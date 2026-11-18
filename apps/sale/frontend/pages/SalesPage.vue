@@ -166,10 +166,10 @@ async function issue(row: SaleRow): Promise<void> {
   issuingId.value = row.id;
   try {
     await issuing.run({ sale_id: row.id });
-    void toastSuccess(t('sale.document.pending.issued'));
+    toastSuccess(t('sale.document.pending.issued'));
   } catch (error) {
     const fallback = t('sale.document.pending.failed');
-    void toastError(refusal(error, fallback)?.message ?? fallback);
+    toastError(refusal(error, fallback)?.message ?? fallback);
   } finally {
     issuingId.value = null;
   }

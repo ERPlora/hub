@@ -6,13 +6,12 @@ and its payload. Its delivery by the worker's real relay is in ``test_relay.py``
 
 import re
 
-import pytest
 from live.operations import NAME_RE
 
 from apps.task import events
 from apps.task.models import Task
 
-from .conftest import A, make_member, make_task
+from .conftest import HUB_DB, A, make_member, make_task
 
 PAST_FACT = re.compile(r"^task\.[a-z_]+\.[a-z_]+ed$")
 
@@ -54,7 +53,7 @@ def test_it_reacts_only_to_a_person_leaving_the_team():
     assert events.REACTIONS == {"staff.member.terminated": "task.task.release_member"}
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_react_runs_the_reaction_as_the_platform():
     ana = make_member()
     task = make_task(assigned_to=ana)

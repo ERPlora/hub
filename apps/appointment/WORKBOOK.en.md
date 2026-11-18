@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:ff4bbe3a8718def67b34a0faace940fdae26dc101b96cf8edafa18801f373b7b -->
+<!-- generated from WORKBOOK.md sha256:28f86a33368d8b1648f86920b6dbb413c6c388c03dbedf90a32e0e623d9ded7f -->
 
 ## What it is for and who it is for
 
@@ -41,7 +41,7 @@ Who uses it:
 - **Google Calendar / RFC 5545**: editing a series "only this appointment" or "this one and the following
   ones", never all of them, and the series keeps its wall-clock time when the official time changes.
 - **Mindbody/Booker**: the front desk can note down an appointment that has already started.
-- Decisions of the current product that rule here: the business's opening hours live only in Schedules,
+- Decisions that rule here: the business's opening hours live only in Schedules,
   charging is done by the till (Appointments only notes which sale it was charged with), the clock is
   always the business's and series are edited with a cut.
 
@@ -229,7 +229,8 @@ appointment, one of a batch and one of a series.
 If it fails: the reason shows inside the panel, without losing what was typed: outside the business's
 opening hours, the professional does not work at that time, blocked slot, the professional already has an
 appointment (`appointment.slot_taken`), too far ahead, the customer, the service or the professional do
-not exist or cannot be booked. From the front desk neither the minimum notice nor a time already past
+not exist or cannot be booked. The customer's one, shown under her search, goes away as soon as another
+customer is chosen, without saving again (hub#1448). From the front desk neither the minimum notice nor a time already past
 refuses (the past time only warns before saving); an automation does not have those exceptions. An employee
 only books for themselves; an automation allowed to book, with any professional. Two people
 who book the same slot of the same professional at once: one gets in and the other gets the refusal.
@@ -269,8 +270,9 @@ Actor: employee (their own), manager, assistant
 Screen: Agenda
 Steps:
 1. Come in from the **N to confirm** notice (you tap it and the list filters the pending ones), from the
-   bell in the top bar (its "Appointments to confirm" row opens the Agenda) or search for the **Pending**
-   appointment.
+   bell in the top bar (its notice "N appointments to confirm", "Customers are waiting for you to confirm their
+   bookings before they start.", opens the Agenda with "Confirm the appointments", and its deadline is the start of
+   the soonest one) or search for the **Pending** appointment.
 2. Tap **Confirm** on its row.
 3. The appointment becomes **Confirmed**, the history says "Confirmed" and the **N to confirm** notice
    goes down; the bell too, at once, and it stops counting it.
@@ -391,9 +393,10 @@ Screen: Agenda
 Steps:
 1. Tap **History** on the row (in any state) or open the appointment's card.
 2. Each change with its time on the business clock, who made it ("Requested by the customer" if it was
-   them) and what changed (from which professional or service to which, and the new time). A deleted appointment
-   that ERPlora's staff brought back from a separate copy keeps its lines and adds "Deleted" and "Restored"
-   (APPOINTMENT-F11).
+   them; "Done by the platform" if no person did: the system, an automation or a recovery from a separate copy;
+   an API key, by its name) and what changed (from which professional or service to which, and the new time). A
+   deleted appointment that ERPlora's staff brought back from a separate copy keeps its lines and adds "Deleted"
+   and "Restored" (APPOINTMENT-F11).
 3. It is read-only: a single button, **Close**.
 In: an appointment in any state.
 Out: nothing (it only reads).
@@ -440,7 +443,9 @@ settings.
 Out: the active series, its appointments and the `appointment.recurring.created` event.
 If it fails: the reason in the panel; if the series was created and some date did not fit, they are listed
 with their reason.
-Involved: SERVICE-F33
+Involved: SERVICE-F33, BASE-F114 (ERPlora's staff recover from a separate copy the series the business no longer has
+with this same creation, after its appointments: it books no date that already has an appointment; a deleted one comes
+back the same, APPOINTMENT-F15)
 
 ### APPOINTMENT-F13 Book the appointments of a series
 Status: done
@@ -503,8 +508,17 @@ Steps:
    are kept.
 In: a series.
 Out: `appointment.recurring.updated` or `appointment.recurring.deleted`.
-If it fails: "The repeating appointment's status could not be changed." and the series stays as it was.
-Involved: none
+If it fails: "The repeating appointment's status could not be changed." and the series stays as it was. A series
+deleted by mistake is recovered by ERPlora's staff from a separate copy of the business (BASE-F114) if in the copy it
+was still booking (active, with its professional and not ended): THE SAME one comes back to **Repeating**, active, with
+its customer, its services, its professional, its repetition and the appointments it had already booked, with the
+`appointment.recurring.restored` event. It books nothing by itself: its next dates are booked with **Book
+appointments** (APPOINTMENT-F13), which skips those that already have an appointment. It only comes back if it could be
+created today (APPOINTMENT-F12): if its customer is no longer in the business, or its professional or one of its
+services can no longer be booked, it does not come back and Recoveries says why. One the business created again (the
+same customer, repeating the same way on the same day at the same time) stays as it is. One the business no longer has
+is created again as in APPOINTMENT-F12.
+Involved: BASE-F114
 
 ### APPOINTMENT-F16 Block time in the agenda
 Status: done
@@ -802,6 +816,7 @@ confirmation before doing them.
 | `appointment.appointment.reassigned` | Merging of cards | The card that stays and the absorbed one |
 | `appointment.blocked_time.created`, `.deleted` | Blocks | The block |
 | `appointment.recurring.created`, `.updated`, `.deleted` | Series | The series |
+| `appointment.recurring.restored` | A deleted series comes back to Repeating (recovering from a separate copy) | The series and its customer |
 | `appointment.settings.updated` | Saving settings with some change | Nothing |
 
 The events carry identifiers, never notes or reasons (they may carry health data).

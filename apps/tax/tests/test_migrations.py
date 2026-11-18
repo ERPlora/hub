@@ -2,20 +2,22 @@
 reversible.
 
 The functions of the ``RunPython`` are called the way the migration runs them, with the app registry
-and a schema editor whose connection is the test database.
+and a schema editor whose connection is business A's database, inside the test's transaction.
 """
 
 from datetime import date
 from decimal import Decimal
 from importlib import import_module
 
-import pytest
 from django.apps import apps as global_apps
-from django.db import connection
+from django.db import connections
 
 from apps.tax.models import TaxAlias, TaxCategory, TaxRule
+from base.tenancy.context import current_alias
 
-pytestmark = pytest.mark.django_db
+from .conftest import HUB_DB
+
+pytestmark = HUB_DB
 
 SPAIN_FROM = date(2012, 9, 1)
 SPAIN_RATES = {
@@ -56,9 +58,11 @@ SHIPPED_ALIASES = {
 
 
 class _SchemaEditor:
-    """What a ``RunPython`` function reads from the schema editor: the connection."""
+    """What a ``RunPython`` function reads from the schema editor: the connection of the business at work."""
 
-    connection = connection
+    @property
+    def connection(self):
+        return connections[current_alias()]
 
 
 def _catalogue():

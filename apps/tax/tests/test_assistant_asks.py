@@ -11,17 +11,15 @@ from pathlib import Path
 
 import pytest
 from django.conf import settings
-from live.operations import AI, Operation, registry
+from live.operations import AI, registry
 
 from base import assistant
 from base.models import Membership
-from base.tests.test_assistant_asks import (
-    assert_its_asks_bring,
-    catalog_of,  # noqa: F401 (a fixture: the tests below take it by name)
-    comparable,
-    place_of_no_ask,
-    probe_phrases,
-)
+from base.tests.test_assistant_asks import assert_offered_with_room, comparable, offered_to
+from base.tests.test_assistant_asks import probe_phrases
+from base.tests.test_assistant_asks import english_coverage_test, english_words_test, own_words_test
+
+from .conftest import HUB_DB, in_hubs
 
 #: Taxes' assistant tools: its reads (the calculator, categories, rules, aliases and the business's tax region) and
 #: its writes (categories, aliases, rules one by one or in a batch, their end, deactivation and reactivation, and the
@@ -60,9 +58,6 @@ REPORTED = [
     ("tax.rule.end", "haz que la regla española de product.qa deje de aplicarse después del 31/12/2026 inclusive"),
 ]
 
-#: How far down the tools a turn offers (``MAX_TOOLS``, 40) a request of the QA may bring its tool: half of them, so
-#: twenty tools of the apps that say their asks later may climb past it before the model loses it.
-WITH_ROOM = 20
 #: Every probe of layer 2 of Taxes, the owner's and the employee's real phrases of the QA: the three above and the
 #: ones the model got right.
 PROBES = [
@@ -103,21 +98,14 @@ OWN_WORDS = [
 ]
 
 
-def assert_offered_with_room(tools: dict[str, Operation], name: str, phrase: str) -> None:
-    """That ``phrase``, a person's real words of layer 2 and none of the asks of tool ``name``, brings it among the first
-    ``WITH_ROOM`` a turn offers."""
-    place = place_of_no_ask(tools, name, phrase)
-    assert place is not None and place <= WITH_ROOM, place
-
-
 def test_tax_offers_its_eighteen_tools():
     """Taxes' assistant tools (``AI``, never ``INTERNAL``): a silent drop of a tool fails."""
-    tools = {name for name, op in registry.items() if op.app_label == "tax" and assistant.is_tool(op)}
+    tools = {name for name, op in registry.items() if op.app_label == "tax" and assistant.tools.is_tool(op)}
     assert all(isinstance(registry[name].ai_spec(), AI) for name in tools)
     assert tools == TOOLS
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation) and of the person's role
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation) and of the person's role
 def test_an_employee_is_never_offered_what_decides_what_is_charged(catalog_of):
     for role in (Membership.Role.OWNER, Membership.Role.ADMIN, Membership.Role.MANAGER):
         assert {name for name in catalog_of(role, "es") if name.startswith("tax.")} == TOOLS, role
@@ -133,13 +121,13 @@ def test_the_reported_requests_are_the_probes_of_layer_2():
     ]
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize(("name", "phrase"), REPORTED)
 def test_the_reported_tax_request_offers_its_existing_operation(catalog_of, name, phrase):
     assert_offered_with_room(catalog_of(Membership.Role.OWNER, "es"), name, phrase)
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation) and of the person's role
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation) and of the person's role
 @pytest.mark.parametrize("probe", PROBES, ids=[probe["id"] for probe in PROBES])
 def test_every_probe_of_taxes_offers_its_tool_to_whoever_may_run_it(catalog_of, probe):
     """The owner's and the employee's phrases of layer 2, the ones the model answered right too: a tool of Taxes that a
@@ -154,11 +142,12 @@ def test_every_probe_of_taxes_offers_its_tool_to_whoever_may_run_it(catalog_of, 
     assert_offered_with_room(tools, name, phrase)
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize(("name", "instead"), CHOSEN_INSTEAD)
 def test_the_reported_request_offers_its_tool_before_the_switch_of_an_app(catalog_of, name, instead):
     tools = catalog_of(Membership.Role.OWNER, "es")
-    offered = [op.name for op in assistant.relevant(tools, [dict(REPORTED)[name]], "es")]
+    offered = offered_to(tools, dict(REPORTED)[name])
+
     assert instead in tools  # positive control: what comes ahead is a tool of the owner too
     assert name in offered, offered[:10]
     assert instead not in offered or offered.index(name) < offered.index(instead), offered[:10]
@@ -169,7 +158,30 @@ def test_every_tool_of_taxes_has_its_own_words():
     assert {name for name, _ in OWN_WORDS} == TOOLS
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
-@pytest.mark.parametrize(("name", "phrase"), OWN_WORDS)
-def test_a_request_in_the_persons_own_words_reaches_its_tool_by_its_asks(catalog_of, name, phrase):
-    assert_its_asks_bring(catalog_of(Membership.Role.OWNER, "es"), name, phrase, "es")
+test_a_request_in_the_persons_own_words_reaches_its_tool_by_its_asks = in_hubs(own_words_test(OWN_WORDS, "es"))
+
+
+#: What the owner says in English in words of their own for each tool of Taxes that needs one, neither
+#: an ask nor a probe of layer 2: its English asks lift it among the first ten (``assert_its_asks_lift``).
+OWN_WORDS_EN = [
+    ("tax.alias.create", "teach it that «menú diario» means food"),
+    ("tax.alias.list", "what words does it know from a spreadsheet?"),
+    ("tax.alias.resolve", "what would «reduced 10» mean?"),
+    ("tax.category.create", "make one for footwear, called Footwear, with its VAT"),
+    ("tax.category.get", "what's the Spanish name of the food one?"),
+    ("tax.category.list", "which VAT can a product have today?"),
+    ("tax.rate.calculate", "a 60 € book: work out its VAT at the reduced rate"),
+    ("tax.rule.activate", "bring the 10 % on books back"),
+    ("tax.rule.bulk_create", "several at once: books 4, food 10, general 21"),
+    ("tax.rule.countries", "which countries are the taxes set up for?"),
+    ("tax.rule.create", "bread is 4 % in Spain from January"),
+    ("tax.rule.deactivate", "put the footwear VAT on hold for a while"),
+    ("tax.rule.end", "footwear's rate stops in July: give it its last day"),
+    ("tax.rule.list", "which ones apply in Spain?"),
+    ("tax.rule.parent_candidates", "for books, what can it hang under?"),
+    ("tax.rule.status", "does the till have what it needs to start selling?"),
+    ("tax.settings.get", "which territory do we operate in?"),
+    ("tax.settings.update", "go back to the national one, nothing special"),
+]
+test_a_request_in_english_is_lifted_by_its_english_asks = in_hubs(english_words_test(OWN_WORDS_EN))
+test_each_tool_has_its_own_english_words = english_coverage_test("tax", OWN_WORDS_EN)

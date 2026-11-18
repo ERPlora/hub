@@ -12,9 +12,9 @@ from apps.attendance import events
 from apps.attendance.models import Record
 from base import scheduler
 
-from .conftest import utc
+from .conftest import HUB_DB, A, utc
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 TASK = "attendance.review_stale"
 
@@ -22,7 +22,7 @@ TASK = "attendance.review_stale"
 @pytest.fixture
 def worker(settings, monkeypatch, clock):
     """The worker's scope and attendance's task, scheduled as the worker does at 20:01 UTC."""
-    settings.WORKER_SCOPE_SLUG = "a"
+    settings.WORKER_SCOPE_SLUG = A.key
     # Inside the test's transaction a released connection could not be opened again.
     monkeypatch.setattr(scheduler, "close_old_connections", lambda: None)
     started = clock("2026-10-06T20:01")

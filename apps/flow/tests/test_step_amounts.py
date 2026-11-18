@@ -38,9 +38,9 @@ from apps.pricing.tests.conftest import make_list, make_rule
 from apps.service.tests.conftest import make_tax
 from base.models import Hub
 
-from .conftest import A, make_flow, run
+from .conftest import A, HUB_DB, make_flow, run
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 MADRID = ZoneInfo("Europe/Madrid")
 NOON = dt.datetime(2026, 10, 15, 12, 0, tzinfo=MADRID)
@@ -206,9 +206,10 @@ def test_a_charge_preview_leaves_its_legal_limits_as_money():
 
 def test_the_question_after_a_charge_preview_says_its_limits_in_euros_in_a_business_in_yen(clock):
     """hub#926: Ley 7/2012 and RD 1619/2012 write the limits in euros; marked as money alone they would be said in the
-    business's yen («100.000 JPY»). The rest of the preview stays in the business's currency."""
+    business's yen («100.000 JPY»). The rest of the preview stays in the business's currency. Only a business in Spain
+    has them, and Spain charges in euros: what a Spanish preview answered is then said for a business in yen."""
     clock(NOON)
-    Hub.objects.filter(slug=A.key).update(country="JP")
+    Hub.objects.filter(slug=A.key).update(country="ES")
     coffee = {"name": "Coffee", "sku": "COF", "price": 1250, "tax_category_key": "product.generic"}
     run("inventory.product.create", coffee, system_context(A))
     check = run("sale.order.open", {"lines": [{"product": "COF"}]}, system_context(A))
@@ -217,7 +218,12 @@ def test_the_question_after_a_charge_preview_says_its_limits_in_euros_in_a_busin
         {"order_id": str(check.id)},
         "Cash below {{steps.s1.cash_limit}}, ticket up to {{steps.s1.ticket_limit}}: {{steps.s1.total}}?",
     )
-    assert title == "Cash below 1.000,00\xa0€, ticket up to 3.000,00\xa0€: 1.250\xa0JPY?"
+    assert title == "Cash below 1.000,00\xa0€, ticket up to 3.000,00\xa0€: 12,50\xa0€?"
+    answered = FlowRun.objects.get().outputs
+    Hub.objects.filter(slug=A.key).update(country="JP")
+    say = words_for([{"id": "s1", "kind": "query", "operation": PREVIEW}], "es", A, {"steps": answered})
+    said = [say(f"steps.s1.{datum}", answered["s1"][datum]) for datum in ("cash_limit", "ticket_limit", "total")]
+    assert said == ["1.000,00\xa0€", "3.000,00\xa0€", "1.250\xa0JPY"]
 
 
 def test_every_amount_in_a_currency_of_its_own_names_a_text_its_step_leaves():
@@ -386,8 +392,8 @@ def test_an_amount_inside_a_datum_of_a_step_is_marked(operation):
 # ── The ratchet: amounts a step leaves that nobody marks, by app ─────────────────────────────────────────────────────
 
 #: How an amount says itself in this repo's schemas, as the assistant's ratchet reads it
-#: (``base/tests/test_assistant_card_values.py``): a whole number named ``…_cents``, or whose description speaks of
-#: cents or of the minor unit. The words find the amounts to mark; they never make one.
+#: (``base/tests/test_assistant_card_values_amounts.py``): a whole number named ``…_cents``, or whose description
+#: speaks of cents or of the minor unit. The words find the amounts to mark; they never make one.
 AMOUNT_WORDS = re.compile(r"\bcents?\b|\bminor units?\b|\bcéntimos?\b", re.IGNORECASE)
 
 #: The decimals of a currency say «its amounts' minor unit»: a count, never an amount.

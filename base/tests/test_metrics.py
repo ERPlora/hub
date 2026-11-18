@@ -328,12 +328,12 @@ def test_a_stop_ends_the_pass_before_the_next_hub(hub_a, hub_b, monkeypatch):
 @pytest.mark.usefixtures("no_test_fallback")
 def test_a_registry_that_cannot_be_read_leaves_the_measure_out(hub_a, hub_b, monkeypatch):
     """Without the list of the businesses to read, a reading of none would say nothing waits and hide them all."""
-    from base import services
+    from base.services import provisioning
 
     def broken(now):
         raise RuntimeError("database gone")
 
-    monkeypatch.setattr(services, "hubs_to_serve", broken)
+    monkeypatch.setattr(provisioning, "hubs_to_serve", broken)
 
     with pytest.raises(RuntimeError):
         FiscalBacklog()(timezone.now(), never())
@@ -433,14 +433,14 @@ def test_a_business_that_cannot_be_read_keeps_its_last_count_and_is_logged(hub_a
     waiting(hub_a, "website", activation.FAILED, now)
     counted = StuckActivations()
     assert stuck_count(counted(now, never())) == 1.0
-    real = queries.activations_stuck
+    real = queries.apps.activations_stuck
 
     def broken(host, at):
         if host == hub_a.slug:
             raise RuntimeError("database gone")
         return real(host, at)
 
-    monkeypatch.setattr(queries, "activations_stuck", broken)
+    monkeypatch.setattr(queries.apps, "activations_stuck", broken)
     with caplog.at_level(logging.ERROR, logger="base.metrics"):
         assert stuck_count(counted(now, never())) == 1.0
 
@@ -457,7 +457,7 @@ def test_a_business_never_read_that_cannot_be_read_counts_nothing(hub_a, hub_b, 
     def broken(host, at):
         raise RuntimeError("database gone")
 
-    monkeypatch.setattr(queries, "activations_stuck", broken)
+    monkeypatch.setattr(queries.apps, "activations_stuck", broken)
 
     assert stuck_count(StuckActivations()(timezone.now(), never())) == 0.0
 

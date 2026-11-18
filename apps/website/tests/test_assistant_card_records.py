@@ -19,15 +19,16 @@ from live.operations import get, registry
 
 from apps.website.models import Image, Site
 from apps.website.schemas import PALETTE_IDS
-from apps.website.tests.conftest import B, ctx_for, full_content
+from apps.website.tests.conftest import HUB_DB, B, ctx_for, full_content
 from apps.website.tests.test_choices import editor_words
 from apps.website.tests.test_queries import products_catalog, services_catalog, source_off  # noqa: F401 (fixtures)
 from apps.website.tests.test_services import png_bytes, save as save_draft, upload
 from base import assistant
 from base.tests.test_assistant import technical_names
-from base.tests.test_assistant_card_values import AN_ID
+from base.tenancy.context import use_hub
+from base.tests.test_assistant_card_values_references import AN_ID
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 SAVE = "website.site.save"
 A_MISSING_ID = "0192f0b2-3333-7000-8000-000000000003"
@@ -44,12 +45,12 @@ def a_save(content: dict | None = None, palette: str = "ocean", mode: str = "aut
 
 def said(arguments: dict, language: str = "en", ctx=None) -> dict:
     """Each datum of the card of the save, in words."""
-    card = assistant._card_details(get(SAVE), arguments, language, ctx or ctx_for())
+    card = assistant.cards._card_details(get(SAVE), arguments, language, ctx or ctx_for())
     return {field["name"]: field["value"] for field in card["fields"]}
 
 
 def summary(arguments: dict, language: str = "en") -> dict:
-    card = assistant.card(get(SAVE), arguments, language, ctx_for())
+    card = assistant.cards.card(get(SAVE), arguments, language, ctx_for())
     return {field["name"]: field["value"] for field in card["fields"]}
 
 
@@ -92,9 +93,10 @@ def test_an_image_uploaded_before_its_name_was_kept_is_said_by_its_format_and_si
     assert said(a_save(full_content(topbar={"logo": logo})))["content"]["topbar"]["logo"]["id"] == "PNG 4 × 3"
 
 
-def test_an_image_of_another_business_or_not_there_is_left_out(hub_files):
+def test_an_image_of_another_business_or_not_there_is_left_out(hub_files, hub_b):
     """Read as whoever asks, in their business: an upload of B, or an id nobody uploaded, is no name for a card of A."""
-    theirs = an_image("suyo.png", 1, ctx=ctx_for(scope=B))
+    with use_hub(hub_b):
+        theirs = an_image("suyo.png", 1, ctx=ctx_for(scope=B))
     content = full_content(topbar={"logo": theirs}, hero={"cover": {"id": A_MISSING_ID, "url": ""}})
     shown = said(a_save(content))["content"]
     assert "id" not in shown["topbar"]["logo"]
@@ -172,7 +174,7 @@ def test_each_day_of_the_opening_hours_is_said_by_the_word_the_editor_shows(lang
 
 
 def website_writes():
-    return [op for op in registry.values() if op.app_label == "website" and op.kind == "command" and assistant.is_tool(op)]
+    return [op for op in registry.values() if op.app_label == "website" and op.kind == "command" and assistant.tools.is_tool(op)]
 
 
 def test_no_datum_of_a_write_of_the_website_reaches_a_spanish_card_by_its_technical_name():
@@ -180,7 +182,7 @@ def test_no_datum_of_a_write_of_the_website_reaches_a_spanish_card_by_its_techni
     and unpublish send none."""
     assert [op.name for op in website_writes()] == [SAVE, "website.site.publish", "website.site.unpublish"]
     assert technical_names(website_writes()) == {}
-    card = assistant._card_details(get(SAVE), a_save(), "es", ctx_for())
+    card = assistant.cards._card_details(get(SAVE), a_save(), "es", ctx_for())
     assert [field["label"] for field in card["fields"]] == ["Plantilla", "Tema", "Contenido"]
 
 
@@ -188,7 +190,7 @@ def test_each_datum_of_the_save_is_titled_by_the_website_s_own_catalog_not_anoth
     """The predicate ``technical_names()`` cannot see (hub#927's review): «template» is translated by base and the
     WhatsApp inbox too, so a title the website forgot would still reach a Spanish card. Each one is in its own."""
     own = gettext.translation("django", localedir=Path(settings.BASE_DIR) / "apps/website/locale", languages=["es"])
-    card = assistant._card_details(get(SAVE), a_save(), "es", ctx_for())
+    card = assistant.cards._card_details(get(SAVE), a_save(), "es", ctx_for())
     for field in card["fields"]:
         with translation.override("en"):
             msgid = str(Site._meta.get_field(field["name"]).verbose_name)

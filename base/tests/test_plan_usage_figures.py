@@ -505,7 +505,7 @@ def an_app_meter(monkeypatch):
 
     def declare(used=None, limit=None, *, available=True):
         monkeypatch.setattr(
-            "base.queries.home.plan_meters", lambda ctx, configs: [whatsapp_meter(used, limit, available=available)]
+            "base.home.plan_meters", lambda ctx, configs: [whatsapp_meter(used, limit, available=available)]
         )
 
     return declare
@@ -548,6 +548,11 @@ def test_each_motive_adds_one_and_the_row_opens_the_tab(hub_a):
             "route": "/system#usage",
             "label": "Plan limits",
             "icon": "ion:speedometer-outline",
+            "severity": "warning",
+            "title": "1 plan limit to review",
+            "body": "Your business is reaching what its plan includes: some things may stop or slow down until you upgrade.",
+            "action_label": "See the plan’s usage",
+            "due": None,
         }
     ]
 
@@ -610,7 +615,7 @@ def test_the_bell_never_calls_erplora_com(hub_a, monkeypatch):
     def refuses(*args, **kwargs):
         raise AssertionError("the bell asked erplora.com")
 
-    monkeypatch.setattr("base.assistant.usage", refuses)
+    monkeypatch.setattr("base.assistant.gateway.usage", refuses)
     on_plan(hub_a, STARTER, max_storage_bytes=100)
     measured(hub_a, s3=100)
 

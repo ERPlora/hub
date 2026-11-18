@@ -3,6 +3,7 @@ freeze switch. Their bounds are the model's (``control.models.Cluster``,
 ``control.models.Freeze``), so any caller, not only the admin's form, is held to them."""
 
 import datetime as dt
+from typing import Literal
 from uuid import UUID
 
 from ninja import Schema
@@ -73,20 +74,33 @@ class ClusterSizesOut(Schema):
     databases: dict[str, int]
 
 
+#: A move asked now: its business closes from now until the worker is done.
+MOVE_NOW = "now"
+#: A move asked for the business's next night (``control.services.night_start``): open until the worker starts it.
+MOVE_AT_NIGHT = "at_night"
+
+
 class HubMoveIn(Schema):
-    """Which hub moves, and to which cluster."""
+    """Which hub moves, to which cluster, and when."""
 
     hub: UUID
     cluster: UUID
+    when: Literal["now", "at_night"] = Field(
+        default=MOVE_NOW,
+        description="now: it closes and moves at once; at_night: it moves in its next night, on its own clock.",
+    )
 
 
 class HubMoveOut(Schema):
-    """The hub asked to move: the cluster it is on (none: the settings' own server) and the one it is moving to."""
+    """The hub asked to move: the cluster it is on (none: the settings' own server), the one it is moving to, and the
+    one it moves to in its night with when it starts."""
 
     id: UUID
     slug: str
     cluster: UUID | None
     moving_to: UUID | None
+    scheduled_to: UUID | None = None
+    scheduled_for: dt.datetime | None = None
 
 
 class HubRestoreIn(Schema):

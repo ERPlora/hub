@@ -12,17 +12,20 @@ import json
 from pathlib import Path
 
 import pytest
+from django.apps import apps
 from django.conf import settings
 from live import assistant as shared
-from live.context import OperationContext, Scope
-from live.operations import AI, Operation, registry
+from live.operations import AI, registry
 
+from apps.invoice.tests.conftest import in_hubs
 from base import assistant
 from base.models import Membership
-from base.permissions import permissions_for
-from base.tests.test_assistant_asks import TOP, assert_its_asks_bring, comparable, probe_phrases
+from base.tests.test_assistant_asks import TOP, assert_offered_with_room, comparable
+from base.tests.test_assistant_asks import offered_place, offered_to, place_of_no_ask, probe_phrases
+from base.tests.test_assistant_asks import english_coverage_test, english_words_test, own_words_test
 
-A = Scope("host", "a")
+from .conftest import HUB_DB
+
 #: The writes of Menus and combos: they need ``combo.manage``, which an employee does not hold, and none of them is one a
 #: manager approves, so an employee's assistant is never offered them (the QA's employee probes of them are refusals).
 WRITES = {
@@ -48,9 +51,6 @@ REPORTED = (
     "combo.option.reorder",
     "ordena las opciones de Platos QA del Menú QA así: flan, merluza, lentejas y café, incluyendo todas",
 )
-#: How far down the tools a turn offers (``MAX_TOOLS``, 40) a probe of the QA may bring its tool: half of them, so the
-#: tools of the apps that say their asks later may climb past it before the model loses it.
-WITH_ROOM = 20
 PROBES_DIR = Path(settings.BASE_DIR) / "tests" / "e2e" / "qa" / "probes"
 #: Every probe of layer 2 of Menus and combos, the owner's and the employee's real phrases from QA, and
 #: the owner's of the day a restaurant gets ready to sell.
@@ -83,36 +83,11 @@ OWN_WORDS = [
     ("combo.option.delete", "ya no damos gazpacho de entrante"),
     ("combo.option.reorder", "que el helado salga el primero de los postres"),
 ]
-#: The Hub's group of the choices of a course (``base.assistant.SYNONYMS``): «opción» and «elección» name what
+#: Menus' group of the choices of a course (its ``assistant_synonyms``): «opción» and «elección» name what
 #: ``combo.option`` (and ``modifier.option``) is of, as «option» and «choice» do.
 CHOICES = ("opcion", "opciones", "eleccion", "elecciones", "option", "options", "choice", "choices")
 #: The places an ask of another app keeps free below the first ten: the asks of the next app to say its own take them.
 ROOM = 2
-
-
-@pytest.fixture
-def catalog_of(make_user):
-    """The real catalogue of the assistant of a person with ``role`` in business ``a``, in ``language``."""
-
-    def of(role: str, language: str) -> dict[str, Operation]:
-        user = make_user(f"asker-{role}", host=A.key, role=role)
-        ctx = OperationContext(scope=A, actor=user.username, permissions=permissions_for(user, A), language=language)
-        return assistant.catalog(ctx)
-
-    return of
-
-
-def offered(tools: dict[str, Operation], phrase: str, language: str = "es", **ranking) -> list[str]:
-    """The tools a turn offers for ``phrase``, best first, ranked as ``base.assistant.RANKING`` says (or ``ranking``)."""
-    return [op.name for op in shared.relevant(tools, [phrase], language, **{**assistant.RANKING, **ranking})]
-
-
-def place_of_no_ask(tools: dict[str, Operation], name: str, phrase: str, language: str = "es") -> int | None:
-    """The place (1 is first) a turn offers ``name`` at for ``phrase``, none of its asks; ``None`` if not offered."""
-    assert name in tools  # positive control: the person holds the tool, so its place is known
-    assert comparable(phrase) not in {comparable(ask) for ask in shared.asks_of(tools[name]).get(language, ())}
-    ranked = offered(tools, phrase, language)
-    return ranked.index(name) + 1 if name in ranked else None
 
 
 def test_menus_and_combos_is_listed_so_layer_1_sweeps_every_ask_of_it():
@@ -124,14 +99,14 @@ def test_menus_and_combos_is_listed_so_layer_1_sweeps_every_ask_of_it():
 def test_combo_offers_its_eighteen_tools():
     """Menus and combos' tools are its eighteen operations (``AI``, never ``INTERNAL``): a silent drop of a tool fails.
     The upload of a photo of its own (the form's file) and the reaction to Inventory's deletion are none."""
-    tools = {name for name, op in registry.items() if op.app_label == "combo" and assistant.is_tool(op)}
+    tools = {name for name, op in registry.items() if op.app_label == "combo" and assistant.tools.is_tool(op)}
     assert all(isinstance(registry[name].ai_spec(), AI) for name in tools)
     assert len(tools) == 18
     assert WRITES < tools
     assert not {"combo.combo.upload_image", "combo.option.drop_product"} & tools
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation) and of the person's role
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation) and of the person's role
 def test_an_employee_is_never_offered_a_change_of_the_menus(catalog_of):
     owner = catalog_of(Membership.Role.OWNER, "es")
     employee = catalog_of(Membership.Role.EMPLOYEE, "es")
@@ -145,7 +120,7 @@ def test_the_reported_request_is_a_probe_of_layer_2():
     assert probe_phrases().get(comparable(phrase)) == f"qa20261108.owner.es.{name}"
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 def test_putting_the_choices_in_order_is_offered_ahead_of_deleting_and_creating_them_again(catalog_of):
     """hub#1091: the owner's request offers the reorder of the choices among the first ten and ahead of every other
     change of Menus and combos, deleting and creating a choice included."""
@@ -153,12 +128,12 @@ def test_putting_the_choices_in_order_is_offered_ahead_of_deleting_and_creating_
     name, phrase = REPORTED
     place = place_of_no_ask(tools, name, phrase)
     assert place is not None and place <= TOP, place
-    ranked = offered(tools, phrase)
+    ranked = offered_to(tools, phrase)
     ahead = [tool for tool in ranked[: place - 1] if tool in WRITES]
     assert ahead == [], ahead
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation) and of the person's role
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation) and of the person's role
 @pytest.mark.parametrize("probe", PROBES, ids=[probe["id"] for probe in PROBES])
 def test_every_probe_of_menus_offers_its_tool_to_whoever_may_run_it(catalog_of, probe):
     """The phrases of layer 2 of Menus and combos, the ones the model answered right too: a tool of Menus that a new ask
@@ -170,46 +145,68 @@ def test_every_probe_of_menus_offers_its_tool_to_whoever_may_run_it(catalog_of, 
         assert (probe["role"], probe["tool"] in WRITES) == ("employee", True)
         assert probe["tool"] not in tools
         return
-    place = place_of_no_ask(tools, probe["tool"], probe["phrase"], probe["language"])
-    assert place is not None and place <= WITH_ROOM, place
+    assert_offered_with_room(tools, probe["tool"], probe["phrase"], probe["language"])
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
-@pytest.mark.parametrize(("name", "phrase"), OWN_WORDS)
-def test_a_request_in_the_persons_own_words_reaches_its_tool_by_its_asks(catalog_of, name, phrase):
-    assert_its_asks_bring(catalog_of(Membership.Role.OWNER, "es"), name, phrase, "es")
+test_a_request_in_the_persons_own_words_reaches_its_tool_by_its_asks = in_hubs(own_words_test(OWN_WORDS, "es"))
+
+
+#: What the owner says in English in words of their own for each tool of Menus that needs one, neither
+#: an ask nor a probe of layer 2: its English asks lift it among the first ten (``assert_its_asks_lift``).
+OWN_WORDS_EN = [
+    ("combo.combo.create", "make a new takeaway one at 9.90"),
+    ("combo.combo.delete", "the Christmas one won't come back, drop it for good"),
+    ("combo.combo.for_sale", "what is on offer at the counter for customers?"),
+    ("combo.combo.get", "what comes in the kids' one?"),
+    ("combo.combo.list", "go over the ones we have and what each costs"),
+    ("combo.combo.resolve", "how much would the tasting one come to with steak?"),
+    ("combo.combo.set_image", "for the summer one use the paella drawing"),
+    ("combo.combo.suggest_image", "what would suit the summer one?"),
+    ("combo.combo.update", "bring the kids' one down to 8.50"),
+    ("combo.group.create", "the kids' one needs one more: dessert"),
+    ("combo.group.delete", "the vegan one no longer has desserts"),
+    ("combo.group.reorder", "desserts should come out before the mains"),
+    ("combo.group.update", "make drinks optional in the kids' one"),
+    ("combo.option.bulk_create", "put three desserts in the kids' one in a go"),
+    ("combo.option.create", "the vegan one gets salad among its starters"),
+    ("combo.option.delete", "we no longer do gazpacho as a starter"),
+    ("combo.option.reorder", "ice cream should be the first of the desserts"),
+    ("combo.option.update", "we've run out of custard for the kids' one"),
+]
+test_a_request_in_english_is_lifted_by_its_english_asks = in_hubs(english_words_test(OWN_WORDS_EN))
+test_each_tool_has_its_own_english_words = english_coverage_test("combo", OWN_WORDS_EN)
 
 
 def test_every_tool_of_menus_has_a_phrase_of_its_own():
     """``OWN_WORDS`` covers every tool once: a tool whose asks no phrase of a person's own reaches would let its asks
     change unseen (the sweep of ``base`` ranks only the asks themselves)."""
-    tools = sorted(name for name, op in registry.items() if op.app_label == "combo" and assistant.is_tool(op))
+    tools = sorted(name for name, op in registry.items() if op.app_label == "combo" and assistant.tools.is_tool(op))
     assert sorted(name for name, _ in OWN_WORDS) == tools
 
 
 def test_the_hub_reads_an_opcion_and_an_eleccion_as_a_choice_of_a_course():
-    """``base.assistant.SYNONYMS``: «las opciones» and «las elecciones» name what ``combo.option`` is of, as «options»
-    and «choices» do; without the Hub's group, neither does (positive control)."""
-    assert CHOICES in assistant.SYNONYMS
+    """Menus' own words (its ``assistant_synonyms``): «las opciones» and «las elecciones» name what ``combo.option`` is
+    of, as «options» and «choices» do; without the Hub's group, neither does (positive control)."""
+    assert CHOICES in apps.get_app_config("combo").assistant_synonyms
     option = shared.stem("option")
     for phrase in ("ordena las opciones del segundo plato", "¿qué elecciones tiene el postre?"):
-        assert any(option in concept for concept in shared.asked([phrase], assistant.SYNONYMS).concepts), phrase
+        assert any(option in concept for concept in shared.asked([phrase], (CHOICES,)).concepts), phrase
         assert not any(option in concept for concept in shared.asked([phrase]).concepts), phrase
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 def test_the_choices_named_as_elecciones_bring_their_reorder_only_with_the_hubs_group(catalog_of):
     """A phrase that is no ask and no probe: with the Hub's group of the choices, the reorder of the choices is among the
     first ten; without it, «elecciones» names nothing and the reorder falls out of them."""
     tools = catalog_of(Membership.Role.OWNER, "es")
     phrase = "ordena las elecciones del segundo plato: pollo, merluza y tortilla"
     assert comparable(phrase) not in probe_phrases()
-    assert "combo.option.reorder" in offered(tools, phrase)[:TOP]
-    without = tuple(group for group in assistant.SYNONYMS if group != CHOICES)
-    assert "combo.option.reorder" not in offered(tools, phrase, synonyms=without)[:TOP]
+    assert "combo.option.reorder" in offered_to(tools, phrase)[:TOP]
+    without = tuple(group for group in assistant.relevance.synonyms() if group != CHOICES)
+    assert "combo.option.reorder" not in offered_to(tools, phrase, synonyms=without)[:TOP]
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation) and of the person's role
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation) and of the person's role
 @pytest.mark.parametrize("role", [Membership.Role.OWNER, Membership.Role.ADMIN])
 @pytest.mark.parametrize("language", ["en", "es"])
 def test_a_value_of_a_customers_field_takes_no_place_from_the_choices_of_a_menu(catalog_of, role, language):
@@ -218,8 +215,6 @@ def test_a_value_of_a_customers_field_takes_no_place_from_the_choices_of_a_menu(
     the tenth place, the last ``base/tests/test_assistant_asks.py`` allows."""
     tools = catalog_of(role, language)
     name = "customer.field.update"
-    places = {}
-    for ask in shared.asks_of(tools[name])[language]:
-        ranked = offered(tools, ask, language)
-        places[ask] = ranked.index(name) + 1 if name in ranked else None
+    places = {ask: offered_place(tools, name, ask, language) for ask in shared.asks_of(tools[name])[language]}
+
     assert {ask: place for ask, place in places.items() if place is None or place > TOP - ROOM} == {}

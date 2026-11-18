@@ -14,6 +14,8 @@ import { A, api, EMPLOYEE, login, OWNER, psql, shot, shown, untilStill, username
 import { cleanInventory, createProduct } from './inventory-helpers';
 import { snapshotSeries } from './invoice-helpers';
 import { chargeByApi, cleanSales, drawerOff, restoreDrawer, type SaleOut, stamp } from './sale-helpers';
+import { rowAction } from './service-helpers';
+import { toastSaying } from './toast-helpers';
 import { discardChanges } from './unsaved-back-helpers';
 
 const KEY = 'FIX-HUB-BASE-APPROVAL-KEYPAD-CUT-ON-TABLET-DESKTOP';
@@ -110,11 +112,7 @@ async function find(page: Page, sale: SaleOut): Promise<void> {
 
 /** «Void» on `sale`: its own button where the row has room, otherwise in its «⋮» menu. */
 async function askToVoid(page: Page, sale: SaleOut): Promise<void> {
-  const button = shown(page).locator(`[data-testid=sales-table-row-${sale.id}-void]`).first();
-  if (!(await button.isVisible())) {
-    await shown(page).locator(`[data-testid=sales-table-row-${sale.id}-menu]`).first().click();
-  }
-  await page.locator(`[data-testid=sales-table-row-${sale.id}-void]`).filter({ visible: true }).first().click();
+  await rowAction(page, 'sales-table', sale.id, 'void');
   const modal = page.locator('ion-modal[data-testid=sale-void]');
   await expect(modal).toBeVisible();
   await modal.locator('[data-testid=sale-void-reason] textarea').fill('e2e approval pad');
@@ -191,7 +189,7 @@ for (const viewport of VIEWPORTS) {
     for (const digit of OWNER_PIN) await dialog.getByTestId(`pinpad-key-${digit}`).click();
 
     const approvedBy = new RegExp(`(Approved by|Aprobado por) ${escaped(name)}`);
-    await expect(page.locator('ion-toast').filter({ hasText: approvedBy }).first()).toBeVisible();
+    await expect(toastSaying(page, approvedBy)).toBeVisible();
     await expect(dialog).toBeHidden();
     await expect(page.locator('ion-modal[data-testid=sale-void]')).toBeHidden();
     await expect

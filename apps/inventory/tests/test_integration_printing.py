@@ -16,9 +16,9 @@ from live.operations import get
 from apps.inventory.models import Product
 from apps.printing.models import PrintJob
 
-from .conftest import ctx_for, ctx_with
+from .conftest import HUB_DB, ctx_for, ctx_with
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 TAX = "product.generic"
 

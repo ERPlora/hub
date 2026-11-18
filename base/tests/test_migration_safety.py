@@ -142,9 +142,9 @@ ACCEPTED = {
     # with ``restored``; every action the code of before writes still passes it.
     ("appointment", "0004_history_restored", "AddConstraint", "history.appointment_history_action"),
     # The WhatsApp inbox's two unique guards without the business column, the step after the one that took that column
-    # out of the state (#1133): since then the code of before writes every channel and template with an empty host, so
-    # the old guards on it already held what it writes to one channel row and one live template per name and language,
-    # and no row it writes breaks these.
+    # out of the state: since then the code of before writes every channel and template with an empty host, so the old
+    # guards on it already held what it writes to one channel row and one live template per name and language, and no
+    # row it writes breaks these.
     ("whatsapp_inbox", "0013_guards_without_host", "AddConstraint", "channel.whatsapp_inbox_channel_one_row"),
     (
         "whatsapp_inbox",
@@ -157,7 +157,7 @@ ACCEPTED = {
     # more, leave the database through
     # SeparateDatabaseAndState(database_operations=[RunSQL("ALTER TABLE … DROP COLUMN …")]), with no state, and
     # nothing is linked again first: an old column keeps forever what it said before the move, so filling the new
-    # links from it again (link_hub_users overwrites them) would undo every reassignment made since and could break
+    # links from it again (overwriting them) would undo every reassignment made since and could break
     # staff_member_hub_user_unique. A row the code of before linked during the move's own deploy keeps no person: it
     # is linked again on its screen. The columns:
     #   staff_member.user_id, staff_timeoff.approved_by_id,
@@ -267,7 +267,7 @@ def _shape(field) -> str:
     return field.db_type(connection) + (f" CHECK ({check.removeprefix('\"%(column)s\" ')})" if check else "")
 
 
-def _why(app_label: str, operation, state) -> tuple[str, str] | None:
+def _why(app_label: str, operation, state) -> tuple[str, str] | None:  # noqa: C901, PLR0911, PLR0912
     """``(target, why)`` if the operation breaks the code of before, else ``None``."""
     if isinstance(operation, migrations.AddField):
         field = operation.field

@@ -118,6 +118,7 @@ async function confirm(): Promise<void> {
           </ion-segment>
           <ion-input
             data-testid="service-grant-adjust-uses"
+            name="uses_delta"
             type="number"
             inputmode="numeric"
             min="0"
@@ -135,6 +136,7 @@ async function confirm(): Promise<void> {
         <ion-input
           v-if="expires"
           data-testid="service-grant-adjust-days"
+          name="days_delta"
           type="number"
           inputmode="numeric"
           min="0"
@@ -150,6 +152,7 @@ async function confirm(): Promise<void> {
         />
         <ion-textarea
           data-testid="service-grant-adjust-reason"
+          name="reason"
           :value="reason"
           :label="t('service.adjust.reason')"
           :helper-text="t('service.adjust.reasonHelp')"

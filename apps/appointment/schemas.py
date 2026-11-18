@@ -36,7 +36,7 @@ MAX_BULK_DELETE = 100
 MAX_RANGE_DAYS = 62
 
 #: How the assistant's card names an appointment, a repeating appointment, a blocked period and what booking one takes,
-#: by what their reads answer and never by an id (base/assistant.py).
+#: by what their reads answer and never by an id (base/assistant/cards.py).
 AN_APPOINTMENT = names("appointment.appointment.get", name=("label",))
 A_SERIES = names("appointment.recurring.get", name=("label",))
 A_BLOCK = names("appointment.blocked_time.get", name=("label",))
@@ -614,8 +614,9 @@ class HistoryOut(Schema):
     id: UUID
     action: HistoryAction
     at: dt.datetime
-    actor: str = Field(description="Who did it (empty for the platform).")
+    actor: str = Field(description="Who did it: a person's name, an API key's or the platform's own mark.")
     by_customer: bool
+    by_platform: bool = Field(description="No person did it: the platform (the system, an automation, a recovery).")
     reason: str
     old_value: dict
     new_value: dict

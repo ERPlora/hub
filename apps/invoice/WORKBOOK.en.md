@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:f62f4229a9d70bf19df10a45d1474a30470e6f98e9347594dcc682eca3b2ffe6 -->
+<!-- generated from WORKBOOK.md sha256:d7fe1051ab3a80b2405028ddb09bd9f42b61909349c063750e2ad5f8698b778e -->
 
 ## What it is for and who it is for
 
@@ -54,10 +54,10 @@ Here the official specification prevails over the market:
   **VeriFactu** does not turn on by itself, but in Spain it is needed for every invoice to reach the AEAT.
 - **The issuer** (legal name, tax ID and address of the business) is mandatory: **without it no document
   is issued** (Invoicing → Issuer, INVOICE-F21); until then, Home asks for it in "Finish setting up your
-  business" with the step "Your business details" and the pill "Needed to invoice", and the banner "You
-  cannot issue invoices yet" warns about it above the other screens, **Invoices** and **Series** too,
-  with "Set up". The issuer is typed here, by hand: receiving it from the ERPlora account
-  (INVOICE-F22) is not in yet.
+  business" with the step "Your business details" and the pill "Needed to invoice", and the bell carries the
+  notice "You cannot issue invoices yet" on any screen, with "Set up your business details". The issuer is typed
+  here, by hand: it does not come from the
+  ERPlora account.
 - **"Today" is Madrid time** in phase 1 (the Hub does not keep the business's time zone yet): it decides
   the date of each document and, with it, the year of its series. A charge at 00:30 on 1 January numbers
   in the new year's series.
@@ -85,11 +85,10 @@ Menu **Invoicing → Invoices**. Table paginated 50 at a time (table or card vie
 with the number as title) with "Number", "Customer", "Total", "Status", "Date" and "Type"; every column
 sorts. Search box "Search invoices…" (number, name or tax ID of the customer) and filters for "Status",
 "Type", "Series", "Source", "Date" (between two days) and "Total" (between two amounts, in the business's
-currency). Unsorted, the latest issued comes on top. While the issuer is not set up, on top comes, once,
-"You cannot issue invoices yet", the banner of every screen ("No ticket or invoice can be issued until
-this is set up:", "Your business details" and "Set up", which opens **Issuer**; to whoever cannot change
-the issuer, instead of "Set up", "An administrator has to set this up."), with no other identical warning
-below. Per row: "View" (also when tapping the row), "Mark as paid" (only on those "Issued" that are not
+currency). Unsorted, the latest issued comes on top. While the issuer is not set up, the bell's notice "You cannot
+issue invoices yet" says it once ("No ticket or invoice can be issued until this is set up: Your business details."
+and "Set up your business details", which opens **Issuer**; to whoever cannot change the issuer, with no button,
+"An administrator has to set this up."), with no other identical warning on the screen. Per row: "View" (also when tapping the row), "Mark as paid" (only on those "Issued" that are not
 rectifying invoices) and "Rectify" (only on those that are not rectifying invoices and are neither
 cancelled nor replaced). The **+** button opens "New manual invoice" (INVOICE-F03); without permission to
 issue it does not appear, nor does "Mark as paid". The list updates by itself when an invoice is issued,
@@ -151,7 +150,8 @@ prefix, the format and the counter of the numbering of one invoice type and one 
 "Code", "Name", "Type", "Year", "Prefix", "Format" (empty reads `PREFIX-YYYY-NNNNNN`), "Current no.",
 "Active" and "Default"; search box "Search code, name…". Below 1280 px it opens as cards. **+** opens
 "New numbering series"; "Edit" (or tapping the row) opens "Edit series {code}" (INVOICE-F12,
-INVOICE-F13). Without an issuer, the same banner "You cannot issue invoices yet" as in **Invoices**, once.
+INVOICE-F13). Without an issuer, the same bell's notice "You cannot issue invoices yet" as in **Invoices** says
+it, once, and none on the screen.
 Empty: "No series yet. Create the first one to number your invoices.". Loading: "Loading series…".
 Error: "Could not load the series" with "Retry".
 
@@ -187,7 +187,6 @@ rectifying invoice already issued: Back closes its result (BASE-F05).
 | INVOICE-F01 | The ticket (simplified invoice) born when charging | done — Sales asks for it within the same charge |
 | INVOICE-F02 | The full invoice when charging a customer with a tax ID | done — Sales asks for it within the same charge |
 | INVOICE-F03 | Issue an invoice by hand | done |
-| INVOICE-F04 | The customer asks for the full invoice of their ticket | discarded — the public page where the customer types their details and the ticket's code that opens it belong to the platform and to Sales; Invoicing already issues the full invoice that page will ask for, as in INVOICE-F05 (hub#500) |
 | INVOICE-F05 | Turn a ticket into a full invoice at the counter | done |
 | INVOICE-F06 | A charged sale that could not be invoiced | done |
 | INVOICE-F07 | Void a charged sale that already has its ticket | done — Sales asks for it within the same void |
@@ -205,8 +204,7 @@ rectifying invoice already issued: Back closes its result (BASE-F05).
 | INVOICE-F19 | Mark an invoice as paid | done |
 | INVOICE-F20 | Give other apps the invoice of a sale | done |
 | INVOICE-F21 | Set up the issuer | done |
-| INVOICE-F22 | Receive the issuer from the ERPlora account | discarded — the ERPlora account does not send the business's tax identity with the hub's data and the platform does not hand it to Invoicing; Invoicing already keeps it when it arrives (hub#501) |
-| INVOICE-F23 | Issue ERPlora's invoices (platform hub) | discarded — the Invoicing part is done and tested, but the platform hub is not set up until it is born with its own database, like every business (hub#502) |
+| INVOICE-F23 | Issue ERPlora's invoices (platform hub) | done |
 
 ### INVOICE-F01 The ticket (simplified invoice) born when charging
 Status: done — Sales asks for it within the same charge
@@ -309,19 +307,6 @@ territory's tax. If the currency cannot be read, the window says so ("The busine
 reason) and offers "Retry", which asks for it again; as soon as it arrives, "Issue invoice" lights up (hub#938).
 Involved: TAX-F18, CUSTOMER-F17, TAX-F11
 
-### INVOICE-F04 The customer asks for the full invoice of their ticket
-Status: discarded — the public page where the customer types their details and the ticket's code that opens it belong to the platform and to Sales; Invoicing already issues the full invoice that page will ask for, as in INVOICE-F05 (hub#500)
-Actor: customer
-Screen: public page of the platform (it does not exist yet)
-Steps:
-1. The ticket Sales prints carries a code to ask for the invoice.
-2. The customer opens it on their phone, without signing in, and types their tax details.
-3. Invoicing issues the replacing full invoice (F3), as in INVOICE-F05.
-In: the ticket (F2) and the details the customer types.
-Out: the F3 (announces `invoice.invoice.issued`).
-If it fails: as in INVOICE-F05.
-Involved: SALE-F29, INVOICE-F05
-
 ### INVOICE-F05 Turn a ticket into a full invoice at the counter
 Status: done
 Actor: employee, manager, administrator
@@ -345,7 +330,7 @@ card fills it; the tax ID's, also when the country or the document type changes)
 next try is refused too; a document that is not a ticket, "Only a ticket (simplified invoice) can be
 replaced by a full invoice.". If the ticket already has its F3, it answers with it without issuing
 another or using a number.
-Involved: INVOICE-F04
+Involved: none
 
 ### INVOICE-F06 A charged sale that could not be invoiced
 Status: done
@@ -704,14 +689,13 @@ Steps:
    details" with the pill "Needed to invoice": "Legal name, tax ID and address: without them you cannot
    issue an invoice.". Everyone sees it; "Set up" only whoever can change the issuer, and to the others it
    says "An administrator has to set this up.".
-2. Tap "Set up" on that step, open **Invoicing → Issuer**, or tap "Set up" on the banner "You cannot issue
-   invoices yet" that shows above the other screens while there is no issuer, **Invoices** and **Series**
-   too, only once (to whoever cannot change the issuer, the banner says "An administrator has to set this
-   up.", without "Set up").
+2. Tap "Set up" on that step, open **Invoicing → Issuer**, or tap "Set up your business details" on the bell's
+   notice "You cannot issue invoices yet", which shows on any screen while there is no issuer (to whoever cannot
+   change the issuer, the notice says "An administrator has to set this up.", with no button).
 3. Type "Legal name", "Tax ID", "Address", "Postal code", "City", "Province" and choose the "Country"
    (Spain at first).
-4. Tap "Save": "Issuer saved." comes, the banner disappears from every screen, **Invoices** and **Series**
-   too, and the Home step becomes "Done", without reloading and on the other devices too.
+4. Tap "Save": "Issuer saved." comes, the notice disappears from the bell and the Home step becomes "Done",
+   without reloading and on the other devices too.
 In: what the person types.
 Out: the issuer, which is copied into every document issued from now on (those already issued do not
 change); announces `invoice.issuer.updated`.
@@ -721,42 +705,36 @@ next try is refused too; a refusal that names no field shows above the form and 
 (hub#854).
 Involved: none
 
-### INVOICE-F22 Receive the issuer from the ERPlora account
-Status: discarded — the ERPlora account does not send the business's tax identity with the hub's data and the platform does not hand it to Invoicing; Invoicing already keeps it when it arrives (hub#501)
-Actor: system
-Screen: Issuer
-Steps:
-1. When the ERPlora account sends the hub's data with the business's tax identity, the platform hands it
-   to Invoicing with the version of that data.
-2. Invoicing saves the issuer and **Issuer** says "Received from your ERPlora account on {date}.".
-In: the business's tax identity the account sends (legal name, tax ID, address, postal code, city,
-province and country) and its version.
-Out: the issuer (announces `invoice.issuer.updated`). Data older than the saved one is ignored.
-If it fails: an incomplete issuer or one with an invalid tax ID is refused and the previous one stays.
-Involved: none
-
 ### INVOICE-F23 Issue ERPlora's invoices (platform hub)
-Status: discarded — the Invoicing part is done and tested, but the platform hub is not set up until it is born with its own database, like every business (hub#502)
+Status: done
 Actor: system (the ERPlora account)
 Screen: none (nobody enters the platform hub)
 Steps:
-1. A customer pays their subscription; the ERPlora account numbers its invoice (`ERP-2026-00123`, credit
+1. Before charging real money, the account asks the platform hub whether it is ready: it is with its issuer
+   and VeriFactu and, in production, only while real filing with the AEAT is open on the server
+   (VERIFACTU-F08). Otherwise it answers "not ready" with the reason and the account does not charge. In pre
+   nothing changes: it files in testing and charges with test keys.
+2. A customer pays their subscription; the ERPlora account numbers its invoice (`ERP-2026-00123`, credit
    notes in `ERPR`) and sends it, signed, to ERPlora's platform hub.
-2. Invoicing issues it as it arrives, with the account's number and date (no series of the hub counts for
+3. Invoicing issues it as it arrives, with the account's number and date (no series of the hub counts for
    it), with ERPlora as issuer and that day's payer as recipient, and VeriFactu seals its record in the
-   same operation. It answers "issued" with its QR.
-3. The account then asks how it is going: "issued" while the record goes to the AEAT, and "accepted",
+   same operation. It answers "issued" with its QR. A discounted line (a promotion code) carries the plan's
+   price and the discount apart; a free month is an invoice of 0 €, which is issued, filed and printed like
+   any other.
+4. The account then asks how it is going: "issued" while the record goes to the AEAT, and "accepted",
    "accepted with errors" or "rejected" when it answers (with its code and its message).
-4. The PDF is the same A4 as in INVOICE-F18 in the payer's language, with the VeriFactu QR ("QR
+5. The PDF is the same A4 as in INVOICE-F18 in the payer's language, with the VeriFactu QR ("QR
    tributario:", "VERI*FACTU") only once the AEAT has accepted it, as in the old account.
-In: the account's invoice: its number, its date, its amounts, how it is taxed, the payer, its lines and,
-in a credit note, the invoice it corrects.
+In: the account's invoice: its number, its date, its amounts, how it is taxed, the payer, its lines
+(each with its discount) and, in a credit note, the invoice it corrects.
 Out: the invoice, with the account's reference (announces `invoice.invoice.issued`; a credit note, also
 `invoice.invoice.rectified`), and its VeriFactu record.
 If it fails: the same invoice again (or two deliveries at once) answers what there already is, without
 writing anything; a credit note of an invoice that did not arrive is refused; above €400 without the
 payer's tax ID it is refused; an invoice that does not follow the contract is refused with its reason; a
-VeriFactu refusal undoes the whole invoice.
+VeriFactu refusal undoes the whole invoice; in production with real filing with the AEAT closed, "not ready":
+"Real filing with the AEAT is closed on this server: ERPlora's invoices would not reach it.", and the account
+does not charge.
 Involved: VERIFACTU-F13
 
 ## Services: what goes in and what comes out
@@ -786,7 +764,7 @@ name, their phone or their email (as in Customers) and a series by its code.
 | The issuer | view | F21, F22 | `invoice.issuer.get` |
 | How an ERPlora invoice is going (by the SaaS's `id`) | only the system | F23 | `invoice.invoice.platform_status` |
 | The A4 of an ERPlora invoice, in its language | only the system | F23 | `invoice.invoice.platform_document` |
-| Whether the platform hub can issue now | only the system | F23 | `invoice.invoice.platform_health` |
+| Whether the platform hub can issue now (in production, only with real filing with the AEAT open) | only the system | F23 | `invoice.invoice.platform_health` |
 
 All of them can be followed live.
 
@@ -857,8 +835,7 @@ notice delivery hands it these notices afterwards and, if that one stayed "pendi
   exists (the territory the line froze when it was charged); rounding half up (`round_half_up`). The
   name of the tax of the rate of a typed line ("VAT %", "IGIC %", "IPSI %") is read by the screen from
   `tax.settings.get` (`tax_kind`, with `useTaxKind()` of Taxes), the only source:
-  `invoice.invoice.line_defaults` only gives the general rate and does not repeat the tax (round
-  2026-10-17 of PLAN-HUB). What has already been issued is labelled by what it declared (the tax of its
+  `invoice.invoice.line_defaults` only gives the general rate and does not repeat the tax. What has already been issued is labelled by what it declared (the tax of its
   breakdown; "Tax %" if it mixes), never by today's territory: the same rule as the Sales tax figure
   (SALE-F28), which says the tax of the period's sales, "Taxes" if they mix, and the territory's only
   without sales.

@@ -3,7 +3,7 @@ refunds, the payment methods, the departments of the open price, the quick notes
 (WORKBOOK.md)."""
 
 from django.utils.translation import gettext_lazy as _
-from live.meta import Category, LiveAppConfig, Nav, Widget
+from live.meta import Category, Help, LiveAppConfig, Nav, Widget
 
 from apps.sale.events import FIGURE_EVENTS, SALE_EVENTS
 
@@ -33,6 +33,14 @@ class SaleConfig(LiveAppConfig):
     # Inventory is optional: its products are read through its own operations.
     requires = ["tax", "customer"]
     default_auto_field = "django.db.models.BigAutoField"
+    # What these words mean to the Hub's assistant (base.assistant.relevance.synonyms). A «cuenta», a check or a tab is a table's
+    # open check (sale.order), never the person's account (what it is in erplora.com's panel); a ticket or a receipt is
+    # a sale's, as the till's screens say («Tiques hoy», «Tique medio», the «Tique» it prints), never the kitchen's,
+    # which is its «comanda».
+    assistant_synonyms = (
+        ("cuenta", "check", "tab", "order"),
+        ("ticket", "tique", "recibo", "receipt", "sale"),
+    )
     permissions = [
         "sale.view_sale",
         "sale.add_sale",
@@ -106,6 +114,7 @@ class SaleConfig(LiveAppConfig):
         Nav("departments", _("Sections"), "ion:grid-outline", "/sale/departments"),
         Nav("settings", _("Settings"), "ion:settings-outline", "/sale/settings"),
     ]
+    help = Help()
     # The Home's panels, on the queries Sales' own screen reads, each refreshed by the events live.py re-runs its query
     # on. Registered icons only: the old `trending-up-outline` and `bar-chart-outline` wait in UI-REQUESTS.md. No steps
     # of «Finish setting up your business» nor counters of the bell: the old module had none.

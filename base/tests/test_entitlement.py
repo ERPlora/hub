@@ -14,7 +14,7 @@ from types import SimpleNamespace
 
 import pytest
 from django.apps import apps as django_apps
-from django.db import connection
+from django.db import connections
 from django.test.utils import CaptureQueriesContext
 from django.utils import timezone
 from live.context import OperationContext, Scope, system_context
@@ -26,9 +26,11 @@ from base.entitlement import EntitlementBlocked
 from base.models import Hub
 from base.relay import active_apps
 from base.schemas import HubStateIn
+from base.tenancy.context import use_hub
+from base.tenancy.tests.business import A, B, HUB_DB
 
-A = Scope("host", "a")
-B = Scope("host", "b")
+pytestmark = pytest.mark.usefixtures("no_test_fallback")
+
 NOW = dt.datetime(2026, 10, 24, 12, 0, tzinfo=dt.UTC)
 
 
@@ -44,7 +46,7 @@ CONFIGS = [TAX, STOCK, INVOICE, SALE]
 
 
 def keep(slug, state):
-    """The photo the SaaS last pushed for ``slug`` (``a`` and ``b`` are the suite's local hubs)."""
+    """The photo the SaaS last pushed for ``slug`` (the row of ``hub_a`` or ``hub_b`` when the test asks for it)."""
     Hub.objects.update_or_create(slug=slug, defaults={"status": "ready", "state": state, "state_version": 1})
 
 
@@ -128,15 +130,15 @@ def test_a_right_with_an_unreadable_end_is_no_right(caplog):
 def test_without_a_paid_module_nothing_is_read(modules):
     """Today no module is premium: blocking costs no query on any operation."""
     modules(TAX, SALE)
-    with CaptureQueriesContext(connection) as queries:
+    with CaptureQueriesContext(connections["default"]) as queries:
         assert entitlement.blocked_apps(A) == frozenset()
     assert len(queries) == 0
 
 
 @pytest.mark.django_db
 def test_each_business_has_its_own_rights(modules):
-    keep("a", photo("invoice"))
-    keep("b", photo())
+    keep(A.key, photo("invoice"))
+    keep(B.key, photo())
 
     assert entitlement.blocked_apps(A) == frozenset()
     assert entitlement.blocked_apps(B) == frozenset({"stock", "invoice"})
@@ -159,13 +161,14 @@ def test_a_host_without_a_row_has_no_paid_app(modules):
     assert entitlement.blocked_apps(Scope("host", "nobody")) == frozenset({"stock", "invoice"})
 
 
-@pytest.mark.django_db
-def test_the_relay_and_the_home_leave_out_what_is_blocked(modules, monkeypatch):
+@HUB_DB
+def test_the_relay_and_the_home_leave_out_what_is_blocked(modules, monkeypatch, hub_a):
     """``active_apps``: what the relay delivers to and the Home asks: every installed app but the blocked ones."""
     monkeypatch.setattr("base.relay.all_live_app_configs", lambda: [*CONFIGS, SimpleNamespace(label="base")])
-    keep("a", photo("stock"))
+    keep(A.key, photo("stock"))
 
-    assert active_apps(A) == frozenset({"base", "tax", "stock", "sale"})
+    with use_hub(hub_a):
+        assert active_apps(A) == frozenset({"base", "tax", "stock", "sale"})
 
 
 # --- The gate: an operation of a blocked app answers 402 -----------------------------------------------------
@@ -198,7 +201,7 @@ def ctx(scope=A):
 
 @pytest.mark.django_db
 def test_an_operation_of_a_blocked_app_answers_402(modules):
-    keep("a", photo())
+    keep(A.key, photo())
 
     with pytest.raises(EntitlementBlocked) as refused:
         operation("stock.item.list")(ctx(), AnyIn())
@@ -209,7 +212,7 @@ def test_an_operation_of_a_blocked_app_answers_402(modules):
 
 @pytest.mark.django_db
 def test_the_402_is_said_in_the_language_of_who_asks(modules):
-    keep("a", photo())
+    keep(A.key, photo())
     said = {}
     for language in ("en", "es"):
         asking = OperationContext(scope=A, actor=None, permissions=frozenset({"*"}), language=language)
@@ -221,21 +224,23 @@ def test_the_402_is_said_in_the_language_of_who_asks(modules):
     assert all("Stock" in message and "erplora.com" in message for message in said.values())
 
 
-@pytest.mark.django_db
-def test_the_same_operation_runs_where_the_business_has_the_right(modules):
-    keep("a", photo("stock"))
-    keep("b", photo())
+@HUB_DB
+def test_the_same_operation_runs_where_the_business_has_the_right(modules, hub_a, hub_b):
+    keep(A.key, photo("stock"))
+    keep(B.key, photo())
 
-    assert operation("stock.item.list")(ctx(A), AnyIn()).model_dump() == {"ran": True}
-    with pytest.raises(EntitlementBlocked):
+    with use_hub(hub_a):
+        assert operation("stock.item.list")(ctx(A), AnyIn()).model_dump() == {"ran": True}
+    with use_hub(hub_b), pytest.raises(EntitlementBlocked):
         operation("stock.item.list")(ctx(B), AnyIn())
 
 
-@pytest.mark.django_db
-def test_a_free_app_and_the_platform_are_never_blocked(modules):
-    keep("a", photo())
-    assert operation("tax.rate.list")(ctx(), AnyIn()).model_dump() == {"ran": True}
-    assert operation("base.setup.status")(ctx(), AnyIn()).model_dump() == {"ran": True}
+@HUB_DB
+def test_a_free_app_and_the_platform_are_never_blocked(modules, hub_a):
+    keep(A.key, photo())
+    with use_hub(hub_a):
+        assert operation("tax.rate.list")(ctx(), AnyIn()).model_dump() == {"ran": True}
+        assert operation("base.setup.status")(ctx(), AnyIn()).model_dump() == {"ran": True}
 
 
 def test_the_gate_is_the_operations_database_hook(settings):
@@ -246,7 +251,7 @@ def test_the_gate_is_the_operations_database_hook(settings):
 def test_the_end_of_a_right_is_read_now(modules, monkeypatch):
     """Nobody pushes a photo when a cancelled module's period ends: the gate reads the clock."""
     ends = (timezone.now() + dt.timedelta(minutes=1)).isoformat()
-    keep("a", photo({"id": "stock", "valid_until": ends}))
+    keep(A.key, photo({"id": "stock", "valid_until": ends}))
     assert entitlement.blocked_apps(A) == frozenset({"invoice"})
     later = timezone.now() + dt.timedelta(minutes=2)
     monkeypatch.setattr(entitlement.timezone, "now", lambda: later)
@@ -270,8 +275,8 @@ def run(operation_name, /, **data):
     return op(ctx(), op.input.model_validate(data)).model_dump(mode="json")
 
 
-@pytest.mark.django_db
-def test_a_paid_app_blocked_when_its_right_ends_comes_back_with_its_data_when_bought_again(monkeypatch):
+@HUB_DB
+def test_a_paid_app_blocked_when_its_right_ends_comes_back_with_its_data_when_bought_again(monkeypatch, hub_a):
     """BILLING-F34 of the SaaS, step 3: nothing is deleted, and bought again the business has the app as it was. The
     block only reads the photo, so what the business wrote with the app waits; the newer photo that names it again,
     open-ended, opens it on those same rows. The twin, for a right, of ``test_turning_one_off_and_on_again_keeps_its_data``
@@ -279,20 +284,23 @@ def test_a_paid_app_blocked_when_its_right_ends_comes_back_with_its_data_when_bo
     from apps.task.models import Project
 
     monkeypatch.setattr(django_apps.get_app_config("task"), "premium", True)
-    keep("a", photo({"id": "task", "source": "purchase"}))
-    written = run("task.project.create", code="SPRING", name="Spring menu", color="#336699")
+    keep(A.key, photo({"id": "task", "source": "purchase"}))
+    with use_hub(hub_a):
+        written = run("task.project.create", code="SPRING", name="Spring menu", color="#336699")
 
     ended = (timezone.now() - dt.timedelta(minutes=1)).isoformat()
-    push("a", 2, {"id": "task", "source": "purchase", "valid_until": ended})
+    push(A.key, 2, {"id": "task", "source": "purchase", "valid_until": ended})
 
-    with pytest.raises(EntitlementBlocked) as refused:
-        run("task.project.list")
+    with use_hub(hub_a):
+        with pytest.raises(EntitlementBlocked) as refused:
+            run("task.project.list")
+        assert Project.objects.filter(pk=written["id"], code="SPRING", name="Spring menu", color="#336699").exists()
     assert (refused.value.status, refused.value.code) == (402, "app_entitlement_blocked")
-    assert Project.objects.filter(pk=written["id"], code="SPRING", name="Spring menu", color="#336699").exists()
 
-    push("a", 3, {"id": "task", "source": "purchase"})
+    push(A.key, 3, {"id": "task", "source": "purchase"})
 
-    [again] = run("task.project.list")["rows"]
+    with use_hub(hub_a):
+        [again] = run("task.project.list")["rows"]
     assert {key: again[key] for key in ("id", "code", "name", "color")} == {
         key: written[key] for key in ("id", "code", "name", "color")
     }

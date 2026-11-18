@@ -57,10 +57,10 @@ async function toggle(row: RegisterOut): Promise<void> {
   try {
     await update.run({ register_id: row.id, is_active: !row.is_active });
   } catch {
-    void toastError(refusal(update.error.value, t('cash_register.registers.toggleFailed'))?.message ?? t('cash_register.registers.toggleFailed'));
+    toastError(refusal(update.error.value, t('cash_register.registers.toggleFailed'))?.message ?? t('cash_register.registers.toggleFailed'));
     return;
   }
-  void toastSuccess(t(row.is_active ? 'cash_register.registers.deactivated' : 'cash_register.registers.activated'));
+  toastSuccess(t(row.is_active ? 'cash_register.registers.deactivated' : 'cash_register.registers.activated'));
 }
 
 function onAction({ actionId, row }: { actionId: string; row: RegisterOut }): void {

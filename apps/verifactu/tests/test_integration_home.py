@@ -19,7 +19,18 @@ from live.outbox import channel_for
 
 from apps.verifactu import certificates
 from apps.verifactu.models import OwnCertificate
-from apps.verifactu.tests.conftest import A, B, b64, business_in, ctx_for, make_p12, manual, run
+from apps.verifactu.tests.conftest import (
+    HUB_DB,
+    HUB_DB_COMMITTED,
+    A,
+    B,
+    b64,
+    business_in,
+    ctx_for,
+    make_p12,
+    manual,
+    run,
+)
 from base.schemas import SetupStatusIn, WidgetListIn
 
 STEP = "verifactu.sending_route"
@@ -66,7 +77,7 @@ def ticket():
     )
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_owner_has_the_step_pending_until_erplora_may_file_in_production(issuer):
     owner = ctx_for("hub_owner")
     step = steps(owner)[STEP]
@@ -88,19 +99,18 @@ def test_the_owner_has_the_step_pending_until_erplora_may_file_in_production(iss
     assert steps(owner)[STEP]["state"] == "pending"
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_own_certificate_also_completes_the_step(issuer):
     owner = ctx_for("hub_admin")
-    run("verifactu.certificate.upload", {"p12_base64": b64(make_p12()), "password": "secret"})
-    # Uploaded but not chosen: ERPlora still files, and its way still waits for the authorisation.
     assert steps(owner)[STEP]["state"] == "pending"
-    run("verifactu.config.update", {"route": "own"})
+    # Uploading it is all it takes: nothing else to choose.
+    run("verifactu.certificate.upload", {"p12_base64": b64(make_p12()), "password": "secret"})
     assert steps(owner)[STEP]["state"] == "done"
     run("verifactu.certificate.remove")
     assert steps(owner)[STEP]["state"] == "pending"
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_step_is_in_spanish_for_a_spanish_reader(issuer):
     step = steps(ctx_for("hub_owner", language="es"))[STEP]
     assert (step["title"], step["description"]) == (
@@ -109,7 +119,7 @@ def test_the_step_is_in_spanish_for_a_spanish_reader(issuer):
     )
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize("role", ["hub_manager", "hub_employee"])
 def test_whoever_cannot_configure_verifactu_is_not_told_about_the_step(issuer, role):
     # In testing a functional step goes to whoever can do it; the legal level, which reaches everybody, is base's
@@ -148,11 +158,10 @@ def live_by_erplora():
 
 def live_by_own_certificate():
     run("verifactu.certificate.upload", {"p12_base64": b64(make_p12()), "password": "secret"})
-    run("verifactu.config.update", {"route": "own"})
     run("verifactu.config.go_live")
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_in_production_with_the_way_ready_the_step_is_done_and_off_the_strip(issuer, opened):
     live_by_erplora()
 
@@ -161,7 +170,7 @@ def test_in_production_with_the_way_ready_the_step_is_done_and_off_the_strip(iss
     assert run("verifactu.config.get").issue_blocker is None
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_in_production_a_revoked_authorisation_is_a_wall_for_everybody(issuer, opened):
     """Its sales are refused from now on: the Home says so to the owner, and to the person at the till."""
     live_by_erplora()
@@ -173,7 +182,7 @@ def test_in_production_a_revoked_authorisation_is_a_wall_for_everybody(issuer, o
         assert wall(ctx_for(role)) == (("legal", "pending", False), 1)
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_in_production_an_expired_or_removed_own_certificate_is_a_wall(issuer, opened):
     live_by_own_certificate()
     assert wall(ctx_for("hub_owner")) == (("legal", "done", True), 0)
@@ -187,7 +196,7 @@ def test_in_production_an_expired_or_removed_own_certificate_is_a_wall(issuer, o
     assert wall(ctx_for("hub_owner")) == (("legal", "pending", True), 1)
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_in_testing_a_revoked_authorisation_stops_nothing(issuer):
     """A hub in testing sells without a way, so the step stays functional and off the strip."""
     photo(1, "approved")
@@ -201,7 +210,7 @@ def test_in_testing_a_revoked_authorisation_stops_nothing(issuer):
 # ── Only for a business in Spain ───────────────────────────────────────────────────────────────────────────────────
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize(("country", "told"), [("PL", False), ("FR", False), ("ES", True), ("", True)])
 def test_the_step_is_only_for_a_business_in_spain(issuer, country, told):
     """VeriFactu is Spanish law: a business erplora.com registered in another country is never asked to set it up; one
@@ -211,7 +220,7 @@ def test_the_step_is_only_for_a_business_in_spain(issuer, country, told):
     assert (STEP in steps(ctx_for("hub_owner"))) is told
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize(("country", "walled"), [("PL", False), ("ES", True), ("", True)])
 def test_in_production_the_wall_is_only_for_a_business_in_spain(issuer, opened, country, walled):
     """A business that went live in Spain and lost its way is walled; registered in another country, VeriFactu seals
@@ -225,7 +234,7 @@ def test_in_production_the_wall_is_only_for_a_business_in_spain(issuer, opened, 
         assert wall(ctx_for(role)) == told
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize("role", ["hub_owner", "hub_manager", "hub_employee"])
 def test_whoever_reads_the_records_is_offered_the_four_panels(role):
     offered = panels(ctx_for(role))
@@ -241,7 +250,7 @@ def test_whoever_reads_the_records_is_offered_the_four_panels(role):
     assert {panel["category"] for panel in offered.values()} == {"VeriFactu"}
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize(("language", "label"), [("en", "In contingency queue"), ("es", "En cola de contingencia")])
 def test_the_queue_panel_says_under_its_figure_what_it_counts(language, label):
     # The old module's text under the queue's figure (its module.json, `verifactu.contingency` options.label), in the
@@ -250,7 +259,7 @@ def test_the_queue_panel_says_under_its_figure_what_it_counts(language, label):
     assert queue["options"] == {"format": "number", "label": label}
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_each_panel_paints_its_figure_from_its_own_query(issuer):
     for _ in range(2):
         ticket()
@@ -290,10 +299,11 @@ def received(session, timeout=WAIT):
     return [(note.channel, json.loads(note.payload)) for note in session.notifies(timeout=timeout)]
 
 
-@pytest.mark.django_db(transaction=True)
-def test_the_photo_received_in_hub_b_re_runs_bs_checklist_and_tells_a_nothing(listen):
+@HUB_DB_COMMITTED
+def test_the_photo_received_in_hub_b_re_runs_bs_checklist_and_tells_a_nothing(listen, in_business_b):
     on_a, on_b = listen(A), listen(B)
-    photo(1, "approved", scope=B)
+    with in_business_b():
+        photo(1, "approved", scope=B)
     notes = received(on_b)
     assert {channel for channel, _ in notes} == {channel_for(B)}
     events = {event for _, payload in notes for event in payload["events"]}

@@ -14,13 +14,13 @@ from live.errors import Conflict
 from live.models import OutboxEvent
 
 from apps.invoice.models import Invoice, InvoiceSeries
-from apps.invoice.tests.conftest import A, ISSUER, ctx_for, deliver, run
+from apps.invoice.tests.conftest import A, HUB_DB, ISSUER, ctx_for, deliver, run
 from apps.sale import events as sale_events
 from apps.sale.models import Sale, SaleLine
 from apps.tax.models import TaxRule
 from apps.verifactu.models import Record
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 RECIPIENT = {
     "customer_name": "Talleres Pérez SL",

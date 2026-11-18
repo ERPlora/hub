@@ -6,46 +6,16 @@ inbox's reaction as the system, once. Nothing is called by hand: before the tick
 the conversation follows the card. erplora.com's erasure door is the only thing ``respx`` stands in for.
 """
 
-import datetime as dt
-import threading
-
 import httpx
-import pytest
 import respx
-from django.db.backends.base.base import BaseDatabaseWrapper
-from django.utils import timezone
 
 from apps.whatsapp_inbox.models import Conversation
-from apps.whatsapp_inbox.tests.conftest import ctx_for, receive, run, system
-from base import catalog, worker
-from base.catalog import RegisterResult
+from apps.whatsapp_inbox.tests.conftest import HUB_DB_COMMITTED, ctx_for, receive, run, system
 from base.models import EventDelivery
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB_COMMITTED
 
 ERASE = "http://saas.test/internal/whatsapp/erase"
-REGISTERED = RegisterResult(written=0, retired=0, docs_changed=0, skipped=True)
-
-
-@pytest.fixture
-def tick(monkeypatch, django_capture_on_commit_callbacks):
-    """One turn of the worker's real loop, without the SaaS's catalogue and, inside the test's transaction,
-    without releasing its connection; what the reactions leave for after their COMMIT runs too."""
-    monkeypatch.setattr(catalog, "register_apps", lambda: REGISTERED)
-    monkeypatch.setattr(BaseDatabaseWrapper, "close_if_unusable_or_obsolete", lambda self: None)
-    now = timezone.now()
-
-    def run_once() -> None:
-        stop = threading.Event()
-
-        def wait(seconds: float) -> bool:
-            stop.set()
-            return True
-
-        with django_capture_on_commit_callbacks(execute=True):
-            assert worker.run(stop, tick_seconds=0, wait=wait, clock=lambda: now + dt.timedelta(seconds=1)) == 0
-
-    return run_once
 
 
 def owner():

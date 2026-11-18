@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:df540680227702cbaa10d19b34a2ba4410f7b7018917f5742444dec95e05d6fb -->
+<!-- generated from WORKBOOK.md sha256:190cc6f01cc5281aa034580c3ff95bc2afaf7b30c62765cb56e0454466eaa7eb -->
 
 ## What it is for and who it is for
 
@@ -161,7 +161,7 @@ With the window as it opened, Back closes it without asking (BASE-F05).
 | STAFF-F04 | Create, edit and retire a role | done (server and screen) |
 | STAFF-F05 | Deactivate a professional | done (server and screen) |
 | STAFF-F06 | Terminate a professional | done (server and screen) |
-| STAFF-F07 | Add several professionals at once | done (assistant and API, like the current product) |
+| STAFF-F07 | Add several professionals at once | done (assistant and API) |
 | STAFF-F08 | See my own record and my time off | done (server and screen) |
 | STAFF-F09 | Give the team to other apps | done (the other apps read it) |
 | STAFF-F13 | Create a professional's weekly schedule | done (server and screen) |
@@ -177,8 +177,7 @@ With the window as it opened, Back closes it without asking (BASE-F05).
 | STAFF-F23 | See the figures of the staff and by role | done (server and screen) |
 | STAFF-F24 | Ask for my own time off | done (server and screen) |
 
-The services each professional performs (STAFF-F10, F11 and F12 of the current product) are in the
-Services app: see "Changes from the current product".
+The services each professional performs are in the Services app (SERVICE-F31, F32 and F33).
 
 ### STAFF-F01 Add a professional
 Status: done (server and screen)
@@ -221,7 +220,7 @@ Steps:
 3. Save: only what was sent changes.
 In: the record (and, with the permission, its rate, commission and notes).
 Out: the changed record (`staff.member.updated`). Saving without changing anything does not announce.
-Setting Inactive here does not turn Bookable off, as today; going back to Active does not turn it on
+Setting Inactive here does not turn Bookable off; going back to Active does not turn it on
 either.
 If it fails: the same refusals as when adding; "That staff member does not exist in this business." if it
 is no longer there (also if it was terminated); setting **Inactive** with pending or approved time off not
@@ -299,7 +298,7 @@ If it fails: "That staff member does not exist in this business." if it was alre
 Involved: APPOINTMENT-F25, SERVICE-F32, ATTENDANCE-F13, TASK-F15
 
 ### STAFF-F07 Add several professionals at once
-Status: done (assistant and API, like the current product)
+Status: done (assistant and API)
 Actor: assistant, API
 Screen: assistant
 Steps:
@@ -365,7 +364,10 @@ If it fails: under each field: "A schedule needs at least one working day with h
 must be before the end time.", "The break needs a start and an end, or neither.", "The break must fall
 inside the working hours.", "Each weekday can appear only once.", "The schedule's validity ends before it
 starts."; "That staff member does not exist in this business.". A shift that crosses midnight is not
-accepted.
+accepted. "A schedule needs at least one working day with hours." shows on top of the week and goes away
+as soon as any day changes (ticked, unticked, or an hour typed), without saving again (hub#1448). A day's
+reason shows under that day and goes away as soon as that day changes (ticked, unticked, or one of its hours
+typed), without saving again; the other days' reasons stay until those days change (hub#1460).
 Involved: none
 
 ### STAFF-F14 Edit a schedule
@@ -379,7 +381,8 @@ Steps:
 In: the schedule and its whole week.
 Out: the changed schedule (`staff.schedule.updated`), with the same "Default" rule and the same rule of
 which schedule rules as when creating it.
-If it fails: the same refusals as when creating, or "That schedule does not exist in this business.".
+If it fails: the same refusals as when creating, which go away the same way when what was refused
+changes, or "That schedule does not exist in this business.".
 Involved: none
 
 ### STAFF-F15 Activate, deactivate or delete a schedule
@@ -679,6 +682,3 @@ the directory for "Who is serving this check" without needing Staff, and Automat
 | Register anyone's time off, approve, reject and cancel it | yes | yes | yes | no | `staff.manage_time_off` |
 | Roles, schedules and settings | yes | yes | yes | no | `staff.manage_settings` |
 | Ask for one's own time off and withdraw one's own pending requests | yes | yes | yes | yes | `staff.request_time_off` |
-
-The cashier of the current product no longer exists as a role: what they saw (the directory) the employee
-sees.

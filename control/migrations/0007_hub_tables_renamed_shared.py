@@ -125,7 +125,7 @@ def _stop_if_not_cut(apps, schema_editor) -> None:
         raise HubTablesNotRenamed(
             "control.hub_not_cut",
             f"Nothing was renamed: {', '.join(waiting)} still have no database of their own and these tables may be "
-            "theirs. Run manage.py cut_shared_hubs (docs/runbooks/cut-shared-hubs.md) and deploy again.",
+            "theirs. Run manage.py cut_shared_hubs (knowledge/wiki/runbooks/cut-shared-hubs.md) and deploy again.",
             slugs=waiting,
         )
 

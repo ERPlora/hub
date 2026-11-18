@@ -1,17 +1,17 @@
 <script setup lang="ts">
 // «Choose table» (SALE-F19; Tables' TABLE-F10, F12, F13), the product's table sheet of the till: the
 // tables in service, searched on the server (its zone tabs became the search: each tile names its zone,
-// as numbers repeat across zones), as tiles in their status colour — available green, occupied red,
-// reserved amber, blocked grey — with the number, the zone, the seats, the status and the reservation's
-// name and time. Only a free or reserved table can be tapped. A tap seats the check on screen there
-// (`table.session.open` with its `order_id`, TABLE-F12); with no check yet, Tables opens one titled
-// with the table (TABLE-F10) and the page puts it on the till; a check whose table was taken away is
-// seated again (`table.session.restore`, TABLE-F24). The guests are not asked: the server takes the
-// reservation's or the table's seats. «Remove from table» parks the check's seat (TABLE-F13): the table
+// as numbers repeat across zones), as tiles that draw each table as the floor plan does, in its colours —
+// available green, occupied blue, reserved yellow, blocked grey — with the number, the zone, the seats,
+// the status and the reservation's name and time. Only a free or reserved table can be tapped. A tap
+// seats the check on screen there (`table.session.open` with its `order_id`, TABLE-F12); with no check
+// yet, Tables opens one titled with the table (TABLE-F10) and the page puts it on the till; a check whose
+// table was taken away is seated again (`table.session.restore`, TABLE-F24). The guests are not asked:
+// the server takes the reservation's or the table's seats. «Remove from table» parks the check's seat (TABLE-F13): the table
 // frees, the check stays open. A refusal stays in the sheet in the server's words.
 // Sales does not require Tables: it talks to it only through operation names. The page mounts this only
 // while someone is choosing, so nothing of Tables is followed otherwise.
-import { InlineFeedback } from '@erplora/ui/components';
+import { type FloorGlyphTable, InlineFeedback, TableGlyph } from '@erplora/ui/components';
 import { type OutputOf, useCommand, useLive } from '@erplora/ui/sdk';
 import { useSession } from '@erplora/ui/shell';
 import { IonButton, IonSearchbar } from '@ionic/vue';
@@ -71,6 +71,12 @@ function onInput(event: CustomEvent<{ value?: string | null }>): void {
 
 const tappable = (row: TableRow) => row.status === 'available' || row.status === 'reserved';
 const isCurrent = (row: TableRow) => props.seat?.table_id === row.id;
+
+/** The table as the floor plan draws it; the till shows no timer, so its arc stays at rest. */
+function glyphOf(row: TableRow): FloorGlyphTable {
+  const { status, shape, capacity, guests } = row;
+  return { status, shape, capacity, guests, ratio: row.width / row.height, tone: 'normal', progress: 0 };
+}
 
 /** Whose reservation the table paints: its name, or «Deleted customer» once her data was erased. */
 function holder(row: TableRow): string {
@@ -189,13 +195,21 @@ function remove(): void {
           :key="row.id"
           type="button"
           class="pos-table-tile"
-          :class="`pos-table-tile--${row.status}`"
           :data-testid="`pos-table-tile-${row.id}`"
           :disabled="!tappable(row) || pending"
           :aria-pressed="isCurrent(row) ? 'true' : 'false'"
           :title="titleOf(row)"
           @click="seatAt(row)"
         >
+          <span
+            class="pos-table-tile__glyph"
+            :data-shape="row.shape"
+          >
+            <TableGlyph
+              :table="glyphOf(row)"
+              variant="mini"
+            />
+          </span>
           <span class="pos-table-tile__number">{{ row.number }}</span>
           <span
             v-if="row.zone_name"
@@ -265,12 +279,11 @@ ion-modal.pos-sheet .pos-table-tile {
   text-align: center;
   color: var(--ion-text-color, #1c1b18);
   background: var(--ion-background-color, #fff);
-  border: 2px solid var(--pos-table-tone);
+  border: 1px solid var(--ion-border-color);
   border-radius: 12px;
   cursor: pointer;
   container-type: inline-size;
   transition: transform 0.05s;
-  --pos-table-tone: var(--ion-color-medium, #868e96);
 }
 ion-modal.pos-sheet .pos-table-tile:active {
   transform: scale(0.96);
@@ -284,14 +297,16 @@ ion-modal.pos-sheet .pos-table-tile[aria-pressed='true'] {
   outline: 3px solid var(--ion-color-primary, #0091ce);
   outline-offset: 1px;
 }
-ion-modal.pos-sheet .pos-table-tile--available {
-  --pos-table-tone: var(--ion-color-success, #2f9e44);
+/* The drawn table leaves room around it for its seats. */
+ion-modal.pos-sheet .pos-table-tile__glyph {
+  position: relative;
+  width: 2.25rem;
+  height: 2.25rem;
+  margin: 0.3rem 0 0.45rem;
 }
-ion-modal.pos-sheet .pos-table-tile--occupied {
-  --pos-table-tone: var(--ion-color-danger, #d9480f);
-}
-ion-modal.pos-sheet .pos-table-tile--reserved {
-  --pos-table-tone: var(--ion-color-warning, #f08c00);
+ion-modal.pos-sheet .pos-table-tile__glyph[data-shape='rectangle'] {
+  width: 2.75rem;
+  height: 1.75rem;
 }
 ion-modal.pos-sheet .pos-table-tile__number,
 ion-modal.pos-sheet .pos-table-tile__zone,
@@ -316,7 +331,7 @@ ion-modal.pos-sheet .pos-table-tile__status {
   overflow: hidden;
   font-size: min(0.65rem, 15cqi);
   font-weight: 600;
-  color: var(--pos-table-tone);
+  color: var(--ep-text-muted);
   text-transform: uppercase;
   white-space: nowrap;
   text-overflow: ellipsis;
@@ -330,7 +345,7 @@ ion-modal.pos-sheet .pos-table-tile__hold {
   min-width: 0;
   font-size: 0.65rem;
   font-weight: 600;
-  color: var(--ion-color-warning, #f08c00);
+  color: var(--ep-warning-text);
   white-space: nowrap;
 }
 ion-modal.pos-sheet .pos-table-tile__holder {

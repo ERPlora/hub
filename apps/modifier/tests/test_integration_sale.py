@@ -21,9 +21,9 @@ from live.meta import all_live_app_configs, permissions_for_role
 
 from apps.sale.models import OrderLine, SaleLine
 
-from .conftest import A, FOOD, GENERIC, make_category, make_product, run
+from .conftest import FOOD, GENERIC, HUB_DB, A, make_category, make_product, run
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 
 def ctx(role: str = "hub_admin") -> OperationContext:

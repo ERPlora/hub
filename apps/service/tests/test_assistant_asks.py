@@ -18,16 +18,18 @@ from django.conf import settings
 from live import assistant as shared
 from live.operations import AI, Operation, registry
 
+from apps.invoice.tests.conftest import catalog_of  # noqa: F401 (a fixture: the tests below take it by name)
+from apps.invoice.tests.conftest import in_hubs
+from apps.service.tests.conftest import HUB_DB
 from base import assistant
 from base.models import Membership
-from base.tests.test_assistant_asks import (
-    assert_its_asks_bring,
-    assert_reported_are_owner_probes,
-    catalog_of,  # noqa: F401 (a fixture: the tests below take it by name)
-    comparable,
-    probe_phrases,
-)
-from base.tests.test_assistant_asks import offered_place as place
+from base.tests.test_assistant_asks import assert_its_words_name
+from base.tests.test_assistant_asks import assert_offered_with_room
+from base.tests.test_assistant_asks import assert_reported_are_owner_probes, comparable, offered_place, offered_to
+from base.tests.test_assistant_asks import probe_phrases
+from base.tests.test_assistant_asks import english_coverage_test, english_words_test, own_words_test, probes_test
+from base.tests.test_assistant_asks import reported_test
+
 PROBES_DIR = Path(settings.BASE_DIR) / "tests" / "e2e" / "qa" / "probes"
 
 #: The requests of the real-model QA (``tests/e2e/qa/probes/owner-es-service-2026-11-08.json``) as the owner said them,
@@ -63,9 +65,6 @@ REPORTED = [
     ),
 ]
 
-#: How far down the tools a turn offers (``MAX_TOOLS``, 40) a request of the QA may bring its tool: half of them, so
-#: twenty tools of the apps that say their asks later may climb past it before the model loses it.
-WITH_ROOM = 20
 #: Every probe of layer 2 of Services, the owner's real phrases of the QA: the eleven above and the ones the model got
 #: right.
 PROBES = json.loads((PROBES_DIR / "owner-es-service-2026-11-08.json").read_text(encoding="utf-8"))["probes"]
@@ -185,14 +184,6 @@ def neighbour_probes() -> list[dict]:
     ]
 
 
-def offered_with_room(tools: dict[str, Operation], name: str, phrase: str) -> None:
-    """``phrase`` is none of ``name``'s asks, and a turn offers ``name`` for it among the first ``WITH_ROOM``."""
-    assert name in tools  # positive control: the owner holds the tool, so its place is known
-    assert comparable(phrase) not in {comparable(ask) for ask in shared.asks_of(tools[name]).get("es", ())}
-    found = place(tools, name, phrase)
-    assert found is not None and found <= WITH_ROOM, found
-
-
 def without_services_asks(tools: dict[str, Operation]) -> dict[str, Operation]:
     """``tools`` with Services' tools saying no asks: how a turn ranked them before Services said its own."""
     return {
@@ -205,7 +196,7 @@ def without_services_asks(tools: dict[str, Operation]) -> dict[str, Operation]:
 
 def test_services_offers_at_least_46_tools():
     """Services' tools are at least 46 (``AI``, never ``INTERNAL``): a silent drop of tools fails."""
-    tools = {name for name, op in registry.items() if op.app_label == "service" and assistant.is_tool(op)}
+    tools = {name for name, op in registry.items() if op.app_label == "service" and assistant.tools.is_tool(op)}
     assert all(isinstance(registry[name].ai_spec(), AI) for name in tools)
     assert len(tools) >= 46
 
@@ -214,32 +205,22 @@ def test_the_reported_requests_are_the_probes_of_layer_2():
     assert_reported_are_owner_probes(REPORTED)
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
-@pytest.mark.parametrize(("name", "phrase"), REPORTED)
-def test_the_reported_service_request_offers_its_existing_operation(catalog_of, name, phrase):
-    tools = catalog_of(Membership.Role.OWNER, "es")
-    offered_with_room(tools, name, phrase)
+test_the_reported_service_request_offers_its_existing_operation = in_hubs(reported_test(REPORTED))
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
-@pytest.mark.parametrize("probe", PROBES, ids=[probe["id"] for probe in PROBES])
-def test_every_probe_of_services_offers_its_tool_without_being_one_of_its_asks(catalog_of, probe):
-    """The owner's forty-six phrases of layer 2, the ones the model answered right too: a tool of Services that a new
-    ask elsewhere pushes out of the ones a turn offers fails here before the real-model QA sees it."""
-    assert (probe["app"], probe["role"], probe["language"]) == ("service", "owner", "es")
-    tools = catalog_of(Membership.Role.OWNER, probe["language"])
-    name, phrase = probe["tool"], probe["phrase"]
-    offered_with_room(tools, name, phrase)
+#: The owner's forty-six phrases of layer 2, the ones the model answered right too: a tool of Services that a new ask
+#: elsewhere pushes out of the ones a turn offers fails here before the real-model QA sees it.
+test_every_probe_of_services_offers_its_tool_without_being_one_of_its_asks = in_hubs(probes_test(PROBES, "service"))
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize(
     "probe", [probe for probe in PROBES if probe["tool"] in FIRST_TEN], ids=lambda probe: probe["id"]
 )
 def test_the_probes_that_come_close_stay_among_the_first_ten(catalog_of, probe):
     """What its own asks give each of these tools: without them, more than half of them would fall behind the tenth
     (the session's release 17th, the voucher's redemption 17th, the service settings 19th)."""
-    found = place(catalog_of(Membership.Role.OWNER, "es"), probe["tool"], probe["phrase"])
+    found = offered_place(catalog_of(Membership.Role.OWNER, "es"), probe["tool"], probe["phrase"])
     assert found is not None and found <= 10, found
 
 
@@ -247,19 +228,70 @@ def test_the_close_probes_are_probes_of_services():
     assert FIRST_TEN <= {probe["tool"] for probe in PROBES}  # positive control: no name of the list is mistyped
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
-@pytest.mark.parametrize(("name", "phrase"), OWN_WORDS)
-def test_a_request_in_the_owners_own_words_reaches_its_tool_by_its_asks(catalog_of, name, phrase):
-    assert_its_asks_bring(catalog_of(Membership.Role.OWNER, "es"), name, phrase, "es")
+test_a_request_in_the_owners_own_words_reaches_its_tool_by_its_asks = in_hubs(own_words_test(OWN_WORDS, "es"))
+
+
+#: What the owner says in English in words of their own for each tool of Services that needs one, neither
+#: an ask nor a probe of layer 2: its English asks lift it among the first ten (``assert_its_asks_lift``).
+OWN_WORDS_EN = [
+    ("service.assignment.assign", "Sonia will do colour too now, at 50 euros"),
+    ("service.assignment.eligible", "anyone able to do a pedicure, and at what price?"),
+    ("service.assignment.get", "what time and price does Raquel have for the beard trim?"),
+    ("service.assignment.list", "what does Sonia do in the salon?"),
+    ("service.assignment.remove", "take Sonia off colour"),
+    ("service.assignment.update", "Sonia's main one should be the pedicure now"),
+    ("service.catalog.status", "how is the catalogue doing, can everything be charged yet?"),
+    ("service.category.create", "we need a Colour category among the services"),
+    ("service.category.delete", "drop the nails one; what's in it can stay without"),
+    ("service.category.get", "what's under the nails one?"),
+    ("service.category.list", "how are our services split up?"),
+    ("service.category.update", "Nails should go inside Hair"),
+    ("service.grant.adjust", "give Pilar two more weeks on hers"),
+    ("service.grant.adjust_check", "could Marta's get a later expiry?"),
+    ("service.grant.create", "Inés is taking the five-massage one"),
+    ("service.grant.get", "details of Marta's, with its balance"),
+    ("service.grant.list", "what has Inés bought?"),
+    ("service.grant.list_orphans", "any left whose customer was erased?"),
+    ("service.grant.redeem", "mark one of Pilar's massage sessions as spent"),
+    ("service.grant.redeem_check", "what stops Pilar's from being used?"),
+    ("service.grant.tender_options", "what can Pilar use to pay for her massage?"),
+    ("service.grant.void", "Pilar's was sold by mistake"),
+    ("service.grant.void_check", "too late to undo Pilar's?"),
+    ("service.movement.list", "what happened with the laser one?"),
+    ("service.package.create", "five massages for 180 euros, valid a year"),
+    ("service.package.delete", "we'll stop selling the massage pack"),
+    ("service.package.get", "details of the massage pack, please"),
+    ("service.package.list", "which ones do we offer to choose from?"),
+    ("service.package.update", "the massage one goes up to 230 euros"),
+    ("service.service.archive", "we don't offer the perm any longer"),
+    ("service.service.bulk_create", "create all of these at once: brows, lashes and nails"),
+    ("service.service.create", "add a men's haircut at 14 euros"),
+    ("service.service.get", "how long does the manicure take?"),
+    ("service.service.list", "which services do we offer today?"),
+    ("service.service.list_for_sale", "what's for sale right now?"),
+    ("service.service.restore", "we're doing beard trims again, bring them back"),
+    ("service.service.set_image", "put the second one on the beard trim"),
+    ("service.service.suggest_image", "suggest a drawing for the beard trim"),
+    ("service.service.update", "the manicure now costs 30 euros"),
+    ("service.session.get", "Marta's session: still held, or what happened?"),
+    ("service.session.hold", "keep one of Marta's sessions for her colour"),
+    ("service.session.release", "free the one held for Marta's manicure"),
+    ("service.session.return", "the laser sale was refunded, put the sessions back"),
+    ("service.session.settle", "we just charged the sale, deliver whatever is held"),
+    ("service.settings.get", "how much buffer do we leave by default?"),
+    ("service.settings.update", "I want fifteen minutes between them by default"),
+]
+test_a_request_in_english_is_lifted_by_its_english_asks = in_hubs(english_words_test(OWN_WORDS_EN))
+test_each_tool_has_its_own_english_words = english_coverage_test("service", OWN_WORDS_EN)
 
 
 def test_every_tool_of_services_has_its_own_words():
-    tools = {name for name, op in registry.items() if op.app_label == "service" and assistant.is_tool(op)}
+    tools = {name for name, op in registry.items() if op.app_label == "service" and assistant.tools.is_tool(op)}
     assert [name for name, _ in OWN_WORDS] == list(dict.fromkeys(name for name, _ in OWN_WORDS))  # one each
     assert {name for name, _ in OWN_WORDS} == tools
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation) and of the person's role
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation) and of the person's role
 @pytest.mark.parametrize(("name", "language", "ask"), MOVED)
 def test_services_leaves_room_to_the_asks_of_other_apps_it_moves(catalog_of, name, language, ask):
     assert ask in shared.asks_of(registry[name])[language]  # positive control: it is still that tool's ask
@@ -267,7 +299,7 @@ def test_services_leaves_room_to_the_asks_of_other_apps_it_moves(catalog_of, nam
     for role in Membership.Role:
         tools = catalog_of(role, language)
         if name in tools:
-            places[role] = place(tools, name, ask, language)
+            places[role] = offered_place(tools, name, ask, language)
     assert places  # positive control: some role holds the tool
     assert {role: found for role, found in places.items() if found is None or found > TOP - ROOM} == {}
 
@@ -276,23 +308,24 @@ def test_services_leaves_room_to_the_asks_of_other_apps_it_moves(catalog_of, nam
 def test_a_record_taken_by_its_id_says_which_read_finds_it(name, read):
     op = registry[name]
     assert list(op.input.model_fields)[0] in {"id", "ids"}  # positive control: it takes the record by its id
-    assert assistant.is_tool(registry[read]) and registry[read].kind == "query"
+    assert assistant.tools.is_tool(registry[read]) and registry[read].kind == "query"
     assert read in op.ai["description"], name
 
 
 def test_the_hub_reads_a_bono_as_a_voucher_of_services_and_an_asignacion_as_an_assignment():
-    """``base.assistant.SYNONYMS``: «el bono» names Services' voucher, the one of the catalogue and the one sold
-    (``service.package``, ``service.grant``), and «la asignación», or what one «asigna», a professional's assignment
-    to a service (``service.assignment``); without the Hub's groups, none of them does (positive control)."""
-    for phrase, wanted in (
-        ("anula el bono de Marta", "grant"),
-        ("¿qué bonos ofrecemos?", "package"),
-        ("asigna los peinados a Lucas", "assignment"),
-        ("cambia la asignación de Lucas", "assignment"),
-    ):
-        concepts = shared.asked([phrase], assistant.SYNONYMS).concepts
-        assert any(shared.stem(wanted) in concept for concept in concepts), phrase
-        assert not any(shared.stem(wanted) in concept for concept in shared.asked([phrase]).concepts), phrase
+    """Services' own words (its ``assistant_synonyms``): «el bono» names Services' voucher, the one of the catalogue and
+    the one sold (``service.package``, ``service.grant``), and «la asignación», or what one «asigna», a professional's
+    assignment to a service (``service.assignment``); without the Hub's groups, none of them does (positive control)."""
+    grant, package, assignment = shared.stem("grant"), shared.stem("package"), shared.stem("assignment")
+    assert_its_words_name(
+        "service",
+        [
+            ("anula el bono de Marta", grant),
+            ("¿qué bonos ofrecemos?", package),
+            ("asigna los peinados a Lucas", assignment),
+            ("cambia la asignación de Lucas", assignment),
+        ],
+    )
 
 
 #: Requests in the owner's words that are neither an ask nor a probe of layer 2: each brings its tool among the first
@@ -304,14 +337,14 @@ BY_THE_GROUPS = [
 ]
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize(("name", "phrase"), BY_THE_GROUPS)
 def test_the_groups_of_services_bring_a_new_request_to_its_tool(catalog_of, name, phrase):
     tools = catalog_of(Membership.Role.OWNER, "es")
     assert comparable(phrase) not in probe_phrases()
-    assert comparable(phrase) not in {comparable(ask) for ask in shared.asks_of(tools[name]).get("es", ())}
-    assert name in ranked(tools, phrase)[:10]
-    assert name not in ranked(tools, phrase, without_services_groups())[:10]
+    assert_offered_with_room(tools, name, phrase, room=10)
+
+    assert name not in offered_to(tools, phrase, synonyms=without_services_groups())[:10]
 
 
 #: Services' own records that the words of a check or an appointment («el bono», «la sesión», «asigna») are of too:
@@ -330,16 +363,11 @@ NAMES_AN_ASSIGNMENT = re.compile(r"\basign", re.IGNORECASE)
 
 
 def without_services_groups() -> tuple[tuple[str, ...], ...]:
-    """``base.assistant.SYNONYMS`` without the groups Services adds: «bono» and «asignación»."""
-    kept = tuple(group for group in assistant.SYNONYMS if not {"bono", "asignacion"} & set(group))
-    assert len(assistant.SYNONYMS) - len(kept) == 2  # positive control: both of Services' groups are there
+    """The Hub's words (``base.assistant.relevance.synonyms``) without the groups Services says: «bono» and «asignación»."""
+    every = assistant.relevance.synonyms()
+    kept = tuple(group for group in every if not {"bono", "asignacion"} & set(group))
+    assert len(every) - len(kept) == 2  # positive control: both of Services' groups are there
     return kept
-
-
-def ranked(tools: dict[str, Operation], phrase: str, synonyms: tuple | None = None) -> list[str]:
-    """The tools a turn offers for ``phrase`` in Spanish, as ``base.assistant.RANKING`` ranks, with ``synonyms``."""
-    ranking = {**assistant.RANKING} if synonyms is None else {**assistant.RANKING, "synonyms": synonyms}
-    return [op.name for op in shared.relevant(tools, [phrase], "es", **ranking)]
 
 
 def passed_by(offered: list[str], name: str) -> set[str] | None:
@@ -358,7 +386,7 @@ def lost_places(before: list[str], now: list[str], name: str) -> set[str] | None
     return None if after is None else after - then
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 def test_services_asks_take_no_place_from_sales_nor_appointments(catalog_of):
     """Each request of Appointments and of Sales' checks of layer 2 that a turn offers its tool for keeps it ahead of
     the same vouchers, sessions and assignments of Services whether their tools say their asks or not: none climbs past
@@ -372,12 +400,12 @@ def test_services_asks_take_no_place_from_sales_nor_appointments(catalog_of):
     lost = {}
     for probe in probes:
         name, phrase = probe["tool"], probe["phrase"]
-        if (passed := lost_places(ranked(before, phrase), ranked(tools, phrase), name)) != set():
+        if (passed := lost_places(offered_to(before, phrase), offered_to(tools, phrase), name)) != set():
             lost[probe["id"]] = passed
     assert lost == {}
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 def test_services_groups_take_no_place_from_sales_nor_appointments(catalog_of):
     """The same requests, with and without the Hub's groups of Services («bono», «asignación»): none loses its place to
     a voucher, a session or an assignment of Services, unless the request names an assignment itself."""
@@ -387,7 +415,8 @@ def test_services_groups_take_no_place_from_sales_nor_appointments(catalog_of):
     lost, named = {}, []
     for probe in probes:
         name, phrase = probe["tool"], probe["phrase"]
-        if (passed := lost_places(ranked(tools, phrase, without), ranked(tools, phrase), name)) != set():
+        if (passed := lost_places(offered_to(tools, phrase, synonyms=without), offered_to(tools, phrase), name)
+) != set():
             if NAMES_AN_ASSIGNMENT.search(phrase) and passed:
                 named.append(probe["id"])
                 continue

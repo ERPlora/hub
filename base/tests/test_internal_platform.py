@@ -14,15 +14,22 @@ import copy
 import json
 
 import pytest
+from django.conf import settings as deployed
 
 from apps.invoice.models import Invoice
-from apps.invoice.tests.test_platform import BODY
+from apps.invoice.tests.test_platform import BODY, free_month
 from apps.invoice.tests.test_platform_invoices import PLATFORM, PLATFORM_ISSUER, system
 from apps.invoice.tests.conftest import run
-from base.tenancy.tests.hubs import HUB_DATABASES
+from apps.verifactu.models import Record
+from base.tenancy.context import use_hub
+from base.tenancy.tests.business import HUB_DB
 from base.tenancy.tests.legacy import use_legacy
 from base.tests.test_internal import code, signed
+from control.models import Hub
 from live.context import Scope, system_context
+
+#: The door opens the platform hub's database itself: each test enters it only to read it.
+pytestmark = [HUB_DB, pytest.mark.usefixtures("no_test_fallback")]
 
 ROOT = "/internal/platform/invoices"
 HOST = "hub.erplora.internal"
@@ -40,19 +47,26 @@ def get(client, path, **more):
 
 
 @pytest.fixture
-def platform_row(db, settings):
-    """The platform hub's row in the registry (``create_platform_hub`` makes it); the suite's fallback keeps its rows
-    on control's test database, as for every business of the tests without its own database."""
-    from control.models import Hub
-
+def platform_row(hub_a, settings):
+    """The platform hub's row in the registry, ready on a database of its own (``hub_a``), as ``create_platform_hub``
+    leaves it."""
+    assert hub_a.slug == PLATFORM.key
+    Hub.objects.filter(pk=hub_a.pk).update(is_platform=True)
     settings.PLATFORM_HUB_SLUG = PLATFORM.key
-    return Hub.objects.create(slug=PLATFORM.key, status=Hub.Status.READY, is_platform=True)
+    return hub_a
 
 
 @pytest.fixture
 def platform_hub(platform_row, settings):
     settings.ERPLORA_ENVIRONMENT = "pre"
-    run("invoice.issuer.update", PLATFORM_ISSUER, system())
+    with use_hub(platform_row):
+        run("invoice.issuer.update", PLATFORM_ISSUER, system())
+
+
+def invoices() -> list[Invoice]:
+    """ERPlora's invoices in the platform hub's own database."""
+    with use_hub(Hub.objects.get(slug=deployed.PLATFORM_HUB_SLUG)):
+        return list(Invoice.objects.all())
 
 
 # Health
@@ -82,9 +96,11 @@ def test_without_the_platform_hub_in_the_registry_it_is_503_and_says_how_to_make
     assert (issued.status_code, code(issued)) == (503, "base.platform_hub_missing")
 
 
-@pytest.mark.usefixtures("no_test_fallback")
-def test_a_platform_hub_without_its_own_database_is_503_and_says_how_to_make_it(client, platform_row):
+def test_a_platform_hub_without_its_own_database_is_503_and_says_how_to_make_it(client, db, settings):
     """Its row is there but its data is still in control's: never run there, nor on control."""
+    settings.PLATFORM_HUB_SLUG = "erplora"
+    Hub.objects.create(slug="erplora", status=Hub.Status.READY, is_platform=True)
+
     issued = post(client, BODY)
     health = get(client, f"{ROOT}/health")
 
@@ -94,13 +110,8 @@ def test_a_platform_hub_without_its_own_database_is_503_and_says_how_to_make_it(
         assert not Invoice.objects.exists()
 
 
-@pytest.mark.django_db(databases=HUB_DATABASES)
-@pytest.mark.usefixtures("no_test_fallback")
 def test_the_platform_hub_issues_in_its_own_database_and_nowhere_else(client, hub_a, settings):
     """The platform hub is a business with its own database (``is_platform``): its invoices go there."""
-    from base.tenancy.context import use_hub
-    from control.models import Hub
-
     Hub.objects.filter(pk=hub_a.pk).update(is_platform=True)
     settings.PLATFORM_HUB_SLUG = hub_a.slug
     settings.ERPLORA_ENVIRONMENT = "pre"
@@ -131,7 +142,36 @@ def test_an_invoice_is_issued_with_its_qr(client, platform_hub):
     assert set(body) == {"status", "qr", "error"}
     assert (body["status"], body["error"]) == ("issued", None)
     assert body["qr"].startswith("https://prewww2.aeat.es/wlpl/TIKE-CONT/ValidarQR?")
-    assert Invoice.objects.get().platform_ref is not None
+    [invoice] = invoices()
+    assert invoice.platform_ref is not None
+
+
+def test_a_free_month_is_issued_with_its_record_sealed_at_zero_and_its_pdf(client, platform_hub):
+    answer = post(client, free_month())
+
+    assert answer.status_code == 201
+    assert (answer.json()["status"], answer.json()["error"]) == ("issued", None)
+    assert "&importe=0.00" in answer.json()["qr"]
+    with use_hub(Hub.objects.get(slug=deployed.PLATFORM_HUB_SLUG)):
+        [record] = Record.objects.filter(invoice__platform_ref=BODY["id"])
+        assert record.fingerprint and record.qr_url == answer.json()["qr"]
+        assert "<sum1:ImporteTotal>0.00</sum1:ImporteTotal>" in record.xml
+        [line] = record.invoice.lines.all()
+        assert (line.unit_price, line.discount_amount, line.base_amount) == (2999, 2999, 0)
+    pdf = get(client, f"{ROOT}/{BODY['id']}/pdf")
+    assert (pdf.status_code, pdf["Content-Type"]) == (200, "application/pdf")
+    assert pdf.content.startswith(b"%PDF-")
+
+
+def test_a_negative_discount_is_422_with_its_field(client, platform_hub):
+    body = free_month()
+    body["lines"][0]["discount_cents"] = -1
+
+    answer = post(client, body)
+
+    assert (answer.status_code, code(answer)) == (422, "internal.payload_invalid")
+    assert any("discount_cents" in field for field in answer.json()["error"]["fields"])
+    assert invoices() == []
 
 
 def test_posting_it_again_answers_the_same_with_200(client, platform_hub):
@@ -140,7 +180,7 @@ def test_posting_it_again_answers_the_same_with_200(client, platform_hub):
     again = post(client, BODY)
 
     assert (again.status_code, again.json()) == (200, first.json())
-    assert Invoice.objects.count() == 1
+    assert len(invoices()) == 1
 
 
 def test_it_answers_on_the_private_name_of_the_hub_too(client, platform_hub, settings):
@@ -161,7 +201,7 @@ def test_a_body_out_of_contract_is_422_with_the_fields(client, platform_hub):
     error = answer.json()["error"]
     assert error["code"] == "internal.payload_invalid"
     assert "lines" in error["fields"]
-    assert Invoice.objects.count() == 0
+    assert invoices() == []
 
 
 def test_a_body_that_is_no_json_object_is_422(client, platform_hub):
@@ -190,7 +230,7 @@ def test_a_signature_over_another_body_is_401(client, platform_hub):
     )
 
     assert (answer.status_code, code(answer)) == (401, "internal.unsigned")
-    assert Invoice.objects.count() == 0
+    assert invoices() == []
 
 
 def test_issuing_is_a_post(client, platform_hub):

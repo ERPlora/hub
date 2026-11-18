@@ -13,13 +13,15 @@ from pathlib import Path
 import pytest
 from django.conf import settings
 from live import assistant as shared
-from live.operations import AI, Operation, registry
+from live.operations import AI, registry
 
 from base import assistant
 from base.models import Membership
-# ``context_of`` is base's fixture (a member of business ``a``, which has every app on, with a role and a language):
-# imported here, pytest hands it to the tests of this module as it does to base's.
-from base.tests.test_assistant_asks import TOP, assert_its_asks_bring, comparable, context_of, probe_phrases
+from base.tests.test_assistant_asks import TOP, assert_offered_with_room, comparable
+from base.tests.test_assistant_asks import probe_phrases
+from base.tests.test_assistant_asks import english_coverage_test, english_words_test, own_words_test
+
+from .conftest import HUB_DB, in_hubs
 
 #: The requests of hub#1107's QA (``tests/e2e/qa/probes/owner-es-online_booking-2026-11-08.json``), as the owner said
 #: them, and nothing of the tools' ``asks``: before Online booking said its asks, booking from the public page as the
@@ -38,10 +40,6 @@ REPORTED = [
         "¿qué servicios puede reservar una clienta en la web, con precio y duración?",
     ),
 ]
-#: How far down the tools a turn offers (``MAX_TOOLS``, 40) a probe of the QA may bring its tool: the first ten for the
-#: ones the issue reports, half of them for every other probe, so the tools of the apps that say their asks later may
-#: climb past them before the model loses them.
-WITH_ROOM = 20
 PROBES_DIR = Path(settings.BASE_DIR) / "tests" / "e2e" / "qa" / "probes"
 #: Every probe of layer 2 of Online booking, the owner's real phrases of the QA: the ones above and the ones the model
 #: answered right.
@@ -75,21 +73,8 @@ OWN_WORDS = [
 ]
 
 
-def owners_catalog(context_of, language: str = "es") -> dict[str, Operation]:
-    """The real catalogue of the assistant of the owner of business ``a``, which has every app on."""
-    return assistant.catalog(context_of(Membership.Role.OWNER, language))
-
-
-def place_of_no_ask(tools: dict[str, Operation], name: str, phrase: str, language: str = "es") -> int | None:
-    """The place (1 is first) a turn offers ``name`` at for ``phrase``, none of its asks; ``None`` if not offered."""
-    assert name in tools  # positive control: the person holds the tool, so its place is known
-    assert comparable(phrase) not in {comparable(ask) for ask in shared.asks_of(tools[name]).get(language, ())}
-    ranked = [op.name for op in assistant.relevant(tools, [phrase], language)]
-    return ranked.index(name) + 1 if name in ranked else None
-
-
 def online_booking_tools() -> list[str]:
-    return sorted(name for name, op in registry.items() if op.app_label == "online_booking" and assistant.is_tool(op))
+    return sorted(name for name, op in registry.items() if op.app_label == "online_booking" and assistant.tools.is_tool(op))
 
 
 def test_online_booking_is_listed_so_layer_1_sweeps_every_ask_of_it():
@@ -108,30 +93,51 @@ def test_online_booking_offers_its_fifteen_tools():
     assert "online_booking.customer.erase" not in tools
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize(("name", "phrase"), REPORTED)
-def test_the_reported_request_offers_its_existing_operation_among_the_first_ten(context_of, name, phrase):
+def test_the_reported_request_offers_its_existing_operation_among_the_first_ten(catalog_of, name, phrase):
     assert probe_phrases().get(comparable(phrase)) == f"owner.es.{name}"  # the owner's own words, as the QA said them
-    place = place_of_no_ask(owners_catalog(context_of), name, phrase)
-    assert place is not None and place <= TOP, place
+    assert_offered_with_room(catalog_of(Membership.Role.OWNER, "es"), name, phrase, room=TOP)
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize("probe", PROBES, ids=[probe["id"] for probe in PROBES])
-def test_every_probe_of_online_booking_offers_its_tool_without_being_one_of_its_asks(context_of, probe):
+def test_every_probe_of_online_booking_offers_its_tool_without_being_one_of_its_asks(catalog_of, probe):
     """The owner's fifteen phrases of layer 2, the ones the model answered right too: a tool of Online booking that a
     new ask elsewhere pushes out of the first half of the ones a turn offers fails here before the real-model QA sees
     it."""
     assert (probe["role"], probe["language"]) == ("owner", "es")
-    tools = owners_catalog(context_of, probe["language"])
-    place = place_of_no_ask(tools, probe["tool"], probe["phrase"], probe["language"])
-    assert place is not None and place <= WITH_ROOM, place
+    tools = catalog_of(Membership.Role.OWNER, probe["language"])
+    assert_offered_with_room(tools, probe["tool"], probe["phrase"], probe["language"])
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
-@pytest.mark.parametrize(("name", "phrase"), OWN_WORDS)
-def test_a_request_in_the_persons_own_words_reaches_its_tool_by_its_asks(context_of, name, phrase):
-    assert_its_asks_bring(owners_catalog(context_of), name, phrase, "es")
+test_a_request_in_the_persons_own_words_reaches_its_tool_by_its_asks = in_hubs(own_words_test(OWN_WORDS, "es"))
+
+
+#: What the owner says in English in words of their own for each tool of Online booking that needs one, neither
+#: an ask nor a probe of layer 2: its English asks lift it among the first ten (``assert_its_asks_lift``).
+OWN_WORDS_EN = [
+    ("online_booking.booking.cancel", "something came up on Saturday, turn down the one from my link"),
+    ("online_booking.booking.complete", "the one from earlier today is done"),
+    ("online_booking.booking.confirm", "Nerea's came in from my link: tell her yes"),
+    ("online_booking.booking.delete", "the fake one from my link, get rid of it for good"),
+    ("online_booking.booking.get", "Ainhoa is calling about hers on Wednesday, what is it?"),
+    ("online_booking.booking.list", "anything new in the inbox this week?"),
+    ("online_booking.booking.no_show", "no sign of Olga yesterday, she never turned up"),
+    (
+        "online_booking.public.book",
+        "a new customer wants a cut on Thursday at 5, anyone free is fine, mobile 600 111 222",
+    ),
+    ("online_booking.public.booking", "what details does Leire have on her own link?"),
+    ("online_booking.public.cancel", "free up Leire's using her own link"),
+    ("online_booking.public.page", "what do people see when they open my link?"),
+    ("online_booking.public.services", "which treatments do I let people pick on the web?"),
+    ("online_booking.public.slots", "on Tuesday, what times are left for anyone on the web?"),
+    ("online_booking.settings.get", "what do customers have to give before they book themselves?"),
+    ("online_booking.settings.update", "they should see «Hi, lovely» when they book"),
+]
+test_a_request_in_english_is_lifted_by_its_english_asks = in_hubs(english_words_test(OWN_WORDS_EN))
+test_each_tool_has_its_own_english_words = english_coverage_test("online_booking", OWN_WORDS_EN)
 
 
 #: Where booking as the customer sends the model for what it takes (hub#1107: «payload inválido» and

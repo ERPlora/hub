@@ -5,6 +5,7 @@
 import { Combo, type ComboOption } from '@erplora/ui/components';
 import { describe, expect, it, vi } from 'vitest';
 
+import { itTellsTheCorrectedFieldApart } from '../../../../base/frontend/__tests__/same-words-refusal';
 import type { CategoryRowOut } from '../operations';
 import { click, ionValue, mountTax, settle } from '../__tests__/mount-tax';
 import AliasCreateModal from './AliasCreateModal.vue';
@@ -125,5 +126,17 @@ describe('AliasCreateModal: Android Back with unsaved changes (hub#1020, BASE-F0
       change: () => ionValue(s.field('alias'), 'comida', 'ionInput'),
       restore: () => ionValue(s.field('alias'), '', 'ionInput'),
     });
+  });
+});
+
+describe('AliasCreateModal: fields refused with the same words (hub#888)', () => {
+  // Alias, the Category (the picker) and Origin each paint a refusal under their own key.
+  const FIELD_OF: Record<string, string> = { tax_category_key: 'category' };
+  itTellsTheCorrectedFieldApart(['alias', 'tax_category_key', 'source'], async (locale, refusal) => {
+    const s = await setup(locale);
+    await ionValue(s.field('alias'), 'comida', 'ionInput');
+    await s.chooseCategory('restaurant.food');
+    s.answer(422, refusal);
+    return { field: (key) => s.field(FIELD_OF[key] ?? key), send: () => click(s.add()), settle };
   });
 });

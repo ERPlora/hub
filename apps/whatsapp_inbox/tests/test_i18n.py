@@ -4,7 +4,6 @@ import gettext
 import json
 from pathlib import Path
 
-import pytest
 from django.apps import apps
 from django.utils.functional import Promise
 from django.utils.translation import gettext as gettext_
@@ -12,7 +11,7 @@ from django.utils.translation import override
 
 from apps.whatsapp_inbox import queries, schemas, services
 from apps.whatsapp_inbox.models import Channel, Conversation, Message, Note, Template
-from apps.whatsapp_inbox.tests.conftest import receive
+from apps.whatsapp_inbox.tests.conftest import HOST, A, HUB_DB, receive
 from base.tests.po import (
     catalogue_key,
     compiled_differences,
@@ -124,15 +123,15 @@ def test_spanish_says_the_inboxs_own_words_not_an_earlier_apps():
         }
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_an_error_follows_the_language_of_the_request(client, make_user):
     receive("wamid.1")
-    client.force_login(make_user("boss", host="a", role="hub_admin"))
+    client.force_login(make_user("boss", host=A.key, role="hub_admin"))
     response = client.post(
         "/api/whatsapp_inbox/messages/send",
         json.dumps({"conversation": "Zoe", "text": "Hola", "client_message_id": "0199e000-0000-7000-8000-0000000000be"}),
         content_type="application/json",
-        HTTP_HOST="a.localhost",
+        HTTP_HOST=HOST,
         HTTP_ACCEPT_LANGUAGE="es",
     )
     assert response.status_code == 404

@@ -22,7 +22,8 @@ from pydantic import (
     model_validator,
 )
 
-from apps.modifier.models import MAX_CHOICES, MAX_DELTA, NAME_MAX_LENGTH
+from apps.modifier.models import MAX_CHOICES, MAX_DELTA, MAX_OPTIONS, NAME_MAX_LENGTH
+from base.recovery import RecoveredOut
 from base.schemas import names, unless_given
 
 T = TypeVar("T")
@@ -46,7 +47,7 @@ OWN_TAX_CATEGORY = gettext_noop("Own tax category")
 #: The forms' name for it; the model's own, «kitchen name», is the Django admin's (hub#958).
 KITCHEN_TICKET_NAME = gettext_noop("Kitchen ticket name")
 
-# The assistant's card names the record a write acts on by these reads (base/assistant.py ``REFERS``), run as whoever
+# The assistant's card names the record a write acts on by these reads (base/assistant/cards.py ``REFERS``), run as whoever
 # asks, never by its id: a group, a product and a category by their names; an option by its name and its group, because
 # two groups may have an option with one name; a link by its group and what it hangs from.
 A_GROUP = names("modifier.group.get")
@@ -298,7 +299,9 @@ class OptionRefIn(_Input):
         return self
 
 
-class OptionIn(_OwningGroup):
+class _OptionFields(_Input):
+    """What an option is, its group aside."""
+
     name: Name = Field(
         description="The option's name, unique in its group (e.g. «Cheese»)."
     )
@@ -322,6 +325,24 @@ class OptionIn(_OwningGroup):
     )
     sort_order: Order = Field(
         0, description="Where the option shows in its group: lower first."
+    )
+
+
+# Bases in this order keep the group's fields first in the schema, as they have always come.
+class OptionIn(_OptionFields, _OwningGroup):
+    pass
+
+
+class OptionOfCopyIn(_OptionFields):
+    """An option of a group of a separate copy, as ``modifier.option.create`` takes it but its group."""
+
+
+class GroupRecoverIn(GroupIn):
+    """A group of a separate copy the business no longer has: what ``modifier.group.create`` takes and its options
+    there."""
+
+    options: list[OptionOfCopyIn] = Field(
+        [], max_length=MAX_OPTIONS, description="Its options in the copy, in the order they were added."
     )
 
 
@@ -493,6 +514,10 @@ class GroupOut(Schema):
     updated_at: datetime = Field(description="When it was last changed.")
 
 
+class GroupRecoveredOut(GroupOut, RecoveredOut):
+    """A group made again from a separate copy, and the options it came back without."""
+
+
 class OptionOut(Schema):
     id: UUID = Field(description="The option's id.")
     group_id: UUID = Field(description="Its group.")
@@ -515,6 +540,10 @@ class OptionOut(Schema):
     sort_order: int = Field(description="Order in its group.")
     created_at: datetime = Field(description="When it was created.")
     updated_at: datetime = Field(description="When it was last changed.")
+
+
+class OptionRecoveredOut(OptionOut, RecoveredOut):
+    """An option added again from a separate copy, and why it came back without being chosen by default."""
 
 
 class LinkOut(Schema):

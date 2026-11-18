@@ -42,9 +42,12 @@ ALL = [
 ]
 
 # Inventory's events (its WORKBOOK fixes the payload): a product's name, price or state is what a
-# choice shows, so they re-run the menus live; a deleted one also leaves every menu.
+# choice shows, so they re-run the menus live; a deleted one also leaves every menu. One recovered from
+# a separate copy is the same product again (INVENTORY-F34): its choices come back from the copy with
+# the recovery (COMBO-F15), so it only re-runs the menus.
 PRODUCT_UPDATED = "inventory.product.updated"
 PRODUCT_DELETED = "inventory.product.deleted"
+PRODUCT_RESTORED = "inventory.product.restored"
 
 #: Event of another app → the operation of this app that reacts to it.
 REACTIONS = {PRODUCT_DELETED: "combo.option.drop_product"}

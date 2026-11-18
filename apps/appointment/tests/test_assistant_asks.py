@@ -13,15 +13,17 @@ from pathlib import Path
 import pytest
 from django.conf import settings
 from live import assistant as shared
-from live.context import OperationContext, Scope
 from live.operations import AI, Operation, registry
 
+from apps.invoice.tests.conftest import catalog_of  # noqa: F401 (a fixture: the tests below take it by name)
+from apps.invoice.tests.conftest import in_hubs
 from base import assistant
 from base.models import Membership
-from base.permissions import permissions_for
-from base.tests.test_assistant_asks import TOP, assert_its_asks_bring, comparable, probe_phrases
+from base.tests.test_assistant_asks import TOP, assert_offered_with_room, comparable
+from base.tests.test_assistant_asks import offered_place, place_of_no_ask, probe_phrases
+from base.tests.test_assistant_asks import by_group_test, english_coverage_test, english_words_test, own_words_test
 
-A = Scope("host", "a")
+from .conftest import HUB_DB
 
 #: The requests of hub#1097's QA (``tests/e2e/qa/probes/owner-es-appointment-2026-11-08.json``), as the owner said them,
 #: and nothing of the tools' ``asks``: before Appointments said its asks, the blocks of the agenda and generating the
@@ -49,11 +51,9 @@ REPORTED = [
         "comprueba si Camarera Ventas QA puede atender un Corte QA mañana a las 13:00 y, si no puede, dime el motivo",
     ),
 ]
-#: How far down the tools a turn offers (``MAX_TOOLS``, 40) a request of the QA may bring its tool: the first ten for
-#: the ones the issue reports, half of them for every other probe, so the tools of the apps that say their asks later
-#: may climb past them before the model loses them.
+#: How far down the tools a turn offers the requests the issue reports bring their tool: the first ten; every other
+#: probe, the first ``WITH_ROOM``.
 REPORTED_TOP = TOP
-WITH_ROOM = 20
 #: Every probe of layer 2 of Appointments, the owner's real phrases of the QA: the ones above and the ones the model got
 #: right.
 PROBES = json.loads(
@@ -68,18 +68,18 @@ TWINS = [
     ("appointment.appointment.confirm", "online_booking.booking.confirm"),
     ("appointment.settings.update", "online_booking.settings.update"),
 ]
-#: What Appointments' groups of ``base.assistant.SYNONYMS`` are for, in a turn: a request nobody wrote as an ask nor as
-#: a probe, the tool it brings among the first ten (``TOP``) and the word of its group. Without «bloqueo», a block put
-#: on a professional is not offered at all; without «citas fijas», deleting them comes 15th, behind the appointments'
-#: own tools. The group of «puede atender» is ``REPORTED``'s: without it, checking a time is the 40th.
+#: What Appointments' own groups of words (its ``assistant_synonyms``) are for, in a turn: a request nobody wrote as an
+#: ask nor as a probe, the tool it brings among the first ten (``TOP``) and the word of its group. Without «bloqueo», a
+#: block put on a professional is not offered at all; without «citas fijas», deleting them comes 15th, behind the
+#: appointments' own tools. The group of «puede atender» is ``REPORTED``'s: without it, checking a time is the 40th.
 BY_GROUP = [
     ("appointment.blocked_time.create", "pon un bloqueo a Inés el lunes de 9:00 a 11:00", "bloqueo"),
     ("appointment.recurring.delete", "quita las citas fijas de los martes de Lola", "citas fijas"),
 ]
 #: What a person says in words of their own, neither an ask nor a probe of layer 2, for the twenty-eight tools whose
-#: probe a turn already offers by their name and description alone: here it is their asks that bring the tool among
-#: the first ten, so asks that stop reading as people speak fail. None says a word of ``base.assistant.SYNONYMS`` that
-#: names the tool's own thing («bloqueo», «cita fija», «puede atender»): that word alone brings it.
+#: probe a turn already offers by their name and description alone: here it is their asks that bring the tool among the
+#: first ten, so asks that stop reading as people speak fail. None says a word of Appointments' ``assistant_synonyms``
+#: that names the tool's own thing («bloqueo», «cita fija», «puede atender»): that word alone brings it.
 OWN_WORDS = [
     ("appointment.agenda.lanes", "¿qué tiene cada peluquera el jueves, en columnas?"),
     ("appointment.appointment.bulk_create", "Lola quiere las cinco sesiones de golpe, todas o ninguna"),
@@ -115,33 +115,8 @@ OWN_WORDS = [
 ]
 
 
-@pytest.fixture
-def catalog_of(make_user):
-    """The real catalogue of the assistant of a person with ``role`` in business ``a``, in ``language``."""
-
-    def of(role: str, language: str) -> dict[str, Operation]:
-        user = make_user(f"asker-{role}", host=A.key, role=role)
-        ctx = OperationContext(scope=A, actor=user.username, permissions=permissions_for(user, A), language=language)
-        return assistant.catalog(ctx)
-
-    return of
-
-
-def offered_place(tools: dict[str, Operation], name: str, phrase: str) -> int | None:
-    """The place a turn offers ``name`` at for ``phrase`` (1 is first), ``None`` when it is not offered at all."""
-    offered = [op.name for op in assistant.relevant(tools, [phrase], "es")]
-    return offered.index(name) + 1 if name in offered else None
-
-
-def place_of_no_ask(tools: dict[str, Operation], name: str, phrase: str) -> int | None:
-    """``offered_place`` of a tool the person holds for a ``phrase`` that is none of its asks in Spanish."""
-    assert name in tools  # positive control: the owner holds the tool, so its place is known
-    assert comparable(phrase) not in {comparable(ask) for ask in shared.asks_of(tools[name]).get("es", ())}
-    return offered_place(tools, name, phrase)
-
-
 def appointment_tools() -> dict[str, Operation]:
-    return {name: op for name, op in registry.items() if op.app_label == "appointment" and assistant.is_tool(op)}
+    return {name: op for name, op in registry.items() if op.app_label == "appointment" and assistant.tools.is_tool(op)}
 
 
 def test_appointments_is_listed_so_layer_1_sweeps_every_ask_of_it():
@@ -165,27 +140,23 @@ def test_the_reported_requests_are_the_probes_of_layer_2():
     ]
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize(("name", "phrase"), REPORTED)
 def test_the_reported_appointment_request_offers_its_existing_operation(catalog_of, name, phrase):
-    tools = catalog_of(Membership.Role.OWNER, "es")
-    place = place_of_no_ask(tools, name, phrase)
-    assert place is not None and place <= REPORTED_TOP, place
+    assert_offered_with_room(catalog_of(Membership.Role.OWNER, "es"), name, phrase, room=REPORTED_TOP)
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize("probe", PROBES, ids=[probe["id"] for probe in PROBES])
 def test_every_probe_of_appointments_offers_its_tool_without_being_one_of_its_asks(catalog_of, probe):
     """The owner's thirty-five phrases of layer 2, the ones the model answered right too: a tool of Appointments that a
     new ask elsewhere pushes out of the first half of the ones a turn offers fails here before the real-model QA sees
     it."""
     assert (probe["app"], probe["role"], probe["language"]) == ("appointment", "owner", "es")
-    tools = catalog_of(Membership.Role.OWNER, probe["language"])
-    place = place_of_no_ask(tools, probe["tool"], probe["phrase"])
-    assert place is not None and place <= WITH_ROOM, place
+    assert_offered_with_room(catalog_of(Membership.Role.OWNER, probe["language"]), probe["tool"], probe["phrase"])
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize(("name", "twin"), TWINS)
 def test_the_reported_request_offers_appointments_tool_before_online_bookings_twin(catalog_of, name, twin):
     tools = catalog_of(Membership.Role.OWNER, "es")
@@ -195,23 +166,53 @@ def test_the_reported_request_offers_appointments_tool_before_online_bookings_tw
     assert place is not None and (twins is None or place < twins), (place, twins)
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
-@pytest.mark.parametrize(("name", "phrase", "word"), BY_GROUP)
-def test_a_request_in_spanish_brings_its_tool_among_the_first_ten_by_appointments_groups(catalog_of, name, phrase, word):
-    tools = catalog_of(Membership.Role.OWNER, "es")
-    assert comparable(phrase) not in probe_phrases()
-    place = place_of_no_ask(tools, name, phrase)
-    assert place is not None and place <= TOP, place
-    without = tuple(group for group in assistant.SYNONYMS if word not in group)
-    assert len(without) == len(assistant.SYNONYMS) - 1  # positive control: exactly its group is left out
-    unread = [op.name for op in shared.relevant(tools, [phrase], "es", **{**assistant.RANKING, "synonyms": without})]
-    assert name not in unread[:TOP]
+test_a_request_in_spanish_brings_its_tool_among_the_first_ten_by_appointments_groups = in_hubs(by_group_test(BY_GROUP))
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
-@pytest.mark.parametrize(("name", "phrase"), OWN_WORDS)
-def test_a_request_in_the_persons_own_words_reaches_its_tool_by_its_asks(catalog_of, name, phrase):
-    assert_its_asks_bring(catalog_of(Membership.Role.OWNER, "es"), name, phrase, "es")
+test_a_request_in_the_persons_own_words_reaches_its_tool_by_its_asks = in_hubs(own_words_test(OWN_WORDS, "es"))
+
+
+#: What the owner says in English in words of their own for each tool of Appointments that needs one, neither
+#: an ask nor a probe of layer 2: its English asks lift it among the first ten (``assert_its_asks_lift``).
+OWN_WORDS_EN = [
+    ("appointment.agenda.lanes", "show Thursday split per hairdresser"),
+    ("appointment.appointment.bulk_create", "Marisa wants all five sessions at once, every Monday, all or none"),
+    ("appointment.appointment.bulk_delete", "those three of Marisa's, out at once"),
+    ("appointment.appointment.cancel", "Marisa can't make it on Friday, call it off"),
+    ("appointment.appointment.charge", "send Marisa's appointment to checkout"),
+    ("appointment.appointment.complete", "Marisa's colour appointment is finished, mark it"),
+    ("appointment.appointment.confirm", "accept what Marisa asked for on Thursday"),
+    ("appointment.appointment.count_active_for_service", "does anyone still have highlights coming up?"),
+    ("appointment.appointment.count_to_confirm", "how many are left unconfirmed?"),
+    ("appointment.appointment.create", "put Marisa down for a colour on Friday at noon"),
+    ("appointment.appointment.delete", "delete that test from Friday"),
+    ("appointment.appointment.get", "what phone number is on APT-0077?"),
+    ("appointment.appointment.history", "who moved hers? Marisa's, I mean"),
+    ("appointment.appointment.list", "who's coming on Friday?"),
+    ("appointment.appointment.list_for_customer", "has Marisa been here in the past? anything upcoming?"),
+    ("appointment.appointment.mark_no_show", "Marisa never showed up yesterday"),
+    ("appointment.appointment.notices", "anything booked or cancelled by customers themselves lately?"),
+    ("appointment.appointment.reschedule", "push Marisa's Thursday one back an hour"),
+    ("appointment.appointment.start", "Marisa just walked in, get hers going"),
+    ("appointment.appointment.update", "Marisa can't stand ammonia, note it on hers"),
+    ("appointment.availability.check", "is 9:30 on Friday bookable for Marisa?"),
+    ("appointment.availability.slots", "what free times are left on Saturday for a colour?"),
+    ("appointment.blocked_time.create", "nobody should book Inés on Friday afternoon, she has training"),
+    ("appointment.blocked_time.delete", "no need to close Friday afternoon anymore, unblock it"),
+    ("appointment.blocked_time.list", "anything off next month?"),
+    ("appointment.recurring.activate", "resume Marisa's weekly one"),
+    ("appointment.recurring.create", "Marisa will come every Tuesday at 6 pm"),
+    ("appointment.recurring.deactivate", "stop Marisa's weekly one until September"),
+    ("appointment.recurring.delete", "Marisa stops coming every week: remove it, but keep what's booked"),
+    ("appointment.recurring.get", "when's the next date of Marisa's weekly one?"),
+    ("appointment.recurring.list", "which repeating ones are still running?"),
+    ("appointment.recurring.materialize", "fill in what's missing for Marisa's weekly one"),
+    ("appointment.recurring.update", "Marisa will come on Wednesdays instead of Tuesdays from now on"),
+    ("appointment.settings.get", "how much notice do we need for a booking?"),
+    ("appointment.settings.update", "they should book at least two hours ahead, require that"),
+]
+test_a_request_in_english_is_lifted_by_its_english_asks = in_hubs(english_words_test(OWN_WORDS_EN))
+test_each_tool_has_its_own_english_words = english_coverage_test("appointment", OWN_WORDS_EN)
 
 
 def test_every_tool_is_caught_by_a_probe_or_by_words_of_its_own():

@@ -19,9 +19,9 @@ from live.models import OutboxEvent
 
 from apps.inventory.models import Product
 from apps.sale.models import Order, SaleLine
-from apps.sale.tests.conftest import A, run
+from apps.sale.tests.conftest import HUB_DB, A, run
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 #: Taxes' factory catalogue: restaurant food (10 %), a restaurant's beer (10 % at the table, 21 % to take away).
 FOOD = "restaurant.food"

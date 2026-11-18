@@ -9,6 +9,8 @@
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
 import { A, api, capture, createItem, EMPLOYEE, horizontalOverflow, hostPage, listReady, row, rowNames, rowOf, settled, shown, uniqueName } from './helpers';
+import { loadsMore, scrollToEnd } from './infinite-scroll-helpers';
+import { dismissToasts, toastSaying } from './toast-helpers';
 
 const FLOW_VIEWPORTS = {
   390: { width: 390, height: 844 },
@@ -168,10 +170,8 @@ for (const [width, viewport] of Object.entries(FLOW_VIEWPORTS)) {
         await detail.locator('[data-testid=demo-line-input-qty] input').fill('1');
         await detail.locator('[data-testid=demo-line-input-text] input').fill('Too late');
         await detail.locator('[data-testid=demo-line-add]').click();
-        const toast = page.locator('ion-toast');
-        await expect(toast).toHaveJSProperty('message', 'This item is closed: open it to add lines.');
-        await toast.evaluate((el) => (el as HTMLElement & { dismiss: () => Promise<boolean> }).dismiss());
-        await expect(toast).toHaveCount(0);
+        await expect(toastSaying(page, 'This item is closed: open it to add lines.')).toBeVisible();
+        await dismissToasts(page);
         await expect(detail.locator('[data-testid=demo-line-text]')).toHaveText(['Two boxes']);
         await act(page, width, 'demo-detail-toggle');
         await expect(detail.locator('[data-testid=demo-detail-status]')).toHaveText('Open');
@@ -238,9 +238,9 @@ for (const [width, viewport] of Object.entries(FLOW_VIEWPORTS)) {
  *  `MAX_BACKOFF_MS` of `@erplora/ui/sdk`), with the 150 ms of its resubscribe debounce and room for the reopen. */
 const LIVE_REOPEN_MS = 45_000;
 
-// More items than one page of `demo.item.list` holds (100, `ItemListIn.limit`). On a phone «Load more»
+// More items than one page of `demo.item.list` holds (100, `ItemListIn.limit`). On a phone the end of the cards
 // grows the window only within those 100 (three in a row at 25 per page), and past them the list pages instead, so
-// the oldest row is reached without «The items could not be loaded» (the second «Load more» at 50 per page asked for
+// the oldest row is reached without «The items could not be loaded» (the second growth at 50 per page asked for
 // 150 rows and the server refused it with a 422).
 test('DEMO-F05 with more than 100 items, every row in reach at 390, 834 and 1440 wide', async ({ browser }) => {
   test.setTimeout(240_000);
@@ -252,7 +252,6 @@ test('DEMO-F05 with more than 100 items, every row in reach at 390, 834 and 1440
   const { context, page } = await tablet(browser, FLOW_VIEWPORTS[1440], '/demo/items');
   const created: string[] = [];
   const loadError = () => shown(page).locator('[data-role=load-error]');
-  const loadMore = () => shown(page).locator('[data-testid=demo-items-load-more]');
   /** Searches `text` and waits until the list is that search's: the outside items gone, `first` on top. */
   async function search(text: string, first: string): Promise<void> {
     await shown(page).locator('[data-testid=demo-items-search] input').fill(text);
@@ -260,17 +259,17 @@ test('DEMO-F05 with more than 100 items, every row in reach at 390, 834 and 1440
     await expect.poll(async () => (await rowNames(page))[0]).toBe(first);
   }
   /**
-   * Clicks `control` and waits for its answer: first the live stream reopened with the control's change, then the
+   * Does `step` (a click, the end of the scroll) and waits for its answer: first the live stream reopened with its change, then the
    * last row shown changes, or the list fails. The SDK reopens the stream 150 ms after a change, but when the stream
    * has dropped (a loaded machine) it holds every change until its reconnection backoff ends, up to `LIVE_REOPEN_MS`:
    * the rows' 15 s count from the reopen, never from a click the backoff held (FIX DEMO-F05, rv-332).
    */
-  async function advance(control: Locator, what: string): Promise<void> {
+  async function advance(step: () => Promise<unknown>, what: string): Promise<void> {
     const before = (await rowNames(page)).at(-1);
     const reopened = page.waitForResponse((answer) => answer.url().includes('/api/live') && answer.status() === 200, {
       timeout: LIVE_REOPEN_MS,
     });
-    await control.click();
+    await step();
     await reopened.catch(() => {
       throw new Error(`${what}: the live stream did not reopen with the list's new window in ${LIVE_REOPEN_MS / 1000} s`);
     });
@@ -291,15 +290,15 @@ test('DEMO-F05 with more than 100 items, every row in reach at 390, 834 and 1440
       await search(`LM${run}`, name('b', 30));
       const oldest = row(page, name('a', 1));
       for (let step = 1; step <= 6 && !(await oldest.isVisible()); step += 1) {
-        const more = (await loadMore().count()) > 0;
-        await advance(more ? loadMore() : shown(page).locator('[data-testid=demo-items-page-next]'), `step ${step}`);
+        const next = shown(page).locator('[data-testid=demo-items-page-next]');
+        await advance((await loadsMore(page)) ? () => scrollToEnd(page) : () => next.click(), `step ${step}`);
       }
       await expect(oldest).toBeVisible();
-      await expect(loadMore(), 'no «Load more» that would ask past 100 rows').toHaveCount(0);
+      expect(await loadsMore(page), 'nothing at the end that would ask past 100 rows').toBe(false);
       await snap(page, 'CLOSE-DEMO-more-than-100', '390');
     });
 
-    await test.step('390: three «Load more» in a row at 25 per page, within the 100 rows', async () => {
+    await test.step('390: the end of the cards three times in a row at 25 per page, within the 100 rows', async () => {
       await page.setViewportSize(FLOW_VIEWPORTS[1440]);
       await search(`LM${run} a`, name('a', 100));
       await shown(page).locator('ion-select.data-table__page-size-select').click();
@@ -308,11 +307,11 @@ test('DEMO-F05 with more than 100 items, every row in reach at 390, 834 and 1440
       await page.setViewportSize(FLOW_VIEWPORTS[390]);
       await expect(shown(page).locator('[data-testid=demo-items-row]')).toHaveCount(25);
       for (const shownRows of [50, 75, 100]) {
-        await advance(loadMore(), `«Load more» to ${shownRows}`);
+        await advance(() => scrollToEnd(page), `the end of the cards to ${shownRows}`);
         await expect(shown(page).locator('[data-testid=demo-items-row]')).toHaveCount(shownRows);
       }
       await expect(row(page, name('a', 1))).toBeVisible();
-      await expect(loadMore(), 'every row is shown').toHaveCount(0);
+      expect(await loadsMore(page), 'every row is shown').toBe(false);
       await snap(page, 'CLOSE-DEMO-load-more-100', '390');
     });
 

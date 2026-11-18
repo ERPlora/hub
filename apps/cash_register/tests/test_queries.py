@@ -12,9 +12,9 @@ from apps.cash_register.models import Count, Session
 from apps.cash_register.queries import DENOMINATIONS, count_total, currency_decimals
 from base.tests.ordering import assert_reads_backwards, listed_with
 
-from apps.cash_register.tests.conftest import A, ctx_for, open_session, run
+from apps.cash_register.tests.conftest import HUB_DB, A, ctx_for, open_session, run
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 
 def close(closing_balance: int = 10000, **more):

@@ -189,6 +189,9 @@ msgstr "cita periódica"
 msgid "repeating appointments"
 msgstr "citas periódicas"
 
+msgid "Repeating appointments"
+msgstr "Citas periódicas"
+
 msgid "series"
 msgstr "serie"
 
@@ -643,3 +646,22 @@ msgstr "Cita periódica"
 
 msgid "Blocked period"
 msgstr "Bloqueo"
+
+#: apps.py
+#, python-format
+msgid "%(count)d appointment to confirm"
+msgid_plural "%(count)d appointments to confirm"
+msgstr[0] "%(count)d cita por confirmar"
+msgstr[1] "%(count)d citas por confirmar"
+msgstr[2] "%(count)d citas por confirmar"
+
+#: apps.py
+msgid "A customer is waiting for you to confirm their booking before it starts."
+msgid_plural "Customers are waiting for you to confirm their bookings before they start."
+msgstr[0] "Un cliente espera a que le confirmes la cita antes de que empiece."
+msgstr[1] "Tus clientes esperan a que les confirmes las citas antes de que empiecen."
+msgstr[2] "Tus clientes esperan a que les confirmes las citas antes de que empiecen."
+
+#: apps.py
+msgid "Confirm the appointments"
+msgstr "Confirmar las citas"

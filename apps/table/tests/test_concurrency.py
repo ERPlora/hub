@@ -14,49 +14,26 @@ from types import SimpleNamespace
 
 import pytest
 from django.contrib import admin
-from django.db import connection, transaction
+from django.db import connections
 from django.test import RequestFactory
 from django.utils import timezone
 from live.errors import OperationError
+from live.operations import atomic
 
 from apps.customer.models import Customer, OrderLink
-from apps.customer.tests.conftest import card_deleted_on_screen, writes
+from apps.customer.tests.conftest import writes
 from apps.sale.models import Order
 from apps.table.models import Table, TableSession, Zone
+from base.tenancy.context import current_alias
+from base.tenancy.tests.concurrency import HOW, at_once, in_a_thread, meanwhile
+from base.tenancy.tests.concurrency import admin_delete as hub_admin_delete
 
-from .conftest import ctx_for, make_customer, make_session, make_table, make_zone, open_check, run
+from .conftest import HUB_DB_COMMITTED, ctx_for, make_customer, make_session, make_table, make_zone, open_check, run
 
-pytestmark = pytest.mark.django_db(transaction=True)
+#: Several sessions of the business at once, each committing: its plan has room for them all.
+pytestmark = [HUB_DB_COMMITTED, pytest.mark.usefixtures("plan_with_room")]
 
 EMPLOYEE = "hub_employee"
-
-
-def at_once(*calls):
-    """Runs every ``call`` in its own thread and session, released together; their results or errors."""
-    barrier = threading.Barrier(len(calls))
-    results: list = [None] * len(calls)
-
-    def worker(index, call):
-        try:
-            barrier.wait(5)
-            results[index] = call()
-        except OperationError as error:
-            results[index] = error
-        except (
-            Exception
-        ) as error:  # an unexpected failure (a deadlock…) is reported by the test
-            results[index] = error
-        finally:
-            connection.close()
-
-    threads = [
-        threading.Thread(target=worker, args=(i, call)) for i, call in enumerate(calls)
-    ]
-    for thread in threads:
-        thread.start()
-    for thread in threads:
-        thread.join(30)
-    return results
 
 
 def codes(results) -> list:
@@ -112,7 +89,7 @@ def test_two_transfers_to_the_same_free_table_leave_one_there():
 
 
 @contextmanager
-def crossing_after_the_first_lock(other, table: str):
+def crossing_after_the_first_lock(other, table: str):  # noqa: C901
     """Forces two lock orders to cross instead of hoping two threads interleave (rv-121: released together
     at a barrier, a merge locking its two checks one by one in the order of the call still passed 5 of 5).
 
@@ -120,7 +97,7 @@ def crossing_after_the_first_lock(other, table: str):
     ``other`` starts in its own thread and session, and this one goes on only once ``other`` holds its own
     first lock or waits for one (``pg_locks``): two orders that cross then deadlock every time. ``other``'s
     result, or its error, lands in the list."""
-    results: list = []
+    results: list = [None]
     issued, holding = threading.Event(), threading.Event()
     pids: list[int] = []
 
@@ -138,15 +115,10 @@ def crossing_after_the_first_lock(other, table: str):
         return result
 
     def run_other():
-        try:
-            with connection.execute_wrapper(other_wrapper):
-                results.append(other())
-        except Exception as error:  # a refusal, or a deadlock reported to the test
-            results.append(error)
-        finally:
-            connection.close()
+        with connections[current_alias()].execute_wrapper(other_wrapper):
+            return other()
 
-    thread = threading.Thread(target=run_other)
+    thread = in_a_thread(run_other, results)
 
     def other_waits(raw) -> bool:
         with raw.cursor() as cursor:
@@ -166,7 +138,7 @@ def crossing_after_the_first_lock(other, table: str):
         return result
 
     try:
-        with connection.execute_wrapper(wrapper):
+        with connections[current_alias()].execute_wrapper(wrapper):
             yield results
     finally:
         if thread.ident is not None:
@@ -270,8 +242,8 @@ def admin_delete(target) -> None:
 def delete(target, how: str) -> None:
     """Deletes ``target`` in this session, giving up after LOCK_TIMEOUT on a row another session holds (SET
     LOCAL: a session-level timeout would go back with the connection and reach the tests after this one)."""
-    with transaction.atomic():
-        with connection.cursor() as cursor:
+    with atomic():
+        with connections[current_alias()].cursor() as cursor:
             cursor.execute(f"SET LOCAL lock_timeout = '{LOCK_TIMEOUT}'")
         if how == "row":
             admin_delete(target)
@@ -292,7 +264,7 @@ def deleted_after_the_first_read_of(target, how: str):
             deletions.extend(at_once(lambda: delete(target, how)))
         return result
 
-    with connection.execute_wrapper(wrapper):
+    with connections[current_alias()].execute_wrapper(wrapper):
         yield deletions
 
 
@@ -348,11 +320,12 @@ def _seat_with(ana):
     return lambda: as_waiter("table.session.open", {"table_id": str(table.id), "customer_id": str(ana.id)})()
 
 
-@pytest.mark.parametrize("how", ["page", "list"])
-def test_the_hub_admin_deleting_the_card_a_seating_puts_on_the_check_takes_the_link_along(how):
+@pytest.mark.parametrize("how", HOW)
+def test_the_hub_admin_deleting_the_card_a_seating_puts_on_the_check_takes_the_link_along(hub_staff, how):
     ana = Customer.objects.get(pk=make_customer("Ana García", phone="+34600111222").id)
     seat = _seat_with(ana)
-    with card_deleted_on_screen(ana, how, writes("customer_orderlink")) as answers:
+    deletion = hub_admin_delete(hub_staff, how, ana)
+    with meanwhile(writes("customer_orderlink"), deletion, first=True) as answers:
         session = seat()
     [answer] = answers
     assert not isinstance(answer, Exception), answer
@@ -362,12 +335,12 @@ def test_the_hub_admin_deleting_the_card_a_seating_puts_on_the_check_takes_the_l
     assert not OrderLink.objects.exists()
 
 
-@pytest.mark.parametrize("how", ["page", "list"])
-def test_a_seating_whose_customer_the_hub_admin_deletes_first_seats_without_one(how):
+@pytest.mark.parametrize("how", HOW)
+def test_a_seating_whose_customer_the_hub_admin_deletes_first_seats_without_one(hub_staff, how):
     ana = Customer.objects.get(pk=make_customer("Ana García", phone="+34600111222").id)
     seat = _seat_with(ana)
     card_locked = lambda sql: 'FROM "customer_customer"' in sql and "FOR UPDATE" in sql  # noqa: E731
-    with card_deleted_on_screen(ana, how, card_locked) as answers:
+    with meanwhile(card_locked, hub_admin_delete(hub_staff, how, ana), first=True) as answers:
         session = seat()
     [answer] = answers
     assert not isinstance(answer, Exception), answer

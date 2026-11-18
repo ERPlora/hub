@@ -15,6 +15,20 @@ export const ADMIN_LIST_SIZES = [
   { label: '1280', viewport: { width: 1280, height: 860 } },
 ];
 
+/** The three sizes the fleet looks at a page of the admin in: a low phone, a tablet and a desktop. */
+export const ADMIN_PAGE_SIZES = [
+  { label: '375x667', viewport: { width: 375, height: 667 } },
+  { label: '820x1180', viewport: { width: 820, height: 1180 } },
+  { label: '1440x900', viewport: { width: 1440, height: 900 } },
+];
+
+/** What the confirmation page of «Move to cluster…» or «Restore from a copy…» says under a hub, in English and in
+ *  Spanish: the size of its database and how long it can stay closed (the e2e's hubs are small: minutes). */
+export const CLOSURE_SAID = {
+  en: /^\d[\d.,]*\s(bytes|KB|MB|GB): closed for up to \d+\sminutes?$/,
+  es: /^\d[\d.,]*\s(bytes|KB|MB|GB): cerrado hasta \d+\sminutos?$/,
+};
+
 /** Runs `python` in control's shell (the registry of hubs, never a business) and returns the last line it printed. */
 export function inControl(python: string[]): string {
   const out = managePy(STACK.database)(['shell', '-c', python.join('\n')]);

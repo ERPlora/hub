@@ -21,9 +21,11 @@ from live.operations import get
 from live.outbox import channel_for
 
 from apps.whatsapp_inbox.models import Conversation
-from apps.whatsapp_inbox.tests.conftest import A, B, NOW, card, connect, ctx_for, receive, run
+from apps.whatsapp_inbox.tests.conftest import HUB_DB, HUB_DB_COMMITTED, A, B, NOW, card, connect, ctx_for, receive, run
 from base.permissions import VIEW_HOME
-from base.schemas import BellCountersIn, NoticeListIn
+from base.schemas import NoticeListIn
+from base.schemas.bell import BellCountersIn
+from base.tenancy.context import use_hub
 
 COUNTER = {
     "key": "whatsapp_inbox.awaiting_reply",
@@ -31,6 +33,11 @@ COUNTER = {
     "route": "/whatsapp_inbox/inbox",
     "label": "WhatsApp customers waiting for an answer",
     "icon": "ion:chatbubbles-outline",
+    "severity": "warning",
+    "title": "1 WhatsApp customer waiting for an answer",
+    "body": "Answer within 24 hours of their last message: after that, WhatsApp only lets you send an approved template.",
+    "action_label": "Answer the customers",
+    "due": None,
 }
 
 
@@ -51,19 +58,30 @@ def only(*permissions: str) -> OperationContext:
     return OperationContext(scope=A, actor="tester", permissions=frozenset({VIEW_HOME, *permissions}), language="en")
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_customer_waiting_is_counted_and_leads_to_the_inbox():
     receive("wamid.1")
     assert bell(ctx_for("hub_employee")) == {**COUNTER, "count": 1}
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_in_spanish_it_says_the_old_words():
     receive("wamid.1")
     assert bell(ctx_for("hub_admin", language="es"))["label"] == "Clientes de WhatsApp esperando respuesta"
 
 
-@pytest.mark.django_db
+@HUB_DB
+def test_in_spanish_it_says_how_many_wait_and_that_the_24_hours_run():
+    receive("wamid.1")
+    row = bell(ctx_for("hub_admin", language="es"))
+    assert (row["title"], row["body"], row["action_label"]) == (
+        "1 cliente de WhatsApp esperando respuesta",
+        "Contesta antes de 24 horas desde su último mensaje: después, WhatsApp solo deja mandar una plantilla aprobada.",
+        "Contestar a los clientes",
+    )
+
+
+@HUB_DB
 def test_at_zero_nothing_shows_and_without_the_inbox_there_is_no_counter():
     admin = ctx_for("hub_admin")
     assert bell(admin) is None
@@ -124,7 +142,7 @@ def awaiting_reply():
     return apps.get_app_config("whatsapp_inbox").bell[0]
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize("event", list(CHANGES))
 def test_each_change_of_the_number_records_an_event_that_refreshes_the_bell(event):
     receive("wamid.1")
@@ -138,7 +156,7 @@ def test_each_change_of_the_number_records_an_event_that_refreshes_the_bell(even
     assert recorded & set(awaiting_reply().refresh_on) == {event}
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_an_answer_from_the_phone_takes_it_away_too():
     receive("wamid.1")
     seen = set(OutboxEvent.objects.values_list("id", flat=True))
@@ -166,7 +184,7 @@ def sources(ctx) -> list[str]:
     return op(ctx, NoticeListIn()).model_dump(mode="json")["sources"]
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_device_is_told_of_each_customer_left_waiting_with_what_she_wrote():
     receive("wamid.1", contact_name="Ana")
     lopez = card("Bea López", "600222222")
@@ -186,14 +204,14 @@ def test_the_device_is_told_of_each_customer_left_waiting_with_what_she_wrote():
     assert all(n["at"] for n in told)
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_once_answered_it_is_no_longer_told():
     receive("wamid.1")
     answer_from_the_hub()
     assert [n for n in notices() if n["app"] == "whatsapp_inbox"] == []
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_whoever_reads_the_inbox_hears_it_so_the_app_asks_to_notify():
     """A business that only uses WhatsApp is asked to let the app notify (base asks where ``sources`` names
     some notice); whoever cannot read the inbox neither hears it nor is asked for it."""
@@ -225,10 +243,11 @@ def heard(session, timeout=5.0, stop_after=None):
 
 
 # Transactional: the notice leaves after a real COMMIT.
-@pytest.mark.django_db(transaction=True)
-def test_a_customer_writing_to_hub_b_re_runs_the_bell_and_the_notices_of_b_and_tells_a_nothing(listen):
+@HUB_DB_COMMITTED
+def test_a_customer_writing_to_hub_b_re_runs_the_bell_and_the_notices_of_b_and_tells_a_nothing(listen, hub_b):
     on_a, on_b = listen(A), listen(B)
-    receive("wamid.1", scope=B)
+    with use_hub(hub_b):
+        receive("wamid.1", scope=B)
     notes = heard(on_b, stop_after=1)
     assert {channel for channel, _ in notes} == {channel_for(B)}
     affected = live_registry.affected({event for _, payload in notes for event in payload["events"]})
@@ -248,27 +267,27 @@ def meter(ctx=None) -> dict:
     return found
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_messages_of_the_month_against_what_the_plan_includes():
     connect(version=1, monthly_limit=150, monthly_usage=40, usage_month="2026-10")
 
     assert meter() == {"key": "whatsapp_inbox", "label": "WhatsApp", "used": 40, "limit": 150, "available": True}
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_last_month_s_figure_is_nothing_spent_this_month():
     connect(version=1, monthly_limit=150, monthly_usage=150, usage_month="2026-09")
 
     assert (meter()["used"], meter()["limit"]) == (0, 150)
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_plan_that_includes_none_says_zero():
     connect(version=1, monthly_limit=0, monthly_usage=0, usage_month="2026-10")
 
     assert (meter()["used"], meter()["limit"]) == (0, 0)
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_before_erplora_com_sent_any_figure_it_says_nothing_never_a_zero():
     assert (meter()["used"], meter()["limit"], meter()["available"]) == (None, None, True)

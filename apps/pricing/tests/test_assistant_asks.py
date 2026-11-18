@@ -13,16 +13,16 @@ from pathlib import Path
 
 import pytest
 from django.conf import settings
-from live import assistant as shared
-from live.context import OperationContext, Scope
-from live.operations import AI, Operation, registry
+from live.operations import AI, registry
 
+from apps.invoice.tests.conftest import in_hubs
 from base import assistant
 from base.models import Membership
-from base.permissions import permissions_for
-from base.tests.test_assistant_asks import assert_its_asks_bring, comparable, probe_phrases
+from base.tests.test_assistant_asks import assert_offered_with_room, comparable, english_coverage_test, english_words_test
+from base.tests.test_assistant_asks import offered_to, own_words_test, probe_phrases
 
-A = Scope("host", "a")
+from .conftest import HUB_DB
+
 #: Every write of Price lists is ``pricing.manage``, which an employee lacks (they only read the prices,
 #: ``pricing.view``): an employee's assistant is never offered one.
 NOT_THE_EMPLOYEES = {
@@ -71,9 +71,6 @@ CHOSEN_INSTEAD = [
     ("pricing.rule.activate", "base.app.enable"),
 ]
 
-#: How far down the tools a turn offers (``MAX_TOOLS``, 40) a request of the QA may bring its tool: half of them, so
-#: twenty tools of the apps that say their asks later may climb past it before the model loses it.
-WITH_ROOM = 20
 #: Every probe of layer 2 of Price lists, the owner's real phrases of the QA: the four above and the ones the model got
 #: right (or answered with an equivalent list).
 PROBES = json.loads(
@@ -111,38 +108,6 @@ OWN_WORDS = [
 ]
 
 
-@pytest.fixture
-def catalog_of(make_user):
-    """The real catalogue of the assistant of a person with ``role`` in business ``a``, in ``language``."""
-
-    def of(role: str, language: str) -> dict[str, Operation]:
-        user = make_user(f"asker-{role}", host=A.key, role=role)
-        ctx = OperationContext(scope=A, actor=user.username, permissions=permissions_for(user, A), language=language)
-        return assistant.catalog(ctx)
-
-    return of
-
-
-def offered(tools: dict[str, Operation], phrase: str) -> list[str]:
-    """The tools a turn offers for ``phrase`` in Spanish, best first."""
-    return [op.name for op in assistant.relevant(tools, [phrase], "es")]
-
-
-def place_of(tools: dict[str, Operation], name: str, phrase: str) -> int | None:
-    """Where a turn offers ``name`` for ``phrase`` (1 is first, ``None`` out of the ``MAX_TOOLS``), a phrase that is
-    none of its asks: what it brings is the tool's name, description and other words, never the phrase itself."""
-    assert name in tools  # positive control: the owner holds the tool, so its place is known
-    assert comparable(phrase) not in {comparable(ask) for asks in shared.asks_of(tools[name]).values() for ask in asks}
-    names = offered(tools, phrase)
-    return names.index(name) + 1 if name in names else None
-
-
-def assert_offered_with_room(tools: dict[str, Operation], name: str, phrase: str) -> None:
-    """A request of the QA brings its tool into the first half of the ones a turn offers (``WITH_ROOM``)."""
-    place = place_of(tools, name, phrase)
-    assert place is not None and place <= WITH_ROOM, place
-
-
 def test_price_lists_is_listed_so_layer_1_sweeps_every_ask_of_it():
     """Price lists is in ``LIVE_ASSISTANT_ASKS_REQUIRED``: ``base/tests/test_assistant_asks.py`` ranks each of its asks
     for every role and language, and ``live.E020`` requires them of each of its tools."""
@@ -152,13 +117,13 @@ def test_price_lists_is_listed_so_layer_1_sweeps_every_ask_of_it():
 def test_pricing_offers_its_twenty_tools():
     """Price lists' tools are its reads and its writes (``AI``, never ``INTERNAL``; its reactions to other apps are no
     tool): a silent drop of a tool fails."""
-    tools = {name for name, op in registry.items() if op.app_label == "pricing" and assistant.is_tool(op)}
+    tools = {name for name, op in registry.items() if op.app_label == "pricing" and assistant.tools.is_tool(op)}
     assert all(isinstance(registry[name].ai_spec(), AI) for name in tools)
     assert tools == READS | NOT_THE_EMPLOYEES
     assert {name for name, _ in OWN_WORDS} == tools  # one phrase of a person's own words for each tool
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation) and of the person's role
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation) and of the person's role
 def test_an_employee_is_never_offered_what_only_who_manages_the_prices_may_do(catalog_of):
     owner = catalog_of(Membership.Role.OWNER, "es")
     employee = catalog_of(Membership.Role.EMPLOYEE, "es")
@@ -174,24 +139,24 @@ def test_the_reported_requests_are_the_probes_of_layer_2():
     ]
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize(("name", "phrase"), REPORTED)
 def test_the_reported_pricing_request_offers_its_existing_operation(catalog_of, name, phrase):
     assert_offered_with_room(catalog_of(Membership.Role.OWNER, "es"), name, phrase)
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize(("name", "instead"), CHOSEN_INSTEAD)
 def test_the_reported_request_to_bring_back_offers_its_tool_before_the_one_the_model_ran(catalog_of, name, instead):
     tools = catalog_of(Membership.Role.OWNER, "es")
     phrase = dict(REPORTED)[name]
-    names = offered(tools, phrase)
+    names = offered_to(tools, phrase)
     assert instead in tools  # positive control: what the model ran is a tool of the owner too
     assert name in names, names[:10]
     assert instead not in names or names.index(name) < names.index(instead), names[:10]
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize("probe", PROBES, ids=[probe["id"] for probe in PROBES])
 def test_every_probe_of_price_lists_offers_its_tool_without_being_one_of_its_asks(catalog_of, probe):
     """The owner's twenty phrases of layer 2, the ones the model answered right too: a tool of Price lists that a new
@@ -200,7 +165,32 @@ def test_every_probe_of_price_lists_offers_its_tool_without_being_one_of_its_ask
     assert_offered_with_room(catalog_of(Membership.Role.OWNER, probe["language"]), probe["tool"], probe["phrase"])
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
-@pytest.mark.parametrize(("name", "phrase"), OWN_WORDS)
-def test_a_request_in_the_persons_own_words_reaches_its_tool_by_its_asks(catalog_of, name, phrase):
-    assert_its_asks_bring(catalog_of(Membership.Role.OWNER, "es"), name, phrase, "es")
+test_a_request_in_the_persons_own_words_reaches_its_tool_by_its_asks = in_hubs(own_words_test(OWN_WORDS, "es"))
+
+
+#: What the owner says in English in words of their own for each tool of Price lists that needs one, neither
+#: an ask nor a probe of layer 2: its English asks lift it among the first ten (``assert_its_asks_lift``).
+OWN_WORDS_EN = [
+    ("pricing.catalog.get", "what group is behind that code of the partners?"),
+    ("pricing.price.resolve", "Nuria wants two beers, work out what she pays"),
+    ("pricing.price_item.add", "put the orange juice in Hospitality at 1.50"),
+    ("pricing.price_item.get", "how much is a beer for the partners, from how many?"),
+    ("pricing.price_item.list", "what does the croissant cost in each of them?"),
+    ("pricing.price_item.remove", "Distributors should pay for the juice like everybody else"),
+    ("pricing.price_item.update", "the muffin in Hospitality is 1.60 now"),
+    ("pricing.price_list.activate", "the winter one should apply again for distributors"),
+    ("pricing.price_list.create", "a separate one for the club, call it Club Oro"),
+    ("pricing.price_list.deactivate", "switch off the summer one until next year, keep what it has"),
+    ("pricing.price_list.get", "does Hospitality end at some point this year?"),
+    ("pricing.price_list.list", "what special treatment do I give the distributors?"),
+    ("pricing.price_list.set_default", "make the partners' one apply to everybody else"),
+    ("pricing.price_list.update", "the summer one should last longer, until late October"),
+    ("pricing.rule.activate", "bring back the 2x1 on juices from other summers"),
+    ("pricing.rule.create", "a reduction on toasts for partners who take three"),
+    ("pricing.rule.deactivate", "put the juice deal aside, but keep it for next summer"),
+    ("pricing.rule.get", "what exactly does the summer promo do and how long does it last?"),
+    ("pricing.rule.list", "what's running now in the shop that applies by itself?"),
+    ("pricing.rule.update", "raise what the summer one takes off to a quarter"),
+]
+test_a_request_in_english_is_lifted_by_its_english_asks = in_hubs(english_words_test(OWN_WORDS_EN))
+test_each_tool_has_its_own_english_words = english_coverage_test("pricing", OWN_WORDS_EN)

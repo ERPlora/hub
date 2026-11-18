@@ -33,6 +33,15 @@ class InvoiceConfig(LiveAppConfig):
     # keys are tax's rules, and its recipient is copied from a customer's card.
     requires = ["tax", "sale", "customer"]
     default_auto_field = "django.db.models.BigAutoField"
+    # What these words mean to the Hub's assistant (base.assistant.relevance.synonyms). An invoice «pagada» or «pagado» is a paid
+    # one (invoice.invoice.mark_paid), as «paid» is in English, and so is one marked «como cobrada», named by its
+    # phrases: «cobrar» and «cobro» alone are a sale's charge.
+    assistant_synonyms = (
+        (
+            "pagada", "pagadas", "pagado", "pagados", "paid", "como cobrada", "como cobradas", "como cobrado",
+            "como cobrados",
+        ),
+    )
     permissions = [
         "invoice.view_invoice",
         "invoice.add_invoice",

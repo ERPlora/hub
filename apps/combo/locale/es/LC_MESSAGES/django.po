@@ -42,6 +42,14 @@ msgstr "Menús y combos vende el menú del día, el menú infantil o el bocadill
 msgid "Menus"
 msgstr "Menús"
 
+#: apps.py
+msgid "Menu courses"
+msgstr "Platos de menú"
+
+#: apps.py
+msgid "Menu choices of products"
+msgstr "Elecciones de menú de productos"
+
 #: models.py:30
 msgid "Eaten in"
 msgstr "En el local"
@@ -392,6 +400,14 @@ msgstr "SKU"
 #: models.py
 msgid "image"
 msgstr "imagen"
+
+#: models.py
+msgid "copy's menu it stands for"
+msgstr "menú de la copia al que sustituye"
+
+#: models.py
+msgid "copy's course it stands for"
+msgstr "plato de la copia al que sustituye"
 
 #: schemas.py
 msgid "Image"

@@ -2,16 +2,11 @@
 Prefijo: INVOICE
 Alcance MVP: núcleo
 Estado de la app: completa (2026-10-31)
-Lo que no entra todavía: ver «Qué queda fuera» (INVOICE-F04, INVOICE-F22 e INVOICE-F23, descartados con su issue).
+Lo que no entra todavía: ver «Qué queda fuera».
 
 > Manual de usuario y especificación de la app `invoice`. Se escribe **antes** que el código: no se
 > programa nada que no esté aquí, y cada flujo pasa a `Estado: hecho` cuando sus tests están en verde
-> (servidor y páginas). Parte del `WORKFLOW.md` del módulo Facturación del producto actual
-> (`modules-workspace/modules/invoice`, `origin/main` `a68c8ae`, v1.2.74) y de sus ficheros
-> `workflow/*.md`. La app hace lo mismo y se ve igual; los números de flujo se conservan
-> (`INVOICE-Fnn`) porque otras apps los citan. Las dudas abiertas del producto actual se han decidido
-> con el mercado (sección «Decisiones») y lo que depende de una pieza de otra app que no existe todavía
-> está `descartado` en su flujo, con el motivo y su issue.
+> (servidor y páginas). Las dudas de diseño se han decidido con el mercado (sección «Decisiones»).
 
 ## Para qué sirve y para quién
 
@@ -66,9 +61,9 @@ Aquí manda la especificación oficial sobre el mercado:
 - **El emisor** (razón social, NIF y domicilio del negocio) es obligatorio: **sin él no se emite
   ningún documento** (Facturación → Emisor, INVOICE-F21); hasta entonces, el Inicio lo pide en «Termina de
   configurar tu negocio» con el paso «Los datos de tu negocio» y la píldora «Necesario para facturar», y
-  la franja «Todavía no puedes facturar» lo avisa encima de las demás pantallas, también de **Facturas** y **Series**,
-  con «Configurar». El emisor se escribe aquí, a mano: recibirlo de la cuenta de ERPlora
-  (INVOICE-F22) no entra todavía.
+  la campana lleva el aviso «Todavía no puedes facturar» en cualquier pantalla, con «Configurar los datos del
+  negocio». El emisor se escribe aquí, a mano: no llega de la cuenta de
+  ERPlora.
 - **«Hoy» es la hora de Madrid** en la fase 1 (el Hub todavía no guarda la zona horaria del negocio):
   decide la fecha de cada documento y, con ella, el año de su serie. Un cobro a las 00:30 del 1 de enero
   numera en la serie del año nuevo.
@@ -83,7 +78,7 @@ Configuración inicial, paso a paso:
 
 1. En **Facturación → Emisor**, escribe la razón social, el NIF y el domicilio del negocio y guarda.
 2. Si quieres otro prefijo, otro formato o continuar la numeración de otro sistema, crea **antes de la
-   primera venta del año** las series `TICKET` (Ticket F2), `FACT` (Factura F1) y `RECT` (Rectificativa
+   primera venta del año** las series `TICKET` (Tique F2), `FACT` (Factura F1) y `RECT` (Rectificativa
    R1) del año en curso con su «Siguiente número» (INVOICE-F12). Comprueba el «Siguiente número» al
    editarlas (INVOICE-F13).
 3. Haz una venta de prueba y comprueba en **Facturación → Facturas** que aparece su tique con el número
@@ -96,10 +91,10 @@ Menú **Facturación → Facturas**. Tabla paginada de 50 en 50 (vista de tabla 
 tarjetas con el número como título) con «Número», «Cliente», «Total», «Estado», «Fecha» y «Tipo»; cada
 columna se ordena. Buscador «Buscar facturas…» (número, nombre o NIF del cliente) y filtros de «Estado»,
 «Tipo», «Serie», «Origen», «Fecha» (entre dos días) y «Total» (entre dos importes, en la moneda del negocio). Sin ordenar, lo
-último emitido sale arriba. Mientras el emisor no está configurado, arriba sale una sola vez «Todavía no puedes
-facturar», la franja de todas las pantallas («No se podrá emitir ningún tique ni factura hasta que configures esto:»,
-«Los datos de tu negocio» y «Configurar», que abre **Emisor**; a quien no puede cambiar el emisor, en lugar de
-«Configurar», «Esto lo tiene que configurar un administrador.»), sin otro aviso igual debajo. Por fila: «Ver» (también al pulsar la fila), «Marcar pagada» (solo en las
+último emitido sale arriba. Mientras el emisor no está configurado, lo dice una sola vez el aviso «Todavía no puedes
+facturar» de la campana («No se podrá emitir ningún tique ni factura hasta que configures esto: Los datos de tu
+negocio.» y «Configurar los datos del negocio», que abre **Emisor**; a quien no puede cambiar el emisor, sin botón,
+«Esto lo tiene que configurar un administrador.»), sin otro aviso igual en la pantalla. Por fila: «Ver» (también al pulsar la fila), «Marcar pagada» (solo en las
 que están «Emitida» y no son rectificativas) y «Rectificar» (solo en las que no son rectificativas, no
 están canceladas ni sustituidas). El botón **+** abre «Nueva factura manual» (INVOICE-F03); sin permiso
 de emitir no aparece, ni tampoco «Marcar pagada». La lista se pone al día sola cuando se emite, se
@@ -140,7 +135,7 @@ cancelada.») y el resultado «Rectificativa {número} emitida. {original} queda
 «Cerrar».
 
 ### Factura completa (sustituir un tique)
-Ventana que abre «Factura completa» en la ficha de un tique. Título «Factura completa del ticket
+Ventana que abre «Factura completa» en la ficha de un tique. Título «Factura completa del tique
 {número}», el buscador de clientes de Clientes (rellena los datos) y «Nombre o razón social», «País»,
 «Tipo de documento» (solo fuera de España), «NIF» y «Domicilio», todos obligatorios salvo el tipo.
 «Emitir factura completa» y «Cancelar». Al emitir, la ventana se cierra y la ficha abre la F3 nueva.
@@ -162,8 +157,8 @@ el prefijo, el formato y el contador de la numeración de un tipo de factura y u
 «Código», «Nombre», «Tipo», «Año», «Prefijo», «Formato» (vacío se lee `PREFIX-YYYY-NNNNNN`), «Nº
 actual», «Activa» y «Predet.»; buscador «Buscar código, nombre…». Por debajo de 1280 px abre en
 tarjetas. **+** abre «Nueva serie de numeración»; «Editar» (o pulsar la fila) abre «Editar serie
-{código}» (INVOICE-F12, INVOICE-F13). Sin emisor, la misma franja «Todavía no puedes facturar» que en
-**Facturas**, una sola vez.
+{código}» (INVOICE-F12, INVOICE-F13). Sin emisor, lo dice el mismo aviso «Todavía no puedes facturar» de la
+campana que en **Facturas**, una sola vez, y ninguno en la pantalla.
 Vacía: «Aún no hay series. Crea la primera para numerar tus facturas.». Cargando: «Cargando series…».
 Error: «No se pudieron cargar las series» con «Reintentar».
 
@@ -187,7 +182,7 @@ ninguna factura.»; si lo mandó la cuenta de ERPlora, «Datos recibidos de tu c
 ## Cambios sin guardar en Android
 
 En «Nueva factura manual», «Rectificar», «Nueva serie de numeración», «Editar serie» y «Factura completa del
-ticket», el botón atrás del móvil pregunta «¿Descartar los cambios?» cuando hay algo escrito o elegido sin guardar:
+tique», el botón atrás del móvil pregunta «¿Descartar los cambios?» cuando hay algo escrito o elegido sin guardar:
 «Seguir editando» conserva lo tecleado y «Descartar cambios» cierra la ventana sin guardarlo. Con la ventana como
 se abrió, atrás la cierra sin preguntar; la serie que la ventana elige sola al abrirse y el tipo que llega del
 territorio no cuentan como cambio, ni una rectificativa ya emitida: atrás cierra su resultado (BASE-F05).
@@ -199,7 +194,6 @@ territorio no cuentan como cambio, ni una rectificativa ya emitida: atrás cierr
 | INVOICE-F01 | El tique (factura simplificada) que nace al cobrar | hecho — Ventas lo pide dentro del mismo cobro |
 | INVOICE-F02 | La factura completa al cobrar a un cliente con NIF | hecho — Ventas lo pide dentro del mismo cobro |
 | INVOICE-F03 | Emitir una factura a mano | hecho |
-| INVOICE-F04 | El cliente pide la factura completa de su tique | descartado — la página pública donde el cliente escribe sus datos y el código del tique que la abre son de la plataforma y de Ventas; Facturación ya emite la factura completa que esa página pedirá, como en INVOICE-F05 (hub#500) |
 | INVOICE-F05 | Pasar un tique a factura completa desde el mostrador | hecho |
 | INVOICE-F06 | Una venta cobrada que no se ha podido facturar | hecho |
 | INVOICE-F07 | Anular una venta cobrada que ya tiene su tique | hecho — Ventas la pide dentro de la misma anulación |
@@ -217,11 +211,9 @@ territorio no cuentan como cambio, ni una rectificativa ya emitida: atrás cierr
 | INVOICE-F19 | Marcar una factura como pagada | hecho |
 | INVOICE-F20 | Dar a otras apps la factura de una venta | hecho |
 | INVOICE-F21 | Configurar el emisor | hecho |
-| INVOICE-F22 | Recibir el emisor de la cuenta de ERPlora | descartado — la cuenta de ERPlora no manda la identidad fiscal del negocio con los datos del hub y la plataforma no se la entrega a Facturación; Facturación ya la guarda cuando le llega (hub#501) |
-| INVOICE-F23 | Emitir las facturas de ERPlora (hub de plataforma) | descartado — la parte de Facturación está hecha y probada, pero el hub de plataforma no se da de alta hasta que nazca con su propia base de datos, como cada negocio (hub#502) |
+| INVOICE-F23 | Emitir las facturas de ERPlora (hub de plataforma) | hecho |
 
 ### INVOICE-F01 El tique (factura simplificada) que nace al cobrar
-<!-- origen: wf:restaurante-dia#rec_restaurante-f12 fi:modules/invoice#command-invoice-create_from_sale-handler-wasm-create_from_sale fi:modules/invoice#event-listen-sale-completed-invoice-create_from_sale old:invoice/workflow/emision.md#invoice-f01 qa:modules/invoice/simplified-receipt-vs-invoice wf:cadena-fiscal#rec_fiscal-f02 wf:peluqueria-dia#rec_peluqueria-f11 -->
 Estado: hecho — Ventas lo pide dentro del mismo cobro
 Actor: sistema
 Pantalla: ninguna
@@ -231,7 +223,7 @@ Pasos:
    serie «TICKET» del año, fechada el día del negocio, con la fecha de operación del cobro, las líneas de
    la venta y el cliente si la venta tenía uno. La factura nace **«Pagada»** (el dinero ya está en la
    caja), con la hora del cobro, y el tique de Ventas ya lleva su número.
-3. La factura aparece en **Facturación → Facturas** como «Ticket», «Pagada», con «Origen» «Venta del
+3. La factura aparece en **Facturación → Facturas** como «Tique», «Pagada», con «Origen» «Venta del
    TPV».
 4. Se comprueba abriéndola: las líneas y el «Total» son los del tique de Ventas, al céntimo.
 Entra: la venta cobrada de Ventas (`sale.sale.completed`), leída de la propia venta: sus líneas con
@@ -255,7 +247,6 @@ ya no existe no se factura. El techo de la simplificada (3.000 €) lo vigila Ve
 Implicados: SALE-F01, SALE-F04, TAX-F18, TAX-F19
 
 ### INVOICE-F02 La factura completa al cobrar a un cliente con NIF
-<!-- origen: fi:modules/invoice#command-invoice-create_from_sale-handler-wasm-create_from_sale qa:modules/invoice/simplified-receipt-vs-invoice old:invoice/workflow/emision.md#invoice-f02 wf:cadena-fiscal#rec_fiscal-f03 -->
 Estado: hecho — Ventas lo pide dentro del mismo cobro
 Actor: sistema
 Pantalla: ninguna
@@ -281,7 +272,6 @@ nombre y sin NIF (queda en el registro de la aplicación), para que nunca quede 
 Implicados: SALE-F04, CUSTOMER-F17
 
 ### INVOICE-F03 Emitir una factura a mano
-<!-- origen: fi:modules/invoice#command-invoice-create-handler-wasm-create_invoice old:invoice/workflow/emision.md#invoice-f03 -->
 Estado: hecho
 Actor: empleado, responsable, administrador
 Pantalla: Facturas, Nueva factura manual
@@ -325,22 +315,7 @@ con el impuesto del territorio. Si la moneda no se puede leer, la ventana lo dic
 motivo) y ofrece «Reintentar», que la vuelve a pedir; en cuanto llega, «Emitir factura» se enciende (hub#938).
 Implicados: TAX-F18, CUSTOMER-F17, TAX-F11
 
-### INVOICE-F04 El cliente pide la factura completa de su tique
-<!-- origen: old-hub:HUB-F16 old-hub:HUB-F17 old:invoice/workflow/emision.md#invoice-f04 qa:modules/invoice/convert-receipt-to-invoice wf:cadena-fiscal#rec_fiscal-f10 -->
-Estado: descartado — la página pública donde el cliente escribe sus datos y el código del tique que la abre son de la plataforma y de Ventas; Facturación ya emite la factura completa que esa página pedirá, como en INVOICE-F05 (hub#500)
-Actor: cliente
-Pantalla: página pública de la plataforma (aún no existe)
-Pasos:
-1. El tique que imprime Ventas lleva un código para pedir la factura.
-2. El cliente lo abre en su móvil, sin iniciar sesión, y escribe sus datos fiscales.
-3. Facturación emite la factura completa sustitutiva (F3), como en INVOICE-F05.
-Entra: el tique (F2) y los datos que escribe el cliente.
-Sale: la F3 (avisa `invoice.invoice.issued`).
-Si falla: como en INVOICE-F05.
-Implicados: SALE-F29, INVOICE-F05
-
 ### INVOICE-F05 Pasar un tique a factura completa desde el mostrador
-<!-- origen: qa:modules/invoice/convert-receipt-to-invoice wf:cadena-fiscal#rec_fiscal-f10 old:invoice/workflow/emision.md#invoice-f05 -->
 Estado: hecho
 Actor: empleado, responsable, administrador
 Pantalla: Ficha de factura, Factura completa
@@ -362,10 +337,9 @@ campo, en cuanto se corrige ese campo, también si lo rellena la tarjeta de un c
 también si cambia el país o el tipo de documento) y vuelve si el siguiente intento también se rechaza; un
 documento que no es un tique, «Solo un tique (factura simplificada) se puede sustituir por una factura
 completa.». Si el tique ya tiene su F3, responde con ella sin emitir otra ni gastar número.
-Implicados: INVOICE-F04
+Implicados: ninguno
 
 ### INVOICE-F06 Una venta cobrada que no se ha podido facturar
-<!-- origen: old:invoice/workflow/emision.md#invoice-f06 wf:cadena-fiscal#rec_fiscal-f09 old-hub:HUB-F52 old-hub:HUB-F55 -->
 Estado: hecho
 Actor: sistema, empleado, responsable, administrador, asistente
 Pantalla: ninguna
@@ -395,7 +369,6 @@ documento que ya salió no emite otro ni gasta número.
 Implicados: SALE-F01, SALE-F29
 
 ### INVOICE-F07 Anular una venta cobrada que ya tiene su tique
-<!-- origen: old:invoice/workflow/emision.md#invoice-f07 wf:cadena-fiscal#rec_fiscal-f13 -->
 Estado: hecho — Ventas la pide dentro de la misma anulación
 Actor: sistema
 Pantalla: ninguna
@@ -415,7 +388,6 @@ poder, la anulación sigue adelante y los dos quedan «pendientes», a la vista,
 Implicados: SALE-F30
 
 ### INVOICE-F08 Rectificar una factura a mano
-<!-- origen: fi:modules/invoice#command-invoice-rectify old:invoice/workflow/rectificacion.md#invoice-f08 qa:modules/invoice/corrective-invoice wf:cadena-fiscal#rec_fiscal-f12 -->
 Estado: hecho
 Actor: responsable, administrador, asistente
 Pantalla: Rectificar
@@ -462,7 +434,6 @@ confirmes, no se emite otra: sale «La factura ya está cancelada.».
 Implicados: SALE-F31
 
 ### INVOICE-F09 La rectificativa al devolver una venta entera
-<!-- origen: qa:modules/invoice/corrective-invoice old:invoice/workflow/rectificacion.md#invoice-f09 wf:cadena-fiscal#rec_fiscal-f11 -->
 Estado: hecho — Ventas la pide dentro de la misma devolución
 Actor: sistema
 Pantalla: ninguna
@@ -485,7 +456,6 @@ adelante y los dos quedan «pendientes», a la vista, hasta «Emitir ahora» (IN
 Implicados: SALE-F31
 
 ### INVOICE-F10 La rectificativa por diferencias al devolver parte de una venta
-<!-- origen: wf:cadena-fiscal#rec_fiscal-f11 old:invoice/workflow/rectificacion.md#invoice-f10 -->
 Estado: hecho — Ventas la pide dentro de la misma devolución
 Actor: sistema
 Pantalla: ninguna
@@ -506,7 +476,6 @@ de la original.
 Implicados: SALE-F31
 
 ### INVOICE-F11 Numerar cada documento en su serie y su año
-<!-- origen: fi:modules/invoice_series#command-invoice_series-series-next_number-handler-wasm-get_next_number old:invoice/workflow/numeracion.md#invoice-f11 -->
 Estado: hecho
 Actor: sistema
 Pantalla: ninguna
@@ -529,7 +498,6 @@ de otro año usa un formato sin el año).
 Implicados: ninguno
 
 ### INVOICE-F12 Crear una serie de numeración
-<!-- origen: fi:modules/invoice#command-invoice-series-create fi:modules/invoice#query-invoice-series-list fi:modules/invoice_series#command-invoice_series-series-create fi:modules/invoice_series#navigation-web-components fi:modules/invoice_series#query-invoice_series-series-list fi:modules/invoice_series#query-invoice_series-series-peek_next old:invoice/workflow/numeracion.md#invoice-f12 qa:modules/invoice/series-and-numbering -->
 Estado: hecho
 Actor: responsable, administrador
 Pantalla: Series
@@ -559,7 +527,6 @@ arriba en cuanto se cambia algo, y vuelven si el siguiente intento también se r
 Implicados: ninguno
 
 ### INVOICE-F13 Cambiar una serie
-<!-- origen: fi:modules/invoice#query-invoice-series-list fi:modules/invoice#command-invoice-series-update fi:modules/invoice_series#command-invoice_series-series-deactivate fi:modules/invoice_series#command-invoice_series-series-set_default-handler-wasm-set_as_default fi:modules/invoice_series#command-invoice_series-series-update fi:modules/invoice_series#query-invoice_series-series-get old:invoice/workflow/numeracion.md#invoice-f13 -->
 Estado: hecho
 Actor: responsable, administrador
 Pantalla: Series
@@ -580,7 +547,6 @@ cambiar: el número forma parte de la cadena de VeriFactu. Crea una serie nueva 
 Implicados: ninguno
 
 ### INVOICE-F14 Saber si la numeración del año está preparada
-<!-- origen: old:invoice/workflow/numeracion.md#invoice-f14 -->
 Estado: hecho
 Actor: propietario, responsable, administrador, asistente
 Pantalla: Inicio, Series
@@ -603,7 +569,6 @@ Si falla: nada que fallar; un negocio recién creado tiene el paso pendiente y r
 Implicados: ninguno
 
 ### INVOICE-F15 Comprobar que la numeración no tiene huecos
-<!-- origen: qa:modules/invoice/series-and-numbering fi:modules/invoice_series#query-invoice_series-allocations-list old:invoice/workflow/numeracion.md#invoice-f15 -->
 Estado: hecho
 Actor: empleado, responsable, administrador, asistente
 Pantalla: ninguna (asistente o API)
@@ -620,7 +585,6 @@ saltó números, o uno que nunca se usó; antes del primer número de una serie 
 Implicados: ninguno
 
 ### INVOICE-F16 Buscar una factura
-<!-- origen: fi:modules/invoice#navigation-web-components fi:modules/invoice#query-invoice-list old:invoice/workflow/consulta.md#invoice-f16 -->
 Estado: hecho
 Actor: empleado, responsable, administrador
 Pantalla: Facturas
@@ -641,7 +605,6 @@ en cualquier campo de importe del Hub y como en las demás listas (hub#1196: «1
 Implicados: ninguno
 
 ### INVOICE-F17 Ver una factura
-<!-- origen: fi:modules/invoice#query-invoice-get fi:modules/invoice#query-invoice-lines old:invoice/workflow/consulta.md#invoice-f17 -->
 Estado: hecho
 Actor: empleado, responsable, administrador
 Pantalla: Ficha de factura
@@ -663,7 +626,6 @@ AEAT, «No se ha podido abrir esa página. Inténtalo de nuevo.».
 Implicados: VERIFACTU-F19
 
 ### INVOICE-F18 Imprimir o guardar en PDF una factura
-<!-- origen: old:invoice/workflow/consulta.md#invoice-f18 qa:verticals/beauty/06-fiscal-and-printing -->
 Estado: hecho
 Actor: empleado, responsable, administrador
 Pantalla: Ficha de factura
@@ -691,7 +653,6 @@ aviso dice por qué tras dos puntos («…: esta versión de la app de ERPlora n
 Implicados: PRINTING-F08, VERIFACTU-F19
 
 ### INVOICE-F19 Marcar una factura como pagada
-<!-- origen: fi:modules/invoice#command-invoice-mark_paid old:invoice/workflow/consulta.md#invoice-f19 -->
 Estado: hecho
 Actor: empleado, responsable, administrador, asistente
 Pantalla: Facturas, Ficha de factura
@@ -713,7 +674,6 @@ facturas que nacen de una venta ya nacen pagadas y una rectificativa no se paga:
 Implicados: ninguno
 
 ### INVOICE-F20 Dar a otras apps la factura de una venta
-<!-- origen: fi:modules/invoice#query-invoice-by_source old:invoice/workflow/consulta.md#invoice-f20 -->
 Estado: hecho
 Actor: sistema
 Pantalla: ninguna
@@ -727,7 +687,6 @@ Si falla: si la factura aún no existe, contesta que no hay.
 Implicados: SALE-F29
 
 ### INVOICE-F21 Configurar el emisor
-<!-- origen: old-hub:HUB_SHELL-F164 -->
 Estado: hecho
 Actor: propietario, administrador
 Pantalla: Inicio, Facturas, Series, Emisor
@@ -736,14 +695,13 @@ Pasos:
    negocio» con la píldora «Necesario para facturar»: «Razón social, NIF y domicilio: sin ellos no puedes
    emitir una factura.». Lo ven todos; «Configurar» solo quien puede cambiar el emisor, y a los demás les dice
    «Esto lo tiene que configurar un administrador.».
-2. Pulsa «Configurar» en ese paso, abre **Facturación → Emisor**, o pulsa «Configurar» en la franja «Todavía no
-   puedes facturar» que sale encima de las demás pantallas mientras no hay emisor, también de **Facturas** y
-   **Series**, una sola vez (a quien no puede cambiar el emisor, la franja le dice «Esto lo tiene que configurar un
-   administrador.», sin «Configurar»).
+2. Pulsa «Configurar» en ese paso, abre **Facturación → Emisor**, o pulsa «Configurar los datos del negocio» en el
+   aviso «Todavía no puedes facturar» de la campana, que sale en cualquier pantalla mientras no hay emisor (a quien
+   no puede cambiar el emisor, el aviso le dice «Esto lo tiene que configurar un administrador.», sin botón).
 3. Escribe «Razón social», «NIF», «Domicilio», «Código postal», «Ciudad», «Provincia» y elige el «País»
    (España de entrada).
-4. Pulsa «Guardar»: sale «Emisor guardado.», la franja desaparece de todas las pantallas, también de **Facturas**
-   y **Series**, y el paso del Inicio queda «Hecho», sin recargar y también en los demás dispositivos.
+4. Pulsa «Guardar»: sale «Emisor guardado.», el aviso desaparece de la campana y el paso del Inicio queda «Hecho»,
+   sin recargar y también en los demás dispositivos.
 Entra: lo que escribe la persona.
 Sale: el emisor, que se copia en cada documento que se emita desde ahora (los ya emitidos no cambian);
 avisa `invoice.issuer.updated`.
@@ -753,44 +711,35 @@ también se rechaza; un rechazo sin campo sale encima del formulario y se queda 
 (hub#854).
 Implicados: ninguno
 
-### INVOICE-F22 Recibir el emisor de la cuenta de ERPlora
-<!-- origen: old-hub:HUB_SHELL-F164 -->
-Estado: descartado — la cuenta de ERPlora no manda la identidad fiscal del negocio con los datos del hub y la plataforma no se la entrega a Facturación; Facturación ya la guarda cuando le llega (hub#501)
-Actor: sistema
-Pantalla: Emisor
-Pasos:
-1. Cuando la cuenta de ERPlora manda los datos del hub con la identidad fiscal del negocio, la plataforma
-   se la entrega a Facturación con la versión de esos datos.
-2. Facturación guarda el emisor y **Emisor** dice «Datos recibidos de tu cuenta de ERPlora el {fecha}.».
-Entra: la identidad fiscal del negocio que manda la cuenta (razón social, NIF, domicilio, código postal,
-ciudad, provincia y país) y su versión.
-Sale: el emisor (avisa `invoice.issuer.updated`). Unos datos más viejos que los guardados se ignoran.
-Si falla: un emisor incompleto o con un NIF no válido se rechaza y queda el anterior.
-Implicados: ninguno
-
 ### INVOICE-F23 Emitir las facturas de ERPlora (hub de plataforma)
-<!-- origen: nuevo (PLAN-SAAS §4: las facturas de ERPlora las emite su propio hub de plataforma) -->
-Estado: descartado — la parte de Facturación está hecha y probada, pero el hub de plataforma no se da de alta hasta que nazca con su propia base de datos, como cada negocio (hub#502)
+Estado: hecho
 Actor: sistema (la cuenta de ERPlora)
 Pantalla: ninguna (nadie entra en el hub de plataforma)
 Pasos:
-1. Un cliente paga su suscripción; la cuenta de ERPlora numera su factura (`ERP-2026-00123`, abonos en
+1. Antes de cobrar con dinero real, la cuenta pregunta al hub de plataforma si está listo: lo está con su emisor
+   y VeriFactu y, en producción, solo mientras el envío real a la AEAT está abierto en el servidor
+   (VERIFACTU-F08). Si no, contesta «no listo» con el motivo y la cuenta no cobra. En pre no cambia nada:
+   registra en pruebas y cobra con claves de prueba.
+2. Un cliente paga su suscripción; la cuenta de ERPlora numera su factura (`ERP-2026-00123`, abonos en
    `ERPR`) y la manda, firmada, al hub de plataforma de ERPlora.
-2. Facturación la emite tal cual llega, con el número y la fecha de la cuenta (ninguna serie del hub
+3. Facturación la emite tal cual llega, con el número y la fecha de la cuenta (ninguna serie del hub
    cuenta para ella), con ERPlora como emisor y el pagador de ese día como destinatario, y VeriFactu sella
-   su registro en la misma operación. Contesta «emitida» con su QR.
-3. La cuenta pregunta después cómo va: «emitida» mientras el registro va a la AEAT, y «aceptada»,
+   su registro en la misma operación. Contesta «emitida» con su QR. Una línea con descuento (un código
+   promocional) lleva el precio del plan y el descuento aparte; un mes gratis es una factura de 0 €, que se
+   emite, se registra y se imprime como cualquier otra.
+4. La cuenta pregunta después cómo va: «emitida» mientras el registro va a la AEAT, y «aceptada»,
    «aceptada con errores» o «rechazada» cuando contesta (con su código y su mensaje).
-4. El PDF es el mismo A4 de INVOICE-F18 en el idioma del pagador, con el QR de VeriFactu («QR
+5. El PDF es el mismo A4 de INVOICE-F18 en el idioma del pagador, con el QR de VeriFactu («QR
    tributario:», «VERI*FACTU») solo cuando la AEAT ya lo aceptó, como en la cuenta antigua.
-Entra: la factura de la cuenta: su número, su fecha, sus importes, cómo tributa, el pagador, sus líneas y,
-en un abono, la factura que corrige.
+Entra: la factura de la cuenta: su número, su fecha, sus importes, cómo tributa, el pagador, sus líneas
+(cada una con su descuento) y, en un abono, la factura que corrige.
 Sale: la factura, con la referencia de la cuenta (avisa `invoice.invoice.issued`; un abono, además,
 `invoice.invoice.rectified`), y su registro de VeriFactu.
 Si falla: la misma factura otra vez (o dos entregas a la vez) contesta lo que ya hay, sin escribir nada;
 un abono de una factura que no llegó se rechaza; por encima de 400 € sin el NIF del pagador se rechaza; una
 factura que no sigue el contrato se rechaza con su motivo; un rechazo de VeriFactu deshace la factura
-entera.
+entera; en producción con el envío real a la AEAT cerrado, «no listo»: «El envío real a la AEAT está cerrado en
+este servidor: las facturas de ERPlora no le llegarían.», y la cuenta no cobra.
 Implicados: VERIFACTU-F13
 
 ## Servicios: lo que entra y lo que sale
@@ -820,7 +769,7 @@ cliente por su nombre, su teléfono o su correo (como en Clientes) y una serie p
 | El emisor | ver | F21, F22 | `invoice.issuer.get` |
 | Cómo va una factura de ERPlora (por el `id` del SaaS) | solo el sistema | F23 | `invoice.invoice.platform_status` |
 | El A4 de una factura de ERPlora, en su idioma | solo el sistema | F23 | `invoice.invoice.platform_document` |
-| Si el hub de plataforma puede emitir ahora | solo el sistema | F23 | `invoice.invoice.platform_health` |
+| Si el hub de plataforma puede emitir ahora (en producción, solo con el envío real a la AEAT abierto) | solo el sistema | F23 | `invoice.invoice.platform_health` |
 
 Todas se pueden seguir en vivo.
 
@@ -891,8 +840,8 @@ lo reintenta a los 2, 4, 8… segundos hasta 8 veces; pasado eso, sale con «Emi
   de una venta cuya regla ya no existe (el territorio que la línea congeló al cobrarse); el redondeo a mitad
   hacia arriba (`round_half_up`). El nombre del impuesto del tipo de una línea tecleada («IVA %», «IGIC %»,
   «IPSI %») lo lee la pantalla de `tax.settings.get` (`tax_kind`, con `useTaxKind()` de Impuestos), la única
-  fuente: `invoice.invoice.line_defaults` solo da el tipo general y no repite el impuesto (ronda 2026-10-17
-  de PLAN-HUB). Lo ya emitido se rotula por lo que declaró (el impuesto de su desglose; «Imp. %» si mezcla),
+  fuente: `invoice.invoice.line_defaults` solo da el tipo general y no repite el impuesto. Lo ya emitido se rotula por lo que
+  declaró (el impuesto de su desglose; «Imp. %» si mezcla),
   nunca por el territorio de hoy: la misma regla que la cifra de impuestos de Ventas (SALE-F28), que dice el
   impuesto de las ventas del periodo, «Impuestos» si mezclan, y el del territorio solo sin ventas.
 - **Clientes** (requisito): la ficha del cliente (nombre o empresa, NIF, domicilio y país) que rellena
@@ -928,23 +877,18 @@ Recibir el emisor del SaaS (`invoice.sync_issuer`) no es de ningún papel: solo 
 
 ## Para quien lo mantiene
 
-- **El Inicio** (FIX-INVOICE-SETUP-HOOKS, 2026-10-27; ronda 2026-10-21 «Inicio» de PLAN-HUB): `InvoiceConfig.setup`
-  declara dos pasos de «Termina de configurar tu negocio», sin paneles ni contadores de la campana (el módulo viejo
-  no tenía `widgets` ni `bell`):
-  - `business_identity` («Los datos de tu negocio», orden 40, el ítem del núcleo del hub viejo, `BLOCKING_KEYS`):
+- **El Inicio**: `InvoiceConfig.setup` declara dos pasos de «Termina de configurar tu negocio», sin paneles ni
+  contadores de la campana:
+  - `business_identity` («Los datos de tu negocio», orden 40, `BLOCKING_KEYS`):
     hecho con `configured` de `invoice.issuer.get`, la misma condición con la que `_configured_issuer` rechaza
     emitir, así que «bloquea ⇔ la emisión se rechaza». El ⛔ lo pone `base` (`base.home.LEGAL_STEPS`), nunca la app;
     pendiente, también se le dice a quien no tiene `invoice.manage_issuer` (`actionable: false`, gh:hub#435). El
-    texto viejo hablaba solo de razón social y NIF; aquí el domicilio también es obligatorio y el texto lo dice.
-    Lleva a `/invoice/issuer`, la pantalla con el NIF a la vista (gh:hub#1954), y se refresca con
-    `invoice.issuer.updated` (gh:hub#900: el aviso viejo no se iba al guardar).
-  - **Un solo aviso de emisor** (FIX-HUB-INVOICE-TWO-NEAR-IDENTICAL-BUSINESS-DATA-NOTICES, 2026-10-28): sin emisor,
-    Facturas y Series enseñaban dos avisos casi iguales, la franja de `base` (`BlockingStrip.vue`, por `chrome.notice`
-    de `frontend/main.ts`, alimentada por este paso) y el `IssuerMissingNotice.vue` propio debajo. La franja dice lo
-    mismo a las mismas personas (también «Esto lo tiene que configurar un administrador.» con `actionable: false`,
-    gh:hub#435) y se va sola con `invoice.issuer.updated`, así que el propio se retiró con sus cadenas
-    (`invoice.issuerNotice.*`); las capturas del hub viejo (`invoice-invoice-*.png`, `invoice-settings-*.png`) también
-    enseñan solo la franja. `market-decision`: un aviso por causa — Material Design (m2.material.io/components/banners:
+    domicilio también es obligatorio y el texto lo dice. Lleva a `/invoice/issuer`, la pantalla con el NIF a la
+    vista, y se refresca con `invoice.issuer.updated`.
+  - **Un solo aviso de emisor**: sin emisor, Facturas y Series no enseñan aviso propio; lo dice el aviso
+    `base.blocking` del centro de avisos (`useHubActionNotices` de `base/frontend/lib/action-notices.ts`, por
+    `actionNotices` de `frontend/main.ts`, alimentado por este paso) a las mismas personas (también «Esto lo tiene
+    que configurar un administrador.» con `actionable: false`, gh:hub#435), y se va solo con `invoice.issuer.updated`. `market-decision`: un aviso por causa — Material Design (m2.material.io/components/banners:
     «Only one banner should be shown at a time»), Primer de GitHub (primer.style/product/components/banner/guidelines:
     no más de un banner por página), Atlassian Forge (developer.atlassian.com/platform/forge/manifest-reference/modules/
     confluence-page-banner: uno a la vez), Shopify (shopify.dev/docs/api/pos-ui-extensions/2025-07/ui-components/
@@ -955,13 +899,13 @@ Recibir el emisor del SaaS (`invoice.sync_issuer`) no es de ningún papel: solo 
     sitio para lo pendiente de la cuenta, la guía de configuración y sus avisos: squareup.com/help/ie/en/article/5123-
     square-get-started-guide) y, como contraejemplo, WooCommerce, cuyos avisos de administración amontonados tienen
     plugins solo para esconderlos (wordpress.org/plugins/hide-admin-notices/). Los tests de las páginas montan la
-    pantalla como la pinta el hub (`mountInvoice(..., { platformNotice: true })`) y cuentan los avisos rojos.
-  - `numbering` («Tu numeración de facturas», orden 50, el `setup` del módulo viejo): hecho con `total_series` de
+    pantalla como la pinta el hub (`mountInvoice(..., { platformNotice: true })`, con la fuente del centro de avisos
+    al lado): cuentan los avisos rojos de la pantalla, que son cero, y el aviso del centro, que es uno.
+  - `numbering` («Tu numeración de facturas», orden 50): hecho con `total_series` de
     `invoice.numbering.status`, `required = False` (recomendado), solo para quien tiene `invoice.manage_series`, y
     se refresca con `SERIES_EVENTS` (la serie que nace con el primer documento avisa con `invoice.invoice.issued`).
-    El viejo lo daba por hecho con una ordinaria y una rectificativa del año y lo pedía como «Importante», porque
-    allí las series se creaban a mano; aquí nacen solas, y con aquella condición el paso seguiría pendiente hasta
-    la primera devolución y volvería cada 1 de enero sin nada que hacer. Decisión de mercado: ningún TPV ni
+    Las series nacen solas: darlo por hecho con una ordinaria y una rectificativa del año dejaría el paso pendiente
+    hasta la primera devolución y lo haría volver cada 1 de enero sin nada que hacer. Decisión de mercado: ningún TPV ni
     programa de facturación pone la numeración como tarea obligatoria del arranque; todos numeran solos con un
     formato de fábrica y dejan el prefijo y el número de inicio en los ajustes (el arranque de Facturación de Odoo
     pide los datos de la empresa, el diseño, el pago y una factura de prueba, y numera `INV/año/00001` solo,
@@ -982,8 +926,7 @@ Recibir el emisor del SaaS (`invoice.sync_issuer`) no es de ningún papel: solo 
     recomendado, mientras se puede (antes del primer documento: luego la serie congela su prefijo y su formato), y
     queda hecho para siempre en cuanto el negocio tiene su numeración (la serie de un año nuevo hereda la del
     anterior). La respuesta de la API (`configured`: una ordinaria y una rectificativa del año) no cambia.
-- **Moneda** (FIX-HUB-APPS-CHARGE-IN-EUR-WHATEVER-THE-COUNTRY, 2026-10-25; FIX-HUB-INVOICE-OWN-COPY-OF-BUSINESS-CURRENCY,
-  2026-10-28): la factura hecha a mano guarda la moneda del negocio, que Facturas pregunta a
+- **Moneda**: la factura hecha a mano guarda la moneda del negocio, que Facturas pregunta a
   `base.operations.business_currency` como toda app que cobra (BASE-F50), sin copia propia: la de su país, que contesta
   `base.business.get` leído como la plataforma (una API key solo tiene el permiso de su operación); la nacida de una
   venta, la de la venta; una rectificativa, la de su original; la de ERPlora (hub de plataforma), la que manda el SaaS
@@ -991,19 +934,21 @@ Recibir el emisor del SaaS (`invoice.sync_issuer`) no es de ningún papel: solo 
   su emisor (`PLATFORM_ISSUER_COUNTRY`, hub#329). Decisión de mercado: un
   negocio no español emite y guarda su moneda (Odoo, Business Central, Shopify, WooCommerce, Square, Toast, Lightspeed,
   Holded y SumUp emiten en la moneda local del negocio; ninguno deja de emitir por el país). Un negocio español sigue
-  en euros, y lo que se manda a la AEAT no cambia (las mismas cifras). El campo `currency` ya no tiene valor por
+  en euros, y lo que se manda a la AEAT no cambia (las mismas cifras). El campo `currency` no tiene valor por
   defecto (`0005_currency_from_the_business`, sin migración de datos: lo emitido no se reescribe). Cada fila lleva
   `currency_decimals` (los de `babel`), con los que las pantallas dividen sus céntimos: nunca los de Intl, que le da 0
-  al forinto. El documento A4 escribe los importes con esos decimales.
-- **Hub de plataforma** (INVOICE-F23; PLAN-SAAS §4; plan del bloque fiscal, tarea 4): el hub propio de
+  al forinto. El documento A4 escribe los importes con esos decimales. Los importes y precios unitarios agrupan
+  los millares desde cuatro cifras («1.234,56 €», hub#1090) en la lista, la ficha y el aviso del tope del tique.
+- **Hub de plataforma** (INVOICE-F23; PLAN-SAAS §4): el hub propio de
   ERPlora, el slug `PLATFORM_HUB_SLUG` (`erplora`, reservado en `live.slugs`: ningún negocio lo puede
   coger y el alta normal del SaaS no lo crea). Las cuatro puertas viven en `base/internal.py`
   (`/internal/platform/invoices`, `/health`, `/{id}`, `/{id}/pdf`) y llaman como sistema a
   `invoice.invoice.issue_platform`, `platform_status`, `platform_document` y `platform_health` (permiso
   `invoice.issue_platform`, sin rol ni ruta ninja). Contrato: `POST /internal/platform/invoices` con el
   cuerpo de `platform_payload()` del SaaS (`id`, `kind`, `series`, `number`, `issued_on`, `rectification`,
-  `currency`, `language`, céntimos, `tax_treatment`, `tax_country`, `tax_rate`, `recipient`, `lines`,
-  `rectifies`) → `201 {"status": "issued", "qr", "error": null}` (la misma otra vez, `200` con lo que ya
+  `currency`, `language`, céntimos, `tax_treatment`, `tax_country`, `tax_rate`, `recipient`, `lines`
+  (cada una con su `discount_cents`), `rectifies`; esquemas en `schemas/platform.py`) →
+  `201 {"status": "issued", "qr", "error": null}` (la misma otra vez, `200` con lo que ya
   hay); `GET …/{id}` → `issued`, `accepted`, `accepted_with_errors` o `rejected` (con su código y mensaje);
   `GET …/{id}/pdf`; un abono de una original que no llegó, 404 `invoice.platform_original_unknown`; más de
   400 € sin NIF, 409 `invoice.platform_recipient_required`; fuera de contrato, 422 con su código. La factura
@@ -1019,6 +964,15 @@ Recibir el emisor del SaaS (`invoice.sync_issuer`) no es de ningún papel: solo 
     lleva el aviso «VAT included — customer VAT number could not be verified» del PDF antiguo (queda fuera).
   - **Notas**: el aviso que imprimía la factura antigua (inversión del sujeto pasivo, OSS, no sujeta), en
     el idioma del pagador.
+  - **Descuento** (los meses gratis de un código promocional): cada línea trae `discount_cents`, el descuento
+    sin IVA, de 0 a 10^12 (uno negativo es 422; sin el campo, 0); `net_cents` ya viene descontado. El precio
+    unitario es (|base| + descuento) / cantidad y `InvoiceLine.discount_amount` lleva el descuento con el signo
+    de la línea (negativo en un abono), así que cantidad × precio − descuento es la base y el A4 lo enseña en
+    su columna «Descuento». Sin IVA español la base es el importe entero de la línea, y en OSS ese importe
+    lleva el IVA del otro Estado: el descuento lo lleva también (29,99 € al 19 % → 35,69 €). Un mes gratis
+    es una factura de 0 € (base y cuota 0 en su clave, S1 al 21 % en una venta nacional; F1 con NIF, F2
+    sin él) que se emite, se registra en VeriFactu (`ImporteTotal` 0.00) y se lee por todas las puertas
+    como una de pago.
   - **Número**: el del SaaS tal cual; `sequence` = sus últimas cifras; la serie `ERP`/`ERPR` del año nace
     con el formato del SaaS (`{prefix}-{year}-{seq:05d}`) y su contador no se usa. Dos entregas a la vez
     se ponen en cola en el bloqueo de esa serie y la segunda contesta lo de la primera (test con hilos);
@@ -1026,12 +980,18 @@ Recibir el emisor del SaaS (`invoice.sync_issuer`) no es de ningún papel: solo 
   - **Entorno**: el registro va al entorno de la AEAT del despliegue (`ERPLORA_ENVIRONMENT=prod` →
     producción; `pre` → pruebas; `verifactu.queries.effective_environment`), y su interruptor está fijo
     (409 `verifactu.platform_fixed`).
+  - **Salud** (`platform_health`, la puerta `/health`): «listo» solo con el emisor configurado, VeriFactu
+    activo y, con `ERPLORA_ENVIRONMENT=prod`, el envío real abierto (`production_open` de
+    `verifactu.config.get`, VERIFACTU-F08); si no, 503 `unconfigured` con su motivo. El SaaS solo cobra con
+    clave live mientras contesta `ok` (`billing/services.py::invoicing_available` de `ERPlora/saas`), así
+    que «cobro real ⇒ factura en la AEAT real» la cumple el código, no la infraestructura. En `pre` no mira
+    el envío real.
   - **PDF**: `pdf.py` (WeasyPrint ≥ 66) imprime el A4 fuera de la transacción; solo lee `data:` (nada de
     red). La imagen lleva Pango, HarfBuzz y DejaVu, y la caché de Fontconfig en `/tmp`.
 - **Alta del hub de plataforma**: `manage.py create_platform_hub` (ensayo; con `--execute` escribe),
   idempotente como el `ensure_platform_hub` del SaaS antiguo. Desde S5 el hub de plataforma es una fila del
   registro (`is_platform`) con su propia BD, como cualquier negocio: si falta, la hace como un alta
-  (`base.services.platform_hub_register` y `base.tenancy.provision`); después, dentro de esa BD, le pone el emisor
+  (`base.services.provisioning.platform_hub_register` y `base.tenancy.provision`); después, dentro de esa BD, le pone el emisor
   de ERPlora desde `PLATFORM_ISSUER_LEGAL_NAME`, `PLATFORM_ISSUER_TAX_ID`,
   `PLATFORM_ISSUER_ADDRESS`, `PLATFORM_ISSUER_POSTAL_CODE`, `PLATFORM_ISSUER_CITY`,
   `PLATFORM_ISSUER_PROVINCE` y `PLATFORM_ISSUER_COUNTRY` (por defecto, los datos de ERPLORA CLOUD SL del
@@ -1039,12 +999,11 @@ Recibir el emisor del SaaS (`invoice.sync_issuer`) no es de ningún papel: solo 
   (`verifactu.config.follow_deployment`). Nunca escribe encima de otro emisor (otra cadena). En AWS se
   lanza una vez por entorno como tarea ECS puntual de la familia `worker`, que tiene las credenciales del
   migrador para hacer la BD, con el comando `python manage.py create_platform_hub --execute` (primero sin
-  `--execute` para ver lo que hará). Su emisor es solo el de su BD: ningún otro negocio lo ve. Que ERPlora
-  emita de verdad sus facturas desde él sigue en hub#502 (INVOICE-F23).
+  `--execute` para ver lo que hará). Su emisor es solo el de su BD: ningún otro negocio lo ve.
 
 - Anatomía completa: `apps.py`, `models.py` (`InvoiceSeries`, `Issuer`, `Invoice`, `InvoiceLine`),
-  `migrations/`, `schemas.py`, `fiscal.py` (aritmética pura: cierre por clave fiscal, prorrateo,
-  formato del número), `queries.py`, `services.py`, `events.py`, `live.py`, `api.py`, `admin.py`,
+  `migrations/`, `schemas/` (`platform.py`, el cuerpo que manda el SaaS al hub de plataforma), `fiscal.py`
+  (aritmética pura: cierre por clave fiscal, prorrateo, formato del número), `queries.py`, `services.py`, `events.py`, `live.py`, `api.py`, `admin.py`,
   `templates/invoice/invoice.html`, `locale/`, `frontend/` y un `tests/test_<fichero>.py` por fichero,
   más integración con Ventas y Clientes y concurrencia con hilos.
 - **Numeración**: `InvoiceSeries.current_number` se sube con `UPDATE … RETURNING` (Django 6 refresca el
@@ -1078,15 +1037,13 @@ Recibir el emisor del SaaS (`invoice.sync_issuer`) no es de ningún papel: solo 
   desglose y líneas de la original.
 - **Fechas**: `issue_date` es el día del negocio al emitir (Madrid en la fase 1); `operation_date`, el
   del cobro (`Sale.business_day`), el de la devolución o el de la anulación; la F3 conserva el del tique.
-- **El emisor** (`Issuer`, una fila) se copia en cada documento. Contrato con el SaaS (INVOICE-F22,
-  descartado sin la foto ni la entrega, hub#501): el bloque `issuer` (`legal_name`, `tax_id`, `address`, `postal_code`, `city`,
-  `province`, `country`) de `PUT /internal/hubs/{id}/state` → la plataforma llama a
-  `invoice.issuer.sync` como sistema con `{legal_name, tax_id, address, postal_code, city, province,
-  country, version}`; una `version` menor o igual que la guardada se ignora. ⚠️ **Contradicción señalada, sin
-  elegir** (CLOSE-INVOICE, hub#501): PLAN-SAAS §3.1 punto 2, «Dos identidades» (decisión del 2026-10-11), dice
-  que los datos fiscales del negocio viven y se editan en el Hub y que el SaaS solo guarda al pagador
-  (`BillingProfile`); este contrato pide la dirección contraria. Hasta que se decida, el emisor se escribe en el
-  Hub (INVOICE-F21).
+- **El emisor** (`Issuer`, una fila) se copia en cada documento. `invoice.issuer.sync` lo guarda como sistema
+  con `{legal_name, tax_id, address, postal_code, city, province, country, version}` (una `version` menor o igual
+  que la guardada se ignora), pero nadie lo llama: la foto del SaaS (`PUT /internal/hubs/{id}/state`) no lleva un
+  bloque `issuer` y la plataforma no lo entrega (hub#501). ⚠️ **Contradicción señalada, sin elegir** (hub#501):
+  PLAN-SAAS §3.1 punto 2, «Dos identidades» (decisión del 2026-10-11), dice que los datos fiscales del negocio
+  viven y se editan en el Hub y que el SaaS solo guarda al pagador (`BillingProfile`); recibir el emisor del SaaS
+  pide la dirección contraria. El emisor se escribe en el Hub (INVOICE-F21).
 - **Contrato con VeriFactu** (`apps/verifactu`, `requires=["invoice"]`; su WORKBOOK, «Contrato con
   Facturación»): `_issue`, tras escribir el documento y su aviso y **dentro de la misma transacción**, llama
   por nombre a `verifactu.record.create` con `{"invoice_id": …}` y la misma sesión, en su savepoint. La
@@ -1138,11 +1095,10 @@ Recibir el emisor del SaaS (`invoice.sync_issuer`) no es de ningún papel: solo 
   fiscales de solo lectura, sin alta ni borrado desde el admin (la ley obliga a conservarlas y el número
   solo lo da la operación); solo cambian las notas, y marcar pagada se hace con
   `invoice.invoice.mark_paid` (pantalla, API o asistente). Ids y fechas, siempre de solo lectura.
-  **Ronda a escribir en PLAN §17**: CLAUDE.md dice «CRUD completo… fiscales incluidas»; aquí la ley
-  manda solo lectura en lo emitido (decisión mantenida tras la revisión fiscal del 2026-10-14).
+  La regla general del admin es CRUD completo (PLAN §17), pero en lo emitido la ley manda solo lectura.
 - **Reacciones**: Ventas llama a las mismas operaciones dentro de su cobro, devolución o anulación (un
   rechazo deshace solo su parte y la venta queda «pendiente»); `events.react(scope, name, payload)` las
-  ejecuta como sistema cuando el relay del outbox (`base/relay.py`, en el worker desde hub#105) entrega el
+  ejecuta como sistema cuando el relay del outbox (`base/relay.py`, en el worker) entrega el
   aviso: si el documento ya existe, responde el mismo sin gastar número; si se rechaza (sin emisor), el
   relay reintenta a 2, 4, 8… s y al octavo intento lo deja (`dead`), y queda «Emitir ahora»
   (`sale.sale.issue_documents`). Los tests entregan el aviso real del outbox (`deliver`) y
@@ -1152,9 +1108,9 @@ Recibir el emisor del SaaS (`invoice.sync_issuer`) no es de ningún papel: solo 
   de quien pide más el permiso `sale.record_invoice` de la plataforma, como `apps/reservation`) cuando la
   fila de Ventas ya está escrita sin él: su estado fiscal (`invoice_status`, `void_invoice_status` o el de
   la devolución) no está vacío. Dentro del propio cobro, anulación o devolución ese estado aún está vacío y
-  lo escribe Ventas con la respuesta. También en la rama «ya estaba» (repara una venta que una versión
-  anterior dejó «pendiente» con su factura emitida). `record_invoice` solo escribe lo que no está
-  «emitido» y avisa `sale.sale.invoiced` una vez por documento; «Emitir ahora» ya no lo escribe dos veces.
+  lo escribe Ventas con la respuesta. También en la rama «ya estaba» (repara una venta que quedó
+  «pendiente» con su factura emitida). `record_invoice` solo escribe lo que no está
+  «emitido» y avisa `sale.sale.invoiced` una vez por documento; «Emitir ahora» no lo escribe dos veces.
 - **Validación del NIF**: `python-stdnum` (NIF, NIE y CIF de España; NIF-IVA de la UE con el tipo 02).
 - **Asistente**: cada operación declara `ai` (en las escrituras, `risk`: `high` al emitir, sustituir,
   rectificar y en el emisor) y cada campo su `description`. La tarjeta de confirmación nombra cada
@@ -1171,8 +1127,8 @@ Recibir el emisor del SaaS (`invoice.sync_issuer`) no es de ningún papel: solo 
   el tipo de rectificativa aún sale con su código (R1–R4): `live` solo etiqueta por los `choices` de un campo
   del modelo con el mismo nombre, y ninguno se llama `rectification_type`.
   Rectificar y su vista previa (`invoice.invoice.rectify`, `invoice.invoice.rectification_preview`) dicen que la
-  vista previa se cuenta en la misma respuesta que llama a rectificar, como el cierre de Caja: con «tell the person
-  its preview, then rectify» el asistente enseñaba la vista previa y nunca la tarjeta (hub#1175, hub#1102; lo guarda
+  vista previa se cuenta en la misma respuesta que llama a rectificar, como el cierre de Caja: pedirle contar la
+  vista previa y después rectificar hace que el asistente enseñe la vista previa y nunca la tarjeta (lo guarda
   `tests/test_guardrails_assistant.py` para todo el Hub).
   Cada herramienta dice además sus `asks`, las frases en `en` y `es` con que una persona la pide (`live.E020`:
   Facturación está en `LIVE_ASSISTANT_ASKS_REQUIRED`, hub#1102), con clientes y números de ejemplo que ninguna
@@ -1180,16 +1136,16 @@ Recibir el emisor del SaaS (`invoice.sync_issuer`) no es de ningún papel: solo 
   «Construcciones» comparte raíz con «conste»), las que nombran la factura por su número sin decir «factura» (cada
   palabra de las `asks` suma a toda frase que la diga, y con ella las 13 `invoice.invoice.*` empatan por delante de las
   de VeriFactu), y los `SYNONYMS` del Hub
-  (`base/assistant.py`) leen «pagada», «pagado» y «como cobrada» como una factura pagada (`paid`; «cobrar» y «cobro»
+  (`base/assistant/relevance.py`) leen «pagada», «pagado» y «como cobrada» como una factura pagada (`paid`; «cobrar» y «cobro»
   a secas siguen siendo el cobro de una venta). Así marcar cobrada, rectificar y el resto de las 25 herramientas
   llegan a su operación desde el chat: las frases reales de la QA del asistente
   (`tests/e2e/qa/probes/owner-es-invoice-2026-11-08.json`) quedan entre las 20 primeras herramientas del turno,
   «marca como cobrada la FACT-2026-000001» y «rectifícala con una R1» entre las 8 primeras, y una frase propia por
   herramienta solo llega con sus `asks` (`tests/test_assistant_asks.py`). La sonda «…sin tocar caja ni cambiar
-  importes» sale 5.ª (12.ª antes de ERPlora/live#74): live ya no lee como pedido el «cambiar» detrás de «ni» cuando
+  importes» sale 5.ª: live no lee como pedido el «cambiar» detrás de «ni» cuando
   hay un «sin» antes.
 
-### Decisiones (dudas abiertas del producto actual, resueltas con el mercado)
+### Decisiones (resueltas con el mercado)
 
 1. **La factura de una venta nace «Pagada»** (Square, Lightspeed, Toast, Odoo TPV): el dinero ya se
    cobró. «Marcar pagada» queda para las emitidas a mano.
@@ -1206,16 +1162,15 @@ Recibir el emisor del SaaS (`invoice.sync_issuer`) no es de ningún papel: solo 
 7. **La serie del año nuevo hereda** nombre, prefijo y formato de la del año anterior con su código.
 8. **«Activa» gobierna el alta manual** (una inactiva no se ofrece y se rechaza); «Predeterminada» es
    la serie que el alta manual propone.
-9. **El empleado emite a mano y marca pagada** (como el producto actual).
-10. **«Devolución» pasa a llamarse «Rectificar»**: en Facturación no se devuelve dinero; eso es Ventas.
+9. **El empleado emite a mano y marca pagada**.
+10. **«Rectificar», no «Devolución»**: en Facturación no se devuelve dinero; eso es Ventas.
 11. **Prefijo vacío al crear = el código**, y el prefijo se congela con el primer número, como el formato
-    (cambiarlo cambiaba la forma de los números siguientes).
+    (cambiarlo cambiaría la forma de los números siguientes).
 12. **Dos rectificaciones a la vez** de la misma factura: la segunda espera al bloqueo de la original y
     se rechaza sin gastar número (test con dos sesiones reales).
-13. **Una devolución o anulación que llega antes que la factura** se rechaza para que se reintente (antes
-    se perdía); Ventas pide antes el documento que espera, en la misma operación.
-14. **La factura completa (F1 y F3) exige nombre, NIF y domicilio** del cliente (art. 6 RD 1619/2012);
-    el producto actual solo pedía el NIF.
+13. **Una devolución o anulación que llega antes que la factura** se rechaza para que se reintente; Ventas pide antes el documento que
+    espera, en la misma operación.
+14. **La factura completa (F1 y F3) exige nombre, NIF y domicilio** del cliente (art. 6 RD 1619/2012).
 15. **El documento de una venta se emite al cobrar**, dentro de la transacción del cobro (Ventas llama a
     `invoice.invoice.create_from_sale`; igual la devolución y la anulación), y cuando no se pudo (sin
     emisor, importes que no cuadran) la venta queda «pendiente»: la reacción del outbox la reintenta sola
@@ -1224,8 +1179,7 @@ Recibir el emisor del SaaS (`invoice.sync_issuer`) no es de ningún papel: solo 
     estado de facturación de un pedido cambia con la factura, no después): pedido a Facturación por la API
     o el asistente, el documento ya está en la venta al contestar; el aviso que llega después no cambia
     nada.
-16. **Precio unitario sin IVA y descuento aparte** en cada línea (art. 6.1.f RD 1619/2012); antes la
-    factura de una venta imprimía el precio con IVA y antes del descuento.
+16. **Precio unitario sin IVA y descuento aparte** en cada línea (art. 6.1.f RD 1619/2012).
 17. **Una rectificativa por diferencias no inventa un «tipo efectivo»**: una línea por clave fiscal, a su
     tipo; si la devolución trae artículos, solo sus claves.
 18. **El formato de una serie exige el año** (si no, la serie del año siguiente, que nace de esta,
@@ -1235,27 +1189,6 @@ Recibir el emisor del SaaS (`invoice.sync_issuer`) no es de ningún papel: solo 
 20. **Un rechazo de VeriFactu deshace la emisión** (revisión fiscal de VeriFactu, 2026-10-15): una
     factura sin su registro de alta no se emite ni se imprime; solo un error transitorio de la base de
     datos la deja «pendiente» de la reacción, y sin VeriFactu en el negocio sale sin registro.
-
-### Cambios frente al producto actual
-
-1. La factura de una venta se construye leyendo la propia venta (líneas, importes, regla congelada),
-   no el aviso: un aviso no puede inflar ni cambiar lo que se declara, y la calificación es la regla con
-   la que se cobró, no la vigente el día de emitir (desaparece el rechazo por cambio de tipo entre el
-   cobro y la emisión).
-2. Sin emisor configurado no se emite nada (antes se emitía sin emisor y VeriFactu no podía
-   registrarla).
-3. El libro de números es la propia factura (no hay tabla aparte): un número sin documento no puede
-   existir.
-4. La lista sale por defecto con lo último emitido arriba.
-5. «Factura completa» tiene botón en la ficha del tique (antes solo asistente o API).
-6. El alta manual pide la serie de entre las que emiten facturas (F1, F2) y la rechaza si está
-   inactiva; ya no emite una «Rectificativa» en positivo con la serie RECT.
-7. Los nombres de las series que se crean solas y la línea de la rectificativa por diferencias ya no
-   salen en inglés en un papel en español: las series de fábrica llevan su nombre traducido y la línea
-   dice lo que volvió.
-8. Los importes y precios unitarios agrupan los millares desde cuatro cifras (hub#1090): «1.234,56 €» en
-   español en la lista, la ficha y el aviso del tope del tique (antes «1234,56 €» y «3000.00 €»), como ya hacía
-   el documento A4.
 
 ### Lo que NO hace, a propósito
 
@@ -1272,16 +1205,13 @@ Recibir el emisor del SaaS (`invoice.sync_issuer`) no es de ningún papel: solo 
 
 ### Qué queda fuera
 
-Al cerrar la app (2026-10-31, `CLOSE-INVOICE`), lo que no entra tiene su issue abierta (`migration-leftover`):
+Lo que no entra tiene su issue abierta:
 
-- **hub#500** — El cliente no puede pedir él mismo la factura completa de su tique (INVOICE-F04): faltan la
+- **hub#500** — El cliente no puede pedir él mismo la factura completa de su tique: faltan la
   página pública de `base` bajo `/p/` y el código en el tique de Ventas; Facturación ya emite la F3
   (`invoice.invoice.substitute`).
-- **hub#501** — El emisor de Facturación no se rellena con los datos fiscales de la cuenta de ERPlora
-  (INVOICE-F22): la foto del SaaS no lleva el bloque `issuer` y `base.hub.state_apply` no llama a
+- **hub#501** — El emisor de Facturación no se rellena con los datos fiscales de la cuenta de ERPlora:
+  la foto del SaaS no lleva el bloque `issuer` y `base.hub.state_apply` no llama a
   `invoice.issuer.sync`, que ya existe; y el flujo choca con «Dos identidades» de PLAN-SAAS (los datos fiscales
   del negocio viven en el Hub): primero hay que decidir la dirección.
-- **hub#502** — ERPlora todavía no puede emitir sus propias facturas desde su hub de plataforma
-  (INVOICE-F23): el alta del hub de plataforma con su BD propia es de la tenencia (S2, PLAN §35); las
-  operaciones de Facturación y sus puertas `/internal/platform/invoices` ya están.
 - Las piezas compartidas que la app pide a `@erplora/ui` y aún no han llegado: [`UI-REQUESTS.md`](UI-REQUESTS.md).

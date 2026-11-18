@@ -83,8 +83,9 @@ from apps.tax.models import TaxCategory
 from base import images
 from base import operations as platform
 from base.business import money_text
-from base.queries import business_language, image_library
+from base.queries.catalog_images import business_language, image_library
 from base.ordering import list_order_for
+from base.recovery import brought_back
 
 PRODUCT_NOT_FOUND = _("This product does not exist in this hub.")
 CATEGORY_NOT_FOUND = _("This category no longer exists.")
@@ -442,7 +443,7 @@ def list_low_stock(ctx: OperationContext, params: LowStockListIn) -> dict:
     )
 
 
-def filter_products(products, params: ProductFiltersIn):
+def filter_products(products, params: ProductFiltersIn):  # noqa: C901
     """The product list's search, filters and order (the export takes the same)."""
     if params.search:
         products = products.filter(
@@ -1096,9 +1097,10 @@ def _csv(filename, headers, rows) -> dict:
 #: and its tax category, by its key here.
 CATEGORY_FIELDS = ("name", "slug", "description", "icon", "color", "order")
 
-#: What ``inventory.product.create`` takes of a product of a separate copy, all of its columns since
-#: ``0001_initial`` (``products_in_copy``). Not its stock (the copy's balance is another day's: a count says today's,
-#: INVENTORY-F14), its «sold out» (a day's state) nor its image (hub#1319).
+#: What ``inventory.product.recover`` takes of a product of a separate copy (``products_in_copy``): its create's, each
+#: a column since ``0001_initial``, and the image it showed, one since ``0005_product_image``, the migration its
+#: declaration names (``reads_since``). Not its stock (the copy's balance is
+#: another day's: a count says today's, INVENTORY-F14) nor its «sold out» (a day's state).
 PRODUCT_FIELDS = (
     "name",
     "sku",
@@ -1113,6 +1115,7 @@ PRODUCT_FIELDS = (
     "pricing_unit",
     "track_stock",
     "is_active",
+    "image",
 )
 
 
@@ -1127,13 +1130,13 @@ def categories_in_copy(conn) -> list[dict]:
     rows = conn.execute(_live_in_copy(Category, read))
     categories = [dict(zip(read, row, strict=True)) | {"product_ids": []} for row in rows]
     by_id = {one["id"]: one for one in categories}
-    for product_id, category_id, _name in conn.execute(_live_links_in_copy()):
+    for _link_id, product_id, category_id in conn.execute(_live_links_in_copy()):
         by_id[category_id]["product_ids"].append(product_id)
     return categories
 
 
 def products_in_copy(conn) -> list[dict]:
-    """Each live product of a separate copy of the business, with its ``id`` there, what ``inventory.product.create``
+    """Each live product of a separate copy of the business, with its ``id`` there, what ``inventory.product.recover``
     takes, its tax category's id there (``tax_category``) and the ids of its live categories there
     (``category_ids``); and with every one, the copy's live categories by id (``copy_categories``), to tell its own from
     one the business made again with its name. Nothing where the app's table is not there. ``conn`` is the copy's
@@ -1142,15 +1145,35 @@ def products_in_copy(conn) -> list[dict]:
     if conn.execute("SELECT to_regclass(%s)", [table]).fetchone()[0] is None:
         return []
     read = ("id", *PRODUCT_FIELDS, "tax_category")
-    copy_categories = dict(conn.execute(_live_in_copy(Category, ("id", "name"))).fetchall())
+    copy_categories = category_names_in_copy(conn)
     products = [
         dict(zip(read, row, strict=True)) | {"category_ids": [], "copy_categories": copy_categories}
         for row in conn.execute(_live_in_copy(Product, read))
     ]
     by_id = {one["id"]: one for one in products}
-    for product_id, category_id, _name in conn.execute(_live_links_in_copy()):
+    for _link_id, product_id, category_id in conn.execute(_live_links_in_copy()):
         by_id[product_id]["category_ids"].append(category_id)
     return products
+
+
+def product_links_in_copy(conn) -> list[dict]:
+    """Each link of a live product to a live category in a separate copy of the business, with its ``id`` there, the
+    product's and the category's ids there; and with every one, the copy's live categories by id (``copy_categories``),
+    to pair each with the business's as the categories' part does. Nothing where the links' table is not there.
+    ``conn`` is the copy's direct, read-only connection: it is read by its own SQL over the models' names."""
+    if conn.execute("SELECT to_regclass(%s)", [ProductCategory._meta.db_table]).fetchone()[0] is None:
+        return []
+    copy_categories = category_names_in_copy(conn)
+    return [
+        {"id": link_id, "product_id": product_id, "category_id": category_id, "copy_categories": copy_categories}
+        for link_id, product_id, category_id in conn.execute(_live_links_in_copy())
+    ]
+
+
+def category_names_in_copy(conn) -> dict[UUID, str]:
+    """The live categories of a separate copy of the business by id, with their name there: what pairs each with the
+    business's (``categories_standing_for``). ``conn`` is the copy's direct, read-only connection."""
+    return dict(conn.execute(_live_in_copy(Category, ("id", "name"))).fetchall())
 
 
 def _live_in_copy(model, read: tuple[str, ...]) -> sql.Composed:
@@ -1165,21 +1188,21 @@ def _live_in_copy(model, read: tuple[str, ...]) -> sql.Composed:
 
 
 def _live_links_in_copy() -> sql.Composed:
-    """The copy's ``(product, category, category's name)`` links whose product and category are both live there; a
-    deleted product keeps its links."""
+    """The copy's ``(link, product, category)`` links whose product and category are both live there; a deleted product
+    keeps its links."""
     link, product, category = ProductCategory._meta, Product._meta, Category._meta
 
     def column(meta, field: str) -> sql.Identifier:
         return sql.Identifier(meta.get_field(field).column)
 
     return sql.SQL(
-        "SELECT l.{product_id}, l.{category_id}, c.{name} FROM {links} l"
+        "SELECT l.{link_pk}, l.{product_id}, l.{category_id} FROM {links} l"
         " JOIN {products} p ON p.{product_pk} = l.{product_id} JOIN {categories} c ON c.{category_pk} = l.{category_id}"
         " WHERE NOT p.{product_deleted} AND NOT c.{category_deleted} ORDER BY l.{product_id}, l.{category_id}"
     ).format(
+        link_pk=column(link, "id"),
         product_id=column(link, "product"),
         category_id=column(link, "category"),
-        name=column(category, "name"),
         links=sql.Identifier(link.db_table),
         products=sql.Identifier(product.db_table),
         categories=sql.Identifier(category.db_table),
@@ -1226,6 +1249,43 @@ def _categories_held(copy: dict[UUID, str]) -> dict[UUID, UUID]:
     return held
 
 
+def product_links_not_in_business(links: list[dict]) -> list[dict]:
+    """The links of a separate copy (``product_links_in_copy``) a category brought back lacks, in their order, each as
+    ``inventory.product_category.add`` takes it here, with its ``id`` there: the copy's category is no longer live here
+    and its place is taken by one a recovery brought back (``_categories_held``, the same pairing as the categories'
+    part); the product is one the business keeps live, out of it. A category the business kept, or made again by
+    hand, stays as the business has it, and a product's other categories are never touched."""
+    if not links:
+        return []
+    standing = categories_standing_for(links[0]["copy_categories"])
+    wanted = [(one, standing[one["category_id"]]) for one in links if one["category_id"] in standing]
+    asked = {one["product_id"] for one, _here in wanted}
+    live = set(Product.objects.filter(pk__in=asked, is_deleted=False).values_list("pk", flat=True))
+    back = set(standing.values())
+    linked = set(ProductCategory.objects.filter(product__in=asked, category__in=back).values_list("product", "category"))
+    return [
+        {"id": one["id"], "product_id": one["product_id"], "category_id": here}
+        for one, here in wanted
+        if one["product_id"] in live and (one["product_id"], here) not in linked
+    ]
+
+
+def categories_standing_for(copy: dict[UUID, str]) -> dict[UUID, UUID]:
+    """The business's category that stands for each of a separate copy's it no longer holds live, as ``{id there: id
+    here}``: the live one with its name that a recovery brought back (``brought_back``), paired as the categories' part
+    pairs them (``_categories_held``), which is why ``copy`` is every live category of the copy, by name
+    (``category_names_in_copy``). One the business made again by hand is its own, set up as it chose: it stands for
+    none. A category still live here is itself, and is not in the result. For the apps whose records hang from a
+    category to give each back to the category it is now."""
+    stand_ins = {there: here for there, here in _categories_held(copy).items() if there != here}
+    back = {
+        pk
+        for pk, created_by in Category.objects.filter(pk__in=stand_ins.values()).values_list("pk", "created_by")
+        if brought_back(created_by)
+    }
+    return {there: here for there, here in stand_ins.items() if here in back}
+
+
 def _same_name(name: str) -> str:
     """A name as two that are the same compare: single spaces, the case aside."""
     return " ".join(name.split()).casefold()
@@ -1256,7 +1316,7 @@ def products_deleted_in_business(products: list[dict]) -> list[dict]:
 
 def products_not_in_business(products: list[dict]) -> list[dict]:
     """The products of a separate copy (``products_in_copy``) the business lacks, in their order, each as
-    ``inventory.product.create`` takes it here. Not lacking: any product it still holds, live or deleted (it comes back
+    ``inventory.product.recover`` takes it here. Not lacking: any product it still holds, live or deleted (it comes back
     the same, ``products_deleted_in_business``), nor one with the SKU or the EAN-13 of a live one (the code is the
     article's identity: one made again by hand, or brought back already). Lacking: one gone altogether. Each takes the
     key of its tax category (Taxes never deletes one; one no longer active is the create's to refuse, and one without
@@ -1277,8 +1337,21 @@ def products_not_in_business(products: list[dict]) -> list[dict]:
     return [_as_created(one, keys.get(one["tax_category"]), categories) for one in lacking]
 
 
+def products_standing_for(skus: dict[UUID, str]) -> dict[UUID, UUID]:
+    """The business's product that stands for each of a separate copy's products (``{id there: SKU there}``) it no
+    longer holds live, as ``{id there: id here}``: the live one with its SKU, the article's identity, that a recovery
+    made (``brought_back``), as ``products_not_in_business`` has one the business no longer holds at all made again
+    with another id (INVENTORY-F01). One the business made again by hand is its own, set up as it chose: it stands for
+    none. A product still live here is itself, and is not in the result. For the apps whose records hang from a
+    product to give each back to the product it is now."""
+    live = set(Product.objects.filter(pk__in=list(skus), is_deleted=False).values_list("pk", flat=True))
+    wanted = {sku: there for there, sku in skus.items() if there not in live}
+    made = Product.objects.filter(sku__in=list(wanted), is_deleted=False).values_list("sku", "pk", "created_by")
+    return {wanted[sku]: pk for sku, pk, created_by in made if brought_back(created_by)}
+
+
 def _as_created(product: dict, tax_key: str | None, categories: dict[UUID, UUID]) -> dict:
-    """``product`` of the copy as ``inventory.product.create`` takes it in the business, with its ``id`` there."""
+    """``product`` of the copy as ``inventory.product.recover`` takes it in the business, with its ``id`` there."""
     created = {field: product[field] for field in ("id", *PRODUCT_FIELDS)}
     created["category_ids"] = [categories[one] for one in product["category_ids"] if one in categories]
     if tax_key is not None:

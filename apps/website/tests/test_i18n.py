@@ -4,12 +4,12 @@ models, the errors and the public page's chrome (``{% translate %}`` in its temp
 import re
 from pathlib import Path
 
-import pytest
 from django.apps import apps
 from django.utils import translation
 
 from apps.website import choices, queries, schemas, services
 from apps.website.models import Image, Site
+from apps.website.tests.conftest import HOST, HUB_DB
 from base.catalog import build_registry
 from base.tests.po import (
     catalogue_key,
@@ -123,8 +123,8 @@ def test_spanish_texts():
         assert not hasattr(schemas, "CUSTOM_WITHOUT_COLOURS")
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_an_error_message_follows_the_language_of_the_request(client):
-    response = client.get("/api/website/public/site", HTTP_HOST="a.localhost", HTTP_ACCEPT_LANGUAGE="es")
+    response = client.get("/api/website/public/site", HTTP_HOST=HOST, HTTP_ACCEPT_LANGUAGE="es")
     assert response.status_code == 404
     assert response.json()["error"]["message"] == "Esta página web no está publicada."

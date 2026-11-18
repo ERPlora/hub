@@ -20,6 +20,7 @@ import { chats, relay } from './provider-helpers';
 import { guestRowInTheBook, madridDay } from './reservation-helpers';
 import { noHorizontalScroll, settled, VIEWPORTS } from './schedule-helpers';
 import { STACK } from './stack';
+import { toastSaying } from './toast-helpers';
 import { answerSpec, bookingCleanUp, customerWrites, tablesAnswered } from './whatsapp-answer-helpers';
 import { NUMBER_ID, TOKEN } from './whatsapp-graph';
 import { e2ePhone, metaGraph, restorePhoto, seedErplora } from './whatsapp-helpers';
@@ -110,7 +111,7 @@ for (const viewport of VIEWPORTS) {
       await expect(question).toBeVisible();
       await expect(question).toContainText(phone);
       await question.locator('[data-testid^=flow-question-yes-]').click();
-      await expect(page.locator('ion-toast').filter({ hasText: 'Approved: the automation carries on.' }).last()).toBeVisible();
+      await expect(toastSaying(page, 'Approved: the automation carries on.')).toBeVisible();
       const answered = chats(provider()).length;
       await relay(parkedEvent(psql(`select id from flow_flow where recipe = '${ANSWER}'`)));
       expect(chats(provider()), `${viewport.label}: the assistant heard what Reservas answered`).toHaveLength(answered + 1);

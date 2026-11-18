@@ -8,9 +8,9 @@ Cases from the old module's tests: stations.hub (routing by product, then by cat
 import pytest
 from live.context import system_context
 
-from .conftest import A, add_line, fire, open_check, run
+from .conftest import A, HUB_DB, add_line, fire, open_check, run
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 
 def inventory(name: str, data: dict):

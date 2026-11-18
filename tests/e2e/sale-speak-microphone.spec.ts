@@ -9,6 +9,7 @@
 import { expect, type Locator, type Page, test } from '@playwright/test';
 
 import { A, EMPLOYEE, login, shot, untilStill } from './helpers';
+import { toastSaying } from './toast-helpers';
 
 const VIEWPORTS = [
   { label: '390', width: 390, height: 844 },
@@ -29,7 +30,7 @@ async function refuse(page: Page, label: string, notice: string): Promise<void> 
   await page.goto(`${A}/sale/pos`);
   await expect(key(page)).toHaveText(label);
   await key(page).click();
-  await expect(page.locator('ion-toast').filter({ hasText: notice })).toBeVisible();
+  await expect(toastSaying(page, notice)).toBeVisible();
   await expect(key(page)).toHaveAttribute('aria-pressed', 'false');
   await expect(key(page)).toHaveText(label);
   await expect(page.locator('[data-testid="pos-speak-status"]')).toHaveCount(0);

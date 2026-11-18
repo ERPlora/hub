@@ -9,6 +9,7 @@
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
 import { A, api, login, psql, shot, shown } from './helpers';
+import { rowAction } from './service-helpers';
 import { createProduct, dialog, fill, pick, type Product } from './inventory-helpers';
 import { cleanDocumentsOf, newestSaleOf, shots, stamp } from './sale-helpers';
 
@@ -120,7 +121,7 @@ async function chargeAtTheTill(page: Page): Promise<void> {
   await expect(page.locator('[data-testid=sale-document-modal] [data-testid=sale-receipt]')).toBeVisible();
 }
 
-test('CASH_REGISTER-F03, F13, F05, F06, F09: a shift from the float to the close, with a cash sale of the till', async ({ page }) => {
+test('CASH_REGISTER-F03, F13, F05, F06, F09: a shift from the float to the close, with a cash sale of the till @smoke', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await login(page, A, '/cash_register/sessions');
   await sessionsReady(page);
@@ -148,7 +149,7 @@ test('CASH_REGISTER-F03, F13, F05, F06, F09: a shift from the float to the close
   await expect(rowOf(page, opened.id)).toContainText(/112[.,]10/);
 
   // F05: 2.00 € out for a supplier.
-  await shown(page).locator(`[data-testid=cash-register-sessions-row-${opened.id}-movement]`).first().click();
+  await rowAction(page, 'cash-register-sessions', opened.id, 'movement');
   const movement = dialog(page, 'cash-register-movement');
   await expect(movement).toBeVisible();
   await pick(page, movement.locator('[data-testid=cash-register-movement-type]'), /Cash out|Salida/);
@@ -160,7 +161,7 @@ test('CASH_REGISTER-F03, F13, F05, F06, F09: a shift from the float to the close
   await shots(page, 'cash-register-sessions', sessionsReady);
 
   // F06 → F09: a closing count of 110.00 € leads to the close, which starts from it: 10 cents short.
-  await shown(page).locator(`[data-testid=cash-register-sessions-row-${opened.id}-count]`).first().click();
+  await rowAction(page, 'cash-register-sessions', opened.id, 'count');
   const count = dialog(page, 'cash-register-count');
   await expect(count).toBeVisible();
   await fill(count, 'cash-register-count-denom-100', '1');

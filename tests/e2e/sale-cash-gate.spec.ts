@@ -75,7 +75,7 @@ async function chargeInCash(page: Page) {
   return sheet;
 }
 
-test('SALE-F08: with the drawer closed, cash is refused in the sheet and «Open a cash session» goes to Cash register', async ({ page, context }) => {
+test('SALE-F08: with the drawer closed, cash is refused in the sheet and «Open a cash session» goes to Cash register @smoke', async ({ page, context }) => {
   await page.setViewportSize({ width: 1280, height: 860 });
   await tillWithCoffee(page);
   const sheet = await chargeInCash(page);

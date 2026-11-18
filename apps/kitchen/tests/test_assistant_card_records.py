@@ -15,11 +15,10 @@ from django.apps import apps
 from live.context import OperationContext, Scope
 from live.operations import INTERNAL, get, registry
 
-from apps.kitchen.tests.conftest import A, add_line, ctx_for, make_station, open_check, run
+from apps.kitchen.tests.conftest import HUB_DB, A, add_line, ctx_for, make_station, open_check, run
 from base import assistant
 from base.tenancy.context import use_hub
-from base.tenancy.tests import hubs
-from base.tests.test_assistant_card_values import AN_ID
+from base.tests.test_assistant_card_values_references import AN_ID
 
 A_MISSING_ID = "0192f0b2-3333-7000-8000-000000000003"
 
@@ -148,7 +147,7 @@ def make_kitchen(
 
 
 def fields_of(write: str, arguments: dict, language: str = "en", ctx=None) -> dict:
-    card = assistant.card(get(write), arguments, language, ctx or ctx_for())
+    card = assistant.cards.card(get(write), arguments, language, ctx or ctx_for())
     return {field["name"]: field for field in card["fields"]}
 
 
@@ -193,7 +192,7 @@ def name_of(kitchen: Kitchen, write: str, datum: str) -> str:
 # ── A ticket, a station, a product, a category and a check by their names ────────────────────────────────────────────
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize(("write", "datum"), ON_ONE)
 def test_a_write_says_the_record_it_names_by_its_name(write, datum):
     """The case the issue names, «kitchen.item.bump:ticket_id»: «Ticket: 20261014-0001», never its id nor its label;
@@ -202,7 +201,7 @@ def test_a_write_says_the_record_it_names_by_its_name(write, datum):
     assert shown(write, {datum: id_of(kitchen, write, datum)})[datum] == name_of(kitchen, write, datum)
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_among_several_the_card_says_the_one_the_write_names():
     """Each id names its own record, never another one of the business (the first, the last)."""
     kitchens = [
@@ -218,7 +217,7 @@ def test_among_several_the_card_says_the_one_the_write_names():
             assert said == [[kitchen.dishes[0].name] for kitchen in listed], f"{write}:{datum}"
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize(("write", "datum"), ON_DISHES)
 def test_the_dishes_a_write_marks_are_said_by_their_names_in_that_order(write, datum):
     """«Dishes: Hamburguesa, Tortilla»: each one by its name, in the order sent, said in words (``named``), never its
@@ -229,7 +228,7 @@ def test_the_dishes_a_write_marks_are_said_by_their_names_in_that_order(write, d
     assert (field["value"], field.get("named")) == (["Hamburguesa", "Tortilla"], True)
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_dishes_of_a_round_sent_are_said_by_the_dish_on_each_line_of_the_check():
     """The round Sales fired, received by the kitchen: its check by its title and each line by the dish on it."""
     kitchen = make_kitchen()
@@ -248,7 +247,7 @@ def test_the_dishes_of_a_round_sent_are_said_by_the_dish_on_each_line_of_the_che
     )
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_dish_made_by_hand_from_the_catalogue_is_said_by_its_product_beside_how_many():
     """A ticket made by hand: a product of the catalogue by its name, beside its quantity (hub#970), never its id."""
     kitchen = make_kitchen()
@@ -256,7 +255,7 @@ def test_a_dish_made_by_hand_from_the_catalogue_is_said_by_its_product_beside_ho
     assert (field["items"]["value"], field["items"].get("named")) == ([{"product_id": "Hamburguesa", "quantity": "2"}], True)
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize("language", ["en", "es"])
 @pytest.mark.parametrize(("write", "datum"), list(TITLES))
 def test_the_record_a_write_names_is_titled_with_the_screens_word_in_each_language(write, datum, language):
@@ -273,7 +272,7 @@ def test_the_record_a_write_names_is_titled_with_the_screens_word_in_each_langua
     assert field["label"] == words(language)[TITLES[(write, datum)]]
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize(
     ("language", "title", "types"),
     [
@@ -290,7 +289,7 @@ def test_the_type_of_a_round_is_said_by_its_label_never_its_code(write, language
         assert (field["label"], field["value"]) == (title, said)
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize(
     ("language", "said"), [("en", ["Normal", "Rush", "VIP"]), ("es", ["Normal", "Urgente", "VIP"])]
 )
@@ -302,7 +301,7 @@ def test_the_priority_of_a_round_received_is_said_by_its_label_never_its_code(la
         assert shown("kitchen.ticket.receive", arguments, language)["priority"] == label
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_change_keeps_saying_the_record_beside_what_it_changes():
     """The name is the record's as it is now, before the write runs: a rename says the old name under «Station» and the
     new one under its own datum."""
@@ -316,7 +315,7 @@ def test_a_change_keeps_saying_the_record_beside_what_it_changes():
 # ── A round of Sales the kitchen has not saved yet ────────────────────────────────────────────────────────────────────
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_round_not_saved_yet_is_said_by_its_number_and_its_dishes_by_their_names(product):
     """A round the till just fired, before the kitchen saved it: the board already shows it, so the card names it by
     the number it will have and each dish by its name, as the board does."""
@@ -345,7 +344,7 @@ READ_BY = {
 }
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize(("write", "datum"), ON_ONE)
 def test_a_record_is_left_out_for_whoever_may_not_read_it(write, datum):
     """Whoever may not see the tickets (``kitchen.view_ticket``), Inventory's products or categories, or Sales' checks
@@ -358,7 +357,7 @@ def test_a_record_is_left_out_for_whoever_may_not_read_it(write, datum):
     assert no_id(said)
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_dishes_are_left_out_for_whoever_may_not_see_the_tickets_and_a_line_for_whoever_may_not_see_the_sales():
     kitchen = make_kitchen()
     dishes = {"item_ids": [str(kitchen.dishes[0].id)]}
@@ -374,7 +373,7 @@ def test_the_dishes_are_left_out_for_whoever_may_not_see_the_tickets_and_a_line_
         assert name not in str(said), write
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize(("write", "datum"), ON_ONE)
 def test_what_does_not_exist_is_left_out(write, datum):
     said = shown(write, {datum: A_MISSING_ID})
@@ -382,13 +381,13 @@ def test_what_does_not_exist_is_left_out(write, datum):
     assert no_id(said)
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_dish_that_does_not_exist_is_left_out():
     """The list still says how many it carries; the dish it cannot name is none of them."""
     assert shown("kitchen.item.bump", {"item_ids": [A_MISSING_ID]}) == {"item_ids": [None]}
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_record_removed_meanwhile_is_left_out():
     """A ticket or a station deleted is no longer there for the card either, nor the dishes of that ticket."""
     kitchen = make_kitchen()
@@ -404,15 +403,15 @@ def test_a_record_removed_meanwhile_is_left_out():
     assert shown("kitchen.item.bump", {"item_ids": dish}) == {"item_ids": [None]}
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_nobody_behind_the_request_reads_no_record():
     """An automation's card (no person at hand) names no record: nothing is read for anybody."""
     kitchen = make_kitchen()
-    card = assistant.card(get("kitchen.station.update"), {"station_id": str(kitchen.station.id), "name": "Horno"}, "en")
+    card = assistant.cards.card(get("kitchen.station.update"), {"station_id": str(kitchen.station.id), "name": "Horno"}, "en")
     assert {field["name"]: field["value"] for field in card["fields"]} == {"name": "Horno"}
 
 
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
+@HUB_DB
 @pytest.mark.usefixtures("no_test_fallback")
 def test_a_record_of_another_business_is_left_out(hub_a, hub_b):
     """Each business in its own database, as production: an id of A names nothing in B."""
@@ -444,7 +443,7 @@ def test_the_reads_that_name_a_station_or_a_dish_are_no_tool_route_nor_live_quer
     assert (read.kind, read.permission, read.ai, read.expose_api) == ("query", "kitchen.view_ticket", INTERNAL, False)
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_read_that_names_a_station_finds_it_by_its_id_or_its_name():
     grill, oven = make_station("Plancha"), make_station("Horno")
     read = get("kitchen.station.get")
@@ -454,7 +453,7 @@ def test_the_read_that_names_a_station_finds_it_by_its_id_or_its_name():
     assert read(ctx_for(), read.input(station="horno")).id == oven.id
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_read_that_names_a_dish_finds_the_one_its_id_names():
     kitchens = [make_kitchen(), make_kitchen("Barra", "Croquetas", "Postres", "Tarta", "TAR-02", "8410000000024")]
     read = get("kitchen.item.get")

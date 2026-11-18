@@ -3,8 +3,9 @@
 import datetime as dt
 
 import pytest
-from django.db import IntegrityError, transaction
+from django.db import IntegrityError
 from django.utils import timezone
+from live.operations import atomic
 
 from apps.cash_register.models import (
     Count,
@@ -15,12 +16,13 @@ from apps.cash_register.models import (
     Settings,
     session_number,
 )
+from apps.cash_register.tests.conftest import HUB_DB
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 
 def refused(make):
-    with pytest.raises(IntegrityError), transaction.atomic():
+    with pytest.raises(IntegrityError), atomic():
         make()
 
 

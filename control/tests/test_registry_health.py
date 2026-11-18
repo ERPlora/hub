@@ -9,6 +9,7 @@ sign-up still being prepared: it is an ended demo, the reaper's.
 import datetime as dt
 
 import pytest
+from django.db import connections
 from django.utils import timezone
 
 from control.models import Hub
@@ -135,5 +136,5 @@ def test_one_query_reads_it_all(django_assert_num_queries):
     now = timezone.now()
     make("acme", "failed", created=now)
 
-    with django_assert_num_queries(1):
+    with django_assert_num_queries(1, connection=connections["default"]):
         registry_health(now)

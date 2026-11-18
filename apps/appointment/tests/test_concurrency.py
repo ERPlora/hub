@@ -11,7 +11,6 @@ what it added (or answers «Cannot delete»); a write that comes second finds it
 """
 
 import datetime as dt
-import threading
 import time
 from collections.abc import Callable
 from contextlib import contextmanager
@@ -19,20 +18,21 @@ from uuid import uuid7
 
 import pytest
 from django.contrib import admin
-from django.contrib.auth import get_user_model
-from django.db import connection, transaction
-from django.test import Client, RequestFactory
+from django.db import connections
+from django.test import RequestFactory
 from live.context import system_context
 from live.errors import OperationError
-from live.operations import get
+from live.operations import atomic, get
 
 from apps.appointment.models import Appointment, Recurring
 from apps.customer.models import Customer
-from apps.customer.tests.conftest import card_deleted_on_screen, card_protected, reads, writes
+from apps.customer.tests.conftest import card_protected, reads, writes
 from apps.staff.models import Member
-from apps.staff.tests.conftest import WAIT_LIMIT, _waited_for, deleted_on_screen
+from base.tenancy.context import current_alias
+from base.tenancy.tests.concurrency import HOW, WAIT_LIMIT, admin_delete, at_once, in_a_thread, meanwhile
 
 from .conftest import (
+    HUB_DB_COMMITTED,
     MONDAY,
     A,
     at,
@@ -45,35 +45,9 @@ from .conftest import (
 )
 
 pytestmark = [
-    pytest.mark.django_db(transaction=True),
-    pytest.mark.usefixtures("anytime"),
+    HUB_DB_COMMITTED,
+    pytest.mark.usefixtures("anytime", "plan_with_room"),
 ]
-
-
-def at_once(*calls):
-    """Runs every ``call`` in its own thread and session, released together; their results or errors."""
-    barrier = threading.Barrier(len(calls))
-    results: list = [None] * len(calls)
-
-    def worker(index, call):
-        try:
-            barrier.wait(5)
-            results[index] = call()
-        except OperationError as error:
-            results[index] = error
-        except Exception as error:  # an unexpected failure is reported by the test
-            results[index] = error
-        finally:
-            connection.close()
-
-    threads = [
-        threading.Thread(target=worker, args=(i, call)) for i, call in enumerate(calls)
-    ]
-    for thread in threads:
-        thread.start()
-    for thread in threads:
-        thread.join(30)
-    return results
 
 
 def codes(results) -> list[str]:
@@ -160,9 +134,9 @@ def test_two_charges_of_the_same_appointment_at_once_open_one_check(salon):
 
 
 @pytest.mark.parametrize("how", ["page", "list"])
-def test_a_booking_while_the_hub_admin_deletes_the_professional_leaves_them_protected(salon, how):
+def test_a_booking_while_the_hub_admin_deletes_the_professional_leaves_them_protected(salon, hub_staff, how):
     books = lambda sql: sql.lstrip().startswith('INSERT INTO "appointment_appointment"')  # noqa: E731
-    with deleted_on_screen(salon.ana, how, books) as answers:
+    with meanwhile(books, admin_delete(hub_staff, how, salon.ana), first=True) as answers:
         booking(salon, "10:00")()
     [answer] = answers
     assert not isinstance(answer, Exception), answer
@@ -232,7 +206,7 @@ def deleted_after_the_first_read_of(target, how: str, business_delete: str):
             deletions.extend(at_once(lambda: delete(target, how, business_delete)))
         return result
 
-    with connection.execute_wrapper(wrapper):
+    with connections[current_alias()].execute_wrapper(wrapper):
         yield deletions
 
 
@@ -263,78 +237,10 @@ def test_a_row_deleted_while_its_detail_is_read_is_never_a_server_error(salon, d
 # either way). Locked first, it waits for the write and then takes what it added, or answers «Cannot delete»
 # when that protects the row; a write that comes second waits for the deletion and finds nothing.
 
-#: How the platform staff delete: from the row's delete page, or with the list's «Delete selected».
-HOW = ["page", "list"]
-
 
 def locks(table: str) -> Callable[[str], bool]:
     """Whether a statement locks rows of ``table``."""
     return lambda sql: f'FROM "{table}"' in sql and "FOR UPDATE" in sql
-
-
-@pytest.fixture
-def hub_staff(db) -> Client:
-    """The platform staff, signed in to the Hub admin."""
-    staff = get_user_model().objects.create_superuser(
-        username="root", password="pw", email="root@example.com"
-    )
-    client = Client()
-    client.force_login(staff)
-    return client
-
-
-def admin_delete(client: Client, how: str, *targets):
-    """The Hub admin's «Delete» of ``targets`` (one for its page), ``how`` it says (see ``HOW``); it returns
-    the answer."""
-    meta = type(targets[0])._meta
-    changelist = f"/admin/{meta.app_label}/{meta.model_name}/"
-    if how == "page":
-        [target] = targets
-        url, data = f"{changelist}{target.pk}/delete/", {"post": "yes"}
-    else:
-        url, data = changelist, {
-            "action": "delete_selected",
-            "_selected_action": [str(target.pk) for target in targets],
-            "post": "yes",
-        }
-    return lambda: client.post(
-        url, data, HTTP_HOST="hubs.localhost", HTTP_ACCEPT_LANGUAGE="en"
-    )
-
-
-@contextmanager
-def meanwhile(after: Callable[[str], bool], call):
-    """Runs ``call`` in another session right after the first statement of this one for which ``after``
-    holds; this one goes on once ``call`` waits for what it holds (or has ended). Yields its outcome (an
-    error raised, a 500 included, is the outcome)."""
-    outcome: list = []
-
-    def other():
-        try:
-            outcome.append(call())
-        except Exception as error:  # reported to the test
-            outcome.append(error)
-        finally:
-            connection.close()
-
-    thread = threading.Thread(target=other)
-
-    def wrapper(execute, sql, params, many, context):
-        result = execute(sql, params, many, context)
-        if thread.ident is None and after(sql):
-            thread.start()
-            deadline = time.monotonic() + WAIT_LIMIT
-            while thread.is_alive() and not _waited_for() and time.monotonic() < deadline:
-                time.sleep(0.02)
-        return result
-
-    try:
-        with connection.execute_wrapper(wrapper):
-            yield outcome
-    finally:
-        if thread.ident is not None:
-            thread.join(30)
-    assert thread.ident is not None, "this session never locked"
 
 
 def booked_pending(salon) -> Appointment:
@@ -476,6 +382,24 @@ def test_a_deleted_appointment_restored_twice_at_once_comes_back_once(salon):
     ]
 
 
+def test_a_deleted_series_restored_twice_at_once_comes_back_once(salon):
+    """The restore holds the series' row while it judges and writes: a second restore of it, from its first read of the
+    series, waits, then finds it back in Repeating and answers it as it is, with nothing written."""
+    from live.models import OutboxEvent
+
+    series = make_series(salon)
+    run("appointment.recurring.delete", {"id": str(series.id)})
+    restore = get("appointment.recurring.restore")
+    asked = restore.input.model_validate({"id": str(series.id)})
+    again = lambda: restore(system_context(A), asked)  # noqa: E731
+    with meanwhile(lambda sql: 'FROM "appointment_recurring"' in sql, again) as outcomes:
+        restore(system_context(A), asked)
+    [outcome] = outcomes
+    assert not isinstance(outcome, Exception), outcome
+    assert Recurring.objects.get(pk=series.pk).deleted_at is None
+    assert OutboxEvent.objects.filter(name="appointment.recurring.restored").count() == 1
+
+
 def test_the_agenda_and_the_hub_admin_deleting_the_same_appointments_never_wait_in_a_circle(
     salon, hub_staff
 ):
@@ -513,7 +437,7 @@ def system(name: str, data: dict):
 
 def waiting() -> int:
     """How many other sessions on this database wait for a lock."""
-    with connection.cursor() as cursor:
+    with connections[current_alias()].cursor() as cursor:
         cursor.execute("SELECT pg_stat_clear_snapshot()")
         cursor.execute(
             "SELECT count(*) FROM pg_stat_activity WHERE datname = current_database()"
@@ -527,17 +451,8 @@ def in_turn(row, *calls) -> list:
     wait for a lock, so they queue for ``row`` in that order; then lets it go. Their outcomes (an error raised,
     a 500 included, is the outcome)."""
     outcomes: list = [None] * len(calls)
-
-    def other(index, call):
-        try:
-            outcomes[index] = call()
-        except Exception as error:  # reported to the test
-            outcomes[index] = error
-        finally:
-            connection.close()
-
-    threads = [threading.Thread(target=other, args=(i, call)) for i, call in enumerate(calls)]
-    with transaction.atomic():
+    threads = [in_a_thread(call, outcomes, index) for index, call in enumerate(calls)]
+    with atomic():
         list(type(row).objects.select_for_update().filter(pk=row.pk))
         for queued, thread in enumerate(threads, start=1):
             thread.start()
@@ -728,9 +643,9 @@ CARD_LINKS = {
 
 @pytest.mark.parametrize("how", HOW)
 @pytest.mark.parametrize("write", sorted(CARD_LINKS))
-def test_the_hub_admin_cannot_delete_a_card_a_booking_links_meanwhile(salon, write, how):
+def test_the_hub_admin_cannot_delete_a_card_a_booking_links_meanwhile(salon, hub_staff, write, how):
     book, table = CARD_LINKS[write]
-    with card_deleted_on_screen(salon.lucia, how, writes(table)) as answers:
+    with meanwhile(writes(table), admin_delete(hub_staff, how, salon.lucia), first=True) as answers:
         book(salon)
     [answer] = answers
     assert card_protected(answer)
@@ -741,9 +656,9 @@ def test_the_hub_admin_cannot_delete_a_card_a_booking_links_meanwhile(salon, wri
 
 @pytest.mark.parametrize("how", HOW)
 @pytest.mark.parametrize("write", sorted(CARD_LINKS))
-def test_a_booking_whose_card_the_hub_admin_deletes_first_is_told_it_is_gone(salon, write, how):
+def test_a_booking_whose_card_the_hub_admin_deletes_first_is_told_it_is_gone(salon, hub_staff, write, how):
     book, _ = CARD_LINKS[write]
-    with card_deleted_on_screen(salon.lucia, how, reads("customer_customer")) as answers:
+    with meanwhile(reads("customer_customer"), admin_delete(hub_staff, how, salon.lucia), first=True) as answers:
         with pytest.raises(OperationError) as refused:
             book(salon)
     [answer] = answers
@@ -771,9 +686,9 @@ def _merged_into_marta(salon):
 
 
 @pytest.mark.parametrize("how", HOW)
-def test_the_hub_admin_cannot_delete_the_card_a_merge_moves_the_appointments_to_meanwhile(salon, how):
+def test_the_hub_admin_cannot_delete_the_card_a_merge_moves_the_appointments_to_meanwhile(salon, hub_staff, how):
     booked, series, marta, move = _merged_into_marta(salon)
-    with card_deleted_on_screen(marta, how, writes("appointment_appointment")) as answers:
+    with meanwhile(writes("appointment_appointment"), admin_delete(hub_staff, how, marta), first=True) as answers:
         move()
     [answer] = answers
     assert card_protected(answer)

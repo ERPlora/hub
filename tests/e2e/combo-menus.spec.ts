@@ -16,7 +16,7 @@ import { spawnSync } from 'node:child_process';
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
 import { A, api, capture, HUB_DIR, login, painted, psql, shown, untilStill } from './helpers';
-import { capturedAtSizes } from './service-helpers';
+import { capturedAtSizes, rowAction } from './service-helpers';
 
 const TAG = 'E2E Combo';
 const STAMP = Date.now().toString(36).toUpperCase();
@@ -430,14 +430,7 @@ test('COMBO-F03, F05, F06: several dishes at once, choices and courses changed, 
   const row = shown(page).locator(`[data-testid=combo-menus-row][data-id="${id}"]`);
   await expect(row).toBeVisible();
   const edit = async () => {
-    const action = shown(page).locator(`[data-testid=combo-menus-row-${id}-edit]`);
-    const menu = shown(page).locator(`[data-testid=combo-menus-row-${id}-menu]`);
-    await action.or(menu).first().waitFor({ state: 'visible' });
-    if (await action.isVisible()) await action.click();
-    else {
-      await menu.click();
-      await page.locator(`ion-popover [data-testid=combo-menus-row-${id}-edit]`).click();
-    }
+    await rowAction(page, 'combo-menus', id, 'edit');
     await expect(page.locator('ion-modal[data-testid=combo-menu-form]')).toBeVisible();
   };
   await edit();
@@ -575,14 +568,7 @@ test('COMBO-F01, F04: the list finds the menu and withdraws it after its confirm
   const row = shown(page).locator(`[data-testid=combo-menus-row][data-id="${id}"]`);
   await expect(row).toBeVisible();
   await shoot(page, 'APP-COMBO-COMBO-F01', '.ion-page:not(.ion-page-hidden) [data-testid^=combo-menus]');
-  const action = shown(page).locator(`[data-testid=combo-menus-row-${id}-delete]`);
-  const menu = shown(page).locator(`[data-testid=combo-menus-row-${id}-menu]`);
-  await action.or(menu).first().waitFor({ state: 'visible' });
-  if (await action.isVisible()) await action.click();
-  else {
-    await menu.click();
-    await page.locator(`ion-popover [data-testid=combo-menus-row-${id}-delete]`).click();
-  }
+  await rowAction(page, 'combo-menus', id, 'delete');
   const dialog = page.locator('ion-modal[data-testid=combo-menus-delete]');
   await expect(dialog).toContainText(`«${MENU}» stops being on sale`);
   await shoot(page, 'APP-COMBO-COMBO-F04', 'ion-modal[data-testid=combo-menus-delete] [data-testid]');

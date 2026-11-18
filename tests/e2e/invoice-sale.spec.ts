@@ -73,7 +73,7 @@ async function findInList(page: Page, number: string): Promise<void> {
   await expect(list.locator('[data-testid=invoice-list-row]', { hasText: number }).first()).toBeVisible();
 }
 
-test('INVOICE-F02 and F18: a sale charged as an invoice at the till is a full invoice, found and printed', async ({ page, context }) => {
+test('INVOICE-F02 and F18: a sale charged as an invoice at the till is a full invoice, found and printed @smoke', async ({ page, context }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await login(page, A, '/sale/pos');
   await tillReady(page);

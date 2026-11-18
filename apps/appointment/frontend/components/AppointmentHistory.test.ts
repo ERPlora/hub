@@ -14,6 +14,7 @@ const line = (over: Partial<HistoryOut>): HistoryOut => ({
   at: '2026-10-19T09:00:00+02:00',
   actor: 'Ana López',
   by_customer: false,
+  by_platform: false,
   reason: '',
   old_value: {},
   new_value: {},
@@ -53,9 +54,36 @@ describe('AppointmentHistory', () => {
     ]);
   });
 
+  it('says the platform did what the system, an automation or a recovery did, and names a person or a key', async () => {
+    const s = await setup('es');
+    await s.result(
+      OP,
+      page([
+        line({ actor: 'system', by_platform: true }),
+        line({ id: 'h2', action: 'cancelled', actor: 'flow_run:0199e7a0-0000-7000-8000-000000000001', by_platform: true }),
+        line({ id: 'h3', action: 'restored', actor: 'copy_recovery:0199e7a0-0000-7000-8000-000000000002', by_platform: true }),
+        line({ id: 'h4', action: 'confirmed', actor: 'API · Zapier' }),
+        line({ id: 'h5', action: 'rescheduled', actor: 'Ana López' }),
+      ]),
+    );
+    expect(s.entries()).toEqual([
+      expect.stringMatching(/^Reservada.*9:00 · Lo hizo la plataforma$/),
+      expect.stringMatching(/^Cancelada.*9:00 · Lo hizo la plataforma$/),
+      expect.stringMatching(/^Recuperada.*9:00 · Lo hizo la plataforma$/),
+      expect.stringMatching(/^Confirmada.*9:00 · API · Zapier$/),
+      expect.stringMatching(/^Cambio de hora.*9:00 · Ana López$/),
+    ]);
+  });
+
   it('says when a deleted appointment came back from a copy of the business', async () => {
     const s = await setup('es');
-    await s.result(OP, page([line({ action: 'deleted' }), line({ id: 'h2', action: 'restored', actor: '' })]));
+    await s.result(
+      OP,
+      page([
+        line({ action: 'deleted' }),
+        line({ id: 'h2', action: 'restored', actor: 'copy_recovery:0199e7a0-0000-7000-8000-000000000002', by_platform: true }),
+      ]),
+    );
     expect(s.entries()).toEqual([
       expect.stringMatching(/^Borrada.*Ana López$/),
       expect.stringMatching(/^Recuperada.*Lo hizo la plataforma$/),

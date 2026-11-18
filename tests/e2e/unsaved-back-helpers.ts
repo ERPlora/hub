@@ -8,15 +8,24 @@ import { expect, type Locator, type Page } from '@playwright/test';
 
 import { A, capture, login, shown } from './helpers';
 import { presentedDialog } from './inventory-helpers';
+import { rowAction } from './service-helpers';
 import { insideTheApp, pressBack } from './system-back-helpers';
+
+/** A row action of a DataTable: on its row, or inside the row's «⋮». */
+export interface RowActionOpener {
+  table: string;
+  id: string;
+  action: string;
+}
 
 export interface UnsavedFormCase {
   app: string;
   flow: string;
   /** The screen that opens the window. */
   route: string;
-  /** The button that opens it (its `data-testid`), or what opens it on the screen when it is not a button (a row). */
-  add: string | ((page: Page) => Locator);
+  /** The button that opens it (its `data-testid`), what opens it on the screen when it is not a button (a row), or the
+   *  row action that opens it. */
+  add: string | ((page: Page) => Locator) | RowActionOpener;
   /** The window's `data-testid`. */
   form: string;
   /** A text field of it, which opens blank. */
@@ -57,15 +66,14 @@ export async function expectBackAsksOnDirtyForm(page: Page, item: UnsavedFormCas
   await login(page, A);
   await insideTheApp(page);
   await page.goto(item.route);
-  const add = typeof item.add === 'string' ? shown(page).locator(`[data-testid=${item.add}]`) : item.add(page);
-  await expect(add).toBeVisible();
+  const add = opener(page, item.add);
   const form = page.locator(`ion-modal[data-testid=${item.form}]`);
   const field = form.locator(`[data-testid=${item.field}] input`);
   const value = item.value ?? 'E2E unsaved';
 
   for (const viewport of VIEWPORTS) {
     await page.setViewportSize({ width: viewport.width, height: viewport.height });
-    await add.click();
+    await add();
     await expect(form).toBeVisible();
     await field.fill(value);
     await pressBack(page);
@@ -84,7 +92,7 @@ export async function expectBackAsksOnDirtyForm(page: Page, item: UnsavedFormCas
     await discardChanges(page);
     await expect(form).toBeHidden();
 
-    await add.click();
+    await add();
     await expect(form).toBeVisible();
     await expect(field).toHaveValue('');
     await pressBack(page);
@@ -123,9 +131,7 @@ async function waysOut(form: Locator, item: UnsavedFormCase): Promise<Way[]> {
 export async function expectWaysOutAskOnDirtyForm(page: Page, item: UnsavedFormCase, shots: string): Promise<void> {
   await login(page, A);
   await page.goto(item.route);
-  const add = typeof item.add === 'string' ? shown(page).locator(`[data-testid=${item.add}]`) : item.add(page);
-  await expect(add).toBeVisible();
-  const open = () => presentedDialog(page, item.form, () => add.click());
+  const open = () => presentedDialog(page, item.form, opener(page, item.add));
   const value = item.value ?? 'E2E unsaved';
 
   for (const viewport of VIEWPORTS) {
@@ -160,4 +166,15 @@ export async function expectWaysOutAskOnDirtyForm(page: Page, item: UnsavedFormC
     await expect(again).toBeHidden();
     await noQuestion(page);
   }
+}
+
+/** What opens the window, as the person does it: a click on its button once it is on screen, or the row action wherever
+ *  its row shows it. */
+function opener(page: Page, add: UnsavedFormCase['add']): () => Promise<void> {
+  if (typeof add === 'object') return () => rowAction(page, add.table, add.id, add.action);
+  const button = typeof add === 'string' ? shown(page).locator(`[data-testid=${add}]`) : add(page);
+  return async () => {
+    await expect(button).toBeVisible();
+    await button.click();
+  };
 }

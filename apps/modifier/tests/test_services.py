@@ -4,11 +4,9 @@ transaction with its events in the outbox. Inventory and Taxes are the real apps
 import json
 import uuid
 
-import psycopg
 import pytest
 from live.errors import Conflict, InvalidPayload, NotFound, PermissionDenied
 from live.models import OutboxEvent
-from live.outbox import channel_for
 
 from apps.modifier.models import (
     MAX_OPTIONS,
@@ -17,9 +15,11 @@ from apps.modifier.models import (
     ModifierOption,
 )
 
-from .conftest import A, B, FOOD, GENERIC, ctx_for, make_category, make_product, run
+from base.tenancy.context import use_hub
 
-pytestmark = pytest.mark.django_db
+from .conftest import FOOD, GENERIC, HUB_DB, HUB_DB_COMMITTED, A, B, ctx_for, make_category, make_product, run
+
+pytestmark = HUB_DB
 
 
 def events(name: str) -> list[dict]:
@@ -575,30 +575,21 @@ def test_a_product_with_its_food_tax_is_still_linkable_whatever_its_category():
 # Notifications: after the COMMIT, on the channel of the command's scope only
 
 
-@pytest.fixture
-def listen(db_dsn):
-    sessions = []
-
-    def open_session(scope):
-        session = psycopg.connect(db_dsn, autocommit=True)
-        sessions.append(session)
-        session.execute(f"LISTEN {channel_for(scope)}")
-        return session
-
-    yield open_session
-    for session in sessions:
-        session.close()
-
-
 def received(session, timeout=1.0, stop_after=None):
     return [json.loads(note.payload) for note in session.notifies(timeout=timeout, stop_after=stop_after)]
 
 
-@pytest.mark.django_db(transaction=True)
-def test_a_write_in_scope_b_notifies_b_only(listen):
+@HUB_DB_COMMITTED
+def test_a_write_in_scope_b_notifies_b_only(listen, hub_b):
     on_a, on_b = listen(A), listen(B)
 
-    run("modifier.group.create", {"name": "Sauces"}, ctx=ctx_for("hub_admin", B))
+    with use_hub(hub_b):
+        run("modifier.group.create", {"name": "Sauces"}, ctx=ctx_for("hub_admin", B))
+        # The notice goes out on the operation's scope: the event itself is B's, in B's database.
+        assert list(OutboxEvent.objects.values_list("name", "scope_kind", "scope_key")) == [
+            ("modifier.group.created", B.kind, B.key)
+        ]
 
     assert received(on_b, stop_after=1) == [{"events": ["modifier.group.created"]}]
     assert received(on_a, timeout=0.3) == []
+    assert not OutboxEvent.objects.exists()

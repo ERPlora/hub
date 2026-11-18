@@ -3,8 +3,8 @@
 // Inventory apps: a burger with its options sheet («+CHEESE» under the dish, before the note) and a menu composed
 // course by course (its header with how many dishes, each dish indented under it, at its own station: the grill
 // sees only the hake, still under «MENU»); the card names its waiter, never the id of the session. A tap on the menu's header marks its dishes ready. The card in
-// 390×844, 834×1112 and 1440×900. KITCHEN-F11: a dish marked ready keeps the width of its name, so its ✓ never splits
-// a word («HAMBURGUESA» broke in two at 834 once its dish was done). What a run creates — products
+// 390×844, 834×1112 and 1440×900. KITCHEN-F11: a dish marked ready keeps the width of its name, so its state icon never
+// splits a word («HAMBURGUESA» broke in two at 834 once its dish was done). What a run creates — products
 // `E2E-KMO-<run>-…`, the options group «E2E KMO <run>», the menu «e2e KMO Menu <run>», the station
 // «E2E KMO <run> Grill», its checks and tickets — is deleted after it.
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
@@ -12,6 +12,7 @@ import { type BrowserContext, expect, type Locator, type Page, test } from '@pla
 import { A, api, capture, login, psql, shown, untilStill } from './helpers';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
 import { cleanSales, drawerOff, restoreDrawer, stamp } from './sale-helpers';
+import { toastSaying } from './toast-helpers';
 
 const RUN = stamp();
 const SKU = `E2E-KMO-${RUN}`;
@@ -77,7 +78,7 @@ const dishOn = (page: Page, name: string) => shown(page).locator('[data-testid^=
 /** How `word` of a dish's name is drawn: on how many lines (a name parts between words, never inside one), how wide
  *  it is and how wide the name's box is — what ui-clip-sweep.sh calls SPLIT-WORD, measured on the card. */
 async function drawnWord(dish: Locator, word: string): Promise<{ lines: number; word: number; box: number }> {
-  return dish.locator('.kds-line__name').evaluate((name, w) => {
+  return dish.locator('.ep-order-ticket__name').evaluate((name, w) => {
     const box = Math.round(name.getBoundingClientRect().width);
     const walker = document.createTreeWalker(name, NodeFilter.SHOW_TEXT);
     for (let node = walker.nextNode(); node; node = walker.nextNode()) {
@@ -169,7 +170,7 @@ test('KITCHEN-F06 y KITCHEN-F07: the round sent from the till reaches the displa
   // SALE-F20: «Current order» → «Send».
   await shown(page).locator('[data-testid=pos-cart-tab-round]').click();
   await shown(page).locator('[data-testid=pos-kitchen-send]').click();
-  await expect(page.locator('ion-toast').filter({ hasText: /Order \d+ sent to the kitchen\./ })).toBeVisible();
+  await expect(toastSaying(page, /Order \d+ sent to the kitchen\./)).toBeVisible();
 
   // The kitchen display, every station: the burger with «+CHEESE» under it; the menu's header with its two dishes.
   await page.goto('/kitchen/display');
@@ -221,26 +222,28 @@ test('KITCHEN-F06 y KITCHEN-F07: the round sent from the till reaches the displa
   await expect(dishOn(page, hake.name)).toHaveAttribute('data-status', 'ready');
   await expect(shown(page).locator(`[data-testid=kitchen-line-${burgerId}]`)).toHaveAttribute('data-status', 'pending');
 
-  // KITCHEN-F11: the dishes done keep the whole width of their name, like the burger still cooking — the ✓ never
-  // breaks «HAMBURGUESA» in two, in any of the three sizes.
+  // KITCHEN-F11: the dishes done keep the whole width of their name, like the burger still cooking — the state icon
+  // never breaks «HAMBURGUESA» in two, in any of the three sizes.
   for (const size of SIZES) {
     await page.setViewportSize({ width: size.width, height: size.height });
     await card.scrollIntoViewIfNeeded();
     for (const dish of [burgerDish, dishOn(page, lentils.name), dishOn(page, hake.name)]) {
-      const name = (await dish.locator('.kds-line__name').textContent())?.trim();
+      const name = (await dish.locator('.ep-order-ticket__name').textContent())?.trim();
       const drawn = await drawnWord(dish, WIDE);
       expect(drawn.lines, `${size.label}: «${WIDE}» of «${name}» is ${drawn.word}px, its name ${drawn.box}px`).toBe(1);
     }
-    // ...and its ✓ is where it always was: at the dish's right edge, level with the first line of the name.
-    for (const dish of [dishOn(page, lentils.name), dishOn(page, hake.name)]) {
+    // ...and its state icon is where it always is, done or not: past the end of the name, level with its first line,
+    // inside the dish.
+    for (const dish of [burgerDish, dishOn(page, lentils.name), dishOn(page, hake.name)]) {
       const off = await dish.evaluate((line) => {
-        const tick = line.querySelector('.kds-line__tick')!.getBoundingClientRect();
-        const name = line.querySelector('.kds-line__name')!.getBoundingClientRect();
-        const edge = line.getBoundingClientRect().right - parseFloat(getComputedStyle(line).paddingRight);
-        return { top: Math.abs(tick.top - name.top), right: Math.abs(tick.right - edge) };
+        const icon = line.querySelector('.ep-order-ticket__state')!.getBoundingClientRect();
+        const name = line.querySelector('.ep-order-ticket__name')!.getBoundingClientRect();
+        const row = line.getBoundingClientRect();
+        return { top: Math.abs(icon.top - name.top), gap: icon.left - name.right, inside: icon.right <= row.right + 1 };
       });
-      expect(off.top, `${size.label}: the ✓ starts level with the name`).toBeLessThan(8);
-      expect(off.right, `${size.label}: the ✓ ends at the dish's right edge`).toBeLessThanOrEqual(1);
+      expect(off.top, `${size.label}: the state icon starts level with the name`).toBeLessThan(12);
+      expect(off.gap, `${size.label}: the state icon never sits over the name`).toBeGreaterThanOrEqual(0);
+      expect(off.inside, `${size.label}: the state icon inside the dish`).toBe(true);
     }
   }
   await page.setViewportSize({ width: 1440, height: 900 });

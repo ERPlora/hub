@@ -53,6 +53,7 @@ from apps.customer.schemas import (
     FieldPage,
     GroupListIn,
     GroupPage,
+    NoteIn,
     OrderCustomerOut,
     OrderIn,
     OrderListIn,
@@ -64,9 +65,11 @@ from apps.customer.schemas import (
     TagPage,
 )
 
-from .conftest import run
+from base.tests.actors import who_did_it
 
-pytestmark = pytest.mark.django_db
+from .conftest import HUB_DB, run
+
+pytestmark = HUB_DB
 
 NOW = datetime(2026, 10, 14, 10, 0, tzinfo=UTC)
 
@@ -793,6 +796,17 @@ def test_the_activity_is_newest_first_and_searchable():
     ] == ["Prefers mornings"]
 
 
+@pytest.mark.parametrize("caller, who, by_platform", who_did_it("tester", "tester"))
+def test_the_activity_says_whether_a_person_or_the_platform_did_it(caller, who, by_platform):
+    """A person and an API key are named; the platform's own marks are kept, and the entry says the platform did it."""
+    ana = card("Ana")
+    run("customer.note.add", NoteIn(customer_id=ana.id, content="Prefers mornings"), actor=caller)
+
+    page = run("customer.activity.list", ActivityListIn(customer_id=ana.id))
+
+    assert [(row.kind, row.actor, row.by_platform) for row in page.rows] == [("note_added", who, by_platform)]
+
+
 def test_the_timeline_of_a_card_that_is_gone_is_not_found():
     with pytest.raises(NotFound):
         run(
@@ -995,7 +1009,6 @@ def test_the_health_query_is_for_the_screen_only():
     assert (op.ai, op.expose_api) == (INTERNAL, False)
 
 
-@pytest.mark.django_db
 def test_without_permission_the_health_block_holds_nothing():
     ana = Customer.objects.create(name="Ana")
     block = run(
@@ -1012,7 +1025,6 @@ def test_without_permission_the_health_block_holds_nothing():
     ) == (ana.id, "none", None, "", None, "", None)
 
 
-@pytest.mark.django_db
 def test_the_health_block_is_the_last_health_decision_and_its_data():
     ana = Customer.objects.create(name="Ana")
     said = timezone.now() - timedelta(days=1)
@@ -1058,7 +1070,6 @@ def test_the_health_block_is_the_last_health_decision_and_its_data():
     )
 
 
-@pytest.mark.django_db
 def test_the_health_data_stays_out_of_the_card_the_list_and_the_export():
     ana = Customer.objects.create(name="Ana")
     HealthRecord.objects.create(customer=ana, allergies="PPD-allergy-marker")
@@ -1070,14 +1081,12 @@ def test_the_health_data_stays_out_of_the_card_the_list_and_the_export():
     assert "PPD-allergy-marker" not in export.csv
 
 
-@pytest.mark.django_db
 def test_the_health_block_of_a_card_that_is_gone_is_not_found():
     ana = Customer.objects.create(name="Ana", deleted_at=timezone.now())
     with pytest.raises(NotFound):
         run("customer.health.detail", HealthDetailIn(customer_id=ana.id))
 
 
-@pytest.mark.django_db
 def test_the_consent_history_and_state_carry_the_health_permission_without_channel():
     ana = Customer.objects.create(name="Ana")
     Consent.objects.create(

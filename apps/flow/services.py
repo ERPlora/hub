@@ -32,12 +32,14 @@ from django.db.models import Q, TextField
 from django.db.models.functions import Cast, Coalesce
 from django.utils import timezone, translation
 from django.utils.translation import gettext_lazy as _
+from live import assistant as shared
 from live.context import OperationContext, Scope, system_context
 from live.errors import Conflict, InvalidPayload, NotFound, OperationError, PermissionDenied
 from live.operations import Operation, atomic, get, operation
 from live.outbox import record_event
 
 from apps.flow import document, events, gateway, http, recipes, vault
+from apps.flow.apps import RUN_ACTOR
 from apps.flow.models import Draft, Flow, FlowRun, Question, Secret
 from apps.flow.queries import (
     ASSISTANT_GONE_KEY,
@@ -117,8 +119,7 @@ from apps.flow.schemas import (
     SecretSetIn,
     UpdateIn,
 )
-from base import assistant as hub_assistant
-from base import outbound
+from base import assistant as hub_assistant, outbound
 from base.business import business_zone
 from base.recovery import brought_back
 
@@ -162,8 +163,6 @@ FINISHED = (
     FlowRun.Status.CANCELLED,
 )
 
-#: The actor prefix of what a run does (``flow_run:<id>``): the outbox keeps it, the loop guard reads it.
-RUN_ACTOR = "flow_run:"
 #: A call's ``Idempotency-Key`` is ``uuid5(IDEMPOTENCY_NAMESPACE, "<run id>:<step id>")``: the same in every
 #: attempt of a run's step, another in every run.
 IDEMPOTENCY_NAMESPACE = uuid.UUID("0199f6a0-6b1f-7c3e-9a51-3f1b2c4d5e6f")
@@ -1017,7 +1016,7 @@ def _end_turn(run: FlowRun) -> None:
     run.outputs = {key: value for key, value in run.outputs.items() if key != TURN}
 
 
-def _start(
+def _start(  # noqa: PLR0913
     ctx: OperationContext,
     flow: Flow,
     *,
@@ -1142,7 +1141,7 @@ def _operation_step(
     return output, "done", {}
 
 
-def _fail(
+def _fail(  # noqa: PLR0913, PLR0917
     ctx: OperationContext, run: FlowRun, step: dict, failure: StepFailed, now: dt.datetime, left: dict | None = None
 ) -> bool:
     """Writes a step's failure; ``True`` when the run goes on (``on_error: continue``, FLOW-F25), leaving
@@ -1179,7 +1178,7 @@ def _skipped(ctx: OperationContext, run: FlowRun, step: dict, data: dict, now: d
     return True
 
 
-def _advance(ctx: OperationContext, run: FlowRun, flow: Flow, now: dt.datetime) -> None:
+def _advance(ctx: OperationContext, run: FlowRun, flow: Flow, now: dt.datetime) -> None:  # noqa: C901, PLR0911, PLR0912
     """Runs ``run``'s steps from ``step_index`` until it ends, waits or fails."""
     steps = run.definition.get("steps", [])
     with translation.override(flow.language):
@@ -1268,7 +1267,7 @@ def _call_allowed(run: FlowRun, flow: Flow, step: dict) -> StepFailed | None:
     return None
 
 
-def _mark_calling(
+def _mark_calling(  # noqa: PLR0913, PLR0917
     ctx: OperationContext, run: FlowRun, flow: Flow, step: dict, outcome: str, now: dt.datetime, **details
 ) -> None:
     _log(run, step, outcome, now, **details)
@@ -1299,7 +1298,7 @@ def _go_on(ctx: OperationContext, run: FlowRun, flow: Flow, now: dt.datetime) ->
     _advance(ctx, run, flow, now)
 
 
-def _call_failed(ctx: OperationContext, run: FlowRun, flow: Flow, step: dict, failure: StepFailed, now, left=None) -> None:
+def _call_failed(ctx: OperationContext, run: FlowRun, flow: Flow, step: dict, failure: StepFailed, now, left=None) -> None:  # noqa: PLR0913, PLR0917
     run.resume_at = None
     if _fail(ctx, run, step, failure, now, left):
         _go_on(ctx, run, flow, now)
@@ -1313,7 +1312,7 @@ UNATTENDED = (
     "tools and answer with what you found or did, in a few words."
 )
 #: What the assistant hears of a call of its answer that was not made: one change waits for a person at a time.
-NOT_MADE = hub_assistant.error_content("not_made", "Not made: ask for one change at a time.")
+NOT_MADE = shared.error_content("not_made", "Not made: ask for one change at a time.")
 #: What the assistant hears of a call whose fixed datum is empty in this run: the tool is not used (nothing half done).
 PINNED_EMPTY_CODE = "flow.pinned_empty"
 PINNED_EMPTY_TOLD = "Not made: %(fields)s, fixed by this step, is empty in this run, so this tool cannot be used now."
@@ -1343,14 +1342,14 @@ def _offered(ctx: OperationContext, flow: Flow, step: dict) -> dict[str, Operati
     tools: dict[str, Operation] = {}
     for name in step.get("tools") or []:
         op = catalog.get(name)
-        if name in flow.grants and op is not None and hub_assistant.is_tool(op):
+        if name in flow.grants and op is not None and hub_assistant.tools.is_tool(op):
             tools[name] = op
     return tools
 
 
 def _spec(op: Operation, step: dict) -> dict:
     """``op`` as the step offers it to the assistant: without the data the step fixes, which it never sees."""
-    spec = hub_assistant.tool_spec(op)
+    spec = shared.tool_spec(op)
     fixed = (step.get("pinned") or {}).get(op.name)
     if not fixed:
         return spec
@@ -1387,7 +1386,7 @@ def _instructions(ctx: OperationContext, flow: Flow, step: dict) -> str:
     except OperationError:
         business = {}
     currency = business.get("currency") or "EUR"
-    text = hub_assistant.instructions(
+    text = hub_assistant.prompt.instructions(
         language=flow.language,
         currency=currency,
         decimals=business.get("currency_decimals", 2),
@@ -1495,7 +1494,7 @@ def claim_assistant(ctx: OperationContext, data: RunRefIn) -> dict:
     }
 
 
-def _propose(
+def _propose(  # noqa: PLR0913, PLR0917
     ctx: OperationContext,
     run: FlowRun,
     flow: Flow,
@@ -1518,7 +1517,7 @@ def _propose(
         run=run,
         flow=flow,
         step_id=f"{step['id']}:{Question.objects.filter(run=run).count() + 1}",
-        title=(str(ASSISTANT_WANTS) % {"app": hub_assistant.app_name(op)})[:300],
+        title=(str(ASSISTANT_WANTS) % {"app": hub_assistant.cards.app_name(op)})[:300],
         details=said[:2000],
         role="",
         on_no="stop",
@@ -1565,13 +1564,13 @@ def assistant_round(ctx: OperationContext, data: AssistantRoundIn) -> dict:
     ]}]
     with translation.override(flow.language):
         for index, call in enumerate(data.calls):
-            op = hub_assistant.operation_of(call.name, tools)
+            op = shared.operation_of(call.name, tools)
             fixed, empty = _pinned(run, step, op) if op is not None else ({}, [])
             if op is None:
-                content = hub_assistant.error_content("not_available", "That tool was not offered in this step.")
+                content = shared.error_content("not_available", "That tool was not offered in this step.")
             elif empty:
                 told = PINNED_EMPTY_TOLD % {"fields": ", ".join(f"«{name}»" for name in empty)}
-                content = hub_assistant.error_content(PINNED_EMPTY_CODE, told)
+                content = shared.error_content(PINNED_EMPTY_CODE, told)
                 _log(run, step, "assistant_pinned_empty", now, operation=op.name, fields=empty)
             elif op.kind == "command" and step.get("mode", "ask") == "ask":
                 later = [behind.call_id for behind in data.calls[index + 1 :]]
@@ -1580,7 +1579,7 @@ def assistant_round(ctx: OperationContext, data: AssistantRoundIn) -> dict:
                 _propose(ctx, run, flow, step, op, call, arguments, later, asked_turn, data.text, now)
                 return {"go_on": False}
             else:
-                outcome = hub_assistant.run_tool(_step_context(ctx, run, flow, op), op, _with_pinned(call.arguments, fixed))
+                outcome = shared.run_tool(_step_context(ctx, run, flow, op), op, _with_pinned(call.arguments, fixed))
                 _log(run, step, "assistant_used", now, operation=op.name, ok=outcome.outcome == "ok")
                 content = outcome.content
             messages.append({"role": "tool", "tool_call_id": call.call_id, "content": content})
@@ -1636,7 +1635,7 @@ def record_assistant(ctx: OperationContext, data: RecordAssistantIn) -> dict:
     return {"count": 1}
 
 
-def _out_of_rounds(ctx: OperationContext, run: FlowRun, flow: Flow, step: dict, rounds: int, now: dt.datetime) -> bool:
+def _out_of_rounds(ctx: OperationContext, run: FlowRun, flow: Flow, step: dict, rounds: int, now: dt.datetime) -> bool:  # noqa: PLR0913, PLR0917
     """Stops the step when the assistant spent its turns (``max_rounds``) and says so; ``True`` when it did."""
     if rounds < int(step.get("max_rounds", 6)):
         return False
@@ -1646,7 +1645,7 @@ def _out_of_rounds(ctx: OperationContext, run: FlowRun, flow: Flow, step: dict, 
     return True
 
 
-def _make_proposal(ctx: OperationContext, run: FlowRun, flow: Flow, step: dict, answered: dict, now: dt.datetime) -> None:
+def _make_proposal(ctx: OperationContext, run: FlowRun, flow: Flow, step: dict, answered: dict, now: dt.datetime) -> None:  # noqa: PLR0913, PLR0917
     """A yes to the assistant's change: it is made now, by its own operation, as the automation (what it was granted
     now, not when it was proposed), and the step goes back to the assistant with what happened — the change's result
     (or its refusal) and, for the calls of that answer behind it, that they were not made —, so it can say it or ask
@@ -1666,11 +1665,11 @@ def _make_proposal(ctx: OperationContext, run: FlowRun, flow: Flow, step: dict, 
     fixed, empty = _pinned(run, step, op)
     if empty:
         told_empty = PINNED_EMPTY_TOLD % {"fields": ", ".join(f"«{name}»" for name in empty)}
-        content = hub_assistant.error_content(PINNED_EMPTY_CODE, told_empty)
+        content = shared.error_content(PINNED_EMPTY_CODE, told_empty)
         _log(run, step, "assistant_pinned_empty", now, operation=op.name, fields=empty)
     else:
         arguments = _with_pinned(str(proposal.get("arguments") or "{}"), fixed)
-        outcome = hub_assistant.run_tool(_step_context(ctx, run, flow, op), op, arguments)
+        outcome = shared.run_tool(_step_context(ctx, run, flow, op), op, arguments)
         _log(run, step, "assistant_used", now, operation=op.name, ok=outcome.outcome == "ok")
         content = outcome.content
     told = [{"role": "tool", "tool_call_id": proposal["call_id"], "content": content}]
@@ -1700,7 +1699,7 @@ def _who(ctx: OperationContext) -> str:
     return _actor(ctx)
 
 
-def _ask(ctx: OperationContext, run: FlowRun, flow: Flow, step: dict, data: dict, now: dt.datetime) -> None:
+def _ask(ctx: OperationContext, run: FlowRun, flow: Flow, step: dict, data: dict, now: dt.datetime) -> None:  # noqa: PLR0913, PLR0917
     """Leaves the step's question, its texts filled in now, in «Waiting for your answer» and parks the run on it. A
     question the run already asked at this step (a run resumed onto it) is not asked twice."""
     expires = now + dt.timedelta(hours=int(step.get("hours", 72)))
@@ -1734,7 +1733,7 @@ def _ask(ctx: OperationContext, run: FlowRun, flow: Flow, step: dict, data: dict
     )
 
 
-def _carry_on(ctx: OperationContext, run: FlowRun, flow: Flow, step: dict, left: dict, now: dt.datetime) -> None:
+def _carry_on(ctx: OperationContext, run: FlowRun, flow: Flow, step: dict, left: dict, now: dt.datetime) -> None:  # noqa: PLR0913, PLR0917
     run.outputs = {**run.outputs, step["id"]: left}
     run.step_index += 1
     _go_on(ctx, run, flow, now)

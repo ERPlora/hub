@@ -121,7 +121,7 @@ test.afterAll(async () => {
   await employee?.context.close();
 });
 
-test("BASE-F13 (HUBS-F26): a new role ends the employee's session in the business; back in, they work with it", async () => {
+test("BASE-F13 (HUBS-F26): a new role ends the employee's session in the business; back in, they work with it @smoke", async () => {
   await login(tab, origin, '/demo/items', employee.credentials);
   await listReady(tab);
   await atEverySize(tab, 'BASE-F13-employee', async () => {

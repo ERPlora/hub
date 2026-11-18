@@ -6,22 +6,18 @@ each order keeps its own currency (a record is never rewritten) and says the dec
 gives the forint none)."""
 
 import pytest
-from django.db import connection
+from django.db import connections
 from django.test.utils import CaptureQueriesContext
-from live.context import OperationContext, Scope
+from live.context import OperationContext
 from live.models import OutboxEvent
 
 from apps.cart_checkout.models import Cart, Order
-from base.models import Hub
+from apps.sale.tests.test_business_currency import business_in
+from base.tenancy.context import current_alias, use_hub
 
-from .conftest import A, B, ctx_for, make_cart, make_item, make_order
+from .conftest import HUB_DB, A, B, ctx_for, make_cart, make_item, make_order
 
-pytestmark = pytest.mark.django_db
-
-
-def business_in(country: str, slug: str = "a") -> None:
-    """The country erplora.com registered for the business of ``slug`` (``PUT /internal/hubs/{id}``)."""
-    Hub.objects.filter(slug=slug).update(country=country)
+pytestmark = HUB_DB
 
 
 def run(name: str, data: dict, ctx: OperationContext | None = None):
@@ -50,11 +46,12 @@ def test_a_currency_the_customer_asked_for_still_wins():
     assert run("cart_checkout.cart.create", {"session_token": "sess_1", "currency": "eur"}).currency == "EUR"
 
 
-def test_each_hub_creates_its_carts_in_its_own_business_s_currency():
-    business_in("PL", "a")
-    business_in("ES", "b")
+def test_each_hub_creates_its_carts_in_its_own_business_s_currency(hub_b):
+    business_in("PL", A.key)
+    business_in("ES", B.key)
     assert run("cart_checkout.cart.create", {"session_token": "sess_a"}).currency == "PLN"
-    assert run("cart_checkout.cart.create", {"session_token": "sess_b"}, ctx_for(scope=B)).currency == "EUR"
+    with use_hub(hub_b):
+        assert run("cart_checkout.cart.create", {"session_token": "sess_b"}, ctx_for(scope=B)).currency == "EUR"
 
 
 def test_an_api_key_with_only_the_cart_permission_gets_the_business_s_currency():
@@ -64,13 +61,12 @@ def test_an_api_key_with_only_the_cart_permission_gets_the_business_s_currency()
 
 
 @pytest.mark.parametrize(("country", "currency"), [("PL", "PLN"), ("JP", "JPY")])
-def test_erploras_own_hub_creates_its_carts_in_the_currency_of_its_issuer_s_country(settings, country, currency):
+def test_erploras_own_hub_creates_its_carts_in_the_currency_of_its_issuer_s_country(settings, platform, country, currency):
     # ERPlora's own hub has no business on erplora.com and every module is on in it: its carts go in the currency of its
     # issuer's country, as its sales and invoices do, never a 404 because there is no business to read.
-    settings.PLATFORM_HUB_SLUG = "erplora"
     settings.PLATFORM_ISSUER_COUNTRY = country
-    platform = ctx_for(scope=Scope("host", "erplora"))
-    assert run("cart_checkout.cart.create", {"session_token": "sess_1"}, platform).currency == currency
+    with use_hub(platform):
+        assert run("cart_checkout.cart.create", {"session_token": "sess_1"}, ctx_for(scope=B)).currency == currency
 
 
 def test_the_model_invents_no_currency():
@@ -152,7 +148,7 @@ def test_the_list_of_a_cart_s_lines_reads_its_cart_once_however_many_lines_it_ha
         cart = make_cart(f"sess_{Cart.objects.count()}", currency="PLN")
         for number in range(lines):
             make_item(cart, product_ref=f"p-{number}")
-        with CaptureQueriesContext(connection) as reads:
+        with CaptureQueriesContext(connections[current_alias()]) as reads:
             assert len(run("cart_checkout.item.list", {"cart_id": str(cart.id)}).rows) == lines
         return len(reads)
 

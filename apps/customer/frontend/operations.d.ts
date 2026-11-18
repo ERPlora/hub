@@ -238,6 +238,8 @@ export interface ActivityRow {
   related_id: string;
   related_type: string;
   actor: string;
+  /** No person did it: the platform (the system, an automation, a recovery). */
+  by_platform: boolean;
   created_at: string;
 }
 

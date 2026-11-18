@@ -24,10 +24,12 @@ from live.operations import get
 from live.outbox import channel_for
 
 from apps.printing.models import PrintDevice, PrintJob
-from apps.printing.tests.conftest import A, B, ctx_for, enqueue, printer, run
+from apps.printing.tests.conftest import A, B, HUB_DB, HUB_DB_COMMITTED, ctx_for, enqueue, printer, run
 from apps.printing.tests.test_services import SPARE_ID, TILL_ID, answer, on_device, register, take
 from base.permissions import VIEW_HOME
-from base.schemas import BellCountersIn, SetupStatusIn, SystemCardsIn
+from base.schemas import SetupStatusIn, SystemCardsIn
+from base.schemas.bell import BellCountersIn
+from base.tenancy.context import use_hub
 
 STEP = "printing.printer"
 WAIT = 1.0
@@ -62,7 +64,7 @@ def counted(ctx=None) -> dict[str, int]:
 # ── «Set up your printer» ────────────────────────────────────────────────────────────────────────────────────────
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_hub_without_a_receipt_printer_has_set_up_your_printer_pending_and_it_leads_to_the_devices():
     item = step(ctx_for("hub_owner"))
     assert {name: item[name] for name in ("key", "state", "level", "required", "actionable", "route", "order", "icon")} == {
@@ -81,7 +83,7 @@ def test_a_hub_without_a_receipt_printer_has_set_up_your_printer_pending_and_it_
     )
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_in_spanish_it_says_the_old_words():
     item = step(ctx_for("hub_owner", language="es"))
     assert (item["title"], item["description"]) == (
@@ -90,7 +92,7 @@ def test_in_spanish_it_says_the_old_words():
     )
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_receipt_printer_alone_is_not_enough_the_device_that_prints_it_ticks_it():
     till = printer("Till")
     assert step(ctx_for())["state"] == "pending"
@@ -98,7 +100,7 @@ def test_a_receipt_printer_alone_is_not_enough_the_device_that_prints_it_ticks_i
     assert step(ctx_for())["state"] == "done"
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_manager_who_sets_printers_up_is_told_and_the_employee_is_not():
     # Recommended, never ⛔: who cannot set a printer up is not told (base's rule; only a pending ⛔ is told to all).
     assert step(ctx_for("hub_manager"))["state"] == "pending"
@@ -129,7 +131,7 @@ UNDOING = {
 }
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize("event", list(UNDOING))
 def test_each_change_of_the_step_records_an_event_that_refreshes_it(event):
     till, spare = printer("Till"), printer("Kitchen", usage="kitchen", address="10.0.0.2")
@@ -140,7 +142,7 @@ def test_each_change_of_the_step_records_an_event_that_refreshes_it(event):
     assert recorded & set(printing().setup[0].refresh_on) == {"printing.device.registered", event}
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_setting_the_device_up_by_printing_from_it_records_the_event_that_ticks_it():
     # PRINTING-F18: whoever sets printers up pairs the device by printing from it.
     till = printer("Till")
@@ -162,7 +164,7 @@ def printing():
     return apps.get_app_config("printing")
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_receipts_waiting_for_a_printer_no_device_reaches_ring_the_bell_and_lead_to_the_printers():
     # The owner is told that nobody is printing, and which function (where it is fixed).
     printer("Till")
@@ -176,11 +178,16 @@ def test_receipts_waiting_for_a_printer_no_device_reaches_ring_the_bell_and_lead
             "route": "/printing/printers",
             "label": "Nothing is printing “Receipt”",
             "icon": "lucide:receipt",
+            "severity": "warning",
+            "title": "Nothing is printing “Receipt”: 2 jobs waiting",
+            "body": "They will not come out until a device with the ERPlora app open can print them.",
+            "action_label": "See the printers",
+            "due": None,
         }
     }
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_in_spanish_the_row_names_the_function_as_printing_does():
     printer("Kitchen", usage="kitchen", address="10.0.0.2")
     enqueue(usage="kitchen", job_key="kitchen:1")
@@ -189,7 +196,20 @@ def test_in_spanish_the_row_names_the_function_as_printing_does():
     ]
 
 
-@pytest.mark.django_db
+@HUB_DB
+def test_the_kitchen_not_printing_is_urgent_and_says_so_in_spanish():
+    printer("Kitchen", usage="kitchen", address="10.0.0.2")
+    enqueue(usage="kitchen", job_key="kitchen:1")
+    [row] = bell(ctx_for("hub_employee", language="es")).values()
+    assert (row["severity"], row["title"], row["body"], row["action_label"]) == (
+        "danger",
+        "Nadie está imprimiendo «Cocina»: 1 trabajo esperando",
+        "No saldrá hasta que un dispositivo con la app de ERPlora abierta pueda imprimirlo.",
+        "Ver las impresoras",
+    )
+
+
+@HUB_DB
 def test_a_device_that_prints_them_quiets_the_bell_and_at_zero_nothing_shows():
     till = printer("Till")
     enqueue()
@@ -197,7 +217,7 @@ def test_a_device_that_prints_them_quiets_the_bell_and_at_zero_nothing_shows():
     assert bell(ctx_for()) == {}
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_device_set_up_but_off_rings_the_bell_once_the_receipt_waited_a_minute():
     # The till set up for the receipts went off (no news for 90 s); a minute after a receipt is queued, nobody is
     # printing it.
@@ -215,7 +235,7 @@ def test_a_device_set_up_but_off_rings_the_bell_once_the_receipt_waited_a_minute
     assert bell(ctx_for("hub_employee"), waited=None) == {}
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_bell_reads_its_rows_again_every_30_seconds_for_whoever_sees_printing():
     # Nothing records an event when a minute passes or a till goes quiet: the SPA's bell asks again (HubBell.vue).
     assert bell_read(ctx_for("hub_employee"))["refresh_every"] == 30
@@ -224,7 +244,7 @@ def test_the_bell_reads_its_rows_again_every_30_seconds_for_whoever_sees_printin
     assert bell_read(who_sees_the_home_only)["refresh_every"] is None
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_each_function_is_its_own_row():
     printer("Till")
     printer("Kitchen", usage="kitchen", address="10.0.0.2")
@@ -234,7 +254,7 @@ def test_each_function_is_its_own_row():
     assert counted() == {"printing.stalled_receipt": 1, "printing.stalled_kitchen": 2}
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_without_a_permission_of_printing_there_is_no_row():
     printer("Till")
     enqueue()
@@ -318,7 +338,7 @@ CHANGES = {
 }
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize("event", list(CHANGES))
 def test_each_change_of_the_number_records_an_event_that_refreshes_the_bell(event):
     """A receipt waits on «Spare», which no device reaches, before each change (the till is the first by name)."""
@@ -371,11 +391,12 @@ def received(session, timeout=WAIT):
 
 
 # Transactional: the notice leaves after a real COMMIT.
-@pytest.mark.django_db(transaction=True)
-def test_a_receipt_waiting_in_hub_b_re_runs_the_home_of_b_and_tells_a_nothing(listen):
+@HUB_DB_COMMITTED
+def test_a_receipt_waiting_in_hub_b_re_runs_the_home_of_b_and_tells_a_nothing(listen, hub_b):
     on_a, on_b = listen(A), listen(B)
-    run("printing.printer.create", {"name": "Till", "kind": "network", "address": "10.0.0.1", "usage": "receipt"}, ctx_for(scope=B))
-    run("printing.job.create", {"document_type": "receipt", "document": {"receipt_id": "T-1", "items": []}}, ctx_for(scope=B))
+    with use_hub(hub_b):
+        run("printing.printer.create", {"name": "Till", "kind": "network", "address": "10.0.0.1", "usage": "receipt"}, ctx_for(scope=B))
+        run("printing.job.create", {"document_type": "receipt", "document": {"receipt_id": "T-1", "items": []}}, ctx_for(scope=B))
 
     notes = received(on_b)
     assert {channel for channel, _ in notes} == {channel_for(B)}
@@ -395,20 +416,21 @@ def system_cards(ctx) -> list[dict]:
     return [card for card in cards if card["app"] == "printing"]
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize("role", ["hub_owner", "hub_admin", "hub_manager", "hub_employee"])
 def test_everybody_with_printing_has_your_printer_in_system(role):
     assert system_cards(ctx_for(role)) == [YOUR_PRINTER]
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_without_a_permission_of_printing_there_is_no_card():
     who_sees_the_home_only = dataclasses.replace(ctx_for("hub_employee"), permissions=frozenset({VIEW_HOME}))
     assert system_cards(who_sees_the_home_only) == []
 
 
-@pytest.mark.django_db
-def test_with_printing_off_system_has_no_printer_card_and_the_other_business_keeps_it():
+@HUB_DB
+def test_with_printing_off_system_has_no_printer_card_and_the_other_business_keeps_it(hub_b):
     run("base.app.disable", {"app": "printing"}, dataclasses.replace(ctx_for(), permissions=frozenset({"*"})))
     assert system_cards(ctx_for("hub_owner")) == []
-    assert system_cards(ctx_for("hub_owner", scope=B)) == [YOUR_PRINTER]
+    with use_hub(hub_b):
+        assert system_cards(ctx_for("hub_owner", scope=B)) == [YOUR_PRINTER]

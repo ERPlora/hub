@@ -107,6 +107,7 @@ async function save(): Promise<void> {
       >
         <ion-input
           data-testid="service-category-form-name"
+          name="name"
           :value="form.name"
           :label="$t('service.categories.form.name')"
           label-placement="floating"
@@ -119,6 +120,7 @@ async function save(): Promise<void> {
         />
         <Combo
           testid="service-category-form-parent"
+          name="parent_id"
           :model-value="form.parent"
           :search="searchParents"
           :label="$t('service.categories.form.parent')"
@@ -128,6 +130,7 @@ async function save(): Promise<void> {
         />
         <ion-input
           data-testid="service-category-form-sort_order"
+          name="sort_order"
           type="number"
           inputmode="numeric"
           min="0"

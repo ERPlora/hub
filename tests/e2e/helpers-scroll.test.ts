@@ -9,13 +9,13 @@
 // itself again fails saying so. Nine specs and helpers had each written their own way past the same repaint before it (a
 // retry of the scroll on a clock of 2 s, in `toPass`); the last block keeps a new copy of that retry from appearing
 // anywhere in the e2e while those nine move to `scrolledTo` (hub#837), one by one.
-import { globSync, readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 
 import type { Locator } from '@playwright/test';
 import { describe, expect, it } from 'vitest';
 
+import { E2E_DIR, helpersAndSpecs } from './e2e-sources';
 import { scrolledTo } from './helpers';
 
 /** One element the fake list paints: a card (a phone) or a row (a tablet or a desk). */
@@ -115,12 +115,6 @@ describe('scrolledTo() when the list paints itself again for the new size (hub#1
     expect(list.scrolled).toEqual([]);
   });
 });
-
-const E2E_DIR = dirname(fileURLToPath(import.meta.url));
-
-/** The e2e's helpers and specs, in its subfolders too: not Vitest's own tests nor what a run leaves (dot folders). */
-const helpersAndSpecs = (): string[] =>
-  globSync('**/*.ts', { cwd: E2E_DIR, exclude: (name) => name === 'node_modules' || name.startsWith('.') || name.endsWith('.test.ts') });
 
 /** The bodies of the retries in `source` that scroll: an `expect(async () => { … }).toPass()` with a
  *  `scrollIntoViewIfNeeded` in it, the way past a repaint `scrolledTo` is the one of. */

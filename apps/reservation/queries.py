@@ -242,7 +242,7 @@ def blocked_out(block: BlockedDate) -> dict:
 
 
 # ── How the book names a record (a read by id's ``label``) ──────────────────────────────────────
-# In the words the assistant's card says a day and a time (base/assistant.py: CLDR's medium day and short
+# In the words the assistant's card says a day and a time (base/assistant/cards.py: CLDR's medium day and short
 # time, as the screens' formatters), in the caller's language: «Ana García · 15 oct 2026 · 21:00».
 
 
@@ -606,7 +606,7 @@ RESERVATION_SORTS = {
         "default; pages of up to 100."
     },
 )
-def list_reservations(ctx: OperationContext, params: ReservationListIn) -> dict:
+def list_reservations(ctx: OperationContext, params: ReservationListIn) -> dict:  # noqa: C901
     rows = reservations()
     if params.search:
         rows = rows.filter(_guest_matches(params.search))

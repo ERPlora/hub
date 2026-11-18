@@ -15,22 +15,25 @@ import logging
 import os
 import subprocess
 import sys
-import threading
 import types
 import zoneinfo
 
 import pytest
 from django.conf import settings
-from django.contrib.auth import get_user_model
-from django.db import close_old_connections, connection
+from django.db import close_old_connections
 from live import operations
-from live.context import Scope
 from live.operations import Operation
 from ninja import Schema
 
 from base import scheduler
-from base.models import TaskSchedule
+from base.models import HubUser, TaskSchedule
 from base.scheduler import ScheduledTask
+from base.tenancy.tests.business import HUB_DB, HUB_DB_COMMITTED, A, in_business_a
+from base.tenancy.tests.concurrency import in_a_thread, plan_with_room
+from config.tests.test_reuse_db import RUN_TIMEOUT
+
+#: Business A, whose own database keeps its schedule, entered for every test with it; room for two workers at once.
+__all__ = ["in_business_a", "plan_with_room"]
 
 UTC = dt.UTC
 
@@ -208,7 +211,7 @@ def next_run(name: str, app: str = "test") -> dt.datetime:
     return TaskSchedule.objects.get(app_label=app, name=name).next_run
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_sync_schedules_a_new_task_at_its_next_time_and_keeps_the_clock_of_a_known_one():
     scheduler.sync(at(9, 59, 30), declared=[task("tick")])
     assert next_run("tick") == at(10, 0)
@@ -225,7 +228,7 @@ def test_sync_schedules_a_new_task_at_its_next_time_and_keeps_the_clock_of_a_kno
     )
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_sync_forgets_a_task_no_app_declares_any_more():
     scheduler.sync(at(10, 0), declared=[task("tick"), task("gone")])
     scheduler.sync(at(10, 0), declared=[task("tick")])
@@ -233,7 +236,7 @@ def test_sync_forgets_a_task_no_app_declares_any_more():
     assert list(TaskSchedule.objects.values_list("name", flat=True)) == ["tick"]
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_sync_without_declarations_reads_the_apps():
     scheduler.sync(at(10, 0))
 
@@ -245,100 +248,95 @@ def test_sync_without_declarations_reads_the_apps():
 # ── Running what is due ────────────────────────────────────────────────────────────────────────
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_task_runs_on_its_minute_and_not_before(ticks):
     scheduler.sync(at(9, 59, 30), declared=[task("tick")])
 
-    assert scheduler.run_due(at(10, 0)) == ["test.tick"]
-    assert scheduler.run_due(at(10, 0, 30)) == []
-    assert scheduler.run_due(at(10, 1)) == ["test.tick"]
+    assert scheduler.run_due(at(10, 0), scope=A) == ["test.tick"]
+    assert scheduler.run_due(at(10, 0, 30), scope=A) == []
+    assert scheduler.run_due(at(10, 1), scope=A) == ["test.tick"]
     assert len(ticks) == 2
     row = TaskSchedule.objects.get()
     assert (row.last_run, row.next_run) == (at(10, 1), at(10, 2))
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_minutes_missed_while_stopped_collapse_into_one_run(ticks):
     scheduler.sync(at(9, 59, 30), declared=[task("tick")])
-    scheduler.run_due(at(10, 0))
+    scheduler.run_due(at(10, 0), scope=A)
 
     # Five minutes stopped: one run, then the next time after now.
-    assert scheduler.run_due(at(10, 6)) == ["test.tick"]
-    assert scheduler.run_due(at(10, 6)) == []
+    assert scheduler.run_due(at(10, 6), scope=A) == ["test.tick"]
+    assert scheduler.run_due(at(10, 6), scope=A) == []
     assert len(ticks) == 2
     assert next_run("tick") == at(10, 7)
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_task_runs_as_the_system_on_the_workers_scope(settings, ticks):
-    settings.WORKER_SCOPE_SLUG = "acme"
+    settings.WORKER_SCOPE_SLUG = A.key
     scheduler.sync(at(9, 59), declared=[task("tick")])
 
     scheduler.run_due(at(10, 0))
 
     [(ctx, data)] = ticks
     assert (ctx.scope, ctx.actor, ctx.permissions) == (
-        Scope("host", "acme"),
+        A,
         "system",
         frozenset({"*"}),
     )
     assert isinstance(data, NoIn)
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_task_that_raises_is_logged_rolled_back_and_the_others_still_run(
     monkeypatch, caplog, ticks
 ):
     def boom(ctx, data):
-        get_user_model().objects.create_user("half-done")
+        HubUser.objects.create(username="half-done")
         raise RuntimeError("broken task")
 
     fake_operation(monkeypatch, "test.task.boom", boom)
     scheduler.sync(at(9, 59), declared=[task("boom"), task("tick")])
 
-    with caplog.at_level(logging.ERROR, logger="base.services"):
-        assert scheduler.run_due(at(10, 0)) == ["test.tick"]
+    with caplog.at_level(logging.ERROR, logger="base.services.relay_runs"):
+        assert scheduler.run_due(at(10, 0), scope=A) == ["test.tick"]
 
     assert len(ticks) == 1
-    assert not get_user_model().objects.filter(username="half-done").exists()
+    assert not HubUser.objects.filter(username="half-done").exists()
     [record] = [r for r in caplog.records if r.levelno == logging.ERROR]
     assert "test.boom" in record.getMessage()
     assert str(record.exc_info[1]) == "broken task"
     # Rescheduled, not retried on every tick; it never finished, so it has no last run.
     boom = TaskSchedule.objects.get(name="boom")
     assert (boom.next_run, boom.last_run) == (at(10, 1), None)
-    assert scheduler.run_due(at(10, 0, 30)) == []
+    assert scheduler.run_due(at(10, 0, 30), scope=A) == []
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_task_whose_operation_is_gone_is_logged_and_rescheduled(caplog):
     scheduler.sync(at(9, 59), declared=[task("vanished")])
 
-    with caplog.at_level(logging.ERROR, logger="base.services"):
-        assert scheduler.run_due(at(10, 0)) == []
+    with caplog.at_level(logging.ERROR, logger="base.services.relay_runs"):
+        assert scheduler.run_due(at(10, 0), scope=A) == []
 
     assert "test.vanished" in caplog.text
     assert next_run("vanished") == at(10, 1)
 
 
-@pytest.mark.django_db(transaction=True)
+@HUB_DB_COMMITTED
+@pytest.mark.usefixtures("plan_with_room")
 def test_two_workers_never_run_the_same_due_task(monkeypatch):
     # The deploy starts the new worker before stopping the old one: both tick on the same row.
     monkeypatch.setattr(scheduler, "close_old_connections", close_old_connections)
-    seen_by_the_other: list[list[str]] = []
+    seen_by_the_other: list = [None]
     runs: list[bool] = []
 
     def slow(ctx, data):
-        def other_worker():
-            try:
-                seen_by_the_other.append(scheduler.run_due(at(10, 0)))
-            finally:
-                connection.close()
-
         runs.append(True)
         if len(runs) == 1:
             # While this run holds the row, the other worker ticks; it must neither run it nor wait.
-            thread = threading.Thread(target=other_worker)
+            thread = in_a_thread(lambda: scheduler.run_due(at(10, 0), scope=A), seen_by_the_other)
             thread.start()
             thread.join(timeout=10)
             runs.append(thread.is_alive())
@@ -347,23 +345,23 @@ def test_two_workers_never_run_the_same_due_task(monkeypatch):
     fake_operation(monkeypatch, "test.task.slow", slow)
     scheduler.sync(at(9, 59), declared=[task("slow")])
 
-    assert scheduler.run_due(at(10, 0)) == ["test.slow"]
+    assert scheduler.run_due(at(10, 0), scope=A) == ["test.slow"]
     # The other worker skipped the row this one held, and once it committed the row was not due.
     assert runs == [True, False]
     assert seen_by_the_other == [[]]
-    assert scheduler.run_due(at(10, 0)) == []
+    assert scheduler.run_due(at(10, 0), scope=A) == []
     assert next_run("slow") == at(10, 1)
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_connections_are_released_after_every_task_and_before_idling(released, ticks):
     scheduler.sync(at(9, 59), declared=[task("tick")])
 
-    scheduler.run_due(at(10, 0))
+    scheduler.run_due(at(10, 0), scope=A)
     # One task, then the claim that found nothing: the worker never idles holding a connection.
     assert released == ["close", "close"]
 
-    scheduler.run_due(at(10, 0, 30))
+    scheduler.run_due(at(10, 0, 30), scope=A)
     assert released == ["close"] * 3
 
 
@@ -379,7 +377,7 @@ def test_the_check_runs_with_every_system_check():
         env={**os.environ, "DJANGO_SETTINGS_MODULE": "config.settings"},
         capture_output=True,
         text=True,
-        timeout=60,
+        timeout=RUN_TIMEOUT,
         check=False,
     )
 

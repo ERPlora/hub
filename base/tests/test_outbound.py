@@ -11,7 +11,6 @@ import logging
 import threading
 import time
 from dataclasses import FrozenInstanceError
-from types import SimpleNamespace
 
 import pytest
 from django.db import connection, connections
@@ -24,10 +23,9 @@ from base import outbound
 from base.models import HubIdentity
 from base.tenancy import context
 from base.tenancy.tests import hubs
+from base.tenancy.tests.business import A, HUB_DB, HUB_DB_COMMITTED
 from base.tenancy.tests.legacy import LEGACY
 
-A = Scope("host", "a")
-B = Scope("host", "b")
 #: The platform's (``base.registry.REGISTRY_SCOPE``): its operations run on control from anywhere.
 PLATFORM = Scope("platform", "registry")
 #: The most a test waits for a thread.
@@ -82,8 +80,8 @@ def job_here(fn, *args) -> outbound.Job:
 
 
 @pytest.mark.outbound_threads
-@pytest.mark.django_db(transaction=True)
-def test_a_job_runs_after_the_commit_in_a_thread_of_its_own_and_the_operation_never_waits():
+@HUB_DB_COMMITTED
+def test_a_job_runs_after_the_commit_in_a_thread_of_its_own_and_the_operation_never_waits(hub_a):
     test_thread, seen, let_go, finished = threading.current_thread(), [], threading.Event(), threading.Event()
 
     def job(scope, event_id):
@@ -98,7 +96,8 @@ def test_a_job_runs_after_the_commit_in_a_thread_of_its_own_and_the_operation_ne
         outbound.after_commit(job, ctx.scope, event.pk)
         return {"count": 1}
 
-    command(fn)(as_system(), Schema())
+    with context.use_hub(hub_a):
+        command(fn)(as_system(), Schema())
     let_go.set()
 
     assert finished.wait(WAIT)
@@ -107,8 +106,8 @@ def test_a_job_runs_after_the_commit_in_a_thread_of_its_own_and_the_operation_ne
 
 
 @pytest.mark.outbound_threads
-@pytest.mark.django_db(transaction=True)
-def test_an_operation_that_is_undone_sends_nothing(pool, monkeypatch):
+@HUB_DB_COMMITTED
+def test_an_operation_that_is_undone_sends_nothing(pool, monkeypatch, hub_a):
     monkeypatch.setattr(outbound, "_pool", pool(threads=1))
     ran: list[str] = []
 
@@ -123,18 +122,20 @@ def test_an_operation_that_is_undone_sends_nothing(pool, monkeypatch):
         outbound.after_commit(job, ctx.scope, "kept")
         return {"count": 1}
 
-    with pytest.raises(RuntimeError):
-        command(undone)(as_system(), Schema())
-    command(kept)(as_system(), Schema())
+    with context.use_hub(hub_a):
+        with pytest.raises(RuntimeError):
+            command(undone)(as_system(), Schema())
+        command(kept)(as_system(), Schema())
 
     # One thread, in order: had the undone one been sent, it would have run first.
     assert eventually(lambda: ran == ["kept"])
 
 
-def test_after_commit_outside_an_operation_is_a_misuse():
+@HUB_DB
+def test_after_commit_outside_an_operation_is_a_misuse(hub_a):
     from live.errors import LiveMisuse
 
-    with pytest.raises(LiveMisuse):
+    with context.use_hub(hub_a), pytest.raises(LiveMisuse):
         outbound.after_commit(print, "nothing")
 
 
@@ -230,14 +231,14 @@ def test_a_job_for_another_hub_never_reaches_its_database(hub_a, hub_b, pool, mo
     ]
 
 
-def test_whom_a_job_is_for_is_kept_from_when_it_is_asked():
+@HUB_DB
+def test_whom_a_job_is_for_is_kept_from_when_it_is_asked(hub_a):
     """The context a job runs in is chosen when it is asked and never changes after: nobody hands it another hub's."""
-    a = SimpleNamespace(slug="a", db_name="")
-    with context.use_hub(a):
+    with context.use_hub(hub_a):
         job = outbound.Job(print, (), context.current())
     with pytest.raises(FrozenInstanceError):
         job.database = context.CONTROL_DATABASE  # type: ignore[misc]
-    assert job.database.hub is a
+    assert job.database.hub is hub_a
 
 
 # ── Bounded: a few at once, a queue with a limit, the same job never twice ───────────────────────────────────────
@@ -363,11 +364,13 @@ def test_release_inside_an_operation_is_refused_and_its_transaction_kept(pool):
     assert seen == ["refused", False]
 
 
-@pytest.mark.django_db
-def test_release_outside_a_job_of_the_pool_changes_nothing():
-    HubIdentity.objects.exists()
-    outbound.release()  # the test's own transaction, or a request's: never closed under them
-    assert connection.connection is not None and connection.in_atomic_block
+@HUB_DB
+def test_release_outside_a_job_of_the_pool_changes_nothing(hub_a):
+    with context.use_hub(hub_a):
+        HubIdentity.objects.exists()
+        outbound.release()  # the test's own transaction, or a request's: never closed under them
+        business = connections[context.current_alias()]
+    assert business.connection is not None and business.in_atomic_block
 
 
 def test_stop_drops_what_waits_and_gives_what_runs_its_grace(pool, caplog):

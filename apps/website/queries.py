@@ -462,7 +462,7 @@ def public_reviews(ctx: OperationContext, data: NoIn) -> dict:
 # The cache
 
 
-def page_cache_key(slug: str, version: int, lang: str, day: str, currency: str, *, own_domain: bool = False) -> str:
+def page_cache_key(slug: str, version: int, lang: str, day: str, currency: str, *, own_domain: bool = False) -> str:  # noqa: PLR0913
     """The rendered page of ``slug``'s publication ``version`` in ``lang`` on ``day`` (the opening hours mark today),
     priced in ``currency`` (the business's), for this deploy's bundle; ``own_domain``, the page painted for its own
     domain, which is another page (``public_home``).

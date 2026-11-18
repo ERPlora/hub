@@ -16,10 +16,9 @@ from live.errors import OperationError, PermissionDenied
 from live.models import OutboxEvent
 
 from apps.whatsapp_inbox.models import Channel
-from apps.whatsapp_inbox.tests.conftest import connect, ctx_for, run, system
-from base.tenancy.tests import hubs
+from apps.whatsapp_inbox.tests.conftest import HUB_DB, HUB_DB_COMMITTED, connect, ctx_for, run, system
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 SAAS = "http://saas.test"
 CONFIG = f"{SAAS}/internal/whatsapp/config"
@@ -71,7 +70,7 @@ def test_meta_s_window_opens_with_erplora_s_public_ids_for_this_business():
     route = respx.post(CONFIG).mock(return_value=httpx.Response(200, json=CONFIGURED))
     out = run("whatsapp_inbox.channel.prepare")
     assert out.model_dump() == {"available": True, "reason": None, **{k: v for k, v in CONFIGURED.items() if k != "configured"}}
-    assert route.calls.last.request.content == b'{"hub":"a"}'
+    assert route.calls.last.request.content == b'{"hub":"tenant-a"}'
 
 
 @respx.mock
@@ -209,7 +208,7 @@ def test_a_server_without_erplora_s_address_says_so(settings):
 
 
 @respx.mock
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
+@HUB_DB
 @pytest.mark.usefixtures("no_test_fallback")
 def test_the_number_meta_s_window_chose_is_the_business_s_at_once(hub_a, hub_b):
     from base.tenancy.context import use_hub
@@ -349,7 +348,7 @@ def test_disconnecting_leaves_the_business_without_its_number_and_keeps_the_mont
 
     assert run("whatsapp_inbox.channel.disconnect").model_dump() == {"disconnected": True}
 
-    assert route.calls.last.request.content == b'{"hub":"a"}'
+    assert route.calls.last.request.content == b'{"hub":"tenant-a"}'
     now = run("whatsapp_inbox.channel.get")
     assert (now.status, now.phone_number, now.display_name, now.monthly_limit) == ("not_connected", "", "", 150)
     assert Channel.objects.get().version == 3
@@ -390,7 +389,7 @@ def test_only_the_owner_and_the_administrators_connect_or_disconnect(role, name,
         run(name, payload, ctx_for(role))
 
 
-@pytest.mark.django_db(transaction=True)
+@HUB_DB_COMMITTED
 @pytest.mark.parametrize(
     ("name", "url", "payload", "answer"),
     [

@@ -3,13 +3,17 @@
 // stays listed, marked «Retired». Schedules: for a member picked by searching the server, «+» proposes
 // Monday to Friday with the default working day of Settings (as proposed: 09:00–18:00, break 13:00–14:00;
 // STAFF-F22) and «Create schedule» lists it as the default one with its
-// hours; a day ending before it starts is refused under that day (422); editing drops Friday; «Delete»
-// asks first and empties the list. Everything this spec creates is named «E2E …» and removed after it.
-import { type Browser, expect, test } from '@playwright/test';
+// hours; a day ending before it starts is refused under that day (422), and its reason goes as soon as that
+// day is changed, while another refused day keeps its own; editing drops Friday; «Delete» asks first and
+// empties the list. In English and in Spanish, from a phone to a desk, every day's name reads whole, on one line
+// and in one column, whether the day is worked or off, and so do the labels and the hours of a working day.
+// Everything this spec creates is named «E2E …» and removed after it.
+import { type Browser, expect, type Page, test } from '@playwright/test';
 
-import { A, api, psql, shot, shown } from './helpers';
+import { A, api, capture, psql, shot, shown } from './helpers';
 import { signedIn } from './flow-helpers';
-import { staffCleanUp } from './staff-helpers';
+import { shoot } from './inventory-helpers';
+import { pickMember, staffCleanUp } from './staff-helpers';
 import { rowAction } from './service-helpers';
 import { discardChanges } from './unsaved-back-helpers';
 
@@ -22,6 +26,59 @@ test.afterAll(cleanup);
 
 /** The owner on `next` at a desk's size, in English. */
 const ownerPage = (browser: Browser, next: string) => signedIn(browser, next, { width: 1280, height: 860 });
+
+/** The sizes the week of a schedule is read at: the narrowest phone, a common Android one, a small and a common iPhone, a
+ *  tablet upright and a desk. */
+const WEEK_SIZES = [
+  { width: 320, height: 640 },
+  { width: 360, height: 740 },
+  { width: 375, height: 667 },
+  { width: 390, height: 844 },
+  { width: 768, height: 1024 },
+  { width: 820, height: 1180 },
+  { width: 1440, height: 900 },
+] as const;
+
+/** What is wrong with how the schedule window lays out each day: its name on more than one line, cut short or running
+ *  under what follows it (its hours or «Off», which go beside the name or, without room, below it); the days off not
+ *  starting their «Off» at the same place (the names are one column, as wide as the longest); or the label or the hour
+ *  of a time field cut short. Empty when the week reads right. */
+async function weekProblems(page: Page): Promise<string[]> {
+  return page.locator('ion-modal[data-testid=staff-schedule-form] .staff-week').evaluate((week) => {
+    const cut = (element: Element): boolean => element.scrollWidth > element.clientWidth + 1;
+    const problems = [...week.querySelectorAll('.staff-week__day')].flatMap((row) => {
+      const box = row.querySelector('ion-checkbox') as HTMLElement;
+      const name = (box.textContent ?? '').trim();
+      const text = document.createRange();
+      text.selectNodeContents(box);
+      const lines = new Set([...text.getClientRects()].filter((rect) => rect.width > 0).map((rect) => Math.round(rect.top))).size;
+      const label = box.shadowRoot?.querySelector('[part~="label"]') as HTMLElement;
+      const whole = text.getBoundingClientRect();
+      const next = row.querySelector('.staff-week__hours, .staff-week__sep')!.getBoundingClientRect();
+      const found: string[] = [];
+      if (lines !== 1) found.push(`«${name}» on ${lines} lines`);
+      if (cut(label)) found.push(`«${name}» cut short`);
+      if (next.left < whole.right - 1 && next.top < whole.bottom - 1) found.push(`«${name}» runs under what follows it`);
+      for (const time of row.querySelectorAll('.staff-week__time')) {
+        const title = time.querySelector('.label-text')!;
+        const said = `${name}, «${(title.textContent ?? '').trim()}»`;
+        if (cut(title)) found.push(`${said} cut short`);
+        // A time input clips its hour without any overflow to read, so a copy at its own width says what it needs.
+        const hour = time.querySelector('input')!;
+        const probe = hour.cloneNode() as HTMLInputElement;
+        probe.style.cssText = 'position: absolute; visibility: hidden; width: auto; min-width: 0; max-width: none;';
+        hour.after(probe);
+        const needs = probe.getBoundingClientRect().width;
+        probe.remove();
+        if (needs > hour.getBoundingClientRect().width + 1) found.push(`${said}: its hour cut short`);
+      }
+      return found;
+    });
+    const offs = new Set([...week.querySelectorAll('[data-testid$="-off"]')].map((off) => Math.round(off.getBoundingClientRect().left)));
+    if (offs.size > 1) problems.push(`«Off» starts at ${[...offs].join(', ')} px, not in one column`);
+    return problems;
+  });
+}
 
 test('Roles: create, a duplicate refused in the form, retire from Edit (still listed, marked)', async ({ browser }) => {
   const name = `${TAG} Colourist ${Date.now().toString(36)}`;
@@ -60,7 +117,35 @@ test('Roles: create, a duplicate refused in the form, retire from Edit (still li
   }
 });
 
-test('Schedules: the default week, a day refused under its row, edit, delete', async ({ browser }) => {
+test('Schedules: a week without working days is refused on top of it, and the line goes as soon as a day is ticked', async ({ browser }) => {
+  // flow: STAFF-F13 (hub#1448)
+  const stamp = Date.now().toString(36);
+  const noDays = 'A schedule needs at least one working day with hours.';
+  const { context, page } = await ownerPage(browser, '/staff/schedules');
+  try {
+    const created = await api<{ id: string; full_name: string }>(context, A, 'POST', '/staff/members', { first_name: `${TAG} Iris`, last_name: `Week${stamp}` });
+    expect(created.status).toBe(201);
+    const view = shown(page);
+    await pickMember(page, 'staff-schedules-member', `Week${stamp}`, created.data.full_name);
+    await view.locator('[data-testid=staff-schedules-add]').click();
+    for (const weekday of [0, 1, 2, 3, 4]) await page.locator(`[data-testid=staff-schedule-form-day-${weekday}-working]`).click();
+    await page.locator('[data-testid=staff-schedule-form-submit]').click();
+    const refused = page.locator('[data-testid=staff-schedule-form-week-error]');
+    await expect(refused).toContainText(noDays);
+    await shoot(page, 'APP-STAFF-STAFF-F13-week-refused', { width: 1280, height: 860 });
+    await page.locator('[data-testid=staff-schedule-form-day-2-working]').click();
+    await expect(refused).toBeHidden();
+    await shoot(page, 'APP-STAFF-STAFF-F13-week-ticked', { width: 1280, height: 860 });
+    await page.locator('[data-testid=staff-schedule-form-submit]').click();
+    await expect(page.locator('ion-modal[data-testid=staff-schedule-form]')).toBeHidden();
+    await expect(view.locator('[data-testid=staff-schedules-row]').first()).toContainText('Wed 09:00–18:00 (13:00–14:00)');
+  } finally {
+    await context.close();
+  }
+});
+
+test('Schedules: the default week, a day refused under its row and corrected on its own, edit, delete', async ({ browser }) => {
+  // flow: STAFF-F13, STAFF-F14 (hub#1460)
   const stamp = Date.now().toString(36);
   const { context, page } = await ownerPage(browser, '/staff/schedules');
   try {
@@ -69,23 +154,33 @@ test('Schedules: the default week, a day refused under its row, edit, delete', a
     const name = created.data.full_name;
     const view = shown(page);
 
-    // Pick the member by searching the server.
-    const member = view.locator('[data-testid=staff-schedules-member] input');
-    await member.click();
-    await member.fill(`Shifts${stamp}`);
-    await page.locator('[data-testid^=staff-schedules-member-option-]', { hasText: name }).first().click();
+    await pickMember(page, 'staff-schedules-member', `Shifts${stamp}`, name);
     await expect(view.locator('[data-testid=staff-schedules-member] input')).toHaveValue(name);
     await expect(view.locator('[data-testid=staff-schedules-empty]')).toContainText('This member has no schedules yet.');
 
     // «+»: Monday to Friday 09:00–18:00 with a break 13:00–14:00 (the working day of Settings as proposed);
-    // a Monday ending before it starts is refused under Monday.
+    // a Monday and a Tuesday ending before they start are refused, each under its own day. Correcting one takes
+    // its reason away before saving again, typing an hour or unticking it, and leaves the other's (hub#1460).
     await view.locator('[data-testid=staff-schedules-add]').click();
     await expect(page.locator('[data-testid=staff-schedule-form-day-5-off]')).toHaveText('Off');
     await page.locator('[data-testid=staff-schedule-form-day-0-end] input').fill('08:00');
+    await page.locator('[data-testid=staff-schedule-form-day-1-end] input').fill('08:00');
     await page.locator('[data-testid=staff-schedule-form-submit]').click();
-    await expect(page.locator('[data-testid=staff-schedule-form-day-0-error]')).toContainText('The start time must be before the end time.');
+    const order = 'The start time must be before the end time.';
+    const monday = page.locator('[data-testid=staff-schedule-form-day-0-error]');
+    const tuesday = page.locator('[data-testid=staff-schedule-form-day-1-error]');
+    await expect(monday).toContainText(order);
+    await expect(tuesday).toContainText(order);
     await page.screenshot({ path: shot('staff-schedules-422') });
     await page.locator('[data-testid=staff-schedule-form-day-0-end] input').fill('18:00');
+    await expect(monday).toBeHidden();
+    await expect(tuesday).toContainText(order);
+    await shoot(page, 'APP-STAFF-STAFF-F13-day-corrected', { width: 1280, height: 860 });
+    const tuesdayWorks = page.locator('[data-testid=staff-schedule-form-day-1-working]');
+    await tuesdayWorks.click();
+    await expect(tuesday).toBeHidden();
+    await tuesdayWorks.click();
+    await page.locator('[data-testid=staff-schedule-form-day-1-end] input').fill('18:00');
     await page.locator('[data-testid=staff-schedule-form-submit]').click();
     const row = view.locator('[data-testid=staff-schedules-row]').first();
     await expect(row).toContainText('Yes');
@@ -111,3 +206,39 @@ test('Schedules: the default week, a day refused under its row, edit, delete', a
     await context.close();
   }
 });
+
+for (const language of ['en', 'es'] as const) {
+  test(`Schedules: in ${language}, every day's name reads whole, on one line and in one column, worked or off, and so does each label and hour of a working day, from a phone to a desk`, async ({ browser }) => {
+    // flow: STAFF-F13, STAFF-F14 (hub#1461, hub#1478)
+    const stamp = Date.now().toString(36);
+    const { context, page } = await ownerPage(browser, '/staff/schedules');
+    try {
+      const created = await api<{ id: string; full_name: string }>(context, A, 'POST', '/staff/members', { first_name: `${TAG} Wanda`, last_name: `Days${stamp}` });
+      expect(created.status).toBe(201);
+      if (language === 'es') {
+        await context.addCookies([{ name: 'django_language', value: 'es', domain: new URL(A).hostname, path: '/' }]);
+        await page.goto(`${A}/staff/schedules`);
+      }
+      await pickMember(page, 'staff-schedules-member', `Days${stamp}`, created.data.full_name);
+      await shown(page).locator('[data-testid=staff-schedules-add]').click();
+      // Wednesday and Miércoles are the longest names: proposed, Monday to Friday work and the weekend is off;
+      // then every day is ticked or unticked, so each name is read beside its hours and beside «Off».
+      await expect(page.locator('[data-testid=staff-schedule-form-day-2-working]')).toHaveText(language === 'en' ? 'Wednesday' : 'Miércoles');
+      for (const week of ['proposed', 'flipped'] as const) {
+        if (week === 'flipped') {
+          for (const weekday of [0, 1, 2, 3, 4, 5, 6]) await page.locator(`[data-testid=staff-schedule-form-day-${weekday}-working]`).click();
+          await expect(page.locator('[data-testid=staff-schedule-form-day-2-off]')).toBeVisible();
+          await expect(page.locator('[data-testid=staff-schedule-form-day-6-start]')).toBeVisible();
+        }
+        for (const size of WEEK_SIZES) {
+          const where = `${week} week at ${size.width}x${size.height}`;
+          await page.setViewportSize(size);
+          await capture(page, `APP-STAFF-STAFF-F13-day-names-${language}-${week}-${size.width}x${size.height}`);
+          expect.soft(await weekProblems(page), where).toEqual([]);
+        }
+      }
+    } finally {
+      await context.close();
+    }
+  });
+}

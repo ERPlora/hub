@@ -15,10 +15,12 @@ from pydantic import Field
 from apps.demo.models import Item
 from base.schemas import names
 from base.tenancy import context
-from base.tenancy.tests import hubs
+from base.tenancy.tests.business import HUB_DB, in_business_a
 from base.tests.test_services_assistant import ASK, MANAGER, asked, call, turn
 
-pytestmark = pytest.mark.django_db
+__all__ = ["in_business_a"]
+
+pytestmark = HUB_DB
 
 
 def yes_to(plan: dict, *, typed: str | None = None, turn_of=turn, **extra) -> dict:
@@ -346,8 +348,6 @@ def test_the_record_a_card_found_by_its_mark_or_by_its_check_is_held_alone(touch
 # ── Each business on its own ──────────────────────────────────────────────────────────────────────────────────────────
 
 
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
-@pytest.mark.usefixtures("no_test_fallback")
 def test_a_card_drawn_in_one_business_is_no_yes_in_another(hub_a, hub_b):
     """Two businesses with a database each, as production: the same words name another record in B, and the card A
     drew is no yes there."""

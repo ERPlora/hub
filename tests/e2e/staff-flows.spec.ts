@@ -8,7 +8,7 @@
 import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
 import { A, api, type Credentials, EMPLOYEE, horizontalOverflow, hubUserIdOf, login, psql, shot, shown, THREE_SIZES as VIEWPORTS } from './helpers';
-import { staffCleanUp } from './staff-helpers';
+import { pickMember, staffCleanUp } from './staff-helpers';
 import { rowAction } from './service-helpers';
 
 const TAG = 'E2E';
@@ -82,16 +82,6 @@ async function timeOff(context: BrowserContext, memberId: string, from: string, 
 /** Terminates a record: its account (if any) is free again for the next test. */
 async function release(context: BrowserContext, id: string): Promise<void> {
   expect((await api(context, A, 'POST', '/staff/members/terminate', { id })).status).toBe(200);
-}
-
-/** Picks, in a staff `Combo`, the option that names `name`, searching the server by `text`. */
-async function pickMember(page: Page, field: string, text: string, name: string): Promise<void> {
-  const input = page.locator(`[data-testid=${field}] input`);
-  await input.click();
-  await input.fill(text);
-  await page.locator(`[data-testid^=${field}-option-]`, { hasText: name }).first().click();
-  // Choosing closes the list: nothing of it is left over the next field.
-  await expect(page.locator(`[data-testid^=${field}-option-]`)).toHaveCount(0);
 }
 
 // flow: STAFF-F01 — a refused save is told under its field and in sight, also on a phone

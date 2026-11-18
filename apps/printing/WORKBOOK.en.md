@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:868caee8930f82c5e81f2dde3aaabff2ccd0fdb6579cb46d17dcff878c2a0a84 -->
+<!-- generated from WORKBOOK.md sha256:bfbeaae81d717269d5721780830ddb3712e084abd0b0c15ad6589d2dceb773ee -->
 
 ## What it is for and who it is for
 
@@ -192,7 +192,7 @@ the window without saving. With the window as it opened, Back closes it without 
 | PRINTING-F12 | Print a barcode label | common | done |
 | PRINTING-F13 | Open the drawer when charging | common | done |
 | PRINTING-F14 | Get a print job unstuck | common | done |
-| PRINTING-F15 | Take the old receipt text to Sales | common | done |
+| PRINTING-F15 | Go to the receipt text, which is written in Sales | common | done |
 | PRINTING-F16 | Send to print from the assistant | common | done |
 | PRINTING-F17 | Print the cash register closing | common | done |
 | PRINTING-F18 | Take the paper out: the device picks up and confirms the jobs | common | done |
@@ -214,7 +214,9 @@ Steps:
    them out (none set up reaches its printer, or they wait for a printer and none reaches one of its role,
    or the one that reaches it has given no sign for 90 s: it is off or without the ERPlora app open), the bell of
    everybody who sees Printing shows one row per role: "Nothing is printing “Receipt”" (or "Kitchen", "Bar",
-   "Label") with how many are waiting. Tapping it opens **Printing → Printers**, where the card of that
+   "Label") with how many are waiting, urgent for "Kitchen" and "Bar" (an order that does not come out on paper is a
+   dish or a drink nobody makes) and a warning for "Receipt" and "Label", with "They will not come out until a device
+   with the ERPlora app open can print them.". "See the printers" opens **Printing → Printers**, where the card of that
    role says why: "No device" and "No device set up here prints it: set one up in
    Devices.", "Device off" and "The device that prints it is not responding: switch it on and open the
    ERPlora app on it." or "Waiting, no printer" if it has no active printer.
@@ -233,8 +235,8 @@ clear" requires nothing waiting, sent without confirmation or failed. The screen
 is retried or is cancelled. The Home step and the bell rows change on their own, without
 reloading, when a job is queued, fails or is cancelled, when a
 device is set up, changed or retired and when a printer changes; what the clock moves (a job that
-reaches the minute, a device that stops giving signs or comes back) is picked up on its own every 30 s by the bell, like
-the old Hub's, and by the role's card while something is waiting (a read that fails keeps the last one). The row goes away on its own
+reaches the minute, a device that stops giving signs or comes back) is picked up on its own every 30 s by the bell
+and by the role's card while something is waiting (a read that fails keeps the last one). The row goes away on its own
 when a switched-on device can take out what is waiting (there is no "mark as read").
 If it fails: "Could not read the print queue." with "Retry"; "All clear" is not drawn when
 the read fails. A device that is set up but switched off does make the bell ring, once the minute has passed: the Home
@@ -286,7 +288,8 @@ If it fails: the field marked with the reason: "There is already a printer with 
 network name (for example 192.168.1.100).", "The port goes from 1 to 65535.", "Type the MAC
 as AA:BB:CC:DD:EE:FF.", "Type the print queue's name as the system gives it (no
 spaces, slashes or #).", "The system printer prints A4 pages: give it the Receipt role.". Without
-a name, "Give the printer a name.".
+a name, "Give the printer a name.". Each notice shows under its field and goes as soon as that field changes,
+without tapping "Save" again; another field's stays until its own changes (hub#1470).
 Involved: PRINTING-F04, PRINTING-F05
 
 ### PRINTING-F04 Assign what comes out of each printer
@@ -361,7 +364,7 @@ Steps:
    order to open the drawer (PRINTING-F13); the device takes it out (PRINTING-F18). After charging, Sales says
    which printer it went to.
 4. With Printing not switched on, without an active receipt printer or with the fiscal document still pending,
-   nothing is queued: the receipt comes out through the device's dialog, as before. Repeating the same charge
+   nothing is queued: the receipt comes out through the device's dialog. Repeating the same charge
    does not print another receipt.
 In: the receipt composed by Sales.
 Out: a job in the queue, or nothing if the business does not print when charging.
@@ -381,7 +384,7 @@ Steps:
    system printer. The screen says which printer it went to.
 3. With Printing not switched on, without a printer that accepts it (a receipt one for the receipt; a system one for the
    A4 page) or with the fiscal document still pending, nothing is queued: it comes out through the device's
-   dialog, as before.
+   dialog.
 In: the document marked as a copy.
 Out: a job in the Receipt queue; an A4 invoice goes to the system printer. Each press, one
 paper.
@@ -396,7 +399,7 @@ Steps:
 1. With the bill open, press "Print bill".
 2. Sales asks for the bill (no number, no QR, no payment and with the warning that it is not an invoice) and the screen
    says which printer it went to; with Printing not switched on or without an active receipt printer, it comes out through the
-   device's dialog, as before.
+   device's dialog.
 In: the bill with its lines.
 Out: a job in the Receipt queue. Each press prints one bill.
 If it fails: "A bill has lines to charge for: this one has none.".
@@ -493,9 +496,9 @@ If it fails: "Only a pending or failed job, or a sent one that did not answer, g
 buttons are not seen.
 Involved: PRINTING-F01
 
-### PRINTING-F15 Take the old receipt text to Sales
-Status: done — there is no old text to take: the receipt header and footer live in the
-Sales settings from the start, and the Settings note leads there
+### PRINTING-F15 Go to the receipt text, which is written in Sales
+Status: done — the receipt header and footer live in the Sales settings, and the Settings note leads
+there
 Actor: administrator
 Screen: Settings
 Steps:
@@ -534,7 +537,7 @@ Steps:
 2. Cash register asks Printing for the X report (open session) or the Z report (closed) for the Receipt role, and says which
    printer it went to.
 3. With Printing not switched on or without an active receipt printer, nothing is queued: the device's dialog
-   prints it, as before.
+   prints it.
 In: the report (session, cashier, float, closing and movements).
 Out: a job in the Receipt queue; each press, one paper.
 If it fails: as in F07.
@@ -594,8 +597,9 @@ for jobs of a printer the device does not have is refused ("This device does not
 Confirming twice is one confirmation. A late confirmation from the same device (a slow printer with
 copies goes past the 90 s and the job had already gone back to the queue) is accepted: the paper came out and it is not printed
 again. A confirmation or a failure from another device, or from a hand-out that is not its own, is refused and changes
-nothing. Setting up without a name or without active printers warns in its field, and it is only set up from the
-device itself. The queue and the list name each device by its name, never by its identifier: with it
+nothing. Setting up without a name or without active printers warns in its field, and the notice goes as soon as
+that field changes (the name is typed, a printer is ticked), without tapping "Save" again; the other's stays until
+its own changes (hub#1470). It is only set up from the device itself. The queue and the list name each device by its name, never by its identifier: with it
 anybody could pretend to be the till.
 Involved: PRINTING-F05, PRINTING-F07, PRINTING-F14
 

@@ -24,6 +24,8 @@ from pydantic import (
 
 from apps.customer.models import Activity, Purchase
 from base.business import currency_decimals
+from base.recovery import RecoveredOut
+from base.relay import by_platform
 from base.schemas import names, unless_given
 
 T = TypeVar("T")
@@ -53,7 +55,7 @@ TAG_COLOR = gettext_noop("Tag color")
 CUSTOMER = gettext_noop("Customer")
 CUSTOM_FIELD = gettext_noop("Custom field")
 
-# The assistant's card names the record a write acts on by these reads (base/assistant.py ``REFERS``), run as whoever
+# The assistant's card names the record a write acts on by these reads (base/assistant/cards.py ``REFERS``), run as whoever
 # asks, never by its id. An open order is Sales's, which Customers does not require: ``customer.order.get`` asks Sales
 # for its name, and without Sales the card leaves it out. A card said by its name beside its own card's id is neither
 # read nor shown: the write takes the card by the id and never looks at the name (``unless_given``, hub#1272).
@@ -869,39 +871,52 @@ class FieldPatchIn(FieldRefIn):
         return list(dict.fromkeys(option.strip() for option in value if option.strip()))
 
 
-# ── A card of a separate copy, as its recovery takes it (BASE-F114, hub#1285) ───────────────────
+# ── A card of a separate copy, as its recovery takes it (BASE-F114, hub#1285, hub#1356) ───────────
 
 
 class GroupOfCopyIn(GroupIn):
-    """A group of a card of the copy, as the copy held it: what the Groups screen's create takes, and whether it was
-    offered on the cards."""
+    """A group of a card of the copy, as the copy held it: its id there, what the Groups screen's create takes, and
+    whether it was offered on the cards."""
 
+    id: UUID | None = Field(None, description="The group's id in the copy.")
     is_active: bool = Field(True, description="Whether the group was offered on the cards.")
 
 
 class TagOfCopyIn(TagIn):
-    """A tag of a card of the copy, as the copy held it: what the Tags screen's create takes, and whether it was offered
-    on the cards."""
+    """A tag of a card of the copy, as the copy held it: its id there, what the Tags screen's create takes, and whether
+    it was offered on the cards."""
 
+    id: UUID | None = Field(None, description="The tag's id in the copy.")
     is_active: bool = Field(True, description="Whether the tag was offered on the cards.")
 
 
 class FieldValueOfCopyIn(FieldIn):
-    """A card's value of an active custom field of the copy: the field as the Fields screen's create takes it, and the
-    value."""
+    """A card's value of an active custom field of the copy: the field's id there, the field as the Fields screen's
+    create takes it, and the value."""
 
+    id: UUID | None = Field(None, description="The field's id in the copy.")
     value: _text(10000) = Field(description="The card's value, as text.")
 
 
-class CustomerRecoverIn(CustomerIn):
-    """A card of a separate copy the business no longer has: what ``customer.customer.create`` takes and what hung from
-    it there, each named as the copy named it (the business makes its own ids)."""
+class HungInCopyIn(Schema):
+    """What hung from a card in the copy, each named as the copy named it: the business makes its own ids, and the
+    copy's tell what it still has."""
 
     groups: list[GroupOfCopyIn] = Field([], max_length=200, description="The card's groups in the copy.")
     tags: list[TagOfCopyIn] = Field([], max_length=200, description="The card's tags in the copy.")
     field_values: list[FieldValueOfCopyIn] = Field(
         [], max_length=200, description="The card's values of the copy's active custom fields."
     )
+
+
+class CustomerRecoverIn(CustomerIn, HungInCopyIn):
+    """A card of a separate copy the business no longer has: what ``customer.customer.create`` takes and what hung from
+    it there."""
+
+
+class CustomerRestoreIn(CustomerRefIn, HungInCopyIn):
+    """A deleted card the business still holds, by its id, and what hung from it in a separate copy: what the business
+    deleted since comes back with it."""
 
 
 # ── Outputs ─────────────────────────────────────────────────────────────────────────────────────
@@ -977,6 +992,10 @@ class CustomerDetailOut(CustomerRow):
     consent_date: datetime | None = Field(
         description="When the latest marketing consent in force was given."
     )
+
+
+class CustomerRecoveredOut(CustomerDetailOut, RecoveredOut):
+    """A card back from a separate copy, and the values of its custom fields it came back without, each with why."""
 
 
 class CustomerStatsOut(Schema):
@@ -1056,12 +1075,17 @@ class ActivityRow(Schema):
     )
     related_id: str = Field(description="The id of what it is about.")
     related_type: str = Field(description="The type of what it is about.")
-    actor: str = Field(description="Who did it.")
+    actor: str = Field(description="Who did it: a person's name, an API key's or the platform's own mark.")
+    by_platform: bool = Field(description="No person did it: the platform (the system, an automation, a recovery).")
     created_at: datetime = Field(description="When.")
 
     @staticmethod
     def resolve_currency_decimals(entry: Activity) -> int | None:
         return _decimals((entry.data or {}).get("currency"))
+
+    @staticmethod
+    def resolve_by_platform(entry: Activity) -> bool:
+        return by_platform(entry.actor)
 
 
 ActivityPage = Page[ActivityRow]

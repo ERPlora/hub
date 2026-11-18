@@ -155,7 +155,7 @@ def test_a_table_no_model_names_and_the_saas_shared_schema_are_left_alone(after_
 
 
 def test_it_only_ever_renames(after_the_cut):
-    with CaptureQueriesContext(connection) as queries:
+    with CaptureQueriesContext(connections["default"]) as queries:
         forwards()
         backwards()
 

@@ -4,12 +4,16 @@
 gives each test a bucket of its own on it and points ``base.tenancy.dumps`` there (``HUB_DUMPS_BUCKET``,
 ``HUB_DUMPS_ENDPOINT_URL``), with throwaway credentials: the shell's AWS session is never signed with (a red diff would
 print it, as saas's presign tests once did). :func:`hub_files_bucket` does the same for the hub file store
-(``storages["hub_files"]``), versioned as prod's. Its objects are read back with :func:`objects` and :func:`body`;
-:func:`keep_files` and :func:`spy_on_the_purge` serve what purges a demo and what purges a business alike.
+(``storages["hub_files"]``), versioned as prod's. Its objects are read back with :func:`objects` and :func:`body`
+(:func:`nothing_kept`: nor an upload left unfinished);
+:func:`keep_files` and :func:`spy_on_the_purge` serve what purges a demo and what purges a business alike, and
+:func:`copy_programs`, :func:`stopping_as` and :func:`lose_each_copy` what copies a database through the dumps bucket (a
+move, a restore, a copy aside).
 """
 
+import subprocess
 import uuid
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from pathlib import Path
 
 import boto3
@@ -143,3 +147,67 @@ def objects(endpoint: str, bucket: str) -> dict[str, int]:
 
 def body(endpoint: str, bucket: str, key: str) -> bytes:
     return client(endpoint).get_object(Bucket=bucket, Key=key)["Body"].read()
+
+
+def nothing_kept(endpoint: str, bucket: str) -> bool:
+    """No object and no unfinished upload in ``bucket``."""
+    return objects(endpoint, bucket) == {} and not client(endpoint).list_multipart_uploads(Bucket=bucket).get("Uploads")
+
+
+#: How a database is copied through the dumps bucket (:func:`how_it_was_copied`): ``pg_dump`` sends it out on its
+#: output, and ``pg_restore`` reads it on its input twice, for its listing and for the restore.
+THROUGH_THE_BUCKET = [("pg_dump", "output"), ("pg_restore", "input"), ("pg_restore", "input")]
+
+
+def copy_programs(monkeypatch) -> list[tuple[list[str], dict]]:
+    """Every ``pg_dump`` and ``pg_restore`` started from now on, with how it was started."""
+    started: list[tuple[list[str], dict]] = []
+    real = subprocess.Popen
+
+    def watched(command, **kwargs):
+        if command[0].endswith(("pg_dump", "pg_restore")):
+            started.append((command, kwargs))
+        return real(command, **kwargs)
+
+    monkeypatch.setattr(subprocess, "Popen", watched)
+    return started
+
+
+def how_it_was_copied(started: list[tuple[list[str], dict]]) -> list[tuple[str, str]]:
+    """Each program of ``started`` (:func:`copy_programs`) and where its copy went: ``file`` when its command names a
+    ``.dump``, else ``output`` or ``input`` when that pipe carries it."""
+
+    def way(command: list[str], how: dict) -> str:
+        if any(part.endswith(".dump") for part in command):
+            return "file"
+        if how.get("stdout") == subprocess.PIPE:
+            return "output"
+        return "input" if how.get("stdin") == subprocess.PIPE else "neither"
+
+    return [(command[0].rsplit("/", 1)[-1], way(command, how)) for command, how in started]
+
+
+def stopping_as(monkeypatch, where, step: str) -> Callable[[], bool]:
+    """A worker's ``cancelled`` that turns true the moment ``where.step`` is first called: it stops right then."""
+    called: list[bool] = []
+    real = getattr(where, step)
+
+    def stops(*args, **kwargs):
+        called.append(True)
+        return real(*args, **kwargs)
+
+    monkeypatch.setattr(where, step, stops)
+    return lambda: bool(called)
+
+
+def lose_each_copy(monkeypatch, endpoint: str, bucket: str) -> None:
+    """Each copy is gone from ``bucket`` by the time ``pg_restore`` reads it back (``move._restore_from_bucket``)."""
+    from base.tenancy import move
+
+    real = move._restore_from_bucket
+
+    def lost(key, name, cluster, heartbeat, cancelled=None):
+        client(endpoint).delete_object(Bucket=bucket, Key=key)
+        return real(key, name, cluster, heartbeat, cancelled)
+
+    monkeypatch.setattr(move, "_restore_from_bucket", lost)

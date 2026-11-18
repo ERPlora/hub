@@ -5,10 +5,7 @@ Estado de la app: completa (2026-10-21)
 
 > Manual de usuario y especificación de la app `pricing`. Se escribe **antes** que el código: no se
 > programa nada que no esté aquí, y cada flujo pasa a `hecho` cuando sus tests están en verde (servidor
-> y páginas). Parte del `WORKFLOW.md` del módulo Precios del producto actual
-> (`modules-workspace/modules/pricing`, `origin/main` `cd6985c`, v1.1.32). Hace lo mismo, se ve igual
-> (una entrada de menú, **Tarifas**, con las listas arriba y las reglas debajo) y conserva su
-> funcionalidad salvo lo que dice «Cambios frente al producto actual», al final.
+> y páginas). Una entrada de menú, **Tarifas**, con las listas arriba y las reglas debajo.
 
 ## Para qué sirve y para quién
 
@@ -38,9 +35,7 @@ Quién la usa:
 ## Referencia adoptada
 
 **Qué tarifa gana, cuántos descuentos automáticos se suman y cuándo se fija el precio** (skill
-`market-decision`, 2026-10-15). El producto actual elegía el precio más bajo entre todas las tarifas
-activas (sin mirar fechas ni la tarifa por defecto), sumaba todas las reglas en cadena por prioridad
-sobre el importe del tique, y nadie lo llamaba.
+`market-decision`, 2026-10-15).
 
 | Producto | Cómo lo resuelve | Fuente |
 |---|---|---|
@@ -74,7 +69,7 @@ sobre el importe del tique, y nadie lo llamaba.
 
 **Por qué las demás no:** «la regla más específica gana» (Odoo) obliga a entender un orden que el dueño
 no ve y en el foro se queja de que la tarifa del cliente no se aplica; sumar todas las reglas en cadena
-(el producto actual, Square con la queja del foro) cobra de menos sin que nadie lo note; los descuentos
+(Square, con la queja del foro) cobra de menos sin que nadie lo note; los descuentos
 por importe del tique (gasto mínimo) necesitan el tique entero, que esta app no tiene: se quedan fuera
 («Lo que NO hace»).
 
@@ -118,7 +113,7 @@ Tarifas se abre desde el menú **Tarifas** (icono de etiquetas). Lo que una pers
 aparece, y la app lo rechaza aunque lo intente por la API o por el asistente.
 
 ### Tarifas
-Dos tablas, una encima de otra, como en el producto actual.
+Dos tablas, una encima de otra.
 
 **Listas de precios**: buscador «Buscar código o nombre…», columnas **Código** (con la etiqueta
 **General** si es la tarifa general), **Nombre**, **Divisa**, **Grupo de clientes** («Todos» si es
@@ -202,10 +197,10 @@ cierra la ventana sin guardarlo. Con la ventana como se abrió, atrás la cierra
 | PRICING-F11 | Editar una regla | hecho |
 | PRICING-F12 | Desactivar o reactivar una regla | hecho |
 | PRICING-F13 | Consultar el precio de una línea | hecho |
-| PRICING-F14 | Cuando se borra un producto, una categoría o un grupo, o cambia un servicio | hecho |
+| PRICING-F14 | Cuando se borra o vuelve un producto, se borra una categoría o un grupo, o cambia un servicio | hecho |
+| PRICING-F15 | Recuperar los precios de tarifa desde una copia aparte | hecho |
 
 ### PRICING-F01 Ver las tarifas
-<!-- origen: fi:modules/pricing#navigation-lists-erp-pricing-lists fi:modules/pricing#permission-pricing-view_pricing-manage_pricing-apply_pricing fi:modules/pricing#query-pricing-price_lists-list-expose_api old:pricing/WORKFLOW.md#pricing-f01 -->
 Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, responsable, empleado, asistente
 Pantalla: Tarifas
@@ -218,7 +213,6 @@ Si falla: el aviso de la tabla con «Reintentar».
 Implicados: Clientes (el nombre del grupo)
 
 ### PRICING-F02 Crear una tarifa
-<!-- origen: fi:modules/pricing#command-wasm-pricing-price_lists-create-create_price_list fi:modules/pricing#event-emitidos-price_list-created-price_item-added-rule-created-rule-deactivated old:pricing/WORKFLOW.md#pricing-f02 -->
 Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, responsable, asistente
 Pantalla: Tarifas
@@ -242,7 +236,6 @@ se apaga solo con un grupo o con otra divisa).
 Implicados: Clientes
 
 ### PRICING-F03 Editar una tarifa
-<!-- origen: nuevo (Business Central, Shopify, Lightspeed y Odoo editan, desactivan y reactivan tarifas, precios y reglas; el producto actual no: «Cambios frente al producto actual») -->
 Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, responsable, asistente
 Pantalla: Tarifas, Tarifa (detalle)
@@ -257,7 +250,6 @@ hasta que se le quite o se le elija otro.
 Implicados: Clientes
 
 ### PRICING-F04 Elegir la tarifa general
-<!-- origen: fi:modules/pricing#command-interno-pricing-_unset_default-pricing-_insert_price_list -->
 Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, responsable, asistente
 Pantalla: Tarifas, Tarifa (detalle)
@@ -275,7 +267,6 @@ en un instante.» (409 `pricing.default_busy`, nunca un error del servidor).
 Implicados: ninguno
 
 ### PRICING-F05 Desactivar o reactivar una tarifa
-<!-- origen: nuevo (Business Central, Shopify, Lightspeed y Odoo editan, desactivan y reactivan tarifas, precios y reglas; el producto actual no: «Cambios frente al producto actual») -->
 Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, responsable, asistente
 Pantalla: Tarifas, Tarifa (detalle)
@@ -290,7 +281,6 @@ desactivarla.», «Esa tarifa ya está desactivada.», «Esa tarifa ya está act
 Implicados: ninguno
 
 ### PRICING-F06 Ver los precios de una tarifa
-<!-- origen: fi:modules/pricing#query-pricing-price_lists-get-expose_api fi:modules/pricing#query-pricing-price_lists-items-expose_api -->
 Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, responsable, empleado, asistente
 Pantalla: Tarifa (detalle)
@@ -305,7 +295,6 @@ Si falla: «Esta tarifa no existe» con **Volver**.
 Implicados: Inventario, Servicios
 
 ### PRICING-F07 Poner el precio de un producto o un servicio en una tarifa
-<!-- origen: fi:modules/pricing#event-emitidos-price_list-created-price_item-added-rule-created-rule-deactivated fi:modules/pricing#command-pricing-price_lists-add_item old:pricing/WORKFLOW.md#pricing-f03 -->
 Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, responsable, asistente
 Pantalla: Tarifa (detalle)
@@ -330,7 +319,6 @@ negocio.».
 Implicados: Inventario, Servicios
 
 ### PRICING-F08 Cambiar o quitar un precio
-<!-- origen: nuevo (Business Central, Shopify, Lightspeed y Odoo editan, desactivan y reactivan tarifas, precios y reglas; el producto actual no: «Cambios frente al producto actual») -->
 Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, responsable, asistente
 Pantalla: Tarifa (detalle)
@@ -347,7 +335,6 @@ está disponible…»): el detalle no ofrece **+** ni **Editar**, solo **Quitar*
 Implicados: ninguno
 
 ### PRICING-F09 Ver las reglas de descuento
-<!-- origen: fi:modules/pricing#query-pricing-rules-list-expose_api old:pricing/WORKFLOW.md#pricing-f04 -->
 Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, responsable, empleado, asistente
 Pantalla: Tarifas
@@ -360,7 +347,6 @@ Si falla: el aviso de la tabla con «Reintentar».
 Implicados: Inventario, Clientes
 
 ### PRICING-F10 Crear una regla de descuento
-<!-- origen: fi:modules/pricing#event-emitidos-price_list-created-price_item-added-rule-created-rule-deactivated fi:modules/pricing#command-pricing-rules-create old:pricing/WORKFLOW.md#pricing-f05 -->
 Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, responsable, asistente
 Pantalla: Tarifas
@@ -384,7 +370,9 @@ Entra: el formulario.
 Sale: la regla activa y `pricing.rule.created`.
 Si falla: debajo de su campo: «Ya existe una regla con ese código. Elige otro.», un valor que falta o
 fuera de rango para su tipo, tramos repetidos o desordenados, una categoría, un producto o un servicio
-que no existe, «Hasta» antes que «Desde». **Crear** (y **Guardar** al editarla, PRICING-F11) está en gris
+que no existe, «Hasta» antes que «Desde». El de los tramos, que sale debajo de todos ellos, se quita en
+cuanto se cambia cualquier tramo (se escribe en él, se añade o se quita uno), sin volver a guardar
+(hub#1448). **Crear** (y **Guardar** al editarla, PRICING-F11) está en gris
 mientras el negocio no haya dicho todavía su moneda, porque el importe por unidad se lee en ella (sin
 ella, «1500» yenes se guardaría como 150 000); hasta entonces, salir del importe lo deja como se
 escribió, sin inventarle decimales ni juzgarlo: «¥1500» o «12,50 zł» no salen en rojo como «Esto no es un
@@ -393,7 +381,6 @@ motivo) y ofrece «Reintentar», que la vuelve a pedir; en cuanto llega, **Crear
 Implicados: Inventario, Servicios, Clientes
 
 ### PRICING-F11 Editar una regla
-<!-- origen: nuevo (Business Central, Shopify, Lightspeed y Odoo editan, desactivan y reactivan tarifas, precios y reglas; el producto actual no: «Cambios frente al producto actual») -->
 Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, responsable, asistente
 Pantalla: Tarifas
@@ -406,7 +393,6 @@ Si falla: los mismos rechazos que al crear.
 Implicados: Inventario, Servicios, Clientes
 
 ### PRICING-F12 Desactivar o reactivar una regla
-<!-- origen: fi:modules/pricing#event-emitidos-price_list-created-price_item-added-rule-created-rule-deactivated fi:modules/pricing#command-pricing-rules-deactivate old:pricing/WORKFLOW.md#pricing-f06 -->
 Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, responsable, asistente
 Pantalla: Tarifas
@@ -421,7 +407,6 @@ antes de activarla.» (409 `pricing.rule_group_deleted`): sin grupo valdría par
 Implicados: Clientes
 
 ### PRICING-F13 Consultar el precio de una línea
-<!-- origen: fi:modules/pricing#command-wasm-pricing-price_lists-get_price-get_price old:pricing/WORKFLOW.md#pricing-f07 -->
 Estado: hecho (no tiene pantalla propia: lo pide quien vende o el asistente; Ventas aún no lo pide, ver «Contrato con Ventas»)
 Actor: sistema (Ventas), asistente, empleado por la API
 Pantalla: ninguna
@@ -454,8 +439,7 @@ lista), una tarifa concreta que no existe, está desactivada o no está vigente 
 cantidad que no es mayor que 0.
 Implicados: Inventario, Servicios, Clientes, Ventas
 
-### PRICING-F14 Cuando se borra un producto, una categoría o un grupo, o cambia un servicio
-<!-- origen: nuevo (lo piden los borrados y cambios de Inventario, Clientes y Servicios sobre lo que señala una tarifa o una regla) -->
+### PRICING-F14 Cuando se borra o vuelve un producto, se borra una categoría o un grupo, o cambia un servicio
 Estado: hecho (no tiene pantalla: lo hace la app sola, unos segundos después del cambio de la otra)
 Actor: sistema
 Pantalla: ninguna
@@ -467,13 +451,53 @@ Pasos:
    desactivan (nunca pasa a valer para todos un descuento de un grupo).
 4. Servicios cambia un servicio (`service.service.updated`): Tarifas copia su nombre nuevo en sus
    precios y sus reglas.
+5. El personal de ERPlora recupera desde una copia aparte un producto que el negocio eliminó y aún guarda
+   (`inventory.product.restored`, INVENTORY-F34): Tarifas vuelve a activar las reglas de ese producto que
+   desactivó al borrarlo. Sus precios se borraron: vuelven con la recuperación de Tarifas (PRICING-F15).
 Entra: el aviso.
 Sale: `pricing.price_item.removed`, `pricing.rule.deactivated`, `pricing.price_list.updated` o
-`pricing.price_item.updated` y `pricing.rule.updated`. Repetir el aviso no cambia nada.
+`pricing.price_item.updated` y `pricing.rule.updated`; con un producto que vuelve, `pricing.rule.activated`.
+Repetir el aviso no cambia nada.
 Si falla: se reintenta solo, cada vez más espaciado (hasta una hora entre intentos), y tras ocho intentos se
 da por perdido y queda anotado. Mientras tanto, un producto o una categoría borrados ya no salen en los precios
-y un grupo borrado no vale para nadie (se mira al leer).
-Implicados: Inventario, Clientes, Servicios
+y un grupo borrado no vale para nadie (se mira al leer). Con un producto que vuelve, una regla que el negocio
+desactivó o cambió a mano mientras estaba borrado, o cuyo grupo ya no existe, se queda como está; si el producto se
+volvió a borrar antes de que llegue el aviso, no se activa ninguna.
+Implicados: Inventario, Clientes, Servicios, INVENTORY-F34, PRICING-F15
+
+### PRICING-F15 Recuperar los precios de tarifa desde una copia aparte
+Estado: hecho
+Actor: el personal de ERPlora que administra la plataforma, cuando un negocio lo pide (BASE-F114)
+Pantalla: ninguna de Tarifas: en el admin de Hubs, Copias aparte › «Recuperar en el negocio…», con **Precios de
+tarifa** marcado (lo está, como todo lo que se puede traer)
+Pasos:
+1. El personal recupera desde una copia aparte con **Precios de tarifa** marcado. Tarifas va siempre después de
+   Inventario, se pida en el orden que se pida: un producto eliminado que vuelve ya está vivo cuando se ponen sus
+   precios.
+2. Cada precio de la copia (de un producto vivo en ella o de un servicio) que el negocio ya no tiene vuelve a su
+   tarifa, con su precio y su «desde cantidad», puesto como lo pone el detalle de la tarifa (PRICING-F07). Un producto
+   que el negocio ya no tenía en absoluto vuelve como uno nuevo, con otro identificador (INVENTORY-F01): sus precios
+   van a ese, el que la recuperación hizo con su SKU. Lo mismo un servicio: si vuelve como uno nuevo (SERVICE-F01), sus
+   precios van al que la recuperación hizo por él. Si se piden juntos, Servicios va antes que Tarifas, como en la lista
+   de «Qué recuperar».
+3. Recuperaciones lo cuenta aparte: «Precios de tarifa: se crearon 2».
+Entra: la copia aparte y lo que el negocio tiene hoy.
+Sale: un precio por cada uno que faltaba, con su aviso de precio puesto (`pricing.price_item.added`) hecho por la
+recuperación, así que no arranca ninguna automatización (FLOW-F21); nada más.
+Si falla: un precio que el negocio aún tiene, aunque le cambiara el importe o la «desde cantidad», se queda como está, y
+no se repite uno cuyo sitio (la misma tarifa, el mismo producto o servicio y la misma «desde cantidad») el negocio ya
+volvió a ocupar, al precio que sea: se queda el suyo, y pedirlo otra vez no pone nada dos veces. Un precio que el negocio quitó a mano después de la copia también vuelve, como todo lo que el negocio ya no
+tiene (BASE-F114). Lo que el detalle de la tarifa no acepta hoy no vuelve y Recuperaciones dice por qué: una tarifa
+desactivada («pricing.price_list_unavailable: …»), un producto que sigue eliminado o que el negocio ya no tiene (no se
+recuperó Productos, o el negocio ya hizo otro a mano con su SKU, que se queda con los precios que él le puso:
+«not_found: …»), un servicio que ya no está o Servicios apagada. El producto que hizo una recuperación se reconoce por
+su SKU la hiciera esta u otra anterior: pedida otra vez desde una copia anterior, le vuelve a poner los precios que el
+negocio le quitó después, como a todo lo que ya no tiene. El servicio que hizo una recuperación se reconoce porque
+Servicios guarda por cuál de la copia lo hizo; uno que el negocio volvió a crear a mano con su nombre no recibe ninguno
+(se queda con los precios que él le puso) y el precio dice por qué («service.service_not_found: …»), igual que si se
+pide Tarifas sin Servicios, o antes, y el servicio aún no ha vuelto: pedirlo otra vez lo pone. Un servicio que
+recuperó una recuperación anterior a esta regla no lo guarda, y sus precios tampoco vuelven.
+Implicados: BASE-F114, INVENTORY-F01, INVENTORY-F34, PRICING-F07, PRICING-F14, SERVICE-F01
 
 ## Servicios: lo que entra y lo que sale
 
@@ -506,7 +530,7 @@ por su id, su nombre, su teléfono o su correo. Si un nombre vale para varios, s
 | Elige o quita la tarifa general | gestionar | F04 | `pricing.price_list.set_default` |
 | Desactiva una tarifa | gestionar | F05 | `pricing.price_list.deactivate` |
 | Reactiva una tarifa | gestionar | F05 | `pricing.price_list.activate` |
-| Pone el precio de un producto o un servicio en una tarifa | gestionar | F07 | `pricing.price_item.add` |
+| Pone el precio de un producto o un servicio en una tarifa | gestionar | F07, F15 | `pricing.price_item.add` |
 | Cambia un precio | gestionar | F08 | `pricing.price_item.update` |
 | Quita un precio | gestionar | F08 | `pricing.price_item.remove` |
 | Crea una regla | gestionar | F10 | `pricing.rule.create` |
@@ -514,11 +538,12 @@ por su id, su nombre, su teléfono o su correo. Si un nombre vale para varios, s
 | Desactiva una regla | gestionar | F12 | `pricing.rule.deactivate` |
 | Reactiva una regla | gestionar | F12 | `pricing.rule.activate` |
 | Olvida un producto borrado | solo la plataforma | F14 | `pricing.catalog.forget_product` |
+| Vuelve a activar las reglas de un producto recuperado | solo la plataforma | F14 | `pricing.catalog.recall_product` |
 | Olvida una categoría borrada | solo la plataforma | F14 | `pricing.catalog.forget_category` |
 | Olvida un grupo de clientes borrado | solo la plataforma | F14 | `pricing.catalog.forget_group` |
 | Copia el nombre nuevo de un servicio | solo la plataforma | F14 | `pricing.catalog.refresh_service` |
 
-Cuando el Hub tenga API keys (`erpk_live`), llegarán a las consultas, a crear y cambiar tarifas y a
+Las API keys del Hub (`erpk_live`) llegan a las consultas, a crear y cambiar tarifas y a
 poner, cambiar y quitar precios (para sincronizar precios desde otro sistema); elegir la general,
 desactivar y las reglas, solo desde el Hub o el asistente.
 
@@ -530,12 +555,12 @@ desactivar y las reglas, solo desde el Hub o el asistente.
 | Tarifa cambiada | Editar con algún cambio, o su grupo borrado | `id` | `pricing.price_list.updated` |
 | Tarifa general cambiada | Elegirla o quitarla | `id`, `is_default`, `previous_id` | `pricing.price_list.default_changed` |
 | Tarifa desactivada / reactivada | Desactivar / activar | `id` | `pricing.price_list.deactivated`, `…activated` |
-| Precio puesto | Añadir | `id`, `price_list_id`, `product_id` o `service_id`, `min_quantity`, `price` | `pricing.price_item.added` |
+| Precio puesto | Añadir, o recuperarlo desde una copia aparte | `id`, `price_list_id`, `product_id` o `service_id`, `min_quantity`, `price` | `pricing.price_item.added` |
 | Precio cambiado | Editar, o el nombre nuevo de un servicio | `id` (o `service_id`) | `pricing.price_item.updated` |
 | Precio quitado | Quitar, o el producto borrado | `id`, `price_list_id` | `pricing.price_item.removed` |
 | Regla nueva | Crear | `id`, `code` | `pricing.rule.created` |
 | Regla cambiada | Editar, o el nombre nuevo de un servicio | `id` | `pricing.rule.updated` |
-| Regla desactivada / reactivada | Desactivar / activar, o su producto, categoría o grupo borrados | `id` | `pricing.rule.deactivated`, `…activated` |
+| Regla desactivada / reactivada | Desactivar / activar, o su producto, categoría o grupo borrados (reactivada: su producto recuperado) | `id` | `pricing.rule.deactivated`, `…activated` |
 
 Ninguna app los escucha salvo **Automatizaciones**, que puede arrancar una automatización con cualquiera
 de ellos (FLOW-F21). Sus pasos también pueden consultar tarifas, precios, reglas y el precio de una
@@ -544,8 +569,8 @@ poner o cambiar un precio y crear, cambiar o reactivar una regla.
 
 ### A qué reacciona y lo que necesita de otras apps
 - **Inventario** (`requires`): los precios y las reglas apuntan a sus productos y categorías; Tarifas lee
-  su nombre, SKU, unidad, escalón y precio de ficha. Reacciona a `inventory.product.deleted` y
-  `inventory.category.deleted` (F14).
+  su nombre, SKU, unidad, escalón y precio de ficha. Reacciona a `inventory.product.deleted`,
+  `inventory.product.restored` y `inventory.category.deleted` (F14).
 - **Clientes** (`requires`): una tarifa o una regla puede ser de un grupo; el precio de una línea lee los
   grupos activos del cliente (un grupo desactivado deja de dar sus precios y sus reglas). Si Clientes
   **borra** un grupo (`customer.group.deleted`), sus tarifas se quedan sin grupo y sus reglas se
@@ -553,7 +578,8 @@ poner o cambiar un precio y crear, cambiar o reactivar una regla.
 - **Servicios** (no es requisito): un precio o una regla de un servicio guarda su id y una copia de su
   nombre; el servicio se comprueba y su precio de ficha se lee con `service.service.get`, con la sesión
   de quien pide. Reacciona a `service.service.updated` (F14).
-- De la plataforma: la zona horaria del negocio (el «hoy» de las fechas).
+- De la plataforma: la zona horaria del negocio (el «hoy» de las fechas) y la recuperación desde una copia aparte
+  (BASE-F114), a la que Tarifas dice qué precios devuelve (F15).
 
 ### Contrato con Ventas
 Ventas **no** requiere Tarifas y Tarifas no toca Ventas. Lo que se pide a Ventas (no lo hace esta app):
@@ -630,11 +656,10 @@ Ventas **no** requiere Tarifas y Tarifas no toca Ventas. Lo que se pide a Ventas
   `base.operations.business_currency(ctx.scope)` (BASE-F50), que lee `base.business.get` como la plataforma
   (el registro de este hub, nunca una llamada a erplora.com) y en el hub propio de ERPlora, sin negocio en
   erplora.com, contesta la del país de su emisor (`PLATFORM_ISSUER_COUNTRY`). Tarifas no guarda copia propia
-  de esa pregunta (FIX-HUB-PRICING-OWN-COPY-OF-BUSINESS-CURRENCY). Una tarifa
+  de esa pregunta. Una tarifa
   sin divisa se guarda en la del negocio; el `default="EUR"` de la columna se queda (una columna no sabe el
   negocio) y nada guardado se reescribe. La pantalla la lee con `useBusinessMoney` de `base` (los decimales
-  del servidor, nunca los de `Intl`; mientras no contesta, un importe es «—» y no se puede «Hacer general»)
-  (FIX-HUB-PRICING-CHARGES-IN-EUR-WHATEVER-THE-COUNTRY).
+  del servidor, nunca los de `Intl`; mientras no contesta, un importe es «—» y no se puede «Hacer general»).
 - El «hoy» es el del reloj del negocio (`base.business.business_zone`, hub#771), también el día de un `when`;
   `pricing.price.resolve` toma `when` y los tests nunca leen el reloj real.
 - Asistente: toda operación declara `ai={"description"…}` (`risk` solo en las acciones: `high` en
@@ -668,8 +693,8 @@ Ventas **no** requiere Tarifas y Tarifas no toca Ventas. Lo que se pide a Ventas
   `pricing.catalog.get` (Servicios no es requisito: su nombre, por `call_service`; apagada o ausente, la tarjeta lo
   deja fuera). El id de una tarifa, un precio o una regla lleva su título («Tarifa», «Precio», «Regla de
   descuento»), nunca «Registro». Sin persona detrás, sin permiso o con un id de otro negocio, el registro queda
-  fuera, nunca su id (FIX-HUB-PRICING-ASSISTANT-CARD-LEAVES-OUT-ITS-RECORDS).
-- El admin de Django del Hub tiene **CRUD completo** sobre los tres modelos (ronda 12, PLAN §17); una
+  fuera, nunca su id.
+- El admin de Django del Hub tiene **CRUD completo** sobre los tres modelos (PLAN §17); una
   escritura cruda del admin no deja aviso ni comprueba reglas, salvo los tramos de una regla, que lee
   como la API (`schemas.Tier`, hasta 10, cantidad creciente) porque el precio de una línea los lee así.
 - La marca de la general la toma `_take_default_mark` en un punto de guardado; tras 3 carreras perdidas,
@@ -677,33 +702,35 @@ Ventas **no** requiere Tarifas y Tarifas no toca Ventas. Lo que se pide a Ventas
 - Cantidades de las reglas: `Article.measure` (la cantidad en `pricing_unit`, con las fracciones exactas
   de `UNIT_SPECS`); el importe de la línea usa además `price_quantity` (`Article.ratio`). Los tramos de
   una tarifa siguen en la unidad propia del producto, que la tabla pinta junto a la cantidad («500 g»).
-- Tenencia: el ámbito es la primera parte del Host y cada negocio tiene su propia BD (desde el corte S5,
-  hub#602): los datos de `a` no se ven en `b`. Solo los tests escritos antes de la tenencia guardan `a` y `b`
-  en la misma BD de test (`base/tenancy/tests/legacy.py`, hasta hub#611).
-- **Orden de las tablas** (`base.ordering.list_order`, nota vigente del producto actual del 2026-09-28, hub#2355, como Ventas,
-  Caja, Inventario y Tareas): la columna elegida y después el desempate, todo en la dirección de la lista y
+- Tenencia: el ámbito es la primera parte del Host y cada negocio tiene su propia BD: los datos de `a` no se ven en `b`. Solo los tests escritos antes de la tenencia guardan `a` y `b`
+  en la misma BD de test (`base/tenancy/tests/legacy.py`).
+- `PriceItem.product`, `DiscountRule.product` y `DiscountRule.category` van en `CASCADE` hacia Inventario: el
+  borrado físico de un producto o de una categoría (el admin del Hub) en un hub donde Tarifas nunca se creó pasa
+  por alto la relación con sus tablas, que no existen (`base/tenancy/deletion.py`). El grupo de clientes es un
+  UUID por eso mismo.
+- **Desde una copia aparte** (BASE-F114, F15): `recoverable_from_copy` de `apps.py` declara una sola cosa, «Price
+  list prices». `queries.prices_in_copy` lee con su propio SQL los `PriceItem` de la copia que cuentan allí (de un
+  servicio o de un producto no borrado, como `live_items`) y `queries.prices_not_in_business` deja los que el negocio no
+  tiene ni por id ni por sitio (tarifa, producto o servicio y `min_quantity`, el índice único); la plataforma los crea
+  con `pricing.price_item.add` como la recuperación (`copy_recovery:<id>`). Cada precio va al artículo que hace del de
+  la copia: el producto por `inventory.queries.products_standing_for` (su SKU) y el servicio por
+  `service.service.standing_for`, la operación de Servicios (no es requisito), preguntada como la plataforma en el
+  negocio en curso (`base.operations.current_business_scope`); con Servicios apagada o ausente, el de la copia, que el
+  alta rechaza con su motivo (hub#1459). Las reglas no van por la copia: el borrado
+  solo las apaga, y `pricing.catalog.recall_product` (la reacción a `inventory.product.restored`) enciende las del
+  producto que siguen apagadas con el `updated_by` de la plataforma, el mismo con el que `forget_product` las apagó.
+  Las lee con `select_for_update`: un cambio a mano a la vez espera a que acabe (`tests/test_concurrency.py`).
+- **Orden de las tablas** (`base.ordering.list_order`, como Ventas, Caja, Inventario y Tareas): la columna elegida y después el desempate, todo en la dirección de la lista y
   con los vacíos al final en las dos; `desc` es `asc` leído al revés, empates incluidos. Tarifas y reglas
   desempatan por código e `id`; los precios, por cantidad mínima e `id`. Lo fijan los tres
-  `test_tied_*` de `tests/test_queries.py` (hasta CLOSE-PRICING desempataba siempre en ascendente).
+  `test_tied_*` de `tests/test_queries.py`.
 
 ## Contradicciones señaladas (no se resuelven aquí)
 
-- ~~**`@operation` no lanzaba `AppInactive`**~~ — **resuelta** en la plataforma: con Servicios apagada en el
-  negocio, `service.service.get` lanza `AppInactive` (`base.entitlement.operation_database`) y `call_service`
-  responde, igual que sin Servicios instalada (`UnknownOperation`), 409 `pricing.services_unavailable`: el
-  «Servicios no está activa en este negocio» de PRICING-F07.
 - **Ventas no llama a Tarifas** (pricing#9 sigue abierto): ninguna app llama a `pricing.price.resolve`
   (`git grep` en `origin/main`); el `pricing` de Ventas es su propia valoración (`apps/sale/pricing.py`). El
   TPV cobra el precio de la ficha. PRICING-F13 es `hecho` como consulta (su test y `pricing-lists.spec.ts`);
   engancharla es de Ventas, con «Contrato con Ventas» como encargo.
-- ~~**API keys**: el Hub aún no las tenía~~ — **resuelta**: las llaves son de `base` (BASE-F86, `base/api_keys.py`) y
-  `expose_api` marca lo que alcanzan de Tarifas (`EXPOSED` en `tests/test_apps.py`).
-- ~~**«Asistente» en los flujos**~~ — **resuelta**: el actor de casi todos y el ejemplo de voz es el asistente del
-  Hub, que llama a la operación por su `ai=`, como las pantallas y la API.
-- ~~**Las claves ajenas hacia Inventario frente a «tablas al activar»**~~ (`PriceItem.product`,
-  `DiscountRule.product` y `DiscountRule.category` en `CASCADE`) — **resuelta** por hub#778: el borrado físico de
-  un producto o de una categoría (el admin del Hub) en un hub donde Tarifas nunca se creó pasa por alto la
-  relación con sus tablas, que no existen (`base/tenancy/deletion.py`). El grupo ya era un UUID por eso mismo.
 
 ## Cómo son las páginas (para quien lo mantiene)
 
@@ -711,7 +738,7 @@ Ventas **no** requiere Tarifas y Tarifas no toca Ventas. Lo que se pide a Ventas
   `RulesTable`) y `/pricing/lists/:id` (el detalle, `ListDetailPage`, con el id como prop).
 - Las confirmaciones de la tarifa (hacer general, desactivar) viven en `ListConfirm`, que comparten la
   tabla y el detalle.
-- Las tres tablas llevan sus filtros detrás del embudo (`filterable`, como la tabla del producto actual), y
+- Las tres tablas llevan sus filtros detrás del embudo (`filterable`), y
   las de tarifas y reglas abren con «Activas» elegido: su opción vacía («Todos») pide todas.
 - Listas en vivo con `useLiveList` (ventanas de 100 filas, cada una su suscripción) y `useServerTable`;
   escrituras con `useCommand`; formularios con `FormModal`, confirmaciones con `ConfirmDialog` y
@@ -721,8 +748,7 @@ Ventas **no** requiere Tarifas y Tarifas no toca Ventas. Lo que se pide a Ventas
   una persona, en céntimos de la moneda que recibe: la de la tarifa o la del negocio; hub#924), y el formato del idioma (`Intl`),
   con los millares agrupados desde cuatro cifras también en español («1.234,56 €»; el CLDR espera a cinco:
   hub#1090), como Cobro en línea.
-- Icono: `ion:pricetags-outline` (registrado); el `pricetag` del producto actual espera en
-  `UI-REQUESTS.md`.
+- Icono: `ion:pricetag`.
 
 ## Lo que NO hace, a propósito
 
@@ -733,24 +759,3 @@ Ventas **no** requiere Tarifas y Tarifas no toca Ventas. Lo que se pide a Ventas
 - **No convierte divisas ni bases fiscales**: lo dice en la respuesta y decide quien vende.
 - **No tiene reglas por categoría de servicio**: por servicio, por todos los servicios o por todo.
 - **No borra tarifas ni reglas**: se desactivan y se reactivan (los precios sí se quitan).
-
-## Cambios frente al producto actual
-
-| Producto actual | Ahora | Por qué |
-|---|---|---|
-| Segmento de la tarifa (particular, empresa, mayorista, minorista), que nadie enviaba | **Grupo de clientes** de Clientes | Es lo que hacen Business Central, Lightspeed y Shopify; Clientes ya tiene grupos y el segmento nunca se enlazó |
-| La tarifa por defecto no influía en nada | **Tarifa general**: vale para todos | Business Central «todos los clientes», Odoo «por defecto del TPV» |
-| Gana el precio más bajo de todas las tarifas activas, sin fechas, comparando divisas sin convertir | El más bajo de las que valen para ese cliente, **vigentes** y en la divisa del negocio | Las fechas se guardaban y no se miraban; 90 USD «ganaban» a 100 EUR |
-| Tramos con mínimo y máximo en millonésimas | **Cantidad mínima** decimal, en la unidad del producto; el tramo acaba donde empieza el siguiente | Business Central y Odoo; la cantidad es la de Inventario y Ventas |
-| El artículo era un texto libre sin comprobar | **Producto de Inventario** o **servicio de Servicios**, comprobados | El precio de un artículo que no existe no lo cobraba nadie |
-| Reglas en cadena por prioridad sobre el importe del tique, con mínimo y máximo de importe | **Una regla por línea, la mejor para el cliente**; prioridad como desempate; cantidad mínima | Square, Shopify, Toast y Lightspeed; las quejas de los foros |
-| Alcance «categoría» que no filtraba nada | Todo, todos los productos, todos los servicios, categoría, producto o servicio, que **sí** filtran | |
-| Por tramos sobre el importe; «compra X, llévate Y» con cantidad y precio en el texto de condiciones | Por tramos **de cantidad**; «compra X, llévate Y» con la cantidad de la línea, contada en la unidad del precio (kg en lo que se vende al peso) | Las condiciones eran JSON libre que nadie validaba; ver «Referencia adoptada» para el peso |
-| Las bases fiscales mezcladas se rechazaban con un error genérico (`mixed_tax_basis`) | Solo compiten las tarifas de la base de la venta (`tax_included`) o que siguen al negocio | Nunca se comparan precios con y sin impuesto |
-| `pricing.rules.calculate_discount` (descuento de un importe y su reparto por líneas y tipos) | Quitado: el descuento automático es por línea (`pricing.price.resolve`) | El reparto del descuento de la cuenta ya lo hace Ventas (`pricing.allocate`): no se duplica |
-| `get_price` era una orden con rechazos genéricos | `pricing.price.resolve`, consulta, con sus códigos de error | |
-| Sin editar ni desactivar tarifas, sin editar ni reactivar reglas, sin pantalla de precios ni alta de reglas | Editar y desactivar tarifas, editar y reactivar reglas, **detalle de la tarifa** con sus precios y **alta de reglas** en pantalla | Lo que hacen todos los productos de la tabla |
-| Permisos `pricing.view_pricing`, `manage_pricing`, `apply_pricing` | `pricing.view` y `pricing.manage` | Todos los papeles que veían aplicaban |
-| Servicios `pricing.price_lists.*`, `pricing.rules.*` | `pricing.price_list.*`, `pricing.price_item.*`, `pricing.rule.*`, `pricing.price.resolve` (en singular) | Convención de nombres; los avisos `pricing.price_list.created`, `pricing.price_item.added`, `pricing.rule.created` y `pricing.rule.deactivated` se conservan |
-| Divisa libre de tres letras | Divisa ISO 4217 con dos decimales | Los importes se teclean y se leen con dos decimales |
-| Alta en el panel lateral de la tabla | Alta y edición en un formulario (`FormModal`) | Ver `UI-REQUESTS.md` |

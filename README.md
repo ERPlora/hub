@@ -11,6 +11,8 @@ uv sync && pnpm install
 uv run python manage.py migrate && uv run python manage.py seed_local_hubs   # deja `a` y `b` en el registro
 uv run python manage.py runserver    # Django en a.localhost:8000 y Vite (`pnpm run dev`)
 uv run pytest -q                     # Postgres de compose.yaml (`docker compose up -d`)
+uv run lint-imports                  # cada app importa solo lo que requiere; contratos en pyproject.toml (la suite lo corre)
+uv run complexipy                    # complejidad cognitiva ≤ 15; lo de antes, congelado en complexipy-snapshot.json (la suite lo corre)
 ```
 
 `DEBUG` está apagado si no se define: sin `DEBUG=True` en `.env` (o en el entorno), los ajustes
@@ -22,10 +24,37 @@ sube al repo.
 a un segundo checkout le basta `VITE_DEV_PORT=5203` en su `.env`. `pnpm run dev` o la e2e sueltos solo la leen
 del entorno, y `uv run pytest` sigue en el `5173` aunque la defina (`config/settings_pytest.py`).
 
+## El humo de navegador (`@smoke`)
+
+```bash
+bash .github/scripts/smoke-e2e.sh    # los tests @smoke del commit en el que estás; rojo si uno falla o si pasan del tope
+```
+
+Recorre en el navegador lo que no se puede romper: entrar, las sesiones y los permisos, la separación entre negocios, la
+suspensión por impago, cobrar y la caja, la impresión, el ticket con QR, la factura, VeriFactu, la cocina y las mesas, las
+citas, el alta de un negocio y la demo. Usa la misma pila que la pasada nocturna (`tests/e2e/README.md`, «La pasada
+nocturna»): sus worktrees, sus BD, los dos `runserver` y, pase lo que pase, la limpieza.
+
+- **Qué tests**: los que llevan `@smoke` al final de su título; se marca el test concreto, nunca la spec entera.
+  `pnpm e2e --list --grep @smoke` los lista.
+- **Qué código**: el último commit del checkout desde el que se lanza, subido o no; lo que no está en un commit no entra.
+  El SaaS va en su `origin/main`.
+- **El tope**: 20 minutos para los tests (el tope global de Playwright), fijado con las pasadas medidas en el Mac
+  cargado. Al llegar, Playwright corta y el humo sale en rojo. Subirlo es una decisión, no el arreglo de una pasada lenta.
+- **Dónde**: `~/.erplora/hub-smoke-e2e/` y el puerto `9780` (el SaaS en el `9781`, como en la noche), aparte de la
+  pasada nocturna, así que ninguna espera a la otra. Un worker lo lleva a su carpeta y a sus puertos con `NIGHTLY_DIR` y
+  `NIGHTLY_HUB_PORT`. Nunca escribe en GitHub; lo que deja está en `runs/<pasada>/` de esa carpeta (`night.log`, los
+  registros de los dos `runserver` y `test-results/`).
+- **Salida**: 0 en verde; 1 en rojo (un test, el tope o un paso previo, como las dependencias o una BD); 2 con
+  argumentos, porque no lleva ninguno; 3 si ya corre otro humo en esa carpeta.
+- **Entrar en el humo**: un test se marca solo después de pasar 3 veces seguidas con este comando. Uno que falla sin
+  nada roto frenaría todos los cambios: se queda fuera y, si es un fallo de verdad, va a su issue.
+- Hoy no frena ninguna fusión: se corre a mano.
+
 ## Registro de hubs y `/internal`
 
-El Hub sirve solo los hubs de su registro (`control.Hub`, antes `base.Hub`; plan `docs/plans/2026-10-17-demo-hubs-fase-1.md`,
-ERPlora/docs): `HubHostRequiredMiddleware` busca la fila del slug del `Host` y responde **404** si no hay fila,
+El Hub sirve solo los hubs de su registro (`control.Hub`, antes `base.Hub`; plan `knowledge/raw/plans/2026-10-17-demo-hubs-fase-1.md`,
+ERPlora/knowledge): `HubHostRequiredMiddleware` busca la fila del slug del `Host` y responde **404** si no hay fila,
 **410** si el hub terminó (cancelado, purgado o una demo pasada su `expires_at`; página con la vuelta a ERPlora) y
 **503** con `Retry-After` si aún se prepara. La API, y toda llamada que no pide una página, recibe el sobre
 (`base.hub_gone`, `base.hub_preparing`). En local, `seed_local_hubs` (solo con `DEBUG`, idempotente) deja `a` y `b`;
@@ -98,7 +127,7 @@ corte y qué se repite, en el README de `packages/live`):
 
 ## Tenencia: una BD por hub (fase 1, tajadas S1–S5)
 
-Plan `docs/plans/2026-10-22-fase-2-tenencia.md` (ERPlora/docs); reglas en PLAN-DB y en `ARCHITECTURE.md` §3 «Tenencia
+Plan `knowledge/raw/plans/2026-10-22-fase-2-tenencia.md` (ERPlora/knowledge); reglas en PLAN-DB y en `ARCHITECTURE.md` §3 «Tenencia
 del Hub» de erplora-next.
 
 - **Dos clases de BD.** La de control (`default`) guarda el registro (`control/`: `Hub`, `DemoCode`, `Cluster`,
@@ -108,7 +137,7 @@ del Hub» de erplora-next.
   y sus entregas) sigue al contexto: las operaciones del registro (`base.hub.*`, `base.demo.*`) lo escriben en control.
 - **Sin modo compartido (S5).** Todo negocio y toda demo nacen con `db_name` (`<control>_<hex>`,
   `<control>_demo_<hex>`; `base/tenancy/names.py`) y trabajan en su BD; un test (`base/tenancy/tests/test_provision.py`)
-  impide crear un hub en `base/services.py` sin ella, también `a`/`b`: `seed_local_hubs` les da su BD (clonada de
+  impide crear un hub en `base/services/` sin ella, también `a`/`b`: `seed_local_hubs` les da su BD (clonada de
   `<control>_template`, con las tablas de todas las apps y todas encendidas) y se niega si alguna app no puede vivir en
   una (`migrator.portable_apps`). Un negocio de la fase 1 que aún tiene `db_name` vacío no se sirve: su host da 503
   `base.hub_maintenance` y el worker lo nombra al arrancar (`ERROR base.worker.hub_without_database`) sin tocarlo, hasta
@@ -117,7 +146,7 @@ del Hub» de erplora-next.
   todas las filas de las tablas de hub que quedan en control), `--recreate <slug>` (de su plantilla y la foto del SaaS,
   nada copiado) o `--skip <slug>` (un cancelado, sin BD: si vuelve, `base.hub.restore` le hace una de cero);
   `--dry-run` dice el plan, y antes del primer corte copia control al bucket de volcados (`<control>/<hora>-cut.dump`;
-  sin bucket, solo con `--no-dump`). Runbook: `docs/runbooks/cut-shared-hubs.md` (ERPlora/docs). `migrate` ya no crea
+  sin bucket, solo con `--no-dump`). Runbook: `knowledge/wiki/runbooks/cut-shared-hubs.md` (ERPlora/knowledge). `migrate` ya no crea
   tablas de hub en control (`TenantRouter.allow_migrate`); las que quedan allí de la fase 1 no se tocan.
 - **Alta** (`base/tenancy/provision.py`, S2a). `PUT /internal/hubs/{id}` y `POST /internal/demos` dejan el hub
   `requested` y debido en `control.HubDue`; el worker (o `provision(hub)`) toma su arriendo (`SELECT … FOR UPDATE SKIP
@@ -132,7 +161,7 @@ del Hub» de erplora-next.
   encendidas; si llega otra mientras, se aplica también antes de `ready`) y `ready` (el SaaS lo oye tras el COMMIT).
   Una foto que llega a un negocio sin BD hecha (preparándose, o cancelado o fallido antes de estar listo) se guarda en
   la fila sin entrar en ella (`registry.database_is_made`). Cada paso escribe
-  control en una transacción corta (`base/services.py`, «The provisioning's writes in control») y se puede repetir. Un
+  control en una transacción corta (`base/services/provisioning.py`) y se puede repetir. Un
   fallo deja `failed` con `attempts`, `last_error` (`<código>: <motivo>`: `no_cluster_available`, `template_missing`,
   `clone_failed`, `schema_failed`, `photo_moving`, `unexpected`) y `next_attempt_at` (1 min, 5 min, 15 min y luego cada hora). La
   puerta del host responde 503 en todos esos estados. `CREATE`/`DROP DATABASE` van por `base/tenancy/ops.py`: conexión
@@ -147,7 +176,9 @@ del Hub» de erplora-next.
   `use_control()` (el registro, las demos, el outbox de control, el admin sin negocio elegido y `manage.py shell` sin
   `--hub`). El hub de plataforma es una fila más con su BD (`create_platform_hub --execute` la hace). Sin contexto, un modelo o una operación de hub lanza
   `HubContextMissing`: nunca cae a `default`. Una operación de un hub dentro del contexto de otro,
-  `HubContextMismatch`.
+  `HubContextMismatch`; también un objeto cargado de la BD de un hub y usado dentro del contexto de otro (guardarlo,
+  borrarlo, refrescarlo o seguir sus relaciones), antes de mandar SQL: nunca escribe ni lee en la BD de su hub. Sin
+  contexto (un `RunPython`) o en su propio hub, por su alias o por su `…__ddl` (la misma BD), va donde se cargó.
 - **Enrutado** (`base/tenancy/router.py`, detrás de `SharedRouter`): control → `default`; hub → el alias del contexto.
   El alias de un hub con BD propia es `hub_<hex>`, registrado en caliente copiando `hub_template` (PgBouncer en modo
   transacción: sin pool, `CONN_MAX_AGE` 0, sin cursores de servidor ni sentencias preparadas) sin mutar
@@ -202,11 +233,19 @@ del Hub» de erplora-next.
 - **Tests**: la suite construye por sesión `<BD de test>_template_test` con el migrador y clona dos hubs con BD
   propia (`base/tenancy/tests/hubs.py`; fixtures `hub_a`, `hub_b`; marca `django_db(databases=hubs.HUB_DATABASES)`).
   La plantilla de test lleva todas las apps del hub (`migrator.portable_apps()`, `base/tests/test_hub_user_links.py`).
-  Los tests escritos antes de la tenencia caen en un respaldo solo de la suite (`base/tenancy/tests/legacy.py`, fixture
-  de sesión `legacy_fallback`): la BD de control de test lleva también las tablas de hub (`LegacyTablesRouter`, solo en
-  `config/settings_pytest.py`) y el worker les corre un paso propio (`legacy_worker`, `worker_pass`): sus tareas en el
-  ámbito del negocio `a` y el relay de sus avisos; los de la tenencia y los de cada puerta de entrada lo apagan
-  (`no_test_fallback`), como en producción.
+  Los tests escritos antes de la tenencia que aún no se han pasado a una BD por negocio caen en un respaldo solo de la
+  suite (`base/tenancy/tests/legacy.py`): la BD de control de test lleva también las tablas de hub (`LegacyTablesRouter`,
+  solo en `config/settings_pytest.py`) y el worker les corre un paso propio (`legacy_worker`, `worker_pass`): sus tareas
+  en el ámbito del negocio `a` y el relay de sus avisos. El respaldo se enciende solo para los tests que nombra
+  `.legacy-fallback-allow`, una línea `<fichero>::<test>` por test (`base/tenancy/tests/legacy_allow.py`); cualquier otro
+  test corre como producción y, si se apoya en el respaldo, falla (`HubContextMissing`, `HubWithoutDatabase`). La lista
+  solo encoge: no gana líneas frente a `origin/main` (una línea sí puede moverse con su test a otro fichero) y la de un
+  test que ya no existe sale (`tests/test_guardrails_legacy_fallback.py`); y una pasada que corre todos los casos de un
+  test de la lista, todos en verde, sin que se apoye ni una vez en el respaldo, cae y dice qué línea quitar. La CI
+  reparte los casos de un test entre varios trabajos y ninguno los corre todos: cada trabajo guarda lo que vio
+  (`--legacy-fallback-report`) y el trabajo `legacy-fallback` lo junta (`python -m base.tenancy.tests.legacy_allow`) y
+  cae igual. Pasarlos a
+  una BD por negocio y borrar la lista con el respaldo es hub#611.
 
 
 ### Activar una app crea sus tablas (tajada S3)
@@ -417,7 +456,7 @@ token que nadie emitió, 30 por dirección en 5 min (`base/api_keys.py`).
 `pre` es la preproducción del equipo (`hubs.pre.erplora.com`, `<slug>.pre.erplora.com`): misma Aurora
 que prod, con su propio clúster de ECS (`erplora-pre`; prod corre en `erplora-prod`), sus propios
 servicios (`hub-pre`, `worker-pre`), BD `pre_*` y repositorio de ECR (`erplora/hub-pre`). Se apaga
-sola cada tarde (plan `docs/plans/2026-10-14-entorno-pre.md`, ERPlora/docs).
+sola cada tarde (plan `knowledge/raw/plans/2026-10-14-entorno-pre.md`, ERPlora/knowledge).
 
 1. Cada push a una rama de trabajo corre `test / test` (`ci.yml`).
 2. Si `pre` avanzó, se integra `origin/pre` en la rama y se vuelve a empujar.
@@ -449,11 +488,11 @@ Control guarda el usuario de la sesión (`auth.User`, la copia `saas:<id>` de la
 (`Membership`); la BD del hub guarda a la persona del negocio, `base.HubUser`: `username` (`saas:<id>`, `demo:<slug>`),
 `account_id` (la cuenta de erplora.com; ninguna para el dueño de una demo), nombre, correo, `is_active` y su alta. Nunca
 se borra: quien se va conserva su nombre en lo que firmó y deja de estar activo. Se crea o se pone al día en cada
-entrada (código de erplora.com, demo, PIN o tarjeta: `base.services.ensure_hub_user`), en la primera escritura de quien
+entrada (código de erplora.com, demo, PIN o tarjeta: `base.services.sessions.ensure_hub_user`), en la primera escritura de quien
 aún no la tiene (`acting_hub_user`) y desde la foto del SaaS (`base.hub_user.sync`, dentro de `hub.state_apply`; la de un negocio cuya BD aún se prepara, en
 su siembra). Las
 apps enlazan a ella, nunca a `settings.AUTH_USER_MODEL` (lint «(h)»): `staff` (registro y aprobación de ausencias),
-`attendance`, `task` y `whatsapp_inbox`; leen la de quien llama con `base.queries.hub_user_of`, y la tarjeta del
+`attendance`, `task` y `whatsapp_inbox`; leen la de quien llama con `base.queries.people.hub_user_of`, y la tarjeta del
 asistente nombra a la persona por su id con `base.hub_user.get`. `base.session.me` da como `user.id` el de esa persona,
 el mismo que guardan los registros, para que una pantalla sepa qué es «suyo».
 

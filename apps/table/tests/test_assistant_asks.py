@@ -12,12 +12,14 @@ from pathlib import Path
 
 import pytest
 from django.conf import settings
+from live import assistant as shared
 from live.assistant import asks_of
 from live.operations import registry
 
 from base import assistant
+from base.tests.test_assistant_asks import offered_to
 
-from .conftest import ctx_for
+from .conftest import HUB_DB, ctx_for
 
 LANGUAGES = ("en", "es")
 #: Table's tools (``AI``, never ``INTERNAL``): a silent drop of tools fails.
@@ -41,7 +43,7 @@ NOT_THE_EMPLOYEES = {
 
 
 def table_tools() -> list:
-    return [op for op in registry.values() if op.app_label == "table" and assistant.is_tool(op)]
+    return [op for op in registry.values() if op.app_label == "table" and assistant.tools.is_tool(op)]
 
 
 def test_table_offers_at_least_33_tools():
@@ -55,10 +57,10 @@ def test_every_phrase_of_table_is_one_of_at_least_160():
     assert sum(len(asks_of(op).get(language, ())) for op in table_tools() for language in LANGUAGES) >= MIN_PHRASES
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 def test_an_employee_is_never_offered_what_only_the_owner_may_do():
-    owner = assistant.catalog(ctx_for("hub_owner", language="es"))
-    employee = assistant.catalog(ctx_for("hub_employee", language="es"))
+    owner = assistant.tools.catalog(ctx_for("hub_owner", language="es"))
+    employee = assistant.tools.catalog(ctx_for("hub_employee", language="es"))
     assert NOT_THE_EMPLOYEES <= set(owner)
     assert NOT_THE_EMPLOYEES.isdisjoint(employee)
     # Positive control: the employee seats, splits and moves checks, as the floor plan lets them.
@@ -99,12 +101,12 @@ QA_PROBES = [
 
 
 def offered(role: str, language: str, name: str, phrase: str) -> list[str]:
-    tools = assistant.catalog(ctx_for(role, language=language))
+    tools = assistant.tools.catalog(ctx_for(role, language=language))
     assert name in tools  # positive control: the role holds the tool, so its place is known
-    return [op.name for op in assistant.relevant(tools, [phrase], language)]
+    return offered_to(tools, phrase, language)
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize(("role", "language", "name", "phrase"), QA_PROBES)
 def test_the_reported_tables_request_offers_its_existing_operation(role, language, name, phrase):
     """Among the ``MAX_TOOLS`` a turn offers, so the model can choose it: its description says when it, and not Sales',
@@ -118,7 +120,7 @@ def test_the_reported_tables_request_offers_its_existing_operation(role, languag
 WITHIN_TEN = [case for case in QA_PROBES if case[1:3] != ("es", "table.session.split")]
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize(("role", "language", "name", "phrase"), WITHIN_TEN)
 def test_the_reported_tables_request_comes_among_the_first_ten(role, language, name, phrase):
     first = offered(role, language, name, phrase)
@@ -164,7 +166,7 @@ NOT_SALES = {
 
 @pytest.mark.parametrize(("name", "sales"), NOT_SALES.items())
 def test_the_tables_operation_says_it_and_not_the_sales_one_does_it(name, sales):
-    description = assistant.description(registry[name])
+    description = shared.description(registry[name])
     for other in sales:
         assert other in description
 
@@ -186,6 +188,6 @@ RESOLUTION_READS = {
 
 @pytest.mark.parametrize(("name", "reads"), RESOLUTION_READS.items())
 def test_the_operation_names_the_reads_that_resolve_human_references(name, reads):
-    description = assistant.description(registry[name])
+    description = shared.description(registry[name])
     for read in reads:
         assert read in description

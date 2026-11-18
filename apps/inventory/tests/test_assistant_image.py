@@ -11,6 +11,7 @@ import json
 
 import pytest
 from django.contrib.auth import get_user_model
+from live import assistant as shared
 from live.context import OperationContext
 from live.operations import get
 
@@ -20,9 +21,9 @@ from base.models import Hub, Membership
 from base.permissions import permissions_for
 from base.tests.test_image_catalog import image_library  # noqa: F401 - the library fixture
 
-from .conftest import A
+from .conftest import A, HUB_DB
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 LATTE = "catalog:hospitality/cafe_con_leche"
 ASKED = "ponle foto al café con leche"
@@ -44,9 +45,9 @@ def latte(owner, db):
 
 
 def test_asked_for_a_photo_the_turn_offers_the_suggestion_and_the_set_but_never_the_upload(owner):
-    tools = assistant.catalog(owner)
+    tools = assistant.tools.catalog(owner)
 
-    offered = [op.name for op in assistant.relevant(tools, [ASKED], "es")]
+    offered = [op.name for op in assistant.relevance.relevant(tools, [ASKED], "es")]
 
     assert "inventory.product.suggest_image" in offered
     assert "inventory.product.set_image" in offered
@@ -54,7 +55,7 @@ def test_asked_for_a_photo_the_turn_offers_the_suggestion_and_the_set_but_never_
 
 
 def test_the_suggestion_for_cafe_con_leche_brings_the_coffee_with_milk_first(owner, latte, image_library):  # noqa: F811
-    outcome = assistant.run_tool(owner, get("inventory.product.suggest_image"), json.dumps({"product": "café con leche"}))
+    outcome = shared.run_tool(owner, get("inventory.product.suggest_image"), json.dumps({"product": "café con leche"}))
 
     assert outcome.outcome == "ok", outcome.content
     rows = json.loads(outcome.content)["rows"]
@@ -63,7 +64,7 @@ def test_the_suggestion_for_cafe_con_leche_brings_the_coffee_with_milk_first(own
 
 
 def test_the_card_names_the_image_by_its_title_never_by_its_reference(owner, latte, image_library):  # noqa: F811
-    card = assistant.card(get("inventory.product.set_image"), {"product": "Café con leche", "image": LATTE}, "es", owner)
+    card = assistant.cards.card(get("inventory.product.set_image"), {"product": "Café con leche", "image": LATTE}, "es", owner)
 
     [image] = [field for field in card["fields"] if field["name"] == "image"]
     assert (image["label"], image["value"]) == ("Imagen", "Café con leche")
@@ -71,7 +72,7 @@ def test_the_card_names_the_image_by_its_title_never_by_its_reference(owner, lat
 
 
 def test_a_photo_the_card_cannot_name_is_left_out_of_it(owner, latte, image_library):  # noqa: F811
-    card = assistant.card(
+    card = assistant.cards.card(
         get("inventory.product.set_image"), {"product": "Café con leche", "image": "catalog:hospitality/churros"}, "es", owner
     )
 
@@ -79,6 +80,6 @@ def test_a_photo_the_card_cannot_name_is_left_out_of_it(owner, latte, image_libr
 
 
 def test_the_card_names_the_product_by_its_name_when_the_write_names_it_by_its_id(owner, latte, image_library):  # noqa: F811
-    card = assistant.card(get("inventory.product.set_image"), {"id": str(latte.id), "image": LATTE}, "es", owner)
+    card = assistant.cards.card(get("inventory.product.set_image"), {"id": str(latte.id), "image": LATTE}, "es", owner)
 
     assert [field["value"] for field in card["fields"]] == ["Café con leche", "Café con leche"]

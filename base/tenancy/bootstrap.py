@@ -154,7 +154,7 @@ def admin_conninfo() -> dict:
     return {key: value for key, value in params.items() if key not in NON_LIBPQ}
 
 
-def bootstrap(
+def bootstrap(  # noqa: PLR0913
     *,
     passwords: Mapping[str, str],
     names: Names | None = None,

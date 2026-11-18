@@ -1,5 +1,5 @@
-"""Each WhatsApp record lives only in its business's own database (hub#1053), which keeps one channel row and one
-live template per name and language whatever old business column its rows kept."""
+"""Each WhatsApp record lives only in its business's own database, which keeps one channel row and one live template
+per name and language whatever old business column its rows kept."""
 
 import uuid
 
@@ -11,12 +11,11 @@ from live.models import OutboxEvent
 
 from apps.whatsapp_inbox import events
 from apps.whatsapp_inbox.models import Channel, Conversation, Message, Template, TemplateSample
-from apps.whatsapp_inbox.tests.conftest import ctx_for, receive, run, system, template
+from apps.whatsapp_inbox.tests.conftest import HUB_DB, ctx_for, receive, run, system, template
 from base.tenancy.context import current_alias, use_hub
-from base.tenancy.tests import hubs
 
 pytestmark = [
-    pytest.mark.django_db(databases=hubs.HUB_DATABASES),
+    HUB_DB,
     pytest.mark.usefixtures("no_test_fallback"),
 ]
 

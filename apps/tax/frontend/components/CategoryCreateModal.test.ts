@@ -4,6 +4,7 @@
 // exists, the 409 `tax.category_exists` under Key) and nothing is lost of what was typed.
 import { describe, expect, it, vi } from 'vitest';
 
+import { itTellsTheCorrectedFieldApart } from '../../../../base/frontend/__tests__/same-words-refusal';
 import { click, ionValue, mountTax, settle } from '../__tests__/mount-tax';
 import CategoryCreateModal from './CategoryCreateModal.vue';
 
@@ -102,5 +103,15 @@ describe('CategoryCreateModal: Android Back with unsaved changes (hub#1020, BASE
       change: () => ionValue(s.field('name'), 'Books', 'ionInput'),
       restore: () => ionValue(s.field('name'), '', 'ionInput'),
     });
+  });
+});
+
+describe('CategoryCreateModal: fields refused with the same words (hub#888)', () => {
+  // Key, Name and Description each paint a refusal under their own key.
+  itTellsTheCorrectedFieldApart(['key', 'name', 'description'], async (locale, refusal) => {
+    const s = await setup(locale);
+    await s.fill({ key: 'product.books', name: 'Books', description: 'Paper books' });
+    s.answer(422, refusal);
+    return { field: s.field, send: () => click(s.add()), settle };
   });
 });

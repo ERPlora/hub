@@ -7,7 +7,7 @@ from django.apps import apps
 from django.conf import settings
 from django.utils import translation
 from live.live_registry import live_registry
-from live.meta import Category, LiveAppConfig, Nav, SetupCheck, SetupStep, module_configs
+from live.meta import Category, Help, LiveAppConfig, Nav, SetupCheck, SetupStep, module_configs
 from live.operations import registry
 
 from apps.table import events as E
@@ -122,6 +122,10 @@ def test_navigation_is_four_sections_with_registered_icons():
     ]
 
 
+def test_its_help_window_is_ready_without_a_video_yet():
+    assert table().help == Help(videos={})
+
+
 #: Done at the table by the waiter with the party in front (``ai.in_person``): seating a party, seating a parked
 #: check again, splitting a check and bringing an open check to a table. Never granted to an automation, and still
 #: of normal risk, so the assistant does them by voice without a confirmation card.
@@ -136,7 +140,7 @@ IN_PERSON = {
 def test_what_is_done_at_the_table_is_in_person_and_of_normal_risk():
     from live.operations import get
 
-    from base.assistant import risk
+    from live.assistant import risk
 
     for name in IN_PERSON:
         op = get(name)
@@ -151,7 +155,7 @@ def test_every_operation_is_a_tool_of_the_assistant():
     # platform's own writes (permission ``table.system``) are no tool and say none.
     from live.operations import registry
 
-    from base.assistant import is_tool
+    from base.assistant.tools import is_tool
 
     operations = [op for name, op in registry.items() if name.startswith("table.")]
     assert len(operations) == 38

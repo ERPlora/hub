@@ -1,6 +1,6 @@
 """The assistant's card for a write of printing (base's half is hub#258): in Spanish, every datum it sends by the name
 the Printing screens give it, never by the title pydantic makes up from the field («Job Id», «Attempt», «Source Ref»).
-The card is base's (``base.assistant.card``); the names are printing's: the titles of its schemas and the
+The card is base's (``base.assistant.cards.card``); the names are printing's: the titles of its schemas and the
 ``verbose_name`` of its models, with their Spanish in its catalog."""
 
 import json
@@ -9,19 +9,18 @@ from pathlib import Path
 
 import pytest
 from django.apps import apps
+from live import assistant as shared
 from live.assistant import NAMED as SAID_ITEM_BY_ITEM
-from live.context import OperationContext, Scope
+from live.context import OperationContext
 from live.operations import get, registry
 
 from apps.printing.documents import DOCUMENT_TYPES
 from apps.printing.models import PrintDevice, PrintJob
-from apps.printing.tests.conftest import A, RECEIPT, ctx_for, run
+from apps.printing.tests.conftest import A, B, HUB_DB, RECEIPT, ctx_for, run
 from base import assistant
-from base.tenancy import context
 from base.tenancy.context import use_hub
-from base.tenancy.tests import hubs
 from base.tests.test_assistant import technical_names
-from base.tests.test_assistant_card_values import AN_ID
+from base.tests.test_assistant_card_values_references import AN_ID
 
 FRONTEND = Path(apps.get_app_config("printing").path) / "frontend/locale"
 SCREENS = json.loads((FRONTEND / "es.json").read_text())["printing"]
@@ -34,7 +33,7 @@ def labels(card: dict) -> list[str]:
 
 def printing_writes() -> list:
     return [
-        op for op in registry.values() if op.app_label == "printing" and op.kind == "command" and assistant.is_tool(op)
+        op for op in registry.values() if op.app_label == "printing" and op.kind == "command" and assistant.tools.is_tool(op)
     ]
 
 
@@ -51,56 +50,56 @@ def a_job() -> str:
     return str(run("printing.job.create", {"document_type": "receipt", "document": RECEIPT}).job.id)
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_card_names_a_job_of_the_queue_as_the_queue_does():
     """The job by the queue's word («trabajo») and its document's number, as retrying or cancelling one names it."""
     retry = get("printing.job.retry")
     arguments = {"job_id": a_job(), "reference": "T-000123"}
     job, job_en = SCREENS["jobs"]["entity"]["one"].capitalize(), SCREENS_EN["jobs"]["entity"]["one"].capitalize()
-    assert labels(assistant.card(retry, arguments, "es", ctx_for(language="es"))) == [job, "Referencia"]
-    assert labels(assistant.card(retry, arguments, "en", ctx_for())) == [job_en, "Reference"]
+    assert labels(assistant.cards.card(retry, arguments, "es", ctx_for(language="es"))) == [job, "Referencia"]
+    assert labels(assistant.cards.card(retry, arguments, "en", ctx_for())) == [job_en, "Reference"]
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_card_names_what_a_device_reports_about_a_job():
     """A device confirms a job it printed, or says why it could not: the job, the device, the hand-out and the
     error."""
     arguments = {"job_id": a_job(), "device": "Caja", "attempt": 1, "error": "Sin papel"}
     fail = get("printing.job.fail")
-    assert labels(assistant.card(fail, arguments, "es", ctx_for(language="es"))) == [
+    assert labels(assistant.cards.card(fail, arguments, "es", ctx_for(language="es"))) == [
         "Trabajo",
         SCREENS["devices"]["modal"]["name"],
         "Intento",
         "Error de impresión",
     ]
-    assert labels(assistant.card(fail, arguments, "en", ctx_for())) == [
+    assert labels(assistant.cards.card(fail, arguments, "en", ctx_for())) == [
         "Job",
         SCREENS_EN["devices"]["modal"]["name"],
         "Attempt",
         "Print error",
     ]
     complete = get("printing.job.complete")
-    assert labels(assistant.card(complete, {"attempt": 2}, "es")) == ["Intento"]
+    assert labels(assistant.cards.card(complete, {"attempt": 2}, "es")) == ["Intento"]
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_card_names_a_device_as_the_devices_screen_does():
     retire = get("printing.device.retire")
     counter = {"device_id": str(PrintDevice.objects.create(name="Mostrador", key=PrintDevice.key_of("counter")).id)}
     device, device_en = SCREENS["devices"]["entity"]["one"], SCREENS_EN["devices"]["entity"]["one"]
-    assert labels(assistant.card(retire, counter, "es", ctx_for(language="es"))) == [device.capitalize()]
-    assert labels(assistant.card(retire, counter, "en", ctx_for())) == [device_en.capitalize()]
+    assert labels(assistant.cards.card(retire, counter, "es", ctx_for(language="es"))) == [device.capitalize()]
+    assert labels(assistant.cards.card(retire, counter, "en", ctx_for())) == [device_en.capitalize()]
 
 
 def test_the_card_names_the_money_the_print_at_checkout_and_the_document_of_a_new_job():
     arguments = {"currency": "EUR", "automatic": True, "source_ref": "T-000123"}
     create = get("printing.job.create")
-    assert labels(assistant.card(create, arguments, "es")) == [
+    assert labels(assistant.cards.card(create, arguments, "es")) == [
         "Moneda",
         "Impresión automática al cobrar",
         "Referencia",
     ]
-    assert labels(assistant.card(create, arguments, "en")) == ["Currency", "Automatic print at checkout", "Reference"]
+    assert labels(assistant.cards.card(create, arguments, "en")) == ["Currency", "Automatic print at checkout", "Reference"]
 
 
 def test_the_card_says_a_printer_is_active_as_the_printers_screen_does():
@@ -109,7 +108,7 @@ def test_the_card_says_a_printer_is_active_as_the_printers_screen_does():
     for name in ("printing.printer.create", "printing.printer.update"):
         op = get(name)
         arguments = dict.fromkeys(op.input.model_json_schema()["properties"], "x")
-        said = {field["name"]: field["label"] for field in assistant.card(op, arguments, "es")["fields"]}
+        said = {field["name"]: field["label"] for field in assistant.cards.card(op, arguments, "es")["fields"]}
         assert said["is_active"] == SCREENS["printers"]["columns"]["active"] == "Activa", name
 
 
@@ -152,7 +151,7 @@ def references(op) -> set[str]:
     defs = schema.get("$defs", {})
 
     def an_id(prop: dict) -> bool:
-        prop = assistant._resolved(prop, defs)
+        prop = shared.resolved(prop, defs)
         return prop.get("format") == "uuid" or (isinstance(prop.get("items"), dict) and an_id(prop["items"]))
 
     return {name for name, prop in schema.get("properties", {}).items() if an_id(prop)}
@@ -177,7 +176,7 @@ def arguments(business: dict, data: tuple[str, ...]) -> dict:
 
 def cards(business: dict, ctx, language: str = "es") -> dict:
     """The card of each write of ``NAMED`` naming every record it names by its id, as ``ctx``'s person would confirm it."""
-    return {write: assistant.card(get(write), arguments(business, data), language, ctx) for write, data in NAMED.items()}
+    return {write: assistant.cards.card(get(write), arguments(business, data), language, ctx) for write, data in NAMED.items()}
 
 
 #: How the card names each record of ``a_business``, as the Printing screens show it, by language.
@@ -203,7 +202,7 @@ def test_every_record_a_write_of_printing_names_by_its_id_is_listed_here():
     }
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize("language", ["es", "en"])
 def test_a_write_of_printing_names_each_record_as_the_printing_screens_do(language):
     """«Reintenta el ticket T-000123», «retira la tablet del mostrador», «prueba la impresora de la caja»: the card says
@@ -216,7 +215,7 @@ def test_a_write_of_printing_names_each_record_as_the_printing_screens_do(langua
     assert len(printers) == 3 and all(field.get(SAID_ITEM_BY_ITEM) is True for field in printers)
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize(("language", "test_page", "drawer"), [("es", "Hoja de prueba Caja", "Abrir el cajón"), ("en", "Test page Caja", "Open the drawer")])
 def test_a_job_is_named_by_its_document_as_the_queue_titles_it(language, test_page, drawer):
     """A test page by the printer it tests; a job with no number (a drawer opening at checkout) by what it is."""
@@ -224,7 +223,7 @@ def test_a_job_is_named_by_its_document_as_the_queue_titles_it(language, test_pa
     page = run("printing.printer.test", {"printer_id": str(till.id)})
     opening = PrintJob.objects.create(job_key="drawer-1", kind=PrintJob.Kind.DRAWER, usage="receipt", printer_id=till.id)
     retry = get("printing.job.retry")
-    named = [values(assistant.card(retry, {"job_id": str(job)}, language, ctx_for(language=language))) for job in (page.id, opening.id)]
+    named = [values(assistant.cards.card(retry, {"job_id": str(job)}, language, ctx_for(language=language))) for job in (page.id, opening.id)]
     assert named == [{"job_id": test_page}, {"job_id": drawer}]
 
 
@@ -233,11 +232,11 @@ def test_the_document_of_a_new_job_is_said_by_the_queues_word_for_it(language):
     """«Imprime la comanda de cocina»: the card says «Comanda de cocina», as the queue does, never «kitchen_order»."""
     screens = SCREENS if language == "es" else SCREENS_EN
     create = get("printing.job.create")
-    said = {kind: values(assistant.card(create, {"document_type": kind}, language))["document_type"] for kind in DOCUMENT_TYPES}
+    said = {kind: values(assistant.cards.card(create, {"document_type": kind}, language))["document_type"] for kind in DOCUMENT_TYPES}
     assert said == {kind: screens["documents"][kind] for kind in DOCUMENT_TYPES}
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_nobody_behind_the_request_reads_no_record_of_printing():
     """An automation's card (no person at hand) names no record: nothing is read for anybody."""
     said = cards(a_business(), None)
@@ -245,7 +244,7 @@ def test_nobody_behind_the_request_reads_no_record_of_printing():
     assert all(no_id(card) for card in said.values())
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_who_may_not_see_the_printers_reads_none_of_them_on_the_card():
     """Whoever asks without «view printers» (a key that only prints and handles the queue, say) gets every record left
     out, never its id."""
@@ -258,7 +257,7 @@ def test_who_may_not_see_the_printers_reads_none_of_them_on_the_card():
     assert all(no_id(card) for card in said.values())
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_record_that_is_not_there_is_left_out_never_by_its_id():
     gone = {"printer_id": uuid.uuid7(), "printers": [uuid.uuid7(), uuid.uuid7()], "device_id": uuid.uuid7(), "job_id": uuid.uuid7()}
     said = cards(gone, ctx_for(language="es"))
@@ -266,31 +265,23 @@ def test_a_record_that_is_not_there_is_left_out_never_by_its_id():
     assert all(no_id(card) for card in said.values())
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_retired_device_is_no_device_to_name():
     """Retired, it prints nothing and the devices screen no longer lists it: a card does not name it either."""
     business = a_business()
     run("printing.device.retire", {"device_id": str(business["device_id"])})
-    card = assistant.card(get("printing.device.update"), arguments(business, ("device_id",)), "es", ctx_for(language="es"))
+    card = assistant.cards.card(get("printing.device.update"), arguments(business, ("device_id",)), "es", ctx_for(language="es"))
     assert values(card) == {} and no_id(card)
 
 
-@pytest.fixture
-def no_fallback(monkeypatch):
-    """As production: without ``use_hub`` a hub's model fails, nothing falls back on the shared database."""
-    monkeypatch.setattr(context, "_test_fallback", None)
-
-
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
-def test_a_record_of_hub_b_is_never_named_on_a_card_of_hub_a(hub_a, hub_b, no_fallback):
+@HUB_DB
+def test_a_record_of_hub_b_is_never_named_on_a_card_of_hub_a(hub_b):
     """The read runs in the hub the person asks in: hub B's printer, device or job is nobody in hub A."""
-    in_b = ctx_for(scope=Scope("host", hub_b.slug), language="es")
+    in_b = ctx_for(scope=B, language="es")
     with use_hub(hub_b):
         theirs = a_business(in_b)
         named_in_b = cards(theirs, in_b)
-    in_a = ctx_for(scope=Scope("host", hub_a.slug), language="es")
-    with use_hub(hub_a):
-        said = cards(theirs, in_a)
+    said = cards(theirs, ctx_for(scope=A, language="es"))
     assert {write: values(card) for write, card in said.items()} == left_out()
     assert all(no_id(card) for card in said.values())
     # Positive control: in hub B the same cards name them.
@@ -310,8 +301,8 @@ def test_whoever_may_run_a_write_reads_the_record_its_card_names():
                 continue
             schema = op.input.model_json_schema()
             for datum in data:
-                prop = assistant._resolved(schema["properties"][datum], schema.get("$defs", {}))
-                marked = assistant.refers_of(assistant._resolved(prop.get("items", prop), schema.get("$defs", {})))
+                prop = shared.resolved(schema["properties"][datum], schema.get("$defs", {}))
+                marked = shared.refers_of(shared.resolved(prop.get("items", prop), schema.get("$defs", {})))
                 checked += 1
                 if marked is None or not mine.has(registry[marked["read"]].permission):
                     unread.append((role, name, datum))

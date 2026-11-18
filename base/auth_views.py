@@ -53,6 +53,7 @@ from live.errors import OperationError
 from live.slugs import validate_hub_slug
 
 from base import access, auth, queries, services
+from base.services import demos, sessions
 from base.models import SessionOwner
 from base.operations import HostScopeResolver
 from base.throttle import AttemptLimit, client_key
@@ -127,27 +128,27 @@ def auth_callback(request: HttpRequest) -> HttpResponse:
     if not result.ok:
         return (result.refused and _refused_attempt(request)) or auth.login_redirect(slug, next_path, error=result.error)
     try:
-        services.open_session_from_saas(request, result.user, slug)
-    except services.InactiveUser:
+        sessions.open_session_from_saas(request, result.user, slug)
+    except sessions.InactiveUser:
         logger.warning("Login on hub %r refused: the hub's user %r is deactivated.", slug, result.user.user_id)
         return auth.login_redirect(slug, next_path, error=USER_INACTIVE)
     landing = _choose_a_pin_first(request, next_path, slug)
     # The language chosen in «My profile», else the account's on erplora.com.
-    language = queries.chosen_language(request.user) or result.user.locale
+    language = queries.profile.chosen_language(request.user) or result.user.locale
     return with_device(request, auth.forget_state(_with_language(HttpResponseRedirect(landing), language)))
 
 
 def _demo_callback(request: HttpRequest, hub, next_path: str) -> HttpResponseRedirect:
     """A demo's code, redeemed here (never by the SaaS): the owner's session and ``next``, else the SaaS's door."""
-    redeemed = services.redeem_demo_code(hub.slug, request.POST.get("code"))
+    redeemed = demos.redeem_demo_code(hub.slug, request.POST.get("code"))
     if redeemed is None:
         logger.warning(
             "Demo login on %r refused: the code is missing, spent, out of its minute or another demo's.", hub.slug
         )
         return _refused_attempt(request) or auth.forget_state(HttpResponseRedirect(auth.demo_failed_url()))
     try:
-        services.open_demo_session(request, hub)
-    except services.InactiveUser:
+        demos.open_demo_session(request, hub)
+    except sessions.InactiveUser:
         logger.warning("Demo login on %r refused: its owner was deactivated.", hub.slug)
         return auth.forget_state(HttpResponseRedirect(auth.demo_failed_url()))
     return auth.forget_state(_with_language(HttpResponseRedirect(next_path), redeemed.language))
@@ -191,8 +192,8 @@ def _admin_callback(request: HttpRequest) -> HttpResponse:
     if not result.ok:
         return (result.refused and _refused_attempt(request)) or HttpResponseRedirect(auth.admin_hubs_url(result.error))
     try:
-        services.open_admin_session_from_saas(request, result.user)
-    except services.InactiveUser:
+        sessions.open_admin_session_from_saas(request, result.user)
+    except sessions.InactiveUser:
         logger.warning("Hub admin entry refused: the hub's user %r is deactivated.", result.user.user_id)
         return HttpResponseRedirect(auth.admin_hubs_url(USER_INACTIVE))
     logger.info("Hub admin session opened for SaaS user %r (%s) on hub %r.", result.user.user_id, result.user.role, slug)
@@ -244,7 +245,7 @@ def auth_logout(request: HttpRequest) -> HttpResponseRedirect:
     next person enters with their PIN, and erplora.com's session in this browser is whoever made it a device's, not the
     person signing out."""
     demo = _is_demo(request)
-    pin_pad = not demo and _hub_slug_of(request) is not None and queries.pin_door_open(request, _hub_slug_of(request))
+    pin_pad = not demo and _hub_slug_of(request) is not None and queries.access.pin_door_open(request, _hub_slug_of(request))
     logout(request)
     if pin_pad:
         return HttpResponseRedirect(ACCESS_PAGE)
@@ -303,7 +304,7 @@ def access_page_url(request: HttpRequest, next_path: str) -> str | None:
     if _is_demo(request):
         return None
     notice = _notice(request)
-    if notice == NOTICE_DEVICE_LIMIT or queries.pin_door_open(request, HostScopeResolver().resolve(request).key):
+    if notice == NOTICE_DEVICE_LIMIT or queries.access.pin_door_open(request, HostScopeResolver().resolve(request).key):
         return f"{ACCESS_PAGE}?{urlencode({'next': next_path, **({'notice': notice} if notice else {})})}"
     return None
 
@@ -322,7 +323,7 @@ def jump_page(request: HttpRequest, next_path: str) -> HttpResponse:
 def _notice(request: HttpRequest) -> str:
     """Why this browser has no session, when it had one: another device's entry ended it, or it ended (it expired, it
     was revoked, its device removed): the session cookie came and no session answers it."""
-    device = queries.device_of(request)
+    device = queries.devices.device_of(request)
     if device is not None and device.ended_reason == device.EndedReason.DEVICE_LIMIT:
         return NOTICE_DEVICE_LIMIT
     if settings.SESSION_COOKIE_NAME in request.COOKIES and not request.user.is_authenticated:
@@ -335,11 +336,11 @@ def _choose_a_pin_first(request: HttpRequest, next_path: str, slug: str) -> str:
     business already enters its tills by PIN (somebody else of it has one) and the person has none yet. The page lets
     them leave it for later. A business nobody of which has a PIN is never asked: its first PIN is chosen in «My
     profile» or given in Personal, as Square and Toast hand out their passcodes."""
-    device = queries.device_of_entry(request)
-    if device is None or not access.pin_offered(device.mode, queries.access_settings().pin_policy):
+    device = queries.devices.device_of_entry(request)
+    if device is None or not access.pin_offered(device.mode, queries.access.access_settings().pin_policy):
         return next_path
     me = request.user.get_username()
-    if queries.has_pin(request.user) or not queries.pin_people(slug, exclude=me):
+    if queries.access.has_pin(request.user) or not queries.access.pin_people(slug, exclude=me):
         return next_path
     return f"{PIN_SETUP_PAGE}?{urlencode({'next': next_path})}"
 
@@ -367,7 +368,7 @@ def auth_pin(request: HttpRequest) -> HttpResponse:
     wait = access.PIN_PERSON_LIMIT.wait(slug, person)
     if wait:
         return _pin_too_many(wait)
-    user = queries.pin_owner(slug, person, str(body.get("pin", ""))[:16])
+    user = queries.access.pin_owner(slug, person, str(body.get("pin", ""))[:16])
     if user is None:
         access.PIN_PERSON_LIMIT.failed(slug, person)
         access.PIN_ADDRESS_LIMIT.failed(slug, client_key(request))
@@ -390,22 +391,22 @@ def _device_door(request: HttpRequest):
     wait = access.PIN_ADDRESS_LIMIT.wait(slug, client_key(request))
     if wait:
         return _pin_too_many(wait)
-    device = queries.device_of(request)
+    device = queries.devices.device_of(request)
     if device is None:
         return _refused(
             403,
             "base.device_not_trusted",
             gettext("This device does not work with a PIN yet. Sign in once here with your account and from then on it will."),
         )
-    if not access.pin_offered(device.mode, queries.access_settings().pin_policy):
+    if not access.pin_offered(device.mode, queries.access.access_settings().pin_policy):
         return _refused(403, "base.pin_not_offered", gettext("This device does not ask for a PIN: sign in with your account."))
     return slug, device, body
 
 
-def _entered(request: HttpRequest, user, device, credential: str, slug: str, body: dict) -> HttpResponse:
+def _entered(request: HttpRequest, user, device, credential: str, slug: str, body: dict) -> HttpResponse:  # noqa: PLR0913, PLR0917
     services.open_session_on_device(request, user, device, credential)
     response = JsonResponse({"next": safe_next(body.get("next"))})
-    return _with_language(response, queries.language_of(user, slug))
+    return _with_language(response, queries.profile.language_of(user, slug))
 
 
 def _refused(status: int, code: str, message: str) -> JsonResponse:

@@ -38,11 +38,27 @@ describe('HistoryPage', () => {
     expect(s.find('kitchen-history-title').text()).toBe('Kitchen history');
     await s.show([
       entry('l2', { action: 'item_voided', item_name: 'Fries', notes: 'Cold', created_at: '2026-10-14T10:58:00Z' }),
-      entry('l1', { action: 'item_ready', item_name: 'Burger', actor: 'marta', station_name: 'Grill' }),
+      entry('l1', { action: 'item_ready', item_name: 'Burger', actor: 'marta', by_platform: false, station_name: 'Grill' }),
     ]);
     expect((prop(s.table(), 'columns') as Array<{ label: string }>).map((c) => c.label)).toEqual(['Action', 'Ticket', 'Dish', 'Who', 'Notes', 'When']);
     const text = s.wrapper.text();
     for (const words of ['Dish voided', 'Fries', 'Cold', '10/14/26, 12:58', 'Dish ready', 'marta', 'System']) expect(text, words).toContain(words);
+  });
+
+  it('«Who» says «Sistema» for what the platform did, never its own mark; a person and an API key keep their name (hub#1445)', async () => {
+    const s = await setup({ locale: 'es' });
+    await s.show([
+      entry('l1', { action: 'ready', actor: 'flow_run:0199e7a0-0000-7000-8000-000000000001' }),
+      entry('l2', { action: 'served', actor: 'system' }),
+      entry('l3', { action: 'started', actor: 'copy_recovery:0199e7a0-0000-7000-8000-000000000002' }),
+      entry('l4'),
+      entry('l5', { action: 'started', actor: 'Marta Ruiz', by_platform: false }),
+      entry('l6', { action: 'rushed', actor: 'API · Zapier', by_platform: false }),
+    ]);
+    const who = (prop(s.table(), 'columns') as Array<{ key: string; format: (value: unknown, row: unknown) => string }>).find((c) => c.key === 'actor')!;
+    const rows = prop(s.table(), 'rows') as Array<{ actor: string }>;
+    expect(rows.map((row) => who.format(row.actor, row))).toEqual(['Sistema', 'Sistema', 'Sistema', 'Sistema', 'Marta Ruiz', 'API · Zapier']);
+    expect(s.wrapper.text()).not.toContain('flow_run:');
   });
 
   it('searches and filters by action on the server', async () => {

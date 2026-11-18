@@ -3,9 +3,11 @@
 import pytest
 from django.urls import resolve
 
+from base.tenancy.tests.business import HOST, HUB_DB, A
 from base.tests.routes import assert_bound, spa_route_map
+from base.tests.test_spa import B_HOST, assert_an_employee_of_a_holds_nothing_in_b
 
-pytestmark = pytest.mark.django_db
+pytestmark = [HUB_DB, pytest.mark.usefixtures("hub_a")]
 
 
 def test_me_is_bound_to_session_me():
@@ -18,26 +20,22 @@ def test_me_is_bound_to_session_me():
 
 
 def test_anonymous(client):
-    response = client.get("/api/me", HTTP_HOST="a.localhost:8000")
+    response = client.get("/api/me", HTTP_HOST=HOST)
     assert response.status_code == 200
     body = response.json()
-    assert (body["user"], body["permissions"], body["scope"]) == (None, [], {"kind": "host", "key": "a"})
+    assert (body["user"], body["permissions"], body["scope"]) == (None, [], {"kind": "host", "key": A.key})
     assert body["demo"] is None
 
 
-def test_employee_on_its_host_and_elsewhere(client, make_user):
-    client.force_login(make_user("ana", host="a", role="hub_employee"))
-    on_a = client.get("/api/me", HTTP_HOST="a.localhost:8000").json()
-    on_b = client.get("/api/me", HTTP_HOST="b.localhost:8000").json()
-    # demo is the reference app; the other modules' grants and menus are pinned by their own tests.
-    demo_permissions = [permission for permission in on_a["permissions"] if permission.startswith("demo.")]
-    assert (on_a["user"]["label"], demo_permissions) == ("ana", ["demo.view"])
-    assert "demo" in [g["id"] for g in on_a["menu"]]
-    assert (on_b["permissions"], on_b["menu"]) == ([], [])
+def test_employee_on_its_host_and_elsewhere(client, make_user, hub_b):
+    client.force_login(make_user("ana", host=A.key, role="hub_employee"))
+    on_a = client.get("/api/me", HTTP_HOST=HOST).json()
+    on_b = client.get("/api/me", HTTP_HOST=B_HOST).json()
+    assert_an_employee_of_a_holds_nothing_in_b(on_a, on_b)
 
 
 def test_language_follows_the_request(client):
-    body = client.get("/api/me", HTTP_HOST="a.localhost", HTTP_ACCEPT_LANGUAGE="es").json()
+    body = client.get("/api/me", HTTP_HOST=HOST, HTTP_ACCEPT_LANGUAGE="es").json()
     assert body["language"] == "es"
 
 
@@ -59,9 +57,9 @@ def test_the_homes_routes_are_bound_to_its_queries(path, operation):
 
 def test_the_list_of_an_owner_over_http(client, make_user, settings):
     settings.SHOW_UNLISTED_MODULES = False
-    client.force_login(make_user("ana", host="a", role="hub_owner"))
+    client.force_login(make_user("ana", host=A.key, role="hub_owner"))
 
-    response = client.get("/api/home/setup", HTTP_HOST="a.localhost:8000")
+    response = client.get("/api/home/setup", HTTP_HOST=HOST)
 
     assert response.status_code == 200
     body = response.json()
@@ -74,7 +72,7 @@ def test_the_list_of_an_owner_over_http(client, make_user, settings):
 
 def test_an_anonymous_visitor_gets_no_home(client):
     for path in ("/api/home/setup", "/api/home/widgets", "/api/home/bell", "/api/home/notices", "/api/system/cards"):
-        response = client.get(path, HTTP_HOST="a.localhost:8000")
+        response = client.get(path, HTTP_HOST=HOST)
         assert response.status_code in (401, 403), path
 
 
@@ -82,6 +80,7 @@ def test_the_spas_route_map_names_every_base_route():
     from base.tests.test_access_routes import ROUTES as WAY_IN
     from base.tests.test_api_keys import KEY_ROUTES as KEYS
     from base.tests.test_api_docs import API_DOC_ROUTES as API_DOCS
+    from base.tests.test_api_help import HELP_ROUTES as HELP
     from base.tests.test_approvals import APPROVAL_ROUTES as APPROVALS
     from base.tests.test_files_api import ROUTES as FILES
     from base.tests.test_image_catalog import CATALOG_IMAGE_ROUTES as CATALOG_IMAGES
@@ -125,7 +124,7 @@ def test_the_spas_route_map_names_every_base_route():
         ("POST", "/api/assistant/speak", "base.assistant.speak"),
         ("POST", "/api/support/report", "base.support.report"),
         ("POST", "/api/saas-pass", "base.saas_pass.create"),
-    } | {(method, f"/api{path}", op) for method, path, op in WAY_IN | PEOPLE | KEYS | APPROVALS | API_DOCS | LOCATIONS | CATALOG_IMAGES}
+    } | {(method, f"/api{path}", op) for method, path, op in WAY_IN | PEOPLE | KEYS | APPROVALS | API_DOCS | LOCATIONS | CATALOG_IMAGES | HELP}
 
 
 # Settings › Data: the blueprints, the loads, the export and the reset. Reading what a file brings goes by POST (a
@@ -156,7 +155,7 @@ def test_an_owner_loads_a_file_over_http_bigger_than_any_other_body(client, make
     from base import blueprint
 
     settings.DATA_UPLOAD_MAX_MEMORY_SIZE = 1024
-    client.force_login(make_user("ana", host="a", role="hub_owner"))
+    client.force_login(make_user("ana", host=A.key, role="hub_owner"))
     zone = {"name": "Patio", "description": "", "color": "warning", "sort_order": 1}
     bundle = blueprint.Bundle(
         manifest=blueprint.manifest(
@@ -168,7 +167,7 @@ def test_an_owner_loads_a_file_over_http_bigger_than_any_other_body(client, make
     padded = {"file_base64": base64.b64encode(blueprint.write_zip(bundle)).decode(), "apps": ["table"], "note": "x" * 2048}
 
     response = client.post(
-        "/api/settings/data/blueprints/import", padded, content_type="application/json", HTTP_HOST="a.localhost:8000"
+        "/api/settings/data/blueprints/import", padded, content_type="application/json", HTTP_HOST=HOST
     )
 
     assert response.status_code == 200, response.content
@@ -176,9 +175,9 @@ def test_an_owner_loads_a_file_over_http_bigger_than_any_other_body(client, make
 
 
 def test_an_employee_gets_no_data_over_http(client, make_user):
-    client.force_login(make_user("eva", host="a", role="hub_employee"))
+    client.force_login(make_user("eva", host=A.key, role="hub_employee"))
 
-    response = client.get("/api/settings/data/blueprints", HTTP_HOST="a.localhost:8000")
+    response = client.get("/api/settings/data/blueprints", HTTP_HOST=HOST)
 
     assert response.status_code == 403
     assert response.json()["error"]["code"] == "permission_denied"

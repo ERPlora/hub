@@ -1,6 +1,6 @@
 """The assistant's card for a write of modifier (base's half is hub#258): in Spanish, every datum it sends by the name
 the Modifiers screens give it, never by the title pydantic makes up from the field («Option», «Tax Category Key»). The
-card is base's (``base.assistant.card``); the names are modifier's: the titles of its schemas and the ``verbose_name``
+card is base's (``base.assistant.cards.card``); the names are modifier's: the titles of its schemas and the ``verbose_name``
 of its models, with their Spanish in its catalog."""
 
 import json
@@ -9,16 +9,16 @@ from pathlib import Path
 
 import pytest
 from django.apps import apps
+from live import assistant as shared
 from live.context import OperationContext, Scope
 from live.operations import get, registry
 
 from base import assistant
 from base.tenancy.context import use_hub
-from base.tenancy.tests import hubs
 from base.tests.test_assistant import technical_names
-from base.tests.test_assistant_card_values import AN_ID, unnamed
+from base.tests.test_assistant_card_values_references import AN_ID, unnamed
 
-from .conftest import GENERIC, ctx_for, run
+from .conftest import GENERIC, HUB_DB, ctx_for, run
 
 FRONTEND = Path(apps.get_app_config("modifier").path) / "frontend/locale"
 SCREENS = json.loads((FRONTEND / "es.json").read_text())["modifier"]
@@ -33,7 +33,7 @@ def modifier_writes() -> list:
     return [
         op
         for op in registry.values()
-        if op.app_label == "modifier" and op.kind == "command" and assistant.is_tool(op)
+        if op.app_label == "modifier" and op.kind == "command" and assistant.tools.is_tool(op)
     ]
 
 
@@ -48,8 +48,8 @@ def test_no_datum_of_a_write_of_modifier_reaches_a_spanish_card_by_its_technical
 def test_the_card_names_the_option_said_by_its_name_as_the_group_sheet_does():
     """Changing or deleting an option the person names («Sin cebolla»): «Opción», as «Borrar opción» says it."""
     for name in ("modifier.option.update", "modifier.option.delete"):
-        assert labels(assistant.card(get(name), {"option": "Sin cebolla"}, "es")) == ["Opción"]
-        assert labels(assistant.card(get(name), {"option": "No onion"}, "en")) == ["Option"]
+        assert labels(assistant.cards.card(get(name), {"option": "Sin cebolla"}, "es")) == ["Opción"]
+        assert labels(assistant.cards.card(get(name), {"option": "No onion"}, "en")) == ["Option"]
 
 
 def test_the_card_names_the_own_tax_category_of_an_option_as_its_form_does():
@@ -57,8 +57,8 @@ def test_the_card_names_the_own_tax_category_of_an_option_as_its_form_does():
     tax, tax_en = SCREENS["options"]["form"]["tax"], SCREENS_EN["options"]["form"]["tax"]
     for name in ("modifier.option.create", "modifier.option.update"):
         arguments = {"tax_category_key": "product.generic"}
-        assert labels(assistant.card(get(name), arguments, "es")) == [tax]
-        assert labels(assistant.card(get(name), arguments, "en")) == [tax_en]
+        assert labels(assistant.cards.card(get(name), arguments, "es")) == [tax]
+        assert labels(assistant.cards.card(get(name), arguments, "en")) == [tax_en]
 
 
 def test_the_card_names_the_kitchen_name_as_the_group_and_option_forms_do():
@@ -72,8 +72,8 @@ def test_the_card_names_the_kitchen_name_as_the_group_and_option_forms_do():
     ):
         arguments = {"kitchen_name": "SALSA"}
         said, said_en = SCREENS[form]["form"]["kitchenName"], SCREENS_EN[form]["form"]["kitchenName"]
-        assert labels(assistant.card(get(name), arguments, "es")) == [said], name
-        assert labels(assistant.card(get(name), arguments, "en")) == [said_en], name
+        assert labels(assistant.cards.card(get(name), arguments, "es")) == [said], name
+        assert labels(assistant.cards.card(get(name), arguments, "en")) == [said_en], name
 
 
 # ── The records a write names by their id (hub#672) ──────────────────────────────────────────────────────────────────
@@ -111,7 +111,7 @@ def references(op) -> set[str]:
     """The data of ``op``'s input its schema declares an id of (``format: uuid``)."""
     schema = op.input.model_json_schema()
     props = schema.get("properties", {})
-    return {name for name, prop in props.items() if assistant._resolved(prop, schema.get("$defs", {})).get("format") == "uuid"}
+    return {name for name, prop in props.items() if shared.resolved(prop, schema.get("$defs", {})).get("format") == "uuid"}
 
 
 def write_of(case: str) -> str:
@@ -148,7 +148,7 @@ def a_menu(hub) -> dict:
 def cards(menu: dict, ctx: OperationContext | None, language: str = "es") -> dict:
     """The card of each write of ``NAMED`` naming every record it names by its id, as ``ctx``'s person would confirm it."""
     return {
-        case: assistant.card(
+        case: assistant.cards.card(
             get(write_of(case)), {datum: str(menu[kind]) for datum, kind in data.items()}, language, ctx
         )
         for case, data in NAMED.items()
@@ -172,9 +172,9 @@ def test_every_record_a_write_of_modifier_names_by_its_id_is_listed_here():
     assert {op.name: unnamed(op)[0] for op in modifier_writes() if unnamed(op)[0]} == {}
 
 
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
+@HUB_DB
 @pytest.mark.parametrize("language", ["es", "en"])
-def test_a_write_of_modifier_names_each_record_as_its_screens_do(language, hub_a, no_fallback):
+def test_a_write_of_modifier_names_each_record_as_its_screens_do(language, hub_a):
     """«Borra el grupo», «quita ese suplemento de la hamburguesa»: the card says which group, option, link, product or
     category by its name, in the person's language, never by its id."""
     with use_hub(hub_a):
@@ -183,9 +183,9 @@ def test_a_write_of_modifier_names_each_record_as_its_screens_do(language, hub_a
     assert [write for write, card in shown.items() if not no_id(card)] == []
 
 
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
+@HUB_DB
 @pytest.mark.parametrize("language", ["es", "en"])
-def test_each_record_is_titled_as_the_screens_title_it(language, hub_a, no_fallback):
+def test_each_record_is_titled_as_the_screens_title_it(language, hub_a):
     """«Grupo: Salsas», «Opción: Ali oli (Salsas)», never «Id: Salsas»: the mark alone would name it under its field."""
     with use_hub(hub_a):
         shown = cards(a_menu(hub_a), in_hub(hub_a, language=language), language)
@@ -194,8 +194,8 @@ def test_each_record_is_titled_as_the_screens_title_it(language, hub_a, no_fallb
     }
 
 
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
-def test_nobody_behind_the_request_reads_no_record_of_modifier(hub_a, no_fallback):
+@HUB_DB
+def test_nobody_behind_the_request_reads_no_record_of_modifier(hub_a):
     """An automation's card (no person at hand) names no record: nothing is read for anybody."""
     with use_hub(hub_a):
         shown = cards(a_menu(hub_a), None)
@@ -203,8 +203,8 @@ def test_nobody_behind_the_request_reads_no_record_of_modifier(hub_a, no_fallbac
     assert all(no_id(card) for card in shown.values())
 
 
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
-def test_who_may_not_see_them_reads_none_of_them_on_the_card(hub_a, no_fallback):
+@HUB_DB
+def test_who_may_not_see_them_reads_none_of_them_on_the_card(hub_a):
     """Whoever may keep the modifiers but see neither them nor the catalogue (a key that only writes, say) gets every
     record left out, never its id."""
     writes_only = OperationContext(
@@ -216,8 +216,8 @@ def test_who_may_not_see_them_reads_none_of_them_on_the_card(hub_a, no_fallback)
     assert all(no_id(card) for card in shown.values())
 
 
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
-def test_a_record_that_is_not_there_is_left_out_never_by_its_id(hub_a, no_fallback):
+@HUB_DB
+def test_a_record_that_is_not_there_is_left_out_never_by_its_id(hub_a):
     gone = {kind: uuid.uuid7() for kind in SAID}
     with use_hub(hub_a):
         shown = cards(gone, in_hub(hub_a))
@@ -225,8 +225,8 @@ def test_a_record_that_is_not_there_is_left_out_never_by_its_id(hub_a, no_fallba
     assert all(no_id(card) for card in shown.values())
 
 
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
-def test_a_record_of_hub_b_is_never_named_on_a_card_of_hub_a(hub_a, hub_b, no_fallback):
+@HUB_DB
+def test_a_record_of_hub_b_is_never_named_on_a_card_of_hub_a(hub_a, hub_b):
     """The read runs in the hub the person asks in: hub B's group, option, link, product or category is nobody in hub A."""
     with use_hub(hub_b):
         theirs = a_menu(hub_b)
@@ -239,8 +239,8 @@ def test_a_record_of_hub_b_is_never_named_on_a_card_of_hub_a(hub_a, hub_b, no_fa
     assert {write: values(card) for write, card in named_in_b.items()} == named_as_the_screens()
 
 
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
-def test_two_options_with_one_name_are_told_apart_by_their_group(hub_a, no_fallback):
+@HUB_DB
+def test_two_options_with_one_name_are_told_apart_by_their_group(hub_a):
     """«Grande» of the drinks and «Grande» of the chips: whoever confirms deleting one sees which, as the question the
     assistant asks when the name alone is not enough says it."""
     with use_hub(hub_a):
@@ -250,20 +250,20 @@ def test_two_options_with_one_name_are_told_apart_by_their_group(hub_a, no_fallb
         of_drinks = run("modifier.option.create", {"group_id": str(drinks.id), "name": "Grande"}, ctx=admin)
         of_chips = run("modifier.option.create", {"group_id": str(chips.id), "name": "Grande"}, ctx=admin)
         said = [
-            values(assistant.card(get("modifier.option.delete"), {"id": str(option.id)}, "es", admin))["id"]
+            values(assistant.cards.card(get("modifier.option.delete"), {"id": str(option.id)}, "es", admin))["id"]
             for option in (of_drinks, of_chips)
         ]
     assert said == ["Grande (Bebidas)", "Grande (Patatas)"]
 
 
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
-def test_a_link_to_a_category_is_named_by_its_group_and_that_category(hub_a, no_fallback):
+@HUB_DB
+def test_a_link_to_a_category_is_named_by_its_group_and_that_category(hub_a):
     with use_hub(hub_a):
         admin = in_hub(hub_a)
         category = run("inventory.category.create", {"name": "Postres"}, ctx=admin)
         group = run("modifier.group.create", {"name": "Toppings"}, ctx=admin)
         link = run("modifier.link.attach", {"group_id": str(group.id), "category_id": str(category.id)}, ctx=admin)
-        card = assistant.card(get("modifier.link.detach"), {"id": str(link.id)}, "es", admin)
+        card = assistant.cards.card(get("modifier.link.detach"), {"id": str(link.id)}, "es", admin)
     assert values(card) == {"id": "Toppings · Postres"}
 
 
@@ -281,7 +281,7 @@ def test_whoever_may_run_a_write_reads_the_record_its_card_names():
             schema = op.input.model_json_schema()
             for datum in data:
                 checked += 1
-                marked = assistant.refers_of(assistant._resolved(schema["properties"][datum], schema.get("$defs", {})))
+                marked = shared.refers_of(shared.resolved(schema["properties"][datum], schema.get("$defs", {})))
                 if marked is None or not mine.has(registry[marked["read"]].permission):
                     unread.append((role, name, datum))
     # Positive control: 3 roles over the 14 records of ``NAMED``.

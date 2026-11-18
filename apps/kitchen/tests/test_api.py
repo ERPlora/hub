@@ -1,6 +1,6 @@
 """The kitchen app's routes: each bound to its operation, and the whole app over HTTP.
 
-Requests go to ``a.localhost`` (scope ``a``) with Django's sync test client, which sees the test's
+Requests go to business A's host (``HOST``) with Django's sync test client, which sees the test's
 transaction. No path parameters: a record travels in the input (query string on GET, body on POST), by its
 id or as a person says it.
 """
@@ -10,11 +10,12 @@ import json
 import pytest
 from live.ninja import ensure_api_parity
 
+from apps.flow.tests.test_api import get, post
 from apps.kitchen.api import router
 from base.tests.routes import spa_routes
 from config.api import api
 
-from .conftest import add_line, open_check
+from .conftest import HOST, HUB_DB, A, B, add_line, open_check
 
 ROUTES = {
     ("GET", "/kitchen/board", "kitchen.ticket.board"),
@@ -48,29 +49,15 @@ ROUTES = {
 }
 
 
-def get(client, path, host="a.localhost", **params):
-    return client.get(f"/api{path}", params, HTTP_HOST=host)
-
-
-def post(client, path, data, host="a.localhost", **headers):
-    return client.post(
-        f"/api{path}",
-        json.dumps(data),
-        content_type="application/json",
-        HTTP_HOST=host,
-        **headers,
-    )
-
-
 @pytest.fixture
 def admin_client(client, make_user):
-    client.force_login(make_user("boss", host="a", role="hub_admin"))
+    client.force_login(make_user("boss", host=A.key, role="hub_admin"))
     return client
 
 
 @pytest.fixture
 def employee_client(client, make_user):
-    client.force_login(make_user("luis", host="a", role="hub_employee"))
+    client.force_login(make_user("luis", host=A.key, role="hub_employee"))
     return client
 
 
@@ -103,7 +90,7 @@ def test_the_spas_route_map_names_every_kitchen_route():
 # ── Authentication and permissions ───────────────────────────────────────────────────────────────
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_anonymous_gets_the_401_envelope(client):
     for response in (
         get(client, "/kitchen/board"),
@@ -113,7 +100,7 @@ def test_anonymous_gets_the_401_envelope(client):
         assert response.json()["error"]["code"] == "unauthorized"
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_cook_moves_tickets_but_does_not_run_the_kitchen(employee_client):
     for path in (
         "/kitchen/board",
@@ -144,15 +131,15 @@ def test_a_cook_moves_tickets_but_does_not_run_the_kitchen(employee_client):
         assert response.json()["error"]["code"] == "permission_denied"
 
 
-@pytest.mark.django_db
-def test_a_role_on_a_is_no_role_on_b(admin_client):
-    assert get(admin_client, "/kitchen/board", host="b.localhost").status_code == 403
+@HUB_DB
+def test_a_role_on_a_is_no_role_on_b(admin_client, hub_b):
+    assert get(admin_client, "/kitchen/board", host=f"{B.key}.localhost").status_code == 403
 
 
 # ── Validation and refusals ──────────────────────────────────────────────────────────────────────
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_an_invalid_station_is_422_per_field(admin_client):
     response = post(admin_client, "/kitchen/stations", {"name": "", "color": "orange"})
     assert response.status_code == 422
@@ -163,7 +150,7 @@ def test_an_invalid_station_is_422_per_field(admin_client):
     )
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_limit_over_100_is_422(admin_client):
     response = get(admin_client, "/kitchen/tickets", limit=101)
     assert (response.status_code, set(response.json()["error"]["fields"])) == (
@@ -172,13 +159,14 @@ def test_a_limit_over_100_is_422(admin_client):
     )
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_step_off_the_path_is_a_409_in_the_readers_language(admin_client):
     made = post(admin_client, "/kitchen/tickets", {"items": [{"name": "Soup"}]}).json()
-    response = post(
-        admin_client,
-        "/kitchen/tickets/serve",
-        {"ticket_id": made["id"]},
+    response = admin_client.post(
+        "/api/kitchen/tickets/serve",
+        json.dumps({"ticket_id": made["id"]}),
+        content_type="application/json",
+        HTTP_HOST=HOST,
         HTTP_ACCEPT_LANGUAGE="es",
     )
     assert response.status_code == 409
@@ -190,7 +178,7 @@ def test_a_step_off_the_path_is_a_409_in_the_readers_language(admin_client):
 # ── The whole flow over HTTP ─────────────────────────────────────────────────────────────────────
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_sending_a_check_and_taking_it_to_the_pass_over_http(admin_client, product):
     station = post(admin_client, "/kitchen/stations", {"name": "Grill"})
     assert station.status_code == 201

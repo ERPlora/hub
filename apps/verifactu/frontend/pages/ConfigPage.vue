@@ -5,7 +5,9 @@
 // from here (`RepresentationGrant`); what the account has not sent yet is said so. «My certificate»: «Loaded» /
 // «Not loaded», holder, its tax ID, kind, uploaded and expiry dates and the warning 30 days before it expires (or that
 // it expired); who configures VeriFactu uploads the .p12/.pfx here with its password («Upload the certificate») or
-// removes it («Remove», asking first in a card). It is kept encrypted in the hub's database and never shown again.
+// removes it («Remove», asking first in a card). When ERPlora's route is unavailable, the tabs and authorisation
+// disappear and the certificate is the only card, with an explicit status and no warning in testing.
+// It is kept encrypted in the hub's database and never shown again.
 // Outside Spain VeriFactu is not for the business: «VeriFactu is only for businesses in Spain.» is the one reason said,
 // with no authorisation to sign and no certificate to upload, only the certificate's state.
 import { formatDateTime, InlineFeedback, StatusPill, useConfirm } from '@erplora/ui/components';
@@ -16,6 +18,7 @@ import { computed, shallowRef, useTemplateRef } from 'vue';
 
 import PageNotices from '../components/PageNotices.vue';
 import RepresentationGrant from '../components/RepresentationGrant.vue';
+import OwnCertificateStatus from '../components/OwnCertificateStatus.vue';
 import { useLocale, useT } from '../composables/useT';
 import { fileToBase64 } from '../lib/files';
 import { refusal } from '../lib/refusal';
@@ -87,14 +90,20 @@ async function uploadCertificate(): Promise<void> {
   }
   picked.value = null;
   password.value = '';
-  void toastSuccess(t('verifactu.config.uploadedToast', { holder: out.own_certificate.holder, taxId: out.own_certificate.holder_tax_id }));
+  toastSuccess(t('verifactu.config.uploadedToast', { holder: out.own_certificate.holder, taxId: out.own_certificate.holder_tax_id }));
 }
+
+/** What removing the certificate does to the records: in testing they keep going out; live, the fixed route says. */
+const removeMessage = computed(() => {
+  if (config.value?.environment !== 'production') return 'verifactu.config.removeMessage';
+  return config.value.route === 'own' ? 'verifactu.config.removeMessageOwn' : 'verifactu.config.removeMessageSeal';
+});
 
 async function removeCertificate(): Promise<void> {
   problem.value = null;
   const yes = await confirm({
     title: t('verifactu.config.removeTitle'),
-    message: t('verifactu.config.removeMessage'),
+    message: t(removeMessage.value),
     confirmLabel: t('verifactu.config.remove'),
     cancelLabel: t('verifactu.cancel'),
     tone: 'danger',
@@ -106,7 +115,7 @@ async function removeCertificate(): Promise<void> {
     problem.value = refusal(remove.error.value, t('verifactu.config.removeFailed'))?.message ?? t('verifactu.config.removeFailed');
     return;
   }
-  void toastSuccess(t('verifactu.config.removedToast'));
+  toastSuccess(t('verifactu.config.removedToast'));
 }
 </script>
 
@@ -137,6 +146,7 @@ async function removeCertificate(): Promise<void> {
         {{ $t('verifactu.onlyInSpain') }}
       </InlineFeedback>
       <ion-segment
+        v-if="config.erplora_route_available"
         :value="tab"
         mode="md"
         @ion-change="tab = $event.detail.value as 'erplora' | 'own'"
@@ -158,7 +168,7 @@ async function removeCertificate(): Promise<void> {
       </ion-segment>
 
       <section
-        v-if="tab === 'erplora'"
+        v-if="config.erplora_route_available && tab === 'erplora'"
         class="verifactu-config__panel"
         data-testid="verifactu-config-erplora"
       >
@@ -177,14 +187,30 @@ async function removeCertificate(): Promise<void> {
         </template>
       </section>
 
-      <section
+      <article
         v-else
         class="verifactu-config__panel"
+        :class="{ 'verifactu-config__panel--sole': !config.erplora_route_available }"
         data-testid="verifactu-config-own"
       >
-        <h3>{{ $t('verifactu.config.certTitle') }}</h3>
+        <div :class="{ 'verifactu-config__cert-heading': !config.erplora_route_available }">
+          <h3>{{ $t('verifactu.config.certTitle') }}</h3>
+          <OwnCertificateStatus
+            v-if="!config.erplora_route_available"
+            testid="verifactu-config-cert-status"
+            :certificate="config.own_certificate"
+          />
+        </div>
+        <p
+          v-if="!config.erplora_route_available && !config.own_certificate.loaded && !outsideSpain"
+          class="verifactu-config__intro"
+          :data-testid="config.environment === 'testing' ? 'verifactu-config-testing-note' : 'verifactu-config-production-note'"
+        >
+          {{ $t(config.environment === 'testing' ? 'verifactu.config.testingNote' : 'verifactu.config.productionNote') }}
+        </p>
         <div data-testid="verifactu-config-cert">
           <StatusPill
+            v-if="config.erplora_route_available"
             :tone="config.own_certificate.loaded ? 'success' : 'neutral'"
             :label="config.own_certificate.loaded ? $t('verifactu.config.loaded') : $t('verifactu.config.notLoaded')"
           />
@@ -287,9 +313,9 @@ async function removeCertificate(): Promise<void> {
           class="verifactu-config__note"
           data-testid="verifactu-config-keys"
         >
-          {{ $t('verifactu.config.keysNote') }}
+          {{ $t(config.erplora_route_available ? 'verifactu.config.keysNote' : 'verifactu.config.keysNoteOwn') }}
         </p>
-      </section>
+      </article>
     </template>
   </AppPage>
 </template>
@@ -298,13 +324,34 @@ async function removeCertificate(): Promise<void> {
 .verifactu-config__panel {
   margin: 1rem 0;
 }
+.verifactu-config__panel--sole {
+  container-type: inline-size;
+  max-width: 44rem;
+  padding: 1.25rem;
+  border: 1px solid var(--ion-color-light-shade, #e4e1d8);
+  border-radius: 12px;
+}
 .verifactu-config__panel h3 {
   margin: 0 0 0.5rem;
   font-size: 0.95rem;
 }
+.verifactu-config__cert-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+.verifactu-config__panel--sole .verifactu-config__cert-heading h3 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+.verifactu-config__intro {
+  margin: 0.75rem 0 0;
+}
 .verifactu-config__fields {
   display: grid;
-  grid-template-columns: minmax(8rem, max-content) 1fr;
+  grid-template-columns: minmax(8rem, max-content) minmax(0, 1fr);
   gap: 0.25rem 1rem;
   margin: 0.75rem 0 0;
 }
@@ -312,7 +359,9 @@ async function removeCertificate(): Promise<void> {
   color: var(--ion-color-medium, #8a8577);
 }
 .verifactu-config__fields dd {
+  min-width: 0;
   margin: 0;
+  overflow-wrap: anywhere;
 }
 .verifactu-config__note {
   color: var(--ion-color-medium, #8a8577);
@@ -338,5 +387,13 @@ async function removeCertificate(): Promise<void> {
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem;
+}
+@container (max-width: 30rem) {
+  .verifactu-config__fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .verifactu-config__fields dd {
+    margin-bottom: 0.5rem;
+  }
 }
 </style>

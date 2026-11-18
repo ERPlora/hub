@@ -7,6 +7,7 @@
 import { Combo } from '@erplora/ui/components';
 import { describe, expect, it, vi } from 'vitest';
 
+import { itTellsTheCorrectedFieldApart } from '../../../../base/frontend/__tests__/same-words-refusal';
 import type { Business } from '../../../../base/frontend/operations';
 import type { ComboOut } from '../operations';
 import {
@@ -357,4 +358,19 @@ describe('MenuFormModal: Android Back with unsaved changes (hub#1031, BASE-F05)'
     await ionValue(s.field('price'), '1500', 'ionInput');
     expect(unsavedChangesIn(overlay)).toBeDefined();
   });
+});
+
+describe('MenuFormModal: fields refused with the same words (hub#888)', () => {
+  // A new menu eaten in: Name, Kitchen name, Closed price, the VAT category (the picker) and Order paint a refusal,
+  // each under its own key.
+  const FIELD_OF: Record<string, string> = { tax_category_key: 'tax_category' };
+  itTellsTheCorrectedFieldApart(['name', 'kitchen_name', 'price', 'tax_category_key', 'sort_order'], async (locale, refusal) => {
+    const s = await setup(null, locale);
+    await ionValue(s.field('name'), 'Menu of the day', 'ionInput');
+    await ionValue(s.field('price'), '13,50', 'ionInput');
+    s.tax().vm.$emit('update:modelValue', { id: 'restaurant.food', label: 'Restaurant — food · 10%' });
+    await settle();
+    s.answer(422, refusal);
+    return { field: (key) => s.field(FIELD_OF[key] ?? key), send: () => click(s.save()), settle };
+  }, 'price');
 });

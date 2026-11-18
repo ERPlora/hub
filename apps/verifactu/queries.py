@@ -30,6 +30,7 @@ from apps.verifactu import (
     certificates,
     chain,
     envelope,
+    erplora_route,
     gateway,
     producer,
     representation,
@@ -195,18 +196,18 @@ def own_certificate_blob() -> bytes | None:
     return bytes(blob) if blob is not None else None
 
 
-def own_certificate_material(config: Config) -> gateway.Certificate | None:
-    """What the gateway presents with on the «own» route (``None`` on ERPlora's, or without a certificate);
+def own_certificate_material(route: str) -> gateway.Certificate | None:
+    """What the gateway presents with on the «own» ``route`` (``None`` on ERPlora's, or without a certificate);
     ``certificates.CertificateUnreadable`` when this server's key cannot open it."""
-    if config.route != Config.Route.OWN:
+    if route != Config.Route.OWN:
         return None
     blob = own_certificate_blob()
     return certificates.material(blob) if blob is not None else None
 
 
-def own_certificate_readable(config: Config) -> bool:
+def own_certificate_readable(route: str) -> bool:
     try:
-        own_certificate_material(config)
+        own_certificate_material(route)
     except certificates.CertificateUnreadable:
         return False
     return True
@@ -218,30 +219,32 @@ def certificate_valid(now: dt.datetime | None = None) -> bool:
     return OwnCertificate.objects.filter(singleton=True, expires_at__gt=now).exists()
 
 
+def sending_route(config: Config, environment: str, scope: Scope | None) -> str:
+    """The route the records of ``environment`` go by (``erplora_route.route_for``)."""
+    return erplora_route.route_for(config, environment, scope, certificate_valid())
+
+
 def _route_sending_problem(config: Config, environment: str, scope: Scope | None) -> str:
-    """What the chosen route itself lacks to carry a record to the AEAT of ``environment``: the own route, its valid
-    certificate (as in the old Hub) and, in production, one this server can open; ERPlora's route in production,
-    the approved signed authorisation, but for ERPlora's own records on ERPlora's own hub (``scope``; ``None``, no
-    hub's, never is: a business typing ERPlora's tax ID is no exemption)."""
+    """What the route of ``environment`` lacks to carry a record to its AEAT: on the own route, a valid certificate
+    and, in production, one this server can open; on ERPlora's in production, being open to a business not live
+    through it yet and the approved signed authorisation, but for ERPlora's own records on ERPlora's own hub
+    (``scope``; ``None``, no hub's, never is: a business typing ERPlora's tax ID is no exemption)."""
     production = environment == Environment.PRODUCTION
-    if config.route == Config.Route.OWN:
+    route = sending_route(config, environment, scope)
+    if route == Config.Route.OWN:
         if not certificate_valid():
             return "own_certificate_missing"
-        if production and not own_certificate_readable(config):
-            return "own_certificate_unreadable"
-        return ""
-    if not production:
-        return ""
-    if (
+        return "own_certificate_unreadable" if production and not own_certificate_readable(route) else ""
+    if not production or (
         scope is not None
         and platform.is_platform_hub(scope)
         and issuer_identity()[0] == settings.PLATFORM_ISSUER_TAX_ID
     ):
         # ERPlora's seal presents ERPlora's own records on its own hub: it represents nobody.
         return ""
-    if config.representation_status != Config.Representation.APPROVED:
-        return "representation_not_approved"
-    return ""
+    if erplora_route.closed(config, route, scope):
+        return erplora_route.CLOSED
+    return "" if config.representation_status == Config.Representation.APPROVED else "representation_not_approved"
 
 
 def _server_problem(environment: str) -> str:
@@ -281,7 +284,7 @@ def issue_problem(config: Config, scope: Scope | None) -> str:
 def live_problems(config: Config, scope: Scope) -> list[str]:
     """Everything that keeps this business from going live now (VERIFACTU-F08), as codes; empty when it can, in
     ``go_live``'s order: the server (closed, no gateway), a demo, the route, the account. Invoicing's issuer is told
-    apart. A demo never goes live, as in the old Hub; whether it is one, the platform says
+    apart. A demo never goes live; whether it is one, the platform says
     (``base.operations.is_demo_hub``). Outside Spain, that alone: nothing else would ever let it."""
     if outside_spain(scope):
         return [OUTSIDE_SPAIN]
@@ -290,13 +293,8 @@ def live_problems(config: Config, scope: Scope) -> list[str]:
         found.append("gateway_unavailable")
     if platform.is_demo_hub(scope):
         found.append("go_live_forbidden")
-    if config.route == Config.Route.OWN:
-        if not certificate_valid():
-            found.append("own_certificate_missing")
-        elif not own_certificate_readable(config):
-            found.append("own_certificate_unreadable")
-    elif config.representation_status != Config.Representation.APPROVED:
-        found.append("representation_not_approved")
+    if problem := _route_sending_problem(config, Environment.PRODUCTION, scope):
+        found.append(problem)
     if config.hub_status != Config.HubStatus.ACTIVE:
         found.append("hub_not_active")
     return found
@@ -318,7 +316,7 @@ def blockers(config: Config, environment: str, scope: Scope | None) -> list[str]
     if not gateway.configured():
         found.append("gateway_unavailable")
     problem = route_problem(config, environment, scope)
-    if not problem and not own_certificate_readable(config):
+    if not problem and not own_certificate_readable(sending_route(config, environment, scope)):
         problem = "own_certificate_unreadable"
     if problem and problem not in found:
         found.append(problem)
@@ -502,7 +500,8 @@ def config_out(config: Config, ctx: OperationContext) -> ConfigOut:
     refused = issue_problem(config, ctx.scope)
     return ConfigOut(
         environment=config.environment,
-        route=config.route,
+        route=sending_route(config, config.environment, ctx.scope),
+        erplora_route_available=erplora_route.available(ctx.scope),
         production_since=config.production_since,
         production_open=production_open(),
         can_go_back=not Record.objects.filter(
@@ -537,9 +536,7 @@ def config_out(config: Config, ctx: OperationContext) -> ConfigOut:
         representation=representation_out(config, nif),
         synced_at=config.synced_at,
         route_ready=not route_problem(config, config.environment, ctx.scope),
-        route_ready_for_production=not _route_sending_problem(
-            config, Environment.PRODUCTION, ctx.scope
-        ),
+        route_ready_for_production=not _route_sending_problem(config, Environment.PRODUCTION, ctx.scope),
         reasons=[wait(code) for code in blockers(config, config.environment, ctx.scope)],
         issue_blocker=wait(refused) if refused else None,
         live_blockers=[wait(code) for code in live_problems(config, ctx.scope)],
@@ -628,7 +625,7 @@ SORTS = {
         },
     },
 )
-def list_records(ctx: OperationContext, data: RecordListIn) -> dict:
+def list_records(ctx: OperationContext, data: RecordListIn) -> dict:  # noqa: C901
     queryset = with_corrections(Record.objects.all())
     text = (data.search or "").strip()
     if text.startswith("#") and text[1:].isdigit():
@@ -1251,9 +1248,7 @@ def representation_out(config: Config, issuer_nif: str) -> dict:
 
 
 def saas_unreachable() -> OperationError:
-    return OperationError(
-        str(SAAS_UNREACHABLE), code="verifactu.saas_unreachable", status=503
-    )
+    return OperationError(str(SAAS_UNREACHABLE), code="verifactu.saas_unreachable", status=503)
 
 
 @operation(
@@ -1280,6 +1275,7 @@ def saas_unreachable() -> OperationError:
     },
 )
 def representation_model(ctx: OperationContext, data: NoInput) -> RepresentationModelOut:
+    erplora_route.refuse_unavailable(ctx.scope)
     try:
         content = representation.model_pdf(issuer_model_details())
     except representation.SaasUnreachable:

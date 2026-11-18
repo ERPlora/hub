@@ -18,7 +18,7 @@ from apps.staff.admin import (
 )
 from apps.staff.models import Member, Role, Schedule, StaffSettings, TimeOff
 
-from .conftest import make_member, make_role, make_schedule, make_time_off
+from .conftest import HUB_DB, HUB_DB_COMMITTED, make_member, make_role, make_schedule, make_time_off
 
 MODELS = {
     Member: MemberAdmin,
@@ -48,6 +48,7 @@ def test_every_model_is_registered():
     assert ScheduleAdmin.inlines == [ScheduleDayInline]
 
 
+@HUB_DB
 def test_full_crud_for_the_platform_staff(superuser):
     # CRUD, not read only.
     request = request_by(superuser)
@@ -62,17 +63,16 @@ def test_full_crud_for_the_platform_staff(superuser):
     assert inline.has_delete_permission(request)
 
 
-@pytest.mark.django_db
-def test_a_role_is_added_and_changed_from_the_admin(client, superuser):
-    client.force_login(superuser)
-    added = client.post(
+@HUB_DB
+def test_a_role_is_added_and_changed_from_the_admin(hub_staff):
+    added = hub_staff.post(
         "/admin/staff/role/add/",
         {"name": "Stylist", "description": "", "color": "", "order": 0, "is_active": "on"},
         HTTP_HOST="hubs.localhost",
     )
     assert added.status_code == 302, added.content[:500]
     role = Role.objects.get()
-    changed = client.post(
+    changed = hub_staff.post(
         f"/admin/staff/role/{role.pk}/change/",
         {"name": "Senior stylist", "description": "", "color": "", "order": 1},
         HTTP_HOST="hubs.localhost",
@@ -82,13 +82,12 @@ def test_a_role_is_added_and_changed_from_the_admin(client, superuser):
     assert (role.name, role.order, role.is_active) == ("Senior stylist", 1, False)
 
 
-@pytest.mark.django_db
-def test_the_pages_render_on_the_platform_host(client, superuser):
+@HUB_DB
+def test_the_pages_render_on_the_platform_host(hub_staff):
     member = make_member(role=make_role("Stylist"), notes="Private")
     schedule = make_schedule(member)
     leave = make_time_off(member, "2026-10-12", reason="Flu")
     StaffSettings.objects.create()
-    client.force_login(superuser)
 
     for url, text in (
         ("/admin/staff/member/add/", b"first_name"),
@@ -100,23 +99,22 @@ def test_the_pages_render_on_the_platform_host(client, superuser):
         (f"/admin/staff/timeoff/{leave.pk}/change/", b"Flu"),
         ("/admin/staff/staffsettings/", b"staff settings"),
     ):
-        # The admin lives only on the platform host.
-        response = client.get(url, HTTP_HOST="hubs.localhost")
+        # The admin lives only on the platform host, with the business chosen.
+        response = hub_staff.get(url, HTTP_HOST="hubs.localhost")
         assert response.status_code == 200, url
         assert text in response.content, url
 
 
-@pytest.mark.django_db
-def test_the_settings_page_edits_the_working_day_by_the_same_rules_as_the_screen(client, superuser):
+@HUB_DB
+def test_the_settings_page_edits_the_working_day_by_the_same_rules_as_the_screen(hub_staff):
     # The eight retired settings (they changed nothing) are not offered; a working day that crosses
     # midnight cannot propose a schedule's week (STAFF-F13), so the admin refuses it like the screen.
     row = StaffSettings.objects.create()
-    client.force_login(superuser)
     url = f"/admin/staff/staffsettings/{row.pk}/change/"
-    form = client.get(url, HTTP_HOST="hubs.localhost").context["adminform"].form
+    form = hub_staff.get(url, HTTP_HOST="hubs.localhost").context["adminform"].form
     assert list(form.fields) == ["default_work_start", "default_work_end", "default_break_duration"]
 
-    refused = client.post(
+    refused = hub_staff.post(
         url,
         {"default_work_start": "22:00", "default_work_end": "06:00", "default_break_duration": 60},
         HTTP_HOST="hubs.localhost",
@@ -125,7 +123,7 @@ def test_the_settings_page_edits_the_working_day_by_the_same_rules_as_the_screen
     assert refused.context["adminform"].form.errors == {
         "default_work_end": ["The start time must be before the end time."]
     }
-    saved = client.post(
+    saved = hub_staff.post(
         url,
         {"default_work_start": "08:00", "default_work_end": "16:00", "default_break_duration": 30},
         HTTP_HOST="hubs.localhost",
@@ -135,19 +133,18 @@ def test_the_settings_page_edits_the_working_day_by_the_same_rules_as_the_screen
     assert (row.default_work_start.hour, row.default_work_end.hour, row.default_break_duration) == (8, 16, 30)
 
 
-@pytest.mark.django_db(transaction=True)
+@HUB_DB_COMMITTED
 @pytest.mark.parametrize("how", ["page", "list"])
-def test_a_record_is_deleted_with_what_hangs_from_it(client, superuser, how):
+def test_a_record_is_deleted_with_what_hangs_from_it(hub_staff, how):
     # Its «Delete» locks the record before Django deletes the rest (test_concurrency.py), in a transaction
     # of its own: the list's «Delete selected» runs outside the one of the delete page.
     member = make_member()
     make_schedule(member)
     make_time_off(member, "2026-11-02")
-    client.force_login(superuser)
     if how == "page":
         url, data = f"/admin/staff/member/{member.pk}/delete/", {"post": "yes"}
     else:
         url, data = "/admin/staff/member/", {"action": "delete_selected", "_selected_action": [str(member.pk)], "post": "yes"}
-    response = client.post(url, data, HTTP_HOST="hubs.localhost")
+    response = hub_staff.post(url, data, HTTP_HOST="hubs.localhost")
     assert response.status_code == 302, response.content[:500]
     assert not (Member.objects.exists() or Schedule.objects.exists() or TimeOff.objects.exists())

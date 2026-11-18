@@ -10,19 +10,18 @@ base.E014 only check its shape): each write is checked here against the real nam
 import json
 
 import pytest
+from live import assistant as shared
 from live.assistant import NAMED
 from live.context import OperationContext, Scope
 from live.meta import all_live_app_configs, permissions_for_role
 from live.operations import get, registry
 
 from base import assistant
-from base.tenancy import context
 from base.tenancy.context import use_hub
-from base.tenancy.tests import hubs
 from base.tests.test_assistant import technical_names
-from base.tests.test_assistant_card_values import AN_ID, list_field
+from base.tests.test_assistant_card_values_references import AN_ID, list_field
 
-from .conftest import make_service
+from .conftest import HUB_DB, make_service
 from .test_i18n import own_catalogue
 
 #: The writes of Citas the assistant runs whose data carry the services of a booking, each a line of its own.
@@ -36,12 +35,6 @@ BOOKS_SERVICES = {
 }
 
 
-@pytest.fixture
-def no_fallback(monkeypatch):
-    """As production: without ``use_hub`` a hub's model fails, nothing falls back on the shared database."""
-    monkeypatch.setattr(context, "_test_fallback", None)
-
-
 def person(hub, language: str, without: frozenset = frozenset()) -> OperationContext:
     """The business's admin in ``hub``, asking in ``language``, lacking the permissions ``without``."""
     return OperationContext(
@@ -53,7 +46,7 @@ def person(hub, language: str, without: frozenset = frozenset()) -> OperationCon
 
 
 def services_of(write: str, ids: list, ctx: OperationContext) -> dict:
-    card = assistant.card(get(write), {"services": [{"service_id": str(id_)} for id_ in ids]}, ctx.language, ctx)
+    card = assistant.cards.card(get(write), {"services": [{"service_id": str(id_)} for id_ in ids]}, ctx.language, ctx)
     assert not AN_ID.search(json.dumps(card, ensure_ascii=False)), write
     return list_field(card, "services")
 
@@ -62,20 +55,20 @@ def test_every_write_of_citas_that_books_services_is_listed_here():
     """Positive control of the tests below: a new write of Citas with a booking's services comes in here."""
     found = set()
     for name, op in registry.items():
-        if op.app_label != "appointment" or op.kind != "command" or not assistant.is_tool(op):
+        if op.app_label != "appointment" or op.kind != "command" or not assistant.tools.is_tool(op):
             continue
         schema = op.input.model_json_schema()
-        services = assistant._resolved(schema.get("properties", {}).get("services", {}), schema.get("$defs", {}))
-        line = assistant._resolved(services.get("items", {}), schema.get("$defs", {}))
+        services = shared.resolved(schema.get("properties", {}).get("services", {}), schema.get("$defs", {}))
+        line = shared.resolved(services.get("items", {}), schema.get("$defs", {}))
         if "service_id" in line.get("properties", {}):
             found.add(name)
     assert found == BOOKS_SERVICES
 
 
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
+@HUB_DB
 @pytest.mark.parametrize("language", ["es", "en"])
 @pytest.mark.parametrize("write", sorted(BOOKS_SERVICES))
-def test_the_card_names_each_service_a_write_books(write, language, hub_a, no_fallback):
+def test_the_card_names_each_service_a_write_books(write, language, hub_a):
     """What Lucía asked for, a cut and a colour: the card says both by their names, in the person's language."""
     with use_hub(hub_a):
         cut, colour = make_service("Corte de pelo"), make_service("Tinte", duration=60)
@@ -85,28 +78,28 @@ def test_the_card_names_each_service_a_write_books(write, language, hub_a, no_fa
     assert shown["label"] == {"es": "Servicios", "en": "Services"}[language]
 
 
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
-def test_a_name_the_model_writes_as_null_beside_the_id_still_names_the_service(hub_a, no_fallback):
+@HUB_DB
+def test_a_name_the_model_writes_as_null_beside_the_id_still_names_the_service(hub_a):
     """A model writes the name it does not give as null (``{"service_id": …, "service": null}``): the line still carries
     only its service, and the card names it. The name beside its record is left out, null or not (hub#860)."""
     with use_hub(hub_a):
         cut = make_service("Corte de pelo")
         booking = {"services": [{"service_id": str(cut.id), "service": None}]}
-        card = assistant.card(get("appointment.appointment.create"), booking, "es", person(hub_a, "es"))
+        card = assistant.cards.card(get("appointment.appointment.create"), booking, "es", person(hub_a, "es"))
         shown = list_field(card, "services")
     assert (shown["value"], shown.get(NAMED)) == ([{"service_id": "Corte de pelo"}], True)
 
 
 def services_said(write: str, services: list, ctx: OperationContext) -> tuple:
     """What the card of ``write`` shows of the booking's ``services`` as sent: its value and whether it is ``named``."""
-    shown = list_field(assistant.card(get(write), {"services": services}, ctx.language, ctx), "services")
+    shown = list_field(assistant.cards.card(get(write), {"services": services}, ctx.language, ctx), "services")
     return shown["value"], shown.get(NAMED, False)
 
 
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
+@HUB_DB
 @pytest.mark.parametrize("language", ["es", "en"])
 @pytest.mark.parametrize("write", sorted(BOOKS_SERVICES))
-def test_the_card_names_a_service_the_assistant_sends_by_its_name(write, language, hub_a, no_fallback):
+def test_the_card_names_a_service_the_assistant_sends_by_its_name(write, language, hub_a):
     """hub#860: with no id, the assistant sends the service as a person says it (``[{"service": "Tinte"}]``, as its
     schema invites) and the card said «Servicios: 1 elemento». Citas marks that text a name (``name_of``): the card says
     it, «Servicios: Tinte», alone or beside a service sent by its id."""
@@ -119,7 +112,7 @@ def test_the_card_names_a_service_the_assistant_sends_by_its_name(write, languag
     assert mixed == ([{"service_id": "Corte de pelo"}, {"service": "Tinte"}], True)
 
 
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
+@HUB_DB
 @pytest.mark.parametrize(
     ("line", "said"),
     [
@@ -128,7 +121,7 @@ def test_the_card_names_a_service_the_assistant_sends_by_its_name(write, languag
         ({"service_id": "CUT", "service": ""}, {"service_id": "Corte de pelo"}),
     ],
 )
-def test_an_empty_id_or_name_beside_the_other_still_names_the_service(line, said, hub_a, no_fallback):
+def test_an_empty_id_or_name_beside_the_other_still_names_the_service(line, said, hub_a):
     """rv-856: a model writes the datum it does not give as null or empty, in either place: the line still says its
     service, by the name sent or by its record (a null name beside its id: the test above)."""
     with use_hub(hub_a):
@@ -138,8 +131,8 @@ def test_an_empty_id_or_name_beside_the_other_still_names_the_service(line, said
     assert shown == ([said], True)
 
 
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
-def test_beside_its_id_the_card_says_the_service_booked_never_another_name(hub_a, no_fallback):
+@HUB_DB
+def test_beside_its_id_the_card_says_the_service_booked_never_another_name(hub_a):
     """The booking takes the service by its id and ignores the name beside it (``resolve_services``): the card says the
     one it books, «Corte de pelo», not the «Tinte» the model wrote."""
     with use_hub(hub_a):
@@ -150,8 +143,8 @@ def test_beside_its_id_the_card_says_the_service_booked_never_another_name(hub_a
     assert shown == ([{"service_id": "Corte de pelo"}], True)
 
 
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
-def test_an_id_written_where_the_name_goes_is_never_said(hub_a, no_fallback):
+@HUB_DB
+def test_an_id_written_where_the_name_goes_is_never_said(hub_a):
     """rv-37: a model that mixes up the two data writes the id in the name's place: an id is no name, the card says how
     many services the booking carries."""
     with use_hub(hub_a):
@@ -160,8 +153,8 @@ def test_an_id_written_where_the_name_goes_is_never_said(hub_a, no_fallback):
     assert shown[1] is False
 
 
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
-def test_a_name_beside_a_service_the_person_may_not_see_never_stands_for_it(hub_a, no_fallback):
+@HUB_DB
+def test_a_name_beside_a_service_the_person_may_not_see_never_stands_for_it(hub_a):
     """Whoever may not read Services sees how many services the booking carries: never the name the model wrote beside
     an id the booking takes."""
     with use_hub(hub_a):
@@ -171,9 +164,9 @@ def test_a_name_beside_a_service_the_person_may_not_see_never_stands_for_it(hub_
     assert shown == ([{}], True)
 
 
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
+@HUB_DB
 @pytest.mark.parametrize("language", ["es", "en"])
-def test_a_service_the_person_may_not_see_is_left_out_never_by_its_id(language, hub_a, no_fallback):
+def test_a_service_the_person_may_not_see_is_left_out_never_by_its_id(language, hub_a):
     """Whoever may not read Services sees how many services the booking carries, never which by an id."""
     with use_hub(hub_a):
         cut = make_service("Corte de pelo")
@@ -182,8 +175,8 @@ def test_a_service_the_person_may_not_see_is_left_out_never_by_its_id(language, 
     assert (shown["value"], shown.get(NAMED)) == ([{}], True)
 
 
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
-def test_a_service_of_another_business_is_never_named(hub_a, hub_b, no_fallback):
+@HUB_DB
+def test_a_service_of_another_business_is_never_named(hub_a, hub_b):
     """A service of business B, sent to a card of business A: A's card reads nothing of B's."""
     with use_hub(hub_b):
         theirs = make_service("Corte de B")
@@ -229,9 +222,9 @@ def test_the_card_names_a_datum_no_model_names_by_its_title_in_the_persons_langu
     neither the one pydantic makes up nor another app's words for it."""
     op = get(write)
     title = op.input.model_fields[datum].title
-    assert title and title != assistant._generated_title(datum)
+    assert title and title != shared.generated_title(datum)
     said = {
-        language: [field["label"] for field in assistant.card(op, {datum: "x"}, language)["fields"]]
+        language: [field["label"] for field in assistant.cards.card(op, {datum: "x"}, language)["fields"]]
         for language in ("es", "en")
     }
     spanish = own_catalogue().gettext(title)

@@ -201,6 +201,9 @@ class Service(UUIDModel):
     # own («file:service/services/<uuid7 hex>.webp» under its hub's prefix); empty: none, the till shows its initials.
     # Never a URL. ``db_default``: a process still on the previous code inserts without it.
     image = models.CharField(_("image"), max_length=200, blank=True, default="", db_default="")
+    # The id, in a separate copy of the business, of the service a recovery made this one again for (BASE-F114): a
+    # service has no code of its own, so it is how an app whose records hang from the copy's finds this one.
+    stands_for = models.UUIDField(_("copy's service it stands for"), null=True, blank=True, editable=False)
     # Without a live one it cannot be charged (it needs tax setup); tax.TaxCategory is never deleted.
     tax_category = models.ForeignKey(
         "tax.TaxCategory",

@@ -8,10 +8,7 @@ Ventas, con las operaciones de aquí (KITCHEN-F18–F20).
 
 > Manual de usuario y especificación de la app `kitchen`. Se escribe **antes** que el código: no se
 > programa nada que no esté aquí, y cada flujo pasa a `hecho` cuando sus tests están en verde
-> (servidor y páginas). Parte del `WORKFLOW.md` del módulo Cocina del producto actual
-> (`modules-workspace/modules/kitchen`, `origin/main` `fa95827`) y de sus `workflow/*.md`. Los números
-> de flujo se conservan (`KITCHEN-Fnn`) porque otras apps los citan. Lo que cambia frente al producto
-> actual lo dice «Cambios frente al producto actual», al final.
+> (servidor y páginas).
 
 ## Para qué sirve y para quién
 
@@ -42,8 +39,7 @@ ver, o lo que ya no existe, no sale.
 
 ## Referencia adoptada
 
-ERPlora no inventa flujos: adopta los que el mercado ya probó (contrastados en el producto actual el
-10/08, 15/08, 24/08 y 02/09/2026, y revisados al portar).
+ERPlora no inventa flujos: adopta los que el mercado ya probó.
 
 - **Estaciones de preparación, vista de pase (todas las estaciones), marcar listo por plato y por
   comanda, «urgente» después de enviar**:
@@ -58,16 +54,15 @@ ERPlora no inventa flujos: adopta los que el mercado ya probó (contrastados en 
 - **La comanda pasa sola a la siguiente etapa cuando se tacha el último plato**:
   [Odoo — pantalla de preparación](https://www.odoo.com/documentation/18.0/applications/sales/point_of_sale/preparation.html).
 - **Una estación deja de ver una comanda en cuanto termina su parte; el pase («Todas») la sigue
-  viendo entera** (Toast prep stations, Square KDS por estación, Fresh KDS): decisión de mercado de la
-  duda 1 del producto actual.
+  viendo entera** (Toast prep stations, Square KDS por estación, Fresh KDS): decisión de mercado.
 - **Cada tableta recuerda su estación** (Toast, Square y Fresh configuran cada pantalla a una
-  estación): decisión de mercado de la duda 4.
+  estación): decisión de mercado.
 - **Imprimir el pase al marcar listo, apagado de fábrica; un solo interruptor de sonido con volumen
   y tono de una lista cerrada** (Toast, Fresh KDS, MobiPOS).
 - **Lo que va solo a impresora no espera a que nadie lo marque**, y **cobrar no para la cocina**
   (Toast, Lightspeed K, Odoo, LS Central, Simphony): al cobrar sale lo que nadie va a marcar.
 - **La comanda nombra a quien atiende la cuenta («Atiende» del TPV) y, si es «Yo», a quien la envía**
-  (decisión de mercado del 21/10/2026; kitchen#82, hub#2033, staff#59). Así el pase sabe a quién llamar,
+  (decisión de mercado del 21/10/2026). Así el pase sabe a quién llamar,
   aunque esa persona no entre en la app.
   - Los TPV de sala nombran al camarero dueño de la cuenta o de la mesa:
     [Toast](https://support.toasttab.com/en/article/Why-Aren-t-Server-Names-Showing-on-Kitchen-Tickets)
@@ -86,8 +81,7 @@ ERPlora no inventa flujos: adopta los que el mercado ya probó (contrastados en 
     De ahí sale el respaldo de «Yo».
   - [Lightspeed K](https://k-series-support.lightspeedhq.com/hc/articles/4403006478107) deja elegir los
     campos del ticket.
-  - Es también lo que hacía el producto actual y lo que promete el propio TPV en «Quién atiende esta
-    cuenta».
+  - Es lo que promete el propio TPV en «Quién atiende esta cuenta».
 
 ## Antes de empezar
 
@@ -115,16 +109,21 @@ Menú **Cocina → Pantalla**. El tablero de cocina. Una sola barra arriba, fija
 vistas en pestañas con su contador («Comandas» y «Listas»; «Resumen» sin contador), el botón «Pantalla completa»
 y, si en las comandas en marcha hay platos de más de una estación, los botones de estación («Todas»,
 cada estación por su nombre y con su color, y «Sin estación»). La estación elegida se recuerda en ese
-dispositivo. Debajo, una rejilla de tarjetas de columnas iguales (una sola en el móvil). Cada tarjeta:
-la etiqueta («Mesa 4»; sin etiqueta, el tipo), «Camarero: <nombre>», las marcas «Urgente», «VIP»,
-«Ronda N» (desde la segunda) y «Lista», el reloj y el número corto «#0012»; los platos con la cantidad
-grande, el nombre, sus suplementos en negrita, la nota en cursiva y, en «Todas», la estación; los platos
-de un menú, junto a una raya bajo la cabecera del menú, que dice cuántos platos lleva («2 platos») y al
-tocarla marca listos sus platos; un icono de papel si la estación es solo de papel. Un plato anulado en el TPV sale tachado, con «Anulado» y el motivo en rojo, y no
-responde al toque. Al pie, según el permiso y el estado: «Listo», «Marcar urgente» / «Quitar
-urgente», «Recuperar» y «Servida», enteros y del tamaño de un dedo en una tableta. El borde superior de la tarjeta va en verde, ámbar o rojo según el
-tiempo desde que se envió. Vacía: «No hay comandas en marcha.» (Comandas), «No hay nada esperando a
-recoger.» (Listas), «No queda nada por cocinar.» (Resumen). Cargando: «Cargando la pantalla…». Error:
+dispositivo. Debajo, una rejilla de tarjetas de columnas iguales, tantas como quepan (una sola en el móvil, sin
+desplazamiento lateral). Cada tarjeta: a la izquierda, el tipo en un icono, la etiqueta («Mesa 4»; sin etiqueta, el
+tipo) y «Camarero: <nombre>»; a la derecha, el reloj, la espera en palabras con su icono («En tiempo», «Aviso» o
+«Retraso») y el número corto «#0012»; debajo, el estado («Por preparar», «En preparación» o «Lista») y las marcas
+«Urgente», «VIP» y «Ronda N» (desde la segunda). Los platos con la cantidad grande («2×»), el nombre, sus suplementos
+en negrita, la nota en cursiva, en «Todas» la estación con su color, «Solo papel» si la estación es solo de papel y, a
+la derecha, un icono con su estado (por preparar, en preparación, listo o anulado); los platos de un menú, junto a una
+raya bajo la cabecera del menú, que dice cuántos platos lleva («2 platos») y al tocarla marca listos sus platos. Un
+plato listo sale tachado y atenuado. Un plato anulado en el TPV sale tachado, con «Anulado» y el motivo en rojo, y no
+responde al toque. Al pie, según el permiso y el estado, la acción principal a todo el ancho («Listo» mientras se
+cocina con platos por hacer, «Servida» cuando está lista) y, a su derecha, «⋮», que abre las demás: «Marcar urgente» /
+«Quitar urgente» y «Recuperar»; sin ninguna de ellas no hay «⋮». Todo se pulsa bien con el dedo en una tableta. La
+franja superior de la tarjeta va en verde, ámbar o rojo según el tiempo desde que se envió. Vacía: «No hay comandas en marcha.» (Comandas), «No hay nada esperando a
+recoger.» (Listas), «No queda nada por cocinar.» (Resumen). Cargando: «Cargando la pantalla…» sobre tarjetas
+grises. Error:
 «No se pudo cargar la pantalla de cocina» con «Reintentar». Un fallo al pedir papel deja «No se ha
 podido imprimir el pase. Revisa la impresora de la estación.» o «No se ha podido imprimir el aviso de
 urgencia. Avisa a cocina de viva voz y revisa su impresora.» hasta que una impresión posterior salga
@@ -161,9 +160,9 @@ acciones solo salen a quien puede gestionar estaciones (responsable, administrad
 ### Historial
 Menú **Cocina → Historial**, título «Historial de cocina». Tabla de lo que pasó en cocina, lo último
 primero, 50 por página (otro tamaño se elige al pie): Acción, Comanda (el número), Plato, Quién (el
-nombre de la persona o, si no tiene, su correo; «Sistema» si lo hizo Cocina sola), Notas y Cuándo
-(fecha y hora del negocio). Buscador «Buscar comanda o notas…» (un trozo del número o palabras de las
-notas); filtro de acción con las mismas palabras de la columna («Recibida», «Creada», «Lanzada»,
+nombre de la persona o, si no tiene, su correo, o el de la API key; «Sistema» si no lo hizo una persona:
+Cocina sola o una automatización), Notas y Cuándo (fecha y hora del negocio). Buscador «Buscar comanda o
+notas…» (un trozo del número o palabras de las notas); filtro de acción con las mismas palabras de la columna («Recibida», «Creada», «Lanzada»,
 «Lista», «Plato listo», «Plato recuperado», «Plato anulado», «Servida», «Recuperada», «Cancelada»,
 «Urgente», «Urgencia quitada», «Reimpresa», «Borrada»). Vacía: «Sin actividad reciente en cocina.». Cargando: el esqueleto. Error:
 el de la tabla con reintento.
@@ -227,11 +226,9 @@ cierra la ventana sin guardarlo. Con la ventana como se abrió, atrás la cierra
 | KITCHEN-F27 | Cerrar las rondas al cobrar la cuenta entera | hecho |
 | KITCHEN-F28 | Retirar las rondas de una cuenta eliminada o unida a otra | hecho |
 | KITCHEN-F29 | Anular un plato ya enviado con aviso a cocina | hecho |
-| KITCHEN-F30 | Pasar las comandas de un cliente unido a otro | descartado — la comanda no guarda cliente |
 | KITCHEN-F31 | Dar a Caja las comandas que siguen en marcha | hecho |
 
 ### KITCHEN-F01 Crear una estación
-<!-- origen: fi:modules/kitchen#command-kitchen-stations-create-update-sql fi:modules/kitchen#query-kitchen-stations-list old:kitchen/workflow/estaciones.md#kitchen-f01 wf:restaurante-dia#rec_restaurante-f02 -->
 Estado: hecho
 Actor: responsable, administrador
 Pantalla: Estaciones
@@ -251,7 +248,6 @@ Quien no puede gestionar estaciones no ve el botón.
 Implicados: KITCHEN-F02, KITCHEN-F03, KITCHEN-F04, KITCHEN-F08, PRINTING-F04
 
 ### KITCHEN-F02 Editar, renombrar o desactivar una estación
-<!-- origen: fi:modules/kitchen#command-kitchen-stations-create-update-sql old:kitchen/workflow/estaciones.md#kitchen-f02 -->
 Estado: hecho
 Actor: responsable, administrador
 Pantalla: Estaciones
@@ -269,7 +265,6 @@ dispositivo acaba de eliminar dice que ya no existe.
 Implicados: KITCHEN-F01, KITCHEN-F04, KITCHEN-F10, PRINTING-F04
 
 ### KITCHEN-F03 Eliminar una estación
-<!-- origen: fi:modules/kitchen#command-kitchen-stations-delete-handler-wasm-delete_station old:kitchen/workflow/estaciones.md#kitchen-f03 -->
 Estado: hecho
 Actor: responsable, administrador
 Pantalla: Estaciones
@@ -285,7 +280,6 @@ Pásalos antes a otra estación.», dentro del diálogo.
 Implicados: KITCHEN-F01, KITCHEN-F04, KITCHEN-F10
 
 ### KITCHEN-F04 Mandar productos y categorías a una estación (y quitarlos)
-<!-- origen: wf:restaurante-dia#rec_restaurante-f17 wf:restaurante-dia#rec_restaurante-f02 fi:modules/kitchen#command-kitchen-stations-set_routing-handler-wasm-set_routing old:kitchen/workflow/estaciones.md#kitchen-f04 -->
 Estado: hecho
 Actor: responsable, administrador
 Pantalla: Estaciones
@@ -307,7 +301,6 @@ momento, el enrutado se rechaza igual o se guarda antes del borrado: nunca da er
 Implicados: KITCHEN-F01, KITCHEN-F05, KITCHEN-F08, INVENTORY-F04, INVENTORY-F06, INVENTORY-F07, INVENTORY-F27
 
 ### KITCHEN-F05 Recibir la ronda que envía el TPV
-<!-- origen: wf:restaurante-dia#rec_restaurante-f07 wf:restaurante-dia#rec_restaurante-f17 fi:modules/kitchen#command-kitchen-orders-create_from_sale-handler-wasm-create_order_from_sale fi:modules/kitchen#event-listen-sale-completed-kitchen-orders-create_from_sale old:kitchen/workflow/llegada-de-la-comanda.md#kitchen-f05 qa:modules/kitchen/kds-screen-and-courses qa:verticals/restaurant/06-service-orders-and-kitchen -->
 Estado: hecho
 Actor: sistema
 Pantalla: ninguna
@@ -333,7 +326,6 @@ aquí bloquea al camarero.
 Implicados: SALE-F20, KITCHEN-F04, KITCHEN-F06, KITCHEN-F07, KITCHEN-F08, KITCHEN-F16, KITCHEN-F18
 
 ### KITCHEN-F06 Un menú del día en la comanda
-<!-- origen: wf:restaurante-dia#rec_restaurante-f07 old:kitchen/workflow/llegada-de-la-comanda.md#kitchen-f06 -->
 Estado: hecho
 Actor: empleado
 Pantalla: Pantalla
@@ -359,7 +351,6 @@ el menú cambie después.
 Implicados: SALE-F12, SALE-F20, COMBO-F11, KITCHEN-F04, KITCHEN-F08, KITCHEN-F29
 
 ### KITCHEN-F07 Notas de cada plato
-<!-- origen: wf:restaurante-dia#rec_restaurante-f07 old:kitchen/workflow/llegada-de-la-comanda.md#kitchen-f07 -->
 Estado: hecho
 Actor: empleado
 Pantalla: Pantalla
@@ -379,7 +370,6 @@ suplemento que se cobra en una línea aparte (otro IVA) sale igual bajo su plato
 Implicados: SALE-F11, SALE-F13, SALE-F20, MODIFIER-F08, KITCHEN-F08
 
 ### KITCHEN-F08 La comanda sale en papel en cada estación
-<!-- origen: wf:restaurante-dia#rec_restaurante-f07 old:kitchen/workflow/llegada-de-la-comanda.md#kitchen-f08 -->
 Estado: hecho
 Actor: sistema
 Pantalla: ninguna
@@ -401,7 +391,6 @@ impresora de cocina en Impresión.» (KITCHEN-F18).
 Implicados: KITCHEN-F05, KITCHEN-F06, KITCHEN-F07, KITCHEN-F09, KITCHEN-F18, SALE-F20, PRINTING-F04, PRINTING-F10, PRINTING-F18
 
 ### KITCHEN-F09 Reimprimir una comanda
-<!-- origen: old:kitchen/workflow/llegada-de-la-comanda.md#kitchen-f09 -->
 Estado: hecho
 Actor: empleado, responsable
 Pantalla: Comandas
@@ -416,7 +405,6 @@ Si falla: «No se pudo imprimir la comanda: <motivo>», con el motivo de Impresi
 Implicados: KITCHEN-F08, KITCHEN-F21, PRINTING-F11
 
 ### KITCHEN-F10 Ver el tablero de cocina
-<!-- origen: wf:restaurante-dia#rec_restaurante-f07 qa:modules/kitchen/kds-screen-and-courses qa:verticals/restaurant/06-service-orders-and-kitchen fi:modules/kitchen#query-kitchen-orders-items old:kitchen/workflow/pantalla-de-cocina.md#kitchen-f10 -->
 Estado: hecho
 Actor: empleado, responsable
 Pantalla: Pantalla
@@ -428,9 +416,10 @@ Pasos:
 3. Si hay platos de más de una estación, elige la tuya: «Todas» enseña todos los platos (el pase);
    una estación enseña solo sus platos y solo las comandas que aún tienen algo suyo por hacer; «Sin
    estación», los platos sin enrutar. La elección se recuerda en ese dispositivo.
-4. El borde de cada tarjeta pasa de verde a ámbar al llegar a «Aviso ámbar» y a rojo al llegar a «Aviso
-   rojo», contando desde que se envió; el reloj sigue en rojo. Sin «Semáforo de color» el borde queda
-   gris; sin «Mostrar cronómetro» no hay reloj.
+4. La franja de cada tarjeta pasa de verde a ámbar al llegar a «Aviso ámbar» y a rojo al llegar a «Aviso
+   rojo», contando desde que se envió, y junto al reloj lo dice en palabras: «En tiempo», «Aviso» o «Retraso»
+   (el reloj y la palabra, en ámbar o en rojo). Sin «Semáforo de color» la franja queda gris y no dice la
+   espera; sin «Mostrar cronómetro» no hay reloj, pero sí la espera.
 Entra: las comandas Por preparar, En preparación y Listas con sus platos; los ajustes; los nombres y
 colores vivos de las estaciones.
 Sale: nada; solo enseña. Los botones de cada tarjeta se ven enteros y se pulsan bien con el dedo en una
@@ -440,12 +429,11 @@ permiso de cambiar comandas, la pantalla es de solo mirar: sin botones y los pla
 Implicados: KITCHEN-F11, KITCHEN-F12, KITCHEN-F13, KITCHEN-F14, KITCHEN-F15, KITCHEN-F16, KITCHEN-F26
 
 ### KITCHEN-F11 Marcar platos listos
-<!-- origen: wf:restaurante-dia#rec_restaurante-f07 qa:verticals/restaurant/06-service-orders-and-kitchen fi:modules/kitchen#command-kitchen-orders-set_status-handler-wasm-update_order_status old:kitchen/workflow/pantalla-de-cocina.md#kitchen-f11 qa:modules/kitchen/mark-ready-and-pass -->
 Estado: hecho
 Actor: empleado, responsable
 Pantalla: Pantalla (también el asistente: «marca lista la mesa 4»)
 Pasos:
-1. Toca un plato cuando esté hecho: se tacha con ✓.
+1. Toca un plato cuando esté hecho: se tacha y su icono pasa a listo.
 2. O toca la cabecera de la tarjeta, o «Listo»: se marcan los platos de esa tarjeta que se ven en tu
    pantalla y siguen por hacer (en una estación, solo los suyos).
 3. El primer plato marcado pasa la comanda a «En preparación». Cuando no queda ningún plato por hacer,
@@ -459,15 +447,13 @@ Actualiza e inténtalo de nuevo.».
 Implicados: KITCHEN-F10, KITCHEN-F12, KITCHEN-F17, KITCHEN-F25
 
 ### KITCHEN-F12 Recuperar lo marcado por error
-<!-- origen: fi:modules/kitchen#command-kitchen-orders-set_status-handler-wasm-update_order_status qa:modules/kitchen/mark-ready-and-pass old:kitchen/workflow/pantalla-de-cocina.md#kitchen-f12 -->
 Estado: hecho
 Actor: empleado, responsable
 Pantalla: Pantalla
 Pasos:
 1. Toca un plato tachado: vuelve a estar por hacer.
-2. O «Recuperar» en la tarjeta (en una tableta, el botón se ve entero): vuelven los platos tachados
-   que se ven en tu pantalla.
-3. Una comanda de «Listas» se recupera con «Recuperar»: vuelve a «En preparación» y a «Comandas».
+2. O «⋮» → «Recuperar» en la tarjeta: vuelven los platos tachados que se ven en tu pantalla.
+3. Una comanda de «Listas» se recupera con «⋮» → «Recuperar»: vuelve a «En preparación» y a «Comandas».
 Entra: los platos tachados.
 Sale: cada plato por hacer (avisa: plato recuperado; Historial «Plato recuperado») y, si la comanda
 estaba Lista, «Recuperada». Recuperar lo que ya está por hacer no cambia nada.
@@ -475,7 +461,6 @@ Si falla: una comanda Servida o Cancelada no se recupera.
 Implicados: KITCHEN-F10, KITCHEN-F11, KITCHEN-F16, KITCHEN-F21, KITCHEN-F25
 
 ### KITCHEN-F13 Entregar lo que está listo
-<!-- origen: qa:verticals/restaurant/06-service-orders-and-kitchen fi:modules/kitchen#command-kitchen-orders-set_status-handler-wasm-update_order_status qa:modules/kitchen/mark-ready-and-pass old:kitchen/workflow/pantalla-de-cocina.md#kitchen-f13 wf:restaurante-dia#rec_restaurante-f08 -->
 Estado: hecho
 Actor: empleado, responsable
 Pantalla: Pantalla, Comandas
@@ -489,16 +474,15 @@ Si falla: solo una comanda Lista se entrega.
 Implicados: KITCHEN-F11, KITCHEN-F21, KITCHEN-F27
 
 ### KITCHEN-F14 Marcar urgente una ronda desde la pantalla de cocina
-<!-- origen: old:kitchen/workflow/pantalla-de-cocina.md#kitchen-f14 -->
 Estado: hecho
 Actor: empleado, responsable
 Pantalla: Pantalla
 Pasos:
-1. En una tarjeta que se cocina, «Marcar urgente»: lleva «Urgente» y salta al principio del tablero
+1. En una tarjeta que se cocina, «⋮» → «Marcar urgente»: lleva «Urgente» y salta al principio del tablero
    en todas las pantallas, que suenan una vez.
 2. Las estaciones que imprimen y aún tienen platos de esa ronda por hacer reciben un aviso corto en
    papel: la cabecera de la comanda con `!! URGENTE !!` y sin platos.
-3. «Quitar urgente» lo deshace y no imprime nada. Una ronda VIP no ofrece el botón, y por el asistente
+3. «Quitar urgente» lo deshace y no imprime nada. Una ronda VIP no lo ofrece, y por el asistente
    o la API se rechaza («Esa comanda es VIP: marcarla urgente no cambia su prioridad.»).
 Entra: la comanda que se cocina.
 Sale: la ronda urgente (avisa: comanda cambiada; Historial «Urgente»); cada paso a urgente da un aviso
@@ -508,7 +492,6 @@ cocina.»). Si el aviso no se imprime, la pantalla lo dice.
 Implicados: KITCHEN-F10, KITCHEN-F16, KITCHEN-F20, PRINTING-F10
 
 ### KITCHEN-F15 Ver cuánto queda por cocinar
-<!-- origen: fi:modules/kitchen#query-kitchen-stations-pending_counts old:kitchen/workflow/pantalla-de-cocina.md#kitchen-f15 -->
 Estado: hecho
 Actor: empleado, responsable
 Pantalla: Pantalla (también el asistente: «qué hay pendiente en plancha»)
@@ -522,7 +505,6 @@ Si falla: sin nada por hacer, «No queda nada por cocinar.».
 Implicados: KITCHEN-F10, KITCHEN-F29
 
 ### KITCHEN-F16 Sonar al entrar una comanda
-<!-- origen: old-hub:HUB_APP-F24 old-hub:HUB_APP-F26 old-hub:HUB_SHELL-F65 old:kitchen/workflow/pantalla-de-cocina.md#kitchen-f16 -->
 Estado: hecho
 Actor: sistema
 Pantalla: Pantalla
@@ -542,7 +524,6 @@ suena. Si Android aún no permite notificar, la app pide el permiso una vez; la 
 Implicados: KITCHEN-F05, KITCHEN-F10, KITCHEN-F12, KITCHEN-F14, KITCHEN-F26
 
 ### KITCHEN-F17 Imprimir el pase al marcar lista
-<!-- origen: qa:modules/kitchen/mark-ready-and-pass old:kitchen/workflow/pantalla-de-cocina.md#kitchen-f17 -->
 Estado: hecho
 Actor: sistema
 Pantalla: ninguna
@@ -558,7 +539,6 @@ Si falla: la pantalla enseña «No se ha podido imprimir el pase. Revisa la impr
 Implicados: KITCHEN-F11, KITCHEN-F26, PRINTING-F10
 
 ### KITCHEN-F18 Enviar la ronda desde el TPV, normal o urgente
-<!-- origen: wf:restaurante-dia#rec_restaurante-f07 qa:modules/kitchen/kds-screen-and-courses qa:verticals/restaurant/06-service-orders-and-kitchen old:kitchen/workflow/tpv.md#kitchen-f18 qa:modules/sales/take-order-by-courses qa:verticals/restaurant/11-races-and-concurrency -->
 Estado: hecho
 Actor: empleado
 Pantalla: Ventas: Vender
@@ -583,7 +563,6 @@ enviar la comanda a cocina. Inténtalo de nuevo.». Sin Cocina activa, el TPV no
 Implicados: SALE-F20, KITCHEN-F05, KITCHEN-F08, KITCHEN-F09, KITCHEN-F19, PRINTING-F10
 
 ### KITCHEN-F19 Seguir las comandas de la cuenta desde el TPV
-<!-- origen: wf:restaurante-dia#rec_restaurante-f08 old:kitchen/workflow/tpv.md#kitchen-f19 -->
 Estado: hecho
 Actor: empleado
 Pantalla: Ventas: Vender (hoja «Comandas de la cuenta»)
@@ -602,7 +581,6 @@ Sin permiso de ver comandas, o sin Cocina activa, el TPV no enseña «Comandas �
 Implicados: SALE-F20, SALE-F24, KITCHEN-F05, KITCHEN-F20, KITCHEN-F28, KITCHEN-F29
 
 ### KITCHEN-F20 Marcar urgente una ronda desde el TPV
-<!-- origen: wf:restaurante-dia#rec_restaurante-f08 old:kitchen/workflow/tpv.md#kitchen-f20 -->
 Estado: hecho
 Actor: empleado, responsable
 Pantalla: Ventas: Vender (hoja «Comandas de la cuenta»)
@@ -624,7 +602,6 @@ cambiar comandas lo ve. Sin Cocina activa, el TPV no enseña nada de esto.
 Implicados: SALE-F20, KITCHEN-F14, KITCHEN-F19
 
 ### KITCHEN-F21 Mover una comanda desde la lista de Comandas
-<!-- origen: fi:modules/kitchen#command-kitchen-orders-set_status-handler-wasm-update_order_status fi:modules/kitchen#command-kitchen-orders-update-sql fi:modules/kitchen#query-kitchen-orders-get fi:modules/kitchen#query-kitchen-orders-list old:kitchen/workflow/comandas-historial-y-ajustes.md#kitchen-f21 -->
 Estado: hecho
 Actor: empleado, responsable
 Pantalla: Comandas
@@ -641,7 +618,6 @@ esta acción. Actualiza e inténtalo de nuevo.».
 Implicados: KITCHEN-F11, KITCHEN-F12, KITCHEN-F13, KITCHEN-F19, KITCHEN-F22, KITCHEN-F23, KITCHEN-F25
 
 ### KITCHEN-F22 Cancelar una comanda
-<!-- origen: old-hub:HUB_SHELL-F78 old:kitchen/workflow/comandas-historial-y-ajustes.md#kitchen-f22 qa:modules/kitchen/void-visible-in-kitchen -->
 Estado: hecho
 Actor: responsable
 Pantalla: Comandas (también el asistente)
@@ -659,7 +635,6 @@ Si falla: una comanda Servida o Cancelada no se cancela. Una que nunca salió en
 Implicados: KITCHEN-F21, KITCHEN-F25, KITCHEN-F28, KITCHEN-F29, PRINTING-F10
 
 ### KITCHEN-F23 Crear una comanda a mano
-<!-- origen: fi:modules/kitchen#command-kitchen-orders-create-handler-wasm-create_order old:kitchen/workflow/comandas-historial-y-ajustes.md#kitchen-f23 -->
 Estado: hecho
 Actor: empleado, responsable
 Pantalla: Comandas
@@ -680,7 +655,6 @@ hub#888). Como no cuelga de ninguna cuenta, cobrar no la cierra.
 Implicados: KITCHEN-F04, KITCHEN-F10, KITCHEN-F21, KITCHEN-F24, KITCHEN-F27, INVENTORY-F27
 
 ### KITCHEN-F24 Borrar una comanda
-<!-- origen: fi:modules/kitchen#command-kitchen-orders-delete-handler-wasm-delete_order old:kitchen/workflow/comandas-historial-y-ajustes.md#kitchen-f24 -->
 Estado: hecho
 Actor: responsable
 Pantalla: asistente o API
@@ -696,13 +670,13 @@ lo mismo y no cambia nada.
 Implicados: KITCHEN-F22, KITCHEN-F23, KITCHEN-F25
 
 ### KITCHEN-F25 Consultar el historial de cocina
-<!-- origen: fi:modules/kitchen#command-kitchen-logs-create-sql fi:modules/kitchen#event-listen-kitchen-order-fired-ready-served-recalled-cancelled-kitchen-logs-create fi:modules/kitchen#query-kitchen-logs-list old:kitchen/workflow/comandas-historial-y-ajustes.md#kitchen-f25 -->
 Estado: hecho
 Actor: empleado, responsable, administrador
 Pantalla: Historial
 Pasos:
 1. Abre **Cocina → Historial**: qué pasó, en qué comanda y con qué plato, quién (su nombre o, si no
-   tiene, su correo), sus notas y cuándo, lo último primero.
+   tiene, su correo; «Sistema» si no fue una persona: Cocina sola o una automatización), sus notas y
+   cuándo, lo último primero.
 2. En «Buscar comanda o notas…», escribe un trozo del número de la comanda o unas palabras de las
    notas; filtra por acción («Recibida», «Cancelada»…).
 3. Al pie, pasa de página o elige cuántas entradas ver (25, 50…).
@@ -715,7 +689,6 @@ permiso de ver el historial lee «No tienes permiso para ver esto.».
 Implicados: KITCHEN-F05, KITCHEN-F11, KITCHEN-F12, KITCHEN-F14, KITCHEN-F21, KITCHEN-F22, KITCHEN-F24, KITCHEN-F29
 
 ### KITCHEN-F26 Ajustar la pantalla de cocina
-<!-- origen: fi:modules/kitchen#command-kitchen-settings-update-sql fi:modules/kitchen#query-kitchen-settings-get old:kitchen/workflow/comandas-historial-y-ajustes.md#kitchen-f26 -->
 Estado: hecho
 Actor: responsable, administrador
 Pantalla: Ajustes
@@ -740,7 +713,6 @@ siguiente intento también se rechaza. Un rechazo sin campo se queda hasta el si
 Implicados: KITCHEN-F10, KITCHEN-F16, KITCHEN-F17, KITCHEN-F23, KITCHEN-F27
 
 ### KITCHEN-F27 Cerrar las rondas al cobrar la cuenta entera
-<!-- origen: wf:restaurante-dia#rec_restaurante-f11 wf:restaurante-dia#rec_restaurante-f17 old:kitchen/workflow/cierre-y-otros-modulos.md#kitchen-f27 -->
 Estado: hecho
 Actor: sistema
 Pantalla: ninguna
@@ -762,7 +734,6 @@ sirve al cobrar aunque nadie lo haya marcado; lo cobrado antes de apagarlo se si
 Implicados: SALE-F01, SALE-F22, KITCHEN-F13, KITCHEN-F25, KITCHEN-F26
 
 ### KITCHEN-F28 Retirar las rondas de una cuenta eliminada o unida a otra
-<!-- origen: qa:verticals/restaurant/08-incidents-voids-and-refunds old:kitchen/workflow/cierre-y-otros-modulos.md#kitchen-f28 wf:restaurante-dia#rec_restaurante-f10 wf:restaurante-dia#rec_restaurante-f14 -->
 Estado: hecho
 Actor: sistema
 Pantalla: ninguna
@@ -780,7 +751,6 @@ en la cocina, y un aviso repetido tampoco: ninguna ronda se cancela dos veces.
 Implicados: SALE-F18, SALE-F24, KITCHEN-F19, KITCHEN-F22, KITCHEN-F25, KITCHEN-F27
 
 ### KITCHEN-F29 Anular un plato ya enviado con aviso a cocina
-<!-- origen: old-hub:HUB_SHELL-F78 qa:verticals/restaurant/08-incidents-voids-and-refunds qa:verticals/restaurant/06-service-orders-and-kitchen qa:modules/kitchen/void-visible-in-kitchen wf:restaurante-dia#rec_restaurante-f14 old:kitchen/workflow/cierre-y-otros-modulos.md#kitchen-f29 qa:modules/sales/modify-order-after-sending -->
 Estado: hecho
 Actor: responsable (en el TPV)
 Pantalla: Ventas: Vender
@@ -796,23 +766,7 @@ salió en papel, sale el vale «PLATO ANULADO · Mesa 4» con ese plato.
 Si falla: una ronda Servida o Cancelada no se toca.
 Implicados: SALE-F20, COMBO-F11, KITCHEN-F06, KITCHEN-F10, KITCHEN-F15, KITCHEN-F19, KITCHEN-F25
 
-### KITCHEN-F30 Pasar las comandas de un cliente unido a otro
-<!-- origen: old:kitchen/workflow/cierre-y-otros-modulos.md#kitchen-f30 -->
-Estado: descartado — la comanda no guarda cliente: unir dos fichas de cliente no toca Cocina
-Actor: nadie en Cocina (la unión la hace Clientes)
-Pantalla: ninguna
-Pasos:
-1. En Clientes se unen dos fichas de la misma persona (CUSTOMER-F13) y Ventas pasa sus ventas a la que
-   queda (SALE-F33).
-2. En Cocina no pasa nada: la comanda guarda la etiqueta de la cuenta como texto y ningún cliente, así
-   que no hay nada que pasar.
-Entra: nada; el TPV no manda el cliente a Cocina.
-Sale: nada; las comandas no cambian.
-Si falla: no aplica: Cocina no hace nada que pueda fallar.
-Implicados: CUSTOMER-F13, SALE-F33
-
 ### KITCHEN-F31 Dar a Caja las comandas que siguen en marcha
-<!-- origen: wf:restaurante-dia#rec_restaurante-f16 old:kitchen/workflow/cierre-y-otros-modulos.md#kitchen-f31 qa:verticals/restaurant/09-register-closing-and-reports -->
 Estado: hecho
 Actor: sistema
 Pantalla: ninguna
@@ -944,8 +898,8 @@ avisos de Ventas (`sale.order.*`).
 | Guardar los ajustes | sí | sí | sí | no | `kitchen.change_settings` |
 | Ver el historial | sí | sí | sí | sí | `kitchen.view_log` |
 
-Los papeles llegan del SaaS con prefijo (`hub_owner`, `hub_admin`, `hub_manager`, `hub_employee`); el
-cajero y el cocinero del producto actual son empleados. `kitchen.ticket.sync` pide `kitchen.system`,
+Los papeles llegan del SaaS con prefijo (`hub_owner`, `hub_admin`, `hub_manager`, `hub_employee`).
+`kitchen.ticket.sync` pide `kitchen.system`,
 que no tiene ningún papel: solo el sistema (`*`).
 
 ### Notas técnicas
@@ -1020,7 +974,7 @@ que no tiene ningún papel: solo el sistema (`*`).
   como las diría quien la usa (Cocina está en `LIVE_ASSISTANT_ASKS_REQUIRED`, `live.E020`), sin «cocina», «ticket»,
   «mesa» ni «cuenta» salvo donde la herramienta es eso (las rondas de una cuenta: `send`, `receive`, `by_order`):
   esas palabras ya nombran la app o su comanda, y repetidas en 29 herramientas las ponían por delante de Ventas en
-  cada frase que las dice. Para el Hub (`base.assistant.SYNONYMS`), «la comanda» (por sus frases: «la comanda», «qué
+  cada frase que las dice. Para el Hub (`assistant_synonyms`, en `apps.py`), «la comanda» (por sus frases: «la comanda», «qué
   comandas», «las comandas de…»; la palabra sola sigue siendo la cuenta de Ventas para live) es la comanda de cocina
   (`ticket`), una «estación» y «el puesto» la estación, «urgente» o «prisa» la urgencia (`set_rush`), el «enrutado»
   y la «regla» que manda un plato a una estación el enrutado (live lee «regla» como cualquier regla, la de Impuestos
@@ -1043,11 +997,10 @@ que no tiene ningún papel: solo el sistema (`*`).
   y por `DISHES` («Platos»). El tipo de `send` y `receive` lleva `choices_of: order_type` (`OF_ORDER_TYPE`) y la
   prioridad de `receive` es la lista cerrada de la comanda: la tarjeta los dice con las etiquetas de `Ticket`
   («Para llevar», «Urgente»). Lo que Ventas manda se sigue leyendo antes (`_channel`, `_priority`): una palabra
-  desconocida cae a «En sala» y «Normal», y una ronda pedida sin prioridad queda «Normal» (antes llegaba vacía y
-  rompía la restricción `kitchen_ticket_priority`). Sin persona detrás, sin `kitchen.view_ticket`,
+  desconocida cae a «En sala» y «Normal», y una ronda pedida sin prioridad queda «Normal». Sin persona detrás, sin `kitchen.view_ticket`,
   `inventory.view_product`, `inventory.view_category` o `sale.view_sale`, con un id de otro negocio o de algo
   borrado, el registro queda fuera, nunca su id (`tests/test_assistant_card_records.py`); el trinquete de
-  `base/tests/test_assistant_card_values.py` impide que entre un dato sin marca o una lista sin etiqueta. Las dos
+  `base/tests/test_assistant_card_values_references.py` impide que entre un dato sin marca o una lista sin etiqueta. Las dos
   lecturas nuevas son internas (`ai=INTERNAL`, sin ruta ni consulta viva: el modelo lee las estaciones en su lista
   y los platos con su comanda) y tienen su nombre en el catálogo de Automatizaciones. En el navegador,
   `tests/e2e/kitchen-assistant-card.spec.ts` (la tarjeta en español e inglés, en tres tamaños), que borra lo suyo.
@@ -1057,36 +1010,14 @@ que no tiene ningún papel: solo el sistema (`*`).
 - **Moneda**: el Total de Comandas va en la moneda del negocio (`useBusinessMoney` de `base`, la de
   `base.business.get`) con los decimales del servidor, nunca los de `Intl` (el forint) ni un euro por defecto:
   mientras el negocio no contesta, un importe es «—», nunca con decimales supuestos. El `total` del servidor ya va en unidades menores de la
-  moneda de la venta (FIX-HUB-KITCHEN-CHARGES-IN-EUR-WHATEVER-THE-COUNTRY, como Caja en hub#273).
+  moneda de la venta (como Caja, hub#273).
 - Toda lista pagina (`limit` ≤ 100) con desempate por `id`; el tablero tiene un tope de 200 comandas en
   marcha (`truncated`).
-
-### Cambios frente al producto actual
-
-| Producto actual | Ahora | Por qué |
-|---|---|---|
-| El reloj vuelve a cero cuando cocina toca la comanda | Cuenta desde el envío | BD-08 y el mercado: el semáforo mide la espera real |
-| «Lista» desde Comandas no tachaba los platos | Los tacha | Dejaba platos colgados que impedían borrar la estación |
-| Una estación ve su tarjeta tachada hasta que terminan las demás | Sale de esa estación al terminar su parte; el pase la sigue viendo | Duda 1, mercado (Toast, Square, Fresh) |
-| La estación elegida no se recuerda | Se recuerda en el dispositivo | Duda 4, mercado |
-| Color e Impresora de la estación no hacían nada; destino y función solo por API | Color en la pantalla; destino, función e impresora en el formulario | Duda 5: lo que se ve, hace algo |
-| Enrutado invisible, sin quitar, y a una estación inactiva decía «guardado» | Lista con «Quitar» y rechazo claro | Parcial de F04 |
-| Nueva comanda a mano sin platos | Con platos | Duda 6: una tarjeta vacía no sirve |
-| Cancelar sin confirmación ni motivo | Confirmación y motivo opcional | Parcial de F22 |
-| Borrar contestaba bien sin borrar | Rechazo claro | Parcial de F24 |
-| No había reimpresión | «Reimprimir» | F09 |
-| Historial sin quién, sin plato; urgencias y borrados sin apuntar | Con quién, plato, urgencia y borrado | Parcial de F25 |
-| El número del día iba en UTC | Día del negocio (Madrid) | Entre medianoche y la 1–2 salía el día anterior |
-| La hoja del TPV enseñaba la hora en UTC | La hora del envío, en la del negocio | F19 |
-| Pase y aviso de urgencia los imprimía la pantalla | Los pide el servidor en la transacción | Sin reacciones del cliente (PLAN §14) |
-| Unión de clientes (F30) | Descartado | La comanda no guarda cliente |
-| Apuntar en el historial a mano (`kitchen.logs.create`) | Retirado | Un historial que se escribe a mano deja de ser historial; ningún KDS lo ofrece |
-| Ajustes retirados en kitchen#48 (aceptar y retirar solas…) | No vuelven | No movían nada |
 
 ### Contradicciones (sin resolver; se señalan)
 
 - **Ronda de una cuenta fusionada**: Ventas conserva su `round_no`, así que la cuenta que queda puede
-  tener dos «Comanda 1»; el producto actual las renumeraba detrás de las suyas.
+  tener dos «Comanda 1».
 
 ### Lo que queda fuera
 

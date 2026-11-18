@@ -4,13 +4,14 @@ import json
 import uuid
 from pathlib import Path
 
-import pytest
 from django.apps import apps
 from django.utils import translation
 
 from apps.demo import queries, schemas, services
 from apps.demo.models import Item, ItemLine
 from base.tests.po import compiled_differences, config_texts, missing_from_catalogue, model_texts, untranslated
+
+from .conftest import HOST, HUB_DB
 
 LOCALE = Path(apps.get_app_config("demo").path) / "locale" / "es" / "LC_MESSAGES"
 
@@ -59,28 +60,28 @@ def test_spanish_texts():
         )
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_an_error_message_follows_the_language_of_the_request(client, make_user):
-    client.force_login(make_user("boss", host="a", role="hub_admin"))
+    client.force_login(make_user("boss", role="hub_admin"))
     response = client.post(
         "/api/demo/items/update",
         json.dumps({"id": str(uuid.uuid7()), "name": "x"}),
         content_type="application/json",
-        HTTP_HOST="a.localhost",
+        HTTP_HOST=HOST,
         HTTP_ACCEPT_LANGUAGE="es",
     )
     assert response.status_code == 404
     assert response.json()["error"]["message"] == "Este elemento ya no existe."
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_name_that_fits_several_items_or_none_is_told_in_the_language_of_the_request(client, make_user):
     """hub#1162: the 409 names the items, and the 404 the name nobody has, in the person's language."""
-    client.force_login(make_user("boss", host="a", role="hub_admin"))
+    client.force_login(make_user("boss", role="hub_admin"))
     for _ in range(2):
         Item.objects.create(name="Ensayo")
-    response = client.get("/api/demo/items/detail", {"called": "ensayo"}, HTTP_HOST="a.localhost", HTTP_ACCEPT_LANGUAGE="es")
+    response = client.get("/api/demo/items/detail", {"called": "ensayo"}, HTTP_HOST=HOST, HTTP_ACCEPT_LANGUAGE="es")
     assert response.status_code == 409
     assert response.json()["error"]["message"] == "Hay varios elementos que se llaman «ensayo»: Ensayo, Ensayo. Di cuál."
-    none = client.get("/api/demo/items/detail", {"called": "Otoño"}, HTTP_HOST="a.localhost", HTTP_ACCEPT_LANGUAGE="es")
+    none = client.get("/api/demo/items/detail", {"called": "Otoño"}, HTTP_HOST=HOST, HTTP_ACCEPT_LANGUAGE="es")
     assert (none.status_code, none.json()["error"]["message"]) == (404, "Ningún elemento se llama «Otoño».")

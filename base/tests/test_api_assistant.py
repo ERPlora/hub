@@ -7,12 +7,15 @@ import json
 import pytest
 from asgiref.sync import async_to_sync
 
-from base.tests.fake_gateway import gateway, signed  # noqa: F401 - the fixture
+from base.tenancy.tests.business import HUB_DB, HUB_DB_COMMITTED, A, in_business_a
+from base.tests.fake_gateway import gateway, signed
 from base.tests.routes import assert_bound
 
-pytestmark = pytest.mark.django_db
+__all__ = ["gateway", "in_business_a", "signed"]
 
-HOST = {"HTTP_HOST": "a.localhost:8000"}
+pytestmark = HUB_DB
+
+HOST = {"HTTP_HOST": f"{A.key}.localhost"}
 #: A question that names the app it asks about: «elementos» is no tool's word (the demo items say no asks), and a
 #: «¿cuántos…?» of nothing a tool knows brings no list at all.
 ASK = {"role": "user", "content": "¿cuántos elementos tengo en Demo?"}
@@ -53,7 +56,7 @@ def test_nobody_without_a_session_talks_to_the_assistant(client, gateway):
 
 
 def test_a_turn_streams_the_answer_of_the_gateway(client, make_user, gateway):
-    client.force_login(make_user("ana", host="a", role="hub_employee"))
+    client.force_login(make_user("ana", host=A.key, role="hub_employee"))
     gateway.turn(
         {"type": "text_delta", "text": "Tienes "},
         {"type": "text_delta", "text": "**2** elementos."},
@@ -65,14 +68,14 @@ def test_a_turn_streams_the_answer_of_the_gateway(client, make_user, gateway):
     assert got[-1]["append"] == [{"role": "assistant", "content": "Tienes **2** elementos."}]
     sent = gateway.sent("/internal/assistant/chat/stream")[0]
     assert signed(sent)
-    assert sent.body["hub"] == "a"
+    assert sent.body["hub"] == A.key
     assert "demo__item__list" in [tool["name"] for tool in sent.body["tools"]]
     # An employee may read the items but not create them: the write is not even offered.
     assert "demo__item__create" not in [tool["name"] for tool in sent.body["tools"]]
 
 
 def test_a_write_the_model_asked_for_comes_as_a_card_and_the_gateway_waits(client, make_user, gateway):
-    client.force_login(make_user("ana", host="a", role="hub_manager"))
+    client.force_login(make_user("ana", host=A.key, role="hub_manager"))
     body = _create_turn()
     [call] = body["pending"]
     got = frames(post(client, "/assistant/turn", {key: value for key, value in body.items() if key != "decision"}))
@@ -89,7 +92,7 @@ def test_a_write_the_model_asked_for_comes_as_a_card_and_the_gateway_waits(clien
 
 
 def test_the_yes_runs_it_and_the_turn_goes_on_with_its_result(client, make_user, gateway):
-    client.force_login(make_user("ana", host="a", role="hub_manager"))
+    client.force_login(make_user("ana", host=A.key, role="hub_manager"))
     body = _answering_its_card(client, _create_turn())
     gateway.turn({"type": "text_delta", "text": "Hecho."}, {"type": "response", "output": [], "usage": {}, "continuation": None})
     got = frames(post(client, "/assistant/turn", body))
@@ -104,7 +107,7 @@ def test_the_yes_runs_it_and_the_turn_goes_on_with_its_result(client, make_user,
 
 
 def test_after_too_many_rounds_it_stops_and_says_why(client, make_user, gateway):
-    client.force_login(make_user("ana", host="a", role="hub_employee"))
+    client.force_login(make_user("ana", host=A.key, role="hub_employee"))
     messages = [ASK]
     for n in range(6):
         messages.append({"role": "assistant", "content": "", "tool_calls": [
@@ -122,7 +125,7 @@ def test_after_too_many_rounds_it_stops_and_says_why(client, make_user, gateway)
 
 
 def test_a_turn_too_heavy_is_refused_before_it_is_read(client, make_user):
-    client.force_login(make_user("ana", host="a", role="hub_employee"))
+    client.force_login(make_user("ana", host=A.key, role="hub_employee"))
     from base.api import MAX_ASSISTANT_TURN_BODY
 
     response = client.post(
@@ -132,7 +135,7 @@ def test_a_turn_too_heavy_is_refused_before_it_is_read(client, make_user):
 
 
 def test_usage_report_and_dictation_go_through_their_routes(client, make_user, gateway):
-    client.force_login(make_user("ana", host="a", role="hub_employee"))
+    client.force_login(make_user("ana", host=A.key, role="hub_employee"))
     gateway.reply("/internal/assistant/usage", json={"used": 1, "limit": 30, "resets_at": None, "demo": False})
     gateway.reply("/internal/assistant/report", status=202, json={"sent": True, "duplicate": False})
     gateway.reply("/internal/speech/transcribe", json={"text": "hola", "language": "es"})
@@ -145,14 +148,14 @@ def test_usage_report_and_dictation_go_through_their_routes(client, make_user, g
 
 
 def test_a_dictation_over_two_megabytes_is_refused_by_the_hub(client, make_user):
-    client.force_login(make_user("ana", host="a", role="hub_employee"))
+    client.force_login(make_user("ana", host=A.key, role="hub_employee"))
     dictation = {"audio": "A" * 2_800_001, "mime_type": "audio/webm"}
     assert post(client, "/assistant/transcribe", dictation).status_code == 422
 
 
 def test_a_long_answer_can_be_reported_whole(client, make_user, gateway):
     """An answer with a long table runs past 4,000 characters: the Hub takes what erplora.com's door takes."""
-    client.force_login(make_user("ana", host="a", role="hub_employee"))
+    client.force_login(make_user("ana", host=A.key, role="hub_employee"))
     gateway.reply("/internal/assistant/report", status=202, json={"sent": True, "duplicate": False})
     answer = "| a | b |\n" * 2_000
     report = {"message_id": "m1", "reason": "incorrect", "question": "¿?" * 3_000, "answer": answer}
@@ -166,7 +169,7 @@ def test_a_long_answer_can_be_reported_whole(client, make_user, gateway):
 def test_a_turn_that_searched_the_web_tells_the_browser_and_its_report_tells_erplora(client, make_user, gateway):
     """The whole way of the mark through the Hub: the gateway's ``{type: web}`` closes the turn as ``done.web``, and the
     report the browser sends back with it reaches erplora.com's door with it, which then does not mail the answer."""
-    client.force_login(make_user("ana", host="a", role="hub_employee"))
+    client.force_login(make_user("ana", host=A.key, role="hub_employee"))
     gateway.turn(
         {"type": "web"},
         {"type": "text_delta", "text": "El plazo acaba el 20 (aeat.es)."},
@@ -184,7 +187,7 @@ def test_a_turn_that_searched_the_web_tells_the_browser_and_its_report_tells_erp
 
 
 def test_a_turn_that_did_not_search_lets_support_read_its_report(client, make_user, gateway):
-    client.force_login(make_user("ana", host="a", role="hub_employee"))
+    client.force_login(make_user("ana", host=A.key, role="hub_employee"))
     gateway.turn({"type": "text_delta", "text": "Tienes 2."}, {"type": "response", "output": [], "usage": {}, "continuation": None})
     done = frames(post(client, "/assistant/turn", {"messages": [ASK]}))[-1]
     assert done["web"] is False
@@ -194,14 +197,14 @@ def test_a_turn_that_did_not_search_lets_support_read_its_report(client, make_us
 
 
 def test_a_report_of_an_answer_kept_before_the_mark_leaves_the_web_out(client, make_user, gateway):
-    client.force_login(make_user("ana", host="a", role="hub_employee"))
+    client.force_login(make_user("ana", host=A.key, role="hub_employee"))
     gateway.reply("/internal/assistant/report", status=202, json={"sent": True, "duplicate": False})
     post(client, "/assistant/report", {"message_id": "m1", "reason": "other", "answer": "x"})
     assert "web" not in gateway.sent("/internal/assistant/report")[0].body
 
 
 def test_a_turn_the_gateway_refused_closes_saying_it_brought_no_pages(client, make_user, gateway):
-    client.force_login(make_user("ana", host="a", role="hub_employee"))
+    client.force_login(make_user("ana", host=A.key, role="hub_employee"))
     gateway.reply("/internal/assistant/chat/stream", status=503, json={"error": {"code": "assistant.no_model", "message": "x"}})
     got = frames(post(client, "/assistant/turn", {"messages": [ASK]}))
     assert [frame["type"] for frame in got] == ["error", "done"]
@@ -225,7 +228,7 @@ def test_the_model_is_told_the_role_of_an_employee_and_what_a_manager_must_appro
     way until «too many steps», or told the state of something else as if it were the app's. What the gateway gets
     names their role as the screens do, in their language, who can do what it cannot, and the write their app lets a
     manager approve (``demo.item.add_line``), offered to them as its button on the screen is."""
-    client.force_login(make_user("eva", host="a", role="hub_employee"))
+    client.force_login(make_user("eva", host=A.key, role="hub_employee"))
     gateway.turn({"type": "response", "output": [], "usage": {}, "continuation": None})
     ask = {"role": "user", "content": "añade una línea de 2 cafés al elemento Mesa 4"}
     frames(post(client, "/assistant/turn", {"messages": [ask]}, HTTP_ACCEPT_LANGUAGE="es"))
@@ -243,7 +246,7 @@ def test_the_model_is_told_the_role_of_an_employee_and_what_a_manager_must_appro
 
 
 def test_a_manager_who_may_do_it_is_asked_for_no_approval(client, make_user, gateway):
-    client.force_login(make_user("mario", host="a", role="hub_manager"))
+    client.force_login(make_user("mario", host=A.key, role="hub_manager"))
     gateway.turn({"type": "response", "output": [], "usage": {}, "continuation": None})
     ask = {"role": "user", "content": "add a line of 2 coffees to the item Mesa 4"}
     frames(post(client, "/assistant/turn", {"messages": [ask]}, HTTP_ACCEPT_LANGUAGE="en"))
@@ -284,9 +287,9 @@ def _answering_its_card(client, body: dict) -> dict:
 def _employee_and_manager(client, make_user):
     from base.tests.test_people import with_pin
 
-    make_user("saas:4", host="a", role="hub_manager", first_name="Mario")
+    make_user("saas:4", host=A.key, role="hub_manager", first_name="Mario")
     with_pin("saas:4", "1357")
-    client.force_login(make_user("saas:3", host="a", role="hub_employee", first_name="Eva"))
+    client.force_login(make_user("saas:3", host=A.key, role="hub_employee", first_name="Eva"))
 
 
 def _items(name: str = "Mesa 4") -> int:
@@ -433,7 +436,7 @@ SEARCH_ASKED = {"role": "assistant", "content": "", "tool_calls": [
 def _how_to_turn(client, make_user, gateway, role: str) -> list[dict]:
     """The frames of a turn where ``role`` asked how to open the till and the model searched the documentation, which
     erplora.com answers with ``EXCERPT``."""
-    client.force_login(make_user("ana", host="a", role=role))
+    client.force_login(make_user("ana", host=A.key, role=role))
     gateway.reply(DOCS, json={"results": [EXCERPT]})
     gateway.turn({"type": "text_delta", "text": "Desde Caja > Abrir."}, {"type": "response", "output": [], "usage": {}, "continuation": None})
     body = {"messages": [HOW, SEARCH_ASKED], "pending": [SEARCH], "continuation": "tok"}
@@ -448,7 +451,7 @@ def test_a_how_to_question_gets_the_excerpts_of_the_documentation_as_its_tool_re
     result = got[-1]["append"][0]
     assert (result["tool_call_id"], json.loads(result["content"])) == ("d1", {"results": [CITED]})
     [asked] = gateway.sent(DOCS)
-    assert asked.body == {"hub": "a", "query": "¿Cómo abro la caja?", "language": "es", "limit": 8}
+    assert asked.body == {"hub": A.key, "query": "¿Cómo abro la caja?", "language": "es", "limit": 8}
     assert signed(asked)
     assert gateway.sent("/internal/assistant/chat/stream")[0].body["messages"][-1]["tool_call_id"] == "d1"
 
@@ -466,7 +469,7 @@ def test_the_model_answers_a_how_to_question_told_to_end_it_with_the_cite_of_its
 
 
 def test_documentation_that_cannot_be_searched_is_told_to_the_model_never_made_up(client, make_user, gateway):
-    client.force_login(make_user("ana", host="a", role="hub_employee"))
+    client.force_login(make_user("ana", host=A.key, role="hub_employee"))
     gateway.reply(DOCS, status=503, json={"error": {"code": "assistant.provider_unavailable", "message": "down"}})
     gateway.turn({"type": "text_delta", "text": "No he podido buscar."}, {"type": "response", "output": [], "usage": {}, "continuation": None})
 
@@ -485,7 +488,7 @@ def test_nobody_without_a_session_makes_erplora_com_search(client, gateway):
     assert gateway.requests == []
 
 
-@pytest.mark.django_db(transaction=True)
+@HUB_DB_COMMITTED
 def test_the_turn_asks_the_documentation_before_its_transaction_opens(client, make_user, gateway, monkeypatch):
     """The search waits on erplora.com (up to 15 s): inside the turn's transaction it would hold the hub's connection,
     so the route asks it first (``assistant.prepare``) and the turn reads the answer."""
@@ -493,18 +496,18 @@ def test_the_turn_asks_the_documentation_before_its_transaction_opens(client, ma
 
     from base import assistant
 
-    client.force_login(make_user("ana", host="a", role="hub_employee"))
+    client.force_login(make_user("ana", host=A.key, role="hub_employee"))
     gateway.reply(DOCS, json={"results": [EXCERPT]})
     gateway.turn({"type": "text_delta", "text": "Desde Caja > Abrir."}, {"type": "response", "output": [], "usage": {}, "continuation": None})
     seen = []
-    post_to_gateway = assistant._post
+    post_to_gateway = assistant.gateway._post
 
     def probe(path, payload):
         if path == DOCS:
             seen.append(any(connection.in_atomic_block for connection in connections.all()))
         return post_to_gateway(path, payload)
 
-    monkeypatch.setattr(assistant, "_post", probe)
+    monkeypatch.setattr(assistant.gateway, "_post", probe)
     body = {"messages": [HOW, SEARCH_ASKED], "pending": [SEARCH], "continuation": "tok"}
     got = frames(post(client, "/assistant/turn", body, HTTP_ACCEPT_LANGUAGE="es"))
 

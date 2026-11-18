@@ -50,7 +50,7 @@ guardado en ella lo hereda la siguiente. Una spec con dos dispositivos de la mis
 empleado por PIN si no rota la clave de sesión, pide `fresh: true` para tener la suya.
 
 Cada paso del login se espera **todo el tiempo del test**, nunca una parte: la shell del hub (la barra de arriba,
-`topbar-apps`), al entrar y al final, y cada paso del SaaS (su página de acceso o la vuelta, su respuesta al inicio de
+su camino a «Mis apps», `MY_APPS_DOOR`: ⠿ desde la tableta y el «⋮» de la shell en el teléfono), al entrar y al final, y cada paso del SaaS (su página de acceso o la vuelta, su respuesta al inicio de
 sesión, la pantalla del código, su respuesta al código y la vuelta al hub). Con la máquina cargada la SPA tardó más de
 30 s en montar la shell (hub#1342) y el SaaS lo mismo en contestar un paso (hub#1370), sin nada roto. Lo que dice que
 no va a llegar cae en el acto y dice por qué:
@@ -72,7 +72,7 @@ no va a llegar cae en el acto y dice por qué:
   una vez, cuando la pantalla del código ya está.
 
 Un fallo de red (`net::…`) se reintenta una vez, como una conexión rechazada. Un paso que no llega sin nada de eso
-choca con el tope del propio test, y Playwright nombra esa espera: `locator.waitFor` de `topbar-apps` para la shell,
+choca con el tope del propio test, y Playwright nombra esa espera: `locator.waitFor` de `topbarApps` para la shell,
 `page.waitForResponse` desde `signInWithCode` (la línea del código o la del inicio de sesión) para una respuesta del
 SaaS que no llega.
 
@@ -231,9 +231,47 @@ node tests/e2e/database.ts --drop
 `$(…)` da los dos ids, primero el de `a`, como dos palabras (en bash y en zsh); la misma orden, ya con la BD y el puerto de
 la pila, la escribe `global-setup.ts` si la ejecución arranca sin las cuentas.
 
+## La pasada nocturna (`.github/scripts/nightly-e2e.sh`)
+
+Cada noche, en el Mac, corre todas las specs sobre el `origin/main` recién traído y mantiene **una sola issue**
+(«Pruebas de navegador del Hub en rojo en la pasada nocturna», `prio:P1`, `e2e-report.sh`): una noche en rojo la abre o la
+comenta, y la primera noche en verde la cierra. No es un check: una noche roja no para ninguna PR ni ningún despliegue. Va
+en el Mac y no en GitHub Actions porque, desde la ronda 2026-11-10e de los planes, solo `aws` usa Actions; el SaaS hace lo
+mismo con su pasada.
+
+- **Monta la pila de la receta de arriba, sola**: worktrees sueltos de `origin/main` del Hub (o del commit que diga
+  `NIGHTLY_HUB_REF`, aunque no esté subido) y del SaaS en
+  `~/.erplora/hub-nightly-e2e/` (de los checkouts compartidos solo hace `fetch`), con su `.env`; sus BD `hub_e2e_9770` y
+  `saas_e2e_9771`; la siembra (cuentas de demo con los ids de `a` y `b`, y el proveedor falso del asistente); los dos
+  `runserver` con las variables de la receta, del asistente y de WhatsApp; y `CI=1 pnpm e2e` con el tope global de Playwright
+  (`NIGHTLY_MAX_MINUTES`, 360); con `NIGHTLY_GREP`, solo los tests cuyo título casa con ese patrón (`--grep` de
+  Playwright). Las specs que gastan tokens de verdad (`QA_REAL_PROVIDER`) se quedan fuera. El humo de navegador
+  (`.github/scripts/smoke-e2e.sh`, README del Hub) es esta misma pila con `@smoke`, el commit en el que estás y su tope.
+- **Pase lo que pase**, al acabar para lo que escucha en los puertos de la pila (también un `runserver` que una spec
+  reinició), borra las dos BD y quita los worktrees; al empezar, borra lo que dejó una noche cortada. Un paso previo a las
+  specs que falla (las dependencias, una BD, la siembra, los servidores que no contestan) también es una noche roja, y la
+  issue lo nombra.
+- **Lo que deja**: `~/.erplora/hub-nightly-e2e/runs/<noche>/`, con `night.log`, los registros de los dos `runserver` y
+  `test-results/` (el `results.json`, las trazas y las capturas de cada fallo). Guarda las 7 últimas (`NIGHTLY_KEEP_RUNS`).
+- **Una noche a la vez**: si otra sigue viva, sale con 3 sin tocar nada.
+- **Pararla**: `kill <pid>` (el de `~/.erplora/hub-nightly-e2e/lock/pid`) o Ctrl-C. Durante las specs para en el acto y
+  limpia; en un paso anterior (dependencias, BD) limpia cuando ese paso termina. Tras un `kill -9` o un apagón no limpia
+  nadie: lo hace la noche siguiente al empezar. `NIGHTLY_DIR` no puede ser una carpeta cuyo `hub/` o `saas/` sea un
+  checkout: la noche borra esas dos carpetas a la fuerza, y se niega.
+- **Programarla**, una vez y desde el checkout principal del Hub (un worktree desaparece con su rama, y se niega):
+  `bash .github/scripts/nightly-e2e.sh install-launchd [--at HH:MM]`, a las 02:17 si no se dice otra hora. El agente de
+  launchd guarda el `PATH` de quien lo instala (uv, pnpm, node, docker y gh, con la sesión de GitHub abierta) y corre el
+  script de ese checkout, que la flota pone al día. `uninstall-launchd` lo quita. Con el Mac dormido, launchd la lanza al
+  despertar; con el Mac apagado, esa noche no hay pasada y nada lo dice.
+- **A mano**: `bash .github/scripts/nightly-e2e.sh --no-publish [--spec tests/e2e/<spec>]…` hace lo mismo sin escribir en
+  GitHub. Su pila va en el `9770`, por debajo de los puertos que la flota da a sus workers (`10000 + 10 × issue` en el
+  SaaS y `20000 + 10 × issue` en el Hub): en uno de esos, la noche pararía los servidores y borraría la BD del worker de
+  esa issue. Otros puertos, con `NIGHTLY_HUB_PORT` (el SaaS en +1, el proveedor falso en +2, los dos Vite en +5 y +6 y el proxy
+  de Meta en +9; sus BD, con esos números).
+
 ## La demo (`demo.spec.ts`)
 
-Recorre la demo de punta a punta (plan `docs/plans/2026-10-17-demo-hubs-fase-1.md` §3, README del Hub «Demo»):
+Recorre la demo de punta a punta (plan `knowledge/raw/plans/2026-10-17-demo-hubs-fase-1.md` §3, README del Hub «Demo»):
 `/demo/` del SaaS → «Try the demo» → `demo-<hex>.localhost:<puerto>` con la shell y la sesión «Demo» → crea un ítem
 → `manage.py demo_expire <slug>` (por `execFileSync`, desde este checkout y con el `DB_NAME` de la ejecución) → 410
 «This demo has ended» → su enlace → `/demo/?state=expired` del SaaS → otra demo. Pide dos cosas que el resto de
@@ -325,7 +363,7 @@ variables más las del Graph: nunca con un `SSL_CERT_FILE` escrito a mano.
 
 ## La QA del asistente con el modelo real (`qa/assistant-battery.spec.ts`)
 
-La batería de QA del asistente del Hub (`docs/plans/2026-10-31-qa-asistente.md` de erplora-next: bloque B, 21 a 34, y
+La batería de QA del asistente del Hub (`knowledge/raw/plans/2026-10-31-qa-asistente.md` de erplora-next: bloque B, 21 a 34, y
 C35 a C37) con el **modelo de verdad** y el **índice de documentación de verdad**: una prueba por punto. Se salta sin
 `QA_REAL_PROVIDER=1`, así que la suite y la CI nunca la corren (gasta tokens de verdad, unos 20 turnos). Pide una pila
 propia (arriba, «Varias ejecuciones a la vez») con el SaaS arrancado con `ASSISTANT_SERVICE_PROVIDER=openai` (las
@@ -360,7 +398,7 @@ QA_BATTERY_RUN=<id> CI=1 pnpm e2e tests/e2e/qa/assistant-battery.spec.ts --grep 
 
 ## Las sondas del asistente: capa 2 con el modelo real (`qa/assistant-probes.spec.ts`)
 
-La capa 2 de la QA del asistente (`docs/plans/2026-10-31-asistente-conocimiento-y-qa.md` de erplora-next, §1.5): una
+La capa 2 de la QA del asistente (`knowledge/raw/plans/2026-10-31-asistente-conocimiento-y-qa.md` de erplora-next, §1.5): una
 **sonda** es una frase natural **nueva** para una herramienta, escrita como la teclearía una persona de un rol en un
 idioma, y lo que el turno tiene que hacer. Nunca es una de las `asks` de la herramienta (eso ya lo mide la capa 1 en cada
 PR): mide que el asistente generaliza. Las sondas viven en `qa/probes/*.json` (esquema `qa/probes.schema.json`; el corpus
@@ -507,6 +545,9 @@ contaba 0 filas tras confirmar un diálogo pasaba antes de que se borrara nada (
 - Un diálogo se busca en la página entera: `page.locator('ion-modal[data-testid=…]')`, nunca dentro de `shown(page)`.
 - Tras confirmar un diálogo, se espera `await expect(<diálogo>).toBeHidden()` antes de contar filas o afirmar que
   algo ya no está.
+- Un aviso (toast) se busca con `toast-helpers.ts`, por lo que dice (`toastSaying`), nunca por su sitio: cada borde de
+  la pantalla enseña hasta 3 a la vez, el más reciente primero en el DOM. Con el ratón o el foco encima, la pila se
+  abre y sus relojes se paran: una spec que espera a que un aviso se vaya aparta antes el ratón (`page.mouse.move(0, 0)`).
 
 ## Las capturas
 
@@ -514,7 +555,7 @@ Una captura justo después de `setViewportSize` puede salir antes de que el nave
 la zona que destapa el cambio de tamaño aún tiene lo de arriba de la página, y la captura repite la barra superior en su
 parte de abajo (87 filas; en `main`, 5 de 24 capturas de la lista de la demo sin espera y 2 de 24 tras `settled`). Esa
 captura es la prueba de una pantalla que nadie vio. Toda captura de la e2e pasa por `capture(page, name)` (`helpers.ts`):
-espera a que nada finito se mueva (`untilStill`, abajo: un `ion-toast` o un `ion-modal` entrando, no un spinner) y a un
+espera a que nada finito se mueva (`untilStill`, abajo: un aviso o un `ion-modal` entrando, no un spinner) y a un
 fotograma pintado, repite la captura mientras repite la franja de arriba (`repeatedTop`, la del SaaS) y, si no deja de
 hacerlo, falla diciéndolo y no escribe nada; si no, la deja en `.artifacts/<name>.png` y la devuelve. Si algo sigue
 moviéndose a los 10 s, falla con `capture <name>: still moving`, nombrando lo que se mueve, y no escribe nada: antes, una
@@ -529,8 +570,8 @@ blanco arriba y abajo con su borde izquierdo) y la tarjeta de confirmación enci
 `settled(page)` (`helpers.ts`; `service-helpers.ts` y `schedule-helpers.ts` reparten el mismo, sin copias) espera a que
 nada se mueva (`untilStill`) y a un fotograma pintado. «Nada se mueve» se lee en el documento **y en cada shadow root
 abierto, a cualquier profundidad** (`movingInPage`): `document.getAnimations()` no ve los shadow roots, y Ionic anima ahí
-sus avisos, diálogos y popovers (con el `settled` de antes, un `ion-toast` aún entrando daba 0 animaciones en el
-documento y 1 en su shadow root). Las infinitas (spinners, un brillo de carga) no cuentan; si algo sigue moviéndose a los
+sus diálogos y popovers; los avisos de `@erplora/ui` entran con transiciones CSS en el propio documento. Las infinitas
+(spinners, un brillo de carga) no cuentan; si algo sigue moviéndose a los
 10 s, la spec falla diciendo qué; y si la página navega a mitad de espera, mira la página nueva. Lo cubre
 `settled.spec.ts` (la misma corrección que la e2e del SaaS, saas#147).
 

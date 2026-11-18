@@ -10,18 +10,16 @@ import json
 from pathlib import Path
 
 import pytest
+from django.apps import apps
 from django.conf import settings
 from live import assistant as shared
 from live.operations import AI, registry
 
 from base import assistant
 from base.models import Membership
-from base.tests.test_assistant_asks import (
-    TOP,
-    catalog_of,  # noqa: F401 (a fixture: the tests below take it by name)
-    comparable,
-    place_of_no_ask,
-)
+from base.tests.test_assistant_asks import TOP, assert_offered_with_room, comparable, offered_to, place_of_no_ask
+
+from .conftest import HUB_DB
 
 #: Cart & Checkout's reads: its carts, their lines and the orders made from them.
 READS = {
@@ -58,7 +56,7 @@ def test_cart_checkout_offers_its_nineteen_tools():
     assert tools == TOOLS
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation) and of the person's role
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation) and of the person's role
 def test_who_manages_the_carts_is_offered_every_tool_and_an_employee_only_the_reads(catalog_of):
     """``CartCheckoutConfig.role_permissions``: the owner, the admin and the manager hold every tool; an employee only
     looks (``cart_checkout.view_cart``)."""
@@ -157,7 +155,7 @@ def test_the_reported_requests_are_the_owners_probes_of_layer_2():
     assert {name for name, _ in REPORTED} == TOOLS
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize(("name", "phrase"), REPORTED)
 def test_the_reported_cart_request_is_offered_its_tool_without_being_its_asks(catalog_of, name, phrase):
     assert place_of_no_ask(catalog_of(Membership.Role.OWNER, "es"), name, phrase) is not None
@@ -168,13 +166,13 @@ def test_the_reported_cart_request_is_offered_its_tool_without_being_its_asks(ca
 CHOSEN_INSTEAD = [("cart_checkout.item.update", "inventory.product.update")]
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize(("name", "instead"), CHOSEN_INSTEAD)
 def test_the_reported_cart_request_offers_its_tool_before_the_one_the_model_ran(catalog_of, name, instead):
     tools = catalog_of(Membership.Role.OWNER, "es")
     assert instead in tools  # positive control: the rival is offered to the owner too
     phrase = dict(REPORTED)[name]
-    offered = [op.name for op in assistant.relevant(tools, [phrase], "es")]
+    offered = offered_to(tools, phrase)
     assert name in offered, offered
     if instead in offered:
         assert offered.index(name) < offered.index(instead), offered
@@ -185,11 +183,11 @@ def test_the_reported_cart_request_offers_its_tool_before_the_one_the_model_ran(
 NOT_EMPTYING = ("cart_checkout.cart.delete", "cart_checkout.item.remove")
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize("instead", NOT_EMPTYING)
 def test_the_reported_request_to_empty_a_cart_offers_emptying_it_before_deleting_it_or_a_line(catalog_of, instead):
     tools = catalog_of(Membership.Role.OWNER, "es")
-    offered = [op.name for op in assistant.relevant(tools, [dict(REPORTED)["cart_checkout.cart.clear"]], "es")]
+    offered = offered_to(tools, dict(REPORTED)["cart_checkout.cart.clear"])
     assert "cart_checkout.cart.clear" in offered, offered
     assert instead in offered, offered  # positive control: the rival is offered too, so their order is measured
     assert offered.index("cart_checkout.cart.clear") < offered.index(instead), offered
@@ -199,26 +197,28 @@ def test_the_reported_request_to_empty_a_cart_offers_emptying_it_before_deleting
 LINE_READS = {"cart_checkout.cart.get", "cart_checkout.item.list"}
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize("name", ["cart_checkout.item.update", "cart_checkout.item.remove"])
 def test_a_reported_change_of_a_line_is_offered_a_read_that_finds_the_line(catalog_of, name):
     """The person names the line by its product («el Café de QA-WEB-1»), the tool takes its id: the same turn offers a
     read of the cart that gives it, so the model finds the line instead of asking for its id."""
     tools = catalog_of(Membership.Role.OWNER, "es")
-    offered = [op.name for op in assistant.relevant(tools, [dict(REPORTED)[name]], "es")]
+    offered = offered_to(tools, dict(REPORTED)[name])
     assert name in offered, offered
     assert LINE_READS & set(offered), offered
 
 
 def test_the_hub_reads_a_cesta_as_a_cart_and_units_as_a_quantity():
-    """``base.assistant.SYNONYMS``: «la cesta» or «el carrito» is a shopping cart (``cart_checkout.cart``), and «tres
-    unidades» or «la cantidad» the quantity a line takes, never only Inventory's unit of measure: «la cantidad» names
-    no unit of measure."""
-    concepts = shared.asked(["cambia la cesta a tres unidades"], assistant.SYNONYMS).concepts
+    """Cart and checkout's own words (its ``assistant_synonyms``): «la cesta» or «el carrito» is a shopping cart
+    (``cart_checkout.cart``), and «tres unidades» or «la cantidad» the quantity a line takes, never only Inventory's
+    unit of measure: «la cantidad» names no unit of measure."""
+    own_words = apps.get_app_config("cart_checkout").assistant_synonyms
+    concepts = shared.asked(["cambia la cesta a tres unidades"], own_words).concepts
     assert any(shared.stem("cart") in concept for concept in concepts)
     assert any(shared.stem("quantity") in concept for concept in concepts)
-    assert any(shared.stem("unit") in concept for concept in concepts)  # «unidades» still names the unit of measure
-    quantity = shared.asked(["cambia la cantidad"], assistant.SYNONYMS).concepts
+    every = shared.asked(["cambia la cesta a tres unidades"], assistant.relevance.synonyms()).concepts
+    assert any(shared.stem("unit") in concept for concept in every)  # «unidades» still names the unit of measure
+    quantity = shared.asked(["cambia la cantidad"], assistant.relevance.synonyms()).concepts
     assert any(shared.stem("quantity") in concept for concept in quantity)
     assert not any(shared.stem("unit") in concept for concept in quantity)
     assert not any(shared.stem("cart") in concept for concept in shared.asked(["la cesta"]).concepts)  # the Hub's own
@@ -226,7 +226,7 @@ def test_the_hub_reads_a_cesta_as_a_cart_and_units_as_a_quantity():
 
 #: Phrases nobody wrote as an ask or a probe, in the words a shop uses for its carts, with the tool they ask for: each is
 #: among the first ten only because the Hub reads «cesta» as a cart (the first) or «unidades» and «cantidad» as a line's
-#: quantity (the other two); without its group of ``SYNONYMS`` it comes 13th or lower.
+#: quantity (the other two); without its group of words it comes 13th or lower.
 BY_SYNONYM = [
     ("cart_checkout.cart.list", "¿cuántas cestas se han quedado a medias hoy?"),
     ("cart_checkout.item.update", "en la cesta de Lucía, que sean cuatro unidades de jabón"),
@@ -234,8 +234,7 @@ BY_SYNONYM = [
 ]
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize(("name", "phrase"), BY_SYNONYM)
 def test_a_cart_named_by_the_shops_words_is_offered_among_the_first_ten(catalog_of, name, phrase):
-    place = place_of_no_ask(catalog_of(Membership.Role.OWNER, "es"), name, phrase)
-    assert place is not None and place <= TOP, place
+    assert_offered_with_room(catalog_of(Membership.Role.OWNER, "es"), name, phrase, room=TOP)

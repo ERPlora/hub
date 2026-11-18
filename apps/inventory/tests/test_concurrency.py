@@ -18,10 +18,10 @@ from contextlib import contextmanager
 from types import SimpleNamespace
 
 import pytest
-from django.db import connection, transaction
+from django.db import connections
 from django.test.utils import CaptureQueriesContext
 from live.errors import NotFound, OperationError
-from live.operations import get
+from live.operations import atomic, get
 
 from apps.inventory.models import Category, Product, ProductCategory
 from apps.inventory.schemas import (
@@ -36,10 +36,13 @@ from apps.inventory.schemas import (
     ProductRefIn,
 )
 from apps.tax.models import TaxCategory
+from base.tenancy.context import current_alias
+from base.tenancy.tests.concurrency import at_once, in_a_thread
 
-from .conftest import ctx_for
+from .conftest import HUB_DB_COMMITTED, ctx_for
 
-pytestmark = pytest.mark.django_db(transaction=True)
+#: Several sessions of the business at once, each committing: its plan has room for them all.
+pytestmark = [HUB_DB_COMMITTED, pytest.mark.usefixtures("plan_with_room")]
 
 DELETIONS = ["operation", "row"]
 #: A deletion gives up after this on a row another session holds (a real one waits for its COMMIT).
@@ -60,28 +63,6 @@ def run(name, data):
     return get(name)(ctx_for("hub_admin"), data)
 
 
-def at_once(*calls):
-    """Runs every ``call`` in its own thread and session, released together; their results or errors."""
-    barrier = threading.Barrier(len(calls))
-    results: list = [None] * len(calls)
-
-    def worker(index, call):
-        try:
-            barrier.wait(5)
-            results[index] = call()
-        except Exception as error:  # reported to the test, which fails on it
-            results[index] = error
-        finally:
-            connection.close()
-
-    threads = [threading.Thread(target=worker, args=(i, call)) for i, call in enumerate(calls)]
-    for thread in threads:
-        thread.start()
-    for thread in threads:
-        thread.join(30)
-    return results
-
-
 def remove(target, how: str) -> None:
     if how == "operation":
         name, ref = DELETE_OPERATIONS[type(target)]
@@ -95,8 +76,8 @@ def delete(target, how: str) -> None:
     """Deletes ``target`` in this session, giving up after LOCK_TIMEOUT on a row another session holds. The
     lock timeout is the transaction's (SET LOCAL): a session-level one would go back with the connection and
     reach the tests after this one (the autouse fixture of conftest.py fails a test that leaves it)."""
-    with transaction.atomic():
-        with connection.cursor() as cursor:
+    with atomic():
+        with connections[current_alias()].cursor() as cursor:
             cursor.execute(f"SET LOCAL lock_timeout = '{LOCK_TIMEOUT}'")
         remove(target, how)
 
@@ -114,7 +95,7 @@ def deleted_after_the_first_read_of(target, how: str):
             deletions.extend(at_once(lambda: delete(target, how)))
         return result
 
-    with connection.execute_wrapper(wrapper):
+    with connections[current_alias()].execute_wrapper(wrapper):
         yield deletions
 
 
@@ -130,7 +111,7 @@ def deleted_just_before(statement: str, target, how: str):
             deletions.extend(at_once(lambda: delete(target, how)))
         return execute(sql, params, many, context)
 
-    with connection.execute_wrapper(wrapper):
+    with connections[current_alias()].execute_wrapper(wrapper):
         yield deletions
 
 
@@ -144,7 +125,7 @@ def deleted_in_flight(target, how: str):
 
     def deletion():
         try:
-            with transaction.atomic():
+            with atomic():
                 type(target).objects.select_for_update().get(pk=target.pk)
                 holds.set()
                 time.sleep(IN_FLIGHT)
@@ -154,9 +135,8 @@ def deleted_in_flight(target, how: str):
             deletions.append(repr(error))
         finally:
             holds.set()
-            connection.close()
 
-    thread = threading.Thread(target=deletion)
+    thread = in_a_thread(deletion, [None])
 
     def wrapper(execute, sql, params, many, context):
         if thread.ident is None and sql.lstrip().upper().startswith("SELECT") and table in sql:
@@ -165,7 +145,7 @@ def deleted_in_flight(target, how: str):
         return execute(sql, params, many, context)
 
     try:
-        with connection.execute_wrapper(wrapper):
+        with connections[current_alias()].execute_wrapper(wrapper):
             yield deletions
     finally:
         if thread.ident is not None:
@@ -229,7 +209,7 @@ def test_a_product_deleted_while_its_detail_is_read_is_never_a_server_error(how)
 def test_the_detail_reads_the_product_once():
     # The read that finds the product is the one that loads its row: no second read for a deletion to fall into.
     espresso = a_categorized_product()
-    with CaptureQueriesContext(connection) as read:
+    with CaptureQueriesContext(connections[current_alias()]) as read:
         detail = run("inventory.product.get", ProductRefIn(id=espresso.id))
     reads = [query["sql"] for query in read.captured_queries if f'FROM "{Product._meta.db_table}"' in query["sql"]]
     assert len(reads) == 1, reads

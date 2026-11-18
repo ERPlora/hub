@@ -11,11 +11,10 @@ from live.context import OperationContext, Scope
 from live.errors import NotFound, PermissionDenied
 from live.operations import INTERNAL, get
 
-from apps.schedule.tests.conftest import A, ctx_for, make_override, make_special_day
+from apps.schedule.tests.conftest import HUB_DB, A, B, ctx_for, make_override, make_special_day
 from base import assistant
 from base.tenancy.context import use_hub
-from base.tenancy.tests import hubs
-from base.tests.test_assistant_card_values import AN_ID
+from base.tests.test_assistant_card_values_references import AN_ID
 
 A_MISSING_ID = "0192f0b2-3333-7000-8000-000000000003"
 
@@ -25,7 +24,7 @@ ON_AN_OVERRIDE = ["schedule.override.delete", "schedule.override.update"]
 
 
 def fields_of(write: str, arguments: dict, language: str = "en", ctx=None) -> dict:
-    card = assistant.card(get(write), arguments, language, ctx or ctx_for())
+    card = assistant.cards.card(get(write), arguments, language, ctx or ctx_for())
     return {field["name"]: field for field in card["fields"]}
 
 
@@ -46,7 +45,7 @@ def no_id(said) -> bool:
 # ── A special day, by its name; a temporary change, by its reason ─────────────────────────────────────────────────────
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize(("language", "title"), [("en", "Special day"), ("es", "Día especial")])
 @pytest.mark.parametrize("write", ON_A_SPECIAL_DAY)
 def test_a_write_on_a_special_day_says_it_by_its_name(write, language, title):
@@ -56,7 +55,7 @@ def test_a_write_on_a_special_day_says_it_by_its_name(write, language, title):
     assert (field["value"], field["label"]) == ("Navidad", title)
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize(("language", "title"), [("en", "Override"), ("es", "Cambio temporal")])
 @pytest.mark.parametrize("write", ON_AN_OVERRIDE)
 def test_a_write_on_a_temporary_change_says_it_by_its_reason(write, language, title):
@@ -66,7 +65,7 @@ def test_a_write_on_a_temporary_change_says_it_by_its_reason(write, language, ti
     assert (field["value"], field["label"]) == ("Horario de verano", title)
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_among_several_the_card_says_the_one_the_write_names():
     """Each id names its own record, never another of the list (the first, the last, the one of the same date)."""
     days = [make_special_day("2026-01-06", "Reyes"), make_special_day("2026-12-25", "Navidad")]
@@ -75,7 +74,7 @@ def test_among_several_the_card_says_the_one_the_write_names():
     assert [shown("schedule.override.delete", {"id": str(change.id)})["id"] for change in changes] == ["Julio", "Agosto"]
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_change_keeps_saying_the_record_beside_what_it_changes():
     """The name is the record's as it is now, before the write runs: a rename says the old name under «Special day»
     and the new one under its own datum."""
@@ -87,7 +86,7 @@ def test_a_change_keeps_saying_the_record_beside_what_it_changes():
 # ── What is not theirs to read, or no longer there ────────────────────────────────────────────────────────────────────
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize("write", ON_A_SPECIAL_DAY + ON_AN_OVERRIDE)
 def test_what_the_person_may_not_read_is_left_out_never_said_by_its_id(write):
     """Whoever may not see the opening hours (``schedule.view``) is told no special day nor temporary change."""
@@ -99,7 +98,7 @@ def test_what_the_person_may_not_read_is_left_out_never_said_by_its_id(write):
     assert no_id(said)
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize("write", ON_A_SPECIAL_DAY + ON_AN_OVERRIDE)
 def test_what_does_not_exist_is_left_out(write):
     said = shown(write, {"id": A_MISSING_ID})
@@ -107,7 +106,7 @@ def test_what_does_not_exist_is_left_out(write):
     assert no_id(said)
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_record_deleted_meanwhile_is_left_out():
     christmas = make_special_day("2026-12-25", "Navidad")
     arguments = {"id": str(christmas.id)}
@@ -116,26 +115,24 @@ def test_a_record_deleted_meanwhile_is_left_out():
     assert shown("schedule.special_day.delete", arguments) == {}
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_nobody_behind_the_request_reads_no_record():
     """An automation's card (no person at hand) names no record: nothing is read for anybody."""
     summer = make_override(reason="Horario de verano")
-    card = assistant.card(get("schedule.override.update"), {"id": str(summer.id), "reason": "Verano"}, "en")
+    card = assistant.cards.card(get("schedule.override.update"), {"id": str(summer.id), "reason": "Verano"}, "en")
     assert {field["name"]: field["value"] for field in card["fields"]} == {"reason": "Verano"}
 
 
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
-@pytest.mark.usefixtures("no_test_fallback")
-def test_a_record_of_another_business_is_left_out(hub_a, hub_b):
+@HUB_DB
+def test_a_record_of_another_business_is_left_out(hub_b):
     """Each business in its own database, as production: an id of A names nothing in B."""
-    in_a, in_b = ctx_for(scope=Scope("host", hub_a.slug)), ctx_for(scope=Scope("host", hub_b.slug))
-    with use_hub(hub_a):
-        records = [
-            ("schedule.special_day.delete", make_special_day("2026-12-25", "Navidad")),
-            ("schedule.override.delete", make_override(reason="Horario de verano")),
-        ]
-        for write, record in records:  # positive control
-            assert "id" in shown(write, {"id": str(record.id)}, ctx=in_a), write
+    in_a, in_b = ctx_for(scope=A), ctx_for(scope=B)
+    records = [
+        ("schedule.special_day.delete", make_special_day("2026-12-25", "Navidad")),
+        ("schedule.override.delete", make_override(reason="Horario de verano")),
+    ]
+    for write, record in records:  # positive control
+        assert "id" in shown(write, {"id": str(record.id)}, ctx=in_a), write
     with use_hub(hub_b):
         for write, record in records:
             assert "id" not in shown(write, {"id": str(record.id)}, ctx=in_b), write
@@ -151,7 +148,7 @@ def test_the_reads_that_name_them_are_no_tool_and_no_door_of_the_api(read):
     assert (op.kind, op.permission, op.ai, op.expose_api) == ("query", "schedule.view", INTERNAL, False)
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_reads_answer_the_record_as_its_list_does_to_whoever_sees_the_hours():
     christmas = make_special_day("2026-12-25", "Navidad")
     summer = make_override("2026-07-01", "2026-08-31", "Horario de verano", ("09:00", "15:00"))
@@ -164,7 +161,7 @@ def test_the_reads_answer_the_record_as_its_list_does_to_whoever_sees_the_hours(
     assert (said.id, said.reason, said.is_closed, len(said.intervals)) == (summer.id, "Horario de verano", False, 1)
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize("read", ["schedule.special_day.get", "schedule.override.get"])
 def test_a_read_of_what_is_not_there_is_a_404_and_without_the_permission_a_403(read):
     op = get(read)

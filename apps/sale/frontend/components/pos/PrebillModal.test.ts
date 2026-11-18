@@ -24,8 +24,8 @@ vi.mock('@ionic/vue', async (importOriginal) => {
 vi.mock('../../lib/print', () => ({ printPaper: vi.fn() }));
 vi.mock('@erplora/ui/shell', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@erplora/ui/shell')>()),
-  toastError: vi.fn(() => Promise.resolve()),
-  toastSuccess: vi.fn(() => Promise.resolve()),
+  toastError: vi.fn(),
+  toastSuccess: vi.fn(),
 }));
 
 beforeEach(() => {
@@ -105,7 +105,7 @@ describe('PrebillModal', () => {
     const tax = paper.find('.pos-bill__tax');
     expect([tax.find('dt'), ...tax.findAll('dd span')].map((part) => plain(part.text()))).toEqual(['IVA 10 %', '24,55 €', '2,45 €']);
     expect(plain(paper.find('.pos-bill__total').text())).toContain('27,00 €');
-    expect(paper.find('.pos-bill__notice').text()).toBe('Cuenta — no es una factura. El tiquet fiscal se entrega al cobrar.');
+    expect(paper.find('.pos-bill__notice').text()).toBe('Cuenta — no es una factura. El tique fiscal se entrega al cobrar.');
   });
 
   it('names the dishes of a menu under it, as the ticket will (SALE-F12)', async () => {

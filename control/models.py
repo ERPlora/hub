@@ -184,6 +184,17 @@ class Hub(models.Model):
     # Its move is to be undone (``control.hub.move_cancel``, or an undo that could not finish): the worker puts it back
     # on its origin on its next pass, never taking it forward. Its restore's too (below): its own database back.
     move_undo_asked_at = models.DateTimeField(_("move undo asked"), null=True, blank=True)
+    # A move asked for the business's night (``control.hub.move`` with ``when="at_night"``): nothing closes until the
+    # worker starts it at ``move_scheduled_for`` (``base.tenancy.move.launch_due``), when ``moving_to`` takes its place.
+    move_scheduled_to = models.ForeignKey(
+        Cluster,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="scheduled_incoming",
+        verbose_name=_("move scheduled to"),
+    )
+    move_scheduled_for = models.DateTimeField(_("move scheduled for"), null=True, blank=True)
     # Its database put back as it was at a moment: asked in the Hub admin
     # (``control.hub.restore``) and done by the worker (``base.tenancy.restore``). ``restoring_from`` is the temporary
     # cluster its copy is on (a point-in-time restore of its own, closed to new hubs), set while it is to do: its host
@@ -526,13 +537,17 @@ class CopyRecovery(AskedOfTheWorker):
     with its copy.
 
     ``apps`` are the labels asked, each an app that answers ``recoverable_from_copy`` on its ``LiveAppConfig``;
-    ``language`` is the staff's, which the apps' refusals are said in. ``results`` says, app by app, how many were
-    restored (absent from a result noted before that count existed), created and not, with why (``reasons``, the first
-    :data:`REASONS_KEPT`, by the copy's id: no personal data), or why the app gave nothing back (``refused``). The
-    worker holds the row's own lease (``lease_owner``, ``lease_until``) while it recovers, never the hub's: the
-    business's own work does not wait for it."""
+    ``language`` is the staff's, which the apps' refusals are said in. ``results`` says, for each thing each app
+    declares it gives back (its ``label``, as the code writes it; absent from a result noted before each was counted
+    apart, which is the app's whole, and from that of an app that declares nothing), how many were restored (absent
+    from a result noted before that count existed), created and not, with why (``reasons``, the first
+    :data:`REASONS_KEPT`, by the copy's id: no personal data), how many came back without something that hung from
+    them and what (``noted`` and ``notes``, the same way; both absent while none did), or why it gave nothing back
+    (``refused``). The worker holds the row's own lease (``lease_owner``, ``lease_until``) while it recovers, never
+    the hub's: the business's own work does not wait for it."""
 
-    #: How many records a recovery notes the reason of, app by app, when its operation refuses them.
+    #: How many reasons a recovery keeps, result by result, of the records its operation refuses, and how many notes of
+    #: what the records it brought back came back without.
     REASONS_KEPT = 50
 
     class Status(models.TextChoices):

@@ -15,8 +15,9 @@ from live.operations import get
 
 from base.models import Hub, Membership
 from base.operations import HubContextBuilder
+from base.tenancy.tests.business import HOST, HUB_DB_COMMITTED, A
 
-pytestmark = pytest.mark.django_db(transaction=True)
+pytestmark = [HUB_DB_COMMITTED, pytest.mark.usefixtures("hub_a")]
 
 
 async def db(fn, *args, **kwargs):
@@ -30,10 +31,10 @@ async def db(fn, *args, **kwargs):
 
 
 def open_stream(django_user_model) -> Stream:
-    """The stream a member of ``a`` opens on ``/demo/items``: one subscription to ``demo.item.list``."""
+    """The stream a member of business A opens on ``/demo/items``: one subscription to ``demo.item.list``."""
     user = django_user_model.objects.create_user(username="ana", password="pw")
-    Membership.objects.create(user=user, host="a", role=Membership.Role.OWNER)
-    request = RequestFactory().get("/api/live", HTTP_HOST="a.localhost")
+    Membership.objects.create(user=user, host=A.key, role=Membership.Role.OWNER)
+    request = RequestFactory().get("/api/live", HTTP_HOST=HOST)
     request.user = user
     request.LANGUAGE_CODE = "en"
     stream = Stream(HubContextBuilder().from_request(request))
@@ -62,7 +63,7 @@ async def test_the_stream_of_a_hub_that_stopped_serving_ends_without_a_result(dj
     await executor.run_all(stream)
     assert b"event: result" in stream.queue.get_nowait()
 
-    await db(Hub.objects.filter(slug="a").update, **change)
+    await db(Hub.objects.filter(slug=A.key).update, **change)
     await executor.run_all(stream)
 
     assert stream.closed
@@ -75,7 +76,7 @@ async def test_the_stream_of_a_hub_that_serves_goes_on(django_user_model):
     await executor.run_all(stream)
     stream.queue.get_nowait()
 
-    await db(Hub.objects.filter(slug="a").update, state={"status": "past_due"})
+    await db(Hub.objects.filter(slug=A.key).update, state={"status": "past_due"})
     await executor.run_all(stream)
 
     assert not stream.closed

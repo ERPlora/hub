@@ -18,7 +18,7 @@ from live.errors import Conflict
 from live.operations import get
 
 from apps.verifactu.models import Record
-from apps.verifactu.tests.conftest import A, business_in, ctx_for, run
+from apps.verifactu.tests.conftest import HUB_DB, A, business_in, ctx_for, run
 from base import activation
 from base.models import AppActivation
 from base.tenancy import context
@@ -63,7 +63,7 @@ def is_on(scope: Scope = A, app: str = "verifactu") -> bool:
     return activation.states_of(scope)[app].on
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_with_nothing_to_send_verifactu_stays_on_and_says_why():
     business_in("ES")
 
@@ -76,7 +76,7 @@ def test_with_nothing_to_send_verifactu_stays_on_and_says_why():
     assert apps.get_app_config("verifactu").can_disable(admin()) == NEVER_OFF
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_once_the_aeat_answered_every_record_it_still_stays_on(issuer):
     for record, status in zip(
         (ticket(), ticket(), ticket()),
@@ -89,7 +89,7 @@ def test_once_the_aeat_answered_every_record_it_still_stays_on(issuer):
     assert is_on()
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_records_still_to_send_give_the_same_reason_and_stay_as_they_are(issuer):
     waiting = ticket()
 
@@ -98,7 +98,7 @@ def test_records_still_to_send_give_the_same_reason_and_stay_as_they_are(issuer)
     assert Record.objects.get(pk=waiting.pk).status == Record.Status.PENDING
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_business_without_a_country_is_in_spain_and_is_refused_too():
     # A demo has no country: it is in ERPlora's market, Spain.
     business_in("")
@@ -107,18 +107,18 @@ def test_a_business_without_a_country_is_in_spain_and_is_refused_too():
     assert is_on()
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize("state", [activation.CREATING, activation.FAILED])
 def test_a_verifactu_that_never_got_on_goes_off(state):
     business_in("ES")
-    AppActivation.objects.update_or_create(host="a", app="verifactu", defaults={"state": state, "chosen": True})
+    AppActivation.objects.update_or_create(host=A.key, app="verifactu", defaults={"state": state, "chosen": True})
 
     assert apps.get_app_config("verifactu").can_disable(admin()) is None
     assert disable()["state"] == "off"
     assert activation.states_of(A)["verifactu"].state == activation.OFF
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_reason_is_in_the_language_of_whoever_turns_it_off():
     assert refusal(admin(language="es")).message == NEVER_OFF_ES
 
@@ -129,7 +129,7 @@ NAMES = {"invoice": "Invoicing", "sale": "Sales & POS", "customer": "Customers"}
 NAMES_ES = {"invoice": "Facturación", "sale": "Ventas / TPV", "customer": "Clientes"}
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize("app", list(NAMES))
 def test_what_verifactu_needs_stays_on_with_it_and_says_why(app):
     """hub#619: never «Turn off VeriFactu first», which nobody can do: the real reason, VeriFactu's."""
@@ -144,7 +144,7 @@ def test_what_verifactu_needs_stays_on_with_it_and_says_why(app):
     assert is_on()
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize("app", list(NAMES))
 def test_that_reason_is_in_the_language_of_whoever_turns_it_off(app):
     business_in("ES")
@@ -154,7 +154,7 @@ def test_that_reason_is_in_the_language_of_whoever_turns_it_off(app):
     assert refused.message == f"{NAMES_ES[app]} no se puede desactivar: hace falta para VeriFactu. {NEVER_OFF_ES}"
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize("app", list(NAMES))
 def test_outside_spain_turning_verifactu_off_first_is_what_there_is_to_do(app):
     business_in("PL")
@@ -167,7 +167,7 @@ def test_outside_spain_turning_verifactu_off_first_is_what_there_is_to_do(app):
     assert "VeriFactu" in refused.message
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize(("country", "named"), [("ES", "Spain"), ("", "Spain"), ("PL", "Poland")])
 def test_taxes_says_it_is_mandatory_before_that_verifactu_needs_it(country, named):
     """hub#997: Taxes, mandatory in every country, gives base's reason, its own, in Spain with VeriFactu on too:
@@ -192,7 +192,7 @@ def rows_of_the_list(language: str = "en") -> dict[str, dict]:
     return {row["id"]: row for row in document["apps"]}
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize("country", ["ES", ""])
 def test_in_spain_the_list_says_verifactu_and_what_it_needs_stay_on(country):
     business_in(country)
@@ -205,14 +205,14 @@ def test_in_spain_the_list_says_verifactu_and_what_it_needs_stay_on(country):
     assert rows["task"]["refusal"] is None
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_list_says_it_in_the_language_of_who_reads():
     business_in("ES")
 
     assert rows_of_the_list("es")["verifactu"]["refusal"] == NEVER_OFF_ES
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_outside_spain_the_list_refuses_nothing_of_a_verifactu_that_is_on():
     business_in("PL")
 
@@ -222,11 +222,11 @@ def test_outside_spain_the_list_refuses_nothing_of_a_verifactu_that_is_on():
     assert {app: rows[app]["refusal"] for app in ("verifactu", *NAMES)} == dict.fromkeys(("verifactu", *NAMES))
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize("state", [activation.CREATING, activation.FAILED])
 def test_the_list_lets_go_a_verifactu_that_never_got_on(state):
     business_in("ES")
-    AppActivation.objects.update_or_create(host="a", app="verifactu", defaults={"state": state, "chosen": True})
+    AppActivation.objects.update_or_create(host=A.key, app="verifactu", defaults={"state": state, "chosen": True})
 
     assert rows_of_the_list()["verifactu"]["refusal"] is None
 

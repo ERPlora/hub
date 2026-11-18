@@ -36,6 +36,30 @@ class KitchenConfig(LiveAppConfig):
     # station of its product or its category of Inventory (foreign keys of the routing).
     requires = ["sale", "inventory"]
     default_auto_field = "django.db.models.BigAutoField"
+    # What these words mean to the Hub's assistant (base.assistant.relevance.synonyms). The kitchen's ticket is its «comanda»
+    # (kitchen.ticket, as its screens say): «la comanda», «qué comandas», «las comandas de…», named by its phrases and
+    # never by the word, which live keeps for a table's order, and a «comandas» said in passing («sin alterar las
+    # comandas ya enviadas») names no kitchen ticket. A kitchen's «estación», and its «puesto» named by its phrases («el
+    # puesto», never «tenemos puesto…»), is its station (kitchen.station), what goes «urgente» or in a hurry («prisa») a
+    # rush (kitchen.ticket.set_rush), the «enrutado» the routing (kitchen.routing), a dish marked «como listo» or «como
+    # hecho» bumped (kitchen.item.bump) and one sent back «a pendientes» or «a preparación» recalled (kitchen.*.recall).
+    assistant_synonyms = (
+        (
+            "ticket", "la comanda", "una comanda", "unas comandas", "esta comanda", "esa comanda", "su comanda",
+            "sus comandas", "que comanda", "que comandas", "cuantas comandas", "otra comanda", "alguna comanda",
+            "cada comanda", "comanda manual", "comandas manuales", "las comandas de",
+        ),
+        ("estacion", "estaciones", "station", "stations", "el puesto", "al puesto", "del puesto", "un puesto",
+         "los puestos", "que puesto", "que puestos", "cada puesto", "por puesto"),
+        ("urgente", "urgentes", "urgencia", "prisa", "rush", "urgent"),
+        ("enrutado", "enrutados", "enrutar", "enruta", "enrutamiento", "routing", "route", "routes"),
+        # the «regla» that sends a product or a family to a station is its routing (``kitchen.routing``): live reads
+        # «regla» as any rule («rule», as Taxes' and Pricing's), and the QA says it of the routing.
+        ("regla", "routing"),
+        ("bump", "como listo", "como listos", "como lista", "como listas", "como hecho", "como hechos", "como hecha",
+         "como hechas"),
+        ("recall", "a pendientes", "a pendiente", "a preparacion", "a preparar"),
+    )
     permissions = [
         "kitchen.view_ticket",
         "kitchen.add_ticket",

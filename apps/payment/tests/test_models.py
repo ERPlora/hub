@@ -3,14 +3,15 @@
 import datetime as dt
 
 import pytest
-from django.db import IntegrityError, transaction
+from django.db import IntegrityError
 from django.db.models import ProtectedError
+from live.operations import atomic
 
 from apps.payment.models import Payment, PaymentCounter, PaymentMethod
 
-from .conftest import make_method, make_payment
+from .conftest import HUB_DB, make_method, make_payment
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 
 def test_a_method_is_an_active_bank_transfer_by_default():
@@ -34,7 +35,7 @@ def test_the_six_method_types_of_the_old_module():
 
 def test_two_methods_cannot_share_a_name_whatever_the_case():
     make_method("Cash drawer")
-    with pytest.raises(IntegrityError), transaction.atomic():
+    with pytest.raises(IntegrityError), atomic():
         make_method("CASH DRAWER", method_type="cash")
 
 
@@ -71,19 +72,19 @@ def test_the_ladder_of_states():
 
 @pytest.mark.parametrize("amount", [0, -1])
 def test_the_database_refuses_an_amount_that_is_not_positive(amount):
-    with pytest.raises(IntegrityError), transaction.atomic():
+    with pytest.raises(IntegrityError), atomic():
         make_payment(amount=amount)
 
 
 def test_the_database_refuses_an_unknown_status():
-    with pytest.raises(IntegrityError), transaction.atomic():
+    with pytest.raises(IntegrityError), atomic():
         make_payment(status="lost")
 
 
 def test_a_reference_is_never_repeated():
     method = make_method()
     make_payment(method, reference="PAY-20261014-0001")
-    with pytest.raises(IntegrityError), transaction.atomic():
+    with pytest.raises(IntegrityError), atomic():
         make_payment(method, reference="PAY-20261014-0001")
 
 
@@ -102,6 +103,6 @@ def test_payments_read_newest_payment_date_first():
 
 def test_one_counter_per_day():
     PaymentCounter.objects.create(day=dt.date(2026, 10, 14))
-    with pytest.raises(IntegrityError), transaction.atomic():
+    with pytest.raises(IntegrityError), atomic():
         PaymentCounter.objects.create(day=dt.date(2026, 10, 14))
     assert PaymentCounter.objects.get().last == 0

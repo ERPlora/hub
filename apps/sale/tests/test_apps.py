@@ -9,6 +9,7 @@ from django.utils import translation
 from live.live_registry import live_registry
 from live.meta import (
     Category,
+    Help,
     LiveAppConfig,
     Nav,
     Widget,
@@ -251,7 +252,7 @@ def test_the_panels_are_titled_in_english_and_in_spanish_as_the_old_ones():
     ]
     assert spanish == [
         "Ventas hoy",
-        "Tickets hoy",
+        "Tiques hoy",
         "Ventas últimos 7 días",
         "Actividad reciente",
     ]
@@ -292,3 +293,8 @@ def test_sales_has_no_setup_steps_nor_bell_counters():
     # The old module declared neither: its module.json has no `setup`, and the old hub's setup_status.rs only
     # listed the core's own steps (apps, business details, printer, team).
     assert (sale().setup, sale().bell) == ([], [])
+
+
+def test_its_help_window_is_ready_without_a_video_yet():
+    # No video is recorded: the window opens with its text only.
+    assert sale().help == Help()

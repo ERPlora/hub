@@ -468,6 +468,18 @@ msgstr "Elige una de las opciones."
 msgid "This field already has values on some cards: its type cannot change."
 msgstr "Este campo ya tiene valores en algunas fichas: su tipo no se puede cambiar."
 
+#, python-format
+msgid "came back without its value of the field \"%(field)s\": deactivated in Customers"
+msgstr "volvió sin su valor del campo «%(field)s»: desactivado en Clientes"
+
+#, python-format
+msgid "came back without its value of the field \"%(field)s\": no longer one of its options"
+msgstr "volvió sin su valor del campo «%(field)s»: ya no es una de sus opciones"
+
+#, python-format
+msgid "came back without its value of the field \"%(field)s\": no longer of its type"
+msgstr "volvió sin su valor del campo «%(field)s»: ya no es de su tipo"
+
 msgid "There is already a group with that name. Choose another name."
 msgstr "Ya hay un grupo con ese nombre. Elige otro nombre."
 

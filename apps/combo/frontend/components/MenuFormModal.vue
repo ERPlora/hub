@@ -208,6 +208,7 @@ const canDismiss = useUnsavedFormOnOpen(
         </InlineFeedback>
         <ion-input
           data-testid="combo-menu-form-name"
+          name="name"
           :value="form.name"
           :label="$t('combo.form.name')"
           label-placement="floating"
@@ -220,6 +221,7 @@ const canDismiss = useUnsavedFormOnOpen(
         />
         <ion-input
           data-testid="combo-menu-form-kitchen_name"
+          name="kitchen_name"
           :value="form.kitchenName"
           :label="$t('combo.form.kitchenName')"
           :helper-text="$t('combo.form.kitchenNameHelp')"
@@ -234,6 +236,7 @@ const canDismiss = useUnsavedFormOnOpen(
         <MoneyInput
           v-model="form.price"
           testid="combo-menu-form-price"
+          name="price"
           :money="money"
           :label="money ? t('combo.form.priceIn', { currency: money.currency }) : t('combo.form.price')"
           :helper-text="t('combo.form.priceHelp')"
@@ -274,6 +277,7 @@ const canDismiss = useUnsavedFormOnOpen(
         <Combo
           v-if="eatenIn"
           testid="combo-menu-form-tax_category"
+          name="tax_category_key"
           :model-value="form.tax"
           :search="searchTax"
           :label="t('combo.form.taxCategory')"
@@ -284,6 +288,7 @@ const canDismiss = useUnsavedFormOnOpen(
         />
         <ion-input
           data-testid="combo-menu-form-sort_order"
+          name="sort_order"
           type="number"
           inputmode="numeric"
           min="0"

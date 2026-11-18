@@ -12,18 +12,20 @@ route asks before the turn's transaction opens (``assistant.prepare``). erplora.
 import pytest
 from django.db import connections
 from live.assistant import is_tool
-from live.context import OperationContext, Scope
+from live.context import OperationContext
 from live.errors import OperationError
 from live.operations import AI, get
 from pydantic import ValidationError
 
 from base import assistant
 from base.schemas import AssistantCallIn
-from base.tests.fake_gateway import gateway, signed  # noqa: F401 - the fixture
+from base.tenancy.tests.business import HUB_DB, HUB_DB_COMMITTED, A, in_business_a
+from base.tests.fake_gateway import gateway, signed
 
-pytestmark = pytest.mark.django_db
+__all__ = ["gateway", "in_business_a"]
 
-A = Scope("host", "a")
+pytestmark = HUB_DB
+
 DOCS = "/internal/assistant/docs/search"
 EXCERPT = {
     "source": "app_doc",
@@ -67,7 +69,7 @@ class TestTheOperation:
 
         assert found == {"results": [CITED]}
         [seen] = gateway.sent(DOCS)
-        assert seen.body == {"hub": "a", "query": "¿Cómo abro la caja?", "language": "es", "limit": 8}
+        assert seen.body == {"hub": A.key, "query": "¿Cómo abro la caja?", "language": "es", "limit": 8}
         assert signed(seen)
 
     @pytest.mark.parametrize(("language", "asked"), [("en", "en"), ("es", "es"), ("es-ES", "es"), ("fr", "en")])
@@ -160,7 +162,7 @@ class TestPreparedBeforeTheTurn:
         gateway.reply(DOCS, json={"results": [EXCERPT]})
         pending = calls(HOW_TO)
 
-        with assistant.prepared_docs(assistant.prepare_docs(ctx(), pending)):
+        with assistant.gateway.prepared_docs(assistant.gateway.prepare_docs(ctx(), pending)):
             found = search()
 
         assert found == {"results": [CITED]}
@@ -170,7 +172,7 @@ class TestPreparedBeforeTheTurn:
         gateway.reply(DOCS, status=503, json={"error": {"code": "assistant.provider_unavailable", "message": "x"}})
         pending = calls(HOW_TO)
 
-        with assistant.prepared_docs(assistant.prepare_docs(ctx(), pending)), pytest.raises(OperationError) as caught:
+        with assistant.gateway.prepared_docs(assistant.gateway.prepare_docs(ctx(), pending)), pytest.raises(OperationError) as caught:
             search()
 
         assert caught.value.code == "base.assistant_unavailable"
@@ -186,29 +188,29 @@ class TestPreparedBeforeTheTurn:
         ],
     )
     def test_only_the_documentation_searches_the_model_asked_for_are_prepared(self, gateway, pending):
-        assert assistant.prepare_docs(ctx(), pending) == {}
+        assert assistant.gateway.prepare_docs(ctx(), pending) == {}
         assert gateway.requests == []
 
     @pytest.mark.parametrize(("actor", "permissions"), [(None, {"base.view_home"}), ("ana", set())])
     def test_nobody_who_may_not_search_makes_erplora_com_search(self, gateway, actor, permissions):
         pending = calls(HOW_TO)
 
-        assert assistant.prepare_docs(ctx(actor=actor, permissions=permissions), pending) == {}
+        assert assistant.gateway.prepare_docs(ctx(actor=actor, permissions=permissions), pending) == {}
         assert gateway.requests == []
 
 
-@pytest.mark.django_db(transaction=True)
+@HUB_DB_COMMITTED
 def test_waiting_for_the_documentation_holds_no_transaction(gateway, monkeypatch):
     """Up to 15 s of waiting inside a transaction would hold the hub's connection, as for every door of
     the gateway (``test_services_assistant.test_waiting_for_erplora_com_holds_no_transaction``)."""
     gateway.reply(DOCS, json={"results": []})
     seen = []
-    post = assistant._post
+    post = assistant.gateway._post
 
     def probe(*args, **kwargs):
         seen.append(any(connection.in_atomic_block for connection in connections.all()))
         return post(*args, **kwargs)
 
-    monkeypatch.setattr(assistant, "_post", probe)
+    monkeypatch.setattr(assistant.gateway, "_post", probe)
     search()
     assert seen == [False]

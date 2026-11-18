@@ -23,7 +23,7 @@ from live.operations import INTERNAL, UnknownOperation, get, operation
 from apps.staff.models import Member, Role, Schedule, StaffSettings, TimeOff
 from base.business import babel_locale, business_zone
 from base.models import HubUser, Membership
-from base.queries import hub_user_of
+from base.queries.people import hub_user_of
 from base.ordering import list_order_for
 from apps.staff.schemas import (
     AccountListIn,
@@ -149,7 +149,7 @@ def list_members(ctx: OperationContext, params: MemberListIn) -> dict:
     return _page(members.order_by(*list_order_for(params.sort, columns=MEMBER_ORDER, nulls_last=True)), params)
 
 
-def filter_members(members: QuerySet[Member], params: MemberListIn) -> QuerySet[Member]:
+def filter_members(members: QuerySet[Member], params: MemberListIn) -> QuerySet[Member]:  # noqa: C901
     """The directory's search and filters, shared by the pay sheet so both give the same rows."""
     members = members.annotate(search_name=Concat("first_name", Value(" "), "last_name"))
     if params.search:
@@ -912,7 +912,7 @@ def _subtract(
         "person, status, type or dates."
     },
 )
-def list_time_off(ctx: OperationContext, params: TimeOffListIn) -> dict:
+def list_time_off(ctx: OperationContext, params: TimeOffListIn) -> dict:  # noqa: C901
     time_off = live_time_off()
     if params.search:
         time_off = time_off.filter(member_name__icontains=params.search)
@@ -1082,7 +1082,7 @@ def load_time_off(time_off_id: UUID) -> TimeOff | None:
     return time_off
 
 
-def overlapping_time_off(
+def overlapping_time_off(  # noqa: PLR0913, PLR0917
     member: Member,
     start_date: dt.date,
     end_date: dt.date,

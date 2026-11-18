@@ -2,6 +2,10 @@
 apps invoice works with (tax's factory catalogue, inventory's products, customer's cards, sale's charges,
 refunds and voids) — made through their own operations, never by hand: no mocks.
 
+Every test with the database runs as production does: inside business A's own database (``hub_a`` of the root
+conftest, entered with ``use_hub``), nothing falling back on control's. Business B (``hub_b``) has its own database
+beside it; a test of B asks for ``hub_b`` and enters it.
+
 ``deliver(name)`` hands the newest ``name`` event of the outbox to Invoicing's real reaction
 (``apps.invoice.events.react``), as the worker's outbox relay does.
 """
@@ -15,10 +19,20 @@ from live.meta import all_live_app_configs, permissions_for_role
 from live.operations import get
 from psycopg.conninfo import make_conninfo
 
+from base import assistant
 from base.models import Membership
+from base.permissions import permissions_for
+from base.tenancy.tests.business import HUB_DB, HUB_DB_COMMITTED, A, B, factory_data, in_business_a
+from base.tenancy.tests.concurrency import hub_staff, plan_with_room
 
-A = Scope("host", "a")
-B = Scope("host", "b")
+
+def in_hubs(test):
+    """A test made by one of ``base.tests.test_assistant_asks``' factories, run in the businesses' own databases: its
+    ``django_db`` mark becomes :data:`HUB_DB`."""
+    test.pytestmark = [HUB_DB.mark if mark.name == "django_db" else mark for mark in test.pytestmark]
+    return test
+
+
 ISSUER = {
     "legal_name": "Peluquería Ana SL",
     "tax_id": "B12345674",
@@ -71,15 +85,6 @@ def english():
 
 
 @pytest.fixture
-def no_fallback(monkeypatch):
-    """As production: without ``use_hub`` a hub's model fails, nothing falls back on the shared database (the tests
-    with the hubs ``hub_a`` and ``hub_b`` of the root conftest, each with its own database)."""
-    from base.tenancy import context
-
-    monkeypatch.setattr(context, "_test_fallback", None)
-
-
-@pytest.fixture
 def today():
     """The business day the test runs on, taken when it runs as the operations take it: a date taken at import
     is the day of the collection, and a run that crosses midnight would compare it with the next one
@@ -92,7 +97,7 @@ def make_user(db):
     def make(
         username: str = "ana",
         *,
-        host: str | None = "a",
+        host: str | None = A.key,
         role: str = Membership.Role.ADMIN,
     ):
         user = get_user_model().objects.create_user(username=username, password="pw")
@@ -101,6 +106,22 @@ def make_user(db):
         return user
 
     return make
+
+
+@pytest.fixture
+def catalog_of(make_user):
+    """``catalog_of(role, language)``: the real catalogue of the assistant of a person of business A with ``role``, who
+    asks in ``language`` (one person per role)."""
+    users = {}
+
+    def of(role: str, language: str):
+        if role not in users:
+            users[role] = make_user(f"asker-{role}", role=role)
+        user = users[role]
+        ctx = OperationContext(scope=A, actor=user, permissions=permissions_for(user, A), language=language)
+        return assistant.tools.catalog(ctx)
+
+    return of
 
 
 @pytest.fixture
@@ -162,7 +183,7 @@ def charge(db):
 
 @pytest.fixture
 def db_dsn(django_db_setup):
-    """DSN of the test database, for raw psycopg sessions (reading only what is committed)."""
+    """DSN of control's test database, where a live stream listens for a business's notices."""
     params = connections["default"].settings_dict
     return make_conninfo(
         dbname=params["NAME"],

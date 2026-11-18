@@ -23,14 +23,15 @@ from ninja import Field, Schema
 
 from apps.cart_checkout.tests.conftest import make_cart
 from apps.flow.models import Flow, FlowRun, Question
+from apps.flow.queries import words_for
 from apps.task.models import Task
 from apps.whatsapp_inbox.models import Message
 from apps.whatsapp_inbox.tests.conftest import connect, receive
 from base.models import Hub
 
-from .conftest import A, ctx_for, make_flow, run
+from .conftest import A, HUB_DB, ctx_for, make_flow, run
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 MADRID = ZoneInfo("Europe/Madrid")
 NOON = dt.datetime(2026, 10, 15, 12, 0, tzinfo=MADRID)
@@ -211,7 +212,7 @@ def chatting(settings):
     settings.SAAS_INTERNAL_URL = "http://saas.test"
     settings.INTERNAL_SHARED_SECRET = "s3cret"
     connect()
-    receive("wamid.IN", sent_at=(timezone.now() - dt.timedelta(minutes=10)).isoformat())
+    receive("wamid.IN", sent_at=(timezone.now() - dt.timedelta(minutes=10)).isoformat(), scope=A)
 
 
 def test_a_whatsapp_to_a_customer_says_each_datum_in_words(chatting):
@@ -236,8 +237,9 @@ def test_a_whatsapp_to_a_customer_says_an_amount_in_the_currency_its_step_answer
 
 def test_a_whatsapp_to_a_customer_says_a_charge_s_legal_limit_in_euros_in_a_business_in_yen(chatting):
     # hub#926: as the question (FLOW-F28), a charge preview's cash limit reaches the customer in the euros the law
-    # writes it in, never as «100000» nor in the business's yen; its total, in yen.
-    Hub.objects.filter(slug=A.key).update(country="JP")
+    # writes it in, never as «100000» nor in the business's yen; its total, in yen. Only a business in Spain has the
+    # limit, and Spain charges in euros: what its preview answered is then said for a business in yen.
+    Hub.objects.filter(slug=A.key).update(country="ES")
     coffee = {"name": "Coffee", "sku": "COF", "price": 1250, "tax_category_key": "product.generic"}
     run("inventory.product.create", coffee, system_context(A))
     check = run("sale.order.open", {"lines": [{"product": "COF"}]}, system_context(A))
@@ -247,7 +249,12 @@ def test_a_whatsapp_to_a_customer_says_a_charge_s_legal_limit_in_euros_in_a_busi
     flow = make_flow(trigger_kind=Flow.Trigger.MANUAL, steps=[preview, notify], grants=[PREVIEW, NOTIFY], language="es")
     done = run("flow.flow.run", {"id": str(flow.id), "input": INPUT})
     assert done.status == FlowRun.Status.SUCCEEDED, (done.error_code, done.error_message)
-    assert Message.objects.get(direction="outbound").body == "No cash from 1.000,00\xa0€. Total: 1.250\xa0JPY."
+    assert Message.objects.get(direction="outbound").body == "No cash from 1.000,00\xa0€. Total: 12,50\xa0€."
+    answered = {"s0": run(PREVIEW, {"order_id": str(check.id)}, system_context(A)).model_dump(mode="json")}
+    Hub.objects.filter(slug=A.key).update(country="JP")
+    say = words_for([preview, notify], "es", A, {"steps": answered})
+    said = [say(f"steps.s0.{datum}", answered["s0"][datum]) for datum in ("cash_limit", "total")]
+    assert said == ["1.000,00\xa0€", "1.250\xa0JPY"]
 
 
 def test_a_whatsapp_to_a_customer_says_the_amounts_inside_a_cart_s_line_in_its_cart_s_currency(chatting):

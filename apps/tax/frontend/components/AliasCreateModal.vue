@@ -77,6 +77,7 @@ const canDismiss = useUnsavedFormOnOpen('tax-alias-form', form, open);
       <div class="tax-form">
         <ion-input
           data-testid="tax-alias-form-alias"
+          name="alias"
           :value="form.alias"
           :label="$t('tax.aliases.columns.alias')"
           :placeholder="$t('tax.aliases.form.aliasPlaceholder')"
@@ -90,6 +91,7 @@ const canDismiss = useUnsavedFormOnOpen('tax-alias-form', form, open);
         />
         <Combo
           testid="tax-alias-form-category"
+          name="tax_category_key"
           :model-value="category"
           :search="searchCategories"
           :label="$t('tax.aliases.columns.category')"
@@ -99,6 +101,7 @@ const canDismiss = useUnsavedFormOnOpen('tax-alias-form', form, open);
         />
         <ion-select
           data-testid="tax-alias-form-source"
+          name="source"
           :value="form.source"
           :label="$t('tax.aliases.columns.source')"
           label-placement="floating"

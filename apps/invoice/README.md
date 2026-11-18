@@ -6,8 +6,8 @@ sustituye a un tique (F3) y la rectificativa (R1–R5) de cada devolución, anul
 entre Ventas y VeriFactu en la cadena fiscal española: aquí nace el número de serie que luego viaja a la AEAT.
 Sirve igual al restaurante y a la peluquería.
 
-- **Estado**: completa (2026-10-31): 20 de los 23 flujos `INVOICE-F01` … `F23` están `hecho`; F04, F22 y F23,
-  `descartado` con su motivo y su issue (hub#500, hub#501 y hub#502; ver «Qué queda fuera»).
+- **Estado**: completa (2026-10-31): sus 21 flujos están `hecho`; lo que no entra, con su issue, en «Qué queda
+  fuera».
 - **Especificación**: [`WORKBOOK.md`](WORKBOOK.md) (en inglés, [`WORKBOOK.en.md`](WORKBOOK.en.md), hasta
   «Para quien lo mantiene»). Lo que se cambie de la app se cambia antes allí.
 - **Peticiones a `@erplora/ui`** que siguen abiertas: [`UI-REQUESTS.md`](UI-REQUESTS.md).
@@ -29,10 +29,13 @@ Sirve igual al restaurante y a la peluquería.
   «Justificante VeriFactu», A4 por la impresora del sistema o el diálogo del navegador (nunca sin su QR), «Marcar
   pagada» y la factura vigente de una venta para otras apps.
 - **El emisor** (F21): la identidad fiscal del negocio, obligatoria para emitir; el paso «Los datos de tu negocio»
-  del Inicio y la franja «Todavía no puedes facturar» hasta que está.
+  del Inicio y el aviso «Todavía no puedes facturar» de la campana hasta que está.
 - **Hub de plataforma** (F23, parte de Facturación): `invoice.invoice.issue_platform` y sus consultas emiten las
-  facturas de ERPlora que manda el SaaS por `/internal/platform/invoices`; el alta de ese hub con su BD propia
-  queda fuera (hub#502).
+  facturas de ERPlora que manda el SaaS por `/internal/platform/invoices`, en la BD propia de ese hub
+  (`manage.py create_platform_hub --execute`); en producción solo se declara listo con el envío real a la AEAT
+  abierto. Cada línea trae su descuento (`discount_cents`, sin IVA; `net_cents` ya descontado): la factura
+  guarda el precio del plan y el descuento aparte, y un mes gratis de un código promocional es una factura de
+  0 € que se emite y se registra como cualquier otra.
 
 ## Ficha
 
@@ -72,11 +75,10 @@ CI=1 pnpm e2e tests/e2e/invoice-sale.spec.ts tests/e2e/invoice-manual.spec.ts te
 
 ## Qué queda fuera
 
-- **hub#500** — El cliente no puede pedir él mismo la factura completa de su tique (INVOICE-F04).
-- **hub#501** — El emisor de Facturación no se rellena con los datos fiscales de la cuenta de ERPlora (INVOICE-F22);
+- **hub#500** — El cliente no puede pedir él mismo la factura completa de su tique.
+- **hub#501** — El emisor de Facturación no se rellena con los datos fiscales de la cuenta de ERPlora;
   choca con «Dos identidades» de PLAN-SAAS (los datos fiscales del negocio viven en el Hub): contradicción señalada,
   sin elegir.
-- **hub#502** — ERPlora todavía no puede emitir sus propias facturas desde su hub de plataforma (INVOICE-F23).
 - Lo que no hace a propósito (enviar a la AEAT, cobrar, presupuestos, vencimientos, el libro registro para la
   gestoría…): «Lo que NO hace, a propósito» del WORKBOOK.
 - Los iconos y las piezas compartidas de [`UI-REQUESTS.md`](UI-REQUESTS.md).

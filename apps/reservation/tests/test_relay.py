@@ -1,52 +1,38 @@
 """Reservations hears Customers through the worker's outbox relay, end to end (RESERVATION-F21, F22).
 
 Customers' real operations merge two cards or erase one and record ``customer.customer.merged`` /
-``customer.customer.erased`` in the outbox; one tick of the worker's real loop (``base.worker.run`` →
-``base.relay``) hands them to Reservations, whose reaction moves the absorbed card's reservations and waitlist
+``customer.customer.erased`` in the outbox; one tick of the worker's real loop over every business (``base.worker.run``
+→ ``base.relay``), committed, hands them to Reservations, whose reaction moves the absorbed card's reservations and waitlist
 entries to the card that stays, or empties the personal data of the erased card's — once: a second tick, or the
 same notice handed over again, changes nothing. An erasure in hub B is heard in B only.
 """
 
 import json
-import threading
 
 import psycopg
 import pytest
-from django.db.backends.base.base import BaseDatabaseWrapper
 from django.utils import timezone
 from live.models import OutboxEvent
 from live.outbox import channel_for
 
+from apps.flow.tests.test_relay import worker_loop
 from apps.reservation.models import Reservation, WaitlistEntry
 from apps.table.models import Hold
-from base import catalog, worker
-from base.catalog import RegisterResult
 from base.models import EventDelivery
+from base.tenancy.context import use_hub
 
-from .conftest import A, B, TOMORROW, book, ctx_for, holds, make_table, open_week, run
+from .conftest import HUB_DB_COMMITTED, TOMORROW, A, B, book, ctx_for, holds, make_table, open_week, run
 
-REGISTERED = RegisterResult(written=0, retired=0, docs_changed=0, skipped=True)
+#: The worker's real loop over every business, that these tests take from here.
+__all__ = ["worker_loop"]
 
-
-def one_tick() -> None:
-    """One tick of the worker's real loop."""
-    stop = threading.Event()
-
-    def wait(_seconds: float) -> bool:
-        stop.set()
-        return True
-
-    now = timezone.now()
-    assert worker.run(stop, tick_seconds=0, wait=wait, clock=lambda: now) == 0
+pytestmark = HUB_DB_COMMITTED
 
 
 @pytest.fixture
-def tick(db, monkeypatch):
-    """``one_tick`` without the SaaS (``register_apps``) and, inside the test's transaction, without releasing
-    the connections (that would close the test's own)."""
-    monkeypatch.setattr(catalog, "register_apps", lambda: REGISTERED)
-    monkeypatch.setattr(BaseDatabaseWrapper, "close_if_unusable_or_obsolete", lambda self: None)
-    return one_tick
+def tick(worker_loop):
+    """One tick of the worker's real loop over every business, without the SaaS."""
+    return worker_loop
 
 
 def delivery_to_reservation(name: str) -> tuple[str, int]:
@@ -165,19 +151,23 @@ def heard(session, timeout: float = 0.5) -> set[str]:
     return {name for note in session.notifies(timeout=timeout) for name in json.loads(note.payload)["events"]}
 
 
-def test_an_erasure_in_hub_b_is_heard_in_b_only(listen, monkeypatch):
-    monkeypatch.setattr(catalog, "register_apps", lambda: REGISTERED)
-    open_week()
+def test_an_erasure_in_hub_b_is_heard_in_b_only(listen, tick, hub_b):
+    with use_hub(hub_b):
+        open_week()
     on_a, on_b = listen(A), listen(B)
-    in_b = book(ctx_for(scope=B), guest_name="Bea Ruiz", guest_phone="600333444")
+    with use_hub(hub_b):
+        in_b = book(ctx_for(scope=B), guest_name="Bea Ruiz", guest_phone="600333444")
     heard(on_a), heard(on_b)  # the booking's own notices
 
-    run("customer.customer.erase", {"id": str(in_b.customer_id)}, ctx_for(scope=B))
+    with use_hub(hub_b):
+        run("customer.customer.erase", {"id": str(in_b.customer_id)}, ctx_for(scope=B))
     heard(on_b)  # the erasure's own notice
-    one_tick()
+    tick()
 
-    assert Reservation.objects.get(pk=in_b.id).guest_name == ""
+    with use_hub(hub_b):
+        assert Reservation.objects.get(pk=in_b.id).guest_name == ""
+        reaction = OutboxEvent.objects.get(name="reservation.customer.erased")
     assert "reservation.customer.erased" in heard(on_b)
     assert heard(on_a) == set()
-    reaction = OutboxEvent.objects.get(name="reservation.customer.erased")
+    assert not OutboxEvent.objects.filter(name="reservation.customer.erased").exists()  # nor in business A
     assert (reaction.scope_kind, reaction.scope_key) == (B.kind, B.key)

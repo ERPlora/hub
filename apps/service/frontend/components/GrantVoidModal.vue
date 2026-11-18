@@ -73,6 +73,7 @@ async function confirm(): Promise<void> {
         </p>
         <ion-textarea
           data-testid="service-grant-void-reason"
+          name="reason"
           :value="reason"
           :label="t('service.void.reason')"
           :helper-text="t('service.void.reasonHelp')"

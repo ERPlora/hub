@@ -13,18 +13,8 @@ export type Route = 'erplora' | 'own';
 export type CertificateKind = 'seal' | 'representative' | 'personal' | 'unknown';
 export type InvoiceType = 'F1' | 'F2' | 'F3' | 'R1' | 'R2' | 'R3' | 'R4' | 'R5';
 export type EventKind =
-  | 'record_created'
-  | 'deferred'
-  | 'accepted'
-  | 'accepted_with_errors'
-  | 'failed'
-  | 'queue_processed'
-  | 'queue_retried'
-  | 'chain_valid'
-  | 'chain_broken'
-  | 'aeat_queried'
-  | 'chain_recovered'
-  | 'connection_test'
+  | 'record_created' | 'deferred' | 'accepted' | 'accepted_with_errors' | 'failed' | 'queue_processed'
+  | 'queue_retried' | 'chain_valid' | 'chain_broken' | 'aeat_queried' | 'chain_recovered' | 'connection_test'
   | 'config_changed';
 export type Severity = 'debug' | 'info' | 'warning' | 'error' | 'critical';
 export type Representation = 'none' | 'submitted' | 'approved' | 'returned' | 'revoked';
@@ -261,7 +251,10 @@ export interface DiagnosticOut {
 
 export interface ConfigOut {
   environment: Environment;
+  /** The route the records go by, never chosen: own with a valid own certificate, erplora without; fixed on going live. */
   route: Route;
+  /** ERPlora's route is open to this business here; when not, only the own certificate goes live. */
+  erplora_route_available: boolean;
   production_since: string | null;
   production_open: boolean;
   can_go_back: boolean;
@@ -372,7 +365,6 @@ export interface IssuerIn {
 declare module '@erplora/ui/sdk' {
   interface Operations {
     'verifactu.config.get': { input: NoInput; output: ConfigOut };
-    'verifactu.config.update': { input: { route: Route }; output: ConfigOut };
     'verifactu.config.go_live': { input: NoInput; output: ConfigOut };
     'verifactu.config.back_to_testing': { input: NoInput; output: ConfigOut };
     'verifactu.certificate.upload': { input: { p12_base64: string; password: string }; output: ConfigOut };

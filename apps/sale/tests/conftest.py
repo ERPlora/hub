@@ -1,10 +1,15 @@
 """Fixtures of the sale tests: contexts per role and scope, users with a role on a host, and the real
 apps sale works with (tax's factory catalogue, inventory's products, customer's cards).
 
+Every test that uses the database sells as production does: inside the business ``A``'s own database
+(``in_business_a``), never on control's. A test of two businesses also asks for ``hub_b`` and enters it with
+``use_hub``.
+
 The products and the customers are created through their own apps' operations, never by hand: the
 integration with ``tax``, ``inventory`` and ``customer`` is tested as it runs (no mocks).
 """
 
+import datetime as dt
 from decimal import Decimal
 
 import pytest
@@ -17,10 +22,9 @@ from live.operations import get
 from psycopg.conninfo import make_conninfo
 
 from base.models import Membership
-from base.services import ensure_hub_user
-
-A = Scope("host", "a")
-B = Scope("host", "b")
+from base.services.sessions import ensure_hub_user
+from base.tenancy.tests.business import HOST, HUB_DB, A, B, factory_data, factory_data_b, in_business_a
+from base.tenancy.tests.concurrency import hub_staff, plan_with_room
 
 
 def ctx_for(
@@ -48,6 +52,19 @@ def run(name: str, data: dict | None = None, ctx: OperationContext | None = None
     """Runs the operation ``name`` with ``data`` as its input (validated as a route would)."""
     op = get(name)
     return op(ctx or ctx_for(), op.input.model_validate(data or {}))
+
+
+#: Bogotá at 23:30 of 2 November 2026, already the 3rd in Madrid, the deployment's clock (hub#771).
+ELSEWHERE = "America/Bogota"
+NIGHT_THERE = dt.datetime(2026, 11, 3, 4, 30, tzinfo=dt.UTC)
+
+
+@pytest.fixture
+def night_elsewhere(monkeypatch, in_business_a):
+    """The business ``A`` in another zone than the deployment's, at night: it is 2 November 2026 there and the 3rd on
+    the deployment's clock (hub#771). The root conftest's opens a business without a database of its own."""
+    monkeypatch.setattr(timezone, "now", lambda: NIGHT_THERE)
+    monkeypatch.setattr(in_business_a, "timezone", ELSEWHERE)
 
 
 @pytest.fixture(autouse=True)
@@ -81,7 +98,7 @@ def make_user(db):
     def make(
         username: str = "ana",
         *,
-        host: str | None = "a",
+        host: str | None = A.key,
         role: str = Membership.Role.ADMIN,
     ):
         user = get_user_model().objects.create_user(username=username, password="pw")
@@ -130,25 +147,8 @@ def customer(db):
 
 
 @pytest.fixture
-def factory_data(transactional_db):
-    """A transactional test starts from a flushed database: tax's factory catalogue and the factory
-    payment methods are planted again, as their migrations do (idempotent)."""
-    from importlib import import_module
-
-    from django.apps import apps as registry
-
-    with connections["default"].schema_editor() as editor:
-        for module in (
-            "apps.tax.migrations.0002_factory_catalogue",
-            "apps.tax.migrations.0005_retail_alcohol",
-            "apps.sale.migrations.0002_factory_payment_methods",
-        ):
-            import_module(module).plant(registry, editor)
-
-
-@pytest.fixture
 def db_dsn(django_db_setup):
-    """DSN of the test database, for raw psycopg sessions (reading only what is committed)."""
+    """DSN of control's test database, where the live notices go after the COMMIT, for raw psycopg sessions."""
     params = connections["default"].settings_dict
     return make_conninfo(
         dbname=params["NAME"],

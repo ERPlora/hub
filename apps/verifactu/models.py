@@ -464,9 +464,7 @@ class Record(UUIDModel):
 #: The reasons a record waits (VERIFACTU-F17) and those that keep a business from going live (VERIFACTU-F08), by
 #: code; ``%(detail)s`` and ``%(at)s`` where they apply.
 WAIT_REASONS = {
-    "gateway_unavailable": _(
-        "ERPlora's sending gateway is not configured on this server"
-    ),
+    "gateway_unavailable": _("ERPlora's sending gateway is not configured on this server"),
     "production_closed": _(
         "ERPlora has not opened real filing with the AEAT on this server yet"
     ),
@@ -477,6 +475,7 @@ WAIT_REASONS = {
     "representation_not_approved": _(
         "ERPlora still has to approve your signed authorisation to file for you"
     ),
+    "own_certificate_required": _("ERPlora does not file on behalf of businesses for now: use your own certificate"),
     "go_live_forbidden": _(
         "this is a demo business: it always files in the AEAT's test environment"
     ),

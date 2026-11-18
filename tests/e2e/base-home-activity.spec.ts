@@ -39,7 +39,7 @@ function cuts(el: Locator): Promise<string[]> {
     range.selectNodeContents(node);
     const text = range.getBoundingClientRect();
     const found: string[] = [];
-    const cell = node.closest('.data-table__cell, .data-table__field-value') ?? node;
+    const cell = node.closest('.data-table__cell, .data-table__card-meta-value') ?? node;
     for (let at: Element | null = node as Element; at; at = at.parentElement) {
       const style = getComputedStyle(at);
       const box = at.getBoundingClientRect();
@@ -198,7 +198,7 @@ test('BASE-F09 — a sale shows up live in «Activity», its date and time whole
     await page.setViewportSize({ width: vp.width, height: vp.height });
     await page.goto(`${A}/#actividad`);
     const seen = await rowOf(page, sale.id);
-    const cells = seen.locator('.data-table__cell, .data-table__field-value');
+    const cells = seen.locator('.data-table__cell, .data-table__card-meta-value');
     const date = cells.first();
     // The date carries its time («22/10/2026, 9:30»), and nothing clips it, nor any other value of the row.
     await expect(date).toHaveText(/\d{1,2}:\d{2}/);

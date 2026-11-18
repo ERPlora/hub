@@ -19,6 +19,7 @@ from live.models import OutboxEvent
 
 from apps.sale.apps import SaleConfig
 from base import queries, registry, services, worker
+from base.services import hub_registry, provisioning
 from base.events import HUB_PURGED
 from base.schemas import HubCancelIn, HubGetIn, HubRegistryIn, HubRestoreIn, HubStateIn
 from base.tenancy import connections as tenancy_connections
@@ -55,7 +56,7 @@ def fresh(hub: Hub) -> Hub:
 def business(django_db_blocker, hub_databases, monkeypatch):
     """``business(left_days_ago=91)``: a business made by the provisioning, with a real database, that left then. Its
     row and its database are gone after the test."""
-    monkeypatch.setattr(services, "report_ready", lambda hub_id: None)
+    monkeypatch.setattr(provisioning, "report_ready", lambda hub_id: None)
     started = timezone.now()
     made: list[Hub] = []
 
@@ -535,7 +536,7 @@ def test_a_database_already_gone_while_dropping_is_no_failure(business, dumps_bu
 def test_a_lease_another_worker_holds_is_left_alone(business, dumps_bucket, moto_s3):
     hub = business(left_days_ago=91)
     now = timezone.now()
-    assert services.claim_hub(hub.pk, now, provision.LEASE, owner="another") is not None
+    assert provisioning.claim_hub(hub.pk, now, provision.LEASE, owner="another") is not None
 
     run_pass(now)
 
@@ -767,7 +768,7 @@ def test_a_business_that_comes_back_during_its_final_copy_keeps_its_database(
 
     def back(row, **kwargs):
         made = real(row, **kwargs)
-        services.hub_restore(internal(), HubRestoreIn(id=row.pk))
+        hub_registry.hub_restore(internal(), HubRestoreIn(id=row.pk))
         return made
 
     monkeypatch.setattr(dumps, "dump_hub", back)
@@ -787,7 +788,7 @@ def test_a_copy_that_fails_after_the_business_came_back_notes_nothing_on_it(
     hub = business(left_days_ago=91)
 
     def back_and_broken(row, **kwargs):
-        services.hub_restore(internal(), HubRestoreIn(id=row.pk))
+        hub_registry.hub_restore(internal(), HubRestoreIn(id=row.pk))
         raise dumps.DumpFailed("the bucket said no")
 
     monkeypatch.setattr(dumps, "dump_hub", back_and_broken)
@@ -806,7 +807,7 @@ def test_a_fiscal_document_found_after_the_business_came_back_leaves_it_ready(
 
     def back_with_a_sale(row, **kwargs):
         made = real(row, **kwargs)
-        services.hub_restore(internal(), HubRestoreIn(id=row.pk))
+        hub_registry.hub_restore(internal(), HubRestoreIn(id=row.pk))
         with use_hub(row):
             one_sale()
         return made
@@ -828,7 +829,7 @@ def test_a_kept_business_that_comes_back_is_ready_and_clean(business, dumps_buck
     assert (hub.status, hub.last_error.split(":")[0]) == ("cancelled", "fiscal_archive_missing")
     assert hub.next_attempt_at is not None
 
-    services.hub_restore(internal(), HubRestoreIn(id=hub.pk))
+    hub_registry.hub_restore(internal(), HubRestoreIn(id=hub.pk))
 
     hub = fresh(hub)
     assert (hub.status, hub.attempts, hub.last_error, hub.next_attempt_at) == ("ready", 0, "", None)
@@ -839,9 +840,9 @@ def test_a_business_whose_database_is_going_never_comes_back(business):
     hub = business(left_days_ago=91, status=Hub.Status.DROPPING)
 
     for door, data in (
-        (services.hub_restore, HubRestoreIn(id=hub.pk)),
-        (services.hub_cancel, HubCancelIn(id=hub.pk)),
-        (services.hub_register, registered(hub)),
+        (hub_registry.hub_restore, HubRestoreIn(id=hub.pk)),
+        (hub_registry.hub_cancel, HubCancelIn(id=hub.pk)),
+        (hub_registry.hub_register, registered(hub)),
     ):
         with pytest.raises(Conflict) as refused:
             door(internal(), data)
@@ -852,7 +853,7 @@ def test_a_business_whose_database_is_going_never_comes_back(business):
 def test_a_cancel_while_archiving_does_not_count_the_90_days_again(business):
     hub = business(left_days_ago=91, status=Hub.Status.ARCHIVING)
 
-    services.hub_cancel(internal(), HubCancelIn(id=hub.pk))
+    hub_registry.hub_cancel(internal(), HubCancelIn(id=hub.pk))
 
     after = fresh(hub)
     assert (after.status, after.cancelled_at) == ("archiving", hub.cancelled_at)
@@ -862,7 +863,7 @@ def test_a_register_while_archiving_asks_to_restore_first(business):
     hub = business(left_days_ago=91, status=Hub.Status.ARCHIVING)
 
     with pytest.raises(Conflict) as refused:
-        services.hub_register(internal(), registered(hub))
+        hub_registry.hub_register(internal(), registered(hub))
 
     assert refused.value.code == "base.hub_cancelled"
 
@@ -875,7 +876,7 @@ def photo(hub: Hub, version: int) -> HubStateIn:
 def test_a_late_photo_of_a_business_whose_database_went_is_ignored(business, status):
     hub = business(left_days_ago=91, status=status)
 
-    answer = services.hub_state_apply(internal(), photo(hub, hub.state_version + 1))
+    answer = hub_registry.hub_state_apply(internal(), photo(hub, hub.state_version + 1))
 
     assert answer.applied is False
     assert fresh(hub).state == hub.state
@@ -884,7 +885,7 @@ def test_a_late_photo_of_a_business_whose_database_went_is_ignored(business, sta
 def test_a_photo_of_a_business_that_left_is_still_applied(business):
     hub = business(left_days_ago=10)
 
-    answer = services.hub_state_apply(internal(), photo(hub, hub.state_version + 1))
+    answer = hub_registry.hub_state_apply(internal(), photo(hub, hub.state_version + 1))
 
     assert answer.applied is True
 
@@ -894,7 +895,7 @@ def test_the_saas_still_lists_the_copies_while_archiving_and_finds_nothing_once_
     copy = dumps.dump_hub(hub, kind=HubDump.Kind.OFFBOARDING)
     Hub.objects.filter(pk=hub.pk).update(status=Hub.Status.ARCHIVING)
 
-    listed = queries.hub_dump_list(internal(), HubGetIn(id=hub.pk))
+    listed = queries.dumps.hub_dump_list(internal(), HubGetIn(id=hub.pk))
 
     assert listed.available is True
     assert [row.id for row in listed.dumps] == [copy.key]
@@ -903,7 +904,7 @@ def test_the_saas_still_lists_the_copies_while_archiving_and_finds_nothing_once_
 
     assert fresh(hub).status == "purged"
     with pytest.raises(NotFound):
-        queries.hub_dump_list(internal(), HubGetIn(id=hub.pk))
+        queries.dumps.hub_dump_list(internal(), HubGetIn(id=hub.pk))
 
 
 def test_the_purge_is_only_for_a_business_being_dropped(business):

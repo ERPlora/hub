@@ -44,6 +44,7 @@ from apps.service.queries import (
     ASSIGNMENT_NOT_FOUND,
     PACKAGE_NOT_FOUND,
     SESSION_NOT_FOUND,
+    SYSTEM,
     balance,
     current_settings,
     find_category,
@@ -58,6 +59,7 @@ from apps.service.queries import (
     load_grant,
     load_package,
     load_service,
+    left_by_deleting,
     lock_grant,
     redeem_refusal,
     session_value,
@@ -77,6 +79,8 @@ from apps.service.schemas import (
     CategoryIn,
     CategoryOut,
     CategoryPatchIn,
+    CategoryRecoveredOut,
+    CategoryRecoverIn,
     CategoryRefIn,
     DeletedOut,
     ExpiredOut,
@@ -98,8 +102,10 @@ from apps.service.schemas import (
     ServiceIn,
     ServiceImageIn,
     ServiceImageUploadIn,
+    ServiceLinkIn,
     ServiceOut,
     ServicePatchIn,
+    ServiceRecoveredOut,
     ServiceRecoverIn,
     ServiceRefIn,
     ServicesOut,
@@ -109,6 +115,7 @@ from apps.service.schemas import (
     SettingsIn,
     SettingsOut,
     SettleIn,
+    SubcategoryLinkIn,
     NoIn,
     VoidIn,
 )
@@ -118,6 +125,7 @@ from apps.tax.models import TaxCategory
 from apps.tax.queries import held_categories
 from base import images
 from base.operations import call
+from base.recovery import LeftOut, carries_on
 
 TAX_REQUIRED = _("Pick a tax category: without one the service cannot be charged.")
 TAX_UNKNOWN = _("That tax category does not exist in Taxes or is deactivated.")
@@ -142,6 +150,22 @@ GRANT_UNLIMITED = _(
 GRANT_NO_EXPIRY = _("That voucher never expires: there is no expiry to extend.")
 GRANT_BELOW_USED = _("You cannot take away more sessions than the customer has left.")
 CUSTOMER_UNAVAILABLE = _("That customer's card does not exist in this business.")
+#: Who a service made again from a separate copy came back without, said by their id (``service.service.recover``).
+MEMBER_TERMINATED_LEFT = _("came back without the professional %(member)s: terminated in Staff")
+MEMBER_GONE_LEFT = _("came back without the professional %(member)s: no longer in Staff")
+#: What a category made again from a separate copy came back without, said by its id (``service.category.recover``).
+SERVICE_MOVED_LEFT = _("came back without the service %(service)s: moved to another category since")
+SUBCATEGORY_MOVED_LEFT = _("came back without the subcategory %(category)s: moved elsewhere since")
+SUBCATEGORY_LOOP_LEFT = _(
+    "came back without the subcategory %(category)s: it would hang from one of its own subcategories"
+)
+#: Why one the business changed since the category came back, even without moving it, stays as it left it.
+SERVICE_CHANGED_LEFT = _("came back without the service %(service)s: changed by the business meanwhile")
+SUBCATEGORY_CHANGED_LEFT = _("came back without the subcategory %(category)s: changed by the business meanwhile")
+#: Why nothing the business kept goes back into a category a recovery brought back before this one.
+CATEGORY_BROUGHT_EARLIER = _(
+    "the category %(category)s came back in an earlier recovery: what goes in it is the business's to decide"
+)
 #: Why a session cannot be spent (queries.redeem_refusal) → its code and its message.
 REDEEM_REFUSALS = {
     "voided": (
@@ -177,9 +201,6 @@ SESSION_NOT_SETTLED = _("That session was never charged, so there is nothing to 
 SESSION_ALREADY_RETURNED = _("That session was already given back by another refund.")
 #: How long a session held at the till waits to be charged (SERVICE-F25).
 HOLD_DURATION = dt.timedelta(days=1)
-
-#: Run only by the platform (events.py): no role holds it, so no person and no API key reaches it.
-SYSTEM = "service.system"
 
 # The plain fields of a service an edit may change (the others need a lookup or may be emptied).
 SERVICE_PLAIN = (
@@ -783,6 +804,107 @@ def delete_category(ctx: OperationContext, data: CategoryRefIn) -> dict:
     return {"id": category.id}
 
 
+# Not an assistant tool and no route: its one door is the recovery from a separate copy (BASE-F114), for a category
+# the business no longer has at all.
+@operation(
+    "service.category.recover",
+    kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
+    permission=SYSTEM,
+    input=CategoryRecoverIn,
+    output=CategoryRecoveredOut,
+    ai=INTERNAL,
+)
+def recover_category(ctx: OperationContext, data: CategoryRecoverIn) -> dict:
+    """A category of a separate copy the business no longer has, made again by ``service.category.create``. What it
+    had inside it there and the business keeps where deleting it left it (SERVICE-F08) goes back into it afterwards,
+    each by its own link, counted apart (``service.service.return_to_category``, ``service.category.return_to_parent``).
+    What the business moved since stays where it is, and the output says the category came back without it, and why
+    (``left_out``)."""
+    parent_of = lock_tree()
+    made = create_category(ctx, CategoryIn.model_validate(data.model_dump(include=set(CategoryIn.model_fields))))
+    parent_of[made.id] = made.parent_id
+    left_in = left_by_deleting(data.stands_for)
+    moved = Service.objects.filter(pk__in=data.service_ids, category__isnull=False).order_by("id")
+    left_out = [
+        LeftOut(code="service.service_moved", message=SERVICE_MOVED_LEFT % {"service": pk})
+        for pk in moved.values_list("pk", flat=True)
+    ]
+    for child in Category.objects.filter(pk__in=data.subcategory_ids, is_deleted=False).order_by("id"):
+        if child.parent_id != left_in:
+            message, code = SUBCATEGORY_MOVED_LEFT, "service.subcategory_moved"
+        elif parent_problem(child.pk, made.id, parent_of):
+            message, code = SUBCATEGORY_LOOP_LEFT, "service.subcategory_loop"
+        else:
+            continue
+        left_out.append(LeftOut(code=code, message=message % {"category": child.pk}))
+    return load_category(made.id) | {"left_out": left_out}
+
+
+def _brought_back_now(ctx: OperationContext, category: Category) -> Category:
+    """``category``, made again by the recovery that runs or by one it carries on (``base.recovery.carries_on``): one
+    any other recovery brought back is the business's own, and nothing it kept goes back into it."""
+    if category.created_by != _actor(ctx) and not carries_on(category.created_by):
+        raise Conflict(str(CATEGORY_BROUGHT_EARLIER % {"category": category.pk}), code="service.category_brought_earlier")
+    return category
+
+
+# Not an assistant tool and no route: like the category's recover, its one door is the recovery from a separate copy.
+@operation(
+    "service.service.return_to_category",
+    kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
+    permission=SYSTEM,
+    input=ServiceLinkIn,
+    output=ServiceOut,
+    ai=INTERNAL,
+)
+def return_service_to_category(ctx: OperationContext, data: ServiceLinkIn) -> dict:
+    """A service the business kept without a category since it deleted the one it was in, put back into the category
+    the running recovery made again for that one, as the screen changes it. One moved since stays where the business put
+    it (``service.service_moved``). The category is held before the service, as an edit does."""
+    category = _brought_back_now(ctx, find_category(data.category_id, None, hold=True))
+    service = find_service(data.service_id, None, lock=True)
+    if service.category_id is not None:
+        raise Conflict(str(SERVICE_MOVED_LEFT % {"service": service.pk}), code="service.service_moved")
+    if service.updated_at > category.created_at:
+        raise Conflict(str(SERVICE_CHANGED_LEFT % {"service": service.pk}), code="service.service_changed")
+    _apply(service, {"category_id": category.id}, ctx)
+    service.save()
+    record_event(ctx, events.SERVICE_UPDATED, {"id": str(service.id)})
+    return load_service(service.id, ctx.scope)
+
+
+# Not an assistant tool and no route: like the category's recover, its one door is the recovery from a separate copy.
+@operation(
+    "service.category.return_to_parent",
+    kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
+    permission=SYSTEM,
+    input=SubcategoryLinkIn,
+    output=CategoryOut,
+    ai=INTERNAL,
+)
+def return_subcategory_to_parent(ctx: OperationContext, data: SubcategoryLinkIn) -> dict:
+    """A subcategory the business kept where deleting its parent left it, hung again from the category the running
+    recovery made again for that parent, as a move of the screen. One moved since stays where the business put it
+    (``service.subcategory_moved``), and so does one that would hang from one of its own subcategories
+    (``service.subcategory_loop``). The whole tree is held first, as a move does."""
+    parent_of = lock_tree()
+    parent = _brought_back_now(ctx, find_category(data.parent_id, None))
+    child = find_category(data.category_id, None)
+    if child.parent_id != left_by_deleting(data.stands_for):
+        raise Conflict(str(SUBCATEGORY_MOVED_LEFT % {"category": child.pk}), code="service.subcategory_moved")
+    if parent_problem(child.pk, parent.pk, parent_of):
+        raise Conflict(str(SUBCATEGORY_LOOP_LEFT % {"category": child.pk}), code="service.subcategory_loop")
+    if child.updated_at > parent.created_at:
+        raise Conflict(str(SUBCATEGORY_CHANGED_LEFT % {"category": child.pk}), code="service.subcategory_changed")
+    _apply(child, {"parent_id": parent.id}, ctx)
+    child.save()
+    record_event(ctx, events.CATEGORY_UPDATED, {"id": str(child.id)})
+    return load_category(child.id)
+
+
 # ── Settings (SERVICE-F11) ────────────────────────────────────────────────────────────────────
 
 
@@ -1030,19 +1152,26 @@ def release_member(ctx: OperationContext, data: MemberReleaseIn) -> dict:
     repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission=SYSTEM,
     input=ServiceRecoverIn,
-    output=ServiceOut,
+    output=ServiceRecoveredOut,
     ai=INTERNAL,
 )
 def recover_service(ctx: OperationContext, data: ServiceRecoverIn) -> dict:
     """A service of a separate copy the business no longer has, made again with who performed it there, all
     or nothing, each by the operation its screen uses: the service by ``service.service.create``; each professional the
     business still has by ``service.assignment.assign`` (SERVICE-F31), with their own minutes and price. One who left
-    (terminated) or whom the business no longer has is not assigned: Staff no longer books them. It is their main
-    service only if the business gave them none since (the business's choice stays), and it comes back switched off,
-    by ``service.assignment.update``, if it was."""
+    (terminated) or whom the business no longer has is not assigned: Staff no longer books them, and the output says it
+    came back without them, and why (``left_out``). It is their main service only if the business gave them none since
+    (the business's choice stays), and it comes back switched off, by ``service.assignment.update``, if it was. Its
+    image of the library comes back as ``service.service.set_image`` sets it (SERVICE-F34); a photo of its own does not
+    (``base.images.from_copy``). It keeps which of the copy's it is made again for (``stands_for``), for the apps whose
+    records hang from that one (``queries.services_standing_for``)."""
     made = create_service(ctx, ServiceIn.model_validate(data.model_dump(include=set(ServiceIn.model_fields))))
+    Service.objects.filter(pk=made.id).update(stands_for=data.stands_for)
+    if image := images.from_copy(ctx, data.image):
+        _change_image(ctx, find_service(made.id, None), image)
     asked = [one.member_id for one in data.assignments]
     staying = set(live_members().filter(pk__in=asked).values_list("pk", flat=True))
+    known = set(Member.objects.filter(pk__in=asked).values_list("pk", flat=True))
     with_main = set(
         Assignment.objects.filter(member_id__in=asked, is_primary=True).values_list("member_id", flat=True)
     )
@@ -1059,7 +1188,14 @@ def recover_service(ctx: OperationContext, data: ServiceRecoverIn) -> dict:
         )
         if not one.is_active:
             update_assignment(ctx, AssignmentPatchIn(id=assigned.id, is_active=False))
-    return load_service(made.id, ctx.scope)
+    left_out = [
+        LeftOut(code="service.member_terminated", message=MEMBER_TERMINATED_LEFT % {"member": member})
+        if member in known
+        else LeftOut(code="service.member_not_in_business", message=MEMBER_GONE_LEFT % {"member": member})
+        for member in asked
+        if member not in staying
+    ]
+    return load_service(made.id, ctx.scope) | {"left_out": left_out}
 
 
 # ── Packages (SERVICE-F12, F13) ───────────────────────────────────────────────────────────────

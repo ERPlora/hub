@@ -17,6 +17,13 @@ business leaves and again as its final copy after its 90 days, ``base.tenancy.of
   copy goes up (boto3's ``Callback``, in this same thread) and once more right after it;
 - to a temporary file first, uploaded only when ``pg_dump`` ended well, so a failed dump leaves nothing in the bucket.
 
+:func:`stream_to_bucket` copies a database the same way for a move between clusters (``base.tenancy.move``), straight
+from ``pg_dump``'s output to its key and never through a file, so the worker's disk bounds no size: in parts of
+:data:`STREAM_PART_BYTES`, read in this thread, with the same heartbeat, stop and time limit. The object is completed
+only once ``pg_dump`` ended well; a dump that fails, is stopped or runs too long aborts the upload, and nothing is kept.
+No ``HubDump`` is noted: it is no copy of the business's to download, and the bucket keeps it its 90 days.
+:func:`stream_from_bucket` reads such a copy back a part at a time, for ``pg_restore``'s input.
+
 A hub without its own database is never dumped (:class:`HubWithoutDatabase`: a business not cut yet);
 without a bucket there is nothing to dump to (:class:`DumpsUnavailable`). Every failure is a :class:`DumpFailed` with
 what went wrong in a line. :func:`dump_control` copies control's own database the same way, before the cut
@@ -33,6 +40,7 @@ empty and boto3 signs with the task role.
 import datetime as dt
 import logging
 import os
+import select
 import shutil
 import subprocess
 import tempfile
@@ -74,6 +82,11 @@ ERROR_LINES = 3
 #: The kind of control's own copy, made before the businesses moved to databases of their own (``base.tenancy.cut``),
 #: under ``<control>/``.
 CUT = "cut"
+#: The size of each part of a copy streamed to the bucket: S3 takes 10 000 parts at most, so up to 312 GiB. One part is
+#: held in memory at a time.
+STREAM_PART_BYTES = 32 * 1024 * 1024
+#: How much of ``pg_dump``'s output, or of a copy in the bucket, is read at once.
+READ_BYTES = 1024 * 1024
 
 
 class DumpError(RuntimeError):
@@ -138,7 +151,7 @@ def key_for(hub, kind: str, at: dt.datetime) -> str:
     return f"{hub.id.hex}/{at.astimezone(dt.UTC):{KEY_TIME}}-{kind}.dump"
 
 
-def dump_hub(
+def dump_hub(  # noqa: PLR0913
     hub,
     *,
     kind: str,
@@ -235,6 +248,28 @@ class _Progress:
             self.last_beat = time.monotonic()
 
 
+def _pg_dump_command(hub, *output: str) -> tuple[list[str], dict[str, str], str]:
+    """``pg_dump`` of ``hub``'s database as the migrator, with ``output`` before its ``--dbname``; its environment and
+    the password, which is only there."""
+    conninfo = tenancy_connections.migrator_conninfo(hub.db_name, cluster=hub.cluster)
+    password = str(conninfo.pop("password", "") or "")
+    dsn = make_conninfo(**{name: str(value) for name, value in conninfo.items() if value not in (None, "")})
+    command = [pg_dump(), "--format=custom", "--no-owner", "--no-acl", *output, f"--dbname={dsn}"]
+    # Nothing of the process's own PG* variables: only what the command names, and the password.
+    env = {name: value for name, value in os.environ.items() if not name.startswith("PG")}
+    env["PGPASSWORD"] = password
+    # No Kerberos anywhere: libpq's first try at a GSSAPI session only adds a line to every failure.
+    env["PGGSSENCMODE"] = "disable"
+    return command, env, password
+
+
+def _complaint(complaints, password: str) -> str:
+    """The last lines ``pg_dump`` wrote to ``complaints``, its password hidden."""
+    complaints.seek(0)
+    said = " ".join(line.strip() for line in complaints.read().splitlines()[-ERROR_LINES:] if line.strip())
+    return said.replace(password, "***") if password else said
+
+
 def run_pg_dump(
     hub,
     path: Path,
@@ -243,15 +278,7 @@ def run_pg_dump(
     heartbeat: Callable[[], object] | None,
     cancelled: Callable[[], bool] | None = None,
 ) -> None:
-    conninfo = tenancy_connections.migrator_conninfo(hub.db_name, cluster=hub.cluster)
-    password = str(conninfo.pop("password", "") or "")
-    dsn = make_conninfo(**{name: str(value) for name, value in conninfo.items() if value not in (None, "")})
-    command = [pg_dump(), "--format=custom", "--no-owner", "--no-acl", f"--file={path}", f"--dbname={dsn}"]
-    # Nothing of the process's own PG* variables: only what the command names, and the password.
-    env = {name: value for name, value in os.environ.items() if not name.startswith("PG")}
-    env["PGPASSWORD"] = password
-    # No Kerberos anywhere: libpq's first try at a GSSAPI session only adds a line to every failure.
-    env["PGGSSENCMODE"] = "disable"
+    command, env, password = _pg_dump_command(hub, f"--file={path}")
     with open(path.with_suffix(".err"), "w+", encoding="utf-8", errors="replace") as complaints:
         process = subprocess.Popen(command, env=env, stdout=subprocess.DEVNULL, stderr=complaints)
         started = last_beat = time.monotonic()
@@ -274,11 +301,131 @@ def run_pg_dump(
             process.wait()
             raise
         if process.returncode != 0:
-            complaints.seek(0)
-            said = " ".join(line.strip() for line in complaints.read().splitlines()[-ERROR_LINES:] if line.strip())
-            if password:
-                said = said.replace(password, "***")
+            said = _complaint(complaints, password)
             raise DumpFailed(f"pg_dump could not copy {hub.db_name} (exit {process.returncode}): {said}")
+
+
+def stream_to_bucket(
+    source,
+    key: str,
+    *,
+    timeout: float,
+    heartbeat: Callable[[], object] | None = None,
+    cancelled: Callable[[], bool] | None = None,
+) -> int:
+    """``pg_dump`` of ``source``'s database (its ``db_name`` on its ``cluster``) sent to the bucket at ``key`` as it is
+    made, never written to a file; how many bytes. Nothing is kept unless ``pg_dump`` ended well (see the module)."""
+    target = bucket()
+    if not target:
+        raise DumpsUnavailable("No bucket is named for the copies (HUB_DUMPS_BUCKET).")
+    command, env, password = _pg_dump_command(source)
+    s3 = client()
+    with tempfile.TemporaryFile("w+", encoding="utf-8", errors="replace") as complaints:
+        process = subprocess.Popen(command, env=env, stdout=subprocess.PIPE, stderr=complaints)
+        output = _DumpOutput(process, source, complaints, password, timeout, heartbeat, cancelled)
+        try:
+            _upload_in_parts(s3, target, key, output)
+        except (BotoCoreError, ClientError) as error:
+            raise DumpFailed(f"The copy of {source.slug} could not be uploaded: {error}") from error
+        finally:
+            process.kill()  # nothing if it ended already
+            process.wait()
+            process.stdout.close()
+    logger.info("base.tenancy.dumps.streamed database=%s key=%s bytes=%d", source.db_name, key, output.sent)
+    return output.sent
+
+
+def _upload_in_parts(s3, target: str, key: str, output: "_DumpOutput") -> None:
+    """``output`` uploaded to ``key`` one part at a time, in this thread; completed only once it ended well, aborted on
+    any failure (the bucket's lifecycle rule aborts one whose abort failed too)."""
+    upload = s3.create_multipart_upload(Bucket=target, Key=key, ContentType="application/octet-stream")["UploadId"]
+    parts: list[dict] = []
+    try:
+        while True:
+            chunk = output.read(STREAM_PART_BYTES)
+            if not chunk:
+                break
+            number = len(parts) + 1
+            sent = s3.upload_part(Bucket=target, Key=key, UploadId=upload, PartNumber=number, Body=chunk)
+            parts.append({"ETag": sent["ETag"], "PartNumber": number})
+        s3.complete_multipart_upload(Bucket=target, Key=key, UploadId=upload, MultipartUpload={"Parts": parts})
+    except BaseException:
+        try:
+            s3.abort_multipart_upload(Bucket=target, Key=key, UploadId=upload)
+        except (BotoCoreError, ClientError):
+            logger.warning("base.tenancy.dumps.abort_failed key=%s: the bucket's lifecycle rule aborts it.", key)
+        raise
+
+
+class _DumpOutput:
+    """``pg_dump``'s output as the upload reads it, in this thread: each wait lasts :data:`STOP_CHECK_SECONDS` at most,
+    so a stop is heard, the heartbeat runs every :data:`POLL_SECONDS` and the dump is stopped past its time. A read
+    returns all it was asked for (S3 refuses a part under 5 MiB but the last), and the end only once ``pg_dump`` ended
+    well: a failure raises instead, so the upload is aborted and never completed with half a copy."""
+
+    def __init__(self, process, source, complaints, password: str, timeout: float, heartbeat, cancelled) -> None:  # noqa: PLR0913, PLR0917
+        self.process = process
+        self.source = source
+        self.complaints = complaints
+        self.password = password
+        self.timeout = timeout
+        self.heartbeat = heartbeat
+        self.cancelled = cancelled
+        self.started = self.last_beat = time.monotonic()
+        self.sent = 0
+
+    def read(self, size: int) -> bytes:
+        chunks: list[bytes] = []
+        got = 0
+        while got < size:
+            left = self._left()
+            ready, _, _ = select.select([self.process.stdout], [], [], min(STOP_CHECK_SECONDS, left))
+            if not ready:
+                continue
+            chunk = os.read(self.process.stdout.fileno(), min(READ_BYTES, size - got))
+            if not chunk:
+                self._ended()
+                break
+            chunks.append(chunk)
+            got += len(chunk)
+        self.sent += got
+        return b"".join(chunks)
+
+    def _left(self) -> float:
+        """The time the dump has left, the stop and the heartbeat seen to first."""
+        if self.cancelled is not None and self.cancelled():
+            raise DumpStopped(f"The copy of {self.source.slug} was stopped: the worker is stopping.")
+        left = self.timeout - (time.monotonic() - self.started)
+        if left <= 0:
+            raise DumpFailed(f"The copy of {self.source.slug} took longer than {self.timeout:g} s and was stopped.")
+        if self.heartbeat is not None and time.monotonic() - self.last_beat >= POLL_SECONDS:
+            self.heartbeat()
+            self.last_beat = time.monotonic()
+        return left
+
+    def _ended(self) -> None:
+        while True:
+            try:
+                self.process.wait(timeout=min(STOP_CHECK_SECONDS, self._left()))
+                break
+            except subprocess.TimeoutExpired:
+                continue
+        if self.process.returncode != 0:
+            said = _complaint(self.complaints, self.password)
+            raise DumpFailed(f"pg_dump could not copy {self.source.db_name} (exit {self.process.returncode}): {said}")
+
+
+def stream_from_bucket(key: str):
+    """The copy at ``key`` read from the bucket, :data:`READ_BYTES` at a time, and closed once its reader is done (or
+    closes it); one that cannot be read is a :class:`DumpFailed`."""
+    try:
+        copy = client().get_object(Bucket=bucket(), Key=key)["Body"]
+        try:
+            yield from copy.iter_chunks(READ_BYTES)
+        finally:
+            copy.close()
+    except (BotoCoreError, ClientError) as error:
+        raise DumpFailed(f"The copy at {key} could not be read from the bucket: {error}") from error
 
 
 def link_expires_at(url: str) -> dt.datetime:

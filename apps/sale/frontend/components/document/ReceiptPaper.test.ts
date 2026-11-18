@@ -73,7 +73,7 @@ describe('ReceiptPaper', () => {
     expect([en.text('sale-receipt-title'), en.text('sale-receipt-number')]).toEqual(['Invoice', 'No.: 20261014-0007']);
     const ticket = await paper({ sale: saleOut(), settings: SETTINGS });
     expect(ticket.find('sale-receipt-title').exists()).toBe(false);
-    expect(ticket.text('sale-receipt-number')).toBe('Tiquet: 20261014-0007');
+    expect(ticket.text('sale-receipt-number')).toBe('Tique: 20261014-0007');
   });
 
   it('prints the number Invoicing gave it: «Invoice <series number>» or the ticket’s, never the sale’s', async () => {
@@ -83,7 +83,7 @@ describe('ReceiptPaper', () => {
     const en = await paper({ sale: invoice, settings: SETTINGS }, 'en');
     expect(en.text('sale-receipt-number')).toBe('Invoice: FACT-2026-000012');
     const ticket = saleOut({ invoice_status: 'issued', invoice_type: 'F2', invoice_number: 'TICKET-2026-000031' });
-    expect((await paper({ sale: ticket, settings: SETTINGS })).text('sale-receipt-number')).toBe('Tiquet: TICKET-2026-000031');
+    expect((await paper({ sale: ticket, settings: SETTINGS })).text('sale-receipt-number')).toBe('Tique: TICKET-2026-000031');
   });
 
   // The paper is 80 mm whatever the screen: «Receipt: TICKET-2026-000004» and «Nov 3, 2026, 2:08 PM» do not
@@ -122,7 +122,7 @@ describe('ReceiptPaper', () => {
 
   it('says the sale’s number with its date and time, and the customer when there is one', async () => {
     const s = await paper({ sale: saleOut({ customer_name: 'Lucía Pérez' }), settings: SETTINGS });
-    expect(s.text('sale-receipt-number')).toBe('Tiquet: 20261014-0007');
+    expect(s.text('sale-receipt-number')).toBe('Tique: 20261014-0007');
     expect(s.text('sale-receipt-datetime')).toBe(plain(formatDateTime('2026-10-14T10:05:00Z', 'es')));
     expect(s.text('sale-receipt-customer')).toBe('Cliente: Lucía Pérez');
     const anonymous = await paper({ sale: saleOut(), settings: SETTINGS });

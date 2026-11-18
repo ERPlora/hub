@@ -180,6 +180,7 @@ export interface HistoryOut {
   at: string;
   actor: string;
   by_customer: boolean;
+  by_platform: boolean;
   reason: string;
   old_value: Record<string, unknown>;
   new_value: Record<string, unknown>;

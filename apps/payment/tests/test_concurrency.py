@@ -11,48 +11,25 @@ import time
 import uuid
 
 import pytest
-from django.db import connection, transaction
+from django.db import connections
 from django.utils import timezone
 from live.errors import OperationError
 from live.models import OutboxEvent
-from live.operations import get
+from live.operations import atomic, get
 
 from apps.payment.models import Payment, PaymentCounter, PaymentMethod
+from base.tenancy.context import current_alias
+from base.tenancy.tests.concurrency import at_once, in_a_thread
 
-from .conftest import ctx_for, make_method, make_payment
+from .conftest import HUB_DB_COMMITTED, ctx_for, make_method, make_payment
 
-pytestmark = pytest.mark.django_db(transaction=True)
+# With room for several sessions at once: on Free's plan the second one would queue for its turn, not for the lock.
+pytestmark = [HUB_DB_COMMITTED, pytest.mark.usefixtures("plan_with_room")]
 
 
 def run(name, data):
     op = get(name)
     return op(ctx_for("hub_admin"), op.input.model_validate(data))
-
-
-def at_once(*calls):
-    """Runs every ``call`` in its own thread and session, released together; their results or errors."""
-    barrier = threading.Barrier(len(calls))
-    results: list = [None] * len(calls)
-
-    def worker(index, call):
-        try:
-            barrier.wait(5)
-            results[index] = call()
-        except OperationError as error:
-            results[index] = error
-        except Exception as error:  # an unexpected failure is reported by the test
-            results[index] = error
-        finally:
-            connection.close()
-
-    threads = [
-        threading.Thread(target=worker, args=(i, call)) for i, call in enumerate(calls)
-    ]
-    for thread in threads:
-        thread.start()
-    for thread in threads:
-        thread.join(30)
-    return results
 
 
 def at_once_behind(hold, *calls):
@@ -63,18 +40,15 @@ def at_once_behind(hold, *calls):
     held = threading.Event()
 
     def holder():
-        try:
-            with transaction.atomic():
-                hold()
-                held.set()
-                deadline = time.monotonic() + 10
-                while time.monotonic() < deadline and waiting() < len(calls):
-                    time.sleep(0.02)
-        finally:
-            connection.close()
+        with atomic():
+            hold()
+            held.set()
+            deadline = time.monotonic() + 10
+            while time.monotonic() < deadline and waiting() < len(calls):
+                time.sleep(0.02)
 
     def waiting() -> int:
-        with connection.cursor() as cursor:
+        with connections[current_alias()].cursor() as cursor:
             # Inside a transaction Postgres keeps the first snapshot of the activity view: clear it.
             cursor.execute("SELECT pg_stat_clear_snapshot()")
             cursor.execute(
@@ -83,7 +57,7 @@ def at_once_behind(hold, *calls):
             )
             return cursor.fetchone()[0]
 
-    keeper = threading.Thread(target=holder)
+    keeper = in_a_thread(holder, [None])
     keeper.start()
     assert held.wait(5), "the holding session never took its lock"
     results = at_once(*calls)
@@ -93,12 +67,14 @@ def at_once_behind(hold, *calls):
 
 def codes(results) -> list[str]:
     """``ok`` per success, the domain code per refusal, the class name per unexpected failure (an
-    ``IntegrityError`` from a repeated reference is not «ok»)."""
+    ``IntegrityError`` from a repeated reference is not «ok») and ``unfinished`` per call that never ended."""
     return sorted(
         result.code
         if isinstance(result, OperationError)
         else type(result).__name__
         if isinstance(result, Exception)
+        else "unfinished"
+        if result is None
         else "ok"
         for result in results
     )
@@ -190,6 +166,7 @@ def test_two_methods_with_one_name_at_once():
     create = lambda: run("payment.method.create", {"name": "Cash drawer"})  # noqa: E731
 
     def keep_from_writes():
+        connection = connections[current_alias()]
         table = connection.ops.quote_name(PaymentMethod._meta.db_table)
         with connection.cursor() as cursor:
             cursor.execute(f"LOCK TABLE {table} IN SHARE ROW EXCLUSIVE MODE")

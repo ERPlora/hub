@@ -4,10 +4,7 @@ leaves the team a task, through the worker's real outbox relay; one the team mak
 """
 
 import datetime as dt
-import threading
 
-import pytest
-from django.db.backends.base.base import BaseDatabaseWrapper
 from django.utils import timezone
 from live.context import OperationContext
 from live.meta import all_live_app_configs
@@ -16,15 +13,12 @@ from live.operations import get
 from apps.appointment import recipes as declared
 from apps.flow import recipes
 from apps.task.models import Task
-from base import catalog, worker
-from base.catalog import RegisterResult
 
-from .conftest import A, TESTER, make_appointment, make_customer, make_member, make_service, make_settings
+from .conftest import A, HUB_DB, HUB_DB_COMMITTED, TESTER, make_appointment, make_customer, make_member, make_service, make_settings
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 REF = "appointment/customer_cancelled"
-REGISTERED = RegisterResult(written=0, retired=0, docs_changed=0, skipped=True)
 
 
 def owner(language: str = "en") -> OperationContext:
@@ -35,20 +29,6 @@ def owner(language: str = "en") -> OperationContext:
 def run(name: str, data: dict, ctx: OperationContext | None = None):
     op = get(name)
     return op(ctx or owner(), op.input.model_validate(data))
-
-
-@pytest.fixture
-def tick(monkeypatch):
-    """One tick of the worker's real loop, without the SaaS and without releasing the test's connection."""
-    monkeypatch.setattr(catalog, "register_apps", lambda: REGISTERED)
-    monkeypatch.setattr(BaseDatabaseWrapper, "close_if_unusable_or_obsolete", lambda self: None)
-
-    def once() -> None:
-        stop = threading.Event()
-        now = timezone.now()
-        assert worker.run(stop, tick_seconds=0, wait=lambda _seconds: stop.set() or True, clock=lambda: now) == 0
-
-    return once
 
 
 def test_citas_declares_fill_the_gap_and_automations_offers_it():
@@ -63,7 +43,8 @@ def test_citas_declares_fill_the_gap_and_automations_offers_it():
     }
 
 
-def test_turned_on_a_cancellation_the_customer_asks_for_leaves_a_task_and_one_by_the_team_does_not(tick):
+@HUB_DB_COMMITTED  # the worker's real loop releases the business's connections once it has served it
+def test_turned_on_a_cancellation_the_customer_asks_for_leaves_a_task_and_one_by_the_team_does_not(worker_loop):
     make_settings(allow_customer_cancellation=True, cancellation_notice_hours=0)
     lucia = make_customer("Lucía Pérez")
     ana = make_member("Ana", "López")
@@ -75,8 +56,8 @@ def test_turned_on_a_cancellation_the_customer_asks_for_leaves_a_task_and_one_by
 
     run("appointment.appointment.cancel", {"id": str(hers.id), "on_behalf_of_customer": True, "customer": "Lucía Pérez"})
     run("appointment.appointment.cancel", {"id": str(ours.id)})
-    tick()
+    worker_loop()
 
     assert list(Task.objects.values_list("title", "priority")) == [("Fill the gap of appointment APT-TEST-0101", "high")]
-    tick()
+    worker_loop()
     assert Task.objects.count() == 1

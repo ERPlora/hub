@@ -3,6 +3,10 @@ memory, and a full content that fills every section.
 
 The builders import the app's modules lazily, so that the tests of apps.py still collect while the rest does not
 exist.
+
+Every test with the database runs as production does: inside business A's own database (``hub_a``, entered by
+``in_business_a``), its public pages and API on A's host. Business B (``hub_b``) has its own database beside it; a test
+of B asks for ``hub_b`` and enters it.
 """
 
 import json
@@ -13,8 +17,18 @@ from django.core.cache import cache
 from live.context import OperationContext, Scope
 from live.meta import all_live_app_configs, permissions_for_role
 
-A = Scope("host", "a")
-B = Scope("host", "b")
+from apps.invoice.tests.conftest import catalog_of
+from apps.sale.tests.conftest import make_user
+from base.tenancy.tests.business import HOST, HUB_DB, HUB_DB_COMMITTED, A, B, in_business_a
+from base.tenancy.tests.concurrency import hub_staff, plan_with_room
+
+#: The marks, scopes and fixtures of the businesses' own databases, and what Sales' and Invoicing's tests already make
+#: of them (users with a role on a host, the assistant's catalogue of a person of A), that these tests take from here.
+__all__ = [
+    "A", "B", "HOST", "HUB_DB", "HUB_DB_COMMITTED", "catalog_of", "hub_staff", "in_business_a", "make_user",
+    "plan_with_room",
+]
+
 WEBSITE_ENTRY = "frontend/website.ts"
 #: The public bundle as `vite build` names it (hashed per deploy).
 WEBSITE_JS = "/static/spa/assets/website-9f8e7d.js"
@@ -57,21 +71,6 @@ def clean_cache():
     cache.clear()
     yield
     cache.clear()
-
-
-@pytest.fixture
-def make_user(db):
-    """A person with ``role`` on ``host`` (a user and its Membership), to sign in with the test client."""
-    from django.contrib.auth import get_user_model
-
-    from base.models import Membership
-
-    def make(username: str = "ana", *, host: str = "a", role: str = "hub_admin"):
-        user = get_user_model().objects.create_user(username=username, password="pw")
-        Membership.objects.create(user=user, host=host, role=role)
-        return user
-
-    return make
 
 
 @pytest.fixture

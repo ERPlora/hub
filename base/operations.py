@@ -43,7 +43,7 @@ from base.approvals import Approved, consequence_context
 from base.business import country_or_market
 from base.permissions import permissions_for, reload_user
 from base.tenancy import connections as tenancy_connections
-from base.tenancy.context import HUB_SCOPE_KIND, current_hub, use_hub
+from base.tenancy.context import HUB_SCOPE_KIND, HubContextMissing, current_hub, use_hub
 from base.tenancy.identity import HubIdentityMismatch
 
 
@@ -126,6 +126,17 @@ def current_business_country() -> str:
     if hub is None:
         return country_or_market("")
     return business_country(Scope(HUB_SCOPE_KIND, hub.slug))
+
+
+def current_business_scope() -> Scope:
+    """The scope of the business at work, the hub whose database the active context opened (``use_hub``): for a reading
+    with no caller at hand that asks another app as the platform (``system_context``), such as which of its records
+    stands for one of a separate copy's while the copy is given back (BASE-F114). Without a business at work there is
+    none to ask in: ``HubContextMissing``."""
+    hub = current_hub()
+    if hub is None:
+        raise HubContextMissing("No business at work: ask inside use_hub(hub).")
+    return Scope(HUB_SCOPE_KIND, hub.slug)
 
 
 def allow_idle_wait(seconds: int) -> None:

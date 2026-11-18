@@ -13,6 +13,7 @@ import { expect, test } from '@playwright/test';
 
 import { A, login, shot, shown } from './helpers';
 import { cleanInventory, createProduct, dialog, fill, pickCombo, productBySku, productsReady, shootFlow, stamp } from './inventory-helpers';
+import { rowAction } from './service-helpers';
 
 test.afterAll(() => {
   cleanInventory();
@@ -107,13 +108,7 @@ test('INVENTORY-F06/F07/F10: a category is created, edited and deleted; a CSV of
   const renamed = shown(page).locator('[data-testid=inventory-categories-row]', { hasText: `${name} bar` });
   await expect(renamed).toBeVisible();
 
-  const id = await renamed.getAttribute('data-id');
-  const deleteButton = shown(page).locator(`[data-testid=inventory-categories-row-${id}-delete]`);
-  if (await deleteButton.isVisible()) await deleteButton.click();
-  else {
-    await shown(page).locator(`[data-testid=inventory-categories-row-${id}-menu]`).click();
-    await page.locator(`ion-popover [data-testid=inventory-categories-row-${id}-delete]`).click();
-  }
+  await rowAction(page, 'inventory-categories', (await renamed.getAttribute('data-id'))!, 'delete');
   const confirm = page.locator('ion-modal.ep-form-modal').filter({ hasText: /Delete and unlink|Eliminar y desvincular/ });
   await expect(confirm).toContainText(/0 (products will lose|productos quedarán)/);
   await page.screenshot({ path: shot('inventory-category-delete-1280') });

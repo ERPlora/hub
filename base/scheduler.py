@@ -14,7 +14,7 @@ A port of the old Hub's ``crates/runtime/src/scheduler.rs``. Every ``LiveAppConf
 ``sync`` writes the declarations to ``TaskSchedule`` when the worker starts, keeping the clock of the
 tasks it already knew (``seed_module_tasks``); ``run_due`` runs, on every tick, what is due
 (``process_once``): each row is claimed with ``SKIP LOCKED`` and its ``next_run`` moves in the same
-transaction as the task's writes (``base.services.run_next_due_task``). A task that raises is logged
+transaction as the task's writes (``base.services.relay_runs.run_next_due_task``). A task that raises is logged
 and rescheduled; the others still run. ``check_scheduled_tasks`` (``base.E001``–``E003``) refuses a
 declaration the engine could not run, at ``manage.py check`` and before every command.
 
@@ -37,7 +37,7 @@ from live.meta import all_live_app_configs
 from live.operations import UnknownOperation
 from live.operations import get as get_operation
 
-from base import services
+from base.services import relay_runs
 
 COLLAPSE = "collapse"
 #: The keys of a declaration; ``catch_up`` may be left out (it is ``collapse``).
@@ -90,7 +90,7 @@ def sync(now: dt.datetime, *, declared: list[ScheduledTask] | None = None) -> No
     A new task is due at its first time after ``now``; a known one keeps its clock.
     """
     declared = tasks() if declared is None else declared
-    services.sync_task_schedules(
+    relay_runs.sync_task_schedules(
         (
             task.app_label,
             task.name,
@@ -119,7 +119,7 @@ def run_due(now: dt.datetime, *, scope: Scope | None = None, active: frozenset[s
 
     ran: list[str] = []
     for _ in range(MAX_PER_TICK):
-        outcome = services.run_next_due_task(
+        outcome = relay_runs.run_next_due_task(
             now, execute=execute, reschedule=next_after
         )
         close_old_connections()

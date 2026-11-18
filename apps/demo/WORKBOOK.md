@@ -96,7 +96,6 @@ del formulario.
 | DEMO-F06 | Intentarlo sin permiso | hecho |
 
 ### DEMO-F01 Crear un elemento
-<!-- origen: nuevo (app de referencia de la fase 1, PLAN §16; sin módulo viejo) -->
 Estado: hecho
 Actor: administrador, responsable
 Pantalla: Elementos
@@ -112,7 +111,6 @@ guarda nada.
 Implicados: ninguno
 
 ### DEMO-F02 Editar un elemento
-<!-- origen: nuevo (app de referencia de la fase 1, PLAN §16; sin módulo viejo) -->
 Estado: hecho
 Actor: administrador, responsable
 Pantalla: Ficha del elemento
@@ -131,7 +129,6 @@ borró): «Este elemento ya no existe».
 Implicados: ninguno
 
 ### DEMO-F03 Borrar un elemento
-<!-- origen: nuevo (app de referencia de la fase 1, PLAN §16; sin módulo viejo) -->
 Estado: hecho
 Actor: administrador, responsable
 Pantalla: Ficha del elemento
@@ -146,7 +143,6 @@ Si falla: «Este elemento ya no existe» si otra persona lo borró antes.
 Implicados: ninguno
 
 ### DEMO-F04 Añadir una línea al instante (optimista e idempotente)
-<!-- origen: nuevo (app de referencia de la fase 1, PLAN §16; sin módulo viejo) -->
 Estado: hecho
 Actor: administrador, responsable
 Pantalla: Ficha del elemento
@@ -168,7 +164,6 @@ Si el elemento ya no existe: «Este elemento ya no existe».
 Implicados: ninguno
 
 ### DEMO-F05 Ver el cambio en otra tableta en menos de un segundo
-<!-- origen: nuevo (app de referencia de la fase 1, PLAN §16; sin módulo viejo) -->
 Estado: hecho
 Actor: cualquiera con permiso de ver
 Pantalla: Elementos y Ficha del elemento
@@ -184,7 +179,6 @@ completos. Lo hecho en `a` no avisa a las pantallas de `b` (ni al revés).
 Implicados: ninguno
 
 ### DEMO-F06 Intentarlo sin permiso
-<!-- origen: nuevo (app de referencia de la fase 1, PLAN §16; sin módulo viejo) -->
 Estado: hecho
 Actor: empleado
 Pantalla: Elementos y Ficha del elemento
@@ -269,10 +263,11 @@ papel en ningún negocio.
 
 ## Para quien lo mantiene
 
-- Ejemplo de los ganchos del Inicio (PLAN-HUB, ronda 2026-10-21), el que copian los módulos: `DemoConfig`
+- Ejemplo de los ganchos del Inicio, el que copian los módulos: `DemoConfig`
   declara un paso (`setup`: «Crea tu primer elemento», hecho con `total` de `demo.item.stats`), un panel
   (`widgets`: «Elementos abiertos», `kpi` sobre `demo.item.stats`) y un contador de la campana (`bell`:
-  «Elementos de demo abiertos», sobre `demo.item.open_count`). Demo no está en la tienda (`listed = False`):
+  «Elementos de demo abiertos», sobre `demo.item.open_count`, de información, con su titular en plural
+  «N elementos de demo abiertos», su frase y «Ver los elementos»). Demo no está en la tienda (`listed = False`):
   base solo la enseña (menú, «Mis apps» y estos ejemplos) con `SHOW_UNLISTED_MODULES` (desarrollo y tests) o en
   un hub de demo, nunca a un cliente.
 - Anatomía completa de una app: `apps.py`, `models.py`, `schemas.py`, `queries.py`, `services.py`,
@@ -293,7 +288,7 @@ papel en ningún negocio.
 - Cada operación es una herramienta del asistente: `ai=` con su descripción, sus `asks` (las frases en `en` y `es`
   con que una persona la pide; `live.E020`: Demo está en `LIVE_ASSISTANT_ASKS_REQUIRED`, hub#1095) y, en las
   acciones, su `risk` (`high` solo para borrar un elemento, que se lleva sus líneas y no se deshace). Los
-  `SYNONYMS` del Hub (`base/assistant.py`) leen «elemento» como `item`, así que «el elemento X» nombra lo que
+  `SYNONYMS` del Hub (`base/assistant/relevance.py`) leen «elemento» como `item`, así que «el elemento X» nombra lo que
   tocan sus operaciones y trae la lista que lo busca por su nombre. Las frases reales de la QA del asistente
   (`tests/e2e/qa/probes/*-es-demo-2026-11-08.json`) quedan entre las 20 primeras herramientas del turno
   (`tests/test_assistant_asks.py`), y las que nombran el elemento solo por su nombre («elimina Ejemplo QA…») llegan a
@@ -305,7 +300,7 @@ papel en ningún negocio.
   `called` y no como `item`: el turno sube 1 punto a cada herramienta que toma un dato que la frase nombra
   (`live.assistant.relevant`), e «item»/«elemento» nombran también las cosas de Carrito y Tarifas; con `item`, tres
   `asks` de `inventory.product.bulk_create` bajaban del 4.º al 8.º, y con `called` no se mueve ningún `ask` ni sonda
-  del Hub. Las tres escrituras declaran `check: demo.item.detail` (`base.assistant.checked`): antes de dibujar la
+  del Hub. Las tres escrituras declaran `check: demo.item.detail` (`base.assistant.cards.checked`): antes de dibujar la
   tarjeta, el turno busca el elemento como lo hará la escritura, y un nombre que encaja con varios o con ninguno
   vuelve al modelo en lugar de una tarjeta que fallaría tras el sí.
 - La tarjeta de confirmación del asistente (BASE-F97, hub#670) nombra el elemento que una escritura señala por su id
@@ -320,12 +315,12 @@ papel en ningún negocio.
   lleva el título de su pantalla (`T_ITEM`: «Elemento», «Item»), nunca «Registro». Sin persona detrás, sin `demo.view`,
   con un id de otro negocio o de algo que ya no está, el elemento queda fuera, nunca su id
   (`tests/test_assistant_card_records.py`); el trinquete `UNNAMED_REFERENCES` de
-  `base/tests/test_assistant_card_values.py` impide que entre un dato sin marca. El estado, la única lista cerrada de
+  `base/tests/test_assistant_card_values_references.py` impide que entre un dato sin marca. El estado, la única lista cerrada de
   sus escrituras, sale con las etiquetas de `Item.Status` en cada idioma.
 - La lista nunca pide más de 100 filas (`PAGE_MAX`, el `le=100` de `ItemListIn`): «Cargar más» crece
   hasta ese tope y, con más elementos, el `DataTable` pagina también en el móvil (`maxWindow`).
 - El administrador de Django tiene CRUD sobre los elementos y sus líneas (en línea), como el de las
-  demás apps (PLAN §17, ronda 12, y PLAN-HUB §3.2): es la vía de soporte para reparar una fila, por el
+  demás apps (PLAN §17 y PLAN-HUB §3.2): es la vía de soporte para reparar una fila, por el
   ORM, sin aviso ni las reglas de `services.py` (ni elemento cerrado ni posición siguiente); las
   pantallas, la API y el asistente escriben por las operaciones. Vive solo en `http://hubs.localhost:8000/admin/`
   (en `a.localhost:8000/admin/`, 404) y entra el staff desde la página «Hubs» del admin del SaaS

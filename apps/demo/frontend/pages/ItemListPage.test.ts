@@ -380,9 +380,9 @@ describe('ItemListPage: the figures above the table (managers only)', () => {
   });
 });
 
-// On a phone «Load more» must ADD the next rows below the ones shown. The page keeps one
+// On a phone the end of the cards must ADD the next rows below the ones shown. The page keeps one
 // live window from the first row (a bigger `limit`, `offset` 0), so every row on screen stays live.
-describe('ItemListPage on a phone: «Load more» grows the live window', () => {
+describe('ItemListPage on a phone: the end of the cards grows the live window', () => {
   type MediaListener = (e: { matches: boolean }) => void;
   let listeners: MediaListener[] = [];
   /** happy-dom lays nothing out: the DataTable's phone breakpoint answers what this says. */
@@ -403,12 +403,16 @@ describe('ItemListPage on a phone: «Load more» grows the live window', () => {
     for (const listener of listeners) listener({ matches: phone });
     await flush();
   }
+  const infinite = (s: Awaited<ReturnType<typeof setup>>) => s.wrapper.find('ion-infinite-scroll');
+  /** The cards scrolled to their end (Ionic asks for the next ones), and what was asked for sent. */
+  const scrollToEnd = (s: Awaited<ReturnType<typeof setup>>) => infinite(s).element.dispatchEvent(new CustomEvent('ionInfinite')) && flush();
+  const ended = (s: Awaited<ReturnType<typeof setup>>) => !infinite(s).exists() || (infinite(s).element as { disabled?: boolean }).disabled === true;
 
   afterEach(() => {
     vi.unstubAllGlobals();
   });
 
-  it('10 per page picked on a desk, then on a phone «Load more» asks for 20 from row 0 and shows both pages', async () => {
+  it('10 per page picked on a desk, then on a phone the end of the cards asks for 20 from row 0 and shows both pages', async () => {
     viewport(false);
     const s = await setup();
     await s.show({ rows: many(12), total: 12, limit: 50, offset: 0 });
@@ -419,13 +423,12 @@ describe('ItemListPage on a phone: «Load more» grows the live window', () => {
     await cross(true);
     expect(s.params(), 'the first page alone is already a phone window').toEqual([{ limit: 10, offset: 0 }]);
 
-    await s.testid('demo-items-load-more').trigger('click');
-    await flush();
+    await scrollToEnd(s);
     expect(s.params()).toEqual([{ limit: 20, offset: 0 }]);
     expect(s.rows(), 'the shown rows stay while the bigger window loads').toHaveLength(10);
     await s.showOnNewStream({ rows: many(12), total: 12, limit: 20, offset: 0 });
     expect(s.rows().map((r) => r.attributes('data-id'))).toEqual(ids(12));
-    expect(s.testid('demo-items-load-more').exists(), 'every row is shown').toBe(false);
+    expect(ended(s), 'every row is shown').toBe(true);
 
     // A write elsewhere re-runs the same window: a row of the second page is updated in place.
     const renamed = many(12).map((r) => (r.id === 'i11' ? { ...r, name: 'Renamed 11' } : r));
@@ -434,10 +437,10 @@ describe('ItemListPage on a phone: «Load more» grows the live window', () => {
     expect(s.wrapper.text()).toContain('Renamed 11');
   });
 
-  // One page of `demo.item.list` holds 100 rows at most (`ItemListIn.limit`, le=100). «Load more» never asks for
+  // One page of `demo.item.list` holds 100 rows at most (`ItemListIn.limit`, le=100). The end of the cards never asks for
   // more (at 50 per page the second one asked for 150 and the 422 left «The items could not be loaded»), and past
   // 100 rows a phone pages too (`maxWindow`), so every row stays in reach.
-  it('«Load more» never asks for more than the server’s 100 rows', async () => {
+  it('the end of the cards never asks for more than the server’s 100 rows', async () => {
     viewport(true);
     const s = await setup();
     await s.show({ rows: many(50), total: 100, limit: 50, offset: 0 });
@@ -447,11 +450,11 @@ describe('ItemListPage on a phone: «Load more» grows the live window', () => {
     expect(s.params()).toEqual([{ limit: 100, offset: 0 }]);
   });
 
-  it('past 100 rows a phone pages one page at a time instead of «Load more»', async () => {
+  it('past 100 rows a phone pages one page at a time instead of growing at the end', async () => {
     viewport(true);
     const s = await setup();
     await s.show({ rows: many(50), total: 250, limit: 50, offset: 0 });
-    expect(s.testid('demo-items-load-more').exists(), 'no «Load more» that would ask past 100 rows').toBe(false);
+    expect(ended(s), 'nothing at the end that would ask past 100 rows').toBe(true);
     await s.testid('demo-items-page-next').trigger('click');
     await flush();
     expect(s.params()).toEqual([{ limit: 50, offset: 50 }]);
@@ -463,8 +466,7 @@ describe('ItemListPage on a phone: «Load more» grows the live window', () => {
     const s = await setup();
     expect(s.params()).toEqual([{ limit: 50, offset: 0 }]);
     await s.show({ rows: many(50), total: 100, limit: 50, offset: 0 });
-    await s.testid('demo-items-load-more').trigger('click');
-    await flush();
+    await scrollToEnd(s);
     expect(s.params()).toEqual([{ limit: 100, offset: 0 }]);
     await s.showOnNewStream({ rows: many(100), total: 100, limit: 100, offset: 0 });
 
@@ -473,8 +475,7 @@ describe('ItemListPage on a phone: «Load more» grows the live window', () => {
     await s.showOnNewStream({ rows: many(50), total: 100, limit: 50, offset: 0 });
 
     await cross(true);
-    await s.testid('demo-items-load-more').trigger('click');
-    await flush();
+    await scrollToEnd(s);
     expect(s.params()).toEqual([{ limit: 100, offset: 0 }]);
     const bar = s.testid('demo-items-search').element as HTMLElement & { value?: string };
     bar.value = 'item';
@@ -484,8 +485,7 @@ describe('ItemListPage on a phone: «Load more» grows the live window', () => {
 
     // A new status filter starts the window again too.
     await s.showOnNewStream({ rows: many(50), total: 100, limit: 50, offset: 0 });
-    await s.testid('demo-items-load-more').trigger('click');
-    await flush();
+    await scrollToEnd(s);
     expect(s.params()).toEqual([{ search: 'item', limit: 100, offset: 0 }]);
     await s.filterBy('open');
     expect(s.params()).toEqual([{ search: 'item', status: 'open', limit: 50, offset: 0 }]);

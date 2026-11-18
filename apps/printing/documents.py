@@ -58,7 +58,7 @@ def _breakdown_ok(rows: Any) -> bool:
     )
 
 
-def problems(document_type: str, document: Any) -> str | None:
+def problems(document_type: str, document: Any) -> str | None:  # noqa: PLR0911
     """Why the printer would refuse ``document`` (a sentence for a person), or ``None``."""
     if not isinstance(document, dict):
         return str(NOT_AN_OBJECT)

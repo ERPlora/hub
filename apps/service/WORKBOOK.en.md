@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:63f09ecb4c04df29ec49c4c7db6a518a6866f4d2e336fc39dfdf8b1376d034c0 -->
+<!-- generated from WORKBOOK.md sha256:688b67c3424e740ecf6dc41c72e83eaf4e8a4187d9e5931e9e6a8f79dc946b6e -->
 
 ## What it is for and who it is for
 
@@ -39,7 +39,7 @@ on it.
   issues no tax document; it covers service lines, not amounts; the expiry counts from the purchase; what
   was sold keeps the terms it was sold with; giving or correcting is a separate movement with a reason;
   only a voucher that has not been used is voided.
-- Decisions of the current product that rule here: ADR-0386 (a voucher covers lines; a gift card,
+- Decisions that rule here: ADR-0386 (a voucher covers lines; a gift card,
   amounts), ADR-0390 (ownership is born when it is sold, the clock starts at the purchase and it is not
   transferred) and ADR-0085 (VAT is linked through the tax category of Taxes).
 
@@ -246,7 +246,7 @@ not an amount. Type a figure, for example 12.50.", also with another currency's 
 business in Poland), one that reads two ways or a negative one; a deleted
 category ("That category is not available: it does not exist in this business or it has been
 deleted."); a tax category that does not exist or is deactivated ("That tax category does not exist in
-Taxes or is deactivated."); with no tax category at all, the notice of Taxes. What was typed is kept.
+Taxes or is deactivated."); with no tax category at all, the notice of Taxes. What was typed is kept. The reason of a field goes as soon as that field is corrected, even if another one says the same (hub#888).
 Involved: TAX-F01, BASE-F01, BASE-F114 (the ERPlora staff get back from a separate copy the services that were lost,
 each by this same creation)
 
@@ -352,7 +352,7 @@ If it fails: a name another live category already has (ignoring case and extra s
 field: "There is already a category with that name. Pick another name.". A category cannot be its own
 parent nor hang from one of its children: "A category cannot hang from itself or from one of its
 subcategories.". A deleted parent: "That parent category is not available: it does not exist in this
-business or it has been deleted.".
+business or it has been deleted.". The reason of a field goes as soon as that field is corrected, even if another one says the same (hub#888).
 Involved: SERVICE-F01, SERVICE-F08, BASE-F114 (the ERPlora staff recover from a separate copy the categories the
 business no longer has, each by this same creation)
 
@@ -370,7 +370,13 @@ are left **without a category** and its subcategories move to hang from its pare
 If it fails: in the confirmation, the reason (for example, "That category does not exist in this
 business.").
 Involved: SERVICE-F07, SERVICE-F02, BASE-F114 (from a separate copy, the deleted category comes back as a new one,
-with the lost services inside it; those the business kept stay as they are)
+with the lost services inside it and with what the business kept where deleting it left it: its services without a
+category and its subcategories where it hung, which Recoveries counts apart ("Service links to categories",
+"Subcategory links to categories"). What the business moved since stays where it is, and Recoveries says so in the
+category's notes; what it changed without moving it while the category came back also stays as the business left
+it, and Recoveries counts it "not created" with its reason. If it is asked again, the category is the business's
+already and is not filled: what the business took out of it since stays out; if the recovery that brought it back
+failed halfway, asking for it again from the same copy fills it with what the business keeps untouched)
 
 ### SERVICE-F09 Sell a service at the till
 Status: done (Sales does it, SALE-F38)
@@ -442,7 +448,8 @@ uses up one of its "Uses".
 If it fails: with no service at all, "Add at least one service: a package with no lines cannot be
 redeemed."; a repeated service, an archived one or one that does not exist; an unreadable or negative
 amount, below its field; a name another live voucher already has, "There is already a package with that
-name. Pick another name.". "Create package" (and "Save changes" when editing it, SERVICE-F13) is grey while
+name. Pick another name.". The reason of a field goes as soon as that field is corrected, even if another one says
+the same, and the one of the lines as a whole (a repeated service), below them, as soon as a line is changed, added or removed (hub#888). "Create package" (and "Save changes" when editing it, SERVICE-F13) is grey while
 the business has not yet said its currency, because the closed price and the discount are read in it
 (without it, "1500" yen would be saved as 150,000); until then, leaving the closed price or the discount keeps it as
 typed, without inventing decimals for it or judging it: "¥9500" or "7,50 zł" are not marked red as "This is not an amount", and as soon as the currency arrives they are read in it (hub#945). If the currency cannot be read, the window says so ("The business's currency could not be read", with the
@@ -562,7 +569,7 @@ used-up voucher. The sessions already delivered keep their value; the ones left 
 price (SERVICE-F24).
 If it fails: "Say why this voucher is being adjusted…", "Add or remove at least one session, or add at
 least one day.", "You cannot take away more sessions than the customer has left.", "That voucher has no
-session limit…", "That voucher never expires…" or "That voucher was already voided.".
+session limit…", "That voucher never expires…" or "That voucher was already voided.". The reason of a field goes as soon as that field is corrected, even if another one says the same (hub#888).
 Involved: SERVICE-F16, SERVICE-F20
 
 ### SERVICE-F19 See a voucher's movements
@@ -849,7 +856,8 @@ could not be read", with the reason) and offers "Retry"; as soon as it arrives, 
 "Loading…"; if it cannot be read, "The professionals could not be loaded." with the reason and
 "Retry", never "Nobody assigned yet".
 Involved: STAFF-F01, SALE-F38, BASE-F114 (from a separate copy, a service brought back comes back assigned, by this
-same operation, to whoever performed it and the business still has on its staff)
+same operation, to whoever performed it and the business still has on its staff; whoever it does not, Recoveries names
+with why)
 
 ### SERVICE-F32 Change or remove a professional from a service
 Status: done
@@ -916,7 +924,7 @@ says "The service has been saved, but the photo has not: That image is no longer
 another one." with "Retry", and the service keeps the photo it had (through the assistant or the API
 nothing is saved). Whoever may not edit services does not see "Photo", and the app refuses it through the
 assistant or the API too.
-Involved: SERVICE-F01, SERVICE-F02, SERVICE-F09, SALE-F38, INVENTORY-F30, INVENTORY-F32
+Involved: SERVICE-F01, SERVICE-F02, SERVICE-F09, SALE-F38, INVENTORY-F30, INVENTORY-F32, BASE-F114
 
 ### SERVICE-F35 Upload the service's own photo
 Status: done
@@ -1120,5 +1128,4 @@ with the session of whoever sells, as it does with Inventory.
 | Give sessions back when voiding or refunding a sale | yes | yes | yes | no | `service.return_session` |
 | Settings | yes | yes | no | no | `service.manage_settings` |
 
-The roles arrive from the SaaS with a prefix (`hub_owner`, `hub_admin`, `hub_manager`, `hub_employee`); the
-cashier of the current product is an employee: what they had (view, spend and grant) the employee has.
+The roles arrive from the SaaS with a prefix (`hub_owner`, `hub_admin`, `hub_manager`, `hub_employee`).

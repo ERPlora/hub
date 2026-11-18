@@ -5,7 +5,8 @@ read-only connection, and Inventory answers with its own SQL over its models' na
 business lacks is created again by ``inventory.category.recover``, with the products the copy had in it that the
 business still holds deleted, so they come back inside it. Then its products: each one the business still holds deleted
 comes back the same by ``inventory.product.restore``, and each one it no longer holds at all is created by
-``inventory.product.create`` in its categories here (the same one, or the one with its name).
+``inventory.product.recover`` in its categories here (the same one, or the one with its name), with the image of the
+library it had.
 
 Then, end to end on real databases (``hubs.CopiedHubs``): the business's own and its copy, a clone of it.
 """
@@ -15,8 +16,9 @@ from decimal import Decimal
 
 import pytest
 from django.apps import apps
-from django.db import connection
+from django.db import connections
 from live.models import OutboxEvent
+from live.operations import get as get_operation
 
 from apps.inventory import queries
 from apps.inventory.models import (
@@ -27,17 +29,22 @@ from apps.inventory.models import (
     ProductCategory,
     StockMovement,
 )
-from apps.inventory.schemas import CategoryRecoverIn, ProductIn
+from apps.inventory.schemas import CategoryRecoverIn, ProductCategoryIn, ProductIn
 from apps.tax.models import TaxCategory
-from base.tenancy.context import use_hub
-from base.tenancy.tests.test_recovery import Recoveries, fresh, run, run_in
+from base.recovery import actor_of
+from base.tenancy.context import current_alias, use_hub
+from base.tenancy.tests.test_recovery import Recoveries, fields_held_since, fresh, run, run_in
+from base.tests.test_image_catalog import image_library  # noqa: F401 - the library fixture
+
+from .conftest import HUB_DB
 
 TAX = "test.general"
 BARCODE = "8412345678905"
 
 
 def direct():
-    """The raw connection of the tests' database, as the platform's direct one reads the copy."""
+    """The raw connection of business A's database, as the platform's direct one reads the copy."""
+    connection = connections[current_alias()]
     connection.ensure_connection()
     return connection.connection
 
@@ -51,7 +58,7 @@ def product(name: str, sku: str, **fields) -> Product:
     return Product.objects.create(name=name, sku=sku, price=fields.pop("price", 100), **fields)
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_copy_gives_each_live_product_with_what_its_create_takes(general):
     drinks = Category.objects.create(name="Drinks")
     gone = Category.objects.create(name="Old menu", is_deleted=True)
@@ -100,12 +107,13 @@ def test_the_copy_gives_each_live_product_with_what_its_create_takes(general):
         "pricing_unit": "g",
         "track_stock": True,
         "is_active": False,
+        "image": "catalog:drinks/coffee",
     }
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_copy_without_the_apps_table_gives_nothing():
-    with connection.cursor() as cursor:
+    with connections[current_alias()].cursor() as cursor:
         # Undone with the test's transaction.
         cursor.execute("DROP TABLE inventory_product CASCADE")
 
@@ -129,6 +137,7 @@ def a_product_of_the_copy(found: Product | None = None, **fields) -> dict:
         "pricing_unit": "ud",
         "track_stock": None,
         "is_active": True,
+        "image": "",
         "tax_category": None,
         "category_ids": [],
         "copy_categories": {},
@@ -138,7 +147,7 @@ def a_product_of_the_copy(found: Product | None = None, **fields) -> dict:
     return given | fields
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_business_lacks_only_what_it_no_longer_holds_nor_made_again_with_its_sku_or_barcode():
     live = product("Tea", "TEA-1")
     # Deleted, it is still held: it comes back the same (products_deleted_in_business), never created again.
@@ -156,7 +165,7 @@ def test_the_business_lacks_only_what_it_no_longer_holds_nor_made_again_with_its
     assert [one["id"] for one in lacking] == [absent["id"]]
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_business_holds_deleted_what_comes_back_the_same_unless_its_codes_were_taken_since():
     live = product("Tea", "TEA-1")
     deleted = product("Coffee", "COF-1", ean13=BARCODE, is_deleted=True, is_active=False)
@@ -176,7 +185,7 @@ def test_the_business_holds_deleted_what_comes_back_the_same_unless_its_codes_we
     assert [one["id"] for one in held] == [deleted.pk, without_barcode.pk]
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_lacking_product_is_what_the_create_takes_in_the_categories_the_business_still_has(general):
     drinks = Category.objects.create(name="Drinks")
     lost = Category.objects.create(name="Desserts", is_deleted=True)
@@ -185,23 +194,62 @@ def test_a_lacking_product_is_what_the_create_takes_in_the_categories_the_busine
         name="Coffee", sku="COF-1", price=250, is_active=False, tax_category=general.pk,
         category_ids=[drinks.pk, lost.pk, gone],
         copy_categories={drinks.pk: "Drinks", lost.pk: "Desserts", gone: "Old menu"},
+        image="catalog:drinks/coffee",
     )
 
     [lacking] = queries.products_not_in_business([coffee])
 
     assert lacking["id"] == coffee["id"]
-    payload = ProductIn.model_validate({key: value for key, value in lacking.items() if key != "id"})
+    recover = get_operation("inventory.product.recover").input
+    payload = recover.model_validate({key: value for key, value in lacking.items() if key != "id"})
     assert (payload.tax_category_key, payload.category_ids, payload.is_active) == (TAX, [drinks.pk], False)
     assert (payload.initial_stock, payload.price) == (Decimal("0"), 250)
+    # The image it showed in the copy: its recover sets it as the screen does after the create.
+    assert payload.image == "catalog:drinks/coffee"
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_lacking_product_without_a_tax_category_names_none_and_its_create_says_so():
     [lacking] = queries.products_not_in_business([a_product_of_the_copy(name="Cake", sku="CAK-1", price=300)])
 
     assert "tax_category_key" not in lacking
     with pytest.raises(ValueError, match="tax_category_key"):
         ProductIn.model_validate({key: value for key, value in lacking.items() if key != "id"})
+
+
+def made_by_a_recovery(name: str, sku: str, **fields) -> Product:
+    """A product a recovery from a separate copy made again, as ``inventory.product.recover`` leaves it."""
+    return product(name, sku, created_by=actor_of(uuid.uuid7()), **fields)
+
+
+@HUB_DB
+def test_a_product_no_longer_held_live_stands_for_the_one_a_recovery_made_again_with_its_sku():
+    tea = made_by_a_recovery("Tea", "TEA-1")
+    gone = uuid.uuid7()
+    # Still held, but deleted, and its SKU taken since by one a recovery made: that one stands for it too.
+    old = product("Cake", "CAK-1", is_deleted=True)
+    cake = made_by_a_recovery("Cake", "CAK-1")
+
+    assert queries.products_standing_for({gone: "TEA-1", old.pk: "CAK-1"}) == {gone: tea.pk, old.pk: cake.pk}
+
+
+@HUB_DB
+def test_a_product_still_live_is_itself_by_its_id_before_any_sku():
+    tea = product("Tea", "TEA-2")
+    made_by_a_recovery("Old tea", "TEA-1")
+
+    # The copy knew it by another SKU, and it is still live here: no other stands for it.
+    assert queries.products_standing_for({tea.pk: "TEA-1"}) == {}
+
+
+@HUB_DB
+def test_one_made_again_by_hand_or_deleted_since_stands_for_none():
+    # Made again by hand with the SKU: the business's own, set up as the business chose.
+    product("Tea", "TEA-1", created_by="ana")
+    # Made again by a recovery, then deleted by the business.
+    made_by_a_recovery("Cake", "CAK-1", is_deleted=True)
+
+    assert queries.products_standing_for({uuid.uuid7(): "TEA-1", uuid.uuid7(): "CAK-1"}) == {}
 
 
 def category(name: str, **fields) -> Category:
@@ -226,7 +274,7 @@ def a_category_of_the_copy(found: Category | None = None, **fields) -> dict:
     return given | fields
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_copy_gives_each_live_category_with_what_its_create_takes_and_the_live_products_in_it(general):
     drinks = category(
         "Drinks", slug="bar", description="Hot and cold", icon="ion:wine-outline", color="#aa3300", order=2,
@@ -253,16 +301,16 @@ def test_the_copy_gives_each_live_category_with_what_its_create_takes_and_the_li
     ]
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_copy_without_the_category_table_gives_no_category():
-    with connection.cursor() as cursor:
+    with connections[current_alias()].cursor() as cursor:
         # Undone with the test's transaction.
         cursor.execute("DROP TABLE inventory_category CASCADE")
 
     assert queries.categories_in_copy(direct()) == []
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_lacking_category_comes_as_its_recover_takes_it_with_the_deleted_products_it_had(general):
     drinks = category("Drinks")
     desserts = category("Desserts", is_deleted=True)
@@ -310,7 +358,7 @@ def test_a_lacking_category_comes_as_its_recover_takes_it_with_the_deleted_produ
         CategoryRecoverIn.model_validate({key: value for key, value in record.items() if key != "id"})
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_category_the_business_made_again_by_hand_is_never_made_twice():
     gone = category("Desserts", is_deleted=True)
     # The same name, the case and the spaces aside.
@@ -319,7 +367,7 @@ def test_a_category_the_business_made_again_by_hand_is_never_made_twice():
     assert queries.categories_not_in_business([a_category_of_the_copy(gone)]) == []
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_category_the_business_renamed_since_is_the_same_one_whoever_took_its_old_name():
     drinks = category("Drinks")
     copy = [a_category_of_the_copy(drinks)]
@@ -335,7 +383,7 @@ def test_a_category_the_business_renamed_since_is_the_same_one_whoever_took_its_
     assert lacking["category_ids"] == [drinks.pk]
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_each_one_made_again_stands_for_one_category_of_the_copy_the_oldest_first():
     kept = category("Specials")
     lost, also_lost = category("Specials", is_deleted=True), category("Specials", is_deleted=True)
@@ -356,7 +404,7 @@ def test_each_one_made_again_stands_for_one_category_of_the_copy_the_oldest_firs
     assert lacking["category_ids"] == [second_again.pk, kept.pk, first_again.pk]
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_lacking_product_goes_into_its_category_brought_back_just_before_with_its_name():
     desserts = category("Desserts", is_deleted=True)
     # What the categories' part of the same recovery created just before: a new one, the same name.
@@ -370,15 +418,223 @@ def test_a_lacking_product_goes_into_its_category_brought_back_just_before_with_
     assert lacking["category_ids"] == [back.pk]
 
 
-@pytest.mark.django_db
+@HUB_DB
+def test_the_copy_gives_each_link_of_a_live_product_to_a_live_category():
+    drinks, desserts = category("Drinks"), category("Desserts")
+    gone = category("Old menu", is_deleted=True)
+    coffee, cake = product("Coffee", "COF-1"), product("Cake", "CAK-1")
+    deleted = product("Deleted", "DEL-1", is_deleted=True, is_active=False)
+    in_drinks = ProductCategory.objects.create(product=coffee, category=drinks)
+    in_desserts = ProductCategory.objects.create(product=cake, category=desserts)
+    also_in_desserts = ProductCategory.objects.create(product=coffee, category=desserts)
+    # A deleted product keeps its links, and a raw write may leave one to a deleted category: neither is read.
+    ProductCategory.objects.create(product=deleted, category=drinks)
+    ProductCategory.objects.create(product=coffee, category=gone)
+
+    read = queries.product_links_in_copy(direct())
+
+    copy_categories = {drinks.pk: "Drinks", desserts.pk: "Desserts"}
+    assert sorted(read, key=lambda one: one["id"]) == sorted(
+        [
+            {"id": link.pk, "product_id": link.product_id, "category_id": link.category_id,
+             "copy_categories": copy_categories}
+            for link in (in_drinks, in_desserts, also_in_desserts)
+        ],
+        key=lambda one: one["id"],
+    )
+
+
+@HUB_DB
+def test_a_copy_without_the_link_table_gives_no_link():
+    with connections[current_alias()].cursor() as cursor:
+        # Undone with the test's transaction.
+        cursor.execute("DROP TABLE inventory_productcategory CASCADE")
+
+    assert queries.product_links_in_copy(direct()) == []
+
+
+def a_link_of_the_copy(product_id, category: Category, copy: list[Category]) -> dict:
+    """A link of the copy as ``product_links_in_copy`` gives it: ``product_id`` in ``category``, with the copy's live
+    categories ``copy``."""
+    return {
+        "id": uuid.uuid7(),
+        "product_id": product_id,
+        "category_id": category.pk,
+        "copy_categories": {one.pk: one.name for one in copy},
+    }
+
+
+def brought_back(name: str, **fields) -> Category:
+    """A category a recovery created, as ``inventory.category.recover`` leaves it."""
+    return category(name, created_by=actor_of(uuid.uuid7()), **fields)
+
+
+@HUB_DB
+def test_a_category_brought_back_gets_back_the_live_products_the_copy_had_in_it():
+    drinks, desserts = category("Drinks"), category("Desserts", is_deleted=True)
+    back = brought_back("Desserts")
+    # Kept live by the business, in Drinks too: it goes back in, and keeps Drinks.
+    brownie = product("Brownie", "BRO-1")
+    ProductCategory.objects.create(product=brownie, category=drinks)
+    # Kept, but off sale: still the business's.
+    flan = product("Flan", "FLA-1", is_active=False)
+    copy = [drinks, desserts]
+    links = [a_link_of_the_copy(one.pk, desserts, copy) for one in (brownie, flan)]
+    links.append(a_link_of_the_copy(brownie.pk, drinks, copy))
+
+    lacking = queries.product_links_not_in_business(links)
+
+    assert lacking == [
+        {"id": links[0]["id"], "product_id": brownie.pk, "category_id": back.pk},
+        {"id": links[1]["id"], "product_id": flan.pk, "category_id": back.pk},
+    ]
+    for record in lacking:
+        ProductCategoryIn.model_validate({key: value for key, value in record.items() if key != "id"})
+
+
+@HUB_DB
+def test_only_a_product_the_business_keeps_live_and_out_of_it_goes_back_in():
+    desserts = category("Desserts", is_deleted=True)
+    back = brought_back("Desserts")
+    # Already in it: put back by the category's recover when restored, or by an earlier pass of the recovery.
+    cake = product("Cake", "CAK-1")
+    ProductCategory.objects.create(product=cake, category=back)
+    # Deleted: its restore brings it back, in it already; gone altogether: created again in it.
+    flan = product("Flan", "FLA-1", is_deleted=True, is_active=False)
+    copy = [desserts]
+    links = [a_link_of_the_copy(one, desserts, copy) for one in (cake.pk, flan.pk, uuid.uuid7())]
+
+    assert queries.product_links_not_in_business(links) == []
+
+
+@HUB_DB
+def test_a_category_the_business_kept_or_made_again_by_hand_stays_as_the_business_has_it():
+    # Kept, and its product taken out of it since by the business.
+    drinks = category("Drinks")
+    # Deleted, and made again by hand with its name: the business's own, whatever it put in it.
+    desserts = category("Desserts", is_deleted=True)
+    category("Desserts", created_by="user:7")
+    # Deleted, and not brought back (its recover refused it): nothing to put its product in.
+    specials = category("Specials", is_deleted=True)
+    brought_back("Sweets")
+    coffee, brownie, tart = product("Coffee", "COF-1"), product("Brownie", "BRO-1"), product("Tart", "TAR-1")
+    copy = [drinks, desserts, specials]
+    links = [
+        a_link_of_the_copy(coffee.pk, drinks, copy),
+        a_link_of_the_copy(brownie.pk, desserts, copy),
+        a_link_of_the_copy(tart.pk, specials, copy),
+    ]
+
+    assert queries.product_links_not_in_business(links) == []
+
+
+@HUB_DB
+def test_a_category_an_earlier_recovery_brought_back_and_the_business_kept_is_its_own():
+    # Brought back by an earlier recovery before this copy was made, then kept: the business took its product out of it
+    # since, and that stays.
+    specials = brought_back("Specials")
+    soup = product("Soup", "SOU-1")
+    links = [a_link_of_the_copy(soup.pk, specials, [specials])]
+
+    assert queries.product_links_not_in_business(links) == []
+
+
+@HUB_DB
+def test_the_copys_category_is_the_business_own_by_its_id_before_any_name():
+    drinks = category("Drinks")
+    coffee = product("Coffee", "COF-1")
+    links = [a_link_of_the_copy(coffee.pk, drinks, [drinks])]
+    # Renamed since, and its old name taken by one a recovery brought back: the copy's is the renamed one, which the
+    # business kept, so nothing goes into the other.
+    Category.objects.filter(pk=drinks.pk).update(name="Beverages")
+    brought_back("Drinks")
+
+    assert queries.product_links_not_in_business(links) == []
+
+
+@HUB_DB
+def test_each_category_brought_back_gets_the_products_of_the_one_it_stands_for_the_oldest_first():
+    lost, also_lost = category("Specials", is_deleted=True), category("Specials", is_deleted=True)
+    first_back, second_back = brought_back("Specials"), brought_back("specials")
+    soup, salad = product("Soup", "SOU-1"), product("Salad", "SAL-1")
+    copy = [lost, also_lost]
+    links = [a_link_of_the_copy(soup.pk, lost, copy), a_link_of_the_copy(salad.pk, also_lost, copy)]
+
+    lacking = queries.product_links_not_in_business(links)
+
+    # The pairing of the categories' part: the oldest brought back stands for the copy's oldest.
+    assert [(one["product_id"], one["category_id"]) for one in lacking] == [
+        (soup.pk, first_back.pk),
+        (salad.pk, second_back.pk),
+    ]
+
+
+@HUB_DB
+def test_the_copy_gives_its_live_categories_by_id_with_their_names():
+    drinks, desserts = category("Drinks"), category("Desserts")
+    category("Old menu", is_deleted=True)
+
+    assert queries.category_names_in_copy(direct()) == {drinks.pk: "Drinks", desserts.pk: "Desserts"}
+
+
+@HUB_DB
+def test_a_category_no_longer_held_live_stands_for_the_one_a_recovery_brought_back_with_its_name():
+    # Held, but deleted; and gone altogether: each stands for the one a recovery made again with its name.
+    desserts = category("Desserts", is_deleted=True)
+    gone = uuid.uuid7()
+    desserts_back, specials_back = brought_back("Desserts"), brought_back(" specials ")
+
+    standing = queries.categories_standing_for({desserts.pk: "Desserts", gone: "Specials"})
+
+    assert standing == {desserts.pk: desserts_back.pk, gone: specials_back.pk}
+
+
+@HUB_DB
+def test_a_category_still_live_is_itself_and_one_made_again_by_hand_or_deleted_since_stands_for_none():
+    # Still live, renamed since, and its old name taken by one a recovery brought back: it is itself, by its id.
+    drinks = category("Beverages")
+    brought_back("Drinks")
+    # Made again by hand with its name: the business's own, set up as it chose.
+    category("Desserts", created_by="user:7")
+    # Brought back by a recovery, then deleted by the business.
+    brought_back("Specials", is_deleted=True)
+    copy = {drinks.pk: "Drinks", uuid.uuid7(): "Desserts", uuid.uuid7(): "Specials"}
+
+    assert queries.categories_standing_for(copy) == {}
+
+
+@HUB_DB
+def test_a_category_of_the_copy_brought_back_earlier_is_its_own_and_stands_for_no_other():
+    # Brought back by an earlier recovery before the copy was made, and kept: it is the copy's own, never the stand-in
+    # of another of the copy's with its name. The whole copy is given, so the pairing is the categories' part's.
+    lost = category("Specials", is_deleted=True)
+    earlier = brought_back("Specials")
+
+    assert queries.categories_standing_for({lost.pk: "Specials", earlier.pk: "Specials"}) == {}
+    # Read alone, the lost one would take it.
+    assert queries.categories_standing_for({lost.pk: "Specials"}) == {lost.pk: earlier.pk}
+
+
+@HUB_DB
+def test_each_category_brought_back_stands_for_one_of_the_copy_the_oldest_first():
+    lost, also_lost = category("Specials", is_deleted=True), category("Specials", is_deleted=True)
+    first_back, second_back = brought_back("Specials"), brought_back("specials")
+
+    standing = queries.categories_standing_for({also_lost.pk: "Specials", lost.pk: "Specials"})
+
+    assert standing == {lost.pk: first_back.pk, also_lost.pk: second_back.pk}
+
+
+@HUB_DB
 def test_with_nothing_read_nothing_is_lacking():
     # The platform asks what is lacking also when the copy gave nothing.
     assert queries.categories_not_in_business([]) == []
     assert queries.products_not_in_business([]) == []
+    assert queries.product_links_not_in_business([]) == []
 
 
-def test_the_app_declares_what_it_gives_back_its_categories_first():
-    categories, products = apps.get_app_config("inventory").recoverable_from_copy()
+def test_the_app_declares_what_it_gives_back_its_categories_first_its_links_last():
+    categories, products, links = apps.get_app_config("inventory").recoverable_from_copy()
 
     assert (categories.read, categories.missing, categories.create, categories.deleted, categories.restore) == (
         queries.categories_in_copy,
@@ -390,12 +646,30 @@ def test_the_app_declares_what_it_gives_back_its_categories_first():
     assert (products.read, products.missing, products.create, products.deleted, products.restore) == (
         queries.products_in_copy,
         queries.products_not_in_business,
-        "inventory.product.create",
+        "inventory.product.recover",
         queries.products_deleted_in_business,
         "inventory.product.restore",
     )
-    assert (str(categories.label), str(products.label)) == ("Product categories", "Products")
-    assert categories.reads_since == products.reads_since == "0001_initial"
+    # Last, once every product the business holds is live again: the screen's link, each counted apart.
+    assert (links.read, links.missing, links.create, links.deleted, links.restore) == (
+        queries.product_links_in_copy,
+        queries.product_links_not_in_business,
+        "inventory.product_category.add",
+        None,
+        "",
+    )
+    assert [one.reads_since for one in (categories, products, links)] == [
+        "0001_initial",
+        "0005_product_image",
+        "0001_initial",
+    ]
+    # Its products are read with their image: a copy from before it is refused them (recover_copy_behind).
+    assert fields_held_since("inventory", "product", products.reads_since) >= set(queries.PRODUCT_FIELDS)
+    assert [str(one.label) for one in (categories, products, links)] == [
+        "Product categories",
+        "Products",
+        "Product links to categories",
+    ]
 
 
 # ── End to end: the business's own database and its copy ────────────────────────────────────────────────────────────
@@ -436,9 +710,18 @@ def gone_altogether(hub, *product_ids) -> None:
         Product.objects.filter(pk__in=product_ids).delete()
 
 
+CATEGORIES = {
+    "app": "inventory", "label": "Product categories", "restored": 0, "created": 0, "not_created": 0, "reasons": [],
+    "refused": "",
+}
+PRODUCTS = CATEGORIES | {"label": "Products"}
+LINKS = CATEGORIES | {"label": "Product links to categories"}
+
+
 def said(row) -> tuple[str, list[dict]]:
-    """``row``'s status and what each app gave back, by the keys these tests read."""
-    keys = ("app", "restored", "created", "not_created", "reasons", "refused")
+    """``row``'s status and what each thing Inventory gives back gave, its categories, its products and then the links
+    of the products the business kept, by the keys these tests read."""
+    keys = ("app", "label", "restored", "created", "not_created", "reasons", "refused")
     row = fresh(row)
     return row.status, [{key: result[key] for key in keys} for result in row.results]
 
@@ -447,10 +730,7 @@ def asked_again_gives_nothing(recoveries, copy) -> None:
     """``copy`` asked again: nothing comes back twice."""
     again = recoveries.ask(copy, "inventory")
     assert run() == 1
-    assert said(again) == (
-        "done",
-        [{"app": "inventory", "restored": 0, "created": 0, "not_created": 0, "reasons": [], "refused": ""}],
-    )
+    assert said(again) == ("done", [CATEGORIES, PRODUCTS, LINKS])
 
 
 @pytest.mark.usefixtures("no_test_fallback")
@@ -484,11 +764,8 @@ class TestProductsComeBack:
 
         assert run() == 1
 
-        # Created: the category the business deleted, and the product no longer held.
-        assert said(row) == (
-            "done",
-            [{"app": "inventory", "restored": 2, "created": 2, "not_created": 0, "reasons": [], "refused": ""}],
-        )
+        # Created: the category the business deleted, and the product no longer held; each counted apart.
+        assert said(row) == ("done", [CATEGORIES | {"created": 1}, PRODUCTS | {"restored": 2, "created": 1}, LINKS])
         # The deleted ones, the same products, active and on sale again, with the stock their movements left; the one
         # no longer held, created in its category, which came back just before it, with no stock: a count says today's.
         assert live_products(hub) == [
@@ -513,8 +790,10 @@ class TestProductsComeBack:
         run_in(hub, "inventory.category.update", id=desserts, icon="ion:ice-cream-outline", color="#cc0066", order=3)
         flan = run_in(hub, "inventory.product.create", name="Flan", sku="FLA-1", price=350, tax_category_key=tax,
                       category_ids=[desserts]).id
-        run_in(hub, "inventory.product.create", name="Brownie", sku="BRO-1", price=300, tax_category_key=tax,
-               category_ids=[desserts])
+        with use_hub(hub):
+            drinks = Category.objects.get(name="Drinks").pk
+        brownie = run_in(hub, "inventory.product.create", name="Brownie", sku="BRO-1", price=300, tax_category_key=tax,
+                         category_ids=[desserts, drinks]).id
         copy = recoveries.copy_of(hub)
         run_in(hub, "inventory.product.delete", id=flan)
         run_in(hub, "inventory.product.delete", id=ids["cake"])
@@ -524,9 +803,11 @@ class TestProductsComeBack:
 
         assert run() == 1
 
+        # Created: the category, the product no longer held, and the link of the one the business kept live; each
+        # counted apart.
         assert said(row) == (
             "done",
-            [{"app": "inventory", "restored": 1, "created": 2, "not_created": 0, "reasons": [], "refused": ""}],
+            [CATEGORIES | {"created": 1}, PRODUCTS | {"restored": 1, "created": 1}, LINKS | {"created": 1}],
         )
         with use_hub(hub):
             back = Category.objects.get(name="Desserts", is_deleted=False)
@@ -535,19 +816,72 @@ class TestProductsComeBack:
             assert (back.slug, back.icon, back.color, back.order) == ("desserts", "ion:ice-cream-outline", "#cc0066", 3)
             assert Category.objects.get(pk=desserts).is_deleted is True
             assert Product.objects.get(sku="FLA-1").pk == flan
-        # In it, what came back: the deleted one, the same product, and the one no longer held, made again. The one the
-        # business kept live stays as it is, out of it since the deletion.
+        # In it, what it had: the deleted one, the same product; the one no longer held, made again; and the one the
+        # business kept live, back in it by the screen's link, in Drinks still.
         assert live_products(hub) == [
-            ("Brownie", "BRO-1", True, Decimal("0.000"), []),
+            ("Brownie", "BRO-1", True, Decimal("0.000"), ["Desserts", "Drinks"]),
             ("Cake", "CAK-1", True, Decimal("0.000"), ["Desserts"]),
             ("Coffee", "COF-1", True, Decimal("12.000"), ["Drinks"]),
             ("Flan", "FLA-1", True, Decimal("0.000"), ["Desserts"]),
             ("Tea", "TEA-1", False, Decimal("0.000"), ["Drinks"]),
         ]
 
+        with use_hub(hub):
+            linked = OutboxEvent.objects.filter(name="inventory.product.categorized", payload__product_id=str(brownie))
+            said_linked = [(one.payload["category_id"], one.actor) for one in linked.order_by("created_at", "id")]
+            # Its create's two, then the one the recovery made, said as the recovery's.
+            assert sorted(said_linked[:2]) == sorted([(str(desserts), "system"), (str(drinks), "system")])
+            assert said_linked[2:] == [(str(back.pk), actor_of(row.pk))]
+
         asked_again_gives_nothing(recoveries, copy)
         with use_hub(hub):
             assert Category.objects.filter(name="Desserts", is_deleted=False).count() == 1
+            assert ProductCategory.objects.filter(product=brownie, category=back).count() == 1
+
+    def test_each_product_comes_back_with_the_image_of_the_library_it_had(
+        self, recoveries, every_app_on, image_library  # noqa: F811
+    ):
+        hub, ids, _ = self.a_business(recoveries, every_app_on)
+        latte, espresso = "catalog:hospitality/cafe_con_leche", "catalog:hospitality/cafe_solo"
+        run_in(hub, "inventory.product.set_image", id=ids["coffee"], image=latte)
+        run_in(hub, "inventory.product.set_image", id=ids["cake"], image=espresso)
+        copy = recoveries.copy_of(hub)
+        run_in(hub, "inventory.product.delete", id=ids["coffee"])
+        run_in(hub, "inventory.product.delete", id=ids["cake"])
+        gone_altogether(hub, ids["cake"])
+        row = recoveries.ask(copy, "inventory")
+
+        assert run() == 1
+
+        assert fresh(row).status == "done"
+        # The deleted one, the same product with its image; the one no longer held, made again with the copy's.
+        with use_hub(hub):
+            assert dict(Product.objects.filter(is_deleted=False).values_list("sku", "image")) == {
+                "COF-1": latte,
+                "TEA-1": "",
+                "CAK-1": espresso,
+            }
+            assert Product.objects.get(sku="COF-1").pk == ids["coffee"]
+
+    def test_one_deleted_before_deleting_kept_its_image_gets_back_the_copys(
+        self, recoveries, every_app_on, image_library  # noqa: F811
+    ):
+        hub, ids, _ = self.a_business(recoveries, every_app_on)
+        latte = "catalog:hospitality/cafe_con_leche"
+        run_in(hub, "inventory.product.set_image", id=ids["coffee"], image=latte)
+        copy = recoveries.copy_of(hub)
+        run_in(hub, "inventory.product.delete", id=ids["coffee"])
+        with use_hub(hub):
+            # As deleting left a product before it kept the image of the library.
+            Product.objects.filter(pk=ids["coffee"]).update(image="")
+        row = recoveries.ask(copy, "inventory")
+
+        assert run() == 1
+
+        assert said(row) == ("done", [CATEGORIES, PRODUCTS | {"restored": 1}, LINKS])
+        with use_hub(hub):
+            back = Product.objects.get(pk=ids["coffee"])
+            assert (back.is_deleted, back.image) == (False, latte)
 
     def test_asked_again_nothing_is_made_twice_and_what_the_business_has_stays(self, recoveries, every_app_on):
         hub, ids, _ = self.a_business(recoveries, every_app_on)
@@ -573,10 +907,7 @@ class TestProductsComeBack:
 
         assert run() == 1
 
-        assert said(row) == (
-            "done",
-            [{"app": "inventory", "restored": 0, "created": 0, "not_created": 0, "reasons": [], "refused": ""}],
-        )
+        assert said(row) == ("done", [CATEGORIES, PRODUCTS, LINKS])
         with use_hub(hub):
             assert dict(Product.objects.filter(sku="COF-1").values_list("pk", "is_deleted")) == {
                 ids["coffee"]: True,
@@ -594,7 +925,10 @@ class TestProductsComeBack:
 
         assert run() == 1
 
-        _, [result] = said(row)
-        assert (result["restored"], result["created"], result["not_created"], result["refused"]) == (0, 0, 2, "")
+        _, [categories, result, links] = said(row)
+        assert (categories, links) == (CATEGORIES, LINKS)
+        assert (result["label"], result["restored"], result["created"], result["not_created"], result["refused"]) == (
+            "Products", 0, 0, 2, ""
+        )
         assert {one["id"] for one in result["reasons"]} == {str(ids["tea"]), str(ids["cake"])}
         assert all(one["reason"].startswith("invalid_field: ") for one in result["reasons"])

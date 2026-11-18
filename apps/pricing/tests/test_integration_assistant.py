@@ -1,6 +1,6 @@
 """The assistant's card for a write of pricing (base's half is hub#258): in Spanish, every datum it sends by the name
 the Price lists screens give it, never by the title pydantic makes up from the field («Customer Group», «Rule»). The
-card is base's (``base.assistant.card``); the names are pricing's: the titles of its schemas and the ``verbose_name`` of
+card is base's (``base.assistant.cards.card``); the names are pricing's: the titles of its schemas and the ``verbose_name`` of
 its models, with their Spanish in its catalog."""
 
 import dataclasses
@@ -10,17 +10,17 @@ from pathlib import Path
 
 import pytest
 from django.apps import apps
+from live import assistant as shared
 from live.context import OperationContext, Scope
 from live.errors import AppInactive
 from live.operations import get, registry
 
 from base import assistant
 from base.tenancy.context import use_hub
-from base.tenancy.tests import hubs
 from base.tests.test_assistant import technical_names
-from base.tests.test_assistant_card_values import AN_ID, card_title
+from base.tests.test_assistant_card_values_references import AN_ID, card_title
 
-from .conftest import ctx_for, make_item, make_list, make_product
+from .conftest import HUB_DB, ctx_for, make_item, make_list, make_product
 
 FRONTEND = Path(apps.get_app_config("pricing").path) / "frontend/locale"
 SCREENS = json.loads((FRONTEND / "es.json").read_text())["pricing"]
@@ -35,7 +35,7 @@ def pricing_writes() -> list:
     return [
         op
         for op in registry.values()
-        if op.app_label == "pricing" and op.kind == "command" and assistant.is_tool(op)
+        if op.app_label == "pricing" and op.kind == "command" and assistant.tools.is_tool(op)
     ]
 
 
@@ -52,15 +52,15 @@ def test_the_card_names_the_customer_group_said_by_its_name_as_the_forms_do():
     group, group_en = SCREENS["lists"]["form"]["group"], SCREENS_EN["lists"]["form"]["group"]
     assert SCREENS["rules"]["form"]["group"] == group
     for name in ("pricing.price_list.create", "pricing.price_list.update", "pricing.rule.create", "pricing.rule.update"):
-        assert labels(assistant.card(get(name), {"customer_group": "Socios"}, "es")) == [group]
-        assert labels(assistant.card(get(name), {"customer_group": "Socios"}, "en")) == [group_en]
+        assert labels(assistant.cards.card(get(name), {"customer_group": "Socios"}, "es")) == [group]
+        assert labels(assistant.cards.card(get(name), {"customer_group": "Socios"}, "en")) == [group_en]
 
 
 def test_the_card_names_the_rule_it_changes_as_the_discount_rules_screen_does():
     """Editing, deactivating or activating a rule named by its code or name: «Regla de descuento», never «Rule»."""
     for name in ("pricing.rule.update", "pricing.rule.deactivate", "pricing.rule.activate"):
-        assert labels(assistant.card(get(name), {"rule": "VERANO"}, "es")) == ["Regla de descuento"]
-        assert labels(assistant.card(get(name), {"rule": "VERANO"}, "en")) == ["Discount rule"]
+        assert labels(assistant.cards.card(get(name), {"rule": "VERANO"}, "es")) == ["Regla de descuento"]
+        assert labels(assistant.cards.card(get(name), {"rule": "VERANO"}, "en")) == ["Discount rule"]
 
 
 # ── A price in the currency of its list (BASE-F97) ────────────────────────────────────────────────────────────────────
@@ -73,7 +73,7 @@ def priced(card: dict) -> dict:
     return {key: price[key] for key in ("kind", "value", "money") if key in price}
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize(
     ("currency", "money"),
     [("USD", {"currency": "USD", "decimals": 2}), ("PLN", {"currency": "PLN", "decimals": 2})],
@@ -88,14 +88,14 @@ def test_a_price_added_to_a_list_in_another_currency_is_said_in_that_currency(cu
     product = make_product("Shampoo", "SH-1")
     which = {"price_list_id": str(price_list.id), "price_list": "DOLARES"}[named]
     arguments = {named: which, "product_id": str(product.id), "price": 1500}
-    card = assistant.card(get("pricing.price_item.add"), arguments, "es", ctx_for(language="es"))
+    card = assistant.cards.card(get("pricing.price_item.add"), arguments, "es", ctx_for(language="es"))
     assert priced(card) == {"kind": "money", "value": 1500, "money": money}
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_price_on_a_list_that_is_not_there_is_said_as_sent():
     """No currency made up: the write refuses a list that does not exist, and the card does not paint a price in one."""
-    card = assistant.card(get("pricing.price_item.add"), {"price_list": "NADA", "product": "Shampoo", "price": 1500}, "es", ctx_for(language="es"))
+    card = assistant.cards.card(get("pricing.price_item.add"), {"price_list": "NADA", "product": "Shampoo", "price": 1500}, "es", ctx_for(language="es"))
     assert priced(card) == {"kind": "text", "value": 1500}
 
 
@@ -113,17 +113,17 @@ def a_price(currency: str = "USD"):
 
 
 def price_change(item, ctx: OperationContext | None) -> dict:
-    return assistant.card(get("pricing.price_item.update"), {"id": str(item.id), "price": 1500}, "es", ctx)
+    return assistant.cards.card(get("pricing.price_item.update"), {"id": str(item.id), "price": 1500}, "es", ctx)
 
 
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
+@HUB_DB
 @pytest.mark.parametrize("role", WRITERS)
 @pytest.mark.parametrize(
     ("currency", "money"),
     [("USD", {"currency": "USD", "decimals": 2}), ("PLN", {"currency": "PLN", "decimals": 2}), ("EUR", {"currency": "EUR", "decimals": 2})],
     ids=["dollars", "zlotys", "the business's"],
 )
-def test_a_price_changed_on_a_list_in_another_currency_is_said_in_that_currency(currency, money, role, hub_a, no_fallback):
+def test_a_price_changed_on_a_list_in_another_currency_is_said_in_that_currency(currency, money, role, hub_a):
     """«Pon el champú a 15 en la lista de dólares», a price named by its id: it goes in the minor unit of its list's
     currency, and the card said it in the business's («15,00 €»), never «1500». It reads the price as the person who
     changes it, every role that may."""
@@ -132,8 +132,8 @@ def test_a_price_changed_on_a_list_in_another_currency_is_said_in_that_currency(
     assert priced(card) == {"kind": "money", "value": 1500, "money": money}
 
 
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
-def test_a_price_of_another_business_is_said_as_sent_never_in_its_currency(hub_a, hub_b, no_fallback):
+@HUB_DB
+def test_a_price_of_another_business_is_said_as_sent_never_in_its_currency(hub_a, hub_b):
     """The id of another business's price names none of this one (the write refuses it): no currency made up, neither
     the other's nor this business's."""
     with use_hub(hub_b):
@@ -145,16 +145,16 @@ def test_a_price_of_another_business_is_said_as_sent_never_in_its_currency(hub_a
         assert priced(price_change(theirs, in_hub(hub_b)))["money"] == {"currency": "USD", "decimals": 2}
 
 
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
-def test_nobody_behind_the_request_reads_no_price_for_its_card(hub_a, no_fallback):
+@HUB_DB
+def test_nobody_behind_the_request_reads_no_price_for_its_card(hub_a):
     """An automation's card (no person at hand) reads nothing for anybody: the price as sent."""
     with use_hub(hub_a):
         card = price_change(a_price(), None)
     assert priced(card) == {"kind": "text", "value": 1500}
 
 
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
-def test_who_may_not_see_prices_reads_none_on_the_card(hub_a, no_fallback):
+@HUB_DB
+def test_who_may_not_see_prices_reads_none_on_the_card(hub_a):
     """Whoever asks without «view prices» (the write refuses them too) reads no list's currency: the price as sent."""
     with use_hub(hub_a):
         card = price_change(a_price(), in_hub(hub_a, permissions={"base.view_home"}))
@@ -222,7 +222,7 @@ def references(op) -> set[str]:
     """The data of ``op``'s input its schema declares an id of (``format: uuid``)."""
     schema = op.input.model_json_schema()
     props = schema.get("properties", {})
-    return {name for name, prop in props.items() if assistant._resolved(prop, schema.get("$defs", {})).get("format") == "uuid"}
+    return {name for name, prop in props.items() if shared.resolved(prop, schema.get("$defs", {})).get("format") == "uuid"}
 
 
 def a_business(*, service: bool = False) -> dict:
@@ -253,7 +253,7 @@ def cards(business: dict, ctx, named: dict = IN_A_HUB, language: str = "es") -> 
     """The card of each write of ``named`` naming every record it names by its id, as ``ctx``'s person would confirm
     it."""
     return {
-        write: assistant.card(
+        write: assistant.cards.card(
             get(write),
             {**{datum: str(business[whose(write, datum)].id) for datum in data}, **BESIDES.get(write, {})},
             language,
@@ -278,9 +278,9 @@ def test_every_record_a_write_of_pricing_names_by_its_id_is_listed_here():
     }
 
 
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
+@HUB_DB
 @pytest.mark.parametrize("role", WRITERS)
-def test_a_write_of_pricing_names_each_record_as_the_price_lists_screens_do(role, hub_a, no_fallback):
+def test_a_write_of_pricing_names_each_record_as_the_price_lists_screens_do(role, hub_a):
     """«Desactiva la tarifa», «quita el precio del champú», «crea una regla para el grupo VIP»: the card says which list,
     price, rule, product, category or group as the Price lists screens show it, never by its id — for every role that
     may run the write."""
@@ -290,7 +290,7 @@ def test_a_write_of_pricing_names_each_record_as_the_price_lists_screens_do(role
     assert [write for write, card in said.items() if not no_id(card)] == []
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize("role", WRITERS)
 def test_a_write_of_pricing_names_the_service_as_services_does(role):
     """«Pon el corte de pelo a 15 en Mayoristas», «crea una regla del 10 % en el corte»: the service by the name Services
@@ -300,7 +300,7 @@ def test_a_write_of_pricing_names_the_service_as_services_does(role):
     assert all(no_id(card) for card in said.values())
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_each_record_is_titled_as_its_screen_titles_it():
     """«Tarifa: Mayoristas», «Precio: Champú · Mayoristas», «Regla de descuento: Verano», never «Registro» or «Id»."""
     said = cards(a_business(service=True), ctx_for(language="es"), NAMED)
@@ -313,19 +313,19 @@ def test_each_record_is_titled_as_its_screen_titles_it():
     }
 
 
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
+@HUB_DB
 @pytest.mark.parametrize(("language", "from_ten"), [("es", "Champú · Mayoristas · desde 10"), ("en", "Champú · Mayoristas · from 10")])
-def test_a_price_from_a_quantity_on_is_named_with_it(language, from_ten, hub_a, no_fallback):
+def test_a_price_from_a_quantity_on_is_named_with_it(language, from_ten, hub_a):
     """The shampoo has two prices in «Mayoristas», by quantity: the card names the one it changes by its «Desde»."""
     with use_hub(hub_a):
         business = a_business()
         by_ten = make_item(business["price_list"], business["product_id"], price=1000, min_quantity="10")
-        card = assistant.card(get("pricing.price_item.update"), {"id": str(by_ten.id), "price": 900}, language, ctx_for("hub_manager", scope=Scope("host", hub_a.slug), language=language))
+        card = assistant.cards.card(get("pricing.price_item.update"), {"id": str(by_ten.id), "price": 900}, language, ctx_for("hub_manager", scope=Scope("host", hub_a.slug), language=language))
     assert values(card)["id"] == from_ten
 
 
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
-def test_a_price_named_by_its_id_is_said_by_its_name_and_in_its_list_s_currency(hub_a, no_fallback):
+@HUB_DB
+def test_a_price_named_by_its_id_is_said_by_its_name_and_in_its_list_s_currency(hub_a):
     """Both marks on the price's id: the card names the price and says the new one in the currency of its list."""
     with use_hub(hub_a):
         card = price_change(a_price("USD"), in_hub(hub_a))
@@ -346,7 +346,7 @@ def services_unavailable(request, monkeypatch):
         monkeypatch.setitem(registry, "service.service.get", dataclasses.replace(registry["service.service.get"], fn=off))
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_without_services_the_card_leaves_the_service_out_and_names_the_rest(services_unavailable):
     business = a_business(service=True)
     said = cards(business, ctx_for(language="es"), {"pricing.price_item.add": NAMED["pricing.price_item.add"]})
@@ -354,8 +354,8 @@ def test_without_services_the_card_leaves_the_service_out_and_names_the_rest(ser
     assert no_id(said["pricing.price_item.add"])
 
 
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
-def test_nobody_behind_the_request_reads_no_record_of_pricing(hub_a, no_fallback):
+@HUB_DB
+def test_nobody_behind_the_request_reads_no_record_of_pricing(hub_a):
     """An automation's card (no person at hand) names no record: nothing is read for anybody."""
     with use_hub(hub_a):
         said = cards(a_business(), None)
@@ -363,8 +363,8 @@ def test_nobody_behind_the_request_reads_no_record_of_pricing(hub_a, no_fallback
     assert all(no_id(card) for card in said.values())
 
 
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
-def test_who_may_not_see_prices_reads_none_of_them_on_the_card(hub_a, no_fallback):
+@HUB_DB
+def test_who_may_not_see_prices_reads_none_of_them_on_the_card(hub_a):
     """Whoever asks without «view prices» (a key that only changes them, say) gets every record left out, never its id;
     the product too, without Inventory's «view products»."""
     with use_hub(hub_a):
@@ -373,19 +373,19 @@ def test_who_may_not_see_prices_reads_none_of_them_on_the_card(hub_a, no_fallbac
     assert all(no_id(card) for card in said.values())
 
 
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
-def test_a_record_that_is_not_there_is_left_out_never_by_its_id(hub_a, no_fallback):
+@HUB_DB
+def test_a_record_that_is_not_there_is_left_out_never_by_its_id(hub_a):
     with use_hub(hub_a):
         gone = {
-            write: assistant.card(get(write), {**dict.fromkeys(data, str(uuid.uuid7())), **BESIDES.get(write, {})}, "es", in_hub(hub_a))
+            write: assistant.cards.card(get(write), {**dict.fromkeys(data, str(uuid.uuid7())), **BESIDES.get(write, {})}, "es", in_hub(hub_a))
             for write, data in IN_A_HUB.items()
         }
     assert {write: values(card) for write, card in gone.items()} == left_out()
     assert all(no_id(card) for card in gone.values())
 
 
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
-def test_a_record_of_hub_b_is_never_named_on_a_card_of_hub_a(hub_a, hub_b, no_fallback):
+@HUB_DB
+def test_a_record_of_hub_b_is_never_named_on_a_card_of_hub_a(hub_a, hub_b):
     """The read runs in the hub the person asks in: hub B's list, price, rule, product, category or group is nobody in
     hub A."""
     with use_hub(hub_b):
@@ -414,7 +414,7 @@ def test_whoever_may_run_a_write_reads_the_record_its_card_names():
             schema = op.input.model_json_schema()
             for datum in data:
                 checked += 1
-                marked = assistant.refers_of(assistant._resolved(schema["properties"][datum], schema.get("$defs", {})))
+                marked = shared.refers_of(shared.resolved(schema["properties"][datum], schema.get("$defs", {})))
                 reads = [marked["read"], *(["service.service.get"] if datum == "service_id" else [])] if marked else []
                 if not reads or not all(mine.has(registry[read].permission) for read in reads):
                     unread.append((role, name, datum))

@@ -1,6 +1,6 @@
 """The task app's routes: each bound to its operation, and the flows over HTTP.
 
-Requests go to ``a.localhost`` (scope ``a``) with Django's sync test client, which sees the test's
+Requests go to business A's host (``HOST``, scope ``A``) with Django's sync test client, which sees the test's
 transaction.
 """
 
@@ -9,11 +9,12 @@ import json
 import pytest
 from live.ninja import ensure_api_parity
 
+from apps.flow.tests.test_api import get, post
 from apps.task.api import router
 from base.tests.routes import spa_routes
 from config.api import api
 
-from .conftest import make_member, make_task
+from .conftest import HOST, HUB_DB, A, make_member, make_task
 
 ROUTES = {
     ("GET", "/task/tasks", "task.task.list"),
@@ -36,25 +37,15 @@ ROUTES = {
 }
 
 
-def get(client, path, host="a.localhost", **params):
-    return client.get(f"/api{path}", params, HTTP_HOST=host)
-
-
-def post(client, path, data, host="a.localhost", **headers):
-    return client.post(
-        f"/api{path}", json.dumps(data), content_type="application/json", HTTP_HOST=host, **headers
-    )
-
-
 @pytest.fixture
 def admin_client(client, make_user):
-    client.force_login(make_user("boss", host="a", role="hub_admin", first_name="Marta"))
+    client.force_login(make_user("boss", host=A.key, role="hub_admin", first_name="Marta"))
     return client
 
 
 @pytest.fixture
 def employee(make_user):
-    user = make_user("bea", host="a", role="hub_employee", first_name="Bea", last_name="Ruiz")
+    user = make_user("bea", host=A.key, role="hub_employee", first_name="Bea", last_name="Ruiz")
     return user, make_member("Bea", "Ruiz", user=user.person)
 
 
@@ -81,9 +72,9 @@ def test_the_api_keeps_parity():
     assert ensure_api_parity(api) == []
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_openapi_describes_the_task_routes(client):
-    paths = client.get("/api/openapi.json", HTTP_HOST="a.localhost").json()["paths"]
+    paths = client.get("/api/openapi.json", HTTP_HOST=HOST).json()["paths"]
     served = {
         (method.upper(), path.removeprefix("/api"), op["operationId"])
         for path, methods in paths.items()
@@ -100,14 +91,14 @@ def test_the_spas_route_map_names_every_task_route():
 # Authentication and permissions
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_anonymous_gets_the_401_envelope(client):
     for response in (get(client, "/task/tasks"), post(client, "/task/tasks", {"title": "t"})):
         assert response.status_code == 401
         assert response.json()["error"]["code"] == "unauthorized"
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_an_employee_works_their_own_tasks_and_does_not_manage(employee_client, employee):
     created = post(employee_client, "/task/tasks", {"title": "Restock shampoo", "to_me": True})
     assert created.status_code == 422  # «to_me» belongs to assign, not to create
@@ -127,7 +118,7 @@ def test_an_employee_works_their_own_tasks_and_does_not_manage(employee_client, 
         assert response.json()["error"]["code"] == "permission_denied"
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_someone_elses_task_is_a_404_for_an_employee(employee_client):
     other = make_task("Ana's", assigned_to=make_member())
     response = post(employee_client, "/task/tasks/complete", {"id": str(other.id)})
@@ -138,7 +129,7 @@ def test_someone_elses_task_is_a_404_for_an_employee(employee_client):
 # Flows over HTTP
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_task_from_creation_to_its_comments(admin_client):
     make_member("Ana", "López")
     project = post(admin_client, "/task/projects", {"code": "opening", "name": "Opening", "color": "#AA3300"})
@@ -171,7 +162,7 @@ def test_a_task_from_creation_to_its_comments(admin_client):
     assert get(admin_client, "/task/tasks").json()["total"] == 0
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_my_tasks_over_http(employee_client, employee):
     make_task("Mine", assigned_to=employee[1])
     assert [row["title"] for row in get(employee_client, "/task/tasks/mine").json()["rows"]] == ["Mine"]
@@ -180,7 +171,7 @@ def test_my_tasks_over_http(employee_client, employee):
 # Errors
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_an_unknown_filter_or_field_is_a_422(admin_client):
     # The live stream and the assistant validate the input with the schema, which forbids extras; a GET
     # of ninja drops unknown query keys before the schema sees them (a gap of packages/live, reported).
@@ -195,7 +186,7 @@ def test_an_unknown_filter_or_field_is_a_422(admin_client):
     assert "author" in response.json()["error"]["fields"]
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_refusal_names_its_field(admin_client):
     response = post(admin_client, "/task/tasks", {"title": "t", "project": "nowhere"})
     assert response.status_code == 422
@@ -204,7 +195,7 @@ def test_a_refusal_names_its_field(admin_client):
     assert response.status_code == 422 and "title" in response.json()["error"]["fields"]
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_completing_a_closed_task_is_a_409(admin_client):
     task = make_task(status="cancelled")
     response = post(admin_client, "/task/tasks/complete", {"id": str(task.id)})
@@ -212,10 +203,14 @@ def test_completing_a_closed_task_is_a_409(admin_client):
     assert response.json()["error"]["code"] == "task.task_already_closed"
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_an_error_message_follows_the_language_of_the_request(admin_client):
-    response = post(
-        admin_client, "/task/tasks/complete", {"task": "ghost"}, HTTP_ACCEPT_LANGUAGE="es"
+    response = admin_client.post(
+        "/api/task/tasks/complete",
+        json.dumps({"task": "ghost"}),
+        content_type="application/json",
+        HTTP_HOST=HOST,
+        HTTP_ACCEPT_LANGUAGE="es",
     )
     assert response.status_code == 404
     assert response.json()["error"]["message"] == "Esa tarea no existe en este negocio."

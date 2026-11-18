@@ -16,7 +16,6 @@ The clock is the Hub's time zone (Madrid): ``FechaHoraHusoGenRegistro`` carries 
 
 import base64
 import binascii
-import copy
 import datetime as dt
 import hashlib
 import uuid
@@ -37,6 +36,7 @@ from apps.verifactu import (
     certificates,
     chain,
     envelope,
+    erplora_route,
     events,
     gateway,
     producer,
@@ -77,6 +77,7 @@ from apps.verifactu.queries import (
     refuse_outside_spain,
     route_problem,
     saas_unreachable,
+    sending_route,
     summary,
     system_for,
     wait,
@@ -90,7 +91,6 @@ from apps.verifactu.schemas import (
     ConfigOut,
     ConfigSyncIn,
     ConfigSyncOut,
-    ConfigUpdateIn,
     ContingencyRetryIn,
     DiagnosticOut,
     NoInput,
@@ -147,9 +147,6 @@ NOTHING_TO_RECOVER = _(
     "The AEAT has no records of that issuer this month: there is nothing to recover."
 )
 TESTING_ONLY = _("The test invoice is only for the test environment.")
-NO_OWN_CERTIFICATE = _(
-    "There is no valid certificate loaded: upload it in VeriFactu → Configuration → My certificate."
-)
 REPRESENTATION_NOT_APPROVED = _(
     "For ERPlora to file in production, ERPlora still has to approve your signed authorisation."
 )
@@ -188,16 +185,6 @@ NO_WAY_TO_THE_AEAT = _(
     "Nothing was issued: this business files for real with the AEAT and cannot reach it now: %(why)s. Fix it in "
     "VeriFactu → Settings and try again."
 )
-#: Why a certificate cannot present to the AEAT (``certificates.CertificateInvalid.code``), in the reader's language.
-CERTIFICATE_REFUSALS = {
-    "unopenable": _(
-        "The file is not a .p12/.pfx certificate that this password opens."
-    ),
-    "incomplete": _("The file does not hold a certificate and its private key."),
-    "no_client_auth": _(
-        "The certificate does not allow client authentication, so it cannot connect to the AEAT."
-    ),
-}
 #: Line of the test invoice (VERIFACTU-F11): a fiscal document's text, in the AEAT's language.
 TEST_LINE = "Prueba VeriFactu"
 
@@ -215,7 +202,7 @@ def _actor(ctx: OperationContext) -> str:
     return str(getattr(actor, "username", None) or actor or "")[:128]
 
 
-def _event(
+def _event(  # noqa: PLR0913
     ctx: OperationContext,
     kind: str,
     key: str,
@@ -551,7 +538,7 @@ def _refuse_without_a_way(config: Config, environment: str, scope: Scope) -> Non
         )
 
 
-def _seal_alta(
+def _seal_alta(  # noqa: PLR0913
     ctx: OperationContext,
     config: Config,
     invoice: Invoice,
@@ -804,7 +791,7 @@ def _back_in_the_queue(records=None) -> None:
     )
 
 
-def _failed(
+def _failed(  # noqa: PLR0913
     ctx,
     batch,
     code: str,
@@ -903,7 +890,7 @@ def _settle(ctx, batch, answer: aeat.SubmissionAnswer, now, tally: _Tally) -> No
         )
 
 
-def _send_chain(
+def _send_chain(  # noqa: C901, PLR0912, PLR0913, PLR0915, PLR0917
     ctx,
     config: Config,
     system,
@@ -916,10 +903,11 @@ def _send_chain(
 ) -> None:
     now = timezone.now()
     problem = route_problem(config, environment, ctx.scope)
+    route = sending_route(config, environment, ctx.scope)
     certificate = None
     if not problem:
         try:
-            certificate = own_certificate_material(config)
+            certificate = own_certificate_material(route)
         except certificates.CertificateUnreadable:
             problem = "own_certificate_unreadable"
     if problem:
@@ -982,7 +970,7 @@ def _send_chain(
             registros=[record.xml for record in batch],
             representative=(
                 (producer.MANUFACTURER["NombreRazon"], producer.MANUFACTURER["NIF"])
-                if config.route == Config.Route.ERPLORA
+                if route == Config.Route.ERPLORA
                 else None
             ),
             incident=any(
@@ -1018,7 +1006,7 @@ def _send_chain(
         hub=presenter(ctx.scope),
         nif=issuer_nif,
         environment=environment,
-        route=config.route,
+        route=route,
         envelope=whole,
         certificate=certificate,
     )
@@ -1450,7 +1438,7 @@ def validate_chain(ctx: OperationContext, data: ChainValidateIn) -> ChainValidat
     )
 
 
-def _anchor(
+def _anchor(  # noqa: PLR0913
     ctx,
     nif: str,
     environment: str,
@@ -1539,9 +1527,9 @@ def recover_manual(ctx: OperationContext, data: RecoverManualIn) -> RecoveryOut:
     )
 
 
-def _query_page(
+def _query_page(  # noqa: PLR0913, PLR0917
     ctx: OperationContext,
-    config: Config,
+    route: str,
     nif: str,
     name: str,
     environment: str,
@@ -1572,7 +1560,7 @@ def _query_page(
         hub=presenter(ctx.scope),
         nif=nif,
         environment=environment,
-        route=config.route,
+        route=route,
         envelope=body,
         certificate=certificate,
     )
@@ -1594,7 +1582,7 @@ def _query_page(
         ) from None
 
 
-def _query_aeat(
+def _query_aeat(  # noqa: PLR0913, PLR0917
     ctx, config: Config, nif: str, environment: str, year: int, month: int
 ) -> list[aeat.QueriedRecord]:
     """Ask the AEAT, through the gateway, for the records of ``nif`` in a month; replace the last photo."""
@@ -1603,8 +1591,9 @@ def _query_aeat(
             str(CANNOT_SEND) % {"why": wait_reason_text("gateway_unavailable")},
             code="verifactu.gateway_unavailable",
         )
+    route = sending_route(config, environment, ctx.scope)
     try:
-        certificate = own_certificate_material(config)
+        certificate = own_certificate_material(route)
     except certificates.CertificateUnreadable:
         raise Conflict(
             str(CANNOT_SEND) % {"why": wait_reason_text("own_certificate_unreadable")},
@@ -1617,15 +1606,12 @@ def _query_aeat(
         .first()
     )
     name = latest_name or issuer_identity()[1]
-    represented = (
-        config.route == Config.Route.ERPLORA
-        and nif.upper() != producer.MANUFACTURER["NIF"]
-    )
+    represented = route == Config.Route.ERPLORA and nif.upper() != producer.MANUFACTURER["NIF"]
     records: list[aeat.QueriedRecord] = []
     after = None
     for _page in range(MAX_QUERY_PAGES):
         page = _query_page(
-            ctx, config, nif, name, environment, year, month, represented, after, certificate
+            ctx, route, nif, name, environment, year, month, represented, after, certificate
         )
         records.extend(page.records)
         if not page.more:
@@ -1813,6 +1799,7 @@ def run_diagnostic(ctx: OperationContext, data: NoInput) -> DiagnosticOut:
     config = config_row()
     nif = issuer_identity()[0]
     codes = blockers(config, config.environment, ctx.scope)
+    route = sending_route(config, config.environment, ctx.scope)
     gateway_ready, gateway_detail, refusal = None, "", ""
     if gateway.configured() and "own_certificate_unreadable" not in codes:
         _outlast_the_gateway()
@@ -1820,8 +1807,8 @@ def run_diagnostic(ctx: OperationContext, data: NoInput) -> DiagnosticOut:
             hub=presenter(ctx.scope),
             nif=nif,
             environment=config.environment,
-            route=config.route,
-            certificate=own_certificate_material(config),
+            route=route,
+            certificate=own_certificate_material(route),
         )
         gateway_ready = reply.kind == gateway.ANSWERED and reply.ready
         gateway_detail = reply.message or reply.code
@@ -1837,7 +1824,7 @@ def run_diagnostic(ctx: OperationContext, data: NoInput) -> DiagnosticOut:
     result = {
         "ran_at": timezone.now(),
         "environment": config.environment,
-        "route": config.route,
+        "route": route,
         "issuer_ready": issuer_configured(),
         "route_ready": not route_problem(config, config.environment, ctx.scope),
         "gateway_configured": gateway.configured(),
@@ -1947,68 +1934,21 @@ def _changed(
     record_event(ctx, events.CONFIG_CHANGED, {"fields": fields})
 
 
-def _route_refusal(
-    config: Config, route: str, environment: str, scope: Scope
-) -> Conflict | None:
-    """Why ``route`` cannot file in ``environment`` (VERIFACTU-F04, F08), as the refusal to raise. A closed server
-    is not the route's: ``go_live`` refuses it first, and choosing a route stays possible meanwhile."""
-    probe = copy.copy(config)
-    probe.route = route
-    problem = route_problem(probe, environment, scope)
-    if problem == "own_certificate_missing":
-        return Conflict(str(NO_OWN_CERTIFICATE), code="verifactu.no_own_certificate")
-    if problem == "own_certificate_unreadable":
-        return Conflict(
-            str(OWN_CERTIFICATE_UNREADABLE), code="verifactu.own_certificate_unreadable"
-        )
-    if problem == "gateway_unavailable":
-        return Conflict(str(GATEWAY_UNAVAILABLE), code="verifactu.gateway_unavailable")
-    if problem == "representation_not_approved":
-        return Conflict(
-            str(REPRESENTATION_NOT_APPROVED),
-            code="verifactu.representation_not_approved",
-        )
-    return None
+#: What keeps the route of that moment from filing in production, as the refusal ``go_live`` raises
+#: (VERIFACTU-F04, F08). A closed server is not the route's: ``go_live`` refuses it first.
+_ROUTE_REFUSALS = {
+    "own_certificate_unreadable": OWN_CERTIFICATE_UNREADABLE,
+    "gateway_unavailable": GATEWAY_UNAVAILABLE,
+    "representation_not_approved": REPRESENTATION_NOT_APPROVED,
+    erplora_route.CLOSED: erplora_route.OWN_CERTIFICATE_REQUIRED,
+}
 
 
-@operation(
-    "verifactu.config.update",
-    kind="command",
-    permission=CONFIGURE,
-    input=ConfigUpdateIn,
-    output=ConfigOut,
-    ai={
-        "description": "Choose who files the VeriFactu records: «erplora» (ERPlora files on the business's behalf with "
-        "its seal; in production it needs the approved signed authorisation) or «own» (the business's own certificate, "
-        "uploaded in VeriFactu → Configuration).",
-        "risk": "high",
-        "asks": {
-            "en": (
-                "let ERPlora file for us on our behalf",
-                "switch the filing route to our own certificate",
-            ),
-            "es": (
-                "que ERPlora remita los registros por nosotros",
-                "cambia la vía de envío a nuestro certificado propio",
-            ),
-        },
-    },
-)
-def update_config(ctx: OperationContext, data: ConfigUpdateIn) -> ConfigOut:
-    config = _config()
-    refusal = _route_refusal(config, data.route, config.environment, ctx.scope)
-    if refusal is not None:
-        raise refusal
-    if config.route != data.route:
-        config.route = data.route
-        _back_in_the_queue()
-        _changed(
-            ctx,
-            config,
-            "route_own" if data.route == Config.Route.OWN else "route_erplora",
-            fields=["route"],
-        )
-    return config_out(config, ctx)
+def _route_refusal(config: Config, scope: Scope) -> Conflict | None:
+    problem = route_problem(config, Environment.PRODUCTION, scope)
+    if problem not in _ROUTE_REFUSALS:
+        return None
+    return Conflict(str(_ROUTE_REFUSALS[problem]), code=f"verifactu.{problem}")
 
 
 def _refuse_on_the_platform_hub(ctx: OperationContext) -> None:
@@ -2053,14 +1993,16 @@ def go_live(ctx: OperationContext, data: NoInput) -> ConfigOut:
         raise Conflict(str(GO_LIVE_FORBIDDEN), code="verifactu.go_live_forbidden")
     if not issuer_configured():
         raise Conflict(str(ISSUER_MISSING), code="verifactu.issuer_missing")
-    refusal = _route_refusal(config, config.route, Environment.PRODUCTION, ctx.scope)
+    refusal = _route_refusal(config, ctx.scope)
     if refusal is not None:
         raise refusal
     if config.hub_status != Config.HubStatus.ACTIVE:
         raise Conflict(str(HUB_NOT_ACTIVE), code="verifactu.hub_not_active")
+    # The route of this moment is kept: from now on production goes by it, whatever happens to the certificate.
+    config.route = sending_route(config, Environment.PRODUCTION, ctx.scope)
     config.environment = Environment.PRODUCTION
     config.production_since = timezone.now()
-    _changed(ctx, config, "went_live", fields=["environment"])
+    _changed(ctx, config, "went_live", fields=["environment", "route"])
     return config_out(config, ctx)
 
 
@@ -2147,9 +2089,7 @@ def upload_certificate(ctx: OperationContext, data: CertificateUploadIn) -> Conf
     try:
         facts = certificates.inspect(p12, password)
     except certificates.CertificateInvalid as invalid:
-        raise Conflict(
-            str(CERTIFICATE_REFUSALS[invalid.code]), code="verifactu.certificate_invalid"
-        ) from None
+        raise Conflict(str(invalid), code="verifactu.certificate_invalid") from None
     if facts.expires_at <= timezone.now():
         raise Conflict(
             str(CERTIFICATE_EXPIRED)
@@ -2187,8 +2127,8 @@ def upload_certificate(ctx: OperationContext, data: CertificateUploadIn) -> Conf
     input=NoInput,
     output=ConfigOut,
     ai={
-        "description": "Remove the business's own certificate from this Hub. With the «own» route, records wait in the "
-        "queue until another certificate is uploaded or ERPlora files for the business.",
+        "description": "Remove the business's own certificate from this Hub. In testing, records then go out with "
+        "ERPlora's seal; live on the «own» route, they wait in the queue until another certificate is uploaded.",
         "risk": "high",
         "asks": {
             "en": (
@@ -2206,6 +2146,8 @@ def remove_certificate(ctx: OperationContext, data: NoInput) -> ConfigOut:
     row = own_certificate()
     if row is not None:
         OwnCertificate.objects.filter(pk=row.pk).delete()
+        # Only testing changes route without it: production keeps the route fixed on going live.
+        _back_in_the_queue(_unsent().filter(environment=Environment.TESTING))
         _certificate_event(ctx, "certificate_removed", row)
     return config_out(config_row(), ctx)
 
@@ -2291,13 +2233,9 @@ def follow_deployment(ctx: OperationContext, data: NoInput) -> ConfigOut:
 
 SIGNER_REQUIRED = _("Fill in the name and ID number of the person signing.")
 SIGNED_MODEL_REQUIRED = _("Attach the signed form.")
-SIGNED_MODEL_NOT_PDF = _(
-    "The signed form has to be a PDF: scan it or sign it with AutoFirma."
-)
+SIGNED_MODEL_NOT_PDF = _("The signed form has to be a PDF: scan it or sign it with AutoFirma.")
 ID_COPY_REQUIRED = _("Attach a copy of the identity document.")
-SIGNATURE_SAMPLE_REQUIRED = _(
-    "With a NIE we also need a sample of the handwritten signature."
-)
+SIGNATURE_SAMPLE_REQUIRED = _("With a NIE we also need a sample of the handwritten signature.")
 REPRESENTATION_PROOF_REQUIRED = _(
     "Attach the document that proves you may sign for the company."
 )
@@ -2334,7 +2272,7 @@ def _representation_step(ctx: OperationContext, config: Config, data) -> None:
     )
 
 
-def _representation_payload(
+def _representation_payload(  # noqa: C901, PLR0912
     data: RepresentationSubmitIn, taxpayer_tax_id: str, taxpayer_name: str
 ) -> dict:
     """The contract's body, or ``InvalidPayload`` naming every broken rule with the first one's code: the SaaS's
@@ -2420,6 +2358,7 @@ def submit_representation(
     ctx: OperationContext, data: RepresentationSubmitIn
 ) -> ConfigOut:
     refuse_outside_spain(ctx)
+    erplora_route.refuse_unavailable(ctx.scope)
     hub_id = config_row().hub_id
     if hub_id is None:
         raise Conflict(str(HUB_UNREGISTERED), code="verifactu.hub_unregistered")

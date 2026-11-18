@@ -1,6 +1,6 @@
 """The sale app's routes: each bound to its operation, and the main flows over HTTP.
 
-Requests go to ``a.localhost`` (scope ``a``) with Django's sync test client, which sees the test's
+Requests go to the business ``A``'s host (``HOST``) with Django's sync test client, which sees the test's
 transaction.
 """
 
@@ -13,7 +13,7 @@ from live.operations import UnknownOperation
 from live.operations import get as get_operation
 
 from apps.sale.api import router
-from apps.sale.tests.conftest import A, run
+from apps.sale.tests.conftest import HOST, HUB_DB, A, run
 from base.tests.routes import bound_routes, spa_route_map
 from config.api import api
 
@@ -87,11 +87,11 @@ ROUTES = {
 }
 
 
-def get(client, path, host="a.localhost", **params):
+def get(client, path, host=HOST, **params):
     return client.get(f"/api{path}", params, HTTP_HOST=host)
 
 
-def post(client, path, data, host="a.localhost", **headers):
+def post(client, path, data, host=HOST, **headers):
     return client.post(
         f"/api{path}", json.dumps(data), content_type="application/json", HTTP_HOST=host, **headers
     )
@@ -99,13 +99,13 @@ def post(client, path, data, host="a.localhost", **headers):
 
 @pytest.fixture
 def admin_client(client, make_user):
-    client.force_login(make_user("boss", host="a", role="hub_admin"))
+    client.force_login(make_user("boss", role="hub_admin"))
     return client
 
 
 @pytest.fixture
 def employee_client(client, make_user):
-    client.force_login(make_user("ana", host="a", role="hub_employee"))
+    client.force_login(make_user("ana", role="hub_employee"))
     return client
 
 
@@ -133,7 +133,7 @@ def test_the_reactions_have_no_route():
     assert {"sale.customer.reassign", "sale.sale.record_invoice"}.isdisjoint(bound)
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_an_employee_builds_and_charges_a_check_over_http(employee_client, product):
     product("Coffee", "COF", 150, "restaurant.drink")
     opened = post(
@@ -171,7 +171,7 @@ def test_an_employee_builds_and_charges_a_check_over_http(employee_client, produ
     )
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_an_employee_neither_voids_nor_reads_the_figures(employee_client):
     assert (
         post(
@@ -186,14 +186,14 @@ def test_an_employee_neither_voids_nor_reads_the_figures(employee_client):
     assert response.json()["error"]["code"] == "permission_denied"
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_bad_payload_is_a_422_by_field(admin_client):
     response = post(admin_client, "/sale/sales", {"idempotency_key": "short"})
     assert response.status_code == 422
     assert "idempotency_key" in response.json()["error"]["fields"]
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_refusal_is_the_error_envelope(admin_client, product):
     product("Gold", "GLD", 120000, "product.generic")
     response = post(
@@ -209,12 +209,12 @@ def test_a_refusal_is_the_error_envelope(admin_client, product):
     assert response.json()["error"]["code"] == "sale.cash_limit_exceeded"
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_without_a_session_nothing_is_read(client):
     assert get(client, "/sale/sales").status_code == 401
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_settings_over_http(admin_client):
     assert (
         post(admin_client, "/sale/settings", {"require_customer": True}).json()[
@@ -226,7 +226,7 @@ def test_the_settings_over_http(admin_client):
     assert get(admin_client, "/sale/pos_settings").json()["require_customer"] is True
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_an_employee_pays_a_line_with_a_voucher_over_http_and_an_exhausted_one_is_a_409(
     employee_client, customer
 ):
@@ -279,7 +279,7 @@ def test_an_employee_pays_a_line_with_a_voucher_over_http_and_an_exhausted_one_i
     assert undone.status_code == 200 and undone.json()["lines"][0]["paid_by_voucher"] is False
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_sold_out_article_is_a_409_over_http_and_the_check_stays_as_it_was(employee_client, product):
     # INVENTORY-F29 / SALE-F07: a new line of an article marked sold out is refused at every door.
     product("Croquettes", "CRQ", 650, "restaurant.food")

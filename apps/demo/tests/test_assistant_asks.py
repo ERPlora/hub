@@ -13,15 +13,18 @@ from pathlib import Path
 import pytest
 from django.conf import settings
 from live import assistant as shared
-from live.context import OperationContext, Scope
-from live.operations import AI, Operation, registry
+from live.operations import AI, registry
 
+from apps.invoice.tests.conftest import in_hubs
 from base import assistant
 from base.models import Membership
-from base.permissions import permissions_for
-from base.tests.test_assistant_asks import assert_its_asks_bring, comparable, probe_phrases
+from base.tests.test_assistant_asks import assert_its_words_name
+from base.tests.test_assistant_asks import assert_offered_with_room, comparable, offered_to
+from base.tests.test_assistant_asks import place_of_no_ask, probe_phrases
+from base.tests.test_assistant_asks import english_coverage_test, english_words_test, nobodys_words, own_words_test
 
-A = Scope("host", "a")
+from .conftest import HUB_DB
+
 OWNER, EMPLOYEE = Membership.Role.OWNER, Membership.Role.EMPLOYEE
 #: The role of a probe as its file says it (``"role": "owner"``).
 PROBE_ROLE = {"owner": OWNER, "employee": EMPLOYEE}
@@ -60,9 +63,6 @@ BY_NAME = "demo.item.list"
 #: own name alone («elimina Ejemplo QA…»), with no word of Demo's that would bring the list, acts on it (hub#1162).
 NAMES_AN_ITEM = {"demo.item.detail", "demo.item.update", "demo.item.delete", "demo.item.add_line"}
 
-#: How far down the tools a turn offers (``MAX_TOOLS``, 40) a probe of the QA may bring its tool: half of them, so
-#: twenty tools of the apps that say their asks later may climb past it before the model loses it.
-WITH_ROOM = 20
 #: How far down the tools a turn offers an ask brings its own tool in layer 1 (``base/tests/test_assistant_asks.py``).
 TOP = 10
 #: Every probe of layer 2 of Demo, both roles: the reported ones and the ones the model got right.
@@ -75,31 +75,9 @@ PROBES = [
 OFFERED_PROBES = [probe for probe in PROBES if probe["expect"] != "refused"]
 
 
-@pytest.fixture
-def catalog_of(make_user):
-    """The real catalogue of the assistant of a person with ``role`` in business ``a``, in ``language``."""
-
-    def of(role: str, language: str) -> dict[str, Operation]:
-        user = make_user(f"asker-{role}", host=A.key, role=role)
-        ctx = OperationContext(scope=A, actor=user.username, permissions=permissions_for(user, A), language=language)
-        return assistant.catalog(ctx)
-
-    return of
-
-
-def offered_to(tools: dict[str, Operation], phrase: str) -> list[str]:
-    return [op.name for op in assistant.relevant(tools, [phrase], "es")]
-
-
-def is_own_words(tools: dict[str, Operation], phrase: str) -> bool:
-    """Whether ``phrase`` is neither an ask in Spanish of any tool of ``tools`` nor a probe of layer 2."""
-    asks = {comparable(ask) for op in tools.values() for ask in shared.asks_of(op).get("es", ())}
-    return comparable(phrase) not in asks | set(probe_phrases())
-
-
 def test_demo_offers_at_least_8_tools():
     """Demo's tools are at least 8 (``AI``, never ``INTERNAL``): a silent drop of tools fails."""
-    tools = {name for name, op in registry.items() if op.app_label == "demo" and assistant.is_tool(op)}
+    tools = {name for name, op in registry.items() if op.app_label == "demo" and assistant.tools.is_tool(op)}
     assert all(isinstance(registry[name].ai_spec(), AI) for name in tools)
     assert len(tools) >= 8
 
@@ -120,13 +98,11 @@ def test_the_probes_of_demo_are_read():
 
 
 def test_the_hub_reads_an_elemento_as_an_item():
-    """``base.assistant.SYNONYMS``: «el elemento», as Demo's screens name one, is the item its operations are of
-    (``demo.item``), so the person's words reach those tools by their entity and not only by the words of their asks;
-    without the Hub's group, it does not (positive control)."""
+    """Demo's own words (its ``assistant_synonyms``): «el elemento», as Demo's screens name one, is the item its
+    operations are of (``demo.item``), so the person's words reach those tools by their entity and not only by the words
+    of their asks; without the Hub's group, it does not (positive control)."""
     item = shared.stem("item")
-    for phrase in ("borra el elemento Ensayo 7", "¿qué elementos están hechos?"):
-        assert any(item in concept for concept in shared.asked([phrase], assistant.SYNONYMS).concepts), phrase
-        assert not any(item in concept for concept in shared.asked([phrase]).concepts), phrase
+    assert_its_words_name("demo", [("borra el elemento Ensayo 7", item), ("¿qué elementos están hechos?", item)])
 
 
 #: Phrases that are neither asks nor probes, each with the tool of Demo it asks for: the Hub's «elemento» brings it
@@ -137,11 +113,11 @@ ELEMENTO = [
 ]
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize(("name", "phrase"), ELEMENTO)
 def test_a_phrase_that_names_an_elemento_is_offered_its_tool_and_the_read_that_finds_it(catalog_of, name, phrase):
     tools = catalog_of(OWNER, "es")
-    assert is_own_words(tools, phrase)
+    assert nobodys_words(tools, phrase)
     offered = offered_to(tools, phrase)
     assert name in offered[:TOP], (offered.index(name) + 1 if name in offered else None, offered[:TOP])
     assert BY_NAME in offered[:TOP], (offered.index(BY_NAME) + 1 if BY_NAME in offered else None, offered[:TOP])
@@ -157,13 +133,26 @@ OWN_WORDS = [
     ("demo.item.delete", "el Ensayo de otoño ya no sirve: que desaparezca para siempre"),
     ("demo.item.add_line", "al Ensayo de otoño le faltan cables nuevos, cuatro"),
 ]
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
-@pytest.mark.parametrize(("name", "phrase"), OWN_WORDS)
-def test_a_request_in_the_persons_own_words_reaches_its_tool_by_its_asks(catalog_of, name, phrase):
-    assert_its_asks_bring(catalog_of(OWNER, "es"), name, phrase, "es")
+test_a_request_in_the_persons_own_words_reaches_its_tool_by_its_asks = in_hubs(own_words_test(OWN_WORDS, "es"))
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation) and of the person's role
+#: What the owner says in English in words of their own for each tool of Demo that needs one, neither
+#: an ask nor a probe of layer 2: its English asks lift it among the first ten (``assert_its_asks_lift``).
+OWN_WORDS_EN = [
+    ("demo.item.add_line", "put four screws on Autumn trial"),
+    ("demo.item.create", "make «Spring trial» with the note «call the technician»"),
+    ("demo.item.delete", "Autumn trial is no use anymore, get rid of it for good"),
+    ("demo.item.detail", "read me what's in Autumn trial"),
+    ("demo.item.list", "find the ones with «autumn» in the name"),
+    ("demo.item.open_count", "how many are still pending?"),
+    ("demo.item.stats", "what are the figures altogether?"),
+    ("demo.item.update", "Autumn trial is done"),
+]
+test_a_request_in_english_is_lifted_by_its_english_asks = in_hubs(english_words_test(OWN_WORDS_EN))
+test_each_tool_has_its_own_english_words = english_coverage_test("demo", OWN_WORDS_EN)
+
+
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation) and of the person's role
 def test_an_employee_is_never_offered_what_only_who_manages_the_items_may_do(catalog_of):
     owner = catalog_of(OWNER, "es")
     employee = catalog_of(EMPLOYEE, "es")
@@ -175,14 +164,10 @@ def test_an_employee_is_never_offered_what_only_who_manages_the_items_may_do(cat
     assert refused and refused <= NOT_THE_EMPLOYEES
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation) and of the person's role
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation) and of the person's role
 @pytest.mark.parametrize(("role", "name", "phrase"), REPORTED)
 def test_the_reported_demo_request_offers_its_existing_operation(catalog_of, role, name, phrase):
-    tools = catalog_of(role, "es")
-    assert name in tools  # positive control: the role holds the tool, so its place is known
-    assert comparable(phrase) not in {comparable(ask) for ask in shared.asks_of(tools[name]).get("es", ())}
-    offered = offered_to(tools, phrase)
-    assert name in offered, (len(offered), offered[:10])
+    assert place_of_no_ask(catalog_of(role, "es"), name, phrase) is not None
 
 
 #: Every probe of layer 2 whose tool acts on one item, as its role said it: all but the owner's detail («enséñame el
@@ -202,20 +187,19 @@ def test_the_probes_that_name_an_item_are_the_four_tools_on_an_item_of_both_role
     ]
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation) and of the person's role
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation) and of the person's role
 @pytest.mark.parametrize(("role", "name", "phrase"), NAMING_PROBES)
 def test_a_probe_that_names_an_item_is_offered_its_tool_which_takes_the_item_by_its_name(catalog_of, role, name, phrase):
     """The tool the probe is offered takes the item as the person said it, so the model sends «Ejemplo QA» and never
     asks for the item's id, whether or not the list that finds it comes beside it."""
     tools = catalog_of(role, "es")
-    offered = offered_to(tools, phrase)
-    assert name in offered[:WITH_ROOM], (offered.index(name) + 1 if name in offered else None, offered[:10])
+    assert_offered_with_room(tools, name, phrase)
     parameters = shared.tool_spec(tools[name])["parameters"]
     assert "called" in parameters["properties"] and "id" in parameters["properties"]
     assert not {"id", "called"} & set(parameters.get("required", ()))
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 def test_the_owners_probe_that_says_elemento_is_offered_the_list_that_finds_it_too(catalog_of):
     """«enséñame el elemento «Ejemplo QA»…»: the Hub's «elemento» brings the list beside the detail (positive control of
     the one above: what it no longer needs, a turn still offers when the person's words say it)."""
@@ -223,14 +207,9 @@ def test_the_owners_probe_that_says_elemento_is_offered_the_list_that_finds_it_t
     assert BY_NAME in offered_to(catalog_of(OWNER, "es"), phrase)
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation) and of the person's role
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation) and of the person's role
 @pytest.mark.parametrize("probe", OFFERED_PROBES, ids=[probe["id"] for probe in OFFERED_PROBES])
 def test_every_probe_of_demo_offers_its_tool_without_being_one_of_its_asks(catalog_of, probe):
     """Both roles' phrases of layer 2, the ones the model answered right too: a tool of Demo that a new ask elsewhere
     pushes out of the first half of the ones a turn offers fails here before the real-model QA sees it."""
-    tools = catalog_of(PROBE_ROLE[probe["role"]], probe["language"])
-    name, phrase = probe["tool"], probe["phrase"]
-    assert name in tools  # positive control: the role holds the tool, so its place is known
-    assert comparable(phrase) not in {comparable(ask) for ask in shared.asks_of(tools[name]).get("es", ())}
-    offered = offered_to(tools, phrase)
-    assert name in offered[:WITH_ROOM], (offered.index(name) + 1 if name in offered else None, offered[:10])
+    assert_offered_with_room(catalog_of(PROBE_ROLE[probe["role"]], probe["language"]), probe["tool"], probe["phrase"])

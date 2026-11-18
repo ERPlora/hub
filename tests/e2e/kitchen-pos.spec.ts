@@ -11,6 +11,7 @@ import { type BrowserContext, expect, type Locator, type Page, test } from '@pla
 import { A, api, capture, login, psql, shown, untilStill } from './helpers';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
 import { cleanSales, drawerOff, openTillCart, restoreDrawer, stamp } from './sale-helpers';
+import { toastSaying } from './toast-helpers';
 
 const RUN = stamp();
 const SKU = `E2E-KPOS-${RUN}`;
@@ -93,7 +94,7 @@ test.afterAll(() => {
   restoreDrawer();
 });
 
-test('KITCHEN-F18, F19, F20: the till sends rounds, follows them in «Order tickets» and rushes one', async ({ page, context }) => {
+test('KITCHEN-F18, F19, F20: the till sends rounds, follows them in «Order tickets» and rushes one @smoke', async ({ page, context }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await login(page, A, '/sale/pos');
   await tillReady(page);
@@ -119,7 +120,7 @@ test('KITCHEN-F18, F19, F20: the till sends rounds, follows them in «Order tick
   }
   await page.setViewportSize({ width: 1440, height: 900 });
   await view.locator('[data-testid=pos-kitchen-send]').click();
-  await expect(page.locator('ion-toast').filter({ hasText: 'Order 1 sent to the kitchen.' })).toBeVisible();
+  await expect(toastSaying(page, 'Order 1 sent to the kitchen.')).toBeVisible();
   await expect(view.locator('[data-testid=pos-cart-round-empty]')).toContainText('Everything is sent');
 
   // A second round, the soup and the bread, normal: the flame went out with the send.
@@ -128,7 +129,7 @@ test('KITCHEN-F18, F19, F20: the till sends rounds, follows them in «Order tick
   await expect(flame).toHaveAttribute('aria-pressed', 'false');
   await expect(view.locator('[data-testid=pos-kitchen-send]')).toContainText('Send order (2)');
   await view.locator('[data-testid=pos-kitchen-send]').click();
-  const sent = page.locator('ion-toast').filter({ hasText: 'Order 2 sent to the kitchen.' });
+  const sent = toastSaying(page, 'Order 2 sent to the kitchen.');
   await expect(sent).toBeVisible();
   // The notice goes by itself: the screenshots show the sheet, not the toast on top of it.
   await expect(sent).toBeHidden({ timeout: 15_000 });

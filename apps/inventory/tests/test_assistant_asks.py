@@ -8,15 +8,13 @@ the asks and the guard that no ask copies a probe of layer 2.
 
 import pytest
 from live import assistant as shared
-from live.context import OperationContext, Scope
-from live.operations import AI, Operation, registry
+from live.operations import AI, registry
 
-from base import assistant
 from base.models import Membership
-from base.permissions import permissions_for
-from base.tests.test_assistant_asks import comparable, probe_phrases
+from base.tests.test_assistant_asks import assert_its_words_name
+from base.tests.test_assistant_asks import TOP, assert_offered_with_room, comparable, place_of_no_ask, probe_phrases
 
-A = Scope("host", "a")
+from .conftest import HUB_DB
 
 #: The requests of the real-model QA (``qa20261108.owner.es.inventory.*``), as the owner said them: each is offered its
 #: existing operation (among the ``MAX_TOOLS`` a turn offers, so the model can choose it), without being one of its
@@ -36,20 +34,6 @@ REPORTED = [
 ]
 
 
-@pytest.fixture
-def catalog_of(make_user):
-    """The real catalogue of the assistant of a person with ``role`` in business ``a``, in ``language``."""
-
-    def of(role: str, language: str) -> dict[str, Operation]:
-        user = make_user(f"asker-{role}", host=A.key, role=role)
-        ctx = OperationContext(
-            scope=A, actor=user.username, permissions=permissions_for(user, A), language=language
-        )
-        return assistant.catalog(ctx)
-
-    return of
-
-
 def test_inventory_offers_at_least_30_tools():
     """Inventory's tools are at least 30 (``AI``, never ``INTERNAL``): a silent drop of tools fails."""
     tools = {name for name, op in registry.items() if op.app_label == "inventory" and isinstance(op.ai_spec(), AI)}
@@ -64,43 +48,39 @@ def test_the_reported_requests_are_the_probes_of_layer_2():
 
 
 def test_the_hub_reads_units_as_units_and_a_delivery_note_as_goods_received():
-    """``base.assistant.SYNONYMS``: «unidades» are the units of measure of ``inventory.unit.*`` and «el albarán» or
-    «la mercancía que entra» what ``inventory.stock.receive`` records, so the owner's words reach those tools without
-    their own asks; without the Hub's groups, none of them does (positive control)."""
+    """``InventoryConfig.assistant_synonyms`` (gathered by ``base.assistant.relevance.synonyms``): «unidades» are the
+    units of measure of ``inventory.unit.*`` and «el albarán» or «la mercancía que entra» what
+    ``inventory.stock.receive`` records, so the owner's words reach those tools without their own asks; the platform's
+    own words (``base.assistant.relevance.SYNONYMS``) do not say it, and without the Hub's groups none of them does (positive
+    control)."""
     unit, receive = shared.stem("unit"), shared.stem("receive")
-    for phrase, wanted in (
-        ("¿qué unidades tengo configuradas?", unit),
-        ("registra el albarán del proveedor", receive),
-        ("entran 20 cafés más", receive),
-    ):
-        concepts = shared.asked([phrase], assistant.SYNONYMS).concepts
-        assert any(wanted in concept for concept in concepts), phrase
-        assert not any(wanted in concept for concept in shared.asked([phrase]).concepts), phrase
+    assert_its_words_name(
+        "inventory",
+        [
+            ("¿qué unidades tengo configuradas?", unit),
+            ("registra el albarán del proveedor", receive),
+            ("entran 20 cafés más", receive),
+        ],
+    )
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize(("name", "phrase"), REPORTED)
 def test_the_reported_inventory_request_offers_its_existing_operation(catalog_of, name, phrase):
-    tools = catalog_of(Membership.Role.OWNER, "es")
-    assert name in tools  # positive control: the owner holds the tool, so its place is known
-    assert comparable(phrase) not in {comparable(ask) for ask in shared.asks_of(tools[name])["es"]}
-    offered = [op.name for op in assistant.relevant(tools, [phrase], "es")]
-    assert name in offered, (len(offered), offered[:10])
+    assert place_of_no_ask(catalog_of(Membership.Role.OWNER, "es"), name, phrase) is not None
 
 
-#: How far down the tools a turn offers a request in the Hub's words may bring its tool: the QA's first ten
-#: (``base/tests/test_assistant_asks.py``).
-TOP = 10
 #: Goods received said as a business says it, in words that are none of the tool's asks nor a probe: «la mercancía» is
-#: what ``inventory.stock.receive`` records only through ``base.assistant.SYNONYMS`` (37th of 40 without them).
-GOODS_IN = [("inventory.stock.receive", "apunta la mercancía que nos ha traído hoy el proveedor")]
+#: what ``inventory.stock.receive`` records only through Inventory's ``assistant_synonyms`` (37th of 40 without them),
+#: and «han entrado» is read as its present «entran» (152nd, behind the cart's items, before live read it so).
+GOODS_IN = [
+    ("inventory.stock.receive", "apunta la mercancía que nos ha traído hoy el proveedor"),
+    ("inventory.stock.receive", "apunta que han entrado 12 unidades de tarta"),
+]
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize(("name", "phrase"), GOODS_IN)
 def test_goods_received_in_the_hubs_words_bring_the_reception_among_the_first_ten(catalog_of, name, phrase):
-    tools = catalog_of(Membership.Role.OWNER, "es")
-    assert comparable(phrase) not in {comparable(ask) for ask in shared.asks_of(tools[name])["es"]}
     assert comparable(phrase) not in probe_phrases()
-    offered = [op.name for op in assistant.relevant(tools, [phrase], "es")]
-    assert name in offered[:TOP], (offered.index(name) + 1 if name in offered else None, offered[:TOP])
+    assert_offered_with_room(catalog_of(Membership.Role.OWNER, "es"), name, phrase, room=TOP)

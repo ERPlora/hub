@@ -1,15 +1,20 @@
 """What an app says it gives back from a separate copy of its business (hub#1257; BASE-F114).
 
 The contract of the hook ``recoverable_from_copy`` of a ``LiveAppConfig``, here and not in ``base.tenancy`` because the
-apps import it and a module never imports the tenancy (``tests/test_guardrails.py``): the app only declares its reads
-and its operation; the platform (``base.tenancy.recovery``) connects to the copy and chooses the business's database.
+apps import it and a module never imports the tenancy (``tests/test_guardrails_tenancy.py``): the app only declares
+its reads and its operation; the platform (``base.tenancy.recovery``) connects to the copy and chooses the business's
+database.
 """
 
-from collections.abc import Callable
+from collections.abc import Callable, Iterable, Iterator
+from contextlib import contextmanager
+from contextvars import ContextVar
 from dataclasses import dataclass
-from typing import Any
+from typing import Annotated, Any
 
 import psycopg
+from ninja import Field, Schema
+from pydantic import StringConstraints
 
 #: The hook of a ``LiveAppConfig`` that says what the app gives back from a separate copy.
 HOOK = "recoverable_from_copy"
@@ -27,6 +32,37 @@ def actor_of(recovery_id: object) -> str:
     return f"{ACTOR}{recovery_id}"
 
 
+_at_work: ContextVar[str | None] = ContextVar("base_recovery_at_work", default=None)
+_carried_on: ContextVar[frozenset[str]] = ContextVar("base_recovery_carried_on", default=frozenset())
+
+
+def at_work() -> str | None:
+    """The actor of the recovery giving a separate copy back right now, around its apps' reads and operations; ``None``
+    outside one. What an app reads in the business tells by it what this same recovery did from what an earlier one
+    left there."""
+    return _at_work.get()
+
+
+def carries_on(actor: str) -> bool:
+    """Whether the recovery at work carries on the one that ran as ``actor``: one of the same copy that failed. Asked
+    again, a recovery finishes what such a one left halfway, so an app takes what it brought back as this one's own;
+    never one that was done, nor one of another copy, nor outside a recovery."""
+    return actor in _carried_on.get()
+
+
+@contextmanager
+def giving_back(actor: str, *, carrying_on: Iterable[str] = ()) -> Iterator[None]:
+    """Inside it, the recovery that runs as ``actor`` is the one at work (``at_work``), and it carries on those that ran
+    as ``carrying_on`` (``carries_on``)."""
+    token = _at_work.set(actor)
+    carried = _carried_on.set(frozenset(carrying_on))
+    try:
+        yield
+    finally:
+        _carried_on.reset(carried)
+        _at_work.reset(token)
+
+
 def brought_back(actor: str) -> bool:
     """Whether an event's ``actor``, as the outbox keeps it, is a recovery's: what it records came back from a separate
     copy, and is nothing new to the business."""
@@ -37,7 +73,8 @@ def brought_back(actor: str) -> bool:
 class Recoverable:
     """What an app gives back from a separate copy of its business (``recoverable_from_copy`` on its config).
 
-    - ``label``: what the staff reads (a lazy translation: «Customers»);
+    - ``label``: what the staff reads, a lazy translation without a context («Customers»): a recovery keeps it as the
+      code writes it, counted apart from the app's other things, and Recoveries says it in its reader's language;
     - ``reads_since``: the app's migration whose schema ``read`` reads (its tables and columns are there since);
     - ``read(conn)``: the records the copy holds, through ``conn``, the copy's direct read-only connection (its own SQL
       over its model's names, never the ORM): each a ``dict`` with its ``id`` in the copy and the input of ``create``;
@@ -45,8 +82,10 @@ class Recoverable:
     - ``create``: the operation of the app that creates each, the one its screen uses;
     - ``deleted(records)`` and ``restore``, together or neither, for an app whose deletion keeps the record: those the
       business still holds deleted, read in the business (its ``queries.py``), and the operation of the app that brings
-      each back, the same record with all that hangs from it, given its ``id`` (hub#1306). They come back before the
-      missing are created, so ``missing`` never counts them.
+      each back, the same record with all that hangs from it (hub#1306). It is given, of the record as ``read`` found
+      it, what its input declares: the ``id`` and whatever else it gives back to the record that the business lost
+      since (a group it deleted, hub#1356). They come back before the missing are created, so ``missing`` never counts
+      them.
     """
 
     label: Any
@@ -60,3 +99,33 @@ class Recoverable:
     def __post_init__(self) -> None:
         if (self.deleted is None) != (not self.restore):
             raise ValueError("A Recoverable restores what it reads deleted: deleted and restore come together.")
+
+
+class LeftOut(Schema):
+    """One thing a record came back without, and why: ``code`` (``<app>.<why>``) and ``message``, said in the language
+    the operation runs in, which a recovery sets to the staff's."""
+
+    code: str
+    message: str
+
+
+class RecoveredOut(Schema):
+    """Mixed into the output of an operation a recovery runs (a ``Recoverable``'s ``create`` or ``restore``) whose
+    record may come back without something that hung from it in the copy (a professional who has left since): the
+    recovery notes each by the record's id in the copy, as it notes why one did not come back at all. An output without
+    it notes nothing."""
+
+    left_out: list[LeftOut] = Field(
+        default_factory=list, description="What the record came back without, each with why."
+    )
+
+
+class ImageInCopyIn(Schema):
+    """Mixed into the input of an operation a recovery runs whose record showed an image in the copy: the platform
+    gives it as ``read`` found it, and the operation keeps what ``base.images.from_copy`` lets come back."""
+
+    image: Annotated[str, StringConstraints(strip_whitespace=True, max_length=200)] = Field(
+        "",
+        description="The image it showed in the copy: one of the shared library (catalog:<folder>/<name>) comes back "
+        "with it, a photo of its own does not (a copy is of the database, not of the files).",
+    )

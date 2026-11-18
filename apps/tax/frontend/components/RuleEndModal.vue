@@ -72,6 +72,7 @@ const canDismiss = useUnsavedFormOnOpen('tax-rule-end', validTo, open);
       </p>
       <ion-input
         data-testid="tax-rule-end-valid_to"
+        name="valid_to"
         type="date"
         :value="validTo"
         :label="$t('tax.rules.end.field')"

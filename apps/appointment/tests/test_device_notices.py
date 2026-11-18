@@ -13,17 +13,17 @@ from live.operations import get
 
 from base.schemas import NoticeListIn
 
-from .conftest import MONDAY, at, ctx_for, make_appointment, make_customer
+from .conftest import HUB_DB, MONDAY, at, ctx_for, make_appointment, make_customer
 from .test_queries import TUESDAY, employee_linked_to
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 
 @pytest.fixture(autouse=True)
 def citas_on(monkeypatch):
     """Citas on in the hub of the tests (the photo of the SaaS says which apps are on)."""
     monkeypatch.setattr(
-        "base.queries.active_apps", lambda scope: frozenset({"base", "appointment", "customer", "service", "staff", "schedule"})
+        "base.queries.home.active_apps", lambda scope: frozenset({"base", "appointment", "customer", "service", "staff", "schedule"})
     )
 
 

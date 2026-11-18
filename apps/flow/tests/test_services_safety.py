@@ -11,7 +11,6 @@
 from dataclasses import replace
 
 import pytest
-from live.context import Scope
 from live.errors import InvalidPayload, PermissionDenied
 from live.operations import get
 
@@ -19,9 +18,9 @@ from apps.flow import services
 from apps.flow.models import FlowRun
 from apps.sale.models import Order
 
-from .conftest import A, TASK_STEP, ctx_for, make_flow, run
+from .conftest import A, HUB_DB, TASK_STEP, ctx_for, make_flow, run
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 VOID = {"id": "s1", "kind": "command", "operation": "sale.order.void", "params": {"order_id": "input.order_id"}}
 
@@ -83,7 +82,7 @@ def test_a_step_acts_only_with_its_own_permission_so_an_operation_s_checks_still
 def test_the_step_context_holds_its_operation_s_permission_and_its_app_s_reads():
     flow = make_flow()
     started = FlowRun.objects.create(flow=flow, flow_version=1, trigger_kind="manual", trigger_key="k")
-    ctx = services._step_context(ctx_for(scope=Scope("host", "a")), started, flow, get("task.task.create"))
+    ctx = services._step_context(ctx_for(scope=A), started, flow, get("task.task.create"))
     assert ctx.permissions == frozenset({"task.add", "task.view", "task.view_all"})
     assert ctx.actor == f"flow_run:{started.id}"
     assert not ctx.has("task.delete") and not ctx.has("customer.view")

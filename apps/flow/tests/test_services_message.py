@@ -14,17 +14,16 @@ from live.errors import InvalidPayload
 
 from apps.flow import queries
 from apps.whatsapp_inbox.models import Message
-from apps.whatsapp_inbox.tests.conftest import connect, receive, system, template
+from apps.whatsapp_inbox.tests.conftest import connect, receive, template
 from apps.whatsapp_inbox.tests.conftest import ctx_for as inbox_ctx_for
 from apps.whatsapp_inbox.tests.test_template_header_file import hub_files  # noqa: F401 - fixture
 from apps.whatsapp_inbox.tests.test_template_header_file import upload
 
 from base.tenancy.context import use_hub
-from base.tenancy.tests import hubs
 
-from .conftest import A, ctx_for, run
+from .conftest import A, HUB_DB, ctx_for, run
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 NOTIFY = "whatsapp_inbox.message.notify"
 STEP = {
@@ -65,7 +64,7 @@ def test_granting_it_is_allowed_and_granting_the_inbox_s_send_still_needs_a_pers
 
 def test_a_run_sends_to_the_customer_s_conversation_and_a_refusal_is_its_reason_in_the_history():
     connect()
-    receive("wamid.IN", sent_at=(timezone.now() - dt.timedelta(minutes=10)).isoformat())
+    receive("wamid.IN", sent_at=(timezone.now() - dt.timedelta(minutes=10)).isoformat(), scope=A)
     flow_id = automation()
 
     done = run("flow.flow.run", {"id": flow_id, "input": {"phone": "+34600111222", "name": "Ana"}})
@@ -100,8 +99,8 @@ def photo_automation(template_params: dict, ctx=None) -> str:
 @pytest.mark.usefixtures("hub_files")
 def test_a_template_with_a_photo_at_the_top_goes_with_the_file_the_step_chose():
     connect(templates=[template(MANAGER_PHOTO, header_format="IMAGE", body="¡Hola {{1}}!", variables=1)])
-    receive("wamid.IN", sent_at=(timezone.now() - dt.timedelta(minutes=10)).isoformat())
-    chosen = upload(name="carta-otono.jpg")
+    receive("wamid.IN", sent_at=(timezone.now() - dt.timedelta(minutes=10)).isoformat(), scope=A)
+    chosen = upload(name="carta-otono.jpg", ctx=inbox_ctx_for(scope=A))
     flow_id = photo_automation(
         {"name": MANAGER_PHOTO, "language": "es", "variables": ["{{input.name}}"], "header_sample": str(chosen.id)}
     )
@@ -121,7 +120,7 @@ def test_a_template_with_a_photo_at_the_top_goes_with_the_file_the_step_chose():
 @pytest.mark.usefixtures("hub_files")
 def test_without_the_file_it_asks_for_nothing_is_sent_and_the_history_says_why():
     connect(templates=[template(MANAGER_PHOTO, header_format="IMAGE", body="¡Hola {{1}}!", variables=1)])
-    receive("wamid.IN", sent_at=(timezone.now() - dt.timedelta(minutes=10)).isoformat())
+    receive("wamid.IN", sent_at=(timezone.now() - dt.timedelta(minutes=10)).isoformat(), scope=A)
     flow_id = photo_automation({"name": MANAGER_PHOTO, "language": "es", "variables": ["Ana"]})
 
     failed = run("flow.flow.run", {"id": flow_id, "input": {"phone": "+34600111222"}})
@@ -131,7 +130,7 @@ def test_without_the_file_it_asks_for_nothing_is_sent_and_the_history_says_why()
     assert not Message.objects.filter(direction="outbound").exists()
 
 
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
+@HUB_DB
 @pytest.mark.usefixtures("hub_files", "no_test_fallback")
 def test_a_file_of_another_business_is_never_sent(hub_a, hub_b):
     """Another business's file lives in its own database: an automation here that names it finds none and sends
@@ -140,17 +139,7 @@ def test_a_file_of_another_business_is_never_sent(hub_a, hub_b):
     with use_hub(hub_b):
         theirs = upload(ctx=inbox_ctx_for(scope=theirs_scope))
     with use_hub(hub_a):
-        system(
-            "whatsapp_inbox.channel.sync",
-            {
-                "version": 1,
-                "status": "connected",
-                "phone_number": "+34910000000",
-                "monthly_limit": 150,
-                "templates": [template(MANAGER_PHOTO, header_format="IMAGE", body="¡Hola {{1}}!", variables=1)],
-            },
-            ours,
-        )
+        connect(templates=[template(MANAGER_PHOTO, header_format="IMAGE", body="¡Hola {{1}}!", variables=1)])
         receive("wamid.IN", sent_at=(timezone.now() - dt.timedelta(minutes=10)).isoformat(), scope=ours)
         flow_id = photo_automation(
             {"name": MANAGER_PHOTO, "language": "es", "variables": ["Ana"], "header_sample": str(theirs.id)},

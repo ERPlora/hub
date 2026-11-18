@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:57b39908820422fec44930f4965b48a0b8b6b6d7b51e4adb7f8e4a6abf645f67 -->
+<!-- generated from WORKBOOK.md sha256:445f7a278f1b7b84574ff69079e27be9588e00f522c8e7679d5607430a56581d -->
 
 ## What it is for and who it is for
 
@@ -63,7 +63,7 @@ but not the quantity left on the till, which does not exist here. Also:
 - **The item's photo on the till's tile and, without a photo, its initials over a colour**: Square (the
   item's image or, without one, its colour and its abbreviation), Loyverse (image, or colour and shape)
   and Shopify POS (the product's image on the grid). The photo is chosen from ERPlora's library or
-  uploaded from the product's card, and it travels in the business's backup, as in the current product.
+  uploaded from the product's card, and it travels in the business's backup.
 
 ## Before you start
 
@@ -428,13 +428,19 @@ In: the chosen category.
 Out: the category is deleted and all its products, active or not, unlinked in the same step; the
 products stay. The till stops grouping them under it.
 A category deleted by mistake is recovered by the ERPlora staff from a separate copy (BASE-F114): it comes back as a
-new one, with its name, slug, description, icon, colour, order and tax category, before the products, and in it the
-products that come back with the recovery: those the business deleted and still holds (the same ones, INVENTORY-F34)
-and those it no longer has (created again). A category the business keeps, even renamed, is the same one and is not
-repeated; nor is one it made again with its name (case and spaces aside): its own is used, as it is. The products the
-business keeps live stay as they are, without it (hub#1373).
+new one, with its name, slug, description, icon, colour, order and tax category, before the products, and with what it
+had inside in the copy: the products the business deleted and still holds (the same ones, INVENTORY-F34), those it no
+longer has (created again) and, last, those the business keeps live, which go back into it without losing any other
+category. Recoveries counts those links apart ("Product links to categories"). A category the business keeps, even
+renamed or with products taken out of it since, is the same one: it is neither repeated nor filled; nor is one it made
+again with its name (case and spaces aside): its own is used, as it is, and only the products created again go into it.
+A deleted product that comes back (INVENTORY-F34) does not go into the one the business made again by hand. The
+category that comes back also gets back its modifier groups, if Modifiers is recovered too (MODIFIER-F10); the one the
+business made again by hand keeps those it linked to it.
+If the recovery is asked again from a copy made before the category it brought back, that category still counts as
+brought back: the live products the business took out of it since go back into it.
 If it fails: "The category could not be deleted" (or the reason) above the table.
-Involved: KITCHEN-F04, SALE-F01, BASE-F114, INVENTORY-F34
+Involved: KITCHEN-F04, SALE-F01, BASE-F114, INVENTORY-F34, MODIFIER-F10
 
 ### INVENTORY-F08 Group products into categories for the till
 Status: done
@@ -982,8 +988,10 @@ Out: the item with its library image. The business does not keep a copy of the i
 is, so it does not use space of its plan. Inventory tells of the change (`inventory.product.updated`) and
 the till shows it without reloading (INVENTORY-F32). Choosing another one replaces it; if the previous
 one was an own photo (INVENTORY-F31), it is deleted from the business's folder. "Remove photo" leaves the
-item with its initials. The candidates come from `inventory.product.suggest_image`, the search is
-`base.catalog_image.search` and the photo is set or removed by `inventory.product.set_image`.
+item with its initials. Deleting the item leaves it its library image (only an own photo is deleted), and if the
+ERPlora staff recover it from a separate copy it comes back with the one it had (INVENTORY-F34, BASE-F114). The
+candidates come from `inventory.product.suggest_image`, the search is `base.catalog_image.search` and the photo is set
+or removed by `inventory.product.set_image`.
 If it fails: if the library does not answer, "The image library could not be loaded." with "Retry", and
 the product can still be saved without a photo. No results: "No image matches your search. Try another
 word or upload a photo.". The assistant that finds no candidates says so and proposes uploading a photo
@@ -992,7 +1000,7 @@ from the card. An image the library no longer has is refused when the photo is s
 another one." with "Retry", and the item keeps the photo it had (through the assistant or the API
 nothing is saved). Whoever cannot change products does not see "Photo", and the app also refuses it
 through the assistant or the API.
-Involved: INVENTORY-F01, INVENTORY-F02, INVENTORY-F32, BASE-F93
+Involved: INVENTORY-F01, INVENTORY-F02, INVENTORY-F32, INVENTORY-F34, BASE-F93, BASE-F114
 
 ### INVENTORY-F31 Upload the item's own photo
 Status: done
@@ -1070,7 +1078,6 @@ WebP of up to 2 MB makes the file unreadable ("The file holds a photo that is no
 Involved: BASE-F31, BASE-F34, BASE-F35, BASE-F36, BASE-F37, INVENTORY-F12
 
 ### INVENTORY-F34 Recover a deleted product
-<!-- origen: nuevo (BASE-F114: recuperar desde una copia aparte lo que el negocio perdió) gh:hub#1321 -->
 Status: done
 Actor: the ERPlora staff, when the business asks (in the business no screen undoes a deletion)
 Screen: none of the business; the Hubs admin › Separate copies › "Recover into the business…" (BASE-F114)
@@ -1080,21 +1087,27 @@ Steps:
    (BASE-F114, steps 6 to 11).
 3. Each product the business deleted and still holds comes back to **Products**, to the till and to the sale
    catalog: THE SAME product, with its SKU, its EAN-13, its categories that are still live and the one that comes back
-   with the recovery if the business deleted it afterwards (INVENTORY-F07), its tax category and its stock, and in **Movements** its whole history (initial, receptions, sales, counts and write-offs) is still its own.
+   with the recovery if the business deleted it afterwards (INVENTORY-F07), its tax category, its stock and its image
+   of the library, and in **Movements** its whole history (initial, receptions, sales, counts and write-offs) is still its own.
    It comes back active and on sale, as unarchiving does in Odoo or Square: if it was deactivated or marked as sold
    out before it was deleted, that is done again by hand (INVENTORY-F03, INVENTORY-F29). Recoveries counts it among
    the restored Products.
-In: the deleted product, by its identifier.
-Out: the product live again, active and on sale, with none of its other data changed, and the product-recovered
-notice (`inventory.product.restored`), with the product as it comes back.
+In: the deleted product, by its identifier, and the image it had in the copy.
+Out: the product live again, active and on sale, with none of its other data changed (but for the image of the
+library it gets back if it had none), and the product-recovered notice (`inventory.product.restored`), with the
+product as it comes back.
 If it fails: it does not come back if the business has already made another product with its SKU or its EAN-13 since
 it deleted it: the one it made stays, and the recovery neither counts nor creates it. A product the business no longer
-has at all is created again (INVENTORY-F01), with no stock. On a live product it does not fail: it answers well and
-announces again. Its photo does not come back: its own was erased when it was deleted (INVENTORY-F31) and the library
-one was taken off it (hub#1319). What the other apps hung from it (its prices in the price lists, its modifier groups,
-its options in the menus) was erased when it was deleted and does not come back with it yet (hub#1343).
-Involved: BASE-F114, INVENTORY-F01, INVENTORY-F03, INVENTORY-F04, INVENTORY-F07, INVENTORY-F16, INVENTORY-F29,
-PRICING-F14, MODIFIER-F09, COMBO-F13
+has at all is created again (INVENTORY-F01), with no stock, with the image of the library it had in the copy. On a
+live product it does not fail: it answers well and announces again. Its own photo does not come back: it was erased
+when it was deleted (INVENTORY-F31). The image of the library does, because deleting leaves it; one deleted before
+deleting left it, which was left without any, gets back the one it had in the copy, unless the library no longer has
+it. Its discount rules in Price Lists are switched back on by
+themselves (PRICING-F14) and its prices in the price lists come back if Price Lists is recovered too (PRICING-F15),
+its modifier groups, if Modifiers is recovered too (MODIFIER-F10), and its choices in the menus, if Menus is recovered
+too (COMBO-F15).
+Involved: BASE-F114, INVENTORY-F01, INVENTORY-F03, INVENTORY-F04, INVENTORY-F07, INVENTORY-F16, INVENTORY-F29, INVENTORY-F30,
+PRICING-F14, PRICING-F15, MODIFIER-F09, MODIFIER-F10, COMBO-F13, COMBO-F15
 
 ## What the verticals share
 
@@ -1161,7 +1174,7 @@ or what no longer exists, is left out.
 | Marks a product as sold out or puts it back on sale | change products | one tap | F29 | `inventory.product.set_sold_out` |
 | Sets a product's photo, from the library, or removes it | change products | one tap | F30 | `inventory.product.set_image` |
 | Uploads a product's own photo (JPG, PNG or WebP of up to 2 MB; kept as a 512 × 512 WebP) | change products | not the assistant's: the file is chosen on the card | F31 | `inventory.product.upload_image` |
-| Adds a product to a category | change products | one tap | F08 | `inventory.product_category.add` |
+| Adds a product to a category (also the platform, when recovering a deleted category from a separate copy with the products the business keeps) | change products | one tap | F08, F07 | `inventory.product_category.add` |
 | Removes a product from a category | change products | one tap | F08 | `inventory.product_category.remove` |
 | Creates a category | create categories | one tap | F06 | `inventory.category.create` |
 | Creates many categories at once, with a report per row | create categories | one tap | F10 | `inventory.category.bulk_create` |

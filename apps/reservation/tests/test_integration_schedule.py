@@ -10,6 +10,7 @@ from live.errors import Conflict
 
 from .conftest import (
     A,
+    HUB_DB,
     THURSDAY,
     book,
     ctx_for,
@@ -19,7 +20,7 @@ from .conftest import (
     set_week_hours,
 )
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 EMPLOYEE = "hub_employee"
 

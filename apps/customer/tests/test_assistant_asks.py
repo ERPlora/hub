@@ -8,6 +8,7 @@ each.
 """
 
 import pytest
+from live import assistant as shared
 from live.errors import Conflict
 from live.operations import AI, registry
 
@@ -15,12 +16,10 @@ from apps.customer.models import Customer
 from apps.customer.schemas import MergeIn
 from base import assistant
 from base.models import Membership
-from base.tests.test_assistant_asks import (
-    assert_its_asks_bring,
-    catalog_of,  # noqa: F401 (a fixture: the tests below take it by name)
-)
+from base.tests.test_assistant_asks import assert_its_asks_bring, offered_to
+from base.tests.test_assistant_asks import english_words_test, said_in_spanish_too_test
 
-from .conftest import ctx_for
+from .conftest import HUB_DB, ctx_for, in_hubs
 
 #: Writes on cards and settings that only the owner and the admin hold, none of them a manager approves: an employee's
 #: assistant is never offered them (an approvable write is, as its button on the screen: running it asks a manager).
@@ -38,7 +37,7 @@ def test_customer_offers_at_least_30_tools():
     assert len(tools) >= 30
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 def test_an_employee_is_never_offered_what_only_the_owner_may_do(catalog_of):
     owner = catalog_of(Membership.Role.OWNER, "es")
     employee = catalog_of(Membership.Role.EMPLOYEE, "es")
@@ -63,13 +62,13 @@ ORDER_PHRASES = [
 WITH_ROOM = 7
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize("role", [Membership.Role.OWNER, Membership.Role.MANAGER])
 @pytest.mark.parametrize(("language", "name", "phrase"), ORDER_PHRASES)
 def test_a_customers_orders_bring_the_tool_of_customers_with_room_to_spare(catalog_of, role, language, name, phrase):
     tools = catalog_of(role, language)
     assert name in tools  # positive control: the role holds the tool, so its place is known
-    offered = [op.name for op in assistant.relevant(tools, [phrase], language)]
+    offered = offered_to(tools, phrase, language)
     assert name in offered[:WITH_ROOM], (offered.index(name) + 1 if name in offered else None, offered[:WITH_ROOM])
 
 
@@ -85,7 +84,7 @@ OWN_WORDS = [
 ]
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize("role", [Membership.Role.OWNER, Membership.Role.MANAGER])
 @pytest.mark.parametrize(("language", "name", "phrase"), OWN_WORDS)
 def test_a_customers_orders_in_the_persons_own_words_reach_their_tool_by_its_asks(
@@ -94,7 +93,18 @@ def test_a_customers_orders_in_the_persons_own_words_reach_their_tool_by_its_ask
     assert_its_asks_bring(catalog_of(role, language), name, phrase, language)
 
 
-@pytest.mark.django_db
+#: What the owner says in English in words of their own for the order tool whose English words above its English
+#: asks do not lift (the Spanish asks say the same), neither an ask nor a probe of layer 2: here they do.
+OWN_WORDS_EN = [
+    ("customer.order.customer", "whose is this one?"),
+]
+test_a_request_in_english_is_lifted_by_its_english_asks = in_hubs(english_words_test(OWN_WORDS_EN))
+#: The order tool whose English asks say nothing its Spanish asks or description do not: no English phrase depends
+#: on them, so what sees them change is that they keep saying nothing else.
+test_the_english_asks_that_say_nothing_new_keep_saying_nothing_new = said_in_spanish_too_test(["customer.order.list"])
+
+
+@HUB_DB
 def test_a_phrase_that_says_nothing_of_the_asks_is_refused_as_a_persons_own_words(catalog_of):
     """Positive control of ``assert_its_asks_bring``: a probe of layer 2, an ask with a word added, a phrase that
     brings ``customer.order.customer`` by name alone («which customer is this order for?», ``ORDER_PHRASES``: 4th
@@ -133,18 +143,18 @@ MERGE_BY_TWO_PHONES = [
 ]
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize(("language", "phrase"), MERGE_BY_TWO_PHONES)
 def test_a_merge_by_two_phones_offers_the_existing_operation_with_room_to_spare(catalog_of, language, phrase):
     tools = catalog_of(Membership.Role.OWNER, language)
     name = "customer.customer.merge"
     assert name in tools  # positive control: the owner holds it, so the model can receive it
-    offered = [op.name for op in assistant.relevant(tools, [phrase], language)]
+    offered = offered_to(tools, phrase, language)
     assert name in offered[:WITH_ROOM], (offered.index(name) + 1 if name in offered else None, offered[:WITH_ROOM])
 
 
 def test_the_merge_instruction_completes_the_action_with_human_references():
-    description = assistant.description(registry["customer.customer.merge"])
+    description = shared.description(registry["customer.customer.merge"])
     for expected in (
         "Use this tool once both cards are known",
         "do not stop at reading or explaining",
@@ -167,7 +177,7 @@ def test_the_merge_schema_distinguishes_the_survivor_from_the_duplicate():
         assert "duplicate" in properties[name]["description"]
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_reported_merge_keeps_its_confirmation_and_absorbs_the_right_card():
     survivor = Customer.objects.create(name="Ana QA", phone="+34611222333")
     duplicate = Customer.objects.create(name="Ana QA copia", phone="+34611222444")
@@ -175,7 +185,7 @@ def test_the_reported_merge_keeps_its_confirmation_and_absorbs_the_right_card():
     arguments = {"customer": "611 222 333", "absorbed": "611 222 444"}
     ctx = ctx_for("hub_owner", language="es")
 
-    card = assistant.card(op, arguments, "es", ctx)
+    card = assistant.cards.card(op, arguments, "es", ctx)
     assert op.ai_spec().risk == "high"
     assert [(field["name"], field["value"]) for field in card["fields"]] == [
         ("customer", "Ana QA"),
@@ -189,7 +199,7 @@ def test_the_reported_merge_keeps_its_confirmation_and_absorbs_the_right_card():
     assert survivor.name == "Ana QA"
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_merge_whose_survivor_fits_two_cards_leaves_it_out_of_the_card_and_merges_nothing():
     """The written reference is no name: with two «Ana» the card cannot say which one stays, so it leaves that datum
     out (as an id it cannot name), and the merge refuses: it never merges into the first card that fits."""
@@ -200,7 +210,7 @@ def test_a_merge_whose_survivor_fits_two_cards_leaves_it_out_of_the_card_and_mer
     arguments = {"customer": "Ana", "absorbed": "611 222 444"}
     ctx = ctx_for("hub_owner", language="es")
 
-    card = assistant.card(op, arguments, "es", ctx)
+    card = assistant.cards.card(op, arguments, "es", ctx)
     assert [(field["name"], field["value"]) for field in card["fields"]] == [("absorbed", "Ana QA copia")]
 
     with pytest.raises(Conflict) as excinfo:

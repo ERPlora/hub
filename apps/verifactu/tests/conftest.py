@@ -5,6 +5,10 @@ reaction, in place of the relay.
 The only stand-in is the SaaS's gateway (``gateway_answers``): its transport is replaced and it answers with the
 AEAT's **real** answers kept in ``fixtures/`` (accepted, accepted with errors, duplicate, fault), rewritten only
 to name the invoices of the test. Nothing the AEAT says is invented.
+
+Every test that uses the database works as production does: inside the business ``A``'s own database
+(``in_business_a``), never on control's. A test of two businesses also enters the business ``B``'s
+(``in_business_b``).
 """
 
 import base64
@@ -24,9 +28,19 @@ from live.meta import all_live_app_configs, permissions_for_role
 from live.operations import get
 
 from apps.verifactu import gateway
+from base.tenancy.context import use_hub
+from base.tenancy.tests.business import (
+    HOST,
+    HUB_DB,
+    HUB_DB_COMMITTED,
+    A,
+    B,
+    factory_data,
+    factory_data_b,
+    in_business_a,
+)
+from base.tenancy.tests.concurrency import plan_with_room
 
-A = Scope("host", "a")
-B = Scope("host", "b")
 FIXTURES = Path(__file__).parent / "fixtures"
 ISSUER = {
     "legal_name": "Peluquería Ana SL",
@@ -93,7 +107,17 @@ def manual(lines=None, **more):
     return run("invoice.invoice.create", data)
 
 
-def business_in(country: str, slug: str = "a") -> None:
+def ticket(scope: Scope = A):
+    """A one-line ticket issued in the business of ``scope`` through Invoicing's own operation."""
+    lines = [{"description": "Cut", "quantity": "1", "unit_price": 1000, "tax_rate": "21"}]
+    return run("invoice.invoice.create", {"lines": lines, "series_code": "TICKET"}, ctx_for(scope=scope))
+
+
+def codes(waits) -> set[str]:
+    return {wait.code for wait in waits}
+
+
+def business_in(country: str, slug: str = A.key) -> None:
     """The country erplora.com registered for the business of ``slug`` (``PUT /internal/hubs/{id}``)."""
     from base.models import Hub  # the models are not loaded yet when this module is
 
@@ -108,6 +132,13 @@ def poland_and_spain(hub_a, hub_b, no_test_fallback) -> tuple[Scope, Scope]:
     return Scope("host", hub_a.slug), Scope("host", hub_b.slug)
 
 
+@pytest.fixture
+def in_business_b(hub_b):
+    """``in_business_b()``: the business ``B`` (``hub_b``) entered until the block ends."""
+    assert hub_b.slug == B.key, f"hub_b is {hub_b.slug!r}, not the scope B of these tests"
+    return lambda: use_hub(hub_b)
+
+
 @pytest.fixture(autouse=True)
 def english():
     with translation.override("en"):
@@ -116,7 +147,7 @@ def english():
 
 @pytest.fixture
 def make_user(db):
-    def make(username: str = "ana", *, host: str | None = "a", role: str = "hub_admin"):
+    def make(username: str = "ana", *, host: str | None = A.key, role: str = "hub_admin"):
         from django.contrib.auth import get_user_model
 
         from base.models import Membership
@@ -177,27 +208,22 @@ def at_emission(monkeypatch):
 
 
 @pytest.fixture
-def committed_factory_data(transactional_db):
-    """A transactional test starts from a flushed database: tax's factory catalogue and the factory payment
-    methods are planted again, as their migrations do (idempotent); then the issuer."""
-    from importlib import import_module
-
-    from django.apps import apps as registry
-    from django.db import connection
-
-    with connection.schema_editor() as editor:
-        for module in (
-            "apps.tax.migrations.0002_factory_catalogue",
-            "apps.tax.migrations.0005_retail_alcohol",
-            "apps.sale.migrations.0002_factory_payment_methods",
-        ):
-            import_module(module).plant(registry, editor)
+def committed_factory_data(factory_data):
+    """A transactional test starts from flushed businesses: the business ``A``'s factory data and issuer."""
     run("invoice.issuer.update", ISSUER)
 
 
 @pytest.fixture
+def committed_factory_data_b(factory_data_b, in_business_b):
+    """The business ``B``'s factory data and issuer, for a transactional test that works in it too."""
+    with in_business_b():
+        run("invoice.issuer.update", ISSUER, ctx_for(scope=B))
+
+
+@pytest.fixture
 def db_dsn(django_db_setup):
-    """DSN of the test database, for raw psycopg sessions (reading only what is committed)."""
+    """DSN of control's test database, for raw psycopg sessions: every business's live notices are sent there, each on
+    its scope's channel (``live.outbox.notify``)."""
     from django.db import connections
     from psycopg.conninfo import make_conninfo
 
@@ -350,6 +376,7 @@ def scope_b():
 #: (0.4.0.1862.1.6 → 0.4.0.1862.1.6.2), DER-encoded by hand: the library writes it, it does not build it.
 QC_STATEMENTS = x509.ObjectIdentifier("1.3.6.1.5.5.7.1.3")
 QC_TYPE_ESEAL = bytes.fromhex("3015" + "3013" + "06060400" + "8e460106" + "3009" + "060704008e46010602")
+TEST_AUTHORITY = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, "ERPlora Test Authority")])
 _KEYS: list = []
 
 
@@ -361,12 +388,13 @@ def make_p12(
     days: int = 365,
     password: bytes = b"secret",
     eseal: bool = False,
+    self_signed: bool = False,
 ) -> bytes:
-    """A .p12 made for the test (self-signed, never a real certificate) whose subject and usages are the
-    ones asked: ``None`` leaves an attribute (or the Extended Key Usage) out."""
-    if not _KEYS:
+    """A .p12 made for the test (never a real certificate) whose subject and usages are the ones asked: ``None``
+    leaves an attribute (or the Extended Key Usage) out. ``TEST_AUTHORITY`` issues it, or its own key signs it."""
+    while len(_KEYS) < 2:
         _KEYS.append(rsa.generate_private_key(public_exponent=65537, key_size=2048))
-    key = _KEYS[0]
+    key, authority_key = _KEYS
     attributes = [x509.NameAttribute(NameOID.COMMON_NAME, "ACME SL")]
     if org_id:
         attributes.append(x509.NameAttribute(NameOID.ORGANIZATION_IDENTIFIER, org_id))
@@ -377,7 +405,7 @@ def make_p12(
     builder = (
         x509.CertificateBuilder()
         .subject_name(name)
-        .issuer_name(name)
+        .issuer_name(name if self_signed else TEST_AUTHORITY)
         .public_key(key.public_key())
         .serial_number(1)
         .not_valid_before(now - dt.timedelta(days=max(1, -days + 1)))
@@ -394,7 +422,7 @@ def make_p12(
         builder = builder.add_extension(
             x509.UnrecognizedExtension(QC_STATEMENTS, QC_TYPE_ESEAL), critical=False
         )
-    cert = builder.sign(key, hashes.SHA256())
+    cert = builder.sign(key if self_signed else authority_key, hashes.SHA256())
     return pkcs12.serialize_key_and_certificates(
         b"test", key, cert, None, serialization.BestAvailableEncryption(password)
     )

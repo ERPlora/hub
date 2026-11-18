@@ -6,25 +6,26 @@ A delivery the relay gives up on is told to its hub's live queries too (the bell
 import datetime as dt
 import json
 
-import psycopg
 import pytest
-from django.db import connections
 from django.utils import timezone
 from live.assistant import description
-from live.context import OperationContext, Scope
+from live.context import OperationContext
 from live.errors import Conflict, NotFound, PermissionDenied
 from live.live_registry import live_registry
 from live.models import OutboxEvent
 from live.operations import get
-from live.outbox import channel_for
-from psycopg.conninfo import make_conninfo
 
-from base import events, relay, services
+from base import events, relay
+from base.services import relay_runs
 from base.models import EventDelivery
+from base.tenancy.tests.business import HOST, HUB_DB, HUB_DB_COMMITTED, A, B, in_business_a
 from base.tests.routes import assert_bound
+from base.tests.test_queries_home import listen
 
-A = Scope("host", "a")
-B = Scope("host", "b")
+__all__ = ["in_business_a", "listen"]
+
+pytestmark = HUB_DB
+
 ADMIN = "base.administer_hub"
 
 
@@ -38,6 +39,8 @@ def run(name, context=None, **data):
 
 
 def dead(scope=A, app="invoice", name="sale.sale.completed", status=EventDelivery.Status.DEAD):
+    """A delivery the relay gave up on, in the business at work; one with another business's scope stands for a row no
+    command of this business may touch."""
     outbox_event = OutboxEvent.objects.create(
         scope_kind=scope.kind, scope_key=scope.key, name=name, delivered_at=timezone.now()
     )
@@ -67,7 +70,6 @@ def test_each_command_is_for_who_runs_the_business_and_told_to_the_assistant(nam
 # ── Resend one ───────────────────────────────────────────────────────────────────────────────────────────────
 
 
-@pytest.mark.django_db
 def test_resending_puts_it_back_in_the_queue_with_its_attempts_at_zero():
     delivery = dead()
     before = timezone.now()
@@ -77,10 +79,9 @@ def test_resending_puts_it_back_in_the_queue_with_its_attempts_at_zero():
     delivery.refresh_from_db()
     assert (delivery.status, delivery.attempts, delivery.last_error) == ("pending", 0, "")
     assert delivery.next_attempt_at >= before
-    assert recorded(events.FAILED_EVENT_RETRIED) == [("a", {"id": str(delivery.id), "count": 1})]
+    assert recorded(events.FAILED_EVENT_RETRIED) == [(A.key, {"id": str(delivery.id), "count": 1})]
 
 
-@pytest.mark.django_db
 def test_resent_it_is_delivered_only_to_the_app_that_had_failed():
     delivery = dead()
     other = EventDelivery.objects.create(
@@ -89,10 +90,11 @@ def test_resent_it_is_delivered_only_to_the_app_that_had_failed():
     run("base.failed_event.retry", id=str(delivery.id))
     got = []
 
-    services.relay_deliver_next(
+    relay_runs.relay_deliver_next(
         timezone.now(),
         deliver=lambda app, event: got.append((app, event.name)),
         listeners=lambda _: [],
+        carried=relay.carried,
         max_depth=relay.MAX_EVENT_DEPTH,
         max_attempts=relay.MAX_ATTEMPTS,
         backoff=relay.backoff,
@@ -104,7 +106,6 @@ def test_resent_it_is_delivered_only_to_the_app_that_had_failed():
     assert (delivery.status, other.status) == ("delivered", "delivered")
 
 
-@pytest.mark.django_db
 @pytest.mark.parametrize("status", [EventDelivery.Status.PENDING, EventDelivery.Status.DELIVERED])
 def test_only_a_failed_event_is_resent(status):
     delivery = dead(status=status)
@@ -113,7 +114,6 @@ def test_only_a_failed_event_is_resent(status):
         run("base.failed_event.retry", id=str(delivery.id))
 
 
-@pytest.mark.django_db
 def test_another_hubs_failed_event_is_not_found_and_left_alone():
     delivery = dead(B)
 
@@ -126,13 +126,11 @@ def test_another_hubs_failed_event_is_not_found_and_left_alone():
     assert delivery.status == "dead"
 
 
-@pytest.mark.django_db
 def test_an_unknown_id_is_not_found():
     with pytest.raises(NotFound):
         run("base.failed_event.retry", id="0190f3a4-b5c6-7d8e-9fa0-b1c2d3e4f5a6")
 
 
-@pytest.mark.django_db
 def test_a_failed_event_for_an_app_that_is_not_on_is_refused_with_why(monkeypatch):
     monkeypatch.setattr("base.entitlement.blocked_apps", lambda scope: frozenset({"invoice"}))
     delivery = dead()
@@ -145,7 +143,6 @@ def test_a_failed_event_for_an_app_that_is_not_on_is_refused_with_why(monkeypatc
     assert delivery.status == "dead"
 
 
-@pytest.mark.django_db
 def test_a_cashier_cannot_resend_nor_discard():
     delivery = dead()
     cashier = ctx("base.view_home")
@@ -160,7 +157,6 @@ def test_a_cashier_cannot_resend_nor_discard():
 # ── Resend all ───────────────────────────────────────────────────────────────────────────────────────────────
 
 
-@pytest.mark.django_db
 def test_resending_all_resends_every_failed_event_of_this_hub_that_can_be(monkeypatch):
     monkeypatch.setattr("base.entitlement.blocked_apps", lambda scope: frozenset({"kitchen"}))
     mine = [dead() for _ in range(120)]  # more than the list shows
@@ -176,10 +172,9 @@ def test_resending_all_resends_every_failed_event_of_this_hub_that_can_be(monkey
     for delivery, status in ((stuck, "dead"), (discarded, "discarded"), (theirs, "dead")):
         delivery.refresh_from_db()
         assert delivery.status == status
-    assert recorded(events.FAILED_EVENT_RETRIED) == [("a", {"count": 120})]
+    assert recorded(events.FAILED_EVENT_RETRIED) == [(A.key, {"count": 120})]
 
 
-@pytest.mark.django_db
 def test_resending_all_with_nothing_to_resend_records_nothing():
     assert run("base.failed_event.retry_all") == {"count": 0}
     assert recorded(events.FAILED_EVENT_RETRIED) == []
@@ -188,7 +183,6 @@ def test_resending_all_with_nothing_to_resend_records_nothing():
 # ── Discard one ──────────────────────────────────────────────────────────────────────────────────────────────
 
 
-@pytest.mark.django_db
 def test_discarding_closes_it_for_good_with_who_when_and_why_and_keeps_the_row():
     delivery = dead()
     before = timezone.now()
@@ -203,13 +197,14 @@ def test_discarding_closes_it_for_good_with_who_when_and_why_and_keeps_the_row()
     )
     assert delivery.closed_at >= before
     assert delivery.last_error == "Conflict: Set up the issuer first."  # what went wrong stays, for the audit
-    assert recorded(events.FAILED_EVENT_DISCARDED) == [("a", {"id": str(delivery.id)})]
+    assert recorded(events.FAILED_EVENT_DISCARDED) == [(A.key, {"id": str(delivery.id)})]
     # The relay never takes it again.
     assert (
-        services.relay_deliver_next(
+        relay_runs.relay_deliver_next(
             timezone.now() + dt.timedelta(days=2),
             deliver=lambda app, event: pytest.fail("a discarded event was delivered"),
             listeners=lambda _: [],
+            carried=relay.carried,
             max_depth=relay.MAX_EVENT_DEPTH,
             max_attempts=relay.MAX_ATTEMPTS,
             backoff=relay.backoff,
@@ -218,7 +213,6 @@ def test_discarding_closes_it_for_good_with_who_when_and_why_and_keeps_the_row()
     )
 
 
-@pytest.mark.django_db
 def test_a_reason_is_optional_and_bounded(monkeypatch):
     monkeypatch.setattr("base.entitlement.blocked_apps", lambda scope: frozenset({"invoice"}))
     delivery = dead()  # an event that cannot be resent can still be discarded
@@ -233,7 +227,6 @@ def test_a_reason_is_optional_and_bounded(monkeypatch):
         get("base.failed_event.discard").input.model_validate({"id": str(delivery.id), "reason": "x" * 501})
 
 
-@pytest.mark.django_db
 def test_a_discarded_event_cannot_be_discarded_again_nor_resent():
     delivery = dead(status=EventDelivery.Status.DISCARDED)
 
@@ -257,21 +250,16 @@ def test_the_routes_are_bound_to_their_commands(path, operation, db):
     assert_bound("POST", path, operation)
 
 
-@pytest.mark.django_db
 def test_an_owner_resends_over_http_and_a_cashier_is_refused(client, make_user):
     delivery = dead()
     body = json.dumps({"id": str(delivery.id)})
 
-    client.force_login(make_user("eva", host="a", role="hub_employee"))
-    refused = client.post(
-        "/api/system/failed-events/retry", body, content_type="application/json", HTTP_HOST="a.localhost:8000"
-    )
+    client.force_login(make_user("eva", host=A.key, role="hub_employee"))
+    refused = client.post("/api/system/failed-events/retry", body, content_type="application/json", HTTP_HOST=HOST)
     assert (refused.status_code, refused.json()["error"]["code"]) == (403, "permission_denied")
 
-    client.force_login(make_user("ana", host="a", role="hub_owner"))
-    answered = client.post(
-        "/api/system/failed-events/retry", body, content_type="application/json", HTTP_HOST="a.localhost:8000"
-    )
+    client.force_login(make_user("ana", host=A.key, role="hub_owner"))
+    answered = client.post("/api/system/failed-events/retry", body, content_type="application/json", HTTP_HOST=HOST)
     assert (answered.status_code, answered.json()) == (200, {"id": str(delivery.id)})
 
 
@@ -285,44 +273,27 @@ def test_the_failed_events_and_the_bell_follow_what_changes_them():
     assert "base.failed_event.list" in live_registry.affected([events.HUB_STATE_APPLIED])
 
 
-@pytest.fixture
-def listen():
-    params = connections["default"].settings_dict
-    dsn = make_conninfo(
-        dbname=params["NAME"], user=params["USER"], password=params["PASSWORD"], host=params["HOST"], port=params["PORT"]
-    )
-    sessions = []
-
-    def open_session(scope):
-        session = psycopg.connect(dsn, autocommit=True)
-        sessions.append(session)
-        session.execute(f"LISTEN {channel_for(scope)}")
-        return session
-
-    yield open_session
-    for session in sessions:
-        session.close()
-
-
 def heard(session, timeout=0.5):
     return {name for note in session.notifies(timeout=timeout) for name in json.loads(note.payload)["events"]}
 
 
+@HUB_DB_COMMITTED
 def test_a_delivery_given_up_is_told_to_its_hub_only_after_the_commit(transactional_db, listen):
     """BASE-F10: the bell of who runs the hub rises at once, without waiting nor reloading; another hub hears nothing."""
     on_a, on_b = listen(A), listen(B)
-    outbox_event = OutboxEvent.objects.create(scope_kind="host", scope_key="a", name="sale.sale.completed")
+    outbox_event = OutboxEvent.objects.create(scope_kind=A.kind, scope_key=A.key, name="sale.sale.completed")
     now = timezone.now()
-    services.relay_take_events(now, listeners=lambda _: ["invoice"], limit=10, max_depth=relay.MAX_EVENT_DEPTH)
+    relay_runs.relay_take_events(now, listeners=lambda _: ["invoice"], limit=10, max_depth=relay.MAX_EVENT_DEPTH)
 
     def fail(app, event):
         raise RuntimeError("the reaction crashed")
 
     def attempt(at, max_attempts):
-        return services.relay_deliver_next(
+        return relay_runs.relay_deliver_next(
             at,
             deliver=fail,
             listeners=lambda _: [],
+            carried=relay.carried,
             max_depth=relay.MAX_EVENT_DEPTH,
             max_attempts=max_attempts,
             backoff=relay.backoff,
@@ -337,16 +308,17 @@ def test_a_delivery_given_up_is_told_to_its_hub_only_after_the_commit(transactio
     assert heard(on_b) == set()
 
 
+@HUB_DB_COMMITTED
 def test_a_delivery_past_the_deepest_level_is_told_too(transactional_db, listen):
     on_a = listen(A)
-    OutboxEvent.objects.create(scope_kind="host", scope_key="a", name="sale.sale.completed")
+    OutboxEvent.objects.create(scope_kind=A.kind, scope_key=A.key, name="sale.sale.completed")
 
-    services.relay_take_events(timezone.now(), listeners=lambda _: ["invoice"], limit=10, max_depth=-1)
+    relay_runs.relay_take_events(timezone.now(), listeners=lambda _: ["invoice"], limit=10, max_depth=-1)
 
     assert events.FAILED_EVENT_CREATED in heard(on_a)
 
 
-@pytest.mark.django_db(transaction=True)
+@HUB_DB_COMMITTED
 def test_resending_is_heard_in_its_hub_after_the_commit(listen):
     on_a, on_b = listen(A), listen(B)
     delivery = dead()

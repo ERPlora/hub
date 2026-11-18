@@ -6,14 +6,14 @@ payload. The full flows (charge → invoice, refund → rectification, void → 
 import re
 
 import pytest
-from live.context import Scope
 from live.errors import Conflict, NotFound
+from live.models import OutboxEvent
 from live.operations import NAME_RE, registry
 
 from apps.invoice import events
-from apps.invoice.tests.conftest import deliver
+from apps.invoice.tests.conftest import A, HUB_DB, deliver, run
+from apps.sale.models import Sale
 
-A = Scope("host", "a")
 PAST_FACT = re.compile(r"^invoice\.[a-z_]+\.([a-z_]+ed|paid)$")
 
 
@@ -56,7 +56,7 @@ def test_an_event_it_does_not_react_to_is_ignored():
     assert events.react(A, "sale.order.opened", {"order_id": "x"}) is None
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_reaction_runs_as_the_system_and_refuses_what_does_not_exist():
     with pytest.raises(NotFound):
         events.react(
@@ -72,16 +72,12 @@ def test_a_reaction_runs_as_the_system_and_refuses_what_does_not_exist():
         )
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_refund_of_a_sale_without_its_invoice_waits_for_it(charge, product):
     # Charged without an issuer, the sale has no document yet (INVOICE-F06).
     product()
     charge()
     sale_id = deliver_payload("sale.sale.completed")["sale_id"]
-    from apps.invoice.tests.conftest import run
-
-    from apps.sale.models import Sale
-
     sale = Sale.objects.get(pk=sale_id)
     payment = sale.payments.get()
     run(
@@ -99,8 +95,6 @@ def test_a_refund_of_a_sale_without_its_invoice_waits_for_it(charge, product):
 
 
 def deliver_payload(name):
-    from live.models import OutboxEvent
-
     return (
         OutboxEvent.objects.filter(name=name)
         .order_by("-created_at", "-id")

@@ -16,9 +16,14 @@ from django.db.backends.utils import CursorWrapper
 from base import custom_domains, registry
 from base.models import Hub
 from base.storage import hub_prefix
-from base.tests.test_internal import HUB_ID, code, signed
+from base.tenancy.tests import hubs
+from base.tenancy.tests.business import HOST, HUB_DB, A
+from base.tests.test_internal import code, signed
 
-pytestmark = [pytest.mark.django_db, pytest.mark.usefixtures("spa_manifest")]
+pytestmark = [HUB_DB, pytest.mark.usefixtures("spa_manifest", "hub_a")]
+
+#: Business A's, with its own database: the photos name its domain, and its database serves what the domain opens.
+HUB_ID = hubs.HUB_A_ID
 
 DOMAIN = "www.minegocio.es"
 OTHER_DOMAIN = "www.elotro.es"
@@ -50,8 +55,7 @@ def photo(client, *, hub_id=HUB_ID, version=1, host="hubs.localhost", **body):
 
 @pytest.fixture
 def acme(client, django_capture_on_commit_callbacks) -> Hub:
-    """The business ``acme``, ready, whose last photo names :data:`DOMAIN`; this process knows it."""
-    Hub.objects.create(id=HUB_ID, slug="acme", status="ready")
+    """Business A, ready, whose last photo names :data:`DOMAIN`; this process knows it."""
     with django_capture_on_commit_callbacks(execute=True):
         answer = photo(client, custom_domain=DOMAIN)
     assert answer.status_code == 200, answer.content
@@ -72,17 +76,14 @@ def the_map_was_read_just_now() -> None:
 
 class TestThePhoto:
     def test_the_row_keeps_the_domain_the_photo_names(self, client):
-        Hub.objects.create(id=HUB_ID, slug="acme", status="ready")
         assert photo(client, custom_domain=DOMAIN).json() == {"applied": True, "version": 1}
         assert Hub.objects.get(pk=HUB_ID).custom_domain == DOMAIN
 
     def test_it_is_kept_lowercase_and_without_its_final_dot(self, client):
-        Hub.objects.create(id=HUB_ID, slug="acme", status="ready")
         assert photo(client, custom_domain="WWW.MiNegocio.ES.").status_code == 200
         assert Hub.objects.get(pk=HUB_ID).custom_domain == DOMAIN
 
     def test_an_idn_domain_comes_in_its_ascii_form(self, client):
-        Hub.objects.create(id=HUB_ID, slug="acme", status="ready")
         assert photo(client, custom_domain="www.xn--peluquera-n4a.es").status_code == 200
         assert photo(client, version=2, custom_domain="www.peluquería.es").status_code == 422
 
@@ -182,7 +183,7 @@ class TestTheHostsOfTheHub:
 
     def test_a_hubs_own_host_is_no_door_of_the_domain(self, client, acme):
         # acme's own address keeps the whole app: nothing changes there.
-        response = visit(client, "/settings", host="acme.localhost:8000")
+        response = visit(client, "/settings", host=HOST)
         assert response.status_code == 200 and "hub-jump" in response.content.decode()
 
 
@@ -259,7 +260,7 @@ class TestWhatIsClosedOnTheDomain:
         assert signed(client, "get", "/internal/usage?day=2026-11-01", b"", host=DOMAIN).status_code == 404
 
     def test_a_session_of_the_business_opens_nothing_more(self, client, acme, make_user):
-        client.force_login(make_user("ana", host="acme"))
+        client.force_login(make_user("ana", host=A.key))
         for path in ("/settings", "/api/session/me", "/auth/login"):
             assert visit(client, path).status_code == 404
 
@@ -279,8 +280,7 @@ class TestWhenItStopsServing:
     def test_a_business_without_a_website_serves_nothing(self, client, acme):
         assert visit(client).status_code == 404
 
-    def test_a_domain_given_up_stops_at_once_even_before_the_map_is_read_again(self, client, acme, hub_files, every_app_on):
-        every_app_on("acme")
+    def test_a_domain_given_up_stops_at_once_even_before_the_map_is_read_again(self, client, acme, hub_files):
         hub_files.save(f"{hub_prefix(acme.id)}/website/img/3f2a9c.png", ContentFile(PNG))
         image = f"/p/media/{acme.id.hex}/website/img/3f2a9c.png"
         assert visit(client, image).status_code == 200
@@ -352,9 +352,8 @@ class TestTheProbe:
         assert visit(client).status_code == 404
         assert visit(client, PROBE).json() == {"hub_id": str(acme.id)}
 
-    def test_each_domain_gives_the_id_of_its_own_business(self, client, acme, django_capture_on_commit_callbacks):
-        other_id = "0199c4b0-0000-7000-8000-000000000002"
-        Hub.objects.create(id=other_id, slug="other", status="ready")
+    def test_each_domain_gives_the_id_of_its_own_business(self, client, acme, hub_b, django_capture_on_commit_callbacks):
+        other_id = str(hub_b.id)
         with django_capture_on_commit_callbacks(execute=True):
             photo(client, hub_id=other_id, custom_domain=OTHER_DOMAIN)
         assert visit(client, PROBE, host=OTHER_DOMAIN).json() == {"hub_id": other_id}
@@ -362,7 +361,7 @@ class TestTheProbe:
 
     def test_it_is_only_on_the_domain(self, client, acme):
         # On the business's own address, that path is any other of the SPA's.
-        response = visit(client, PROBE, host="acme.localhost:8000")
+        response = visit(client, PROBE, host=HOST)
         assert str(acme.id) not in response.content.decode()
 
 
@@ -376,8 +375,7 @@ def hub_files(settings):
 
 
 class TestTheImages:
-    def test_a_public_image_of_the_business_is_served(self, client, acme, hub_files, every_app_on):
-        every_app_on("acme")
+    def test_a_public_image_of_the_business_is_served(self, client, acme, hub_files):
         hub_files.save(f"{hub_prefix(acme.id)}/website/img/3f2a9c.png", ContentFile(PNG))
         response = visit(client, f"/p/media/{acme.id.hex}/website/img/3f2a9c.png")
         assert response.status_code == 200
@@ -385,8 +383,8 @@ class TestTheImages:
         assert response["Cache-Control"] == "public, max-age=31536000, immutable"
         assert not response.cookies
 
-    def test_another_business_never_serves_its_images_here(self, client, acme, hub_files, statements):
-        other = Hub.objects.get(slug="a")
+    def test_another_business_never_serves_its_images_here(self, client, acme, hub_b, hub_files, statements):
+        other = hub_b
         hub_files.save(f"{hub_prefix(other.id)}/website/img/3f2a9c.png", ContentFile(PNG))
         the_map_was_read_just_now()
         statements.clear()
@@ -395,11 +393,10 @@ class TestTheImages:
 
     def test_a_members_file_stays_theirs_even_with_their_session(self, client, acme, hub_files, make_user):
         hub_files.save(f"{hub_prefix(acme.id)}/avatars/ana.png", ContentFile(PNG))
-        client.force_login(make_user("ana", host="acme"))
+        client.force_login(make_user("ana", host=A.key))
         assert visit(client, f"/p/media/{acme.id.hex}/avatars/ana.png").status_code == 404
 
-    def test_a_business_that_left_serves_no_image(self, client, acme, hub_files, every_app_on):
-        every_app_on("acme")
+    def test_a_business_that_left_serves_no_image(self, client, acme, hub_files):
         hub_files.save(f"{hub_prefix(acme.id)}/website/img/3f2a9c.png", ContentFile(PNG))
         the_map_was_read_just_now()
         Hub.objects.filter(pk=acme.pk).update(status=Hub.Status.CANCELLED)
@@ -414,11 +411,10 @@ class TestTheMap:
         for host in ("WWW.MINEGOCIO.ES", "www.minegocio.es:443", "www.minegocio.es."):
             assert visit(client, PROBE, host=host).json() == {"hub_id": str(acme.id)}
 
-    def test_a_domain_two_businesses_name_is_nobodys(self, client, acme, caplog, django_capture_on_commit_callbacks):
+    def test_a_domain_two_businesses_name_is_nobodys(self, client, acme, hub_b, caplog, django_capture_on_commit_callbacks):
         # Its move between businesses: two photos in any order, with no order between their versions. The Hub never
         # chooses a website for it, and neither photo is refused.
-        other_id = "0199c4b0-0000-7000-8000-000000000002"
-        Hub.objects.create(id=other_id, slug="other", status="ready")
+        other_id = str(hub_b.id)
         with django_capture_on_commit_callbacks(execute=True):
             assert photo(client, hub_id=other_id, custom_domain=DOMAIN).json()["applied"] is True
         assert custom_domains.hub_of(DOMAIN) is None
@@ -511,18 +507,17 @@ class TestTheDomainItIsServedOn:
         acme.custom_domain = ""
         assert custom_domains.served_on(acme) == ""
 
-    def test_none_while_two_businesses_name_it(self, client, acme, django_capture_on_commit_callbacks):
+    def test_none_while_two_businesses_name_it(self, client, acme, hub_b, django_capture_on_commit_callbacks):
         # Its move between businesses: the door opens it to neither, so neither page names it.
-        other_id = "0199c4b0-0000-7000-8000-000000000002"
-        Hub.objects.create(id=other_id, slug="other", status="ready")
+        other_id = str(hub_b.id)
         with django_capture_on_commit_callbacks(execute=True):
             assert photo(client, hub_id=other_id, custom_domain=DOMAIN).json()["applied"] is True
         assert custom_domains.served_on(acme) == ""
         assert custom_domains.served_on(Hub.objects.get(pk=other_id)) == ""
 
-    def test_none_for_a_row_read_before_the_domain_went_to_another_business(self, client, acme):
-        other_id = "0199c4b0-0000-7000-8000-000000000002"
-        Hub.objects.create(id=other_id, slug="other", status="ready", custom_domain=DOMAIN)
+    def test_none_for_a_row_read_before_the_domain_went_to_another_business(self, client, acme, hub_b):
+        other_id = str(hub_b.id)
+        Hub.objects.filter(pk=other_id).update(custom_domain=DOMAIN)
         Hub.objects.filter(pk=acme.pk).update(custom_domain="")
         custom_domains.forget()
         # The door would open the other business's website there, never this one's.

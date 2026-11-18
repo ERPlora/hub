@@ -16,23 +16,24 @@ from django.contrib.auth.hashers import make_password
 from django.core.cache import cache
 from django.utils import timezone
 from live.assistant import description
-from live.context import OperationContext, Scope
+from live.context import OperationContext
 from live.errors import OperationError
 from live.models import OutboxEvent
 from live.operations import AI
 from live.operations import get as get_operation
 
 from base import access, services
+from base.services import sessions
 from base import people as people_rules
 from base.permissions import permissions_for
 from base.models import AccessSettings, Credential, Hub, Membership
+from base.tenancy.tests.business import A, B, HOST, HUB_DB, in_business_a
 from base.tests.routes import bound_routes, spa_routes
 from base.tests.test_access_pin import a_device, door
 
-pytestmark = pytest.mark.django_db
+__all__ = ["in_business_a"]
 
-HOST = "a.localhost:8000"
-B_HOST = "b.localhost:8000"
+pytestmark = HUB_DB
 
 
 def get(client, path, host=HOST, **params):
@@ -62,7 +63,7 @@ def with_badge(username: str, card: str) -> Credential:
     return credential
 
 
-def photo(slug="a", *, members=(), max_users=None):
+def photo(slug=A.key, *, members=(), max_users=None):
     """The SaaS's photo of ``slug``, as ``base.hub.state_apply`` keeps it."""
     state = {"version": 1, "members": list(members)}
     if max_users is not None:
@@ -79,22 +80,22 @@ def no_attempts_left_from_another_test():
 
 @pytest.fixture
 def olga(make_user):
-    return make_user("saas:1", host="a", role=Membership.Role.OWNER, first_name="Olga", email="olga@example.com")
+    return make_user("saas:1", host=A.key, role=Membership.Role.OWNER, first_name="Olga", email="olga@example.com")
 
 
 @pytest.fixture
 def adam(make_user):
-    return make_user("saas:2", host="a", role=Membership.Role.ADMIN, first_name="Adam", email="adam@example.com")
+    return make_user("saas:2", host=A.key, role=Membership.Role.ADMIN, first_name="Adam", email="adam@example.com")
 
 
 @pytest.fixture
 def eva(make_user):
-    return make_user("saas:3", host="a", role=Membership.Role.EMPLOYEE, first_name="Eva", email="eva@example.com")
+    return make_user("saas:3", host=A.key, role=Membership.Role.EMPLOYEE, first_name="Eva", email="eva@example.com")
 
 
 @pytest.fixture
 def mario(make_user):
-    return make_user("saas:4", host="a", role=Membership.Role.MANAGER, first_name="Mario", email="mario@example.com")
+    return make_user("saas:4", host=A.key, role=Membership.Role.MANAGER, first_name="Mario", email="mario@example.com")
 
 
 def people(client, host=HOST) -> dict:
@@ -111,7 +112,7 @@ class TestWhoIsInTheBusiness:
     """Employees › Personal, with how each person gets in."""
 
     def test_every_person_of_this_business_once_from_the_top_role(self, client, olga, eva, mario, make_user):
-        make_user("saas:9", host="b", role=Membership.Role.ADMIN, first_name="Bea")
+        make_user("saas:9", host=B.key, role=Membership.Role.ADMIN, first_name="Bea")
         client.force_login(olga)
         answer = people(client)
         assert [entry["id"] for entry in answer["people"]] == ["saas:1", "saas:4", "saas:3"]
@@ -173,7 +174,7 @@ class TestThePlansPlaces:
         photo(max_users=0)
         client.force_login(olga)
         assert people(client)["seats"] == {"known": True, "used": 2, "limit": None, "full": False}
-        Hub.objects.filter(slug="a").update(state={})
+        Hub.objects.filter(slug=A.key).update(state={})
         assert people(client)["seats"] == {"known": False, "used": 2, "limit": None, "full": False}
 
 
@@ -193,7 +194,7 @@ class TestOnePerson:
         assert mine["may"] == {"remove_pin": True, "set_badge": False}
 
     def test_a_person_of_another_business_or_nobody_is_not_found(self, client, adam, make_user):
-        make_user("saas:9", host="b", role=Membership.Role.EMPLOYEE)
+        make_user("saas:9", host=B.key, role=Membership.Role.EMPLOYEE)
         client.force_login(adam)
         assert code(get(client, "/people/detail", person="saas:9")) == "base.person_not_found"
         assert code(get(client, "/people/detail", person="saas:404")) == "base.person_not_found"
@@ -275,7 +276,7 @@ class TestABadge:
     def test_and_then_the_card_opens_the_way_in_as_that_person(self, client, adam, eva):
         client.force_login(adam)
         post(client, "/people/badge", {"person": "saas:3", "badge": "CARD-0003"})
-        user, _ = services.badge_owner("a", "card-0003")
+        user, _ = services.badge_owner(A.key, "card-0003")
         assert user is not None and user.username == "saas:3"
 
     @pytest.mark.parametrize("card", ["abc", "x" * 65, "CARD 0003", "CARD/0003", ""])
@@ -328,7 +329,7 @@ class TestABadge:
         client.force_login(adam)
         response = post(client, "/people/badge/remove", {"person": "saas:3"})
         assert response.json()["ways"] == {"account": True, "pin": True, "badge": False}
-        assert services.badge_owner("a", "CARD-0003")[0] is None
+        assert services.badge_owner(A.key, "CARD-0003")[0] is None
         assert OutboxEvent.objects.filter(name="base.person.badge_removed").count() == 1
 
     def test_without_a_badge_there_is_nothing_to_take_away(self, client, adam, eva):
@@ -349,13 +350,13 @@ class TestComingBack:
     def test_what_the_hub_kept_of_them_is_theirs_again(self, client, olga, eva):
         with_pin("saas:3")
         with_badge("saas:3", "CARD-0003")
-        Membership.objects.filter(user=eva, host="a").delete()
+        Membership.objects.filter(user=eva, host=A.key).delete()
         client.force_login(olga)
         assert [entry["id"] for entry in people(client)["people"]] == ["saas:1"]
-        assert services.badge_owner("a", "CARD-0003")[0] is None
-        Membership.objects.create(user=eva, host="a", role=Membership.Role.EMPLOYEE)
+        assert services.badge_owner(A.key, "CARD-0003")[0] is None
+        Membership.objects.create(user=eva, host=A.key, role=Membership.Role.EMPLOYEE)
         assert row(people(client), "saas:3")["ways"] == {"account": True, "pin": True, "badge": True}
-        assert services.badge_owner("a", "CARD-0003")[0] == eva
+        assert services.badge_owner(A.key, "CARD-0003")[0] == eva
 
 
 class TestTheRoles:
@@ -381,7 +382,7 @@ class TestPermissions:
 
     def test_an_operation_refuses_whom_its_permission_is_not_given(self, eva, olga):
         op = get_operation("base.person.pin_remove")
-        employee = OperationContext(scope=Scope("host", "a"), actor=eva, permissions=permissions_for(eva, Scope("host", "a")))
+        employee = OperationContext(scope=A, actor=eva, permissions=permissions_for(eva, A))
         with pytest.raises(OperationError) as refused:
             op(employee, op.input(person="saas:1"))
         assert refused.value.code == "permission_denied"
@@ -406,7 +407,7 @@ class TestFollowedLive:
         assert on["base.api_key.list"] == sorted({events.HUB_STATE_APPLIED, *events.API_KEY_EVENTS, *events.APP_EVENTS})
 
     def test_the_prefix_of_a_person_is_the_one_of_their_account(self):
-        assert people_rules.SAAS_PREFIX == services.SAAS_USERNAME_PREFIX
+        assert people_rules.SAAS_PREFIX == sessions.SAAS_USERNAME_PREFIX
 
 
 PEOPLE_ROUTES = {

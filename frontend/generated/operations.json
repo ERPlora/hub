@@ -59,6 +59,10 @@
     "method": "get",
     "path": "/api/catalog/images/detail"
   },
+  "base.help.get": {
+    "method": "get",
+    "path": "/api/help"
+  },
   "base.blueprint.list": {
     "method": "get",
     "path": "/api/settings/data/blueprints"
@@ -2717,10 +2721,6 @@
   },
   "verifactu.config.get": {
     "method": "get",
-    "path": "/api/verifactu/config"
-  },
-  "verifactu.config.update": {
-    "method": "post",
     "path": "/api/verifactu/config"
   },
   "verifactu.config.go_live": {

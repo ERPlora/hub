@@ -222,6 +222,7 @@
       "loadError": "The activity could not be loaded",
       "more": "Show more",
       "by": "by {name}",
+      "byPlatform": "Done by the platform",
       "kinds": {
         "note_added": "Note added",
         "purchase_recorded": "Purchase recorded",

@@ -14,6 +14,7 @@ import { A, api, EMPLOYEE, psql, shot, shown } from './helpers';
 import { choose, confirmDialog, idFromUrl, manualFlow, signedIn, workerCalls } from './flow-helpers';
 import { noHorizontalScroll, settled, VIEWPORTS } from './schedule-helpers';
 import { pick } from './task-helpers';
+import { toastSaying } from './toast-helpers';
 
 const TAG = 'E2E FlowG';
 const SECRET = 'E2E_FLOWG';
@@ -69,7 +70,7 @@ for (const viewport of VIEWPORTS) {
       const failed = await openRun(page, 'Stopped by an error');
       await failed.locator('[data-testid^=flow-run-retry-]').first().click();
       await confirmDialog(page, 'Resume it from the step that failed?', () => snap('FLOW-F24'));
-      await expect(page.locator('ion-toast').filter({ hasText: 'Resumed: it finished well.' }).last()).toBeVisible();
+      await expect(toastSaying(page, 'Resumed: it finished well.')).toBeVisible();
       expect(await taskTitles(context, resumedTitle)).toEqual([resumedTitle]);
 
       // FLOW-F25: a step that fails carries on, and the next one runs only if it failed.
@@ -97,7 +98,7 @@ for (const viewport of VIEWPORTS) {
       await snap('FLOW-F25');
       await shown(page).locator('[data-testid=flow-editor-run]').click();
       await confirmDialog(page, 'Run it now?');
-      await expect(page.locator('ion-toast').filter({ hasText: 'See it in History' }).last()).toBeVisible();
+      await expect(toastSaying(page, 'See it in History')).toBeVisible();
       await shown(page).locator('[data-testid=flow-editor-tab-history]').click();
       const carried = await openRun(page, 'Finished well');
       await expect(carried.locator('[data-testid^=flow-run-steps-]')).toContainText('It carried on with the next steps.');
@@ -111,7 +112,7 @@ for (const viewport of VIEWPORTS) {
       await editor.locator('[data-testid=flow-http-secrets-s1-name] input').fill(secret.toLowerCase());
       await editor.locator('[data-testid=flow-http-secrets-s1-value] input').fill('sk_test_e2e_never_shown');
       await editor.locator('[data-testid=flow-http-secrets-s1-save]').click();
-      await expect(page.locator('ion-toast').filter({ hasText: `${secret} saved. Its value can no longer be shown.` }).last()).toBeVisible();
+      await expect(toastSaying(page, `${secret} saved. Its value can no longer be shown.`)).toBeVisible();
       await expect(editor.locator(`[data-testid=flow-http-secrets-s1-name-${secret}]`)).toHaveText(secret);
       await expect(editor.locator('[data-testid=flow-http-secrets-s1-value] input')).toHaveValue('');
       await noHorizontalScroll(page, viewport.label);
@@ -149,7 +150,7 @@ for (const viewport of VIEWPORTS) {
       await snap('FLOW-F27');
       await shown(page).locator('[data-testid=flow-editor-run]').click();
       await confirmDialog(page, 'Run it now?');
-      await expect(page.locator('ion-toast').filter({ hasText: 'calling another system' }).last()).toBeVisible();
+      await expect(toastSaying(page, 'calling another system')).toBeVisible();
       await shown(page).locator('[data-testid=flow-editor-tab-history]').click();
       // «Run now» answered without calling: the run waits for the worker, which makes the call on its next pass.
       const calling = await openRun(page, 'Calling another system');
@@ -192,7 +193,7 @@ for (const viewport of VIEWPORTS) {
       await expect(shown(page).locator('[data-testid=flow-editor-notice]')).toHaveText('Saved.');
       await shown(page).locator('[data-testid=flow-editor-run]').click();
       await confirmDialog(page, 'Run it now?');
-      await expect(page.locator('ion-toast').filter({ hasText: 'waiting for an answer in «Waiting for your answer»' }).last()).toBeVisible();
+      await expect(toastSaying(page, 'waiting for an answer in «Waiting for your answer»')).toBeVisible();
       expect(await taskTitles(context, answeredTitle)).toEqual([]);
 
       // FLOW-F29: the employee sees only «Waiting for your answer», approves with a note; the run goes on.
@@ -210,7 +211,7 @@ for (const viewport of VIEWPORTS) {
         await settled(employee.page);
         await employee.page.screenshot({ path: shot(`APP-FLOW-2-FLOW-F29-${viewport.label}`) });
         await card.locator('[data-testid^=flow-question-yes-]').click();
-        await expect(employee.page.locator('ion-toast').filter({ hasText: 'Approved: the automation carries on.' }).last()).toBeVisible();
+        await expect(toastSaying(employee.page, 'Approved: the automation carries on.')).toBeVisible();
         await expect(card).toHaveCount(0);
       } finally {
         await employee.context.close();

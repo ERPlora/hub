@@ -44,6 +44,8 @@ BLOCKED_TIME_DELETED = "appointment.blocked_time.deleted"
 RECURRING_CREATED = "appointment.recurring.created"
 RECURRING_UPDATED = "appointment.recurring.updated"
 RECURRING_DELETED = "appointment.recurring.deleted"
+# A deleted series back in Repeating, the same one (the recovery from a separate copy, BASE-F114).
+RECURRING_RESTORED = "appointment.recurring.restored"
 SETTINGS_UPDATED = "appointment.settings.updated"
 
 #: Everything that changes what an appointment row says.
@@ -83,7 +85,7 @@ TO_CONFIRM_EVENTS = [
     APPOINTMENT_RESTORED,
 ]
 BLOCKED_TIME_EVENTS = [BLOCKED_TIME_CREATED, BLOCKED_TIME_DELETED]
-RECURRING_EVENTS = [RECURRING_CREATED, RECURRING_UPDATED, RECURRING_DELETED]
+RECURRING_EVENTS = [RECURRING_CREATED, RECURRING_UPDATED, RECURRING_DELETED, RECURRING_RESTORED]
 ALL = [*APPOINTMENT_EVENTS, *BLOCKED_TIME_EVENTS, *RECURRING_EVENTS, SETTINGS_UPDATED]
 
 # Other apps' events (their WORKBOOKs fix the payloads).

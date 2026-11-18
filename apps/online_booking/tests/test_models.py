@@ -7,13 +7,14 @@ of the customer's link and the visitor's fingerprint, both emptied when her data
 import uuid
 
 import pytest
-from django.db import IntegrityError, transaction
+from django.db import IntegrityError
+from live.operations import atomic
 
 from apps.online_booking.models import Booking, Settings
 
-from .conftest import TUESDAY, at, make_appointment
+from .conftest import HUB_DB, TUESDAY, at, make_appointment
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 
 def test_the_factory_settings_keep_the_page_off_and_ask_only_for_the_mobile():
@@ -33,7 +34,7 @@ def test_the_factory_settings_keep_the_page_off_and_ask_only_for_the_mobile():
 
 def test_the_settings_are_one_row():
     Settings.objects.create()
-    with pytest.raises(IntegrityError), transaction.atomic():
+    with pytest.raises(IntegrityError), atomic():
         Settings.objects.create()
 
 
@@ -51,7 +52,7 @@ def test_a_booking_is_one_appointment_with_the_hash_of_its_link(salon):
     assert booking.id.version == 7
     assert booking.created_at is not None
     assert str(booking) == appointment.number
-    with pytest.raises(IntegrityError), transaction.atomic():
+    with pytest.raises(IntegrityError), atomic():
         Booking.objects.create(appointment=appointment, token_hash="b" * 64)
 
 
@@ -60,7 +61,7 @@ def test_two_bookings_never_share_a_link_but_many_may_be_revoked(salon):
     second = make_appointment(salon.lucia, salon.ana, [salon.cut], at(TUESDAY, "11:00"))
     third = make_appointment(salon.lucia, salon.ana, [salon.cut], at(TUESDAY, "12:00"))
     Booking.objects.create(appointment=first, token_hash="a" * 64)
-    with pytest.raises(IntegrityError), transaction.atomic():
+    with pytest.raises(IntegrityError), atomic():
         Booking.objects.create(appointment=second, token_hash="a" * 64)
     # A revoked link has no hash: any number of them.
     Booking.objects.create(appointment=second, token_hash=None)

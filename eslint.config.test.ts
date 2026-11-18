@@ -2,7 +2,7 @@
 // Lint of hub-next: the SPA reaches the server only through the SDK (`@erplora/ui/sdk`), so the
 // shell entry and every app frontend are linted for raw network globals. Linted for real here, by the hub's ESLint
 // in a thread of its own (`lintInThread`).
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
@@ -20,8 +20,10 @@ const nodeRequire = createRequire(import.meta.url);
 type Lint = readonly [code: string, filePath: string];
 /** What ESLint said of each text of a `lintInThread`, in order, and whether it ignores each of its paths. */
 interface Found {
-  lints: { ruleId: string | null; message: string }[][];
+  lints: { ruleId: string | null; message: string; line: number }[][];
   ignored: boolean[];
+  /** Each object of eslint.config.js: its keys, its files and ignores, and what it sets of the size limits. */
+  blocks: { keys: string[]; files: string[] | null; ignores: string[] | null; rules: Record<string, unknown> }[];
 }
 
 /** The thread's side: the ESLint at `workerData.eslint` lints each text as its file and tells whether it ignores each
@@ -34,11 +36,19 @@ const eslint = new ESLint({ cwd: workerData.cwd });
   const lints = [];
   for (const [code, filePath] of workerData.lints) {
     const [result] = await eslint.lintText(code, { filePath });
-    lints.push(result.messages.map(({ ruleId, message }) => ({ ruleId, message })));
+    lints.push(result.messages.map(({ ruleId, message, line }) => ({ ruleId, message, line })));
   }
   const ignored = [];
   for (const path of workerData.paths) ignored.push(await eslint.isPathIgnored(path));
-  parentPort.postMessage({ lints, ignored });
+  const configFile = require('node:url').pathToFileURL(require('node:path').join(workerData.cwd, 'eslint.config.js'));
+  const { default: config } = await import(configFile.href);
+  const blocks = config.map((block) => ({
+    keys: Object.keys(block),
+    files: block.files ?? null,
+    ignores: block.ignores ?? null,
+    rules: Object.fromEntries(Object.entries(block.rules ?? {}).filter(([rule]) => workerData.limits.includes(rule))),
+  }));
+  parentPort.postMessage({ lints, ignored, blocks });
 })();
 `;
 
@@ -50,10 +60,12 @@ const eslint = new ESLint({ cwd: workerData.cwd });
  * (hub#1315). A lint left waiting on nothing that could end it fails at once, saying so.
  */
 function lintInThread(lints: readonly Lint[], paths: readonly string[], eslint = nodeRequire.resolve('eslint')): Promise<Found> {
-  return inThread<Found>(LINTER, { eslint, cwd: HUB_DIR, lints, paths });
+  return inThread<Found>(LINTER, { eslint, cwd: HUB_DIR, lints, paths, limits: [...FUNCTION_LIMITS, BLOCKS] });
 }
 
 const RESTRICTED = 'no-restricted-globals';
+const FUNCTION_LIMITS = ['complexity', 'max-depth', 'max-params', 'max-lines-per-function'];
+const BLOCKS = 'vue/max-lines-per-block';
 const NETWORK = ['fetch', 'EventSource', 'WebSocket', 'XMLHttpRequest'];
 const APP_PAGE = 'apps/demo/frontend/pages/ItemListPage.ts';
 const ENTRY = 'frontend/main.ts';
@@ -62,6 +74,33 @@ const PROBE = 'apps/demo/frontend/pages/Probe.vue';
 const uses = (name: string) => `export const x = ${name};\n`;
 const SCRIPT_SETUP = `<script setup lang="ts">\nconst items = fetch('/api/demo/items');\n</script>\n<template><div>{{ items }}</div></template>\n`;
 const slottedIn = (tag: string) => `<template><ion-button><${tag} slot="start" /></ion-button></template>\n`;
+const APP_TEST = 'apps/demo/frontend/pages/ItemListPage.test.ts';
+const E2E_HELPER = 'tests/e2e/probe.ts';
+/** A function with `branches` ifs: its complexity is `branches` + 1. */
+const branchy = (branches: number) =>
+  `export function f(v: number): number {\n${Array.from({ length: branches }, (_, i) => `  if (v === ${i}) v += 1;\n`).join('')}  return v;\n}\n`;
+/** Ifs nested `depth` deep. */
+const nested = (depth: number) =>
+  `export function f(v: number): number {\n${'  if (v) {\n'.repeat(depth)}  v += 1;\n${'  }\n'.repeat(depth)}  return v;\n}\n`;
+const taking = (count: number) =>
+  `export function f(${Array.from({ length: count }, (_, i) => `a${i}: number`).join(', ')}): number {\n  return a0;\n}\n`;
+/** A function of `lines` lines, braces included, with a blank line and a comment that do not count. */
+const long = (lines: number) =>
+  `export function f(): number {\n  let v = 0;\n\n  // a comment\n${'  v += 1;\n'.repeat(lines - 4)}  return v;\n}\n`;
+
+/** `count` lines of `text`, every other one blank: a blank line counts like any other. */
+const lines = (count: number, text: (n: number) => string) =>
+  Array.from({ length: count }, (_, n) => (n % 2 ? '' : text(n))).join('\n');
+/** A Vue page whose blocks hold the given number of lines between their opening and closing tags. */
+const vuePage = (template: number, script: number, style: number) =>
+  [
+    `<template>\n${lines(template, (n) => `  <p>${n}</p>`)}\n</template>`,
+    `<script setup lang="ts">\n${lines(script, (n) => `const line${n} = ${n};`)}\n</script>`,
+    `<style scoped>\n${lines(style, (n) => `.line${n} { order: ${n}; }`)}\n</style>`,
+    '',
+  ].join('\n');
+const AT_CAPS = vuePage(250, 300, 150);
+const PAST_CAPS = vuePage(251, 301, 151);
 
 /** Every lint these tests read. */
 const LINTS: readonly Lint[] = [
@@ -71,11 +110,19 @@ const LINTS: readonly Lint[] = [
   ]),
   [SCRIPT_SETUP, VUE_PAGE],
   ...['ion-icon', 'HubIcon', 'ok-icon'].map((tag): Lint => [slottedIn(tag), PROBE]),
+  [AT_CAPS, PROBE],
+  [PAST_CAPS, PROBE],
+  ...[branchy(14), branchy(15), nested(4), nested(5), taking(3), taking(4), long(50), long(51)].flatMap((code): Lint[] => [
+    [code, APP_PAGE],
+    [code, APP_TEST],
+    [code, E2E_HELPER],
+  ]),
 ];
 /** What ESLint must ignore: the build and collectstatic output, the repo's own .venv (uv), which carries the admin's
- *  JavaScript, and packages/ui and packages/live, linted in their own repos. */
+ *  JavaScript, packages/ui and packages/live, linted in their own repos, and the shell scripts' tests. */
 const IGNORED = [
   'frontend/dist/assets/main-abc.js',
+  '.github/scripts/pytest-shard.test.sh',
   'staticfiles/admin/js/core.js',
   '.venv/lib/python3.14/site-packages/django/contrib/admin/static/admin/js/core.js',
   'packages/ui/src/sdk/client.ts',
@@ -89,11 +136,22 @@ describe('eslint config', () => {
     found = await lintInThread(LINTS, IGNORED);
   }, NO_CLOCK);
 
-  /** The messages of `rule` in what ESLint said of `code` linted as `filePath`, one of `LINTS`. */
-  function said(code: string, filePath: string, rule: string): string[] {
+  /** What ESLint said under `rule` of `code` linted as `filePath`, one of `LINTS`. */
+  function reports(code: string, filePath: string, rule: string): Found['lints'][number] {
     const index = LINTS.findIndex(([text, file]) => text === code && file === filePath);
     if (index < 0) throw new Error(`no lint of that text as ${filePath} in LINTS`);
-    return found.lints[index].filter((message) => message.ruleId === rule).map((message) => message.message);
+    return found.lints[index].filter((message) => message.ruleId === rule);
+  }
+
+  /** The messages of `rule` in what ESLint said of `code` linted as `filePath`. */
+  function said(code: string, filePath: string, rule: string): string[] {
+    return reports(code, filePath, rule).map((message) => message.message);
+  }
+
+  /** The blocks of a Vue page ESLint finds too long, by the tag of the line it points to. */
+  function longBlocks(code: string): string[] {
+    const source = code.split('\n');
+    return reports(code, PROBE, BLOCKS).map(({ line }) => source[line - 1].replace(/^<(\w+).*$/, '$1'));
   }
 
   it.each(NETWORK)('forbids %s in an app page and in the entry', (name) => {
@@ -112,12 +170,83 @@ describe('eslint config', () => {
     expect(slotted('ok-icon')).toBe(1); // OutfitKit is gone: no exception left for it
   });
 
+  it('caps the complexity of a function at 15, in tests too', () => {
+    for (const file of [APP_PAGE, APP_TEST, E2E_HELPER]) {
+      expect(said(branchy(14), file, 'complexity')).toEqual([]);
+      expect(said(branchy(15), file, 'complexity')).toHaveLength(1);
+    }
+  });
+
+  it('caps the nesting of blocks at 4, in tests too', () => {
+    for (const file of [APP_PAGE, APP_TEST, E2E_HELPER]) {
+      expect(said(nested(4), file, 'max-depth')).toEqual([]);
+      expect(said(nested(5), file, 'max-depth')).toHaveLength(1);
+    }
+  });
+
+  it('caps a function at 3 parameters and 50 lines, not counting blanks and comments, outside tests', () => {
+    expect(said(taking(3), APP_PAGE, 'max-params')).toEqual([]);
+    expect(said(taking(4), APP_PAGE, 'max-params')).toHaveLength(1);
+    expect(said(long(50), APP_PAGE, 'max-lines-per-function')).toEqual([]);
+    expect(said(long(51), APP_PAGE, 'max-lines-per-function')).toHaveLength(1);
+  });
+
+  it('leaves the parameters and the length of a function free in tests, where each describe is one', () => {
+    for (const file of [APP_TEST, E2E_HELPER]) {
+      expect(said(taking(4), file, 'max-params')).toEqual([]);
+      expect(said(long(51), file, 'max-lines-per-function')).toEqual([]);
+    }
+  });
+
+  it('caps each block of a Vue page, blank lines included: template 250, script 300 and style 150', () => {
+    expect(longBlocks(AT_CAPS)).toEqual([]);
+    expect(longBlocks(PAST_CAPS)).toEqual(['template', 'script', 'style']);
+  });
+
+  it('keeps the suppressions of what already broke a limit, and fails on one no longer needed', () => {
+    const { scripts } = JSON.parse(readFileSync(join(HUB_DIR, 'package.json'), 'utf8')) as { scripts: Record<string, string> };
+    expect(existsSync(join(HUB_DIR, 'eslint-suppressions.json'))).toBe(true);
+    expect(scripts.lint).toBe('eslint .');
+  });
+
+  it('sets the function limits for every file and the block caps for every Vue page once, loosens two only in tests and ignores nothing else', () => {
+    const globalIgnores = found.blocks.filter(({ keys }) => keys.length === 1 && keys[0] === 'ignores');
+    expect(globalIgnores.map(({ ignores }) => ignores)).toEqual([
+      ['frontend/dist/**', 'staticfiles/**', 'node_modules/**', 'coverage/**', '.venv/**', 'packages/**'],
+    ]);
+    expect(found.blocks.filter(({ rules }) => Object.keys(rules).length > 0)).toEqual([
+      {
+        keys: ['rules'],
+        files: null,
+        ignores: null,
+        rules: {
+          complexity: ['error', 15],
+          'max-depth': ['error', 4],
+          'max-params': ['error', 3],
+          'max-lines-per-function': ['error', { max: 50, skipBlankLines: true, skipComments: true }],
+        },
+      },
+      {
+        keys: ['files', 'rules'],
+        files: ['**/*.vue'],
+        ignores: null,
+        rules: { [BLOCKS]: ['error', { template: 250, script: 300, style: 150 }] },
+      },
+      {
+        keys: ['files', 'rules'],
+        files: ['**/tests/**', '**/e2e/**', '**/*.{test,spec}.{ts,tsx,js,mjs,cjs,vue}'],
+        ignores: null,
+        rules: { 'max-params': 'off', 'max-lines-per-function': 'off' },
+      },
+    ]);
+  });
+
   it('lints in a thread of its own: this worker never loads ESLint', () => {
     const loaded = Object.keys(nodeRequire.cache).filter((file) => file.includes(join('node_modules', 'eslint', 'lib')));
     expect(loaded).toEqual([]);
   });
 
-  it('ignores the build and collectstatic output, the virtualenv, and the live and ui submodules', () => {
+  it('ignores the build and collectstatic output, the virtualenv, the live and ui submodules and the shell scripts', () => {
     expect(IGNORED.filter((_path, index) => !found.ignored[index])).toEqual([]);
   });
 });

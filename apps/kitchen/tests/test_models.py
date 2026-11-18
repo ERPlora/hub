@@ -4,18 +4,18 @@ import datetime as dt
 import uuid
 from decimal import Decimal
 
-import pytest
-from django.db import IntegrityError, transaction
+from django.db import IntegrityError
 from django.utils import timezone
+from live.operations import atomic
 
-from .conftest import make_station
+from .conftest import HUB_DB, make_station
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 
 def refused(build) -> bool:
     try:
-        with transaction.atomic():
+        with atomic():
             build()
     except IntegrityError:
         return True
@@ -245,8 +245,8 @@ def test_a_log_entry_belongs_to_its_ticket():
 
 
 def test_a_ticket_keeps_no_customer_so_merging_two_customers_has_nothing_to_move():
-    """KITCHEN-F30 (descartado): the till sends a label, never a customer; no ticket nor dish keeps one, and the
-    kitchen hears nothing of Customers (``customer.merged`` has no reaction here)."""
+    """The till sends a label, never a customer: no ticket nor dish keeps one, and the kitchen hears nothing of
+    Customers (``customer.merged`` has no reaction here)."""
     from apps.kitchen import events
     from apps.kitchen.models import Ticket, TicketItem
 

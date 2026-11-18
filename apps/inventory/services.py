@@ -75,10 +75,11 @@ from apps.inventory.schemas import (
     ProductImageUploadIn,
     ProductImportIn,
     ProductIn,
-    ProductIdIn,
     ProductOut,
     ProductPatchIn,
+    ProductRecoverIn,
     ProductRefIn,
+    ProductRestoreIn,
     PrintLabelOut,
     ProductSoldOutIn,
     ProductsOut,
@@ -393,11 +394,12 @@ def update_product(ctx: OperationContext, data: ProductPatchIn) -> dict:
     },
 )
 def delete_product(ctx: OperationContext, data: ProductRefIn) -> dict:
-    """INVENTORY-F04: its movements stay; its photo of its own goes with it (INVENTORY-F31), once this is saved."""
+    """INVENTORY-F04: its movements stay; its photo of its own goes with it (INVENTORY-F31), once this is saved. An
+    image of the library is ERPlora's, not the business's: it stays, so that restoring it (INVENTORY-F34) shows it."""
     product = find_product(data.id, data.product, lock=True)
     photo = product.image
     product.is_deleted, product.is_active, product.deleted_at = True, False, timezone.now()
-    product.image = ""
+    product.image = photo if images.kind_of(photo) == images.CATALOG else ""
     product.updated_by = _actor(ctx)
     product.save(update_fields=["is_deleted", "is_active", "deleted_at", "image", "updated_by", "updated_at"])
     images.let_go(ctx, photo)
@@ -410,25 +412,31 @@ def delete_product(ctx: OperationContext, data: ProductRefIn) -> dict:
     kind="command",
     repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission=SYSTEM,
-    input=ProductIdIn,
+    input=ProductRestoreIn,
     output=ProductOut,
     ai={
-        "description": "Bring a deleted product back to the catalog, the same product with its stock movements (run "
-        "by the platform when ERPlora's staff recovers the business from a separate copy).",
+        "description": "Bring a deleted product back to the catalog, the same product with its stock movements and "
+        "its image of the library (run by the platform when ERPlora's staff recovers the business from a separate "
+        "copy).",
         "risk": "normal",
     },
 )
-def restore_product(ctx: OperationContext, data: ProductIdIn) -> dict:
+def restore_product(ctx: OperationContext, data: ProductRestoreIn) -> dict:
     """INVENTORY-F34: a deleted product back in every list and in the till, the same product (deleting keeps it,
-    INVENTORY-F04): its id, its codes, its categories and its stock, with every movement that hangs from it. Active and
-    on sale, as unarchiving does: the «sold out» it had was another day's. Not while another live product holds its
-    SKU or its EAN-13 (it was made again since). Repeating it on a product already back answers well and announces
-    again, as deleting does."""
+    INVENTORY-F04): its id, its codes, its categories, its stock and its image of the library, with every movement that
+    hangs from it. One deleted before deleting kept that image has none: it gets back the one it showed in the copy,
+    as one made again does (``base.images.from_copy``). Active and on sale, as unarchiving does: the «sold out» it had
+    was another day's. Not while another live product holds its SKU or its EAN-13 (it was made again since). Repeating
+    it on a product already back answers well and announces again, as deleting does, and changes nothing of it."""
     product = find_product(data.id, None, lock=True, rows=Product.objects.all())
     if product.is_deleted:
         product.is_deleted, product.deleted_at, product.is_active, product.is_sold_out = False, None, True, False
+        product.image = product.image or images.from_copy(ctx, data.image)
         product.updated_by = _actor(ctx)
-        _save(product, update_fields=["is_deleted", "deleted_at", "is_active", "is_sold_out", "updated_by", "updated_at"])
+        _save(
+            product,
+            update_fields=["is_deleted", "deleted_at", "is_active", "is_sold_out", "image", "updated_by", "updated_at"],
+        )
     record_event(ctx, events.PRODUCT_RESTORED, _product_payload(product))
     return load_product(product.id, ctx.scope)
 
@@ -468,6 +476,29 @@ def set_sold_out(ctx: OperationContext, data: ProductSoldOutIn) -> dict:
         product.save(update_fields=["is_sold_out", "updated_by", "updated_at"])
         record_event(ctx, events.PRODUCT_UPDATED, _product_payload(product))
     return load_product(product.id, ctx.scope)
+
+
+@operation(
+    "inventory.product.recover",
+    kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
+    permission=SYSTEM,
+    input=ProductRecoverIn,
+    output=ProductOut,
+    ai={
+        "description": "Make again a product the business no longer holds, with the image of the library it had (run "
+        "by the platform when ERPlora's staff recovers the business from a separate copy).",
+        "risk": "normal",
+    },
+)
+def recover_product(ctx: OperationContext, data: ProductRecoverIn) -> dict:
+    """BASE-F114: a product of a separate copy made again as its screen makes it, all or nothing: the product by
+    ``inventory.product.create``, then the image of the library it showed there (INVENTORY-F30), unless the library no
+    longer has it; never a photo of its own, deleted with the product (``base.images.from_copy``)."""
+    made = create_product(ctx, ProductIn.model_validate(data.model_dump(include=set(ProductIn.model_fields))))
+    if image := images.from_copy(ctx, data.image):
+        _change_image(ctx, find_product(made.id, None), image)
+    return load_product(made.id, ctx.scope)
 
 
 # The product's image (base.images)
@@ -1317,7 +1348,7 @@ def _locked(product_ids: set[UUID]) -> dict[UUID, Product]:
     return {product.id: product for product in products}
 
 
-def _move(
+def _move(  # noqa: PLR0913
     ctx: OperationContext,
     product: Product,
     movement_type: str,
@@ -1349,7 +1380,7 @@ def _move(
     return movement
 
 
-def _crossing(
+def _crossing(  # noqa: PLR0913, PLR0917
     ctx: OperationContext, product: Product, settings: Settings, previous: Decimal, movement_type: str, reference: str
 ) -> None:
     """INVENTORY-F18: an article with stock control crossing its threshold, down («below») or up («recovered»).
@@ -1435,7 +1466,7 @@ def _refund_result(note: RefundStock, *, applied: bool, movements: int) -> dict:
 # Imports
 
 
-def _check_product_row(
+def _check_product_row(  # noqa: PLR0911, PLR0913, PLR0917
     row, name: str, sku: str, settings: Settings, tax_categories: dict, currency: str
 ) -> dict | str:
     """The fields of a new product from one CSV row (its name and SKU already read, its amounts in the business's

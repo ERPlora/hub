@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:3c4bcbca058dfc22585a0c2bf2c2086cd6bff45c8d7106b2fba8a3c7860ef93c -->
+<!-- generated from WORKBOOK.md sha256:46a072ac4c989b32b9e61da2a2ff57e10e02c1ab73579f949e9d8d3ed4f8144d -->
 
 ## What it is for and who it is for
 
@@ -190,7 +190,6 @@ With the window as it opened, Back closes it without asking (BASE-F05).
 | CUSTOMER-F33 | Recover a deleted card | done | common |
 
 "Done": server and pages with their tests (of the pages and end to end in Chrome).
-"Discarded": it does not go into the app for now; the reason and its issue go in its "Status".
 
 ### CUSTOMER-F01 Add a card
 Status: done
@@ -250,9 +249,11 @@ Actor: everyone
 Screen: Customer card
 Steps:
 1. From **Customers**, tap the row.
-2. The card shows all its details (also internal notes, birthday, anniversary and custom fields, which
-   in the current product were only seen when editing), its groups and tags, its consent per channel, the
-   activity (newest first, 50 per page), its purchases and the blocks of other apps.
+2. The card shows all its details (also internal notes, birthday, anniversary and custom fields), its
+   groups and tags, its consent per channel, the
+   activity (newest first, 50 per page; each entry says when and who: the person or the API key by their
+   name, or "Done by the platform" when nobody did it in person, such as the purchase a charged sale
+   records, an automation or a recovery from a separate copy), its purchases and the blocks of other apps.
 3. **← Back** returns to the list.
 In: the card and, apart, its activity, its purchases and its consent history.
 Out: nothing; read only. If another person changes it while it is open, the change is seen without
@@ -363,7 +364,7 @@ In: the file, which the screen sends in blocks of 50 rows.
 Out: the cards created, with source "Import", the phone in the international format and without consent
 (even if the file brings a consent column), and a card-created notice for each one, so WhatsApp joins
 their conversations as with adding by hand. A row without stage comes in as "Active" (it is a customer
-already had), just as in the current product; the old stage `customer` is also read as "Active". A row
+already had); the stage `customer` is also read as "Active". A row
 without source comes in as "Import".
 If it fails: a bad row is skipped with its reason and the others are created. A row with the same name,
 phone and email as a card already there (because it was already imported or because the file repeats it)
@@ -892,18 +893,32 @@ Steps:
    card, with its purchases and what was spent, its consents, its notes and its activity, its health data, its
    groups, tags and custom fields and its linked orders. Recoveries counts it as restored ("Customers: 1
    restored").
-In: the deleted card, by its identifier.
+4. If after deleting it the business deleted one of its groups, tags or custom fields, the card also comes back with
+   it, as a card the business no longer has comes back: the one with the same name if the business made it again and,
+   if not, one made again as it was in the copy, with the operations of the Groups, Tags and Fields screens
+   (CUSTOMER-F06, CUSTOMER-F04, CUSTOMER-F29).
+In: the deleted card, by its identifier, and its groups, tags and custom field values in the copy, each with its
+identifier there.
 Out: the card live again, none of its details changed, and the card-recovered notice
-(`customer.customer.restored`).
+(`customer.customer.restored`); and, if it lacked something that hung from it, each group, tag or field made again with
+its notice (`customer.group.created`, `customer.tag.created`, `customer.field.created`, and `customer.group.updated` or
+`customer.tag.updated` if it was deactivated) and those of its groups and tags set (`customer.customer.groups_changed`,
+`customer.customer.tags_changed`).
 If it fails: a card merged into another (CUSTOMER-F13) or with its personal data erased (CUSTOMER-F16) never comes
 back: its history lives on in the other card, or its data no longer exists ("This customer is no longer
 available."). Nor does it come back if the business has already created the same person again (the same name, phone
 and email, CUSTOMER-F12): the one it made stays. A card the business no longer has at all is created again
 (CUSTOMER-F01), with its groups, tags and custom fields from the copy: the group, tag or field the business has with
 that name is that one, without making another, and one it no longer has is made again as it was (CUSTOMER-F06,
-CUSTOMER-F04, CUSTOMER-F29); a value of a field the business deactivated does not come back, and one its field no
-longer accepts leaves the whole card out with its reason. A deleted card that comes back does not get back the group,
-tag or field the business deleted afterwards (hub#1356). On a live card it does not fail: it answers fine and
+CUSTOMER-F04, CUSTOMER-F29). A value of a field the business deactivated, or one its field no longer accepts (no
+longer one of its options or no longer of its type), does not come back, but it does not leave the card out: the card
+comes back without it, and Recoveries counts it ("Customers: 2 created, 1 with notes") and says under "notes" which
+field and why, without the value, which is the customer's ("customer.field_inactive: came back without its value of
+the field "Size": deactivated in Customers", "customer.field_invalid_option: … no longer one of its options")
+(hub#1438). For a deleted card that comes back, what the business still has stays as it is, even if it took the card
+out of a group or removed a value before deleting it; a value it already has in a field the business made again stays,
+and one of a field the business deactivated or that its field no longer accepts does not come back: the card comes
+back all the same, without it and with its note (hub#1356, hub#1438). On a live card it does not fail: it answers fine and
 notifies again. What was charged in its name
 while it was deleted does not add up (CUSTOMER-F20).
 Involved: BASE-F114, CUSTOMER-F01, CUSTOMER-F04, CUSTOMER-F06, CUSTOMER-F07, CUSTOMER-F12, CUSTOMER-F13, CUSTOMER-F16,
@@ -1064,7 +1079,7 @@ who use the services of Customers.
 | Erase personal data | yes | yes | no | no | `customer.erase` |
 
 "With PIN": the employee does it if a manager approves it on the spot with their PIN (or their badge) on
-the same device (BASE-F84), as in the current product: what the manager holds, another profile does with
+the same device (BASE-F84): what the manager holds, another profile does with
 their approval. Exporting is a read and is not approved; deleting cards, groups and tags and erasing
 personal data belong only to the owner and the administrator, and are never asked for.
 
@@ -1074,4 +1089,4 @@ card back or making again the one the business no longer has: the system does it
 separate copy (CUSTOMER-F33, `customer.restore`, which no app declares either).
 
 The server applies these permissions even if the screen shows the button, also through the API and the
-assistant. What the "Cashier" profile had in the current product, the employee has here.
+assistant.

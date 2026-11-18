@@ -6,9 +6,9 @@ never changes when the card does afterwards.
 import pytest
 from live.errors import InvalidPayload, NotFound
 
-from apps.invoice.tests.conftest import ISSUER, deliver, run
+from apps.invoice.tests.conftest import HUB_DB, ISSUER, deliver, run
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 LINE = {
     "description": "Hair course",

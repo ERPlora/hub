@@ -19,7 +19,7 @@ const photo = (): unknown =>
 
 /** The row of `a`'s WhatsApp channel, whole, or none. */
 const channel = (): unknown =>
-  JSON.parse(psql("select coalesce(json_agg(c order by c.id), '[]') from whatsapp_inbox_channel c where c.host = 'a'"));
+  JSON.parse(psql("select coalesce(json_agg(c order by c.id), '[]') from whatsapp_inbox_channel c"));
 
 test.describe.configure({ mode: 'serial' });
 

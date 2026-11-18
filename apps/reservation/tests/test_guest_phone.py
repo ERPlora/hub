@@ -18,9 +18,9 @@ from apps.customer.models import Customer
 from apps.customer.services import PHONE_INVALID
 from apps.reservation.models import Reservation, TimeSlot, WaitlistEntry
 
-from .conftest import THURSDAY, TOMORROW, book, make_customer, make_reservation, make_slot, open_week, run
+from .conftest import HUB_DB, THURSDAY, TOMORROW, book, make_customer, make_reservation, make_slot, open_week, run
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 LOCAL = "600111222"
 LUCIA = "+34600111222"

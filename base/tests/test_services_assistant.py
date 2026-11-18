@@ -9,6 +9,7 @@ from datetime import datetime
 
 import pytest
 from django.db import connections
+from live import assistant as shared
 from live.context import OperationContext, Scope
 from live.errors import OperationError, Unauthorized
 from live.operations import Operation, get, registry
@@ -17,14 +18,15 @@ from ninja import Schema
 from base import assistant
 from base.models import Hub, Membership
 from base.tenancy import context
-from base.tenancy.tests import hubs
-from base.tests.fake_gateway import gateway  # noqa: F401 - the fixture
+from base.tenancy.tests.business import HUB_DB, HUB_DB_COMMITTED, A, in_business_a
+from base.tests.fake_gateway import gateway
 from base.tests.test_assistant import SECRET_SET, PricedPreviewOut, count_preview, declaring
-from base.tests.test_assistant import settle  # noqa: F401 - the fixture: a dangerous write with its preview
+from base.tests.test_assistant import settle  # a dangerous write with its preview
 
-pytestmark = pytest.mark.django_db
+#: The fixtures these tests take from elsewhere.
+__all__ = ["gateway", "in_business_a", "settle"]
 
-A = Scope("host", "a")
+pytestmark = HUB_DB
 MANAGER = frozenset({"base.view_home", "demo.*"})
 EMPLOYEE = frozenset({"base.view_home", "demo.view"})
 ASK = {"role": "user", "content": "crea el elemento Mesa 4"}
@@ -40,7 +42,7 @@ def run(operation_name, permissions=MANAGER, *, actor="ana", **data):
 
 
 def call(name, arguments, call_id="c1"):
-    return {"call_id": call_id, "name": assistant.tool_name(name), "arguments": json.dumps(arguments)}
+    return {"call_id": call_id, "name": shared.tool_name(name), "arguments": json.dumps(arguments)}
 
 
 def asked(*calls):
@@ -86,7 +88,7 @@ def items():
 def test_the_turn_is_the_persons_and_not_a_tool():
     op = get("base.assistant.turn")
     assert (op.kind, op.permission) == ("command", "base.view_home")
-    assert not assistant.is_tool(op)
+    assert not assistant.tools.is_tool(op)
     with pytest.raises(Unauthorized):
         run("base.assistant.turn", actor=None, messages=[ASK])
 
@@ -109,7 +111,7 @@ def test_a_turn_whose_actor_has_no_role_here_names_none():
 
 
 def test_a_turn_names_the_role_of_the_persons_membership(make_user):
-    ana = make_user("ana", host="a", role=Membership.Role.ADMIN)
+    ana = make_user("ana", host=A.key, role=Membership.Role.ADMIN)
     plan = run("base.assistant.turn", actor=ana, messages=[ASK])
     assert "You talk to the «Administrador» of this business" in plan["instructions"]
 
@@ -118,7 +120,7 @@ def test_the_instructions_take_the_decimals_of_the_business_currency_not_two():
     """A yen business has no cents, so its turn
     tells the model «17 JPY → 17» (``base.business.get``'s ``currency_decimals``), never a fixed «.00 → 1700»;
     the card's money carries the same decimals."""
-    Hub.objects.filter(slug="a").update(country="JP")
+    Hub.objects.filter(slug=A.key).update(country="JP")
     plan = turn(call("demo.item.create", {"name": "Mesa 4"}))
     assert "17 JPY → 17" in plan["instructions"]
     assert plan["confirm"]["money"] == {"currency": "JPY", "decimals": 0}
@@ -331,7 +333,7 @@ def test_a_preview_the_person_may_not_read_shows_no_card(settle):
 
 def test_taking_a_pin_away_names_whose_it_is(make_user):
     """Base's own: the card of «Remove the PIN» named the person by the id the model sent («saas:3»)."""
-    make_user("saas:3", host="a", role=Membership.Role.EMPLOYEE, first_name="Eva", last_name="Gil", email="eva@example.com")
+    make_user("saas:3", host=A.key, role=Membership.Role.EMPLOYEE, first_name="Eva", last_name="Gil", email="eva@example.com")
     admin = {"base.view_home", "base.administer_hub"}
     card = turn(call("base.person.pin_remove", {"person": "saas:3"}), permissions=admin)["confirm"]
     assert {field["name"]: field["value"] for field in card["preview"]} == {"name": "Eva Gil", "email": "eva@example.com"}
@@ -432,10 +434,8 @@ def test_a_tool_this_person_was_not_offered_is_refused_and_writes_nothing():
     assert "Mesa 4" not in items()
 
 
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
-def test_a_write_the_assistant_runs_for_one_business_never_lands_in_another(hub_a, hub_b, monkeypatch):
+def test_a_write_the_assistant_runs_for_one_business_never_lands_in_another(hub_a, hub_b):
     """Two businesses with a database each, as production (no fallback on the shared one)."""
-    monkeypatch.setattr(context, "_test_fallback", None)
     write = call("demo.item.create", {"name": "Solo en A"})
     op = get("base.assistant.turn")
     as_a = OperationContext(scope=Scope("host", hub_a.slug), actor="ana", permissions=MANAGER, language="es")
@@ -459,11 +459,11 @@ def test_a_write_the_assistant_runs_for_one_business_never_lands_in_another(hub_
 
 
 def test_after_too_many_rounds_the_turn_stops_and_says_why():
-    rounds = [asked(call("demo.item.list", {}, f"r{n}")) for n in range(assistant.MAX_ROUNDS)]
+    rounds = [asked(call("demo.item.list", {}, f"r{n}")) for n in range(shared.MAX_ROUNDS)]
     messages = [ASK]
     for n, message in enumerate(rounds[:-1]):
         messages += [message, {"role": "tool", "tool_call_id": f"r{n}", "content": "{}"}]
-    last = call("demo.item.list", {}, f"r{assistant.MAX_ROUNDS - 1}")
+    last = call("demo.item.list", {}, f"r{shared.MAX_ROUNDS - 1}")
     plan = run("base.assistant.turn", messages=[*messages, asked(last)], pending=[last])
     assert plan["stop"] == "assistant.too_many_steps"
     assert plan["executed"][0]["outcome"] == "ok"
@@ -581,27 +581,27 @@ GATEWAY_CALLS = [
 ]
 
 
-@pytest.mark.django_db(transaction=True)
+@HUB_DB_COMMITTED
 @pytest.mark.parametrize(("operation_name", "path", "answer", "data"), GATEWAY_CALLS)
 def test_waiting_for_erplora_com_holds_no_transaction(gateway, monkeypatch, operation_name, path, answer, data):
     """Up to 15 s of waiting inside a transaction would hold the hub's connection (and, on the Free plan, its one
     transaction at a time), so the till would wait too: while the gateway answers, none is open."""
     gateway.reply(path, json=answer)
     seen = []
-    post = assistant._post
+    post = assistant.gateway._post
 
     def probe(*args, **kwargs):
         seen.append(any(connection.in_atomic_block for connection in connections.all()))
         return post(*args, **kwargs)
 
-    monkeypatch.setattr(assistant, "_post", probe)
+    monkeypatch.setattr(assistant.gateway, "_post", probe)
     run(operation_name, EMPLOYEE, **data)
     assert seen == [False]
 
 
 def test_a_turn_reads_the_hubs_own_words():
-    """In the Hub a «cuenta» is a table's open check (``base.assistant.SYNONYMS``): the turn offers the read of a check
-    among its first tools, as the assistant's QA ranks it (base/tests/test_assistant_asks.py), never at 14."""
+    """In the Hub a «cuenta» is a table's open check (Sales' ``assistant_synonyms``): the turn offers the read of a
+    check among its first tools, as the assistant's QA ranks it (base/tests/test_assistant_asks.py), never at 14."""
     asked = {"role": "user", "content": "¿qué hay en la cuenta de la mesa 6?"}
     plan = run("base.assistant.turn", {"*"}, messages=[asked])
-    assert assistant.tool_name("sale.order.get") in [tool["name"] for tool in plan["tools"]][:10]
+    assert shared.tool_name("sale.order.get") in [tool["name"] for tool in plan["tools"]][:10]

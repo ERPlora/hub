@@ -16,6 +16,7 @@ from apps.invoice.models import Invoice, InvoiceSeries
 from apps.verifactu import certificates, queries
 from apps.verifactu.models import Chain, Config, Environment, Record
 from apps.verifactu.tests.conftest import (
+    HUB_DB,
     A,
     answering,
     b64,
@@ -25,7 +26,7 @@ from apps.verifactu.tests.conftest import (
     run,
 )
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 
 @pytest.fixture
@@ -66,7 +67,6 @@ def by_own_certificate(*, live: bool = False):
         "verifactu.certificate.upload",
         {"p12_base64": b64(make_p12()), "password": "secret"},
     )
-    run("verifactu.config.update", {"route": "own"})
     if live:
         run("verifactu.config.go_live")
 
@@ -190,7 +190,7 @@ def test_an_unreadable_own_certificate_is_no_way_to_production(issuer, opened, h
         code_of(lambda: run("verifactu.config.go_live"))
         == "verifactu.own_certificate_unreadable"
     )
-    assert Config.objects.get().environment == Environment.TESTING
+    assert run("verifactu.config.get").environment == Environment.TESTING
 
 
 @pytest.mark.parametrize("how", ["missing", "rotated"])

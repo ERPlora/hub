@@ -4,7 +4,6 @@ import gettext
 import json
 from pathlib import Path
 
-import pytest
 from django.apps import apps
 from django.utils import translation
 
@@ -20,6 +19,8 @@ from base.tests.po import (
     operation_titles,
     untranslated,
 )
+
+from .conftest import HOST, HUB_DB
 
 LOCALE = Path(apps.get_app_config("online_booking").path) / "locale" / "es" / "LC_MESSAGES"
 MODELS = (Settings, Booking)
@@ -77,13 +78,13 @@ def test_spanish_texts_of_the_workbook():
         assert str(services.DEFAULT_CONFIRMED) == "Tu reserva está confirmada. ¡Hasta pronto!"
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_public_page_answers_in_the_visitors_language(client, make_user, salon):
-    client.force_login(make_user("boss", host="a", role="hub_admin"))
-    response = client.get("/api/online_booking/public/page", HTTP_HOST="a.localhost", HTTP_ACCEPT_LANGUAGE="es")
+    client.force_login(make_user("boss", role="hub_admin"))
+    response = client.get("/api/online_booking/public/page", HTTP_HOST=HOST, HTTP_ACCEPT_LANGUAGE="es")
     assert response.json()["title"] == "Reserva tu cita"
     refused = client.get(
-        "/api/online_booking/bookings/detail", {"number": "APT-NOPE"}, HTTP_HOST="a.localhost", HTTP_ACCEPT_LANGUAGE="es"
+        "/api/online_booking/bookings/detail", {"number": "APT-NOPE"}, HTTP_HOST=HOST, HTTP_ACCEPT_LANGUAGE="es"
     )
     assert refused.status_code == 404
     assert refused.json()["error"]["message"] == "Esa reserva no existe o su enlace ya no es válido."

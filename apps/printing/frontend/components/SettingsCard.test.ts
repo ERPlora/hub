@@ -12,7 +12,7 @@ import SettingsCard from './SettingsCard.vue';
 
 vi.mock('@erplora/ui/shell', async (importOriginal) => ({
   ...((await importOriginal()) as object),
-  toastSuccess: vi.fn(() => Promise.resolve()),
+  toastSuccess: vi.fn(),
 }));
 beforeEach(() => vi.mocked(toastSuccess).mockClear());
 
@@ -147,7 +147,7 @@ describe('SettingsCard', () => {
   it('speaks Spanish', async () => {
     const s = await setup(true, 'es');
     await s.result(OP, FACTORY);
-    expect(s.find('printing-settings-label-print_receipt_on_sale').text()).toBe('Imprimir ticket al cobrar');
+    expect(s.find('printing-settings-label-print_receipt_on_sale').text()).toBe('Imprimir tique al cobrar');
     expect(s.inDoc('printing-settings-save')?.textContent?.trim()).toBe('Guardar ajustes');
   });
 

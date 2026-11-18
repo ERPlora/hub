@@ -4,14 +4,17 @@ exact-number lookup for other apps, the summary, the templates, the channel and 
 import datetime as dt
 
 import pytest
-from django.db import connection
+from django.db import connections
 from django.test.utils import CaptureQueriesContext
 from live.errors import Conflict, NotFound, PermissionDenied
 
 from apps.whatsapp_inbox.models import Conversation
+from base.tenancy.context import current_alias
 from base.tests.ordering import assert_reads_backwards, listed_with
 
 from apps.whatsapp_inbox.tests.conftest import (
+    B,
+    HUB_DB,
     NOW,
     card,
     connect,
@@ -21,7 +24,7 @@ from apps.whatsapp_inbox.tests.conftest import (
     template,
 )
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 
 def listed(params=None, ctx=None) -> list[str]:
@@ -304,12 +307,16 @@ def test_the_notes_ask_who_the_caller_is_once_however_many_there_are(three, make
         return run("whatsapp_inbox.note.list", {"conversation": "Ana"}, as_luis).rows
 
     run("whatsapp_inbox.note.add", {"conversation": "Ana", "text": "One"}, as_luis)
-    with CaptureQueriesContext(connection) as one:
+    business, control = connections[current_alias()], connections["default"]
+    with CaptureQueriesContext(business) as one, CaptureQueriesContext(control) as one_on_control:
         assert len(listed()) == 1
     for text in ("Two", "Three", "Four"):
         run("whatsapp_inbox.note.add", {"conversation": "Ana", "text": text}, as_luis)
 
-    with django_assert_num_queries(len(one.captured_queries)):
+    with (
+        django_assert_num_queries(len(one), connection=business),
+        django_assert_num_queries(len(one_on_control), connection=control),
+    ):
         assert [note.can_delete for note in listed()] == [True] * 4
 
 
@@ -358,7 +365,7 @@ def test_the_channel_before_erplora_speaks_and_after():
 def test_the_team_is_the_people_of_this_business(make_user):
     make_user("luis", first_name="Luis", last_name="Gil")
     make_user("marta", first_name="Marta", role="hub_manager")
-    make_user("pepe", host="b")
+    make_user("pepe", host=B.key)
     page = run("whatsapp_inbox.agent.list", {}, ctx_for("hub_employee"))
     assert [(a.name, a.role) for a in page.rows] == [
         ("Luis Gil", "hub_employee"),

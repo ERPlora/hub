@@ -11,12 +11,11 @@ from live.context import Scope
 from live.errors import NotFound
 
 from apps.whatsapp_inbox.models import Template
-from apps.whatsapp_inbox.tests.conftest import NOW, ctx_for, receive, resume_each, run, system, template
+from apps.whatsapp_inbox.tests.conftest import HUB_DB, NOW, ctx_for, receive, resume_each, run, system, template
 from base.tenancy.context import use_hub
-from base.tenancy.tests import hubs
 
 pytestmark = [
-    pytest.mark.django_db(databases=hubs.HUB_DATABASES),
+    HUB_DB,
     pytest.mark.usefixtures("no_test_fallback"),
 ]
 
@@ -73,7 +72,8 @@ def test_a_business_neither_edits_nor_deletes_nor_retries_another_s_template(hub
             with pytest.raises(NotFound) as raised:
                 run(name, payload, ctx_for(scope=Scope("host", hub_a.slug)))
             assert raised.value.code == "whatsapp_inbox.template_not_found", name
-    theirs.refresh_from_db()
+    with use_hub(hub_b):
+        theirs.refresh_from_db()
     assert (theirs.deleted_at, theirs.body) == (None, "Hola {{1}}, te esperamos el {{2}}.")
 
 

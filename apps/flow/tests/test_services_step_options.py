@@ -17,9 +17,9 @@ from apps.customer.models import Customer
 from apps.flow.models import Flow, FlowRun
 from apps.task.models import Task
 
-from .conftest import TASK_STEP, make_flow, run
+from .conftest import HUB_DB, TASK_STEP, make_flow, run
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 MADRID = ZoneInfo("Europe/Madrid")
 NOON = dt.datetime(2026, 10, 15, 12, 0, tzinfo=MADRID)

@@ -563,7 +563,7 @@ CONTACT_FIELDS = ("guest_name", "guest_phone", "guest_email")
         "risk": "normal",
     },
 )
-def update_reservation(ctx: OperationContext, data: ReservationPatchIn) -> dict:
+def update_reservation(ctx: OperationContext, data: ReservationPatchIn) -> dict:  # noqa: C901
     settings = lock_book()
     reservation = _named(data)
     if data.on_behalf_of is not None and any(

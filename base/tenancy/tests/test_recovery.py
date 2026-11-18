@@ -23,15 +23,18 @@ import uuid
 import pytest
 from django.apps import apps as django_apps
 from django.db import connections
+from django.db.migrations.loader import MigrationLoader
 from django.utils import timezone
 from live.context import OperationContext, Scope
 from live.meta import all_live_app_configs
 from live.models import OutboxEvent
 from live.operations import get as get_operation
+from ninja import Schema
 from psycopg import sql
+from pydantic import ConfigDict
 
 from base import recovery as base_recovery
-from base import services
+from base.services import provisioning
 from base.tenancy import connections as tenancy_connections
 from base.tenancy import names, recovery
 from base.tenancy.context import use_control, use_hub
@@ -128,6 +131,20 @@ class Recoveries(hubs.CopiedHubs):
         gone(hub, *ids)
         return hub, self.ask(copy)
 
+    def deleted_with_customers_off(self, every_app_on) -> tuple[Hub, CopyRecovery]:
+        """A business that deleted Ana's card since its copy and then turned Customers off, and the recovery asked of
+        that copy."""
+        hub, (ana,) = self.business(every_app_on, ANA)
+        copy = self.copy_of(hub)
+        run_in(hub, "customer.customer.delete", id=ana)
+        with use_hub(hub):
+            from base import activation
+            from base.models import AppActivation
+
+            AppActivation.objects.filter(host=hub.slug, app="customer").update(state="off")
+            activation.forget(hub.slug)
+        return hub, self.ask(copy)
+
     def ask(self, copy: RestoredCopy, *apps: str, **fields) -> CopyRecovery:
         """What ``control.copy.recover`` writes: the apps to bring back from ``copy``, asked by the staff."""
         values = {"copy": copy, "apps": list(apps or ["customer"]), "asked_by": "root", "language": "en"}
@@ -151,13 +168,21 @@ def fresh(row: CopyRecovery) -> CopyRecovery:
     return CopyRecovery.objects.get(pk=row.pk)
 
 
+def fields_held_since(label: str, model: str, migration: str) -> set[str]:
+    """The fields ``model`` of the app ``label`` holds once ``migration`` is applied: what a read that names it as
+    its ``reads_since`` may read of a copy."""
+    return set(MigrationLoader(None).project_state((label, migration)).models[label, model].fields)
+
+
 def in_the_copy(copy: RestoredCopy, statement: str, params=()) -> list[tuple]:
     with hubs._maintenance(copy.db_name) as conn:
         cursor = conn.execute(statement, params)
         return cursor.fetchall() if cursor.description else []
 
 
-CUSTOMERS = {"app": "customer", "restored": 0, "created": 0, "not_created": 0, "reasons": [], "refused": ""}
+CUSTOMERS = {
+    "app": "customer", "label": "Customers", "restored": 0, "created": 0, "not_created": 0, "reasons": [], "refused": ""
+}
 
 
 def test_only_the_actor_of_a_recovery_says_it_brought_something_back():
@@ -429,16 +454,7 @@ class TestCustomersComeBack:
         assert (customers["created"], customers["not_created"], len(customers["reasons"])) == (0, 2, 1)
 
     def test_an_app_the_business_turned_off_is_refused_with_why_and_nothing_is_made(self, recoveries, every_app_on):
-        hub, (ana,) = recoveries.business(every_app_on, ANA)
-        copy = recoveries.copy_of(hub)
-        run_in(hub, "customer.customer.delete", id=ana)
-        with use_hub(hub):
-            from base import activation
-            from base.models import AppActivation
-
-            AppActivation.objects.filter(host=hub.slug, app="customer").update(state="off")
-            activation.forget(hub.slug)
-        asked = recoveries.ask(copy)
+        hub, asked = recoveries.deleted_with_customers_off(every_app_on)
 
         run()
 
@@ -485,7 +501,17 @@ class TestCustomersComeBack:
         assert len(live_cards(hub)) == 1
 
 
-APPOINTMENTS = {"app": "appointment", "restored": 0, "created": 0, "not_created": 0, "reasons": [], "refused": ""}
+APPOINTMENTS = {
+    "app": "appointment",
+    "label": "Appointments",
+    "restored": 0,
+    "created": 0,
+    "not_created": 0,
+    "reasons": [],
+    "refused": "",
+}
+#: What Appointments gives back after its appointments, its series (hub#1327): none in these tests of appointments.
+SERIES = APPOINTMENTS | {"label": "Repeating appointments"}
 
 
 def a_monday_at(hhmm: str) -> str:
@@ -565,7 +591,8 @@ def gone_from_the_agenda(hub: Hub, *appointments) -> None:
 def the_one_not_booked(asked: CopyRecovery) -> dict:
     """Why the only appointment of ``asked`` that did not come back did not, the others having come back the same: a
     deleted one the restore refuses is never booked anew."""
-    [appointments] = fresh(asked).results
+    [appointments, series] = fresh(asked).results
+    assert series == SERIES
     assert (appointments["restored"], appointments["created"], appointments["not_created"], appointments["refused"]) == (
         1,
         0,
@@ -611,7 +638,7 @@ class TestAppointmentsComeBack:
         )
         done = fresh(asked)
         assert (done.status, done.last_error) == ("done", "")
-        assert done.results == [APPOINTMENTS | {"restored": 1, "created": 1}]
+        assert done.results == [APPOINTMENTS | {"restored": 1, "created": 1}, SERIES]
 
     def test_asked_again_nothing_is_booked_twice(self, recoveries, every_app_on):
         salon = Salon(recoveries, every_app_on, ANA)
@@ -623,7 +650,7 @@ class TestAppointmentsComeBack:
         assert run() == 1
 
         assert len(salon.live()) == 1
-        assert fresh(again).results == [APPOINTMENTS]
+        assert fresh(again).results == [APPOINTMENTS, SERIES]
 
     def test_one_gone_by_in_the_copy_does_not_come_back(self, recoveries, every_app_on):
         salon = Salon(recoveries, every_app_on, ANA)
@@ -637,7 +664,7 @@ class TestAppointmentsComeBack:
         run()
 
         assert salon.live() == []
-        assert fresh(asked).results == [APPOINTMENTS]
+        assert fresh(asked).results == [APPOINTMENTS, SERIES]
 
     def test_its_customer_lost_too_comes_back_first_whatever_the_order_they_are_asked_in(self, recoveries, every_app_on):
         salon = Salon(recoveries, every_app_on, ANA)
@@ -650,8 +677,8 @@ class TestAppointmentsComeBack:
 
         [(name, *_rest)] = salon.live()
         assert name == "Ana López"
-        assert [result["app"] for result in fresh(asked).results] == ["customer", "appointment"]
-        assert fresh(asked).results[1] == APPOINTMENTS | {"restored": 1}
+        assert [result["app"] for result in fresh(asked).results] == ["customer", "appointment", "appointment"]
+        assert fresh(asked).results[1:] == [APPOINTMENTS | {"restored": 1}, SERIES]
 
     def test_one_whose_time_was_taken_since_is_never_booked_over_and_says_why_and_the_others_come_back(
         self, recoveries, every_app_on
@@ -685,6 +712,265 @@ class TestAppointmentsComeBack:
         why = the_one_not_booked(asked)
         assert why["id"] == str(lost.id)
         assert why["reason"].startswith("customer.customer_unavailable: ")
+
+
+GROUPS = CUSTOMERS | {"label": "Groups"}
+
+
+def groups_given_back_too(monkeypatch, missing=list) -> None:
+    """Customers declares a second thing it gives back after its cards: the copy's group «VIP», made by
+    ``customer.group.create`` when ``missing`` says the business lacks it."""
+    from django.utils.translation import gettext_lazy
+
+    from base.recovery import Recoverable
+
+    declared = recovery.recoverable_apps
+
+    def with_groups():
+        answers = declared()
+        groups = Recoverable(
+            label=gettext_lazy("Groups"),
+            reads_since="0001_initial",
+            read=lambda conn: [{"id": str(uuid.uuid7()), "name": "VIP"}],
+            missing=missing,
+            create="customer.group.create",
+        )
+        return answers | {"customer": [*answers["customer"], groups]}
+
+    monkeypatch.setattr(recovery, "recoverable_apps", with_groups)
+
+
+def live_groups(hub: Hub) -> list[str]:
+    with use_hub(hub):
+        from apps.customer.models import CustomerGroup
+
+        return list(CustomerGroup.objects.values_list("name", flat=True))
+
+
+class TestEachThingAnAppGivesBack:
+    """An app may declare several things it gives back (a category before what goes in it): each is counted apart,
+    under its own name, so Recoveries says how each went."""
+
+    def test_each_is_counted_apart_under_its_name_as_the_code_writes_it(self, recoveries, every_app_on, monkeypatch):
+        groups_given_back_too(monkeypatch)
+        hub, (ana,) = recoveries.business(every_app_on, ANA)
+        copy = recoveries.copy_of(hub)
+        gone(hub, ana)
+        # Asked by staff who read Spanish: the name is kept as the code writes it, and said in whoever reads it's.
+        asked = recoveries.ask(copy, language="es")
+
+        assert run() == 1
+
+        assert fresh(asked).results == [CUSTOMERS | {"created": 1}, GROUPS | {"created": 1}]
+        assert live_groups(hub) == ["VIP"]
+
+    def test_what_an_app_reads_while_it_gives_back_knows_the_recovery_at_work_and_nothing_outside_one(
+        self, recoveries, every_app_on, monkeypatch
+    ):
+        seen = []
+        groups_given_back_too(monkeypatch, missing=lambda records: seen.append(base_recovery.at_work()) or [])
+        hub, _ = recoveries.business(every_app_on, ANA)
+        asked = recoveries.ask(recoveries.copy_of(hub))
+
+        assert run() == 1
+
+        assert seen == [base_recovery.actor_of(asked.pk)]
+        assert base_recovery.at_work() is None
+
+    def test_asked_again_it_carries_on_the_ones_of_its_copy_that_failed_and_no_other(
+        self, recoveries, every_app_on, monkeypatch
+    ):
+        hub, _ = recoveries.business(every_app_on, ANA)
+        copy, other_copy = recoveries.copy_of(hub), recoveries.copy_of(hub)
+        failed = recoveries.ask(copy, status=CopyRecovery.Status.FAILED)
+        done = recoveries.ask(copy, status=CopyRecovery.Status.DONE)
+        failed_elsewhere = recoveries.ask(other_copy, status=CopyRecovery.Status.FAILED)
+        asked = recoveries.ask(copy)
+        rows = (failed, done, failed_elsewhere, asked)
+        seen = []
+
+        def carried(records):
+            seen.append([base_recovery.carries_on(base_recovery.actor_of(row.pk)) for row in rows])
+            return []
+
+        groups_given_back_too(monkeypatch, missing=carried)
+
+        assert run() == 1
+
+        assert seen == [[True, False, False, False]]
+        assert [base_recovery.carries_on(base_recovery.actor_of(row.pk)) for row in rows] == [False] * 4
+
+    def test_what_an_app_refuses_for_all_ends_its_part_and_what_was_left_of_it_says_why(
+        self, recoveries, every_app_on, monkeypatch
+    ):
+        asked_for = []
+        groups_given_back_too(monkeypatch, missing=lambda records: asked_for.append(records) or records)
+        hub, asked = recoveries.deleted_with_customers_off(every_app_on)
+
+        run()
+
+        [customers, groups] = fresh(asked).results
+        assert customers["refused"].startswith("app_inactive: ")
+        assert groups == GROUPS | {"refused": customers["refused"]}
+        # Never even looked for in the business.
+        assert (asked_for, live_groups(hub)) == ([], [])
+
+    def test_an_app_the_copy_cannot_give_back_says_why_for_each_thing_it_declares(
+        self, recoveries, every_app_on, monkeypatch
+    ):
+        groups_given_back_too(monkeypatch)
+        hub, (ana,) = recoveries.business(every_app_on, ANA)
+        copy = recoveries.copy_of(hub)
+        gone(hub, ana)
+        in_the_copy(copy, "DELETE FROM django_migrations WHERE app = 'customer'")
+        asked = recoveries.ask(copy)
+
+        run()
+
+        why = "recover_not_in_copy: customer was not in the business at the copy's moment"
+        assert fresh(asked).results == [CUSTOMERS | {"refused": why}, GROUPS | {"refused": why}]
+        assert (live_cards(hub), live_groups(hub)) == ([], [])
+
+    def test_an_app_that_declares_nothing_says_so_as_a_whole(self, recoveries, every_app_on):
+        hub, _ = recoveries.business(every_app_on)
+        asked = recoveries.ask(recoveries.copy_of(hub), "task")
+
+        assert run() == 1
+
+        why = "recover_not_recoverable: task gives nothing back from a copy"
+        assert fresh(asked).results == [
+            {"app": "task", "restored": 0, "created": 0, "not_created": 0, "reasons": [], "refused": why}
+        ]
+
+
+def came_back_without(monkeypatch, operation: str, left_out) -> None:
+    """``operation`` says, as an app's operation says it (its output mixes in ``base.recovery.RecoveredOut``), what
+    each record it brings back came back without: ``left_out(data)``, by its input."""
+    op = get_operation(operation)
+    real, plain = op.fn, op.output
+
+    class Recovered(plain, base_recovery.RecoveredOut):
+        pass
+
+    def saying_what_it_left(ctx, data):
+        made = plain.model_validate(real(ctx, data))
+        # An output that mixes it in already, as Customers' does, says here what the test makes it say.
+        return Recovered(**(made.model_dump() | {"left_out": left_out(data)}))
+
+    monkeypatch.setattr(op, "fn", saying_what_it_left)
+    monkeypatch.setattr(op, "output", Recovered)
+
+
+def left(code: str, message: str):
+    return base_recovery.LeftOut(code=code, message=message)
+
+
+class TestWhatARecordCameBackWithout:
+    """A record can come back without something that hung from it (a professional of a service who has left since):
+    its operation says so and why, and the recovery notes it by the record's id in the copy, as it notes why one did not
+    come back at all."""
+
+    def test_each_is_noted_by_the_records_id_in_the_copy_with_why_and_counted_once_a_record(
+        self, recoveries, every_app_on, monkeypatch
+    ):
+        hub, (ana, luis, marta) = recoveries.business(every_app_on, ANA, LUIS, MARTA)
+        copy = recoveries.copy_of(hub)
+        # Ana deleted and still held, Luis and Marta gone: only Ana and Luis come back without something.
+        gone(hub, luis, marta)
+        run_in(hub, "customer.customer.delete", id=ana)
+        came_back_without(
+            monkeypatch,
+            "customer.customer.restore",
+            lambda data: [left("customer.test_left_out", "came back without its tag Regular")],
+        )
+        came_back_without(
+            monkeypatch,
+            "customer.customer.recover",
+            lambda data: [left("customer.test_left_out", f"came back without its group {group}") for group in "AB"]
+            if data.name == LUIS["name"]
+            else [],
+        )
+        asked = recoveries.ask(copy)
+
+        run()
+
+        assert fresh(asked).results == [
+            CUSTOMERS
+            | {
+                "restored": 1,
+                "created": 2,
+                "noted": 2,
+                "notes": [
+                    {"id": str(ana), "note": "customer.test_left_out: came back without its tag Regular"},
+                    {"id": str(luis), "note": "customer.test_left_out: came back without its group A"},
+                    {"id": str(luis), "note": "customer.test_left_out: came back without its group B"},
+                ],
+            }
+        ]
+
+    def test_only_the_first_notes_are_kept_and_every_record_noted_is_counted(
+        self, recoveries, every_app_on, monkeypatch
+    ):
+        hub, asked = recoveries.all_lost(every_app_on, ANA, LUIS)
+        came_back_without(
+            monkeypatch, "customer.customer.recover", lambda data: [left("customer.test_left_out", data.name)]
+        )
+        monkeypatch.setattr(CopyRecovery, "REASONS_KEPT", 1)
+
+        run()
+
+        [customers] = fresh(asked).results
+        assert (customers["created"], customers["noted"], len(customers["notes"])) == (2, 2, 1)
+
+    def test_an_output_that_says_nothing_left_notes_nothing(self, recoveries, every_app_on, monkeypatch):
+        hub, asked = recoveries.all_lost(every_app_on, ANA)
+        came_back_without(monkeypatch, "customer.customer.recover", lambda data: [])
+
+        run()
+
+        assert fresh(asked).results == [CUSTOMERS | {"created": 1}]
+
+
+def restore_given(monkeypatch, takes: type[Schema]) -> list[dict]:
+    """Customers' restore declares the input ``takes``: each input it is given, in the list returned, and the card
+    brought back as its own restore brings it back."""
+    op = get_operation("customer.customer.restore")
+    real, plain = op.fn, op.input
+    given = []
+
+    def keeping_what_it_takes(ctx, data):
+        given.append(data.model_dump())
+        return real(ctx, plain.model_validate({"id": data.id}))
+
+    monkeypatch.setattr(op, "fn", keeping_what_it_takes)
+    monkeypatch.setattr(op, "input", takes)
+    return given
+
+
+class TestWhatARestoreTakes:
+    """A restore takes, of the record as the copy holds it, what its input declares: its id, as every restore of an
+    app takes it, and whatever else it names to give back to the record what the business lost of it since (a group
+    it deleted, hub#1356). An input that refuses a field it does not declare is never given one."""
+
+    def test_a_restore_takes_of_the_record_what_its_input_declares_and_nothing_else(
+        self, recoveries, every_app_on, monkeypatch
+    ):
+        class TakesItsCity(Schema):
+            model_config = ConfigDict(extra="forbid")
+
+            id: uuid.UUID
+            city: str = ""
+
+        given = restore_given(monkeypatch, TakesItsCity)
+        hub, (ana,) = recoveries.business(every_app_on, ANA)
+        copy = recoveries.copy_of(hub)
+        run_in(hub, "customer.customer.delete", id=ana)
+        asked = recoveries.ask(copy)
+
+        run()
+
+        assert fresh(asked).results == [CUSTOMERS | {"restored": 1}]
+        assert given == [{"id": ana, "city": "Madrid"}]
 
 
 class TestTheCopyIsOnlyRead:
@@ -869,7 +1155,7 @@ def test_the_apps_that_answer_and_never_one_whose_records_reach_the_tax_authorit
     answering = {config.label for config in all_live_app_configs() if hasattr(config, recovery.HOOK)}
     fiscal = {config.label for config in all_live_app_configs() if hasattr(config, "fiscal_record_states")}
 
-    assert answering == {"customer", "inventory", "service", "appointment"}
+    assert answering == {"combo", "customer", "inventory", "modifier", "pricing", "service", "appointment"}
     assert not answering & fiscal
     assert set(recovery.recoverable_apps()) == answering
 
@@ -886,6 +1172,20 @@ def test_each_declaration_names_a_migration_of_its_app_and_an_operation_of_its_a
                 assert (op.app_label, op.kind) == (label, "command")
 
 
+def test_each_declaration_is_named_in_words_every_language_of_the_staff_says():
+    """A result keeps the name of what it counts as the code writes it, and Recoveries says it in the language of
+    whoever reads it: so each name is a plain translation (never one with a context), and Spanish has it."""
+    from django.utils import translation
+    from django.utils.translation import gettext
+
+    for label, declared in recovery.recoverable_apps().items():
+        for one in declared:
+            with translation.override(None):
+                written = str(one.label)
+            with translation.override("es"):
+                assert gettext(written) == str(one.label) != written, (label, written)
+
+
 @pytest.mark.parametrize("half", [{"restore": "customer.customer.restore"}, {"deleted": list}])
 def test_a_declaration_restores_only_what_it_reads_deleted_and_both_come_together(half):
     from base.recovery import Recoverable
@@ -900,4 +1200,4 @@ def test_the_lease_is_the_moves():
     from base.tenancy import move
 
     assert recovery.LEASE == move.LEASE
-    assert services.LEASE_OWNER
+    assert provisioning.LEASE_OWNER

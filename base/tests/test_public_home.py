@@ -17,9 +17,11 @@ from django.http import HttpResponse
 from django.test import RequestFactory
 
 from base import public_home
+from base.models import Hub
+from base.tenancy.tests.business import HOST, HUB_DB, A, B
 from base.tests.test_middleware import through_the_jump
 
-pytestmark = [pytest.mark.django_db, pytest.mark.usefixtures("spa_manifest")]
+pytestmark = [HUB_DB, pytest.mark.usefixtures("spa_manifest", "hub_a")]
 
 HTML = "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
 SAAS = "http://localhost:8001"
@@ -62,11 +64,11 @@ def website(monkeypatch) -> FakeProvider:
     return provider
 
 
-def browse(client, path="/", host="a.localhost:8000", method="get", accept=HTML):
+def browse(client, path="/", host=HOST, method="get", accept=HTML):
     return getattr(client, method)(path, HTTP_HOST=host, HTTP_ACCEPT=accept)
 
 
-def jumps_to(client, response, path: str, host="a.localhost:8000") -> bool:
+def jumps_to(client, response, path: str, host=HOST) -> bool:
     """Whether ``response`` is the hub's jump page whose ``/auth/login`` jumps on to the SaaS's ``path``."""
     response = through_the_jump(client, response, host)
     location = urlsplit(response["Location"]) if response.status_code == 302 else None
@@ -87,7 +89,7 @@ def test_without_the_module_the_home_page_jumps_to_the_saas_login(client, monkey
 def test_a_published_site_is_the_home_page_of_a_visitor_without_a_session(client, website, method):
     response = browse(client, method=method)
     assert response.status_code == 200
-    assert website.served == ["a"]
+    assert website.served == [A.key]
     if method == "get":
         assert response.content.decode() == PAGE
 
@@ -109,11 +111,11 @@ def test_a_call_that_does_not_ask_for_a_page_gets_the_published_site_too(client,
 def test_an_unpublished_site_leaves_the_home_page_jumping_to_the_login(client, website):
     website.published = False
     assert jumps_to(client, browse(client), "/hub-login/")
-    assert (website.asked, website.served) == (["a"], [])
+    assert (website.asked, website.served) == ([A.key], [])
 
 
 def test_a_signed_in_person_gets_the_shell_even_with_a_published_site(client, website, make_user):
-    client.force_login(make_user("ana", host="a", role="hub_employee"))
+    client.force_login(make_user("ana", host=A.key, role="hub_employee"))
     response = browse(client)
     assert response.status_code == 200
     assert '<div id="app"></div>' in response.content.decode()
@@ -150,31 +152,28 @@ def test_a_demo_with_a_published_site_shows_it_and_one_without_jumps_to_its_door
 
     from django.utils import timezone
 
-    from base.models import Hub
-
     expires = timezone.now() + dt.timedelta(minutes=5)
-    Hub.objects.create(slug="demo-0000beef", status="ready", is_demo=True, expires_at=expires)
-    response = browse(client, host="demo-0000beef.localhost:8000")
-    assert (response.status_code, website.served) == (200, ["demo-0000beef"])
+    Hub.objects.filter(slug=A.key).update(is_demo=True, expires_at=expires)
+    response = browse(client)
+    assert (response.status_code, website.served) == (200, [A.key])
     website.published = False
-    demo = "demo-0000beef.localhost:8000"
-    assert jumps_to(client, browse(client, host=demo), "/demo/enter/", demo)
+    assert jumps_to(client, browse(client), "/demo/enter/")
 
 
-def test_each_hub_asks_about_its_own_site(client, website):
-    assert browse(client, host="b.localhost:8000").status_code == 200
-    assert website.asked == ["b"]
+def test_each_hub_asks_about_its_own_site(client, website, hub_b):
+    assert browse(client, host=f"{B.key}.localhost").status_code == 200
+    assert website.asked == [B.key]
 
 
 def test_the_answer_is_asked_once_per_request(client, website):
     # The login gate and the view both need it: the provider is asked once, and again on the next request.
     browse(client)
     browse(client)
-    assert website.asked == ["a", "a"]
+    assert website.asked == [A.key, A.key]
 
 
 def test_a_request_without_a_hub_has_no_website(website):
-    request = RequestFactory().get("/", HTTP_HOST="a.localhost:8000")
+    request = RequestFactory().get("/", HTTP_HOST=HOST)
     assert public_home.website_enabled(request) is False
     assert website.asked == []
 

@@ -1,13 +1,15 @@
-// VeriFactu → Settings (VERIFACTU-F04, F08–F12; the old `erp-verifactu-settings`): «Sending» (the «Use my own
-// certificate» switch and the AEAT environment with «Go live» / «Back to testing», each asking first), «Live test»
+// VeriFactu → Settings (VERIFACTU-F04, F08–F12; the old `erp-verifactu-settings`): «Sending» (the route the records go
+// by, said and never chosen, and the AEAT environment with «Go live» / «Back to testing», each asking first), «Live test»
 // («Test the connection», presenting nothing, and «Create test invoice» in testing) and «Responsible declaration»
 // (the signed declaration and the identifying data of this system).
 import { toastSuccess } from '@erplora/ui/shell';
+import { IonButton } from '@ionic/vue';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { outOfTheApp } from '../../../../base/frontend/__tests__/app-download';
 import { expectTapOpensInTheSystemBrowser, insideTheInstalledApp } from '../__tests__/system-browser';
-import { click, EMPLOYEE, flush, ionValue, type MountOptions, mountVerifactu } from '../__tests__/mount-verifactu';
+import { CONFIG as STARTING_CONFIG, CONFIG_WITHOUT_ERPLORA_ROUTE, LOADED_CERTIFICATE } from '../__tests__/config-fixture';
+import { click, EMPLOYEE, type MountOptions, mountVerifactu } from '../__tests__/mount-verifactu';
 import type { ConfigOut, DiagnosticOut } from '../operations';
 import SettingsPage from './SettingsPage.vue';
 
@@ -18,35 +20,14 @@ vi.mock('@erplora/ui/components', async (importOriginal) => ({
 }));
 vi.mock('@erplora/ui/shell', async (importOriginal) => ({
   ...((await importOriginal()) as object),
-  toastSuccess: vi.fn(() => Promise.resolve()),
+  toastSuccess: vi.fn(),
 }));
 beforeEach(() => {
   mocks.confirm.mockReset();
   vi.mocked(toastSuccess).mockClear();
 });
 
-const CONFIG: ConfigOut = {
-  environment: 'testing',
-  route: 'erplora',
-  production_since: null,
-  production_open: true,
-  can_go_back: true,
-  gateway_configured: false,
-  issuer_nif: 'B12345674',
-  issuer_name: 'Peluquería Ana SL',
-  producer: { name: 'ERPLORA CLOUD SL', nif: 'B27593136', system_name: 'ERPlora Hub', system_id: 'EC', version: 'dev', installation: 'a', only_verifactu: 'S', multi_ot: 'S', multiple_ot: 'S' },
-  declaration_version: 'v1',
-  declaration_url: 'https://erplora.com/legal/declaracion-responsable/v1/',
-  account_url: 'https://erplora.com',
-  own_certificate: { loaded: false, holder: '', holder_tax_id: '', kind: '', uploaded_at: null, expires_at: null, expires_in_days: null },
-  representation: { status: 'none', updated_at: null, reason: '', linked: true, company: true, submission: null, history: [] },
-  synced_at: null,
-  route_ready: true,
-  route_ready_for_production: false,
-  reasons: [],
-  issue_blocker: null,
-  live_blockers: [],
-};
+const CONFIG: ConfigOut = { ...STARTING_CONFIG, production_open: true };
 const NOT_APPROVED = { code: 'representation_not_approved', message: 'ERPlora still has to approve your signed authorisation to file for you' };
 const NOT_ACTIVE = { code: 'hub_not_active', message: 'your ERPlora account has a pending payment or is suspended' };
 const GATEWAY = { code: 'gateway_unavailable', message: "ERPlora's sending gateway is not configured on this server" };
@@ -76,17 +57,10 @@ afterEach(outOfTheApp);
 describe('SettingsPage', () => {
   it('says who files and in which environment', async () => {
     const s = await setup();
-    expect(s.find('verifactu-settings-route-hint').text()).toContain('ERPlora files your billing records');
+    expect(s.find('verifactu-settings-route-hint').text()).toContain('ERPlora files your test records with its seal');
     expect(s.find('verifactu-settings-environment').text()).toContain('Testing (AEAT test)');
     expect(s.find('verifactu-settings-go-live').exists()).toBe(true);
-  });
-
-  it('the switch chooses the route and says so', async () => {
-    const s = await setup();
-    s.answer(200, { ...CONFIG, route: 'own' });
-    await ionValue(s.find('verifactu-settings-own').element, true);
-    expect(s.sent()).toEqual([{ method: 'POST', path: '/api/verifactu/config', query: {}, body: { route: 'own' } }]);
-    expect(toastSuccess).toHaveBeenCalledWith('Done: from now on you send with your own certificate.');
+    expect(s.wrapper.find('ion-toggle').exists()).toBe(false);
   });
 
   it('with the own route it says the certificate is the one uploaded in Configuration', async () => {
@@ -94,23 +68,12 @@ describe('SettingsPage', () => {
     expect(s.find('verifactu-settings-route-hint').text()).toContain('uploaded in Configuration → My certificate');
   });
 
-  it('a refused switch says why', async () => {
+  it('a refused «Go live» says why', async () => {
     const s = await setup();
-    s.answer(409, { error: { code: 'verifactu.no_own_certificate', message: 'There is no certificate loaded.' } });
-    await ionValue(s.find('verifactu-settings-own').element, true);
-    expect(s.find('verifactu-settings-error').text()).toBe('There is no certificate loaded.');
-  });
-
-  it('a refused switch goes back to where it was', async () => {
-    const s = await setup();
-    s.answer(409, { error: { code: 'verifactu.no_own_certificate', message: 'There is no certificate loaded.' } });
-    const toggle = s.find('verifactu-settings-own').element as unknown as HTMLElement & { checked: boolean };
-    // What the person's tap does: the toggle turns itself on and says so.
-    toggle.checked = true;
-    toggle.dispatchEvent(new CustomEvent('ionChange', { detail: { checked: true }, bubbles: true }));
-    await flush();
-    expect(s.find('verifactu-settings-error').text()).toBe('There is no certificate loaded.');
-    expect(toggle.checked).toBe(false);
+    mocks.confirm.mockResolvedValue(true);
+    s.answer(409, { error: { code: 'verifactu.representation_not_approved', message: 'ERPlora still has to approve it.' } });
+    await click(s.find('verifactu-settings-go-live').element);
+    expect(s.find('verifactu-settings-error').text()).toBe('ERPlora still has to approve it.');
   });
 
   it('«Go live» asks first and goes live', async () => {
@@ -195,6 +158,9 @@ describe('SettingsPage', () => {
     for (const text of ['ERPLORA CLOUD SL', 'B27593136', 'ERPlora Hub', 'EC', 'dev', 'v1']) expect(identity).toContain(text);
     // IndicadorMultiplesOT is always «S» (ERPlora serves many taxpayers): nothing is pending from the account.
     expect(identity).toMatch(/Serves several taxpayers\s*IndicadorMultiplesOT\s*S/);
+    // The version and the installation are long codes without spaces: drawn as the record's fingerprint, they wrap.
+    const codes = s.find('verifactu-settings-identity').findAll('dd.verifactu-settings__hash').map((dd) => dd.text());
+    expect(codes).toEqual([CONFIG.producer.version, CONFIG.producer.installation]);
     expect(s.find('verifactu-settings-pending-indicator').exists()).toBe(false);
   });
 
@@ -213,7 +179,7 @@ describe('SettingsPage', () => {
   it('outside Spain it says VeriFactu is only for Spain and offers nothing that leads to the AEAT', async () => {
     const s = await setup({ live_blockers: [OUTSIDE_SPAIN], reasons: [OUTSIDE_SPAIN] });
     expect(s.find('verifactu-settings-outside-spain').text()).toBe('VeriFactu is only for businesses in Spain.');
-    for (const hook of ['own', 'go-live', 'test', 'test-invoice']) expect(disabled(s, hook), hook).toBe(true);
+    for (const hook of ['go-live', 'test', 'test-invoice']) expect(disabled(s, hook), hook).toBe(true);
     // That one reason: not repeated in the list of what keeps it from going live.
     expect(s.find('verifactu-settings-live-blockers').exists()).toBe(false);
   });
@@ -229,14 +195,105 @@ describe('SettingsPage', () => {
     expect(s.find('verifactu-settings-outside-spain').text()).toBe('VeriFactu solo es para negocios de España.');
   });
 
-  it('in Spain the switch and the live test are offered, with no word of it', async () => {
+  it('in Spain the live test is offered, with no word of it', async () => {
     const s = await setup();
     expect(s.find('verifactu-settings-outside-spain').exists()).toBe(false);
-    for (const hook of ['own', 'test', 'test-invoice']) expect(disabled(s, hook), hook).toBe(false);
+    for (const hook of ['test', 'test-invoice']) expect(disabled(s, hook), hook).toBe(false);
   });
 
   it('the employee only reads', async () => {
     const s = await setup({}, { session: EMPLOYEE });
-    for (const hook of ['own', 'go-live', 'test', 'test-invoice']) expect(s.find(`verifactu-settings-${hook}`).exists(), hook).toBe(false);
+    for (const hook of ['go-live', 'test', 'test-invoice']) expect(s.find(`verifactu-settings-${hook}`).exists(), hook).toBe(false);
+  });
+
+  it('without the ERPlora route it shows only the certificate and the environment', async () => {
+    const s = await setup({ ...CONFIG_WITHOUT_ERPLORA_ROUTE, production_open: true });
+    expect(s.find('verifactu-settings-route-hint').exists()).toBe(false);
+    expect(s.find('verifactu-settings-certificate').text()).toContain('No certificate uploaded');
+    expect(s.find('verifactu-settings-certificate').text()).toContain('Upload your certificate');
+    expect(s.find('verifactu-settings-environment').text()).toContain('Testing (AEAT test)');
+    expect(s.find('verifactu-settings-sending-card').text()).not.toContain('ERPlora');
+  });
+
+  it('explains the certificate needed to go live without a technical error, an alarm about testing or a link of its own', async () => {
+    const required = { code: 'own_certificate_required', message: 'ERPlora does not file on behalf of businesses for now: use your own certificate' };
+    const s = await setup({ ...CONFIG_WITHOUT_ERPLORA_ROUTE, production_open: true, live_blockers: [NOT_APPROVED, required] });
+    const notice = s.find('verifactu-settings-certificate-required');
+    expect(notice.text()).toContain('You can keep testing. To go live, upload your business certificate.');
+    expect(notice.find('a').exists()).toBe(false);
+    expect(notice.text()).not.toContain('ERPlora');
+    expect(s.find('verifactu-settings-live-blockers').exists()).toBe(false);
+    expect(disabled(s, 'go-live')).toBe(true);
+  });
+
+  it('enables going live with a valid certificate when nothing else blocks it, choosing nothing first', async () => {
+    const starting = {
+      ...CONFIG_WITHOUT_ERPLORA_ROUTE,
+      route: 'own' as const,
+      production_open: true,
+      own_certificate: LOADED_CERTIFICATE,
+      route_ready_for_production: true,
+    };
+    const s = await setup(starting);
+    expect(s.find('verifactu-settings-certificate').text()).toContain('Valid');
+    expect(s.find('verifactu-settings-certificate-required').exists()).toBe(false);
+    expect(disabled(s, 'go-live')).toBe(false);
+    const testButton = s.wrapper.findAllComponents(IonButton).find((button) => button.attributes('data-testid') === 'verifactu-settings-test');
+    expect(testButton?.props('fill')).toBe('outline');
+
+    mocks.confirm.mockResolvedValue(true);
+    s.answer(200, { ...starting, environment: 'production' });
+    await click(s.find('verifactu-settings-go-live').element);
+    expect(s.sent()).toEqual([{ method: 'POST', path: '/api/verifactu/config/go_live', query: {}, body: {} }]);
+  });
+
+  it('omits the diagnostic route when the closed ERPlora route still carries testing records', async () => {
+    const s = await setup(CONFIG_WITHOUT_ERPLORA_ROUTE);
+    await s.result('verifactu.diagnostic.last', { result: { ...DIAGNOSTIC, reasons: [NOT_APPROVED] } });
+    const result = s.find('verifactu-settings-result').text();
+    expect(result).not.toContain('Filed through');
+    expect(result).not.toContain('My certificate');
+    expect(result).not.toContain('ERPlora files for you');
+    expect(result).not.toMatch(/authorisation|representation/i);
+  });
+
+  it('shows the own certificate in the diagnostic when it really carries the records', async () => {
+    const s = await setup(CONFIG_WITHOUT_ERPLORA_ROUTE);
+    await s.result('verifactu.diagnostic.last', { result: { ...DIAGNOSTIC, route: 'own' } });
+    const result = s.find('verifactu-settings-result').text();
+    expect(result).toContain('Filed through');
+    expect(result).toContain('My certificate');
+  });
+
+  it('keeps both diagnostic route labels when ERPlora is available', async () => {
+    for (const [route, label] of [['erplora', 'ERPlora files for you'], ['own', 'My certificate']] as const) {
+      const s = await setup();
+      await s.result('verifactu.diagnostic.last', { result: { ...DIAGNOSTIC, route } });
+      const result = s.find('verifactu-settings-result').text();
+      expect(result).toContain('Filed through');
+      expect(result).toContain(label);
+    }
+  });
+
+  it('speaks Spanish when only the own certificate can go live', async () => {
+    const required = { code: 'own_certificate_required', message: 'technical server wording' };
+    const s = await setup({ ...CONFIG_WITHOUT_ERPLORA_ROUTE, production_open: true, live_blockers: [required] }, { locale: 'es' });
+    expect(s.find('verifactu-settings-certificate').text()).toContain('Sin certificado');
+    expect(s.find('verifactu-settings-certificate-required').text()).toContain('Puedes seguir probando. Para pasar a producción, sube el certificado de tu negocio.');
+    const uploads = s.find('verifactu-settings-sending-card').findAll('a').filter((link) => link.text() === 'Sube tu certificado');
+    expect(uploads).toHaveLength(1);
+    expect(s.find('verifactu-settings-sending-card').text()).not.toContain('ERPlora');
+  });
+
+  it('does not bring the authorisation back in production notices', async () => {
+    const s = await setup({
+      ...CONFIG_WITHOUT_ERPLORA_ROUTE,
+      environment: 'production',
+      issue_blocker: NOT_APPROVED,
+      reasons: [NOT_APPROVED],
+    });
+    expect(s.find('verifactu-settings-issue-blocked').exists()).toBe(false);
+    expect(s.find('verifactu-settings-waiting').exists()).toBe(false);
+    expect(s.find('verifactu-settings-sending-card').text()).not.toMatch(/authorisation|representation/i);
   });
 });

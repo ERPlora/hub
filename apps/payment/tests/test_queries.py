@@ -31,9 +31,9 @@ from apps.payment.schemas import (
 
 from base.tests.ordering import assert_reads_backwards, listed_with
 
-from .conftest import ctx_for, make_method, make_payment
+from .conftest import HUB_DB, ctx_for, make_method, make_payment
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 OPERATIONS_TS = Path(__file__).resolve().parents[1] / "frontend" / "operations.d.ts"
 

@@ -52,7 +52,7 @@ function toggle(id: string): void {
 async function copy(id: string): Promise<void> {
   try {
     await navigator.clipboard.writeText(id);
-    void toastSuccess(phrasing.value.t('flow.history.copied'));
+    toastSuccess(phrasing.value.t('flow.history.copied'));
   } catch {
     // No clipboard (an old webview, a denied permission): the reference is still on screen to read.
   }
@@ -86,7 +86,7 @@ async function retry(run: RunOut): Promise<void> {
   try {
     const resumed = await retrying.run({ id: run.id });
     if (resumed.status === 'failed') retryProblem.value = { ...retryProblem.value, [run.id]: t('flow.history.retriedFailed', { message: resumed.error_message }) };
-    else void toastSuccess(t(resumed.status === 'waiting' ? 'flow.history.retriedWaiting' : 'flow.history.retried'));
+    else toastSuccess(t(resumed.status === 'waiting' ? 'flow.history.retriedWaiting' : 'flow.history.retried'));
   } catch (failure) {
     retryProblem.value = { ...retryProblem.value, [run.id]: wording(failure, t('flow.errors.action')) };
   }

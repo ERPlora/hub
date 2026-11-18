@@ -7,16 +7,17 @@ import json
 import uuid
 from decimal import Decimal
 
-import psycopg
 import pytest
 from live.errors import Conflict, InvalidPayload, NotFound, PermissionDenied
 from live.models import OutboxEvent
 from live.operations import get
-from live.outbox import channel_for
 
 from apps.pricing.models import DiscountRule, PriceItem, PriceList
+from base.tenancy.context import use_hub
 
 from .conftest import (
+    HUB_DB,
+    HUB_DB_COMMITTED,
     A,
     B,
     ctx_for,
@@ -29,7 +30,7 @@ from .conftest import (
     make_service,
 )
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 
 def run(name, data, role="hub_admin", actor="tester"):
@@ -431,6 +432,63 @@ def test_a_deleted_product_leaves_no_price_and_switches_its_rules_off_once():
     assert (again.items, again.rules) == (0, 0)
 
 
+def deleted(product, is_deleted: bool = True) -> None:
+    """``product`` deleted in Inventory (or back, the same one, from the separate copy: INVENTORY-F34)."""
+    type(product).objects.filter(pk=product.pk).update(is_deleted=is_deleted)
+
+
+def test_a_restored_product_switches_back_on_only_the_rules_its_deletion_switched_off():
+    product = make_product("Shampoo", "SH-1")
+    other = make_product("Gel", "GE")
+    gone = make_rule("PROD", applies_to="product", product=product)
+    by_hand = make_rule("HAND", applies_to="product", product=product)
+    touched = make_rule("EDIT", applies_to="product", product=product)
+    make_rule("OTHER", applies_to="product", product=other)
+    run("pricing.rule.deactivate", {"id": str(by_hand.id)})
+    deleted(product)
+    deleted(other)
+    react("pricing.catalog.forget_product", {"id": str(product.id)})
+    react("pricing.catalog.forget_product", {"id": str(other.id)})
+    # Off since, the business renamed it: it stays as the business left it.
+    run("pricing.rule.update", {"id": str(touched.id), "name": "Renamed"})
+    OutboxEvent.objects.all().delete()
+    deleted(product, False)
+
+    answer = react("pricing.catalog.recall_product", {"id": str(product.id), "sku": "SH-1", "name": "Shampoo"})
+
+    assert (answer.lists, answer.items, answer.rules) == (0, 0, 1)
+    assert dict(DiscountRule.objects.values_list("code", "is_active")) == {
+        "PROD": True,
+        "HAND": False,
+        "EDIT": False,
+        "OTHER": False,
+    }
+    assert DiscountRule.objects.get(pk=gone.pk).updated_by == "system"
+    assert events("pricing.rule.activated") == [{"id": str(gone.id)}]
+    assert events("pricing.rule.deactivated") == []
+    again = react("pricing.catalog.recall_product", {"id": str(product.id)})
+    assert again.rules == 0 and len(events("pricing.rule.activated")) == 1
+
+
+def test_a_product_deleted_again_or_a_group_gone_leaves_its_rules_off():
+    product = make_product()
+    group = make_group("VIP")
+    plain = make_rule("PROD", applies_to="product", product=product)
+    vip = make_rule("VIP", applies_to="product", product=product, customer_group_id=group.id)
+    deleted(product)
+    react("pricing.catalog.forget_product", {"id": str(product.id)})
+    # The event of its restore reaches Tarifas after the product was deleted again: nothing to switch on.
+    assert react("pricing.catalog.recall_product", {"id": str(product.id)}).rules == 0
+    group.delete()
+    deleted(product, False)
+
+    # A rule of a group Customers deleted would apply to nobody: it stays off, the others come back.
+    assert react("pricing.catalog.recall_product", {"id": str(product.id)}).rules == 1
+    plain.refresh_from_db()
+    vip.refresh_from_db()
+    assert (plain.is_active, vip.is_active) == (True, False)
+
+
 def test_a_deleted_category_switches_its_rules_off():
     category = make_category("Colour")
     rule = make_rule("CAT", applies_to="category", category=category)
@@ -467,37 +525,28 @@ def test_a_renamed_service_is_renamed_in_its_prices_and_rules():
     assert react("pricing.catalog.refresh_service", {"id": str(haircut.id)}).items == 0
 
 
-def test_a_reaction_is_no_person_s():
+@pytest.mark.parametrize("name", ["pricing.catalog.forget_product", "pricing.catalog.recall_product"])
+def test_a_reaction_is_no_person_s(name):
     product = make_product()
-    refused(PermissionDenied, "pricing.catalog.forget_product", {"id": str(product.id)})
+    refused(PermissionDenied, name, {"id": str(product.id)})
 
 
 # Notifications: after the COMMIT, on the channel of the command's scope only
-
-
-@pytest.fixture
-def listen(db_dsn):
-    sessions = []
-
-    def open_session(scope):
-        session = psycopg.connect(db_dsn, autocommit=True)
-        sessions.append(session)
-        session.execute(f"LISTEN {channel_for(scope)}")
-        return session
-
-    yield open_session
-    for session in sessions:
-        session.close()
 
 
 def received(session, timeout=1.0, stop_after=None):
     return [json.loads(note.payload) for note in session.notifies(timeout=timeout, stop_after=stop_after)]
 
 
-@pytest.mark.django_db(transaction=True)
-def test_a_write_in_scope_b_notifies_b_only(listen):
+@HUB_DB_COMMITTED
+def test_a_write_in_scope_b_notifies_b_only(listen, hub_b):
     on_a, on_b = listen(A), listen(B)
     op = get("pricing.price_list.create")
-    op(ctx_for("hub_admin", B), op.input.model_validate({"code": "VIP", "name": "VIP", "is_default": True}))
+    with use_hub(hub_b):
+        op(ctx_for("hub_admin", B), op.input.model_validate({"code": "VIP", "name": "VIP", "is_default": True}))
     assert received(on_b, stop_after=1) == [{"events": ["pricing.price_list.created", "pricing.price_list.default_changed"]}]
     assert received(on_a, timeout=0.3) == []
+    # The channel is the command's scope; the rows of the outbox carry theirs, and B's database holds them all.
+    with use_hub(hub_b):
+        assert set(OutboxEvent.objects.values_list("scope_kind", "scope_key")) == {(B.kind, B.key)}
+    assert not OutboxEvent.objects.exists()

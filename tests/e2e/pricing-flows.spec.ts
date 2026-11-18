@@ -14,7 +14,7 @@
 //   - PRICING-F10: «+» creates an amount-per-unit rule on every product;
 //   - PRICING-F11: «Edit» opens «Editing rule — <name>»; the row shows the new priority;
 //   - PRICING-F12: «Deactivate» asks first; the rule waits under «Inactive» until «Activate».
-import { expect, type Page, test } from '@playwright/test';
+import { expect, type Locator, type Page, test } from '@playwright/test';
 
 import { A, login, psql, shot, shown } from './helpers';
 import {
@@ -347,11 +347,8 @@ test('PRICING-F09: the rules, each type with its value', async ({ page }) => {
   await shootFlow(page, 'PRICING-F09');
 });
 
-test('PRICING-F10: «+» creates an amount-per-unit rule on every product', async ({ page }) => {
-  // flow: PRICING-F10
-  const s = stamp();
-  const code = `${CODE}${s}R`;
-  const name = `${TAG} Fifty off ${s}`;
+/** «+» on the rules of this run (`s`): «New discount rule», with its code and name typed. */
+async function newRuleForm(page: Page, s: string, code: string, name: string): Promise<Locator> {
   await login(page, A, '/pricing/lists');
   await ready(page, RULES);
   await search(page, RULES, `${CODE}${s}`);
@@ -360,6 +357,14 @@ test('PRICING-F10: «+» creates an amount-per-unit rule on every product', asyn
   await expect(form).toContainText('New discount rule');
   await fill(page, 'pricing-rule-form-code', code);
   await fill(page, 'pricing-rule-form-name', name);
+  return form;
+}
+
+test('PRICING-F10: «+» creates an amount-per-unit rule on every product', async ({ page }) => {
+  // flow: PRICING-F10
+  const s = stamp();
+  const code = `${CODE}${s}R`;
+  const form = await newRuleForm(page, s, code, `${TAG} Fifty off ${s}`);
   await choose(page, page.locator('[data-testid=pricing-rule-form-rule_type]'), 'Amount per unit');
   await fill(page, 'pricing-rule-form-amount', '0,50');
   await choose(page, page.locator('[data-testid=pricing-rule-form-applies_to]'), 'All products');
@@ -373,6 +378,30 @@ test('PRICING-F10: «+» creates an amount-per-unit rule on every product', asyn
   expect(psql(`select rule_type || ':' || amount || ':' || applies_to from pricing_discountrule where code = '${code}'`)).toBe(
     'fixed:50:products',
   );
+});
+
+test('PRICING-F10: tiers that do not rise are refused under them, and the line goes as soon as a tier changes', async ({ page }) => {
+  // flow: PRICING-F10 (hub#1448)
+  const s = stamp();
+  const code = `${CODE}${s}T`;
+  const rising = 'Each tier starts at a higher quantity than the one before.';
+  const form = await newRuleForm(page, s, code, `${TAG} Volume ${s}`);
+  await choose(page, page.locator('[data-testid=pricing-rule-form-rule_type]'), 'Tiered');
+  await fill(page, 'pricing-rule-form-tier-0-min_quantity', '6');
+  await fill(page, 'pricing-rule-form-tier-0-percent', '10');
+  await page.locator('[data-testid=pricing-rule-form-add-tier]').click();
+  await fill(page, 'pricing-rule-form-tier-1-min_quantity', '3');
+  await fill(page, 'pricing-rule-form-tier-1-percent', '15');
+  await page.locator('[data-testid=pricing-rule-form-submit]').click();
+  const tiers = page.locator('[data-testid=pricing-rule-form-tiers]');
+  await expect(tiers).toContainText(rising);
+  await shootFlow(page, 'PRICING-F10-tiers-refused');
+  await fill(page, 'pricing-rule-form-tier-1-min_quantity', '12');
+  await expect(tiers).not.toContainText(rising);
+  await shootFlow(page, 'PRICING-F10-tiers-changed');
+  await page.locator('[data-testid=pricing-rule-form-submit]').click();
+  await expect(form).toBeHidden();
+  expect(psql(`select (tiers->0->>'min_quantity') || '+' || (tiers->1->>'min_quantity') from pricing_discountrule where code = '${code}'`)).toBe('6+12');
 });
 
 test('PRICING-F11: «Edit» opens the rule with what it has and the row shows the change', async ({ page }) => {

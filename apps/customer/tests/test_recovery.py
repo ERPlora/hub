@@ -6,8 +6,9 @@ config) with its own read, by SQL over its model's names (``queries.cards_in_cop
 what its create takes. Then, in the business, which of those it lacks (``queries.cards_not_in_business``): a card the
 business has live, merged into another or with its personal data erased is not lacking, and neither is one it made
 again (the same name, phone and email, the import's rule). One it deleted is still there (deleting keeps the card,
-CUSTOMER-F07): it comes back the same, with all that hangs from it, by ``customer.customer.restore``
-(``queries.cards_deleted_in_business``, hub#1306); only one the business no longer has is created, by
+CUSTOMER-F07): it comes back the same, with all that hangs from it and what the business deleted since (a group, a tag
+or a custom field, hub#1356), by ``customer.customer.restore`` (``queries.cards_deleted_in_business``, hub#1306); only
+one the business no longer has is created, by
 ``customer.customer.recover`` (hub#1285): as ``customer.customer.create`` makes it, with its groups, tags and custom
 field values (``queries.recoverable_cards_in_copy``), each by the screen's own operation.
 
@@ -19,25 +20,26 @@ from datetime import date, timedelta
 
 import pytest
 from django.apps import apps
-from django.db import connection
+from django.db import connections
 from django.utils import timezone
 from live.operations import get as get_operation
 
 from apps.customer import queries
 from apps.customer.models import Customer, CustomerGroup, CustomerTag, CustomField, CustomFieldValue
 from apps.customer.schemas import CustomerIn
-from base.tenancy.context import use_hub
+from base.tenancy.context import current_alias, use_hub
 from base.tenancy.tests.test_recovery import ANA, CUSTOMERS, LUIS, Recoveries, fresh, gone, run, run_in
 
+from .conftest import HUB_DB
 
 
 def direct():
-    """The raw connection of the tests' database, as the platform's direct one reads the copy."""
-    connection.ensure_connection()
-    return connection.connection
+    """The raw connection of business A's database, as the platform's direct one reads the copy."""
+    (business := connections[current_alias()]).ensure_connection()
+    return business.connection
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_copy_gives_each_live_card_with_what_its_create_takes():
     ana = Customer.objects.create(
         name="Ana López",
@@ -85,9 +87,9 @@ def test_the_copy_gives_each_live_card_with_what_its_create_takes():
     }
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_copy_without_the_apps_table_gives_nothing():
-    with connection.cursor() as cursor:
+    with connections[current_alias()].cursor() as cursor:
         # Undone with the test's transaction.
         cursor.execute("DROP TABLE customer_customer CASCADE")
 
@@ -101,7 +103,7 @@ def a_card_of_the_copy(card: Customer | None = None, **fields) -> dict:
     return {"id": uuid.uuid7(), "name": "", "phone": "", "email": ""} | fields
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_business_lacks_only_what_it_no_longer_has_nor_made_again():
     now = timezone.now()
     live = Customer.objects.create(name="Marta Ruiz", phone="+34600555666", email="marta@example.com")
@@ -120,7 +122,7 @@ def test_the_business_lacks_only_what_it_no_longer_has_nor_made_again():
     assert [card["id"] for card in lacking] == [absent["id"], sharing["id"]]
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_business_holds_deleted_only_the_card_deleted_from_its_card_and_not_made_again():
     now = timezone.now()
     live = Customer.objects.create(name="Marta Ruiz", phone="+34600555666", email="marta@example.com")
@@ -140,7 +142,7 @@ def test_the_business_holds_deleted_only_the_card_deleted_from_its_card_and_not_
     assert held[0] is cards[1]
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_card_of_the_copy_is_in_the_business_live_in_the_one_it_was_merged_into_or_made_again():
     """hub#1284: what another app's recovery matches the card a record of the copy points at by (an appointment's
     customer): the rule ``cards_not_in_business`` tells a card is not lacking by, naming the business's card."""
@@ -165,7 +167,7 @@ def test_a_card_of_the_copy_is_in_the_business_live_in_the_one_it_was_merged_int
     assert queries.card_in_business({"id": erased.pk, "name": live.name, "phone": live.phone, "email": live.email}) is None
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_of_two_cards_made_again_alike_the_business_card_is_the_oldest():
     """hub#1284: two live cards may share name, phone and email (CUSTOMER-F12 only warns): the record of the copy goes
     to the one made first, always the same, whatever order the database gives them in."""
@@ -180,7 +182,7 @@ def test_of_two_cards_made_again_alike_the_business_card_is_the_oldest():
     assert queries.card_in_business(again) == first.pk
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_app_declares_what_it_gives_back():
     [declared] = apps.get_app_config("customer").recoverable_from_copy()
 
@@ -195,11 +197,12 @@ def test_the_app_declares_what_it_gives_back():
     assert declared.reads_since == "0001_initial"
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_copy_gives_each_card_with_its_groups_tags_and_custom_field_values_as_its_recovery_takes_them():
     """hub#1285: what hangs from a card comes back with it, by name: the business makes its own ids. A group or tag as
     the copy holds it, active or not (a card keeps an inactive one); only an active field's value (an inactive field
-    shows on no card and takes no value, CUSTOMER-F29)."""
+    shows on no card and takes no value, CUSTOMER-F29). Each with its id in the copy, which tells a deleted card's
+    restore what the business still has (hub#1356)."""
     vip = CustomerGroup.objects.create(name="VIP", description="Best customers", color="warning", sort_order=2)
     old = CustomerGroup.objects.create(name="Old", is_active=False)
     regular = CustomerTag.objects.create(name="Regular", color="success")
@@ -229,12 +232,20 @@ def test_the_copy_gives_each_card_with_its_groups_tags_and_custom_field_values_a
     takes = get_operation("customer.customer.recover").input
     ana_read, luis_read = (takes.model_validate(card).model_dump() for card in read)
     assert ana_read["groups"] == [
-        {"name": "Old", "description": "", "color": "primary", "sort_order": 0, "is_active": False},
-        {"name": "VIP", "description": "Best customers", "color": "warning", "sort_order": 2, "is_active": True},
+        {"id": old.pk, "name": "Old", "description": "", "color": "primary", "sort_order": 0, "is_active": False},
+        {
+            "id": vip.pk,
+            "name": "VIP",
+            "description": "Best customers",
+            "color": "warning",
+            "sort_order": 2,
+            "is_active": True,
+        },
     ]
-    assert ana_read["tags"] == [{"name": "Regular", "color": "success", "is_active": True}]
+    assert ana_read["tags"] == [{"id": regular.pk, "name": "Regular", "color": "success", "is_active": True}]
     assert ana_read["field_values"] == [
         {
+            "id": size.pk,
             "name": "Size",
             "field_type": "select",
             "options": ["S", "M"],
@@ -242,14 +253,27 @@ def test_the_copy_gives_each_card_with_its_groups_tags_and_custom_field_values_a
             "sort_order": 1,
             "value": "M",
         },
-        {"name": "Pet", "field_type": "text", "options": [], "is_required": False, "sort_order": 2, "value": "Luna"},
+        {
+            "id": pet.pk,
+            "name": "Pet",
+            "field_type": "text",
+            "options": [],
+            "is_required": False,
+            "sort_order": 2,
+            "value": "Luna",
+        },
     ]
     assert (luis_read["groups"], luis_read["tags"], luis_read["field_values"]) == ([], [], [])
+    # A deleted card's restore takes the same of each card: its id and what hung from it.
+    restores = get_operation("customer.customer.restore").input
+    assert restores.model_validate(read[0]).model_dump(include={"groups", "tags", "field_values"}) == {
+        key: ana_read[key] for key in ("groups", "tags", "field_values")
+    }
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_copy_without_the_apps_table_gives_no_card_to_recover():
-    with connection.cursor() as cursor:
+    with connections[current_alias()].cursor() as cursor:
         # Undone with the test's transaction.
         cursor.execute("DROP TABLE customer_customer CASCADE")
 
@@ -381,6 +405,57 @@ class TestWhatHangsFromACardComesBack:
         assert [group[1] for group in before["groups"]] == [made["old"], made["vip"]]
         assert all_named(hub) == AS_IN_THE_COPY
 
+    def test_a_card_the_business_deleted_gets_back_the_group_tag_and_field_it_deleted_since(
+        self, recoveries, every_app_on
+    ):
+        hub, ana, _luis, made = self.a_business(recoveries, every_app_on)
+        copy = recoveries.copy_of(hub)
+        # Since the copy: Ana taken out of Old, which the business keeps; then her card deleted, and the group VIP,
+        # the tag Regular and the field Pet deleted with what hung from them.
+        run_in(hub, "customer.customer.set_groups", id=ana, group_ids=[made["vip"]])
+        run_in(hub, "customer.customer.delete", id=ana)
+        run_in(hub, "customer.group.delete", id=made["vip"])
+        run_in(hub, "customer.tag.delete", id=made["regular"])
+        run_in(hub, "customer.field.delete", id=made["pet"])
+        asked = recoveries.ask(copy)
+
+        assert run() == 1
+
+        # The same card back, counted once, as restored.
+        assert fresh(asked).results == [CUSTOMERS | {"restored": 1}]
+        back = what_hangs(hub, ana)
+        # In VIP again, with Regular and Pet, each made again as the copy had it; Size, which the business kept, is
+        # that one; Old, which it keeps too, stays without her, as the business left it.
+        assert [(name, active) for name, _, active in back["groups"]] == [("VIP", True)]
+        assert made["vip"] not in [group[1] for group in back["groups"]]
+        assert [(name, color) for name, _, color in back["tags"]] == [("Regular", "success")]
+        assert [(name, value) for name, _, value in back["values"]] == [("Pet", "Luna"), ("Size", "M")]
+        assert [value[1] for value in back["values"] if value[0] == "Size"] == [made["size"]]
+        assert all_named(hub) == AS_IN_THE_COPY
+        with use_hub(hub):
+            assert CustomerGroup.objects.get(name="VIP").color == "warning"
+
+    def test_two_deleted_cards_of_a_group_deleted_since_come_back_in_one_group_made_again(
+        self, recoveries, every_app_on
+    ):
+        hub, ana, luis, made = self.a_business(recoveries, every_app_on)
+        copy = recoveries.copy_of(hub)
+        for card in (ana, luis):
+            run_in(hub, "customer.customer.delete", id=card)
+        run_in(hub, "customer.group.delete", id=made["vip"])
+        asked = recoveries.ask(copy)
+
+        run()
+
+        assert fresh(asked).results == [CUSTOMERS | {"restored": 2}]
+        assert named(hub, CustomerGroup) == [("Old", False), ("VIP", True)]
+        with use_hub(hub):
+            vip = CustomerGroup.objects.get(name="VIP")
+            assert sorted(Customer.objects.live().filter(groups=vip).values_list("name", flat=True)) == [
+                "Ana López",
+                "Luis Pérez",
+            ]
+
     def test_asked_again_nothing_is_made_twice(self, recoveries, every_app_on):
         hub, _luis, _made, copy = self.luis_lost(recoveries, every_app_on)
         recoveries.ask(copy)
@@ -394,7 +469,7 @@ class TestWhatHangsFromACardComesBack:
         with use_hub(hub):
             assert Customer.objects.live().filter(name="Luis Pérez").count() == 1
 
-    def test_a_value_its_field_no_longer_takes_leaves_the_card_out_with_why_and_nothing_of_it_made(
+    def test_a_value_its_field_no_longer_takes_does_not_keep_the_card_out_and_recoveries_notes_it_with_why(
         self, recoveries, every_app_on
     ):
         hub, luis, made, copy = self.luis_lost(recoveries, every_app_on)
@@ -404,19 +479,21 @@ class TestWhatHangsFromACardComesBack:
 
         run()
 
+        # Luis made again, counted once as made and once as noted: the note says, by his id in the copy, which field
+        # he came back without and why.
         [result] = fresh(asked).results
-        assert (result["created"], result["not_created"]) == (0, 1)
-        assert result["reasons"][0]["id"] == str(luis)
-        assert result["reasons"][0]["reason"].startswith("customer.field_invalid_option: ")
-        # All or nothing: neither Luis nor the tag his card would have made again.
-        with use_hub(hub):
-            assert not Customer.objects.live().filter(name="Luis Pérez").exists()
-        assert named(hub, CustomerTag) == []
+        [note] = result.pop("notes")
+        assert result == CUSTOMERS | {"created": 1, "noted": 1}
+        assert note["id"] == str(luis)
+        assert note["note"].startswith("customer.field_invalid_option: ") and '"Size"' in note["note"]
+        back = what_hangs(hub, the_new(hub, "Luis Pérez"))
+        assert [(name, value) for name, _, value in back["values"]] == [("Pet", "Luna")]
+        assert [(name, color) for name, _, color in back["tags"]] == [("Regular", "success")]
 
     def test_a_field_the_business_deactivated_or_made_required_since_does_not_keep_the_card_out(
         self, recoveries, every_app_on
     ):
-        hub, _luis, made, copy = self.luis_lost(recoveries, every_app_on)
+        hub, luis, made, copy = self.luis_lost(recoveries, every_app_on)
         # Pet deactivated: it shows on no card, so its value does not come back, and no second Pet is made.
         run_in(hub, "customer.field.update", id=made["pet"], is_active=False)
         # A field required since: a card is made without it, as the till makes one (CUSTOMER-F01).
@@ -425,7 +502,35 @@ class TestWhatHangsFromACardComesBack:
 
         run()
 
-        assert fresh(asked).results == [CUSTOMERS | {"created": 1}]
+        # Recoveries says Luis came back without his Pet, and why; the required field without a value is no note.
+        [result] = fresh(asked).results
+        [note] = result.pop("notes")
+        assert result == CUSTOMERS | {"created": 1, "noted": 1}
+        assert (note["id"], note["note"].startswith("customer.field_inactive: ")) == (str(luis), True)
         back = what_hangs(hub, the_new(hub, "Luis Pérez"))
         assert [(name, value) for name, _, value in back["values"]] == [("Size", "M")]
         assert named(hub, CustomField) == [("Allergies", True), ("Pet", False), ("Size", True)]
+
+    def test_a_card_the_business_deleted_comes_back_without_a_value_the_field_it_made_again_no_longer_takes_noted(
+        self, recoveries, every_app_on
+    ):
+        hub, ana, _luis, made = self.a_business(recoveries, every_app_on)
+        copy = recoveries.copy_of(hub)
+        # Since the copy: Ana's card deleted, then Size deleted with its values and made again by hand without M.
+        run_in(hub, "customer.customer.delete", id=ana)
+        run_in(hub, "customer.field.delete", id=made["size"])
+        run_in(hub, "customer.field.create", name="Size", field_type="select", options=["S", "L"])
+        asked = recoveries.ask(copy)
+
+        run()
+
+        # The same card back, counted as restored and as noted, not kept deleted for one value.
+        [result] = fresh(asked).results
+        [note] = result.pop("notes")
+        assert result == CUSTOMERS | {"restored": 1, "noted": 1}
+        assert note["id"] == str(ana)
+        assert note["note"].startswith("customer.field_invalid_option: ") and '"Size"' in note["note"]
+        back = what_hangs(hub, ana)
+        assert [(name, value) for name, _, value in back["values"]] == [("Pet", "Luna")]
+        with use_hub(hub):
+            assert Customer.objects.live().filter(pk=ana).exists()

@@ -5,8 +5,9 @@
 1. the origin is closed to the app (``CONNECT`` taken from the environment's ``hub_app`` and ``hub_admin``, their
    sessions ended), so nothing writes in it from here on; its host answers 503 «maintenance» already;
 2. it is renamed ``<control>_move_<hex>`` (an older copy of the same hub on that server goes first);
-3. it is copied with ``pg_dump`` and, on the destination, its database is made from that cluster's template, emptied
-   and filled with ``pg_restore`` (the template's extensions stay);
+3. it is copied with ``pg_dump`` to the dumps bucket as it is made and, on the destination, its database is made from
+   that cluster's template, emptied and filled with ``pg_restore`` reading the copy from the bucket (the template's
+   extensions stay): never through a file of the worker, so no size stops it;
 4. the destination's identity is checked and its schema brought to the code's leaf (``ensure_schema``);
 5. control switches the hub to the destination in one transaction and keeps the copy's row (``MovedCopy``).
 
@@ -15,11 +16,15 @@ the copy renamed back and opened to the app again, the hub ready there with the 
 went to another worker is left to it. The copies are dropped after ``MOVED_COPY_DAYS``.
 
 Real databases on the session's server: the destination cluster's row points at the same server (CI has one), which
-the move handles as any other, since the origin is renamed before the destination is made.
+the move handles as any other, since the origin is renamed before the destination is made. The bucket is a real S3
+server (moto's, ``s3.py``).
 """
 
 import datetime as dt
+import re
+import time
 import uuid
+from zoneinfo import ZoneInfo
 
 import psycopg
 import pytest
@@ -27,12 +32,13 @@ from django.db import connections as django_connections
 from django.utils import timezone
 from psycopg import sql
 
-from base import services
-from base.tenancy import bootstrap, identity, move, names
+from base.services import provisioning
+from base.tenancy import bootstrap, dumps, identity, move, names
 from base.tenancy import connections as tenancy_connections
 from base.tenancy.context import use_control
-from base.tenancy.tests import hubs
-from control.models import Cluster, Hub, HubDue, LeftoverDatabase, MovedCopy
+from base.tenancy.tests import hubs, s3
+from base.tenancy.tests.s3 import aws_test_credentials, body, dumps_bucket, moto_s3, objects  # noqa: F401
+from control.models import Cluster, Hub, HubDue, HubDump, LeftoverDatabase, MovedCopy
 
 pytestmark = pytest.mark.usefixtures("no_test_fallback")
 
@@ -63,7 +69,7 @@ class Moves(hubs.CopiedHubs):
 
 
 @pytest.fixture
-def moves(django_db_blocker, hub_databases):
+def moves(django_db_blocker, hub_databases, dumps_bucket):
     with django_db_blocker.unblock():
         made = Moves(hub_databases.template)
         yield made
@@ -162,6 +168,146 @@ class TestAMove:
         assert run() == 0
 
 
+def zone_at(now: dt.datetime, hour: int) -> str:
+    """A fixed-offset zone (``Etc/GMT±N``, whose sign is the other way round) whose clock says ``hour`` o'clock at
+    ``now``: the pass runs on the real clock, the one a lease is taken by."""
+    offset = (hour - now.hour) % 24
+    if offset > 14:
+        offset -= 24
+    return f"Etc/GMT{-offset:+d}"
+
+
+class TestAMoveAskedForTheNight:
+    """A move asked for the business's night (``control.hub.move`` with ``when="at_night"``) is started by the worker's
+    pass once it is due and it is night on the business's own clock, under the hub's lease (``claim_hub``, as a move),
+    with the checks of a move asked then; the same pass moves it. By day it waits for the next night."""
+
+    def scheduled(self, moves, target: Cluster, now: dt.datetime, *, hour: int, due: dt.timedelta) -> Hub:
+        return moves.hub(
+            to=None, move_scheduled_to=target, move_scheduled_for=now - due, timezone=zone_at(now, hour)
+        )
+
+    def test_it_starts_in_the_business_s_night_and_the_same_pass_moves_it(self, moves):
+        target = moves.cluster()
+        now = timezone.now()
+        hub = self.scheduled(moves, target, now, hour=3, due=dt.timedelta(minutes=1))
+
+        assert run(now) == 1
+
+        moved = fresh(hub)
+        assert (moved.cluster_id, moved.moving_to_id) == (target.pk, None)
+        assert (moved.move_scheduled_to_id, moved.move_scheduled_for, moved.last_error) == (None, None, "")
+        assert marker(moved.db_name) == [MARKER]
+
+    def test_by_the_business_s_day_it_waits_for_its_next_night_and_closes_nothing(self, moves):
+        target = moves.cluster()
+        now = timezone.now()
+        hub = self.scheduled(moves, target, now, hour=15, due=dt.timedelta(hours=12))
+
+        assert run(now) == 0
+
+        waiting = fresh(hub)
+        assert (waiting.cluster_id, waiting.moving_to_id, waiting.move_scheduled_to_id) == (None, None, target.pk)
+        assert waiting.move_scheduled_for == move.control_services.night_start(now, ZoneInfo(waiting.timezone))
+        assert waiting.move_scheduled_for > now
+
+    def test_one_not_due_yet_waits_even_at_night(self, moves):
+        target = moves.cluster()
+        now = timezone.now()
+        hub = self.scheduled(moves, target, now, hour=3, due=-dt.timedelta(minutes=30))
+
+        assert run(now) == 0
+        with use_control():
+            assert hub.id not in move.control_services.moves_scheduled_due(now)
+            # Even listed (a pass that read it before it was put off), its locked row says it is not due.
+            assert provisioning.claim_hub(hub.id, now, move.LEASE, owner="a:1") is not None
+            assert move.control_services.start_scheduled_move(hub.id, now, owner="a:1") is False
+
+        assert (fresh(hub).moving_to_id, fresh(hub).move_scheduled_to_id) == (None, target.pk)
+
+    def test_the_lease_says_which_worker_starts_it(self, moves):
+        target = moves.cluster()
+        now = timezone.now()
+        hub = self.scheduled(moves, target, now, hour=3, due=dt.timedelta(minutes=1))
+        with use_control():
+            HubDue.objects.create(hub=hub, due_at=now, lease_until=now + dt.timedelta(minutes=1), lease_owner="other:1")
+
+        assert run(now) == 0
+        assert (fresh(hub).moving_to_id, fresh(hub).move_scheduled_to_id) == (None, target.pk)
+
+        with use_control():
+            HubDue.objects.filter(pk=hub.pk).update(lease_until=None, lease_owner="")
+        assert run(now) == 1
+        assert fresh(hub).cluster_id == target.pk
+
+    def test_two_workers_never_start_it_twice(self, moves):
+        target = moves.cluster()
+        now = timezone.now()
+        hub = self.scheduled(moves, target, now, hour=3, due=dt.timedelta(minutes=1))
+        start = move.control_services.start_scheduled_move
+
+        with use_control():
+            assert provisioning.claim_hub(hub.id, now, move.LEASE, owner="a:1") is not None
+            with pytest.raises(move.control_services.MoveTaken):
+                start(hub.id, now, owner="b:2")
+            assert (fresh(hub).moving_to_id, fresh(hub).move_scheduled_to_id) == (None, target.pk)
+
+            assert start(hub.id, now, owner="a:1") is True
+            assert start(hub.id, now, owner="a:1") is False
+        started = fresh(hub)
+        assert (started.moving_to_id, started.move_scheduled_to_id) == (target.pk, None)
+        assert started.move_scheduled_for is None
+
+    def test_the_place_it_was_keeping_on_a_cluster_with_one_left_is_its_own(self, moves):
+        target = moves.cluster(max_hubs=1)
+        now = timezone.now()
+        hub = self.scheduled(moves, target, now, hour=3, due=dt.timedelta(minutes=1))
+
+        assert run(now) == 1
+
+        assert (fresh(hub).cluster_id, fresh(hub).last_error) == (target.pk, "")
+
+    def test_a_size_that_cannot_be_read_leaves_it_asked_and_the_next_pass_starts_it(self, moves, monkeypatch):
+        from control import queries
+
+        target = moves.cluster()
+        now = timezone.now()
+        hub = self.scheduled(moves, target, now, hour=3, due=dt.timedelta(minutes=1))
+        measure = queries.measure
+        reads = []
+
+        def unreachable_once(cluster, names):
+            reads.append(names)
+            if len(reads) == 1:
+                raise queries._unreachable(cluster, "the server is restarting")
+            return measure(cluster, names)
+
+        monkeypatch.setattr(queries, "measure", unreachable_once)
+
+        assert run(now) == 0
+
+        waiting = fresh(hub)
+        assert (waiting.moving_to_id, waiting.move_scheduled_to_id, waiting.last_error) == (None, target.pk, "")
+        assert waiting.move_scheduled_for == now - dt.timedelta(minutes=1)
+        with use_control():
+            assert not HubDue.objects.filter(pk=hub.pk).exists()
+
+        assert run(now) == 1
+        assert fresh(hub).cluster_id == target.pk
+
+    def test_one_refused_when_its_night_comes_says_why_and_closes_nothing(self, moves):
+        target = moves.cluster(is_open=False)
+        now = timezone.now()
+        hub = self.scheduled(moves, target, now, hour=3, due=dt.timedelta(minutes=1))
+
+        assert run(now) == 0
+
+        refused = fresh(hub)
+        assert (refused.cluster_id, refused.moving_to_id, refused.move_scheduled_to_id) == (None, None, None)
+        assert refused.last_error.startswith("move_not_started: control.cluster_closed")
+        assert marker(refused.db_name) == [MARKER]
+
+
 class TestTheOriginIsClosedToTheApp:
     """While it moves, the environment's app roles cannot reach the origin; after it, the moved database is theirs and
     the copy is not; after a failure, the origin is theirs again. A role of this test's own plays ``hub_app``."""
@@ -182,13 +328,13 @@ class TestTheOriginIsClosedToTheApp:
             dbname=hub.db_name, user=app_role, password="app", host=default["HOST"], port=default["PORT"]
         )
         seen: list[bool] = []
-        real = move._dump
+        real = move._dump_to_bucket
 
-        def dump(source, cluster, path, heartbeat, cancelled=None):
+        def dump(key, source, cluster, heartbeat, cancelled=None):
             seen.append(hubs.reaches(app_role, source))
-            return real(source, cluster, path, heartbeat, cancelled)
+            real(key, source, cluster, heartbeat, cancelled)
 
-        monkeypatch.setattr(move, "_dump", dump)
+        monkeypatch.setattr(move, "_dump_to_bucket", dump)
 
         run(roles=hubs.app_roles(app_role))
 
@@ -208,7 +354,7 @@ class TestTheOriginIsClosedToTheApp:
     def test_after_a_failure_the_app_reaches_the_origin_again(self, moves, app_role, monkeypatch):
         hub = moves.hub(to=moves.cluster())
         hubs.grant_connect(app_role, hub.db_name)
-        monkeypatch.setattr(move, "_restore", self.fails("restore"))
+        monkeypatch.setattr(move, "_restore_from_bucket", self.fails("restore"))
 
         run(roles=hubs.app_roles(app_role))
 
@@ -226,7 +372,9 @@ class TestTheOriginIsClosedToTheApp:
 class TestAFailurePutsEverythingBack:
     """Whatever step fails before the switch, the hub stays ready on its origin with every row it had."""
 
-    @pytest.mark.parametrize("step", ["_dump", "_restore", "_verify_identity", "_ensure_schema", "_switch"])
+    @pytest.mark.parametrize(
+        "step", ["_dump_to_bucket", "_restore_from_bucket", "_verify_identity", "_ensure_schema", "_switch"]
+    )
     def test_the_hub_is_ready_on_its_origin_with_its_data_and_says_why(self, moves, monkeypatch, step):
         target = moves.cluster()
         hub = moves.hub(to=target)
@@ -249,14 +397,14 @@ class TestAFailurePutsEverythingBack:
 
     def test_a_destination_that_says_it_is_another_hub_is_refused(self, moves, monkeypatch):
         hub = moves.hub(to=moves.cluster())
-        real = move._restore
+        real = move._restore_from_bucket
 
-        def restore_and_lie(path, name, cluster, heartbeat, cancelled=None):
-            real(path, name, cluster, heartbeat, cancelled)
+        def restore_and_lie(key, name, cluster, heartbeat, cancelled=None):
+            real(key, name, cluster, heartbeat, cancelled)
             with hubs._maintenance(name) as conn:
                 conn.execute("UPDATE base_hub_identity SET hub_id = %s", [uuid.uuid7()])
 
-        monkeypatch.setattr(move, "_restore", restore_and_lie)
+        monkeypatch.setattr(move, "_restore_from_bucket", restore_and_lie)
 
         run()
 
@@ -278,9 +426,9 @@ class TestAFailurePutsEverythingBack:
         hub = moves.hub(to=target)
 
         def stolen(*args, **kwargs):
-            raise services.ProvisioningStopped("another worker holds it now")
+            raise provisioning.ProvisioningStopped("another worker holds it now")
 
-        monkeypatch.setattr(move, "_restore", stolen)
+        monkeypatch.setattr(move, "_restore_from_bucket", stolen)
 
         run()
 
@@ -432,6 +580,348 @@ def test_the_restore_leaves_out_the_extensions_and_the_public_schema_of_the_copy
 
 
 
+# ── The copy goes through the dumps bucket, never a file of the worker ──────────────────────────────────────────────
+
+
+#: S3's smallest part: what these tests stream in, so a business of a few MiB goes up in several parts.
+SMALLEST_PART = 5 * 1024 * 1024
+
+
+class TestTheCopyGoesThroughTheBucket:
+    """``pg_dump`` sends the copy to the dumps bucket as it makes it, and ``pg_restore`` reads it from there: the
+    worker's disk never holds it, so no size stops a move. The copy is no business's to download (no ``HubDump``)."""
+
+    def test_the_copy_is_in_the_bucket_and_never_in_a_file_of_the_worker(
+        self, moves, moto_s3, dumps_bucket, monkeypatch
+    ):
+        hub = moves.hub(to=moves.cluster())
+        started = s3.copy_programs(monkeypatch)
+
+        assert run() == 1
+
+        hub = fresh(hub)
+        assert (hub.moving_to_id, hub.last_error) == (None, "") and marker(hub.db_name) == [MARKER]
+        [key] = objects(moto_s3, dumps_bucket)
+        assert re.fullmatch(rf"{hub.id.hex}/\d{{8}}T\d{{6}}Z-move\.dump", key)
+        assert body(moto_s3, dumps_bucket, key).startswith(b"PGDMP")
+        assert not HubDump.objects.exists()
+        assert s3.how_it_was_copied(started) == s3.THROUGH_THE_BUCKET
+
+    def test_a_business_larger_than_a_part_moves_whole(self, moves, monkeypatch):
+        monkeypatch.setattr(dumps, "STREAM_PART_BYTES", SMALLEST_PART)
+        hub = moves.hub(to=moves.cluster())
+        # 12 MiB that do not compress: the copy goes up in three parts and comes back in many reads.
+        with hubs._maintenance(hub.db_name) as conn:
+            conn.execute("CREATE TABLE w8a_bulk (n int PRIMARY KEY, data bytea NOT NULL)")
+            conn.execute(
+                "INSERT INTO w8a_bulk SELECT n, decode(md5(n::text) || md5((n + 1)::text), 'hex') "
+                "FROM generate_series(1, 393216) AS n"
+            )
+        fingerprint = "SELECT count(*), md5(string_agg(data, '' ORDER BY n)) FROM w8a_bulk"
+        with hubs._maintenance(hub.db_name) as conn:
+            before = conn.execute(fingerprint).fetchone()
+
+        assert run() == 1
+
+        hub = fresh(hub)
+        assert (hub.moving_to_id, hub.last_error) == (None, "")
+        with hubs._maintenance(hub.db_name) as conn:
+            assert conn.execute(fingerprint).fetchone() == before
+        assert says_it_is(hub.db_name) == [hub.id]
+
+    def test_a_worker_that_stops_while_it_copies_leaves_the_move_to_the_next_one(
+        self, moves, moto_s3, dumps_bucket, monkeypatch
+    ):
+        target = moves.cluster()
+        hub = moves.hub(to=target)
+
+        run(cancelled=s3.stopping_as(monkeypatch, dumps, "_pg_dump_command"))
+
+        # Not a failure: the move is neither undone nor noted as failed, and half a copy is never kept.
+        stopped = fresh(hub)
+        assert (stopped.moving_to_id, stopped.last_error) == (target.pk, "")
+        assert objects(moto_s3, dumps_bucket) == {}
+
+        assert run() == 1
+
+        hub = fresh(hub)
+        assert (hub.cluster_id, hub.moving_to_id, hub.last_error) == (target.pk, None, "")
+        assert marker(hub.db_name) == [MARKER]
+
+    def test_without_a_bucket_the_business_is_never_closed_and_stays_where_it_was(self, moves, monkeypatch):
+        hub = moves.hub(to=moves.cluster())
+        monkeypatch.setenv("HUB_DUMPS_BUCKET", "")
+        default = django_connections.settings["default"]
+        # A session on its database before the pass: closing the origin would end it.
+        session = psycopg.connect(
+            dbname=hub.db_name,
+            user=default["USER"],
+            password=default["PASSWORD"],
+            host=default["HOST"],
+            port=default["PORT"],
+        )
+        try:
+            assert run() == 1
+
+            hub = fresh(hub)
+            assert (hub.cluster_id, hub.moving_to_id, hub.status) == (None, None, "ready")
+            assert hub.last_error.startswith("move_dump_failed:") and "HUB_DUMPS_BUCKET" in hub.last_error
+            assert session.execute("SELECT 1").fetchone() == (1,)
+        finally:
+            session.close()
+        assert marker(hub.db_name) == [MARKER]
+        assert not MovedCopy.objects.filter(hub=hub).exists()
+
+    def test_a_copy_that_cannot_be_read_back_puts_the_hub_back_with_its_data(
+        self, moves, moto_s3, dumps_bucket, monkeypatch
+    ):
+        hub = moves.hub(to=moves.cluster())
+        s3.lose_each_copy(monkeypatch, moto_s3, dumps_bucket)
+
+        assert run() == 1
+
+        hub = fresh(hub)
+        assert (hub.cluster_id, hub.moving_to_id, hub.status) == (None, None, "ready")
+        assert hub.last_error.startswith("move_restore_failed:")
+        assert "could not be read from the bucket" in hub.last_error
+        assert marker(hub.db_name) == [MARKER]
+
+    def test_a_move_has_an_hour_for_each_half_of_its_copy(self, moves, monkeypatch):
+        seen = []
+        real_stream, real_run = dumps.stream_to_bucket, move._run
+
+        def streamed(source, key, **kwargs):
+            seen.append(("dump", kwargs["timeout"]))
+            return real_stream(source, key, **kwargs)
+
+        def ran(command, *args, **kwargs):
+            seen.append(("restore", kwargs["timeout"]))
+            return real_run(command, *args, **kwargs)
+
+        monkeypatch.setattr(dumps, "stream_to_bucket", streamed)
+        monkeypatch.setattr(move, "_run", ran)
+        hub = moves.hub(to=moves.cluster())
+
+        run()
+
+        assert fresh(hub).last_error == "" and move.COPY_TIMEOUT_SECONDS == 60 * 60
+        # The dump, then the restore's listing and the restore itself.
+        assert seen == [("dump", 3600), ("restore", 3600), ("restore", 3600)]
+
+    def test_a_dump_that_fails_puts_the_hub_back_and_says_why(
+        self, moves, moto_s3, dumps_bucket, monkeypatch, tmp_path
+    ):
+        failing = tmp_path / "pg_dump"
+        failing.write_text("#!/bin/sh\necho 'pg_dump: error: the connection to the server was lost' >&2\nexit 1\n")
+        failing.chmod(0o755)
+        monkeypatch.setattr(dumps, "pg_dump", lambda: str(failing))
+        hub = moves.hub(to=moves.cluster())
+
+        assert run() == 1
+
+        hub = fresh(hub)
+        assert (hub.cluster_id, hub.moving_to_id, hub.status) == (None, None, "ready")
+        assert hub.last_error.startswith("move_dump_failed:")
+        assert "the connection to the server was lost" in hub.last_error
+        assert marker(hub.db_name) == [MARKER] and objects(moto_s3, dumps_bucket) == {}
+
+    def test_every_read_of_the_copy_from_the_bucket_is_closed(self, moves, monkeypatch):
+        opened, closed = [], []
+        real = dumps.client
+
+        def watched():
+            s3 = real()
+            get = s3.get_object
+
+            def get_object(**kwargs):
+                answer = get(**kwargs)
+                body = answer["Body"]
+                close = body.close
+                opened.append(body)
+
+                def closing():
+                    closed.append(body)
+                    close()
+
+                body.close = closing
+                return answer
+
+            s3.get_object = get_object
+            return s3
+
+        monkeypatch.setattr(dumps, "client", watched)
+        hub = moves.hub(to=moves.cluster())
+
+        run()
+
+        assert fresh(hub).last_error == ""
+        # The listing reads only the start of it; the restore, all of it: both are closed.
+        assert len(opened) == 2 and closed == opened
+
+
+#: More than a pipe holds (64 KiB on Linux and macOS): a writer that is not read waits.
+FEED = [bytes([n]) * (256 * 1024) for n in range(8)]
+
+
+def feeding(*chunks: bytes):
+    yield from chunks
+
+
+class TestFeedingAProgram:
+    """``move._run`` with a ``feed``: what it reads from the bucket goes to the program's input as it comes, while the
+    stop, the heartbeat and the time limit are heard as when it waits."""
+
+    def test_everything_reaches_the_program_in_order(self, tmp_path):
+        out = tmp_path / "out"
+
+        move._run(
+            ["sh", "-c", f"cat > {out}"],
+            "",
+            tmp_path / "err",
+            lambda: None,
+            None,
+            what="cat",
+            feed=feeding(*FEED),
+            timeout=30,
+        )
+
+        assert out.read_bytes() == b"".join(FEED)
+
+    def test_a_program_that_ends_well_before_reading_it_all_is_done(self, tmp_path):
+        move._run(
+            ["sh", "-c", "head -c 10 > /dev/null"],
+            "",
+            tmp_path / "err",
+            lambda: None,
+            None,
+            what="head",
+            feed=feeding(*FEED),
+            timeout=30,
+        )
+
+    def test_a_program_that_fails_says_why_even_before_reading_it_all(self, tmp_path):
+        with pytest.raises(move.MoveFailed) as failed:
+            move._run(
+                ["sh", "-c", "echo 'pg_restore: error: not an archive' >&2; exit 3"],
+                "",
+                tmp_path / "err",
+                lambda: None,
+                None,
+                what="the restore of x",
+                feed=feeding(*FEED),
+            )
+
+        assert failed.value.code == "move_restore_failed"
+        assert "exit 3" in str(failed.value) and "not an archive" in str(failed.value)
+
+    def test_a_program_that_never_reads_is_stopped_past_its_time(self, tmp_path):
+        started = time.monotonic()
+
+        with pytest.raises(move.MoveFailed) as failed:
+            move._run(
+                ["sleep", "60"],
+                "",
+                tmp_path / "err",
+                lambda: None,
+                None,
+                what="sleep",
+                feed=feeding(*FEED),
+                timeout=0.5,
+            )
+
+        assert "took longer than 0.5 s" in str(failed.value)
+        assert time.monotonic() - started < 10
+
+    def test_a_stop_is_heard_while_it_feeds(self, tmp_path):
+        asked = time.monotonic()
+
+        with pytest.raises(move.MoveStopped):
+            move._run(
+                ["sleep", "60"],
+                "",
+                tmp_path / "err",
+                lambda: None,
+                lambda: time.monotonic() - asked > 0.5,
+                what="sleep",
+                feed=feeding(*FEED),
+            )
+
+        assert time.monotonic() - asked < 10
+
+    def test_its_heartbeat_beats_while_it_feeds(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(dumps, "POLL_SECONDS", 0.5)
+        monkeypatch.setattr(dumps, "STOP_CHECK_SECONDS", 0.05)
+        beats = []
+
+        move._run(
+            ["sh", "-c", "sleep 1; cat > /dev/null"],
+            "",
+            tmp_path / "err",
+            lambda: beats.append(1),
+            None,
+            what="cat",
+            feed=feeding(*FEED),
+            timeout=30,
+        )
+
+        assert 1 <= len(beats) <= 4, beats
+
+    def test_a_program_slow_to_read_is_waited_for_not_spun_on(self, tmp_path):
+        checks = []
+
+        move._run(
+            ["sh", "-c", "sleep 1.5; cat > /dev/null"],
+            "",
+            tmp_path / "err",
+            lambda: None,
+            lambda: checks.append(1) or False,
+            what="cat",
+            feed=feeding(*FEED),
+            timeout=30,
+        )
+
+        assert len(checks) < 1000, len(checks)
+
+    def test_its_feed_is_closed_at_once_when_the_program_fails(self, tmp_path):
+        closed = []
+
+        def tracked():
+            try:
+                yield from FEED
+            finally:
+                closed.append(True)
+
+        with pytest.raises(move.MoveFailed) as failed:
+            move._run(
+                ["sh", "-c", "exit 3"], "", tmp_path / "err", lambda: None, None, what="sh", feed=tracked(), timeout=30
+            )
+
+        # The failure still holds the run's frame: only closing the feed lets the copy's read from the bucket go now.
+        assert "exit 3" in str(failed.value) and closed == [True]
+
+    def test_what_the_feed_raises_stops_the_program_and_reaches_the_caller(self, tmp_path):
+        def broken():
+            yield FEED[0]
+            raise move.MoveFailed("move_restore_failed", "its copy could not be read from the bucket: gone")
+
+        started = time.monotonic()
+
+        with pytest.raises(move.MoveFailed) as failed:
+            move._run(
+                ["sh", "-c", "cat > /dev/null; sleep 60"],
+                "",
+                tmp_path / "err",
+                lambda: None,
+                None,
+                what="cat",
+                feed=broken(),
+                timeout=30,
+            )
+
+        assert "could not be read from the bucket" in str(failed.value)
+        assert time.monotonic() - started < 10
+
+
 # ── Two workers, an unreachable destination, a missing origin, the schema record ─────────────────────────────────────
 
 
@@ -464,18 +954,18 @@ class TestTwoWorkers:
     def test_a_stale_worker_never_drops_the_live_destination_nor_touches_control(self, moves, monkeypatch, caplog):
         target = moves.cluster()
         hub = moves.hub(to=target)
-        real_dump = move._dump
+        real_dump = move._dump_to_bucket
         state = {"nested": False}
 
-        def dump(source, cluster, path, heartbeat, cancelled=None):
-            real_dump(source, cluster, path, heartbeat, cancelled)
+        def dump(key, source, cluster, heartbeat, cancelled=None):
+            real_dump(key, source, cluster, heartbeat, cancelled)
             if not state["nested"]:
                 state["nested"] = True
                 move.move_hub(hub.id)  # the other worker, all the way to its switch
                 with hubs._maintenance(fresh(hub).db_name) as conn:
                     conn.execute("INSERT INTO w8a_marker VALUES ('written after the switch')")
 
-        monkeypatch.setattr(move, "_dump", dump)
+        monkeypatch.setattr(move, "_dump_to_bucket", dump)
 
         run()
 
@@ -522,15 +1012,15 @@ class TestTwoWorkers:
     ):
         target = moves.cluster()
         hub = moves.hub(to=target)
-        real = move._dump
+        real = move._dump_to_bucket
 
-        def cancelled_meanwhile(source, cluster, path, heartbeat, cancelled=None):
-            real(source, cluster, path, heartbeat, cancelled)
+        def cancelled_meanwhile(key, source, cluster, heartbeat, cancelled=None):
+            real(key, source, cluster, heartbeat, cancelled)
             with use_control():
                 Hub.objects.filter(pk=hub.pk).update(move_undo_asked_at=AT)
 
         with monkeypatch.context() as patched:
-            patched.setattr(move, "_dump", cancelled_meanwhile)
+            patched.setattr(move, "_dump_to_bucket", cancelled_meanwhile)
             run()
         assert fresh(hub).moving_to_id == target.pk
 
@@ -550,7 +1040,7 @@ class TestTwoWorkers:
         assert fresh(hub).cluster_id == target.pk
         monkeypatch.setattr(move.control_services, "moving_row", lambda hub_id: stale)
         with use_control():
-            move.services.claim_hub(hub.id, AT, move.LEASE)
+            move.services.provisioning.claim_hub(hub.id, AT, move.LEASE)
 
         with use_control():
             move.move_hub(hub.id)
@@ -678,7 +1168,7 @@ class TestTheOriginFirst:
             raise move.MoveStopped("the worker is stopping")
 
         with monkeypatch.context() as patched:
-            patched.setattr(move, "_restore", stopped)
+            patched.setattr(move, "_restore_from_bucket", stopped)
             run()
         assert fresh(hub).moving_to_id == target.pk
         with use_control():
@@ -809,7 +1299,7 @@ class TestTheUndoRenamesBackOnlyWhatLeft:
             raise move.MoveFailed("move_restore_failed", "broke on purpose")
 
         monkeypatch.setattr(move.ops, "drop_database", drop)
-        monkeypatch.setattr(move, "_restore", broken_restore)
+        monkeypatch.setattr(move, "_restore_from_bucket", broken_restore)
 
         run()
 
@@ -854,16 +1344,16 @@ class TestTheUndoRenamesBackOnlyWhatLeft:
 
 class TestTheMinorPoints:
     def test_the_switch_locks_the_lease_it_checks(self, moves):
-        from django.db import connection
+        from django.db import connections
         from django.test.utils import CaptureQueriesContext
 
         target = moves.cluster()
         hub = moves.hub(to=target)
         with use_control():
-            move.services.claim_hub(hub.id, AT, move.LEASE)
-            with CaptureQueriesContext(connection) as queries:
+            move.services.provisioning.claim_hub(hub.id, AT, move.LEASE)
+            with CaptureQueriesContext(connections["default"]) as queries:
                 move.control_services.move_finished(
-                    hub.id, target.pk, None, f"x_move_{hub.id.hex}", AT, owner=move.services.LEASE_OWNER
+                    hub.id, target.pk, None, f"x_move_{hub.id.hex}", AT, owner=move.services.provisioning.LEASE_OWNER
                 )
 
         leases = [q["sql"] for q in queries.captured_queries if '"control_hubdue"' in q["sql"]]
@@ -876,7 +1366,7 @@ class TestTheMinorPoints:
         with use_control():
             LeftoverDatabase.objects.create(hub=hub, cluster=target, db_name=hub.db_name, noted_at=AT)
         claimed: list[dt.datetime] = []
-        real = move.services.claim_hub
+        real = move.services.provisioning.claim_hub
 
         def claim(hub_id, now, lease, **kwargs):
             claimed.append(now)
@@ -884,7 +1374,7 @@ class TestTheMinorPoints:
             Hub.objects.filter(pk=hub_id).update(cluster=target)
             return real(hub_id, now, lease, **kwargs)
 
-        monkeypatch.setattr(move.services, "claim_hub", claim)
+        monkeypatch.setattr(move.services.provisioning, "claim_hub", claim)
 
         run()
 

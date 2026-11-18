@@ -1,13 +1,13 @@
 """Guardrail of the assistant's tool descriptions (hub#1140): the card of a write is the person's confirmation.
 
-``base.assistant.instructions`` tell the model «To change something, call its tool: the person sees a card and confirms
+``base.assistant.prompt.instructions`` tell the model «To change something, call its tool: the person sees a card and confirms
 it before it runs». A tool whose ``ai=`` description tells it to ask, confirm or wait for a yes in the chat before the
 call is asked about in the chat and its card never shows: the model answers «are you sure…?» and the change is never
 made from the chat. Seen with the real model in Reservations (hub#1105: «Ask first.» on cancelling, deleting,
 unblocking and taking off the waitlist, offered 4th to 10th), in Tables (hub#1081, ``table.session.delete``) and in the
 Cash register (hub#1138: «tell the person its summary, then close»).
 
-Here every assistant tool of the Hub (``base.assistant.is_tool``, every app and the platform, reads too: a read needs
+Here every assistant tool of the Hub (``base.assistant.tools.is_tool``, every app and the platform, reads too: a read needs
 no yes either) is read sentence by sentence with :func:`stops_in_the_chat`, proven by the old texts and their wordings
 (the positive controls) and by sentences that must pass. Its known limit: it reads prose, so a new wording of the same
 instruction («get their OK beforehand») passes until it is added here; :data:`IN_THE_CHAT` says which ones it reads.
@@ -62,7 +62,7 @@ def stops_in_the_chat(description: str) -> list[str]:
 
 def tools() -> dict[str, str]:
     """Every assistant tool of the Hub, by name, with its description."""
-    return {name: shared.description(op) for name, op in sorted(registry.items()) if assistant.is_tool(op)}
+    return {name: shared.description(op) for name, op in sorted(registry.items()) if assistant.tools.is_tool(op)}
 
 
 def test_the_guard_reads_the_old_texts_and_their_wordings():

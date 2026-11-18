@@ -8,6 +8,9 @@
   the other devices past the N - 1 most recent; each of them says why at its next way in.
 - BASE-F40: «Usage and plan» counts the devices in use the way that cap does: those with a session open on
   this hub.
+
+The hub is ``hub_a``, on a database of its own as every business is: its devices and events are written and read there,
+inside its context.
 """
 
 import datetime as dt
@@ -23,11 +26,11 @@ from live.operations import get as get_operation
 
 from base import access
 from base.models import Hub, Membership, SessionOwner, TrustedDevice
+from base.tenancy.context import use_hub
 from base.tests.test_access_account import enter
+from base.tests.test_auth_views import A, B, HOST, ON_HUB_A
 
-pytestmark = pytest.mark.django_db
-
-HOST = "a.localhost:8000"
+pytestmark = ON_HUB_A
 
 
 def a_device(client, mode=access.SHARED, **fields) -> TrustedDevice:
@@ -52,51 +55,56 @@ def code(response):
 
 @pytest.fixture
 def owner(client, make_user):
-    user = make_user("saas:1", host="a", role=Membership.Role.OWNER, first_name="Olga")
+    user = make_user("saas:1", host=A, role=Membership.Role.OWNER, first_name="Olga")
     client.force_login(user)
     return user
 
 
 @pytest.fixture
 def employee(client, make_user):
-    user = make_user("saas:2", host="a", role=Membership.Role.EMPLOYEE, first_name="Eva")
+    user = make_user("saas:2", host=A, role=Membership.Role.EMPLOYEE, first_name="Eva")
     client.force_login(user)
     return user
 
 
 class TestThisDevice:
-    def test_it_says_its_mode_and_whether_the_hub_knows_it(self, client, owner):
+    def test_it_says_its_mode_and_whether_the_hub_knows_it(self, client, owner, hub_a):
         assert get(client, "/device").json() == {"known": False, "mode": "shared", "mode_set_by": "", "mode_set_at": None}
-        a_device(client, mode=access.PERSONAL)
+        with use_hub(hub_a):
+            a_device(client, mode=access.PERSONAL)
         answer = get(client, "/device").json()
         assert (answer["known"], answer["mode"]) == (True, "personal")
 
-    def test_an_administrator_makes_it_personal_from_the_device_itself(self, client, owner):
-        device = a_device(client)
+    def test_an_administrator_makes_it_personal_from_the_device_itself(self, client, owner, hub_a):
+        with use_hub(hub_a):
+            device = a_device(client)
         response = post(client, "/device/mode", {"mode": "personal"})
         assert response.status_code == 200 and response.json()["mode"] == "personal"
-        device.refresh_from_db()
+        with use_hub(hub_a):
+            device.refresh_from_db()
+            assert OutboxEvent.objects.filter(name="base.device.mode_changed").count() == 1
         assert (device.mode, device.mode_set_by) == ("personal", "Olga")
         assert device.mode_set_at is not None
-        assert OutboxEvent.objects.filter(name="base.device.mode_changed").count() == 1
 
     def test_a_device_nobody_entered_with_an_account_cannot_be_set(self, client, owner):
         response = post(client, "/device/mode", {"mode": "personal"})
         assert (response.status_code, code(response)) == (404, "base.device_unknown")
         assert "account" in response.json()["error"]["message"]
 
-    def test_only_an_administrator(self, client, employee):
-        a_device(client)
+    def test_only_an_administrator(self, client, employee, hub_a):
+        with use_hub(hub_a):
+            a_device(client)
         assert post(client, "/device/mode", {"mode": "personal"}).status_code == 403
 
-    def test_a_mode_it_does_not_know_is_refused(self, client, owner):
-        a_device(client)
+    def test_a_mode_it_does_not_know_is_refused(self, client, owner, hub_a):
+        with use_hub(hub_a):
+            a_device(client)
         assert post(client, "/device/mode", {"mode": "kiosk"}).status_code == 422
 
     def test_the_sessions_open_from_now_on_follow_it_and_the_open_one_keeps_its_end(self, client, fake_saas):
         fake_saas()
         enter(client)
-        Membership.objects.filter(host="a").update(role=Membership.Role.OWNER)
+        Membership.objects.filter(host=A).update(role=Membership.Role.OWNER)
         until = client.session.get_expiry_date()
         post(client, "/device/mode", {"mode": "personal"})
         assert client.session.get_expiry_date() == until
@@ -105,12 +113,13 @@ class TestThisDevice:
 
 
 class TestTheDevicesOfTheHub:
-    def test_an_administrator_sees_each_device_without_its_token(self, client, owner):
-        here = a_device(client, name="Bar", agent="Chrome · Android", last_user_label="Olga")
+    def test_an_administrator_sees_each_device_without_its_token(self, client, owner, hub_a):
+        with use_hub(hub_a):
+            here = a_device(client, name="Bar", agent="Chrome · Android", last_user_label="Olga")
+            other = TrustedDevice.objects.create(
+                token_digest="0" * 64, agent="Safari · iPad", last_entry_at=timezone.now() - dt.timedelta(days=40)
+            )
         token = client.cookies[access.DEVICE_COOKIE].value
-        other = TrustedDevice.objects.create(
-            token_digest="0" * 64, agent="Safari · iPad", last_entry_at=timezone.now() - dt.timedelta(days=40)
-        )
         answer = get(client, "/devices").json()
         rows = {row["id"]: row for row in answer["devices"]}
         assert set(rows) == {str(here.pk), str(other.pk)}
@@ -119,8 +128,9 @@ class TestTheDevicesOfTheHub:
         assert answer["unused"] == 1
         assert token not in json.dumps(answer) and "token" not in json.dumps(answer)
 
-    def test_the_one_in_hand_is_never_unused_however_old(self, client, owner):
-        here = a_device(client, last_entry_at=timezone.now() - dt.timedelta(days=40))
+    def test_the_one_in_hand_is_never_unused_however_old(self, client, owner, hub_a):
+        with use_hub(hub_a):
+            here = a_device(client, last_entry_at=timezone.now() - dt.timedelta(days=40))
         answer = get(client, "/devices").json()
         [row] = [row for row in answer["devices"] if row["id"] == str(here.pk)]
         assert (row["current"], row["unused"], answer["unused"]) == (True, False, 0)
@@ -128,7 +138,7 @@ class TestTheDevicesOfTheHub:
     def test_it_says_which_one_has_a_session_open_and_until_when(self, client, fake_saas):
         fake_saas()
         enter(client)
-        Membership.objects.filter(host="a").update(role=Membership.Role.OWNER)
+        Membership.objects.filter(host=A).update(role=Membership.Role.OWNER)
         [row] = get(client, "/devices").json()["devices"]
         assert row["in_use"] is True
         assert row["session_until"] is not None
@@ -136,32 +146,37 @@ class TestTheDevicesOfTheHub:
     def test_only_an_administrator_sees_them(self, client, employee):
         assert get(client, "/devices").status_code == 403
 
-    def test_naming_one(self, client, owner):
-        device = a_device(client)
+    def test_naming_one(self, client, owner, hub_a):
+        with use_hub(hub_a):
+            device = a_device(client)
         assert post(client, "/devices/rename", {"id": str(device.pk), "name": "  Kitchen  "}).status_code == 200
-        device.refresh_from_db()
+        with use_hub(hub_a):
+            device.refresh_from_db()
+            assert OutboxEvent.objects.filter(name="base.device.renamed").count() == 1
         assert device.name == "Kitchen"
-        assert OutboxEvent.objects.filter(name="base.device.renamed").count() == 1
         too_long = post(client, "/devices/rename", {"id": str(device.pk), "name": "x" * 61})
         assert too_long.status_code == 422
 
-    def test_removing_a_lost_one_ends_its_sessions_at_once_and_the_pin_with_it(self, client, owner, fake_saas):
+    def test_removing_a_lost_one_ends_its_sessions_at_once_and_the_pin_with_it(self, client, owner, fake_saas, hub_a):
         fake_saas()
         lost = Client()
         enter(lost)
-        lost_device = TrustedDevice.objects.get()
-        a_device(client)
+        with use_hub(hub_a):
+            lost_device = TrustedDevice.objects.get()
+            a_device(client)
         response = post(client, "/devices/remove", {"id": str(lost_device.pk)})
         assert (response.status_code, response.json()) == (200, {"removed": 1, "yours": False})
-        assert not TrustedDevice.objects.filter(pk=lost_device.pk).exists()
         assert lost.get("/api/me", HTTP_HOST=HOST).json()["user"] is None
-        assert OutboxEvent.objects.filter(name="base.device.removed").count() == 1
+        with use_hub(hub_a):
+            assert not TrustedDevice.objects.filter(pk=lost_device.pk).exists()
+            assert OutboxEvent.objects.filter(name="base.device.removed").count() == 1
 
-    def test_removing_the_one_in_your_hand_ends_your_session(self, client, fake_saas):
+    def test_removing_the_one_in_your_hand_ends_your_session(self, client, fake_saas, hub_a):
         fake_saas()
         enter(client)
-        Membership.objects.filter(host="a").update(role=Membership.Role.OWNER)
-        device = TrustedDevice.objects.get()
+        Membership.objects.filter(host=A).update(role=Membership.Role.OWNER)
+        with use_hub(hub_a):
+            device = TrustedDevice.objects.get()
         assert post(client, "/devices/remove", {"id": str(device.pk)}).json() == {"removed": 1, "yours": True}
         assert client.get("/api/me", HTTP_HOST=HOST).json()["user"] is None
 
@@ -169,30 +184,35 @@ class TestTheDevicesOfTheHub:
         response = post(client, "/devices/remove", {"id": "01a16b35-d6b9-71ea-84a7-7880b22e3139"})
         assert (response.status_code, code(response)) == (404, "base.device_unknown")
 
-    def test_removing_those_nobody_used_in_thirty_days_keeps_the_rest_and_the_one_in_hand(self, client, owner):
+    def test_removing_those_nobody_used_in_thirty_days_keeps_the_rest_and_the_one_in_hand(self, client, owner, hub_a):
         old = timezone.now() - dt.timedelta(days=31)
-        here = a_device(client, last_entry_at=old)
-        unused = TrustedDevice.objects.create(token_digest="1" * 64, last_entry_at=old)
-        recent = TrustedDevice.objects.create(token_digest="2" * 64, last_entry_at=timezone.now() - dt.timedelta(days=29))
+        with use_hub(hub_a):
+            here = a_device(client, last_entry_at=old)
+            unused = TrustedDevice.objects.create(token_digest="1" * 64, last_entry_at=old)
+            recent = TrustedDevice.objects.create(
+                token_digest="2" * 64, last_entry_at=timezone.now() - dt.timedelta(days=29)
+            )
         assert post(client, "/devices/prune").json() == {"removed": 1}
-        assert set(TrustedDevice.objects.values_list("pk", flat=True)) == {here.pk, recent.pk}
-        assert not TrustedDevice.objects.filter(pk=unused.pk).exists()
-        assert OutboxEvent.objects.filter(name="base.device.pruned").count() == 1
+        with use_hub(hub_a):
+            assert set(TrustedDevice.objects.values_list("pk", flat=True)) == {here.pk, recent.pk}
+            assert not TrustedDevice.objects.filter(pk=unused.pk).exists()
+            assert OutboxEvent.objects.filter(name="base.device.pruned").count() == 1
 
 
 class TestThePlanCoversOneDevice:
     @pytest.fixture
-    def one_device(self, db):
-        Hub.objects.filter(slug="a").update(state={"plan": {"max_devices": 1}})
+    def one_device(self, hub_a):
+        Hub.objects.filter(pk=hub_a.pk).update(state={"plan": {"max_devices": 1}})
 
-    def test_entering_on_another_device_ends_this_one_s_session_and_says_why(self, fake_saas, one_device):
+    def test_entering_on_another_device_ends_this_one_s_session_and_says_why(self, fake_saas, one_device, hub_a):
         fake_saas()
         first, second = Client(), Client()
         enter(first)
         enter(second)
         assert first.get("/api/me", HTTP_HOST=HOST).json()["user"] is None
         assert second.get("/api/me", HTTP_HOST=HOST).json()["user"] is not None
-        evicted = TrustedDevice.objects.get(token_digest=access.token_digest(first.cookies[access.DEVICE_COOKIE].value))
+        with use_hub(hub_a):
+            evicted = TrustedDevice.objects.get(token_digest=access.token_digest(first.cookies[access.DEVICE_COOKIE].value))
         assert evicted.ended_reason == "device_limit"
         response = first.get("/sale/pos", HTTP_HOST=HOST, HTTP_ACCEPT="text/html")
         assert "notice=device_limit" in response["Location"]
@@ -213,8 +233,8 @@ class TestThePlanCoversOneDevice:
         enter(second)
         assert first.get("/api/me", HTTP_HOST=HOST).json()["user"] is not None
 
-    def test_two_devices_keep_the_most_recent_other_one(self, fake_saas):
-        Hub.objects.filter(slug="a").update(state={"plan": {"max_devices": 2}})
+    def test_two_devices_keep_the_most_recent_other_one(self, fake_saas, hub_a):
+        Hub.objects.filter(pk=hub_a.pk).update(state={"plan": {"max_devices": 2}})
         fake_saas()
         oldest, newer, entering = Client(), Client(), Client()
         enter(oldest)
@@ -223,36 +243,40 @@ class TestThePlanCoversOneDevice:
         assert oldest.get("/api/me", HTTP_HOST=HOST).json()["user"] is None
         assert newer.get("/api/me", HTTP_HOST=HOST).json()["user"] is not None
 
-    def test_the_next_entry_on_the_evicted_device_forgets_why(self, fake_saas, one_device):
+    def test_the_next_entry_on_the_evicted_device_forgets_why(self, fake_saas, one_device, hub_a):
         fake_saas()
         first, second = Client(), Client()
         enter(first)
         enter(second)
         enter(first)
         token = first.cookies[access.DEVICE_COOKIE].value
-        assert TrustedDevice.objects.get(token_digest=access.token_digest(token)).ended_reason == ""
+        with use_hub(hub_a):
+            assert TrustedDevice.objects.get(token_digest=access.token_digest(token)).ended_reason == ""
 
-    def test_the_session_s_note_names_the_device_it_was_on(self, fake_saas, one_device):
+    def test_the_session_s_note_names_the_device_it_was_on(self, fake_saas, one_device, hub_a):
         fake_saas()
         first = Client()
         enter(first)
-        assert SessionOwner.objects.get().device_id == TrustedDevice.objects.get().pk
+        with use_hub(hub_a):
+            device = TrustedDevice.objects.get()
+        assert SessionOwner.objects.get().device_id == device.pk
 
 
 class TestThePlanSaysTheDevicesInUse:
     """The devices «Usage and plan» counts are those the plan's cap on devices keeps: a session open on this hub."""
 
     @pytest.fixture(autouse=True)
-    def plan(self, db):
-        Hub.objects.filter(slug="a").update(state={"plan": {"max_users": 5, "max_devices": 3}})
+    def plan(self, hub_a):
+        Hub.objects.filter(pk=hub_a.pk).update(state={"plan": {"max_users": 5, "max_devices": 3}})
 
-    def devices(self, slug="a"):
+    def devices(self, slug=A):
         from base.schemas import PlanUsageIn
 
         ctx = OperationContext(
             scope=Scope("host", slug), actor="ana", permissions=frozenset({"base.administer_hub"}), language="en"
         )
-        return get_operation("base.plan.usage")(ctx, PlanUsageIn()).model_dump(mode="json")["devices"]
+        with use_hub(Hub.objects.get(slug=slug)):
+            return get_operation("base.plan.usage")(ctx, PlanUsageIn()).model_dump(mode="json")["devices"]
 
     def test_none_in_use_until_someone_enters(self):
         assert self.devices() == {"used": 0, "limit": 3}
@@ -267,12 +291,12 @@ class TestThePlanSaysTheDevicesInUse:
         session = Session.objects.create(
             session_key="second-on-the-tablet", session_data="", expire_date=timezone.now() + dt.timedelta(hours=1)
         )
-        SessionOwner.objects.create(session=session, saas_user_id="7", host="a", device_id=device)
+        SessionOwner.objects.create(session=session, saas_user_id="7", host=A, device_id=device)
         assert self.devices() == {"used": 2, "limit": 3}
 
-    def test_an_ended_session_a_session_without_a_device_or_another_hub_s_does_not_count(self, fake_saas):
+    def test_an_ended_session_a_session_without_a_device_or_another_hub_s_does_not_count(self, fake_saas, hub_a, hub_b):
         # No cap here: four entries would otherwise end the oldest session before it could expire.
-        Hub.objects.filter(slug="a").update(state={"plan": {"max_users": 5, "max_devices": 0}})
+        Hub.objects.filter(pk=hub_a.pk).update(state={"plan": {"max_users": 5, "max_devices": 0}})
         fake_saas()
         ended, deviceless, elsewhere, here = Client(), Client(), Client(), Client()
         for client in (ended, deviceless, elsewhere, here):
@@ -281,6 +305,6 @@ class TestThePlanSaysTheDevicesInUse:
             expire_date=timezone.now() - dt.timedelta(minutes=1)
         )
         SessionOwner.objects.filter(session_id=deviceless.session.session_key).update(device_id=None)
-        SessionOwner.objects.filter(session_id=elsewhere.session.session_key).update(host="b")
+        SessionOwner.objects.filter(session_id=elsewhere.session.session_key).update(host=B)
         assert self.devices()["used"] == 1
-        assert self.devices("b")["used"] == 1
+        assert self.devices(B)["used"] == 1

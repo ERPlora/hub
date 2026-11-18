@@ -2,7 +2,7 @@
 
 Every module declares in its ``LiveAppConfig`` its steps of «Finish setting up your business» (``setup``), its
 panels of the dashboard (``widgets``) and its counters of the bell (``bell``), each naming a query of its own
-``queries.py``. Base aggregates them in three live queries of ``base/queries.py`` (``base.setup.status``,
+``queries.py``. Base aggregates them in three live queries of ``base/queries/`` (``base.setup.status``,
 ``base.widget.list``, ``base.bell.counters``) with the old hub's rules (``crates/runtime/src/setup_status.rs``):
 
 - only the modules on in the scope bring anything, and a module kept out of the store (``listed = False``, the
@@ -60,6 +60,7 @@ from live.live_registry import live_registry
 from live.meta import DeviceNotice, LiveAppConfig, SetupCheck, all_live_app_configs, module_configs
 from live.operations import UnknownOperation, get
 
+from base import bell
 from base.business import business_zone, country_name, country_or_market
 
 logger = logging.getLogger(__name__)
@@ -262,7 +263,7 @@ def system_cards(ctx: OperationContext, configs: Iterable[LiveAppConfig]) -> lis
     return cards
 
 
-def module_steps(ctx: OperationContext, configs: Iterable[LiveAppConfig], hub_country: str) -> list[dict]:
+def module_steps(ctx: OperationContext, configs: Iterable[LiveAppConfig], hub_country: str) -> list[dict]:  # noqa: C901
     """The modules' steps of the list, as the person of ``ctx`` may be told about them."""
     items = []
     for config in configs:
@@ -425,24 +426,12 @@ def bell_counters(ctx: OperationContext, configs: Iterable[LiveAppConfig]) -> li
                 continue
             key = f"{config.label}.{counter.key}"
             try:
-                row = run_hook(ctx, counter.operation, counter.params)
-                count = (row or {}).get("count", 0)
-                if not isinstance(count, int) or isinstance(count, bool):
-                    raise TypeError(f"count is {count!r}, not a whole number")
+                notice = bell.notice(key, counter, run_hook(ctx, counter.operation, counter.params))
             except Exception:
                 hook_failed(key, counter.operation)
                 continue
-            if count > 0:
-                counters.append(
-                    {
-                        "key": key,
-                        "app": config.label,
-                        "count": count,
-                        "route": counter.route,
-                        "label": str(counter.label),
-                        "icon": counter.icon,
-                    }
-                )
+            if notice["count"] > 0:
+                counters.append(notice)
     return counters
 
 

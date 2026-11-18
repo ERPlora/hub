@@ -1,6 +1,7 @@
 """The appointment app: the salon's diary — who comes, for what, with whom and when."""
 
 from django.utils.translation import gettext_lazy as _
+from django.utils.translation import ngettext_lazy
 from live.meta import BellCounter, Category, DeviceNotice, LiveAppConfig, Nav, SetupCheck
 
 from apps.appointment.events import TO_CONFIRM_EVENTS
@@ -38,6 +39,25 @@ class AppointmentConfig(LiveAppConfig):
     # (The README's and the erplora-apps skill's example omit `schedule`: the diary reads the hours.)
     requires = ["customer", "service", "staff", "schedule"]
     default_auto_field = "django.db.models.BigAutoField"
+    # What these words mean to the Hub's assistant (base.assistant.relevance.synonyms). A «bloqueo» of the agenda is its blocked
+    # period (appointment.blocked_time), as «block» says in English; a «cita fija», a «serie semanal» or a «cita que se
+    # repite» is a repeating appointment (appointment.recurring), named by its phrases and never by «serie» alone, which
+    # is also an invoice's series; whether someone «puede atender» or there is a «hueco libre» asks for the availability
+    # of the agenda (appointment.availability), named by its phrases: «puede» and «libre» alone ask for nothing.
+    assistant_synonyms = (
+        ("bloqueo", "blocked"),
+        (
+            "recurring", "cita fija", "citas fijas", "cita periodica", "citas periodicas", "cita semanal",
+            "citas semanales", "cita mensual", "citas mensuales", "serie semanal", "series semanales", "serie mensual",
+            "serie quincenal", "serie de citas", "series de citas", "que se repite", "que se repiten", "que se repita",
+            "que se repitan", "repeating appointment", "repeating appointments", "weekly appointment",
+            "monthly appointment",
+        ),
+        (
+            "availability", "puede atender", "pueda atender", "puede coger", "pueda coger", "hueco libre",
+            "huecos libres",
+        ),
+    )
     permissions = [
         "appointment.view_appointment",
         "appointment.view_own_appointment",
@@ -93,6 +113,16 @@ class AppointmentConfig(LiveAppConfig):
             icon="ion:calendar-outline",
             permission="appointment.view_own_appointment",
             refresh_on=TO_CONFIRM_EVENTS,
+            severity="warning",
+            title=ngettext_lazy("%(count)d appointment to confirm", "%(count)d appointments to confirm", "count"),
+            body=ngettext_lazy(
+                "A customer is waiting for you to confirm their booking before it starts.",
+                "Customers are waiting for you to confirm their bookings before they start.",
+                "count",
+            ),
+            action_label=_("Confirm the appointments"),
+            # The start of the soonest one: it has to be confirmed before then.
+            due="earliest",
         )
     ]
     # The device is told what the customer booked or cancelled herself, of the agenda the person sees (the
@@ -127,7 +157,13 @@ class AppointmentConfig(LiveAppConfig):
         (``queries.appointments_deleted_in_business``, ``appointment.appointment.restore``), and each it no longer has
         is created by ``appointment.appointment.create``, the agenda's own, for the business's card of its customer
         (``queries.appointments_not_in_business``); what does not fit the agenda now (its time taken, outside the hours,
-        a customer, a service or a professional it no longer has) is refused with why, never booked over another."""
+        a customer, a service or a professional it no longer has) is refused with why, never booked over another.
+
+        Then its series still booking (``queries.series_in_copy``), after the appointments so that none of their dates
+        is booked twice: each the business holds deleted comes back the same, active, with the appointments it had
+        booked and booking nothing by itself (``queries.series_deleted_in_business``,
+        ``appointment.recurring.restore``), and each it no longer has is created by ``appointment.recurring.create``,
+        Repeating's own (``queries.series_not_in_business``); one made again since stays as it is."""
         from apps.appointment import queries  # the models are not loaded yet when this module is
         from base.recovery import Recoverable
 
@@ -140,5 +176,14 @@ class AppointmentConfig(LiveAppConfig):
                 create="appointment.appointment.create",
                 deleted=queries.appointments_deleted_in_business,
                 restore="appointment.appointment.restore",
-            )
+            ),
+            Recoverable(
+                label=_("Repeating appointments"),
+                reads_since="0001_initial",
+                read=queries.series_in_copy,
+                missing=queries.series_not_in_business,
+                create="appointment.recurring.create",
+                deleted=queries.series_deleted_in_business,
+                restore="appointment.recurring.restore",
+            ),
         ]

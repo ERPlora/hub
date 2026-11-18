@@ -8,6 +8,7 @@
 import { expect, type Page, test } from '@playwright/test';
 
 import { A, api, login, shot, shown } from './helpers';
+import { rowAction } from './service-helpers';
 import { ensureIssuer, snapshotSeries } from './invoice-helpers';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
 import { chargeByApi, cleanSales, newestSaleOf, stamp } from './sale-helpers';
@@ -69,7 +70,7 @@ async function recipient(page: Page, taxId: string): Promise<void> {
   await sheet.locator('[data-testid=sale-checkout-recipient-address] input').fill('Calle Luna 3, Madrid');
 }
 
-test('SALE-F04: charged as an invoice, the ticket says the number Invoicing gave it in the same charge', async ({ page, context }) => {
+test('SALE-F04: charged as an invoice, the ticket says the number Invoicing gave it in the same charge @smoke', async ({ page, context }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await login(page, A, '/sale/pos');
   await tillReady(page);
@@ -119,7 +120,7 @@ test('SALE-F04: charged as an invoice, the ticket says the number Invoicing gave
   await page.screenshot({ path: shot('sale-invoice-receipt-1440') });
 });
 
-test('SALE-F30 and F31: a voided ticket and a refund get their rectifying invoices in the same operation', async ({ page, context }) => {
+test('SALE-F30 and F31: a voided ticket and a refund get their rectifying invoices in the same operation @smoke', async ({ page, context }) => {
   await login(page, A, '/sale/sales');
   const ticket = (await chargeByApi(context, { lines: [{ product: tapa.sku }], payments: [{ method: 'card' }] })) as unknown as FiscalSale;
   expect([ticket.invoice_status, ticket.invoice_type]).toEqual(['issued', 'F2']);
@@ -128,7 +129,7 @@ test('SALE-F30 and F31: a voided ticket and a refund get their rectifying invoic
   await page.reload();
   await shown(page).locator('[data-testid=sales-table-row], [data-testid=sales-empty]').first().waitFor({ state: 'visible' });
   await shown(page).locator('[data-testid=sales-table-search] input').fill(ticket.number);
-  await shown(page).locator(`[data-testid=sales-table-row-${ticket.id}-void]`).first().click();
+  await rowAction(page, 'sales-table', ticket.id, 'void');
   const modal = page.locator('ion-modal[data-testid=sale-void]');
   await modal.locator('[data-testid=sale-void-reason] textarea').fill('e2e wrong table');
   await modal.locator('[data-testid=sale-void-submit]').click();

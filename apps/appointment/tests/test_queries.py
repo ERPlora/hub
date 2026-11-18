@@ -13,10 +13,13 @@ from live.errors import NotFound
 
 from apps.appointment.models import Appointment, History
 
+from base.tests.actors import who_did_it
 from base.tests.ordering import assert_reads_backwards, listed_with
 
 from .conftest import (
+    HUB_DB,
     MONDAY,
+    TESTER,
     assign,
     at,
     make_appointment,
@@ -33,7 +36,7 @@ from .conftest import (
     wall,
 )
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 TUESDAY = MONDAY + dt.timedelta(days=1)
 
 
@@ -200,6 +203,17 @@ def test_the_history_lists_every_change_in_order(salon):
         ("created", False, ""),
         ("cancelled", True, "Ill"),
     ]
+
+
+@pytest.mark.parametrize("caller, who, by_platform", who_did_it(TESTER, "tester"))
+def test_the_history_says_whether_a_person_or_the_platform_did_it(salon, caller, who, by_platform):
+    """A person and an API key are named; the platform's own marks are kept, and the line says the platform did it."""
+    pending = make_appointment(salon.lucia, salon.ana, [salon.cut], at(MONDAY, "10:00"), status="pending")
+    run("appointment.appointment.confirm", {"id": str(pending.id)}, actor=caller)
+
+    page = run("appointment.appointment.history", {"id": str(pending.id)})
+
+    assert [(h.action, h.actor, h.by_platform) for h in page.rows] == [("confirmed", who, by_platform)]
 
 
 # A customer's visits (her card's block)

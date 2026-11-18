@@ -9,6 +9,7 @@ import { expect, test } from '@playwright/test';
 import { A, api, OWNER, shown } from './helpers';
 import { rowAction } from './service-helpers';
 import { choose, cleanUp, FLOW_VIEWPORTS, pick, post, recordOf, rowOf, signedIn, snap, TAG } from './task-helpers';
+import { toastSaying } from './toast-helpers';
 
 test.beforeAll(cleanUp);
 test.afterAll(cleanUp);
@@ -105,7 +106,7 @@ for (const [width, viewport] of Object.entries(FLOW_VIEWPORTS)) {
       const task = await find(title);
       await test.step('TASK-F05 start a task from its row', async () => {
         await rowAction(page, 'task-tasks', task.id, 'start');
-        await expect(page.locator('ion-toast')).toContainText('Task started');
+        await expect(toastSaying(page, 'Task started')).toBeVisible();
         await expect(rowOf(page, 'task-tasks', title)).toContainText('In Progress');
         await snap(page, 'TASK-F05', width);
       });

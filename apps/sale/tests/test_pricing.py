@@ -18,6 +18,7 @@ from apps.sale.pricing import (
     price_ratio,
     value,
 )
+from apps.sale.tests.conftest import HUB_DB
 from apps.tax.queries import split_amount
 
 RATES = {
@@ -460,7 +461,7 @@ def test_an_empty_charge_is_refused():
     assert refusal.value.code == "sale.empty_sale"
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_real_closing_of_tax():
     from apps.sale.pricing import tax_closer
 
@@ -476,7 +477,7 @@ def test_the_real_closing_of_tax():
     assert water.tax_rate == Decimal("10.00")
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_real_closing_of_tax_closes_once_per_fiscal_key():
     from apps.sale.pricing import tax_closer
 

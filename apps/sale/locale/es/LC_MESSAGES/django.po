@@ -42,7 +42,7 @@ msgid "Today's sales"
 msgstr "Ventas hoy"
 
 msgid "Today's tickets"
-msgstr "Tickets hoy"
+msgstr "Tiques hoy"
 
 msgid "Sales, last 7 days"
 msgstr "Ventas últimos 7 días"

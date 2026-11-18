@@ -1,6 +1,6 @@
 """The assistant's card for a write of verifactu (base's half is hub#258): in Spanish, every datum it sends by the name
 the VeriFactu screens give it, never by the title pydantic makes up from the field («Invoice Id», «Issuer Nif»,
-«Month»). The card is base's (``base.assistant.card``); the names are verifactu's: the titles of its schemas and the
+«Month»). The card is base's (``base.assistant.cards.card``); the names are verifactu's: the titles of its schemas and the
 ``verbose_name`` of its models, with their Spanish in its catalog.
 
 And which writes are tools at all: a write that takes a secret (the certificate and its password, the signed
@@ -13,11 +13,12 @@ from typing import get_args
 import pytest
 from django.utils import translation
 from django.utils.text import capfirst
+from live import assistant as shared
 from live.operations import get, registry
 from pydantic import BaseModel, SecretBytes, SecretStr
 
 from apps.verifactu.models import Record
-from apps.verifactu.tests.conftest import ctx_for
+from apps.verifactu.tests.conftest import HUB_DB, ctx_for
 from base import assistant
 from base.tests.test_assistant import technical_names
 
@@ -30,7 +31,7 @@ def verifactu_writes() -> list:
     return [
         op
         for op in registry.values()
-        if op.app_label == "verifactu" and op.kind == "command" and assistant.is_tool(op)
+        if op.app_label == "verifactu" and op.kind == "command" and assistant.tools.is_tool(op)
     ]
 
 
@@ -54,7 +55,7 @@ def test_the_card_names_the_invoice_of_a_record_as_the_records_do():
     for language in ("es", "en"):
         with translation.override(language):
             invoice_number = capfirst(str(Record._meta.get_field("invoice_number").verbose_name))
-        card = assistant.card(create, {"invoice_id": "x", "number": "F-1"}, language)
+        card = assistant.cards.card(create, {"invoice_id": "x", "number": "F-1"}, language)
         assert labels(card) == [{"es": "Factura", "en": "Invoice"}[language], invoice_number]
     assert invoice_number == "Invoice number"
 
@@ -62,8 +63,8 @@ def test_the_card_names_the_invoice_of_a_record_as_the_records_do():
 def test_the_card_names_the_month_asked_of_the_aeat():
     query = get("verifactu.aeat.query")
     arguments = {"year": 2026, "month": 10}
-    assert labels(assistant.card(query, arguments, "es")) == ["Año", "Mes"]
-    assert labels(assistant.card(query, arguments, "en")) == ["Year", "Month"]
+    assert labels(assistant.cards.card(query, arguments, "es")) == ["Año", "Mes"]
+    assert labels(assistant.cards.card(query, arguments, "en")) == ["Year", "Month"]
 
 
 def _types(annotation) -> list:
@@ -101,21 +102,21 @@ def test_no_write_of_verifactu_that_takes_a_secret_is_an_assistant_tool():
     # of the identity document) are secrets the screen asks for.
     assert SECRET_WRITES["verifactu.certificate.upload"] == ["p12_base64", "password"]
     assert "id_copy_base64" in SECRET_WRITES["verifactu.representation.submit"]
-    assert sorted(name for name in SECRET_WRITES if assistant.is_tool(get(name))) == []
+    assert sorted(name for name in SECRET_WRITES if assistant.tools.is_tool(get(name))) == []
 
 
 def test_the_certificate_and_its_password_are_never_asked_for_in_a_chat():
     upload = get("verifactu.certificate.upload")
-    assert assistant.description(upload).startswith("Not an assistant tool")
-    assert not assistant.is_tool(upload)
+    assert shared.description(upload).startswith("Not an assistant tool")
+    assert not assistant.tools.is_tool(upload)
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize("role", ["hub_owner", "hub_admin"])
 def test_not_even_who_may_configure_verifactu_is_offered_them(role):
     """What the assistant hands the model: verifactu's other tools, none of its writes with a secret."""
-    tools = assistant.catalog(ctx_for(role))
-    assert {"verifactu.aeat.query", "verifactu.config.update"} <= set(tools)  # positive control: verifactu is on
+    tools = assistant.tools.catalog(ctx_for(role))
+    assert {"verifactu.aeat.query", "verifactu.config.go_live"} <= set(tools)  # positive control: verifactu is on
     assert sorted(set(SECRET_WRITES) & set(tools)) == []
 
 
@@ -134,13 +135,13 @@ def test_a_secret_inside_a_nested_schema_is_seen_too():
     assert secret_data(Upload) == ["holder.password", "others.password"]
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_turn_that_still_names_the_certificate_upload_builds_no_card_and_runs_nothing():
     """The way the chat really takes (``base.assistant.turn``): a model that calls the write by its name anyway,
     password included, is refused as «not available»; no card is built, so the password is painted nowhere the person
     sees, and the receipt names what was refused without running it."""
     turn = get("base.assistant.turn")
-    name = assistant.tool_name("verifactu.certificate.upload")
+    name = shared.tool_name("verifactu.certificate.upload")
     arguments = json.dumps({"p12_base64": "MIIFAKEP12", "password": "hunter2"})
     asked = {"role": "user", "content": "sube mi certificado, la contraseña es hunter2"}
     called = {

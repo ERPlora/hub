@@ -10,18 +10,19 @@ asks and the guard that no ask copies a probe of layer 2.
 import json
 from pathlib import Path
 
-import pytest
 from django.conf import settings
 from live import assistant as shared
-from live.context import OperationContext, Scope
-from live.operations import AI, Operation, registry
+from live.operations import AI, registry
 
+from apps.invoice.tests.conftest import in_hubs
 from base import assistant
 from base.models import Membership
-from base.permissions import permissions_for
+from base.tests.test_assistant_asks import assert_its_words_name
 from base.tests.test_assistant_asks import comparable, probe_phrases
+from base.tests.test_assistant_asks import probes_test, reported_test
 
-A = Scope("host", "a")
+from .conftest import HUB_DB
+
 #: Writes on what the whole team shares that only who runs it holds (``task.delete``, ``task.manage_project``), none
 #: of them a manager approves: an employee's assistant is never offered them.
 NOT_THE_EMPLOYEES = {
@@ -41,10 +42,6 @@ REPORTED = [
     ("task.task.set_status", "pon Revisar almacén QA en curso porque ya he empezado"),
 ]
 
-#: How far down the tools a turn offers (``MAX_TOOLS``, 40) a request of the QA may bring its tool: half of them, so
-#: twenty tools of the apps that say their asks later may climb past it before the model loses it (measured on this
-#: branch: the 12th at worst, the task's completion).
-WITH_ROOM = 20
 #: Every probe of layer 2 of Tasks, the owner's real phrases of the QA: the four above and the ones the model got right.
 PROBES = json.loads(
     (Path(settings.BASE_DIR) / "tests" / "e2e" / "qa" / "probes" / "owner-es-task-2026-11-08.json").read_text(
@@ -53,26 +50,14 @@ PROBES = json.loads(
 )["probes"]
 
 
-@pytest.fixture
-def catalog_of(make_user):
-    """The real catalogue of the assistant of a person with ``role`` in business ``a``, in ``language``."""
-
-    def of(role: str, language: str) -> dict[str, Operation]:
-        user = make_user(f"asker-{role}", host=A.key, role=role)
-        ctx = OperationContext(scope=A, actor=user.username, permissions=permissions_for(user, A), language=language)
-        return assistant.catalog(ctx)
-
-    return of
-
-
 def test_task_offers_at_least_17_tools():
     """Tasks' tools are at least 17 (``AI``, never ``INTERNAL``): a silent drop of tools fails."""
-    tools = {name for name, op in registry.items() if op.app_label == "task" and assistant.is_tool(op)}
+    tools = {name for name, op in registry.items() if op.app_label == "task" and assistant.tools.is_tool(op)}
     assert all(isinstance(registry[name].ai_spec(), AI) for name in tools)
     assert len(tools) >= 17
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 def test_an_employee_is_never_offered_what_only_who_runs_the_team_may_do(catalog_of):
     owner = catalog_of(Membership.Role.OWNER, "es")
     employee = catalog_of(Membership.Role.EMPLOYEE, "es")
@@ -89,17 +74,19 @@ def test_the_reported_requests_are_the_probes_of_layer_2():
 
 
 def test_the_hub_reads_a_tarea_as_a_task_a_proyecto_as_a_project_and_a_comentario_as_a_comment():
-    """``base.assistant.SYNONYMS``: «la tarea», «el proyecto» and «comenta» name what Tasks' operations are of
-    (``task.task``, ``task.project``, ``task.comment``), so the owner's words reach those tools by their entity and not
-    only by the words of their asks; without the Hub's groups, none of them does (positive control)."""
-    for phrase, wanted in (
-        ("borra la tarea de colgar el cartel", "task"),
-        ("¿qué proyectos tenemos?", "project"),
-        ("comenta que el técnico viene el lunes", "comment"),
-    ):
-        concepts = shared.asked([phrase], assistant.SYNONYMS).concepts
-        assert any(shared.stem(wanted) in concept for concept in concepts), phrase
-        assert not any(shared.stem(wanted) in concept for concept in shared.asked([phrase]).concepts), phrase
+    """``TaskConfig.assistant_synonyms`` (gathered by ``base.assistant.relevance.synonyms``): «la tarea», «el proyecto»
+    and «comenta» name what Tasks' operations are of (``task.task``, ``task.project``, ``task.comment``), so the owner's
+    words reach those tools by their entity and not only by the words of their asks; the platform's own words
+    (``base.assistant.relevance.SYNONYMS``) do not say it, and without the Hub's groups none of them does (positive control)."""
+    task, project, comment = shared.stem("task"), shared.stem("project"), shared.stem("comment")
+    assert_its_words_name(
+        "task",
+        [
+            ("borra la tarea de colgar el cartel", task),
+            ("¿qué proyectos tenemos?", project),
+            ("comenta que el técnico viene el lunes", comment),
+        ],
+    )
 
 
 def test_the_guests_of_a_table_are_no_comment():
@@ -109,29 +96,15 @@ def test_the_guests_of_a_table_are_no_comment():
     comment = shared.stem("comment")
     assert not any(
         comment in concept
-        for concept in shared.asked(["¿cuántos comensales tiene la cuenta de la mesa 4?"], assistant.SYNONYMS).concepts
+        for concept in shared.asked(
+            ["¿cuántos comensales tiene la cuenta de la mesa 4?"], assistant.relevance.synonyms()
+        ).concepts
     )
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
-@pytest.mark.parametrize(("name", "phrase"), REPORTED)
-def test_the_reported_task_request_offers_its_existing_operation(catalog_of, name, phrase):
-    tools = catalog_of(Membership.Role.OWNER, "es")
-    assert name in tools  # positive control: the owner holds the tool, so its place is known
-    assert comparable(phrase) not in {comparable(ask) for ask in shared.asks_of(tools[name]).get("es", ())}
-    offered = [op.name for op in assistant.relevant(tools, [phrase], "es")]
-    assert name in offered[:WITH_ROOM], (offered.index(name) + 1 if name in offered else None, offered[:10])
+test_the_reported_task_request_offers_its_existing_operation = in_hubs(reported_test(REPORTED))
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
-@pytest.mark.parametrize("probe", PROBES, ids=[probe["id"] for probe in PROBES])
-def test_every_probe_of_tasks_offers_its_tool_without_being_one_of_its_asks(catalog_of, probe):
-    """The owner's seventeen phrases of layer 2, the ones the model answered right too: a tool of Tasks that a new ask
-    elsewhere pushes out of the ones a turn offers fails here before the real-model QA sees it."""
-    assert (probe["app"], probe["role"], probe["language"]) == ("task", "owner", "es")
-    tools = catalog_of(Membership.Role.OWNER, probe["language"])
-    name, phrase = probe["tool"], probe["phrase"]
-    assert name in tools  # positive control: the owner holds the tool, so its place is known
-    assert comparable(phrase) not in {comparable(ask) for ask in shared.asks_of(tools[name]).get("es", ())}
-    offered = [op.name for op in assistant.relevant(tools, [phrase], "es")]
-    assert name in offered[:WITH_ROOM], (offered.index(name) + 1 if name in offered else None, offered[:10])
+#: The owner's seventeen phrases of layer 2, the ones the model answered right too: a tool of Tasks that a new ask
+#: elsewhere pushes out of the ones a turn offers fails here before the real-model QA sees it.
+test_every_probe_of_tasks_offers_its_tool_without_being_one_of_its_asks = in_hubs(probes_test(PROBES, "task"))

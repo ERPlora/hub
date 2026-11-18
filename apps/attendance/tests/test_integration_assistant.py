@@ -1,6 +1,6 @@
 """The assistant's card for a write of attendance (base's half is hub#258): in Spanish, every datum it sends by the name
 the Time tracking screens give it, never by the title pydantic makes up from the field («Lat», «Lng», «Accuracy M»). The
-card is base's (``base.assistant.card``); the names are attendance's: the titles of its schemas and the ``verbose_name``
+card is base's (``base.assistant.cards.card``); the names are attendance's: the titles of its schemas and the ``verbose_name``
 of its models, with their Spanish in its catalog.
 
 The record a write names by its id (base's half is hub#416): the person clocked, whose break starts or ends or whose day
@@ -19,9 +19,9 @@ from apps.attendance.models import Record
 from apps.staff.models import Member
 from base import assistant
 from base.tests.test_assistant import technical_names
-from base.tests.test_assistant_card_values import AN_ID
+from base.tests.test_assistant_card_values_references import AN_ID
 
-from .conftest import ctx_for, make_member, utc
+from .conftest import HUB_DB, ctx_for, make_member, utc
 
 FRONTEND = Path(apps.get_app_config("attendance").path) / "frontend/locale"
 SETTINGS = json.loads((FRONTEND / "es.json").read_text())["attendance"]["settings"]
@@ -37,7 +37,7 @@ def attendance_writes() -> list:
     return [
         op
         for op in registry.values()
-        if op.app_label == "attendance" and op.kind == "command" and assistant.is_tool(op)
+        if op.app_label == "attendance" and op.kind == "command" and assistant.tools.is_tool(op)
     ]
 
 
@@ -55,12 +55,12 @@ def test_no_datum_of_a_write_of_attendance_reaches_a_spanish_card_by_its_technic
 def test_the_card_names_the_position_of_a_clock_in_as_the_settings_screen_does():
     for name in ("attendance.record.clock_in", "attendance.record.clock_out"):
         op = get(name)
-        assert labels(assistant.card(op, POSITION, "es")) == [
+        assert labels(assistant.cards.card(op, POSITION, "es")) == [
             SETTINGS["latitude"],
             SETTINGS["longitude"],
             "Precisión (m)",
         ], name
-        assert labels(assistant.card(op, POSITION, "en")) == [
+        assert labels(assistant.cards.card(op, POSITION, "en")) == [
             SETTINGS_EN["latitude"],
             SETTINGS_EN["longitude"],
             "Accuracy (m)",
@@ -91,46 +91,46 @@ def no_id(card: dict) -> bool:
     return not AN_ID.search(json.dumps(card, ensure_ascii=False))
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize("name", CLOCKING)
 def test_an_employee_who_clocks_themselves_reads_their_own_name_on_the_card(name, person):
     """The most common card: an employee, with only «Clock in», clocks in or out or pauses by their own id."""
     ana, ctx = person()
-    card = assistant.card(get(name), {"member_id": str(ana.id)}, "es", ctx)
+    card = assistant.cards.card(get(name), {"member_id": str(ana.id)}, "es", ctx)
     assert values(card) == {"member_id": "Ana López"}
     assert labels(card) == ["Persona"]
     assert no_id(card)
-    assert labels(assistant.card(get(name), {"member_id": str(ana.id)}, "en", ctx)) == ["Person"]
+    assert labels(assistant.cards.card(get(name), {"member_id": str(ana.id)}, "en", ctx)) == ["Person"]
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize("permissions", [CLOCKS_OTHERS, None], ids=["clock_others", "hub_manager"])
 @pytest.mark.parametrize("name", CLOCKING)
 def test_who_clocks_someone_else_reads_their_name_on_the_card(name, permissions, make_user):
     """ATTENDANCE-F12 «ficha la entrada de Ana»: the card says whom, by the name, never by the id."""
     bea = make_member("Bea", "Ruiz")
-    card = assistant.card(get(name), {"member_id": str(bea.id)}, "es", manager(make_user, permissions))
+    card = assistant.cards.card(get(name), {"member_id": str(bea.id)}, "es", manager(make_user, permissions))
     assert values(card) == {"member_id": "Bea Ruiz"}
     assert no_id(card)
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize("name", CLOCKING)
 def test_someone_else_is_left_out_of_the_card_of_who_only_clocks_themselves(name, person):
     """The write refuses it («You can only clock yourself in and out.»); the card names nobody by an id meanwhile."""
     _, ctx = person()
     bea = make_member("Bea", "Ruiz")
-    card = assistant.card(get(name), {"member_id": str(bea.id)}, "es", ctx)
+    card = assistant.cards.card(get(name), {"member_id": str(bea.id)}, "es", ctx)
     assert values(card) == {}
     # Positive control: the same card names her for whoever clocks others.
-    assert values(assistant.card(get(name), {"member_id": str(bea.id)}, "es", ctx_for("hub_manager"))) == {
+    assert values(assistant.cards.card(get(name), {"member_id": str(bea.id)}, "es", ctx_for("hub_manager"))) == {
         "member_id": "Bea Ruiz"
     }
 
 
 @pytest.mark.parametrize("name", CLOCKING)
 def test_a_person_named_by_their_name_is_a_person_on_the_card_too(name):
-    card = assistant.card(get(name), {"member": "Bea"}, "es")
+    card = assistant.cards.card(get(name), {"member": "Bea"}, "es")
     assert (values(card), labels(card)) == ({"member": "Bea"}, ["Persona"])
 
 
@@ -145,7 +145,7 @@ def open_day(member: Member, clock_in: str = "2026-10-06T07:00", clock_out: str 
     )
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize("permissions", [CORRECTS, None], ids=["correct", "hub_manager"])
 @pytest.mark.parametrize(
     ("language", "named", "label"),
@@ -161,19 +161,19 @@ def test_a_correction_names_the_working_day_by_its_person_and_its_day(language, 
         "clock_out_at": "2026-10-06T16:00:00+02:00",
         "reason": "Forgot to clock in",
     }
-    card = assistant.card(get("attendance.record.correct"), arguments, language, manager(make_user, permissions))
+    card = assistant.cards.card(get("attendance.record.correct"), arguments, language, manager(make_user, permissions))
     assert values(card)["record_id"] == named
     assert labels(card)[0] == label
     assert no_id(card)
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize("permissions", [CORRECTS, None], ids=["correct", "hub_manager"])
 def test_closing_the_day_of_who_was_terminated_names_them(permissions, make_user):
     """ATTENDANCE-F13 (the reaction to a termination, also the assistant's): the card says whose day it closes."""
     carlos = make_member("Carlos", "Gil", status=Member.Status.TERMINATED)
     open_day(carlos)
-    card = assistant.card(
+    card = assistant.cards.card(
         get("attendance.record.close_for_terminated"), {"id": str(carlos.id)}, "es", manager(make_user, permissions)
     )
     assert (values(card), labels(card)) == ({"id": "Carlos Gil"}, ["Persona"])

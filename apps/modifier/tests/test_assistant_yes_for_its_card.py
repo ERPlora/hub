@@ -17,16 +17,14 @@ unread beside the id the write takes its record by instead (hub#1291).
 import json
 
 import pytest
-from live.context import Scope
 from live.operations import get, registry
 
 from apps.modifier.models import ModifierGroup, ModifierLink, ModifierOption
-from apps.modifier.tests.conftest import GENERIC, ctx_for, make_category, make_product, run
+from apps.modifier.tests.conftest import GENERIC, HUB_DB, A, B, ctx_for, make_category, make_product, run
 from apps.modifier.tests.test_integration_assistant import TITLES, modifier_writes
 from base import assistant
 from base.schemas import names
 from base.tenancy.context import use_hub
-from base.tenancy.tests import hubs
 from base.tests.test_assistant_yes_for_its_card import (
     read_as,
     said,
@@ -38,7 +36,7 @@ from base.tests.test_assistant_yes_for_its_card import (
 )
 from base.tests.test_services_assistant import call
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 BY_ITS_NAME = ("modifier.group.delete", {"group": "salsa"})
 
@@ -109,7 +107,7 @@ def group_on(plan: dict) -> list[tuple[str, object]]:
 
 
 def fields_of(write: str, arguments: dict, language: str) -> dict:
-    card = assistant.card(get(write), arguments, language, as_admin(language))
+    card = assistant.cards.card(get(write), arguments, language, as_admin(language))
     return {field["name"]: field for field in card["fields"]}
 
 
@@ -213,7 +211,7 @@ def test_every_write_of_modifiers_that_takes_a_group_by_its_name_is_here():
 def test_only_the_writes_that_take_a_group_by_its_name_check_their_record():
     """Ratchet: a check is a read before the card, which a write that takes no group by its name does not need (and
     whose refusal would hide its card): exactly these, each with the read of its own record."""
-    declared = {op.name: assistant.check_of(op) for op in registry.values() if op.app_label == "modifier"}
+    declared = {op.name: assistant.cards.check_of(op) for op in registry.values() if op.app_label == "modifier"}
     assert {name: read for name, read in declared.items() if read is not None} == CHECKS
 
 
@@ -350,7 +348,7 @@ def by_its_id_beside_picantes(write: str) -> dict:
 
 @pytest.mark.parametrize("write", ["modifier.group.delete", "modifier.group.update", "modifier.link.detach"])
 def test_a_record_that_comes_by_its_id_names_no_other_group_said_beside_it(write):
-    card = assistant.card(get(write), by_its_id_beside_picantes(write), "es", as_admin())
+    card = assistant.cards.card(get(write), by_its_id_beside_picantes(write), "es", as_admin())
     assert "Salsas picantes" not in [field["value"] for field in card["fields"]]
 
 
@@ -636,17 +634,16 @@ def test_the_card_says_the_product_the_yes_applies_the_group_to(said, product):
     assert ModifierLink.objects.get().product.name == product
 
 
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
-def test_words_that_fit_a_product_or_a_category_of_another_business_are_said_as_said(hub_a, hub_b, no_fallback):
+def test_words_that_fit_a_product_or_a_category_of_another_business_are_said_as_said(hub_a, hub_b):
     """Each business in its own database: «pizz» and «postr» name «Pizza» and «Postres» in A, nothing in B."""
-    in_a = ctx_for("hub_admin", scope=Scope("host", hub_a.slug), language="es")
-    in_b = ctx_for("hub_admin", scope=Scope("host", hub_b.slug), language="es")
+    in_a = ctx_for("hub_admin", scope=A, language="es")
+    in_b = ctx_for("hub_admin", scope=B, language="es")
 
     def shown(ctx) -> dict:
         return {
             kind: {
                 field["name"]: field["value"]
-                for field in assistant.card(get(write), arguments, "es", ctx)["fields"]
+                for field in assistant.cards.card(get(write), arguments, "es", ctx)["fields"]
             }[kind]
             for (write, kind), (arguments, _) in SAID_IN_PART.items()
             if write == "modifier.link.attach"

@@ -4,6 +4,7 @@
 // Adjust sends `service.grant.adjust` with signed sessions and closes; a refusal stays in the dialog.
 import { describe, expect, it, vi } from 'vitest';
 
+import { itTellsTheCorrectedFieldApart } from '../../../../base/frontend/__tests__/same-words-refusal';
 import { click, ionValue, mountService, settle } from '../__tests__/mount-service';
 import { grant } from '../__tests__/grant';
 import GrantAdjustModal from './GrantAdjustModal.vue';
@@ -100,6 +101,19 @@ describe('GrantAdjustModal', () => {
     const s = await setup({}, 'es');
     expect(s.inDoc('service-grant-adjust')?.getAttribute('aria-label')).toBe('Ajustar este bono');
     expect(s.el('service-grant-adjust-uses').label).toBe('Sesiones que se añaden');
+  });
+});
+
+describe('GrantAdjustModal: fields refused with the same words (hub#888)', () => {
+  // The sessions, the days and the Reason each paint a refusal under their own key.
+  const FIELD_OF: Record<string, string> = { uses_delta: 'uses', days_delta: 'days' };
+  itTellsTheCorrectedFieldApart(['uses_delta', 'days_delta', 'reason'], async (locale, refusal) => {
+    const s = await setup({}, locale);
+    await ionValue(s.el('service-grant-adjust-uses'), '2', 'ionInput');
+    await ionValue(s.el('service-grant-adjust-days'), '30', 'ionInput');
+    await ionValue(s.el('service-grant-adjust-reason'), 'closed in August', 'ionInput');
+    s.answer(422, refusal);
+    return { field: (key) => s.el(`service-grant-adjust-${FIELD_OF[key] ?? key}`), send: () => click(s.el('service-grant-adjust-submit')), settle };
   });
 });
 

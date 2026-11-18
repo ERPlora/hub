@@ -1,8 +1,8 @@
 """Django admin of the online booking app: full CRUD on both tables, for support.
 
-A second write path, for the staff only on hubs.erplora.com: it does not go through the operations' rules,
-so it warns rather than prevents. What the database fills in (ids and timestamps) is shown, not edited; a
-link's hash can be emptied (revoked), never read back as a link.
+A second write path, for the staff only on hubs.erplora.com with a business chosen: it does not go through the
+operations' rules, so it warns rather than prevents. What the database fills in (ids and timestamps) is shown, not
+edited; a link's hash can be emptied (revoked), never read back as a link.
 """
 
 import pytest
@@ -12,8 +12,9 @@ from django.test import RequestFactory
 
 from apps.online_booking.admin import BookingAdmin, SettingsAdmin
 from apps.online_booking.models import Booking, Settings
+from base.tenancy.tests.concurrency import PLATFORM_HOST
 
-from .conftest import TUESDAY, at, make_appointment
+from .conftest import HUB_DB, TUESDAY, at, make_appointment
 
 MODELS = {Settings: SettingsAdmin, Booking: BookingAdmin}
 
@@ -41,6 +42,7 @@ def test_every_model_is_registered():
         assert isinstance(admin.site._registry[model], model_admin), model
 
 
+@HUB_DB
 def test_full_crud_for_a_superuser(superuser):
     request = request_by(superuser)
     for model in MODELS:
@@ -64,20 +66,19 @@ def test_ids_and_timestamps_are_read_only_and_every_field_is_reachable():
         assert editable <= set(model_admin.fields), model
 
 
-@pytest.mark.django_db
-def test_changelists_and_change_pages_render(client, superuser, salon):
+@HUB_DB
+def test_changelists_and_change_pages_render(hub_staff, salon):
     appointment = make_appointment(
         salon.lucia, salon.ana, [salon.cut], at(TUESDAY, "10:00"), number="APT-ADMIN-1"
     )
     booking = Booking.objects.create(
         appointment=appointment, token_hash="a" * 64, requester="f" * 64
     )
-    client.force_login(superuser)
     for path, text in (
         ("/admin/online_booking/booking/", b"APT-ADMIN-1"),
         (f"/admin/online_booking/booking/{booking.pk}/change/", b"APT-ADMIN-1"),
         ("/admin/online_booking/settings/", b"#6366f1"),
         ("/admin/online_booking/settings/add/", b"page_title"),
     ):
-        response = client.get(path, HTTP_HOST="hubs.localhost")
+        response = hub_staff.get(path, HTTP_HOST=PLATFORM_HOST)
         assert response.status_code == 200 and text in response.content, path

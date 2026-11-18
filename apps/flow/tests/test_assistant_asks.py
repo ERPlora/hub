@@ -7,22 +7,26 @@ Every ask of every tool of flow bringing its tool among the first ten, role by r
 asks and the guard that no ask copies a probe of layer 2.
 """
 
-import dataclasses
 import json
 from pathlib import Path
 
 import pytest
+from django.apps import apps
 from django.conf import settings
 from live import assistant as shared
-from live.context import OperationContext, Scope
-from live.operations import AI, Operation, registry
+from live.operations import AI, registry
 
+from apps.flow.tests.conftest import HUB_DB
+from apps.invoice.tests.conftest import (
+    catalog_of,  # noqa: F401 (a fixture: the tests below take it by name)
+    in_hubs,
+)
 from base import assistant
 from base.models import Membership
-from base.permissions import permissions_for
-from base.tests.test_assistant_asks import TOP, comparable, probe_phrases
+from base.tests.test_assistant_asks import TOP, comparable, offered_to, place_of_no_ask
+from base.tests.test_assistant_asks import probe_phrases
+from base.tests.test_assistant_asks import english_coverage_test, english_words_test, nobodys_words, own_words_test
 
-A = Scope("host", "a")
 #: The questions an automation asks a person (FLOW-F29): every role may be asked one, so every role holds these.
 THE_QUESTIONS = {"flow.question.list", "flow.question.get", "flow.question.answer"}
 #: Automations' assistant tools: its catalogue, its automations, their runs, the ready-made ones its apps bring, the
@@ -126,7 +130,7 @@ PROBES = json.loads(
         encoding="utf-8"
     )
 )["probes"]
-#: The Hub's groups of words of Automations (``base.assistant.SYNONYMS``), each by a word of its own, and a request that
+#: Automations' own groups of words (its ``assistant_synonyms``), each by a word of its own, and a request that
 #: is neither an ask nor a probe whose tool only the group brings among the first ten: what it is for. A recipe's is
 #: also the read that finds the recipe the person names (``FINDS``), as pausing one asks.
 GROUPS = [
@@ -179,54 +183,14 @@ CAUGHT_ABOVE = {
 }
 
 
-@pytest.fixture
-def catalog_of(make_user):
-    """The real catalogue of the assistant of a person with ``role`` in business ``a``, in ``language``."""
-
-    def of(role: str, language: str) -> dict[str, Operation]:
-        user = make_user(f"asker-{role}", host=A.key, role=role)
-        ctx = OperationContext(scope=A, actor=user.username, permissions=permissions_for(user, A), language=language)
-        return assistant.catalog(ctx)
-
-    return of
-
-
-def offered(tools: dict[str, Operation], phrase: str, synonyms=None) -> list[str]:
-    """The tools a turn offers for ``phrase`` in Spanish, as the Hub ranks them (``base.assistant.RANKING``), or with
-    ``synonyms`` instead of the Hub's."""
-    ranking = dict(assistant.RANKING) if synonyms is None else {**assistant.RANKING, "synonyms": synonyms}
-    return [op.name for op in shared.relevant(tools, [phrase], "es", **ranking)]
-
-
-def offered_without_its_asks(tools: dict[str, Operation], name: str, phrase: str) -> list[str]:
-    """``offered`` with ``name`` saying no asks: how a turn ranked it by its name, its description and the Hub's words."""
-    op = tools[name]
-    bare = {**tools, name: dataclasses.replace(op, ai={key: value for key, value in op.ai.items() if key != "asks"})}
-    assert not shared.asks_of(bare[name])  # positive control: the tool is ranked without its asks
-    return offered(bare, phrase)
-
-
-def offered_for_no_ask(tools: dict[str, Operation], name: str, phrase: str) -> list[str]:
-    """``offered`` for a ``phrase`` that is none of the Spanish asks of ``name``, a tool the person holds."""
-    assert name in tools  # positive control: the owner holds the tool, so its place is known
-    assert comparable(phrase) not in {comparable(ask) for ask in shared.asks_of(tools[name]).get("es", ())}
-    return offered(tools, phrase)
-
-
-def is_own_words(tools: dict[str, Operation], phrase: str) -> bool:
-    """Whether ``phrase`` is neither an ask of any tool in Spanish nor a probe of layer 2: words of the person's own."""
-    asks = {comparable(ask) for op in tools.values() for ask in shared.asks_of(op).get("es", ())}
-    return comparable(phrase) not in asks and comparable(phrase) not in probe_phrases()
-
-
 def test_automations_offers_its_thirty_tools():
     """Automations' assistant tools (``AI``, never ``INTERNAL`` nor the engine's «System only»): a silent drop fails."""
-    tools = {name for name, op in registry.items() if op.app_label == "flow" and assistant.is_tool(op)}
+    tools = {name for name, op in registry.items() if op.app_label == "flow" and assistant.tools.is_tool(op)}
     assert all(isinstance(registry[name].ai_spec(), AI) for name in tools)
     assert tools == TOOLS
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation) and of the person's role
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation) and of the person's role
 def test_only_who_runs_the_business_is_offered_the_automations(catalog_of):
     """An automation acts in the business's name with nobody watching (``FlowConfig.role_permissions``): the owner and
     the admin hold every tool; a manager and an employee only the questions an automation asks them."""
@@ -244,15 +208,15 @@ def test_the_reported_requests_are_the_owners_probes_of_layer_2():
     assert {probe["tool"] for probe in PROBES} == TOOLS  # positive control: one probe per tool, all read
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize(("name", "phrase"), REPORTED)
 def test_the_reported_request_is_offered_its_tool_and_the_read_that_finds_it(catalog_of, name, phrase):
-    names = offered_for_no_ask(catalog_of(Membership.Role.OWNER, "es"), name, phrase)
-    assert name in names, names[:10]
-    assert FINDS.get(name, name) in names, names[:10]
+    tools = catalog_of(Membership.Role.OWNER, "es")
+    assert place_of_no_ask(tools, name, phrase) is not None
+    assert FINDS.get(name, name) in offered_to(tools, phrase)
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize(
     "probe",
     [
@@ -265,17 +229,16 @@ def test_every_probe_of_automations_offers_its_tool_without_being_one_of_its_ask
     """The owner's thirty phrases of layer 2, the ones the model answered right too: a tool of Automations that a new ask
     elsewhere pushes out of the ones a turn offers fails here before the real-model QA sees it."""
     assert (probe["app"], probe["role"], probe["language"]) == ("flow", "owner", "es")
-    names = offered_for_no_ask(catalog_of(Membership.Role.OWNER, "es"), probe["tool"], probe["phrase"])
-    assert probe["tool"] in names, (len(names), names[:10])
+    assert place_of_no_ask(catalog_of(Membership.Role.OWNER, "es"), probe["tool"], probe["phrase"]) is not None
 
 
 def test_the_hub_names_an_automation_its_runs_steps_questions_drafts_and_recipes():
-    """``base.assistant.SYNONYMS``: «la automatización» is a ``flow.flow``, «la ejecución» a run (``flow.run``), «los
-    pasos» its steps, «la pregunta» the one it waits on, «el borrador» the assistant's draft and «la receta» a ready-made
-    one, so a request in the words of the Automations screens names what their tools are of; live alone names none
-    (positive control)."""
+    """Automations' own words (its ``assistant_synonyms``): «la automatización» is a ``flow.flow``, «la ejecución» a run
+    (``flow.run``), «los pasos» its steps, «la pregunta» the one it waits on, «el borrador» the assistant's draft and
+    «la receta» a ready-made one, so a request in the words of the Automations screens names what their tools are of;
+    live alone names none (positive control)."""
     phrase = "abre la automatización y dime la ejecución, los pasos, la pregunta, el borrador y la receta"
-    named = shared.asked([phrase], assistant.SYNONYMS).concepts
+    named = shared.asked([phrase], apps.get_app_config("flow").assistant_synonyms).concepts
     bare = shared.asked([phrase]).concepts
     for word in ("flow", "run", "step", "question", "draft", "recipe"):
         assert any(shared.stem(word) in concept for concept in named), word
@@ -299,21 +262,21 @@ def test_a_word_that_only_shares_their_stem_names_no_automation_step_question_or
     """«automática» shares its stem with «automatización», «pasó» is «paso» without its accent and «pregunta» is a verb
     too: the Hub names those by their phrases, so a request about something else does not climb to Automations. «borra»
     and «bórralo» stem apart from «borrador» (``borr``, ``borra``): deleting names no draft."""
-    assert not any(shared.stem(word) in concept for concept in shared.asked([phrase], assistant.SYNONYMS).concepts)
+    assert not any(shared.stem(word) in concept for concept in shared.asked([phrase], assistant.relevance.synonyms()).concepts)
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize(("member", "name", "phrase"), GROUPS)
 def test_each_group_brings_its_tool_among_the_first_ten(catalog_of, member, name, phrase):
-    """What a group of ``SYNONYMS`` is for, measured on what a turn offers and not on how a word reads: without it, the
-    request's tool falls past the first ten."""
+    """What a group of Automations' words is for, measured on what a turn offers and not on how a word reads: without
+    it, the request's tool falls past the first ten."""
     tools = catalog_of(Membership.Role.OWNER, "es")
-    assert is_own_words(tools, phrase)
-    group = [group for group in assistant.SYNONYMS if member in group]
-    assert len(group) == 1, member  # positive control: the group is the Hub's, and only one
-    without = tuple(other for other in assistant.SYNONYMS if other is not group[0])
-    assert name in offered(tools, phrase)[:TOP]
-    assert name not in offered(tools, phrase, without)[:TOP]
+    assert nobodys_words(tools, phrase)
+    group = [group for group in apps.get_app_config("flow").assistant_synonyms if member in group]
+    assert len(group) == 1, member  # positive control: the group is Automations', and only one
+    without = tuple(other for other in assistant.relevance.synonyms() if other != group[0])
+    assert name in offered_to(tools, phrase)[:TOP]
+    assert name not in offered_to(tools, phrase, synonyms=without)[:TOP]
 
 
 #: Three asked naming «la automatización» and not only its own name: the thing they act on is named, so they come
@@ -325,13 +288,13 @@ NAMED = [
 ]
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize(("name", "phrase"), NAMED)
 def test_what_waits_for_live_is_offered_when_the_request_names_the_automation(catalog_of, name, phrase):
     tools = catalog_of(Membership.Role.OWNER, "es")
-    assert is_own_words(tools, phrase)
+    assert nobodys_words(tools, phrase)
     assert {name for name, _ in NAMED} == AWAITS_LIVE  # positive control: the same three the probes wait for
-    assert name in offered(tools, phrase)[:TOP]
+    assert name in offered_to(tools, phrase)[:TOP]
 
 
 def test_the_asks_of_every_tool_are_caught_by_a_request():
@@ -343,12 +306,42 @@ def test_the_asks_of_every_tool_are_caught_by_a_request():
     assert len(OWN_WORDS) == len(own)
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
-@pytest.mark.parametrize(("name", "phrase"), OWN_WORDS)
-def test_a_request_in_the_persons_own_words_reaches_its_tool_by_its_asks(catalog_of, name, phrase):
-    tools = catalog_of(Membership.Role.OWNER, "es")
-    assert is_own_words(tools, phrase)
-    names = offered_for_no_ask(tools, name, phrase)
-    assert name in names[:TOP], names.index(name) + 1 if name in names else None
-    unasked = offered_without_its_asks(tools, name, phrase)
-    assert name not in unasked[:TOP], unasked.index(name) + 1
+test_a_request_in_the_persons_own_words_reaches_its_tool_by_its_asks = in_hubs(own_words_test(OWN_WORDS, "es"))
+
+
+#: What the owner says in English in words of their own for each tool of Automations that needs one, neither
+#: an ask nor a probe of layer 2: its English asks lift it among the first ten (``assert_its_asks_lift``).
+OWN_WORDS_EN = [
+    ("flow.catalog.read", "what can an automation react to?"),
+    ("flow.draft.dismiss", "I don't want the assistant's proposal, drop it"),
+    ("flow.draft.get", "what doubts are left in what you proposed yesterday?"),
+    ("flow.draft.list", "did the assistant leave anything for me to look at?"),
+    ("flow.draft.propose", "whenever a big sale is completed, add a task: automate it"),
+    ("flow.event.sample", "give me a real one: what does the sale event bring?"),
+    ("flow.flow.create", "make a new one that runs every Monday at 8"),
+    ("flow.flow.delete", "the birthday one is no use anymore, get rid of it"),
+    ("flow.flow.detail", "what's the birthday one missing?"),
+    ("flow.flow.duplicate", "make another one just like the birthday one"),
+    ("flow.flow.grant", "give the welcome one what it needs to send messages"),
+    ("flow.flow.list", "which ones are switched on and how did their last run go?"),
+    ("flow.flow.run", "launch the weekly review right away"),
+    ("flow.flow.set_enabled", "turn the birthday one on"),
+    ("flow.flow.status", "do I already have one that listens to completed sales?"),
+    ("flow.flow.test", "try the welcome one, but nothing for real"),
+    ("flow.flow.update", "the birthday one needs other steps"),
+    ("flow.question.answer", "say yes, the customer has already paid"),
+    ("flow.question.get", "what is the birthday one asking me?"),
+    ("flow.question.list", "is anything waiting for my answer?"),
+    ("flow.recipe.disable", "I don't want the ready-made reminder anymore"),
+    ("flow.recipe.enable", "switch on the ready-made one that fills a slot when someone cancels"),
+    ("flow.recipe.list", "which ready-made ones are there for bookings?"),
+    ("flow.recipe.repair", "the old one is outdated: fix its conditions"),
+    ("flow.recipe.restore", "the birthday one: put it back the way the app brings it"),
+    ("flow.run.get", "tell me which step failed this morning"),
+    ("flow.run.list", "how many times has the welcome one failed?"),
+    ("flow.run.retry", "the permission is granted now, resume where it stopped"),
+    ("flow.secret.delete", "the old API one is no good, delete it"),
+    ("flow.secret.list", "which saved names can the automations use now?"),
+]
+test_a_request_in_english_is_lifted_by_its_english_asks = in_hubs(english_words_test(OWN_WORDS_EN))
+test_each_tool_has_its_own_english_words = english_coverage_test("flow", OWN_WORDS_EN)

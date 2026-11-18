@@ -19,16 +19,17 @@ import pytest
 from django.contrib.auth import get_user_model
 from django.utils import timezone
 from live.context import OperationContext, Scope, system_context
-from live.errors import Conflict, PermissionDenied
+from live.errors import PermissionDenied
 from live.models import OutboxEvent
 from live.operations import get
 
 from base import blueprint, services, worker
+from base.services import provisioning
 from base.models import Membership
 from base.permissions import permissions_for
 from base.registry import REGISTRY_SCOPE
 from base.tenancy import dumps, provision
-from base.tenancy.context import use_control, use_hub
+from base.tenancy.context import HubWithoutDatabase, use_control, use_hub
 from base.tenancy.tests import hubs
 from base.tenancy.tests.s3 import aws_test_credentials, dumps_bucket, moto_s3, no_dumps_bucket, objects  # noqa: F401
 from control.models import Hub, HubDue, HubDump
@@ -152,7 +153,7 @@ def test_a_slow_upload_keeps_its_lease_and_the_reset_is_done_with_one_copy(hub_a
 
     def rival() -> None:
         with use_control():
-            taken.append(services.claim_hub(hub_a.pk, timezone.now(), provision.LEASE, owner="another:1:x"))
+            taken.append(provisioning.claim_hub(hub_a.pk, timezone.now(), provision.LEASE, owner="another:1:x"))
 
     monkeypatch.setattr(dumps, "client", lambda: SlowUpload(real(), rival))
     monkeypatch.setattr(provision, "LEASE", dt.timedelta(seconds=1))
@@ -244,7 +245,7 @@ def test_a_reset_of_a_business_that_left_meanwhile_empties_nothing(hub_a, dumps_
 def test_the_pass_leaves_a_reset_whose_lease_another_worker_holds(hub_a, dumps_bucket):
     loaded_and_asked(ready(hub_a), ["table"])
     with use_control():
-        assert services.claim_hub(hub_a.pk, timezone.now(), provision.LEASE, owner="another:1:x") is not None
+        assert provisioning.claim_hub(hub_a.pk, timezone.now(), provision.LEASE, owner="another:1:x") is not None
 
     run_pass()
 
@@ -257,9 +258,9 @@ def test_a_reset_still_to_do_stays_due_when_the_provisioning_pass_gives_its_leas
     now = timezone.now()
     with use_control():
         # The provisioning's pass never takes a ready hub's ring (its data work's or its apps' to set up).
-        assert services.claim_next_due_hub(now, provision.LEASE) is None
+        assert provisioning.claim_next_due_hub(now, provision.LEASE) is None
         assert services.claim_next_data_hub(now, provision.LEASE) == hub_a.pk
-        services.release_hub(hub_a.pk, now)
+        provisioning.release_hub(hub_a.pk, now)
 
     assert HubDue.objects.filter(hub_id=hub_a.pk, due_at=now, lease_until=None).exists()
 
@@ -271,35 +272,25 @@ def test_the_worker_empties_only_through_its_own_operation(hub_a):
     assert refused.value.code == "base.internal_only"
 
 
-def test_a_business_s_owner_with_every_permission_never_empties_through_it(hub_databases, monkeypatch):
-    """The platform's alone, refused before anything else (OPEN_OPERATIONS «platform»). The local ``a`` has no
-    database of its own: only the suite's fallback enters such a business."""
-    from base.tenancy import context
-    from base.tenancy.tests.legacy import LEGACY
-
-    monkeypatch.setattr(context, "_test_fallback", LEGACY)
+def test_a_business_s_owner_with_every_permission_never_empties_through_it(hub_a):
+    """The platform's alone, refused before anything else (OPEN_OPERATIONS «platform»)."""
     owner = get_user_model().objects.create_user(username="saas:owner-of-a")
-    Membership.objects.create(user=owner, host="a", role=Membership.Role.OWNER)
-    ctx = OperationContext(scope=Scope("host", "a"), actor=owner, permissions=frozenset({"*"}))
+    Membership.objects.create(user=owner, host=hub_a.slug, role=Membership.Role.OWNER)
+    ctx = OperationContext(scope=Scope("host", hub_a.slug), actor=owner, permissions=frozenset({"*"}))
 
-    with use_hub(Hub.objects.get(slug="a")), pytest.raises(PermissionDenied) as refused:
+    with use_hub(ready(hub_a)), pytest.raises(PermissionDenied) as refused:
         call(ctx, "base.hub.reset_apply", apps=["table"])
 
     assert refused.value.code == "base.internal_only"
 
 
-def test_the_emptying_is_never_run_on_a_shared_database(dumps_bucket, monkeypatch):
-    # Production never enters a business without its own database: only the suite's fallback does.
-    from base.tenancy import context
-    from base.tenancy.tests.legacy import LEGACY
+def test_the_emptying_never_reaches_a_business_without_its_own_database(dumps_bucket):
+    """Production never enters one: its address answers 503 maintenance, and the worker's data pass serves only the
+    businesses with their own database."""
+    shared = Hub.objects.create(slug="shared", status=Hub.Status.READY)
 
-    monkeypatch.setattr(context, "_test_fallback", LEGACY)
-    shared = Hub.objects.get(slug="a")
-
-    with use_hub(shared), pytest.raises(Conflict) as refused:
-        call(system_context(Scope("host", "a")), "base.hub.reset_apply", apps=["table"])
-
-    assert refused.value.code == "base.reset_shared_database"
+    with pytest.raises(HubWithoutDatabase), use_hub(shared):
+        call(system_context(Scope("host", shared.slug)), "base.hub.reset_apply", apps=["table"])
 
 
 # ── A business that leaves ───────────────────────────────────────────────────────────────────────────────────────
@@ -393,7 +384,7 @@ def test_a_business_cancelled_before_its_database_was_finished_is_never_copied(h
 
 
 def test_a_business_without_its_own_database_that_leaves_is_never_copied(dumps_bucket):
-    shared = Hub.objects.get(slug="a")
+    shared = Hub.objects.create(slug="shared", status=Hub.Status.READY)
     Hub.objects.filter(pk=shared.pk).update(ready_at=timezone.now())
 
     cancel(shared)

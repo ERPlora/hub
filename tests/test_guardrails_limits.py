@@ -24,7 +24,8 @@ from live.context import OperationContext, Scope
 from live.executor import Executor, Stream, Subscription
 from live.operations import get as get_operation
 
-from base import access, registry, services
+from base import access, registry
+from base.services import provisioning
 from base.models import Membership
 from base.tenancy import connections as tenancy_connections
 from base.tenancy import context, identity, limits, names
@@ -502,9 +503,9 @@ def test_a_process_whose_limiter_was_already_made_is_corrected_by_the_first_use_
 
 ROWS = {
     "the host gate": lambda hub: registry.hub_by_slug(hub.slug),
-    "the worker": lambda hub: next(row for row in services.hubs_to_serve(timezone.now()) if row.pk == hub.pk),
-    "the registry by id": lambda hub: services.registry_row(hub.pk),
-    "the registry by slug": lambda hub: services.registry_row_by_slug(hub.slug),
+    "the worker": lambda hub: next(row for row in provisioning.hubs_to_serve(timezone.now()) if row.pk == hub.pk),
+    "the registry by id": lambda hub: provisioning.registry_row(hub.pk),
+    "the registry by slug": lambda hub: provisioning.registry_row_by_slug(hub.slug),
     "a row without the field loaded": lambda hub: Hub.objects.defer("is_platform").get(pk=hub.pk),
 }
 

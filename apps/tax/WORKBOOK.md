@@ -6,10 +6,7 @@ Lo que no entra todavía: ver «Lo que queda fuera».
 
 > Manual de usuario y especificación de la app `tax`. Se escribe **antes** que el código: no se
 > programa nada que no esté aquí, y cada flujo pasa a `Estado: hecho` cuando sus tests están en verde
-> (servidor y páginas). Parte del `WORKFLOW.md` del módulo Impuestos del producto actual
-> (`modules-workspace/modules/taxes`, `origin/main` `3755bc4`). La app hace lo mismo y se verá igual,
-> salvo lo que dice «Cambios frente al producto actual», al final; los números de flujo se conservan
-> (`TAXES-Fnn` → `TAX-Fnn`) porque otras apps los citan.
+> (servidor y páginas).
 
 ## Para qué sirve y para quién
 
@@ -163,8 +160,6 @@ atrás la cierra sin preguntar (BASE-F05).
 | TAX-F06 | Añadir un recargo de equivalencia a un tipo | hecho |
 | TAX-F07 | Cambiar un tipo a partir de una fecha | hecho |
 | TAX-F08 | Desactivar y reactivar una regla | hecho |
-| TAX-F09 | Reparar una regla que cobra un tipo donde no toca | descartado |
-| TAX-F10 | Resolver reglas que se solapan | descartado |
 | TAX-F11 | Montar un negocio de Canarias, Ceuta o Melilla | hecho |
 | TAX-F12 | Crear varias reglas de golpe | hecho |
 | TAX-F13 | Ver los alias de categoría | hecho |
@@ -176,7 +171,6 @@ atrás la cierra sin preguntar (BASE-F05).
 | TAX-F19 | Entregar las reglas y las categorías a Ventas, Facturación, Inventario y Servicios | hecho |
 
 ### TAX-F01 Ver las categorías fiscales
-<!-- origen: wf:peluqueria-dia#rec_peluqueria-f04 fi:modules/taxes#permission-role_permissions fi:modules/taxes#query-taxes-categories-list old:taxes/WORKFLOW.md#taxes-f01 -->
 Estado: hecho
 Actor: propietario, administrador, responsable, empleado
 Pantalla: Categorías
@@ -193,7 +187,6 @@ Implicados: COMBO-F02, INVENTORY-F01, INVENTORY-F02, INVENTORY-F05, INVENTORY-F0
 SALE-F35, SERVICE-F01
 
 ### TAX-F02 Crear una categoría fiscal propia
-<!-- origen: fi:modules/taxes#command-taxes-categories-create old:taxes/WORKFLOW.md#taxes-f02 -->
 Estado: hecho
 Actor: propietario, administrador, responsable
 Pantalla: Categorías
@@ -208,11 +201,10 @@ Sale: la categoría, única por clave en el negocio; Impuestos avisa de que hay 
 categoría se rechaza. Inventario también la crea cuando alguien elige «Crear» al importar un fichero
 (TAX-F15).
 Si falla: una clave con otra forma o un nombre vacío salen debajo de su campo; una clave que ya existe,
-«Ya hay una categoría fiscal con esa clave.» debajo de la Clave. No se guarda nada.
+«Ya hay una categoría fiscal con esa clave.» debajo de la Clave. El motivo de un campo se quita en cuanto se corrige ese campo, aunque otro diga lo mismo (hub#888). No se guarda nada.
 Implicados: INVENTORY-F09
 
 ### TAX-F03 Ver y filtrar las reglas
-<!-- origen: fi:modules/taxes#query-taxes-rules-by_country fi:modules/taxes#query-taxes-rules-list old:taxes/WORKFLOW.md#taxes-f03 -->
 Estado: hecho
 Actor: propietario, administrador, responsable, empleado
 Pantalla: Reglas
@@ -228,7 +220,6 @@ Si falla: el aviso de la tabla con «Reintentar».
 Implicados: ninguno
 
 ### TAX-F04 Fijar el tipo de una categoría en un país o región
-<!-- origen: fi:modules/taxes#command-taxes-rules-create old:taxes/WORKFLOW.md#taxes-f04 -->
 Estado: hecho
 Actor: propietario, administrador, responsable
 Pantalla: Reglas
@@ -254,11 +245,10 @@ categoría…» (se resuelve con TAX-F07 o TAX-F08). Un país que no existe, una
 fuera de 0–100, un «Vigente hasta» anterior a «Vigente desde» o una categoría que no existe salen
 debajo de su campo. Una regla del mismo país, región y categoría que empieza el mismo día que otra ya
 guardada, aunque esté desactivada: «Ya hay una regla de este país, región y categoría desde ese día,
-quizá desactivada: reactívala o empieza esta otro día.», en «Vigente desde». No se guarda nada.
+quizá desactivada: reactívala o empieza esta otro día.», en «Vigente desde». El motivo de un campo se quita en cuanto se corrige ese campo, aunque otro diga lo mismo (hub#888). No se guarda nada.
 Implicados: INVOICE-F01, SALE-F01
 
 ### TAX-F05 Declarar una operación exenta, no sujeta o con inversión del sujeto pasivo
-<!-- origen: old:taxes/WORKFLOW.md#taxes-f05 wf:cadena-fiscal#rec_fiscal-f04 -->
 Estado: hecho
 Actor: propietario, administrador, responsable
 Pantalla: Reglas
@@ -279,7 +269,6 @@ operación no lleva impuesto: su tipo tiene que ser 0 %.») y no se guarda nada.
 Implicados: INVOICE-F01
 
 ### TAX-F06 Añadir un recargo de equivalencia a un tipo
-<!-- origen: old:taxes/WORKFLOW.md#taxes-f06 -->
 Estado: hecho
 Actor: propietario, administrador, responsable
 Pantalla: Reglas
@@ -300,7 +289,6 @@ regla raíz. Un componente de un componente no existe: solo hay un nivel.
 Implicados: INVOICE-F01, SALE-F01
 
 ### TAX-F07 Cambiar un tipo a partir de una fecha
-<!-- origen: wf:cadena-fiscal#rec_fiscal-f02 wf:cadena-fiscal#rec_fiscal-f10 old:taxes/WORKFLOW.md#taxes-f07 -->
 Estado: hecho
 Actor: propietario, administrador, responsable
 Pantalla: Reglas
@@ -317,10 +305,9 @@ Si falla: un fin anterior al inicio de la regla: «Esa regla no puede terminar a
 empieza.»; un fin que invade otra regla activa del mismo hueco, el aviso de solape. Dos tramos
 seguidos (uno acaba el 31/12, el otro empieza el 1/1) no se solapan. Un fin en el pasado deja un hueco
 sin tipo: las ventas de esa categoría se rechazan hasta crear la siguiente.
-Implicados: INVOICE-F01, INVOICE-F04, SALE-F01
+Implicados: INVOICE-F01, SALE-F01
 
 ### TAX-F08 Desactivar y reactivar una regla
-<!-- origen: fi:modules/taxes#command-taxes-rules-deactivate old:taxes/WORKFLOW.md#taxes-f08 -->
 Estado: hecho
 Actor: propietario, administrador, responsable
 Pantalla: Reglas
@@ -340,37 +327,7 @@ reactivar una ya activa: «Esa regla ya está desactivada.» / «Esa regla ya es
 una que ahora se solapa con otra activa, el aviso de solape.
 Implicados: SALE-F01
 
-### TAX-F09 Reparar una regla que cobra un tipo donde no toca
-<!-- origen: wf:cadena-fiscal#rec_fiscal-f09 old:taxes/WORKFLOW.md#taxes-f09 -->
-Estado: descartado — en el producto actual servía para arreglar reglas guardadas antes de que se prohibieran; aquí ninguna puerta (pantalla, API, lote ni asistente) deja crear una regla que no cobra impuesto con un %, ni un componente con tipo bajo ella, así que no hay nada que reparar
-Actor: propietario, administrador, responsable
-Pantalla: Reglas
-Pasos:
-1. Quien guarda una regla exenta, no sujeta o con inversión del sujeto pasivo con un % mayor que 0 ve el
-   rechazo debajo del % (TAX-F05).
-2. Quien cuelga un componente con tipo de una raíz que no cobra impuesto ve el rechazo debajo de la regla
-   raíz (TAX-F06).
-Entra: nada.
-Sale: nada: la regla incoherente no llega a guardarse.
-Si falla: no aplica.
-Implicados: ninguno
-
-### TAX-F10 Resolver reglas que se solapan
-<!-- origen: old:taxes/WORKFLOW.md#taxes-f10 -->
-Estado: descartado — aquí ninguna puerta deja que dos reglas activas del mismo país, región y categoría estén vigentes el mismo día, tampoco si dos personas guardan a la vez: el solape se resuelve antes de guardar, con TAX-F07 o TAX-F08
-Actor: propietario, administrador, responsable
-Pantalla: Reglas
-Pasos:
-1. Quien guarda una regla que se solaparía con otra activa del mismo país, región y categoría ve el
-   rechazo en «Vigente desde» (TAX-F04).
-2. Pone fecha de fin a la vigente (TAX-F07) o la desactiva (TAX-F08) y vuelve a guardar la nueva.
-Entra: nada.
-Sale: nada: el solape no llega a guardarse.
-Si falla: no aplica.
-Implicados: ninguno
-
 ### TAX-F11 Montar un negocio de Canarias, Ceuta o Melilla
-<!-- origen: wf:cadena-fiscal#rec_fiscal-f04 old:taxes/WORKFLOW.md#taxes-f11 -->
 Estado: hecho
 Actor: propietario, administrador, responsable
 Pantalla: Ajustes y Reglas
@@ -406,7 +363,6 @@ territorio, pero no lo cambia.
 Implicados: INVOICE-F01, INVOICE-F03, SALE-F01
 
 ### TAX-F12 Crear varias reglas de golpe
-<!-- origen: fi:modules/taxes#command-handler-wasm-taxes-rules-bulk_create-bulk_create_rules old:taxes/WORKFLOW.md#taxes-f12 -->
 Estado: hecho
 Actor: propietario, administrador, responsable (por el asistente o por la API con su sesión; una llave de API no llega)
 Pantalla: ninguna (API)
@@ -423,7 +379,6 @@ lote: se crean de uno en uno (TAX-F06), porque necesitan su raíz ya guardada.
 Implicados: ninguno
 
 ### TAX-F13 Ver los alias de categoría
-<!-- origen: fi:modules/taxes#query-taxes-aliases-list old:taxes/WORKFLOW.md#taxes-f13 -->
 Estado: hecho
 Actor: propietario, administrador, responsable, empleado
 Pantalla: Alias
@@ -436,7 +391,6 @@ Si falla: el aviso de la tabla con «Reintentar».
 Implicados: ninguno
 
 ### TAX-F14 Enseñar un alias de categoría a mano
-<!-- origen: fi:modules/taxes#command-taxes-aliases-create old:taxes/WORKFLOW.md#taxes-f14 -->
 Estado: hecho
 Actor: propietario, administrador, responsable
 Pantalla: Alias
@@ -449,11 +403,10 @@ Entra: el texto externo, la categoría y el origen que elige la persona.
 Sale: el alias, guardado en minúsculas y sin espacios de sobra, único en el negocio
 (`tax.alias.created`). La próxima importación de Inventario lo entiende, se escriba como se escriba.
 Si falla: un alias que ya existe: «Ese alias ya existe.» debajo del Alias; una categoría que no existe,
-debajo de la Categoría. No se guarda nada.
+debajo de la Categoría. El motivo de un campo se quita en cuanto se corrige ese campo, aunque otro diga lo mismo (hub#888). No se guarda nada.
 Implicados: INVENTORY-F09
 
 ### TAX-F15 Decir al importador de Inventario qué categoría es un texto
-<!-- origen: fi:modules/taxes#query-taxes-aliases-resolve old:taxes/WORKFLOW.md#taxes-f15 -->
 Estado: hecho
 Actor: sistema
 Pantalla: ninguna
@@ -471,7 +424,6 @@ Si falla: un texto que no casa devuelve «nada», nunca una categoría parecida.
 Implicados: INVENTORY-F09, INVENTORY-F10
 
 ### TAX-F16 Sembrar el catálogo de fábrica al activar
-<!-- origen: qa:verticals/beauty/00-signup-and-blueprint-beauty qa:verticals/restaurant/00-signup-and-blueprint wf:alta#rec_alta-f08 old-hub:HUB-F22 fi:modules/taxes#seed-bloque old:taxes/WORKFLOW.md#taxes-f16 -->
 Estado: hecho
 Actor: sistema
 Pantalla: ninguna
@@ -494,7 +446,6 @@ Si falla: nunca pisa una fila que ya existe ni duplica nada.
 Implicados: ninguno
 
 ### TAX-F17 Avisar de que faltan tipos para el país del negocio
-<!-- origen: old:taxes/WORKFLOW.md#taxes-f17 wf:alta#rec_alta-f09 old-hub:HUB_SHELL-F27 gh:taxes#19 -->
 Estado: hecho
 Actor: propietario, administrador, responsable
 Pantalla: Inicio, Categorías, Reglas y Alias
@@ -525,7 +476,6 @@ de IGIC también cuenta: un negocio que solo vende servicios exentos está bien 
 Implicados: BASE-F01
 
 ### TAX-F18 Calcular el impuesto de un importe
-<!-- origen: wf:cadena-fiscal#rec_fiscal-f04 fi:modules/taxes#command-handler-wasm-taxes-calculate-calculate_tax old-hub:HUB-F18 old:taxes/WORKFLOW.md#taxes-f18 qa:modules/taxes/vat-rates-and-breakdown -->
 Estado: hecho
 Actor: empleado, responsable, administrador, propietario (por el asistente o por la API con su sesión; una llave de API no llega)
 Pantalla: ninguna (API)
@@ -549,7 +499,6 @@ debajo de su campo. Si las reglas no se pueden leer, el cálculo se detiene sin 
 Implicados: INVOICE-F01, INVOICE-F03, SALE-F01, SALE-F09
 
 ### TAX-F19 Entregar las reglas y las categorías a Ventas, Facturación, Inventario y Servicios
-<!-- origen: wf:restaurante-dia#rec_restaurante-f03 qa:verticals/restaurant/03-menu-and-prices wf:cadena-fiscal#rec_fiscal-f02 qa:verticals/restaurant/07-payment-and-fiscal wf:cadena-fiscal#rec_fiscal-f01 fi:modules/taxes#event-emit-taxes-category-created-taxes-rule-created-taxes-rule-deactivated-taxes-alias-created-declarados-taxes-rule-created-taxes-rules-bulk_create-report-emitidos-por-el-wasm-bulk fi:modules/taxes#query-taxes-categories-get old:taxes/WORKFLOW.md#taxes-f19 -->
 Estado: hecho
 Actor: sistema
 Pantalla: ninguna
@@ -572,8 +521,8 @@ SALE-F07, SERVICE-F01
 ## Servicios: lo que entra y lo que sale
 
 Todo se puede pedir por las pantallas, el asistente (por voz o por texto, con la sesión de la propia
-persona) y la API, con las mismas reglas y los mismos permisos. Una llave de API del negocio llega a menos,
-lo mismo que en el producto actual: ver las categorías, las reglas y los alias, leer un texto como
+persona) y la API, con las mismas reglas y los mismos permisos. Una llave de API del negocio llega a menos:
+ver las categorías, las reglas y los alias, leer un texto como
 categoría, y poner fecha de fin a una regla o reactivarla. Pensado para la voz: una
 categoría se nombra por su clave, por su nombre (en español o en inglés) o por un alias («Restauración
 — comida», «comida», `restaurant.food`), y una regla por su id o por su país, región y categoría
@@ -650,12 +599,11 @@ Nada: Impuestos no depende de ninguna app ni reacciona a avisos de otras.
 | Ver categorías, reglas, alias y el territorio fiscal, y calcular | sí | sí | sí | sí | `tax.view` |
 | Crear categorías, reglas y alias; poner fecha de fin, desactivar y reactivar reglas; cambiar el territorio fiscal | sí | sí | sí | no | `tax.manage` |
 
-Los papeles llegan del SaaS con prefijo (`hub_owner`, `hub_admin`, `hub_manager`, `hub_employee`); el
-cajero del producto actual es un empleado.
+Los papeles llegan del SaaS con prefijo (`hub_owner`, `hub_admin`, `hub_manager`, `hub_employee`).
 
 ## Para quien lo mantiene
 
-- **Orden de las listas** (`base.ordering.list_order`; regla hub#2355 del producto viejo): categorías, reglas y alias
+- **Orden de las listas** (`base.ordering.list_order`): categorías, reglas y alias
   van por la columna elegida, después por su clave natural y al final por `id`, todo en la dirección de la lista y con
   los vacíos al final en las dos: la descendente es la ascendente leída al revés, empates incluidos. Lo fija
   `test_ties_read_backwards_in_a_descending_list`, por lista. La única excepción, a propósito: en Reglas un componente
@@ -668,7 +616,7 @@ cajero del producto actual es un empleado.
   (`frontend/`: Categorías, Reglas, Alias y Ajustes, con sus diálogos) con su Vitest y su e2e por flujo en
   tres tamaños (`tests/e2e/tax-flows.spec.ts`, más `tax-categories`, `tax-rules`, `tax-employee`,
   `tax-region-sale` y `tax-region-no-national-fallback`). País y Categoría de las altas son el `Combo` de
-  `@erplora/ui` (el `ok-combo` de antes): la categoría se busca en el servidor (`tax.category.list` por
+  `@erplora/ui`: la categoría se busca en el servidor (`tax.category.list` por
   nombre), nunca se carga entera.
 - **Contrato con quien enlaza una categoría**: `TaxCategory` tiene clave UUIDv7 y `key` única (la
   `tax_category_key` enlazable). Ponen su FK aquí, todas `PROTECT`, Inventario (producto y categoría),
@@ -711,10 +659,9 @@ cajero del producto actual es un empleado.
   (el territorio del negocio hoy), la línea de venta sin su regla (`_charged_kind` de Facturación: el
   territorio que la línea congeló al cobrarse), el 0 % pedido expresamente (`fallback_zero`) y el alta de
   una regla sin `tax_type`. VeriFactu lo declara como `Impuesto` 03, 02 o 01.
-- **El impuesto del territorio lo publica solo Impuestos** (ronda 2026-10-17 de PLAN-HUB): `tax.settings.get`
+- **El impuesto del territorio lo publica solo Impuestos**: `tax.settings.get`
   (y la respuesta de `tax.settings.update`) lo devuelve en `tax_kind`, vivo sobre `tax.settings.updated`.
-  Ninguna otra app lo republica con una operación propia (Ventas y Facturación tenían una fachada cada una;
-  se borraron). En la SPA, `useTaxKind()` y `useTaxName()` de `frontend/composables/useTaxName.ts` lo leen
+  Ninguna otra app lo republica con una operación propia. En la SPA, `useTaxKind()` y `useTaxName()` de `frontend/composables/useTaxName.ts` lo leen
   con una sola suscripción por pestaña y dan la familia y su nombre corto («IVA», «IGIC», «IPSI»,
   `tax.common.taxName.*`); `taxNameKey(familia)` nombra cualquier otra (la que declararon las ventas de un
   periodo). En el servidor, `schemas.TAX_KIND_NAMES` da el mismo nombre corto a un mensaje («Falta configurar
@@ -723,8 +670,7 @@ cajero del producto actual es un empleado.
   (`select_for_update`) antes de comprobar; dos escrituras a la vez sobre la misma categoría se ponen
   en cola y la segunda ve la primera (tests con dos sesiones reales para crear, reactivar, poner fecha
   de fin y el lote). Las fechas son inclusivas; vacías = abiertas.
-- **Clave natural de la raíz** (`tax_rule_root_natural_key`, la `ix_tax_rule_root_natural` del producto
-  actual): una raíz por país, región, categoría y primer día, también las desactivadas; un primer día
+- **Clave natural de la raíz** (`tax_rule_root_natural_key`): una raíz por país, región, categoría y primer día, también las desactivadas; un primer día
   vacío es «desde siempre», así que dos vacías son la misma. Las operaciones la comprueban antes y
   responden 409 `tax.rule_exists`; si la gemela está activa, el rechazo es el del solape.
 - **Reactivar por país, región y categoría** trae la desactivada más recientemente (`updated_at`).
@@ -732,18 +678,16 @@ cajero del producto actual es un empleado.
   impuesto y rango de fechas hacia delante (`CheckConstraint`).
 - Los nombres de las categorías de fábrica se traducen en el código (`SYSTEM_CATEGORY_LABELS`, con su
   `es` en `locale/`), no en la base de datos: en la fila queda el nombre en inglés.
-- **Administrador de Django con CRUD completo** (ronda 12, PLAN §17), solo en `hubs.erplora.com` y
+- **Administrador de Django con CRUD completo** (PLAN §17), solo en `hubs.erplora.com` y
   para el staff de la plataforma. Lo que guarda de categorías, reglas y alias no pasa por las operaciones:
   no deja aviso ni comprueba el solape ni la coherencia de un componente; la base de datos sigue rechazando
   el % fuera de 0–100, el % en una clase sin impuesto, el rango al revés y la raíz gemela. Los ajustes del
   negocio sí (hub#42): el territorio es un desplegable con los del país del negocio más «Todo el país», se
   guarda por `tax.settings.update` (su actor y su evento en el outbox) y no se añade una segunda fila ni se
   borra la que hay (borrarla movería el negocio a todo el país en silencio).
-- **Paridad con el producto actual**: las listas aceptan los mismos filtros, búsqueda y orden
-  (`sort`, `dir`) que sus tablas; las filas llevan las mismas columnas (también Activa, siempre «Sí»:
-  como antes, ninguna operación archiva una categoría o un alias). El alta de alias acepta Origen y la
-  de categoría, `is_system` (solo por la API), como antes. `expose_api` es el del manifiesto viejo:
-  `tax.category.list`/`get`, `tax.rule.list`, `tax.alias.list`/`resolve`, `tax.rule.end` y
+- **Listas y API**: las listas aceptan los filtros, la búsqueda y el orden (`sort`, `dir`) de sus tablas;
+  las filas llevan también Activa, siempre «Sí»: ninguna operación archiva una categoría o un alias. El alta
+  de alias acepta Origen y la de categoría, `is_system` (solo por la API). `expose_api`: `tax.category.list`/`get`, `tax.rule.list`, `tax.alias.list`/`resolve`, `tax.rule.end` y
   `tax.rule.activate`.
 - **Asistente**: cada operación declara `ai` (descripción; en las escrituras, `risk`: `high` en las de
   reglas, que deciden lo que se cobra y se declara, y en el lote) y cada campo de `schemas.py` su
@@ -754,19 +698,19 @@ cajero del producto actual es un empleado.
   Cada herramienta dice además sus `asks`, las frases en `en` y `es` con que una persona la pide
   (`live.E020`: Impuestos está en `LIVE_ASSISTANT_ASKS_REQUIRED`, hub#1094; `tests/test_services.py` y
   `tests/test_queries.py` exigen la clave). Sin ellas, desactivar, reactivar o poner fecha de fin a una
-  regla desde el chat (TAX-F07 y TAX-F08) quedaba fuera de las 40 herramientas que ofrece un turno y el
-  asistente mandaba a la pantalla o buscaba una automatización. `tests/test_assistant_asks.py` mide con las
+  regla desde el chat (TAX-F07 y TAX-F08) queda fuera de las 40 herramientas que ofrece un turno y el
+  asistente manda a la pantalla o busca una automatización. `tests/test_assistant_asks.py` mide con las
   frases reales de la QA de la capa 2 (`tests/e2e/qa/probes/owner-es-tax-2026-11-08.json` y la del
   empleado), nunca con los propios `asks`: cada una trae su herramienta entre las 20 primeras, y lo que el
   empleado no puede hacer (las escrituras, `tax.manage`) ni se le ofrece. Además, una frase propia por
   herramienta (`OWN_WORDS`, ni ask ni sonda) que solo llega entre las diez primeras por sus `asks`: cambiar
   las de cualquier herramienta lo ve un test. live lee «activar» y «desactivar» como las acciones `activate` y
-  `deactivate` desde ERPlora/live#70, y «regla» como `rule` desde ERPlora/live#73: aunque «de product.qa»
+  `deactivate`, y «regla» como `rule`: aunque «de product.qa»
   nombre Productos, en esas frases de la QA reactivar y desactivar la regla salen antes que encender o apagar
   una app (`base.app.enable`/`disable`), y lo vigila
   `test_the_reported_request_offers_its_tool_before_the_switch_of_an_app`.
-  Sin sinónimos propios en
-  `base.assistant.SYNONYMS`: «desactiva» ya lo lee el grupo de Personal (hub#1103), y una palabra suelta
+  Sin sinónimos propios
+  (`assistant_synonyms`): «desactiva» ya lo lee el grupo de Personal (hub#1103), y una palabra suelta
   para «termina» o «activa» arrastraría las tareas terminadas o las reglas «activas» de una lista.
 - **Tarjeta de confirmación del asistente** (BASE-F97, hub#678): nombra la regla que una escritura señala por su id
   con la marca `refers` de `schemas.py` (`A_RULE`), leída como quien pregunta con `tax.rule.get`, lectura interna
@@ -782,18 +726,17 @@ cajero del producto actual es un empleado.
   modelo etiqueta; `choices.py` la declara (`TaxConfig.choices`) con el nombre de cada país en el idioma de quien
   lee (CLDR por `base.business.country_name`, el mismo que enseña el selector de País de la pantalla con
   `Intl.DisplayNames`), en las escrituras de reglas y en cada línea del lote (`tests/test_choices.py`). El
-  trinquete de `base/tests/test_assistant_card_values.py` (`UNNAMED_REFERENCES`, `UNLABELLED_LISTS`) impide que
+  trinquete de `base/tests/test_assistant_card_values_references.py` (`UNNAMED_REFERENCES`, `UNLABELLED_LISTS`) impide que
   entre un dato sin marca o una lista sin etiquetas.
 - **País y región** salen de `pycountry` (ISO 3166-1 y 3166-2), no de una lista copiada.
 - **Decisión de mercado: «Tus impuestos» (TAX-F17) en las pantallas de Impuestos**: el mercado avisa de
   los tipos que faltan en una lista de primeros pasos del inicio (Square, Odoo, Lightspeed, Business
   Central) y en la propia pantalla de impuestos (WooCommerce, Shopify, Toast). El aviso va en Categorías,
   Reglas y Alias y lee `tax.rule.status` sin país; el paso «Tus impuestos» de la lista «Termina de
-  configurar tu negocio» del Inicio (ronda 2026-10-21 de `PLAN-HUB.md`, que trae esa lista a `base`)
-  lee la misma consulta y dice las mismas palabras (FIX-TAX-SETUP-HOOKS).
-- **El paso del Inicio** (PLAN-HUB ronda 2026-10-21; FIX-TAX-SETUP-HOOKS): `TaxConfig.setup` declara el `setup` del
-  módulo viejo (`module.json`, taxes#19): clave `tax.rules`, sobre `tax.rule.status` sin país, hecho con
-  `configured` (el mismo campo que lee el aviso; el viejo miraba `matching_rules`, que es lo mismo), orden 20,
+  configurar tu negocio» del Inicio (una lista de `base`) lee la misma consulta y dice las mismas
+  palabras.
+- **El paso del Inicio**: `TaxConfig.setup` declara el `setup`: clave `tax.rules`, sobre `tax.rule.status` sin
+  país, hecho con `configured` (el mismo campo que lee el aviso), orden 20,
   `required` (nivel «Importante»), permiso `tax.manage`, ruta `/tax/rules` y `refresh_on`
   `events.RULE_IN_FORCE_EVENTS` (regla creada, una o varias; terminada; desactivada; reactivada). El cambio de
   territorio (`tax.settings.updated`) no entra: el paso cuenta las reglas del país del negocio, de cualquier
@@ -801,34 +744,30 @@ cajero del producto actual es un empleado.
   `factory_rules` (`FACTORY_COUNTRIES`, solo España), con el que `SetupNotice.vue` dice que el país no trae
   tipos de fábrica (`tax.setup.ownRules`); el paso del Inicio no cambia de texto. Una regla con
   fecha de inicio futura que empieza a regir no emite evento: el Inicio la ve al volver a abrirse, como el aviso.
-  El título y la descripción son los del aviso (el viejo decía `Set the VAT rates for the country you sell in,
-  so the till can price a sale.`), con su español en `locale/`. Sin paneles ni campana: el módulo viejo no los
-  declaraba. Pruebas: `tests/test_apps.py` y `tests/test_integration_home.py` (con `base` real y dos hubs).
+  El título y la descripción son los del aviso, con su español en `locale/`. Sin paneles ni campana. Pruebas: `tests/test_apps.py` y `tests/test_integration_home.py` (con `base` real y dos hubs).
 - **Decisión de mercado: el territorio fiscal del negocio (TAX-F11)**: vive en Impuestos, en la pestaña
   **Ajustes**, como el «país fiscal» de Odoo en los ajustes de Contabilidad y el régimen IGIC de Holded o Sage
   en los de impuestos; Square, Shopify y Toast lo sacan de la dirección del local. El país no se edita aquí:
-  es el de la cuenta del SaaS, que lo bloquea cuando el negocio está listo, y llega al Hub con su registro;
-  Impuestos lo lee desde hub#996 (ronda 2026-11-07 de `PLAN-HUB.md`). Ventas y Facturación leen los dos de la
+  es el de la cuenta del SaaS, que lo bloquea cuando el negocio está listo, y llega al Hub con su registro,
+  de donde lo lee Impuestos. Ventas y Facturación leen los dos de la
   misma fuente (pm#629, VF-17).
 
 ## Lo que queda fuera
 
-- **Que «Tus impuestos» mire el territorio del negocio**: desde hub#996 cuenta solo las reglas del país del
+- **Que «Tus impuestos» mire el territorio del negocio**: cuenta solo las reglas del país del
   negocio, pero de cualquier territorio; un negocio de Canarias, Ceuta o Melilla con solo las reglas de fábrica
   (IVA) no ve el aviso, aunque el TPV no le deja cobrar esas categorías y le dice por qué. Es comportamiento
-  nuevo: aplazado de la migración (ronda FIX-TAX-REGION-NATIONAL-FALLBACK de `PLAN-HUB.md`;
-  `tax:setup-notice-territory` en `## 6` de `archive/migration/MIGRATION.md` de `ERPlora/erplora-next`).
+  nuevo, todavía sin hacer.
 - **«Hoy» en la zona del negocio**: en la fase 1 es el de Madrid (`settings.TIME_ZONE`), también en
   Canarias, donde un cambio de tipo empieza una hora antes de su medianoche (la zona horaria del negocio en
-  dos fuentes es una contradicción señalada en la ronda CLOSE-SCHEDULE de `PLAN-HUB.md`). No se mueve sola: la vista
+  dos fuentes es una contradicción señalada en `PLAN-HUB.md`). No se mueve sola: la vista
   previa de Ventas y `invoice.invoice.line_defaults` toman de él el tipo, que tiene que ser el del día del registro, y
   ese tipo llega al `TipoImpositivo` y a la `Huella` de VeriFactu. Cambia con las fechas de la factura, con supervisión
   (hub#772); hasta entonces lo congela `tests/test_guardrails_fiscal_clock.py`.
 - **Tipos de fábrica de IGIC, IPSI, recargo de equivalencia o de otros países**: no se siembran, a propósito
   (un tipo inventado se declararía); los crea el negocio (TAX-F04, TAX-F06, TAX-F11).
 - **`useServerTable`/`useLiveList` y `formatPercent`/`formatDate` en `@erplora/ui`**: siguen en
-  [`UI-REQUESTS.md`](UI-REQUESTS.md), sin llegar a `ui`; anotados en `## 6` de `archive/migration/MIGRATION.md` de
-  `ERPlora/erplora-next` como `tax:ui-live-server-table` y `tax:ui-percent-date-format`.
+  [`UI-REQUESTS.md`](UI-REQUESTS.md), sin llegar a `ui`.
 
 ## Lo que NO hace, a propósito
 
@@ -841,36 +780,3 @@ cajero del producto actual es un empleado.
 - No hace depender el recargo de equivalencia del cliente: se suma a toda venta de la categoría.
 - No traduce los códigos de exención ni de régimen ni habla con la AEAT.
 - No siembra tipos de IGIC, IPSI, recargo de equivalencia ni de otros países.
-
-## Cambios frente al producto actual
-
-1. **Ninguna regla incoherente ni solapada puede nacer**, tampoco por el lote, que ahora aplica las
-   mismas comprobaciones que el alta y es todo o nada. Por eso se retiran TAX-F09 (reparar) y TAX-F10
-   (marcar solapes) y sus marcas `is_incoherent` y `overlaps`: eran salidas para filas guardadas antes
-   de las guardas, y aquí no las hay.
-2. **Los rechazos dicen el campo**: rango de fechas al revés, % en una clase sin impuesto, región de
-   otro país, categoría inexistente (422 por campo); clave o alias repetidos (409 con su campo).
-3. **Desactivar** una regla que no existe da 404 y una ya desactivada, 409 (antes respondía bien sin
-   hacer nada); reactivar una ya activa, 409.
-4. **El alias se guarda normalizado** (minúsculas, espacios juntos) en toda puerta: antes la pantalla
-   guardaba mayúsculas que nunca casaban.
-5. **Una categoría se nombra también por su nombre o un alias** (alta de regla y de alias, cálculo,
-   consulta) y **una regla por su país, región y categoría** (fecha de fin, desactivar, reactivar),
-   además de por su clave o su id: el asistente se usa por voz.
-6. **La región se comprueba contra la lista ISO 3166-2** (`pycountry`), no solo por su forma: una región
-   que no existe nunca casaría.
-7. **La fecha por defecto del cálculo es la del negocio**, no la UTC (en la fase 1, la de Madrid).
-8. **Un componente sale debajo de su raíz** en la lista de reglas.
-9. **El cajero** es un empleado: recibe `tax.view` (ver y calcular).
-10. **`restaurant.alcohol` se siembra al 10 %** (antes, 21 %): las bebidas alcohólicas servidas para
-   consumir en el local son un servicio de hostelería (art. 91.Uno.2.2º de la Ley 37/1992). El alcohol
-   para llevar o a domicilio, al 21 %, tiene su categoría: `retail.alcohol`. Un hub que ya tuviera la
-   semilla anterior recibe `retail.alcohol` (migración 0005) y conserva su regla de
-   `restaurant.alcohol`: una migración nunca reescribe un tipo; se cambia con TAX-F07.
-11. **«Tus impuestos» sale también en las pantallas de Impuestos** (TAX-F17). En el producto actual era solo un
-   paso de la lista de primeros pasos del inicio (hub#2356); el paso sigue en «Termina de configurar tu negocio»
-   del Inicio, con las mismas palabras que el aviso de Categorías, Reglas y Alias.
-12. **El territorio fiscal se elige en una pantalla** (Impuestos → Ajustes, TAX-F11): antes solo se fijaba
-   por la API de ajustes, y Ajustes del Hub dejaba elegir el país (España o Portugal), que ahora es el de
-   la cuenta de ERPlora. Solo se admiten los territorios con impuestos propios (Canarias, Ceuta, Melilla),
-   nunca un código cualquiera (hub#1496).

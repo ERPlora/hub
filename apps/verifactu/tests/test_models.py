@@ -5,8 +5,9 @@ and environment, the statuses), and the texts each model shows."""
 import datetime as dt
 
 import pytest
-from django.db import IntegrityError, transaction
+from django.db import IntegrityError
 from django.utils import timezone
+from live.operations import atomic
 
 from apps.invoice.models import Invoice, InvoiceSeries
 from apps.verifactu.models import (
@@ -19,8 +20,9 @@ from apps.verifactu.models import (
     SendControl,
     backoff,
 )
+from apps.verifactu.tests.conftest import HUB_DB
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 
 @pytest.fixture
@@ -76,7 +78,7 @@ def test_there_is_one_configuration_row_and_it_starts_in_testing_through_erplora
     assert config.route == "erplora"
     assert not hasattr(config, "multiple_taxpayers")
     assert config.representation_status == "none"
-    with pytest.raises(IntegrityError), transaction.atomic():
+    with pytest.raises(IntegrityError), atomic():
         Config.objects.create()
 
 
@@ -92,7 +94,7 @@ def test_own_certificate_is_a_single_row_without_the_blob_in_str():
     assert "sealed-material" not in str(row)
     assert "sealed-material" not in repr(row)
     assert "B12345674" in str(row)
-    with pytest.raises(IntegrityError), transaction.atomic():
+    with pytest.raises(IntegrityError), atomic():
         OwnCertificate.objects.create(
             holder="B",
             holder_tax_id="B1",
@@ -112,22 +114,22 @@ def test_one_chain_head_and_one_send_control_per_issuer_and_environment():
     Chain.objects.create(issuer_nif="B12345674", environment="testing")
     Chain.objects.create(issuer_nif="B12345674", environment="production")
     SendControl.objects.create(issuer_nif="B12345674", environment="testing")
-    with pytest.raises(IntegrityError), transaction.atomic():
+    with pytest.raises(IntegrityError), atomic():
         Chain.objects.create(issuer_nif="B12345674", environment="testing")
-    with pytest.raises(IntegrityError), transaction.atomic():
+    with pytest.raises(IntegrityError), atomic():
         SendControl.objects.create(issuer_nif="B12345674", environment="testing")
 
 
 def test_a_sequence_number_is_given_once_per_chain(invoice):
     record(invoice)
     record(invoice, environment="production")  # another chain
-    with pytest.raises(IntegrityError), transaction.atomic():
+    with pytest.raises(IntegrityError), atomic():
         record(invoice, correction=True)  # same chain, same number
 
 
 def test_one_original_alta_per_invoice_and_environment(invoice):
     record(invoice)
-    with pytest.raises(IntegrityError), transaction.atomic():
+    with pytest.raises(IntegrityError), atomic():
         record(invoice, sequence=2)
     # A correction (subsanación) and an anulación of the same invoice are new records of the chain.
     record(invoice, sequence=2, correction=True)
@@ -143,19 +145,19 @@ def test_one_original_alta_per_invoice_and_environment(invoice):
 
 
 def test_the_status_is_one_of_the_five(invoice):
-    with pytest.raises(IntegrityError), transaction.atomic():
+    with pytest.raises(IntegrityError), atomic():
         record(invoice, status="error")
 
 
 def test_an_alta_carries_its_amounts_and_an_anulacion_none(invoice):
-    with pytest.raises(IntegrityError), transaction.atomic():
+    with pytest.raises(IntegrityError), atomic():
         record(invoice, total_amount=None)
-    with pytest.raises(IntegrityError), transaction.atomic():
+    with pytest.raises(IntegrityError), atomic():
         record(invoice, record_type=Record.Type.ANULACION, invoice_type="")
 
 
 def test_a_fingerprint_is_64_characters(invoice):
-    with pytest.raises(IntegrityError), transaction.atomic():
+    with pytest.raises(IntegrityError), atomic():
         record(invoice, fingerprint="ABC")
 
 

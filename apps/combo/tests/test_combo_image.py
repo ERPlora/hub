@@ -33,12 +33,13 @@ from apps.combo.schemas import (
 )
 from base.models import Hub
 from base.storage import hub_prefix
+from base.tenancy.context import current_alias, use_hub
 from base.tests.test_image_catalog import IMAGES, write_library
 from base.tests.test_images import hub_files  # noqa: F401 - the store fixture
 
-from .conftest import ctx_for, make_combo, make_group, make_option, make_product, run
+from .conftest import HOST, HUB_DB, A, B, ctx_for, make_combo, make_group, make_option, make_product, run
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 FOLDER = "combo/combos/"
 MENU = "catalog:hospitality/menu_dia"
@@ -67,13 +68,32 @@ def photo() -> bytes:
     return buffer.getvalue()
 
 
-def upload(combo_id, raw=None, role="hub_admin"):
+def upload(combo_id, raw=None, role="hub_admin", scope=A):
     data = {"id": str(combo_id), "data_base64": base64.b64encode(raw or photo()).decode()}
-    return run("combo.combo.upload_image", data, ctx_for(role))
+    return run("combo.combo.upload_image", data, ctx_for(role, scope))
+
+
+def sellable(name: str = "Menu of the day"):
+    """A menu the till offers: one course with one product to choose."""
+    combo = make_combo(name)
+    make_option(make_group(combo, min_choices=1, max_choices=1), make_product())
+    return combo
+
+
+def own_url(reference: str, scope=A) -> str:
+    return f"/p/media/{Hub.objects.get(slug=scope.key).id.hex}/{reference.removeprefix('file:')}"
+
+
+def said(scope=A) -> list[tuple[str, str]]:
+    """The image and its URL of the business's only menu, as its list, its detail and the till's menus say them."""
+    [listed] = run("combo.combo.list", {}, ctx_for(scope=scope)).rows
+    detail = run("combo.combo.get", {"id": str(listed.id)}, ctx_for(scope=scope))
+    [for_sale] = run("combo.combo.for_sale", {}, ctx_for(scope=scope)).rows
+    return [(row.image, row.image_url) for row in (listed, detail, for_sale)]
 
 
 def key(reference: str) -> str:
-    return f"{hub_prefix(Hub.objects.get(slug='a').id)}/{reference.removeprefix('file:')}"
+    return f"{hub_prefix(Hub.objects.get(slug=A.key).id)}/{reference.removeprefix('file:')}"
 
 
 def test_a_menu_is_born_without_an_image_and_its_photos_are_the_hubs_sessions_only():
@@ -136,26 +156,32 @@ def test_a_photo_takes_the_place_of_the_last_one_and_withdrawing_the_menu_delete
     combo = make_combo()
     first = upload(combo.id).image
 
-    with django_capture_on_commit_callbacks(execute=True):
+    with django_capture_on_commit_callbacks(using=current_alias(), execute=True):
         second = upload(combo.id).image
     assert re.fullmatch(rf"file:{FOLDER}[0-9a-f]{{32}}\.webp", second)
     assert not hub_files.exists(key(first)) and hub_files.exists(key(second))
 
-    with django_capture_on_commit_callbacks(execute=True):
+    with django_capture_on_commit_callbacks(using=current_alias(), execute=True):
         run("combo.combo.delete", {"id": str(combo.id)})
     assert not hub_files.exists(key(second))
 
 
 def test_the_list_and_the_tills_menus_say_the_image(library):
-    combo = make_combo()
-    make_option(make_group(combo, min_choices=1, max_choices=1), make_product())
-    run("combo.combo.set_image", {"id": str(combo.id), "image": MENU})
+    run("combo.combo.set_image", {"id": str(sellable().id), "image": MENU})
 
-    [listed] = run("combo.combo.list", {}).rows
-    [for_sale] = run("combo.combo.for_sale", {}).rows
+    assert said() == [(MENU, "/p/catalog/hospitality/menu_dia.webp")] * 3
 
-    assert (listed.image, listed.image_url) == (MENU, "/p/catalog/hospitality/menu_dia.webp")
-    assert (for_sale.image, for_sale.image_url) == (MENU, "/p/catalog/hospitality/menu_dia.webp")
+
+@pytest.mark.usefixtures("hub_files")
+def test_a_photo_of_its_own_is_said_at_the_address_of_the_business_that_asks(hub_b):
+    # A library image has the same address in every business; a photo of its own lives under its business's folder.
+    ours = upload(sellable().id)
+    with use_hub(hub_b):
+        theirs = upload(sellable("Kids' menu").id, scope=B)
+        said_to_b = said(B)
+
+    assert [(ours.image, ours.image_url), *said()] == [(ours.image, own_url(ours.image))] * 4
+    assert [(theirs.image, theirs.image_url), *said_to_b] == [(theirs.image, own_url(theirs.image, B))] * 4
 
 
 def test_it_suggests_the_librarys_images_for_its_name_and_sets_none(library):
@@ -170,13 +196,13 @@ def test_it_suggests_the_librarys_images_for_its_name_and_sets_none(library):
 
 def test_the_routes(client, make_user, library):
     combo = make_combo()
-    client.force_login(make_user("boss", host="a", role="hub_admin"))
+    client.force_login(make_user("boss", host=A.key, role="hub_admin"))
 
     response = client.post(
         "/api/combo/combos/image",
         json.dumps({"id": str(combo.id), "image": MENU}),
         content_type="application/json",
-        HTTP_HOST="a.localhost",
+        HTTP_HOST=HOST,
     )
 
     assert response.status_code == 200, response.content
@@ -186,8 +212,8 @@ def test_the_routes(client, make_user, library):
 def test_asked_for_a_menus_photo_the_assistants_turn_offers_the_suggestion_and_the_set():
     from base import assistant
 
-    tools = assistant.catalog(ctx_for("hub_admin"))
-    offered = [op.name for op in assistant.relevant(tools, ["ponle foto al menú del día"], "es")]
+    tools = assistant.tools.catalog(ctx_for("hub_admin"))
+    offered = [op.name for op in assistant.relevance.relevant(tools, ["ponle foto al menú del día"], "es")]
 
     assert {"combo.combo.suggest_image", "combo.combo.set_image"} <= set(offered)
     assert "combo.combo.upload_image" not in tools

@@ -1,19 +1,21 @@
 """The demo app's routes: each bound to its operation, and the whole CRUD over HTTP.
 
-Requests go to ``a.localhost`` (scope ``a``) with Django's sync test client, which sees the test's
+Requests go to business A's host (``HOST``, scope ``A``) with Django's sync test client, which sees the test's
 transaction.
 """
 
 import json
 import uuid
-from pathlib import Path
 
 import pytest
-from django.conf import settings
 from live.ninja import ensure_api_parity
 
 from apps.demo.api import router
+from apps.flow.tests.test_api import get, post
+from base.tests.routes import bound_routes, published_routes, spa_routes
 from config.api import api
+
+from .conftest import HOST, HUB_DB, A, B
 
 ROUTES = {
     ("GET", "/demo/items", "demo.item.list"),
@@ -24,27 +26,17 @@ ROUTES = {
     ("POST", "/demo/items/delete", "demo.item.delete"),
     ("POST", "/demo/items/add_line", "demo.item.add_line"),
 }
-# The SPA's op → route map (written by hand: nothing generates it from the OpenAPI).
-SPA_ROUTES = settings.BASE_DIR / "frontend" / "generated" / "operations.json"
-
-
-def get(client, path, host="a.localhost", **params):
-    return client.get(f"/api{path}", params, HTTP_HOST=host)
-
-
-def post(client, path, data, host="a.localhost"):
-    return client.post(f"/api{path}", json.dumps(data), content_type="application/json", HTTP_HOST=host)
 
 
 @pytest.fixture
 def admin_client(client, make_user):
-    client.force_login(make_user("boss", host="a", role="hub_admin"))
+    client.force_login(make_user("boss", host=A.key, role="hub_admin"))
     return client
 
 
 @pytest.fixture
 def employee_client(client, make_user):
-    client.force_login(make_user("ana", host="a", role="hub_employee"))
+    client.force_login(make_user("ana", host=A.key, role="hub_employee"))
     return client
 
 
@@ -52,43 +44,29 @@ def employee_client(client, make_user):
 
 
 def test_seven_routes_each_bound_to_its_operation():
-    routes = {
-        (method, path, route.operation_id)
-        for path, view in router.path_operations.items()
-        for route in view.operations
-        for method in route.methods
-    }
-    assert routes == ROUTES
+    assert bound_routes(router) == ROUTES
 
 
 def test_the_api_keeps_parity():
     assert ensure_api_parity(api) == []
 
 
-@pytest.mark.django_db  # the host gate reads the registry's row of the hub (base.middleware)
+@HUB_DB  # the host gate reads the registry's row of the hub (base.middleware)
 def test_openapi_matches_the_spa_route_map(client):
-    paths = client.get("/api/openapi.json", HTTP_HOST="a.localhost").json()["paths"]
-    served = {
-        op["operationId"]: {"method": method, "path": path}
-        for path, methods in paths.items()
-        for method, op in methods.items()
-        if op["operationId"].startswith("demo.")
-    }
-    expected = {name: route for name, route in json.loads(Path(SPA_ROUTES).read_text()).items() if name.startswith("demo.")}
-    assert served == expected
+    assert published_routes(client, "demo.", HOST) == spa_routes("demo.") == ROUTES
 
 
 # Authentication and permissions
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_anonymous_gets_the_401_envelope(client):
     for response in (get(client, "/demo/items"), post(client, "/demo/items", {"name": "x"})):
         assert response.status_code == 401
         assert response.json()["error"]["code"] == "unauthorized"
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_an_employee_reads_but_does_not_write(employee_client):
     assert get(employee_client, "/demo/items").status_code == 200
     for response in (get(employee_client, "/demo/items/stats"), post(employee_client, "/demo/items", {"name": "x"})):
@@ -96,19 +74,19 @@ def test_an_employee_reads_but_does_not_write(employee_client):
         assert response.json()["error"]["code"] == "permission_denied"
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_an_employee_s_line_asks_for_a_manager_s_approval_saying_its_figures(client, make_user):
     """BASE-F84: the reference app names «add a line» as what a manager approves on the spot, said with the quantity and
     the text of that very line (``approval_figures``), in the language of who asks; nothing is added meanwhile."""
-    client.force_login(make_user("boss", host="a", role="hub_admin"))
+    client.force_login(make_user("boss", host=A.key, role="hub_admin"))
     item = post(client, "/demo/items", {"name": "Order"}).json()
-    client.force_login(make_user("ana", host="a", role="hub_employee"))
+    client.force_login(make_user("ana", host=A.key, role="hub_employee"))
     line = {"id": item["id"], "text": "Coffee", "qty": "2.500"}
     asked = {}
     for language in ("en", "es"):
         response = client.post(
             "/api/demo/items/add_line", json.dumps(line), content_type="application/json",
-            HTTP_HOST="a.localhost", HTTP_ACCEPT_LANGUAGE=language,
+            HTTP_HOST=HOST, HTTP_ACCEPT_LANGUAGE=language,
         )
         assert response.status_code == 403, response.content
         assert response.json()["error"]["code"] == "requires_elevation"
@@ -117,16 +95,16 @@ def test_an_employee_s_line_asks_for_a_manager_s_approval_saying_its_figures(cli
     assert get(client, "/demo/items/detail", id=item["id"]).json()["lines"] == []
 
 
-@pytest.mark.django_db
-def test_a_role_on_a_is_no_role_on_b(admin_client):
-    response = get(admin_client, "/demo/items", host="b.localhost")
+@HUB_DB
+def test_a_role_on_a_is_no_role_on_b(admin_client, hub_b):
+    response = get(admin_client, "/demo/items", host=f"{B.key}.localhost")
     assert response.status_code == 403
 
 
 # Validation
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_an_invalid_item_is_422_per_field(admin_client):
     response = post(admin_client, "/demo/items", {"name": "", "status": "closed"})
     assert response.status_code == 422
@@ -135,14 +113,14 @@ def test_an_invalid_item_is_422_per_field(admin_client):
     assert set(error["fields"]) == {"name", "status"}
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_limit_over_100_is_422(admin_client):
     response = get(admin_client, "/demo/items", limit=101)
     assert response.status_code == 422
     assert set(response.json()["error"]["fields"]) == {"limit"}
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_missing_or_malformed_id(admin_client):
     missing = get(admin_client, "/demo/items/detail", id=str(uuid.uuid7()))
     assert (missing.status_code, missing.json()["error"]["code"]) == (404, "not_found")
@@ -150,7 +128,7 @@ def test_a_missing_or_malformed_id(admin_client):
     assert (malformed.status_code, set(malformed.json()["error"]["fields"])) == (422, {"id"})
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_an_item_is_named_by_its_name_over_http(admin_client):
     """hub#1162: the detail and the writes on an item take it by its name when its id is not known."""
     item_id = post(admin_client, "/demo/items", {"name": "Autumn trial"}).json()["id"]
@@ -161,7 +139,7 @@ def test_an_item_is_named_by_its_name_over_http(admin_client):
     assert (deleted.status_code, deleted.json()) == (200, {"id": item_id})
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_without_its_id_or_its_name_the_item_is_422_on_its_field(admin_client):
     detail = get(admin_client, "/demo/items/detail")
     assert (detail.status_code, set(detail.json()["error"]["fields"])) == (422, {"called"})
@@ -169,7 +147,7 @@ def test_without_its_id_or_its_name_the_item_is_422_on_its_field(admin_client):
     assert (update.status_code, set(update.json()["error"]["fields"])) == (422, {"called"})
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_name_two_items_share_is_409_and_one_none_has_404(admin_client):
     for _ in range(2):
         post(admin_client, "/demo/items", {"name": "Autumn trial"})
@@ -183,7 +161,7 @@ def test_a_name_two_items_share_is_409_and_one_none_has_404(admin_client):
 # The whole CRUD
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_crud_round_trip(admin_client):
     created = post(admin_client, "/demo/items", {"name": "Table 1"})
     assert created.status_code == 201

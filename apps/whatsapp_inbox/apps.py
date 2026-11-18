@@ -5,7 +5,7 @@ come in through ``/internal`` and go out through it (WORKBOOK «Contrato con el 
 """
 
 from django.utils.translation import gettext_lazy as _
-from django.utils.translation import pgettext_lazy
+from django.utils.translation import ngettext_lazy, pgettext_lazy
 from live.meta import BellCounter, Category, DeviceNotice, LiveAppConfig, Nav
 
 from apps.whatsapp_inbox.events import AWAITING_REPLY_EVENTS, NOTICE_EVENTS
@@ -33,6 +33,14 @@ class WhatsappInboxConfig(LiveAppConfig):
     verticals = ["hair_salon", "restaurant"]
     requires = ["customer"]
     default_auto_field = "django.db.models.BigAutoField"
+    # What these words mean to the Hub's assistant (base.assistant.relevance.synonyms). A «plantilla» and a «mensaje» are the
+    # inbox's template and message (whatsapp_inbox.template, whatsapp_inbox.message), as «template» and «message»
+    # already are in English; a business template (base.blueprint) or the staff a «plantilla» also names are said with
+    # their own words beside it («plantilla de negocio», «el personal»).
+    assistant_synonyms = (
+        ("plantilla", "plantillas", "template", "templates"),
+        ("mensaje", "mensajes", "message", "messages"),
+    )
     # Not declared on purpose: ``whatsapp_inbox.receive``, which only the system context holds (the
     # doors erplora.com calls through /internal and the reactions to Customers).
     permissions = [
@@ -88,6 +96,14 @@ class WhatsappInboxConfig(LiveAppConfig):
             icon="ion:chatbubbles-outline",
             permission="whatsapp_inbox.view",
             refresh_on=AWAITING_REPLY_EVENTS,
+            severity="warning",
+            title=ngettext_lazy(
+                "%(count)d WhatsApp customer waiting for an answer",
+                "%(count)d WhatsApp customers waiting for an answer",
+                "count",
+            ),
+            body=_("Answer within 24 hours of their last message: after that, WhatsApp only lets you send an approved template."),
+            action_label=_("Answer the customers"),
         )
     ]
     # What the plan includes and the month has spent, for System › «Usage and plan» and the bell (BASE-F40): base reads no

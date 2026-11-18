@@ -3,12 +3,11 @@
 import json
 from pathlib import Path
 
-import pytest
 from django.apps import apps
 from django.utils import translation
 
 from apps.verifactu import admin as verifactu_admin
-from apps.verifactu import models, queries, schemas, services
+from apps.verifactu import certificates, erplora_route, models, queries, schemas, services
 from apps.verifactu.models import (
     EVENT_MESSAGES,
     WAIT_REASONS,
@@ -21,6 +20,7 @@ from apps.verifactu.models import (
     Record,
     SendControl,
 )
+from apps.verifactu.tests.conftest import HOST, HUB_DB, A
 from base.tests.po import (
     catalogue_key,
     compiled_differences,
@@ -50,7 +50,7 @@ def visible_texts() -> set[str]:
             for value in panel.options.values()
             if type(value).__name__ == "__proxy__"
         ),
-        *module_texts(queries, schemas, services, models, verifactu_admin),
+        *module_texts(queries, schemas, services, models, verifactu_admin, erplora_route, certificates),
         *EVENT_MESSAGES.values(),
         *WAIT_REASONS.values(),
         *Environment.labels,
@@ -89,6 +89,9 @@ def test_spanish_texts():
         assert str(Record.Type.ANULACION.label) == "Anulación"
         assert str(Environment.TESTING.label) == "Pruebas (AEAT de pruebas)"
         assert str(services.NOT_IN_QUEUE).startswith("Este registro no está en la cola")
+        assert "emitido por una entidad reconocida, por ejemplo la FNMT" in str(
+            certificates.REFUSALS["self_signed"]
+        )
 
 
 def test_verifactu_says_its_fields_with_the_aeats_words():
@@ -120,17 +123,17 @@ def test_verifactu_says_its_fields_with_the_aeats_words():
     }
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_an_error_message_follows_the_language_of_the_request(
     client, make_user, issuer, settings
 ):
     settings.VERIFACTU_GATEWAY_URL = ""
-    client.force_login(make_user("boss", host="a", role="hub_admin"))
+    client.force_login(make_user("boss", host=A.key, role="hub_admin"))
     response = client.post(
         "/api/verifactu/contingency/retry",
         json.dumps({"invoice_number": "NOPE"}),
         content_type="application/json",
-        HTTP_HOST="a.localhost",
+        HTTP_HOST=HOST,
         HTTP_ACCEPT_LANGUAGE="es",
     )
     assert response.status_code == 404

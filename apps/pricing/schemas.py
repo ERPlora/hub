@@ -65,7 +65,7 @@ DISCOUNT_RULE = gettext_noop("Discount rule")
 PRICE_LIST = gettext_noop("Price list")
 PRICE = gettext_noop("Price")
 
-# The assistant's card names the record a write acts on by these reads (base/assistant.py ``REFERS``), run as whoever
+# The assistant's card names the record a write acts on by these reads (base/assistant/cards.py ``REFERS``), run as whoever
 # asks, never by its id: a list and a rule by their name, as the Price lists screen; a price by its article and its
 # list, as its dialogs; a product by Inventory's read; a category, a customer group or a service (Services is no
 # requirement) by the read of what a price or a rule points at in another app. Whoever changes prices reads them all.
@@ -531,7 +531,7 @@ def _given(value: Any) -> bool:
     return value not in (None, [], "")
 
 
-def rule_problems(values: dict[str, Any]) -> dict[str, str]:
+def rule_problems(values: dict[str, Any]) -> dict[str, str]:  # noqa: C901
     """What is wrong in a rule as it would be saved (``{field: message}``; empty = coherent).
 
     Each type wants its value and nothing of another type's; each scope its target and no other one;

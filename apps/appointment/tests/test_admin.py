@@ -33,7 +33,7 @@ from apps.appointment.models import (
     Settings,
 )
 
-from .conftest import MONDAY, at, make_appointment, make_block, make_series
+from .conftest import HUB_DB, MONDAY, at, make_appointment, make_block, make_series
 
 MODELS = {
     Appointment: AppointmentAdmin,
@@ -78,6 +78,7 @@ def test_every_model_is_registered_and_the_children_are_inlines():
     )
 
 
+@HUB_DB
 def test_full_crud_for_a_superuser(superuser):
     request = request_by(superuser)
     for model in MODELS:
@@ -113,8 +114,8 @@ def test_support_sees_and_repairs_every_field_of_an_appointment():
     assert editable <= set(AppointmentAdmin.fields)
 
 
-@pytest.mark.django_db
-def test_changelists_and_change_pages_render(client, superuser, salon):
+@HUB_DB
+def test_changelists_and_change_pages_render(hub_staff, salon):
     appointment = make_appointment(
         salon.lucia, salon.ana, [salon.cut], at(MONDAY, "10:00"), number="APT-ADMIN-1"
     )
@@ -122,7 +123,6 @@ def test_changelists_and_change_pages_render(client, superuser, salon):
     block = make_block(at(MONDAY, "12:00"), at(MONDAY, "13:00"), title="Training")
     Settings.objects.create()
     Counter.objects.create(day=MONDAY, last_number=4)
-    client.force_login(superuser)
     for path, text in (
         ("/admin/appointment/appointment/", b"APT-ADMIN-1"),
         (f"/admin/appointment/appointment/{appointment.pk}/change/", b"Haircut"),
@@ -134,12 +134,12 @@ def test_changelists_and_change_pages_render(client, superuser, salon):
         ("/admin/appointment/settings/", b"60"),
         ("/admin/appointment/counter/", b"4"),
     ):
-        response = client.get(path, HTTP_HOST="hubs.localhost")
+        response = hub_staff.get(path, HTTP_HOST="hubs.localhost")
         assert response.status_code == 200 and text in response.content, path
 
 
-@pytest.mark.django_db
-def test_the_admin_in_spanish_says_citas_own_words(client, superuser, salon):
+@HUB_DB
+def test_the_admin_in_spanish_says_citas_own_words(hub_staff, salon):
     """An appointment's page reads its dates and authors in the feminine of a «cita» («Borrada el», «Creada el»,
     «Actualizada por»…) and its history names who did each change «Quién», as Citas' WORKBOOK says it; the series'
     list filters and shows the «Activa» ones; a block keeps the masculine of a «bloqueo». Not the «Eliminado el»,
@@ -150,10 +150,9 @@ def test_the_admin_in_spanish_says_citas_own_words(client, superuser, salon):
     History.objects.create(appointment=appointment, action="created", actor="Ana")
     make_series(salon)
     block = make_block(at(MONDAY, "12:00"), at(MONDAY, "13:00"), title="Formación")
-    client.force_login(superuser)
 
     def page(path: str) -> str:
-        response = client.get(path, HTTP_HOST="hubs.localhost", HTTP_ACCEPT_LANGUAGE="es")
+        response = hub_staff.get(path, HTTP_HOST="hubs.localhost", HTTP_ACCEPT_LANGUAGE="es")
         assert response.status_code == 200, path
         return response.content.decode()
 

@@ -13,17 +13,20 @@ import json
 from pathlib import Path
 
 import pytest
+from django.apps import apps
 from django.conf import settings
 from live import assistant as shared
-from live.context import OperationContext, Scope
-from live.operations import AI, Operation, registry
+from live.operations import AI, registry
 
+from apps.invoice.tests.conftest import in_hubs
 from base import assistant
 from base.models import Membership
-from base.permissions import permissions_for
-from base.tests.test_assistant_asks import TOP, assert_its_asks_bring, comparable, probe_phrases
+from base.tests.test_assistant_asks import TOP, assert_offered_with_room, comparable
+from base.tests.test_assistant_asks import offered_place, probe_phrases
+from base.tests.test_assistant_asks import english_coverage_test, english_words_test, own_words_test
 
-A = Scope("host", "a")
+from .conftest import HUB_DB
+
 OWNER, ADMIN, MANAGER, EMPLOYEE = (
     Membership.Role.OWNER,
     Membership.Role.ADMIN,
@@ -65,9 +68,6 @@ REPORTED = [
      "renombra Sin azúcar QA como «Sin azúcar ni edulcorante QA» y quítala como opción predeterminada"),
     (EMPLOYEE, "modifier.selection.resolve", "¿cuánto cuesta un Café con Sin azúcar QA y qué nota manda a cocina?"),
 ]
-#: How far down the tools a turn offers (``MAX_TOOLS``, 40) a request of the QA may bring its tool: half of them, so
-#: twenty tools of the apps that say their asks later may climb past it before the model loses it.
-WITH_ROOM = 20
 #: Every probe of layer 2 of Modifiers, the owner's and the employee's real phrases: the ones above and the ones the
 #: model got right, or refused right (an employee asking for a write it does not hold).
 PROBES = [
@@ -105,35 +105,6 @@ OWN_WORDS = [
 BY_DEFAULT = "la salsa de la casa ya no tiene que salir como predeterminada"
 
 
-@pytest.fixture
-def catalog_of(make_user):
-    """The real catalogue of the assistant of a person with ``role`` in business ``a``, in ``language``."""
-
-    def of(role: str, language: str) -> dict[str, Operation]:
-        user = make_user(f"asker-{role}", host=A.key, role=role)
-        ctx = OperationContext(scope=A, actor=user.username, permissions=permissions_for(user, A), language=language)
-        return assistant.catalog(ctx)
-
-    return of
-
-
-def offered_place(
-    tools: dict[str, Operation], name: str, phrase: str, synonyms=assistant.SYNONYMS, language: str = "es"
-) -> int | None:
-    """The place a turn in ``language`` offers ``name`` at for ``phrase`` (1 is first), ``None`` when it is not offered;
-    with the Hub's ``synonyms`` unless others are given."""
-    ranking = {**assistant.RANKING, "synonyms": synonyms}
-    offered = [op.name for op in shared.relevant(tools, [phrase], language, **ranking)]
-    return offered.index(name) + 1 if name in offered else None
-
-
-def place_of_no_ask(tools: dict[str, Operation], name: str, phrase: str) -> int | None:
-    """``offered_place`` of a tool the person holds for a ``phrase`` that is none of its asks in Spanish."""
-    assert name in tools  # positive control: the person holds the tool, so its place is known
-    assert comparable(phrase) not in {comparable(ask) for ask in shared.asks_of(tools[name]).get("es", ())}
-    return offered_place(tools, name, phrase)
-
-
 def test_modifiers_is_listed_so_layer_1_sweeps_every_ask_of_it():
     """Modifiers is in ``LIVE_ASSISTANT_ASKS_REQUIRED``: ``base/tests/test_assistant_asks.py`` ranks each of its asks
     for every role and language, and ``live.E020`` requires them of each of its tools."""
@@ -143,13 +114,13 @@ def test_modifiers_is_listed_so_layer_1_sweeps_every_ask_of_it():
 def test_modifier_offers_its_seventeen_tools():
     """Modifiers' tools are its seventeen operations (``AI``, never ``INTERNAL``), the two reactions to a deletion in
     Inventory aside (``SYSTEM``: no role holds them): a silent drop of a tool fails, and each has its own words."""
-    tools = {name for name, op in registry.items() if op.app_label == "modifier" and assistant.is_tool(op)}
+    tools = {name for name, op in registry.items() if op.app_label == "modifier" and assistant.tools.is_tool(op)}
     assert all(isinstance(registry[name].ai_spec(), AI) for name in tools)
     assert len(tools) == 17
     assert sorted(name for name, _ in OWN_WORDS) == sorted(tools)
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation) and of the person's role
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation) and of the person's role
 def test_an_employee_is_never_offered_what_only_who_runs_the_menu_may_do(catalog_of):
     owner = catalog_of(OWNER, "es")
     employee = catalog_of(EMPLOYEE, "es")
@@ -166,15 +137,13 @@ def test_the_reported_requests_are_the_probes_of_layer_2():
     ]
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize(("role", "name", "phrase"), REPORTED, ids=[f"{role}-{name}" for role, name, _ in REPORTED])
 def test_the_reported_modifier_request_offers_its_existing_operation(catalog_of, role, name, phrase):
-    tools = catalog_of(role, "es")
-    place = place_of_no_ask(tools, name, phrase)
-    assert place is not None and place <= WITH_ROOM, place
+    assert_offered_with_room(catalog_of(role, "es"), name, phrase)
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize("probe", PROBES, ids=[probe["id"] for probe in PROBES])
 def test_every_probe_of_modifiers_offers_its_tool_without_being_one_of_its_asks(catalog_of, probe):
     """The owner's and the employee's phrases of layer 2, the ones the model answered right too: a tool of Modifiers
@@ -188,8 +157,7 @@ def test_every_probe_of_modifiers_offers_its_tool_without_being_one_of_its_asks(
     if role == EMPLOYEE and name in NOT_THE_EMPLOYEES:
         assert name not in tools
         return
-    place = place_of_no_ask(tools, name, phrase)
-    assert place is not None and place <= WITH_ROOM, place
+    assert_offered_with_room(tools, name, phrase)
 
 
 def test_the_probes_of_modifiers_are_read():
@@ -198,32 +166,56 @@ def test_the_probes_of_modifiers_are_read():
     assert len(PROBES) == 23  # the owner's seventeen, one per tool, and six of the employee's
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
-@pytest.mark.parametrize(("name", "phrase"), OWN_WORDS)
-def test_a_request_in_the_persons_own_words_reaches_its_tool_by_its_asks(catalog_of, name, phrase):
-    assert_its_asks_bring(catalog_of(OWNER, "es"), name, phrase, "es")
+test_a_request_in_the_persons_own_words_reaches_its_tool_by_its_asks = in_hubs(own_words_test(OWN_WORDS, "es"))
+
+
+#: What the owner says in English in words of their own for each tool of Modifiers that needs one, neither
+#: an ask nor a probe of layer 2: its English asks lift it among the first ten (``assert_its_asks_lift``).
+OWN_WORDS_EN = [
+    ("modifier.category.get", "where is Sandwiches? I want to hang add-ons on it"),
+    ("modifier.group.create", "we need one for doneness, one choice only"),
+    ("modifier.group.delete", "Doneness is not needed, delete all of it"),
+    ("modifier.group.for_target", "what will the till ask if I ring up a steak sandwich?"),
+    ("modifier.group.get", "what's the most that can be picked in Doneness?"),
+    ("modifier.group.list", "what add-ons can go with the dishes?"),
+    ("modifier.group.update", "up to three can be picked in Extras now"),
+    ("modifier.link.attach", "with the sirloin, always ask about doneness"),
+    ("modifier.link.detach", "the sirloin doesn't need Extras anymore, unlink it"),
+    ("modifier.link.get", "do the fries carry Extras?"),
+    ("modifier.link.list", "which dishes come with Sauces?"),
+    ("modifier.option.create", "Extras is missing double bacon, add it at one euro"),
+    ("modifier.option.delete", "drop barbecue sauce, we don't have it"),
+    ("modifier.option.get", "where does Gluten free hang and how much does it add?"),
+    ("modifier.option.list", "what's in Sauces and what does each cost?"),
+    ("modifier.option.update", "extra cheese now costs one fifty, change it"),
+    ("modifier.selection.resolve", "if I add double cheese to the pizza, how much more is it?"),
+]
+test_a_request_in_english_is_lifted_by_its_english_asks = in_hubs(english_words_test(OWN_WORDS_EN))
+test_each_tool_has_its_own_english_words = english_coverage_test("modifier", OWN_WORDS_EN)
 
 
 def test_the_hub_reads_predeterminada_as_the_default():
     """A «predeterminada» option is the one a group brings chosen (``is_default``): the Hub reads the word as the
     default the English descriptions and the option's data say."""
-    said = shared.asked(["quítala como opción predeterminada"], assistant.SYNONYMS).concepts
+    own_words = apps.get_app_config("modifier").assistant_synonyms
+    said = shared.asked(["quítala como opción predeterminada"], own_words).concepts
     assert any({shared.stem("predeterminada"), shared.stem("default")} <= concept for concept in said)
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 def test_a_request_with_predeterminada_reaches_the_change_of_an_option_by_the_hubs_synonyms(catalog_of):
     tools = catalog_of(OWNER, "es")
     assert comparable(BY_DEFAULT) not in probe_phrases()
-    place = place_of_no_ask(tools, "modifier.option.update", BY_DEFAULT)
-    assert place is not None and place <= TOP, place
-    without = tuple(group for group in assistant.SYNONYMS if "predeterminada" not in group)
-    assert len(without) == len(assistant.SYNONYMS) - 1  # positive control: one group is left out, the default's
+    assert_offered_with_room(tools, "modifier.option.update", BY_DEFAULT, room=TOP)
+
+    every = assistant.relevance.synonyms()
+    without = tuple(group for group in every if "predeterminada" not in group)
+    assert len(without) == len(every) - 1  # positive control: one group is left out, the default's
     unread = offered_place(tools, "modifier.option.update", BY_DEFAULT, synonyms=without)
     assert unread is None or unread > TOP, unread
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation) and of the person's role
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation) and of the person's role
 @pytest.mark.parametrize("language", ["en", "es"])
 @pytest.mark.parametrize("role", [OWNER, ADMIN, MANAGER])
 def test_changing_a_category_of_inventory_comes_before_the_category_modifiers_look_up(catalog_of, role, language):
@@ -248,7 +240,7 @@ def test_changing_a_category_of_inventory_comes_before_the_category_modifiers_lo
 ROOM = 2
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation) and of the person's role
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation) and of the person's role
 @pytest.mark.parametrize("language", ["en", "es"])
 @pytest.mark.parametrize("role", [OWNER, ADMIN, MANAGER, EMPLOYEE])
 def test_the_group_behind_a_price_list_keeps_its_room_beside_the_groups_of_modifiers(catalog_of, role, language):

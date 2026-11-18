@@ -1,15 +1,15 @@
 """The cash register app's routes: each bound to its operation, and the main flows over HTTP.
 
-Requests go to ``a.localhost`` (scope ``a``) with Django's sync test client, which sees the test's
-transaction.
+Requests go to business A's host with Django's sync test client, which sees the test's transaction in A's own
+database.
 """
-
-import json
 
 import pytest
 from live.ninja import ensure_api_parity
 
 from apps.cash_register.api import router
+from apps.cash_register.tests.conftest import HUB_DB
+from apps.flow.tests.test_api import get, post
 from base.tests.routes import spa_routes
 from config.api import api
 
@@ -36,25 +36,15 @@ ROUTES = {
 }
 
 
-def get(client, path, host="a.localhost", **params):
-    return client.get(f"/api{path}", params, HTTP_HOST=host)
-
-
-def post(client, path, data, host="a.localhost"):
-    return client.post(
-        f"/api{path}", json.dumps(data), content_type="application/json", HTTP_HOST=host
-    )
-
-
 @pytest.fixture
 def employee_client(client, make_user):
-    client.force_login(make_user("ana", host="a", role="hub_employee"))
+    client.force_login(make_user("ana", role="hub_employee"))
     return client
 
 
 @pytest.fixture
 def admin_client(client, make_user):
-    client.force_login(make_user("boss", host="a", role="hub_admin"))
+    client.force_login(make_user("boss", role="hub_admin"))
     return client
 
 
@@ -84,7 +74,7 @@ def test_every_operation_has_a_route_and_is_open_to_api_keys():
     assert all(registry[name].expose_api for name in ops)
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_an_employee_opens_records_counts_and_closes_over_http(employee_client):
     opened = post(
         employee_client, "/cash_register/sessions/open", {"opening_balance": 10000}
@@ -133,7 +123,7 @@ def test_an_employee_opens_records_counts_and_closes_over_http(employee_client):
     assert get(employee_client, "/cash_register/sessions").json()["total"] == 1
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_close_summary_is_read_over_http_before_closing(employee_client):
     session = post(employee_client, "/cash_register/sessions/open", {"opening_balance": 10000}).json()
     seen = get(employee_client, "/cash_register/sessions/closing_summary", closing_balance=9500)
@@ -145,7 +135,7 @@ def test_the_close_summary_is_read_over_http_before_closing(employee_client):
     assert get(employee_client, "/cash_register/sessions/current").json()["session"]["status"] == "open"
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_refusal_is_the_error_envelope(employee_client):
     post(employee_client, "/cash_register/sessions/open", {"opening_balance": 100})
     response = post(
@@ -161,7 +151,7 @@ def test_a_refusal_is_the_error_envelope(employee_client):
     )
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_bad_payload_is_a_422_by_field(employee_client):
     response = post(
         employee_client, "/cash_register/movements", {"type": "in", "amount": 0}
@@ -170,7 +160,7 @@ def test_a_bad_payload_is_a_422_by_field(employee_client):
     assert "amount" in response.json()["error"]["fields"]
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_employee_neither_changes_the_settings_nor_creates_drawers(employee_client):
     assert (
         post(
@@ -185,7 +175,7 @@ def test_the_employee_neither_changes_the_settings_nor_creates_drawers(employee_
     assert get(employee_client, "/cash_register/settings").status_code == 200
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_admin_sets_up_the_drawer_over_http(admin_client):
     assert (
         post(
@@ -213,6 +203,6 @@ def test_the_admin_sets_up_the_drawer_over_http(admin_client):
     )
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_without_a_session_nothing_is_read(client):
     assert get(client, "/cash_register/sessions").status_code == 401

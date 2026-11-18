@@ -9,60 +9,65 @@ silent euro. Each hub answers its own, never another's.
 """
 
 import pytest
-from django.test import override_settings
 from django.utils import translation
 from live.context import OperationContext, Scope
 from live.errors import NotFound, PermissionDenied
 from live.operations import get
 
+from apps.sale.tests.test_business_currency import platform
 from base.models import Hub
 from base.operations import business_currency
 from base.schemas import BusinessIn
+from base.tenancy.context import use_hub
+from base.tenancy.tests.business import A, B, HUB_DB, in_business_a
+from base.tests.businesses import in_each
 
-pytestmark = pytest.mark.django_db
+__all__ = ["in_business_a", "platform"]
 
-A = Scope("host", "a")
-B = Scope("host", "b")
-ERPLORA = Scope("host", "erplora")
+pytestmark = HUB_DB
 
 
 @pytest.fixture
-def hubs():
-    """``a`` in Spain and ``b`` in Japan, as the SaaS registered each business."""
-    for slug, country in (("a", "ES"), ("b", "JP")):
-        Hub.objects.update_or_create(slug=slug, defaults={"status": "ready", "name": slug.upper(), "country": country})
+def hubs(hub_b):
+    """A in Spain and B in Japan, as the SaaS registered each business; B's row."""
+    for slug, country in ((A.key, "ES"), (B.key, "JP")):
+        Hub.objects.filter(slug=slug).update(name=slug.upper(), country=country)
+    return hub_b
 
 
 def test_a_hub_s_business_charges_in_its_country_s_currency_never_another_hub_s(hubs):
-    assert (business_currency(A), business_currency(B)) == ("EUR", "JPY")
-    Hub.objects.filter(slug="b").update(country="PL")
-    assert (business_currency(A), business_currency(B)) == ("EUR", "PLN")
+    assert in_each(business_currency, hubs) == ("EUR", "JPY")
+    Hub.objects.filter(slug=B.key).update(country="PL")
+    assert in_each(business_currency, hubs) == ("EUR", "PLN")
 
 
-def test_erplora_s_own_hub_charges_in_its_issuer_s_country_s_currency():
-    assert not Hub.objects.filter(slug="erplora").exists()  # without a registry row
-    assert business_currency(ERPLORA) == "EUR"
-    with override_settings(PLATFORM_ISSUER_COUNTRY="GB"):
-        assert business_currency(ERPLORA) == "GBP"
-    with override_settings(PLATFORM_ISSUER_COUNTRY="CH"):
-        assert business_currency(ERPLORA) == "CHF"
+def test_erplora_s_own_hub_charges_in_its_issuer_s_country_s_currency(platform, settings):
+    assert platform.country == ""  # its registry row has no country of its own
+    with use_hub(platform):
+        assert business_currency(B) == "EUR"
+        settings.PLATFORM_ISSUER_COUNTRY = "GB"
+        assert business_currency(B) == "GBP"
+        settings.PLATFORM_ISSUER_COUNTRY = "CH"
+        assert business_currency(B) == "CHF"
 
 
-@override_settings(PLATFORM_HUB_SLUG="erplora-pre", PLATFORM_ISSUER_COUNTRY="JP")
-def test_erplora_s_own_hub_is_the_one_its_setting_names(hubs):
-    assert business_currency(Scope("host", "erplora-pre")) == "JPY"
+def test_erplora_s_own_hub_is_the_one_its_setting_names(platform, settings):
+    settings.PLATFORM_ISSUER_COUNTRY = "JP"
+    Hub.objects.filter(slug=A.key).update(country="ES")
+    with use_hub(platform):
+        assert business_currency(B) == "JPY"
     assert business_currency(A) == "EUR"
 
 
-def test_a_demo_charges_in_its_row_s_currency():
-    Hub.objects.create(slug="demo-0000c0de", status="ready", is_demo=True)
-    Hub.objects.create(slug="demo-0000beef", status="ready", is_demo=True, country="PL")
-    assert business_currency(Scope("host", "demo-0000c0de")) == "EUR"  # no country: euros
-    assert business_currency(Scope("host", "demo-0000beef")) == "PLN"
+def test_a_demo_charges_in_its_row_s_currency(hub_b):
+    Hub.objects.filter(slug__in=(A.key, B.key)).update(is_demo=True)
+    Hub.objects.filter(slug=B.key).update(country="PL")
+    assert in_each(business_currency, hub_b) == ("EUR", "PLN")  # no country: euros
 
 
-@pytest.mark.parametrize("scope", [Scope("host", "nobody"), Scope("platform", "registry")])
+@pytest.mark.parametrize("scope", [A, Scope("platform", "registry")])
 def test_a_scope_that_is_no_hub_s_has_no_currency_never_a_silent_euro(scope):
+    Hub.objects.filter(slug=A.key).update(slug="moved")  # no registry row holds A's address any more
     with translation.override("es"), pytest.raises(NotFound) as refused:
         business_currency(scope)
     assert refused.value.message == "No hay ningún negocio aquí."
@@ -71,6 +76,7 @@ def test_a_scope_that_is_no_hub_s_has_no_currency_never_a_silent_euro(scope):
 def test_it_reads_as_the_platform_whatever_the_caller_may_see(hubs):
     """An API key that only charges (no ``base.view_home``) is refused the business, yet charges in its currency."""
     key = OperationContext(scope=B, actor="key", permissions=frozenset({"sale.charge"}))
-    with pytest.raises(PermissionDenied):
-        get("base.business.get")(key, BusinessIn())
-    assert business_currency(key.scope) == "JPY"
+    with use_hub(hubs):
+        with pytest.raises(PermissionDenied):
+            get("base.business.get")(key, BusinessIn())
+        assert business_currency(key.scope) == "JPY"

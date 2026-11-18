@@ -1,21 +1,21 @@
 """The staff app's routes: each bound to its operation, and the main flows over HTTP.
 
-Requests go to ``a.localhost`` (scope ``a``) with Django's sync test client, which sees the test's
+Requests go to business A's host (``HOST``, scope ``A``) with Django's sync test client, which sees the test's
 transaction. No path parameters: ids (or names) travel in the input.
 """
 
-import json
 import uuid
 
 import pytest
 from live.ninja import ensure_api_parity
 
+from apps.flow.tests.test_api import get, post
 from apps.staff.api import router
 from apps.staff.models import Member, TimeOff
 from base.tests.routes import spa_routes
 from config.api import api
 
-from .conftest import make_member, make_time_off
+from .conftest import HOST, HUB_DB, A, B, make_member, make_time_off
 
 ROUTES = {
     ("GET", "/staff/members", "staff.member.list"),
@@ -56,30 +56,16 @@ ROUTES = {
 }
 
 
-def get(client, path, host="a.localhost", **params):
-    return client.get(f"/api{path}", params, HTTP_HOST=host)
-
-
-def post(client, path, data, host="a.localhost", **headers):
-    return client.post(
-        f"/api{path}",
-        json.dumps(data),
-        content_type="application/json",
-        HTTP_HOST=host,
-        **headers,
-    )
-
-
 @pytest.fixture
 def boss(client, make_user):
-    user = make_user("boss", host="a", role="hub_admin")
+    user = make_user("boss", host=A.key, role="hub_admin")
     client.force_login(user)
     return user
 
 
 @pytest.fixture
 def employee(client, make_user):
-    user = make_user("ana", host="a", role="hub_employee")
+    user = make_user("ana", host=A.key, role="hub_employee")
     client.force_login(user)
     return user
 
@@ -101,9 +87,9 @@ def test_the_api_keeps_parity():
     assert ensure_api_parity(api) == []
 
 
-@pytest.mark.django_db  # the host gate reads the registry's row of the hub (base.middleware)
+@HUB_DB  # the host gate reads the registry's row of the hub (base.middleware)
 def test_openapi_publishes_the_operations_with_their_ids(client):
-    paths = client.get("/api/openapi.json", HTTP_HOST="a.localhost").json()["paths"]
+    paths = client.get("/api/openapi.json", HTTP_HOST=HOST).json()["paths"]
     served = {
         (method.upper(), path.removeprefix("/api"), op["operationId"])
         for path, methods in paths.items()
@@ -120,7 +106,7 @@ def test_the_spas_route_map_names_every_staff_route():
 # Authentication and permissions
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_anonymous_gets_the_401_envelope(client):
     for response in (
         get(client, "/staff/members"),
@@ -130,7 +116,7 @@ def test_anonymous_gets_the_401_envelope(client):
         assert response.json()["error"]["code"] == "unauthorized"
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_an_employee_reads_the_team_but_neither_writes_nor_sees_pay(employee, client):
     assert get(client, "/staff/members").status_code == 200
     assert get(client, "/staff/time_off/today").status_code == 200
@@ -145,7 +131,7 @@ def test_an_employee_reads_the_team_but_neither_writes_nor_sees_pay(employee, cl
         assert response.json()["error"]["code"] == "permission_denied"
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_commission_report_over_http_today_by_default_and_a_bad_period_is_422(boss, client):
     # flow: STAFF-F21 (paso 3: la comisión del día)
     make_member("Ana", commission_rate="15")
@@ -160,15 +146,15 @@ def test_the_commission_report_over_http_today_by_default_and_a_bad_period_is_42
     assert list(response.json()["error"]["fields"]) == ["date_to"]
 
 
-@pytest.mark.django_db
-def test_a_role_on_a_is_no_role_on_b(boss, client):
-    assert get(client, "/staff/members", host="b.localhost").status_code == 403
+@HUB_DB
+def test_a_role_on_a_is_no_role_on_b(boss, client, hub_b):
+    assert get(client, "/staff/members", host=f"{B.key}.localhost").status_code == 403
 
 
 # Validation
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_an_invalid_record_is_422_per_field(boss, client):
     response = post(
         client,
@@ -179,14 +165,14 @@ def test_an_invalid_record_is_422_per_field(boss, client):
     assert set(response.json()["error"]["fields"]) == {"first_name", "commission_rate"}
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_limit_over_100_or_an_unknown_sort_is_422(boss, client):
     for params in ({"limit": 101}, {"sort": "salary"}):
         response = get(client, "/staff/members", **params)
         assert response.status_code == 422
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_schedule_error_names_the_day_and_its_field(boss, client):
     member = make_member()
     response = post(
@@ -201,12 +187,13 @@ def test_a_schedule_error_names_the_day_and_its_field(boss, client):
     assert set(response.json()["error"]["fields"]) == {"days.0.end_time"}
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_an_error_follows_the_language_of_the_request(boss, client):
-    response = post(
-        client,
-        "/staff/members/update",
+    response = client.post(
+        "/api/staff/members/update",
         {"id": str(uuid.uuid7()), "phone": "1"},
+        content_type="application/json",
+        HTTP_HOST=HOST,
         HTTP_ACCEPT_LANGUAGE="es",
     )
     assert response.status_code == 404
@@ -219,7 +206,7 @@ def test_an_error_follows_the_language_of_the_request(boss, client):
 # Flows over HTTP
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_record_round_trip(boss, client):
     role = post(client, "/staff/roles", {"name": "Stylist", "color": "#ff0000"})
     assert role.status_code == 201
@@ -264,7 +251,7 @@ def test_the_record_round_trip(boss, client):
     assert get(client, "/staff/members/detail", id=member["id"]).status_code == 404
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_an_ambiguous_name_is_a_409(boss, client):
     make_member("Ana", "López")
     make_member("Ana", "Ruiz")
@@ -275,9 +262,9 @@ def test_an_ambiguous_name_is_a_409(boss, client):
     )
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_time_off_round_trip(boss, client, make_user):
-    me = make_user("eva", host="a", role="hub_employee")
+    me = make_user("eva", host=A.key, role="hub_employee")
     member = make_member("Eva", "Sanz", user=me.person)
 
     created = post(
@@ -344,7 +331,7 @@ def test_the_time_off_round_trip(boss, client, make_user):
     assert TimeOff.objects.get(pk=leave_id).status == "approved"
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_schedule_round_trip(boss, client):
     member = make_member()
     week = [
@@ -394,7 +381,7 @@ def test_the_schedule_round_trip(boss, client):
     }
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_settings_and_bulk_over_http(boss, client):
     assert get(client, "/staff/settings").json()["default_work_start"] == "09:00"
     saved = post(
@@ -429,7 +416,7 @@ def test_settings_and_bulk_over_http(boss, client):
     assert get(client, "/staff/members/stats").json()["active"] == 1
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_field_the_batch_does_not_know_never_brings_it_down(boss, client):
     # STAFF-F07: the old batch was refused whole for a field it did not know, and a
     # row past the hundredth was lost without a word; now that field is left out and 101 rows are a 422.
@@ -446,7 +433,7 @@ def test_a_field_the_batch_does_not_know_never_brings_it_down(boss, client):
     assert Member.objects.count() == 1
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_my_record_over_http(employee, client):
     member = make_member("Ana", user=employee.person, hourly_rate=1200)
     assert get(client, "/staff/members/mine").json()["member"]["hourly_rate"] == 1200
@@ -454,7 +441,7 @@ def test_my_record_over_http(employee, client):
     assert get(client, "/staff/time_off/mine").json()["total"] == 1
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_current_record_over_http_says_only_who_and_never_the_pay(employee, client):
     # flow: SALE-F16 (atribuir a quien tiene la sesión con «Atiende yo»)
     assert get(client, "/staff/members/current").json() == {"member": None}
@@ -466,7 +453,7 @@ def test_the_current_record_over_http_says_only_who_and_never_the_pay(employee, 
     assert get(client, "/staff/members/current").status_code == 401
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_hub_user_selector_over_http(boss, client, employee):
     client.force_login(boss)
     rows = get(client, "/staff/accounts").json()["rows"]

@@ -1,6 +1,6 @@
 """The assistant's confirmation card names each datum of a write of the WhatsApp inbox by a name of the app's own
 (base's half is hub#258): in Spanish, never by the title pydantic makes up from the field («Assignee», «Business Id»),
-nor by a word another app's catalog happens to lend. The card is base's (``base.assistant.card``); the names are
+nor by a word another app's catalog happens to lend. The card is base's (``base.assistant.cards.card``); the names are
 whatsapp_inbox's: the titles of its schemas and the ``verbose_name`` of its models, with their Spanish in its catalog,
 as its screens (the inbox, the conversation, the templates, the quick replies and the channel's settings) say them."""
 
@@ -11,13 +11,13 @@ from pathlib import Path
 
 import pytest
 from django.apps import apps
+from live import assistant as shared
 from live.operations import get, registry
 
-from apps.whatsapp_inbox.tests.conftest import ctx_for
+from apps.whatsapp_inbox.tests.conftest import HUB_DB, ctx_for
 from apps.whatsapp_inbox.tests.test_template_header_file import PDF, upload
 from apps.whatsapp_inbox.tests.test_template_header_file import hub_files  # noqa: F401 - fixture
 from base import assistant
-from base.tenancy.tests import hubs
 from base.tests.test_assistant import named_by_the_screen, technical_names
 
 APP = Path(apps.get_app_config("whatsapp_inbox").path)
@@ -33,14 +33,14 @@ def labels(card: dict) -> list[str]:
 def named(monkeypatch):
     """Every record a write names by its id comes out named, as a person who may read it sees it: this test is about
     what the card calls each datum, and a record nobody names is left out of it (hub#571)."""
-    monkeypatch.setattr(assistant, "_reference", lambda value, prop, words: "Ana")
+    monkeypatch.setattr(assistant.cards, "_reference", lambda value, prop, words: "Ana")
 
 
 def whatsapp_inbox_writes() -> list:
     return [
         op
         for op in registry.values()
-        if op.app_label == "whatsapp_inbox" and op.kind == "command" and assistant.is_tool(op)
+        if op.app_label == "whatsapp_inbox" and op.kind == "command" and assistant.tools.is_tool(op)
     ]
 
 
@@ -48,12 +48,12 @@ def named_by_whatsapp_inbox(op, name: str, title: str | None) -> bool:
     """Whether whatsapp_inbox itself names the datum ``name`` of ``op``: by its schema's own title, by the
     ``verbose_name`` of one of its models, or by its own catalog. A title pydantic made up that another app's catalog
     happens to translate is not a name of the WhatsApp inbox: it changes if that app's text changes."""
-    made_up = assistant._generated_title(name)
+    made_up = shared.generated_title(name)
     with (APP / "locale/es/LC_MESSAGES/django.mo").open("rb") as compiled:
         own = gettext.GNUTranslations(compiled)
     return (
         bool(title and title != made_up)
-        or assistant._verbose_name("whatsapp_inbox", op.name.split(".")[1], name) is not None
+        or shared.verbose_name("whatsapp_inbox", op.name.split(".")[1], name) is not None
         or own.gettext(made_up) != made_up
     )
 
@@ -73,15 +73,15 @@ def test_no_datum_of_a_write_of_whatsapp_inbox_borrows_its_name_from_another_app
     screen = named_by_the_screen()
     borrowed: dict[str, list[str]] = {}
     for op in whatsapp_inbox_writes():
-        props = assistant._schema(op).get("properties", {})
-        for field in assistant.card(op, dict.fromkeys(props, "x"), "es")["fields"]:
+        props = shared.input_schema(op).get("properties", {})
+        for field in assistant.cards.card(op, dict.fromkeys(props, "x"), "es")["fields"]:
             datum = field["name"]
             if datum not in screen and not named_by_whatsapp_inbox(op, datum, props[datum].get("title")):
                 borrowed.setdefault(op.name, []).append(datum)
     assert borrowed == {}
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_card_names_the_assignee_as_the_conversation_screen(make_user):
     """By their name or by their id, the same person: «Assigned to», as the conversation's header says it; the id
     named as the business's database knows them (``base.hub_user.get``), never as an id."""
@@ -89,13 +89,13 @@ def test_the_card_names_the_assignee_as_the_conversation_screen(make_user):
     ana = make_user("ana", first_name="Ana", last_name="López")
     ctx = ctx_for("hub_employee", actor=ana)
     for arguments in ({"assignee": "Ana"}, {"assignee_id": str(ana.person.id)}):
-        es, en = assistant.card(assign, arguments, "es", ctx), assistant.card(assign, arguments, "en", ctx)
+        es, en = assistant.cards.card(assign, arguments, "es", ctx), assistant.cards.card(assign, arguments, "en", ctx)
         assert labels(es) == [SCREENS["conversation"]["assignedTo"]]
         assert labels(en) == [SCREENS_EN["conversation"]["assignedTo"]]
-    assert [field["value"] for field in assistant.card(assign, {"assignee_id": str(ana.person.id)}, "es", ctx)["fields"]] == [
+    assert [field["value"] for field in assistant.cards.card(assign, {"assignee_id": str(ana.person.id)}, "es", ctx)["fields"]] == [
         "Ana López"
     ]
-    unassign = assistant.card(assign, {"unassign": True}, "es")
+    unassign = assistant.cards.card(assign, {"unassign": True}, "es")
     assert labels(unassign) == [SCREENS["conversation"]["unassign"]]
 
 
@@ -103,16 +103,16 @@ def test_the_card_names_the_customer_card_actions_as_the_conversation_screen():
     link = get("whatsapp_inbox.conversation.link_customer")
     conversation, conversation_en = SCREENS["conversation"], SCREENS_EN["conversation"]
     arguments = {"create": True, "unlink": True}
-    assert labels(assistant.card(link, arguments, "es")) == [conversation["createCard"], conversation["unlink"]]
-    assert labels(assistant.card(link, arguments, "en")) == [conversation_en["createCard"], conversation_en["unlink"]]
+    assert labels(assistant.cards.card(link, arguments, "es")) == [conversation["createCard"], conversation["unlink"]]
+    assert labels(assistant.cards.card(link, arguments, "en")) == [conversation_en["createCard"], conversation_en["unlink"]]
 
 
 def test_the_card_names_a_template_as_the_composer():
     """To the inbox's customer or from an automation, the same word: «Template», as the composer's button."""
     template = {"name": "cita_recordatorio", "language": "es"}
     for name in ("whatsapp_inbox.message.send", "whatsapp_inbox.message.notify"):
-        assert labels(assistant.card(get(name), {"template": template}, "es")) == [SCREENS["composer"]["template"]]
-        assert labels(assistant.card(get(name), {"template": template}, "en")) == [SCREENS_EN["composer"]["template"]]
+        assert labels(assistant.cards.card(get(name), {"template": template}, "es")) == [SCREENS["composer"]["template"]]
+        assert labels(assistant.cards.card(get(name), {"template": template}, "en")) == [SCREENS_EN["composer"]["template"]]
 
 
 # ── A real card: the header's file by its name, the attempt key never ──
@@ -134,7 +134,7 @@ def sending(sample_id, key: str) -> dict:
     return {"to": "+34600111222", "template": template, "client_message_id": key}
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize("key", KEYS)
 @pytest.mark.parametrize("language", ["es", "en"])
 def test_the_card_of_a_template_names_its_headers_file_and_never_its_message_key(language, key):
@@ -143,14 +143,14 @@ def test_the_card_of_a_template_names_its_headers_file_and_never_its_message_key
     kept = upload(PDF, "DOCUMENT", "carta.pdf")
     who = ctx_for("hub_employee", language=language)
 
-    card = assistant.card(get("whatsapp_inbox.message.send"), sending(kept.id, key), language, ctx=who)
+    card = assistant.cards.card(get("whatsapp_inbox.message.send"), sending(kept.id, key), language, ctx=who)
 
     template = {"name": "carta_del_dia", "language": "es", "header_sample": "carta.pdf"}
     assert values(card) == {"to": "+34600111222", "template": template}
     assert not AN_ID.search(json.dumps(card, ensure_ascii=False))
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize("key", KEYS)
 @pytest.mark.parametrize("name", ["whatsapp_inbox.template.create", "whatsapp_inbox.template.update"])
 def test_the_card_of_a_template_to_review_names_its_headers_file_and_never_its_save_key(name, key):
@@ -158,14 +158,13 @@ def test_the_card_of_a_template_to_review_names_its_headers_file_and_never_its_s
     kept = upload(PDF, "DOCUMENT", "carta.pdf")
     arguments = {"header_format": "DOCUMENT", "header_sample": str(kept.id), "body": "Hola", "submit_key": key}
 
-    shown = values(assistant.card(get(name), arguments, "es", ctx=ctx_for(language="es")))
+    shown = values(assistant.cards.card(get(name), arguments, "es", ctx=ctx_for(language="es")))
 
     assert shown["header_sample"] == "carta.pdf"
     assert "submit_key" not in shown
 
 
-@pytest.mark.django_db
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
+@HUB_DB
 @pytest.mark.usefixtures("no_test_fallback")
 def test_a_file_of_another_business_is_never_named_nor_shown_by_its_id(hub_a, hub_b):
     from base.tenancy.context import use_hub
@@ -174,7 +173,7 @@ def test_a_file_of_another_business_is_never_named_nor_shown_by_its_id(hub_a, hu
     with use_hub(hub_b):
         theirs = upload(PDF, "DOCUMENT", "de-b.pdf", ctx=ctx_for(scope=Scope("host", hub_b.slug)))
     with use_hub(hub_a):
-        card = assistant.card(get("whatsapp_inbox.message.send"), sending(theirs.id, KEYS[0]), "es", ctx=ctx_for("hub_employee", scope=Scope("host", hub_a.slug)))
+        card = assistant.cards.card(get("whatsapp_inbox.message.send"), sending(theirs.id, KEYS[0]), "es", ctx=ctx_for("hub_employee", scope=Scope("host", hub_a.slug)))
 
     assert values(card)["template"] == {"name": "carta_del_dia", "language": "es"}
     assert not AN_ID.search(json.dumps(card, ensure_ascii=False))
@@ -186,6 +185,6 @@ def test_an_automations_card_never_shows_the_message_key(key):
     template = {"name": "carta_del_dia", "header_sample": KEYS[0]}
     arguments = {"phone": "+34600111222", "template": template, "client_message_id": key}
 
-    shown = values(assistant.card(get("whatsapp_inbox.message.notify"), arguments, "es"))
+    shown = values(assistant.cards.card(get("whatsapp_inbox.message.notify"), arguments, "es"))
 
     assert shown == {"phone": "+34600111222", "template": {"name": "carta_del_dia"}}

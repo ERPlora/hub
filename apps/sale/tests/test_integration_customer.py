@@ -10,9 +10,9 @@ from live.models import OutboxEvent
 
 from apps.customer import events as customer_events
 from apps.customer.models import Customer
-from apps.sale.tests.conftest import A, run
+from apps.sale.tests.conftest import HUB_DB, A, run
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 
 def deliver(name: str):
@@ -131,5 +131,5 @@ def test_an_erased_customer_keeps_the_sales_printed_name(coffee, customer):
     )
     run("customer.customer.erase", {"id": str(ana.id), "reason": "GDPR request"})
     found = run("sale.sale.get", {"sale_id": str(sale.id)})
-    # A sale is a fiscal record: its copy of the name stays (WORKBOOK «Dudas abiertas»).
+    # A sale is a fiscal record: its copy of the name stays.
     assert found.customer_name == "Ana López" and found.customer_id == ana.id

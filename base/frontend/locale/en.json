@@ -86,15 +86,14 @@
       "loadErrorBody": "Check the connection and try again.",
       "retry": "Retry"
     },
-    "bell": {
-      "title": "Notifications",
-      "empty": "All caught up. No notifications.",
-      "loadError": "Could not check the notifications. They will show up when the connection is back."
-    },
     "blocking": {
       "title": "You cannot issue invoices yet",
-      "body": "No ticket or invoice can be issued until this is set up:",
-      "configure": "Set up"
+      "body": "No ticket or invoice can be issued until this is set up: {steps}.",
+      "configureStep": "Set up: {step}",
+      "steps": {
+        "businessIdentity": "Set up your business details",
+        "verifactu": "Set up VeriFactu"
+      }
     },
     "plan": {
       "upgrade": "Upgrade plan",
@@ -163,7 +162,9 @@
       },
       "noResults": "No apps match your search.",
       "toggle": {
-        "on": "Turn on",
+        "labelOn": "{app}: on",
+        "labelOff": "{app}: off",
+        "busy": "Changing…",
         "off": "Turn off",
         "retry": "Retry"
       },
@@ -1215,8 +1216,28 @@
         "generic": "Something went wrong. Try again."
       }
     },
+    "help": {
+      "open": "Help",
+      "title": "Help · {app}",
+      "videoTitle": "How {app} works",
+      "purpose": "What it is for",
+      "current": "On this screen",
+      "here": "You are here",
+      "how": "How to",
+      "others": "Other screens of this module",
+      "failure": "If something goes wrong",
+      "search": "Search tasks…",
+      "empty": "Nothing matches your search",
+      "clear": "Clear search",
+      "loading": "Loading help…",
+      "loadError": "Could not load the help.",
+      "retry": "Retry",
+      "ask": "Ask the assistant",
+      "close": "Close",
+      "flowQuestion": "How do I do this: {title}?",
+      "screenQuestion": "How do I use {app} on {screen}?"
+    },
     "assistant": {
-      "more": "More options",
       "empty": "Ask me about your sales, your stock or anything about your business.",
       "setupIntro": "Review your business's setup. Choose an option or write your question.",
       "shortcuts": {

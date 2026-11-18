@@ -42,7 +42,581 @@ dev = [
     "flask-cors>=6",
     # The CI runs the suite in shards (.github/scripts/pytest-shard.sh, hub#1185).
     "pytest-split>=0.11",
+    "ruff>=0.17.5",
+    "import-linter>=2.16",
+    "complexipy>=9.0.0",
 ]
+
+# ruff checks how big and how branchy each function is, and the common mistakes of the rule families E4, E7, E9, F, B
+# and DJ (tests/test_guardrails_lint.py runs it, tests/test_guardrails_ruff.py pins this configuration down). It is not
+# the project's formatter. Migrations are generated, and packages/ holds the live and ui submodules, checked in their
+# own repos.
+[tool.ruff]
+target-version = "py314"
+extend-exclude = ["migrations", "packages"]
+force-exclude = true
+
+# The code keeps its own layout: `ruff format` (an editor's format on save, say) finds nothing to format.
+[tool.ruff.format]
+exclude = ["*"]
+
+[tool.ruff.lint]
+select = ["B", "C901", "DJ", "E4", "E7", "E9", "F", "PLR0911", "PLR0912", "PLR0913", "PLR0915", "PLR0917", "RUF100"]
+# Rules the code's older `# noqa` markers name where ruff reports nothing (another linter's rule, or a line other than
+# the one ruff reports): RUF100 keeps those markers instead of reporting them as unused.
+external = ["A002", "B018", "BLE001", "E402", "E731", "F401", "F403", "F405", "F811", "N801", "N802", "N803"]
+
+[tool.ruff.lint.mccabe]
+max-complexity = 10
+
+[tool.ruff.lint.pylint]
+max-args = 5
+max-positional-args = 5
+max-branches = 12
+max-returns = 6
+max-statements = 50
+
+# pytest hands fixtures over as arguments, so a test's argument count says nothing about its size, and a fixture comes
+# back as an argument under the name it was imported with (F811).
+[tool.ruff.lint.per-file-ignores]
+"**/tests/**" = ["F811", "PLR0913", "PLR0917"]
+"**/test_*.py" = ["F811", "PLR0913", "PLR0917"]
+"**/conftest.py" = ["F811", "PLR0913", "PLR0917"]
+# What broke one of the rule families when it came in, one file per line: it only shrinks. Fix the code instead of
+# adding a line; tests/test_guardrails_ruff.py says when a line has to go.
+"apps/appointment/services.py" = ["B007"]
+"apps/appointment/tests/test_concurrency.py" = ["E731"]
+"apps/appointment/tests/test_integration_staff.py" = ["F401"]
+"apps/appointment/tests/test_services.py" = ["B023"]
+"apps/flow/recipes.py" = ["B007"]
+"apps/flow/tests/test_apps.py" = ["F402"]
+"apps/flow/tests/test_services_recipes.py" = ["B017"]
+"apps/inventory/models.py" = ["DJ001"]
+"apps/invoice/admin.py" = ["DJ007"]
+"apps/invoice/tests/conftest.py" = ["F401"]
+"apps/modifier/queries.py" = ["F401"]
+"apps/modifier/tests/test_concurrency.py" = ["E731"]
+"apps/modifier/tests/test_models.py" = ["B023"]
+"apps/payment/tests/test_queries.py" = ["E731"]
+"apps/pricing/admin.py" = ["DJ007"]
+"apps/pricing/queries.py" = ["B035"]
+"apps/pricing/schemas.py" = ["F402"]
+"apps/pricing/tests/test_relay.py" = ["F841"]
+"apps/printing/services.py" = ["F401"]
+"apps/printing/tests/test_integration_home.py" = ["F401"]
+"apps/printing/tests/test_models.py" = ["B017"]
+"apps/reservation/tests/test_services.py" = ["B023"]
+"apps/sale/queries.py" = ["F401"]
+"apps/sale/services.py" = ["F401"]
+"apps/sale/tests/conftest.py" = ["F401"]
+"apps/sale/tests/test_concurrency.py" = ["E731"]
+"apps/schedule/engine.py" = ["B905"]
+"apps/schedule/tests/test_services.py" = ["F401"]
+"apps/service/admin.py" = ["DJ007"]
+"apps/service/services.py" = ["F401", "F811"]
+"apps/service/tests/test_concurrency.py" = ["E731"]
+"apps/service/tests/test_queries.py" = ["E731"]
+"apps/service/tests/test_recovery.py" = ["B905"]
+"apps/service/tests/test_services.py" = ["F841"]
+"apps/service/tests/test_services_session.py" = ["B017"]
+"apps/staff/tests/test_integration_sale.py" = ["F841"]
+"apps/staff/tests/test_models.py" = ["B023"]
+"apps/staff/tests/test_services.py" = ["F841"]
+"apps/task/tests/test_services.py" = ["F841"]
+"apps/tax/tests/test_queries.py" = ["E731"]
+"apps/verifactu/schemas.py" = ["E731"]
+"apps/verifactu/services.py" = ["F401"]
+"apps/verifactu/tests/conftest.py" = ["F401"]
+"apps/verifactu/tests/test_concurrency.py" = ["B905"]
+"apps/website/tests/test_render.py" = ["F541"]
+"apps/website/tests/test_schemas.py" = ["F541"]
+"apps/whatsapp_inbox/models.py" = ["DJ001"]
+"apps/whatsapp_inbox/schemas.py" = ["B905"]
+"base/access.py" = ["B905"]
+"base/auth.py" = ["F401"]
+"base/files.py" = ["B911"]
+"base/metrics.py" = ["B027"]
+"base/schemas/__init__.py" = ["F811"]
+"base/tenancy/tests/test_business.py" = ["F401"]
+"base/tenancy/tests/test_concurrency.py" = ["F401"]
+"base/tests/test_access_account.py" = ["F401"]
+"base/tests/test_access_badge.py" = ["F401"]
+"base/tests/test_access_entry.py" = ["F401"]
+"base/tests/test_access_settings.py" = ["F401"]
+"base/tests/test_activation.py" = ["B905"]
+"base/tests/test_data_copies.py" = ["F821"]
+"base/tests/test_database_cut.py" = ["B905"]
+"base/tests/test_session_host.py" = ["F401"]
+"control/tests/test_admin.py" = ["F841"]
+"tests/packaged_doors/apps/shop/queries/__init__.py" = ["F401"]
+"tests/packaged_doors/apps/shop/services/__init__.py" = ["F401"]
+"tests/test_guardrails_permissions.py" = ["F601"]
+
+# complexipy (`uv run complexipy`; tests/test_guardrails_complexity.py runs it): no function's cognitive complexity
+# goes over 15, and no ignore comment switches that off. complexipy-snapshot.json froze the functions over it when it
+# came in: it only shrinks. Migrations are generated, and the live and ui submodules are checked in their own repos.
+[tool.complexipy]
+paths = ["."]
+exclude = ["**/migrations/**", "packages/**"]
+max-complexity-allowed = 15
+no-ignore = true
+
+# import-linter (`uv run lint-imports`; tests/test_guardrails_imports.py runs it): each app imports only itself, base,
+# live and the apps its LiveAppConfig requires, base imports no app, and no sibling modules import each other in a
+# circle. The app contracts follow the requires, and that test says what to change when they do not. Tests are out of
+# every contract. The rest of each ignore_imports froze what broke a contract when it came in: it only shrinks.
+[tool.importlinter]
+root_packages = ["apps", "base", "config", "control", "shared"]
+
+[[tool.importlinter.contracts]]
+id = "base-imports-no-app"
+name = "base imports no app"
+type = "forbidden"
+source_modules = ["base"]
+forbidden_modules = ["apps"]
+allow_indirect_imports = true
+ignore_imports = [
+    "**.tests.** -> **",
+    "base.internal -> apps.invoice.pdf",
+]
+
+[[tool.importlinter.contracts]]
+id = "no-sibling-cycles"
+name = "No sibling modules import each other in a circle"
+type = "acyclic_siblings"
+ancestors = [
+    "base", "base.tenancy", "base.services", "base.queries", "control", "control.services", "control.queries",
+    "apps.*", "apps.*.services", "apps.*.queries",
+]
+depth = 0
+ignore_imports = [
+    "**.tests.** -> **",
+    "apps.flow.recipes -> apps.flow.queries",
+    "apps.verifactu.queries -> apps.verifactu.apps",
+    "base.activation -> base.queries",
+    "base.activation -> base.services",
+    "base.activation -> base.services.provisioning",
+    "base.activation -> base.tenancy.context",
+    "base.api_keys -> base.services",
+    "base.approvals -> base.operations",
+    "base.business -> base.tenancy.context",
+    "base.entitlement -> base.tenancy.context",
+    "base.images -> base.queries.catalog_images",
+    "base.images -> base.queries.files",
+    "base.meter -> base.services",
+    "base.operations -> base.services",
+    "base.permissions -> base.tenancy.context",
+    "base.registry -> base.tenancy.context",
+    "base.relay -> base.services.relay_runs",
+    "base.services -> base.middleware",
+    "base.services.sessions -> base.middleware",
+    "base.tenancy.context -> base.tenancy.connections",
+    "base.tenancy.cut -> base.services.photo",
+    "base.tenancy.cut -> base.services.provisioning",
+    "base.tenancy.dumps -> base.services",
+    "base.tenancy.move -> base.services",
+    "base.tenancy.offboarding -> base.services",
+    "base.tenancy.offboarding -> base.services.provisioning",
+    "base.tenancy.provision -> base.services.demos",
+    "base.tenancy.provision -> base.services.hub_registry",
+    "base.tenancy.provision -> base.services.photo",
+    "base.tenancy.provision -> base.services.provisioning",
+    "base.tenancy.recovery -> base.services.provisioning",
+    "base.tenancy.restore -> base.services",
+    "base.tenancy.restore -> base.services.provisioning",
+    "base.usage -> base.services",
+]
+
+[[tool.importlinter.contracts]]
+id = "app-appointment"
+name = "apps.appointment imports only itself, base, live and the apps it requires"
+type = "forbidden"
+source_modules = ["apps.appointment"]
+forbidden_modules = [
+    "apps.attendance", "apps.cart_checkout", "apps.cash_register", "apps.combo", "apps.demo", "apps.flow",
+    "apps.inventory", "apps.invoice", "apps.kitchen", "apps.modifier", "apps.online_booking", "apps.payment",
+    "apps.pricing", "apps.printing", "apps.reservation", "apps.sale", "apps.table", "apps.task", "apps.tax",
+    "apps.verifactu", "apps.website", "apps.whatsapp_inbox", "config", "control", "shared",
+]
+allow_indirect_imports = true
+ignore_imports = ["**.tests.** -> **"]
+
+[[tool.importlinter.contracts]]
+id = "app-attendance"
+name = "apps.attendance imports only itself, base, live and the apps it requires"
+type = "forbidden"
+source_modules = ["apps.attendance"]
+forbidden_modules = [
+    "apps.appointment", "apps.cart_checkout", "apps.cash_register", "apps.combo", "apps.customer", "apps.demo",
+    "apps.flow", "apps.inventory", "apps.invoice", "apps.kitchen", "apps.modifier", "apps.online_booking",
+    "apps.payment", "apps.pricing", "apps.printing", "apps.reservation", "apps.sale", "apps.schedule", "apps.service",
+    "apps.table", "apps.task", "apps.tax", "apps.verifactu", "apps.website", "apps.whatsapp_inbox", "config",
+    "control", "shared",
+]
+allow_indirect_imports = true
+ignore_imports = ["**.tests.** -> **"]
+
+[[tool.importlinter.contracts]]
+id = "app-cart_checkout"
+name = "apps.cart_checkout imports only itself, base, live and the apps it requires"
+type = "forbidden"
+source_modules = ["apps.cart_checkout"]
+forbidden_modules = [
+    "apps.appointment", "apps.attendance", "apps.cash_register", "apps.combo", "apps.customer", "apps.demo",
+    "apps.flow", "apps.inventory", "apps.invoice", "apps.kitchen", "apps.modifier", "apps.online_booking",
+    "apps.payment", "apps.pricing", "apps.printing", "apps.reservation", "apps.sale", "apps.schedule", "apps.service",
+    "apps.staff", "apps.table", "apps.task", "apps.tax", "apps.verifactu", "apps.website", "apps.whatsapp_inbox",
+    "config", "control", "shared",
+]
+allow_indirect_imports = true
+ignore_imports = ["**.tests.** -> **"]
+
+[[tool.importlinter.contracts]]
+id = "app-cash_register"
+name = "apps.cash_register imports only itself, base, live and the apps it requires"
+type = "forbidden"
+source_modules = ["apps.cash_register"]
+forbidden_modules = [
+    "apps.appointment", "apps.attendance", "apps.cart_checkout", "apps.combo", "apps.customer", "apps.demo",
+    "apps.flow", "apps.inventory", "apps.invoice", "apps.kitchen", "apps.modifier", "apps.online_booking",
+    "apps.payment", "apps.pricing", "apps.printing", "apps.reservation", "apps.schedule", "apps.service", "apps.staff",
+    "apps.table", "apps.task", "apps.tax", "apps.verifactu", "apps.website", "apps.whatsapp_inbox", "config",
+    "control", "shared",
+]
+allow_indirect_imports = true
+ignore_imports = ["**.tests.** -> **"]
+
+[[tool.importlinter.contracts]]
+id = "app-combo"
+name = "apps.combo imports only itself, base, live and the apps it requires"
+type = "forbidden"
+source_modules = ["apps.combo"]
+forbidden_modules = [
+    "apps.appointment", "apps.attendance", "apps.cart_checkout", "apps.cash_register", "apps.customer", "apps.demo",
+    "apps.flow", "apps.invoice", "apps.kitchen", "apps.modifier", "apps.online_booking", "apps.payment",
+    "apps.pricing", "apps.printing", "apps.reservation", "apps.sale", "apps.schedule", "apps.service", "apps.staff",
+    "apps.table", "apps.task", "apps.verifactu", "apps.website", "apps.whatsapp_inbox", "config", "control", "shared",
+]
+allow_indirect_imports = true
+ignore_imports = ["**.tests.** -> **"]
+
+[[tool.importlinter.contracts]]
+id = "app-customer"
+name = "apps.customer imports only itself, base, live and the apps it requires"
+type = "forbidden"
+source_modules = ["apps.customer"]
+forbidden_modules = [
+    "apps.appointment", "apps.attendance", "apps.cart_checkout", "apps.cash_register", "apps.combo", "apps.demo",
+    "apps.flow", "apps.inventory", "apps.invoice", "apps.kitchen", "apps.modifier", "apps.online_booking",
+    "apps.payment", "apps.pricing", "apps.printing", "apps.reservation", "apps.sale", "apps.schedule", "apps.service",
+    "apps.staff", "apps.table", "apps.task", "apps.tax", "apps.verifactu", "apps.website", "apps.whatsapp_inbox",
+    "config", "control", "shared",
+]
+allow_indirect_imports = true
+ignore_imports = ["**.tests.** -> **"]
+
+[[tool.importlinter.contracts]]
+id = "app-demo"
+name = "apps.demo imports only itself, base, live and the apps it requires"
+type = "forbidden"
+source_modules = ["apps.demo"]
+forbidden_modules = [
+    "apps.appointment", "apps.attendance", "apps.cart_checkout", "apps.cash_register", "apps.combo", "apps.customer",
+    "apps.flow", "apps.inventory", "apps.invoice", "apps.kitchen", "apps.modifier", "apps.online_booking",
+    "apps.payment", "apps.pricing", "apps.printing", "apps.reservation", "apps.sale", "apps.schedule", "apps.service",
+    "apps.staff", "apps.table", "apps.task", "apps.tax", "apps.verifactu", "apps.website", "apps.whatsapp_inbox",
+    "config", "control", "shared",
+]
+allow_indirect_imports = true
+ignore_imports = ["**.tests.** -> **"]
+
+[[tool.importlinter.contracts]]
+id = "app-flow"
+name = "apps.flow imports only itself, base, live and the apps it requires"
+type = "forbidden"
+source_modules = ["apps.flow"]
+forbidden_modules = [
+    "apps.appointment", "apps.attendance", "apps.cart_checkout", "apps.cash_register", "apps.combo", "apps.customer",
+    "apps.demo", "apps.inventory", "apps.invoice", "apps.kitchen", "apps.modifier", "apps.online_booking",
+    "apps.payment", "apps.pricing", "apps.printing", "apps.reservation", "apps.sale", "apps.schedule", "apps.service",
+    "apps.staff", "apps.table", "apps.task", "apps.tax", "apps.verifactu", "apps.website", "apps.whatsapp_inbox",
+    "config", "control", "shared",
+]
+allow_indirect_imports = true
+ignore_imports = ["**.tests.** -> **"]
+
+[[tool.importlinter.contracts]]
+id = "app-inventory"
+name = "apps.inventory imports only itself, base, live and the apps it requires"
+type = "forbidden"
+source_modules = ["apps.inventory"]
+forbidden_modules = [
+    "apps.appointment", "apps.attendance", "apps.cart_checkout", "apps.cash_register", "apps.combo", "apps.customer",
+    "apps.demo", "apps.flow", "apps.invoice", "apps.kitchen", "apps.modifier", "apps.online_booking", "apps.payment",
+    "apps.pricing", "apps.printing", "apps.reservation", "apps.sale", "apps.schedule", "apps.service", "apps.staff",
+    "apps.table", "apps.task", "apps.verifactu", "apps.website", "apps.whatsapp_inbox", "config", "control", "shared",
+]
+allow_indirect_imports = true
+ignore_imports = ["**.tests.** -> **"]
+
+[[tool.importlinter.contracts]]
+id = "app-invoice"
+name = "apps.invoice imports only itself, base, live and the apps it requires"
+type = "forbidden"
+source_modules = ["apps.invoice"]
+forbidden_modules = [
+    "apps.appointment", "apps.attendance", "apps.cart_checkout", "apps.cash_register", "apps.combo", "apps.demo",
+    "apps.flow", "apps.inventory", "apps.kitchen", "apps.modifier", "apps.online_booking", "apps.payment",
+    "apps.pricing", "apps.printing", "apps.reservation", "apps.schedule", "apps.service", "apps.staff", "apps.table",
+    "apps.task", "apps.verifactu", "apps.website", "apps.whatsapp_inbox", "config", "control", "shared",
+]
+allow_indirect_imports = true
+ignore_imports = ["**.tests.** -> **"]
+
+[[tool.importlinter.contracts]]
+id = "app-kitchen"
+name = "apps.kitchen imports only itself, base, live and the apps it requires"
+type = "forbidden"
+source_modules = ["apps.kitchen"]
+forbidden_modules = [
+    "apps.appointment", "apps.attendance", "apps.cart_checkout", "apps.cash_register", "apps.combo", "apps.customer",
+    "apps.demo", "apps.flow", "apps.invoice", "apps.modifier", "apps.online_booking", "apps.payment", "apps.pricing",
+    "apps.printing", "apps.reservation", "apps.schedule", "apps.service", "apps.staff", "apps.table", "apps.task",
+    "apps.tax", "apps.verifactu", "apps.website", "apps.whatsapp_inbox", "config", "control", "shared",
+]
+allow_indirect_imports = true
+ignore_imports = ["**.tests.** -> **"]
+
+[[tool.importlinter.contracts]]
+id = "app-modifier"
+name = "apps.modifier imports only itself, base, live and the apps it requires"
+type = "forbidden"
+source_modules = ["apps.modifier"]
+forbidden_modules = [
+    "apps.appointment", "apps.attendance", "apps.cart_checkout", "apps.cash_register", "apps.combo", "apps.customer",
+    "apps.demo", "apps.flow", "apps.invoice", "apps.kitchen", "apps.online_booking", "apps.payment", "apps.pricing",
+    "apps.printing", "apps.reservation", "apps.sale", "apps.schedule", "apps.service", "apps.staff", "apps.table",
+    "apps.task", "apps.verifactu", "apps.website", "apps.whatsapp_inbox", "config", "control", "shared",
+]
+allow_indirect_imports = true
+ignore_imports = ["**.tests.** -> **"]
+
+[[tool.importlinter.contracts]]
+id = "app-online_booking"
+name = "apps.online_booking imports only itself, base, live and the apps it requires"
+type = "forbidden"
+source_modules = ["apps.online_booking"]
+forbidden_modules = [
+    "apps.attendance", "apps.cart_checkout", "apps.cash_register", "apps.combo", "apps.demo", "apps.flow",
+    "apps.inventory", "apps.invoice", "apps.kitchen", "apps.modifier", "apps.payment", "apps.pricing", "apps.printing",
+    "apps.reservation", "apps.sale", "apps.schedule", "apps.table", "apps.task", "apps.tax", "apps.verifactu",
+    "apps.website", "apps.whatsapp_inbox", "config", "control", "shared",
+]
+allow_indirect_imports = true
+ignore_imports = ["**.tests.** -> **"]
+
+[[tool.importlinter.contracts]]
+id = "app-payment"
+name = "apps.payment imports only itself, base, live and the apps it requires"
+type = "forbidden"
+source_modules = ["apps.payment"]
+forbidden_modules = [
+    "apps.appointment", "apps.attendance", "apps.cart_checkout", "apps.cash_register", "apps.combo", "apps.customer",
+    "apps.demo", "apps.flow", "apps.inventory", "apps.invoice", "apps.kitchen", "apps.modifier", "apps.online_booking",
+    "apps.pricing", "apps.printing", "apps.reservation", "apps.sale", "apps.schedule", "apps.service", "apps.staff",
+    "apps.table", "apps.task", "apps.tax", "apps.verifactu", "apps.website", "apps.whatsapp_inbox", "config",
+    "control", "shared",
+]
+allow_indirect_imports = true
+ignore_imports = ["**.tests.** -> **"]
+
+[[tool.importlinter.contracts]]
+id = "app-pricing"
+name = "apps.pricing imports only itself, base, live and the apps it requires"
+type = "forbidden"
+source_modules = ["apps.pricing"]
+forbidden_modules = [
+    "apps.appointment", "apps.attendance", "apps.cart_checkout", "apps.cash_register", "apps.combo", "apps.demo",
+    "apps.flow", "apps.invoice", "apps.kitchen", "apps.modifier", "apps.online_booking", "apps.payment",
+    "apps.printing", "apps.reservation", "apps.sale", "apps.schedule", "apps.service", "apps.staff", "apps.table",
+    "apps.task", "apps.tax", "apps.verifactu", "apps.website", "apps.whatsapp_inbox", "config", "control", "shared",
+]
+allow_indirect_imports = true
+ignore_imports = ["**.tests.** -> **"]
+
+[[tool.importlinter.contracts]]
+id = "app-printing"
+name = "apps.printing imports only itself, base, live and the apps it requires"
+type = "forbidden"
+source_modules = ["apps.printing"]
+forbidden_modules = [
+    "apps.appointment", "apps.attendance", "apps.cart_checkout", "apps.cash_register", "apps.combo", "apps.customer",
+    "apps.demo", "apps.flow", "apps.inventory", "apps.invoice", "apps.kitchen", "apps.modifier", "apps.online_booking",
+    "apps.payment", "apps.pricing", "apps.reservation", "apps.sale", "apps.schedule", "apps.service", "apps.staff",
+    "apps.table", "apps.task", "apps.tax", "apps.verifactu", "apps.website", "apps.whatsapp_inbox", "config",
+    "control", "shared",
+]
+allow_indirect_imports = true
+ignore_imports = ["**.tests.** -> **"]
+
+[[tool.importlinter.contracts]]
+id = "app-reservation"
+name = "apps.reservation imports only itself, base, live and the apps it requires"
+type = "forbidden"
+source_modules = ["apps.reservation"]
+forbidden_modules = [
+    "apps.appointment", "apps.attendance", "apps.cart_checkout", "apps.cash_register", "apps.combo", "apps.demo",
+    "apps.flow", "apps.inventory", "apps.invoice", "apps.kitchen", "apps.modifier", "apps.online_booking",
+    "apps.payment", "apps.pricing", "apps.printing", "apps.sale", "apps.service", "apps.staff", "apps.task",
+    "apps.tax", "apps.verifactu", "apps.website", "apps.whatsapp_inbox", "config", "control", "shared",
+]
+allow_indirect_imports = true
+ignore_imports = ["**.tests.** -> **"]
+
+[[tool.importlinter.contracts]]
+id = "app-sale"
+name = "apps.sale imports only itself, base, live and the apps it requires"
+type = "forbidden"
+source_modules = ["apps.sale"]
+forbidden_modules = [
+    "apps.appointment", "apps.attendance", "apps.cart_checkout", "apps.cash_register", "apps.combo", "apps.demo",
+    "apps.flow", "apps.inventory", "apps.invoice", "apps.kitchen", "apps.modifier", "apps.online_booking",
+    "apps.payment", "apps.pricing", "apps.printing", "apps.reservation", "apps.schedule", "apps.service", "apps.staff",
+    "apps.table", "apps.task", "apps.verifactu", "apps.website", "apps.whatsapp_inbox", "config", "control", "shared",
+]
+allow_indirect_imports = true
+ignore_imports = ["**.tests.** -> **"]
+
+[[tool.importlinter.contracts]]
+id = "app-schedule"
+name = "apps.schedule imports only itself, base, live and the apps it requires"
+type = "forbidden"
+source_modules = ["apps.schedule"]
+forbidden_modules = [
+    "apps.appointment", "apps.attendance", "apps.cart_checkout", "apps.cash_register", "apps.combo", "apps.customer",
+    "apps.demo", "apps.flow", "apps.inventory", "apps.invoice", "apps.kitchen", "apps.modifier", "apps.online_booking",
+    "apps.payment", "apps.pricing", "apps.printing", "apps.reservation", "apps.sale", "apps.service", "apps.staff",
+    "apps.table", "apps.task", "apps.tax", "apps.verifactu", "apps.website", "apps.whatsapp_inbox", "config",
+    "control", "shared",
+]
+allow_indirect_imports = true
+ignore_imports = ["**.tests.** -> **"]
+
+[[tool.importlinter.contracts]]
+id = "app-service"
+name = "apps.service imports only itself, base, live and the apps it requires"
+type = "forbidden"
+source_modules = ["apps.service"]
+forbidden_modules = [
+    "apps.appointment", "apps.attendance", "apps.cart_checkout", "apps.cash_register", "apps.combo", "apps.demo",
+    "apps.flow", "apps.inventory", "apps.invoice", "apps.kitchen", "apps.modifier", "apps.online_booking",
+    "apps.payment", "apps.pricing", "apps.printing", "apps.reservation", "apps.sale", "apps.schedule", "apps.table",
+    "apps.task", "apps.verifactu", "apps.website", "apps.whatsapp_inbox", "config", "control", "shared",
+]
+allow_indirect_imports = true
+ignore_imports = ["**.tests.** -> **"]
+
+[[tool.importlinter.contracts]]
+id = "app-staff"
+name = "apps.staff imports only itself, base, live and the apps it requires"
+type = "forbidden"
+source_modules = ["apps.staff"]
+forbidden_modules = [
+    "apps.appointment", "apps.attendance", "apps.cart_checkout", "apps.cash_register", "apps.combo", "apps.customer",
+    "apps.demo", "apps.flow", "apps.inventory", "apps.invoice", "apps.kitchen", "apps.modifier", "apps.online_booking",
+    "apps.payment", "apps.pricing", "apps.printing", "apps.reservation", "apps.sale", "apps.schedule", "apps.service",
+    "apps.table", "apps.task", "apps.tax", "apps.verifactu", "apps.website", "apps.whatsapp_inbox", "config",
+    "control", "shared",
+]
+allow_indirect_imports = true
+ignore_imports = ["**.tests.** -> **"]
+
+[[tool.importlinter.contracts]]
+id = "app-table"
+name = "apps.table imports only itself, base, live and the apps it requires"
+type = "forbidden"
+source_modules = ["apps.table"]
+forbidden_modules = [
+    "apps.appointment", "apps.attendance", "apps.cart_checkout", "apps.cash_register", "apps.combo", "apps.demo",
+    "apps.flow", "apps.inventory", "apps.invoice", "apps.kitchen", "apps.modifier", "apps.online_booking",
+    "apps.payment", "apps.pricing", "apps.printing", "apps.reservation", "apps.schedule", "apps.service", "apps.staff",
+    "apps.task", "apps.tax", "apps.verifactu", "apps.website", "apps.whatsapp_inbox", "config", "control", "shared",
+]
+allow_indirect_imports = true
+ignore_imports = ["**.tests.** -> **"]
+
+[[tool.importlinter.contracts]]
+id = "app-task"
+name = "apps.task imports only itself, base, live and the apps it requires"
+type = "forbidden"
+source_modules = ["apps.task"]
+forbidden_modules = [
+    "apps.appointment", "apps.attendance", "apps.cart_checkout", "apps.cash_register", "apps.combo", "apps.customer",
+    "apps.demo", "apps.flow", "apps.inventory", "apps.invoice", "apps.kitchen", "apps.modifier", "apps.online_booking",
+    "apps.payment", "apps.pricing", "apps.printing", "apps.reservation", "apps.sale", "apps.schedule", "apps.service",
+    "apps.table", "apps.tax", "apps.verifactu", "apps.website", "apps.whatsapp_inbox", "config", "control", "shared",
+]
+allow_indirect_imports = true
+ignore_imports = ["**.tests.** -> **"]
+
+[[tool.importlinter.contracts]]
+id = "app-tax"
+name = "apps.tax imports only itself, base, live and the apps it requires"
+type = "forbidden"
+source_modules = ["apps.tax"]
+forbidden_modules = [
+    "apps.appointment", "apps.attendance", "apps.cart_checkout", "apps.cash_register", "apps.combo", "apps.customer",
+    "apps.demo", "apps.flow", "apps.inventory", "apps.invoice", "apps.kitchen", "apps.modifier", "apps.online_booking",
+    "apps.payment", "apps.pricing", "apps.printing", "apps.reservation", "apps.sale", "apps.schedule", "apps.service",
+    "apps.staff", "apps.table", "apps.task", "apps.verifactu", "apps.website", "apps.whatsapp_inbox", "config",
+    "control", "shared",
+]
+allow_indirect_imports = true
+ignore_imports = ["**.tests.** -> **"]
+
+[[tool.importlinter.contracts]]
+id = "app-verifactu"
+name = "apps.verifactu imports only itself, base, live and the apps it requires"
+type = "forbidden"
+source_modules = ["apps.verifactu"]
+forbidden_modules = [
+    "apps.appointment", "apps.attendance", "apps.cart_checkout", "apps.cash_register", "apps.combo", "apps.customer",
+    "apps.demo", "apps.flow", "apps.inventory", "apps.kitchen", "apps.modifier", "apps.online_booking", "apps.payment",
+    "apps.pricing", "apps.printing", "apps.reservation", "apps.sale", "apps.schedule", "apps.service", "apps.staff",
+    "apps.table", "apps.task", "apps.tax", "apps.website", "apps.whatsapp_inbox", "config", "control", "shared",
+]
+allow_indirect_imports = true
+ignore_imports = ["**.tests.** -> **"]
+
+[[tool.importlinter.contracts]]
+id = "app-website"
+name = "apps.website imports only itself, base, live and the apps it requires"
+type = "forbidden"
+source_modules = ["apps.website"]
+forbidden_modules = [
+    "apps.appointment", "apps.attendance", "apps.cart_checkout", "apps.cash_register", "apps.combo", "apps.customer",
+    "apps.demo", "apps.flow", "apps.inventory", "apps.invoice", "apps.kitchen", "apps.modifier", "apps.online_booking",
+    "apps.payment", "apps.pricing", "apps.printing", "apps.reservation", "apps.sale", "apps.schedule", "apps.service",
+    "apps.staff", "apps.table", "apps.task", "apps.tax", "apps.verifactu", "apps.whatsapp_inbox", "config", "control",
+    "shared",
+]
+allow_indirect_imports = true
+ignore_imports = ["**.tests.** -> **"]
+
+[[tool.importlinter.contracts]]
+id = "app-whatsapp_inbox"
+name = "apps.whatsapp_inbox imports only itself, base, live and the apps it requires"
+type = "forbidden"
+source_modules = ["apps.whatsapp_inbox"]
+forbidden_modules = [
+    "apps.appointment", "apps.attendance", "apps.cart_checkout", "apps.cash_register", "apps.combo", "apps.demo",
+    "apps.flow", "apps.inventory", "apps.invoice", "apps.kitchen", "apps.modifier", "apps.online_booking",
+    "apps.payment", "apps.pricing", "apps.printing", "apps.reservation", "apps.sale", "apps.schedule", "apps.service",
+    "apps.staff", "apps.table", "apps.task", "apps.tax", "apps.verifactu", "apps.website", "config", "control",
+    "shared",
+]
+allow_indirect_imports = true
+ignore_imports = ["**.tests.** -> **"]
 
 [tool.uv]
 package = false

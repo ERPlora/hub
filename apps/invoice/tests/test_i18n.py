@@ -4,11 +4,10 @@ import json
 import re
 from pathlib import Path
 
-import pytest
 from django.apps import apps
 from django.core.validators import RegexValidator
 from django.utils import translation
-from live.operations import get, registry
+from live.operations import get
 
 from apps.invoice import platform, queries, schemas, services
 from apps.invoice.models import (
@@ -19,7 +18,7 @@ from apps.invoice.models import (
     InvoiceType,
     Issuer,
 )
-from apps.invoice.tests.conftest import ctx_for, run
+from apps.invoice.tests.conftest import A, HUB_DB, ctx_for, run
 from base import assistant
 from base.tests.po import (
     catalogue_key,
@@ -94,9 +93,9 @@ def test_spanish_texts():
         assert str(queries.DOC_SIMPLIFIED) == "Factura simplificada"
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_an_error_message_follows_the_language_of_the_request(client, make_user):
-    client.force_login(make_user("boss", host="a", role="hub_admin"))
+    client.force_login(make_user("boss", host=A.key, role="hub_admin"))
     response = client.post(
         "/api/invoice/invoices",
         json.dumps(
@@ -112,7 +111,7 @@ def test_an_error_message_follows_the_language_of_the_request(client, make_user)
             }
         ),
         content_type="application/json",
-        HTTP_HOST="a.localhost",
+        HTTP_HOST=f"{A.key}.localhost",
         HTTP_ACCEPT_LANGUAGE="es",
     )
     assert response.status_code == 409
@@ -155,7 +154,7 @@ def test_the_card_says_a_series_active_and_the_issuer_s_tax_id_and_address_as_th
     def card(name: str) -> dict[str, str]:
         op = get(name)
         arguments = dict.fromkeys(op.input.model_json_schema()["properties"], "x")
-        return {field["name"]: field["label"] for field in assistant.card(op, arguments, "es")["fields"]}
+        return {field["name"]: field["label"] for field in assistant.cards.card(op, arguments, "es")["fields"]}
 
     for name in ("invoice.series.create", "invoice.series.update"):
         assert card(name)["is_active"] == SCREENS["series"]["form"]["active"] == "Activa", name
@@ -167,7 +166,7 @@ def test_the_card_says_a_series_active_and_the_issuer_s_tax_id_and_address_as_th
         ) == ("NIF", "Domicilio"), name
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_printed_breakdown_says_exempt_and_not_subject_as_the_invoice_screen_does(issuer):
     """The A4 paper's breakdown (INVOICE-F18) in Spanish: an exempt line «Exento» and one not subject «No sujeto», as
     the invoice's screen says them, never taxes' «Exenta» and «No sujeta»."""

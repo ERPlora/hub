@@ -19,11 +19,11 @@ from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
 from live.context import system_context
 
-from base import services
-from base.queries import hubs_by_slugs
+from base.services import hub_registry, provisioning
+from base.queries.hubs import hubs_by_slugs
 from base.registry import REGISTRY_SCOPE
 from base.schemas import HubsBySlugIn, HubSeedLocalIn
-from base.services import hub_seed_local
+from base.services.hub_registry import hub_seed_local
 from base.tenancy import migrator, provision
 
 
@@ -70,10 +70,10 @@ class Command(BaseCommand):
         answer = hub_seed_local(ctx, HubSeedLocalIn(slugs=list(LOCAL_HUBS)))
         for seeded in answer.hubs:
             said = OUTCOMES[seeded.outcome]
-            hub = services.registry_row_by_slug(seeded.slug)
+            hub = provisioning.registry_row_by_slug(seeded.slug)
             if hub.db_name and hub.status != hub.Status.READY:
-                if not provision.provision(hub, apps=every_app, seed=services.turn_every_app_on, tell_saas=False):
-                    failed = services.registry_row_by_slug(seeded.slug)
+                if not provision.provision(hub, apps=every_app, seed=hub_registry.turn_every_app_on, tell_saas=False):
+                    failed = provisioning.registry_row_by_slug(seeded.slug)
                     raise CommandError(
                         f"{seeded.slug}: its own database could not be made ({failed.status}: "
                         f"{failed.last_error or 'held by another process'}). Run `manage.py migrate_hubs` "

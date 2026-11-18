@@ -1,6 +1,7 @@
 """The demo app: the reference every app of the Hub copies."""
 
 from django.utils.translation import gettext_lazy as _
+from django.utils.translation import ngettext_lazy
 from live.meta import BellCounter, Category, LiveAppConfig, Nav, SetupCheck, SetupStep, Widget
 
 from apps.demo.events import ITEM_CREATED, ITEM_DELETED, ITEM_UPDATED
@@ -26,6 +27,11 @@ class DemoConfig(LiveAppConfig):
     # The technical reference, not sold (its WORKBOOK): registered, but kept out of the public store.
     listed = False
     default_auto_field = "django.db.models.BigAutoField"
+    # What these words mean to the Hub's assistant (base.assistant.relevance.synonyms). An «elemento», as the screens name one, is
+    # an item (demo.item).
+    assistant_synonyms = (
+        ("elemento", "elementos", "item", "items"),
+    )
     permissions = ["demo.view", "demo.manage"]
     # Keys are the customer roles as the SaaS sends them (``hub_`` prefix included).
     role_permissions = {
@@ -81,5 +87,9 @@ class DemoConfig(LiveAppConfig):
             icon="ion:flask-outline",
             permission="demo.view",
             refresh_on=[ITEM_CREATED, ITEM_UPDATED, ITEM_DELETED],
+            severity="info",
+            title=ngettext_lazy("%(count)d open demo item", "%(count)d open demo items", "count"),
+            body=_("An open item stays on the list until it is marked done."),
+            action_label=_("See the items"),
         )
     ]

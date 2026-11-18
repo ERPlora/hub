@@ -222,6 +222,7 @@
       "loadError": "No se pudo cargar la actividad",
       "more": "Ver más",
       "by": "por {name}",
+      "byPlatform": "Lo hizo la plataforma",
       "kinds": {
         "note_added": "Nota añadida",
         "purchase_recorded": "Compra registrada",

@@ -16,7 +16,7 @@ from apps.cash_register.models import (
     Settings,
 )
 
-from .conftest import open_session
+from .conftest import HUB_DB, open_session
 
 MODELS = [Settings, Register, Session, SessionCounter, Movement, Count]
 DATES = ("created_at", "updated_at", "opened_at", "closed_at", "counted_at")
@@ -40,6 +40,7 @@ def test_every_model_is_registered():
         assert model in admin.site._registry, model.__name__
 
 
+@HUB_DB
 def test_full_crud_for_the_staff(superuser):
     request = request_by(superuser)
     for model in MODELS:
@@ -59,13 +60,12 @@ def test_ids_and_dates_are_read_only():
                 assert field in readonly, (model.__name__, field)
 
 
-@pytest.mark.django_db
-def test_the_sessions_list_in_spanish_says_open_as_the_cash_register_does(client, superuser):
+@HUB_DB
+def test_the_sessions_list_in_spanish_says_open_as_the_cash_register_does(hub_staff):
     """An open session reads «Abierta», as Caja's own screens and WORKBOOK say it, next to the «Cerrada» of its
     filter; not «Abierto», demo's Spanish of the same English (hub#660)."""
     open_session()
-    client.force_login(superuser)
-    response = client.get(
+    response = hub_staff.get(
         "/admin/cash_register/session/", HTTP_HOST="hubs.localhost", HTTP_ACCEPT_LANGUAGE="es"
     )
     assert response.status_code == 200

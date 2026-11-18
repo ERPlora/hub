@@ -21,6 +21,7 @@ import { computed, onBeforeUnmount, ref } from 'vue';
 import { useBaseI18n } from '../lib/i18n';
 import { useUnsavedFormOnOpen } from '../lib/unsaved-changes';
 import type { ApiKeyInput, ApiKeyMode, ApiKeyRow, ApiKind } from '../operations';
+import FieldGroup from './FieldGroup.vue';
 
 const MODES: readonly ApiKeyMode[] = ['full', 'read', 'write', 'per_app'];
 const KINDS: readonly ApiKind[] = ['read', 'write'];
@@ -304,7 +305,7 @@ async function confirmRevoke(): Promise<void> {
           :max="10000"
           @ion-input="rateText = String($event.detail.value ?? '')"
         />
-        <fieldset class="api-key-modes">
+        <FieldGroup class="api-key-modes">
           <legend>{{ t('base.apiKeys.form.mode') }}</legend>
           <div
             role="radiogroup"
@@ -327,7 +328,7 @@ async function confirmRevoke(): Promise<void> {
           <p class="api-keys-hint">
             {{ form.mode === 'per_app' ? t('base.apiKeys.form.perAppHint') : t('base.apiKeys.form.generalHint') }}
           </p>
-        </fieldset>
+        </FieldGroup>
         <div
           v-if="form.mode === 'per_app'"
           class="api-key-apps"
@@ -483,10 +484,13 @@ async function confirmRevoke(): Promise<void> {
 
 .api-keys-intro,
 .api-keys-hint {
-  flex: 1 1 20rem;
   margin: 0;
   color: var(--ion-color-medium-shade, #555);
   font-size: 0.875rem;
+}
+
+.api-keys-intro {
+  flex: 1 1 20rem;
 }
 
 .api-keys-error {
@@ -505,9 +509,6 @@ async function confirmRevoke(): Promise<void> {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  margin: 0;
-  padding: 0;
-  border: 0;
 }
 
 .api-key-modes legend {

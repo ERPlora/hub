@@ -12,6 +12,7 @@ from live.context import system_context
 from apps.table import events
 
 from .conftest import (
+    HUB_DB,
     A,
     add_line,
     charge,
@@ -22,7 +23,7 @@ from .conftest import (
     run,
 )
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 EMPLOYEE = "hub_employee"
 

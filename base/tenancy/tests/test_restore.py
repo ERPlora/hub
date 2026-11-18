@@ -4,14 +4,16 @@
 a time, with the move's own steps (``base.tenancy.move``) and its origin and destination the other way round:
 
 1. the copy of the hub's database is dumped from the temporary cluster (a point-in-time restore of its own, closed to
-   new hubs); its host answers 503 «maintenance» already;
+   new hubs) to the dumps bucket as it is made, never to a file of the worker; its host answers 503 «maintenance»
+   already;
 2. its database is closed to the app (``CONNECT`` taken from the environment's ``hub_app`` and ``hub_admin``, their
    sessions ended), so nothing writes in it from here on;
 3. with nothing writing any more, each production VeriFactu record of it is compared with the copy's: one the copy
    lacks or has otherwise (made, sent, answered or changed after the moment) stops the restore, nothing changed;
 4. it is kept aside as ``<control>_old_<hex>`` (its own UUIDv7), noted in control first (``MovedCopy``);
-5. a new database of its name is made from its vertical's template on its own cluster, emptied and filled with the
-   copy's ``pg_restore``, its identity checked and its schema brought to the code's leaf (``ensure_schema``);
+5. a new database of its name is made from its vertical's template on its own cluster, emptied and filled with
+   ``pg_restore`` reading the copy from the bucket, its identity checked and its schema brought to the code's leaf
+   (``ensure_schema``);
 6. control ends the restore and dates the kept copy, in one transaction.
 
 Any failure before the end puts the hub's own database back, nothing lost: the new database dropped, the kept copy
@@ -20,27 +22,31 @@ worker is left to it. The kept copies are dropped after ``move.MOVED_COPY_DAYS``
 
 Real databases on the session's server: the temporary cluster's row points at the same server (CI has one), so the
 copy there has a name of its own (``run_due(source=…)``); in AWS it has the hub's, as a restore of the whole cluster
-keeps it.
+keeps it. The bucket is a real S3 server (moto's, ``s3.py``).
 """
 
 import datetime as dt
 import itertools
+import re
 import uuid
 
+import psycopg
 import pytest
+from django.db import connections as django_connections
 from django.utils import timezone
 from live.meta import all_live_app_configs
 from psycopg import sql
 from psycopg.types.json import Jsonb
 
 from apps.sale.apps import SaleConfig
-from base import services
-from base.tenancy import identity, move, names, restore
+from base.services import provisioning
+from base.tenancy import dumps, identity, move, names, restore
 from base.tenancy import connections as tenancy_connections
 from base.tenancy.context import use_control
-from base.tenancy.tests import hubs
+from base.tenancy.tests import hubs, s3
+from base.tenancy.tests.s3 import aws_test_credentials, dumps_bucket, moto_s3  # noqa: F401
 from control import services as control_services
-from control.models import Cluster, Hub, HubDue, MovedCopy
+from control.models import Cluster, Hub, HubDue, HubDump, MovedCopy
 
 pytestmark = pytest.mark.usefixtures("no_test_fallback")
 
@@ -167,7 +173,7 @@ class Restores(hubs.CopiedHubs):
 
 
 @pytest.fixture
-def restores(django_db_blocker, hub_databases):
+def restores(django_db_blocker, hub_databases, dumps_bucket):
     with django_db_blocker.unblock():
         made = Restores(hub_databases.template)
         yield made
@@ -298,14 +304,14 @@ class TestClosedToTheApp:
         hub = restores.hub(source=restores.cluster())
         hubs.grant_connect(app_role, hub.db_name)
         seen: list[tuple[bool, bool]] = []
-        real = move._restore
+        real = move._restore_from_bucket
 
-        def restoring(path, name, cluster, heartbeat, cancelled=None):
+        def restoring(key, name, cluster, heartbeat, cancelled=None):
             kept = control_services.pending_copy(hub.id).db_name
             seen.append((hubs.reaches(app_role, name), hubs.reaches(app_role, kept)))
-            return real(path, name, cluster, heartbeat, cancelled)
+            return real(key, name, cluster, heartbeat, cancelled)
 
-        monkeypatch.setattr(move, "_restore", restoring)
+        monkeypatch.setattr(move, "_restore_from_bucket", restoring)
 
         run(restores, roles=hubs.app_roles(app_role))
 
@@ -320,7 +326,7 @@ class TestClosedToTheApp:
         def broken(*args, **kwargs):
             raise move.MoveFailed("move_restore_failed", "the restore broke on purpose")
 
-        monkeypatch.setattr(move, "_restore", broken)
+        monkeypatch.setattr(move, "_restore_from_bucket", broken)
 
         run(restores, roles=hubs.app_roles(app_role))
 
@@ -348,8 +354,8 @@ class TestAFailurePutsItsOwnBack:
     @pytest.mark.parametrize(
         ("where", "step"),
         [
-            (move, "_dump"),
-            (move, "_restore"),
+            (move, "_dump_to_bucket"),
+            (move, "_restore_from_bucket"),
             (move, "_verify_identity"),
             (move, "_ensure_schema"),
             (restore, "_finish"),
@@ -388,7 +394,9 @@ class TestAFailurePutsItsOwnBack:
         assert hub.restoring_from_id is None and hub.last_error.startswith("restore_identity_mismatch")
         assert marker(hub.db_name) == [AS_THEN, SINCE] and says_it_is(hub.db_name) == [hub.id]
 
-    def test_a_copy_missing_on_the_temporary_cluster_ends_it_with_why_its_own_untouched(self, restores):
+    def test_a_copy_missing_on_the_temporary_cluster_ends_it_with_why_its_own_untouched(
+        self, restores, moto_s3, dumps_bucket
+    ):
         hub = restores.hub(source=restores.cluster())
         with hubs._maintenance() as conn:
             hubs._drop(conn, restores.copies[hub.id], tenancy_connections.control_name())
@@ -398,6 +406,8 @@ class TestAFailurePutsItsOwnBack:
         hub = fresh(hub)
         assert hub.restoring_from_id is None and hub.last_error.startswith("restore_dump_failed")
         assert marker(hub.db_name) == [AS_THEN, SINCE]
+        # The upload of a dump that failed is aborted: nothing of it is kept.
+        assert s3.nothing_kept(moto_s3, dumps_bucket)
 
     def test_its_own_database_missing_ends_it_with_why(self, restores):
         hub = restores.hub(source=restores.cluster())
@@ -554,9 +564,9 @@ class TestTwoWorkers:
         hub = restores.hub(source=source)
 
         def stolen(*args, **kwargs):
-            raise services.ProvisioningStopped("another worker holds it now")
+            raise provisioning.ProvisioningStopped("another worker holds it now")
 
-        monkeypatch.setattr(move, "_restore", stolen)
+        monkeypatch.setattr(move, "_restore_from_bucket", stolen)
 
         run(restores)
 
@@ -599,14 +609,14 @@ class TestTwoWorkers:
     def test_a_restore_another_worker_ended_meanwhile_is_never_touched_again(self, restores, monkeypatch, caplog):
         source = restores.cluster()
         hub = restores.hub(source=source)
-        real = move._dump
+        real = move._dump_to_bucket
 
-        def dump(copied, cluster, path, heartbeat, cancelled=None):
-            real(copied, cluster, path, heartbeat, cancelled)
+        def dump(*args, **kwargs):
+            real(*args, **kwargs)
             with use_control():
                 Hub.objects.filter(pk=hub.pk).update(restoring_from=None, restore_point=None)
 
-        monkeypatch.setattr(move, "_dump", dump)
+        monkeypatch.setattr(move, "_dump_to_bucket", dump)
 
         run(restores)
 
@@ -700,6 +710,119 @@ class TestResuming:
         assert hub.last_error == "restore_unexpected: RuntimeError: broke on purpose"
         assert marker(hub.db_name) == [AS_THEN, SINCE]
         assert not MovedCopy.objects.filter(hub=hub).exists()
+
+
+
+# ── The copy goes through the dumps bucket, never a file of the worker ──────────────────────────────────────────────
+
+#: S3's smallest part but the last: what makes a copy of a few MiB go up in several.
+SMALLEST_PART = 5 * 1024 * 1024
+
+
+class TestTheCopyGoesThroughTheBucket:
+    """The copy is dumped to the dumps bucket as it is made and ``pg_restore`` reads it from there, as a move's: the
+    worker's disk never holds it, so no size stops a restore. It is no copy of the business's to download (no
+    ``HubDump``)."""
+
+    def test_the_copy_is_under_the_hubs_own_key_and_never_in_a_file_of_the_worker(
+        self, restores, moto_s3, dumps_bucket, monkeypatch
+    ):
+        hub = restores.hub(source=restores.cluster())
+        started = s3.copy_programs(monkeypatch)
+
+        assert run(restores) == 1
+
+        hub = fresh(hub)
+        assert (hub.restoring_from_id, hub.last_error) == (None, "") and marker(hub.db_name) == [AS_THEN]
+        [key] = s3.objects(moto_s3, dumps_bucket)
+        assert re.fullmatch(rf"{hub.id.hex}/\d{{8}}T\d{{6}}Z-restore\.dump", key)
+        assert s3.body(moto_s3, dumps_bucket, key).startswith(b"PGDMP")
+        assert not HubDump.objects.exists()
+        assert s3.how_it_was_copied(started) == s3.THROUGH_THE_BUCKET
+
+    def test_a_business_larger_than_a_part_is_restored_whole(self, restores, monkeypatch):
+        monkeypatch.setattr(dumps, "STREAM_PART_BYTES", SMALLEST_PART)
+        hub = restores.hub(source=restores.cluster())
+        # 12 MiB that do not compress in the copy: it goes up in three parts and comes back in many reads.
+        fingerprint = "SELECT count(*), md5(string_agg(data, '' ORDER BY n)) FROM w8a_bulk"
+        with hubs._maintenance(restores.copies[hub.id]) as conn:
+            conn.execute("CREATE TABLE w8a_bulk (n int PRIMARY KEY, data bytea NOT NULL)")
+            conn.execute(
+                "INSERT INTO w8a_bulk SELECT n, decode(md5(n::text) || md5((n + 1)::text), 'hex') "
+                "FROM generate_series(1, 393216) AS n"
+            )
+            then = conn.execute(fingerprint).fetchone()
+
+        assert run(restores) == 1
+
+        hub = fresh(hub)
+        assert (hub.restoring_from_id, hub.last_error) == (None, "")
+        with hubs._maintenance(hub.db_name) as conn:
+            assert conn.execute(fingerprint).fetchone() == then
+        assert marker(hub.db_name) == [AS_THEN] and says_it_is(hub.db_name) == [hub.id]
+
+    @pytest.mark.parametrize("stops_in", ["the dump", "the restore"])
+    def test_a_worker_that_stops_while_it_copies_leaves_the_restore_to_the_next_one(
+        self, restores, moto_s3, dumps_bucket, monkeypatch, stops_in
+    ):
+        source = restores.cluster()
+        hub = restores.hub(source=source)
+        where, step = (dumps, "_pg_dump_command") if stops_in == "the dump" else (move, "_restore_command")
+
+        run(restores, cancelled=s3.stopping_as(monkeypatch, where, step))
+
+        # Not a failure: neither undone nor noted as failed.
+        stopped = fresh(hub)
+        assert (stopped.restoring_from_id, stopped.last_error) == (source.pk, "")
+        if stops_in == "the dump":
+            # Before the business was closed: half a copy is never kept, and nothing of the business moved.
+            assert s3.nothing_kept(moto_s3, dumps_bucket)
+            assert marker(hub.db_name) == [AS_THEN, SINCE] and not MovedCopy.objects.filter(hub=hub).exists()
+        else:
+            assert marker(kept_copy(stopped).db_name) == [AS_THEN, SINCE]
+
+        assert run(restores) == 1
+
+        hub = fresh(hub)
+        assert (hub.restoring_from_id, hub.last_error) == (None, "")
+        assert marker(hub.db_name) == [AS_THEN] and marker(kept_copy(hub).db_name) == [AS_THEN, SINCE]
+
+    def test_without_a_bucket_the_business_is_never_closed_and_keeps_its_data(self, restores, monkeypatch):
+        hub = restores.hub(source=restores.cluster())
+        monkeypatch.setenv("HUB_DUMPS_BUCKET", "")
+        default = django_connections.settings["default"]
+        # A session on its database before the pass: closing it would end it.
+        session = psycopg.connect(
+            dbname=hub.db_name,
+            user=default["USER"],
+            password=default["PASSWORD"],
+            host=default["HOST"],
+            port=default["PORT"],
+        )
+        try:
+            assert run(restores) == 1
+
+            hub = fresh(hub)
+            assert (hub.restoring_from_id, hub.status) == (None, "ready")
+            assert hub.last_error.startswith("restore_dump_failed:") and "HUB_DUMPS_BUCKET" in hub.last_error
+            assert session.execute("SELECT 1").fetchone() == (1,)
+        finally:
+            session.close()
+        assert marker(hub.db_name) == [AS_THEN, SINCE] and not MovedCopy.objects.filter(hub=hub).exists()
+
+    def test_a_copy_that_cannot_be_read_back_puts_its_own_back_with_its_data(
+        self, restores, moto_s3, dumps_bucket, monkeypatch
+    ):
+        hub = restores.hub(source=restores.cluster())
+        s3.lose_each_copy(monkeypatch, moto_s3, dumps_bucket)
+
+        assert run(restores) == 1
+
+        hub = fresh(hub)
+        assert (hub.restoring_from_id, hub.status) == (None, "ready")
+        assert hub.last_error.startswith("restore_restore_failed:")
+        assert "could not be read from the bucket" in hub.last_error
+        assert marker(hub.db_name) == [AS_THEN, SINCE] and not MovedCopy.objects.filter(hub=hub).exists()
 
 
 class TestTheKeptCopiesGoAfterTheirDays:

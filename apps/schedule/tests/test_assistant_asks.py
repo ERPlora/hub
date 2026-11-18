@@ -8,22 +8,21 @@ of the catalogue of a business with every app on and ranked as a turn ranks, is 
 copies a probe of layer 2.
 """
 
-import dataclasses
 import json
 from pathlib import Path
 
 import pytest
 from django.conf import settings
-from live import assistant as shared
-from live.context import OperationContext, Scope
-from live.operations import AI, Operation, registry
+from live.operations import AI, registry
 
 from base import assistant
 from base.models import Membership
-from base.permissions import permissions_for
-from base.tests.test_assistant_asks import TOP, comparable, probe_phrases
+from base.tests.test_assistant_asks import assert_offered_with_room, comparable, offered_place, place_of_no_ask
+from base.tests.test_assistant_asks import probe_phrases
+from base.tests.test_assistant_asks import english_coverage_test, english_words_test, own_words_test
 
-A = Scope("host", "a")
+from .conftest import HUB_DB, in_hubs
+
 #: What changes the business's opening hours (``schedule.add``, ``schedule.change``, ``schedule.delete``,
 #: ``schedule.manage_settings``): an employee reads the hours (``schedule.view``), never these.
 NOT_THE_EMPLOYEES = {
@@ -71,9 +70,6 @@ REPORTED = [
 #: the agenda of the professionals, never the business.
 TAKEN_FOR_A_BLOCK = [(name, phrase) for name, phrase in REPORTED if name != "schedule.hours.for_range"]
 
-#: How far down the tools a turn offers (``MAX_TOOLS``, 40) a probe of the QA may bring its tool: half of them, so the
-#: tools of the apps that say their asks later may climb past it before the model loses it.
-WITH_ROOM = 20
 #: Every probe of layer 2 of Schedules, the owner's real phrases of the QA: the five above and the ones the model got
 #: right.
 PROBES = json.loads(
@@ -104,37 +100,6 @@ OWN_WORDS = [
     ("schedule.settings.update", "quiero que el calendario arranque en domingo"),
 ]
 
-@pytest.fixture
-def catalog_of(make_user):
-    """The real catalogue of the assistant of a person with ``role`` in business ``a``, in ``language``."""
-
-    def of(role: str, language: str) -> dict[str, Operation]:
-        user = make_user(f"asker-{role}", host=A.key, role=role)
-        ctx = OperationContext(scope=A, actor=user.username, permissions=permissions_for(user, A), language=language)
-        return assistant.catalog(ctx)
-
-    return of
-
-
-def offered_place(tools: dict[str, Operation], name: str, phrase: str) -> int | None:
-    """The place a turn offers ``name`` at for ``phrase`` (1 is first), ``None`` when it is not offered at all."""
-    offered = [op.name for op in assistant.relevant(tools, [phrase], "es")]
-    return offered.index(name) + 1 if name in offered else None
-
-
-def place_of_no_ask(tools: dict[str, Operation], name: str, phrase: str) -> int | None:
-    """``offered_place`` of a tool the person holds for a ``phrase`` that is none of its asks in Spanish."""
-    assert name in tools  # positive control: the owner holds the tool, so its place is known
-    assert comparable(phrase) not in {comparable(ask) for ask in shared.asks_of(tools[name]).get("es", ())}
-    return offered_place(tools, name, phrase)
-
-
-def without_its_asks(tools: dict[str, Operation], name: str) -> dict[str, Operation]:
-    """``tools`` with ``name`` saying no asks: how a turn ranked it by its name and description alone."""
-    op = tools[name]
-    return {**tools, name: dataclasses.replace(op, ai={key: value for key, value in op.ai.items() if key != "asks"})}
-
-
 def test_schedules_is_listed_so_layer_1_sweeps_every_ask_of_it():
     """Schedules is in ``LIVE_ASSISTANT_ASKS_REQUIRED``: ``base/tests/test_assistant_asks.py`` ranks each of its asks
     for every role and language, and ``live.E020`` requires them of each of its tools."""
@@ -144,13 +109,13 @@ def test_schedules_is_listed_so_layer_1_sweeps_every_ask_of_it():
 def test_schedule_offers_its_sixteen_tools():
     """Schedules' tools are its sixteen operations (``AI``, never ``INTERNAL``; the two reads of the card of a write
     are not tools): a silent drop of a tool fails."""
-    tools = {name for name, op in registry.items() if op.app_label == "schedule" and assistant.is_tool(op)}
+    tools = {name for name, op in registry.items() if op.app_label == "schedule" and assistant.tools.is_tool(op)}
     assert all(isinstance(registry[name].ai_spec(), AI) for name in tools)
     assert tools == {name for name, _ in OWN_WORDS}
     assert len(tools) == 16
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation) and of the person's role
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation) and of the person's role
 def test_an_employee_is_never_offered_a_change_of_the_opening_hours(catalog_of):
     owner = catalog_of(Membership.Role.OWNER, "es")
     employee = catalog_of(Membership.Role.EMPLOYEE, "es")
@@ -164,15 +129,13 @@ def test_the_reported_requests_are_the_probes_of_layer_2():
     assert [phrases.get(comparable(phrase)) for _, phrase in REPORTED] == [f"owner.es.{name}" for name, _ in REPORTED]
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize(("name", "phrase"), REPORTED)
 def test_the_reported_schedule_request_offers_its_existing_operation(catalog_of, name, phrase):
-    tools = catalog_of(Membership.Role.OWNER, "es")
-    place = place_of_no_ask(tools, name, phrase)
-    assert place is not None and place <= WITH_ROOM, place
+    assert_offered_with_room(catalog_of(Membership.Role.OWNER, "es"), name, phrase)
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize(("name", "phrase"), TAKEN_FOR_A_BLOCK)
 def test_a_reported_change_of_the_hours_is_offered_before_any_block_of_appointments(catalog_of, name, phrase):
     """What the model chose instead (hub#1096): each block of Appointments a turn offers comes after the tool of
@@ -186,25 +149,37 @@ def test_a_reported_change_of_the_hours_is_offered_before_any_block_of_appointme
     assert {block: at for block, at in ahead.items() if at is not None and at < place} == {}, place
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize("probe", PROBES, ids=[probe["id"] for probe in PROBES])
 def test_every_probe_of_schedules_offers_its_tool_without_being_one_of_its_asks(catalog_of, probe):
     """The owner's sixteen phrases of layer 2, the ones the model answered right too: a tool of Schedules that a new
     ask elsewhere pushes out of the first half of the ones a turn offers fails here before the real-model QA sees it."""
     assert (probe["app"], probe["role"], probe["language"]) == ("schedule", "owner", "es")
-    tools = catalog_of(Membership.Role.OWNER, probe["language"])
-    place = place_of_no_ask(tools, probe["tool"], probe["phrase"])
-    assert place is not None and place <= WITH_ROOM, place
+    assert_offered_with_room(catalog_of(Membership.Role.OWNER, probe["language"]), probe["tool"], probe["phrase"])
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
-@pytest.mark.parametrize(("name", "phrase"), OWN_WORDS)
-def test_a_request_in_the_persons_own_words_reaches_its_tool_by_its_asks(catalog_of, name, phrase):
-    tools = catalog_of(Membership.Role.OWNER, "es")
-    assert comparable(phrase) not in probe_phrases()
-    place = place_of_no_ask(tools, name, phrase)
-    assert place is not None and place <= TOP, place
-    before = without_its_asks(tools, name)
-    assert not shared.asks_of(before[name])  # positive control: the tool is ranked without its asks
-    unasked = offered_place(before, name, phrase)
-    assert unasked is None or unasked > TOP, unasked
+test_a_request_in_the_persons_own_words_reaches_its_tool_by_its_asks = in_hubs(own_words_test(OWN_WORDS, "es"))
+
+
+#: What the owner says in English in words of their own for each tool of Schedules that needs one, neither
+#: an ask nor a probe of layer 2: its English asks lift it among the first ten (``assert_its_asks_lift``).
+OWN_WORDS_EN = [
+    ("schedule.business.is_open", "do we have the shop open at this hour?"),
+    ("schedule.hours.for_range", "what times are we open every day in the first half of December?"),
+    ("schedule.override.create", "we're shutting the first half of August for the holidays"),
+    ("schedule.override.delete", "drop the August closure, this year we don't stop"),
+    ("schedule.override.list", "have we planned any closure for the summer?"),
+    ("schedule.override.update", "the August holidays end on the 20th in the end"),
+    ("schedule.settings.get", "which time zone are we in?"),
+    ("schedule.settings.update", "make Monday the first day"),
+    ("schedule.special_day.bulk_create", "put in all the national holidays for 2027 at once"),
+    ("schedule.special_day.create", "the 15th of August we stay closed, it's the town's fair"),
+    ("schedule.special_day.delete", "we'll open as usual on the town's fair day after all"),
+    ("schedule.special_day.list", "what holidays do I have marked on the calendar?"),
+    ("schedule.special_day.update", "we'll open on Epiphany morning after all"),
+    ("schedule.week.confirm", "the default opening is fine as it is, without changes"),
+    ("schedule.week.get", "usually, which days are we shut, Monday to Sunday?"),
+    ("schedule.week.set_day", "make the usual Saturday 9 to 13"),
+]
+test_a_request_in_english_is_lifted_by_its_english_asks = in_hubs(english_words_test(OWN_WORDS_EN))
+test_each_tool_has_its_own_english_words = english_coverage_test("schedule", OWN_WORDS_EN)

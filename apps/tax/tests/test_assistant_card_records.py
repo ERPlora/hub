@@ -17,11 +17,10 @@ from live.errors import NotFound
 from live.operations import INTERNAL, get, registry
 
 from apps.tax.models import TaxCategory, TaxRule
-from apps.tax.tests.conftest import A, ctx_for
+from apps.tax.tests.conftest import HUB_DB, A, B, ctx_for
 from base import assistant
 from base.tenancy.context import use_hub
-from base.tenancy.tests import hubs
-from base.tests.test_assistant_card_values import AN_ID
+from base.tests.test_assistant_card_values_references import AN_ID
 
 A_MISSING_ID = "0192f0b2-3333-7000-8000-000000000003"
 
@@ -87,7 +86,7 @@ def make_rule(
 
 
 def fields_of(write: str, arguments: dict, language: str = "en", ctx=None) -> dict:
-    card = assistant.card(get(write), arguments, language, ctx or ctx_for(language=language))
+    card = assistant.cards.card(get(write), arguments, language, ctx or ctx_for(language=language))
     return {field["name"]: field for field in card["fields"]}
 
 
@@ -108,7 +107,7 @@ def no_id(said) -> bool:
 # ── A rule by its name ────────────────────────────────────────────────────────────────────────────────────────────────
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize(("write", "datum"), ON_A_RULE + ON_A_ROOT)
 @pytest.mark.parametrize(
     ("language", "expected"),
@@ -124,7 +123,7 @@ def test_a_write_says_the_rule_it_names_by_its_category_country_and_rate(write, 
     assert shown(write, {datum: str(rule.id)}, language)[datum] == expected
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_rule_of_a_region_says_its_region_and_a_component_its_label():
     """A rule of the Canary Islands says its region beside its country; an equivalence surcharge says its label after
     its category, as the Rules screen's card does («↳ Cervezas artesanas · Recargo de equivalencia»)."""
@@ -140,7 +139,7 @@ def test_a_rule_of_a_region_says_its_region_and_a_component_its_label():
     )
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_among_several_the_card_says_the_one_the_write_names():
     """Each id names its own rule, never another one of the business (the first, the last)."""
     beer, wine = make_category(), make_category("Vinos de la tierra", "drink.local_wine")
@@ -152,14 +151,14 @@ def test_among_several_the_card_says_the_one_the_write_names():
             assert said == names, f"{write}:{datum}"
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_deactivated_rule_is_still_named_to_bring_it_back():
     """Reactivating names a rule nobody applies any more: it is still there, so the card says it."""
     rule = make_rule(make_category(), is_active=False)
     assert shown("tax.rule.activate", {"id": str(rule.id)})["id"] == "Cervezas artesanas · Spain · 10%"
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize("language", ["en", "es"])
 @pytest.mark.parametrize(("write", "datum"), ON_A_RULE + ON_A_ROOT)
 def test_the_rule_a_write_names_is_titled_with_the_screens_word_in_each_language(write, datum, language):
@@ -170,7 +169,7 @@ def test_the_rule_a_write_names_is_titled_with_the_screens_word_in_each_language
     assert field["label"] == words(language)["rule" if datum == "id" else "root"]
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_change_keeps_saying_the_rule_beside_what_it_changes():
     """Ending a rule says the rule as it is now, before the write runs, beside the last day it will apply."""
     rule = make_rule(make_category())
@@ -188,7 +187,7 @@ def test_a_change_keeps_saying_the_rule_beside_what_it_changes():
 def test_a_write_says_the_country_by_its_name_never_its_code(write, datum, language, expected):
     """«Deactivate the beer rule in Germany» by voice: «País: Alemania», as the Rules screen's picker says it, never «DE».
     No person is needed: the name is the app's, not a record's."""
-    card = assistant.card(get(write), {datum: "DE", "tax_category_key": "cerveza"}, language)
+    card = assistant.cards.card(get(write), {datum: "DE", "tax_category_key": "cerveza"}, language)
     assert {field["name"]: field["value"] for field in card["fields"]}[datum] == expected
 
 
@@ -200,13 +199,13 @@ def test_a_batch_of_rules_says_the_country_of_each_one_by_its_name(language, exp
         {"country_code": "DE", "tax_category_key": "cerveza", "rate_pct": "19"},
         {"country_code": "FR", "tax_category_key": "vino", "rate_pct": "20"},
     ]
-    (field,) = assistant.card(get("tax.rule.bulk_create"), {"rules": rules}, language)["fields"]
+    (field,) = assistant.cards.card(get("tax.rule.bulk_create"), {"rules": rules}, language)["fields"]
     assert [line["country_code"] for line in field["value"]] == expected
 
 # ── What is not theirs to read, or no longer there ────────────────────────────────────────────────────────────────────
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize(("write", "datum"), ON_A_RULE + ON_A_ROOT)
 def test_a_rule_is_left_out_for_whoever_may_not_see_the_taxes(write, datum):
     """Whoever may not see Taxes (``tax.view``) is told no rule, never its id."""
@@ -217,7 +216,7 @@ def test_a_rule_is_left_out_for_whoever_may_not_see_the_taxes(write, datum):
     assert no_id(said)
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize(("write", "datum"), ON_A_RULE + ON_A_ROOT)
 def test_what_does_not_exist_is_left_out(write, datum):
     said = shown(write, {datum: A_MISSING_ID})
@@ -225,19 +224,18 @@ def test_what_does_not_exist_is_left_out(write, datum):
     assert no_id(said)
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_nobody_behind_the_request_reads_no_rule():
     """An automation's card (no person at hand) names no rule: nothing is read for anybody."""
     rule = make_rule(make_category())
-    card = assistant.card(get("tax.rule.end"), {"id": str(rule.id), "valid_to": "2026-12-31"}, "en")
+    card = assistant.cards.card(get("tax.rule.end"), {"id": str(rule.id), "valid_to": "2026-12-31"}, "en")
     assert {field["name"]: field["value"] for field in card["fields"]} == {"valid_to": "Dec 31, 2026"}
 
 
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
-@pytest.mark.usefixtures("no_test_fallback")
+@HUB_DB
 def test_a_rule_of_another_business_is_left_out(hub_a, hub_b):
     """Each business in its own database, as production: an id of A names nothing in B."""
-    in_a, in_b = ctx_for(scope=Scope("host", hub_a.slug)), ctx_for(scope=Scope("host", hub_b.slug))
+    in_a, in_b = ctx_for(scope=A), ctx_for(scope=B)
     with use_hub(hub_a):
         rule = make_rule(make_category())
         for write, datum in ON_A_RULE + ON_A_ROOT:  # positive control
@@ -257,7 +255,7 @@ def test_the_read_that_names_a_rule_is_no_tool_route_nor_live_query():
     assert (read.kind, read.permission, read.ai, read.expose_api) == ("query", "tax.view", INTERNAL, False)
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_read_that_names_a_rule_finds_it_by_its_id_in_the_language_asked():
     """The rule as the list gives it, and its name in the language of whoever asks."""
     rule = make_rule(make_category(), country="DE", rate="19")

@@ -103,7 +103,8 @@ class CustomerConfig(LiveAppConfig):
         """The platform asks (``base.tenancy.recovery``) what a separate copy of the business gives back when the staff
         recovers from it: of the copy's live cards (``queries.cards_in_copy``), each the business still holds deleted
         comes back the same, with all that hangs from it (``queries.cards_deleted_in_business``,
-        ``customer.customer.restore``, CUSTOMER-F33), and each it no longer has is made again by
+        ``customer.customer.restore``, CUSTOMER-F33) and the groups, tags and custom field values the business deleted
+        since (hub#1356), and each it no longer has is made again by
         ``customer.customer.recover`` (``queries.cards_not_in_business``): as ``customer.customer.create``, the till's
         and the card's own, makes it, with its groups, tags and custom field values there
         (``queries.recoverable_cards_in_copy``, hub#1285), each by the screen's own operation. Never one merged into

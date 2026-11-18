@@ -33,7 +33,7 @@ from apps.tax.models import TaxCategory
 from base.activation import CREATED_APPS_CACHE
 from base.tenancy import connections as tenancy_connections
 from base.tenancy import inventory, migrator
-from base.tenancy.context import use_control, use_hub
+from base.tenancy.context import HubContextMismatch, use_control, use_hub
 from base.tenancy.tests.test_app_not_created import counted_cache
 from base.tests.test_worker_activations import (  # noqa: F401 (fixtures)
     business,
@@ -260,13 +260,17 @@ def test_a_row_read_before_the_tables_were_made_keeps_the_protection(with_module
 
 
 def test_the_context_of_another_business_never_decides_what_this_one_has(with_modules):
-    """B's context (no Inventory) holding A's object: A's own database answers, and A has the row that protects it."""
+    """B's context (no Inventory) deleting A's rows by A's alias: A's own database answers, and A has the row that
+    protects it. A's object itself is never deleted inside B's context: the router refuses it before the walk."""
     with_everything, only_tax = with_modules(*what_hangs_from_a_tax_category()), with_modules("tax")
     with use_hub(with_everything):
         category = a_held_tax_category()
 
-    with use_hub(only_tax), pytest.raises(ProtectedError):
-        category.delete()
+    with use_hub(only_tax):
+        with pytest.raises(HubContextMismatch):
+            category.delete()
+        with pytest.raises(ProtectedError):
+            TaxCategory.objects.using(category._state.db).filter(pk=category.pk).delete()
 
     with use_hub(with_everything):
         assert TaxCategory.objects.filter(key="mine").exists()

@@ -14,7 +14,7 @@ from urllib.parse import urlsplit
 from decouple import Csv, config
 from django.core.exceptions import ImproperlyConfigured
 from django.utils.csp import CSP
-from live.csp import base_policy, debug_policy
+from live.csp import YOUTUBE_NOCOOKIE, base_policy, debug_policy, with_frames
 from psycopg_pool import ConnectionPool
 
 from base.storage import hub_files_storage
@@ -338,9 +338,7 @@ CACHES = {
 
 # The SaaS is erplora.com, locally http://localhost:8001 (hubs.localhost is the Hub admin's host):
 # SAAS_URL is where the browser goes (/hub-login/, the admin's Hubs page, the logout).
-SAAS_URL = (
-    config("SAAS_URL", default="http://localhost:8001") if DEBUG else config("SAAS_URL")
-)
+SAAS_URL = config("SAAS_URL", default="http://localhost:8001") if DEBUG else config("SAAS_URL")
 # Where the Hub calls the SaaS's /internal/*: the ALB answers 404 to it, so production uses the private
 # name (http://saas.erplora.internal:8000); without it, the public URL (local development).
 SAAS_INTERNAL_URL = config("SAAS_INTERNAL_URL", default=SAAS_URL)
@@ -386,6 +384,8 @@ GOOGLE_PLACES_API_KEY = config("GOOGLE_PLACES_API_KEY", default="")
 # Whether a business may go live with VeriFactu on this server (VERIFACTU-F08): ERPlora opens it by hand,
 # and only the prod deployment honours it (apps.verifactu.queries.production_open; pre files in testing).
 VERIFACTU_PRODUCTION_ENABLED = config("VERIFACTU_PRODUCTION_ENABLED", default=False, cast=bool)
+# Whether a business may take ERPlora's route, ERPlora filing for it with its seal (apps/verifactu/erplora_route.py).
+VERIFACTU_ERPLORA_ROUTE_ENABLED = config("VERIFACTU_ERPLORA_ROUTE_ENABLED", default=True, cast=bool)
 # ERPlora's own hub: it issues ERPlora's invoices to its customers, which the SaaS posts to
 # /internal/platform/invoices (base.internal). A reserved slug, so no business can ever take it; it files in the
 # AEAT's environment of the deployment (prod: production; pre: testing), never by its own switch.
@@ -437,9 +437,9 @@ TIME_ZONE = "Europe/Madrid"
 USE_I18N = True
 USE_TZ = True
 
-# Content Security Policy (Django's native middleware, with a nonce per response).
-
-SECURE_CSP = debug_policy(VITE_DEV_SERVER) if DEBUG else base_policy()
+# Content Security Policy (Django's native middleware, with a nonce per response). A page frames its own origin and
+# YouTube's privacy-enhanced player, where a module's help video plays.
+SECURE_CSP = with_frames(debug_policy(VITE_DEV_SERVER) if DEBUG else base_policy(), YOUTUBE_NOCOOKIE)
 # form-action filters the whole redirect chain of a form post: the SPA's logout POSTs to /auth/logout,
 # which answers 302 to the SaaS's logout (one hop, no page of our own in between).
 saas_origin = "{0.scheme}://{0.netloc}".format(urlsplit(SAAS_URL))

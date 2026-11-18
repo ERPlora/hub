@@ -11,23 +11,33 @@ from pathlib import Path
 import pytest
 from django.apps import apps
 from django.core.cache import cache
-from django.db import connection, connections, transaction
 from live.context import Scope
-from live.errors import Conflict, InvalidPayload, NotFound, PermissionDenied
+from live.errors import Conflict, InvalidPayload, PermissionDenied
 from live.models import OutboxEvent
-from live.operations import get
+from live.operations import atomic, get
 from PIL import Image as PILImage
 
 from apps.website.models import Image, Site
-from apps.website.queries import catalog_cache_key, page_cache_key
+from apps.website.queries import catalog_cache_key, live_version, page_cache_key, published_page
 from apps.website import reviews, services
-from apps.website.tests.conftest import PLACE_ID, A, B, ctx_for, full_content, google_reviews, with_language
+from apps.website.tests.conftest import (
+    HUB_DB,
+    HUB_DB_COMMITTED,
+    PLACE_ID,
+    A,
+    B,
+    ctx_for,
+    full_content,
+    google_reviews,
+    with_language,
+)
 from base import files
 from base.models import Hub
-from base.tenancy.context import use_hub
+from base.tenancy.context import HubContextMismatch, current_alias, use_hub
 from base.tenancy.tests import hubs
+from base.tenancy.tests.concurrency import in_a_thread
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 
 def run(name: str, data: dict | None = None, ctx=None):
@@ -115,11 +125,12 @@ def test_an_image_of_the_draft_is_an_upload_of_this_hub_and_its_url_is_the_serve
     assert Site.objects.get().content["hero"]["cover"] == {"id": str(image.id), "url": image.url}
 
 
-def test_an_image_that_is_no_upload_of_this_hub_is_refused(hub_files):
+def test_an_image_that_is_no_upload_of_this_hub_is_refused(hub_files, hub_b):
     with pytest.raises(InvalidPayload) as refused:
         save(full_content(about={"image": {"id": str(uuid.uuid4()), "url": ""}}))
     assert set(refused.value.fields) == {"content.about.image"}
-    other_hub = upload(png_bytes(), ctx=ctx_for(scope=B))
+    with use_hub(hub_b):
+        other_hub = upload(png_bytes(), ctx=ctx_for(scope=B))
     with pytest.raises(InvalidPayload) as refused:
         save(full_content(topbar={"logo": {"id": str(other_hub.id), "url": other_hub.url}}))
     assert set(refused.value.fields) == {"content.topbar.logo"}
@@ -139,9 +150,10 @@ def test_the_gallery_keeps_its_uploads_in_their_order_with_the_servers_urls(hub_
     ]
 
 
-def test_a_gallery_image_that_is_no_upload_of_this_hub_is_refused_at_its_place(hub_files):
+def test_a_gallery_image_that_is_no_upload_of_this_hub_is_refused_at_its_place(hub_files, hub_b):
     mine = upload(png_bytes())
-    theirs = upload(png_bytes(colour=(1, 2, 3)), ctx=ctx_for(scope=B))
+    with use_hub(hub_b):
+        theirs = upload(png_bytes(colour=(1, 2, 3)), ctx=ctx_for(scope=B))
     images = [{"id": str(mine.id), "url": ""}, {"id": str(theirs.id), "url": ""}, {"id": str(uuid.uuid4()), "url": ""}]
     with pytest.raises(InvalidPayload) as refused:
         save(full_content(gallery={"images": images}))
@@ -156,8 +168,8 @@ def test_publish_copies_the_draft_with_a_catalog_snapshot_bumps_the_version_and_
     services_catalog, django_capture_on_commit_callbacks
 ):
     save(template="modern", theme={"palette": "forest", "mode": "dark"})
-    cache.set(page_cache_key("a", 0, "en", "sun", "EUR"), b"stale")
-    with django_capture_on_commit_callbacks(execute=True):
+    cache.set(page_cache_key(A.key, 0, "en", "sun", "EUR"), b"stale")
+    with django_capture_on_commit_callbacks(execute=True, using=current_alias()):
         out = run("website.site.publish")
     site = Site.objects.get()
     assert (out.published_version, out.is_live) == (1, True)
@@ -180,15 +192,15 @@ def test_publish_copies_the_draft_with_a_catalog_snapshot_bumps_the_version_and_
         ],
     }
     assert [event.payload for event in events("website.site.published")] == [{"id": str(site.id), "version": 1}]
-    assert cache.get(page_cache_key("a", 0, "en", "sun", "EUR")) is None
+    assert cache.get(page_cache_key(A.key, 0, "en", "sun", "EUR")) is None
     # A change of the draft stays out of the page until it is published again.
     save(template="bold")
     assert Site.objects.get().published_content["template"] == "modern"
-    cache.set(page_cache_key("a", 1, "es", "wed", "EUR"), b"old")
-    with django_capture_on_commit_callbacks(execute=True):
+    cache.set(page_cache_key(A.key, 1, "es", "wed", "EUR"), b"old")
+    with django_capture_on_commit_callbacks(execute=True, using=current_alias()):
         assert run("website.site.publish").published_version == 2
     assert Site.objects.get().published_content["template"] == "bold"
-    assert cache.get(page_cache_key("a", 1, "es", "wed", "EUR")) is None
+    assert cache.get(page_cache_key(A.key, 1, "es", "wed", "EUR")) is None
 
 
 def test_publish_snapshots_only_the_chosen_categories(services_catalog):
@@ -229,12 +241,14 @@ def hub_site(slug: str) -> Site:
     return Site.objects.get(hub_id=Hub.objects.get(slug=slug).id)
 
 
-def test_each_hub_saves_and_publishes_its_own_site():
+def test_each_hub_saves_and_publishes_its_own_site(hub_b):
     save(template="modern", ctx=ctx_for(scope=A))
     run("website.site.publish", ctx=ctx_for(scope=A))
-    save(full_content(hero={"title": "Bea's barber shop"}), template="bold", ctx=ctx_for(scope=B))
-    assert run("website.site.publish", ctx=ctx_for(scope=B)).published_version == 1
-    a, b = hub_site("a"), hub_site("b")
+    with use_hub(hub_b):
+        save(full_content(hero={"title": "Bea's barber shop"}), template="bold", ctx=ctx_for(scope=B))
+        assert run("website.site.publish", ctx=ctx_for(scope=B)).published_version == 1
+        b = hub_site(B.key)
+    a = hub_site(A.key)
     assert (a.published_content["template"], a.published_content["content"]["hero"]["title"]) == (
         "modern",
         "Fresh food every day",
@@ -244,24 +258,52 @@ def test_each_hub_saves_and_publishes_its_own_site():
         "Bea's barber shop",
     )
     assert (a.published_version, b.published_version) == (1, 1)
-    run("website.site.unpublish", ctx=ctx_for(scope=B))
-    assert (hub_site("a").is_live, hub_site("b").is_live) == (True, False)
+    with use_hub(hub_b):
+        run("website.site.unpublish", ctx=ctx_for(scope=B))
+        b_is_live = hub_site(B.key).is_live
+    assert (hub_site(A.key).is_live, b_is_live) == (True, False)
 
 
 @pytest.mark.usefixtures("website_manifest")
-def test_the_team_of_another_hub_never_reads_nor_changes_this_hubs_site():
+def test_the_team_of_another_hub_never_reads_nor_changes_this_hubs_site(hub_b):
     save(template="modern", ctx=ctx_for(scope=A))
     run("website.site.publish", ctx=ctx_for(scope=A))
     save(full_content(hero={"title": "Draft only"}), template="modern", ctx=ctx_for(scope=A))
     b_admin = ctx_for(scope=B)
-    seen = run("website.site.get", ctx=b_admin)
-    assert (seen.template, seen.content.hero.title, seen.published_version, seen.is_live) == ("classic", "", 0, False)
-    assert "Draft only" not in run("website.site.preview", ctx=b_admin).html
-    save(full_content(hero={"title": "Overwritten"}), template="bold", ctx=b_admin)
-    run("website.site.unpublish", ctx=b_admin)
-    a = hub_site("a")
+    with use_hub(hub_b):
+        seen = run("website.site.get", ctx=b_admin)
+        assert (seen.template, seen.content.hero.title, seen.published_version, seen.is_live) == ("classic", "", 0, False)
+        assert "Draft only" not in run("website.site.preview", ctx=b_admin).html
+        save(full_content(hero={"title": "Overwritten"}), template="bold", ctx=b_admin)
+        run("website.site.unpublish", ctx=b_admin)
+    a = hub_site(A.key)
     assert (a.template, a.content["hero"]["title"], a.published_version, a.is_live) == ("modern", "Draft only", 1, True)
     assert run("website.site.get", ctx=ctx_for(scope=A)).content.hero.title == "Draft only"
+
+
+def test_a_site_kept_for_another_hub_in_this_database_is_never_this_hubs():
+    # Each write and read asks for its own hub's row: one that names another hub, even in this business's database,
+    # is neither read nor changed.
+    theirs = Site.objects.create(
+        hub_id=uuid.uuid7(), template="bold", content=full_content(hero={"title": "Theirs"}), published_version=3, is_live=True
+    )
+    seen = run("website.site.get")
+    assert (seen.template, seen.content.hero.title, seen.published_version, seen.is_live) == ("classic", "", 0, False)
+    # Nor is its publication what this hub's visitors see.
+    assert (published_page(A), live_version(A)) == (None, 0)
+    save(full_content(hero={"title": "Ours"}), template="modern")
+    theirs.refresh_from_db()
+    assert (theirs.template, theirs.content["hero"]["title"]) == ("bold", "Theirs")
+    assert hub_site(A.key).content["hero"]["title"] == "Ours"
+
+
+def test_an_image_kept_for_another_hub_in_this_database_is_no_upload_of_this_hub():
+    theirs = Image.objects.create(
+        hub_id=uuid.uuid7(), key="theirs/logo.png", sha256="0" * 64, content_type="image/png", width=1, height=1, size=1
+    )
+    with pytest.raises(InvalidPayload) as refused:
+        save(full_content(topbar={"logo": {"id": str(theirs.id), "url": ""}}))
+    assert set(refused.value.fields) == {"content.topbar.logo"}
 
 
 def test_taking_offline_a_site_never_saved_keeps_it_unsaved():
@@ -272,19 +314,19 @@ def test_taking_offline_a_site_never_saved_keeps_it_unsaved():
 
 def test_publishing_and_taking_offline_drop_what_is_kept_in_the_business_s_currency(django_capture_on_commit_callbacks):
     # What is kept is keyed by the business's currency: dropping it asks for that currency, never the euro's.
-    Hub.objects.filter(slug="a").update(country="PL")
+    Hub.objects.filter(slug=A.key).update(country="PL")
     save()
     run("website.site.publish")
-    cache.set(page_cache_key("a", 1, "en", "mon", "PLN"), b"page")
-    cache.set(catalog_cache_key("a", 1, "es", "PLN"), {"groups": []})
-    with django_capture_on_commit_callbacks(execute=True):
+    cache.set(page_cache_key(A.key, 1, "en", "mon", "PLN"), b"page")
+    cache.set(catalog_cache_key(A.key, 1, "es", "PLN"), {"groups": []})
+    with django_capture_on_commit_callbacks(execute=True, using=current_alias()):
         run("website.site.publish")
-    assert cache.get(page_cache_key("a", 1, "en", "mon", "PLN")) is None
-    assert cache.get(catalog_cache_key("a", 1, "es", "PLN")) is None
-    cache.set(page_cache_key("a", 2, "es", "sun", "PLN"), b"page")
-    with django_capture_on_commit_callbacks(execute=True):
+    assert cache.get(page_cache_key(A.key, 1, "en", "mon", "PLN")) is None
+    assert cache.get(catalog_cache_key(A.key, 1, "es", "PLN")) is None
+    cache.set(page_cache_key(A.key, 2, "es", "sun", "PLN"), b"page")
+    with django_capture_on_commit_callbacks(execute=True, using=current_alias()):
         run("website.site.unpublish")
-    assert cache.get(page_cache_key("a", 2, "es", "sun", "PLN")) is None
+    assert cache.get(page_cache_key(A.key, 2, "es", "sun", "PLN")) is None
 
 
 # Take offline
@@ -293,11 +335,11 @@ def test_publishing_and_taking_offline_drop_what_is_kept_in_the_business_s_curre
 def test_taking_the_site_offline_keeps_its_version_and_publishing_again_goes_on(django_capture_on_commit_callbacks):
     save()
     run("website.site.publish")
-    cache.set(page_cache_key("a", 1, "en", "mon", "EUR"), b"page")
-    with django_capture_on_commit_callbacks(execute=True):
+    cache.set(page_cache_key(A.key, 1, "en", "mon", "EUR"), b"page")
+    with django_capture_on_commit_callbacks(execute=True, using=current_alias()):
         out = run("website.site.unpublish")
     assert (out.published_version, out.is_live) == (1, False)
-    assert cache.get(page_cache_key("a", 1, "en", "mon", "EUR")) is None
+    assert cache.get(page_cache_key(A.key, 1, "en", "mon", "EUR")) is None
     assert len(events("website.site.unpublished")) == 1
     # Already offline: nothing to do, nothing recorded.
     run("website.site.unpublish")
@@ -317,7 +359,7 @@ def test_only_who_manages_the_website_takes_it_offline():
 def test_image_upload_stores_a_content_hashed_key_in_hub_files(hub_files):
     raw = png_bytes(4, 3)
     image = upload(raw)
-    hub = Hub.objects.get(slug="a")
+    hub = Hub.objects.get(slug=A.key)
     sha = hashlib.sha256(raw).hexdigest()
     key = f"hub-{hub.id.hex}/website/img/{sha[:16]}.png"
     assert hub_files.exists(key)
@@ -330,14 +372,16 @@ def test_image_upload_stores_a_content_hashed_key_in_hub_files(hub_files):
     assert [event.payload for event in events("website.image.uploaded")] == [{"id": str(image.id)}]
 
 
-def test_an_upload_belongs_to_its_hub(hub_files):
+def test_an_upload_belongs_to_its_hub(hub_files, hub_b):
     raw = png_bytes()
-    a_image, b_image = upload(raw, ctx=ctx_for(scope=A)), upload(raw, ctx=ctx_for(scope=B))
+    a_image = upload(raw, ctx=ctx_for(scope=A))
+    with use_hub(hub_b):
+        b_image = upload(raw, ctx=ctx_for(scope=B))
+        assert Image.objects.get(id=b_image.id).hub_id == Hub.objects.get(slug=B.key).id
+        # The same file on each hub: each saves it with its own upload, never the other's.
+        save(full_content(hero={"cover": {"id": str(b_image.id), "url": ""}}), ctx=ctx_for(scope=B))
     assert a_image.id != b_image.id
-    assert Image.objects.get(id=a_image.id).hub_id == Hub.objects.get(slug="a").id
-    assert Image.objects.get(id=b_image.id).hub_id == Hub.objects.get(slug="b").id
-    # The same file on each hub: each saves it with its own upload, never the other's.
-    save(full_content(hero={"cover": {"id": str(b_image.id), "url": ""}}), ctx=ctx_for(scope=B))
+    assert Image.objects.get(id=a_image.id).hub_id == Hub.objects.get(slug=A.key).id
     with pytest.raises(InvalidPayload) as refused:
         save(full_content(hero={"cover": {"id": str(b_image.id), "url": ""}}), ctx=ctx_for(scope=A))
     assert set(refused.value.fields) == {"content.hero.cover"}
@@ -391,18 +435,18 @@ def test_only_who_manages_the_website_uploads(hub_files):
         upload(png_bytes(), ctx=ctx_for("hub_manager"))
 
 
-def test_a_scope_that_is_no_hub_has_nowhere_to_keep_images(hub_files, every_app_on):
-    from live.context import Scope
-
-    every_app_on("nohub")  # the website on, so the upload reaches its own check of the registry
-    with pytest.raises(NotFound):
+def test_a_scope_that_is_no_hub_has_nowhere_to_keep_images(hub_files):
+    # An upload runs in its own business only: for a scope that is none, it is refused before anything is kept.
+    with pytest.raises(HubContextMismatch):
         upload(png_bytes(), ctx=ctx_for(scope=Scope("host", "nohub")))
+    assert not Image.objects.exists()
+    assert hub_files.listdir("") == ([], [])
 
 
 # Images and the plan's space for files, the same as Files (WEBSITE-F04)
 
 
-def plan_space(limit: int, slug: str = "a") -> None:
+def plan_space(limit: int, slug: str = A.key) -> None:
     """The SaaS's photo of ``slug`` includes ``limit`` bytes for the business's files."""
     Hub.objects.filter(slug=slug).update(state={"plan": {"max_storage_bytes": limit}})
 
@@ -412,7 +456,7 @@ def files_upload(content: bytes, name: str = "full.dat", ctx=None):
     return run("base.file.upload", {"folder": "", "name": name, "content_base64": base64.b64encode(content).decode()}, ctx)
 
 
-def image_key_of(raw: bytes, slug: str = "a") -> str:
+def image_key_of(raw: bytes, slug: str = A.key) -> str:
     """Where the website keeps the PNG ``raw`` of ``slug`` in the hub file store."""
     return f"hub-{Hub.objects.get(slug=slug).id.hex}/website/img/{hashlib.sha256(raw).hexdigest()[:16]}.png"
 
@@ -478,26 +522,27 @@ def test_an_image_whose_file_is_already_kept_takes_no_more_space(hub_files):
     assert Image.objects.get(id=image.id).key == image_key_of(raw)
 
 
-def test_one_business_full_does_not_refuse_another_ones_image(hub_files):
+def test_one_business_full_does_not_refuse_another_ones_image(hub_files, hub_b):
     raw = png_bytes()
-    plan_space(len(KEPT), "a")
-    plan_space(len(raw), "b")
+    plan_space(len(KEPT), A.key)
+    plan_space(len(raw), B.key)
     files_upload(KEPT)
 
     with pytest.raises(Conflict):
         upload(raw)
-    image = upload(raw, ctx=ctx_for(scope=B))
+    with use_hub(hub_b):
+        image = upload(raw, ctx=ctx_for(scope=B))
+        assert Image.objects.get(id=image.id).hub_id == Hub.objects.get(slug=B.key).id
+        # And B's own space is the one that counts: its plan, exactly filled by that image, refuses one more of its
+        # images (A's plan, with room to spare for it, would let it through).
+        another = png_bytes(colour=(30, 200, 30))
+        with pytest.raises(Conflict) as full:
+            upload(another, ctx=ctx_for(scope=B))
 
-    assert Image.objects.get(id=image.id).hub_id == Hub.objects.get(slug="b").id
-    assert hub_files.exists(image_key_of(raw, "b"))
-    assert not hub_files.exists(image_key_of(raw, "a"))
-    # And B's own space is the one that counts: its plan, exactly filled by that image, refuses one more of its images
-    # (A's plan, with room to spare for it, would let it through).
-    another = png_bytes(colour=(30, 200, 30))
-    with pytest.raises(Conflict) as full:
-        upload(another, ctx=ctx_for(scope=B))
+    assert hub_files.exists(image_key_of(raw, B.key))
+    assert not hub_files.exists(image_key_of(raw, A.key))
     assert full.value.code == "base.file_no_space"
-    assert not hub_files.exists(image_key_of(another, "b"))
+    assert not hub_files.exists(image_key_of(another, B.key))
 
 
 def test_without_a_space_in_its_plan_an_image_is_kept_however_full_the_store(hub_files):
@@ -518,56 +563,52 @@ def test_the_plans_space_is_base_s_one_check_and_its_sentence_is_not_the_website
 
     upload(raw)  # base's check (here, one that lets everything in) decides: the website keeps the image
 
-    assert asked == [(Hub.objects.get(slug="a").id, len(raw), len(raw) - 1)]
+    assert asked == [(Hub.objects.get(slug=A.key).id, len(raw), len(raw) - 1)]
     catalogue = Path(apps.get_app_config("website").path, "locale", "es", "LC_MESSAGES", "django.po").read_text()
     assert 'msgid "There is no space left for that file: your plan includes %(space)s."' not in catalogue
 
 
-# Two first saves at once (threads, real transactions)
+# Two sessions of the business at once (threads, real transactions, a plan with room for both: on Free's the second
+# would wait for its turn, not for the first one's row)
 
 
-def _in_thread(target):
-    outcome = {}
+def while_the_first_holds(first, second):
+    """Runs ``first`` in its own session, its transaction kept open once it has run, and ``second`` in another one
+    meanwhile: their outcomes (an error raised is the outcome), and whether the second waited for the first's COMMIT."""
+    ran, release = threading.Event(), threading.Event()
 
-    def body():
-        try:
-            outcome["result"] = target()
-        except Exception as error:  # the outcome is asserted by the test
-            outcome["error"] = error
-        finally:
-            connection.close()
-
-    thread = threading.Thread(target=body)
-    thread.start()
-    return thread, outcome
-
-
-@pytest.mark.django_db(transaction=True)
-def test_two_first_saves_at_once_leave_one_site_and_neither_fails(transactional_db):
-    # The first save of a hub creates its row: another one at the same moment waits for it and saves after it,
-    # never a duplicate key (a 500).
-    first_saved, release = threading.Event(), threading.Event()
-
-    def first():
-        with transaction.atomic():
-            out = save(template="modern")
-            first_saved.set()
+    def holding():
+        with atomic():
+            out = first()
+            ran.set()
             release.wait(5)
         return out
 
-    holder, held = _in_thread(first)
-    assert first_saved.wait(5)
-    waiter, second = _in_thread(lambda: save(template="bold"))
+    outcomes = [None, None]
+    holder = in_a_thread(holding, outcomes, 0)
+    holder.start()
+    assert ran.wait(5), outcomes
+    waiter = in_a_thread(second, outcomes, 1)
+    waiter.start()
     waiter.join(0.3)
     waited = waiter.is_alive()
     release.set()
     holder.join(5)
     waiter.join(5)
-    assert "result" in held, held
-    assert "result" in second, second
+    return outcomes[0], outcomes[1], waited
+
+
+@HUB_DB_COMMITTED
+@pytest.mark.usefixtures("plan_with_room")
+def test_two_first_saves_at_once_leave_one_site_and_neither_fails():
+    # The first save of a hub creates its row: another one at the same moment waits for it and saves after it,
+    # never a duplicate key (a 500).
+    held, second, waited = while_the_first_holds(lambda: save(template="modern"), lambda: save(template="bold"))
+    assert not isinstance(held, Exception) and held.template == "modern", held
+    assert not isinstance(second, Exception) and second.template == "bold", second
     assert waited, "the second save did not wait for the first one's row"
     assert Site.objects.count() == 1
-    assert hub_site("a").template == "bold"
+    assert hub_site(A.key).template == "bold"
 
 
 # A hub with its own database
@@ -602,48 +643,18 @@ def test_in_a_hub_with_its_own_database_what_follows_a_write_waits_for_that_hubs
     assert google == []
 
 
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES, transaction=True)
-def test_two_uploads_of_one_image_at_once_in_a_hub_with_its_own_database_keep_one_row_and_neither_fails(
-    hub_a, hub_files
-):
+@HUB_DB_COMMITTED
+@pytest.mark.usefixtures("plan_with_room")
+def test_two_uploads_of_one_image_at_once_in_a_hub_with_its_own_database_keep_one_row_and_neither_fails(hub_files):
     # The second one's row waits for the first one's COMMIT and then finds it: its duplicate is recovered from on the
     # hub's own connection, never on control's (``default``), which would leave the hub's transaction aborted (a 500).
-    ctx = ctx_for(scope=Scope("host", hub_a.slug))
     raw = png_bytes()
-    first_kept, release = threading.Event(), threading.Event()
-
-    def in_the_hub(body):
-        def run_in_the_hub():
-            try:
-                with use_hub(hub_a):
-                    return body()
-            finally:
-                connections[hubs.HUB_A_ALIAS].close()
-
-        return run_in_the_hub
-
-    def first():
-        with transaction.atomic(using=hubs.HUB_A_ALIAS):
-            out = upload(raw, ctx=ctx)
-            first_kept.set()
-            release.wait(5)
-        return out
-
-    holder, held = _in_thread(in_the_hub(first))
-    assert first_kept.wait(5)
-    waiter, second = _in_thread(in_the_hub(lambda: upload(raw, ctx=ctx)))
-    waiter.join(0.3)
-    waited = waiter.is_alive()
-    release.set()
-    holder.join(5)
-    waiter.join(5)
-
-    assert "result" in held, held
-    assert "result" in second, second
+    held, second, waited = while_the_first_holds(lambda: upload(raw), lambda: upload(raw))
+    assert not isinstance(held, Exception) and held is not None, held
+    assert not isinstance(second, Exception), second
     assert waited, "the second upload did not wait for the first one's row"
-    assert second["result"].id == held["result"].id
-    with use_hub(hub_a):
-        assert Image.objects.count() == 1
+    assert second.id == held.id
+    assert Image.objects.count() == 1
 
 
 # Google's reviews
@@ -668,26 +679,26 @@ def google(monkeypatch, settings):
 def test_saving_a_new_place_asks_google_after_the_commit_and_keeps_the_answer_in_the_site(
     google, django_capture_on_commit_callbacks
 ):
-    with django_capture_on_commit_callbacks(execute=True):
+    with django_capture_on_commit_callbacks(execute=True, using=current_alias()):
         out = save(full_content(reviews={"place_ref": PLACE_ID}))
     # The save answers before Google is asked (after its COMMIT); the next read of the site has the reviews.
     assert out.reviews.state == "waiting"
-    assert google == [("a", PLACE_ID, ["Gran Vía 1", "28013 Madrid"])]
+    assert google == [(A.key, PLACE_ID, ["Gran Vía 1", "28013 Madrid"])]
     assert Site.objects.get().reviews_snapshot["place_id"] == PLACE_ID
     status = run("website.site.get").reviews
     assert (status.state, status.rating, status.count) == ("ready", 4.7, 128)
     # Saving again with the same place does not ask again; another place does.
-    with django_capture_on_commit_callbacks(execute=True):
+    with django_capture_on_commit_callbacks(execute=True, using=current_alias()):
         save(full_content(reviews={"place_ref": PLACE_ID}, hero={"title": "Other"}))
     assert len(google) == 1
     link = f"https://www.google.com/maps/place/?q=place_id:{PLACE_ID}"
-    with django_capture_on_commit_callbacks(execute=True):
+    with django_capture_on_commit_callbacks(execute=True, using=current_alias()):
         save(full_content(reviews={"place_ref": link}))
     assert [ref for _slug, ref, _address in google] == [PLACE_ID, link]
 
 
 def test_a_hidden_section_or_no_place_asks_google_nothing(google, django_capture_on_commit_callbacks):
-    with django_capture_on_commit_callbacks(execute=True):
+    with django_capture_on_commit_callbacks(execute=True, using=current_alias()):
         save(full_content(reviews={"place_ref": PLACE_ID, "hidden": True}))
         save(full_content(reviews={"place_ref": ""}))
     assert google == []
@@ -695,17 +706,17 @@ def test_a_hidden_section_or_no_place_asks_google_nothing(google, django_capture
 
 
 def test_publishing_drops_what_is_kept_and_asks_google_again(google, monkeypatch, django_capture_on_commit_callbacks):
-    with django_capture_on_commit_callbacks(execute=True):
+    with django_capture_on_commit_callbacks(execute=True, using=current_alias()):
         save(full_content(reviews={"place_ref": PLACE_ID}))
-    cache.set(reviews.reviews_key("a", PLACE_ID), {**google_reviews(), "count": 1}, reviews.TTL)
+    cache.set(reviews.reviews_key(A.key, PLACE_ID), {**google_reviews(), "count": 1}, reviews.TTL)
     forgotten = []
     real_forget = reviews.forget
     monkeypatch.setattr(reviews, "forget", lambda *args: (forgotten.append(args), real_forget(*args)))
-    with django_capture_on_commit_callbacks(execute=True):
+    with django_capture_on_commit_callbacks(execute=True, using=current_alias()):
         run("website.site.publish")
-    assert forgotten == [("a", PLACE_ID, ["Gran Vía 1", "28013 Madrid"])]
+    assert forgotten == [(A.key, PLACE_ID, ["Gran Vía 1", "28013 Madrid"])]
     assert len(google) == 2
-    assert reviews.cached("a", PLACE_ID, [])["count"] == 128
+    assert reviews.cached(A.key, PLACE_ID, [])["count"] == 128
 
 
 def test_an_answer_already_kept_is_not_written_to_the_site_again(google, monkeypatch):
@@ -713,15 +724,16 @@ def test_an_answer_already_kept_is_not_written_to_the_site_again(google, monkeyp
 
     save(full_content(reviews={"place_ref": PLACE_ID}))
     kept = google_reviews(count=7)
-    cache.set(reviews.reviews_key("a", PLACE_ID), kept, reviews.TTL)
+    cache.set(reviews.reviews_key(A.key, PLACE_ID), kept, reviews.TTL)
     monkeypatch.setattr(reviews, "load", lambda slug, ref, address: reviews.cached(slug, ref, address))
     assert refresh_reviews(A, Site.objects.get().content) == kept
     assert Site.objects.get().reviews_snapshot == {}
 
 
-def test_each_hub_keeps_its_own_reviews(google, django_capture_on_commit_callbacks):
-    with django_capture_on_commit_callbacks(execute=True):
-        save(full_content(reviews={"place_ref": PLACE_ID}), ctx=ctx_for(scope=B))
-    assert google[0][0] == "b"
-    assert Site.objects.get(hub_id=Hub.objects.get(slug="b").id).reviews_snapshot["place_id"] == PLACE_ID
+def test_each_hub_keeps_its_own_reviews(google, django_capture_on_commit_callbacks, hub_b):
+    with use_hub(hub_b):
+        with django_capture_on_commit_callbacks(execute=True, using=current_alias()):
+            save(full_content(reviews={"place_ref": PLACE_ID}), ctx=ctx_for(scope=B))
+        assert Site.objects.get(hub_id=Hub.objects.get(slug=B.key).id).reviews_snapshot["place_id"] == PLACE_ID
+    assert google[0][0] == B.key
 

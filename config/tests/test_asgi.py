@@ -17,16 +17,17 @@ from asgiref.sync import async_to_sync
 from django.core.signals import request_finished, request_started
 from django.db import close_old_connections
 
+from base.tenancy.tests.business import A, HUB_DB
 from config.asgi import application
 
-# The SPA reads the session through an operation (a transaction).
+# The SPA reads the session through an operation (a transaction), in business A's own database.
 pytestmark = [
-    pytest.mark.django_db,
-    pytest.mark.usefixtures("keep_the_test_connection", "spa_manifest"),
+    HUB_DB,
+    pytest.mark.usefixtures("hub_a", "keep_the_test_connection", "spa_manifest"),
 ]
 
 PLATFORM_HOST = "hubs.localhost:8000"
-HUB_HOST = "a.localhost:8000"
+HUB_HOST = f"{A.key}.localhost:8000"
 
 
 @pytest.fixture

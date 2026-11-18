@@ -3,28 +3,30 @@ kitchen receives the rounds Sales fires (WORKBOOK «Notas técnicas»). Planted 
 (the options and the menu of a dish) is expand/contract: the code of before keeps saving dishes while it runs.
 
 The functions of the ``RunPython`` are called the way the migration runs them, with the app registry
-and a schema editor whose connection is the test database.
+and a schema editor whose connection is business A's database, inside the test's transaction.
 """
 
 import datetime as dt
 import uuid
 from importlib import import_module
 
-import pytest
 from django.apps import apps as global_apps
-from django.db import connection
+from django.db import connections
 from django.utils import timezone
 
 from apps.kitchen.models import KitchenSettings, Ticket, TicketItem
+from base.tenancy.context import current_alias
 
-pytestmark = pytest.mark.django_db
+from .conftest import HUB_DB
+
+pytestmark = HUB_DB
 
 migration = import_module("apps.kitchen.migrations.0002_settings_row")
 
 
 def test_the_settings_row_is_made_with_the_tables_at_that_moment(clock):
     KitchenSettings.objects.all().delete()
-    with connection.schema_editor() as editor:
+    with connections[current_alias()].schema_editor() as editor:
         migration.plant_settings(global_apps, editor)
     row = KitchenSettings.objects.get()
     assert row.receiving_since == clock.now
@@ -40,14 +42,14 @@ def test_planting_twice_keeps_the_row_it_found(clock):
     first.warning_minutes = 5
     first.save()
     clock.advance(days=1)
-    with connection.schema_editor() as editor:
+    with connections[current_alias()].schema_editor() as editor:
         migration.plant_settings(global_apps, editor)
     row = KitchenSettings.objects.get()
     assert row.pk == first.pk and row.warning_minutes == 5
 
 
 def test_the_reverse_removes_the_row():
-    with connection.schema_editor() as editor:
+    with connections[current_alias()].schema_editor() as editor:
         migration.remove_settings(global_apps, editor)
     assert not KitchenSettings.objects.exists()
 
@@ -66,7 +68,7 @@ def test_the_code_from_before_0004_still_saves_a_dish_during_the_deploy():
         number="20261014-0007", day=dt.date(2026, 10, 14), sequence=7, received_at=timezone.now()
     )
     dish = uuid.uuid7()
-    with connection.cursor() as cursor:
+    with connections[current_alias()].cursor() as cursor:
         cursor.execute(
             "INSERT INTO kitchen_ticketitem (id, ticket_id, sale_line_id, position, product_id, category_id, "
             "name, quantity, unit, notes, station_id, station_name, destination, printer_usage, printer_name, "

@@ -10,6 +10,7 @@ import { cleanInventory, createProduct, type Product } from './inventory-helpers
 import {  } from './invoice-helpers';
 import { cleanSales, newestSaleOf, restoreDrawer, stamp } from './sale-helpers';
 import { cleanUp as cleanTaxes, createRule, FLOW_VIEWPORTS, freshCategory, horizontalOverflow, pickSelect, regionSaleContext, taxSettingsForm, taxSettingsReady, wholeCountry } from './tax-helpers';
+import { toastSaying } from './toast-helpers';
 
 const RUN = stamp();
 let shirt: Product;
@@ -37,7 +38,7 @@ test('TAX-F11: a business of the Canary Islands keeps its region and the till ch
   await expect(form.locator('[data-testid=tax-settings-country]')).toContainText('Spain');
   await pickSelect(page, form.locator('[data-testid=tax-settings-region]'), 'Canary Islands (IGIC)');
   await form.locator('[data-testid=tax-settings-save]').click();
-  await expect(page.locator('ion-toast').filter({ hasText: 'Tax region saved.' })).toBeVisible();
+  await expect(toastSaying(page, 'Tax region saved.')).toBeVisible();
   // Kept: nothing left to save (ion-button says it with aria-disabled).
   await expect(form.locator('[data-testid=tax-settings-save]')).toHaveAttribute('aria-disabled', 'true');
 

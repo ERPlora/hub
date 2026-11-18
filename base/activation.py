@@ -314,7 +314,7 @@ def mandatory_on(current: Mapping[str, Activation], country: str, configs: Itera
     )
 
 
-def refusals(
+def refusals(  # noqa: PLR0913
     labels: Iterable[str],
     *,
     ctx: Any,
@@ -359,14 +359,14 @@ def is_platform(scope: Scope) -> bool:
 
 
 def states_of(scope: Scope) -> dict[str, Activation]:
-    """Every module's state in ``scope``'s business, read from its rows (``base.queries.app_activations``); the
+    """Every module's state in ``scope``'s business, read from its rows (``base.queries.apps.app_activations``); the
     platform (:func:`is_platform`) has every module on: nothing of it is ever off."""
     graph = module_graph()
     if is_platform(scope):
         return every_on(graph)
     from base import queries  # base.queries imports this module
 
-    return effective(queries.app_activations(scope.key), graph)
+    return effective(queries.apps.app_activations(scope.key), graph)
 
 
 def off_apps(scope: Scope) -> frozenset[str]:
@@ -418,8 +418,9 @@ def _created_apps(hub: Any) -> frozenset[str] | None:
     if isinstance(kept, list):
         return frozenset(kept)
     from base import services  # base.services imports this module
+    from base.services import provisioning
 
-    row = services.registry_row(hub.pk)
+    row = provisioning.registry_row(hub.pk)
     if row is None or CONFIRMED_BY not in (row.schema_apps or ()):
         return None
     created = services.apps_created(row)

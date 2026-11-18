@@ -12,48 +12,27 @@ one already under way when the write reads it is not found, as one deleted befor
 «Delete» (the row stays, marked deleted) and the Hub admin's (the row goes) are landed there.
 """
 
-import threading
-import time
+import uuid
 from contextlib import contextmanager
 from types import SimpleNamespace
 
 import pytest
-from django.db import connection, transaction
+from django.db import connections
 from live.errors import NotFound, OperationError
+from live.models import OutboxEvent
 
 from apps.inventory.models import Category, Product
+from apps.inventory.tests.test_concurrency import attempt, deleted, deleted_in_flight, deleted_just_before, held
 from apps.modifier.models import ModifierGroup, ModifierLink, ModifierOption
 from apps.tax.models import TaxCategory
+from base.recovery import actor_of
+from base.tenancy.context import current_alias
+from base.tenancy.tests.concurrency import at_once, meanwhile
 
-from .conftest import make_product, run
+from .conftest import HUB_DB_COMMITTED, ctx_with, make_product, run
 
-pytestmark = pytest.mark.django_db(transaction=True)
-
-
-def at_once(*calls):
-    """Runs every ``call`` in its own thread and session, released together; their results or errors."""
-    barrier = threading.Barrier(len(calls))
-    results: list = [None] * len(calls)
-
-    def worker(index, call):
-        try:
-            barrier.wait(5)
-            results[index] = call()
-        except OperationError as error:
-            results[index] = error
-        except Exception as error:  # an unexpected failure is reported by the test
-            results[index] = error
-        finally:
-            connection.close()
-
-    threads = [
-        threading.Thread(target=worker, args=(i, call)) for i, call in enumerate(calls)
-    ]
-    for thread in threads:
-        thread.start()
-    for thread in threads:
-        thread.join(30)
-    return results
+#: Several sessions of the business at once, each committing: its plan has room for them all.
+pytestmark = [HUB_DB_COMMITTED, pytest.mark.usefixtures("plan_with_room")]
 
 
 def codes(results) -> list[str]:
@@ -86,7 +65,7 @@ def test_two_options_with_the_same_name_in_a_group_at_once_one_wins():
 
 def test_the_same_link_twice_at_once_one_wins():
     run("modifier.group.create", {"name": "Sauces"})
-    # transaction=True flushes Taxes' factory catalogue (a data migration): one category of its own.
+    # A committed test finds business A emptied by the one before, Taxes' factory catalogue too: one category of its own.
     TaxCategory.objects.create(key="test.general", name="General")
     burger = make_product(tax="test.general")
     attach = lambda: run(
@@ -162,7 +141,7 @@ def deleted_after_the_first_read_of(name):
             deletions.extend(at_once(lambda: run("modifier.group.delete", {"group": name})))
         return result
 
-    with connection.execute_wrapper(wrapper):
+    with connections[current_alias()].execute_wrapper(wrapper):
         yield deletions
 
 
@@ -191,121 +170,12 @@ def test_a_group_deleted_between_its_name_and_its_detail_is_not_found():
 # The writes that name a product, a category or a tax category
 
 DELETIONS = ["operation", "row"]
-#: A deletion gives up after this on a row another session holds (a real one waits for its COMMIT).
-LOCK_TIMEOUT = "300ms"
-#: Postgres' ``lock_not_available``: the deletion found the row held.
-LOCK_NOT_AVAILABLE = "55P03"
-#: How long a deletion under way holds its row before it commits.
-IN_FLIGHT = 0.5
 GENERAL, PROBE = "test.general", "test.probe"
-#: The business's «Delete» of a product and of a category; the Hub admin's is the row's delete() (tax
-#: categories have only that).
-DELETE_OPERATIONS = {
-    Product: "inventory.product.delete",
-    Category: "inventory.category.delete",
-}
-
-
-def remove(target, how: str) -> None:
-    if how == "operation":
-        run(DELETE_OPERATIONS[type(target)], {"id": str(target.pk)})
-    else:
-        # What the Hub admin's «Delete» does: ModelAdmin.delete_model is the row's delete().
-        type(target).objects.get(pk=target.pk).delete()
-
-
-def delete(target, how: str) -> None:
-    """Deletes ``target`` in this session, giving up after LOCK_TIMEOUT on a row another session holds. The
-    lock timeout is the transaction's (SET LOCAL): a session-level one would go back with the connection and
-    reach the tests after this one (the autouse fixture of conftest.py fails a test that leaves it)."""
-    with transaction.atomic():
-        with connection.cursor() as cursor:
-            cursor.execute(f"SET LOCAL lock_timeout = '{LOCK_TIMEOUT}'")
-        remove(target, how)
-
-
-@contextmanager
-def deleted_just_before(statement: str, target, how: str):
-    """Deletes ``target`` in another session right before the first statement of this one that starts with
-    ``statement`` (the write that names it): between the read that found it and the write, every time. It
-    commits, or waits for this session when it holds the row (and gives up)."""
-    deletions: list = []
-
-    def wrapper(execute, sql, params, many, context):
-        if not deletions and sql.lstrip().startswith(statement):
-            deletions.extend(at_once(lambda: delete(target, how)))
-        return execute(sql, params, many, context)
-
-    with connection.execute_wrapper(wrapper):
-        yield deletions
-
-
-@contextmanager
-def deleted_in_flight(target, how: str):
-    """A deletion of ``target`` under way in another session when this one first reads its table: it holds
-    the row, as a deletion takes it first, and commits a moment later while this one goes on."""
-    table = f'FROM "{type(target)._meta.db_table}"'
-    holds = threading.Event()
-    deletions: list = []
-
-    def deletion():
-        try:
-            with transaction.atomic():
-                type(target).objects.select_for_update().get(pk=target.pk)
-                holds.set()
-                time.sleep(IN_FLIGHT)
-                remove(target, how)
-            deletions.append("ok")
-        except Exception as error:  # reported to the test, which fails on it
-            deletions.append(repr(error))
-        finally:
-            holds.set()
-            connection.close()
-
-    thread = threading.Thread(target=deletion)
-
-    def wrapper(execute, sql, params, many, context):
-        if thread.ident is None and sql.lstrip().upper().startswith("SELECT") and table in sql:
-            thread.start()
-            holds.wait(5)
-        return execute(sql, params, many, context)
-
-    try:
-        with connection.execute_wrapper(wrapper):
-            yield deletions
-    finally:
-        if thread.ident is not None:
-            thread.join(30)
-
-
-def deleted(deletions) -> list[str]:
-    return ["ok" if not isinstance(result, Exception) else repr(result) for result in deletions]
-
-
-def sqlstate(error) -> str | None:
-    while error is not None:
-        if getattr(error, "sqlstate", None):
-            return error.sqlstate
-        error = error.__cause__ or error.__context__
-    return None
-
-
-def held(deletions) -> bool:
-    """The deletion waited for the row this write holds (and gave up)."""
-    return len(deletions) == 1 and sqlstate(deletions[0]) == LOCK_NOT_AVAILABLE
-
-
-def attempt(call):
-    """What ``call`` answers: its result, or the error it is refused with (a 500 is raised as it comes)."""
-    try:
-        return call()
-    except OperationError as error:
-        return error
 
 
 @pytest.fixture
 def world():
-    # transaction=True flushes Taxes' factory catalogue (a data migration): categories of its own.
+    # A committed test finds business A emptied by the one before, Taxes' factory catalogue too: categories of its own.
     general = TaxCategory.objects.create(key=GENERAL, name="General")
     sauces = run("modifier.group.create", {"name": "Sauces"})
     return SimpleNamespace(
@@ -393,3 +263,28 @@ def test_a_tax_category_being_deleted_when_an_option_names_it_is_refused(world, 
     assert (outcome.status, outcome.code, list(outcome.fields)) == (422, "invalid_field", ["tax_category_key"])
     assert not ModifierOption.objects.filter(name="Truffle").exists()
     assert ModifierOption.objects.get(pk=world.mayo.id).tax_category_id is None
+
+
+def reading(table: str):
+    """Whether a statement is this session's read of ``table``."""
+    return lambda sql: sql.lstrip().upper().startswith("SELECT") and f'FROM "{table}"' in sql
+
+
+def test_a_default_the_business_chooses_while_an_option_comes_back_is_never_taken_from_it():
+    sauces = run("modifier.group.create", {"name": "Sauces", "max_choices": 1})
+    ketchup = run("modifier.option.create", {"group": "Sauces", "name": "Ketchup"})
+    recovery = actor_of(uuid.uuid7())
+    choose = lambda: run("modifier.option.update", {"id": str(ketchup.id), "is_default": True})  # noqa: E731
+
+    # The recovery has just read that the group has room for its option chosen by default.
+    with meanwhile(reading(ModifierOption._meta.db_table), choose) as chosen:
+        run(
+            "modifier.option.recover",
+            {"group_id": str(sauces.id), "name": "Alioli", "is_default": True},
+            ctx=ctx_with("*", actor=recovery),
+        )
+
+    # The business's choice waited for the group the recovery held, and stands: the recovery changed nothing of its own.
+    assert codes(chosen) == ["ok"]
+    assert list(ModifierOption.objects.filter(is_default=True).values_list("name", flat=True)) == ["Ketchup"]
+    assert list(OutboxEvent.objects.filter(actor=recovery).values_list("name", flat=True)) == ["modifier.option.created"]

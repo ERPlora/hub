@@ -103,11 +103,11 @@ describe('closeTopmostLayer', () => {
     expect(idle.dismiss).not.toHaveBeenCalled();
   });
 
-  it('a toast never holds the press', async () => {
-    const toast = presentOverlay('ion-toast', { backdropDismiss: false });
-
+  it('a toast on screen never holds the press, nor does the press take it away', async () => {
+    const toast = document.body.appendChild(Object.assign(document.createElement('div'), { role: 'status', tabIndex: 0 }));
+    toast.dataset.testid = 'toast';
     await expect(closeTopmostLayer(document, window)).resolves.toBe('none');
-    expect(toast.dismiss).not.toHaveBeenCalled();
+    expect(toast.isConnected).toBe(true);
   });
 
   it('closes an open side menu', async () => {

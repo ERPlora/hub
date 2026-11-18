@@ -8,6 +8,7 @@ stood in for (``gateway_answers``).
 
 import datetime as dt
 import hashlib
+import re
 
 import httpx
 import pytest
@@ -29,12 +30,11 @@ from apps.verifactu.models import (
     Record,
     SendControl,
 )
-import re
-
 from apps.verifactu.tests.conftest import (
-    A,
     FIXTURES,
+    HUB_DB,
     RECIPIENT,
+    A,
     aeat_holds,
     answering,
     b64,
@@ -46,7 +46,7 @@ from apps.verifactu.tests.conftest import (
     run,
 )
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 ISSUER_NIF = "B12345674"
 
@@ -203,7 +203,7 @@ def test_the_xml_is_built_when_sealed_and_passes_the_schema(issuer):
     assert record.fingerprint and record.qr_url
     assert record.xml.startswith("<sum1:RegistroAlta>")
     assert "<sum1:PrimerRegistro>S</sum1:PrimerRegistro>" in record.xml
-    assert "<sum1:NumeroInstalacion>a</sum1:NumeroInstalacion>" in record.xml
+    assert f"<sum1:NumeroInstalacion>{A.key}</sum1:NumeroInstalacion>" in record.xml
     assert "<sum1:IndicadorMultiplesOT>S</sum1:IndicadorMultiplesOT>" in record.xml
     assert f"<sum1:Huella>{record.fingerprint}</sum1:Huella>" in record.xml
     xsd.validate_record(
@@ -608,7 +608,7 @@ def test_a_submission_carries_the_chain_in_order_and_takes_the_aeats_acceptance(
         payload["nif"],
         payload["environment"],
         payload["route"],
-    ) == ("a", ISSUER_NIF, "testing", "erplora")
+    ) == (A.key, ISSUER_NIF, "testing", "erplora")
     sent = payload["envelope"]
     xsd.validate(sent)
     assert sent.index(first.invoice_number) < sent.index(second.invoice_number)
@@ -882,14 +882,14 @@ def test_a_representation_the_saas_has_not_approved_says_so_in_the_language_of_t
     assert "The representation grant" not in refused.message
 
 
-@pytest.mark.parametrize("change", ["route", "certificate", "account"])
+@pytest.mark.parametrize("change", ["certificate_removed", "certificate", "account"])
 def test_a_change_of_the_configuration_puts_a_refused_record_back_in_the_queue(
     issuer, storage, gateway_answers, change
 ):
     upload()
     record = refuse_once(gateway_answers)
-    if change == "route":
-        run("verifactu.config.update", {"route": "own"})
+    if change == "certificate_removed":
+        run("verifactu.certificate.remove")
     elif change == "certificate":
         upload()
     else:
@@ -926,7 +926,7 @@ def test_a_record_sealed_behind_a_refused_one_waits_for_the_same_reason(
     told = Event.objects.filter(kind=Event.Kind.DEFERRED, params__reason="refused")
     assert told.count() == 2
 
-    run("verifactu.config.update", {"route": "own"})
+    upload()
     gateway_answers.set(answering())
     run("verifactu.contingency.process")
 
@@ -1002,11 +1002,14 @@ def test_an_unreadable_answer_is_to_retry(issuer, gateway_answers):
     )
 
 
-def test_without_a_certificate_the_own_route_cannot_send(
-    issuer, gateway_answers
+def test_live_on_the_own_route_without_a_certificate_it_cannot_send(
+    issuer, gateway_answers, settings
 ):
-    Config.objects.create(route="own")
+    open_production(settings)
+    own_certificate()
+    Config.objects.create(environment="production", route="own")
     record = Record.objects.get(pk=create(ticket()).record.id)
+    OwnCertificate.objects.all().delete()
     assert run("verifactu.contingency.process").reason == "own_certificate_missing"
     record.refresh_from_db()
     assert record.wait_reason == "own_certificate_missing"
@@ -1497,22 +1500,12 @@ def own_certificate(days: float = 400) -> OwnCertificate:
     )
 
 
-def test_the_own_route_needs_a_loaded_certificate(issuer):
-    assert (
-        code_of(lambda: run("verifactu.config.update", {"route": "own"}))
-        == "verifactu.no_own_certificate"
-    )
+def test_a_valid_certificate_is_the_route_and_an_expired_one_is_none(issuer):
+    assert run("verifactu.config.get").route == "erplora"
     own_certificate()
-    assert run("verifactu.config.update", {"route": "own"}).route == "own"
-    assert outbox("verifactu.config.changed")
-
-
-def test_an_expired_certificate_is_no_certificate(issuer):
-    own_certificate(days=-1)
-    assert (
-        code_of(lambda: run("verifactu.config.update", {"route": "own"}))
-        == "verifactu.no_own_certificate"
-    )
+    assert run("verifactu.config.get").route == "own"
+    OwnCertificate.objects.update(expires_at=timezone.now() - dt.timedelta(days=1))
+    assert run("verifactu.config.get").route == "erplora"
 
 
 def test_going_live_is_closed_until_erplora_opens_it_on_the_server(issuer, settings):
@@ -1555,33 +1548,16 @@ def test_going_live_with_the_own_certificate_needs_no_authorisation(issuer, sett
     # valid certificate alone; ERPlora's approval is ERPlora filing for the business.
     open_production(settings)
     own_certificate()
-    run("verifactu.config.update", {"route": "own"})
     assert run("verifactu.config.go_live").environment == "production"
+    assert Config.objects.get().route == "own"
 
 
-def test_in_production_erplora_takes_over_with_the_approved_authorisation_alone(issuer, settings):
+def test_going_live_with_an_expired_own_certificate_asks_for_the_authorisation(issuer, settings):
+    # Expired, it is no certificate: the route of that moment is ERPlora's, which needs its approval.
     open_production(settings)
-    own_certificate()
-    run("verifactu.config.update", {"route": "own"})
-    run("verifactu.config.go_live")
-    erplora = lambda: run("verifactu.config.update", {"route": "erplora"})  # noqa: E731
-    assert code_of(erplora) == "verifactu.representation_not_approved"
-    # An older SaaS still says the live option is unpaid: on any plan the approval is enough.
-    run(
-        "verifactu.config.sync",
-        {"version": 1, "live_paid": False, "representation": {"status": "approved"}},
-        system_context(A),
-    )
-    assert erplora().route == "erplora"
-
-
-def test_going_live_with_an_expired_own_certificate_is_refused(issuer, settings):
-    open_production(settings)
-    own_certificate()
-    run("verifactu.config.update", {"route": "own"})
-    OwnCertificate.objects.update(expires_at=timezone.now() - dt.timedelta(days=1))
-    assert code_of(lambda: run("verifactu.config.go_live")) == "verifactu.no_own_certificate"
-    assert Config.objects.get().environment == "testing"
+    own_certificate(days=-1)
+    assert code_of(lambda: run("verifactu.config.go_live")) == "verifactu.representation_not_approved"
+    assert run("verifactu.config.get").environment == "testing"
 
 
 @pytest.mark.parametrize("status", ["past_due", "suspended"])
@@ -1668,7 +1644,6 @@ def test_in_production_without_a_way_to_the_aeat_nothing_new_is_sealed(
     open_production(settings)
     if problem == "own_certificate_missing":
         own_certificate()
-        run("verifactu.config.update", {"route": "own"})
         run("verifactu.config.go_live")
     else:
         live_through_erplora()
@@ -1683,7 +1658,7 @@ def test_in_production_without_a_way_to_the_aeat_nothing_new_is_sealed(
 
 
 def test_in_testing_a_missing_way_never_refuses_a_sale(issuer):
-    Config.objects.create(route="own")
+    Config.objects.create(representation_status="revoked")
     record = Record.objects.get(pk=create(ticket()).record.id)
     assert (record.environment, record.status) == ("testing", "pending")
 
@@ -1714,7 +1689,7 @@ def test_a_photo_saying_the_live_option_is_unpaid_stops_nothing_in_production(
     first = Record.objects.get(pk=create(ticket()).record.id)
     second = Record.objects.get(pk=create(ticket(2000)).record.id)
     assert (first.environment, second.environment, second.sequence) == ("production", "production", 2)
-    assert run("verifactu.config.update", {"route": "erplora"}).route == "erplora"
+    assert run("verifactu.config.get").route == "erplora"
     gateway_answers.set(answering())
     assert run("verifactu.contingency.process").sent == 2
     config = run("verifactu.config.get")
@@ -1792,7 +1767,7 @@ def test_nobody_but_the_system_receives_the_accounts_photo(db):
 
 def test_the_configuration_is_the_owners(db):
     with pytest.raises(PermissionDenied):
-        run("verifactu.config.update", {"route": "erplora"}, ctx_for("hub_manager"))
+        run("verifactu.config.go_live", ctx=ctx_for("hub_manager"))
 
 
 # The reaction to Invoicing's notice (the backup when the emission could not seal)
@@ -1836,11 +1811,6 @@ def upload(p12: bytes | None = None, password: str = "secret", ctx=None):
         {"p12_base64": b64(p12 or make_p12()), "password": password},
         ctx,
     )
-
-
-def own_route(p12: bytes | None = None):
-    upload(p12)
-    run("verifactu.config.update", {"route": "own"})
 
 
 def test_upload_stores_the_certificate_sealed_and_reports_its_holder(issuer, storage):
@@ -1924,18 +1894,19 @@ def test_only_who_configures_uploads_and_removes(issuer, storage):
         run("verifactu.certificate.remove", {}, manager)
 
 
-def test_remove_leaves_the_own_route_waiting(
+def test_remove_in_testing_leaves_the_seal_to_file(
     issuer, storage, gateway_answers
 ):
-    own_route()
+    upload()
     out = run("verifactu.certificate.remove")
-    assert out.own_certificate.loaded is False
+    assert (out.own_certificate.loaded, out.route) == (False, "erplora")
     assert not OwnCertificate.objects.exists()
-    assert queries.route_problem(queries.config_row(), "testing", A) == "own_certificate_missing"
+    assert queries.route_problem(queries.config_row(), "testing", A) == ""
     assert Event.objects.filter(message_key="certificate_removed").exists()
+    gateway_answers.set(answering())
     create(ticket())
-    assert run("verifactu.contingency.process").reason == "own_certificate_missing"
-    assert gateway_answers.calls == []
+    assert run("verifactu.contingency.process").sent == 1
+    assert gateway_answers.calls[-1][1]["route"] == "erplora"
 
 
 def test_removing_without_a_certificate_changes_nothing(issuer):
@@ -1947,7 +1918,7 @@ def test_sending_by_own_route_hands_the_certificate_to_the_gateway(
     issuer, storage, gateway_answers
 ):
     p12 = make_p12()
-    own_route(p12)
+    upload(p12)
     gateway_answers.set(answering())
     record = Record.objects.get(pk=create(ticket()).record.id)
     run("verifactu.contingency.process")
@@ -1959,20 +1930,10 @@ def test_sending_by_own_route_hands_the_certificate_to_the_gateway(
     assert record.status == "accepted"
 
 
-def test_erplora_route_never_hands_a_certificate(
-    issuer, storage, gateway_answers
-):
-    upload()
-    gateway_answers.set(answering())
-    create(ticket())
-    run("verifactu.contingency.process")
-    assert "certificate" not in gateway_answers.calls[-1][1]
-
-
 def test_an_unreadable_certificate_keeps_the_record_waiting(
     issuer, storage, gateway_answers
 ):
-    own_route()
+    upload()
     record = Record.objects.get(pk=create(ticket()).record.id)
     storage.FISCAL_CERTIFICATE_KEY = certificates.generate_key()  # rotated
     out = run("verifactu.contingency.process")
@@ -1992,7 +1953,7 @@ def test_the_probe_and_the_query_carry_the_certificate_on_the_own_route(
     issuer, storage, gateway_answers
 ):
     p12 = make_p12()
-    own_route(p12)
+    upload(p12)
     material = {"p12_base64": b64(p12), "password": "secret"}
     gateway_answers.set(gateway.Reply(kind=gateway.ANSWERED, ready=True, message="Ready."))
     assert run("verifactu.diagnostic.run").gateway_ready is True
@@ -2007,7 +1968,7 @@ def test_the_probe_and_the_query_carry_the_certificate_on_the_own_route(
 def test_the_connection_test_says_an_unreadable_certificate_and_asks_nothing(
     issuer, storage, gateway_answers
 ):
-    own_route()
+    upload()
     storage.FISCAL_CERTIFICATE_KEY = ""
     result = run("verifactu.diagnostic.run")
     assert result.can_send is False

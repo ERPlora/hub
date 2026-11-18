@@ -40,7 +40,8 @@ from live.models import OutboxEvent
 from live.operations import get as get_operation
 from psycopg import sql
 
-from base import registry, services
+from base import registry
+from base.services import photo, provisioning
 from base.models import EventDelivery, HubIdentity
 from base.schemas import HubCutFinishIn
 from base.tenancy import connections as tenancy_connections
@@ -162,7 +163,7 @@ def copy_order(tables: Iterable[str], points_to: Iterable[tuple[str, str]]) -> l
     return ordered
 
 
-def _strongly_connected(tables: list[str], parents: dict[str, list[str]]) -> list[list[str]]:
+def _strongly_connected(tables: list[str], parents: dict[str, list[str]]) -> list[list[str]]:  # noqa: C901
     """Tarjan's strongly connected components of the graph ``table → its parents``, each sorted."""
     index_of: dict[str, int] = {}
     low: dict[str, int] = {}
@@ -397,24 +398,24 @@ def cut_hub(hub_id, mode: str, *, dump: str = "") -> Outcome:
         raise CutError(f"{mode!r} makes no database.")
     started = time.monotonic()
     with use_control():
-        if services.claim_hub(hub_id, timezone.now(), LEASE) is None:
+        if provisioning.claim_hub(hub_id, timezone.now(), LEASE) is None:
             raise CutError("another process is working on it (its lease is held).")
         try:
             return _cut(hub_id, mode, dump, started)
         finally:
-            services.release_hub(hub_id, timezone.now())
+            provisioning.release_hub(hub_id, timezone.now())
 
 
 def _cut(hub_id, mode: str, dump: str, started: float) -> Outcome:
     def renew() -> None:
         try:
-            services.renew_hub_lease(hub_id, timezone.now(), LEASE)
-        except services.ProvisioningStopped as stopped:
+            provisioning.renew_hub_lease(hub_id, timezone.now(), LEASE)
+        except provisioning.ProvisioningStopped as stopped:
             raise CutError(f"its lease went to another process, which cuts it now: {stopped}") from stopped
 
     try:
-        hub = services.place_hub(hub_id)
-    except services.ProvisioningFailed as failed:
+        hub = provisioning.place_hub(hub_id)
+    except provisioning.ProvisioningFailed as failed:
         raise CutError(str(failed)) from failed
     if hub.db_name or hub.status != Hub.Status.READY:
         raise CutError(
@@ -458,7 +459,7 @@ def _seed_and_finish(hub, mode: str, copied: dict[str, int], dump: str, renew: C
     finish = get_operation("base.hub.cut_finish")
     for _ in range(provision.SEED_ROUNDS):
         with use_hub(hub):
-            services.apply_kept_photo(hub)
+            photo.apply_kept_photo(hub)
         renew()
         done = finish(
             system_context(registry.REGISTRY_SCOPE),
@@ -474,7 +475,7 @@ def _seed_and_finish(hub, mode: str, copied: dict[str, int], dump: str, renew: C
         )
         if done.done:
             return
-        found = services.registry_row(hub.id)
+        found = provisioning.registry_row(hub.id)
         hub.state, hub.state_version = found.state, found.state_version
     raise CutError(f"the SaaS's photo kept changing while it was seeded ({provision.SEED_ROUNDS} times).")
 
@@ -482,10 +483,10 @@ def _seed_and_finish(hub, mode: str, copied: dict[str, int], dump: str, renew: C
 def _undo(hub) -> None:
     """Drop what a cut that broke made, unless control already names it (its last step went through) or its lease is
     another process's now (what is under that name is the other cut's)."""
-    found = services.registry_row(hub.id)
+    found = provisioning.registry_row(hub.id)
     if found is not None and found.db_name:
         return
-    if not services.holds_hub_lease(hub.id):
+    if not provisioning.holds_hub_lease(hub.id):
         logger.warning(
             "base.tenancy.cut.undo_skipped hub=%s: another process holds its lease; %s is that one's.",
             hub.slug,

@@ -10,12 +10,11 @@ import respx
 from live.context import Scope
 
 from apps.whatsapp_inbox.models import Conversation, Message
-from apps.whatsapp_inbox.tests.conftest import NOW, ctx_for, receive, resume_each, run, system
+from apps.whatsapp_inbox.tests.conftest import HUB_DB, NOW, ctx_for, receive, resume_each, run, system
 from base.tenancy.context import use_hub
-from base.tenancy.tests import hubs
 
 pytestmark = [
-    pytest.mark.django_db(databases=hubs.HUB_DATABASES),
+    HUB_DB,
     pytest.mark.usefixtures("no_test_fallback"),
 ]
 

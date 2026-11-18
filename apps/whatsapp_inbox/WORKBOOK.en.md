@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:e647fc7c37895c3d61a277160f020589b582941f264f2b68eb9f4b559aed4679 -->
+<!-- generated from WORKBOOK.md sha256:02e44b0a80ffe235ab16f8d5e469a9143e2e036ee730250f0c5b473926e4c671 -->
 
 ## What it is for and who it is for
 
@@ -43,11 +43,11 @@ conversation as a message from the business (Meta's coexistence).
 **Wins:** an inbox you answer from (Square, Shopify, Fresha, Vagaro, Odoo), with three statuses (open, pending,
 closed) where a new message from the customer reopens the conversation (Zendesk), assignment to whoever can read the
 inbox with "Assign to me" that never overrides someone else (Shopify, Chakra), internal notes in the thread (Fresha,
-Intercom, Front), Meta's 24-hour rule enforced on the server and the templates managed in the app itself (Odoo, WATI,
-Respond.io and the current product).
-**Why not the others:** answering only from the phone (the current product) forces you to pick up the phone and
+Intercom, Front), Meta's 24-hour rule enforced on the server and the templates managed in the app itself (Odoo, WATI
+and Respond.io).
+**Why not the others:** answering only from the phone forces you to pick up the phone and
 leaves the inbox read-only; two statuses (Shopify) do not tell "waiting for the customer" from "it is done";
-assigning by typing an identifier (the current product) is used by nobody; sending the owner to WhatsApp Manager to
+assigning by typing an identifier is used by nobody; sending the owner to WhatsApp Manager to
 create the templates takes them out of the app for something they do every day.
 
 ## Before you start
@@ -349,7 +349,9 @@ Screen: Inbox
 Steps:
 1. In **Filters**, choose **Status: Open** and **Unread** and press **Apply**: the conversations whose last message
    is the customer's are left.
-2. The Hub's bell counts **WhatsApp customers waiting for an answer** and leads to the **Inbox**; it also counts the
+2. The Hub's bell counts **WhatsApp customers waiting for an answer** ("N WhatsApp customers waiting for an answer",
+   with "Answer within 24 hours of their last message: after that, WhatsApp only lets you send an approved
+   template.") and leads with "Answer the customers" to the **Inbox**; it also counts the
    conversations an automatic answer could not answer, marked "Needs attention" next to the name (F20). It goes down
    by itself as soon as someone answers (from the Hub or from the phone), leaves it pending or closes it, and it does
    not show when nobody is waiting.

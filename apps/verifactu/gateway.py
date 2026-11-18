@@ -135,7 +135,7 @@ def _refusal(response: httpx.Response, error: dict | None) -> Reply:
     return Reply(kind=REFUSED, code=str(error["code"]), message=message)
 
 
-def _reply(path: str, payload: dict) -> Reply:
+def _reply(path: str, payload: dict) -> Reply:  # noqa: PLR0911
     failure, response, message = _post(path, payload)
     if response is None:
         return Reply(kind=failure, message=message)
@@ -180,7 +180,7 @@ def _reply(path: str, payload: dict) -> Reply:
     )
 
 
-def _body(
+def _body(  # noqa: PLR0913, PLR0917
     hub: str,
     nif: str,
     environment: str,
@@ -199,7 +199,7 @@ def _body(
     return body
 
 
-def submit(
+def submit(  # noqa: PLR0913
     *,
     hub: str,
     nif: str,
@@ -212,7 +212,7 @@ def submit(
     return _reply(SUBMIT_PATH, _body(hub, nif, environment, route, certificate, envelope))
 
 
-def query(
+def query(  # noqa: PLR0913
     *,
     hub: str,
     nif: str,

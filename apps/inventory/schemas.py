@@ -18,6 +18,7 @@ from ninja import Field, Schema
 from pydantic import ConfigDict, StringConstraints, model_validator
 
 from base.images import MAX_UPLOAD_BASE64
+from base.recovery import ImageInCopyIn
 from base.schemas import CatalogImageOut, names
 
 T = TypeVar("T")
@@ -125,7 +126,7 @@ Said = _text(200, 1)
 #: A raw CSV cell, as typed in the file.
 Cell = _text(500)
 
-# The assistant's card names the record a write acts on by these reads (base/assistant.py ``REFERS``), run as whoever
+# The assistant's card names the record a write acts on by these reads (base/assistant/cards.py ``REFERS``), run as whoever
 # asks, never by its id: a product and a category by their name, as the screens' «Delete» dialogs and forms say them.
 A_PRODUCT = names("inventory.product.get")
 A_CATEGORY = names("inventory.category.get")
@@ -205,6 +206,11 @@ class ProductIdIn(Schema):
     business and in the business."""
 
     id: UUID = Field(title=T_PRODUCT, description="The product's id.")
+
+
+class ProductRestoreIn(ProductIdIn, ImageInCopyIn):
+    """A deleted product of a separate copy the business still holds, by its id, and the image it showed there: one
+    deleted before deleting kept the image of the library gets it back."""
 
 
 class CategoryRefIn(Schema):
@@ -450,6 +456,11 @@ class ProductIn(Schema):
     is_active: bool = Field(
         True, description="Whether it is on sale; one created inactive stays out of the till until it is activated."
     )
+
+
+class ProductRecoverIn(ProductIn, ImageInCopyIn):
+    """A product of a separate copy the business no longer holds: what ``inventory.product.create`` takes and the image
+    it showed there (the business makes its own id)."""
 
 
 class ProductPatchIn(ProductRefIn):

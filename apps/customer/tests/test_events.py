@@ -10,7 +10,7 @@ from live.operations import NAME_RE, get
 
 from apps.customer import events
 from apps.customer.models import Activity, Customer, Purchase
-from apps.customer.tests.conftest import A
+from apps.customer.tests.conftest import HUB_DB, A
 
 
 def declared():
@@ -87,9 +87,9 @@ def test_an_event_it_does_not_react_to_does_nothing():
 
 
 def _sale_run(name: str, data: dict):
-    from apps.sale.tests.conftest import run
+    from apps.sale.tests.conftest import ctx_for, run
 
-    return run(name, data)
+    return run(name, data, ctx_for(scope=A))
 
 
 def _last_payload(name: str) -> dict:
@@ -126,7 +126,7 @@ def _paid(ana, quantity="2"):
     )
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_paid_sale_is_recorded_on_its_card_once(coffee, ana):
     _paid(ana)
     payload = _last_payload("sale.sale.completed")
@@ -136,7 +136,7 @@ def test_a_paid_sale_is_recorded_on_its_card_once(coffee, ana):
     assert events.react(A, "sale.sale.completed", payload).recorded is False
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_voided_sale_is_taken_off_its_card(coffee, ana):
     sale = _paid(ana)
     events.react(A, "sale.sale.completed", _last_payload("sale.sale.completed"))
@@ -146,7 +146,7 @@ def test_a_voided_sale_is_taken_off_its_card(coffee, ana):
     assert (card.total_purchases, card.total_spent) == (0, 0)
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_refund_lowers_the_spend_and_stays_in_the_history_once(coffee, ana):
     sale = _paid(ana)
     events.react(A, "sale.sale.completed", _last_payload("sale.sale.completed"))

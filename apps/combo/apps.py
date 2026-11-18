@@ -31,6 +31,12 @@ class ComboConfig(LiveAppConfig):
     # The menus' own photos (COMBO-F14, base.images): served by /p/media/ to the hub's sessions only.
     members_media = ["combo/combos/"]
     default_auto_field = "django.db.models.BigAutoField"
+    # What these words mean to the Hub's assistant (base.assistant.relevance.synonyms). An «opción» or an «elección» of a course
+    # is a choice (combo.option), as of a modifier group (modifier.option). live still reads «ordena» and «orden» as
+    # «ordenador»'s stem, so they also name a device.
+    assistant_synonyms = (
+        ("opcion", "opciones", "eleccion", "elecciones", "option", "options", "choice", "choices"),
+    )
     permissions = ["combo.view", "combo.manage"]
     # Keys are the customer roles as the SaaS sends them (``hub_`` prefix included).
     role_permissions = {
@@ -42,3 +48,36 @@ class ComboConfig(LiveAppConfig):
     # Positional (id, label, icon, path): scripts/app-icons.mjs reads every line starting with
     # `icon =` as the module's own icon. One entry, no tabbar.
     navigation = [Nav("menus", _("Menus"), "ion:layers-outline", "/combo/menus")]
+
+    def recoverable_from_copy(self) -> list:
+        """What a separate copy of the business gives back when ERPlora's staff recovers from it (BASE-F114, COMBO-F15):
+        each menu the business no longer has, made again by ``combo.combo.recover``; each course its menu no longer has,
+        added again by ``combo.group.recover``; then each choice of a product that the business no longer offers in its
+        course, offered again by ``combo.option.create``, the menu builder's own, each counted apart. It goes after
+        Inventory, so a deleted product is back before its choices."""
+        from apps.combo import queries  # the models are not loaded yet when this module is
+        from base.recovery import Recoverable
+
+        return [
+            Recoverable(
+                label=_("Menus"),
+                reads_since="0002_combo_image",
+                read=queries.combos_in_copy,
+                missing=queries.combos_not_in_business,
+                create="combo.combo.recover",
+            ),
+            Recoverable(
+                label=_("Menu courses"),
+                reads_since="0001_initial",
+                read=queries.groups_in_copy,
+                missing=queries.groups_not_in_business,
+                create="combo.group.recover",
+            ),
+            Recoverable(
+                label=_("Menu choices of products"),
+                reads_since="0001_initial",
+                read=queries.options_in_copy,
+                missing=queries.options_not_in_business,
+                create="combo.option.create",
+            ),
+        ]

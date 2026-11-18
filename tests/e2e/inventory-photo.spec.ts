@@ -28,8 +28,12 @@ import {
   stamp,
   VIEWPORTS,
 } from './inventory-helpers';
-import { drawerOff, restoreDrawer } from './sale-helpers';
+import { drawerOff, restoreDrawer, tilePhotoLoaded } from './sale-helpers';
 import { rowAction } from './service-helpers';
+
+// The till and the list show the photos the first tests give: a failure stops the rest, instead of a new worker's
+// articles without them.
+test.describe.configure({ mode: 'serial' });
 
 const RUN = stamp();
 let coffee: Product;
@@ -145,15 +149,13 @@ test('INVENTORY-F32: the till shows each article’s photo, and the initials ove
     await page.setViewportSize({ width: viewport.width, height: viewport.height });
     await expect(tile(page, coffee)).toBeAttached();
     await tile(page, coffee).scrollIntoViewIfNeeded();
-    const photo = tile(page, coffee).locator('.pos-tile__thumb img');
-    await expect(photo).toHaveAttribute('src', LIBRARY_URL);
-    await expect(photo).toHaveAttribute('alt', coffee.name);
-    expect(await photoLoaded(tile(page, coffee).locator('.pos-tile__thumb'))).toBe(512);
-    expect(await photoLoaded(tile(page, own).locator('.pos-tile__thumb'))).toBe(512);
+    expect(await tilePhotoLoaded(tile(page, coffee), coffee.name, LIBRARY_URL)).toBe(512);
+    expect(await tilePhotoLoaded(tile(page, own), own.name)).toBe(512);
     // Without a photo: its initials over its colour, never a gap nor a broken image.
-    const initials = tile(page, toast).locator('.pos-tile__thumb');
-    await expect(initials.locator('img')).toHaveCount(0);
+    const initials = tile(page, toast).locator('[data-image=initials]');
+    await expect(tile(page, toast).locator('img')).toHaveCount(0);
     await expect(initials).toHaveText('ET');
+    await expect(initials.getByText('ET', { exact: true })).toBeVisible();
     await expect(initials).toHaveAttribute('style', /linear-gradient/);
     await tile(page, coffee).scrollIntoViewIfNeeded();
     await capture(page, `APP-INVENTORY-F32-${viewport.label}`);

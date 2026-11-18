@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:baa85c8936dd85733d130a971859871a3d8519137c69ea748192568685660974 -->
+<!-- generated from WORKBOOK.md sha256:ad24a182c25f96f53562b0d72aee74657553b9ace4bcc644ecf87d8e6d75e53c -->
 
 ## What it is for and who it is for
 
@@ -41,22 +41,21 @@ assistant, with nobody in front of it: **Ask the assistant** (FLOW-F37 to F39).
 | Zapier (consulting forum) | A Zap made with the account of someone who left keeps running with their credentials | https://alltomate.com/blogs/is-zapier-safe/ |
 | Business Central | Queued tasks run with the session of whoever set them ready and need their permissions | https://learn.microsoft.com/en-us/dynamics365/release-plan/2023wave1/smb/dynamics365-business-central/delegated-admins-job-queue-entries-are-run-user |
 | Odoo | Automated actions run with elevated access (`sudo`); it is advised not to hide missing permissions with it | https://deploymonkey.com/blog/odoo-sudo-superuser-security |
-| Current product (ERPlora) | "An automation acts with its own permissions, never with those of whoever created it"; they are granted one by one; the hub refuses to run a paused one | `modules/flows/WORKFLOW.md`, "Rules that are never broken" and FLOWS-F22 |
 
-**Winner:** the tools **inside the product** (Salesforce, HubSpot, Odoo and the current product) make the
+**Winner:** the tools **inside the product** (Salesforce, HubSpot, Odoo) make the
 automation run **as the business**, not as the person who created it; the integration ones (Zapier, Power
 Automate, Business Central) use the owner's account, and their forums tell what happens when that person
 leaves. Our user is a small business whose staff changes, so the automation acts **as the business**, but
-**only with the actions the owner has allowed it one by one** (like the current product): without a granted
+**only with the actions the owner has allowed it one by one**: without a granted
 permission, the step is refused and the history says so. And **running by hand requires it to be on**
-(HubSpot, Power Automate and the current product): to see what it would do while off there is **Try it**,
+(HubSpot and Power Automate): to see what it would do while off there is **Try it**,
 which runs nothing.
 **Why not the others:** with the permissions of whoever created it, the automation stops working the day
 that person leaves or changes role, which is the repeated complaint in the forums; with all the system's
 permissions and no list, a badly written automation could do anything.
 
-From the current product we keep, already checked there against Zapier, Make, Power Automate, Shopify
-Flow, Odoo and Business Central (`qa-hub-flows`, ADR-0461): **one column** of steps from top to bottom and
+Against Zapier, Make, Power Automate, Shopify Flow, Odoo and Business Central, it keeps **one column**
+of steps from top to bottom and
 not a canvas of nodes (on the counter's tablet a column is used with a finger); **no branches**: an "Only
 continue if…" that is not met ends the automation (that is working, not failing), and two outcomes are two
 automations; **starting from a template** of the gallery; and what the assistant writes is born a
@@ -653,9 +652,10 @@ card again). What the business creates afterwards starts them as always.
 Out: a run (`flow.run.started`, `flow.run.finished` or `flow.run.parked` if it waits), in the business
 where the notice happened. The same notice delivered twice starts **a single** run per automation.
 If it fails: each step that fails stops the run with its reason, visible in History; the previous steps
-stay done. An automation that would set itself off in a chain is stopped (see "Para quien lo mantiene"). An
-"Only continue if…" that can no longer be read stops the run with "This "Only continue if…" can no longer be
-read…".
+stay done. An automation that would set itself off in a chain is stopped (see "Para quien lo mantiene"), also
+when the chain goes through another app: the WhatsApp Inbox linking the conversation of her number to the card an
+automation made does not make the next one start over. An "Only continue if…" that can no longer be read stops the
+run with "This "Only continue if…" can no longer be read…".
 Involved: FLOW-F10, FLOW-F11, FLOW-F15, FLOW-F16, BASE-F114, WHATSAPP_INBOX-F04
 
 ### FLOW-F22 When the time comes, the automation starts

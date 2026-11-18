@@ -317,6 +317,49 @@ describe('RuleFormModal: fields refused with the same words (hub#888)', () => {
   });
 });
 
+// The server refuses the tiers as a whole (they must rise) on a line of their own under them, not under one tier: any
+// change the person makes to the tiers takes that line away at once, and only that line (hub#1448).
+describe('RuleFormModal: a refusal of the tiers as a whole', () => {
+  const RISING = 'Each tier starts at a higher quantity than the one before.';
+  const CODE_TAKEN = 'A discount rule with that code already exists. Pick a different code.';
+
+  async function refusedTiers(fields: Record<string, string> = { tiers: RISING }) {
+    const s = await setupAnswered();
+    await named(s, 'VOL', 'Volume');
+    await ionValue(s.field('rule_type'), 'tiered');
+    await ionValue(s.field('tier-0-min_quantity'), '6', 'ionInput');
+    await ionValue(s.field('tier-0-percent'), '10', 'ionInput');
+    await click(s.field('add-tier'));
+    await ionValue(s.field('tier-1-min_quantity'), '3', 'ionInput');
+    await ionValue(s.field('tier-1-percent'), '15', 'ionInput');
+    s.answer(422, { error: { code: 'invalid_payload', message: 'Check the fields.', fields } });
+    await click(s.save());
+    const said = () => s.inDoc('pricing-rule-form-tiers')?.textContent ?? '';
+    return { ...s, said };
+  }
+
+  const CHANGES: [string, (s: Awaited<ReturnType<typeof refusedTiers>>) => Promise<void>][] = [
+    ['typing a tier’s quantity', (s) => ionValue(s.field('tier-1-min_quantity'), '12', 'ionInput')],
+    ['typing a tier’s percent', (s) => ionValue(s.field('tier-0-percent'), '5', 'ionInput')],
+    ['removing a tier', (s) => click(s.field('tier-1-remove'))],
+    ['adding a tier', (s) => click(s.field('add-tier'))],
+  ];
+
+  it.each(CHANGES)('%s takes it away before saving again', async (_, change) => {
+    const s = await refusedTiers();
+    expect(s.said()).toContain(RISING);
+    await change(s);
+    expect(s.said()).not.toContain(RISING);
+    expect(s.sent()).toHaveLength(1);
+  });
+
+  it('a change to the tiers leaves another field’s refusal under it', async () => {
+    const s = await refusedTiers({ code: CODE_TAKEN, tiers: RISING });
+    await ionValue(s.field('tier-1-min_quantity'), '12', 'ionInput');
+    expect([s.field('code').errorText, s.said().includes(RISING)]).toEqual([CODE_TAKEN, false]);
+  });
+});
+
 // hub#938 (PRICING-F11): if the business's money cannot be read, the rule says so with «Retry» instead of waiting in grey
 // without a word, also when it opens after the read had failed (the page read the money on loading).
 describe('RuleFormModal: a business whose money cannot be read (hub#938)', () => {

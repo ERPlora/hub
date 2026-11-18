@@ -126,6 +126,7 @@ const canDismiss = useUnsavedFormOnOpen('modifier-group-form', form, open);
       <div class="modifier-form">
         <ion-input
           data-testid="modifier-group-form-name"
+          name="name"
           :value="form.name"
           :label="$t('modifier.groups.form.name')"
           label-placement="floating"
@@ -138,6 +139,7 @@ const canDismiss = useUnsavedFormOnOpen('modifier-group-form', form, open);
         />
         <ion-input
           data-testid="modifier-group-form-kitchen_name"
+          name="kitchen_name"
           :value="form.kitchenName"
           :label="$t('modifier.groups.form.kitchenName')"
           :helper-text="$t('modifier.groups.form.kitchenHint')"
@@ -152,6 +154,7 @@ const canDismiss = useUnsavedFormOnOpen('modifier-group-form', form, open);
         <div class="modifier-form__pair">
           <ion-input
             data-testid="modifier-group-form-min_choices"
+            name="min_choices"
             type="number"
             inputmode="numeric"
             min="0"
@@ -167,6 +170,7 @@ const canDismiss = useUnsavedFormOnOpen('modifier-group-form', form, open);
           />
           <ion-input
             data-testid="modifier-group-form-max_choices"
+            name="max_choices"
             type="number"
             inputmode="numeric"
             min="0"
@@ -192,6 +196,7 @@ const canDismiss = useUnsavedFormOnOpen('modifier-group-form', form, open);
         </ion-toggle>
         <ion-input
           data-testid="modifier-group-form-sort_order"
+          name="sort_order"
           type="number"
           inputmode="numeric"
           min="0"

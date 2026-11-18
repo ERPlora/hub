@@ -6,12 +6,7 @@ Lo que no entra todavía: ver «Lo que queda fuera».
 
 > Manual de usuario y especificación de la app `service`. Se escribe **antes** que el código: no se
 > programa nada que no esté aquí, y cada flujo pasa a `hecho` cuando sus tests están en verde
-> (servidor y páginas). Parte del `WORKFLOW.md` del módulo Servicios del producto actual
-> (`modules-workspace/modules/services`, `origin/main` `75ee10a`, v1.5.77) y de sus `workflow/*.md`,
-> más los servicios por profesional que el producto actual guardaba en Personal (`modules/staff`,
-> STAFF-F10, F11 y F12). Los números de flujo se conservan (`SERVICES-Fnn` → `SERVICE-Fnn`); los de
-> Personal pasan a SERVICE-F31, F32 y F33. Lo que cambia frente al producto actual lo dice «Cambios
-> frente al producto actual», al final.
+> (servidor y páginas).
 
 ## Para qué sirve y para quién
 
@@ -50,7 +45,7 @@ depende de él.
   documento fiscal; cubre líneas de servicio, no importes; la caducidad cuenta desde la compra; lo
   vendido conserva las condiciones con que se vendió; regalar o corregir es un movimiento aparte con
   motivo; anular solo un bono que no se ha usado.
-- Decisiones del producto actual que mandan aquí: ADR-0386 (un bono cubre líneas; una tarjeta regalo,
+- Decisiones que mandan aquí: ADR-0386 (un bono cubre líneas; una tarjeta regalo,
   importes), ADR-0390 (la titularidad nace al venderlo, el reloj arranca en la compra y no se
   transfiere) y ADR-0085 (el IVA se enlaza por la categoría fiscal de Impuestos).
 
@@ -229,7 +224,6 @@ cierra la ventana sin guardarlo. Con la ventana como se abrió, atrás la cierra
 | SERVICE-F35 | Subir una foto propia del servicio | hecho |
 
 ### SERVICE-F01 Dar de alta un servicio
-<!-- origen: qa:verticals/beauty/01-services-professionals-and-schedules wf:peluqueria-dia#rec_peluqueria-f04 fi:modules/services#command-services-services-create-sql-transaccional fi:modules/services#navigation fi:modules/services#permission-role_permissions fi:modules/services#query-services-services-list fi:modules/services#validation-declarativa-bloque-validates old:services/workflow/catalogo.md#services-f01 qa:modules/services/create-service-with-duration-and-price old-hub:HUB_SHELL-F27 gh:services#26 -->
 Estado: hecho
 Actor: empleado, responsable, asistente
 Pantalla: Inicio, Servicios
@@ -260,12 +254,11 @@ Si falla: dentro del formulario, cada motivo debajo de su campo: un importe que 
 «22,50 €» en un negocio de Polonia), uno que se lee de dos maneras o uno negativo; una categoría eliminada («Esa categoría no está disponible: no existe en este negocio o se
 ha eliminado.»); una categoría fiscal que no existe o está desactivada («Esa categoría fiscal no
 existe en Impuestos o está desactivada.»); sin ninguna categoría fiscal, el aviso de Impuestos. Lo
-tecleado se conserva.
+tecleado se conserva. El motivo de un campo se quita en cuanto se corrige ese campo, aunque otro diga lo mismo (hub#888).
 Implicados: TAX-F01, BASE-F01, BASE-F114 (el personal de ERPlora recupera desde una copia aparte los servicios que se
 perdieron, cada uno por esta misma alta)
 
 ### SERVICE-F02 Editar un servicio
-<!-- origen: fi:modules/services#command-services-services-update-sql-transaccional fi:modules/services#query-services-services-get old:services/workflow/catalogo.md#services-f02 -->
 Estado: hecho
 Actor: responsable, asistente
 Pantalla: Servicios
@@ -281,7 +274,6 @@ negocio.». Un servicio cuya categoría se eliminó sale «Sin categoría» y se
 Implicados: SERVICE-F31
 
 ### SERVICE-F03 Poner un servicio a precio abierto
-<!-- origen: old:services/workflow/catalogo.md#services-f03 -->
 Estado: hecho
 Actor: responsable, asistente
 Pantalla: Servicios
@@ -297,7 +289,6 @@ Si falla: una tarifa fuera de las cinco o un mínimo por encima del máximo se r
 Implicados: SALE-F09
 
 ### SERVICE-F04 Archivar un servicio
-<!-- origen: fi:modules/services#command-services-services-delete-sql-transaccional old:services/workflow/catalogo.md#services-f04 -->
 Estado: hecho
 Actor: propietario, administrador, asistente
 Pantalla: Servicios
@@ -320,7 +311,6 @@ archivar, y si Citas no contesta la confirmación sale sin esa línea.
 Implicados: APPOINTMENT-F01, APPOINTMENT-F26
 
 ### SERVICE-F05 Ver y restaurar los servicios archivados
-<!-- origen: old:services/workflow/catalogo.md#services-f05 -->
 Estado: hecho
 Actor: responsable, asistente
 Pantalla: Servicios
@@ -336,7 +326,6 @@ ofrece Editar ni Archivar y tocarla no abre nada.
 Implicados: SERVICE-F04
 
 ### SERVICE-F06 Dar de alta muchos servicios de golpe
-<!-- origen: fi:modules/services#command-services-services-bulk_create-handler-wasm-bulk_create_services old:services/workflow/catalogo.md#services-f06 -->
 Estado: hecho (asistente y API; no hay importador en pantalla)
 Actor: responsable, asistente
 Pantalla: ninguna
@@ -353,7 +342,6 @@ de la cuarta línea).
 Implicados: SERVICE-F01, SERVICE-F11
 
 ### SERVICE-F07 Crear y editar categorías
-<!-- origen: wf:peluqueria-dia#rec_peluqueria-f04 fi:modules/services#command-services-categories-create-sql-transaccional fi:modules/services#command-services-categories-update-sql-transaccional fi:modules/services#query-services-categories-list old:services/workflow/catalogo.md#services-f07 -->
 Estado: hecho
 Actor: responsable, asistente
 Pantalla: Categorías
@@ -370,12 +358,11 @@ Si falla: un nombre que ya tiene otra categoría viva (sin distinguir mayúscula
 sale debajo del campo: «Ya hay una categoría con ese nombre. Elige otro nombre.». Una categoría no
 puede ser su propio padre ni colgar de una de sus hijas: «Una categoría no puede colgar de sí misma
 ni de una de sus subcategorías.». Un padre eliminado: «Esa categoría padre no está disponible: no
-existe en este negocio o se ha eliminado.».
+existe en este negocio o se ha eliminado.». El motivo de un campo se quita en cuanto se corrige ese campo, aunque otro diga lo mismo (hub#888).
 Implicados: SERVICE-F01, SERVICE-F08, BASE-F114 (el personal de ERPlora recupera desde una copia aparte las categorías
 que el negocio ya no tiene, cada una por esta misma alta)
 
 ### SERVICE-F08 Eliminar una categoría
-<!-- origen: fi:modules/services#command-services-categories-delete-sql-transaccional old:services/workflow/catalogo.md#services-f08 -->
 Estado: hecho
 Actor: propietario, administrador
 Pantalla: Categorías
@@ -388,10 +375,15 @@ Sale: la categoría eliminada, no borrada (`service.category.deleted`); su nombr
 servicios se quedan **sin categoría** y sus subcategorías pasan a colgar de su padre (o a ser raíz).
 Si falla: en la confirmación, el motivo (por ejemplo, «Esa categoría no existe en este negocio.»).
 Implicados: SERVICE-F07, SERVICE-F02, BASE-F114 (desde una copia aparte, la categoría eliminada vuelve como una nueva,
-con los servicios perdidos dentro; los que el negocio conserva se quedan como están)
+con los servicios perdidos dentro y con lo que el negocio conserva donde lo dejó eliminarla: sus servicios sin
+categoría y sus subcategorías donde colgaba ella, que Recuperaciones cuenta aparte («Enlaces de servicios a
+categorías», «Enlaces de subcategorías a categorías»). Lo que el negocio movió después se queda donde está, y
+Recuperaciones lo dice en las notas de la categoría; lo que cambió sin moverlo mientras volvía la categoría también se
+queda como lo dejó, y Recuperaciones lo cuenta «sin crear» con su porqué. Si se pide otra vez, la categoría ya es del
+negocio y no se rellena: lo que le quitó después se queda fuera; si la recuperación que la trajo falló a medias,
+pedirla otra vez desde la misma copia la rellena con lo que el negocio conserva sin tocar)
 
 ### SERVICE-F09 Vender un servicio en el TPV
-<!-- origen: wf:peluqueria-dia#rec_peluqueria-f09 old:services/workflow/catalogo.md#services-f09 -->
 Estado: hecho (lo hace Ventas, SALE-F38)
 Actor: empleado
 Pantalla: Ventas: Vender
@@ -406,7 +398,6 @@ Si falla: lo dice Ventas (SALE-F38).
 Implicados: SALE-F01, SALE-F38
 
 ### SERVICE-F10 Dar el catálogo a Citas, Ventas, Reservas online y Tarifas
-<!-- origen: wf:peluqueria-dia#rec_peluqueria-f06 wf:whatsapp-cita#rec_wa_cita-f04 fi:modules/services#event-emitidos old:services/workflow/catalogo.md#services-f10 -->
 Estado: hecho
 Actor: sistema, asistente
 Pantalla: ninguna
@@ -423,7 +414,6 @@ Implicados: APPOINTMENT-F01, SALE-F01, ONLINE_BOOKING-F01, ONLINE_BOOKING-F07, P
 WHATSAPP_INBOX-F21
 
 ### SERVICE-F11 Cambiar los ajustes de Servicios
-<!-- origen: fi:modules/services#command-services-settings-update-sql-transaccional fi:modules/services#query-services-settings-get old:services/workflow/catalogo.md#services-f11 -->
 Estado: hecho
 Actor: propietario, administrador
 Pantalla: Ajustes de Servicios
@@ -445,7 +435,6 @@ también se rechaza. Un rechazo sin campo se queda hasta el siguiente intento (h
 Implicados: SERVICE-F01, SERVICE-F06, ONLINE_BOOKING-F01
 
 ### SERVICE-F12 Crear un bono
-<!-- origen: wf:peluqueria-dia#rec_peluqueria-f04 wf:peluqueria-dia#rec_peluqueria-f13 fi:modules/services#command-services-packages-create-handler-wasm-create_package fi:modules/services#query-services-package_items-list fi:modules/services#query-services-packages-list old:services/workflow/bonos.md#services-f12 -->
 Estado: hecho
 Actor: responsable, asistente
 Pantalla: Bonos y paquetes
@@ -464,7 +453,8 @@ líneas consume uno de sus «Usos».
 Si falla: sin ningún servicio, «Añade al menos un servicio: un paquete sin líneas no se puede
 canjear.»; un servicio repetido, archivado o que no existe; un importe ilegible o negativo, debajo de
 su campo; un nombre que ya tiene otro bono vivo, «Ya hay un paquete con ese nombre. Elige otro
-nombre.». «Crear paquete» (y «Guardar cambios» al editarlo, SERVICE-F13) está en gris mientras el negocio
+nombre.». El motivo de un campo se quita en cuanto se corrige ese campo, aunque otro diga lo mismo, y el
+de las líneas en conjunto (un servicio repetido), debajo de ellas, en cuanto se cambia, se añade o se quita una línea (hub#888). «Crear paquete» (y «Guardar cambios» al editarlo, SERVICE-F13) está en gris mientras el negocio
 no haya dicho todavía su moneda, porque el precio cerrado y el descuento se leen en ella (sin ella,
 «1500» yenes se guardaría como 150 000); hasta entonces, salir del precio cerrado o del descuento lo deja como se
 escribió, sin inventarle decimales ni juzgarlo: «¥9500» o «7,50 zł» no salen en rojo como «Esto no es un importe», y en cuanto llega la moneda se leen en ella (hub#945). Si la moneda no se puede leer, la ventana lo dice («No se ha podido leer la moneda del negocio», con el
@@ -472,7 +462,6 @@ motivo) y ofrece «Reintentar», que la vuelve a pedir; en cuanto llega, el bot�
 Implicados: SERVICE-F14, SERVICE-F22
 
 ### SERVICE-F13 Editar o eliminar un bono
-<!-- origen: fi:modules/services#command-services-packages-delete-sql-transaccional fi:modules/services#command-services-packages-update-sql-transaccional fi:modules/services#query-services-packages-get old:services/workflow/bonos.md#services-f13 -->
 Estado: hecho
 Actor: responsable (editar), propietario y administrador (eliminar)
 Pantalla: Bonos y paquetes
@@ -492,7 +481,6 @@ eliminó entretanto) o los de SERVICE-F12 debajo de su campo; al eliminar, el mo
 Implicados: SERVICE-F12, SERVICE-F16
 
 ### SERVICE-F14 Vender un bono a una clienta
-<!-- origen: wf:peluqueria-dia#rec_peluqueria-f14 wf:peluqueria-dia#rec_peluqueria-f13 old:services/workflow/bonos.md#services-f14 -->
 Estado: hecho la concesión (asistente y API); la venta en el TPV, no (ver «Lo que queda fuera»)
 Actor: empleado, responsable, asistente
 Pantalla: asistente
@@ -518,7 +506,6 @@ decirlo. Nada se concede.
 Implicados: CUSTOMER-F01, SALE-F28, SERVICE-F24
 
 ### SERVICE-F15 Consultar los bonos de una clienta
-<!-- origen: fi:modules/services#query-services-packages-balance old:services/workflow/bonos.md#services-f15 -->
 Estado: hecho (asistente y API)
 Actor: empleado, responsable, asistente
 Pantalla: asistente
@@ -533,7 +520,6 @@ la encuentra, lo dice.
 Implicados: SERVICE-F14, SERVICE-F28, CUSTOMER-F01
 
 ### SERVICE-F16 Ver quién ha comprado un bono
-<!-- origen: wf:peluqueria-dia#rec_peluqueria-f13 old:services/workflow/bonos.md#services-f16 -->
 Estado: hecho
 Actor: empleado, responsable, asistente
 Pantalla: Bonos y paquetes
@@ -550,7 +536,6 @@ cargar los bonos vendidos» con el motivo.
 Implicados: SERVICE-F17, SERVICE-F18, SERVICE-F21
 
 ### SERVICE-F17 Anular un bono vendido por error
-<!-- origen: wf:peluqueria-dia#rec_peluqueria-f13 old:services/workflow/bonos.md#services-f17 -->
 Estado: hecho
 Actor: responsable, asistente
 Pantalla: Bonos y paquetes
@@ -571,7 +556,6 @@ la anulación espera y recibe el motivo real.
 Implicados: SERVICE-F16, SALE-F28, SALE-F32
 
 ### SERVICE-F18 Regalar sesiones, alargar la caducidad o corregir el saldo
-<!-- origen: wf:peluqueria-dia#rec_peluqueria-f14 old:services/workflow/bonos.md#services-f18 -->
 Estado: hecho
 Actor: responsable, asistente
 Pantalla: Bonos y paquetes
@@ -588,11 +572,10 @@ o agotado. Las sesiones ya entregadas conservan su valor; las que quedan se repa
 precio (SERVICE-F24).
 Si falla: «Indica por qué se ajusta este bono…», «Añade o quita al menos una sesión, o añade al menos
 un día.», «No puedes quitar más sesiones de las que le quedan al cliente.», «Ese bono no tiene límite
-de sesiones…», «Ese bono no caduca…» o «Ese bono ya estaba anulado.».
+de sesiones…», «Ese bono no caduca…» o «Ese bono ya estaba anulado.». El motivo de un campo se quita en cuanto se corrige ese campo, aunque otro diga lo mismo (hub#888).
 Implicados: SERVICE-F16, SERVICE-F20
 
 ### SERVICE-F19 Ver los movimientos de un bono
-<!-- origen: old:services/workflow/bonos.md#services-f19 -->
 Estado: hecho
 Actor: empleado, responsable, asistente
 Pantalla: Bonos y paquetes
@@ -609,7 +592,6 @@ movimientos» con el motivo.
 Implicados: SERVICE-F18, SERVICE-F21, SERVICE-F22
 
 ### SERVICE-F20 Un bono caduca
-<!-- origen: old:services/workflow/bonos.md#services-f20 -->
 Estado: hecho
 Actor: sistema
 Pantalla: ninguna
@@ -624,7 +606,6 @@ Si falla: nada falla al caducar; gastarlo después se rechaza con «Este bono ha
 Implicados: SERVICE-F18, SERVICE-F21
 
 ### SERVICE-F21 Gastar una sesión fuera del cobro
-<!-- origen: fi:modules/services#command-services-packages-redeem-sql-transaccional fi:modules/services#query-services-packages-redeem_check old:services/workflow/bonos.md#services-f21 -->
 Estado: hecho
 Actor: empleado, responsable, asistente
 Pantalla: Bonos y paquetes, asistente
@@ -669,7 +650,6 @@ gastan la última sesión a la vez van en fila y la segunda recibe el motivo rea
 Implicados: SERVICE-F16, SERVICE-F19, SERVICE-F20, SERVICE-F24, SALE-F28, STAFF-F21
 
 ### SERVICE-F22 Pagar una línea con un bono
-<!-- origen: qa:verticals/beauty/05-sale-upsell-and-payment wf:peluqueria-dia#rec_peluqueria-f10 wf:peluqueria-dia#rec_peluqueria-f11 old:services/workflow/cobro-y-devolucion.md#services-f22 -->
 Estado: hecho (con Ventas, SALE-F27)
 Actor: empleado, responsable
 Pantalla: Ventas: Cobro
@@ -702,7 +682,6 @@ sesiones, el hueco no aparece.
 Implicados: SALE-F27, CUSTOMER-F17
 
 ### SERVICE-F23 Soltar la sesión si la línea o la cuenta desaparecen
-<!-- origen: wf:peluqueria-dia#rec_peluqueria-f10 old:services/workflow/cobro-y-devolucion.md#services-f23 -->
 Estado: hecho
 Actor: empleado, responsable
 Pantalla: Ventas: Vender, Cobro
@@ -719,7 +698,6 @@ la línea se quita igual y la sesión vuelve sola al cabo de un día (SERVICE-F2
 Implicados: SALE-F18, SALE-F20, SALE-F27
 
 ### SERVICE-F24 Dar por gastadas las sesiones al cobrar
-<!-- origen: wf:peluqueria-dia#rec_peluqueria-f10 old:services/workflow/cobro-y-devolucion.md#services-f24 -->
 Estado: hecho (conceder los bonos vendidos en el tique, no: ver «Lo que queda fuera»)
 Actor: empleado, responsable
 Pantalla: Ventas: Cobro
@@ -747,7 +725,6 @@ negocio, tampoco se cobra.
 Implicados: SALE-F01, SALE-F22, SALE-F27, SALE-F28
 
 ### SERVICE-F25 La sesión retenida que nadie cobra vuelve sola
-<!-- origen: wf:peluqueria-dia#rec_peluqueria-f10 old:services/workflow/cobro-y-devolucion.md#services-f25 -->
 Estado: hecho (al leer y con la tarea de cada hora)
 Actor: sistema
 Pantalla: ninguna
@@ -765,7 +742,6 @@ Si falla: si la tarea no corre, la sesión vuelve igual en cuanto pasa el plazo:
 Implicados: SALE-F17
 
 ### SERVICE-F26 Devolver la sesión al devolver la venta
-<!-- origen: wf:peluqueria-dia#rec_peluqueria-f14 old:services/workflow/cobro-y-devolucion.md#services-f26 qa:verticals/beauty/08-edge-cases -->
 Estado: hecho (con Ventas, SALE-F32)
 Actor: responsable
 Pantalla: Ventas: Devolver
@@ -785,7 +761,6 @@ la devolución se rechaza entera.
 Implicados: SALE-F31, SALE-F32
 
 ### SERVICE-F27 Devolver la sesión al anular la venta
-<!-- origen: wf:peluqueria-dia#rec_peluqueria-f14 wf:peluqueria-dia#rec_peluqueria-f13 old:services/workflow/cobro-y-devolucion.md#services-f27 -->
 Estado: hecho (anular los bonos vendidos en ella, no: ver «Lo que queda fuera»)
 Actor: responsable
 Pantalla: Ventas: Anular venta
@@ -801,7 +776,6 @@ venta no se anula y se avisa en la ventana.
 Implicados: SALE-F30
 
 ### SERVICE-F28 Unir dos fichas: los bonos pasan a la que queda
-<!-- origen: old:services/workflow/fichas-de-clienta.md#services-f28 -->
 Estado: hecho
 Actor: sistema
 Pantalla: ninguna
@@ -818,7 +792,6 @@ Si falla: repetir el aviso no cambia nada.
 Implicados: CUSTOMER-F13, SERVICE-F15, SERVICE-F22
 
 ### SERVICE-F29 Eliminar o anonimizar una ficha: sus bonos quedan sin cliente
-<!-- origen: old-hub:HUB-F250 old:services/workflow/fichas-de-clienta.md#services-f29 -->
 Estado: hecho
 Actor: sistema
 Pantalla: ninguna
@@ -840,7 +813,6 @@ Si falla: repetir el aviso no cambia nada.
 Implicados: CUSTOMER-F07, CUSTOMER-F16, CUSTOMER-F33
 
 ### SERVICE-F30 Rescatar los bonos sin cliente
-<!-- origen: old:services/workflow/fichas-de-clienta.md#services-f30 -->
 Estado: hecho (la lista; un bono no se pasa a otra ficha)
 Actor: responsable
 Pantalla: Bonos y paquetes
@@ -857,7 +829,6 @@ cargar los bonos sin cliente.».
 Implicados: SERVICE-F29, SERVICE-F17
 
 ### SERVICE-F31 Asignar un profesional a un servicio
-<!-- origen: wf:peluqueria-dia#rec_peluqueria-f03 old:staff/workflow/disponibilidad.md#staff-f10 -->
 Estado: hecho
 Actor: responsable, asistente
 Pantalla: Servicios (Editando servicio)
@@ -882,10 +853,10 @@ enciende (hub#946). Mientras llega la lista sale
 «Cargando…»; si no se puede leer, «No se han podido cargar los profesionales.» con el motivo y
 «Reintentar», nunca «Nadie asignado todavía».
 Implicados: STAFF-F01, SALE-F38, BASE-F114 (desde una copia aparte, un servicio recuperado vuelve asignado, por esta
-misma operación, a quien lo hacía y el negocio sigue teniendo de alta)
+misma operación, a quien lo hacía y el negocio sigue teniendo de alta; a quien no, Recuperaciones lo nombra con el
+porqué)
 
 ### SERVICE-F32 Cambiar o quitar un profesional de un servicio
-<!-- origen: old:staff/workflow/disponibilidad.md#staff-f11 -->
 Estado: hecho
 Actor: responsable, asistente
 Pantalla: Servicios (Editando servicio)
@@ -906,7 +877,6 @@ negocio, como **Asignar** (SERVICE-F31): el precio propio se lee en ella (hub#94
 Implicados: SERVICE-F31, SERVICE-F33, STAFF-F06
 
 ### SERVICE-F33 Saber quién puede hacer un servicio
-<!-- origen: wf:peluqueria-dia#rec_peluqueria-f06 wf:whatsapp-cita#rec_wa_cita-f04 old:staff/workflow/disponibilidad.md#staff-f12 -->
 Estado: hecho
 Actor: sistema, asistente
 Pantalla: ninguna
@@ -922,7 +892,6 @@ Si falla: un servicio que no existe, «Ese servicio no existe en este negocio.»
 Implicados: SERVICE-F31, APPOINTMENT-F01
 
 ### SERVICE-F34 Elegir la imagen de un servicio desde la librería
-<!-- origen: nuevo (decisión de Ioan del 2026-10-30: los servicios de la plantilla de peluquería llevan una imagen de la librería compartida, carpetas beauty_hair/ y beauty_body/; encargo docs/plans/2026-10-30-blueprints-imagenes-prompt.md de erplora-next) -->
 Estado: hecho
 Actor: responsable, asistente
 Pantalla: Servicios
@@ -953,10 +922,9 @@ la foto: el formulario dice «El servicio se ha guardado, pero la foto no: Esa i
 librería. Elige otra.» con «Reintentar», y el servicio se queda con la foto que tenía (por el asistente o
 la API no se guarda nada). Quien no puede editar servicios no ve «Foto», y la app lo rechaza también por
 el asistente o la API.
-Implicados: SERVICE-F01, SERVICE-F02, SERVICE-F09, SALE-F38, INVENTORY-F30, INVENTORY-F32
+Implicados: SERVICE-F01, SERVICE-F02, SERVICE-F09, SALE-F38, INVENTORY-F30, INVENTORY-F32, BASE-F114
 
 ### SERVICE-F35 Subir una foto propia del servicio
-<!-- origen: nuevo (decisión de Ioan del 2026-10-30: cada negocio guarda sus fotos en su propia carpeta, convertidas a WebP de 512 × 512 y de hasta 2 MB al subirlas; encargo docs/plans/2026-10-30-blueprints-imagenes-prompt.md de erplora-next) -->
 Estado: hecho
 Actor: responsable
 Pantalla: Servicios
@@ -1157,12 +1125,11 @@ con la sesión de quien vende, como hace con Inventario.
 | Devolver sesiones al anular o devolver una venta | sí | sí | sí | no | `service.return_session` |
 | Ajustes | sí | sí | no | no | `service.manage_settings` |
 
-Los papeles llegan del SaaS con prefijo (`hub_owner`, `hub_admin`, `hub_manager`, `hub_employee`); el
-cajero del producto actual es un empleado: lo que tenía (ver, gastar y conceder) lo tiene el empleado.
+Los papeles llegan del SaaS con prefijo (`hub_owner`, `hub_admin`, `hub_manager`, `hub_employee`).
 
 ## Para quien lo mantiene
 
-- **Orden de las listas** (`base.ordering.list_order_for`; regla hub#2355 del producto viejo): servicios, categorías y
+- **Orden de las listas** (`base.ordering.list_order_for`): servicios, categorías y
   paquetes van por la columna elegida, después por su orden y su nombre, y al final por `id`, todo en la dirección de la
   lista y con los vacíos al final en las dos: la descendente es la ascendente leída al revés, empates incluidos. Lo fija
   `test_ties_read_backwards_in_a_descending_list`, por lista.
@@ -1187,12 +1154,11 @@ cajero del producto actual es un empleado: lo que tenía (ver, gastar y conceder
   puntos básicos (1050 = 10,50 %).
 - **Millares**: los importes agrupan los millares también con cuatro cifras («1.234,56 €»; `formatMoney` de
   `@erplora/ui/components`, con `useGrouping: 'always'`, porque el CLDR del español espera a cinco: hub#657).
-- **El paso del Inicio** (PLAN-HUB ronda 2026-10-21; FIX-SERVICE-SETUP-HOOKS): `ServiceConfig.setup` declara el
-  `setup` del módulo viejo (`module.json`, services#26): clave `service.catalog`, sobre `service.catalog.status`, hecho
+- **El paso del Inicio**: `ServiceConfig.setup` declara el `setup`: clave `service.catalog`, sobre `service.catalog.status`, hecho
   con `sellable_services` (en oferta y con la categoría fiscal activa), orden 31, `required` (nivel «Importante»),
   permiso `service.add_service`, ruta `/service/services` y `refresh_on` los eventos de servicio (alta, una o varias;
   cambio; archivo; restauración). Una categoría fiscal no se desactiva por operación (solo en el admin), así que no
-  hay evento de Impuestos que lo mueva. Sin paneles ni campana: el módulo viejo no los declaraba. Pruebas:
+  hay evento de Impuestos que lo mueva. Sin paneles ni campana. Pruebas:
   `tests/test_apps.py` y `tests/test_integration_home.py` (con `base` real y dos hubs).
 - **Archivar y eliminar son lógicos**: un servicio archivado (`is_active = False`, `archived_at`),
   una categoría o un bono eliminados (`is_deleted`) siguen en la base de datos. Una categoría
@@ -1200,18 +1166,42 @@ cajero del producto actual es un empleado: lo que tenía (ver, gastar y conceder
 - **Nombres únicos** entre los vivos, sin distinguir mayúsculas: categorías
   (`service_category_live_name_unique`) y bonos (`service_package_live_name_unique`); el servicio lo
   comprueba antes para dar el 409 y traduce la violación (dos guardados a la vez) al mismo 409.
-- **Recuperar desde una copia aparte** (BASE-F114, hub#1283, hub#1322, hub#1323): `apps.py` responde a la plataforma
-  (`recoverable_from_copy`, `base.tenancy.recovery`) con lo que devuelve una copia aparte del negocio, en dos
-  declaraciones que se devuelven en su orden. Primero sus categorías vivas que el negocio no tiene
+- **Recuperar desde una copia aparte** (BASE-F114, hub#1283, hub#1322, hub#1323, hub#1364): `apps.py` responde a la
+  plataforma (`recoverable_from_copy`, `base.tenancy.recovery`) con lo que devuelve una copia aparte del negocio, en
+  cuatro declaraciones que se devuelven en su orden. Primero sus categorías vivas que el negocio no tiene
   (`queries.categories_not_in_business`: eliminadas o perdidas, y no hechas otra vez, es decir, sin otra viva con su
-  nombre sin distinguir mayúsculas ni espacios, que es único entre las vivas), cada una creada por
-  `service.category.create`, padres primero: dentro de su padre por su id si el negocio lo tiene (el mismo o hecho otra
-  vez), por su nombre si vuelve también (se acaba de crear y aquí aún no tiene id), y en la raíz si la copia no lo tenía
-  vivo; `queries.categories_in_copy` las lee por SQL. Después sus servicios en oferta que el negocio no tiene
+  nombre sin distinguir mayúsculas ni espacios, que es único entre las vivas), cada una hecha otra vez por
+  `service.category.recover` (solo el sistema, sin ruta ni herramienta del asistente), padres primero: creada por
+  `service.category.create` dentro de su padre por su id si el negocio lo tiene (el mismo o hecho otra vez), por su
+  nombre si vuelve también (se acaba de crear y aquí aún no tiene id), y en la raíz si la copia no lo tenía vivo; y con
+  lo que tenía dentro en la copia (`service_ids` de `queries.categories_in_copy`, archivados también, y sus
+  subcategorías vivas, `subcategory_ids`) que el negocio conserva con el mismo id donde lo dejó eliminarla
+  (SERVICE-F08): el servicio sin categoría y la subcategoría colgando de donde colgaba la eliminada (`stands_for`, la
+  fila eliminada que el negocio guarda con el id de la copia; la raíz si ya no la tiene: el «Eliminar» del admin de
+  Hubs la borra y deja a sus hijas en la raíz). `service.category.recover` solo la crea, y su salida dice lo que el
+  negocio movió después (un servicio con otra categoría, una subcategoría en otro sitio) o colgaría de una de sus propias
+  subcategorías (`left_out`: `service.service_moved`, `service.subcategory_moved`, `service.subcategory_loop`), que
+  Recuperaciones anota en la categoría. Lo demás vuelve a ella al final, en las dos últimas declaraciones, que
+  Recuperaciones cuenta aparte (hub#1462): cada servicio por `service.service.return_to_category`
+  (`queries.service_links_not_in_business`) y cada subcategoría por `service.category.return_to_parent`
+  (`queries.subcategory_links_not_in_business`), solo el sistema; cogen primero la categoría (o el árbol, `lock_tree`)
+  y después la fila, y la cambian como la pantalla, con su `service.service.updated` o `service.category.updated`. Solo
+  se rellena la categoría que trajo la recuperación en marcha (su `created_by` es el actor de esa recuperación; si no,
+  `service.category_brought_earlier`): una que el negocio conserva o rehízo a mano, o la que trajo una recuperación
+  anterior, se queda como está, y la lectura deja fuera lo que el negocio tocó desde que volvió la categoría. Lo que
+  toca mientras esa misma recuperación sigue en marcha (`base.recovery.at_work`, hub#1494) sí se lee, y su enlace lo
+  rechaza (`service.service_changed`, `service.subcategory_changed`, también si lo cambia entre la lectura y su enlace)
+  para que Recuperaciones lo cuente «sin crear» con su porqué, igual que lo que mueve mientras tanto
+  (`service.service_moved`, `service.subcategory_moved`, `service.subcategory_loop`). `queries.categories_in_copy`
+  las lee por SQL. Después sus servicios en oferta que el negocio no tiene
   (`queries.services_not_in_business`), cada uno hecho otra vez por `service.service.recover` (solo el sistema, sin
   ruta ni herramienta del asistente), todo o nada: el servicio, por `service.service.create` con la clave de su
   categoría fiscal y su categoría aquí (`_category_held`): la misma si sigue viva, si no la viva con su nombre en la
-  copia (la que acaba de volver o una hecha a mano), si no ninguna; y cada profesional que lo hacía en la copia y el
+  copia (la que acaba de volver o una hecha a mano), si no ninguna; su imagen de la copia (`ServiceRecoverIn.image`,
+  de `base.recovery.ImageInCopyIn`), puesta como la pone `service.service.set_image` (SERVICE-F34) si
+  `base.images.from_copy` la deja: la de la librería, salvo una que la librería dice que ya no tiene; nunca una foto
+  propia; con la librería sin leer, tal como estaba, para no dejar el servicio fuera (hub#1429); y cada profesional
+  que lo hacía en la copia y el
   negocio sigue teniendo (no dado de baja, por su id: `staff.queries.live_members`), por `service.assignment.assign`
   con sus minutos y su precio propios, principal solo si el negocio no le ha dado otro servicio principal desde
   entonces, y apagado por `service.assignment.update` si lo estaba. Va en la misma operación, y no en una declaración
@@ -1224,9 +1214,16 @@ cajero del producto actual es un empleado: lo que tenía (ver, gastar y conceder
   mayúsculas ni espacios) en la categoría a la que volvería. Los nombres no son únicos: cada hecho otra vez responde por
   un solo servicio de la copia, el más antiguo por el más antiguo, y dos perdidos con el mismo nombre vuelven los dos.
   Es lo que usa la recuperación de otra app (Citas, hub#1284) para emparejar un servicio de la copia con el del negocio;
-  uno que la copia tenía archivado solo se empareja por su id. Lee desde
-  `0001_initial`; una migración que quite o renombre una de sus columnas cambia también `services_in_copy` y su
-  `reads_since`. Tests: `tests/test_recovery.py`, también de punta a punta con la base del negocio y su copia.
+  uno que la copia tenía archivado solo se empareja por su id. Un servicio hecho otra vez guarda por cuál de la copia lo
+  hizo `service.service.recover` (`Service.stands_for`, de `0007_service_stands_for`; vacío en el que hace la pantalla), y
+  `queries.services_standing_for` (`{id en la copia: id en el negocio}`) dice con él qué servicio hace de cada uno de la
+  copia que el negocio ya no tiene: el que hizo una recuperación por él, archivado o renombrado después también; uno
+  hecho a mano no hace de ninguno. Lo pide Tarifas, que no requiere Servicios, por `service.service.standing_for`
+  (solo el sistema, sin ruta ni herramienta del asistente) para poner los precios de la copia (PRICING-F15, hub#1459).
+  Las categorías se leen desde
+  `0001_initial` y los servicios desde `0003_service_image`, la que les dio la imagen (a una copia anterior se le
+  niegan los servicios con `recover_copy_behind`); una migración que añada, quite o renombre una de las columnas que
+  se leen cambia también `services_in_copy` y su `reads_since`. Tests: `tests/test_recovery.py`, también de punta a punta con la base del negocio y su copia.
 - **Saldo de un bono vendido**: usos = los congelados + la suma de los ajustes; usadas = las sesiones
   entregadas más las reservadas cuyo plazo no ha vencido; quedan = usos − usadas (sin límite si los
   usos congelados son nulos); caduca = compra + vigencia congelada + días regalados. Se calcula al
@@ -1253,9 +1250,9 @@ cajero del producto actual es un empleado: lo que tenía (ver, gastar y conceder
   borrado del admin de un servicio borra sus asignaciones y después el servicio. Hay tests con hilos de cada
   carrera.
 - **Tareas programadas**: `scheduled_tasks` del `AppConfig` declara `service.session.expire` cada
-  hora (`0 * * * *`, UTC, `collapse`); hecho — la corre el worker (`base/scheduler.py`, 2026-10-15), en cada
-  negocio y con su ámbito (`base.worker._serve_hub`). Además, el saldo ya no cuenta una reserva vencida y reservar de nuevo la misma
-  línea marca antes la vencida.
+  hora (`0 * * * *`, UTC, `collapse`): la corre el worker (`base/scheduler.py`), en cada negocio y con su
+  ámbito (`base.worker._serve_hub`). Además, el saldo no cuenta una reserva vencida y reservar de nuevo la
+  misma línea marca antes la vencida.
 - **Bonos sin cliente** se calculan desde la ficha de Clientes (eliminada o anonimizada, y no unida a
   otra): no hace falta sellar nada al eliminarla. Unir dos fichas mueve los bonos con la reacción a
   `customer.customer.merged`; hasta que el relay la entrega (el siguiente tick del worker, o el
@@ -1281,7 +1278,7 @@ cajero del producto actual es un empleado: lo que tenía (ver, gastar y conceder
   eliminar categorías y bonos, anular, ajustar, alta de golpe y ajustes) y todo campo de entrada su
   `description`. Cada herramienta dice además sus `asks`, las frases en `en` y `es` con que una persona la
   pide (`live.E020`: Servicios está en `LIVE_ASSISTANT_ASKS_REQUIRED`, hub#1104), y los `SYNONYMS` del Hub
-  (`base/assistant.py`) leen «bono» como el bono del catálogo y el vendido (`service.package`,
+  (`base/assistant/relevance.py`) leen «bono» como el bono del catálogo y el vendido (`service.package`,
   `service.grant`) y «asignación», o lo que se «asigna», como la asignación de un profesional a un servicio
   (`service.assignment`). Así ver, vender, gastar, anular y ajustar bonos, retener y soltar sesiones,
   restaurar un servicio y asignar, cambiar o quitar un profesional desde el chat (SERVICE-F04, F05, F14 a
@@ -1309,11 +1306,10 @@ cajero del producto actual es un empleado: lo que tenía (ver, gastar y conceder
   «Línea de la cuenta») y el de la escritura («Devolución o anulación»). La lectura de Ventas o de Citas corre como
   quien pregunta: sin «Ver ventas», o una cita que no es suya para quien solo ve las suyas, el dato queda fuera
   (`tests/test_integration_assistant.py`, hub#756).
-- El admin de Django del Hub tiene **CRUD completo** sobre todos los modelos (ronda 12, PLAN §17);
+- El admin de Django del Hub tiene **CRUD completo** sobre todos los modelos (PLAN §17);
   una escritura cruda del admin no pasa por las reglas ni deja aviso, salvo la del árbol de categorías.
-- Tenencia: el ámbito es la primera parte del Host y cada negocio tiene su propia BD (desde el corte S5,
-  hub#602): los datos de `a` no se ven en `b`. Solo los tests escritos antes de la tenencia guardan `a` y `b`
-  en la misma BD de test (`base/tenancy/tests/legacy.py`, hasta hub#611). Cada negocio enciende y apaga sus
+- Tenencia: el ámbito es la primera parte del Host y cada negocio tiene su propia BD: los datos de `a` no se ven en `b`. Solo los tests escritos antes de la tenencia guardan `a` y `b`
+  en la misma BD de test (`base/tenancy/tests/legacy.py`). Cada negocio enciende y apaga sus
   apps (BASE-F23, BASE-F24; `base.relay.active_apps`): los rechazos por «Servicios no activa» de F24, F26 y F27
   los ve un negocio que apaga Servicios y sigue cobrando en Ventas, que no la tiene en sus `requires`.
 - Quién lee el catálogo, contado por sus llamadas (`rg '"service\.' apps`): Citas
@@ -1322,7 +1318,7 @@ cajero del producto actual es un empleado: lo que tenía (ver, gastar y conceder
   Ajustes, y los modelos con «Mostrar precios» y «Mostrar duración», que requiere) y Tarifas
   (`service.service.list` y `.get`, sin requerirla). Menús no admite servicios (solo artículos de
   Inventario) y la respuesta automática de WhatsApp lo leerá por el asistente (WHATSAPP_INBOX-F21).
-- **La foto del servicio (SERVICE-F34 y F35, hechas el 2026-10-30; decisión de Ioan del 2026-10-30)**: la misma pieza que
+- **La foto del servicio (SERVICE-F34 y F35)**: la misma pieza que
   la foto del artículo (bullet «La foto del artículo» del WORKBOOK de Inventario, INVENTORY-F30 a F33).
   `Service.image` guarda una referencia lógica, nunca una URL: `catalog:<carpeta>/<nombre>` (la librería
   compartida de `ERPlora/blueprints`; para la peluquería, `beauty_hair/` y `beauty_body/`) o
@@ -1352,16 +1348,12 @@ cajero del producto actual es un empleado: lo que tenía (ver, gastar y conceder
 ## Lo que queda fuera
 
 - **Vender un bono en el TPV (F14) y, con ello, concederlo al cobrar (F24) y anularlo al anular o
-  devolver su venta (F27)**: el TPV del producto actual tampoco lo ofrecía (solo el asistente o la API,
-  con la línea marcada como servicio y el IVA que mandaba el cobro); aquí toda línea necesita una
-  categoría fiscal y un bono del catálogo no la tiene. Mientras, el bono se cobra a precio libre (con
+  devolver su venta (F27)**: toda línea del TPV necesita una categoría fiscal y un bono del catálogo
+  no la tiene. Mientras, el bono se cobra a precio libre (con
   la sección de su IVA) y se concede con la concesión (asistente o API, F14) diciendo la venta.
 - **Enlazar a su venta un bono concedido sin decirla** (F14, hub#786): el bono sigue sin contar para quien hace
   sus sesiones. Le pasa también a los vendidos antes de esa cifra.
-- **Importar servicios desde un fichero**: como en el producto actual, el alta de golpe es del
-  asistente y la API.
-- **Lo que no vuelve con un servicio recuperado desde una copia aparte** (BASE-F114): su imagen (hub#1319); y
-  Recuperaciones no nombra al profesional dado de baja que no vuelve con él (hub#1375).
+- **Importar servicios desde un fichero**: el alta de golpe es del asistente y la API.
 
 ## Lo que NO hace, a propósito
 
@@ -1370,44 +1362,4 @@ cajero del producto actual es un empleado: lo que tenía (ver, gastar y conceder
 - No pasa un bono de una clienta a otra ni lo comparte (ADR-0390).
 - No es una tarjeta regalo: un bono paga una línea de servicio entera.
 - No avisa a la clienta de que su bono va a caducar.
-- Las «Sesiones» de cada línea de un bono no limitan nada: el tope es «Usos», para el bono entero
-  (como en el producto actual).
-
-## Cambios frente al producto actual
-
-1. **Los servicios por profesional viven aquí** (antes en Personal, STAFF-F10–F12), y se asignan en
-   el servicio, como en Fresha, Square o Vagaro. Se pueden cambiar los minutos y el precio de una
-   asignación desde la pantalla (antes había que quitarla y volver a asignarla), y dar de baja a una
-   persona la quita de sus servicios.
-2. **Servicios requiere Clientes**: la titular de un bono es una ficha de Clientes.
-3. **La Tarifa se elige en el formulario** (antes solo con el asistente o la API).
-4. **Eliminar una categoría suelta de verdad sus servicios** y sube sus subcategorías (antes los
-   servicios seguían apuntando a ella y editarlos se rechazaba); una categoría no puede colgar de una
-   de sus hijas (antes solo de sí misma).
-5. **«Categoría fiscal por defecto»** es una categoría de Impuestos que el formulario trae elegida y
-   que toma el alta sin categoría fiscal (antes «Tipo de IVA por defecto» era un texto que nadie
-   leía). Salen de los ajustes «Precios con IVA incluido» (es de Ventas) y «Moneda» (la del negocio es
-   la de su país, que da la plataforma), que nadie leía.
-6. **Un nombre de bono se puede reutilizar** cuando el anterior se eliminó (antes se rechazaba sin
-   decir por qué), y un nombre repetido se dice («Ya hay un paquete con ese nombre.»).
-7. **Gastar una sesión fuera del cobro comprueba el servicio** si se dice cuál (antes no).
-8. **El alta de golpe usa los Ajustes** y avisa de cada servicio creado (antes ninguna de las dos).
-9. **Bonos sin cliente**: un bono ilimitado sale «Sin límite de sesiones» (antes «Quedan 0»).
-10. **El empleado concede bonos** (lo hacía el cajero, que ahora es un empleado).
-11. **Anonimizar una ficha vacía los textos libres de sus bonos** (antes se quedaban, «hueco de la
-    familia RGPD»), como dice el WORKBOOK de Clientes.
-12. **Una compra no se puede fechar en el futuro** (antes se aceptaba cualquier fecha: un bono fechado
-    en 2099 no caducaba nunca).
-13. **La sesión del cobro se reserva, se entrega y se devuelve en la misma operación de Ventas**
-    (antes Servicios esperaba los avisos `sale.completed`, `order.line_removed`, `order.voided`…): ya
-    no hay una línea cobrada a 0 sin sesión detrás (sales#539), ni una sesión que se queda en la
-    cuenta de origen al dividirla o juntarla (sales#540), ni un cobro que gasta la sesión y cobra el
-    precio a la vez tras recargar (la marca vive en la línea, no en la pantalla).
-14. **La sesión se devuelve también sin dinero** (antes solo junto con una devolución de dinero,
-    sales#512 y sales#531): en un tique pagado entero con bono, **Devolver** devuelve la sesión.
-15. **Cobrar la venta a otra clienta que la del bono se rechaza** (antes la línea se cobraba a su
-    precio y la sesión volvía al bono sin avisar): lo que enseña el cobro es lo que se cobra.
-16. **Devolver una sesión** pide su propio permiso, que tienen responsable, propietario y
-    administrador (antes la devolvía quien hacía la devolución).
-17. **Una sesión gastada fuera del cobro dice quién la hizo** (hub#770; antes no lo recibía y no contaba en la
-    producción ni en la comisión de nadie): su valor cuenta para esa profesional en Ventas, como la del cobro.
+- Las «Sesiones» de cada línea de un bono no limitan nada: el tope es «Usos», para el bono entero.

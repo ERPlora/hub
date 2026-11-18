@@ -9,19 +9,15 @@
 // deleted after it.
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, api, login, psql, shot, shown } from './helpers';
+import { A, api, login, psql, shown } from './helpers';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
+import { capture } from './kitchen-helpers';
 import { cleanSales, stamp } from './sale-helpers';
-import { ownerPage, rowAction, settled } from './service-helpers';
+import { ownerPage, rowAction } from './service-helpers';
 
 const RUN = stamp();
 const CHECK = `e2e ktk ${RUN}`;
 const PRINTER = `e2e KTK ${RUN} Grill`;
-const SIZES = [
-  { label: '390', width: 390, height: 844 },
-  { label: '834', width: 834, height: 1112 },
-  { label: '1440', width: 1440, height: 900 },
-];
 
 interface Sent {
   id: string;
@@ -69,16 +65,6 @@ async function statusOf(context: BrowserContext, id: string): Promise<string> {
 }
 
 const row = (page: Page, text: string): Locator => shown(page).locator('[data-testid=kitchen-tickets-row]').filter({ hasText: text }).first();
-
-async function capture(page: Page, flow: string, ready: () => Promise<void>): Promise<void> {
-  for (const size of SIZES) {
-    await page.setViewportSize({ width: size.width, height: size.height });
-    await ready();
-    await settled(page);
-    await page.screenshot({ path: shot(`APP-KITCHEN-${flow}-${size.label}`) });
-  }
-  await page.setViewportSize({ width: 1440, height: 900 });
-}
 
 test.beforeAll(async ({ browser }) => {
   cleanUp();

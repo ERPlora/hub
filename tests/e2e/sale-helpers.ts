@@ -8,8 +8,8 @@
 import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
 import { A, api, login, psql, shot, shown } from './helpers';
-import { cleanInventory, createProduct, type Product } from './inventory-helpers';
-import { cleanInvoices, ensureIssuer, issuedIds, parkIssuer, unparkIssuer } from './invoice-helpers';
+import { cleanInventory, createProduct, photoLoaded, type Product } from './inventory-helpers';
+import { cleanInvoices, issuedIds } from './invoice-helpers';
 
 export const VIEWPORTS = [
   { label: '390', width: 390, height: 844 },
@@ -98,7 +98,7 @@ export async function expectTakes(button: Locator, takes: boolean): Promise<void
 }
 
 /** A tile of the till's grid, a child of it: `PosItemTile.vue`, an Ionic button for products, services and menus alike. */
-const TILL_TILE = ':scope > ion-button.pos-tile';
+export const TILL_TILE = ':scope > ion-button.pos-tile';
 
 /** The till's grid on screen. «Services» keeps its own grid in the page, hidden while «All» is chosen. */
 export const tillGrid = (page: Page): Locator => shown(page).locator('.pos-grid').filter({ visible: true });
@@ -108,6 +108,16 @@ export async function expectFirstTile(page: Page, testid: string | RegExp): Prom
   const grid = tillGrid(page);
   await expect(grid, 'one grid of the till on screen').toHaveCount(1);
   await expect(grid.locator(TILL_TILE).first()).toHaveAttribute('data-testid', testid);
+}
+
+/**
+ * The width the photo of `tile` loaded at, once it is on screen: the image named after its item `name`, as ItemImage.vue
+ * names it, never a style class of the tile, which a restyle renames. With `src`, it is also that image.
+ */
+export async function tilePhotoLoaded(tile: Locator, name: string, src?: string): Promise<number> {
+  const photo = tile.getByAltText(name, { exact: true });
+  if (src !== undefined) await expect(photo).toHaveAttribute('src', src);
+  return photoLoaded(photo.locator('xpath=..'));
 }
 
 /** The lines of the check on screen that sell `product`. */
@@ -254,66 +264,35 @@ export const TILL_LANGUAGES = [
   { name: 'Spanish', lang: 'es', locale: 'es-ES' },
 ] as const;
 
-/** For the `beforeAll` of a spec that sells with and without the red strip of a hub that cannot issue invoices yet:
- *  `dishForTheTill`, and hub `a` with an issuer, as a business with its data complete has (no strip). The runs with the
- *  strip park it (`tillUnderStrip`); `cleanTillAndIssuer` deletes it if the spec set it up. */
-export async function dishWithAnIssuer(browser: Browser, label: string, run: string): Promise<Product> {
-  const dish = await dishForTheTill(browser, label, run);
-  const context = await browser.newContext({ baseURL: A });
-  await login(await context.newPage(), A, '/sale/pos');
-  await ensureIssuer(context);
-  await context.close();
-  return dish;
-}
-
-/** The `afterAll` of such a spec: its sales, its products and the issuer it set up go, and the cash register comes back
- *  as it was. */
-export function cleanTillAndIssuer(): void {
+/** The `afterAll` of a spec that sold with `dishForTheTill`: its sales and its products go, and the cash register comes
+ *  back as it was. */
+export function cleanTill(): void {
   try {
     cleanSales();
     cleanInventory();
-    cleanInvoices();
   } finally {
     restoreDrawer();
   }
 }
 
-/** What `tillUnderStrip` opens: the till in `lang` (`locale`), under the red strip of a hub that cannot issue invoices yet
- *  when `strip` (hub `a`'s issuer parked in the table `parked` meanwhile) or without it. */
-export interface TillUnderStrip {
-  strip: boolean;
-  parked: string;
-  locale: string;
-  lang: string;
-}
-
 /**
- * For a `describe` of a spec that sells with and without the strip: its `beforeAll` opens the till at 1440x900 as
- * `till` says (the strip there or not, checked) and runs `then` on it; its `afterAll` closes it and puts hub `a`'s
- * issuer back, even if the till never opened. Returns the till's page, for the tests of that `describe`.
+ * For a `describe` whose tests share one till: its `beforeAll` opens the till at 1440x900 in `till.lang` (`till.locale`)
+ * and runs `then` on it; its `afterAll` closes it. Returns the till's page, for the tests of that `describe`.
  */
-export function tillUnderStrip(till: TillUnderStrip, then?: (page: Page) => Promise<void>): () => Page {
+export function tillOpenAt1440(till: { locale: string; lang: string }, then?: (page: Page) => Promise<void>): () => Page {
   let context: BrowserContext | undefined;
   let page: Page | undefined;
   test.beforeAll(async ({ browser }) => {
-    if (till.strip) parkIssuer(till.parked);
     context = await browser.newContext({ baseURL: A, locale: till.locale, viewport: { width: 1440, height: 900 } });
     page = await context.newPage();
     await tillIn(page, context, till.lang);
-    const notice = shown(page).locator('[data-testid=blocking-strip]');
-    if (till.strip) await expect(notice, 'the strip of a hub that cannot issue invoices yet').toBeVisible();
-    else await expect(notice, 'a hub with its issuer has no strip').toBeHidden();
     if (then) await then(page);
   });
   test.afterAll(async () => {
-    try {
-      await context?.close();
-    } finally {
-      if (till.strip) unparkIssuer(till.parked);
-    }
+    await context?.close();
   });
   return () => {
-    if (!page) throw new Error('tillUnderStrip(): the till is not open: its beforeAll failed');
+    if (!page) throw new Error('tillOpenAt1440(): the till is not open: its beforeAll failed');
     return page;
   };
 }
@@ -353,10 +332,10 @@ export async function holdNotices(page: Page, ms: number): Promise<void> {
   }, ms);
 }
 
-/** The notice's own box: the host of an `ion-toast` fills the screen. */
+/** The notice's box on screen, where its stack moves it (`translate` and `scale` included). */
 export function noticeBox(notice: Locator): Promise<Box> {
   return notice.evaluate((el) => {
-    const box = el.shadowRoot!.querySelector('.toast-wrapper')!.getBoundingClientRect();
+    const box = el.getBoundingClientRect();
     return { top: box.top, bottom: box.bottom, left: box.left, right: box.right };
   });
 }

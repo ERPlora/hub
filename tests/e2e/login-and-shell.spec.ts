@@ -12,7 +12,6 @@ import {
   iconStates,
   listReady,
   login,
-  openApps,
   record,
   rowNames,
   rowOf,
@@ -20,10 +19,11 @@ import {
   shown,
   uniqueName,
 } from './helpers';
+import { openApps } from './topbar';
 
 const ICONIFY_HOSTS = /iconify\.design|simplesvg\.com|unisvg\.com/;
 
-test('login on a: shell, topbar with Demo among the apps, empty state, CSP header and zero violations', async ({ page, context }) => {
+test('login on a: shell, topbar with Demo among the apps, empty state, CSP header and zero violations @smoke', async ({ page, context }) => {
   const problems = await collectProblems(page);
   const iconifyRequests: string[] = [];
   const iconFetches: string[] = [];

@@ -22,8 +22,8 @@ from apps.task.schemas import (
     TaskPatchIn,
     TaskRefIn,
 )
-from base.models import Hub
-from base.tenancy.context import use_hub
+
+from .conftest import HUB_DB
 
 
 def errors(schema, **data) -> dict[str, str]:
@@ -53,6 +53,7 @@ def test_only_the_four_priorities():
     assert errors(TaskIn, title="t", priority="critical") == {"priority": "literal_error"}
 
 
+@HUB_DB  # a moment is read on the clock of the business at work, A's (the deployment's, Madrid)
 def test_a_due_date_is_a_day_and_a_moment_is_taken_as_its_day_in_madrid():
     assert TaskIn(title="t", due_date="2026-10-20").due_date == dt.date(2026, 10, 20)
     # 23:30 UTC on the 20th is already the 21st in Madrid (UTC+2 in October).
@@ -151,7 +152,8 @@ def test_the_lists_declare_their_filters_and_sorts():
     assert "due_within_days" in errors(TaskMineIn, due_within_days=-1)
 
 
-def test_a_moment_is_the_day_it_falls_on_in_the_businesss_zone():
+@HUB_DB
+def test_a_moment_is_the_day_it_falls_on_in_the_businesss_zone(monkeypatch, in_business_a):
     # 23:30 UTC on 2 November is still the 2nd in the Canaries and already the 3rd in Madrid (hub#779).
-    with use_hub(Hub(slug="a", timezone="Atlantic/Canary")):
-        assert TaskIn(title="t", due_date="2026-11-02T23:30:00Z").due_date == dt.date(2026, 11, 2)
+    monkeypatch.setattr(in_business_a, "timezone", "Atlantic/Canary")
+    assert TaskIn(title="t", due_date="2026-11-02T23:30:00Z").due_date == dt.date(2026, 11, 2)

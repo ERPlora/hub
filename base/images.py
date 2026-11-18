@@ -15,7 +15,7 @@ A photo comes in as a JPG, PNG or WebP of :data:`MAX_UPLOAD_BYTES` at most, in b
 and without what the camera wrote in it (:func:`to_webp`); a WebP that already is one, with nothing written in it, whose
 pixels decode and with nothing after its end, is kept as it came (an exported blueprint's photo loses nothing when it is
 loaded again). Each upload is a file of its own, named by a new UUIDv7 (:func:`keep_photo`), counted against the plan's
-space as Files counts its own (``base.queries.refuse_past_the_plans_space``). The photo a row lets go is deleted once
+space as Files counts its own (``base.queries.files.refuse_past_the_plans_space``). The photo a row lets go is deleted once
 its change is saved (:func:`let_go`): only its upload writes a ``file:`` reference (:func:`check` refuses one set by
 hand), so no two rows share a photo. No ORM here: the apps' ``services.py`` and ``queries.py`` call these.
 """
@@ -124,8 +124,23 @@ def check(ctx: OperationContext, reference: str, *, field: str = "image") -> Non
             raise _unknown(str(IMAGE_UNKNOWN), field)
 
 
+def from_copy(ctx: OperationContext, reference: str) -> str:
+    """Of the image a row showed in a separate copy of its business, what comes back with it when it is recovered: one
+    of the library, unless the library says it no longer has it; never a photo of its own, which went with the row (a
+    copy is of the database, not of the files). While the library cannot be read it comes back as the copy had it:
+    the row is never left out for it, the library never renames an image, and the screens show the initials of one
+    they cannot load."""
+    try:
+        check(ctx, reference)
+    except InvalidPayload:
+        return ""
+    except OperationError:  # the library cannot be read now (503 base.image_library_unavailable)
+        return reference
+    return reference
+
+
 def _in_library(ctx: OperationContext, reference: str) -> bool:
-    from base.queries import image_library
+    from base.queries.catalog_images import image_library
 
     return image_library(ctx).get(*image_catalog.parse_reference(reference)) is not None
 
@@ -197,7 +212,7 @@ def _kept_as_it_came(image: PILImage.Image, raw: bytes) -> bool:
 def keep_photo(ctx: OperationContext, folder: str, webp: bytes) -> str:
     """Keep ``webp`` (what :func:`to_webp` made) under ``ctx``'s hub's prefix in ``folder``, by a new UUIDv7, within the
     plan's space (409 ``base.file_no_space`` otherwise, nothing kept); its ``file:`` reference."""
-    from base.queries import refuse_past_the_plans_space
+    from base.queries.files import refuse_past_the_plans_space
 
     store = storages["hub_files"]
     refuse_past_the_plans_space(ctx, store, len(webp))

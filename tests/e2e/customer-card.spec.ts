@@ -6,7 +6,9 @@
 import { type BrowserContext, expect, test } from '@playwright/test';
 
 import { cardOf, cleanUp, createCard, customersReady, e2eName, FLOW_VIEWPORTS, inputOf, rowNamed, searchList, spanishMobile } from './customer-helpers';
-import { A, api, login, shot, shown } from './helpers';
+import { A, api, capture, login, psql, shot, shown } from './helpers';
+import { rowAction } from './service-helpers';
+import { toastSaying } from './toast-helpers';
 
 test.afterAll(() => cleanUp());
 
@@ -22,7 +24,7 @@ test('a note added in one tab shows live in the other tab\'s activity', async ({
   await expect(form.locator('[data-testid=customer-note-add]')).toHaveJSProperty('disabled', true);
   await form.locator('[data-testid=customer-note-text] textarea').fill('Prefers mornings, allergic to latex');
   await form.locator('[data-testid=customer-note-add]').click();
-  await expect(page.locator('ion-toast')).toContainText(/Note added|Nota añadida/);
+  await expect(toastSaying(page, /Note added|Nota añadida/)).toBeVisible();
   await expect(form.locator('[data-testid=customer-note-text] textarea')).toHaveValue('');
 
   // The other tab: same text, no reload.
@@ -31,6 +33,39 @@ test('a note added in one tab shows live in the other tab\'s activity', async ({
   await expect(item).toContainText(/Note added|Nota añadida/);
   await other.screenshot({ path: shot('customer-card-note-live-other-tab') });
   await other.close();
+});
+
+// flow: CUSTOMER-F03 — each entry of the activity says who did it: a person by their name and the platform in its own
+// words, never its mark («system», «flow_run:…»; hub#1445). The purchase is written here as Sales' notice records it,
+// because the e2e stack's worker does not relay that notice.
+test('the activity names the person who wrote a note and says the platform recorded a purchase', async ({ page, context }) => {
+  await login(page, A, '/customer/customers');
+  const card = await createCard(context, { name: e2eName('Done by'), phone: spanishMobile() });
+  psql(
+    `insert into customer_activity (id, customer_id, kind, title, text, data, related_id, related_type, actor, created_at) values ` +
+      `(gen_random_uuid(), '${card.id}', 'purchase_recorded', '', '', jsonb_build_object('amount', 1250, 'currency', 'EUR'), '', 'sale', 'system', now() - interval '1 minute')`,
+  );
+
+  await page.goto(`/customer/customers/${card.id}`);
+  const form = shown(page).locator('[data-testid=customer-note-form]');
+  await form.locator('[data-testid=customer-note-text] textarea').fill('Prefers mornings');
+  await form.locator('[data-testid=customer-note-add]').click();
+
+  const items = shown(page).locator('[data-testid=customer-activity-item]');
+  await expect(items).toHaveCount(2);
+  await expect(items.nth(0).locator('.customer-activity__when')).toHaveText(/ · (by|por) \S.*$/);
+  await expect(items.nth(1).locator('.customer-activity__when')).toHaveText(/ · (Done by the platform|Lo hizo la plataforma)$/);
+  await expect(shown(page).locator('[data-testid=customer-activity]')).not.toContainText('system');
+
+  // In Spanish, at the fleet's three sizes.
+  await context.addCookies([{ name: 'django_language', value: 'es', domain: new URL(A).hostname, path: '/' }]);
+  await page.reload();
+  await expect(items.nth(1).locator('.customer-activity__when')).toHaveText(/ · Lo hizo la plataforma$/);
+  for (const [width, height] of [[1440, 900], [820, 1180], [375, 667]]) {
+    await page.setViewportSize({ width, height });
+    await shown(page).locator('[data-testid=customer-activity]').scrollIntoViewIfNeeded();
+    await capture(page, `customer-card-activity-done-by-the-platform-${width}x${height}`);
+  }
 });
 
 // flow: CUSTOMER-F06 — saving the groups refreshes the card live; that refresh must not untick the tag
@@ -64,11 +99,11 @@ test('a group and a tag made in their lists are assigned on the card; their coun
   const groups = shown(page).locator('[data-testid=customer-groups]');
   await groups.locator('[data-testid=customer-groups-item-' + (await idOf(context, 'groups', groupName)) + ']').click();
   await groups.locator('[data-testid=customer-groups-save]').click();
-  await expect(page.locator('ion-toast').last()).toContainText(/Groups assigned|Grupos asignados/);
+  await expect(toastSaying(page, /Groups assigned|Grupos asignados/)).toBeVisible();
   const tags = shown(page).locator('[data-testid=customer-tags]');
   await tags.locator('[data-testid=customer-tags-item-' + (await idOf(context, 'tags', tagName)) + ']').click();
   await tags.locator('[data-testid=customer-tags-save]').click();
-  await expect(page.locator('ion-toast').last()).toContainText(/Tags assigned|Etiquetas asignadas/);
+  await expect(toastSaying(page, /Tags assigned|Etiquetas asignadas/)).toBeVisible();
   await expect.poll(async () => (await cardOf(context, card.id)).data.group_ids.length).toBe(1);
   await expect.poll(async () => (await cardOf(context, card.id)).data.tag_ids.length).toBe(1);
   await page.screenshot({ path: shot('customer-card-groups-tags') });
@@ -94,7 +129,7 @@ test('a tag saved first, a group ticked while the card changes, then saved: the 
   const groups = shown(page).locator('[data-testid=customer-groups]');
   await tags.locator(`[data-testid=customer-tags-item-${tag.data.id}]`).click();
   await tags.locator('[data-testid=customer-tags-save]').click();
-  await expect(page.locator('ion-toast').last()).toContainText(/Tags assigned|Etiquetas asignadas/);
+  await expect(toastSaying(page, /Tags assigned|Etiquetas asignadas/)).toBeVisible();
   const groupBox = groups.locator(`[data-testid=customer-groups-item-${group.data.id}]`);
   await groupBox.click();
   await expect(groupBox).toHaveJSProperty('checked', true);
@@ -103,7 +138,7 @@ test('a tag saved first, a group ticked while the card changes, then saved: the 
   await expect(shown(page).locator('ion-title')).toContainText(renamed);
   await expect(groupBox).toHaveJSProperty('checked', true);
   await groups.locator('[data-testid=customer-groups-save]').click();
-  await expect(page.locator('ion-toast').last()).toContainText(/Groups assigned|Grupos asignados/);
+  await expect(toastSaying(page, /Groups assigned|Grupos asignados/)).toBeVisible();
   await expect
     .poll(async () => {
       const { data } = await cardOf(context, card.id);
@@ -146,7 +181,7 @@ test('«Merge with…» folds a duplicate into the open card', async ({ page, co
   await expect(panel.locator('[data-testid=customer-merge-confirm]')).toContainText(duplicate.name);
   await page.screenshot({ path: shot('customer-card-merge-confirm') });
   await panel.locator('[data-testid=customer-merge-submit]').click();
-  await expect(page.locator('ion-toast').last()).toContainText(duplicate.name);
+  await expect(toastSaying(page, duplicate.name)).toBeVisible();
 
   // The survivor gained the phone and the activity says so; the duplicate is gone.
   await expect(shown(page).locator('[data-fact=phone] dd')).not.toHaveText('—');
@@ -171,7 +206,7 @@ test('«Erase personal data» asks first, then erases and goes back to the list'
   expect((await cardOf(context, card.id)).status).toBe(200);
   await panel.locator('[data-testid=customer-erase-submit]').click();
   await page.waitForURL(/\/customer\/customers$/);
-  await expect(page.locator('ion-toast').last()).toContainText(/Personal data erased|Datos personales borrados/);
+  await expect(toastSaying(page, /Personal data erased|Datos personales borrados/)).toBeVisible();
   expect((await cardOf(context, card.id)).status).toBe(404);
 });
 
@@ -181,7 +216,7 @@ test('«Delete» on a row asks in a dialog, then deletes', async ({ page, contex
   await page.goto('/customer/customers');
   await customersReady(page);
   await searchList(page, 'customer-list', card.name);
-  await shown(page).locator(`[data-testid=customer-list-row-${card.id}-delete]`).click();
+  await rowAction(page, 'customer-list', card.id, 'delete');
   const dialog = page.locator('ion-modal[data-testid=customer-delete-confirm]');
   await expect(dialog).toContainText(card.name);
   await page.screenshot({ path: shot('customer-list-delete-confirm') });

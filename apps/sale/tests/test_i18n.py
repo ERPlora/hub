@@ -9,6 +9,7 @@ from django.utils import translation
 from django.utils.functional import Promise
 
 from apps.sale import models, pricing, queries, schemas, services
+from apps.sale.tests.conftest import HOST, HUB_DB
 from base.tests.po import (
     catalogue_key,
     compiled_differences,
@@ -132,14 +133,14 @@ def test_a_line_names_the_product_data_it_freezes_as_inventory_names_them():
             assert shown == {name: said[msgid] for name, msgid in fields.items()}, model.__name__
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_an_error_message_follows_the_language_of_the_request(client, make_user):
-    client.force_login(make_user("boss", host="a", role="hub_admin"))
+    client.force_login(make_user("boss", role="hub_admin"))
     response = client.post(
         "/api/sale/sales/void",
         json.dumps({"sale": "20990101-0001", "reason": "x"}),
         content_type="application/json",
-        HTTP_HOST="a.localhost",
+        HTTP_HOST=HOST,
         HTTP_ACCEPT_LANGUAGE="es",
     )
     assert response.status_code == 404

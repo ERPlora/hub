@@ -19,7 +19,7 @@ Name = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max
 LineText = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)]
 
 # What the assistant's card calls the item a write acts on (its Spanish in this app's catalog), as its screen calls one,
-# and the read it names that item by (base/assistant.py ``REFERS``), run as whoever asks, never by its id: by its name,
+# and the read it names that item by (base/assistant/cards.py ``REFERS``), run as whoever asks, never by its id: by its name,
 # as the list and the «Delete» dialog say it. Said by its name, the card reads it by that name too, so it shows the item
 # the write will find («Autumn trial» when the person said «autumn»), not only what was said; beside the item's id,
 # which the write takes it by instead, the card neither reads nor shows the name (``unless_given``, hub#1272).
@@ -57,7 +57,7 @@ class ItemRefIn(Schema):
     in any case before one that contains it: ``queries.find_item``). The id wins.
 
     The name travels as ``called``, not as ``item``: a turn ranks a tool 1 higher for each datum it takes that the
-    question names (``live.assistant.relevant``), and «item» (and «elemento», ``base.assistant.SYNONYMS``) is what the
+    question names (``live.assistant.relevant``), and «item» (and «elemento», Demo's ``assistant_synonyms``) is what the
     cart's and the price lists' items are called too (``cart_checkout``, ``pricing``), so an ``item`` datum would lift
     Demo's four tools in their requests (measured on hub#1162: three asks of ``inventory.product.bulk_create`` went
     from 4th to 8th); ``called`` moves no ask nor probe of the Hub."""

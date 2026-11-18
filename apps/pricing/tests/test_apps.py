@@ -33,12 +33,14 @@ COMMANDS = {
     "pricing.rule.deactivate",
     "pricing.rule.activate",
     "pricing.catalog.forget_product",
+    "pricing.catalog.recall_product",
     "pricing.catalog.forget_category",
     "pricing.catalog.forget_group",
     "pricing.catalog.refresh_service",
 }
 SYSTEM = {
     "pricing.catalog.forget_product",
+    "pricing.catalog.recall_product",
     "pricing.catalog.forget_category",
     "pricing.catalog.forget_group",
     "pricing.catalog.refresh_service",
@@ -139,7 +141,7 @@ def test_every_operation_tells_the_assistant_what_it_does():
         assert isinstance(op.ai, dict), name
         assert str(op.ai.get("description", "")).strip(), name
         expected = {"description", "risk"} if op.kind == "command" else {"description"}
-        if assistant.is_tool(op):  # a tool says what a person types to ask for it (live.E020); a reaction, no
+        if assistant.tools.is_tool(op):  # a tool says what a person types to ask for it (live.E020); a reaction, no
             expected |= {"asks"}
         assert set(op.ai) == expected, name
         if op.kind == "command":

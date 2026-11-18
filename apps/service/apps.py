@@ -34,6 +34,13 @@ class ServiceConfig(LiveAppConfig):
     # The services' own photos (SERVICE-F35; base.images): served by /p/media/ to the hub's sessions only.
     members_media = ["service/services/"]
     default_auto_field = "django.db.models.BigAutoField"
+    # What these words mean to the Hub's assistant (base.assistant.relevance.synonyms). A «bono» (a voucher, a pack) is the
+    # voucher of the catalogue (service.package) or the one sold to a customer (service.grant), and an «asignación»
+    # (what one «asigna») is a professional's assignment to a service (service.assignment).
+    assistant_synonyms = (
+        ("bono", "bonos", "voucher", "vouchers", "pack", "packs", "package", "packages", "grant", "grants"),
+        ("asignacion", "asignaciones", "assignment", "assignments"),
+    )
     permissions = [
         "service.view_service",
         "service.add_service",
@@ -133,12 +140,15 @@ class ServiceConfig(LiveAppConfig):
     def recoverable_from_copy(self) -> list:
         """The platform asks (``base.tenancy.recovery``) what a separate copy of the business gives back when the staff
         recovers from it (BASE-F114), in this order: first the categories the business lacks
-        (``queries.categories_in_copy``, ``queries.categories_not_in_business``), each created by
-        ``service.category.create``, the screen's own, parents first; then the services the copy offers and the business
+        (``queries.categories_in_copy``, ``queries.categories_not_in_business``), each made again by
+        ``service.category.recover``: created by ``service.category.create``, the screen's own, parents first;
+        then the services the copy offers and the business
         lacks (``queries.recoverable_services_in_copy``, ``queries.services_not_in_business``), each made again by
         ``service.service.recover``: created by ``service.service.create``, the screen's own, in its category (the same
         one, or the one brought back just before with its name), and assigned to each professional who performed it
-        there and the business still has, by ``service.assignment.assign``, the screen's own too."""
+        there and the business still has, by ``service.assignment.assign``, the screen's own too; last, what a category
+        brought back had inside it and the business keeps where deleting it left it (SERVICE-F08), each service and
+        each subcategory put back into it by its own link, counted apart because it touches what the business has."""
         from apps.service import queries  # the models are not loaded yet when this module is
         from base.recovery import Recoverable
 
@@ -148,13 +158,27 @@ class ServiceConfig(LiveAppConfig):
                 reads_since="0001_initial",
                 read=queries.categories_in_copy,
                 missing=queries.categories_not_in_business,
-                create="service.category.create",
+                create="service.category.recover",
             ),
             Recoverable(
                 label=self.verbose_name,
-                reads_since="0001_initial",
+                reads_since="0003_service_image",
                 read=queries.recoverable_services_in_copy,
                 missing=queries.services_not_in_business,
                 create="service.service.recover",
+            ),
+            Recoverable(
+                label=_("Service links to categories"),
+                reads_since="0001_initial",
+                read=queries.categories_in_copy,
+                missing=queries.service_links_not_in_business,
+                create="service.service.return_to_category",
+            ),
+            Recoverable(
+                label=_("Subcategory links to categories"),
+                reads_since="0001_initial",
+                read=queries.categories_in_copy,
+                missing=queries.subcategory_links_not_in_business,
+                create="service.category.return_to_parent",
             ),
         ]

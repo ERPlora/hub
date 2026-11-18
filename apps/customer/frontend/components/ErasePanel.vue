@@ -24,7 +24,7 @@ async function confirm(): Promise<void> {
   } catch {
     return; // `error` holds it: the panel shows it.
   }
-  void toastSuccess(t('customer.erase.done'));
+  toastSuccess(t('customer.erase.done'));
   emit('erased');
 }
 </script>

@@ -10,11 +10,11 @@ import pytest
 from live.context import OperationContext, Scope
 from live.operations import get
 
-from apps.task.tests.conftest import A, ctx_for, make_member, make_project, make_task
+from apps.task.tests.conftest import HUB_DB, A, ctx_for, make_member, make_project, make_task
 from base import assistant
 from base.tenancy.context import use_hub
 from base.tenancy.tests import hubs
-from base.tests.test_assistant_card_values import AN_ID
+from base.tests.test_assistant_card_values_references import AN_ID
 
 A_MISSING_ID = "0192f0b2-3333-7000-8000-000000000003"
 
@@ -45,7 +45,7 @@ ON_A_PERSON = [
 
 
 def fields_of(write: str, arguments: dict, language: str = "en", ctx=None) -> dict:
-    card = assistant.card(get(write), arguments, language, ctx or ctx_for())
+    card = assistant.cards.card(get(write), arguments, language, ctx or ctx_for())
     return {field["name"]: field for field in card["fields"]}
 
 
@@ -66,7 +66,7 @@ def no_id(said) -> bool:
 # ── A task by its title, a project by its name, a person by their full name ───────────────────────────────────────────
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize(("write", "datum"), ON_A_TASK)
 def test_a_write_on_a_task_says_it_by_its_title(write, datum):
     """The case the issue names, «task.comment.add:task_id»: «Task: Clean the store room», never its id."""
@@ -74,21 +74,21 @@ def test_a_write_on_a_task_says_it_by_its_title(write, datum):
     assert shown(write, {datum: str(task.id)})[datum] == "Clean the store room"
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize(("write", "datum"), ON_A_PROJECT)
 def test_a_write_on_a_project_says_it_by_its_name(write, datum):
     project = make_project("q3-audit", "Q3 audit")
     assert shown(write, {datum: str(project.id)})[datum] == "Q3 audit"
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize(("write", "datum"), ON_A_PERSON)
 def test_a_write_on_a_person_says_them_by_their_full_name(write, datum):
     ana = make_member("Ana", "López")
     assert shown(write, {datum: str(ana.id)})[datum] == "Ana López"
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize(("language", "title"), [("en", "Task"), ("es", "Tarea")])
 def test_the_case_of_the_issue_reads_task_and_its_title_in_each_language(language, title):
     task = make_task("Limpiar el almacén")
@@ -96,7 +96,7 @@ def test_the_case_of_the_issue_reads_task_and_its_title_in_each_language(languag
     assert (field["value"], field["label"]) == ("Limpiar el almacén", title)
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_among_several_the_card_says_the_one_the_write_names():
     """Each id names its own record, never another of the list (the first, the last, the one of the same project)."""
     project = make_project("opening", "Opening")
@@ -113,7 +113,7 @@ def test_among_several_the_card_says_the_one_the_write_names():
         assert said == [f"{m.first_name} {m.last_name}" for m in listed]
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_change_keeps_saying_the_record_beside_what_it_changes():
     """The name is the record's as it is now, before the write runs: a rename says the old title under «Task» and the
     new one under its own datum; a project moved says the task, the project it goes to and nothing by an id."""
@@ -126,7 +126,7 @@ def test_a_change_keeps_saying_the_record_beside_what_it_changes():
     assert renamed == {"id": "Opening", "name": "Grand opening"}
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_new_subtask_says_the_task_it_hangs_from_and_whom_it_goes_to():
     parent = make_task("Open the shop")
     ana = make_member("Ana", "López")
@@ -138,7 +138,7 @@ def test_a_new_subtask_says_the_task_it_hangs_from_and_whom_it_goes_to():
 # ── What is not theirs to read, or no longer there ────────────────────────────────────────────────────────────────────
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize(("write", "datum"), ON_A_TASK + ON_A_PROJECT)
 def test_what_the_person_may_not_read_is_left_out_never_said_by_its_id(write, datum):
     """Whoever may not see the tasks (``task.view``) is told no task nor project."""
@@ -150,7 +150,7 @@ def test_what_the_person_may_not_read_is_left_out_never_said_by_its_id(write, da
     assert no_id(said)
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize(("write", "datum"), ON_A_PERSON)
 def test_a_person_is_left_out_for_whoever_may_not_see_the_team(write, datum):
     """A person of the team is Staff's to name (``staff.view``): without it, the card says nobody."""
@@ -162,7 +162,7 @@ def test_a_person_is_left_out_for_whoever_may_not_see_the_team(write, datum):
     assert no_id(said)
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_task_an_employee_does_not_see_is_left_out_for_them(make_user):
     """An employee sees the tasks assigned to them or made by them: another person's task is not theirs to read, so
     the card does not name it to them, as the list does not show it."""
@@ -175,7 +175,7 @@ def test_a_task_an_employee_does_not_see_is_left_out_for_them(make_user):
     assert shown("task.comment.add", {"task_id": str(others.id)}) == {"task_id": "Ana's"}  # an admin sees it
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize(("write", "datum"), ON_A_TASK + ON_A_PROJECT + ON_A_PERSON)
 def test_what_does_not_exist_is_left_out(write, datum):
     said = shown(write, {datum: A_MISSING_ID})
@@ -183,7 +183,7 @@ def test_what_does_not_exist_is_left_out(write, datum):
     assert no_id(said)
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_record_deleted_meanwhile_is_left_out():
     task = make_task("Clean the store room")
     arguments = {"id": str(task.id)}
@@ -192,11 +192,11 @@ def test_a_record_deleted_meanwhile_is_left_out():
     assert shown("task.task.delete", arguments) == {}
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_nobody_behind_the_request_reads_no_record():
     """An automation's card (no person at hand) names no record: nothing is read for anybody."""
     task = make_task("Clean the store room")
-    card = assistant.card(get("task.task.update"), {"id": str(task.id), "title": "Tidy"}, "en")
+    card = assistant.cards.card(get("task.task.update"), {"id": str(task.id), "title": "Tidy"}, "en")
     assert {field["name"]: field["value"] for field in card["fields"]} == {"title": "Tidy"}
 
 

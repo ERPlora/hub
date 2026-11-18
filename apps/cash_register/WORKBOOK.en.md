@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:b8c5f7ec0b9f9ceaf14d9513e9432347f9cb5abc7e81489684200785ff39abeb -->
+<!-- generated from WORKBOOK.md sha256:26fdf12c67137fa95a580dbcd7fd546931098cc86c09c82b2ef4ae3a2bd3166a -->
 
 ## What it is for and who it is for
 
@@ -111,7 +111,8 @@ From **Cash register**, "Detail" or tapping a row: it opens as a page, with its 
 in two columns: Status, Drawer, Opened (when and by whom), Closed (when and by whom, or "Closed by
 itself"), Movements (how many), Opening float, Sales (all payment methods) and, below, Cash sales, Card
 sales and Sales with other payment methods (this one only if there were any), Refunds, Cash in, Cash out,
-Comps, Expected, Counted and Difference, and the opening and closing notes. In an open session Counted
+Comps, Expected, Counted and Difference, and the opening and closing notes. With the Tips app turned on, also
+"Cash tips", "Card tips" and "Tips paid out" (CASH_REGISTER-F18). In an open session Counted
 and Difference show "—". Below, two tables, from the most recent to the oldest, 50 per page and as cards
 on the phone: **Movements** (When, Type, Amount with its sign, Method, Concept) and **Counts** (When,
 Count type, Total counted, Notes). Empty: "No movements in this session." and "No counts in this
@@ -167,6 +168,7 @@ With the window as it opened, Back closes it without asking (BASE-F05); the draw
 | CASH_REGISTER-F15 | Record a refund in the cash register | common | done |
 | CASH_REGISTER-F16 | Print the session report (X or Z) | common | done |
 | CASH_REGISTER-F17 | See the sale lines in no shift | common | done |
+| CASH_REGISTER-F18 | See the tips in the cash register | common | not done |
 
 ### CASH_REGISTER-F01 Set up how the cash register works
 Status: done
@@ -210,7 +212,8 @@ In: the drawer's name.
 Out: the drawer (announces: `cash_register.register.created` or `cash_register.register.updated`). A
 drawer is never deleted: the sessions name it.
 If it fails: without a name, "Type the drawer's name."; with a name another drawer already has (whatever
-the case), "There is already a drawer with that name.".
+the case), "There is already a drawer with that name.". Both show under the name and go as soon as
+something is typed in it, without tapping "Save" again (hub#1470).
 Involved: CASH_REGISTER-F03
 
 ### CASH_REGISTER-F03 Open the cash shift with the starting float
@@ -235,7 +238,9 @@ give the cash the drawer starts with." under the field; a deactivated drawer or 
 "That drawer is not available."; an unreadable amount ("This is not an amount. Type a figure, for example
 12.50."), a negative ("This amount cannot be negative.") or an ambiguous one ("1,250") is said under the field on
 leaving it or on tapping "Open session", and nothing is sent; "12.555" is not ambiguous: it is €12,555.00, as in a
-price (hub#1160). "Open session" is grey while
+price (hub#1160). The notice the server puts under a field (the required float) goes as soon as that field
+changes, without tapping "Open session" again; another field's stays until its own changes (hub#1470).
+"Open session" is grey while
 the business has not yet said its currency, because the float is read in it (without it, "1500" yen would
 be saved as 150,000). If the currency cannot be read, the window says so ("The business's currency could not be read", with the
 reason) and offers "Retry", which asks for it again; as soon as it arrives, "Open session" lights up (hub#938).
@@ -278,7 +283,8 @@ Out: the movement, in the name of whoever records it (announces: `cash_register.
 sign is set by the system according to the type.
 If it fails: "This cash-out would leave the drawer below zero and a negative balance is not allowed." if
 the settings do not allow it; a zero ("Invalid amount"), unreadable, negative or ambiguous amount is said under the
-field and nothing is sent (it is read as in F03); the
+field and nothing is sent (it is read as in F03); a field's notice goes as soon as that field changes,
+without tapping "Register" again, and another field's stays until its own changes (hub#1470); the
 session closed on another device: "That cash session is closed: a closed session takes no new
 movements.". "Register" is grey while the business has not yet said its currency, because the amount is
 read in it (without it, "1500" yen would be saved as 150,000). If the currency cannot be read, the window says so ("The business's currency could not be read", with the
@@ -582,6 +588,32 @@ warn.
 If it fails: nothing of its own.
 Involved: CASH_REGISTER-F04, F10, F13
 
+### CASH_REGISTER-F18 See the tips in the cash register
+Status: not done — the Cash register does not tell yet what another app records (hub#1499)
+Vertical: common
+Actor: system, employee, manager
+Screen: Cash register, Session detail
+Steps:
+1. With the Tips app turned on, the cashier takes a tip (TIP-F02 to TIP-F05) or a manager pays it out
+   (TIP-F12).
+2. Without anyone typing anything, the open session gets its line: "Tip" in cash or by card, or "Tips paid
+   out" in cash, with the sale or the person in the concept.
+3. In the **Session detail**, the summary shows them apart from the sales, the cash in and the cash out: "Cash
+   tips", "Card tips" (and with other payment methods, if there were any) and "Tips paid out".
+4. Only cash touches the expected cash: a cash tip raises it (it is in the drawer) and a tip paid out in cash
+   lowers it (it left the drawer); a card tip does not. That way the count squares at closing (F09).
+5. The X or Z report (F16) carries the same three lines, and the "Close session" window counts the cash tips
+   in "Expected in the drawer".
+In: the cash in and cash out that Tips records in the open session, marked as its own
+(`cash_register.movement.add`).
+Out: the lines in the session (announces: `cash_register.movement.added`), with the name of the app that
+records them. The sales figures do not change: a tip is never a sale.
+If it fails: with no open session, Tips does not record a cash tip and refuses it with its notice (TIP-F04); a
+card tip is kept in Tips and goes into no session. A tip line is not corrected with a movement by hand: it is
+adjusted or voided in Tips (TIP-F06), which records the difference in the open session; the closed one is never
+touched.
+Involved: TIP-F02, TIP-F03, TIP-F04, TIP-F05, TIP-F06, TIP-F12, CASH_REGISTER-F09, CASH_REGISTER-F16
+
 ## Services: what goes in and what comes out
 
 Everything can be asked for through the screens, the assistant (by voice or by text, with the person's own
@@ -619,7 +651,7 @@ All of them can be followed live.
 | Opens a session with its float | open | F03, F10 | `cash_register.session.open` |
 | Closes a session with the counted cash | close | F09 | `cash_register.session.close` |
 | Closes the sessions forgotten at the cut-off of the day | close | F10 | `cash_register.session.auto_close` |
-| Records cash in or cash out | record | F05 | `cash_register.movement.add` |
+| Records cash in or cash out (also the one another app records, such as Tips, marked as its own) | record | F05, F18 | `cash_register.movement.add` |
 | Registers a count | count | F06 | `cash_register.count.add` |
 | Prints the X or Z report of a session on the receipt printer | view sessions | F16 | `cash_register.session.print` |
 
@@ -680,6 +712,7 @@ Cash register was off or did not answer is seen in CASH_REGISTER-F17.
 | App | What for | Service |
 |---|---|---|
 | Sales & POS | Knowing whether it can charge in cash (F04) | `cash_register.session.current` |
+| Tips | Recording what comes in and goes out of tips (F18) | `cash_register.movement.add` |
 
 ### Who can do what
 
@@ -695,5 +728,4 @@ Cash register was off or did not answer is seen in CASH_REGISTER-F17.
 | See the expected cash with the blind count | yes | yes | yes | no | `cash_register.view_expected_totals` |
 | Settings and drawers | yes | yes | no | no | `cash_register.manage_settings` |
 
-The roles arrive from the SaaS with a prefix (`hub_owner`, `hub_admin`, `hub_manager`, `hub_employee`);
-the cashier of the current product is an employee.
+The roles arrive from the SaaS with a prefix (`hub_owner`, `hub_admin`, `hub_manager`, `hub_employee`).

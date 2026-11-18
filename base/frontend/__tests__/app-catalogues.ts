@@ -116,6 +116,20 @@ export function expectSamePlaceholders({ EN, ES }: AppCatalogues, { pluralForms 
   }
 }
 
+/** «ticket» or the Catalan «tiquet» as a word, in any case: the sales receipt, which Spanish calls «tique» (RAE, and
+ *  the word of the invoicing rules, RD 1619/2012). */
+const ANGLICISED_RECEIPT = /\bti(?:ck|qu)ets?\b/gi;
+
+/** The code of the receipts' series, which the business sees as it is written: the one spelling that is let through. */
+const SERIES_CODE = 'TICKET';
+
+/** Every Spanish message of `ES` that says «ticket» or «tiquet», as «key: message». The keys (`tickets`,
+ *  `settingsTickets`) are a published contract, not text, and never count. */
+export function anglicisedReceipts(ES: ReadonlyMap<string, string>): string[] {
+  const saysIt = (message: string): boolean => (message.match(ANGLICISED_RECEIPT) ?? []).some((word) => word !== SERIES_CODE);
+  return [...ES].filter(([, message]) => saysIt(message)).map(([key, message]) => `${key}: ${message}`);
+}
+
 function expectNoEmptyMessage({ EN, ES }: AppCatalogues): void {
   for (const [key, message] of [...EN, ...ES]) expect(message.trim(), key).not.toBe('');
 }
@@ -158,6 +172,13 @@ export function sharedCatalogueChecks(tests: SharedTests): Check[] {
   } else {
     checks.push(['have no empty message', expectNoEmptyMessage]);
   }
+  checks.push([
+    'say «tique» in Spanish, never «ticket»',
+    ({ ES }) => {
+      const found = anglicisedReceipts(ES);
+      expect(found, found.join(' · ')).toEqual([]);
+    },
+  ]);
   if (kind === 'and plural forms') {
     checks.push(['keep the same placeholders and plural forms in both languages', (catalogues) => expectSamePlaceholders(catalogues, { pluralForms: true })]);
   } else if (kind === 'only') {

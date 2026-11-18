@@ -3,6 +3,7 @@
 // over a minute and no active printer; «All clear» with nothing waiting; the read's failure with «Retry».
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import { clockReads, withFakeTimers } from '../../../../base/frontend/__tests__/clock-reads';
 import { errorFrame, flush, mountPrinting, words } from '../__tests__/mount-printing';
 import type { JobSummaryOut, UsageSummary } from '../operations';
 import QueueSummary from './QueueSummary.vue';
@@ -163,34 +164,16 @@ describe('QueueSummary by the clock', () => {
 describe('QueueSummary reads the summary again by the clock', () => {
   // «Device off» moves as time passes (a job reaching its minute, a device going quiet for 90 s) with no event to
   // re-run the live query. While something waits and the page is in sight, the card reads `printing.job.summary` once
-  // every 30 s, the bell's pace (HubBell.vue): a reading older than a live result that came meanwhile is dropped, one
+  // every 30 s, the bell’s pace (base/frontend/lib/bell-counters.ts): a reading older than a live result that came meanwhile is dropped, one
   // that fails keeps the last. The fake timers are the test's only.
   const SUMMARY = '/api/printing/jobs/summary';
   const waitingOn = (more: Partial<UsageSummary> = {}) =>
     summary(usage('receipt', { printers: 1, prints_on: 'Till', pending: 1, oldest_pending_at: ago(2), ...more }));
 
   async function clocked(answer: (call: number) => Response | Promise<Response>) {
-    let calls = 0;
     const s = await setup();
-    s.net.onApi(() => answer(++calls));
-    const reads = () => s.net.api.filter((call) => call.url.startsWith(SUMMARY)).length;
-    const tick = async (ms: number) => {
-      vi.advanceTimersByTime(ms);
-      await flush();
-    };
     const state = () => words(s.find('printing-summary-card-receipt').element);
-    return { ...s, reads, tick, state };
-  }
-
-  function withFakeTimers(test: () => Promise<void>) {
-    return async () => {
-      vi.useFakeTimers({ shouldAdvanceTime: true, toFake: ['setTimeout', 'setInterval', 'clearTimeout', 'clearInterval'] });
-      try {
-        await test();
-      } finally {
-        vi.useRealTimers();
-      }
-    };
+    return { ...s, ...clockReads(s.net, SUMMARY, answer), state };
   }
 
   it(

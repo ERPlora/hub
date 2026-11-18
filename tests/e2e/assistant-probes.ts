@@ -475,7 +475,7 @@ export function skeleton(roleCatalog: Catalog, ownerCatalog: Catalog, options: S
     const lacked = ownerCatalog.filter((row) => row.app_label === app && offered(row) && !held.has(row.name));
     const taken = options.all ? mine : mixed(mine, options.sample, next);
     // What to expect comes from the kind alone: every write a person holds shows its card before it runs (the turn's
-    // instructions, base/assistant.py: «To change something, call its tool: the person sees a card and confirms it»).
+    // instructions, base/assistant/prompt.py: «To change something, call its tool: the person sees a card and confirms it»).
     for (const row of taken) add(row.name, app, row.kind === 'read' ? 'read' : 'card');
     const refused = options.all ? lacked : shuffled([...lacked].sort((a, b) => a.name.localeCompare(b.name)), next).slice(0, options.sample);
     for (const row of refused) add(row.name, app, 'refused');
