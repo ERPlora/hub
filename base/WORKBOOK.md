@@ -261,7 +261,7 @@ Sobre la pantalla en la que se intentó la acción: qué se aprueba, «¿Quién 
 Con el botón de volver: cómo se llama a la API, «Descargar el fichero OpenAPI» y una sección por app con sus llamadas.
 
 ### Asistente
-El panel que se abre con los destellos «Asistente» de la barra de arriba (en un móvil, dentro de «Más opciones»), a la
+El panel que se abre con los destellos «Asistente» de la barra de arriba (en un móvil, dentro de «⋮», junto a «Mis apps»), a la
 derecha. En una tableta o un ordenador se queda al lado de la pantalla y la empuja, así que se sigue trabajando con él
 abierto; en un móvil la tapa, sobre un velo oscuro. Arriba, «Asistente», «Nueva conversación» cuando ya hay una y la ×
 «Cerrar». En medio, la conversación: vacía, los destellos, la frase de bienvenida y los atajos de la puesta en marcha;
@@ -2352,9 +2352,9 @@ Actor: propietario, administrador, responsable, empleado
 Pantalla: Asistente
 Pasos:
   1. Con la sesión abierta, pulsa los destellos «Asistente» de la barra de arriba, al lado de la campana. Volver a
-     pulsarlos lo cierra. En un móvil, los destellos van en «Más opciones», para que el título siga centrado, y la
-     campana se queda a la vista: ahí, «Asistente» abre el panel en cuanto el menú termina de cerrarse, así que lo
-     que se escribe enseguida va a la caja del chat y el Intro lo envía.
+     pulsarlos lo cierra. En un móvil, los destellos y «Mis apps» van en «⋮» («Más acciones»), para que el título
+     siga centrado, y la campana se queda a la vista: ahí, «Asistente» abre el panel en cuanto el menú termina de
+     cerrarse, así que lo que se escribe enseguida va a la caja del chat y el Intro lo envía.
   2. El panel entra por la derecha. En una tableta o un ordenador ocupa una columna al lado de la pantalla y la
      empuja: se puede seguir trabajando con el panel abierto. En un móvil tapa la pantalla, sobre un velo oscuro.
   3. Se cierra con la × «Cerrar», con la tecla Esc (esté donde esté el cursor, salvo en una ventana abierta encima
@@ -3977,7 +3977,7 @@ hub#1458, hub#1459, hub#1473, hub#1474, hub#1495, hub#1505, aws#77
   `base`) al arrancar y en los helpers de test que montan sus piezas (`mountBase`, `mount-sale`), y le pone su
   conversación vacía con los atajos de la configuración (`AssistantSetupEmpty.vue`, en el slot `empty` del panel). Los textos propios del chat son
   `assistantMessages` del paquete (raíz `assistant`, `en` + `es`), que `appMessages` de `frontend/main.ts` mezcla con
-  los de las apps; en `base.assistant` quedan solo los del Hub (`more`, `empty`, `setupIntro`, `shortcuts`, `setup`,
+  los de las apps; en `base.assistant` quedan solo los del Hub (`empty`, `setupIntro`, `shortcuts`, `setup`,
   `card.actions`, `card.operations` y `screens`). Estado por pestaña en `state.ts` del paquete; la conversación, en
   `sessionStorage` (`erplora.assistant.history`, de una persona: otra empieza vacía) y el abierto o cerrado en
   `localStorage` (`erplora.assistant.open`); sin IndexedDB. `signOut()` de `frontend/main.ts` la olvida antes de

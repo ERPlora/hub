@@ -195,9 +195,9 @@ describe('main.ts', () => {
   });
 
   it("on import, the shell speaks the shared assistant's words next to base's (its panel would show raw keys otherwise)", () => {
-    const messages = importBoot.messages as Record<string, { assistant: { send: string }; base: { assistant: { more: string } } }>;
+    const messages = importBoot.messages as Record<string, { assistant: { send: string }; base: { assistant: { empty: string } } }>;
     expect([messages.en.assistant.send, messages.es.assistant.send]).toEqual(['Send', 'Enviar']);
-    expect(messages.es.base.assistant.more).toBe('Más opciones');
+    expect(messages.es.base.assistant.empty).toBe('Pregúntame por tus ventas, tu inventario o cualquier cosa de tu negocio.');
   });
 
   it("configures the shared assistant as the Hub's before the shell mounts (HUB_ASSISTANT)", async () => {

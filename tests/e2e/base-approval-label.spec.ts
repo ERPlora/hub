@@ -14,7 +14,8 @@ import { execSync } from 'node:child_process';
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
 import { type Provider, startProvider } from './assistant-provider';
-import { A, api, compactBar, createItem, EMPLOYEE, login, OWNER, psql, REPO_DIR, shot, shown, untilStill, usernamesOf } from './helpers';
+import { openPanel } from './assistant-real';
+import { A, api, createItem, EMPLOYEE, login, OWNER, psql, REPO_DIR, shot, shown, untilStill, usernamesOf } from './helpers';
 import { STACK } from './stack';
 import { toastSaying } from './toast-helpers';
 
@@ -103,20 +104,6 @@ const panel = (page: Page): Locator => page.locator('[data-testid="assistant-pan
 const card = (page: Page): Locator => page.locator('ion-modal[data-testid="assistant-confirm"]');
 /** «An approval is needed», over the screen that asked. */
 const approval = (page: Page): Locator => page.locator('ion-modal').filter({ has: page.getByTestId('approval-action') });
-/** The topbar's way to the assistant: the sparkles, or on a phone «More options» (the sparkles folded with the bell). */
-const opener = (page: Page): Locator =>
-  shown(page).locator(compactBar(page) ? '[data-testid="topbar-chrome-more"]' : '[data-testid="assistant-button"]');
-
-async function openPanel(page: Page): Promise<void> {
-  await page.goto(`${A}/`);
-  await expect(opener(page)).toBeVisible();
-  if ((await panel(page).getAttribute('data-open')) !== 'true') {
-    await opener(page).click();
-    if (compactBar(page)) await page.locator('ion-popover [data-testid="topbar-chrome-more-assistant"]').click();
-  }
-  await expect(panel(page)).toHaveAttribute('data-open', 'true');
-}
-
 const escaped = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 test('BASE-F84: the dialog says the figures of the very line it approves, and a manager approves it with their PIN', async () => {

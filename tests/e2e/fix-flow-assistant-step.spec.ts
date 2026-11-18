@@ -12,12 +12,13 @@ import { promisify } from 'node:util';
 import { expect, type Page, test } from '@playwright/test';
 
 import { DONE, type Provider, startProvider } from './assistant-provider';
-import { capture, compactBar, HUB_DIR, psql, REPO_DIR, shown } from './helpers';
+import { capture, HUB_DIR, psql, REPO_DIR, shown } from './helpers';
 import { confirmDialog, idFromUrl, parkedEvent, RELAY, signedIn } from './flow-helpers';
 import { noHorizontalScroll, settled, VIEWPORTS } from './schedule-helpers';
 import { STACK } from './stack';
 import { pick } from './task-helpers';
 import { toastSaying } from './toast-helpers';
+import { openAssistant } from './topbar';
 
 const TAG = 'E2E FlowAI';
 const PROVIDER_PORT = Number(process.env.E2E_AI_PROVIDER_PORT ?? STACK.hubPort + 2);
@@ -149,15 +150,7 @@ for (const viewport of VIEWPORTS) {
         definition: { trigger: { kind: 'manual' }, steps: [{ id: 's1', kind: 'command', operation: 'task.task.create', params: { title: 'Call back' } }] },
         notes: ['I did not know who to assign it to.'],
       };
-      // On a phone the chat lives under the top bar's «More» (its popover); wider, it has its own button.
-      const panel = page.locator('[data-testid="assistant-panel"]');
-      if (compactBar(page)) {
-        await shown(page).locator('[data-testid="topbar-chrome-more"]').click();
-        await page.locator('ion-popover [data-testid="topbar-chrome-more-assistant"]').click();
-      } else {
-        await shown(page).locator('[data-testid="assistant-button"]').click();
-      }
-      await expect(panel).toHaveAttribute('data-open', 'true');
+      const panel = await openAssistant(page);
       const box = panel.locator('[data-testid="assistant-input"] textarea');
       await expect(box).toBeVisible();
       await box.fill(`E2E-ASK flow__draft__propose ${JSON.stringify(draft)}`);

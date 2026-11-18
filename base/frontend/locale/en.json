@@ -1243,7 +1243,6 @@
       }
     },
     "assistant": {
-      "more": "More options",
       "empty": "Ask me about your sales, your stock or anything about your business.",
       "setupIntro": "Review your business's setup. Choose an option or write your question.",
       "shortcuts": {
