@@ -24,6 +24,30 @@ sube al repo.
 a un segundo checkout le basta `VITE_DEV_PORT=5203` en su `.env`. `pnpm run dev` o la e2e sueltos solo la leen
 del entorno, y `uv run pytest` sigue en el `5173` aunque la defina (`config/settings_pytest.py`).
 
+## Comprobaciones antes de subir
+
+```bash
+git config core.hooksPath .githooks   # una vez por clon, cuando su HEAD ya trae .githooks/
+scripts/checks.sh fast                # lo mismo que corre el gancho, a mano, sobre el árbol de trabajo
+```
+
+`scripts/checks.sh fast` pasa en unos segundos, sin red ni base de datos, los tests de guardarraíles del tamaño de
+cada fichero, de ruff, de los contratos de import-linter y de la complejidad cognitiva, con sus listas de excepciones,
+que solo encogen (`.file-size-allow`, las de `pyproject.toml` y `complexipy-snapshot.json`). Su salida dice qué
+fichero incumple y por qué.
+
+El gancho `.githooks/pre-push` corre primero el `pre-push` global de la máquina, con los mismos argumentos y la misma
+entrada, y después `scripts/checks.sh fast` sobre cada commit que se sube, sacado en un worktree temporal con el
+entorno de Python de este checkout (`.venv`, o el de `UV_PROJECT_ENVIRONMENT`): se comprueba lo que se sube, nunca el
+árbol de trabajo. Un rojo para el push, y no hay variable para saltárselo; sin el entorno (`uv sync`) también se para.
+`commit-msg`, `pre-commit` y `applypatch-msg` pasan el turno a los ganchos globales del mismo nombre, que
+`core.hooksPath` dejaría de correr. La suite de la CI vuelve a pasar estos tests al fusionar, así que un clon sin el
+gancho no se salta nada. Sus tests: `tests/test_githooks.py` y `tests/test_checks.py`.
+
+El ajuste vale para todos los worktrees del clon, y la ruta es relativa a cada uno: en un worktree cuya rama aún no
+trae `.githooks/`, git no corre ningún gancho, tampoco los globales. Una rama que no trae `scripts/checks.sh` no se
+puede subir hasta que se le mergea `origin/main`.
+
 ## El humo de navegador (`@smoke`)
 
 ```bash
