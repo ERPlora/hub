@@ -5,7 +5,7 @@
 import { type LiveStatus, useLive, useLiveClient } from '@erplora/ui/sdk';
 import { onScopeDispose, type Ref, shallowRef, watch } from 'vue';
 
-import type { BellCounters } from '../operations';
+import type { BellCounters } from '../operations-bell';
 
 export interface BellReading {
   /** The newest result: the live one, or the reading of the clock when it came after it; undefined before the first. */

@@ -2,17 +2,15 @@
 and System's cards; their rules are ``base.home``'s."""
 
 from django.utils import translation
-from django.utils.translation import gettext, gettext_lazy
+from django.utils.translation import gettext_lazy
 from live.context import OperationContext
 from live.operations import AI, INTERNAL, operation
 
-from base import activation, home
+from base import activation, bell, home
 from base.models import EventDelivery, Hub, Membership
 from base.permissions import ADMINISTER_HUB, VIEW_HOME
 from base.relay import active_apps
 from base.schemas import (
-    BellCountersIn,
-    BellCountersOut,
     NoticeListIn,
     NoticeListOut,
     SetupStatusIn,
@@ -22,6 +20,7 @@ from base.schemas import (
     WidgetListIn,
     WidgetListOut,
 )
+from base.schemas.bell import BellCountersIn, BellCountersOut
 
 from .usage import _plan_motives
 
@@ -167,29 +166,9 @@ def bell_counters(ctx: OperationContext, data: BellCountersIn) -> dict:
             ).count()
             motives = _plan_motives(ctx, hub, modules)
             if motives:
-                counters.insert(
-                    0,
-                    {
-                        "key": "base.plan_limits",
-                        "app": "base",
-                        "count": motives,
-                        "route": "/system#usage",
-                        "label": gettext("Plan limits"),
-                        "icon": "ion:speedometer-outline",
-                    },
-                )
+                counters.insert(0, bell.notice("base.plan_limits", bell.PLAN_LIMITS, {"count": motives}))
             if failed:
-                counters.insert(
-                    0,
-                    {
-                        "key": "base.failed_events",
-                        "app": "base",
-                        "count": failed,
-                        "route": "/system#events",
-                        "label": gettext("Failed events"),
-                        "icon": "ion:warning-outline",
-                    },
-                )
+                counters.insert(0, bell.notice("base.failed_events", bell.FAILED_EVENTS, {"count": failed}))
         return {"counters": counters, "refresh_every": home.bell_refresh_every(ctx, modules)}
 
 

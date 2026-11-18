@@ -30,6 +30,29 @@ export async function bellTotal(context: BrowserContext, origin: string = A): Pr
   return bell.data.counters.reduce((sum, counter) => sum + counter.count, 0) + (setup.data.blocking_pending > 0 ? 1 : 0);
 }
 
+/** A counter of the bell as the server sends it (`base.bell.counters`), its words in the person's language. */
+export interface ServerCounter {
+  key: string;
+  count: number;
+  severity: 'danger' | 'warning' | 'info';
+  title: string;
+  body: string | null;
+  action_label: string;
+  due: string | null;
+}
+
+/** The counter `key` the server gives the person of `context` now; undefined while it is at zero. */
+export async function serverCounter(context: BrowserContext, key: string, origin: string = A): Promise<ServerCounter | undefined> {
+  const bell = await api<{ counters: ServerCounter[] }>(context, origin, 'GET', '/home/bell');
+  expect(bell.status).toBe(200);
+  return bell.data.counters.find((counter) => counter.key === key);
+}
+
+/** How much of the deadline ring on the bell's pill is left: 1 with no deadline or a week or more away, 0 when due. */
+export async function bellRingLeft(page: Page): Promise<number> {
+  return Number(await actionBell(page).locator('.action-bell__ring').getAttribute('data-progress'));
+}
+
 /** The panel of the action center: Ionic moves a presented modal to `ion-app`, outside the page. */
 export const actionPanel = (page: Page): Locator => page.locator('ion-modal[data-testid=action-panel]');
 
@@ -85,3 +108,12 @@ export async function featureNotice(page: Page, text: string | RegExp): Promise<
 /** The button of the featured notice that says `label`. */
 export const noticeButton = (featured: Locator, label: string | RegExp): Locator =>
   featured.locator('ion-button').filter({ hasText: label });
+
+/** The featured notice says the server's heading, sentence and button for `counter`. */
+export async function expectTheServersWords(featured: Locator, counter: ServerCounter): Promise<void> {
+  await expect(featured.locator('h3')).toHaveText(counter.title);
+  const body = featured.locator('.action-featured__body');
+  if (counter.body) await expect(body).toHaveText(counter.body);
+  else await expect(body).toHaveCount(0);
+  await expect(noticeButton(featured, counter.action_label)).toBeVisible();
+}

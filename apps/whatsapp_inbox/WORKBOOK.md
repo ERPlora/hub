@@ -365,7 +365,9 @@ Pantalla: Bandeja de entrada
 Pasos:
 1. En **Filtros**, elegir **Estado: Abierta** y **Sin leer** y pulsar **Aplicar**: quedan las
    conversaciones cuyo último mensaje es del cliente.
-2. La campana del Hub cuenta **Clientes de WhatsApp esperando respuesta** y lleva a la **Bandeja de entrada**;
+2. La campana del Hub cuenta **Clientes de WhatsApp esperando respuesta** («N clientes de WhatsApp esperando
+   respuesta», con «Contesta antes de 24 horas desde su último mensaje: después, WhatsApp solo deja mandar una
+   plantilla aprobada.») y lleva con «Contestar a los clientes» a la **Bandeja de entrada**;
    cuenta también las conversaciones que una respuesta automática no pudo contestar, marcadas «Necesita atención»
    junto al nombre (F20). Baja sola en cuanto alguien contesta (desde el Hub o desde el móvil), la deja pendiente o
    la cierra, y no sale cuando no espera nadie.

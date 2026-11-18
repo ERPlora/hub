@@ -998,3 +998,19 @@ msgstr "necesita atención"
 
 msgid "Sends the customer the WhatsApp, only in her own conversation and within your plan's messages."
 msgstr "Manda el WhatsApp a la clienta, solo en su propia conversación y dentro de los mensajes de tu plan."
+
+#: apps.py
+#, python-format
+msgid "%(count)d WhatsApp customer waiting for an answer"
+msgid_plural "%(count)d WhatsApp customers waiting for an answer"
+msgstr[0] "%(count)d cliente de WhatsApp esperando respuesta"
+msgstr[1] "%(count)d clientes de WhatsApp esperando respuesta"
+msgstr[2] "%(count)d clientes de WhatsApp esperando respuesta"
+
+#: apps.py
+msgid "Answer within 24 hours of their last message: after that, WhatsApp only lets you send an approved template."
+msgstr "Contesta antes de 24 horas desde su último mensaje: después, WhatsApp solo deja mandar una plantilla aprobada."
+
+#: apps.py
+msgid "Answer the customers"
+msgstr "Contestar a los clientes"
