@@ -77,3 +77,14 @@ export function assistantQuestion(
   if (context.flow) return templates.flow.replace('{title}', context.flow);
   return templates.screen.replace('{app}', context.app).replace('{screen}', context.screen);
 }
+
+let lastHelpQuestion = '';
+
+export function writeAssistantQuestion(draft: string, question: string): string {
+  const current = draft.trimEnd();
+  const unedited = lastHelpQuestion.length > 0
+    && (current === lastHelpQuestion || current.endsWith(`\n\n${lastHelpQuestion}`));
+  const base = unedited ? current.slice(0, -lastHelpQuestion.length).trimEnd() : current;
+  lastHelpQuestion = question;
+  return base.trim() ? `${base}\n\n${question}` : question;
+}
