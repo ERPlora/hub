@@ -349,7 +349,10 @@ def test_turning_on_again_an_app_that_failed_with_its_tables_made_loads_what_wai
     hub = business("a")
     load = load_template(hub)
     # The tables got made, and the settle that follows them said they had not: an app on at once when turned on again.
-    with mock.patch.object(services, "apps_created", return_value=frozenset()):
+    with (
+        mock.patch.object(services.apps, "apps_created", return_value=frozenset()),
+        mock.patch.object(services.activation, "apps_created", return_value=frozenset()),
+    ):
         run_pass()
     assert row(hub, "service").state == FAILED
 

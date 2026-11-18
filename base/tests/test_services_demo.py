@@ -231,12 +231,12 @@ class TestCreate:
     def test_an_address_already_taken_is_drawn_again(self, monkeypatch):
         Hub.objects.create(slug="demo-0000beef", is_demo=True, status="purged")
         draws = iter(["0000beef", "0000cafe"])
-        monkeypatch.setattr(services.secrets, "token_hex", lambda nbytes: next(draws))
+        monkeypatch.setattr(services.demos.secrets, "token_hex", lambda nbytes: next(draws))
         assert create().slug == "demo-0000cafe"
 
     def test_no_free_address_after_a_few_draws_is_a_503(self, monkeypatch):
         Hub.objects.create(slug="demo-0000beef", is_demo=True, status="purged")
-        monkeypatch.setattr(services.secrets, "token_hex", lambda nbytes: "0000beef")
+        monkeypatch.setattr(services.demos.secrets, "token_hex", lambda nbytes: "0000beef")
         with pytest.raises(OperationError) as refused:
             create()
         assert (refused.value.status, refused.value.code) == (503, "base.demo_unavailable")
@@ -262,14 +262,14 @@ class TestCreateAtOnce:
         # too (or two seconds pass): without a lock both count none and both make one; with it the second one
         # counts only after the first has committed, and is told the demos are full.
         settings.MAX_CONCURRENT_DEMOS = 1
-        draw, both_counted = services.secrets.token_hex, threading.Barrier(2)
+        draw, both_counted = services.demos.secrets.token_hex, threading.Barrier(2)
 
         def counted_then_draw(nbytes):
             with contextlib.suppress(threading.BrokenBarrierError):
                 both_counted.wait(2)
             return draw(nbytes)
 
-        monkeypatch.setattr(services.secrets, "token_hex", counted_then_draw)
+        monkeypatch.setattr(services.demos.secrets, "token_hex", counted_then_draw)
         results = at_once(lambda: create(ANA), lambda: create(BEA))
         assert sorted(getattr(result, "code", "created") for result in results) == ["base.demo_full", "created"]
         assert Hub.objects.filter(is_demo=True).count() == 1

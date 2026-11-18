@@ -193,7 +193,7 @@ def move_hub(
     origin, target = hub.cluster, hub.moving_to
 
     def heartbeat() -> None:
-        services.renew_lease(hub.id, LEASE)
+        services.reset.renew_lease(hub.id, LEASE)
 
     def ours(*, forward: bool = True) -> None:
         heartbeat()

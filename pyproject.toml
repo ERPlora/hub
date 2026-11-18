@@ -124,7 +124,6 @@ max-statements = 50
 "apps/task/tests/test_services.py" = ["F841"]
 "apps/tax/tests/test_queries.py" = ["E731"]
 "apps/verifactu/schemas.py" = ["E731"]
-"apps/verifactu/services.py" = ["F401"]
 "apps/verifactu/tests/conftest.py" = ["F401"]
 "apps/verifactu/tests/test_concurrency.py" = ["B905"]
 "apps/website/tests/test_render.py" = ["F541"]
@@ -203,11 +202,11 @@ ignore_imports = [
     "base.images -> base.queries.catalog_images",
     "base.images -> base.queries.files",
     "base.meter -> base.services",
-    "base.operations -> base.services",
+    "base.operations -> base.services.devices",
     "base.permissions -> base.tenancy.context",
     "base.registry -> base.tenancy.context",
     "base.relay -> base.services.relay_runs",
-    "base.services -> base.middleware",
+    "base.services.devices -> base.middleware",
     "base.services.sessions -> base.middleware",
     "base.tenancy.context -> base.tenancy.connections",
     "base.tenancy.cut -> base.services.photo",

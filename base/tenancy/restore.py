@@ -134,7 +134,7 @@ def restore_hub(
     kept_name = note.db_name if note is not None else names.kept_db_name(control, uuid.uuid7())
 
     def heartbeat() -> None:
-        services.renew_lease(hub.id, LEASE)
+        services.reset.renew_lease(hub.id, LEASE)
 
     def ours(*, forward: bool = True) -> None:
         heartbeat()

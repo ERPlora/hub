@@ -40,7 +40,7 @@ set up every 10 minutes when it had a visit in the last 7 days, and once a day o
 Then two slow passes of the data, each in a
 thread of its own (:class:`Background`, one piece at a time, its own connections closed when it ends): the loop starts
 them and goes on, so a copy of minutes never holds the relay, the tasks, VeriFactu or
-the hubs due. ``_data`` takes one hub with data work due (``base.services.claim_next_data_hub``, under its lease): a reset asked (its database copied by
+the hubs due. ``_data`` takes one hub with data work due (``base.services.offboarding.claim_next_data_hub``, under its lease): a reset asked (its database copied by
 ``base.tenancy.dumps``, then, only if the copy was kept, its sections emptied by ``base.hub.reset_apply`` in its
 database), the copy of a business that left (tried again later when it fails), or, past its 90 days, its final copy and
 the drop of its database (``base.tenancy.offboarding``; not while it keeps fiscal documents); ``_usage`` measures the last UTC day
@@ -345,7 +345,7 @@ def _hubs(now: dt.datetime) -> None:
     try:
         with use_control():
             hubs = services.provisioning.hubs_to_serve(now)
-            active = services.hubs_visited_since((now - ACTIVE_WINDOW).date()) if hubs else frozenset()
+            active = services.activation.hubs_visited_since((now - ACTIVE_WINDOW).date()) if hubs else frozenset()
     except Exception:
         logger.exception("worker: the hubs to serve could not be read; the next tick tries again.")
         close_old_connections()
@@ -367,7 +367,7 @@ def _activations(now: dt.datetime) -> None:
     others are served."""
     try:
         with use_control():
-            rung = services.activation_hubs(now)
+            rung = services.activation.activation_hubs(now)
     except Exception:
         logger.exception("worker: the hubs with apps to set up could not be read; the next tick tries again.")
         close_old_connections()
@@ -397,7 +397,7 @@ def _activate_in(hub, now: dt.datetime) -> None:
         due = queries.apps.activations_due(hub.slug, now)
         if not due:
             # Rung for nothing due now (a retry still to come, or nothing left): its ring moves to what is next, or ends.
-            services.activations_rung_at(hub.pk, queries.apps.activation_next_at(hub.slug))
+            services.activation.activations_rung_at(hub.pk, queries.apps.activation_next_at(hub.slug))
             return
     apps, error = sorted(due), ""
     code = _code()
@@ -447,7 +447,7 @@ def _data(now: dt.datetime, stop: threading.Event | None = None) -> None:
     copy in course (``pg_dump`` killed), its lease given back and the work left due for the next worker."""
     try:
         with use_control():
-            hub_id = services.claim_next_data_hub(now, provision.LEASE)
+            hub_id = services.offboarding.claim_next_data_hub(now, provision.LEASE)
     except Exception:
         logger.exception("worker: the hubs with data work could not be read; the next tick tries again.")
         close_old_connections()
@@ -460,7 +460,7 @@ def _data(now: dt.datetime, stop: threading.Event | None = None) -> None:
             cancelled = stop.is_set if stop is not None else None
             if hub is not None and hub.reset_requested_at is not None:
                 _reset(hub, cancelled)
-            elif hub is not None and services.past_retention(hub, now):
+            elif hub is not None and services.offboarding.past_retention(hub, now):
                 offboarding.retire(hub.pk, now, cancelled)
             elif hub is not None and services.provisioning.offboarding_due(hub):
                 _offboarding_copy(hub, now, cancelled)
@@ -489,8 +489,8 @@ def _usage(now: dt.datetime) -> None:
         return
     try:
         with use_control():
-            measured = None if services.usage_ready(day) else usage.measure(day, now=now)
-            finished = measured is not None or services.usage_ready(day)
+            measured = None if services.usage.usage_ready(day) else usage.measure(day, now=now)
+            finished = measured is not None or services.usage.usage_ready(day)
     except Exception:
         logger.exception("worker: the nightly measurement failed (%s); the next tick tries again.", day)
         return
@@ -528,14 +528,14 @@ def _moves(now: dt.datetime, stop: threading.Event | None = None) -> None:
 
 
 def _heartbeat(hub) -> Callable[[], None]:
-    return lambda: services.renew_lease(hub.pk, provision.LEASE)
+    return lambda: services.reset.renew_lease(hub.pk, provision.LEASE)
 
 
 def _reset(hub, cancelled: Callable[[], bool] | None = None) -> None:
     """Copy the database of ``hub`` and, only if the copy was kept, empty the sections asked; each step noted."""
     asked = hub.reset_sections or {}
     if hub.status != Hub.Status.READY or not hub.db_name:
-        services.reset_moved(hub.pk, state="failed", error="hub_not_ready")
+        services.reset.reset_moved(hub.pk, state="failed", error="hub_not_ready")
         logger.warning("worker: the reset of %s was not done: the business is %s.", hub.slug, hub.status)
         return
     try:
@@ -548,10 +548,10 @@ def _reset(hub, cancelled: Callable[[], bool] | None = None) -> None:
         )
     except dumps.DumpError as failed:
         logger.warning("worker: the copy before the reset of %s failed, nothing was emptied: %s", hub.slug, failed)
-        services.reset_moved(hub.pk, state="failed", error=failed.code)
+        services.reset.reset_moved(hub.pk, state="failed", error=failed.code)
         return
-    services.reset_moved(hub.pk, state="emptying", dump=str(copy.pk))
-    services.renew_lease(hub.pk, EMPTYING_LEASE)
+    services.reset.reset_moved(hub.pk, state="emptying", dump=str(copy.pk))
+    services.reset.renew_lease(hub.pk, EMPTYING_LEASE)
     ctx = OperationContext(
         scope=Scope("host", hub.slug), actor="system", permissions=frozenset({"*"}), language=asked.get("language") or "en"
     )
@@ -560,9 +560,9 @@ def _reset(hub, cancelled: Callable[[], bool] | None = None) -> None:
             done = get_operation("base.hub.reset_apply")(ctx, HubResetApplyIn(apps=asked.get("apps") or []))
     except Exception:
         logger.exception("worker: the sections of %s could not be emptied; its copy is kept, nothing was emptied.", hub.slug)
-        services.reset_moved(hub.pk, state="failed", error="emptying_failed")
+        services.reset.reset_moved(hub.pk, state="failed", error="emptying_failed")
         return
-    services.reset_moved(hub.pk, state="done", removed=[app.model_dump(mode="json") for app in done.apps])
+    services.reset.reset_moved(hub.pk, state="done", removed=[app.model_dump(mode="json") for app in done.apps])
     logger.info("worker: the business %s was reset (%s) after its copy %s.", hub.slug, ", ".join(asked.get("apps") or []), copy.key)
 
 
@@ -572,9 +572,9 @@ def _offboarding_copy(hub, now: dt.datetime, cancelled: Callable[[], bool] | Non
         dumps.dump_hub(hub, kind=HubDump.Kind.OFFBOARDING, heartbeat=_heartbeat(hub), cancelled=cancelled)
     except dumps.DumpError as failed:
         logger.warning("worker: the copy of %s, which left, failed; it is tried again: %s", hub.slug, failed)
-        services.offboarding_copy_failed(hub.pk, now, f"{failed.code}: {failed}")
+        services.offboarding.offboarding_copy_failed(hub.pk, now, f"{failed.code}: {failed}")
         return
-    services.offboarding_copied(hub.pk)
+    services.offboarding.offboarding_copied(hub.pk)
 
 
 def _serve_hub(hub, now: dt.datetime, *, active: bool = False) -> None:
@@ -593,7 +593,7 @@ def _serve_hub(hub, now: dt.datetime, *, active: bool = False) -> None:
                 _swept[hub.pk] = now
                 pending = queries.apps.activation_next_at(hub.slug)
                 if pending is not None:
-                    services.ring_activations(hub, pending)
+                    services.activation.ring_activations(hub, pending)
     except Exception:
         logger.exception("worker: the hub %s failed; the next tick tries it again.", hub.slug)
     finally:

@@ -26,8 +26,16 @@ def load(name):
 app_env = load("app_env")
 
 PROD = {
-    "hub": {"PLATFORM_HUB_SLUG": "erplora", "VERIFACTU_PRODUCTION_ENABLED": "true"},
-    "worker": {"PLATFORM_HUB_SLUG": "erplora", "VERIFACTU_PRODUCTION_ENABLED": "true"},
+    "hub": {
+        "PLATFORM_HUB_SLUG": "erplora",
+        "VERIFACTU_PRODUCTION_ENABLED": "true",
+        "VERIFACTU_ERPLORA_ROUTE_ENABLED": "false",
+    },
+    "worker": {
+        "PLATFORM_HUB_SLUG": "erplora",
+        "VERIFACTU_PRODUCTION_ENABLED": "true",
+        "VERIFACTU_ERPLORA_ROUTE_ENABLED": "false",
+    },
 }
 PRE = {
     "hub": {
@@ -54,6 +62,14 @@ def with_production(value):
     section = copy.deepcopy(PROD)
     for family in ("hub", "worker"):
         section[family]["VERIFACTU_PRODUCTION_ENABLED"] = value
+    return section
+
+
+def without_route():
+    """Prod's settings as an older version ran them, without VERIFACTU_ERPLORA_ROUTE_ENABLED: the route left open."""
+    section = copy.deepcopy(PROD)
+    for family in ("hub", "worker"):
+        del section[family]["VERIFACTU_ERPLORA_ROUTE_ENABLED"]
     return section
 
 

@@ -80,7 +80,7 @@ def _held(hub: Hub, now: dt.datetime) -> bool:
     """Whether ``hub`` keeps fiscal documents, noted on its row if it does."""
     kept = fiscal_documents_kept(hub)
     if kept:
-        services.offboarding_held(hub.pk, now, kept)
+        services.offboarding.offboarding_held(hub.pk, now, kept)
         logger.info("base.tenancy.offboarding.held hub=%s apps=%s: its database stays.", hub.slug, ",".join(kept))
     return bool(kept)
 
@@ -91,19 +91,19 @@ def _retire(hub: Hub, now: dt.datetime, cancelled: Callable[[], bool] | None) ->
     if hub.status != Hub.Status.DROPPING and hub.db_name and registry.database_is_made(hub):
         if _held(hub, now):
             return
-        hub = services.offboarding_archiving(hub.pk, now, provision.LEASE)
+        hub = services.offboarding.offboarding_archiving(hub.pk, now, provision.LEASE)
         if hub is None:
             return
-        if not services.final_copy_kept(hub):
+        if not services.offboarding.final_copy_kept(hub):
             dumps.dump_hub(
                 hub,
                 kind=HubDump.Kind.OFFBOARDING,
-                heartbeat=lambda: services.renew_lease(hub.pk, provision.LEASE),
+                heartbeat=lambda: services.reset.renew_lease(hub.pk, provision.LEASE),
                 cancelled=cancelled,
             )
         if _held(hub, now):
             return
-    dropping = services.offboarding_dropping(hub.pk, now, provision.LEASE)
+    dropping = services.offboarding.offboarding_dropping(hub.pk, now, provision.LEASE)
     if dropping is None:
         return
     # Its database first, then its files, outside any transaction of control; its row after, in base.hub.purge's own.
@@ -111,7 +111,7 @@ def _retire(hub: Hub, now: dt.datetime, cancelled: Callable[[], bool] | None) ->
         tenancy_connections.close_hub_aliases(dropping)
         ops.drop_database(dropping.db_name, cluster=dropping.cluster)
     files.delete_hub_files(storages["hub_files"], dropping.pk)
-    services.hub_purge(system_context(registry.REGISTRY_SCOPE), HubGetIn(id=dropping.pk))
+    services.offboarding.hub_purge(system_context(registry.REGISTRY_SCOPE), HubGetIn(id=dropping.pk))
     logger.info("base.tenancy.offboarding.purged hub=%s database=%s", dropping.slug, dropping.db_name or "-")
 
 
@@ -121,7 +121,7 @@ def retire(hub_id, now: dt.datetime, cancelled: Callable[[], bool] | None = None
     What fails is noted on it and tried again at its next attempt, never raised. A worker that stops
     (``dumps.DumpStopped``) leaves it due; a lease lost leaves it to its new holder."""
     hub = provisioning.registry_row(hub_id)
-    if hub is None or not services.past_retention(hub, now):
+    if hub is None or not services.offboarding.past_retention(hub, now):
         return
     if hub.next_attempt_at is not None and hub.next_attempt_at > now:
         return
@@ -146,4 +146,4 @@ def retire(hub_id, now: dt.datetime, cancelled: Callable[[], bool] | None = None
 
 def _failed(hub: Hub, code: str, why) -> None:
     logger.warning("base.tenancy.offboarding.failed hub=%s: %s: %s", hub.slug, code, why)
-    services.offboarding_copy_failed(hub.pk, timezone.now(), f"{code}: {why}")
+    services.offboarding.offboarding_copy_failed(hub.pk, timezone.now(), f"{code}: {why}")

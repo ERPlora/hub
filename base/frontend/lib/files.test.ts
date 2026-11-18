@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -147,9 +147,11 @@ describe('refusals', () => {
     expect(refusalKey(undefined)).toBe('base.files.refusal.generic');
   });
 
-  it('every code base/files.py and base/services/__init__.py write has its sentence, in English and in Spanish', () => {
+  it('every code base/files.py and the modules of base/services/ write has its sentence, in English and in Spanish', () => {
     const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
-    const sources = ['files.py', 'services/__init__.py'].map((file) => readFileSync(join(root, file), 'utf8')).join('\n');
+    const services = readdirSync(join(root, 'services')).filter((file) => file.endsWith('.py'));
+    const files = ['files.py', ...services.map((file) => join('services', file))];
+    const sources = files.map((file) => readFileSync(join(root, file), 'utf8')).join('\n');
     const written = new Set([...sources.matchAll(/code="(base\.file_[a-z_]+)"/g)].map((match) => match[1]));
     expect(written.size).toBeGreaterThan(8);
     for (const code of written) {

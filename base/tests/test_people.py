@@ -57,7 +57,7 @@ def with_pin(username: str, pin: str = "2580") -> Credential:
 
 def with_badge(username: str, card: str) -> Credential:
     credential, _ = Credential.objects.get_or_create(username=username)
-    credential.badge_digest = access.badge_digest(access.clean_badge(card), key=services.badge_key())
+    credential.badge_digest = access.badge_digest(access.clean_badge(card), key=services.devices.badge_key())
     credential.badge_set_at = timezone.now()
     credential.save()
     return credential
@@ -276,7 +276,7 @@ class TestABadge:
     def test_and_then_the_card_opens_the_way_in_as_that_person(self, client, adam, eva):
         client.force_login(adam)
         post(client, "/people/badge", {"person": "saas:3", "badge": "CARD-0003"})
-        user, _ = services.badge_owner(A.key, "card-0003")
+        user, _ = services.devices.badge_owner(A.key, "card-0003")
         assert user is not None and user.username == "saas:3"
 
     @pytest.mark.parametrize("card", ["abc", "x" * 65, "CARD 0003", "CARD/0003", ""])
@@ -329,7 +329,7 @@ class TestABadge:
         client.force_login(adam)
         response = post(client, "/people/badge/remove", {"person": "saas:3"})
         assert response.json()["ways"] == {"account": True, "pin": True, "badge": False}
-        assert services.badge_owner(A.key, "CARD-0003")[0] is None
+        assert services.devices.badge_owner(A.key, "CARD-0003")[0] is None
         assert OutboxEvent.objects.filter(name="base.person.badge_removed").count() == 1
 
     def test_without_a_badge_there_is_nothing_to_take_away(self, client, adam, eva):
@@ -353,10 +353,10 @@ class TestComingBack:
         Membership.objects.filter(user=eva, host=A.key).delete()
         client.force_login(olga)
         assert [entry["id"] for entry in people(client)["people"]] == ["saas:1"]
-        assert services.badge_owner(A.key, "CARD-0003")[0] is None
+        assert services.devices.badge_owner(A.key, "CARD-0003")[0] is None
         Membership.objects.create(user=eva, host=A.key, role=Membership.Role.EMPLOYEE)
         assert row(people(client), "saas:3")["ways"] == {"account": True, "pin": True, "badge": True}
-        assert services.badge_owner(A.key, "CARD-0003")[0] == eva
+        assert services.devices.badge_owner(A.key, "CARD-0003")[0] == eva
 
 
 class TestTheRoles:

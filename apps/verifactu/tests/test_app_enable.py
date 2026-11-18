@@ -154,7 +154,7 @@ def test_a_blueprint_outside_spain_leaves_it_off_with_the_reason_and_turns_on_th
     business_in("PL")
     verifactu_off()
 
-    refused = services._turn_on_listed(admin(), ["task", "verifactu"], set())
+    refused = services.blueprints._turn_on_listed(admin(), ["task", "verifactu"], set())
 
     assert refused == {"verifactu": ONLY_IN_SPAIN}
     states = activation.states_of(A)

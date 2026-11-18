@@ -30,7 +30,11 @@ KNOWN_READINGS = {
     "apps/invoice/queries.py": 3,
     "apps/invoice/services.py": 4,
     "apps/verifactu/queries/route.py": 1,
-    "apps/verifactu/services.py": 6,
+    "apps/verifactu/services/aeat_query.py": 1,
+    "apps/verifactu/services/chains.py": 1,
+    "apps/verifactu/services/own_certificate.py": 2,
+    "apps/verifactu/services/sealing.py": 1,
+    "apps/verifactu/services/sending.py": 1,
     # hub#772 too, because they reach a record: a sale's day and number, and Taxes' «today», the rate a sale's preview
     # says and Invoicing's form proposes (``tests/test_guardrails_fiscal_clock.py``).
     "apps/sale/services/checkout.py": 1,

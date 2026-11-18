@@ -350,7 +350,7 @@ def test_the_session_tells_an_app_being_created_activating_and_keeps_it_out_of_t
 
 
 def answers_over_http(client, monkeypatch, route: str, command: str, state: str, status: int) -> None:
-    """An owner of business A posts to ``route`` while its command (``base.services.<command>``) answers ``state``:
+    """An owner of business A posts to ``route`` while its command (``base.services.apps.<command>``) answers ``state``:
     the route answers ``status`` with the command's answer."""
     import json
 
@@ -366,7 +366,7 @@ def answers_over_http(client, monkeypatch, route: str, command: str, state: str,
         def __call__(self, ctx, data):
             return AppChangeOut(app=data.app, state=state, chosen=True, along=[], already=False)
 
-    monkeypatch.setattr(services, command, Answering())
+    monkeypatch.setattr(services.apps, command, Answering())
     user = get_user_model().objects.create(username="ana")
     Membership.objects.create(user=user, host=A.key, role=Membership.Role.OWNER)
     client.force_login(user)

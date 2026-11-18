@@ -173,7 +173,7 @@ def dump_hub(  # noqa: PLR0913
     made_at = (now or timezone.now()).astimezone(dt.UTC)
     # The key's time is to the second; a second copy of the hub in that second takes the next one.
     stamp = made_at.replace(microsecond=0)
-    while services.dump_key_taken(key_for(hub, kind, stamp)):
+    while services.dumps.dump_key_taken(key_for(hub, kind, stamp)):
         stamp += dt.timedelta(seconds=1)
     key = key_for(hub, kind, stamp)
     with tempfile.TemporaryDirectory(prefix="hub-dump-") as folder:
@@ -194,7 +194,7 @@ def dump_hub(  # noqa: PLR0913
             raise DumpFailed(f"The copy of {hub.slug} could not be uploaded: {error}") from error
         if heartbeat is not None:
             heartbeat()  # the lease, renewed right after the upload: what follows notes it under that lease
-    made = services.dump_recorded(hub.id, kind=kind, key=key, size=size, created_at=made_at, requested_by=requested_by)
+    made = services.dumps.dump_recorded(hub.id, kind=kind, key=key, size=size, created_at=made_at, requested_by=requested_by)
     logger.info("base.tenancy.dumps.made hub=%s kind=%s key=%s bytes=%d", hub.slug, kind, key, size)
     return made
 

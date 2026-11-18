@@ -3498,12 +3498,12 @@ Implicados: BASE-F92, BASE-F93
 - Una plantilla espera a sus apps (hub#609; BASE-F31–F33, F38): una app `creating` queda en su informe como `waiting`, y
   esa fila de `ImportBatch` es todo el estado (sin columna, ni cola, ni migración; el idioma de quien cargó va en
   `report["language"]` mientras espera). Lo que le toca entra en la misma transacción que la enciende:
-  `base.app.activation_settle` (o `base.app.enable`, si tenía las tablas) llama a `services._load_what_waited` →
+  `base.app.activation_settle` (o `base.app.enable`, si tenía las tablas) llama a `services.blueprints._load_what_waited` →
   `blueprint.finish_waiting`, que reusa `apply`, con su orden y sus operaciones, en el hub activo. Si el worker muere, no
   ha pasado ninguna de las dos cosas y el siguiente pase, o el barrido de `_serve_hub` si se perdió el aviso, hace las
   dos: por eso sobrevive a un reinicio sin nada más. Cómo va la preparación (`setup_failed`) nunca se escribe: se lee de
   la fila de la app al describir la carga (`describe_load`). Lo que corta la espera: desactivar la app, deshacer la
-  carga, reintentarla (la nueva toma el relevo) y restablecer el negocio (`services._stop_waiting`). Un fichero no se
+  carga, reintentarla (la nueva toma el relevo) y restablecer el negocio (`services.blueprints._stop_waiting`). Un fichero no se
   guarda, así que no espera. Una carga que rompe deja la app encendida y su fila en `failed`: una app no se queda sin
   encender por sus datos. `base.import.list` se re-ejecuta también con `APP_EVENTS`, y `ImportPanel` y
   `BlueprintCardPending` siguen esa lista. Tests: `base/tests/test_blueprint_waits_for_apps.py`, con dos BD reales y el
@@ -3554,7 +3554,7 @@ Implicados: BASE-F92, BASE-F93
   preguntar a erplora.com, con los mismos umbrales. Una app dice qué incluye su plan declarando `plan_meter` en su
   `LiveAppConfig` (`home.plan_meters`, comprobado por `base.E013`): `base` no lee tablas de otra app. `base/meter.py`
   cuenta en la memoria de cada proceso que atiende peticiones y lo vuelca cada 60 s y al salir
-  (`services.activity_recorded`, `services.people_seen`): peticiones en `HubDatabaseMiddleware`, personas en
+  (`services.usage.activity_recorded`, `services.usage.people_seen`): peticiones en `HubDatabaseMiddleware`, personas en
   `HubContextBuilder.from_request`, pico en `Limiter.take`, fuera de su lock. «Sin hueco» solo cuando llega a un cliente
   (`HubBusy.reached_client`, gancho de `live`): nunca un reintento del ejecutor vivo. Solo lo arranca `config/asgi.py`: lo
   que hace el worker no es la petición de nadie. Una lectura suma lo que su proceso aún no ha volcado (`meter.unflushed`).
@@ -4127,7 +4127,7 @@ Implicados: BASE-F92, BASE-F93
   número y `money` de un entero, y los mismos huecos en `en` y `es`. Hoy la declaran `demo` (`demo.item.add_line`) y
   Ventas (los descuentos y el cobro por encima del máximo de SALE-F14, y el precio libre de SALE-F09).
   `base.approval.approve` comprueba el PIN o la placa como la puerta del PIN (`queries.access.pin_owner`,
-  `services.badge_owner`, `PIN_PERSON_LIMIT`/`PIN_ADDRESS_LIMIT`) y que quien aprueba tenga el permiso, y devuelve un
+  `services.devices.badge_owner`, `PIN_PERSON_LIMIT`/`PIN_ADDRESS_LIMIT`) y que quien aprueba tenga el permiso, y devuelve un
   pase de un uso (120 s, `X-Elevation-Token`); la puerta marca la petición con él (`Approved`), `base.operations`
   añade ese permiso a esa llamada y el pase se gasta en la transacción de la propia orden: `LIVE["operation_database"]`
   (`base/entitlement.py`) abre esa transacción en `base/approval_spend.py` y gasta el pase dentro
