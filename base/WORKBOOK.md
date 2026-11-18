@@ -439,7 +439,7 @@ En la pantalla Archivos:
 | BASE-F112 | Guardar un archivo descargado dentro de la app | hecho |
 | BASE-F113 | Seguir avisando con la pantalla apagada (app de Android) | hecho |
 | BASE-F114 | Devolver un negocio a un momento pasado desde el admin de Hubs | hecho |
-| BASE-F115 | Ver la ayuda de la pantalla de un módulo | parcial |
+| BASE-F115 | Ver la ayuda de la pantalla de un módulo | hecho |
 
 ### BASE-F01 Ver lo que le falta por configurar al negocio
 Estado: hecho
@@ -3229,29 +3229,36 @@ hub#1355, hub#1356, hub#1364, hub#1365, hub#1373, hub#1375, hub#1429, hub#1431, 
 hub#1458, hub#1459, hub#1473, hub#1474, hub#1495, hub#1505, aws#77
 
 ### BASE-F115 Ver la ayuda de la pantalla de un módulo
-Estado: parcial — el Hub ya da la ayuda de cada módulo que la tiene lista, en el idioma de la persona; falta la ventana
-con su botón «?»
+Estado: hecho
 Actor: propietario, administrador, responsable, empleado
 Pantalla: la barra de arriba de un módulo con la ayuda lista (botón «?», «Ayuda») y la ventana de ayuda
 Pasos:
   1. En un módulo con la ayuda lista, arriba a la derecha, junto al asistente, está el botón «?» («Ayuda»). Un módulo
      cuya ayuda aún no está lista no lo enseña.
-  2. Al pulsarlo se abre la ventana de ayuda, centrada en una tableta o un ordenador y desde abajo en un móvil. Nunca
-     se abre sola.
+  2. Al pulsarlo se abre la ventana «Ayuda · <módulo>», con el icono del módulo, centrada en una tableta o un ordenador
+     y desde abajo en un móvil. Nunca se abre sola, y se cierra al pasar a otro módulo.
   3. Arriba, el vídeo del módulo, si tiene uno, en el idioma de la persona o, si no lo hay, en español. No se pide
      nada a YouTube hasta que se pulsa, y se ve dentro de la ventana.
-  4. Debajo, «Para qué sirve», con un texto corto, de dos o tres frases, de lo que se hace en el módulo; «En esta
-     pantalla», con un resumen corto de lo que enseña la pestaña en la que se está, abierto y marcado «Estás aquí»;
-     «Cómo se hace», con cada tarea terminada que se hace en ese módulo, plegada, con sus pasos y lo que pasa si falla;
-     y «Otras pantallas del módulo», plegadas, cada una con su resumen corto.
-  5. «Pregúntale al asistente» cierra la ayuda y abre el asistente con la pregunta escrita, sin enviarla: sobre la
-     última tarea que se abrió o, si no se abrió ninguna, sobre el módulo y la pantalla. «Cerrar» cierra la ayuda.
+  4. Debajo, «Para qué sirve», con un texto corto, de dos o tres frases, de lo que se hace en el módulo, y «En esta
+     pantalla · <pestaña>», marcado «Estás aquí», con el resumen de lo que enseña la pestaña en la que se está: corto
+     y entero, sin «Ver más».
+  5. «Cómo se hace» trae cada tarea terminada del módulo, agrupada por pestaña, primero las de la pestaña en la que se
+     está. Cada tarea es una fila plegada que se abre con sus pasos y su «Si algo falla», una a la vez. Con más de
+     ocho tareas, arriba sale «Buscar tareas…», que filtra por el título y los pasos sin mirar acentos ni mayúsculas;
+     si nada coincide, dice «Nada coincide con tu búsqueda» y «Borrar búsqueda» vuelve a enseñarlas todas.
+  6. «Otras pantallas del módulo» trae las demás pestañas, plegadas, cada una con su resumen corto. Un enlace de la
+     ayuda a una pantalla del Hub lleva a ella y cierra la ayuda.
+  7. «Pregúntale al asistente» cierra la ayuda y abre el asistente con la pregunta escrita, sin enviarla: «¿Cómo hago
+     esto: <tarea>?» sobre la última tarea que se abrió o, si no se abrió ninguna, «¿Cómo uso <módulo> en
+     <pantalla>?»; si ya había algo escrito, la pregunta va debajo. «Cerrar» cierra la ayuda.
 Entra: el módulo y la pestaña en la que se está.
 Sale: nada: la ayuda solo se lee. Es la parte del manual de uso del módulo que lee el cliente, en el idioma de la
 persona.
-Si falla: mientras se lee, la ventana enseña su esqueleto; si no se puede leer, lo dice y deja volver a intentarlo.
-Sin conexión, el vídeo dice que no se puede ver y el texto se sigue leyendo. Si el manual no está traducido al idioma
-de la persona, o su traducción se quedó atrás, la ayuda sale en español.
+Si falla: mientras se lee, la ventana enseña su esqueleto; si no se puede leer, dice «No se ha podido cargar la
+ayuda.» y «Reintentar» la vuelve a pedir. La ayuda ya leída se queda guardada hasta que se recarga la página: sin
+conexión se vuelve a abrir, también desde otra pestaña del módulo, y el vídeo dice «Sin conexión: el vídeo no está
+disponible». Si el manual no está traducido al idioma de la persona, o su traducción se quedó atrás, la ayuda sale en
+español.
 Implicados: BASE-F92, BASE-F93
 
 ## Para quien lo mantiene
@@ -3995,7 +4002,10 @@ Implicados: BASE-F92, BASE-F93
   `base/queries/app_help.py`; su ruta, `GET /api/help`, en `base/api_help.py`, que monta `config/api.py`) lee la parte
   del cliente del WORKBOOK del módulo con `base/workbook_help.py`, sin tocar la base de datos. Un módulo tiene la ayuda
   lista cuando declara `help = Help(…)` (`live.meta.Help`, con un vídeo de YouTube opcional por idioma, que valida
-  `live.E023`), y el JSON `hub-home` de `base/spa.py` nombra esos módulos en `help_apps`. El idioma es `ctx.language`:
+  `live.E023`), y el JSON `hub-home` de `base/spa.py` nombra esos módulos en `help_apps`. Con ellos, `HelpEntry.vue`
+  pinta el «?» en la barra de la página visible y abre `HelpWindow.vue` (con `HelpContent.vue` y `HelpFlowList.vue`, en
+  `base/frontend/components/`); `base/frontend/lib/help.ts` guarda lo leído por módulo e idioma hasta que se recarga la
+  página, y `tests/e2e/base-help.spec.ts` la recorre en tres tamaños. El idioma es `ctx.language`:
   el original, `SOURCE_LANGUAGE` (`es`), se lee de `WORKBOOK.md`, y cualquier otro de `WORKBOOK.<idioma>.md` solo si su
   primera línea es `catalog.en_header` del hash de la parte española; si no, el de su idioma base (`en` para `en-gb`),
   y si tampoco, el español; `language` dice cuál salió. El vídeo, igual. Lo leído se guarda en memoria por módulo e
