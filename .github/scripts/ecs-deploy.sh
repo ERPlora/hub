@@ -10,9 +10,9 @@
 #      erplora-<environment>-* (the deploy roles can register any family: ECS takes no resource
 #      there, so this guard keeps pre's role from turning a prod revision into its own and back);
 #   1. registers a new revision of each family from that one, with its tags, changing only the image of the
-#      containers that run the hub image (the app and its pgbouncer sidecar) and the app's settings: those of
-#      deploy/app-env.json in that commit, which deploy/app_env.py checks first, refusing any that break a rule
-#      (in prod, changing VERIFACTU_PRODUCTION_ENABLED takes CONFIRM_PROTECTED); Terraform owns the rest;
+#      containers that run the hub image (the app and its pgbouncer sidecar) and the app's settings, exactly
+#      those of deploy/app-env.json in that commit, which deploy/app_env.py checks first, refusing any that break a
+#      rule (in prod, changing VERIFACTU_PRODUCTION_ENABLED takes CONFIRM_PROTECTED); Terraform owns the rest;
 #   2. runs the migration (hub-migrate) on the new revision and polls it until it is STOPPED; if it
 #      fails, never ran or outlasts MIGRATE_TIMEOUT_SECONDS (the task is left running), the deploy
 #      stops before any service changes;
