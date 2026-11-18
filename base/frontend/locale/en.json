@@ -1216,6 +1216,27 @@
         "generic": "Something went wrong. Try again."
       }
     },
+    "help": {
+      "open": "Help",
+      "title": "Help · {app}",
+      "videoTitle": "How {app} works",
+      "purpose": "What it is for",
+      "current": "On this screen",
+      "here": "You are here",
+      "how": "How to",
+      "others": "Other screens of this module",
+      "failure": "If something goes wrong",
+      "search": "Search tasks…",
+      "empty": "Nothing matches your search",
+      "clear": "Clear search",
+      "loading": "Loading help…",
+      "loadError": "Could not load the help.",
+      "retry": "Retry",
+      "ask": "Ask the assistant",
+      "close": "Close",
+      "flowQuestion": "How do I do this: {title}?",
+      "screenQuestion": "How do I use {app} on {screen}?"
+    },
     "assistant": {
       "empty": "Ask me about your sales, your stock or anything about your business.",
       "setupIntro": "Review your business's setup. Choose an option or write your question.",
