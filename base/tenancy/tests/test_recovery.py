@@ -41,8 +41,6 @@ from base.tenancy.context import use_control, use_hub
 from base.tenancy.tests import hubs
 from control.models import CopyRecovery, Hub, RestoredCopy
 
-pytestmark = pytest.mark.usefixtures("no_test_fallback")
-
 AT = dt.datetime(2026, 11, 12, 9, 0, tzinfo=dt.UTC)
 THEN = AT - dt.timedelta(days=2)
 

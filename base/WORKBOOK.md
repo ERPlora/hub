@@ -3510,8 +3510,7 @@ Implicados: BASE-F92, BASE-F93
   worker de verdad; e2e `tests/e2e/base-template-waits-for-apps.spec.ts`.
 - Un negocio sin BD propia (`hub.db_name` vacío) recibe de `base.hub.reset` sin `dry_run` un 409
   `base.reset_shared_database` (`available: false` en el plan). Ninguno de producción está así
-  (hub#602): solo lo alcanza el respaldo de los tests escritos antes de la tenencia
-  (`base/tenancy/tests/legacy.py`), y la rama se va con él (hub#611).
+  (hub#602): ya nada alcanza esa rama, que se retira en hub#1626.
 - Frontend: `base/frontend/pages/SettingsPage.vue` (`/settings`, pestaña en el hash `#data`; `/import` y `/export`
   llevan aquí), `components/data/*` y `lib/data.ts`; la tarjeta `components/BlueprintCard.vue` («Ahora
   no» en `localStorage["hub-blueprint-card-dismissed"]`). Tests: `base/tests/test_blueprint.py`,

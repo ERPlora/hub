@@ -2,9 +2,8 @@
 
 ``base/0006`` creates the index with a ``RunSQL`` that names no model. Under production's routers ``base`` counts as a
 hub's, so a control database made from scratch skips it and still records the migration: its relay then reads the whole
-outbox on every tick. ``base/0023`` gives control the index. The suite's ``LegacyTablesRouter`` lets every operation
-through, which is why nobody saw it: these tests run ``manage.py migrate`` with production's settings, on a control
-database of their own.
+outbox on every tick. ``base/0023`` gives control the index. These tests run ``manage.py migrate`` with production's
+settings, on a control database of their own.
 """
 
 import os

@@ -1161,18 +1161,11 @@ def test_production_shared_alias_without_its_password_refuses_to_start(load_sett
         load_settings(**PRODUCTION_ENV, SHARED_DB_USER="hub_shared")
 
 
-def test_the_shared_router_goes_first(load_settings):
-    # The TenantRouter goes after it and never touches `shared`. The tests put one of theirs in front, for their
-    # businesses written before the tenancy only (base/tenancy/tests/legacy.py): never production's settings.
-    assert settings.DATABASE_ROUTERS == [
-        "base.tenancy.tests.legacy.LegacyTablesRouter",
-        "base.routers.SharedRouter",
-        "base.tenancy.router.TenantRouter",
-    ]
-    assert load_settings(**PRODUCTION_ENV)["DATABASE_ROUTERS"] == [
-        "base.routers.SharedRouter",
-        "base.tenancy.router.TenantRouter",
-    ]
+def test_the_shared_router_goes_first_and_the_tests_route_as_production_does(load_settings):
+    # The TenantRouter goes after it and never touches `shared`.
+    routers = ["base.routers.SharedRouter", "base.tenancy.router.TenantRouter"]
+    assert load_settings(**PRODUCTION_ENV)["DATABASE_ROUTERS"] == routers
+    assert settings.DATABASE_ROUTERS == routers
 
 
 def test_the_static_files_finders_add_the_documentation_images_of_the_modules():

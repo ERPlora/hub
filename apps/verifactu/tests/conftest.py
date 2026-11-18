@@ -125,7 +125,7 @@ def business_in(country: str, slug: str = A.key) -> None:
 
 
 @pytest.fixture
-def poland_and_spain(hub_a, hub_b, no_test_fallback) -> tuple[Scope, Scope]:
+def poland_and_spain(hub_a, hub_b) -> tuple[Scope, Scope]:
     """The scopes of two real hubs: ``hub_a``'s business registered in Poland, ``hub_b``'s in Spain."""
     business_in("PL", hub_a.slug)
     business_in("ES", hub_b.slug)

@@ -324,7 +324,6 @@ def the_new(hub, name: str):
         return Customer.objects.live().get(name=name).pk
 
 
-@pytest.mark.usefixtures("no_test_fallback")
 class TestWhatHangsFromACardComesBack:
     """A card of the copy comes back with its groups, tags and custom field values (CUSTOMER-F06, CUSTOMER-F04,
     CUSTOMER-F29): the one the business deleted keeps its own (it is the same card), the one it no longer has gets them

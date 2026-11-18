@@ -380,12 +380,6 @@ def test_every_listed_function_still_uses_djangos_atomic():
 HUB_DB = pytest.mark.django_db(databases=hubs.HUB_DATABASES)
 
 
-@pytest.fixture
-def no_test_fallback(monkeypatch):
-    """As production: without a context a hub's model fails (``base/tenancy/tests/conftest.py`` has the same one)."""
-    monkeypatch.setattr(context, "_test_fallback", None)
-
-
 class Empty(Schema):
     pass
 
@@ -424,7 +418,6 @@ def recover(ctx, data) -> dict:
 
 
 @HUB_DB
-@pytest.mark.usefixtures("no_test_fallback")
 def test_an_operation_in_a_recovers_from_an_integrity_error_in_a_savepoint_of_a_and_never_opens_one_on_control(
     hub_a, hub_b
 ):
@@ -450,7 +443,6 @@ def test_an_operation_in_a_recovers_from_an_integrity_error_in_a_savepoint_of_a_
 
 
 @HUB_DB
-@pytest.mark.usefixtures("no_test_fallback")
 def test_outside_an_operation_atomic_opens_in_the_active_context_and_refuses_without_one(hub_a):
     with context.use_hub(hub_a):
         in_a = current_alias()

@@ -15,28 +15,16 @@ from types import SimpleNamespace
 
 import pytest
 from django.contrib.auth import get_user_model
-from django.core.cache import cache
 from django.test import Client
 from live.models import OutboxEvent
 
 from base import api_keys
 from base.models import ApiKey, Membership
-from base.tenancy import context
 from base.tenancy.context import use_hub
 from base.tenancy.tests import hubs
-from base.tenancy.tests.legacy import use_legacy
 from base.tests.routes import bound_routes, spa_routes
 
 HUB_DB = pytest.mark.django_db(databases=hubs.HUB_DATABASES)
-
-
-@pytest.fixture(autouse=True)
-def as_in_production(monkeypatch):
-    """Every request opens its own database context, as in production (``base/tenancy/tests/conftest.py``)."""
-    monkeypatch.setattr(context, "_test_fallback", None)
-    cache.clear()
-    yield
-    cache.clear()
 
 
 @pytest.fixture(autouse=True)
@@ -94,8 +82,7 @@ TAX_CATEGORIES = "/tax/categories"
 
 class TestNotYetAvailable:
     """A business without its own database is not served at all: its door answers 503 before any key is read, made or
-    accepted (the operations' own refusals, for the suite's fallback, are guardrail (g) of
-    ``tests/test_guardrails_tenancy.py``)."""
+    accepted."""
 
     @pytest.mark.django_db
     def test_the_screen_and_a_new_key_answer_503_and_nothing_is_created(self, client):
@@ -103,22 +90,11 @@ class TestNotYetAvailable:
         listed = get(client, "a.localhost:8000", "/keys")
         refused = post(client, "a.localhost:8000", "/keys", {"name": "X", "rate_per_minute": 60, "mode": "full", "scopes": {}})
         assert [(answer.status_code, code(answer)) for answer in (listed, refused)] == [(503, "base.hub_maintenance")] * 2
-        with use_legacy():
-            assert not ApiKey.objects.exists()
 
     @pytest.mark.django_db
     def test_no_token_gets_in(self, client):
         response = get(client, "a.localhost:8000", CARTS, **bearer("erpk_live_" + "x" * 43))
         assert (response.status_code, code(response)) == (503, "base.hub_maintenance")
-
-    @pytest.mark.django_db
-    def test_not_even_one_that_is_in_control_s_tables(self, client):
-        """A key row left in control's tables (by hand, or by a business before it got its own database) is nobody's."""
-        token = api_keys.new_token()
-        with use_legacy():
-            ApiKey.objects.create(name="Planted", prefix=token[: api_keys.PREFIX_LENGTH], token_digest=api_keys.digest(token), mode="full")
-        for slug in ("a", "b"):
-            assert get(client, f"{slug}.localhost:8000", CARTS, **bearer(token)).status_code == 503
 
 
 @HUB_DB

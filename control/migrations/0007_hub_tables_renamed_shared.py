@@ -3,8 +3,7 @@
 # Never a DROP: the tables are not deleted, and stepping back returns every name.
 #
 # - Only control's: it lives in the ``control`` app, which ``TenantRouter`` migrates on ``default`` alone. A table is
-#   left over when the routers refuse its model on this alias (:func:`left_behind`), so a hub's database has none, and
-#   neither has the suite's control database, whose ``LegacyTablesRouter`` keeps those tables on purpose.
+#   left over when the routers refuse its model on this alias (:func:`left_behind`), so a hub's database has none.
 # - The list comes from ``base.tenancy.inventory``, the one place that says whose a table is, and from the installed
 #   models: this migration's historical state knows only the apps it depends on. It is the exception to «a migration
 #   never imports app code», so it holds as long as the inventory does; on a database made after the cut it finds

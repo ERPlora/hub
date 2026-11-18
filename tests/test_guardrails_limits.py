@@ -38,9 +38,7 @@ SHORT_WAIT = 0.3
 
 @pytest.fixture(autouse=True)
 def as_in_production(monkeypatch, settings):
-    """No fallback context (a thread without ``use_hub`` reaches no hub), every hub known by the live builder, and a
-    fresh set of limiters in the process."""
-    monkeypatch.setattr(context, "_test_fallback", None)
+    """Every hub known by the live builder, and a fresh set of limiters in the process."""
     monkeypatch.setattr(limits, "_limiters", {})
     settings.LIVE = {**settings.LIVE, "context_builder": "base.operations.HubContextBuilder"}
 

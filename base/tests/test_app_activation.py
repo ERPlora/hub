@@ -819,7 +819,7 @@ def test_one_mandatory_only_in_another_country_goes_off_here(monkeypatch):
 
 
 @HUB_DB
-def test_each_hub_keeps_on_what_its_own_business_country_requires(hub_a, hub_b, no_test_fallback, monkeypatch):
+def test_each_hub_keeps_on_what_its_own_business_country_requires(hub_a, hub_b, monkeypatch):
     """Two businesses with their own databases: Tasks, mandatory in Poland only, stays on in A's (Poland) and goes off
     in B's (Spain); neither reads the other's country."""
     monkeypatch.setattr(

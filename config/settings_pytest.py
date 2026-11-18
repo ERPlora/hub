@@ -30,7 +30,3 @@ METER_ENABLED = False
 # production): in the tests, the one user of the tests' Postgres, as the hub-migrate task's DB_MIGRATOR_* are its.
 os.environ.setdefault("DB_MIGRATOR_USER", DATABASES["default"]["USER"])  # noqa: F405
 os.environ.setdefault("DB_MIGRATOR_PASSWORD", DATABASES["default"]["PASSWORD"])  # noqa: F405
-
-# The suite's tests written before the tenancy keep their businesses' rows in control's test database
-# (base/tenancy/tests/legacy.py): only here; production's control holds control's tables alone.
-DATABASE_ROUTERS = ["base.tenancy.tests.legacy.LegacyTablesRouter", *DATABASE_ROUTERS]  # noqa: F405

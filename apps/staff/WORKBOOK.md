@@ -800,8 +800,7 @@ ofrece la plantilla «La lista de bienvenida de alguien nuevo en el equipo» sob
 - Los avisos llegan a las apps que reaccionan por el relay del outbox del worker (`base.relay`): lo
   prueban de punta a punta `apps/task/tests/test_relay.py` (TASK-F15, hub#124), `apps/service/tests/test_relay.py`
   y `apps/appointment/tests/test_relay.py`.
-- Tenencia: cada negocio tiene su propia BD, así que cada uno tiene su equipo: fichas, horarios y ausencias. Solo los tests escritos
-  antes de la tenencia guardan `a` y `b` en la misma BD de test (`base/tenancy/tests/legacy.py`).
+- Tenencia: cada negocio tiene su propia BD, así que cada uno tiene su equipo: fichas, horarios y ausencias.
 - La resta de intervalos de la disponibilidad está hecha a mano: la única librería de intervalos de
   tamaño razonable (`portion`) es un proyecto de una sola persona, y las que cumplen los criterios
   (`sympy`, `pandas`) son desproporcionadas para eso.
