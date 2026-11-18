@@ -250,7 +250,7 @@ Escape y tocar fuera del panel (hub#1023).
 | INVENTORY-F08 | Agrupar productos en categorías para el TPV | hecho |
 | INVENTORY-F29 | Marcar un artículo como agotado | hecho |
 | INVENTORY-F34 | Recuperar un producto eliminado | hecho |
-| INVENTORY-F35 | Declarar los alérgenos de un producto | no hecho |
+| INVENTORY-F35 | Declarar los alérgenos de un producto | parcial — falta la interfaz: el bloque del formulario, la línea de la ficha y la columna en Importar productos |
 | | **Importar y exportar** | |
 | INVENTORY-F09 | Importar productos desde un CSV | hecho |
 | INVENTORY-F10 | Importar categorías desde un CSV | hecho |
@@ -552,7 +552,7 @@ Pasos:
    productos).
 Entra: los productos o las categorías que cumplen la búsqueda y los filtros.
 Sale: el fichero, con las mismas cabeceras que reconoce la importación (Nombre, SKU, Precio, Coste,
-Stock, Umbral, EAN-13, Descripción, Unidad, Categoría fiscal, Activo) y las cifras como se leen en
+Stock, Umbral, EAN-13, Descripción, Alérgenos, Unidad, Categoría fiscal, Activo) y las cifras como se leen en
 pantalla (2,20 €, 3 unidades), de modo que se puede volver a importar sin cambiar nada. No guarda
 ni avisa nada.
 Si falla: sin productos, el fichero lleva solo la cabecera. Sin permiso de exportar, el botón no
@@ -926,8 +926,8 @@ Pantalla: ninguna
 Pasos:
 1. Al abrir el TPV, Ventas pide a Inventario los productos activos (los agotados, para enseñarlos en
    gris), las categorías, qué categorías tiene cada producto y las unidades. Al cobrar, pide el
-   catálogo de venta entero: precio, coste, categoría fiscal, unidad y si cada artículo lleva control
-   de stock.
+   catálogo de venta entero: precio, coste, categoría fiscal, unidad, alérgenos y si cada artículo lleva
+   control de stock.
 2. Cocina pide los productos y las categorías para elegir qué envía a cada estación.
 3. Menús pide los productos que se pueden poner como componente: los activos, también los agotados
    hoy (un menú se monta con ellos); al vender, no ofrece una elección cuyo producto está agotado.
@@ -1135,8 +1135,9 @@ Implicados: BASE-F114, INVENTORY-F01, INVENTORY-F03, INVENTORY-F04, INVENTORY-F0
 PRICING-F14, PRICING-F15, MODIFIER-F09, MODIFIER-F10, COMBO-F13, COMBO-F15
 
 ### INVENTORY-F35 Declarar los alérgenos de un producto
-Estado: no hecho — el producto todavía no guarda alérgenos: faltan su lista cerrada, el bloque del formulario, la
-línea de la ficha y la columna del CSV
+Estado: parcial — el producto ya guarda sus alérgenos por el asistente y la API, y el catálogo, el CSV exportado y la
+importación por la API los llevan; faltan el bloque del formulario, la línea de la ficha y que Importar productos
+reconozca la columna «Alérgenos»
 Actor: administrador, responsable
 Pantalla: Productos, Ficha del producto, Importar productos
 Pasos:
@@ -1211,7 +1212,7 @@ puede ver, o lo que ya no existe, no sale.
 |---|---|---|---|
 | Los productos con su stock y si están agotados, con búsqueda, filtros (nombre, SKU, precio, stock, estado, agotado) y páginas; «a la venta» da lo que ofrece el TPV | ver productos | F03, F05, F27, F29 | `inventory.product.list` |
 | La ficha completa de un producto (por su id, su SKU o su nombre) | ver productos | F02, F25 | `inventory.product.get` |
-| El catálogo de venta entero: productos a la venta (activos y no agotados) con precio, coste, categoría fiscal, unidad y si llevan control de stock | ver productos | F27 | `inventory.product.list_for_sale` |
+| El catálogo de venta entero: productos a la venta (activos y no agotados) con precio, coste, categoría fiscal, unidad, alérgenos y si llevan control de stock | ver productos | F27 | `inventory.product.list_for_sale` |
 | Los productos en su umbral o por debajo, del que menos tiene al que más | ver productos | F17 | `inventory.product.list_low_stock` |
 | Qué categorías tiene cada producto activo | ver productos | F08, F27 | `inventory.product_category.list` |
 | Las categorías, con cuántos productos activos tiene cada una (agotados incluidos, lo que enseña el TPV) | ver categorías | F06, F27 | `inventory.category.list` |
@@ -1226,9 +1227,9 @@ puede ver, o lo que ya no existe, no sale.
 
 | Qué hace | Quién puede | Confirmación en el asistente | Flujos | Servicio |
 |---|---|---|---|---|
-| Da de alta un producto, con sus categorías y su stock inicial | dar de alta productos | un clic | F01, F20, F26 | `inventory.product.create` |
-| Da de alta muchos productos de una vez y dice qué fila entró, cuál se omitió y cuál falló | importar productos | un clic | F09 | `inventory.product.bulk_create` |
-| Cambia un producto: datos, activo o inactivo, control de stock y categorías | cambiar productos | un clic | F02, F03, F05, F08, F20 | `inventory.product.update` |
+| Da de alta un producto, con sus categorías, sus alérgenos y su stock inicial | dar de alta productos | un clic | F01, F20, F26, F35 | `inventory.product.create` |
+| Da de alta muchos productos de una vez y dice qué fila entró, cuál se omitió y cuál falló | importar productos | un clic | F09, F35 | `inventory.product.bulk_create` |
+| Cambia un producto: datos, alérgenos, activo o inactivo, control de stock y categorías | cambiar productos | un clic | F02, F03, F05, F08, F20, F35 | `inventory.product.update` |
 | Elimina un producto | eliminar productos | escribir para confirmar | F04 | `inventory.product.delete` |
 | Devuelve al catálogo un producto eliminado, tal como era (solo el sistema, al recuperar desde una copia aparte) | sistema | no es del asistente: solo lo hace la plataforma | F34 | `inventory.product.restore` |
 | Marca un producto como agotado o lo vuelve a poner a la venta | cambiar productos | un clic | F29 | `inventory.product.set_sold_out` |
@@ -1241,7 +1242,7 @@ puede ver, o lo que ya no existe, no sale.
 | Cambia una categoría | cambiar categorías | un clic | F06 | `inventory.category.update` |
 | Elimina una categoría y desvincula sus productos | eliminar categorías | escribir para confirmar | F07 | `inventory.category.delete` |
 | Devuelve una categoría eliminada, como una nueva, con los productos eliminados que tenía (solo el sistema, al recuperar desde una copia aparte) | sistema | no es del asistente: solo lo hace la plataforma | F07, F34 | `inventory.category.recover` |
-| Exporta productos o categorías a CSV | exportar productos | un clic | F11 | `inventory.product.export`, `inventory.category.export` |
+| Exporta productos o categorías a CSV | exportar productos | un clic | F11, F35 | `inventory.product.export`, `inventory.category.export` |
 | Registra una recepción de mercancía (uno o varios productos, coste y albarán) | mover stock | un clic | F13 | `inventory.stock.receive` |
 | Aplica un recuento: el saldo pasa a ser lo contado, con motivo | mover stock | un clic | F14 | `inventory.stock.count` |
 | Da de baja una cantidad sin venta (merma, rotura, consumo propio), con motivo | mover stock | un clic | F15 | `inventory.stock.write_off` |

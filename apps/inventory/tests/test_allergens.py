@@ -21,7 +21,7 @@ from apps.inventory.tests.test_services import (
     TAX,
     create,
     import_products,
-    listen,  # noqa: F401 - the sessions that hear each business
+    listen,
     outbox,
     received,
     row,
@@ -34,6 +34,8 @@ from base.tenancy.context import current_alias, use_hub
 from .conftest import HOST, A, B, HUB_DB, HUB_DB_COMMITTED, ctx_for
 
 pytestmark = HUB_DB
+#: The fixture taken from the service tests: the sessions that hear each business.
+__all__ = ["listen"]
 
 NOT_ONE_OF_THE_FOURTEEN = {
     "en": "That allergen is not one of the fourteen that must be declared.",

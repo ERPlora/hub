@@ -200,6 +200,7 @@ def test_a_row_has_everything_the_screen_and_the_form_show(general):
         "sku": "CAF-1",
         "ean13": "8412345678905",
         "description": "",
+        "allergens": [],
         "product_type": "physical",
         "price": 100,
         "cost": 40,
@@ -434,6 +435,7 @@ def test_the_sale_catalog_has_only_active_live_products_with_what_prices_them(ge
         "unit": "kg",
         "price_quantity": Decimal("100.000"),
         "pricing_unit": "g",
+        "allergens": [],
         "tracks_stock": True,
         # INVENTORY-F32: the till's tile shows it, or its initials without one.
         "image": "",
@@ -926,32 +928,11 @@ def test_the_export_has_every_filtered_product_not_just_a_page_with_the_import_h
     )
     rows = read_csv(export, ",")
     assert rows[0] == [
-        "Name",
-        "SKU",
-        "Price",
-        "Cost",
-        "Stock",
-        "Threshold",
-        "EAN-13",
-        "Description",
-        "Unit",
-        "Tax category",
-        "Active",
+        "Name", "SKU", "Price", "Cost", "Stock", "Threshold", "EAN-13", "Description", "Allergens", "Unit",
+        "Tax category", "Active",
     ]
     assert len(rows) == 121
-    assert rows[1] == [
-        "Item 000",
-        "IT-000",
-        "€1.00",
-        "€0.00",
-        "0",
-        "10",
-        "",
-        "",
-        "ud",
-        "product.general",
-        "Yes",
-    ]
+    assert rows[1] == ["Item 000", "IT-000", "€1.00", "€0.00", "0", "10", "", "", "", "ud", "product.general", "Yes"]
 
 
 def test_the_spanish_export_reads_like_the_screen_and_uses_the_semicolon_of_excel(
@@ -975,19 +956,7 @@ def test_the_spanish_export_reads_like_the_screen_and_uses_the_semicolon_of_exce
     assert export.filename == "inventario-productos.csv"
     header, row = read_csv(export, ";")
     assert header[0] == "Nombre" and header[-2:] == ["Categoría fiscal", "Activo"]
-    assert row == [
-        "Gambas",
-        "GAM",
-        "12,50\xa0€",
-        "8,20\xa0€",
-        "2,5",
-        "10",
-        "8412345678905",
-        "",
-        "kg",
-        "product.general",
-        "No",
-    ]
+    assert row == ["Gambas", "GAM", "12,50\xa0€", "8,20\xa0€", "2,5", "10", "8412345678905", "", "", "kg", "product.general", "No"]
 
 
 def test_an_empty_export_has_only_the_header():

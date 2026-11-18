@@ -135,6 +135,7 @@ def test_product_in_defaults():
         "low_stock_threshold": None,
         "ean13": None,
         "description": "",
+        "allergens": [],
         "product_type": "physical",
         "unit": "ud",
         "price_quantity": Decimal("1"),
