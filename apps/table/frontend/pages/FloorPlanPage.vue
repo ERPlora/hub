@@ -1,15 +1,4 @@
 <script setup lang="ts">
-// Tables → Floor plan. On top, the zone strip (each tab with its occupied tables), «Service / Edit plan» for
-// whoever draws the room and — editing — «+» («Add zone or table») and the pencil («Edit zone»); then a summary
-// of the chosen zone and its live plan (on a phone in «Service», its cards). Every table of the room
-// (`table.table.list`, windows of 100) is read from the start, on the page's one stream, and the strip only picks
-// the zone it paints (a query that waited for the zones would change when they came and throw the first stream
-// away; a zone tap would reopen it). It changes by itself when somebody seats, moves, joins, splits, charges or voids.
-// - Service: the zones and tables in service; a tap opens the table's window (TableSheet). Transfer and
-//   Merge come back here to pick their destination: only the tables that may be picked answer, with
-//   «Transfer 4 to…» / «Pick a free table» and «Cancel».
-// - Edit plan: every zone and table (inactive ones greyed out), always on the plan; a tap opens «Edit table»; a
-//   drag (or the arrows) saves the place at once (`table.table.move`), and a refused move goes back and says so.
 import { EmptyState, FloorCards, FloorSkeleton, FloorSummary, FloorZoneTabs, InlineFeedback, zoneColor } from '@erplora/ui/components';
 import { type ApiError, useCommand, useLive } from '@erplora/ui/sdk';
 import { AppPage, HubIcon, useSession } from '@erplora/ui/shell';
@@ -74,6 +63,8 @@ watch(
 );
 const isPhone = useIsPhone();
 
+// Every table of the room is read from the start and the zone strip only picks the zone painted: a query that
+// waited for the zones would change when they came and drop its first stream, and a zone tap would reopen it.
 const plan = useAllRows('table.table.list', () => ({ sort: 'number' }));
 /** The tables as the clock paints them now: a reservation enters its window or ends with no event. */
 const painted = computed<TableOut[]>(() =>

@@ -1,5 +1,3 @@
-// `useFloorViews(tables, source)`: the tables as the plan and the phone's cards paint them, in the app's
-// language, following the clock, the rows and the destination being picked.
 import type { FloorTable } from '@erplora/ui/components';
 import { computed, type ComputedRef } from 'vue';
 

@@ -704,7 +704,7 @@ test('TABLE-F25, F26, F27, F28: a reservation holds its table, moves it, frees i
       await post(context, '/reservation/reservations/confirm', { id: made.id }, 200);
       return made.id;
     };
-    const hour = tile(page, one.id).locator('.table-tile__hold-time');
+    const hour = tile(page, one.id).locator('[data-part=hold-time]');
 
     // TABLE-F25: a reservation of tonight paints its hour on the plan in the page's language («8:00 PM» in
     // English). Always an afternoon one of today, whatever the time of the run (before noon an hour reads the

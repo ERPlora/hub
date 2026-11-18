@@ -1,4 +1,4 @@
-import { onBeforeUnmount, type Ref, shallowRef, watch } from 'vue';
+import { onBeforeUnmount, type Ref, shallowRef, watch, type WatchSource } from 'vue';
 
 import { fitPlan, type FloorFit } from '../lib/floor-fit';
 import type { Size } from '../lib/floor';
@@ -12,7 +12,8 @@ function inner(box: HTMLElement | null): Size {
   return { w: Math.max(0, box.clientWidth - across), h: Math.max(0, box.clientHeight - down) };
 }
 
-export function useFloorFit(stage: Readonly<Ref<HTMLElement | null>>, content: Readonly<Ref<Size>>) {
+/** Fits `content` to the stage whenever the stage is resized or `refit` changes (by default, the content). */
+export function useFloorFit(stage: Readonly<Ref<HTMLElement | null>>, content: Readonly<Ref<Size>>, refit: WatchSource = content) {
   const fit = shallowRef<FloorFit>(fitPlan(content.value, { w: 0, h: 0 }));
   let observer: ResizeObserver | null = null;
 
@@ -33,7 +34,7 @@ export function useFloorFit(stage: Readonly<Ref<HTMLElement | null>>, content: R
     },
     { immediate: true, flush: 'post' },
   );
-  watch(content, measure);
+  watch(refit, measure);
   onBeforeUnmount(() => observer?.disconnect());
   return { fit, measure };
 }

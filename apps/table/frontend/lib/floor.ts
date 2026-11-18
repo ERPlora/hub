@@ -9,6 +9,8 @@ import type { HoldShownOut, TableOut, TableStatus } from '../operations';
 
 /** The side of a table box in plan pixels (`models.BOX`). */
 export const BOX = 72;
+/** A cell of the grid new tables are placed on (`services.CELL`): the room «Edit plan» keeps past the farthest table. */
+export const CELL = BOX + 16;
 /** What a tile paints past its box (border and padding): the plan holds the painted tile whole. */
 export const TILE_CHROME = 10;
 /** Below this many pixels of pointer travel a press is a tap (edit), above it a drag (move). */

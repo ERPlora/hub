@@ -14,6 +14,7 @@ import { ownerPage, post } from './service-helpers';
 const STAMP = Date.now().toString(36).toUpperCase();
 const ZONE = `E2E Tbl ${STAMP} Terrace`;
 const HALL = `E2E Tbl ${STAMP} Hall`;
+const PATIO = `E2E Tbl ${STAMP} Patio`;
 const VIEWPORTS = [
   { label: '390', width: 390, height: 844 },
   { label: '834', width: 834, height: 1194 },
@@ -338,6 +339,53 @@ test('The default zone fits the stage with every status apart, and a phone lists
       await page.evaluate((dark) => document.documentElement.classList.toggle('ion-palette-dark', dark), theme === 'dark');
       await capture(page, `table-floor-glance-390-${theme}`);
     }
+  } finally {
+    await context.close();
+  }
+});
+
+const centre = (box: Box) => ({ x: box.x + box.width / 2, y: box.y + box.height / 2 });
+
+async function savedX(context: BrowserContext, table: TableRow): Promise<number> {
+  const res = await api<TableRow>(context, A, 'GET', `/table/tables/detail?table=${table.number}&zone=${encodeURIComponent(PATIO)}`);
+  return res.data.position_x;
+}
+
+test('Edit plan on a tablet: the farthest table of a new zone goes past it, under the pointer, and the others stay', async ({ browser }) => {
+  const { context, page } = await ownerPage(browser, '/table/floor-plan', { width: VIEWPORTS[1].width, height: VIEWPORTS[1].height });
+  try {
+    const zone = await post<{ id: string }>(context, '/table/zones', { name: PATIO });
+    const made = await post<{ rows: TableRow[] }>(context, '/table/tables/bulk_create', { zone_id: zone.id, count: 10 });
+    const far = made.rows.reduce((best, table) => (table.position_x > best.position_x ? table : best));
+    const view = shown(page);
+    await view.locator('[data-testid=table-floor-mode-edit]').click();
+    await view.locator(`[data-testid=table-floor-zone-tab-${zone.id}]`).click();
+    await expect(tile(page, far.id)).toBeVisible();
+    await settled(page);
+    const button = (id: string) => tile(page, id).locator('.table-tile__button');
+    const others = made.rows.filter((table) => table.id !== far.id).map((table) => table.id);
+    const before = await Promise.all(others.map((id) => button(id).boundingBox()));
+    const from = await button(far.id).boundingBox();
+    if (!from) throw new Error('the farthest table is not painted');
+    const start = centre(from);
+    await page.mouse.move(start.x, start.y);
+    await page.mouse.down();
+    await page.mouse.move(start.x + 56, start.y, { steps: 8 });
+    await page.mouse.up();
+    await expect.poll(() => savedX(context, far)).toBeGreaterThan(far.position_x);
+    await settled(page);
+    const to = await button(far.id).boundingBox();
+    if (!to) throw new Error('the dropped table is not painted');
+    expect(Math.abs(centre(to).x - (start.x + 56)), 'the dropped table is under the pointer').toBeLessThan(3);
+    expect(Math.abs(centre(to).y - start.y), 'the dropped table is under the pointer').toBeLessThan(3);
+    const after = await Promise.all(others.map((id) => button(id).boundingBox()));
+    for (const [index, id] of others.entries()) {
+      const was = before[index];
+      const now = after[index];
+      if (!was || !now) throw new Error(`table ${id} is not painted`);
+      expect(Math.abs(now.x - was.x) + Math.abs(now.y - was.y), `table ${id} did not move`).toBeLessThan(0.5);
+    }
+    await capture(page, 'table-floor-edit-834-full', { fullPage: true });
   } finally {
     await context.close();
   }

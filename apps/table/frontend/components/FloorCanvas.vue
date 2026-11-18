@@ -1,10 +1,4 @@
 <script setup lang="ts">
-// The plan of a zone: the positions spread to fit the stage (never below a legible size; past that the
-// stage scrolls on both axes, with a fade on every edge that has tables behind it, a mouse drags its
-// background and the focused stage scrolls with the arrows). In «Service» a tap or the keyboard picks a
-// table (`select`); in «Edit plan» a press that travels drags it (the screen distance over the spread), one
-// that does not is a tap, and the arrows move a focused table. A table never leaves the plan; its new place
-// shows at once (`move`) until the server's row has it, and `revert(id)` puts a refused one back.
 import { FloorTile, useScrollEdges } from '@erplora/ui/components';
 import { computed, ref, shallowRef, useTemplateRef, watch } from 'vue';
 
@@ -12,7 +6,7 @@ import { useFloorFit } from '../composables/useFloorFit';
 import { useFloorViews } from '../composables/useFloorViews';
 import { useStagePan } from '../composables/useStagePan';
 import { useT } from '../composables/useT';
-import { clampPosition, DRAG_THRESHOLD, keyDelta, planeSize, type Size } from '../lib/floor';
+import { CELL, clampPosition, DRAG_THRESHOLD, keyDelta, planeSize, type Size } from '../lib/floor';
 import { paintBox } from '../lib/floor-fit';
 import type { SettingsOut, TableOut } from '../operations';
 
@@ -41,6 +35,8 @@ interface Drag {
   fromX: number;
   fromY: number;
   moved: boolean;
+  /** The plan when the drag started: one drag takes a table a cell past the farthest one at most. */
+  limit: Size;
 }
 
 const EDGES = ['left', 'right', 'top', 'bottom'] as const;
@@ -48,7 +44,7 @@ const EDGES = ['left', 'right', 'top', 'bottom'] as const;
 /** Places shown before the server has them, by table id. */
 const local = ref<Record<string, { x: number; y: number }>>({});
 const drag = shallowRef<Drag | null>(null);
-/** The plan's size when a drag started: neither the plan nor its scale changes under the finger. */
+/** The plan's size when a drag started: it does not shrink under the finger (a scrolled stage would jump). */
 const floor = shallowRef<Size | undefined>();
 const stage = useTemplateRef<HTMLElement>('stage');
 const plane = useTemplateRef<HTMLElement>('plane');
@@ -60,11 +56,12 @@ const shown = computed(() =>
   }),
 );
 const size = computed(() => planeSize(shown.value, floor.value));
-const { fit } = useFloorFit(
-  stage,
-  computed(() => floor.value ?? size.value),
-);
-const painted = computed(() => ({ w: rounded(size.value.w * fit.value.spread), h: rounded(size.value.h * fit.value.spread) }));
+/** «Edit plan» keeps a cell of room past the farthest table and the lowest one, to place a table beyond them. */
+const content = computed(() => (props.editable ? { w: size.value.w + CELL, h: size.value.h + CELL } : size.value));
+const tableIds = computed(() => props.tables.map((table) => table.id).join(' '));
+// While the plan is edited its scale holds: a move that changed the farthest table would zoom every table.
+const { fit } = useFloorFit(stage, content, () => (props.editable ? tableIds.value : content.value));
+const painted = computed(() => ({ w: rounded(content.value.w * fit.value.spread), h: rounded(content.value.h * fit.value.spread) }));
 const t = useT();
 const views = useFloorViews(
   () => shown.value,
@@ -104,15 +101,15 @@ function revert(id: string): void {
 }
 defineExpose({ revert });
 
-/** The plan's size in plan units, to keep a table inside: what is painted, never less than the tables need. */
+/** The plan in plan units, to keep a table inside: as painted (it fills the stage at least), with its room. */
 function bounds(): Size {
   const spread = fit.value.spread;
   const box = plane.value;
-  return { w: Math.max((box?.clientWidth ?? 0) / spread, size.value.w), h: Math.max((box?.clientHeight ?? 0) / spread, size.value.h) };
+  return { w: Math.max((box?.clientWidth ?? 0) / spread, content.value.w), h: Math.max((box?.clientHeight ?? 0) / spread, content.value.h) };
 }
 
-function place(table: TableOut, x: number, y: number): { x: number; y: number } {
-  const spot = clampPosition(x, y, { w: table.width, h: table.height }, bounds());
+function place(table: TableOut, to: { x: number; y: number }, limit: Size): { x: number; y: number } {
+  const spot = clampPosition(to.x, to.y, { w: table.width, h: table.height }, limit);
   local.value = { ...local.value, [table.id]: spot };
   return spot;
 }
@@ -128,7 +125,15 @@ function onTileDown(table: TableOut, event: PointerEvent): void {
   if (!props.editable) return;
   const current = shown.value.find((row) => row.id === table.id) ?? table;
   floor.value = size.value;
-  drag.value = { id: table.id, startX: event.clientX, startY: event.clientY, fromX: current.position_x, fromY: current.position_y, moved: false };
+  drag.value = {
+    id: table.id,
+    startX: event.clientX,
+    startY: event.clientY,
+    fromX: current.position_x,
+    fromY: current.position_y,
+    moved: false,
+    limit: bounds(),
+  };
   (event.currentTarget as HTMLElement | null)?.setPointerCapture?.(event.pointerId);
   event.preventDefault();
 }
@@ -143,7 +148,7 @@ function onPointerMove(event: PointerEvent): void {
   drag.value = { ...current, moved: true };
   const table = props.tables.find((row) => row.id === current.id);
   const spread = fit.value.spread;
-  if (table) place(table, current.fromX + dx / spread, current.fromY + dy / spread);
+  if (table) place(table, { x: current.fromX + dx / spread, y: current.fromY + dy / spread }, current.limit);
 }
 
 function onPointerUp(): void {
@@ -168,7 +173,7 @@ function onKeydown(table: TableOut, event: KeyboardEvent): void {
   if (!delta) return;
   event.preventDefault();
   const current = shown.value.find((row) => row.id === table.id) ?? table;
-  const spot = place(table, current.position_x + delta[0], current.position_y + delta[1]);
+  const spot = place(table, { x: current.position_x + delta[0], y: current.position_y + delta[1] }, bounds());
   emit('move', { table, x: spot.x, y: spot.y });
 }
 

@@ -1,7 +1,3 @@
-// The plan of a zone: the tables spread to fit the stage, on a plan as large as the farthest one. In «Service»
-// a tap (or Enter) picks a table; in «Edit plan» a table is dragged to its place — a press that does not travel
-// is a tap — or moved with the arrows (8 px, 32 with Shift), and it never leaves the plan. The new place shows
-// at once and stays until the server has it; a refused move goes back.
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { click, mountTable, settle } from '../__tests__/mount-table';
@@ -42,12 +38,20 @@ async function canvas(props: Record<string, unknown> = {}, locale: 'en' | 'es' =
     el.dispatchEvent(new KeyboardEvent('keydown', { key: keyName, shiftKey, bubbles: true }));
     await settle();
   };
-  /** Gives the stage a measured box, as the browser does once the page has its size. */
+  /** Gives the stage a measured box, as the browser does once the page has its size; the plane, as edited, is
+   *  as large as it is painted and never smaller than the stage. */
   const measure = async (w: number, h: number) => {
     Object.defineProperty(stage(), 'clientWidth', { configurable: true, value: w });
     Object.defineProperty(stage(), 'clientHeight', { configurable: true, value: h });
+    Object.defineProperty(plane(), 'clientWidth', { configurable: true, get: () => Math.max(parseFloat(plane().style.width), w) });
+    Object.defineProperty(plane(), 'clientHeight', { configurable: true, get: () => Math.max(parseFloat(plane().style.height), h) });
     for (const resized of observers) resized();
     await settle();
+  };
+  const drag = async (id: string, dx: number, dy: number) => {
+    await pointer(tile(id), 'pointerdown', 400, 300);
+    await pointer(tile(id), 'pointermove', 400 + dx, 300 + dy);
+    await pointer(tile(id), 'pointerup', 400 + dx, 300 + dy);
   };
   /** A click that a pointer made (a keyboard's click, Enter or Space on a button, has `detail` 0). */
   const tap = async (el: Element) => {
@@ -57,8 +61,14 @@ async function canvas(props: Record<string, unknown> = {}, locale: 'en' | 'es' =
   const button = (id: string) => tile(id).querySelector('button')!;
   const selected = () => (m.wrapper.emitted('select') ?? []).map(([table]) => (table as TableOut).id);
   const moves = () => (m.wrapper.emitted('move') ?? []).map(([move]) => move as { table: TableOut; x: number; y: number });
-  return { ...m, tile, button, plane, stage, pointer, key, measure, click, tap, selected, moves };
+  return { ...m, tile, button, plane, stage, pointer, key, measure, drag, click, tap, selected, moves };
 }
+
+/** The ten tables a new zone gets: five to a row, 88 px apart, 16 px from the edge. */
+const ZONE = Array.from({ length: 10 }, (_, index) =>
+  tableRow({ id: `z${index}`, number: String(index + 1), position_x: 16 + (index % 5) * 88, position_y: 16 + Math.floor(index / 5) * 88 }),
+);
+const ROW = Array.from({ length: 6 }, (_, index) => tableRow({ id: `r${index}`, number: String(index + 1), position_x: 16 + index * 88, position_y: 16 }));
 
 describe('FloorCanvas', () => {
   it('lays every table at its box on a plan as large as the farthest one while the stage is unmeasured', async () => {
@@ -152,25 +162,86 @@ describe('FloorCanvas', () => {
     expect(c.selected()).toEqual([]);
   });
 
-  it('a drag on a spread plan moves the table by the screen distance over the spread, and the plan keeps its scale meanwhile', async () => {
+  it('a drag on a spread plan moves the table by the screen distance over the spread, and one drag goes a cell past the farthest table at most', async () => {
     vi.stubGlobal('ResizeObserver', FakeObserver);
     const c = await canvas({ editable: true });
     await c.measure(1000, 700);
-    // In Edit plan the plan fills the stage at least: the room to drag into.
-    Object.defineProperty(c.plane(), 'clientWidth', { configurable: true, value: 1400 });
+    const left = c.tile('t2').style.left;
     await c.pointer(c.tile('t1'), 'pointerdown', 100, 100);
-    await c.pointer(c.tile('t1'), 'pointermove', 1200, 144);
-    expect(c.tile('t2').style.left).toBe('714px');
-    await c.pointer(c.tile('t1'), 'pointerup', 1200, 144);
-    // Dropped, the wider plan fits again at 1.7: the painted 1400 px hold 1400 / 1.7 plan units, and a table
-    // goes no farther than that, less its own box.
+    await c.pointer(c.tile('t1'), 'pointermove', 300, 144);
+    expect(c.tile('t2').style.left).toBe(left);
+    await c.pointer(c.tile('t1'), 'pointerup', 300, 144);
+    // The 700 px of the stage hold the plan and a cell of room below it: 282 + 88 plan units. The plan grows
+    // while the table goes into its room, but that drag goes no farther.
     await c.pointer(c.tile('t1'), 'pointerdown', 100, 100);
     await c.pointer(c.tile('t1'), 'pointermove', 2100, 100);
-    await c.pointer(c.tile('t1'), 'pointerup', 2100, 100);
+    await c.pointer(c.tile('t1'), 'pointermove', 2500, 100);
+    await c.pointer(c.tile('t1'), 'pointerup', 2500, 100);
+    await c.drag('t1', 2000, 0);
     expect(c.moves().map((m) => [m.x, m.y])).toEqual([
-      [516, 36],
-      [742, 36],
+      [122, 39],
+      [447, 39],
+      [535, 39],
     ]);
+    expect(c.tile('t2').style.left).toBe(left);
+    expect(parseFloat(c.plane().style.width)).toBeGreaterThan(1000);
+  });
+
+  it('in Edit plan the farthest column is dragged past itself, into the room the plan keeps on the right', async () => {
+    vi.stubGlobal('ResizeObserver', FakeObserver);
+    const c = await canvas({ editable: true, tables: ZONE });
+    await c.measure(770, 700);
+    await c.drag('z4', 100, 0);
+    expect(c.moves().map((m) => [m.table.id, m.x, m.y])).toEqual([['z4', 427, 16]]);
+  });
+
+  it('in Edit plan the right arrow moves the farthest column past itself too', async () => {
+    vi.stubGlobal('ResizeObserver', FakeObserver);
+    const c = await canvas({ editable: true, tables: ZONE });
+    await c.measure(770, 700);
+    await c.key(c.tile('z4'), 'ArrowRight');
+    expect(c.moves().map((m) => [m.table.id, m.x, m.y])).toEqual([['z4', 376, 16]]);
+  });
+
+  it('in Edit plan the lowest row goes below itself on a stage the plan fills from top to bottom', async () => {
+    vi.stubGlobal('ResizeObserver', FakeObserver);
+    const c = await canvas({ editable: true, tables: ZONE });
+    await c.measure(1000, 320);
+    await c.drag('z9', 0, 100);
+    await c.key(c.tile('z5'), 'ArrowDown');
+    expect(c.moves().map((m) => [m.table.id, m.x, m.y])).toEqual([
+      ['z9', 368, 163],
+      ['z5', 16, 112],
+    ]);
+  });
+
+  it('in Edit plan a drop keeps the scale: the farthest table dropped inward stays under the pointer and the others do not move', async () => {
+    vi.stubGlobal('ResizeObserver', FakeObserver);
+    const c = await canvas({ editable: true, tables: ROW });
+    await c.measure(1000, 700);
+    const others = () => ['r0', 'r4'].map((id) => [c.tile(id).style.left, c.tile(id).style.top]);
+    const before = others();
+    const from = parseFloat(c.tile('r5').style.left);
+    await c.drag('r5', -300, 0);
+    expect(others()).toEqual(before);
+    expect(Math.abs(parseFloat(c.tile('r5').style.left) - (from - 300))).toBeLessThan(1);
+    expect(c.moves().map((m) => [m.x, m.y])).toEqual([[280, 16]]);
+  });
+
+  it('in Edit plan the plan fits again for other tables (another zone, one added or removed) or the other mode, never for a move', async () => {
+    vi.stubGlobal('ResizeObserver', FakeObserver);
+    const c = await canvas({ editable: true, tables: ROW });
+    await c.measure(1000, 700);
+    const width = () => c.plane().style.width;
+    expect(width()).toBe('1064.2px');
+    await c.wrapper.setProps({ tables: [...ROW.slice(0, 5), { ...ROW[5], position_x: 280 }] });
+    expect(width()).toBe('914.6px');
+    await c.wrapper.setProps({ tables: ROW.slice(0, 5) });
+    expect(width()).toBe('1000px');
+    await c.wrapper.setProps({ tables: ROW });
+    expect(width()).toBe('1064.2px');
+    await c.wrapper.setProps({ editable: false });
+    expect(width()).toBe('1000px');
   });
 
   it('a press that does not travel is a tap, even in Edit plan (and its click is not a second one)', async () => {
