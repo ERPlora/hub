@@ -197,19 +197,18 @@ def app_container(revision, family):
     raise Refused([Problem(where, "no_app_container", f"has no container named {family} for the settings")])
 
 
-def owner_problems(environment, section, in_force, revisions):
-    """One owner per variable: the file never takes over what Terraform sets in a family."""
+def owner_problems(environment, section, revisions):
+    """One owner per variable: Terraform never sets a setting of the file as a variable, it only passes app_env on
+    (ERPlora/aws README, "Ajustes de la app"), so one the latest revision runs and app_env lacks is still the file's,
+    left by a rollback or by a deploy that failed after registering. Only a secret of the family is Terraform's."""
     problems = []
     for family, variables in section.items():
-        container = app_container(revisions[family], family)
-        carried, secrets = _names(container.get("environment", [])), _names(container.get("secrets", []))
-        for name in variables:
-            where = f"{environment}.{family}.{name}"
-            if name in secrets:
-                problems.append(Problem(where, "terraform_secret", f"is a secret Terraform sets in {family}"))
-            elif name in carried and name not in in_force.get(family, {}):
-                message = f"Terraform sets it in {family}; take it out there first"
-                problems.append(Problem(where, "terraform_owns", message))
+        secrets = _names(app_container(revisions[family], family).get("secrets", []))
+        problems += [
+            Problem(f"{environment}.{family}.{name}", "terraform_secret", f"is a secret Terraform sets in {family}")
+            for name in variables
+            if name in secrets
+        ]
     return problems
 
 
@@ -237,11 +236,10 @@ def lock_problems(section, in_force, confirm):
 
 
 def merged(revision, family, section, in_force):
-    """The revision with its family's settings: those the file no longer gives leave, Terraform's stay."""
+    """The revision with exactly its family's settings of the file: any other setting leaves, also one the app_env in
+    force does not name. Terraform's variables stay."""
     wanted = section.get(family, {})
-    dropped = set(in_force.get(family, {})) - set(wanted)
-    if not wanted and not dropped:
-        return revision
+    dropped = (set(SETTINGS) | set(in_force.get(family, {}))) - set(wanted)
     result = copy.deepcopy(revision)
     container = app_container(result, family)
     variables = {e["name"]: e["value"] for e in container.get("environment", []) if e["name"] not in dropped}
@@ -317,7 +315,7 @@ def apply(workdir, environment, commit, region, confirm):
     in_force = read_in_force(environment, region)
     section = read_section(commit, environment, in_force)
     revisions = {family: json.loads((workdir / f"{family}.json").read_text()) for family in FAMILIES}
-    problems = owner_problems(environment, section, in_force, revisions)
+    problems = owner_problems(environment, section, revisions)
     if environment == "prod":
         problems += lock_problems(section, in_force, confirm)
         problems += charging_problems(section, saas_charges(region))
