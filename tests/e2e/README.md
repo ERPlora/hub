@@ -50,7 +50,7 @@ guardado en ella lo hereda la siguiente. Una spec con dos dispositivos de la mis
 empleado por PIN si no rota la clave de sesión, pide `fresh: true` para tener la suya.
 
 Cada paso del login se espera **todo el tiempo del test**, nunca una parte: la shell del hub (la barra de arriba,
-`topbar-apps`), al entrar y al final, y cada paso del SaaS (su página de acceso o la vuelta, su respuesta al inicio de
+su camino a «Mis apps», `MY_APPS_DOOR`: ⠿ desde la tableta y el «⋮» de la shell en el teléfono), al entrar y al final, y cada paso del SaaS (su página de acceso o la vuelta, su respuesta al inicio de
 sesión, la pantalla del código, su respuesta al código y la vuelta al hub). Con la máquina cargada la SPA tardó más de
 30 s en montar la shell (hub#1342) y el SaaS lo mismo en contestar un paso (hub#1370), sin nada roto. Lo que dice que
 no va a llegar cae en el acto y dice por qué:
@@ -72,7 +72,7 @@ no va a llegar cae en el acto y dice por qué:
   una vez, cuando la pantalla del código ya está.
 
 Un fallo de red (`net::…`) se reintenta una vez, como una conexión rechazada. Un paso que no llega sin nada de eso
-choca con el tope del propio test, y Playwright nombra esa espera: `locator.waitFor` de `topbar-apps` para la shell,
+choca con el tope del propio test, y Playwright nombra esa espera: `locator.waitFor` de `topbarApps` para la shell,
 `page.waitForResponse` desde `signInWithCode` (la línea del código o la del inicio de sesión) para una respuesta del
 SaaS que no llega.
 

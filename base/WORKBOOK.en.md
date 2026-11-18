@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:dd99fa68e9b0c61d2461d56907357586439ee6b0257abf4997e8fe21cb8a6202 -->
+<!-- generated from WORKBOOK.md sha256:069e3b6654ebedb75bcec0ae40998f88bb62c4e6be3c34807e321cd318fb8be9 -->
 
 ## What it is for and who it is for
 
@@ -246,7 +246,7 @@ Over the screen where the action was tried: what is approved, "Who approves it?"
 With the back button: how the API is called, "Download the OpenAPI file" and a section per app with its calls.
 
 ### Assistant
-The panel the "Assistant" sparkles of the top bar open (on a phone, inside "More options"), on the right. On a tablet
+The panel the "Assistant" sparkles of the top bar open (on a phone, inside "⋮", beside "My apps"), on the right. On a tablet
 or a computer it stays beside the screen and pushes it, so they keep working with it open; on a phone it covers it,
 over a dark veil. At the top, "Assistant", "New conversation" once there is one and the "Close" ×. In the middle, the
 conversation: empty, the sparkles, the welcome sentence and the setup's shortcuts; then, the messages, each answer
@@ -2332,9 +2332,9 @@ Actor: owner, administrator, manager, employee
 Screen: Assistant
 Steps:
   1. With the session open, they tap the "Assistant" sparkles in the top bar, next to the bell. Tapping them again
-     closes it. On a phone, the sparkles go in "More options", so the title stays centred, and the bell stays in
-     sight: there, "Assistant" opens the panel as soon as the menu has finished closing, so what they type straight
-     away goes to the chat's box and Enter sends it.
+     closes it. On a phone, the sparkles and "My apps" go in "⋮" ("More actions"), so the title stays centred, and
+     the bell stays in sight: there, "Assistant" opens the panel as soon as the menu has finished closing, so what
+     they type straight away goes to the chat's box and Enter sends it.
   2. The panel comes in from the right. On a tablet or a computer it takes a column beside the screen and pushes it:
      they can keep working with the panel open. On a phone it covers the screen, over a dark veil.
   3. It closes with the "Close" ×, with the Esc key (wherever the cursor is, except in a window open over the

@@ -2,7 +2,7 @@
 // - «Upgrade plan» at the foot of the side menu (BASE-F11): lined up with the QR above it and inside the menu, and on
 //   the rail (≥992 px, the menu folded to its icons) only its icon, still named, inside the 68 px;
 // - «Manage on erplora.com» right below it (BASE-F11): this business on erplora.com's panel, in a new tab, for who runs
-//   it; on the rail only its icon, still named. The bar no longer has it, nor «More options» on a phone; an employee's
+//   it; on the rail only its icon, still named. The bar no longer has it, nor «⋮» on a phone; an employee's
 //   menu has none.
 // - nothing between the bar and the screen's content (BASE-F01): «You cannot issue invoices yet» is a notice of the
 //   bell, which stays on the bar at every size;
@@ -14,14 +14,9 @@
 import { expect, type Locator, type Page, type Route, test } from '@playwright/test';
 
 import { actionBell, bellSays, closeActionCenter, featuredNotice, noticeButton, openActionCenter } from './action-center';
-import { A, capture, decodeSubs, EMPLOYEE, login, psql, shot, shown, untilStill } from './helpers';
+import { A, capture, decodeSubs, EMPLOYEE, login, psql, shot, shown, THREE_SIZES as VIEWPORTS, untilStill } from './helpers';
 import { STACK } from './stack';
-
-const VIEWPORTS = [
-  { label: '390', width: 390, height: 844 },
-  { label: '834', width: 834, height: 1112 },
-  { label: '1440', width: 1440, height: 900 },
-];
+import { topbarMore, topbarMoreMenu } from './topbar';
 
 /** The side menu is pinned from 992 px; below it is a drawer behind the bar's menu button. */
 const PINNED_MIN = 992;
@@ -241,17 +236,17 @@ test('BASE-F11 — «Manage on erplora.com», right below «Upgrade plan», open
     await expect(shown(page).locator('[data-testid="setup-progress"]')).toBeVisible();
     await expect(shown(page).locator('ion-skeleton-text:visible, [data-testid="widgets-loading"]:visible')).toHaveCount(0);
     if (vp.width < 768) {
-      // On a phone «More options» folds the assistant, and nothing else: the bell stays on the bar.
+      // On a phone «⋮» folds «My apps» and the assistant, and nothing else: the bell stays on the bar.
       await expect(actionBell(page)).toBeVisible();
       const presented = page.evaluate(
         () => new Promise<void>((resolve) => document.addEventListener('ionPopoverDidPresent', () => resolve(), { once: true })),
       );
-      await shown(page).getByTestId('topbar-chrome-more').click();
+      await topbarMore(page).click();
       await presented;
-      const rows = page.locator('ion-popover ion-item[data-testid^="topbar-chrome-more-"]');
-      await expect(rows).toHaveCount(1);
-      expect(await rows.evaluateAll((items) => items.map((item) => item.getAttribute('data-testid')))).toEqual(['topbar-chrome-more-assistant']);
-      expect(await linksOutsideMenu(page, address), `«More options» leads nowhere near erplora.com at ${vp.label}`).toBe(0);
+      const rows = topbarMoreMenu(page).locator('ion-button');
+      await expect(rows).toHaveCount(2);
+      expect(await rows.evaluateAll((items) => items.map((item) => item.getAttribute('data-testid')))).toEqual(['topbar-more-apps', 'assistant-button']);
+      expect(await linksOutsideMenu(page, address), `«⋮» leads nowhere near erplora.com at ${vp.label}`).toBe(0);
       const dismissed = page.evaluate(
         () => new Promise<void>((resolve) => document.addEventListener('ionPopoverDidDismiss', () => resolve(), { once: true })),
       );

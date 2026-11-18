@@ -12,10 +12,11 @@ import { type Browser, type BrowserContext, expect, type Locator, type Page, tes
 import { ownerIn, sentCard, thisDeviceNamed } from './assistant-card-helpers';
 import { CLAIM_ANSWER, DICTATION, DONE, GREETING, NOT_DONE, type Provider, STEPS_SAID } from './assistant-provider';
 import { saasSql } from './assistant-real';
-import { A, api, capture, compactBar, EMPLOYEE, exposeMovingInPage, login, shot, shown, THREE_SIZES as VIEWPORTS, turnOffTurnedOn, turnOnMissing, untilStill, upgradeLandsInside } from './helpers';
+import { A, api, capture, EMPLOYEE, exposeMovingInPage, login, shot, shown, THREE_SIZES as VIEWPORTS, turnOffTurnedOn, turnOnMissing, untilStill, upgradeLandsInside } from './helpers';
 import { cleanPricing, CODE as PRICING_CODE, createProduct, post, TAG as PRICING_TAG } from './pricing-helpers';
 import { seededProvider } from './provider-helpers';
 import {  } from './stack';
+import { assistantDoor, openAssistant, pressAssistant, topbarMore, topbarMoreMenu } from './topbar';
 
 let provider: Provider;
 
@@ -63,26 +64,14 @@ async function decide(page: Page, button: 'submit' | 'cancel'): Promise<void> {
   await expect(card(page)).toBeHidden();
 }
 
-/** The topbar's way to the assistant: the sparkles, or on a phone «More options», which carries them. */
-const opener = (page: Page): Locator =>
-  shown(page).locator(compactBar(page) ? '[data-testid="topbar-chrome-more"]' : '[data-testid="assistant-button"]');
-
 async function home(page: Page): Promise<void> {
   await page.goto(`${A}/`);
-  await expect(opener(page)).toBeVisible();
+  await expect(assistantDoor(page)).toBeVisible();
 }
 
+/** On a phone the panel opens once «⋮» has gone: while Ionic dismisses it, its focus trap keeps the keyboard (hub#742). */
 async function openPanel(page: Page): Promise<void> {
-  if ((await panel(page).getAttribute('data-open')) !== 'true') {
-    await opener(page).click();
-    if (compactBar(page)) {
-      const row = page.locator('ion-popover [data-testid="topbar-chrome-more-assistant"]');
-      await row.click();
-      // While Ionic dismisses the menu, its focus trap keeps the keyboard out of the composer (hub#742), as in `decide`.
-      await expect(row).toHaveCount(0);
-    }
-  }
-  await expect(panel(page)).toHaveAttribute('data-open', 'true');
+  await openAssistant(page);
   await expect(box(page)).toBeVisible();
 }
 
@@ -244,22 +233,22 @@ test.use({
   permissions: ['microphone'],
 });
 
-test('the sparkles open the panel on the right (on a phone, from «More options»): docked from 768 px, over the screen on a phone; Escape, × and the veil close it; it stays open across screens and reloads', async ({ page }) => {
+test('the sparkles open the panel on the right (on a phone, from «⋮»): docked from 768 px, over the screen on a phone; Escape, × and the veil close it; it stays open across screens and reloads', async ({ page }) => {
   await login(page, A, '/');
   for (const vp of VIEWPORTS) {
     await page.setViewportSize({ width: vp.width, height: vp.height });
     await home(page);
     if (vp.width < 768) {
-      // The sparkles folded into «More options», so the title stays centred; the bell stays on the bar.
+      // The sparkles and «My apps» folded into «⋮», so the title stays centred; the bell stays on the bar.
       await expect(shown(page).locator('[data-testid="assistant-button"]')).toHaveCount(0);
       await expect(shown(page).locator('[data-testid="action-bell"]')).toBeVisible();
-      await opener(page).click();
-      await expect(page.locator('ion-popover [data-testid="topbar-chrome-more-assistant"]')).toHaveText('Assistant');
-      await expect(page.locator('ion-popover ion-item[data-testid^="topbar-chrome-more-"]')).toHaveCount(1);
+      await topbarMore(page).click();
+      await expect(topbarMoreMenu(page).locator('[data-testid="assistant-button"]')).toHaveText('Assistant');
+      await expect(topbarMoreMenu(page).locator('ion-button')).toHaveCount(2);
       await untilStill(page);
       await page.screenshot({ path: shot(`APP-BASE-9-BASE-G110-more-${vp.label}`) });
       await page.keyboard.press('Escape');
-      await expect(page.locator('ion-popover [data-testid="topbar-chrome-more-assistant"]')).toHaveCount(0);
+      await expect(topbarMoreMenu(page)).toHaveCount(0);
     }
     await openPanel(page);
     await expect(panel(page)).toContainText('Ask me about your sales, your stock or anything about your business.');
@@ -322,20 +311,19 @@ test('hub-e2e-capture — capture() keeps the panel open after a turn at 390, 83
   await lastAnswerAtEachSize(page, KEY);
 });
 
-// hub#742, hub#1121: on a phone the panel opens from «More options», and while Ionic dismisses that menu its focus trap
+// hub#742, hub#1121: on a phone the panel opens from «⋮», and while Ionic dismisses that menu its focus trap
 // pulls the keyboard back into it: the Enter written in the box reached a row of the menu (it opened the bell's list)
 // and «Hola» stayed in the box. The panel opens once the menu has gone. The menu's way out is slowed, so a run never gets
 // past that moment by luck (a loaded machine did), and the question is written as soon as the box is there, with no
 // wait for the menu, as a person does.
-test('hub-e2e-open-panel — on a phone the panel takes a question with Enter as soon as it has opened from «More options»', async ({ page }) => {
+test('hub-e2e-open-panel — on a phone the panel takes a question with Enter as soon as it has opened from «⋮»', async ({ page }) => {
   await login(page, A, '/');
   await page.setViewportSize({ width: 390, height: 844 });
   await home(page);
   const devtools = await page.context().newCDPSession(page);
   await devtools.send('Animation.enable');
   await devtools.send('Animation.setPlaybackRate', { playbackRate: 0.05 });
-  await opener(page).click();
-  await page.locator('ion-popover [data-testid="topbar-chrome-more-assistant"]').click();
+  await pressAssistant(page);
   await ask(page, 'Hola');
   await expect(lastAnswer(page)).toHaveText(GREETING.en);
   // Nothing of the menu caught the keys: no menu is left on screen.

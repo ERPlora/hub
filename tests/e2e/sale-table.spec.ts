@@ -8,10 +8,11 @@
 // checks and their moves, its checks and lines, its product — is deleted after it.
 import { expect, type Page, test } from '@playwright/test';
 
-import { A, api, login, openApps, psql, shown } from './helpers';
+import { A, api, login, psql, shown } from './helpers';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
 import { addToTill, cleanSales, shots, stamp, tillReady, zoneWithTable } from './sale-helpers';
 import { toastSaying, toasts } from './toast-helpers';
+import { openApps } from './topbar';
 
 const RUN = stamp();
 const ZONE = `E2E Tbl ${RUN} Till`;
