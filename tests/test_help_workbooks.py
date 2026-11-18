@@ -2,10 +2,12 @@
 
 For each module that declares ``help`` and each language of the deployment, the help ``base.help.get`` serves: every
 entry of the module's menu has its ``###`` under the screens heading, once, and every ``###`` there is one of its tabs;
-every screen has a summary (what goes before its first ``####``, the only part of it that is published) of at most
-``SUMMARY_MAX`` characters; what is published (what it is for, each screen's summary, and each flow's title, steps and
-what happens if it fails) holds no code (backticks), no issue reference, no size in pixels, no flow id and no operation
-or event name, while the detail under a ``####`` may hold any of them; every published flow has
+what it is for (what the first section says before its first ``###``, the only part of it that is published) is not
+empty and has at most ``PURPOSE_MAX`` characters; every screen has a summary (what goes before its first ``####``, the
+only part of it that is published) of at most ``SUMMARY_MAX`` characters; what is published (what it is for, each
+screen's summary, and each flow's title, steps and what happens if it fails) holds no code (backticks), no issue
+reference, no size in pixels, no flow id and no operation or event name, while the detail under a ``###`` of the first
+section or a ``####`` of a screen may hold any of them; every published flow has
 its steps; and no flow that reads as done on a tab is left out. A translation publishes the same tabs and flows as its
 source, each with its steps and what happens if it fails when the source has them, so a word of the vocabulary that is
 missing or wrong in it cannot empty the help in that language. While no module declares its help, the real cases are
@@ -37,6 +39,8 @@ FORBIDDEN = {
 DOTTED = re.compile(r"(?<![\w.])([a-z][a-z0-9_]*)\.[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*(?!\w|\.\w)")
 #: A screen's summary is two or three sentences, and a short list (a colour legend) where the screen has one.
 SUMMARY_MAX = 900
+#: What a module is for is two or three sentences, the first thing the window shows.
+PURPOSE_MAX = 500
 LANGUAGES = [code for code, _name in settings.LANGUAGES]
 READY = app_help.ready_apps()
 
@@ -76,6 +80,16 @@ def summary_problems(read: workbook_help.Help) -> list[str]:
     ]
 
 
+def purpose_problems(read: workbook_help.Help) -> list[str]:
+    """What it is for, the only text of the first section that is published, when it is empty or longer than
+    ``PURPOSE_MAX``."""
+    if not read.purpose.strip():
+        return ["what it is for is empty before its first ###"]
+    if len(read.purpose) > PURPOSE_MAX:
+        return [f"what it is for has {len(read.purpose)} characters, more than {PURPOSE_MAX}"]
+    return []
+
+
 def problems(read: workbook_help.Help, tabs, menu: set[str], done: str) -> list[str]:
     """What breaks the rules in ``read``, for a module whose tabs are ``tabs``, whose menu has the ids ``menu`` (its
     implicit settings tab is a tab only when the WORKBOOK writes it) and whose done flows say ``done``."""
@@ -83,7 +97,7 @@ def problems(read: workbook_help.Help, tabs, menu: set[str], done: str) -> list[
     found = [f"the tab «{tab.label}» has no ### under the screens heading" for tab in tabs if tab.id in menu - documented]
     found += [f"«### {title}» under the screens heading is no tab" for title in read.unknown_screens]
     found += [f"«### {title}» is written twice under the screens heading" for title in read.repeated_screens]
-    found += summary_problems(read)
+    found += purpose_problems(read) + summary_problems(read)
     names = {config.label for config in all_live_app_configs()}
     found += [problem for where, text in published(read) for problem in text_problems(where, text, names)]
     found += [f"{flow.id} is published without steps" for flow in read.flows if not flow.steps.strip()]
@@ -191,6 +205,8 @@ def test_the_clean_module_passes_with_code_and_ids_where_nothing_is_published():
         ("Estado: hecho\n", "Estado: hecho, también por la API\n", "TABLE-F01 is done on a tab, but its status"),
         ("Tocar una mesa abre su ventana.\n", "", "the screen «Plano de sala» has no summary"),
         ("Una tabla de zonas.", "Z" * (SUMMARY_MAX + 1), f"the summary of «Zonas» has {SUMMARY_MAX + 1} characters"),
+        ("Mesas es el plano de la sala.\n", "### Quién la usa\nEl responsable.\n", "what it is for is empty before its"),
+        ("Mesas es el plano de la sala.", "M" * (PURPOSE_MAX + 1), f"what it is for has {PURPOSE_MAX + 1} characters"),
     ],
     ids=[
         "missing-tab",
@@ -205,6 +221,8 @@ def test_the_clean_module_passes_with_code_and_ids_where_nothing_is_published():
         "dropped",
         "no-summary",
         "long-summary",
+        "no-purpose",
+        "long-purpose",
     ],
 )
 def test_each_rule_catches_the_module_that_breaks_it(before, after, caught):
@@ -215,6 +233,15 @@ def test_each_rule_catches_the_module_that_breaks_it(before, after, caught):
 
 def test_a_summary_of_the_most_characters_allowed_passes():
     assert made_up(CLEAN.replace("Una tabla de zonas.", "Z" * SUMMARY_MAX, 1)) == []
+
+
+def test_what_it_is_for_of_the_most_characters_allowed_passes():
+    assert made_up(CLEAN.replace("Mesas es el plano de la sala.", "M" * PURPOSE_MAX, 1)) == []
+
+
+def test_what_goes_under_a_subheading_of_what_it_is_for_is_not_checked():
+    detail = "### Quién la usa\n\nEl responsable, con `table.zone.create` (hub#12, TABLE-F01), en 8 px.\n" + "R" * 600
+    assert made_up(CLEAN.replace("\n## Pantallas\n", f"\n{detail}\n\n## Pantallas\n", 1)) == []
 
 
 def test_a_dotted_name_that_is_no_app_s_is_no_operation():

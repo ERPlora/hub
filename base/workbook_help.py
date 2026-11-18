@@ -1,9 +1,10 @@
 """A module's help window, read from the customer's part of its WORKBOOK in one language.
 
-The window only paints markdown. What it paints is cut here: what the module is for (the first section), the summary of
-each tab (what its ``###`` under the screens heading, named as its tab, says before its first ``####``; each ``####`` is
-a window inside the tab, written for whoever maintains the module, and only its title counts here, as a place where a
-flow is done) and the flows that are done on one of those tabs, of which only the title, the steps and what happens if
+The window only paints markdown. What it paints is cut here: what the module is for (what the first section says before
+its first ``###``; from there on, who uses it and what it does not do stay in the file), the summary of each tab (what
+its ``###`` under the screens heading, named as its tab, says before its first ``####``; each ``####`` is a window
+inside the tab, written for whoever maintains the module, and only its title counts here, as a place where a flow is
+done) and the flows that are done on one of those tabs, of which only the title, the steps and what happens if
 they fail are published. The heading and the flow keys are written in the file's language, with the words of base's ``workbook``
 vocabulary, so the only language this module names is the source's.
 """
@@ -133,7 +134,7 @@ def _current(path: Path, header: str) -> str | None:
 def parse(markdown: str, tabs: Sequence[Tab], vocabulary: Words) -> Help:
     """The help of a customer's part written with ``vocabulary``, for a module whose tabs are ``tabs``."""
     sections = _sections(markdown.splitlines(), 2)[1:]
-    purpose = _markdown(sections[0][1]) if sections else ""
+    purpose = _markdown(_sections(sections[0][1], 3)[0][1]) if sections else ""
     screens_heading = _name(vocabulary.screens)
     screen_lines = next((body for title, body in sections if _name(title) == screens_heading), [])
     screens, windows, unknown, repeated = _screens(screen_lines, tabs)

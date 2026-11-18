@@ -1,6 +1,13 @@
-<!-- generated from WORKBOOK.md sha256:f8d40c816a39096416fa2f77cc0ac3c3570ad245963a3df3a12ceede275fb8db -->
+<!-- generated from WORKBOOK.md sha256:143c337e93ce25a99c8f3795fd84a7c45f041015483f1494eb0d6866ae30f71a -->
 
 ## What it is for and who it is for
+
+Sales is the business's cash register: you tap the articles or the services to build the check and
+charge it in cash, by card or across several payment methods. In a restaurant, the check stays open
+while the table eats. Each charge becomes a sale with its ticket or its invoice, which you can later
+look up, reprint or refund.
+
+### In detail
 
 Sales & POS is the business's **cash register**: the check is built by tapping articles, it is charged
 in cash, by card or split across several payment methods, and what remains is a **sale that can no longer
@@ -12,7 +19,7 @@ businesses:
 - In the **hair salon**, each service on the ticket carries the professional who did it and the check is
   charged at the end, with the client set.
 
-Who uses it:
+### Who uses it and what each one does
 
 - The **employee** (waiter, receptionist, cashier): builds the check, adds notes, comps a line, applies
   discounts up to the business's maximum, parks and retrieves checks, charges and looks up the sales.
@@ -20,6 +27,8 @@ Who uses it:
   or a line already sent to the kitchen, voids and refunds sales, sees the figures and prepares the quick
   notes, the sections, the payment methods and the POS settings.
 - The **owner** and the **administrator**: everything.
+
+### What it does not do
 
 Sales does not keep tables or customers in the check (they belong to Tables and Customers), does not
 number invoices or talk to the AEAT (it asks Invoicing for them in the same charge; the AEAT belongs to
