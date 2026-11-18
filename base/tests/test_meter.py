@@ -194,9 +194,9 @@ def test_a_session_open_for_days_counts_on_each_of_them(counting, at, acme):
     meter.flush()
 
     assert set(HubVisit.objects.values_list("day", flat=True)) == {DAY, NEXT_DAY}
-    assert services.active_people("acme", NEXT_DAY, 30) == (1, 1)
+    assert services.usage.active_people("acme", NEXT_DAY, 30) == (1, 1)
     # So the sweep keeps looking into a hub whose session never logged in again (base.worker).
-    assert services.hubs_visited_since(NEXT_DAY) == {"acme"}
+    assert services.activation.hubs_visited_since(NEXT_DAY) == {"acme"}
 
 
 def test_a_pass_with_nothing_to_write_touches_nothing(counting, at, db, django_assert_num_queries):
@@ -208,7 +208,7 @@ def test_a_pass_with_nothing_to_write_touches_nothing(counting, at, db, django_a
 
 
 def test_what_could_not_be_written_stays_for_the_next_pass_and_the_others_go_on(counting, at, acme, globex, monkeypatch, caplog):
-    written = services.activity_recorded
+    written = services.usage.activity_recorded
 
     def refuses_acme(hub_id, *args, **kwargs):
         if hub_id == ACME:
@@ -219,7 +219,7 @@ def test_what_could_not_be_written_stays_for_the_next_pass_and_the_others_go_on(
     meter.note_peak(ACME, 2)
     meter.count_request(GLOBEX)
     with monkeypatch.context() as patch, caplog.at_level(logging.ERROR, logger="base.meter"):
-        patch.setattr(services, "activity_recorded", refuses_acme)
+        patch.setattr(services.usage, "activity_recorded", refuses_acme)
         meter.flush()
 
     assert row(globex).requests == 1
@@ -238,7 +238,7 @@ def test_what_could_not_be_written_stays_for_the_next_pass_and_the_others_go_on(
 def test_the_people_that_could_not_be_written_stay_for_the_next_pass(counting, at, acme, monkeypatch, caplog):
     meter.note_seen("acme", ANA)
     with monkeypatch.context() as patch, caplog.at_level(logging.ERROR, logger="base.meter"):
-        patch.setattr(services, "people_seen", refuses)
+        patch.setattr(services.usage, "people_seen", refuses)
         meter.flush()
     assert "base.meter.not_written" in caplog.text
     assert not HubVisit.objects.exists()
@@ -259,7 +259,7 @@ def test_a_person_seen_while_the_pass_failed_keeps_the_latest_moment(counting, a
         raise RuntimeError("away")
 
     with monkeypatch.context() as patch:
-        patch.setattr(services, "people_seen", fails_after_a_new_moment)
+        patch.setattr(services.usage, "people_seen", fails_after_a_new_moment)
         meter.flush()
 
     assert meter._seen == {("acme", DAY, ANA): later}
@@ -280,7 +280,7 @@ def test_a_hub_that_went_away_does_not_stop_the_others_and_is_forgotten(counting
 
 def test_a_failed_pass_never_reaches_who_counts(counting, at, monkeypatch):
     with monkeypatch.context() as patch:
-        patch.setattr(services, "activity_recorded", refuses)
+        patch.setattr(services.usage, "activity_recorded", refuses)
         meter.count_request(ACME)
         meter.flush()
         meter.count_request(ACME)
@@ -298,7 +298,7 @@ def test_several_tasks_writing_at_once_lose_nothing(at):
     def one_task(peak: int) -> None:
         try:
             barrier.wait(5)
-            services.activity_recorded(ACME, DAY, requests=3, peak=peak, busy=2)
+            services.usage.activity_recorded(ACME, DAY, requests=3, peak=peak, busy=2)
         except Exception as error:  # noqa: BLE001 - reported to the test, which fails on it
             failures.append(error)
         finally:
@@ -322,10 +322,10 @@ def test_a_row_another_task_made_meanwhile_is_added_to(acme, monkeypatch):
         return True
 
     monkeypatch.setattr(
-        services, "Hub", SimpleNamespace(objects=SimpleNamespace(filter=lambda **_: SimpleNamespace(exists=another_task_made_it)))
+        services.usage, "Hub", SimpleNamespace(objects=SimpleNamespace(filter=lambda **_: SimpleNamespace(exists=another_task_made_it)))
     )
 
-    assert services.activity_recorded(ACME, DAY, requests=2, peak=7, busy=4) is True
+    assert services.usage.activity_recorded(ACME, DAY, requests=2, peak=7, busy=4) is True
 
     assert (row(acme).requests, row(acme).peak_connections, row(acme).busy_requests) == (7, 7, 5)
 

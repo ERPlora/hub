@@ -518,7 +518,9 @@ def test_the_operations_that_need_the_own_database_are_the_base_s_doors():
     defined = {name: _defined_in(name) for name in [*OWN_DATABASE_OPERATIONS, *OWN_DATABASE_READS]}
 
     assert set(defined.values()) <= {
-        "base/services/__init__.py",
+        "base/services/api_keys.py",
+        "base/services/apps.py",
+        "base/services/reset.py",
         "base/queries/api_keys.py",
         "base/queries/dumps.py",
         "base/queries/usage.py",

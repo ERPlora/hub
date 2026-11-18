@@ -404,7 +404,7 @@ def _device_door(request: HttpRequest):
 
 
 def _entered(request: HttpRequest, user, device, credential: str, slug: str, body: dict) -> HttpResponse:  # noqa: PLR0913, PLR0917
-    services.open_session_on_device(request, user, device, credential)
+    services.devices.open_session_on_device(request, user, device, credential)
     response = JsonResponse({"next": safe_next(body.get("next"))})
     return _with_language(response, queries.profile.language_of(user, slug))
 
@@ -415,7 +415,7 @@ def _refused(status: int, code: str, message: str) -> JsonResponse:
 
 
 def _pin_too_many(wait: int) -> JsonResponse:
-    response = _refused(429, "base.too_many_attempts", services.too_many_message(wait, gettext("Too many wrong attempts.")))
+    response = _refused(429, "base.too_many_attempts", services.devices.too_many_message(wait, gettext("Too many wrong attempts.")))
     response["Retry-After"] = str(wait)
     return response
 
@@ -430,7 +430,7 @@ def auth_badge(request: HttpRequest) -> HttpResponse:
     if isinstance(door, HttpResponse):
         return door
     slug, device, body = door
-    user, card = services.badge_owner(slug, str(body.get("badge", ""))[:128])
+    user, card = services.devices.badge_owner(slug, str(body.get("badge", ""))[:128])
     wait = access.PIN_PERSON_LIMIT.wait(slug, "badge", card)
     if wait:
         return _pin_too_many(wait)

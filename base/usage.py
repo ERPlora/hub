@@ -57,9 +57,9 @@ def measure(day: dt.date, *, now: dt.datetime | None = None) -> int | None:
     """Measure ``day`` for every hub with its own database; how many were measured, or ``None`` when the night is
     another worker's or done already."""
     now = now or timezone.now()
-    if not services.usage_run_claim(day, now, RUN_TAKEOVER):
+    if not services.usage.usage_run_claim(day, now, RUN_TAKEOVER):
         return None
-    measured, shared = services.hubs_to_measure()
+    measured, shared = services.usage.hubs_to_measure()
     if shared:
         logger.info("base.usage_shared_database day=%s hubs=%d: not measured, they share control's database.", day, shared)
     sizes = database_sizes(measured)
@@ -73,8 +73,8 @@ def measure(day: dt.date, *, now: dt.datetime | None = None) -> int | None:
         except Exception:  # the store away: this hub stays unmeasured tonight, the others go on
             logger.exception("base.usage.not_measured hub=%s day=%s: its files could not be counted.", hub.slug, day)
             continue
-        on_day, in_window = services.active_people(hub.slug, day, WINDOW_DAYS)
-        services.usage_recorded(
+        on_day, in_window = services.usage.active_people(hub.slug, day, WINDOW_DAYS)
+        services.usage.usage_recorded(
             hub.pk,
             day,
             db_bytes=sizes[hub.pk],
@@ -84,10 +84,10 @@ def measure(day: dt.date, *, now: dt.datetime | None = None) -> int | None:
             now=now,
         )
         done += 1
-    services.visits_forgotten(before=day - dt.timedelta(days=WINDOW_DAYS))
+    services.usage.visits_forgotten(before=day - dt.timedelta(days=WINDOW_DAYS))
     # The copies of the hubs' data the bucket's lifecycle rule deleted (90 days): their rows go too.
-    services.expired_dumps_forgotten(before=now - dumps.RETENTION)
-    services.usage_run_finished(day, done, now)
+    services.dumps.expired_dumps_forgotten(before=now - dumps.RETENTION)
+    services.usage.usage_run_finished(day, done, now)
     logger.info("base.usage.measured day=%s hubs=%d", day, done)
     return done
 
