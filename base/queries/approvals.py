@@ -13,7 +13,7 @@ from live.operations import AI, operation
 from base import access, approvals as approval_rules, blueprint, business
 from base.models import Approval
 from base.permissions import ADMINISTER_HUB, VIEW_HOME, permissions_for
-from base.schemas import ApprovalExportIn, ApprovalExportOut, ApprovalListIn, ApprovalListOut, ApproversIn, ApproversOut
+from base.schemas.approvals import ApprovalExportIn, ApprovalExportOut, ApprovalListIn, ApprovalListOut, ApproversIn, ApproversOut
 
 from .access import access_settings, pin_people
 from .people import face_name

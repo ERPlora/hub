@@ -10,7 +10,7 @@ from base import activation, bell, home
 from base.models import EventDelivery, Hub, Membership
 from base.permissions import ADMINISTER_HUB, VIEW_HOME
 from base.relay import active_apps
-from base.schemas import (
+from base.schemas.home import (
     NoticeListIn,
     NoticeListOut,
     SetupStatusIn,

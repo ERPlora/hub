@@ -13,16 +13,8 @@ from live.operations import AI, INTERNAL, operation
 from base import access, people as people_rules
 from base.models import Credential, Hub, HubUser, Membership, Profile
 from base.permissions import ADMINISTER_HUB, FULL_ACCESS_ROLES, VIEW_HOME
-from base.schemas import (
-    HubUserGetIn,
-    HubUserOut,
-    PersonDetailOut,
-    PersonIn,
-    PersonListIn,
-    PersonListOut,
-    RoleListIn,
-    RoleListOut,
-)
+from base.schemas.people import PersonDetailOut, PersonIn, PersonListIn, PersonListOut, RoleListIn, RoleListOut
+from base.schemas.sessions import HubUserGetIn, HubUserOut
 
 from .usage import _is_count
 

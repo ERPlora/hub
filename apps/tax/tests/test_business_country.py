@@ -23,7 +23,7 @@ from apps.tax import queries
 from apps.tax.models import TaxRule, TaxSettings
 from apps.tax.schemas import FACTORY_COUNTRIES
 from base.models import Hub
-from base.schemas import SetupStatusIn
+from base.schemas.home import SetupStatusIn
 from base.tenancy.context import use_hub
 from base.tenancy.tests import hubs
 

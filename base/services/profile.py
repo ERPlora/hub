@@ -25,10 +25,8 @@ from base.media import AVATARS_FOLDER
 from base.models import AccessSettings, Profile
 from base.operations import hub_id
 from base.permissions import ADMINISTER_HUB, VIEW_HOME
-from base.schemas import (
-    AccessSettingsIn,
-    AccessSettingsOut,
-    AccessSettingsUpdateIn,
+from base.schemas.access import AccessSettingsIn, AccessSettingsOut, AccessSettingsUpdateIn
+from base.schemas.profile import (
     AvatarIn,
     AvatarOut,
     AvatarRemoveIn,

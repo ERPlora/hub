@@ -18,7 +18,7 @@ from base import approvals as approval_rules
 from base import assistant, queries
 from base.models import Membership
 from base.permissions import ADMINISTER_HUB, VIEW_HOME
-from base.schemas import (
+from base.schemas.assistant import (
     AssistantReportIn,
     AssistantReportOut,
     AssistantSpeakIn,

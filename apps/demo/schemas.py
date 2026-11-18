@@ -10,7 +10,7 @@ from django.utils.translation import gettext_noop
 from ninja import Field, Schema
 from pydantic import StringConstraints, ValidationInfo, field_validator
 
-from base.schemas import names, unless_given
+from base.schemas.assistant import names, unless_given
 
 T = TypeVar("T")
 

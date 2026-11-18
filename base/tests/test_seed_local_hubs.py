@@ -15,7 +15,7 @@ from live.errors import PermissionDenied
 
 from base import registry
 from base.models import Hub
-from base.schemas import HubSeedLocalIn
+from base.schemas.hub_registry import HubSeedLocalIn
 from base.services.hub_registry import hub_seed_local
 from base.tenancy import migrator
 

@@ -22,7 +22,7 @@ from live.context import system_context
 from base.services import hub_registry, provisioning
 from base.queries.hubs import hubs_by_slugs
 from base.registry import REGISTRY_SCOPE
-from base.schemas import HubsBySlugIn, HubSeedLocalIn
+from base.schemas.hub_registry import HubsBySlugIn, HubSeedLocalIn
 from base.services.hub_registry import hub_seed_local
 from base.tenancy import migrator, provision
 

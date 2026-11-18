@@ -17,7 +17,7 @@ from live.slugs import validate_hub_slug
 
 from base.models import AppActivation, Hub, Location, Membership, TaskSchedule
 from base.registry import REGISTRY_SCOPE
-from base.schemas import DemoSlugIn
+from base.schemas.demos import DemoSlugIn
 from base.services.demos import demo_expire
 
 #: The hub chosen for the admin (its slug), set by the deep link.

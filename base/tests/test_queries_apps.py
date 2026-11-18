@@ -16,7 +16,7 @@ from live.operations import get
 
 from base.events import HUB_STATE_APPLIED
 from base.models import Hub
-from base.schemas import AppListIn, AppListOut
+from base.schemas.apps import AppListIn, AppListOut
 from base.tenancy.context import use_hub
 from base.tenancy.tests.business import HOST, HUB_DB, A, B, in_business_a
 
@@ -199,14 +199,14 @@ def test_over_http(client, make_user):
 
 
 def plan_usage(*permissions, scope=A):
-    from base.schemas import PlanUsageIn
+    from base.schemas.usage import PlanUsageIn
 
     ctx = OperationContext(scope=scope, actor="ana", permissions=frozenset(permissions), language="en")
     return get("base.plan.usage")(ctx, PlanUsageIn()).model_dump(mode="json")
 
 
 def test_plan_usage_is_for_who_runs_the_business():
-    from base.schemas import PlanUsageIn, PlanUsageOut
+    from base.schemas.usage import PlanUsageIn, PlanUsageOut
 
     op = get("base.plan.usage")
     assert (op.kind, op.permission, op.input, op.output) == ("query", "base.administer_hub", PlanUsageIn, PlanUsageOut)

@@ -25,7 +25,7 @@ from base import auth, signing
 from base.access import CREDENTIAL_SESSION_KEY
 from base.models import SessionOwner
 from base.permissions import OPEN_MANAGEMENT, VIEW_HOME
-from base.schemas import SaasPassIn, SaasPassOut, SupportReportIn, SupportReportOut
+from base.schemas.support import SaasPassIn, SaasPassOut, SupportReportIn, SupportReportOut
 from base.services.devices import saas_user_id_of
 from base.services.sessions import SAAS_USERNAME_PREFIX
 

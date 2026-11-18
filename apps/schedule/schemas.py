@@ -31,7 +31,7 @@ from apps.schedule.engine import (
     normalize,
     parse_when,
 )
-from base.schemas import names
+from base.schemas.assistant import names
 
 T = TypeVar("T")
 

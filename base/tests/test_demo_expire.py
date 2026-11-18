@@ -19,7 +19,7 @@ from live.context import system_context
 
 from base.models import DemoCode, Hub, Membership
 from base.registry import REGISTRY_SCOPE
-from base.schemas import DemoCodeIn, DemoCreateIn
+from base.schemas.demos import DemoCodeIn, DemoCreateIn
 from base.services.demos import demo_code_create, demo_create, reap_demos, redeem_demo_code
 from base.tenancy.tests.business import HUB_DB
 from base.tests.test_services_demo import open_session

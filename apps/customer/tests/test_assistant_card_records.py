@@ -16,7 +16,7 @@ from pydantic import ValidationError
 from apps.customer.models import Activity, Customer, CustomerGroup, CustomerTag, CustomField
 from apps.customer.schemas import A_CUSTOMER_REFERENCE
 from base import assistant
-from base.schemas import names
+from base.schemas.assistant import names
 from base.tenancy.context import use_hub
 from base.tests.test_assistant_card_values_references import AN_ID
 from base.tests.test_assistant_yes_for_its_card import unless_marked, yes_to_its_card

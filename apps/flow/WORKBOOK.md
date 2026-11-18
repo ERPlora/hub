@@ -1469,7 +1469,7 @@ Los avisos llevan ids, nunca nombres ni contenidos.
   anulación pide al encargado su código): gana un título que dice quién pide y dónde, y la acción en la primera
   línea, que además no rompe los filtros de las specs de WhatsApp que leen ese título.
 - **Cada registro de la tarjeta del asistente, por su nombre**: cada id que nombra un registro en una escritura lleva su
-  marca `refers` (`names` de `base/schemas/`; `base.E009` la comprueba al arrancar), a una lectura por id de
+  marca `refers` (`names` de `base/schemas/assistant.py`; `base.E009` la comprueba al arrancar), a una lectura por id de
   flow ejecutada como quien confirma: la automatización (`FlowRefIn.id`, seis escrituras), `flow.flow.detail` por
   su `name`; el borrador (`DraftRefIn.id`, `CreateIn.draft_id`), `flow.draft.get` por su `name`; la ejecución
   (`RunRefIn.id`), `flow.run.get` por su `label` (`queries.run_label`: el nombre de su automatización y su

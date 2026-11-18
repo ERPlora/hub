@@ -49,7 +49,7 @@ from live.context import system_context
 from base import activation, registry
 from base.services import demos, hub_registry, photo, provisioning
 from base.catalog import template_apps
-from base.schemas import DemoSlugIn
+from base.schemas.demos import DemoSlugIn
 from base.tenancy import connections as tenancy_connections
 from base.tenancy import identity, migrator, names, ops
 from base.tenancy.context import use_control, use_hub

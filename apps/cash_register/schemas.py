@@ -15,7 +15,7 @@ from django.utils.translation import gettext_noop
 from ninja import Field, Schema
 from pydantic import ConfigDict, StringConstraints, model_validator
 
-from base.schemas import names
+from base.schemas.assistant import names
 
 T = TypeVar("T")
 

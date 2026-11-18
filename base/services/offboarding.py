@@ -22,7 +22,7 @@ from live.outbox import record_event
 from base import events, registry
 from base.models import Hub, Membership, SessionOwner
 from base.registry import hub_answer, internal_only
-from base.schemas import HubGetIn, HubOut
+from base.schemas.hub_registry import HubGetIn, HubOut
 from base.services.hub_registry import LEFT_STATUSES, _locked_hub
 from base.services.provisioning import (
     LAST_ERROR_MAX,

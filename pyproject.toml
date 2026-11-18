@@ -134,7 +134,6 @@ max-statements = 50
 "base/auth.py" = ["F401"]
 "base/files.py" = ["B911"]
 "base/metrics.py" = ["B027"]
-"base/schemas/__init__.py" = ["F811"]
 "base/tenancy/tests/test_business.py" = ["F401"]
 "base/tenancy/tests/test_concurrency.py" = ["F401"]
 "base/tests/test_access_account.py" = ["F401"]
@@ -183,8 +182,8 @@ id = "no-sibling-cycles"
 name = "No sibling modules import each other in a circle"
 type = "acyclic_siblings"
 ancestors = [
-    "base", "base.tenancy", "base.services", "base.queries", "control", "control.services", "control.queries",
-    "apps.*", "apps.*.services", "apps.*.queries",
+    "base", "base.tenancy", "base.services", "base.queries", "base.schemas", "control", "control.services",
+    "control.queries", "apps.*", "apps.*.services", "apps.*.queries",
 ]
 depth = 0
 ignore_imports = [

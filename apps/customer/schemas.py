@@ -26,7 +26,7 @@ from apps.customer.models import Activity, Purchase
 from base.business import currency_decimals
 from base.recovery import RecoveredOut
 from base.relay import by_platform
-from base.schemas import names, unless_given
+from base.schemas.assistant import names, unless_given
 
 T = TypeVar("T")
 

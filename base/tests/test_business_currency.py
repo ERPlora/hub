@@ -17,7 +17,7 @@ from live.operations import get
 from apps.sale.tests.test_business_currency import platform
 from base.models import Hub
 from base.operations import business_currency
-from base.schemas import BusinessIn
+from base.schemas.business import BusinessIn
 from base.tenancy.context import use_hub
 from base.tenancy.tests.business import A, B, HUB_DB, in_business_a
 from base.tests.businesses import in_each

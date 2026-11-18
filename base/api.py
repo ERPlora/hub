@@ -17,18 +17,12 @@ from django.http import HttpResponse
 from base import files, queries, services
 from base.auth_views import with_language_cookie
 from base.request_body import accept_body_up_to
-from base.schemas import (
-    AccessSettingsUpdateIn,
-    AvatarIn,
-    BlueprintExportIn,
-    BlueprintImportIn,
-    BlueprintSourceIn,
-    DeviceByIdIn,
-    DeviceModeIn,
-    DeviceRenameIn,
-    FailedEventDiscardIn,
-    FailedEventIn,
-    FailedEventListIn,
+from base.schemas.access import AccessSettingsUpdateIn
+from base.schemas.blueprints import BlueprintExportIn, BlueprintImportIn, BlueprintSourceIn, ImportIdIn, ImportUndoIn
+from base.schemas.devices import DeviceByIdIn, DeviceModeIn, DeviceRenameIn, PinSetIn
+from base.schemas.dumps import HubDumpLinkIn
+from base.schemas.failed_events import FailedEventDiscardIn, FailedEventIn, FailedEventListIn
+from base.schemas.files import (
     FileDeleteIn,
     FileFolderCreateIn,
     FileListIn,
@@ -36,16 +30,13 @@ from base.schemas import (
     FileReadIn,
     FileRenameIn,
     FileUploadIn,
-    HubDumpLinkIn,
-    HubResetIn,
-    ImportIdIn,
-    ImportUndoIn,
-    PinSetIn,
-    PreferencesIn,
-    ProfileUpdateIn,
 )
+from base.schemas.profile import AvatarIn, PreferencesIn, ProfileUpdateIn
+from base.schemas.reset import HubResetIn
 
-from base.schemas import ApiKeyCreateIn, ApiKeyIdIn, ApprovalExportIn, ApprovalIn, ApproversIn, BadgeSetIn, PersonIn  # noqa: E402
+from base.schemas.api_keys import ApiKeyCreateIn, ApiKeyIdIn  # noqa: E402
+from base.schemas.approvals import ApprovalExportIn, ApprovalIn, ApproversIn  # noqa: E402
+from base.schemas.people import BadgeSetIn, PersonIn  # noqa: E402
 
 router = Router(tags=["base"])
 
@@ -87,7 +78,7 @@ async def app_list(request):
 # Turning an app on or off, with the plan's limit: the app by its name or its id in the body; which app
 # a name names, by ``base.app.get``. While a hub's own database gets the app's tables the same answer
 # comes with 202: accepted, the worker finishes it. Both codes are in the OpenAPI, with the same schema.
-from base.schemas import AppChangeIn, AppRefIn  # noqa: E402
+from base.schemas.apps import AppChangeIn, AppRefIn  # noqa: E402
 
 
 @bind(router, "base.app.get", "/apps/detail")
@@ -468,7 +459,7 @@ async def approval_approve(request, data: ApprovalIn):
 
 
 # ── People and permissions: the API's documentation ────────────────────────────────────────────────────────────────
-from base.schemas import ApiDocSettingsUpdateIn  # noqa: E402
+from base.schemas.api_keys import ApiDocSettingsUpdateIn  # noqa: E402
 
 
 @bind(router, "base.api_doc.get", "/api-docs")
@@ -489,8 +480,8 @@ async def api_doc_settings_update(request, data: ApiDocSettingsUpdateIn):
 # ── Assistant ───────────────────────────────────────────────────────────────────────────────────────────────────
 
 from base import assistant  # noqa: E402 - the assistant's block keeps its imports with it
-from base.schemas import AssistantReportIn, AssistantSpeakIn, AssistantTranscribeIn, AssistantTurnIn  # noqa: E402
-from base.schemas import SaasPassIn, SupportReportIn  # noqa: E402
+from base.schemas.assistant import AssistantReportIn, AssistantSpeakIn, AssistantTranscribeIn, AssistantTurnIn  # noqa: E402
+from base.schemas.support import SaasPassIn, SupportReportIn  # noqa: E402
 
 #: A turn's body: the conversation and the attachments of its last question, in base64 (the gateway takes 32 MB).
 MAX_ASSISTANT_TURN_BODY = 32 * 1024 * 1024
@@ -570,7 +561,7 @@ async def location_list(request):
 
 # ── The shared image library (base.image_catalog) ──────────────────────────────────────────────────────────────────
 
-from base.schemas import CatalogImageRefIn, CatalogImageSearchIn  # noqa: E402
+from base.schemas.catalog_images import CatalogImageRefIn, CatalogImageSearchIn  # noqa: E402
 
 
 @bind(router, "base.catalog_image.search", "/catalog/images")

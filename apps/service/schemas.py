@@ -22,7 +22,7 @@ from pydantic import ConfigDict, StringConstraints, field_validator, model_valid
 
 from base.images import MAX_UPLOAD_BASE64
 from base.recovery import ImageInCopyIn, RecoveredOut
-from base.schemas import CatalogImageOut, exactly_one, names
+from base.schemas import assistant, catalog_images
 
 T = TypeVar("T")
 
@@ -73,19 +73,19 @@ VOUCHER_SESSIONS = gettext_noop("Voucher sessions")
 # line, the appointment, the line of an open check and the refund or the void that gives sessions back are of apps
 # Services does not require: its own read names them by theirs (``service.record.get``), the sale by its
 # number, a line by what it charges, the appointment as Appointments' cards say it and a refund or a void by its sale.
-A_SERVICE = names("service.service.get")
-A_CATEGORY = names("service.category.get")
-A_PACKAGE = names("service.package.get")
-AN_ASSIGNMENT = names("service.assignment.get", name=("label",))
-A_GRANT = names("service.grant.get", name=("label",))
-A_SESSION = names("service.session.get", name=("label",))
-A_MEMBER = names("staff.member.detail", name=("full_name",))
-A_CUSTOMER = names("customer.customer.detail")
-A_SALE = names("service.record.get", by="sale_id")
-A_SALE_LINE = names("service.record.get", by="sale_line_id")
-AN_APPOINTMENT = names("service.record.get", by="appointment_id")
-A_CHECK_LINE = names("service.record.get", by="order_line_id")
-A_RETURN = names("service.record.get", by="reference")
+A_SERVICE = assistant.names("service.service.get")
+A_CATEGORY = assistant.names("service.category.get")
+A_PACKAGE = assistant.names("service.package.get")
+AN_ASSIGNMENT = assistant.names("service.assignment.get", name=("label",))
+A_GRANT = assistant.names("service.grant.get", name=("label",))
+A_SESSION = assistant.names("service.session.get", name=("label",))
+A_MEMBER = assistant.names("staff.member.detail", name=("full_name",))
+A_CUSTOMER = assistant.names("customer.customer.detail")
+A_SALE = assistant.names("service.record.get", by="sale_id")
+A_SALE_LINE = assistant.names("service.record.get", by="sale_line_id")
+AN_APPOINTMENT = assistant.names("service.record.get", by="appointment_id")
+A_CHECK_LINE = assistant.names("service.record.get", by="order_line_id")
+A_RETURN = assistant.names("service.record.get", by="reference")
 ONE_RECORD = _("Say one record, by its id.")
 #: How far ahead of this server's clock a purchase may be dated (the till's clock may run fast).
 CLOCK_SKEW = timedelta(minutes=5)
@@ -224,7 +224,7 @@ class ServiceRefIn(In):
 # The service's image (SERVICE-F34, F35; base.images): one of the shared library or a photo of its own.
 
 #: An image a write sets: the assistant's card names it by its title in the library, never by its reference.
-AN_IMAGE = names("base.catalog_image.get", by="reference", name=("title",))
+AN_IMAGE = assistant.names("base.catalog_image.get", by="reference", name=("title",))
 
 
 class ServiceImageIn(ServiceRefIn):
@@ -290,7 +290,7 @@ class RecordRefIn(In):
 
     @model_validator(mode="after")
     def _one(self):
-        return exactly_one(self, ONE_RECORD)
+        return assistant.exactly_one(self, ONE_RECORD)
 
 
 # ── Services ──────────────────────────────────────────────────────────────────────────────────
@@ -531,7 +531,7 @@ class ServiceSaleOut(Schema):
 class ServiceImageSuggestOut(Schema):
     service_id: UUID = Field(description="The service the images are proposed for.")
     query: str = Field(description="What was looked for in the library: the service's name.")
-    rows: list[CatalogImageOut] = Field(
+    rows: list[catalog_images.CatalogImageOut] = Field(
         description="The library's images that match its name, the best first; none is set until one is chosen."
     )
 

@@ -1185,7 +1185,7 @@ asistente.
   `customer` es la que se queda («A dentro de B»: B es `customer`, A es `absorbed`) y que no se para en leerlas:
   `tests/test_assistant_asks.py` (hub#1084). Junto al id de su propia ficha (`id` para `customer`, `absorbed_id`
   para `absorbed`), que `find_customer` usa sin mirar el nombre, la tarjeta deja ese nombre sin leer
-  (`base.schemas.unless_given`, hub#1272; `UNLESS` de `tests/test_assistant_card_records.py`); junto al id de la otra
+  (`base.schemas.assistant.unless_given`, hub#1272; `UNLESS` de `tests/test_assistant_card_records.py`); junto al id de la otra
   ficha, lo lee.
 - En las demás escrituras, la ficha, el grupo, la etiqueta o el campo dichos con palabras (`customer` de
   `CustomerRefIn`, `CustomerOfIn` y `OrderLinkIn`, `group` de `GroupRefIn`, `tag` de `TagRefIn` y `field` de

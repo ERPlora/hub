@@ -43,7 +43,7 @@ from psycopg import sql
 from base import registry
 from base.services import photo, provisioning
 from base.models import EventDelivery, HubIdentity
-from base.schemas import HubCutFinishIn
+from base.schemas.hub_registry import HubCutFinishIn
 from base.tenancy import connections as tenancy_connections
 from base.tenancy import identity, inventory, migrator, names, ops, provision
 from base.tenancy.context import HUB_SCOPE_KIND, use_control, use_hub

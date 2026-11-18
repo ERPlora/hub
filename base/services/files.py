@@ -20,7 +20,7 @@ from live.outbox import record_event
 
 from base import events, files, queries
 from base.operations import hub_id
-from base.schemas import (
+from base.schemas.files import (
     FileDeletedOut,
     FileDeleteIn,
     FileFolderCreateIn,

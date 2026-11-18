@@ -20,7 +20,7 @@ from base import activation, events, queries, registry
 from base.activation import CREATING, FAILED, ON
 from base.models import AppActivation, Hub
 from base.registry import internal_only
-from base.schemas import AppActivationSettleIn, AppActivationSettleOut
+from base.schemas.apps import AppActivationSettleIn, AppActivationSettleOut
 from base.services.apps import _business_hub, _locked_states, _write_states, apps_created
 from base.services.blueprints import _load_what_waited
 from base.services.photo import _sync_photo_blocks

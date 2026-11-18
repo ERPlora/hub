@@ -33,7 +33,7 @@ from pydantic import (
 )
 
 from apps.reservation.models import MAX_GUESTS, MAX_MINUTES
-from base.schemas import names
+from base.schemas.assistant import names
 
 T = TypeVar("T")
 

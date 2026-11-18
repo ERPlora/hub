@@ -37,7 +37,7 @@ from psycopg import errors
 
 from base import files, registry, services
 from base.services import provisioning
-from base.schemas import HubGetIn
+from base.schemas.hub_registry import HubGetIn
 from base.tenancy import connections as tenancy_connections
 from base.tenancy import dumps, names, ops, provision
 from base.tenancy.context import AppNotCreated, use_hub

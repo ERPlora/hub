@@ -11,7 +11,7 @@ import pytest
 from django.utils import timezone
 from live.operations import get
 
-from base.schemas import NoticeListIn
+from base.schemas.home import NoticeListIn
 
 from .conftest import HUB_DB, MONDAY, at, ctx_for, make_appointment, make_customer
 from .test_queries import TUESDAY, employee_linked_to

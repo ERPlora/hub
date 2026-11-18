@@ -9,7 +9,8 @@ from live.errors import InvalidPayload
 from live.operations import get as get_operation
 
 from base.models import Hub
-from base.schemas import HubStateIn, HubUserSyncIn
+from base.schemas.hub_registry import HubStateIn
+from base.schemas.sessions import HubUserSyncIn
 from base.services.sessions import hub_user_sync
 
 logger = logging.getLogger(__name__)

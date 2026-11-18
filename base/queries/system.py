@@ -14,16 +14,8 @@ from base import system
 from base.models import EventDelivery, Hub
 from base.permissions import ADMINISTER_HUB
 from base.relay import active_apps
-from base.schemas import (
-    EventListIn,
-    EventListOut,
-    FailedEventIn,
-    FailedEventListIn,
-    FailedEventListOut,
-    FailedEventOut,
-    SystemStatusIn,
-    SystemStatusOut,
-)
+from base.schemas.failed_events import FailedEventIn, FailedEventListIn, FailedEventListOut, FailedEventOut
+from base.schemas.system import EventListIn, EventListOut, SystemStatusIn, SystemStatusOut
 
 
 # ── System ─────────────────────────────────────────────────────────────────────────────────────────────────────

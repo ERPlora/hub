@@ -18,7 +18,7 @@ from base import access, events, queries
 from base.middleware import session_host
 from base.models import AccessSettings, Credential, Membership, SessionOwner, TrustedDevice
 from base.permissions import ADMINISTER_HUB, VIEW_HOME
-from base.schemas import (
+from base.schemas.devices import (
     DeviceByIdIn,
     DeviceCurrentOut,
     DeviceModeIn,

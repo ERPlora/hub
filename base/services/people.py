@@ -13,7 +13,7 @@ from base import access, events, queries
 from base import people as people_rules
 from base.models import Credential
 from base.permissions import ADMINISTER_HUB
-from base.schemas import BadgeSetIn, PersonDetailOut, PersonIn
+from base.schemas.people import BadgeSetIn, PersonDetailOut, PersonIn
 from base.services.devices import badge_key, too_many_message
 
 _PERSON_REFUSALS = {people_rules.OWNER_ONLY: people_rules.OWNER_ONLY_MESSAGE, people_rules.OWN_BADGE: people_rules.OWN_BADGE_MESSAGE}

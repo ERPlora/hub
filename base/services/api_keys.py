@@ -17,7 +17,7 @@ from live.outbox import record_event
 from base import api_keys, events, queries
 from base.models import ApiKey, ApiSettings, Hub
 from base.permissions import ADMINISTER_HUB
-from base.schemas import (
+from base.schemas.api_keys import (
     ApiDocSettingsIn,
     ApiDocSettingsOut,
     ApiDocSettingsUpdateIn,

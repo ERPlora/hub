@@ -358,7 +358,7 @@ def answers_over_http(client, monkeypatch, route: str, command: str, state: str,
 
     from base import services
     from base.models import Membership
-    from base.schemas import AppChangeIn, AppChangeOut
+    from base.schemas.apps import AppChangeIn, AppChangeOut
 
     class Answering:
         input = AppChangeIn

@@ -19,7 +19,7 @@ from pydantic import ConfigDict, StringConstraints, field_validator, model_valid
 
 from apps.customer.tax_ids import InvalidCountry, normalize_country
 from apps.tax.schemas import TerritoryTaxKind
-from base.schemas import exactly_one, names
+from base.schemas.assistant import exactly_one, names
 
 T = TypeVar("T")
 

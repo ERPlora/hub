@@ -12,7 +12,7 @@ from live.operations import AI, operation, registry as operation_registry
 from base import activation, api_docs, entitlement
 from base.models import ApiKey, ApiSettings, Hub
 from base.permissions import ADMINISTER_HUB, VIEW_HOME
-from base.schemas import (
+from base.schemas.api_keys import (
     ApiDocIn,
     ApiDocOut,
     ApiDocSettingsIn,

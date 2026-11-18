@@ -35,7 +35,7 @@ from pydantic import (
 )
 
 from apps.flow import document
-from base.schemas import AssistantFieldOut, names
+from base.schemas.assistant import AssistantFieldOut, names
 from apps.flow.models import EVENT_MAX_LENGTH, NAME_MAX_LENGTH, QUESTION_ROLES, SECRET_NAME_RE, Draft, FlowRun
 
 T = TypeVar("T")

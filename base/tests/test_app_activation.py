@@ -25,7 +25,7 @@ from base import activation, events, relay
 from base.activation import OFF, ON, Activation
 from base.entitlement import EntitlementBlocked
 from base.models import AppActivation, Hub
-from base.schemas import AppChangeIn, AppChangeOut
+from base.schemas.apps import AppChangeIn, AppChangeOut
 from base.tenancy import inventory
 from base.tenancy.context import current_alias, use_hub
 from base.tenancy.tests.business import HOST, HUB_DB, HUB_DB_COMMITTED, A, B, in_business_a
@@ -179,7 +179,7 @@ def test_a_business_the_saas_registers_is_born_with_every_app_off():
     from live.context import system_context
 
     from base import registry
-    from base.schemas import HubRegistryIn
+    from base.schemas.hub_registry import HubRegistryIn
 
     get("base.hub.register")(
         system_context(registry.REGISTRY_SCOPE),
@@ -201,7 +201,7 @@ def test_a_demo_is_born_with_every_app_off():
     from live.context import system_context
 
     from base import registry
-    from base.schemas import DemoCreateIn
+    from base.schemas.demos import DemoCreateIn
 
     demo = get("base.demo.create")(
         system_context(registry.REGISTRY_SCOPE),

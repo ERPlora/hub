@@ -31,7 +31,7 @@ from pydantic import (
 )
 
 from apps.pricing.models import CODE_MAX_LENGTH, DEFAULT_PRIORITY, NAME_MAX_LENGTH, DiscountRule
-from base.schemas import in_currency_of, names
+from base.schemas.assistant import in_currency_of, names
 
 T = TypeVar("T")
 
