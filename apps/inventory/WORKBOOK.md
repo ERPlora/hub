@@ -250,6 +250,7 @@ Escape y tocar fuera del panel (hub#1023).
 | INVENTORY-F08 | Agrupar productos en categorías para el TPV | hecho |
 | INVENTORY-F29 | Marcar un artículo como agotado | hecho |
 | INVENTORY-F34 | Recuperar un producto eliminado | hecho |
+| INVENTORY-F35 | Declarar los alérgenos de un producto | no hecho |
 | | **Importar y exportar** | |
 | INVENTORY-F09 | Importar productos desde un CSV | hecho |
 | INVENTORY-F10 | Importar categorías desde un CSV | hecho |
@@ -1133,6 +1134,41 @@ recupera también Tarifas (PRICING-F15), sus grupos de suplementos, si se recupe
 Implicados: BASE-F114, INVENTORY-F01, INVENTORY-F03, INVENTORY-F04, INVENTORY-F07, INVENTORY-F16, INVENTORY-F29, INVENTORY-F30,
 PRICING-F14, PRICING-F15, MODIFIER-F09, MODIFIER-F10, COMBO-F13, COMBO-F15
 
+### INVENTORY-F35 Declarar los alérgenos de un producto
+Estado: no hecho — el producto todavía no guarda alérgenos: faltan su lista cerrada, el bloque del formulario, la
+línea de la ficha y la columna del CSV
+Actor: administrador, responsable
+Pantalla: Productos, Ficha del producto, Importar productos
+Pasos:
+1. En **Productos**, abre el formulario con **+** o con «Editar». Debajo de «Descripción» sale el bloque
+   «Alérgenos», con la nota «Marca los que lleva, también dentro de una salsa, un rebozado o una guarnición.»
+   y los catorce alérgenos de declaración obligatoria, cada uno por su nombre y siempre en este orden: Gluten,
+   Crustáceos, Huevo, Pescado, Cacahuete, Soja, Leche, Frutos de cáscara, Apio, Mostaza, Sésamo, Sulfitos,
+   Altramuces y Moluscos. En el alta no sale ninguno marcado.
+2. Toca los que lleva el producto: cada toque marca o desmarca uno. No hay otros: es la lista del reglamento
+   europeo y no se amplía.
+3. Pulsa «Guardar» o «Guardar cambios», como en el alta y en la edición (INVENTORY-F01, INVENTORY-F02). Un
+   alérgeno marcado sin guardar pregunta antes de cerrar el panel, como cualquier otro campo.
+4. La **ficha del producto** dice «Alérgenos: Gluten, Leche», en el orden de la lista, o «Sin alérgenos
+   declarados» si no tiene ninguno marcado.
+5. Para tener la carta entera por escrito, exporta el catálogo (INVENTORY-F11): el fichero lleva la columna
+   «Alérgenos», con sus nombres separados por comas («Gluten, Leche») y vacía si no tiene ninguno. La
+   importación (INVENTORY-F09) reconoce esa columna en los productos que crea, con los nombres en español o en
+   inglés, con o sin tildes y en mayúsculas o minúsculas; un SKU que ya existe se omite como siempre y sus
+   alérgenos no cambian.
+Entra: el producto; la lista de los catorce alérgenos.
+Sale: el producto con sus alérgenos, en el mismo paso que el resto del formulario: o se guarda todo o nada.
+Inventario avisa del cambio como de cualquier otro, y el catálogo que leen el TPV y Cocina (INVENTORY-F27) lleva
+los alérgenos de cada producto. Lo mismo se hace por el asistente o la API, con los mismos permisos («marca gluten
+y leche en la hamburguesa» pide antes la tarjeta de confirmación). Un cambio vale para lo que se pida desde ese
+momento: una línea ya pedida conserva los alérgenos que tenía al pedirla (SALE-F40).
+Si falla: un alérgeno que no es de la lista se rechaza, también por el asistente o la API, y no se guarda nada
+(«Ese alérgeno no es uno de los catorce de declaración obligatoria.»). En la importación, una celda con un nombre
+que no se reconoce deja la fila como fallida con el motivo «Alérgeno no reconocido: <texto>». Quien solo puede ver
+productos lee la línea de la ficha, pero no tiene el formulario. Todo rechazo sale dentro del panel, como los del
+resto del formulario.
+Implicados: INVENTORY-F01, INVENTORY-F02, INVENTORY-F09, INVENTORY-F11, INVENTORY-F27, SALE-F40, SALE-F41, KITCHEN-F32
+
 ## Qué comparten los verticales
 
 El restaurante usa Inventario para la carta y la peluquería para los productos de venta, con las
@@ -1579,6 +1615,8 @@ Las hace cumplir la app por cualquier puerta (pantalla, asistente, API).
 - Las peticiones a `@erplora/ui` de `UI-REQUESTS.md` (iconos, `KpiCard`, `Combo` múltiple, importar y
   exportar CSV y panel lateral del `DataTable`, formateadores, `useI18n` y ayudas de test): ninguna rompe
   un flujo y cada una tiene su sustituto en uso.
+- **Los alérgenos del producto** (F35, `no hecho`): el servidor, con el catálogo y el CSV, va por hub#1735, y el
+  formulario y la ficha, por hub#1738. Los de un suplemento son de Suplementos (hub#1739).
 
 ## Lo que NO hace, a propósito
 
@@ -1597,6 +1635,11 @@ Las hace cumplir la app por cualquier puerta (pantalla, asistente, API).
 - No enseña en el TPV cuántas unidades quedan, ni marca un artículo agotado sola cuando su stock llega
   a cero, ni lo vuelve a poner a la venta al recibir mercancía: la marca «Agotado» la pone y la quita
   una persona (F29).
+- No declara más alérgenos que los catorce de declaración obligatoria (anexo II del Reglamento (UE)
+  1169/2011), ni guarda «puede contener trazas» (F35): ese aviso es voluntario y ninguno de los TPV de
+  referencia lo guarda; lo que no es de la lista se escribe en la descripción.
+- No deduce los alérgenos de unos ingredientes (no hace recetas) ni los trae la plantilla del sector (F12):
+  dependen de la receta de cada cocina, y los declara el negocio producto a producto.
 
 ## Dudas abiertas
 

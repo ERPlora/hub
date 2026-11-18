@@ -1122,7 +1122,7 @@ msgstr "El otorgamiento de representación se ha revocado."
 msgid "ERPlora holds no signed representation authorisation for this business."
 msgstr "ERPlora no tiene ningún otorgamiento de representación firmado de este negocio."
 
-#: apps/verifactu/queries.py
+#: apps/verifactu/queries/authorisation.py
 msgid "ERPlora could not handle this right now. Try again in a few minutes."
 msgstr "ERPlora no ha podido atenderlo ahora mismo. Inténtalo en unos minutos."
 
@@ -1226,7 +1226,7 @@ msgstr "Registros por estado"
 msgid "Recent AEAT events"
 msgstr "Eventos AEAT recientes"
 
-#: apps/verifactu/queries.py
+#: apps/verifactu/queries/app_hooks.py
 msgid ""
 "VeriFactu can't be turned off once it's on: the law requires your invoices "
 "to keep reaching the AEAT."
@@ -1234,7 +1234,7 @@ msgstr ""
 "VeriFactu no se puede desactivar una vez activada: la ley obliga a que tus "
 "facturas sigan llegando a la AEAT."
 
-#: apps/verifactu/queries.py
+#: apps/verifactu/queries/country.py
 msgid "VeriFactu is only for businesses in Spain."
 msgstr "VeriFactu solo es para negocios de España."
 

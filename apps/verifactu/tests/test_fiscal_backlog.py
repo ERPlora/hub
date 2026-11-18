@@ -71,7 +71,7 @@ def record(status: str, created: dt.datetime, environment: str = Environment.PRO
 
 
 def test_with_no_record_nothing_waits():
-    assert queries.oldest_unsent_at() is None
+    assert queries.app_hooks.oldest_unsent_at() is None
 
 
 @pytest.mark.parametrize("status", Record.UNSENT)
@@ -79,7 +79,7 @@ def test_a_production_record_not_in_the_aeat_yet_waits_since_it_was_created(stat
     created = timezone.now() - dt.timedelta(minutes=9)
     record(status, created)
 
-    assert queries.oldest_unsent_at() == created
+    assert queries.app_hooks.oldest_unsent_at() == created
 
 
 def test_the_oldest_of_the_records_still_to_send_is_the_one_read():
@@ -88,14 +88,14 @@ def test_the_oldest_of_the_records_still_to_send_is_the_one_read():
     record(Record.Status.SENT, now - dt.timedelta(minutes=30))
     record(Record.Status.PENDING, now - dt.timedelta(minutes=6))
 
-    assert queries.oldest_unsent_at() == now - dt.timedelta(minutes=30)
+    assert queries.app_hooks.oldest_unsent_at() == now - dt.timedelta(minutes=30)
 
 
 @pytest.mark.parametrize("status", sorted(set(Record.Status.values) - set(Record.UNSENT)))
 def test_a_record_the_aeat_answered_has_left_the_queue(status):
     record(status, timezone.now() - dt.timedelta(days=2))
 
-    assert queries.oldest_unsent_at() is None
+    assert queries.app_hooks.oldest_unsent_at() is None
 
 
 def test_a_record_of_the_aeats_test_environment_never_counts():
@@ -103,7 +103,7 @@ def test_a_record_of_the_aeats_test_environment_never_counts():
     record(Record.Status.PENDING, now - dt.timedelta(hours=5), environment=Environment.TESTING)
     record(Record.Status.PENDING, now - dt.timedelta(minutes=2))
 
-    assert queries.oldest_unsent_at() == now - dt.timedelta(minutes=2)
+    assert queries.app_hooks.oldest_unsent_at() == now - dt.timedelta(minutes=2)
 
 
 def test_the_app_answers_the_platforms_question_with_its_queue():

@@ -59,7 +59,7 @@ def test_the_platform_hub_files_where_its_deployment_does(
         else Environment.PRODUCTION
     )
 
-    assert queries.effective_environment(system_context(PLATFORM), config) == expected
+    assert queries.route.effective_environment(system_context(PLATFORM), config) == expected
 
 
 def test_the_platform_hub_skips_no_production_lock(on_the_platform_hub, settings):
@@ -68,7 +68,7 @@ def test_the_platform_hub_skips_no_production_lock(on_the_platform_hub, settings
     settings.VERIFACTU_PRODUCTION_ENABLED = False
 
     assert (
-        queries.effective_environment(
+        queries.route.effective_environment(
             system_context(PLATFORM), Config(environment=Environment.TESTING)
         )
         == Environment.TESTING
@@ -84,7 +84,7 @@ def test_once_live_the_platform_hub_keeps_its_chain_in_production_while_closed(
     settings.VERIFACTU_PRODUCTION_ENABLED = False
 
     assert (
-        queries.effective_environment(
+        queries.route.effective_environment(
             system_context(PLATFORM), Config(environment=Environment.PRODUCTION)
         )
         == Environment.PRODUCTION
@@ -98,7 +98,7 @@ def test_any_other_hub_files_where_its_configuration_says(
     settings.ERPLORA_ENVIRONMENT = "prod"
 
     assert (
-        queries.effective_environment(
+        queries.route.effective_environment(
             system_context(A), Config(environment=environment)
         )
         == environment
@@ -139,9 +139,9 @@ def test_erploras_seal_files_erploras_own_records_without_an_authorisation(
         route=Config.Route.ERPLORA, representation_status=Config.Representation.NONE
     )
 
-    assert queries.route_problem(config, Environment.PRODUCTION, PLATFORM) == ""
+    assert queries.route.route_problem(config, Environment.PRODUCTION, PLATFORM) == ""
     # Only on ERPlora's own hub: the same tax ID on any other business is no exemption.
-    assert queries.route_problem(config, Environment.PRODUCTION, A) == "representation_not_approved"
+    assert queries.route.route_problem(config, Environment.PRODUCTION, A) == "representation_not_approved"
 
 
 def test_any_other_issuer_needs_its_approved_authorisation(settings):
@@ -152,7 +152,7 @@ def test_any_other_issuer_needs_its_approved_authorisation(settings):
     )
 
     assert (
-        queries.route_problem(config, Environment.PRODUCTION, A)
+        queries.route.route_problem(config, Environment.PRODUCTION, A)
         == "representation_not_approved"
     )
 

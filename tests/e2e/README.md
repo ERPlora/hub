@@ -133,9 +133,9 @@ a la sentencia del hub.
 | Variable | Qué aísla | Quién la lee |
 |---|---|---|
 | `E2E_HUB_PORT` | puerto del `runserver` del Hub | las specs (`stack.ts`) |
-| `VITE_DEV_PORT` | puerto del Vite del Hub | `config/settings.py` (entorno o `.env`; `runserver` se la pasa a su Vite), `vite.config.ts` y specs (solo el entorno) |
-| `SAAS_URL` | el SaaS propio, donde va el login | `config/settings.py`, specs |
-| `DB_NAME` | la BD de control de la ejecución (y, por su nombre, las de sus hubs: `<DB_NAME>_<hex>`) | `config/settings.py`, specs (`psql()`) |
+| `VITE_DEV_PORT` | puerto del Vite del Hub | `config/settings/core.py` (entorno o `.env`; `runserver` se la pasa a su Vite), `vite.config.ts` y specs (solo el entorno) |
+| `SAAS_URL` | el SaaS propio, donde va el login | `config/settings/saas_contract.py`, specs |
+| `DB_NAME` | la BD de control de la ejecución (y, por su nombre, las de sus hubs: `<DB_NAME>_<hex>`) | `config/settings/backends.py`, specs (`psql()`) |
 | `E2E_MAIL_DIR` | la carpeta de correo del SaaS propio (código de acceso) | specs (`mail.ts`) |
 | `E2E_SAAS_DB` | la BD del SaaS propio, si no es `saas_e2e_<Hub+1>` (con el Hub en `:8000`, `saas`) | `global-setup.ts` y las specs que la leen (`stack.ts`) |
 
@@ -192,13 +192,13 @@ Lo que no puede comprobar el e2e, y lo pide la receta:
   `E2E_SAAS_PORT=<Hub+1>`), con `env -u DB_NAME` al crearla y `DB_NAME=saas_e2e_<Hub+1>` en su `runserver`: la `saas` del
   `.env` es de la pila compartida y puede ir atrasada de migraciones (su login cae con un 500), y con el `DB_NAME` del Hub
   exportado el SaaS abre la BD del Hub (su login cae con `relation "django_site" does not exist`).
-- **Sus límites por dirección subidos** (`E2E_RELAX_LOGIN_RATE_LIMIT=True` en su `runserver`; `config/settings.py` del
+- **Sus límites por dirección subidos** (`E2E_RELAX_LOGIN_RATE_LIMIT=True` en su `runserver`; `config/settings/accounts.py` del
   SaaS, solo con `DEBUG`): todas las specs entran y se dan de alta desde `127.0.0.1`, y sin la marca una pasada entera
   cae con «429 · Too many attempts» en el login o en la 11.ª alta de la hora (10 por hora y dirección). Cada cuenta
   conserva su propio límite, y el freno de saltos al hub (`HUB_LOGIN_RATELIMIT`, arriba) no cambia. El e2e no lo puede
   comprobar: la marca vive en el entorno del proceso del SaaS, el SaaS no la dice por ninguna ruta y probarla gastaría
   los intentos que protege. Con ella va **`DEMO_SPAWN_RATELIMIT=100/h`**, el tope de demos nuevas por dirección, que
-  la marca no toca: el SaaS deja 3 por hora (`config/settings.py` del SaaS; producción se queda así) y cada pasada de
+  la marca no toca: el SaaS deja 3 por hora (`config/settings/public.py` del SaaS; producción se queda así) y cada pasada de
   `demo.spec.ts` abre dos desde `127.0.0.1`, así que la segunda pasada de la hora se quedaba esperando la demo y caía
   con la espera agotada (hub#1048). Sin Valkey, la cuenta vive en la memoria de ese `runserver` y solo se borra al
   reiniciarlo. Si falta, `demo.spec.ts` cae diciendo `state=throttled` y esta variable; `demo-door.test.ts` exige que

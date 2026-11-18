@@ -114,8 +114,8 @@ class Command(BaseCommand):
             raise CommandError(
                 f"Set {', '.join(missing)}: the platform hub's issuer. Nothing was written."
             )
-        # What ``verifactu.config.follow_deployment`` pins on a new hub (``queries.production_open``): production only
-        # on the prod deployment once ERPlora opens real filing there.
+        # What ``verifactu.config.follow_deployment`` pins on a new hub (``queries.route.production_open``): production
+        # only on the prod deployment once ERPlora opens real filing there.
         environment = (
             "production"
             if settings.ERPLORA_ENVIRONMENT == "prod"
