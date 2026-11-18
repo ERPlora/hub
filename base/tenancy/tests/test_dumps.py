@@ -324,6 +324,7 @@ def a_pg_dump(tmp_path, monkeypatch, script: str) -> list[subprocess.Popen]:
             super().__init__(command, **kwargs)
             while self.poll() is None and not running.exists():
                 time.sleep(0.01)
+            self.running_since = time.monotonic()
             started.append(self)
 
         def wait(self, timeout=None):
@@ -336,8 +337,9 @@ def a_pg_dump(tmp_path, monkeypatch, script: str) -> list[subprocess.Popen]:
 
 
 def killed(process: subprocess.Popen) -> bool:
-    """Whether the copy killed ``process`` and waited for it (no zombie left), rather than letting it end on its own."""
-    return process.returncode == -signal.SIGKILL
+    """Whether the copy killed ``process`` and waited for it (no zombie left) within seconds of it running, rather than
+    letting it end on its own or stopping it far past its time; a slow start of the program is not counted."""
+    return process.returncode == -signal.SIGKILL and time.monotonic() - process.running_since < 10
 
 
 def test_a_database_is_streamed_to_its_key_never_through_a_file(hub_a, dumps_bucket, moto_s3, monkeypatch, tmp_path):
