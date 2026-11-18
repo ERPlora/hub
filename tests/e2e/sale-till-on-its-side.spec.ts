@@ -1,22 +1,17 @@
 // flow: SALE-F01, SALE-F20
-// hub#800: a phone on its side (568x320, 640x360, 667x375) sells from start to end, with the red strip of a hub that
-// cannot issue invoices yet and without it, in English and in Spanish. Every tap here is a real one, never forced: a
-// product from the catalogue, the cart button, the «+» of the check's line, the tabs of the check and «Charge», which
-// opens its sheet. Before the fix, the strip left the till 45 to 100 px («Charge» under the tab bar, the cart button out
-// of a finger's reach), and without it the bar and the foot of the check, 180 px, left 0 to 35 px for the lines.
-// A phone upright and a tablet keep what they had: the drawer between the strip and the tab bar, nothing to scroll in
-// the page, the cart button in its corner, the foot in its two rows. What a run creates, its product `E2E-TILLSIDE-<run>`, its check and the
-// issuer of a hub that had none (with it, the strip goes as it does for a business with its data complete), is deleted
-// after it; hub `a`'s issuer is parked only for the runs with the strip.
+// hub#800: a phone on its side (568x320, 640x360, 667x375, and the lowest of them under an address bar) sells from start
+// to end, in English and in Spanish. Every tap here is a real one, never forced: a product from the catalogue, the cart
+// button, the «+» of the check's line, the tabs of the check and «Charge», which opens its sheet. Before the fix, the bar
+// and the foot of the check, 180 px, left 0 to 35 px for the lines. A phone upright and a tablet keep what they had: the
+// drawer between the top bar and the tab bar, nothing to scroll in the page, the cart button in its corner, the foot in
+// its two rows. What a run creates, its product `E2E-TILLSIDE-<run>` and its check, is deleted after it.
 import { expect, type Locator, type Page, test } from '@playwright/test';
 
 import { A, capture, login, settled, shown } from './helpers';
 import { type Product } from './inventory-helpers';
-import { cleanTillAndIssuer, dishWithAnIssuer, fingerOn, stamp, TILL_LANGUAGES, tillIsPhone, tillUnderStrip } from './sale-helpers';
+import { cleanTill, dishForTheTill, fingerOn, stamp, TILL_LANGUAGES, tillIsPhone, tillOpenAt1440 } from './sale-helpers';
 
 const KEY = 'FIX-HUB-800-TILL-ON-ITS-SIDE';
-/** Hub `a`'s issuer, parked while a run needs the strip of a hub that cannot issue invoices yet. */
-const PARKED = 'e2e_sale_till_on_its_side_issuer';
 const RUN = stamp();
 /** A phone on its side: the lowest one is the narrowest phone there is, turned. */
 const ON_ITS_SIDE = [
@@ -24,8 +19,7 @@ const ON_ITS_SIDE = [
   { label: '640x360', width: 640, height: 360 },
   { label: '667x375', width: 667, height: 375 },
 ] as const;
-/** The lowest of them in a browser, under its address bar (56 px). Only without the strip: with it, 21 px are left
- *  between the strip and the tab bar, less than a cart button; the strip itself would have to give way. */
+/** The lowest of them in a browser, under its address bar (56 px): the lowest window of this spec. */
 const UNDER_AN_ADDRESS_BAR = { label: '568x264', width: 568, height: 264 } as const;
 /** As low, but so wide that one row of the catalogue does not fill the page. */
 const LOW_AND_WIDE = { label: '1280x500', width: 1280, height: 500 } as const;
@@ -47,10 +41,10 @@ const LINE_PEEK = 30;
 let product: Product;
 
 test.beforeAll(async ({ browser }) => {
-  product = await dishWithAnIssuer(browser, 'TILLSIDE', RUN);
+  product = await dishForTheTill(browser, 'TILLSIDE', RUN);
 });
 
-test.afterAll(cleanTillAndIssuer);
+test.afterAll(cleanTill);
 
 /** The check's line, whose «+» a real tap reaches, however low the window: the quantity goes up by one. */
 async function tapTheLine(page: Page, where: string): Promise<void> {
@@ -96,8 +90,8 @@ async function openChecksFit(page: Page, height: number, where: string): Promise
 }
 
 /** A whole sale's taps, at the size the page is at now, from the catalogue to the charge sheet. */
-async function sellOnItsSide(page: Page, size: { label: string; width: number; height: number }, strip: boolean, lang: string): Promise<void> {
-  const where = `${lang} ${size.label} ${strip ? 'with-strip' : 'no-strip'}`;
+async function sellOnItsSide(page: Page, size: { label: string; width: number; height: number }, lang: string): Promise<void> {
+  const where = `${lang} ${size.label}`;
   await page.setViewportSize({ width: size.width, height: size.height });
   expect(await tillIsPhone(page), `the check is a drawer at ${where}`).toBe(true);
   const till = shown(page).locator('[data-testid=pos-till]');
@@ -111,7 +105,7 @@ async function sellOnItsSide(page: Page, size: { label: string; width: number; h
   await capture(page, `${KEY}-${where.replaceAll(' ', '-')}-catalogue`);
 
   // The cart button whole in what the page shows, at both ends of the catalogue's scroll (the tap above moved it): its
-  // count too, 6 px over it. Under an address bar with the strip nothing fits; that size is not sold here.
+  // count too, 6 px over it.
   await settled(page);
   for (const end of ['top', 'bottom'] as const) {
     const button = await fab.evaluate(async (el, to) => {
@@ -122,14 +116,13 @@ async function sellOnItsSide(page: Page, size: { label: string; width: number; h
       await new Promise((frame) => requestAnimationFrame(frame));
       const box = el.getBoundingClientRect();
       const tillBox = el.closest('[data-testid=pos-till]')?.getBoundingClientRect();
-      const under = view?.querySelector('.page-notice')?.getBoundingClientRect().bottom ?? 0;
       const over = view?.querySelector('ion-footer.section-tabbar')?.getBoundingClientRect().top ?? 0;
       return {
         top: box.top,
         bottom: box.bottom,
         left: box.left,
         middle: ((tillBox?.left ?? 0) + (tillBox?.right ?? 0)) / 2,
-        from: Math.max(under, content?.getBoundingClientRect().top ?? 0),
+        from: content?.getBoundingClientRect().top ?? 0,
         to: over,
       };
     }, end);
@@ -236,7 +229,7 @@ async function emptyCheckOnItsSide(page: Page, where: string): Promise<void> {
 
 /** The search over the catalogue, as low as it gets: its field, its result and the line a real tap on it adds. */
 async function searchOnItsSide(page: Page): Promise<void> {
-  await page.setViewportSize({ width: ON_ITS_SIDE[0].width, height: ON_ITS_SIDE[0].height });
+  await page.setViewportSize({ width: UNDER_AN_ADDRESS_BAR.width, height: UNDER_AN_ADDRESS_BAR.height });
   const till = shown(page).locator('[data-testid=pos-till]');
   await expect(shown(page).locator('[data-testid=pos-cart-drawer]')).toBeHidden();
   await settled(page);
@@ -322,7 +315,7 @@ async function keepsItsLayout(page: Page, size: (typeof UPRIGHT)[number], where:
   });
   // The foot's two rows with the air between them they always had (0.65rem): the low phone's one row is not theirs.
   expect.soft(seen.actions.top - seen.total.bottom, `the total over the foot's buttons at ${where}`).toBeGreaterThanOrEqual(8);
-  // The drawer lies inside the till's border of 1 px: over it would be the strip, the top bar or the tab bar.
+  // The drawer lies inside the till's border of 1 px: over it would be the top bar or the tab bar.
   expect.soft(Math.abs(seen.drawer.top - seen.till.top), `the drawer starts with the till at ${where}`).toBeLessThanOrEqual(1 + EDGE);
   expect.soft(Math.abs(seen.drawer.bottom - seen.till.bottom), `the drawer ends with the till at ${where}`).toBeLessThanOrEqual(1 + EDGE);
   expect.soft(seen.till.bottom, `the till above the tab bar at ${where}`).toBeLessThanOrEqual(seen.tabbar.top + EDGE);
@@ -370,42 +363,36 @@ test('SALE-F01: on a phone with a notch and a home bar, the drawer on its side k
   await context.close();
 });
 
-for (const strip of [true, false]) {
-  for (const { name, lang, locale } of TILL_LANGUAGES) {
-    test.describe(`SALE-F01: in ${name}, ${strip ? 'under the red strip' : 'without the strip'}, a phone on its side sells`, () => {
-      const page = tillUnderStrip({ strip, parked: PARKED, locale, lang });
+for (const { name, lang, locale } of TILL_LANGUAGES) {
+  test.describe(`SALE-F01: in ${name}, a phone on its side sells`, () => {
+    const page = tillOpenAt1440({ locale, lang });
 
-      test('568x320, a check with no lines yet', async () => {
-        await emptyCheckOnItsSide(page(), `${lang} 568x320 ${strip ? 'with-strip' : 'no-strip'}`);
-      });
-
-      for (const size of strip ? ON_ITS_SIDE : [...ON_ITS_SIDE, UNDER_AN_ADDRESS_BAR]) {
-        test(size.label, async () => {
-          await sellOnItsSide(page(), size, strip, lang);
-        });
-      }
-
-      if (strip) {
-        test('the search, under the strip of the lowest phone', async () => {
-          await searchOnItsSide(page());
-        });
-      }
-
-      for (const size of UPRIGHT) {
-        test(`${size.label} keeps its layout`, async () => {
-          await keepsItsLayout(page(), size, `${lang} ${size.label} ${strip ? 'with-strip' : 'no-strip'}`);
-        });
-      }
-
-      if (!strip) {
-        test('568x320, a check with a ticket discount', async () => {
-          await discountOnItsSide(page(), `${lang} 568x320 no-strip`);
-        });
-
-        test(`${LOW_AND_WIDE.label}, the till fills the page`, async () => {
-          await fillsThePage(page(), `${lang} ${LOW_AND_WIDE.label} no-strip`);
-        });
-      }
+    test('568x320, a check with no lines yet', async () => {
+      await emptyCheckOnItsSide(page(), `${lang} 568x320`);
     });
-  }
+
+    for (const size of [...ON_ITS_SIDE, UNDER_AN_ADDRESS_BAR]) {
+      test(size.label, async () => {
+        await sellOnItsSide(page(), size, lang);
+      });
+    }
+
+    test(`${UNDER_AN_ADDRESS_BAR.label}, the search`, async () => {
+      await searchOnItsSide(page());
+    });
+
+    for (const size of UPRIGHT) {
+      test(`${size.label} keeps its layout`, async () => {
+        await keepsItsLayout(page(), size, `${lang} ${size.label}`);
+      });
+    }
+
+    test('568x320, a check with a ticket discount', async () => {
+      await discountOnItsSide(page(), `${lang} 568x320`);
+    });
+
+    test(`${LOW_AND_WIDE.label}, the till fills the page`, async () => {
+      await fillsThePage(page(), `${lang} ${LOW_AND_WIDE.label}`);
+    });
+  });
 }

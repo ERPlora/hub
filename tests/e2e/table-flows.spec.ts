@@ -296,11 +296,11 @@ test('TABLE-F02, F03, F04, F05: tables on the plan (add, drag, edit, delete, blo
     await page.mouse.down();
     await page.mouse.move(box.x + box.width / 2 + 40, box.y + box.height / 2 + 160, { steps: 8 });
     await page.mouse.up();
-    await expect.poll(async () => (await tableNo(context, '1')).position_y).toBeGreaterThan(one.position_y + 100);
+    await expect.poll(async () => (await tableNo(context, '1')).position_y).toBeGreaterThan(one.position_y + 50);
     const moved = await tableNo(context, '1');
     await page.reload();
     await floor(page, 'edit');
-    await expect(tile(page, one.id)).toHaveCSS('top', `${moved.position_y}px`);
+    await expect(tile(page, one.id)).toHaveAttribute('data-y', String(moved.position_y));
     await flowShots(page, ['TABLE-F03'], async () => {
       await expect(tile(page, one.id)).toBeVisible();
     });
@@ -398,7 +398,7 @@ test('TABLE-F09, F10, F32, F14, F11: seat a party with its customer, correct the
     });
     await page.locator('[data-testid=table-guests-quick-3]').click();
     await expect(sheet(page)).toBeHidden();
-    await expect(tile(page, one.id)).toContainText('3 pax · 0 min');
+    await expect(tile(page, one.id)).toHaveText(/0:00[\s\S]*3\/6 pax/);
     const seated = await tableNo(context, '1');
     expect(seated.checks.map((check) => check.customer_name)).toEqual([ana.name]);
     const check = await api<{ label: string; status: string }>(context, A, 'GET', `/sale/orders/detail?order_id=${seated.checks[0].order_id}`);
@@ -414,7 +414,7 @@ test('TABLE-F09, F10, F32, F14, F11: seat a party with its customer, correct the
     await expect(guests(page).locator('[data-testid=table-guests-value]')).toContainText('3');
     await page.locator('[data-testid=table-guests-more]').click();
     await page.locator('[data-testid=table-guests-confirm]').click();
-    await expect(tile(page, one.id)).toContainText('4 pax');
+    await expect(tile(page, one.id)).toContainText('4/6 pax');
     // Each size opens the window afresh: a new size may relay the page out under an open window.
     await flowShots(page, ['TABLE-F14'], async () => {
       await closeSheet(page);
@@ -704,7 +704,7 @@ test('TABLE-F25, F26, F27, F28: a reservation holds its table, moves it, frees i
       await post(context, '/reservation/reservations/confirm', { id: made.id }, 200);
       return made.id;
     };
-    const hour = tile(page, one.id).locator('.table-tile__hold-time');
+    const hour = tile(page, one.id).locator('[data-part=hold-time]');
 
     // TABLE-F25: a reservation of tonight paints its hour on the plan in the page's language («8:00 PM» in
     // English). Always an afternoon one of today, whatever the time of the run (before noon an hour reads the

@@ -365,7 +365,6 @@ def _live_with_its_own_certificate(settings):
         "verifactu.certificate.upload",
         {"p12_base64": b64(make_p12()), "password": "secret"},
     )
-    run("verifactu.config.update", {"route": "own"})
     run("verifactu.config.go_live")
 
 

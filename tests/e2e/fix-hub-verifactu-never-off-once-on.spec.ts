@@ -8,7 +8,8 @@
 // flow: VERIFACTU-F32 BASE-F25
 import { expect, type Page, test } from '@playwright/test';
 
-import { A, api, appRow, hostPage, menuApps, psql, settledCapture, signedInSpanish, testid } from './helpers';
+import { A, api, appRow, hostPage, psql, settledCapture, signedInSpanish, testid } from './helpers';
+import { menuApps } from './topbar';
 
 const VIEWPORTS = {
   390: { width: 390, height: 844 },

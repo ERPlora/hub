@@ -12,7 +12,6 @@ import {
   iconStates,
   listReady,
   login,
-  openApps,
   record,
   rowNames,
   rowOf,
@@ -20,6 +19,7 @@ import {
   shown,
   uniqueName,
 } from './helpers';
+import { openApps } from './topbar';
 
 const ICONIFY_HOSTS = /iconify\.design|simplesvg\.com|unisvg\.com/;
 

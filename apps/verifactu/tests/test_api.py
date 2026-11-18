@@ -18,7 +18,6 @@ from config.api import api
 
 ROUTES = {
     ("GET", "/verifactu/config", "verifactu.config.get"),
-    ("POST", "/verifactu/config", "verifactu.config.update"),
     ("POST", "/verifactu/config/go_live", "verifactu.config.go_live"),
     ("POST", "/verifactu/config/back_to_testing", "verifactu.config.back_to_testing"),
     ("POST", "/verifactu/certificate", "verifactu.certificate.upload"),

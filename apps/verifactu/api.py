@@ -20,7 +20,6 @@ from apps.verifactu.schemas import (
     ByInvoiceIn,
     CertificateUploadIn,
     ChainValidateIn,
-    ConfigUpdateIn,
     ContingencyListIn,
     ContingencyRetryIn,
     EventListIn,
@@ -47,11 +46,6 @@ router = Router(tags=["verifactu"])
 @bind(router, "verifactu.config.get", "/verifactu/config")
 async def config_get(request):
     return await run_operation(request, queries.get_config)
-
-
-@bind(router, "verifactu.config.update", "/verifactu/config")
-async def config_update(request, data: ConfigUpdateIn):
-    return await run_operation(request, services.update_config, data)
 
 
 @bind(router, "verifactu.config.go_live", "/verifactu/config/go_live")

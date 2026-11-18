@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:c95b41f865491e119c6c7e9c34dd7a1ba6752bf27d6de22c643a46dcf317573e -->
+<!-- generated from WORKBOOK.md sha256:4a02a9067d5869f43ddf83d170416b18fe6cb98616a2ae255edc716b18169acb -->
 
 ## What it is for and who it is for
 
@@ -290,7 +290,7 @@ Steps:
 3. Press "Charge · <total>" at the foot of the check (on a phone, first open the check with the floating
    button, which shows the total). On a phone on its side, or in a window just as low (up to 500 px tall),
    the catalogue scrolls with the page, with the floating button always in view, and the check takes the
-   whole screen, over the red strip and the tab bar: its bar and its foot stay put, "Charge" in view, and
+   whole screen, over the tab bar: its bar and its foot stay put, "Charge" in view, and
    what lies between them scrolls (hub#800).
 4. In the **Charge** sheet, with cash chosen, enter the amount tendered on the keypad; the change shows
    large above the keypad, in the row that until then asks for the amount, and the keys do not move under
@@ -783,9 +783,10 @@ Screen: Sell
 Steps:
 1. With Tables active and the permission to seat, the check's bar has, before the customer, the table
    button (grid, "Assign table"). Tap it: "Choose table" opens, with a search ("Search a table…", on the
-   server) and the tables in service as tiles in the colour of their state (Available green, Occupied
-   red, Reserved amber, Blocked grey), with the number, the area, the seats ("4 pax"), the state and, if
-   it has one, today's reservation ("Marta · 21:00"). With no tables: "There are no tables yet. Set them
+   server) and the tables in service as tiles that draw each table as the floor plan does, with its
+   shape, its chairs and the floor plan's colours (Available green, Occupied blue, Reserved yellow,
+   Blocked grey), with the number, the area, the seats ("4 pax"), the state and, if it has one, today's
+   reservation ("Marta · 21:00"). With no tables: "There are no tables yet. Set them
    up in Tables → Floor plan.".
 2. Tap an Available or Reserved table: the check on screen sits there (TABLE-F12) and takes its name as
    its title ("Table 4"); with no check yet, Tables opens one with that title and the POS puts it on
@@ -821,12 +822,10 @@ Steps:
    to go; the lines are marked with their round ("Order N") and the time sent, and the flame disarms. A
    double send never sends anything twice.
    In the phone's drawer, "Send order" and the flame stay pinned above the foot while they leave room for
-   the tabs and a line; on a lower phone, such as a 320×568 one with the red strip on top, they scroll with
-   them, after the lines, and "Charge" stays in view. The same goes for the side column of a screen just as low,
-   such as a 1024×600 tablet with the strip (hub#787).
+   the tabs and a line; on a lower phone they scroll with them, after the lines, and "Charge" stays in view. The
+   same goes for the side column of a screen just as low (hub#787).
    In the side column, when the heading, the tabs and "Send order" leave no room for a whole line (a 1024×600 or
-   1024×700 tablet on its side, or a 1280×560 laptop, without the strip; a 1024×700 or 1024×768 tablet, or a
-   1280×720 or 1280×800 laptop, with it), the whole column scrolls, on both tabs, as the phone's drawer does, with
+   1024×700 tablet on its side, or a 1280×560 laptop), the whole column scrolls, on both tabs, as the phone's drawer does, with
    "Send order" pinned at the bottom: a line is brought up and read whole above the bar. Where the line fits, the
    heading and the tabs stay in place and only the lines scroll (hub#820). At any size, both tabs are seen and
    tapped whole (hub#1435).

@@ -147,7 +147,6 @@ test('an error stays longer than a success and is the one with a close button', 
 });
 
 test('with the assistant docked beside the screen, the stack is centred on the screen it shares the window with', async ({ page }) => {
-  test.fail(true, 'ERPlora/ui#164: the stack keeps the whole window and lies under the docked panel');
   for (const size of THREE_SIZES.filter((each) => each.width >= 768)) {
     await test.step(size.label, async () => {
       await home(page, size);

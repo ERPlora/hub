@@ -157,6 +157,17 @@ describe('ConfigPage', () => {
     expect(toastSuccess).toHaveBeenCalledWith('Certificate removed.');
   });
 
+  it.each([
+    ['testing', 'own', 'You can keep testing without it: your test records keep going out.'],
+    ['production', 'own', 'Records will wait until you upload another certificate.'],
+    ['production', 'erplora', "Your records keep going out with ERPlora's seal."],
+  ] as const)('«Remove» in %s on the %s route says what happens to the records', async (environment, route, message) => {
+    const s = await ownTab({ environment, route, own_certificate: LOADED });
+    mocks.confirm.mockResolvedValue(false);
+    await click(s.find('verifactu-config-cert-remove').element);
+    expect(mocks.confirm.mock.calls[0][0].message).toBe(message);
+  });
+
   it('«Remove» cancelled removes nothing', async () => {
     const s = await ownTab({ own_certificate: LOADED });
     mocks.confirm.mockResolvedValue(false);
@@ -244,11 +255,11 @@ describe('ConfigPage', () => {
     expect(primary[0].attributes('data-testid')).toBe('verifactu-config-cert-upload');
   });
 
-  it('does not name the ERPlora route when removing the only way to send', async () => {
+  it('does not name the ERPlora route when removing the certificate in testing', async () => {
     const s = await setup({ ...CONFIG_WITHOUT_ERPLORA_ROUTE, own_certificate: LOADED });
     mocks.confirm.mockResolvedValue(false);
     await click(s.find('verifactu-config-cert-remove').element);
-    expect(mocks.confirm.mock.calls[0][0].message).toBe('Records will wait until you upload another certificate.');
+    expect(mocks.confirm.mock.calls[0][0].message).toBe('You can keep testing without it: your test records keep going out.');
   });
 
   it('speaks Spanish without the ERPlora route', async () => {

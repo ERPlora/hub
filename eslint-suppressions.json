@@ -712,11 +712,6 @@
       "count": 1
     }
   },
-  "tests/e2e/sale-till-on-its-side.spec.ts": {
-    "complexity": {
-      "count": 1
-    }
-  },
   "tests/e2e/service-helpers.ts": {
     "complexity": {
       "count": 1

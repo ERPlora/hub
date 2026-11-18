@@ -1,15 +1,16 @@
 // Invoicing in Chrome, by hand (apps/invoice/WORKBOOK.md), against the real Sales, Customers and Taxes:
-//   - INVOICE-F21: without the issuer, Invoices says once that nothing can be invoiced (base's red strip, no notice of
-//     Invoicing's own under it); its «Set up» opens the issuer page, a refused tax ID is said under it until it
-//     is corrected, the owner saves it and the strip goes;
+//   - INVOICE-F21: without the issuer, Invoices paints no red notice of its own and the action center says once that
+//     nothing can be invoiced; its «Set up your business details» opens the issuer page, a refused tax ID is said
+//     under it until it is corrected, the owner saves it and the notice leaves the bell;
 //   - INVOICE-F16: the manual invoice found in Invoices by its customer;
 //   - INVOICE-F03, F19, F08: a manual invoice from «New invoice» (the server's VAT and number), marked as
 //     paid, then rectified (R1, its reason): the original is cancelled and links its rectifying one;
 //   - INVOICE-F05: the full invoice (F3) of a ticket, in the customer's name; the ticket links it;
 //   - an employee issues and marks paid, but never sees «Rectify».
 // What this file creates is deleted after it, and the hub's issuer and numbering are left as found.
-import { expect, type Page, test } from '@playwright/test';
+import { expect, type Locator, type Page, test } from '@playwright/test';
 
+import { actionPanel, bellSays, bellTotal, closeActionCenter, featureNotice, noticeButton, noticeIn, openActionCenter } from './action-center';
 import { A, api, EMPLOYEE, login, psql, shown } from './helpers';
 import { cleanUp as cleanCustomers } from './customer-helpers';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
@@ -49,6 +50,15 @@ test.afterAll(() => {
   }
 });
 
+const CANNOT_INVOICE = 'You cannot issue invoices yet';
+const LIST_READY = '[data-testid=invoice-list-row], [data-testid=invoice-list-empty]';
+
+/** The action center opened afresh at the page's size, with «You cannot issue invoices yet» on top. */
+async function blockingNoticeOpen(page: Page): Promise<Locator> {
+  if (await actionPanel(page).isVisible()) await closeActionCenter(page);
+  return featureNotice(page, CANNOT_INVOICE);
+}
+
 /** The invoice the list API finds for `search` (server-side evidence; the spec records it for cleanup). */
 async function issuedFor(page: Page, search: string): Promise<InvoiceOut> {
   const res = await api<{ rows: { id: string }[] }>(page.context(), A, 'GET', `/invoice/invoices?search=${encodeURIComponent(search)}&limit=10`);
@@ -57,20 +67,23 @@ async function issuedFor(page: Page, search: string): Promise<InvoiceOut> {
   return invoiceOf(page.context(), res.data.rows[0].id);
 }
 
-test('INVOICE-F21: without the issuer Invoices says so once; «Set up» opens it, the owner saves it and the strip goes', async ({ page, context }) => {
+test('INVOICE-F21: without the issuer the action center says so once; its button opens the issuer, the owner saves it and the notice goes', async ({ page, context }) => {
   // No issuer: a configured one loses its address (the hub's own comes back after).
   if (original.configured) psql("update invoice_issuer set address = ''");
   try {
     await login(page, A, '/invoice/invoices');
-    const strip = shown(page).locator('[data-testid=blocking-strip]');
-    await expect(strip).toContainText('You cannot issue invoices yet');
-    await expect(strip).toContainText('No ticket or invoice can be issued until this is set up:');
-    // The one notice: Invoicing does not say it again under the strip.
-    await expect(shown(page).locator('[data-testid=invoice-issuer-notice]')).toHaveCount(0);
+    await expect(shown(page).locator(LIST_READY).first()).toBeVisible();
+    // Invoices paints nothing of it: neither those words nor a red notice of its own.
+    await expect(shown(page).getByText(CANNOT_INVOICE, { exact: true })).toHaveCount(0);
+    await expect(shown(page).locator('[data-testid=invoice-issuer-notice], .inline-feedback[data-tone="danger"]')).toHaveCount(0);
+    const total = await bellTotal(context);
     await flowShots(page, 'INVOICE-F21-notice', async (p) => {
-      await expect(shown(p).locator('[data-testid=blocking-strip]')).toBeVisible();
+      await blockingNoticeOpen(p);
     });
-    await strip.locator('[data-testid="blocking-configure-invoice.business_identity"]').click();
+    const featured = await blockingNoticeOpen(page);
+    await expect(featured.locator('.action-featured__body')).toContainText('No ticket or invoice can be issued until this is set up:');
+    await expect(noticeIn(actionPanel(page), CANNOT_INVOICE)).toHaveCount(1);
+    await noticeButton(featured, 'Set up your business details').click();
     await page.waitForURL(/\/invoice\/issuer$/);
     const form = shown(page);
     await expect(form.locator('[data-testid=invoice-issuer-missing]')).toBeVisible();
@@ -93,13 +106,13 @@ test('INVOICE-F21: without the issuer Invoices says so once; «Set up» opens it
     await expect(form.locator('[data-testid=invoice-issuer-missing]')).toHaveCount(0);
     const saved = await issuerNow(context);
     expect([saved.configured, saved.legal_name, saved.tax_id, saved.address, saved.country]).toEqual([true, ISSUER['legal-name'], ISSUER['tax-id'], ISSUER.address, 'ES']);
+    // The notice leaves the bell without a reload.
+    await bellSays(page, total - 1);
+    await expect(noticeIn(await openActionCenter(page), CANNOT_INVOICE)).toHaveCount(0);
+    await closeActionCenter(page);
     await flowShots(page, 'INVOICE-F21', async (p) => {
       await expect(shown(p).locator('[data-testid=invoice-issuer-legal-name] input')).toHaveValue(ISSUER['legal-name']);
     });
-    // Back in Invoices, the strip is gone.
-    await page.goto(`${A}/invoice/invoices`);
-    await expect(shown(page).locator('[data-testid=invoice-list-row], [data-testid=invoice-list-empty]').first()).toBeVisible();
-    await expect(shown(page).locator('[data-testid=blocking-strip]')).toHaveCount(0);
   } finally {
     // The hub's own issuer back; with none before, the run's stays for the next tests and goes at the end.
     await restoreIssuer(context, original);
