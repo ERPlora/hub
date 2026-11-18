@@ -2,7 +2,7 @@
 // and Inventory apps: the owner opens a check with a product, seats it at the run's table from the
 // check's bar (searched on the server), sees the table chip and the check retitled «Table N», and then
 // takes the table off the check: the table frees and the check stays on the till. The sheet in three
-// viewports. And «Merge» from Tables (TABLE-F16, SALE-F24) with the till still behind it (hub#459): the
+// viewports, also with an occupied table, drawn in the floor plan's blue. And «Merge» from Tables (TABLE-F16, SALE-F24) with the till still behind it (hub#459): the
 // till's check is the one absorbed, and the till says it was joined and shows the one that stays, never
 // «closed on another device». What a run creates — its zone «E2E Tbl <stamp> Till», its tables, the table
 // checks and their moves, its checks and lines, its product — is deleted after it.
@@ -119,6 +119,42 @@ test('SALE-F19: the till seats its check at a table and takes the table off agai
   expect(parked.data.rows.map((row) => [row.status, row.table_id])).toEqual([['parked', null]]);
   const freed = await api<{ status: string }>(context, A, 'GET', `/table/tables/detail?id=${tableId}`);
   expect(freed.data.status).toBe('available');
+});
+
+test('SALE-F19: an occupied table in «Choose table» is the floor plan’s blue, never red', async ({ page, context }) => {
+  await coffeeOnACheck(page);
+  // Created after the first test has searched the run's number, like the merge's table below.
+  const busy = await api<{ id: string }>(context, A, 'POST', '/table/tables', { zone_id: zoneId, number: `${NUMBER}O`, capacity: 4 });
+  expect(busy.status, `table ${JSON.stringify(busy.data)}`).toBe(201);
+  const opened = await api<{ order_id: string }>(context, A, 'POST', '/table/sessions/open', { table_id: busy.data.id });
+  expect(opened.status, `open ${JSON.stringify(opened.data)}`).toBe(201);
+  const added = await api(context, A, 'POST', '/sale/orders/add_line', { order_id: opened.data.order_id, product_id: coffee.id, quantity: '1' });
+  expect(added.status, JSON.stringify(added.data)).toBe(200);
+
+  await shown(page).locator('[data-testid=pos-table-trigger]').click();
+  const sheet = page.locator('ion-modal[data-testid=pos-table]');
+  await sheet.locator('ion-searchbar input').fill(`${NUMBER}O`);
+  const tile = sheet.locator(`[data-testid=pos-table-tile-${busy.data.id}]`);
+  await expect(tile).toContainText('Occupied');
+  await expect(tile).toBeDisabled();
+  const colours = await tile.locator('.table-glyph__body').evaluate((body) => {
+    const resolved = (value: string) => {
+      const probe = body.appendChild(document.createElement('span'));
+      probe.style.color = value;
+      const colour = getComputedStyle(probe).color;
+      probe.remove();
+      return colour;
+    };
+    return { painted: getComputedStyle(body).backgroundColor, blue: resolved('var(--ep-primary-text)'), red: resolved('var(--ion-color-danger)') };
+  });
+  expect(colours.painted).toBe(colours.blue);
+  expect(colours.painted).not.toBe(colours.red);
+  // The capture: the run's free table beside the occupied one.
+  await sheet.locator('ion-searchbar input').fill(NUMBER);
+  await expect(sheet.locator('[data-testid^=pos-table-tile-]')).toHaveCount(2);
+  await shots(page, 'sale-table-picker-occupied', async () => {
+    await expect(tile).toBeVisible();
+  });
 });
 
 test('TABLE-F16, SALE-F24: merging the table of the till check from Tables says it was joined, not closed on another device', async ({ page, context }) => {

@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:12e78a76b82eab564ea3584a6942296169140a0b854333a1166861ea934becf0 -->
+<!-- generated from WORKBOOK.md sha256:4a02a9067d5869f43ddf83d170416b18fe6cb98616a2ae255edc716b18169acb -->
 
 ## What it is for and who it is for
 
@@ -783,9 +783,10 @@ Screen: Sell
 Steps:
 1. With Tables active and the permission to seat, the check's bar has, before the customer, the table
    button (grid, "Assign table"). Tap it: "Choose table" opens, with a search ("Search a table…", on the
-   server) and the tables in service as tiles in the colour of their state (Available green, Occupied
-   red, Reserved amber, Blocked grey), with the number, the area, the seats ("4 pax"), the state and, if
-   it has one, today's reservation ("Marta · 21:00"). With no tables: "There are no tables yet. Set them
+   server) and the tables in service as tiles that draw each table as the floor plan does, with its
+   shape, its chairs and the floor plan's colours (Available green, Occupied blue, Reserved yellow,
+   Blocked grey), with the number, the area, the seats ("4 pax"), the state and, if it has one, today's
+   reservation ("Marta · 21:00"). With no tables: "There are no tables yet. Set them
    up in Tables → Floor plan.".
 2. Tap an Available or Reserved table: the check on screen sits there (TABLE-F12) and takes its name as
    its title ("Table 4"); with no check yet, Tables opens one with that title and the POS puts it on
