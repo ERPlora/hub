@@ -30,7 +30,7 @@ from apps.cart_checkout.models import (
     SESSION_MAX_LENGTH,
     SKU_MAX_LENGTH,
 )
-from base.schemas import in_currency_of, names
+from base.schemas.assistant import in_currency_of, names
 
 T = TypeVar("T")
 

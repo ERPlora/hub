@@ -18,7 +18,7 @@ from ninja import Field, Schema
 from pydantic import AfterValidator, StringConstraints, ValidationInfo, field_validator
 
 from base.business import business_zone
-from base.schemas import names
+from base.schemas.assistant import names
 
 T = TypeVar("T")
 

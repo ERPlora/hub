@@ -97,11 +97,10 @@ from django.utils import timezone
 from live.context import OperationContext, Scope
 from live.operations import get as get_operation
 
-from base import activation, catalog, metrics, outbound, queries, relay, scheduler, services, usage
+from base import activation, catalog, metrics, outbound, queries, relay, scheduler, schemas, services, usage
 from base.services.demos import reap_demos
 from base.tenancy import dumps, migrator, move, offboarding, provision, recovery, restore
 from base.tenancy.connections import close_hub_aliases, close_this_threads_connections
-from base.schemas import AppActivationSettleIn, HubResetApplyIn
 from base.tenancy.context import use_control, use_hub
 from control import queries as control_queries
 from control.models import Hub, HubDump
@@ -430,7 +429,7 @@ def _activate_in(hub, now: dt.datetime) -> None:
     with use_control():
         hub = services.provisioning.registry_row(hub.pk)
     with use_hub(hub):
-        get_operation("base.app.activation_settle")(ctx, AppActivationSettleIn(apps=apps, outcome=outcome, error=error))
+        get_operation("base.app.activation_settle")(ctx, schemas.apps.AppActivationSettleIn(apps=apps, outcome=outcome, error=error))
 
 
 @cache
@@ -557,7 +556,7 @@ def _reset(hub, cancelled: Callable[[], bool] | None = None) -> None:
     )
     try:
         with use_hub(hub):
-            done = get_operation("base.hub.reset_apply")(ctx, HubResetApplyIn(apps=asked.get("apps") or []))
+            done = get_operation("base.hub.reset_apply")(ctx, schemas.reset.HubResetApplyIn(apps=asked.get("apps") or []))
     except Exception:
         logger.exception("worker: the sections of %s could not be emptied; its copy is kept, nothing was emptied.", hub.slug)
         services.reset.reset_moved(hub.pk, state="failed", error="emptying_failed")

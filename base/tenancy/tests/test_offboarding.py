@@ -21,7 +21,7 @@ from apps.sale.apps import SaleConfig
 from base import queries, registry, services, worker
 from base.services import hub_registry, provisioning
 from base.events import HUB_PURGED
-from base.schemas import HubCancelIn, HubGetIn, HubRegistryIn, HubRestoreIn, HubStateIn
+from base.schemas.hub_registry import HubCancelIn, HubGetIn, HubRegistryIn, HubRestoreIn, HubStateIn
 from base.tenancy import connections as tenancy_connections
 from base.tenancy import dumps, names, ops, provision
 from base.tenancy.context import current_alias, use_control, use_hub

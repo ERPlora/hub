@@ -26,7 +26,8 @@ from base.services import demos, hub_registry, sessions
 from base.api_keys import KeyCaller
 from base.models import HubUser, Membership
 from base.registry import REGISTRY_SCOPE
-from base.schemas import HubStateIn, HubUserGetIn, SessionMeIn
+from base.schemas.hub_registry import HubStateIn
+from base.schemas.sessions import HubUserGetIn, SessionMeIn
 from base.tenancy import inventory
 from base.tenancy.context import use_hub
 from base.tenancy.tests import hubs

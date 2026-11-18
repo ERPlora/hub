@@ -36,7 +36,7 @@ from live.operations import get as get_operation
 from base import activation, services
 from base.activation import Activation
 from base.models import AppActivation, Location
-from base.schemas import SetupStatusIn
+from base.schemas.home import SetupStatusIn
 from base.tenancy import connections as tenancy_connections
 from base.tenancy import identity, migrator, names, ops, provision
 from base.tenancy.context import use_control, use_hub
@@ -639,7 +639,7 @@ def test_a_photo_that_arrives_while_it_is_seeded_is_in_its_database_when_it_is_r
 
     from base.models import HubUser
     from base.registry import REGISTRY_SCOPE
-    from base.schemas import HubStateIn
+    from base.schemas.hub_registry import HubStateIn
 
     hub = registry.hub()
     late = uuid.uuid7()

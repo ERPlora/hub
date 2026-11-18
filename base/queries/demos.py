@@ -9,7 +9,7 @@ from live.operations import INTERNAL, operation
 
 from base.models import Hub
 from base.registry import internal_only
-from base.schemas import DemoSlugIn, DemoStatusOut
+from base.schemas.demos import DemoSlugIn, DemoStatusOut
 
 
 # Not an assistant tool: the SaaS's door to the demo (/internal), no person.

@@ -31,7 +31,7 @@ from pydantic import (
 
 from apps.tax.choices import COUNTRY_CODES
 from apps.tax.models import CATEGORY_KEY_MAX_LENGTH, CATEGORY_KEY_RE, TaxAlias, TaxRule
-from base.schemas import names
+from base.schemas.assistant import names
 
 T = TypeVar("T")
 #: The countries the factory catalogue brings rules for (TAX-F16, migration 0002): Spain, and no other. A business of

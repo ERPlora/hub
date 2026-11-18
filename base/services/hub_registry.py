@@ -25,7 +25,7 @@ from live.slugs import validate_hub_slug
 from base import activation, custom_domains, events, registry
 from base.models import AppActivation, Hub
 from base.registry import hub_answer, internal_only
-from base.schemas import (
+from base.schemas.hub_registry import (
     HubCancelIn,
     HubCutFinishIn,
     HubCutFinishOut,

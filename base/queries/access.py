@@ -12,7 +12,7 @@ from base import access
 from base.auth import SAAS_PANEL_PATH, saas_url
 from base.models import AccessSettings, Credential, Membership, SessionOwner
 from base.permissions import ADMINISTER_HUB, VIEW_HOME
-from base.schemas import AccessDoorIn, AccessDoorOut, AccessSettingsIn, AccessSettingsOut
+from base.schemas.access import AccessDoorIn, AccessDoorOut, AccessSettingsIn, AccessSettingsOut
 from base.throttle import client_key
 
 from .devices import device_of

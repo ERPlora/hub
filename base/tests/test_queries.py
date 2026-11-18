@@ -9,7 +9,7 @@ from live.meta import Nav, module_configs
 from live.operations import get
 
 from base.models import AppActivation
-from base.schemas import SessionMeIn, SessionMeOut
+from base.schemas.sessions import SessionMeIn, SessionMeOut
 from base.tenancy.context import use_hub
 from base.tenancy.tests.business import HUB_DB, A, in_business_a
 

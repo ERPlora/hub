@@ -26,7 +26,7 @@ def spending(op: Operation, ctx, alias: str) -> Iterator[str]:
     if not isinstance(approved, Approved) or approved.operation != op.name:
         yield alias
         return
-    from base.schemas import ApprovalSpendIn
+    from base.schemas.approvals import ApprovalSpendIn
 
     with transaction.atomic(using=alias):
         spend = ApprovalSpendIn(

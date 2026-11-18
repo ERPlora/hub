@@ -16,7 +16,7 @@ from live.operations import get
 from apps.attendance.models import Record
 from apps.staff.models import Member
 from apps.staff.tests.test_integration_home import affected, received
-from base.schemas import WidgetListIn
+from base.schemas.home import WidgetListIn
 from base.tenancy.context import use_hub
 
 from .conftest import HOST, HUB_DB, HUB_DB_COMMITTED, A, B, ctx_for, make_member, run

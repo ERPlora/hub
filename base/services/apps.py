@@ -31,7 +31,7 @@ from base import activation, blueprint, entitlement, events, home, queries
 from base.activation import CREATING, FAILED
 from base.models import AppActivation, Hub
 from base.permissions import ADMINISTER_HUB
-from base.schemas import AppChangeIn, AppChangeOut
+from base.schemas.apps import AppChangeIn, AppChangeOut
 from base.services.blueprints import _load_what_waited, _stop_waiting, _waiting_loads
 from base.services.photo import _sync_photo_blocks
 from base.services.reset import has_own_database

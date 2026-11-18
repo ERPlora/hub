@@ -1129,7 +1129,7 @@ Recibir el emisor del SaaS (`invoice.sync_issuer`) no es de ningún papel: solo 
   «Tipo de rectificativa», «Siguiente número», «Venta», «Devolución de la venta») o, si no lo tiene,
   por el `verbose_name` de su campo en el modelo, el que da la ficha; un dato sin ninguno sale con el
   nombre técnico y lo para `tests/test_integration_assistant.py`. Un dato que nombra un registro por su id
-  lleva la marca `refers` (`base.schemas.names`) y la tarjeta lo dice por esa lectura, hecha como quien
+  lleva la marca `refers` (`base.schemas.assistant.names`) y la tarjeta lo dice por esa lectura, hecha como quien
   pregunta y nunca por el id: la factura y la venta por su número, la devolución por su venta y lo devuelto
   (`invoice.refund.get`), la serie por su código, su año y su nombre (`invoice.series.get`) y el cliente por
   el nombre de su ficha; sin persona detrás, sin permiso para leerlo o si no existe, el dato no sale. El

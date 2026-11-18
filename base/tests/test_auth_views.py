@@ -31,7 +31,7 @@ from live.context import system_context
 
 from base.models import DemoCode, Hub, Membership
 from base.registry import REGISTRY_SCOPE
-from base.schemas import DemoCodeIn, DemoCreateIn
+from base.schemas.demos import DemoCodeIn, DemoCreateIn
 from base.services.demos import demo_code_create, demo_create
 from base.tenancy import connections as tenancy_connections
 from base.tenancy.context import use_hub

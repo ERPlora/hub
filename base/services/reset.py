@@ -25,7 +25,7 @@ from base import blueprint, events
 from base.models import Hub
 from base.permissions import ADMINISTER_HUB
 from base.registry import internal_only
-from base.schemas import HubResetApplyIn, HubResetApplyOut, HubResetIn, HubResetOut
+from base.schemas.reset import HubResetApplyIn, HubResetApplyOut, HubResetIn, HubResetOut
 from base.services.blueprints import _stop_waiting, _waiting_loads, _who
 from base.services.provisioning import LEASE_OWNER, ProvisioningStopped, _control_transaction, _leased
 from control.models import HubDue

@@ -18,7 +18,7 @@ from base.models import Hub, Membership, SessionOwner
 from base.permissions import ADMINISTER_HUB
 from base.registry import internal_only
 from base.relay import active_apps
-from base.schemas import PlanUsageIn, PlanUsageOut, UsageListIn, UsageListOut
+from base.schemas.usage import PlanUsageIn, PlanUsageOut, UsageListIn, UsageListOut
 from base.tenancy import limits as tenancy_limits
 from control.models import HubActivityDaily, HubUsageDaily, HubVisit, UsageRun
 

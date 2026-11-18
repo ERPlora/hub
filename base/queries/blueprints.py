@@ -12,7 +12,7 @@ from live.operations import AI, operation
 from base import blueprint, home
 from base.models import Hub, ImportBatch
 from base.permissions import ADMINISTER_HUB
-from base.schemas import (
+from base.schemas.blueprints import (
     BlueprintExportIn,
     BlueprintFileOut,
     BlueprintListIn,

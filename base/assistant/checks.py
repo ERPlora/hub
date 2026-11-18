@@ -242,7 +242,7 @@ def check_currencies(app_configs=None, **kwargs) -> list[checks.CheckMessage]:
                 checks.Error(
                     f"{op.name} marks a currency that {'; '.join(problems)}.",
                     hint='Mark a code json_schema_extra={"currency": True}, or the datum that names a record in a currency '
-                    'of its own base.schemas.in_currency_of("<app>.<entity>.<a query>", by="<its input>", '
+                    'of its own base.schemas.assistant.in_currency_of("<app>.<entity>.<a query>", by="<its input>", '
                     'code="<the datum of its answer that gives the currency>").',
                     obj=op.name,
                     id="base.E011",

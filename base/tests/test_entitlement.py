@@ -25,7 +25,7 @@ from base import entitlement, registry
 from base.entitlement import EntitlementBlocked
 from base.models import Hub
 from base.relay import active_apps
-from base.schemas import HubStateIn
+from base.schemas.hub_registry import HubStateIn
 from base.tenancy.context import use_hub
 from base.tenancy.tests.business import A, B, HUB_DB
 

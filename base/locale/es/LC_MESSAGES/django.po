@@ -1826,19 +1826,19 @@ msgctxt "base"
 msgid "Help"
 msgstr "Ayuda"
 
-#: base/schemas.py
+#: base/schemas/support.py
 msgid "Report subject"
 msgstr "Asunto del informe"
 
-#: base/schemas.py
+#: base/schemas/support.py
 msgid "Where to go"
 msgstr "A dónde ir"
 
-#: base/schemas.py
+#: base/schemas/support.py
 msgid "What happened?"
 msgstr "¿Qué pasó?"
 
-#: base/schemas.py
+#: base/schemas/support.py
 msgid "Screen"
 msgstr "Pantalla"
 
@@ -1993,35 +1993,35 @@ msgstr[0] "Has llegado al límite de %(count)s app de tu plan. Mejora el plan o 
 msgstr[1] "Has llegado al límite de %(count)s apps de tu plan. Mejora el plan o desactiva una."
 msgstr[2] "Has llegado al límite de %(count)s apps de tu plan. Mejora el plan o desactiva una."
 
-#: base/schemas.py
+#: base/schemas/blueprints.py
 msgid "Template"
 msgstr "Plantilla"
 
-#: base/schemas.py
+#: base/schemas/blueprints.py base/schemas/files.py
 msgid "File"
 msgstr "Archivo"
 
-#: base/schemas.py
+#: base/schemas/blueprints.py
 msgid "Apps to load"
 msgstr "Apps que se cargan"
 
-#: base/schemas.py
+#: base/schemas/people.py
 msgid "Person"
 msgstr "Persona"
 
-#: base/schemas.py
+#: base/schemas/files.py
 msgid "Folder"
 msgstr "Carpeta"
 
-#: base/schemas.py
+#: base/schemas/files.py
 msgid "In folder"
 msgstr "En la carpeta"
 
-#: base/schemas.py
+#: base/schemas/files.py
 msgid "File or folder"
 msgstr "Archivo o carpeta"
 
-#: base/schemas.py
+#: base/schemas/files.py
 msgid "Move to"
 msgstr "Mover a"
 

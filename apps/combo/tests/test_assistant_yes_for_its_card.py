@@ -23,7 +23,7 @@ from apps.combo.schemas import A_CHOICE, A_COURSE, A_MENU
 from apps.combo.tests.conftest import HUB_DB, ctx_for, make_combo, make_group, make_option, make_product
 from apps.combo.tests.test_apps import CHECKED_BY_THE_MENU
 from apps.combo.tests.test_assistant_card_records import fields_of, words
-from base.schemas import names
+from base.schemas.assistant import names
 from base.tests.test_assistant_yes_for_its_card import read_as, turn_as, unless_by_id, unless_of, yes_to_its_card
 from base.tests.test_services_assistant import call
 
@@ -327,7 +327,7 @@ def test_every_assistant_write_of_menus_that_takes_a_course_or_a_choice_by_its_n
 # The card reads a course by its name with its menu, a choice by its product with its menu and its course, and the
 # menu and Inventory's product by their names, in every write, with or without a check before it: what it finds goes
 # in the card's fingerprint, so the yes holds to it; what it cannot read (two fit, none does) it says as said, never
-# leaving it off the card (base.schemas ``names(…, within=…, as_said=True)``).
+# leaving it off the card (base.schemas.assistant ``names(…, within=…, as_said=True)``).
 
 
 def mark_of(op, name: str) -> dict | None:

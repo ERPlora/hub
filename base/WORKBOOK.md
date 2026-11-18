@@ -3933,7 +3933,7 @@ Implicados: BASE-F92, BASE-F93
   escritura que su esquema marca `json_schema_extra={"currency": True}` (`CURRENCY`, siempre sobre un texto; vale
   para los importes de su mismo objeto y de lo que cuelga de él; hoy `currency` de `payment.payment.create`) o, sobre
   el dato que nombra un registro con moneda propia, la lectura de su app que la da
-  (`base.schemas.in_currency_of("<query>", by="<su entrada>", code="<el dato de su respuesta>")`, que es
+  (`base.schemas.assistant.in_currency_of("<query>", by="<su entrada>", code="<el dato de su respuesta>")`, que es
   `{"currency": {"read", "by", "code"}}`; hoy `cart_id`, `session_token` y `customer` de las escrituras de Carrito y
   pago, con `cart_checkout.cart.get`; `price_list_id` y `price_list` de `pricing.price_item.add`, con
   `pricing.price_list.get`, e `id` de `pricing.price_item.update`, con `pricing.price_item.get`), corrida como la persona (`_run`, como el nombre de un registro) solo si el objeto lleva

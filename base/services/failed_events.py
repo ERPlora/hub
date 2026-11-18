@@ -17,7 +17,7 @@ from live.outbox import record_event
 from base import events, system
 from base.models import EventDelivery
 from base.permissions import ADMINISTER_HUB
-from base.schemas import (
+from base.schemas.failed_events import (
     FailedEventCountOut,
     FailedEventDiscardIn,
     FailedEventIn,

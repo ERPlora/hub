@@ -803,7 +803,7 @@ vende, y si Menús no está activo el TPV no ofrece menús.
   plato o una elección por su id o por su nombre dentro del menú declaran el `check` de su propio registro
   (`combo.group.update` y `combo.group.delete`, `combo.group.get`; `combo.option.update` y `combo.option.delete`,
   `combo.option.get`; el del menú leería el id del plato como el de un menú; hub#1231). Todo dato dicho por su nombre
-  lleva su marca leída por ese nombre, con `as_said` (`base.schemas.names`, hub#1245): el `combo` de `_ComboOfIn`
+  lleva su marca leída por ese nombre, con `as_said` (`base.schemas.assistant.names`, hub#1245): el `combo` de `_ComboOfIn`
   (`A_MENU_BY_NAME`), el `group` con su menú (`A_COURSE_BY_NAME`, `within` `combo_id` y `combo`), el `product` de una
   elección con su menú y su plato (`A_CHOICE_BY_NAME`) y el producto de Inventario (`A_PRODUCT_BY_NAME`: el `product`
   de `OptionIn` y el `new_product`), nunca con el `id` de la escritura, que es su propio registro. Lo que no se puede
@@ -813,7 +813,7 @@ vende, y si Menús no está activo el TPV no ofrece menús.
   `test_every_write_that_takes_a_menu_or_a_course_by_its_name_reads_it_and_says_it_as_said_when_it_cannot` y
   `test_a_choice_is_read_by_its_product_with_its_menu_and_its_course_and_a_product_of_inventory_by_its_name`). Cada
   dato dicho por su nombre se deja sin leer junto al id con que la escritura toma su registro en su lugar
-  (`base.schemas.unless_given`, hub#1250): el suyo y el del registro que lo contiene (el menú de un plato es el del
+  (`base.schemas.assistant.unless_given`, hub#1250): el suyo y el del registro que lo contiene (el menú de un plato es el del
   plato). La lista exacta de cada escritura, en `UNLESS` de `tests/test_assistant_yes_for_its_card.py`. Igual con los
   ids que la escritura no mira porque llega el de su registro (hub#1278): el `combo_id` de `GroupRefIn` junto al `id`
   del plato, el de `_GroupOfIn` junto a `group_id`, y en `OptionRefIn` el `combo_id` junto a `id` o `group_id` y el

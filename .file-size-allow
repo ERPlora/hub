@@ -131,7 +131,7 @@
 1211 apps/whatsapp_inbox/schemas.py ERPlora/erplora-next#74
 2587 apps/whatsapp_inbox/services.py ERPlora/erplora-next#74
 1367 apps/whatsapp_inbox/tests/test_services.py ERPlora/erplora-next#74
-583 base/api.py ERPlora/erplora-next#74
+574 base/api.py ERPlora/erplora-next#74
 1403 base/blueprint.py ERPlora/erplora-next#74
 960 base/catalog.py ERPlora/erplora-next#74
 802 base/files.py ERPlora/erplora-next#74
@@ -145,7 +145,6 @@
 512 base/internal.py ERPlora/erplora-next#74
 539 base/middleware.py ERPlora/erplora-next#74
 693 base/models.py ERPlora/erplora-next#74
-2078 base/schemas/__init__.py ERPlora/erplora-next#74
 508 base/tenancy/bootstrap.py ERPlora/erplora-next#74
 835 base/tenancy/migrator.py ERPlora/erplora-next#74
 777 base/tenancy/move.py ERPlora/erplora-next#74
@@ -157,7 +156,7 @@
 1030 base/tests/test_queries_home.py ERPlora/erplora-next#74
 1056 base/tests/test_worker.py ERPlora/erplora-next#74
 1194 base/tests/test_ws_print.py ERPlora/erplora-next#74
-641 base/worker.py ERPlora/erplora-next#74
+640 base/worker.py ERPlora/erplora-next#74
 849 base/ws_print.py ERPlora/erplora-next#74
 1223 config/tests/test_settings.py ERPlora/erplora-next#74
 990 control/admin.py ERPlora/erplora-next#74

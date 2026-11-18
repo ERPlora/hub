@@ -20,7 +20,7 @@ from base import activation, business, entitlement, home
 from base.auth import SAAS_PANEL_PATH, saas_url
 from base.models import AppActivation, Hub
 from base.permissions import VIEW_HOME
-from base.schemas import AppListIn, AppListOut, AppRefIn, AppRefOut
+from base.schemas.apps import AppListIn, AppListOut, AppRefIn, AppRefOut
 
 
 # ── Apps ───────────────────────────────────────────────────────────────────────────────────────────────────────

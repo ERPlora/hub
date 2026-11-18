@@ -11,7 +11,8 @@ from base import blueprint
 from base.models import Hub
 from base.permissions import ADMINISTER_HUB
 from base.registry import internal_only
-from base.schemas import HubDumpLinkIn, HubDumpLinkOut, HubDumpsIn, HubDumpsOut, HubGetIn, InternalDumpsOut
+from base.schemas.dumps import HubDumpLinkIn, HubDumpLinkOut, HubDumpsIn, HubDumpsOut, InternalDumpsOut
+from base.schemas.hub_registry import HubGetIn
 from control.models import HubDump
 
 

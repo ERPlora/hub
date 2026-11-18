@@ -15,7 +15,7 @@ from live.errors import NotFound
 
 from base.queries.demos import demo_get
 from base.registry import REGISTRY_SCOPE
-from base.schemas import DemoSlugIn
+from base.schemas.demos import DemoSlugIn
 from base.services.demos import demo_expire, reap_demos
 from base.tenancy.context import use_control
 from control.queries import active_freeze

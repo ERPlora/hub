@@ -25,7 +25,7 @@ from live.operations import atomic, get
 
 from base.admin import LocationAdmin
 from base.models import DEFAULT_LOCATION_NAME, Location
-from base.schemas import LocationListIn
+from base.schemas.business import LocationListIn
 from base.tenancy import context, inventory
 from base.tenancy.tests.business import A, HOST, HUB_DB, in_business_a
 from base.tenancy.tests.concurrency import PLATFORM_HOST, hub_staff

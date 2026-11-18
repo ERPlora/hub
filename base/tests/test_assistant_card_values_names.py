@@ -9,7 +9,7 @@ from live.operations import Operation, registry
 from ninja import Field, Schema
 
 from base import assistant
-from base.schemas import names, unless_given
+from base.schemas.assistant import names, unless_given
 from base.tenancy.tests.business import HUB_DB, in_business_a
 from base.tests.card_values import ADMIN, ctx, reference_errors, values
 

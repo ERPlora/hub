@@ -4,7 +4,8 @@ schema the assistant's card reads."""
 import pydantic
 import pytest
 
-from base.schemas import RecordNameOut, SessionMeIn, SessionMeOut, exactly_one, in_currency_of
+from base.schemas.assistant import RecordNameOut, exactly_one, in_currency_of
+from base.schemas.sessions import SessionMeIn, SessionMeOut
 
 FULL = {
     "user": {"id": "7", "label": "Ana"},

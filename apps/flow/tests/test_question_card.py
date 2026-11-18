@@ -18,7 +18,7 @@ from apps.flow import gateway as flow_gateway
 from apps.flow.models import Flow, Question
 from apps.flow.queries import TURN
 from base.models import Hub, Membership
-from base.schemas import names
+from base.schemas.assistant import names
 from base.tenancy.context import use_hub
 from base.tests.fake_gateway import gateway  # noqa: F401 - the fixture
 

@@ -22,7 +22,7 @@ from live.outbox import channel_for
 from psycopg.conninfo import make_conninfo
 
 from apps.staff.tests.conftest import HOST, HUB_DB, HUB_DB_COMMITTED, A, B, ctx_for
-from base.schemas import WidgetListIn
+from base.schemas.home import WidgetListIn
 from base.tenancy.context import use_hub
 
 HEADCOUNT = "staff.headcount"

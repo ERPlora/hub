@@ -216,7 +216,7 @@ def test_the_registrys_operations_run_on_control_and_their_events_land_there(cli
     from live.context import system_context
 
     from base.registry import REGISTRY_SCOPE
-    from base.schemas import HubSeedLocalIn
+    from base.schemas.hub_registry import HubSeedLocalIn
     from base.services.hub_registry import hub_seed_local
 
     answer = hub_seed_local(system_context(REGISTRY_SCOPE), HubSeedLocalIn(slugs=["c"]))

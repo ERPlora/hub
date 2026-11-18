@@ -10,7 +10,7 @@ import pytest
 from live.context import Scope, system_context
 from live.operations import get
 
-from base.schemas import NoticeListIn
+from base.schemas.home import NoticeListIn
 from base.tenancy.context import use_hub
 
 from .conftest import A, HUB_DB, add_line, ctx_for, fire, fired_round, open_check, run
