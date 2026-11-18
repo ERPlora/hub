@@ -270,6 +270,7 @@ def test_a_variable_named_like_a_secret_is_refused_as_one(name):
     ("name", "value"),
     [
         ("PLATFORM_HUB_SLUG", "Hunter2-Passw0rd!"),
+        ("PLATFORM_HUB_SLUG", "postgres://hub:Hunter2-Passw0rd!@db.internal/hub"),
         ("VERIFACTU_PRODUCTION_ENABLED", {"token": "Hunter2-Passw0rd!"}),
         ("VERIFACTU_ERPLORA_ROUTE_ENABLED", ["Hunter2-Passw0rd!"]),
     ],
@@ -441,6 +442,37 @@ def test_a_confirmation_when_nothing_protected_changes_is_refused():
 
 def test_an_unchanged_lock_needs_no_confirmation():
     assert app_env.lock_problems(PROD, PROD, confirm="") == []
+
+
+def without_production():
+    section = copy.deepcopy(PROD)
+    for family in ("hub", "worker"):
+        del section[family]["VERIFACTU_PRODUCTION_ENABLED"]
+    return section
+
+
+def test_opening_it_when_the_settings_in_force_do_not_name_it_needs_the_confirmation():
+    problems = app_env.lock_problems(with_production("true"), without_production(), confirm="")
+
+    assert kinds(problems) == {("prod.VERIFACTU_PRODUCTION_ENABLED", "needs_confirmation")}
+    assert "VERIFACTU_PRODUCTION_ENABLED=true" in problems[0].message
+
+
+def test_closing_it_by_dropping_it_from_the_file_needs_the_confirmation():
+    problems = app_env.lock_problems(without_production(), with_production("true"), confirm="")
+
+    assert kinds(problems) == {("prod.VERIFACTU_PRODUCTION_ENABLED", "needs_confirmation")}
+    assert "VERIFACTU_PRODUCTION_ENABLED=false" in problems[0].message
+
+
+@pytest.mark.parametrize("family", ["hub", "worker"])
+def test_a_change_in_one_family_alone_needs_the_confirmation(family):
+    current = with_production("true")
+    current[family]["VERIFACTU_PRODUCTION_ENABLED"] = "false"
+
+    problems = app_env.lock_problems(with_production("true"), current, confirm="")
+
+    assert kinds(problems) == {("prod.VERIFACTU_PRODUCTION_ENABLED", "needs_confirmation")}
 
 
 def test_writing_down_the_hub_default_is_no_change():
@@ -692,6 +724,20 @@ def test_a_commit_from_before_the_file_keeps_the_settings_in_force(monkeypatch, 
     assert read(workdir, "app_env") == PROD
     assert app_environment(read(workdir, "hub"), "hub") == app_environment(deployed()["hub"], "hub")
     assert capsys.readouterr().err.startswith("::warning::")
+
+
+def test_a_commit_from_before_the_file_never_keeps_pre_on_the_aeat_production_environment(
+    monkeypatch, workdir, capsys
+):
+    in_force = copy.deepcopy(PRE)
+    in_force["hub"]["VERIFACTU_PRODUCTION_ENABLED"] = in_force["worker"]["VERIFACTU_PRODUCTION_ENABLED"] = "true"
+    before = read(workdir, "hub")
+
+    assert deploy(monkeypatch, workdir, FakeCommands(file=False, current={"pre": in_force}), environment="pre") == 1
+
+    assert read(workdir, "hub") == before
+    assert not (workdir / "app_env.json").exists()
+    assert "pre.hub.VERIFACTU_PRODUCTION_ENABLED" in capsys.readouterr().err
 
 
 def test_an_unknown_commit_refuses_the_deploy(monkeypatch, workdir, capsys):
