@@ -10,17 +10,15 @@
 // flow: BASE-F05
 import { execSync } from 'node:child_process';
 
-import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
+import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
 import { closeActionCenter, openActionCenter } from './action-center';
 import { GREETING, type Provider, startProvider } from './assistant-provider';
 import {
   api,
-  compactBar,
   horizontalOverflow,
   HUB_DIR,
   login,
-  openApps,
   psql,
   REPO_DIR,
   SAAS,
@@ -30,6 +28,7 @@ import {
 } from './helpers';
 import { type SaasOwner, saasPost, signUpOnSaas } from './saas-owner';
 import { STACK } from './stack';
+import { openApps, openAssistant } from './topbar';
 import { type Language, loadCatalog, normalText, rawKeys, wrongLanguage } from './translations';
 
 test.use({ actionTimeout: 30_000 });
@@ -181,19 +180,6 @@ async function tab(page: Page, id: string): Promise<void> {
   const button = shown(page).locator(`[data-testid="tab-${id}"]`);
   await button.click();
   await expect(button).toHaveClass(/segment-button-checked/);
-}
-
-/** The topbar's way to the assistant: the sparkles, or on a phone «More options», which carries them. */
-async function openAssistant(page: Page): Promise<Locator> {
-  const panel = page.locator('[data-testid="assistant-panel"]');
-  if (compactBar(page)) {
-    await shown(page).locator('[data-testid="topbar-chrome-more"]').click();
-    await page.locator('ion-popover [data-testid="topbar-chrome-more-assistant"]').click();
-  } else {
-    await shown(page).locator('[data-testid="assistant-button"]').click();
-  }
-  await expect(panel).toHaveAttribute('data-open', 'true');
-  return panel;
 }
 
 test.beforeAll(async ({ browser }) => {

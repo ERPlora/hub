@@ -13,14 +13,9 @@
 import { expect, type Locator, type Page, test } from '@playwright/test';
 
 import { DICTATION, startProvider } from './assistant-provider';
-import { A, compactBar, login, shot, shown, untilStill } from './helpers';
+import { openPanel } from './assistant-real';
+import { A, login, shot, THREE_SIZES as VIEWPORTS, untilStill } from './helpers';
 import { STACK } from './stack';
-
-const VIEWPORTS = [
-  { label: '390', width: 390, height: 844 },
-  { label: '834', width: 834, height: 1112 },
-  { label: '1440', width: 1440, height: 900 },
-];
 
 const KEY = 'FIX-HUB-BASE-MIC-DENIED-SAYS-BROWSER-INSIDE-THE-APP';
 const DOUBLE_TAP_KEY = 'FIX-HUB-BASE-ASSISTANT-DICTATION-NOT-EXPORTED';
@@ -37,20 +32,6 @@ const panel = (page: Page): Locator => page.locator('[data-testid="assistant-pan
 const mic = (page: Page): Locator => panel(page).locator('[data-testid="assistant-mic"]');
 const problem = (page: Page): Locator => panel(page).locator('[data-testid="assistant-composer-problem"]');
 const box = (page: Page): Locator => panel(page).locator('[data-testid="assistant-input"] textarea');
-const opener = (page: Page): Locator =>
-  shown(page).locator(compactBar(page) ? '[data-testid="topbar-chrome-more"]' : '[data-testid="assistant-button"]');
-
-/** The Home with the assistant's panel open. */
-async function openPanel(page: Page): Promise<void> {
-  await page.goto(`${A}/`);
-  await expect(opener(page)).toBeVisible();
-  if ((await panel(page).getAttribute('data-open')) !== 'true') {
-    await opener(page).click();
-    if (compactBar(page)) await page.locator('ion-popover [data-testid="topbar-chrome-more-assistant"]').click();
-  }
-  await expect(panel(page)).toHaveAttribute('data-open', 'true');
-}
-
 /** The Home with the assistant's panel open, and a tap on «Dictate by voice». */
 async function refuse(page: Page): Promise<void> {
   await openPanel(page);

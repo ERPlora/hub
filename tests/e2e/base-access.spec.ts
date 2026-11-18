@@ -11,7 +11,7 @@ import { createHmac } from 'node:crypto';
 
 import { expect, type Locator, type Page, test } from '@playwright/test';
 
-import { api, capture, collectProblems, horizontalOverflow, login, psql, SAAS, shot, shown, THREE_SIZES as SIZES, turnOn, untilStill } from './helpers';
+import { api, capture, collectProblems, horizontalOverflow, login, MY_APPS_DOOR, psql, SAAS, shot, shown, THREE_SIZES as SIZES, turnOn, untilStill } from './helpers';
 import { businessOnSaas, type SaasBusiness, type SaasOwner, saasPost, signUpOnSaas } from './saas-owner';
 import { cleanSales } from './sale-helpers';
 import { STACK } from './stack';
@@ -319,7 +319,7 @@ test('the employee enters on a till, creates their PIN there, and the first devi
   await expect(shown(till).getByTestId('pin-setup-step')).toHaveText('Confirm your PIN');
   await press(till, EMPLOYEE_PIN);
   await expect(till).toHaveURL(`${origin}/`);
-  await expect(shown(till).locator('[data-testid="topbar-apps"]').first()).toBeAttached();
+  await expect(shown(till).locator(MY_APPS_DOOR).first()).toBeAttached();
 
   // A's session ended (one device at a time): its next page says why, with «Upgrade plan».
   await owner.page.goto(`${origin}/`);

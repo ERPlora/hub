@@ -5,6 +5,8 @@
 // facturar» on top and the counters in rows, and closes with Esc or a tap outside, giving the focus back to the bell;
 // with the assistant open the card comes in to its left and the panel opens over it; with the till's charge sheet open
 // no card comes, the bell only counts; and once the business details are saved, «Todavía no puedes facturar» goes.
+// The bar keeps the title centred: on a phone its end holds «⋮» and the bell, and «⋮» lists «Mis apps» and «Asistente»,
+// each opening its own; from a tablet «Mis apps», the sparkles and the bell are all on it.
 // The new notice is the demo's «open demo items» counter, raised and dropped through Demo's operations. Hub `a`'s
 // issuer is parked for the run and put back as it was after it.
 import { type Browser, type BrowserContext, expect, type Page, test } from '@playwright/test';
@@ -15,6 +17,7 @@ import { spanishContext, spanishHome } from './home-helpers';
 import { cleanInventory, type Product, VIEWPORTS } from './inventory-helpers';
 import { type IssuerOut, issuerNow, parkIssuer, unparkIssuer } from './invoice-helpers';
 import { checkWithDish, cleanSales, dishForTheTill } from './sale-helpers';
+import { expectTitleCentred, openApps, openAssistant, topbar, topbarMore, topbarMoreMenu } from './topbar';
 
 const KEY = 'BASE-ACTION-CENTER';
 /** Hub `a`'s issuer, parked while the run needs a business that cannot issue invoices yet. */
@@ -129,6 +132,40 @@ async function expectThePanel(page: Page, size: (typeof SIZES)[number], shotOf: 
   await expectFocusOnTheBell(page);
 }
 
+/** The buttons at the end of the bar, as `data-testid`s, without the rows of an open «⋮». */
+function endOfTheBar(page: Page): Promise<(string | null)[]> {
+  return topbar(page)
+    .locator('ion-buttons[slot=end]')
+    .evaluate((group) =>
+      [...group.querySelectorAll('ion-button')]
+        .filter((button) => !button.closest('ion-popover') && button.getBoundingClientRect().width > 0)
+        .map((button) => button.getAttribute('data-testid')),
+    );
+}
+
+/** On a phone, «⋮» and the bell at the end of the bar and the title centred; «⋮» lists «Mis apps» and «Asistente», and
+ *  each one opens. From a tablet, «Mis apps», the sparkles and the bell, all on the bar. */
+async function expectTheBar(page: Page, size: (typeof SIZES)[number], shotOf: (state: string) => Promise<void>): Promise<void> {
+  await expectTitleCentred(page, size.label);
+  if (!compactBar(page)) {
+    expect(await endOfTheBar(page)).toEqual(['topbar-apps', 'assistant-button', 'action-bell']);
+    return;
+  }
+  expect(await endOfTheBar(page)).toEqual(['topbar-more', 'action-bell']);
+  await topbarMore(page).click();
+  await expect(topbarMoreMenu(page).locator('ion-button')).toHaveText(['Mis apps', 'Asistente']);
+  await shotOf('bar-more');
+  await page.keyboard.press('Escape');
+  await expect(topbarMoreMenu(page)).toHaveCount(0);
+  const sheet = await openApps(page);
+  await sheet.locator('[data-testid=apps-launcher-close]').click();
+  await expect(sheet).toHaveCount(0);
+  const assistant = await openAssistant(page);
+  await expect(assistant.locator('[data-testid=assistant-input] textarea')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(assistant).toHaveAttribute('data-open', 'false');
+}
+
 /** With the assistant open (beside the screen from a tablet), a new card comes in to its left and the panel opens
  *  over it. */
 async function expectBesideTheAssistant(page: Page, context: BrowserContext, shotOf: (state: string) => Promise<void>): Promise<void> {
@@ -214,6 +251,7 @@ for (const size of SIZES) {
         await bellSaysTheServer(page, context);
         await expect(actionBell(page)).toHaveAttribute('data-severity', 'danger');
         await shotOf('pill');
+        await expectTheBar(page, size, shotOf);
         await expectArrival(page, context, shotOf);
         await expectThePanel(page, size, shotOf);
         if (!compactBar(page)) await expectBesideTheAssistant(page, context, shotOf);
