@@ -176,7 +176,7 @@ abiertas» y «Toca una cuenta para retomarla.», y una fila por cuenta abierta 
 importe, hora e importe) con su papelera. Vacía: «No hay cuentas abiertas». Un fallo se pinta encima
 de las filas. Se cierra tocando fuera, con Esc o con el botón atrás del móvil.
 
-#### Cuenta para la mesa
+#### Cuenta (precuenta)
 Ventana «Cuenta» que abre la impresora del pie («Imprimir cuenta»): el papel que se lleva a la mesa, con el aviso «Cuenta
 — no es una factura. El tique fiscal se entrega al cobrar.», y los botones de imprimir y cerrar.
 
@@ -824,7 +824,7 @@ Implicados: KITCHEN-F05, KITCHEN-F18, KITCHEN-F19, KITCHEN-F20, KITCHEN-F29, BAS
 Estado: hecho
 Vertical: restaurante
 Actor: empleado, responsable
-Pantalla: Cuenta para la mesa
+Pantalla: Cuenta (precuenta)
 Pasos:
 1. Con la cuenta en pantalla, pulsa la impresora del pie («Imprimir cuenta»).
 2. Se abre «Cuenta» con el negocio (nombre, domicilio y NIF del emisor, con la «Cabecera del recibo»

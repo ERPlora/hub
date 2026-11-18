@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:c451ccd8e3374e4c25d12520e8779f2e0a5010962c89a553df89294a1cec6d54 -->
+<!-- generated from WORKBOOK.md sha256:d4aafce230b7313f0d8b4efd247e584150ca4c2c87e0ae63948f6968e2cddbad -->
 
 ## What it is for and who it is for
 
@@ -166,7 +166,7 @@ check to resume it.", and a row per open check of the business (title or amount,
 its bin. Empty: "No open checks". A failure is painted above the rows. It closes by tapping outside, with
 Esc or with the phone's back button.
 
-#### Bill for the table
+#### Bill (pre-bill)
 "Bill" window opened by the footer's printer ("Print bill"): the paper taken to the table, with the notice "Bill — this
 is not an invoice. The fiscal receipt is issued on payment.", and the print and close buttons.
 
@@ -818,7 +818,7 @@ Involved: KITCHEN-F05, KITCHEN-F18, KITCHEN-F19, KITCHEN-F20, KITCHEN-F29, BASE-
 Status: done
 Vertical: restaurant
 Actor: employee, manager
-Screen: Bill for the table
+Screen: Bill (pre-bill)
 Steps:
 1. With the check on screen, press the footer's printer ("Print bill").
 2. "Bill" opens with the business (name, address and tax ID of the issuer, with the "Receipt header"
