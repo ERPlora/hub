@@ -41,7 +41,7 @@ from apps.verifactu.models import (
     SendControl,
     wait_reason_text,
 )
-from apps.verifactu.queries import config_row, waiting_of
+from apps.verifactu.queries.route import config_row, waiting_of
 from base.admin import ADMIN_HUB_SESSION_KEY
 
 #: What the staff may run here: send and ask the AEAT, correct a rejection.

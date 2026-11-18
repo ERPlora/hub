@@ -18,7 +18,7 @@ hub's (hub#1053).
   waits); one that already runs may be (the next step of its run may need it: its claim says whether it goes).
 - **Connections**: a job's thread gives its connections back when the job ends, and ``release()`` gives them back
   before the job waits on the network: no thread idles holding one (``close_old_connections``, as the loop does: every
-  alias has ``CONN_MAX_AGE`` 0; the loop's and these fit in the default alias's pool of 8, ``config/settings.py``).
+  alias has ``CONN_MAX_AGE`` 0; the loop's and these fit in the default alias's pool of 8, ``config/settings/backends.py``).
 - **Stop**: ``stop(grace)``, the worker on its way out (SIGTERM on a deploy): what waits is dropped; what runs gets
   ``grace`` seconds, and what still runs then is left behind (daemon threads end with the process): its lease sends
   it again.

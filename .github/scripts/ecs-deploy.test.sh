@@ -475,11 +475,35 @@ setup
 edit_fixture app-env.json '.pre.hub.VERIFACTU_PRODUCTION_ENABLED = "true" | .pre.worker.VERIFACTU_PRODUCTION_ENABLED = "true"'
 check "settings: pre never opens the AEAT's production environment" \
   'refused_settings pre.hub.VERIFACTU_PRODUCTION_ENABLED: ENVIRONMENT=pre'
-setup
-edit_fixture erplora-prod-worker.json \
-  '.taskDefinition.containerDefinitions[0].environment += [{"name": "VERIFACTU_ERPLORA_ROUTE_ENABLED", "value": "true"}]'
-edit_fixture app-env.json '.prod.worker.VERIFACTU_ERPLORA_ROUTE_ENABLED = "false"'
-check "settings: a variable Terraform sets stays Terraform's" 'refused_settings prod.worker.VERIFACTU_ERPLORA_ROUTE_ENABLED:'
+# One owner per variable. ERPlora/aws passes the settings on from app_env and never sets them itself, so one the latest
+# revisions run and the app_env in force lacks was left by a rollback, or by a deploy that failed after registering.
+left_behind() {
+  setup
+  for f in hub worker; do
+    edit_fixture "erplora-prod-$f.json" \
+      '.taskDefinition.containerDefinitions[0].environment += [{"name": "VERIFACTU_ERPLORA_ROUTE_ENABLED", "value": "false"}]'
+  done
+}
+left_behind
+edit_fixture app-env.json '.prod.hub.VERIFACTU_ERPLORA_ROUTE_ENABLED = "false" | .prod.worker.VERIFACTU_ERPLORA_ROUTE_ENABLED = "false"'
+run_deploy && status=0 || status=$?
+check "one owner: after a deploy that failed after registering, the same file deploys and records the setting" \
+  '[ "$status" -eq 0 ] && [ "$(jq -S -c . "$APP_ENV_PUT")" = "$(jq -S -c .prod "$FIXTURES/app-env.json")" ] &&
+   for f in hub worker; do [ "$(environment_of "erplora-prod-$f" "$f" | jq -r .VERIFACTU_ERPLORA_ROUTE_ENABLED)" = false ] || exit 1; done'
+left_behind
+run_deploy && status=0 || status=$?
+check "one owner: after it, a file without the setting takes it out of the revisions" \
+  '[ "$status" -eq 0 ] && [ "$(jq -S -c . "$APP_ENV_PUT")" = "$(jq -S -c .prod "$FIXTURES/app-env.json")" ] &&
+   for f in hub worker; do [ "$(environment_of "erplora-prod-$f" "$f" | jq "has(\"VERIFACTU_ERPLORA_ROUTE_ENABLED\")")" = false ] || exit 1; done'
+# A secret stays Terraform's whether the app_env in force names it (the slug) or not (the route).
+for setting in PLATFORM_HUB_SLUG=erplora VERIFACTU_ERPLORA_ROUTE_ENABLED=false; do
+  setup
+  edit_fixture erplora-prod-worker.json \
+    ".taskDefinition.containerDefinitions[0].secrets = [{\"name\": \"${setting%%=*}\", \"valueFrom\": \"arn:secret:x\"}]"
+  edit_fixture app-env.json ".prod.worker.${setting%%=*} = \"${setting#*=}\""
+  check "one owner: ${setting%%=*}, given to a family as a secret by Terraform, stays Terraform's" \
+    'refused_settings "prod.worker.${setting%%=*}:"'
+done
 setup
 rm "$FIXTURES/erplora_prod_hub_app_env.json"
 check "settings: without the settings in force nothing is registered" 'refused_settings /erplora/prod/hub/app_env:'

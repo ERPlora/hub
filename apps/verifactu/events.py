@@ -63,7 +63,7 @@ REACTIONS = {INVOICE_ISSUED: "verifactu.record.create"}
 def react(scope: Scope, name: str, payload: dict[str, Any]):
     """Run this app's reaction to the event ``name`` of ``scope`` as the system; ``None`` if it has none, or when the
     business is outside Spain, where VeriFactu seals nothing (delivered, never a failed delivery retried)."""
-    from apps.verifactu.queries import outside_spain  # the models are not loaded yet when this module is
+    from apps.verifactu.queries.country import outside_spain  # the models are not loaded yet when this module is
 
     operation_name = REACTIONS.get(name)
     if operation_name is None or outside_spain(scope):
