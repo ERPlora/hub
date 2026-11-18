@@ -8,6 +8,7 @@ import { DataTable, EmptyState } from '@erplora/ui/components';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Component } from 'vue';
 
+import { cardValues } from '../../../../base/frontend/__tests__/data-table-cards';
 import { itFillsThePage } from '../__tests__/list-fills-the-page';
 import { click, EMPLOYEE, flush, ionValue, type MountOptions, mountReservation, page } from '../__tests__/mount-reservation';
 import { dayOut, reservationRow, settingsOut } from '../__tests__/rows';
@@ -84,10 +85,7 @@ describe('ReservationsPage', () => {
     await s.show([PENDING, reservationRow({ id: 'r3', guest_name: 'John Smith', guest_phone: '+447911123456' })]);
     expect([s.cells(0)[3], s.cells(1)[3]]).toEqual(['+34 600 111 222', '+44 791 112 3456']);
     await ionValue(s.wrapper.find('[data-testid="reservation-list-view"]').element, 'cards');
-    const phones = s.wrapper
-      .findAll('.data-table__field')
-      .filter((field) => field.find('.data-table__field-label').text() === 'Phone')
-      .map((field) => field.find('.data-table__field-value').text().trim());
+    const phones = cardValues(s.wrapper, 'Phone');
     expect(phones).toEqual(['+34 600 111 222', '+44 791 112 3456']);
   });
 
@@ -228,14 +226,11 @@ describe('ReservationsPage: why a reservation was cancelled (RESERVATION-F09, F1
     expect(status.find('[data-testid="reservation-list-reason"]').exists()).toBe(true);
   });
 
-  it('says it in the card too, inside its Status', async () => {
+  it('says it in the card too, inside its Status under the card’s head', async () => {
     const s = await setup();
     await s.show([BY_STAFF, RELEASED, SILENT]);
     await ionValue(s.wrapper.find('[data-testid="reservation-list-view"]').element, 'cards');
-    const statuses = s.wrapper
-      .findAll('.data-table__field')
-      .filter((field) => field.find('.data-table__field-label').text() === 'Status')
-      .map((field) => field.find('.data-table__field-value'));
+    const statuses = s.wrapper.findAll('.data-table__card-status[data-column="status"]');
     expect(statuses.map((value) => value.find('.status-pill').text())).toEqual(['Cancelled', 'Cancelled', 'Cancelled']);
     expect(statuses.map((value) => value.find('[data-testid="reservation-list-reason"]')).map((r) => (r.exists() ? r.text().trim() : null))).toEqual([
       en.reservation.list.cancelReason.replace('{reason}', 'Plans changed'),

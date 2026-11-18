@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:069e3b6654ebedb75bcec0ae40998f88bb62c4e6be3c34807e321cd318fb8be9 -->
+<!-- generated from WORKBOOK.md sha256:31240a81ce8caa066ed65b49a0530b4ea8c6bd1be07125305367f575bce20e4e -->
 
 ## What it is for and who it is for
 
@@ -430,6 +430,7 @@ On the Employees screens and the API documentation:
 | BASE-F112 | Save a downloaded file inside the app | done |
 | BASE-F113 | Keep warning with the screen off (Android app) | done |
 | BASE-F114 | Put a business back as it was at a past moment from the Hub admin | done |
+| BASE-F115 | See the help of a module's screen | partial |
 
 ### BASE-F01 See what the business still has to set up
 Status: done
@@ -3207,3 +3208,28 @@ hub#1282, hub#1283, hub#1284,
 hub#1285, hub#1306, hub#1307, hub#1319, hub#1320, hub#1321, hub#1322, hub#1323, hub#1326, hub#1327, hub#1341, hub#1343,
 hub#1355, hub#1356, hub#1364, hub#1365, hub#1373, hub#1375, hub#1429, hub#1431, hub#1438, hub#1442, hub#1456, hub#1457,
 hub#1458, hub#1459, hub#1473, hub#1474, hub#1495, hub#1505, aws#77
+
+### BASE-F115 See the help of a module's screen
+Status: partial — the Hub already gives the help of each module whose help is ready, in the person's language; the
+window and its "?" button are missing
+Actor: owner, administrator, manager, employee
+Screen: the top bar of a module whose help is ready ("?" button, "Help") and the help window
+Steps:
+  1. In a module whose help is ready, at the top right, next to the assistant, is the "?" button ("Help"). A module
+     whose help is not ready yet does not show it.
+  2. Tapping it opens the help window, centred on a tablet or a computer and from the bottom on a phone. It never
+     opens by itself.
+  3. At the top, the module's video, if it has one, in the person's language or, if there is none, in Spanish. Nothing
+     is asked of YouTube until it is tapped, and it plays inside the window.
+  4. Below, "What it is for"; "On this screen", with a short summary of what the tab the person is on shows, open and
+     marked "You are here"; "How to", with each finished task done in that module, folded, with its steps and what
+     happens if it fails; and "Other screens of this module", folded, each with its short summary.
+  5. "Ask the assistant" closes the help and opens the assistant with the question written, without sending it: about
+     the last task opened or, if none was opened, about the module and the screen. "Close" closes the help.
+In: the module and the tab the person is on.
+Out: nothing: the help is only read. It is the part of the module's user manual the customer reads, in the person's
+language.
+If it fails: while it is read, the window shows its skeleton; if it cannot be read, it says so and lets the person try
+again. Offline, the video says it cannot be watched and the text can still be read. If the manual is not translated
+into the person's language, or its translation fell behind, the help comes in Spanish.
+Involved: BASE-F92, BASE-F93

@@ -7,21 +7,17 @@
 // stations «E2E KST <run> …», products `E2E-KST-<run>-…` and the category «E2E KST <run>» — is deleted after it.
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, api, psql, shot, shown } from './helpers';
+import { A, api, psql, shown } from './helpers';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
+import { capture, SIZES } from './kitchen-helpers';
 import { stamp } from './sale-helpers';
-import { ownerPage, pick, rowAction, settled } from './service-helpers';
+import { ownerPage, pick, rowAction } from './service-helpers';
 
 const RUN = stamp();
 const TAG = `E2E KST ${RUN}`;
 const GRILL = `${TAG} Grill`;
 const BAR = `${TAG} Bar`;
 const CATEGORY = `${TAG} Drinks`;
-const SIZES = [
-  { label: '390', width: 390, height: 844 },
-  { label: '834', width: 834, height: 1112 },
-  { label: '1440', width: 1440, height: 900 },
-];
 
 let burger: Product;
 
@@ -54,16 +50,6 @@ async function choose(page: Page, select: Locator, text: string): Promise<void> 
 
 const row = (page: Page, name: string): Locator => shown(page).locator('[data-testid=kitchen-stations-row]').filter({ hasText: name }).first();
 const route = (page: Page, text: string): Locator => shown(page).locator('[data-testid=kitchen-routing-row]').filter({ hasText: text }).first();
-
-async function capture(page: Page, flow: string, ready: () => Promise<void>): Promise<void> {
-  for (const size of SIZES) {
-    await page.setViewportSize({ width: size.width, height: size.height });
-    await ready();
-    await settled(page);
-    await page.screenshot({ path: shot(`APP-KITCHEN-${flow}-${size.label}`) });
-  }
-  await page.setViewportSize({ width: 1440, height: 900 });
-}
 
 test.beforeAll(async ({ browser }) => {
   cleanRun();
