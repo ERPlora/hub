@@ -108,3 +108,8 @@ def test_a_row_with_an_allergen_off_the_list_fails_alone_with_its_reason(ctx):
 def test_allergens_that_are_not_a_list_or_a_text_load_the_product_without_any(ctx):
     load(ctx, [{**OLD_ROW, "allergens": {"gluten": True}}])
     assert Product.objects.get(sku="ENT-01").allergens == []
+
+
+def test_a_list_with_something_that_is_not_an_allergen_fails_its_row_instead_of_dropping_it(ctx):
+    report = products_report(load(ctx, [{**OLD_ROW, "allergens": ["gluten", 7]}]))
+    assert (report["created"], report["problems"]) == (0, ["«Croquetas»: Alérgeno no reconocido: 7"])

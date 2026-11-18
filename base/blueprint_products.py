@@ -27,5 +27,5 @@ def allergens_cell(row: dict) -> dict:
     if isinstance(written, str):
         return {"allergens": written}
     if isinstance(written, list):
-        return {"allergens": ", ".join(code for code in written if isinstance(code, str))}
+        return {"allergens": ", ".join(str(code) for code in written)}
     return {}
