@@ -39,7 +39,7 @@ function cuts(el: Locator): Promise<string[]> {
     range.selectNodeContents(node);
     const text = range.getBoundingClientRect();
     const found: string[] = [];
-    const cell = node.closest('.data-table__cell, .data-table__field-value') ?? node;
+    const cell = node.closest('.data-table__cell, .data-table__card-meta-value') ?? node;
     for (let at: Element | null = node as Element; at; at = at.parentElement) {
       const style = getComputedStyle(at);
       const box = at.getBoundingClientRect();
@@ -139,7 +139,7 @@ async function toolbarAt(page: Page, size: Size): Promise<Toolbar> {
       if (!pane || typeof pane.when !== 'string') return true;
       return pane.classList.contains('split-pane-visible') === matchMedia(breakpoints[pane.when] ?? pane.when).matches;
     };
-    // helpers.ts's `movingInPage`, put in the page by `exposeMovingInPage`: the one detector of the e2e.
+    // detectors.ts's `movingInPage`, put in the page by `exposeMovingInPage` (helpers.ts): the one detector of the e2e.
     const animating = () => (window as unknown as { __movingInPage: () => string[] }).__movingInPage().length > 0;
     (window as unknown as { __toolbar: Promise<unknown> }).__toolbar = new Promise((resolve) => {
       let last: string | undefined;
@@ -198,7 +198,7 @@ test('BASE-F09 — a sale shows up live in «Activity», its date and time whole
     await page.setViewportSize({ width: vp.width, height: vp.height });
     await page.goto(`${A}/#actividad`);
     const seen = await rowOf(page, sale.id);
-    const cells = seen.locator('.data-table__cell, .data-table__field-value');
+    const cells = seen.locator('.data-table__cell, .data-table__card-meta-value');
     const date = cells.first();
     // The date carries its time («22/10/2026, 9:30»), and nothing clips it, nor any other value of the row.
     await expect(date).toHaveText(/\d{1,2}:\d{2}/);

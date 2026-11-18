@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:0ed55fac6e6c1b0ab779d4cced98bc9628b8c815b9c5f5837ffc6a6ae70f9e02 -->
+<!-- generated from WORKBOOK.md sha256:d1612aa67b73df92eec3bb5a36f5eb599a6643371a6580cc77ac5b82d09d7f89 -->
 
 ## What it is for and who it is for
 
@@ -16,7 +16,7 @@ Who uses it:
 - The **employee** looks at the records, the queue, the events and the state of the chain.
 - The **manager**, besides, sends a given record, processes and retries the queue, looks up what the AEAT has
   and tests the connection.
-- The **owner** and the **administrator**, besides, choose who files (their own certificate or ERPlora), go
+- The **owner** and the **administrator**, besides, upload or remove the business's certificate, go
   live or go back to testing, correct or cancel a record, recover the chain and create the test invoice.
 - The **system**, with nobody in front, records every invoice in the same operation that issues it and sends
   the queue.
@@ -46,7 +46,7 @@ Here the reference is not a competitor: it is the AEAT's rules.
   up to 1,000 records of the same taxpayer per submission.
 - From the market (Odoo `l10n_es_edi_verifactu`, Holded, Sage, Square) the split of screens is copied: a list
   of submissions with their status and their QR, the detail with the AEAT's answer, a send-now button and a
-  cancel one, and the choice of route (own certificate or the provider on your behalf).
+  cancel one, and the two routes (own certificate or the provider on your behalf).
 
 ## Before you start
 
@@ -57,18 +57,20 @@ Here the reference is not a competitor: it is the AEAT's rules.
   invoice, it does not ask for them again.
 - **The environment** starts in **testing** (the AEAT's test environment): nothing issued counts before the tax
   agency until going live (VERIFACTU-F08).
-- **The sending route**: either ERPlora files on your behalf with its seal (for production it needs your signed
-  authorisation, the Annex I, approved by ERPlora), or you file yourself with your own certificate. The
+- **The sending route** is not chosen: your certificate decides it (VERIFACTU-F04). With your own certificate
+  loaded and in force, you file yourself with it; without it, in testing ERPlora files on your behalf with its seal.
+  Going live needs your certificate or, where ERPlora files on behalf of businesses, your signed authorisation (the
+  Annex I) approved by ERPlora; with both, the certificate wins, and the route of that moment is fixed. The
   authorisation (the representation authorisation) is signed and uploaded here, in "ERPlora files for you", and
-  ERPlora reviews it; the certificate is uploaded here, in "My certificate". Here you choose which one to use.
-- **On the Home**, while the chosen route cannot carry your records to the AEAT's production environment (ERPlora
-  without the approved authorisation, or your certificate not uploaded or expired), "Finish setting up your
-  business" reminds you with "Set up VeriFactu"; its "Set up" leads to VeriFactu → Configuration, and the step turns
-  "Done" as soon as ERPlora approves the authorisation or you upload and choose your certificate. In testing it
-  carries the "Important" pill (it does not hold back selling: in testing you sell just the same) and only whoever
-  sets up VeriFactu sees it. In production (VERIFACTU-F08), if the route is lost (the authorisation is revoked, or
-  the certificate expires or is removed), it carries "Needed to invoice" and the strip "You cannot invoice yet" shows
-  above the other screens, because every new sale is refused; the whole team sees it, and whoever does not set up
+  ERPlora reviews it; the certificate is uploaded here, in "My certificate".
+- **On the Home**, while you have no way to carry your records to the AEAT's production environment (neither your
+  certificate in force nor the approved authorisation), "Finish setting up your business" reminds you with "Set up
+  VeriFactu"; its "Set up" leads to VeriFactu → Configuration, and the step turns "Done" as soon as you upload your
+  certificate or ERPlora approves the authorisation. In testing it carries the "Important" pill (it does not hold
+  back selling: in testing you sell just the same) and only whoever sets up VeriFactu sees it. In production
+  (VERIFACTU-F08), if the fixed route is lost (with ERPlora's, the authorisation is revoked; with the certificate's,
+  it expires or is removed), it carries "Needed to invoice" and the bell carries the notice "You cannot issue
+  invoices yet", with "Set up VeriFactu", because every new sale is refused; the whole team sees it, and whoever does not set up
   VeriFactu is told "An administrator has to set this up.". Only a business in Spain is asked; one without a
   country (a demo) counts as Spain, and one from another country never sees it, neither in testing nor in production
   (hub#682).
@@ -180,23 +182,31 @@ the two routes:
   ID", "Kind", "Uploaded on" and "Expires on" (with the notice "Expires in {n} days: upload the renewed one here." at
   30 days or less and "The certificate has expired. Upload a valid one to send to the AEAT."). Whoever sets up
   VeriFactu sees "Choose the .p12 / .pfx file", "Certificate password", "Upload the certificate" and, with one
-  loaded, "Remove" (it asks first, in a card). Note: "The certificate and its password are kept encrypted in this
-  Hub and only travel to ERPlora's gateway when sending to the AEAT; they are never shown again.".
+  loaded, "Remove" (it asks first, in a card that says what will happen: in testing, "You can keep testing without
+  it: your test records keep going out."; in production with your certificate, "Records will wait until you upload
+  another certificate."; in production with ERPlora, "Your records keep going out with ERPlora's seal."). Note: "The
+  certificate and its password are kept encrypted in this Hub and only travel to ERPlora's gateway when sending to
+  the AEAT; they are never shown again.".
 When ERPlora's route is unavailable, there are no tabs and nothing of the authorisation is shown. The certificate
 is the only card: its status says "No certificate uploaded", "Valid", "Expires soon" or "Expired", along with its
 details and expiry notices. In testing without a certificate, "You can test VeriFactu without a certificate. You only
 need one to go live."; in production, "Upload a valid certificate to send your records to the AEAT.". "Upload the
 certificate" is the only primary action; choosing the file and removing it are secondary. When removing it, the
-notice only says that records will wait until another one is uploaded. The encryption note does not mention ERPlora's
-route.
+notice is the same as with the tabs. The encryption note does not mention ERPlora's route.
 In a business outside Spain, on top shows "VeriFactu is only for businesses in Spain." as the only reason: "ERPlora
 files for you", if available, shows neither the authorisation nor the procedure, and the certificate only shows its
 status, without uploading or removing it.
 
 ### Settings
 Menu **VeriFactu → Settings**. Title "VeriFactu settings". Three blocks:
-- **"Sending"**: with ERPlora's route available, "Use my own certificate" (switch, with its explanation by route)
-  and "AEAT environment" with the pill "Testing (AEAT test)" or "Production" and, as the case may be, "Go live" (with
+- **"Sending"**: with ERPlora's route available, a sentence with its icon says which route the records go out by
+  and what is missing (VERIFACTU-F04), with "Open Configuration": with your certificate, "You file directly with the
+  tax agency using your business certificate, uploaded in Configuration → My certificate."; by ERPlora with the
+  approved authorisation, "ERPlora files your billing records with the tax agency on your behalf, with its own seal:
+  your signed authorisation is approved."; by ERPlora in testing without it, "ERPlora files your test records with
+  its seal. To go live, upload your business certificate or get ERPlora to approve your signed authorisation."; by
+  ERPlora in production without it, "ERPlora files on your behalf with its seal, but your signed authorisation is not
+  approved: your records wait until it is.". Below, "AEAT environment" with the pill "Testing (AEAT test)" or "Production" and, as the case may be, "Go live" (with
   "It cannot go live yet:" and what is missing, if something is missing) or "Back to testing" with its explanation
   and its confirmation; in production, "New sales and invoices are refused until this is fixed:" and the reason, if
   there is no route to the AEAT, and "Records are waiting:" and why, if they wait.
@@ -207,13 +217,14 @@ Menu **VeriFactu → Settings**. Title "VeriFactu settings". Three blocks:
   this system" (Producer, Producer tax ID, System name, System code, Installed version, Installation number,
   VERI\*FACTU only, Can serve several taxpayers, Serves several taxpayers: always "S").
 When ERPlora's route is unavailable, "Sending" shows the certificate status and "Upload your certificate" or
-"Manage certificate", without the switch or any reference to the authorisation. If it is needed for production, an
-information notice beside "Go live" says "You can keep testing. To go live, upload your business certificate." and
-links to "Upload your certificate"; the other blockers stay in their list and the button is disabled while any remain.
-Confirming "Go live" with a valid certificate first chooses the own route in the same action. Notices and diagnostics
-do not bring back the authorisation or the old route's name, and "Test the connection" is secondary in testing.
-In a business outside Spain, on top shows "VeriFactu is only for businesses in Spain." as the only reason, and the
-switch, if available, "Go live", "Test the connection" and "Create test invoice" are disabled.
+"Manage certificate", without the route's sentence or any reference to the authorisation. If it is needed for
+production, an information notice beside "Go live" says "You can keep testing. To go live, upload your business
+certificate.", with no link of its own: the action is the one beside the certificate status, a single one in the
+card; the other blockers stay in their list and the button is
+disabled while any remain. Notices and diagnostics do not bring back the authorisation or the old route's name, and
+"Test the connection" is secondary in testing.
+In a business outside Spain, on top shows "VeriFactu is only for businesses in Spain." as the only reason, and "Go
+live", "Test the connection" and "Create test invoice" are disabled.
 Screen notices: the result of each action in a strip on top (green if it went well, red if not).
 
 ## States of each screen
@@ -234,10 +245,10 @@ Screen notices: the result of each action in a strip on top (green if it went we
 | VERIFACTU-F01 | Activate VeriFactu | done — turning the app on in the Hub is activating it, in that business; outside Spain, Apps does not offer it and the hub refuses it (`can_enable`, hub#694), and one already on records and sends nothing |
 | VERIFACTU-F02 | Upload the business's own certificate | done — in the Hub; encrypted in the hub's DB with `FISCAL_CERTIFICATE_KEY` |
 | VERIFACTU-F03 | Remove the own certificate | done — in the Hub |
-| VERIFACTU-F04 | Choose who files: my certificate or ERPlora | done — the ERPlora route can only be chosen while the server keeps it open (`VERIFACTU_ERPLORA_ROUTE_ENABLED`) |
+| VERIFACTU-F04 | Know who files: my certificate or ERPlora | done — the route is not chosen: the certificate decides it and it is fixed on going live |
 | VERIFACTU-F05 | Sign and upload the representation authorisation so ERPlora files | done — uploaded in the Hub, reviewed by staff in the SaaS (`fiscal/`) and the status comes back in the snapshot; with the ERPlora route closed on the server it is not offered |
 | VERIFACTU-F06 | Send the authorisation again | done — in the Hub, like VERIFACTU-F05 |
-| VERIFACTU-F08 | Go live | done — production = `prod` deployment ∧ `VERIFACTU_PRODUCTION_ENABLED` ∧ (own route with a valid certificate \| ERPlora route open on the server with an approved authorisation) ∧ active account, in every plan (Free included); the server keeps it closed until ERPlora opens it (under Ioan's supervision) |
+| VERIFACTU-F08 | Go live | done — production = `prod` deployment ∧ `VERIFACTU_PRODUCTION_ENABLED` ∧ (a valid own certificate \| ERPlora route open on the server with an approved authorisation) ∧ active account, in every plan (Free included); the server keeps it closed until ERPlora opens it (under Ioan's supervision) |
 | VERIFACTU-F09 | Go back to testing | done |
 | VERIFACTU-F10 | Test the connection with the AEAT | done — with the SaaS gateway's probe (`/internal/verifactu/probe`) |
 | VERIFACTU-F11 | Create a test invoice | done |
@@ -280,8 +291,8 @@ Steps:
 4. If it was already on in a business from another country, it does nothing and can be turned off: invoices go out without a record or QR, **VeriFactu → Settings** and **VeriFactu → Configuration**
    say on top "VeriFactu is only for businesses in Spain." without offering anything that leads to the AEAT, and
    whatever asks to record or send something answers the same.
-   "Finish setting up your business", on the Home, does not ask it to "Set up VeriFactu" nor does the strip "You
-   cannot invoice yet" show because of it; a business without a country (a demo) counts as Spain and does see it
+   "Finish setting up your business", on the Home, does not ask it to "Set up VeriFactu" nor does the bell's notice
+   "You cannot issue invoices yet" show because of it; a business without a country (a demo) counts as Spain and does see it
    (hub#682).
 5. No template turns it on, in Spain either: neither the Home's "Start with a business like yours" nor "Use template"
    in **Settings → Data and backups** names it in "Review what it brings" or turns it on. They load everything else of
@@ -304,7 +315,9 @@ Steps:
 3. The Hub opens it with the password, reads holder, tax ID, kind and expiry and keeps it encrypted (Fernet)
    together with the password in the hub's database. "Certificate uploaded: {holder} ({taxId})." shows and the tab
    turns "Loaded". Uploading another one replaces the previous one.
-4. In a business outside Spain it is not offered: on top it says "VeriFactu is only for businesses in Spain." and
+4. While the business is in testing, from that moment its records go out with it (VERIFACTU-F04), also those the
+   gateway had refused, and it can now go live with it (VERIFACTU-F08).
+5. In a business outside Spain it is not offered: on top it says "VeriFactu is only for businesses in Spain." and
    the tab only shows the certificate's status, without uploading or removing it.
 In: the `.p12`/`.pfx` in base64 and its password (`verifactu.certificate.upload`).
 Out: the certificate kept (`OwnCertificate`), an event "Own certificate of … uploaded" and the notice
@@ -315,7 +328,9 @@ If it fails: the certificate is not kept (409):
   key." (`verifactu.certificate_storage_unavailable`);
 - with no issuer, "Set up the issuer first in Invoicing → Issuer." (`verifactu.issuer_missing`);
 - a wrong password or a file that is not a `.p12`, "The file is not a .p12/.pfx certificate that this password
-  opens."; without client-authentication use, "The certificate does not allow client authentication, so it cannot
+  opens."; self-signed, "No authority issued this certificate (it is self-signed), so the AEAT will not accept it.
+  Use your business's electronic certificate issued by a recognised authority, for example the FNMT."; without
+  client-authentication use, "The certificate does not allow client authentication, so it cannot
   connect to the AEAT."; expired, "The certificate expired on {date}: upload a valid one."
   (all `verifactu.certificate_invalid`);
 - a holder other than Invoicing's issuer, "The certificate belongs to {tax ID}, not to this business's issuer {tax
@@ -327,43 +342,46 @@ Status: done — in the Hub
 Actor: owner and administrator (configure)
 Screen: Configuration
 Steps:
-1. In "My certificate", with one loaded, tap "Remove"; a card asks "Remove the certificate?".
+1. In "My certificate", with one loaded, tap "Remove"; a card asks "Remove the certificate?" and says what will
+   happen (the Configuration screen).
 2. On confirming, the certificate is deleted from the hub's database, "Certificate removed." shows and the tab
    turns "Not loaded".
-3. If the route was "my certificate", the records can no longer go out until another one is uploaded or ERPlora
-   is chosen (VERIFACTU-F04): they wait in the queue with the reason "your own certificate is not loaded or has
-   expired".
+3. In testing, the records not sent yet go out with ERPlora's seal instead (VERIFACTU-F04), also those the gateway
+   had refused. In production with the certificate's route fixed, they can no longer go out until another one is
+   uploaded: they wait in the queue with the reason "your own certificate is not loaded or has expired" and new
+   sales are refused (VERIFACTU-F08); they never go back to the seal. In production with ERPlora's route fixed,
+   nothing changes.
 In: nothing (`verifactu.certificate.remove`).
 Out: the certificate deleted, an event "Own certificate of … removed" and the notice `verifactu.config.changed`.
 If it fails: without the configure permission, 403.
-Involved: VERIFACTU-F04
+Involved: VERIFACTU-F04, VERIFACTU-F08
 
-### VERIFACTU-F04 Choose who files: my certificate or ERPlora
-Status: done
+### VERIFACTU-F04 Know who files: my certificate or ERPlora
+Status: done — the route is not chosen: the certificate decides it and it is fixed on going live
 Actor: administrator
 Screen: Settings
 Steps:
-1. In **VeriFactu → Settings**, the switch "Use my own certificate" shows the current route with its explanation:
-   "ERPlora files your billing records with the tax agency on your behalf, with its own seal. You do not need a
-   certificate." or "You file directly with the tax agency using your business certificate, uploaded in
-   Configuration → My certificate.".
-2. Change it.
-3. "Done: from now on you send with your own certificate." or "Done: from now on ERPlora files on your behalf."
-   shows.
-4. In a business outside Spain, on top it says "VeriFactu is only for businesses in Spain." and the switch is
-   disabled.
-5. ERPlora can close its route on the server (`VERIFACTU_ERPLORA_ROUTE_ENABLED` set to false; open by default):
-   then nobody can move to it and only the own certificate is left. Whoever is already on it carries on: in testing
-   it files with ERPlora's seal and, if already live, keeps sending and cancelling through it. ERPlora's own business
-   is not affected.
-In: the chosen route; the uploaded certificate (VERIFACTU-F02) and the authorisation's status, from the account.
-Out: the route kept; the next records go out through it (it announces `verifactu.config.changed`).
-If it fails: with no valid certificate, "There is no valid certificate loaded: upload it in VeriFactu →
-Configuration → My certificate."; in production and through the ERPlora route with no approved authorisation, "For
-ERPlora to file in production, ERPlora still has to approve your signed authorisation."; with the ERPlora route
-closed on the server, moving to it gives "ERPlora does not file on behalf of businesses for now: file with your own
-certificate." (409 `verifactu.erplora_route_unavailable`). The switch goes back to the real route.
-Involved: VERIFACTU-F02, VERIFACTU-F05
+1. The certificate decides the route. With an own certificate loaded and in force (VERIFACTU-F02), the records go
+   out with it; without it, in testing ERPlora files them with its seal, also in a demo business. While the business
+   is in testing, uploading, removing or letting the certificate expire changes the route of what has not gone out
+   yet.
+2. In **VeriFactu → Settings**, "Sending" says it in a sentence with its icon, along with what is missing (the
+   Settings screen).
+3. On going live (VERIFACTU-F08), the route of that moment is fixed: with a valid certificate, the certificate, even
+   if the authorisation is approved too; without it, ERPlora's. From then on, uploading, removing or letting the
+   certificate expire does not change it. With the certificate's route fixed and no valid certificate, the records
+   wait and new sales are refused (VERIFACTU-F08); they never go back to the seal. With ERPlora's route fixed, it
+   keeps sending and cancelling with the seal while its authorisation stays approved.
+4. ERPlora can close its route on the server (`VERIFACTU_ERPLORA_ROUTE_ENABLED` set to false; open by default):
+   then going live is only possible with the own certificate. Testing without a certificate, demos included, keeps
+   going out with the seal, and whoever is already live through it keeps sending and cancelling through it. ERPlora's
+   own business is not affected: it always files with the seal.
+5. In a business outside Spain, on top it says "VeriFactu is only for businesses in Spain.".
+In: the uploaded certificate (VERIFACTU-F02, F03), the environment and, from the account, the authorisation's status.
+Out: the route each record goes out by, in `verifactu.config.get` (`route`); on going live, kept.
+If it fails: there is nothing to choose and nothing to refuse. What is missing to send is said by "Records are
+waiting:", and what is missing to go live, by VERIFACTU-F08.
+Involved: VERIFACTU-F02, VERIFACTU-F03, VERIFACTU-F05, VERIFACTU-F08
 
 ### VERIFACTU-F05 Sign and upload the representation authorisation so ERPlora files
 Status: done — uploaded in the Hub, reviewed by staff in the SaaS and the status comes back in the snapshot
@@ -423,8 +441,8 @@ If it fails: like VERIFACTU-F05.
 Involved: VERIFACTU-F05
 
 ### VERIFACTU-F08 Go live
-Status: done — production = `prod` deployment ∧ `VERIFACTU_PRODUCTION_ENABLED` ∧ (own route with a valid
-certificate | ERPlora route open on the server with an approved authorisation) ∧ active account (`status` of the snapshot), in every
+Status: done — production = `prod` deployment ∧ `VERIFACTU_PRODUCTION_ENABLED` ∧ (a valid own certificate |
+ERPlora route open on the server with an approved authorisation) ∧ active account (`status` of the snapshot), in every
 plan (Free included, with no paid option); the server keeps it closed until ERPlora opens it (under Ioan's supervision). In `pre` it never opens: everything goes to testing. A
 demo hub never goes live (`verifactu.go_live_forbidden`).
 Actor: administrator
@@ -439,10 +457,12 @@ Steps:
    real AEAT. As soon as the first one is sealed you can no longer go back to testing.").
 3. "Your business is live: records now go to the real AEAT." shows and the pill turns
    "Production".
-In: Invoicing's issuer; the route and its status; from the account's snapshot (`verifactu.config.sync`), the
-authorisation and the business's status (the snapshot of an older SaaS still brings `live_paid`: it is accepted and not read).
-Out: the environment in production (it announces `verifactu.config.changed`): new records are born in the
-production chain, with the real site's QR; those born in testing keep going to testing.
+In: Invoicing's issuer; the own certificate and its expiry; from the account's snapshot (`verifactu.config.sync`),
+the authorisation and the business's status (the snapshot of an older SaaS still brings `live_paid`: it is accepted
+and not read).
+Out: the environment in production and the route of that moment fixed (VERIFACTU-F04: with a valid certificate, the
+certificate; without it, ERPlora's), announcing `verifactu.config.changed`: new records are born in the production
+chain, with the real site's QR; those born in testing keep going to testing.
 If it fails: while ERPlora does not open it on the server, "Going live is not open on this server yet: ERPlora
 opens it when the real submission is ready." (in Settings, in the list of what is missing: "ERPlora has not opened
 real filing with the AEAT on this server yet", `production_closed`); without the SaaS gateway on the server,
@@ -452,35 +472,33 @@ real filing with the AEAT on this server yet", `production_closed`); without the
 again in VeriFactu → Configuration → My certificate." (`verifactu.own_certificate_unreadable`); in a demo hub, "A demo
 business cannot go live: it always files in the AEAT's test environment." (`verifactu.go_live_forbidden`;
 who is a demo is said by the platform, `base.operations.is_demo_hub`); with no issuer, "Set up the issuer first in
-Invoicing → Issuer."; through the ERPlora route with no approved authorisation, "For ERPlora to file in production,
-ERPlora still has to approve your signed authorisation." (`verifactu.representation_not_approved`); through the
-ERPlora route while the server keeps it closed, approved authorisation or not, "To go live, upload your own
-certificate and choose it as the sending route: ERPlora does not file on behalf of businesses for now."
-(`verifactu.own_certificate_required`; in the list of what is missing: "ERPlora does not file on behalf of businesses
-for now: use your own certificate", `own_certificate_required`); with the account
+Invoicing → Issuer."; with no valid certificate and no approved authorisation, "For ERPlora to file in production,
+ERPlora still has to approve your signed authorisation." (`verifactu.representation_not_approved`); with no valid
+certificate while the server keeps the ERPlora route closed, approved authorisation or not, "To go live, upload your
+own certificate: ERPlora does not file on behalf of businesses for now." (`verifactu.own_certificate_required`; in the
+list of what is missing: "ERPlora does not file on behalf of businesses for now: use your own certificate",
+`own_certificate_required`); with the account
 with a pending payment or suspended, "Your ERPlora account has a pending payment or is suspended: settle it in your
-ERPlora account to go live." (`verifactu.hub_not_active`); with an own certificate missing or expired, "There is no
-valid certificate loaded: upload it in VeriFactu → Configuration → My certificate."
-(`verifactu.no_own_certificate`). All of them are 409 and the environment stays in testing. Already in production,
-it does nothing.
+ERPlora account to go live." (`verifactu.hub_not_active`). All of them are 409 and the environment stays in testing.
+Already in production, it does nothing.
 In a business outside Spain it is refused as with the app off, "VeriFactu is only for businesses in Spain." (404
 `app_inactive`), and Settings says it on top, "VeriFactu is only for businesses in Spain.", as the only reason
 (without the list of what is missing), with "Go live" disabled.
-If the route is lost in production (the snapshot stops bringing the approved authorisation, or the own certificate
-expires), it does not go back to testing (there are production records already): **nothing new is sealed** —the
+If the fixed route is lost in production (with ERPlora's, the snapshot stops bringing the approved authorisation;
+with the certificate's, it expires or is removed), it neither changes route nor goes back to testing (there are production records already): **nothing new is sealed** —the
 sale or the invoice is refused with 409 and the route's code (`verifactu.representation_not_approved`,
 `verifactu.own_certificate_missing`) and "Nothing was issued: this business files for real with the AEAT and cannot
 reach it now:", the reason and "Fix it in VeriFactu → Settings and try again."— and Settings says it under "New sales
 and invoices are refused until this is fixed:" (`issue_blocker`). What was already sealed with no approved
-authorisation or no valid certificate waits, because the gateway could not file it. Switching to the ERPlora route
-in production without the approved authorisation is refused the same way.
-Closing the ERPlora route on the server does not take anyone already live through it out of production: it keeps
-sealing, sending and cancelling with ERPlora's seal, because the AEAT only takes a cancellation filed with the same
-seal. With the route closed, the Home's "Set up VeriFactu" step is only done with the own certificate.
+authorisation or no valid certificate waits, because the gateway could not file it.
+Closing the ERPlora route on the server neither takes anyone already live through it out of production nor changes
+their route: it keeps sealing, sending and cancelling with ERPlora's seal, because the AEAT only takes a cancellation
+filed with the same seal; uploading a certificate afterwards does not change it either. With the route closed, the
+Home's "Set up VeriFactu" step is only done with the own certificate.
 It is checked in this order and the first cause gives the 409 with its code: the closed server → a demo
-business → the issuer → the route (ERPlora's, open on the server; the own certificate needs no authorisation) → the
-account.
-Involved: VERIFACTU-F05, VERIFACTU-F09
+business → the issuer → the route (with a valid certificate, the certificate, which needs no authorisation; without
+it, ERPlora's, open on the server and with the approved authorisation) → the account.
+Involved: VERIFACTU-F04, VERIFACTU-F05, VERIFACTU-F09
 
 ### VERIFACTU-F09 Go back to testing
 Status: done
@@ -926,7 +944,8 @@ Steps:
 2. The new certificate is uploaded as in VERIFACTU-F02 and replaces the previous one; the chain does not change.
 In: the renewed certificate.
 Out: the new one, instead of the previous one.
-If it fails: expired and with the route "my certificate", the records wait with the reason; if the server changed
+If it fails: expired, in testing the records go out with ERPlora's seal until the renewed one is uploaded, and in
+production with the certificate's route fixed they wait with the reason; if the server changed
 its storage key and cannot open the kept one, they wait with "your own certificate cannot be opened on this server:
 upload it again".
 Involved: VERIFACTU-F02
@@ -968,7 +987,7 @@ invoice** (`TICKET-2026-000012`) or by its sequence; an issuer, by its tax ID.
 
 | What it gives | Who can | Flows | Service |
 |---|---|---|---|
-| The configuration: environment, route (and whether ERPlora's can be chosen), own certificate (holder, tax ID, kind, expiry; never its material), status of the authorisation, producer's data, declaration | view | F02, F04, F08, F09, F12 | `verifactu.config.get` |
+| The configuration: environment, route the records go out by (and whether ERPlora's is available), own certificate (holder, tax ID, kind, expiry; never its material), status of the authorisation, producer's data, declaration | view | F02, F04, F08, F09, F12 | `verifactu.config.get` |
 | The records, with search, filters, sorting and pages (up to 100) | view | F16 | `verifactu.record.list` |
 | A record, by its id or by its invoice's number, with its QR, its XML and why it waits | view | F17, F18 | `verifactu.record.get` |
 | The current record of an invoice (QR, CSV, status) | view | F19 | `verifactu.record.by_invoice` |
@@ -1001,7 +1020,6 @@ All of them can be followed live.
 | Continues the chain from an external fingerprint | configure | F29 | `verifactu.chain.recover_manual` |
 | Tests the connection without filing anything | send | F10 | `verifactu.diagnostic.run` |
 | Creates the test invoice (in testing) | configure | F11 | `verifactu.test_invoice.create` |
-| Chooses the sending route | configure | F04 | `verifactu.config.update` |
 | Goes live | configure | F08 | `verifactu.config.go_live` |
 | Goes back to testing | configure | F09 | `verifactu.config.back_to_testing` |
 | Uploads (or replaces) the own certificate | configure | F02, F34 | `verifactu.certificate.upload` |
@@ -1069,7 +1087,7 @@ delivered).
 | Record an issued invoice (Invoicing asks for it with the session of whoever issues) | yes | yes | yes | yes | `verifactu.add_record` |
 | Send, process and retry the queue, query the AEAT, test the connection | yes | yes | yes | no | `verifactu.transmit_record` |
 | Correct and cancel records | yes | yes | no | no | `verifactu.correct_record` |
-| Upload and remove the own certificate, choose the route, go live and back, recover the chain, test invoice | yes | yes | no | no | `verifactu.configure` |
+| Upload and remove the own certificate, go live and back, recover the chain, test invoice | yes | yes | no | no | `verifactu.configure` |
 
 The roles arrive from the SaaS with a prefix (`hub_owner`, `hub_admin`, `hub_manager`, `hub_employee`). Keeping
 what the account sends (`verifactu.sync_config`) belongs to no role: only to the system.

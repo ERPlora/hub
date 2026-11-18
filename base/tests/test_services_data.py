@@ -22,7 +22,7 @@ from live.errors import Conflict, InvalidPayload, NotFound, OperationError, Perm
 from live.models import OutboxEvent
 from live.operations import get
 
-from apps.verifactu.queries import enable_refusal
+from apps.verifactu.queries.app_hooks import enable_refusal
 from base import activation, blueprint, events as base_events, relay, services
 from base.catalog import template_apps
 from base.models import AppActivation, Hub, ImportBatch, Membership

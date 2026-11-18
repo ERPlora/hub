@@ -22,12 +22,14 @@
 // figure in the three viewports; the maximum goes back to what it was.
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
-import { A, api, EMPLOYEE, login, OWNER, psql, shot, shown, untilStill, usernameOf, usernamesOf } from './helpers';
+import { A, api, EMPLOYEE, login, OWNER, psql, shot, shown, untilStill, usernamesOf } from './helpers';
+import { usernameOf } from './business';
 import { cleanUp as cleanCustomers, createCard, e2eName } from './customer-helpers';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
 import { ensureIssuer, snapshotSeries } from './invoice-helpers';
 import { chargeByApi, cleanSales, drawerOff, restoreDrawer, type SaleOut, stamp } from './sale-helpers';
-import { cleanUp as cleanServices, named, post } from './service-helpers';
+import { cleanUp as cleanServices, named, post, rowAction } from './service-helpers';
+import { toastSaying } from './toast-helpers';
 import { discardChanges } from './unsaved-back-helpers';
 
 const KEY = 'FIX-SALE-VOID-REFUND-ASKS-NO-APPROVAL';
@@ -145,7 +147,7 @@ async function detail(sale: SaleOut): Promise<Detail> {
 /** The cashier asks to void `sale` from Sales with `reason`: «An approval is needed» opens over the window. */
 async function askToVoid(page: Page, sale: SaleOut, reason: string) {
   await find(page, sale);
-  await shown(page).locator(`[data-testid=sales-table-row-${sale.id}-void]`).first().click();
+  await rowAction(page, 'sales-table', sale.id, 'void');
   const modal = page.locator('ion-modal[data-testid=sale-void]');
   await expect(modal).toBeVisible();
   await modal.locator('[data-testid=sale-void-reason] textarea').fill(reason);
@@ -177,7 +179,7 @@ const sessionOf = (sale: SaleOut): string =>
 test('SALE-F30: the cashier voids a charged ticket and the owner approves it with their PIN', async () => {
   const { page } = cashier;
   await find(page, toVoid);
-  await shown(page).locator(`[data-testid=sales-table-row-${toVoid.id}-void]`).first().click();
+  await rowAction(page, 'sales-table', toVoid.id, 'void');
   const modal = page.locator('ion-modal[data-testid=sale-void]');
   await expect(modal).toBeVisible();
   await modal.locator('[data-testid=sale-void-reason] textarea').fill('e2e wrong ticket');
@@ -196,7 +198,7 @@ test('SALE-F30: the cashier voids a charged ticket and the owner approves it wit
   await ownerApproves(page);
   await expect(dialog).toBeHidden();
   await expect(modal).toBeHidden();
-  await expect(page.locator('ion-toast').filter({ hasText: /Sale voided|Venta anulada/ }).first()).toBeVisible();
+  await expect(toastSaying(page, /Sale voided|Venta anulada/)).toBeVisible();
   await expect(row(page, toVoid)).toContainText(/Voided|Anulada/);
   const stored = await detail(toVoid);
   expect([stored.status, stored.void_reason, stored.voided_by]).toEqual(['voided', 'e2e wrong ticket', cashierName]);
@@ -207,7 +209,7 @@ test('SALE-F30: the cashier voids a charged ticket and the owner approves it wit
 test('SALE-F31: the cashier refunds a charged ticket and the owner approves it with their PIN', async () => {
   const { page } = cashier;
   await find(page, toRefund);
-  await shown(page).locator(`[data-testid=sales-table-row-${toRefund.id}-refund]`).first().click();
+  await rowAction(page, 'sales-table', toRefund.id, 'refund');
   const modal = page.locator('ion-modal[data-testid=sale-refund]');
   await expect(modal).toBeVisible();
   await expect(modal.locator(`[data-testid=refund-tender-${toRefund.payments[0].id}]`)).toBeVisible();
@@ -220,7 +222,7 @@ test('SALE-F31: the cashier refunds a charged ticket and the owner approves it w
   await ownerApproves(page);
   await expect(dialog).toBeHidden();
   await expect(modal).toBeHidden();
-  await expect(page.locator('ion-toast').filter({ hasText: /Refund recorded\.|Devolución registrada\./ }).first()).toBeVisible();
+  await expect(toastSaying(page, /Refund recorded\.|Devolución registrada\./)).toBeVisible();
   await expect.poll(async () => (await detail(toRefund)).status).toBe('refunded');
   await expect(row(page, toRefund)).toContainText(/Refunded|Devuelta/);
 });
@@ -228,7 +230,7 @@ test('SALE-F31: the cashier refunds a charged ticket and the owner approves it w
 test('SALE-F30: «Cancel» on the approval leaves its refusal inside the window, and nothing is voided', async () => {
   const { page } = cashier;
   await find(page, toKeep);
-  await shown(page).locator(`[data-testid=sales-table-row-${toKeep.id}-void]`).first().click();
+  await rowAction(page, 'sales-table', toKeep.id, 'void');
   const modal = page.locator('ion-modal[data-testid=sale-void]');
   await expect(modal).toBeVisible();
   await modal.locator('[data-testid=sale-void-reason] textarea').fill('e2e not approved');

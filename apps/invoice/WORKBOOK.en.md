@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:01bbe865cc6da71c2d9c7b4f8e14ece45ade5f8f3cfc5b5573bc005f49242e46 -->
+<!-- generated from WORKBOOK.md sha256:d7fe1051ab3a80b2405028ddb09bd9f42b61909349c063750e2ad5f8698b778e -->
 
 ## What it is for and who it is for
 
@@ -54,9 +54,9 @@ Here the official specification prevails over the market:
   **VeriFactu** does not turn on by itself, but in Spain it is needed for every invoice to reach the AEAT.
 - **The issuer** (legal name, tax ID and address of the business) is mandatory: **without it no document
   is issued** (Invoicing → Issuer, INVOICE-F21); until then, Home asks for it in "Finish setting up your
-  business" with the step "Your business details" and the pill "Needed to invoice", and the banner "You
-  cannot issue invoices yet" warns about it above the other screens, **Invoices** and **Series** too,
-  with "Set up". The issuer is typed here, by hand: it does not come from the
+  business" with the step "Your business details" and the pill "Needed to invoice", and the bell carries the
+  notice "You cannot issue invoices yet" on any screen, with "Set up your business details". The issuer is typed
+  here, by hand: it does not come from the
   ERPlora account.
 - **"Today" is Madrid time** in phase 1 (the Hub does not keep the business's time zone yet): it decides
   the date of each document and, with it, the year of its series. A charge at 00:30 on 1 January numbers
@@ -85,11 +85,10 @@ Menu **Invoicing → Invoices**. Table paginated 50 at a time (table or card vie
 with the number as title) with "Number", "Customer", "Total", "Status", "Date" and "Type"; every column
 sorts. Search box "Search invoices…" (number, name or tax ID of the customer) and filters for "Status",
 "Type", "Series", "Source", "Date" (between two days) and "Total" (between two amounts, in the business's
-currency). Unsorted, the latest issued comes on top. While the issuer is not set up, on top comes, once,
-"You cannot issue invoices yet", the banner of every screen ("No ticket or invoice can be issued until
-this is set up:", "Your business details" and "Set up", which opens **Issuer**; to whoever cannot change
-the issuer, instead of "Set up", "An administrator has to set this up."), with no other identical warning
-below. Per row: "View" (also when tapping the row), "Mark as paid" (only on those "Issued" that are not
+currency). Unsorted, the latest issued comes on top. While the issuer is not set up, the bell's notice "You cannot
+issue invoices yet" says it once ("No ticket or invoice can be issued until this is set up: Your business details."
+and "Set up your business details", which opens **Issuer**; to whoever cannot change the issuer, with no button,
+"An administrator has to set this up."), with no other identical warning on the screen. Per row: "View" (also when tapping the row), "Mark as paid" (only on those "Issued" that are not
 rectifying invoices) and "Rectify" (only on those that are not rectifying invoices and are neither
 cancelled nor replaced). The **+** button opens "New manual invoice" (INVOICE-F03); without permission to
 issue it does not appear, nor does "Mark as paid". The list updates by itself when an invoice is issued,
@@ -151,7 +150,8 @@ prefix, the format and the counter of the numbering of one invoice type and one 
 "Code", "Name", "Type", "Year", "Prefix", "Format" (empty reads `PREFIX-YYYY-NNNNNN`), "Current no.",
 "Active" and "Default"; search box "Search code, name…". Below 1280 px it opens as cards. **+** opens
 "New numbering series"; "Edit" (or tapping the row) opens "Edit series {code}" (INVOICE-F12,
-INVOICE-F13). Without an issuer, the same banner "You cannot issue invoices yet" as in **Invoices**, once.
+INVOICE-F13). Without an issuer, the same bell's notice "You cannot issue invoices yet" as in **Invoices** says
+it, once, and none on the screen.
 Empty: "No series yet. Create the first one to number your invoices.". Loading: "Loading series…".
 Error: "Could not load the series" with "Retry".
 
@@ -689,14 +689,13 @@ Steps:
    details" with the pill "Needed to invoice": "Legal name, tax ID and address: without them you cannot
    issue an invoice.". Everyone sees it; "Set up" only whoever can change the issuer, and to the others it
    says "An administrator has to set this up.".
-2. Tap "Set up" on that step, open **Invoicing → Issuer**, or tap "Set up" on the banner "You cannot issue
-   invoices yet" that shows above the other screens while there is no issuer, **Invoices** and **Series**
-   too, only once (to whoever cannot change the issuer, the banner says "An administrator has to set this
-   up.", without "Set up").
+2. Tap "Set up" on that step, open **Invoicing → Issuer**, or tap "Set up your business details" on the bell's
+   notice "You cannot issue invoices yet", which shows on any screen while there is no issuer (to whoever cannot
+   change the issuer, the notice says "An administrator has to set this up.", with no button).
 3. Type "Legal name", "Tax ID", "Address", "Postal code", "City", "Province" and choose the "Country"
    (Spain at first).
-4. Tap "Save": "Issuer saved." comes, the banner disappears from every screen, **Invoices** and **Series**
-   too, and the Home step becomes "Done", without reloading and on the other devices too.
+4. Tap "Save": "Issuer saved." comes, the notice disappears from the bell and the Home step becomes "Done",
+   without reloading and on the other devices too.
 In: what the person types.
 Out: the issuer, which is copied into every document issued from now on (those already issued do not
 change); announces `invoice.issuer.updated`.

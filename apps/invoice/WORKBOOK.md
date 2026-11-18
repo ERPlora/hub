@@ -61,8 +61,8 @@ Aquí manda la especificación oficial sobre el mercado:
 - **El emisor** (razón social, NIF y domicilio del negocio) es obligatorio: **sin él no se emite
   ningún documento** (Facturación → Emisor, INVOICE-F21); hasta entonces, el Inicio lo pide en «Termina de
   configurar tu negocio» con el paso «Los datos de tu negocio» y la píldora «Necesario para facturar», y
-  la franja «Todavía no puedes facturar» lo avisa encima de las demás pantallas, también de **Facturas** y **Series**,
-  con «Configurar». El emisor se escribe aquí, a mano: no llega de la cuenta de
+  la campana lleva el aviso «Todavía no puedes facturar» en cualquier pantalla, con «Configurar los datos del
+  negocio». El emisor se escribe aquí, a mano: no llega de la cuenta de
   ERPlora.
 - **«Hoy» es la hora de Madrid** en la fase 1 (el Hub todavía no guarda la zona horaria del negocio):
   decide la fecha de cada documento y, con ella, el año de su serie. Un cobro a las 00:30 del 1 de enero
@@ -91,10 +91,10 @@ Menú **Facturación → Facturas**. Tabla paginada de 50 en 50 (vista de tabla 
 tarjetas con el número como título) con «Número», «Cliente», «Total», «Estado», «Fecha» y «Tipo»; cada
 columna se ordena. Buscador «Buscar facturas…» (número, nombre o NIF del cliente) y filtros de «Estado»,
 «Tipo», «Serie», «Origen», «Fecha» (entre dos días) y «Total» (entre dos importes, en la moneda del negocio). Sin ordenar, lo
-último emitido sale arriba. Mientras el emisor no está configurado, arriba sale una sola vez «Todavía no puedes
-facturar», la franja de todas las pantallas («No se podrá emitir ningún tique ni factura hasta que configures esto:»,
-«Los datos de tu negocio» y «Configurar», que abre **Emisor**; a quien no puede cambiar el emisor, en lugar de
-«Configurar», «Esto lo tiene que configurar un administrador.»), sin otro aviso igual debajo. Por fila: «Ver» (también al pulsar la fila), «Marcar pagada» (solo en las
+último emitido sale arriba. Mientras el emisor no está configurado, lo dice una sola vez el aviso «Todavía no puedes
+facturar» de la campana («No se podrá emitir ningún tique ni factura hasta que configures esto: Los datos de tu
+negocio.» y «Configurar los datos del negocio», que abre **Emisor**; a quien no puede cambiar el emisor, sin botón,
+«Esto lo tiene que configurar un administrador.»), sin otro aviso igual en la pantalla. Por fila: «Ver» (también al pulsar la fila), «Marcar pagada» (solo en las
 que están «Emitida» y no son rectificativas) y «Rectificar» (solo en las que no son rectificativas, no
 están canceladas ni sustituidas). El botón **+** abre «Nueva factura manual» (INVOICE-F03); sin permiso
 de emitir no aparece, ni tampoco «Marcar pagada». La lista se pone al día sola cuando se emite, se
@@ -157,8 +157,8 @@ el prefijo, el formato y el contador de la numeración de un tipo de factura y u
 «Código», «Nombre», «Tipo», «Año», «Prefijo», «Formato» (vacío se lee `PREFIX-YYYY-NNNNNN`), «Nº
 actual», «Activa» y «Predet.»; buscador «Buscar código, nombre…». Por debajo de 1280 px abre en
 tarjetas. **+** abre «Nueva serie de numeración»; «Editar» (o pulsar la fila) abre «Editar serie
-{código}» (INVOICE-F12, INVOICE-F13). Sin emisor, la misma franja «Todavía no puedes facturar» que en
-**Facturas**, una sola vez.
+{código}» (INVOICE-F12, INVOICE-F13). Sin emisor, lo dice el mismo aviso «Todavía no puedes facturar» de la
+campana que en **Facturas**, una sola vez, y ninguno en la pantalla.
 Vacía: «Aún no hay series. Crea la primera para numerar tus facturas.». Cargando: «Cargando series…».
 Error: «No se pudieron cargar las series» con «Reintentar».
 
@@ -695,14 +695,13 @@ Pasos:
    negocio» con la píldora «Necesario para facturar»: «Razón social, NIF y domicilio: sin ellos no puedes
    emitir una factura.». Lo ven todos; «Configurar» solo quien puede cambiar el emisor, y a los demás les dice
    «Esto lo tiene que configurar un administrador.».
-2. Pulsa «Configurar» en ese paso, abre **Facturación → Emisor**, o pulsa «Configurar» en la franja «Todavía no
-   puedes facturar» que sale encima de las demás pantallas mientras no hay emisor, también de **Facturas** y
-   **Series**, una sola vez (a quien no puede cambiar el emisor, la franja le dice «Esto lo tiene que configurar un
-   administrador.», sin «Configurar»).
+2. Pulsa «Configurar» en ese paso, abre **Facturación → Emisor**, o pulsa «Configurar los datos del negocio» en el
+   aviso «Todavía no puedes facturar» de la campana, que sale en cualquier pantalla mientras no hay emisor (a quien
+   no puede cambiar el emisor, el aviso le dice «Esto lo tiene que configurar un administrador.», sin botón).
 3. Escribe «Razón social», «NIF», «Domicilio», «Código postal», «Ciudad», «Provincia» y elige el «País»
    (España de entrada).
-4. Pulsa «Guardar»: sale «Emisor guardado.», la franja desaparece de todas las pantallas, también de **Facturas**
-   y **Series**, y el paso del Inicio queda «Hecho», sin recargar y también en los demás dispositivos.
+4. Pulsa «Guardar»: sale «Emisor guardado.», el aviso desaparece de la campana y el paso del Inicio queda «Hecho»,
+   sin recargar y también en los demás dispositivos.
 Entra: lo que escribe la persona.
 Sale: el emisor, que se copia en cada documento que se emita desde ahora (los ya emitidos no cambian);
 avisa `invoice.issuer.updated`.
@@ -886,10 +885,10 @@ Recibir el emisor del SaaS (`invoice.sync_issuer`) no es de ningún papel: solo 
     pendiente, también se le dice a quien no tiene `invoice.manage_issuer` (`actionable: false`, gh:hub#435). El
     domicilio también es obligatorio y el texto lo dice. Lleva a `/invoice/issuer`, la pantalla con el NIF a la
     vista, y se refresca con `invoice.issuer.updated`.
-  - **Un solo aviso de emisor**: sin emisor, Facturas y Series enseñan solo la franja de `base`
-    (`BlockingStrip.vue`, por `chrome.notice` de `frontend/main.ts`, alimentada por este paso), sin aviso propio:
-    dice lo mismo a las mismas personas (también «Esto lo tiene que configurar un administrador.» con
-    `actionable: false`, gh:hub#435) y se va sola con `invoice.issuer.updated`. `market-decision`: un aviso por causa — Material Design (m2.material.io/components/banners:
+  - **Un solo aviso de emisor**: sin emisor, Facturas y Series no enseñan aviso propio; lo dice el aviso
+    `base.blocking` del centro de avisos (`useHubActionNotices` de `base/frontend/lib/action-notices.ts`, por
+    `actionNotices` de `frontend/main.ts`, alimentado por este paso) a las mismas personas (también «Esto lo tiene
+    que configurar un administrador.» con `actionable: false`, gh:hub#435), y se va solo con `invoice.issuer.updated`. `market-decision`: un aviso por causa — Material Design (m2.material.io/components/banners:
     «Only one banner should be shown at a time»), Primer de GitHub (primer.style/product/components/banner/guidelines:
     no más de un banner por página), Atlassian Forge (developer.atlassian.com/platform/forge/manifest-reference/modules/
     confluence-page-banner: uno a la vez), Shopify (shopify.dev/docs/api/pos-ui-extensions/2025-07/ui-components/
@@ -900,7 +899,8 @@ Recibir el emisor del SaaS (`invoice.sync_issuer`) no es de ningún papel: solo 
     sitio para lo pendiente de la cuenta, la guía de configuración y sus avisos: squareup.com/help/ie/en/article/5123-
     square-get-started-guide) y, como contraejemplo, WooCommerce, cuyos avisos de administración amontonados tienen
     plugins solo para esconderlos (wordpress.org/plugins/hide-admin-notices/). Los tests de las páginas montan la
-    pantalla como la pinta el hub (`mountInvoice(..., { platformNotice: true })`) y cuentan los avisos rojos.
+    pantalla como la pinta el hub (`mountInvoice(..., { platformNotice: true })`, con la fuente del centro de avisos
+    al lado): cuentan los avisos rojos de la pantalla, que son cero, y el aviso del centro, que es uno.
   - `numbering` («Tu numeración de facturas», orden 50): hecho con `total_series` de
     `invoice.numbering.status`, `required = False` (recomendado), solo para quien tiene `invoice.manage_series`, y
     se refresca con `SERIES_EVENTS` (la serie que nace con el primer documento avisa con `invoice.invoice.issued`).
@@ -978,7 +978,7 @@ Recibir el emisor del SaaS (`invoice.sync_issuer`) no es de ningún papel: solo 
     se ponen en cola en el bloqueo de esa serie y la segunda contesta lo de la primera (test con hilos);
     `platform_ref` es único en la base de datos.
   - **Entorno**: el registro va al entorno de la AEAT del despliegue (`ERPLORA_ENVIRONMENT=prod` →
-    producción; `pre` → pruebas; `verifactu.queries.effective_environment`), y su interruptor está fijo
+    producción; `pre` → pruebas; `verifactu.queries.route.effective_environment`), y su interruptor está fijo
     (409 `verifactu.platform_fixed`).
   - **Salud** (`platform_health`, la puerta `/health`): «listo» solo con el emisor configurado, VeriFactu
     activo y, con `ERPLORA_ENVIRONMENT=prod`, el envío real abierto (`production_open` de
@@ -1002,8 +1002,10 @@ Recibir el emisor del SaaS (`invoice.sync_issuer`) no es de ningún papel: solo 
   `--execute` para ver lo que hará). Su emisor es solo el de su BD: ningún otro negocio lo ve.
 
 - Anatomía completa: `apps.py`, `models.py` (`InvoiceSeries`, `Issuer`, `Invoice`, `InvoiceLine`),
-  `migrations/`, `schemas/` (`platform.py`, el cuerpo que manda el SaaS al hub de plataforma), `fiscal.py`
-  (aritmética pura: cierre por clave fiscal, prorrateo, formato del número), `queries.py`, `services.py`, `events.py`, `live.py`, `api.py`, `admin.py`,
+  `migrations/`, `schemas/` (`platform.py`, el cuerpo que manda el SaaS al hub de plataforma;
+  `document_issuer.py`, el emisor de `InvoiceOut`), `fiscal.py` (aritmética pura: cierre por clave fiscal,
+  prorrateo, formato del número), `document_issuer.py` (puro: el emisor de un documento y el NIF que imprime),
+  `queries.py`, `services.py`, `events.py`, `live.py`, `api.py`, `admin.py`,
   `templates/invoice/invoice.html`, `locale/`, `frontend/` y un `tests/test_<fichero>.py` por fichero,
   más integración con Ventas y Clientes y concurrencia con hilos.
 - **Numeración**: `InvoiceSeries.current_number` se sube con `UPDATE … RETURNING` (Django 6 refresca el
@@ -1044,6 +1046,15 @@ Recibir el emisor del SaaS (`invoice.sync_issuer`) no es de ningún papel: solo 
   PLAN-SAAS §3.1 punto 2, «Dos identidades» (decisión del 2026-10-11), dice que los datos fiscales del negocio
   viven y se editan en el Hub y que el SaaS solo guarda al pagador (`BillingProfile`); recibir el emisor del SaaS
   pide la dirección contraria. El emisor se escribe en el Hub (INVOICE-F21).
+- **El NIF que imprime el papel** (`document_issuer.py`): `InvoiceOut` lleva, junto a `issuer_tax_id` (el NIF tal
+  como se guarda, el que va a `IDEmisorFactura` y al `nif=` del QR, siempre sin prefijo: con «ES» la AEAT lo
+  rechaza), `issuer_vat_number`, el que imprimen el A4 y la pantalla. Un emisor inscrito en el ROI imprime su
+  NIF-IVA con el prefijo de su país (`ESB27593136`; Grecia, `EL`; un NIF que ya lo trae no lo duplica) en todas
+  sus facturas, también las nacionales; cualquier otro, su NIF tal cual. La composición es una sola,
+  `vat_number` de `apps/customer/tax_ids.py`, la misma que escribe el NIF-IVA de un destinatario. El Hub no
+  guarda la inscripción en el ROI de ningún negocio: solo sabe la de ERPlora, que está inscrita, por el NIF del
+  emisor de plataforma (`PLATFORM_ISSUER_TAX_ID`). La etiqueta sigue siendo «NIF» («Tax ID»). Que un negocio
+  diga que está en el ROI, y que su tique lo imprima también, es hub#1723.
 - **Contrato con VeriFactu** (`apps/verifactu`, `requires=["invoice"]`; su WORKBOOK, «Contrato con
   Facturación»): `_issue`, tras escribir el documento y su aviso y **dentro de la misma transacción**, llama
   por nombre a `verifactu.record.create` con `{"invoice_id": …}` y la misma sesión, en su savepoint. La

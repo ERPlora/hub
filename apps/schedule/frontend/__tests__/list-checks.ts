@@ -26,7 +26,7 @@ export function itNamesTheListThatDoesNotLoad(setup: (options: MountOptions) => 
     s.net.lastStream().push(errorFrame(s.subId(op), 'boom'));
     await flush();
     const box = s.wrapper.find('.data-table__error');
-    expect(box.find('.data-table__error-title').text()).toBe(title);
+    expect(box.text().startsWith(title)).toBe(true);
     expect(box.find('.data-table__error-reason').text()).toBe('msg boom');
     expect(box.text()).not.toContain('No se han podido cargar los datos');
   });

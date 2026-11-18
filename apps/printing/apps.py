@@ -3,6 +3,7 @@ settings (receipt at checkout, drawer, copies, the printer of each function) and
 apps fill by name and the device next to the printer drains (WORKBOOK.md)."""
 
 from django.utils.translation import gettext_lazy as _
+from django.utils.translation import ngettext_lazy
 from live.meta import BellCounter, Category, LiveAppConfig, Nav, SetupCheck, SetupStep
 
 from apps.printing.events import COVERAGE_EVENTS, UNATTENDED_EVENTS
@@ -14,6 +15,14 @@ NOTHING_PRINTING = {
     "bar": _("Nothing is printing “Bar”"),
     "label": _("Nothing is printing “Label”"),
 }
+#: An order the kitchen or the bar never gets on paper is a dish or a drink nobody makes.
+URGENT_USAGES = frozenset({"kitchen", "bar"})
+STALLED_TITLE = ngettext_lazy("%(label)s: %(count)d job waiting", "%(label)s: %(count)d jobs waiting", "count")
+STALLED_BODY = ngettext_lazy(
+    "It will not come out until a device with the ERPlora app open can print it.",
+    "They will not come out until a device with the ERPlora app open can print them.",
+    "count",
+)
 
 
 class PrintingConfig(LiveAppConfig):
@@ -83,6 +92,10 @@ class PrintingConfig(LiveAppConfig):
             icon="lucide:receipt",
             permission="printing.view_settings",
             refresh_on=UNATTENDED_EVENTS,
+            severity="danger" if usage in URGENT_USAGES else "warning",
+            title=STALLED_TITLE,
+            body=STALLED_BODY,
+            action_label=_("See the printers"),
         )
         for usage, label in NOTHING_PRINTING.items()
     ]

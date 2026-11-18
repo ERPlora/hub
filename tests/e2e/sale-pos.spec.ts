@@ -11,10 +11,12 @@
 import { expect, type Page, test } from '@playwright/test';
 
 import { A, EMPLOYEE, api, hostPage, login, psql, shot, shown } from './helpers';
+import { offersRowAction } from './service-helpers';
 import { cleanUp as cleanCustomers, createCard, e2eName, spanishMobile } from './customer-helpers';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
 import { snapshotSeries } from './invoice-helpers';
 import { cleanSales, drawerOff, expectTakes, newestSaleOf, openTillCart, restoreDrawer, shots, stamp } from './sale-helpers';
+import { toastSaying } from './toast-helpers';
 
 const RUN = stamp();
 let water: Product;
@@ -330,8 +332,8 @@ test('the employee charges at the till and sees «Void» and «Refund» on their
     // The cashier sees «Void» and «Refund» (hub#250): either asks a
     // manager's approval, which sale-approval.spec.ts walks end to end.
     const sold = await newestSaleOf(context, water.sku);
-    await expect(shown(page).locator(`[data-testid=sales-table-row-${sold.id}-void]`).first()).toBeVisible();
-    await expect(shown(page).locator(`[data-testid=sales-table-row-${sold.id}-refund]`).first()).toBeVisible();
+    expect(await offersRowAction(page, 'sales-table', sold.id, 'void'), 'Void').toBe(true);
+    expect(await offersRowAction(page, 'sales-table', sold.id, 'refund'), 'Refund').toBe(true);
     await page.screenshot({ path: shot('sale-sales-employee') });
   } finally {
     await context.close();
@@ -356,7 +358,7 @@ test('a check opened by its address (/sale/pos?order=<id>, as the agenda’s «C
   expect((await api(context, A, 'POST', '/sale/orders/void', { order_id: voided.data.id })).status).toBe(200);
   await page.goto(`${A}/sale/pos?order=${voided.data.id}`);
   await tillReady(page);
-  await expect(page.locator('ion-toast')).toContainText(/not open any more|ya no está abierta/);
+  await expect(toastSaying(page, /not open any more|ya no está abierta/)).toBeVisible();
   await expect(shown(page).locator('[data-testid=pos-check-title]')).toHaveValue(`e2e link ${RUN}`);
   // The check opened by its address goes, as every other this file opened (afterAll).
   expect((await api(context, A, 'POST', '/sale/orders/void', { order_id: opened.data.id })).status).toBe(200);

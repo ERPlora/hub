@@ -20,7 +20,7 @@ from live.errors import Conflict, InvalidPayload, NotFound, PermissionDenied
 from apps.verifactu.models import Config
 from base import registry, signing
 from base.models import Hub
-from base.queries import hub_get, hubs_by_slugs
+from base.queries.hubs import hub_get, hubs_by_slugs
 from base.schemas import HubCancelIn, HubGetIn, HubRegistryIn, HubRestoreIn, HubsBySlugIn, HubStateIn
 from base.services.hub_registry import hub_cancel, hub_register, hub_restore, hub_state_apply
 from base.services.provisioning import report_ready

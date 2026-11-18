@@ -72,23 +72,6 @@ export interface SystemCardDef {
   component: string;
 }
 
-/** `base.BellCounterOut`. */
-export interface BellCounter {
-  /** «<app>.<counter>», or «base.failed_events». */
-  key: string;
-  app: string;
-  count: number;
-  route: string;
-  label: string;
-  icon: string;
-}
-
-/** `base.BellCountersOut`: the counters above zero, and how often the bell reads them again (none: only on a change). */
-export interface BellCounters {
-  counters: BellCounter[];
-  refresh_every: number | null;
-}
-
 /** `base.DeviceNoticeOut`: a row the device is told once (APPOINTMENT-F28). */
 export interface DeviceNoticeRow {
   /** «<app>.<notice>». */
@@ -870,7 +853,6 @@ declare module '@erplora/ui/sdk' {
   interface Operations {
     'base.setup.status': { input: NoInput; output: SetupStatus };
     'base.widget.list': { input: NoInput; output: { widgets: WidgetDef[] } };
-    'base.bell.counters': { input: NoInput; output: BellCounters };
     'base.notice.list': { input: NoInput; output: { notices: DeviceNoticeRow[]; sources: string[] } };
     // Apps
     'base.app.list': { input: NoInput; output: AppList };

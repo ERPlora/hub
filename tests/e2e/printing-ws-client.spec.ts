@@ -21,6 +21,7 @@ import { cleanInvoices, ensureIssuer, snapshotSeries } from './invoice-helpers';
 import { FLOW_VIEWPORTS, forgetDevices } from './printing-helpers';
 import { cleanSales, drawerOff, restoreDrawer, stamp } from './sale-helpers';
 import { rowAction } from './service-helpers';
+import { dismissToasts, toastSaying } from './toast-helpers';
 
 test.describe.configure({ mode: 'serial' });
 
@@ -144,13 +145,6 @@ async function closeDocument(page: Page): Promise<void> {
   await expect(document).toBeHidden();
 }
 
-async function dismissToasts(page: Page): Promise<void> {
-  await page.locator('ion-toast').evaluateAll((toasts) =>
-    Promise.all(toasts.map((toast) => (toast as unknown as { dismiss: () => Promise<boolean> }).dismiss())),
-  );
-  await expect(page.locator('ion-toast')).toHaveCount(0);
-}
-
 test.beforeAll(async ({ browser }) => {
   const context = await browser.newContext({ baseURL: A });
   const page = await context.newPage();
@@ -220,7 +214,7 @@ test('PRINTING-F18, F05: the device set up from Devices prints the test page fro
   await page.goto('/printing/printers');
   await shown(page).locator('[data-testid=printing-printers-row]').filter({ hasText: PRINTER }).waitFor({ state: 'visible' });
   await rowAction(page, 'printing-printers', printer, 'test');
-  await expect(page.locator('ion-toast').filter({ hasText: /Test page sent to the queue of|Hoja de prueba enviada a la cola de/ }).last()).toBeVisible();
+  await expect(toastSaying(page, /Test page sent to the queue of|Hoja de prueba enviada a la cola de/)).toBeVisible();
   await expect.poll(async () => (await newestJob(context))?.status).toBe('done');
   const test = await newestJob(context);
   expect([test.kind, test.attempts]).toEqual(['test_page', 1]);
@@ -252,16 +246,17 @@ test('PRINTING-F18, F13: a cash charge at the till prints its receipt, then open
   // The drawer does not answer: the till says so, and the receipt that came out is not printed again.
   await setMode(page, 'drawer');
   await chargeCoffeeInCash(page, cash);
-  const told = page.locator('ion-toast').filter({
-    hasText: new RegExp(`(The cash drawer did not open: check that “${PRINTER}” is on and connected\\.|El cajón no se ha abierto: comprueba que «${PRINTER}» está encendida y conectada\\.)`),
-  });
-  await expect(told.last()).toBeVisible();
+  const told = toastSaying(
+    page,
+    new RegExp(`(The cash drawer did not open: check that “${PRINTER}” is on and connected\\.|El cajón no se ha abierto: comprueba que «${PRINTER}» está encendida y conectada\\.)`),
+  );
+  await expect(told).toBeVisible();
   // The capture with the sale's document painted behind the notice: the charge opens it and it loads on its own
   // subscriptions, never left at «Loading document…».
   const document = page.locator('[data-testid=sale-document-modal]');
   await expect(document.locator('[data-testid=sale-document-loading]')).toHaveCount(0);
   await expect(document.locator('[data-testid=sale-document-print]')).toBeEnabled();
-  await expect(told.last()).toBeVisible();
+  await expect(told).toBeVisible();
   await capture(page, `${KEY}-drawer-1440`);
   await expect.poll(async () => (await jobsOf(context)).length).toBe(before + 2);
   await expect.poll(async () => (await newestJob(context)).status).toBe('done');

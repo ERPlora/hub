@@ -1,7 +1,7 @@
 """Events of the sale app (``sale.<entity>.<fact>``) and its reactions to Customers' merge and to the
 documents Invoicing issues.
 
-services.py records them in the outbox, in the command's transaction; live.py names the ones that re-run
+The services package records them in the outbox, in the command's transaction; live.py names the ones that re-run
 each live query. ``sale.sale.completed`` and ``sale.sale.voided`` carry what Inventory
 (``inventory.stock.apply_sale`` / ``restore_sale``) and Customers (``customer.purchase.record`` /
 ``void``) read from them (WORKBOOK «Lo que avisa»).

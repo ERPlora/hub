@@ -11,6 +11,7 @@ import { crc32, deflateSync } from 'node:zlib';
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
 import { A, api, capture, horizontalOverflow, hostPage, psql, shown } from './helpers';
+import { toastSaying } from './toast-helpers';
 
 const VIEWPORTS = {
   390: { width: 390, height: 844 },
@@ -67,7 +68,6 @@ async function wipe(context: BrowserContext, origin: string): Promise<void> {
 
 const testid = (page: Page, id: string) => shown(page).locator(`[data-testid="${id}"]`);
 const item = (page: Page, path: string) => shown(page).locator(`[data-item="${path}"]`);
-const toast = (page: Page, text: string) => page.locator('ion-toast').filter({ hasText: text }).last();
 
 async function upload(page: Page, name: string, size: number): Promise<void> {
   await testid(page, 'files-upload-input').setInputFiles([
@@ -99,7 +99,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
       await expect(item(page, 'scan.dat')).toBeVisible();
       // Past the plan's space, Files refuses with the sentence and keeps nothing.
       await upload(page, 'second.dat', 600 * 1024);
-      await expect(toast(page, `No se pudo subir «second.dat»: ${NO_SPACE}`)).toBeVisible();
+      await expect(toastSaying(page, `No se pudo subir «second.dat»: ${NO_SPACE}`)).toBeVisible();
       await expect(item(page, 'second.dat')).toHaveCount(0);
       await page.mouse.move(0, 0);
       expect(await horizontalOverflow(page), `${label}: no sideways scroll`).toBeLessThanOrEqual(0);

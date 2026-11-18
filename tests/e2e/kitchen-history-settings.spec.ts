@@ -6,17 +6,13 @@
 // deleted after it, and the settings go back to what they were.
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, api, psql, shot, shown } from './helpers';
+import { A, api, psql, shown } from './helpers';
+import { capture } from './kitchen-helpers';
 import { stamp } from './sale-helpers';
-import { ownerPage, settled } from './service-helpers';
+import { ownerPage } from './service-helpers';
 
 const RUN = stamp();
 const LABEL = `e2e khs ${RUN}`;
-const SIZES = [
-  { label: '390', width: 390, height: 844 },
-  { label: '834', width: 834, height: 1112 },
-  { label: '1440', width: 1440, height: 900 },
-];
 
 interface Settings {
   warning_minutes: number;
@@ -40,16 +36,6 @@ async function post<T>(context: BrowserContext, path: string, body: unknown, sta
   const res = await api<T>(context, A, 'POST', path, body);
   expect(res.status, `${path} ${JSON.stringify(res.data)}`).toBe(status);
   return res.data;
-}
-
-async function capture(page: Page, flow: string, ready: () => Promise<void>): Promise<void> {
-  for (const size of SIZES) {
-    await page.setViewportSize({ width: size.width, height: size.height });
-    await ready();
-    await settled(page);
-    await page.screenshot({ path: shot(`APP-KITCHEN-${flow}-${size.label}`) });
-  }
-  await page.setViewportSize({ width: 1440, height: 900 });
 }
 
 /** Picks `text` in an `ion-select` (popover interface). */

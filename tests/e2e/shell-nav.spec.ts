@@ -7,15 +7,19 @@ import { join } from 'node:path';
 import { type Locator, type Page, expect, test } from '@playwright/test';
 
 import { customersReady } from './customer-helpers';
-import { A, createItem, HUB_DIR, listReady, login, openApps, record, shot, shown, THREE_SIZES as VIEWPORTS, topbarApps, uniqueName } from './helpers';
+import { A, HUB_DIR, login, MY_APPS_DOOR, record, shot, shown, THREE_SIZES as VIEWPORTS, topbarApps, uniqueName } from './helpers';
+import { createItem, listReady } from './demo-items';
 import { insideTheApp, leftTheApp, pressBack } from './system-back-helpers';
+import { toastWithId } from './toast-helpers';
+import { openApps } from './topbar';
 
 type Box = { x: number; y: number; width: number; height: number };
 
 const overlaps = (a: Box, b: Box): boolean =>
   a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
 
-/** The topbar of the screen on view and its pieces: the way to the menu (drawer or rail), the title, Back and the apps. */
+/** The topbar of the screen on view and its pieces: the way to the menu (drawer or rail), the title, Back and the way
+ *  to «My apps» (⠿, or «⋮» on a phone). */
 function topbar(page: Page): Record<'title' | 'drawer' | 'rail' | 'back' | 'apps', Locator> {
   const bar = shown(page).locator('ion-header.app-topbar');
   return {
@@ -23,7 +27,7 @@ function topbar(page: Page): Record<'title' | 'drawer' | 'rail' | 'back' | 'apps
     drawer: bar.locator('ion-menu-button'),
     rail: bar.locator('[data-testid=topbar-rail]'),
     back: bar.locator('[data-testid=topbar-back]'),
-    apps: bar.locator('[data-testid=topbar-apps]'),
+    apps: bar.locator(MY_APPS_DOOR),
   };
 }
 
@@ -143,7 +147,7 @@ test('an app whose page does not load says so, with a Retry; never silent', asyn
   const target = otherApps(sheet).filter({ hasText: /^\s*Customers\s*$/ });
   const name = (await target.getAttribute('title'))!;
   await target.click();
-  const toast = page.locator('ion-toast#view-load-failed');
+  const toast = toastWithId(page, 'view-load-failed');
   await expect(toast).toBeVisible();
   await expect(toast).toContainText(name);
   await expect(page).toHaveURL(`${A}/demo/items`);
@@ -151,7 +155,7 @@ test('an app whose page does not load says so, with a Retry; never silent', asyn
 
   // The network is back: the toast's Retry opens the app and the toast goes away.
   await page.unroute(/\/frontend\/pages\//);
-  await toast.locator('button', { hasText: /retry|reintentar/i }).click();
+  await toast.getByRole('button', { name: /retry|reintentar/i }).click();
   await expect(page).toHaveURL(`${A}/customer/customers`);
   await customersReady(page);
   await expect(topbarApps(page)).toBeVisible();

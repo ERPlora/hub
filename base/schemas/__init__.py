@@ -365,7 +365,7 @@ class DemoStatusOut(Schema):
     expires_at: dt.datetime | None
 
 
-# --- The Home: base.setup.status, base.widget.list, base.bell.counters ------------------------------------------
+# --- The Home: base.setup.status, base.widget.list ------------------------------------------------------------
 
 
 class SetupStatusIn(Schema):
@@ -441,28 +441,6 @@ class SystemCardsOut(Schema):
     cards: list[SystemCardOut]
 
 
-class BellCountersIn(Schema):
-    """No input: the counters above zero this person may see in this hub."""
-
-
-class BellCounterOut(Schema):
-    key: str = Field(description="«<app>.<counter>», or «base.failed_events».")
-    app: str
-    count: int
-    route: str
-    label: str
-    icon: str
-
-
-class BellCountersOut(Schema):
-    counters: list[BellCounterOut]
-    refresh_every: int | None = Field(
-        default=None,
-        description="Seconds after which the bell reads its counters again, for one whose figure moves as time passes; "
-        "none: only when something changes.",
-    )
-
-
 class NoticeListIn(Schema):
     """No input: what the modules on tell this person's device, of the rows their queries give them."""
 
@@ -492,7 +470,7 @@ class AppListIn(Schema):
 
 
 class AppOut(Schema):
-    """A module as the Apps screen paints it: from its ``LiveAppConfig``, with its right (``base.entitlement``)."""
+    """A module as the Apps screen paints it, with the business's right to it."""
 
     id: str
     name: str
@@ -541,7 +519,7 @@ class AppListOut(Schema):
     enabled: int
 
 
-#: An app as the person names it (BASE-F23, F24; hub#539): ``base.queries.find_app`` resolves it.
+#: An app as the person names it (BASE-F23, F24; hub#539): ``base.queries.apps.find_app`` resolves it.
 APP_SAID = (
     "The app: its name as the person says it (e.g. «Reservas»), or its id. A name that fits several apps is refused "
     "naming them: ask the person which one."
@@ -617,7 +595,7 @@ class LimitOut(Schema):
 
 
 class DatabaseUsageOut(Schema):
-    """The size of the business's own database, as the last night measured it (``base.usage``)."""
+    """The size of the business's own database, as the last night measured it."""
 
     available: bool = Field(
         description="False while the business shares its database with others: it has no size of its own yet."
@@ -670,7 +648,7 @@ class ActivityUsageOut(Schema):
 
 
 class PlanMeterOut(Schema):
-    """What an app on says its plan includes this month (``base.home.plan_meters``), such as WhatsApp's messages."""
+    """What an app on says its plan includes this month, such as WhatsApp's messages."""
 
     key: str = Field(description="The app it is of.")
     label: str = Field(description="What it is called, in the person's language.")
@@ -1781,8 +1759,8 @@ class AssistantCallIn(Schema):
     shown: str = Field(
         default="",
         max_length=64,
-        description="The fingerprint of what the card of this call showed (``base.assistant.fingerprint``); empty "
-        "while no card was drawn for it.",
+        description="The fingerprint of what the card of this call showed the person; empty while no card was drawn "
+        "for it.",
     )
 
 
@@ -1848,7 +1826,7 @@ class AssistantFieldOut(Schema):
     named: bool = Field(
         default=False,
         description="A list whose every item the server said in words (a record by its name, a moment, a value by its "
-        "label, an amount): the card says its items; without it, how many it carries (`live.assistant.NAMED`).",
+        "label, an amount): the card says its items; without it, how many it carries.",
     )
     money: AssistantMoneyOut | None = Field(
         default=None,

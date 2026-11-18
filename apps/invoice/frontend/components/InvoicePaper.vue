@@ -86,7 +86,7 @@ const note = computed(() => documentNote(props.invoice, t));
           <div v-if="invoice.issuer_address">
             {{ invoice.issuer_address }}
           </div>
-          <div>{{ $t('invoice.paper.taxId') }}: {{ invoice.issuer_tax_id }}</div>
+          <div>{{ $t('invoice.paper.taxId') }}: {{ invoice.issuer_vat_number }}</div>
         </div>
       </div>
       <div class="invoice-paper__doc">

@@ -2,15 +2,16 @@
 // and its people.
 // Dialogs: a test that opens one mocks `@ionic/vue`'s IonModal with FormModal's `ionModalStub` (imported
 // from its own file in the mock factory: this helper loads @ionic/vue, the factory must not).
-// `platformNotice` paints a page as the hub does: base's blocking strip over it (`chrome.notice`, frontend/main.ts).
-import { type SessionMe, SHELL_CONFIG_KEY } from '@erplora/ui/shell';
+// `platformNotice` mounts a page as the hub does: with base's source of the action center beside it (`actionNotices`,
+// frontend/main.ts), whose notices `notices()` gives.
+import type { ActionNotice, ActionNoticeSource, SessionMe } from '@erplora/ui/shell';
 import type { OpName } from '@erplora/ui/sdk';
 import type { Component } from 'vue';
 
 import { memoryRouter, mountInShell, overBase } from '../../../../base/frontend/__tests__/mount-in-shell';
-import BlockingStrip from '../../../../base/frontend/components/BlockingStrip.vue';
 import type { Business, SetupStatus } from '../../../../base/frontend/operations';
 import { ComposableHost } from './composable-host';
+import { withHubNotices } from './hub-notices-host';
 import en from '../locale/en.json';
 import es from '../locale/es.json';
 
@@ -74,19 +75,23 @@ export interface MountOptions {
   locale?: 'en' | 'es';
   session?: SessionMe;
   stubs?: Record<string, Component | boolean>;
-  /** The page behind a session with the hub's chrome: base's blocking strip over it, in base's words too. */
+  /** The page behind a session with the hub's chrome: base's action center fed beside it, in base's words too. */
   platformNotice?: boolean;
 }
 
 export async function mountInvoice(component: Component, options: MountOptions = {}) {
-  return mountInShell(component, options, {
+  let source: ActionNoticeSource | undefined;
+  const page = options.platformNotice ? withHubNotices(component, (given) => (source = given)) : component;
+  const m = await mountInShell(page, options, {
     path: '/invoice/invoices',
     session: OWNER,
     messages: overBase(en, es),
     router: memoryRouter(options.platformNotice ? { auth: true } : {}),
-    provide: options.platformNotice ? { [SHELL_CONFIG_KEY as symbol]: { homePath: '/', chrome: { notice: BlockingStrip } } } : {},
     inDocFrom: 'component',
   });
+  /** What the hub's action center is told beside the page (`platformNotice`): none without it. */
+  const notices = (): readonly ActionNotice[] => source?.notices.value ?? [];
+  return { ...m, notices };
 }
 
 export type MountedInvoice = Awaited<ReturnType<typeof mountInvoice>>;
@@ -118,18 +123,19 @@ export function issuerStatus(fields: { configured: boolean; actionable: boolean;
   };
 }
 
-/** What the hub answers every live question of a screen about its issuer (the platform's strip and, if the screen
+/** What the hub answers every live question of a screen about its issuer (the platform's notices and, if the screen
  *  asks, `invoice.issuer.get`): set up or missing, for the person mounted (`actionable` by `invoice.manage_issuer`). */
 export async function answerIssuer(m: MountedInvoice, configured: boolean, options: { locale?: 'en' | 'es'; actionable?: boolean; rev?: number } = {}) {
   const status = issuerStatus({ configured, actionable: options.actionable ?? true, locale: options.locale });
   const asked = (op: OpName) => m.client.stream.subscriptions(op).length > 0;
   if (asked('base.setup.status')) await m.result('base.setup.status', status, {}, options.rev);
+  if (asked('base.bell.counters')) await m.result('base.bell.counters', { counters: [], refresh_every: null }, {}, options.rev);
   if (asked('invoice.issuer.get')) await m.result('invoice.issuer.get', { configured }, {}, options.rev);
 }
 
-/** The red notices on the screen, whatever their words: base's strip and any danger notice of the page's own. */
+/** The red notices the screen paints itself, whatever their words. */
 export function redNotices(m: MountedInvoice): number {
-  return m.wrapper.findAll('[data-testid="blocking-strip"], [data-tone="danger"]').length;
+  return m.wrapper.findAll('[data-tone="danger"]').length;
 }
 
 /** How many times `needle` is said in `text`. */

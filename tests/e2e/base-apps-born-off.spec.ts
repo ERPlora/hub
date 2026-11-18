@@ -17,19 +17,8 @@
 import { expect, type Page, test } from '@playwright/test';
 
 import { appRowsCopy, bounceTasks } from './app-rows-helpers';
-import {
-  A,
-  api,
-  emptyOfTemplateData,
-  horizontalOverflow,
-  hostPage,
-  psql,
-  registerBusinessIn,
-  registrationOf,
-  shot,
-  shown,
-  untilStill,
-} from './helpers';
+import { A, api, horizontalOverflow, hostPage, psql, registerBusinessIn, registrationOf, shot, shown, untilStill } from './helpers';
+import { emptyOfTemplateData } from './business';
 
 const VIEWPORTS = {
   390: { width: 390, height: 844 },
@@ -214,8 +203,10 @@ for (const [label, viewport] of Object.entries(SPAIN_VIEWPORTS)) {
       await testid(page, 'apps-search').locator('input').fill('VeriFactu');
       const verifactu = appRow(page, 'verifactu');
       await expect(verifactu.locator('[data-testid="apps-state"]')).toContainText('Off');
-      await expect(verifactu.locator('[data-testid="apps-refusal"]')).toHaveCount(0);
-      await expect(verifactu).toContainText('Turn on');
+      await expect(verifactu.locator('.data-table__cell-note, .data-table__card-note')).toHaveCount(0);
+      const offered = verifactu.locator('ion-toggle');
+      await expect(offered).toHaveJSProperty('checked', false);
+      await expect(offered).toHaveJSProperty('disabled', false);
       await snap(page, 'spain-apps', width);
     } finally {
       if (loadId) {

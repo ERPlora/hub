@@ -13,7 +13,7 @@ import SettingsForm from './SettingsForm.vue';
 
 vi.mock('@erplora/ui/shell', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@erplora/ui/shell')>()),
-  toastSuccess: vi.fn(() => Promise.resolve()),
+  toastSuccess: vi.fn(),
 }));
 beforeEach(() => vi.mocked(toastSuccess).mockClear());
 

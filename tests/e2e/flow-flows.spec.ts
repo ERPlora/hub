@@ -231,7 +231,7 @@ for (const viewport of VIEWPORTS) {
       // FLOW-F15: run by hand, asked first.
       await shown(page).locator('[data-testid=flow-editor-run]').click();
       await confirmDialog(page, 'Run it now?', () => snap('FLOW-F15'));
-      await expect(page.locator('ion-toast').filter({ hasText: 'See it in History' }).last()).toBeVisible();
+      await expect(page.getByTestId('toast').filter({ hasText: 'See it in History' }).first()).toBeVisible();
 
       // FLOW-F16: its history says it finished well, step by step; the task is in Tasks.
       await shown(page).locator('[data-testid=flow-editor-tab-history]').click();
@@ -274,7 +274,7 @@ for (const viewport of VIEWPORTS) {
       await expect(shown(page).locator('[data-testid=flow-editor-state]')).toContainText('Active');
       await shown(page).locator('[data-testid=flow-editor-run]').click();
       await confirmDialog(page, 'Run it now?');
-      await expect(page.locator('ion-toast').filter({ hasText: 'See it in History' }).last()).toBeVisible();
+      await expect(page.getByTestId('toast').filter({ hasText: 'See it in History' }).first()).toBeVisible();
       const drafted = await api<{ rows: { title: string }[] }>(context, A, 'GET', `/task/tasks?search=${encodeURIComponent(draftTitle)}`);
       expect(drafted.data.rows.map((row) => row.title)).toEqual([draftTitle]);
 

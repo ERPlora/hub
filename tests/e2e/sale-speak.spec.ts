@@ -14,6 +14,7 @@ import { expect, type Locator, type Page, test } from '@playwright/test';
 import { DICTATION, type Provider, startProvider } from './assistant-provider';
 import { A, EMPLOYEE, login, REPO_DIR, shot, untilStill } from './helpers';
 import { STACK } from './stack';
+import { toastSaying } from './toast-helpers';
 
 const VIEWPORTS = [
   { label: '390', width: 390, height: 844 },
@@ -138,7 +139,7 @@ test('SALE-F01 / BASE-F94 — offline, «Speak» stays greyed and a tap says why
   await expect(key(page)).toHaveAttribute('aria-disabled', 'true');
   // A person can tap a greyed key (it explains itself); Playwright does not tap what is `aria-disabled` unless forced.
   await key(page).click({ force: true });
-  await expect(page.locator('ion-toast').filter({ hasText: 'No connection: talking to the assistant needs the internet.' })).toBeVisible();
+  await expect(toastSaying(page, 'No connection: talking to the assistant needs the internet.')).toBeVisible();
   await expect(key(page)).toHaveAttribute('aria-pressed', 'false');
 
   await page.context().setOffline(false);
@@ -168,7 +169,7 @@ test('SALE-F01 — a recording stopped once the connection is gone is thrown awa
     // A recording can always be stopped: the key is not greyed while it records.
     await expect(key(page)).toHaveAttribute('aria-disabled', 'false');
     await key(page).click();
-    await expect(page.locator('ion-toast').filter({ hasText: 'No connection: talking to the assistant needs the internet.' }).last()).toBeVisible();
+    await expect(toastSaying(page, 'No connection: talking to the assistant needs the internet.')).toBeVisible();
     await expect(key(page)).toHaveText('Speak');
     await expect(key(page)).toHaveAttribute('aria-disabled', 'true');
     await expect(status).toBeHidden();

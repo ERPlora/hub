@@ -12,6 +12,7 @@ import { cleanInventory, createProduct, type Product } from './inventory-helpers
 import { cleanInvoices, ensureIssuer, issuedIds, snapshotSeries } from './invoice-helpers';
 import { chargeByApi, cleanSales, drawerOff, numberRow, restoreDrawer, stamp } from './sale-helpers';
 import { rowAction } from './service-helpers';
+import { toastSaying, toasts } from './toast-helpers';
 
 const RUN = stamp();
 let coffee: Product;
@@ -130,7 +131,7 @@ test('SALE-F29: «Print» on a sale\'s document opens the app\'s print screen wi
   expect(html).toContain(coffee.name);
   // The paper alone: nothing of the page around it.
   expect(html).not.toContain('sale-document-print');
-  await expect(page.locator('ion-toast')).toHaveCount(0);
+  await expect(toasts(page)).toHaveCount(0);
   // The window holds only the rules `paperDocument` carried: the number has to arrive whole there too (hub#695).
   await paintAsTheApp(page, html, 'SALE-F29', async (printWindow) => {
     await printWindow.emulateMedia({ media: 'print' });
@@ -186,7 +187,7 @@ test('SALE-F21: an app from before the print screen says, in Spanish too, to upd
     const bill = page.locator('ion-modal[data-testid=pos-prebill]');
     await expect(bill.locator('[data-testid=pos-prebill-print]')).toBeEnabled();
     await bill.locator('[data-testid=pos-prebill-print]').click();
-    await expect(page.locator('ion-toast').filter({ hasText: said })).toBeVisible();
+    await expect(toastSaying(page, said)).toBeVisible();
     expect((await printedIn(page)).browser).toBe(0);
     await context.close();
   }

@@ -4,7 +4,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { TableOut } from '../operations';
-import { BOX, clampPosition, holdName, keyDelta, paintedStatus, planeSize, STATUS_ICON, STATUS_TONE, targetable } from './floor';
+import { BOX, clampPosition, holdName, keyDelta, paintedStatus, planeSize, STATUS_TONE, targetable } from './floor';
 
 function table(overrides: Partial<TableOut> = {}): TableOut {
   return {
@@ -60,14 +60,8 @@ describe('keyDelta', () => {
 });
 
 describe('statuses', () => {
-  it('give each status its own icon and tone', () => {
-    expect(STATUS_ICON).toEqual({
-      available: 'ion:checkmark-circle-outline',
-      occupied: 'ion:people-outline',
-      reserved: 'ion:time-outline',
-      blocked: 'ion:ban-outline',
-    });
-    expect(STATUS_TONE).toEqual({ available: 'success', occupied: 'danger', reserved: 'warning', blocked: 'neutral' });
+  it('give each status its own tone', () => {
+    expect(STATUS_TONE).toEqual({ available: 'success', occupied: 'info', reserved: 'warning', blocked: 'neutral' });
   });
 });
 

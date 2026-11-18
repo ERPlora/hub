@@ -7,7 +7,9 @@ what those tests compare them with. Its behaviour is tested in ``base/tests/test
 import ast
 import gettext
 import inspect
+import pkgutil
 from collections.abc import Iterable
+from importlib import import_module
 from pathlib import Path
 
 from babel.messages.catalog import Message
@@ -70,23 +72,34 @@ def config_texts(config) -> list:
 
 def module_texts(*modules) -> list:
     """The lazy texts each module keeps at its top, alone, in a tuple or as the values of a dict (a pair of a code and
-    its message too): its messages, its labels and its headers. What it imports is another module's, and its own test
-    checks it."""
-    texts = []
-    for module in modules:
-        imported = {
-            (alias.asname or alias.name).split(".")[0]
-            for node in ast.parse(inspect.getsource(module)).body
-            if isinstance(node, (ast.Import, ast.ImportFrom))
-            for alias in node.names
-        }
-        for name, value in vars(module).items():
-            if name in imported:
-                continue
-            items = value.values() if isinstance(value, dict) else value if isinstance(value, tuple) else (value,)
-            for item in items:
-                texts += [leaf for leaf in (item if isinstance(item, tuple) else (item,)) if isinstance(leaf, Promise)]
-    return texts
+    its message too): its messages, its labels and its headers. A package is read with every module under it, as
+    ``services/`` or ``queries/`` once split. What a module imports is another module's, and its own test checks it."""
+    return [text for module in modules for inner in _with_submodules(module) for text in _own_texts(inner)]
+
+
+def _with_submodules(module) -> list:
+    """The module and, if it is a package, every module under it. One that cannot be imported raises: its texts would
+    leave the check without a word."""
+    if not hasattr(module, "__path__"):
+        return [module]
+    submodules = [import_module(f"{module.__name__}.{info.name}") for info in pkgutil.iter_modules(module.__path__)]
+    return [module, *(inner for submodule in submodules for inner in _with_submodules(submodule))]
+
+
+def _own_texts(module) -> list:
+    imported = {
+        (alias.asname or alias.name).split(".")[0]
+        for node in ast.parse(inspect.getsource(module)).body
+        if isinstance(node, (ast.Import, ast.ImportFrom))
+        for alias in node.names
+    }
+    values = [value for name, value in vars(module).items() if name not in imported]
+    items = [item for value in values for item in (value.values() if isinstance(value, dict) else _as_tuple(value))]
+    return [leaf for item in items for leaf in _as_tuple(item) if isinstance(leaf, Promise)]
+
+
+def _as_tuple(value) -> tuple:
+    return value if isinstance(value, tuple) else (value,)
 
 
 def operation_titles(label: str) -> set[str]:

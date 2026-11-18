@@ -89,7 +89,7 @@ async function confirm(): Promise<void> {
   } catch {
     return; // The window shows `command.error`.
   }
-  void toastSuccess(t('cash_register.count.done', { total: formatMoney(sent, locale.value, table.value) }));
+  toastSuccess(t('cash_register.count.done', { total: formatMoney(sent, locale.value, table.value) }));
   open.value = false;
   emit('counted', { type: kind, total: sent });
 }

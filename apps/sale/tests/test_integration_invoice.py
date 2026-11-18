@@ -365,7 +365,6 @@ def _live_with_its_own_certificate(settings):
         "verifactu.certificate.upload",
         {"p12_base64": b64(make_p12()), "password": "secret"},
     )
-    run("verifactu.config.update", {"route": "own"})
     run("verifactu.config.go_live")
 
 
@@ -438,26 +437,26 @@ def test_sales_refuses_as_without_a_way_exactly_the_codes_verifactu_raises_today
     # A code VeriFactu no longer raises (the paid live option's, retired with it)
     # is dead code in Sales: each one Sales treats as «no way to the AEAT» is one the test above makes VeriFactu
     # raise for real, and each way lost it walks is one Sales refuses.
-    from apps.sale.services import NO_WAY_TO_THE_AEAT
+    from apps.sale.services.documents import NO_WAY_TO_THE_AEAT
 
     assert NO_WAY_TO_THE_AEAT == {f"verifactu.{lost}" for lost in WAYS_LOST}
 
 
 def test_sales_refuses_every_problem_verifactu_can_find_on_the_route():
     # Bound to VeriFactu's source, not to this file's table (the test above): a wait code ``route_problem`` (or
-    # what it calls in ``apps.verifactu.queries``) returns tomorrow that Sales does not refuse would be a sale
+    # what it calls in ``apps.verifactu.queries.route``) returns tomorrow that Sales does not refuse would be a sale
     # charged whose ticket never reaches the AEAT. It shows up here first; then ``WAYS_LOST`` asks for the real way
     # to lose it. The same for a code VeriFactu retires: dead in Sales. Testing's refusals are no exception, as
     # there is none (``_refuse_without_a_way`` only refuses in production).
     import ast
     import inspect
 
-    from apps.sale.services import NO_WAY_TO_THE_AEAT
-    from apps.verifactu import queries
+    from apps.sale.services.documents import NO_WAY_TO_THE_AEAT
+    from apps.verifactu.queries import route
 
     functions = {
         node.name: node
-        for node in ast.parse(inspect.getsource(queries)).body
+        for node in ast.parse(inspect.getsource(route)).body
         if isinstance(node, ast.FunctionDef)
     }
     problems, seen, pending = set(), set(), ["route_problem"]

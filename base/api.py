@@ -53,27 +53,27 @@ router = Router(tags=["base"])
 # auth=None: an anonymous visitor gets ``user: null`` (and the SPA sends it to the login).
 @bind(router, "base.session.me", "/me", auth=None)
 async def session_me(request):
-    return await run_operation(request, queries.session_me)
+    return await run_operation(request, queries.sessions.session_me)
 
 
 @bind(router, "base.setup.status", "/home/setup")
 async def setup_status(request):
-    return await run_operation(request, queries.setup_status)
+    return await run_operation(request, queries.home.setup_status)
 
 
 @bind(router, "base.widget.list", "/home/widgets")
 async def widget_list(request):
-    return await run_operation(request, queries.widget_list)
+    return await run_operation(request, queries.home.widget_list)
 
 
 @bind(router, "base.bell.counters", "/home/bell")
 async def bell_counters(request):
-    return await run_operation(request, queries.bell_counters)
+    return await run_operation(request, queries.home.bell_counters)
 
 
 @bind(router, "base.notice.list", "/home/notices")
 async def notice_list(request):
-    return await run_operation(request, queries.notice_list)
+    return await run_operation(request, queries.home.notice_list)
 
 
 # ── Apps ───────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -81,7 +81,7 @@ async def notice_list(request):
 
 @bind(router, "base.app.list", "/apps")
 async def app_list(request):
-    return await run_operation(request, queries.app_list)
+    return await run_operation(request, queries.apps.app_list)
 
 
 # Turning an app on or off, with the plan's limit: the app by its name or its id in the body; which app
@@ -92,7 +92,7 @@ from base.schemas import AppChangeIn, AppRefIn  # noqa: E402
 
 @bind(router, "base.app.get", "/apps/detail")
 async def app_get(request, params: Query[AppRefIn]):
-    return await run_operation(request, queries.app_get, params)
+    return await run_operation(request, queries.apps.app_get, params)
 
 
 def _accepted_while_creating(answer):
@@ -116,7 +116,7 @@ async def app_retry(request, data: AppChangeIn):
 
 @bind(router, "base.plan.usage", "/system/plan")
 async def plan_usage(request):
-    return await run_operation(request, queries.plan_usage)
+    return await run_operation(request, queries.usage.plan_usage)
 
 
 # ── Data: blueprints, imports and reset ───────────────
@@ -126,7 +126,7 @@ MAX_BLUEPRINT_BODY = 28_100_000
 
 @bind(router, "base.blueprint.list", "/settings/data/blueprints")
 async def blueprint_list(request):
-    return await run_operation(request, queries.blueprint_list)
+    return await run_operation(request, queries.blueprints.blueprint_list)
 
 
 @bind(router, "base.blueprint.inspect", "/settings/data/blueprints/inspect")
@@ -143,17 +143,17 @@ async def blueprint_import(request, data: BlueprintImportIn):
 
 @bind(router, "base.blueprint.export", "/settings/data/export")
 async def blueprint_export(request, data: Query[BlueprintExportIn]):
-    return await run_operation(request, queries.blueprint_export, data)
+    return await run_operation(request, queries.blueprints.blueprint_export, data)
 
 
 @bind(router, "base.import.list", "/settings/data/imports")
 async def import_list(request):
-    return await run_operation(request, queries.import_list)
+    return await run_operation(request, queries.blueprints.import_list)
 
 
 @bind(router, "base.import.detail", "/settings/data/imports/detail")
 async def import_detail(request, data: Query[ImportIdIn]):
-    return await run_operation(request, queries.import_detail, data)
+    return await run_operation(request, queries.blueprints.import_detail, data)
 
 
 @bind(router, "base.import.undo", "/settings/data/imports/undo")
@@ -163,7 +163,7 @@ async def import_undo(request, data: ImportUndoIn):
 
 @bind(router, "base.dataset.list", "/settings/data/datasets")
 async def dataset_list(request):
-    return await run_operation(request, queries.dataset_list)
+    return await run_operation(request, queries.blueprints.dataset_list)
 
 
 @bind(router, "base.hub.reset", "/settings/data/reset")
@@ -173,12 +173,12 @@ async def hub_reset(request, data: HubResetIn):
 
 @bind(router, "base.hub.dumps", "/settings/data/dumps")
 async def hub_dumps(request):
-    return await run_operation(request, queries.hub_dumps)
+    return await run_operation(request, queries.dumps.hub_dumps)
 
 
 @bind(router, "base.hub.dump_link", "/settings/data/dumps/link")
 async def hub_dump_link(request, data: Query[HubDumpLinkIn]):
-    return await run_operation(request, queries.hub_dump_link, data)
+    return await run_operation(request, queries.dumps.hub_dump_link, data)
 
 
 # ── Business settings and the hub's context ───────────────
@@ -186,7 +186,7 @@ async def hub_dump_link(request, data: Query[HubDumpLinkIn]):
 
 @bind(router, "base.business.get", "/business")
 async def business_get(request):
-    return await run_operation(request, queries.business_get)
+    return await run_operation(request, queries.hubs.business_get)
 
 
 # ── System ─────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -194,27 +194,27 @@ async def business_get(request):
 
 @bind(router, "base.system.cards", "/system/cards")
 async def system_cards(request):
-    return await run_operation(request, queries.system_cards)
+    return await run_operation(request, queries.home.system_cards)
 
 
 @bind(router, "base.system.status", "/system/status")
 async def system_status(request):
-    return await run_operation(request, queries.system_status)
+    return await run_operation(request, queries.system.system_status)
 
 
 @bind(router, "base.event.list", "/system/events")
 async def event_list(request):
-    return await run_operation(request, queries.event_list)
+    return await run_operation(request, queries.system.event_list)
 
 
 @bind(router, "base.failed_event.list", "/system/failed-events")
 async def failed_event_list(request, params: Query[FailedEventListIn]):
-    return await run_operation(request, queries.failed_event_list, params)
+    return await run_operation(request, queries.system.failed_event_list, params)
 
 
 @bind(router, "base.failed_event.detail", "/system/failed-events/detail")
 async def failed_event_detail(request, data: Query[FailedEventIn]):
-    return await run_operation(request, queries.failed_event_detail, data)
+    return await run_operation(request, queries.system.failed_event_detail, data)
 
 
 @bind(router, "base.failed_event.retry", "/system/failed-events/retry")
@@ -239,7 +239,7 @@ MAX_FILE_BODY = 35_100_000
 
 @bind(router, "base.file.list", "/files")
 async def file_list(request, params: Query[FileListIn]):
-    return await run_operation(request, queries.file_list, params)
+    return await run_operation(request, queries.files.file_list, params)
 
 
 @bind(
@@ -257,7 +257,7 @@ async def file_list(request, params: Query[FileListIn]):
     },
 )
 async def file_read(request, params: Query[FileReadIn]):
-    described = await run_operation(request, queries.file_read, params)
+    described = await run_operation(request, queries.files.file_read, params)
     if request.headers.get("Accept", "").strip() == "application/json":
         return described
     return await sync_to_async(files.file_response)(
@@ -297,7 +297,7 @@ async def file_delete(request, data: FileDeleteIn):
 # auth=None: the PIN pad is the door of a browser without a session (its device cookie decides what it shows).
 @bind(router, "base.access.door", "/access/door", auth=None)
 async def access_door(request):
-    return await run_operation(request, queries.access_door)
+    return await run_operation(request, queries.access.access_door)
 
 
 @bind(router, "base.pin.set", "/me/pin")
@@ -307,7 +307,7 @@ async def pin_set(request, data: PinSetIn):
 
 @bind(router, "base.device.current", "/device")
 async def device_current(request):
-    return await run_operation(request, queries.device_current)
+    return await run_operation(request, queries.devices.device_current)
 
 
 @bind(router, "base.device.mode_set", "/device/mode")
@@ -317,12 +317,12 @@ async def device_mode_set(request, data: DeviceModeIn):
 
 @bind(router, "base.device.list", "/devices")
 async def device_list(request):
-    return await run_operation(request, queries.device_list)
+    return await run_operation(request, queries.devices.device_list)
 
 
 @bind(router, "base.device.detail", "/devices/detail")
 async def device_detail(request, data: Query[DeviceByIdIn]):
-    return await run_operation(request, queries.device_detail, data)
+    return await run_operation(request, queries.devices.device_detail, data)
 
 
 @bind(router, "base.device.rename", "/devices/rename")
@@ -342,7 +342,7 @@ async def device_prune(request):
 
 @bind(router, "base.access.settings", "/access/settings")
 async def access_settings(request):
-    return await run_operation(request, queries.access_settings_get)
+    return await run_operation(request, queries.access.access_settings_get)
 
 
 @bind(router, "base.access.settings_update", "/access/settings/update")
@@ -352,7 +352,7 @@ async def access_settings_update(request, data: AccessSettingsUpdateIn):
 
 @bind(router, "base.profile.get", "/me/profile")
 async def profile_get(request):
-    return await run_operation(request, queries.profile_get)
+    return await run_operation(request, queries.profile.profile_get)
 
 
 @bind(router, "base.profile.update", "/me/profile/update")
@@ -388,12 +388,12 @@ async def avatar_remove(request):
 
 @bind(router, "base.person.list", "/people")
 async def person_list(request):
-    return await run_operation(request, queries.person_list)
+    return await run_operation(request, queries.people.person_list)
 
 
 @bind(router, "base.person.detail", "/people/detail")
 async def person_detail(request, data: Query[PersonIn]):
-    return await run_operation(request, queries.person_detail, data)
+    return await run_operation(request, queries.people.person_detail, data)
 
 
 @bind(router, "base.person.pin_remove", "/people/pin/remove")
@@ -413,7 +413,7 @@ async def person_badge_remove(request, data: PersonIn):
 
 @bind(router, "base.role.list", "/roles")
 async def role_list(request):
-    return await run_operation(request, queries.role_list)
+    return await run_operation(request, queries.people.role_list)
 
 
 # ── People and permissions: the business's API keys ────────────────────────────────────────────────────────────────
@@ -421,12 +421,12 @@ async def role_list(request):
 
 @bind(router, "base.api_key.list", "/keys")
 async def api_key_list(request):
-    return await run_operation(request, queries.api_key_list)
+    return await run_operation(request, queries.api_keys.api_key_list)
 
 
 @bind(router, "base.api_key.detail", "/keys/detail")
 async def api_key_detail(request, data: Query[ApiKeyIdIn]):
-    return await run_operation(request, queries.api_key_detail, data)
+    return await run_operation(request, queries.api_keys.api_key_detail, data)
 
 
 @bind(router, "base.api_key.create", "/keys")
@@ -449,17 +449,17 @@ async def api_key_revoke(request, data: ApiKeyIdIn):
 
 @bind(router, "base.approval.list", "/approvals")
 async def approval_list(request):
-    return await run_operation(request, queries.approval_list)
+    return await run_operation(request, queries.approvals.approval_list)
 
 
 @bind(router, "base.approval.export", "/approvals/export")
 async def approval_export(request, data: Query[ApprovalExportIn]):
-    return await run_operation(request, queries.approval_export, data)
+    return await run_operation(request, queries.approvals.approval_export, data)
 
 
 @bind(router, "base.approval.approvers", "/approvals/approvers")
 async def approval_approvers(request, data: Query[ApproversIn]):
-    return await run_operation(request, queries.approval_approvers, data)
+    return await run_operation(request, queries.approvals.approval_approvers, data)
 
 
 @bind(router, "base.approval.approve", "/approvals")
@@ -473,12 +473,12 @@ from base.schemas import ApiDocSettingsUpdateIn  # noqa: E402
 
 @bind(router, "base.api_doc.get", "/api-docs")
 async def api_doc_get(request):
-    return await run_operation(request, queries.api_doc_get)
+    return await run_operation(request, queries.api_keys.api_doc_get)
 
 
 @bind(router, "base.api_doc.settings", "/api-docs/settings")
 async def api_doc_settings(request):
-    return await run_operation(request, queries.api_doc_settings)
+    return await run_operation(request, queries.api_keys.api_doc_settings)
 
 
 @bind(router, "base.api_doc.settings_update", "/api-docs/settings/update")
@@ -511,7 +511,7 @@ async def assistant_turn(request, data: AssistantTurnIn):
 
 @bind(router, "base.assistant.usage", "/assistant/usage")
 async def assistant_usage(request):
-    return await run_operation(request, queries.assistant_usage)
+    return await run_operation(request, queries.assistant.assistant_usage)
 
 
 @bind(router, "base.assistant.report", "/assistant/report")
@@ -565,7 +565,7 @@ async def assistant_speak(request, data: AssistantSpeakIn):
 
 @bind(router, "base.location.list", "/locations")
 async def location_list(request):
-    return await run_operation(request, queries.location_list)
+    return await run_operation(request, queries.hubs.location_list)
 
 
 # ── The shared image library (base.image_catalog) ──────────────────────────────────────────────────────────────────
@@ -575,9 +575,9 @@ from base.schemas import CatalogImageRefIn, CatalogImageSearchIn  # noqa: E402
 
 @bind(router, "base.catalog_image.search", "/catalog/images")
 async def catalog_image_search(request, params: Query[CatalogImageSearchIn]):
-    return await run_operation(request, queries.catalog_image_search, params)
+    return await run_operation(request, queries.catalog_images.catalog_image_search, params)
 
 
 @bind(router, "base.catalog_image.get", "/catalog/images/detail")
 async def catalog_image_get(request, params: Query[CatalogImageRefIn]):
-    return await run_operation(request, queries.catalog_image_get, params)
+    return await run_operation(request, queries.catalog_images.catalog_image_get, params)

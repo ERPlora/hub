@@ -394,10 +394,10 @@ def _activate_in(hub, now: dt.datetime) -> None:
     """Read what is due in ``hub``'s database; make its tables, unless the request or the database is of a newer code
     than this worker's; settle the rows with how it went."""
     with use_hub(hub):
-        due = queries.activations_due(hub.slug, now)
+        due = queries.apps.activations_due(hub.slug, now)
         if not due:
             # Rung for nothing due now (a retry still to come, or nothing left): its ring moves to what is next, or ends.
-            services.activations_rung_at(hub.pk, queries.activation_next_at(hub.slug))
+            services.activations_rung_at(hub.pk, queries.apps.activation_next_at(hub.slug))
             return
     apps, error = sorted(due), ""
     code = _code()
@@ -591,7 +591,7 @@ def _serve_hub(hub, now: dt.datetime, *, active: bool = False) -> None:
             scheduler.run_due(now, scope=scope, active=relay.active_apps(scope))
             if hub.status == Hub.Status.READY and _sweep_due(hub.pk, now, active):
                 _swept[hub.pk] = now
-                pending = queries.activation_next_at(hub.slug)
+                pending = queries.apps.activation_next_at(hub.slug)
                 if pending is not None:
                     services.ring_activations(hub, pending)
     except Exception:

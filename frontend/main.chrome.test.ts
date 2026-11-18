@@ -1,8 +1,8 @@
 // base's chrome mounts with the screen: its pieces load on demand, but the hub
-// mounts only once they are here. The bell (topbar) and the apps followed beside the pane (background) read live
-// queries: mounted after the screen, they came more than 150 ms after its queries on a slow device, and the one live
-// stream was cut and opened again with them (tests/e2e/base-home.spec.ts, «when base's chrome arrives late»). Its own
-// file: the pieces' modules are held from the first import of main.ts, which boots on import.
+// mounts only once they are here. The apps followed beside the pane (background) read a live query: mounted after the
+// screen, it came more than 150 ms after its queries on a slow device, and the one live stream was cut and opened
+// again with it (tests/e2e/base-home.spec.ts, «when base's chrome arrives late»). Its own file: the pieces' modules are
+// held from the first import of main.ts, which boots on import.
 import { describe, expect, it, vi } from 'vitest';
 import { createApp, h } from 'vue';
 
@@ -28,7 +28,6 @@ vi.mock('@erplora/ui/sdk', async (importOriginal) => ({
 // tagged `Module`). The one beside the pane is held until the test lets it arrive; the menu's foot («Upgrade plan»,
 // «Manage on erplora.com») never loads (a chunk the network lost): the piece's own load reports it at render.
 vi.mock('../base/frontend/components/TopbarChrome.vue', () => ({ __esModule: true, default: { render: () => null } }));
-vi.mock('../base/frontend/components/BlockingStrip.vue', () => ({ __esModule: true, default: { render: () => null } }));
 vi.mock('../base/frontend/components/BackgroundChrome.vue', async () => {
   await chrome.late;
   return { __esModule: true, default: { render: () => h('span', { 'data-testid': 'background-chrome' }) } };
@@ -39,22 +38,14 @@ vi.mock('../base/frontend/components/SidebarFooter.vue', () => {
 
 import { createShell } from '@erplora/ui/shell';
 
-const ME = { user: { id: 'u1', label: 'Ana' }, permissions: [], menu: [], apps: [], language: 'es' };
-const app = { mount: vi.fn(), config: {} };
-const router = {
-  isReady: vi.fn(() => Promise.resolve()),
-  addRoute: vi.fn(),
-  beforeEach: vi.fn(),
-  replace: vi.fn(() => Promise.resolve()),
-  currentRoute: { value: { path: '/', fullPath: '/', query: {}, hash: '', meta: {} } },
-};
+import { useHubActionNotices } from '../base/frontend/lib/action-notices';
+import { embedPage, shellFakes } from './__tests__/main-boot';
+
+const { app, router } = shellFakes();
 
 // Importing main.ts boots it, with the file: out of any test's or hook's clock, which its module graph (Ionic, every
 // component, every app's routes and catalogues) outlasted on a loaded machine (a 10 s hook at load ~22).
-document.body.innerHTML = `
-  <script id="spa-config" type="application/json">{"csrfCookieName": "csrftoken", "lang": "es", "loginUrl": "/auth/login"}</script>
-  <script id="session-me" type="application/json">${JSON.stringify(ME)}</script>
-  <div id="app"></div>`;
+embedPage();
 vi.mocked(createShell).mockResolvedValue({ app, router } as never);
 const main = await import('./main');
 
@@ -73,5 +64,9 @@ describe("main.ts — base's chrome mounts with the screen", () => {
     const host = document.createElement('div');
     createApp({ render: () => h(main.CHROME.background!) }).mount(host);
     expect(host.querySelector('[data-testid="background-chrome"]')).not.toBeNull();
+  });
+
+  it("hands the shell the hub's notices: the bell, its arrivals and its panel are the shell's", () => {
+    expect(vi.mocked(createShell).mock.calls[0][0].actionNotices).toBe(useHubActionNotices);
   });
 });

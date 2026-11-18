@@ -99,7 +99,7 @@ class Config(UUIDModel):
     # contract step drops it: the tasks of the previous deployment still read it while the new one rolls out.
     live_paid = models.BooleanField(_("live option in the plan"), default=False)
     # From the ERPlora account's photo: the business's commercial status; going live needs it active
-    # (``queries.live_problems``).
+    # (``queries.route.live_problems``).
     hub_status = models.CharField(
         _("business status"),
         max_length=10,

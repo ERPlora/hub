@@ -15,7 +15,7 @@ from live.errors import Conflict
 
 from apps.verifactu import certificates
 from apps.verifactu.models import Config, Environment, Record
-from apps.verifactu.queries import production_open
+from apps.verifactu.queries.route import production_open
 from apps.verifactu.tests.conftest import HUB_DB, ISSUER, A, B, ctx_for, run
 from base.models import Hub
 

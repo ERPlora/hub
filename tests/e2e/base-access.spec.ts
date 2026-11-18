@@ -11,7 +11,7 @@ import { createHmac } from 'node:crypto';
 
 import { expect, type Locator, type Page, test } from '@playwright/test';
 
-import { api, capture, collectProblems, horizontalOverflow, login, psql, SAAS, shot, shown, THREE_SIZES as SIZES, turnOn, untilStill } from './helpers';
+import { api, capture, collectProblems, horizontalOverflow, login, MY_APPS_DOOR, psql, SAAS, shot, shown, THREE_SIZES as SIZES, turnOn, untilStill } from './helpers';
 import { businessOnSaas, type SaasBusiness, type SaasOwner, saasPost, signUpOnSaas } from './saas-owner';
 import { cleanSales } from './sale-helpers';
 import { STACK } from './stack';
@@ -319,7 +319,7 @@ test('the employee enters on a till, creates their PIN there, and the first devi
   await expect(shown(till).getByTestId('pin-setup-step')).toHaveText('Confirm your PIN');
   await press(till, EMPLOYEE_PIN);
   await expect(till).toHaveURL(`${origin}/`);
-  await expect(shown(till).locator('[data-testid="topbar-apps"]').first()).toBeAttached();
+  await expect(shown(till).locator(MY_APPS_DOOR).first()).toBeAttached();
 
   // A's session ended (one device at a time): its next page says why, with «Upgrade plan».
   await owner.page.goto(`${origin}/`);
@@ -412,7 +412,7 @@ test('«Switch user» over the sale in progress: whoever takes over enters with 
   await shown(till).getByTestId('pin-face').filter({ hasText: 'Bea' }).click();
   await press(till, EMPLOYEE_PIN);
   await expect(till).toHaveURL(`${origin}/sale/pos`);
-  await expect(till.locator('ion-toast')).toContainText('Now serving Bea');
+  await expect(till.getByTestId('toast').filter({ hasText: 'Now serving Bea' }).first()).toBeVisible();
   expect(await whoIsIn(till, origin)).toBe('Bea');
   // The same check, with its line, on the till of whoever took over; still open.
   await expect(shown(till).locator('.pos-line', { hasText: 'Coffee' })).toHaveCount(1);

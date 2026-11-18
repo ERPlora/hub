@@ -30,7 +30,7 @@ function finish(failure?: string): void {
   finished = true;
   if (failure !== undefined) {
     const failed = t('sale.document.printFailed');
-    void toastError(failure ? `${failed}: ${failure}` : failed);
+    toastError(failure ? `${failed}: ${failure}` : failed);
   }
   emit('done');
 }
@@ -55,7 +55,7 @@ onMounted(async () => {
   try {
     const sent = await queue.run({ sale_id: props.saleId });
     if (sent.queued) {
-      void toastSuccess(t('sale.document.queued', { printer: sent.printer ?? '' }));
+      toastSuccess(t('sale.document.queued', { printer: sent.printer ?? '' }));
       finish();
       return;
     }

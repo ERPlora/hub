@@ -19,7 +19,8 @@ registro nuevo. Solo para negocios de España (Canarias, Ceuta y Melilla incluid
 - **Configuración y vía** (F01–F06, F08–F12, F34): dos vías de envío, las dos por la pasarela del SaaS: ERPlora
   remite con su sello y el otorgamiento de representación (Anexo I del Convenio 17) que se firma y se sube aquí y
   revisa el staff en el SaaS, o el negocio remite con su certificado propio, subido aquí y guardado cifrado (Fernet,
-  `FISCAL_CERTIFICATE_KEY`) en la BD del hub. Empieza en pruebas; pasar a producción exige despliegue `prod`,
+  `FISCAL_CERTIFICATE_KEY`) en la BD del hub. La vía no se elige: con certificado válido, el certificado; sin él, en
+  pruebas, el sello; al pasar a producción queda fijada. Empieza en pruebas; pasar a producción exige despliegue `prod`,
   `VERIFACTU_PRODUCTION_ENABLED`, la vía lista y la cuenta activa, en todos los planes. Prueba de conexión sin
   presentar nada, factura de prueba y declaración responsable.
 - **Registrar** (F13, F14): Facturación pide el registro de alta dentro de su propia emisión (la reacción a
@@ -47,11 +48,11 @@ registro nuevo. Solo para negocios de España (Canarias, Ceuta y Melilla incluid
 | Quién la lee | Facturación (`verifactu.record.create` dentro de su emisión), Ventas, Facturación e Impresión (`verifactu.record.by_invoice`), la plataforma (`can_disable`) y Automatizaciones (la tarjeta de FLOW-F04 ante un rechazo) |
 | Pantallas | `/verifactu/records` (y la ficha `/verifactu/records/<id>`), `/verifactu/contingency`, `/verifactu/events`, `/verifactu/recovery`, `/verifactu/config` y `/verifactu/settings` |
 | Inicio | el paso «Configura VeriFactu» (`verifactu.sending_route`, `required=True`; legal en producción por `base`) y cuatro paneles: «Pendientes VeriFactu» (de serie), «Cola de contingencia», «Registros por estado» y «Eventos AEAT recientes» |
-| Operaciones | 14 consultas (`queries.py`) y 21 acciones (`services.py`), todas con `ai=`; 33 rutas en `/api/verifactu/…` (`verifactu.config.sync` y `verifactu.config.follow_deployment` no tienen ruta: solo el sistema) |
+| Operaciones | 14 consultas (`queries/`) y 21 acciones (`services.py`), todas con `ai=`; 33 rutas en `/api/verifactu/…` (`verifactu.config.sync` y `verifactu.config.follow_deployment` no tienen ruta: solo el sistema) |
 | Eventos | 12, `verifactu.record.{created,transmitted,rejected,accepted_with_errors,reconciled}`, `verifactu.contingency.{processed,retried}`, `verifactu.chain.{validated,recovered}`, `verifactu.aeat.queried`, `verifactu.diagnostic.run` y `verifactu.config.changed` (`events.py`); reacciona a `invoice.invoice.issued` |
 | Tarea programada | `process_queue` (`verifactu.contingency.process`, cada minuto, `catch_up: collapse`) |
 | Migraciones | `0001_initial`, `0002_own_certificate`, `0003_live_paid` (columna sin uso, a la espera de su contracción), `0004_multiple_taxpayers_always`, `0005_config_hub_id` |
-| Admin | Django admin en `hubs.erplora.com` sin CRUD libre sobre sus siete modelos (PLAN §28): lo registrado, en solo lectura; lo no registrado, con acciones de soporte que son operaciones («Reenviar a la AEAT», «Reprogramar», «Consultar a la AEAT», «Subsanar el rechazo»); la vía, por `verifactu.config.update` |
+| Admin | Django admin en `hubs.erplora.com` sin CRUD libre sobre sus siete modelos (PLAN §28): lo registrado, en solo lectura; lo no registrado, con acciones de soporte que son operaciones («Reenviar a la AEAT», «Reprogramar», «Consultar a la AEAT», «Subsanar el rechazo»); la configuración, solo a la vista |
 | Pasarela | `VERIFACTU_GATEWAY_URL` (la del SaaS, firmada con HMAC); sin ella los registros esperan en la cola con su motivo |
 
 Las decisiones de diseño (la cola son los propios registros, un SOAP Fault no rechaza registros, un rechazo deshace

@@ -20,29 +20,19 @@ vi.mock('@erplora/ui/sdk', async (importOriginal) => ({
 // never settles.
 vi.mock('../base/frontend/components/TopbarChrome.vue', () => ({ __esModule: true, default: { render: () => null } }));
 vi.mock('../base/frontend/components/SidebarFooter.vue', () => ({ __esModule: true, default: { render: () => null } }));
-vi.mock('../base/frontend/components/BlockingStrip.vue', () => ({ __esModule: true, default: { render: () => null } }));
 vi.mock('../base/frontend/components/BackgroundChrome.vue', () => new Promise(() => undefined));
 
 import { createShell } from '@erplora/ui/shell';
 
-const ME = { user: { id: 'u1', label: 'Ana' }, permissions: [], menu: [], apps: [], language: 'es' };
-const app = { mount: vi.fn(), config: {} };
-const router = {
-  isReady: vi.fn(() => Promise.resolve()),
-  addRoute: vi.fn(),
-  beforeEach: vi.fn(),
-  replace: vi.fn(() => Promise.resolve()),
-  currentRoute: { value: { path: '/', fullPath: '/', query: {}, hash: '', meta: {} } },
-};
+import { embedPage, shellFakes } from './__tests__/main-boot';
+
+const { app, router } = shellFakes();
 const warned = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
 
 // The wait's clock is the test's: the boot starts it, so the timers are fake before main.ts is imported. Imported with
 // the file, out of any test's or hook's clock (main.chrome.test.ts says why).
 vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
-document.body.innerHTML = `
-  <script id="spa-config" type="application/json">{"csrfCookieName": "csrftoken", "lang": "es", "loginUrl": "/auth/login"}</script>
-  <script id="session-me" type="application/json">${JSON.stringify(ME)}</script>
-  <div id="app"></div>`;
+embedPage();
 vi.mocked(createShell).mockResolvedValue({ app, router } as never);
 const main = await import('./main');
 const { chromeLoaded } = main;

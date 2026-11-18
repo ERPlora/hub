@@ -6,21 +6,8 @@
 import { expect, test } from '@playwright/test';
 
 import { type Figures, figuresAt, shownFigures, watchFigures } from './demo-figures';
-import {
-  A,
-  api,
-  appearedAt,
-  createViaPage,
-  listReady,
-  login,
-  record,
-  row,
-  runningTimeout,
-  shot,
-  shown,
-  uniqueName,
-  watchForRow,
-} from './helpers';
+import { A, api, login, record, runningTimeout, shot, shown, uniqueName } from './helpers';
+import { appearedAt, createViaPage, listReady, row, watchForRow } from './demo-items';
 import { recordResponses, responseEnd } from './resource-timing';
 
 const ROUNDS = 3;

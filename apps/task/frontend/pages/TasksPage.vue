@@ -193,12 +193,12 @@ async function onAction({ actionId, row }: { actionId: string; row: TaskOut }): 
   try {
     if (actionId === 'start') {
       await setStatus.run({ id: row.id, status: 'in_progress' });
-      void toastSuccess(t('task.tasks.started'));
+      toastSuccess(t('task.tasks.started'));
     }
     if (actionId === 'complete') {
       await complete.run({ id: row.id });
       if (view.value === 'mine') keptDone.set(row.id, { ...row, status: 'done' });
-      void toastSuccess(t('task.tasks.completed'));
+      toastSuccess(t('task.tasks.completed'));
     }
   } catch (error) {
     rowError.value = (actionId === 'start' ? setStatus.error.value : complete.error.value) ?? (error as ApiError);

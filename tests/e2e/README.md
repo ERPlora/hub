@@ -24,6 +24,23 @@ tiene las cuentas de demo con las que entran las specs (abajo, «Varias ejecucio
 worker: `--workers=N` pisa el `workers: 1` de `playwright.config.ts`, y dos specs a la vez sobre la misma pila se
 borran los datos. Para correr en paralelo, otra pila (abajo, «Varias ejecuciones a la vez»).
 
+## Las ayudas compartidas
+
+Una spec importa cada ayuda del módulo que la lleva; ninguno reexporta lo de otro. `helpers.ts` sigue en la lista de
+tamaño (`.file-size-allow`) porque lleva todo lo que importan de él los ficheros de esa lista, que no pueden ganar ni
+una línea de import; lo que no importa ninguno de ellos está en los demás módulos:
+
+| Módulo | Qué lleva |
+|---|---|
+| `helpers.ts` | `api`, los hubs `A` y `B`, las cuentas `OWNER` y `EMPLOYEE`, `login` y las páginas que abre (`hostPage`, `signedInSpanish`), el SaaS por el que pasa el login y los pasos del viaje (`SAAS`, `SAAS_SIGN_IN`, `SAAS_CODE`, la carpeta de su correo, `runningTimeout`), la puerta de «Mis apps» (`MY_APPS_DOOR`, `topbarApps`), `collectProblems`, las carpetas `HUB_DIR` y `REPO_DIR`, la página a la vista (`shown`, `testid`, `appRow`), la espera de «nada se mueve» (`settled`, `untilStill`, `painted`), `scrolledTo`, las capturas (`capture`, `shot`, `record`), `horizontalOverflow`, las apps de la spec (`turnOn`, `turnOnMissing`, `turnOffTurnedOn`), `upgradeLandsInside`, el registro del negocio (`registrationOf`, `registerBusinessIn`), `psql` y los elementos de la demo que borran (`clearItems`, `uniqueName`) |
+| `business.ts` | el negocio de la spec, vaciado y devuelto: lo que trae una plantilla (`emptyOfTemplateData`), el plan de su foto (`dropPlanFromPhoto`, `restorePhotoFrom`) y quién ha entrado (`usernameOf`) |
+| `screen.ts` | más de la pantalla: el tamaño de la tableta alta, `iconStates`, `settledCapture` y `capturedFitting` |
+| `detectors.ts` | los dos detectores que corren en la página: qué se mueve (`movingInPage`) y si una captura repite su parte de arriba (`repeatedTop`) |
+| `demo-items.ts` | los elementos de la app de demo: crearlos y leerlos por la API, y la lista |
+| `dev-server.ts` | el `runserver` y su Vite: si contestan, quién escucha en un puerto y arrancarlo otra vez |
+| `topbar.ts` | la barra de arriba: «Mis apps», el asistente y `compactBar` |
+| `live-streams.ts` | los `/api/live` que abre una página, con `decodeSubs` |
+
 ## El login
 
 `login()` de `helpers.ts` hace el login de verdad: el hub manda al SaaS, el SaaS pide la cuenta y el código que
@@ -50,7 +67,7 @@ guardado en ella lo hereda la siguiente. Una spec con dos dispositivos de la mis
 empleado por PIN si no rota la clave de sesión, pide `fresh: true` para tener la suya.
 
 Cada paso del login se espera **todo el tiempo del test**, nunca una parte: la shell del hub (la barra de arriba,
-`topbar-apps`), al entrar y al final, y cada paso del SaaS (su página de acceso o la vuelta, su respuesta al inicio de
+su camino a «Mis apps», `MY_APPS_DOOR`: ⠿ desde la tableta y el «⋮» de la shell en el teléfono), al entrar y al final, y cada paso del SaaS (su página de acceso o la vuelta, su respuesta al inicio de
 sesión, la pantalla del código, su respuesta al código y la vuelta al hub). Con la máquina cargada la SPA tardó más de
 30 s en montar la shell (hub#1342) y el SaaS lo mismo en contestar un paso (hub#1370), sin nada roto. Lo que dice que
 no va a llegar cae en el acto y dice por qué:
@@ -72,7 +89,7 @@ no va a llegar cae en el acto y dice por qué:
   una vez, cuando la pantalla del código ya está.
 
 Un fallo de red (`net::…`) se reintenta una vez, como una conexión rechazada. Un paso que no llega sin nada de eso
-choca con el tope del propio test, y Playwright nombra esa espera: `locator.waitFor` de `topbar-apps` para la shell,
+choca con el tope del propio test, y Playwright nombra esa espera: `locator.waitFor` de `topbarApps` para la shell,
 `page.waitForResponse` desde `signInWithCode` (la línea del código o la del inicio de sesión) para una respuesta del
 SaaS que no llega.
 
@@ -154,7 +171,7 @@ Reglas que el e2e hace cumplir:
   llevó unos 3, hub#759).
 - Los negocios de la pila van con los límites de Gratis (una transacción a la vez, `base.tenancy.limits`): con la máquina
   cargada, la página que una spec acaba de abrir puede ocupar ese hueco más de lo que espera el servidor, y el Hub contesta
-  503 `base.hub_busy` a la preparación que viene detrás. Ese 503 no ejecutó nada, así que `api` (`hub-api.ts`, el camino de
+  503 `base.hub_busy` a la preparación que viene detrás. Ese 503 no ejecutó nada, así que `api` (`helpers.ts`, el camino de
   todos los ayudantes al API del Hub: `turnOn`, `manualFlow`, `createProduct`, los `post` de las specs…) repite la misma
   petición tras el `Retry-After` del servidor (1 s), hasta 6 intentos, y deja una línea por intento en la salida; si sigue
   ocupado, falla con `HubStillBusy` diciendo la ruta, los intentos y la respuesta. Cualquier otra respuesta, también otro
@@ -545,6 +562,9 @@ contaba 0 filas tras confirmar un diálogo pasaba antes de que se borrara nada (
 - Un diálogo se busca en la página entera: `page.locator('ion-modal[data-testid=…]')`, nunca dentro de `shown(page)`.
 - Tras confirmar un diálogo, se espera `await expect(<diálogo>).toBeHidden()` antes de contar filas o afirmar que
   algo ya no está.
+- Un aviso (toast) se busca con `toast-helpers.ts`, por lo que dice (`toastSaying`), nunca por su sitio: cada borde de
+  la pantalla enseña hasta 3 a la vez, el más reciente primero en el DOM. Con el ratón o el foco encima, la pila se
+  abre y sus relojes se paran: una spec que espera a que un aviso se vaya aparta antes el ratón (`page.mouse.move(0, 0)`).
 
 ## Las capturas
 
@@ -552,7 +572,7 @@ Una captura justo después de `setViewportSize` puede salir antes de que el nave
 la zona que destapa el cambio de tamaño aún tiene lo de arriba de la página, y la captura repite la barra superior en su
 parte de abajo (87 filas; en `main`, 5 de 24 capturas de la lista de la demo sin espera y 2 de 24 tras `settled`). Esa
 captura es la prueba de una pantalla que nadie vio. Toda captura de la e2e pasa por `capture(page, name)` (`helpers.ts`):
-espera a que nada finito se mueva (`untilStill`, abajo: un `ion-toast` o un `ion-modal` entrando, no un spinner) y a un
+espera a que nada finito se mueva (`untilStill`, abajo: un aviso o un `ion-modal` entrando, no un spinner) y a un
 fotograma pintado, repite la captura mientras repite la franja de arriba (`repeatedTop`, la del SaaS) y, si no deja de
 hacerlo, falla diciéndolo y no escribe nada; si no, la deja en `.artifacts/<name>.png` y la devuelve. Si algo sigue
 moviéndose a los 10 s, falla con `capture <name>: still moving`, nombrando lo que se mueve, y no escribe nada: antes, una
@@ -567,8 +587,8 @@ blanco arriba y abajo con su borde izquierdo) y la tarjeta de confirmación enci
 `settled(page)` (`helpers.ts`; `service-helpers.ts` y `schedule-helpers.ts` reparten el mismo, sin copias) espera a que
 nada se mueva (`untilStill`) y a un fotograma pintado. «Nada se mueve» se lee en el documento **y en cada shadow root
 abierto, a cualquier profundidad** (`movingInPage`): `document.getAnimations()` no ve los shadow roots, y Ionic anima ahí
-sus avisos, diálogos y popovers (con el `settled` de antes, un `ion-toast` aún entrando daba 0 animaciones en el
-documento y 1 en su shadow root). Las infinitas (spinners, un brillo de carga) no cuentan; si algo sigue moviéndose a los
+sus diálogos y popovers; los avisos de `@erplora/ui` entran con transiciones CSS en el propio documento. Las infinitas
+(spinners, un brillo de carga) no cuentan; si algo sigue moviéndose a los
 10 s, la spec falla diciendo qué; y si la página navega a mitad de espera, mira la página nueva. Lo cubre
 `settled.spec.ts` (la misma corrección que la e2e del SaaS, saas#147).
 
@@ -581,7 +601,7 @@ profundidad, pide las animaciones por su cuenta (`getAnimations`) más veces de 
 (las esperas propias que quedaban al llegar el guardarraíl), y un fichero nuevo no lo hace ninguna: «nada se mueve» se
 espera con `settled(page)` o `untilStill(page)`, que miran también los shadow roots. Cuenta toda referencia en el código,
 sin los comentarios: la llamada, guardada con otro nombre (`const a = document.getAnimations`), entre corchetes
-(`document['getAnimations']()`) o dentro de una cadena que va a `page.evaluate`. Solo `helpers.ts` (el detector) y las dos
+(`document['getAnimations']()`) o dentro de una cadena que va a `page.evaluate`. Solo `detectors.ts` (el detector) y las dos
 specs que lo miden desde fuera (`settled.spec.ts` y `helpers-capture.spec.ts`) tienen su número fijo en el propio test.
 Al retirar una copia, baja su número en el JSON (o quita su línea). Los `<app>-wait.test.ts` (Ventas, Cocina, Menús,
 Modificadores, Tareas) siguen: prohíben además, en los ficheros de su app, las esperas fijas y los recuentos propios.

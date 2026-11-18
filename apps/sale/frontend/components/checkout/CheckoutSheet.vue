@@ -7,7 +7,9 @@
 // on each opening: nothing is read while it is closed, and every opening is a new attempt with its own
 // key. The ✕, the backdrop and Escape close it, never while charging. A charge closes it and hands the
 // sale to the till (`charged`) with the lines it charged — frozen when the sheet opened; none = the
-// whole check —, also when it was the lookup of a lost answer that found it.
+// whole check —, also when it was the lookup of a lost answer that found it. While it is open a new notice of the
+// action center does not come as a card over it: the bell only pulses.
+import { useQuietActionNotices } from '@erplora/ui/shell';
 import { IonModal } from '@ionic/vue';
 import { shallowRef, watch } from 'vue';
 
@@ -29,6 +31,7 @@ withDefaults(
 );
 
 const open = defineModel<boolean>('open', { default: false });
+useQuietActionNotices(open);
 
 const emit = defineEmits<{ charged: [sale: SaleOut, lineIds: readonly string[]] }>();
 

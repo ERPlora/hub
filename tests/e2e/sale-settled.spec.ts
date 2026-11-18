@@ -1,16 +1,18 @@
 // flow: sale-e2e-wait — the Sales specs' wait
 // Before a capture or a measurement, the Sales specs (sale-*.spec.ts) wait for the screen to stop moving with the
-// harness's one wait, `untilStill` (helpers.ts). A wait that asks the document alone for its animations leaves shadow
-// roots out, and Ionic animates its overlays (`ion-toast`, `ion-modal`, the till's sheets) in theirs: a
+// harness's one wait, `untilStill` (helpers.ts). A wait that asks only for what Ionic animates in its shadow roots
+// (`ion-modal`, the till's sheets) leaves out the toasts, which enter with a CSS transition in the document: a
 // capture could come out with a notice still sliding in and pass for good. Here the till's «… is sold out.» toast
 // (SALE-F07: a tap on a sold-out article says why) enters at a fifth of its speed (Chrome's own control), and once
 // the Sales specs' wait returns nothing may move, asked with the harness's own detector (`exposeMovingInPage`,
 // helpers.ts), at 390, 834 and 1440. What this file creates is deleted after it.
 import { type CDPSession, expect, type Page, test } from '@playwright/test';
 
-import { A, api, capture, exposeMovingInPage, hostPage, repeatedTop, shown, untilStill } from './helpers';
+import { A, api, capture, exposeMovingInPage, hostPage, shown, untilStill } from './helpers';
+import { repeatedTop } from './detectors';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
 import { cleanSales, drawerOff, restoreDrawer, stamp } from './sale-helpers';
+import { toastSaying } from './toast-helpers';
 
 const KEY = 'FIX-HUB-SALE-E2E-WAIT-BLIND-TO-SHADOW-ROOTS';
 const RUN = stamp();
@@ -69,7 +71,7 @@ test('sale-e2e-wait: after the Sales specs’ wait the till’s «sold out» toa
       await playbackRate(devtools, 0.2);
       // The tile is `aria-disabled` but takes the tap (a touchscreen would swallow a native `disabled`).
       await tile.click({ force: true });
-      const toast = page.locator('ion-toast').filter({ hasText: `«${croquettes.name}» is sold out.` });
+      const toast = toastSaying(page, `«${croquettes.name}» is sold out.`);
       await expect(toast).toBeVisible();
       await untilStill(page);
       expect(await moving(page), `still moving after the Sales specs’ wait at ${size.label}`).toEqual([]);

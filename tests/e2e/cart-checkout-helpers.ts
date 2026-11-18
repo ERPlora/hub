@@ -24,7 +24,7 @@ export const FLOW_VIEWPORTS = { 390: VIEWPORTS.phone, 834: VIEWPORTS.tablet, 144
 
 /**
  * Captures what the page shows for `flow` at `width` once nothing moves (`settled`: a sheet, a dialog or a toast still
- * sliding in right after it is «visible», in its shadow root), after checking nothing scrolls sideways (`capture`).
+ * sliding in right after it is «visible»), after checking nothing scrolls sideways (`capture`).
  */
 export async function snap(page: Page, flow: string, width: number | string): Promise<void> {
   await settled(page);

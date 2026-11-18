@@ -9,7 +9,7 @@ command through.
 """
 
 from django.conf import settings
-from base import api_keys, approvals
+from base import api_help, api_keys, approvals
 from live.ninja import install_error_handlers, mount_app_routers
 from ninja import NinjaAPI
 from ninja.openapi.docs import Swagger
@@ -45,6 +45,8 @@ def build_api(*, urls_namespace: str = "api", docs: bool | None = None) -> Ninja
 api = build_api()
 # The api.py router of every app of ours: base (platform) and the modules of apps/.
 mount_app_routers(api)
+# A module's help window: base's one router outside base/api.py.
+api.add_router("", api_help.router)
 # The business's API keys (``erpk_live``) open the routes of the operations the apps publish (``expose_api``).
 api_keys.install(api)
 # A manager's PIN lets one refused command through (``base.approvals``): its door, before the session's.
