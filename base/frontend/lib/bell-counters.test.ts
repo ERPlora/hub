@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { defineComponent, h } from 'vue';
 
-import type { BellCounter } from '../operations';
+import type { BellCounter } from '../operations-bell';
 import { clockReads, withFakeTimers } from '../__tests__/clock-reads';
 import { errorFrame, flush, mountBase, subId } from '../__tests__/mount-base';
 import { type BellReading, useBellCounters } from './bell-counters';
@@ -15,7 +15,20 @@ const Host = defineComponent({
 });
 
 function counter(key: string, count: number, route = '/demo/items'): BellCounter {
-  return { key, app: key.split('.')[0], count, route, label: `Counter ${key}`, icon: 'ion:warning-outline' };
+  const label = `Counter ${key}`;
+  return {
+    key,
+    app: key.split('.')[0],
+    count,
+    route,
+    label,
+    icon: 'ion:warning-outline',
+    severity: 'warning',
+    title: `${label} (${count})`,
+    body: null,
+    action_label: 'Open',
+    due: null,
+  };
 }
 
 const counts = () => reading.counters.value?.counters.map((c) => c.count);

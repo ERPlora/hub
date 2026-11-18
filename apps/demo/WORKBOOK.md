@@ -266,7 +266,8 @@ papel en ningún negocio.
 - Ejemplo de los ganchos del Inicio, el que copian los módulos: `DemoConfig`
   declara un paso (`setup`: «Crea tu primer elemento», hecho con `total` de `demo.item.stats`), un panel
   (`widgets`: «Elementos abiertos», `kpi` sobre `demo.item.stats`) y un contador de la campana (`bell`:
-  «Elementos de demo abiertos», sobre `demo.item.open_count`). Demo no está en la tienda (`listed = False`):
+  «Elementos de demo abiertos», sobre `demo.item.open_count`, de información, con su titular en plural
+  «N elementos de demo abiertos», su frase y «Ver los elementos»). Demo no está en la tienda (`listed = False`):
   base solo la enseña (menú, «Mis apps» y estos ejemplos) con `SHOW_UNLISTED_MODULES` (desarrollo y tests) o en
   un hub de demo, nunca a un cliente.
 - Anatomía completa de una app: `apps.py`, `models.py`, `schemas.py`, `queries.py`, `services.py`,

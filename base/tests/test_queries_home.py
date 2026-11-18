@@ -19,7 +19,7 @@ from live.assistant import description
 from live.context import OperationContext, system_context
 from live.errors import NotFound
 from live.live_registry import live_registry
-from live.meta import BellCounter, DeviceNotice, Nav, SetupCheck, SetupStep, Widget
+from live.meta import DeviceNotice, Nav, SetupCheck, SetupStep, Widget
 from live.operations import Operation, get, registry
 from live.outbox import channel_for
 from live.models import OutboxEvent
@@ -28,10 +28,8 @@ from pydantic import BaseModel, ConfigDict
 
 from apps.demo.models import Item
 from apps.demo.schemas import ItemIn
-from base.models import EventDelivery, Hub, Membership
+from base.models import Hub, Membership
 from base.schemas import (
-    BellCountersIn,
-    BellCountersOut,
     NoticeListIn,
     NoticeListOut,
     SetupStatusIn,
@@ -41,6 +39,7 @@ from base.schemas import (
     WidgetListIn,
     WidgetListOut,
 )
+from base.schemas.bell import BellCountersIn, BellCountersOut
 from base.tenancy.context import use_hub
 from base.tenancy.tests.business import HUB_DB, HUB_DB_COMMITTED, A, B, in_business_a
 
@@ -722,120 +721,6 @@ def test_panels_of_a_module_off_or_out_of_the_store(modules, settings):
 
     Hub.objects.filter(slug=A.key).update(is_demo=True)
     assert [w["key"] for w in widget_list(ctx())] == ["demo.w"]
-
-
-# --- base.bell.counters ---------------------------------------------------------------------------------
-
-
-def bell(context):
-    return get("base.bell.counters")(context, BellCountersIn()).model_dump(mode="json")["counters"]
-
-
-def counter(key="to_confirm", operation="stock.item.count", **fields):
-    return BellCounter(key=key, operation=operation, route="/stock", label=fields.pop("label", "To confirm"), **fields)
-
-
-def test_the_counters_above_zero(modules, declare):
-    declare("stock.item.count", {"count": 2})
-    declare("stock.low.count", {"rows": [{"count": 0}]})
-    modules(module("stock", bell=[counter(icon="ion:alert"), counter("low", "stock.low.count")]))
-
-    assert bell(ctx()) == [
-        {"key": "stock.to_confirm", "app": "stock", "count": 2, "route": "/stock", "label": "To confirm", "icon": "ion:alert"}
-    ]
-
-
-def test_a_counter_the_person_may_not_see_or_whose_query_fails(modules, declare, caplog):
-    def broken(c, data):
-        raise RuntimeError("boom")
-
-    declare("stock.item.count", {"count": 2})
-    declare("stock.broken.count", broken)
-    declare("stock.text.count", {"count": "many"})
-    modules(
-        module(
-            "stock",
-            permissions=["stock.view"],
-            bell=[
-                counter(permission="stock.view"),
-                counter("broken", "stock.broken.count"),
-                counter("text", "stock.text.count"),
-            ],
-        )
-    )
-
-    with caplog.at_level(logging.WARNING, logger="base.home"):
-        assert bell(ctx()) == []
-    assert "stock.broken" in caplog.text
-    assert "stock.text" in caplog.text
-    assert [c["key"] for c in bell(ctx("stock.view"))] == ["stock.to_confirm"]
-
-
-def test_the_counters_of_a_module_out_of_the_store_only_where_the_setting_says(modules, declare, settings):
-    declare("demo.item.open_count", {"count": 1})
-    modules(module("demo", bell=[counter("open", "demo.item.open_count")], listed=False))
-    assert [c["key"] for c in bell(ctx())] == ["demo.open"]
-
-    settings.SHOW_UNLISTED_MODULES = False
-    assert bell(ctx()) == []
-
-    Hub.objects.filter(slug=A.key).update(is_demo=True)
-    assert [c["key"] for c in bell(ctx())] == ["demo.open"]
-
-
-def refresh_every(context):
-    return get("base.bell.counters")(context, BellCountersIn()).model_dump(mode="json")["refresh_every"]
-
-
-def test_a_counter_that_changes_with_time_asks_the_bell_to_read_it_again(modules, declare):
-    """A counter whose figure moves as time passes (a job waiting for a minute with no device alive) names how often
-    the bell reads it again, besides its events. The bell is told the shortest period among the counters the person
-    may see of the apps on, also while they are at zero: it is the time that raises them."""
-    declare("printing.device.coverage", {"count": 0})
-    declare("stock.item.count", {"count": 2})
-    stalled = counter("stalled", "printing.device.coverage", permission="printing.view_settings")
-    late = counter("late", "printing.device.coverage")
-    printing = module(
-        "printing",
-        permissions=["printing.view_settings"],
-        bell=[stalled, late],
-        bell_refresh_every={"stalled": 30, "late": 60},
-    )
-    modules(printing, module("stock", bell=[counter()]))
-
-    assert refresh_every(ctx("printing.view_settings")) == 30
-    assert refresh_every(ctx()) == 60, "only the counters this person may see"
-    assert bell(ctx()) == [
-        {"key": "stock.to_confirm", "app": "stock", "count": 2, "route": "/stock", "label": "To confirm", "icon": ""}
-    ]
-
-    modules(printing, module("stock", bell=[counter()]), on=["stock"])
-    assert refresh_every(ctx("printing.view_settings")) is None, "printing is off"
-    modules(module("stock", bell=[counter()]))
-    assert refresh_every(ctx()) is None, "no counter asks: the bell follows its events only, as before"
-
-
-def dead_event(scope, status=EventDelivery.Status.DEAD):
-    event = OutboxEvent.objects.create(scope_kind=scope.kind, scope_key=scope.key, name="sale.sale.completed")
-    return EventDelivery.objects.create(event=event, app_label="invoice", status=status, next_attempt_at=timezone.now())
-
-
-def test_the_failed_events_of_this_hub_for_an_administrator(modules, hub_b):
-    """The bell says how many events between apps the relay gave up on, in this hub only."""
-    modules(module("sale"))
-    dead_event(A)
-    dead_event(A)
-    dead_event(A, EventDelivery.Status.PENDING)
-    dead_event(B)  # another scope's row in A's database: not A's to count
-    in_b(dead_event, B)
-
-    assert bell(ctx(ADMIN)) == [
-        {"key": "base.failed_events", "app": "base", "count": 2, "route": "/system#events", "label": "Failed events",
-         "icon": "ion:warning-outline"}
-    ]
-    assert bell(ctx(ADMIN, language="es"))[0]["label"] == "Eventos caídos"
-    assert bell(ctx()) == []  # not an administrator
-    assert [c["count"] for c in in_b(bell, ctx(ADMIN, scope=B))] == [1]
 
 
 # --- Live: a write in hub B reaches B's channel only, and re-runs base's queries there ----------------------

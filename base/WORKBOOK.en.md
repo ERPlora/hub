@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:31240a81ce8caa066ed65b49a0530b4ea8c6bd1be07125305367f575bce20e4e -->
+<!-- generated from WORKBOOK.md sha256:af76e9fbb7739a882ef249356924465362d204f19fdcca6bb39d9a2b7628a56f -->
 
 ## What it is for and who it is for
 
@@ -78,16 +78,21 @@ plan's limits, the appointments to confirm, the WhatsApp customers waiting for a
 print… No notice is dismissed: it goes by itself once it is solved.
 
 - **The bell.** With nothing pending, just the bell. With something, it becomes a pill with the bell and the number,
-  in the colour and with the icon of the gravest notice (urgent, attention or information).
+  in the colour and with the icon of the gravest notice (urgent, attention or information). If a notice has a
+  deadline, such as the time of the soonest appointment to confirm, the bell's ring empties over the last week before
+  it.
 - **The arrival.** A new notice comes in as a card under the bar, at the top right (full width on a phone), stays a
   few seconds and settles in the bell, which pulses; with the assistant open, it comes in to its left. While a sale is
   being charged at the till it does not show: the bell only pulses. The first result on opening the page announces
   nothing.
 - **The panel.** Tapping the bell opens a panel from the right, over the screen and over the assistant (full width on
   a phone): on top, the gravest notice, with its sentence and its button (for example "Set up your business
-  details"); below, the others in rows ("3 appointments to confirm"), and tapping a row puts it on top. It closes with
-  its ✕, with Esc or tapping outside, and the bell gets the focus back. With nothing: "All caught up". A notice just
-  solved stays a moment with "Resolved" before it goes.
+  details"); below, the others in rows ("3 appointments to confirm"), and tapping a row puts it on top. Each notice is
+  worded by the app that gives it, in the person's language: the problem in its heading ("3 appointments to confirm"),
+  the consequence in one sentence ("Customers are waiting for you to confirm their bookings before they start.") and
+  the action on its button ("Confirm the appointments"). It closes with its ✕, with Esc or tapping outside, and the
+  bell gets the focus back. With nothing: "All caught up". A notice just solved stays a moment with "Resolved" before
+  it goes.
 
 ### The side menu
 On the left (on a phone, from the bar's button): the person at the top and the platform's entries in two groups,
@@ -647,7 +652,8 @@ Actor: owner, administrator
 Screen: The bell
 Steps:
   1. A notice between apps (for example, "sale charged" towards Invoicing) ran out of retries.
-  2. An administrator's bell goes up at once, without waiting or reloading: the urgent notice "2 failed events"
+  2. An administrator's bell goes up at once, without waiting or reloading: the urgent notice "2 failed events",
+     with "An app did not receive what another one sent it: what it had to do stays undone until you send it again.",
      comes in as a card and settles in it.
   3. "Review the events" opens "System" on "Failed events", where they are resent or discarded (BASE-F43).
   4. When none is left, the notice disappears.
@@ -1326,7 +1332,8 @@ Steps:
      with "Measured on {day}". Neither CPU nor memory: they cannot be attributed to a business, so they do not appear, nor
      does any sentence in their place.
   9. With motives the hub knows without asking erplora.com (the files, the capacity and WhatsApp), the bell of whoever
-     runs the business carries the notice "1 plan limit to review", which adds one per motive, and "See the plan’s
+     runs the business carries the notice "1 plan limit to review", which adds one per motive, with "Your business is
+     reaching what its plan includes: some things may stop or slow down until you upgrade.", and "See the plan’s
      usage" opens "System" on "Usage and plan". Without them, the notice goes away.
   10. Whoever runs the business can ask the assistant the same ("how much space do I have left?", "how many requests
       have we had this month?") and it answers with these figures.
@@ -3221,9 +3228,10 @@ Steps:
      opens by itself.
   3. At the top, the module's video, if it has one, in the person's language or, if there is none, in Spanish. Nothing
      is asked of YouTube until it is tapped, and it plays inside the window.
-  4. Below, "What it is for"; "On this screen", with a short summary of what the tab the person is on shows, open and
-     marked "You are here"; "How to", with each finished task done in that module, folded, with its steps and what
-     happens if it fails; and "Other screens of this module", folded, each with its short summary.
+  4. Below, "What it is for", with a short text, two or three sentences, of what is done in the module; "On this
+     screen", with a short summary of what the tab the person is on shows, open and marked "You are here"; "How to",
+     with each finished task done in that module, folded, with its steps and what happens if it fails; and "Other
+     screens of this module", folded, each with its short summary.
   5. "Ask the assistant" closes the help and opens the assistant with the question written, without sending it: about
      the last task opened or, if none was opened, about the module and the screen. "Close" closes the help.
 In: the module and the tab the person is on.

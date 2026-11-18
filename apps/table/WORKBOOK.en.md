@@ -1,6 +1,12 @@
-<!-- generated from WORKBOOK.md sha256:24e0f782a95ff30d70518329cd020778a339bd990d905d248b720b602901d0e0 -->
+<!-- generated from WORKBOOK.md sha256:051c7e5ea19d24afc4580ff7ec21a57f77e04faadd0836bb94afe6a2fcff3b74 -->
 
 ## What it is for and who it is for
+
+Tables is the floor plan of your place and its zones, such as the dining room, the terrace or the bar.
+At a glance you see which table is free, occupied or reserved and how long each group has been seated.
+You tap a table to seat a group, move its check to another table or take it to the till.
+
+### In detail
 
 Tables is the **floor plan of the restaurant or bar**: the zones of the room (dining room, terrace,
 bar), the tables of each zone with their capacity, their shape and their spot on the plan, and the
@@ -8,7 +14,7 @@ bar), the tables of each zone with their capacity, their shape and their spot on
 service, how many guests there are, since when and who serves them, and it knows which Sales check is at
 which table.
 
-Who uses it:
+### Who uses it and what each one does
 
 - The floor **manager** draws the plan: creates zones and tables, places them by dragging them and
   changes their capacity, their shape or their status.
@@ -16,6 +22,8 @@ Who uses it:
   change the room settings.
 - The **employee** (server, cashier) seats people, moves a check to another table, joins or splits
   checks, corrects the guests, takes the table away from a check and closes a table by hand.
+
+### What it does not do
 
 Tables does not charge (that is Sales: the table takes you to the till with its check), does not take
 bookings (that is Reservations: Tables only sets the table aside on the plan) and is not the kitchen
