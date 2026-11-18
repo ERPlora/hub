@@ -10,12 +10,18 @@ Lo que no entra todavía: ver «Lo que queda fuera».
 
 ## Para qué sirve y para quién
 
+Mesas es el plano de tu local y de sus zonas, como el salón, la terraza o la barra. De un vistazo ves
+qué mesa está libre, ocupada o reservada y cuánto tiempo lleva sentado cada grupo. Tocas una mesa
+para sentar a un grupo, pasar su cuenta a otra mesa o llevarla a cobrar.
+
+### En detalle
+
 Mesas es el **plano del restaurante o del bar**: las zonas del local (salón, terraza, barra), las
 mesas de cada zona con su aforo, su forma y su sitio en el plano, y las **cuentas que hay sentadas en
 cada mesa**. Dice, en vivo, qué mesa está libre, ocupada, reservada o fuera de servicio, cuántos
 comensales hay, desde cuándo y quién la atiende, y sabe qué cuenta de Ventas está en qué mesa.
 
-Quién la usa:
+### Quién la usa y qué hace cada uno
 
 - El **responsable** de sala dibuja el plano: crea zonas y mesas, las coloca arrastrándolas y cambia
   su aforo, su forma o su estado.
@@ -23,6 +29,8 @@ Quién la usa:
   cambian los ajustes de sala.
 - El **empleado** (camarero, cajero) sienta a la gente, pasa una cuenta a otra mesa, junta o divide
   cuentas, corrige los comensales, quita la mesa a una cuenta y cierra una mesa a mano.
+
+### Lo que no hace
 
 Mesas no cobra (eso es Ventas: la mesa lleva al TPV con su cuenta), no apunta reservas (eso es
 Reservas: Mesas solo aparta la mesa en el plano) y no es la pantalla de cocina.

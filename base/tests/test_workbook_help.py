@@ -30,17 +30,32 @@ def spanish():
 
 
 class TestWhatItIsFor:
-    def test_it_is_the_first_section_with_the_lines_of_each_list_item_joined(self):
+    def test_it_is_what_the_first_section_says_before_its_first_subheading_not_one_inside_code(self):
         assert spanish().purpose == (
             "Mesas es el **plano de la sala**: sus zonas y sus mesas.\n"
             "\n"
-            "Quién la usa:\n"
-            "\n"
-            "- El **responsable** dibuja el plano y cambia el aforo de cada mesa.\n"
-            "- El **empleado** sienta a la gente.\n"
-            "\n"
             "```\n"
             "## Esto no es un encabezado\n"
+            "### Ni esto\n"
+            "```"
+        )
+
+    def test_what_goes_from_its_first_subheading_on_is_not_published(self):
+        purpose = spanish().purpose
+        for detail in ("Quién la usa", "responsable", "empleado", "Lo que no hace", "No cobra"):
+            assert detail not in purpose
+
+    def test_a_first_section_without_a_subheading_is_published_whole(self):
+        written = "## Para qué sirve\n\nUno.\n\n- Dos.\n#### Tres\nCuatro.\n\n## Pantallas\n\n### Zonas\nUna tabla.\n"
+        assert parse(written, ES_TABS, ES_WORDS).purpose == "Uno.\n\n- Dos.\n#### Tres\nCuatro."
+
+    def test_a_translation_is_cut_at_its_own_first_subheading(self):
+        assert parse(EN, EN_TABS, EN_WORDS).purpose == (
+            "Tables is the **floor plan of the room**: its zones and its tables.\n"
+            "\n"
+            "```\n"
+            "## This is no heading\n"
+            "### Nor is this\n"
             "```"
         )
 

@@ -4,7 +4,7 @@ import { applySurface } from '@erplora/ui/shell';
 
 import type { HubHome } from '../lib/home';
 
-export function embedHubHome(block: Partial<HubHome> | null): void {
+export function embedHubHome(block: (Partial<HubHome> & { help_apps?: string[] }) | null): void {
   document.head.innerHTML = block
     ? `<script id="hub-home" type="application/json">${JSON.stringify(block)}</script>`
     : '';

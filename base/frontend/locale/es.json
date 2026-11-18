@@ -1216,6 +1216,27 @@
         "generic": "Algo ha fallado. Inténtalo de nuevo."
       }
     },
+    "help": {
+      "open": "Ayuda",
+      "title": "Ayuda · {app}",
+      "videoTitle": "Cómo funciona {app}",
+      "purpose": "Para qué sirve",
+      "current": "En esta pantalla",
+      "here": "Estás aquí",
+      "how": "Cómo se hace",
+      "others": "Otras pantallas del módulo",
+      "failure": "Si algo falla",
+      "search": "Buscar tareas…",
+      "empty": "Nada coincide con tu búsqueda",
+      "clear": "Borrar búsqueda",
+      "loading": "Cargando ayuda…",
+      "loadError": "No se ha podido cargar la ayuda.",
+      "retry": "Reintentar",
+      "ask": "Pregúntale al asistente",
+      "close": "Cerrar",
+      "flowQuestion": "¿Cómo hago esto: {title}?",
+      "screenQuestion": "¿Cómo uso {app} en {screen}?"
+    },
     "assistant": {
       "empty": "Pregúntame por tus ventas, tu inventario o cualquier cosa de tu negocio.",
       "setupIntro": "Revisa la configuración de tu negocio. Elige una opción o escribe tu duda.",
