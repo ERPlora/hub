@@ -164,6 +164,7 @@ def test_a_cell_reads_the_names_in_spanish_or_english_in_any_case_and_in_any_ord
 def test_a_cell_reads_the_names_with_or_without_accents_and_by_their_codes():
     fields = allergens.read_into("Crustaceos, sésamo, FRUTOS DE CASCARA, tree nuts, sulphites", {})
     assert fields == {"allergens": ["crustaceans", "tree_nuts", "sesame", "sulphites"]}
+    assert allergens.read_into("tree_nuts, egg", {}) == {"allergens": ["egg", "tree_nuts"]}
 
 
 @pytest.mark.parametrize("cell", ["", "   ", " , "])
