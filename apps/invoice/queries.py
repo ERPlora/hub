@@ -27,6 +27,7 @@ from live.operations import UnknownOperation, operation
 from live.operations import get as get_operation
 
 from apps.invoice import fiscal
+from apps.invoice.document_issuer import document_issuer, issuer_vat_number
 from apps.invoice.models import (
     FACTORY_SERIES_NAMES,
     Invoice,
@@ -234,10 +235,7 @@ def invoice_detail(invoice: Invoice) -> dict:
         "series_id": invoice.series_id,
         "sequence": invoice.sequence,
         "operation_date": invoice.operation_date,
-        "issuer_name": invoice.issuer_name,
-        "issuer_tax_id": invoice.issuer_tax_id,
-        "issuer_address": invoice.issuer_address,
-        "issuer_country": invoice.issuer_country,
+        **document_issuer(invoice),
         "customer_id": invoice.customer_id,
         "customer_address": invoice.customer_address,
         "customer_country": invoice.customer_country,
@@ -564,6 +562,7 @@ def render_document(invoice: Invoice, *, duplicate: bool = False, qr: dict | Non
     discounted = any(line.discount_amount for line in lines)
     context = {
         "invoice": invoice,
+        "issuer_vat_number": issuer_vat_number(invoice.issuer_tax_id, invoice.issuer_country),
         "language": language,
         "title": title,
         "duplicate": duplicate,

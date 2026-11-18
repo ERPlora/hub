@@ -39,6 +39,7 @@ from apps.invoice.models import (
     Invoice,
     InvoiceType,
 )
+from apps.invoice.schemas.document_issuer import DocumentIssuerOut
 from base.schemas import names
 
 T = TypeVar("T")
@@ -801,14 +802,10 @@ class InvoiceRowOut(Schema):
     can_substitute: bool
 
 
-class InvoiceOut(InvoiceRowOut):
+class InvoiceOut(InvoiceRowOut, DocumentIssuerOut):
     series_id: UUID
     sequence: int
     operation_date: dt.date
-    issuer_name: str
-    issuer_tax_id: str
-    issuer_address: str
-    issuer_country: str
     customer_id: UUID | None
     customer_address: str
     customer_country: str
