@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:7dc7c6bd4999ce01e87f19e7086427a2a1117955cbd7b7008e0a60e333f02987 -->
+<!-- generated from WORKBOOK.md sha256:af76e9fbb7739a882ef249356924465362d204f19fdcca6bb39d9a2b7628a56f -->
 
 ## What it is for and who it is for
 
@@ -3228,9 +3228,10 @@ Steps:
      opens by itself.
   3. At the top, the module's video, if it has one, in the person's language or, if there is none, in Spanish. Nothing
      is asked of YouTube until it is tapped, and it plays inside the window.
-  4. Below, "What it is for"; "On this screen", with a short summary of what the tab the person is on shows, open and
-     marked "You are here"; "How to", with each finished task done in that module, folded, with its steps and what
-     happens if it fails; and "Other screens of this module", folded, each with its short summary.
+  4. Below, "What it is for", with a short text, two or three sentences, of what is done in the module; "On this
+     screen", with a short summary of what the tab the person is on shows, open and marked "You are here"; "How to",
+     with each finished task done in that module, folded, with its steps and what happens if it fails; and "Other
+     screens of this module", folded, each with its short summary.
   5. "Ask the assistant" closes the help and opens the assistant with the question written, without sending it: about
      the last task opened or, if none was opened, about the module and the screen. "Close" closes the help.
 In: the module and the tab the person is on.

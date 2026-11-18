@@ -1,8 +1,9 @@
 """Made-up WORKBOOKs of the Tables module for the tests of its help window: Spanish (the source), English, and a third
 language whose words no catalogue of the Hub knows, so that nothing in the reading can assume a pair of languages.
 
-Each one has the same shape: what the module is for (with a list whose items go on over indented lines, and a heading
-inside a code block), the screens heading with three tabs (one with a window, ``####``), a section that names no tab,
+Each one has the same shape: what the module is for (a paragraph wrapped over two lines and a code block with headings
+inside, then who uses it and what it does not do under their ``###``, with a list whose items go on over indented
+lines), the screens heading with three tabs (one with a window, ``####``), a section that names no tab,
 and flows that are done on a tab, done through a window, not done, and done on no tab; some statuses carry a note after
 a dash, a colon or a parenthesis, a window's title has its own parentheses, and some paragraphs are wrapped over lines.
 """
@@ -23,17 +24,23 @@ Prefijo: TABLE
 
 ## Para qué sirve y para quién
 
-Mesas es el **plano de la sala**: sus zonas y sus mesas.
+Mesas es el **plano de la sala**: sus zonas
+y sus mesas.
 
-Quién la usa:
+```
+## Esto no es un encabezado
+### Ni esto
+```
+
+### Quién la usa
 
 - El **responsable** dibuja el plano y cambia
   el aforo de cada mesa.
 - El **empleado** sienta a la gente.
 
-```
-## Esto no es un encabezado
-```
+### Lo que no hace
+
+No cobra.
 
 ## Pantallas
 
@@ -124,17 +131,23 @@ Pasos:
 EN = """\
 ## What it is for and who it is for
 
-Tables is the **floor plan of the room**: its zones and its tables.
+Tables is the **floor plan of the room**: its zones
+and its tables.
 
-Who uses it:
+```
+## This is no heading
+### Nor is this
+```
+
+### Who uses it
 
 - The **manager** draws the plan and changes
   the capacity of each table.
 - The **employee** seats people.
 
-```
-## This is no heading
-```
+### What it does not do
+
+It does not charge.
 
 ## Screens
 

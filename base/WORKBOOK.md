@@ -3240,9 +3240,10 @@ Pasos:
      se abre sola.
   3. Arriba, el vídeo del módulo, si tiene uno, en el idioma de la persona o, si no lo hay, en español. No se pide
      nada a YouTube hasta que se pulsa, y se ve dentro de la ventana.
-  4. Debajo, «Para qué sirve»; «En esta pantalla», con un resumen corto de lo que enseña la pestaña en la que se está,
-     abierto y marcado «Estás aquí»; «Cómo se hace», con cada tarea terminada que se hace en ese módulo, plegada, con
-     sus pasos y lo que pasa si falla; y «Otras pantallas del módulo», plegadas, cada una con su resumen corto.
+  4. Debajo, «Para qué sirve», con un texto corto, de dos o tres frases, de lo que se hace en el módulo; «En esta
+     pantalla», con un resumen corto de lo que enseña la pestaña en la que se está, abierto y marcado «Estás aquí»;
+     «Cómo se hace», con cada tarea terminada que se hace en ese módulo, plegada, con sus pasos y lo que pasa si falla;
+     y «Otras pantallas del módulo», plegadas, cada una con su resumen corto.
   5. «Pregúntale al asistente» cierra la ayuda y abre el asistente con la pregunta escrita, sin enviarla: sobre la
      última tarea que se abrió o, si no se abrió ninguna, sobre el módulo y la pantalla. «Cerrar» cierra la ayuda.
 Entra: el módulo y la pestaña en la que se está.
@@ -3998,7 +3999,10 @@ Implicados: BASE-F92, BASE-F93
   el original, `SOURCE_LANGUAGE` (`es`), se lee de `WORKBOOK.md`, y cualquier otro de `WORKBOOK.<idioma>.md` solo si su
   primera línea es `catalog.en_header` del hash de la parte española; si no, el de su idioma base (`en` para `en-gb`),
   y si tampoco, el español; `language` dice cuál salió. El vídeo, igual. Lo leído se guarda en memoria por módulo e
-  idioma (`_READ`): los WORKBOOK solo cambian con una imagen nueva; con `DEBUG` se relee en cada llamada. Cada `###` bajo el encabezado de las pantallas es
+  idioma (`_READ`): los WORKBOOK solo cambian con una imagen nueva; con `DEBUG` se relee en cada llamada. De la primera
+  sección («Para qué sirve») se publica solo lo que va antes de su primer `###` (toda la sección, si no tiene ninguno):
+  dos o tres frases; desde el primer `###` (quién lo usa, lo que no hace) se queda en el fichero y nunca se publica.
+  Cada `###` bajo el encabezado de las pantallas es
   la pestaña del menú que tiene esa etiqueta en el idioma del fichero, más la de ajustes (`/<módulo>/settings`) si el
   menú no la trae. De cada pestaña se publica solo su resumen: lo que va entre su `###` y su primer `####` (o el final
   de la sección, si no tiene ninguno). Desde el primer `####` es detalle para quien mantiene el módulo: se queda en el
@@ -4012,9 +4016,11 @@ Implicados: BASE-F92, BASE-F93
   (dos espacios o una barra al final de la línea), porque la pantalla respeta cada salto de línea y su `parseMarkdown`
   cierra un elemento en su primera línea. La CSP deja `frame-src 'self' https://www.youtube-nocookie.com` (`live.csp.with_frames`;
   `'self'` es la vista previa del editor de la web). `tests/test_help_workbooks.py` vigila cada módulo con la ayuda
-  lista en cada idioma: cada entrada del menú con su `###`, una sola vez, y cada `###` una pestaña; cada pestaña, con
+  lista en cada idioma: cada entrada del menú con su `###`, una sola vez, y cada `###` una pestaña; «Para qué sirve»,
+  que no está vacío y no pasa de 500 caracteres; cada pestaña, con
   un resumen que no está vacío y no pasa de 900 caracteres (dos o tres frases y, si la pantalla la tiene, una lista
-  corta como la leyenda de colores); lo publicado (y solo eso: el detalle bajo un `####` no se vigila), sin
+  corta como la leyenda de colores); lo publicado (y solo eso: el detalle bajo un `###` de la primera sección o un
+  `####` de una pestaña no se vigila), sin
   código, sin referencias a issues, sin tamaños en px, sin ids de flujo ni nombres de operación o de evento; cada flujo
   publicado, con sus pasos; ningún flujo que se lea como hecho en una pestaña, fuera; y cada traducción, con las mismas
   pestañas y flujos que el original.

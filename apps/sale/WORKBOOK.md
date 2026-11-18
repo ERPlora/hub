@@ -11,6 +11,13 @@ su paso al cobro (SALE-F39, no hecho).
 
 ## Para qué sirve y para quién
 
+Ventas es la caja del negocio: tocas los artículos o los servicios para hacer la cuenta y la cobras
+en efectivo, con tarjeta o entre varios medios. En un restaurante, la cuenta sigue abierta mientras
+la mesa come. Cada cobro queda como una venta con su tique o su factura, que después puedes buscar,
+reimprimir o devolver.
+
+### En detalle
+
 Ventas / TPV es la **caja registradora** del negocio: se monta la cuenta tocando artículos, se cobra
 en efectivo, con tarjeta o repartido entre varios medios, y queda una **venta que ya no se puede
 cambiar**, con su número del día, su IVA línea a línea y su tique o su factura. Sirve a los dos
@@ -21,7 +28,7 @@ negocios:
 - En la **peluquería**, cada servicio del tique lleva a la profesional que lo hizo y la cuenta se
   cobra al terminar, con la clienta puesta.
 
-Quién la usa:
+### Quién la usa y qué hace cada uno
 
 - El **empleado** (camarero, recepcionista, cajero): monta la cuenta, pone notas, invita una línea,
   aplica descuentos hasta el máximo del negocio, aparca y recupera cuentas, cobra y consulta las
@@ -30,6 +37,8 @@ Quién la usa:
   cuenta abierta o una línea ya enviada a cocina, anula y devuelve ventas, ve las cifras y prepara las
   notas rápidas, las secciones, los medios de pago y los ajustes del TPV.
 - El **propietario** y el **administrador**: todo.
+
+### Lo que no hace
 
 Ventas no guarda mesas ni clientes en la cuenta (son de Mesas y de Clientes), no numera facturas ni
 habla con la AEAT (se las pide a Facturación en el mismo cobro; la AEAT es de VeriFactu), no mueve el
