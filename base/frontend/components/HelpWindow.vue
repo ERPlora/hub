@@ -7,7 +7,7 @@ import { computed, shallowRef, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
 import type { AppHelp } from '../operations-help';
-import { assistantQuestion, createHelpStore, resolveScreen } from '../lib/help';
+import { assistantQuestion, createHelpStore, resolveScreen, writeAssistantQuestion } from '../lib/help';
 import { useBaseI18n } from '../lib/i18n';
 import HelpContent from './HelpContent.vue';
 
@@ -78,8 +78,7 @@ function onDismissed(): void {
     { flow: lastFlow.value, app: help.value.name, screen },
     { flow: t('base.help.flowQuestion', { title: '{title}' }), screen: t('base.help.screenQuestion', { app: '{app}', screen: '{screen}' }) },
   );
-  const draft = assistant.state.draft.trimEnd();
-  assistant.state.draft = draft.trim() ? `${draft}\n\n${question}` : question;
+  assistant.state.draft = writeAssistantQuestion(assistant.state.draft, question);
   assistant.setOpen(true);
 }
 

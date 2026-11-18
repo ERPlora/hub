@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { createAssistant, installAssistant, useAssistant } from '@erplora/ui/components';
 
+import type { AppHelp } from '../operations-help';
 import { EMPLOYEE, flush, help, memoryStorage, mountBase } from '../__tests__/mount-base';
 import { resetHelpCache } from '../lib/help';
 import HelpContent from './HelpContent.vue';
@@ -9,16 +10,44 @@ import HelpWindow from './HelpWindow.vue';
 
 vi.mock('@ionic/vue', async (importOriginal) => (await import('../__tests__/modal')).mockIonicModal(importOriginal));
 
-async function setup(options: { onApi?: () => Response | Promise<Response>; session?: typeof EMPLOYEE } = {}) {
+interface SetupOptions {
+  app?: string;
+  answer?: AppHelp;
+  onApi?: () => Response | Promise<Response>;
+  session?: typeof EMPLOYEE;
+}
+
+async function setup(options: SetupOptions = {}) {
+  const app = options.app ?? 'table';
+  const answer = options.answer ?? help;
   const m = await mountBase(HelpWindow, {
     path: '/table/floor-plan', routes: ['/table/floor-plan', '/table/settings'],
-    props: { open: true, app: 'table', appName: 'Tables', icon: 'ion:grid-outline' },
+    props: { open: true, app, appName: answer.name, icon: 'ion:grid-outline' },
     session: options.session,
-    onApi: options.onApi ?? (() => Response.json(help)),
+    onApi: options.onApi ?? (() => Response.json(answer)),
   });
   await flush();
   const el = (id: string) => document.querySelector<HTMLElement>(`[data-testid="${id}"]`);
-  return { ...m, el };
+  async function ask(): Promise<void> {
+    el('help-ask-assistant')!.click();
+    await flush();
+  }
+  async function reopen(): Promise<void> {
+    await m.wrapper.setProps({ open: false });
+    await m.wrapper.setProps({ open: true });
+    await flush();
+  }
+  return { ...m, el, ask, reopen };
+}
+
+async function askFromSales(changeDraft?: (draft: string) => string): Promise<void> {
+  const table = await setup();
+  await table.ask();
+  if (changeDraft) useAssistant().state.draft = changeDraft(useAssistant().state.draft);
+  table.wrapper.unmount();
+
+  const sale = await setup({ app: 'sale', answer: { ...help, app: 'sale', name: 'Sales' } });
+  await sale.ask();
 }
 
 beforeEach(() => {
@@ -120,6 +149,31 @@ describe('HelpWindow', () => {
     m.el('help-ask-assistant')!.click();
     await flush();
     expect(useAssistant().state.draft).toBe('My existing draft\n\nHow do I use Tables on Floor plan?');
+  });
+
+  it('keeps one copy when the same help question is requested twice', async () => {
+    const m = await setup();
+    await m.ask();
+    await m.reopen();
+    await m.ask();
+    expect(useAssistant().state.draft).toBe('How do I use Tables on Floor plan?');
+  });
+
+  it('replaces an unedited help question when another module asks', async () => {
+    await askFromSales();
+    expect(useAssistant().state.draft).toBe('How do I use Sales on Floor plan?');
+  });
+
+  it('keeps hand-written text above a replaced help question', async () => {
+    await askFromSales((draft) => `My existing draft\n\n${draft}`);
+    expect(useAssistant().state.draft).toBe('My existing draft\n\nHow do I use Sales on Floor plan?');
+  });
+
+  it('keeps an edited help question and appends the new question below it', async () => {
+    await askFromSales((draft) => `${draft} Edited by me.`);
+    expect(useAssistant().state.draft).toBe(
+      'How do I use Tables on Floor plan? Edited by me.\n\nHow do I use Sales on Floor plan?',
+    );
   });
 
   it('reads from the cache after the whole window has remounted', async () => {
