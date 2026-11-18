@@ -131,6 +131,8 @@ def _variable_problems(where, family, name, value):
     where = f"{where}.{name}"
     if _is_secrets(name):
         return [_secrets_problem(where)]
+    if SECRET_NAME.search(name):
+        return [Problem(where, "looks_like_secret", "is named like a secret; secrets stay in Terraform")]
     if name not in SETTINGS:
         return [Problem(where, "unknown_variable", f"is no setting of {FILE}; Terraform sets the rest")]
     if family not in SETTINGS[name].families:
@@ -140,11 +142,11 @@ def _variable_problems(where, family, name, value):
 
 def _value_problems(where, name, value):
     if not isinstance(value, str):
-        return [Problem(where, "not_text", f"must be text, as ECS hands it over, not {json.dumps(value)}")]
+        return [Problem(where, "not_text", "must be a JSON string, as ECS hands it over")]
     if looks_like_secret(name, value):
         return [Problem(where, "looks_like_secret", "looks like a secret; secrets stay in Terraform")]
     if not SETTINGS[name].pattern.fullmatch(value):
-        return [Problem(where, "invalid_value", f"must match {SETTINGS[name].pattern.pattern}, not {value!r}")]
+        return [Problem(where, "invalid_value", f"must match {SETTINGS[name].pattern.pattern}")]
     return []
 
 
@@ -157,8 +159,7 @@ def _rule_problems(environment, section):
             if value != "false"
         ]
     if len(set(values.values())) > 1:
-        message = f"must be the same in hub and worker, not {values}"
-        return [Problem(f"{environment}.{LOCK}", "families_disagree", message)]
+        return [Problem(f"{environment}.{LOCK}", "families_disagree", "must be the same in hub and worker")]
     return []
 
 
@@ -213,14 +214,17 @@ def owner_problems(environment, section, in_force, revisions):
 
 
 def lock_problems(section, in_force, confirm):
-    """Prod's lock: a change of what is in force goes through only with confirm set to exactly <name>=<new value>."""
+    """Prod's lock: a change of what is in force goes through only with confirm set to exactly <name>=<new value>.
+
+    Its messages name the new value, which a setting's pattern has already held to true or false; no other message
+    repeats a value of the file, since the deploy logs of a public repository are public."""
     default = SETTINGS[LOCK].default
     changes = sorted({
         f"{LOCK}={section.get(family, {}).get(LOCK, default)}"
         for family in SERVING
         if section.get(family, {}).get(LOCK, default) != in_force.get(family, {}).get(LOCK, default)
     })
-    given = sorted({item.strip() for item in confirm.split(",") if item.strip()})
+    given = sorted({item for item in re.split(r"[,\s]+", confirm) if item})
     if given == changes:
         return []
     where = f"prod.{LOCK}"
@@ -322,7 +326,7 @@ def apply(workdir, environment, commit, region, confirm):
     results = {family: merged(revision, family, section, in_force) for family, revision in revisions.items()}
     for family, result in results.items():
         (workdir / f"{family}.json").write_text(json.dumps(result))
-    (workdir / "app_env.json").write_text(json.dumps(section, separators=(",", ":")))
+    (workdir / "app_env.json").write_text(json.dumps(section, sort_keys=True, separators=(",", ":")))
 
 
 def main(argv=None):

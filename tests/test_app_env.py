@@ -258,6 +258,33 @@ def test_a_known_variable_holding_something_shaped_like_a_secret_is_refused():
     assert ("pre.worker.PLATFORM_HUB_SLUG", "looks_like_secret") in kinds(app_env.file_problems(data))
 
 
+@pytest.mark.parametrize("name", ["STRIPE_SECRET_KEY", "DB_PASSWORD", "GITHUB_TOKEN"])
+def test_a_variable_named_like_a_secret_is_refused_as_one(name):
+    data = settings()
+    data["prod"]["hub"][name] = "x"
+
+    assert (f"prod.hub.{name}", "looks_like_secret") in kinds(app_env.file_problems(data))
+
+
+@pytest.mark.parametrize(
+    ("name", "value"),
+    [
+        ("PLATFORM_HUB_SLUG", "Hunter2-Passw0rd!"),
+        ("VERIFACTU_PRODUCTION_ENABLED", {"token": "Hunter2-Passw0rd!"}),
+        ("VERIFACTU_ERPLORA_ROUTE_ENABLED", ["Hunter2-Passw0rd!"]),
+    ],
+)
+def test_no_problem_repeats_the_value_it_refuses(name, value):
+    data = settings()
+    data["prod"]["hub"][name] = value
+    data["prod"]["worker"][name] = value
+
+    problems = app_env.file_problems(data)
+
+    assert problems
+    assert not [problem for problem in problems if "Hunter2" in str(problem)]
+
+
 def test_the_file_sets_only_the_hub_settings_terraform_left_to_it():
     assert set(app_env.SETTINGS) == set(SETTINGS_NAMES)
 
@@ -392,6 +419,18 @@ def test_a_confirmation_of_something_else_is_refused(confirm):
     problems = app_env.lock_problems(with_production("true"), with_production("false"), confirm=confirm)
 
     assert kinds(problems) == {("prod.VERIFACTU_PRODUCTION_ENABLED", "confirmation_mismatch")}
+
+
+@pytest.mark.parametrize(
+    "confirm",
+    [
+        " VERIFACTU_PRODUCTION_ENABLED=true ",
+        "VERIFACTU_PRODUCTION_ENABLED=true,",
+        "VERIFACTU_PRODUCTION_ENABLED=true VERIFACTU_PRODUCTION_ENABLED=true",
+    ],
+)
+def test_the_confirmation_may_be_set_apart_by_commas_or_spaces(confirm):
+    assert app_env.lock_problems(with_production("true"), with_production("false"), confirm=confirm) == []
 
 
 def test_a_confirmation_when_nothing_protected_changes_is_refused():
@@ -538,6 +577,15 @@ def test_a_deploy_gives_each_revision_the_settings_of_its_commit(monkeypatch, wo
     assert "VERIFACTU_ERPLORA_ROUTE_ENABLED" not in app_environment(read(workdir, "worker"), "worker")
     assert read(workdir, "app_env") == data["prod"]
     assert ["git", "show", f"{COMMIT}:deploy/app-env.json"] in commands.calls
+
+
+def test_the_settings_to_record_are_compact_json_with_sorted_keys(monkeypatch, workdir):
+    section = {"worker": dict(reversed(PROD["worker"].items())), "hub": dict(reversed(PROD["hub"].items()))}
+    commands = FakeCommands(file=json.dumps(settings(prod=section)))
+
+    assert deploy(monkeypatch, workdir, commands) == 0
+
+    assert (workdir / "app_env.json").read_text() == json.dumps(PROD, sort_keys=True, separators=(",", ":"))
 
 
 def test_a_deploy_reads_the_settings_in_force_and_the_saas_revision_of_its_environment(monkeypatch, workdir):
