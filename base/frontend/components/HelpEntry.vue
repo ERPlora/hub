@@ -46,7 +46,6 @@ watch(app, () => {
     >
       <ion-button
         class="help-entry"
-        fill="clear"
         data-testid="help-button"
         aria-haspopup="dialog"
         :aria-expanded="String(open)"
