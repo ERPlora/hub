@@ -129,7 +129,7 @@
 577 apps/website/queries.py ERPlora/erplora-next#74
 563 apps/whatsapp_inbox/frontend/components/TemplateFormModal.test.ts ERPlora/erplora-next#74
 430 apps/whatsapp_inbox/frontend/operations.d.ts ERPlora/erplora-next#74
-536 apps/whatsapp_inbox/models.py ERPlora/erplora-next#74
+534 apps/whatsapp_inbox/models.py ERPlora/erplora-next#74
 1136 apps/whatsapp_inbox/queries.py ERPlora/erplora-next#74
 1211 apps/whatsapp_inbox/schemas.py ERPlora/erplora-next#74
 2587 apps/whatsapp_inbox/services.py ERPlora/erplora-next#74
