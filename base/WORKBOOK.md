@@ -3962,12 +3962,13 @@ Implicados: BASE-F92, BASE-F93
   idioma (`_READ`): los WORKBOOK solo cambian con una imagen nueva; con `DEBUG` se relee en cada llamada. Cada `###` bajo el encabezado de las pantallas es
   la pestaña del menú que tiene esa etiqueta en el idioma del fichero, más la de ajustes (`/<módulo>/settings`) si el
   menú no la trae; un `####` es una ventana de esa pestaña. De los flujos se publican los que están hechos (lo que
-  sigue en `Estado:` a una raya, dos puntos o un paréntesis es una nota) y cuya `Pantalla:` (partida por «,» y «;»,
-  sin lo que va entre paréntesis) nombra una pestaña o una de sus ventanas, y de ellos solo el título sin el id, los
-  pasos y «Si falla:». El encabezado, las claves de un flujo y «hecho» son el
+  sigue en `Estado:` a una raya, dos puntos o un paréntesis es una nota) y cuya `Pantalla:` (partida por «,» y «;»)
+  nombra una pestaña o una de sus ventanas, sin lo que va entre paréntesis en un lado ni en el otro; y de ellos solo el
+  título sin el id, los pasos y «Si falla:», que empiezan con mayúscula. El encabezado, las claves de un flujo y «hecho» son el
   vocabulario `pgettext("workbook", …)` del `.po` de `base`, así que el código no nombra más idioma que el original.
-  Las líneas sangradas que siguen a un elemento de lista se unen a él, porque el `parseMarkdown` de la pantalla lo
-  cierra en su primera línea. La CSP deja `frame-src 'self' https://www.youtube-nocookie.com` (`live.csp.with_frames`;
+  Un párrafo o un elemento de lista que el fichero parte en varias líneas sale en una sola, salvo tras un salto forzado
+  (dos espacios o una barra al final de la línea), porque la pantalla respeta cada salto de línea y su `parseMarkdown`
+  cierra un elemento en su primera línea. La CSP deja `frame-src 'self' https://www.youtube-nocookie.com` (`live.csp.with_frames`;
   `'self'` es la vista previa del editor de la web). `tests/test_help_workbooks.py` vigila cada módulo con la ayuda
   lista en cada idioma: cada entrada del menú con su `###`, una sola vez, y cada `###` una pestaña; lo publicado, sin
   código, sin referencias a issues, sin tamaños en px, sin ids de flujo ni nombres de operación o de evento; cada flujo

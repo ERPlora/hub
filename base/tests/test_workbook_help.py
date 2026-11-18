@@ -45,6 +45,48 @@ class TestWhatItIsFor:
         )
 
 
+FENCE = "`" * 3
+
+
+@pytest.mark.parametrize(
+    ("written", "painted"),
+    [
+        ("Una frase que sigue\nen la línea de abajo\ny en otra.", "Una frase que sigue en la línea de abajo y en otra."),
+        ("Un párrafo.\n\nOtro párrafo.", "Un párrafo.\n\nOtro párrafo."),
+        ("Acaba en dos espacios  \nsigue aparte.", "Acaba en dos espacios\nsigue aparte."),
+        ("Acaba en una barra\\\nsigue aparte.", "Acaba en una barra\nsigue aparte."),
+        ("- Un elemento\n- Otro elemento", "- Un elemento\n- Otro elemento"),
+        ("- Un elemento que sigue\nsin sangría.", "- Un elemento que sigue sin sangría."),
+        ("Antes de la tabla:\n| a | b |\n|---|---|\n| 1 | 2 |", "Antes de la tabla:\n| a | b |\n|---|---|\n| 1 | 2 |"),
+        ("Antes de la cita:\n> una cita\n> que sigue", "Antes de la cita:\n> una cita\n> que sigue"),
+        ("Antes de la ventana\n#### Ventana\nSu texto\nsigue.", "Antes de la ventana\n#### Ventana\nSu texto sigue."),
+        (f"Antes del código:\n{FENCE}\nuna línea\notra\n{FENCE}", f"Antes del código:\n{FENCE}\nuna línea\notra\n{FENCE}"),
+        ("Antes de la raya\n---\ndespués.", "Antes de la raya\n---\ndespués."),
+    ],
+    ids=["wrapped", "paragraphs", "two-spaces", "backslash", "items", "lazy-item", "table", "quote", "heading", "code", "rule"],
+)
+def test_a_paragraph_is_one_line_however_the_file_wraps_it(written, painted):
+    # The window paints a paragraph keeping its line breaks, so a break the file makes to fit its width is a space.
+    assert parse(f"## Para qué sirve\n\n{written}\n", ES_TABS, ES_WORDS).purpose == painted
+
+
+@pytest.mark.parametrize(
+    ("written", "published"),
+    [
+        ("sin nombre, no se activa.", "Sin nombre, no se activa."),
+        ("él no puede.", "Él no puede."),
+        ("1. pulsa «+».", "1. pulsa «+»."),
+        ("`zona` vacía.", "`zona` vacía."),
+        ("«Ya hay una zona».", "«Ya hay una zona»."),
+    ],
+    ids=["lowercase", "accented", "list", "code", "quote"],
+)
+def test_the_steps_and_what_happens_if_it_fails_start_with_a_capital(written, published):
+    flow = f"## Flujos\n\n### TABLE-F01 Crear\nEstado: hecho\nPantalla: Zonas\nPasos: {written}\nSi falla: {written}\n"
+    [read] = parse(flow, ES_TABS, ES_WORDS).flows
+    assert (read.steps, read.failure) == (published, published)
+
+
 class TestScreens:
     def test_each_tab_with_its_section_in_the_order_of_the_menu_its_windows_inside(self):
         assert spanish().screens == (
@@ -57,7 +99,7 @@ class TestScreens:
                 "- libre: pregunta los comensales y la sienta.\n"
                 "  - con reserva: dice a nombre de quién.\n"
                 "\n"
-                "#### Cobrar mesa\n"
+                "#### Cobrar mesa (cuenta)\n"
                 "Pide el importe y cobra.",
             ),
             Screen("zones", "Zonas", "/table/zones", "Una tabla con el nombre y el color de cada zona."),
@@ -93,7 +135,7 @@ class TestFlows:
             ("zones",),
             "1. En **Mesas → Zonas** pulsa «+» y escribe el nombre, que después sale como pestaña del plano.\n"
             "2. Pulsa «Añadir zona».",
-            "sin nombre, el botón no se activa.",
+            "Sin nombre, el botón no se activa. Un nombre repetido dice «Ya hay una zona con ese nombre.».",
         )
 
     def test_its_screen_names_tabs_without_what_goes_in_parentheses_commas_included(self):
@@ -162,7 +204,7 @@ def test_every_language_reads_alike_with_its_own_words_and_labels(markdown, tabs
 def test_the_third_language_joins_its_list_lines_and_maps_a_window_to_its_tab():
     read = parse(EO, EO_TABS, EO_WORDS)
     assert read.flows[0].steps == "1. Tuŝu «+» kaj skribu la nomon, kiu poste aperas en la plano."
-    assert read.flows[0].failure == "sen nomo, la butono restas malŝaltita."
+    assert read.flows[0].failure == "Sen nomo, la butono restas malŝaltita."
     assert read.screens[0].title == "Salonplano"
 
 

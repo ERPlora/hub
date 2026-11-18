@@ -4,7 +4,7 @@ language whose words no catalogue of the Hub knows, so that nothing in the readi
 Each one has the same shape: what the module is for (with a list whose items go on over indented lines, and a heading
 inside a code block), the screens heading with three tabs (one with a window, ``####``), a section that names no tab,
 and flows that are done on a tab, done through a window, not done, and done on no tab; some statuses carry a note after
-a dash, a colon or a parenthesis.
+a dash, a colon or a parenthesis, a window's title has its own parentheses, and some paragraphs are wrapped over lines.
 """
 
 from pathlib import Path
@@ -46,11 +46,12 @@ Tocar una mesa abre su ventana:
   y la sienta.
   - con reserva: dice a nombre de quién.
 
-#### Cobrar mesa
+#### Cobrar mesa (cuenta)
 Pide el importe y cobra.
 
 ### Zonas
-Una tabla con el nombre y el color de cada zona.
+Una tabla con el nombre y el color
+de cada zona.
 
 ### Ajustes
 Los avisos de tiempo.
@@ -74,7 +75,8 @@ Pasos:
 2. Pulsa «Añadir zona».
 Entra: el nombre y el color.
 Sale: la zona (avisa: `table.zone.created`).
-Si falla: sin nombre, el botón no se activa.
+Si falla: sin nombre, el botón no se activa. Un nombre repetido dice
+«Ya hay una zona con ese nombre.».
 Implicados: TABLE-F02
 
 ### TABLE-F02 Cobrar una mesa desde el plano
@@ -145,7 +147,7 @@ Tapping a table opens its window:
   and seats them.
   - with a booking: says whose it is.
 
-#### Charge table
+#### Charge table (check)
 Asks for the amount and charges it.
 
 ### Zones
@@ -169,7 +171,8 @@ Steps:
 2. Tap «Add zone».
 In: the name and the colour.
 Out: the zone (notifies: `table.zone.created`).
-If it fails: without a name, the button stays off.
+If it fails: without a name, the button stays off. A repeated name says
+"There is already a zone with that name.".
 Involved: TABLE-F02
 
 ### TABLE-F02 Charge a table from the plan
@@ -217,7 +220,7 @@ Tabloj estas la **plano de la salono**.
 ### Salonplano
 Tuŝi tablon malfermas ĝian fenestron.
 
-#### Pagi tablon
+#### Pagi tablon (konto)
 Petas la sumon.
 
 ### Zonoj
@@ -231,7 +234,8 @@ Ekrano: Zonoj
 Paŝoj:
 1. Tuŝu «+» kaj skribu la nomon, kiu poste
    aperas en la plano.
-Se ĝi malsukcesas: sen nomo, la butono restas malŝaltita.
+Se ĝi malsukcesas: sen nomo, la butono restas
+malŝaltita.
 
 ### TABLE-F02 Pagi tablon
 Stato: farita

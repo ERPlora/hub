@@ -37,6 +37,11 @@ KEYS = {
 _FENCE = re.compile(r"^ {0,3}(`{3,}|~{3,})")
 _FLOW = re.compile(r"^([A-Z][A-Z0-9_]*-F\d+)\s+(.+)$")
 _LIST_ITEM = re.compile(r"^\s*(?:[-*+]|\d+[.)])\s+")
+#: A line that is a block of its own: a heading, a quote, a table row or a rule.
+_BLOCK = re.compile(r"^ {0,3}(?:#{1,6}(?:\s|$)|>|\|)")
+_RULE = re.compile(r"^ {0,3}([-*_])(?:[ \t]*\1){2,}[ \t]*$")
+#: Markdown's hard line break at the end of a line: two spaces or a backslash.
+_HARD_BREAK = re.compile(r"(?:  |\\)$")
 _PARENTHESES = re.compile(r"\([^()]*\)")
 #: What starts the note a status may carry after its word: a dash, a colon or a parenthesis.
 _STATUS_NOTE = re.compile(r"[(:—–]|\s-\s")
@@ -131,7 +136,7 @@ def parse(markdown: str, tabs: Sequence[Tab], vocabulary: Words) -> Help:
     screens_heading = _name(vocabulary.screens)
     screen_lines = next((body for title, body in sections if _name(title) == screens_heading), [])
     screens, windows, unknown, repeated = _screens(screen_lines, tabs)
-    places = {**windows, **{_name(tab.label): tab.id for tab in tabs}}
+    places = {**windows, **{_place(tab.label): tab.id for tab in tabs}}
     read = [flow for _title, body in sections for flow in _flows(body, vocabulary, places)]
     flows = tuple(flow for flow in read if isinstance(flow, Flow))
     drafts = tuple(flow for flow in read if isinstance(flow, Draft))
@@ -156,7 +161,7 @@ def _screens(
         else:
             found[tab.id] = body
     screens = tuple(Screen(tab.id, tab.label, tab.path, _markdown(found[tab.id])) for tab in tabs if tab.id in found)
-    windows = {_name(title): tab_id for tab_id, body in found.items() for title, _ in _sections(body, 4)[1:]}
+    windows = {_place(title): tab_id for tab_id, body in found.items() for title, _ in _sections(body, 4)[1:]}
     return screens, windows, tuple(unknown), tuple(repeated)
 
 
@@ -170,7 +175,7 @@ def _flows(lines: list[str], vocabulary: Words, places: dict[str, str]) -> Itera
         status = " ".join(line.strip() for line in fields.get("status", [])).strip()
         screens = _places(fields.get("screen", []), places)
         if screens and _is_done(status, vocabulary):
-            steps, failure = _markdown(fields.get("steps", [])), _markdown(fields.get("failure", []))
+            steps, failure = (_capital(_markdown(fields.get(key, []))) for key in ("steps", "failure"))
             yield Flow(heading.group(1), heading.group(2).strip(), screens, steps, failure)
         else:
             yield Draft(heading.group(1), status, screens)
@@ -201,7 +206,7 @@ def _places(screen: list[str], places: dict[str, str]) -> tuple[str, ...]:
     """The tabs a flow's screen names: its parts split on «,» and «;», what goes in parentheses left out."""
     found: list[str] = []
     for part in re.split(r"[,;]", _without_parentheses(" ".join(screen))):
-        tab_id = places.get(_name(part))
+        tab_id = places.get(_place(part))
         if tab_id is not None and tab_id not in found:
             found.append(tab_id)
     return tuple(found)
@@ -215,6 +220,17 @@ def _without_parentheses(text: str) -> str:
 
 def _name(text: str | None) -> str:
     return " ".join((text or "").split()).casefold()
+
+
+def _place(text: str) -> str:
+    """How a flow's screen and a tab's or a window's name are compared: what goes in parentheses left out."""
+    return _name(_without_parentheses(text))
+
+
+def _capital(text: str) -> str:
+    """``text`` with its first character in capitals: a lower-case letter's, since a list's number, a backtick or a
+    quotation mark have none."""
+    return text[:1].upper() + text[1:]
 
 
 def _sections(lines: list[str], level: int) -> list[tuple[str | None, list[str]]]:
@@ -245,17 +261,25 @@ def _code_lines(lines: list[str]) -> list[bool]:
 
 
 def _markdown(lines: list[str]) -> str:
-    """``lines`` as the window paints them: the indented lines that go on with a list item joined to it, since the
-    screen ends an item at its first line, and the blank lines around them dropped."""
+    """``lines`` as the window paints them, which keeps every line break: a paragraph or a list item that the file wraps
+    over several lines becomes one line, unless a line ends in a hard break (two spaces or a backslash, which then goes);
+    headings, quotes, tables, rules and code stay as they are, and the blank lines around them all go."""
     out: list[str] = []
-    in_item = False
+    joinable = False
     for line, code in zip(lines, _code_lines(lines), strict=True):
-        if code or not line.strip():
-            out.append(line.rstrip())
-            in_item = False
-        elif in_item and line[:1].isspace() and not _LIST_ITEM.match(line):
+        kind = _kind(line, code)
+        if kind == "text" and joinable:
             out[-1] = f"{out[-1]} {line.strip()}"
         else:
             out.append(line.rstrip())
-            in_item = _LIST_ITEM.match(line) is not None
+        joinable = kind != "block" and not _HARD_BREAK.search(line)
+        if kind != "block" and not joinable:
+            out[-1] = out[-1].removesuffix("\\")
     return "\n".join(out).strip("\n")
+
+
+def _kind(line: str, code: bool) -> str:
+    """``block`` (code, a blank line, a heading, a quote, a table row or a rule), ``item`` or ``text``."""
+    if code or not line.strip() or _BLOCK.match(line) or _RULE.match(line):
+        return "block"
+    return "item" if _LIST_ITEM.match(line) else "text"

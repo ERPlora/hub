@@ -12,7 +12,7 @@ from django.apps import apps
 from live.assistant import is_tool
 from live.context import OperationContext
 from live.errors import NotFound
-from live.meta import Help
+from live.meta import Help, module_configs
 from live.operations import AI, get
 
 from base import workbook_help
@@ -47,16 +47,23 @@ def test_it_is_a_read_of_whoever_sees_the_home_that_holds_no_database_and_is_a_t
     assert set(op.ai.asks) == {"en", "es"}
 
 
+@pytest.fixture
+def no_help(monkeypatch):
+    """No module declares its help, whichever modules already have it."""
+    for config in module_configs():
+        monkeypatch.setattr(config, "help", None)
+
+
 class TestWhichApps:
-    def test_no_module_has_its_help_ready_until_it_declares_it(self):
+    def test_no_module_has_its_help_ready_until_it_declares_it(self, no_help):
         assert app_help.ready_apps() == []
 
-    def test_a_module_that_declares_its_help_is_ready(self, monkeypatch):
+    def test_a_module_that_declares_its_help_is_ready(self, no_help, monkeypatch):
         monkeypatch.setattr(apps.get_app_config("table"), "help", Help())
         assert app_help.ready_apps() == ["table"]
 
     @pytest.mark.parametrize("app", ["table", "base", "nope"])
-    def test_an_app_without_its_help_ready_is_not_found_in_the_person_s_language(self, app):
+    def test_an_app_without_its_help_ready_is_not_found_in_the_person_s_language(self, no_help, app):
         with pytest.raises(NotFound) as refused:
             ask(app)
         assert (refused.value.code, refused.value.message) == ("base.help_missing", "Esta app aún no tiene ayuda.")
@@ -82,7 +89,7 @@ class TestTheAnswer:
             ("TABLE-F02", "Cobrar una mesa desde el plano", ["floor_plan"]),
             ("TABLE-F03", "Cobrar desde la ventana de cobro", ["floor_plan", "zones"]),
         ]
-        assert answer["flows"][0]["failure"] == "sin nombre, el botón no se activa."
+        assert answer["flows"][0]["failure"].startswith("Sin nombre, el botón no se activa. Un nombre repetido dice «Ya")
 
     def test_in_another_language_it_reads_its_current_file_with_the_tabs_in_that_language(self, table):
         answer = ask(language="en")
