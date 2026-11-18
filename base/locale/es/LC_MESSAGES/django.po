@@ -2337,3 +2337,82 @@ msgstr "Ajustes"
 #: queries/app_help.py
 msgid "This app has no help yet."
 msgstr "Esta app aún no tiene ayuda."
+
+#: allergens.py
+msgctxt "allergen"
+msgid "Gluten"
+msgstr "Gluten"
+
+#: allergens.py
+msgctxt "allergen"
+msgid "Crustaceans"
+msgstr "Crustáceos"
+
+#: allergens.py
+msgctxt "allergen"
+msgid "Egg"
+msgstr "Huevo"
+
+#: allergens.py
+msgctxt "allergen"
+msgid "Fish"
+msgstr "Pescado"
+
+#: allergens.py
+msgctxt "allergen"
+msgid "Peanut"
+msgstr "Cacahuete"
+
+#: allergens.py
+msgctxt "allergen"
+msgid "Soy"
+msgstr "Soja"
+
+#: allergens.py
+msgctxt "allergen"
+msgid "Milk"
+msgstr "Leche"
+
+#: allergens.py
+msgctxt "allergen"
+msgid "Tree nuts"
+msgstr "Frutos de cáscara"
+
+#: allergens.py
+msgctxt "allergen"
+msgid "Celery"
+msgstr "Apio"
+
+#: allergens.py
+msgctxt "allergen"
+msgid "Mustard"
+msgstr "Mostaza"
+
+#: allergens.py
+msgctxt "allergen"
+msgid "Sesame"
+msgstr "Sésamo"
+
+#: allergens.py
+msgctxt "allergen"
+msgid "Sulphites"
+msgstr "Sulfitos"
+
+#: allergens.py
+msgctxt "allergen"
+msgid "Lupin"
+msgstr "Altramuces"
+
+#: allergens.py
+msgctxt "allergen"
+msgid "Molluscs"
+msgstr "Moluscos"
+
+#: allergens.py
+msgid "That allergen is not one of the fourteen that must be declared."
+msgstr "Ese alérgeno no es uno de los catorce de declaración obligatoria."
+
+#: allergens.py
+#, python-format
+msgid "Allergen not recognized: %(text)s"
+msgstr "Alérgeno no reconocido: %(text)s"

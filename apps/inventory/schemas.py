@@ -17,6 +17,7 @@ from django.utils.translation import gettext_noop
 from ninja import Field, Schema
 from pydantic import ConfigDict, StringConstraints, model_validator
 
+from base.allergens import AllergensCellIn, AllergensIn, AllergensOut, AllergensPatchIn
 from base.images import MAX_UPLOAD_BASE64
 from base.recovery import ImageInCopyIn
 from base.schemas import CatalogImageOut, names
@@ -401,10 +402,8 @@ class ConfigGetIn(Schema):
 # Inputs: products
 
 
-class ProductIn(Schema):
-    name: Name = Field(
-        description="The product's name, as the till and the ticket show it."
-    )
+class ProductIn(AllergensIn):
+    name: Name = Field(description="The product's name, as the till and the ticket show it.")
     sku: Sku = Field(
         description="The product's code; its identity, never edited afterwards."
     )
@@ -463,7 +462,7 @@ class ProductRecoverIn(ProductIn, ImageInCopyIn):
     it showed there (the business makes its own id)."""
 
 
-class ProductPatchIn(ProductRefIn):
+class ProductPatchIn(ProductRefIn, AllergensPatchIn):
     """Only the fields sent are changed; ``null`` leaves one as it is; ``ean13: ""`` clears it.
 
     The SKU (the product's identity), the type and the stock are not editable: sending them is a 422.
@@ -507,7 +506,7 @@ class ProductPatchIn(ProductRefIn):
     )
 
 
-class ProductImportRowIn(Schema):
+class ProductImportRowIn(AllergensCellIn):
     """One row of a CSV, its columns already mapped to our fields, each cell as written in the file."""
 
     line: int = Field(ge=1, description="Line of the file, for the report.")
@@ -729,7 +728,7 @@ class SaleRefundedIn(Schema):
 # Outputs
 
 
-class ProductOut(Schema):
+class ProductOut(AllergensOut):
     id: UUID = Field(description="The product's id.")
     name: str = Field(description="Name.")
     sku: str = Field(description="SKU, its identity.")
@@ -783,7 +782,7 @@ class ProductsOut(Schema):
     rows: list[ProductOut] = Field(description="The products, as they are now.")
 
 
-class SaleProductOut(Schema):
+class SaleProductOut(AllergensOut):
     """What the till needs to price and sell a product; never its stock."""
 
     id: UUID = Field(description="The product's id.")

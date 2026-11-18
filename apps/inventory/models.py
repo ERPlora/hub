@@ -152,6 +152,9 @@ class Product(UUIDModel):
     sku = models.CharField(_("SKU"), max_length=64)
     ean13 = models.CharField(_("EAN-13"), max_length=13, null=True, blank=True)
     description = models.TextField(_("description"), blank=True)
+    # The codes of the fourteen that must be declared (base.allergens), in the order of the list. ``db_default``: a
+    # process still on the previous code inserts products without it (expand/contract).
+    allergens = models.JSONField(_("allergens"), blank=True, default=list, db_default=[])
     product_type = models.CharField(
         _("type"), max_length=16, choices=Type.choices, default=Type.PHYSICAL
     )
