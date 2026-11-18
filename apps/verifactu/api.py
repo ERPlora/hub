@@ -50,12 +50,12 @@ async def config_get(request):
 
 @bind(router, "verifactu.config.go_live", "/verifactu/config/go_live")
 async def config_go_live(request):
-    return await run_operation(request, services.go_live)
+    return await run_operation(request, services.config.go_live)
 
 
 @bind(router, "verifactu.config.back_to_testing", "/verifactu/config/back_to_testing")
 async def config_back_to_testing(request):
-    return await run_operation(request, services.back_to_testing)
+    return await run_operation(request, services.config.back_to_testing)
 
 
 # The own certificate (VERIFACTU-F02, F03)
@@ -63,12 +63,12 @@ async def config_back_to_testing(request):
 
 @bind(router, "verifactu.certificate.upload", "/verifactu/certificate", status=201)
 async def certificate_upload(request, data: CertificateUploadIn):
-    return await run_operation(request, services.upload_certificate, data)
+    return await run_operation(request, services.own_certificate.upload_certificate, data)
 
 
 @bind(router, "verifactu.certificate.remove", "/verifactu/certificate/remove")
 async def certificate_remove(request):
-    return await run_operation(request, services.remove_certificate)
+    return await run_operation(request, services.own_certificate.remove_certificate)
 
 
 # The signed authorisation (VERIFACTU-F05, F06): the documents in the body, four PDFs of up to 5 MB in base64, more
@@ -79,7 +79,7 @@ async def certificate_remove(request):
 @bind(router, "verifactu.representation.submit", "/verifactu/representation", status=201)
 @decorate_view(accept_body_up_to(representation.MAX_BODY_BYTES))
 async def representation_submit(request, data: RepresentationSubmitIn):
-    return await run_operation(request, services.submit_representation, data)
+    return await run_operation(request, services.authorisation.submit_representation, data)
 
 
 @bind(
@@ -127,27 +127,27 @@ async def record_by_invoice(request, params: Query[ByInvoiceIn]):
 
 @bind(router, "verifactu.record.create", "/verifactu/records", status=201)
 async def record_create(request, data: RecordCreateIn):
-    return await run_operation(request, services.create_record, data)
+    return await run_operation(request, services.records.create_record, data)
 
 
 @bind(router, "verifactu.record.correct", "/verifactu/records/correct")
 async def record_correct(request, data: RecordCorrectIn):
-    return await run_operation(request, services.correct_record, data)
+    return await run_operation(request, services.records.correct_record, data)
 
 
 @bind(router, "verifactu.record.cancel", "/verifactu/records/cancel")
 async def record_cancel(request, data: RecordCancelIn):
-    return await run_operation(request, services.cancel_record, data)
+    return await run_operation(request, services.records.cancel_record, data)
 
 
 @bind(router, "verifactu.record.transmit", "/verifactu/records/transmit")
 async def record_transmit(request, data: RecordTransmitIn):
-    return await run_operation(request, services.transmit_record, data)
+    return await run_operation(request, services.records.transmit_record, data)
 
 
 @bind(router, "verifactu.record.reconcile", "/verifactu/records/reconcile")
 async def record_reconcile(request, data: RecordReconcileIn):
-    return await run_operation(request, services.reconcile_record, data)
+    return await run_operation(request, services.records.reconcile_record, data)
 
 
 # The queue
@@ -160,12 +160,12 @@ async def contingency_list(request, params: Query[ContingencyListIn]):
 
 @bind(router, "verifactu.contingency.process", "/verifactu/contingency/process")
 async def contingency_process(request):
-    return await run_operation(request, services.process_queue)
+    return await run_operation(request, services.contingency.process_queue)
 
 
 @bind(router, "verifactu.contingency.retry", "/verifactu/contingency/retry")
 async def contingency_retry(request, data: ContingencyRetryIn):
-    return await run_operation(request, services.retry_record, data)
+    return await run_operation(request, services.contingency.retry_record, data)
 
 
 # Audit and summaries
@@ -212,7 +212,7 @@ async def aeat_record_list(request, params: Query[AeatRecordListIn]):
 
 @bind(router, "verifactu.aeat.query", "/verifactu/aeat/query")
 async def aeat_query(request, data: AeatQueryIn):
-    return await run_operation(request, services.query_aeat, data)
+    return await run_operation(request, services.aeat_query.query_aeat, data)
 
 
 @bind(router, "verifactu.chain.status", "/verifactu/chain/status")
@@ -222,17 +222,17 @@ async def chain_status(request, params: Query[IssuerIn]):
 
 @bind(router, "verifactu.chain.validate", "/verifactu/chain/validate")
 async def chain_validate(request, data: ChainValidateIn):
-    return await run_operation(request, services.validate_chain, data)
+    return await run_operation(request, services.chains.validate_chain, data)
 
 
 @bind(router, "verifactu.chain.recover_from_aeat", "/verifactu/chain/recover_from_aeat")
 async def chain_recover_from_aeat(request, data: RecoverFromAeatIn):
-    return await run_operation(request, services.recover_from_aeat, data)
+    return await run_operation(request, services.chains.recover_from_aeat, data)
 
 
 @bind(router, "verifactu.chain.recover_manual", "/verifactu/chain/recover_manual")
 async def chain_recover_manual(request, data: RecoverManualIn):
-    return await run_operation(request, services.recover_manual, data)
+    return await run_operation(request, services.chains.recover_manual, data)
 
 
 # The connection test and the test invoice
@@ -245,9 +245,9 @@ async def diagnostic_last(request):
 
 @bind(router, "verifactu.diagnostic.run", "/verifactu/diagnostics/run")
 async def diagnostic_run(request):
-    return await run_operation(request, services.run_diagnostic)
+    return await run_operation(request, services.diagnostics.run_diagnostic)
 
 
 @bind(router, "verifactu.test_invoice.create", "/verifactu/test_invoice")
 async def test_invoice_create(request):
-    return await run_operation(request, services.create_test_invoice)
+    return await run_operation(request, services.diagnostics.create_test_invoice)

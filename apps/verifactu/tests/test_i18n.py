@@ -88,7 +88,7 @@ def test_spanish_texts():
         assert str(Record.Status.PENDING.label) == "Pendiente"
         assert str(Record.Type.ANULACION.label) == "Anulación"
         assert str(Environment.TESTING.label) == "Pruebas (AEAT de pruebas)"
-        assert str(services.NOT_IN_QUEUE).startswith("Este registro no está en la cola")
+        assert str(services.records.NOT_IN_QUEUE).startswith("Este registro no está en la cola")
         assert "emitido por una entidad reconocida, por ejemplo la FNMT" in str(
             certificates.REFUSALS["self_signed"]
         )
