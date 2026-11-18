@@ -68,12 +68,12 @@ function choose(step: Secondary): void {
 <template>
   <footer
     v-if="primary || secondary.length"
-    class="kds-actions"
+    class="ep-order-ticket__foot"
     :data-testid="`kitchen-card-${id}-foot`"
   >
     <ion-button
       v-if="primary === 'bump'"
-      class="kds-actions__main"
+      class="ep-order-ticket__step"
       color="success"
       :data-testid="`kitchen-card-${id}-bump`"
       @click="emit('bump')"
@@ -86,7 +86,7 @@ function choose(step: Secondary): void {
     </ion-button>
     <ion-button
       v-else-if="primary === 'serve'"
-      class="kds-actions__main"
+      class="ep-order-ticket__step"
       color="success"
       :data-testid="`kitchen-card-${id}-served`"
       @click="emit('serve')"
@@ -99,7 +99,7 @@ function choose(step: Secondary): void {
     </ion-button>
     <ion-button
       v-if="secondary.length"
-      class="kds-actions__more"
+      class="ep-order-ticket__more"
       fill="outline"
       color="medium"
       :data-testid="`kitchen-card-${id}-more`"
@@ -115,7 +115,7 @@ function choose(step: Secondary): void {
       />
     </ion-button>
     <ion-popover
-      class="kds-actions__popover"
+      class="ep-order-ticket-steps"
       :is-open="open"
       :event="anchor"
       alignment="end"
@@ -123,7 +123,7 @@ function choose(step: Secondary): void {
       @did-dismiss="open = false"
     >
       <ion-list
-        class="kds-actions__menu"
+        class="ep-order-ticket-steps__list"
         lines="none"
         :data-testid="`kitchen-card-${id}-menu`"
       >
@@ -146,51 +146,3 @@ function choose(step: Secondary): void {
   </footer>
 </template>
 
-<style scoped>
-.kds-actions {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  margin-top: auto;
-  padding: 0.6rem 0.75rem 0.75rem;
-  border-top: 1px solid var(--ion-border-color);
-}
-.kds-actions ion-button {
-  min-height: 52px;
-  margin: 0;
-  text-transform: none;
-  --border-radius: 12px;
-}
-.kds-actions__main {
-  flex: 1 1 auto;
-  min-width: 0;
-  font-size: 1.1rem;
-  font-weight: 700;
-}
-/* Alone in the foot, «⋮» keeps to the right where it always is. */
-.kds-actions__more {
-  flex: 0 0 52px;
-  width: 52px;
-  margin-inline-start: auto;
-  font-size: 1.3rem;
-  --padding-start: 0;
-  --padding-end: 0;
-}
-/* Wide enough for «Marcar urgente» in iOS mode, whose popover is narrower than the list would be. */
-.kds-actions__popover {
-  --width: 16rem;
-}
-.kds-actions__menu {
-  padding: 0.35rem;
-}
-.kds-actions__menu ion-item {
-  --border-radius: 10px;
-  --min-height: 52px;
-  font-size: 1.05rem;
-  font-weight: 600;
-}
-.kds-actions__menu ion-item.ion-focused::part(native) {
-  outline: 3px solid var(--ion-color-primary);
-  outline-offset: -3px;
-}
-</style>

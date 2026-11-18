@@ -53,7 +53,7 @@ describe('KdsDisplayToolbar', () => {
     expect(s.words('kitchen-display-stations')).toContain('All');
     expect(s.words('kitchen-display-stations')).toContain('Grill');
     expect(s.words('kitchen-display-stations')).toContain('No station');
-    expect(s.find('kitchen-display-station-st-grill').find('.kds-bar__dot').attributes('style')).toContain('background');
+    expect(s.find('kitchen-display-station-st-grill').find('.ep-station-dot').attributes('style')).toContain('background');
     await s.change('kitchen-display-stations', 'st-grill');
     await s.change('kitchen-display-stations', '__all');
     await s.change('kitchen-display-stations', 'none');

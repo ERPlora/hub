@@ -46,13 +46,13 @@ const headTappable = computed(() => props.canChange && cooking.value && anyToDo.
 
 <template>
   <article
-    class="kds-ticket"
+    class="ep-order-ticket"
     :data-testid="`kitchen-card-${ticket.id}`"
     :data-status="ticket.status"
     :data-sem="sem"
     :aria-label="t('kitchen.card.aria', { n: ticket.short_number })"
   >
-    <ion-card class="kds-ticket__card">
+    <ion-card class="ep-order-ticket__card ep-surface">
       <KdsTicketHeader
         :ticket="ticket"
         :elapsed="elapsed"
@@ -61,7 +61,7 @@ const headTappable = computed(() => props.canChange && cooking.value && anyToDo.
         :tappable="headTappable"
         @bump-all="emit('bump', [])"
       />
-      <ion-card-content class="kds-ticket__body">
+      <ion-card-content class="ep-order-ticket__body">
         <KdsTicketLines
           :items="ticket.items"
           :show-station="showStation"
@@ -72,7 +72,7 @@ const headTappable = computed(() => props.canChange && cooking.value && anyToDo.
         />
         <p
           v-if="ticket.notes"
-          class="kds-ticket__notes"
+          class="ep-order-ticket__notes"
         >
           {{ ticket.notes }}
         </p>
@@ -90,45 +90,3 @@ const headTappable = computed(() => props.canChange && cooking.value && anyToDo.
   </article>
 </template>
 
-<style scoped>
-.kds-ticket {
-  --kds-sem: var(--ion-border-color);
-  min-width: 0;
-}
-.kds-ticket[data-sem='ok'] {
-  --kds-sem: var(--ion-color-success);
-}
-.kds-ticket[data-sem='warning'] {
-  --kds-sem: var(--ion-color-warning);
-}
-.kds-ticket[data-sem='critical'] {
-  --kds-sem: var(--ion-color-danger);
-}
-.kds-ticket__card {
-  --background: var(--ion-card-background, var(--ion-background-color));
-  --color: var(--ion-text-color);
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  margin: 0;
-  border: 1px solid var(--ion-border-color);
-  border-top: 6px solid var(--kds-sem);
-  border-radius: var(--ep-radius-lg);
-  box-shadow: var(--ep-shadow-xs);
-}
-.kds-ticket__body {
-  padding: 0;
-  color: var(--ion-text-color);
-}
-.kds-ticket__notes {
-  margin: 0;
-  padding: 0.6rem 0.9rem;
-  border-top: 1px solid var(--ion-border-color);
-  background: color-mix(in srgb, var(--ion-color-step-50) 55%, var(--ion-card-background));
-  color: var(--ep-text-muted);
-  font-size: 1rem;
-  line-height: 1.4;
-  font-style: italic;
-  overflow-wrap: anywhere;
-}
-</style>

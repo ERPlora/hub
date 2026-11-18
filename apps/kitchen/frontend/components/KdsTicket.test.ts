@@ -43,6 +43,8 @@ describe('KdsTicket', () => {
     expect(said(s.find('kitchen-line-i1').element)).toContain('Well done');
     expect(s.card().attributes('aria-label')).toBe('Ticket 0012');
     expect(s.card().find('ion-card').exists()).toBe(true);
+    expect(s.card().classes()).toContain('ep-order-ticket');
+    expect(s.card().find('ion-card').classes()).toEqual(expect.arrayContaining(['ep-order-ticket__card', 'ep-surface']));
   });
 
   it('says the type when there is no label, and no round mark on the first round', async () => {

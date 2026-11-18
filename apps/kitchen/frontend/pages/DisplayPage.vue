@@ -248,7 +248,7 @@ const emptyKey = computed(() => (view.value === 'ready' ? 'kitchen.display.empty
         />
         <div
           v-else-if="shown.length"
-          class="kds__grid"
+          class="ep-order-board"
           data-testid="kitchen-display-grid"
         >
           <KdsTicket
@@ -285,11 +285,5 @@ const emptyKey = computed(() => (view.value === 'ready' ? 'kitchen.display.empty
   background: var(--ion-background-color, #fff);
   padding: 0.75rem;
   overflow: auto;
-}
-.kds__grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 19rem), 1fr));
-  gap: 0.75rem;
-  align-items: start;
 }
 </style>

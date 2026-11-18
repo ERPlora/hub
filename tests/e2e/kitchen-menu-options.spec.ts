@@ -78,7 +78,7 @@ const dishOn = (page: Page, name: string) => shown(page).locator('[data-testid^=
 /** How `word` of a dish's name is drawn: on how many lines (a name parts between words, never inside one), how wide
  *  it is and how wide the name's box is — what ui-clip-sweep.sh calls SPLIT-WORD, measured on the card. */
 async function drawnWord(dish: Locator, word: string): Promise<{ lines: number; word: number; box: number }> {
-  return dish.locator('.kds-line__name').evaluate((name, w) => {
+  return dish.locator('.ep-order-ticket__name').evaluate((name, w) => {
     const box = Math.round(name.getBoundingClientRect().width);
     const walker = document.createTreeWalker(name, NodeFilter.SHOW_TEXT);
     for (let node = walker.nextNode(); node; node = walker.nextNode()) {
@@ -228,7 +228,7 @@ test('KITCHEN-F06 y KITCHEN-F07: the round sent from the till reaches the displa
     await page.setViewportSize({ width: size.width, height: size.height });
     await card.scrollIntoViewIfNeeded();
     for (const dish of [burgerDish, dishOn(page, lentils.name), dishOn(page, hake.name)]) {
-      const name = (await dish.locator('.kds-line__name').textContent())?.trim();
+      const name = (await dish.locator('.ep-order-ticket__name').textContent())?.trim();
       const drawn = await drawnWord(dish, WIDE);
       expect(drawn.lines, `${size.label}: «${WIDE}» of «${name}» is ${drawn.word}px, its name ${drawn.box}px`).toBe(1);
     }
@@ -236,8 +236,8 @@ test('KITCHEN-F06 y KITCHEN-F07: the round sent from the till reaches the displa
     // inside the dish.
     for (const dish of [burgerDish, dishOn(page, lentils.name), dishOn(page, hake.name)]) {
       const off = await dish.evaluate((line) => {
-        const icon = line.querySelector('.kds-line__state')!.getBoundingClientRect();
-        const name = line.querySelector('.kds-line__name')!.getBoundingClientRect();
+        const icon = line.querySelector('.ep-order-ticket__state')!.getBoundingClientRect();
+        const name = line.querySelector('.ep-order-ticket__name')!.getBoundingClientRect();
         const row = line.getBoundingClientRect();
         return { top: Math.abs(icon.top - name.top), gap: icon.left - name.right, inside: icon.right <= row.right + 1 };
       });

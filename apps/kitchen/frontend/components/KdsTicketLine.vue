@@ -34,7 +34,7 @@ function tap(): void {
 
 <template>
   <ion-item
-    :class="['kds-line', { 'kds-line--menu': inMenu }]"
+    :class="['ep-order-ticket__dish', { 'ep-order-ticket__dish--menu': inMenu }]"
     :button="tappable"
     :detail="false"
     lines="full"
@@ -47,38 +47,38 @@ function tap(): void {
   >
     <ion-text
       slot="start"
-      class="kds-line__qty"
+      class="ep-order-ticket__qty"
     >
       {{ formatQuantity(line.quantity, locale) }}×
     </ion-text>
-    <ion-label class="kds-line__body">
-      <span class="kds-line__name">{{ line.name }}</span>
+    <ion-label class="ep-order-ticket__dish-body">
+      <span class="ep-order-ticket__name">{{ line.name }}</span>
       <span
         v-if="line.modifiers.length"
-        class="kds-line__mods"
+        class="ep-order-ticket__modifiers"
         :data-testid="`kitchen-line-${line.id}-modifiers`"
       >{{ line.modifiers.join(', ') }}</span>
       <span
         v-if="line.notes"
-        class="kds-line__note"
+        class="ep-order-ticket__dish-note"
       >{{ line.notes }}</span>
       <span
         v-if="line.status === 'voided'"
-        class="kds-line__void"
+        class="ep-order-ticket__void"
       >
         <strong>{{ t('kitchen.card.voided') }}</strong>
         <em v-if="line.void_reason">{{ line.void_reason }}</em>
       </span>
       <span
         v-if="showStation || line.destination === 'printer'"
-        class="kds-line__meta"
+        class="ep-order-ticket__meta"
       >
         <span
           v-if="showStation"
           :data-testid="`kitchen-line-${line.id}-station`"
         ><i
           v-if="line.station_color"
-          class="kds-line__dot"
+          class="ep-station-dot"
           :style="{ background: line.station_color }"
         />{{ line.station_name || t('kitchen.display.stationNone') }}</span>
         <span
@@ -89,7 +89,7 @@ function tap(): void {
     </ion-label>
     <HubIcon
       slot="end"
-      class="kds-line__state"
+      class="ep-order-ticket__state"
       :name="ITEM_STATUS_ICONS[line.status]"
       :label="t(`kitchen.itemStatus.${line.status}`)"
       :data-testid="`kitchen-line-${line.id}-state`"
@@ -97,128 +97,3 @@ function tap(): void {
   </ion-item>
 </template>
 
-<style scoped>
-.kds-line {
-  --background: transparent;
-  --color: var(--ion-text-color);
-  --border-color: var(--ion-border-color);
-  --padding-start: 0.75rem;
-  --inner-padding-end: 0.75rem;
-  --padding-top: 0.6rem;
-  --padding-bottom: 0.6rem;
-  --min-height: 64px;
-  align-items: flex-start;
-  user-select: none;
-}
-.kds-line.ion-focused::part(native) {
-  outline: 3px solid var(--ion-color-primary);
-  outline-offset: -3px;
-}
-/* The dishes of a menu hang from its header along a rule inside the row: each keeps the full width for its name. */
-.kds-line--menu {
-  --padding-start: 0.5rem;
-  margin-inline-start: 0.5rem;
-  border-inline-start: 3px solid var(--ep-primary-text);
-}
-.kds-line__qty {
-  flex: none;
-  min-width: 2.6ch;
-  margin: 0.1rem 0.75rem 0 0;
-  text-align: right;
-  font-size: 1.75rem;
-  line-height: 1;
-  font-weight: 800;
-  font-variant-numeric: tabular-nums;
-}
-.kds-line__body {
-  margin: 0;
-  min-width: 0;
-  white-space: normal;
-}
-.kds-line__name {
-  display: block;
-  font-size: 1.3rem;
-  line-height: 1.2;
-  font-weight: 700;
-  overflow-wrap: break-word;
-}
-.kds-line__mods {
-  display: block;
-  margin-top: 0.25rem;
-  font-size: 1.05rem;
-  line-height: 1.25;
-  font-weight: 800;
-  overflow-wrap: anywhere;
-}
-.kds-line__note {
-  display: block;
-  margin-top: 0.2rem;
-  color: var(--ep-text-muted);
-  font-size: 1rem;
-  line-height: 1.3;
-  font-style: italic;
-  overflow-wrap: anywhere;
-}
-.kds-line__void {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.2rem 0.5rem;
-  margin-top: 0.3rem;
-  color: var(--ep-danger-text);
-  font-size: 1rem;
-}
-.kds-line__void strong {
-  font-weight: 800;
-}
-.kds-line__void em {
-  overflow-wrap: anywhere;
-}
-.kds-line__meta {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.3rem 0.75rem;
-  margin-top: 0.35rem;
-  color: var(--ep-text-muted);
-  font-size: 0.9rem;
-  font-weight: 600;
-}
-.kds-line__meta > span {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.3rem;
-}
-.kds-line__dot {
-  flex: none;
-  width: 0.65rem;
-  height: 0.65rem;
-  border-radius: 50%;
-}
-.kds-line__state {
-  flex: none;
-  margin: 0.1rem 0 0 0.5rem;
-  font-size: 1.6rem;
-  color: var(--ep-text-muted);
-}
-.kds-line[data-status='ready'] .kds-line__name,
-.kds-line[data-status='served'] .kds-line__name,
-.kds-line[data-status='voided'] .kds-line__name,
-.kds-line[data-status='cancelled'] .kds-line__name {
-  text-decoration: line-through;
-  color: var(--ep-text-muted);
-}
-.kds-line[data-status='ready'] .kds-line__qty,
-.kds-line[data-status='served'] .kds-line__qty,
-.kds-line[data-status='voided'] .kds-line__qty,
-.kds-line[data-status='cancelled'] .kds-line__qty {
-  color: var(--ep-text-muted);
-}
-.kds-line[data-status='ready'] .kds-line__state,
-.kds-line[data-status='served'] .kds-line__state {
-  color: var(--ep-success-text);
-}
-.kds-line[data-status='voided'] .kds-line__state,
-.kds-line[data-status='cancelled'] .kds-line__state {
-  color: var(--ep-danger-text);
-}
-</style>

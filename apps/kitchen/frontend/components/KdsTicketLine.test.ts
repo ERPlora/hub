@@ -19,10 +19,10 @@ describe('KdsTicketLine', () => {
   it('is an Ionic item with the quantity as «2×», the name, its options and its note', async () => {
     const s = await setup(item('i1', { quantity: '2.000', name: 'Burger', modifiers: ['+CHEESE', 'Rare'], notes: 'Allergic to nuts' }));
     expect(s.row().element.tagName.toLowerCase()).toBe('ion-item');
-    expect(s.row().find('.kds-line__qty').text()).toBe('2×');
-    expect(s.row().find('.kds-line__name').text()).toBe('Burger');
+    expect(s.row().find('.ep-order-ticket__qty').text()).toBe('2×');
+    expect(s.row().find('.ep-order-ticket__name').text()).toBe('Burger');
     expect(s.find('kitchen-line-i1-modifiers').text()).toBe('+CHEESE, Rare');
-    expect(s.row().find('.kds-line__note').text()).toBe('Allergic to nuts');
+    expect(s.row().find('.ep-order-ticket__dish-note').text()).toBe('Allergic to nuts');
     const text = said(s.row().element);
     expect(text.indexOf('+CHEESE')).toBeLessThan(text.indexOf('Allergic to nuts'));
   });
@@ -65,15 +65,15 @@ describe('KdsTicketLine', () => {
 
   it('a voided dish says «Voided» and why', async () => {
     const s = await setup(item('i1', { status: 'voided', void_reason: 'Cold' }), { tappable: false });
-    expect(s.row().find('.kds-line__void').text()).toContain('Voided');
-    expect(s.row().find('.kds-line__void').text()).toContain('Cold');
+    expect(s.row().find('.ep-order-ticket__void').text()).toContain('Voided');
+    expect(s.row().find('.ep-order-ticket__void').text()).toContain('Cold');
   });
 
   it('shows the station with its colour in «All», and an icon for a paper-only station', async () => {
     const line = item('i1', { station_id: 's1', station_name: 'Bar', station_color: '#228BE6', destination: 'printer' });
     const s = await setup(line, { showStation: true });
     expect(s.find('kitchen-line-i1-station').text()).toBe('Bar');
-    expect(s.row().find('.kds-line__dot').attributes('style')).toContain('background');
+    expect(s.row().find('.ep-station-dot').attributes('style')).toContain('background');
     expect(s.find('kitchen-line-i1-paper').text()).toBe('Paper only');
     const bare = await setup(item('i2', { station_name: '' }), { showStation: true });
     expect(bare.find('kitchen-line-i2-station').text()).toBe('No station');
@@ -83,7 +83,7 @@ describe('KdsTicketLine', () => {
 
   it('hangs from its menu when it is one of its dishes', async () => {
     const s = await setup(item('i1', { menu_line_id: 'm1', menu_name: 'MENU' }), { inMenu: true });
-    expect(s.row().classes()).toContain('kds-line--menu');
+    expect(s.row().classes()).toContain('ep-order-ticket__dish--menu');
     expect(s.row().attributes('data-menu')).toBe('m1');
     const plain = await setup(item('i2'));
     expect(plain.row().attributes('data-menu')).toBeUndefined();

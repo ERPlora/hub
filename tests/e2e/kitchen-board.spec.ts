@@ -161,7 +161,7 @@ test('KITCHEN-F10, F11, F12, F13, F16: a new round rings once and comes in; a di
     await expect.poll(() => rings(page), { message: 'one ring for the new round' }).toBe(1);
     await expect(card(page, ticketId).locator(`[data-testid=kitchen-card-${ticketId}-label]`)).toHaveText(`${CHECK} 1`);
     await expect(dish(page, steakLine).locator('[data-testid$=-station]')).toHaveText(STATION);
-    const dot = await dish(page, steakLine).locator('.kds-line__dot').boundingBox();
+    const dot = await dish(page, steakLine).locator('.ep-station-dot').boundingBox();
     expect(dot?.width ?? 0, 'the station colour beside the dish').toBeGreaterThan(6);
     await capture(page, 'KITCHEN-F10', async () => {
       await card(page, ticketId).scrollIntoViewIfNeeded();
@@ -328,7 +328,7 @@ test('KITCHEN-F14, F15, F29, F10: rush jumps to the front and rings, «All day»
     await expect(dish(page, saladLine)).toHaveAttribute('aria-disabled', 'true');
     await dish(page, saladLine).click({ force: true });
     await expect(dish(page, saladLine)).toHaveAttribute('data-status', 'voided');
-    const struck = await dish(page, saladLine).locator('.kds-line__name').evaluate((name) => getComputedStyle(name).textDecorationLine);
+    const struck = await dish(page, saladLine).locator('.ep-order-ticket__name').evaluate((name) => getComputedStyle(name).textDecorationLine);
     expect(struck, 'the voided dish is struck').toContain('line-through');
     await capture(page, 'KITCHEN-F29', async () => {
       await card(page, olderId).scrollIntoViewIfNeeded();

@@ -19,7 +19,7 @@ const locale = useLocale();
 <template>
   <p
     v-if="rows === undefined"
-    class="kds-allday__loading"
+    class="ep-text-muted"
     role="status"
     data-testid="kitchen-display-allday-loading"
   >
@@ -27,7 +27,7 @@ const locale = useLocale();
   </p>
   <table
     v-else-if="rows.length"
-    class="kds-allday"
+    class="ep-order-board-totals"
     data-testid="kitchen-display-allday"
   >
     <thead>
@@ -36,7 +36,7 @@ const locale = useLocale();
         <th v-if="showStation">
           {{ $t('kitchen.display.colStation') }}
         </th>
-        <th class="kds-allday__num">
+        <th class="ep-order-board-totals__num">
           {{ $t('kitchen.display.colLeft') }}
         </th>
       </tr>
@@ -50,7 +50,7 @@ const locale = useLocale();
         <td v-if="showStation">
           {{ dish.station_name || $t('kitchen.display.stationNone') }}
         </td>
-        <td class="kds-allday__num">
+        <td class="ep-order-board-totals__num">
           {{ formatQuantity(dish.quantity, locale) }}
         </td>
       </tr>
@@ -64,39 +64,3 @@ const locale = useLocale();
   />
 </template>
 
-<style scoped>
-.kds-allday__loading {
-  color: var(--ep-text-muted);
-}
-.kds-allday {
-  width: 100%;
-  border-collapse: separate;
-  border-spacing: 0;
-  overflow: hidden;
-  border: 1px solid var(--ion-border-color);
-  border-radius: var(--ep-radius-lg);
-  background: var(--ion-card-background, var(--ion-background-color));
-  font-size: 1.2rem;
-}
-.kds-allday th,
-.kds-allday td {
-  padding: 0.75rem 1rem;
-  border-bottom: 1px solid var(--ion-border-color);
-  text-align: left;
-}
-.kds-allday tbody tr:last-child td {
-  border-bottom: none;
-}
-.kds-allday th {
-  background: var(--ion-color-step-50);
-  color: var(--ep-text-muted);
-  font-size: 0.8rem;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-.kds-allday .kds-allday__num {
-  text-align: right;
-  font-weight: 800;
-  font-variant-numeric: tabular-nums;
-}
-</style>

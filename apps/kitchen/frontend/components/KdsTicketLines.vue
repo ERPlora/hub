@@ -45,7 +45,6 @@ function bumpMenu(group: DishGroup): void {
 
 <template>
   <ion-list
-    class="kds-lines"
     lines="none"
   >
     <template
@@ -54,7 +53,7 @@ function bumpMenu(group: DishGroup): void {
     >
       <ion-item
         v-if="group.menu"
-        class="kds-menu"
+        class="ep-order-ticket__menu"
         :button="menuTappable(group)"
         :detail="false"
         lines="full"
@@ -65,12 +64,12 @@ function bumpMenu(group: DishGroup): void {
       >
         <HubIcon
           slot="start"
-          class="kds-menu__icon"
+          class="ep-order-ticket__menu-icon"
           name="ion:list-outline"
         />
-        <ion-label class="kds-menu__label">
-          <span class="kds-menu__name">{{ group.menu.name }}</span>
-          <span class="kds-menu__count">{{ $t('kitchen.card.menuDishes', group.items.length) }}</span>
+        <ion-label class="ep-order-ticket__menu-label">
+          <span class="ep-order-ticket__menu-name">{{ group.menu.name }}</span>
+          <span class="ep-order-ticket__menu-count">{{ $t('kitchen.card.menuDishes', group.items.length) }}</span>
         </ion-label>
       </ion-item>
       <KdsTicketLine
@@ -86,46 +85,3 @@ function bumpMenu(group: DishGroup): void {
   </ion-list>
 </template>
 
-<style scoped>
-.kds-lines {
-  padding: 0;
-  background: transparent;
-}
-.kds-menu {
-  --background: color-mix(in srgb, var(--ep-primary-tint) 55%, transparent);
-  --color: var(--ion-text-color);
-  --border-color: var(--ion-border-color);
-  --padding-start: 0.75rem;
-  --inner-padding-end: 0.75rem;
-  --min-height: 52px;
-  user-select: none;
-}
-.kds-menu.ion-focused::part(native) {
-  outline: 3px solid var(--ion-color-primary);
-  outline-offset: -3px;
-}
-.kds-menu__icon {
-  margin-inline-end: 0.6rem;
-  color: var(--ep-primary-text);
-  font-size: 1.3rem;
-}
-.kds-menu__label {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 0.25rem 0.75rem;
-  margin: 0;
-  white-space: normal;
-}
-.kds-menu__name {
-  font-size: 1.05rem;
-  font-weight: 800;
-  overflow-wrap: anywhere;
-}
-.kds-menu__count {
-  color: var(--ep-text-muted);
-  font-size: 0.95rem;
-  font-weight: 600;
-}
-</style>

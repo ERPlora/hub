@@ -13,7 +13,7 @@ describe('KdsBoardSkeleton', () => {
     expect(root.text()).toBe('Loading the display…');
     const cards = root.findAll('ion-card');
     expect(cards.length).toBeGreaterThanOrEqual(3);
-    expect(root.find('.kds-skeleton__grid').attributes('aria-hidden')).toBe('true');
+    expect(root.find('.ep-order-board').attributes('aria-hidden')).toBe('true');
     for (const card of cards) expect(card.findAll('ion-skeleton-text').length).toBeGreaterThanOrEqual(4);
     expect((root.find('ion-skeleton-text').element as HTMLElement & { animated?: boolean }).animated).toBe(true);
   });

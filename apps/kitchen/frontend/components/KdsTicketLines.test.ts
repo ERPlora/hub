@@ -23,8 +23,8 @@ describe('KdsTicketLines', () => {
     expect(head.element.tagName.toLowerCase()).toBe('ion-item');
     expect(head.element.innerHTML).toContain('MENU');
     expect(head.element.innerHTML).toContain('2 dishes');
-    expect(s.find('kitchen-line-i2').classes()).toContain('kds-line--menu');
-    expect(s.find('kitchen-line-i3').classes()).not.toContain('kds-line--menu');
+    expect(s.find('kitchen-line-i2').classes()).toContain('ep-order-ticket__dish--menu');
+    expect(s.find('kitchen-line-i3').classes()).not.toContain('ep-order-ticket__dish--menu');
   });
 
   it('a tap on a dish to do marks it, on a done one recalls it; struck and served dishes do not answer', async () => {
