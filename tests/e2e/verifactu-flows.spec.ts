@@ -20,6 +20,7 @@
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
 import { A, api, login, psql, shot, shown } from './helpers';
+import { rowAction } from './service-helpers';
 import { cleanInvoices, ensureIssuer, FLOW_VIEWPORTS, issuedIds, snapshotSeries } from './invoice-helpers';
 import { stamp } from './sale-helpers';
 import { toastSaying } from './toast-helpers';
@@ -219,7 +220,7 @@ test('VERIFACTU-F20, F21, F22: the queue lists what is not in the AEAT; «Proces
     await seen(shown(p).locator('[data-testid=verifactu-queue-result]'));
   });
 
-  await queue.locator(`[data-testid=verifactu-queue-row-${record.id}-retry]`).first().click();
+  await rowAction(page, 'verifactu-queue', record.id, 'retry');
   await expect(toastSaying(page, `${record.invoice_number} goes out with the next pass.`)).toBeVisible();
   await flowShots(page, 'F22', async (p) => {
     await seen(shown(p).locator('[data-testid=verifactu-queue-row]').filter({ hasText: record.invoice_number }).first());

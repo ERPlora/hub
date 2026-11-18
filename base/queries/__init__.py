@@ -6,6 +6,7 @@ from . import blueprints as blueprints
 from . import (
     access as access,
     api_keys as api_keys,
+    app_help as app_help,
     approvals as approvals,
     apps as apps,
     assistant as assistant,

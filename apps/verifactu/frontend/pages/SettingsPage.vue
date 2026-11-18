@@ -64,8 +64,8 @@ const identity = computed(() => {
     { label: t('verifactu.settings.producerNif'), element: 'NIF', value: p.nif },
     { label: t('verifactu.settings.systemName'), element: 'NombreSistemaInformatico', value: p.system_name },
     { label: t('verifactu.settings.systemId'), element: 'IdSistemaInformatico', value: p.system_id },
-    { label: t('verifactu.settings.version'), element: 'Version', value: p.version },
-    { label: t('verifactu.settings.installation'), element: 'NumeroInstalacion', value: p.installation },
+    { label: t('verifactu.settings.version'), element: 'Version', value: p.version, hash: true },
+    { label: t('verifactu.settings.installation'), element: 'NumeroInstalacion', value: p.installation, hash: true },
     { label: t('verifactu.settings.onlyVerifactu'), element: 'TipoUsoPosibleSoloVerifactu', value: p.only_verifactu },
     { label: t('verifactu.settings.multiOt'), element: 'TipoUsoPosibleMultiOT', value: p.multi_ot },
     { label: t('verifactu.settings.multipleOt'), element: 'IndicadorMultiplesOT', value: p.multiple_ot },
@@ -201,12 +201,6 @@ const yesNo = (value: boolean | null) => (value === null ? t('verifactu.settings
             data-testid="verifactu-settings-certificate-required"
           >
             {{ $t('verifactu.settings.certificateRequired') }}
-            <router-link
-              class="verifactu-settings__certificate-link"
-              to="/verifactu/config"
-            >
-              {{ $t('verifactu.settings.uploadCertificate') }}
-            </router-link>
           </InlineFeedback>
           <InlineFeedback
             v-if="visibleLiveBlockers.length && !outsideSpain"
@@ -378,7 +372,9 @@ const yesNo = (value: boolean | null) => (value === null ? t('verifactu.settings
             :key="row.element"
           >
             <dt>{{ row.label }} <code>{{ row.element }}</code></dt>
-            <dd>{{ row.value }}</dd>
+            <dd :class="{ 'verifactu-settings__hash': row.hash }">
+              {{ row.value }}
+            </dd>
           </template>
         </dl>
       </section>
@@ -405,12 +401,6 @@ const yesNo = (value: boolean | null) => (value === null ? t('verifactu.settings
   color: var(--ion-color-medium, #8a8577);
   font-size: 0.875rem;
 }
-.verifactu-settings__certificate-link {
-  display: inline-flex;
-  align-items: center;
-  min-height: 2.75rem;
-  margin-inline-start: 0.5rem;
-}
 .verifactu-settings__environment {
   display: flex;
   align-items: center;
@@ -424,7 +414,7 @@ const yesNo = (value: boolean | null) => (value === null ? t('verifactu.settings
 }
 .verifactu-settings__fields {
   display: grid;
-  grid-template-columns: minmax(10rem, max-content) 1fr;
+  grid-template-columns: fit-content(50%) 1fr;
   gap: 0.25rem 1rem;
   margin: 0.75rem 0;
 }
@@ -436,6 +426,11 @@ const yesNo = (value: boolean | null) => (value === null ? t('verifactu.settings
 }
 .verifactu-settings__fields code {
   font-size: 0.75rem;
+}
+.verifactu-settings__hash {
+  font-family: ui-monospace, monospace;
+  font-size: 0.8rem;
+  word-break: break-all;
 }
 .verifactu-settings__reasons {
   margin: 0.25rem 0 0;

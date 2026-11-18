@@ -6,6 +6,7 @@
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
 import { A, api, capture, login, psql, shown } from './helpers';
+import { rowAction } from './service-helpers';
 import { dialog } from './inventory-helpers';
 import { stamp } from './sale-helpers';
 import { expectMarked, expectUnmarked, refuseWithTheSameWords, testEachSameWordsCase } from './same-words-helpers';
@@ -108,7 +109,7 @@ async function floatRequired(page: Page, language: Language, label: string): Pro
 
 async function movementOneByOne(page: Page, language: Language, label: string): Promise<void> {
   const words = SAME_WORDS[language];
-  await shown(page).locator(`[data-testid=cash-register-sessions-row-${session}-movement]`).first().click();
+  await rowAction(page, 'cash-register-sessions', session, 'movement');
   const modal = dialog(page, 'cash-register-movement');
   const [type, amount, concept] = ['type', 'amount', 'concept'].map((key) => modal.locator(`[data-testid=cash-register-movement-${key}]`));
   await amount.locator('input').fill('20');

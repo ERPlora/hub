@@ -7,6 +7,7 @@
 import { expect, test } from '@playwright/test';
 
 import { A, api, login, shown } from './helpers';
+import { loadsMore, scrollToEnd } from './infinite-scroll-helpers';
 import { rowAction } from './service-helpers';
 import {
   cleanUp,
@@ -107,7 +108,7 @@ test('TAX-F03: a component is read right under its root; Status reaches the deac
 });
 
 // flow: TAX-F03
-test('TAX-F03: on a phone «Load more» brings the rest and the footer counts every rule on screen', async ({ page, context }) => {
+test('TAX-F03: on a phone the end of the cards brings the rest and the footer counts every rule on screen', async ({ page, context }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await login(page, A, '/tax/rules');
   const key = await freshCategory(context, 'f03_more');
@@ -124,12 +125,12 @@ test('TAX-F03: on a phone «Load more» brings the rest and the footer counts ev
   // The search has landed (it is debounced): the first page of the 51.
   await expect(footer).toContainText(/1\s*[–-]\s*50 of 51 rules/);
   await expect(rows(page, 'rules')).toHaveCount(50);
-  await shown(page).locator('[data-testid=tax-rules-load-more]').click();
+  await scrollToEnd(page);
   await expect(rows(page, 'rules')).toHaveCount(51);
   await expect(footer).toContainText('51 rules');
   // Never «Showing 51–51» over 51 rules on screen.
   await expect(footer).not.toContainText(/51\s*[–-]\s*51/);
-  await expect(shown(page).locator('[data-testid=tax-rules-load-more]')).toHaveCount(0);
+  expect(await loadsMore(page), 'every rule is shown').toBe(false);
 });
 
 // flow: TAX-F04

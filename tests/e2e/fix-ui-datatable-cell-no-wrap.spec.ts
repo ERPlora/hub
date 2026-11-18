@@ -44,7 +44,7 @@ test('ui-datatable-cell-no-wrap: a «Not configured» product that is sold out s
     if (process.env.E2E_SAVE_STORAGE_STATE) await context.storageState({ path: process.env.E2E_SAVE_STORAGE_STATE });
     const chip = shown(page).locator(`[data-testid=inventory-products-unconfigured-${product.id}]`);
     const badge = `[data-testid=inventory-products-sold-out-${product.id}]`;
-    const within = '[role=cell], .data-table__field-value';
+    const within = '[role=cell], .data-table__card-status';
     for (const vp of WIDTHS) {
       await page.setViewportSize({ width: vp.width, height: vp.height });
       await expect(chip).toBeVisible();

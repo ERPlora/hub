@@ -16,7 +16,7 @@
 import { expect, type Page, test } from '@playwright/test';
 
 import { A, login, psql, shot, shown } from './helpers';
-import { FLOW_VIEWPORTS, noHorizontalScroll, rowAction, settled } from './service-helpers';
+import { FLOW_VIEWPORTS, noHorizontalScroll, offersRowAction, rowAction, settled } from './service-helpers';
 import {
   cleanUp,
   e2ePhone,
@@ -92,7 +92,7 @@ test('WHATSAPP_INBOX-F27, F28: the templates erplora.com brings from Meta show w
   await expect(rowOf(page, manager)).toContainText('Hola {{nombre}}, te damos la bienvenida al salón.');
   await expect(rowOf(page, manager)).toContainText(unfillable);
   await expect(rowOf(page, approved)).not.toContainText(unfillable);
-  await expect(page.locator(`[data-testid=${TABLE}-row-${idOf(manager)}-edit]`)).toHaveCount(0);
+  expect(await offersRowAction(page, TABLE, idOf(manager), 'edit')).toBe(false);
   await rowOf(page, manager).click();
   await expect(page.locator('ion-modal[data-testid=whatsapp-inbox-template-editor]')).toBeHidden();
   await shots(page, 'F28', async (p) => {

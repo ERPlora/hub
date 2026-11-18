@@ -436,6 +436,7 @@ En la pantalla Archivos:
 | BASE-F112 | Guardar un archivo descargado dentro de la app | hecho |
 | BASE-F113 | Seguir avisando con la pantalla apagada (app de Android) | hecho |
 | BASE-F114 | Devolver un negocio a un momento pasado desde el admin de Hubs | hecho |
+| BASE-F115 | Ver la ayuda de la pantalla de un módulo | parcial |
 
 ### BASE-F01 Ver lo que le falta por configurar al negocio
 Estado: hecho
@@ -3222,6 +3223,31 @@ hub#1285, hub#1306, hub#1307, hub#1319, hub#1320, hub#1321, hub#1322, hub#1323, 
 hub#1355, hub#1356, hub#1364, hub#1365, hub#1373, hub#1375, hub#1429, hub#1431, hub#1438, hub#1442, hub#1456, hub#1457,
 hub#1458, hub#1459, hub#1473, hub#1474, hub#1495, hub#1505, aws#77
 
+### BASE-F115 Ver la ayuda de la pantalla de un módulo
+Estado: parcial — el Hub ya da la ayuda de cada módulo que la tiene lista, en el idioma de la persona; falta la ventana
+con su botón «?»
+Actor: propietario, administrador, responsable, empleado
+Pantalla: la barra de arriba de un módulo con la ayuda lista (botón «?», «Ayuda») y la ventana de ayuda
+Pasos:
+  1. En un módulo con la ayuda lista, arriba a la derecha, junto al asistente, está el botón «?» («Ayuda»). Un módulo
+     cuya ayuda aún no está lista no lo enseña.
+  2. Al pulsarlo se abre la ventana de ayuda, centrada en una tableta o un ordenador y desde abajo en un móvil. Nunca
+     se abre sola.
+  3. Arriba, el vídeo del módulo, si tiene uno, en el idioma de la persona o, si no lo hay, en español. No se pide
+     nada a YouTube hasta que se pulsa, y se ve dentro de la ventana.
+  4. Debajo, «Para qué sirve»; «En esta pantalla», con un resumen corto de lo que enseña la pestaña en la que se está,
+     abierto y marcado «Estás aquí»; «Cómo se hace», con cada tarea terminada que se hace en ese módulo, plegada, con
+     sus pasos y lo que pasa si falla; y «Otras pantallas del módulo», plegadas, cada una con su resumen corto.
+  5. «Pregúntale al asistente» cierra la ayuda y abre el asistente con la pregunta escrita, sin enviarla: sobre la
+     última tarea que se abrió o, si no se abrió ninguna, sobre el módulo y la pantalla. «Cerrar» cierra la ayuda.
+Entra: el módulo y la pestaña en la que se está.
+Sale: nada: la ayuda solo se lee. Es la parte del manual de uso del módulo que lee el cliente, en el idioma de la
+persona.
+Si falla: mientras se lee, la ventana enseña su esqueleto; si no se puede leer, lo dice y deja volver a intentarlo.
+Sin conexión, el vídeo dice que no se puede ver y el texto se sigue leyendo. Si el manual no está traducido al idioma
+de la persona, o su traducción se quedó atrás, la ayuda sale en español.
+Implicados: BASE-F92, BASE-F93
+
 ## Para quien lo mantiene
 
 - **Dominio propio de un negocio** (BASE-F110, HUBS-F17, PLAN-SAAS §37 punto 2; `base/custom_domains.py`,
@@ -3948,6 +3974,34 @@ hub#1458, hub#1459, hub#1473, hub#1474, hub#1495, hub#1505, aws#77
   5xx, tiempo agotado, una respuesta que no es audio), 503 `base.assistant_speech_failed`; los dos dejan su línea en el
   log. El panel lo reproduce desde un `blob:` (CSP `media-src 'self' blob:` y el origen del SaaS) y, si falla, lee con
   la voz del dispositivo (`hubAssistant(doc).speak` = `speakAloud`, `base/frontend/lib/assistant-hub.ts`).
+- **La ayuda de un módulo** (BASE-F115): `base.help.get` (query, `base.view_home`, `database=False`, `ai=AI(…)`, en
+  `base/queries/app_help.py`; su ruta, `GET /api/help`, en `base/api_help.py`, que monta `config/api.py`) lee la parte
+  del cliente del WORKBOOK del módulo con `base/workbook_help.py`, sin tocar la base de datos. Un módulo tiene la ayuda
+  lista cuando declara `help = Help(…)` (`live.meta.Help`, con un vídeo de YouTube opcional por idioma, que valida
+  `live.E023`), y el JSON `hub-home` de `base/spa.py` nombra esos módulos en `help_apps`. El idioma es `ctx.language`:
+  el original, `SOURCE_LANGUAGE` (`es`), se lee de `WORKBOOK.md`, y cualquier otro de `WORKBOOK.<idioma>.md` solo si su
+  primera línea es `catalog.en_header` del hash de la parte española; si no, el de su idioma base (`en` para `en-gb`),
+  y si tampoco, el español; `language` dice cuál salió. El vídeo, igual. Lo leído se guarda en memoria por módulo e
+  idioma (`_READ`): los WORKBOOK solo cambian con una imagen nueva; con `DEBUG` se relee en cada llamada. Cada `###` bajo el encabezado de las pantallas es
+  la pestaña del menú que tiene esa etiqueta en el idioma del fichero, más la de ajustes (`/<módulo>/settings`) si el
+  menú no la trae. De cada pestaña se publica solo su resumen: lo que va entre su `###` y su primer `####` (o el final
+  de la sección, si no tiene ninguno). Desde el primer `####` es detalle para quien mantiene el módulo: se queda en el
+  fichero y nunca se publica; cada `####` es una ventana de esa pestaña y su título sirve de lugar para la `Pantalla:`
+  de un flujo. De los flujos se publican los que están hechos (lo que
+  sigue en `Estado:` a una raya, dos puntos o un paréntesis es una nota) y cuya `Pantalla:` (partida por «,» y «;»)
+  nombra una pestaña o una de sus ventanas, sin lo que va entre paréntesis en un lado ni en el otro; y de ellos solo el
+  título sin el id, los pasos y «Si falla:», que empiezan con mayúscula. El encabezado, las claves de un flujo y «hecho» son el
+  vocabulario `pgettext("workbook", …)` del `.po` de `base`, así que el código no nombra más idioma que el original.
+  Un párrafo o un elemento de lista que el fichero parte en varias líneas sale en una sola, salvo tras un salto forzado
+  (dos espacios o una barra al final de la línea), porque la pantalla respeta cada salto de línea y su `parseMarkdown`
+  cierra un elemento en su primera línea. La CSP deja `frame-src 'self' https://www.youtube-nocookie.com` (`live.csp.with_frames`;
+  `'self'` es la vista previa del editor de la web). `tests/test_help_workbooks.py` vigila cada módulo con la ayuda
+  lista en cada idioma: cada entrada del menú con su `###`, una sola vez, y cada `###` una pestaña; cada pestaña, con
+  un resumen que no está vacío y no pasa de 900 caracteres (dos o tres frases y, si la pantalla la tiene, una lista
+  corta como la leyenda de colores); lo publicado (y solo eso: el detalle bajo un `####` no se vigila), sin
+  código, sin referencias a issues, sin tamaños en px, sin ids de flujo ni nombres de operación o de evento; cada flujo
+  publicado, con sus pasos; ningún flujo que se lea como hecho en una pestaña, fuera; y cada traducción, con las mismas
+  pestañas y flujos que el original.
 - **La documentación de ERPlora** (saas ASSISTANT-F28): `base.docs.search` (query, `base.view_home`, `database=False`, `ai=AI(…)`; herramienta
   `base__docs__search`, en `ALWAYS` porque una pregunta de «cómo se hace» no comparte palabras con ella) pregunta al
   único índice de erplora.com (`assistant.DocChunk`: la ayuda pública, la documentación de cada app, los WORKBOOK del

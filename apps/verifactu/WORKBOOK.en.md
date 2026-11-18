@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:b7d032ba25d0614826d2d707abf180cf4790aa984c6462fd7255eb914c13e847 -->
+<!-- generated from WORKBOOK.md sha256:d1612aa67b73df92eec3bb5a36f5eb599a6643371a6580cc77ac5b82d09d7f89 -->
 
 ## What it is for and who it is for
 
@@ -219,7 +219,8 @@ Menu **VeriFactu → Settings**. Title "VeriFactu settings". Three blocks:
 When ERPlora's route is unavailable, "Sending" shows the certificate status and "Upload your certificate" or
 "Manage certificate", without the route's sentence or any reference to the authorisation. If it is needed for
 production, an information notice beside "Go live" says "You can keep testing. To go live, upload your business
-certificate." and links to "Upload your certificate"; the other blockers stay in their list and the button is
+certificate.", with no link of its own: the action is the one beside the certificate status, a single one in the
+card; the other blockers stay in their list and the button is
 disabled while any remain. Notices and diagnostics do not bring back the authorisation or the old route's name, and
 "Test the connection" is secondary in testing.
 In a business outside Spain, on top shows "VeriFactu is only for businesses in Spain." as the only reason, and "Go
@@ -327,7 +328,9 @@ If it fails: the certificate is not kept (409):
   key." (`verifactu.certificate_storage_unavailable`);
 - with no issuer, "Set up the issuer first in Invoicing → Issuer." (`verifactu.issuer_missing`);
 - a wrong password or a file that is not a `.p12`, "The file is not a .p12/.pfx certificate that this password
-  opens."; without client-authentication use, "The certificate does not allow client authentication, so it cannot
+  opens."; self-signed, "No authority issued this certificate (it is self-signed), so the AEAT will not accept it.
+  Use your business's electronic certificate issued by a recognised authority, for example the FNMT."; without
+  client-authentication use, "The certificate does not allow client authentication, so it cannot
   connect to the AEAT."; expired, "The certificate expired on {date}: upload a valid one."
   (all `verifactu.certificate_invalid`);
 - a holder other than Invoicing's issuer, "The certificate belongs to {tax ID}, not to this business's issuer {tax

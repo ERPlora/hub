@@ -6,6 +6,7 @@
 // edit; «Deactivate» (confirmed) and «Terminate» (with its dialog) only for the owner and the admin.
 // «My record» opens one's own record when it is linked. Every change comes back through the stream.
 import { ConfirmDialog, DataTable, EmptyState } from '@erplora/ui/components';
+import { pressRowAction } from '@erplora/ui/testing/data-table';
 import { AppPage } from '@erplora/ui/shell';
 import { describe, expect, it, vi } from 'vitest';
 import type { Component } from 'vue';
@@ -101,7 +102,7 @@ async function setup(options: MountOptions = {}) {
     await flush();
   }
   async function action(id: string, actionId: string) {
-    await m.find(`staff-members-row-${id}-${actionId}`).trigger('click');
+    await pressRowAction(m.wrapper, id, actionId);
     await settle();
   }
   return { ...m, table, prop, rows, cells, list, show, showOnNewStream, filter, applyInPanel, action };

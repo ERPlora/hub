@@ -5,6 +5,7 @@
 import { expect, test } from '@playwright/test';
 
 import { A, api, EMPLOYEE, login, psql, shown } from './helpers';
+import { rowAction } from './service-helpers';
 import { dialog, fill } from './inventory-helpers';
 import { shots, stamp } from './sale-helpers';
 
@@ -52,7 +53,7 @@ test('CASH_REGISTER-F02: the owner adds a drawer and deactivates it', async ({ p
   await expect(row).toContainText(/Yes|Sí/);
   const listed = await api<{ rows: { id: string; name: string }[] }>(context, A, 'GET', `/cash_register/registers?search=${encodeURIComponent(RUN)}`);
   const drawer = listed.data.rows.find((r) => r.name === DRAWER)!;
-  await shown(page).locator(`[data-testid=cash-register-registers-row-${drawer.id}-toggle]`).first().click();
+  await rowAction(page, 'cash-register-registers', drawer.id, 'toggle');
   await expect(row).toContainText(/No/);
 });
 

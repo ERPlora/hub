@@ -274,6 +274,7 @@ BASE_SCREENS = {
     "dataset": "settings",
     "device": "settings",
     "docs": "help",
+    "help": "help",
     "event": "system",
     "failed_event": "system",
     "file": "files",

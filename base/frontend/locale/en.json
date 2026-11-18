@@ -190,7 +190,9 @@
       },
       "noResults": "No apps match your search.",
       "toggle": {
-        "on": "Turn on",
+        "labelOn": "{app}: on",
+        "labelOff": "{app}: off",
+        "busy": "Changing…",
         "off": "Turn off",
         "retry": "Retry"
       },
