@@ -1,7 +1,7 @@
 """The help window's route (``base/api_help.py``): ``GET /api/help`` calls ``base.help.get``, mounted on the hub's API."""
 
 import pytest
-from django.apps import apps
+from live.meta import module_configs
 
 from base import api_help
 from base.tenancy.tests.business import HOST, HUB_DB, A, in_business_a
@@ -40,7 +40,8 @@ def test_a_stranger_gets_no_help_and_an_employee_gets_a_module_s_in_their_langua
 @HUB_DB
 @pytest.mark.parametrize("app", ["table", "nope"])
 def test_a_module_without_its_help_ready_answers_404_with_its_code(client, make_user, monkeypatch, app):
-    monkeypatch.setattr(apps.get_app_config("table"), "help", None)
+    for config in module_configs():
+        monkeypatch.setattr(config, "help", None)
     client.force_login(make_user("ana", host=A.key, role="hub_employee"))
     response = client.get(f"/api/help?app={app}", HTTP_HOST=HOST)
     assert (response.status_code, response.json()["error"]["code"]) == (404, "base.help_missing")

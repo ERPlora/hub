@@ -22,7 +22,7 @@ from base.tests.help_workbooks import (
     header_of,
     write_workbooks,
 )
-from base.workbook_help import SOURCE_LANGUAGE, Flow, Screen, parse, workbook, words
+from base.workbook_help import SOURCE_LANGUAGE, Draft, Flow, Screen, parse, workbook, words
 
 
 def spanish():
@@ -45,6 +45,48 @@ class TestWhatItIsFor:
         )
 
 
+FENCE = "`" * 3
+
+
+@pytest.mark.parametrize(
+    ("written", "painted"),
+    [
+        ("Una frase que sigue\nen la línea de abajo\ny en otra.", "Una frase que sigue en la línea de abajo y en otra."),
+        ("Un párrafo.\n\nOtro párrafo.", "Un párrafo.\n\nOtro párrafo."),
+        ("Acaba en dos espacios  \nsigue aparte.", "Acaba en dos espacios\nsigue aparte."),
+        ("Acaba en una barra\\\nsigue aparte.", "Acaba en una barra\nsigue aparte."),
+        ("- Un elemento\n- Otro elemento", "- Un elemento\n- Otro elemento"),
+        ("- Un elemento que sigue\nsin sangría.", "- Un elemento que sigue sin sangría."),
+        ("Antes de la tabla:\n| a | b |\n|---|---|\n| 1 | 2 |", "Antes de la tabla:\n| a | b |\n|---|---|\n| 1 | 2 |"),
+        ("Antes de la cita:\n> una cita\n> que sigue", "Antes de la cita:\n> una cita\n> que sigue"),
+        ("Antes de la ventana\n#### Ventana\nSu texto\nsigue.", "Antes de la ventana\n#### Ventana\nSu texto sigue."),
+        (f"Antes del código:\n{FENCE}\nuna línea\notra\n{FENCE}", f"Antes del código:\n{FENCE}\nuna línea\notra\n{FENCE}"),
+        ("Antes de la raya\n---\ndespués.", "Antes de la raya\n---\ndespués."),
+    ],
+    ids=["wrapped", "paragraphs", "two-spaces", "backslash", "items", "lazy-item", "table", "quote", "heading", "code", "rule"],
+)
+def test_a_paragraph_is_one_line_however_the_file_wraps_it(written, painted):
+    # The window paints a paragraph keeping its line breaks, so a break the file makes to fit its width is a space.
+    assert parse(f"## Para qué sirve\n\n{written}\n", ES_TABS, ES_WORDS).purpose == painted
+
+
+@pytest.mark.parametrize(
+    ("written", "published"),
+    [
+        ("sin nombre, no se activa.", "Sin nombre, no se activa."),
+        ("él no puede.", "Él no puede."),
+        ("1. pulsa «+».", "1. pulsa «+»."),
+        ("`zona` vacía.", "`zona` vacía."),
+        ("«Ya hay una zona».", "«Ya hay una zona»."),
+    ],
+    ids=["lowercase", "accented", "list", "code", "quote"],
+)
+def test_the_steps_and_what_happens_if_it_fails_start_with_a_capital(written, published):
+    flow = f"## Flujos\n\n### TABLE-F01 Crear\nEstado: hecho\nPantalla: Zonas\nPasos: {written}\nSi falla: {written}\n"
+    [read] = parse(flow, ES_TABS, ES_WORDS).flows
+    assert (read.steps, read.failure) == (published, published)
+
+
 class TestScreens:
     def test_each_tab_with_its_section_in_the_order_of_the_menu_its_windows_inside(self):
         assert spanish().screens == (
@@ -57,7 +99,7 @@ class TestScreens:
                 "- libre: pregunta los comensales y la sienta.\n"
                 "  - con reserva: dice a nombre de quién.\n"
                 "\n"
-                "#### Cobrar mesa\n"
+                "#### Cobrar mesa (cuenta)\n"
                 "Pide el importe y cobra.",
             ),
             Screen("zones", "Zonas", "/table/zones", "Una tabla con el nombre y el color de cada zona."),
@@ -73,6 +115,13 @@ class TestScreens:
         assert read.unknown_screens == ("Pantalla retirada",)
         assert "tables" not in [screen.id for screen in read.screens]
 
+    def test_a_tab_written_twice_keeps_its_first_section_and_says_so(self):
+        twice = user_part(ES).replace("### Ajustes\n", "### Zonas\nOtra tabla.\n\n### Ajustes\n", 1)
+        read = parse(twice, ES_TABS, ES_WORDS)
+        assert read.repeated_screens == ("Zonas",)
+        assert read.screens[1].text == "Una tabla con el nombre y el color de cada zona."
+        assert spanish().repeated_screens == ()
+
     def test_without_the_screens_heading_there_are_no_screens(self):
         read = parse(user_part(ES.replace("## Pantallas", "## Otra cosa")), ES_TABS, ES_WORDS)
         assert (read.screens, read.unknown_screens) == ((), ())
@@ -86,7 +135,7 @@ class TestFlows:
             ("zones",),
             "1. En **Mesas → Zonas** pulsa «+» y escribe el nombre, que después sale como pestaña del plano.\n"
             "2. Pulsa «Añadir zona».",
-            "sin nombre, el botón no se activa.",
+            "Sin nombre, el botón no se activa. Un nombre repetido dice «Ya hay una zona con ese nombre.».",
         )
 
     def test_its_screen_names_tabs_without_what_goes_in_parentheses_commas_included(self):
@@ -104,6 +153,30 @@ class TestFlows:
     def test_only_the_flows_that_are_done_on_a_tab_of_the_customer_s_part_are_published(self):
         # F04 is not done, F05 is done on no screen, F06 is below the customer's part.
         assert [flow.id for flow in spanish().flows] == ["TABLE-F01", "TABLE-F02", "TABLE-F03"]
+
+    def test_what_is_not_published_is_kept_aside_with_its_status_and_the_tabs_it_names(self):
+        assert spanish().unpublished == (
+            Draft("TABLE-F04", "no hecho — falta la pantalla", ("zones",)),
+            Draft("TABLE-F05", "hecho", ()),
+        )
+
+    @pytest.mark.parametrize(
+        ("status", "done"),
+        [
+            ("hecho", True),
+            ("hecho — sin preguntar los comensales en el TPV", True),
+            ("hecho: también por la API", True),
+            ("hecho (servidor y pantalla)", True),
+            ("hecho - en la tableta", True),
+            ("no hecho", False),
+            ("no hecho — falta la pantalla", False),
+            ("parcial — sin la ventana", False),
+            ("hecho en Mesas (TABLE-F15): la cuenta no cambia", False),
+        ],
+    )
+    def test_a_flow_is_done_when_its_status_before_any_note_is_the_done_word(self, status, done):
+        flow = f"## Flujos\n\n### TABLE-F01 Crear una zona\nEstado: {status}\nPantalla: Zonas\nPasos:\n1. Pulsa «+».\n"
+        assert bool(parse(flow, ES_TABS, ES_WORDS).flows) is done
 
     def test_nothing_but_its_title_steps_and_failure_leaves_a_flow(self):
         published = repr(spanish().flows)
@@ -131,7 +204,7 @@ def test_every_language_reads_alike_with_its_own_words_and_labels(markdown, tabs
 def test_the_third_language_joins_its_list_lines_and_maps_a_window_to_its_tab():
     read = parse(EO, EO_TABS, EO_WORDS)
     assert read.flows[0].steps == "1. Tuŝu «+» kaj skribu la nomon, kiu poste aperas en la plano."
-    assert read.flows[0].failure == "sen nomo, la butono restas malŝaltita."
+    assert read.flows[0].failure == "Sen nomo, la butono restas malŝaltita."
     assert read.screens[0].title == "Salonplano"
 
 
@@ -155,6 +228,16 @@ class TestWhichFile:
     def test_another_language_reads_its_own_file_while_it_is_current(self, tmp_path, language, body):
         write_workbooks(tmp_path, {"en": EN, "eo": EO})
         assert workbook(tmp_path, language) == (language, body)
+
+    def test_a_regional_language_reads_its_own_file_else_its_base_language_s(self, tmp_path):
+        write_workbooks(tmp_path, {"en": EN})
+        assert workbook(tmp_path, "en-gb") == ("en", EN)
+        write_workbooks(tmp_path, {"en": EN, "en-gb": EN.replace("colour", "color")})
+        assert workbook(tmp_path, "en-gb") == ("en-gb", EN.replace("colour", "color"))
+
+    def test_a_regional_variant_of_the_source_language_reads_the_source(self, tmp_path):
+        write_workbooks(tmp_path, {"en": EN})
+        assert workbook(tmp_path, "es-mx") == (SOURCE_LANGUAGE, user_part(ES))
 
     def test_a_language_without_its_file_reads_the_source(self, tmp_path):
         write_workbooks(tmp_path, {"en": EN})
