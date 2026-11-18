@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:5eb84700189a270d55f59c47a209e75d93d6d15432d9808e438e675db53c3e7d -->
+<!-- generated from WORKBOOK.md sha256:d1612aa67b73df92eec3bb5a36f5eb599a6643371a6580cc77ac5b82d09d7f89 -->
 
 ## What it is for and who it is for
 
@@ -328,7 +328,9 @@ If it fails: the certificate is not kept (409):
   key." (`verifactu.certificate_storage_unavailable`);
 - with no issuer, "Set up the issuer first in Invoicing → Issuer." (`verifactu.issuer_missing`);
 - a wrong password or a file that is not a `.p12`, "The file is not a .p12/.pfx certificate that this password
-  opens."; without client-authentication use, "The certificate does not allow client authentication, so it cannot
+  opens."; self-signed, "No authority issued this certificate (it is self-signed), so the AEAT will not accept it.
+  Use your business's electronic certificate issued by a recognised authority, for example the FNMT."; without
+  client-authentication use, "The certificate does not allow client authentication, so it cannot
   connect to the AEAT."; expired, "The certificate expired on {date}: upload a valid one."
   (all `verifactu.certificate_invalid`);
 - a holder other than Invoicing's issuer, "The certificate belongs to {tax ID}, not to this business's issuer {tax

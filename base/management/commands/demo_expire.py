@@ -13,7 +13,7 @@ from django.core.management.base import BaseCommand, CommandError
 from live.context import system_context
 from live.errors import NotFound
 
-from base.queries import demo_get
+from base.queries.demos import demo_get
 from base.registry import REGISTRY_SCOPE
 from base.schemas import DemoSlugIn
 from base.services.demos import demo_expire, reap_demos

@@ -115,7 +115,7 @@ function unknownToTheSaas(): void {
   psql(`update verifactu_config set hub_id = '${randomUUID()}'`);
 }
 
-/** A .p12 made here (self-signed, the issuer's NIF as its organisation identifier), valid for a year. */
+/** A .p12 made here (issued by a test authority, the issuer's NIF as its organisation identifier), valid for a year. */
 function makeP12(path: string): void {
   const script = join(DIR, 'make_p12.py');
   writeFileSync(
@@ -128,7 +128,8 @@ from cryptography.hazmat.primitives.serialization import pkcs12
 from cryptography.x509.oid import ExtendedKeyUsageOID, NameOID
 
 out, password, nif = sys.argv[1], sys.argv[2].encode(), sys.argv[3]
-key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+key, authority_key = (rsa.generate_private_key(public_exponent=65537, key_size=2048) for _ in range(2))
+authority = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, "E2E TEST AUTHORITY")])
 name = x509.Name([
     x509.NameAttribute(NameOID.COMMON_NAME, "E2E PELUQUERIA ANA SL"),
     x509.NameAttribute(NameOID.ORGANIZATION_IDENTIFIER, "VATES-" + nif),
@@ -136,11 +137,11 @@ name = x509.Name([
 ])
 now = dt.datetime.now(dt.UTC)
 cert = (
-    x509.CertificateBuilder().subject_name(name).issuer_name(name).public_key(key.public_key())
+    x509.CertificateBuilder().subject_name(name).issuer_name(authority).public_key(key.public_key())
     .serial_number(x509.random_serial_number())
     .not_valid_before(now - dt.timedelta(days=1)).not_valid_after(now + dt.timedelta(days=365))
     .add_extension(x509.ExtendedKeyUsage([ExtendedKeyUsageOID.CLIENT_AUTH]), critical=False)
-    .sign(key, hashes.SHA256())
+    .sign(authority_key, hashes.SHA256())
 )
 data = pkcs12.serialize_key_and_certificates(b"e2e", key, cert, None, serialization.BestAvailableEncryption(password))
 open(out, "wb").write(data)

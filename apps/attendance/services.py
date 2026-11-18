@@ -55,7 +55,7 @@ from apps.attendance.schemas import (
 )
 from apps.staff.models import Member
 from base import access
-from base.queries import device_of
+from base.queries.devices import device_of
 from base.services.sessions import acting_hub_user
 
 NO_MEMBER_RECORD = _(

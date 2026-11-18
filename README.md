@@ -492,7 +492,7 @@ entrada (código de erplora.com, demo, PIN o tarjeta: `base.services.sessions.en
 aún no la tiene (`acting_hub_user`) y desde la foto del SaaS (`base.hub_user.sync`, dentro de `hub.state_apply`; la de un negocio cuya BD aún se prepara, en
 su siembra). Las
 apps enlazan a ella, nunca a `settings.AUTH_USER_MODEL` (lint «(h)»): `staff` (registro y aprobación de ausencias),
-`attendance`, `task` y `whatsapp_inbox`; leen la de quien llama con `base.queries.hub_user_of`, y la tarjeta del
+`attendance`, `task` y `whatsapp_inbox`; leen la de quien llama con `base.queries.people.hub_user_of`, y la tarjeta del
 asistente nombra a la persona por su id con `base.hub_user.get`. `base.session.me` da como `user.id` el de esa persona,
 el mismo que guardan los registros, para que una pantalla sepa qué es «suyo».
 
