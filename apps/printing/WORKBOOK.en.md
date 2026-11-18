@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:bfbeaae81d717269d5721780830ddb3712e084abd0b0c15ad6589d2dceb773ee -->
+<!-- generated from WORKBOOK.md sha256:2388ce265e570213734ef1774ad9624071305d4e66fa8364e7f5ed697c550a48 -->
 
 ## What it is for and who it is for
 
@@ -307,7 +307,8 @@ Steps:
 In: each printer's role and, if there are several, the chosen one.
 Out: each document comes out of the printer of its role. A printer is not deleted: the queue names it.
 If it fails: if no active printer has the role, the job **waits** in the queue without a
-printer ("Waiting, no printer") and comes out as soon as one has it. In settings, a printer of another
+printer ("Waiting, no printer") and comes out as soon as one has it; not Kitchen's order, because Kitchen
+then does not send it (PRINTING-F10). In settings, a printer of another
 role or an inactive one is refused: "That printer does not have this role.", "That printer is inactive.".
 Involved: PRINTING-F01, PRINTING-F06, INVENTORY-F25
 
@@ -419,8 +420,10 @@ Steps:
    takes it out (PRINTING-F18).
 In: the order from Kitchen (table, waiter, round and dishes).
 Out: one job per printer in the Printing queue.
-If it fails: the order is not diverted to the receipt printer: without a printer of its role, it waits in the
-queue ("Waiting, no printer") and comes out as soon as one has it. Paper never blocks the waiter.
+If it fails: the order is not diverted to the receipt printer. If no active printer has its role, Kitchen
+does not send it to the queue: the kitchen works with its display and the bell gives no warning. If the
+printer exists but no device that is on takes it out, it waits in the queue and the bell warns
+(PRINTING-F01). Paper never blocks the waiter.
 Involved: KITCHEN-F08, KITCHEN-F18, PRINTING-F04, PRINTING-F18
 
 ### PRINTING-F11 Reprint an order
@@ -432,7 +435,8 @@ Steps:
 2. Kitchen asks Printing for another sheet for each printer of its dishes, marked as a copy (KITCHEN-F09).
 In: the order.
 Out: a new job with another key each time, in the queue of the printer of its role.
-If it fails: as in PRINTING-F10; if Printing refuses it, Kitchen says its reason.
+If it fails: as in PRINTING-F10, except that without any active printer of its role Kitchen says so and
+sends nothing to the queue; if Printing refuses it, Kitchen says its reason.
 Involved: KITCHEN-F09, PRINTING-F10
 
 ### PRINTING-F12 Print a barcode label
@@ -737,7 +741,7 @@ Nothing (`requires = []`). It reads nobody's models: whoever prints sends the do
 | Invoicing | An invoice's A4 page, for the system printer | `printing.job.create` |
 | Cash register | X and Z report | `printing.job.create` |
 | Inventory | Barcode label | `printing.job.create` |
-| Kitchen | Each station's order and its reprint | `printing.job.create` |
+| Kitchen | Each station's order and its reprint, only if there is an active printer of its role | `printing.printer.list`, `printing.job.create` |
 | `base` (`/ws/print`) | Hand out and confirm jobs | `printing.job.claim`, `printing.job.complete`, `printing.job.fail` |
 | `base` (Home and bell) | "Set up your printer" and "Nothing is printing “…”" | `printing.device.coverage` |
 

@@ -188,7 +188,7 @@ def said_by(ticket_id) -> tuple[str, str, str, list[str]]:
     return card.waiter, detail.waiter, saved.waiter, [job.document["waiter"] for job in kitchen_sheets()]
 
 
-def test_a_round_sent_from_the_till_says_its_waiter_by_name(product, ana):
+def test_a_round_sent_from_the_till_says_its_waiter_by_name(product, ana, printers):
     order = open_check("Table 4")
     add_line(order.id, product("Burger"), ctx=ctx_for(actor=ana))
     ticket = run("kitchen.ticket.send", {"order_id": str(order.id)}, ctx_for(actor=ana))
@@ -197,7 +197,7 @@ def test_a_round_sent_from_the_till_says_its_waiter_by_name(product, ana):
 
 
 @HUB_DB_COMMITTED
-def test_a_round_sent_for_whoever_attends_the_check_names_them_even_after_the_relay(relay, product, ana):
+def test_a_round_sent_for_whoever_attends_the_check_names_them_even_after_the_relay(relay, product, ana, printers):
     """KITCHEN-F18, F08, F10: the till sends the round naming who attends the
     check («Atiende»: a member of the team, who may have no login); the card, the detail, the ticket and its paper
     say that person, also once the relay brings the fire. With nobody in «Atiende», who sends it (above)."""
@@ -214,7 +214,7 @@ def test_a_round_sent_for_whoever_attends_the_check_names_them_even_after_the_re
 
 
 @HUB_DB_COMMITTED
-def test_a_round_fired_by_sales_says_its_waiter_by_name_once_the_relay_brings_it(relay, product, ana):
+def test_a_round_fired_by_sales_says_its_waiter_by_name_once_the_relay_brings_it(relay, product, ana, printers):
     order = open_check("Table 4")
     line = add_line(order.id, product("Burger"), ctx=ctx_for(actor=ana)).lines[0]
     fire(order.id, ctx=ctx_for(actor=ana))

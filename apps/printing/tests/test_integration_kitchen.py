@@ -2,15 +2,21 @@
 (``kitchen.ticket.send``, which Sales' till calls) and its «Reprint» (``kitchen.ticket.reprint``) go
 through Kitchen's own operations, which call ``printing.job.create`` by name inside their transaction
 (KITCHEN-F08, F09). No mocks: Sales opens the check, Inventory owns the products, Kitchen routes the
-dishes to its stations and Printing queues one sheet per printer.
+dishes to its stations and Printing queues one sheet per printer. Where no active printer prints a function, the
+kitchen cooks from its screen: nothing of that function is queued and the bell stays quiet.
 """
 
+import pytest
+from django.db.models import F
 from live.context import system_context
+from live.errors import Conflict
 
 from apps.kitchen.models import Destination
 from apps.kitchen.tests.conftest import add_line, make_station, open_check, route_product
 from apps.printing.models import PrintJob
-from apps.printing.tests.conftest import A, HUB_DB, ctx_for, printer, run
+from apps.printing.queries import STALLED_AFTER
+from apps.printing.tests.conftest import A, B, HUB_DB, ctx_for, printer, run
+from base.tenancy.context import use_hub
 
 pytestmark = HUB_DB
 
@@ -61,15 +67,75 @@ def test_the_order_comes_out_on_the_printer_of_each_station():
     assert all(job.usage != "receipt" for job in sheets())
 
 
-def test_an_order_without_a_kitchen_printer_waits_for_one():
+def nothing_printing(usage: str) -> int:
+    """The bell's «Nothing is printing» count of ``usage``, once whatever was queued has waited its minute."""
+    PrintJob.objects.update(created_at=F("created_at") - STALLED_AFTER)
+    return run("printing.device.coverage", {"usage": usage}).count
+
+
+def test_a_kitchen_with_no_kitchen_printer_cooks_from_its_screen_and_the_bell_stays_quiet():
     printer("Till")
     order = open_check("Table 4", ctx=system_context(A))
     add_line(order.id, dish("Burger"), ctx=waiter())
+    ticket = send(order.id)
+    assert (ticket.status, ticket.print_error) == ("pending", None)
+    assert nothing_printing("kitchen") == 0
+    assert sheets() == []
+
+
+def test_a_station_left_on_screen_and_paper_goes_to_the_screen_only_without_its_printer():
+    grill = make_station("Grill")
+    order = open_check("Table 4", ctx=system_context(A))
+    burger = dish("Burger")
+    route_product(burger.id, grill)
+    add_line(order.id, burger, ctx=waiter())
+    assert send(order.id).print_error is None
+    assert sheets() == []
+
+
+def test_an_inactive_kitchen_printer_is_no_kitchen_printer():
+    grill = printer("Grill printer", usage="kitchen", address="10.0.0.2")
+    run("printing.printer.update", {"printer_id": str(grill.id), "is_active": False})
+    order = open_check("Table 4", ctx=system_context(A))
+    add_line(order.id, dish("Burger"), ctx=waiter())
     send(order.id)
-    (job,) = sheets()
-    assert (job.usage, job.printer, job.status) == ("kitchen", None, "pending")
-    summary = {row.usage: row for row in run("printing.job.summary").usages}
-    assert (summary["kitchen"].printers, summary["kitchen"].pending) == (0, 1)
+    assert sheets() == []
+    assert nothing_printing("kitchen") == 0
+
+
+def test_each_function_goes_to_paper_only_where_it_has_a_printer():
+    printer("Grill printer", usage="kitchen", address="10.0.0.2")
+    bar = make_station("Bar", printer_usage="bar")
+    order = open_check("Table 4", ctx=system_context(A))
+    add_line(order.id, dish("Burger"), ctx=waiter())
+    beer = dish("Beer")
+    route_product(beer.id, bar)
+    add_line(order.id, beer, ctx=waiter())
+    send(order.id)
+    (kitchen,) = sheets()
+    assert (kitchen.usage, kitchen.printer.name) == ("kitchen", "Grill printer")
+    assert [item["name"] for item in kitchen.document["items"]] == ["Burger"]
+    assert nothing_printing("bar") == 0
+
+
+def test_another_business_kitchen_printer_does_not_send_this_one_to_paper(hub_b):
+    with use_hub(hub_b):
+        data = {"name": "Grill printer", "kind": "network", "address": "10.0.0.2", "usage": "kitchen"}
+        run("printing.printer.create", data, ctx_for(scope=B))
+    order = open_check("Table 4", ctx=system_context(A))
+    add_line(order.id, dish("Burger"), ctx=waiter())
+    send(order.id)
+    assert sheets() == []
+
+
+def test_reprinting_with_no_kitchen_printer_says_so_and_queues_nothing():
+    order = open_check("Table 4", ctx=system_context(A))
+    add_line(order.id, dish("Burger"), ctx=waiter())
+    ticket = send(order.id)
+    with pytest.raises(Conflict) as refused:
+        run("kitchen.ticket.reprint", {"ticket_id": str(ticket.id)})
+    assert refused.value.code == "kitchen.printing_unavailable"
+    assert sheets() == []
 
 
 def test_a_reprint_is_a_new_sheet_marked_copy_each_time():

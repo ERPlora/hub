@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:c5c23ab43ea2af780657615e01e6c386715995c8d4e71bc5a6e75ee1ec7375ea -->
+<!-- generated from WORKBOOK.md sha256:15880d013dfb224aee8cf56036e4b47a4295e83d924107220fe1c9ba0ba5199e -->
 
 ## What it is for and who it is for
 
@@ -79,8 +79,9 @@ ERPlora does not invent flows: it adopts the ones the market has already proven.
 
 - Switching Kitchen on also switches on **Sales** and **Inventory**. **Tables** and **Customers** are not
   needed: without Tables, the ticket carries the check's label or its type.
-- For paper to come out you need **Printing** with a printer for the "Kitchen" (or "Bar") function set up
-  (PRINTING-F04). Without Printing, Kitchen works with the display only.
+- For paper to come out you need **Printing** with an active printer for the "Kitchen" (or "Bar") function
+  set up (PRINTING-F04). Without Printing, or without any active printer of that function, Kitchen works
+  with the display only: it sends nothing to the print queue and the bell gives no warning.
 - Initial setup, step by step:
   1. In **Kitchen → Stations**, create the real stations (Grill, Bar, Desserts) with their destination
      (screen, paper or both) and their printer (KITCHEN-F01).
@@ -371,16 +372,19 @@ Screen: none
 Steps:
 1. On receiving the round, Kitchen asks Printing for one sheet per printer: the dishes of each station
    that is not "Screen only", by its function ("Kitchen", "Bar") or by the station's specific printer; a
-   dish without a station, by "Kitchen". It is the same for the round the waiter sends (KITCHEN-F18) and
-   for the one Sales sends by itself, which prints when it reaches Kitchen.
+   dish without a station, by "Kitchen". If no active printer has that function (and the station does not
+   name a specific printer), it asks for no sheet: those dishes are seen on the display only. It is the
+   same for the round the waiter sends (KITCHEN-F18) and for the one Sales sends by itself, which prints
+   when it reaches Kitchen.
 2. The sheet carries the label, the number, the round, the waiter and each dish with its quantity, its
    modifiers (one per line) and its note, and the dishes of a menu indented under their header
    (KITCHEN-F06, F07); if the round is rush, `!! URGENTE !!`.
 In: the dishes with the destination and the printer frozen on receiving.
 Out: one job per printer in Printing's queue, only once even if it is asked for twice: the round Kitchen
 sent is not printed again when the notice from Sales reaches it.
-If it fails: it never blocks the waiter. Without Printing no paper comes out and there is no warning (the
-kitchen works with the display). If Printing rejects the job, the ticket stays on the display and can be
+If it fails: it never blocks the waiter. Without Printing, or without any active printer of its dishes'
+function, no paper comes out, nothing is sent to the queue and there is no warning (the kitchen works with
+the display); the same goes for the pass and the rush notice. If Printing rejects the job, the ticket stays on the display and can be
 reprinted (KITCHEN-F09); at the till, the waiter sees "Order N sent to the kitchen, but it did not print.
 Check the kitchen printer in Printing." (KITCHEN-F18).
 Involved: KITCHEN-F05, KITCHEN-F06, KITCHEN-F07, KITCHEN-F09, KITCHEN-F18, SALE-F20, PRINTING-F04, PRINTING-F10, PRINTING-F18
@@ -395,8 +399,9 @@ Steps:
    on paper comes out as its first sheet, without "copy".
 In: the ticket.
 Out: new jobs in Printing's queue (each reprint is a different job).
-If it fails: "The ticket could not be printed: <reason>", with Printing's reason; without Printing, "Printing
-is not active in this business.".
+If it fails: "The ticket could not be printed: <reason>", with Printing's reason; without Printing, or
+without any active printer of its dishes' function, "No printer prints this ticket: turn on Printing and add
+an active kitchen or bar printer." and nothing is sent to the queue.
 Involved: KITCHEN-F08, KITCHEN-F21, PRINTING-F11
 
 ### KITCHEN-F10 See the kitchen board

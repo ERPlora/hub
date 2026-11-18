@@ -116,7 +116,7 @@ NOTHING_ON_PAPER = _(
     "Nothing of this ticket goes to paper: its stations are screen only."
 )
 NOTHING_TO_COOK = _("Nothing on this check is cooked: services do not go to the kitchen.")
-PRINTING_UNAVAILABLE = _("Printing is not active in this business.")
+PRINTING_UNAVAILABLE = _("No printer prints this ticket: turn on Printing and add an active kitchen or bar printer.")
 PRINT_FAILED = _("The ticket could not be printed: %(reason)s")
 STATION_NAME_TAKEN = _(
     "There is already a station with that name. Choose a different name."
@@ -421,10 +421,11 @@ def _print(  # noqa: PLR0913
     printer: str,
     ref: str,
 ):
-    """Queue a ``kitchen_order`` in Printing: ``None`` when queued, ``UNAVAILABLE`` without Printing, else why
-    Printing refused it. Nested in this write, it runs in a savepoint: a refusal leaves nothing behind."""
+    """Queue a ``kitchen_order`` in Printing: ``None`` when queued; ``UNAVAILABLE`` without Printing, or when no
+    printer is given and no active one prints ``usage`` (the kitchen cooks from its screen: nothing waits for paper);
+    else why Printing refused it. Nested in this write, it runs in a savepoint: a refusal leaves nothing behind."""
     try:
-        op = get("printing.job.create")
+        op, printers = get("printing.job.create"), get("printing.printer.list")
     except UnknownOperation:
         return UNAVAILABLE
     data = {
@@ -432,12 +433,14 @@ def _print(  # noqa: PLR0913
         "document_type": "kitchen_order",
         "document": document,
         "usage": usage,
+        "printer": printer or None,
         "source_app": "kitchen",
         "source_ref": ref[:64],
     }
-    if printer:
-        data["printer"] = printer
+    of_its_function = printers.input.model_validate({"usage": usage, "is_active": True, "limit": 1})
     try:
+        if not printer and not printers(ctx, of_its_function).total:
+            return UNAVAILABLE
         op(ctx, op.input.model_validate(data))
     except AppInactive:
         return UNAVAILABLE
@@ -450,10 +453,7 @@ def _paper(items) -> dict[tuple[str, str], list]:
     """The dishes that go to paper, one sheet per printer (function and given printer)."""
     sheets: dict[tuple[str, str], list] = {}
     for item in items:
-        if (
-            item.destination != Destination.PRINTER
-            and item.destination != Destination.BOTH
-        ):
+        if item.destination not in (Destination.PRINTER, Destination.BOTH):
             continue
         sheets.setdefault((item.printer_usage, item.printer_name), []).append(item)
     return sheets
