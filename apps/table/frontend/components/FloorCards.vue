@@ -31,8 +31,7 @@ const cards = computed(() =>
     .sort((a, b) => byNumber.compare(a.number, b.number))
     .map((table) => {
       const view = floorView(table, { now: props.now, settings: props.settings, locale: locale.value, timeZone: props.timeZone, t });
-      const hold = view.holder ? [view.holder, view.holdTime].filter(Boolean).join(' · ') : '';
-      return { table, view, meta: hold || view.pax, pickable: props.pick ? props.pick(table) : undefined };
+      return { table, view, pickable: props.pick ? props.pick(table) : undefined };
     }),
 );
 
@@ -83,7 +82,10 @@ function onClick(table: TableOut, pickable: boolean | undefined): void {
           <span
             class="floor-card__meta"
             data-part="meta"
-          >{{ card.meta }}</span>
+          >{{ card.view.holder || card.view.pax }}<span
+            v-if="card.view.holder && card.view.holdTime"
+            class="table-tile__hold-time"
+          >{{ ` · ${card.view.holdTime}` }}</span></span>
           <span class="floor-card__status">
             <span data-part="status">{{ $t(`table.status.${card.table.status}`) }}</span>
             <span

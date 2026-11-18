@@ -40,6 +40,7 @@ describe('FloorCards', () => {
     expect(['number', 'meta', 'status'].map((name) => c.part('t1', name).text())).toEqual(['1', '4 pax', 'Available']);
     expect(c.part('t1', 'time').exists()).toBe(false);
     expect(['meta', 'status'].map((name) => c.part('t10', name).text())).toEqual(['Maximiliana Fernández · 8:00 PM', 'Reserved']);
+    expect(c.card('t10').find('.table-tile__hold-time').text()).toBe('· 8:00 PM');
   });
 
   it('a tap picks a table; while picking, only the tables that may be picked answer', async () => {

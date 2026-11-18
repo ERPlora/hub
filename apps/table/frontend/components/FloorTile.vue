@@ -160,10 +160,15 @@ const style = computed(() => {
   scale: 1.025;
 }
 .table-tile__button:focus-visible {
-  outline: 2px solid var(--ep-primary-text); outline-offset: 3px; box-shadow: var(--ep-focus-ring);
+  outline: 2px solid var(--ep-primary-text);
+  outline-offset: 3px;
+  box-shadow: var(--ep-focus-ring);
 }
 .table-tile__number {
-  font-size: 32cqi; font-weight: 750; line-height: 1; letter-spacing: -0.045em;
+  font-size: 32cqi;
+  font-weight: 750;
+  line-height: 1;
+  letter-spacing: -0.045em;
 }
 .table-tile__line {
   max-width: 100%;
