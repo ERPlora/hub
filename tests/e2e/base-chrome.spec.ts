@@ -4,14 +4,16 @@
 // - «Manage on erplora.com» right below it (BASE-F11): this business on erplora.com's panel, in a new tab, for who runs
 //   it; on the rail only its icon, still named. The bar no longer has it, nor «More options» on a phone; an employee's
 //   menu has none.
-// - the strip «You cannot invoice yet» (BASE-F01) between the bar and the screen's content, at its own height;
+// - nothing between the bar and the screen's content (BASE-F01): «You cannot issue invoices yet» is a notice of the
+//   bell, which stays on the bar at every size;
 // - the user menu's «My account»: erplora.com's page, in a new tab; its «Report a problem» is the
 //   hub's own dialog (BASE-F108, tests/e2e/base-report-problem.spec.ts);
-// The strip's test does not depend on any app's setup: it serves the page a `base.setup.status` with one pending ⛔
-// step; the live stream is answered by the test, every other query stays loading.
+// The blocking step's test does not depend on any app's setup: it serves the page a `base.setup.status` with one
+// pending ⛔ step and a bell with no counters; the live stream is answered by the test, every other query stays loading.
 // flow: BASE-F01 BASE-F11
 import { expect, type Locator, type Page, type Route, test } from '@playwright/test';
 
+import { actionBell, bellSays, closeActionCenter, featuredNotice, noticeButton, openActionCenter } from './action-center';
 import { A, capture, decodeSubs, EMPLOYEE, login, psql, shot, shown, untilStill } from './helpers';
 import { STACK } from './stack';
 
@@ -98,7 +100,7 @@ test('BASE-F11 — «Upgrade plan» lines up with the QR at the foot of the menu
 
 /**
  * A ⛔ step pending: what `base.setup.status` says until Invoicing has the business's tax details. Its route is
- * Invoicing's real issuer screen, so the strip shows its «Set up» as the old hub did (an unknown route hides it).
+ * Invoicing's real issuer screen, so the notice has its button to it (an unknown route leaves it without).
  */
 const IDENTITY_PENDING = {
   total: 1,
@@ -125,9 +127,13 @@ const IDENTITY_PENDING = {
 /** No sale yet: what `sale.sale.list` gives «Activity», so the table shows its empty state, not «Loading…». */
 const NO_SALES = { rows: [], total: 0, limit: 100, offset: 0 };
 
-/** Answers the page's live stream: `base.setup.status` with the ⛔ step pending and «Activity» empty; nothing else. */
+/** The bell's counters with none above zero: the action center waits for them before it lists anything. */
+const NO_COUNTERS = { counters: [], refresh_every: null };
+
+/** Answers the page's live stream: `base.setup.status` with the ⛔ step pending, no counters in the bell and
+ *  «Activity» empty; nothing else. */
 async function oneBlockingStep(route: Route): Promise<void> {
-  const answers: Record<string, unknown> = { 'base.setup.status': IDENTITY_PENDING, 'sale.sale.list': NO_SALES };
+  const answers: Record<string, unknown> = { 'base.setup.status': IDENTITY_PENDING, 'base.bell.counters': NO_COUNTERS, 'sale.sale.list': NO_SALES };
   const frames = ['event: hello\ndata: {}\n\n'];
   for (const sub of decodeSubs(route.request().url()) as { id: string; op: string }[]) {
     if (sub.op in answers) {
@@ -143,30 +149,25 @@ async function openWithBlockingStep(page: Page, path: string): Promise<void> {
   await page.goto(`${A}${path}`);
 }
 
-test('BASE-F01 — the blocking strip sits between the bar and the content, at its own height', async ({ page }) => {
+test('BASE-F01 — a ⛔ step pending paints nothing between the bar and the content: the bell carries it', async ({ page }) => {
   await login(page, A, '/');
   for (const vp of VIEWPORTS) {
     await page.setViewportSize({ width: vp.width, height: vp.height });
     await openWithBlockingStep(page, '/#actividad');
     const screen = shown(page);
-    const strip = screen.locator('[data-testid="blocking-strip"]');
-    await expect(strip).toBeVisible();
-    await expect(strip).toContainText("Your business's tax details");
-    await expect(strip.locator('[data-testid="blocking-configure-invoice.business_identity"]')).toBeVisible();
-    const [bar, notice, body, content] = await Promise.all([
-      boxOf(screen.locator(':scope > ion-header')),
-      boxOf(screen.locator(':scope > .page-notice')),
-      boxOf(strip),
-      boxOf(screen.locator(':scope > ion-content')),
-    ]);
-    expect(notice.top, `under the bar at ${vp.label}`).toBeGreaterThanOrEqual(bar.bottom - 0.5);
-    expect(content.top, `the content under the strip at ${vp.label}`).toBeGreaterThanOrEqual(notice.bottom - 0.5);
-    expect(body.height, `the strip has a height at ${vp.label}`).toBeGreaterThan(0);
-    expect(notice.height, `the strip whole, never squeezed, at ${vp.label}`).toBeGreaterThanOrEqual(body.height - 0.5);
-    // The capture shows «Activity» loaded (empty here), never its «Loading…».
+    // «Activity» loaded (empty here), never its «Loading…», and the bell counts the one notice.
     await expect(screen.locator('[data-testid="home-activity-loading"]')).toHaveCount(0);
     await expect(screen.locator('.data-table__empty')).toBeVisible();
-    await page.screenshot({ path: shot(`APP-BASE-1-BASE-F01-strip-${vp.label}`) });
+    await bellSays(page, 1);
+    await expect(actionBell(page)).toHaveAttribute('data-severity', 'danger');
+    const [bar, content] = await Promise.all([boxOf(screen.locator(':scope > ion-header')), boxOf(screen.locator(':scope > ion-content'))]);
+    expect(near(content.top, bar.bottom), `the content right under the bar at ${vp.label}`).toBe(true);
+    const featured = featuredNotice(await openActionCenter(page));
+    await expect(featured.locator('h3')).toHaveText('You cannot issue invoices yet');
+    await expect(featured).toContainText("No ticket or invoice can be issued until this is set up: Your business's tax details.");
+    await expect(noticeButton(featured, 'Set up your business details')).toBeVisible();
+    await capture(page, `APP-BASE-1-BASE-F01-bell-${vp.label}`);
+    await closeActionCenter(page);
     await page.unroute(/\/api\/live\?/);
   }
 });
@@ -240,18 +241,16 @@ test('BASE-F11 — «Manage on erplora.com», right below «Upgrade plan», open
     await expect(shown(page).locator('[data-testid="setup-progress"]')).toBeVisible();
     await expect(shown(page).locator('ion-skeleton-text:visible, [data-testid="widgets-loading"]:visible')).toHaveCount(0);
     if (vp.width < 768) {
-      // On a phone «More options» folds the assistant and the bell, and nothing else.
+      // On a phone «More options» folds the assistant, and nothing else: the bell stays on the bar.
+      await expect(actionBell(page)).toBeVisible();
       const presented = page.evaluate(
         () => new Promise<void>((resolve) => document.addEventListener('ionPopoverDidPresent', () => resolve(), { once: true })),
       );
       await shown(page).getByTestId('topbar-chrome-more').click();
       await presented;
       const rows = page.locator('ion-popover ion-item[data-testid^="topbar-chrome-more-"]');
-      await expect(rows).toHaveCount(2);
-      expect(await rows.evaluateAll((items) => items.map((item) => item.getAttribute('data-testid')))).toEqual([
-        'topbar-chrome-more-assistant',
-        'topbar-chrome-more-bell',
-      ]);
+      await expect(rows).toHaveCount(1);
+      expect(await rows.evaluateAll((items) => items.map((item) => item.getAttribute('data-testid')))).toEqual(['topbar-chrome-more-assistant']);
       expect(await linksOutsideMenu(page, address), `«More options» leads nowhere near erplora.com at ${vp.label}`).toBe(0);
       const dismissed = page.evaluate(
         () => new Promise<void>((resolve) => document.addEventListener('ionPopoverDidDismiss', () => resolve(), { once: true })),

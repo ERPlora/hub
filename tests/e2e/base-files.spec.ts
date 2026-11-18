@@ -157,7 +157,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
       const folderDialog = dialog(page, 'files-new-folder-dialog');
       await expect(folderDialog).toBeVisible();
       await folderDialog.locator('[data-testid="files-new-folder-name"] input').fill('Invoices');
-      await folderDialog.locator('[data-testid="files-new-folder-name"] input').press('Enter');
+      await folderDialog.locator('[data-testid="files-new-folder-dialog-submit"]').click();
       await expect(toastSaying(page, 'Folder created.')).toBeVisible();
       await expect(item(page, 'Invoices')).toHaveAttribute('data-kind', 'folder');
 

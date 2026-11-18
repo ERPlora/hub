@@ -182,7 +182,7 @@
 638 tests/e2e/base-app-activation.spec.ts ERPlora/erplora-next#74
 1179 tests/e2e/base-assistant.spec.ts ERPlora/erplora-next#74
 624 tests/e2e/base-files.spec.ts ERPlora/erplora-next#74
-636 tests/e2e/base-home.spec.ts ERPlora/erplora-next#74
+635 tests/e2e/base-home.spec.ts ERPlora/erplora-next#74
 501 tests/e2e/cash-register-assistant.spec.ts ERPlora/erplora-next#74
 590 tests/e2e/cash-register-flows.spec.ts ERPlora/erplora-next#74
 584 tests/e2e/combo-menus.spec.ts ERPlora/erplora-next#74
@@ -190,11 +190,11 @@
 654 tests/e2e/flow-flows.spec.ts ERPlora/erplora-next#74
 689 tests/e2e/global-setup.test.ts ERPlora/erplora-next#74
 729 tests/e2e/helpers-login.test.ts ERPlora/erplora-next#74
-1427 tests/e2e/helpers.ts ERPlora/erplora-next#74
+1392 tests/e2e/helpers.ts ERPlora/erplora-next#74
 531 tests/e2e/inventory-products.spec.ts ERPlora/erplora-next#74
 528 tests/e2e/invoice-assistant.spec.ts ERPlora/erplora-next#74
 694 tests/e2e/reservation-book.spec.ts ERPlora/erplora-next#74
-538 tests/e2e/sale-helpers.ts ERPlora/erplora-next#74
+507 tests/e2e/sale-helpers.ts ERPlora/erplora-next#74
 539 tests/e2e/staff-flows.spec.ts ERPlora/erplora-next#74
 794 tests/e2e/table-flows.spec.ts ERPlora/erplora-next#74
 542 tests/e2e/verifactu-records.spec.ts ERPlora/erplora-next#74
