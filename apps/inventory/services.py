@@ -1484,7 +1484,9 @@ def _check_product_row(  # noqa: PLR0911, PLR0913, PLR0917
     if unit not in Unit.values:
         return str(ROW_UNIT_UNKNOWN) % {"text": row.unit.strip()}
     stock = parse_quantity(row.stock) if row.stock.strip() else Decimal("0")
-    threshold = parse_quantity(row.low_stock_threshold) if row.low_stock_threshold.strip() else Decimal(settings.low_stock_threshold)
+    threshold = (
+        parse_quantity(row.low_stock_threshold) if row.low_stock_threshold.strip() else Decimal(settings.low_stock_threshold)
+    )
     if stock is None or threshold is None:
         return str(ROW_QUANTITY_NOT_NUMERIC)
     if max(stock, threshold) >= MAX_QUANTITY:

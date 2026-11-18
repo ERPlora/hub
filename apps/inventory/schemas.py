@@ -403,7 +403,9 @@ class ConfigGetIn(Schema):
 
 
 class ProductIn(AllergensIn):
-    name: Name = Field(description="The product's name, as the till and the ticket show it.")
+    name: Name = Field(
+        description="The product's name, as the till and the ticket show it."
+    )
     sku: Sku = Field(
         description="The product's code; its identity, never edited afterwards."
     )

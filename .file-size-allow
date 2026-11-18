@@ -43,9 +43,9 @@
 487 apps/inventory/frontend/operations.d.ts ERPlora/erplora-next#74
 559 apps/inventory/frontend/pages/ProductsPage.test.ts ERPlora/erplora-next#74
 1349 apps/inventory/queries.py ERPlora/erplora-next#74
-985 apps/inventory/schemas.py ERPlora/erplora-next#74
-1584 apps/inventory/services.py ERPlora/erplora-next#74
-1120 apps/inventory/tests/test_queries.py ERPlora/erplora-next#74
+986 apps/inventory/schemas.py ERPlora/erplora-next#74
+1585 apps/inventory/services.py ERPlora/erplora-next#74
+1151 apps/inventory/tests/test_queries.py ERPlora/erplora-next#74
 2503 apps/inventory/tests/test_services.py ERPlora/erplora-next#74
 463 apps/invoice/frontend/operations.d.ts ERPlora/erplora-next#74
 1356 apps/invoice/queries.py ERPlora/erplora-next#74
