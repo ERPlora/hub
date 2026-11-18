@@ -14,9 +14,9 @@ from live.errors import Conflict, PermissionDenied
 from live.models import OutboxEvent
 
 from apps.verifactu import certificates, trust
-from apps.verifactu.models import Event, OwnCertificate
+from apps.verifactu.models import Event, OwnCertificate, Record
 from apps.verifactu.queries.route import certificate_valid, production_open
-from apps.verifactu.tests.conftest import HUB_DB, A, b64, make_p12, run
+from apps.verifactu.tests.conftest import HUB_DB, A, b64, make_p12, manual, run
 
 pytestmark = HUB_DB
 
@@ -95,6 +95,33 @@ def test_a_kept_certificate_no_recognised_authority_issued_stops_counting(issuer
     refused = Event.objects.get(message_key="certificate_refused")
     assert (refused.severity, refused.params["holder_tax_id"]) == ("warning", ISSUER_NIF)
     assert OutboxEvent.objects.filter(name="verifactu.config.changed").exists()
+
+
+def sealed_record() -> Record:
+    invoice = manual(series_code="TICKET")
+    return Record.objects.get(pk=run("verifactu.record.create", {"invoice_id": str(invoice.id)}).record.id)
+
+
+def test_the_refusal_sends_again_what_the_gateway_refused_and_leaves_what_the_aeat_has(issuer):
+    # Like a removal: the testing record the gateway refused with that certificate goes out with the next pass, by
+    # ERPlora's seal. A record the AEAT already has is never touched, whatever it says.
+    waiting, in_aeat = sealed_record(), sealed_record()
+    long_ago = timezone.now() - dt.timedelta(days=30)
+    refusal = {"wait_reason": "refused", "wait_detail": "Not the declared NIF.", "next_attempt_at": long_ago}
+    Record.objects.filter(pk=waiting.id).update(**refusal)
+    Record.objects.filter(pk=in_aeat.id).update(status="accepted", **refusal)
+    kept_before_the_check(make_p12(unrecognised=True))
+    recheck()
+    waiting.refresh_from_db()
+    in_aeat.refresh_from_db()
+    assert (waiting.wait_reason, waiting.wait_detail) == ("", "")
+    assert waiting.next_attempt_at > long_ago
+    assert (in_aeat.status, in_aeat.wait_reason, in_aeat.wait_detail, in_aeat.next_attempt_at) == (
+        "accepted",
+        "refused",
+        "Not the declared NIF.",
+        long_ago,
+    )
 
 
 def test_a_kept_certificate_a_recognised_authority_issued_keeps_counting(issuer):
