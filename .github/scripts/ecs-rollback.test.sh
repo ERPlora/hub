@@ -41,37 +41,17 @@ setup() {
   : > "$FIXTURES/environments"
   : > "$FIXTURES/roles"
 
-  # deploy/app-env.json of the commits gone back to (tag-<revision>), the settings in force of each environment
-  # (/erplora/<environment>/hub/app_env), what the app container of each previous revision carries (the same) and
-  # the SaaS's latest revision, charging real money.
-  export GIT_LOG="$work/git.log" APP_ENV_PUT="$work/app-env-put.json"
-  : > "$GIT_LOG"
-  cat > "$FIXTURES/app-env.json" <<'JSON'
+  # What the app container of each previous revision runs, per environment and family; the settings in force of
+  # each environment (/erplora/<environment>/hub/app_env, the same) and the SaaS's latest revision, charging real money.
+  export APP_ENV_PUT="$work/app-env-put.json"
+  cat > "$FIXTURES/carried.json" <<'JSON'
 {"prod": {"hub": {"PLATFORM_HUB_SLUG": "erplora", "VERIFACTU_PRODUCTION_ENABLED": "true"},
           "worker": {"PLATFORM_HUB_SLUG": "erplora", "VERIFACTU_PRODUCTION_ENABLED": "true"}},
  "pre": {"hub": {"PLATFORM_HUB_SLUG": "erplora", "VERIFACTU_PRODUCTION_ENABLED": "false", "VERIFACTU_ERPLORA_ROUTE_ENABLED": "false"},
          "worker": {"PLATFORM_HUB_SLUG": "erplora", "VERIFACTU_PRODUCTION_ENABLED": "false", "VERIFACTU_ERPLORA_ROUTE_ENABLED": "false"}}}
 JSON
-  cp "$FIXTURES/app-env.json" "$FIXTURES/in-force.json"
-  cp "$FIXTURES/app-env.json" "$FIXTURES/carried.json"
+  cp "$FIXTURES/carried.json" "$FIXTURES/in-force.json"
   echo true > "$FIXTURES/saas-charging"
-
-  cat > "$work/bin/git" <<'FAKE'
-#!/usr/bin/env bash
-echo "$*" >> "$GIT_LOG"
-case "$1 $2" in
-  "show tag-"*":deploy/app-env.json")
-    if [ -f "$FIXTURES/app-env.json" ]; then cat "$FIXTURES/app-env.json" && exit 0; fi
-    echo "fatal: path 'deploy/app-env.json' does not exist in '${2%%:*}'" >&2
-    ;;
-  "cat-file -e")
-    if [[ "$3" == tag-*"^{commit}" ]]; then exit 0; fi
-    echo "fatal: Not a valid object name $3" >&2
-    ;;
-  *) echo "fatal: unexpected git $*" >&2 ;;
-esac
-exit 128
-FAKE
 
   # Fails after 500 pauses: a rollout loop that never times out fails its test instead of hanging.
   cat > "$work/bin/sleep" <<'FAKE'
@@ -182,7 +162,7 @@ case "$1 $2" in
   *) ;;
 esac
 FAKE
-  chmod +x "$work/bin/aws" "$work/bin/sleep" "$work/bin/git"
+  chmod +x "$work/bin/aws" "$work/bin/sleep"
 }
 
 # edit_fixture <fixture> <jq filter>: rewrites the fixture with the filter.
@@ -267,27 +247,19 @@ check "every aws call names the region" '[ -s "$CALLS_LOG" ] && ! grep -qv -- "-
 check "nothing of pre is touched" '! grep -Eq "erplora-pre|-pre |/erplora/pre/" "$CALLS_LOG"'
 check "every cluster-scoped call names prod's cluster, erplora-prod" '[ "$(clusters_named)" = erplora-prod ]'
 
-# --- the settings of the version it goes back to --------------------------------------
-check "settings: the rollback reads deploy/app-env.json of the commit it goes back to" \
-  'grep -qx "show tag-10:deploy/app-env.json" "$GIT_LOG"'
+# --- the settings the revisions it goes back to run --------------------------------------
 check "settings: they are checked before any service moves" \
   '[ "$(line_of "ssm get-parameter --name /erplora/prod/hub/app_env ")" -lt "$(line_of "update-service")" ] &&
    [ "$(line_of "describe-task-definition --task-definition erplora-prod-saas ")" -lt "$(line_of "update-service")" ]'
-check "settings: the rollback records prod's settings of that commit in /erplora/prod/hub/app_env" \
-  '[ "$(jq -S -c . "$APP_ENV_PUT")" = "$(jq -S -c .prod "$FIXTURES/app-env.json")" ]'
+check "settings: the rollback records what prod's previous revisions run in /erplora/prod/hub/app_env" \
+  '[ "$(jq -S -c . "$APP_ENV_PUT")" = "$(jq -S -c .prod "$FIXTURES/carried.json")" ]'
 check "settings: they are recorded once the services are checked, with the tag" \
   'n="$(line_of "put-parameter --name /erplora/prod/hub/app_env ")" &&
    [ "$n" -gt "$(last_line_of "describe-services")" ] && [ "$n" -lt "$(line_of "put-parameter --name /erplora/prod/hub/image_tag ")" ]'
-
-# older_version: the commit gone back to, and its revisions, keep the ERPlora route closed; the settings in force do not.
-older_version() {
-  edit_fixture app-env.json '.prod.hub.VERIFACTU_ERPLORA_ROUTE_ENABLED = "false" | .prod.worker.VERIFACTU_ERPLORA_ROUTE_ENABLED = "false"'
-  cp "$FIXTURES/app-env.json" "$FIXTURES/carried.json"
-}
 setup
-older_version
+edit_fixture carried.json '.prod.hub.VERIFACTU_ERPLORA_ROUTE_ENABLED = "false" | .prod.worker.VERIFACTU_ERPLORA_ROUTE_ENABLED = "false"'
 run_rollback && status=0 || status=$?
-check "settings: back to an older version, its settings replace those in force" \
+check "settings: back to revisions that run other settings, those replace the ones in force" \
   '[ "$status" -eq 0 ] && [ "$(jq -r .worker.VERIFACTU_ERPLORA_ROUTE_ENABLED "$APP_ENV_PUT")" = false ]'
 
 # refused_settings <where>: the rollback failed on the settings of <where>, before changing anything.
@@ -296,26 +268,16 @@ refused_settings() {
     grep -q "::error::$1.*nothing was changed" "$work/out.log"
 }
 setup
-edit_fixture app-env.json '.prod.hub.DEBUG = "True"'
+edit_fixture carried.json '.prod.worker.PLATFORM_HUB_SLUG = "Erplora_Old"'
 run_rollback && status=0 || status=$?
-check "settings: a version whose file breaks a rule is never gone back to" 'refused_settings prod.hub.DEBUG:'
-setup
-edit_fixture carried.json '.prod.worker.VERIFACTU_PRODUCTION_ENABLED = "false"'
-run_rollback && status=0 || status=$?
-check "settings: a revision that runs other settings than its commit is never gone back to" \
-  'refused_settings "$td/erplora-prod-worker:10.VERIFACTU_PRODUCTION_ENABLED:"'
+check "settings: revisions whose settings break a rule are never gone back to" \
+  'refused_settings prod.worker.PLATFORM_HUB_SLUG: && ! grep -q Erplora_Old "$work/out.log"'
 setup
 rm "$FIXTURES/in-force.json"
 run_rollback && status=0 || status=$?
 check "settings: without the settings in force nothing changes" 'refused_settings /erplora/prod/hub/app_env:'
-setup
-rm "$FIXTURES/app-env.json"
-run_rollback && status=0 || status=$?
-check "settings: a commit without deploy/app-env.json keeps the settings in force, with a warning" \
-  '[ "$status" -eq 0 ] && grep -q "::warning::tag-10 has no deploy/app-env.json" "$work/out.log" &&
-   [ "$(jq -S -c . "$APP_ENV_PUT")" = "$(jq -S -c .prod "$FIXTURES/in-force.json")" ]'
 
-# The lock: going back to a version that opens the AEAT's production environment in prod takes the confirmation.
+# The lock: going back to revisions that open the AEAT's production environment in prod takes the confirmation.
 lock_closed_in_force() {
   edit_fixture in-force.json '.prod.hub.VERIFACTU_PRODUCTION_ENABLED = "false" | .prod.worker.VERIFACTU_PRODUCTION_ENABLED = "false"'
   echo false > "$FIXTURES/saas-charging"
@@ -336,10 +298,9 @@ check "lock: with the exact confirmation it goes back and records the open lock"
   '[ "$status" -eq 0 ] && [ "$(jq -r .hub.VERIFACTU_PRODUCTION_ENABLED "$APP_ENV_PUT")" = true ] &&
    grep -q "update-service .*--service hub " "$CALLS_LOG"'
 setup
-edit_fixture app-env.json '.prod.hub.VERIFACTU_PRODUCTION_ENABLED = "false" | .prod.worker.VERIFACTU_PRODUCTION_ENABLED = "false"'
-cp "$FIXTURES/app-env.json" "$FIXTURES/carried.json"
+edit_fixture carried.json '.prod.hub.VERIFACTU_PRODUCTION_ENABLED = "false" | .prod.worker.VERIFACTU_PRODUCTION_ENABLED = "false"'
 run_rollback CONFIRM_PROTECTED=VERIFACTU_PRODUCTION_ENABLED=false && status=0 || status=$?
-check "lock: while the SaaS charges, it never goes back to a version that closes the AEAT" \
+check "lock: while the SaaS charges, it never goes back to revisions that close the AEAT" \
   'refused_settings prod.hub.VERIFACTU_PRODUCTION_ENABLED:'
 
 # --- pre: its own cluster, services, families and tag ------------------------------------
@@ -358,9 +319,9 @@ check "pre: a rollback does not wake pre up" '! grep -q "desired-count" "$CALLS_
 check "pre: waits for hub-pre and worker-pre" 'grep -Eq "wait services-stable .*--services hub-pre worker-pre( |$)" "$CALLS_LOG"'
 check "pre: records the restored tag in its own parameter" \
   'grep -q "^ssm put-parameter --name /erplora/pre/hub/image_tag --value tag-5 --type String --overwrite" "$CALLS_LOG"'
-check "pre: records pre's settings of the commit gone back to in its own parameter" \
-  'grep -qx "show tag-5:deploy/app-env.json" "$GIT_LOG" && grep -q "^ssm put-parameter --name /erplora/pre/hub/app_env " "$CALLS_LOG" &&
-   [ "$(jq -S -c . "$APP_ENV_PUT")" = "$(jq -S -c .pre "$FIXTURES/app-env.json")" ]'
+check "pre: records what pre's previous revisions run in its own parameter" \
+  'grep -q "^ssm put-parameter --name /erplora/pre/hub/app_env " "$CALLS_LOG" &&
+   [ "$(jq -S -c . "$APP_ENV_PUT")" = "$(jq -S -c .pre "$FIXTURES/carried.json")" ]'
 check "pre: never names a prod cluster, family, service or parameter" \
   '! grep -Eq "erplora-prod|/erplora/prod/|--services? (hub|worker)( |$)|--services (hub|worker) " "$CALLS_LOG"'
 setup

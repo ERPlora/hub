@@ -6,8 +6,8 @@
 # pre: cluster erplora-pre, services hub-pre and worker-pre, families erplora-pre-*, image erplora/hub-pre.
 #   1. finds each service's previous revision; nothing changes unless every service has one of this environment
 #      (tag Environment=<environment>, task and execution roles erplora-<environment>-*, the guard of ecs-deploy.sh),
-#      they all run the same tag and their settings pass deploy/app_env_rollback.py: those of deploy/app-env.json in
-#      that commit, under the deploy's rules (in prod, changing VERIFACTU_PRODUCTION_ENABLED takes CONFIRM_PROTECTED);
+#      they all run the same tag and the settings they run pass deploy/app_env_rollback.py, under the deploy's rules
+#      (in prod, changing VERIFACTU_PRODUCTION_ENABLED takes CONFIRM_PROTECTED), whatever deploy/app-env.json says;
 #   2. moves the services to those revisions and waits until they are stable and each one's PRIMARY deployment is
 #      the previous revision, COMPLETED (ECS marks it so once the old tasks drain from the ALB); a FAILED rollout,
 #      another revision as PRIMARY (the circuit breaker put back the one the service ran) or a rollout that outlasts
@@ -120,7 +120,7 @@ if [ "$(printf '%s\n' "${tags[@]}" | sort -u | wc -l)" -ne 1 ]; then
   echo "::error::the previous revisions run different tags (${tags[*]}); nothing was changed" >&2
   exit 1
 fi
-python3 "$(dirname "$0")/../../deploy/app_env_rollback.py" "$workdir" "$ENVIRONMENT" "${tags[0]}" "$AWS_REGION" --confirm="${CONFIRM_PROTECTED:-}"
+python3 "$(dirname "$0")/../../deploy/app_env_rollback.py" "$workdir" "$ENVIRONMENT" "$AWS_REGION" --confirm="${CONFIRM_PROTECTED:-}"
 
 for i in "${!services[@]}"; do
   aws ecs update-service --cluster "$CLUSTER" --service "${services[i]}" \

@@ -334,12 +334,12 @@ def write_settings(workdir, settings):
     (workdir / "app_env.json").write_text(json.dumps(settings, sort_keys=True, separators=(",", ":")))
 
 
-def arguments(argv, description):
+def arguments(argv, description, positionals=("commit", "region")):
     parser = argparse.ArgumentParser(description=description)
     parser.add_argument("workdir", type=Path)
     parser.add_argument("environment", choices=ENVIRONMENTS)
-    parser.add_argument("commit")
-    parser.add_argument("region")
+    for name in positionals:
+        parser.add_argument(name)
     parser.add_argument("--confirm", default="", help="the protected changes confirmed, NAME=value[,NAME=value]")
     return parser.parse_args(argv)
 
