@@ -7,7 +7,7 @@ from django.apps import apps
 from django.utils import translation
 
 from apps.verifactu import admin as verifactu_admin
-from apps.verifactu import erplora_route, models, queries, schemas, services
+from apps.verifactu import certificates, erplora_route, models, queries, schemas, services
 from apps.verifactu.models import (
     EVENT_MESSAGES,
     WAIT_REASONS,
@@ -50,7 +50,7 @@ def visible_texts() -> set[str]:
             for value in panel.options.values()
             if type(value).__name__ == "__proxy__"
         ),
-        *module_texts(queries, schemas, services, models, verifactu_admin, erplora_route),
+        *module_texts(queries, schemas, services, models, verifactu_admin, erplora_route, certificates),
         *EVENT_MESSAGES.values(),
         *WAIT_REASONS.values(),
         *Environment.labels,
@@ -89,6 +89,9 @@ def test_spanish_texts():
         assert str(Record.Type.ANULACION.label) == "Anulación"
         assert str(Environment.TESTING.label) == "Pruebas (AEAT de pruebas)"
         assert str(services.NOT_IN_QUEUE).startswith("Este registro no está en la cola")
+        assert "emitido por una entidad reconocida, por ejemplo la FNMT" in str(
+            certificates.REFUSALS["self_signed"]
+        )
 
 
 def test_verifactu_says_its_fields_with_the_aeats_words():
