@@ -430,16 +430,6 @@
     ]
   },
   {
-    "path": "apps/verifactu/queries.py",
-    "file_name": "queries.py",
-    "functions": [
-      {
-        "name": "list_records",
-        "complexity": 16
-      }
-    ]
-  },
-  {
     "path": "apps/verifactu/services.py",
     "file_name": "services.py",
     "functions": [
@@ -900,6 +890,16 @@
       {
         "name": "_refund_legs",
         "complexity": 17
+      }
+    ]
+  },
+  {
+    "path": "apps/verifactu/queries/records.py",
+    "file_name": "records.py",
+    "functions": [
+      {
+        "name": "list_records",
+        "complexity": 16
       }
     ]
   }

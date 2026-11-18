@@ -1901,7 +1901,7 @@ def test_remove_in_testing_leaves_the_seal_to_file(
     out = run("verifactu.certificate.remove")
     assert (out.own_certificate.loaded, out.route) == (False, "erplora")
     assert not OwnCertificate.objects.exists()
-    assert queries.route_problem(queries.config_row(), "testing", A) == ""
+    assert queries.route.route_problem(queries.route.config_row(), "testing", A) == ""
     assert Event.objects.filter(message_key="certificate_removed").exists()
     gateway_answers.set(answering())
     create(ticket())
