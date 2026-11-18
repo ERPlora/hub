@@ -21,22 +21,7 @@ import { login } from './login';
 import { psql } from './psql';
 import { shown } from './screen';
 import { A } from './stack';
-import {
-  cleanInventory,
-  createProduct,
-  dialog,
-  fill,
-  GENERIC,
-  pickCombo,
-  productBySku,
-  productRow,
-  productsReady,
-  searchProducts,
-  settledChipFit,
-  shoot,
-  shootFlow,
-  stamp,
-} from './inventory-helpers';
+import { cleanInventory, createProduct, dialog, fill, GENERIC, pickCombo, productBySku, productRow, productsReady, searchProducts, settledChipFit, shoot, shootFlow, stamp } from './inventory-helpers';
 import { rowAction } from './service-helpers';
 
 test.afterAll(() => {

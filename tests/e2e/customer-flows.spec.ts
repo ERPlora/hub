@@ -10,20 +10,7 @@ import { join } from 'node:path';
 
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import {
-  cardOf,
-  cleanUp,
-  createCard,
-  createdIds,
-  customersReady,
-  e2eName,
-  FLOW_VIEWPORTS,
-  horizontalOverflow,
-  inputOf,
-  rowNamed,
-  searchList,
-  spanishMobile,
-} from './customer-helpers';
+import { cardOf, cleanUp, createCard, createdIds, customersReady, e2eName, FLOW_VIEWPORTS, horizontalOverflow, inputOf, rowNamed, searchList, spanishMobile } from './customer-helpers';
 import { shot } from './capture';
 import { api } from './hub-api';
 import { login } from './login';
