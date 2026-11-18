@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:66069eb46c3f08a041840c1cde62676b94a081a201e447d48530d6220c7c5fc5 -->
+<!-- generated from WORKBOOK.md sha256:24e0f782a95ff30d70518329cd020778a339bd990d905d248b720b602901d0e0 -->
 
 ## What it is for and who it is for
 
@@ -88,6 +88,19 @@ The **Tables** menu has five tabs: **Floor plan**, **Zones**, **Tables**, **Sess
 buttons the profile cannot use do not show.
 
 ### Floor plan
+Here you see at a glance how the room is doing: each table in its place, with its colour and, when it is
+occupied, how long the party has been seated. In **Service** you tap a table to seat a party, charge,
+move the check to another table or merge it with another one; in **Edit plan** you drag the tables into
+place and add zones and tables.
+
+The colour of each table says how it is:
+
+- **Green**, Available: it is free and can be seated.
+- **Filled with the main colour** (blue by default), Occupied: a party is seated with its check open.
+- **Yellow**, Reserved: its booking starts within an hour or has already started.
+- **Grey stripes**, Blocked: it is out of service and cannot be seated.
+
+#### Details
 Menu **Tables → Floor plan**. At the top are the strip of zones (it slides sideways on the phone and
 fades at an edge with more zones behind it), the **Service / Edit plan** switch (only for whoever can draw
 the plan) and, in "Edit plan", a "+" ("Add zone or table") and a pencil ("Edit zone"). Each tab has a dot
@@ -149,6 +162,12 @@ charges, moves or edits a table. It has two modes:
 The windows cover the whole screen on the phone and are centred on tablet and computer.
 
 ### Zones
+Here you create and order the zones of your place, such as the dining room, the terrace or the bar,
+each with its colour. The zones are the tabs at the top of the **Floor plan**, and here you see how many
+tables each one has and how many are free right now. With the "+" you add a zone and, from its row, you
+change its name, its colour or its order.
+
+#### Details
 Menu **Tables → Zones**. Table: Name (with its colour), Tables, Free ("free / total"), Order, Status
 (Active, Inactive); search box "Search zone…", column filters behind the funnel, table or cards view.
 The "+" (only for whoever can create zones) opens the panel with Name, Description, Colour (Blue, Cyan,
@@ -157,6 +176,12 @@ Purple, Green, Amber, Red, Grey), Order and "Add zone"; per row "Edit" (the same
 in "Delete zone?" and leaves "Delete zone" off if the zone has tables.
 
 ### Tables
+Here you have all the tables of your place in a list, with their number, zone, capacity and status. It
+is for finding a table, adding new tables with the "+" or changing their details with **Edit** without
+going through the plan. A new table appears in the first free spot of its zone; to move it into place,
+use **Edit plan** on the **Floor plan**.
+
+#### Details
 Menu **Tables → Tables**. Table in natural order (2 before 10): Number, Name, Zone, Capacity, Status;
 search box "Search table…" (number and name), column filters behind the funnel (zone, status, shape,
 capacity), table or cards view. The "+" opens the panel with Number, Capacity, Width, Height, Zone and
@@ -164,6 +189,12 @@ capacity), table or cards view. The "+" opens the panel with Number, Capacity, W
 "Delete" (the administrator only, with confirmation).
 
 ### Sessions
+Here you see the checks of the room, the open ones and those already closed, with their table, who
+serves, the guests and how long they have been running. From each row you look at the **Details** of a
+check, close one that was left open or, with **Seat again**, take a check that was left without a table
+to a free one.
+
+#### Details
 Menu **Tables → Sessions**: the checks of the room. Tabs "Open", "Closed" and "All". Table: Table ("No
 table (parked)" if it has none), Charged and Closed (they do not show in Open), Zone, Server, Guests,
 Opened, Time, Status (Open, Closed, Transferred, Merged, Parked); the time of an open check turns amber
@@ -175,6 +206,12 @@ business's time. What was charged goes in the currency it was charged in: the bu
 with its decimals), never in euros if the business charges in another.
 
 ### Settings
+Here you decide how the room works: whether the guests are asked for when a table is seated, and after
+how many minutes the time of an occupied table turns amber and then red. If they are not asked for, the
+table is seated with its capacity. Change what you need and tap **Save**: it applies to the whole
+business, on every device.
+
+#### Details
 Menu **Tables → Settings**: "Ask for the guests when seating a table", "Amber warning (minutes)" and
 "Red warning (minutes)", and "Save". Only whoever can change them sees it (by default, the owner and the
 administrator).
