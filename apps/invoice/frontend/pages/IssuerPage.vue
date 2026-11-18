@@ -86,7 +86,7 @@ async function submit(): Promise<void> {
     return; // The page shows the refusal.
   }
   take(saved);
-  void toastSuccess(t('invoice.issuer.saved'));
+  toastSuccess(t('invoice.issuer.saved'));
 }
 </script>
 

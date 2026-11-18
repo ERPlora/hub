@@ -1,7 +1,6 @@
 // The floor plan's geometry and rules, apart from the screen (WORKBOOK «Plano de sala»).
 // - Tables keep their real size: the plan is as large as its farthest table (it scrolls sideways on a
 //   phone and grows down), and a dragged table never leaves it (in the old module it could).
-// - A status is never the colour alone: colour, written word and an icon of its own.
 // - A transfer picks a free or reserved table in service; a merge an occupied one (its own table only
 //   when it holds another check: the two halves of a split join back).
 import type { StatusPillTone } from '@erplora/ui/components';
@@ -10,6 +9,8 @@ import type { HoldShownOut, TableOut, TableStatus } from '../operations';
 
 /** The side of a table box in plan pixels (`models.BOX`). */
 export const BOX = 72;
+/** A cell of the grid new tables are placed on (`services.CELL`): the room «Edit plan» keeps past the farthest table. */
+export const CELL = BOX + 16;
 /** What a tile paints past its box (border and padding): the plan holds the painted tile whole. */
 export const TILE_CHROME = 10;
 /** Below this many pixels of pointer travel a press is a tap (edit), above it a drag (move). */
@@ -58,26 +59,11 @@ export function keyDelta(key: string, shift: boolean): [number, number] | null {
   return [direction[0] * step, direction[1] * step];
 }
 
-export const STATUS_ICON: Readonly<Record<TableStatus, string>> = Object.freeze({
-  available: 'ion:checkmark-circle-outline',
-  occupied: 'ion:people-outline',
-  reserved: 'ion:time-outline',
-  blocked: 'ion:ban-outline',
-});
-
 export const STATUS_TONE: Readonly<Record<TableStatus, StatusPillTone>> = Object.freeze({
   available: 'success',
-  occupied: 'danger',
+  occupied: 'info',
   reserved: 'warning',
   blocked: 'neutral',
-});
-
-/** The theme colour of each status, painted on a tile's border and its written status. */
-export const STATUS_COLOR: Readonly<Record<TableStatus, string>> = Object.freeze({
-  available: 'var(--ion-color-success, #2f9e44)',
-  occupied: 'var(--ion-color-danger, #d9480f)',
-  reserved: 'var(--ion-color-warning, #f08c00)',
-  blocked: 'var(--ion-color-medium, #868e96)',
 });
 
 /** Whose reservation a table paints: its name, or «Deleted customer» once her data was erased (F31). */

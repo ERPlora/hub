@@ -27,8 +27,8 @@ import { listFillProblems } from '../../../../frontend/testing/list-fill';
 
 vi.mock('@erplora/ui/shell', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@erplora/ui/shell')>()),
-  toastError: vi.fn(() => Promise.resolve()),
-  toastSuccess: vi.fn(() => Promise.resolve()),
+  toastError: vi.fn(),
+  toastSuccess: vi.fn(),
 }));
 
 vi.mock('@ionic/vue', async (importOriginal) => {

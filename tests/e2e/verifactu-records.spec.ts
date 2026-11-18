@@ -239,7 +239,7 @@ test('VERIFACTU-F30: an invoice issued by error is cancelled from its record wit
   await expect(dialog).toBeVisible();
   await dialog.locator('[data-testid=verifactu-cancel-reason] textarea').fill('e2e duplicated ticket');
   await dialog.locator('[data-testid=verifactu-cancel-submit]').click();
-  await expect(page.locator('ion-toast').filter({ hasText: `Cancellation of ${issued.number} sealed` })).toBeVisible();
+  await expect(page.getByTestId('toast').filter({ hasText: `Cancellation of ${issued.number} sealed` }).first()).toBeVisible();
 
   const both = await api<{ rows: RecordOut[] }>(context, A, 'GET', `/verifactu/records?search=${encodeURIComponent(issued.number)}&limit=10`);
   expect(both.data.rows.map((row) => row.record_type).sort()).toEqual(['alta', 'anulacion']);
@@ -292,7 +292,7 @@ test('VERIFACTU-F24: a rejection is listed «Pending correction» and, corrected
   const confirm = page.locator('.ep-confirm-dialog').last();
   await expect(confirm).toContainText(`Correct the record of ${issued.number}?`);
   await confirm.getByRole('button', { name: 'Correct' }).click();
-  await expect(page.locator('ion-toast').filter({ hasText: `Correction of ${issued.number} sealed` })).toBeVisible();
+  await expect(page.getByTestId('toast').filter({ hasText: `Correction of ${issued.number} sealed` }).first()).toBeVisible();
   const both = await api<{ rows: (RecordOut & { correction_status: string; corrected_by_id: string | null })[] }>(
     context,
     A,

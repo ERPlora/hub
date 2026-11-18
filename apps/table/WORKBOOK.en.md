@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:03abbc35ef928551bba5165ac49d1a65c6f5ffd590e44131318a917d923d3756 -->
+<!-- generated from WORKBOOK.md sha256:66069eb46c3f08a041840c1cde62676b94a081a201e447d48530d6220c7c5fc5 -->
 
 ## What it is for and who it is for
 
@@ -88,28 +88,41 @@ The **Tables** menu has five tabs: **Floor plan**, **Zones**, **Tables**, **Sess
 buttons the profile cannot use do not show.
 
 ### Floor plan
-Menu **Tables → Floor plan**. At the top, a single row: the strip of zones (it slides sideways on the
-phone and fades out at the edge when there are more zones), the **Service / Edit plan** switch (only for
-whoever can draw the plan) and, in "Edit plan", a "+" ("Add zone or table") and a pencil ("Edit zone").
-Below, the plan of the chosen zone, with the tables at their real size: if it does not fit in width
-(phone, tablet) it slides sideways and the edge with tables behind fades out; if it does not fit in
-height, it grows and the page scrolls down.
+Menu **Tables → Floor plan**. At the top are the strip of zones (it slides sideways on the phone and
+fades at an edge with more zones behind it), the **Service / Edit plan** switch (only for whoever can draw
+the plan) and, in "Edit plan", a "+" ("Add zone or table") and a pencil ("Edit zone"). Each tab has a dot
+in its zone's colour and the number of occupied tables over those in service ("7/12"). Below, a card
+summarises the chosen zone: available, occupied, reserved tables and guests.
 
-Each table is a tile with its number, its status written with its icon and colour (Available, Occupied,
-Reserved, Blocked), the capacity ("4 pax") or, if it is occupied, the guests and the minutes they have
-been there ("3 pax · 35 min", which move forward by themselves) and who serves it; if it has a booking
-today, the name and the time of the booking ("Deleted customer" if that customer's data were erased) on
-one line: a name that does not fit is cut with "…" and the time is always seen whole
-("Maximiliana F… · 20:00"). Round tables are painted round and the rectangular one, wider than tall.
-The border of each table and its written status have the colour of its status:
+On tablet and desktop, the plan adjusts the place and size of the tables by itself to show the whole zone
+while they can still be read. If it still does not fit, it scrolls within its frame, sideways and up and
+down, with a fade at every edge that has tables behind it; the background can be dragged with the mouse
+and, with the plan selected, the keyboard's arrows scroll it. There are no zoom buttons. The grid only
+shows in "Edit plan". On a phone, "Service" shows the tables as two-column cards, each with the drawing of
+the table and its seats, the number, the status and the time; "Edit plan" is still the plan.
 
-- **Green**, Available: it is free and can be seated.
-- **Red**, Occupied: a party is seated with its check open.
-- **Amber**, Reserved: its booking starts within an hour or has already started.
-- **Grey**, Blocked: it is out of service and cannot be seated until it is unblocked.
+Each table has its shape (round, square or rectangular) and seats according to its capacity; the filled
+seats are the seated guests. At most twelve seats are drawn: with a bigger capacity, the filled ones are
+shared out in proportion, and the exact figure is always written. Inside the table are its number in large
+type and one fact: the time it has been occupied ("1:08"), the time on a reserved one or the status on the
+others. Below, the status written with its icon, the guests ("3/4 pax") or the capacity, and the booking's
+name and time ("Ana · 9:00 PM"; "Deleted customer" if that customer's data were erased). Who serves an
+occupied table is seen in its window.
 
-The plan **is live**: it changes by itself when somebody seats, charges, moves or edits a table. It has
-two modes:
+The colour of each table says its status:
+
+- **Green**, Available: soft green background and green border. It is free and can be seated.
+- **Filled with colour**, Occupied: the whole table in the main colour of the "Theme palette" (blue with
+  the ERPlora palette). A party is seated with its check open.
+- **Yellow**, Reserved: soft yellow background and dashed yellow border. Its booking starts within an hour
+  or has already started.
+- **Grey stripes**, Blocked: it is out of service and cannot be seated until it is unblocked.
+
+On an occupied table, the time also has an arc that moves forward. Past the minutes of "Amber warning
+(minutes)" in Settings, the time and the arc turn amber, and past those of "Red warning (minutes)", red;
+the table does not change colour. Status and zone changes are animated gently, unless the device asks for less motion. While
+it loads, the outline of the plan shows. The plan **is live**: it changes by itself when somebody seats,
+charges, moves or edits a table. It has two modes:
 
 - **Service** (at first): nothing is dragged. Tapping a table opens its **Table N** window:
   - free or reserved: the guests question ("Guests at table N · 4 pax", "−" and "+", shortcuts from 1
@@ -169,7 +182,7 @@ administrator).
 
 | Screen | Loading | Empty | Error |
 |---|---|---|---|
-| Floor plan | "Loading…" | No zones: "Create a zone to start placing tables."; zone without tables: "No tables in this zone. Tap “Add table”." | On loading: notice with "Retry"; on saving, inside the open window (or above the plan if there is none) |
+| Floor plan | Floor-plan skeleton | No zones: "Create a zone to start placing tables."; zone without tables: "No tables in this zone. Tap “Add table”." | On loading: notice with "Retry"; on saving, inside the open window (or above the plan if there is none) |
 | Zones | The table loading | "No zones. Tap «+» to create the first one (Dining room, Terrace, Bar…)." | The table's, with "Retry"; the saving one, inside the panel |
 | Tables | The table loading | "No tables." | The table's, with "Retry"; the saving one, inside the panel |
 | Sessions | The table loading | "No sessions. Seat a party from the floor plan and it will show up here." | The table's, with "Retry"; the closing one, in its confirmation |
@@ -380,16 +393,19 @@ Status: done
 Actor: manager, employee
 Screen: Floor plan
 Steps:
-1. Open **Tables → Floor plan** and choose the zone: its plan shows at once, without waiting to load.
-   All its tables in use are seen, at their real size.
-2. Each table says its status in writing, with icon and colour: Available, Occupied, Reserved or Blocked.
-3. An occupied table says the guests and the minutes they have been there ("3 pax · 35 min") and who
-   serves it; the minutes move forward by themselves. A table with a booking today says the name and the
-   time.
-4. The plan changes by itself when somebody seats, transfers, joins, splits, charges or voids: there is
-   no need to leave and come back, and the window you have open (split, guests, close, "Edit table")
-   stays at the step you were at, with whatever you typed. And with the clock: a table turns Reserved an hour before its booking and goes back to
-   Available when the booking ends, without anybody touching anything.
+1. Open **Tables → Floor plan** and choose the zone: its content shows at once, without waiting to load.
+   The tab says how many tables are occupied and the card summarises available, occupied, reserved tables
+   and guests.
+2. On tablet and desktop the plan fits every table to the space; on the phone, "Service" shows them in
+   two-column cards. Each table says its status in writing, with an icon, shape, seats and colour:
+   Available, Occupied, Reserved or Blocked.
+3. An occupied table shows the time ("0:35") and guests ("3/4 pax"); the time moves forward by itself and
+   past the warnings in Settings only the time and its arc change colour. A table with a booking today says
+   its name and time. Who serves it is seen in its window.
+4. The plan changes by itself when somebody seats, transfers, joins, splits, charges or voids: there is no
+   need to leave and come back, and the window you have open (split, guests, close, "Edit table") stays at
+   the step you were at, with whatever you typed. And with the clock: a table turns Reserved an hour before
+   its booking and goes back to Available when the booking ends, without anybody touching anything.
 In: the tables, their open checks, their holds and the status of their checks in Sales.
 Out: nothing.
 If it fails: a failure on loading shows with "Retry".

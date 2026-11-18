@@ -33,7 +33,7 @@ async function send(operations: string[]): Promise<void> {
   try {
     const flow = await grant.run({ id: props.flow.id, operations });
     emit('granted', flow);
-    void toastSuccess(phrasing.value.t('flow.permissions.updated'));
+    toastSuccess(phrasing.value.t('flow.permissions.updated'));
   } catch (failure) {
     error.value = failure as ApiError;
   }

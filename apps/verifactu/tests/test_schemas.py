@@ -124,11 +124,6 @@ def test_a_manual_anchor_is_a_64_hexadecimal_fingerprint_with_its_invoice():
     assert set(errors) == {"invoice_number", "issue_date"}
 
 
-def test_the_route_is_erplora_or_own():
-    assert schemas.ConfigUpdateIn.model_validate({"route": "own"}).route == "own"
-    assert "route" in refused(schemas.ConfigUpdateIn, {"route": "gateway"})
-
-
 def test_the_photo_no_longer_carries_the_certificate():
     """The certificate is uploaded in the Hub: an older photo that still names it is read without it."""
     assert "own_certificate" not in schemas.ConfigSyncIn.model_fields

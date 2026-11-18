@@ -25,7 +25,7 @@ async function issue(): Promise<void> {
   failure.value = null;
   try {
     await issuing.run({ sale_id: props.saleId });
-    void toastSuccess(t('sale.document.pending.issued'));
+    toastSuccess(t('sale.document.pending.issued'));
   } catch (error) {
     const fallback = t('sale.document.pending.failed');
     failure.value = refusal(error, fallback)?.message ?? fallback;

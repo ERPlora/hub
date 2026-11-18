@@ -11,6 +11,7 @@ import { expect, type Page, test } from '@playwright/test';
 import { A, api, login, openApps, psql, shown } from './helpers';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
 import { addToTill, cleanSales, shots, stamp, tillReady, zoneWithTable } from './sale-helpers';
+import { toastSaying, toasts } from './toast-helpers';
 
 const RUN = stamp();
 const ZONE = `E2E Tbl ${RUN} Till`;
@@ -149,9 +150,8 @@ test('TABLE-F16, SALE-F24: merging the table of the till check from Tables says 
   await expect(floor.locator(`[data-testid=table-floor-tile-${tableId}]`)).toContainText('Available');
 
   // The till behind says the check was joined (neutral), never that it was closed on another device.
-  const toasts = page.locator('ion-toast');
-  await expect(toasts.filter({ hasText: 'That check was joined with another one' }).first()).toBeVisible();
-  await expect(toasts.filter({ hasText: 'closed on another device' })).toHaveCount(0);
+  await expect(toastSaying(page, 'That check was joined with another one')).toBeVisible();
+  await expect(toasts(page).filter({ hasText: 'closed on another device' })).toHaveCount(0);
   expect((await api<{ status: string; merged_into_id: string | null }>(context, A, 'GET', `/sale/orders/detail?order_id=${absorbed}`)).data).toMatchObject({
     status: 'voided',
     merged_into_id: stays,
@@ -167,5 +167,5 @@ test('TABLE-F16, SALE-F24: merging the table of the till check from Tables says 
   const joined = await api<{ status: string; lines: { sku: string }[] }>(context, A, 'GET', `/sale/orders/detail?order_id=${stays}`);
   expect(joined.data.status).toBe('open');
   expect(joined.data.lines.filter((line) => line.sku === SKU)).toHaveLength(2);
-  await expect(toasts.filter({ hasText: 'closed on another device' })).toHaveCount(0);
+  await expect(toasts(page).filter({ hasText: 'closed on another device' })).toHaveCount(0);
 });

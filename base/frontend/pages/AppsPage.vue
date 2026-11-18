@@ -292,7 +292,7 @@ async function change(kind: 'enable' | 'disable' | 'retry', app: AppRow): Promis
     const done = answer.state === 'creating' ? 'base.appsPage.turningOn' : on ? 'base.appsPage.turnedOn' : 'base.appsPage.turnedOff';
     const said = [t(done, { app: app.name })];
     if (along.length) said.push(t(on ? 'base.appsPage.alsoOn' : 'base.appsPage.alsoOff', { apps: listOf(along) }));
-    void toastSuccess(said.join(' '));
+    toastSuccess(said.join(' '));
     // The menu is the session's: read it again (the other screens of the business follow the live list).
     sessionChanged();
   } catch (error) {

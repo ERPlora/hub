@@ -14,7 +14,7 @@
 // (`combo`). With VeriFactu on and readable (`fiscal`), its notice goes first when it refuses new sales now (SALE-F07).
 import { InlineFeedback } from '@erplora/ui/components';
 import { useLive } from '@erplora/ui/sdk';
-import { HubIcon, dismissToast, toast } from '@erplora/ui/shell';
+import { HubIcon, dismissToast, toastWarning } from '@erplora/ui/shell';
 import { IonButton } from '@ionic/vue';
 import { computed, shallowRef, watch } from 'vue';
 import { useRoute } from 'vue-router';
@@ -119,7 +119,7 @@ const emptyText = computed(() => {
 /** A tap on something the till cannot sell now: the reason above the grid and in a toast; nothing is added. */
 function refuse(text: string, refused: Pick<TapNotice, 'product' | 'serviceId'>): void {
   tapNotice.value = { text, ...refused };
-  void toast(text, 'warning', undefined, TAP_TOAST);
+  toastWarning(text, { id: TAP_TOAST });
 }
 
 /** The reason of a tap on something without VAT. */
@@ -145,7 +145,7 @@ function pickService(service: ServiceSaleOut): void {
 /** The reason of the refused tap is gone: so are the notice and its toast. */
 function dropTapNotice(): void {
   tapNotice.value = null;
-  void dismissToast(TAP_TOAST);
+  dismissToast(TAP_TOAST);
 }
 
 /** The refused product as Inventory has it now (its follower is the notice's own: `:key`, and Vue drops what an

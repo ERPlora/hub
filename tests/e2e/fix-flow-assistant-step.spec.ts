@@ -17,6 +17,7 @@ import { confirmDialog, idFromUrl, parkedEvent, RELAY, signedIn } from './flow-h
 import { noHorizontalScroll, settled, VIEWPORTS } from './schedule-helpers';
 import { STACK } from './stack';
 import { pick } from './task-helpers';
+import { toastSaying } from './toast-helpers';
 
 const TAG = 'E2E FlowAI';
 const PROVIDER_PORT = Number(process.env.E2E_AI_PROVIDER_PORT ?? STACK.hubPort + 2);
@@ -110,7 +111,7 @@ for (const viewport of VIEWPORTS) {
       const spentBefore = spent();
       await shown(page).locator('[data-testid=flow-editor-run]').click();
       await confirmDialog(page, 'Run it now?');
-      await expect(page.locator('ion-toast').filter({ hasText: 'the assistant is on it' }).last()).toBeVisible();
+      await expect(toastSaying(page, 'the assistant is on it')).toBeVisible();
       await shown(page).locator('[data-testid=flow-editor-tab-history]').click();
       // «Run now» answered without asking: the run waits for the worker, which asks the assistant.
       const waiting = await openRun(page, 'Waiting for the assistant');

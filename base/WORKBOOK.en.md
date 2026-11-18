@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:cc635a78f44ed22d33612d608feb296a08d745f344eb61741ecaed528a066cbd -->
+<!-- generated from WORKBOOK.md sha256:bd9a9b857e6db43112158c4ed2004a4a374be843bc282594b2f6118b45c08a9c -->
 
 ## What it is for and who it is for
 
@@ -34,7 +34,9 @@ Who uses it:
 The Home has this structure: greeting and date, app launcher, setup list with a progress bar, board of panels and the "Summary" and "Activity"
 tabs. It follows what the market does: the "Setup guide" list of Shopify and Square (steps with their
 button, the progress on top and what is done folded away), Odoo's app launcher, the board of panels that
-each person picks and orders of Lightspeed and Toast, and the bell with counters of any back office. System's
+each person picks and orders of Lightspeed and Toast, and the bell of the notices that ask for an action, which stay
+until they are solved and arrive at the top right (Shopify, Business Central, Stripe; macOS's notification centre).
+System's
 "Usage and plan" follows Business Central's "Capacity" and the usage pages of Supabase, Vercel and Neon: each figure
 against what the plan includes and, like Google Workspace, the yellow notice at 80 % and the red one when full.
 
@@ -70,9 +72,22 @@ The table of the latest sales: "Date", "Sale", "Customer", "Method", "Amount" an
 also opens with the Home's link ending in `#actividad`.
 
 ### The bell
-At the top right, after "My apps" and the assistant's sparkles; on a phone, both go inside "More options", which
-carries its number. Its number adds up the pending notices; tapped, one row per notice ("Failed events (2)") that
-leads to its screen. With nothing: "All caught up. No notifications.".
+At the top right, the last one in the bar, after "My apps" and the assistant's sparkles, on a phone too. It gathers
+what asks for an action and stays true until it is solved: "You cannot issue invoices yet", the failed events, the
+plan's limits, the appointments to confirm, the WhatsApp customers waiting for an answer, a printer that does not
+print… No notice is dismissed: it goes by itself once it is solved.
+
+- **The bell.** With nothing pending, just the bell. With something, it becomes a pill with the bell and the number,
+  in the colour and with the icon of the gravest notice (urgent, attention or information).
+- **The arrival.** A new notice comes in as a card under the bar, at the top right (full width on a phone), stays a
+  few seconds and settles in the bell, which pulses; with the assistant open, it comes in to its left. While a sale is
+  being charged at the till it does not show: the bell only pulses. The first result on opening the page announces
+  nothing.
+- **The panel.** Tapping the bell opens a panel from the right, over the screen and over the assistant (full width on
+  a phone): on top, the gravest notice, with its sentence and its button (for example "Set up your business
+  details"); below, the others in rows ("3 appointments to confirm"), and tapping a row puts it on top. It closes with
+  its ✕, with Esc or tapping outside, and the bell gets the focus back. With nothing: "All caught up". A notice just
+  solved stays a moment with "Resolved" before it goes.
 
 ### The side menu
 On the left (on a phone, from the bar's button): the person at the top and the platform's entries in two groups,
@@ -101,14 +116,12 @@ account", which opens that page on erplora.com (in a new tab; in the installed a
 "Report a problem", which opens a form in a window without leaving the hub (BASE-F108); last "Theme" (light, dark
 or the system's) and "Sign out". Both also show in the installed app: neither sells anything.
 
-### The "You cannot issue invoices yet" strip
-Over any screen while a step that stops invoicing is missing: "No ticket or invoice can be issued until
-this is set up:" and each step with "Set up" (on the screen that sets it up, only its name). It does not
-show on the Home's "Summary" (the list says the same a little further down); on "Activity", it does. On a
-very low screen (a phone on its side: 500 px high or less, the till's own cut) it is one line, to leave room for the
-screen: "You cannot issue invoices yet" and a single "Set up", which leads to the first step that can be set up from
-there; without the sentence or the steps' names, which read upright or on the Home. If there is none to set up from
-there, the warning alone.
+### The "You cannot issue invoices yet" notice
+While a step that stops invoicing is missing, the bell carries the urgent notice "You cannot issue invoices yet", on
+any screen (the Home too) and taking room on none: "No ticket or invoice can be issued until this is set up: Your
+business details.", with "Set up your business details" and, if another step is missing, a second button with its
+own ("Set up VeriFactu"). To whoever cannot set it up it says, with no buttons, "An administrator has to set this
+up.". It goes by itself as soon as the step is done, on any device.
 
 ### Apps
 From "Apps" in the side menu. Three tabs at the bottom: "My apps" (the apps the business has running), "Add
@@ -251,8 +264,8 @@ behind it). In a dangerous action, each datum on its own line and a box to type 
 | State | What the person sees |
 |---|---|
 | Loading | Grey tiles in "My apps" ("Loading your apps…" for the screen reader), the list in grey, "Loading widgets…" on the board, each panel's figure in grey and "Loading…" in "Activity"; "Loading…" on the PIN pad, "Loading your profile…" and "Loading the devices…". |
-| Empty | "Your apps will show up here. Add the ones your business needs."; with no steps, the list does not show; "Empty panel. Tap ⋮ to add widgets."; a panel without data, "No data"; the bell, "All caught up. No notifications."; "Nobody has entered from any device yet."; in "Switch user", "Nobody here has a PIN yet: give one in My profile or in Employees.". |
-| Error | Each zone fails on its own: "Could not load your apps. Reload the page; if it keeps failing, sign in again.", "Could not load what is left to set up" with "Retry", "Could not load the panels" with "Retry", a panel with "Unavailable" (never the figure it had), "Could not load the latest sales" with "Retry" and, in the bell, "Could not check the notifications. They will show up when the connection is back.". In the way in: "Could not load the PIN pad. You can still enter with your account.", "Could not load the profile" with "Retry", "Could not load this device. Check the connection and try again.", "Could not load how the business asks for the PIN. Check the connection and try again." and "Could not load the devices. Check the connection and try again.". |
+| Empty | "Your apps will show up here. Add the ones your business needs."; with no steps, the list does not show; "Empty panel. Tap ⋮ to add widgets."; a panel without data, "No data"; the bell's panel, "All caught up" and "Nothing needs your attention."; "Nobody has entered from any device yet."; in "Switch user", "Nobody here has a PIN yet: give one in My profile or in Employees.". |
+| Error | Each zone fails on its own: "Could not load your apps. Reload the page; if it keeps failing, sign in again.", "Could not load what is left to set up" with "Retry", "Could not load the panels" with "Retry", a panel with "Unavailable" (never the figure it had), "Could not load the latest sales" with "Retry" and, in the bell's panel, "Could not load notifications" with "Retry" or, if it already had notices, "Could not refresh the notifications. What you see may be out of date." with the ones from before. In the way in: "Could not load the PIN pad. You can still enter with your account.", "Could not load the profile" with "Retry", "Could not load this device. Check the connection and try again.", "Could not load how the business asks for the PIN. Check the connection and try again." and "Could not load the devices. Check the connection and try again.". |
 | No permission | A step the person cannot do: no button and "An administrator has to set this up.". A panel or a counter they may not see does not show. In Settings, whoever does not run the business sees "This device" and "PIN pad" with the controls off ("Only an administrator can change how people enter on this device.", "Only an administrator can change whether it asks.") and, instead of the list, "Only an administrator can see and remove the devices.". |
 
 On the Settings · Business screen:
@@ -445,8 +458,8 @@ Steps:
      without a country (a demo, ERPlora's own) counts as Spain, ERPlora's market: it sees Spain's steps and none
      of another country (hub#682). A step whose check fails does not show either: what could not be checked is
      never taken as done nor as pending.
-  6. While a "Needed to invoice" step is missing, the "You cannot issue invoices yet" strip shows over the
-     other screens; with the phone on its side, in one line with a single "Set up" (hub#838).
+  6. While a "Needed to invoice" step is missing, the bell carries the "You cannot issue invoices yet" notice,
+     with "Set up" to that step, on any screen.
   7. When someone else completes a step on another device, or turns an app on, the list updates by itself.
 In: the steps each app that is on declares, with their check, their country, their permission and their
 screen; and the countries where each app says it is mandatory.
@@ -497,8 +510,8 @@ Status: done
 Actor: manager, employee
 Screen: Home · Summary
 Steps:
-  1. A step that stops invoicing and that this person cannot do stays on their list and on the strip,
-     with its "Needed to invoice" label.
+  1. A step that stops invoicing and that this person cannot do stays on their list, with its "Needed to
+     invoice" label, and in the bell's "You cannot issue invoices yet" notice.
   2. It carries no "Set up": it says "An administrator has to set this up.".
   3. The steps that do not stop invoicing and that this person cannot do do not show on their list.
 In: the person's permissions in this business.
@@ -634,15 +647,15 @@ Actor: owner, administrator
 Screen: The bell
 Steps:
   1. A notice between apps (for example, "sale charged" towards Invoicing) ran out of retries.
-  2. An administrator's bell goes up at once, without waiting or reloading, and opened it shows "Failed
-     events" with how many there are.
-  3. Tapping the row opens "System" on "Failed events", where they are resent or discarded (BASE-F43).
-  4. When none is left, the row disappears.
+  2. An administrator's bell goes up at once, without waiting or reloading: the urgent notice "2 failed events"
+     comes in as a card and settles in it.
+  3. "Review the events" opens "System" on "Failed events", where they are resent or discarded (BASE-F43).
+  4. When none is left, the notice disappears.
 In: how many notices of this business were left undelivered, only for whoever runs the business.
 Out: nothing.
-If it fails: an employee or a manager does not see the row. If it cannot ask, the bell keeps what it
-last knew; if it never knew: "Could not check the notifications. They will show up when the connection is
-back.".
+If it fails: an employee or a manager does not see the notice. If it cannot ask, the bell keeps what it
+last knew and its panel says "Could not refresh the notifications. What you see may be out of date."; if it never
+knew: "Could not load notifications" with "Retry".
 Involved: BASE-F40
 
 ### BASE-F11 Go to erplora.com to manage or upgrade the plan
@@ -1254,7 +1267,7 @@ Status: done
 Actor: owner, administrator, manager, employee
 Screen: System · Usage and plan
 Steps:
-  1. They tap "System" in the side menu, or come from the bell's "Failed events" row.
+  1. They tap "System" in the side menu, or come from the bell's notice of the failed events.
   2. At the bottom there are four tabs, in this order: "Usage and plan", "Updates", "Failed events" and "Logs". "Usage and
      plan" opens. The tab chosen stays in the address: a link or a reload opens the same one.
   3. A tab that does not exist opens "Usage and plan", and so do the old links to "Resources" and to "Plan and limits"; the
@@ -1313,8 +1326,8 @@ Steps:
      with "Measured on {day}". Neither CPU nor memory: they cannot be attributed to a business, so they do not appear, nor
      does any sentence in their place.
   9. With motives the hub knows without asking erplora.com (the files, the capacity and WhatsApp), the bell of whoever
-     runs the business shows the "Plan limits" row, which adds one per motive and opens "System" on "Usage and plan".
-     Without them, the row goes away.
+     runs the business carries the notice "1 plan limit to review", which adds one per motive, and "See the plan’s
+     usage" opens "System" on "Usage and plan". Without them, the notice goes away.
   10. Whoever runs the business can ask the assistant the same ("how much space do I have left?", "how many requests
       have we had this month?") and it answers with these figures.
 In: what is measured of this business: every night, what its files and its database take up and the people who had
@@ -1377,7 +1390,7 @@ Status: done
 Actor: owner, administrator
 Screen: System · Failed events
 Steps:
-  1. They come from the bell's "Failed events" row (BASE-F10) or tap the "Failed events" tab.
+  1. They come from the bell's notice of the failed events (BASE-F10) or tap the "Failed events" tab.
   2. While it loads: "Loading the failed events…". With events: "Fix the cause (a permission, an app that is
      off…) and resend. The event is never edited: if the cause is still there, it fails again and comes back
      here.".
@@ -2320,9 +2333,9 @@ Actor: owner, administrator, manager, employee
 Screen: Assistant
 Steps:
   1. With the session open, they tap the "Assistant" sparkles in the top bar, next to the bell. Tapping them again
-     closes it. On a phone, the sparkles and the bell go together in "More options" (with the bell's number), so the
-     title stays centred: there, "Assistant" opens the panel as soon as the menu has finished closing, so what they
-     type straight away goes to the chat's box and Enter sends it; and "Notifications" opens the bell.
+     closes it. On a phone, the sparkles go in "More options", so the title stays centred, and the bell stays in
+     sight: there, "Assistant" opens the panel as soon as the menu has finished closing, so what they type straight
+     away goes to the chat's box and Enter sends it.
   2. The panel comes in from the right. On a tablet or a computer it takes a column beside the screen and pushes it:
      they can keep working with the panel open. On a phone it covers the screen, over a dark veil.
   3. It closes with the "Close" ×, with the Esc key (wherever the cursor is, except in a window open over the

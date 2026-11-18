@@ -147,3 +147,10 @@ export function setupStep(key: string) {
 export async function streamsQuiet(streams: number[], quietMs = 1_000): Promise<void> {
   await expect.poll(() => Date.now() - (streams.at(-1) ?? 0), { timeout: 15_000 }).toBeGreaterThan(quietMs);
 }
+
+/** The Home as it is read, before anything changes the bell: its panels answered and its live stream settled. */
+export async function homeRead(page: Page, streams: number[]): Promise<void> {
+  await expect(shown(page).locator('[data-testid="widget-board"] [data-testid="widget"]').first()).toBeVisible();
+  await expect(shown(page).locator('[data-testid="widget-board"] [data-testid="widget"][aria-busy="true"]')).toHaveCount(0);
+  await streamsQuiet(streams);
+}

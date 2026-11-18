@@ -53,7 +53,7 @@ async function send(entry: { person: string; pin: string } | { badge: string }):
   const input: ApprovalInput = { operation: props.question.operation, fingerprint: props.question.fingerprint, ...entry };
   try {
     const pass = await approve.run(input);
-    void toastSuccess(t('base.approval.approvedBy', { name: pass.approver }));
+    toastSuccess(t('base.approval.approvedBy', { name: pass.approver }));
     await modalController.dismiss(pass.token, APPROVED);
   } catch (failure) {
     error.value = refusalOf(failure);

@@ -76,7 +76,7 @@ async function confirm(): Promise<void> {
   } catch {
     return; // The window shows `command.error`.
   }
-  void toastSuccess(t('cash_register.open.done'));
+  toastSuccess(t('cash_register.open.done'));
   open.value = false;
   emit('opened');
 }

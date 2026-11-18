@@ -124,7 +124,7 @@ async function confirm(): Promise<void> {
   } catch {
     return; // The form shows `command.error`.
   }
-  void toastSuccess(
+  toastSuccess(
     t('cash_register.close.done', {
       number: closed.number,
       expected: formatMoney(closed.expected_balance, locale.value, money),

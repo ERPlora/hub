@@ -79,8 +79,8 @@ export async function restoreIssuer(context: BrowserContext, original: IssuerOut
   expect(res.status, 'the issuer back as it was').toBe(200);
 }
 
-/** Hub `a`'s issuer moved to the table `parked`, for a run that needs a hub without one (the red strip of a hub that
- *  cannot issue invoices yet). `unparkIssuer` puts it back. */
+/** Hub `a`'s issuer moved to the table `parked`, for a run that needs a business that cannot issue invoices yet.
+ *  `unparkIssuer` puts it back. */
 export function parkIssuer(parked: string): void {
   psql([`drop table if exists ${parked}`, `create table ${parked} as select * from invoice_issuer`, 'delete from invoice_issuer'].join('; '));
 }
