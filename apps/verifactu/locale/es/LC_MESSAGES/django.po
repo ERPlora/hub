@@ -861,87 +861,87 @@ msgstr "Di qué factura: su id o su número."
 msgid "The fingerprint must be 64 hexadecimal characters."
 msgstr "La huella debe tener 64 caracteres hexadecimales."
 
-#: services.py:89
+#: apps/verifactu/services/sealing.py
 msgid "This invoice cannot be declared to the AEAT: its amounts do not square (%(detail)s). No record was sealed and no number of the chain was spent."
 msgstr "Esta factura no se puede declarar a la AEAT: sus importes no cuadran (%(detail)s). No se ha sellado ningún registro ni se ha gastado ningún número de la cadena."
 
-#: services.py:93
+#: apps/verifactu/services/sealing.py
 msgid "The record does not pass the AEAT's schema (%(detail)s). No record was sealed and no number of the chain was spent."
 msgstr "El registro no pasa el esquema de la AEAT (%(detail)s). No se ha sellado ningún registro ni se ha gastado ningún número de la cadena."
 
-#: services.py:96
+#: apps/verifactu/services/sealing.py
 msgid "A full or rectifying invoice %(type)s needs the customer's tax ID: it cannot be declared without it."
 msgstr "Una factura completa o rectificativa %(type)s necesita el NIF del cliente: sin él no se puede declarar."
 
-#: services.py:99
+#: apps/verifactu/services/records.py
 msgid "This record cannot be corrected: only the last record of a registration the AEAT rejected or accepted with errors can."
 msgstr "Este registro no se puede subsanar: solo se subsana el último registro de un alta que la AEAT rechazó o aceptó con errores."
 
-#: services.py:102
+#: apps/verifactu/services/records.py
 msgid "This record cannot be cancelled: only a registration that reached (or will reach) the AEAT and has no cancellation can."
 msgstr "Este registro no se puede anular: solo se anula un alta que está (o estará) en la AEAT y no tiene anulación."
 
-#: services.py:105
+#: apps/verifactu/services/records.py
 msgid "This record is not in the queue: it is already in the AEAT, or the AEAT rejected it."
 msgstr "Este registro no está en la cola: ya está en la AEAT, o la AEAT lo rechazó."
 
-#: services.py:107
+#: apps/verifactu/services/sending.py
 msgid "This chain is being sent right now: try again in a moment."
 msgstr "Esta cadena se está enviando ahora mismo: inténtalo de nuevo en un momento."
 
-#: services.py:108
+#: apps/verifactu/services/sending.py
 msgid "The AEAT asked to wait: it goes out by itself at %(at)s."
 msgstr "La AEAT pidió esperar: sale solo a las %(at)s."
 
-#: services.py:110
+#: apps/verifactu/services/sending.py
 msgid "It cannot be sent now: %(why)s. It stays in the queue and goes out as soon as it can."
 msgstr "No se puede enviar ahora: %(why)s. Sigue en la cola y sale en cuanto se pueda."
 
-#: services.py:112
+#: apps/verifactu/services/chains.py
 msgid "There are no records of that issuer in this environment."
 msgstr "No hay registros de ese emisor en este entorno."
 
-#: services.py:113
+#: apps/verifactu/services/chains.py
 msgid "The pending records of this chain have to go out first."
 msgstr "Antes tienen que salir los registros pendientes de esta cadena."
 
-#: services.py:114
+#: apps/verifactu/services/aeat_query.py
 msgid "The AEAT refused the query: %(detail)s"
 msgstr "La AEAT ha rechazado la consulta: %(detail)s"
 
-#: services.py:115
+#: apps/verifactu/services/aeat_query.py
 msgid "The AEAT could not be asked: %(detail)s"
 msgstr "No se ha podido consultar a la AEAT: %(detail)s"
 
-#: services.py:116
+#: apps/verifactu/services/aeat_query.py
 msgid "it named the same page of records again"
 msgstr "volvió a indicar la misma página de registros"
 
-#: services.py:117
+#: apps/verifactu/services/aeat_query.py
 msgid "it has more than %(pages)s pages of records"
 msgstr "tiene más de %(pages)s páginas de registros"
 
-#: services.py:121
+#: apps/verifactu/services/chains.py
 msgid "The AEAT has no records of that issuer this month: there is nothing to recover."
 msgstr "La AEAT no tiene registros de ese emisor este mes: no hay nada que recuperar."
 
-#: services.py:123
+#: apps/verifactu/services/diagnostics.py
 msgid "The test invoice is only for the test environment."
 msgstr "La factura de prueba es solo para el entorno de pruebas."
 
-#: services.py:128
+#: apps/verifactu/services/config.py
 msgid "For ERPlora to file in production, ERPlora still has to approve your signed authorisation."
 msgstr "Para que ERPlora remita en producción falta que apruebe tu autorización firmada."
 
-#: services.py:131
+#: apps/verifactu/services/config.py
 msgid "Going live is not open on this server yet: ERPlora opens it when the real submission is ready."
 msgstr "El paso a producción todavía no está abierto en este servidor: ERPlora lo abre cuando la remisión real esté lista."
 
-#: services.py:133
+#: apps/verifactu/services/writes.py
 msgid "Set up the issuer first in Invoicing → Issuer."
 msgstr "Configura antes el emisor en Facturación → Emisor."
 
-#: services.py:135
+#: apps/verifactu/services/config.py
 msgid "It cannot go back to testing: this business already has records in production."
 msgstr "No se puede volver a pruebas: este negocio ya tiene registros en producción."
 
@@ -1005,15 +1005,15 @@ msgstr "Certificado propio de %(holder)s (%(holder_tax_id)s) subido; caduca el %
 msgid "Own certificate of %(holder)s (%(holder_tax_id)s) removed."
 msgstr "Certificado propio de %(holder)s (%(holder_tax_id)s) quitado."
 
-#: services.py
+#: apps/verifactu/services/own_certificate.py
 msgid "This server cannot keep certificates yet: ERPlora has to set its storage key."
 msgstr "Este servidor aún no puede guardar certificados: ERPlora tiene que configurar su clave de almacenamiento."
 
-#: services.py
+#: apps/verifactu/services/own_certificate.py
 msgid "The certificate belongs to %(holder)s, not to this business's issuer %(issuer)s."
 msgstr "El certificado es de %(holder)s, no del emisor de este negocio, %(issuer)s."
 
-#: services.py
+#: apps/verifactu/services/own_certificate.py
 msgid "The certificate expired on %(date)s: upload a valid one."
 msgstr "El certificado caducó el %(date)s: sube uno vigente."
 
@@ -1066,11 +1066,11 @@ msgstr "tu cuenta de ERPlora tiene un pago pendiente o está suspendida"
 msgid "ERPlora has not linked this business to its account on this server yet"
 msgstr "ERPlora todavía no ha vinculado este negocio con su cuenta en este servidor"
 
-#: services.py
+#: apps/verifactu/services/config.py
 msgid "Your ERPlora account has a pending payment or is suspended: settle it in your ERPlora account to go live."
 msgstr "Tu cuenta de ERPlora tiene un pago pendiente o está suspendida: regulariza el pago en tu cuenta de ERPlora para pasar a producción."
 
-#: services.py
+#: apps/verifactu/services/sealing.py
 msgid "Nothing was issued: this business files for real with the AEAT and cannot reach it now: %(why)s. Fix it in VeriFactu → Settings and try again."
 msgstr "No se ha emitido nada: este negocio presenta en real a la AEAT y ahora no puede hacerle llegar sus registros: %(why)s. Resuélvelo en VeriFactu → Ajustes y vuelve a intentarlo."
 
@@ -1078,11 +1078,11 @@ msgstr "No se ha emitido nada: este negocio presenta en real a la AEAT y ahora n
 msgid "this is a demo business: it always files in the AEAT's test environment"
 msgstr "es un negocio de demostración: siempre presenta en el entorno de pruebas de la AEAT"
 
-#: services.py
+#: apps/verifactu/services/config.py
 msgid "A demo business cannot go live: it always files in the AEAT's test environment."
 msgstr "Un negocio de demostración no puede pasar a producción: siempre presenta en el entorno de pruebas de la AEAT."
 
-#: services.py
+#: apps/verifactu/services/config.py
 msgid ""
 "ERPlora's own business files in the AEAT environment of its server: its "
 "environment cannot be switched."
@@ -1090,7 +1090,7 @@ msgstr ""
 "El negocio propio de ERPlora presenta en el entorno de la AEAT de su "
 "servidor: su entorno no se puede cambiar."
 
-#: services.py
+#: apps/verifactu/services/config.py
 msgid "Only ERPlora's own business follows the environment of its server."
 msgstr "Solo el negocio propio de ERPlora sigue el entorno de su servidor."
 
@@ -1126,47 +1126,47 @@ msgstr "ERPlora no tiene ningún otorgamiento de representación firmado de este
 msgid "ERPlora could not handle this right now. Try again in a few minutes."
 msgstr "ERPlora no ha podido atenderlo ahora mismo. Inténtalo en unos minutos."
 
-#: apps/verifactu/services.py
+#: apps/verifactu/services/authorisation.py
 msgid "Fill in the name and ID number of the person signing."
 msgstr "Rellena el nombre y el NIF de quien firma."
 
-#: apps/verifactu/services.py
+#: apps/verifactu/services/authorisation.py
 msgid "Attach the signed form."
 msgstr "Adjunta el modelo firmado."
 
-#: apps/verifactu/services.py
+#: apps/verifactu/services/authorisation.py
 msgid "The signed form has to be a PDF: scan it or sign it with AutoFirma."
 msgstr "El modelo firmado tiene que ser un PDF: escanéalo o fírmalo con AutoFirma."
 
-#: apps/verifactu/services.py
+#: apps/verifactu/services/authorisation.py
 msgid "Attach a copy of the identity document."
 msgstr "Adjunta una copia del documento de identidad."
 
-#: apps/verifactu/services.py
+#: apps/verifactu/services/authorisation.py
 msgid "With a NIE we also need a sample of the handwritten signature."
 msgstr "Con NIE necesitamos además una muestra de la firma manuscrita."
 
-#: apps/verifactu/services.py
+#: apps/verifactu/services/authorisation.py
 msgid "Attach the document that proves you may sign for the company."
 msgstr "Adjunta el documento que acredita que puedes firmar por la sociedad."
 
-#: apps/verifactu/services.py
+#: apps/verifactu/services/authorisation.py
 msgid "Each file has to be 5 MB at most."
 msgstr "Cada fichero puede ocupar 5 MB como máximo."
 
-#: apps/verifactu/services.py
+#: apps/verifactu/services/authorisation.py
 msgid "Each file has to be a PDF."
 msgstr "Cada fichero tiene que ser un PDF."
 
-#: apps/verifactu/services.py
+#: apps/verifactu/services/authorisation.py
 msgid "The authorisation cannot be sent as it is."
 msgstr "El otorgamiento no se puede enviar tal como está."
 
-#: apps/verifactu/services.py
+#: apps/verifactu/services/authorisation.py
 msgid "ERPlora did not take the authorisation as it is."
 msgstr "ERPlora no ha admitido el otorgamiento tal como está."
 
-#: apps/verifactu/services.py
+#: apps/verifactu/services/authorisation.py
 msgid "ERPlora has not linked this business yet. Try again in a few minutes."
 msgstr "ERPlora todavía no ha vinculado este negocio. Inténtalo en unos minutos."
 
@@ -1178,7 +1178,7 @@ msgstr "El fichero del certificado tiene que ocupar 1 MB como máximo."
 msgid "ERPlora has not opened real filing with the AEAT on this server yet"
 msgstr "ERPlora todavía no ha abierto la presentación real a la AEAT en este servidor"
 
-#: apps/verifactu/services.py
+#: apps/verifactu/services/config.py
 msgid ""
 "Your own certificate cannot be opened on this server: upload it again in "
 "VeriFactu → Configuration → My certificate."
@@ -1186,7 +1186,7 @@ msgstr ""
 "Tu certificado propio no se puede abrir en este servidor: vuelve a subirlo en "
 "VeriFactu → Configuración → Mi certificado."
 
-#: apps/verifactu/services.py
+#: apps/verifactu/services/config.py
 msgid ""
 "ERPlora's sending gateway is not configured on this server: nothing could "
 "reach the AEAT."

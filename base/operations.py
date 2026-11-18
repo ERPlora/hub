@@ -217,7 +217,7 @@ def _note_the_person(request: HttpRequest, user: Any) -> None:
     """The person of this request has activity in its business (``base.meter``, BASE-F40): here their session is already
     read, so it adds no statement, and an API key or a visitor never get here. A demo is not measured; the platform's host
     has no ``request.hub``."""
-    from base.services import saas_user_id_of
+    from base.services.devices import saas_user_id_of
 
     hub = getattr(request, "hub", None)
     if hub is not None and not hub.is_demo:

@@ -40,7 +40,7 @@ from base.tenancy.tests.business import A, HUB_DB
 from control.models import HubDue
 
 #: The door opens no database context of its own: each test enters a business's database only to read it.
-pytestmark = [HUB_DB, pytest.mark.usefixtures("no_test_fallback")]
+pytestmark = [HUB_DB]
 
 #: The business the SaaS registered: ``hub_a``, on its own database as every business is.
 HUB_ID = str(hubs.HUB_A_ID)

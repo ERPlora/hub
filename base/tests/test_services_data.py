@@ -485,7 +485,7 @@ def test_an_app_beyond_the_plans_limit_stays_off_says_why_and_the_rest_loads(bor
 
     assert chosen() == {"inventory"}
     assert "table" not in modules_on()
-    with pytest.raises(services.AppLimitReached) as refused:
+    with pytest.raises(services.apps.AppLimitReached) as refused:
         call(born, "base.app.enable", app="table")
     report = {app.id: app for app in loaded.report.apps}
     assert (report["inventory"].status, report["inventory"].reason) == ("applied", "")

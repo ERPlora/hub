@@ -6,9 +6,8 @@ explicit list: ``control`` (the registry, Django's admin, auth, contenttypes and
 deliveries: in the database of the context, control's for the registry's events) or ``shared`` (the SaaS's schema).
 A model nobody classified fails here and in the router, never lands anywhere by default. Own models have a UUIDv7
 key. Once migrated, each database holds exactly its classes' tables and ``django_migrations``: control's, its own and
-the outbox (nothing of a hub's: ``SHARED_MODE_EXTRA`` is empty); a hub's, those of its apps. The suite's
-control test database also holds the hubs' tables, for its tests written before the tenancy only
-(``base/tenancy/tests/legacy.py``): what production's ``migrate`` makes is checked on a database of its own.
+the outbox (nothing of a hub's: ``SHARED_MODE_EXTRA`` is empty); a hub's, those of its apps. What production's
+``migrate`` makes is checked on a database of its own.
 """
 
 import uuid
@@ -174,8 +173,7 @@ def test_control_shares_its_database_with_no_hub():
 @pytest.fixture
 def production_control(django_db_blocker):
     """A control database migrated as production's is: ``manage.py migrate`` in a process of its own, with
-    ``config.settings`` (its routers alone, not the tests' ``LegacyTablesRouter``), on a database of its own; dropped
-    after the test."""
+    ``config.settings``, on a database of its own; dropped after the test."""
     import os
     import subprocess
     import sys
@@ -220,16 +218,14 @@ def test_controls_database_as_production_migrates_it_holds_exactly_controls_tabl
 
 
 @pytest.mark.django_db
-def test_the_suites_control_database_holds_the_hubs_tables_too_only_for_its_tests_written_before_the_tenancy():
-    from django.conf import settings
+def test_the_suites_control_database_holds_exactly_what_productions_does():
     from django.db import connection
 
     from base.tenancy.tests import hubs
 
     found = hubs.table_names(connection.settings_dict["NAME"])
 
-    assert settings.DATABASE_ROUTERS[0] == "base.tenancy.tests.legacy.LegacyTablesRouter"
-    expected = tables_of(inventory.CONTROL, inventory.CONTEXTUAL, inventory.HUB) | {MIGRATIONS_TABLE}
+    expected = tables_of(inventory.CONTROL, inventory.CONTEXTUAL, *SHARED_MODE_EXTRA) | {MIGRATIONS_TABLE}
     assert found == expected, {"not a model's": sorted(found - expected), "missing": sorted(expected - found)}
 
 

@@ -159,7 +159,6 @@ def test_without_its_file_it_does_not_leave():
 
 
 @HUB_DB
-@pytest.mark.usefixtures("no_test_fallback")
 @pytest.mark.parametrize("sample", ["another_kind", "another_business"])
 def test_the_file_is_of_its_kind_and_of_its_business(hub_a, hub_b, sample):
     with use_hub(hub_a):

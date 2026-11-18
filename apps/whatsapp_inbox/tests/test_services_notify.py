@@ -167,7 +167,6 @@ def test_a_number_not_connected_sends_nothing():
 
 
 @HUB_DB
-@pytest.mark.usefixtures("no_test_fallback")
 def test_another_business_goes_by_its_own_number(hub_a, hub_b):
     from base.tenancy.context import use_hub
     from live.context import Scope

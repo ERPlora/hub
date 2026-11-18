@@ -23,13 +23,12 @@ from apps.invoice.tests.conftest import run
 from apps.verifactu.models import Record
 from base.tenancy.context import use_hub
 from base.tenancy.tests.business import HUB_DB
-from base.tenancy.tests.legacy import use_legacy
 from base.tests.test_internal import code, signed
 from control.models import Hub
 from live.context import Scope, system_context
 
 #: The door opens the platform hub's database itself: each test enters it only to read it.
-pytestmark = [HUB_DB, pytest.mark.usefixtures("no_test_fallback")]
+pytestmark = [HUB_DB]
 
 ROOT = "/internal/platform/invoices"
 HOST = "hub.erplora.internal"
@@ -106,8 +105,6 @@ def test_a_platform_hub_without_its_own_database_is_503_and_says_how_to_make_it(
 
     assert (issued.status_code, code(issued)) == (503, "base.platform_hub_missing")
     assert health.status_code == 503 and "create_platform_hub" in health.json()["detail"]
-    with use_legacy():
-        assert not Invoice.objects.exists()
 
 
 def test_the_platform_hub_issues_in_its_own_database_and_nowhere_else(client, hub_a, settings):

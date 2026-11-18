@@ -18,7 +18,7 @@ from base.tenancy.context import HubContextMismatch
 from base.tenancy.router import TenantRouter
 from base.tenancy.tests import hubs
 
-pytestmark = [pytest.mark.usefixtures("no_test_fallback"), pytest.mark.django_db(databases=hubs.HUB_DATABASES)]
+pytestmark = [pytest.mark.django_db(databases=hubs.HUB_DATABASES)]
 
 
 @pytest.fixture

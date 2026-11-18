@@ -90,7 +90,7 @@ def api_apps(ctx: OperationContext) -> list[dict[str, Any]]:
 )
 def api_key_list(ctx: OperationContext, data: ApiKeyListIn) -> dict:
     """Employees › API keys: every key, the newest first, and the apps a key per app may reach. While
-    the business shares its database with others, none is available (``base.services.has_own_database``)."""
+    the business shares its database with others, none is available (``base.services.reset.has_own_database``)."""
     hub = Hub.objects.filter(slug=ctx.scope.key).first()
     available = bool(hub is not None and hub.db_name)
     keys = [api_key_out(key) for key in ApiKey.objects.all()] if available else []

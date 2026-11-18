@@ -1,4 +1,4 @@
-"""Read operations of the verifactu app, one module per entity or use case, and the read helpers ``services.py``
+"""Read operations of the verifactu app, one module per entity or use case, and the read helpers ``services/``
 shares: importing each module here registers its operations.
 
 Every query runs ``READ ONLY`` (``@operation(kind="query")``) and can be followed live (``live.py``). Lists page

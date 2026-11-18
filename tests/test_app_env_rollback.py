@@ -19,6 +19,7 @@ from app_env_doubles import (
     revision,
     settings,
     with_production,
+    without_route,
 )
 
 app_env_rollback = load("app_env_rollback")
@@ -57,32 +58,24 @@ def kinds_reported(capsys):
     return {line.removeprefix("::error::").split(": ", 1)[0] for line in capsys.readouterr().err.splitlines()}
 
 
-def older_prod():
-    """The settings of an older version: the ERPlora route still closed in prod."""
-    section = copy.deepcopy(PROD)
-    for family in ("hub", "worker"):
-        section[family]["VERIFACTU_ERPLORA_ROUTE_ENABLED"] = "false"
-    return section
-
-
 # ── What a rollback records ────────────────────────────────────────────────────────────────────────────────────────
 
 
 def test_a_rollback_records_the_hub_settings_the_revisions_run(monkeypatch, workdir):
-    write_targets(workdir, older_prod())
+    write_targets(workdir, without_route())
 
     assert roll_back(monkeypatch, workdir, FakeCommands()) == 0
 
-    assert (workdir / "app_env.json").read_text() == json.dumps(older_prod(), sort_keys=True, separators=(",", ":"))
+    assert (workdir / "app_env.json").read_text() == json.dumps(without_route(), sort_keys=True, separators=(",", ":"))
 
 
 def test_a_revision_that_runs_other_settings_than_its_commit_goes_back_with_what_it_runs(monkeypatch, workdir):
-    write_targets(workdir, older_prod())
+    write_targets(workdir, without_route())
     commands = FakeCommands(file=json.dumps(settings()))
 
     assert roll_back(monkeypatch, workdir, commands) == 0
 
-    assert recorded(workdir) == older_prod()
+    assert recorded(workdir) == without_route()
     assert not any(command[0] == "git" for command in commands.calls)
 
 

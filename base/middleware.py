@@ -371,16 +371,13 @@ class HubDatabaseMiddleware:
             if hub is None:
                 return _CONTROL
         if hub is not None:
-            if hub.db_name:
-                tenancy_connections.open_hub_alias(hub)
-            elif not tenancy_context.serves_hubs_without_database():
-                raise tenancy_context.HubWithoutDatabase(f"{hub.slug} has no database of its own yet.")
+            tenancy_connections.open_hub_alias(hub)
         return hub
 
     @staticmethod
     def _entered(resolved):
         if resolved is _CONTROL:
-            return tenancy_context.use_admin_without_a_business()
+            return tenancy_context.use_control()
         if resolved is None:
             return nullcontext()
         return tenancy_context.use_hub(resolved)

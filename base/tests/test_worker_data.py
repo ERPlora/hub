@@ -1,6 +1,6 @@
 """The worker's data pass: a reset and a business that leaves, each copied first.
 
-Every tick the worker takes one hub with data work due (``base.services.claim_next_data_hub``, under its lease):
+Every tick the worker takes one hub with data work due (``base.services.offboarding.claim_next_data_hub``, under its lease):
 
 - a reset asked (``base.hub.reset``): its database copied (``base.tenancy.dumps``, ``reset``) and, only if the copy was
   kept, the sections emptied in its database with ``base.hub.data_reset`` recorded there; a copy that fails empties
@@ -36,22 +36,14 @@ from control.models import Hub, HubDue, HubDump
 
 pytestmark = [
     pytest.mark.django_db(transaction=True, databases=hubs.HUB_DATABASES),
-    pytest.mark.usefixtures("no_test_fallback"),
 ]
-
-
-@pytest.fixture
-def no_test_fallback(monkeypatch):
-    from base.tenancy import context
-
-    monkeypatch.setattr(context, "_test_fallback", None)
 
 
 @pytest.fixture
 def told(monkeypatch) -> list[tuple[str, list[str]]]:
     """Every live notice the pass sends: ``(channel, events)``."""
     sent: list[tuple[str, list[str]]] = []
-    monkeypatch.setattr(services, "notify", lambda scope, names: sent.append((scope.channel, list(names))))
+    monkeypatch.setattr(services.reset, "notify", lambda scope, names: sent.append((scope.channel, list(names))))
     return sent
 
 
@@ -259,7 +251,7 @@ def test_a_reset_still_to_do_stays_due_when_the_provisioning_pass_gives_its_leas
     with use_control():
         # The provisioning's pass never takes a ready hub's ring (its data work's or its apps' to set up).
         assert provisioning.claim_next_due_hub(now, provision.LEASE) is None
-        assert services.claim_next_data_hub(now, provision.LEASE) == hub_a.pk
+        assert services.offboarding.claim_next_data_hub(now, provision.LEASE) == hub_a.pk
         provisioning.release_hub(hub_a.pk, now)
 
     assert HubDue.objects.filter(hub_id=hub_a.pk, due_at=now, lease_until=None).exists()

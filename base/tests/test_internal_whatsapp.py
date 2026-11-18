@@ -30,7 +30,6 @@ from base.tenancy.context import use_hub
 from base.tenancy.identity import HubIdentityMismatch
 from base.tenancy.tests import hubs
 from base.tenancy.tests.business import A, B, HUB_DB, HUB_DB_COMMITTED
-from base.tenancy.tests.legacy import use_legacy
 from base.tests.test_hub_state_wake import heard, listening
 from base.tests.test_internal import HUB_ID, PATH as STATE_PATH, SECRET, code, signed
 from base.tests.test_session_revoke import acme
@@ -38,7 +37,7 @@ from base.tests.test_session_revoke import acme
 __all__ = ["acme", "listening"]
 
 #: The doors open the named business's database themselves: each test enters it only to read it.
-pytestmark = [HUB_DB, pytest.mark.usefixtures("no_test_fallback")]
+pytestmark = [HUB_DB]
 
 INBOUND = "/internal/whatsapp/inbound"
 STATUS = "/internal/whatsapp/status"
@@ -314,14 +313,12 @@ SAAS_HOSTS = [PRIVATE_NAME, "localhost"]
 
 
 @pytest.fixture
-def production(settings, monkeypatch):
-    """``() -> Client``: from now on, as in production: no shared database to fall back on (a hub's model without
-    ``use_hub`` is ``HubContextMissing``) and a client that answers a failure as the server does (500), not by raising.
-    Called after the rows the test needs are written."""
+def production(settings):
+    """``() -> Client``: a client that answers a failure as the server does (500), not by raising. Called after the rows
+    the test needs are written."""
     settings.ALLOWED_HOSTS = [*settings.ALLOWED_HOSTS, PRIVATE_NAME]
 
     def enter() -> Client:
-        monkeypatch.setattr(context, "_test_fallback", None)
         return Client(raise_request_exception=False)
 
     return enter
@@ -370,8 +367,6 @@ def test_a_business_without_its_own_database_is_503_and_runs_nothing(db, product
     answer = post(door, path, door_body(path, hub="acme"), host=PRIVATE_NAME)
 
     assert answer.status_code == 503 and code(answer) == "base.hub_maintenance"
-    with use_legacy():
-        assert not Message.objects.exists() and not Channel.objects.exists()
 
 
 @pytest.mark.django_db(databases=hubs.HUB_DATABASES)

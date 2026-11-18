@@ -22,8 +22,6 @@ from base.recovery import actor_of
 from base.tenancy.context import use_hub
 from base.tenancy.tests.test_recovery import ANA, LUIS, MARTA, Recoveries, gone, run, run_in
 
-pytestmark = pytest.mark.usefixtures("no_test_fallback")
-
 
 @pytest.fixture
 def recoveries(django_db_blocker, hub_databases):

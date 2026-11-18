@@ -24,6 +24,30 @@ sube al repo.
 a un segundo checkout le basta `VITE_DEV_PORT=5203` en su `.env`. `pnpm run dev` o la e2e sueltos solo la leen
 del entorno, y `uv run pytest` sigue en el `5173` aunque la defina (`config/settings_pytest.py`).
 
+## Comprobaciones antes de subir
+
+```bash
+git config core.hooksPath .githooks   # una vez por clon, cuando su HEAD ya trae .githooks/
+scripts/checks.sh fast                # lo mismo que corre el gancho, a mano, sobre el árbol de trabajo
+```
+
+`scripts/checks.sh fast` pasa en unos segundos, sin red ni base de datos, los tests de guardarraíles del tamaño de
+cada fichero, de ruff, de los contratos de import-linter y de la complejidad cognitiva, con sus listas de excepciones,
+que solo encogen (`.file-size-allow`, las de `pyproject.toml` y `complexipy-snapshot.json`). Su salida dice qué
+fichero incumple y por qué.
+
+El gancho `.githooks/pre-push` corre primero el `pre-push` global de la máquina, con los mismos argumentos y la misma
+entrada, y después `scripts/checks.sh fast` sobre cada commit que se sube, sacado en un worktree temporal con el
+entorno de Python de este checkout (`.venv`, o el de `UV_PROJECT_ENVIRONMENT`): se comprueba lo que se sube, nunca el
+árbol de trabajo. Un rojo para el push, y no hay variable para saltárselo; sin el entorno (`uv sync`) también se para.
+`commit-msg`, `pre-commit` y `applypatch-msg` pasan el turno a los ganchos globales del mismo nombre, que
+`core.hooksPath` dejaría de correr. La suite de la CI vuelve a pasar estos tests al fusionar, así que un clon sin el
+gancho no se salta nada. Sus tests: `tests/test_githooks.py` y `tests/test_checks.py`.
+
+El ajuste vale para todos los worktrees del clon, y la ruta es relativa a cada uno: en un worktree cuya rama aún no
+trae `.githooks/`, git no corre ningún gancho, tampoco los globales. Una rama que no trae `scripts/checks.sh` no se
+puede subir hasta que se le mergea `origin/main`.
+
 ## El humo de navegador (`@smoke`)
 
 ```bash
@@ -233,19 +257,10 @@ del Hub» de erplora-next.
 - **Tests**: la suite construye por sesión `<BD de test>_template_test` con el migrador y clona dos hubs con BD
   propia (`base/tenancy/tests/hubs.py`; fixtures `hub_a`, `hub_b`; marca `django_db(databases=hubs.HUB_DATABASES)`).
   La plantilla de test lleva todas las apps del hub (`migrator.portable_apps()`, `base/tests/test_hub_user_links.py`).
-  Los tests escritos antes de la tenencia que aún no se han pasado a una BD por negocio caen en un respaldo solo de la
-  suite (`base/tenancy/tests/legacy.py`): la BD de control de test lleva también las tablas de hub (`LegacyTablesRouter`,
-  solo en `config/settings_pytest.py`) y el worker les corre un paso propio (`legacy_worker`, `worker_pass`): sus tareas
-  en el ámbito del negocio `a` y el relay de sus avisos. El respaldo se enciende solo para los tests que nombra
-  `.legacy-fallback-allow`, una línea `<fichero>::<test>` por test (`base/tenancy/tests/legacy_allow.py`); cualquier otro
-  test corre como producción y, si se apoya en el respaldo, falla (`HubContextMissing`, `HubWithoutDatabase`). La lista
-  solo encoge: no gana líneas frente a `origin/main` (una línea sí puede moverse con su test a otro fichero) y la de un
-  test que ya no existe sale (`tests/test_guardrails_legacy_fallback.py`); y una pasada que corre todos los casos de un
-  test de la lista, todos en verde, sin que se apoye ni una vez en el respaldo, cae y dice qué línea quitar. La CI
-  reparte los casos de un test entre varios trabajos y ninguno los corre todos: cada trabajo guarda lo que vio
-  (`--legacy-fallback-report`) y el trabajo `legacy-fallback` lo junta (`python -m base.tenancy.tests.legacy_allow`) y
-  cae igual. Pasarlos a
-  una BD por negocio y borrar la lista con el respaldo es hub#611.
+  Todos los tests corren como producción: la BD de control de test tiene solo las tablas de control (los mismos routers
+  que producción) y un modelo de hub sin contexto falla (`HubContextMissing`). Las pruebas del corte y de
+  `control/0007`, que leen las tablas de las apps en control como estaban antes del corte, las crean ellas mismas
+  (`base/tenancy/tests/before_the_cut.py`).
 
 
 ### Activar una app crea sus tablas (tajada S3)

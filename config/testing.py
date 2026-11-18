@@ -20,9 +20,10 @@ from django.db import DEFAULT_DB_ALIAS, connections
 from psycopg import OperationalError, errors
 from psycopg.pq import TransactionStatus
 
-#: A table the migrations plant factory rows in, the tax app's catalogue. The flush of a transactional test empties
-#: every table at once, so this one speaks for all of them (``config/tests/test_reuse_db.py`` holds it to that).
-FACTORY_TABLE = "tax_taxcategory"
+#: A table of control's the migrations plant a factory row in, the freeze switch (``control/0010``). The flush of a
+#: transactional test empties every table at once, so this one speaks for all of them (``config/tests/test_reuse_db.py``
+#: holds it to that).
+FACTORY_TABLE = "control_freeze"
 
 #: What a session set and did not put back. Django's own time zone, which it sets on every new
 #: connection, is no change.

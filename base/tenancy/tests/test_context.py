@@ -5,7 +5,6 @@ thread of its own starts without it. Without a context, a hub's database is neve
 Every test runs in a fresh ``contextvars.Context``, so nothing the suite sets around it leaks in.
 """
 
-import contextlib
 import contextvars
 import threading
 import uuid
@@ -18,7 +17,7 @@ from live.context import OperationContext, Scope
 from base.tenancy import context
 from base.tenancy.context import HubContextMismatch, HubContextMissing
 
-pytestmark = pytest.mark.usefixtures("no_test_fallback", "aliases_without_a_server")
+pytestmark = pytest.mark.usefixtures("aliases_without_a_server")
 
 
 @pytest.fixture
@@ -88,7 +87,6 @@ def test_a_business_without_its_own_database_is_never_entered_nor_sent_to_contro
             context.current()
 
     fresh(probe)
-    assert not context.serves_hubs_without_database()
 
 
 def test_there_is_no_shared_database_any_more():
@@ -227,117 +225,3 @@ def test_an_operation_for_another_hub_never_runs_in_this_one():
                 pass
 
     fresh(probe)
-
-
-def test_the_test_fallback_stands_for_a_missing_context_only_when_the_tests_set_it(monkeypatch):
-    from base.tenancy.tests.legacy import LEGACY
-
-    a = shared_hub("a")
-
-    def probe():
-        with context.use_hub(a) as entered:
-            assert entered.alias == "default" and entered.hub is a
-        with context.operation_database(op(), ctx_of("host", "b")) as alias:
-            assert alias == "default"
-        return context.current().kind
-
-    monkeypatch.setattr(context, "_test_fallback", LEGACY)
-    # The suite's tests written before the tenancy: every business of theirs on control's test database.
-    assert fresh(probe) == LEGACY.kind
-    assert context.serves_hubs_without_database()
-    monkeypatch.setattr(context, "_test_fallback", None)
-    with pytest.raises(context.HubWithoutDatabase):
-        fresh(probe)
-
-
-def test_the_admin_without_a_business_works_on_control_and_under_the_suites_fallback_on_it(monkeypatch):
-    from base.tenancy.tests.legacy import LEGACY
-
-    def probe():
-        with context.use_admin_without_a_business() as active:
-            return active.kind
-
-    assert fresh(probe) == context.CONTROL
-    monkeypatch.setattr(context, "_test_fallback", LEGACY)
-    assert fresh(probe) == LEGACY.kind
-
-
-def enter_a_business_without_its_database():
-    with context.use_hub(shared_hub("a")):
-        pass
-
-
-def ask_without_a_context():
-    context.current_alias()
-
-
-def open_the_admin_without_a_business():
-    with context.use_admin_without_a_business():
-        pass
-
-
-def serve_a_business_without_its_database():
-    context.serves_hubs_without_database()
-
-
-def peek_without_a_context():
-    context.peek()
-
-
-def ask_inside_a_hub():
-    with context.use_hub(own_hub("b")):
-        context.current_alias()
-
-
-def ask_inside_control():
-    with context.use_control():
-        context.current_alias()
-
-
-def ask_inside_the_legacy_tables():
-    from base.tenancy.tests.legacy import use_legacy
-
-    with use_legacy():
-        context.current_alias()
-
-
-LEANING_ON_THE_FALLBACK = [
-    enter_a_business_without_its_database,
-    ask_without_a_context,
-    open_the_admin_without_a_business,
-    serve_a_business_without_its_database,
-]
-RUNNING_AS_PRODUCTION_DOES = [
-    peek_without_a_context,
-    ask_inside_a_hub,
-    ask_inside_control,
-    ask_inside_the_legacy_tables,
-]
-
-
-def times_the_fallback_was_leaned_on(probe) -> int:
-    before = context._test_fallback_entries
-    with contextlib.suppress(context.HubWithoutDatabase, HubContextMissing):
-        fresh(probe)
-    return context._test_fallback_entries - before
-
-
-@pytest.mark.parametrize("probe", LEANING_ON_THE_FALLBACK)
-def test_whatever_production_would_refuse_or_tell_apart_counts_as_leaning_on_the_suites_fallback(monkeypatch, probe):
-    from base.tenancy.tests.legacy import LEGACY
-
-    monkeypatch.setattr(context, "_test_fallback", LEGACY)
-    assert times_the_fallback_was_leaned_on(probe) == 1
-
-
-@pytest.mark.parametrize("probe", RUNNING_AS_PRODUCTION_DOES)
-def test_what_runs_as_production_does_never_counts_even_with_the_fallback_on(monkeypatch, probe):
-    from base.tenancy.tests.legacy import LEGACY
-
-    monkeypatch.setattr(context, "_test_fallback", LEGACY)
-    assert times_the_fallback_was_leaned_on(probe) == 0
-
-
-@pytest.mark.parametrize("probe", LEANING_ON_THE_FALLBACK + RUNNING_AS_PRODUCTION_DOES)
-def test_without_the_fallback_nothing_counts(probe):
-    assert times_the_fallback_was_leaned_on(probe) == 0
