@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:b7d032ba25d0614826d2d707abf180cf4790aa984c6462fd7255eb914c13e847 -->
+<!-- generated from WORKBOOK.md sha256:5eb84700189a270d55f59c47a209e75d93d6d15432d9808e438e675db53c3e7d -->
 
 ## What it is for and who it is for
 
@@ -219,7 +219,8 @@ Menu **VeriFactu → Settings**. Title "VeriFactu settings". Three blocks:
 When ERPlora's route is unavailable, "Sending" shows the certificate status and "Upload your certificate" or
 "Manage certificate", without the route's sentence or any reference to the authorisation. If it is needed for
 production, an information notice beside "Go live" says "You can keep testing. To go live, upload your business
-certificate." and links to "Upload your certificate"; the other blockers stay in their list and the button is
+certificate.", with no link of its own: the action is the one beside the certificate status, a single one in the
+card; the other blockers stay in their list and the button is
 disabled while any remain. Notices and diagnostics do not bring back the authorisation or the old route's name, and
 "Test the connection" is secondary in testing.
 In a business outside Spain, on top shows "VeriFactu is only for businesses in Spain." as the only reason, and "Go

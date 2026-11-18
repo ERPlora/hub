@@ -230,7 +230,8 @@ Menú **VeriFactu → Ajustes**. Título «Ajustes de VeriFactu». Tres bloques:
 Cuando la vía de ERPlora no está disponible, «Envío» muestra el estado del certificado y «Sube tu certificado» o
 «Gestionar el certificado», sin la frase de la vía ni ninguna referencia a la autorización. Si falta para producción, un
 aviso informativo junto a «Pasar a producción» dice «Puedes seguir probando. Para pasar a producción, sube el
-certificado de tu negocio.» y enlaza con «Sube tu certificado»; los demás bloqueos siguen en su lista y el botón queda
+certificado de tu negocio.», sin enlace propio: la acción es la que va junto al estado del certificado, una sola en la
+tarjeta; los demás bloqueos siguen en su lista y el botón queda
 deshabilitado mientras haya alguno. Los avisos y diagnósticos no recuperan la autorización ni el nombre de la vía
 antigua, y «Probar la conexión» es secundario en pruebas.
 En un negocio de fuera de España, arriba sale «VeriFactu solo es para negocios de España.» como único motivo, y «Pasar
