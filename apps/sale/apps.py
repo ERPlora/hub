@@ -3,7 +3,7 @@ refunds, the payment methods, the departments of the open price, the quick notes
 (WORKBOOK.md)."""
 
 from django.utils.translation import gettext_lazy as _
-from live.meta import Category, LiveAppConfig, Nav, Widget
+from live.meta import Category, Help, LiveAppConfig, Nav, Widget
 
 from apps.sale.events import FIGURE_EVENTS, SALE_EVENTS
 
@@ -114,6 +114,7 @@ class SaleConfig(LiveAppConfig):
         Nav("departments", _("Sections"), "ion:grid-outline", "/sale/departments"),
         Nav("settings", _("Settings"), "ion:settings-outline", "/sale/settings"),
     ]
+    help = Help()
     # The Home's panels, on the queries Sales' own screen reads, each refreshed by the events live.py re-runs its query
     # on. Registered icons only: the old `trending-up-outline` and `bar-chart-outline` wait in UI-REQUESTS.md. No steps
     # of «Finish setting up your business» nor counters of the bell: the old module had none.

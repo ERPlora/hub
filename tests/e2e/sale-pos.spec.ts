@@ -11,6 +11,7 @@
 import { expect, type Page, test } from '@playwright/test';
 
 import { A, EMPLOYEE, api, hostPage, login, psql, shot, shown } from './helpers';
+import { offersRowAction } from './service-helpers';
 import { cleanUp as cleanCustomers, createCard, e2eName, spanishMobile } from './customer-helpers';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
 import { snapshotSeries } from './invoice-helpers';
@@ -331,8 +332,8 @@ test('the employee charges at the till and sees «Void» and «Refund» on their
     // The cashier sees «Void» and «Refund» (hub#250): either asks a
     // manager's approval, which sale-approval.spec.ts walks end to end.
     const sold = await newestSaleOf(context, water.sku);
-    await expect(shown(page).locator(`[data-testid=sales-table-row-${sold.id}-void]`).first()).toBeVisible();
-    await expect(shown(page).locator(`[data-testid=sales-table-row-${sold.id}-refund]`).first()).toBeVisible();
+    expect(await offersRowAction(page, 'sales-table', sold.id, 'void'), 'Void').toBe(true);
+    expect(await offersRowAction(page, 'sales-table', sold.id, 'refund'), 'Refund').toBe(true);
     await page.screenshot({ path: shot('sale-sales-employee') });
   } finally {
     await context.close();

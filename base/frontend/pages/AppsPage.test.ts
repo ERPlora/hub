@@ -1,83 +1,18 @@
-import { AppPage, applySurface, toastError, toastSuccess } from '@erplora/ui/shell';
+import { AppPage, applySurface } from '@erplora/ui/shell';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { sessionChanged } from '../lib/access';
-
-import { EMPLOYEE, errorFrame, flush, followPass, mountBase, OWNER, passRefused, placedUpgrade, SIGNED, subId } from '../__tests__/mount-base';
+import { app } from '../__tests__/app-row';
+import { appActionLabel, freshEachTest, ids as idsOf, INVOICE, LIST, type Mounted, noteOf, open, PLANS, REPORTS, STOCK, STORE, TAX } from '../__tests__/apps-page';
+import { EMPLOYEE, errorFrame, flush, OWNER, subId } from '../__tests__/mount-base';
 import type { AppList, AppRow } from '../operations';
-import AppsPage from './AppsPage.vue';
 
-const mocks = vi.hoisted(() => ({ confirm: vi.fn() }));
-vi.mock('@erplora/ui/components', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@erplora/ui/components')>()),
-  useConfirm: () => ({ confirm: mocks.confirm }),
-}));
-vi.mock('@erplora/ui/shell', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@erplora/ui/shell')>()),
-  toastSuccess: vi.fn(),
-  toastError: vi.fn(),
-}));
-vi.mock('../lib/access', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../lib/access')>()),
-  sessionChanged: vi.fn(),
-}));
+const ids = (wrapper: Mounted['wrapper']) => idsOf({ wrapper } as Mounted);
 
-function app(id: string, fields: Partial<AppRow> = {}): AppRow {
-  return {
-    id,
-    name: id[0].toUpperCase() + id.slice(1),
-    icon: 'ion:cube-outline',
-    category: 'sales',
-    category_label: 'Sales, payments and tax',
-    summary: `What ${id} does.`,
-    premium: false,
-    right: 'free',
-    state: 'on',
-    chosen: true,
-    path: `/${id}/home`,
-    requires: [],
-    required_by: [],
-    refusal: null,
-    mandatory: false,
-    ...fields,
-  };
-}
+vi.mock('@erplora/ui/components', async (importOriginal) => (await import('../__tests__/apps-page-spies')).componentsWithConfirmSpy(importOriginal));
+vi.mock('@erplora/ui/shell', async (importOriginal) => (await import('../__tests__/toast-spies')).shellWithToastSpies(importOriginal));
+vi.mock('../lib/access', async (importOriginal) => (await import('../__tests__/apps-page-spies')).accessWithSessionSpy(importOriginal));
 
-const STORE = 'https://erplora.com/store/modules?business=h1';
-const TAX = app('tax', { name: 'Taxes', required_by: ['invoice'] });
-const INVOICE = app('invoice', { name: 'Invoicing', requires: ['tax'], category: 'sales' });
-const REPORTS = app('reports', { name: 'Reports', path: null, category: 'organization', category_label: 'Organization' });
-const STOCK = app('stock', { name: 'Stock', premium: true, right: 'missing', state: 'blocked', path: null, category: 'catalog', category_label: 'Catalog and stock' });
-const PLANS = 'https://erplora.com/store/plans?business=h1';
-const LIST: AppList = {
-  apps: [TAX, INVOICE, REPORTS, STOCK],
-  country_name: 'Spain',
-  store_url: STORE,
-  plan_url: PLANS,
-  max_apps: null,
-  enabled: 3,
-};
-
-async function open(path = '/apps', options: Parameters<typeof mountBase>[1] = {}) {
-  const m = await mountBase(AppsPage, { path, routes: ['/apps', '/tax/home', '/invoice/home'], ...options });
-  const call = await m.live();
-  return { ...m, call };
-}
-
-function ids(wrapper: Awaited<ReturnType<typeof open>>['wrapper']) {
-  return wrapper.findAll('[data-testid="apps-row"]').map((row) => row.attributes('data-id'));
-}
-
-beforeEach(() => {
-  applySurface('web');
-  mocks.confirm.mockReset();
-  vi.mocked(toastSuccess).mockClear();
-  vi.mocked(toastError).mockClear();
-  vi.mocked(sessionChanged).mockClear();
-});
-afterEach(() => {
-  document.body.innerHTML = '';
-});
+freshEachTest();
 
 describe('AppsPage', () => {
   it('follows the business’s apps live', async () => {
@@ -130,6 +65,18 @@ describe('AppsPage', () => {
     expect(m.wrapper.find('[data-testid="apps-row"][data-id="stock"]').text()).toContain('Needs a subscription');
   });
 
+  it('shows the plan under the app name, and «Open» as a named icon button in the list', async () => {
+    const m = await open('/apps#all');
+    await m.result(m.call, 'base.app.list', LIST);
+    const invoice = m.wrapper.find('[data-testid="apps-row"][data-id="invoice"]');
+    expect(invoice.find('.data-table__identity-title').text()).toContain('Invoicing');
+    expect(invoice.find('[data-testid="apps-plan"]').text()).toBe('Free');
+    expect(invoice.find('.data-table__identity-icon').classes()).toContain('ep-icon-tile');
+    const opener = m.wrapper.find('[data-testid="apps-row-tax-open"]');
+    // Its name is the title of the host and, inside, the `aria-label` Ionic moves onto its native button.
+    expect([opener.text(), opener.attributes('title')]).toEqual(['', 'Open']);
+  });
+
   it('«Paid» (#paid) lists only what is bought apart; never a free app', async () => {
     const m = await open('/apps#paid');
     await m.result(m.call, 'base.app.list', LIST);
@@ -157,27 +104,26 @@ describe('AppsPage', () => {
     ]);
   });
 
-  it('a paid app without its right links to erplora.com’s Store for whoever runs the business', async () => {
+  it('a paid app without its right offers «Upgrade plan» to whoever runs the business, and only it', async () => {
     const m = await open('/apps#all');
     await m.result(m.call, 'base.app.list', LIST);
-    const buy = m.wrapper.find('[data-testid="apps-row"][data-id="stock"] [data-testid="apps-buy"]');
-    expect(buy.attributes()).toMatchObject({ href: STORE, target: '_blank', rel: 'noopener' });
-    expect(buy.text()).toBe('Upgrade plan');
-    expect(m.wrapper.find('[data-testid="apps-row"][data-id="tax"] [data-testid="apps-buy"]').exists()).toBe(false);
+    expect(await appActionLabel(m, 'stock', 'plans')).toBe('Upgrade plan');
+    expect(await appActionLabel(m, 'tax', 'plans')).toBeUndefined();
   });
 
-  it('who does not run the business sees why, without the link', async () => {
+  it('who does not run the business sees why and where it is bought, without the link', async () => {
     const m = await open('/apps#all', { session: EMPLOYEE });
     await m.result(m.call, 'base.app.list', LIST);
     expect(m.wrapper.find('[data-testid="apps-row"][data-id="stock"]').text()).toContain('Needs a subscription');
-    expect(m.wrapper.find('[data-testid="apps-buy"]').exists()).toBe(false);
+    expect(await appActionLabel(m, 'stock', 'plans')).toBeUndefined();
+    expect(noteOf(m, 'stock').text()).toBe('Subscribed to on erplora.com, from your ERPlora account.');
   });
 
   it('inside the installed app it sells nothing: no link to the Store, it says where it is bought', async () => {
     applySurface('mobile');
     const m = await open('/apps#all', { session: OWNER });
     await m.result(m.call, 'base.app.list', LIST);
-    expect(m.wrapper.find('[data-testid="apps-buy"]').exists()).toBe(false);
+    expect(await appActionLabel(m, 'stock', 'plans')).toBeUndefined();
     expect(m.wrapper.find('[data-testid="apps-row"][data-id="stock"]').text()).toContain('erplora.com');
   });
 
@@ -222,9 +168,9 @@ describe('AppsPage', () => {
   // and again, so they are not there; the day an app is sold apart they come back on their own.
   describe('with no app sold apart', () => {
     const FREE_LIST: AppList = { ...LIST, apps: [TAX, INVOICE, REPORTS] };
-    const tabIds = (m: Awaited<ReturnType<typeof open>>) =>
+    const tabIds = (m: Mounted) =>
       (m.wrapper.getComponent(AppPage).props('tabs') as { id: string }[]).map((tab) => tab.id);
-    const headers = (m: Awaited<ReturnType<typeof open>>) =>
+    const headers = (m: Mounted) =>
       m.wrapper.findAll('[role="columnheader"]').map((header) => header.text());
 
     it('has no «Paid» tab', async () => {
@@ -243,7 +189,7 @@ describe('AppsPage', () => {
       expect(headers(m)).toContain('Comes with');
       expect(m.wrapper.find('[data-testid="apps-price"]').exists()).toBe(false);
       const invoice = m.wrapper.find('[data-testid="apps-row"][data-id="invoice"]');
-      expect(invoice.text()).not.toContain('Free');
+      expect(invoice.find('[data-testid="apps-plan"]').text()).toBe('Free');
       expect(invoice.text()).toContain('Taxes');
     });
 
@@ -280,8 +226,8 @@ describe('AppsPage', () => {
       afterEach(() => {
         vi.unstubAllGlobals();
       });
-      const fields = (m: Awaited<ReturnType<typeof open>>, id: string) =>
-        m.wrapper.findAll(`[data-testid="apps-row"][data-id="${id}"] .data-table__field-label`).map((label) => label.text());
+      const fields = (m: Mounted, id: string) =>
+        m.wrapper.findAll(`[data-testid="apps-row"][data-id="${id}"] .data-table__card-meta-label`).map((label) => label.text());
 
       it('say no price either', async () => {
         const m = await open('/apps#all');
@@ -292,6 +238,25 @@ describe('AppsPage', () => {
         expect(m.wrapper.find('[data-testid="apps-price"]').exists()).toBe(false);
       });
 
+      it('put the slotted app identity and its plan in the card head', async () => {
+        const m = await open('/apps#all');
+        await m.result(m.call, 'base.app.list', FREE_LIST);
+        const head = m.wrapper.find('[data-testid="apps-row"][data-id="invoice"] .data-table__card-head');
+        expect(head.find('[data-testid="apps-plan"]').text()).toBe('Free');
+        expect(head.find('.data-table__identity-icon').classes()).toContain('ep-icon-tile');
+        expect(fields(m, 'invoice')).not.toContain('App');
+      });
+
+      it('keep category and state filters in the mobile sheet', async () => {
+        const m = await open('/apps#all');
+        await m.result(m.call, 'base.app.list', LIST);
+        await m.wrapper.find('[data-testid="apps-filters-toggle"]').trigger('click');
+        await flush();
+        expect(m.wrapper.find('[data-testid="apps-filters-panel"]').attributes('aria-modal')).toBe('true');
+        expect(m.wrapper.find('[data-testid="apps-filter-category"]').exists()).toBe(true);
+        expect(m.wrapper.find('[data-testid="apps-filter-state"]').exists()).toBe(true);
+      });
+
       it('say the price again once an app is sold apart', async () => {
         const m = await open('/apps#all');
         await m.result(m.call, 'base.app.list', LIST);
@@ -300,556 +265,76 @@ describe('AppsPage', () => {
     });
   });
 
-  describe('turning an app on or off', () => {
-    // sale came with customer; task was chosen; flow is off and needs nothing; booking (off) needs schedule (off).
+  describe('the counter: the apps on, as «My apps» lists them, and the plan’s chosen ones (hub#1286)', () => {
+    // Taxes is born on in every country (hub#997): on, never chosen, it takes nothing of the plan's limit.
+    const BORN = app('tax', { name: 'Taxes', chosen: false, mandatory: true });
+    const CHOSEN = app('task', { name: 'Tasks' });
+    const OFF = app('flow', { name: 'Flows', state: 'off', chosen: false, path: null });
+    // sale came with customer: both are on, and only sale is one of the plan's.
     const SALE = app('sale', { name: 'Sales', requires: ['customer'] });
     const CUSTOMER = app('customer', { name: 'Customers', chosen: false, required_by: ['sale'] });
-    const TASK = app('task', { name: 'Tasks' });
-    const FLOW = app('flow', { name: 'Flows', state: 'off', chosen: false, path: null });
-    const SCHEDULE = app('schedule', { name: 'Schedules', state: 'off', chosen: false, path: null });
-    const BOOKING = app('booking', { name: 'Bookings', state: 'off', chosen: false, path: null, requires: ['schedule'] });
-    const APPS: AppList = {
-      apps: [SALE, CUSTOMER, TASK, FLOW, SCHEDULE, BOOKING, STOCK],
+    const listOf = (enabled: number, ...apps: AppRow[]): AppList => ({
+      apps,
       country_name: 'Spain',
       store_url: STORE,
       plan_url: PLANS,
       max_apps: 20,
-      enabled: 2,
-    };
-    const posted = (m: Awaited<ReturnType<typeof open>>) =>
-      m.net.api.map((c) => [c.url, JSON.parse(String(c.init.body ?? '{}')) as Record<string, unknown>]);
-    const refusal = (status: number, error: Record<string, unknown>) => () => Response.json({ error }, { status });
-    /** The refusal's notice: it stays on screen until it is closed or the next change, because a toast went before
-     *  its long reason could be read. */
-    const refused = (m: Awaited<ReturnType<typeof open>>) => m.wrapper.find('[data-testid="apps-refused"]');
-
-    it('«Turn off» asks with the app and what goes with it, turns it off and reads the menu again', async () => {
-      mocks.confirm.mockResolvedValue(true);
-      const m = await open('/apps', {
-        onApi: () => Response.json({ app: 'sale', state: 'off', chosen: false, along: [{ id: 'customer', name: 'Customers' }] }),
-      });
-      await m.result(m.call, 'base.app.list', APPS);
-
-      await m.wrapper.find('[data-testid="apps-row-sale-toggle"]').trigger('click');
-      await flush();
-
-      expect(mocks.confirm).toHaveBeenCalledTimes(1);
-      const asked = mocks.confirm.mock.calls[0][0];
-      expect(asked.title).toBe('Turn off Sales?');
-      expect(asked.message).toContain('Customers');
-      expect(asked.message).toContain('Nothing is deleted');
-      expect(asked.tone).toBe('danger');
-      expect(posted(m)).toEqual([['/api/apps/disable', { app: 'sale' }]]);
-      expect(vi.mocked(toastSuccess).mock.calls[0][0]).toBe('Sales is off. Also turned off: Customers.');
-      expect(sessionChanged).toHaveBeenCalledTimes(1);
+      enabled,
     });
+    const counter = (m: Mounted) => m.wrapper.find('[data-testid="apps-counter"]').text();
 
-    it('cancelled, nothing is sent', async () => {
-      mocks.confirm.mockResolvedValue(false);
+    it('an app born on is turned on, and none of the plan’s', async () => {
       const m = await open();
-      await m.result(m.call, 'base.app.list', APPS);
-      await m.wrapper.find('[data-testid="apps-row-task-toggle"]').trigger('click');
-      await flush();
-      expect(m.net.api).toEqual([]);
-      expect(sessionChanged).not.toHaveBeenCalled();
+      await m.result(m.call, 'base.app.list', listOf(0, BORN, OFF));
+      expect(counter(m)).toBe('1 app turned on · 0 of 20 in your plan');
     });
 
-    it('one another app on needs says which to turn off first, without asking or sending', async () => {
+    it('an app the business chose is turned on and one of the plan’s', async () => {
       const m = await open();
-      await m.result(m.call, 'base.app.list', APPS);
-      await m.wrapper.find('[data-testid="apps-row-customer-toggle"]').trigger('click');
-      await flush();
-      expect(mocks.confirm).not.toHaveBeenCalled();
-      expect(m.net.api).toEqual([]);
-      expect(refused(m).text()).toContain('Nothing was changed');
-      expect(refused(m).text()).toContain('Turn off Sales first.');
-      expect(toastError).not.toHaveBeenCalled();
+      await m.result(m.call, 'base.app.list', listOf(1, BORN, CHOSEN, OFF));
+      expect(counter(m)).toBe('2 apps turned on · 1 of 20 in your plan');
     });
 
-    it('a 409 from the server says the same, with the apps it names', async () => {
-      mocks.confirm.mockResolvedValue(true);
-      const m = await open('/apps', {
-        locale: 'es',
-        onApi: refusal(409, { code: 'base.app_required', message: 'server words', required_by: ['sale'] }),
-      });
-      await m.result(m.call, 'base.app.list', APPS);
-      await m.wrapper.find('[data-testid="apps-row-task-toggle"]').trigger('click');
-      await flush();
-      expect(refused(m).text()).toContain('No se ha cambiado nada');
-      expect(refused(m).text()).toContain('Desactiva antes Sales.');
-      expect(toastError).not.toHaveBeenCalled();
-      expect(sessionChanged).not.toHaveBeenCalled();
+    it('an app off, or paid without its right, is not turned on', async () => {
+      const m = await open();
+      await m.result(m.call, 'base.app.list', listOf(0, OFF, STOCK));
+      expect(counter(m)).toBe('0 apps turned on · 0 of 20 in your plan');
     });
 
-    it('an app that refuses to go off says its reason', async () => {
-      mocks.confirm.mockResolvedValue(true);
-      const m = await open('/apps', {
-        onApi: refusal(409, { code: 'base.app_vetoed', message: 'VeriFactu has records the AEAT has not accepted yet.', app: 'task' }),
-      });
-      await m.result(m.call, 'base.app.list', APPS);
-      await m.wrapper.find('[data-testid="apps-row-task-toggle"]').trigger('click');
-      await flush();
-      expect(refused(m).text()).toContain('VeriFactu has records the AEAT has not accepted yet.');
-      expect(toastError).not.toHaveBeenCalled();
-    });
-
-    it('a refusal stays until it is closed, and the next change clears it', async () => {
-      mocks.confirm.mockResolvedValue(true);
-      let answer = refusal(409, { code: 'base.app_vetoed', message: 'Send the pending records first.', app: 'task' });
-      const m = await open('/apps', { onApi: () => answer() });
-      await m.result(m.call, 'base.app.list', APPS);
-      // A minute later the reason is still there: nothing on a timer takes it away.
-      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'] });
-      try {
-        await m.wrapper.find('[data-testid="apps-row-task-toggle"]').trigger('click');
-        await vi.advanceTimersByTimeAsync(60_000);
-      } finally {
-        vi.useRealTimers();
-      }
-      await flush();
-      expect(refused(m).text()).toContain('Send the pending records first.');
-
-      await refused(m).find('button.close').trigger('click');
-      await flush();
-      expect(refused(m).exists()).toBe(false);
-
-      await m.wrapper.find('[data-testid="apps-row-task-toggle"]').trigger('click');
-      await flush();
-      expect(refused(m).exists()).toBe(true);
-      answer = () => Response.json({ app: 'task', state: 'off', chosen: false, along: [] });
-      await m.wrapper.find('[data-testid="apps-row-task-toggle"]').trigger('click');
-      await flush();
-      expect(refused(m).exists()).toBe(false);
-    });
-
-    it('«Turn on» an app that needs nothing turns it on at once and reads the menu again', async () => {
-      const m = await open('/apps#all', { onApi: () => Response.json({ app: 'flow', state: 'on', chosen: true, along: [] }) });
-      await m.result(m.call, 'base.app.list', APPS);
-      const toggle = m.wrapper.find('[data-testid="apps-row-flow-toggle"]');
-      expect(toggle.text()).toContain('Turn on');
-      await toggle.trigger('click');
-      await flush();
-      expect(mocks.confirm).not.toHaveBeenCalled();
-      expect(posted(m)).toEqual([['/api/apps/enable', { app: 'flow' }]]);
-      expect(vi.mocked(toastSuccess).mock.calls[0][0]).toBe('Flows is on.');
-      expect(sessionChanged).toHaveBeenCalledTimes(1);
-    });
-
-    it('«Turn on» an app that needs others off asks first, naming them', async () => {
-      mocks.confirm.mockResolvedValue(true);
-      const m = await open('/apps#all', {
-        onApi: () => Response.json({ app: 'booking', state: 'on', chosen: true, along: [{ id: 'schedule', name: 'Schedules' }] }),
-      });
-      await m.result(m.call, 'base.app.list', APPS);
-      await m.wrapper.find('[data-testid="apps-row-booking-toggle"]').trigger('click');
-      await flush();
-      const asked = mocks.confirm.mock.calls[0][0];
-      expect([asked.title, asked.message]).toEqual(['Turn on Bookings?', 'Bookings needs Schedules: it turns on with it.']);
-      expect(posted(m)).toEqual([['/api/apps/enable', { app: 'booking' }]]);
-      expect(vi.mocked(toastSuccess).mock.calls[0][0]).toBe('Bookings is on. Also turned on: Schedules.');
-    });
-
-    it('at the plan’s limit it says so, with «Upgrade plan» for whoever runs the business on the web', async () => {
-      const m = await open('/apps#all', {
-        onApi: refusal(402, { code: 'base.app_limit_reached', message: 'server words', max_apps: 20, enabled: 20 }),
-      });
-      await m.result(m.call, 'base.app.list', { ...APPS, enabled: 20 });
-      await m.wrapper.find('[data-testid="apps-row-flow-toggle"]').trigger('click');
-      await flush();
-      const notice = m.wrapper.find('[data-testid="apps-limit"]');
-      expect(notice.text()).toContain('You have reached the 20-app limit of your plan. Upgrade your plan or turn one off.');
-      const upgrade = notice.find('[data-testid="apps-limit-upgrade"]');
-      expect(upgrade.attributes()).toMatchObject({ href: PLANS, target: '_blank', rel: 'noopener' });
-      expect(upgrade.text()).toBe('Upgrade plan');
-      expect(sessionChanged).not.toHaveBeenCalled();
-      expect(toastError).not.toHaveBeenCalled();
-      expect(refused(m).exists()).toBe(false);
-    });
-
-    /** The Apps store at the plan's limit, its notice out, with `pass` as what signing the pass answers. */
-    async function atTheLimit(pass: () => Response) {
-      const limit = refusal(402, { code: 'base.app_limit_reached', message: 'server words', max_apps: 20, enabled: 20 });
-      const m = await open('/apps#all', { onApi: (call) => (call.url.includes('/saas-pass') ? pass() : limit()) });
-      await m.result(m.call, 'base.app.list', { ...APPS, enabled: 20 });
-      await m.wrapper.find('[data-testid="apps-row-flow-toggle"]').trigger('click');
-      await flush();
-      return m;
-    }
-
-    it('its «Upgrade plan» goes with the pass, already signed in on erplora.com', async () => {
-      const m = await atTheLimit(() => Response.json({ url: SIGNED }));
-
-      expect(await followPass(m, m.wrapper.get('[data-testid="apps-limit-upgrade"]').element)).toEqual({ next: 'plan', to: SIGNED });
-    });
-
-    it('its «Upgrade plan» is the platform’s PlanUpgradeLink to the business’s plans, not a copy of its own', async () => {
-      const m = await atTheLimit(passRefused);
-      expect(placedUpgrade(m.wrapper.get('[data-testid="apps-limit"]'))).toEqual({
-        url: PLANS,
-        testid: 'apps-limit-upgrade',
-        says: 'Upgrade plan',
-      });
-    });
-
-    it('when the pass cannot be signed, its «Upgrade plan» opens the plans as usual', async () => {
-      const error = vi.spyOn(console, 'error').mockImplementation(() => {});
-      const m = await atTheLimit(passRefused);
-
-      expect(await followPass(m, m.wrapper.get('[data-testid="apps-limit-upgrade"]').element)).toEqual({ next: 'plan', to: PLANS });
-      error.mockRestore();
-    });
-
-    it('in Spanish, and inside the installed app without the link', async () => {
-      applySurface('mobile');
-      const m = await open('/apps#all', {
-        locale: 'es',
-        onApi: refusal(402, { code: 'base.app_limit_reached', message: 'server words', max_apps: 20, enabled: 21 }),
-      });
-      await m.result(m.call, 'base.app.list', { ...APPS, enabled: 21 });
-      await m.wrapper.find('[data-testid="apps-row-flow-toggle"]').trigger('click');
-      await flush();
-      const notice = m.wrapper.find('[data-testid="apps-limit"]');
-      expect(notice.text()).toContain('Has llegado al límite de 20 apps de tu plan. Mejora el plan o desactiva una.');
-      expect(notice.find('[data-testid="apps-limit-upgrade"]').exists()).toBe(false);
-    });
-
-    it('a paid app without its right offers no «Turn on»: it is bought on erplora.com', async () => {
-      const m = await open('/apps#all');
-      await m.result(m.call, 'base.app.list', APPS);
-      expect(m.wrapper.find('[data-testid="apps-row-stock-toggle"]').exists()).toBe(false);
-      expect(m.wrapper.find('[data-testid="apps-row"][data-id="stock"] [data-testid="apps-buy"]').exists()).toBe(true);
-    });
-
-    it('any other failure says so with the server’s words, and the button waits while it is sent', async () => {
-      let answer: (response: Response) => void = () => undefined;
-      const m = await open('/apps#all', { onApi: () => new Promise<Response>((resolve) => (answer = resolve)) });
-      await m.result(m.call, 'base.app.list', APPS);
-      await m.wrapper.find('[data-testid="apps-row-flow-toggle"]').trigger('click');
-      await flush();
-      expect(m.wrapper.find('[data-testid="apps-row-flow-toggle"]').attributes('disabled')).toBeDefined();
-      answer(Response.json({ error: { code: 'internal_error', message: 'Boom.' } }, { status: 500 }));
-      await flush();
-      expect(refused(m).text()).toContain('Flows could not be changed: Boom.');
-      expect(toastError).not.toHaveBeenCalled();
-      expect(m.wrapper.find('[data-testid="apps-row-flow-toggle"]').attributes('disabled')).toBeUndefined();
-    });
-
-    describe('what an app refuses is said beforehand (hub#618, hub#694)', () => {
-      const NEVER_OFF = 'VeriFactu can’t be turned off once it’s on.';
-      const ONLY_THERE = 'VeriFactu is only for businesses in Spain.';
-      const row = (m: Awaited<ReturnType<typeof open>>, id: string) => m.wrapper.find(`[data-testid="apps-row"][data-id="${id}"]`);
-
-      const OFF_HERE = app('verifactu', { name: 'VeriFactu', state: 'off', chosen: false, path: null, refusal: ONLY_THERE });
-
-      it('one on that never goes off offers no «Turn off», says why and stays «Active»', async () => {
-        const m = await open('/apps');
-        await m.result(m.call, 'base.app.list', {
-          ...LIST,
-          apps: [app('verifactu', { name: 'VeriFactu', refusal: NEVER_OFF }), TAX],
-        });
-
-        expect(m.wrapper.find('[data-testid="apps-row-verifactu-toggle"]').exists()).toBe(false);
-        expect(row(m, 'verifactu').find('[data-testid="apps-refusal"]').text()).toBe(NEVER_OFF);
-        expect(row(m, 'verifactu').find('[data-testid="apps-state"]').text()).toBe('Active');
-        // «Open» is still there: only turning it off is refused.
-        expect(m.wrapper.find('[data-testid="apps-row-verifactu-open"]').exists()).toBe(true);
-        // The app next to it goes on as ever.
-        expect(m.wrapper.find('[data-testid="apps-row-tax-toggle"]').text()).toContain('Turn off');
-        expect(row(m, 'tax').find('[data-testid="apps-refusal"]').exists()).toBe(false);
-      });
-
-      it('one off that does not go on offers no «Turn on» and says it is not available, and why', async () => {
-        const m = await open('/apps#all');
-        await m.result(m.call, 'base.app.list', { ...LIST, apps: [OFF_HERE] });
-
-        expect(m.wrapper.find('[data-testid="apps-row-verifactu-toggle"]').exists()).toBe(false);
-        expect(row(m, 'verifactu').find('[data-testid="apps-state"]').text()).toBe('Not available');
-        expect(row(m, 'verifactu').find('[data-testid="apps-refusal"]').text()).toBe(ONLY_THERE);
-      });
-
-      it('in Spanish too', async () => {
-        const m = await open('/apps#all', { locale: 'es' });
-        await m.result(m.call, 'base.app.list', { ...LIST, apps: [OFF_HERE] });
-
-        expect(row(m, 'verifactu').find('[data-testid="apps-state"]').text()).toBe('No disponible');
-      });
-
-      it('who does not run the business can do nothing about it: not the reason, only that it is not available', async () => {
-        const m = await open('/apps#all', { session: EMPLOYEE });
-        await m.result(m.call, 'base.app.list', {
-          ...LIST,
-          apps: [OFF_HERE, app('invoice', { name: 'Invoicing', refusal: NEVER_OFF })],
-        });
-
-        expect(m.wrapper.find('[data-testid="apps-refusal"]').exists()).toBe(false);
-        expect(row(m, 'verifactu').find('[data-testid="apps-state"]').text()).toBe('Not available');
-      });
-    });
-
-    describe('what the business’s country requires on (hub#997)', () => {
-      const MANDATORY_HERE = 'Taxes is mandatory for businesses in Spain: it can’t be turned off.';
-      const row = (m: Awaited<ReturnType<typeof open>>, id: string) => m.wrapper.find(`[data-testid="apps-row"][data-id="${id}"]`);
-      const label = (m: Awaited<ReturnType<typeof open>>, id: string) => row(m, id).find('[data-testid="apps-mandatory"]');
-      const TAX_ON = app('tax', { name: 'Taxes', chosen: false, required_by: ['sale'], mandatory: true, refusal: MANDATORY_HERE });
-      const SALE_ = app('sale', { name: 'Sales', requires: ['customer', 'tax'] });
-      const CUSTOMER_ = app('customer', { name: 'Customers', chosen: false, required_by: ['sale'] });
-      const VERIFACTU_OFF = app('verifactu', { name: 'VeriFactu', state: 'off', chosen: false, path: null, mandatory: true });
-      const MINE: AppList = { ...APPS, apps: [SALE_, TAX_ON, CUSTOMER_, VERIFACTU_OFF] };
-
-      it('«My apps» says it is mandatory in the business’s country, offers no «Turn off» and says why', async () => {
-        const m = await open('/apps');
-        await m.result(m.call, 'base.app.list', MINE);
-
-        expect(label(m, 'tax').text()).toBe('Mandatory in Spain');
-        expect(row(m, 'tax').find('[data-testid="apps-state"]').text()).toBe('Active');
-        expect(row(m, 'tax').find('[data-testid="apps-refusal"]').text()).toBe(MANDATORY_HERE);
-        expect(m.wrapper.find('[data-testid="apps-row-tax-toggle"]').exists()).toBe(false);
-        // Another app goes on as ever, with no label.
-        expect(label(m, 'sale').exists()).toBe(false);
-        expect(m.wrapper.find('[data-testid="apps-row-sale-toggle"]').text()).toContain('Turn off');
-      });
-
-      it('one off is labelled too in «Add apps», still «Off» and offered to turn on', async () => {
-        const m = await open('/apps#all');
-        await m.result(m.call, 'base.app.list', MINE);
-
-        expect(label(m, 'verifactu').text()).toBe('Mandatory in Spain');
-        expect(row(m, 'verifactu').find('[data-testid="apps-state"]').text()).toBe('Off');
-        expect(m.wrapper.find('[data-testid="apps-row-verifactu-toggle"]').text()).toContain('Turn on');
-      });
-
-      it('«Turn off» the app it came with never names it among what goes off with it', async () => {
-        mocks.confirm.mockResolvedValue(false);
-        const m = await open('/apps');
-        await m.result(m.call, 'base.app.list', MINE);
-
-        await m.wrapper.find('[data-testid="apps-row-sale-toggle"]').trigger('click');
-        await flush();
-
-        const asked = mocks.confirm.mock.calls[0][0];
-        expect(asked.message).toContain('Customers');
-        expect(asked.message).not.toContain('Taxes');
-      });
-
-      it('in Spanish, with the country by its Spanish name', async () => {
-        const m = await open('/apps', { locale: 'es' });
-        await m.result(m.call, 'base.app.list', { ...MINE, country_name: 'España' });
-
-        expect(label(m, 'tax').text()).toBe('Obligatoria en España');
-      });
-
-      it('whoever does not run the business reads the label too, not the reason', async () => {
-        const m = await open('/apps', { session: EMPLOYEE });
-        await m.result(m.call, 'base.app.list', MINE);
-
-        expect(label(m, 'tax').text()).toBe('Mandatory in Spain');
-        expect(row(m, 'tax').find('[data-testid="apps-refusal"]').exists()).toBe(false);
-      });
-    });
-
-    it('who does not run the business turns nothing on or off', async () => {
-      const m = await open('/apps#all', { session: EMPLOYEE });
-      await m.result(m.call, 'base.app.list', APPS);
-      expect(m.wrapper.find('[data-testid="apps-row-flow-toggle"]').exists()).toBe(false);
-      expect(m.wrapper.find('[data-testid="apps-row-task-toggle"]').exists()).toBe(false);
-    });
-
-    it('an app off is still in «Add apps» with its icon, its name and «Off»; «My apps» lists only the ones on', async () => {
-      const m = await open('/apps#all');
-      await m.result(m.call, 'base.app.list', APPS);
-      const flow = m.wrapper.find('[data-testid="apps-row"][data-id="flow"]');
-      expect(flow.text()).toContain('Flows');
-      expect(flow.find('.apps-icon').exists()).toBe(true);
-      expect(flow.find('[data-testid="apps-state"]').text()).toBe('Off');
-      m.wrapper.getComponent(AppPage).vm.$emit('update:tab', 'mine');
-      await flush();
+    it('counts what came along with another app, the way «My apps» lists it', async () => {
+      const m = await open();
+      await m.result(m.call, 'base.app.list', listOf(2, SALE, CUSTOMER, CHOSEN, OFF));
+      expect(counter(m)).toBe(`${ids(m.wrapper).length} apps turned on · 2 of 20 in your plan`);
       expect(ids(m.wrapper)).toEqual(['sale', 'customer', 'task']);
     });
 
-    describe('the counter: the apps on, as «My apps» lists them, and the plan’s chosen ones (hub#1286)', () => {
-      // Taxes is born on in every country (hub#997): on, never chosen, it takes nothing of the plan's limit.
-      const BORN = app('tax', { name: 'Taxes', chosen: false, mandatory: true });
-      const CHOSEN = app('task', { name: 'Tasks' });
-      const OFF = app('flow', { name: 'Flows', state: 'off', chosen: false, path: null });
-      const listOf = (enabled: number, ...apps: AppRow[]): AppList => ({
-        apps,
-        country_name: 'Spain',
-        store_url: STORE,
-        plan_url: PLANS,
-        max_apps: 20,
-        enabled,
-      });
-      const counter = (m: Awaited<ReturnType<typeof open>>) => m.wrapper.find('[data-testid="apps-counter"]').text();
-
-      it('an app born on is turned on, and none of the plan’s', async () => {
-        const m = await open();
-        await m.result(m.call, 'base.app.list', listOf(0, BORN, OFF));
-        expect(counter(m)).toBe('1 app turned on · 0 of 20 in your plan');
-      });
-
-      it('an app the business chose is turned on and one of the plan’s', async () => {
-        const m = await open();
-        await m.result(m.call, 'base.app.list', listOf(1, BORN, CHOSEN, OFF));
-        expect(counter(m)).toBe('2 apps turned on · 1 of 20 in your plan');
-      });
-
-      it('an app off, or paid without its right, is not turned on', async () => {
-        const m = await open();
-        await m.result(m.call, 'base.app.list', listOf(0, OFF, STOCK));
-        expect(counter(m)).toBe('0 apps turned on · 0 of 20 in your plan');
-      });
-
-      it('counts what came along with another app, the way «My apps» lists it', async () => {
-        const m = await open();
-        await m.result(m.call, 'base.app.list', APPS);
-        expect(counter(m)).toBe(`${ids(m.wrapper).length} apps turned on · 2 of 20 in your plan`);
-        expect(ids(m.wrapper)).toEqual(['sale', 'customer', 'task']);
-      });
-
-      it('an app still being set up, or that failed to be, is turned on', async () => {
-        const m = await open();
-        const creating = { ...OFF, state: 'creating' as const, chosen: true };
-        const failed = { ...CHOSEN, state: 'failed' as const };
-        await m.result(m.call, 'base.app.list', listOf(2, creating, failed));
-        expect(counter(m)).toBe('2 apps turned on · 2 of 20 in your plan');
-      });
-
-      it('without a limit, the apps turned on', async () => {
-        const m = await open();
-        await m.result(m.call, 'base.app.list', { ...listOf(0, BORN, OFF), max_apps: null });
-        expect(counter(m)).toBe('1 app turned on · Unlimited');
-        await m.result(m.call, 'base.app.list', { ...listOf(1, BORN, CHOSEN, OFF), max_apps: null }, 2);
-        expect(counter(m)).toBe('2 apps turned on · Unlimited');
-      });
-
-      it('in Spanish', async () => {
-        const m = await open('/apps', { locale: 'es' });
-        await m.result(m.call, 'base.app.list', listOf(0, BORN, OFF));
-        expect(counter(m)).toBe('1 app activada · 0 de 20 de tu plan');
-        await m.result(m.call, 'base.app.list', listOf(1, BORN, CHOSEN, OFF), 2);
-        expect(counter(m)).toBe('2 apps activadas · 1 de 20 de tu plan');
-        await m.result(m.call, 'base.app.list', { ...listOf(1, BORN, CHOSEN, OFF), max_apps: null }, 3);
-        expect(counter(m)).toBe('2 apps activadas · Sin límite');
-        // A business just born without a limit: Taxes alone, in the singular.
-        await m.result(m.call, 'base.app.list', { ...listOf(0, BORN, OFF), max_apps: null }, 4);
-        expect(counter(m)).toBe('1 app activada · Sin límite');
-      });
-    });
-  });
-
-  describe('an app whose tables the business’s database is still getting', () => {
-    const FLOW = app('flow', { name: 'Flows', state: 'off', chosen: false, path: null });
-    const FLOW_CREATING = { ...FLOW, state: 'creating' as const, chosen: true };
-    const FLOW_FAILED = { ...FLOW, state: 'failed' as const, chosen: true };
-    const TASK = app('task', { name: 'Tasks' });
-    const listOf = (...apps: AppRow[]): AppList => ({ apps, country_name: 'Spain', store_url: STORE, plan_url: PLANS, max_apps: 20, enabled: 1 });
-    const posted = (m: Awaited<ReturnType<typeof open>>) =>
-      m.net.api.map((c) => [c.url, JSON.parse(String(c.init.body ?? '{}')) as Record<string, unknown>]);
-    const pill = (m: Awaited<ReturnType<typeof open>>, id: string) =>
-      m.wrapper.find(`[data-testid="apps-row"][data-id="${id}"] [data-testid="apps-state"]`);
-
-    it('«Turn on» answered «creating» says it is being set up, and the row says so until it is on', async () => {
-      const m = await open('/apps#all', {
-        onApi: () => Response.json({ app: 'flow', state: 'creating', chosen: true, along: [] }, { status: 202 }),
-      });
-      await m.result(m.call, 'base.app.list', listOf(TASK, FLOW));
-
-      await m.wrapper.find('[data-testid="apps-row-flow-toggle"]').trigger('click');
-      await flush();
-
-      expect(posted(m)).toEqual([['/api/apps/enable', { app: 'flow' }]]);
-      expect(vi.mocked(toastSuccess).mock.calls[0][0]).toBe('Turning on Flows… It will be ready in a moment.');
-      await m.result(m.call, 'base.app.list', listOf(TASK, FLOW_CREATING), 2);
-      expect([pill(m, 'flow').text(), pill(m, 'flow').attributes('data-tone')]).toEqual(['Turning on…', 'info']);
-      // A business that changed its mind turns it off while it is set up (a code rolled back would keep it waiting).
-      expect(m.wrapper.find('[data-testid="apps-row-flow-toggle"]').text()).toContain('Turn off');
-      expect(m.wrapper.find('[data-testid="apps-row-flow-open"]').exists()).toBe(false);
-      await m.result(m.call, 'base.app.list', listOf(TASK, { ...FLOW, state: 'on', chosen: true, path: '/flow/home' }), 3);
-      expect(pill(m, 'flow').text()).toBe('Installed');
-    });
-
-    it('«My apps» lists the ones being set up and the ones that failed, with their state and no «Open»', async () => {
+    it('an app still being set up, or that failed to be, is turned on', async () => {
       const m = await open();
-      await m.result(m.call, 'base.app.list', listOf(TASK, FLOW_CREATING, { ...FLOW_FAILED, id: 'website', name: 'Website' }));
-      expect(ids(m.wrapper)).toEqual(['task', 'flow', 'website']);
-      expect([pill(m, 'flow').text(), pill(m, 'website').text(), pill(m, 'website').attributes('data-tone')]).toEqual([
-        'Turning on…',
-        'Could not turn on',
-        'danger',
-      ]);
-      expect(m.wrapper.find('[data-testid="apps-row-flow-open"]').exists()).toBe(false);
+      const creating = { ...OFF, state: 'creating' as const, chosen: true };
+      const failed = { ...CHOSEN, state: 'failed' as const };
+      await m.result(m.call, 'base.app.list', listOf(2, creating, failed));
+      expect(counter(m)).toBe('2 apps turned on · 2 of 20 in your plan');
     });
 
-    it('one that could not be turned on offers «Retry» to whoever runs the business, and is set up again', async () => {
-      const m = await open('/apps', {
-        onApi: () => Response.json({ app: 'flow', state: 'creating', chosen: true, along: [] }, { status: 202 }),
-      });
-      await m.result(m.call, 'base.app.list', listOf(TASK, FLOW_FAILED));
-      const retry = m.wrapper.find('[data-testid="apps-row-flow-retry"]');
-      expect(retry.text()).toContain('Retry');
-
-      await retry.trigger('click');
-      await flush();
-
-      expect(posted(m)).toEqual([['/api/apps/retry', { app: 'flow' }]]);
-      expect(vi.mocked(toastSuccess).mock.calls[0][0]).toBe('Turning on Flows… It will be ready in a moment.');
-    });
-
-    it('a retry refused says why, on screen', async () => {
-      const m = await open('/apps', {
-        onApi: () =>
-          Response.json({ error: { code: 'base.app_not_failed', message: 'This app is not waiting to be set up again.' } }, { status: 409 }),
-      });
-      await m.result(m.call, 'base.app.list', listOf(TASK, FLOW_FAILED));
-      await m.wrapper.find('[data-testid="apps-row-flow-retry"]').trigger('click');
-      await flush();
-      expect(m.wrapper.find('[data-testid="apps-refused"]').text()).toContain('This app is not waiting to be set up again.');
-    });
-
-    it('one that could not be turned on can be turned off instead', async () => {
-      mocks.confirm.mockResolvedValue(true);
-      const m = await open('/apps', { onApi: () => Response.json({ app: 'flow', state: 'off', chosen: false, along: [] }) });
-      await m.result(m.call, 'base.app.list', listOf(TASK, FLOW_FAILED));
-      const toggle = m.wrapper.find('[data-testid="apps-row-flow-toggle"]');
-      expect(toggle.text()).toContain('Turn off');
-      await toggle.trigger('click');
-      await flush();
-      expect(posted(m)).toEqual([['/api/apps/disable', { app: 'flow' }]]);
-    });
-
-    it('who does not run the business sees the state, without «Retry»', async () => {
-      const m = await open('/apps', { session: EMPLOYEE });
-      await m.result(m.call, 'base.app.list', listOf(TASK, FLOW_FAILED));
-      expect(pill(m, 'flow').text()).toBe('Could not turn on');
-      expect(m.wrapper.find('[data-testid="apps-row-flow-retry"]').exists()).toBe(false);
-    });
-
-    it('one being set up can be turned off too, in Spanish «Desactivar»', async () => {
-      mocks.confirm.mockResolvedValue(true);
-      const m = await open('/apps', {
-        locale: 'es',
-        onApi: () => Response.json({ app: 'flow', state: 'off', chosen: false, along: [] }),
-      });
-      await m.result(m.call, 'base.app.list', listOf(TASK, FLOW_CREATING));
-      const toggle = m.wrapper.find('[data-testid="apps-row-flow-toggle"]');
-      expect(toggle.text()).toContain('Desactivar');
-      await toggle.trigger('click');
-      await flush();
-      expect(posted(m)).toEqual([['/api/apps/disable', { app: 'flow' }]]);
+    it('without a limit, the apps turned on', async () => {
+      const m = await open();
+      await m.result(m.call, 'base.app.list', { ...listOf(0, BORN, OFF), max_apps: null });
+      expect(counter(m)).toBe('1 app turned on · Unlimited');
+      await m.result(m.call, 'base.app.list', { ...listOf(1, BORN, CHOSEN, OFF), max_apps: null }, 2);
+      expect(counter(m)).toBe('2 apps turned on · Unlimited');
     });
 
     it('in Spanish', async () => {
-      const m = await open('/apps', {
-        locale: 'es',
-        onApi: () => Response.json({ app: 'flow', state: 'creating', chosen: true, along: [] }, { status: 202 }),
-      });
-      await m.result(m.call, 'base.app.list', listOf(TASK, FLOW_CREATING, { ...FLOW_FAILED, id: 'website', name: 'Web' }));
-      expect([pill(m, 'flow').text(), pill(m, 'website').text()]).toEqual(['Activándose…', 'No se ha podido activar']);
-      const retry = m.wrapper.find('[data-testid="apps-row-website-retry"]');
-      expect(retry.text()).toContain('Reintentar');
-      await retry.trigger('click');
-      await flush();
-      expect(vi.mocked(toastSuccess).mock.calls[0][0]).toBe('Activando Web… Estará lista en un momento.');
+      const m = await open('/apps', { locale: 'es' });
+      await m.result(m.call, 'base.app.list', listOf(0, BORN, OFF));
+      expect(counter(m)).toBe('1 app activada · 0 de 20 de tu plan');
+      await m.result(m.call, 'base.app.list', listOf(1, BORN, CHOSEN, OFF), 2);
+      expect(counter(m)).toBe('2 apps activadas · 1 de 20 de tu plan');
+      await m.result(m.call, 'base.app.list', { ...listOf(1, BORN, CHOSEN, OFF), max_apps: null }, 3);
+      expect(counter(m)).toBe('2 apps activadas · Sin límite');
+      // A business just born without a limit: Taxes alone, in the singular.
+      await m.result(m.call, 'base.app.list', { ...listOf(0, BORN, OFF), max_apps: null }, 4);
+      expect(counter(m)).toBe('1 app activada · Sin límite');
     });
   });
 });

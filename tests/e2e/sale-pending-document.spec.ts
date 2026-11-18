@@ -7,6 +7,7 @@
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
 import { A, api, login, psql, shot, shown } from './helpers';
+import { rowAction } from './service-helpers';
 import { ensureIssuer, issuerNow, type IssuerOut, snapshotSeries } from './invoice-helpers';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
 import { chargeByApi, cleanSales, type SaleOut, stamp } from './sale-helpers';
@@ -88,7 +89,7 @@ test('SALE-F29: a ticket that waits says so, and «Issue now» issues it once th
   // The issuer set up (the hub's own back, or one for the run), «Issue now» from the row issues its F2.
   putIssuerBack();
   if (!original?.configured) await ensureIssuer(context);
-  await shown(page).locator(`[data-testid=sales-table-row-${sale.id}-issue]`).first().click();
+  await rowAction(page, 'sales-table', sale.id, 'issue');
   await expect(row.locator('[data-testid=sales-documents-pending]')).toHaveCount(0);
   const issued = await saleOf(context, sale.id);
   expect([issued.invoice_status, issued.invoice_type, issued.documents_pending]).toEqual(['issued', 'F2', false]);

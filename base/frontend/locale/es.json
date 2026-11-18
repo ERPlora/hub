@@ -162,7 +162,9 @@
       },
       "noResults": "No hay apps que coincidan con tu búsqueda.",
       "toggle": {
-        "on": "Activar",
+        "labelOn": "{app}: activada",
+        "labelOff": "{app}: sin activar",
+        "busy": "Cambiando…",
         "off": "Desactivar",
         "retry": "Reintentar"
       },
