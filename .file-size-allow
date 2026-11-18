@@ -124,7 +124,7 @@
 748 apps/verifactu/models.py ERPlora/erplora-next#74
 1310 apps/verifactu/queries.py ERPlora/erplora-next#74
 841 apps/verifactu/schemas.py ERPlora/erplora-next#74
-2417 apps/verifactu/services.py ERPlora/erplora-next#74
+2405 apps/verifactu/services.py ERPlora/erplora-next#74
 1980 apps/verifactu/tests/test_services.py ERPlora/erplora-next#74
 577 apps/website/queries.py ERPlora/erplora-next#74
 563 apps/whatsapp_inbox/frontend/components/TemplateFormModal.test.ts ERPlora/erplora-next#74
