@@ -1,8 +1,10 @@
 """The help window of a module (``base.help.get``), read from its WORKBOOK in the person's language."""
 
+from collections.abc import Mapping
 from dataclasses import asdict
 from pathlib import Path
 
+from django.conf import settings
 from django.utils import translation
 from django.utils.translation import get_supported_language_variant, gettext_lazy, pgettext_lazy
 from live.context import OperationContext
@@ -18,6 +20,9 @@ HELP_MISSING = gettext_lazy("This app has no help yet.")
 #: The tab of a module's settings when its menu has no entry for them, at ``/<module>/settings``.
 SETTINGS_TAB = "settings"
 SETTINGS = pgettext_lazy("workbook", "Settings")
+#: The help read so far, by module and language: a module's WORKBOOKs only change with a new image, so each one is read
+#: and cut once per process. With DEBUG, on every call, so that an edited WORKBOOK shows at once.
+_READ: dict[tuple[str, str], dict] = {}
 
 
 def ready_apps() -> list[str]:
@@ -73,24 +78,38 @@ def _language(code: str) -> str:
     ),
 )
 def help_get(ctx: OperationContext, data: AppHelpIn) -> dict:
-    """A module's help in the person's language while its file is current, else in the source's (``language`` says
-    which); its video in the person's language, else the source's."""
+    """A module's help in the person's language while its file is current, else in its base language's, else in the
+    source's (``language`` says which); its video likewise."""
     config = _ready(data.app)
     if config is None:
         with translation.override(ctx.language):
             raise NotFound(str(HELP_MISSING), code="base.help_missing")
     language = _language(ctx.language)
-    served, markdown = workbook_help.workbook(Path(config.path), language)
-    with translation.override(served):
-        read = workbook_help.parse(markdown, tabs_of(config), workbook_help.words())
-        name = str(config.verbose_name)
-    videos = config.help.videos
-    return {
-        "app": config.label,
-        "name": name,
-        "language": served,
-        "video": videos.get(language) or videos.get(workbook_help.SOURCE_LANGUAGE),
-        "purpose": read.purpose,
-        "screens": [asdict(screen) for screen in read.screens],
-        "flows": [asdict(flow) for flow in read.flows],
-    }
+    return {**_read(config, language), "video": _video(config.help.videos, language)}
+
+
+def _read(config: LiveAppConfig, language: str) -> dict:
+    """The help of ``config`` for ``language`` (``_READ``), with the name of the module in the language served."""
+    key = (config.label, language)
+    if key not in _READ or settings.DEBUG:
+        served, markdown = workbook_help.workbook(Path(config.path), language)
+        with translation.override(served):
+            read = workbook_help.parse(markdown, tabs_of(config), workbook_help.words())
+            name = str(config.verbose_name)
+        _READ[key] = {
+            "app": config.label,
+            "name": name,
+            "language": served,
+            "purpose": read.purpose,
+            "screens": [asdict(screen) for screen in read.screens],
+            "flows": [asdict(flow) for flow in read.flows],
+        }
+    return _READ[key]
+
+
+def _video(videos: Mapping[str, str], language: str) -> str | None:
+    """The module's video in ``language``, else in its base language (``en`` for ``en-gb``), else in the source's."""
+    return next(
+        (videos[code] for code in (language, language.split("-")[0], workbook_help.SOURCE_LANGUAGE) if videos.get(code)),
+        None,
+    )

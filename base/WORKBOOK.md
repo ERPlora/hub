@@ -3957,19 +3957,23 @@ Implicados: BASE-F92, BASE-F93
   lista cuando declara `help = Help(…)` (`live.meta.Help`, con un vídeo de YouTube opcional por idioma, que valida
   `live.E023`), y el JSON `hub-home` de `base/spa.py` nombra esos módulos en `help_apps`. El idioma es `ctx.language`:
   el original, `SOURCE_LANGUAGE` (`es`), se lee de `WORKBOOK.md`, y cualquier otro de `WORKBOOK.<idioma>.md` solo si su
-  primera línea es `catalog.en_header` del hash de la parte española; si no, el español, y `language` dice cuál salió.
-  El vídeo es el del idioma de la persona, o si no el del original. Cada `###` bajo el encabezado de las pantallas es
+  primera línea es `catalog.en_header` del hash de la parte española; si no, el de su idioma base (`en` para `en-gb`),
+  y si tampoco, el español; `language` dice cuál salió. El vídeo, igual. Lo leído se guarda en memoria por módulo e
+  idioma (`_READ`): los WORKBOOK solo cambian con una imagen nueva; con `DEBUG` se relee en cada llamada. Cada `###` bajo el encabezado de las pantallas es
   la pestaña del menú que tiene esa etiqueta en el idioma del fichero, más la de ajustes (`/<módulo>/settings`) si el
-  menú no la trae; un `####` es una ventana de esa pestaña. De los flujos se publican los que están hechos y cuya
-  `Pantalla:` (partida por «,» y «;», sin lo que va entre paréntesis) nombra una pestaña o una de sus ventanas, y de
-  ellos solo el título sin el id, los pasos y «Si falla:». El encabezado, las claves de un flujo y «hecho» son el
+  menú no la trae; un `####` es una ventana de esa pestaña. De los flujos se publican los que están hechos (lo que
+  sigue en `Estado:` a una raya, dos puntos o un paréntesis es una nota) y cuya `Pantalla:` (partida por «,» y «;»)
+  nombra una pestaña o una de sus ventanas, sin lo que va entre paréntesis en un lado ni en el otro; y de ellos solo el
+  título sin el id, los pasos y «Si falla:», que empiezan con mayúscula. El encabezado, las claves de un flujo y «hecho» son el
   vocabulario `pgettext("workbook", …)` del `.po` de `base`, así que el código no nombra más idioma que el original.
-  Las líneas sangradas que siguen a un elemento de lista se unen a él, porque el `parseMarkdown` de la pantalla lo
-  cierra en su primera línea. La CSP deja `frame-src 'self' https://www.youtube-nocookie.com` (`live.csp.with_frames`;
+  Un párrafo o un elemento de lista que el fichero parte en varias líneas sale en una sola, salvo tras un salto forzado
+  (dos espacios o una barra al final de la línea), porque la pantalla respeta cada salto de línea y su `parseMarkdown`
+  cierra un elemento en su primera línea. La CSP deja `frame-src 'self' https://www.youtube-nocookie.com` (`live.csp.with_frames`;
   `'self'` es la vista previa del editor de la web). `tests/test_help_workbooks.py` vigila cada módulo con la ayuda
-  lista en cada idioma: cada entrada del menú con su `###` y cada `###` una pestaña; lo publicado, sin código, sin
-  referencias a issues, sin tamaños en px, sin ids de flujo ni nombres de operación o de evento; y cada flujo publicado,
-  con sus pasos.
+  lista en cada idioma: cada entrada del menú con su `###`, una sola vez, y cada `###` una pestaña; lo publicado, sin
+  código, sin referencias a issues, sin tamaños en px, sin ids de flujo ni nombres de operación o de evento; cada flujo
+  publicado, con sus pasos; ningún flujo que se lea como hecho en una pestaña, fuera; y cada traducción, con las mismas
+  pestañas y flujos que el original.
 - **La documentación de ERPlora** (saas ASSISTANT-F28): `base.docs.search` (query, `base.view_home`, `database=False`, `ai=AI(…)`; herramienta
   `base__docs__search`, en `ALWAYS` porque una pregunta de «cómo se hace» no comparte palabras con ella) pregunta al
   único índice de erplora.com (`assistant.DocChunk`: la ayuda pública, la documentación de cada app, los WORKBOOK del
