@@ -102,16 +102,16 @@ def test_nobody_is_retired_before_the_90_days_nor_a_demo_the_platform_or_one_mov
     now = timezone.now()
     left = {"status": Hub.Status.CANCELLED, "cancelled_at": now - dt.timedelta(days=90, seconds=1), "db_name": "x"}
 
-    assert services.past_retention(Hub(**left), now) is True
-    assert services.past_retention(Hub(**left | {"cancelled_at": now - dt.timedelta(days=89)}), now) is False
-    assert services.past_retention(Hub(**left | {"is_demo": True}), now) is False
-    assert services.past_retention(Hub(**left | {"is_platform": True}), now) is False
-    assert services.past_retention(Hub(**left | {"moving_to_id": uuid.uuid7()}), now) is False
-    assert services.past_retention(Hub(**left | {"restoring_from_id": uuid.uuid7()}), now) is False
-    assert services.past_retention(Hub(status=Hub.Status.READY, db_name="x"), now) is False
-    assert services.past_retention(Hub(status=Hub.Status.ARCHIVING, db_name="x"), now) is True
-    assert services.past_retention(Hub(status=Hub.Status.DROPPING, db_name="x"), now) is True
-    assert services.past_retention(Hub(status=Hub.Status.PURGED, db_name="x"), now) is False
+    assert services.offboarding.past_retention(Hub(**left), now) is True
+    assert services.offboarding.past_retention(Hub(**left | {"cancelled_at": now - dt.timedelta(days=89)}), now) is False
+    assert services.offboarding.past_retention(Hub(**left | {"is_demo": True}), now) is False
+    assert services.offboarding.past_retention(Hub(**left | {"is_platform": True}), now) is False
+    assert services.offboarding.past_retention(Hub(**left | {"moving_to_id": uuid.uuid7()}), now) is False
+    assert services.offboarding.past_retention(Hub(**left | {"restoring_from_id": uuid.uuid7()}), now) is False
+    assert services.offboarding.past_retention(Hub(status=Hub.Status.READY, db_name="x"), now) is False
+    assert services.offboarding.past_retention(Hub(status=Hub.Status.ARCHIVING, db_name="x"), now) is True
+    assert services.offboarding.past_retention(Hub(status=Hub.Status.DROPPING, db_name="x"), now) is True
+    assert services.offboarding.past_retention(Hub(status=Hub.Status.PURGED, db_name="x"), now) is False
 
 
 def test_a_business_past_its_90_days_is_copied_dropped_and_purged_and_one_within_them_is_left(
@@ -911,7 +911,7 @@ def test_the_purge_is_only_for_a_business_being_dropped(business):
     hub = business(left_days_ago=91)
 
     with pytest.raises(Conflict) as refused:
-        services.hub_purge(internal(), HubGetIn(id=hub.pk))
+        services.offboarding.hub_purge(internal(), HubGetIn(id=hub.pk))
 
     assert refused.value.code == "base.hub_not_dropping"
 
@@ -949,7 +949,7 @@ def test_a_tombstone_does_not_keep_its_cluster_from_being_deleted(business):
     try:
         Hub.objects.filter(pk=hub.pk).update(cluster=cluster)
 
-        services.hub_purge(internal(), HubGetIn(id=hub.pk))
+        services.offboarding.hub_purge(internal(), HubGetIn(id=hub.pk))
         control_services.cluster_delete(internal(), ClusterIdIn(id=cluster.pk))
 
         assert not Cluster.objects.filter(pk=cluster.pk).exists()

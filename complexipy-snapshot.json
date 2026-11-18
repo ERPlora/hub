@@ -588,28 +588,6 @@
     ]
   },
   {
-    "path": "base/services/__init__.py",
-    "file_name": "__init__.py",
-    "functions": [
-      {
-        "name": "_enable",
-        "complexity": 18
-      },
-      {
-        "name": "app_activation_settle",
-        "complexity": 18
-      },
-      {
-        "name": "_assistant_answer",
-        "complexity": 19
-      },
-      {
-        "name": "assistant_turn",
-        "complexity": 27
-      }
-    ]
-  },
-  {
     "path": "base/tenancy/cut.py",
     "file_name": "cut.py",
     "functions": [
@@ -900,6 +878,40 @@
       {
         "name": "list_records",
         "complexity": 16
+      }
+    ]
+  },
+  {
+    "path": "base/services/activation.py",
+    "file_name": "activation.py",
+    "functions": [
+      {
+        "name": "app_activation_settle",
+        "complexity": 18
+      }
+    ]
+  },
+  {
+    "path": "base/services/apps.py",
+    "file_name": "apps.py",
+    "functions": [
+      {
+        "name": "_enable",
+        "complexity": 18
+      }
+    ]
+  },
+  {
+    "path": "base/services/assistant.py",
+    "file_name": "assistant.py",
+    "functions": [
+      {
+        "name": "_assistant_answer",
+        "complexity": 19
+      },
+      {
+        "name": "assistant_turn",
+        "complexity": 27
       }
     ]
   }

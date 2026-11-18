@@ -423,7 +423,7 @@ def _created_apps(hub: Any) -> frozenset[str] | None:
     row = provisioning.registry_row(hub.pk)
     if row is None or CONFIRMED_BY not in (row.schema_apps or ()):
         return None
-    created = services.apps_created(row)
+    created = services.apps.apps_created(row)
     if created is None:
         return None
     try:

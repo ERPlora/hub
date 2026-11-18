@@ -153,7 +153,7 @@ def test_the_night_forgets_the_copies_the_bucket_no_longer_keeps(hub_a):
 @pytest.mark.django_db(databases=hubs.HUB_DATABASES)
 def test_each_business_measured_hears_it_live(hub_a, monkeypatch):
     told = []
-    monkeypatch.setattr(services, "notify", lambda scope, names: told.append((scope.channel, list(names))))
+    monkeypatch.setattr(services.usage, "notify", lambda scope, names: told.append((scope.channel, list(names))))
 
     usage.measure(DAY, now=NIGHT)
 

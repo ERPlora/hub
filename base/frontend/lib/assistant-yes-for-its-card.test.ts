@@ -1,5 +1,5 @@
 // hub#1208: the Hub holds a yes to the card it answers by the fingerprint the turn puts on the call that waits
-// (`pending[].shown`, base/services/__init__.py `_assistant_answer`), and a card that changed comes again instead of running.
+// (`pending[].shown`, base/services/assistant.py `_assistant_answer`), and a card that changed comes again instead of running.
 // That needs nothing new of the shared panel (@erplora/ui): it gives back the calls that wait as the turn gave them and
 // shows a card that comes after a yes. This pins both, from the Hub's side: a panel that rebuilt the calls would drop
 // `shown`, and every yes would draw its card again.

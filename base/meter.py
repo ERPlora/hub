@@ -15,7 +15,7 @@ Four figures, each in the UTC day of its moment:
 
 Counting is a lock and a dictionary: nothing here reaches the network, so no request waits for it and a busy or absent
 control database never reaches one. A thread (:func:`start`, once per process) writes the deltas every
-:data:`INTERVAL_SECONDS` and at exit (``services.activity_recorded``, ``services.people_seen``): what could not be written
+:data:`INTERVAL_SECONDS` and at exit (``services.usage.activity_recorded``, ``services.usage.people_seen``): what could not be written
 stays for the next pass, and a hub that went away meanwhile is forgotten without stopping the others.
 
 Only a process that serves requests counts (``config/asgi.py`` starts it, unless ``METER_ENABLED`` is off, as in the
@@ -149,7 +149,7 @@ def flush() -> None:
             _activity, _seen = {}, {}
         for (hub_id, day), delta in activity.items():
             try:
-                if not services.activity_recorded(hub_id, day, requests=delta.requests, peak=delta.peak, busy=delta.busy):
+                if not services.usage.activity_recorded(hub_id, day, requests=delta.requests, peak=delta.peak, busy=delta.busy):
                     logger.info("base.meter.hub_gone hub=%s day=%s: what it did is forgotten.", hub_id, day)
             except Exception:
                 logger.exception("base.meter.not_written hub=%s day=%s: kept for the next pass.", hub_id, day)
@@ -159,7 +159,7 @@ def flush() -> None:
             by_place.setdefault((host, day), {})[person] = moment
         for (host, day), people in by_place.items():
             try:
-                services.people_seen(host, day, people)
+                services.usage.people_seen(host, day, people)
             except Exception:
                 logger.exception("base.meter.not_written host=%s day=%s: its people kept for the next pass.", host, day)
                 _keep_people(host, day, people)
