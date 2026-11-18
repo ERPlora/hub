@@ -8,6 +8,7 @@ import pytest
 from django.utils.csp import CSP
 from live.csp import base_policy, debug_policy
 
+from base.queries import app_help
 from base.tenancy.tests.business import HOST, HUB_DB, A, B
 from base.tests.test_middleware import through_the_jump
 
@@ -154,7 +155,28 @@ def test_the_shell_embeds_this_hub_s_name_and_where_its_plan_is_changed_on_the_s
             "linux": f"{saas}/app/download/linux/",
             "android": f"{saas}/app/download/android/",
         },
+        # The modules whose help window is ready, those that declare it (the test below).
+        "help_apps": app_help.ready_apps(),
     }
+
+
+def test_the_shell_names_the_modules_whose_help_is_ready_so_only_they_show_the_help_button(client, make_user, monkeypatch):
+    from django.apps import apps
+    from live.meta import Help, module_configs
+
+    for config in module_configs():
+        monkeypatch.setattr(config, "help", None)
+    monkeypatch.setattr(apps.get_app_config("table"), "help", Help())
+    client.force_login(make_user("ana", host=A.key, role="hub_employee"))
+    _, home = json_block(client.get("/demo/items", HTTP_HOST=HOST), "hub-home")
+    assert home["help_apps"] == ["table"]
+
+
+def test_the_csp_header_frames_only_the_page_itself_and_youtube_s_player_without_cookies(client):
+    # A module's help window plays its video in YouTube's privacy-enhanced player; the website editor's preview is a
+    # frame of the page's own origin. No page of the Hub may be framed by another (frame-ancestors).
+    directives = csp_directives(client.get("/demo/items", HTTP_HOST=HOST))
+    assert (directives["frame-src"], directives["frame-ancestors"]) == ("'self' https://www.youtube-nocookie.com", "'none'")
 
 
 @pytest.mark.parametrize(
