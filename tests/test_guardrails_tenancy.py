@@ -383,7 +383,7 @@ def test_a_new_bare_on_commit_in_the_modules_is_caught_listed_file_or_not():
     assert on_commit_problems({}) == {}
     assert on_commit_problems({"apps/demo/services.py": 1}) == {"apps/demo/services.py": (1, 0)}
     # Moved off (flow's and the inbox's through base.outbound, website's to live.operations.on_commit): none comes back.
-    assert on_commit_problems({"apps/flow/services.py": 1}) == {"apps/flow/services.py": (1, 0)}
+    assert on_commit_problems({"apps/flow/services/calls.py": 1}) == {"apps/flow/services/calls.py": (1, 0)}
     assert on_commit_problems({"apps/whatsapp_inbox/services.py": 1}) == {"apps/whatsapp_inbox/services.py": (1, 0)}
     assert on_commit_problems({"apps/website/services.py": 4}) == {"apps/website/services.py": (4, 0)}
 

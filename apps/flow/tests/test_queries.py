@@ -217,7 +217,7 @@ def test_the_list_searches_the_name_the_event_and_the_actions():
         "task.task.create": ["Welcome"],
         "nothing": [],
     }
-    from apps.flow.services import refresh_search_text
+    from apps.flow.services.flow_document import refresh_search_text
 
     for flow in Flow.objects.all():
         refresh_search_text(flow)

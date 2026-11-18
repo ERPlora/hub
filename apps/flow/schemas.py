@@ -7,7 +7,7 @@ so the editor puts it next to the step. An automation is named by its id or its 
 used by voice («activate the welcome automation»).
 
 What a step names (an action, a read, an event) is checked against the apps that are active in
-``services.py``: a schema knows the shape, not the business.
+``services/``: a schema knows the shape, not the business.
 
 Each id a write takes is marked with the read that names its record (``names``, base/assistant/cards.py ``REFERS``,
 checked at start by ``base.E009``): the assistant's card says which automation, draft, run or question, as the person

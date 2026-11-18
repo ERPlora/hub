@@ -264,7 +264,7 @@ def test_the_relay_and_the_sweep_in_one_tick_give_one_turn(gateway, held, hub_a,
     tick()
 
     both_ways_in_one_tick(held, hub_b)
-    assert held.jobs[0].fn is services.dispatch_assistant
+    assert held.jobs[0].fn is services.assistant_steps.dispatch_assistant
     second_goes_while_the_first_waits(held, monkeypatch, flow_gateway, "turn")
     assert turns(gateway) == [hub_b.slug]
     went_on_in_its_business_alone(run_id, hub_b, hub_a, told)
@@ -277,7 +277,7 @@ def test_the_relay_and_the_sweep_in_one_tick_give_one_call(trusted, held, hub_a,
     tick()
 
     both_ways_in_one_tick(held, hub_b)
-    assert held.jobs[0].fn is services.dispatch_call
+    assert held.jobs[0].fn is services.calls.dispatch_call
     second_goes_while_the_first_waits(held, monkeypatch, http, "call")
     assert len(Handler.seen) == 1
     went_on_in_its_business_alone(run_id, hub_b, hub_a, told)
