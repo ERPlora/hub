@@ -6,6 +6,7 @@
 import { expect, type Page, test } from '@playwright/test';
 
 import { A, EMPLOYEE, api, hostPage, login, psql, shot, shown } from './helpers';
+import { rowAction } from './service-helpers';
 import { shots } from './sale-helpers';
 
 const CLEANUP = ["delete from sale_quicknote where text like 'e2e %'", "delete from sale_department where name like 'e2e %'"].join('; ');
@@ -49,8 +50,8 @@ test('SALE-F36: the owner prepares a quick note, changes it and deletes it', asy
   const row = shown(page).locator('[data-testid=sale-quick-notes-row]').filter({ hasText: 'e2e no salt' });
   await expect(row).toBeVisible();
 
-  const id = await row.getAttribute('data-id');
-  await shown(page).locator(`[data-testid=sale-quick-notes-row-${id}-edit]`).first().click();
+  const id = (await row.getAttribute('data-id')) ?? '';
+  await rowAction(page, 'sale-quick-notes', id, 'edit');
   await expect(form).toBeVisible();
   await type(page, 'sale-quick-note-form-text', 'e2e very rare');
   await form.locator('[data-testid=sale-quick-note-form-submit]').click();
@@ -58,7 +59,7 @@ test('SALE-F36: the owner prepares a quick note, changes it and deletes it', asy
   await threeShots(page, 'sale-quick-notes', (p) => listReady(p, 'sale-quick-notes'));
   await page.setViewportSize({ width: 1280, height: 860 });
 
-  await shown(page).locator(`[data-testid=sale-quick-notes-row-${id}-delete]`).first().click();
+  await rowAction(page, 'sale-quick-notes', id, 'delete');
   const confirm = page.locator('ion-modal').filter({ hasText: /Delete quick note|Eliminar nota rápida/ }).last();
   await confirm.locator('.ep-form-modal__submit').click();
   await expect(confirm).toBeHidden();

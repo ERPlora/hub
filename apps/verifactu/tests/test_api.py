@@ -224,6 +224,23 @@ def test_a_certificate_of_another_holder_is_a_409_with_its_code(
 
 
 @HUB_DB
+def test_a_self_signed_certificate_is_a_409_that_says_which_one_to_use(
+    admin_client, issuer, settings
+):
+    settings.FISCAL_CERTIFICATE_KEY = certificates.generate_key()
+    response = post(
+        admin_client,
+        "/verifactu/certificate",
+        {"p12_base64": b64(make_p12(self_signed=True)), "password": "secret"},
+    )
+    assert response.status_code == 409
+    error = response.json()["error"]
+    assert error["code"] == "verifactu.certificate_invalid"
+    assert "FNMT" in error["message"]
+    assert not OwnCertificate.objects.exists()
+
+
+@HUB_DB
 def test_without_configure_the_certificate_is_a_403(manager_client, issuer, settings):
     settings.FISCAL_CERTIFICATE_KEY = certificates.generate_key()
     body = {"p12_base64": b64(make_p12()), "password": "secret"}

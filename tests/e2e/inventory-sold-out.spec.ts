@@ -122,7 +122,7 @@ const soldOutMark = (page: Page, product: Product): Locator =>
 async function statusProblems(page: Page, product: Product): Promise<string[]> {
   return soldOutMark(page, product).evaluate((mark) => {
     const px = (n: number) => Math.round(n * 10) / 10;
-    const box = mark.closest('[role=cell], .data-table__field-value');
+    const box = mark.closest('[role=cell], .data-table__card-status');
     if (!box) return ['no cell around the mark'];
     const parentOf = (node: Element): Element | null => node.parentElement ?? ((node.getRootNode() as ShadowRoot).host || null);
     const problemOf = (name: string, node: Element | null | undefined): string[] => {

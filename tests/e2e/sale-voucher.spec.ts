@@ -12,7 +12,7 @@ import { A, api, login, psql, shot, shown } from './helpers';
 import { cleanUp as cleanCustomers, createCard, e2eName } from './customer-helpers';
 import { snapshotSeries } from './invoice-helpers';
 import { cleanDocumentsOf, shots } from './sale-helpers';
-import { cleanUp as cleanServices, named, post } from './service-helpers';
+import { cleanUp as cleanServices, named, post, rowAction } from './service-helpers';
 
 interface Service {
   id: string;
@@ -232,7 +232,7 @@ test('SALE-F32, SERVICE-F26: a sale paid with a voucher gives its session back f
   await shown(page).locator('[data-testid=sales-table-search] input').fill(sale.number);
   const row = shown(page).locator(`[data-testid=sales-table-row][data-id="${sale.id}"]`);
   await expect(row).toBeVisible();
-  await shown(page).locator(`[data-testid=sales-table-row-${sale.id}-refund]`).first().click();
+  await rowAction(page, 'sales-table', sale.id, 'refund');
   const modal = page.locator('ion-modal[data-testid=sale-refund]');
   await expect(modal).toBeVisible();
   const line = sale.lines[0].id;

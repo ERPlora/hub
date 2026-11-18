@@ -8,9 +8,10 @@
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
 import { A, api, EMPLOYEE, login, psql, saveSessionForTheSweep, shot, shown } from './helpers';
+import { FLOW_VIEWPORTS, offersRowAction, rowAction } from './service-helpers';
 import { createProduct, dialog, fill, type Product } from './inventory-helpers';
 import { cleanDocumentsOf, stamp } from './sale-helpers';
-import { discardChanges, expectWaysOutAskOnDirtyForm, type UnsavedFormCase } from './unsaved-back-helpers';
+import { discardChanges, expectWaysOutAskOnDirtyForm, type RowActionOpener, type UnsavedFormCase } from './unsaved-back-helpers';
 
 const RUN = stamp();
 const SKU = `E2E-CRF-${RUN}`;
@@ -22,16 +23,9 @@ const mine = new Set<string>();
 /** The printers this file made. */
 const printers = new Set<string>();
 
-/** The three sizes of every flow's screenshots (390×844, 834×1112, 1440×900). */
-const SIZES = [
-  { label: '390', width: 390, height: 844 },
-  { label: '834', width: 834, height: 1112 },
-  { label: '1440', width: 1440, height: 900 },
-];
-
 /** `APP-CASH_REGISTER-<flow>-<size>` in the three sizes, each once `ready` says it painted. */
 async function flowShots(page: Page, flow: string, ready: (page: Page) => Promise<void>): Promise<void> {
-  for (const size of SIZES) {
+  for (const size of FLOW_VIEWPORTS) {
     await page.setViewportSize({ width: size.width, height: size.height });
     await ready(page);
     // A new size relays the shell out (menu, tabs): one page header on screen once it settled, never a
@@ -249,7 +243,7 @@ test('CASH_REGISTER-F03, F13, F05, F06, F09: the windows of a shift, in three si
   await flowShots(page, 'CASH_REGISTER-F13', sessionsReady);
 
   // F05: the movement window.
-  await shown(page).locator(`[data-testid=cash-register-sessions-row-${session.id}-movement]`).first().click();
+  await rowAction(page, 'cash-register-sessions', session.id, 'movement');
   const movement = dialog(page, 'cash-register-movement');
   await expect(movement).toBeVisible();
   // hub#1160: «12,555» is 12.555 €, as in a price: rewritten in the page format on leaving the field.
@@ -264,7 +258,7 @@ test('CASH_REGISTER-F03, F13, F05, F06, F09: the windows of a shift, in three si
   await expect(movement).toBeHidden();
 
   // F06: the count by notes and coins (no face value cut on the phone).
-  await shown(page).locator(`[data-testid=cash-register-sessions-row-${session.id}-count]`).first().click();
+  await rowAction(page, 'cash-register-sessions', session.id, 'count');
   const count = dialog(page, 'cash-register-count');
   await expect(count).toBeVisible();
   await fill(count, 'cash-register-count-denom-50', '1');
@@ -279,7 +273,7 @@ test('CASH_REGISTER-F03, F13, F05, F06, F09: the windows of a shift, in three si
   await expect(count).toBeHidden();
 
   // F09: the close, with the expected and the difference while typing.
-  await shown(page).locator(`[data-testid=cash-register-sessions-row-${session.id}-close]`).first().click();
+  await rowAction(page, 'cash-register-sessions', session.id, 'close');
   const close = dialog(page, 'cash-register-close');
   await expect(close).toBeVisible();
   await fill(close, 'cash-register-close-counted', '62');
@@ -299,20 +293,20 @@ test('CASH_REGISTER-F03, F13, F05, F06, F09: the windows of a shift, in three si
 test('BASE-F05: the windows of a shift ask «Discard changes?» on every way out with something typed (hub#1234)', async ({ page, context }) => {
   await login(page, A, '/cash_register/sessions');
   await closeLeftOpen(context);
-  /** A window of the sessions screen, by the button that opens it and a field that opens blank. */
-  const shift = (flow: string, form: string, add: string, field: string): UnsavedFormCase => ({
+  /** A window of the sessions screen, by the button or the row action that opens it and a field that opens blank. */
+  const shift = (flow: string, form: string, add: string | RowActionOpener, field: string): UnsavedFormCase => ({
     app: 'cash_register',
     flow,
     route: '/cash_register/sessions',
-    add: (on) => shown(on).locator(`[data-testid=${add}]`).filter({ visible: true }).first(),
+    add: typeof add === 'string' ? (on) => shown(on).locator(`[data-testid=${add}]`).filter({ visible: true }).first() : add,
     form,
     field,
   });
   await expectWaysOutAskOnDirtyForm(page, shift('CASH_REGISTER-F03', 'cash-register-open', 'cash-register-new-session', 'cash-register-open-notes'), 'HUB-1234-open');
   const id = await openByApi(context, 5000);
-  await expectWaysOutAskOnDirtyForm(page, shift('CASH_REGISTER-F05', 'cash-register-movement', `cash-register-sessions-row-${id}-movement`, 'cash-register-movement-concept'), 'HUB-1234-movement');
-  await expectWaysOutAskOnDirtyForm(page, shift('CASH_REGISTER-F06', 'cash-register-count', `cash-register-sessions-row-${id}-count`, 'cash-register-count-notes'), 'HUB-1234-count');
-  await expectWaysOutAskOnDirtyForm(page, shift('CASH_REGISTER-F09', 'cash-register-close', `cash-register-sessions-row-${id}-close`, 'cash-register-close-notes'), 'HUB-1234-close');
+  await expectWaysOutAskOnDirtyForm(page, shift('CASH_REGISTER-F05', 'cash-register-movement', { table: 'cash-register-sessions', id, action: 'movement' }, 'cash-register-movement-concept'), 'HUB-1234-movement');
+  await expectWaysOutAskOnDirtyForm(page, shift('CASH_REGISTER-F06', 'cash-register-count', { table: 'cash-register-sessions', id, action: 'count' }, 'cash-register-count-notes'), 'HUB-1234-count');
+  await expectWaysOutAskOnDirtyForm(page, shift('CASH_REGISTER-F09', 'cash-register-close', { table: 'cash-register-sessions', id, action: 'close' }, 'cash-register-close-notes'), 'HUB-1234-close');
   expect((await detailOf(context, id)).status).toBe('open');
   await closeByApi(context, id, 5000);
 });
@@ -388,7 +382,7 @@ test('CASH_REGISTER-F08: the close warns of an open check, a kitchen ticket and 
 
   await page.reload();
   await sessionsReady(page);
-  await shown(page).locator(`[data-testid=cash-register-sessions-row-${id}-close]`).first().click();
+  await rowAction(page, 'cash-register-sessions', id, 'close');
   const close = dialog(page, 'cash-register-close');
   await expect(close).toBeVisible();
   const review = close.locator('[data-testid=cash-register-review]');
@@ -419,7 +413,7 @@ test('CASH_REGISTER-F10: a session forgotten past its cut-off says so and closes
     await sessionsReady(page);
     const due = shown(page).locator('[data-testid=cash-register-auto-close-due]');
     await expect(due).toBeVisible();
-    await expect(shown(page).locator(`[data-testid=cash-register-sessions-row-${id}-movement]`)).toHaveCount(0);
+    expect(await offersRowAction(page, 'cash-register-sessions', id, 'movement')).toBe(false);
     await flowShots(page, 'CASH_REGISTER-F10', async (p) => {
       await expect(shown(p).locator('[data-testid=cash-register-auto-close-due]')).toBeVisible();
     });

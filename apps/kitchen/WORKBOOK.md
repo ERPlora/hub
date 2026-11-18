@@ -109,16 +109,21 @@ Menú **Cocina → Pantalla**. El tablero de cocina. Una sola barra arriba, fija
 vistas en pestañas con su contador («Comandas» y «Listas»; «Resumen» sin contador), el botón «Pantalla completa»
 y, si en las comandas en marcha hay platos de más de una estación, los botones de estación («Todas»,
 cada estación por su nombre y con su color, y «Sin estación»). La estación elegida se recuerda en ese
-dispositivo. Debajo, una rejilla de tarjetas de columnas iguales (una sola en el móvil). Cada tarjeta:
-la etiqueta («Mesa 4»; sin etiqueta, el tipo), «Camarero: <nombre>», las marcas «Urgente», «VIP»,
-«Ronda N» (desde la segunda) y «Lista», el reloj y el número corto «#0012»; los platos con la cantidad
-grande, el nombre, sus suplementos en negrita, la nota en cursiva y, en «Todas», la estación; los platos
-de un menú, junto a una raya bajo la cabecera del menú, que dice cuántos platos lleva («2 platos») y al
-tocarla marca listos sus platos; un icono de papel si la estación es solo de papel. Un plato anulado en el TPV sale tachado, con «Anulado» y el motivo en rojo, y no
-responde al toque. Al pie, según el permiso y el estado: «Listo», «Marcar urgente» / «Quitar
-urgente», «Recuperar» y «Servida», enteros y del tamaño de un dedo en una tableta. El borde superior de la tarjeta va en verde, ámbar o rojo según el
-tiempo desde que se envió. Vacía: «No hay comandas en marcha.» (Comandas), «No hay nada esperando a
-recoger.» (Listas), «No queda nada por cocinar.» (Resumen). Cargando: «Cargando la pantalla…». Error:
+dispositivo. Debajo, una rejilla de tarjetas de columnas iguales, tantas como quepan (una sola en el móvil, sin
+desplazamiento lateral). Cada tarjeta: a la izquierda, el tipo en un icono, la etiqueta («Mesa 4»; sin etiqueta, el
+tipo) y «Camarero: <nombre>»; a la derecha, el reloj, la espera en palabras con su icono («En tiempo», «Aviso» o
+«Retraso») y el número corto «#0012»; debajo, el estado («Por preparar», «En preparación» o «Lista») y las marcas
+«Urgente», «VIP» y «Ronda N» (desde la segunda). Los platos con la cantidad grande («2×»), el nombre, sus suplementos
+en negrita, la nota en cursiva, en «Todas» la estación con su color, «Solo papel» si la estación es solo de papel y, a
+la derecha, un icono con su estado (por preparar, en preparación, listo o anulado); los platos de un menú, junto a una
+raya bajo la cabecera del menú, que dice cuántos platos lleva («2 platos») y al tocarla marca listos sus platos. Un
+plato listo sale tachado y atenuado. Un plato anulado en el TPV sale tachado, con «Anulado» y el motivo en rojo, y no
+responde al toque. Al pie, según el permiso y el estado, la acción principal a todo el ancho («Listo» mientras se
+cocina con platos por hacer, «Servida» cuando está lista) y, a su derecha, «⋮», que abre las demás: «Marcar urgente» /
+«Quitar urgente» y «Recuperar»; sin ninguna de ellas no hay «⋮». Todo se pulsa bien con el dedo en una tableta. La
+franja superior de la tarjeta va en verde, ámbar o rojo según el tiempo desde que se envió. Vacía: «No hay comandas en marcha.» (Comandas), «No hay nada esperando a
+recoger.» (Listas), «No queda nada por cocinar.» (Resumen). Cargando: «Cargando la pantalla…» sobre tarjetas
+grises. Error:
 «No se pudo cargar la pantalla de cocina» con «Reintentar». Un fallo al pedir papel deja «No se ha
 podido imprimir el pase. Revisa la impresora de la estación.» o «No se ha podido imprimir el aviso de
 urgencia. Avisa a cocina de viva voz y revisa su impresora.» hasta que una impresión posterior salga
@@ -411,9 +416,10 @@ Pasos:
 3. Si hay platos de más de una estación, elige la tuya: «Todas» enseña todos los platos (el pase);
    una estación enseña solo sus platos y solo las comandas que aún tienen algo suyo por hacer; «Sin
    estación», los platos sin enrutar. La elección se recuerda en ese dispositivo.
-4. El borde de cada tarjeta pasa de verde a ámbar al llegar a «Aviso ámbar» y a rojo al llegar a «Aviso
-   rojo», contando desde que se envió; el reloj sigue en rojo. Sin «Semáforo de color» el borde queda
-   gris; sin «Mostrar cronómetro» no hay reloj.
+4. La franja de cada tarjeta pasa de verde a ámbar al llegar a «Aviso ámbar» y a rojo al llegar a «Aviso
+   rojo», contando desde que se envió, y junto al reloj lo dice en palabras: «En tiempo», «Aviso» o «Retraso»
+   (el reloj y la palabra, en ámbar o en rojo). Sin «Semáforo de color» la franja queda gris y no dice la
+   espera; sin «Mostrar cronómetro» no hay reloj, pero sí la espera.
 Entra: las comandas Por preparar, En preparación y Listas con sus platos; los ajustes; los nombres y
 colores vivos de las estaciones.
 Sale: nada; solo enseña. Los botones de cada tarjeta se ven enteros y se pulsan bien con el dedo en una
@@ -427,7 +433,7 @@ Estado: hecho
 Actor: empleado, responsable
 Pantalla: Pantalla (también el asistente: «marca lista la mesa 4»)
 Pasos:
-1. Toca un plato cuando esté hecho: se tacha con ✓.
+1. Toca un plato cuando esté hecho: se tacha y su icono pasa a listo.
 2. O toca la cabecera de la tarjeta, o «Listo»: se marcan los platos de esa tarjeta que se ven en tu
    pantalla y siguen por hacer (en una estación, solo los suyos).
 3. El primer plato marcado pasa la comanda a «En preparación». Cuando no queda ningún plato por hacer,
@@ -446,9 +452,8 @@ Actor: empleado, responsable
 Pantalla: Pantalla
 Pasos:
 1. Toca un plato tachado: vuelve a estar por hacer.
-2. O «Recuperar» en la tarjeta (en una tableta, el botón se ve entero): vuelven los platos tachados
-   que se ven en tu pantalla.
-3. Una comanda de «Listas» se recupera con «Recuperar»: vuelve a «En preparación» y a «Comandas».
+2. O «⋮» → «Recuperar» en la tarjeta: vuelven los platos tachados que se ven en tu pantalla.
+3. Una comanda de «Listas» se recupera con «⋮» → «Recuperar»: vuelve a «En preparación» y a «Comandas».
 Entra: los platos tachados.
 Sale: cada plato por hacer (avisa: plato recuperado; Historial «Plato recuperado») y, si la comanda
 estaba Lista, «Recuperada». Recuperar lo que ya está por hacer no cambia nada.
@@ -473,11 +478,11 @@ Estado: hecho
 Actor: empleado, responsable
 Pantalla: Pantalla
 Pasos:
-1. En una tarjeta que se cocina, «Marcar urgente»: lleva «Urgente» y salta al principio del tablero
+1. En una tarjeta que se cocina, «⋮» → «Marcar urgente»: lleva «Urgente» y salta al principio del tablero
    en todas las pantallas, que suenan una vez.
 2. Las estaciones que imprimen y aún tienen platos de esa ronda por hacer reciben un aviso corto en
    papel: la cabecera de la comanda con `!! URGENTE !!` y sin platos.
-3. «Quitar urgente» lo deshace y no imprime nada. Una ronda VIP no ofrece el botón, y por el asistente
+3. «Quitar urgente» lo deshace y no imprime nada. Una ronda VIP no lo ofrece, y por el asistente
    o la API se rechaza («Esa comanda es VIP: marcarla urgente no cambia su prioridad.»).
 Entra: la comanda que se cocina.
 Sale: la ronda urgente (avisa: comanda cambiada; Historial «Urgente»); cada paso a urgente da un aviso
