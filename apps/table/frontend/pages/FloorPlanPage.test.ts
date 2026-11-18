@@ -1,18 +1,19 @@
-// Tables → Floor plan (WORKBOOK «Pantallas · Plano de sala»; TABLE-F01 to F06, F09 to F17): one row on
-// top — the zone strip and, for whoever draws the room, «Service / Edit plan», the «+» and the pencil —
-// and the live plan of the chosen zone underneath: every table of the room is read once, on the page's one
-// stream, and the strip only picks which zone the plan paints.
+// Tables → Floor plan: one row on top — the zone strip and, for whoever draws the room, «Service / Edit plan»,
+// the «+» and the pencil — a summary of the chosen zone, and its live plan underneath (on a phone in
+// «Service», its cards): every table of the room is read once, on the page's one stream, and the strip only
+// picks which zone the plan paints.
 // - Service: the zones and tables in service; a tap opens the table's window; Transfer and Merge pick
 //   their destination on the plan («Transfer 4 to…», «Pick a free table», «Cancel»).
 // - Edit plan: every zone and table (the inactive ones greyed out); a tap opens «Edit table», a drag saves
 //   the place at once (a refused one goes back and says so); «+» adds a zone or a table, the pencil edits
 //   the zone.
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { click, EMPLOYEE, flush, type MountOptions, mountTable, page, settle } from '../__tests__/mount-table';
 import { occupied, SETTINGS, tableRow, zoneRow } from '../__tests__/tables';
 import AddModal from '../components/AddModal.vue';
 import FloorCanvas from '../components/FloorCanvas.vue';
+import FloorCards from '../components/FloorCards.vue';
 import TableFormModal from '../components/TableFormModal.vue';
 import TableSheet from '../components/TableSheet.vue';
 import ZoneFormModal from '../components/ZoneFormModal.vue';
@@ -30,6 +31,19 @@ const FREE = tableRow({ id: 't1', number: '1' });
 const BUSY = occupied({ id: 't4', number: '4', position_x: 104 });
 const IDLE = tableRow({ id: 't9', number: '9', is_active: false, in_service: false, position_x: 192 });
 const TERRACE = tableRow({ id: 't7', number: '7', zone_id: 'z2', zone_name: 'Terrace' });
+
+/** A screen of `width` px: `@erplora/ui`'s phone breakpoint answers as a browser would. */
+function screenOf(width: number): void {
+  vi.stubGlobal('matchMedia', (query: string) => ({
+    matches: query === '(max-width: 640px)' && width <= 640,
+    addEventListener: () => {},
+    removeEventListener: () => {},
+  }));
+}
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 async function setup(options: MountOptions = {}) {
   const m = await mountTable(FloorPlanPage, { path: '/table/floor-plan', ...options });
@@ -50,7 +64,8 @@ async function setup(options: MountOptions = {}) {
   const canvas = () => m.wrapper.findComponent(FloorCanvas);
   /** The labels of a segment's buttons (Ionic's own element hides its light DOM from \`text()\`). */
   const labels = (prefix: string) => m.wrapper.findAll(`[data-testid^="${prefix}"]`).map((button) => button.find('ion-label').element.innerHTML.trim());
-  return { ...m, el, tiles, show, mode, canvas, labels };
+  const zoneNames = () => m.wrapper.findAll('[data-testid^="table-floor-zone-tab-"] [data-part="zone-name"]').map((name) => name.text());
+  return { ...m, el, tiles, show, mode, canvas, labels, zoneNames };
 }
 
 describe('FloorPlanPage · service', () => {
@@ -62,9 +77,44 @@ describe('FloorPlanPage · service', () => {
     // SDK would throw the page's first stream away (an aborted /api/live on every visit).
     expect(s.params(TABLES)).toEqual([{ sort: 'number', limit: 100, offset: 0 }]);
     expect(s.net.streams.map((stream) => stream.aborted())).toEqual([false]);
-    expect(s.labels('table-floor-zone-tab-')).toEqual(['Dining room', 'Terrace']);
+    expect(s.zoneNames()).toEqual(['Dining room', 'Terrace']);
     expect(s.tiles()).toEqual(['t1', 't4']);
     expect(s.el('hint').exists()).toBe(false);
+  });
+
+  it('shows a skeleton of the plan while it loads, then each zone tab counts its occupied tables and the card sums up the zone', async () => {
+    const s = await setup();
+    expect(s.el('loading').attributes('role')).toBe('progressbar');
+    expect(s.el('summary').exists()).toBe(false);
+    await s.show();
+    expect(s.el('loading').exists()).toBe(false);
+    const counts = s.wrapper.findAll('[data-part="zone-count"]').map((count) => count.text());
+    expect(counts).toEqual(['1/2', '0/1']);
+    expect(s.el('summary').find('h2').text()).toBe('Dining room');
+    expect(s.el('summary').find('[data-stat="occupied"]').text()).toBe('1Occupied');
+    expect(s.el('summary').find('[data-stat="guests"]').text()).toBe('3Guests');
+  });
+
+  it('on a phone lists the zone as cards, and the plan comes back to edit it', async () => {
+    screenOf(390);
+    const s = await setup();
+    await s.show();
+    expect(s.el('cards').exists()).toBe(true);
+    expect(s.el('canvas').exists()).toBe(false);
+    expect(s.tiles()).toEqual(['t1', 't4']);
+    s.wrapper.findComponent(FloorCards).vm.$emit('select', BUSY);
+    await flush();
+    expect((s.wrapper.findComponent(TableSheet).props('table') as TableOut).id).toBe('t4');
+    await s.mode('edit');
+    expect(s.el('cards').exists()).toBe(false);
+    expect(s.el('canvas').exists()).toBe(true);
+  });
+
+  it('a tablet keeps the plan', async () => {
+    screenOf(834);
+    const s = await setup();
+    await s.show();
+    expect([s.el('canvas').exists(), s.el('cards').exists()]).toEqual([true, false]);
   });
 
   it('another zone of the strip shows its plan at once, without asking the server again', async () => {
@@ -187,7 +237,7 @@ describe('FloorPlanPage · edit plan', () => {
     const s = await setup();
     await s.show();
     await s.mode('edit');
-    expect(s.labels('table-floor-zone-tab-')).toEqual(['Dining room', 'Terrace', 'Old bar']);
+    expect(s.zoneNames()).toEqual(['Dining room', 'Terrace', 'Old bar']);
     expect(s.tiles()).toEqual(['t1', 't4', 't9']);
     expect(s.el('hint').text()).toBe('Drag to position · click a table to edit or delete it. Changes are saved instantly.');
     s.canvas().vm.$emit('select', FREE);

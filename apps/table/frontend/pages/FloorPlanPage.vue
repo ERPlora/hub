@@ -1,31 +1,34 @@
 <script setup lang="ts">
-// Tables → Floor plan (WORKBOOK «Pantallas · Plano de sala»; TABLE-F01 to F06, F09 to F17, F28, F32).
-// One row on top: the zone strip (it scrolls sideways on a phone), «Service / Edit plan» for whoever
-// draws the room, and — editing — «+» («Add zone or table») and the pencil («Edit zone»). Underneath, the
-// live plan of the chosen zone: every table of the room (`table.table.list`, windows of 100) is read from
-// the start, on the page's one stream, and the strip only picks the zone it paints (a query that waited for
-// the zones would change when they came and throw the first stream away; a zone tap would reopen it). It
-// changes by itself when somebody seats, moves, joins, splits, charges or voids.
+// Tables → Floor plan. On top, the zone strip (each tab with its occupied tables), «Service / Edit plan» for
+// whoever draws the room and — editing — «+» («Add zone or table») and the pencil («Edit zone»); then a summary
+// of the chosen zone and its live plan (on a phone in «Service», its cards). Every table of the room
+// (`table.table.list`, windows of 100) is read from the start, on the page's one stream, and the strip only picks
+// the zone it paints (a query that waited for the zones would change when they came and throw the first stream
+// away; a zone tap would reopen it). It changes by itself when somebody seats, moves, joins, splits, charges or voids.
 // - Service: the zones and tables in service; a tap opens the table's window (TableSheet). Transfer and
-//   Merge come back here to pick their destination on the plan: only the tables that may be picked answer,
-//   with «Transfer 4 to…» / «Pick a free table» and «Cancel».
-// - Edit plan: every zone and table (inactive ones greyed out); a tap opens «Edit table»; a drag (or the
-//   arrows) saves the place at once (`table.table.move`), and a refused move goes back and says so.
+//   Merge come back here to pick their destination: only the tables that may be picked answer, with
+//   «Transfer 4 to…» / «Pick a free table» and «Cancel».
+// - Edit plan: every zone and table (inactive ones greyed out), always on the plan; a tap opens «Edit table»; a
+//   drag (or the arrows) saves the place at once (`table.table.move`), and a refused move goes back and says so.
 import { EmptyState, InlineFeedback } from '@erplora/ui/components';
 import { type ApiError, useCommand, useLive } from '@erplora/ui/sdk';
 import { AppPage, HubIcon, useSession } from '@erplora/ui/shell';
-import { IonButton, IonLabel, IonSegment, IonSegmentButton, IonSpinner } from '@ionic/vue';
-import { computed, nextTick, ref, useTemplateRef, watch } from 'vue';
+import { IonButton, IonLabel, IonSegment, IonSegmentButton } from '@ionic/vue';
+import { computed, ref, useTemplateRef, watch } from 'vue';
 
 import AddModal from '../components/AddModal.vue';
 import FloorCanvas from '../components/FloorCanvas.vue';
+import FloorCards from '../components/FloorCards.vue';
+import FloorSkeleton from '../components/FloorSkeleton.vue';
+import FloorSummary from '../components/FloorSummary.vue';
+import FloorZoneTabs from '../components/FloorZoneTabs.vue';
 import PageNotices, { blockingError } from '../components/PageNotices.vue';
 import TableFormModal from '../components/TableFormModal.vue';
 import TableSheet from '../components/TableSheet.vue';
 import ZoneFormModal from '../components/ZoneFormModal.vue';
 import { useAllRows } from '../composables/useAllRows';
+import { useIsPhone } from '../composables/useIsPhone';
 import { useNow } from '../composables/useNow';
-import { useScrollEdges } from '../composables/useScrollEdges';
 import { useT } from '../composables/useT';
 import { paintedStatus, type PickMode, targetable } from '../lib/floor';
 import type { SettingsOut, TableCheckOut, TableOut, ZoneOut } from '../operations';
@@ -71,11 +74,8 @@ watch(
   },
   { immediate: true },
 );
-// The strip fades the edge with more zones behind it: a hard cut reads «no more zones».
-const zoneStrip = useTemplateRef<InstanceType<typeof IonSegment>>('zoneStrip');
-const zoneEdges = useScrollEdges(computed(() => (zoneStrip.value?.$el as HTMLElement | undefined) ?? null));
-// Zones added or renamed widen the strip without resizing it.
-watch(zones, () => void nextTick(zoneEdges.mark));
+const zoneColor = computed(() => `var(--ion-color-${activeZone.value?.color ?? 'primary'})`);
+const isPhone = useIsPhone();
 
 const plan = useAllRows('table.table.list', () => ({ sort: 'number' }));
 /** The tables as the clock paints them now: a reservation enters its window or ends with no event. */
@@ -88,6 +88,8 @@ const painted = computed<TableOut[]>(() =>
 const tables = computed<TableOut[]>(() =>
   painted.value.filter((table) => (!activeZoneId.value || table.zone_id === activeZoneId.value) && (editing.value || table.in_service)),
 );
+const inService = computed(() => tables.value.filter((table) => table.in_service));
+const asCards = computed(() => isPhone.value && !editing.value);
 // When the clock repaints a table, the server is asked again (it may know more: another reservation).
 const drift = computed(() =>
   painted.value
@@ -128,10 +130,6 @@ function onModeChange(event: CustomEvent<{ value?: string | number }>): void {
   failure.value = '';
 }
 
-function onZoneChange(event: CustomEvent<{ value?: string | number }>): void {
-  const value = event.detail.value;
-  if (value !== undefined && value !== null) activeZoneId.value = String(value);
-}
 
 const transfer = useCommand('table.session.transfer');
 const merge = useCommand('table.session.merge');
@@ -204,6 +202,7 @@ function onZoneSaved(zone: ZoneOut): void {
     :title="$t('table.title')"
     :tabs="tableTabs($t, { settings: session.can('table.manage_settings') })"
     :tabs-label="$t('table.tabs.label')"
+    content-layout="fill"
   >
     <PageNotices
       testid="table-floor"
@@ -213,28 +212,16 @@ function onZoneSaved(zone: ZoneOut): void {
     <div
       v-if="!blocked"
       class="table-floor"
+      :style="{ '--zone-color': zoneColor }"
     >
       <div class="table-floor__bar">
-        <ion-segment
+        <FloorZoneTabs
           v-if="zones.length"
-          ref="zoneStrip"
-          class="table-floor__zones"
-          :class="{ 'table-floor__zones--more-left': zoneEdges.edges.value.left, 'table-floor__zones--more-right': zoneEdges.edges.value.right }"
-          data-testid="table-floor-zones"
-          scrollable
-          :value="activeZoneId ?? undefined"
-          :aria-label="$t('table.floor.zones')"
-          @ion-change="onZoneChange"
-        >
-          <ion-segment-button
-            v-for="zone in zones"
-            :key="zone.id"
-            :value="zone.id"
-            :data-testid="`table-floor-zone-tab-${zone.id}`"
-          >
-            <ion-label>{{ zone.name }}</ion-label>
-          </ion-segment-button>
-        </ion-segment>
+          :zones="zones"
+          :active="activeZoneId"
+          :tables="painted"
+          @change="(id: string) => (activeZoneId = id)"
+        />
         <span
           v-else
           class="table-floor__spacer"
@@ -263,6 +250,7 @@ function onZoneSaved(zone: ZoneOut): void {
         <template v-if="editing">
           <ion-button
             v-if="canAdd"
+            class="table-floor__action"
             fill="clear"
             data-testid="table-floor-add"
             :aria-label="$t('table.floor.add')"
@@ -276,6 +264,7 @@ function onZoneSaved(zone: ZoneOut): void {
           </ion-button>
           <ion-button
             v-if="canEditZone"
+            class="table-floor__action"
             fill="clear"
             data-testid="table-floor-zone-edit"
             :aria-label="$t('table.floor.editZone')"
@@ -296,8 +285,11 @@ function onZoneSaved(zone: ZoneOut): void {
         class="table-floor__pick"
         data-testid="table-floor-pick"
       >
-        <strong>{{ pick.mode === 'transfer' ? $t('table.floor.transferTitle', { number: pick.table.number }) : $t('table.floor.mergeTitle', { number: pick.table.number }) }}</strong>
-        <span>{{ pick.mode === 'transfer' ? $t('table.floor.pickFree') : $t('table.floor.pickOccupied') }}</span>
+        <HubIcon name="ion:swap-horizontal-outline" />
+        <div>
+          <strong>{{ pick.mode === 'transfer' ? $t('table.floor.transferTitle', { number: pick.table.number }) : $t('table.floor.mergeTitle', { number: pick.table.number }) }}</strong>
+          <span>{{ pick.mode === 'transfer' ? $t('table.floor.pickFree') : $t('table.floor.pickOccupied') }}</span>
+        </div>
         <ion-button
           fill="clear"
           data-testid="table-floor-pick-cancel"
@@ -331,14 +323,7 @@ function onZoneSaved(zone: ZoneOut): void {
         </ion-button>
       </InlineFeedback>
 
-      <p
-        v-if="loading"
-        class="table-floor__loading"
-        data-testid="table-floor-loading"
-      >
-        <ion-spinner name="crescent" />
-        {{ $t('table.loading') }}
-      </p>
+      <FloorSkeleton v-if="loading" />
       <EmptyState
         v-else-if="!zones.length"
         data-testid="table-floor-empty-zones"
@@ -346,11 +331,34 @@ function onZoneSaved(zone: ZoneOut): void {
         :message="$t('table.floor.emptyZones')"
       />
       <template v-else>
+        <FloorSummary
+          :zone="activeZone"
+          :tables="inService"
+        />
+        <template v-if="asCards">
+          <FloorCards
+            v-if="tables.length"
+            :tables="tables"
+            :now="now"
+            :time-zone="settings.timezone"
+            :settings="settings"
+            :pick="pickable"
+            @select="onSelect"
+          />
+          <EmptyState
+            v-else
+            data-testid="table-floor-empty-tables"
+            icon="grid-outline"
+            :message="$t('table.floor.emptyService')"
+          />
+        </template>
         <FloorCanvas
+          v-else
           ref="canvas"
           :tables="tables"
           :now="now"
           :time-zone="settings.timezone"
+          :settings="settings"
           :editable="editing && !pick"
           :pick="pickable"
           @select="onSelect"
@@ -403,65 +411,88 @@ function onZoneSaved(zone: ZoneOut): void {
 </template>
 
 <style scoped>
+.table-floor {
+  display: flex;
+  flex: 1 1 0;
+  min-height: 0;
+  flex-direction: column;
+}
 .table-floor__bar {
   display: flex;
+  flex: none;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0.25rem;
-  margin-bottom: 0.4rem;
-}
-.table-floor__zones {
-  flex: 1;
-  min-width: 0;
-}
-.table-floor__zones--more-right {
-  -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 1.5rem), transparent);
-  mask-image: linear-gradient(to right, #000 calc(100% - 1.5rem), transparent);
-}
-.table-floor__zones--more-left {
-  -webkit-mask-image: linear-gradient(to left, #000 calc(100% - 1.5rem), transparent);
-  mask-image: linear-gradient(to left, #000 calc(100% - 1.5rem), transparent);
-}
-.table-floor__zones--more-left.table-floor__zones--more-right {
-  -webkit-mask-image: linear-gradient(to right, transparent, #000 1.5rem, #000 calc(100% - 1.5rem), transparent);
-  mask-image: linear-gradient(to right, transparent, #000 1.5rem, #000 calc(100% - 1.5rem), transparent);
+  gap: 6px;
 }
 .table-floor__spacer {
   flex: 1;
 }
 .table-floor__mode {
-  width: auto;
+  flex: 0 0 210px;
+  width: 210px;
 }
-.table-floor__bar ion-button {
-  min-height: 44px;
-  --min-height: 44px;
+.table-floor__action {
+  width: var(--ep-touch-min);
+  min-width: var(--ep-touch-min);
+  min-height: var(--ep-touch-min);
+  margin: 0;
+  --color: var(--ep-text-muted);
+}
+@media (min-width: 641px) {
+  .table-floor__bar {
+    flex-wrap: nowrap;
+  }
+}
+@media (max-width: 640px) {
+  .table-floor {
+    flex: 1 0 auto;
+  }
+  .table-floor__bar > :first-child {
+    flex-basis: 100%;
+  }
+  .table-floor__mode {
+    flex: 1;
+  }
 }
 .table-floor__pick {
   display: flex;
-  flex-wrap: wrap;
+  flex: none;
   align-items: center;
-  gap: 0.5rem;
-  margin: 0.4rem 0;
-  padding: 0.6rem 0.7rem;
-  border-radius: var(--ep-radius, 12px);
-  background: var(--ion-color-light, #f4f5f8);
+  gap: 10px;
+  margin: 8px 0;
+  padding: 8px 8px 8px 14px;
+  border: 1px solid color-mix(in srgb, var(--ion-color-primary) 20%, var(--ion-border-color));
+  border-radius: var(--ep-radius);
+  background: var(--ep-primary-tint);
+}
+.table-floor__pick > ion-icon {
+  color: var(--ep-primary-text);
+  font-size: 20px;
+}
+.table-floor__pick div {
+  flex: 1;
+}
+.table-floor__pick strong {
+  display: block;
+  font-size: 12px;
 }
 .table-floor__pick span {
-  margin-inline-end: auto;
-  color: var(--ion-color-medium, #8b897f);
+  color: var(--ep-text-muted);
+  font-size: 10px;
 }
-.table-floor__loading {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+.table-floor__pick ion-button {
+  margin: 0;
+  --color: var(--ep-primary-text);
 }
 .table-floor__empty {
   position: absolute;
   inset: 0;
 }
 .table-floor__hint {
-  margin: 0.5rem 0 0;
-  font-size: 0.85rem;
-  color: var(--ion-color-medium, #8b897f);
+  flex: none;
+  margin: 7px 4px 0;
+  color: var(--ep-text-muted);
+  font-size: 10px;
+  text-align: center;
 }
 </style>

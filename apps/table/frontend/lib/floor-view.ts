@@ -16,6 +16,7 @@ export interface FloorView {
   tone: 'normal' | 'warning' | 'critical';
   progress: number;
   short: string;
+  pax: string;
   holder: string;
   holdTime: string;
   labels: string[];
@@ -60,6 +61,7 @@ export function floorView(table: TableOut, options: FloorViewOptions): FloorView
     tone: rawTone === 'ok' ? ('normal' as const) : rawTone,
     progress: minutes === null ? 0 : Math.min(100, (minutes / options.settings.timer_critical_minutes) * 100),
     short,
+    pax,
     holder,
     holdTime,
     labels: [short === status ? pax : `${status} · ${pax}`, ...(holder ? [`${holder}${holdTime ? ` · ${holdTime}` : ''}`] : [])],

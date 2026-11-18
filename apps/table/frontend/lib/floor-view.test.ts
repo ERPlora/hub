@@ -41,13 +41,13 @@ describe('elapsed', () => {
 describe('floorView', () => {
   it('gives a free table its status inside and its capacity on the label, without inventing a timer', () => {
     const model = view();
-    expect(model).toMatchObject({ minutes: null, tone: 'normal', progress: 0, short: 'Available', labels: ['4 pax'] });
+    expect(model).toMatchObject({ minutes: null, tone: 'normal', progress: 0, short: 'Available', pax: '4 pax', labels: ['4 pax'] });
     expect(model.accessible).toBe('Table 4 · Dining room · 4 pax · Available');
   });
 
   it('gives an occupied table elapsed time, guests and its server', () => {
     const model = view(occupied());
-    expect(model).toMatchObject({ minutes: 35, tone: 'normal', short: '0:35', labels: ['Occupied · 3/4 pax'] });
+    expect(model).toMatchObject({ minutes: 35, tone: 'normal', short: '0:35', pax: '3/4 pax', labels: ['Occupied · 3/4 pax'] });
     expect(model.progress).toBeCloseTo((35 / 90) * 100);
     expect(model.accessible).toContain('3 guests · 35 min · Served by Luis');
   });
