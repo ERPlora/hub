@@ -570,7 +570,6 @@ def test_a_run_of_a_card_of_the_same_id_in_the_history_finished_well_is_left_as_
 
 
 @HUB_DB
-@pytest.mark.usefixtures("no_test_fallback")
 def test_an_erasure_in_another_business_leaves_this_ones_runs_alone(hub_a, hub_b):
     """Each business in its own database, as production: the same id erased in B cancels nothing in A."""
     in_a, in_b = Scope("host", hub_a.slug), Scope("host", hub_b.slug)

@@ -46,8 +46,6 @@ from base.tests.test_worker_activations import (  # noqa: F401 (fixtures)
 )
 from control.models import Hub
 
-pytestmark = pytest.mark.usefixtures("no_test_fallback")
-
 HUB_DB = pytest.mark.django_db(databases=hubs.HUB_DATABASES)
 
 router = TenantRouter()

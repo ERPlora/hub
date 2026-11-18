@@ -24,7 +24,7 @@ from base.tenancy.tests import hubs
 from base.tenancy.tests.s3 import aws_test_credentials, hub_files_bucket, moto_s3  # noqa: F401
 from control.models import Hub
 
-pytestmark = [pytest.mark.django_db(databases=hubs.HUB_DATABASES), pytest.mark.usefixtures("no_test_fallback")]
+pytestmark = [pytest.mark.django_db(databases=hubs.HUB_DATABASES)]
 
 #: What a hub keeps: its Files and what its apps write beside them.
 KEPT = ("files/contract.pdf", "files/Holidays/photo.jpg", "website/img/3f2a9c.webp")

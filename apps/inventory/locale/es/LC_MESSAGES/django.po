@@ -105,6 +105,9 @@ msgstr "slug"
 msgid "description"
 msgstr "descripción"
 
+msgid "allergens"
+msgstr "alérgenos"
+
 msgid "icon"
 msgstr "icono"
 
@@ -305,6 +308,9 @@ msgstr "Umbral"
 
 msgid "Description"
 msgstr "Descripción"
+
+msgid "Allergens"
+msgstr "Alérgenos"
 
 msgid "Unit"
 msgstr "Unidad"

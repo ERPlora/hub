@@ -10,6 +10,7 @@
 // read first and put back by API at the end.
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
+import { aMonday } from './appointment-helpers';
 import { A, api, psql, shot, shown } from './helpers';
 import { ownerPage, pick, post, rowAction, VIEWPORTS } from './service-helpers';
 import { discardChanges } from './unsaved-back-helpers';
@@ -17,13 +18,6 @@ import { discardChanges } from './unsaved-back-helpers';
 const TAG = 'E2E Apt';
 const RUN = Date.now().toString(36);
 const named = (label: string): string => `${TAG} ${label} ${RUN}`;
-
-/** A Monday five weeks ahead (inside the 90 days of advance), as `YYYY-MM-DD` of the business. */
-function aMonday(): string {
-  const day = new Date();
-  day.setUTCDate(day.getUTCDate() + 35 + ((8 - day.getUTCDay()) % 7));
-  return day.toISOString().slice(0, 10);
-}
 const DAY = aMonday();
 /** The Tuesday after: a day of its own for the test that does not use the Monday's cast. */
 const NEXT_DAY = new Date(Date.parse(`${DAY}T00:00:00Z`) + 86_400_000).toISOString().slice(0, 10);

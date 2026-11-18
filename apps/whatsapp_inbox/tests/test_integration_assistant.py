@@ -165,7 +165,6 @@ def test_the_card_of_a_template_to_review_names_its_headers_file_and_never_its_s
 
 
 @HUB_DB
-@pytest.mark.usefixtures("no_test_fallback")
 def test_a_file_of_another_business_is_never_named_nor_shown_by_its_id(hub_a, hub_b):
     from base.tenancy.context import use_hub
     from live.context import Scope

@@ -133,6 +133,11 @@
       "again": "Book another",
       "policy": "Cancellation policy",
       "minutes": "{n} min"
+    },
+    "door": {
+      "title": "Book online",
+      "intro": "Choose your services, a day and a free time, then leave your name and mobile.",
+      "noServices": "This business has nothing to book online right now."
     }
   }
 }

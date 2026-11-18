@@ -11,7 +11,7 @@ from base.tenancy import migrator
 from base.tenancy.context import use_hub
 from base.tenancy.tests import hubs
 
-pytestmark = [pytest.mark.django_db(databases=hubs.HUB_DATABASES), pytest.mark.usefixtures("no_test_fallback")]
+pytestmark = [pytest.mark.django_db(databases=hubs.HUB_DATABASES)]
 
 #: An app every template carries that nothing vetoes and whose requirements are on in both businesses.
 APP = "task"

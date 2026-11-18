@@ -3510,8 +3510,7 @@ Implicados: BASE-F92, BASE-F93
   worker de verdad; e2e `tests/e2e/base-template-waits-for-apps.spec.ts`.
 - Un negocio sin BD propia (`hub.db_name` vacío) recibe de `base.hub.reset` sin `dry_run` un 409
   `base.reset_shared_database` (`available: false` en el plan). Ninguno de producción está así
-  (hub#602): solo lo alcanza el respaldo de los tests escritos antes de la tenencia
-  (`base/tenancy/tests/legacy.py`), y la rama se va con él (hub#611).
+  (hub#602): ya nada alcanza esa rama, que se retira en hub#1626.
 - Frontend: `base/frontend/pages/SettingsPage.vue` (`/settings`, pestaña en el hash `#data`; `/import` y `/export`
   llevan aquí), `components/data/*` y `lib/data.ts`; la tarjeta `components/BlueprintCard.vue` («Ahora
   no» en `localStorage["hub-blueprint-card-dismissed"]`). Tests: `base/tests/test_blueprint.py`,
@@ -3845,6 +3844,19 @@ Implicados: BASE-F92, BASE-F93
   otra. Lo que no cumple no se sirve y `base.E010` lo dice al arrancar. Una app que guarde archivos para enseñarlos los
   declara ahí, sin tocar `base/`. Tests: `base/tests/test_media.py` (miembro, visitante, otro hub, app apagada, `..` y la
   carpeta de otra app) y, por app, el suyo (`apps/whatsapp_inbox/tests/test_template_header_file.py`).
+- **La puerta pública `/p/<slug>/<página>`** (`base/public_door.py`): las páginas sin sesión que una app da a los
+  clientes del negocio, en el host de su hub. La app la pide en su `LiveAppConfig` con `public_pages = {"<página>":
+  "<permiso>"}`, un permiso suyo (uno de otra app, o que no declara, no abre nada: la puerta se lo da a cualquiera; ni
+  una página que también da otra app; `base.E020` lo dice al arrancar);
+  hoy, Reservas online (`{"book": "online_booking.public"}`). `GET /p/<slug>/<página>` es el HTML del shell
+  (`base.spa.shell`), con el dinero del negocio en el bloque `public-door`, y la ruta de la app de ese camino pinta la
+  página; `POST /p/<slug>/api/<operación>` corre en el proceso una operación de esa app que pide justo ese permiso,
+  como nadie (`actor=None`) y con ese permiso y ningún otro, también con una sesión abierta, con la entrada en el
+  cuerpo JSON (nunca en la query) y la respuesta o el sobre de error del API, en el idioma del visitante; lleva el
+  token CSRF del HTML. El negocio es el del Host: un `<slug>` que no es el suyo, una página que ninguna app da, una
+  operación fuera de la página o la app apagada en el negocio, 404. Tests: `base/tests/test_public_door.py` (otro
+  negocio por slug y por host, app apagada, permiso ajeno, CSP, CSRF, el visitante por `X-Forwarded-For`) y el e2e
+  `tests/e2e/online-booking-public-page.spec.ts`.
 - **Asistente** (BASE-F92…F106): es **plataforma** dentro de `base/`, no un
   módulo `kind="app"`: lo traen todos los planes (el cupo mensual llega en la foto; 0 = sin asistente) y sus piezas son
   del shell y del Inicio. Las mecánicas que no dependen de la pasarela son de `live.assistant` (las mismas del panel

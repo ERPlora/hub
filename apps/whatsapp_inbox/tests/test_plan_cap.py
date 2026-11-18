@@ -136,7 +136,6 @@ def test_what_customers_write_still_arrives():
 
 
 @HUB_DB
-@pytest.mark.usefixtures("no_test_fallback")
 def test_each_business_has_its_own_plan(hub_a, hub_b):
     from live.context import Scope
 

@@ -22,7 +22,6 @@ from live.operations import get, registry
 from apps.flow.queries import SYSTEM
 from apps.flow.tests.conftest import HUB_DB, ctx_for, make_draft, make_flow, make_run
 from base import assistant
-from base.tenancy import context
 from base.tenancy.context import use_hub
 from base.tests.test_assistant import named_by_the_screen
 from base.tests.test_assistant_card_values_references import AN_ID
@@ -309,9 +308,8 @@ def test_a_record_the_person_may_not_read_is_left_out_never_by_its_id():
 
 
 @HUB_DB
-def test_a_record_of_another_business_is_left_out_never_by_its_id(hub_a, hub_b, monkeypatch):
+def test_a_record_of_another_business_is_left_out_never_by_its_id(hub_a, hub_b):
     """Each business reads its own automations: one of business B named to business A's assistant is not there."""
-    monkeypatch.setattr(context, "_test_fallback", None)
     with use_hub(hub_b):
         theirs = make_flow("Theirs")
     with use_hub(hub_a):

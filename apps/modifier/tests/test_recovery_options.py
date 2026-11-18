@@ -278,7 +278,6 @@ def options_of(hub, group) -> list[tuple]:
         )
 
 
-@pytest.mark.usefixtures("no_test_fallback")
 class TestOptionsComeBack:
     def a_business(self, recoveries, every_app_on, *, most: int = 0):  # noqa: F811 - the fixture
         """A business whose group «Sauces» offers «Ketchup» and «Alioli», the second chosen by default with a

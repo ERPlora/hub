@@ -26,17 +26,9 @@ from control.models import Hub
 
 pytestmark = [
     pytest.mark.django_db(transaction=True, databases=hubs.HUB_DATABASES),
-    pytest.mark.usefixtures("no_test_fallback"),
 ]
 
 EVENT = "demo.item.created"
-
-
-@pytest.fixture
-def no_test_fallback(monkeypatch):
-    from base.tenancy import context
-
-    monkeypatch.setattr(context, "_test_fallback", None)
 
 
 @pytest.fixture(autouse=True)

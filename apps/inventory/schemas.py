@@ -17,6 +17,7 @@ from django.utils.translation import gettext_noop
 from ninja import Field, Schema
 from pydantic import ConfigDict, StringConstraints, model_validator
 
+from base.allergens import AllergensCellIn, AllergensIn, AllergensOut, AllergensPatchIn
 from base.images import MAX_UPLOAD_BASE64
 from base.recovery import ImageInCopyIn
 from base.schemas import CatalogImageOut, names
@@ -125,6 +126,7 @@ Quantity = Annotated[Decimal, Field(max_digits=15, decimal_places=3)]
 Said = _text(200, 1)
 #: A raw CSV cell, as typed in the file.
 Cell = _text(500)
+ProductSearch = Annotated[str | None, Field(max_length=200, description="Part of the name or the SKU.")]
 
 # The assistant's card names the record a write acts on by these reads (base/assistant/cards.py ``REFERS``), run as whoever
 # asks, never by its id: a product and a category by their name, as the screens' «Delete» dialogs and forms say them.
@@ -248,9 +250,7 @@ class _ProductLineRef(Schema):
 class ProductFiltersIn(Schema):
     """The product list's search, filters and order; the export takes the same."""
 
-    search: str | None = Field(
-        None, max_length=200, description="Part of the name or the SKU."
-    )
+    search: ProductSearch = None
     name: str | None = Field(None, max_length=200, description="Part of the name.")
     sku: str | None = Field(None, max_length=64, description="Part of the SKU.")
     price_min: Cents | None = Field(None, description="Lowest price, in cents.")
@@ -296,9 +296,7 @@ class ProductListIn(PageIn, ProductFiltersIn):
 
 
 class LowStockListIn(PageIn):
-    search: str | None = Field(
-        None, max_length=200, description="Part of the name or the SKU."
-    )
+    search: ProductSearch = None
     sku: str | None = Field(None, max_length=64, description="This exact SKU.")
     stock_min: Quantity | None = Field(None, description="Lowest stock.")
     stock_max: Quantity | None = Field(None, description="Highest stock.")
@@ -309,9 +307,7 @@ class LowStockListIn(PageIn):
 
 
 class ForSaleListIn(PageIn):
-    search: str | None = Field(
-        None, max_length=200, description="Part of the name or the SKU."
-    )
+    search: ProductSearch = None
 
 
 class ProductCategoryListIn(PageIn):
@@ -401,7 +397,7 @@ class ConfigGetIn(Schema):
 # Inputs: products
 
 
-class ProductIn(Schema):
+class ProductIn(AllergensIn):
     name: Name = Field(
         description="The product's name, as the till and the ticket show it."
     )
@@ -463,7 +459,7 @@ class ProductRecoverIn(ProductIn, ImageInCopyIn):
     it showed there (the business makes its own id)."""
 
 
-class ProductPatchIn(ProductRefIn):
+class ProductPatchIn(ProductRefIn, AllergensPatchIn):
     """Only the fields sent are changed; ``null`` leaves one as it is; ``ean13: ""`` clears it.
 
     The SKU (the product's identity), the type and the stock are not editable: sending them is a 422.
@@ -507,7 +503,7 @@ class ProductPatchIn(ProductRefIn):
     )
 
 
-class ProductImportRowIn(Schema):
+class ProductImportRowIn(AllergensCellIn):
     """One row of a CSV, its columns already mapped to our fields, each cell as written in the file."""
 
     line: int = Field(ge=1, description="Line of the file, for the report.")
@@ -729,7 +725,7 @@ class SaleRefundedIn(Schema):
 # Outputs
 
 
-class ProductOut(Schema):
+class ProductOut(AllergensOut):
     id: UUID = Field(description="The product's id.")
     name: str = Field(description="Name.")
     sku: str = Field(description="SKU, its identity.")
@@ -783,7 +779,7 @@ class ProductsOut(Schema):
     rows: list[ProductOut] = Field(description="The products, as they are now.")
 
 
-class SaleProductOut(Schema):
+class SaleProductOut(AllergensOut):
     """What the till needs to price and sell a product; never its stock."""
 
     id: UUID = Field(description="The product's id.")

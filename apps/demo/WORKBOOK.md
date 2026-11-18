@@ -336,9 +336,8 @@ papel en ningún negocio.
   `hub-admin` (el admin del Hub en `hubs`), sobre una copia local propia del staff, `saas-staff:<id>`,
   separada de la copia de cliente `saas:<id>` y sin papel en ningún hub.
 - Tenencia: el ámbito es la primera parte del Host y cada negocio tiene su propia BD (desde el corte S5,
-  hub#602): `base` entra en la del hub (`use_hub`) y esta app no hace nada propio para separarlos. Solo los
-  tests escritos antes de la tenencia guardan `a` y `b` en la misma BD de test (`base/tenancy/tests/legacy.py`,
-  hasta hub#611); `two-orgs-isolated` mide la separación de verdad.
+  hub#602): `base` entra en la del hub (`use_hub`) y esta app no hace nada propio para separarlos;
+  `two-orgs-isolated` mide la separación de verdad.
 - Pruebas por flujo: `tests/e2e/demo-flows.spec.ts` recorre DEMO-F01 a F06 en 390, 834 y 1440 (capturas
   `APP-DEMO-<flujo>-<ancho>`) y la lista con más de 100 elementos (`APP-DEMO-CLOSE-DEMO-*`); las medidas finas siguen en `two-tabs-live`, `optimistic-add-line`,
   `two-orgs-isolated`, `reconnect`, `delete-item`, `create-edit-pages`, `edit-keeps-text`,

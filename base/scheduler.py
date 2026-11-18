@@ -20,7 +20,7 @@ declaration the engine could not run, at ``manage.py check`` and before every co
 
 Every hub has its own schedule in its own database: the worker's pass over the hubs (``base.worker``) writes it once
 per process and runs, under ``use_hub(hub)``, the tasks of its active apps on its own scope (hub#471).
-Without a ``scope`` (the suite's tests written before the tenancy) they run on ``settings.WORKER_SCOPE_SLUG``'s.
+Without a ``scope`` (a test that runs the tasks directly) they run on ``settings.WORKER_SCOPE_SLUG``'s.
 """
 
 import datetime as dt
@@ -106,8 +106,8 @@ def run_due(now: dt.datetime, *, scope: Scope | None = None, active: frozenset[s
     """Run every task due at ``now``, one transaction each; return those that ran (``<app>.<name>``).
 
     ``scope``: whose they are, the system's scope they run on (a hub's own, ``host`` and its slug, in the worker's pass
-    over the hubs: their live notices go on its channel); without one, ``WORKER_SCOPE_SLUG``'s (the suite's tests
-    written before the tenancy). ``active``: the apps that are on there; a task of another app is not run (it moves to
+    over the hubs: their live notices go on its channel); without one, ``WORKER_SCOPE_SLUG``'s (a test that runs
+    the tasks directly). ``active``: the apps that are on there; a task of another app is not run (it moves to
     its next time). The connections are released after each task, so the worker never idles holding one.
     """
     scope = Scope("host", settings.WORKER_SCOPE_SLUG) if scope is None else scope

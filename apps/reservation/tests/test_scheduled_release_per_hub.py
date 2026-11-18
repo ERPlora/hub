@@ -31,7 +31,7 @@ from .conftest import NOW, TODAY, TOMORROW, make_reservation, pin_clock
 
 pytestmark = [
     pytest.mark.django_db(transaction=True, databases=hubs.HUB_DATABASES),
-    pytest.mark.usefixtures("no_test_fallback", "nothing_served_yet"),
+    pytest.mark.usefixtures("nothing_served_yet"),
 ]
 
 #: The worker's first pass writes each hub's schedule at 12:01 in Madrid; the release is due at the next quarter.
@@ -42,13 +42,6 @@ NEXT_QUARTER = DUE + dt.timedelta(minutes=15)
 YESTERDAY = TODAY - dt.timedelta(days=1)
 #: The live query the Reservations screen keeps open on the day it shows.
 SCREEN = "reservation.reservation.list"
-
-
-@pytest.fixture
-def no_test_fallback(monkeypatch):
-    from base.tenancy import context
-
-    monkeypatch.setattr(context, "_test_fallback", None)
 
 
 @pytest.fixture

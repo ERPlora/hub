@@ -1,7 +1,0 @@
-# The tests that still lean on the suite's fallback (base/tenancy/tests/legacy.py), one <file>::<test> per line: the
-# fallback is on for them alone, every other test runs as production does. The list only shrinks: a line is never
-# added, and a test that runs every case without leaning on the fallback leaves it. Moving them to a database per
-# business, and deleting this list with the fallback, is hub#611.
-apps/verifactu/tests/test_assistant_asks.py::test_every_probe_of_verifactu_offers_its_tool_to_whoever_may_run_it
-base/tenancy/tests/test_legacy.py::test_a_task_of_an_app_the_business_turned_off_does_not_run
-base/tenancy/tests/test_legacy.py::test_the_tasks_due_run_on_the_scope_of_the_business_never_on_the_worker_s_fixed_one

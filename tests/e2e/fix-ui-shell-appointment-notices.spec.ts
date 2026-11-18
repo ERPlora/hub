@@ -9,6 +9,7 @@
 // «E2E Apn …», removed before and after.
 import { type BrowserContext, expect, test } from '@playwright/test';
 
+import { aMonday } from './appointment-helpers';
 import {
   expectNoRepeatOnReload,
   nativeApp,
@@ -22,13 +23,6 @@ import { FLOW_VIEWPORTS, ownerPage, post, settled } from './service-helpers';
 const TAG = 'E2E Apn';
 const RUN = Date.now().toString(36);
 const named = (label: string): string => `${TAG} ${label} ${RUN}`;
-
-/** A Monday `weeks` + five weeks ahead (inside the 90 days of advance), as `YYYY-MM-DD`. */
-function aMonday(weeks: number): string {
-  const day = new Date();
-  day.setUTCDate(day.getUTCDate() + 35 + 7 * weeks + ((8 - day.getUTCDay()) % 7));
-  return day.toISOString().slice(0, 10);
-}
 
 function cleanUp(): void {
   const customers = `select id from customer_customer where name like '${TAG}%'`;
