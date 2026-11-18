@@ -1,9 +1,11 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { LiveClient } from '@erplora/ui/sdk';
 
 import type { AppHelp, HelpFlow, HelpScreen } from '../operations-help';
-import { assistantQuestion, createHelpStore, flowMatches, organizeFlows, resolveScreen } from './help';
+import { assistantQuestion, createHelpStore, flowMatches, organizeFlows, resetHelpCache, resolveScreen } from './help';
+
+beforeEach(resetHelpCache);
 
 const screens: HelpScreen[] = [
   { id: 'floor', title: 'Floor plan', path: '/table/floor-plan', text: 'Floor text' },
@@ -64,6 +66,13 @@ describe('flow filtering and grouping', () => {
     expect(groups).toHaveLength(1);
     expect(groups[0].flows.map((item) => item.id)).toEqual(['seat']);
   });
+
+  it('adds flows whose screens are not listed as a final untitled group', () => {
+    const withOrphan = { ...answer, flows: [...answer.flows, flow('orphan', 'Old screen task', ['removed'])] };
+    const groups = organizeFlows(withOrphan, 'floor', '');
+    expect(groups.at(-1)?.screen.title).toBe('');
+    expect(groups.at(-1)?.flows.map((item) => item.id)).toEqual(['orphan']);
+  });
 });
 
 describe('createHelpStore', () => {
@@ -86,6 +95,14 @@ describe('createHelpStore', () => {
     await store.read('table', 'en');
     await expect(store.read('table', 'en')).resolves.toEqual(answer);
     expect(call).toHaveBeenCalledOnce();
+  });
+
+  it('shares cached answers across store instances', async () => {
+    const online = vi.fn().mockResolvedValue(answer);
+    await createHelpStore(clientWith(online)).read('table', 'en');
+    const offline = vi.fn().mockRejectedValue(new Error('offline'));
+    await expect(createHelpStore(clientWith(offline)).read('table', 'en')).resolves.toBe(answer);
+    expect(offline).not.toHaveBeenCalled();
   });
 
   it('keeps languages and apps separate and does not cache a failure', async () => {

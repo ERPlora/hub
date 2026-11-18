@@ -42,7 +42,7 @@ function toggle(key: string, title: string): void {
       @ion-input="query = $event.detail.value ?? ''"
     />
     <div
-      v-if="groups.length === 0"
+      v-if="query.trim() && groups.length === 0"
       class="help-flow-empty"
       data-testid="help-flow-empty"
       role="status"
@@ -62,7 +62,10 @@ function toggle(key: string, title: string): void {
       :key="group.screen.id"
       class="help-flow-group"
     >
-      <h4 class="help-flow-group__title">
+      <h4
+        v-if="group.screen.title && (group.screen.id !== 'unlisted' || groups.length > 1)"
+        class="help-flow-group__title"
+      >
         {{ group.screen.title }}
       </h4>
       <div class="help-accordion">

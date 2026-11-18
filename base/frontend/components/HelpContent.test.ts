@@ -61,4 +61,9 @@ describe('HelpContent', () => {
     expect(button.attributes('aria-expanded')).toBe('true');
     expect(m.wrapper.get('[data-testid="help-other-screen-content-settings"]').text()).toContain('Configura el comedor.');
   });
+
+  it('omits the how-to section when the module has no flows', async () => {
+    const m = await setup({ ...help, flows: [] });
+    expect(m.wrapper.find('[data-help-section="flows"]').exists()).toBe(false);
+  });
 });

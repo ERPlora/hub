@@ -30,17 +30,28 @@ export function flowMatches(flow: HelpFlow, query: string): boolean {
   return !needle || folded(`${flow.title}\n${flow.steps}`).includes(needle);
 }
 
+const UNLISTED_SCREEN: HelpScreen = { id: 'unlisted', title: '', path: '', text: '' };
+
 export function organizeFlows(help: AppHelp, currentId: string | undefined, query: string): HelpFlowGroup[] {
   const ordered = [...help.screens].sort((one) => (one.id === currentId ? -1 : 0));
-  return ordered.flatMap((screen) => {
+  const groups = ordered.flatMap((screen) => {
     const flows = help.flows.filter((flow) => flow.screens.includes(screen.id) && flowMatches(flow, query));
     return flows.length ? [{ screen, flows }] : [];
   });
+  const listed = new Set(help.screens.map((screen) => screen.id));
+  const unlisted = help.flows.filter(
+    (flow) => flow.screens.every((id) => !listed.has(id)) && flowMatches(flow, query),
+  );
+  return unlisted.length ? [...groups, { screen: UNLISTED_SCREEN, flows: unlisted }] : groups;
+}
+
+const cache = new Map<string, AppHelp>();
+
+export function resetHelpCache(): void {
+  cache.clear();
 }
 
 export function createHelpStore(client: LiveClient) {
-  const cache = new Map<string, AppHelp>();
-
   async function read(app: string, language: string): Promise<AppHelp> {
     const key = `${app}\0${language}`;
     const cached = cache.get(key);

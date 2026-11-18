@@ -74,10 +74,12 @@ function onDismissed(): void {
   askAfterDismiss = false;
   if (!help.value) return;
   const screen = current.value?.title ?? help.value.screens[0]?.title ?? '';
-  assistant.state.draft = assistantQuestion(
+  const question = assistantQuestion(
     { flow: lastFlow.value, app: help.value.name, screen },
     { flow: t('base.help.flowQuestion', { title: '{title}' }), screen: t('base.help.screenQuestion', { app: '{app}', screen: '{screen}' }) },
   );
+  const draft = assistant.state.draft.trimEnd();
+  assistant.state.draft = draft.trim() ? `${draft}\n\n${question}` : question;
   assistant.setOpen(true);
 }
 
@@ -106,6 +108,7 @@ function go(path: string): void {
     size="lg"
     readonly
     phone-layout="sheet"
+    @will-present="onPresented"
     @did-present="onPresented"
     @did-dismiss="onDismissed"
   >
@@ -129,8 +132,9 @@ function go(path: string): void {
       class="help-loading"
       data-testid="help-loading"
       aria-busy="true"
-      :aria-label="t('base.help.loading')"
+      role="status"
     >
+      <span class="visually-hidden">{{ t('base.help.loading') }}</span>
       <ion-skeleton-text
         animated
         class="help-loading__lead"

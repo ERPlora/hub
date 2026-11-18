@@ -71,4 +71,16 @@ describe('HelpFlowList', () => {
     expect(large.el('help-flow-search').exists()).toBe(true);
     expect(large.el('help-flow-search').attributes('mode')).toBe('md');
   });
+
+  it('does not show the search empty state when there are no flows and no query', async () => {
+    const s = await setup({ ...help, flows: [] });
+    expect(s.el('help-flow-empty').exists()).toBe(false);
+    expect(s.wrapper.findAll('.help-flow-group')).toHaveLength(0);
+  });
+
+  it('shows an unlisted flow without a group heading when it is the only group', async () => {
+    const s = await setup({ ...help, flows: [flow('orphan', 'Unlisted task', ['removed-screen'])] });
+    expect(s.el('help-flow-unlisted-orphan').exists()).toBe(true);
+    expect(s.wrapper.findAll('.help-flow-group__title')).toHaveLength(0);
+  });
 });

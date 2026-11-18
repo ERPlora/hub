@@ -4,6 +4,7 @@ import { createAssistant, installAssistant, useAssistant } from '@erplora/ui/com
 
 import type { AppHelp } from '../operations-help';
 import { EMPLOYEE, flush, memoryStorage, mountBase } from '../__tests__/mount-base';
+import { resetHelpCache } from '../lib/help';
 import HelpContent from './HelpContent.vue';
 import HelpWindow from './HelpWindow.vue';
 
@@ -34,6 +35,7 @@ async function setup(options: { onApi?: () => Response | Promise<Response>; sess
 }
 
 beforeEach(() => {
+  resetHelpCache();
   installAssistant(createAssistant({ storage: memoryStorage(), openStorage: memoryStorage(), post: async () => undefined }));
 });
 
@@ -50,6 +52,8 @@ describe('HelpWindow', () => {
 
   it('puts the app icon before a left-aligned title in the newest dialog', async () => {
     const m = await setup();
+    const modal = m.wrapper.getComponent({ name: 'FormModal' });
+    expect(modal.vm.$attrs.onWillPresent).toBeTypeOf('function');
     await m.wrapper.setProps({ open: false });
     await flush();
     await m.wrapper.setProps({ open: true });
@@ -67,6 +71,8 @@ describe('HelpWindow', () => {
     const m = await setup({ onApi: () => new Promise<Response>((resolve) => { release = resolve; }) });
     expect(m.el('help-loading')).not.toBeNull();
     expect(m.el('help-loading')?.getAttribute('aria-busy')).toBe('true');
+    expect(m.el('help-loading')?.getAttribute('role')).toBe('status');
+    expect(m.el('help-loading')?.querySelector('.visually-hidden')?.textContent).toBe('Loading help…');
     expect(document.querySelectorAll('ion-skeleton-text').length).toBeGreaterThan(3);
     release(Response.json(help));
     await flush();
@@ -119,5 +125,30 @@ describe('HelpWindow', () => {
     await flush();
     expect(m.router.currentRoute.value.path).toBe('/table/settings');
     expect(m.wrapper.emitted('update:open')?.at(-1)).toEqual([false]);
+  });
+
+  it('appends the question after a blank line when an assistant draft already exists', async () => {
+    const m = await setup();
+    useAssistant().state.draft = 'My existing draft';
+    m.el('help-ask-assistant')!.click();
+    await flush();
+    expect(useAssistant().state.draft).toBe('My existing draft\n\nHow do I use Tables on Floor plan?');
+  });
+
+  it('reads from the cache after the whole window has remounted', async () => {
+    let requests = 0;
+    const first = await setup({ onApi: () => {
+      requests += 1;
+      return Response.json(help);
+    } });
+    first.wrapper.unmount();
+
+    const second = await setup({ onApi: () => {
+      requests += 1;
+      return Response.json({ error: { code: 'offline', message: 'Offline' } }, { status: 503 });
+    } });
+    expect(second.el('help-content')).not.toBeNull();
+    expect(second.el('help-error')).toBeNull();
+    expect(requests).toBe(1);
   });
 });

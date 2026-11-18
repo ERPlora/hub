@@ -60,7 +60,9 @@ test.beforeAll(async ({ browser }) => {
   ({ context, page } = await signedInSpanish(browser, { width: 1440, height: 900 }, '/table/floor-plan'));
   page.on('request', (request) => {
     const url = new URL(request.url());
-    if (url.hostname.includes('youtube') || url.hostname.includes('ytimg')) googleRequests.push(request.url());
+    if (url.hostname.includes('youtube') || url.hostname.includes('ytimg') || url.hostname.includes('google')) {
+      googleRequests.push(request.url());
+    }
     if (url.pathname === '/api/assistant/turn') assistantTurns.push(request.url());
   });
   page.on('console', (message) => {
@@ -204,17 +206,53 @@ test('an aborted help request shows the error and retry loads the same window', 
   await closeHelp();
 });
 
-test('with the browser offline a reopening reads the cached text immediately', async () => {
+test('a video stays local until its poster creates one sandboxed no-cookie frame', async () => {
+  const videoId = 'dQw4w9WgXcQ';
+  const embedUrl = `https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&fs=0&rel=0&playsinline=1`;
+  await page.goto(`${A}/table/floor-plan`);
+  await page.route('**/api/help?app=table', async (route) => {
+    const response = await route.fetch();
+    const answer = (await response.json()) as { video: string | null };
+    await route.fulfill({ response, json: { ...answer, video: videoId } });
+  });
+  await page.route('https://www.youtube-nocookie.com/embed/**', (route) =>
+    route.fulfill({ status: 200, contentType: 'text/html', body: '<!doctype html><title>Video</title>' }),
+  );
+  await page.reload();
+  const before = googleRequests.length;
+  await openHelp();
+  const poster = page.locator('.youtube-embed__poster');
+  await expect(poster).toBeVisible();
+  expect(googleRequests).toHaveLength(before);
+
+  await poster.click();
+  const frame = page.locator('iframe.youtube-embed__player');
+  await expect(frame).toHaveCount(1);
+  await expect(frame).toHaveAttribute('src', embedUrl);
+  await expect(frame).toHaveAttribute('sandbox', 'allow-scripts allow-same-origin allow-presentation');
+  await expect(frame).toHaveAttribute('referrerpolicy', 'strict-origin-when-cross-origin');
+  expect(googleRequests.slice(before)).toEqual([embedUrl]);
+  const csp = await page.evaluate(() => (window as unknown as { helpCsp?: string[] }).helpCsp ?? []);
+  expect(csp).toEqual([]);
+  await closeHelp();
+  await page.unroute('**/api/help?app=table');
+  await page.unroute('https://www.youtube-nocookie.com/embed/**');
+});
+
+test('with the browser offline a reopening after changing tab reads the cached text', async () => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto(`${A}/table/floor-plan`);
   await page.reload();
   await openHelp();
   await closeHelp();
+  await page.getByTestId('tab-tables').click();
+  await expect(page).toHaveURL(/\/table\/tables$/);
+  await expect(page.getByTestId('help-button')).toBeVisible();
   await context.setOffline(true);
   try {
     await openHelp();
     await expect(content()).toHaveAttribute('lang', 'es');
-    await expect(page.getByTestId('help-current-screen')).toContainText('Plano de sala');
+    await expect(page.getByTestId('help-current-screen')).toContainText('En esta pantalla · Mesas');
     await expect(page.getByTestId('help-error')).toHaveCount(0);
     await closeHelp();
   } finally {
@@ -222,8 +260,9 @@ test('with the browser offline a reopening reads the cached text immediately', a
   }
 });
 
-test('no YouTube request, application error, or CSP violation occurs', async () => {
-  expect(googleRequests).toEqual([]);
+test('only the requested video frame reached an external video host; no application or CSP error occurs', async () => {
+  expect(googleRequests).toHaveLength(1);
+  expect(googleRequests[0]).toContain('/embed/dQw4w9WgXcQ');
   expect(pageErrors).toEqual([]);
   const csp = await page.evaluate(() => (window as unknown as { helpCsp?: string[] }).helpCsp ?? []);
   expect(csp).toEqual([]);

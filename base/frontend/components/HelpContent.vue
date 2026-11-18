@@ -72,6 +72,7 @@ const otherScreens = computed(() => props.help.screens.filter((screen) => screen
       </div>
     </section>
     <section
+      v-if="help.flows.length"
       class="help-section"
       data-help-section="flows"
     >
