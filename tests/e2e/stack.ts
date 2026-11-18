@@ -2,8 +2,8 @@
 // the SaaS on :8001 and the database `hub`; a branch checked out beside it (another session's
 // runserver keeps :8000) starts its own with other ports and its own database, and points the specs
 // at it with the same variables Django and Vite read: `E2E_HUB_PORT` (runserver's port, only the
-// specs need it), `VITE_DEV_PORT` (`config/settings.py`, `vite.config.ts`), `SAAS_URL` and `DB_NAME`
-// (`config/settings.py`). runserver restarted by a spec (`startRunserver`) inherits them. Its SaaS keeps its accounts
+// specs need it), `VITE_DEV_PORT` (`config/settings/core.py`, `vite.config.ts`), `SAAS_URL` and `DB_NAME`
+// (`config/settings/`). runserver restarted by a spec (`startRunserver`) inherits them. Its SaaS keeps its accounts
 // in `saasDatabase` (`E2E_SAAS_DB`, by default `saas` on :8000 and `saas_e2e_<port + 1>` beside it).
 //
 // A stack beside the shared one runs on its own e2e database (`hub_e2e_<port>`, `database.ts` creates

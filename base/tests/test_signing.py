@@ -187,7 +187,7 @@ class TestTwoLiveSecrets:
         assert live_secrets() == (SECRET, PREVIOUS)
 
     def test_the_previous_secret_is_a_setting_of_its_own(self):
-        """``INTERNAL_SHARED_SECRET_PREVIOUS`` (env, empty outside a rotation; ``config/settings.py``)."""
+        """``INTERNAL_SHARED_SECRET_PREVIOUS`` (env, empty outside a rotation; ``config/settings/saas_contract.py``)."""
         from django.conf import settings as live_settings
 
         assert isinstance(live_settings.INTERNAL_SHARED_SECRET_PREVIOUS, str)

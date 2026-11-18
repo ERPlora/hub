@@ -99,7 +99,7 @@ def test_a_name_past_postgres_63_characters_is_refused_instead_of_truncated():
 
 
 def test_max_control_is_the_longest_control_database_its_hubs_and_demos_names_fit_after():
-    # A demo's ``_demo_<hex>`` is the longest a name adds to control's (config/settings.py fits the tests' to it).
+    # A demo's ``_demo_<hex>`` is the longest a name adds to control's (config/settings/backends.py fits the tests' to it).
     assert names.demo_db_name("c" * names.MAX_CONTROL, HUB_ID)
     assert names.hub_db_name("c" * names.MAX_CONTROL, HUB_ID)
     with pytest.raises(names.InvalidDatabaseName, match="63"):

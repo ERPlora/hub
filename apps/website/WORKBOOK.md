@@ -579,7 +579,7 @@ nombres, las demás secciones cuyo contenido cambia («Contenido: Cabecera, Cont
   (`sections/reviews.html`) y en el paquete (`frontend/public/reviews.ts`, que rehace el resumen y las tarjetas):
   `frontend/public/reviews.fixture.json` guarda ese marcado y lo comprueban los dos lados. Sin foto del autor (la CSP
   solo deja imágenes del Hub) ni logotipo: «Google Maps» va en texto, con `translate="no"`, como piden las normas de
-  Google. **Clave**: `GOOGLE_PLACES_API_KEY` (`config/settings.py`, `.env.example`); en AWS va en Secrets Manager
+  Google. **Clave**: `GOOGLE_PLACES_API_KEY` (`config/settings/businesses.py`, `.env.example`); en AWS va en Secrets Manager
   (`erplora/prod/hub` y `erplora/pre/app`) y Terraform la da a las tareas de la imagen del Hub (`hub`, `worker`,
   `hub-migrate` y `db-bootstrap`; ERPlora/aws#10), cuyo `scripts/post-apply-verify.sh` exige que esté rellena.
   Restringirla a la Places API (New).
