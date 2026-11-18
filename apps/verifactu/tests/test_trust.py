@@ -98,12 +98,12 @@ def test_one_listing_of_an_authority_still_qualified_is_enough(monkeypatch):
 
 
 def kept_entries() -> list[dict]:
-    return json.loads(trust.LIST_FILE.read_text())["authorities"]
+    return json.loads(trust.LIST_FILE.read_text(encoding="utf-8"))["authorities"]
 
 
 def test_the_kept_list_is_spains_with_the_fnmts_authorities():
     kept = trust.kept()
-    assert kept.sequence == json.loads(trust.LIST_FILE.read_text())["sequence"] > 0
+    assert kept.sequence == json.loads(trust.LIST_FILE.read_text(encoding="utf-8"))["sequence"] > 0
     assert len(kept.authorities) == len(kept_entries())
     services = {entry["service"] for entry in kept_entries()}
     assert any("AC FNMT Usuarios" in service for service in services)

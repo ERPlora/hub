@@ -35,7 +35,7 @@ class TrustedList:
 @cache
 def kept() -> TrustedList:
     """The list kept in the app, read once per process."""
-    data = json.loads(LIST_FILE.read_text())
+    data = json.loads(LIST_FILE.read_text(encoding="utf-8"))
     return TrustedList(
         sequence=int(data["sequence"]),
         authorities=tuple(

@@ -159,7 +159,12 @@ def remove_certificate(ctx: OperationContext, data: NoInput) -> ConfigOut:
 )
 def recheck_certificate(ctx: OperationContext, data: NoInput) -> ConfigOut:
     # Locked: an upload meanwhile waits, so its certificate never takes this one's verdict.
-    row = OwnCertificate.objects.select_for_update().filter(singleton=True).exclude(checked_list=trust.sequence()).first()
+    row = (
+        OwnCertificate.objects.select_for_update()
+        .filter(singleton=True)
+        .exclude(checked_list=trust.sequence())
+        .first()
+    )
     if row is not None:
         _check(ctx, row)
     return config_out(config_row(), ctx)

@@ -24,12 +24,12 @@ class Command(BaseCommand):
         try:
             xml = Path(source).read_bytes() if source else trusted_list.download(trusted_list.TSL_URL)
             read = trusted_list.read(xml, dt.datetime.now(dt.UTC))
-        except (OSError, trusted_list.TrustedListInvalid) as failure:
+        except (OSError, ValueError) as failure:
             raise CommandError(f"The trusted list cannot be used: {failure}") from None
         kept = trust.kept().sequence
         if read["sequence"] < kept:
             raise CommandError(f"The trusted list nº {read['sequence']} is older than the one kept, nº {kept}.")
-        trust.LIST_FILE.write_text(json.dumps(read, indent=1, ensure_ascii=False) + "\n")
+        trust.LIST_FILE.write_text(json.dumps(read, indent=1, ensure_ascii=False) + "\n", encoding="utf-8")
         trust.kept.cache_clear()
         self.stdout.write(
             f"{len(read['authorities'])} recognised authorities from Spain's trusted list nº {read['sequence']} "
