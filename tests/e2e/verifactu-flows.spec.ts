@@ -19,10 +19,11 @@
 // behind them is the Python suite's (`apps/verifactu/tests`). What the run makes is removed after it.
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, api, login, openApps, psql, shot, shown } from './helpers';
+import { A, api, login, psql, shot, shown } from './helpers';
 import { cleanInvoices, ensureIssuer, FLOW_VIEWPORTS, issuedIds, snapshotSeries } from './invoice-helpers';
 import { stamp } from './sale-helpers';
 import { toastSaying } from './toast-helpers';
+import { openApps } from './topbar';
 
 const RUN = stamp();
 const STARTED = new Date().toISOString();

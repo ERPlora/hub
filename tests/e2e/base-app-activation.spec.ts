@@ -28,7 +28,6 @@ import {
   horizontalOverflow,
   HUB_DIR,
   hostPage,
-  menuApps,
   psql,
   shot,
   shown,
@@ -36,6 +35,7 @@ import {
   testid,
   untilStill,
 } from './helpers';
+import { menuApps } from './topbar';
 import { cleanInvoices, ensureIssuer, issuedIds, snapshotSeries } from './invoice-helpers';
 import { STACK } from './stack';
 import { toastSaying } from './toast-helpers';

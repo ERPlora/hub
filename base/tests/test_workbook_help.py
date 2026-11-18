@@ -88,7 +88,7 @@ def test_the_steps_and_what_happens_if_it_fails_start_with_a_capital(written, pu
 
 
 class TestScreens:
-    def test_each_tab_with_its_section_in_the_order_of_the_menu_its_windows_inside(self):
+    def test_each_tab_publishes_its_summary_in_the_order_of_the_menu_without_its_windows(self):
         assert spanish().screens == (
             Screen(
                 "floor_plan",
@@ -97,14 +97,16 @@ class TestScreens:
                 "Tocar una mesa abre su ventana:\n"
                 "\n"
                 "- libre: pregunta los comensales y la sienta.\n"
-                "  - con reserva: dice a nombre de quién.\n"
-                "\n"
-                "#### Cobrar mesa (cuenta)\n"
-                "Pide el importe y cobra.",
+                "  - con reserva: dice a nombre de quién.",
             ),
             Screen("zones", "Zonas", "/table/zones", "Una tabla con el nombre y el color de cada zona."),
             Screen("settings", "Ajustes", "/table/settings", "Los avisos de tiempo."),
         )
+
+    def test_the_summary_ends_at_the_first_window_not_at_a_heading_inside_code(self):
+        section = f"## Pantallas\n\n### Zonas\nUna tabla:\n{FENCE}\n#### no es una ventana\n{FENCE}\n\n#### Nueva\nPide.\n"
+        [screen] = parse(section, ES_TABS, ES_WORDS).screens
+        assert screen.text == f"Una tabla:\n{FENCE}\n#### no es una ventana\n{FENCE}"
 
     def test_they_follow_the_menu_whatever_order_the_workbook_writes_them_in(self):
         read = parse(user_part(ES), tuple(reversed(ES_TABS)), ES_WORDS)
