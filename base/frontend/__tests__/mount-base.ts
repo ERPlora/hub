@@ -9,6 +9,7 @@ import { type Component } from 'vue';
 import { createMemoryHistory, createRouter, type RouteLocationRaw, type Router, type RouteRecordRaw } from 'vue-router';
 
 import { type ApiCall, type ApiHandler, flush } from '../../../packages/ui/src/sdk/__tests__/live-harness';
+import type { AppHelp } from '../operations-help';
 import PlanUpgradeLink from '../components/PlanUpgradeLink.vue';
 import { HUB_ASSISTANT } from '../lib/assistant-hub';
 import { forgetAppDistribution } from '../lib/management';
@@ -29,6 +30,19 @@ export const OWNER: SessionMe = {
 };
 
 export const EMPLOYEE: SessionMe = { ...OWNER, user: { id: 'u2', label: 'Leo' }, permissions: ['base.view_home', 'demo.view'] };
+
+export const help: AppHelp = {
+  app: 'table',
+  name: 'Tables',
+  language: 'en',
+  video: null,
+  purpose: 'Manage the room.',
+  screens: [
+    { id: 'floor', title: 'Floor plan', path: '/table/floor-plan', text: 'The live room.' },
+    { id: 'settings', title: 'Settings', path: '/table/settings', text: 'Room settings.' },
+  ],
+  flows: [{ id: 'seat', title: 'Seat a party', screens: ['floor'], steps: '1. Tap a table.', failure: '' }],
+};
 
 export { business, POLISH } from './business';
 

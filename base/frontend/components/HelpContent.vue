@@ -40,6 +40,7 @@ const otherScreens = computed(() => props.help.screens.filter((screen) => screen
         {{ t('base.help.purpose') }}
       </h3>
       <HelpMarkdown
+        class="ep-text-muted"
         :text="help.purpose"
         @go="emit('go', $event)"
       />
@@ -63,6 +64,7 @@ const otherScreens = computed(() => props.help.screens.filter((screen) => screen
           </span>
         </div>
         <HelpMarkdown
+          class="ep-text-muted"
           :text="current.text"
           @go="emit('go', $event)"
         />
@@ -117,6 +119,7 @@ const otherScreens = computed(() => props.help.screens.filter((screen) => screen
             :data-testid="`help-other-screen-content-${screen.id}`"
           >
             <HelpMarkdown
+              class="ep-text-muted"
               :text="screen.text"
               @go="emit('go', $event)"
             />
@@ -137,7 +140,6 @@ const otherScreens = computed(() => props.help.screens.filter((screen) => screen
   letter-spacing: -0.015em;
 }
 .help-content :deep(.assistant-md) {
-  color: var(--ep-text-muted);
   font-size: 0.875rem;
   line-height: 1.6;
 }
@@ -161,12 +163,9 @@ const otherScreens = computed(() => props.help.screens.filter((screen) => screen
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  color: var(--ion-color-primary-shade);
+  color: var(--ep-primary-text);
   font-size: 0.75rem;
   font-weight: 700;
-}
-:global(:root.ion-palette-dark) .help-here {
-  color: var(--ion-color-primary-tint);
 }
 .help-other-screens {
   overflow: hidden;

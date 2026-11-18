@@ -31,7 +31,7 @@ function toggle(key: string, title: string): void {
   <div class="help-flows">
     <ion-input
       v-if="help.flows.length > 8"
-      class="help-flow-search"
+      class="help-flow-search ion-margin-bottom"
       data-testid="help-flow-search"
       mode="md"
       fill="outline"
@@ -43,7 +43,7 @@ function toggle(key: string, title: string): void {
     />
     <div
       v-if="query.trim() && groups.length === 0"
-      class="help-flow-empty"
+      class="help-flow-empty ep-text-muted"
       data-testid="help-flow-empty"
       role="status"
     >
@@ -64,7 +64,7 @@ function toggle(key: string, title: string): void {
     >
       <h4
         v-if="group.screen.title && (group.screen.id !== 'unlisted' || groups.length > 1)"
-        class="help-flow-group__title"
+        class="help-flow-group__title ep-text-muted"
       >
         {{ group.screen.title }}
       </h4>
@@ -98,6 +98,7 @@ function toggle(key: string, title: string): void {
             :data-testid="`help-flow-content-${group.screen.id}-${flow.id}`"
           >
             <HelpMarkdown
+              class="ep-text-muted"
               :text="flow.steps"
               @go="emit('go', $event)"
             />
@@ -119,15 +120,11 @@ function toggle(key: string, title: string): void {
 </template>
 
 <style scoped>
-.help-flow-search {
-  margin-bottom: 14px;
-}
 .help-flow-group + .help-flow-group {
   margin-top: 18px;
 }
 .help-flow-group__title {
   margin: 0 0 8px;
-  color: var(--ep-text-muted);
   font-size: 0.75rem;
   font-weight: 650;
 }
@@ -167,14 +164,13 @@ function toggle(key: string, title: string): void {
 }
 .help-flow-chevron {
   flex: none;
-  transition: transform 150ms ease;
+  transition: transform var(--ep-transition, 150ms ease);
 }
 .help-flow-chevron--open {
   transform: rotate(180deg);
 }
 .help-flow-content {
   padding: 2px 16px 16px;
-  color: var(--ep-text-muted);
   font-size: 0.8125rem;
 }
 .help-failure {
@@ -191,7 +187,6 @@ function toggle(key: string, title: string): void {
 }
 .help-flow-empty {
   padding: 24px 12px;
-  color: var(--ep-text-muted);
   text-align: center;
 }
 @media (prefers-reduced-motion: reduce) {

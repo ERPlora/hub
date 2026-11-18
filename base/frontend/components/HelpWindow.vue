@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { FormModal, useAssistant } from '@erplora/ui/components';
+import { EmptyState, FormModal, useAssistant } from '@erplora/ui/components';
 import { useLiveClient } from '@erplora/ui/sdk';
 import { HubIcon, useSession } from '@erplora/ui/shell';
 import { IonButton, IonSkeletonText } from '@ionic/vue';
@@ -121,7 +121,7 @@ function go(path: string): void {
         aria-hidden="true"
       >
         <HubIcon
-          class="help-window__app-icon"
+          class="help-window__app-icon ep-icon-tile"
           :name="icon"
         />
         <span class="help-window__title-text">{{ title }}</span>
@@ -165,25 +165,24 @@ function go(path: string): void {
         class="help-loading__row"
       />
     </div>
-    <div
+    <EmptyState
       v-else-if="failed"
       class="help-error"
       data-testid="help-error"
       role="alert"
+      icon="alert-circle-outline"
+      :heading="t('base.help.loadError')"
     >
-      <HubIcon
-        class="help-error__icon"
-        name="ion:alert-circle-outline"
-      />
-      <h3>{{ t('base.help.loadError') }}</h3>
-      <ion-button
-        fill="outline"
-        data-testid="help-retry"
-        @click="retry"
-      >
-        {{ t('base.help.retry') }}
-      </ion-button>
-    </div>
+      <template #action>
+        <ion-button
+          fill="outline"
+          data-testid="help-retry"
+          @click="retry"
+        >
+          {{ t('base.help.retry') }}
+        </ion-button>
+      </template>
+    </EmptyState>
     <HelpContent
       v-else-if="help"
       :key="`${help.app}:${help.language}`"
@@ -244,20 +243,6 @@ ion-modal.help-window .ep-form-modal__title {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.help-window__app-icon {
-  flex: none;
-  box-sizing: border-box;
-  width: 36px;
-  height: 36px;
-  padding: 8px;
-  border-radius: 12px;
-  color: var(--ion-color-primary-shade);
-  background: color-mix(in srgb, var(--ion-color-primary) 10%, transparent);
-  font-size: 20px;
-}
-:root.ion-palette-dark .help-window__app-icon {
-  color: var(--ion-color-primary-tint);
-}
 ion-modal.help-window .ep-form-modal__body {
   overscroll-behavior: contain;
 }
@@ -268,11 +253,8 @@ ion-modal.help-window .ep-form-modal__footer {
   background: var(--ion-card-background);
 }
 ion-modal.help-window .help-ask {
-  --color: var(--ion-color-primary-shade);
+  --color: var(--ep-primary-text);
   font-weight: 650;
-}
-:root.ion-palette-dark ion-modal.help-window .help-ask {
-  --color: var(--ion-color-primary-tint);
 }
 ion-modal.help-window .help-close {
   margin-inline-start: auto;
@@ -301,20 +283,12 @@ ion-modal.help-window .help-close {
   height: 48px;
 }
 .help-error {
+  --icon-size: 36px;
+  --icon-color: var(--ion-color-danger);
+  --padding: 24px;
   display: grid;
   place-content: center;
-  justify-items: center;
   min-height: 280px;
-  padding: 24px;
-  text-align: center;
-}
-.help-error__icon {
-  color: var(--ion-color-danger);
-  font-size: 36px;
-}
-.help-error h3 {
-  margin: 14px 0 18px;
-  font-size: 1rem;
 }
 @media (max-width: 639.98px) {
   ion-modal.help-window .ep-form-modal__footer ion-button {
