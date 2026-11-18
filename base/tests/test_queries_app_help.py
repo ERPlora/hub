@@ -10,7 +10,7 @@ from django.apps import apps
 from live.assistant import is_tool
 from live.context import OperationContext
 from live.errors import NotFound
-from live.meta import Help
+from live.meta import Help, module_configs
 from live.operations import AI, get
 
 from base.queries import app_help
@@ -44,11 +44,18 @@ def test_it_is_a_read_of_whoever_sees_the_home_that_holds_no_database_and_is_a_t
     assert set(op.ai.asks) == {"en", "es"}
 
 
+@pytest.fixture
+def no_help(monkeypatch):
+    """No module declares its help, whichever modules already have it."""
+    for config in module_configs():
+        monkeypatch.setattr(config, "help", None)
+
+
 class TestWhichApps:
-    def test_no_module_has_its_help_ready_until_it_declares_it(self):
+    def test_no_module_has_its_help_ready_until_it_declares_it(self, no_help):
         assert app_help.ready_apps() == []
 
-    def test_a_module_that_declares_its_help_is_ready(self, monkeypatch):
+    def test_a_module_that_declares_its_help_is_ready(self, no_help, monkeypatch):
         monkeypatch.setattr(apps.get_app_config("table"), "help", Help())
         assert app_help.ready_apps() == ["table"]
 
