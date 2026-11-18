@@ -45,7 +45,7 @@ from apps.inventory.models import Product, ProductCategory, Unit
 from apps.inventory.queries import products_standing_for
 from apps.tax.models import TaxCategory
 from base import images
-from base.queries import business_language, image_library
+from base.queries.catalog_images import business_language, image_library
 from base.ordering import list_order
 
 COMBO_NOT_FOUND = _("That menu does not exist in this business.")

@@ -104,7 +104,7 @@ from apps.tax.models import TaxCategory
 from base import images
 from base.business import babel_locale, business_zone
 from base.operations import call
-from base.queries import business_language, image_library
+from base.queries.catalog_images import business_language, image_library
 from base.recovery import at_work, brought_back
 from base.schemas import RecordNameOut
 from base.ordering import list_order_for

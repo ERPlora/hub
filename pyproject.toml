@@ -136,7 +136,6 @@ max-statements = 50
 "base/auth.py" = ["F401"]
 "base/files.py" = ["B911"]
 "base/metrics.py" = ["B027"]
-"base/queries/__init__.py" = ["F811"]
 "base/schemas/__init__.py" = ["F811"]
 "base/tenancy/tests/test_business.py" = ["F401"]
 "base/tenancy/tests/test_concurrency.py" = ["F401"]
@@ -202,7 +201,8 @@ ignore_imports = [
     "base.approvals -> base.operations",
     "base.business -> base.tenancy.context",
     "base.entitlement -> base.tenancy.context",
-    "base.images -> base.queries",
+    "base.images -> base.queries.catalog_images",
+    "base.images -> base.queries.files",
     "base.meter -> base.services",
     "base.operations -> base.services",
     "base.permissions -> base.tenancy.context",

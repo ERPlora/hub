@@ -541,7 +541,7 @@ class AppListOut(Schema):
     enabled: int
 
 
-#: An app as the person names it (BASE-F23, F24; hub#539): ``base.queries.find_app`` resolves it.
+#: An app as the person names it (BASE-F23, F24; hub#539): ``base.queries.apps.find_app`` resolves it.
 APP_SAID = (
     "The app: its name as the person says it (e.g. «Reservas»), or its id. A name that fits several apps is refused "
     "naming them: ask the person which one."
