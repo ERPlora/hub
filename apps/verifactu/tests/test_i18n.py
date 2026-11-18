@@ -1,8 +1,6 @@
 """Every visible text of the verifactu app has its Spanish translation, compiled and current."""
 
-import importlib
 import json
-import pkgutil
 from pathlib import Path
 
 from django.apps import apps
@@ -36,9 +34,6 @@ from base.tests.po import (
 
 APP = Path(apps.get_app_config("verifactu").path)
 LOCALE = APP / "locale" / "es" / "LC_MESSAGES"
-QUERY_MODULES = [
-    importlib.import_module(f"{queries.__name__}.{module.name}") for module in pkgutil.iter_modules(queries.__path__)
-]
 
 
 def visible_texts() -> set[str]:
@@ -55,7 +50,7 @@ def visible_texts() -> set[str]:
             for value in panel.options.values()
             if type(value).__name__ == "__proxy__"
         ),
-        *module_texts(*QUERY_MODULES, schemas, services, models, verifactu_admin, erplora_route, certificates),
+        *module_texts(queries, schemas, services, models, verifactu_admin, erplora_route, certificates),
         *EVENT_MESSAGES.values(),
         *WAIT_REASONS.values(),
         *Environment.labels,
