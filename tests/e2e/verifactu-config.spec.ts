@@ -10,8 +10,8 @@
 //     address) already written in its blanks: the query signed by v2, as the SaaS verifies it, or a 401 and no PDF;
 //   - VERIFACTU-F06: an authorisation in review offers «Volver a enviar», which opens the form again with what the new
 //     sending does to the one in review;
-//   - VERIFACTU-F04: «Usar mi propio certificado» in Settings chooses who files: the own certificate once it is
-//     loaded, ERPlora's seal again when switched off;
+//   - VERIFACTU-F04: Settings says who files, never offering to choose: the own certificate once it is loaded,
+//     ERPlora's seal again once it is removed;
 //   - VERIFACTU-F08: Settings lists what keeps the business from going live, the authorisation in review among it,
 //     from the SaaS's photo (`PUT /internal/hubs/{id}/state`, signed as the SaaS signs it), and drops it once approved;
 //     no plan option is ever among them (VeriFactu is on every plan, Free included).
@@ -459,7 +459,7 @@ test('VERIFACTU-F06: an authorisation in review offers «Volver a enviar», whic
   await context.close();
 });
 
-test('VERIFACTU-F04: «Usar mi propio certificado» chooses who files, the own certificate once loaded', async ({ browser }) => {
+test('VERIFACTU-F04: Settings says who files, the own certificate once loaded and the seal again without it', async ({ browser }) => {
   await pushPhoto('none');
   const p12 = join(DIR, 'negocio-f04.p12');
   makeP12(p12);
@@ -472,15 +472,24 @@ test('VERIFACTU-F04: «Usar mi propio certificado» chooses who files, the own c
   await expect(own.locator('[data-testid=verifactu-config-cert]')).toContainText('Cargado');
 
   await page.goto(`${A}/verifactu/settings`);
-  const toggle = shown(page).locator('[data-testid=verifactu-settings-own]');
-  await toggle.click();
-  await expect(toastSaying(page, 'Listo: a partir de ahora envías con tu propio certificado.')).toBeVisible();
-  expect(psql('select route from verifactu_config')).toBe('own');
+  const hint = shown(page).locator('[data-testid=verifactu-settings-route-hint]');
+  await expect(hint).toHaveAttribute('data-route', 'own');
+  await expect(hint).toContainText('Envías tú directamente a Hacienda con el certificado de tu negocio');
+  // Nothing to choose: the certificate is the route.
+  await expect(shown(page).locator('[data-testid=verifactu-settings-own]')).toHaveCount(0);
   await flowShots(page, 'F04', async (p) => {
-    await expect(shown(p).locator('[data-testid=verifactu-settings-route-hint]')).toBeVisible();
+    await expect(shown(p).locator('[data-testid=verifactu-settings-route-hint]')).toHaveAttribute('data-route', 'own');
   });
-  await toggle.click();
-  await expect(toastSaying(page, 'Listo: a partir de ahora remite ERPlora en tu nombre.')).toBeVisible();
-  expect(psql('select route from verifactu_config')).toBe('erplora');
+
+  await page.goto(`${A}/verifactu/config`);
+  await shown(page).locator('[data-testid=verifactu-config-tab-own]').click();
+  await own.locator('[data-testid=verifactu-config-cert-remove]').click();
+  const dialog = page.locator('ion-modal', { hasText: '¿Quitar el certificado?' });
+  await expect(dialog).toContainText('Puedes seguir probando sin él: tus registros de pruebas siguen saliendo.');
+  await dialog.locator('ion-button', { hasText: 'Quitar' }).click();
+  await expect(dialog).toBeHidden();
+  await page.goto(`${A}/verifactu/settings`);
+  await expect(hint).toHaveAttribute('data-route', 'erploraTesting');
+  await expect(hint).toContainText('ERPlora remite tus registros de pruebas con su sello');
   await context.close();
 });

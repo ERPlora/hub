@@ -1,10 +1,10 @@
 <script setup lang="ts">
-// VeriFactu → Settings (VERIFACTU-F04, F08–F12). Turning the app on is enabling VeriFactu. «Go live» stays closed
-// while something is missing, listed above it: the server's opening and its gateway, the approved signed
-// authorisation, the own certificate (one this server can open), an active account. «Back to testing» is offered only
-// until the first production record. «Test the connection» presents nothing to the AEAT. Outside Spain VeriFactu is not
-// for the business: the switch, «Go live» and the live test are disabled. When ERPlora's route is unavailable,
-// only the certificate status is shown and its production blocker is explained beside «Go live».
+// VeriFactu → Settings (VERIFACTU-F04, F08–F12). Turning the app on is enabling VeriFactu. The route is said, never
+// chosen. «Go live» stays closed while something is missing, listed above it: the server's opening and its gateway,
+// the own certificate (one this server can open) or the approved signed authorisation, an active account. «Back to
+// testing» is offered only until the first production record. «Test the connection» presents nothing to the AEAT.
+// Outside Spain VeriFactu is not for the business: «Go live» and the live test are disabled. When ERPlora's route is
+// unavailable, only the certificate status is shown and its production blocker is explained beside «Go live».
 import { formatDateTime, InlineFeedback, StatusPill, useConfirm } from '@erplora/ui/components';
 import { useCommand, useLive } from '@erplora/ui/sdk';
 import { AppPage, openExternalLink, toastSuccess, useSession } from '@erplora/ui/shell';
@@ -29,7 +29,6 @@ const { confirm } = useConfirm();
 
 const { data: config, status, error } = useLive('verifactu.config.get', () => ({}));
 const { data: last } = useLive('verifactu.diagnostic.last', () => ({}));
-const update = useCommand('verifactu.config.update');
 const goLive = useCommand('verifactu.config.go_live');
 const back = useCommand('verifactu.config.back_to_testing');
 const diagnose = useCommand('verifactu.diagnostic.run');
@@ -38,7 +37,7 @@ const refused = shallowRef<string | null>(null);
 const fresh = shallowRef<DiagnosticOut | null>(null);
 
 const result = computed(() => fresh.value ?? last.value?.result ?? null);
-const busy = computed(() => update.pending.value || goLive.pending.value || back.pending.value || diagnose.pending.value || testInvoice.pending.value);
+const busy = computed(() => goLive.pending.value || back.pending.value || diagnose.pending.value || testInvoice.pending.value);
 const outsideSpain = computed(() => !!config.value?.live_blockers.some((reason) => reason.code === 'outside_spain'));
 const routeAvailable = computed(() => config.value?.erplora_route_available ?? true);
 const diagnosticRoute = computed(() => ({ route: result.value?.route, available: routeAvailable.value }));
@@ -77,23 +76,6 @@ function failed(command: { error: { value: unknown } }): void {
   refused.value = refusal(command.error.value, t('verifactu.settings.failed'))?.message ?? t('verifactu.settings.failed');
 }
 
-async function setRoute(event: CustomEvent<{ checked?: boolean; value?: unknown }>): Promise<void> {
-  const toggle = event.target as (EventTarget & { checked?: boolean }) | null;
-  const own = Boolean(event.detail.checked ?? event.detail.value);
-  const route = own ? 'own' : 'erplora';
-  if (!config.value || config.value.route === route || update.pending.value) return;
-  refused.value = null;
-  try {
-    await update.run({ route });
-  } catch {
-    // The toggle turned itself; `:checked` did not change, so Vue would not put it back.
-    if (toggle) toggle.checked = config.value?.route === 'own';
-    failed(update);
-    return;
-  }
-  toastSuccess(own ? t('verifactu.settings.routeOwn') : t('verifactu.settings.routeErplora'));
-}
-
 async function goingLive(): Promise<void> {
   refused.value = null;
   const yes = await confirm({
@@ -104,14 +86,6 @@ async function goingLive(): Promise<void> {
     tone: 'danger',
   });
   if (!yes) return;
-  if (config.value && !routeAvailable.value && config.value.route !== 'own') {
-    try {
-      await update.run({ route: 'own' });
-    } catch {
-      failed(update);
-      return;
-    }
-  }
   try {
     await goLive.run({});
   } catch {
@@ -206,9 +180,6 @@ const yesNo = (value: boolean | null) => (value === null ? t('verifactu.settings
         <SettingsSendingRoute
           :config="config"
           :can-configure="canConfigure"
-          :busy="busy"
-          :outside-spain="outsideSpain"
-          @route-change="setRoute"
         />
         <div
           class="verifactu-settings__environment"
