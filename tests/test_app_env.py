@@ -1,82 +1,30 @@
 """The hub's settings of each environment (deploy/app-env.json) and how a deploy checks and applies them.
 
-``deploy/app_env.py`` runs on the deploy runner, outside Django and the project's virtualenv: it is loaded
-here from its path, and git and the aws CLI are replaced by a double (``FakeCommands``), so no test calls AWS.
+``deploy/app_env.py`` runs on the deploy runner, outside Django and the project's virtualenv: it is loaded from its
+path, and git and the aws CLI are replaced by a double (``FakeCommands``), so no test calls AWS (``app_env_doubles``).
 """
 
 import copy
-import importlib.util
 import json
-import sys
-from pathlib import Path
 
 import pytest
+from app_env_doubles import (
+    COMMIT,
+    HUB_DIR,
+    PRE,
+    PROD,
+    FakeCommands,
+    app_env,
+    app_environment,
+    kinds,
+    revision,
+    settings,
+    with_production,
+)
 
-HUB_DIR = Path(__file__).resolve().parents[1]
-SCRIPT = HUB_DIR / "deploy" / "app_env.py"
 SETTINGS_FILE = HUB_DIR / "deploy" / "app-env.json"
 
-
-def _load():
-    spec = importlib.util.spec_from_file_location("app_env", SCRIPT)
-    module = importlib.util.module_from_spec(spec)
-    sys.modules["app_env"] = module
-    spec.loader.exec_module(module)
-    return module
-
-
-app_env = _load()
-
 SETTINGS_NAMES = ("VERIFACTU_PRODUCTION_ENABLED", "PLATFORM_HUB_SLUG", "VERIFACTU_ERPLORA_ROUTE_ENABLED")
-
-PROD = {
-    "hub": {"PLATFORM_HUB_SLUG": "erplora", "VERIFACTU_PRODUCTION_ENABLED": "true"},
-    "worker": {"PLATFORM_HUB_SLUG": "erplora", "VERIFACTU_PRODUCTION_ENABLED": "true"},
-}
-PRE = {
-    "hub": {
-        "PLATFORM_HUB_SLUG": "erplora",
-        "VERIFACTU_PRODUCTION_ENABLED": "false",
-        "VERIFACTU_ERPLORA_ROUTE_ENABLED": "false",
-    },
-    "worker": {
-        "PLATFORM_HUB_SLUG": "erplora",
-        "VERIFACTU_PRODUCTION_ENABLED": "false",
-        "VERIFACTU_ERPLORA_ROUTE_ENABLED": "false",
-    },
-}
-
-
-def settings(**sections):
-    data = {"prod": copy.deepcopy(PROD), "pre": copy.deepcopy(PRE)}
-    data.update(sections)
-    return data
-
-
-def kinds(problems):
-    return {(problem.where, problem.kind) for problem in problems}
-
-
-def revision(family, environment=None, secrets=()):
-    """A revision as ecs-deploy.sh hands it over: what it registers, with Terraform's variables in the app container."""
-    environment = {"DEBUG": "False", "ERPLORA_ENVIRONMENT": "prod"} if environment is None else environment
-    return {
-        "family": f"erplora-prod-{family}",
-        "containerDefinitions": [
-            {
-                "name": family,
-                "image": "reg.example/erplora/hub:abc123",
-                "environment": [{"name": name, "value": value} for name, value in environment.items()],
-                "secrets": [{"name": name, "valueFrom": f"arn:secret:{name}"} for name in secrets],
-            },
-            {
-                "name": "pgbouncer",
-                "image": "reg.example/erplora/hub:abc123",
-                "environment": [{"name": "PGBOUNCER_PORT", "value": "6432"}],
-            },
-        ],
-        "tags": [{"key": "Environment", "value": "prod"}],
-    }
 
 
 def deployed(current=None):
@@ -86,11 +34,6 @@ def deployed(current=None):
         family: revision(family, {"DEBUG": "False", **current.get(family, {})}, secrets=("FISCAL_CERTIFICATE_KEY",))
         for family in ("hub", "worker", "hub-migrate")
     }
-
-
-def app_environment(revision, name):
-    container = next(c for c in revision["containerDefinitions"] if c["name"] == name)
-    return {entry["name"]: entry["value"] for entry in container.get("environment", [])}
 
 
 # ── The file in the repository ─────────────────────────────────────────────────────────────────────────────────────
@@ -390,13 +333,6 @@ def test_variables_of_the_settings_in_force_and_new_ones_belong_to_the_file():
 # ── The lock on sending to the AEAT for real ──────────────────────────────────────────────────────────────────────
 
 
-def with_production(value):
-    section = copy.deepcopy(PROD)
-    for family in ("hub", "worker"):
-        section[family]["VERIFACTU_PRODUCTION_ENABLED"] = value
-    return section
-
-
 @pytest.mark.parametrize(("before", "after"), [("false", "true"), ("true", "false")])
 def test_opening_or_closing_it_in_prod_needs_the_confirmation(before, after):
     problems = app_env.lock_problems(with_production(after), with_production(before), confirm="")
@@ -529,57 +465,6 @@ def test_a_revision_without_the_app_container_is_refused():
 
 
 # ── A deploy, with git and the aws CLI replaced ───────────────────────────────────────────────────────────────────
-
-
-COMMIT = "abc123"
-
-
-class FakeCommands:
-    """Answers git and the aws CLI as a deploy runner would, and records every command."""
-
-    def __init__(self, file=None, current=None, saas_charging=True):
-        self.file = json.dumps(settings()) if file is None else file
-        self.current = {"prod": PROD, "pre": PRE} if current is None else current
-        self.saas_charging = saas_charging
-        self.commits = {COMMIT}
-        self.calls = []
-
-    def __call__(self, command):
-        self.calls.append(command)
-        if command[:2] == ["git", "show"]:
-            return self._git_show(command[2])
-        if command[:3] == ["git", "cat-file", "-e"]:
-            return self._git_commit(command[3])
-        if command[:3] == ["aws", "ssm", "get-parameter"]:
-            return self._parameter(command)
-        if command[:3] == ["aws", "ecs", "describe-task-definition"]:
-            return self._saas(command)
-        raise AssertionError(f"unexpected command {command}")
-
-    def _git_show(self, spec):
-        commit, path = spec.split(":", 1)
-        if commit not in self.commits or path != "deploy/app-env.json" or self.file is False:
-            raise app_env.CommandFailed(f"fatal: path '{path}' does not exist in '{commit}'")
-        return self.file
-
-    def _git_commit(self, spec):
-        if spec.removesuffix("^{commit}") not in self.commits:
-            raise app_env.CommandFailed(f"fatal: Not a valid object name {spec}")
-        return ""
-
-    def _parameter(self, command):
-        name = command[command.index("--name") + 1]
-        environment = name.split("/")[2]
-        if name != f"/erplora/{environment}/hub/app_env" or environment not in self.current:
-            raise app_env.CommandFailed("An error occurred (ParameterNotFound) when calling the GetParameter operation")
-        value = self.current[environment]
-        return value if isinstance(value, str) else json.dumps(value)
-
-    def _saas(self, command):
-        if command[command.index("--task-definition") + 1] != "erplora-prod-saas" or self.saas_charging is None:
-            raise app_env.CommandFailed("An error occurred (ClientException): Unable to describe task definition.")
-        invoicing = "true" if self.saas_charging else "false"
-        return json.dumps({"taskDefinition": revision("saas", {"PLATFORM_INVOICING_ENABLED": invoicing})})
 
 
 @pytest.fixture
