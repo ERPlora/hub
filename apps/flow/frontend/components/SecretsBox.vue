@@ -40,7 +40,7 @@ async function submit(): Promise<void> {
     await save.run({ name: chosen, value: value.value });
     name.value = '';
     value.value = '';
-    void toastSuccess(t('flow.secrets.saved', { name: chosen }));
+    toastSuccess(t('flow.secrets.saved', { name: chosen }));
   } catch (failure) {
     const refused = failure as ApiError;
     problem.value = refused.fields?.name ? t('flow.secrets.badName') : wording(refused, t('flow.errors.action'));
@@ -61,7 +61,7 @@ async function forget(secret: string): Promise<void> {
   problem.value = '';
   try {
     await remove.run({ name: secret });
-    void toastSuccess(t('flow.secrets.deleted', { name: secret }));
+    toastSuccess(t('flow.secrets.deleted', { name: secret }));
   } catch (failure) {
     problem.value = wording(failure as ApiError, t('flow.errors.action'));
   }

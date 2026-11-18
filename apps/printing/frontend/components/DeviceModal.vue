@@ -75,7 +75,7 @@ async function confirm(): Promise<void> {
   } catch {
     return; // The window shows the refusal.
   }
-  void toastSuccess(t(props.device ? 'printing.devices.modal.saved' : 'printing.devices.modal.created'));
+  toastSuccess(t(props.device ? 'printing.devices.modal.saved' : 'printing.devices.modal.created'));
   open.value = false;
 }
 

@@ -43,7 +43,7 @@ describe('BusinessMoneyError', () => {
   it('a money that cannot be read: an alert with the reason and «Retry»', async () => {
     const s = await setup();
     await s.fail();
-    expect(s.notice().attributes('role')).toBe('alert');
+    expect(s.notice().find('[role]').attributes('role')).toBe('alert');
     expect(s.notice().text()).toContain("The business's currency could not be read");
     expect(s.notice().text()).toContain('msg base.hub_busy');
     expect(s.wrapper.find('[data-testid="base-money-error-retry"]').text()).toBe('Retry');

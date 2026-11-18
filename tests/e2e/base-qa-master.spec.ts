@@ -10,17 +10,15 @@
 // flow: BASE-F05
 import { execSync } from 'node:child_process';
 
-import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
+import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
+import { closeActionCenter, openActionCenter } from './action-center';
 import { GREETING, type Provider, startProvider } from './assistant-provider';
 import {
   api,
-  compactBar,
   horizontalOverflow,
   HUB_DIR,
   login,
-  openApps,
-  openBell,
   psql,
   REPO_DIR,
   SAAS,
@@ -30,6 +28,7 @@ import {
 } from './helpers';
 import { type SaasOwner, saasPost, signUpOnSaas } from './saas-owner';
 import { STACK } from './stack';
+import { openApps, openAssistant } from './topbar';
 import { type Language, loadCatalog, normalText, rawKeys, wrongLanguage } from './translations';
 
 test.use({ actionTimeout: 30_000 });
@@ -183,19 +182,6 @@ async function tab(page: Page, id: string): Promise<void> {
   await expect(button).toHaveClass(/segment-button-checked/);
 }
 
-/** The topbar's way to the assistant: the sparkles, or on a phone «More options» (the sparkles folded with the bell). */
-async function openAssistant(page: Page): Promise<Locator> {
-  const panel = page.locator('[data-testid="assistant-panel"]');
-  if (compactBar(page)) {
-    await shown(page).locator('[data-testid="topbar-chrome-more"]').click();
-    await page.locator('ion-popover [data-testid="topbar-chrome-more-assistant"]').click();
-  } else {
-    await shown(page).locator('[data-testid="assistant-button"]').click();
-  }
-  await expect(panel).toHaveAttribute('data-open', 'true');
-  return panel;
-}
-
 test.beforeAll(async ({ browser }) => {
   test.setTimeout(180_000);
   provider = await startProvider(PROVIDER_PORT);
@@ -265,7 +251,7 @@ for (const language of LANGUAGES) {
       const seen = watch(page);
       const check = (name: string) => screen(page, name, language, size);
 
-      // Home: Summary, then Activity; «My apps» and the bell over it.
+      // Home: Summary, then Activity; «My apps» and the action center over it.
       await page.goto(`${origin}/`);
       await expect(shown(page).locator('[data-testid="home-date"]')).toBeVisible();
       await expect(shown(page).locator('[data-testid="setup-card"]')).toHaveAttribute('aria-busy', 'false');
@@ -277,10 +263,9 @@ for (const language of LANGUAGES) {
       await check('apps-launcher');
       await launcher.locator('[data-testid="apps-launcher-close"]').click();
       await expect(launcher).toBeHidden();
-      await openBell(page);
+      await openActionCenter(page);
       await check('bell');
-      await page.keyboard.press('Escape');
-      await expect(page.locator('ion-popover [data-testid^="hub-bell-"]')).toHaveCount(0);
+      await closeActionCenter(page);
 
       // BASE-F05: «Add apps», the last tile of «My apps», leads to Apps.
       await shown(page).locator('[data-testid="home-my-apps-add"]').click();

@@ -1,8 +1,8 @@
 // flow: sale-e2e-wait — the Sales specs' wait
 // Before a capture or a measurement, the Sales specs (sale-*.spec.ts) and their helpers wait with the harness's one
-// wait, `untilStill(page)` (helpers.ts), which asks every open shadow root too. A wait of their own that asks the
-// document alone for its animations is blind to Ionic's overlays (`sale-settled.spec.ts` shows the till's «sold out»
-// toast passing for still), and so is a fixed sleep; swapping one back would leave every spec green: this keeps them
+// wait, `untilStill(page)` (helpers.ts), which asks the document and every open shadow root. A wait of their own
+// that asks one of them alone misses Ionic's overlays or the toasts (`sale-settled.spec.ts` shows the till's «sold
+// out» toast entering), and so is a fixed sleep; swapping one back would leave every spec green: this keeps them
 // out of the Sales files. own-animation-waits.test.ts holds the same rule for every spec of the e2e.
 import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';

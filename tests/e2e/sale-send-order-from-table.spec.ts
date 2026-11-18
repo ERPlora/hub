@@ -10,6 +10,7 @@ import { expect, type Page, test } from '@playwright/test';
 import { A, capture, login, psql, shown } from './helpers';
 import { cleanInventory, type Product } from './inventory-helpers';
 import { checkWithDish, cleanSales, dishForTheTill, openTillCart, restoreDrawer, stamp, zoneWithTable } from './sale-helpers';
+import { toastSaying } from './toast-helpers';
 
 const RUN = stamp();
 const ZONE = `E2E Tbs ${RUN}`;
@@ -115,7 +116,7 @@ test('SALE-F20 (hub#1017): a table seated on the plan offers «Send order (1)» 
 
   // Sent from «Check»: the kitchen has it, nothing waits and the bar goes; «Charge» is still there.
   await shown(page).locator('[data-testid=pos-kitchen-send]').click();
-  await expect(page.locator('ion-toast').filter({ hasText: 'Order 1 sent to the kitchen.' })).toBeVisible();
+  await expect(toastSaying(page, 'Order 1 sent to the kitchen.')).toBeVisible();
   await expect(shown(page).locator('[data-testid=pos-cart-tab-round-badge]')).toHaveCount(0);
   await expect(shown(page).locator('[data-testid=pos-kitchen-send]')).toHaveCount(0);
   await expect(shown(page).locator('[data-testid=pos-charge]')).toBeVisible();

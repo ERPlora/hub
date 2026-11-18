@@ -82,7 +82,7 @@ async function record(): Promise<void> {
     return;
   }
   asking.value = false;
-  void toastSuccess(t('customer.health.recorded'));
+  toastSuccess(t('customer.health.recorded'));
 }
 
 function edit(): void {
@@ -105,7 +105,7 @@ async function save(): Promise<void> {
     return; // the refusal shows under its field or in the panel; what was typed stays.
   }
   editing.value = false;
-  void toastSuccess(t('customer.health.saved'));
+  toastSuccess(t('customer.health.saved'));
 }
 
 function askWithdraw(): void {
@@ -121,7 +121,7 @@ async function takeBack(): Promise<void> {
   }
   withdrawing.value = false;
   editing.value = false;
-  void toastSuccess(t('customer.health.withdrawn'));
+  toastSuccess(t('customer.health.withdrawn'));
 }
 
 const consentLine = computed(() => {

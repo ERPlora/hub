@@ -45,7 +45,7 @@ async function confirm(): Promise<void> {
   } catch {
     return; // The window shows the refusal.
   }
-  void toastSuccess(t('printing.jobs.cancel.done'));
+  toastSuccess(t('printing.jobs.cancel.done'));
   open.value = false;
 }
 </script>

@@ -70,7 +70,7 @@ async function record(channel: ConsentChannel): Promise<void> {
     return;
   }
   asking.value = null;
-  void toastSuccess(t('customer.consent.recorded'));
+  toastSuccess(t('customer.consent.recorded'));
 }
 
 async function takeBack(channel: ConsentChannel): Promise<void> {
@@ -80,7 +80,7 @@ async function takeBack(channel: ConsentChannel): Promise<void> {
   } catch {
     return;
   }
-  void toastSuccess(t('customer.consent.withdrawnMsg'));
+  toastSuccess(t('customer.consent.withdrawnMsg'));
 }
 
 const stateLabel = (row: ConsentStateRow | undefined): string =>

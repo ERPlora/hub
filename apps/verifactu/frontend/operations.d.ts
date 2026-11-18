@@ -251,8 +251,9 @@ export interface DiagnosticOut {
 
 export interface ConfigOut {
   environment: Environment;
+  /** The route the records go by, never chosen: own with a valid own certificate, erplora without; fixed on going live. */
   route: Route;
-  /** ERPlora's route can be chosen here; when not, only the own certificate goes live. */
+  /** ERPlora's route is open to this business here; when not, only the own certificate goes live. */
   erplora_route_available: boolean;
   production_since: string | null;
   production_open: boolean;
@@ -364,7 +365,6 @@ export interface IssuerIn {
 declare module '@erplora/ui/sdk' {
   interface Operations {
     'verifactu.config.get': { input: NoInput; output: ConfigOut };
-    'verifactu.config.update': { input: { route: Route }; output: ConfigOut };
     'verifactu.config.go_live': { input: NoInput; output: ConfigOut };
     'verifactu.config.back_to_testing': { input: NoInput; output: ConfigOut };
     'verifactu.certificate.upload': { input: { p12_base64: string; password: string }; output: ConfigOut };

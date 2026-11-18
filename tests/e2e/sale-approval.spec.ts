@@ -28,6 +28,7 @@ import { cleanInventory, createProduct, type Product } from './inventory-helpers
 import { ensureIssuer, snapshotSeries } from './invoice-helpers';
 import { chargeByApi, cleanSales, drawerOff, restoreDrawer, type SaleOut, stamp } from './sale-helpers';
 import { cleanUp as cleanServices, named, post } from './service-helpers';
+import { toastSaying } from './toast-helpers';
 import { discardChanges } from './unsaved-back-helpers';
 
 const KEY = 'FIX-SALE-VOID-REFUND-ASKS-NO-APPROVAL';
@@ -196,7 +197,7 @@ test('SALE-F30: the cashier voids a charged ticket and the owner approves it wit
   await ownerApproves(page);
   await expect(dialog).toBeHidden();
   await expect(modal).toBeHidden();
-  await expect(page.locator('ion-toast').filter({ hasText: /Sale voided|Venta anulada/ }).first()).toBeVisible();
+  await expect(toastSaying(page, /Sale voided|Venta anulada/)).toBeVisible();
   await expect(row(page, toVoid)).toContainText(/Voided|Anulada/);
   const stored = await detail(toVoid);
   expect([stored.status, stored.void_reason, stored.voided_by]).toEqual(['voided', 'e2e wrong ticket', cashierName]);
@@ -220,7 +221,7 @@ test('SALE-F31: the cashier refunds a charged ticket and the owner approves it w
   await ownerApproves(page);
   await expect(dialog).toBeHidden();
   await expect(modal).toBeHidden();
-  await expect(page.locator('ion-toast').filter({ hasText: /Refund recorded\.|Devolución registrada\./ }).first()).toBeVisible();
+  await expect(toastSaying(page, /Refund recorded\.|Devolución registrada\./)).toBeVisible();
   await expect.poll(async () => (await detail(toRefund)).status).toBe('refunded');
   await expect(row(page, toRefund)).toContainText(/Refunded|Devuelta/);
 });

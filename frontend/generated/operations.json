@@ -2723,10 +2723,6 @@
     "method": "get",
     "path": "/api/verifactu/config"
   },
-  "verifactu.config.update": {
-    "method": "post",
-    "path": "/api/verifactu/config"
-  },
   "verifactu.config.go_live": {
     "method": "post",
     "path": "/api/verifactu/config/go_live"

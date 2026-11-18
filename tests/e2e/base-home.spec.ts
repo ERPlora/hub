@@ -2,7 +2,8 @@
 // flow: BASE-F02 BASE-F01 BASE-F03 BASE-F05 BASE-F06 BASE-F07 BASE-F08 BASE-F09 BASE-F10 BASE-F11
 import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, api, bellBadge, clearItems, horizontalOverflow, hostPage, login, openBell, psql, shot, shown, uniqueName, untilStill } from './helpers';
+import { bellSays, bellTotal, featureNotice, noticeButton } from './action-center';
+import { A, api, clearItems, horizontalOverflow, hostPage, login, psql, shot, shown, uniqueName, untilStill } from './helpers';
 import { panelAdded, spanishContext, spanishHome } from './home-helpers';
 
 const VIEWPORTS = {
@@ -119,14 +120,12 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
     await page.reload();
     await expect(testid(page, 'widget-board').locator('[data-testid="widget"][data-key="demo.open_items"]')).toBeVisible();
 
-    // BASE-F10 — the bell (base.bell.counters): the demo's «Open demo items» counter once there is one open.
+    // BASE-F10 — the action center (base.bell.counters): the demo's «open demo items» notice once there is one open.
     await api(context, A, 'POST', '/demo/items', { name: uniqueName('Bell') });
-    await expect(bellBadge(page)).toHaveText('1');
-    await openBell(page);
-    const rows = page.locator('ion-popover [data-testid="hub-bell-row"]');
-    await expect(rows).toHaveCount(1);
+    await bellSays(page, await bellTotal(context));
+    const featured = await featureNotice(page, '1 open demo item');
     await snap(page, 'BASE-F10', width);
-    await rows.first().click();
+    await noticeButton(featured, 'See the items').click();
     await expect(page).toHaveURL(`${A}/demo/items`);
     await page.goto(`${A}/`);
 
@@ -216,8 +215,8 @@ function liveOps(url: string): string[] {
   return (JSON.parse(Buffer.from(list, 'base64url').toString()) as { op: string }[]).map((subscription) => subscription.op);
 }
 
-/** base's four pieces of the chrome (frontend/main.ts `CHROME`), by their module: the source in dev, the chunk in a build. */
-const CHROME_PIECE = /\/(TopbarChrome|SidebarFooter|BlockingStrip|BackgroundChrome)[.-]/;
+/** base's three pieces of the chrome (frontend/main.ts `CHROME`), by their module: the source in dev, the chunk in a build. */
+const CHROME_PIECE = /\/(TopbarChrome|SidebarFooter|BackgroundChrome)[.-]/;
 
 // On a slow device base's chrome can arrive well after the screen's queries; the stream must still open once, with the
 // bell's `base.bell.counters` and the apps beside the pane (`base.app.list`), never cut and opened again for them. Here

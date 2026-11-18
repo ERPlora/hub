@@ -47,9 +47,9 @@ async function resend(item: FailedEvent): Promise<void> {
   resending.value = item.id;
   try {
     await retry.run({ id: item.id });
-    void toastSuccess(t('base.system.failed.retried'));
+    toastSuccess(t('base.system.failed.retried'));
   } catch (error) {
-    void toastError(t('base.system.failed.retryFailed', { reason: why(error) }));
+    toastError(t('base.system.failed.retryFailed', { reason: why(error) }));
   } finally {
     resending.value = null;
   }
@@ -66,11 +66,11 @@ async function resendAll(): Promise<void> {
   if (!yes) return;
   try {
     const { count } = await retryAll.run({});
-    void toastSuccess(
+    toastSuccess(
       count ? t('base.system.failed.retriedAll', { count }) : t('base.system.failed.nothingToRetry'),
     );
   } catch (error) {
-    void toastError(t('base.system.failed.retryFailed', { reason: why(error) }));
+    toastError(t('base.system.failed.retryFailed', { reason: why(error) }));
   }
 }
 
@@ -87,10 +87,10 @@ async function confirmDiscard(): Promise<void> {
   try {
     await discard.run({ id: item.id, reason: reason.value.trim() });
     discardOpen.value = false;
-    void toastSuccess(t('base.system.failed.discarded'));
+    toastSuccess(t('base.system.failed.discarded'));
   } catch (error) {
     discardOpen.value = false;
-    void toastError(t('base.system.failed.discardFailed', { reason: why(error) }));
+    toastError(t('base.system.failed.discardFailed', { reason: why(error) }));
   }
 }
 </script>

@@ -10,6 +10,7 @@ import { expect, test } from '@playwright/test';
 import { A, api, capture, EMPLOYEE, shown, untilStill } from './helpers';
 import { rowAction } from './service-helpers';
 import { cleanUp, named, post, recordOf, rowOf, signedIn, TAG } from './task-helpers';
+import { toastSaying } from './toast-helpers';
 
 test.beforeAll(cleanUp);
 test.afterAll(cleanUp);
@@ -45,7 +46,7 @@ test('an employee works their own tasks and nobody else’s', async ({ browser }
     await shown(page).locator('[data-testid=task-view-mine]').click();
     await expect(rowOf(page, 'task-mine', ownTitle)).toBeVisible();
     await rowAction(page, 'task-mine', own.id, 'complete');
-    await expect(page.locator('ion-toast')).toContainText('Task completed');
+    await expect(toastSaying(page, 'Task completed')).toBeVisible();
     await expect(rowOf(page, 'task-mine', ownTitle)).toContainText('Done');
     await expect(rowOf(page, 'task-mine', ownTitle)).toBeVisible();
     // The notice is still sliding in: the capture waits until nothing moves.

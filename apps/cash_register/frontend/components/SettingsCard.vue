@@ -88,7 +88,7 @@ async function save(): Promise<void> {
   edits.value = Object.fromEntries(
     Object.entries(edits.value).filter(([key, value]) => sent[key as keyof SettingsFields] !== value),
   ) as SettingsPatchIn;
-  void toastSuccess(t('cash_register.settings.saved'));
+  toastSuccess(t('cash_register.settings.saved'));
 }
 
 const loading = computed(() => !server.value && status.value === 'loading');

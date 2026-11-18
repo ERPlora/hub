@@ -125,7 +125,7 @@ describe('checklistView', () => {
   });
 });
 
-describe('blockingItems (the strip)', () => {
+describe('blockingItems (what blocks invoicing)', () => {
   it('lists the ⛔ steps still pending, only while the server counts some', () => {
     const items = [item('invoice.business_identity', { level: 'legal' }), item('a.f'), item('a.l', { level: 'legal', state: 'done' })];
     expect(blockingItems(status(items)).map((i) => i.key)).toEqual(['invoice.business_identity']);

@@ -116,7 +116,7 @@ def test_the_certificate_and_its_password_are_never_asked_for_in_a_chat():
 def test_not_even_who_may_configure_verifactu_is_offered_them(role):
     """What the assistant hands the model: verifactu's other tools, none of its writes with a secret."""
     tools = assistant.tools.catalog(ctx_for(role))
-    assert {"verifactu.aeat.query", "verifactu.config.update"} <= set(tools)  # positive control: verifactu is on
+    assert {"verifactu.aeat.query", "verifactu.config.go_live"} <= set(tools)  # positive control: verifactu is on
     assert sorted(set(SECRET_WRITES) & set(tools)) == []
 
 

@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:a728971217d04a8096d8e5376a5a053f4b391b690bbc91638dca78cc7f917cae -->
+<!-- generated from WORKBOOK.md sha256:3a9921d2601a55dd22b1c4832e5c9793220776dc978c3a3bf67da638bcefa528 -->
 
 ## What it is for and who it is for
 
@@ -88,21 +88,33 @@ The **Tables** menu has five tabs: **Floor plan**, **Zones**, **Tables**, **Sess
 buttons the profile cannot use do not show.
 
 ### Floor plan
-Menu **Tables → Floor plan**. At the top, a single row: the strip of zones (it slides sideways on the
-phone and fades out at the edge when there are more zones), the **Service / Edit plan** switch (only for
-whoever can draw the plan) and, in "Edit plan", a "+" ("Add zone or table") and a pencil ("Edit zone").
-Below, the plan of the chosen zone, with the tables at their real size: if it does not fit in width
-(phone, tablet) it slides sideways and the edge with tables behind fades out; if it does not fit in
-height, it grows and the page scrolls down.
+Menu **Tables → Floor plan**. At the top are the strip of zones (it slides sideways on the phone and
+fades at an edge with more zones behind it), the **Service / Edit plan** switch (only for whoever can draw
+the plan) and, in "Edit plan", a "+" ("Add zone or table") and a pencil ("Edit zone"). Each tab has a dot
+in its zone's colour and the number of occupied tables over those in service ("7/12"). Below, a card
+summarises the chosen zone: available, occupied, reserved tables and guests.
 
-Each table is a tile with its number, its status written with its icon and colour (Available, Occupied,
-Reserved, Blocked), the capacity ("4 pax") or, if it is occupied, the guests and the minutes they have
-been there ("3 pax · 35 min", which move forward by themselves) and who serves it; if it has a booking
-today, the name and the time of the booking ("Deleted customer" if that customer's data were erased) on
-one line: a name that does not fit is cut with "…" and the time is always seen whole ("Maximiliana F… ·
-20:00"); the full name goes in the table's title. Round tables are painted round and the rectangular
-one, wider than tall. The plan **is live**: it changes by itself when somebody seats, charges, moves or
-edits a table.
+On tablet and desktop, the plan automatically adjusts the positions and size of the tables to show the
+whole zone at a minimum legible size. If it still does not fit, it scrolls within its area on both axes,
+with a fade at every edge that has content behind it; the background can be dragged with the mouse and the
+focused area can be scrolled with the arrow keys. There are no zoom controls. The grid only appears in
+"Edit plan". On a phone (up to 640 px), "Service" shows compact two-column cards with a thumbnail of the
+table and its seats, number, status and time; "Edit plan" keeps the interactive plan.
+
+Each table has its shape (round, square or rectangular) and seats according to its capacity; filled seats
+show the seated guests. At most twelve are drawn and, above that capacity, the filled ones are distributed
+proportionally; the exact figure is always written. An Available table has a soft green background and
+green outline; Occupied, a solid blue fill; Reserved, a dashed amber outline; Blocked, a grey hatch. The
+status is also written and has its icon. Inside are the large number and one fact: elapsed time on an
+occupied table ("1:08"), the time on a reserved one or the status on the others. Below, a label shows the
+guests ("3/4 pax") or capacity, and the booking's name and time ("Ana · 9:00 PM"; "Deleted customer" if
+that customer's data were erased). The server is read in the accessible name and the table's sheet.
+
+An occupied table also has an advancing time arc. Past the warning minutes in Settings, only the time and
+arc turn amber and then red: the table stays blue. Status and zone changes have smooth transitions, turned
+off when the device requests reduced motion. While loading, a floor-plan skeleton appears; empty and error
+notices keep their actions. The plan **is live**: it changes by itself when somebody seats, charges, moves
+or edits a table.
 
 - **Service** (at first): nothing is dragged. Tapping a table opens its **Table N** window:
   - free or reserved: the guests question ("Guests at table N · 4 pax", "−" and "+", shortcuts from 1
@@ -118,8 +130,8 @@ edits a table.
     "Merge N with…" / "Pick an occupied table") and "Cancel"; only the tables that are valid can be
     tapped.
 - **Edit plan**: each table is dragged to its spot (also with the keyboard: arrows, 8 px; with Shift,
-  32 px) and it is saved when it is dropped. Tapping a table opens **Edit table** (Number, Capacity,
-  Name (optional), Shape, Status (Available or Blocked), Zone, Active; footer with "Delete" and "Save");
+  32 px) and it is saved when it is dropped. Tapping a table opens **Edit table** (Number, Capacity, Width,
+  Height, Name (optional), Shape, Status (Available or Blocked), Zone, Active; footer with "Delete" and "Save");
   the "+" opens **Add** (Zone field and "Add zone"; "Table number" field, which if left empty is
   "Auto-numbered", and "Add table"); the pencil opens **Edit zone** (Name, Description (optional);
   "Delete zone" and "Save"). Below, the help "Drag to position · click a table to edit or delete it.
@@ -138,9 +150,9 @@ in "Delete zone?" and leaves "Delete zone" off if the zone has tables.
 ### Tables
 Menu **Tables → Tables**. Table in natural order (2 before 10): Number, Name, Zone, Capacity, Status;
 search box "Search table…" (number and name), column filters behind the funnel (zone, status, shape,
-capacity), table or cards view. The "+" opens the panel with Number, Capacity, Zone and "Add table".
-Per row, "Edit" (Number, Name, Capacity, Shape, Zone, Status and Active) and "Delete" (the
-administrator only, with confirmation).
+capacity), table or cards view. The "+" opens the panel with Number, Capacity, Width, Height, Zone and
+"Add table". Per row, "Edit" (Number, Name, Capacity, Width, Height, Shape, Zone, Status and Active) and
+"Delete" (the administrator only, with confirmation).
 
 ### Sessions
 Menu **Tables → Sessions**: the checks of the room. Tabs "Open", "Closed" and "All". Table: Table ("No
@@ -163,7 +175,7 @@ lines and "Save" shows complete at the end (hub#866).
 
 | Screen | Loading | Empty | Error |
 |---|---|---|---|
-| Floor plan | "Loading…" | No zones: "Create a zone to start placing tables."; zone without tables: "No tables in this zone. Tap “Add table”." | On loading: notice with "Retry"; on saving, inside the open window (or above the plan if there is none) |
+| Floor plan | Floor-plan skeleton | No zones: "Create a zone to start placing tables."; zone without tables: "No tables in this zone. Tap “Add table”." | On loading: notice with "Retry"; on saving, inside the open window (or above the plan if there is none) |
 | Zones | The table loading | "No zones. Tap «+» to create the first one (Dining room, Terrace, Bar…)." | The table's, with "Retry"; the saving one, inside the panel |
 | Tables | The table loading | "No tables." | The table's, with "Retry"; the saving one, inside the panel |
 | Sessions | The table loading | "No sessions. Seat a party from the floor plan and it will show up here." | The table's, with "Retry"; the closing one, in its confirmation |
@@ -248,9 +260,10 @@ Steps:
    the first free number of that zone.
 4. Tap "Add table" (off while there is no zone).
 5. The table appears in the zone, in the first free spot, square, for 4 and Available.
-6. Another door: in **Tables → Tables**, "+" with Number, Capacity and Zone and "Add table"; it is also
-   born in the first free spot of its zone.
-In: number (or none), and in the list also capacity and zone.
+6. Another door: in **Tables → Tables**, "+" with Number, Capacity, Width and Height (empty, "Standard":
+   the usual table, 72 × 72) and Zone and "Add table"; it is also born in the first free spot of its
+   zone, at the size it has.
+In: number (or none), and in the list also capacity, width, height and zone.
 Out: the table (announces: `table.table.created`). With a table in use, "Choose table" of the till stops
 saying "There are no tables yet. Set them up in Tables → Floor plan." (`table.floor.status`), and "Your
 tables" is "Done" on the Home without a reload. An occupied or blocked table still counts; if they are
@@ -283,19 +296,22 @@ Actor: manager, administrator
 Screen: Floor plan (Edit plan), Tables
 Steps:
 1. In **Edit plan**, tap the table (or in **Tables**, "Edit" in its row): "Edit table" opens.
-2. Change Number, Capacity, Name (optional), Shape (Square, Round, Rectangular), Status (Available or
-   Blocked), Zone or Active.
+2. Change Number, Capacity, Width and Height (the size of its box on the plan, from 24 to 10000; the
+   usual table is 72 × 72: a long one for eight, 160 × 72), Name (optional), Shape (Square, Round,
+   Rectangular), Status (Available or Blocked), Zone or Active.
 3. Tap "Save": the window closes and the plan changes by itself (if it changed zone, it appears in the
-   other tab in the same spot).
+   other tab in the same spot; with another size, it is painted in its spot with its new box).
 4. To remove it, tap "Delete" (the administrator only) and confirm it: it disappears from the plan and
    from the list; its history of checks is kept.
 In: the chosen table.
 Out: the changed table (announces: `table.table.updated`) or the deleted one (announces:
 `table.table.deleted`).
 If it fails: inside the window: "The table number is required", "There is already a table with that
-number in this zone.", "That table does not exist in this business.", each reason under its field until
-that field is corrected, even if another one says the same (hub#888); deleting a table with an open
-check: "That table has an open check. Close it or move it before deleting the table.".
+number in this zone.", "That table does not exist in this business.", a width or a height outside 24
+to 10000 ("Ensure this value is greater than or equal to 24.", "Ensure this value is less than or equal
+to 10000.") or with decimals ("Enter a whole number."), and then nothing is saved; each reason under its
+field until that field is corrected, even if another one says the same (hub#888); deleting a table with
+an open check: "That table has an open check. Close it or move it before deleting the table.".
 Involved: TABLE-F02, TABLE-F05, TABLE-F21
 
 ### TABLE-F05 Take a table out of service (block it) and bring it back
@@ -374,16 +390,19 @@ Status: done
 Actor: manager, employee
 Screen: Floor plan
 Steps:
-1. Open **Tables → Floor plan** and choose the zone: its plan shows at once, without waiting to load.
-   All its tables in use are seen, at their real size.
-2. Each table says its status in writing, with icon and colour: Available, Occupied, Reserved or Blocked.
-3. An occupied table says the guests and the minutes they have been there ("3 pax · 35 min") and who
-   serves it; the minutes move forward by themselves. A table with a booking today says the name and the
-   time.
-4. The plan changes by itself when somebody seats, transfers, joins, splits, charges or voids: there is
-   no need to leave and come back, and the window you have open (split, guests, close, "Edit table")
-   stays at the step you were at, with whatever you typed. And with the clock: a table turns Reserved an hour before its booking and goes back to
-   Available when the booking ends, without anybody touching anything.
+1. Open **Tables → Floor plan** and choose the zone: its content shows at once, without waiting to load.
+   The tab says how many tables are occupied and the card summarises available, occupied, reserved tables
+   and guests.
+2. On tablet and desktop the plan fits every table to the space; on the phone, "Service" shows them in
+   two-column cards. Each table says its status in writing, with an icon, shape, seats and colour:
+   Available, Occupied, Reserved or Blocked.
+3. An occupied table shows the time ("0:35") and guests ("3/4 pax"); the time moves forward by itself and
+   its warnings change only the clock and arc. A table with a booking today says its name and time. The
+   server is found in the table's sheet.
+4. The plan changes by itself when somebody seats, transfers, joins, splits, charges or voids: there is no
+   need to leave and come back, and the window you have open (split, guests, close, "Edit table") stays at
+   the step you were at, with whatever you typed. And with the clock: a table turns Reserved an hour before
+   its booking and goes back to Available when the booking ends, without anybody touching anything.
 In: the tables, their open checks, their holds and the status of their checks in Sales.
 Out: nothing.
 If it fails: a failure on loading shows with "Retry".

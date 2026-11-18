@@ -2,15 +2,17 @@
 // and Inventory apps: the owner opens a check with a product, seats it at the run's table from the
 // check's bar (searched on the server), sees the table chip and the check retitled «Table N», and then
 // takes the table off the check: the table frees and the check stays on the till. The sheet in three
-// viewports. And «Merge» from Tables (TABLE-F16, SALE-F24) with the till still behind it (hub#459): the
+// viewports, also with an occupied table, drawn in the floor plan's blue. And «Merge» from Tables (TABLE-F16, SALE-F24) with the till still behind it (hub#459): the
 // till's check is the one absorbed, and the till says it was joined and shows the one that stays, never
 // «closed on another device». What a run creates — its zone «E2E Tbl <stamp> Till», its tables, the table
 // checks and their moves, its checks and lines, its product — is deleted after it.
 import { expect, type Page, test } from '@playwright/test';
 
-import { A, api, login, openApps, psql, shown } from './helpers';
+import { A, api, login, psql, shown } from './helpers';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
 import { addToTill, cleanSales, shots, stamp, tillReady, zoneWithTable } from './sale-helpers';
+import { toastSaying, toasts } from './toast-helpers';
+import { openApps } from './topbar';
 
 const RUN = stamp();
 const ZONE = `E2E Tbl ${RUN} Till`;
@@ -120,6 +122,42 @@ test('SALE-F19: the till seats its check at a table and takes the table off agai
   expect(freed.data.status).toBe('available');
 });
 
+test('SALE-F19: an occupied table in «Choose table» is the floor plan’s blue, never red', async ({ page, context }) => {
+  await coffeeOnACheck(page);
+  // Created after the first test has searched the run's number, like the merge's table below.
+  const busy = await api<{ id: string }>(context, A, 'POST', '/table/tables', { zone_id: zoneId, number: `${NUMBER}O`, capacity: 4 });
+  expect(busy.status, `table ${JSON.stringify(busy.data)}`).toBe(201);
+  const opened = await api<{ order_id: string }>(context, A, 'POST', '/table/sessions/open', { table_id: busy.data.id });
+  expect(opened.status, `open ${JSON.stringify(opened.data)}`).toBe(201);
+  const added = await api(context, A, 'POST', '/sale/orders/add_line', { order_id: opened.data.order_id, product_id: coffee.id, quantity: '1' });
+  expect(added.status, JSON.stringify(added.data)).toBe(200);
+
+  await shown(page).locator('[data-testid=pos-table-trigger]').click();
+  const sheet = page.locator('ion-modal[data-testid=pos-table]');
+  await sheet.locator('ion-searchbar input').fill(`${NUMBER}O`);
+  const tile = sheet.locator(`[data-testid=pos-table-tile-${busy.data.id}]`);
+  await expect(tile).toContainText('Occupied');
+  await expect(tile).toBeDisabled();
+  const colours = await tile.locator('.table-glyph__body').evaluate((body) => {
+    const resolved = (value: string) => {
+      const probe = body.appendChild(document.createElement('span'));
+      probe.style.color = value;
+      const colour = getComputedStyle(probe).color;
+      probe.remove();
+      return colour;
+    };
+    return { painted: getComputedStyle(body).backgroundColor, blue: resolved('var(--ep-primary-text)'), red: resolved('var(--ion-color-danger)') };
+  });
+  expect(colours.painted).toBe(colours.blue);
+  expect(colours.painted).not.toBe(colours.red);
+  // The capture: the run's free table beside the occupied one.
+  await sheet.locator('ion-searchbar input').fill(NUMBER);
+  await expect(sheet.locator('[data-testid^=pos-table-tile-]')).toHaveCount(2);
+  await shots(page, 'sale-table-picker-occupied', async () => {
+    await expect(tile).toBeVisible();
+  });
+});
+
 test('TABLE-F16, SALE-F24: merging the table of the till check from Tables says it was joined, not closed on another device', async ({ page, context }) => {
   const absorbed = await coffeeOnACheck(page);
   const seated = await api<TableCheck>(context, A, 'POST', '/table/sessions/open', { table_id: tableId, order_id: absorbed });
@@ -149,9 +187,8 @@ test('TABLE-F16, SALE-F24: merging the table of the till check from Tables says 
   await expect(floor.locator(`[data-testid=table-floor-tile-${tableId}]`)).toContainText('Available');
 
   // The till behind says the check was joined (neutral), never that it was closed on another device.
-  const toasts = page.locator('ion-toast');
-  await expect(toasts.filter({ hasText: 'That check was joined with another one' }).first()).toBeVisible();
-  await expect(toasts.filter({ hasText: 'closed on another device' })).toHaveCount(0);
+  await expect(toastSaying(page, 'That check was joined with another one')).toBeVisible();
+  await expect(toasts(page).filter({ hasText: 'closed on another device' })).toHaveCount(0);
   expect((await api<{ status: string; merged_into_id: string | null }>(context, A, 'GET', `/sale/orders/detail?order_id=${absorbed}`)).data).toMatchObject({
     status: 'voided',
     merged_into_id: stays,
@@ -167,5 +204,5 @@ test('TABLE-F16, SALE-F24: merging the table of the till check from Tables says 
   const joined = await api<{ status: string; lines: { sku: string }[] }>(context, A, 'GET', `/sale/orders/detail?order_id=${stays}`);
   expect(joined.data.status).toBe('open');
   expect(joined.data.lines.filter((line) => line.sku === SKU)).toHaveLength(2);
-  await expect(toasts.filter({ hasText: 'closed on another device' })).toHaveCount(0);
+  await expect(toasts(page).filter({ hasText: 'closed on another device' })).toHaveCount(0);
 });
