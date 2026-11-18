@@ -6,6 +6,7 @@ import { execFileSync } from 'node:child_process';
 import { type Browser, type BrowserContext, expect, type Locator, type Page } from '@playwright/test';
 
 import { A, api, type Credentials, HUB_DIR, login, OWNER, psql, saveSessionForTheSweep, settledCapture, shown } from './helpers';
+import { toastSaying } from './toast-helpers';
 import { OUTBOUND_AT_ONCE } from './whatsapp-helpers';
 
 export async function signedIn(
@@ -136,7 +137,7 @@ export async function addToANewCart(context: BrowserContext, prefix: string): Pr
 export async function grantAllAndSwitchOn(page: Page): Promise<void> {
   await shown(page).locator('[data-testid=flow-editor-tab-permissions]').click();
   await shown(page).locator('[data-testid=flow-perm-grantall]').click();
-  await expect(page.locator('ion-toast').filter({ hasText: 'Permissions updated.' }).last()).toBeVisible();
+  await expect(toastSaying(page, 'Permissions updated.')).toBeVisible();
   await shown(page).locator('[data-testid=flow-editor-enabled]').click();
   await shown(page).locator('[data-testid=flow-editor-save]').click();
   await expect(shown(page).locator('[data-testid=flow-editor-notice]')).toHaveText('Saved.');
@@ -155,13 +156,13 @@ export async function saveGrantAndSwitchOn(page: Page): Promise<string> {
 export async function runNowAsksTheAssistant(page: Page): Promise<void> {
   await shown(page).locator('[data-testid=flow-editor-run]').click();
   await confirmDialog(page, 'Run it now?');
-  await expect(page.locator('ion-toast').filter({ hasText: 'the assistant is on it' }).last()).toBeVisible();
+  await expect(toastSaying(page, 'the assistant is on it')).toBeVisible();
 }
 
 /** The owner's yes to `question`, a card of «Waiting for your answer»: the automation carries on and the card leaves. */
 export async function approve(page: Page, question: Locator): Promise<void> {
   await question.locator('[data-testid^=flow-question-yes-]').click();
-  await expect(page.locator('ion-toast').filter({ hasText: 'Approved: the automation carries on.' }).last()).toBeVisible();
+  await expect(toastSaying(page, 'Approved: the automation carries on.')).toBeVisible();
   await expect(question).toHaveCount(0);
 }
 

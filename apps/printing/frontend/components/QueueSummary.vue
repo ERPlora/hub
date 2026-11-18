@@ -8,7 +8,7 @@
 // Nothing waiting, sent unconfirmed or failed: «All clear». Live: every job that changes re-runs it; the ages and the
 // alert move on by themselves every 30 s (`useNow`). «Device off» moves with the clock on the server (a job reaching
 // its minute, a device quiet for 90 s) with no event: while something waits and the page is in sight, the summary is
-// read once again every 30 s, the bell's pace (HubBell.vue), without reopening the stream; a reading older than a live
+// read once again every 30 s, the bell’s pace (base/frontend/lib/bell-counters.ts), without reopening the stream; a reading older than a live
 // result that came meanwhile is dropped, and one that fails keeps the last. A failed read says so, with «Retry», and
 // never «All clear».
 import { InlineFeedback, StatusPill } from '@erplora/ui/components';

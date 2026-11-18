@@ -74,7 +74,7 @@ async function save(): Promise<void> {
     return; // the form paints the refusal.
   }
   open.value = false;
-  void toastSuccess(t(props.group ? 'customer.groups.updated' : 'customer.groups.created'));
+  toastSuccess(t(props.group ? 'customer.groups.updated' : 'customer.groups.created'));
 }
 
 const canDismiss = useUnsavedFormOnOpen('customer-group-form', () => ({ name: name.value, description: description.value, color: color.value, order: order.value, active: active.value }), open);

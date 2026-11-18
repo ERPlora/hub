@@ -76,7 +76,7 @@ async function confirm(): Promise<void> {
     return; // The window shows `command.error`.
   }
   const key = type.value === 'in' ? 'cash_register.movement.doneIn' : 'cash_register.movement.doneOut';
-  void toastSuccess(t(key, { amount: formatMoney(cents, locale.value, money) }));
+  toastSuccess(t(key, { amount: formatMoney(cents, locale.value, money) }));
   open.value = false;
 }
 

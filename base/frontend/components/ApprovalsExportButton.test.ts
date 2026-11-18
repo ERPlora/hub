@@ -11,7 +11,7 @@ const mocks = vi.hoisted(() => ({ saveFile: vi.fn(async () => true) }));
 vi.mock('../lib/download', () => ({ saveFile: mocks.saveFile }));
 vi.mock('@erplora/ui/shell', async (importOriginal) => ({
   ...((await importOriginal()) as object),
-  toastError: vi.fn(() => Promise.resolve()),
+  toastError: vi.fn(),
 }));
 
 beforeEach(() => {

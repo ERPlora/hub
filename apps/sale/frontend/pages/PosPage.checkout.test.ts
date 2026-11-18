@@ -22,9 +22,10 @@ vi.mock('@ionic/vue', async (importOriginal) => {
 });
 vi.mock('@erplora/ui/shell', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@erplora/ui/shell')>()),
-  toast: vi.fn(() => Promise.resolve()),
-  toastError: vi.fn(() => Promise.resolve()),
-  toastSuccess: vi.fn(() => Promise.resolve()),
+  toast: vi.fn(),
+  toastWarning: vi.fn(),
+  toastError: vi.fn(),
+  toastSuccess: vi.fn(),
 }));
 vi.mock('../../../customer/frontend/components/CustomerSearch.vue', async () => {
   const { h } = await import('vue');

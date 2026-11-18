@@ -12,6 +12,7 @@ import { type BrowserContext, expect, type Locator, type Page, test } from '@pla
 import { A, api, capture, login, psql, shown, untilStill } from './helpers';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
 import { cleanSales, drawerOff, restoreDrawer, stamp } from './sale-helpers';
+import { toastSaying } from './toast-helpers';
 
 const RUN = stamp();
 const SKU = `E2E-KMO-${RUN}`;
@@ -169,7 +170,7 @@ test('KITCHEN-F06 y KITCHEN-F07: the round sent from the till reaches the displa
   // SALE-F20: «Current order» → «Send».
   await shown(page).locator('[data-testid=pos-cart-tab-round]').click();
   await shown(page).locator('[data-testid=pos-kitchen-send]').click();
-  await expect(page.locator('ion-toast').filter({ hasText: /Order \d+ sent to the kitchen\./ })).toBeVisible();
+  await expect(toastSaying(page, /Order \d+ sent to the kitchen\./)).toBeVisible();
 
   // The kitchen display, every station: the burger with «+CHEESE» under it; the menu's header with its two dishes.
   await page.goto('/kitchen/display');

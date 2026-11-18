@@ -40,7 +40,7 @@ vi.mock('@ionic/vue', async (importOriginal) => {
 });
 vi.mock('@erplora/ui/shell', async (importOriginal) => ({
   ...((await importOriginal()) as object),
-  toastSuccess: vi.fn(() => Promise.resolve()),
+  toastSuccess: vi.fn(),
 }));
 
 const row = (id: string, name: string, extra: Record<string, unknown> = {}) => ({

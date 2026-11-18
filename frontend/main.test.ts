@@ -116,9 +116,9 @@ describe('main.ts', () => {
     expect(importBoot.home).toBe(true);
   });
 
-  it("plugs base's pieces into the chrome: the assistant and the bell in the topbar, «Upgrade plan» and «Manage on erplora.com» at the menu's foot, the blocking strip, and the device's notices and the assistant's panel beside the pane", async () => {
+  it("plugs base's pieces into the chrome: the assistant in the topbar, «Upgrade plan» and «Manage on erplora.com» at the menu's foot, and the device's notices and the assistant's panel beside the pane", async () => {
     const chrome = importBoot.chrome as Record<string, unknown>;
-    expect(Object.keys(chrome).sort()).toEqual(['background', 'notice', 'sidebarFooter', 'topbar']);
+    expect(Object.keys(chrome).sort()).toEqual(['background', 'sidebarFooter', 'topbar']);
     for (const piece of Object.values(chrome)) expect(piece).toBeTruthy();
     // Loaded on demand; what each one loads.
     const loaded = async (piece: unknown) =>

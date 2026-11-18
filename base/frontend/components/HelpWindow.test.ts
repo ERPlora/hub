@@ -48,7 +48,7 @@ describe('HelpWindow', () => {
     expect(m.el('help-content')?.getAttribute('lang')).toBe('en');
   });
 
-  it('puts the app mark in the newest dialog when the window reopens', async () => {
+  it('puts the app icon before a left-aligned title in the newest dialog', async () => {
     const m = await setup();
     await m.wrapper.setProps({ open: false });
     await flush();
@@ -56,7 +56,10 @@ describe('HelpWindow', () => {
     await flush();
     const dialogs = [...document.querySelectorAll('[data-testid="help-window"]')];
     const newest = dialogs.at(-1);
-    expect(newest?.querySelector('.ep-form-modal__title .help-window__app-icon')).not.toBeNull();
+    const title = newest?.querySelector('.help-window__title-content');
+    expect(title?.getAttribute('aria-hidden')).toBe('true');
+    expect(title?.firstElementChild?.classList.contains('help-window__app-icon')).toBe(true);
+    expect(title?.querySelector('.help-window__title-text')?.textContent).toBe('Help · Tables');
   });
 
   it('shows a loading skeleton while the operation is pending', async () => {

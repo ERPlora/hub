@@ -1,7 +1,8 @@
 <script setup lang="ts">
-// Base's piece at the end of the topbar. On a phone (under 640 px) only the assistant folds into «More options»: help
-// and the bell stay visible. The assistant's panel opens once the menu has closed, so its focus trap cannot take the
-// keyboard back from the composer.
+// base's piece at the end of the topbar (`createShell({ chrome: { topbar } })`), before the shell's bell. On a phone
+// (under 768 px) the assistant folds into «More options»: the shell keeps the title centred with two buttons a side,
+// and a third one would push it. The assistant's panel opens only once the menu has closed, so what is typed at once
+// goes to its box.
 import { AssistantButton, useAssistant } from '@erplora/ui/components';
 import { HubIcon, useSession } from '@erplora/ui/shell';
 import { IonButton, IonItem, IonLabel, IonList, IonPopover } from '@ionic/vue';
@@ -9,9 +10,9 @@ import { computed, onBeforeUnmount, ref } from 'vue';
 
 import { useBaseI18n } from '../lib/i18n';
 import HelpEntry from './HelpEntry.vue';
-import HubBell from './HubBell.vue';
 
-const COMPACT = '(max-width: 639px)';
+const COMPACT = '(max-width: 767px)';
+
 const { t } = useBaseI18n();
 const session = useSession();
 const assistant = useAssistant();
@@ -41,6 +42,9 @@ function openMore(event: Event): void {
   open.value = true;
 }
 
+/** «Assistant» was picked: the panel opens once Ionic has dismissed the menu. While the menu plays its way out its
+ *  focus trap pulls the keyboard back into it, so a box opened then lost the focus to a row and the Enter written in
+ *  it chose that row again (hub#1121). */
 let assistantOnClose = false;
 
 function openAssistant(): void {
@@ -96,5 +100,4 @@ function onDismissed(): void {
       </ion-list>
     </ion-popover>
   </template>
-  <HubBell />
 </template>

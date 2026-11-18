@@ -1,8 +1,8 @@
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
-import { A, capture, login, settled, turnOffTurnedOn, turnOnMissing } from './helpers';
+import { A, capture, settled, signedInSpanish, turnOffTurnedOn, turnOnMissing } from './helpers';
 
 const SIZES = [
   { label: '390', width: 390, height: 844 },
@@ -21,6 +21,18 @@ const assistantTurns: string[] = [];
 
 const modal = () => page.locator('ion-modal[data-testid="help-window"]').last();
 const content = () => page.locator('[data-testid="help-content"]');
+const search = () => page.getByTestId('help-flow-search');
+const flowHeading = () => page.locator('[data-help-section="flows"] > h3');
+
+async function snap(name: string): Promise<void> {
+  const png = await capture(page, name);
+  writeFileSync(`${SHOTS}/${name}.png`, png);
+}
+
+async function theme(dark: boolean): Promise<void> {
+  await page.evaluate((enabled) => document.documentElement.classList.toggle('ion-palette-dark', enabled), dark);
+  await settled(page);
+}
 
 async function openHelp(): Promise<void> {
   await page.getByTestId('help-button').click();
@@ -43,9 +55,9 @@ async function atTables(): Promise<void> {
 test.describe.configure({ mode: 'serial' });
 
 test.beforeAll(async ({ browser }) => {
+  rmSync(SHOTS, { recursive: true, force: true });
   mkdirSync(SHOTS, { recursive: true });
-  context = await browser.newContext({ baseURL: A, viewport: { width: 1440, height: 900 }, locale: 'en-US' });
-  page = await context.newPage();
+  ({ context, page } = await signedInSpanish(browser, { width: 1440, height: 900 }, '/table/floor-plan'));
   page.on('request', (request) => {
     const url = new URL(request.url());
     if (url.hostname.includes('youtube') || url.hostname.includes('ytimg')) googleRequests.push(request.url());
@@ -62,7 +74,6 @@ test.beforeAll(async ({ browser }) => {
       target.helpCsp.push(`${event.violatedDirective} ${event.blockedURI}`);
     });
   });
-  await login(page, A, '/table/floor-plan');
   await turnOnMissing(context, A, ['table'], turnedOn);
   await atTables();
 });
@@ -74,49 +85,78 @@ test.afterAll(async () => {
   }
 });
 
-test('the entry is contextual, the current screen leads, and the window fits all sizes in light and dark', async () => {
+test('Spanish progressive disclosure and every capture at three sizes in light and dark', async () => {
   await openHelp();
-  await expect(page.getByTestId('help-current-screen')).toContainText('On this screen · Floor plan');
-  await expect(page.getByTestId('help-current-screen')).toContainText('You are here');
-  await expect(page.locator('[data-help-section="purpose"]')).toBeInViewport();
-  await expect(page.getByTestId('help-current-screen')).toBeInViewport();
-  await expect(page.locator('.help-flow-group__title').first()).toHaveText('Floor plan');
+  await expect(page.getByTestId('help-current-screen')).toContainText('En esta pantalla · Plano de sala');
+  await expect(page.getByTestId('help-current-screen')).toContainText('Estás aquí');
+  await expect(page.getByTestId('help-summary-purpose-toggle')).toHaveText('Ver más');
+  await expect(page.getByTestId('help-summary-current-toggle')).toHaveText('Ver más');
   await expect(page.locator('[data-help-section="video"]')).toHaveCount(0);
-  await expect(content()).toHaveAttribute('lang', 'en');
+  await expect(content()).toHaveAttribute('lang', 'es');
 
   for (const size of SIZES) {
-    await page.setViewportSize({ width: size.width, height: size.height });
-    await settled(page);
-    await expect(content()).toBeVisible();
-    const light = await capture(page, `help-window-${size.label}-light`);
-    writeFileSync(`${SHOTS}/help-window-${size.label}-light.png`, light);
-    await page.evaluate(() => document.documentElement.classList.add('ion-palette-dark'));
-    await settled(page);
-    const dark = await capture(page, `help-window-${size.label}-dark`);
-    writeFileSync(`${SHOTS}/help-window-${size.label}-dark.png`, dark);
-    await page.evaluate(() => document.documentElement.classList.remove('ion-palette-dark'));
+    for (const dark of [false, true]) {
+      const mode = dark ? 'dark' : 'light';
+      await closeHelp();
+      await page.setViewportSize({ width: size.width, height: size.height });
+      await theme(dark);
+      await openHelp();
+      await snap(`help-window-${size.label}-${mode}-open`);
+
+      if (size.width >= 834) {
+        await expect(page.locator('[data-help-section="purpose"]')).toBeInViewport();
+        await expect(page.getByTestId('help-current-screen')).toBeInViewport();
+        await expect(flowHeading()).toBeInViewport();
+        await expect(search()).toBeInViewport();
+      }
+
+      await search().scrollIntoViewIfNeeded();
+      const first = page.locator('.help-flow-header').first();
+      await first.click();
+      await expect(first).toHaveAttribute('aria-expanded', 'true');
+      await snap(`help-window-${size.label}-${mode}-flow`);
+
+      await search().locator('input').fill('comensales');
+      await expect(page.locator('.help-flow-header').first()).toBeVisible();
+      await snap(`help-window-${size.label}-${mode}-search-match`);
+
+      await search().locator('input').fill('ninguna-tarea-dice-esto');
+      await expect(page.getByTestId('help-flow-empty')).toContainText('Nada coincide con tu búsqueda');
+      await snap(`help-window-${size.label}-${mode}-search-empty`);
+    }
   }
 
-  await page.setViewportSize({ width: 390, height: 844 });
-  await expect(modal()).toHaveAttribute('data-phone-layout', 'sheet');
   await closeHelp();
-  await expect(page.getByTestId('help-button')).toBeVisible();
-  await expect(page.getByTestId('hub-bell')).toBeVisible();
-  await expect(page.getByTestId('topbar-chrome-more')).toBeVisible();
-  await expect(page.getByTestId('assistant-button')).toHaveCount(0);
+  await page.setViewportSize({ width: 390, height: 844 });
+  for (const dark of [false, true]) {
+    const mode = dark ? 'dark' : 'light';
+    await theme(dark);
+    await expect(page.getByTestId('help-button')).toBeVisible();
+    await expect(page.getByTestId('action-bell')).toBeVisible();
+    await expect(page.getByTestId('topbar-chrome-more')).toBeVisible();
+    await expect(page.getByTestId('assistant-button')).toHaveCount(0);
+    await expect(page.locator('ion-header.app-topbar ion-title').last()).toBeVisible();
+    await snap(`help-phone-header-390-${mode}`);
+  }
 
-  const title = page.locator('ion-header.app-topbar ion-title').last();
-  const titleLayout = await title.evaluate((element) => {
-    element.textContent = 'An extremely long restaurant module name that must stay on one line';
-    const box = element.getBoundingClientRect();
-    const inner = element.shadowRoot?.querySelector('.toolbar-title') ?? element;
-    const style = getComputedStyle(inner);
-    return { right: box.right, width: box.width, whiteSpace: style.whiteSpace, overflow: style.textOverflow };
+  await theme(false);
+  await openHelp();
+  const layout = await page.locator('.help-window__title-content').evaluate((element) => {
+    const text = element.querySelector<HTMLElement>('.help-window__title-text')!;
+    text.textContent = 'Ayuda · Un nombre de módulo de restaurante extremadamente largo';
+    const iconBox = element.querySelector('.help-window__app-icon')!.getBoundingClientRect();
+    const textBox = text.getBoundingClientRect();
+    const titleBox = element.closest('ion-title')!.getBoundingClientRect();
+    const style = getComputedStyle(text);
+    return { iconRight: iconBox.right, textLeft: textBox.left, left: element.getBoundingClientRect().left, titleLeft: titleBox.left, width: text.clientWidth, scrollWidth: text.scrollWidth, whiteSpace: style.whiteSpace, overflow: style.textOverflow };
   });
-  expect(titleLayout.right).toBeLessThanOrEqual(390);
-  expect(titleLayout.width).toBeGreaterThan(0);
-  expect(titleLayout.whiteSpace).toBe('nowrap');
-  expect(titleLayout.overflow).toBe('ellipsis');
+  expect(layout.iconRight).toBeLessThanOrEqual(layout.textLeft);
+  expect(layout.left - layout.titleLeft).toBeGreaterThanOrEqual(0);
+  expect(layout.left - layout.titleLeft).toBeLessThanOrEqual(4);
+  expect(layout.scrollWidth).toBeGreaterThan(layout.width);
+  expect(layout.whiteSpace).toBe('nowrap');
+  expect(layout.overflow).toBe('ellipsis');
+  await closeHelp();
 
   await page.goto(`${A}/demo/items`);
   await expect(page.getByTestId('help-button')).toHaveCount(0);
@@ -129,12 +169,11 @@ test('a flow expands, search filters and clears, and the assistant receives only
   const headers = page.locator('.help-flow-header');
   const total = await headers.count();
   expect(total).toBeGreaterThan(8);
-  const search = page.getByTestId('help-flow-search');
-  await expect(search).toBeVisible();
-  await search.locator('input').fill('guest');
+  await expect(search()).toBeVisible();
+  await search().locator('input').fill('comensales');
   await expect(headers).not.toHaveCount(total);
-  await search.locator('input').fill('no-such-help-task-anywhere');
-  await expect(page.getByTestId('help-flow-empty')).toContainText('Nothing matches your search');
+  await search().locator('input').fill('ninguna-tarea-dice-esto');
+  await expect(page.getByTestId('help-flow-empty')).toContainText('Nada coincide con tu búsqueda');
   await page.getByTestId('help-flow-clear').click();
   await expect(headers).toHaveCount(total);
 
@@ -146,7 +185,7 @@ test('a flow expands, search filters and clears, and the assistant receives only
   await page.getByTestId('help-ask-assistant').click();
   await expect(modal()).toBeHidden();
   await expect(page.getByTestId('assistant-panel')).toHaveAttribute('data-open', 'true');
-  await expect(page.getByTestId('assistant-input').locator('textarea')).toHaveValue(`How do I do this: ${flowTitle}?`);
+  await expect(page.getByTestId('assistant-input').locator('textarea')).toHaveValue(`¿Cómo hago esto: ${flowTitle}?`);
   expect(assistantTurns).toHaveLength(turnsBefore);
   await expect(page.getByTestId('assistant-thread')).not.toContainText(flowTitle);
   await page.getByTestId('assistant-close').click();
@@ -157,7 +196,7 @@ test('an aborted help request shows the error and retry loads the same window', 
   await page.route('**/api/help?app=table', (route) => route.abort('failed'));
   await page.reload();
   await page.getByTestId('help-button').click();
-  await expect(page.getByTestId('help-error')).toContainText('Could not load the help.');
+  await expect(page.getByTestId('help-error')).toContainText('No se ha podido cargar la ayuda.');
   await page.unroute('**/api/help?app=table');
   await page.getByTestId('help-retry').click();
   await expect(content()).toBeVisible();
@@ -174,8 +213,8 @@ test('with the browser offline a reopening reads the cached text immediately', a
   await context.setOffline(true);
   try {
     await openHelp();
-    await expect(content()).toHaveAttribute('lang', 'en');
-    await expect(page.getByTestId('help-current-screen')).toContainText('Floor plan');
+    await expect(content()).toHaveAttribute('lang', 'es');
+    await expect(page.getByTestId('help-current-screen')).toContainText('Plano de sala');
     await expect(page.getByTestId('help-error')).toHaveCount(0);
     await closeHelp();
   } finally {

@@ -24,7 +24,7 @@ const Printing = defineComponent({
     usePrintHost(printers, {
       onDrawerFailed(job) {
         const name = mine.value?.printers.find((printer) => printer.id === job.printerId)?.name;
-        void toastError(name ? t('printing.host.drawerFailed', { printer: name }) : t('printing.host.drawerFailedUnnamed'));
+        toastError(name ? t('printing.host.drawerFailed', { printer: name }) : t('printing.host.drawerFailedUnnamed'));
       },
     });
     return () => null;

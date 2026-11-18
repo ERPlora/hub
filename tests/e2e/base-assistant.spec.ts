@@ -63,7 +63,7 @@ async function decide(page: Page, button: 'submit' | 'cancel'): Promise<void> {
   await expect(card(page)).toBeHidden();
 }
 
-/** The topbar's way to the assistant: the sparkles, or on a phone «More options» (the sparkles folded with the bell). */
+/** The topbar's way to the assistant: the sparkles, or on a phone «More options», which carries them. */
 const opener = (page: Page): Locator =>
   shown(page).locator(compactBar(page) ? '[data-testid="topbar-chrome-more"]' : '[data-testid="assistant-button"]');
 
@@ -250,12 +250,12 @@ test('the sparkles open the panel on the right (on a phone, from «More options�
     await page.setViewportSize({ width: vp.width, height: vp.height });
     await home(page);
     if (vp.width < 768) {
-      // As in the old hub: the sparkles and the bell folded into one «More options», so the title stays centred.
+      // The sparkles folded into «More options», so the title stays centred; the bell stays on the bar.
       await expect(shown(page).locator('[data-testid="assistant-button"]')).toHaveCount(0);
-      await expect(shown(page).locator('[data-testid="hub-bell"]')).toHaveCount(0);
+      await expect(shown(page).locator('[data-testid="action-bell"]')).toBeVisible();
       await opener(page).click();
       await expect(page.locator('ion-popover [data-testid="topbar-chrome-more-assistant"]')).toHaveText('Assistant');
-      await expect(page.locator('ion-popover [data-testid="topbar-chrome-more-bell"] ion-label')).toHaveText('Notifications');
+      await expect(page.locator('ion-popover ion-item[data-testid^="topbar-chrome-more-"]')).toHaveCount(1);
       await untilStill(page);
       await page.screenshot({ path: shot(`APP-BASE-9-BASE-G110-more-${vp.label}`) });
       await page.keyboard.press('Escape');
@@ -338,7 +338,7 @@ test('hub-e2e-open-panel — on a phone the panel takes a question with Enter as
   await page.locator('ion-popover [data-testid="topbar-chrome-more-assistant"]').click();
   await ask(page, 'Hola');
   await expect(lastAnswer(page)).toHaveText(GREETING.en);
-  // Nothing of the menu caught the keys: neither the menu nor the bell's list is left on screen.
+  // Nothing of the menu caught the keys: no menu is left on screen.
   await expect(page.locator('ion-popover:not(.overlay-hidden)')).toHaveCount(0);
 });
 
@@ -1098,7 +1098,7 @@ test('«Report a problem» sends the answer with its question and a reason', asy
   // flow: BASE-F105 (hub#870) — the «Hola» turn brought no pages of the web: the Hub closes it saying so
   // (`done.web`) and the chat sends it with the report, so erplora.com's support reads the answer even with its search on.
   expect(answered.request().postDataJSON()).toMatchObject({ reason: 'harmful', question: 'Hola', web: false });
-  await expect(page.locator('ion-toast')).toContainText('Thank you, we have received your report.');
+  await expect(page.getByTestId('toast').filter({ hasText: 'Thank you, we have received your report.' }).first()).toBeVisible();
   await expect(dialog).toBeHidden();
 });
 

@@ -2,8 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { createAssistant, installAssistant, useAssistant } from '@erplora/ui/components';
 
-import type { BellCounter } from '../operations';
-import { accessibleName, flush, memoryStorage, mountBase } from '../__tests__/mount-base';
+import { accessibleName, flush, memoryStorage, mountBase, OWNER } from '../__tests__/mount-base';
 import BackgroundChrome from './BackgroundChrome.vue';
 import TopbarChrome from './TopbarChrome.vue';
 
@@ -33,10 +32,12 @@ function embedHome(manageUrl: string): void {
 }
 
 describe('the chrome of base', () => {
-  it('the topbar: the assistant, then the bell', async () => {
-    const { wrapper } = await mountBase(TopbarChrome);
-    const order = [...wrapper.element.parentElement!.querySelectorAll('[data-testid="assistant-button"], [data-testid="hub-bell"]')];
-    expect(order.map((element) => element.getAttribute('data-testid'))).toEqual(['assistant-button', 'hub-bell']);
+  // The bell is the shell's own (`createShell({ actionNotices })`), after this piece in the bar.
+  it('the topbar: the assistant and no bell of its own, nor a live query of the bell', async () => {
+    const m = await mountBase(TopbarChrome);
+    expect(m.wrapper.find('[data-testid="assistant-button"]').exists()).toBe(true);
+    expect(m.wrapper.find('[data-testid="topbar-chrome-more"]').exists()).toBe(false);
+    expect(m.client.stream.subscriptions('base.bell.counters')).toEqual([]);
   });
 
   // The way to this business on erplora.com is at the side menu's foot, under «Upgrade plan» (ManageLink.test.ts).
@@ -72,15 +73,12 @@ describe('the chrome of base', () => {
   });
 });
 
-describe('the topbar on a phone (under 640 px): the bell stays beside «More options»', () => {
-  const counter = (count: number): BellCounter => ({
-    key: 'base.failed_events', app: 'base', count, route: '/system#events', label: 'Failed events', icon: 'ion:warning-outline',
-  });
+describe('the topbar on a phone (under 768 px): «More options» holds the assistant', () => {
   const inDoc = (id: string) => document.querySelector<HTMLElement>(`[data-testid="${id}"]`);
 
   beforeEach(() => {
     vi.stubGlobal('matchMedia', (query: string) => ({
-      matches: query === '(max-width: 639px)', addEventListener() {}, removeEventListener() {},
+      matches: query === '(max-width: 767px)', addEventListener() {}, removeEventListener() {},
     }));
   });
 
@@ -88,35 +86,27 @@ describe('the topbar on a phone (under 640 px): the bell stays beside «More opt
     vi.unstubAllGlobals();
   });
 
-  it('folds only the assistant and keeps the bell and its count visible', async () => {
+  it('folds the sparkles into one button with no count: the bell stays in the bar, the shell’s', async () => {
     const m = await mountBase(TopbarChrome, { locale: 'es' });
-    await m.result(await m.live(), 'base.bell.counters', { counters: [counter(2)] });
     expect(m.wrapper.find('[data-testid="assistant-button"]').exists()).toBe(false);
-    expect(m.wrapper.find('[data-testid="hub-bell"]').exists()).toBe(true);
     const more = m.wrapper.get('[data-testid="topbar-chrome-more"]');
     expect(accessibleName(more.element)).toBe('Más opciones');
-    expect(m.wrapper.get('[data-testid="hub-bell-badge"]').text()).toBe('2');
-    expect(m.wrapper.find('[data-testid="topbar-chrome-more-badge"]').exists()).toBe(false);
+    expect(more.find('ion-badge').exists()).toBe(false);
+    expect(m.client.stream.subscriptions('base.bell.counters')).toEqual([]);
   });
 
-  it('«Assistant» opens from the menu; the bell opens directly from the bar', async () => {
+  it('«Assistant» opens the panel and closes the menu', async () => {
     const m = await mountBase(TopbarChrome);
-    await m.result(await m.live(), 'base.bell.counters', { counters: [counter(3)] });
     await m.wrapper.get('[data-testid="topbar-chrome-more"]').trigger('click');
     await flush();
     expect(inDoc('topbar-chrome-more-assistant')?.textContent?.trim()).toBe('Assistant');
-    expect(inDoc('topbar-chrome-more-bell')).toBeNull();
     inDoc('topbar-chrome-more-assistant')!.click();
     await flush();
     expect(useAssistant().state.open).toBe(true);
     expect(inDoc('topbar-chrome-more-assistant')).toBeNull();
-
-    await m.wrapper.get('[data-testid="hub-bell"]').trigger('click');
-    await flush();
-    expect([...document.querySelectorAll('[data-testid="hub-bell-row"]')]).toHaveLength(1);
   });
 
-  it('«More options» has only the assistant, and no «erplora.com»', async () => {
+  it('«More options» has only the assistant, and no «erplora.com» (it is at the side menu’s foot)', async () => {
     embedHome(MANAGE);
     const m = await mountBase(TopbarChrome, { locale: 'es' });
     await m.wrapper.get('[data-testid="topbar-chrome-more"]').trigger('click');
@@ -124,5 +114,10 @@ describe('the topbar on a phone (under 640 px): the bell stays beside «More opt
     const rows = [...document.querySelectorAll('[data-testid^="topbar-chrome-more-"]')].filter((row) => row.tagName === 'ION-ITEM');
     expect(rows.map((row) => row.getAttribute('data-testid'))).toEqual(['topbar-chrome-more-assistant']);
     expect(document.querySelector(`[href="${MANAGE}"]`)).toBeNull();
+  });
+
+  it('without the assistant there is nothing to fold: no «More options»', async () => {
+    const m = await mountBase(TopbarChrome, { session: { ...OWNER, permissions: [] } });
+    expect(m.wrapper.find('[data-testid="topbar-chrome-more"]').exists()).toBe(false);
   });
 });

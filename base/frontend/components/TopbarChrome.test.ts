@@ -73,7 +73,7 @@ async function openMenu(m: Awaited<ReturnType<typeof mountBase>>): Promise<void>
 beforeEach(() => {
   installAssistant(createAssistant({ storage: memoryStorage(), openStorage: memoryStorage(), post: async () => undefined }));
   vi.stubGlobal('matchMedia', (query: string) => ({
-    matches: query === '(max-width: 639px)', addEventListener() {}, removeEventListener() {},
+    matches: query === '(max-width: 767px)', addEventListener() {}, removeEventListener() {},
   }));
 });
 

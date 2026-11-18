@@ -2,16 +2,19 @@
 // VeriFactu is Spanish law, so «Configura VeriFactu» is only for a business in Spain. With `a` filing in production and
 // ERPlora's authorisation revoked (the step a ⛔ wall: the case that shows most), erplora.com registers `a`'s business
 // in Poland: the owner's Home has no «Configura VeriFactu» in «Termina de configurar tu negocio», not even under «Ver
-// todo», counts one step fewer, and the strip «Todavía no puedes facturar» does not name it. Registered in Spain, or
-// with no country (a demo, ERPlora's own hub: ERPlora's market, Spain), the step is there with «Necesario para
-// facturar» and the strip names it. In 375, 768 and 1440, with the captures `<KEY>-<PL|ES|none>-<width>` of the Home.
+// todo», counts one step fewer, and the action center's «Todavía no puedes facturar» does not name it. Registered in
+// Spain, or with no country (a demo, ERPlora's own hub: ERPlora's market, Spain), the step is there with «Necesario
+// para facturar» and that notice names it. In 375, 768 and 1440, with the captures `<KEY>-<PL|ES|none>-<width>` of the
+// Home.
 // The registration and the photo are sent the way the SaaS sends them (`verifactu-helpers.ts`); production is the
 // configuration's environment, set in the database for the run (nothing is sent). What the run changes in `a`'s
 // registration, its photo and VeriFactu's configuration is put back after it.
-import { expect, type Page, test } from '@playwright/test';
+import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
+import { bellSays, bellTotal, featureNotice, noticeIn, openActionCenter } from './action-center';
 import {
   A,
+  api,
   capture,
   horizontalOverflow,
   registerBusinessIn,
@@ -26,6 +29,7 @@ import { keepVerifactu, putVerifactuBack, revokedIn } from './verifactu-helpers'
 const KEY = 'FIX-HUB-HOME-VERIFACTU-STEP-ONLY-IN-SPAIN';
 const STEP = 'verifactu.sending_route';
 const TITLE = 'Configura VeriFactu';
+const BLOCKING = 'Todavía no puedes facturar';
 const SIZES = [
   { label: '375', width: 375, height: 667 },
   { label: '768', width: 768, height: 1024 },
@@ -75,6 +79,23 @@ async function unfolded(page: Page): Promise<void> {
   }
 }
 
+/** Whether the action center's «Todavía no puedes facturar» names VeriFactu's wall in its sentence. With no ⛔ pending
+ *  the notice is not there at all; another ⛔ (the business's tax details, while the hub has no issuer) keeps it
+ *  without the step. */
+async function wallNamed(page: Page, context: BrowserContext): Promise<boolean> {
+  const setup = await api<{ blocking_pending: number }>(context, A, 'GET', '/home/setup');
+  expect(setup.status).toBe(200);
+  await bellSays(page, await bellTotal(context));
+  if (setup.data.blocking_pending === 0) {
+    const panel = await openActionCenter(page);
+    await expect(panel.locator('[data-testid=action-panel-loading]')).toHaveCount(0);
+    await expect(noticeIn(panel, BLOCKING)).toHaveCount(0);
+    return false;
+  }
+  const featured = await featureNotice(page, BLOCKING);
+  return ((await featured.locator('.action-featured__body').textContent()) ?? '').includes(TITLE);
+}
+
 for (const size of SIZES) {
   test(`BASE-F01 VERIFACTU-F01 hub#682 at ${size.label}: «Configura VeriFactu» and its wall only for a business in Spain or without a country`, async ({ browser }) => {
     const totals: Record<string, number> = {};
@@ -100,11 +121,8 @@ for (const size of SIZES) {
           await expect(checklist(page).getByText(TITLE)).toHaveCount(0);
         }
 
-        // Over the other screens the strip names the wall only where the step is for the business.
-        await page.goto(`${A}/#actividad`);
-        await expect(testid(page, 'home-activity-loading')).toHaveCount(0);
-        const named = testid(page, 'blocking-strip').locator('[data-testid="blocking-item"]').filter({ hasText: TITLE });
-        await expect(named).toHaveCount(told ? 1 : 0);
+        // The action center's «Todavía no puedes facturar» names the wall only where the step is for the business.
+        expect(await wallNamed(page, context), `VeriFactu's wall named in the action center, ${label}`).toBe(told);
       } finally {
         await context.close();
       }

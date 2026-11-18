@@ -113,10 +113,16 @@ function go(path: string): void {
       v-if="titleElement"
       :to="titleElement"
     >
-      <HubIcon
-        class="help-window__app-icon"
-        :name="icon"
-      />
+      <span
+        class="help-window__title-content"
+        aria-hidden="true"
+      >
+        <HubIcon
+          class="help-window__app-icon"
+          :name="icon"
+        />
+        <span class="help-window__title-text">{{ title }}</span>
+      </span>
     </Teleport>
     <div
       v-if="loading"
@@ -212,19 +218,35 @@ function go(path: string): void {
 
 <style>
 ion-modal.help-window .ep-form-modal__title {
+  display: block;
+  font-size: 0;
+  text-align: start;
+}
+.help-window__title-content {
   display: flex;
   align-items: center;
   gap: 10px;
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  color: var(--ion-text-color);
+  font-size: 1rem;
+  line-height: 1.25;
+}
+.help-window__title-text {
+  min-width: 0;
+  overflow: hidden;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .help-window__app-icon {
   flex: none;
   box-sizing: border-box;
   width: 36px;
   height: 36px;
-  margin-inline-start: 8px;
   padding: 8px;
   border-radius: 12px;
-  vertical-align: middle;
   color: var(--ion-color-primary-shade);
   background: color-mix(in srgb, var(--ion-color-primary) 10%, transparent);
   font-size: 20px;

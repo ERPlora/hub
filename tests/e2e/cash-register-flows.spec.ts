@@ -536,7 +536,7 @@ test('CASH_REGISTER-F16: «Print» sends the Z report to the receipt printer; wi
   await page.goto(`${A}/cash_register/sessions/${id}`);
   await detailReady(page);
   await shown(page).locator('[data-testid=cash-register-detail-print]').click();
-  await expect(page.locator('ion-toast').filter({ hasText: /Report sent to the|Informe enviado a la/ }).first()).toBeVisible();
+  await expect(page.getByTestId('toast').filter({ hasText: /Report sent to the|Informe enviado a la/ }).first()).toBeVisible();
   const jobs = await api<{ rows: { document_type: string; reference: string; usage: string }[] }>(context, A, 'GET', '/printing/jobs?limit=50');
   expect(jobs.data.rows.filter((job) => job.reference === number).map((job) => [job.document_type, job.usage])).toEqual([['cash_session_report', 'receipt']]);
   await flowShots(page, 'CASH_REGISTER-F16', detailReady);

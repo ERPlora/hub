@@ -107,6 +107,16 @@ def manual(lines=None, **more):
     return run("invoice.invoice.create", data)
 
 
+def ticket(scope: Scope = A):
+    """A one-line ticket issued in the business of ``scope`` through Invoicing's own operation."""
+    lines = [{"description": "Cut", "quantity": "1", "unit_price": 1000, "tax_rate": "21"}]
+    return run("invoice.invoice.create", {"lines": lines, "series_code": "TICKET"}, ctx_for(scope=scope))
+
+
+def codes(waits) -> set[str]:
+    return {wait.code for wait in waits}
+
+
 def business_in(country: str, slug: str = A.key) -> None:
     """The country erplora.com registered for the business of ``slug`` (``PUT /internal/hubs/{id}``)."""
     from base.models import Hub  # the models are not loaded yet when this module is

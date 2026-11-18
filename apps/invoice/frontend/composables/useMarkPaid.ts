@@ -49,7 +49,7 @@ export function useMarkPaid(): MarkPaid {
     } finally {
       pending.value = null;
     }
-    void toastSuccess(t('invoice.markPaid.done', { number: invoice.number }));
+    toastSuccess(t('invoice.markPaid.done', { number: invoice.number }));
     return true;
   }
 

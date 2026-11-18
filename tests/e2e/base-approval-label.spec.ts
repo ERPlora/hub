@@ -16,6 +16,7 @@ import { type BrowserContext, expect, type Locator, type Page, test } from '@pla
 import { type Provider, startProvider } from './assistant-provider';
 import { A, api, compactBar, createItem, EMPLOYEE, login, OWNER, psql, REPO_DIR, shot, shown, untilStill, usernamesOf } from './helpers';
 import { STACK } from './stack';
+import { toastSaying } from './toast-helpers';
 
 const KEY = 'FIX-HUB-BASE-APPROVAL-LABEL-WITHOUT-DISCOUNT-FIGURE';
 const OWNER_PIN = '2580';
@@ -148,7 +149,7 @@ test('BASE-F84: the dialog says the figures of the very line it approves, and a 
   await expect(dialog.getByTestId('pinpad')).toBeVisible();
   const name = (await dialog.getByTestId('pin-door-chosen').locator('.pin-door__name').innerText()).trim();
   for (const digit of OWNER_PIN) await dialog.getByTestId(`pinpad-key-${digit}`).click();
-  await expect(page.locator('ion-toast').filter({ hasText: new RegExp(`Aprobado por ${escaped(name)}`) }).first()).toBeVisible();
+  await expect(toastSaying(page, new RegExp(`Aprobado por ${escaped(name)}`))).toBeVisible();
   await expect(dialog).toBeHidden();
 
   // Once: the line is in the item, with what the dialog said.

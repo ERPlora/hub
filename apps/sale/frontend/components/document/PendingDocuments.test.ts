@@ -2,12 +2,15 @@
 // issue a document of the sale in its own write (no issuer yet, no permission…). The notice says so and,
 // to whoever may charge, offers «Issue now» (`sale.sale.issue_documents`); a refusal says why, worded by
 // the server, and the notice stays. Once issued, the live sale drops the notice by itself.
-import { describe, expect, it } from 'vitest';
+import { toastSuccess } from '@erplora/ui/shell';
+import { describe, expect, it, vi } from 'vitest';
 
 import { click, EMPLOYEE, mountSale, settle } from '../../__tests__/mount-sale';
 import { refused } from '../pos/__tests__/fixtures';
 import { saleOut } from './__tests__/fixtures';
 import PendingDocuments from './PendingDocuments.vue';
+
+vi.mock('@erplora/ui/shell', async (importOriginal) => (await import('../../../../../base/frontend/__tests__/toast-spies')).shellWithToastSpies(importOriginal));
 
 async function setup(options: { locale?: 'en' | 'es'; session?: typeof EMPLOYEE } = {}) {
   // A command, nothing live: no stream to open.
@@ -32,13 +35,7 @@ describe('PendingDocuments', () => {
     await click(m.find('sale-documents-issue').element);
     expect(m.sent()).toEqual([{ method: 'POST', path: '/api/sale/sales/issue_documents', query: {}, body: { sale_id: 's1' } }]);
     expect(m.find('sale-documents-error').exists()).toBe(false);
-    // A toast says so, and the person closes it with its «Close»: left open, its timer (Ionic clears it
-    // only on dismiss, not when the toast leaves the page) would outlive the test.
-    const toast = document.querySelector('ion-toast');
-    expect(toast?.message).toBe('Fiscal documents issued.');
-    const gone = toast!.onDidDismiss();
-    toast!.shadowRoot!.querySelector<HTMLButtonElement>('button.toast-button-cancel')!.click();
-    expect((await gone).role).toBe('cancel');
+    expect(toastSuccess).toHaveBeenCalledExactlyOnceWith('Fiscal documents issued.');
   });
 
   it('a refusal says why, worded by the server, and the notice stays', async () => {

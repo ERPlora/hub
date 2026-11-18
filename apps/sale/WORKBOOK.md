@@ -300,7 +300,7 @@ Pasos:
 3. Pulsa «Cobrar · <total>» al pie de la cuenta (en el móvil, abre antes la cuenta con el botón
    flotante, que enseña el total). Con el móvil tumbado, o en una ventana igual de baja (hasta 500 px de
    alto), el catálogo se desplaza con la página, con el botón flotante siempre a la vista, y la cuenta ocupa
-   toda la pantalla, por encima de la franja roja y de la barra de pestañas: su barra y su pie se quedan
+   toda la pantalla, por encima de la barra de pestañas: su barra y su pie se quedan
    fijos, «Cobrar» a la vista, y lo que hay entre ellos se desplaza (hub#800).
 4. En la hoja **Cobro**, con efectivo elegido, marca en el teclado el importe entregado; el cambio
    sale en grande encima del teclado, en la fila que hasta entonces pide el importe, y las teclas no se
@@ -824,13 +824,12 @@ Pasos:
    quedan marcadas con su ronda («Comanda N») y la hora de envío, y la llama se desarma. Un doble envío no
    manda nada dos veces.
    En el cajón del móvil, «Enviar comanda» y la llama se quedan fijos sobre el pie mientras dejan sitio a las
-   pestañas y a una línea; en un móvil más bajo, como uno de 320×568 con la franja roja de arriba, se desplazan
-   con ellas, detrás de las líneas, y «Cobrar» sigue a la vista. Lo mismo en la columna lateral de una pantalla igual
-   de baja, como una tableta de 1024×600 con la franja (hub#787).
+   pestañas y a una línea; en un móvil más bajo se desplazan con ellas, detrás de las líneas, y «Cobrar» sigue a la
+   vista. Lo mismo en la columna lateral de una pantalla igual de baja (hub#787).
    En la columna lateral, si la cabecera, las pestañas y «Enviar comanda» no dejan sitio a una línea entera (una
-   tableta apaisada de 1024×600 o 1024×700, o un portátil de 1280×560, sin la franja; una tableta de 1024×700 o
-   1024×768, o un portátil de 1280×720 o 1280×800, con ella), la columna se desplaza entera, en las dos pestañas,
-   como el cajón del móvil, con «Enviar comanda» fija abajo: se sube una línea y se lee entera sobre la barra. Donde
+   tableta apaisada de 1024×600 o 1024×700, o un portátil de 1280×560), la columna se desplaza entera, en las dos
+   pestañas, como el cajón del móvil, con «Enviar comanda» fija abajo: se sube una línea y se lee entera sobre la
+   barra. Donde
    la línea cabe, la cabecera y las pestañas se quedan quietas y solo se desplazan las líneas (hub#820). En
    cualquier tamaño, las dos pestañas se ven y se tocan enteras (hub#1435).
 3. Al pulsar «Cobrar» con algo pendiente, se envía primero a cocina y después se abre el cobro: nadie paga

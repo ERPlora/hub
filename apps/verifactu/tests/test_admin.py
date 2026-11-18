@@ -4,22 +4,22 @@ record not sent is not a record registered; support fixes a sending problem, it 
 Nothing fiscal is typed: what was sealed is shown whole and read-only, never added, changed nor deleted, and a record
 the AEAT registered stays as it is. What support changes, it changes through the module's operations, for the hub
 chosen in the admin session: resend, reschedule, ask the AEAT (a record leaves the queue only when the AEAT holds
-it), correct a rejection with a new record, and choose the route (``verifactu.config.update``, whose refusal is the
-form's error). The SaaS's photo, the environment and the certificate are never typed here.
+it) and correct a rejection with a new record. The configuration (its route fixed on going live, the SaaS's photo,
+the environment) and the certificate are never typed here.
 """
 
 import pytest
-from django.contrib import admin, messages
+from django.contrib import admin
 from django.contrib.admin.utils import flatten_fieldsets
 from django.contrib.auth import get_user_model
 from django.contrib.messages import get_messages
 from django.contrib.messages.storage.fallback import FallbackStorage
 from django.contrib.sessions.backends.db import SessionStore
 from django.test import RequestFactory
-from django.urls import reverse
 from django.utils import timezone, translation
 from django.utils.html import escape
 from live.context import system_context
+from live.errors import PermissionDenied
 
 from apps.verifactu import gateway
 from apps.verifactu.admin import (
@@ -33,6 +33,7 @@ from apps.verifactu.admin import (
     OwnCertificateAdmin,
     RecordAdmin,
     SendControlAdmin,
+    _staff_context,
 )
 from apps.verifactu.models import (
     AeatRecord,
@@ -771,24 +772,23 @@ def test_reschedule_of_a_record_the_gateway_refused_puts_it_back_in_the_queue(
     assert said(request) == ["Rescheduled: 1 record goes out with the next pass."]
 
 
-# The configuration: only the route, through its operation
+# The configuration: seen whole, never typed
 
 
 @pytest.fixture
 def config(issuer):
-    run("verifactu.config.update", {"route": "erplora"})
-    return Config.objects.get()
+    return Config.objects.create()
 
 
-def test_the_configuration_is_seen_whole_and_only_its_route_is_chosen(config, request_of):
+def test_the_configuration_is_seen_whole_and_nothing_is_typed(config, request_of):
     request = request_of()
     instance = model_admin(ConfigAdmin, Config)
-    assert instance.has_change_permission(request, config) is True
+    assert instance.has_change_permission(request, config) is False
     assert instance.has_add_permission(request) is False
     assert instance.has_delete_permission(request, config) is False
     readonly = set(instance.get_readonly_fields(request, config))
-    assert "route" not in readonly
     assert {
+        "route",
         "environment",
         "representation_status",
         "representation_updated_at",
@@ -800,66 +800,26 @@ def test_the_configuration_is_seen_whole_and_only_its_route_is_chosen(config, re
     } <= readonly
     # The retired live option is not shown: its column only waits to be dropped.
     assert "live_paid" not in instance.list_display
+    assert "live_paid" not in readonly
     assert "live_paid" not in instance.get_fields(request, config)
 
 
-def config_page(config) -> str:
-    return f"/admin/verifactu/config/{config.pk}/change/"
+def test_support_runs_nothing_that_configures_the_business(config, request_of):
+    # Going live, the certificate and the environment are the business's: nothing support runs here needs them.
+    with pytest.raises(PermissionDenied):
+        run("verifactu.config.go_live", ctx=_staff_context(request_of()))
 
 
-def test_the_route_is_chosen_through_its_operation(client, staff, config):
-    Config.objects.filter(pk=config.pk).update(route="own")
+def test_the_route_is_never_typed_in_the_admin(client, staff, config):
+    # It is fixed when the business goes live: the page shows it and a POST changes nothing.
     client.force_login(staff)
     client.get(f"/admin/hub/{A.key}/", HTTP_HOST=PLATFORM)
-    response = client.post(
-        config_page(config),
-        {"route": "erplora", "hub_status": "suspended", "_save": "Save"},
-        HTTP_HOST=PLATFORM,
-    )
-    assert response.status_code == 302
+    page = f"/admin/verifactu/config/{config.pk}/change/"
+    assert client.get(page, HTTP_HOST=PLATFORM).status_code == 200
+    response = client.post(page, {"route": "own", "_save": "Save"}, HTTP_HOST=PLATFORM)
+    assert response.status_code == 403
     config.refresh_from_db()
-    assert (config.route, config.hub_status) == ("erplora", "active")
-    assert config.updated_by == "staff"
-    assert Event.objects.filter(message_key="route_erplora", actor="staff").exists()
-
-
-def test_a_route_the_operation_refuses_is_the_forms_error(client, staff, config):
-    client.force_login(staff)
-    client.get(f"/admin/hub/{A.key}/", HTTP_HOST=PLATFORM)
-    response = client.post(
-        config_page(config), {"route": "own", "_save": "Save"}, HTTP_HOST=PLATFORM
-    )
-    assert response.status_code == 200
-    assert "There is no valid certificate loaded" in response.content.decode()
-    config.refresh_from_db()
-    assert config.route == "erplora"
-    assert not Event.objects.filter(message_key="route_own").exists()
-
-
-def test_without_a_chosen_hub_the_route_is_not_changed(client, staff, config):
-    # A business's configuration is only in its own database: without one chosen, the page goes back to the admin's
-    # index, warning to choose it first.
-    Config.objects.filter(pk=config.pk).update(route="own")
-    client.force_login(staff)
-    response = client.post(
-        config_page(config), {"route": "erplora", "_save": "Save"}, HTTP_HOST=PLATFORM
-    )
-    assert (response.status_code, response.url) == (302, reverse("admin:index"))
-    assert [message.level for message in get_messages(response.wsgi_request)] == [messages.WARNING]
-    config.refresh_from_db()
-    assert config.route == "own"
-
-
-def test_the_form_itself_refuses_a_route_without_a_chosen_hub(request_of, config):
-    # The page never hands the form a request without a hub chosen; the form refuses one on its own all the same.
-    Config.objects.filter(pk=config.pk).update(route="own")
-    config.refresh_from_db()
-    form_class = model_admin(ConfigAdmin, Config).get_form(request_of(hub=None), config, change=True)
-    form = form_class({"route": "erplora"}, instance=config)
-    assert not form.is_valid()
-    assert "Choose a hub first" in str(form.errors)
-    assert Config.objects.get(pk=config.pk).route == "own"
-    assert not Event.objects.filter(message_key="route_erplora").exists()
+    assert config.route == Config.Route.ERPLORA
 
 
 TICKET = {

@@ -993,10 +993,6 @@ msgstr "certificado cifrado"
 msgid "own certificate"
 msgstr "certificado propio"
 
-#: services.py
-msgid "There is no valid certificate loaded: upload it in VeriFactu → Configuration → My certificate."
-msgstr "No hay ningún certificado válido cargado: súbelo en VeriFactu → Configuración → Mi certificado."
-
 #: models.py
 msgid "your own certificate cannot be opened on this server: upload it again"
 msgstr "tu certificado propio no se puede abrir en este servidor: vuelve a subirlo"
@@ -1295,9 +1291,6 @@ msgid "ERPlora does not file on behalf of businesses for now: file with your own
 msgstr "De momento ERPlora no presenta por cuenta de los negocios: presenta con tu propio certificado."
 
 #: erplora_route.py
-msgid ""
-"To go live, upload your own certificate and choose it as the sending route: ERPlora does not file on behalf of "
-"businesses for now."
+msgid "To go live, upload your own certificate: ERPlora does not file on behalf of businesses for now."
 msgstr ""
-"Para pasar a producción, sube tu propio certificado y elígelo como vía de envío: de momento ERPlora no presenta "
-"por cuenta de los negocios."
+"Para pasar a producción, sube tu propio certificado: de momento ERPlora no presenta por cuenta de los negocios."
