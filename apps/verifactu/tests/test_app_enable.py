@@ -21,11 +21,12 @@ from live.operations import get
 from apps.verifactu.queries.app_hooks import VERIFACTU
 from apps.verifactu.tests.conftest import HUB_DB, A, business_in
 from base import activation, blueprint, events, services
-from base.models import AppActivation, Membership
-from base.permissions import permissions_for
+from base.models import AppActivation
 from base.tenancy import context
 from base.tenancy.tests import hubs
-from base.tests.test_services_data import call, modules_on
+from base.tests.test_services_data import born, call, load, modules_on
+
+__all__ = ["born", "load"]
 
 ONLY_IN_SPAIN = "VeriFactu is only for businesses in Spain."
 ONLY_IN_SPAIN_ES = "VeriFactu solo es para negocios de España."
@@ -47,27 +48,6 @@ def verifactu_off(host: str = A.key) -> None:
         AppActivation(host=host, app=label, state=activation.OFF, chosen=False) for label in activation.module_graph()
     )
     activation.forget(host)
-
-
-@pytest.fixture
-def born(make_user):
-    """The business ``A`` as it is born: every app off (no row), and its owner."""
-    AppActivation.objects.filter(host=A.key).delete()
-    activation.forget(A.key)
-    owner = make_user("carla", role=Membership.Role.OWNER)
-    return OperationContext(scope=A, actor=owner, permissions=permissions_for(owner, A), language="es")
-
-
-@pytest.fixture
-def load(django_capture_on_commit_callbacks):
-    """``base.blueprint.import`` as a request runs it: what runs after its COMMIT in the business's database (the cache
-    of the apps off forgotten) runs too, so what the test reads next sees the apps it turned on."""
-
-    def run(ctx, **data):
-        with django_capture_on_commit_callbacks(using=context.current_alias(), execute=True):
-            return call(ctx, "base.blueprint.import", **data)
-
-    return run
 
 
 def row_of(language: str = "en", scope: Scope = A) -> dict:
@@ -154,7 +134,7 @@ def test_a_blueprint_outside_spain_leaves_it_off_with_the_reason_and_turns_on_th
     business_in("PL")
     verifactu_off()
 
-    refused = services._turn_on_listed(admin(), ["task", "verifactu"], set())
+    refused = services.blueprints._turn_on_listed(admin(), ["task", "verifactu"], set())
 
     assert refused == {"verifactu": ONLY_IN_SPAIN}
     states = activation.states_of(A)

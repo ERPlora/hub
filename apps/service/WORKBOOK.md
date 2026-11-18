@@ -1308,8 +1308,8 @@ Los papeles llegan del SaaS con prefijo (`hub_owner`, `hub_admin`, `hub_manager`
   (`tests/test_integration_assistant.py`, hub#756).
 - El admin de Django del Hub tiene **CRUD completo** sobre todos los modelos (PLAN §17);
   una escritura cruda del admin no pasa por las reglas ni deja aviso, salvo la del árbol de categorías.
-- Tenencia: el ámbito es la primera parte del Host y cada negocio tiene su propia BD: los datos de `a` no se ven en `b`. Solo los tests escritos antes de la tenencia guardan `a` y `b`
-  en la misma BD de test (`base/tenancy/tests/legacy.py`). Cada negocio enciende y apaga sus
+- Tenencia: el ámbito es la primera parte del Host y cada negocio tiene su propia BD: los datos de `a` no se ven en `b`.
+  Cada negocio enciende y apaga sus
   apps (BASE-F23, BASE-F24; `base.relay.active_apps`): los rechazos por «Servicios no activa» de F24, F26 y F27
   los ve un negocio que apaga Servicios y sigue cobrando en Ventas, que no la tiene en sus `requires`.
 - Quién lee el catálogo, contado por sus llamadas (`rg '"service\.' apps`): Citas

@@ -67,7 +67,7 @@ def test_the_platform_is_on_the_deployments_clock():
         assert business.zone_name() == settings.TIME_ZONE
 
 
-def test_with_no_hub_nor_platform_at_work_it_fails_as_any_read_of_a_hub_does(no_test_fallback):
+def test_with_no_hub_nor_platform_at_work_it_fails_as_any_read_of_a_hub_does():
     """No hour is told on a clock nobody chose."""
     with pytest.raises(HubContextMissing):
         business.business_zone()

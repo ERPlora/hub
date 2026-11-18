@@ -485,7 +485,6 @@ def test_nobody_behind_the_request_reads_no_record():
 
 
 @HUB_DB
-@pytest.mark.usefixtures("no_test_fallback")
 def test_a_record_of_another_business_is_left_out(hub_a, hub_b):
     """Each business in its own database, as production: an id of A names nothing in B."""
     in_a, in_b = ctx_for(scope=Scope("host", hub_a.slug)), ctx_for(scope=Scope("host", hub_b.slug))
@@ -504,7 +503,6 @@ def test_a_record_of_another_business_is_left_out(hub_a, hub_b):
 
 
 @HUB_DB
-@pytest.mark.usefixtures("no_test_fallback")
 def test_words_that_fit_a_record_of_another_business_are_said_as_said(hub_a, hub_b):
     """Each business in its own database: the words that name a record of A name nothing in B (hub#1280)."""
     in_a, in_b = ctx_for(scope=Scope("host", hub_a.slug)), ctx_for(scope=Scope("host", hub_b.slug))

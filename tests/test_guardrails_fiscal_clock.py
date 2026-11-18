@@ -24,7 +24,7 @@ from apps.verifactu.tests.conftest import HUB_DB, run
 from base.tenancy.context import use_hub
 from control.models import Hub
 
-pytestmark = [HUB_DB, pytest.mark.usefixtures("no_test_fallback")]
+pytestmark = [HUB_DB]
 
 ISSUER = {
     "legal_name": "Peluquería Ana SL",

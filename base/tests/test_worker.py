@@ -29,8 +29,6 @@ from base import catalog, outbound, relay, scheduler, worker
 from base.catalog import CatalogError, RegisterResult, SharedSchemaNotReady
 from base.tenancy import context, provision
 
-pytestmark = pytest.mark.production_worker
-
 WRITTEN = RegisterResult(written=1, retired=0, docs_changed=1, skipped=False, apps=("demo",))
 SKIPPED = RegisterResult(written=0, retired=0, docs_changed=0, skipped=True)
 NOT_READY = SharedSchemaNotReady(["shared.app", "shared.app_doc"])

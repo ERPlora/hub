@@ -257,19 +257,10 @@ del Hub» de erplora-next.
 - **Tests**: la suite construye por sesión `<BD de test>_template_test` con el migrador y clona dos hubs con BD
   propia (`base/tenancy/tests/hubs.py`; fixtures `hub_a`, `hub_b`; marca `django_db(databases=hubs.HUB_DATABASES)`).
   La plantilla de test lleva todas las apps del hub (`migrator.portable_apps()`, `base/tests/test_hub_user_links.py`).
-  Los tests escritos antes de la tenencia que aún no se han pasado a una BD por negocio caen en un respaldo solo de la
-  suite (`base/tenancy/tests/legacy.py`): la BD de control de test lleva también las tablas de hub (`LegacyTablesRouter`,
-  solo en `config/settings_pytest.py`) y el worker les corre un paso propio (`legacy_worker`, `worker_pass`): sus tareas
-  en el ámbito del negocio `a` y el relay de sus avisos. El respaldo se enciende solo para los tests que nombra
-  `.legacy-fallback-allow`, una línea `<fichero>::<test>` por test (`base/tenancy/tests/legacy_allow.py`); cualquier otro
-  test corre como producción y, si se apoya en el respaldo, falla (`HubContextMissing`, `HubWithoutDatabase`). La lista
-  solo encoge: no gana líneas frente a `origin/main` (una línea sí puede moverse con su test a otro fichero) y la de un
-  test que ya no existe sale (`tests/test_guardrails_legacy_fallback.py`); y una pasada que corre todos los casos de un
-  test de la lista, todos en verde, sin que se apoye ni una vez en el respaldo, cae y dice qué línea quitar. La CI
-  reparte los casos de un test entre varios trabajos y ninguno los corre todos: cada trabajo guarda lo que vio
-  (`--legacy-fallback-report`) y el trabajo `legacy-fallback` lo junta (`python -m base.tenancy.tests.legacy_allow`) y
-  cae igual. Pasarlos a
-  una BD por negocio y borrar la lista con el respaldo es hub#611.
+  Todos los tests corren como producción: la BD de control de test tiene solo las tablas de control (los mismos routers
+  que producción) y un modelo de hub sin contexto falla (`HubContextMissing`). Las pruebas del corte y de
+  `control/0007`, que leen las tablas de las apps en control como estaban antes del corte, las crean ellas mismas
+  (`base/tenancy/tests/before_the_cut.py`).
 
 
 ### Activar una app crea sus tablas (tajada S3)

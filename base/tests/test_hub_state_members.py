@@ -26,8 +26,6 @@ from base.tests.test_session_revoke import acme, alive, beta, login
 
 __all__ = ["acme", "beta"]
 
-pytestmark = pytest.mark.usefixtures("no_test_fallback")
-
 ANA = "0199c4b0-0000-7000-8000-00000000a0a0"
 OLGA = "0199c4b0-0000-7000-8000-00000000b0b0"
 

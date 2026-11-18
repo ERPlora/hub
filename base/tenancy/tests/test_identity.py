@@ -17,8 +17,6 @@ from django.db import connections as django_connections
 from base.tenancy import connections, context, identity, names
 from base.tenancy.tests import hubs
 
-pytestmark = pytest.mark.usefixtures("no_test_fallback")
-
 
 @pytest.fixture(autouse=True)
 def nothing_checked_yet(monkeypatch):

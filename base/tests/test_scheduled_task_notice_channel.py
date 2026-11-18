@@ -23,7 +23,7 @@ from control.models import Hub
 
 pytestmark = [
     pytest.mark.django_db(transaction=True, databases=hubs.HUB_DATABASES),
-    pytest.mark.usefixtures("no_test_fallback", "a_worker_just_started"),
+    pytest.mark.usefixtures("a_worker_just_started"),
 ]
 
 

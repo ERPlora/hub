@@ -383,7 +383,7 @@ def off_apps(scope: Scope) -> frozenset[str]:
 def creating_apps(scope: Scope) -> frozenset[str]:
     """The modules whose tables ``scope``'s business is getting (``creating``), kept with :func:`off_apps`: the session
     tells them «activating». None in the platform, nor in a hub without a database of its own, where nothing is made
-    later (only the test suite's fallback keeps one)."""
+    later."""
     if is_platform(scope):
         return frozenset()
     return _kept(scope)[1]
@@ -423,7 +423,7 @@ def _created_apps(hub: Any) -> frozenset[str] | None:
     row = provisioning.registry_row(hub.pk)
     if row is None or CONFIRMED_BY not in (row.schema_apps or ()):
         return None
-    created = services.apps_created(row)
+    created = services.apps.apps_created(row)
     if created is None:
         return None
     try:

@@ -1,6 +1,6 @@
 """Events of the verifactu app (``verifactu.<entity>.<fact>``) and its reaction to Invoicing's.
 
-services.py records them in the outbox, in the command's transaction; live.py names the ones that re-run each
+services/ records them in the outbox, in the command's transaction; live.py names the ones that re-run each
 live query. A rejection or an acceptance with errors carries no amounts.
 
 Reaction: an issued invoice (``invoice.invoice.issued``, Invoicing's notice of every F1, F2, F3 and R1–R5) is

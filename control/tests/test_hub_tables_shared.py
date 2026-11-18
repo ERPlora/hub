@@ -2,8 +2,8 @@
 
 Since the cut no business uses them, yet nothing tells their rows from live data. The
 migration ``control/0007`` renames them, never dropping one. What decides which tables are left over is the routers
-and the inventory, so the suite's control database, whose ``LegacyTablesRouter`` keeps those tables on purpose, stays
-as it is with no test-only branch in the migration: the tests here ask for production's routers themselves.
+and the inventory. Neither production's control database nor the suite's holds those tables any more, so the tests
+here make them first, as control was before the cut (``base/tenancy/tests/before_the_cut.py``).
 
 The renames of a test with a test case roll back with it (PostgreSQL's DDL is transactional). A test that needs them
 committed, or another database, works on a database of its own.
@@ -18,7 +18,6 @@ from pathlib import Path
 
 import psycopg
 import pytest
-from django.apps import apps
 from django.db import OperationalError, connection, connections
 from django.db.migrations.executor import MigrationExecutor
 from django.db.migrations.loader import MigrationLoader
@@ -26,8 +25,9 @@ from django.test.utils import CaptureQueriesContext
 from psycopg import sql
 
 from base.tenancy import connections as tenancy_connections
-from base.tenancy import inventory, names
+from base.tenancy import names
 from base.tenancy.tests import hubs
+from base.tenancy.tests.before_the_cut import hub_tables, hub_tables_sql, make_hub_tables
 from control.models import Hub
 
 MIGRATION = "0007_hub_tables_renamed_shared"
@@ -36,7 +36,6 @@ BEFORE = "0006_hub_activity"
 #: 0012: the separate copies; 0013: the recoveries from them).
 LATER_TABLES = {"control_freeze", "control_restoredcopy", "control_copyrecovery"}
 SUFFIX = "_shared_20261101"
-LEGACY_ROUTER = "base.tenancy.tests.legacy.LegacyTablesRouter"
 #: Control's own tables, Django's and the outbox's: none of them is ever renamed.
 KEPT = {
     "auth_user",
@@ -59,15 +58,6 @@ FOREIGN_KEYS = """
 
 def migration():
     return importlib.import_module(f"control.migrations.{MIGRATION}")
-
-
-def hub_tables() -> set[str]:
-    """Every table the inventory calls a hub's, as the tests read it on their own."""
-    return {
-        model._meta.db_table
-        for model in apps.get_models(include_auto_created=True)
-        if model._meta.managed and inventory.classify(model) == inventory.HUB
-    }
 
 
 def shared(table: str) -> str:
@@ -103,15 +93,15 @@ def backwards(on=connection) -> None:
 
 
 @pytest.fixture
-def production_routers(settings):
-    """The routers of ``config.settings``: the tests' ``LegacyTablesRouter`` out."""
-    settings.DATABASE_ROUTERS = [router for router in settings.DATABASE_ROUTERS if router != LEGACY_ROUTER]
+def hub_tables_on_control(db):
+    """Control as it was before the cut: the tables of the hubs' apps in it, made in the test's transaction."""
+    make_hub_tables()
 
 
 @pytest.fixture
-def after_the_cut(db, production_routers):
-    """Control as production's is since the cut: no ready business without its own database (the suite's ``a`` and
-    ``b`` are, so they are cancelled, as ``yfn`` is in production)."""
+def after_the_cut(hub_tables_on_control):
+    """Control as production's was at the cut: its tables still there, and no ready business without its own database
+    (the suite's ``a`` and ``b`` are, so they are cancelled, as ``yfn`` is in production)."""
     Hub.objects.filter(db_name="", is_demo=False, status=Hub.Status.READY).update(status=Hub.Status.CANCELLED)
 
 
@@ -128,7 +118,7 @@ def test_every_hub_table_left_in_control_gets_its_shared_name_and_no_other_table
     assert KEPT <= tables()
 
 
-def test_the_list_comes_from_the_inventory_and_nothing_of_control_is_in_it(production_routers):
+def test_the_list_comes_from_the_inventory_and_nothing_of_control_is_in_it():
     listed = set(migration().left_behind("default"))
 
     assert listed == hub_tables()
@@ -171,7 +161,7 @@ def test_it_only_ever_renames(after_the_cut):
 # ── Only in control ───────────────────────────────────────────────────────────────────────────────────────────────
 
 
-def test_a_hubs_real_database_is_never_renamed(hub_databases, django_db_blocker, production_routers):
+def test_a_hubs_real_database_is_never_renamed(hub_databases, django_db_blocker):
     name = names.hub_db_name(hub_databases.control, uuid.uuid7())
     with django_db_blocker.unblock(), hubs.clone_of_the_template(hub_databases, name):
         ddl = connections[tenancy_connections.register_ddl_alias(name)]
@@ -187,15 +177,6 @@ def test_a_hubs_real_database_is_never_renamed(hub_databases, django_db_blocker,
             migration().forwards(_state().apps, editor)
         assert hubs.table_names(name) == found
         ddl.close()
-
-
-def test_under_the_suites_routers_the_tables_it_keeps_on_purpose_are_not_left_over(db):
-    found = tables()
-    assert hub_tables() <= found
-
-    forwards()
-
-    assert tables() == found
 
 
 # ── The name ──────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -316,7 +297,7 @@ def test_rows_survive_both_ways(after_the_cut):
 # ── A business that was never cut ─────────────────────────────────────────────────────────────────────────────────
 
 
-def test_a_ready_business_without_its_database_stops_it_and_nothing_is_renamed(db, production_routers):
+def test_a_ready_business_without_its_database_stops_it_and_nothing_is_renamed(hub_tables_on_control):
     # The suite's ``a`` and ``b``: ready, ``db_name`` empty, as an environment that was never cut.
     assert Hub.objects.filter(db_name="", is_demo=False, status=Hub.Status.READY).exists()
     found = tables()
@@ -345,7 +326,7 @@ def test_who_does_not_stop_it(after_the_cut, fields):
     assert shared("printing_printer") in tables()
 
 
-def test_with_nothing_left_over_a_business_without_its_database_stops_no_deploy(db, production_routers, monkeypatch):
+def test_with_nothing_left_over_a_business_without_its_database_stops_no_deploy(db, monkeypatch):
     # A database made after the cut holds none of the tables the inventory names: there is nothing to rename under
     # anyone.
     assert Hub.objects.filter(db_name="", is_demo=False, status=Hub.Status.READY).exists()
@@ -428,7 +409,8 @@ def _manage(database: str, settings_module: str, *args: str) -> subprocess.Compl
 @pytest.fixture
 def control_as_s5_left_it(django_db_blocker):
     """A control database with every hub's table and everything up to ``control/0006`` applied, in production's state
-    today: made by the tests' settings, the migration's record taken out. Dropped after the test."""
+    at the cut: control's own made by the tests' settings, the hubs' apps' made as they were then, the migration's
+    record taken out. Dropped after the test."""
     name = f"{connection.settings_dict['NAME']}_s5ctl"
     with django_db_blocker.unblock():
         with hubs._maintenance() as conn:
@@ -441,6 +423,8 @@ def control_as_s5_left_it(django_db_blocker):
             stepped = _manage(name, "config.settings_pytest", "control", MIGRATION)
             assert stepped.returncode == 0, stepped.stderr[-3000:]
             with hubs._maintenance(name) as conn:
+                for statement in hub_tables_sql():
+                    conn.execute(statement)
                 conn.execute("DELETE FROM django_migrations WHERE app = 'control' AND name > %s", [BEFORE])
                 conn.execute("INSERT INTO base_hub_identity (hub_id) VALUES (%s)", [uuid.uuid7()])
             yield name

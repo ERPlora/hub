@@ -430,24 +430,6 @@
     ]
   },
   {
-    "path": "apps/verifactu/services.py",
-    "file_name": "services.py",
-    "functions": [
-      {
-        "name": "_representation_payload",
-        "complexity": 19
-      },
-      {
-        "name": "_check_declarable",
-        "complexity": 21
-      },
-      {
-        "name": "_send_chain",
-        "complexity": 52
-      }
-    ]
-  },
-  {
     "path": "apps/website/reviews.py",
     "file_name": "reviews.py",
     "functions": [
@@ -584,28 +566,6 @@
       {
         "name": "Command::handle",
         "complexity": 19
-      }
-    ]
-  },
-  {
-    "path": "base/services/__init__.py",
-    "file_name": "__init__.py",
-    "functions": [
-      {
-        "name": "_enable",
-        "complexity": 18
-      },
-      {
-        "name": "app_activation_settle",
-        "complexity": 18
-      },
-      {
-        "name": "_assistant_answer",
-        "complexity": 19
-      },
-      {
-        "name": "assistant_turn",
-        "complexity": 27
       }
     ]
   },
@@ -900,6 +860,70 @@
       {
         "name": "list_records",
         "complexity": 16
+      }
+    ]
+  },
+  {
+    "path": "base/services/activation.py",
+    "file_name": "activation.py",
+    "functions": [
+      {
+        "name": "app_activation_settle",
+        "complexity": 18
+      }
+    ]
+  },
+  {
+    "path": "base/services/apps.py",
+    "file_name": "apps.py",
+    "functions": [
+      {
+        "name": "_enable",
+        "complexity": 18
+      }
+    ]
+  },
+  {
+    "path": "base/services/assistant.py",
+    "file_name": "assistant.py",
+    "functions": [
+      {
+        "name": "_assistant_answer",
+        "complexity": 19
+      },
+      {
+        "name": "assistant_turn",
+        "complexity": 27
+      }
+    ]
+  },
+  {
+    "path": "apps/verifactu/services/authorisation.py",
+    "file_name": "authorisation.py",
+    "functions": [
+      {
+        "name": "_representation_payload",
+        "complexity": 19
+      }
+    ]
+  },
+  {
+    "path": "apps/verifactu/services/sealing.py",
+    "file_name": "sealing.py",
+    "functions": [
+      {
+        "name": "_check_declarable",
+        "complexity": 21
+      }
+    ]
+  },
+  {
+    "path": "apps/verifactu/services/sending.py",
+    "file_name": "sending.py",
+    "functions": [
+      {
+        "name": "_send_chain",
+        "complexity": 52
       }
     ]
   }

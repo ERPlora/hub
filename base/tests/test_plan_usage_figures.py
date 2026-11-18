@@ -34,7 +34,7 @@ STARTER = {"slug": "starter", "max_users": 3, "max_devices": 2, "max_db_connecti
 STANDARD = {"slug": "standard", "max_users": 8, "max_devices": 4, "max_db_connections": 6, "statement_timeout_seconds": 15}
 PRO = {"slug": "pro", "max_users": 20, "max_devices": 8, "max_db_connections": 12, "statement_timeout_seconds": 15}
 
-pytestmark = [HUB_DB, pytest.mark.usefixtures("no_test_fallback")]
+pytestmark = [HUB_DB]
 
 
 @pytest.fixture(autouse=True)

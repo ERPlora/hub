@@ -856,13 +856,10 @@ def test_the_refusals_are_the_api_s_statuses():
 
 # ── Every sentence in Spanish too ─────────────────────────────────────────────────────────────────────────────
 
-#: The sentences the refusals of Files say, as written in its code (``gettext("…")`` in ``base/files.py`` and in the
-#: Files block of ``base/services/__init__.py``); the API and the assistant pass them on to the person, so each one has its
-#: Spanish.
-_SERVICES = (Path(files.__file__).parent / "services" / "__init__.py").read_text().split("── Files ──", 1)[1]
-SENTENCES = sorted(
-    set(re.findall(r'gettext\(\s*"((?:[^"\\]|\\.)*)"', Path(files.__file__).read_text() + _SERVICES.split("\n# ── ", 1)[0]))
-)
+#: The sentences the refusals of Files say, as written in its code (``gettext("…")`` in ``base/files.py`` and in
+#: ``base/services/files.py``); the API and the assistant pass them on to the person, so each one has its Spanish.
+_SERVICES = (Path(files.__file__).parent / "services" / "files.py").read_text()
+SENTENCES = sorted(set(re.findall(r'gettext\(\s*"((?:[^"\\]|\\.)*)"', Path(files.__file__).read_text() + _SERVICES)))
 
 
 def test_files_says_its_refusals_in_some_words():

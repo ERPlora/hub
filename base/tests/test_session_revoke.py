@@ -35,8 +35,6 @@ from base.tenancy.tests import hubs
 from base.tests.test_internal import code, signed
 from base.tests.test_queries_home import listen  # noqa: F401 (a fixture)
 
-pytestmark = pytest.mark.usefixtures("no_test_fallback")
-
 HUB_DB = pytest.mark.django_db(databases=hubs.HUB_DATABASES)
 REVOKE = "/internal/sessions/revoke"
 ANA = "0199c4b0-0000-7000-8000-00000000a0a0"

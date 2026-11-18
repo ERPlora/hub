@@ -4,6 +4,7 @@ from django.utils.translation import gettext_lazy as _
 from live.meta import Category, LiveAppConfig, Nav, SetupCheck, SetupStep, Widget
 
 from apps.inventory.events import FIGURE_EVENTS, PRODUCT_EVENTS
+from base.allergens import ALLERGENS
 
 VIEW = "inventory.view_product"
 
@@ -35,6 +36,8 @@ class InventoryConfig(LiveAppConfig):
     # The products' own photos (base.images): served by /p/media/ to the hub's sessions only.
     members_media = ["inventory/products/"]
     default_auto_field = "django.db.models.BigAutoField"
+    # The allergens by their names: no field of the models labels them, so the assistant's card would say their codes.
+    choices = {"allergens": ALLERGENS}
     # What these words mean to the Hub's assistant (base.assistant.relevance.synonyms). The «unidades» are the units of measure
     # (inventory.unit), and a «albarán», the «mercancía» or what «entran» (never «entrada»: its stem is that of «entre»)
     # is the goods inventory.stock.receive records.

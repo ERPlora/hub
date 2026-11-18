@@ -29,8 +29,6 @@ from base.schemas import HubStateIn
 from base.tenancy.context import use_hub
 from base.tenancy.tests.business import A, B, HUB_DB
 
-pytestmark = pytest.mark.usefixtures("no_test_fallback")
-
 NOW = dt.datetime(2026, 10, 24, 12, 0, tzinfo=dt.UTC)
 
 

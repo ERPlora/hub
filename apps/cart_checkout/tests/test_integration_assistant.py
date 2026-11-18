@@ -24,7 +24,6 @@ from live.operations import get, registry
 
 from apps.cart_checkout.models import CartItem
 from base import assistant
-from base.tenancy import context
 from base.tenancy.context import use_hub
 from base.tenancy.tests import hubs
 from base.tests.test_assistant import named_by_the_screen
@@ -139,12 +138,6 @@ def shop(ctx: OperationContext, session: str = "sess_ana") -> dict:
     return {"cart_id": str(cart.id), "item_id": str(line.id), "order_id": str(order.id), "number": order.order_number}
 
 
-@pytest.fixture
-def no_fallback(monkeypatch):
-    """As production: without ``use_hub`` a hub's model fails, nothing falls back on the shared database."""
-    monkeypatch.setattr(context, "_test_fallback", None)
-
-
 def cards(ctx: OperationContext, names: tuple[str, ...], datum: str, record: str, language: str = "es") -> dict:
     return {
         name: assistant.cards.card(get(name), {datum: record, **BESIDES.get(name, {})}, language, ctx) for name in names
@@ -153,7 +146,7 @@ def cards(ctx: OperationContext, names: tuple[str, ...], datum: str, record: str
 
 @pytest.mark.django_db(databases=hubs.HUB_DATABASES)
 @pytest.mark.parametrize("role", WRITERS)
-def test_a_write_on_a_cart_names_it_by_its_session_code(role, hub_a, no_fallback):
+def test_a_write_on_a_cart_names_it_by_its_session_code(role, hub_a):
     """«Vacía el carrito», «bórralo», «abandónalo», «inicia su pedido», «añade una línea»: the card says which cart as
     the Carts list does, by its session code, never by its id."""
     with use_hub(hub_a):
@@ -166,7 +159,7 @@ def test_a_write_on_a_cart_names_it_by_its_session_code(role, hub_a, no_fallback
 
 @pytest.mark.django_db(databases=hubs.HUB_DATABASES)
 @pytest.mark.parametrize("role", WRITERS)
-def test_a_change_to_a_line_names_it_by_its_product(role, hub_a, no_fallback):
+def test_a_change_to_a_line_names_it_by_its_product(role, hub_a):
     """«Pon tres» or «quita esa línea»: no screen lists a cart's lines, so the card says the line by its product, as the
     cart's detail gives it, never by its id."""
     with use_hub(hub_a):
@@ -180,7 +173,7 @@ def test_a_change_to_a_line_names_it_by_its_product(role, hub_a, no_fallback):
 @pytest.mark.django_db(databases=hubs.HUB_DATABASES)
 @pytest.mark.parametrize("role", WRITERS)
 @pytest.mark.parametrize("language", ["es", "en"])
-def test_a_write_on_an_order_names_it_by_its_number(language, role, hub_a, no_fallback):
+def test_a_write_on_an_order_names_it_by_its_number(language, role, hub_a):
     """«Márcalo pagado», «falló», «complétalo» (the first two, dangerous): the card says which order as the Orders list
     does, by its number (OS-YYYYMMDD-NNNN), so a wrong one is seen before confirming."""
     with use_hub(hub_a):
@@ -214,7 +207,7 @@ def test_whoever_may_run_a_write_reads_the_record_its_card_names():
 
 
 @pytest.mark.django_db(databases=hubs.HUB_DATABASES)
-def test_nobody_behind_the_request_reads_no_cart_line_or_order(hub_a, no_fallback):
+def test_nobody_behind_the_request_reads_no_cart_line_or_order(hub_a):
     """An automation's card (no person at hand) names no record: nothing is read for anybody."""
     with use_hub(hub_a):
         made = shop(in_hub(hub_a))
@@ -225,7 +218,7 @@ def test_nobody_behind_the_request_reads_no_cart_line_or_order(hub_a, no_fallbac
 
 
 @pytest.mark.django_db(databases=hubs.HUB_DATABASES)
-def test_who_may_not_see_carts_reads_none_of_them_on_the_card(hub_a, no_fallback):
+def test_who_may_not_see_carts_reads_none_of_them_on_the_card(hub_a):
     """Whoever asks without «view carts» (the write refuses them too) gets the record left out, never its id."""
     with use_hub(hub_a):
         made = shop(in_hub(hub_a))
@@ -240,7 +233,7 @@ def test_who_may_not_see_carts_reads_none_of_them_on_the_card(hub_a, no_fallback
 
 
 @pytest.mark.django_db(databases=hubs.HUB_DATABASES)
-def test_a_deleted_cart_is_left_out_never_by_its_id(hub_a, no_fallback):
+def test_a_deleted_cart_is_left_out_never_by_its_id(hub_a):
     """A deleted cart is never read (the write refuses it too): its card names none."""
     with use_hub(hub_a):
         ctx = in_hub(hub_a)
@@ -251,7 +244,7 @@ def test_a_deleted_cart_is_left_out_never_by_its_id(hub_a, no_fallback):
 
 
 @pytest.mark.django_db(databases=hubs.HUB_DATABASES)
-def test_a_cart_of_hub_b_is_never_named_on_a_card_of_hub_a(hub_a, hub_b, no_fallback):
+def test_a_cart_of_hub_b_is_never_named_on_a_card_of_hub_a(hub_a, hub_b):
     """The read runs in the hub the person asks in: hub B's cart, line or order is nobody in hub A."""
     with use_hub(hub_b):
         of_b = shop(in_hub(hub_b), session="sess_bea")
@@ -272,7 +265,7 @@ def test_a_cart_of_hub_b_is_never_named_on_a_card_of_hub_a(hub_a, hub_b, no_fall
 
 
 @pytest.mark.django_db(databases=hubs.HUB_DATABASES)
-def test_the_card_names_the_line_of_a_cart_as_its_model(hub_a, no_fallback):
+def test_the_card_names_the_line_of_a_cart_as_its_model(hub_a):
     """No screen shows a cart's lines: the card says the line as the app's model does («línea del carrito»). A line is
     named by its record (since hub#416 one the card cannot read is left out): a real one, read as its manager."""
     with override("es"):
@@ -286,7 +279,7 @@ def test_the_card_names_the_line_of_a_cart_as_its_model(hub_a, no_fallback):
 
 
 @pytest.mark.django_db(databases=hubs.HUB_DATABASES)
-def test_the_card_names_the_order_as_the_orders_screen(hub_a, no_fallback):
+def test_the_card_names_the_order_as_the_orders_screen(hub_a):
     with use_hub(hub_a):
         order = shop(in_hub(hub_a))["order_id"]
         for name in ON_AN_ORDER:
@@ -318,7 +311,7 @@ def test_the_card_says_the_payment_method_as_cart_checkout_does(language, label)
     ids=["dollars", "yen"],
 )
 @pytest.mark.parametrize("datum", ["cart_id", "session_token", "customer"])
-def test_a_line_added_to_a_cart_in_another_currency_is_priced_in_it(currency, money, datum, hub_a, no_fallback):
+def test_a_line_added_to_a_cart_in_another_currency_is_priced_in_it(currency, money, datum, hub_a):
     """«Añade una mascarilla a 9 al carrito de Ana», a cart in dollars: the price goes in the minor unit of the cart's
     currency, and the card said it in the business's («9,00 €»). It reads the cart as the person, by what names it."""
     with use_hub(hub_a):

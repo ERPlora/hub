@@ -24,8 +24,6 @@ from base.models import Hub
 
 router = TenantRouter()
 
-pytestmark = pytest.mark.usefixtures("no_test_fallback")
-
 
 @pytest.fixture(autouse=True)
 def restored_settings(monkeypatch):
