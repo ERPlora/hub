@@ -5,14 +5,16 @@
 // table (`select`); in «Edit plan» a press that travels drags it (the screen distance over the spread), one
 // that does not is a tap, and the arrows move a focused table. A table never leaves the plan; its new place
 // shows at once (`move`) until the server's row has it, and `revert(id)` puts a refused one back.
+import { FloorTile, useScrollEdges } from '@erplora/ui/components';
 import { computed, ref, shallowRef, useTemplateRef, watch } from 'vue';
 
 import { useFloorFit } from '../composables/useFloorFit';
-import { useScrollEdges } from '../composables/useScrollEdges';
+import { useFloorViews } from '../composables/useFloorViews';
 import { useStagePan } from '../composables/useStagePan';
+import { useT } from '../composables/useT';
 import { clampPosition, DRAG_THRESHOLD, keyDelta, planeSize, type Size } from '../lib/floor';
+import { paintBox } from '../lib/floor-fit';
 import type { SettingsOut, TableOut } from '../operations';
-import FloorTile from './FloorTile.vue';
 
 const props = withDefaults(
   defineProps<{
@@ -63,6 +65,19 @@ const { fit } = useFloorFit(
   computed(() => floor.value ?? size.value),
 );
 const painted = computed(() => ({ w: rounded(size.value.w * fit.value.spread), h: rounded(size.value.h * fit.value.spread) }));
+const t = useT();
+const views = useFloorViews(
+  () => shown.value,
+  () => ({ now: props.now, settings: props.settings, timeZone: props.timeZone, pick: props.pick }),
+);
+const tiles = computed(() =>
+  shown.value.map((table, index) => ({
+    table,
+    view: views.value[index],
+    box: paintBox(table, fit.value),
+    inactive: props.editable && !table.in_service ? t('table.inactive') : '',
+  })),
+);
 const { panning, onPointerDown: panDown, onPointerMove: panMove, onPointerUp: panUp, onKeydown: panKey } = useStagePan(stage);
 
 function rounded(value: number): number {
@@ -89,10 +104,6 @@ function revert(id: string): void {
 }
 defineExpose({ revert });
 
-function pickable(table: TableOut): boolean | undefined {
-  return props.pick ? props.pick(table) : undefined;
-}
-
 /** The plan's size in plan units, to keep a table inside: what is painted, never less than the tables need. */
 function bounds(): Size {
   const spread = fit.value.spread;
@@ -107,7 +118,7 @@ function place(table: TableOut, x: number, y: number): { x: number; y: number } 
 }
 
 function onClick(table: TableOut, event: MouseEvent): void {
-  if (pickable(table) === false) return;
+  if (props.pick && !props.pick(table)) return;
   // In «Edit plan» a pointer's tap was answered on its release; a click with no pointer is Enter or Space.
   if (props.editable && event.detail !== 0) return;
   emit('select', table);
@@ -195,20 +206,18 @@ const edgeClasses = computed(() => Object.fromEntries(EDGES.map((edge) => [`tabl
         :style="{ width: `${painted.w}px`, height: `${painted.h}px` }"
       >
         <FloorTile
-          v-for="table in shown"
-          :key="table.id"
-          :table="table"
-          :now="now"
-          :time-zone="timeZone"
-          :settings="settings"
-          :fit="fit"
+          v-for="tile in tiles"
+          :key="tile.table.id"
+          :table="tile.view"
+          :box="tile.box"
+          :inactive-label="tile.inactive"
           :editing="editable"
-          :pickable="pickable(table)"
-          :dragging="drag?.id === table.id && drag.moved"
-          :class="{ 'table-tile--editable': editable }"
-          @click="onClick(table, $event)"
-          @pointerdown="onTileDown(table, $event)"
-          @keydown="onKeydown(table, $event)"
+          :dragging="drag?.id === tile.table.id && drag.moved"
+          :data-x="tile.table.position_x"
+          :data-y="tile.table.position_y"
+          @click="onClick(tile.table, $event)"
+          @pointerdown="onTileDown(tile.table, $event)"
+          @keydown="onKeydown(tile.table, $event)"
         />
       </div>
     </div>
@@ -268,9 +277,6 @@ const edgeClasses = computed(() => Object.fromEntries(EDGES.map((edge) => [`tabl
   background-position: 20px 20px;
   background-size: 40px 40px;
 }
-.table-canvas__plane > :deep(.table-tile) {
-  animation: table-canvas-enter 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
-}
 .table-canvas__fade {
   position: absolute;
   z-index: 3;
@@ -312,23 +318,7 @@ const edgeClasses = computed(() => Object.fromEntries(EDGES.map((edge) => [`tabl
 .table-canvas--more-bottom .table-canvas__fade--bottom {
   opacity: 0.9;
 }
-:deep(.table-tile:not(.table-tile--editable) .table-tile__button) {
-  touch-action: manipulation;
-}
-:deep(.table-tile--editable .table-tile__button) {
-  cursor: grab;
-  touch-action: none;
-}
-@keyframes table-canvas-enter {
-  from {
-    opacity: 0;
-    transform: translateY(10px) scale(0.985);
-  }
-}
 @media (prefers-reduced-motion: reduce) {
-  .table-canvas__plane > :deep(.table-tile) {
-    animation: none;
-  }
   .table-canvas__fade {
     transition: none;
   }

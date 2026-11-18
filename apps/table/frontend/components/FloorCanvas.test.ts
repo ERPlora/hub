@@ -76,6 +76,28 @@ describe('FloorCanvas', () => {
     expect(c.tile('t1').dataset.x).toBe('16');
   });
 
+  it('paints each table in the app’s language, at its place on the plan and with the width its label may take', async () => {
+    const c = await canvas({ tables: [ONE, occupied({ id: 't3', number: '3', position_x: 120 })] });
+    expect(c.button('t1').getAttribute('aria-label')).toBe('Table 1 · Dining room · 4 pax · Available');
+    expect(c.tile('t3').querySelector('[data-part="status"]')?.textContent?.trim()).toBe('Occupied · 3/4 pax');
+    expect([c.tile('t3').dataset.x, c.tile('t3').dataset.y, c.tile('t3').dataset.timer]).toEqual(['120', '16', 'normal']);
+    expect(c.tile('t1').style.getPropertyValue('--tile-slot')).toBe('72px');
+    const es = await canvas({}, 'es');
+    expect(es.button('t2').getAttribute('aria-label')).toBe('Mesa 2 · Dining room · 4 pax · Disponible');
+  });
+
+  it('greys out a table out of service only while the plan is edited, and lets every table be grabbed then', async () => {
+    const idle = tableRow({ id: 't9', number: '9', is_active: false, in_service: false });
+    const c = await canvas({ tables: [ONE, idle] });
+    expect(c.tile('t9').querySelector('[data-part="inactive"]')).toBeNull();
+    expect(c.tile('t1').classList.contains('table-tile--editing')).toBe(false);
+    await c.wrapper.setProps({ editable: true });
+    expect(c.tile('t9').querySelector('[data-part="inactive"]')?.textContent).toBe('Inactive');
+    expect(c.tile('t9').classList.contains('table-tile--inactive')).toBe(true);
+    expect(c.tile('t1').classList.contains('table-tile--inactive')).toBe(false);
+    expect(c.tile('t1').classList.contains('table-tile--editing')).toBe(true);
+  });
+
   it('is a focusable region named for the arrows, with a grid only while the plan is edited', async () => {
     const c = await canvas();
     expect([c.stage().getAttribute('role'), c.stage().getAttribute('tabindex')]).toEqual(['region', '0']);

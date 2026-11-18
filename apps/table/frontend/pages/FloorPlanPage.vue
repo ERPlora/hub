@@ -10,7 +10,7 @@
 //   «Transfer 4 to…» / «Pick a free table» and «Cancel».
 // - Edit plan: every zone and table (inactive ones greyed out), always on the plan; a tap opens «Edit table»; a
 //   drag (or the arrows) saves the place at once (`table.table.move`), and a refused move goes back and says so.
-import { EmptyState, InlineFeedback } from '@erplora/ui/components';
+import { EmptyState, FloorCards, FloorSkeleton, FloorSummary, FloorZoneTabs, InlineFeedback, zoneColor } from '@erplora/ui/components';
 import { type ApiError, useCommand, useLive } from '@erplora/ui/sdk';
 import { AppPage, HubIcon, useSession } from '@erplora/ui/shell';
 import { IonButton, IonLabel, IonSegment, IonSegmentButton } from '@ionic/vue';
@@ -18,19 +18,17 @@ import { computed, ref, useTemplateRef, watch } from 'vue';
 
 import AddModal from '../components/AddModal.vue';
 import FloorCanvas from '../components/FloorCanvas.vue';
-import FloorCards from '../components/FloorCards.vue';
-import FloorSkeleton from '../components/FloorSkeleton.vue';
-import FloorSummary from '../components/FloorSummary.vue';
-import FloorZoneTabs from '../components/FloorZoneTabs.vue';
 import PageNotices, { blockingError } from '../components/PageNotices.vue';
 import TableFormModal from '../components/TableFormModal.vue';
 import TableSheet from '../components/TableSheet.vue';
 import ZoneFormModal from '../components/ZoneFormModal.vue';
 import { useAllRows } from '../composables/useAllRows';
+import { useFloorViews } from '../composables/useFloorViews';
 import { useIsPhone } from '../composables/useIsPhone';
 import { useNow } from '../composables/useNow';
 import { useT } from '../composables/useT';
 import { paintedStatus, type PickMode, targetable } from '../lib/floor';
+import { zoneSummary, zoneTabs } from '../lib/floor-summary';
 import type { SettingsOut, TableCheckOut, TableOut, ZoneOut } from '../operations';
 import { tableTabs } from '../tabs';
 
@@ -74,7 +72,6 @@ watch(
   },
   { immediate: true },
 );
-const zoneColor = computed(() => `var(--ion-color-${activeZone.value?.color ?? 'primary'})`);
 const isPhone = useIsPhone();
 
 const plan = useAllRows('table.table.list', () => ({ sort: 'number' }));
@@ -112,6 +109,12 @@ const pickable = computed(() => {
   const current = pick.value;
   return current ? (table: TableOut) => targetable(current.mode, current.table, table) : null;
 });
+const tabs = computed(() => zoneTabs(zones.value, painted.value, t));
+const summary = computed(() => zoneSummary(activeZone.value, inService.value, t));
+const cards = useFloorViews(
+  () => (asCards.value ? tables.value : []),
+  () => ({ now: now.value, settings: settings.value, timeZone: settings.value.timezone, pick: pickable.value }),
+);
 
 // Dialogs
 const sheetId = ref<string | null>(null);
@@ -160,6 +163,11 @@ async function finishPick(target: TableOut): Promise<void> {
     return;
   }
   pick.value = null;
+}
+
+function onCard(id: string): void {
+  const table = tables.value.find((row) => row.id === id);
+  if (table) onSelect(table);
 }
 
 function onSelect(table: TableOut): void {
@@ -212,14 +220,15 @@ function onZoneSaved(zone: ZoneOut): void {
     <div
       v-if="!blocked"
       class="table-floor"
-      :style="{ '--zone-color': zoneColor }"
+      :style="{ '--zone-color': zoneColor(activeZone?.color) }"
     >
       <div class="table-floor__bar">
         <FloorZoneTabs
           v-if="zones.length"
-          :zones="zones"
+          data-testid="table-floor-zones"
+          :zones="tabs"
           :active="activeZoneId"
-          :tables="painted"
+          :label="$t('table.floor.zones')"
           @change="(id: string) => (activeZoneId = id)"
         />
         <span
@@ -323,7 +332,12 @@ function onZoneSaved(zone: ZoneOut): void {
         </ion-button>
       </InlineFeedback>
 
-      <FloorSkeleton v-if="loading" />
+      <FloorSkeleton
+        v-if="loading"
+        data-testid="table-floor-loading"
+        :label="$t('table.floor.loading')"
+        :variant="asCards ? 'cards' : 'plan'"
+      />
       <EmptyState
         v-else-if="!zones.length"
         data-testid="table-floor-empty-zones"
@@ -332,18 +346,17 @@ function onZoneSaved(zone: ZoneOut): void {
       />
       <template v-else>
         <FloorSummary
-          :zone="activeZone"
-          :tables="inService"
+          v-bind="summary"
+          data-testid="table-floor-summary"
+          :label="$t('table.floor.summary.label')"
         />
         <template v-if="asCards">
           <FloorCards
             v-if="tables.length"
-            :tables="tables"
-            :now="now"
-            :time-zone="settings.timezone"
-            :settings="settings"
-            :pick="pickable"
-            @select="onSelect"
+            data-testid="table-floor-cards"
+            :tables="cards"
+            :label="$t('table.floor.cardsLabel')"
+            @select="onCard"
           />
           <EmptyState
             v-else

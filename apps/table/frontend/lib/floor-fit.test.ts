@@ -50,6 +50,7 @@ describe('paintBox', () => {
       y: 125.2,
       width: 93.6,
       height: 93.6,
+      slot: 144,
     });
   });
 
@@ -64,6 +65,11 @@ describe('paintBox', () => {
   it('leaves a genuinely wide rectangle at its full height', () => {
     const painted = paintBox(tableRow({ shape: 'rectangle', width: 144, height: 72 }), fit);
     expect(painted.height).toBe(93.6);
+  });
+
+  it('owns the width of its place on the plan, which its label never leaves', () => {
+    expect(paintBox(tableRow({ width: 144 }), fit).slot).toBe(288);
+    expect(paintBox(tableRow({ width: 72 }), { ...fit, spread: 1.7 }).slot).toBe(122.4);
   });
 
   it('keeps the default ten-table grid clear of tables, seats and labels', () => {
@@ -83,6 +89,8 @@ describe('paintBox', () => {
         expect(overlaps).toBe(false);
       }
     }
+    const labels = boxes.slice(0, 5).map((box) => [box.x + box.width / 2 - box.slot / 2, box.x + box.width / 2 + box.slot / 2]);
+    for (const [index, [, right]] of labels.slice(0, -1).entries()) expect(right).toBeLessThanOrEqual(labels[index + 1][0]);
   });
 });
 

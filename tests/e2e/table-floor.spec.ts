@@ -286,7 +286,7 @@ async function glanceRoom(context: BrowserContext): Promise<string[]> {
     party_size: 4,
     label,
   });
-  await post(context, '/table/holds', hold(4, 'Maximiliana Fernández', 30));
+  await post(context, '/table/holds', hold(4, 'Maximiliana Fernández de la Concepción', 30));
   await post(context, '/table/tables/update', { id: ids[5], blocked: true }, 200);
   return ids;
 }
@@ -313,12 +313,17 @@ test('The default zone fits the stage with every status apart, and a phone lists
         const label = await tile(page, id).locator('.table-tile__caption').boundingBox();
         if (!table || !label) throw new Error(`table ${id} is not painted`);
         expect(inside(table, stage), `table ${id} inside the stage at ${viewport.label}`).toBe(true);
+        expect(inside(label, stage), `the label of table ${id} inside the stage at ${viewport.label}`).toBe(true);
         expect(overlaps(table, label), `table ${id} clear of its own label at ${viewport.label}`).toBe(false);
         boxes.push(table, label);
       }
       for (const [index, box] of boxes.entries()) {
         for (const other of boxes.slice(index + (index % 2 ? 1 : 2))) expect(overlaps(box, other), `${viewport.label}: ${JSON.stringify([box, other])}`).toBe(false);
       }
+      // A long name is cut with an ellipsis inside the place of its table; its hour never is.
+      const name = tile(page, ids[4]).locator('[data-part=hold-name]');
+      expect(await name.evaluate((el) => el.scrollWidth > el.clientWidth), `the long name is cut at ${viewport.label}`).toBe(true);
+      await expect(tile(page, ids[4]).locator('[data-part=hold-time]')).toBeVisible();
       for (const theme of ['light', 'dark']) {
         await page.evaluate((dark) => document.documentElement.classList.toggle('ion-palette-dark', dark), theme === 'dark');
         await capture(page, `table-floor-glance-${viewport.label}-${theme}`);

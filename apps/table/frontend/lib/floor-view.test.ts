@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { NOW, occupied, SETTINGS, tableRow } from '../__tests__/tables';
+import type { TableOut } from '../operations';
 import { elapsed, floorView } from './floor-view';
 
 const words: Record<string, string> = {
@@ -24,8 +25,8 @@ function t(key: string, named: Record<string, unknown> = {}): string {
   return Object.entries(named).reduce((result, [name, value]) => result.replace(`{${name}}`, String(value)), text);
 }
 
-function view(table = tableRow(), now = NOW) {
-  return floorView(table, { now, settings: SETTINGS, locale: 'en', timeZone: 'Europe/Madrid', t });
+function view(table = tableRow(), now = NOW, pick: ((table: TableOut) => boolean) | null = null) {
+  return floorView(table, { now, settings: SETTINGS, locale: 'en', timeZone: 'Europe/Madrid', t, pick });
 }
 
 describe('elapsed', () => {
@@ -41,13 +42,18 @@ describe('elapsed', () => {
 describe('floorView', () => {
   it('gives a free table its status inside and its capacity on the label, without inventing a timer', () => {
     const model = view();
-    expect(model).toMatchObject({ minutes: null, tone: 'normal', progress: 0, short: 'Available', pax: '4 pax', labels: ['4 pax'] });
+    expect(model).toMatchObject({ timed: false, tone: 'normal', progress: 0, short: 'Available', statusLabel: 'Available', pax: '4 pax', caption: '4 pax', holder: '' });
     expect(model.accessible).toBe('Table 4 · Dining room · 4 pax · Available');
+  });
+
+  it('carries what the plan draws of the table: its number, status, shape, places, guests and test id', () => {
+    expect(view(occupied())).toMatchObject({ id: 't1', number: '4', status: 'occupied', shape: 'square', capacity: 4, guests: 3, ratio: 1, testid: 'table-floor-tile-t1' });
+    expect(view(tableRow({ shape: 'rectangle' })).ratio).toBeCloseTo(1 / 0.68);
   });
 
   it('gives an occupied table elapsed time, guests and its server', () => {
     const model = view(occupied());
-    expect(model).toMatchObject({ minutes: 35, tone: 'normal', short: '0:35', pax: '3/4 pax', labels: ['Occupied · 3/4 pax'] });
+    expect(model).toMatchObject({ timed: true, tone: 'normal', short: '0:35', statusLabel: 'Occupied', pax: '3/4 pax', caption: 'Occupied · 3/4 pax' });
     expect(model.progress).toBeCloseTo((35 / 90) * 100);
     expect(model.accessible).toContain('3 guests · 35 min · Served by Luis');
   });
@@ -62,23 +68,30 @@ describe('floorView', () => {
 
   it('writes the status once: on the label only when the table does not show it inside', () => {
     const untimed = view(occupied({ since: null }));
-    expect([untimed.short, untimed.labels[0]]).toEqual(['Occupied', '3/4 pax']);
+    expect([untimed.short, untimed.caption, untimed.timed]).toEqual(['Occupied', '3/4 pax', false]);
     const blocked = view(tableRow({ status: 'blocked', blocked: true }));
-    expect([blocked.short, blocked.labels]).toEqual(['Blocked', ['4 pax']]);
+    expect([blocked.short, blocked.caption]).toEqual(['Blocked', '4 pax']);
   });
 
-  it('keeps reservation details on a second label line for reserved and free tables', () => {
+  it('keeps who holds a reservation and from what hour, for reserved and free tables', () => {
     const hold = { label: 'Ana', erased: false, held_from: '2026-10-14T18:00:00Z', held_until: '2026-10-14T20:00:00Z', party_size: 4, reserving: true };
     const reserved = view(tableRow({ status: 'reserved', hold }));
-    expect([reserved.short, reserved.holder]).toEqual(['8:00 PM', 'Ana']);
-    expect(reserved.labels).toEqual(['Reserved · 4 pax', 'Ana · 8:00 PM']);
+    expect([reserved.short, reserved.holder, reserved.holdTime, reserved.caption]).toEqual(['8:00 PM', 'Ana', '8:00 PM', 'Reserved · 4 pax']);
     expect(reserved.accessible).toContain('Reserved for Ana · 8:00 PM');
-    expect(view(tableRow({ hold: { ...hold, reserving: false } })).labels).toEqual(['4 pax', 'Ana · 8:00 PM']);
+    const later = view(tableRow({ hold: { ...hold, reserving: false } }));
+    expect([later.caption, later.holder, later.holdTime]).toEqual(['4 pax', 'Ana', '8:00 PM']);
   });
 
   it('keeps exact guest counts above capacity and names erased customers', () => {
-    expect(view(occupied({ guests: 8 })).labels[0]).toBe('Occupied · 8/4 pax');
+    expect(view(occupied({ guests: 8 })).caption).toBe('Occupied · 8/4 pax');
     const erased = tableRow({ hold: { label: '', erased: true, held_from: '2026-10-14T18:00:00Z', held_until: '2026-10-14T20:00:00Z', party_size: 2, reserving: false } });
-    expect(view(erased).labels[1]).toBe('Deleted customer · 8:00 PM');
+    expect([view(erased).holder, view(erased).holdTime]).toEqual(['Deleted customer', '8:00 PM']);
+  });
+
+  it('says whether a table may be picked only while a destination is picked', () => {
+    const free = (table: TableOut) => table.status === 'available';
+    expect(view(tableRow(), NOW, free).pickable).toBe(true);
+    expect(view(occupied(), NOW, free).pickable).toBe(false);
+    expect(view(tableRow()).pickable).toBeUndefined();
   });
 });

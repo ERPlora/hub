@@ -17,7 +17,8 @@ function ignoresReducedMotion(source: string): boolean {
 
 describe('motion of Tables', () => {
   it('reads every page, component and stylesheet', () => {
-    expect(Object.keys(sources).length).toBeGreaterThanOrEqual(20);
+    expect(Object.keys(sources)).toEqual(expect.arrayContaining(['./FloorCanvas.vue', './TableSheet.vue', '../pages/FloorPlanPage.vue']));
+    expect(Object.keys(sources).length).toBeGreaterThanOrEqual(15);
   });
 
   it.each(Object.entries(sources))('%s turns its motion off when the device asks for reduced motion', (_, source) => {

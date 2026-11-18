@@ -7,13 +7,13 @@
 // - Edit plan: every zone and table (the inactive ones greyed out); a tap opens «Edit table», a drag saves
 //   the place at once (a refused one goes back and says so); «+» adds a zone or a table, the pencil edits
 //   the zone.
+import { FloorCards } from '@erplora/ui/components';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { click, EMPLOYEE, flush, type MountOptions, mountTable, page, settle } from '../__tests__/mount-table';
 import { occupied, SETTINGS, tableRow, zoneRow } from '../__tests__/tables';
 import AddModal from '../components/AddModal.vue';
 import FloorCanvas from '../components/FloorCanvas.vue';
-import FloorCards from '../components/FloorCards.vue';
 import TableFormModal from '../components/TableFormModal.vue';
 import TableSheet from '../components/TableSheet.vue';
 import ZoneFormModal from '../components/ZoneFormModal.vue';
@@ -85,6 +85,7 @@ describe('FloorPlanPage · service', () => {
   it('shows a skeleton of the plan while it loads, then each zone tab counts its occupied tables and the card sums up the zone', async () => {
     const s = await setup();
     expect(s.el('loading').attributes('role')).toBe('progressbar');
+    expect(s.el('loading').classes()).toContain('floor-skeleton--plan');
     expect(s.el('summary').exists()).toBe(false);
     await s.show();
     expect(s.el('loading').exists()).toBe(false);
@@ -95,6 +96,21 @@ describe('FloorPlanPage · service', () => {
     expect(s.el('summary').find('[data-stat="guests"]').text()).toBe('3Guests');
   });
 
+  it('names the skeleton, the strip, the summary and the cards in the app’s language', async () => {
+    screenOf(390);
+    const s = await setup({ locale: 'es' });
+    expect(s.el('loading').attributes('aria-label')).toBe('Cargando el plano de sala');
+    expect(s.el('loading').classes()).toContain('floor-skeleton--cards');
+    await s.show();
+    expect(s.el('zones').attributes('aria-label')).toBe('Zonas');
+    expect(s.wrapper.find('[data-testid="table-floor-zone-tab-z1"] [data-part="zone-count-said"]').text()).toBe('1 de 2 mesas ocupadas');
+    expect(s.el('summary').attributes('aria-label')).toBe('Resumen de la zona');
+    expect(s.el('summary').find('[data-part="occupied-of"]').text()).toBe('1 de 2 mesas ocupadas');
+    expect(s.el('summary').find('[data-stat="available"]').text()).toBe('1Disponibles');
+    expect(s.el('cards').attributes('aria-label')).toBe('Mesas por número');
+    expect(s.wrapper.find('[data-testid="table-floor-tile-t4"] [data-part="status"]').text()).toBe('Ocupada');
+  });
+
   it('on a phone lists the zone as cards, and the plan comes back to edit it', async () => {
     screenOf(390);
     const s = await setup();
@@ -102,12 +118,23 @@ describe('FloorPlanPage · service', () => {
     expect(s.el('cards').exists()).toBe(true);
     expect(s.el('canvas').exists()).toBe(false);
     expect(s.tiles()).toEqual(['t1', 't4']);
-    s.wrapper.findComponent(FloorCards).vm.$emit('select', BUSY);
+    s.wrapper.findComponent(FloorCards).vm.$emit('select', 't4');
     await flush();
     expect((s.wrapper.findComponent(TableSheet).props('table') as TableOut).id).toBe('t4');
     await s.mode('edit');
     expect(s.el('cards').exists()).toBe(false);
     expect(s.el('canvas').exists()).toBe(true);
+  });
+
+  it('on a phone a transfer picks its destination among the cards', async () => {
+    screenOf(390);
+    const s = await setup();
+    await s.show();
+    s.wrapper.findComponent(TableSheet).vm.$emit('pick', { mode: 'transfer', table: BUSY, check: BUSY.checks[0] });
+    await flush();
+    const card = (id: string) => s.wrapper.find(`[data-testid="table-floor-tile-${id}"]`).classes();
+    expect(card('t4')).toContain('floor-card--dimmed');
+    expect(card('t1')).toContain('floor-card--target');
   });
 
   it('a tablet keeps the plan', async () => {
@@ -136,8 +163,8 @@ describe('FloorPlanPage · service', () => {
     Object.defineProperty(strip, 'scrollLeft', { configurable: true, writable: true, value: 0 });
     strip.dispatchEvent(new Event('scroll'));
     await flush();
-    expect(s.el('zones').classes()).toContain('table-floor__zones--more-right');
-    expect(s.el('zones').classes()).not.toContain('table-floor__zones--more-left');
+    expect(s.el('zones').classes()).toContain('floor-zone-tabs--more-right');
+    expect(s.el('zones').classes()).not.toContain('floor-zone-tabs--more-left');
   });
 
   it('a tap opens the table’s window, which follows the live table', async () => {

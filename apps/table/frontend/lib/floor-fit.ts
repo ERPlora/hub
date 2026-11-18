@@ -1,3 +1,5 @@
+import type { FloorBox } from '@erplora/ui/components';
+
 import type { Size } from './floor';
 import type { TableOut } from '../operations';
 
@@ -13,13 +15,6 @@ export interface FloorFit {
   spread: number;
   box: number;
   plane: Size;
-}
-
-export interface PaintedBox {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
 }
 
 function rounded(value: number): number {
@@ -47,7 +42,8 @@ export function paintedRatio(table: Shaped): number {
   return table.width / (table.height * heightShare(table));
 }
 
-export function paintBox(table: TableOut, fit: FloorFit): PaintedBox {
+/** Where a table is painted: its box spread over the plan, the table centred in it at its own scale. */
+export function paintBox(table: TableOut, fit: FloorFit): FloorBox {
   const width = table.width * fit.box;
   const height = table.height * fit.box * heightShare(table);
   return {
@@ -55,5 +51,6 @@ export function paintBox(table: TableOut, fit: FloorFit): PaintedBox {
     y: rounded(table.position_y * fit.spread + (table.height * fit.spread - height) / 2),
     width: rounded(width),
     height: rounded(height),
+    slot: rounded(table.width * fit.spread),
   };
 }
