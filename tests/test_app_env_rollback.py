@@ -9,7 +9,18 @@ import copy
 import json
 
 import pytest
-from app_env_doubles import COMMIT, PRE, PROD, FakeCommands, kinds, load, revision, settings, with_production
+from app_env_doubles import (
+    COMMIT,
+    PRE,
+    PROD,
+    FakeCommands,
+    assert_reads_the_settings_in_force_then_the_saas,
+    kinds,
+    load,
+    revision,
+    settings,
+    with_production,
+)
 
 app_env_rollback = load("app_env_rollback")
 app_env = app_env_rollback.app_env
@@ -59,16 +70,8 @@ def test_a_rollback_records_the_settings_of_the_commit_it_goes_back_to(monkeypat
 
     assert roll_back(monkeypatch, workdir, commands) == 0
 
-    assert recorded(workdir) == older_prod()
+    assert (workdir / "app_env.json").read_text() == json.dumps(older_prod(), sort_keys=True, separators=(",", ":"))
     assert ["git", "show", f"{COMMIT}:deploy/app-env.json"] in commands.calls
-
-
-def test_the_settings_to_record_are_compact_json_with_sorted_keys(monkeypatch, workdir):
-    section = {"worker": dict(reversed(PROD["worker"].items())), "hub": dict(reversed(PROD["hub"].items()))}
-
-    assert roll_back(monkeypatch, workdir, FakeCommands(file=json.dumps(settings(prod=section)))) == 0
-
-    assert (workdir / "app_env.json").read_text() == json.dumps(PROD, sort_keys=True, separators=(",", ":"))
 
 
 def test_the_migration_keeps_its_settings_in_force(monkeypatch, workdir):
@@ -89,14 +92,7 @@ def test_a_rollback_reads_the_settings_in_force_and_the_saas_revision_of_its_env
 
     roll_back(monkeypatch, workdir, commands)
 
-    reads = [command for command in commands.calls if command[0] == "aws"]
-    assert [command[:3] for command in reads] == [
-        ["aws", "ssm", "get-parameter"],
-        ["aws", "ecs", "describe-task-definition"],
-    ]
-    assert all(command[command.index("--region") + 1] == "eu-west-1" for command in reads)
-    assert "/erplora/prod/hub/app_env" in reads[0]
-    assert "erplora-prod-saas" in reads[1]
+    assert_reads_the_settings_in_force_then_the_saas(commands)
 
 
 def test_pre_neither_reads_the_saas_nor_asks_for_the_confirmation(monkeypatch, workdir):

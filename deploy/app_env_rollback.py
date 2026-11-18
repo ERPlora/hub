@@ -13,10 +13,8 @@ SaaS charging. Then it writes app_env.json with what ecs-rollback.sh records onc
 reports every problem and changes nothing. Standard library only: it runs on the deploy runner's python3.
 """
 
-import argparse
 import json
 import sys
-from pathlib import Path
 
 import app_env
 
@@ -68,18 +66,11 @@ def roll_back(workdir, environment, commit, region, confirm):
         problems += app_env.charging_problems(section, app_env.saas_charges(region))
     if problems:
         raise app_env.Refused(problems)
-    record = to_record(section, in_force)
-    (workdir / "app_env.json").write_text(json.dumps(record, sort_keys=True, separators=(",", ":")))
+    app_env.write_settings(workdir, to_record(section, in_force))
 
 
 def main(argv=None):
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("workdir", type=Path)
-    parser.add_argument("environment", choices=app_env.ENVIRONMENTS)
-    parser.add_argument("commit")
-    parser.add_argument("region")
-    parser.add_argument("--confirm", default="", help="the protected changes confirmed, NAME=value[,NAME=value]")
-    args = parser.parse_args(argv)
+    args = app_env.arguments(argv, __doc__.splitlines()[0])
     try:
         roll_back(args.workdir, args.environment, args.commit, args.region, args.confirm)
     except app_env.Refused as refused:

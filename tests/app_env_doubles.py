@@ -134,3 +134,15 @@ class FakeCommands:
             raise app_env.CommandFailed("An error occurred (ClientException): Unable to describe task definition.")
         invoicing = "true" if self.saas_charging else "false"
         return json.dumps({"taskDefinition": revision("saas", {"PLATFORM_INVOICING_ENABLED": invoicing})})
+
+
+def assert_reads_the_settings_in_force_then_the_saas(commands):
+    """A prod run reads only the settings in force and then the SaaS's latest revision, in its region."""
+    reads = [command for command in commands.calls if command[0] == "aws"]
+    assert [command[:3] for command in reads] == [
+        ["aws", "ssm", "get-parameter"],
+        ["aws", "ecs", "describe-task-definition"],
+    ]
+    assert all(command[command.index("--region") + 1] == "eu-west-1" for command in reads)
+    assert "/erplora/prod/hub/app_env" in reads[0]
+    assert "erplora-prod-saas" in reads[1]

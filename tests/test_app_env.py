@@ -16,6 +16,7 @@ from app_env_doubles import (
     FakeCommands,
     app_env,
     app_environment,
+    assert_reads_the_settings_in_force_then_the_saas,
     kinds,
     revision,
     settings,
@@ -510,14 +511,7 @@ def test_a_deploy_reads_the_settings_in_force_and_the_saas_revision_of_its_envir
 
     deploy(monkeypatch, workdir, commands)
 
-    reads = [command for command in commands.calls if command[0] == "aws"]
-    assert [command[:3] for command in reads] == [
-        ["aws", "ssm", "get-parameter"],
-        ["aws", "ecs", "describe-task-definition"],
-    ]
-    assert all(command[command.index("--region") + 1] == "eu-west-1" for command in reads)
-    assert "/erplora/prod/hub/app_env" in reads[0]
-    assert "erplora-prod-saas" in reads[1]
+    assert_reads_the_settings_in_force_then_the_saas(commands)
 
 
 def test_pre_neither_reads_the_saas_nor_asks_for_the_confirmation(monkeypatch, workdir):
