@@ -1,6 +1,6 @@
 """The API's documentation speaks to whoever integrates, never in the words of the Hub's own code.
 
-Every schema of ``/api/openapi.json`` (and so of the Postman collection made from it) is read here. A description may
+Every description of ``/api/openapi.json`` (and so of the Postman collection made from it) is read here. One may
 name an operation (``base.app.get``: the ``operationId`` an integrator calls) or a value the API sends or takes, quoted
 as «base.team»; it never names a module, a function or a constant of the Hub's code (``base.usage``,
 ``live.assistant.NAMED``): whoever integrates does not have that code, and the name stops existing as soon as the code
@@ -35,10 +35,22 @@ def descriptions(node: object, path: str) -> list[tuple[str, str]]:
     return found + [item for key, value in node.items() for item in descriptions(value, f"{path}/{key}")]
 
 
-def test_no_schema_description_names_the_hubs_code():
-    schemas = api.get_openapi_schema()["components"]["schemas"]
-    named = [(where, name) for where, text in descriptions(schemas, "") for name in code_names(text)]
+def documented() -> list[tuple[str, str]]:
+    """``(where, text)`` of every description ``/api/openapi.json`` carries.
+
+    The whole document, not only its schemas: a query's fields reach it as the parameters of its operation, under
+    ``paths``, and never as a schema of their own.
+    """
+    return descriptions(api.get_openapi_schema(), "")
+
+
+def test_no_description_of_the_api_names_the_hubs_code():
+    named = [(where, name) for where, text in documented() for name in code_names(text)]
     assert named == []
+
+
+def test_the_query_parameters_of_an_operation_are_read_too():
+    assert any("/parameters[" in where for where, _ in documented())
 
 
 def test_a_schema_is_read_with_its_fields_and_their_alternatives():
@@ -64,6 +76,10 @@ def test_a_schema_is_read_with_its_fields_and_their_alternatives():
         ("The size of the business's own database, as the last night measured it (``base.usage``).", ["base.usage"]),
         ("without it, how many it carries (`live.assistant.NAMED`).", ["live.assistant.NAMED"]),
         ("Its price, as apps.sale.services.total adds it.", ["apps.sale.services.total"]),
+        (
+            "Moved by control.services.move, as config.settings says, with shared.models.",
+            ["control.services.move", "config.settings", "shared.models"],
+        ),
         ("``base.app.enable`` and ``base.app.disable``: one app of the business.", []),
         ("«<app>.<step>»: «base.apps», «base.mandatory.<app>» or «base.team».", []),
         ("catalog:<folder>/<name> (base.catalog_image.search, inventory.product.suggest_image), or empty.", []),
