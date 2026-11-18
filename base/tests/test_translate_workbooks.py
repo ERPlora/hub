@@ -413,7 +413,7 @@ def key(monkeypatch, tmp_path):
     """Where ``translate`` looks for the key, this test's only: nowhere until ``environment`` or ``dotenv``."""
     for name in ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_PROFILE"):
         monkeypatch.delenv(name, raising=False)
-    # python-decouple's config, as settings.py loaded it: the checkout's .env stays out.
+    # python-decouple's config, as config.settings loaded it: the checkout's .env stays out.
     monkeypatch.setattr(decouple.config, "config", Config(RepositoryEmpty()))
 
     def install(*, environment: str | None = None, dotenv: str | None = None) -> None:

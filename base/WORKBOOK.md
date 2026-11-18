@@ -3656,7 +3656,7 @@ Implicados: BASE-F92, BASE-F93
   browser notices that are no error»). `POST /api/error-report` (`base/error_report.py`, fuera de ninja: un beacon no lleva CSRF) exige
   sesión, 30 por minuto y persona (`base.rate_limited`), cuerpo ≤ 16 KB y JSON, y escribe una línea `frontend.error
   {json}` en ERROR del logger `base.error_report` (host, usuario, pantalla, mensaje y traza recortados); el logging
-  va a la consola y de ahí a CloudWatch (`config/settings.py` `LOGGING`). Tests: `base/tests/test_error_report.py`,
+  va a la consola y de ahí a CloudWatch (`config/settings/observability.py` `LOGGING`). Tests: `base/tests/test_error_report.py`,
   `base/frontend/lib/error-report.test.ts`.
 - Pantalla: `SystemPage.vue` con `SystemUsage.vue`, `SystemRelease.vue`, `FailedEvents.vue` (descartar en
   `ConfirmDialog` con motivo; reenviar todos con `confirm`) y `SystemLog.vue` (`DataTable` con tarjetas en el móvil).

@@ -101,7 +101,7 @@ tal cual.
 ## Un corte de la base de datos (BASE-F111)
 
 Un reinicio del escritor, un mantenimiento de AWS o el cambio de Blue/Green cortan la base unos segundos (PLAN-DB, ronda
-2026-11-04e, punto 5). El Hub enciende `live.database_cut` (`LIVE["database_cut"]` en `config/settings.py`; qué es un
+2026-11-04e, punto 5). El Hub enciende `live.database_cut` (`LIVE["database_cut"]` en `config/settings/modules.py`; qué es un
 corte y qué se repite, en el README de `packages/live`):
 
 - **Espera** hasta `DB_CUT_WAIT_SECONDS` (20 s por defecto, muy por debajo de los 120 s del balanceador) y repite sola una
