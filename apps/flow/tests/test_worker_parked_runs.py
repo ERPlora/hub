@@ -8,8 +8,7 @@ holds it yet. Two ways reach it: the outbox relay (``flow.run.parked`` → ``flo
 (``WORKER_SCOPE_SLUG``), so what the customer gets never depends on the minute a tick lands on. Neither way gives two
 turns or two calls: the claim of the step holds it for one.
 
-Real databases, committed: the session's ``hub_a`` and ``hub_b``. The suite's ``legacy.worker_pass`` is not this path:
-with every business's rows in one database, it runs the tasks on the scope of one of them.
+Real databases, committed: the session's ``hub_a`` and ``hub_b``.
 """
 
 import datetime as dt
@@ -40,7 +39,6 @@ from .local_https import Handler
 
 pytestmark = [
     pytest.mark.django_db(transaction=True, databases=hubs.HUB_DATABASES),
-    pytest.mark.usefixtures("no_test_fallback"),
 ]
 
 CHAT = "/internal/assistant/chat"

@@ -733,7 +733,6 @@ def asked_again_gives_nothing(recoveries, copy) -> None:
     assert said(again) == ("done", [CATEGORIES, PRODUCTS, LINKS])
 
 
-@pytest.mark.usefixtures("no_test_fallback")
 class TestProductsComeBack:
     def a_business(self, recoveries, every_app_on):
         """A business with two categories and three products made by their screen's operations, and their ids."""

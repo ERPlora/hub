@@ -43,8 +43,6 @@ from base.tenancy.tests.test_restore import AFTER, AS_THEN, SINCE, THEN, Restore
 from control import services as control_services
 from control.models import Cluster, Hub, MovedCopy, RestoredCopy
 
-pytestmark = pytest.mark.usefixtures("no_test_fallback")
-
 AT = dt.datetime(2026, 11, 12, 9, 0, tzinfo=dt.UTC)
 #: What a copy of the business at another moment holds besides ``AS_THEN``.
 OTHER_MOMENT = "as it was at another moment"

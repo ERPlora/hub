@@ -43,8 +43,6 @@ from base.tests.test_worker_activations import (  # noqa: F401 (fixtures)
 )
 from control.models import Hub
 
-pytestmark = pytest.mark.usefixtures("no_test_fallback")
-
 
 @pytest.fixture
 def with_modules(business):  # noqa: F811

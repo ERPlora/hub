@@ -18,7 +18,7 @@ from django.test import Client
 from live.operations import INTERNAL
 from live.operations import get as get_operation
 
-from base import services
+from base.access import CREDENTIAL_SESSION_KEY
 from base.models import Membership
 from base.tenancy.context import use_hub
 from base.tests.conftest import ANA, SECRET
@@ -180,7 +180,7 @@ class TestOnlyWithTheAccount:
 
     def test_a_session_that_does_not_say_how_it_was_opened_gets_no_pass(self, client, account):
         session = client.session
-        del session[services.CREDENTIAL_SESSION_KEY]
+        del session[CREDENTIAL_SESSION_KEY]
         session.save()
 
         self.refused(ask(client))

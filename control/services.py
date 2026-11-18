@@ -698,7 +698,7 @@ def _restoring_ours(hub: Hub, source_id: UUID, owner: str, *, forward: bool, loc
 
 
 def _held(hub: Hub, owner: str, *, forward: bool, lock: bool) -> None:
-    # Whoever holds it: one that ran out and nobody took is still ``owner``'s (``base.services.renew_lease`` too).
+    # Whoever holds it: one that ran out and nobody took is still ``owner``'s (``base.services.reset.renew_lease`` too).
     leases = HubDue.objects.select_for_update() if lock else HubDue.objects
     if not leases.filter(pk=hub.pk, lease_owner=owner).exists():
         raise MoveTaken(f"the lease of {hub.slug} is no longer {owner}'s.")

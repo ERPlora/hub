@@ -411,9 +411,7 @@ del equipo con su sesión abierta.
   lo guarda la página con `service.service.update`, con el permiso de quien lo toca.
 - Modelos (UUIDv7, sin `hub_id`): `Settings` (una fila; sin ella, los de fábrica) y `Booking` (una por cita
   reservada desde la página: la cita, el hash del enlace y la huella del visitante). Cada negocio tiene su propia
-  BD, así que la fila única de `Settings` (y las `Booking`) es la de ese negocio; solo el respaldo de los tests
-  escritos antes de la tenencia (`base/tenancy/tests/legacy.py`) guarda `a` y `b` en la misma BD y les hace
-  compartirla.
+  BD, así que la fila única de `Settings` (y las `Booking`) es la de ese negocio.
 - **Operaciones públicas**: permiso `online_booking.public` (contrato arriba). Para lo que piden a otras
   apps usan `delegated(ctx)`: el mismo contexto con los permisos justos de Citas, Clientes, Servicios,
   Horarios y Personal (como `appointment.queries.reader`), y como actor «online booking» cuando no hay

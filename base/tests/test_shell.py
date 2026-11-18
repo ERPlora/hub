@@ -10,18 +10,12 @@ import contextvars
 import pytest
 from django.core.management import CommandError, call_command
 
-from base.tenancy import context
 
 from base.tenancy.tests import hubs
 
-pytestmark = [pytest.mark.django_db(databases=hubs.HUB_DATABASES), pytest.mark.usefixtures("no_fallback")]
+pytestmark = pytest.mark.django_db(databases=hubs.HUB_DATABASES)
 
 PROBE = "from base.tenancy import context; print(context.current().kind, context.current_hub() and context.current_hub().slug)"
-
-
-@pytest.fixture
-def no_fallback(monkeypatch):
-    monkeypatch.setattr(context, "_test_fallback", None)
 
 
 def shell(*args, **options) -> None:

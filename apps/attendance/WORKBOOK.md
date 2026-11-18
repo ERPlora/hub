@@ -549,8 +549,8 @@ Los avisos nunca llevan la posición ni el motivo de una corrección (datos pers
   en **solo lectura** (salvo la nota interna de la jornada), sin alta ni borrado: una hora solo cambia
   con `attendance.record.correct`, que deja rastro. Contradice el «CRUD completo sobre todas sus
   tablas» del admin; lo impone el art. 34.9 ET, como en `invoice` lo impone el RD 1619/2012.
-- Tenencia: el ámbito es la primera parte del Host y cada negocio tiene su propia BD: los datos de `a` no se ven en `b`. Solo los tests escritos antes de la tenencia guardan `a` y `b`
-  en la misma BD de test (`base/tenancy/tests/legacy.py`). El PIN y el modo de cada dispositivo
+- Tenencia: el ámbito es la primera parte del Host y cada negocio tiene su propia BD: los datos de `a` no se ven en `b`.
+  El PIN y el modo de cada dispositivo
   (compartido o personal) son de `base` (BASE-F55, BASE-F62): Control horario solo lee el modo.
 
 ## Lo que queda fuera

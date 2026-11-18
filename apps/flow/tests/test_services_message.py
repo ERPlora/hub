@@ -131,7 +131,7 @@ def test_without_the_file_it_asks_for_nothing_is_sent_and_the_history_says_why()
 
 
 @HUB_DB
-@pytest.mark.usefixtures("hub_files", "no_test_fallback")
+@pytest.mark.usefixtures("hub_files")
 def test_a_file_of_another_business_is_never_sent(hub_a, hub_b):
     """Another business's file lives in its own database: an automation here that names it finds none and sends
     nothing."""

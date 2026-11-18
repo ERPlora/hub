@@ -824,8 +824,7 @@ vende, y si Menús no está activo el TPV no ofrece menús.
   modelo.
 - El admin de Django del Hub tiene **CRUD completo** sobre los tres modelos (PLAN §17); una
   escritura cruda del admin no deja aviso.
-- Tenencia: el ámbito es la primera parte del Host y cada negocio tiene su propia BD: los datos de `a` no se ven en `b`. Solo los tests escritos antes de la tenencia guardan `a` y `b`
-  en la misma BD de test (`base/tenancy/tests/legacy.py`).
+- Tenencia: el ámbito es la primera parte del Host y cada negocio tiene su propia BD: los datos de `a` no se ven en `b`.
 - En el navegador: `tests/e2e/combo-menus.spec.ts` (oculto, con Inventario e Impuestos de verdad), que
   borra lo suyo (`E2E Combo …`, `E2E-CMB-…`) antes y después, y `tests/e2e/combo-till.spec.ts` (el TPV de
   Ventas, Cocina e Inventario de verdad y un paso del relay: COMBO-F07–F11), que borra `e2e Combo …` y

@@ -573,8 +573,7 @@ horario» de «Termina de configurar tu negocio» (SCHEDULE-F03).
 - El admin de Django del Hub tiene **CRUD completo** sobre todos los modelos (PLAN §17), con
   los tramos como líneas de su día; ids y fechas de auditoría, de solo lectura. Una escritura cruda del
   admin no deja aviso.
-- Tenencia: el ámbito es la primera parte del Host y cada negocio tiene su propia BD: los datos de `a` no se ven en `b`. Solo los tests escritos antes de la tenencia guardan `a` y `b`
-  en la misma BD de test (`base/tenancy/tests/legacy.py`).
+- Tenencia: el ámbito es la primera parte del Host y cada negocio tiene su propia BD: los datos de `a` no se ven en `b`.
 - La semana por defecto la planta la migración `0002_default_week` (con su vuelta atrás, que solo quita
   la semana si sigue sin confirmar).
 - **El paso del Inicio**: `ScheduleConfig.setup` declara el `setup`: clave `schedule.hours`, sobre

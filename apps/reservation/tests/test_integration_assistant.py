@@ -13,7 +13,6 @@ from live.context import Scope
 from live.operations import get, registry
 
 from base import assistant
-from base.tenancy import context
 from base.tenancy.context import use_hub
 from base.tests.test_assistant import technical_names
 from base.tests.test_assistant_card_values_references import AN_ID
@@ -295,9 +294,8 @@ def test_a_record_the_person_may_not_read_is_left_out_never_by_its_id():
 
 
 @HUB_DB
-def test_a_record_of_another_business_is_left_out_never_by_its_id(hub_a, hub_b, monkeypatch):
+def test_a_record_of_another_business_is_left_out_never_by_its_id(hub_a, hub_b):
     """Each business reads its own book: a reservation of business B named to business A's assistant is not there."""
-    monkeypatch.setattr(context, "_test_fallback", None)
     with use_hub(hub_b):
         theirs = make_reservation()
     with use_hub(hub_a):

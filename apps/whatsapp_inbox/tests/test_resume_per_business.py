@@ -5,7 +5,6 @@ import json
 import uuid
 
 import httpx
-import pytest
 import respx
 from live.context import Scope
 
@@ -15,7 +14,6 @@ from base.tenancy.context import use_hub
 
 pytestmark = [
     HUB_DB,
-    pytest.mark.usefixtures("no_test_fallback"),
 ]
 
 SAAS = "http://saas.test"

@@ -22,7 +22,7 @@ pytestmark = ON_HUB_A
 
 
 def with_badge(user, card: str) -> Credential:
-    digest = access.badge_digest(access.clean_badge(card), key=services.badge_key())
+    digest = access.badge_digest(access.clean_badge(card), key=services.devices.badge_key())
     return Credential.objects.create(username=user.username, badge_digest=digest, badge_set_at=timezone.now())
 
 
@@ -42,8 +42,8 @@ def ana(make_user):
 
 def test_the_hub_s_key_is_made_once_and_kept(hub_a):
     with use_hub(hub_a):
-        first = services.badge_key()
-        assert len(first) == 32 and services.badge_key() == first
+        first = services.devices.badge_key()
+        assert len(first) == 32 and services.devices.badge_key() == first
         assert AccessSettings.objects.get().badge_key == first.hex()
 
 

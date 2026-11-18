@@ -209,7 +209,6 @@ def test_a_server_without_erplora_s_address_says_so(settings):
 
 @respx.mock
 @HUB_DB
-@pytest.mark.usefixtures("no_test_fallback")
 def test_the_number_meta_s_window_chose_is_the_business_s_at_once(hub_a, hub_b):
     from base.tenancy.context import use_hub
     from live.context import Scope

@@ -6,7 +6,7 @@ on every route of the API whose operation is published (``expose_api``) and need
 when the request carries one (the session's own door would refuse a request without its CSRF token before the key
 was looked at), else the session goes on as always. A route no app publishes never opens to a key.
 
-The door (:class:`KeyDoor`) asks ``base.services.authenticate_api_key`` (the ORM's side) for the key of the token in
+The door (:class:`KeyDoor`) asks ``base.services.api_keys.authenticate_api_key`` (the ORM's side) for the key of the token in
 the request's hub — the hub's own database: a key of another business does not exist there — and then this module's
 rules: what the key may do (read reaches the published queries of an app, write its published commands), its pace
 (requests a minute) and the brake on an address that tries tokens nobody issued (``AttemptLimit``, as the PIN's).
@@ -110,7 +110,7 @@ class KeyDoor(HttpBearer):
             return None
         from base import services
 
-        return services.authenticate_api_key(request, token, get(self.op_name))
+        return services.api_keys.authenticate_api_key(request, token, get(self.op_name))
 
 
 def install(api: NinjaAPI) -> list[str]:

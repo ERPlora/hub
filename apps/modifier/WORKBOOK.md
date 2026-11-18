@@ -645,12 +645,6 @@ Los papeles llegan del SaaS con prefijo (`hub_owner`, `hub_admin`, `hub_manager`
   opciones por defecto dentro del máximo, las 100 opciones por grupo); la base de datos sí le rechaza
   nombres repetidos, un máximo por debajo del mínimo, una opción con IVA propio que no vale más de cero y
   enganches vacíos, dobles o repetidos.
-- **Señalado, sin resolver aquí**:
-  - `apps/modifier/tests/test_events.py` (`test_the_reaction_runs_as_the_system_scope_given`) da por bueno que la
-    reacción de un ámbito B borre los enganches que creó A: solo pasa bajo el respaldo de los tests, que guarda
-    `a` y `b` en la misma BD de test (`base/tenancy/tests/legacy.py`). En producción cada negocio tiene su BD
-    y la reacción solo ve los suyos; el test tendrá que decirlo cuando se retire el
-    respaldo (hub#611).
 
 - **Páginas** (`frontend/`): `pages/GroupsPage.vue` (la tabla, `useLiveList` en ventanas de hasta 100),
   `components/GroupSheet.vue` (la hoja: `modifier.group.get` vivo y dos `useSheetList` de 20 en 20),

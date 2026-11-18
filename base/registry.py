@@ -18,7 +18,6 @@ from live.context import OperationContext, Scope
 from live.errors import PermissionDenied
 
 from base.schemas import HubOut
-from base.tenancy.context import serves_hubs_without_database
 from control.models import Hub
 
 #: The scope of the registry's operations (``base.hub.*``): the platform's, never a hub's.
@@ -118,9 +117,7 @@ def database_is_made(hub: Hub) -> bool:
     to share a database and was not yet cut (``db_name=""``): what reaches it waits on its row for the day it is made
     (its seeding, its cut).
     :func:`own_database_made` is the same, as a query."""
-    if not hub.db_name:
-        return serves_hubs_without_database()
-    if hub.status in DROPPED_STATUSES:
+    if not hub.db_name or hub.status in DROPPED_STATUSES:
         return False
     return hub.status == Hub.Status.READY or hub.ready_at is not None
 
@@ -168,7 +165,7 @@ def refusal(hub: Hub | None, *, ended: bool = True) -> Refusal | None:
         return Refusal(410, HUB_GONE, gettext("This hub is no longer available."))
     if is_preparing(hub):
         return Refusal(503, HUB_PREPARING, gettext("This hub is still being prepared; try again in a few seconds."))
-    if is_copying(hub) or not (hub.db_name or serves_hubs_without_database()):
+    if is_copying(hub) or not hub.db_name:
         return Refusal(503, HUB_MAINTENANCE, gettext("This hub is under maintenance for a few minutes; try again shortly."))
     if is_suspended(hub):
         return Refusal(402, HUB_SUSPENDED, gettext("This business is suspended until its unpaid invoice is paid."))

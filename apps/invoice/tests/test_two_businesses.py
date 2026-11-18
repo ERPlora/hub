@@ -26,8 +26,7 @@ def invoice(ctx=None):
     return run("invoice.invoice.create", {"lines": [LINE], **RECIPIENT}, ctx)
 
 
-def test_a_test_of_invoicing_runs_in_hub_as_own_database_with_no_fallback():
-    assert context._test_fallback is None
+def test_a_test_of_invoicing_runs_in_hub_as_own_database():
     assert context.current_alias() == hubs.HUB_A_ALIAS
 
 

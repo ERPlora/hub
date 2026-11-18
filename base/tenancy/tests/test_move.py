@@ -40,8 +40,6 @@ from base.tenancy.tests import hubs, s3
 from base.tenancy.tests.s3 import aws_test_credentials, body, dumps_bucket, moto_s3, objects  # noqa: F401
 from control.models import Cluster, Hub, HubDue, HubDump, LeftoverDatabase, MovedCopy
 
-pytestmark = pytest.mark.usefixtures("no_test_fallback")
-
 AT = dt.datetime(2026, 10, 31, 12, 0, tzinfo=dt.UTC)
 MARKER = "kept across the move"
 

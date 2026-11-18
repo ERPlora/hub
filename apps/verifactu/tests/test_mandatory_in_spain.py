@@ -44,7 +44,7 @@ def test_it_declares_spain_and_that_only_its_owner_turns_it_on():
 
 
 @pytest.mark.django_db(databases=hubs.HUB_DATABASES)
-def test_a_business_of_spain_with_it_off_is_asked_to_turn_it_on_and_one_of_poland_is_not(hub_a, hub_b, no_test_fallback):
+def test_a_business_of_spain_with_it_off_is_asked_to_turn_it_on_and_one_of_poland_is_not(hub_a, hub_b):
     business_in("PL", hub_a.slug)
     business_in("ES", hub_b.slug)
     of_a, of_b = Scope("host", hub_a.slug), Scope("host", hub_b.slug)
@@ -69,7 +69,7 @@ def test_a_business_of_spain_with_it_off_is_asked_to_turn_it_on_and_one_of_polan
 
 
 @pytest.mark.django_db(databases=hubs.HUB_DATABASES)
-def test_once_on_the_step_goes_and_verifactus_own_follows_without_touching_the_other_hub(hub_a, hub_b, no_test_fallback):
+def test_once_on_the_step_goes_and_verifactus_own_follows_without_touching_the_other_hub(hub_a, hub_b):
     business_in("ES", hub_a.slug)
     of_a, of_b = Scope("host", hub_a.slug), Scope("host", hub_b.slug)  # b has no country: Spain too
     with context.use_hub(hub_b):
@@ -90,7 +90,7 @@ def test_once_on_the_step_goes_and_verifactus_own_follows_without_touching_the_o
 
 
 @pytest.mark.django_db(databases=hubs.HUB_DATABASES)
-def test_while_its_tables_are_being_made_it_is_not_on_yet_and_the_step_stays(hub_a, no_test_fallback):
+def test_while_its_tables_are_being_made_it_is_not_on_yet_and_the_step_stays(hub_a):
     business_in("ES", hub_a.slug)
     of_a = Scope("host", hub_a.slug)
     # Its database lacks VeriFactu's tables, as one made before VeriFactu was ported: turning it on makes them first.

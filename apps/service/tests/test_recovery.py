@@ -1294,7 +1294,6 @@ def gone(hub, *ids) -> None:
         Service.objects.filter(pk__in=ids).delete()
 
 
-@pytest.mark.usefixtures("no_test_fallback")
 class TestServicesComeBack:
     def a_business(self, recoveries, every_app_on):
         """A business with two categories and four services made by their screen's operations (one archived), the

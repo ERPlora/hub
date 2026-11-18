@@ -34,7 +34,8 @@ function written(folder: string, files: Record<string, string | Buffer>): string
 }
 
 /** Whether `work` lets this worker's event loop turn before it ends: what was given to the loop as the work started
- *  has run by then. A function that holds the thread ends first, and the loop runs it only after. */
+ *  has run by then. A function that holds the thread ends first, and the loop runs it only after. Work that can end
+ *  within a single turn tells nothing apart, so a test that reads small files slows its first read (`slowNextRead`). */
 async function turnsWhile(work: () => Promise<unknown>): Promise<boolean> {
   let turned = false;
   setImmediate(() => {
@@ -42,6 +43,16 @@ async function turnsWhile(work: () => Promise<unknown>): Promise<boolean> {
   });
   await work();
   return turned;
+}
+
+/** Makes the next read from the disk end only once this worker's event loop has turned, as a slow disk's would. On
+ *  Node 26 small files can be read whole before the loop turns at all; slowed, how fast the disk is decides nothing. */
+function slowNextRead(): void {
+  vi.mocked(readFile).mockImplementationOnce(async (path) => {
+    await new Promise((turn) => setImmediate(turn));
+    const fs = await vi.importActual<typeof import('node:fs/promises')>('node:fs/promises');
+    return fs.readFile(path);
+  });
 }
 
 describe('readAll and readText', () => {
@@ -68,6 +79,7 @@ describe('readAll and readText', () => {
 
   it('reads without holding the worker: what the worker was given meanwhile runs before the reading ends', async () => {
     const paths = written('many', Object.fromEntries(Array.from({ length: 50 }, (_, index) => [`${index}.ts`, `export const n = ${index};\n`])));
+    slowNextRead();
     expect(await turnsWhile(() => readAll(paths))).toBe(true);
     expect(paths.map(readText)).toEqual(paths.map((_, index) => `export const n = ${index};\n`));
   });
@@ -77,6 +89,7 @@ describe('readTexts', () => {
   it('gives the texts of the files, in order, read at once without holding the worker', async () => {
     const paths = written('texts', { 'b.ts': 'b\n', 'a.ts': 'a\n' });
     let texts: string[] = [];
+    slowNextRead();
     expect(await turnsWhile(async () => (texts = await readTexts(paths)))).toBe(true);
     expect(texts).toEqual(['b\n', 'a\n']);
   });

@@ -20,16 +20,17 @@ from live.operations import Operation
 from ninja import Schema
 
 from base import outbound
-from base.models import HubIdentity
+from base.models import Hub, HubIdentity
 from base.tenancy import context
 from base.tenancy.tests import hubs
 from base.tenancy.tests.business import A, HUB_DB, HUB_DB_COMMITTED
-from base.tenancy.tests.legacy import LEGACY
 
 #: The platform's (``base.registry.REGISTRY_SCOPE``): its operations run on control from anywhere.
 PLATFORM = Scope("platform", "registry")
 #: The most a test waits for a thread.
 WAIT = 5
+#: Where the pool's own tests run their jobs: control's, the platform's, whose tables are in ``default``.
+CONTROL = context.CONTROL_DATABASE
 
 
 class Done(Schema):
@@ -143,9 +144,8 @@ def test_after_commit_outside_an_operation_is_a_misuse(hub_a):
 
 
 @pytest.mark.django_db(databases=hubs.HUB_DATABASES, transaction=True)
-def test_each_job_runs_in_the_database_of_the_hub_that_asked_and_leaves_nothing_behind(hub_a, hub_b, pool, monkeypatch):
-    # As in production: a thread of its own has no context, and nothing falls back on control's.
-    monkeypatch.setattr(context, "_test_fallback", None)
+def test_each_job_runs_in_the_database_of_the_hub_that_asked_and_leaves_nothing_behind(hub_a, hub_b, pool):
+    # As in production: a thread of its own has no context.
     one_thread, seen = pool(threads=1), []
 
     def where(name):
@@ -169,8 +169,7 @@ def test_each_job_runs_in_the_database_of_the_hub_that_asked_and_leaves_nothing_
 
 
 @pytest.mark.django_db(databases=hubs.HUB_DATABASES, transaction=True)
-def test_a_job_of_a_hub_with_its_own_database_reaches_it_from_a_fresh_thread(hub_a, pool, monkeypatch):
-    monkeypatch.setattr(context, "_test_fallback", None)
+def test_a_job_of_a_hub_with_its_own_database_reaches_it_from_a_fresh_thread(hub_a, pool):
     seen = []
     with context.use_hub(hub_a):
         job = job_here(lambda: seen.append(context.current_alias()))
@@ -206,7 +205,6 @@ def test_a_job_for_another_hub_never_reaches_its_database(hub_a, hub_b, pool, mo
     """A hub's database holds only its own rows. A job it says is for another hub stays in its database, sees only its
     rows and the other's operation is refused; one for the platform runs on control. No job ever reaches another hub's
     database (there is no shared database to hand it to)."""
-    monkeypatch.setattr(context, "_test_fallback", None)
     monkeypatch.setattr(outbound, "_pool", pool(threads=1))
     seen: list = []
     job = for_its_business(seen)
@@ -257,7 +255,7 @@ def test_at_most_its_threads_run_at_once(pool):
             running.remove(n)
 
     for n in range(5):
-        assert two.submit(outbound.Job(job, (n,), LEGACY))
+        assert two.submit(outbound.Job(job, (n,), CONTROL))
     assert eventually(lambda: len(running) == 2)
     time.sleep(0.1)  # a third thread, had there been one, would have started by now
     assert len(running) == 2
@@ -273,12 +271,12 @@ def test_the_same_job_already_waiting_is_not_queued_twice(pool):
         ran.append(run_id)
         let_go.wait(WAIT)
 
-    assert one.submit(outbound.Job(job, ("r1",), LEGACY))
+    assert one.submit(outbound.Job(job, ("r1",), CONTROL))
     assert eventually(lambda: ran == ["r1"])  # running
-    assert one.submit(outbound.Job(job, ("r2",), LEGACY))  # waits
-    assert not one.submit(outbound.Job(job, ("r2",), LEGACY))  # a sweep sends it again: not twice
+    assert one.submit(outbound.Job(job, ("r2",), CONTROL))  # waits
+    assert not one.submit(outbound.Job(job, ("r2",), CONTROL))  # a sweep sends it again: not twice
     # r1 runs, it no longer waits: the next step of its run may need it again (its claim says whether it goes).
-    assert one.submit(outbound.Job(job, ("r1",), LEGACY))
+    assert one.submit(outbound.Job(job, ("r1",), CONTROL))
     let_go.set()
     assert eventually(lambda: ran == ["r1", "r2", "r1"])
 
@@ -290,11 +288,11 @@ def test_past_its_queue_a_job_is_dropped_with_a_warning_and_its_app_sends_it_aga
         ran.append(n)
         let_go.wait(WAIT)
 
-    assert one.submit(outbound.Job(job, (1,), LEGACY))
+    assert one.submit(outbound.Job(job, (1,), CONTROL))
     assert eventually(lambda: ran == [1])
-    assert one.submit(outbound.Job(job, (2,), LEGACY))  # waits: the queue holds one
+    assert one.submit(outbound.Job(job, (2,), CONTROL))  # waits: the queue holds one
     with caplog.at_level(logging.WARNING, logger="base.outbound"):
-        assert not one.submit(outbound.Job(job, (3,), LEGACY))
+        assert not one.submit(outbound.Job(job, (3,), CONTROL))
     let_go.set()
     assert eventually(lambda: ran == [1, 2])
     assert [record.levelno for record in caplog.records] == [logging.WARNING]
@@ -314,8 +312,8 @@ def test_a_job_that_fails_is_logged_with_its_traceback_and_the_others_go_on(pool
         ran.append(run_id)
 
     with caplog.at_level(logging.ERROR, logger="base.outbound"):
-        one.submit(outbound.Job(broken, ("r1",), LEGACY))
-        one.submit(outbound.Job(fine, ("r2",), LEGACY))
+        one.submit(outbound.Job(broken, ("r1",), CONTROL))
+        one.submit(outbound.Job(fine, ("r2",), CONTROL))
         assert eventually(lambda: ran == ["r2"])
     failed = [record for record in caplog.records if record.levelno == logging.ERROR]
     assert len(failed) == 1 and failed[0].exc_info is not None
@@ -327,23 +325,23 @@ def test_a_job_gives_its_connection_back_before_it_waits_and_when_it_ends(pool):
     one, seen, finished = pool(threads=1), {}, threading.Event()
 
     def job():
-        HubIdentity.objects.exists()  # its claim, in a transaction of its own
+        Hub.objects.exists()  # its claim, in a transaction of its own
         seen["claimed"] = connection.connection is not None
         outbound.release()  # …then it waits on the network with no connection held
         seen["waiting"] = connection.connection is not None
-        HubIdentity.objects.exists()  # its record, on a connection taken again
+        Hub.objects.exists()  # its record, on a connection taken again
         seen["wrapper"] = connections["default"]  # this thread's own, not the proxy the test would read as its own
         finished.set()
 
-    one.submit(outbound.Job(job, (), LEGACY))
+    one.submit(outbound.Job(job, (), CONTROL))
 
     assert finished.wait(WAIT)
     assert eventually(lambda: seen["wrapper"].connection is None)  # given back when the job ended
     assert (seen["claimed"], seen["waiting"]) == (True, False)
 
 
-@pytest.mark.django_db(transaction=True)
-def test_release_inside_an_operation_is_refused_and_its_transaction_kept(pool):
+@HUB_DB_COMMITTED
+def test_release_inside_an_operation_is_refused_and_its_transaction_kept(hub_a, pool):
     one, seen, finished = pool(threads=1), [], threading.Event()
 
     def fn(ctx, data):
@@ -358,10 +356,11 @@ def test_release_inside_an_operation_is_refused_and_its_transaction_kept(pool):
         command(fn)(as_system(), Schema())
         finished.set()
 
-    one.submit(outbound.Job(job, (), LEGACY))
+    with context.use_hub(hub_a):
+        one.submit(job_here(job))
 
     assert finished.wait(WAIT)
-    assert seen == ["refused", False]
+    assert seen == ["refused", True]
 
 
 @HUB_DB
@@ -380,15 +379,15 @@ def test_stop_drops_what_waits_and_gives_what_runs_its_grace(pool, caplog):
         ran.append(n)
         let_go.wait(WAIT)
 
-    one.submit(outbound.Job(job, (1,), LEGACY))
+    one.submit(outbound.Job(job, (1,), CONTROL))
     assert eventually(lambda: ran == [1])
-    one.submit(outbound.Job(job, (2,), LEGACY))
+    one.submit(outbound.Job(job, (2,), CONTROL))
 
     with caplog.at_level(logging.WARNING, logger="base.outbound"):
         started = time.monotonic()
         assert one.stop(grace=0.2) is False  # 1 still runs: left to its lease
         assert time.monotonic() - started < 2
-        assert not one.submit(outbound.Job(job, (3,), LEGACY))  # a stopped pool takes nothing
+        assert not one.submit(outbound.Job(job, (3,), CONTROL))  # a stopped pool takes nothing
     messages = [record.getMessage() for record in caplog.records]
     assert any("waited" in message and "dropped" in message for message in messages)
     assert any("still running" in message for message in messages)
@@ -404,7 +403,7 @@ def test_stop_returns_once_what_runs_ends_within_its_grace(pool):
         let_go.wait(WAIT)
         ran.append(n)
 
-    one.submit(outbound.Job(job, (1,), LEGACY))
+    one.submit(outbound.Job(job, (1,), CONTROL))
     threading.Timer(0.1, let_go.set).start()
 
     assert one.stop(grace=WAIT) is True

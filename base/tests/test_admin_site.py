@@ -7,12 +7,9 @@ from django.contrib import admin
 from django.contrib.auth import get_user_model
 
 from base.admin_site import AdminSite
-from base.tenancy import context
 from base.tenancy.tests import hubs
 
 PLATFORM_HOST = "hubs.localhost"
-
-pytestmark = pytest.mark.usefixtures("no_test_fallback")
 
 
 def superuser(client):
@@ -45,4 +42,3 @@ def test_with_a_business_chosen_its_models_are_listed_too(client, hub_a):
     assert page.status_code == 200
     listed = {model["object_name"] for app in page.context["app_list"] for model in app["models"]}
     assert {"Hub", "TaxSettings", "Item"} <= listed
-    assert context.serves_hubs_without_database() is False
