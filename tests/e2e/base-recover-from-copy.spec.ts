@@ -50,7 +50,7 @@
 // «Restored» (APPOINTMENT-F10).
 // The stack's worker serves databases only (no moves' thread), so the spec plays its passes, as the specs play the
 // relay, in one `manage.py shell` opened before the tests (`manage-shell.ts`). What the business has and loses goes
-// through its apps' API with the owner's session, as in the other specs.
+// through its apps' API with the owner's session, as in the other specs, but for what no person does.
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
 import { WORKER_START_TIMEOUT_MS } from './global-setup';
@@ -82,8 +82,9 @@ async function inA(business: BrowserContext, path: string, body: Record<string, 
 const made = (business: BrowserContext, path: string, body: Record<string, unknown>): Promise<string> =>
   inA(business, path, body, 201);
 
-/** What the worker's relay runs in `a` (the stack's worker relays nothing), each operation with its input. */
-async function relay(calls: [string, Record<string, unknown>][]): Promise<void> {
+/** What the platform runs in `a` as the system, each operation with its input: the worker's relay (the stack's worker
+ *  relays nothing) and what no person does. */
+async function bySystem(calls: [string, Record<string, unknown>][]): Promise<void> {
   await shell.run(
     [
       'import json',
@@ -306,7 +307,7 @@ for (const { label, viewport } of SIZES) {
     await inA(business, '/customer/customers/delete', { id: card });
     await inA(business, '/inventory/products/delete', { id: product });
     await inA(business, '/inventory/categories/delete', { id: shelf });
-    await relay([
+    await bySystem([
       ['pricing.catalog.forget_product', { id: product }],
       ['modifier.link.drop_product', { id: product }],
       ['combo.option.drop_product', { id: product }],
@@ -321,7 +322,8 @@ for (const { label, viewport } of SIZES) {
     await inA(business, '/service/categories/delete', { id: category });
     const elsewhere = await made(business, '/service/categories', { name: `Elsewhere ${label} ${RUN}` });
     await inA(business, '/service/services/update', { id: movedService, category_id: elsewhere });
-    await inA(business, '/appointment/appointments/delete', { id: appointment });
+    // And the appointment, deleted by the platform: its history then holds a line of a person and lines of no one.
+    await bySystem([['appointment.appointment.delete', { id: appointment }]]);
     await inA(business, '/staff/members/terminate', { id: leaving });
     expect(psql(`select count(*) from customer_customer where email = '${email}' and deleted_at is null`)).toBe('0');
     expect(psql(`select count(*) from inventory_product where sku = '${sku}' and not is_deleted`)).toBe('0');
@@ -479,15 +481,15 @@ for (const { label, viewport } of SIZES) {
     await context.close();
 
     // In the business's Agenda, its «History» keeps its lines and ends in «Restored» (APPOINTMENT-F10). The owner booked
-    // and deleted it, and those lines name the owner; the recovery brought it back, and that line says the platform did
-    // it, never its internal mark.
+    // it, and that line names the owner; the platform deleted it and the recovery brought it back, and those lines say
+    // the platform did it, never its internal mark.
     const agenda = await ownerPage(browser, `/appointment/agenda?date=${aMondayAt('10:00').slice(0, 10)}`, viewport);
     await rowAction(agenda.page, 'appointment-list', appointment, 'history');
     const history = agenda.page.locator('ion-modal[data-testid=appointment-history-modal]');
     const owner = OWNER.email.replaceAll('.', '\\.');
     await expect(history.locator('[data-testid=appointment-history-entry]')).toHaveText([
       new RegExp(`^Booked.* · ${owner}$`),
-      new RegExp(`^Deleted.* · ${owner}$`),
+      /^Deleted.* · Done by the platform$/,
       /^Restored.* · Done by the platform$/,
     ]);
     await capture(agenda.page, `${KEY}-${label}-6-history`);
