@@ -1,6 +1,8 @@
 """Every visible text of the sale app has its Spanish translation, compiled and current."""
 
+import importlib
 import json
+import pkgutil
 from pathlib import Path
 
 import pytest
@@ -23,6 +25,9 @@ from base.tests.po import (
 )
 
 LOCALE = Path(apps.get_app_config("sale").path) / "locale" / "es" / "LC_MESSAGES"
+SERVICE_MODULES = [
+    importlib.import_module(f"{services.__name__}.{module.name}") for module in pkgutil.iter_modules(services.__path__)
+]
 
 
 def visible_texts() -> set[str]:
@@ -35,7 +40,7 @@ def visible_texts() -> set[str]:
         *config.approvals.values(),
         *(sentence for sentences in getattr(config, "approval_figures", {}).values() for sentence in sentences),
     ]
-    lazies += module_texts(queries, services, pricing, schemas, models)
+    lazies += module_texts(queries, *SERVICE_MODULES, pricing, schemas, models)
     lazies += list(models.FACTORY_METHOD_NAMES.values())
     lazies += [text for text in model_texts(apps.get_app_config("sale").get_models()) if isinstance(text, Promise)]
     lazies += [
@@ -69,17 +74,17 @@ def test_spanish_texts():
         assert str(models.FACTORY_METHOD_NAMES["Cash"]) == "Efectivo"
         assert str(models.FACTORY_METHOD_NAMES["Card"]) == "Tarjeta"
         assert (
-            str(services.CUSTOMER_REQUIRED)
+            str(services.checkout.CUSTOMER_REQUIRED)
             == "Este negocio exige un cliente en cada venta."
         )
         assert (
-            str(services.DISCOUNTS_NOT_ALLOWED) == "Este negocio no permite descuentos."
+            str(services.discounts.DISCOUNTS_NOT_ALLOWED) == "Este negocio no permite descuentos."
         )
         # SALE-F27 and F32 (WORKBOOK).
-        assert str(services.VOUCHER_NEEDS_ONE_UNIT) == (
+        assert str(services.line_vouchers.VOUCHER_NEEDS_ONE_UNIT) == (
             "Un bono paga una línea de una unidad: separa la línea antes."
         )
-        assert str(services.REFUND_NOTHING) == (
+        assert str(services.refunds.REFUND_NOTHING) == (
             "Una devolución tiene que devolver dinero o la sesión de un bono."
         )
         assert str(queries.SERVICES_UNAVAILABLE).startswith(
