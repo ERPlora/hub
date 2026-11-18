@@ -23,7 +23,7 @@ pytestmark = HUB_DB
 def citas_on(monkeypatch):
     """Citas on in the hub of the tests (the photo of the SaaS says which apps are on)."""
     monkeypatch.setattr(
-        "base.queries.active_apps", lambda scope: frozenset({"base", "appointment", "customer", "service", "staff", "schedule"})
+        "base.queries.home.active_apps", lambda scope: frozenset({"base", "appointment", "customer", "service", "staff", "schedule"})
     )
 
 

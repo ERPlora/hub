@@ -1,10 +1,11 @@
 // The demo list as a server-side DataTable (DEMO-F01/F05 screen, second pass): the search, the page
 // and the page size are the server's (the live subscription is reopened with them, never filtered
 // in the browser); the columns, the page-size and the column choosers are there by default; the
-// list/cards ion-segment switches the view and back; on a phone «Load more» brings the next rows.
+// list/cards ion-segment switches the view and back; on a phone the end of the cards brings the next rows.
 import { type BrowserContext, type Page, expect, test } from '@playwright/test';
 
 import { A, api, createItem, decodeSubs, listReady, login, record, rowNames, shot, shown } from './helpers';
+import { loadsMore, scrollToEnd } from './infinite-scroll-helpers';
 
 const COUNT = 12;
 // Rows the search must leave out: «the search really narrowed something» holds on a fresh database
@@ -124,7 +125,7 @@ test('server-side search, page size 10 with prev/next, list ⇄ cards segment, c
   }
 });
 
-test('phone: cards by default and «Load more» brings the next rows below the ones shown', async ({ page, context }) => {
+test('phone: cards by default and the end of their scroll brings the next rows below the ones shown', async ({ page, context }) => {
   await login(page, A);
   const prefix = `DM${Date.now().toString(36)}`;
   const names = await seed(context, prefix);
@@ -137,31 +138,30 @@ test('phone: cards by default and «Load more» brings the next rows below the o
     await shown(page).locator('[data-testid=demo-items-search] input').fill(prefix);
     await expect(rows(page)).toHaveCount(COUNT);
     const cards = await table.locator('ion-card[data-testid=demo-items-row]').count();
-    // The page size is not offered on a phone: 50 per «page», so 12 fit and there is no «Load more».
-    const loadMoreWith50 = await shown(page).locator('[data-testid=demo-items-load-more]').count();
+    // The page size is not offered on a phone: 50 per «page», so 12 fit and the end asks for nothing more.
+    const loadMoreWith50 = await loadsMore(page);
 
-    // Back on desktop pick 10 per page, then on the phone «Load more» must add the last 2 below.
+    // Back on desktop pick 10 per page, then on the phone the end of the cards must add the last 2 below.
     await page.setViewportSize({ width: 1280, height: 860 });
     await table.locator('ion-select.data-table__page-size-select').click();
     await page.locator('ion-popover ion-radio').filter({ hasText: /^\s*10\s*$/ }).click();
     await expect(rows(page)).toHaveCount(10);
     await page.setViewportSize({ width: 390, height: 844 });
-    const loadMore = shown(page).locator('[data-testid=demo-items-load-more]');
-    await expect(loadMore).toBeVisible();
+    await expect.poll(() => loadsMore(page)).toBe(true);
     await page.screenshot({ path: shot('datatable--phone-load-more') });
-    await loadMore.click();
+    await scrollToEnd(page);
     // One live window from the first row: the subscription asks for 2 pages from offset 0.
     await expect.poll(() => listParams(opened)).toEqual({ search: prefix, limit: 20, offset: 0 });
     await page.waitForTimeout(1500);
     const afterLoadMore = await rowNames(page);
-    const loadMoreLeft = await loadMore.count();
+    const loadMoreLeft = await loadsMore(page);
     await page.screenshot({ path: shot('datatable--phone-after-load-more') });
 
     record('datatable-phone', { cards, loadMoreWith50, afterLoadMore, loadMoreLeft, windowParams: listParams(opened) });
     expect(cards).toBe(COUNT);
-    expect(loadMoreWith50).toBe(0);
-    expect(afterLoadMore, '«Load more» replaced the first 10 rows instead of adding 2 below them').toEqual([...names].reverse());
-    expect(loadMoreLeft, 'every row is shown: no «Load more» left').toBe(0);
+    expect(loadMoreWith50).toBe(false);
+    expect(afterLoadMore, 'the end of the cards replaced the first 10 rows instead of adding 2 below them').toEqual([...names].reverse());
+    expect(loadMoreLeft, 'every row is shown: nothing more to load').toBe(false);
   } finally {
     await cleanup(context, prefix);
   }

@@ -86,15 +86,14 @@
       "loadErrorBody": "Comprueba la conexión y vuelve a intentarlo.",
       "retry": "Reintentar"
     },
-    "bell": {
-      "title": "Notificaciones",
-      "empty": "Todo al día. Sin notificaciones.",
-      "loadError": "No se han podido comprobar las notificaciones. Aparecerán cuando vuelva la conexión."
-    },
     "blocking": {
       "title": "Todavía no puedes facturar",
-      "body": "No se podrá emitir ningún tique ni factura hasta que configures esto:",
-      "configure": "Configurar"
+      "body": "No se podrá emitir ningún tique ni factura hasta que configures esto: {steps}.",
+      "configureStep": "Configurar: {step}",
+      "steps": {
+        "businessIdentity": "Configurar los datos del negocio",
+        "verifactu": "Configurar VeriFactu"
+      }
     },
     "plan": {
       "upgrade": "Mejorar plan",
@@ -163,7 +162,9 @@
       },
       "noResults": "No hay apps que coincidan con tu búsqueda.",
       "toggle": {
-        "on": "Activar",
+        "labelOn": "{app}: activada",
+        "labelOff": "{app}: sin activar",
+        "busy": "Cambiando…",
         "off": "Desactivar",
         "retry": "Reintentar"
       },
@@ -1215,8 +1216,28 @@
         "generic": "Algo ha fallado. Inténtalo de nuevo."
       }
     },
+    "help": {
+      "open": "Ayuda",
+      "title": "Ayuda · {app}",
+      "videoTitle": "Cómo funciona {app}",
+      "purpose": "Para qué sirve",
+      "current": "En esta pantalla",
+      "here": "Estás aquí",
+      "how": "Cómo se hace",
+      "others": "Otras pantallas del módulo",
+      "failure": "Si algo falla",
+      "search": "Buscar tareas…",
+      "empty": "Nada coincide con tu búsqueda",
+      "clear": "Borrar búsqueda",
+      "loading": "Cargando ayuda…",
+      "loadError": "No se ha podido cargar la ayuda.",
+      "retry": "Reintentar",
+      "ask": "Pregúntale al asistente",
+      "close": "Cerrar",
+      "flowQuestion": "¿Cómo hago esto: {title}?",
+      "screenQuestion": "¿Cómo uso {app} en {screen}?"
+    },
     "assistant": {
-      "more": "Más opciones",
       "empty": "Pregúntame por tus ventas, tu inventario o cualquier cosa de tu negocio.",
       "setupIntro": "Revisa la configuración de tu negocio. Elige una opción o escribe tu duda.",
       "shortcuts": {

@@ -26,10 +26,11 @@ import { type BrowserContext, expect, type Locator, type Page, test } from '@pla
 
 import { NOT_DONE, type Provider, startProvider } from './assistant-provider';
 import { confirmedWithTheWord } from './assistant-card-helpers';
-import { A, api, capture, compactBar, EMPLOYEE, exposeMovingInPage, login, psql, REPO_DIR, shot, shown, untilStill } from './helpers';
+import { A, api, capture, EMPLOYEE, exposeMovingInPage, login, psql, REPO_DIR, shot, shown, untilStill } from './helpers';
 import { createProduct, type Product } from './inventory-helpers';
 import { cleanDocumentsOf, stamp } from './sale-helpers';
 import { STACK } from './stack';
+import { openAssistant as openPanel } from './topbar';
 
 const KEY = 'FIX-CASH_REGISTER-NO-VOICE-CLOSE-WITH-ASSISTANT';
 const PREVIEW_KEY = 'FIX-HUB-CASH_REGISTER-ASSISTANT-CLOSE-CARD-WITHOUT-PREVIEW';
@@ -215,19 +216,6 @@ const lastAnswer = (page: Page): Locator => panel(page).locator('[data-testid="a
 const receipts = (page: Page): Locator => panel(page).locator('[data-testid="assistant-receipt"]');
 const card = (page: Page): Locator => page.locator('ion-modal[data-testid="assistant-confirm"]');
 const previewBlock = (page: Page): Locator => card(page).locator('[data-testid="assistant-confirm-preview"]');
-const opener = (page: Page): Locator =>
-  shown(page).locator(compactBar(page) ? '[data-testid="topbar-chrome-more"]' : '[data-testid="assistant-button"]');
-
-async function openPanel(page: Page): Promise<void> {
-  await expect(opener(page)).toBeVisible();
-  if ((await panel(page).getAttribute('data-open')) !== 'true') {
-    await opener(page).click();
-    if (compactBar(page)) await page.locator('ion-popover [data-testid="topbar-chrome-more-assistant"]').click();
-  }
-  await expect(panel(page)).toHaveAttribute('data-open', 'true');
-  await expect(box(page)).toBeVisible();
-}
-
 /** Writes `text` and sends it with Enter, without waiting for the turn to end (a card stops it half-way). */
 async function ask(page: Page, text: string): Promise<void> {
   await expect(panel(page).locator('[data-testid="assistant-send"]')).toBeVisible({ timeout: 30_000 });

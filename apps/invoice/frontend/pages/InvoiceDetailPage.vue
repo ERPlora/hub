@@ -132,13 +132,13 @@ async function print(): Promise<void> {
     if (await queued()) return;
     // The screen's paper never goes out without the QR of a record it could not read.
     if (recordOf.value && fiscal.value.error) {
-      void toastError(t('invoice.detail.printFailed'));
+      toastError(t('invoice.detail.printFailed'));
       return;
     }
     // Inside the installed app, its print screen (hub#455): a printer or «Save as PDF», under the invoice's name.
     await printPaper(element, { title: t('invoice.detail.title', { number }) });
   } catch (failure) {
-    void toastError(withReason(t('invoice.detail.printFailed'), printRefusal(failure, t)));
+    toastError(withReason(t('invoice.detail.printFailed'), printRefusal(failure, t)));
   } finally {
     sending.value = false;
   }
@@ -149,7 +149,7 @@ async function queued(): Promise<boolean> {
   try {
     const sent = await queue.run({ invoice_id: props.id, duplicate: duplicate.value });
     if (!sent.queued) return false;
-    void toastSuccess(t('invoice.detail.queued', { printer: sent.printer ?? '' }));
+    toastSuccess(t('invoice.detail.queued', { printer: sent.printer ?? '' }));
     return true;
   } catch {
     // The queue could not be asked: the screen's paper still prints.

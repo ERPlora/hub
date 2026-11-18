@@ -21,7 +21,7 @@ from live.models import OutboxEvent
 from live.operations import get
 from live.outbox import channel_for
 
-from base.schemas import BellCountersIn
+from base.schemas.bell import BellCountersIn
 from base.tenancy.context import use_hub
 
 from .conftest import A, B, HUB_DB, HUB_DB_COMMITTED, MONDAY, at, ctx_for, make_appointment, make_salon, make_settings
@@ -36,6 +36,10 @@ COUNTER = {
     "route": "/appointment/agenda",
     "label": "Appointments to confirm",
     "icon": "ion:calendar-outline",
+    "severity": "warning",
+    "title": "1 appointment to confirm",
+    "body": "A customer is waiting for you to confirm their booking before it starts.",
+    "action_label": "Confirm the appointments",
 }
 WAIT = 1.0
 QUIET = 0.3
@@ -47,6 +51,16 @@ def bell(ctx) -> dict | None:
     rows = [row for row in counters if row["app"] == "appointment"]
     assert len(rows) <= 1, rows
     return rows[0] if rows else None
+
+
+def one_waiting(start: dt.datetime) -> dict:
+    """Citas's row for one booking waiting that starts at ``start``, the deadline to confirm it."""
+    return {**COUNTER, "count": 1, "due": start}
+
+
+def as_read(row: dict | None) -> dict | None:
+    """``row`` with its deadline read back as an instant."""
+    return row and {**row, "due": dt.datetime.fromisoformat(row["due"])}
 
 
 def counted(ctx) -> int:
@@ -70,13 +84,28 @@ def waiting(salon, member=None, start=None, **fields):
 @HUB_DB
 def test_a_customers_booking_waiting_is_counted_and_leads_to_the_agenda(salon):
     waiting(salon)
-    assert bell(ctx_for("hub_admin")) == {**COUNTER, "count": 1}
+    assert as_read(bell(ctx_for("hub_admin"))) == one_waiting(at(MONDAY, "10:00"))
 
 
 @HUB_DB
 def test_in_spanish_it_says_the_old_words(salon):
     waiting(salon)
     assert bell(ctx_for("hub_admin", language="es"))["label"] == "Citas por confirmar"
+
+
+@HUB_DB
+def test_with_several_waiting_it_says_how_many_in_spanish_and_the_soonest_start_is_the_deadline(salon):
+    waiting(salon, start=at(MONDAY, "12:00"))
+    waiting(salon, start=at(MONDAY, "10:00"))
+    row = as_read(bell(ctx_for("hub_admin", language="es")))
+    assert {key: row[key] for key in ("count", "severity", "title", "body", "action_label", "due")} == {
+        "count": 2,
+        "severity": "warning",
+        "title": "2 citas por confirmar",
+        "body": "Tus clientes esperan a que les confirmes las citas antes de que empiecen.",
+        "action_label": "Confirmar las citas",
+        "due": at(MONDAY, "10:00"),
+    }
 
 
 @HUB_DB
@@ -89,7 +118,7 @@ def test_a_past_confirmed_cancelled_or_deleted_booking_does_not_count_and_at_zer
     assert bell(admin) is None
 
     waiting(salon, start=at(MONDAY, "16:00"))
-    assert bell(admin) == {**COUNTER, "count": 1}
+    assert as_read(bell(admin)) == one_waiting(at(MONDAY, "16:00"))
 
 
 @HUB_DB

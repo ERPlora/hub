@@ -167,7 +167,7 @@ describe('HoursPage', () => {
     s.net.lastStream().push(errorFrame(s.subId(OP), 'boom'));
     await flush();
     const box = s.wrapper.find('.data-table__error');
-    expect(box.find('.data-table__error-title').text()).toBe('No se ha podido cargar el horario.');
+    expect(box.text().startsWith('No se ha podido cargar el horario.')).toBe(true);
     expect(box.find('.data-table__error-reason').text()).toBe('msg boom');
     expect(box.text()).not.toContain('No se han podido cargar los datos');
   });

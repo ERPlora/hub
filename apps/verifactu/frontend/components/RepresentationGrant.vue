@@ -185,7 +185,7 @@ async function submit(): Promise<void> {
   for (const name of DOCUMENTS) files[name] = null;
   resendOpen.value = false;
   downloaded.value = false;
-  void toastSuccess(t('verifactu.grant.sentToast'));
+  toastSuccess(t('verifactu.grant.sentToast'));
 }
 
 function historyLabel(step: RepresentationOut['history'][number]): string {

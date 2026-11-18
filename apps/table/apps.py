@@ -2,7 +2,7 @@
 (WORKBOOK.md)."""
 
 from django.utils.translation import gettext_lazy as _
-from live.meta import Category, LiveAppConfig, Nav, SetupCheck, SetupStep
+from live.meta import Category, Help, LiveAppConfig, Nav, SetupCheck, SetupStep
 
 from apps.table.events import TABLE_EVENTS
 
@@ -118,3 +118,4 @@ class TableConfig(LiveAppConfig):
         Nav("tables", _("Tables"), "ion:grid-outline", "/table/tables"),
         Nav("sessions", _("Sessions"), "ion:time-outline", "/table/sessions"),
     ]
+    help = Help()

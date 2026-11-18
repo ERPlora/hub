@@ -1039,7 +1039,7 @@ def pin_set(ctx: OperationContext, data: PinSetIn) -> dict:
             too_many_message(wait, gettext("Too many tries to change the PIN.")), code="base.too_many_pin_changes", status=429
         )
     access.PIN_CHANGE_LIMIT.failed(ctx.scope.key, username)
-    length = queries.access_settings().pin_length
+    length = queries.access.access_settings().pin_length
     problem = access.pin_problem(data.pin, length)
     if problem is not None:
         raise InvalidPayload(_PIN_PROBLEMS[problem](length), code=f"base.pin_{problem}", fields={"pin": problem})
@@ -1048,7 +1048,7 @@ def pin_set(ctx: OperationContext, data: PinSetIn) -> dict:
         raise PermissionDenied(
             gettext("That is not your current PIN. Type it right to set a new one."), code="base.pin_current_wrong"
         )
-    if any(check_password(data.pin, other.pin_hash) for other, _ in queries.pin_people(ctx.scope.key, exclude=username)):
+    if any(check_password(data.pin, other.pin_hash) for other, _ in queries.access.pin_people(ctx.scope.key, exclude=username)):
         raise Conflict(
             gettext("Another active person already has that PIN: choose a different one."), code="base.pin_taken"
         )
@@ -1116,7 +1116,7 @@ def badge_owner(slug: str, raw: str):
 
 
 def _actor_label(ctx: OperationContext) -> str:
-    return queries.person_label(ctx.actor)[:150] if hasattr(ctx.actor, "get_username") else str(ctx.actor)[:150]
+    return queries.people.person_label(ctx.actor)[:150] if hasattr(ctx.actor, "get_username") else str(ctx.actor)[:150]
 
 
 @operation(
@@ -1149,7 +1149,7 @@ def _actor_label(ctx: OperationContext) -> str:
 def device_mode_set(ctx: OperationContext, data: DeviceModeIn) -> dict:
     """«This device»: the mode of the browser that asks, never another's. The sessions opened from now on
     follow it; the open one keeps its end, fixed when it opened."""
-    device = queries.device_of(ctx.request, for_update=True)
+    device = queries.devices.device_of(ctx.request, for_update=True)
     if device is None:
         raise NotFound(
             gettext("Nobody has signed in with an account on this device yet: sign in once with your account on it."),
@@ -1238,7 +1238,7 @@ def device_remove(ctx: OperationContext, data: DeviceByIdIn) -> dict:
     """«Remove this device»: the device is cut off, not its people; whoever has an account can enter on it
     again, and then it is a new device."""
     device = _device(data.id)
-    here = queries.device_of(ctx.request)
+    here = queries.devices.device_of(ctx.request)
     yours = here is not None and here.pk == device.pk
     _remove_devices([device.pk])
     record_event(ctx, events.DEVICE_REMOVED, {"id": str(device.pk)})
@@ -1270,7 +1270,7 @@ def device_remove(ctx: OperationContext, data: DeviceByIdIn) -> dict:
 )
 def device_prune(ctx: OperationContext, data: DevicePruneIn) -> dict:
     """«Remove the unused»: those nobody entered on in 30 days, as «Remove this device» removes one."""
-    ids = list(queries.unused_devices(queries.device_of(ctx.request)).select_for_update().values_list("pk", flat=True))
+    ids = list(queries.devices.unused_devices(queries.devices.device_of(ctx.request)).select_for_update().values_list("pk", flat=True))
     _remove_devices(ids)
     record_event(ctx, events.DEVICES_PRUNED, {"removed": len(ids)})
     return {"removed": len(ids)}
@@ -1331,7 +1331,7 @@ def access_settings_update(ctx: OperationContext, data: AccessSettingsUpdateIn) 
     row.updated_by = _actor_label(ctx)
     row.save()
     record_event(ctx, events.ACCESS_SETTINGS_CHANGED, changes)
-    return queries.access_settings_get(ctx, AccessSettingsIn())
+    return queries.access.access_settings_get(ctx, AccessSettingsIn())
 
 
 def _profile(user) -> Profile:
@@ -1358,7 +1358,7 @@ def _profile(user) -> Profile:
 )
 def profile_update(ctx: OperationContext, data: ProfileUpdateIn) -> dict:
     """«Save my data»: how the person appears in this hub. The contact email gives and takes no access."""
-    user = queries.signed_in(ctx)
+    user = queries.profile.signed_in(ctx)
     email = data.contact_email.strip()
     if email:
         try:
@@ -1372,7 +1372,7 @@ def profile_update(ctx: OperationContext, data: ProfileUpdateIn) -> dict:
     profile.first_name, profile.last_name, profile.contact_email = data.first_name.strip(), data.last_name.strip(), email
     profile.save()
     record_event(ctx, events.PROFILE_UPDATED, {})
-    return queries.profile_get(ctx, ProfileIn())
+    return queries.profile.profile_get(ctx, ProfileIn())
 
 
 @operation(
@@ -1393,13 +1393,13 @@ def profile_update(ctx: OperationContext, data: ProfileUpdateIn) -> dict:
 def preferences_set(ctx: OperationContext, data: PreferencesIn) -> dict:
     """«Preferences»: saved as chosen and applied at once; empty = the business's. They follow the person
     on any device of the hub (the language from their next entry on another one)."""
-    user = queries.signed_in(ctx)
+    user = queries.profile.signed_in(ctx)
     profile = _profile(user)
     profile.language, profile.theme_mode, profile.palette = data.language, data.theme_mode, data.palette
     profile.ui_scale = data.ui_scale
     profile.save()
     record_event(ctx, events.PROFILE_UPDATED, {})
-    language = queries.language_of(user, ctx.scope.key) or settings.LANGUAGE_CODE
+    language = queries.profile.language_of(user, ctx.scope.key) or settings.LANGUAGE_CODE
     return {"language": language, "theme_mode": profile.theme_mode, "palette": profile.palette, "ui_scale": profile.ui_scale}
 
 
@@ -1423,7 +1423,7 @@ _AVATAR_FORMATS = {"image/jpeg": ("JPEG", "jpg"), "image/png": ("PNG", "png"), "
 def avatar_set(ctx: OperationContext, data: AvatarIn) -> dict:
     """«Change photo»: a JPG, PNG or WebP of 2 MB at most, kept in the hub's files under ``avatars/`` by
     its content's hash (served to the people of this hub only, ``base.media``)."""
-    user = queries.signed_in(ctx)
+    user = queries.profile.signed_in(ctx)
     refused = gettext("The photo could not be saved. Use a JPG, PNG or WebP of up to 2 MB.")
     try:
         raw = base64.b64decode(data.data_base64, validate=True)
@@ -1441,7 +1441,7 @@ def avatar_set(ctx: OperationContext, data: AvatarIn) -> dict:
     profile.avatar = name
     profile.save()
     record_event(ctx, events.PROFILE_UPDATED, {})
-    return {"avatar_url": queries.avatar_url(ctx, name)}
+    return {"avatar_url": queries.profile.avatar_url(ctx, name)}
 
 
 def _is_image(raw: bytes, pillow_format: str) -> bool:
@@ -1472,7 +1472,7 @@ def _is_image(raw: bytes, pillow_format: str) -> bool:
 )
 def avatar_remove(ctx: OperationContext, data: AvatarRemoveIn) -> dict:
     """«Remove»: the profile forgets its photo (the file, named by its content, may be someone else's)."""
-    user = queries.signed_in(ctx)
+    user = queries.profile.signed_in(ctx)
     profile = _profile(user)
     profile.avatar = ""
     profile.save()
@@ -1487,10 +1487,10 @@ _PERSON_REFUSALS = {people_rules.OWNER_ONLY: people_rules.OWNER_ONLY_MESSAGE, pe
 
 def _changeable_person(ctx: OperationContext, person_id: str, *, badge: bool) -> dict:
     """The person ``person_id`` of this business, if who asks may change their way in (``base.people.refusal``)."""
-    person = queries.person_of(ctx, person_id)
+    person = queries.people.person_of(ctx, person_id)
     why = people_rules.refusal(
-        actor=queries.signed_in_username(ctx),
-        actor_role=queries.signed_in_role(ctx),
+        actor=queries.people.signed_in_username(ctx),
+        actor_role=queries.people.signed_in_role(ctx),
         target=person["id"],
         target_role=person["role"],
         badge=badge,
@@ -1501,7 +1501,7 @@ def _changeable_person(ctx: OperationContext, person_id: str, *, badge: bool) ->
 
 
 def _person_answer(ctx: OperationContext, person_id: str) -> dict:
-    return queries.person_detail_out(ctx, queries.person_of(ctx, person_id))
+    return queries.people.person_detail_out(ctx, queries.people.person_of(ctx, person_id))
 
 
 @operation(
@@ -1552,7 +1552,7 @@ def person_badge_set(ctx: OperationContext, data: BadgeSetIn) -> dict:
     """«Badge»: the card, kept as its digest; never one's own, never one somebody else carries. Every try
     counts against who gives it (``people.BADGE_CHANGE_LIMIT``): «already taken» tells something."""
     _changeable_person(ctx, data.person, badge=True)
-    editor = queries.signed_in_username(ctx)
+    editor = queries.people.signed_in_username(ctx)
     wait = people_rules.BADGE_CHANGE_LIMIT.wait(ctx.scope.key, editor)
     if wait:
         raise OperationError(
@@ -1641,7 +1641,7 @@ def _checked_scopes(ctx: OperationContext, data: ApiKeyCreateIn) -> dict:
     """What a key per app may do on each app, of those this business has that publish it; nothing for the others."""
     if data.mode != ApiKey.Mode.PER_APP:
         return {}
-    offered = {app["id"]: app for app in queries.api_apps(ctx)}
+    offered = {app["id"]: app for app in queries.api_keys.api_apps(ctx)}
     scopes = {app: sorted(set(kinds)) for app, kinds in data.scopes.items() if kinds}
     if not scopes:
         message = gettext("Choose at least one app and what the key may do on it.")
@@ -1690,7 +1690,7 @@ def api_key_create(ctx: OperationContext, data: ApiKeyCreateIn) -> dict:
     token = _new_token_for(key)
     key.save()
     record_event(ctx, events.API_KEY_CREATED, {"id": str(key.id), "mode": key.mode})
-    return {"key": queries.api_key_out(key), "token": token}
+    return {"key": queries.api_keys.api_key_out(key), "token": token}
 
 
 def _live_key(key_id: UUID) -> ApiKey:
@@ -1723,7 +1723,7 @@ def api_key_rotate(ctx: OperationContext, data: ApiKeyIdIn) -> dict:
     key.rotated_at = timezone.now()
     key.save(update_fields=["token_digest", "prefix", "rotated_at"])
     record_event(ctx, events.API_KEY_ROTATED, {"id": str(key.id)})
-    return {"key": queries.api_key_out(key), "token": token}
+    return {"key": queries.api_keys.api_key_out(key), "token": token}
 
 
 @operation(
@@ -1759,7 +1759,7 @@ def api_key_revoke(ctx: OperationContext, data: ApiKeyIdIn) -> dict:
     key.revoked_at, key.revoked_by = timezone.now(), _actor_label(ctx)
     key.save(update_fields=["revoked_at", "revoked_by"])
     record_event(ctx, events.API_KEY_REVOKED, {"id": str(key.id)})
-    return {"key": queries.api_key_out(key)}
+    return {"key": queries.api_keys.api_key_out(key)}
 
 
 #: A key's last use is written at most once a minute: a busy integration does not write on every call.
@@ -1845,7 +1845,7 @@ def _approver(ctx: OperationContext, data: ApprovalIn):
         wait = access.PIN_PERSON_LIMIT.wait(slug, *brake)
         if wait:
             raise _approval_too_many(wait)
-        user = queries.pin_owner(slug, person, (data.pin or "")[:16]) if data.pin else None
+        user = queries.access.pin_owner(slug, person, (data.pin or "")[:16]) if data.pin else None
         way = Approval.Way.PIN
     if data.badge and (wait := access.PIN_PERSON_LIMIT.wait(slug, *brake)):
         raise _approval_too_many(wait)
@@ -1883,20 +1883,20 @@ def approval_approve(ctx: OperationContext, data: ApprovalIn) -> dict:
             gettext("Choose who approves it and type their PIN."), code="base.approval_incomplete", fields={"pin": "required"}
         )
     approver, way = _approver(ctx, data)
-    if not queries.holds(approver, ctx.scope, op.permission):
+    if not queries.approvals.holds(approver, ctx.scope, op.permission):
         raise PermissionDenied(
             gettext("That person cannot approve this: ask somebody who may do it themselves."),
             code="base.approver_cannot",
         )
     token = approval_rules.new_token()
-    approver_name = queries.face_name(approver)
+    approver_name = queries.people.face_name(approver)
     approval = Approval.objects.create(
         operation=op.name,
         permission=op.permission,
         fingerprint=data.fingerprint,
         token_digest=approval_rules.digest(token),
         requested_by=ctx.actor.get_username(),
-        requested_by_name=queries.face_name(ctx.actor)[:150],
+        requested_by_name=queries.people.face_name(ctx.actor)[:150],
         approved_by=approver.get_username(),
         approved_by_name=approver_name[:150],
         way=way,
@@ -1982,7 +1982,7 @@ def api_doc_settings_update(ctx: OperationContext, data: ApiDocSettingsUpdateIn)
     row.updated_by = _actor_label(ctx)
     row.save()
     record_event(ctx, events.API_DOC_SETTINGS_CHANGED, {"docs_enabled": data.docs_enabled})
-    return queries.api_doc_settings(ctx, ApiDocSettingsIn())
+    return queries.api_keys.api_doc_settings(ctx, ApiDocSettingsIn())
 
 
 # ── Files ──────────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -2036,7 +2036,7 @@ def file_upload(ctx: OperationContext, data: FileUploadIn) -> dict:
             data.folder,
             data.name,
             content,
-            limit_bytes=queries.space_limit(ctx),
+            limit_bytes=queries.files.space_limit(ctx),
         )
     record_event(ctx, events.FILE_UPLOADED, {"path": saved["path"]})
     return saved
@@ -2188,7 +2188,7 @@ def _assistant_screens(ctx: OperationContext) -> dict[str, str]:
         }
         if ctx.has(ADMINISTER_HUB):
             screens["/system"] = pgettext("base", "System")
-        if ctx.has(queries.VIEW_FILES):
+        if ctx.has(queries.files.VIEW_FILES):
             screens["/files"] = pgettext("base", "Files")
         for config in assistant.tools.active_apps(ctx.scope).values():
             for nav in getattr(config, "navigation", []) or []:
@@ -2723,9 +2723,9 @@ def _business_hub(ctx: OperationContext) -> Hub | None:
 
 
 def _business_module(ctx: OperationContext, said: str, hub: Hub | None) -> Any:
-    """The module ``said`` names (its id, or its name as the person says it: ``queries.find_app``) as this business
+    """The module ``said`` names (its id, or its name as the person says it: ``queries.apps.find_app``) as this business
     shows it; 404 for any other (the platform, or one it never shows), 409 ``base.app_ambiguous`` for a name of several."""
-    return queries.find_app(said, demo=bool(hub and hub.is_demo), language=ctx.language)
+    return queries.apps.find_app(said, demo=bool(hub and hub.is_demo), language=ctx.language)
 
 
 def _locked_states(ctx: OperationContext, graph: dict) -> dict[str, activation.Activation]:
@@ -2743,7 +2743,7 @@ def _locked_states(ctx: OperationContext, graph: dict) -> dict[str, activation.A
             ignore_conflicts=True,
         )
     list(rows.select_for_update().order_by("app").values_list("id", flat=True))
-    return activation.effective(queries.app_activations(host), graph)
+    return activation.effective(queries.apps.app_activations(host), graph)
 
 
 def _write_states(host: str, changes: dict[str, activation.Activation]) -> None:
@@ -2969,7 +2969,7 @@ def _enable(ctx: OperationContext, data: AppChangeIn) -> dict:  # noqa: C901
     if vetoed is not None:
         raise AppVetoed(vetoed[1], app=vetoed[0])
     if changes.get(app, current[app]).chosen and not (current[app].wanted and current[app].chosen):
-        limit = queries.app_limit(hub)
+        limit = queries.apps.app_limit(hub)
         shown = {config.label for config in home.shown_modules(demo_hub=bool(hub and hub.is_demo))}
         enabled = activation.chosen_on(current, among=shown)
         if limit is not None and enabled >= limit:
@@ -3058,7 +3058,7 @@ def _disable(ctx: OperationContext, data: AppChangeIn) -> dict:
     kept = activation.mandatory_on(current, country)
     keeping = activation.keeping_on(app, current, graph, kept)
     said = activation.refusals(keeping, ctx=ctx, kept=kept, country=country)
-    refused = queries.app_off_refusal(ctx, app, current, graph, said, kept)
+    refused = queries.apps.app_off_refusal(ctx, app, current, graph, said, kept)
     if refused is not None:
         raise AppVetoed(refused[1], app=refused[0])
     needed = activation.required_by(app, current, graph)
@@ -3263,7 +3263,7 @@ def app_activation_settle(ctx: OperationContext, data: AppActivationSettleIn) ->
 
 def _ring_next(hub: Hub, host: str) -> None:
     """After the COMMIT of a settle (inside the hub's database): its ring moves to the next app to set up, or ends."""
-    activations_rung_at(hub.pk, queries.activation_next_at(host))
+    activations_rung_at(hub.pk, queries.apps.activation_next_at(host))
 
 
 def _record_enabled(

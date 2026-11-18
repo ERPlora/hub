@@ -586,10 +586,6 @@
     "file_name": "home.py",
     "functions": [
       {
-        "name": "bell_counters",
-        "complexity": 17
-      },
-      {
         "name": "plan_meter_errors",
         "complexity": 17
       },
@@ -860,16 +856,6 @@
     ]
   },
   {
-    "path": "base/queries/__init__.py",
-    "file_name": "__init__.py",
-    "functions": [
-      {
-        "name": "app_list",
-        "complexity": 21
-      }
-    ]
-  },
-  {
     "path": "base/assistant/gateway.py",
     "file_name": "gateway.py",
     "functions": [
@@ -896,6 +882,16 @@
       {
         "name": "unnamed",
         "complexity": 18
+      }
+    ]
+  },
+  {
+    "path": "base/queries/apps.py",
+    "file_name": "apps.py",
+    "functions": [
+      {
+        "name": "app_list",
+        "complexity": 21
       }
     ]
   }

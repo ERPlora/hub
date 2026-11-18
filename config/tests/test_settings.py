@@ -16,7 +16,7 @@ from django.core.cache import CacheHandler
 from django.core.exceptions import ImproperlyConfigured
 from django.core.mail import mailers
 from django.test import RequestFactory, override_settings
-from live.csp import base_policy, debug_policy
+from live.csp import YOUTUBE_NOCOOKIE, base_policy, debug_policy, with_frames
 from live.slugs import is_reserved_hub_slug
 from psycopg_pool import ConnectionPool
 
@@ -157,11 +157,11 @@ def test_database_comes_from_the_environment(load_settings):
 
 
 def with_saas_origin(policy: dict, saas_origin: str) -> dict:
-    """``policy`` with the SaaS's origin where the Hub's page reaches it: ``form-action`` (the logout's
-    redirect leaves for it), ``img-src`` and ``media-src`` (the WhatsApp attachments it serves); ``media-src``
-    also plays the assistant's answers read aloud in the server's voice, a ``blob:`` of the page."""
+    """``policy`` with its frames (test_settings_frames.py) and the SaaS's origin where the Hub's page reaches it:
+    ``form-action`` (the logout's redirect leaves for it), ``img-src`` and ``media-src`` (the WhatsApp attachments it
+    serves); ``media-src`` also plays the assistant's answers read aloud in the server's voice, a ``blob:`` of the page."""
     return {
-        **policy,
+        **with_frames(policy, YOUTUBE_NOCOOKIE),
         "form-action": [*policy["form-action"], saas_origin],
         "img-src": [*policy["img-src"], saas_origin],
         "media-src": ["'self'", "blob:", saas_origin],

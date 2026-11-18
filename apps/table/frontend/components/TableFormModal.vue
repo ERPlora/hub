@@ -1,10 +1,12 @@
 <script setup lang="ts">
 // «Edit table» and «New table» (WORKBOOK «Plano de sala», «Mesas»; TABLE-F02, F04, F05).
-// - Edit: Number, Capacity, Name (optional), Shape, Status — Available or Blocked: occupied and reserved
-//   are the room's, not a person's —, Zone and In use; «Save» sends only what changed
-//   (`table.table.update`; another zone is `move_to_zone_id`); «Delete» (whoever may) asks first.
-// - New: Number (empty = the first free number of the zone), Capacity and Zone (`table.table.create`;
-//   the server puts it on the first free spot of the plan).
+// - Edit: Number, Capacity, Width and Height of its box on the plan, Name (optional), Shape, Status —
+//   Available or Blocked: occupied and reserved are the room's, not a person's —, Zone and In use; «Save»
+//   sends only what changed (`table.table.update`; another zone is `move_to_zone_id`; a new size is
+//   `table.table.move` where the box already is, first, so a refused size saves nothing); «Delete»
+//   (whoever may) asks first.
+// - New: Number (empty = the first free number of the zone), Capacity, Width and Height (empty = the
+//   standard box) and Zone (`table.table.create`; the server puts it on the first free spot of the plan).
 // A number is required when editing; refusals (a number taken, a table with an open check) stay here.
 import { ConfirmDialog, FormModal } from '@erplora/ui/components';
 import { useCommand } from '@erplora/ui/sdk';
@@ -14,7 +16,7 @@ import { computed, ref, watch } from 'vue';
 import { useUnsavedFormOnOpen } from '../../../../base/frontend/lib/unsaved-changes';
 
 import { useT } from '../composables/useT';
-import type { TableOut, TablePatchIn, TableShape, ZoneOut } from '../operations';
+import type { TableMoveIn, TableOut, TablePatchIn, TableShape, ZoneOut } from '../operations';
 
 const props = withDefaults(
   defineProps<{
@@ -34,10 +36,17 @@ const canDismiss = useUnsavedFormOnOpen('table-form', () => form.value, open);
 
 const SHAPES: readonly TableShape[] = ['square', 'round', 'rectangle'];
 const NO_ZONE = '';
+/** The sides of a box the server takes, in pixels of the plan (`MIN_BOX` and `MAX_PLAN` of the table model). */
+const SIDE = { min: 24, max: 10_000 } as const;
+const SIDES = ['width', 'height'] as const;
+
+type Size = Pick<TableMoveIn, 'width' | 'height'>;
 
 interface Form {
   number: string;
   capacity: string;
+  width: string;
+  height: string;
   name: string;
   shape: TableShape;
   status: 'available' | 'blocked';
@@ -48,19 +57,23 @@ interface Form {
 const t = useT();
 const creation = useCommand('table.table.create');
 const update = useCommand('table.table.update');
+const resize = useCommand('table.table.move');
 const removal = useCommand('table.table.delete');
-const pending = computed(() => creation.pending.value || update.pending.value || removal.pending.value);
-const error = computed(() => (props.table ? update.error.value : creation.error.value));
+const pending = computed(() => creation.pending.value || update.pending.value || resize.pending.value || removal.pending.value);
+const error = computed(() => (props.table ? (resize.error.value ?? update.error.value) : creation.error.value));
 const editing = computed(() => props.table !== null);
 const confirmDelete = ref(false);
 
 function fromTable(table: TableOut | null): Form {
   if (!table) {
-    return { number: '', capacity: '4', name: '', shape: 'square', status: 'available', zone: props.defaultZoneId ?? props.zones[0]?.id ?? NO_ZONE, active: true };
+    const zone = props.defaultZoneId ?? props.zones[0]?.id ?? NO_ZONE;
+    return { number: '', capacity: '4', width: '', height: '', name: '', shape: 'square', status: 'available', zone, active: true };
   }
   return {
     number: table.number,
     capacity: String(table.capacity),
+    width: String(table.width),
+    height: String(table.height),
     name: table.name,
     shape: table.shape,
     status: table.blocked ? 'blocked' : 'available',
@@ -79,6 +92,7 @@ watch(
     form.value = fromTable(props.table);
     creation.error.value = null;
     update.error.value = null;
+    resize.error.value = null;
     removal.error.value = null;
   },
   { immediate: true },
@@ -107,18 +121,40 @@ function patch(table: TableOut): TablePatchIn {
   return out;
 }
 
+/** The sides typed, as the server takes them. An empty side is left out (the standard box for a new table, the
+ *  side it has for one being edited), and so is a side of `table` that stays as it is. */
+function typedSize(table: TableOut | null = null): Size {
+  const size: Size = {};
+  for (const side of SIDES) {
+    const typed = form.value[side].trim();
+    if (typed && whole(typed) !== table?.[side]) size[side] = whole(typed);
+  }
+  return size;
+}
+
+async function saveEdit(table: TableOut): Promise<void> {
+  resize.error.value = null;
+  const size = typedSize(table);
+  const changes = patch(table);
+  const resized = Object.keys(size).length > 0;
+  if (resized) await resize.run({ id: table.id, position_x: table.position_x, position_y: table.position_y, ...size });
+  if (!resized || Object.keys(changes).length > 1) await update.run(changes);
+}
+
+async function saveNew(): Promise<void> {
+  const f = form.value;
+  await creation.run({
+    zone_id: f.zone || null,
+    ...(f.number.trim() ? { number: f.number.trim() } : {}),
+    capacity: whole(f.capacity || '4'),
+    ...typedSize(),
+  });
+}
+
 async function save(): Promise<void> {
   if (numberMissing.value || pending.value) return;
-  const f = form.value;
   try {
-    if (props.table) await update.run(patch(props.table));
-    else {
-      await creation.run({
-        zone_id: f.zone || null,
-        ...(f.number.trim() ? { number: f.number.trim() } : {}),
-        capacity: whole(f.capacity || '4'),
-      });
-    }
+    await (props.table ? saveEdit(props.table) : saveNew());
   } catch {
     return; // The dialog paints the error; what was typed stays.
   }
@@ -189,6 +225,27 @@ async function remove(): Promise<void> {
         >
           {{ $t('table.form.numberRequired') }}
         </p>
+        <div class="table-form__pair">
+          <ion-input
+            v-for="side in SIDES"
+            :key="side"
+            :data-testid="`table-form-${side}`"
+            :name="side"
+            type="number"
+            inputmode="numeric"
+            :min="SIDE.min"
+            :max="SIDE.max"
+            :value="form[side]"
+            :label="t(`table.form.${side}`)"
+            :placeholder="editing ? undefined : $t('table.form.sizePlaceholder')"
+            label-placement="floating"
+            fill="outline"
+            mode="md"
+            :error-text="fieldErrors[side]"
+            :class="invalid(fieldErrors[side])"
+            @ion-input="set(side, text($event.detail.value))"
+          />
+        </div>
         <ion-input
           v-if="editing"
           data-testid="table-form-name"

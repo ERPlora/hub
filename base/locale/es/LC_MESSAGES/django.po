@@ -327,10 +327,11 @@ msgstr "Tu equipo"
 msgid "Add the people who will use the till, each with their own way in."
 msgstr "Añade a las personas que usarán el TPV, cada una con su forma de entrar."
 
-#: queries.py:216
+#: bell.py
 msgid "Failed events"
 msgstr "Eventos caídos"
 
+#: bell.py
 msgid "Plan limits"
 msgstr "Límites del plan"
 
@@ -2230,3 +2231,109 @@ msgstr "Otro proceso está cortando este negocio ahora: este corte se detiene."
 #: services.py
 msgid "Control's rows already went to another business: they are copied once."
 msgstr "Las filas de control ya fueron a otro negocio: se copian una sola vez."
+
+#: bell.py
+msgctxt "bell button"
+msgid "Open"
+msgstr "Abrir"
+
+#: bell.py
+#, python-format
+msgid "%(count)d failed event"
+msgid_plural "%(count)d failed events"
+msgstr[0] "%(count)d evento caído"
+msgstr[1] "%(count)d eventos caídos"
+msgstr[2] "%(count)d eventos caídos"
+
+#: bell.py
+msgid "An app did not receive what another one sent it: what it had to do stays undone until you send it again."
+msgstr "Una app no recibió lo que otra le mandó: lo que tenía que hacer sigue sin hacerse hasta que lo reenvíes."
+
+#: bell.py
+msgid "Review the events"
+msgstr "Revisar los eventos"
+
+#: bell.py
+#, python-format
+msgid "%(count)d plan limit to review"
+msgid_plural "%(count)d plan limits to review"
+msgstr[0] "%(count)d límite del plan por revisar"
+msgstr[1] "%(count)d límites del plan por revisar"
+msgstr[2] "%(count)d límites del plan por revisar"
+
+#: bell.py
+msgid "Your business is reaching what its plan includes: some things may stop or slow down until you upgrade."
+msgstr "Tu negocio está llegando a lo que incluye su plan: algunas cosas pueden pararse o ir lentas hasta que lo amplíes."
+
+#: bell.py
+msgid "See the plan’s usage"
+msgstr "Ver el uso del plan"
+
+#: workbook_help.py
+msgctxt "workbook"
+msgid "Screens"
+msgstr "Pantallas"
+
+#: workbook_help.py
+msgctxt "workbook"
+msgid "done"
+msgstr "hecho"
+
+#: workbook_help.py
+msgctxt "workbook"
+msgid "Status"
+msgstr "Estado"
+
+#: workbook_help.py
+msgctxt "workbook"
+msgid "Vertical"
+msgstr "Vertical"
+
+#: workbook_help.py
+msgctxt "workbook"
+msgid "Actor"
+msgstr "Actor"
+
+#: workbook_help.py
+msgctxt "workbook"
+msgid "Screen"
+msgstr "Pantalla"
+
+#: workbook_help.py
+msgctxt "workbook"
+msgid "Steps"
+msgstr "Pasos"
+
+#: workbook_help.py
+msgctxt "workbook"
+msgid "In"
+msgstr "Entra"
+
+#: workbook_help.py
+msgctxt "workbook"
+msgid "Out"
+msgstr "Sale"
+
+#: workbook_help.py
+msgctxt "workbook"
+msgid "If it fails"
+msgstr "Si falla"
+
+#: workbook_help.py
+msgctxt "workbook"
+msgid "Through the assistant"
+msgstr "Por el asistente"
+
+#: workbook_help.py
+msgctxt "workbook"
+msgid "Involved"
+msgstr "Implicados"
+
+#: queries/app_help.py
+msgctxt "workbook"
+msgid "Settings"
+msgstr "Ajustes"
+
+#: queries/app_help.py
+msgid "This app has no help yet."
+msgstr "Esta app aún no tiene ayuda."

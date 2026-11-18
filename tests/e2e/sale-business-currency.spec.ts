@@ -12,6 +12,7 @@
 import { expect, type Page, test } from '@playwright/test';
 
 import { A, login, registerBusinessIn, registrationOf, type Registration, shot, shown } from './helpers';
+import { rowAction } from './service-helpers';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
 import { snapshotSeries } from './invoice-helpers';
 import { cleanSales, drawerOff, newestSaleOf, openTillCart, restoreDrawer, stamp, tillReady } from './sale-helpers';
@@ -149,7 +150,7 @@ test(`back in Spain the till is in euros, and the sale charged in Poland keeps i
 
   const row = await salesRow(page, polish.number);
   await expect(row).toContainText(ZLOTY);
-  await shown(page).locator(`[data-testid=sales-table-row-${polish.id}-document]`).first().click();
+  await rowAction(page, 'sales-table', polish.id, 'document');
   const receipt = page.locator('[data-testid=sale-document-modal] [data-testid=sale-receipt]');
   await expect(receipt).toBeVisible();
   await expect(receipt).toContainText(ZLOTY);

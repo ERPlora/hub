@@ -5,7 +5,7 @@
 // and «Charge» sends `sale.sale.complete` with this opening's attempt key. Every way it can go: cash,
 // card, split, the legal limits, invoice and its recipient abroad, part of a check, a refusal, a lost
 // answer, a read that fails.
-import { toast } from '@erplora/ui/shell';
+import { toastWarning } from '@erplora/ui/shell';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { CustomerSnapshot } from '../../../../customer/frontend/components/CustomerSearch.vue';
@@ -35,9 +35,9 @@ import VoucherLines from './VoucherLines.vue';
 
 vi.mock('@erplora/ui/shell', async (importOriginal) => ({
   ...((await importOriginal()) as object),
-  toast: vi.fn(() => Promise.resolve()),
+  toastWarning: vi.fn(),
 }));
-beforeEach(() => vi.mocked(toast).mockClear());
+beforeEach(() => vi.mocked(toastWarning).mockClear());
 
 const PREVIEW_OP = 'sale.checkout.preview';
 const METHODS_OP = 'sale.payment_method.list';
@@ -281,7 +281,7 @@ describe('CheckoutPanel: cash (SALE-F01)', () => {
   it('a tap while it cannot charge answers with the reason and sends nothing', async () => {
     const s = await setup();
     await click(s.confirm());
-    expect(toast).toHaveBeenCalledWith('Enter the amount tendered on the keypad', 'warning');
+    expect(toastWarning).toHaveBeenCalledWith('Enter the amount tendered on the keypad');
     expect(s.charges()).toEqual([]);
   });
 
@@ -417,7 +417,7 @@ describe('CheckoutPanel: the legal limits', () => {
     expect(s.find('sale-checkout-method-m-cash').attributes('aria-disabled')).toBe('true');
     expect(s.find('sale-checkout-method-m-card').attributes('aria-pressed')).toBe('true');
     await click(s.find('sale-checkout-method-m-cash').element);
-    expect(toast).toHaveBeenCalledWith('The law does not allow cash for sales of €1,000.00 or more. Charge it by card or Bizum.', 'warning');
+    expect(toastWarning).toHaveBeenCalledWith('The law does not allow cash for sales of €1,000.00 or more. Charge it by card or Bizum.');
   });
 
   it('from the cash limit on, cash is unavailable: the sheet starts on card and a tap on cash says why', async () => {
@@ -425,7 +425,7 @@ describe('CheckoutPanel: the legal limits', () => {
     expect(s.find('sale-checkout-method-m-cash').attributes('aria-disabled')).toBe('true');
     expect(s.find('sale-checkout-method-m-card').attributes('aria-pressed')).toBe('true');
     await click(s.find('sale-checkout-method-m-cash').element);
-    expect(toast).toHaveBeenCalledWith('The law does not allow cash for sales of €1,000.00 or more. Charge it by card or Bizum.', 'warning');
+    expect(toastWarning).toHaveBeenCalledWith('The law does not allow cash for sales of €1,000.00 or more. Charge it by card or Bizum.');
     expect(s.find('sale-checkout-method-m-card').attributes('aria-pressed')).toBe('true');
   });
 
@@ -436,7 +436,7 @@ describe('CheckoutPanel: the legal limits', () => {
     await click(s.find('sale-checkout-method-m-card').element);
     expect(s.label()).toBe("Enter the customer's details");
     await click(s.confirm());
-    expect(toast).toHaveBeenCalledWith("Enter the customer's details", 'warning');
+    expect(toastWarning).toHaveBeenCalledWith("Enter the customer's details");
     expect(s.charges()).toEqual([]);
   });
 });

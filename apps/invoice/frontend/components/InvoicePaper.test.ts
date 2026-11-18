@@ -17,6 +17,7 @@ const INVOICE = {
   operation_date: '2026-10-13',
   issuer_name: 'Peluquería Ana SL',
   issuer_tax_id: 'B12345674',
+  issuer_vat_number: 'B12345674',
   issuer_address: 'Calle Mayor 1, 28001 Madrid (Madrid)',
   customer_name: 'Talleres Pérez SL',
   customer_tax_id: 'B12345674',
@@ -76,6 +77,12 @@ describe('InvoicePaper', () => {
     ]);
     const es = await setup({ invoice: discounted }, 'es');
     expect(es.wrapper.findAll('[data-testid="invoice-paper-line"]')[1].findAll('td').map((td) => plain(td.text()))[2]).toBe('0,4132 €');
+  });
+
+  it('prints the issuer’s tax ID as the server composes it: ERPlora’s EU VAT number, not the one VeriFactu gets', async () => {
+    const erplora = { ...INVOICE, issuer_tax_id: 'B27593136', issuer_vat_number: 'ESB27593136' };
+    expect((await setup({ invoice: erplora })).text('invoice-paper-issuer')).toContain('Tax ID: ESB27593136');
+    expect((await setup({ invoice: erplora }, 'es')).text('invoice-paper-issuer')).toContain('NIF: ESB27593136');
   });
 
   it('a ticket is a simplified invoice without «Bill to»; a reprint says «Copy»', async () => {

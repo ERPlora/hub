@@ -56,7 +56,7 @@ function cuts(pill: Locator): Promise<string[]> {
     const outside = (inner: DOMRect, outer: DOMRect) =>
       inner.left < outer.left - 0.5 || inner.right > outer.right + 0.5 || inner.top < outer.top - 0.5 || inner.bottom > outer.bottom + 0.5;
     const found: string[] = [];
-    const cell = el.closest('.data-table__cell, .data-table__field-value');
+    const cell = el.closest('.data-table__cell, .data-table__card-status, .data-table__card-meta-value');
     if (!cell) return ['the pill is in no table cell or card field'];
     for (let node: Element | null = el; node; node = node.parentElement) {
       const style = getComputedStyle(node);

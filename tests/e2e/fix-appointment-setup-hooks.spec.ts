@@ -1,15 +1,16 @@
 // flow: APPOINTMENT-F28
-// Citas's counter of the bell, «Citas por confirmar» (its `LiveAppConfig.bell`): on the Home of hub `a`, as its owner reads it in
-// Spanish, a booking the customer made herself with «confirm automatically» off waits for confirmation, and the bell's
-// badge counts it without a reload; opened, the row «Citas por confirmar (N)» leads to the agenda; confirming it
-// elsewhere takes the row away, live. In each of the three sizes, on a day of its own, leaving a capture with the bell
-// open. What it creates is «E2E Bell …», removed before and after;
+// Citas's counter of the bell (its `LiveAppConfig.bell`) in the action center: on the Home of hub `a`, as its owner
+// reads it in Spanish, a booking the customer made herself with «confirm automatically» off waits for confirmation,
+// and the bell counts it without a reload; opened, the notice «N citas por confirmar» leads to the agenda with
+// «Confirmar las citas»; confirming it elsewhere takes the notice away, live. In each of the three sizes, on a day of
+// its own, leaving a capture with the action center open. What it creates is «E2E Bell …», removed before and after;
 // Citas's settings are put back as they were.
-import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
+import { type Browser, type BrowserContext, expect, test } from '@playwright/test';
 
+import { bellSays, bellTotal, featureNotice, noticeButton, noticeIn, openActionCenter } from './action-center';
 import { aMonday } from './appointment-helpers';
-import { A, api, badgeSays, capturedFitting, login, openBell, psql, shown } from './helpers';
-import { spanishOwnerOnMyApps as spanishOwner, streamsQuiet as settled } from './home-helpers';
+import { A, api, capturedFitting, login, psql, shown } from './helpers';
+import { homeRead, spanishOwnerOnMyApps as spanishOwner } from './home-helpers';
 import { FLOW_VIEWPORTS, post } from './service-helpers';
 
 const KEY = 'FIX-APPOINTMENT-SETUP-HOOKS';
@@ -103,38 +104,28 @@ async function cast(context: BrowserContext, label: string, day: string): Promis
   return { customer, service, member };
 }
 
-interface Counter {
-  key: string;
-  count: number;
-}
-
-/** What the bell counts now, as the server says (`base.bell.counters`). */
-async function counters(context: BrowserContext): Promise<{ total: number; toConfirm: number }> {
-  const res = await api<{ counters: Counter[] }>(context, A, 'GET', '/home/bell');
+/** How many appointments wait for confirmation now, as the server says (`appointment.to_confirm`). */
+async function toConfirmNow(context: BrowserContext): Promise<number> {
+  const res = await api<{ counters: { key: string; count: number }[] }>(context, A, 'GET', '/home/bell');
   expect(res.status).toBe(200);
-  const total = res.data.counters.reduce((sum, counter) => sum + counter.count, 0);
-  const toConfirm = res.data.counters.find((counter) => counter.key === 'appointment.to_confirm')?.count ?? 0;
-  return { total, toConfirm };
+  return res.data.counters.find((counter) => counter.key === 'appointment.to_confirm')?.count ?? 0;
 }
 
-const toConfirmRow = (page: Page): Locator =>
-  page.locator('ion-popover [data-testid="hub-bell-row"]', { hasText: /^\s*Citas por confirmar \(\d+\)\s*$/ });
+/** The notice's title, in the singular for one. */
+const toConfirmTitle = (count: number): string => (count === 1 ? '1 cita por confirmar' : `${count} citas por confirmar`);
+const TO_CONFIRM = /\d+ citas? por confirmar/;
 
-/** The badge says `total`, or is not shown at zero. */
 FLOW_VIEWPORTS.forEach(({ label, width, height }, index) => {
-  test(`the bell's «Citas por confirmar» counter: a customer's booking waiting counts live, leads to the agenda and goes once confirmed — ${label}`, async ({
+  test(`the action center's «citas por confirmar»: a customer's booking waiting counts live, leads to the agenda and goes once confirmed — ${label}`, async ({
     browser,
   }) => {
     const day = aMonday(index);
     const { context, page, streams } = await spanishOwner(browser, { width, height });
     try {
       const who = await cast(context, label, day);
-      const before = await counters(context);
-      // The Home as it is read: its panels answered and its stream settled, before anything changes the bell.
-      await expect(shown(page).locator('[data-testid="widget-board"] [data-testid="widget"]').first()).toBeVisible();
-      await expect(shown(page).locator('[data-testid="widget-board"] [data-testid="widget"][aria-busy="true"]')).toHaveCount(0);
-      await settled(streams);
-      await badgeSays(page, before.total);
+      const [total, toConfirm] = await Promise.all([bellTotal(context), toConfirmNow(context)]);
+      await homeRead(page, streams);
+      await bellSays(page, total);
       const onTheHome = streams.length;
 
       // The customer books by WhatsApp: with «I review them first», it waits for the business.
@@ -152,35 +143,32 @@ FLOW_VIEWPORTS.forEach(({ label, width, height }, index) => {
       const first = await book('10:00');
 
       // Counted without a reload, over the stream already open (the booking's event re-runs the bell).
-      await badgeSays(page, before.total + 1);
+      await bellSays(page, total + 1);
       expect(streams.length, 'the booking reached the bell without a new /api/live').toBe(onTheHome);
       // Confirmed elsewhere, it goes the same way (the confirmation's event re-runs the bell).
       await post(context, '/appointment/appointments/confirm', { id: first.id }, 200);
-      await badgeSays(page, before.total);
+      await bellSays(page, total);
       expect(streams.length, 'the confirmation reached the bell without a new /api/live').toBe(onTheHome);
 
       const booked = await book('11:00');
-      await badgeSays(page, before.total + 1);
-      // The capture: the Home with the bell open.
-      await openBell(page);
-      const row = toConfirmRow(page);
-      await expect(row).toHaveText(`Citas por confirmar (${before.toConfirm + 1})`);
-      await expect(row).toHaveAttribute('data-reachable', 'true');
+      await bellSays(page, total + 1);
+      // The capture: the Home with the action center open on the notice.
+      const featured = await featureNotice(page, TO_CONFIRM);
+      await expect(featured.locator('h3')).toHaveText(toConfirmTitle(toConfirm + 1));
+      const confirmThem = noticeButton(featured, 'Confirmar las citas');
+      await expect(confirmThem).toBeVisible();
       await capturedFitting(page, `${KEY}-${label}`, label);
 
-      // The row leads to the agenda.
-      await row.click();
+      // Its button leads to the agenda.
+      await confirmThem.click();
       await expect(page).toHaveURL(`${A}/appointment/agenda`);
       await expect(shown(page).locator('[data-testid="appointment-toolbar"]')).toBeVisible();
 
       // Confirmed elsewhere: the bell, in the agenda's bar too, takes it away without a reload.
       await post(context, '/appointment/appointments/confirm', { id: booked.id }, 200);
-      await badgeSays(page, before.total);
+      await bellSays(page, total);
       expect(psql(`select status from appointment_appointment where id = '${booked.id}'`)).toBe('confirmed');
-      if (before.toConfirm === 0) {
-        await openBell(page);
-        await expect(page.locator('ion-popover [data-testid="hub-bell-row"]', { hasText: 'Citas por confirmar' })).toHaveCount(0);
-      }
+      if (toConfirm === 0) await expect(noticeIn(await openActionCenter(page), TO_CONFIRM)).toHaveCount(0);
     } finally {
       await context.close();
     }

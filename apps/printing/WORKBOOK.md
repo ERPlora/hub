@@ -225,7 +225,10 @@ Pasos:
    sacarlos (ninguno dado de alta llega a su impresora, o esperan impresora y ninguno llega a una de su función,
    o el que llega lleva 90 s sin dar señales: está apagado o sin la app de ERPlora abierta), la campana de todos
    los que ven Impresión enseña una fila por función: «Nadie está imprimiendo «Recibo»» (o «Cocina», «Barra»,
-   «Etiqueta») con cuántos esperan. Tocarla abre **Impresión → Impresoras**, donde la tarjeta de esa
+   «Etiqueta») con cuántos esperan, urgente para «Cocina» y «Barra» (un pedido que no sale en papel es un plato o
+   una bebida que nadie prepara) y de atención para «Recibo» y «Etiqueta», con «No saldrán hasta que un dispositivo
+   con la app de ERPlora abierta pueda imprimirlos.». «Ver las impresoras» abre **Impresión → Impresoras**, donde la
+   tarjeta de esa
    función dice por qué: «Sin dispositivo» y «Ningún dispositivo dado de alta lo imprime: dalo de alta en
    Dispositivos.», «Dispositivo apagado» y «El dispositivo que lo imprime no responde: enciéndelo y abre en él
    la app de ERPlora.» o «En cola, sin impresora» si no tiene ninguna impresora activa.

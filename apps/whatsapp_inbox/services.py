@@ -133,7 +133,7 @@ from base import outbound
 from base.files import STORE_ERRORS
 from base.operations import hub_id
 from base.models import HubUser
-from base.queries import refuse_past_the_plans_space
+from base.queries.files import refuse_past_the_plans_space
 from base.services.sessions import acting_hub_user
 
 logger = logging.getLogger(__name__)

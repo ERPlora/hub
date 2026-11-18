@@ -18,7 +18,6 @@ from config.api import api
 
 ROUTES = {
     ("GET", "/verifactu/config", "verifactu.config.get"),
-    ("POST", "/verifactu/config", "verifactu.config.update"),
     ("POST", "/verifactu/config/go_live", "verifactu.config.go_live"),
     ("POST", "/verifactu/config/back_to_testing", "verifactu.config.back_to_testing"),
     ("POST", "/verifactu/certificate", "verifactu.certificate.upload"),
@@ -222,6 +221,23 @@ def test_a_certificate_of_another_holder_is_a_409_with_its_code(
     )
     assert response.status_code == 409
     assert response.json()["error"]["code"] == "verifactu.certificate_holder_mismatch"
+
+
+@HUB_DB
+def test_a_self_signed_certificate_is_a_409_that_says_which_one_to_use(
+    admin_client, issuer, settings
+):
+    settings.FISCAL_CERTIFICATE_KEY = certificates.generate_key()
+    response = post(
+        admin_client,
+        "/verifactu/certificate",
+        {"p12_base64": b64(make_p12(self_signed=True)), "password": "secret"},
+    )
+    assert response.status_code == 409
+    error = response.json()["error"]
+    assert error["code"] == "verifactu.certificate_invalid"
+    assert "FNMT" in error["message"]
+    assert not OwnCertificate.objects.exists()
 
 
 @HUB_DB

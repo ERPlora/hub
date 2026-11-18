@@ -365,7 +365,7 @@ class DemoStatusOut(Schema):
     expires_at: dt.datetime | None
 
 
-# --- The Home: base.setup.status, base.widget.list, base.bell.counters ------------------------------------------
+# --- The Home: base.setup.status, base.widget.list ------------------------------------------------------------
 
 
 class SetupStatusIn(Schema):
@@ -439,28 +439,6 @@ class SystemCardOut(Schema):
 
 class SystemCardsOut(Schema):
     cards: list[SystemCardOut]
-
-
-class BellCountersIn(Schema):
-    """No input: the counters above zero this person may see in this hub."""
-
-
-class BellCounterOut(Schema):
-    key: str = Field(description="«<app>.<counter>», or «base.failed_events».")
-    app: str
-    count: int
-    route: str
-    label: str
-    icon: str
-
-
-class BellCountersOut(Schema):
-    counters: list[BellCounterOut]
-    refresh_every: int | None = Field(
-        default=None,
-        description="Seconds after which the bell reads its counters again, for one whose figure moves as time passes; "
-        "none: only when something changes.",
-    )
 
 
 class NoticeListIn(Schema):
@@ -541,7 +519,7 @@ class AppListOut(Schema):
     enabled: int
 
 
-#: An app as the person names it (BASE-F23, F24; hub#539): ``base.queries.find_app`` resolves it.
+#: An app as the person names it (BASE-F23, F24; hub#539): ``base.queries.apps.find_app`` resolves it.
 APP_SAID = (
     "The app: its name as the person says it (e.g. «Reservas»), or its id. A name that fits several apps is refused "
     "naming them: ask the person which one."
