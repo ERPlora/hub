@@ -419,6 +419,12 @@ def test_every_list_has_a_search():
         assert "search" in schema.model_fields, schema.__name__
 
 
+def test_a_product_list_searches_at_most_200_characters():
+    for schema in (ProductListIn, LowStockListIn, ForSaleListIn):
+        assert schema(search="x" * 200).search == "x" * 200, schema.__name__
+        assert invalid_fields(schema, search="x" * 201) == {"search"}, schema.__name__
+
+
 # The JSON Schema of the assistant's tools
 
 
