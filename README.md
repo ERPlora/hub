@@ -482,6 +482,35 @@ Variables del repo: `AWS_REGION`, `ALB_DNS_NAME`, `AWS_DEPLOY_ROLE_ARN` (prod, c
 `HUB_BASE_DOMAIN` (`erplora.com` o `pre.erplora.com`; en local, `localhost`): un Hub solo sirve
 `<slug>.<HUB_BASE_DOMAIN>` y `hubs.<HUB_BASE_DOMAIN>`.
 
+### Ajustes de cada entorno (`deploy/app-env.json`)
+
+Los ajustes del Hub que no son secretos y cambian de un entorno a otro viajan con el código, en
+`deploy/app-env.json`: `PLATFORM_HUB_SLUG`, `VERIFACTU_PRODUCTION_ENABLED` y `VERIFACTU_ERPLORA_ROUTE_ENABLED`,
+por entorno (`prod`, `pre`) y familia de tareas (`hub` y `worker`; `hub-migrate` no lleva ninguno). Cambiar uno es
+editar el fichero y desplegar. Los secretos y el resto de variables siguen en Terraform (ERPlora/aws, «Ajustes de la
+app»), porque el repo es público.
+
+- El despliegue lee el fichero **del commit que despliega**: volver a una release es volver también a sus ajustes.
+  Una release anterior al fichero conserva los ajustes vigentes.
+- Antes de registrar nada, `deploy/app_env.py` comprueba que solo lleva esas variables, en `hub` y `worker`, con
+  valores de texto (`true`/`false`; el slug, en minúsculas), nada con forma de secreto ni ninguna variable que ya
+  ponga Terraform; que `VERIFACTU_PRODUCTION_ENABLED` es igual en `hub` y `worker`, `false` explícito en pre y, en
+  prod, `true` mientras erplora.com cobre de verdad (`PLATFORM_INVOICING_ENABLED` en la última revisión de
+  `erplora-prod-saas`). Si algo falla, el despliegue para y dice qué y dónde (`prod.hub.<VARIABLE>`).
+- **El candado:** en prod, abrir o cerrar el envío real a Hacienda (cambiar `VERIFACTU_PRODUCTION_ENABLED` respecto
+  al vigente) no sale con el push: el despliegue para sin registrar nada y se relanza a mano con la confirmación
+  exacta de lo que cambia:
+
+  ```bash
+  gh workflow run deploy.yml --repo ERPlora/hub --ref main -f environment=prod -f release=<release del push> \
+    -f confirm_protected=VERIFACTU_PRODUCTION_ENABLED=true
+  ```
+
+- Al acabar bien, el despliegue escribe esos ajustes en `/erplora/<entorno>/hub/app_env`, junto a la imagen
+  (`image_tag`), y Terraform los relee para las revisiones que registra.
+- La vuelta atrás (`rollback.yml`) todavía no los mira: vuelve a la revisión anterior con los suyos, sin comprobarlos
+  ni escribirlos (ERPlora/hub#1719).
+
 ### Las personas del negocio en su BD (`base.HubUser`)
 
 Control guarda el usuario de la sesión (`auth.User`, la copia `saas:<id>` de la cuenta de erplora.com) y el rol
