@@ -1,10 +1,11 @@
 name: rollback
 
 # Manual: puts the hub's services of one environment back on the ACTIVE revision right before the
-# one they run and records its image tag (ecs-rollback.sh): hub and worker in prod (run it on main),
-# hub-pre and worker-pre in pre (run it on pre; deploy-env.sh checks the branch). Migrations are not
-# undone. Scheduled hub tasks of prod run the latest ACTIVE worker revision, so they keep the newer
-# image: to go back everywhere, run deploy with the previous release instead.
+# one they run and records its settings and image tag (ecs-rollback.sh): hub and worker in prod (run it
+# on main), hub-pre and worker-pre in pre (run it on pre; deploy-env.sh checks the branch). Its settings
+# go through the deploy's checks first (deploy/app_env_rollback.py). Migrations are not undone. Scheduled
+# hub tasks of prod run the latest ACTIVE worker revision, so they keep the newer image and its
+# settings: to go back everywhere, run deploy with the previous release instead.
 
 on:
   workflow_dispatch:
@@ -18,6 +19,13 @@ on:
         description: Type ROLLBACK to put the hub's services back on their previous revision (migrations are not undone)
         type: string
         required: true
+      # Going back to a version whose settings change a protected one in prod stops before changing anything;
+      # this run lets it through, as in deploy.yml.
+      confirm_protected:
+        description: Protected settings this prod rollback changes, exactly (e.g. VERIFACTU_PRODUCTION_ENABLED=false)
+        type: string
+        required: false
+        default: ""
 
 permissions:
   contents: read
@@ -53,6 +61,7 @@ jobs:
 
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          fetch-depth: 0 # the history: deploy/app-env.json of the commit it goes back to
           persist-credentials: false
       # The same check as deploy.yml: main -> prod, pre -> pre, the environment asked must be the
       # branch's, and its deploy role must be set (never the other environment's).
@@ -71,4 +80,5 @@ jobs:
       - name: Roll the hub's services back
         env:
           ENVIRONMENT: ${{ steps.target.outputs.environment }}
+          CONFIRM_PROTECTED: ${{ inputs.confirm_protected }}
         run: bash .github/scripts/ecs-rollback.sh

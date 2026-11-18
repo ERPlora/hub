@@ -100,6 +100,21 @@ check("the deploy hands the confirmation to ecs-deploy.sh in its environment, ne
 checkout = next((step for step in steps(deploy_job) if "actions/checkout" in str(step.get("uses", ""))), {})
 check("the deploy checks out the whole history: it reads deploy/app-env.json of the commit it deploys",
       (checkout.get("with") or {}).get("fetch-depth") == 0)
+
+# --- rollback.yml: the same confirmation, and the settings of the commit it goes back to ----------
+rollback_dispatch = (rollback.get("on") or rollback.get(True) or {}).get("workflow_dispatch") or {}
+rollback_confirm = (rollback_dispatch.get("inputs") or {}).get("confirm_protected") or {}
+check("a rollback takes the confirmation of a protected setting, empty by default",
+      rollback_confirm.get("type") == "string" and rollback_confirm.get("default") == ""
+      and rollback_confirm.get("required") is False)
+rollback_job = (rollback.get("jobs") or {}).get("rollback", {})
+rollback_step = next((step for step in steps(rollback_job) if "ecs-rollback.sh" in str(step.get("run", ""))), {})
+check("the rollback hands the confirmation to ecs-rollback.sh in its environment, never inline in the script",
+      (rollback_step.get("env") or {}).get("CONFIRM_PROTECTED") == "${{ inputs.confirm_protected }}"
+      and "inputs.confirm_protected" not in str(rollback_step.get("run", "")))
+rollback_checkout = next((step for step in steps(rollback_job) if "actions/checkout" in str(step.get("uses", ""))), {})
+check("the rollback checks out the whole history: it reads deploy/app-env.json of the commit it goes back to",
+      (rollback_checkout.get("with") or {}).get("fetch-depth") == 0)
 check("only build and deploy get an OIDC token",
       sorted(name for name, job in jobs.items() if (job.get("permissions") or {}).get("id-token") == "write")
       == ["build", "deploy"])

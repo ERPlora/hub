@@ -1,26 +1,24 @@
 #!/usr/bin/env bash
-# Puts the hub's services of one environment back on the ACTIVE revision right before the one their
-# PRIMARY deployment runs and records that revision's image tag in /erplora/<environment>/hub/image_tag
-# (ERPlora/aws README, "Imagen"). Each environment has its own ECS cluster, erplora-<environment>.
+# Puts the hub's services of one environment back on the ACTIVE revision right before the one their PRIMARY
+# deployment runs, and records that revision's settings and image tag in /erplora/<environment>/hub/app_env and
+# image_tag (ERPlora/aws README, "Ajustes de la app" and "Imagen"). Each environment has its own ECS cluster:
 # prod: cluster erplora-prod, services hub and worker, families erplora-prod-*, image erplora/hub;
-# pre: cluster erplora-pre, services hub-pre and worker-pre, families erplora-pre-*, image
-# erplora/hub-pre.
-#   1. finds each service's previous revision; nothing changes unless every service has one, every
-#      one is of this environment (tag Environment=<environment>, task and execution roles
-#      erplora-<environment>-*, the guard of ecs-deploy.sh) and they all run the same tag;
-#   2. moves the services to those revisions, waits until they are stable and then polls each
-#      one's PRIMARY deployment until it is the previous revision, COMPLETED: ECS marks it
-#      COMPLETED seconds to a minute after services-stable returns, once the old tasks drain from
-#      the ALB. A FAILED rollout or another revision as PRIMARY (the circuit breaker puts back the
-#      one the service ran and the wait still succeeds) fails at once; a rollout that outlasts
-#      ROLLOUT_TIMEOUT_SECONDS fails too;
-#   3. records the tag only then, so a failed rollback leaves the parameter as it was.
+# pre: cluster erplora-pre, services hub-pre and worker-pre, families erplora-pre-*, image erplora/hub-pre.
+#   1. finds each service's previous revision; nothing changes unless every service has one of this environment
+#      (tag Environment=<environment>, task and execution roles erplora-<environment>-*, the guard of ecs-deploy.sh),
+#      they all run the same tag and their settings pass deploy/app_env_rollback.py: those of deploy/app-env.json in
+#      that commit, under the deploy's rules (in prod, changing VERIFACTU_PRODUCTION_ENABLED takes CONFIRM_PROTECTED);
+#   2. moves the services to those revisions and waits until they are stable and each one's PRIMARY deployment is
+#      the previous revision, COMPLETED (ECS marks it so once the old tasks drain from the ALB); a FAILED rollout,
+#      another revision as PRIMARY (the circuit breaker put back the one the service ran) or a rollout that outlasts
+#      ROLLOUT_TIMEOUT_SECONDS fails;
+#   3. records the settings and the tag only then, so a failed rollback leaves the parameters as they were.
 # Migrations are NOT undone: the previous code must work on the current schema (expand/contract).
 # Scheduled hub tasks run the latest ACTIVE worker revision (ERPlora/aws stacks/prod/scheduler.tf), so they keep
-# the newer image until the next deploy; to go back everywhere, deploy the previous release.
+# the newer image and its settings until the next deploy; to go back everywhere, deploy the previous release.
 #
-# Env: CONFIRM (exactly ROLLBACK), AWS_REGION, ENVIRONMENT (prod | pre); optional CLUSTER
-#      (erplora-<environment>), POLL_SECONDS (15), ROLLOUT_TIMEOUT_SECONDS (600).
+# Env: CONFIRM (exactly ROLLBACK), AWS_REGION, ENVIRONMENT (prod | pre); optional CLUSTER (erplora-<environment>),
+#      POLL_SECONDS (15), ROLLOUT_TIMEOUT_SECONDS (600), CONFIRM_PROTECTED (NAME=value).
 set -euo pipefail
 
 if [ "${CONFIRM:-}" != ROLLBACK ]; then
@@ -57,6 +55,8 @@ names=(hub worker)
 services=("${names[@]/%/$suffix}")
 prefix="erplora-$ENVIRONMENT"
 repository="erplora/$PROJECT$suffix"
+workdir="$(mktemp -d)"
+trap 'rm -rf "$workdir"' EXIT
 
 echo "::warning::rolling back ${services[*]} to their previous revisions; migrations are not undone"
 
@@ -78,8 +78,7 @@ for i in "${!services[@]}"; do
     exit 1
   fi
 
-  # The family prefix also lists longer families (erplora-<env>-hub-migrate): same family only,
-  # and the highest revision below the current one.
+  # Same family only (its prefix also lists erplora-<env>-hub-migrate), the highest revision below the current one.
   arns="$(aws ecs list-task-definitions --family-prefix "$family" --status ACTIVE --sort DESC \
     --region "$AWS_REGION" --query taskDefinitionArns --output text)"
   read -ra listed <<< "$arns"
@@ -95,20 +94,20 @@ for i in "${!services[@]}"; do
     exit 1
   fi
 
-  definition="$(aws ecs describe-task-definition --task-definition "$previous" --include TAGS \
-    --region "$AWS_REGION" --output json)"
+  aws ecs describe-task-definition --task-definition "$previous" --include TAGS \
+    --region "$AWS_REGION" --output json > "$workdir/$name.json"
   if ! jq -e --arg environment "$ENVIRONMENT" --arg roles "^arn:aws[a-z-]*:iam::[0-9]+:role/$prefix-" '
       any(.tags[]?; .key == "Environment" and .value == $environment)
       and ((.taskDefinition.taskRoleArn // "") | test($roles))
-      and ((.taskDefinition.executionRoleArn // "") | test($roles))' <<< "$definition" > /dev/null; then
+      and ((.taskDefinition.executionRoleArn // "") | test($roles))' "$workdir/$name.json" > /dev/null; then
     carries="$(jq -r '"Environment=\(first(.tags[]? | select(.key == "Environment") | .value) // "none"), task role \(.taskDefinition.taskRoleArn // "none"), execution role \(.taskDefinition.executionRoleArn // "none")"' \
-      <<< "$definition")"
+      "$workdir/$name.json")"
     echo "::error::$previous is no revision of $ENVIRONMENT ($carries); nothing was changed" >&2
     exit 1
   fi
   # The app's container is named after the family's short name (ERPlora/aws modules/ecs-service).
   image="$(jq -r --arg name "$name" '[.taskDefinition.containerDefinitions[] | select(.name == $name) | .image][0] // "none"' \
-    <<< "$definition")"
+    "$workdir/$name.json")"
   if [[ "$image" != */$repository:* ]]; then
     echo "::error::$previous does not run an $repository image ($image); nothing was changed" >&2
     exit 1
@@ -117,12 +116,11 @@ for i in "${!services[@]}"; do
   tags+=("${image##*:}")
 done
 
-for tag in "${tags[@]}"; do
-  if [ "$tag" != "${tags[0]}" ]; then
-    echo "::error::the previous revisions run different tags (${tags[*]}); nothing was changed" >&2
-    exit 1
-  fi
-done
+if [ "$(printf '%s\n' "${tags[@]}" | sort -u | wc -l)" -ne 1 ]; then
+  echo "::error::the previous revisions run different tags (${tags[*]}); nothing was changed" >&2
+  exit 1
+fi
+python3 "$(dirname "$0")/../../deploy/app_env_rollback.py" "$workdir" "$ENVIRONMENT" "${tags[0]}" "$AWS_REGION" --confirm="${CONFIRM_PROTECTED:-}"
 
 for i in "${!services[@]}"; do
   aws ecs update-service --cluster "$CLUSTER" --service "${services[i]}" \
@@ -167,6 +165,8 @@ while :; do
 done
 echo "services stable on the previous revisions"
 
+aws ssm put-parameter --name "/erplora/$ENVIRONMENT/$PROJECT/app_env" --value "$(< "$workdir/app_env.json")" \
+  --type String --overwrite --region "$AWS_REGION" > /dev/null
 aws ssm put-parameter --name "/erplora/$ENVIRONMENT/$PROJECT/image_tag" --value "${tags[0]}" \
   --type String --overwrite --region "$AWS_REGION" > /dev/null
-echo "recorded ${tags[0]} in /erplora/$ENVIRONMENT/$PROJECT/image_tag"
+echo "recorded its settings and ${tags[0]} in /erplora/$ENVIRONMENT/$PROJECT/app_env and image_tag"
