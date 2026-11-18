@@ -12,6 +12,7 @@ from live.operations import NAME_RE
 
 from apps.inventory import events
 from apps.inventory.models import Product, StockMovement
+from apps.inventory.tests.test_services import TAX, import_products, outbox, row
 from apps.tax.models import TaxCategory
 
 from .conftest import A, HUB_DB
@@ -79,6 +80,16 @@ def test_a_paid_sale_and_its_void_reach_the_stock_as_the_system():
     assert StockMovement.objects.get(movement_type="sale").actor == "system"
     assert events.react(A, "sale.sale.voided", {"sale_id": str(sale)}).movements == 1
     assert Product.objects.get().stock == Decimal("10")
+
+
+@HUB_DB
+def test_a_product_an_import_makes_is_told_as_one_the_form_makes():
+    TaxCategory.objects.create(key=TAX, name="General")
+    import_products(row("CAF", name="Coffee"))
+    coffee = Product.objects.get()
+    assert outbox(events.PRODUCT_CREATED) == [
+        (events.PRODUCT_CREATED, {"id": str(coffee.id), "sku": "CAF", "name": "Coffee", "category_ids": []}),
+    ]
 
 
 @HUB_DB
