@@ -229,10 +229,10 @@ def lock_problems(section, in_force, confirm):
         return []
     where = f"prod.{LOCK}"
     if not given:
-        message = f"changes what is in force: deploy again by hand with confirm_protected={','.join(changes)}"
+        message = f"changes what is in force: run it again by hand with confirm_protected={','.join(changes)}"
         return [Problem(where, "needs_confirmation", message)]
     changed = ",".join(changes) or "nothing protected"
-    message = f"confirm_protected says {','.join(given)}, but this deploy changes {changed}"
+    message = f"confirm_protected says {','.join(given)}, but the settings change {changed}"
     return [Problem(where, "confirmation_mismatch", message)]
 
 
@@ -326,17 +326,26 @@ def apply(workdir, environment, commit, region, confirm):
     results = {family: merged(revision, family, section, in_force) for family, revision in revisions.items()}
     for family, result in results.items():
         (workdir / f"{family}.json").write_text(json.dumps(result))
-    (workdir / "app_env.json").write_text(json.dumps(section, sort_keys=True, separators=(",", ":")))
+    write_settings(workdir, section)
+
+
+def write_settings(workdir, settings):
+    """What ecs-deploy.sh and ecs-rollback.sh record in app_env once they succeed: compact JSON, keys sorted."""
+    (workdir / "app_env.json").write_text(json.dumps(settings, sort_keys=True, separators=(",", ":")))
+
+
+def arguments(argv, description, positionals=("commit", "region")):
+    parser = argparse.ArgumentParser(description=description)
+    parser.add_argument("workdir", type=Path)
+    parser.add_argument("environment", choices=ENVIRONMENTS)
+    for name in positionals:
+        parser.add_argument(name)
+    parser.add_argument("--confirm", default="", help="the protected changes confirmed, NAME=value[,NAME=value]")
+    return parser.parse_args(argv)
 
 
 def main(argv=None):
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("workdir", type=Path)
-    parser.add_argument("environment", choices=ENVIRONMENTS)
-    parser.add_argument("commit")
-    parser.add_argument("region")
-    parser.add_argument("--confirm", default="", help="the protected changes confirmed, NAME=value[,NAME=value]")
-    args = parser.parse_args(argv)
+    args = arguments(argv, __doc__.splitlines()[0])
     try:
         apply(args.workdir, args.environment, args.commit, args.region, args.confirm)
     except Refused as refused:

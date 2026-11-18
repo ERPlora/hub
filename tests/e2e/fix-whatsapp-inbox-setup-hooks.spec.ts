@@ -9,7 +9,8 @@
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
 import { bellSays, bellTotal, featureNotice, noticeButton, noticeIn, openActionCenter } from './action-center';
-import { A, api, capturedFitting, psql, shown } from './helpers';
+import { A, api, psql, shown } from './helpers';
+import { capturedFitting } from './screen';
 import { homeRead, spanishOwnerOnMyApps as spanishOwner, streamsQuiet as settled } from './home-helpers';
 import { FLOW_VIEWPORTS } from './service-helpers';
 import { cleanUp, e2ePhone, keepPhoto, PREFIX, pushChannel, receive, restorePhoto } from './whatsapp-helpers';

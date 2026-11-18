@@ -3,7 +3,9 @@
 // (`pg_terminate_backend`) the Listener reconnects and the open screens keep receiving changes.
 import { type Page, expect, test } from '@playwright/test';
 
-import { A, B, createItem, hostPage, listenerRows, listReady, psql, record, row, uniqueName, waitFor } from './helpers';
+import { A, B, hostPage, psql, record, uniqueName } from './helpers';
+import { createItem, listReady, row } from './demo-items';
+import { listenerRows, waitFor } from './dev-server';
 
 test('3 pages on a + 2 on b → one live-listener row; closing them keeps it; a killed one comes back', async ({ browser }) => {
   const before = listenerRows();

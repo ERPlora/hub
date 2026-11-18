@@ -1,8 +1,6 @@
 """Every visible text of the sale app has its Spanish translation, compiled and current."""
 
-import importlib
 import json
-import pkgutil
 from pathlib import Path
 
 import pytest
@@ -25,9 +23,6 @@ from base.tests.po import (
 )
 
 LOCALE = Path(apps.get_app_config("sale").path) / "locale" / "es" / "LC_MESSAGES"
-SERVICE_MODULES = [
-    importlib.import_module(f"{services.__name__}.{module.name}") for module in pkgutil.iter_modules(services.__path__)
-]
 
 
 def visible_texts() -> set[str]:
@@ -40,7 +35,7 @@ def visible_texts() -> set[str]:
         *config.approvals.values(),
         *(sentence for sentences in getattr(config, "approval_figures", {}).values() for sentence in sentences),
     ]
-    lazies += module_texts(queries, *SERVICE_MODULES, pricing, schemas, models)
+    lazies += module_texts(queries, services, pricing, schemas, models)
     lazies += list(models.FACTORY_METHOD_NAMES.values())
     lazies += [text for text in model_texts(apps.get_app_config("sale").get_models()) if isinstance(text, Promise)]
     lazies += [

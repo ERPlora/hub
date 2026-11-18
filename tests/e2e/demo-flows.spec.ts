@@ -8,7 +8,8 @@
 // flow: DEMO-F01 DEMO-F02 DEMO-F03 DEMO-F04 DEMO-F05 DEMO-F06
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, api, capture, createItem, EMPLOYEE, horizontalOverflow, hostPage, listReady, row, rowNames, rowOf, settled, shown, uniqueName } from './helpers';
+import { A, api, capture, EMPLOYEE, horizontalOverflow, hostPage, settled, shown, uniqueName } from './helpers';
+import { createItem, listReady, row, rowNames, rowOf } from './demo-items';
 import { loadsMore, scrollToEnd } from './infinite-scroll-helpers';
 import { dismissToasts, toastSaying } from './toast-helpers';
 

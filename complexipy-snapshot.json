@@ -660,16 +660,6 @@
     ]
   },
   {
-    "path": "base/tests/po.py",
-    "file_name": "po.py",
-    "functions": [
-      {
-        "name": "module_texts",
-        "complexity": 21
-      }
-    ]
-  },
-  {
     "path": "base/tests/test_assistant_asks.py",
     "file_name": "test_assistant_asks.py",
     "functions": [
