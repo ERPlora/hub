@@ -1,5 +1,5 @@
 // Vite of hub-next. A contract with Django (`packages/live/live/spa.py`, `LIVE["spa"]` in
-// `config/settings.py`): with DEBUG the shell loads `http://localhost:5173/static/spa/@vite/client`
+// `config/settings/modules.py`): with DEBUG the shell loads `http://localhost:5173/static/spa/@vite/client`
 // (`VITE_DEV_PORT` moves it)
 // and `…/static/spa/frontend/main.ts` (Vite applies `base` in dev too); in production Django reads
 // `frontend/dist/.vite/manifest.json` and links `/static/spa/assets/…` (WhiteNoise). A second entry,
@@ -16,7 +16,7 @@ import { loadScale } from './vitest.load';
 
 const DEV_HOST = 'localhost';
 // 5173 unless a second checkout runs beside another one (the e2e of a branch): Django reads the same
-// VITE_DEV_PORT (`config/settings.py`).
+// VITE_DEV_PORT (`config/settings/core.py`).
 const DEV_PORT = Number(process.env.VITE_DEV_PORT ?? 5173);
 if (!Number.isInteger(DEV_PORT) || DEV_PORT <= 0 || DEV_PORT >= 65536) {
   throw new Error(`VITE_DEV_PORT must be a TCP port, not ${process.env.VITE_DEV_PORT}.`);

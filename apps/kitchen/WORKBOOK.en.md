@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:2136bf080b25b2b4649239464be3b282e4f49ab04d89885c9c768d262b3147c6 -->
+<!-- generated from WORKBOOK.md sha256:c5c23ab43ea2af780657615e01e6c386715995c8d4e71bc5a6e75ee1ec7375ea -->
 
 ## What it is for and who it is for
 
@@ -219,6 +219,7 @@ With the window as it opened, Back closes it without asking (BASE-F05).
 | KITCHEN-F28 | Withdraw the rounds of a check deleted or merged into another | done |
 | KITCHEN-F29 | Void a dish already sent, with a notice to the kitchen | done |
 | KITCHEN-F31 | Give Cash register the tickets still under way | done |
+| KITCHEN-F32 | Highlight the customer's allergy on the card and on paper | not done |
 
 ### KITCHEN-F01 Create a station
 Status: done
@@ -775,3 +776,34 @@ that the review may be incomplete ("What is still pending could not be checked, 
 incomplete."). With Kitchen switched off there are no pending tickets. It never prevents closing the cash
 register.
 Involved: CASH_REGISTER-F08, CASH_REGISTER-F09, KITCHEN-F10, KITCHEN-F13
+
+### KITCHEN-F32 Highlight the customer's allergy on the card and on paper
+Status: not done — the ticket does not receive the customer's allergy or the dish's allergens yet: today an allergy
+arrives as text in the note (KITCHEN-F07)
+Actor: employee
+Screen: Display, Tickets
+Steps:
+1. At the till, the waiter marks the customer's allergy on the line of their dish (SALE-F41) and sends the round
+   (KITCHEN-F18).
+2. On the card, the header carries the "Allergy" mark, in red, next to "Rush" and "VIP", if any of its dishes has an
+   allergy marked. Each station sees it only if one of its dishes has it.
+3. Under the name of that dish, before its modifiers and its note, comes a block of its own in red: "Allergy:
+   Gluten". If the dish has that allergen according to Inventory (SALE-F40), the block adds "The dish has Gluten". A
+   dish without an allergy marked has no block, even if it has allergens: the display does not repeat each dish's.
+4. On a menu, the block shows on each of its dishes, and "The dish has" names only that dish's allergens.
+5. On the station's paper (KITCHEN-F08), the header carries `!! ALERGIA !!` (under `!! URGENTE !!` if the round is
+   rush) and, right under the dish and before its modifiers, `*** ALERGIA: GLUTEN ***` and, if it has it,
+   `*** LLEVA: GLUTEN ***`, each on its own line and in capitals, so that it stands out without colour. The reprint
+   (KITCHEN-F09) comes out the same.
+6. The cook carries on as always: marking ready, recalling and serving do not change (KITCHEN-F11 to KITCHEN-F13),
+   and the block stays in view while the dish is on the display. In **Tickets**, the ticket's detail shows it on its
+   dish too.
+In: from Sales, for each line sent, the customer's allergy and its product's frozen allergens (SALE-F40,
+SALE-F41).
+Out: the allergy and the matching allergens, frozen on the dish like its modifiers: changing the line or the
+catalogue afterwards does not change this ticket (announces: ticket received).
+If it fails: if the sheet does not print, the allergy stays on the display and the ticket is reprinted like any
+other (KITCHEN-F09). Without an allergy marked, the dish comes out as today, with its note as it is. An allergy the
+customer mentions after sending does not arrive by itself: the kitchen is told out loud (SALE-F41). A ticket made by
+hand (KITCHEN-F23) has no allergy block: it is for what does not go through the till, and its note is still there.
+Involved: SALE-F20, SALE-F40, SALE-F41, INVENTORY-F35, KITCHEN-F05, KITCHEN-F06, KITCHEN-F07, KITCHEN-F08, KITCHEN-F09

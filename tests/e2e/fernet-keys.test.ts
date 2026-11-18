@@ -1,4 +1,4 @@
-// The Fernet keys an e2e stack's runserver needs (config/settings.py): `FISCAL_CERTIFICATE_KEY`, which seals a
+// The Fernet keys an e2e stack's runserver needs (config/settings/businesses.py): `FISCAL_CERTIFICATE_KEY`, which seals a
 // business's own VeriFactu certificate, and `FLOW_SECRETS_KEY`, which seals the secrets of the automations. Without
 // the first the Hub refuses every upload (409 verifactu.certificate_storage_unavailable), and verifactu-config.spec.ts
 // failed at «Mi certificado» on every stack whose .env lacked it (2026-10-19, seen in the run of hub#34); without the
@@ -49,7 +49,7 @@ function keyLines(path: string, name: Name): string[] {
 type Seen = { key: string | null; usable: boolean };
 
 /**
- * The Hub's server, asked over its stdin: for each .env, each key python-decouple reads from it, as config/settings.py
+ * The Hub's server, asked over its stdin: for each .env, each key python-decouple reads from it, as config/settings
  * does, and whether the app that seals with it can (apps.verifactu.certificates keeps a certificate, the check behind
  * the 409; apps.flow.vault keeps a secret, the check behind the box's «cannot keep secrets»). One line of paths in, one
  * line of answers out; it stops when its stdin closes, also if this process dies.
@@ -267,7 +267,7 @@ describe('ensureFernetKeys', () => {
     }
   });
 
-  it("works on the checkout's own .env, the one config/settings.py reads", () => {
+  it("works on the checkout's own .env, the one config/settings reads", () => {
     expect(ENV_FILE).toBe(join(HUB_DIR, '.env'));
   });
 });

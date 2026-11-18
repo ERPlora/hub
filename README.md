@@ -101,7 +101,7 @@ tal cual.
 ## Un corte de la base de datos (BASE-F111)
 
 Un reinicio del escritor, un mantenimiento de AWS o el cambio de Blue/Green cortan la base unos segundos (PLAN-DB, ronda
-2026-11-04e, punto 5). El Hub enciende `live.database_cut` (`LIVE["database_cut"]` en `config/settings.py`; qué es un
+2026-11-04e, punto 5). El Hub enciende `live.database_cut` (`LIVE["database_cut"]` en `config/settings/modules.py`; qué es un
 corte y qué se repite, en el README de `packages/live`):
 
 - **Espera** hasta `DB_CUT_WAIT_SECONDS` (20 s por defecto, muy por debajo de los 120 s del balanceador) y repite sola una
@@ -493,10 +493,12 @@ app»), porque el repo es público.
 - El despliegue lee el fichero **del commit que despliega**: volver a una release es volver también a sus ajustes.
   Una release anterior al fichero conserva los ajustes vigentes.
 - Antes de registrar nada, `deploy/app_env.py` comprueba que solo lleva esas variables, en `hub` y `worker`, con
-  valores de texto (`true`/`false`; el slug, en minúsculas), nada con forma de secreto ni ninguna variable que ya
-  ponga Terraform; que `VERIFACTU_PRODUCTION_ENABLED` es igual en `hub` y `worker`, `false` explícito en pre y, en
-  prod, `true` mientras erplora.com cobre de verdad (`PLATFORM_INVOICING_ENABLED` en la última revisión de
-  `erplora-prod-saas`). Si algo falla, el despliegue para y dice qué y dónde (`prod.hub.<VARIABLE>`).
+  valores de texto (`true`/`false`; el slug, en minúsculas), nada con forma de secreto ni ninguna que Terraform dé
+  como secreto a esa familia (un solo dueño por variable: fuera de los secretos, Terraform no fija ninguno de estos
+  ajustes, solo pasa a sus revisiones los del `app_env` vigente); que `VERIFACTU_PRODUCTION_ENABLED` es igual en `hub`
+  y `worker`, `false` explícito en pre y, en prod, `true` mientras erplora.com cobre de verdad
+  (`PLATFORM_INVOICING_ENABLED` en la última revisión de `erplora-prod-saas`). Si algo falla, el despliegue para y
+  dice qué y dónde (`prod.hub.<VARIABLE>`).
 - **El candado:** en prod, abrir o cerrar el envío real a Hacienda (cambiar `VERIFACTU_PRODUCTION_ENABLED` respecto
   al vigente) no sale con el push: el despliegue para sin registrar nada y se relanza a mano con la confirmación
   exacta de lo que cambia:
@@ -506,10 +508,14 @@ app»), porque el repo es público.
     -f confirm_protected=VERIFACTU_PRODUCTION_ENABLED=true
   ```
 
+- Cada revisión nueva lleva exactamente los ajustes del fichero: uno que el fichero ya no trae sale de la revisión,
+  también si el `app_env` vigente no lo nombra porque lo dejó una vuelta atrás o un despliegue que falló después de
+  registrar. Ese despliegue fallido se repite tal cual.
 - Al acabar bien, el despliegue escribe esos ajustes en `/erplora/<entorno>/hub/app_env`, junto a la imagen
   (`image_tag`), y Terraform los relee para las revisiones que registra.
-- La vuelta atrás (`rollback.yml`) todavía no los mira: vuelve a la revisión anterior con los suyos, sin comprobarlos
-  ni escribirlos (ERPlora/hub#1719).
+- La vuelta atrás (`rollback.yml`) no registra revisiones: pasa las reglas de cada entorno y, en prod, el candado (con
+  su `confirm_protected`) y la regla del cobro sobre los ajustes que corren las revisiones a las que vuelve, sin leer
+  `deploy/app-env.json`, y al acabar bien los deja escritos en `app_env`.
 
 ### Las personas del negocio en su BD (`base.HubUser`)
 

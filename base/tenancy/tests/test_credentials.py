@@ -279,7 +279,7 @@ def test_the_secrets_own_host_and_port_are_never_used_the_clusters_row_says_wher
 @pytest.fixture
 def tls_to_the_writer(monkeypatch):
     """Production's settings: the default connection reaches Aurora's writer with ``verify-full``; the hubs' template
-    goes through the task's PgBouncer on loopback, without TLS options (``config/settings.py``)."""
+    goes through the task's PgBouncer on loopback, without TLS options (``config/settings/backends.py``)."""
     import copy
 
     current = django_connections.settings
