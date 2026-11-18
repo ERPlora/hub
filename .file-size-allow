@@ -142,13 +142,13 @@
 669 base/frontend/lib/home.test.ts ERPlora/erplora-next#74
 475 base/frontend/lib/home.ts ERPlora/erplora-next#74
 550 base/frontend/lib/system-back.test.ts ERPlora/erplora-next#74
-988 base/frontend/operations.d.ts ERPlora/erplora-next#74
+970 base/frontend/operations.d.ts ERPlora/erplora-next#74
 623 base/frontend/pages/FilesPage.test.ts ERPlora/erplora-next#74
-753 base/home.py ERPlora/erplora-next#74
+742 base/home.py ERPlora/erplora-next#74
 512 base/internal.py ERPlora/erplora-next#74
 542 base/middleware.py ERPlora/erplora-next#74
 693 base/models.py ERPlora/erplora-next#74
-2100 base/schemas/__init__.py ERPlora/erplora-next#74
+2078 base/schemas/__init__.py ERPlora/erplora-next#74
 3283 base/services/__init__.py ERPlora/erplora-next#74
 508 base/tenancy/bootstrap.py ERPlora/erplora-next#74
 835 base/tenancy/migrator.py ERPlora/erplora-next#74
@@ -158,7 +158,7 @@
 1203 base/tenancy/tests/test_recovery.py ERPlora/erplora-next#74
 1452 base/tests/test_app_activation.py ERPlora/erplora-next#74
 1521 base/tests/test_assistant.py ERPlora/erplora-next#74
-1145 base/tests/test_queries_home.py ERPlora/erplora-next#74
+1030 base/tests/test_queries_home.py ERPlora/erplora-next#74
 1058 base/tests/test_worker.py ERPlora/erplora-next#74
 1194 base/tests/test_ws_print.py ERPlora/erplora-next#74
 641 base/worker.py ERPlora/erplora-next#74

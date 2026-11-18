@@ -1,6 +1,7 @@
 """The appointment app: the salon's diary — who comes, for what, with whom and when."""
 
 from django.utils.translation import gettext_lazy as _
+from django.utils.translation import ngettext_lazy
 from live.meta import BellCounter, Category, DeviceNotice, LiveAppConfig, Nav, SetupCheck
 
 from apps.appointment.events import TO_CONFIRM_EVENTS
@@ -112,6 +113,16 @@ class AppointmentConfig(LiveAppConfig):
             icon="ion:calendar-outline",
             permission="appointment.view_own_appointment",
             refresh_on=TO_CONFIRM_EVENTS,
+            severity="warning",
+            title=ngettext_lazy("%(count)d appointment to confirm", "%(count)d appointments to confirm", "count"),
+            body=ngettext_lazy(
+                "A customer is waiting for you to confirm their booking before it starts.",
+                "Customers are waiting for you to confirm their bookings before they start.",
+                "count",
+            ),
+            action_label=_("Confirm the appointments"),
+            # The start of the soonest one: it has to be confirmed before then.
+            due="earliest",
         )
     ]
     # The device is told what the customer booked or cancelled herself, of the agenda the person sees (the

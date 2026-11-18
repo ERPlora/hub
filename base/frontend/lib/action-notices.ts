@@ -1,47 +1,18 @@
 // The hub's source of the action center (`createShell({ actionNotices })`): every counter of the bell above zero and,
 // while a step blocks invoicing, «You cannot issue invoices yet», as data. The shell paints them; no screen does.
-// The server does not say yet how grave a counter is nor what its button says: the ones known today take theirs from
-// the table below, and the rest are warnings with «Open». What the server does send of a counter wins.
+// A counter's gravity and words come from the server, already in the person's language.
 import { useLive } from '@erplora/ui/sdk';
-import type { ActionNotice, ActionNoticeSource, NoticeAction, NoticeDue, NoticeSeverity } from '@erplora/ui/shell';
+import type { ActionNotice, ActionNoticeSource, NoticeAction } from '@erplora/ui/shell';
 import { computed } from 'vue';
 import { useRouter } from 'vue-router';
 
-import type { BellCounter, SetupItem, SetupStatus } from '../operations';
+import type { SetupItem, SetupStatus } from '../operations';
+import type { BellCounter } from '../operations-bell';
 import { useBellCounters } from './bell-counters';
 import { blockingItems } from './home';
 import { useBaseI18n } from './i18n';
 
 type Translate = ReturnType<typeof useBaseI18n>['t'];
-
-/** What a counter of the bell may also say of itself; each one missing takes its default here. */
-interface CounterWords {
-  severity?: NoticeSeverity;
-  title?: string;
-  body?: string;
-  action_label?: string;
-  due?: NoticeDue;
-}
-
-type HubCounter = BellCounter & CounterWords;
-
-/** The i18n keys of a counter known today: its title, with the count, and the label of its button. */
-interface KnownCounter {
-  severity?: NoticeSeverity;
-  title: string;
-  action: string;
-}
-
-const KNOWN_COUNTERS: Record<string, KnownCounter> = {
-  'base.failed_events': { severity: 'danger', title: 'base.notices.failedEvents.title', action: 'base.notices.failedEvents.action' },
-  'base.plan_limits': { severity: 'warning', title: 'base.notices.planLimits.title', action: 'base.notices.planLimits.action' },
-  'appointment.to_confirm': { title: 'base.notices.appointments.title', action: 'base.notices.appointments.action' },
-  'whatsapp_inbox.awaiting_reply': { title: 'base.notices.whatsapp.title', action: 'base.notices.whatsapp.action' },
-  'demo.open_items': { severity: 'info', title: 'base.notices.demo.title', action: 'base.notices.demo.action' },
-};
-/** Printing declares one counter per printing function: `printing.stalled_<usage>`. */
-const PRINTING_STALLED = 'printing.stalled_';
-const PRINTING: KnownCounter = { title: 'base.notices.printing.title', action: 'base.notices.printing.action' };
 
 /** The ⛔ steps known today and the label of their button. */
 const STEP_ACTIONS: Record<string, string> = {
@@ -49,34 +20,19 @@ const STEP_ACTIONS: Record<string, string> = {
   'verifactu.sending_route': 'base.blocking.steps.verifactu',
 };
 
-const BELL_ICON = 'ion:notifications-outline';
 const BLOCKING_ICON = 'ion:alert-circle-outline';
 
-const knownCounter = (key: string): KnownCounter | undefined =>
-  KNOWN_COUNTERS[key] ?? (key.startsWith(PRINTING_STALLED) ? PRINTING : undefined);
-
-function counterTitle(counter: HubCounter, known: KnownCounter | undefined, t: Translate): string {
-  if (counter.title) return counter.title;
-  const values = { label: counter.label, count: counter.count };
-  return t(known?.title ?? 'base.notices.counter', values);
-}
-
-function counterNotice(counter: HubCounter, t: Translate, reachable: (route: string) => boolean): ActionNotice {
-  const known = knownCounter(counter.key);
-  const title = counterTitle(counter, known, t);
-  const action = reachable(counter.route)
-    ? { label: counter.action_label || t(known?.action ?? 'base.notices.open'), to: counter.route }
-    : undefined;
+function counterNotice(counter: BellCounter, reachable: (route: string) => boolean): ActionNotice {
   return {
     id: counter.key,
-    severity: counter.severity ?? known?.severity ?? 'warning',
-    icon: counter.icon || BELL_ICON,
-    label: title,
-    title,
+    severity: counter.severity,
+    icon: counter.icon,
+    label: counter.title,
+    title: counter.title,
     ...(counter.body ? { body: counter.body } : {}),
     count: counter.count,
-    ...(counter.due ? { due: counter.due } : {}),
-    ...(action ? { action } : {}),
+    ...(counter.due ? { due: { at: counter.due } } : {}),
+    ...(reachable(counter.route) ? { action: { label: counter.action_label, to: counter.route } } : {}),
   };
 }
 
@@ -123,7 +79,7 @@ export function useHubActionNotices(): ActionNoticeSource {
 
   const notices = computed<readonly ActionNotice[] | undefined>(() => {
     if (!answered(bell.counters.value, bell.status.value) || !answered(setup.data.value, setup.status.value)) return undefined;
-    const counters = (bell.counters.value?.counters ?? []).map((counter) => counterNotice(counter, t, reachable));
+    const counters = (bell.counters.value?.counters ?? []).map((counter) => counterNotice(counter, reachable));
     const blocking = blockingNotice(setup.data.value, { t, locale: locale.value }, reachable);
     return blocking ? [...counters, blocking] : counters;
   });

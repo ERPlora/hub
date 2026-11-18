@@ -464,3 +464,22 @@ msgstr "Error de impresión"
 
 msgid "Device"
 msgstr "Dispositivo"
+
+#: apps.py
+#, python-format
+msgid "%(label)s: %(count)d job waiting"
+msgid_plural "%(label)s: %(count)d jobs waiting"
+msgstr[0] "%(label)s: %(count)d trabajo esperando"
+msgstr[1] "%(label)s: %(count)d trabajos esperando"
+msgstr[2] "%(label)s: %(count)d trabajos esperando"
+
+#: apps.py
+msgid "It will not come out until a device with the ERPlora app open can print it."
+msgid_plural "They will not come out until a device with the ERPlora app open can print them."
+msgstr[0] "No saldrá hasta que un dispositivo con la app de ERPlora abierta pueda imprimirlo."
+msgstr[1] "No saldrán hasta que un dispositivo con la app de ERPlora abierta pueda imprimirlos."
+msgstr[2] "No saldrán hasta que un dispositivo con la app de ERPlora abierta pueda imprimirlos."
+
+#: apps.py
+msgid "See the printers"
+msgstr "Ver las impresoras"

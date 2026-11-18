@@ -270,7 +270,9 @@ Actor: empleado (las suyas), responsable, asistente
 Pantalla: Agenda
 Pasos:
 1. Entra desde el aviso **N por confirmar** (lo pulsas y la lista filtra las pendientes), desde la campana
-   de la barra de arriba (su fila «Citas por confirmar» abre la Agenda) o busca la cita **Pendiente**.
+   de la barra de arriba (su aviso «N citas por confirmar», «Tus clientes esperan a que les confirmes las citas antes
+   de que empiecen.», abre la Agenda con «Confirmar las citas», y su plazo es el comienzo de la más próxima) o busca
+   la cita **Pendiente**.
 2. Pulsa **Confirmar** en su fila.
 3. La cita pasa a **Confirmada**, el historial dice «Confirmada» y el aviso **N por confirmar** baja; la
    campana también, al momento, y deja de contarla.

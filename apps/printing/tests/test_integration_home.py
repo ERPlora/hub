@@ -27,7 +27,8 @@ from apps.printing.models import PrintDevice, PrintJob
 from apps.printing.tests.conftest import A, B, HUB_DB, HUB_DB_COMMITTED, ctx_for, enqueue, printer, run
 from apps.printing.tests.test_services import SPARE_ID, TILL_ID, answer, on_device, register, take
 from base.permissions import VIEW_HOME
-from base.schemas import BellCountersIn, SetupStatusIn, SystemCardsIn
+from base.schemas import SetupStatusIn, SystemCardsIn
+from base.schemas.bell import BellCountersIn
 from base.tenancy.context import use_hub
 
 STEP = "printing.printer"
@@ -177,6 +178,11 @@ def test_receipts_waiting_for_a_printer_no_device_reaches_ring_the_bell_and_lead
             "route": "/printing/printers",
             "label": "Nothing is printing “Receipt”",
             "icon": "lucide:receipt",
+            "severity": "warning",
+            "title": "Nothing is printing “Receipt”: 2 jobs waiting",
+            "body": "They will not come out until a device with the ERPlora app open can print them.",
+            "action_label": "See the printers",
+            "due": None,
         }
     }
 
@@ -188,6 +194,19 @@ def test_in_spanish_the_row_names_the_function_as_printing_does():
     assert [row["label"] for row in bell(ctx_for("hub_employee", language="es")).values()] == [
         "Nadie está imprimiendo «Cocina»"
     ]
+
+
+@HUB_DB
+def test_the_kitchen_not_printing_is_urgent_and_says_so_in_spanish():
+    printer("Kitchen", usage="kitchen", address="10.0.0.2")
+    enqueue(usage="kitchen", job_key="kitchen:1")
+    [row] = bell(ctx_for("hub_employee", language="es")).values()
+    assert (row["severity"], row["title"], row["body"], row["action_label"]) == (
+        "danger",
+        "Nadie está imprimiendo «Cocina»: 1 trabajo esperando",
+        "No saldrá hasta que un dispositivo con la app de ERPlora abierta pueda imprimirlo.",
+        "Ver las impresoras",
+    )
 
 
 @HUB_DB
