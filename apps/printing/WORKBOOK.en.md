@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:c874a65006e1ab0a56bbd867dc1825c3f9c08a2550453ab6059ed1b20c0ce358 -->
+<!-- generated from WORKBOOK.md sha256:bfbeaae81d717269d5721780830ddb3712e084abd0b0c15ad6589d2dceb773ee -->
 
 ## What it is for and who it is for
 
@@ -214,7 +214,9 @@ Steps:
    them out (none set up reaches its printer, or they wait for a printer and none reaches one of its role,
    or the one that reaches it has given no sign for 90 s: it is off or without the ERPlora app open), the bell of
    everybody who sees Printing shows one row per role: "Nothing is printing “Receipt”" (or "Kitchen", "Bar",
-   "Label") with how many are waiting. Tapping it opens **Printing → Printers**, where the card of that
+   "Label") with how many are waiting, urgent for "Kitchen" and "Bar" (an order that does not come out on paper is a
+   dish or a drink nobody makes) and a warning for "Receipt" and "Label", with "They will not come out until a device
+   with the ERPlora app open can print them.". "See the printers" opens **Printing → Printers**, where the card of that
    role says why: "No device" and "No device set up here prints it: set one up in
    Devices.", "Device off" and "The device that prints it is not responding: switch it on and open the
    ERPlora app on it." or "Waiting, no printer" if it has no active printer.

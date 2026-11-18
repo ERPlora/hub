@@ -93,15 +93,18 @@ eventos caídos, los límites del plan, las citas por confirmar, los clientes de
 impresora que no imprime… Ningún aviso se descarta: se va solo cuando se resuelve.
 
 - **La campana.** Sin nada pendiente, solo la campana. Con algo, pasa a una píldora con la campana y el número, en el
-  color y con el icono del aviso más grave (urgente, atención o información).
+  color y con el icono del aviso más grave (urgente, atención o información). Si un aviso tiene plazo, como la hora de
+  la cita más próxima por confirmar, el anillo de la campana se va vaciando en la última semana antes de él.
 - **La llegada.** Un aviso nuevo entra como tarjeta bajo la barra, arriba a la derecha (a lo ancho en el móvil), se
   queda unos segundos y se recoge en la campana, que late; con el asistente abierto, entra a su izquierda. Mientras
   se cobra en el TPV no sale: solo late la campana. El primer resultado al abrir la página no anuncia nada.
 - **El panel.** Al tocarla se abre un panel desde la derecha, por encima de la pantalla y del asistente (a lo ancho en
   el móvil): arriba, el aviso más grave, con su frase y su botón (por ejemplo, «Configurar los datos del negocio»);
-  debajo, los demás en filas («3 citas por confirmar»), y tocar una fila la pone arriba. Se cierra con su ✕, con Esc
-  o tocando fuera, y la campana recupera el foco. Sin nada: «Todo al día». Un aviso resuelto se queda un momento
-  con «Resuelto» antes de irse.
+  debajo, los demás en filas («3 citas por confirmar»), y tocar una fila la pone arriba. Cada aviso lo dice la app que
+  lo da, en el idioma de la persona: el problema en el titular («3 citas por confirmar»), la consecuencia en una frase
+  («Tus clientes esperan a que les confirmes las citas antes de que empiecen.») y la acción en su botón («Confirmar las
+  citas»). Se cierra con su ✕, con Esc o tocando fuera, y la campana recupera el foco. Sin nada: «Todo al día». Un
+  aviso resuelto se queda un momento con «Resuelto» antes de irse.
 
 ### El menú lateral
 A la izquierda (en el móvil, desde el botón de la barra): la persona arriba y las entradas de la plataforma en dos
@@ -655,7 +658,8 @@ Pantalla: La campana
 Pasos:
   1. Un aviso entre apps (por ejemplo, «venta cobrada» hacia Facturación) agotó sus reintentos.
   2. La campana de un administrador sube en el momento, sin esperar ni recargar: el aviso urgente «2 eventos
-     caídos» llega como tarjeta y se recoge en ella.
+     caídos», con «Una app no recibió lo que otra le mandó: lo que tenía que hacer sigue sin hacerse hasta que lo
+     reenvíes.», llega como tarjeta y se recoge en ella.
   3. «Revisar los eventos» abre «Sistema» en «Eventos caídos», donde se reenvían o se descartan (BASE-F43).
   4. Cuando no queda ninguno, el aviso desaparece.
 Entra: cuántos avisos de este negocio quedaron sin entregar, solo para quien administra el negocio.
@@ -1336,8 +1340,9 @@ Pasos:
      «Tamaño de la base», con «Medido el {day}». Ni CPU ni memoria: no se pueden atribuir a un negocio, así que no salen,
      ni una frase en su lugar.
   9. Con motivos que el hub sabe sin preguntar a erplora.com (los archivos, la capacidad y WhatsApp), la campana de quien
-     administra el negocio lleva el aviso «1 límite del plan por revisar», que suma uno por motivo, y «Ver el uso del
-     plan» abre «Sistema» en «Uso y plan». Sin ellos, el aviso desaparece.
+     administra el negocio lleva el aviso «1 límite del plan por revisar», que suma uno por motivo, con «Tu negocio
+     está llegando a lo que incluye su plan: algunas cosas pueden pararse o ir lentas hasta que lo amplíes.», y «Ver el
+     uso del plan» abre «Sistema» en «Uso y plan». Sin ellos, el aviso desaparece.
   10. Quien administra el negocio puede preguntar lo mismo al asistente («¿cuánto espacio me queda?», «¿cuántas
       peticiones llevamos este mes?») y contesta con estas cifras.
 Entra: lo que se mide de este negocio: cada noche, lo que ocupan sus archivos y su base de datos y las personas que
@@ -3310,20 +3315,31 @@ Implicados: BASE-F92, BASE-F93
   tiempo el que los sube), y `base/frontend/lib/bell-counters.ts` vuelve a leer `GET /api/home/bell` cada tantos
   segundos mientras la página está a la vista; una lectura más vieja que un resultado vivo llegado mientras tanto se
   descarta, y una que falla deja lo último. Sin `refresh_every`, la campana solo se mueve por eventos. Tests:
-  `test_home.py`, `test_queries_home.py` y `bell-counters.test.ts`.
+  `test_home.py`, `test_queries_home_bell.py` y `bell-counters.test.ts`.
 - El centro de avisos: la campana, la tarjeta de llegada y el panel son de `@erplora/ui` y los monta el shell; el Hub
   solo le da su fuente, `useHubActionNotices` (`base/frontend/lib/action-notices.ts`), en `actionNotices` de
-  `createShell`. Cada contador de `base.bell.counters` por encima de cero es un aviso (`id` = su `key`, su icono, su
-  número y una acción a su `route`, sin acción si el Hub no tiene esa pantalla), y `base.setup.status` da
+  `createShell`. Cada contador de `base.bell.counters` por encima de cero es un aviso con lo que dice el servidor
+  (`id` = su `key`, su icono, su gravedad, su `title` como fila y titular, su `body`, su número, su plazo `due` y una
+  acción con su `action_label` a su `route`, sin acción si el Hub no tiene esa pantalla), y `base.setup.status` da
   `base.blocking`, urgente, mientras queda un ⛔ pendiente (`blockingItems` de `lib/home.ts`): «Configurar» a los dos
   primeros pasos que la persona puede hacer, o «Esto lo tiene que configurar un administrador.» si no puede ninguno.
-  El servidor aún no dice la gravedad, el título, la frase, la etiqueta del botón ni el plazo de un contador: los que
-  hay hoy los toman de la tabla de ese módulo (`base.failed_events` urgente, `demo.open_items` información, el resto
-  atención, cada uno con su título con el número y su botón) y uno nuevo es «atención» con «{etiqueta} ({número})» y
-  «Abrir»; lo que el servidor mande de un contador (`severity`, `title`, `body`, `action_label`, `due`) gana. La hoja
+  La pantalla no pone palabras a un contador. La hoja
   de cobro del TPV (`CheckoutSheet.vue`) retiene las tarjetas mientras está abierta (`useQuietActionNotices`).
   Tests: `action-notices.test.ts`, `frontend/main.chrome.test.ts`, `CheckoutSheet.test.ts`; e2e
   `tests/e2e/base-action-center.spec.ts`.
+- Lo que dice cada contador de la campana: su `BellCounter` (`live.meta`) declara, todo opcional, la gravedad
+  (`severity`: `danger`, `warning` o `info`), el titular (`title`), la frase con la consecuencia (`body`) y el texto del
+  botón (`action_label`), textos traducibles rellenados con `%(count)d` y `%(label)s` (el plural, con
+  `ngettext_lazy(…, "count")`), y `due`, el campo de la primera fila de su consulta con el plazo (Citas declara
+  `earliest`, el comienzo de la cita pendiente más próxima). `base/bell.py` es el único sitio de los valores por
+  defecto (atención, «{etiqueta} ({número})», sin frase, «Abrir» y el icono de la campana) y de los dos contadores
+  de la plataforma (`FAILED_EVENTS`, urgente, y `PLAN_LIMITS`); `base.bell.counters` los devuelve en el idioma de la
+  persona, y un plazo que no es una fecha y hora ISO deja el contador fuera, como un número que no es entero.
+  `live.E024` comprueba la gravedad, los textos y que `due` nombre un campo de la respuesta. El esquema vive en
+  `base/schemas/bell.py` y sus tipos en `base/frontend/operations-bell.d.ts`. Tests: `test_bell.py` (también que cada
+  contador de los módulos dice sus palabras en inglés y en español y que los tipos siguen al esquema),
+  `test_queries_home_bell.py` y los de cada app (`test_integration_home.py` de Citas e Impresión, `test_home_hooks.py`
+  de WhatsApp).
 - Presencia del dispositivo que imprime (misma tarea): la app que
   lleva los dispositivos declara en su `LiveAppConfig` `print_presence`, el nombre de una orden suya cuya entrada lleva
   `device`; `/ws/print` (`base/ws_print.py`) la ejecuta con el contexto del dispositivo en su `hello` y en cada `beat`

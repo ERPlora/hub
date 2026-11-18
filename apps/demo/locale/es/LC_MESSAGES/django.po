@@ -154,3 +154,19 @@ msgstr "Di qué elemento: su id o su nombre."
 #: services.py:19
 msgid "This item is closed: open it to add lines."
 msgstr "Este elemento está cerrado: ábrelo para añadir líneas."
+
+#: apps.py
+#, python-format
+msgid "%(count)d open demo item"
+msgid_plural "%(count)d open demo items"
+msgstr[0] "%(count)d elemento de demo abierto"
+msgstr[1] "%(count)d elementos de demo abiertos"
+msgstr[2] "%(count)d elementos de demo abiertos"
+
+#: apps.py
+msgid "An open item stays on the list until it is marked done."
+msgstr "Un elemento abierto sigue en la lista hasta que se marca como hecho."
+
+#: apps.py
+msgid "See the items"
+msgstr "Ver los elementos"

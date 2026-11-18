@@ -586,10 +586,6 @@
     "file_name": "home.py",
     "functions": [
       {
-        "name": "bell_counters",
-        "complexity": 17
-      },
-      {
         "name": "plan_meter_errors",
         "complexity": 17
       },
