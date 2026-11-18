@@ -136,8 +136,8 @@ vivo**: cambia solo cuando alguien sienta, cobra, mueve o edita una mesa.
     (o «Fusionar N con…» / «Elige una mesa ocupada») y «Cancelar»; solo se pueden tocar las mesas que
     valen.
 - **Editar plano**: se arrastra cada mesa a su sitio (también con el teclado: flechas, 8 px; con
-  Mayúsculas, 32 px) y se guarda al soltar. Tocar una mesa abre **Editar mesa** (Número, Aforo,
-  Nombre (opcional), Forma, Estado (Disponible o Bloqueada), Zona, Activa; pie con «Borrar» y
+  Mayúsculas, 32 px) y se guarda al soltar. Tocar una mesa abre **Editar mesa** (Número, Aforo, Ancho,
+  Alto, Nombre (opcional), Forma, Estado (Disponible o Bloqueada), Zona, Activa; pie con «Borrar» y
   «Guardar»); el «+» abre **Añadir** (campo Zona y «Añadir zona»; campo «Número de mesa», que si se
   deja vacío «Se numera sola», y «Añadir mesa»); el lápiz abre **Editar zona** (Nombre, Descripción
   (opcional); «Borrar zona» y «Guardar»). Debajo, la ayuda «Arrastra para colocar · clic en una mesa
@@ -159,9 +159,9 @@ zona?» y deja «Borrar zona» apagado si la zona tiene mesas.
 Menú **Mesas → Mesas**. Tabla en orden natural (la 2 antes que la 10): Número, Nombre, Zona, Aforo,
 Estado; buscador «Buscar mesa…» (número y nombre), filtros por columna tras el embudo (zona, estado,
 forma, aforo),
-vista tabla o tarjetas. El «+» abre el panel con Número, Aforo, Zona y «Añadir mesa». Por fila,
-«Editar» (Número, Nombre, Aforo, Forma, Zona, Estado y Activa) y «Borrar» (solo el administrador, con
-confirmación).
+vista tabla o tarjetas. El «+» abre el panel con Número, Aforo, Ancho, Alto, Zona y «Añadir mesa». Por
+fila, «Editar» (Número, Nombre, Aforo, Ancho, Alto, Forma, Zona, Estado y Activa) y «Borrar» (solo el
+administrador, con confirmación).
 
 ### Sesiones
 Menú **Mesas → Sesiones**: las cuentas de la sala. Pestañas «Abiertas», «Cerradas» y «Todas». Tabla:
@@ -268,9 +268,10 @@ Pasos:
    con el primer número libre de esa zona.
 4. Pulsa «Añadir mesa» (apagado mientras no haya ninguna zona).
 5. La mesa aparece en la zona, en el primer hueco libre, cuadrada, para 4 y Disponible.
-6. Otra puerta: en **Mesas → Mesas**, «+» con Número, Aforo y Zona y «Añadir mesa»; también nace en el
-   primer hueco libre de su zona.
-Entra: número (o ninguno), y en la lista también aforo y zona.
+6. Otra puerta: en **Mesas → Mesas**, «+» con Número, Aforo, Ancho y Alto (vacíos, «Estándar»: la mesa
+   de siempre, 72 × 72) y Zona y «Añadir mesa»; también nace en el primer hueco libre de su zona, del
+   tamaño que tenga.
+Entra: número (o ninguno), y en la lista también aforo, ancho, alto y zona.
 Sale: la mesa (avisa: `table.table.created`). Con una mesa en uso, «Elegir mesa» del TPV deja de decir
 «Aún no hay mesas. Créalas en Mesas → Plano de sala.» (`table.floor.status`), y «Tus mesas» queda
 «Hecho» en el Inicio sin recargar. Una mesa ocupada o bloqueada sigue contando; si se apagan o se borran
@@ -302,18 +303,21 @@ Actor: responsable, administrador
 Pantalla: Plano de sala (Editar plano), Mesas
 Pasos:
 1. En **Editar plano**, toca la mesa (o en **Mesas**, «Editar» en su fila): se abre «Editar mesa».
-2. Cambia Número, Aforo, Nombre (opcional), Forma (Cuadrada, Redonda, Rectangular), Estado
-   (Disponible o Bloqueada), Zona o Activa.
+2. Cambia Número, Aforo, Ancho y Alto (el tamaño de su caja en el plano, de 24 a 10000; la mesa de
+   siempre mide 72 × 72: una larga para ocho, 160 × 72), Nombre (opcional), Forma (Cuadrada, Redonda,
+   Rectangular), Estado (Disponible o Bloqueada), Zona o Activa.
 3. Pulsa «Guardar»: la ventana se cierra y el plano cambia solo (si cambió de zona, aparece en la otra
-   pestaña en el mismo sitio).
+   pestaña en el mismo sitio; con otro tamaño, se pinta en su sitio con su caja nueva).
 4. Para quitarla, pulsa «Borrar» (solo el administrador) y confírmalo: desaparece del plano y de la
    lista; su historia de cuentas se conserva.
 Entra: la mesa elegida.
 Sale: la mesa cambiada (avisa: `table.table.updated`) o borrada (avisa: `table.table.deleted`).
 Si falla: dentro de la ventana: «El número de mesa es obligatorio», «Ya hay una mesa con ese número
-en esta zona.», «Esa mesa no existe en este negocio.», cada motivo bajo su campo hasta que se corrige
-ese campo, aunque otro diga lo mismo (hub#888); borrar una mesa con cuenta abierta: «Esa mesa
-tiene una cuenta abierta. Ciérrala o trasládala antes de borrar la mesa.».
+en esta zona.», «Esa mesa no existe en este negocio.», un ancho o un alto fuera de 24 a 10000 («Debe
+ser mayor o igual que 24.», «Debe ser menor o igual que 10000.») o con decimales («Introduce un número
+entero.»), y entonces no se guarda nada; cada motivo bajo su campo hasta que se corrige ese campo,
+aunque otro diga lo mismo (hub#888); borrar una mesa con cuenta abierta: «Esa mesa tiene una cuenta
+abierta. Ciérrala o trasládala antes de borrar la mesa.».
 Implicados: TABLE-F02, TABLE-F05, TABLE-F21
 
 ### TABLE-F05 Sacar una mesa del servicio (bloquearla) y devolverla
