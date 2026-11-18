@@ -14,7 +14,8 @@ from live.outbox import record_event
 
 from apps.sale import events
 from apps.sale.models import Order, OrderLine
-from apps.sale.queries import ORDER_CHANGED, ORDER_NOT_FOUND, actor, find_order, order_detail
+from apps.sale.queries.business import actor
+from apps.sale.queries.orders import ORDER_CHANGED, ORDER_NOT_FOUND, find_order, order_detail
 from apps.sale.schemas import (
     OrderFireIn,
     OrderFireOut,

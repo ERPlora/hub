@@ -121,7 +121,7 @@ def test_whoever_can_see_the_sales_reads_it_even_without_rights_over_invoicing(c
 
 
 def test_without_invoicing_the_paper_goes_with_the_header(monkeypatch):
-    monkeypatch.setattr("apps.sale.queries.ISSUER", "invoice.issuer.not_installed")
+    monkeypatch.setattr("apps.sale.queries.letterhead.ISSUER", "invoice.issuer.not_installed")
     run("invoice.issuer.update", ISSUER)
     run("sale.settings.update", {"receipt_header": "Bar Ana"})
     assert identity() == ("Bar Ana", "", [])

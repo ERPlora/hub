@@ -68,7 +68,7 @@ from apps.invoice.schemas.platform import (
     PlatformDocumentOut, PlatformHealthIn, PlatformHealthOut, PlatformInvoiceOut, PlatformRefIn,
 )
 from apps.sale.models import Refund
-from apps.sale.queries import find_sale
+from apps.sale.queries.sales import find_sale
 from apps.tax.queries import business_tax_kind, resolve_tax
 from base.business import money_text
 

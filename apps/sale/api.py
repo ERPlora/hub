@@ -61,37 +61,37 @@ router = Router(tags=["sale"])
 
 @bind(router, "sale.sale.list", "/sale/sales")
 async def sale_list(request, params: Query[SaleListIn]):
-    return await run_operation(request, queries.list_sales, params)
+    return await run_operation(request, queries.sales.list_sales, params)
 
 
 @bind(router, "sale.sale.get", "/sale/sales/detail")
 async def sale_get(request, params: Query[SaleRefIn]):
-    return await run_operation(request, queries.get_sale, params)
+    return await run_operation(request, queries.sales.get_sale, params)
 
 
 @bind(router, "sale.sale.by_idempotency_key", "/sale/sales/by_key")
 async def sale_by_key(request, params: Query[SaleByKeyIn]):
-    return await run_operation(request, queries.sale_by_key, params)
+    return await run_operation(request, queries.sales.sale_by_key, params)
 
 
 @bind(router, "sale.sale.stats", "/sale/sales/stats")
 async def sale_stats(request, params: Query[PeriodIn]):
-    return await run_operation(request, queries.stats, params)
+    return await run_operation(request, queries.figures.stats, params)
 
 
 @bind(router, "sale.sale.today", "/sale/sales/today")
 async def sale_today(request):
-    return await run_operation(request, queries.today)
+    return await run_operation(request, queries.figures.today)
 
 
 @bind(router, "sale.sale.last_7_days", "/sale/sales/last_7_days")
 async def sale_last_7_days(request):
-    return await run_operation(request, queries.last_7_days)
+    return await run_operation(request, queries.figures.last_7_days)
 
 
 @bind(router, "sale.sale.by_staff", "/sale/sales/by_staff")
 async def sale_by_staff(request, params: Query[PeriodIn]):
-    return await run_operation(request, queries.by_staff, params)
+    return await run_operation(request, queries.figures.by_staff, params)
 
 
 @bind(router, "sale.sale.complete", "/sale/sales", status=201)
@@ -131,7 +131,7 @@ async def sale_issue_documents(request, data: SaleRefIn):
 
 @bind(router, "sale.checkout.preview", "/sale/checkout/preview")
 async def checkout_preview(request, params: Query[PreviewIn]):
-    return await run_operation(request, queries.preview, params)
+    return await run_operation(request, queries.checkout.preview, params)
 
 
 # Open checks
@@ -139,12 +139,12 @@ async def checkout_preview(request, params: Query[PreviewIn]):
 
 @bind(router, "sale.order.list", "/sale/orders")
 async def order_list(request, params: Query[OrderListIn]):
-    return await run_operation(request, queries.list_orders, params)
+    return await run_operation(request, queries.orders.list_orders, params)
 
 
 @bind(router, "sale.order.get", "/sale/orders/detail")
 async def order_get(request, params: Query[OrderRefIn]):
-    return await run_operation(request, queries.get_order, params)
+    return await run_operation(request, queries.orders.get_order, params)
 
 
 @bind(router, "sale.order.open", "/sale/orders", status=201)
@@ -278,7 +278,7 @@ async def order_set_appointment(request, data: OrderSetAppointmentIn):
 
 @bind(router, "sale.payment_method.list", "/sale/payment_methods")
 async def payment_method_list(request, params: Query[PaymentMethodListIn]):
-    return await run_operation(request, queries.list_payment_methods, params)
+    return await run_operation(request, queries.payment_methods.list_payment_methods, params)
 
 
 @bind(router, "sale.payment_method.create", "/sale/payment_methods", status=201)
@@ -288,7 +288,7 @@ async def payment_method_create(request, data: PaymentMethodIn):
 
 @bind(router, "sale.settings.get", "/sale/settings")
 async def settings_get(request):
-    return await run_operation(request, queries.get_settings)
+    return await run_operation(request, queries.settings.get_settings)
 
 
 @bind(router, "sale.settings.update", "/sale/settings")
@@ -298,12 +298,12 @@ async def settings_update(request, data: SettingsPatchIn):
 
 @bind(router, "sale.pos_settings.get", "/sale/pos_settings")
 async def pos_settings_get(request):
-    return await run_operation(request, queries.get_pos_settings)
+    return await run_operation(request, queries.settings.get_pos_settings)
 
 
 @bind(router, "sale.letterhead.get", "/sale/letterhead")
 async def letterhead_get(request, params: Query[LetterheadIn]):
-    return await run_operation(request, queries.get_letterhead, params)
+    return await run_operation(request, queries.letterhead.get_letterhead, params)
 
 
 # Departments and quick notes
@@ -311,7 +311,7 @@ async def letterhead_get(request, params: Query[LetterheadIn]):
 
 @bind(router, "sale.department.list", "/sale/departments")
 async def department_list(request, params: Query[DepartmentListIn]):
-    return await run_operation(request, queries.list_departments, params)
+    return await run_operation(request, queries.departments.list_departments, params)
 
 
 @bind(router, "sale.department.create", "/sale/departments", status=201)
@@ -331,7 +331,7 @@ async def department_delete(request, data: DepartmentRefIn):
 
 @bind(router, "sale.quick_note.list", "/sale/quick_notes")
 async def quick_note_list(request, params: Query[QuickNoteListIn]):
-    return await run_operation(request, queries.list_quick_notes, params)
+    return await run_operation(request, queries.departments.list_quick_notes, params)
 
 
 @bind(router, "sale.quick_note.create", "/sale/quick_notes", status=201)
@@ -354,19 +354,19 @@ async def quick_note_delete(request, data: QuickNoteRefIn):
 
 @bind(router, "sale.business_day.get", "/sale/business_day")
 async def business_day(request):
-    return await run_operation(request, queries.business_day)
+    return await run_operation(request, queries.business.business_day)
 
 
 @bind(router, "sale.refund.list", "/sale/refunds")
 async def refund_list(request, params: Query[SaleRefIn]):
-    return await run_operation(request, queries.list_refunds, params)
+    return await run_operation(request, queries.refunds.list_refunds, params)
 
 
 @bind(router, "sale.refund.options", "/sale/refunds/options")
 async def refund_options(request, params: Query[SaleRefIn]):
-    return await run_operation(request, queries.refund_options, params)
+    return await run_operation(request, queries.refunds.refund_options, params)
 
 
 @bind(router, "sale.refund.by_idempotency_key", "/sale/refunds/by_key")
 async def refund_by_key(request, params: Query[RefundByKeyIn]):
-    return await run_operation(request, queries.refund_by_key, params)
+    return await run_operation(request, queries.refunds.refund_by_key, params)

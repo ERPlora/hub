@@ -796,7 +796,7 @@ Los papeles llegan del SaaS con prefijo (`hub_owner`, `hub_admin`, `hub_manager`
 - **Monedas**: la del negocio es la de su país, que da `base.business.get` desde el registro de este hub,
   y en el hub propio de ERPlora (sin negocio en erplora.com: `create_platform_hub` le da su fila del registro y su BD,
   con todas las apps activas), la del
-  país de su emisor (`PLATFORM_ISSUER_COUNTRY`). En el servidor, `business_currency` de Ventas (`apps.sale.queries`,
+  país de su emisor (`PLATFORM_ISSUER_COUNTRY`). En el servidor, `business_currency` de Ventas (`apps.sale.queries.business`,
   la misma con la que nace cada venta; leída como la plataforma: una API key solo tiene el permiso de su operación);
   en pantalla, `useBusinessMoney()` de `base`. Los decimales, de `babel` (los del servidor, nunca los de Intl: Intl le
   da 0 al forinto y Babel 2). Cada venta guarda su moneda al nacer (`Sale.currency`, hub#286). Caja copia el `amount`
