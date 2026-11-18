@@ -19,6 +19,7 @@ from django.apps import apps
 from django.db import connections
 from live.models import OutboxEvent
 from live.operations import get as get_operation
+from psycopg.types.json import JsonbLoader
 
 from apps.inventory import queries
 from apps.inventory.models import (
@@ -33,7 +34,7 @@ from apps.inventory.schemas import CategoryRecoverIn, ProductCategoryIn, Product
 from apps.tax.models import TaxCategory
 from base.recovery import actor_of
 from base.tenancy.context import current_alias, use_hub
-from base.tenancy.tests.test_recovery import Recoveries, fields_held_since, fresh, run, run_in
+from base.tenancy.tests.test_recovery import Recoveries, fields_held_since, fresh, in_the_copy, run, run_in
 from base.tests.test_image_catalog import image_library  # noqa: F401 - the library fixture
 
 from .conftest import HUB_DB
@@ -42,11 +43,23 @@ TAX = "test.general"
 BARCODE = "8412345678905"
 
 
-def direct():
-    """The raw connection of business A's database, as the platform's direct one reads the copy."""
+class Direct:
+    """Business A's raw connection, read as the platform's direct connection reads the copy: with psycopg's own
+    loaders, so a ``jsonb`` column comes as its value (Django's connections load it as text for its ``JSONField``)."""
+
+    def __init__(self, connection):
+        self.connection = connection
+
+    def execute(self, query, params=None):
+        cursor = self.connection.cursor()
+        cursor.adapters.register_loader("jsonb", JsonbLoader)
+        return cursor.execute(query, params)
+
+
+def direct() -> Direct:
     connection = connections[current_alias()]
     connection.ensure_connection()
-    return connection.connection
+    return Direct(connection.connection)
 
 
 @pytest.fixture
@@ -80,6 +93,7 @@ def test_the_copy_gives_each_live_product_with_what_its_create_takes(general):
         is_active=False,
         is_sold_out=True,
         image="catalog:drinks/coffee",
+        allergens=["gluten", "milk"],
     )
     ProductCategory.objects.create(product=coffee, category=drinks)
     ProductCategory.objects.create(product=coffee, category=gone)
@@ -108,6 +122,7 @@ def test_the_copy_gives_each_live_product_with_what_its_create_takes(general):
         "track_stock": True,
         "is_active": False,
         "image": "catalog:drinks/coffee",
+        "allergens": ["gluten", "milk"],
     }
 
 
@@ -195,6 +210,7 @@ def test_a_lacking_product_is_what_the_create_takes_in_the_categories_the_busine
         category_ids=[drinks.pk, lost.pk, gone],
         copy_categories={drinks.pk: "Drinks", lost.pk: "Desserts", gone: "Old menu"},
         image="catalog:drinks/coffee",
+        allergens=["gluten", "milk"],
     )
 
     [lacking] = queries.products_not_in_business([coffee])
@@ -203,7 +219,7 @@ def test_a_lacking_product_is_what_the_create_takes_in_the_categories_the_busine
     recover = get_operation("inventory.product.recover").input
     payload = recover.model_validate({key: value for key, value in lacking.items() if key != "id"})
     assert (payload.tax_category_key, payload.category_ids, payload.is_active) == (TAX, [drinks.pk], False)
-    assert (payload.initial_stock, payload.price) == (Decimal("0"), 250)
+    assert (payload.initial_stock, payload.price, payload.allergens) == (Decimal("0"), 250, ["gluten", "milk"])
     # The image it showed in the copy: its recover sets it as the screen does after the create.
     assert payload.image == "catalog:drinks/coffee"
 
@@ -881,6 +897,35 @@ class TestProductsComeBack:
         with use_hub(hub):
             back = Product.objects.get(pk=ids["coffee"])
             assert (back.is_deleted, back.image) == (False, latte)
+
+    def test_a_product_no_longer_held_comes_back_with_its_allergens(self, recoveries, every_app_on):
+        hub, ids, _ = self.a_business(recoveries, every_app_on)
+        run_in(hub, "inventory.product.update", id=ids["cake"], allergens=["gluten", "milk"])
+        copy = recoveries.copy_of(hub)
+        gone_altogether(hub, ids["cake"])
+        row = recoveries.ask(copy, "inventory")
+
+        assert run() == 1
+
+        assert said(row) == ("done", [CATEGORIES, PRODUCTS | {"created": 1}, LINKS])
+        with use_hub(hub):
+            assert Product.objects.get(sku="CAK-1").allergens == ["gluten", "milk"]
+
+    def test_a_copy_from_before_allergens_still_gives_its_products_back_without_them(self, recoveries, every_app_on):
+        hub, ids, _ = self.a_business(recoveries, every_app_on)
+        copy = recoveries.copy_of(hub)
+        # A copy made before products had allergens: neither the column nor the migration that adds it.
+        in_the_copy(copy, "ALTER TABLE inventory_product DROP COLUMN allergens")
+        in_the_copy(copy, "DELETE FROM django_migrations WHERE app = 'inventory' AND name = '0006_product_allergens'")
+        gone_altogether(hub, ids["cake"])
+        row = recoveries.ask(copy, "inventory")
+
+        assert run() == 1
+
+        assert said(row) == ("done", [CATEGORIES, PRODUCTS | {"created": 1}, LINKS])
+        with use_hub(hub):
+            back = Product.objects.get(sku="CAK-1")
+            assert (back.name, back.price, back.allergens) == ("Cake", 400, [])
 
     def test_asked_again_nothing_is_made_twice_and_what_the_business_has_stays(self, recoveries, every_app_on):
         hub, ids, _ = self.a_business(recoveries, every_app_on)
