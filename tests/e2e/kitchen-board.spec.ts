@@ -58,8 +58,13 @@ async function post<T>(context: BrowserContext, path: string, body: unknown, sta
 }
 
 /** A check of Sales titled `CHECK <n>`, a line per product, fired by Sales: the ids of its check and its lines. */
-async function fireRound(context: BrowserContext, n: number, products: Product[]): Promise<{ order: string; lines: string[] }> {
-  const order = await post<{ id: string }>(context, '/sale/orders', { label: `${CHECK} ${n}` }, 201);
+async function fireRound(
+  context: BrowserContext,
+  n: number,
+  products: Product[],
+  label = `${CHECK} ${n}`,
+): Promise<{ order: string; lines: string[] }> {
+  const order = await post<{ id: string }>(context, '/sale/orders', { label }, 201);
   for (const product of products) await post(context, '/sale/orders/add_line', { order_id: order.id, product_id: product.id, quantity: '1' });
   const fired = await post<{ order: { lines: { id: string }[] } }>(context, '/sale/orders/fire', { order_id: order.id });
   return { order: order.id, lines: fired.order.lines.map((line) => line.id) };
@@ -109,6 +114,24 @@ function labelCut(target: Locator): Promise<boolean> {
     const text = range.getBoundingClientRect();
     const own = el.getBoundingClientRect();
     return text.width === 0 || text.left < own.left - 1 || text.right > own.right + 1;
+  });
+}
+
+function splitWords(target: Locator): Promise<string[]> {
+  return target.evaluate((el) => {
+    const broken: string[] = [];
+    for (const node of el.childNodes) {
+      if (node.nodeType !== Node.TEXT_NODE) continue;
+      const text = node as Text;
+      for (const match of text.data.matchAll(/\S+/g)) {
+        const start = match.index ?? 0;
+        const range = document.createRange();
+        range.setStart(text, start);
+        range.setEnd(text, start + match[0].length);
+        if (range.getClientRects().length > 1) broken.push(match[0]);
+      }
+    }
+    return broken;
   });
 }
 
@@ -338,6 +361,43 @@ test('KITCHEN-F14, F15, F29, F10: rush jumps to the front and rings, «All day»
     await expect(shown(page).locator('[data-testid=kitchen-display-allday] tr').filter({ hasText: steak.name })).toBeVisible();
     await expect(shown(page).locator('[data-testid=kitchen-display-allday] tr').filter({ hasText: salad.name })).toHaveCount(0);
     await page.evaluate(() => localStorage.removeItem('kitchen.display.station'));
+  } finally {
+    await context.close();
+  }
+});
+
+test('KITCHEN-F10: the destination and waiter keep whole words on separate lines at every board width', async ({ browser }) => {
+  const { context, page } = await ownerPage(browser, '/kitchen/display', { width: 1280, height: 800 });
+  try {
+    const round = await fireRound(context, 4, [steak], 'e2e kbd 4');
+    const ticketId = round.lines[0];
+    const destination = card(page, ticketId).locator(`[data-testid=kitchen-card-${ticketId}-label]`);
+    const waiter = card(page, ticketId).locator(`[data-testid=kitchen-card-${ticketId}-waiter]`);
+    await expect(waiter).toHaveText('Waiter: owner@example.com');
+    // The built sheet can put Ionic after the theme; reproduce that cascade with Ionic's own rule.
+    await page.evaluate(() => {
+      const ionic = Array.from(document.querySelectorAll('style')).find((style) => style.textContent?.includes('.item.sc-ion-label-ios-h'));
+      if (!ionic) throw new Error('Ionic label styles not found');
+      ionic.parentElement?.append(ionic);
+    });
+
+    for (const size of [
+      { width: 375, height: 667, columns: 1 },
+      { width: 820, height: 1180, columns: 2 },
+      { width: 1280, height: 800, columns: 3 },
+    ]) {
+      await page.setViewportSize(size);
+      await expect(card(page, ticketId)).toBeVisible();
+      const columns = await card(page, ticketId).evaluate((el) => getComputedStyle(el.parentElement!).gridTemplateColumns.split(' ').length);
+      expect(columns, `board columns at ${size.width}`).toBe(size.columns);
+      const destinationBox = await destination.boundingBox();
+      const waiterBox = await waiter.boundingBox();
+      expect(waiterBox!.y, `waiter below the destination at ${size.width}`).toBeGreaterThanOrEqual(
+        destinationBox!.y + destinationBox!.height - 1,
+      );
+      expect(await splitWords(destination), `whole destination words at ${size.width}`).toEqual([]);
+      expect(await splitWords(waiter), `whole waiter words at ${size.width}`).toEqual([]);
+    }
   } finally {
     await context.close();
   }
