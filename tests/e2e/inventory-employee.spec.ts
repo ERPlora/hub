@@ -8,6 +8,7 @@ import { expect, test } from '@playwright/test';
 
 import { A, api, EMPLOYEE, hostPage, shot, shown } from './helpers';
 import { cleanInventory, createProduct, dialog, productRow, productsReady, searchProducts, stamp } from './inventory-helpers';
+import { offersRowAction } from './service-helpers';
 
 test.afterAll(() => {
   cleanInventory();
@@ -34,7 +35,7 @@ test('an employee sees the inventory but writes nothing, by the screens or by th
     for (const hook of ['inventory-products-add', 'inventory-products-csv-import', 'inventory-products-csv-export', 'tab-settings']) {
       await expect(shown(page).locator(`[data-testid=${hook}]`), hook).toHaveCount(0);
     }
-    await expect(shown(page).locator(`[data-testid=inventory-products-row-${product.id}-edit]`)).toHaveCount(0);
+    expect(await offersRowAction(page, 'inventory-products', product.id, 'edit')).toBe(false);
     await page.screenshot({ path: shot('inventory-employee-products') });
 
     // The sheet opens, without stock buttons.

@@ -8,10 +8,10 @@
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
 import { A, api, EMPLOYEE, login, psql, saveSessionForTheSweep, shot, shown } from './helpers';
-import { rowAction } from './service-helpers';
+import { offersRowAction, rowAction } from './service-helpers';
 import { createProduct, dialog, fill, type Product } from './inventory-helpers';
 import { cleanDocumentsOf, stamp } from './sale-helpers';
-import { discardChanges, expectWaysOutAskOnDirtyForm, type UnsavedFormCase } from './unsaved-back-helpers';
+import { discardChanges, expectWaysOutAskOnDirtyForm, type RowActionOpener, type UnsavedFormCase } from './unsaved-back-helpers';
 
 const RUN = stamp();
 const SKU = `E2E-CRF-${RUN}`;
@@ -298,20 +298,20 @@ test('CASH_REGISTER-F03, F13, F05, F06, F09: the windows of a shift, in three si
 test('BASE-F05: the windows of a shift ask «Discard changes?» on every way out with something typed (hub#1234)', async ({ page, context }) => {
   await login(page, A, '/cash_register/sessions');
   await closeLeftOpen(context);
-  /** A window of the sessions screen, by the button that opens it and a field that opens blank. */
-  const shift = (flow: string, form: string, add: string, field: string): UnsavedFormCase => ({
+  /** A window of the sessions screen, by the button or the row action that opens it and a field that opens blank. */
+  const shift = (flow: string, form: string, add: string | RowActionOpener, field: string): UnsavedFormCase => ({
     app: 'cash_register',
     flow,
     route: '/cash_register/sessions',
-    add: (on) => shown(on).locator(`[data-testid=${add}]`).filter({ visible: true }).first(),
+    add: typeof add === 'string' ? (on) => shown(on).locator(`[data-testid=${add}]`).filter({ visible: true }).first() : add,
     form,
     field,
   });
   await expectWaysOutAskOnDirtyForm(page, shift('CASH_REGISTER-F03', 'cash-register-open', 'cash-register-new-session', 'cash-register-open-notes'), 'HUB-1234-open');
   const id = await openByApi(context, 5000);
-  await expectWaysOutAskOnDirtyForm(page, shift('CASH_REGISTER-F05', 'cash-register-movement', `cash-register-sessions-row-${id}-movement`, 'cash-register-movement-concept'), 'HUB-1234-movement');
-  await expectWaysOutAskOnDirtyForm(page, shift('CASH_REGISTER-F06', 'cash-register-count', `cash-register-sessions-row-${id}-count`, 'cash-register-count-notes'), 'HUB-1234-count');
-  await expectWaysOutAskOnDirtyForm(page, shift('CASH_REGISTER-F09', 'cash-register-close', `cash-register-sessions-row-${id}-close`, 'cash-register-close-notes'), 'HUB-1234-close');
+  await expectWaysOutAskOnDirtyForm(page, shift('CASH_REGISTER-F05', 'cash-register-movement', { table: 'cash-register-sessions', id, action: 'movement' }, 'cash-register-movement-concept'), 'HUB-1234-movement');
+  await expectWaysOutAskOnDirtyForm(page, shift('CASH_REGISTER-F06', 'cash-register-count', { table: 'cash-register-sessions', id, action: 'count' }, 'cash-register-count-notes'), 'HUB-1234-count');
+  await expectWaysOutAskOnDirtyForm(page, shift('CASH_REGISTER-F09', 'cash-register-close', { table: 'cash-register-sessions', id, action: 'close' }, 'cash-register-close-notes'), 'HUB-1234-close');
   expect((await detailOf(context, id)).status).toBe('open');
   await closeByApi(context, id, 5000);
 });
@@ -418,7 +418,7 @@ test('CASH_REGISTER-F10: a session forgotten past its cut-off says so and closes
     await sessionsReady(page);
     const due = shown(page).locator('[data-testid=cash-register-auto-close-due]');
     await expect(due).toBeVisible();
-    await expect(shown(page).locator(`[data-testid=cash-register-sessions-row-${id}-movement]`)).toHaveCount(0);
+    expect(await offersRowAction(page, 'cash-register-sessions', id, 'movement')).toBe(false);
     await flowShots(page, 'CASH_REGISTER-F10', async (p) => {
       await expect(shown(p).locator('[data-testid=cash-register-auto-close-due]')).toBeVisible();
     });
