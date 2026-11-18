@@ -21,6 +21,12 @@ sustituto en la misma PR del puntero.
   completa» de la Pantalla. Hoy: `ion:chevron-expand-outline` en los dos estados (el texto cambia).
 - `ion:print-outline` — el plato «Solo papel» de la tarjeta y la acción «Reimprimir». Hoy:
   `ion:receipt-outline`.
+- Los de la tarjeta de la Pantalla (`frontend/lib/card.ts` y sus piezas `Kds*`): el tipo de comanda
+  (`ion:restaurant-outline`, `ion:bag-handle-outline`, `ion:bicycle-outline`; hoy `ion:storefront-outline`,
+  `lucide:shopping-bag` e `ion:cube-outline`), el plato por preparar (`ion:ellipse-outline`; hoy `ion:time-outline`),
+  la acción «Marcar urgente» (`ion:flame-outline`; hoy `ion:speedometer-outline`), la cabecera de un menú
+  (`ion:restaurant-outline`; hoy `ion:list-outline`) y el botón de las demás acciones del pie
+  (`ion:ellipsis-horizontal`; hoy `ion:ellipsis-vertical`, el mismo «⋮» de las tablas).
 
 Al registrarlos, cambiar a la vez `apps.py` (`icon` y `navigation`), `frontend/tabs.ts` y sus tests
 (`tests/test_apps.py`, `frontend/tabs.test.ts`) y correr `pnpm gen:app-icons`.

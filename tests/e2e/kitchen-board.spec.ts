@@ -1,9 +1,9 @@
 // flow: KITCHEN-F10, KITCHEN-F11, KITCHEN-F12, KITCHEN-F13, KITCHEN-F14, KITCHEN-F15, KITCHEN-F16, KITCHEN-F29 — Kitchen →
 // Display in Chrome, with the real Sales, Kitchen and Inventory apps: rounds fired by Sales come in by themselves and
 // the display rings once for each new one, never for what was already there (F16, a Web Audio that counts its notes
-// instead of sounding); a tap marks a dish ready and another tap takes it back, «Recall» brings back the struck
-// dishes, «Ready» finishes the ticket and «Recall» on the pass returns it (F11, F12); «Served» hands it over (F13);
-// «Mark rush» jumps a round to the front of the board, rings, and «Remove rush» puts it back (F14); «All day» adds up
+// instead of sounding); a tap marks a dish ready and another tap takes it back, «⋮» → «Recall» brings back the struck
+// dishes, «Ready» finishes the ticket and «⋮» → «Recall» on the pass returns it (F11, F12); «Served» hands it over
+// (F13); «⋮» → «Mark rush» jumps a round to the front of the board, rings, and «Remove rush» puts it back (F14); «All day» adds up
 // what is left to cook, all stations or one (F15); a dish the till voids is struck with «Voided» and its reason,
 // does not answer a tap and leaves «All day» (F29); the board orders rush first and the oldest first, and a station
 // shows only its own dishes, remembered on the device (F10). Each screen in 390×844, 834×1112 and 1440×900
@@ -11,19 +11,15 @@
 // checks «e2e kbd <run> …» and their tickets — is deleted after it.
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, api, collectProblems, psql, shot, shown } from './helpers';
+import { A, api, collectProblems, psql, shown, untilStill } from './helpers';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
+import { capture } from './kitchen-helpers';
 import { cleanSales, stamp } from './sale-helpers';
-import { ownerPage, settled } from './service-helpers';
+import { ownerPage } from './service-helpers';
 
 const RUN = stamp();
 const STATION = `E2E KBD ${RUN} Grill`;
 const CHECK = `e2e kbd ${RUN}`;
-const SIZES = [
-  { label: '390', width: 390, height: 844 },
-  { label: '834', width: 834, height: 1112 },
-  { label: '1440', width: 1440, height: 900 },
-];
 /** A dish to do: pending, or preparing once its ticket started. */
 const TO_DO = /^(pending|preparing)$/;
 
@@ -97,14 +93,23 @@ const rings = (page: Page): Promise<number> => page.evaluate(() => (window as un
 const card = (page: Page, id: string): Locator => shown(page).locator(`[data-testid=kitchen-card-${id}]`);
 const dish = (page: Page, id: string): Locator => shown(page).locator(`[data-testid=kitchen-line-${id}]`);
 
-async function capture(page: Page, flow: string, ready: () => Promise<void>): Promise<void> {
-  for (const size of SIZES) {
-    await page.setViewportSize({ width: size.width, height: size.height });
-    await ready();
-    await settled(page);
-    await page.screenshot({ path: shot(`APP-KITCHEN-${flow}-${size.label}`) });
-  }
-  await page.setViewportSize({ width: 1440, height: 900 });
+/** Opens a card's «⋮» and gives one of its steps, in Ionic's popover. */
+async function step(page: Page, id: string, name: 'rush' | 'recall'): Promise<Locator> {
+  await shown(page).locator(`[data-testid=kitchen-card-${id}-more]`).click();
+  const item = page.locator(`[data-testid=kitchen-card-${id}-${name}]`);
+  await expect(item).toBeVisible();
+  return item;
+}
+
+/** Whether `target`'s label is cut: an ellipsis or a clip is paint, the text keeps its full width. */
+function labelCut(target: Locator): Promise<boolean> {
+  return target.evaluate((el) => {
+    const range = document.createRange();
+    range.selectNodeContents(el);
+    const text = range.getBoundingClientRect();
+    const own = el.getBoundingClientRect();
+    return text.width === 0 || text.left < own.left - 1 || text.right > own.right + 1;
+  });
 }
 
 test.beforeAll(async ({ browser }) => {
@@ -156,7 +161,7 @@ test('KITCHEN-F10, F11, F12, F13, F16: a new round rings once and comes in; a di
     await expect.poll(() => rings(page), { message: 'one ring for the new round' }).toBe(1);
     await expect(card(page, ticketId).locator(`[data-testid=kitchen-card-${ticketId}-label]`)).toHaveText(`${CHECK} 1`);
     await expect(dish(page, steakLine).locator('[data-testid$=-station]')).toHaveText(STATION);
-    const dot = await dish(page, steakLine).locator('.kds-line__dot').boundingBox();
+    const dot = await dish(page, steakLine).locator('.ep-station-dot').boundingBox();
     expect(dot?.width ?? 0, 'the station colour beside the dish').toBeGreaterThan(6);
     await capture(page, 'KITCHEN-F10', async () => {
       await card(page, ticketId).scrollIntoViewIfNeeded();
@@ -175,34 +180,49 @@ test('KITCHEN-F10, F11, F12, F13, F16: a new round rings once and comes in; a di
     });
     await dish(page, saladLine).click();
     await expect(dish(page, saladLine)).toHaveAttribute('data-status', TO_DO);
-    // ...and «Recall» on the card brings back the struck ones.
+    // ...and «⋮» → «Recall» on the card brings back the struck ones.
     await dish(page, saladLine).click();
     await expect(dish(page, saladLine)).toHaveAttribute('data-status', 'ready');
-    // Half done, the card offers «Ready», «Mark rush» and «Recall»; on a tablet upright or
-    // on its side none is cut ("Recal…") or spills out of the card, and each is a 44 px touch target.
-    for (const size of [{ width: 834, height: 1112 }, { width: 1112, height: 834 }, { width: 820, height: 1180 }]) {
+    // Half done, the card offers «Ready» across its foot and «⋮» beside it, with «Mark rush» and «Recall»; on a
+    // phone and on a tablet upright or on its side none is cut ("Recal…") or spills out of the card, and each is a
+    // 48 px touch target.
+    for (const size of [{ width: 390, height: 844 }, { width: 834, height: 1112 }, { width: 1024, height: 768 }, { width: 820, height: 1180 }]) {
       await page.setViewportSize(size);
       await card(page, ticketId).scrollIntoViewIfNeeded();
       const edge = await card(page, ticketId).boundingBox();
-      for (const action of ['bump', 'rush', 'recall']) {
+      // The three views fit their bar whole: none is clipped or scrolled out of it.
+      const views = await view.locator('[data-testid=kitchen-display-views]').boundingBox();
+      for (const tab of ['tickets', 'ready', 'allday']) {
+        const box = await view.locator(`[data-testid=kitchen-display-view-${tab}]`).boundingBox();
+        expect(box!.x >= views!.x - 1 && box!.x + box!.width <= views!.x + views!.width + 1, `${tab} whole at ${size.width}`).toBe(true);
+      }
+      // The head row (type, label, clock) leads the card and its pills follow it, in iOS mode too.
+      const head = await view.locator(`[data-testid=kitchen-card-${ticketId}-head]`).boundingBox();
+      const pill = await view.locator(`[data-testid=kitchen-card-${ticketId}-status]`).boundingBox();
+      expect(head!.y + head!.height, `the pills under the head at ${size.width}`).toBeLessThanOrEqual(pill!.y + 1);
+      for (const action of ['bump', 'more']) {
         const button = view.locator(`[data-testid=kitchen-card-${ticketId}-${action}]`);
         await expect(button, `${action} at ${size.width}`).toBeVisible();
         const box = await button.boundingBox();
-        expect(box!.height, `${action} at ${size.width}: 44 px`).toBeGreaterThanOrEqual(44);
+        expect([box!.width, box!.height].every((side) => side >= 48), `${action} at ${size.width}: 48 px`).toBe(true);
         expect(box!.x + box!.width, `${action} at ${size.width}: inside the card`).toBeLessThanOrEqual(edge!.x + edge!.width + 1);
-        // The laid-out label against the button: an ellipsis or a clip is paint, the text keeps its full width.
-        const cut = await button.evaluate((el) => {
-          const range = document.createRange();
-          range.selectNodeContents(el);
-          const text = range.getBoundingClientRect();
-          const own = el.getBoundingClientRect();
-          return text.width === 0 || text.left < own.left - 1 || text.right > own.right + 1;
-        });
-        expect(cut, `${action} at ${size.width}: its label whole`).toBe(false);
+      }
+      expect(await labelCut(view.locator(`[data-testid=kitchen-card-${ticketId}-bump]`)), `Ready at ${size.width}: its label whole`).toBe(false);
+      for (const name of ['rush', 'recall'] as const) {
+        const item = await step(page, ticketId, name);
+        // Measured once Ionic's popover has finished sliding in.
+        await untilStill(page);
+        const box = await item.boundingBox();
+        expect(box!.height, `${name} at ${size.width}: 48 px`).toBeGreaterThanOrEqual(48);
+        expect(box!.x >= 0 && box!.x + box!.width <= size.width, `${name} at ${size.width}: on the screen`).toBe(true);
+        expect(await labelCut(item.locator('ion-label')), `${name} at ${size.width}: its label whole`).toBe(false);
+        // Escape closes the menu without a step, as the system Back does.
+        await page.keyboard.press('Escape');
+        await expect(item).toBeHidden();
       }
     }
     await page.setViewportSize({ width: 1440, height: 900 });
-    await view.locator(`[data-testid=kitchen-card-${ticketId}-recall]`).click();
+    await (await step(page, ticketId, 'recall')).click();
     await expect(dish(page, saladLine)).toHaveAttribute('data-status', TO_DO);
 
     // F11: «Ready» finishes it: off «Tickets», onto «Ready».
@@ -210,12 +230,12 @@ test('KITCHEN-F10, F11, F12, F13, F16: a new round rings once and comes in; a di
     await expect(card(page, ticketId)).toHaveCount(0);
     await view.locator('[data-testid=kitchen-display-view-ready]').click();
     await expect(card(page, ticketId).locator(`[data-testid=kitchen-card-${ticketId}-status]`)).toHaveText('Ready');
-    // F12: «Recall» on the pass returns it to the line, its dishes to do.
+    // F12: «⋮» → «Recall» on the pass returns it to the line, its dishes to do.
     await capture(page, 'KITCHEN-F12', async () => {
       await card(page, ticketId).scrollIntoViewIfNeeded();
-      await expect(view.locator(`[data-testid=kitchen-card-${ticketId}-recall]`)).toBeVisible();
+      await expect(view.locator(`[data-testid=kitchen-card-${ticketId}-more]`)).toBeVisible();
     });
-    await view.locator(`[data-testid=kitchen-card-${ticketId}-recall]`).click();
+    await (await step(page, ticketId, 'recall')).click();
     await expect(card(page, ticketId)).toHaveCount(0);
     await view.locator('[data-testid=kitchen-display-view-tickets]').click();
     await expect(dish(page, steakLine)).toHaveAttribute('data-status', TO_DO);
@@ -257,18 +277,20 @@ test('KITCHEN-F14, F15, F29, F10: rush jumps to the front and rings, «All day»
     // F10: the oldest first.
     expect(before.indexOf(`kitchen-card-${olderId}`)).toBeLessThan(before.indexOf(`kitchen-card-${newerId}`));
 
-    // F14: «Mark rush» on the newer round: «Rush», at the front, and the display rings once.
+    // F14: «⋮» → «Mark rush» on the newer round: «Rush», at the front, and the display rings once.
     expect(await rings(page)).toBe(0);
-    await view.locator(`[data-testid=kitchen-card-${newerId}-rush]`).click();
+    await expect(await step(page, newerId, 'rush')).toHaveText('Mark rush');
+    await page.locator(`[data-testid=kitchen-card-${newerId}-rush]`).click();
     await expect(view.locator(`[data-testid=kitchen-card-${newerId}-priority]`)).toHaveText('Rush');
     await expect.poll(async () => (await order())[0]).toBe(`kitchen-card-${newerId}`);
     await expect.poll(() => rings(page), { message: 'a round turned rush rings' }).toBe(1);
-    await expect(view.locator(`[data-testid=kitchen-card-${newerId}-rush]`)).toHaveText('Remove rush');
     await capture(page, 'KITCHEN-F14', async () => {
       await card(page, newerId).scrollIntoViewIfNeeded();
       await expect(view.locator(`[data-testid=kitchen-card-${newerId}-priority]`)).toBeVisible();
     });
-    await view.locator(`[data-testid=kitchen-card-${newerId}-rush]`).click();
+    const unrush = await step(page, newerId, 'rush');
+    await expect(unrush).toHaveText('Remove rush');
+    await unrush.click();
     await expect(view.locator(`[data-testid=kitchen-card-${newerId}-priority]`)).toHaveCount(0);
     await expect.poll(async () => (await order()).indexOf(`kitchen-card-${olderId}`)).toBeLessThan((await order()).indexOf(`kitchen-card-${newerId}`));
 
@@ -306,7 +328,7 @@ test('KITCHEN-F14, F15, F29, F10: rush jumps to the front and rings, «All day»
     await expect(dish(page, saladLine)).toHaveAttribute('aria-disabled', 'true');
     await dish(page, saladLine).click({ force: true });
     await expect(dish(page, saladLine)).toHaveAttribute('data-status', 'voided');
-    const struck = await dish(page, saladLine).locator('.kds-line__name').evaluate((name) => getComputedStyle(name).textDecorationLine);
+    const struck = await dish(page, saladLine).locator('.ep-order-ticket__name').evaluate((name) => getComputedStyle(name).textDecorationLine);
     expect(struck, 'the voided dish is struck').toContain('line-through');
     await capture(page, 'KITCHEN-F29', async () => {
       await card(page, olderId).scrollIntoViewIfNeeded();
