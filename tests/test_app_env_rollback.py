@@ -52,6 +52,11 @@ def recorded(workdir):
     return json.loads((workdir / "app_env.json").read_text())
 
 
+def kinds_reported(capsys):
+    """Where each problem the rollback reported is."""
+    return {line.removeprefix("::error::").split(": ", 1)[0] for line in capsys.readouterr().err.splitlines()}
+
+
 def older_prod():
     """The settings of an older version: the ERPlora route still closed in prod."""
     section = copy.deepcopy(PROD)
@@ -164,6 +169,18 @@ def test_while_the_saas_charges_it_never_goes_back_to_revisions_that_close_it(mo
 
     assert not (workdir / "app_env.json").exists()
     assert "prod.hub.VERIFACTU_PRODUCTION_ENABLED" in capsys.readouterr().err
+
+
+def test_while_the_saas_charges_it_never_goes_back_to_closed_revisions_even_if_it_was_already_closed(
+    monkeypatch, workdir, capsys
+):
+    write_targets(workdir, with_production("false"))
+    commands = FakeCommands(current={"prod": with_production("false")})
+
+    assert roll_back(monkeypatch, workdir, commands) == 1
+
+    assert not (workdir / "app_env.json").exists()
+    assert kinds_reported(capsys) == {"prod.hub.VERIFACTU_PRODUCTION_ENABLED", "prod.worker.VERIFACTU_PRODUCTION_ENABLED"}
 
 
 def test_an_unreadable_saas_revision_refuses_the_prod_rollback(monkeypatch, workdir, capsys):
