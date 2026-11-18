@@ -12,8 +12,10 @@
 // of Appointments and of this app are read first and put back by API at the end.
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
+import { aMonday } from './appointment-helpers';
 import { A, api, psql, shot, shown } from './helpers';
-import { filterBy, FLOW_VIEWPORTS, noHorizontalScroll, ownerPage, post, rowAction, settled } from './service-helpers';
+import { type Cast, cast, keepTheBusiness } from './online-booking-helpers';
+import { filterBy, FLOW_VIEWPORTS, noHorizontalScroll, ownerPage, rowAction, settled } from './service-helpers';
 
 const TAG = 'E2E OB';
 const RUN = Date.now().toString(36);
@@ -24,90 +26,7 @@ const mobile = (n: number): string => `6${String(STAMP + n * 7919).slice(-8)}`;
 /** The visitor (its forwarded address) each size books as: one of its own per run. */
 const VISITOR = `10.${Math.floor(Math.random() * 250)}.${Math.floor(Math.random() * 250)}`;
 
-/** A Monday `weeks` + five weeks ahead (inside the 90 days of advance), as `YYYY-MM-DD` of the business. */
-function aMonday(weeks: number): string {
-  const day = new Date();
-  day.setUTCDate(day.getUTCDate() + 35 + 7 * weeks + ((8 - day.getUTCDay()) % 7));
-  return day.toISOString().slice(0, 10);
-}
-
-function cleanUp(): void {
-  const customers = `select id from customer_customer where name like '${TAG}%'`;
-  const appointments = `select id from appointment_appointment where customer_id in (${customers})`;
-  const services = `select id from service_service where name like '${TAG}%'`;
-  const members = `select id from staff_member where first_name like '${TAG}%'`;
-  psql(
-    [
-      `delete from online_booking_booking where appointment_id in (${appointments})`,
-      `delete from appointment_history where appointment_id in (${appointments})`,
-      `delete from appointment_appointmentservice where appointment_id in (${appointments})`,
-      `delete from appointment_appointment where id in (${appointments})`,
-      `delete from schedule_specialdayinterval where special_day_id in (select id from schedule_specialday where name like '${TAG}%')`,
-      `delete from schedule_specialday where name like '${TAG}%'`,
-      `delete from service_assignment where service_id in (${services}) or member_id in (${members})`,
-      `delete from service_service where name like '${TAG}%'`,
-      `delete from staff_member where first_name like '${TAG}%'`,
-      `delete from customer_activity where customer_id in (${customers})`,
-      `delete from customer_consent where customer_id in (${customers})`,
-      `delete from customer_customer where name like '${TAG}%'`,
-    ].join('; '),
-  );
-}
-
-/** What the business had, put back at the end: the rules of Appointments and the page's settings. */
-let savedRules: Record<string, unknown> | null = null;
-let savedPage: Record<string, unknown> | null = null;
-const RULES = ['min_booking_notice', 'max_advance_booking', 'slot_interval', 'auto_confirm_online', 'allow_customer_cancellation', 'cancellation_notice_hours'];
-
-test.beforeAll(async ({ browser }) => {
-  cleanUp();
-  const { context } = await ownerPage(browser, '/online_booking/bookings');
-  try {
-    const rules = await api<Record<string, unknown>>(context, A, 'GET', '/appointment/settings');
-    const page = await api<Record<string, unknown>>(context, A, 'GET', '/online_booking/settings');
-    expect([rules.status, page.status]).toEqual([200, 200]);
-    savedRules = Object.fromEntries(Object.entries(rules.data).filter(([key]) => key !== 'timezone'));
-    savedPage = Object.fromEntries(Object.entries(page.data).filter(([key]) => key !== 'timezone' && !RULES.includes(key)));
-  } finally {
-    await context.close();
-  }
-});
-
-test.afterAll(async ({ browser }) => {
-  cleanUp();
-  const { context } = await ownerPage(browser, '/online_booking/bookings');
-  try {
-    if (savedRules) await post(context, '/appointment/settings', savedRules, 200);
-    if (savedPage) await post(context, '/online_booking/settings', savedPage, 200);
-  } finally {
-    await context.close();
-  }
-});
-
-interface Cast {
-  service: { id: string; name: string };
-  member: { id: string; full_name: string };
-}
-
-/** The cast through each app's own API: a service a professional performs, `day` open, the page on. */
-async function cast(context: BrowserContext, label: string, day: string): Promise<Cast> {
-  const service = await post<{ id: string; name: string }>(context, '/service/services', {
-    name: named(`Haircut ${label}`),
-    price: 2000,
-    duration_minutes: 30,
-    tax_category_key: 'service.generic',
-  });
-  const member = await post<{ id: string; full_name: string }>(context, '/staff/members', { first_name: named(`Ana ${label}`), last_name: 'Stylist' });
-  await post(context, '/service/assignments/assign', { service_id: service.id, member_id: member.id }, 200);
-  await post(context, '/schedule/special_days', {
-    date: day,
-    name: named(`Open ${label}`),
-    is_closed: false,
-    intervals: [{ open_time: '09:00', close_time: '18:00' }],
-  });
-  await post(context, '/online_booking/settings', { is_enabled: true, auto_confirm_online: false, allow_customer_cancellation: true, cancellation_notice_hours: 24 }, 200);
-  return { service, member };
-}
+keepTheBusiness(TAG);
 
 interface Booked {
   number: string;
@@ -197,7 +116,7 @@ FLOW_VIEWPORTS.forEach((vp, index) => {
     await context.setExtraHTTPHeaders({ 'X-Forwarded-For': visitor });
     const day = aMonday(index);
     try {
-      const who = await cast(context, vp.label, day);
+      const who = await cast(context, named(vp.label), day);
 
       // ONLINE_BOOKING-F07: the page's title saved and said so; the service's «Online booking» off and on again.
       await page.goto('/online_booking/settings');

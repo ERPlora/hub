@@ -15,8 +15,13 @@ const routes: RouteRecordRaw[] = [
     component: () => import('./pages/SettingsPage.vue'),
     meta: { auth: true },
   },
-  // The public booking page is base's (Django templates, `/p/<slug>/book`); this preview drives the same
-  // public operations on the dev server only (its e2e books through it).
+  // The booking page a customer opens without a session; base's public door serves its HTML on this path.
+  {
+    path: '/p/:slug/book',
+    component: () => import('./pages/PublicBookingPage.vue'),
+    meta: { auth: false, chrome: false },
+  },
+  // The same flow for the team, through its session, on the dev server only.
   ...(import.meta.env.DEV
     ? [
         {

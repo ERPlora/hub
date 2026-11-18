@@ -5,9 +5,9 @@ reserva **es una cita de Citas** con el origen «Reserva online» (`source = "on
 reservas ni estados propios, solo la configuración de la página, el enlace personal de la clienta y la huella
 del dispositivo para los límites.
 
-- **Estado**: completa (2026-10-21): los 12 flujos, `ONLINE_BOOKING-F01` … `F12`, están `hecho`. La página
-  pública sin sesión (`/p/<slug>/book`) es de `base` y aún no existe: aquí están sus operaciones, su contrato y
-  una vista previa de desarrollo.
+- **Estado**: la clienta reserva sin sesión en `/p/<slug>/book` (la sirve la puerta pública de `base`); `F01`, `F10`
+  y `F11` están `parcial` (sin el logo ni el aviso de privacidad, hub#1660; su enlace personal aún no abre una
+  página) y los demás, `hecho`.
 - **Especificación**: [`WORKBOOK.md`](WORKBOOK.md) (en inglés, [`WORKBOOK.en.md`](WORKBOOK.en.md), hasta
   «Para quien lo mantiene»). Lo que se cambie de la app se cambia antes allí.
 - **Peticiones a `@erplora/ui` y a la plataforma** que siguen abiertas: [`UI-REQUESTS.md`](UI-REQUESTS.md).
@@ -38,9 +38,9 @@ del dispositivo para los límites.
 | Verticales | `hair_salon` (entra en su plantilla) |
 | `requires` | `["appointment", "customer", "service", "staff"]` (y, por Citas, `schedule`) |
 | Usa de otras apps | Citas: `appointment.appointment.create`, `.confirm`, `.complete`, `.mark_no_show`, `.cancel`, `.delete`, `.update` (el email tecleado), `appointment.settings.update`, `appointment.availability.slots`, y sus lecturas (`bookable_members`, `current_settings`, el reloj del negocio). Clientes: `customer.customer.create`, el teléfono en E.164 y la búsqueda. Servicios y Personal: lectura del catálogo y de los profesionales. Las operaciones públicas, con un contexto delegado con solo los permisos que necesitan (`DELEGATED` de `queries.py`); la bandeja y los Ajustes, con el permiso de quien actúa |
-| Pantallas | `/online_booking/bookings`, `/online_booking/settings` y, solo en el servidor de desarrollo, `/online_booking/preview` |
+| Pantallas | `/online_booking/bookings`, `/online_booking/settings`, la página de reservas sin sesión `/p/<slug>/book` (`public_pages` del `LiveAppConfig`, que sirve `base`) y, solo en el servidor de desarrollo, `/online_booking/preview` |
 | Operaciones | 7 consultas (`queries.py`) y 9 acciones (`services.py`), todas con `ai=`; no-show, cancelar, borrar y cancelar con el enlace, `risk = "high"`. Rutas en `/api/online_booking/…` para todas salvo `online_booking.customer.erase` (la reacción al RGPD, solo del sistema) |
-| Operaciones públicas | `online_booking.public.page`, `.services`, `.slots`, `.booking`, `.book`, `.cancel`, con el permiso `online_booking.public` (contrato en el WORKBOOK, «Contrato con la página pública») |
+| Operaciones públicas | `online_booking.public.page`, `.services`, `.slots`, `.booking`, `.book`, `.cancel`, con el permiso `online_booking.public`: la página sin sesión las llama por `POST /p/<slug>/api/<operación>` de `base` (contrato en el WORKBOOK, «Contrato con la página pública») |
 | Consultas vivas | `online_booking.booking.list` y `.get` (avisos de Citas, fusión y borrado de Clientes, reserva nueva) y `online_booking.settings.get` (los ajustes de la app y las reglas de Citas) |
 | Eventos | 2: `online_booking.booking.created` y `online_booking.settings.updated`; solo los escucha Automatizaciones (`flow`, que se apunta a todos, FLOW-F21, `hecho`). Reacciona a `customer.customer.erased` (`online_booking.customer.erase`), que entrega el relay del worker |
 | Modelos | `Settings` (una fila; sin ella, los de fábrica) y `Booking` (una por cita reservada desde la página: la cita, el hash SHA-256 del enlace y la huella HMAC del visitante). UUIDv7, sin `hub_id` |
@@ -64,13 +64,15 @@ pnpm e2e tests/e2e/online-booking-flow.spec.ts
 - `tests/test_integration_diary.py` y `test_integration_customer.py` van contra Citas, Clientes, Servicios y
   Personal reales, sin dobles; `tests/test_concurrency.py`, con hilos contra Postgres (dos clientas a la vez,
   la misma hora: entra una); `tests/test_relay.py`, con el bucle real del relay del worker (F09 y F12).
-- `online-booking-flow.spec.ts` recorre los diez flujos con pantalla en 390, 834 y 1440, por la vista previa.
+- `online-booking-flow.spec.ts` recorre los diez flujos con pantalla en 390, 834 y 1440, por la vista previa;
+  `online-booking-public-page.spec.ts`, la página sin sesión en los tres tamaños (cargando, reservar, ver y cancelar
+  justo después, vacía y cerrada) y que otro negocio no la ve.
 
 ## Qué queda fuera
 
-- **La página pública sin sesión** (`/p/<slug>/book` y `/p/<slug>/book/<token>`): es de `base` (PLAN-HUB, bloque
-  7); hasta entonces nadie reserva desde fuera y la vista previa hace el recorrido. Dónde vive (el host del hub
-  o el dominio aparte de la web pública) sigue sin decidir.
+- **La página del enlace personal** (`/p/<slug>/book/<token>`): la clienta ve y cancela su reserva justo después de
+  reservar, pero su enlace aún no abre una página.
+- **El logo, el aviso de privacidad y el campo trampa de la página de reservas**: hub#1660.
 - Verificar el móvil con un código, bloquear a una clienta, elección de profesional obligatoria, mover la
   reserva desde el enlace, avisos a la clienta, depósito, lista de espera, calendario externo y márgenes entre
   citas: «Lo que queda fuera» del WORKBOOK.

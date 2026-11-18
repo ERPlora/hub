@@ -133,6 +133,11 @@
       "again": "Reservar otra",
       "policy": "Política de cancelación",
       "minutes": "{n} min"
+    },
+    "door": {
+      "title": "Reserva online",
+      "intro": "Elige tus servicios, un día y una hora libre, y deja tu nombre y tu móvil.",
+      "noServices": "Este negocio no tiene nada para reservar online ahora mismo."
     }
   }
 }
