@@ -158,6 +158,9 @@ describe('SettingsPage', () => {
     for (const text of ['ERPLORA CLOUD SL', 'B27593136', 'ERPlora Hub', 'EC', 'dev', 'v1']) expect(identity).toContain(text);
     // IndicadorMultiplesOT is always «S» (ERPlora serves many taxpayers): nothing is pending from the account.
     expect(identity).toMatch(/Serves several taxpayers\s*IndicadorMultiplesOT\s*S/);
+    // The version and the installation are long codes without spaces: drawn as the record's fingerprint, they wrap.
+    const codes = s.find('verifactu-settings-identity').findAll('dd.verifactu-settings__hash').map((dd) => dd.text());
+    expect(codes).toEqual([CONFIG.producer.version, CONFIG.producer.installation]);
     expect(s.find('verifactu-settings-pending-indicator').exists()).toBe(false);
   });
 
@@ -212,12 +215,12 @@ describe('SettingsPage', () => {
     expect(s.find('verifactu-settings-sending-card').text()).not.toContain('ERPlora');
   });
 
-  it('explains the certificate needed to go live without a technical error or an alarm about testing', async () => {
+  it('explains the certificate needed to go live without a technical error, an alarm about testing or a link of its own', async () => {
     const required = { code: 'own_certificate_required', message: 'ERPlora does not file on behalf of businesses for now: use your own certificate' };
     const s = await setup({ ...CONFIG_WITHOUT_ERPLORA_ROUTE, production_open: true, live_blockers: [NOT_APPROVED, required] });
     const notice = s.find('verifactu-settings-certificate-required');
     expect(notice.text()).toContain('You can keep testing. To go live, upload your business certificate.');
-    expect(notice.text()).toContain('Upload your certificate');
+    expect(notice.find('a').exists()).toBe(false);
     expect(notice.text()).not.toContain('ERPlora');
     expect(s.find('verifactu-settings-live-blockers').exists()).toBe(false);
     expect(disabled(s, 'go-live')).toBe(true);
@@ -277,6 +280,8 @@ describe('SettingsPage', () => {
     const s = await setup({ ...CONFIG_WITHOUT_ERPLORA_ROUTE, production_open: true, live_blockers: [required] }, { locale: 'es' });
     expect(s.find('verifactu-settings-certificate').text()).toContain('Sin certificado');
     expect(s.find('verifactu-settings-certificate-required').text()).toContain('Puedes seguir probando. Para pasar a producción, sube el certificado de tu negocio.');
+    const uploads = s.find('verifactu-settings-sending-card').findAll('a').filter((link) => link.text() === 'Sube tu certificado');
+    expect(uploads).toHaveLength(1);
     expect(s.find('verifactu-settings-sending-card').text()).not.toContain('ERPlora');
   });
 
