@@ -59,6 +59,10 @@
     "method": "get",
     "path": "/api/catalog/images/detail"
   },
+  "base.help.get": {
+    "method": "get",
+    "path": "/api/help"
+  },
   "base.blueprint.list": {
     "method": "get",
     "path": "/api/settings/data/blueprints"
