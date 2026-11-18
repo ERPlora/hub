@@ -66,7 +66,7 @@ from apps.whatsapp_inbox.schemas import (
 )
 from base.auth import SAAS_PANEL_PATH
 from base.models import HubUser, Membership
-from base.queries import hub_user_of
+from base.queries.people import hub_user_of
 from base.ordering import list_order
 
 CONVERSATION_NOT_FOUND = _("That conversation does not exist in this business.")

@@ -36,7 +36,7 @@ KNOWN_READINGS = {
     "apps/sale/services.py": 1,
     "apps/tax/queries.py": 1,
     # ERPlora's own hub has no zone of its own: Settings › Business shows the deployment's (``base.business.get``).
-    "base/queries/__init__.py": 1,
+    "base/queries/hubs.py": 1,
 }
 
 

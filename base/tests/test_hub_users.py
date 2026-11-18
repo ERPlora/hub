@@ -133,17 +133,17 @@ class TestTheCaller:
 
         with use_hub(hub_a):
             assert sessions.acting_hub_user(ctx) is None
-            assert queries.hub_user_of(ctx) is None
+            assert queries.people.hub_user_of(ctx) is None
             assert not HubUser.objects.exists()
 
     def test_hub_user_of_only_reads(self, hub_a):
         user = account_copy(ANA_ID)
 
         with use_hub(hub_a):
-            assert queries.hub_user_of(as_person(user)) is None
+            assert queries.people.hub_user_of(as_person(user)) is None
             assert not HubUser.objects.exists()
             made = sessions.ensure_hub_user(user)
-            assert queries.hub_user_of(as_person(user)) == made
+            assert queries.people.hub_user_of(as_person(user)) == made
 
     def test_hub_user_of_is_the_caller_s_own_and_never_a_colleague_s(self, hub_a):
         ana, olga = account_copy(ANA_ID, name="Ana"), account_copy(OLGA_ID, name="Olga", email="olga@example.com")
@@ -151,7 +151,7 @@ class TestTheCaller:
         with use_hub(hub_a):
             ana_s, olga_s = sessions.ensure_hub_user(ana), sessions.ensure_hub_user(olga)
 
-            found = [queries.hub_user_of(as_person(user)) for user in (ana, olga, newcomer)]
+            found = [queries.people.hub_user_of(as_person(user)) for user in (ana, olga, newcomer)]
 
         assert found == [ana_s, olga_s, None]
         assert [person._state.db for person in found[:2]] == [hubs.HUB_A_ALIAS] * 2
