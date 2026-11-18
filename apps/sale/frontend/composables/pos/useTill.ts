@@ -11,7 +11,7 @@
 // this very device for anybody else (BASE-F84), as an open price, a line sent to the kitchen voided and a
 // check with something on it deleted do (`apps.py` `approvals`).
 import { useCommand } from '@erplora/ui/sdk';
-import { toast as notify, toastError, useSession } from '@erplora/ui/shell';
+import { toastError, toastInfo, useSession } from '@erplora/ui/shell';
 import { computed, type ComputedRef, type Ref, shallowRef } from 'vue';
 
 import { mergeableLine, mergeableServiceLine, plusOne } from '../../components/pos/till';
@@ -162,7 +162,7 @@ export function useTill(options: TillOptions): Till {
 
   async function toast(result: Promise<WriteResult>): Promise<void> {
     const done = await result;
-    if (!done.ok) void toastError(done.message);
+    if (!done.ok) toastError(done.message);
   }
 
   const staffOf = (staffId: string | null) => (staffId ? { staff_id: staffId } : {});
@@ -393,11 +393,11 @@ export function useTill(options: TillOptions): Till {
       if (joined) {
         resume(joined);
         options.onJoined?.(joined);
-        void notify(t('sale.pos.checkJoined'));
+        toastInfo(t('sale.pos.checkJoined'));
         return;
       }
       release();
-      void toastError(t('sale.pos.checkGone'));
+      toastError(t('sale.pos.checkGone'));
       return;
     }
     accept(next);
@@ -406,7 +406,7 @@ export function useTill(options: TillOptions): Till {
   function gone(): void {
     if (!check.id.value) return;
     release();
-    void toastError(t('sale.pos.checkGone'));
+    toastError(t('sale.pos.checkGone'));
   }
 
   return {

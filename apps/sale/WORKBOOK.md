@@ -752,9 +752,10 @@ Pantalla: Vender
 Pasos:
 1. Con Mesas activa y permiso de sentar, la barra de la cuenta tiene, antes del cliente, el botón de
    mesa (rejilla, «Asignar mesa»). Tócalo: se abre «Elegir mesa», con un buscador («Buscar mesa…») y
-   las mesas en servicio como baldosas del color de su estado (Disponible verde, Ocupada
-   roja, Reservada ámbar, Bloqueada gris), con el número, la zona, las plazas («4 pax»), el estado y,
-   si la tiene, la reserva de hoy («Marta · 21:00»). Sin mesas: «Aún no hay mesas. Créalas en Mesas →
+   las mesas en servicio como baldosas que dibujan cada mesa como el plano de sala, con su forma, sus
+   sillas y los colores del plano (Disponible verde, Ocupada azul, Reservada amarilla, Bloqueada gris),
+   con el número, la zona, las plazas («4 pax»), el estado y, si la tiene, la reserva de hoy
+   («Marta · 21:00»). Sin mesas: «Aún no hay mesas. Créalas en Mesas →
    Plano de sala.».
 2. Toca una mesa Disponible o Reservada: la cuenta en pantalla se sienta allí y toma su nombre como
    título («Mesa 4»); sin cuenta aún, Mesas abre una con ese título y el TPV la pone en pantalla. Una

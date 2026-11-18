@@ -2,24 +2,29 @@
 // Invoicing's steps of the Home (its `setup`), as hub `a` reads them in Spanish: with no
 // issuer, the owner has «Los datos de tu negocio» pending and «Necesario para facturar» in «Termina de configurar tu
 // negocio»; its «Configurar» leads to Invoicing → Issuer and, once the legal name, tax ID and address are saved there,
-// the step is done without a reload. «Tu numeración de facturas» is «Recomendado» and pending while the business has no
-// series, and done without a reload once it has one; an employee is told about the ⛔ without «Configurar» (and the red
-// strip of the other screens says who has to set it up) and never about the numbering. On Invoices and
-// Series the red strip is the one notice: Invoicing does not say it again under it, and it goes, without a reload,
-// once the issuer is saved. Captures of the ⛔, of the numbering and of Invoices and Series with no issuer.
+// the step is done and «Todavía no puedes facturar» leaves the bell, without a reload. «Tu numeración de facturas» is
+// «Recomendado» and pending while the business has no series, and done without a reload once it has one; an employee
+// is told about the ⛔ without «Configurar» (and the action center's notice says who has to set it up) and never about
+// the numbering. Invoices and Series paint no red notice of their own: the action center says it once, with
+// «Configurar los datos del negocio», and the notice goes, without a reload, once the issuer is saved. Captures of the
+// ⛔, of the numbering and of Invoices and Series with no issuer.
 // The hub's issuer row is parked for the run and put back as it was after it (other specs need it); the run's own
 // series are `E2E…`, which the cleanup removes.
 import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, api, type Credentials, EMPLOYEE, horizontalOverflow, login, OWNER, psql, shot, shown, untilStill } from './helpers';
+import { actionBell, actionPanel, bellSays, bellTotal, closeActionCenter, featureNotice, noticeButton, noticeIn, openActionCenter } from './action-center';
+import { A, api, capture, type Credentials, EMPLOYEE, horizontalOverflow, login, OWNER, psql, shown, untilStill } from './helpers';
 import { stamp, VIEWPORTS } from './inventory-helpers';
 import { ensureIssuer, parkIssuer, unparkIssuer } from './invoice-helpers';
+import { toastSaying } from './toast-helpers';
 
 const KEY = 'FIX-INVOICE-SETUP-HOOKS';
-/** The task that left the red strip as the one notice of Invoices and Series. */
+/** The captures of Invoices and Series while nothing can be invoiced. */
 const ONE_NOTICE = 'FIX-HUB-INVOICE-TWO-NEAR-IDENTICAL-BUSINESS-DATA-NOTICES';
-/** Base's strip title, the words both notices said. */
+/** The action center's notice while a step blocks invoicing. */
 const CANNOT_INVOICE = 'Todavía no puedes facturar';
+const SET_UP_ISSUER = 'Configurar los datos del negocio';
+const ONLY_AN_ADMIN = 'Esto lo tiene que configurar un administrador.';
 const IDENTITY = 'invoice.business_identity';
 const NUMBERING = 'invoice.numbering';
 /** The hub's issuer, parked while the run needs a hub without one. */
@@ -99,17 +104,20 @@ async function markNoReload(page: Page): Promise<void> {
   await page.evaluate(() => Object.assign(window, { __e2eNoReload: true }));
 }
 
-/** The lines a text takes on screen: the distinct tops of its line boxes. */
-async function lines(text: Locator): Promise<number> {
-  return text.evaluate((element) => {
-    const range = document.createRange();
-    range.selectNodeContents(element);
-    return new Set([...range.getClientRects()].map((rect) => Math.round(rect.top))).size;
-  });
-}
-
 async function expectNoReload(page: Page): Promise<void> {
   expect(await page.evaluate(() => (window as { __e2eNoReload?: boolean }).__e2eNoReload === true)).toBe(true);
+}
+
+/** Invoices and Series, and what each shows once it painted its list. */
+const SCREENS = [
+  { screen: 'invoices', name: ONE_NOTICE, ready: '[data-testid=invoice-list-row], [data-testid=invoice-list-empty]' },
+  { screen: 'series', name: `${ONE_NOTICE}-series`, ready: '[data-testid=invoice-series-row], [data-testid=invoice-series-empty]' },
+] as const;
+
+/** The screen on view paints nothing of «Todavía no puedes facturar»: neither those words nor a red notice of its own. */
+async function nothingRedOn(page: Page): Promise<void> {
+  await expect(shown(page).getByText(CANNOT_INVOICE, { exact: true })).toHaveCount(0);
+  await expect(shown(page).locator('[data-testid="invoice-issuer-notice"], .inline-feedback[data-tone="danger"]')).toHaveCount(0);
 }
 
 test('INVOICE-F21: «Los datos de tu negocio» is the ⛔ while there is no issuer, «Configurar» leads to the issuer and saving it ticks it live', async ({ browser }) => {
@@ -118,6 +126,7 @@ test('INVOICE-F21: «Los datos de tu negocio» is the ⛔ while there is no issu
     await expect(row(page, IDENTITY).locator('.setup-row-title')).toHaveText('Los datos de tu negocio');
     await expect(row(page, IDENTITY).locator('.setup-row-desc')).toHaveText('Razón social, NIF y domicilio: sin ellos no puedes emitir una factura.');
     await expect(pill(page, IDENTITY)).toHaveText('Necesario para facturar');
+    const total = await bellTotal(context);
 
     // «Configurar» leads to Invoicing → Issuer, inside the app: no reload on the way.
     await markNoReload(page);
@@ -127,7 +136,9 @@ test('INVOICE-F21: «Los datos de tu negocio» is the ⛔ while there is no issu
     await expect(form.locator('[data-testid=invoice-issuer-missing]')).toBeVisible();
     for (const [hook, value] of Object.entries(ISSUER)) await form.locator(`[data-testid=invoice-issuer-${hook}] input`).fill(value);
     await form.locator('[data-testid=invoice-issuer-save]').click();
-    await expect(page.locator('ion-toast').filter({ hasText: 'Emisor guardado.' })).toBeVisible();
+    await expect(toastSaying(page, 'Emisor guardado.')).toBeVisible();
+    // «Todavía no puedes facturar» leaves the bell with it.
+    await bellSays(page, total - 1);
 
     // Back on the Home, the step is done without a reload (it leaves the folded list; «Ver todo» says «Hecho»).
     await page.goBack();
@@ -195,26 +206,21 @@ test('INVOICE-F21 and INVOICE-F14: an employee is told about the ⛔ without «C
     await unfolded(page);
     await expect(pill(page, IDENTITY)).toHaveText('Necesario para facturar');
     await expect(configure(page, IDENTITY)).toHaveCount(0);
-    await expect(row(page, IDENTITY).locator(`[data-testid="setup-note-${IDENTITY}"]`)).toHaveText('Esto lo tiene que configurar un administrador.');
+    await expect(row(page, IDENTITY).locator(`[data-testid="setup-note-${IDENTITY}"]`)).toHaveText(ONLY_AN_ADMIN);
     await expect(row(page, NUMBERING)).toHaveCount(0);
 
-    // Any other screen: the red strip says it, whole, on a phone.
+    // Any other screen paints nothing of it: the action center says it, with no button, and who has to set it up.
     await page.goto(`${A}/invoice/invoices`);
-    const strip = shown(page).locator('[data-testid="blocking-strip"]');
-    await expect(strip).toBeVisible();
-    await expect(strip).toContainText('Los datos de tu negocio');
-    await expect(strip).toContainText('Esto lo tiene que configurar un administrador.');
-    await expect(strip.locator(`[data-testid="blocking-configure-${IDENTITY}"]`)).toHaveCount(0);
-    // The one notice: Invoicing does not say it again under the strip, so who has to set it up is said once.
-    await expect(shown(page).locator('[data-testid="invoice-issuer-notice"]')).toHaveCount(0);
-    await expect(shown(page).getByText(CANNOT_INVOICE, { exact: true })).toHaveCount(1);
-    await expect(shown(page).getByText('Esto lo tiene que configurar un administrador.', { exact: true })).toHaveCount(1);
-    // On a phone the note reads whole, never a narrow column broken into three lines.
-    expect(await lines(strip.locator('.blocking-strip-note')), 'the note in at most two lines').toBeLessThanOrEqual(2);
+    await expect(shown(page).locator(SCREENS[0].ready).first()).toBeVisible();
+    await nothingRedOn(page);
+    await expect(actionBell(page)).toHaveAttribute('data-severity', 'danger');
+    const featured = await featureNotice(page, CANNOT_INVOICE);
+    await expect(featured.locator('.action-featured__body')).toContainText('Los datos de tu negocio');
+    await expect(featured.locator('.action-featured__body')).toContainText(ONLY_AN_ADMIN);
+    await expect(featured.locator('ion-button')).toHaveCount(0);
     await untilStill(page);
-    const overflow = await horizontalOverflow(page);
-    expect(overflow, 'no sideways scroll at 390').toBeLessThanOrEqual(0);
-    await page.screenshot({ path: shot(`${KEY}-INVOICE-F21-employee-390`) });
+    expect(await horizontalOverflow(page), 'no sideways scroll at 390').toBeLessThanOrEqual(0);
+    await capture(page, `${KEY}-INVOICE-F21-employee-390`);
   } finally {
     await context.close();
   }
@@ -231,14 +237,14 @@ for (const size of VIEWPORTS) {
       await row(page, IDENTITY).evaluate((element) => element.scrollIntoView({ block: 'start' }));
       await untilStill(page);
       expect(await overflow(), `no sideways scroll at ${size.label}`).toBeLessThanOrEqual(0);
-      await page.screenshot({ path: shot(`${KEY}-INVOICE-F21-${size.label}`) });
+      await capture(page, `${KEY}-INVOICE-F21-${size.label}`);
 
       await unfolded(page);
       await expect(pill(page, NUMBERING)).toHaveText((await seriesNow(context)) > 0 ? 'Hecho' : 'Recomendado');
       await row(page, NUMBERING).evaluate((element) => element.scrollIntoView({ block: 'start' }));
       await untilStill(page);
       expect(await overflow(), `no sideways scroll at ${size.label}`).toBeLessThanOrEqual(0);
-      await page.screenshot({ path: shot(`${KEY}-INVOICE-F14-${size.label}`) });
+      await capture(page, `${KEY}-INVOICE-F14-${size.label}`);
     } finally {
       await context.close();
     }
@@ -247,35 +253,38 @@ for (const size of VIEWPORTS) {
 
 // flow: INVOICE-F21
 for (const size of VIEWPORTS) {
-  test(`INVOICE-F21 at ${size.label}: Invoices and Series say once that nothing can be invoiced, and nothing once the issuer is saved`, async ({ browser }) => {
+  test(`INVOICE-F21 at ${size.label}: Invoices and Series paint no red notice, the action center says once that nothing can be invoiced, and nothing once the issuer is saved`, async ({ browser }) => {
     const { context, page } = await spanish(browser, { width: size.width, height: size.height });
     try {
-      for (const [screen, name] of [['invoices', ONE_NOTICE], ['series', `${ONE_NOTICE}-series`]] as const) {
+      for (const { screen, name, ready } of SCREENS) {
         await page.goto(`${A}/invoice/${screen}`);
-        const strip = shown(page).locator('[data-testid="blocking-strip"]');
-        await expect(strip).toBeVisible();
-        await expect(strip).toContainText('Los datos de tu negocio');
-        await expect(strip.locator(`[data-testid="blocking-configure-${IDENTITY}"]`)).toHaveText('Configurar');
-        // One red notice on the screen, whatever its words: the strip, and none of Invoicing's own under it.
-        await expect(shown(page).getByText(CANNOT_INVOICE, { exact: true })).toHaveCount(1);
-        await expect(shown(page).locator('[data-testid="blocking-strip"], .inline-feedback[data-tone="danger"]')).toHaveCount(1);
-        await expect(shown(page).locator('[data-testid="invoice-issuer-notice"]')).toHaveCount(0);
+        await expect(shown(page).locator(ready).first()).toBeVisible();
+        await nothingRedOn(page);
+        await expect(actionBell(page)).toHaveAttribute('data-severity', 'danger');
         await untilStill(page);
-        const overflow = await horizontalOverflow(page);
-        expect(overflow, `no sideways scroll at ${size.label}`).toBeLessThanOrEqual(0);
-        await page.screenshot({ path: shot(`${name}-${size.label}`) });
+        expect(await horizontalOverflow(page), `no sideways scroll at ${size.label}`).toBeLessThanOrEqual(0);
+        await capture(page, `${name}-${size.label}`);
       }
 
-      // Saved anywhere (another device, here the API), the strip leaves Series without a reload, and Invoices with it.
+      // The action center says it once, with its button to the issuer.
+      const featured = await featureNotice(page, CANNOT_INVOICE);
+      await expect(featured.locator('.action-featured__body')).toContainText('Los datos de tu negocio');
+      await expect(noticeButton(featured, SET_UP_ISSUER)).toBeVisible();
+      await expect(noticeIn(actionPanel(page), CANNOT_INVOICE)).toHaveCount(1);
+      await capture(page, `${KEY}-INVOICE-F21-notice-${size.label}`);
+      await closeActionCenter(page);
+
+      // Saved anywhere (another device, here the API), the notice leaves the bell of Series without a reload.
+      const total = await bellTotal(context);
       await markNoReload(page);
       await ensureIssuer(context);
-      await expect(shown(page).locator('[data-testid="blocking-strip"]')).toHaveCount(0);
-      await expect(shown(page).getByText(CANNOT_INVOICE, { exact: true })).toHaveCount(0);
+      await bellSays(page, total - 1);
+      await expect(noticeIn(await openActionCenter(page), CANNOT_INVOICE)).toHaveCount(0);
       await expectNoReload(page);
       await page.goto(`${A}/invoice/invoices`);
-      await expect(shown(page).locator('[data-testid=invoice-list-row], [data-testid=invoice-list-empty]').first()).toBeVisible();
-      await expect(shown(page).getByText(CANNOT_INVOICE, { exact: true })).toHaveCount(0);
-      await expect(shown(page).locator('[data-testid="blocking-strip"], .inline-feedback[data-tone="danger"]')).toHaveCount(0);
+      await expect(shown(page).locator(SCREENS[0].ready).first()).toBeVisible();
+      await nothingRedOn(page);
+      await bellSays(page, total - 1);
     } finally {
       await context.close();
       noIssuer();

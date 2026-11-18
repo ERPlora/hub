@@ -10,6 +10,7 @@ import { join } from 'node:path';
 import { type Browser, expect, type Page, test } from '@playwright/test';
 
 import { A, capture, login, shown } from './helpers';
+import { toastWithId } from './toast-helpers';
 
 /** Where the fleet keeps the evidence of this change (`## UI vista` of its PR), outside the repo. */
 const EVIDENCE = process.env.E2E_EVIDENCE_DIR ?? join(homedir(), '.erplora', 'fleet-next', 'logs', '438', 'ui');
@@ -94,7 +95,7 @@ for (const size of SIZES) {
     try {
       await context.setOffline(true);
       await shown(page).getByTestId('home-my-apps-add').click();
-      const notice = page.locator('ion-toast#view-load-failed');
+      const notice = toastWithId(page, 'view-load-failed');
       await expect(notice).toBeVisible();
       await expect(notice).toContainText('Could not open that page. Check the connection and try again.');
       await expect(page).toHaveURL(`${A}/`);

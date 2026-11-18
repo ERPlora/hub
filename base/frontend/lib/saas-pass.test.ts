@@ -3,11 +3,14 @@
 // after an `await`, so the blank tab opens in the click and gets its address later; the installed app has no tabs, and
 // hands the address to the device's browser. Whatever goes wrong, the usual address opens: it still works, asking to
 // sign in.
+import { toastError } from '@erplora/ui/shell';
 import { afterEach, beforeEach, describe, expect, it, type MockInstance, vi } from 'vitest';
 import { defineComponent, h } from 'vue';
 
 import { flush, installedApp, leaveInstalledApp, mountBase, tap } from '../__tests__/mount-base';
 import { SIGN_TIMEOUT_MS, type SaasPassNext, useSaasPass } from './saas-pass';
+
+vi.mock('@erplora/ui/shell', async (importOriginal) => (await import('../__tests__/toast-spies')).shellWithToastSpies(importOriginal));
 
 const USUAL = 'https://erplora.com/dashboard/store/plans?business=b1';
 const SIGNED = 'https://erplora.com/hub-pass/?pass=abc%3A123';
@@ -103,7 +106,7 @@ describe('useSaasPass in a browser', () => {
     await flush();
 
     expect(tab.location.href).toBe(USUAL);
-    expect(document.querySelector('ion-toast')).toBeNull();
+    expect(toastError).not.toHaveBeenCalled();
     expect(error).toHaveBeenCalled();
   });
 

@@ -1,9 +1,10 @@
 // «Choose table» (SALE-F19; Tables' TABLE-F10, F12, F13): the tables in service searched on the server,
-// as tiles in their status colour (number, zone, seats, status, the reservation's name and time); only
-// a free or reserved one can be tapped. A tap seats the check on screen there (`table.session.open` with
+// as tiles that draw each table as the floor plan does (number, zone, seats, status, the reservation's
+// name and time); only a free or reserved one can be tapped. A tap seats the check on screen there (`table.session.open` with
 // its `order_id`), or — with no check yet — lets Tables open one titled with the table; a parked table
 // check is seated again (`table.session.restore`). «Remove from table» parks the check's seat. Refusals
 // stay in the sheet in the server's words. Sales talks to Tables only through operation names.
+import { TableGlyph } from '@erplora/ui/components';
 import type { SessionMe } from '@erplora/ui/shell';
 import { describe, expect, it, vi } from 'vitest';
 import { h, ref } from 'vue';
@@ -129,16 +130,35 @@ describe('TablePicker: the tables', () => {
       table({ id: 't4', number: '7', status: 'blocked', blocked: true, zone_name: null }),
     ]);
     const tile = (id: string) => m.find(`pos-table-tile-${id}`);
-    /** What the tile says, line by line. */
-    const lines = (id: string) => [...tile(id).element.children].map((line) => line.textContent ?? '');
+    /** What the tile says, line by line, after the drawn table. */
+    const lines = (id: string) => [...tile(id).element.children].slice(1).map((line) => line.textContent ?? '');
     const time = shortTime(HOLD.held_from, 'en');
     expect(lines('t1')).toEqual(['4', 'Terrace', '4 pax', 'Available']);
-    expect(tile('t1').classes()).toContain('pos-table-tile--available');
-    expect(tile('t2').classes()).toContain('pos-table-tile--occupied');
     expect(lines('t3')).toEqual(['6', 'Terrace', '4 pax', 'Reserved', `Marta${time}`]);
     expect(tile('t3').findAll('.pos-table-tile__hold span').map((part) => part.text())).toEqual(['Marta', time]);
     expect(tile('t3').attributes('title')).toBe(`Marta (4) · ${time}`);
     expect(lines('t4')).toEqual(['7', '4 pax', 'Blocked']);
+  });
+
+  it('draws each table as the floor plan does: its status, shape, seats and guests, so occupied is the plan’s blue', async () => {
+    const m = await setup();
+    await m.tables([
+      table(),
+      table({ id: 't2', number: '5', status: 'occupied', guests: 2, shape: 'rectangle', capacity: 6, width: 160, height: 80 }),
+      table({ id: 't3', number: '6', status: 'reserved', shape: 'round' }),
+      table({ id: 't4', number: '7', status: 'blocked' }),
+    ]);
+    const glyph = (id: string) => m.find(`pos-table-tile-${id}`).findComponent(TableGlyph);
+    expect(glyph('t2').props()).toEqual({
+      variant: 'mini',
+      table: { status: 'occupied', shape: 'rectangle', capacity: 6, guests: 2, ratio: 2, tone: 'normal', progress: 0 },
+    });
+    expect(['t1', 't3', 't4'].map((id) => glyph(id).props('table'))).toEqual([
+      { status: 'available', shape: 'square', capacity: 4, guests: null, ratio: 1, tone: 'normal', progress: 0 },
+      { status: 'reserved', shape: 'round', capacity: 4, guests: null, ratio: 1, tone: 'normal', progress: 0 },
+      { status: 'blocked', shape: 'square', capacity: 4, guests: null, ratio: 1, tone: 'normal', progress: 0 },
+    ]);
+    expect(m.find('pos-table-tile-t2').find('.pos-table-tile__glyph').attributes('data-shape')).toBe('rectangle');
   });
 
   it('only a free or reserved table can be tapped; the others say why', async () => {

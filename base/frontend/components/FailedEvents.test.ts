@@ -12,8 +12,8 @@ vi.mock('@erplora/ui/components', async (importOriginal) => ({
 }));
 vi.mock('@erplora/ui/shell', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@erplora/ui/shell')>()),
-  toastSuccess: vi.fn(() => Promise.resolve()),
-  toastError: vi.fn(() => Promise.resolve()),
+  toastSuccess: vi.fn(),
+  toastError: vi.fn(),
 }));
 vi.mock('@ionic/vue', async (importOriginal) => {
   const { IonModalStub } = await import('../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');

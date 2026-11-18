@@ -47,7 +47,7 @@ async function confirm(): Promise<void> {
   }
   customer.value = null;
   emit('deleted', target.id);
-  void toastSuccess(t('customer.delete.done', { name: target.name }));
+  toastSuccess(t('customer.delete.done', { name: target.name }));
 }
 </script>
 

@@ -82,7 +82,7 @@ async function onAction({ actionId, row }: { actionId: string; row: QueueRowOut 
     outcome.value = { tone: 'danger', text: refusal(retry.error.value, t('verifactu.contingency.retryFailed'))?.message ?? t('verifactu.contingency.retryFailed') };
     return;
   }
-  void toastSuccess(t('verifactu.contingency.retried', { number: row.invoice_number }));
+  toastSuccess(t('verifactu.contingency.retried', { number: row.invoice_number }));
 }
 </script>
 

@@ -37,7 +37,7 @@ async function confirm(): Promise<void> {
   } catch {
     return; // `error` holds it: the panel shows it.
   }
-  void toastSuccess(t('customer.merge.done', { name: absorbed.name }));
+  toastSuccess(t('customer.merge.done', { name: absorbed.name }));
   emit('done');
 }
 </script>

@@ -54,7 +54,7 @@ async function confirm(): Promise<void> {
   } catch {
     return; // The window shows the refusal.
   }
-  void toastSuccess(t(props.register ? 'cash_register.registers.modal.renamed' : 'cash_register.registers.modal.created'));
+  toastSuccess(t(props.register ? 'cash_register.registers.modal.renamed' : 'cash_register.registers.modal.created'));
   open.value = false;
 }
 

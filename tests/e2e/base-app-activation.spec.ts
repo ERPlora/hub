@@ -28,7 +28,6 @@ import {
   horizontalOverflow,
   HUB_DIR,
   hostPage,
-  menuApps,
   psql,
   shot,
   shown,
@@ -36,8 +35,10 @@ import {
   testid,
   untilStill,
 } from './helpers';
+import { menuApps } from './topbar';
 import { cleanInvoices, ensureIssuer, issuedIds, snapshotSeries } from './invoice-helpers';
 import { STACK } from './stack';
+import { toastSaying } from './toast-helpers';
 
 const VIEWPORTS = {
   390: { width: 390, height: 844 },
@@ -135,9 +136,6 @@ async function snap(page: Page, key: string, width: number): Promise<void> {
 async function signedIn(browser: Browser, viewport: { width: number; height: number }, next: string) {
   return hostPage(browser, A, { viewport, next });
 }
-
-/** The toast that says `text` (one at a time: a new one closes the one on screen). */
-const toast = (page: Page, text: string) => page.locator('ion-toast').filter({ hasText: text }).last();
 
 /** The app names on screen that do not fit their cell and are cut without «…» (a long name such as «Ventas / TPV»
  *  or «Facturación» in a narrow column): each one is whole, or ends in an ellipsis. */
@@ -309,7 +307,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
 
       // It needs no other app: «Activar» turns it on at once, without a question.
       await testid(page, 'apps-row-flow-toggle').click();
-      await expect(toast(page, 'Automatizaciones está activada.')).toBeVisible();
+      await expect(toastSaying(page, 'Automatizaciones está activada.')).toBeVisible();
       await expect(page.locator('.ep-confirm-dialog:visible')).toHaveCount(0);
       await expect(appRow(page, 'flow').locator('[data-testid="apps-state"]')).toHaveText('Instalada');
       await expect(testid(page, 'apps-counter')).toHaveText('27 apps activadas · 17 de 20 de tu plan');
@@ -345,7 +343,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
       await untilStill(page);
       await page.screenshot({ path: shot(`FIX-HUB-BASE-APP-ACTIVATION-BASE-F23-${width}`) });
       await askOff.getByRole('button', { name: 'Desactivar' }).click();
-      await expect(toast(page, 'Reservas está desactivada. También se ha desactivado: Mesas.')).toBeVisible();
+      await expect(toastSaying(page, 'Reservas está desactivada. También se ha desactivado: Mesas.')).toBeVisible();
       await expect(appRow(page, 'reservation')).toHaveCount(0);
       // Both go off (two fewer turned on); only Reservations was chosen (one fewer of the plan's).
       await expect(testid(page, 'apps-counter')).toHaveText('25 apps activadas · 16 de 20 de tu plan');
@@ -368,7 +366,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
       await untilStill(page);
       await page.screenshot({ path: shot(`FIX-HUB-BASE-APP-ACTIVATION-BASE-F19-${width}`) });
       await askOn.getByRole('button', { name: 'Activar' }).click();
-      await expect(toast(page, 'Reservas está activada. También se ha activado: Mesas.')).toBeVisible();
+      await expect(toastSaying(page, 'Reservas está activada. También se ha activado: Mesas.')).toBeVisible();
       await expect(appRow(page, 'reservation').locator('[data-testid="apps-state"]')).toHaveText('Instalada');
       await expect(testid(page, 'apps-counter')).toHaveText('27 apps activadas · 17 de 20 de tu plan');
       // Reservations chosen; Tables came along with it, so it does not count.
@@ -397,7 +395,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
       await expect(refused).toContainText('No se ha cambiado nada');
       await expect(refused).toContainText('Desactiva antes Reservas.');
       await expect(page.locator('.ep-confirm-dialog:visible')).toHaveCount(0);
-      await page.waitForTimeout(5_000); // longer than the 4.5 s of an error toast
+      await page.waitForTimeout(5_500); // longer than the 5 s of an error toast
       await expect(refused).toBeVisible();
       await expect(appRow(page, 'table').locator('[data-testid="apps-state"]')).toHaveText('Activa');
       expect(stored('table'), 'nothing written').toBe(before);
@@ -507,7 +505,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
       await expect(askOff).toContainText('Clientes se desactiva con ella: solo la necesitaba Ventas / TPV.');
       await expect(askOff).not.toContainText('Impuestos');
       await askOff.getByRole('button', { name: 'Desactivar' }).click();
-      await expect(toast(page, 'Ventas / TPV está desactivada. También se ha desactivado: Clientes.')).toBeVisible();
+      await expect(toastSaying(page, 'Ventas / TPV está desactivada. También se ha desactivado: Clientes.')).toBeVisible();
       expect([stored('sale'), stored('customer'), stored('tax')]).toEqual(['off:false', 'off:false', 'on:false']);
       await search(page, 'Impuestos');
       await expect(appRow(page, 'tax').locator('[data-testid="apps-state"]')).toHaveText('Activa');
@@ -588,7 +586,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
       await testid(page, `apps-row-${PRINTING}-toggle`).click();
       const response = await answered;
       expect([response.status(), (await response.json()).state]).toEqual([202, 'creating']);
-      await expect(toast(page, 'Turning on Printing… It will be ready in a moment.')).toBeVisible();
+      await expect(toastSaying(page, 'Turning on Printing… It will be ready in a moment.')).toBeVisible();
 
       // The worker sets it up and turns it on: the row and the topbar's «My apps» follow without a reload.
       await expect(state).toHaveText('Installed', { timeout: SET_UP_MS });
@@ -627,7 +625,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
       const retried = page.waitForResponse((answer) => answer.url().endsWith('/api/apps/retry'));
       await testid(page, `apps-row-${PRINTING}-retry`).click();
       expect((await retried).status()).toBe(202);
-      await expect(toast(page, 'Turning on Printing… It will be ready in a moment.')).toBeVisible();
+      await expect(toastSaying(page, 'Turning on Printing… It will be ready in a moment.')).toBeVisible();
       await expect(state).toHaveText('Installed', { timeout: SET_UP_MS });
       expect(psql(`select attempts || ':' || last_error from base_appactivation where host = 'a' and app = '${PRINTING}'`)).toBe(
         '0:',

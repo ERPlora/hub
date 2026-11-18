@@ -1,10 +1,11 @@
 """A module's help window, read from the customer's part of its WORKBOOK in one language.
 
-The window only paints markdown. What it paints is cut here: what the module is for (the first section), the section of
-each tab (each ``###`` under the screens heading, named as its tab; a ``####`` is a window inside it) and the flows that
-are done on one of those tabs, of which only the title, the steps and what happens if they fail are published. The
-heading and the flow keys are written in the file's language, with the words of base's ``workbook`` vocabulary, so the
-only language this module names is the source's.
+The window only paints markdown. What it paints is cut here: what the module is for (the first section), the summary of
+each tab (what its ``###`` under the screens heading, named as its tab, says before its first ``####``; each ``####`` is
+a window inside the tab, written for whoever maintains the module, and only its title counts here, as a place where a
+flow is done) and the flows that are done on one of those tabs, of which only the title, the steps and what happens if
+they fail are published. The heading and the flow keys are written in the file's language, with the words of base's ``workbook``
+vocabulary, so the only language this module names is the source's.
 """
 
 import re
@@ -146,8 +147,9 @@ def parse(markdown: str, tabs: Sequence[Tab], vocabulary: Words) -> Help:
 def _screens(
     lines: list[str], tabs: Sequence[Tab]
 ) -> tuple[tuple[Screen, ...], dict[str, str], tuple[str, ...], tuple[str, ...]]:
-    """The screen of each tab with a section, in the tabs' order (its first section, when written twice); each window's
-    name with its tab; the titles that name no tab; and those of a tab already written."""
+    """The screen of each tab with a section, in the tabs' order (its first section, when written twice), whose text is
+    its summary: what goes before its first window (``####``); each window's name with its tab; the titles that name no
+    tab; and those of a tab already written."""
     by_name = {_name(tab.label): tab for tab in tabs}
     found: dict[str, list[str]] = {}
     unknown: list[str] = []
@@ -160,8 +162,9 @@ def _screens(
             repeated.append(title)
         else:
             found[tab.id] = body
-    screens = tuple(Screen(tab.id, tab.label, tab.path, _markdown(found[tab.id])) for tab in tabs if tab.id in found)
-    windows = {_place(title): tab_id for tab_id, body in found.items() for title, _ in _sections(body, 4)[1:]}
+    cut = {tab_id: _sections(body, 4) for tab_id, body in found.items()}
+    screens = tuple(Screen(tab.id, tab.label, tab.path, _markdown(cut[tab.id][0][1])) for tab in tabs if tab.id in cut)
+    windows = {_place(title): tab_id for tab_id, parts in cut.items() for title, _ in parts[1:]}
     return screens, windows, tuple(unknown), tuple(repeated)
 
 

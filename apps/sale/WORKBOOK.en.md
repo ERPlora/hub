@@ -744,9 +744,10 @@ Screen: Sell
 Steps:
 1. With Tables active and the permission to seat, the check's bar has, before the customer, the table
    button (grid, "Assign table"). Tap it: "Choose table" opens, with a search ("Search a table…") and
-   the tables in service as tiles in the colour of their state (Available green, Occupied
-   red, Reserved amber, Blocked grey), with the number, the area, the seats ("4 pax"), the state and, if
-   it has one, today's reservation ("Marta · 21:00"). With no tables: "There are no tables yet. Set them
+   the tables in service as tiles that draw each table as the floor plan does, with its shape, its
+   chairs and the floor plan's colours (Available green, Occupied blue, Reserved yellow, Blocked grey),
+   with the number, the area, the seats ("4 pax"), the state and, if it has one, today's reservation
+   ("Marta · 21:00"). With no tables: "There are no tables yet. Set them
    up in Tables → Floor plan.".
 2. Tap an Available or Reserved table: the check on screen sits there and takes its name as its title
    ("Table 4"); with no check yet, Tables opens one with that title and the POS puts it on screen. A

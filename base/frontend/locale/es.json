@@ -86,15 +86,42 @@
       "loadErrorBody": "Comprueba la conexión y vuelve a intentarlo.",
       "retry": "Reintentar"
     },
-    "bell": {
-      "title": "Notificaciones",
-      "empty": "Todo al día. Sin notificaciones.",
-      "loadError": "No se han podido comprobar las notificaciones. Aparecerán cuando vuelva la conexión."
-    },
     "blocking": {
       "title": "Todavía no puedes facturar",
-      "body": "No se podrá emitir ningún tique ni factura hasta que configures esto:",
-      "configure": "Configurar"
+      "body": "No se podrá emitir ningún tique ni factura hasta que configures esto: {steps}.",
+      "configureStep": "Configurar: {step}",
+      "steps": {
+        "businessIdentity": "Configurar los datos del negocio",
+        "verifactu": "Configurar VeriFactu"
+      }
+    },
+    "notices": {
+      "counter": "{label} ({count})",
+      "open": "Abrir",
+      "failedEvents": {
+        "title": "1 evento caído | {count} eventos caídos",
+        "action": "Revisar los eventos"
+      },
+      "planLimits": {
+        "title": "1 límite del plan por revisar | {count} límites del plan por revisar",
+        "action": "Ver el uso del plan"
+      },
+      "appointments": {
+        "title": "1 cita por confirmar | {count} citas por confirmar",
+        "action": "Confirmar las citas"
+      },
+      "whatsapp": {
+        "title": "1 cliente de WhatsApp esperando respuesta | {count} clientes de WhatsApp esperando respuesta",
+        "action": "Contestar a los clientes"
+      },
+      "printing": {
+        "title": "{label}: 1 trabajo esperando | {label}: {count} trabajos esperando",
+        "action": "Ver las impresoras"
+      },
+      "demo": {
+        "title": "1 elemento de demo abierto | {count} elementos de demo abiertos",
+        "action": "Ver los elementos"
+      }
     },
     "plan": {
       "upgrade": "Mejorar plan",
@@ -1216,7 +1243,6 @@
       }
     },
     "assistant": {
-      "more": "Más opciones",
       "empty": "Pregúntame por tus ventas, tu inventario o cualquier cosa de tu negocio.",
       "setupIntro": "Revisa la configuración de tu negocio. Elige una opción o escribe tu duda.",
       "shortcuts": {

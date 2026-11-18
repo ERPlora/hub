@@ -21,6 +21,7 @@ import { capture, psql, shown } from './helpers';
 import { chats, relay } from './provider-helpers';
 import { noHorizontalScroll, settled, VIEWPORTS } from './schedule-helpers';
 import { post } from './service-helpers';
+import { toastSaying } from './toast-helpers';
 import { answerSpec, customerWrites } from './whatsapp-answer-helpers';
 import { cleanUp as inboxCleanUp, e2ePhone, keepPhoto, restorePhoto } from './whatsapp-helpers';
 
@@ -97,7 +98,7 @@ async function askAndApprove(page: Page, phone: string, text: string, viewport: 
     await capture(page, shot);
   }
   await question.locator('[data-testid^=flow-question-yes-]').click();
-  await expect(page.locator('ion-toast').filter({ hasText: 'Approved: the automation carries on.' }).last()).toBeVisible();
+  await expect(toastSaying(page, 'Approved: the automation carries on.')).toBeVisible();
   await expect(question).toHaveCount(0);
   const answered = chats(provider()).length;
   await relay(parkedEvent(flowId));

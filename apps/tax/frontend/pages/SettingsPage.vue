@@ -73,7 +73,7 @@ async function save(): Promise<void> {
     return; // `saveError` holds it and the form paints it.
   }
   synced.value = sent;
-  void toastSuccess(t('tax.settings.saved'));
+  toastSuccess(t('tax.settings.saved'));
 }
 </script>
 

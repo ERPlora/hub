@@ -83,7 +83,7 @@ async function save(): Promise<void> {
     return; // the form paints the refusal.
   }
   open.value = false;
-  void toastSuccess(t(props.field ? 'customer.fields.updated' : 'customer.fields.created'));
+  toastSuccess(t(props.field ? 'customer.fields.updated' : 'customer.fields.created'));
 }
 
 const canDismiss = useUnsavedFormOnOpen('customer-field-form', () => ({ name: name.value, fieldType: fieldType.value, options: options.value, order: order.value, required: required.value, active: active.value }), open);

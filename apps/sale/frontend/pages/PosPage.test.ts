@@ -2,7 +2,7 @@
 // and the check side by side (the phone's drawer and its button), every sheet, the table of the check
 // (with Tables on), the charge (the checkout sheet) and the document after it. Data only through the operations: the check comes back
 // whole from every write and live from `sale.order.get`; the total is the preview's.
-import { toast, toastError, toastSuccess } from '@erplora/ui/shell';
+import { toast, toastError, toastInfo, toastSuccess, toastWarning } from '@erplora/ui/shell';
 import { AppPage } from '@erplora/ui/shell';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -31,9 +31,11 @@ vi.mock('@ionic/vue', async (importOriginal) => {
 });
 vi.mock('@erplora/ui/shell', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@erplora/ui/shell')>()),
-  toast: vi.fn(() => Promise.resolve()),
-  toastError: vi.fn(() => Promise.resolve()),
-  toastSuccess: vi.fn(() => Promise.resolve()),
+  toast: vi.fn(),
+  toastError: vi.fn(),
+  toastInfo: vi.fn(),
+  toastSuccess: vi.fn(),
+  toastWarning: vi.fn(),
 }));
 // The other workers' pieces, by their contracts: stubbed here.
 vi.mock('../components/checkout/CheckoutSheet.vue', async () => {
@@ -73,9 +75,7 @@ vi.mock('../../../customer/frontend/components/CustomerSearch.vue', async () => 
 beforeEach(() => vi.stubGlobal('localStorage', memoryStorage()));
 afterEach(() => {
   vi.unstubAllGlobals();
-  vi.mocked(toast).mockClear();
-  vi.mocked(toastError).mockClear();
-  vi.mocked(toastSuccess).mockClear();
+  for (const spy of [toast, toastError, toastInfo, toastSuccess, toastWarning]) vi.mocked(spy).mockClear();
 });
 
 const CHECK = order({ id: 'o1', version: 1, lines: [line({ id: 'l1', product_id: 'p1' })] });
@@ -302,6 +302,7 @@ describe('PosPage: open price', () => {
     s.wrapper.findComponent(PosCatalog).vm.$emit('openPrice');
     await settle();
     expect(toast).not.toHaveBeenCalled();
+    expect(toastWarning).not.toHaveBeenCalled();
     expect(s.wrapper.findComponent(OpenPriceSheet).props('open')).toBe(true);
   });
 
@@ -323,7 +324,7 @@ describe('PosPage: charging', () => {
     const s = await setup({ settings: { require_customer: true }, locale: 'es' });
     await s.addProduct();
     await click(s.find('pos-charge').element);
-    expect(toast).toHaveBeenCalledWith('Este negocio exige un cliente en cada venta. Elige uno para seguir con el cobro.', 'warning');
+    expect(toastWarning).toHaveBeenCalledWith('Este negocio exige un cliente en cada venta. Elige uno para seguir con el cobro.');
     expect(s.wrapper.findComponent({ name: 'CustomerSearch' }).props('open')).toBe(true);
     expect(s.wrapper.findComponent({ name: 'CheckoutSheet' }).props('open')).toBe(false);
   });
@@ -422,7 +423,7 @@ describe('PosPage: a check joined with another one (TABLE-F16, SALE-F24)', () =>
     await s.clock.advance(2000);
     await s.reopen();
     expect(toastError).not.toHaveBeenCalled();
-    expect(toast).toHaveBeenCalledWith('That check was joined with another one: the screen shows the joined check.');
+    expect(toastInfo).toHaveBeenCalledWith('That check was joined with another one: the screen shows the joined check.');
     expect(localStorage.getItem(CURRENT_CHECK_KEY)).toBe('o2');
     expect(s.params('sale.order.get')).toEqual([{ order_id: 'o2' }]);
     expect(s.sent().some((c) => c.path === '/api/customer/orders/customer' && c.query.order_id === 'o2')).toBe(true);
@@ -926,7 +927,7 @@ describe('PosPage: sending the round to the kitchen (SALE-F20, KITCHEN-F18)', ()
     await settle();
     expect(sends(s)).toEqual([{ order_id: 'o1', priority: 'rush' }]);
     expect(toast).toHaveBeenCalledTimes(1);
-    expect(toast).toHaveBeenCalledWith('Comanda 1 enviada a cocina.', 'success', undefined, undefined, undefined, 'top');
+    expect(toast).toHaveBeenCalledWith({ message: 'Comanda 1 enviada a cocina.', tone: 'success', position: 'top' });
     expect(toastSuccess).not.toHaveBeenCalled();
   });
 
@@ -960,14 +961,11 @@ describe('PosPage: sending the round to the kitchen (SALE-F20, KITCHEN-F18)', ()
     await settle();
     expect(toastSuccess).not.toHaveBeenCalled();
     expect(toast).toHaveBeenCalledTimes(1);
-    expect(toast).toHaveBeenCalledWith(
-      'Comanda 2 enviada a cocina, pero no se imprimió. Revisa la impresora de cocina en Impresión.',
-      'warning',
-      4500,
-      undefined,
-      undefined,
-      'top',
-    );
+    expect(toast).toHaveBeenCalledWith({
+      message: 'Comanda 2 enviada a cocina, pero no se imprimió. Revisa la impresora de cocina en Impresión.',
+      tone: 'warning',
+      position: 'top',
+    });
   });
 
   it('charging with lines not sent sends them first, then opens the charge', async () => {
@@ -988,7 +986,7 @@ describe('PosPage: sending the round to the kitchen (SALE-F20, KITCHEN-F18)', ()
     await settle();
     expect(checkout(s).props('open')).toBe(true);
     expect(toast).toHaveBeenCalledTimes(1);
-    expect(toast).toHaveBeenCalledWith('Comanda 1 enviada a cocina.', 'success', undefined, undefined, undefined, 'top');
+    expect(toast).toHaveBeenCalledWith({ message: 'Comanda 1 enviada a cocina.', tone: 'success', position: 'top' });
     expect(toastSuccess).not.toHaveBeenCalled();
   });
 
@@ -1000,14 +998,11 @@ describe('PosPage: sending the round to the kitchen (SALE-F20, KITCHEN-F18)', ()
     await settle();
     expect(checkout(s).props('open')).toBe(true);
     expect(toast).toHaveBeenCalledTimes(1);
-    expect(toast).toHaveBeenCalledWith(
-      'Comanda 2 enviada a cocina, pero no se imprimió. Revisa la impresora de cocina en Impresión.',
-      'warning',
-      4500,
-      undefined,
-      undefined,
-      'top',
-    );
+    expect(toast).toHaveBeenCalledWith({
+      message: 'Comanda 2 enviada a cocina, pero no se imprimió. Revisa la impresora de cocina en Impresión.',
+      tone: 'warning',
+      position: 'top',
+    });
     expect(toastSuccess).not.toHaveBeenCalled();
   });
 
@@ -1019,9 +1014,9 @@ describe('PosPage: sending the round to the kitchen (SALE-F20, KITCHEN-F18)', ()
     s.wrapper.findComponent(PosCart).vm.$emit('charge');
     await settle();
     expect(checkout(s).props('open')).toBe(false);
-    expect(toast).toHaveBeenCalledTimes(1);
-    expect(toast).toHaveBeenCalledWith('The order could not be sent to the kitchen. Try again.', 'danger', 4500, undefined, undefined, 'top');
-    expect(toastError).not.toHaveBeenCalled();
+    expect(toastError).toHaveBeenCalledTimes(1);
+    expect(toastError).toHaveBeenCalledWith('The order could not be sent to the kitchen. Try again.', { position: 'top' });
+    expect(toast).not.toHaveBeenCalled();
   });
 
   it('a «Send order» that cannot be sent says why at the top too, clear of «Charge» (hub#755)', async () => {
@@ -1030,9 +1025,9 @@ describe('PosPage: sending the round to the kitchen (SALE-F20, KITCHEN-F18)', ()
     kitchenAnswers(s, () => refused('internal_error', 'The kitchen did not answer.', 500));
     s.wrapper.findComponent(PosCart).vm.$emit('send', false);
     await settle();
-    expect(toast).toHaveBeenCalledTimes(1);
-    expect(toast).toHaveBeenCalledWith('No se ha podido enviar la comanda a cocina. Inténtalo de nuevo.', 'danger', 4500, undefined, undefined, 'top');
-    expect(toastError).not.toHaveBeenCalled();
+    expect(toastError).toHaveBeenCalledTimes(1);
+    expect(toastError).toHaveBeenCalledWith('No se ha podido enviar la comanda a cocina. Inténtalo de nuevo.', { position: 'top' });
+    expect(toast).not.toHaveBeenCalled();
   });
 
   it('the cart follows the check’s kitchen tickets with Kitchen on and the right to see them (KITCHEN-F19)', async () => {

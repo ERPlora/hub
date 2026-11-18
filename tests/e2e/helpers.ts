@@ -84,7 +84,7 @@ const STILL_TIMEOUT_MS = 10_000;
 /**
  * What moves on the page now (run in the page, so self-contained): every finite animation running in the document
  * and in every open shadow root under it, however deep. `document.getAnimations()` leaves shadow roots out, and Ionic
- * animates its overlays (`ion-toast`, `ion-modal`, `ion-popover`), an `ion-progress-bar`'s bar or an `ion-segment`'s
+ * animates its overlays (`ion-modal`, `ion-popover`), an `ion-progress-bar`'s bar or an `ion-segment`'s
  * indicator inside theirs. Endless ones (spinners, a shimmer) never stop, so they never count.
  */
 function movingInPage(): string[] {
@@ -915,18 +915,6 @@ export const testid = (page: Page, id: string): Locator => shown(page).locator(`
 /** `id`'s row in the Apps screen. */
 export const appRow = (page: Page, id: string): Locator => shown(page).locator(`[data-testid="apps-row"][data-id="${id}"]`);
 
-/** The names the topbar's «My apps» (the menu of the apps, from the session) lists now. */
-export async function menuApps(page: Page): Promise<string[]> {
-  await testid(page, 'topbar-apps').click();
-  const sheet = page.locator('[data-testid="apps-launcher"]').last();
-  const tiles = sheet.locator('[data-testid="apps-launcher-app"]');
-  await expect(tiles.first()).toBeVisible();
-  const names = (await tiles.allInnerTexts()).map((name) => name.trim());
-  await sheet.locator('[data-testid="apps-launcher-close"]').click();
-  await expect(sheet).toBeHidden();
-  return names;
-}
-
 export async function createItem(context: BrowserContext, origin: string, name: string): Promise<Item> {
   const res = await api<Item>(context, origin, 'POST', '/demo/items', { name });
   expect(res.status, `create ${name}`).toBe(201);
@@ -1046,7 +1034,7 @@ export async function clearItems(context: BrowserContext, origin: string): Promi
 }
 
 /** Ionic's overlays. An inline `ion-modal` wraps its content in an `.ion-page` of its own. */
-const OVERLAYS = 'ion-modal, ion-popover, ion-alert, ion-action-sheet, ion-loading, ion-toast, ion-picker-legacy';
+const OVERLAYS = 'ion-modal, ion-popover, ion-alert, ion-action-sheet, ion-loading, ion-picker-legacy';
 
 /**
  * The page shown by `IonRouterOutlet` (hidden pages stay in the DOM), never a dialog presented over it:
@@ -1056,35 +1044,14 @@ const OVERLAYS = 'ion-modal, ion-popover, ion-alert, ion-action-sheet, ion-loadi
 export const shown = (page: Page): Locator =>
   page.locator(`.ion-page:not(.ion-page-hidden):not(:is(${OVERLAYS}) *)`).last();
 
-/**
- * The ⠿ «My apps» button of the hub's topbar (its sidebar): there once the
- * authenticated shell is painted (every page of the stack has its own; the first one is enough).
- */
-export const topbarApps = (page: Page): Locator => page.locator('[data-testid=topbar-apps]').first();
+/** What opens «My apps» on the hub's topbar: its ⠿ button from a tablet, the shell's «⋮» on a phone. */
+export const MY_APPS_DOOR = '[data-testid=topbar-apps], [data-testid=topbar-more]';
 
-/**
- * Opens the «My apps» sheet from the screen on view and returns it. Ionic moves a presented modal to
- * `ion-app`, outside the page, so it is found on the page (the presented one), not in `shown(page)`.
- */
-export async function openApps(page: Page): Promise<Locator> {
-  await shown(page).locator('[data-testid=topbar-apps]').click();
-  const sheet = page.locator('ion-modal[data-testid=apps-launcher]:not(.overlay-hidden)');
-  await expect(sheet.locator('[data-testid=apps-launcher-app]').first()).toBeVisible();
-  return sheet;
-}
+/** The way to «My apps»: there once the authenticated shell is painted (every page of the stack has its own). */
+export const topbarApps = (page: Page): Locator => page.locator(MY_APPS_DOOR).first();
 
-/** Whether the page is a phone's (under 768 px): base folds the assistant's sparkles and the bell into «More options». */
+/** Whether the page is a phone's (under 768 px): the shell folds «My apps» and the assistant into «⋮». */
 export const compactBar = (page: Page): boolean => (page.viewportSize()?.width ?? 1280) < 768;
-
-/** The bell's count on the screen on view: on the bell, or on a phone's «More options», which carries it. */
-export const bellBadge = (page: Page): Locator =>
-  shown(page).locator(compactBar(page) ? '[data-testid=topbar-chrome-more-badge]' : '[data-testid=hub-bell] [data-testid=hub-bell-badge]');
-
-/** The bell's count says `total`, or shows nothing when it is 0. */
-export async function badgeSays(page: Page, total: number, options: { timeout?: number } = {}): Promise<void> {
-  if (total > 0) await expect(bellBadge(page)).toHaveText(String(total), options);
-  else await expect(bellBadge(page)).toHaveCount(0, options);
-}
 
 /** The page still, with nothing past its right edge at the size `label`, then captured as `name`. */
 export async function capturedFitting(page: Page, name: string, label: string): Promise<void> {
@@ -1092,31 +1059,6 @@ export async function capturedFitting(page: Page, name: string, label: string): 
   const overflow = await horizontalOverflow(page);
   expect(overflow, `no sideways scroll at ${label}`).toBeLessThanOrEqual(0);
   await capture(page, name);
-}
-
-/**
- * Opens the bell's list (BASE-F10) and resolves once it is presented: the bell itself, or on a phone its row in «More
- * options» (TopbarChrome.vue). Ionic animates a popover in a shadow root, so it waits for its `ionPopoverDidPresent`.
- */
-export async function openBell(page: Page): Promise<void> {
-  const presented = page.evaluate(
-    () =>
-      new Promise<void>((resolve) => {
-        const done = (event: Event) => {
-          if (!(event.target as Element).querySelector('[data-testid^="hub-bell-"]')) return;
-          document.removeEventListener('ionPopoverDidPresent', done);
-          resolve();
-        };
-        document.addEventListener('ionPopoverDidPresent', done);
-      }),
-  );
-  if (compactBar(page)) {
-    await shown(page).locator('[data-testid=topbar-chrome-more]').click();
-    await page.locator('ion-popover [data-testid=topbar-chrome-more-bell]').click();
-  } else {
-    await shown(page).locator('[data-testid=hub-bell]').click();
-  }
-  await presented;
 }
 
 /** Waits until the list painted its first result (empty state or rows). */

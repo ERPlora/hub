@@ -50,7 +50,7 @@ guardado en ella lo hereda la siguiente. Una spec con dos dispositivos de la mis
 empleado por PIN si no rota la clave de sesión, pide `fresh: true` para tener la suya.
 
 Cada paso del login se espera **todo el tiempo del test**, nunca una parte: la shell del hub (la barra de arriba,
-`topbar-apps`), al entrar y al final, y cada paso del SaaS (su página de acceso o la vuelta, su respuesta al inicio de
+su camino a «Mis apps», `MY_APPS_DOOR`: ⠿ desde la tableta y el «⋮» de la shell en el teléfono), al entrar y al final, y cada paso del SaaS (su página de acceso o la vuelta, su respuesta al inicio de
 sesión, la pantalla del código, su respuesta al código y la vuelta al hub). Con la máquina cargada la SPA tardó más de
 30 s en montar la shell (hub#1342) y el SaaS lo mismo en contestar un paso (hub#1370), sin nada roto. Lo que dice que
 no va a llegar cae en el acto y dice por qué:
@@ -72,7 +72,7 @@ no va a llegar cae en el acto y dice por qué:
   una vez, cuando la pantalla del código ya está.
 
 Un fallo de red (`net::…`) se reintenta una vez, como una conexión rechazada. Un paso que no llega sin nada de eso
-choca con el tope del propio test, y Playwright nombra esa espera: `locator.waitFor` de `topbar-apps` para la shell,
+choca con el tope del propio test, y Playwright nombra esa espera: `locator.waitFor` de `topbarApps` para la shell,
 `page.waitForResponse` desde `signInWithCode` (la línea del código o la del inicio de sesión) para una respuesta del
 SaaS que no llega.
 
@@ -545,6 +545,9 @@ contaba 0 filas tras confirmar un diálogo pasaba antes de que se borrara nada (
 - Un diálogo se busca en la página entera: `page.locator('ion-modal[data-testid=…]')`, nunca dentro de `shown(page)`.
 - Tras confirmar un diálogo, se espera `await expect(<diálogo>).toBeHidden()` antes de contar filas o afirmar que
   algo ya no está.
+- Un aviso (toast) se busca con `toast-helpers.ts`, por lo que dice (`toastSaying`), nunca por su sitio: cada borde de
+  la pantalla enseña hasta 3 a la vez, el más reciente primero en el DOM. Con el ratón o el foco encima, la pila se
+  abre y sus relojes se paran: una spec que espera a que un aviso se vaya aparta antes el ratón (`page.mouse.move(0, 0)`).
 
 ## Las capturas
 
@@ -552,7 +555,7 @@ Una captura justo después de `setViewportSize` puede salir antes de que el nave
 la zona que destapa el cambio de tamaño aún tiene lo de arriba de la página, y la captura repite la barra superior en su
 parte de abajo (87 filas; en `main`, 5 de 24 capturas de la lista de la demo sin espera y 2 de 24 tras `settled`). Esa
 captura es la prueba de una pantalla que nadie vio. Toda captura de la e2e pasa por `capture(page, name)` (`helpers.ts`):
-espera a que nada finito se mueva (`untilStill`, abajo: un `ion-toast` o un `ion-modal` entrando, no un spinner) y a un
+espera a que nada finito se mueva (`untilStill`, abajo: un aviso o un `ion-modal` entrando, no un spinner) y a un
 fotograma pintado, repite la captura mientras repite la franja de arriba (`repeatedTop`, la del SaaS) y, si no deja de
 hacerlo, falla diciéndolo y no escribe nada; si no, la deja en `.artifacts/<name>.png` y la devuelve. Si algo sigue
 moviéndose a los 10 s, falla con `capture <name>: still moving`, nombrando lo que se mueve, y no escribe nada: antes, una
@@ -567,8 +570,8 @@ blanco arriba y abajo con su borde izquierdo) y la tarjeta de confirmación enci
 `settled(page)` (`helpers.ts`; `service-helpers.ts` y `schedule-helpers.ts` reparten el mismo, sin copias) espera a que
 nada se mueva (`untilStill`) y a un fotograma pintado. «Nada se mueve» se lee en el documento **y en cada shadow root
 abierto, a cualquier profundidad** (`movingInPage`): `document.getAnimations()` no ve los shadow roots, y Ionic anima ahí
-sus avisos, diálogos y popovers (con el `settled` de antes, un `ion-toast` aún entrando daba 0 animaciones en el
-documento y 1 en su shadow root). Las infinitas (spinners, un brillo de carga) no cuentan; si algo sigue moviéndose a los
+sus diálogos y popovers; los avisos de `@erplora/ui` entran con transiciones CSS en el propio documento. Las infinitas
+(spinners, un brillo de carga) no cuentan; si algo sigue moviéndose a los
 10 s, la spec falla diciendo qué; y si la página navega a mitad de espera, mira la página nueva. Lo cubre
 `settled.spec.ts` (la misma corrección que la e2e del SaaS, saas#147).
 

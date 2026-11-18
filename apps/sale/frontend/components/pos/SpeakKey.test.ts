@@ -15,7 +15,7 @@ import {
   type TurnBody,
   useDictation,
 } from '@erplora/ui/components';
-import { type SessionMe, toast } from '@erplora/ui/shell';
+import { type SessionMe, toast, toastWarning } from '@erplora/ui/shell';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { computed, ref, toRaw, toValue } from 'vue';
 
@@ -24,7 +24,8 @@ import SpeakKey from './SpeakKey.vue';
 
 vi.mock('@erplora/ui/shell', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@erplora/ui/shell')>()),
-  toast: vi.fn(() => Promise.resolve()),
+  toast: vi.fn(),
+  toastWarning: vi.fn(),
 }));
 
 // The shared assistant's dictation, the real one unless a test swaps it for one it drives (`fakeDictation`).
@@ -69,6 +70,7 @@ beforeEach(() => {
 afterEach(() => {
   installAssistant(undefined);
   vi.mocked(toast).mockClear();
+  vi.mocked(toastWarning).mockClear();
   // Back to the real dictation, also when a swapped one was never taken.
   vi.mocked(useDictation).mockReset();
   vi.restoreAllMocks();
@@ -197,6 +199,7 @@ describe('SpeakKey: dictating into the assistant', () => {
     expect(k.button().text()).toBe('Hablar');
     expect(k.find('pos-speak-status').exists()).toBe(false);
     expect(toast).not.toHaveBeenCalled();
+    expect(toastWarning).not.toHaveBeenCalled();
   });
 
   it('says «Transcribiendo…» and takes no tap while erplora.com transcribes', async () => {
@@ -217,7 +220,7 @@ describe('SpeakKey: dictating into the assistant', () => {
     const k = await key({ answer: { status: 200, body: { text: '   ', language: 'es' } } });
     await k.press();
     await k.press();
-    expect(toast).toHaveBeenCalledWith('No se ha oído nada. Inténtalo de nuevo más cerca del micrófono.', 'warning');
+    expect(toast).toHaveBeenCalledWith({ message: 'No se ha oído nada. Inténtalo de nuevo más cerca del micrófono.', tone: 'warning' });
     expect(assistant.state.draft).toBe('');
     expect(assistant.state.open).toBe(false);
   });
@@ -229,7 +232,7 @@ describe('SpeakKey: dictating into the assistant', () => {
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
     await k.press();
     await k.press();
-    expect(toast).toHaveBeenCalledWith('No se ha podido transcribir el audio. Inténtalo de nuevo.', 'danger');
+    expect(toast).toHaveBeenCalledWith({ message: 'No se ha podido transcribir el audio. Inténtalo de nuevo.', tone: 'error' });
     expect(assistant.state.open).toBe(false);
     expect(k.button().text()).toBe('Hablar');
   });
@@ -240,14 +243,14 @@ describe('SpeakKey: dictating into the assistant', () => {
     await k.press();
     await k.press();
     expect(k.transcriptions()).toEqual([]);
-    expect(toast).toHaveBeenCalledWith('La grabación es demasiado larga: di algo más corto.', 'warning');
+    expect(toast).toHaveBeenCalledWith({ message: 'La grabación es demasiado larga: di algo más corto.', tone: 'warning' });
   });
 
   it('a microphone the browser refuses is a toast that says how to allow it', async () => {
     const voice = { ...microphone(), getUserMedia: vi.fn(async () => Promise.reject(new DOMException('no', 'NotAllowedError'))) };
     const k = await key({ voice });
     await k.press();
-    expect(toast).toHaveBeenCalledWith('El acceso al micrófono está denegado. Permítelo en tu navegador para hablar.', 'warning');
+    expect(toast).toHaveBeenCalledWith({ message: 'El acceso al micrófono está denegado. Permítelo en tu navegador para hablar.', tone: 'warning' });
     expect(k.button().text()).toBe('Hablar');
     expect(k.find('pos-speak-status').exists()).toBe(false);
   });
@@ -266,14 +269,14 @@ describe('SpeakKey: dictating into the assistant', () => {
     win.__TAURI__ = { core: { invoke: vi.fn(async () => null) } };
     try {
       await refusal('es');
-      expect(toast).toHaveBeenLastCalledWith('El acceso al micrófono está denegado. Permítelo en los ajustes del dispositivo para hablar.', 'warning');
+      expect(toast).toHaveBeenLastCalledWith({ message: 'El acceso al micrófono está denegado. Permítelo en los ajustes del dispositivo para hablar.', tone: 'warning' });
       await refusal('en');
-      expect(toast).toHaveBeenLastCalledWith('Microphone access is blocked. Allow it in your device settings to speak.', 'warning');
+      expect(toast).toHaveBeenLastCalledWith({ message: 'Microphone access is blocked. Allow it in your device settings to speak.', tone: 'warning' });
     } finally {
       delete win.__TAURI__;
     }
     await refusal('en');
-    expect(toast).toHaveBeenLastCalledWith('Microphone access is blocked. Allow it in your browser to speak.', 'warning');
+    expect(toast).toHaveBeenLastCalledWith({ message: 'Microphone access is blocked. Allow it in your browser to speak.', tone: 'warning' });
   });
 
   it('leaving the till while recording frees the microphone and transcribes nothing', async () => {
@@ -314,7 +317,7 @@ describe('SpeakKey: without connection', () => {
     expect(k.button().attributes('title')).toBe('Sin conexión: para hablar con el asistente hace falta internet.');
     await k.press();
     expect(voice.getUserMedia).not.toHaveBeenCalled();
-    expect(toast).toHaveBeenCalledWith('Sin conexión: para hablar con el asistente hace falta internet.', 'warning');
+    expect(toastWarning).toHaveBeenCalledWith('Sin conexión: para hablar con el asistente hace falta internet.');
 
     online.mockReturnValue(true);
     window.dispatchEvent(new Event('online'));
@@ -338,7 +341,7 @@ describe('SpeakKey: without connection', () => {
     await k.press();
     expect(voice.released).toHaveBeenCalled();
     expect(k.transcriptions()).toEqual([]);
-    expect(toast).toHaveBeenCalledWith('Sin conexión: para hablar con el asistente hace falta internet.', 'warning');
+    expect(toastWarning).toHaveBeenCalledWith('Sin conexión: para hablar con el asistente hace falta internet.');
     expect(k.button().text()).toBe('Hablar');
     expect(k.button().attributes('aria-disabled')).toBe('true');
   });
@@ -361,15 +364,15 @@ describe("SpeakKey: base's dictation", () => {
   it("says each of base's reasons with the till's own text", async () => {
     const dictation = fakeDictation();
     await key();
-    for (const [reason, text, color] of [
+    for (const [reason, text, tone] of [
       ['denied', 'El acceso al micrófono está denegado. Permítelo en tu navegador para hablar.', 'warning'],
       ['deniedInApp', 'El acceso al micrófono está denegado. Permítelo en los ajustes del dispositivo para hablar.', 'warning'],
       ['tooLong', 'La grabación es demasiado larga: di algo más corto.', 'warning'],
       ['empty', 'No se ha oído nada. Inténtalo de nuevo más cerca del micrófono.', 'warning'],
-      ['failed', 'No se ha podido transcribir el audio. Inténtalo de nuevo.', 'danger'],
+      ['failed', 'No se ha podido transcribir el audio. Inténtalo de nuevo.', 'error'],
     ] as const) {
       dictation.problem(reason);
-      expect(toast).toHaveBeenLastCalledWith(text, color);
+      expect(toast).toHaveBeenLastCalledWith({ message: text, tone });
     }
     expect(toast).toHaveBeenCalledTimes(5);
   });
@@ -382,7 +385,7 @@ describe("SpeakKey: base's dictation", () => {
     await k.press();
     expect(dictation.cancel).toHaveBeenCalledTimes(1);
     expect(dictation.toggle).not.toHaveBeenCalled();
-    expect(toast).toHaveBeenCalledWith('Sin conexión: para hablar con el asistente hace falta internet.', 'warning');
+    expect(toastWarning).toHaveBeenCalledWith('Sin conexión: para hablar con el asistente hace falta internet.');
   });
 
   it("offline and not recording, a tap reaches neither base's toggle nor its cancel", async () => {
@@ -391,6 +394,6 @@ describe("SpeakKey: base's dictation", () => {
     const k = await key();
     await k.press();
     expect([dictation.toggle.mock.calls.length, dictation.cancel.mock.calls.length]).toEqual([0, 0]);
-    expect(toast).toHaveBeenCalledWith('Sin conexión: para hablar con el asistente hace falta internet.', 'warning');
+    expect(toastWarning).toHaveBeenCalledWith('Sin conexión: para hablar con el asistente hace falta internet.');
   });
 });

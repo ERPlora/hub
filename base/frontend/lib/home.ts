@@ -1,5 +1,5 @@
 // The rules of the Home the browser applies (the server already ordered, filtered and counted): the heading,
-// the fold of «Finish setting up your business», the blocking strip's steps, a panel's data → what it paints,
+// the fold of «Finish setting up your business», the steps that block invoicing, a panel's data → what it paints,
 // the panels this browser keeps on, and «My apps» in the order this browser opens them.
 import { formatDateTime, formatMoney, type Money } from '@erplora/ui/components';
 
@@ -101,7 +101,7 @@ export function checklistView(status: SetupStatus | undefined, options: Checklis
   return { total, done, rows, hidden: items.length - rows.length, complete, empty };
 }
 
-/** The ⛔ steps still pending, while the server counts some: what the blocking strip names. */
+/** The ⛔ steps still pending, while the server counts some: what «You cannot issue invoices yet» names. */
 export function blockingItems(status: SetupStatus | undefined): SetupItem[] {
   if (!status || status.blocking_pending <= 0) return [];
   return status.items.filter((item) => item.level === 'legal' && item.state === 'pending');

@@ -16,7 +16,7 @@
 // Nothing about money is decided here.
 import { InlineFeedback } from '@erplora/ui/components';
 import { ApiError, type OutputOf, useCommand, useLive } from '@erplora/ui/sdk';
-import { AppPage, toast, toastError, toastSuccess, useSession } from '@erplora/ui/shell';
+import { AppPage, toast, toastError, toastSuccess, toastWarning, useSession } from '@erplora/ui/shell';
 import { IonButton, IonSpinner } from '@ionic/vue';
 import { computed, onBeforeUnmount, onMounted, shallowRef, useTemplateRef, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
@@ -153,7 +153,7 @@ async function linkCustomer(orderId: string, snapshot: CustomerSnapshot | null):
   try {
     await link.run({ order_id: orderId, customer_id: snapshot?.customer_id ?? null });
   } catch (error) {
-    void toastError(wordsOf(error, 'sale.pos.customerLinkFailed'));
+    toastError(wordsOf(error, 'sale.pos.customerLinkFailed'));
   }
 }
 
@@ -170,12 +170,12 @@ async function loadCustomer(orderId: string): Promise<void> {
     const card = await cardOf.run({ id: linked.customer_id });
     if (till.orderId.value === orderId) customer.value = snapshotOf(card, locale.value);
   } catch (error) {
-    void toastError(wordsOf(error, 'sale.pos.customerLoadFailed'));
+    toastError(wordsOf(error, 'sale.pos.customerLoadFailed'));
   }
 }
 
 function askCustomer(): void {
-  void toast(t('sale.pos.customerRequiredCharge'), 'warning');
+  toastWarning(t('sale.pos.customerRequiredCharge'));
   choosingCustomer.value = true;
 }
 
@@ -241,7 +241,7 @@ async function pickProduct(product: ProductOut): Promise<void> {
   try {
     groups = (await groupsOf.run({ product_id: product.id })).groups;
   } catch (error) {
-    void toastError(wordsOf(error, 'sale.pos.options.loadFailed'));
+    toastError(wordsOf(error, 'sale.pos.options.loadFailed'));
     return;
   }
   if (!groups.length) return till.addProduct(product, staff.value.id);
@@ -303,7 +303,7 @@ async function pickService(service: ServiceSaleOut): Promise<void> {
     return;
   }
   const done = await till.addService(service, staff.value.id);
-  if (!done.ok) void toastError(done.message);
+  if (!done.ok) toastError(done.message);
 }
 
 const addPricedService = (cents: number) => {
@@ -395,7 +395,7 @@ function park(label: string): void {
       const done = await till.park(label);
       if (done.ok) {
         clearScreen();
-        void toastSuccess(t('sale.pos.parkedToast', { name: label }));
+        toastSuccess(t('sale.pos.parkedToast', { name: label }));
       }
       return done;
     },
@@ -440,10 +440,10 @@ async function openLinked(id: string): Promise<void> {
   try {
     const linked = await checkOf.run({ order_id: id });
     if (linked.status === 'open') resume(linked);
-    else void toastError(t('sale.pos.linkedCheckGone'));
+    else toastError(t('sale.pos.linkedCheckGone'));
   } catch (error) {
     const gone = error instanceof ApiError && error.status === 404;
-    void toastError(gone ? t('sale.pos.linkedCheckGone') : wordsOf(error, 'sale.pos.linkedCheckGone'));
+    toastError(gone ? t('sale.pos.linkedCheckGone') : wordsOf(error, 'sale.pos.linkedCheckGone'));
   }
 }
 
@@ -491,13 +491,13 @@ async function sendRound(rush: boolean): Promise<boolean> {
     const words = notPrinted ? t('sale.pos.kitchen.sentNotPrinted', { n: sent.round ?? '' }) : t('sale.pos.kitchen.sent', { n: sent.round ?? '' });
     // At the bottom it would lie over what comes next, and a tap there would fall on the notice: «Charge» after
     // «Send order» (hub#748), the last row of keys of the sheet when «Charge» itself sent the round (hub#732).
-    void toast(words, notPrinted ? 'warning' : 'success', notPrinted ? 4500 : undefined, undefined, undefined, 'top');
+    toast({ message: words, tone: notPrinted ? 'warning' : 'success', position: 'top' });
     return true;
   }
   if (sent.code && NOTHING_TO_SEND.has(sent.code)) return true;
   // hub#755: the cart stays to try again, and at the bottom the notice would lie over «Charge»: a tap there would
   // fall on the notice and send nothing.
-  void toast(sent.message, 'danger', 4500, undefined, undefined, 'top');
+  toastError(sent.message, { position: 'top' });
   return false;
 }
 
@@ -529,7 +529,7 @@ function onCharged(sale: SaleOut, lineIds: readonly string[]): void {
   } else {
     marks.value = [];
   }
-  if (sale.printed?.queued) void toastSuccess(t('sale.document.queued', { printer: sale.printed.printer ?? '' }));
+  if (sale.printed?.queued) toastSuccess(t('sale.document.queued', { printer: sale.printed.printer ?? '' }));
   documentDuplicate.value = !!sale.printed?.queued;
   documentSaleId.value = sale.id;
   documentOpen.value = true;

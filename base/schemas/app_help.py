@@ -11,7 +11,8 @@ class AppHelpIn(Schema):
 
 
 class HelpScreenOut(Schema):
-    """One tab of the module: its menu entry and its section of the WORKBOOK, in markdown."""
+    """One tab of the module: its menu entry and, in ``text``, the summary of its section of the WORKBOOK (what goes
+    before the section's first window), in markdown."""
 
     id: str
     title: str

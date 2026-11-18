@@ -19,9 +19,11 @@
 // behind them is the Python suite's (`apps/verifactu/tests`). What the run makes is removed after it.
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, api, login, openApps, psql, shot, shown } from './helpers';
+import { A, api, login, psql, shot, shown } from './helpers';
 import { cleanInvoices, ensureIssuer, FLOW_VIEWPORTS, issuedIds, snapshotSeries } from './invoice-helpers';
 import { stamp } from './sale-helpers';
+import { toastSaying } from './toast-helpers';
+import { openApps } from './topbar';
 
 const RUN = stamp();
 const STARTED = new Date().toISOString();
@@ -180,7 +182,7 @@ test('VERIFACTU-F24: a rejected record says what to do and «Correct» seals a n
   const dialog = confirmation(page, `Correct the record of ${record.invoice_number}?`);
   await expect(dialog).toBeVisible();
   await dialog.locator('ion-button', { hasText: 'Correct' }).click();
-  await expect(page.locator('ion-toast').filter({ hasText: `Correction of ${record.invoice_number} sealed` })).toBeVisible();
+  await expect(toastSaying(page, `Correction of ${record.invoice_number} sealed`)).toBeVisible();
   const rows = psql(`select status || ':' || correction from verifactu_record where invoice_number = '${record.invoice_number}' order by sequence`);
   expect(rows.split('\n')).toEqual(['rejected:false', 'pending:true']);
 });
@@ -197,7 +199,7 @@ test('VERIFACTU-F30: «Cancel record» asks why before sealing the cancellation'
   });
   await dialog.locator('[data-testid=verifactu-cancel-reason] textarea').fill('e2e duplicated ticket');
   await dialog.locator('[data-testid=verifactu-cancel-submit]').click();
-  await expect(page.locator('ion-toast').filter({ hasText: `Cancellation of ${record.invoice_number} sealed` })).toBeVisible();
+  await expect(toastSaying(page, `Cancellation of ${record.invoice_number} sealed`)).toBeVisible();
 });
 
 test('VERIFACTU-F20, F21, F22: the queue lists what is not in the AEAT; «Process queue» and «Retry» answer', async ({ page, context }) => {
@@ -218,7 +220,7 @@ test('VERIFACTU-F20, F21, F22: the queue lists what is not in the AEAT; «Proces
   });
 
   await queue.locator(`[data-testid=verifactu-queue-row-${record.id}-retry]`).first().click();
-  await expect(page.locator('ion-toast').filter({ hasText: `${record.invoice_number} goes out with the next pass.` })).toBeVisible();
+  await expect(toastSaying(page, `${record.invoice_number} goes out with the next pass.`)).toBeVisible();
   await flowShots(page, 'F22', async (p) => {
     await seen(shown(p).locator('[data-testid=verifactu-queue-row]').filter({ hasText: record.invoice_number }).first());
   });
@@ -335,7 +337,7 @@ test('VERIFACTU-F09–F12: Settings in two columns on a desk; back to testing, t
     await seen(back);
   });
   await back.locator('ion-button', { hasText: 'Back to testing' }).click();
-  await expect(page.locator('ion-toast').filter({ hasText: 'Your business is back in the test environment.' })).toBeVisible();
+  await expect(toastSaying(page, 'Your business is back in the test environment.')).toBeVisible();
   await expect(view.locator('[data-testid=verifactu-settings-environment]')).toContainText('Testing (AEAT test)');
 
   // F10: the connection test presents nothing and says what is missing.
@@ -355,7 +357,7 @@ test('VERIFACTU-F09–F12: Settings in two columns on a desk; back to testing, t
   expect(invoiceId).not.toBe('');
   issuedIds.add(invoiceId);
   expect(psql(`select environment from verifactu_record where invoice_id = '${invoiceId}'`)).toBe('testing');
-  await expect(page.locator('ion-toast').filter({ hasText: 'Test invoice' })).toBeVisible();
+  await expect(toastSaying(page, 'Test invoice')).toBeVisible();
   await flowShots(page, 'F11', async (p) => {
     await seen(shown(p).locator('[data-testid=verifactu-settings-test-invoice]'));
   });
