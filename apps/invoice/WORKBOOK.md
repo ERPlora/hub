@@ -978,7 +978,7 @@ Recibir el emisor del SaaS (`invoice.sync_issuer`) no es de ningún papel: solo 
     se ponen en cola en el bloqueo de esa serie y la segunda contesta lo de la primera (test con hilos);
     `platform_ref` es único en la base de datos.
   - **Entorno**: el registro va al entorno de la AEAT del despliegue (`ERPLORA_ENVIRONMENT=prod` →
-    producción; `pre` → pruebas; `verifactu.queries.effective_environment`), y su interruptor está fijo
+    producción; `pre` → pruebas; `verifactu.queries.route.effective_environment`), y su interruptor está fijo
     (409 `verifactu.platform_fixed`).
   - **Salud** (`platform_health`, la puerta `/health`): «listo» solo con el emisor configurado, VeriFactu
     activo y, con `ERPLORA_ENVIRONMENT=prod`, el envío real abierto (`production_open` de

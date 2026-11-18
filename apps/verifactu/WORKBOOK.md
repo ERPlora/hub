@@ -1099,12 +1099,12 @@ que manda la cuenta (`verifactu.sync_config`) no es de ningún papel: solo del s
 
 `apps.py`, `models.py` (`Config`, `OwnCertificate`, `Chain`, `SendControl`, `Record`, `Event`, `AeatRecord`),
 `migrations/`,
-`schemas.py`, `services.py`, `queries.py`, `api.py`, `live.py`, `events.py`, `admin.py`, `locale/`,
+`schemas.py`, `services.py`, `queries/`, `api.py`, `live.py`, `events.py`, `admin.py`, `locale/`,
 `frontend/` y, puros y sin ORM: `chain.py` (formatos, huella, QR), `envelope.py` (el XML: `RegistroAlta`,
 `RegistroAnulacion`, el sobre y la consulta), `xsd.py` (validación con los esquemas de `xsd/`), `aeat.py`
 (lectura de las respuestas de la AEAT y de la consulta), `gateway.py` (cliente de la pasarela del SaaS),
 `certificates.py` (abre e inspecciona el certificado propio y lo cifra y descifra; la fila la leen y escriben
-`queries.py` y `services.py`) y
+`queries/` y `services.py`) y
 `producer.py` (los datos del productor que declara la declaración responsable). Un `tests/test_<fichero>.py`
 por fichero, más `test_xsd.py` contra los esquemas reales, `test_integration_invoice.py` (Facturación real,
 sin dobles), `test_concurrency.py` (sesiones reales en hilos; también una emisión cuyo cerrojo de cadena no
@@ -1116,13 +1116,13 @@ llega a tiempo y queda «pendiente») y `test_notifications.py` (escribir en el 
 («Set up VeriFactu» / «Configura VeriFactu», `required=True` → «Importante» en pruebas, gh:hub#1726; ⛔ «Necesario
 para facturar» donde `environment` de su fila es `production`, por `LEGAL_IN_PRODUCTION` de `base/home.py`: el nivel
 es de `base`), sobre `verifactu.config.get` con `route_ready_for_production` (`not _route_sending_problem(config,
-production, scope)` sobre la vía que tendría en producción, `queries.sending_route`: certificado propio vigente que
+production, scope)` sobre la vía que tendría en producción, `queries.route.sending_route`: certificado propio vigente que
 este servidor abre o, sin él, la vía ERPlora abierta en el servidor (`erplora_route.closed`) con el otorgamiento
 aprobado; ya en producción, la vía fijada, sin mirar el interruptor; la exención del hub de ERPlora incluida; lo que le
 falte al servidor no cuenta, no es tarea del negocio),
 permiso `verifactu.configure`, ruta `/verifactu/config`, `refresh_on` `verifactu.config.changed`, `countries`
 `(SPAIN,)` (`apps.py`; hub#682: un negocio de otro país no lo ve, ni su muro en producción; uno sin país cuenta como
-España por `base.business.country_or_market`, que también lee `queries.outside_spain`: una sola regla). **Paneles** (permiso
+España por `base.business.country_or_market`, que también lee `queries.country.outside_spain`: una sola regla). **Paneles** (permiso
 `verifactu.view_record`, `refresh_on` = lo que `live.py` re-ejecuta): `pending` (kpi de
 `verifactu.stats.compliance_summary.pending_count`, de serie), `contingency` (stat de `contingency_summary`,
 `queued_count` y `severity`), `by_status` (bar-list de `records_by_status`) y `events` (componente
@@ -1259,7 +1259,7 @@ estricto en el test hasta ERPlora/live#76; sin «la cuenta y», la misma frase l
     certificado propio (VERIFACTU-F02) viaja descifrado en cada llamada y la pasarela no lo guarda; para
     presentarlo, su clave PEM pasa unos milisegundos por disco, en dos ficheros `0600` de un directorio
     temporal privado del SaaS que se borra en cuanto TLS los ha leído. `hub` nombra al negocio
-    (`queries.presenter`, el mismo para el envío, la consulta y la prueba de conexión): siempre el slug de su host
+    (`queries.route.presenter`, el mismo para el envío, la consulta y la prueba de conexión): siempre el slug de su host
     (`ctx.scope.key`), sea cual sea el NIF del registro. El hub de ERPlora (`PLATFORM_HUB_SLUG`) solo guarda y
     presenta los registros de ERPlora (emisor `PLATFORM_ISSUER_TAX_ID`). En `hub` la pasarela acepta un UUID o
     un slug válido de `live.slugs` (saas#25). Solo pide el otorgamiento aprobado en producción
@@ -1321,27 +1321,27 @@ estricto en el test hasta ERPlora/live#76; sin «la cuenta y», la misma frase l
 - **Producción**: además de lo de VERIFACTU-F08, el despliegue tiene que ser `prod` (`ERPLORA_ENVIRONMENT`; en
   `pre` nunca) y el servidor tener `VERIFACTU_PRODUCTION_ENABLED` a verdadero. Cerrado de nuevo, ningún registro de
   producción sale (esperan con `production_closed`, sin llamar a la pasarela) y no se emite nada nuevo en producción
-  (`queries.route_problem`: primero lo que le falta a la vía, después lo del servidor, pasarela y apertura). Los workers solo trabajan contra la AEAT de pruebas; abrir la remisión real y los certificados
+  (`queries.route.route_problem`: primero lo que le falta a la vía, después lo del servidor, pasarela y apertura). Los workers solo trabajan contra la AEAT de pruebas; abrir la remisión real y los certificados
   queda bajo la supervisión de Ioan (working-rules §15).
 - **Hub de plataforma de ERPlora** (PLAN-SAAS §4; Facturación, INVOICE-F23): el hub `PLATFORM_HUB_SLUG` emite las
   facturas de ERPlora a sus clientes. Sus registros van al entorno de la AEAT del despliegue, diga lo que diga su
-  configuración (`queries.effective_environment`: `prod` con la remisión real abierta → producción; si no, pruebas;
+  configuración (`queries.route.effective_environment`: `prod` con la remisión real abierta → producción; si no, pruebas;
   ya en producción, sigue en producción con el servidor cerrado y sus registros esperan, para que sus facturas reales
   no pasen nunca a la cadena de pruebas; lo usan `record.create` y la factura de prueba); su interruptor está fijo (`go_live` y `back_to_testing` → 409 `verifactu.platform_fixed`) y
   `manage.py create_platform_hub` alinea su configuración con `verifactu.config.follow_deployment` (409
   `verifactu.platform_only` en cualquier otro negocio). El sello de ERPlora presenta sus propios registros sin
-  otorgamiento (`queries.route_problem`: el hub de plataforma **y** el emisor de Facturación `PLATFORM_ISSUER_TAX_ID`):
+  otorgamiento (`queries.route.route_problem`: el hub de plataforma **y** el emisor de Facturación `PLATFORM_ISSUER_TAX_ID`):
   ERPlora no se representa a sí misma. Un negocio cualquiera que teclee ese NIF como emisor sigue necesitando su
   otorgamiento aprobado (saas#2524): sin él, en producción no se emite nada nuevo; la pasarela del SaaS lo rechaza
   igual (`fiscal_gateway`, 409).
 - **Hub de demostración** (PLAN-SAAS §3.5; `base.Hub.is_demo`, que lee `base.operations.is_demo_hub`): nunca pasa a
   producción (`go_live` → 409 `verifactu.go_live_forbidden`) y todo lo que sella va a la AEAT de pruebas
-  (`queries.effective_environment`), diga lo que diga su configuración.
+  (`queries.route.effective_environment`), diga lo que diga su configuración.
 
 ### La cola y el envío
 
 - La cola **son los registros** (`pending`, `sent`, `accepted`, `accepted_with_errors`, `rejected`): sin tabla
-  aparte. Espera por la ruta solo cuando no puede presentar (`queries.route_problem`: certificado propio que falta
+  aparte. Espera por la ruta solo cuando no puede presentar (`queries.route.route_problem`: certificado propio que falta
   o caducó, otorgamiento sin aprobar en producción, o el servidor sin pasarela o cerrado). `SendControl` (una fila por `(NIF, entorno)`) guarda `next_send_at` (`TiempoEsperaEnvio` de la última
   respuesta) y es el cerrojo del envío: la pasada la toma con `select_for_update(skip_locked=True)`, así que dos
   pasadas nunca mandan la misma cadena y el sellado (que bloquea `Chain`) no espera a la red.
@@ -1382,7 +1382,7 @@ estricto en el test hasta ERPlora/live#76; sin «la cuenta y», la misma frase l
   siguiente. La pasada de un negocio ve solo sus registros y los presenta con su slug. También se sirve a un negocio
   que se fue y conserva su BD (`base.services.provisioning.hubs_to_serve`), porque lo que le queda por enviar tiene que llegar a
   la AEAT. La pasada del hub de ERPlora (`PLATFORM_HUB_SLUG`) solo ve los registros de ERPlora y los presenta como
-  `erplora` (`queries.presenter`, hub#1130).
+  `erplora` (`queries.route.presenter`, hub#1130).
 - La consulta a la AEAT (VERIFACTU-F27 y F28) sigue todas sus páginas.
 - Los importes agrupan los millares desde cuatro cifras (hub#1090): «1.234,56 €» en español en la lista y la ficha
   de un registro y en la lista del admin. El XML y la huella de la AEAT llevan el importe sin millares, como pide su
@@ -1478,7 +1478,7 @@ necesitan para el soporte». Por eso:
 15. **VeriFactu solo vale en España**: el RD
     1007/2023 y la Orden HAC/1177/2024 obligan a quien tributa en España (Canarias, Ceuta y Melilla son regiones de
     ES). Un negocio con otro país en su cuenta (`base.Hub.country`, que lee `base.business.get`) se comporta como con
-    la app apagada (`queries.outside_spain`, `refuse_outside_spain` → `AppInactive`): sus facturas salen
+    la app apagada (`queries.country.outside_spain`, `refuse_outside_spain` → `AppInactive`): sus facturas salen
     «unavailable» (nunca un 409 que las deshaga), la reacción no sella, la cola no envía (`blockers` →
     `outside_spain`), la factura no pinta recibo (`by_invoice` vacío) y el veto de apagar no lo atrapa
     (`disable_refusal` → `None`). Sin país (una demo), es España. El hub propio de ERPlora lee su país como los demás,
@@ -1515,7 +1515,7 @@ necesitan para el soporte». Por eso:
     enviando y anulando, porque la AEAT solo acepta una anulación con el mismo sello. El hub de ERPlora queda fuera.
     `verifactu.config.get` lo expone en `erplora_route_available` para que la pantalla oculte la vía. Volver a abrirla
     es solo cambiar el ajuste.
-19. **La vía se calcula, no se elige** (`erplora_route.route_for`, que lee `queries.sending_route`): en pruebas, con
+19. **La vía se calcula, no se elige** (`erplora_route.route_for`, que lee `queries.route.sending_route`): en pruebas, con
     un certificado propio cargado y vigente, el certificado; sin él, el sello de ERPlora. `go_live` guarda en
     `Config.route` la de ese momento y, desde entonces, esa manda en producción para enviar, consultar, anular y probar
     la conexión, aunque el certificado se suba, se quite o caduque: lo presentado con un sello se anula con el mismo,

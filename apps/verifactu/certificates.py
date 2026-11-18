@@ -15,7 +15,7 @@ SaaS's gateway that presents with it (``fiscal_gateway/seal.py``):
 ``seal`` keeps the .p12 and its password together, encrypted with Fernet (AES-128-CBC + HMAC-SHA256, from
 ``cryptography``) under ``settings.FISCAL_CERTIFICATE_KEY``; ``open`` gives them back, or ``CertificateUnreadable``
 when the key is missing or is not the one that sealed them (rotated). Nothing here touches the database: the
-row (``OwnCertificate``) is read and written by ``queries.py`` and ``services.py``. Nothing of the certificate
+row (``OwnCertificate``) is read and written by ``queries/`` and ``services.py``. Nothing of the certificate
 (the .p12, its password, its key) reaches a message, a log or a traceback: errors name what failed only.
 """
 
