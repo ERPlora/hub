@@ -7,7 +7,8 @@ import { join } from 'node:path';
 
 import { expect, type Page, test } from '@playwright/test';
 
-import { A, api, ARTIFACTS, emptyOfTemplateData, horizontalOverflow, hostPage, shot, shown, untilStill } from './helpers';
+import { A, api, ARTIFACTS, horizontalOverflow, hostPage, shot, shown, untilStill } from './helpers';
+import { emptyOfTemplateData } from './business';
 
 // A control that never comes fails in half a minute and says which, instead of eating the whole test.
 test.use({ actionTimeout: 30_000 });

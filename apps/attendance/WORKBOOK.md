@@ -499,7 +499,7 @@ Los avisos nunca llevan la posición ni el motivo de una corrección (datos pers
 - La distancia al local la calcula el servidor con `geopy` (`geodesic`, WGS-84) a partir de la
   posición que manda el dispositivo; el dispositivo nunca dice si está dentro ni si es personal: eso
   sale de `services.device_source(ctx)`, que lee el modo del dispositivo de la sesión
-  (`base.queries.device_of(ctx.request)`, el de la cookie `hub_device`; BASE-F62): `personal` solo si
+  (`base.queries.devices.device_of(ctx.request)`, el de la cookie `hub_device`; BASE-F62): `personal` solo si
   `base` lo conoce y así está marcado; un navegador desconocido o una llamada sin navegador (API key,
   sistema), compartido. La pantalla lo sigue en vivo con `base.device.current`. El radio y las
   coordenadas exactas solo valen para quien ficha lo suyo (`mine` de `_target`): fichar a otra persona

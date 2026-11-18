@@ -5,6 +5,7 @@
 // negative); decimals (`quantity`, rates) are JSON strings on the way out («2.000», «21.00»); dates are ISO
 // `YYYY-MM-DD`.
 import type { Page } from '../../../frontend/sdk-types';
+import type { DocumentIssuerOut } from './document-issuer';
 
 export type SortDir = 'asc' | 'desc';
 
@@ -119,14 +120,10 @@ export interface InvoiceRowOut {
   can_substitute: boolean;
 }
 
-export interface InvoiceOut extends InvoiceRowOut {
+export interface InvoiceOut extends InvoiceRowOut, DocumentIssuerOut {
   series_id: string;
   sequence: number;
   operation_date: string;
-  issuer_name: string;
-  issuer_tax_id: string;
-  issuer_address: string;
-  issuer_country: string;
   customer_id: string | null;
   customer_address: string;
   customer_country: string;

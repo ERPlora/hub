@@ -10,7 +10,7 @@
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
 import { A, api, capture, EMPLOYEE, horizontalOverflow, hostPage, login, painted, psql, shown, untilStill } from './helpers';
-import { rowAction } from './service-helpers';
+import { offersRowAction, rowAction } from './service-helpers';
 import { discardChanges } from './unsaved-back-helpers';
 
 const STAMP = Date.now().toString(36).toUpperCase();
@@ -179,7 +179,7 @@ test('MODIFIER-F01: the employee reads the groups and their sheet, with nothing 
     await shown(page).locator('[data-testid=modifier-groups-search] input').fill(STAMP);
     await expect(groupRow(page, made.id)).toBeVisible();
     await expect(shown(page).locator('[data-testid=modifier-groups-add]')).toHaveCount(0);
-    await expect(shown(page).locator(`[data-testid=modifier-groups-row-${made.id}-delete]`)).toHaveCount(0);
+    expect(await offersRowAction(page, 'modifier-groups', made.id, 'delete')).toBe(false);
     await groupRow(page, made.id).locator('[role=cell]').first().click();
     await expect(sheet(page)).toBeVisible();
     await expect(sheet(page).locator('[data-testid^=modifier-sheet-options-row-]')).toContainText('Rare');

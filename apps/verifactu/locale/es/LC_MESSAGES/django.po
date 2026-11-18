@@ -993,10 +993,6 @@ msgstr "certificado cifrado"
 msgid "own certificate"
 msgstr "certificado propio"
 
-#: services.py
-msgid "There is no valid certificate loaded: upload it in VeriFactu → Configuration → My certificate."
-msgstr "No hay ningún certificado válido cargado: súbelo en VeriFactu → Configuración → Mi certificado."
-
 #: models.py
 msgid "your own certificate cannot be opened on this server: upload it again"
 msgstr "tu certificado propio no se puede abrir en este servidor: vuelve a subirlo"
@@ -1021,15 +1017,23 @@ msgstr "El certificado es de %(holder)s, no del emisor de este negocio, %(issuer
 msgid "The certificate expired on %(date)s: upload a valid one."
 msgstr "El certificado caducó el %(date)s: sube uno vigente."
 
-#: services.py
+#: certificates.py
 msgid "The file is not a .p12/.pfx certificate that this password opens."
 msgstr "El fichero no es un certificado .p12/.pfx que abra esta contraseña."
 
-#: services.py
+#: certificates.py
 msgid "The file does not hold a certificate and its private key."
 msgstr "El fichero no contiene un certificado con su clave privada."
 
-#: services.py
+#: certificates.py
+msgid ""
+"No authority issued this certificate (it is self-signed), so the AEAT will not accept it. Use your business's "
+"electronic certificate issued by a recognised authority, for example the FNMT."
+msgstr ""
+"Este certificado no lo ha emitido ninguna entidad (es autofirmado), así que la AEAT no lo aceptará. Usa el "
+"certificado electrónico de tu negocio emitido por una entidad reconocida, por ejemplo la FNMT."
+
+#: certificates.py
 msgid "The certificate does not allow client authentication, so it cannot connect to the AEAT."
 msgstr "El certificado no permite la autenticación de cliente, así que no puede conectar con la AEAT."
 
@@ -1295,9 +1299,6 @@ msgid "ERPlora does not file on behalf of businesses for now: file with your own
 msgstr "De momento ERPlora no presenta por cuenta de los negocios: presenta con tu propio certificado."
 
 #: erplora_route.py
-msgid ""
-"To go live, upload your own certificate and choose it as the sending route: ERPlora does not file on behalf of "
-"businesses for now."
+msgid "To go live, upload your own certificate: ERPlora does not file on behalf of businesses for now."
 msgstr ""
-"Para pasar a producción, sube tu propio certificado y elígelo como vía de envío: de momento ERPlora no presenta "
-"por cuenta de los negocios."
+"Para pasar a producción, sube tu propio certificado: de momento ERPlora no presenta por cuenta de los negocios."

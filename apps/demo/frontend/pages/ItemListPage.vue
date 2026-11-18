@@ -4,9 +4,9 @@
 // every state of the screen, the «Updated» column (shared formatter) and, for whoever can manage,
 // the live figures above it.
 // Nothing here refetches: a write anywhere in this business re-runs the queries on the server and
-// the new results arrive through the stream. On a phone «Load more» grows ONE live window from the
-// first row (a bigger `limit`, `offset` 0), so every row on screen stays live; a desk pages one
-// page at a time. That window never passes the server's longest page (`PAGE_MAX`): past it a phone
+// the new results arrive through the stream. The cards (and a phone) grow ONE live window from the
+// first row at the end of their scroll (a bigger `limit`, `offset` 0), so every row on screen stays
+// live; a desk list pages one page at a time. That window never passes the server's longest page (`PAGE_MAX`): past it a phone
 // pages too (`maxWindow`).
 import { DataTable, EmptyState, formatDateTime, InlineFeedback } from '@erplora/ui/components';
 import { type InputOf, type OutputOf, useLive } from '@erplora/ui/sdk';
@@ -34,7 +34,7 @@ const statusFilter = ref<StatusFilter>('all');
 /** 0-based, as the table counts. */
 const page = ref(0);
 const pageSize = ref(50);
-/** Pages the live window holds from `page` on: 1 on a desk; each «Load more» on a phone adds one. */
+/** Pages the live window holds from `page` on: 1 for a desk list; each end of the cards adds one. */
 const windowPages = ref(1);
 
 /** Shows `n` alone (the desk pager, a new search or page size, a crossed breakpoint). */

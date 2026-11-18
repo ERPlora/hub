@@ -11,7 +11,7 @@ import { A, api, EMPLOYEE, login, psql, shown } from './helpers';
 import { dialog, fill, pick } from './inventory-helpers';
 import { claim, fail, flowShots, forgetDevices } from './printing-helpers';
 import { shots, stamp } from './sale-helpers';
-import { rowAction } from './service-helpers';
+import { offersRowAction, rowAction } from './service-helpers';
 
 // One printer goes through every test, in order: a failure stops the rest instead of a new worker's names.
 test.describe.configure({ mode: 'serial' });
@@ -222,6 +222,6 @@ test('PRINTING-F03: the employee sees the printers without adding or editing', a
   await printersReady(page);
   await expect(shown(page).locator('[data-testid=printing-printers-add]')).toHaveCount(0);
   await expect(shown(page).locator('[data-testid=printing-printers-discover]')).toHaveCount(0);
-  await expect(shown(page).locator(`[data-testid=printing-printers-row-${till.id}-edit]`)).toHaveCount(0);
   await expect(shown(page).locator('[data-testid=printing-printers-row]').filter({ hasText: TILL })).toBeVisible();
+  expect(await offersRowAction(page, 'printing-printers', till.id, 'edit')).toBe(false);
 });

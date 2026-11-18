@@ -163,14 +163,14 @@ async function publishSite(): Promise<void> {
   });
   if (!asked) return;
   if (!(await saveNow())) {
-    void toastError(t('website.saveError'));
+    toastError(t('website.saveError'));
     return;
   }
   try {
     await publish.run({});
-    void toastSuccess(t('website.publish.done'));
+    toastSuccess(t('website.publish.done'));
   } catch {
-    void toastError(t('website.publish.error'));
+    toastError(t('website.publish.error'));
   }
 }
 
@@ -185,9 +185,9 @@ async function unpublishSite(): Promise<void> {
   if (!asked) return;
   try {
     await unpublish.run({});
-    void toastSuccess(t('website.unpublish.done'));
+    toastSuccess(t('website.unpublish.done'));
   } catch {
-    void toastError(t('website.unpublish.error'));
+    toastError(t('website.unpublish.error'));
   }
 }
 

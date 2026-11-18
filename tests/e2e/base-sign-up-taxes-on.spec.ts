@@ -3,7 +3,7 @@
 // screens and creates the business through its API as the panel does; the SaaS registers it in this Hub, the worker
 // makes its database, and the owner comes in through the SaaS:
 //   - a business of Spain, in 375x667, 820x1180 and 1440x900: Apps › «My apps» has Taxes, «Active» and «Mandatory in Spain», not
-//     chosen (it takes nothing of the plan's limit) and alone; in «Add apps» VeriFactu is «Off» with «Turn on». The
+//     chosen (it takes nothing of the plan's limit) and alone; in «Add apps» VeriFactu is «Off», its switch free. The
 //     Home asks «Turn on VeriFactu», never «Turn on Taxes»; «Your apps» still asks for an app (Taxes alone sells
 //     nothing), Spain's rates are in («Your taxes» done) and «Start with a business like yours» is offered;
 //   - a business of Portugal, in 1440: Taxes on, «Mandatory in Portugal»; no VeriFactu step, and «Your taxes» says its
@@ -12,8 +12,10 @@
 // flow: BASE-F63 BASE-F14 BASE-F01 BASE-F38 TAX-F16 TAX-F17
 import { expect, type Page, test } from '@playwright/test';
 
+import { expectSwitch } from './apps-switch-helpers';
 import { VIEWPORTS } from './assistant-card-helpers';
-import { api, appRow, login, settledCapture, shown, testid } from './helpers';
+import { api, appRow, login, shown, testid } from './helpers';
+import { settledCapture } from './screen';
 import { businessOnSaas, type SaasOwner, signUpOnSaas } from './saas-owner';
 import { STACK } from './stack';
 
@@ -95,13 +97,13 @@ test('BASE-F63 BASE-F14 BASE-F01 TAX-F16 — a business of Spain is born with Ta
     await expect(testid(page, 'apps-counter')).toHaveText('1 app turned on · 0 of 20 in your plan');
     await snap(page, 'ES-mine', size.label);
 
-    // «Add apps»: VeriFactu, mandatory in Spain, is off with «Turn on»: its owner turns it on.
+    // «Add apps»: VeriFactu, mandatory in Spain, is off and its switch moves: its owner turns it on.
     await page.goto(`${origin}/apps#all`);
     await testid(page, 'apps-search').locator('input').fill('VeriFactu');
     const verifactu = appRow(page, 'verifactu');
     await expect(verifactu.locator('[data-testid="apps-state"]')).toContainText('Off');
     await expect(verifactu.locator('[data-testid="apps-mandatory"]')).toContainText('Mandatory in Spain');
-    await expect(verifactu).toContainText('Turn on');
+    await expectSwitch(page, 'verifactu', { checked: false, disabled: false });
     await snap(page, 'ES-all', size.label);
 
     // BASE-F01, BASE-F38 — the Home: «Turn on VeriFactu», never «Turn on Taxes»; the template card is offered.

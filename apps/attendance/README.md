@@ -34,7 +34,7 @@ que queda en su historial y saca el mes en CSV. Ninguna jornada se borra y se co
 | `LiveAppConfig` | `kind = "app"`, icono `ion:finger-print-outline`, categoría `people`, gratuita (`premium = False`) |
 | Verticales | `hair_salon` y `restaurant` |
 | `requires` | `["staff"]`: la jornada es de una ficha de Personal (`staff.Member`) |
-| Usa de otras apps | Personal (fichas y nombres, también las dadas de baja); de la plataforma, la persona de la sesión (`base.HubUser`) y el modo del dispositivo (`base.queries.device_of`, BASE-F62); la pantalla Fichar sigue `base.device.current` |
+| Usa de otras apps | Personal (fichas y nombres, también las dadas de baja); de la plataforma, la persona de la sesión (`base.HubUser`) y el modo del dispositivo (`base.queries.devices.device_of`, BASE-F62); la pantalla Fichar sigue `base.device.current` |
 | La usan | ninguna app la requiere hoy; el Inicio pinta su panel «Fichados ahora» |
 | Pantallas | `/attendance/clock`, `/attendance/records` y `/attendance/settings` |
 | Operaciones | 10 consultas (`queries.py`) y 8 acciones (`services.py`), todas con `ai=`; 16 rutas en `/api/attendance/…`; 16 operaciones abiertas a las API keys |

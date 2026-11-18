@@ -10,6 +10,7 @@ import { cleanInventory, createProduct, type Product } from './inventory-helpers
 import {  } from './invoice-helpers';
 import { cleanSales, newestSaleOf, restoreDrawer, stamp } from './sale-helpers';
 import { cleanUp as cleanTaxes, createRule, FLOW_VIEWPORTS, freshCategory, horizontalOverflow, pickSelect, regionSaleContext, taxSettingsForm, wholeCountry } from './tax-helpers';
+import { toastSaying } from './toast-helpers';
 
 const RUN = stamp();
 let shirt: Product;
@@ -37,7 +38,7 @@ test('in the Canary Islands a category with only the national VAT is not charged
   const form = await taxSettingsForm(page);
   await pickSelect(page, form.locator('[data-testid=tax-settings-region]'), 'Canary Islands (IGIC)');
   await form.locator('[data-testid=tax-settings-save]').click();
-  await expect(page.locator('ion-toast').filter({ hasText: 'Tax region saved.' })).toBeVisible();
+  await expect(toastSaying(page, 'Tax region saved.')).toBeVisible();
   await expect(form.locator('[data-testid=tax-settings-save]')).toHaveAttribute('aria-disabled', 'true');
 
   // The till, as a cashier sells: the product found by its SKU. Its 21 % VAT never prices it here: no total.

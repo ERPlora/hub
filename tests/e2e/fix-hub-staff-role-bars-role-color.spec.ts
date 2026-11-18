@@ -7,7 +7,8 @@
 // Everything this file creates is named «E2E-ROLECOLOR …» and removed after it.
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
-import { A, api, capturedFitting, login, psql, shown } from './helpers';
+import { A, api, login, psql, shown } from './helpers';
+import { capturedFitting } from './screen';
 import { panelAdded, spanishContext, spanishHome } from './home-helpers';
 import { VIEWPORTS } from './inventory-helpers';
 import { stamp } from './sale-helpers';

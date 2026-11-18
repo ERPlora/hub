@@ -640,7 +640,7 @@ NOT_UNDONE_BY_A_ROLLBACK = {
     "apps.invoice.services._take_number": "numbers an invoice",
     "apps.kitchen.services.take_number": "numbers a kitchen ticket",
     "apps.payment.services._number": "numbers a payment",
-    "apps.sale.services._number": "numbers a sale",
+    "apps.sale.services.checkout._number": "numbers a sale",
     "apps.table.services._next_number": "numbers a table",
     "apps.task.services._next_number": "numbers a task",
     "base.images.keep_photo": "keeps a file under a new name",

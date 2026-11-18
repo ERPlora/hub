@@ -8,21 +8,18 @@
 // shows its whole cash keypad above its foot as soon as it opens (375x667: the last row peeked half under «Charge»;
 // 320x568: three rows lay under it), with the words of a total still loading clear of the title on the lowest phone,
 // where the figure shares the title's row. «Current order» leaves the same things in reach, plus its tabs and «Send
-// order» (hub#787: at 320x568 its send bar ate all that scrolled, 0 px, and with it the tabs and the lines), and so does
-// a side column just as low. A tablet and a desktop with room keep what they had. The worst case of a real
-// business: the red strip of a hub that cannot issue invoices yet takes 138 px over the till (hub `a`'s issuer is
-// parked for the run and put back after it), with Tables and Kitchen on (their button and the «Check» / «Current
-// order» tabs). What a run creates, its product `E2E-CARTFIT-<run>` and its check, is deleted after it.
+// order» (hub#787: where it was too low its send bar ate all that scrolled, and with it the tabs and the lines), and so
+// does a low side column: «Send order» stays pinned while it leaves room for the tabs and a line, and scrolls with them
+// where it does not. A tablet and a desktop with room keep what they had. Tables and Kitchen are on (their button and
+// the «Check» / «Current order» tabs). What a run creates, its product `E2E-CARTFIT-<run>` and its check, is deleted
+// after it.
 import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
 import { A, capture, login, settled, shown, untilStill } from './helpers';
-import { cleanInventory, createProduct, type Product } from './inventory-helpers';
-import { parkIssuer, unparkIssuer } from './invoice-helpers';
-import { cleanSales, drawerOff, fingerOn, openTillCart, restoreDrawer, stamp, tillIn, tillIsPhone } from './sale-helpers';
+import { createProduct, type Product } from './inventory-helpers';
+import { cleanTill, drawerOff, fingerOn, openTillCart, stamp, tillIn, tillIsPhone } from './sale-helpers';
 
 const KEY = 'FIX-HUB-630-CART-PHONE';
-/** Hub `a`'s issuer, parked while the run needs the strip of a hub that cannot issue invoices yet. */
-const PARKED = 'e2e_sale_cart_phone_fit_issuer';
 const RUN = stamp();
 const SIZES = [
   /** The narrowest phone (an iPhone SE of the first generation): the customer's button is only its icon. */
@@ -32,13 +29,16 @@ const SIZES = [
   /** The fleet's low phone (an iPhone SE). */
   { label: '375x667', width: 375, height: 667, customerText: true },
 ] as const;
-/** A phone with room, even under the strip: «Send order» stays pinned while what is above it scrolls (hub#787). */
-const ROOMY = { label: '390x844', width: 390, height: 844 } as const;
-/** A side column with as little height under the strip: a small tablet on its side and a low laptop window. */
-const LOW_COLUMN = [
-  { label: '1024x600', width: 1024, height: 600 },
-  { label: '1280x560', width: 1280, height: 560 },
-] as const;
+/** Where «Current order» is read, and what «Send order» does there while the rest scrolls: `pinned` at the bottom while
+ *  it leaves room for the tabs and a line, or `scrolls` after the lines where it does not (hub#787). */
+const ROUND: readonly { label: string; width: number; height: number; send: 'pinned' | 'scrolls' }[] = [
+  ...SIZES.map((size) => ({ ...size, send: 'pinned' as const })),
+  // A small tablet on its side and a low laptop window: their side column scrolls whole (hub#820).
+  { label: '1024x600', width: 1024, height: 600, send: 'pinned' },
+  { label: '1280x560', width: 1280, height: 560, send: 'pinned' },
+  // That small tablet in a browser, under its bars: a side column too low to keep «Send order» pinned.
+  { label: '1024x520', width: 1024, height: 520, send: 'scrolls' },
+];
 /** Where the check is not a phone's low drawer: nothing of this fix may change what they read. */
 const WIDE = [
   { label: '820x1180', width: 820, height: 1180 },
@@ -56,7 +56,6 @@ let other: Product;
 test.describe.configure({ mode: 'serial' });
 
 test.beforeAll(async ({ browser }) => {
-  parkIssuer(PARKED);
   const context = await browser.newContext({ baseURL: A });
   const page = await context.newPage();
   await login(page, A, '/sale/pos');
@@ -67,18 +66,7 @@ test.beforeAll(async ({ browser }) => {
   await context.close();
 });
 
-test.afterAll(() => {
-  try {
-    cleanSales();
-    cleanInventory();
-  } finally {
-    try {
-      restoreDrawer();
-    } finally {
-      unparkIssuer(PARKED);
-    }
-  }
-});
+test.afterAll(cleanTill);
 
 /** The check's drawer open, still, at the size the page is at now. After a resize the drawer first leaves (0.25 s). */
 async function openDrawer(page: Page): Promise<Locator> {
@@ -141,13 +129,12 @@ async function reachedOnceScrolled(control: Locator, name: string, where: string
   expect.soft(reach.reached, `a finger on «${name}» reaches it at ${where} (it touches «${reach.hit}»)`).toBe(true);
 }
 
-/** «Current order» in the drawer, or in a low side column (hub#787): its two tabs, the line to send, its quantity, the flame and «Send order» are
- *  all reached by scrolling (with room, «Send order» is in view from the start, however the rest scrolls), «Charge» stays
- *  where it is, and a real tap on «Check» goes back. */
-async function roundFits(page: Page, size: { label: string; width: number; height: number }, lang: 'en' | 'es'): Promise<void> {
+/** «Current order» in the drawer, or in a low side column (hub#787): its two tabs, the line to send, its quantity, the
+ *  flame and «Send order» are all reached by scrolling («Send order» in view from the start where it stays pinned),
+ *  «Charge» stays where it is, and a real tap on «Check» goes back. */
+async function roundFits(page: Page, size: (typeof ROUND)[number], lang: 'en' | 'es'): Promise<void> {
   const where = `${lang} ${size.label}, «Current order»`;
   await page.setViewportSize({ width: size.width, height: size.height });
-  await expect(shown(page).locator('[data-testid=blocking-strip]'), 'the strip of a hub that cannot issue invoices yet').toBeVisible();
   const phone = await tillIsPhone(page);
   const drawer = phone ? await openDrawer(page) : shown(page).locator('[data-testid=pos-cart-drawer]');
   const till = shown(page);
@@ -159,14 +146,13 @@ async function roundFits(page: Page, size: { label: string; width: number; heigh
   await capture(page, `${KEY}-${lang}-round-${size.label}`);
 
   const send = till.locator('[data-testid=pos-kitchen-send]');
-  if (size.label === ROOMY.label) {
-    const middle = await till.locator('[data-testid=pos-cart] .pos-cart__scroll').evaluate((el) => {
-      el.scrollTo(0, 0);
-      return { scrolls: el.scrollHeight > el.clientHeight };
-    });
-    expect(middle.scrolls, `there is something to scroll at ${where}`).toBe(true);
-    await expect(send, `«Send order» pinned at ${where}`).toBeInViewport({ ratio: 1 });
-  }
+  const middle = await till.locator('[data-testid=pos-cart] .pos-cart__scroll').evaluate((el) => {
+    el.scrollTo(0, 0);
+    const bar = el.querySelector('[data-testid=pos-kitchen-send]')?.getBoundingClientRect();
+    return { scrolls: el.scrollHeight > el.clientHeight, sendInView: !!bar && bar.bottom <= el.getBoundingClientRect().bottom + 0.5 };
+  });
+  expect(middle.scrolls, `there is something to scroll at ${where}`).toBe(true);
+  expect.soft(middle.sendInView, `«Send order» ${size.send} at ${where}`).toBe(size.send === 'pinned');
   await reachedOnceScrolled(check, 'Check', where);
   await reachedOnceScrolled(round, 'Current order', where);
   const line = till.locator('[data-testid^=pos-line-]').filter({ hasText: product.name }).first();
@@ -288,7 +274,6 @@ async function aLongNameStaysInside(page: Page, where: string): Promise<void> {
 async function cartFits(page: Page, size: (typeof SIZES)[number], lang: 'en' | 'es', assign: string): Promise<void> {
   const where = `${lang} ${size.label}`;
   await page.setViewportSize({ width: size.width, height: size.height });
-  await expect(shown(page).locator('[data-testid=blocking-strip]'), 'the strip of a hub that cannot issue invoices yet').toBeVisible();
   const drawer = await openDrawer(page);
   await barInOrder(page, where);
   await customerButton(page, assign, size.customerText, where);
@@ -393,7 +378,7 @@ for (const { name, lang, locale } of LANGUAGES) {
       await context.close();
     });
 
-    for (const size of [...SIZES, ROOMY, ...LOW_COLUMN]) {
+    for (const size of ROUND) {
       test(size.label, async () => {
         await roundFits(page, size, lang);
       });

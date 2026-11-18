@@ -10,11 +10,13 @@
 // way in into the PIN pad: base-access.spec.ts), and everything this file creates goes with it (`afterAll`).
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, api, EMPLOYEE, login, OWNER, psql, shot, shown, untilStill, usernameOf, usernamesOf } from './helpers';
+import { A, api, EMPLOYEE, login, OWNER, psql, shot, shown, untilStill, usernamesOf } from './helpers';
+import { usernameOf } from './business';
 import { cleanInventory, createProduct } from './inventory-helpers';
 import { snapshotSeries } from './invoice-helpers';
 import { chargeByApi, cleanSales, drawerOff, restoreDrawer, type SaleOut, stamp } from './sale-helpers';
 import { rowAction } from './service-helpers';
+import { toastSaying } from './toast-helpers';
 import { discardChanges } from './unsaved-back-helpers';
 
 const KEY = 'FIX-HUB-BASE-APPROVAL-KEYPAD-CUT-ON-TABLET-DESKTOP';
@@ -188,7 +190,7 @@ for (const viewport of VIEWPORTS) {
     for (const digit of OWNER_PIN) await dialog.getByTestId(`pinpad-key-${digit}`).click();
 
     const approvedBy = new RegExp(`(Approved by|Aprobado por) ${escaped(name)}`);
-    await expect(page.locator('ion-toast').filter({ hasText: approvedBy }).first()).toBeVisible();
+    await expect(toastSaying(page, approvedBy)).toBeVisible();
     await expect(dialog).toBeHidden();
     await expect(page.locator('ion-modal[data-testid=sale-void]')).toBeHidden();
     await expect

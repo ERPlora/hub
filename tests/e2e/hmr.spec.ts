@@ -6,7 +6,9 @@ import { join } from 'node:path';
 
 import { type BrowserContext, type Page, expect, test } from '@playwright/test';
 
-import { A, createItem, HUB_DIR, healthy, listReady, login, record, row, shot, shown, uniqueName, waitFor } from './helpers';
+import { A, HUB_DIR, login, record, shot, shown, uniqueName } from './helpers';
+import { createItem, listReady, row } from './demo-items';
+import { healthy, waitFor } from './dev-server';
 import { STACK } from './stack';
 
 const VUE = join(HUB_DIR, 'apps/demo/frontend/pages/ItemListPage.vue');

@@ -49,7 +49,7 @@ async function issue(): Promise<void> {
     return; // The window shows `command.error`.
   }
   if (!answer.invoice) return;
-  void toastSuccess(t('invoice.substitute.done', { number: answer.invoice.number }));
+  toastSuccess(t('invoice.substitute.done', { number: answer.invoice.number }));
   open.value = false;
   emit('substituted', answer.invoice);
 }

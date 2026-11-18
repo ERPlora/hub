@@ -6,6 +6,8 @@ checked with python-stdnum and kept compact; a foreign document of another kind 
 its country, 05 residence certificate, 06 other document, 07 not registered) is taken as written — but a
 foreign tax ID always says its kind: VeriFactu declares it as ``IDOtro``, which the tax agency refuses
 without ``IDType``. The callers name the field and translate the refusal (``tests/test_tax_ids.py``).
+``vat_number`` writes an EU VAT number for both sides of a document: the recipient's here, the issuer's that
+Invoicing prints.
 """
 
 import pycountry
@@ -47,6 +49,14 @@ def normalize_country(value: str) -> str:
     return code
 
 
+def vat_number(tax_id: str, country: str) -> str:
+    """``tax_id`` as an EU VAT number: compact, in capitals and after ``country``'s VAT prefix (Greece's is EL),
+    which it never carries twice. Unchecked: whoever needs a valid one checks it."""
+    prefix = _VAT_PREFIX.get(country, country)
+    number = "".join(char for char in tax_id.upper() if char.isalnum())
+    return number if number.startswith(prefix) else prefix + number
+
+
 def normalize_tax_id(value: str, *, country: str = "", id_type: str = "") -> str:
     """The tax ID as a document keeps it; ``country`` is ISO 3166-1 alpha-2 (empty = Spain) and
     ``id_type`` the AEAT's kind of a foreign document (empty = a Spanish NIF). Empty stays empty."""
@@ -55,10 +65,7 @@ def normalize_tax_id(value: str, *, country: str = "", id_type: str = "") -> str
         return ""
     home = country in ("", HOME_COUNTRY)
     if id_type == EU_VAT:
-        prefix = _VAT_PREFIX.get(country, country)
-        candidate = "".join(char for char in text.upper() if char.isalnum())
-        if prefix and not candidate.startswith(prefix):
-            candidate = prefix + candidate
+        candidate = vat_number(text, country)
         if not vat.is_valid(candidate):
             raise InvalidTaxId(text)
         return candidate

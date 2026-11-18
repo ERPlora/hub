@@ -8,6 +8,7 @@
 import { expect, type Page, test } from '@playwright/test';
 
 import { A, api, capture, login, shot, shown, untilStill } from './helpers';
+import { rowAction } from './service-helpers';
 import { cleanInventory, createProduct, pick } from './inventory-helpers';
 import { snapshotSeries } from './invoice-helpers';
 import { chargeByApi, cleanSales, drawerOff, restoreDrawer, type SaleOut, shots, stamp } from './sale-helpers';
@@ -83,7 +84,7 @@ test('SALE-F28 and F29: the history lists the sales, finds one by number and sho
   await expect(row(page, cash)).toContainText(cash.number);
   await shots(page, 'sale-sales-list', tableReady);
 
-  await shown(page).locator(`[data-testid=sales-table-row-${cash.id}-document]`).first().click();
+  await rowAction(page, 'sales-table', cash.id, 'document');
   const document = page.locator('[data-testid=sale-document-modal]');
   const receipt = document.locator('[data-testid=sale-receipt]');
   await expect(receipt).toBeVisible();
@@ -103,7 +104,7 @@ test('SALE-F30: the owner voids a sale with its reason', async ({ page, context 
   await tableReady(page);
   await search(page, toVoid.number);
   await expect(row(page, toVoid)).toBeVisible();
-  await shown(page).locator(`[data-testid=sales-table-row-${toVoid.id}-void]`).first().click();
+  await rowAction(page, 'sales-table', toVoid.id, 'void');
   const modal = page.locator('ion-modal[data-testid=sale-void]');
   await expect(modal).toBeVisible();
   await expect(modal.locator('[data-testid=sale-void-explain]')).toBeVisible();
@@ -129,7 +130,7 @@ test('SALE-F31: the owner refunds a sale in full by its card', async ({ page, co
   await tableReady(page);
   await search(page, card.number);
   await expect(row(page, card)).toBeVisible();
-  await shown(page).locator(`[data-testid=sales-table-row-${card.id}-refund]`).first().click();
+  await rowAction(page, 'sales-table', card.id, 'refund');
   const modal = page.locator('ion-modal[data-testid=sale-refund]');
   await expect(modal).toBeVisible();
   await expect(modal.locator(`[data-testid=refund-tender-${card.payments[0].id}]`)).toBeVisible();

@@ -9,6 +9,7 @@ import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 import { A, api, capture, login, psql, shown, untilStill } from './helpers';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
 import { cleanSales, drawerOff, expectFirstTile, openTillCart, restoreDrawer, stamp } from './sale-helpers';
+import { toastSaying } from './toast-helpers';
 
 const RUN = stamp();
 const SKU = `E2E-SMO-${RUN}`;
@@ -232,7 +233,7 @@ test('SALE-F20: «Current order» says what waits and sends it to the kitchen as
     expect(await toolbarOverlaps(page), `the check's bar at ${page.viewportSize()?.width}px`).toEqual([]);
   });
   await send.click();
-  await expect(page.locator('ion-toast').filter({ hasText: /Order \d+ sent to the kitchen\./ })).toBeVisible();
+  await expect(toastSaying(page, /Order \d+ sent to the kitchen\./)).toBeVisible();
   await expect(shown(page).locator('[data-testid=pos-cart-round-empty]')).toContainText('Everything is sent');
   await expect(round).toHaveAttribute('aria-label', 'Current order');
 });

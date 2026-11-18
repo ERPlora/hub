@@ -153,7 +153,7 @@ export async function expectSaysMoneyUnreadable(window: WaitingWindow, read: Mon
     await opens();
     await window.settle();
   }
-  expect(inWindow(window, NOTICE)?.getAttribute('role'), "an alert that says the business's money could not be read").toBe('alert');
+  expect(inWindow(window, NOTICE)?.querySelector('[role]')?.getAttribute('role'), "an alert that says the business's money could not be read").toBe('alert');
   expect(!!inWindow(window, RETRY), '«Retry» in that alert').toBe(true);
   expect([window.save()?.disabled, window.sent()], '[«Save» grey, what was sent] while the money cannot be read').toEqual([true, []]);
   const asked = read.asked();

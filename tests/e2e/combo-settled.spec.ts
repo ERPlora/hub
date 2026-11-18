@@ -1,7 +1,7 @@
 // flow: combo-e2e-wait — the Menus specs' wait
 // Before a capture or a measurement, the Menus specs (combo-*.spec.ts) wait for the screen to stop moving with the
 // harness's one wait, `untilStill` (helpers.ts). Their own wait asked the document alone for its animations, which
-// leaves shadow roots out, and Ionic animates its overlays (`ion-modal`, `ion-toast`) in theirs: a capture could come
+// leaves shadow roots out, and Ionic animates its overlays (`ion-modal`, `ion-popover`) in theirs: a capture could come
 // out with a sheet still sliding in and pass for good. Here the till's menu sheet (COMBO-F07: tapping a menu opens
 // it) enters at a fifth of its speed (Chrome's own control), and once the Menus specs' wait returns nothing may move,
 // asked with the harness's own detector (`exposeMovingInPage`, helpers.ts), at 390, 834 and 1440. What this file

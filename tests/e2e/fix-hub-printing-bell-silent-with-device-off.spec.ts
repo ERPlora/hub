@@ -1,17 +1,18 @@
 // flow: PRINTING-F01 PRINTING-F18
-// The bell with the device off: a device set up for the receipt printer that gave no news for 90 s is off,
-// and a receipt that has waited a minute on it rings «Nadie está imprimiendo «Recibo» (N)» for the owner of hub `a`,
-// in Spanish, with no event and no reload: the bell reads its rows again by the clock (`bell_refresh_every`, 30 s).
-// Its row leads to Printing → Printers, whose receipts' card says «Dispositivo apagado» and what to do. With Printers
-// open, the device comes back (its hello on /ws/print, the presence Printing declares): the bell quiets and the card says
-// «Listo» by themselves; it goes quiet again and both say so again, with no event and no reload (the card reads the
-// summary every 30 s while something waits). The minute and the 90 s are not waited for: `psql()` moves the receipt and
-// the device's last news back. In each of the three sizes,
-// leaving a capture with the bell open. What it makes is
-// «e2e Off …», deleted before and after.
+// The bell with the device off: a device set up for the receipt printer that gave no news for 90 s is off, and a
+// receipt that has waited a minute on it rings «Nadie está imprimiendo «Recibo»: N trabajos esperando» for the owner of
+// hub `a`, in Spanish, with no event and no reload: the bell reads its counters again by the clock
+// (`bell_refresh_every`, 30 s). Its notice leads with «Ver las impresoras» to Printing → Printers, whose receipts' card
+// says «Dispositivo apagado» and what to do. With Printers open, the device comes back (its hello on /ws/print, the
+// presence Printing declares): the bell quiets and the card says «Listo» by themselves; it goes quiet again and both
+// say so again, with no event and no reload (the card reads the summary every 30 s while something waits). The minute
+// and the 90 s are not waited for: `psql()` moves the receipt and the device's last news back. In each of the three
+// sizes, leaving a capture with the action center open. What it makes is «e2e Off …», deleted before and after.
 import { type Browser, type BrowserContext, expect, type Page, test } from '@playwright/test';
 
-import { A, api, badgeSays, capturedFitting, login, openBell, psql, shown } from './helpers';
+import { bellSays, bellTotal, featureNotice, noticeButton } from './action-center';
+import { A, api, login, psql, shown } from './helpers';
+import { capturedFitting } from './screen';
 import { streamsQuiet as settled } from './home-helpers';
 import { FLOW_VIEWPORTS, forgetDevices } from './printing-helpers';
 import { stamp } from './sale-helpers';
@@ -22,7 +23,7 @@ const KEY = 'FIX-HUB-PRINTING-BELL-SILENT-WITH-DEVICE-OFF';
 const ROW = 'printing.stalled_receipt';
 const TAG = 'e2e Off';
 const RUN = stamp();
-/** The bell's own reading of its rows, which Printing's clock makes it do. */
+/** The bell's own reading of its counters, which Printing's clock makes it do. */
 const READ_AGAIN = '/api/home/bell';
 /** The receipts' card's own reading of the summary by the clock, while something waits. */
 const CARD_READ = '/api/printing/jobs/summary';
@@ -58,19 +59,19 @@ test.beforeAll(async ({ browser }) => {
 
 test.afterAll(() => cleanUp());
 
-interface Counter {
-  key: string;
-  count: number;
+/** The receipts waiting with nobody printing them (`printing.stalled_receipt`) and how often the bell reads the clock,
+ *  as the server says. */
+async function stalledNow(context: BrowserContext): Promise<{ stalled: number; every: number | null }> {
+  const res = await api<{ counters: { key: string; count: number }[]; refresh_every: number | null }>(context, A, 'GET', '/home/bell');
+  expect(res.status).toBe(200);
+  const stalled = res.data.counters.find((counter) => counter.key === ROW)?.count ?? 0;
+  return { stalled, every: res.data.refresh_every };
 }
 
-/** What the bell counts now, as the server says (`base.bell.counters`). */
-async function counters(context: BrowserContext): Promise<{ total: number; stalled: number; every: number | null }> {
-  const res = await api<{ counters: Counter[]; refresh_every: number | null }>(context, A, 'GET', '/home/bell');
-  expect(res.status).toBe(200);
-  const total = res.data.counters.reduce((sum, counter) => sum + counter.count, 0);
-  const stalled = res.data.counters.find((counter) => counter.key === ROW)?.count ?? 0;
-  return { total, stalled, every: res.data.refresh_every };
-}
+/** The notice's title, in the singular for one job. */
+const stalledTitle = (count: number): string =>
+  `Nadie está imprimiendo «Recibo»: ${count === 1 ? '1 trabajo esperando' : `${count} trabajos esperando`}`;
+const STALLED = /Nadie está imprimiendo «Recibo»: \d+ trabajos? esperando/;
 
 /** Sets up the device `device` with this run's printer, from the device (its `X-Device-Id`), as Devices does. */
 async function setUpDevice(context: BrowserContext, device: string): Promise<void> {
@@ -150,30 +151,31 @@ FLOW_VIEWPORTS.forEach(({ label, width, height }) => {
       job = queued.data.job.id;
     });
     try {
-      const before = await counters(context);
+      const [total, before] = await Promise.all([bellTotal(context), stalledNow(context)]);
       expect(before.every, 'Printing asks the bell to read the clock').toBe(30);
-      await badgeSays(page, before.total);
+      await bellSays(page, total);
       await settled(streams);
       const onTheHome = loads.length;
 
       // The till went quiet 2 min ago and the receipt has waited as long: no event says so, the clock does.
       wentOff(device, job);
       const readsBefore = reads.length;
-      await badgeSays(page, before.total + 1, BY_THE_CLOCK);
-      // Any live result re-runs the rows too (the SaaS's picture after a sign-in, another app's write): what proves
+      await bellSays(page, total + 1, BY_THE_CLOCK);
+      // Any live result re-runs the counters too (the SaaS's picture after a sign-in, another app's write): what proves
       // the bell needs none is that it reads them by itself.
-      await expect.poll(() => reads.length, { ...BY_THE_CLOCK, message: 'the bell reads its rows again by itself' }).toBeGreaterThan(readsBefore);
+      await expect.poll(() => reads.length, { ...BY_THE_CLOCK, message: 'the bell reads its counters again by itself' }).toBeGreaterThan(readsBefore);
       expect(loads.length, 'without a reload').toBe(onTheHome);
-      expect((await counters(context)).stalled).toBe(before.stalled + 1);
+      expect((await stalledNow(context)).stalled).toBe(before.stalled + 1);
 
-      // The capture: the Home with the bell open, the row naming the function as Printing does.
-      await openBell(page);
-      const row = page.locator('ion-popover [data-testid="hub-bell-row"]', { hasText: /^\s*Nadie está imprimiendo «Recibo» \(\d+\)\s*$/ });
-      await expect(row).toHaveText(`Nadie está imprimiendo «Recibo» (${before.stalled + 1})`);
+      // The capture: the Home with the action center open, the notice naming the function as Printing does.
+      const featured = await featureNotice(page, STALLED);
+      await expect(featured.locator('h3')).toHaveText(stalledTitle(before.stalled + 1));
+      const printers = noticeButton(featured, 'Ver las impresoras');
+      await expect(printers).toBeVisible();
       await capturedFitting(page, `${KEY}-${label}`, label);
 
-      // The row leads to the printers, where the receipts' card says the device is off and what to do.
-      await row.click();
+      // Its button leads to the printers, where the receipts' card says the device is off and what to do.
+      await printers.click();
       await expect(page).toHaveURL(`${A}/printing/printers`);
       const card = shown(page).locator('[data-testid=printing-summary-card-receipt]');
       await expect(card).toContainText('Dispositivo apagado');
@@ -189,19 +191,19 @@ FLOW_VIEWPORTS.forEach(({ label, width, height }) => {
       await comesBack(page, device);
       const readsBack = reads.length;
       const cardReadsBack = cardReads.length;
-      await badgeSays(page, before.total, BY_THE_CLOCK);
+      await bellSays(page, total, BY_THE_CLOCK);
       await expect(card).toContainText('Listo', BY_THE_CLOCK);
       await expect(shown(page).locator('[data-testid=printing-summary-device-off-receipt]')).toHaveCount(0);
-      await expect.poll(() => reads.length, { ...BY_THE_CLOCK, message: 'the bell reads its rows again by itself' }).toBeGreaterThan(readsBack);
+      await expect.poll(() => reads.length, { ...BY_THE_CLOCK, message: 'the bell reads its counters again by itself' }).toBeGreaterThan(readsBack);
       expect(cardReads.length, 'the card read the summary again by itself').toBeGreaterThan(cardReadsBack);
-      expect((await counters(context)).stalled).toBe(before.stalled);
+      expect((await stalledNow(context)).stalled).toBe(before.stalled);
 
       // It goes quiet again (no news for 2 min): still on Printers, the card and the bell say so, with no event.
       wentOff(device, job);
       const cardReadsOff = cardReads.length;
       await expect(card).toContainText('Dispositivo apagado', BY_THE_CLOCK);
       await expect(shown(page).locator('[data-testid=printing-summary-device-off-receipt]')).toBeVisible();
-      await badgeSays(page, before.total + 1, BY_THE_CLOCK);
+      await bellSays(page, total + 1, BY_THE_CLOCK);
       expect(cardReads.length, 'the card read the summary again by itself').toBeGreaterThan(cardReadsOff);
       expect(loads.length, 'without a reload').toBe(onThePrinters);
     } finally {

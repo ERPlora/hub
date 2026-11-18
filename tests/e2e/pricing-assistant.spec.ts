@@ -18,7 +18,8 @@ import { type BrowserContext, expect, type Locator, type Page, test } from '@pla
 
 import { sentCard } from './assistant-card-helpers';
 import { type Provider, startProvider } from './assistant-provider';
-import { A, api, capture, compactBar, login, psql, REPO_DIR, shown, turnOffTurnedOn, turnOnMissing, untilStill } from './helpers';
+import { openPanel } from './assistant-real';
+import { A, api, capture, login, psql, REPO_DIR, turnOffTurnedOn, turnOnMissing, untilStill } from './helpers';
 import { createProduct, post, stamp } from './pricing-helpers';
 import { STACK } from './stack';
 
@@ -106,20 +107,6 @@ const box = (page: Page): Locator => panel(page).locator('[data-testid="assistan
 const answers = (page: Page): Locator => panel(page).locator('[data-testid="assistant-answer"]');
 const lastAnswer = (page: Page): Locator => panel(page).locator('[data-testid="assistant-bubble-assistant"]').last();
 const card = (page: Page): Locator => page.locator('ion-modal[data-testid="assistant-confirm"]');
-const opener = (page: Page): Locator =>
-  shown(page).locator(compactBar(page) ? '[data-testid="topbar-chrome-more"]' : '[data-testid="assistant-button"]');
-
-async function openPanel(page: Page): Promise<void> {
-  await page.goto(`${A}/`);
-  await expect(opener(page)).toBeVisible();
-  if ((await panel(page).getAttribute('data-open')) !== 'true') {
-    await opener(page).click();
-    if (compactBar(page)) await page.locator('ion-popover [data-testid="topbar-chrome-more-assistant"]').click();
-  }
-  await expect(panel(page)).toHaveAttribute('data-open', 'true');
-  await expect(box(page)).toBeVisible();
-}
-
 /** Writes `text` and sends it; resolves once its answer has started (its card is up before the turn ends). */
 async function ask(page: Page, text: string): Promise<void> {
   await expect(panel(page).locator('[data-testid="assistant-send"]')).toBeVisible({ timeout: 30_000 });

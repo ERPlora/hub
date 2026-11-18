@@ -23,7 +23,8 @@ from live.outbox import channel_for
 from apps.whatsapp_inbox.models import Conversation
 from apps.whatsapp_inbox.tests.conftest import HUB_DB, HUB_DB_COMMITTED, A, B, NOW, card, connect, ctx_for, receive, run
 from base.permissions import VIEW_HOME
-from base.schemas import BellCountersIn, NoticeListIn
+from base.schemas import NoticeListIn
+from base.schemas.bell import BellCountersIn
 from base.tenancy.context import use_hub
 
 COUNTER = {
@@ -32,6 +33,11 @@ COUNTER = {
     "route": "/whatsapp_inbox/inbox",
     "label": "WhatsApp customers waiting for an answer",
     "icon": "ion:chatbubbles-outline",
+    "severity": "warning",
+    "title": "1 WhatsApp customer waiting for an answer",
+    "body": "Answer within 24 hours of their last message: after that, WhatsApp only lets you send an approved template.",
+    "action_label": "Answer the customers",
+    "due": None,
 }
 
 
@@ -62,6 +68,17 @@ def test_a_customer_waiting_is_counted_and_leads_to_the_inbox():
 def test_in_spanish_it_says_the_old_words():
     receive("wamid.1")
     assert bell(ctx_for("hub_admin", language="es"))["label"] == "Clientes de WhatsApp esperando respuesta"
+
+
+@HUB_DB
+def test_in_spanish_it_says_how_many_wait_and_that_the_24_hours_run():
+    receive("wamid.1")
+    row = bell(ctx_for("hub_admin", language="es"))
+    assert (row["title"], row["body"], row["action_label"]) == (
+        "1 cliente de WhatsApp esperando respuesta",
+        "Contesta antes de 24 horas desde su último mensaje: después, WhatsApp solo deja mandar una plantilla aprobada.",
+        "Contestar a los clientes",
+    )
 
 
 @HUB_DB

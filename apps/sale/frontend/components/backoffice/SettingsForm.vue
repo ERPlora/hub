@@ -102,7 +102,7 @@ async function save(): Promise<void> {
   server.value = saved;
   // What was saved is the server's now; what was written while the save was on its way stays.
   edits.value = Object.fromEntries(Object.entries(edits.value).filter(([key, value]) => sent[key as SettingsKey] !== value));
-  void toastSuccess(t('sale.settings.saved'));
+  toastSuccess(t('sale.settings.saved'));
 }
 
 /** Nothing to show: still loading, refused, or failed. */

@@ -13,10 +13,9 @@ a record not sent is not a record registered; support does not delete a sale, it
 - The AEAT's waiting time (``SendControl.next_send_at``, its ``TiempoEsperaEnvio``) is never shortened: rescheduling
   puts the records out with the next pass, which goes as soon as the AEAT lets it. A record's ``wait_reason`` is
   kept until that pass: it is what declares the record late (``Incidencia`` S).
-- The configuration: only the route is chosen here, through ``verifactu.config.update`` (its refusal is the form's
-  error). The environment moves through ``go_live`` / ``back_to_testing``; the authorisation and the business's
-  status come from the SaaS's photo (the retired live option is not shown); the certificate is uploaded in the
-  module. None is typed here.
+- The configuration: shown, never typed. The route is fixed on going live; the environment moves through
+  ``go_live`` / ``back_to_testing``; the authorisation and the business's status come from the SaaS's photo (the
+  retired live option is not shown); the certificate is uploaded in the module.
 - Own certificate: its holder, kind and expiry only; never its sealed material (the .p12 and its password).
 """
 
@@ -24,9 +23,7 @@ from contextvars import ContextVar
 from decimal import Decimal
 
 from babel.numbers import format_decimal
-from django import forms
 from django.contrib import admin, messages
-from django.core.exceptions import ValidationError
 from django.utils import translation
 from django.utils.translation import gettext_lazy as _
 from django.utils.translation import ngettext_lazy, npgettext_lazy
@@ -47,10 +44,8 @@ from apps.verifactu.models import (
 from apps.verifactu.queries import config_row, waiting_of
 from base.admin import ADMIN_HUB_SESSION_KEY
 
-#: What the staff may run here: send and ask the AEAT, correct a rejection, choose the route.
-STAFF_PERMISSIONS = frozenset(
-    {"verifactu.transmit_record", "verifactu.correct_record", "verifactu.configure"}
-)
+#: What the staff may run here: send and ask the AEAT, correct a rejection.
+STAFF_PERMISSIONS = frozenset({"verifactu.transmit_record", "verifactu.correct_record"})
 
 RESEND = _("Resend to the AEAT")
 #: A notice that joins several counts says each one in its own singular or plural: «1 aceptado, 2 rechazados», never one
@@ -184,36 +179,12 @@ class SupportActions:
             return None
 
 
-class ConfigForm(forms.ModelForm):
-    """Only the route; choosing it IS ``verifactu.config.update``, run when the form is validated so that its
-    refusal (no valid own certificate, no approved authorisation…) is the form's error. ``request`` is set by
-    ``ConfigAdmin.get_form``."""
-
-    request = None
-
-    class Meta:
-        model = Config
-        fields = ("route",)
-
-    def clean(self):
-        cleaned = super().clean()
-        if self.errors or "route" not in self.changed_data:
-            return cleaned
-        ctx = _staff_context(self.request)
-        if ctx is None:
-            raise ValidationError(str(CHOOSE_A_HUB))
-        try:
-            _run(ctx, "verifactu.config.update", {"route": cleaned["route"]})
-        except OperationError as refusal:
-            raise ValidationError(refusal.message) from None
-        return cleaned
-
-
 @admin.register(Config)
-class ConfigAdmin(admin.ModelAdmin):
-    """Seen whole; the route chosen through its operation; nothing added nor deleted."""
+class ConfigAdmin(ReadOnlyAdmin):
+    """Seen whole and never typed: the route is fixed on going live; ``live_paid`` is retired, its column only waits
+    to be dropped."""
 
-    form = ConfigForm
+    exclude = ("live_paid",)
     list_display = (
         "environment",
         "route",
@@ -223,26 +194,7 @@ class ConfigAdmin(admin.ModelAdmin):
     )
 
     def get_readonly_fields(self, request, obj=None) -> tuple:
-        return tuple(
-            field.name
-            for field in Config._meta.concrete_fields
-            # ``live_paid`` is retired: its column only waits to be dropped.
-            if field.name not in ("route", "live_paid")
-        )
-
-    def get_form(self, request, obj=None, change=False, **kwargs):
-        form = super().get_form(request, obj, change=change, **kwargs)
-        form.request = request
-        return form
-
-    def save_model(self, request, obj, form, change) -> None:
-        """Nothing to write: the operation saved the route (and its event) when the form was validated."""
-
-    def has_add_permission(self, request, obj=None) -> bool:
-        return False
-
-    def has_delete_permission(self, request, obj=None) -> bool:
-        return False
+        return tuple(name for name in super().get_readonly_fields(request, obj) if name not in self.exclude)
 
 
 @admin.register(OwnCertificate)

@@ -71,7 +71,7 @@
       <div class="issuer-name">{{ invoice.issuer_name }}</div>
       <div class="issuer-meta">
         {% if invoice.issuer_address %}<div>{{ invoice.issuer_address }}</div>{% endif %}
-        <div>{% translate "Tax ID" %}: {{ invoice.issuer_tax_id }}</div>
+        <div>{% translate "Tax ID" %}: {{ issuer_vat_number }}</div>
       </div>
     </div>
     <div class="doc">

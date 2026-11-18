@@ -348,7 +348,7 @@ def test_the_scanner_lets_lives_atomic_and_the_rest_of_transaction_be():
 def test_the_scan_reads_the_apps_and_base_but_not_the_tenancy_the_migrations_nor_the_tests():
     files = {str(path) for path in scanned_files()}
 
-    assert {"apps/sale/services.py", "apps/task/admin.py", "base/services/__init__.py", "base/catalog.py"} <= files
+    assert {"apps/sale/services/checkout.py", "apps/task/admin.py", "base/services/__init__.py", "base/catalog.py"} <= files
     assert not any(path.startswith("base/tenancy/") for path in files)
     assert not any("/migrations/" in path or "/tests/" in path for path in files)
 

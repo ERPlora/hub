@@ -82,7 +82,7 @@ async function submit(): Promise<void> {
     return; // `error` holds it: the field shows it.
   }
   note.value = '';
-  void toastSuccess(t('customer.notes.added'));
+  toastSuccess(t('customer.notes.added'));
 }
 </script>
 

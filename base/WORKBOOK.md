@@ -7,8 +7,8 @@ Lo que no entra todavía: ver «Lo que queda fuera».
 > Manual de usuario y especificación de `base`, la plataforma del Hub: siempre está, no se activa ni se
 > apaga. Esta primera parte describe el **Inicio**, la pantalla a la que se llega al entrar en el negocio
 > (saludo, «Mis apps», la lista de lo que falta por configurar, los paneles de las apps y
-> la actividad), con lo que acompaña a cualquier pantalla: la campana, «Mejorar plan», «Gestionar en
-> erplora.com» y la franja que avisa cuando todavía no se puede facturar. También «Apps», «Uso y plan» de
+> la actividad), con lo que acompaña a cualquier pantalla: la campana con sus avisos (también el de que todavía no
+> se puede facturar), «Mejorar plan» y «Gestionar en erplora.com». También «Apps», «Uso y plan» de
 > Sistema y las plantillas: la tarjeta del Inicio y Ajustes › Datos y copias (importar, exportar, deshacer y
 > restablecer). El acceso (entrar con la cuenta, con PIN o con la placa, cambiar de usuario, Mi perfil y los
 > dispositivos) está en sus propias pantallas, más abajo.
@@ -47,8 +47,9 @@ Quién lo usa:
 El Inicio tiene esta estructura: saludo y fecha, lanzador de apps, lista de configuración con barra de progreso, tablero de paneles y pestañas
 «Resumen» y «Actividad». Sigue lo que hace el mercado: la lista de «Setup guide» de Shopify y Square
 (pasos con su botón, el progreso arriba y lo hecho plegado), el lanzador de apps de Odoo, el tablero de
-paneles que cada uno elige y ordena de Lightspeed y Toast, y la campana con contadores de cualquier
-backoffice. «Uso y plan» de Sistema sigue a «Capacity» de Business Central y a las páginas de uso de Supabase, Vercel y
+paneles que cada uno elige y ordena de Lightspeed y Toast, y la campana de los avisos que piden una acción, que se
+quedan hasta que se resuelven y llegan arriba a la derecha (Shopify, Business Central, Stripe; el centro de
+notificaciones de macOS). «Uso y plan» de Sistema sigue a «Capacity» de Business Central y a las páginas de uso de Supabase, Vercel y
 Neon: cada cifra frente a lo que incluye el plan y, como Google Workspace, el aviso amarillo al 80 % y el rojo al
 llenarse.
 
@@ -86,9 +87,24 @@ La tabla de las últimas ventas: «Fecha», «Venta», «Cliente», «Método»,
 Se abre también con el enlace del Inicio terminado en `#actividad`.
 
 ### La campana
-Arriba a la derecha, después de «Mis apps» y de los destellos del asistente; en un móvil, las dos van dentro de
-«Más opciones», que lleva su número. Su número suma los avisos pendientes; al tocarla, una fila por aviso («Eventos
-caídos (2)») que lleva a su pantalla. Sin nada: «Todo al día. Sin notificaciones.».
+Arriba a la derecha, la última de la barra, después de «Mis apps» y de los destellos del asistente, también en el
+móvil. Reúne lo que pide una acción y sigue siendo verdad hasta que se resuelve: «Todavía no puedes facturar», los
+eventos caídos, los límites del plan, las citas por confirmar, los clientes de WhatsApp esperando respuesta, una
+impresora que no imprime… Ningún aviso se descarta: se va solo cuando se resuelve.
+
+- **La campana.** Sin nada pendiente, solo la campana. Con algo, pasa a una píldora con la campana y el número, en el
+  color y con el icono del aviso más grave (urgente, atención o información). Si un aviso tiene plazo, como la hora de
+  la cita más próxima por confirmar, el anillo de la campana se va vaciando en la última semana antes de él.
+- **La llegada.** Un aviso nuevo entra como tarjeta bajo la barra, arriba a la derecha (a lo ancho en el móvil), se
+  queda unos segundos y se recoge en la campana, que late; con el asistente abierto, entra a su izquierda. Mientras
+  se cobra en el TPV no sale: solo late la campana. El primer resultado al abrir la página no anuncia nada.
+- **El panel.** Al tocarla se abre un panel desde la derecha, por encima de la pantalla y del asistente (a lo ancho en
+  el móvil): arriba, el aviso más grave, con su frase y su botón (por ejemplo, «Configurar los datos del negocio»);
+  debajo, los demás en filas («3 citas por confirmar»), y tocar una fila la pone arriba. Cada aviso lo dice la app que
+  lo da, en el idioma de la persona: el problema en el titular («3 citas por confirmar»), la consecuencia en una frase
+  («Tus clientes esperan a que les confirmes las citas antes de que empiecen.») y la acción en su botón («Confirmar las
+  citas»). Se cierra con su ✕, con Esc o tocando fuera, y la campana recupera el foco. Sin nada: «Todo al día». Un
+  aviso resuelto se queda un momento con «Resuelto» antes de irse.
 
 ### El menú lateral
 A la izquierda (en el móvil, desde el botón de la barra): la persona arriba y las entradas de la plataforma en dos
@@ -118,14 +134,12 @@ dispositivo), y «Reportar un problema», que abre un formulario en una ventana 
 final «Tema» (claro, oscuro o el del sistema) y «Cerrar sesión». Las dos salen también en la app instalada:
 ninguna vende nada.
 
-### La franja «Todavía no puedes facturar»
-Encima de cualquier pantalla mientras falta un paso que impide facturar: «No se podrá emitir ningún
-tique ni factura hasta que configures esto:» y cada paso con «Configurar» (en la pantalla que lo configura,
-solo su nombre). En el «Resumen» del Inicio no sale (la lista dice lo mismo un poco más abajo); en
-«Actividad», sí. Con la pantalla muy baja (el móvil tumbado: 500 px de alto o menos, el mismo corte del TPV) va en
-una sola línea, para dejar sitio a la pantalla: «Todavía no puedes facturar» y un solo «Configurar», que lleva al
-primer paso que se puede configurar desde ahí; sin la frase ni los nombres de los pasos, que se leen en vertical o en
-el Inicio. Si desde ahí no hay ninguno que configurar, solo el aviso.
+### El aviso «Todavía no puedes facturar»
+Mientras falta un paso que impide facturar, la campana lleva el aviso urgente «Todavía no puedes facturar», en
+cualquier pantalla (también en el Inicio) y sin ocupar sitio en ninguna: «No se podrá emitir ningún tique ni factura
+hasta que configures esto: Los datos de tu negocio.», con «Configurar los datos del negocio» y, si falta otro paso,
+un segundo botón con el suyo («Configurar VeriFactu»). A quien no puede configurarlo le dice, sin botones, «Esto lo
+tiene que configurar un administrador.». Se va solo en cuanto el paso queda hecho, en cualquier dispositivo.
 
 ### Apps
 Desde «Apps» en el menú lateral. Tres pestañas abajo: «Mis apps» (las apps que el negocio tiene en marcha),
@@ -250,7 +264,7 @@ Sobre la pantalla en la que se intentó la acción: qué se aprueba, «¿Quién 
 Con el botón de volver: cómo se llama a la API, «Descargar el fichero OpenAPI» y una sección por app con sus llamadas.
 
 ### Asistente
-El panel que se abre con los destellos «Asistente» de la barra de arriba (en un móvil, dentro de «Más opciones»), a la
+El panel que se abre con los destellos «Asistente» de la barra de arriba (en un móvil, dentro de «⋮», junto a «Mis apps»), a la
 derecha. En una tableta o un ordenador se queda al lado de la pantalla y la empuja, así que se sigue trabajando con él
 abierto; en un móvil la tapa, sobre un velo oscuro. Arriba, «Asistente», «Nueva conversación» cuando ya hay una y la ×
 «Cerrar». En medio, la conversación: vacía, los destellos, la frase de bienvenida y los atajos de la puesta en marcha;
@@ -268,8 +282,8 @@ una acción peligrosa, cada dato en su línea y un cuadro para escribir lo que p
 | Estado | Qué ve la persona |
 |---|---|
 | Cargando | Baldosas grises en «Mis apps» («Cargando tus apps…» para el lector de pantalla), la lista en gris, «Cargando widgets…» en el tablero, la cifra de cada panel en gris y «Cargando…» en «Actividad»; «Cargando…» en el pinpad, «Cargando tu perfil…» y «Cargando los dispositivos…». |
-| Vacío | «Aquí aparecerán tus apps. Añade las que necesite tu negocio.»; sin pasos, la lista no sale; «Panel vacío. Pulsa ⋮ para añadir widgets.»; un panel sin datos, «Sin datos»; la campana, «Todo al día. Sin notificaciones.»; «Todavía no ha entrado nadie desde ningún dispositivo.»; en «Cambiar de usuario», «Aquí nadie tiene PIN todavía: se pone en Mi perfil o en Empleados.». |
-| Error | Cada zona falla por su cuenta: «No se han podido cargar tus apps. Recarga la página; si sigue fallando, vuelve a iniciar sesión.», «No se ha podido cargar lo que te falta por configurar» con «Reintentar», «No se han podido cargar los paneles» con «Reintentar», un panel con «No disponible» (nunca la cifra de antes), «No se han podido cargar las últimas ventas» con «Reintentar» y, en la campana, «No se han podido comprobar las notificaciones. Aparecerán cuando vuelva la conexión.». En el acceso: «No se pudo cargar el pinpad. Puedes entrar con tu cuenta.», «No se pudo cargar el perfil» con «Reintentar», «No se pudo cargar este dispositivo. Comprueba la conexión e inténtalo de nuevo.», «No se pudo cargar cómo pide el PIN el negocio. Comprueba la conexión e inténtalo de nuevo.» y «No se pudieron cargar los dispositivos. Comprueba la conexión e inténtalo de nuevo.». |
+| Vacío | «Aquí aparecerán tus apps. Añade las que necesite tu negocio.»; sin pasos, la lista no sale; «Panel vacío. Pulsa ⋮ para añadir widgets.»; un panel sin datos, «Sin datos»; el panel de la campana, «Todo al día» y «No queda nada que requiera acción.»; «Todavía no ha entrado nadie desde ningún dispositivo.»; en «Cambiar de usuario», «Aquí nadie tiene PIN todavía: se pone en Mi perfil o en Empleados.». |
+| Error | Cada zona falla por su cuenta: «No se han podido cargar tus apps. Recarga la página; si sigue fallando, vuelve a iniciar sesión.», «No se ha podido cargar lo que te falta por configurar» con «Reintentar», «No se han podido cargar los paneles» con «Reintentar», un panel con «No disponible» (nunca la cifra de antes), «No se han podido cargar las últimas ventas» con «Reintentar» y, en el panel de la campana, «No se pudieron cargar los avisos» con «Reintentar» o, si ya tenía avisos, «No se pudieron actualizar los avisos. Lo que ves puede no estar al día.» con los de antes. En el acceso: «No se pudo cargar el pinpad. Puedes entrar con tu cuenta.», «No se pudo cargar el perfil» con «Reintentar», «No se pudo cargar este dispositivo. Comprueba la conexión e inténtalo de nuevo.», «No se pudo cargar cómo pide el PIN el negocio. Comprueba la conexión e inténtalo de nuevo.» y «No se pudieron cargar los dispositivos. Comprueba la conexión e inténtalo de nuevo.». |
 | Sin permiso | Un paso que la persona no puede hacer: sin botón y «Esto lo tiene que configurar un administrador.». Un panel o un contador que no puede ver, no sale. En Ajustes, quien no administra ve «Este dispositivo» y «Pinpad» con los controles apagados («Solo un administrador puede cambiar cómo entra la gente en este dispositivo.», «Solo un administrador puede cambiar si se pregunta.») y, en lugar de la lista, «Solo un administrador puede ver y quitar los dispositivos.». |
 
 En la pantalla Ajustes · Negocio:
@@ -425,6 +439,7 @@ En la pantalla Archivos:
 | BASE-F112 | Guardar un archivo descargado dentro de la app | hecho |
 | BASE-F113 | Seguir avisando con la pantalla apagada (app de Android) | hecho |
 | BASE-F114 | Devolver un negocio a un momento pasado desde el admin de Hubs | hecho |
+| BASE-F115 | Ver la ayuda de la pantalla de un módulo | hecho |
 
 ### BASE-F01 Ver lo que le falta por configurar al negocio
 Estado: hecho
@@ -450,8 +465,8 @@ Pasos:
      demo, el de ERPlora) cuenta como España, el mercado de ERPlora: ve los pasos de España y ninguno de otro país
      (hub#682). Un paso cuya comprobación falla tampoco sale: nunca se da por hecho ni por pendiente lo que no se
      pudo comprobar.
-  6. Mientras falta un paso «Necesario para facturar», la franja «Todavía no puedes facturar» sale encima
-     de las demás pantallas; con el móvil tumbado, en una sola línea con un «Configurar» (hub#838).
+  6. Mientras falta un paso «Necesario para facturar», la campana lleva el aviso «Todavía no puedes facturar», con
+     «Configurar» a ese paso, en cualquier pantalla.
   7. Cuando otra persona completa un paso en otro dispositivo, o activa una app, la lista se pone al día sola.
 Entra: los pasos que declara cada app encendida, con su comprobación, su país, su permiso y su pantalla; y los
 países donde cada app dice que es obligatoria.
@@ -503,8 +518,8 @@ Estado: hecho
 Actor: responsable, empleado
 Pantalla: Inicio · Resumen
 Pasos:
-  1. Un paso que impide facturar y que esta persona no puede hacer sigue en su lista y en la franja, con
-     su etiqueta «Necesario para facturar».
+  1. Un paso que impide facturar y que esta persona no puede hacer sigue en su lista, con su etiqueta
+     «Necesario para facturar», y en el aviso «Todavía no puedes facturar» de la campana.
   2. No lleva «Configurar»: dice «Esto lo tiene que configurar un administrador.».
   3. Los pasos que no impiden facturar y que esta persona no puede hacer no salen en su lista.
 Entra: los permisos de la persona en este negocio.
@@ -642,15 +657,16 @@ Actor: propietario, administrador
 Pantalla: La campana
 Pasos:
   1. Un aviso entre apps (por ejemplo, «venta cobrada» hacia Facturación) agotó sus reintentos.
-  2. La campana de un administrador sube en el momento, sin esperar ni recargar, y al abrirla enseña
-     «Eventos caídos» con cuántos hay.
-  3. Al tocar la fila se abre «Sistema» en «Eventos caídos», donde se reenvían o se descartan (BASE-F43).
-  4. Cuando no queda ninguno, la fila desaparece.
+  2. La campana de un administrador sube en el momento, sin esperar ni recargar: el aviso urgente «2 eventos
+     caídos», con «Una app no recibió lo que otra le mandó: lo que tenía que hacer sigue sin hacerse hasta que lo
+     reenvíes.», llega como tarjeta y se recoge en ella.
+  3. «Revisar los eventos» abre «Sistema» en «Eventos caídos», donde se reenvían o se descartan (BASE-F43).
+  4. Cuando no queda ninguno, el aviso desaparece.
 Entra: cuántos avisos de este negocio quedaron sin entregar, solo para quien administra el negocio.
 Sale: nada.
-Si falla: un empleado o un responsable no ve la fila. Si no se puede preguntar, la campana se queda con
-lo último que supo; si nunca lo supo: «No se han podido comprobar las notificaciones. Aparecerán cuando
-vuelva la conexión.».
+Si falla: un empleado o un responsable no ve el aviso. Si no se puede preguntar, la campana se queda con
+lo último que supo y su panel dice «No se pudieron actualizar los avisos. Lo que ves puede no estar al día.»; si
+nunca lo supo: «No se pudieron cargar los avisos» con «Reintentar».
 Implicados: BASE-F40
 
 ### BASE-F11 Ir a erplora.com a gestionar o mejorar el plan
@@ -1267,7 +1283,7 @@ Estado: hecho
 Actor: propietario, administrador, responsable, empleado
 Pantalla: Sistema · Uso y plan
 Pasos:
-  1. Pulsa «Sistema» en el menú lateral, o llega desde la fila «Eventos caídos» de la campana.
+  1. Pulsa «Sistema» en el menú lateral, o llega desde el aviso de los eventos caídos de la campana.
   2. Abajo hay cuatro pestañas, en este orden: «Uso y plan», «Actualizaciones», «Eventos caídos» y «Registros». Se abre
      «Uso y plan». La pestaña elegida queda en la dirección: un enlace o recargar abre la misma.
   3. Una pestaña que no existe abre «Uso y plan», y también los enlaces de antes a «Recursos» y a «Plan y límites»; la
@@ -1324,8 +1340,9 @@ Pasos:
      «Tamaño de la base», con «Medido el {day}». Ni CPU ni memoria: no se pueden atribuir a un negocio, así que no salen,
      ni una frase en su lugar.
   9. Con motivos que el hub sabe sin preguntar a erplora.com (los archivos, la capacidad y WhatsApp), la campana de quien
-     administra el negocio enseña la fila «Límites del plan», que suma uno por motivo y abre «Sistema» en «Uso y plan».
-     Sin ellos, la fila desaparece.
+     administra el negocio lleva el aviso «1 límite del plan por revisar», que suma uno por motivo, con «Tu negocio
+     está llegando a lo que incluye su plan: algunas cosas pueden pararse o ir lentas hasta que lo amplíes.», y «Ver el
+     uso del plan» abre «Sistema» en «Uso y plan». Sin ellos, el aviso desaparece.
   10. Quien administra el negocio puede preguntar lo mismo al asistente («¿cuánto espacio me queda?», «¿cuántas
       peticiones llevamos este mes?») y contesta con estas cifras.
 Entra: lo que se mide de este negocio: cada noche, lo que ocupan sus archivos y su base de datos y las personas que
@@ -1388,7 +1405,7 @@ Estado: hecho
 Actor: propietario, administrador
 Pantalla: Sistema · Eventos caídos
 Pasos:
-  1. Llega desde la fila «Eventos caídos» de la campana (BASE-F10) o pulsando la pestaña «Eventos caídos».
+  1. Llega desde el aviso de los eventos caídos de la campana (BASE-F10) o pulsando la pestaña «Eventos caídos».
   2. Mientras carga: «Cargando los eventos caídos…». Con eventos: «Arregla la causa (un permiso, una app parada…) y
      reenvía. El evento no se edita: si la causa sigue, vuelve a caer aquí.».
   3. Cada aviso es una tarjeta con su nombre, cuántas veces se intentó, de qué app a cuál iba (por ejemplo, de
@@ -2341,10 +2358,9 @@ Actor: propietario, administrador, responsable, empleado
 Pantalla: Asistente
 Pasos:
   1. Con la sesión abierta, pulsa los destellos «Asistente» de la barra de arriba, al lado de la campana. Volver a
-     pulsarlos lo cierra. En un móvil, los destellos y la campana van juntos en «Más opciones» (con el número de la
-     campana), para que el título siga centrado: ahí, «Asistente» abre el panel en cuanto el menú termina de
-     cerrarse, así que lo que se escribe enseguida va a la caja del chat y el Intro lo envía; y «Notificaciones»
-     abre la campana.
+     pulsarlos lo cierra. En un móvil, los destellos y «Mis apps» van en «⋮» («Más acciones»), para que el título
+     siga centrado, y la campana se queda a la vista: ahí, «Asistente» abre el panel en cuanto el menú termina de
+     cerrarse, así que lo que se escribe enseguida va a la caja del chat y el Intro lo envía.
   2. El panel entra por la derecha. En una tableta o un ordenador ocupa una columna al lado de la pantalla y la
      empuja: se puede seguir trabajando con el panel abierto. En un móvil tapa la pantalla, sobre un velo oscuro.
   3. Se cierra con la × «Cerrar», con la tecla Esc (esté donde esté el cursor, salvo en una ventana abierta encima
@@ -3212,6 +3228,39 @@ hub#1285, hub#1306, hub#1307, hub#1319, hub#1320, hub#1321, hub#1322, hub#1323, 
 hub#1355, hub#1356, hub#1364, hub#1365, hub#1373, hub#1375, hub#1429, hub#1431, hub#1438, hub#1442, hub#1456, hub#1457,
 hub#1458, hub#1459, hub#1473, hub#1474, hub#1495, hub#1505, aws#77
 
+### BASE-F115 Ver la ayuda de la pantalla de un módulo
+Estado: hecho
+Actor: propietario, administrador, responsable, empleado
+Pantalla: la barra de arriba de un módulo con la ayuda lista (botón «?», «Ayuda») y la ventana de ayuda
+Pasos:
+  1. En un módulo con la ayuda lista, arriba a la derecha, junto al asistente, está el botón «?» («Ayuda»). Un módulo
+     cuya ayuda aún no está lista no lo enseña.
+  2. Al pulsarlo se abre la ventana «Ayuda · <módulo>», con el icono del módulo, centrada en una tableta o un ordenador
+     y desde abajo en un móvil. Nunca se abre sola, y se cierra al pasar a otro módulo.
+  3. Arriba, el vídeo del módulo, si tiene uno, en el idioma de la persona o, si no lo hay, en español. No se pide
+     nada a YouTube hasta que se pulsa, y se ve dentro de la ventana.
+  4. Debajo, «Para qué sirve», con un texto corto, de dos o tres frases, de lo que se hace en el módulo, y «En esta
+     pantalla · <pestaña>», marcado «Estás aquí», con el resumen de lo que enseña la pestaña en la que se está: corto
+     y entero, sin «Ver más».
+  5. «Cómo se hace» trae cada tarea terminada del módulo, agrupada por pestaña, primero las de la pestaña en la que se
+     está. Cada tarea es una fila plegada que se abre con sus pasos y su «Si algo falla», una a la vez. Con más de
+     ocho tareas, arriba sale «Buscar tareas…», que filtra por el título y los pasos sin mirar acentos ni mayúsculas;
+     si nada coincide, dice «Nada coincide con tu búsqueda» y «Borrar búsqueda» vuelve a enseñarlas todas.
+  6. «Otras pantallas del módulo» trae las demás pestañas, plegadas, cada una con su resumen corto. Un enlace de la
+     ayuda a una pantalla del Hub lleva a ella y cierra la ayuda.
+  7. «Pregúntale al asistente» cierra la ayuda y abre el asistente con la pregunta escrita, sin enviarla: «¿Cómo hago
+     esto: <tarea>?» sobre la última tarea que se abrió o, si no se abrió ninguna, «¿Cómo uso <módulo> en
+     <pantalla>?»; si ya había algo escrito, la pregunta va debajo. «Cerrar» cierra la ayuda.
+Entra: el módulo y la pestaña en la que se está.
+Sale: nada: la ayuda solo se lee. Es la parte del manual de uso del módulo que lee el cliente, en el idioma de la
+persona.
+Si falla: mientras se lee, la ventana enseña su esqueleto; si no se puede leer, dice «No se ha podido cargar la
+ayuda.» y «Reintentar» la vuelve a pedir. La ayuda ya leída se queda guardada hasta que se recarga la página: sin
+conexión se vuelve a abrir, también desde otra pestaña del módulo, y el vídeo dice «Sin conexión: el vídeo no está
+disponible». Si el manual no está traducido al idioma de la persona, o su traducción se quedó atrás, la ayuda sale en
+español.
+Implicados: BASE-F92, BASE-F93
+
 ## Para quien lo mantiene
 
 - **Dominio propio de un negocio** (BASE-F110, HUBS-F17, PLAN-SAAS §37 punto 2; `base/custom_domains.py`,
@@ -3270,10 +3319,34 @@ hub#1458, hub#1459, hub#1473, hub#1474, hub#1495, hub#1505, aws#77
   `approvals`, que también lee y comprueba `base`). `base.E007` (`base/home.py`) exige claves de su propio `bell` y
   segundos enteros desde `MIN_BELL_REFRESH_SECONDS` (30). `base.bell.counters` devuelve
   `refresh_every`, el menor de los contadores que la persona puede ver de las apps encendidas (también a cero: es el
-  tiempo el que los sube), y `HubBell.vue` vuelve a leer `GET /api/home/bell` cada tantos segundos mientras la página
-  está a la vista; una lectura más vieja que un resultado vivo llegado mientras tanto se descarta, y una que falla deja
-  lo último. Sin `refresh_every`, la campana solo se mueve por eventos. Tests: `test_home.py`,
-  `test_queries_home.py` y `HubBell.test.ts`.
+  tiempo el que los sube), y `base/frontend/lib/bell-counters.ts` vuelve a leer `GET /api/home/bell` cada tantos
+  segundos mientras la página está a la vista; una lectura más vieja que un resultado vivo llegado mientras tanto se
+  descarta, y una que falla deja lo último. Sin `refresh_every`, la campana solo se mueve por eventos. Tests:
+  `test_home.py`, `test_queries_home_bell.py` y `bell-counters.test.ts`.
+- El centro de avisos: la campana, la tarjeta de llegada y el panel son de `@erplora/ui` y los monta el shell; el Hub
+  solo le da su fuente, `useHubActionNotices` (`base/frontend/lib/action-notices.ts`), en `actionNotices` de
+  `createShell`. Cada contador de `base.bell.counters` por encima de cero es un aviso con lo que dice el servidor
+  (`id` = su `key`, su icono, su gravedad, su `title` como fila y titular, su `body`, su número, su plazo `due` y una
+  acción con su `action_label` a su `route`, sin acción si el Hub no tiene esa pantalla), y `base.setup.status` da
+  `base.blocking`, urgente, mientras queda un ⛔ pendiente (`blockingItems` de `lib/home.ts`): «Configurar» a los dos
+  primeros pasos que la persona puede hacer, o «Esto lo tiene que configurar un administrador.» si no puede ninguno.
+  La pantalla no pone palabras a un contador. La hoja
+  de cobro del TPV (`CheckoutSheet.vue`) retiene las tarjetas mientras está abierta (`useQuietActionNotices`).
+  Tests: `action-notices.test.ts`, `frontend/main.chrome.test.ts`, `CheckoutSheet.test.ts`; e2e
+  `tests/e2e/base-action-center.spec.ts`.
+- Lo que dice cada contador de la campana: su `BellCounter` (`live.meta`) declara, todo opcional, la gravedad
+  (`severity`: `danger`, `warning` o `info`), el titular (`title`), la frase con la consecuencia (`body`) y el texto del
+  botón (`action_label`), textos traducibles rellenados con `%(count)d` y `%(label)s` (el plural, con
+  `ngettext_lazy(…, "count")`), y `due`, el campo de la primera fila de su consulta con el plazo (Citas declara
+  `earliest`, el comienzo de la cita pendiente más próxima). `base/bell.py` es el único sitio de los valores por
+  defecto (atención, «{etiqueta} ({número})», sin frase, «Abrir» y el icono de la campana) y de los dos contadores
+  de la plataforma (`FAILED_EVENTS`, urgente, y `PLAN_LIMITS`); `base.bell.counters` los devuelve en el idioma de la
+  persona, y un plazo que no es una fecha y hora ISO deja el contador fuera, como un número que no es entero.
+  `live.E024` comprueba la gravedad, los textos y que `due` nombre un campo de la respuesta. El esquema vive en
+  `base/schemas/bell.py` y sus tipos en `base/frontend/operations-bell.d.ts`. Tests: `test_bell.py` (también que cada
+  contador de los módulos dice sus palabras en inglés y en español y que los tipos siguen al esquema),
+  `test_queries_home_bell.py` y los de cada app (`test_integration_home.py` de Citas e Impresión, `test_home_hooks.py`
+  de WhatsApp).
 - Presencia del dispositivo que imprime (misma tarea): la app que
   lleva los dispositivos declara en su `LiveAppConfig` `print_presence`, el nombre de una orden suya cuya entrada lleva
   `device`; `/ws/print` (`base/ws_print.py`) la ejecuta con el contexto del dispositivo en su `hello` y en cada `beat`
@@ -3312,7 +3385,7 @@ hub#1458, hub#1459, hub#1473, hub#1474, hub#1495, hub#1505, aws#77
   `activation.disabling` nunca apaga en cascada (ni lo que necesitan: siguen queriéndolo) y a las que
   `activation.refusals` da el motivo de `base` (`MANDATORY_OFF`, con el nombre de la app y el del país en el idioma
   de quien pregunta) cuando la app no da uno propio (VeriFactu da el suyo, VERIFACTU-F32). `base.app.disable` y
-  `base.app.list` leen el país de la fila del negocio (`Hub.country`); `queries.app_off_refusal` pone el motivo
+  `base.app.list` leen el país de la fila del negocio (`Hub.country`); `queries.apps.app_off_refusal` pone el motivo
   propio de la app por delante del de las que la necesitan, porque desactivarlas no la apagaría. `base.app.list` trae
   `mandatory` por app y `country_name` (CLDR, `business.country_name`), y Apps pinta «Obligatoria en {país}» con un
   `StatusPill` de `@erplora/ui` junto al estado; `lib/apps.ts` `goesOffWith` deja fuera la obligatoria encendida,
@@ -3325,7 +3398,7 @@ hub#1458, hub#1459, hub#1473, hub#1474, hub#1495, hub#1505, aws#77
   (cuyos bloques son de las apps encendidas), `services.turn_on_born_apps` escribe todas las filas del negocio: esas
   `on` y sin elegir (no gastan `max_apps`), las demás `off`, y olvida lo que la caché guardaba de sus apps. Si la semilla
   ya escribió filas (los hubs locales `a` y `b`, todo encendido) o la preparación se repite, no toca nada. Una demo
-  nace igual (sin país: España). Los hubs que ya existían no cambian. «Tus apps» (`queries._platform_steps`) no cuenta
+  nace igual (sin país: España). Los hubs que ya existían no cambian. «Tus apps» (`queries.home._platform_steps`) no cuenta
   las de `born_apps`: con ellas solas el TPV no vende nada. Tests: `test_activation.py`, `test_queries_home.py` (con
   apps de paja), `base/tenancy/tests/test_provision.py` (dos BD reales: España, Portugal, sin país, una demo, dos
   negocios a la vez y una app de paja obligatoria solo en Portugal), `apps/tax/tests/test_apps.py` y la e2e
@@ -3360,11 +3433,11 @@ hub#1458, hub#1459, hub#1473, hub#1474, hub#1495, hub#1505, aws#77
   (sin él lo reabriría al llegar la lista, `net::ERR_ABORTED`, con cada consulta dos veces); manda la respuesta viva.
   Lo comprueban `test_the_shell_embeds_the_persons_panels_so_the_home_opens_one_live_stream` y
   `tests/e2e/base-home.spec.ts` («one live stream»).
-- Las piezas de base en el marco (`CHROME` de `frontend/main.ts`: la campana, las apps seguidas junto al panel, la
-  franja de bloqueo y «Mejorar plan») van cada una en su trozo, que la SPA carga a la vez que la primera pantalla, y
+- Las piezas de base en el marco (`CHROME` de `frontend/main.ts`: los destellos del asistente, las apps seguidas
+  junto al panel y «Mejorar plan») van cada una en su trozo, que la SPA carga a la vez que la primera pantalla, y
   monta cuando han llegado (o han fallado: una que no carga lo vuelve a intentar al pintarse y Vue lo pasa al informe
   de errores de base), y como mucho 3 s (`CHROME_WAIT_MS`): un trozo que la red deja colgado nunca deja la página en
-  blanco; monta sin él, lo avisa en la consola y la pieza se pinta cuando llega. Así sus consultas vivas (`base.bell.counters`, `base.app.list`, `base.setup.status`) van en el
+  blanco; monta sin él, lo avisa en la consola y la pieza se pinta cuando llega. Así sus consultas vivas (`base.app.list`) van en el
   mismo `/api/live` de la pantalla. Montadas al llegar su trozo, con un equipo lento (la CPU de la pestaña ×6)
   llegarían más de 150 ms después que las de la pantalla y reabrirían el flujo (`net::ERR_ABORTED`). Se precargan con el cargador del propio componente de Vue: otro `import()` de un módulo ya cargado se
   resuelve en otra tarea, cuando el flujo ya ha abierto. Lo comprueban `frontend/main.chrome.test.ts`, `frontend/main.chrome-wait.test.ts` y
@@ -3391,8 +3464,8 @@ hub#1458, hub#1459, hub#1473, hub#1474, hub#1495, hub#1505, aws#77
 - Navegador: el tablero se guarda en `localStorage["dashboard-hub"]` y el uso de
   apps en `localStorage["hub-app-usage"]`. La pestaña «Actividad» es el hash `#actividad`.
 - Frontend en `base/frontend/` (rutas, catálogos `en`/`es` bajo `base`, componentes y su `lib/home.ts`);
-  la campana, «Mejorar plan» y la franja se enchufan en `frontend/main.ts` por `chrome` de
-  `createShell`. La ruta `/` de base (`base-home`) gana a la rejilla del shell (`home`).
+  los destellos y «Mejorar plan» se enchufan en `frontend/main.ts` por `chrome` de `createShell`, y los avisos de la
+  campana por `actionNotices`. La ruta `/` de base (`base-home`) gana a la rejilla del shell (`home`).
 - Tests: `base/tests/test_home.py`, `test_queries_home.py`, `test_live.py`, `test_api.py`, `test_spa.py`;
   Vitest en `base/frontend/**`; e2e `tests/e2e/base-home.spec.ts` y `base-home-activity.spec.ts`.
 - BASE-F13: cada login anota de quién y dónde es su sesión (`base.SessionOwner`, en control junto a las
@@ -3463,7 +3536,7 @@ hub#1458, hub#1459, hub#1473, hub#1474, hub#1495, hub#1505, aws#77
   viva con la foto): `plan.max_users`/`max_devices` de la foto (0 = sin tope) frente a las `Membership` activas del
   host; los dispositivos, sin cuenta. Tests: `base/tests/test_queries_apps.py`.
 - `base.app.get` (`GET /api/apps/detail?app=…`, `base.view_home`, no es viva; hub#539): qué app del negocio nombra
-  `app`, como la dice la persona (`queries.find_app`): su id; si no, la que se llama exactamente así en cualquier idioma
+  `app`, como la dice la persona (`queries.apps.find_app`): su id; si no, la que se llama exactamente así en cualquier idioma
   del Hub, sin mirar mayúsculas ni acentos («reservas» es Reservas, nunca Reservas online); si no, la única con una
   palabra de su nombre que empieza así («booking»). Devuelve `id`, `name` (en el idioma de quien pide) y `state` como lo
   dice la pantalla de Apps: `on`, `off`, `blocked` (de pago sin derecho de uso), `creating` o `failed` (mientras la BD
@@ -3476,7 +3549,7 @@ hub#1458, hub#1459, hub#1473, hub#1474, hub#1495, hub#1505, aws#77
   `test_app_activation_tables.py` y `test_api.py`.
 - «Uso y plan» (BASE-F40, hub#603). `SystemUsage.vue` lee `base.plan.usage` y, aparte,
   `base.assistant.usage`, que espera a erplora.com; `lib/plan-usage.ts` saca de ahí la línea de arriba y las filas, sin
-  estado. La fila de la campana (`base.plan_limits` de `base.bell.counters`) la calcula `queries._plan_motives`, sin
+  estado. La fila de la campana (`base.plan_limits` de `base.bell.counters`) la calcula `queries.usage._plan_motives`, sin
   preguntar a erplora.com, con los mismos umbrales. Una app dice qué incluye su plan declarando `plan_meter` en su
   `LiveAppConfig` (`home.plan_meters`, comprobado por `base.E013`): `base` no lee tablas de otra app. `base/meter.py`
   cuenta en la memoria de cada proceso que atiende peticiones y lo vuelca cada 60 s y al salir
@@ -3649,13 +3722,13 @@ hub#1458, hub#1459, hub#1473, hub#1474, hub#1495, hub#1505, aws#77
   misma ranura. Sin eso el clúster rechazaba la lectura (`CROSSSLOT`), el freno se apartaba y el pinpad aceptó
   nueve PIN erróneos seguidos en producción (hub#440).
 - `way_in` (sin sesión, pidiendo HTML): al Acceso (`/login`) si el dispositivo ofrece el pinpad
-  (`queries.pin_door_open`), con `notice=ended` si llegó la cookie de una sesión que ya no existe, o si otra entrada
+  (`queries.access.pin_door_open`), con `notice=ended` si llegó la cookie de una sesión que ya no existe, o si otra entrada
   cerró la suya (`notice=device_limit`); si no, el salto de siempre a la entrada de erplora.com, que devuelve dentro
   mientras su sesión vive (BASE-F13, `tests/e2e/helpers-login-hub-session.spec.ts`). `/auth/logout` en una caja con
   pinpad vuelve a `/login`.
 - Operaciones (`base/queries/`, `base/services/`; rutas en `base/api.py` y `frontend/generated/operations.json`):
   `base.access.door` (sin sesión: la cookie decide; nunca da caras a quien el PIN no dejaría entrar, ni correos:
-  `queries.face_name`, gh:hub#2536), `base.access.faces` (viva, `base.view_home`), `base.pin.set` (freno
+  `queries.people.face_name`, gh:hub#2536), `base.access.faces` (viva, `base.view_home`), `base.pin.set` (freno
   `PIN_CHANGE_LIMIT`, 30 en 1 h; 409 `base.pin_taken`, 403 `base.pin_current_wrong`), `base.device.current` y
   `base.device.mode_set`, `base.device.list|rename|remove|prune` y `base.access.settings|settings_update`
   (`base.administer_hub`), y `base.profile.get|update|preferences_set|avatar_set|avatar_remove` (la foto, en
@@ -3708,7 +3781,7 @@ hub#1458, hub#1459, hub#1473, hub#1474, hub#1495, hub#1505, aws#77
   (gh:hub#2538, #2539); la cuenta abierta de Ventas la recuerda su app (`useCurrentCheck`). Guardar el nombre en Mi
   perfil llama a `sessionChanged()` (`lib/access.ts`) y `frontend/main.ts` vuelve a leer `base.session.me`, que es la
   sesión que pinta el shell (el menú lateral); si esa lectura falla, se queda la que había.
-- «Uso y plan» (BASE-F40, `queries.plan_usage`) cuenta los dispositivos en uso con la regla del tope de BASE-F57
+- «Uso y plan» (BASE-F40, `queries.usage.plan_usage`) cuenta los dispositivos en uso con la regla del tope de BASE-F57
   (`services._end_other_devices`): los `device_id` distintos de las sesiones vivas del host (`SessionOwner`).
 - `TrustedDevice`, `Credential`, `AccessSettings` y `Profile` viven en la BD de cada negocio, y no hay ninguno en una
   compartida: la lista de dispositivos, el dial y «Quitar» son de ese negocio. Las caras y los PIN se
@@ -3739,7 +3812,7 @@ hub#1458, hub#1459, hub#1473, hub#1474, hub#1495, hub#1505, aws#77
   es el de todo el prefijo del hub, contra `plan.max_storage_bytes` de la foto del SaaS (sin él, «Sin límite»). Una app que
   guarde archivos lo hace en su carpeta propia del prefijo (como `website/`), fuera de `files/`, y Archivos no la
   enseña; antes de guardar uno nuevo pasa por la misma comprobación del espacio que Archivos,
-  `base.queries.refuse_past_the_plans_space(ctx, store, size)` (el plan del hub de `ctx`, en su idioma): el límite, el
+  `base.queries.files.refuse_past_the_plans_space(ctx, store, size)` (el plan del hub de `ctx`, en su idioma): el límite, el
   409 `base.file_no_space` y su frase viven solo en `base.files.refuse_past_the_space`, nunca copiados en una app.
   Pantalla: `pages/FilesPage.vue`, `components/{FileTree,FilePreview}.vue` y `lib/{files,pdf}.ts` (pdf.js en el
   hilo principal). Tests: `base/tests/test_files.py`, `test_files_api.py`, el Vitest de cada pieza y el e2e
@@ -3924,6 +3997,42 @@ hub#1458, hub#1459, hub#1473, hub#1474, hub#1495, hub#1505, aws#77
   5xx, tiempo agotado, una respuesta que no es audio), 503 `base.assistant_speech_failed`; los dos dejan su línea en el
   log. El panel lo reproduce desde un `blob:` (CSP `media-src 'self' blob:` y el origen del SaaS) y, si falla, lee con
   la voz del dispositivo (`hubAssistant(doc).speak` = `speakAloud`, `base/frontend/lib/assistant-hub.ts`).
+- **La ayuda de un módulo** (BASE-F115): `base.help.get` (query, `base.view_home`, `database=False`, `ai=AI(…)`, en
+  `base/queries/app_help.py`; su ruta, `GET /api/help`, en `base/api_help.py`, que monta `config/api.py`) lee la parte
+  del cliente del WORKBOOK del módulo con `base/workbook_help.py`, sin tocar la base de datos. Un módulo tiene la ayuda
+  lista cuando declara `help = Help(…)` (`live.meta.Help`, con un vídeo de YouTube opcional por idioma, que valida
+  `live.E023`), y el JSON `hub-home` de `base/spa.py` nombra esos módulos en `help_apps`. Con ellos, `HelpEntry.vue`
+  pinta el «?» en la barra de la página visible y abre `HelpWindow.vue` (con `HelpContent.vue` y `HelpFlowList.vue`, en
+  `base/frontend/components/`); `base/frontend/lib/help.ts` guarda lo leído por módulo e idioma hasta que se recarga la
+  página, y `tests/e2e/base-help.spec.ts` la recorre en tres tamaños. El idioma es `ctx.language`:
+  el original, `SOURCE_LANGUAGE` (`es`), se lee de `WORKBOOK.md`, y cualquier otro de `WORKBOOK.<idioma>.md` solo si su
+  primera línea es `catalog.en_header` del hash de la parte española; si no, el de su idioma base (`en` para `en-gb`),
+  y si tampoco, el español; `language` dice cuál salió. El vídeo, igual. Lo leído se guarda en memoria por módulo e
+  idioma (`_READ`): los WORKBOOK solo cambian con una imagen nueva; con `DEBUG` se relee en cada llamada. De la primera
+  sección («Para qué sirve») se publica solo lo que va antes de su primer `###` (toda la sección, si no tiene ninguno):
+  dos o tres frases; desde el primer `###` (quién lo usa, lo que no hace) se queda en el fichero y nunca se publica.
+  Cada `###` bajo el encabezado de las pantallas es
+  la pestaña del menú que tiene esa etiqueta en el idioma del fichero, más la de ajustes (`/<módulo>/settings`) si el
+  menú no la trae. De cada pestaña se publica solo su resumen: lo que va entre su `###` y su primer `####` (o el final
+  de la sección, si no tiene ninguno). Desde el primer `####` es detalle para quien mantiene el módulo: se queda en el
+  fichero y nunca se publica; cada `####` es una ventana de esa pestaña y su título sirve de lugar para la `Pantalla:`
+  de un flujo. De los flujos se publican los que están hechos (lo que
+  sigue en `Estado:` a una raya, dos puntos o un paréntesis es una nota) y cuya `Pantalla:` (partida por «,» y «;»)
+  nombra una pestaña o una de sus ventanas, sin lo que va entre paréntesis en un lado ni en el otro; y de ellos solo el
+  título sin el id, los pasos y «Si falla:», que empiezan con mayúscula. El encabezado, las claves de un flujo y «hecho» son el
+  vocabulario `pgettext("workbook", …)` del `.po` de `base`, así que el código no nombra más idioma que el original.
+  Un párrafo o un elemento de lista que el fichero parte en varias líneas sale en una sola, salvo tras un salto forzado
+  (dos espacios o una barra al final de la línea), porque la pantalla respeta cada salto de línea y su `parseMarkdown`
+  cierra un elemento en su primera línea. La CSP deja `frame-src 'self' https://www.youtube-nocookie.com` (`live.csp.with_frames`;
+  `'self'` es la vista previa del editor de la web). `tests/test_help_workbooks.py` vigila cada módulo con la ayuda
+  lista en cada idioma: cada entrada del menú con su `###`, una sola vez, y cada `###` una pestaña; «Para qué sirve»,
+  que no está vacío y no pasa de 500 caracteres; cada pestaña, con
+  un resumen que no está vacío y no pasa de 900 caracteres (dos o tres frases y, si la pantalla la tiene, una lista
+  corta como la leyenda de colores); lo publicado (y solo eso: el detalle bajo un `###` de la primera sección o un
+  `####` de una pestaña no se vigila), sin
+  código, sin referencias a issues, sin tamaños en px, sin ids de flujo ni nombres de operación o de evento; cada flujo
+  publicado, con sus pasos; ningún flujo que se lea como hecho en una pestaña, fuera; y cada traducción, con las mismas
+  pestañas y flujos que el original.
 - **La documentación de ERPlora** (saas ASSISTANT-F28): `base.docs.search` (query, `base.view_home`, `database=False`, `ai=AI(…)`; herramienta
   `base__docs__search`, en `ALWAYS` porque una pregunta de «cómo se hace» no comparte palabras con ella) pregunta al
   único índice de erplora.com (`assistant.DocChunk`: la ayuda pública, la documentación de cada app, los WORKBOOK del
@@ -3953,7 +4062,7 @@ hub#1458, hub#1459, hub#1473, hub#1474, hub#1495, hub#1505, aws#77
   `base`) al arrancar y en los helpers de test que montan sus piezas (`mountBase`, `mount-sale`), y le pone su
   conversación vacía con los atajos de la configuración (`AssistantSetupEmpty.vue`, en el slot `empty` del panel). Los textos propios del chat son
   `assistantMessages` del paquete (raíz `assistant`, `en` + `es`), que `appMessages` de `frontend/main.ts` mezcla con
-  los de las apps; en `base.assistant` quedan solo los del Hub (`more`, `empty`, `setupIntro`, `shortcuts`, `setup`,
+  los de las apps; en `base.assistant` quedan solo los del Hub (`empty`, `setupIntro`, `shortcuts`, `setup`,
   `card.actions`, `card.operations` y `screens`). Estado por pestaña en `state.ts` del paquete; la conversación, en
   `sessionStorage` (`erplora.assistant.history`, de una persona: otra empieza vacía) y el abierto o cerrado en
   `localStorage` (`erplora.assistant.open`); sin IndexedDB. `signOut()` de `frontend/main.ts` la olvida antes de
@@ -4016,7 +4125,7 @@ hub#1458, hub#1459, hub#1473, hub#1474, hub#1495, hub#1505, aws#77
   arrancar: orden de la propia app que su `approvals` nombra, campos que existen en su entrada, `percent` de un
   número y `money` de un entero, y los mismos huecos en `en` y `es`. Hoy la declaran `demo` (`demo.item.add_line`) y
   Ventas (los descuentos y el cobro por encima del máximo de SALE-F14, y el precio libre de SALE-F09).
-  `base.approval.approve` comprueba el PIN o la placa como la puerta del PIN (`queries.pin_owner`,
+  `base.approval.approve` comprueba el PIN o la placa como la puerta del PIN (`queries.access.pin_owner`,
   `services.badge_owner`, `PIN_PERSON_LIMIT`/`PIN_ADDRESS_LIMIT`) y que quien aprueba tenga el permiso, y devuelve un
   pase de un uso (120 s, `X-Elevation-Token`); la puerta marca la petición con él (`Approved`), `base.operations`
   añade ese permiso a esa llamada y el pase se gasta en la transacción de la propia orden: `LIVE["operation_database"]`

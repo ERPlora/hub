@@ -1,20 +1,20 @@
 // The hub's shell, side menu included. The menu is pinned from 992 px and the topbar folds it to a rail of icons;
 // below, a drawer the hamburger opens. In it, the person, the platform's entries whose screen exists and no module;
 // in its footer, the QR «Open on your phone». The topbar: drawer button or rail toggle, the title centred, the ⠿ «My
-// apps»; no Back on the screens of a module nor on Home, only on a detail.
+// apps» («⋮» on a phone); no Back on the screens of a module nor on Home, only on a detail.
 // flow: none — the hub's shell.
 import { type Locator, type Page, expect, test } from '@playwright/test';
 
 import { customersReady } from './customer-helpers';
-import { A, createItem, listReady, login, openApps, record, shot, shown, uniqueName } from './helpers';
+import { A, login, MY_APPS_DOOR, record, shot, shown, uniqueName } from './helpers';
+import { createItem, listReady } from './demo-items';
+import { expectTitleCentred, openApps } from './topbar';
 
 const VIEWPORTS = {
   phone: { label: '390', width: 390, height: 844 },
   tablet: { label: '834', width: 834, height: 1112 },
   desktop: { label: '1440', width: 1440, height: 900 },
 } as const;
-
-type Box = { x: number; y: number; width: number; height: number };
 
 const menu = (page: Page): Locator => page.locator('ion-menu.dash-menu');
 const entries = (page: Page): Locator => menu(page).locator('ion-item.nav-item');
@@ -25,29 +25,11 @@ const PLATFORM_ENTRIES = ['nav-home', 'nav-employees', 'nav-files', 'nav-apps', 
 function topbar(page: Page) {
   const bar = shown(page).locator('ion-header.app-topbar');
   return {
-    toolbar: bar.locator('ion-toolbar'),
-    title: bar.locator('ion-title'),
     drawer: bar.locator('ion-menu-button'),
     rail: bar.locator('[data-testid=topbar-rail]'),
     back: bar.locator('[data-testid=topbar-back]'),
-    apps: bar.locator('[data-testid=topbar-apps]'),
+    apps: bar.locator(MY_APPS_DOOR),
   };
-}
-
-/** The title's text, centred on its bar (Ionic's ios title), within 4 px. */
-async function expectTitleCentred(page: Page, label: string): Promise<{ title: Box; toolbar: Box }> {
-  const bar = topbar(page);
-  const text = await bar.title.evaluate((el) => {
-    const inner = el.shadowRoot?.querySelector('.toolbar-title') ?? el;
-    const range = document.createRange();
-    range.selectNodeContents(inner);
-    const box = (range.getClientRects().length ? range : inner).getBoundingClientRect();
-    return { x: box.x, y: box.y, width: box.width, height: box.height };
-  });
-  const toolbar = (await bar.toolbar.boundingBox())!;
-  const centre = (box: Box) => box.x + box.width / 2;
-  expect(Math.abs(centre(text) - centre(toolbar)), `${label}: the title is centred`).toBeLessThanOrEqual(4);
-  return { title: text, toolbar };
 }
 
 test('1440: the menu pinned next to the content, the person on top and the QR below; the topbar folds it to a rail and back', async ({ page }) => {

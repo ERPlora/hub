@@ -21,7 +21,7 @@ pytestmark = HUB_DB
 @pytest.fixture(autouse=True)
 def kitchen_on(monkeypatch):
     monkeypatch.setattr(
-        "base.queries.active_apps",
+        "base.queries.home.active_apps",
         lambda scope: frozenset({"base", "kitchen", "sale", "inventory"}),
     )
 

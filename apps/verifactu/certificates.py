@@ -8,7 +8,9 @@ SaaS's gateway that presents with it (``fiscal_gateway/seal.py``):
 - ``kind``: ``seal`` only with the eIDAS QcType eSeal (``0.4.0.1862.1.6.2``) and not eSign; else
   ``representative`` (an entity and a person's DNI/NIE), ``personal`` (a person only) or ``unknown``;
 - a declared Extended Key Usage without clientAuth (nor anyExtendedKeyUsage) can never open the AEAT's mTLS
-  connection: ``CertificateInvalid``, as a password that does not open it.
+  connection: ``CertificateInvalid``, as a password that does not open it;
+- a self-signed certificate (its issuer is its own subject) was issued by no authority, and the AEAT never accepts
+  it: ``CertificateInvalid`` too.
 
 ``seal`` keeps the .p12 and its password together, encrypted with Fernet (AES-128-CBC + HMAC-SHA256, from
 ``cryptography``) under ``settings.FISCAL_CERTIFICATE_KEY``; ``open`` gives them back, or ``CertificateUnreadable``
@@ -32,6 +34,7 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.serialization import pkcs12
 from cryptography.x509.oid import ExtendedKeyUsageOID, NameOID
 from django.conf import settings
+from django.utils.translation import gettext_lazy as _
 
 from apps.verifactu import gateway
 
@@ -46,13 +49,28 @@ _ETSI_PREFIX = re.compile(r"^[A-Z]{3}[A-Z]{2}-")
 # A Spanish DNI (8 digits and a letter) or NIE (X/Y/Z, 7 digits and a letter): a natural person.
 _PERSON_ID = re.compile(r"^(\d{8}|[XYZ]\d{7})[A-Z]$")
 
+#: Why a certificate cannot present to the AEAT (``CertificateInvalid.code``), in the reader's language.
+REFUSALS = {
+    "unopenable": _(
+        "The file is not a .p12/.pfx certificate that this password opens."
+    ),
+    "incomplete": _("The file does not hold a certificate and its private key."),
+    "self_signed": _(
+        "No authority issued this certificate (it is self-signed), so the AEAT will not accept it. Use your "
+        "business's electronic certificate issued by a recognised authority, for example the FNMT."
+    ),
+    "no_client_auth": _(
+        "The certificate does not allow client authentication, so it cannot connect to the AEAT."
+    ),
+}
+
 
 class CertificateInvalid(Exception):
-    """The .p12 cannot be used to present to the AEAT. ``code`` says why (``unopenable``, ``incomplete``,
-    ``no_client_auth``); the message names the reason only."""
+    """The .p12 cannot be used to present to the AEAT. ``code`` says why (a key of ``REFUSALS``); the message
+    names the reason only, in the reader's language."""
 
-    def __init__(self, code: str, message: str) -> None:
-        super().__init__(message)
+    def __init__(self, code: str) -> None:
+        super().__init__(REFUSALS[code])
         self.code = code
 
 
@@ -79,21 +97,15 @@ def inspect(p12: bytes, password: str) -> CertificateFacts:
             p12, password.encode() or None
         )
     except ValueError, TypeError, UnsupportedAlgorithm:
-        raise CertificateInvalid(
-            "unopenable",
-            "The file is not a .p12/.pfx certificate that this password opens.",
-        ) from None
+        raise CertificateInvalid("unopenable") from None
     has_key = key is not None
     del key
     if certificate is None or not has_key:
-        raise CertificateInvalid(
-            "incomplete", "The file does not hold a certificate and its private key."
-        )
+        raise CertificateInvalid("incomplete")
+    if certificate.issuer == certificate.subject:
+        raise CertificateInvalid("self_signed")
     if _declares_eku_without_client_auth(certificate):
-        raise CertificateInvalid(
-            "no_client_auth",
-            "The certificate does not allow client authentication, so it cannot connect to the AEAT.",
-        )
+        raise CertificateInvalid("no_client_auth")
     organization_id = _attribute(certificate, NameOID.ORGANIZATION_IDENTIFIER)
     serial = _attribute(certificate, NameOID.SERIAL_NUMBER)
     common_name = certificate.subject.get_attributes_for_oid(NameOID.COMMON_NAME)

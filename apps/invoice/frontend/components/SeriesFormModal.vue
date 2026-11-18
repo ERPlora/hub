@@ -133,7 +133,7 @@ async function save(): Promise<void> {
   } catch {
     return; // The window shows the command's error.
   }
-  void toastSuccess(t(editing.value ? 'invoice.series.form.saved' : 'invoice.series.form.created', { code: saved.code }));
+  toastSuccess(t(editing.value ? 'invoice.series.form.saved' : 'invoice.series.form.created', { code: saved.code }));
   open.value = false;
 }
 

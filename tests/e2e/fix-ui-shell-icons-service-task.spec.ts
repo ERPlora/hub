@@ -12,7 +12,7 @@
 // DataTable action hands as its `icon`), draws a non-empty SVG and is visible. What the run creates is deleted.
 import { expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, openApps, psql, scrolledTo, shot, shown } from './helpers';
+import { A, psql, scrolledTo, shot, shown } from './helpers';
 import {
   cleanUp as cleanServices,
   FLOW_VIEWPORTS,
@@ -25,6 +25,7 @@ import {
   settled,
 } from './service-helpers';
 import { cleanUp as cleanTasks, named as taskNamed } from './task-helpers';
+import { openApps } from './topbar';
 
 const KEY = 'FIX-UI-SHELL-ICONS-SERVICE-TASK';
 

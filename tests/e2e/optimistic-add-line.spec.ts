@@ -3,8 +3,10 @@
 // the saved lines; repeating a request with the same client_line_id does not duplicate it.
 import { type Page, expect, test } from '@playwright/test';
 
-import { A, api, createItem, itemDetail, login, record, shot, uniqueName } from './helpers';
+import { A, api, login, record, shot, uniqueName } from './helpers';
+import { createItem, itemDetail } from './demo-items';
 import { recordResponses, responseEnd } from './resource-timing';
+import { newestToast } from './toast-helpers';
 
 /** Arms in-page probes: click time of «Add line», first/last time a provisional line is on screen. */
 async function armProbes(page: Page): Promise<void> {
@@ -81,9 +83,9 @@ test('add line: optimistic, 409 rollback with toast, server keeps only saved lin
   const conflict = page.waitForResponse((r) => r.url().includes('/api/demo/items/add_line'));
   await addLine(page, 'Refused line');
   const conflictStatus = (await conflict).status();
-  const toast = page.locator('ion-toast');
+  const toast = newestToast(page);
   await expect(toast).toBeVisible();
-  const toastMessage = await toast.evaluate((el) => (el as HTMLElement & { message?: string }).message ?? '');
+  const toastMessage = (await toast.innerText()).trim();
   await page.screenshot({ path: shot('04-optimistic-409-toast') });
   await expect(page.locator('[data-testid=demo-line-pending]')).toHaveCount(0);
   const rejected = await readProbes(page);

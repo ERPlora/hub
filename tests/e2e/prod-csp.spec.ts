@@ -18,7 +18,9 @@ import { join } from 'node:path';
 
 import { type BrowserContext, type Page, expect, test } from '@playwright/test';
 
-import { A, ARTIFACTS, createItem, listReady, login, openApps, rowOf, shown, uniqueName } from './helpers';
+import { A, ARTIFACTS, login, shown, uniqueName } from './helpers';
+import { createItem, listReady, rowOf } from './demo-items';
+import { openApps } from './topbar';
 
 const PROD = (process.env.PROD_ORIGIN ?? 'http://a.localhost:8002').replace(/\/$/, '');
 const OUT = join(ARTIFACTS, 'prod');

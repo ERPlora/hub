@@ -8,7 +8,8 @@ Home), where its plan is changed on the SaaS (``/dashboard/store/plans?business=
 plan»), the SaaS's account page (the user menu's «My account»; its «Report a problem» is the hub's own dialog) and this
 business on the SaaS's panel (``manage_url``, the bar's «erplora.com»; only with ``base.open_management``), those only
 to a session opened with the account, and the session's way in (``access``: «Switch user», the idle lock;
-``base.queries.shell_access``) and the person's own appearance (``preferences``). The addresses on erplora.com
+``base.queries.access.shell_access``), the person's own appearance (``preferences``) and the modules whose help window
+is ready (``help_apps``, ``base.help.get``). The addresses on erplora.com
 are the usual ones, which ask to sign in: their click goes with the pass ``base.saas_pass.create`` signs, never
 embedded here, where it would expire in a minute and any script could read it. ``widget-list`` carries
 ``base.widget.list`` as its live query answers it to this person: the Home's board mounts its panels with it, so their
@@ -69,7 +70,7 @@ def _widgets(request: HttpRequest) -> dict | None:
     """``base.widget.list`` as its live query answers it to this person, or ``None`` when it refuses them (no Home for
     them): then the board waits for the live answer, as it did before."""
     try:
-        return run_operation_sync(request, queries.widget_list).model_dump(mode="json")
+        return run_operation_sync(request, queries.home.widget_list).model_dump(mode="json")
     except OperationError:
         return None
 
@@ -81,11 +82,11 @@ def _may_manage(request: HttpRequest) -> bool:
 
 def _shell(request: HttpRequest) -> HttpResponse:
     """The SPA's HTML (``render_spa``: never cached, with the CSRF cookie the SDK sends back)."""
-    me = run_operation_sync(request, queries.session_me)
+    me = run_operation_sync(request, queries.sessions.session_me)
     extra_json = {SESSION_ME_ID: me.model_dump(mode="json")}
     hub = getattr(request, "hub", None)
     if hub is not None and request.user.is_authenticated:
-        way_in = queries.shell_access(request, hub.slug)
+        way_in = queries.access.shell_access(request, hub.slug)
         # A session opened before the login kept its credential in it: the shell copies what SessionOwner says, so the
         # user menu's «Report a problem» (only for the account) and its operation (BASE-F108) say the same.
         request.session.setdefault(CREDENTIAL_SESSION_KEY, way_in["credential"])
@@ -101,12 +102,14 @@ def _shell(request: HttpRequest) -> HttpResponse:
             # The bar's «erplora.com»: this business on the panel, for who runs it.
             "manage_url": saas_url(f"{SAAS_PANEL_PATH}/businesses/{hub.id}") if account and _may_manage(request) else "",
             "access": way_in,
-            "preferences": queries.appearance_of(request.user),
+            "preferences": queries.profile.appearance_of(request.user),
             # Without the server's voice, the assistant's panel reads with the device's voice.
             "server_voice": settings.ASSISTANT_SERVER_VOICE,
             # The ERPlora app of each system erplora.com publishes, always its latest build. Public pages, so they go
             # to anyone, whatever the way in.
             "app_downloads": {platform: saas_url(f"/app/download/{platform}/") for platform in APP_PLATFORMS},
+            # The modules whose screens show the help button (base.help.get).
+            "help_apps": queries.app_help.ready_apps(),
         }
         widgets = _widgets(request)
         if widgets is not None:

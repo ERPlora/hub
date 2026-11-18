@@ -25,7 +25,7 @@ from live.outbox import channel_for
 
 from base import events, files
 from base.models import Hub
-from base.queries import refuse_past_the_plans_space
+from base.queries.files import refuse_past_the_plans_space
 from base.storage import hub_prefix
 from base.tenancy.context import use_hub
 from base.tenancy.tests.business import HOST, HUB_DB, HUB_DB_COMMITTED, A, B, in_business_a

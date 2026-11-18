@@ -1,16 +1,16 @@
 """ERPlora's route, where ERPlora files on a business's behalf with its own seal, closes to newcomers with a deployment
 switch (``VERIFACTU_ERPLORA_ROUTE_ENABLED``), on by default.
 
-Off, a business can neither choose it, nor ask for or send the signed authorisation, nor go live through it: only its
-own certificate takes it to production, and the Home's step asks for that. Testing still files with the seal, demos
+Off, a business can neither ask for nor send the signed authorisation, nor go live through it: only its own
+certificate takes it to production, and the Home's step asks for that. Testing still files with the seal, demos
 included, and a business already live through it keeps sending and cancelling, since the AEAT only takes a
 cancellation presented with the seal that filed the record. ERPlora's own hub (the business ``B`` here) behaves as
-with the switch on.
+with the switch on. Which route a record goes by is ``route_for``'s: the certificate until the business goes live,
+and the route fixed then afterwards.
 """
 
 import base64
 import datetime as dt
-import json
 
 import httpx
 import pytest
@@ -19,7 +19,7 @@ from django.utils import timezone, translation
 from live.context import system_context
 from live.errors import Conflict, OperationError
 
-from apps.verifactu import certificates
+from apps.verifactu import certificates, erplora_route
 from apps.verifactu.models import Config, Environment, Record, SendControl
 from apps.verifactu.tests.conftest import (
     HOST,
@@ -29,9 +29,11 @@ from apps.verifactu.tests.conftest import (
     B,
     answering,
     b64,
+    codes,
     ctx_for,
     make_p12,
     run,
+    ticket,
 )
 from base.models import Hub
 
@@ -110,22 +112,11 @@ def approve(scope=A, version: int = 1) -> None:
 
 
 def own_certificate(scope=A) -> None:
-    ctx = ctx_for(scope=scope)
-    run("verifactu.certificate.upload", {"p12_base64": b64(make_p12()), "password": "secret"}, ctx)
-    run("verifactu.config.update", {"route": "own"}, ctx)
+    run("verifactu.certificate.upload", {"p12_base64": b64(make_p12()), "password": "secret"}, ctx_for(scope=scope))
 
 
 def config(scope=A, language: str = "en"):
     return run("verifactu.config.get", ctx=ctx_for(scope=scope, language=language))
-
-
-def codes(waits) -> set[str]:
-    return {wait.code for wait in waits}
-
-
-def ticket(scope=A):
-    lines = [{"description": "Cut", "quantity": "1", "unit_price": 1000, "tax_rate": "21"}]
-    return run("invoice.invoice.create", {"lines": lines, "series_code": "TICKET"}, ctx_for(scope=scope))
 
 
 def sent(gateway_answers) -> list[tuple[str, str]]:
@@ -147,10 +138,9 @@ def test_on_a_business_goes_live_through_erplora_with_its_approved_authorisation
     assert run("verifactu.config.go_live").environment == Environment.PRODUCTION
 
 
-def test_on_a_business_chooses_erplora_and_reaches_the_authorisation(issuer, saas):
+def test_on_a_business_with_its_own_certificate_still_reaches_the_authorisation(issuer, saas):
     own_certificate()
 
-    assert run("verifactu.config.update", {"route": "erplora"}).route == "erplora"
     assert run("verifactu.representation.model").content_type == "application/pdf"
     # The switch lets it through: what stops it now is the SaaS not knowing this business yet.
     assert code_of(lambda: run("verifactu.representation.submit", SUBMISSION)) == "verifactu.hub_unregistered"
@@ -176,6 +166,7 @@ def test_off_the_own_certificate_still_goes_live(issuer, opened, switched_off):
     own_certificate()
 
     assert run("verifactu.config.go_live").environment == Environment.PRODUCTION
+    assert Config.objects.get().route == Config.Route.OWN
 
 
 def test_off_settings_say_the_own_certificate_is_what_is_missing_to_go_live(issuer, opened, switched_off):
@@ -197,32 +188,13 @@ def test_off_the_homes_step_is_done_only_with_the_own_certificate(issuer, switch
     assert config().route_ready_for_production is True
 
 
-def test_off_choosing_erplora_is_a_409_and_the_route_stays(issuer, switched_off):
-    own_certificate()
-
-    refusal = refused_with_409(lambda: run("verifactu.config.update", {"route": "erplora"}))
-
-    assert refusal == "verifactu.erplora_route_unavailable"
-    assert Config.objects.get().route == Config.Route.OWN
-    # Choosing the own route, or keeping ERPlora's where it already is, changes nothing new.
-    assert run("verifactu.config.update", {"route": "own"}).route == "own"
-
-
-def test_off_a_business_already_on_erplora_may_keep_it(issuer, switched_off):
-    assert config().route == "erplora"
-
-    assert run("verifactu.config.update", {"route": "erplora"}).route == "erplora"
-
-
-def test_off_choosing_erplora_over_http_is_a_409_said_in_spanish(client, make_user, issuer, switched_off):
-    own_certificate()
+def test_off_asking_for_the_authorisation_over_http_is_a_409_said_in_spanish(client, make_user, issuer, switched_off):
     client.force_login(make_user("boss", host=A.key, role="hub_admin"))
 
-    response = client.post(
-        "/api/verifactu/config",
-        json.dumps({"route": "erplora"}),
-        content_type="application/json",
+    response = client.get(
+        "/api/verifactu/representation/model",
         HTTP_HOST=HOST,
+        HTTP_ACCEPT="application/json",
         HTTP_ACCEPT_LANGUAGE="es",
     )
 
@@ -314,10 +286,50 @@ def test_the_platform_hub_ignores_the_switch(on_the_platform_hub, settings, saas
     ctx = ctx_for(scope=PLATFORM)
     own_certificate(PLATFORM)
 
-    assert run("verifactu.config.update", {"route": "erplora"}, ctx).route == "erplora"
     out = config(PLATFORM)
-    assert (out.erplora_route_available, out.route_ready_for_production) == (True, True)
+    assert (out.route, out.erplora_route_available, out.route_ready_for_production) == ("erplora", True, True)
     assert "own_certificate_required" not in codes(out.live_blockers)
     assert run("verifactu.representation.model", ctx=ctx).content_type == "application/pdf"
     assert code_of(lambda: run("verifactu.representation.submit", SUBMISSION, ctx)) == "verifactu.hub_unregistered"
     assert code_of(lambda: run("verifactu.config.go_live", ctx=ctx)) == "verifactu.platform_fixed"
+
+
+# ── The route a record goes by ──────────────────────────────────────────────────────────────────
+
+
+@pytest.mark.parametrize(("has_certificate", "route"), [(True, "own"), (False, "erplora")])
+@pytest.mark.parametrize("environment", [Environment.TESTING, Environment.PRODUCTION])
+def test_before_going_live_the_certificate_decides_the_route(environment, has_certificate, route):
+    # What it keeps from before (a route it once went live by) counts for nothing while it is in testing.
+    kept = Config(route=Config.Route.ERPLORA if has_certificate else Config.Route.OWN)
+
+    assert erplora_route.route_for(kept, environment, A, has_certificate) == route
+
+
+@pytest.mark.parametrize("has_certificate", [True, False])
+@pytest.mark.parametrize("fixed", [Config.Route.OWN, Config.Route.ERPLORA])
+def test_once_live_its_production_goes_by_the_route_fixed_then(fixed, has_certificate):
+    live = Config(environment=Environment.PRODUCTION, route=fixed)
+
+    assert erplora_route.route_for(live, Environment.PRODUCTION, A, has_certificate) == fixed
+
+
+def test_once_live_what_it_sealed_in_testing_still_follows_the_certificate():
+    live = Config(environment=Environment.PRODUCTION, route=Config.Route.ERPLORA)
+
+    assert erplora_route.route_for(live, Environment.TESTING, A, True) == Config.Route.OWN
+
+
+@pytest.mark.parametrize("environment", [Environment.TESTING, Environment.PRODUCTION])
+def test_erploras_own_hub_files_with_the_seal_even_with_a_certificate(settings, environment):
+    settings.PLATFORM_HUB_SLUG = PLATFORM.key
+
+    assert erplora_route.route_for(Config(), environment, PLATFORM, True) == Config.Route.ERPLORA
+
+
+def test_closed_only_holds_back_a_business_not_yet_live_through_the_seal(switched_off):
+    live = Config(environment=Environment.PRODUCTION, route=Config.Route.ERPLORA)
+
+    assert erplora_route.closed(Config(), Config.Route.ERPLORA, A) is True
+    assert erplora_route.closed(Config(), Config.Route.OWN, A) is False
+    assert erplora_route.closed(live, Config.Route.ERPLORA, A) is False

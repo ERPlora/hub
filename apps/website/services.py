@@ -57,7 +57,7 @@ from apps.website.schemas import (
 )
 from apps.website.storage import image_key, image_url
 from base.operations import business_currency, hub_id
-from base.queries import refuse_past_the_plans_space
+from base.queries.files import refuse_past_the_plans_space
 
 #: The longest side of an image the website takes, in pixels.
 MAX_IMAGE_SIDE = 8000

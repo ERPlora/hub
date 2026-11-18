@@ -83,7 +83,7 @@ from apps.tax.models import TaxCategory
 from base import images
 from base import operations as platform
 from base.business import money_text
-from base.queries import business_language, image_library
+from base.queries.catalog_images import business_language, image_library
 from base.ordering import list_order_for
 from base.recovery import brought_back
 

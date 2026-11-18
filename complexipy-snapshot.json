@@ -342,28 +342,6 @@
     ]
   },
   {
-    "path": "apps/sale/services.py",
-    "file_name": "services.py",
-    "functions": [
-      {
-        "name": "_refund_legs",
-        "complexity": 17
-      },
-      {
-        "name": "_fiscal_document",
-        "complexity": 19
-      },
-      {
-        "name": "_legs",
-        "complexity": 33
-      },
-      {
-        "name": "_complete",
-        "complexity": 41
-      }
-    ]
-  },
-  {
     "path": "apps/sale/tests/test_admin.py",
     "file_name": "test_admin.py",
     "functions": [
@@ -586,10 +564,6 @@
     "file_name": "home.py",
     "functions": [
       {
-        "name": "bell_counters",
-        "complexity": 17
-      },
-      {
         "name": "plan_meter_errors",
         "complexity": 17
       },
@@ -692,16 +666,6 @@
       {
         "name": "FakeGateway::_handler",
         "complexity": 28
-      }
-    ]
-  },
-  {
-    "path": "base/tests/po.py",
-    "file_name": "po.py",
-    "functions": [
-      {
-        "name": "module_texts",
-        "complexity": 21
       }
     ]
   },
@@ -860,16 +824,6 @@
     ]
   },
   {
-    "path": "base/queries/__init__.py",
-    "file_name": "__init__.py",
-    "functions": [
-      {
-        "name": "app_list",
-        "complexity": 21
-      }
-    ]
-  },
-  {
     "path": "base/assistant/gateway.py",
     "file_name": "gateway.py",
     "functions": [
@@ -896,6 +850,56 @@
       {
         "name": "unnamed",
         "complexity": 18
+      }
+    ]
+  },
+  {
+    "path": "base/queries/apps.py",
+    "file_name": "apps.py",
+    "functions": [
+      {
+        "name": "app_list",
+        "complexity": 21
+      }
+    ]
+  },
+  {
+    "path": "apps/sale/services/charge_validation.py",
+    "file_name": "charge_validation.py",
+    "functions": [
+      {
+        "name": "_legs",
+        "complexity": 33
+      }
+    ]
+  },
+  {
+    "path": "apps/sale/services/checkout.py",
+    "file_name": "checkout.py",
+    "functions": [
+      {
+        "name": "_complete",
+        "complexity": 41
+      }
+    ]
+  },
+  {
+    "path": "apps/sale/services/documents.py",
+    "file_name": "documents.py",
+    "functions": [
+      {
+        "name": "_fiscal_document",
+        "complexity": 19
+      }
+    ]
+  },
+  {
+    "path": "apps/sale/services/refunds.py",
+    "file_name": "refunds.py",
+    "functions": [
+      {
+        "name": "_refund_legs",
+        "complexity": 17
       }
     ]
   }
