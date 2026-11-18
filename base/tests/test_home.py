@@ -570,7 +570,7 @@ def test_base_names_no_app_where_it_reads_the_mandatory_ones():
         home.mandatory_problems,
         home.mandatory_errors,
         get("base.setup.status").fn,
-        queries._platform_steps,
+        queries.home._platform_steps,
     ]
     named = sorted(
         node.value

@@ -61,7 +61,7 @@ from apps.attendance.schemas import (
 from apps.staff.models import Member
 from base.models import HubUser
 from base.ordering import list_order_for
-from base.queries import hub_user_of
+from base.queries.people import hub_user_of
 from base.business import babel_locale, business_zone
 
 MEMBER_NOT_FOUND = _("That person does not exist in Staff.")

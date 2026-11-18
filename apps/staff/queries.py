@@ -23,7 +23,7 @@ from live.operations import INTERNAL, UnknownOperation, get, operation
 from apps.staff.models import Member, Role, Schedule, StaffSettings, TimeOff
 from base.business import babel_locale, business_zone
 from base.models import HubUser, Membership
-from base.queries import hub_user_of
+from base.queries.people import hub_user_of
 from base.ordering import list_order_for
 from apps.staff.schemas import (
     AccountListIn,

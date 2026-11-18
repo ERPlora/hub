@@ -517,7 +517,12 @@ def test_the_operations_that_need_the_own_database_are_the_base_s_doors():
     _any_more`` keeps off any shared database: there is none."""
     defined = {name: _defined_in(name) for name in [*OWN_DATABASE_OPERATIONS, *OWN_DATABASE_READS]}
 
-    assert set(defined.values()) <= {"base/services/__init__.py", "base/queries/__init__.py"}, defined
+    assert set(defined.values()) <= {
+        "base/services/__init__.py",
+        "base/queries/api_keys.py",
+        "base/queries/dumps.py",
+        "base/queries/usage.py",
+    }, defined
 
 
 @pytest.fixture

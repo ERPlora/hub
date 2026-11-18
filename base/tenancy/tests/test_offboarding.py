@@ -895,7 +895,7 @@ def test_the_saas_still_lists_the_copies_while_archiving_and_finds_nothing_once_
     copy = dumps.dump_hub(hub, kind=HubDump.Kind.OFFBOARDING)
     Hub.objects.filter(pk=hub.pk).update(status=Hub.Status.ARCHIVING)
 
-    listed = queries.hub_dump_list(internal(), HubGetIn(id=hub.pk))
+    listed = queries.dumps.hub_dump_list(internal(), HubGetIn(id=hub.pk))
 
     assert listed.available is True
     assert [row.id for row in listed.dumps] == [copy.key]
@@ -904,7 +904,7 @@ def test_the_saas_still_lists_the_copies_while_archiving_and_finds_nothing_once_
 
     assert fresh(hub).status == "purged"
     with pytest.raises(NotFound):
-        queries.hub_dump_list(internal(), HubGetIn(id=hub.pk))
+        queries.dumps.hub_dump_list(internal(), HubGetIn(id=hub.pk))
 
 
 def test_the_purge_is_only_for_a_business_being_dropped(business):

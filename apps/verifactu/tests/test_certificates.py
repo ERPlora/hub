@@ -2,7 +2,8 @@
 
 What is read follows the SaaS's gateway (``fiscal_gateway/seal.py``), which presents with it: the holder is the
 subject's ``organizationIdentifier`` and else its ``serialNumber``, without the ETSI prefix; a declared Extended
-Key Usage without client authentication can never open the AEAT's mTLS connection and is refused. The .p12 and
+Key Usage without client authentication can never open the AEAT's mTLS connection and is refused, and so is a
+self-signed certificate, which no authority issued and the AEAT never accepts. The .p12 and
 its password are kept together, encrypted with Fernet under ``FISCAL_CERTIFICATE_KEY``: without the key nothing
 is kept, and a rotated key cannot open what the old one sealed. Every .p12 here is made by the test.
 """
@@ -10,6 +11,7 @@ is kept, and a rotated key cannot open what the old one sealed. Every .p12 here 
 import datetime as dt
 
 import pytest
+from cryptography.hazmat.primitives.serialization import pkcs12
 
 from apps.verifactu import certificates, gateway
 from apps.verifactu.tests.conftest import b64, make_p12
@@ -47,6 +49,20 @@ def test_a_declared_eku_without_client_auth_is_refused():
     with pytest.raises(certificates.CertificateInvalid) as refused:
         certificates.inspect(make_p12(client_auth=False), "secret")
     assert refused.value.code == "no_client_auth"
+
+
+def test_a_certificate_an_authority_issued_is_read():
+    p12 = make_p12()
+    _key, certificate, _chain = pkcs12.load_key_and_certificates(p12, b"secret")
+    assert certificate.issuer != certificate.subject
+    assert certificates.inspect(p12, "secret").holder_tax_id == "B12345674"
+
+
+def test_a_self_signed_certificate_is_refused():
+    with pytest.raises(certificates.CertificateInvalid) as refused:
+        certificates.inspect(make_p12(self_signed=True), "secret")
+    assert refused.value.code == "self_signed"
+    assert "FNMT" in str(refused.value)
 
 
 def test_a_wrong_password_is_refused():

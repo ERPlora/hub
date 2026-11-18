@@ -90,7 +90,7 @@ def modules(monkeypatch, settings):
         labels = {config.label for config in configs} if on is None else set(on)
         monkeypatch.setattr("base.home.module_configs", lambda: list(configs))
         monkeypatch.setattr("base.activation.module_configs", lambda: list(configs))
-        monkeypatch.setattr("base.queries.active_apps", lambda scope: frozenset(labels | {"base"}))
+        monkeypatch.setattr("base.queries.home.active_apps", lambda scope: frozenset(labels | {"base"}))
 
     use()
     return use
@@ -1125,7 +1125,7 @@ def test_an_app_off_puts_no_card(modules):
 
 def test_each_business_sees_the_cards_of_its_own_apps(modules, monkeypatch, hub_b):
     modules(module("stock", system_cards=[PRINTER]))
-    monkeypatch.setattr("base.queries.active_apps", lambda scope: frozenset({"base", "stock"} if scope.key == A.key else {"base"}))
+    monkeypatch.setattr("base.queries.home.active_apps", lambda scope: frozenset({"base", "stock"} if scope.key == A.key else {"base"}))
 
     assert [card["key"] for card in system_cards(ctx("stock.view", scope=A))] == ["stock.printer"]
     assert in_b(system_cards, ctx("stock.view", scope=B)) == []
