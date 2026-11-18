@@ -1,9 +1,9 @@
 """hub-next settings: env through decouple, Postgres with a pool, CSP per DEBUG, WhiteNoise, LIVE."""
 
 import hashlib
+import importlib
 import os
 import re
-import runpy
 import secrets
 import subprocess
 import sys
@@ -20,8 +20,8 @@ from live.csp import YOUTUBE_NOCOOKIE, base_policy, debug_policy, with_frames
 from live.slugs import is_reserved_hub_slug
 from psycopg_pool import ConnectionPool
 
-SETTINGS_FILE = Path(__file__).resolve().parents[1] / "settings.py"
-BASE_DIR = SETTINGS_FILE.parents[1]
+SETTINGS_PACKAGE = "config.settings"
+BASE_DIR = Path(__file__).resolve().parents[2]
 ENV_KEYS = (
     "ASSISTANT_SERVER_VOICE",
     "DEBUG",
@@ -88,17 +88,17 @@ PRODUCTION_ENV = {
 
 @pytest.fixture
 def load_settings(monkeypatch, tmp_path):
-    """Run settings.py again with only the given environment (no .env file) and return its globals."""
-
+    """Import config.settings anew with only the given environment (no .env file); its old modules return after."""
     def load(**env: str) -> dict:
         for key in ENV_KEYS:
             monkeypatch.delenv(key, raising=False)
         for key, value in env.items():
             monkeypatch.setenv(key, value)
-        monkeypatch.setattr(
-            decouple, "config", decouple.AutoConfig(search_path=str(tmp_path))
-        )
-        return runpy.run_path(str(SETTINGS_FILE))
+        monkeypatch.setattr(decouple, "config", decouple.AutoConfig(search_path=str(tmp_path)))
+        monkeypatch.setattr(sys.modules["config"], "settings", sys.modules["config"].settings)
+        for name in [name for name in sys.modules if name.split(".")[:2] == SETTINGS_PACKAGE.split(".")]:
+            monkeypatch.delitem(sys.modules, name)
+        return vars(importlib.import_module(SETTINGS_PACKAGE))
 
     return load
 

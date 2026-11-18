@@ -37,7 +37,7 @@ TRUTHY = frozenset({"y", "yes", "t", "true", "on", "1"})
 class Setting(NamedTuple):
     pattern: re.Pattern
     families: tuple
-    # What the hub takes when the variable is absent (config/settings.py).
+    # What the hub takes when the variable is absent (config/settings/).
     default: str
 
 

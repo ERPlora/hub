@@ -5,7 +5,7 @@ import pytest
 
 from config.tests import test_settings
 
-#: settings.py run again with only the given environment, the fixture of the settings tests.
+#: config.settings imported anew with only the given environment, the fixture of the settings tests.
 load_settings = test_settings.load_settings
 
 
