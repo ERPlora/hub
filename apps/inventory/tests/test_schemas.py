@@ -135,6 +135,7 @@ def test_product_in_defaults():
         "low_stock_threshold": None,
         "ean13": None,
         "description": "",
+        "allergens": [],
         "product_type": "physical",
         "unit": "ud",
         "price_quantity": Decimal("1"),
@@ -416,6 +417,12 @@ def test_movement_list_by_dates_and_by_type():
 def test_every_list_has_a_search():
     for schema in (ProductListIn, LowStockListIn, ForSaleListIn, ProductCategoryListIn, CategoryListIn, MovementListIn, UnitListIn):
         assert "search" in schema.model_fields, schema.__name__
+
+
+def test_a_product_list_searches_at_most_200_characters():
+    for schema in (ProductListIn, LowStockListIn, ForSaleListIn):
+        assert schema(search="x" * 200).search == "x" * 200, schema.__name__
+        assert invalid_fields(schema, search="x" * 201) == {"search"}, schema.__name__
 
 
 # The JSON Schema of the assistant's tools

@@ -58,7 +58,7 @@ from live.errors import InvalidPayload, NotFound, OperationError
 from live.meta import module_configs
 from live.operations import atomic, get
 
-from base import activation, images
+from base import activation, blueprint_products, images
 from base.catalog import template_apps
 from base.entitlement import blocked_apps
 from base.relay import active_apps
@@ -1070,7 +1070,7 @@ def _inventory_product_rows(ctx: OperationContext) -> list[dict]:
             "categories": sorted(names[pk] for pk in row.category_ids if pk in names),
             "track_stock": row.track_stock,
             "is_active": row.is_active,
-            **({"image": row.image} if row.image else {}),
+            **blueprint_products.optional_fields(row),
         }
         for row in _pages(ctx, "inventory.product.list")
     ]
@@ -1093,7 +1093,7 @@ def _inventory_product_load(ctx: OperationContext, rows: list[dict], loaded: Loa
                 "description": _text(row, "description"),
                 "unit": _text(row, "unit"),
                 "tax_category_key": _text(row, "tax_category_key"),
-            }
+            } | blueprint_products.allergens_cell(row)
             for index, row in enumerate(chunk)
         ]
         try:

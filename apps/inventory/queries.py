@@ -80,7 +80,7 @@ from apps.inventory.schemas import (
     UnitPage,
 )
 from apps.tax.models import TaxCategory
-from base import images
+from base import allergens, images
 from base import operations as platform
 from base.business import money_text
 from base.queries.catalog_images import business_language, image_library
@@ -105,6 +105,7 @@ PRODUCT_HEADERS = (
     _("Threshold"),
     _("EAN-13"),
     _("Description"),
+    _("Allergens"),
     _("Unit"),
     _("Tax category"),
     _("Active"),
@@ -829,6 +830,7 @@ def export_products(ctx: OperationContext, params: ProductFiltersIn) -> dict:
             quantity_text(product.low_stock_threshold),
             _text_cell(product.ean13 or ""),
             _text_cell(product.description),
+            allergens.names(product.allergens),
             product.unit,
             _text_cell(product.tax_category.key if product.tax_category else ""),
             str(YES if product.is_active else NO),
@@ -909,21 +911,12 @@ def _products(settings: Settings):
 
 
 def _product_row(product: Product, urls: images.Urls) -> dict:
+    """What the till reads of the product (``_sale_row``) and what only the back office does."""
     fields = (
-        "id",
-        "name",
-        "sku",
         "ean13",
         "description",
-        "product_type",
-        "price",
-        "cost",
         "stock",
         "low_stock_threshold",
-        "unit",
-        "price_quantity",
-        "pricing_unit",
-        "tax_category_id",
         "track_stock",
         "is_active",
         "is_sold_out",
@@ -931,13 +924,9 @@ def _product_row(product: Product, urls: images.Urls) -> dict:
         "updated_at",
     )
     return {
+        **_sale_row(product, urls),
         **{field: getattr(product, field) for field in fields},
-        "tax_category_key": product.tax_category.key if product.tax_category else None,
-        "needs_tax_setup": needs_tax_setup(product),
-        "tracks_stock": product.tracks,
         "category_ids": [link.category_id for link in product.live_links],
-        "image": product.image,
-        "image_url": urls(product.image),
     }
 
 
@@ -953,6 +942,7 @@ def _sale_row(product: Product, urls: images.Urls) -> dict:
         "unit",
         "price_quantity",
         "pricing_unit",
+        "allergens",
     )
     return {
         **{field: getattr(product, field) for field in fields},

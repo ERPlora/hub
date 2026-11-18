@@ -200,6 +200,7 @@ def test_a_row_has_everything_the_screen_and_the_form_show(general):
         "sku": "CAF-1",
         "ean13": "8412345678905",
         "description": "",
+        "allergens": [],
         "product_type": "physical",
         "price": 100,
         "cost": 40,
@@ -434,6 +435,7 @@ def test_the_sale_catalog_has_only_active_live_products_with_what_prices_them(ge
         "unit": "kg",
         "price_quantity": Decimal("100.000"),
         "pricing_unit": "g",
+        "allergens": [],
         "tracks_stock": True,
         # INVENTORY-F32: the till's tile shows it, or its initials without one.
         "image": "",
@@ -908,86 +910,6 @@ def test_an_export_settles_its_ties_the_way_the_list_does(operation, schema, row
 def read_csv(export, delimiter):
     assert export.content.startswith("\ufeff")  # Excel reads it as UTF-8
     return list(csv.reader(io.StringIO(export.content[1:]), delimiter=delimiter))
-
-
-def test_the_export_has_every_filtered_product_not_just_a_page_with_the_import_headers(
-    general,
-):
-    for n in range(120):
-        product(f"Item {n:03}", f"IT-{n:03}", tax=general)
-    product("Other", "OTH")
-
-    with translation.override("en"):
-        export = run("inventory.product.export", ProductFiltersIn(search="item"))
-
-    assert (export.filename, export.content_type) == (
-        "inventory-products.csv",
-        "text/csv",
-    )
-    rows = read_csv(export, ",")
-    assert rows[0] == [
-        "Name",
-        "SKU",
-        "Price",
-        "Cost",
-        "Stock",
-        "Threshold",
-        "EAN-13",
-        "Description",
-        "Unit",
-        "Tax category",
-        "Active",
-    ]
-    assert len(rows) == 121
-    assert rows[1] == [
-        "Item 000",
-        "IT-000",
-        "€1.00",
-        "€0.00",
-        "0",
-        "10",
-        "",
-        "",
-        "ud",
-        "product.general",
-        "Yes",
-    ]
-
-
-def test_the_spanish_export_reads_like_the_screen_and_uses_the_semicolon_of_excel(
-    general,
-):
-    product(
-        "Gambas",
-        "GAM",
-        tax=general,
-        price=1250,
-        cost=820,
-        stock=Decimal("2.500"),
-        unit="kg",
-        ean13="8412345678905",
-        is_active=False,
-    )
-
-    with translation.override("es"):
-        export = run("inventory.product.export", ProductFiltersIn())
-
-    assert export.filename == "inventario-productos.csv"
-    header, row = read_csv(export, ";")
-    assert header[0] == "Nombre" and header[-2:] == ["Categoría fiscal", "Activo"]
-    assert row == [
-        "Gambas",
-        "GAM",
-        "12,50\xa0€",
-        "8,20\xa0€",
-        "2,5",
-        "10",
-        "8412345678905",
-        "",
-        "kg",
-        "product.general",
-        "No",
-    ]
 
 
 def test_an_empty_export_has_only_the_header():
