@@ -898,18 +898,21 @@ class TestProductsComeBack:
             back = Product.objects.get(pk=ids["coffee"])
             assert (back.is_deleted, back.image) == (False, latte)
 
+    def the_cake_comes_back(self, recoveries, hub, ids, copy) -> Product:
+        """The cake, gone altogether from the business, created again from ``copy``."""
+        gone_altogether(hub, ids["cake"])
+        row = recoveries.ask(copy, "inventory")
+        assert run() == 1
+        assert said(row) == ("done", [CATEGORIES, PRODUCTS | {"created": 1}, LINKS])
+        with use_hub(hub):
+            return Product.objects.get(sku="CAK-1")
+
     def test_a_product_no_longer_held_comes_back_with_its_allergens(self, recoveries, every_app_on):
         hub, ids, _ = self.a_business(recoveries, every_app_on)
         run_in(hub, "inventory.product.update", id=ids["cake"], allergens=["gluten", "milk"])
         copy = recoveries.copy_of(hub)
-        gone_altogether(hub, ids["cake"])
-        row = recoveries.ask(copy, "inventory")
 
-        assert run() == 1
-
-        assert said(row) == ("done", [CATEGORIES, PRODUCTS | {"created": 1}, LINKS])
-        with use_hub(hub):
-            assert Product.objects.get(sku="CAK-1").allergens == ["gluten", "milk"]
+        assert self.the_cake_comes_back(recoveries, hub, ids, copy).allergens == ["gluten", "milk"]
 
     def test_a_copy_from_before_allergens_still_gives_its_products_back_without_them(self, recoveries, every_app_on):
         hub, ids, _ = self.a_business(recoveries, every_app_on)
@@ -917,15 +920,9 @@ class TestProductsComeBack:
         # A copy made before products had allergens: neither the column nor the migration that adds it.
         in_the_copy(copy, "ALTER TABLE inventory_product DROP COLUMN allergens")
         in_the_copy(copy, "DELETE FROM django_migrations WHERE app = 'inventory' AND name = '0006_product_allergens'")
-        gone_altogether(hub, ids["cake"])
-        row = recoveries.ask(copy, "inventory")
 
-        assert run() == 1
-
-        assert said(row) == ("done", [CATEGORIES, PRODUCTS | {"created": 1}, LINKS])
-        with use_hub(hub):
-            back = Product.objects.get(sku="CAK-1")
-            assert (back.name, back.price, back.allergens) == ("Cake", 400, [])
+        back = self.the_cake_comes_back(recoveries, hub, ids, copy)
+        assert (back.name, back.price, back.allergens) == ("Cake", 400, [])
 
     def test_asked_again_nothing_is_made_twice_and_what_the_business_has_stays(self, recoveries, every_app_on):
         hub, ids, _ = self.a_business(recoveries, every_app_on)
