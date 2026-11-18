@@ -7,6 +7,7 @@ import { type BrowserContext, expect, test } from '@playwright/test';
 
 import { cardOf, cleanUp, createCard, customersReady, e2eName, FLOW_VIEWPORTS, inputOf, rowNamed, searchList, spanishMobile } from './customer-helpers';
 import { A, api, capture, login, psql, shot, shown } from './helpers';
+import { rowAction } from './service-helpers';
 import { toastSaying } from './toast-helpers';
 
 test.afterAll(() => cleanUp());
@@ -215,7 +216,7 @@ test('«Delete» on a row asks in a dialog, then deletes', async ({ page, contex
   await page.goto('/customer/customers');
   await customersReady(page);
   await searchList(page, 'customer-list', card.name);
-  await shown(page).locator(`[data-testid=customer-list-row-${card.id}-delete]`).click();
+  await rowAction(page, 'customer-list', card.id, 'delete');
   const dialog = page.locator('ion-modal[data-testid=customer-delete-confirm]');
   await expect(dialog).toContainText(card.name);
   await page.screenshot({ path: shot('customer-list-delete-confirm') });

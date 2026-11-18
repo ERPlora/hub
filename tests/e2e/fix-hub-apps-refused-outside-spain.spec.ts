@@ -8,6 +8,7 @@
 import { expect, type Page, test } from '@playwright/test';
 
 import { appRowsCopy } from './app-rows-helpers';
+import { appNote, expectSwitch, flipApp } from './apps-switch-helpers';
 import {
   A,
   api,
@@ -18,6 +19,7 @@ import {
   registerBusinessIn,
   registrationOf,
   settledCapture,
+  shown,
   signedInSpanish,
   testid,
 } from './helpers';
@@ -39,7 +41,7 @@ let registration: Registration;
 
 const verifactu = (page: Page) => appRow(page, 'verifactu');
 const stateOf = (page: Page) => verifactu(page).locator('[data-testid="apps-state"]');
-const reasonOf = (page: Page) => verifactu(page).locator('[data-testid="apps-refusal"]');
+const reasonOf = (page: Page) => appNote(page, 'verifactu');
 
 /** `a`'s row of VeriFactu as `state:chosen`, or `none`. */
 const stored = () =>
@@ -77,15 +79,15 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
       await expect(reasonOf(page)).toHaveCount(0);
       await settledCapture(page, `${KEY}-pl-on-${width}`);
 
-      await testid(page, 'apps-row-verifactu-toggle').click();
+      await flipApp(page, 'verifactu');
       const askOff = page.locator('.ep-confirm-dialog').last();
       await expect(askOff).toContainText('¿Desactivar VeriFactu?');
       await askOff.getByRole('button', { name: 'Desactivar', exact: true }).click();
 
-      // Off, outside Spain: not offered, with the reason.
+      // Off, outside Spain: its switch cannot move, with the reason.
       await expect(stateOf(page)).toHaveText('No disponible');
       await expect(reasonOf(page)).toHaveText(ONLY_IN_SPAIN_ES);
-      await expect(testid(page, 'apps-row-verifactu-toggle')).toHaveCount(0);
+      await expectSwitch(page, 'verifactu', { checked: false, disabled: true });
       await settledCapture(page, `${KEY}-pl-off-${width}`);
 
       // The server refuses it all the same when asked directly, and changes nothing.
@@ -105,7 +107,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
       // «Activar» asks first only when it brings Invoicing back on with it (BASE-F18): decided by what is stored, never
       // by whether the dialog happened to be on screen yet.
       const bringsInvoice = psql("select state from base_appactivation where host = 'a' and app = 'invoice'") !== 'on';
-      await testid(page, 'apps-row-verifactu-toggle').click();
+      await flipApp(page, 'verifactu');
       if (bringsInvoice) {
         const askOn = page.locator('.ep-confirm-dialog').last();
         await expect(askOn).toContainText('¿Activar VeriFactu?');
@@ -113,7 +115,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
       }
       await expect(stateOf(page)).toHaveText('Instalada');
       await expect(reasonOf(page)).toHaveText(NEVER_OFF_ES);
-      await expect(testid(page, 'apps-row-verifactu-toggle')).toHaveCount(0);
+      await expectSwitch(page, 'verifactu', { checked: true, disabled: true });
       await settledCapture(page, `${KEY}-es-on-${width}`);
     } finally {
       await context.close();
@@ -128,7 +130,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) for (const tab of ['/
     await registerBusinessIn(registration, 'ES');
     const { context, page } = await signedInSpanish(browser, viewport, tab);
     try {
-      const reasons = testid(page, 'apps-refusal');
+      const reasons = shown(page).locator('.data-table__cell-note, .data-table__card-note');
       await expect(reasons.first()).toBeVisible();
       await expect(reasons.first()).toContainText('la ley obliga');
       const cut = await reasons.evaluateAll((all) =>
@@ -157,7 +159,7 @@ test('VERIFACTU-F01 — in English, the reason and «Not available», at 1440', 
     await findIt(page);
     await expect(stateOf(page)).toHaveText('Not available');
     await expect(reasonOf(page)).toHaveText(ONLY_IN_SPAIN_EN);
-    await expect(testid(page, 'apps-row-verifactu-toggle')).toHaveCount(0);
+    await expectSwitch(page, 'verifactu', { checked: false, disabled: true });
     await settledCapture(page, `${KEY}-pl-off-en-1440`);
   } finally {
     await context.close();

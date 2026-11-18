@@ -10,6 +10,7 @@ import { type Browser, type BrowserContext, expect, test } from '@playwright/tes
 
 import { clockIn } from './attendance-helpers';
 import { A, api, type Credentials, EMPLOYEE, login, psql, shot, shown } from './helpers';
+import { offersRowAction, rowAction } from './service-helpers';
 
 type Envelope = { error?: { code: string } };
 type Page<T> = { rows: T[]; total: number };
@@ -87,7 +88,7 @@ test('an employee clocks a whole day with a break and sees only their own days',
     expect(new Set(own.data.rows.map((d) => d.member_name))).toEqual(new Set([`${anaName} Clock`]));
     const dayId = own.data.rows[0].id;
     await expect(records.locator(`[data-testid=attendance-records-row-${dayId}-history]`)).toBeVisible();
-    await expect(records.locator(`[data-testid=attendance-records-row-${dayId}-correct]`)).toHaveCount(0);
+    expect(await offersRowAction(employee.page, 'attendance-records', dayId, 'correct')).toBe(false);
     await expect(records.locator('[data-testid=attendance-presence]')).toHaveCount(0);
     await expect(records.locator('[data-testid=attendance-records-person]')).toHaveCount(0);
     await employee.page.screenshot({ path: shot('attendance-records-employee') });
@@ -156,7 +157,7 @@ test('a manager sees who is in, corrects a day with its reason, reads its histor
     await expect(view.locator('[data-testid=attendance-records-corrected]')).toContainText('Working day corrected.');
 
     // History: who, before → after, and the reason.
-    await view.locator(`[data-testid=attendance-records-row-${day.id}-history]`).click();
+    await rowAction(page, 'attendance-records', day.id, 'history');
     const history = page.locator('ion-modal[data-testid=attendance-history]');
     await expect(history.locator('[data-testid=attendance-history-item]')).toHaveCount(1);
     await expect(history.locator('[data-testid=attendance-history-item]')).toContainText('Arrived earlier, forgot to clock in');

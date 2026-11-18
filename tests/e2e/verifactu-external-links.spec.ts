@@ -12,6 +12,7 @@ import { type BrowserContext, expect, type Locator, type Page, test } from '@pla
 import { A, api, login, psql, shown } from './helpers';
 import { cleanInvoices, ensureIssuer, issuedIds, snapshotSeries } from './invoice-helpers';
 import { stamp } from './sale-helpers';
+import { rowAction } from './service-helpers';
 
 const RUN = stamp();
 const OPEN_EXTERNAL_COMMAND = 'open_external_url';
@@ -64,11 +65,13 @@ async function declarationUrl(context: BrowserContext): Promise<string> {
   return res.data.declaration_url;
 }
 
-/** One link: the page it lives on, how to find it there, and the address it goes to. */
+/** One link: the page it lives on, how to find it there (and tap it, when a tap on what was found is not it), and the
+ *  address it goes to. */
 interface ExternalLink {
   name: string;
   path: () => string;
   find: (page: Page) => Promise<Locator>;
+  tap?: (page: Page) => Promise<void>;
   address: (context: BrowserContext) => Promise<string>;
 }
 
@@ -81,8 +84,10 @@ const LINKS: ExternalLink[] = [
       await list.locator('[data-testid=verifactu-records-search] input').fill(ticket.number);
       const row = list.locator('[data-testid=verifactu-records-row]').filter({ hasText: ticket.number });
       await expect(row).toHaveCount(1);
-      return list.locator(`[data-testid=verifactu-records-row-${ticket.id}-verify]`);
+      return row;
     },
+    // A row action: its button, or its entry inside «⋮» (a card's, on a phone).
+    tap: (page) => rowAction(page, 'verifactu-records', ticket.id, 'verify'),
     address: async () => ticket.qrUrl,
   },
   {
@@ -146,7 +151,7 @@ for (const link of LINKS) {
     const tabs: Page[] = [];
     context.on('page', (tab) => tabs.push(tab));
     const before = page.url();
-    await target.click();
+    await (link.tap ? link.tap(page) : target.click());
 
     await expect.poll(() => askedToOpen(page), { message: 'the system browser was asked for the link’s address' }).toEqual([address]);
     // A click the link let through has announced its tab by now.
@@ -165,7 +170,7 @@ for (const link of LINKS) {
     // Any new page, not only a popup Playwright ties to this one: these links are `noopener`.
     const opened = context.waitForEvent('page');
     const before = page.url();
-    await target.click();
+    await (link.tap ? link.tap(page) : target.click());
     const tab = await opened;
     await tab.waitForURL(address);
     await tab.close();
