@@ -40,16 +40,21 @@ def sheets() -> list[PrintJob]:
     return list(PrintJob.objects.select_related("printer").order_by("created_at", "id"))
 
 
-def test_the_order_comes_out_on_the_printer_of_each_station():
-    printer("Grill printer", usage="kitchen", address="10.0.0.2")
-    printer("Bar printer", usage="bar", address="10.0.0.3")
-    bar = make_station("Bar", destination=Destination.PRINTER, printer_usage="bar")
+def burger_and_a_beer_at_the_bar(**bar):
+    """Table 4's check with a burger, which has no station, and a beer routed to the bar."""
+    station = make_station("Bar", printer_usage="bar", **bar)
     order = open_check("Table 4", ctx=system_context(A))
     add_line(order.id, dish("Burger"), ctx=waiter())
     beer = dish("Beer")
-    route_product(beer.id, bar)
+    route_product(beer.id, station)
     add_line(order.id, beer, ctx=waiter())
-    ticket = send(order.id)
+    return order
+
+
+def test_the_order_comes_out_on_the_printer_of_each_station():
+    printer("Grill printer", usage="kitchen", address="10.0.0.2")
+    printer("Bar printer", usage="bar", address="10.0.0.3")
+    ticket = send(burger_and_a_beer_at_the_bar(destination=Destination.PRINTER).id)
     by_usage = {job.usage: job for job in sheets()}
     assert sorted(by_usage) == ["bar", "kitchen"]
     kitchen, drinks = by_usage["kitchen"], by_usage["bar"]
@@ -105,13 +110,7 @@ def test_an_inactive_kitchen_printer_is_no_kitchen_printer():
 
 def test_each_function_goes_to_paper_only_where_it_has_a_printer():
     printer("Grill printer", usage="kitchen", address="10.0.0.2")
-    bar = make_station("Bar", printer_usage="bar")
-    order = open_check("Table 4", ctx=system_context(A))
-    add_line(order.id, dish("Burger"), ctx=waiter())
-    beer = dish("Beer")
-    route_product(beer.id, bar)
-    add_line(order.id, beer, ctx=waiter())
-    send(order.id)
+    send(burger_and_a_beer_at_the_bar().id)
     (kitchen,) = sheets()
     assert (kitchen.usage, kitchen.printer.name) == ("kitchen", "Grill printer")
     assert [item["name"] for item in kitchen.document["items"]] == ["Burger"]
