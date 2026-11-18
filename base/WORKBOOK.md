@@ -3235,9 +3235,9 @@ Pasos:
      se abre sola.
   3. Arriba, el vídeo del módulo, si tiene uno, en el idioma de la persona o, si no lo hay, en español. No se pide
      nada a YouTube hasta que se pulsa, y se ve dentro de la ventana.
-  4. Debajo, «Para qué sirve»; «En esta pantalla», con lo que enseña la pestaña en la que se está, abierto y marcado
-     «Estás aquí»; «Cómo se hace», con cada tarea terminada que se hace en ese módulo, plegada, con sus pasos y lo que
-     pasa si falla; y «Otras pantallas del módulo», plegadas.
+  4. Debajo, «Para qué sirve»; «En esta pantalla», con un resumen corto de lo que enseña la pestaña en la que se está,
+     abierto y marcado «Estás aquí»; «Cómo se hace», con cada tarea terminada que se hace en ese módulo, plegada, con
+     sus pasos y lo que pasa si falla; y «Otras pantallas del módulo», plegadas, cada una con su resumen corto.
   5. «Pregúntale al asistente» cierra la ayuda y abre el asistente con la pregunta escrita, sin enviarla: sobre la
      última tarea que se abrió o, si no se abrió ninguna, sobre el módulo y la pantalla. «Cerrar» cierra la ayuda.
 Entra: el módulo y la pestaña en la que se está.
@@ -3984,7 +3984,10 @@ Implicados: BASE-F92, BASE-F93
   y si tampoco, el español; `language` dice cuál salió. El vídeo, igual. Lo leído se guarda en memoria por módulo e
   idioma (`_READ`): los WORKBOOK solo cambian con una imagen nueva; con `DEBUG` se relee en cada llamada. Cada `###` bajo el encabezado de las pantallas es
   la pestaña del menú que tiene esa etiqueta en el idioma del fichero, más la de ajustes (`/<módulo>/settings`) si el
-  menú no la trae; un `####` es una ventana de esa pestaña. De los flujos se publican los que están hechos (lo que
+  menú no la trae. De cada pestaña se publica solo su resumen: lo que va entre su `###` y su primer `####` (o el final
+  de la sección, si no tiene ninguno). Desde el primer `####` es detalle para quien mantiene el módulo: se queda en el
+  fichero y nunca se publica; cada `####` es una ventana de esa pestaña y su título sirve de lugar para la `Pantalla:`
+  de un flujo. De los flujos se publican los que están hechos (lo que
   sigue en `Estado:` a una raya, dos puntos o un paréntesis es una nota) y cuya `Pantalla:` (partida por «,» y «;»)
   nombra una pestaña o una de sus ventanas, sin lo que va entre paréntesis en un lado ni en el otro; y de ellos solo el
   título sin el id, los pasos y «Si falla:», que empiezan con mayúscula. El encabezado, las claves de un flujo y «hecho» son el
@@ -3993,7 +3996,9 @@ Implicados: BASE-F92, BASE-F93
   (dos espacios o una barra al final de la línea), porque la pantalla respeta cada salto de línea y su `parseMarkdown`
   cierra un elemento en su primera línea. La CSP deja `frame-src 'self' https://www.youtube-nocookie.com` (`live.csp.with_frames`;
   `'self'` es la vista previa del editor de la web). `tests/test_help_workbooks.py` vigila cada módulo con la ayuda
-  lista en cada idioma: cada entrada del menú con su `###`, una sola vez, y cada `###` una pestaña; lo publicado, sin
+  lista en cada idioma: cada entrada del menú con su `###`, una sola vez, y cada `###` una pestaña; cada pestaña, con
+  un resumen que no está vacío y no pasa de 900 caracteres (dos o tres frases y, si la pantalla la tiene, una lista
+  corta como la leyenda de colores); lo publicado (y solo eso: el detalle bajo un `####` no se vigila), sin
   código, sin referencias a issues, sin tamaños en px, sin ids de flujo ni nombres de operación o de evento; cada flujo
   publicado, con sus pasos; ningún flujo que se lea como hecho en una pestaña, fuera; y cada traducción, con las mismas
   pestañas y flujos que el original.
