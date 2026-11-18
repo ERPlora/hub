@@ -1002,8 +1002,10 @@ Recibir el emisor del SaaS (`invoice.sync_issuer`) no es de ningún papel: solo 
   `--execute` para ver lo que hará). Su emisor es solo el de su BD: ningún otro negocio lo ve.
 
 - Anatomía completa: `apps.py`, `models.py` (`InvoiceSeries`, `Issuer`, `Invoice`, `InvoiceLine`),
-  `migrations/`, `schemas/` (`platform.py`, el cuerpo que manda el SaaS al hub de plataforma), `fiscal.py`
-  (aritmética pura: cierre por clave fiscal, prorrateo, formato del número), `queries.py`, `services.py`, `events.py`, `live.py`, `api.py`, `admin.py`,
+  `migrations/`, `schemas/` (`platform.py`, el cuerpo que manda el SaaS al hub de plataforma;
+  `document_issuer.py`, el emisor de `InvoiceOut`), `fiscal.py` (aritmética pura: cierre por clave fiscal,
+  prorrateo, formato del número), `document_issuer.py` (puro: el emisor de un documento y el NIF que imprime),
+  `queries.py`, `services.py`, `events.py`, `live.py`, `api.py`, `admin.py`,
   `templates/invoice/invoice.html`, `locale/`, `frontend/` y un `tests/test_<fichero>.py` por fichero,
   más integración con Ventas y Clientes y concurrencia con hilos.
 - **Numeración**: `InvoiceSeries.current_number` se sube con `UPDATE … RETURNING` (Django 6 refresca el
@@ -1044,6 +1046,15 @@ Recibir el emisor del SaaS (`invoice.sync_issuer`) no es de ningún papel: solo 
   PLAN-SAAS §3.1 punto 2, «Dos identidades» (decisión del 2026-10-11), dice que los datos fiscales del negocio
   viven y se editan en el Hub y que el SaaS solo guarda al pagador (`BillingProfile`); recibir el emisor del SaaS
   pide la dirección contraria. El emisor se escribe en el Hub (INVOICE-F21).
+- **El NIF que imprime el papel** (`document_issuer.py`): `InvoiceOut` lleva, junto a `issuer_tax_id` (el NIF tal
+  como se guarda, el que va a `IDEmisorFactura` y al `nif=` del QR, siempre sin prefijo: con «ES» la AEAT lo
+  rechaza), `issuer_vat_number`, el que imprimen el A4 y la pantalla. Un emisor inscrito en el ROI imprime su
+  NIF-IVA con el prefijo de su país (`ESB27593136`; Grecia, `EL`; un NIF que ya lo trae no lo duplica) en todas
+  sus facturas, también las nacionales; cualquier otro, su NIF tal cual. La composición es una sola,
+  `vat_number` de `apps/customer/tax_ids.py`, la misma que escribe el NIF-IVA de un destinatario. El Hub no
+  guarda la inscripción en el ROI de ningún negocio: solo sabe la de ERPlora, que está inscrita, por el NIF del
+  emisor de plataforma (`PLATFORM_ISSUER_TAX_ID`). La etiqueta sigue siendo «NIF» («Tax ID»). Que un negocio
+  diga que está en el ROI, y que su tique lo imprima también, es hub#1723.
 - **Contrato con VeriFactu** (`apps/verifactu`, `requires=["invoice"]`; su WORKBOOK, «Contrato con
   Facturación»): `_issue`, tras escribir el documento y su aviso y **dentro de la misma transacción**, llama
   por nombre a `verifactu.record.create` con `{"invoice_id": …}` y la misma sesión, en su savepoint. La

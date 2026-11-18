@@ -315,6 +315,25 @@ def test_its_status_follows_its_record(platform_hub, aeat):
         assert answer.error.model_dump() == {"code": "1100", "message": "Bad"}
 
 
+def test_erploras_paper_prints_its_eu_vat_number_while_the_aeat_gets_its_bare_tax_id(
+    platform_hub, settings
+):
+    # ERPlora is registered for intra-EU operations (ROI): every invoice of its own prints «ES» before its tax ID; the
+    # AEAT refuses the prefix, so VeriFactu's record and its QR keep the tax ID as it is.
+    settings.PLATFORM_ISSUER_TAX_ID = PLATFORM_ISSUER["tax_id"]
+    answer = issue()
+
+    got = run("invoice.invoice.get", {"number": BODY["number"]}, system())
+    document = run("invoice.invoice.platform_document", {"id": BODY["id"]}, system())
+    record = Record.objects.get()
+
+    assert (got.issuer_tax_id, got.issuer_vat_number) == ("B12345674", "ESB12345674")
+    assert "NIF: ESB12345674" in document.html
+    assert record.issuer_nif == "B12345674"
+    assert "<sum1:IDEmisorFactura>B12345674</sum1:IDEmisorFactura>" in record.xml
+    assert "nif=B12345674&" in answer.qr and "ESB12345674" not in answer.qr
+
+
 def test_the_status_of_an_invoice_it_never_issued_is_404(platform_hub):
     assert code_of(status) == "invoice.platform_unknown"
 
