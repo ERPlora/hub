@@ -600,7 +600,7 @@ class TestWhatGoesWithIt:
         self, cashier, coffee, platform_rule, monkeypatch
     ):
         # Cash register in the business (the conftest takes it out), charging cash without an open drawer.
-        monkeypatch.setattr("apps.sale.services.DRAWER_CHECK", "cash_register.session.current")
+        monkeypatch.setattr("apps.sale.services.charge_validation.DRAWER_CHECK", "cash_register.session.current")
         run("cash_register.settings.update", {"enable_cash_register": False})
         run("invoice.issuer.update", ISSUER)
         cap(10)
