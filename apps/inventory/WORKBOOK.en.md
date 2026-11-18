@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:e49e607a4983c0187098909fafbfd26141224e3c2c91759e64c19abf6819209b -->
+<!-- generated from WORKBOOK.md sha256:bff5f70590005a8b6b514d95403ef07c31be5dd747798e44245b516a69e73113 -->
 
 ## What it is for and who it is for
 
@@ -1113,8 +1113,8 @@ PRICING-F14, PRICING-F15, MODIFIER-F09, MODIFIER-F10, COMBO-F13, COMBO-F15
 
 ### INVENTORY-F35 Declare a product's allergens
 Status: partial — the product already keeps its allergens through the assistant and the API, and the catalogue, the
-exported CSV and the import through the API carry them; the block of the form, the line of the card and Import
-products recognising the "Allergens" column are missing
+exported CSV, the import through the API, the backup and the template carry them; the block of the form, the line of
+the card and Import products recognising the "Allergens" column are missing
 Actor: administrator, manager
 Screen: Products, Product card, Import products
 Steps:

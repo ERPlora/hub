@@ -1135,9 +1135,9 @@ Implicados: BASE-F114, INVENTORY-F01, INVENTORY-F03, INVENTORY-F04, INVENTORY-F0
 PRICING-F14, PRICING-F15, MODIFIER-F09, MODIFIER-F10, COMBO-F13, COMBO-F15
 
 ### INVENTORY-F35 Declarar los alérgenos de un producto
-Estado: parcial — el producto ya guarda sus alérgenos por el asistente y la API, y el catálogo, el CSV exportado y la
-importación por la API los llevan; faltan el bloque del formulario, la línea de la ficha y que Importar productos
-reconozca la columna «Alérgenos»
+Estado: parcial — el producto ya guarda sus alérgenos por el asistente y la API, y el catálogo, el CSV exportado, la
+importación por la API, la copia de seguridad y la plantilla los llevan; faltan el bloque del formulario, la línea de
+la ficha y que Importar productos reconozca la columna «Alérgenos»
 Actor: administrador, responsable
 Pantalla: Productos, Ficha del producto, Importar productos
 Pasos:
