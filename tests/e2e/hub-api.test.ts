@@ -157,13 +157,13 @@ describe('api and a hub busy for a moment (503 base.hub_busy)', () => {
 });
 
 describe('the shared helpers ask the hub’s API only through api', () => {
-  it('helpers.ts outside api, business.ts and demo-items.ts (turnOn, usernameOf, createItem…) send no request of their own', () => {
+  it('helpers.ts outside api and the modules split from it (turnOn, usernameOf, createItem…) send no request of their own', () => {
     const helpers = read(join(E2E_DIR, 'helpers.ts'));
     const start = helpers.indexOf('export async function api<T>(');
     const end = helpers.indexOf('\n}\n', start);
     expect(start, 'api lives in helpers.ts').toBeGreaterThan(-1);
     expect(end, 'the end of api').toBeGreaterThan(start);
-    const others = ['business.ts', 'demo-items.ts'].map((file) => read(join(E2E_DIR, file)));
+    const others = ['business.ts', 'demo-items.ts', 'detectors.ts', 'dev-server.ts', 'screen.ts'].map((file) => read(join(E2E_DIR, file)));
     const source = [helpers.slice(0, start), helpers.slice(end), ...others].join('\n');
     const own = source.split('\n').filter((line) => /\.request\.(get|post|put|patch|delete|fetch)\(/.test(line));
 
