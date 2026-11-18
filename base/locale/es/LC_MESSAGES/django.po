@@ -2268,3 +2268,72 @@ msgstr "Tu negocio está llegando a lo que incluye su plan: algunas cosas pueden
 #: bell.py
 msgid "See the plan’s usage"
 msgstr "Ver el uso del plan"
+
+#: workbook_help.py
+msgctxt "workbook"
+msgid "Screens"
+msgstr "Pantallas"
+
+#: workbook_help.py
+msgctxt "workbook"
+msgid "done"
+msgstr "hecho"
+
+#: workbook_help.py
+msgctxt "workbook"
+msgid "Status"
+msgstr "Estado"
+
+#: workbook_help.py
+msgctxt "workbook"
+msgid "Vertical"
+msgstr "Vertical"
+
+#: workbook_help.py
+msgctxt "workbook"
+msgid "Actor"
+msgstr "Actor"
+
+#: workbook_help.py
+msgctxt "workbook"
+msgid "Screen"
+msgstr "Pantalla"
+
+#: workbook_help.py
+msgctxt "workbook"
+msgid "Steps"
+msgstr "Pasos"
+
+#: workbook_help.py
+msgctxt "workbook"
+msgid "In"
+msgstr "Entra"
+
+#: workbook_help.py
+msgctxt "workbook"
+msgid "Out"
+msgstr "Sale"
+
+#: workbook_help.py
+msgctxt "workbook"
+msgid "If it fails"
+msgstr "Si falla"
+
+#: workbook_help.py
+msgctxt "workbook"
+msgid "Through the assistant"
+msgstr "Por el asistente"
+
+#: workbook_help.py
+msgctxt "workbook"
+msgid "Involved"
+msgstr "Implicados"
+
+#: queries/app_help.py
+msgctxt "workbook"
+msgid "Settings"
+msgstr "Ajustes"
+
+#: queries/app_help.py
+msgid "This app has no help yet."
+msgstr "Esta app aún no tiene ayuda."

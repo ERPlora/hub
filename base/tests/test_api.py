@@ -80,6 +80,7 @@ def test_the_spas_route_map_names_every_base_route():
     from base.tests.test_access_routes import ROUTES as WAY_IN
     from base.tests.test_api_keys import KEY_ROUTES as KEYS
     from base.tests.test_api_docs import API_DOC_ROUTES as API_DOCS
+    from base.tests.test_api_help import HELP_ROUTES as HELP
     from base.tests.test_approvals import APPROVAL_ROUTES as APPROVALS
     from base.tests.test_files_api import ROUTES as FILES
     from base.tests.test_image_catalog import CATALOG_IMAGE_ROUTES as CATALOG_IMAGES
@@ -123,7 +124,7 @@ def test_the_spas_route_map_names_every_base_route():
         ("POST", "/api/assistant/speak", "base.assistant.speak"),
         ("POST", "/api/support/report", "base.support.report"),
         ("POST", "/api/saas-pass", "base.saas_pass.create"),
-    } | {(method, f"/api{path}", op) for method, path, op in WAY_IN | PEOPLE | KEYS | APPROVALS | API_DOCS | LOCATIONS | CATALOG_IMAGES}
+    } | {(method, f"/api{path}", op) for method, path, op in WAY_IN | PEOPLE | KEYS | APPROVALS | API_DOCS | LOCATIONS | CATALOG_IMAGES | HELP}
 
 
 # Settings › Data: the blueprints, the loads, the export and the reset. Reading what a file brings goes by POST (a

@@ -376,6 +376,7 @@ def scope_b():
 #: (0.4.0.1862.1.6 → 0.4.0.1862.1.6.2), DER-encoded by hand: the library writes it, it does not build it.
 QC_STATEMENTS = x509.ObjectIdentifier("1.3.6.1.5.5.7.1.3")
 QC_TYPE_ESEAL = bytes.fromhex("3015" + "3013" + "06060400" + "8e460106" + "3009" + "060704008e46010602")
+TEST_AUTHORITY = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, "ERPlora Test Authority")])
 _KEYS: list = []
 
 
@@ -387,12 +388,13 @@ def make_p12(
     days: int = 365,
     password: bytes = b"secret",
     eseal: bool = False,
+    self_signed: bool = False,
 ) -> bytes:
-    """A .p12 made for the test (self-signed, never a real certificate) whose subject and usages are the
-    ones asked: ``None`` leaves an attribute (or the Extended Key Usage) out."""
-    if not _KEYS:
+    """A .p12 made for the test (never a real certificate) whose subject and usages are the ones asked: ``None``
+    leaves an attribute (or the Extended Key Usage) out. ``TEST_AUTHORITY`` issues it, or its own key signs it."""
+    while len(_KEYS) < 2:
         _KEYS.append(rsa.generate_private_key(public_exponent=65537, key_size=2048))
-    key = _KEYS[0]
+    key, authority_key = _KEYS
     attributes = [x509.NameAttribute(NameOID.COMMON_NAME, "ACME SL")]
     if org_id:
         attributes.append(x509.NameAttribute(NameOID.ORGANIZATION_IDENTIFIER, org_id))
@@ -403,7 +405,7 @@ def make_p12(
     builder = (
         x509.CertificateBuilder()
         .subject_name(name)
-        .issuer_name(name)
+        .issuer_name(name if self_signed else TEST_AUTHORITY)
         .public_key(key.public_key())
         .serial_number(1)
         .not_valid_before(now - dt.timedelta(days=max(1, -days + 1)))
@@ -420,7 +422,7 @@ def make_p12(
         builder = builder.add_extension(
             x509.UnrecognizedExtension(QC_STATEMENTS, QC_TYPE_ESEAL), critical=False
         )
-    cert = builder.sign(key, hashes.SHA256())
+    cert = builder.sign(key if self_signed else authority_key, hashes.SHA256())
     return pkcs12.serialize_key_and_certificates(
         b"test", key, cert, None, serialization.BestAvailableEncryption(password)
     )
