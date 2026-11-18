@@ -15,14 +15,14 @@ import {
   appRow,
   hostPage,
   psql,
-  type Registration,
   registerBusinessIn,
+  type Registration,
   registrationOf,
-  settledCapture,
   shown,
   signedInSpanish,
   testid,
 } from './helpers';
+import { settledCapture } from './screen';
 
 const KEY = 'FIX-HUB-APPS-REFUSED-OUTSIDE-SPAIN';
 const VIEWPORTS = {

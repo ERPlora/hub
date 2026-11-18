@@ -14,7 +14,7 @@ import { fileURLToPath } from 'node:url';
 import type { BrowserContext } from '@playwright/test';
 import { afterEach, beforeEach, describe, expect, it, type MockInstance, vi } from 'vitest';
 
-import { api } from './hub-api';
+import { api } from './helpers';
 
 const E2E_DIR = dirname(fileURLToPath(import.meta.url));
 const HUB_DIR = join(E2E_DIR, '..', '..');
@@ -157,8 +157,14 @@ describe('api and a hub busy for a moment (503 base.hub_busy)', () => {
 });
 
 describe('the shared helpers ask the hub’s API only through api', () => {
-  it('helpers.ts (turnOn, turnOnMissing, turnOffTurnedOn…) sends no request of its own', () => {
-    const source = read(join(E2E_DIR, 'helpers.ts'));
+  it('helpers.ts outside api and the modules split from it (turnOn, usernameOf, createItem…) send no request of their own', () => {
+    const helpers = read(join(E2E_DIR, 'helpers.ts'));
+    const start = helpers.indexOf('export async function api<T>(');
+    const end = helpers.indexOf('\n}\n', start);
+    expect(start, 'api lives in helpers.ts').toBeGreaterThan(-1);
+    expect(end, 'the end of api').toBeGreaterThan(start);
+    const others = ['business.ts', 'demo-items.ts', 'detectors.ts', 'dev-server.ts', 'screen.ts'].map((file) => read(join(E2E_DIR, file)));
+    const source = [helpers.slice(0, start), helpers.slice(end), ...others].join('\n');
     const own = source.split('\n').filter((line) => /\.request\.(get|post|put|patch|delete|fetch)\(/.test(line));
 
     expect(own).toEqual([]);

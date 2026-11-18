@@ -190,3 +190,6 @@ estilos base/frontend/components/HelpContent.vue la tarjeta «Estás aquí» y e
 estilos base/frontend/components/HelpEntry.vue el orden del «?» visible junto a la campana cuando el shell pliega el resto de la cabecera de la única ventana de ayuda de la plataforma
 estilos base/frontend/components/HelpFlowList.vue el acordeón de tareas, su buscador y la nota «Si algo falla» de la única ventana de ayuda de la plataforma
 estilos base/frontend/components/HelpWindow.vue la cabecera con el icono antes del título, el pie fijo y los estados de la única ventana de ayuda de la plataforma
+duplicados tests/e2e/detectors.ts:11-17 clon heredado de main con tests/e2e/settled.spec.ts:28-34: el código pasa tal cual de tests/e2e/helpers.ts a este módulo al repartirlo (ERPlora/erplora-next#74)
+duplicados tests/e2e/list-filters-stats.spec.ts:12-27 clon heredado de main con tests/e2e/datatable.spec.ts:15-30; al repartir tests/e2e/helpers.ts este cambio solo reescribe en él sus imports o el módulo que nombra un comentario (ERPlora/erplora-next#74)
+duplicados tests/e2e/hub-suspended.spec.ts:12-20 la constante de tamaños ya estaba igual en tests/e2e/website-business-currency.spec.ts:14-20 en main; el import nuevo de la línea de encima, al repartir tests/e2e/helpers.ts, la alarga hasta el mínimo del detector (ERPlora/erplora-next#74)

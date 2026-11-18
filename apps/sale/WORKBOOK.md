@@ -1554,7 +1554,7 @@ es una línea.
 ## Para quien lo mantiene
 
 - Anatomía completa: `apps.py`, `models.py`, `migrations/` (`0002` siembra Efectivo y Tarjeta, con
-  reverso), `schemas.py`, `pricing.py` (la valoración, sin ORM), `queries.py`, `services.py`,
+  reverso), `schemas.py`, `pricing.py` (la valoración, sin ORM), `queries.py`, `services/`,
   `events.py`, `live.py`, `api.py`, `admin.py`, `locale/`, `frontend/` y un `tests/test_<fichero>.py`
   por fichero, más `tests/test_integration_*.py` con Impuestos, Clientes, Inventario, Servicios,
   Facturación, Caja y Citas reales.

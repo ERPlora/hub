@@ -1993,7 +1993,7 @@ def test_an_article_deleted_after_the_sale_gets_nothing_back():
 
 
 def refunded(sale_id, *lines, refund_id=None, reason="returned"):
-    """What Sales records as ``sale.sale.refunded`` (apps/sale/services.py ``refund``), whole."""
+    """What Sales records as ``sale.sale.refunded`` (apps/sale/services/refunds.py ``refund``), whole."""
     payload = {
         "sale_id": str(sale_id),
         "sale_number": "20261014-0001",

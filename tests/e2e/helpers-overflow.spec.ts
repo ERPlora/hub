@@ -5,7 +5,8 @@
 // on screen. The checks here put a block wider than any window in each box the helper has to read and expect to see it.
 import { expect, type Page, test } from '@playwright/test';
 
-import { A, capture, horizontalOverflow, listReady, login, settled, shown } from './helpers';
+import { A, capture, horizontalOverflow, login, settled, shown } from './helpers';
+import { listReady } from './demo-items';
 
 const TASK = 'FIX-HUB-E2E-HORIZONTAL-SCROLL-CHECK-BLIND-TO-ION-CONTENT';
 

@@ -47,9 +47,9 @@
 1585 apps/inventory/services.py ERPlora/erplora-next#74
 1151 apps/inventory/tests/test_queries.py ERPlora/erplora-next#74
 2503 apps/inventory/tests/test_services.py ERPlora/erplora-next#74
-466 apps/invoice/frontend/operations.d.ts ERPlora/erplora-next#74
-1357 apps/invoice/queries.py ERPlora/erplora-next#74
-1034 apps/invoice/schemas/__init__.py ERPlora/erplora-next#74
+463 apps/invoice/frontend/operations.d.ts ERPlora/erplora-next#74
+1356 apps/invoice/queries.py ERPlora/erplora-next#74
+1031 apps/invoice/schemas/__init__.py ERPlora/erplora-next#74
 1759 apps/invoice/services.py ERPlora/erplora-next#74
 355 apps/kitchen/frontend/operations.d.ts ERPlora/erplora-next#74
 515 apps/kitchen/models.py ERPlora/erplora-next#74
@@ -86,7 +86,6 @@
 898 apps/sale/models.py ERPlora/erplora-next#74
 2556 apps/sale/queries.py ERPlora/erplora-next#74
 1717 apps/sale/schemas.py ERPlora/erplora-next#74
-3440 apps/sale/services.py ERPlora/erplora-next#74
 1562 apps/sale/tests/test_integration_service.py ERPlora/erplora-next#74
 562 apps/schedule/queries.py ERPlora/erplora-next#74
 668 apps/schedule/schemas.py ERPlora/erplora-next#74
@@ -187,7 +186,7 @@
 654 tests/e2e/flow-flows.spec.ts ERPlora/erplora-next#74
 689 tests/e2e/global-setup.test.ts ERPlora/erplora-next#74
 729 tests/e2e/helpers-login.test.ts ERPlora/erplora-next#74
-1369 tests/e2e/helpers.ts ERPlora/erplora-next#74
+1071 tests/e2e/helpers.ts ERPlora/erplora-next#74
 531 tests/e2e/inventory-products.spec.ts ERPlora/erplora-next#74
 516 tests/e2e/invoice-assistant.spec.ts ERPlora/erplora-next#74
 694 tests/e2e/reservation-book.spec.ts ERPlora/erplora-next#74
@@ -195,6 +194,6 @@
 539 tests/e2e/staff-flows.spec.ts ERPlora/erplora-next#74
 794 tests/e2e/table-flows.spec.ts ERPlora/erplora-next#74
 542 tests/e2e/verifactu-records.spec.ts ERPlora/erplora-next#74
-779 tests/e2e/website-flows.spec.ts ERPlora/erplora-next#74
+765 tests/e2e/website-flows.spec.ts ERPlora/erplora-next#74
 520 tests/e2e/whatsapp-graph.ts ERPlora/erplora-next#74
 1201 tests/test_no_internal_references.py ERPlora/erplora-next#74
