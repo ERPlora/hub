@@ -44,7 +44,7 @@ jobs:
     env:
       # DEBUG is off unless set: the suite runs with the development settings, like a local .env.
       DEBUG: "True"
-      # The defaults of config/settings.py, spelled out; pytest creates test_hub_next_gw<N>, one per
+      # The defaults of config/settings/backends.py, spelled out; pytest creates test_hub_next_gw<N>, one per
       # xdist worker.
       DB_HOST: 127.0.0.1
       DB_PORT: "5432"
@@ -100,7 +100,7 @@ jobs:
           git -C ../saas sparse-checkout set public/declaracion
       # The seeds' images must be in the shared image library's manifest (base/tests/test_seed_images.py), and the
       # templates load them from it: ERPlora/blueprints is public, so its img/ is fetched beside the Hub
-      # (../blueprints), where config/settings.py looks for it without a bucket (CATALOG_DIR). No token.
+      # (../blueprints), where config/settings/web.py looks for it without a bucket (CATALOG_DIR). No token.
       - name: The shared image library
         run: |
           git clone --quiet --depth 1 --filter=blob:none --sparse https://github.com/ERPlora/blueprints.git ../blueprints

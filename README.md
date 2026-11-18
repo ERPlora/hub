@@ -24,6 +24,30 @@ sube al repo.
 a un segundo checkout le basta `VITE_DEV_PORT=5203` en su `.env`. `pnpm run dev` o la e2e sueltos solo la leen
 del entorno, y `uv run pytest` sigue en el `5173` aunque la defina (`config/settings_pytest.py`).
 
+## Comprobaciones antes de subir
+
+```bash
+git config core.hooksPath .githooks   # una vez por clon, cuando su HEAD ya trae .githooks/
+scripts/checks.sh fast                # lo mismo que corre el gancho, a mano, sobre el árbol de trabajo
+```
+
+`scripts/checks.sh fast` pasa en unos segundos, sin red ni base de datos, los tests de guardarraíles del tamaño de
+cada fichero, de ruff, de los contratos de import-linter y de la complejidad cognitiva, con sus listas de excepciones,
+que solo encogen (`.file-size-allow`, las de `pyproject.toml` y `complexipy-snapshot.json`). Su salida dice qué
+fichero incumple y por qué.
+
+El gancho `.githooks/pre-push` corre primero el `pre-push` global de la máquina, con los mismos argumentos y la misma
+entrada, y después `scripts/checks.sh fast` sobre cada commit que se sube, sacado en un worktree temporal con el
+entorno de Python de este checkout (`.venv`, o el de `UV_PROJECT_ENVIRONMENT`): se comprueba lo que se sube, nunca el
+árbol de trabajo. Un rojo para el push, y no hay variable para saltárselo; sin el entorno (`uv sync`) también se para.
+`commit-msg`, `pre-commit` y `applypatch-msg` pasan el turno a los ganchos globales del mismo nombre, que
+`core.hooksPath` dejaría de correr. La suite de la CI vuelve a pasar estos tests al fusionar, así que un clon sin el
+gancho no se salta nada. Sus tests: `tests/test_githooks.py` y `tests/test_checks.py`.
+
+El ajuste vale para todos los worktrees del clon, y la ruta es relativa a cada uno: en un worktree cuya rama aún no
+trae `.githooks/`, git no corre ningún gancho, tampoco los globales. Una rama que no trae `scripts/checks.sh` no se
+puede subir hasta que se le mergea `origin/main`.
+
 ## El humo de navegador (`@smoke`)
 
 ```bash
@@ -101,7 +125,7 @@ tal cual.
 ## Un corte de la base de datos (BASE-F111)
 
 Un reinicio del escritor, un mantenimiento de AWS o el cambio de Blue/Green cortan la base unos segundos (PLAN-DB, ronda
-2026-11-04e, punto 5). El Hub enciende `live.database_cut` (`LIVE["database_cut"]` en `config/settings.py`; qué es un
+2026-11-04e, punto 5). El Hub enciende `live.database_cut` (`LIVE["database_cut"]` en `config/settings/modules.py`; qué es un
 corte y qué se repite, en el README de `packages/live`):
 
 - **Espera** hasta `DB_CUT_WAIT_SECONDS` (20 s por defecto, muy por debajo de los 120 s del balanceador) y repite sola una
@@ -484,10 +508,12 @@ app»), porque el repo es público.
 - El despliegue lee el fichero **del commit que despliega**: volver a una release es volver también a sus ajustes.
   Una release anterior al fichero conserva los ajustes vigentes.
 - Antes de registrar nada, `deploy/app_env.py` comprueba que solo lleva esas variables, en `hub` y `worker`, con
-  valores de texto (`true`/`false`; el slug, en minúsculas), nada con forma de secreto ni ninguna variable que ya
-  ponga Terraform; que `VERIFACTU_PRODUCTION_ENABLED` es igual en `hub` y `worker`, `false` explícito en pre y, en
-  prod, `true` mientras erplora.com cobre de verdad (`PLATFORM_INVOICING_ENABLED` en la última revisión de
-  `erplora-prod-saas`). Si algo falla, el despliegue para y dice qué y dónde (`prod.hub.<VARIABLE>`).
+  valores de texto (`true`/`false`; el slug, en minúsculas), nada con forma de secreto ni ninguna que Terraform dé
+  como secreto a esa familia (un solo dueño por variable: fuera de los secretos, Terraform no fija ninguno de estos
+  ajustes, solo pasa a sus revisiones los del `app_env` vigente); que `VERIFACTU_PRODUCTION_ENABLED` es igual en `hub`
+  y `worker`, `false` explícito en pre y, en prod, `true` mientras erplora.com cobre de verdad
+  (`PLATFORM_INVOICING_ENABLED` en la última revisión de `erplora-prod-saas`). Si algo falla, el despliegue para y
+  dice qué y dónde (`prod.hub.<VARIABLE>`).
 - **El candado:** en prod, abrir o cerrar el envío real a Hacienda (cambiar `VERIFACTU_PRODUCTION_ENABLED` respecto
   al vigente) no sale con el push: el despliegue para sin registrar nada y se relanza a mano con la confirmación
   exacta de lo que cambia:
@@ -497,10 +523,14 @@ app»), porque el repo es público.
     -f confirm_protected=VERIFACTU_PRODUCTION_ENABLED=true
   ```
 
+- Cada revisión nueva lleva exactamente los ajustes del fichero: uno que el fichero ya no trae sale de la revisión,
+  también si el `app_env` vigente no lo nombra porque lo dejó una vuelta atrás o un despliegue que falló después de
+  registrar. Ese despliegue fallido se repite tal cual.
 - Al acabar bien, el despliegue escribe esos ajustes en `/erplora/<entorno>/hub/app_env`, junto a la imagen
   (`image_tag`), y Terraform los relee para las revisiones que registra.
-- La vuelta atrás (`rollback.yml`) todavía no los mira: vuelve a la revisión anterior con los suyos, sin comprobarlos
-  ni escribirlos (ERPlora/hub#1719).
+- La vuelta atrás (`rollback.yml`) no registra revisiones: pasa las reglas de cada entorno y, en prod, el candado (con
+  su `confirm_protected`) y la regla del cobro sobre los ajustes que corren las revisiones a las que vuelve, sin leer
+  `deploy/app-env.json`, y al acabar bien los deja escritos en `app_env`.
 
 ### Las personas del negocio en su BD (`base.HubUser`)
 

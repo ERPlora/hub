@@ -18,7 +18,7 @@ from live.errors import Conflict
 from live.models import OutboxEvent
 from live.operations import get
 
-from apps.verifactu.queries import VERIFACTU
+from apps.verifactu.queries.app_hooks import VERIFACTU
 from apps.verifactu.tests.conftest import HUB_DB, A, business_in
 from base import activation, blueprint, events, services
 from base.models import AppActivation

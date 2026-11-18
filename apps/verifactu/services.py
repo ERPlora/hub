@@ -56,29 +56,24 @@ from apps.verifactu.models import (
     backoff,
     wait_reason_text,
 )
-from apps.verifactu.queries import (
-    OUTSIDE_SPAIN,
-    aeat_row,
+from apps.verifactu.queries.aeat_records import aeat_row
+from apps.verifactu.queries.authorisation import saas_unreachable
+from apps.verifactu.queries.chains import chain_out
+from apps.verifactu.queries.config import config_out
+from apps.verifactu.queries.country import OUTSIDE_SPAIN, refuse_outside_spain
+from apps.verifactu.queries.records import can_cancel, can_correct, find_invoice, find_record, summary
+from apps.verifactu.queries.route import (
     blockers,
-    can_cancel,
-    can_correct,
-    chain_out,
-    config_out,
     config_row,
     effective_environment,
-    find_invoice,
-    find_record,
     issuer_configured,
     issuer_identity,
     own_certificate,
     own_certificate_material,
     presenter,
     production_open,
-    refuse_outside_spain,
     route_problem,
-    saas_unreachable,
     sending_route,
-    summary,
     system_for,
     wait,
 )
@@ -1952,7 +1947,7 @@ def _route_refusal(config: Config, scope: Scope) -> Conflict | None:
 
 
 def _refuse_on_the_platform_hub(ctx: OperationContext) -> None:
-    """ERPlora's own hub files where its deployment does (``queries.effective_environment``): no switch moves it."""
+    """ERPlora's own hub files where its deployment does (``queries.route.effective_environment``): no switch moves it."""
     if platform.is_platform_hub(ctx.scope):
         raise Conflict(str(PLATFORM_FIXED), code="verifactu.platform_fixed")
 

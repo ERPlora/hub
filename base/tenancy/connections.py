@@ -1,7 +1,7 @@
 """Hot registration of the hubs' aliases.
 
 A hub with a database of its own (``Hub.db_name``) gets its alias, ``hub_<hex of its id>``, the first
-time a process uses it: a copy of the static ``hub_template`` alias (``config/settings.py``: the PgBouncer sidecar in
+time a process uses it: a copy of the static ``hub_template`` alias (``config/settings/backends.py``: the PgBouncer sidecar in
 transaction mode, no pool, ``CONN_MAX_AGE`` 0, no server-side cursors, no prepared statements) with the hub's database
 as ``NAME`` and, for a hub on a :class:`control.models.Cluster`, that cluster's PgBouncer. Its ``NAME`` is the row's
 ``db_name`` (pre's ``pre_hub_<hex>``, a demo's ``<control>_demo_<hex>``), never derived from the id; an alias already

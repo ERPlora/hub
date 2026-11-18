@@ -227,6 +227,7 @@ cierra la ventana sin guardarlo. Con la ventana como se abrió, atrás la cierra
 | KITCHEN-F28 | Retirar las rondas de una cuenta eliminada o unida a otra | hecho |
 | KITCHEN-F29 | Anular un plato ya enviado con aviso a cocina | hecho |
 | KITCHEN-F31 | Dar a Caja las comandas que siguen en marcha | hecho |
+| KITCHEN-F32 | Resaltar la alergia del cliente en la tarjeta y en el papel | no hecho |
 
 ### KITCHEN-F01 Crear una estación
 Estado: hecho
@@ -781,6 +782,37 @@ puede estar incompleta («No se ha podido comprobar lo que queda pendiente, así
 estar incompleta.»). Con Cocina apagada no hay comandas pendientes. Nunca impide cerrar la caja.
 Implicados: CASH_REGISTER-F08, CASH_REGISTER-F09, KITCHEN-F10, KITCHEN-F13
 
+### KITCHEN-F32 Resaltar la alergia del cliente en la tarjeta y en el papel
+Estado: no hecho — la comanda todavía no recibe la alergia del cliente ni los alérgenos del plato: hoy una alergia
+llega como texto de la nota (KITCHEN-F07)
+Actor: empleado
+Pantalla: Pantalla, Comandas
+Pasos:
+1. En el TPV, el camarero marca la alergia del cliente en la línea de su plato (SALE-F41) y envía la ronda
+   (KITCHEN-F18).
+2. En la tarjeta, la cabecera lleva la marca «Alergia», en rojo, junto a «Urgente» y «VIP», si alguno de sus
+   platos tiene una alergia marcada. Cada estación la ve solo si la tiene uno de sus platos.
+3. Debajo del nombre de ese plato, antes de sus suplementos y de su nota, sale un bloque propio en rojo: «Alergia:
+   Gluten». Si el plato lleva ese alérgeno según Inventario (SALE-F40), el bloque añade «El plato lleva Gluten». Un
+   plato sin alergia marcada no lleva bloque, aunque tenga alérgenos: la pantalla no repite los de cada plato.
+4. En un menú, el bloque sale en cada uno de sus platos, y «El plato lleva» nombra solo los alérgenos de ese plato.
+5. En el papel de la estación (KITCHEN-F08), la cabecera lleva `!! ALERGIA !!` (debajo de `!! URGENTE !!` si la
+   ronda va urgente) y, justo debajo del plato y antes de sus suplementos, `*** ALERGIA: GLUTEN ***` y, si lo
+   lleva, `*** LLEVA: GLUTEN ***`, cada uno en su renglón y en mayúsculas, para que se distinga sin color. La
+   reimpresión (KITCHEN-F09) sale igual.
+6. El cocinero sigue como siempre: marcar listo, recuperar y entregar no cambian (KITCHEN-F11 a KITCHEN-F13), y el
+   bloque sigue a la vista mientras el plato está en la pantalla. En **Comandas**, el detalle de la comanda lo
+   enseña también en su plato.
+Entra: de Ventas, por cada línea enviada, la alergia del cliente y los alérgenos congelados de su producto
+(SALE-F40, SALE-F41).
+Sale: la alergia y los alérgenos que coinciden, congelados en el plato como sus suplementos: cambiar la línea o el
+catálogo después no cambia esta comanda (avisa: comanda recibida).
+Si falla: si la hoja no se imprime, la alergia sigue en la pantalla y la comanda se reimprime como cualquier otra
+(KITCHEN-F09). Sin alergia marcada, el plato sale como hoy, con su nota tal cual. Una alergia que el cliente dice
+después de enviar no llega sola: se avisa de viva voz (SALE-F41). Una comanda hecha a mano (KITCHEN-F23) no lleva
+bloque de alergia: es para lo que no pasa por el TPV, y su nota sigue ahí.
+Implicados: SALE-F20, SALE-F40, SALE-F41, INVENTORY-F35, KITCHEN-F05, KITCHEN-F06, KITCHEN-F07, KITCHEN-F08, KITCHEN-F09
+
 ## Para quien lo mantiene
 
 ### Lo que ofrece: consultas (leen, no cambian nada)
@@ -1028,5 +1060,6 @@ que no tiene ningún papel: solo el sistema (`*`).
 - Cursos de verdad, retener y lanzar (kitchen#71): fuera del MVP («Referencia adoptada»).
 - Vaciar de golpe las comandas cobradas antes de pasar la cocina a papel (kitchen#158): hoy se sirven a
   mano (KITCHEN-F26, F27). Comportamiento nuevo, después del MVP.
-- Alérgenos de punta a punta (hub#1195): hoy una alergia es solo texto de la nota (KITCHEN-F07).
-  Comportamiento nuevo, después del MVP.
+- La alergia del cliente resaltada en la tarjeta y en el papel (KITCHEN-F32, `no hecho`, con INVENTORY-F35,
+  SALE-F40 y SALE-F41): la comanda y el papel, por hub#1737, y la tarjeta, por hub#1738. Hasta entonces, una
+  alergia es solo texto de la nota (KITCHEN-F07).

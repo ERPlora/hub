@@ -1613,10 +1613,10 @@ abierta sin su SDK; si no la manda, la puerta 11 tendría que sacar la cuenta de
   Con ellos, quien puede leer la bandeja figura en `sources` de `base.notice.list` y la app instalada le pide
   permiso para avisar aunque el negocio solo use WhatsApp.
 - Las fotos y las notas de voz del hilo (F06) se cargan de erplora.com: la CSP del Hub permite su origen en
-  `img-src` y `media-src` (`config/settings.py`, hub#147), y erplora.com las sirve a quien tiene su sesión
+  `img-src` y `media-src` (`config/settings/web.py`, hub#147), y erplora.com las sirve a quien tiene su sesión
   (`<slug>.erplora.com` y `erplora.com` son un mismo sitio, así que la cookie viaja).
 - Para que la ventana de Meta devuelva su código (F01, F02), las páginas del Hub no pueden cortar las
-  ventanas que abren: `SECURE_CROSS_ORIGIN_OPENER_POLICY = "same-origin-allow-popups"` en `config/settings.py`
+  ventanas que abren: `SECURE_CROSS_ORIGIN_OPENER_POLICY = "same-origin-allow-popups"` en `config/settings/core.py`
   (hecho en hub#154). La CSP no cambia: la ventana es otra pestaña, sin
   `frame-src`, `connect-src` ni `form-action` nuevos, y el `postMessage` no pasa por la CSP.
 

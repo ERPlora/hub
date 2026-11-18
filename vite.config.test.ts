@@ -1,6 +1,6 @@
 // @vitest-environment node
 // The Vite config is a contract with Django (`packages/live/live/spa.py` and `LIVE["spa"]` in
-// `config/settings.py`): the dev server URLs and the manifest Django reads come from here. In Node, where the config
+// `config/settings/modules.py`): the dev server URLs and the manifest Django reads come from here. In Node, where the config
 // runs: under happy-dom a stand-in for `node:os` never reaches the config's own import of it.
 import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
