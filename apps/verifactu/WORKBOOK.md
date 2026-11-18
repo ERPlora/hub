@@ -75,7 +75,7 @@ Aquí la referencia no es un competidor: es la norma de la AEAT.
   aprueba la autorización o subes y eliges tu certificado. En pruebas lleva la pastilla «Importante» (no frena la
   venta: en pruebas se vende igual) y solo lo ve quien configura VeriFactu. En producción (VERIFACTU-F08), si la vía
   se pierde (se revoca la autorización, o el certificado caduca o se quita), lleva «Necesario para facturar» y sale
-  la franja «Todavía no puedes facturar» encima de las demás pantallas, porque cada venta nueva se rechaza; lo ve
+  el aviso «Todavía no puedes facturar» en la campana, con «Configurar VeriFactu», porque cada venta nueva se rechaza; lo ve
   todo el equipo, y a quien no configura VeriFactu le dice «Esto lo tiene que configurar un administrador.». Solo
   se lo pide a un negocio de España; uno sin país (una demo) cuenta como España, y uno de otro país no lo ve nunca,
   ni en pruebas ni en producción (hub#682).
@@ -290,8 +290,8 @@ Pasos:
    encenderla, carga todo lo demás y queda completo, sin «Reintentar», diciendo por qué VeriFactu se queda fuera.
 4. Si ya estaba encendida en un negocio de otro país, no hace nada y se puede desactivar: las facturas salen sin registro ni QR, **VeriFactu → Ajustes** y **VeriFactu → Configuración** dicen
    arriba «VeriFactu solo es para negocios de España.» sin ofrecer nada que lleve a la AEAT, y lo que pida registrar o enviar algo contesta lo mismo.
-   «Termina de configurar tu negocio», en el Inicio, no le pide «Configura VeriFactu» ni la franja «Todavía no puedes
-   facturar» sale por ella; un negocio sin país (una demo) cuenta como España y sí lo ve (hub#682).
+   «Termina de configurar tu negocio», en el Inicio, no le pide «Configura VeriFactu» ni el aviso «Todavía no puedes
+   facturar» de la campana sale por ella; un negocio sin país (una demo) cuenta como España y sí lo ve (hub#682).
 5. Ninguna plantilla la enciende, tampoco en España: ni «Empieza con un negocio como el tuyo» del Inicio ni «Usar
    plantilla» de **Ajustes → Datos y copias** la nombran en «Revisa lo que trae» ni la activan. Cargan todo lo demás del
    sector, Facturación incluida, y VeriFactu sigue «Desactivada» en Apps, con «Activar», y «Termina de configurar tu

@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:0ed55fac6e6c1b0ab779d4cced98bc9628b8c815b9c5f5837ffc6a6ae70f9e02 -->
+<!-- generated from WORKBOOK.md sha256:4b29696d719ef42fac11c0c87eef5fd8e1bb5d7f68358d21773e007b326c47ac -->
 
 ## What it is for and who it is for
 
@@ -67,8 +67,8 @@ Here the reference is not a competitor: it is the AEAT's rules.
   "Done" as soon as ERPlora approves the authorisation or you upload and choose your certificate. In testing it
   carries the "Important" pill (it does not hold back selling: in testing you sell just the same) and only whoever
   sets up VeriFactu sees it. In production (VERIFACTU-F08), if the route is lost (the authorisation is revoked, or
-  the certificate expires or is removed), it carries "Needed to invoice" and the strip "You cannot invoice yet" shows
-  above the other screens, because every new sale is refused; the whole team sees it, and whoever does not set up
+  the certificate expires or is removed), it carries "Needed to invoice" and the bell carries the notice "You cannot
+  issue invoices yet", with "Set up VeriFactu", because every new sale is refused; the whole team sees it, and whoever does not set up
   VeriFactu is told "An administrator has to set this up.". Only a business in Spain is asked; one without a
   country (a demo) counts as Spain, and one from another country never sees it, neither in testing nor in production
   (hub#682).
@@ -280,8 +280,8 @@ Steps:
 4. If it was already on in a business from another country, it does nothing and can be turned off: invoices go out without a record or QR, **VeriFactu → Settings** and **VeriFactu → Configuration**
    say on top "VeriFactu is only for businesses in Spain." without offering anything that leads to the AEAT, and
    whatever asks to record or send something answers the same.
-   "Finish setting up your business", on the Home, does not ask it to "Set up VeriFactu" nor does the strip "You
-   cannot invoice yet" show because of it; a business without a country (a demo) counts as Spain and does see it
+   "Finish setting up your business", on the Home, does not ask it to "Set up VeriFactu" nor does the bell's notice
+   "You cannot issue invoices yet" show because of it; a business without a country (a demo) counts as Spain and does see it
    (hub#682).
 5. No template turns it on, in Spain either: neither the Home's "Start with a business like yours" nor "Use template"
    in **Settings → Data and backups** names it in "Review what it brings" or turns it on. They load everything else of

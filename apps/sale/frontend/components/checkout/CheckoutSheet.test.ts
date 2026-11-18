@@ -3,7 +3,9 @@
 // A sheet over the till; nothing is read while it is closed; each opening is a new attempt (its own key);
 // the ✕, the backdrop and Escape close it, never while charging; a charge closes it and hands the sale
 // to the till (also when the lost answer's lookup found it).
+import { type ActionNotice, connectActionCenter, useActionCenter } from '@erplora/ui/shell';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { ref } from 'vue';
 
 import { business, click, flush, mountSale, resultFrame } from '../../__tests__/mount-sale';
 import type { CompleteIn, PaymentMethodOut, PreviewOut, SaleOut } from '../../operations';
@@ -137,5 +139,32 @@ describe('CheckoutSheet', () => {
     expect(s.modal().attributes('data-backdrop-dismiss')).toBe('false');
     expect((s.find('sale-checkout-close').element as HTMLElement & { disabled?: boolean }).disabled).toBe(true);
     expect(ionModalStubOf(s.modal().element).tapBackdrop()).toBe(false);
+  });
+});
+
+describe('CheckoutSheet keeps the screen clear during a charge', () => {
+  const notice = (id: string): ActionNotice => ({ id, severity: 'danger', icon: 'ion:warning-outline', label: id, title: id });
+
+  it('a notice that comes while it is open only makes the bell pulse; once closed, the next one comes as a card', async () => {
+    const notices = ref<ActionNotice[]>([]);
+    const disconnect = connectActionCenter({ notices, failed: ref(false) });
+    try {
+      const center = useActionCenter();
+      const s = await setup();
+      await s.open();
+      const pulse = center.pulse.value;
+      notices.value = [notice('printer.offline')];
+      await flush();
+      expect(center.arrival.value).toBeUndefined();
+      expect(center.pulse.value).not.toBe(pulse);
+
+      await s.wrapper.setProps({ open: false });
+      await flush();
+      notices.value = [notice('printer.offline'), notice('invoice.blocked')];
+      await flush();
+      expect(center.arrival.value?.id).toBe('invoice.blocked');
+    } finally {
+      disconnect();
+    }
   });
 });
