@@ -1,15 +1,16 @@
 // Turning an app on or off with its switch (BASE-F18, F19, F23, F24): what is asked, sent and said, and the switch
 // going back to the real state when nothing changed.
 import { applySurface, toastError, toastSuccess } from '@erplora/ui/shell';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { sessionChanged } from '../lib/access';
 
+import { app } from '../__tests__/app-row';
 import {
-  app,
   appActionLabel,
   flip,
   flipNow,
+  freshEachTest,
   type Mounted,
   noteOf,
   open,
@@ -20,34 +21,15 @@ import {
   STORE,
   switchState,
 } from '../__tests__/apps-page';
+import { confirmSpy } from '../__tests__/apps-page-spies';
 import { EMPLOYEE, flush, followPass, passRefused, placedUpgrade, SIGNED } from '../__tests__/mount-base';
 import type { AppList } from '../operations';
 
-const mocks = vi.hoisted(() => ({ confirm: vi.fn() }));
-vi.mock('@erplora/ui/components', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@erplora/ui/components')>()),
-  useConfirm: () => ({ confirm: mocks.confirm }),
-}));
-vi.mock('@erplora/ui/shell', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@erplora/ui/shell')>()),
-  toastSuccess: vi.fn(() => Promise.resolve()),
-  toastError: vi.fn(() => Promise.resolve()),
-}));
-vi.mock('../lib/access', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../lib/access')>()),
-  sessionChanged: vi.fn(),
-}));
+vi.mock('@erplora/ui/components', async (importOriginal) => (await import('../__tests__/apps-page-spies')).componentsWithConfirmSpy(importOriginal));
+vi.mock('@erplora/ui/shell', async (importOriginal) => (await import('../__tests__/toast-spies')).shellWithToastSpies(importOriginal));
+vi.mock('../lib/access', async (importOriginal) => (await import('../__tests__/apps-page-spies')).accessWithSessionSpy(importOriginal));
 
-beforeEach(() => {
-  applySurface('web');
-  mocks.confirm.mockReset();
-  vi.mocked(toastSuccess).mockClear();
-  vi.mocked(toastError).mockClear();
-  vi.mocked(sessionChanged).mockClear();
-});
-afterEach(() => {
-  document.body.innerHTML = '';
-});
+freshEachTest();
 
 // sale came with customer; task was chosen; flow is off and needs nothing; booking (off) needs schedule (off).
 const SALE = app('sale', { name: 'Sales', requires: ['customer'] });
@@ -85,14 +67,14 @@ describe('the switch of an app', () => {
   });
 
   it('turned off, it asks with the app and what goes with it, turns it off and reads the menu again', async () => {
-    mocks.confirm.mockResolvedValue(true);
+    confirmSpy.mockResolvedValue(true);
     const m = await open('/apps', {
       onApi: () => Response.json({ app: 'sale', state: 'off', chosen: false, along: [{ id: 'customer', name: 'Customers' }] }),
     });
     await m.result(m.call, 'base.app.list', APPS);
     await flip(m, 'sale', false);
 
-    const asked = mocks.confirm.mock.calls[0][0];
+    const asked = confirmSpy.mock.calls[0][0];
     expect([asked.title, asked.tone]).toEqual(['Turn off Sales?', 'danger']);
     expect(asked.message).toContain('Customers');
     expect(asked.message).toContain('Nothing is deleted');
@@ -102,7 +84,7 @@ describe('the switch of an app', () => {
   });
 
   it('cancelled, nothing is sent and the switch is on again', async () => {
-    mocks.confirm.mockResolvedValue(false);
+    confirmSpy.mockResolvedValue(false);
     const m = await open();
     await m.result(m.call, 'base.app.list', APPS);
     await flip(m, 'task', false);
@@ -115,7 +97,7 @@ describe('the switch of an app', () => {
     const m = await open();
     await m.result(m.call, 'base.app.list', APPS);
     await flip(m, 'customer', false);
-    expect(mocks.confirm).not.toHaveBeenCalled();
+    expect(confirmSpy).not.toHaveBeenCalled();
     expect(m.net.api).toEqual([]);
     expect(refused(m).text()).toContain('Nothing was changed');
     expect(refused(m).text()).toContain('Turn off Sales first.');
@@ -123,7 +105,7 @@ describe('the switch of an app', () => {
   });
 
   it('a 409 from the server says the same, with the apps it names', async () => {
-    mocks.confirm.mockResolvedValue(true);
+    confirmSpy.mockResolvedValue(true);
     const m = await open('/apps', {
       locale: 'es',
       onApi: refusal(409, { code: 'base.app_required', message: 'server words', required_by: ['sale'] }),
@@ -137,7 +119,7 @@ describe('the switch of an app', () => {
   });
 
   it('an app that refuses to go off says its reason', async () => {
-    mocks.confirm.mockResolvedValue(true);
+    confirmSpy.mockResolvedValue(true);
     const m = await open('/apps', {
       onApi: refusal(409, { code: 'base.app_vetoed', message: 'VeriFactu has records the AEAT has not accepted yet.', app: 'task' }),
     });
@@ -147,7 +129,7 @@ describe('the switch of an app', () => {
   });
 
   it('a refusal stays until it is closed, and the next change clears it', async () => {
-    mocks.confirm.mockResolvedValue(true);
+    confirmSpy.mockResolvedValue(true);
     let answer = refusal(409, { code: 'base.app_vetoed', message: 'Send the pending records first.', app: 'task' });
     const m = await open('/apps', { onApi: () => answer() });
     await m.result(m.call, 'base.app.list', APPS);
@@ -175,20 +157,20 @@ describe('the switch of an app', () => {
     const m = await open('/apps#all', { onApi: () => Response.json({ app: 'flow', state: 'on', chosen: true, along: [] }) });
     await m.result(m.call, 'base.app.list', APPS);
     await flip(m, 'flow', true);
-    expect(mocks.confirm).not.toHaveBeenCalled();
+    expect(confirmSpy).not.toHaveBeenCalled();
     expect(posted(m)).toEqual([['/api/apps/enable', { app: 'flow' }]]);
     expect(vi.mocked(toastSuccess).mock.calls[0][0]).toBe('Flows is on.');
     expect(sessionChanged).toHaveBeenCalledTimes(1);
   });
 
   it('turned on, an app that needs others off asks first, naming them', async () => {
-    mocks.confirm.mockResolvedValue(true);
+    confirmSpy.mockResolvedValue(true);
     const m = await open('/apps#all', {
       onApi: () => Response.json({ app: 'booking', state: 'on', chosen: true, along: [{ id: 'schedule', name: 'Schedules' }] }),
     });
     await m.result(m.call, 'base.app.list', APPS);
     await flip(m, 'booking', true);
-    const asked = mocks.confirm.mock.calls[0][0];
+    const asked = confirmSpy.mock.calls[0][0];
     expect([asked.title, asked.message]).toEqual(['Turn on Bookings?', 'Bookings needs Schedules: it turns on with it.']);
     expect(posted(m)).toEqual([['/api/apps/enable', { app: 'booking' }]]);
     expect(vi.mocked(toastSuccess).mock.calls[0][0]).toBe('Bookings is on. Also turned on: Schedules.');

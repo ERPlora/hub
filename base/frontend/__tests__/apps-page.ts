@@ -1,30 +1,15 @@
 // What the tests of the Apps screen share: its apps, its list and how a row is read and handled.
+import { applySurface, toastError, toastSuccess } from '@erplora/ui/shell';
+import { afterEach, beforeEach, vi } from 'vitest';
+
+import { app } from './app-row';
+import { confirmSpy } from './apps-page-spies';
 import { flush, mountBase } from './mount-base';
-import type { AppList, AppRow } from '../operations';
+import { sessionChanged } from '../lib/access';
+import type { AppList } from '../operations';
 import AppsPage from '../pages/AppsPage.vue';
 
 const PopoverStub = { props: { isOpen: Boolean }, template: '<div v-if="isOpen"><slot /></div>' };
-
-export function app(id: string, fields: Partial<AppRow> = {}): AppRow {
-  return {
-    id,
-    name: id[0].toUpperCase() + id.slice(1),
-    icon: 'ion:cube-outline',
-    category: 'sales',
-    category_label: 'Sales, payments and tax',
-    summary: `What ${id} does.`,
-    premium: false,
-    right: 'free',
-    state: 'on',
-    chosen: true,
-    path: `/${id}/home`,
-    requires: [],
-    required_by: [],
-    refusal: null,
-    mandatory: false,
-    ...fields,
-  };
-}
 
 export const STORE = 'https://erplora.com/store/modules?business=h1';
 export const PLANS = 'https://erplora.com/store/plans?business=h1';
@@ -60,6 +45,21 @@ export async function open(path = '/apps', options: Parameters<typeof mountBase>
   return { ...m, call };
 }
 export type Mounted = Awaited<ReturnType<typeof open>>;
+
+/** Each test starts on the web with every spy new, and leaves the page empty. The test file mocks the confirmation,
+ *  the toasts and the session's refresh (`apps-page-spies.ts`, `toast-spies.ts`). */
+export function freshEachTest(): void {
+  beforeEach(() => {
+    applySurface('web');
+    confirmSpy.mockReset();
+    vi.mocked(toastSuccess).mockClear();
+    vi.mocked(toastError).mockClear();
+    vi.mocked(sessionChanged).mockClear();
+  });
+  afterEach(() => {
+    document.body.innerHTML = '';
+  });
+}
 
 export const ids = (m: Mounted) => m.wrapper.findAll('[data-testid="apps-row"]').map((row) => row.attributes('data-id'));
 export const rowOf = (m: Mounted, id: string) => m.wrapper.find(`[data-testid="apps-row"][data-id="${id}"]`);

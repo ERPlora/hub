@@ -1,33 +1,18 @@
 // What an app's switch says beforehand: refused, mandatory, being set up or failed (BASE-F14, F21, F22, F25).
-import { applySurface, toastSuccess } from '@erplora/ui/shell';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { toastSuccess } from '@erplora/ui/shell';
+import { describe, expect, it, vi } from 'vitest';
 
-import { app, appActionLabel, flip, LIST, type Mounted, noteOf, open, PLANS, pressAppAction, rowOf, STORE, switchState, TAX } from '../__tests__/apps-page';
+import { app } from '../__tests__/app-row';
+import { appActionLabel, flip, freshEachTest, LIST, type Mounted, noteOf, open, PLANS, pressAppAction, rowOf, STORE, switchState, TAX } from '../__tests__/apps-page';
+import { confirmSpy } from '../__tests__/apps-page-spies';
 import { EMPLOYEE } from '../__tests__/mount-base';
 import type { AppList, AppRow } from '../operations';
 
-const mocks = vi.hoisted(() => ({ confirm: vi.fn() }));
-vi.mock('@erplora/ui/components', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@erplora/ui/components')>()),
-  useConfirm: () => ({ confirm: mocks.confirm }),
-}));
-vi.mock('@erplora/ui/shell', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@erplora/ui/shell')>()),
-  toastSuccess: vi.fn(() => Promise.resolve()),
-}));
-vi.mock('../lib/access', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../lib/access')>()),
-  sessionChanged: vi.fn(),
-}));
+vi.mock('@erplora/ui/components', async (importOriginal) => (await import('../__tests__/apps-page-spies')).componentsWithConfirmSpy(importOriginal));
+vi.mock('@erplora/ui/shell', async (importOriginal) => (await import('../__tests__/toast-spies')).shellWithToastSpies(importOriginal));
+vi.mock('../lib/access', async (importOriginal) => (await import('../__tests__/apps-page-spies')).accessWithSessionSpy(importOriginal));
 
-beforeEach(() => {
-  applySurface('web');
-  mocks.confirm.mockReset();
-  vi.mocked(toastSuccess).mockClear();
-});
-afterEach(() => {
-  document.body.innerHTML = '';
-});
+freshEachTest();
 
 const state = (m: Mounted, id: string) => rowOf(m, id).find('[data-testid="apps-state"]');
 const posted = (m: Mounted) => m.net.api.map((c) => [c.url, JSON.parse(String(c.init.body ?? '{}')) as Record<string, unknown>]);
@@ -102,11 +87,11 @@ describe('what the business’s country requires on (hub#997)', () => {
   });
 
   it('turning off the app it came with never names it among what goes off with it', async () => {
-    mocks.confirm.mockResolvedValue(false);
+    confirmSpy.mockResolvedValue(false);
     const m = await open('/apps');
     await m.result(m.call, 'base.app.list', MINE);
     await flip(m, 'sale', false);
-    const asked = mocks.confirm.mock.calls[0][0];
+    const asked = confirmSpy.mock.calls[0][0];
     expect(asked.message).toContain('Customers');
     expect(asked.message).not.toContain('Taxes');
   });
@@ -190,7 +175,7 @@ describe('an app whose tables the business’s database is still getting', () =>
   });
 
   it('one that could not be turned on can be given up instead, from «⋮»', async () => {
-    mocks.confirm.mockResolvedValue(true);
+    confirmSpy.mockResolvedValue(true);
     const m = await open('/apps', { onApi: () => Response.json({ app: 'flow', state: 'off', chosen: false, along: [] }) });
     await m.result(m.call, 'base.app.list', listOf(TASK, FLOW_FAILED));
     expect(await appActionLabel(m, 'flow', 'off')).toBe('Turn off');
@@ -199,7 +184,7 @@ describe('an app whose tables the business’s database is still getting', () =>
   });
 
   it('one being set up can be given up too, in Spanish «Desactivar»', async () => {
-    mocks.confirm.mockResolvedValue(true);
+    confirmSpy.mockResolvedValue(true);
     const m = await open('/apps', { locale: 'es', onApi: () => Response.json({ app: 'flow', state: 'off', chosen: false, along: [] }) });
     await m.result(m.call, 'base.app.list', listOf(TASK, FLOW_CREATING));
     expect(await appActionLabel(m, 'flow', 'off')).toBe('Desactivar');

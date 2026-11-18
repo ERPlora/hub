@@ -6,6 +6,7 @@ import { ConfirmDialog, DataTable, EmptyState } from '@erplora/ui/components';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Component } from 'vue';
 
+import { cardValues } from '../../../../base/frontend/__tests__/data-table-cards';
 import { itFillsThePage } from '../__tests__/list-fills-the-page';
 import { flush, ionValue, type MountOptions, mountReservation, page } from '../__tests__/mount-reservation';
 import { entryRow, reservationRow } from '../__tests__/rows';
@@ -81,10 +82,7 @@ describe('WaitlistPage', () => {
     await s.result(OP, page([WAITING, entryRow({ id: 'w4', guest_name: 'John Smith', guest_phone: '+447911123456' })]));
     expect([s.cells(0)[3], s.cells(1)[3]]).toEqual(['+34 600 333 444', '+44 791 112 3456']);
     await ionValue(s.wrapper.find('[data-testid="reservation-waitlist-view"]').element, 'cards');
-    const phones = s.wrapper
-      .findAll('.data-table__card-meta')
-      .filter((field) => field.find('.data-table__card-meta-label').text() === 'Phone')
-      .map((field) => field.find('.data-table__card-meta-value').text().trim());
+    const phones = cardValues(s.wrapper, 'Phone');
     expect(phones).toEqual(['+34 600 333 444', '+44 791 112 3456']);
   });
 

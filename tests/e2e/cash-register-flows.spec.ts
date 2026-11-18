@@ -8,7 +8,7 @@
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
 import { A, api, EMPLOYEE, login, psql, saveSessionForTheSweep, shot, shown } from './helpers';
-import { offersRowAction, rowAction } from './service-helpers';
+import { FLOW_VIEWPORTS, offersRowAction, rowAction } from './service-helpers';
 import { createProduct, dialog, fill, type Product } from './inventory-helpers';
 import { cleanDocumentsOf, stamp } from './sale-helpers';
 import { discardChanges, expectWaysOutAskOnDirtyForm, type RowActionOpener, type UnsavedFormCase } from './unsaved-back-helpers';
@@ -23,14 +23,9 @@ const mine = new Set<string>();
 /** The printers this file made. */
 const printers = new Set<string>();
 
-/** The three sizes of every flow's screenshots (390×844, 834×1112, 1440×900). */
-const SIZES = [
-  { label: '390', width: 390, height: 844 }, { label: '834', width: 834, height: 1112 }, { label: '1440', width: 1440, height: 900 },
-];
-
 /** `APP-CASH_REGISTER-<flow>-<size>` in the three sizes, each once `ready` says it painted. */
 async function flowShots(page: Page, flow: string, ready: (page: Page) => Promise<void>): Promise<void> {
-  for (const size of SIZES) {
+  for (const size of FLOW_VIEWPORTS) {
     await page.setViewportSize({ width: size.width, height: size.height });
     await ready(page);
     // A new size relays the shell out (menu, tabs): one page header on screen once it settled, never a

@@ -1,39 +1,18 @@
-import { AppPage, applySurface, toastError, toastSuccess } from '@erplora/ui/shell';
+import { AppPage, applySurface } from '@erplora/ui/shell';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { sessionChanged } from '../lib/access';
-
-import { app, appActionLabel, ids as idsOf, INVOICE, LIST, type Mounted, noteOf, open, PLANS, REPORTS, STOCK, STORE, TAX } from '../__tests__/apps-page';
+import { app } from '../__tests__/app-row';
+import { appActionLabel, freshEachTest, ids as idsOf, INVOICE, LIST, type Mounted, noteOf, open, PLANS, REPORTS, STOCK, STORE, TAX } from '../__tests__/apps-page';
 import { EMPLOYEE, errorFrame, flush, OWNER, subId } from '../__tests__/mount-base';
 import type { AppList, AppRow } from '../operations';
 
 const ids = (wrapper: Mounted['wrapper']) => idsOf({ wrapper } as Mounted);
 
-const mocks = vi.hoisted(() => ({ confirm: vi.fn() }));
-vi.mock('@erplora/ui/components', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@erplora/ui/components')>()),
-  useConfirm: () => ({ confirm: mocks.confirm }),
-}));
-vi.mock('@erplora/ui/shell', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@erplora/ui/shell')>()),
-  toastSuccess: vi.fn(),
-  toastError: vi.fn(),
-}));
-vi.mock('../lib/access', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../lib/access')>()),
-  sessionChanged: vi.fn(),
-}));
+vi.mock('@erplora/ui/components', async (importOriginal) => (await import('../__tests__/apps-page-spies')).componentsWithConfirmSpy(importOriginal));
+vi.mock('@erplora/ui/shell', async (importOriginal) => (await import('../__tests__/toast-spies')).shellWithToastSpies(importOriginal));
+vi.mock('../lib/access', async (importOriginal) => (await import('../__tests__/apps-page-spies')).accessWithSessionSpy(importOriginal));
 
-beforeEach(() => {
-  applySurface('web');
-  mocks.confirm.mockReset();
-  vi.mocked(toastSuccess).mockClear();
-  vi.mocked(toastError).mockClear();
-  vi.mocked(sessionChanged).mockClear();
-});
-afterEach(() => {
-  document.body.innerHTML = '';
-});
+freshEachTest();
 
 describe('AppsPage', () => {
   it('follows the business’s apps live', async () => {
