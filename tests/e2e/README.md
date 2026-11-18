@@ -26,18 +26,18 @@ borran los datos. Para correr en paralelo, otra pila (abajo, «Varias ejecucione
 
 ## Las ayudas compartidas
 
-Una spec importa cada ayuda del módulo que la lleva; ninguno reexporta lo de otro:
+Una spec importa cada ayuda del módulo que la lleva; ninguno reexporta lo de otro. `helpers.ts` sigue en la lista de
+tamaño (`.file-size-allow`) porque lleva todo lo que importan de él los ficheros de esa lista, que no pueden ganar ni
+una línea de import; lo que no importa ninguno de ellos está en los demás módulos:
 
 | Módulo | Qué lleva |
 |---|---|
-| `helpers.ts` | lo que comparten casi todas las specs: `api`, los hubs `A` y `B`, las cuentas `OWNER` y `EMPLOYEE`, `login` y las páginas que abre (`hostPage`, `signedInSpanish`), la página a la vista (`shown`, `testid`, `appRow`), la espera de «nada se mueve» (`settled`, `untilStill`, `painted`), las capturas (`capture`, `shot`, `record`), `horizontalOverflow`, `psql` y los elementos de la demo que borran (`clearItems`, `uniqueName`) |
-| `saas-login.ts` | el SaaS por el que pasa el login: `SAAS`, dónde publica su inicio de sesión, la carpeta de su correo, los pasos del viaje y la puerta de «Mis apps» (`MY_APPS_DOOR`, `topbarApps`); `collectProblems` y `runningTimeout` |
-| `business.ts` | el negocio de la spec: sus apps (`turnOn`, `turnOnMissing`, `turnOffTurnedOn`), lo que trae una plantilla (`emptyOfTemplateData`), el plan de su foto y su registro (`dropPlanFromPhoto`, `registerBusinessIn`…), `usernameOf` y `upgradeLandsInside` |
-| `screen.ts` | más de la pantalla: el tamaño de la tableta alta, `iconStates`, `scrolledTo`, `settledCapture` y `capturedFitting` |
+| `helpers.ts` | `api`, los hubs `A` y `B`, las cuentas `OWNER` y `EMPLOYEE`, `login` y las páginas que abre (`hostPage`, `signedInSpanish`), el SaaS por el que pasa el login y los pasos del viaje (`SAAS`, `SAAS_SIGN_IN`, `SAAS_CODE`, la carpeta de su correo, `runningTimeout`), la puerta de «Mis apps» (`MY_APPS_DOOR`, `topbarApps`), `collectProblems`, las carpetas `HUB_DIR` y `REPO_DIR`, la página a la vista (`shown`, `testid`, `appRow`), la espera de «nada se mueve» (`settled`, `untilStill`, `painted`), `scrolledTo`, las capturas (`capture`, `shot`, `record`), `horizontalOverflow`, las apps de la spec (`turnOn`, `turnOnMissing`, `turnOffTurnedOn`), `upgradeLandsInside`, el registro del negocio (`registrationOf`, `registerBusinessIn`), `psql` y los elementos de la demo que borran (`clearItems`, `uniqueName`) |
+| `business.ts` | el negocio de la spec, vaciado y devuelto: lo que trae una plantilla (`emptyOfTemplateData`), el plan de su foto (`dropPlanFromPhoto`, `restorePhotoFrom`) y quién ha entrado (`usernameOf`) |
+| `screen.ts` | más de la pantalla: el tamaño de la tableta alta, `iconStates`, `settledCapture` y `capturedFitting` |
 | `detectors.ts` | los dos detectores que corren en la página: qué se mueve (`movingInPage`) y si una captura repite su parte de arriba (`repeatedTop`) |
 | `demo-items.ts` | los elementos de la app de demo: crearlos y leerlos por la API, y la lista |
 | `dev-server.ts` | el `runserver` y su Vite: si contestan, quién escucha en un puerto y arrancarlo otra vez |
-| `stack.ts` | dónde está la pila (puertos, BD, el SaaS) y las carpetas `HUB_DIR` y `REPO_DIR` |
 | `topbar.ts` | la barra de arriba: «Mis apps», el asistente y `compactBar` |
 | `live-streams.ts` | los `/api/live` que abre una página, con `decodeSubs` |
 
@@ -368,7 +368,7 @@ ella (lo normal, ronda 2026-11-04a) corre el caso de la voz del dispositivo y sa
 `ASSISTANT_SERVER_VOICE=True`, al revés. Para cubrirlo todo, se corre una vez con cada valor.
 
 Las specs del asistente de cada app (`<app>-assistant.spec.ts`) encienden en su `beforeAll` las apps que necesitan y que
-están apagadas en `a` con `turnOnMissing(context, A, NEEDED, turnedOn)` (`business.ts`), que apunta cada una en
+están apagadas en `a` con `turnOnMissing(context, A, NEEDED, turnedOn)` (`helpers.ts`), que apunta cada una en
 `turnedOn` cuando ya está encendida, y su `afterAll` apaga solo eso, de la última a la primera, con
 `turnOffTurnedOn(context, A, turnedOn)`. Una spec que cae antes de encender nada (el SaaS sin su proveedor: «not seeded
 with this provider») deja el negocio como estaba: nunca apaga Control horario, Personal ni nada que ya estuviera
