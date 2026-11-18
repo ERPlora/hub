@@ -22,7 +22,7 @@ from base.tests.help_workbooks import (
     header_of,
     write_workbooks,
 )
-from base.workbook_help import SOURCE_LANGUAGE, Flow, Screen, parse, workbook, words
+from base.workbook_help import SOURCE_LANGUAGE, Draft, Flow, Screen, parse, workbook, words
 
 
 def spanish():
@@ -73,6 +73,13 @@ class TestScreens:
         assert read.unknown_screens == ("Pantalla retirada",)
         assert "tables" not in [screen.id for screen in read.screens]
 
+    def test_a_tab_written_twice_keeps_its_first_section_and_says_so(self):
+        twice = user_part(ES).replace("### Ajustes\n", "### Zonas\nOtra tabla.\n\n### Ajustes\n", 1)
+        read = parse(twice, ES_TABS, ES_WORDS)
+        assert read.repeated_screens == ("Zonas",)
+        assert read.screens[1].text == "Una tabla con el nombre y el color de cada zona."
+        assert spanish().repeated_screens == ()
+
     def test_without_the_screens_heading_there_are_no_screens(self):
         read = parse(user_part(ES.replace("## Pantallas", "## Otra cosa")), ES_TABS, ES_WORDS)
         assert (read.screens, read.unknown_screens) == ((), ())
@@ -104,6 +111,30 @@ class TestFlows:
     def test_only_the_flows_that_are_done_on_a_tab_of_the_customer_s_part_are_published(self):
         # F04 is not done, F05 is done on no screen, F06 is below the customer's part.
         assert [flow.id for flow in spanish().flows] == ["TABLE-F01", "TABLE-F02", "TABLE-F03"]
+
+    def test_what_is_not_published_is_kept_aside_with_its_status_and_the_tabs_it_names(self):
+        assert spanish().unpublished == (
+            Draft("TABLE-F04", "no hecho — falta la pantalla", ("zones",)),
+            Draft("TABLE-F05", "hecho", ()),
+        )
+
+    @pytest.mark.parametrize(
+        ("status", "done"),
+        [
+            ("hecho", True),
+            ("hecho — sin preguntar los comensales en el TPV", True),
+            ("hecho: también por la API", True),
+            ("hecho (servidor y pantalla)", True),
+            ("hecho - en la tableta", True),
+            ("no hecho", False),
+            ("no hecho — falta la pantalla", False),
+            ("parcial — sin la ventana", False),
+            ("hecho en Mesas (TABLE-F15): la cuenta no cambia", False),
+        ],
+    )
+    def test_a_flow_is_done_when_its_status_before_any_note_is_the_done_word(self, status, done):
+        flow = f"## Flujos\n\n### TABLE-F01 Crear una zona\nEstado: {status}\nPantalla: Zonas\nPasos:\n1. Pulsa «+».\n"
+        assert bool(parse(flow, ES_TABS, ES_WORDS).flows) is done
 
     def test_nothing_but_its_title_steps_and_failure_leaves_a_flow(self):
         published = repr(spanish().flows)
@@ -155,6 +186,16 @@ class TestWhichFile:
     def test_another_language_reads_its_own_file_while_it_is_current(self, tmp_path, language, body):
         write_workbooks(tmp_path, {"en": EN, "eo": EO})
         assert workbook(tmp_path, language) == (language, body)
+
+    def test_a_regional_language_reads_its_own_file_else_its_base_language_s(self, tmp_path):
+        write_workbooks(tmp_path, {"en": EN})
+        assert workbook(tmp_path, "en-gb") == ("en", EN)
+        write_workbooks(tmp_path, {"en": EN, "en-gb": EN.replace("colour", "color")})
+        assert workbook(tmp_path, "en-gb") == ("en-gb", EN.replace("colour", "color"))
+
+    def test_a_regional_variant_of_the_source_language_reads_the_source(self, tmp_path):
+        write_workbooks(tmp_path, {"en": EN})
+        assert workbook(tmp_path, "es-mx") == (SOURCE_LANGUAGE, user_part(ES))
 
     def test_a_language_without_its_file_reads_the_source(self, tmp_path):
         write_workbooks(tmp_path, {"en": EN})

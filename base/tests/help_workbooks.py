@@ -3,7 +3,8 @@ language whose words no catalogue of the Hub knows, so that nothing in the readi
 
 Each one has the same shape: what the module is for (with a list whose items go on over indented lines, and a heading
 inside a code block), the screens heading with three tabs (one with a window, ``####``), a section that names no tab,
-and flows that are done on a tab, done through a window, not done, and done on no tab.
+and flows that are done on a tab, done through a window, not done, and done on no tab; some statuses carry a note after
+a dash, a colon or a parenthesis.
 """
 
 from pathlib import Path
@@ -64,7 +65,7 @@ Ninguna pestaña se llama así.
 | TABLE-F01 | Crear una zona | hecho |
 
 ### TABLE-F01 Crear una zona
-Estado: hecho
+Estado: hecho — en la tableta y en el móvil
 Actor: responsable
 Pantalla: Zonas
 Pasos:
@@ -88,7 +89,7 @@ Por el asistente: «cobra la mesa 4».
 Implicados: TABLE-F01
 
 ### TABLE-F03 Cobrar desde la ventana de cobro
-Estado: hecho
+Estado: hecho: también por la API
 Actor: empleado
 Pantalla: Cobrar mesa, Zonas
 Pasos:
@@ -96,7 +97,7 @@ Pasos:
 Si falla: «No se pudo cobrar».
 
 ### TABLE-F04 Juntar dos zonas
-Estado: no hecho
+Estado: no hecho — falta la pantalla
 Actor: responsable
 Pantalla: Zonas
 Pasos:
@@ -159,7 +160,7 @@ No tab has this name.
 ## Flows
 
 ### TABLE-F01 Create a zone
-Status: done
+Status: done — on the tablet and on the phone
 Actor: manager
 Screen: Zones
 Steps:
@@ -183,7 +184,7 @@ Through the assistant: «charge table 4».
 Involved: TABLE-F01
 
 ### TABLE-F03 Charge from the charge window
-Status: done
+Status: done: also through the API
 Actor: employee
 Screen: Charge table, Zones
 Steps:
@@ -191,7 +192,7 @@ Steps:
 If it fails: «Could not charge».
 
 ### TABLE-F04 Join two zones
-Status: not done
+Status: not done — the screen is missing
 Actor: manager
 Screen: Zones
 Steps:
@@ -225,7 +226,7 @@ Tabelo de la zonoj.
 ## Fluoj
 
 ### TABLE-F01 Krei zonon
-Stato: farita
+Stato: farita — en la tabulkomputilo kaj en la telefono
 Ekrano: Zonoj
 Paŝoj:
 1. Tuŝu «+» kaj skribu la nomon, kiu poste
@@ -239,7 +240,7 @@ Paŝoj:
 1. Tuŝu la tablon.
 
 ### TABLE-F04 Kunigi du zonojn
-Stato: ne farita
+Stato: ne farita — mankas la ekrano
 Ekrano: Zonoj
 Paŝoj:
 1. Ankoraŭ ne.
@@ -334,4 +335,6 @@ def ready_tables(monkeypatch, root: Path, ready: Help | None = None) -> SimpleNa
         help=ready or Help(),
     )
     monkeypatch.setattr(app_help, "module_configs", lambda: [module])
+    # A cache of its own, so that no help read by another test (of another folder) answers for this one.
+    monkeypatch.setattr(app_help, "_READ", {})
     return module

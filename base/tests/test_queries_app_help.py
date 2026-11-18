@@ -5,6 +5,8 @@ A stand-in for Tables is the module with its help ready: its name and menu are t
 made-up one of ``help_workbooks`` (floor plan, zones and the settings Tables shows as its fifth tab).
 """
 
+from collections import Counter
+
 import pytest
 from django.apps import apps
 from live.assistant import is_tool
@@ -13,6 +15,7 @@ from live.errors import NotFound
 from live.meta import Help
 from live.operations import AI, get
 
+from base import workbook_help
 from base.queries import app_help
 from base.schemas.app_help import AppHelpIn
 from base.tenancy.tests.business import HUB_DB, A, in_business_a
@@ -90,6 +93,10 @@ class TestTheAnswer:
     def test_a_regional_variant_reads_its_language(self, table):
         assert ask(language="en-GB")["language"] == "en"
 
+    def test_a_regional_language_of_the_deployment_without_a_file_reads_its_base_language_s(self, table, settings):
+        settings.LANGUAGES = [*settings.LANGUAGES, ("en-gb", "British English")]
+        assert ask(language="en-gb")["language"] == "en"
+
     def test_a_language_without_a_current_file_reads_the_source(self, table, tmp_path):
         (tmp_path / "WORKBOOK.en.md").unlink()
         answer = ask(language="en")
@@ -116,3 +123,36 @@ class TestTheVideo:
     def test_a_module_without_videos_has_none(self, table, monkeypatch):
         monkeypatch.setattr(table, "help", Help())
         assert ask()["video"] is None
+
+    def test_a_regional_language_has_its_base_language_s_while_it_has_none_of_its_own(self, table, monkeypatch, settings):
+        settings.LANGUAGES = [*settings.LANGUAGES, ("en-gb", "British English")]
+        monkeypatch.setattr(table, "help", Help(videos={"es": VIDEO_ES, "en": VIDEO_EN}))
+        assert ask(language="en-gb")["video"] == VIDEO_EN
+
+
+class TestReadOnce:
+    """A module's WORKBOOKs only change with a new image: each module and language is read and cut once per process."""
+
+    @pytest.fixture
+    def calls(self, monkeypatch):
+        counted = Counter()
+        for name in ("workbook", "parse"):
+            real = getattr(workbook_help, name)
+            monkeypatch.setattr(workbook_help, name, lambda *args, _real=real, _name=name: counted.update([_name]) or _real(*args))
+        return counted
+
+    def test_a_second_call_reads_and_cuts_nothing_again(self, table, calls):
+        first = ask(language="en")
+        assert ask(language="en") == first
+        assert calls == {"workbook": 1, "parse": 1}
+
+    def test_each_language_is_read_once(self, table, calls):
+        ask(language="en"), ask(language="es"), ask(language="en"), ask(language="es")
+        assert calls == {"workbook": 2, "parse": 2}
+
+    def test_with_debug_every_call_reads_the_workbook_so_an_edit_shows_at_once(self, table, calls, settings, tmp_path):
+        settings.DEBUG = True
+        before = ask(language="es")["purpose"]
+        (tmp_path / "WORKBOOK.md").write_text((tmp_path / "WORKBOOK.md").read_text().replace("sus zonas", "sus salas"))
+        assert ask(language="es")["purpose"] == before.replace("sus zonas", "sus salas")
+        assert calls == {"workbook": 2, "parse": 2}
