@@ -548,6 +548,11 @@ def test_each_motive_adds_one_and_the_row_opens_the_tab(hub_a):
             "route": "/system#usage",
             "label": "Plan limits",
             "icon": "ion:speedometer-outline",
+            "severity": "warning",
+            "title": "1 plan limit to review",
+            "body": "Your business is reaching what its plan includes: some things may stop or slow down until you upgrade.",
+            "action_label": "See the plan’s usage",
+            "due": None,
         }
     ]
 

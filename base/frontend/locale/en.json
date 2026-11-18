@@ -95,34 +95,6 @@
         "verifactu": "Set up VeriFactu"
       }
     },
-    "notices": {
-      "counter": "{label} ({count})",
-      "open": "Open",
-      "failedEvents": {
-        "title": "1 failed event | {count} failed events",
-        "action": "Review the events"
-      },
-      "planLimits": {
-        "title": "1 plan limit to review | {count} plan limits to review",
-        "action": "See the plan’s usage"
-      },
-      "appointments": {
-        "title": "1 appointment to confirm | {count} appointments to confirm",
-        "action": "Confirm the appointments"
-      },
-      "whatsapp": {
-        "title": "1 WhatsApp customer waiting for an answer | {count} WhatsApp customers waiting for an answer",
-        "action": "Answer the customers"
-      },
-      "printing": {
-        "title": "{label}: 1 job waiting | {label}: {count} jobs waiting",
-        "action": "See the printers"
-      },
-      "demo": {
-        "title": "1 open demo item | {count} open demo items",
-        "action": "See the items"
-      }
-    },
     "plan": {
       "upgrade": "Upgrade plan",
       "manage": "Manage on erplora.com"

@@ -2,7 +2,8 @@ import type { ActionNotice, ActionNoticeSource } from '@erplora/ui/shell';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { defineComponent, h } from 'vue';
 
-import type { BellCounter, SetupItem, SetupStatus } from '../operations';
+import type { SetupItem, SetupStatus } from '../operations';
+import type { BellCounter } from '../operations-bell';
 import { errorFrame, flush, mountBase, subId } from '../__tests__/mount-base';
 import { useHubActionNotices } from './action-notices';
 
@@ -16,8 +17,23 @@ const Host = defineComponent({
 
 const ROUTES = ['/appointment/agenda', '/whatsapp_inbox/inbox', '/printing/printers', '/demo/items', '/system', '/flow/runs', '/invoice/issuer', '/verifactu/settings'];
 
-function counter(key: string, count: number, fields: Partial<BellCounter> & Record<string, unknown> = {}): BellCounter {
-  return { key, app: key.split('.')[0], count, route: '/demo/items', label: `Counter ${key}`, icon: 'ion:warning-outline', ...fields };
+/** A counter as the server sends it: with the words of one that declares none of its own unless `fields` says. */
+function counter(key: string, count: number, fields: Partial<BellCounter> = {}): BellCounter {
+  const label = fields.label ?? `Counter ${key}`;
+  return {
+    key,
+    app: key.split('.')[0],
+    count,
+    route: '/demo/items',
+    label,
+    icon: 'ion:warning-outline',
+    severity: 'warning',
+    title: `${label} (${count})`,
+    body: null,
+    action_label: 'Abrir',
+    due: null,
+    ...fields,
+  };
 }
 
 function legal(fields: Partial<SetupItem> = {}): SetupItem {
@@ -72,70 +88,61 @@ describe('useHubActionNotices: the counters of the bell', () => {
     expect(source.failed.value).toBe(false);
   });
 
-  it('each counter is a notice: its key, icon and count, its words with the number, and the way to its screen', async () => {
+  it('each counter is a notice with the words the server says: its gravity, heading, sentence, deadline and button', async () => {
     const s = await setup();
     await s.setupStatus(status([]));
-    await s.counters([counter('appointment.to_confirm', 3, { route: '/appointment/agenda', icon: 'ion:calendar-outline' })]);
-    expect(notices()).toEqual([
-      {
-        id: 'appointment.to_confirm',
-        severity: 'warning',
-        icon: 'ion:calendar-outline',
-        label: '3 citas por confirmar',
-        title: '3 citas por confirmar',
-        count: 3,
-        action: { label: 'Confirmar las citas', to: '/appointment/agenda' },
-      },
-    ]);
-    await s.counters([counter('appointment.to_confirm', 1, { route: '/appointment/agenda' })], 2);
-    expect(notice('appointment.to_confirm')?.title).toBe('1 cita por confirmar');
-  });
-
-  it('the counters known today carry their gravity and their action; any other, a warning with «Abrir»', async () => {
-    const s = await setup();
-    await s.setupStatus(status([]));
-    await s.counters([
-      counter('base.failed_events', 2, { route: '/system#events', label: 'Eventos caídos' }),
-      counter('base.plan_limits', 1, { route: '/system#usage', label: 'Límites del plan' }),
-      counter('whatsapp_inbox.awaiting_reply', 4, { route: '/whatsapp_inbox/inbox' }),
-      counter('printing.stalled_kitchen', 2, { route: '/printing/printers', label: 'Nadie está imprimiendo «Cocina»' }),
-      counter('demo.open_items', 5),
-      counter('flow.waiting_runs', 2, { route: '/flow/runs', label: 'Automatizaciones esperando' }),
-    ]);
-    const said = notices().map((n) => [n.id, n.severity, n.title, n.action?.label]);
-    expect(said).toEqual([
-      ['base.failed_events', 'danger', '2 eventos caídos', 'Revisar los eventos'],
-      ['base.plan_limits', 'warning', '1 límite del plan por revisar', 'Ver el uso del plan'],
-      ['whatsapp_inbox.awaiting_reply', 'warning', '4 clientes de WhatsApp esperando respuesta', 'Contestar a los clientes'],
-      ['printing.stalled_kitchen', 'warning', 'Nadie está imprimiendo «Cocina»: 2 trabajos esperando', 'Ver las impresoras'],
-      ['demo.open_items', 'info', '5 elementos de demo abiertos', 'Ver los elementos'],
-      ['flow.waiting_runs', 'warning', 'Automatizaciones esperando (2)', 'Abrir'],
-    ]);
-    expect(notice('flow.waiting_runs')?.label).toBe('Automatizaciones esperando (2)');
-  });
-
-  it('what the server says of a counter wins: its gravity, title, sentence, action and deadline', async () => {
-    const s = await setup();
-    await s.setupStatus(status([]));
-    const due = { at: '2026-12-01T00:00:00Z', from: '2026-11-24T00:00:00Z' };
     await s.counters([
       counter('appointment.to_confirm', 3, {
         route: '/appointment/agenda',
+        icon: 'ion:calendar-outline',
         severity: 'danger',
-        title: 'Tres citas de hoy sin confirmar',
-        body: 'Las clientas no saben si las esperas.',
-        action_label: 'Confirmarlas ahora',
-        due,
+        title: '3 citas por confirmar',
+        body: 'Tus clientes esperan a que les confirmes las citas antes de que empiecen.',
+        action_label: 'Confirmar las citas',
+        due: '2026-12-01T10:30:00+01:00',
       }),
     ]);
-    expect(notice('appointment.to_confirm')).toMatchObject({
-      severity: 'danger',
-      label: 'Tres citas de hoy sin confirmar',
-      title: 'Tres citas de hoy sin confirmar',
-      body: 'Las clientas no saben si las esperas.',
-      due,
-      action: { label: 'Confirmarlas ahora', to: '/appointment/agenda' },
+    expect(notices()).toEqual([
+      {
+        id: 'appointment.to_confirm',
+        severity: 'danger',
+        icon: 'ion:calendar-outline',
+        label: '3 citas por confirmar',
+        title: '3 citas por confirmar',
+        body: 'Tus clientes esperan a que les confirmes las citas antes de que empiecen.',
+        count: 3,
+        due: { at: '2026-12-01T10:30:00+01:00' },
+        action: { label: 'Confirmar las citas', to: '/appointment/agenda' },
+      },
+    ]);
+  });
+
+  it('a counter with no sentence nor deadline is told without them', async () => {
+    const s = await setup();
+    await s.setupStatus(status([]));
+    await s.counters([counter('demo.open_items', 2)]);
+    expect(notice('demo.open_items')).toEqual({
+      id: 'demo.open_items',
+      severity: 'warning',
+      icon: 'ion:warning-outline',
+      label: 'Counter demo.open_items (2)',
+      title: 'Counter demo.open_items (2)',
+      count: 2,
+      action: { label: 'Abrir', to: '/demo/items' },
     });
+  });
+
+  it('adds no words of its own: every counter, known or not, says exactly what the server sent', async () => {
+    const s = await setup();
+    await s.setupStatus(status([]));
+    await s.counters([
+      counter('base.failed_events', 2, { route: '/system#events', severity: 'info', title: 'Two', action_label: 'Look' }),
+      counter('flow.waiting_runs', 1, { route: '/flow/runs', severity: 'danger', title: 'One', action_label: 'Go' }),
+    ]);
+    expect(notices().map((n) => [n.id, n.severity, n.title, n.action?.label])).toEqual([
+      ['base.failed_events', 'info', 'Two', 'Look'],
+      ['flow.waiting_runs', 'danger', 'One', 'Go'],
+    ]);
   });
 
   it('a counter whose screen this hub lacks is told with no button', async () => {
@@ -145,12 +152,6 @@ describe('useHubActionNotices: the counters of the bell', () => {
     expect(notices().map((n) => n.action)).toEqual([undefined, undefined]);
   });
 
-  it('a counter with no icon of its own takes the bell’s', async () => {
-    const s = await setup();
-    await s.setupStatus(status([]));
-    await s.counters([counter('demo.open_items', 1, { icon: '' })]);
-    expect(notice('demo.open_items')?.icon).toBe('ion:notifications-outline');
-  });
 });
 
 describe('useHubActionNotices: «You cannot issue invoices yet»', () => {
@@ -218,9 +219,8 @@ describe('useHubActionNotices: «You cannot issue invoices yet»', () => {
 
   it('in English', async () => {
     const s = await setup({ locale: 'en' });
-    await s.counters([counter('appointment.to_confirm', 2, { route: '/appointment/agenda' })]);
+    await s.counters([]);
     await s.setupStatus(status([legal({ title: 'Your business details', actionable: false })]));
-    expect(notice('appointment.to_confirm')).toMatchObject({ title: '2 appointments to confirm', action: { label: 'Confirm the appointments' } });
     expect(notice('base.blocking')).toMatchObject({
       title: 'You cannot issue invoices yet',
       body: 'No ticket or invoice can be issued until this is set up: Your business details. An administrator has to set this up.',
