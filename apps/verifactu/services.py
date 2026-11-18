@@ -185,16 +185,6 @@ NO_WAY_TO_THE_AEAT = _(
     "Nothing was issued: this business files for real with the AEAT and cannot reach it now: %(why)s. Fix it in "
     "VeriFactu → Settings and try again."
 )
-#: Why a certificate cannot present to the AEAT (``certificates.CertificateInvalid.code``), in the reader's language.
-CERTIFICATE_REFUSALS = {
-    "unopenable": _(
-        "The file is not a .p12/.pfx certificate that this password opens."
-    ),
-    "incomplete": _("The file does not hold a certificate and its private key."),
-    "no_client_auth": _(
-        "The certificate does not allow client authentication, so it cannot connect to the AEAT."
-    ),
-}
 #: Line of the test invoice (VERIFACTU-F11): a fiscal document's text, in the AEAT's language.
 TEST_LINE = "Prueba VeriFactu"
 
@@ -2099,9 +2089,7 @@ def upload_certificate(ctx: OperationContext, data: CertificateUploadIn) -> Conf
     try:
         facts = certificates.inspect(p12, password)
     except certificates.CertificateInvalid as invalid:
-        raise Conflict(
-            str(CERTIFICATE_REFUSALS[invalid.code]), code="verifactu.certificate_invalid"
-        ) from None
+        raise Conflict(str(invalid), code="verifactu.certificate_invalid") from None
     if facts.expires_at <= timezone.now():
         raise Conflict(
             str(CERTIFICATE_EXPIRED)

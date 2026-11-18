@@ -335,7 +335,9 @@ Si falla: el certificado no se guarda (409):
   que configurar su clave de almacenamiento.» (`verifactu.certificate_storage_unavailable`);
 - sin emisor, «Configura antes el emisor en Facturación → Emisor.» (`verifactu.issuer_missing`);
 - contraseña mala o fichero que no es un `.p12`, «El fichero no es un certificado .p12/.pfx que abra esta
-  contraseña.»; sin uso de autenticación de cliente, «El certificado no permite la autenticación de cliente,
+  contraseña.»; autofirmado, «Este certificado no lo ha emitido ninguna entidad (es autofirmado), así que la AEAT
+  no lo aceptará. Usa el certificado electrónico de tu negocio emitido por una entidad reconocida, por ejemplo la
+  FNMT.»; sin uso de autenticación de cliente, «El certificado no permite la autenticación de cliente,
   así que no puede conectar con la AEAT.»; caducado, «El certificado caducó el {fecha}: sube uno vigente.»
   (todos `verifactu.certificate_invalid`);
 - titular distinto del emisor de Facturación, «El certificado es de {NIF}, no del emisor de este negocio,
@@ -1313,7 +1315,8 @@ estricto en el test hasta ERPlora/live#76; sin «la cuenta y», la misma frase l
   NIF, tipo, caducidad y el `.p12` con su contraseña cifrados juntos con Fernet (`certificates.py`) bajo
   `FISCAL_CERTIFICATE_KEY` (variable de entorno; en AWS, Secrets Manager en `hub` y `worker`). Sin clave, la
   subida se rechaza a la vista; con la clave cambiada, el guardado no se abre y los registros por la vía propia
-  esperan con `own_certificate_unreadable` sin llamar a la pasarela.
+  esperan con `own_certificate_unreadable` sin llamar a la pasarela. Al subirlo se rechaza el autofirmado (emisor
+  igual al sujeto); la cadena no se valida contra la lista de prestadores reconocidos (hub#1707).
 - **Producción**: además de lo de VERIFACTU-F08, el despliegue tiene que ser `prod` (`ERPLORA_ENVIRONMENT`; en
   `pre` nunca) y el servidor tener `VERIFACTU_PRODUCTION_ENABLED` a verdadero. Cerrado de nuevo, ningún registro de
   producción sale (esperan con `production_closed`, sin llamar a la pasarela) y no se emite nada nuevo en producción
