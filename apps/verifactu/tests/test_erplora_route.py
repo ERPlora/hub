@@ -29,9 +29,11 @@ from apps.verifactu.tests.conftest import (
     B,
     answering,
     b64,
+    codes,
     ctx_for,
     make_p12,
     run,
+    ticket,
 )
 from base.models import Hub
 
@@ -115,15 +117,6 @@ def own_certificate(scope=A) -> None:
 
 def config(scope=A, language: str = "en"):
     return run("verifactu.config.get", ctx=ctx_for(scope=scope, language=language))
-
-
-def codes(waits) -> set[str]:
-    return {wait.code for wait in waits}
-
-
-def ticket(scope=A):
-    lines = [{"description": "Cut", "quantity": "1", "unit_price": 1000, "tax_rate": "21"}]
-    return run("invoice.invoice.create", {"lines": lines, "series_code": "TICKET"}, ctx_for(scope=scope))
 
 
 def sent(gateway_answers) -> list[tuple[str, str]]:
