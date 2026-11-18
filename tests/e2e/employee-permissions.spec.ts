@@ -9,7 +9,8 @@
 // The owner's screens are the positive control: the same hooks are there for who may manage.
 import { type BrowserContext, expect, test } from '@playwright/test';
 
-import { A, EMPLOYEE, api, createItem, hostPage, itemDetail, listReady, psql, rowOf, shot, shown, uniqueName } from './helpers';
+import { A, api, EMPLOYEE, hostPage, psql, shot, shown, uniqueName } from './helpers';
+import { createItem, itemDetail, listReady, rowOf } from './demo-items';
 
 const OWNER_LINE = 'Owner line';
 /** The Hub's local copy of the SaaS's employee (`saas:<id>`), never the staff one. */

@@ -4,7 +4,8 @@
 // loaded; and no `--ok-*` custom property left in the DataTable's computed styles.
 import { type Page, expect, test } from '@playwright/test';
 
-import { A, createItem, listReady, login, record, shot, shown, uniqueName } from './helpers';
+import { A, login, record, shot, shown, uniqueName } from './helpers';
+import { createItem, listReady } from './demo-items';
 import { recordResponses, resourceUrls } from './resource-timing';
 
 /**

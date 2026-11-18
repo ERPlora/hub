@@ -11,7 +11,8 @@
 import { type Browser, type BrowserContext, expect, type Page, test } from '@playwright/test';
 
 import { bellSays, bellTotal, featureNotice, noticeButton } from './action-center';
-import { A, api, capturedFitting, login, psql, shown } from './helpers';
+import { A, api, login, psql, shown } from './helpers';
+import { capturedFitting } from './screen';
 import { streamsQuiet as settled } from './home-helpers';
 import { FLOW_VIEWPORTS, forgetDevices } from './printing-helpers';
 import { stamp } from './sale-helpers';

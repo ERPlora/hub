@@ -8,7 +8,8 @@
 // and 1440. What a run creates — the product `E2E-KST-<run>`, its check and its kitchen ticket — is deleted after it.
 import { type CDPSession, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, capture, exposeMovingInPage, hostPage, psql, repeatedTop, shown, untilStill } from './helpers';
+import { A, capture, exposeMovingInPage, hostPage, psql, shown, untilStill } from './helpers';
+import { repeatedTop } from './detectors';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
 import { cleanSales, drawerOff, openTillCart, restoreDrawer, stamp } from './sale-helpers';
 import { toastSaying } from './toast-helpers';

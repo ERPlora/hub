@@ -8,7 +8,8 @@
 // flow: none — what `base`'s SPA answers to a path with no URL of its own (file probes: `/robots.txt`, `/favicon.ico`)
 import { expect, test } from '@playwright/test';
 
-import { A, createViaPage, login, row, shot, topbarApps, uniqueName } from './helpers';
+import { A, login, shot, topbarApps, uniqueName } from './helpers';
+import { createViaPage, row } from './demo-items';
 import { FLOW_VIEWPORTS, noHorizontalScroll, settled } from './service-helpers';
 
 const KEY = 'FIX-HUB-SPA-STATIC-PROBES-SET-CSRF-COOKIE';

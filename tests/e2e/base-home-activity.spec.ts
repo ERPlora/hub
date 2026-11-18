@@ -139,7 +139,7 @@ async function toolbarAt(page: Page, size: Size): Promise<Toolbar> {
       if (!pane || typeof pane.when !== 'string') return true;
       return pane.classList.contains('split-pane-visible') === matchMedia(breakpoints[pane.when] ?? pane.when).matches;
     };
-    // helpers.ts's `movingInPage`, put in the page by `exposeMovingInPage`: the one detector of the e2e.
+    // detectors.ts's `movingInPage`, put in the page by `exposeMovingInPage` (helpers.ts): the one detector of the e2e.
     const animating = () => (window as unknown as { __movingInPage: () => string[] }).__movingInPage().length > 0;
     (window as unknown as { __toolbar: Promise<unknown> }).__toolbar = new Promise((resolve) => {
       let last: string | undefined;

@@ -14,7 +14,8 @@ import { expect, type Page, test } from '@playwright/test';
 
 import { expectSwitch } from './apps-switch-helpers';
 import { VIEWPORTS } from './assistant-card-helpers';
-import { api, appRow, login, settledCapture, shown, testid } from './helpers';
+import { api, appRow, login, shown, testid } from './helpers';
+import { settledCapture } from './screen';
 import { businessOnSaas, type SaasOwner, signUpOnSaas } from './saas-owner';
 import { STACK } from './stack';
 

@@ -1,4 +1,4 @@
-"""The open check (SALE-F01, F09, F10, F13–F18, F20, F23, F24, F26): every write of ``services.py``
+"""The open check (SALE-F01, F09, F10, F13–F18, F20, F23, F24, F26): every write of ``services/``
 that builds a check, with Inventory's real catalog and tax's real categories.
 
 Every write locks the check first and raises its version; a line keeps the price it was ordered at.
@@ -956,11 +956,11 @@ def test_sessions_are_released_in_the_order_of_their_voucher_like_settle_locks_t
     # release goes by voucher id (then session id), the order service.session.settle locks them in.
     from types import SimpleNamespace
 
-    from apps.sale import services
+    from apps.sale.services import line_vouchers
 
     released = []
     monkeypatch.setattr(
-        services,
+        line_vouchers,
         "call_services",
         lambda ctx, name, data: released.append((name, data["id"])),
     )
@@ -972,7 +972,7 @@ def test_sessions_are_released_in_the_order_of_their_voucher_like_settle_locks_t
         SimpleNamespace(voucher_session_id=third, voucher_grant_id=low),
         SimpleNamespace(voucher_session_id=first, voucher_grant_id=high),
     ]
-    services._release_vouchers(ctx_for(), lines)
+    line_vouchers._release_vouchers(ctx_for(), lines)
     assert released == [
         ("service.session.release", third),
         ("service.session.release", min(first, second)),

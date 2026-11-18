@@ -22,7 +22,8 @@
 // figure in the three viewports; the maximum goes back to what it was.
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
-import { A, api, EMPLOYEE, login, OWNER, psql, shot, shown, untilStill, usernameOf, usernamesOf } from './helpers';
+import { A, api, EMPLOYEE, login, OWNER, psql, shot, shown, untilStill, usernamesOf } from './helpers';
+import { usernameOf } from './business';
 import { cleanUp as cleanCustomers, createCard, e2eName } from './customer-helpers';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
 import { ensureIssuer, snapshotSeries } from './invoice-helpers';

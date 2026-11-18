@@ -7,7 +7,9 @@
 // erplora.com's e2e waits the same way.
 import { expect, type Page, test } from '@playwright/test';
 
-import { A, api, capture, createItem, login, repeatedTop, settled as baseSettled, shown, uniqueName } from './helpers';
+import { A, api, capture, login, settled as baseSettled, shown, uniqueName } from './helpers';
+import { createItem } from './demo-items';
+import { repeatedTop } from './detectors';
 import { signedIn, snap } from './cart-checkout-helpers';
 import { settled as scheduleSettled } from './schedule-helpers';
 import { settled } from './service-helpers';

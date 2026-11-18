@@ -27,7 +27,7 @@ VOID = {"id": "s1", "kind": "command", "operation": "sale.order.void", "params":
 
 @pytest.fixture(autouse=True)
 def without_cash_register(monkeypatch):
-    monkeypatch.setattr("apps.sale.services.DRAWER_CHECK", "cash_register.session.not_installed")
+    monkeypatch.setattr("apps.sale.services.charge_validation.DRAWER_CHECK", "cash_register.session.not_installed")
 
 
 @pytest.fixture

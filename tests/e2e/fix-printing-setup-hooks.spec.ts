@@ -12,7 +12,8 @@
 import { type BrowserContext, expect, test } from '@playwright/test';
 
 import { bellSays, bellTotal, featureNotice, noticeButton } from './action-center';
-import { A, api, capturedFitting, login, psql, shown } from './helpers';
+import { A, api, login, psql, shown } from './helpers';
+import { capturedFitting } from './screen';
 import { setupStep } from './home-helpers';
 import { liveStreamsSettled, spanishOwner } from './live-streams';
 import { FLOW_VIEWPORTS, forgetDevices } from './printing-helpers';

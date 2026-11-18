@@ -9,7 +9,8 @@ import { type Browser, type BrowserContext, expect, test } from '@playwright/tes
 
 import { bellSays, bellTotal, featureNotice, noticeButton, noticeIn, openActionCenter } from './action-center';
 import { aMonday } from './appointment-helpers';
-import { A, api, capturedFitting, login, psql, shown } from './helpers';
+import { A, api, login, psql, shown } from './helpers';
+import { capturedFitting } from './screen';
 import { homeRead, spanishOwnerOnMyApps as spanishOwner } from './home-helpers';
 import { FLOW_VIEWPORTS, post } from './service-helpers';
 

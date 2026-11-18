@@ -3,7 +3,8 @@
 // the saved lines; repeating a request with the same client_line_id does not duplicate it.
 import { type Page, expect, test } from '@playwright/test';
 
-import { A, api, createItem, itemDetail, login, record, shot, uniqueName } from './helpers';
+import { A, api, login, record, shot, uniqueName } from './helpers';
+import { createItem, itemDetail } from './demo-items';
 import { recordResponses, responseEnd } from './resource-timing';
 import { newestToast } from './toast-helpers';
 

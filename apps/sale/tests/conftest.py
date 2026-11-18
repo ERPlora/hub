@@ -74,7 +74,7 @@ def without_cash_register(monkeypatch):
     tested apart, with Cash register in the business (``test_integration_cash_register.py`` overrides
     this fixture)."""
     monkeypatch.setattr(
-        "apps.sale.services.DRAWER_CHECK", "cash_register.session.not_installed"
+        "apps.sale.services.charge_validation.DRAWER_CHECK", "cash_register.session.not_installed"
     )
 
 
