@@ -21,6 +21,7 @@ from app_env_doubles import (
     revision,
     settings,
     with_production,
+    without_route,
 )
 
 SETTINGS_FILE = HUB_DIR / "deploy" / "app-env.json"
@@ -304,7 +305,7 @@ def test_the_saas_charges_when_its_revision_enables_platform_invoicing(value, ch
 
 
 def test_a_setting_the_latest_revisions_run_and_the_app_env_lacks_belongs_to_the_file():
-    assert app_env.owner_problems("prod", with_route(), deployed(with_route())) == []
+    assert app_env.owner_problems("prod", PROD, deployed()) == []
 
 
 def test_a_secret_terraform_sets_is_refused():
@@ -319,18 +320,7 @@ def test_a_secret_terraform_sets_is_refused():
 
 
 def test_variables_of_the_settings_in_force_and_new_ones_belong_to_the_file():
-    section = copy.deepcopy(PROD)
-    section["hub"]["VERIFACTU_ERPLORA_ROUTE_ENABLED"] = "false"
-
-    assert app_env.owner_problems("prod", section, deployed()) == []
-
-
-def with_route():
-    """Prod's settings plus VERIFACTU_ERPLORA_ROUTE_ENABLED, which the app_env in force (PROD) does not name."""
-    section = copy.deepcopy(PROD)
-    for family in ("hub", "worker"):
-        section[family]["VERIFACTU_ERPLORA_ROUTE_ENABLED"] = "false"
-    return section
+    assert app_env.owner_problems("prod", PROD, deployed(without_route())) == []
 
 
 # ── The lock on sending to the AEAT for real ──────────────────────────────────────────────────────────────────────
@@ -504,7 +494,7 @@ def read(workdir, name):
 
 
 def test_a_deploy_gives_each_revision_the_settings_of_its_commit(monkeypatch, workdir):
-    data = settings()
+    data = settings(prod=without_route())
     data["prod"]["hub"]["VERIFACTU_ERPLORA_ROUTE_ENABLED"] = "false"
     commands = FakeCommands(file=json.dumps(data))
 
@@ -516,31 +506,29 @@ def test_a_deploy_gives_each_revision_the_settings_of_its_commit(monkeypatch, wo
     assert ["git", "show", f"{COMMIT}:deploy/app-env.json"] in commands.calls
 
 
-def leave_behind(workdir):
-    """The latest revisions run a setting the app_env in force lacks, as a rollback or a failed deploy leaves them."""
-    for family, base in deployed(with_route()).items():
-        (workdir / f"{family}.json").write_text(json.dumps(base))
+def left_behind(**commands):
+    """The app_env in force lacks the route the latest revisions run, as a rollback or a failed deploy leaves it."""
+    return FakeCommands(current={"prod": without_route()}, **commands)
 
 
 def test_a_deploy_after_one_that_failed_after_registering_goes_through(monkeypatch, workdir):
-    leave_behind(workdir)
-    commands = FakeCommands(file=json.dumps(settings(prod=with_route())))
+    commands = left_behind()
 
     assert deploy(monkeypatch, workdir, commands) == 0
 
     for family in ("hub", "worker"):
         assert app_environment(read(workdir, family), family)["VERIFACTU_ERPLORA_ROUTE_ENABLED"] == "false"
-    assert read(workdir, "app_env") == with_route()
+    assert read(workdir, "app_env") == PROD
 
 
 def test_a_setting_left_behind_that_the_file_no_longer_gives_leaves_the_revisions(monkeypatch, workdir):
-    leave_behind(workdir)
+    commands = left_behind(file=json.dumps(settings(prod=without_route())))
 
-    assert deploy(monkeypatch, workdir, FakeCommands()) == 0
+    assert deploy(monkeypatch, workdir, commands) == 0
 
     for family in ("hub", "worker"):
         assert "VERIFACTU_ERPLORA_ROUTE_ENABLED" not in app_environment(read(workdir, family), family)
-    assert read(workdir, "app_env") == PROD
+    assert read(workdir, "app_env") == without_route()
 
 
 @pytest.mark.parametrize("name", ["PLATFORM_HUB_SLUG", "VERIFACTU_ERPLORA_ROUTE_ENABLED"])
@@ -550,7 +538,7 @@ def test_a_secret_terraform_sets_refuses_the_deploy_whether_the_app_env_names_it
     worker = read(workdir, "worker")
     worker["containerDefinitions"][0]["secrets"].append({"name": name, "valueFrom": f"arn:secret:{name}"})
     (workdir / "worker.json").write_text(json.dumps(worker))
-    commands = FakeCommands(file=json.dumps(settings(prod=with_route())))
+    commands = FakeCommands(current={"prod": without_route()})
 
     assert deploy(monkeypatch, workdir, commands) == 1
 
