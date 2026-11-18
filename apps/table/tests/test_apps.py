@@ -7,7 +7,7 @@ from django.apps import apps
 from django.conf import settings
 from django.utils import translation
 from live.live_registry import live_registry
-from live.meta import Category, LiveAppConfig, Nav, SetupCheck, SetupStep, module_configs
+from live.meta import Category, Help, LiveAppConfig, Nav, SetupCheck, SetupStep, module_configs
 from live.operations import registry
 
 from apps.table import events as E
@@ -120,6 +120,10 @@ def test_navigation_is_four_sections_with_registered_icons():
         ("tables", "Tables", "ion:grid-outline", "/table/tables"),
         ("sessions", "Sessions", "ion:time-outline", "/table/sessions"),
     ]
+
+
+def test_its_help_window_is_ready_without_a_video_yet():
+    assert table().help == Help(videos={})
 
 
 #: Done at the table by the waiter with the party in front (``ai.in_person``): seating a party, seating a parked

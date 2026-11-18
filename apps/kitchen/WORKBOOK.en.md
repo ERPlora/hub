@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:85acbc5af572d69ae02bc194d4ee5d237e89f83b587b1495e972afffb7ea25eb -->
+<!-- generated from WORKBOOK.md sha256:2136bf080b25b2b4649239464be3b282e4f49ab04d89885c9c768d262b3147c6 -->
 
 ## What it is for and who it is for
 
@@ -101,17 +101,23 @@ Menu **Kitchen → Display**. The kitchen board. A single bar at the top, fixed 
 views as tabs with their counter ("Tickets" and "Ready"; "All-Day" without a counter), the "Full screen"
 button and, if the tickets on the line have dishes from more than one station, the station buttons
 ("All", each station by its name and with its colour, and "No station"). The chosen station is remembered
-on that device. Below, a grid of cards in equal columns (a single one on the phone). Each card: the label
-("Table 4"; without a label, the type), "Waiter: <name>", the marks "Rush", "VIP", "Round N" (from the
-second one) and "Ready", the clock and the short number "#0012"; the dishes with the quantity in large
-type, the name, their modifiers in bold, the note in italics and, in "All", the station; the dishes of a
-menu, next to a line under the menu header, which says how many dishes it has ("2 dishes") and, when
-tapped, marks its dishes ready; a paper icon if the station is paper only. A dish voided at the till shows
-struck through, with "Voided" and the reason in red, and does not respond to a tap. At the bottom,
-depending on the permission and the state: "Ready", "Mark rush" / "Remove rush", "Recall" and "Served",
-whole and finger-sized on a tablet. The top edge of the card is green, amber or red depending on the time
-since it was sent. Empty: "No tickets on the line." (Tickets), "Nothing waiting to be picked up." (Ready),
-"Nothing left to cook." (All-Day). Loading: "Loading the display…". Error: "Could not load the kitchen
+on that device. Below, a grid of cards in equal columns, as many as fit (a single one on the phone, with no
+sideways scroll). Each card: on the left, the type as an icon, the label ("Table 4"; without a label, the
+type) and "Waiter: <name>"; on the right, the clock, the wait in words with its icon ("On time", "Warning"
+or "Late") and the short number "#0012"; below, the status ("To prepare", "Preparing" or "Ready") and the
+marks "Rush", "VIP" and "Round N" (from the second one). The dishes with the quantity in large type
+("2×"), the name, their modifiers in bold, the note in italics, in "All" the station with its colour,
+"Paper only" if the station is paper only and, on the right, an icon with their state (to prepare,
+preparing, ready or voided); the dishes of a menu, next to a line under the menu header, which says how
+many dishes it has ("2 dishes") and, when tapped, marks its dishes ready. A dish that is ready shows
+struck through and dimmed. A dish voided at the till shows struck through, with "Voided" and the reason in
+red, and does not respond to a tap. At the bottom, depending on the permission and the state, the main
+action across the whole width ("Ready" while it cooks with dishes to do, "Served" once it is ready) and, to
+its right, "⋮", which opens the others: "Mark rush" / "Remove rush" and "Recall"; with none of them there
+is no "⋮". Everything is easy to press with a finger on a tablet. The top strip of the card is green, amber
+or red depending on the time since it was sent. Empty: "No tickets on the line." (Tickets), "Nothing waiting
+to be picked up." (Ready), "Nothing left to cook." (All-Day). Loading: "Loading the display…" over grey
+cards. Error: "Could not load the kitchen
 display" with "Retry". A failure when asking for paper leaves "The pass could not be printed. Check the
 printer of the station." or "The urgent notice could not be printed. Tell the kitchen by voice and check
 its printer." until a later print comes out fine. It updates by itself with every change, without
@@ -404,9 +410,10 @@ Steps:
 3. If there are dishes from more than one station, choose yours: "All" shows every dish (the pass); a
    station shows only its dishes and only the tickets that still have something of its own to cook; "No
    station", the dishes without a route. The choice is remembered on that device.
-4. The edge of each card goes from green to amber on reaching "Amber warning" and to red on reaching "Red
-   alert", counting from when it was sent; the clock stays red. Without "Colour semaphore" the edge stays
-   grey; without "Show timer" there is no clock.
+4. The strip of each card goes from green to amber on reaching "Amber warning" and to red on reaching "Red
+   alert", counting from when it was sent, and next to the clock it says so in words: "On time", "Warning"
+   or "Late" (the clock and the word in amber or in red). Without "Colour semaphore" the strip stays grey
+   and the wait is not said; without "Show timer" there is no clock, but the wait is still said.
 In: the tickets To prepare, Preparing and Ready with their dishes; the settings; the live names and
 colours of the stations.
 Out: nothing; it only shows. The buttons of each card show whole and are easy to press with a finger on
@@ -420,7 +427,7 @@ Status: done
 Actor: employee, manager
 Screen: Display (also the assistant: "mark table 4 ready")
 Steps:
-1. Tap a dish when it is done: it is struck through with ✓.
+1. Tap a dish when it is done: it is struck through and its icon turns to ready.
 2. Or tap the card's header, or "Ready": the dishes of that card that show on your screen and are still
    to cook are marked (at a station, only its own).
 3. The first dish marked moves the ticket to "Preparing". When no dish is left to cook, from any station,
@@ -439,9 +446,8 @@ Actor: employee, manager
 Screen: Display
 Steps:
 1. Tap a struck-through dish: it is to cook again.
-2. Or "Recall" on the card (on a tablet, the button shows whole): the struck-through dishes that show on
-   your screen come back.
-3. A ticket in "Ready" is recalled with "Recall": it goes back to "Preparing" and to "Tickets".
+2. Or "⋮" → "Recall" on the card: the struck-through dishes that show on your screen come back.
+3. A ticket in "Ready" is recalled with "⋮" → "Recall": it goes back to "Preparing" and to "Tickets".
 In: the struck-through dishes.
 Out: each dish to cook (announces: dish recalled; History "Dish recalled") and, if the ticket was Ready,
 "Recalled". Recalling what is already to cook changes nothing.
@@ -466,11 +472,11 @@ Status: done
 Actor: employee, manager
 Screen: Display
 Steps:
-1. On a card being cooked, "Mark rush": it carries "Rush" and jumps to the start of the board on every
+1. On a card being cooked, "⋮" → "Mark rush": it carries "Rush" and jumps to the start of the board on every
    display, which ring once.
 2. The stations that print and still have dishes of that round to cook receive a short notice on paper:
    the ticket's header with `!! URGENTE !!` and no dishes.
-3. "Remove rush" undoes it and prints nothing. A VIP round does not offer the button, and through the
+3. "Remove rush" undoes it and prints nothing. A VIP round does not offer it, and through the
    assistant or the API it is rejected ("That ticket is VIP: a rush does not change its priority.").
 In: the ticket being cooked.
 Out: the rush round (announces: ticket changed; History "Rush"); each switch to rush gives a new notice on

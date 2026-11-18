@@ -34,19 +34,26 @@ setup() {
   mkdir -p "$work/bin" "$work/fixtures"
   export CALLS_LOG="$work/calls.log" REGISTERED_LOG="$work/registered.log" SLEEP_LOG="$work/sleep.log"
   export FIXTURES="$work/fixtures" POLLS="$work/polls" ROLLOUT_POLLS="$work/rollout-polls"
+  export GIT_LOG="$work/git.log" APP_ENV_PUT="$work/app-env-put.json"
   : > "$CALLS_LOG"
+  : > "$GIT_LOG"
   : > "$REGISTERED_LOG"
   : > "$SLEEP_LOG"
 
   # The hub and the worker run the app plus its pgbouncer sidecar, both on the hub image;
   # the hub fixture also carries containers of other images, which must stay as they are.
+  # In prod their apps carry Terraform's variables and the settings in force.
   task_definition erplora-prod-hub '[
-    {"name": "hub", "image": "reg.example/erplora/hub:bootstrap"},
+    {"name": "hub", "image": "reg.example/erplora/hub:bootstrap", "environment": [
+      {"name": "DEBUG", "value": "False"}, {"name": "PLATFORM_HUB_SLUG", "value": "erplora"},
+      {"name": "VERIFACTU_PRODUCTION_ENABLED", "value": "true"}]},
     {"name": "pgbouncer", "image": "reg.example/erplora/hub:bootstrap"},
     {"name": "log-router", "image": "public.ecr.aws/aws-observability/aws-for-fluent-bit:stable"},
     {"name": "look-alike", "image": "reg.example/erplora/hubx:bootstrap"}]' > "$FIXTURES/erplora-prod-hub.json"
   task_definition erplora-prod-worker '[
-    {"name": "worker", "image": "reg.example/erplora/hub:bootstrap"},
+    {"name": "worker", "image": "reg.example/erplora/hub:bootstrap", "environment": [
+      {"name": "DEBUG", "value": "False"}, {"name": "PLATFORM_HUB_SLUG", "value": "erplora"},
+      {"name": "VERIFACTU_PRODUCTION_ENABLED", "value": "true"}]},
     {"name": "pgbouncer", "image": "reg.example/erplora/hub:bootstrap"}]' > "$FIXTURES/erplora-prod-worker.json"
   task_definition erplora-prod-hub-migrate '[
     {"name": "hub-migrate", "image": "reg.example/erplora/hub:bootstrap"}]' > "$FIXTURES/erplora-prod-hub-migrate.json"
@@ -64,6 +71,36 @@ setup() {
     {"name": "hub-migrate", "image": "reg.example/erplora/hub-pre:bootstrap"}]' > "$FIXTURES/erplora-pre-hub-migrate.json"
   task_definition erplora-pre-db-bootstrap '[
     {"name": "db-bootstrap", "image": "reg.example/erplora/hub:bootstrap"}]' > "$FIXTURES/erplora-pre-db-bootstrap.json"
+
+  # deploy/app-env.json of the commit deployed (abc123), the settings in force of each environment
+  # (/erplora/<environment>/hub/app_env, the same) and the SaaS's latest revision, charging real money.
+  cat > "$FIXTURES/app-env.json" <<'JSON'
+{"prod": {"hub": {"PLATFORM_HUB_SLUG": "erplora", "VERIFACTU_PRODUCTION_ENABLED": "true"},
+          "worker": {"PLATFORM_HUB_SLUG": "erplora", "VERIFACTU_PRODUCTION_ENABLED": "true"}},
+ "pre": {"hub": {"PLATFORM_HUB_SLUG": "erplora", "VERIFACTU_PRODUCTION_ENABLED": "false", "VERIFACTU_ERPLORA_ROUTE_ENABLED": "false"},
+         "worker": {"PLATFORM_HUB_SLUG": "erplora", "VERIFACTU_PRODUCTION_ENABLED": "false", "VERIFACTU_ERPLORA_ROUTE_ENABLED": "false"}}}
+JSON
+  jq -c .prod "$FIXTURES/app-env.json" > "$FIXTURES/erplora_prod_hub_app_env.json"
+  jq -c .pre "$FIXTURES/app-env.json" > "$FIXTURES/erplora_pre_hub_app_env.json"
+  saas_charging true
+
+  # git answers deploy/app-env.json of abc123 from its fixture, and fails as git does without it.
+  cat > "$work/bin/git" <<'FAKE'
+#!/usr/bin/env bash
+echo "$*" >> "$GIT_LOG"
+case "$1 $2" in
+  "show abc123:deploy/app-env.json")
+    if [ -f "$FIXTURES/app-env.json" ]; then cat "$FIXTURES/app-env.json" && exit 0; fi
+    echo "fatal: path 'deploy/app-env.json' does not exist in 'abc123'" >&2
+    ;;
+  "cat-file -e")
+    if [ "$3" = "abc123^{commit}" ]; then exit 0; fi
+    echo "fatal: Not a valid object name $3" >&2
+    ;;
+  *) echo "fatal: unexpected git $*" >&2 ;;
+esac
+exit 128
+FAKE
 
   # Fails after 500 pauses: a migration loop that never times out fails its test instead of hanging.
   cat > "$work/bin/sleep" <<'FAKE'
@@ -147,22 +184,46 @@ case "$1 $2" in
       *stoppedReason*) echo "${FAKE_STOPPED_REASON:-Essential container in task exited}" ;;
     esac
     ;;
+  "ssm get-parameter")
+    # /erplora/prod/hub/app_env answers the fixture erplora_prod_hub_app_env.json.
+    file="$FIXTURES/$(value --name | sed 's|^/||; s|/|_|g').json"
+    if [ ! -f "$file" ]; then
+      echo "An error occurred (ParameterNotFound) when calling the GetParameter operation: " >&2
+      exit 254
+    fi
+    cat "$file"
+    ;;
+  "ssm put-parameter")
+    if [[ "$(value --name)" == */app_env ]]; then value --value > "$APP_ENV_PUT"; fi
+    ;;
   *) ;;
 esac
 FAKE
-  chmod +x "$work/bin/aws" "$work/bin/sleep"
+  chmod +x "$work/bin/aws" "$work/bin/sleep" "$work/bin/git"
+}
+
+# saas_charging <true|false>: the SaaS's latest revision, with PLATFORM_INVOICING_ENABLED=<value>.
+saas_charging() {
+  task_definition erplora-prod-saas "[{\"name\": \"saas\", \"image\": \"reg.example/erplora/saas:live\",
+    \"environment\": [{\"name\": \"PLATFORM_INVOICING_ENABLED\", \"value\": \"$1\"}]}]" > "$FIXTURES/erplora-prod-saas.json"
+}
+
+# edit_fixture <fixture> <jq filter>: rewrites the fixture with the filter.
+edit_fixture() {
+  jq "$2" "$FIXTURES/$1" > "$work/edited.json"
+  mv "$work/edited.json" "$FIXTURES/$1"
 }
 
 # run_deploy [VAR=value...]: deploys abc123 to prod with the fakes; the arguments override the environment.
 run_deploy() {
-  env -u CLUSTER -u PROJECT -u POLL_SECONDS -u MIGRATE_TIMEOUT_SECONDS -u ROLLOUT_TIMEOUT_SECONDS \
+  env -u CLUSTER -u PROJECT -u POLL_SECONDS -u MIGRATE_TIMEOUT_SECONDS -u ROLLOUT_TIMEOUT_SECONDS -u CONFIRM_PROTECTED \
     PATH="$work/bin:$PATH" AWS_REGION=eu-south-2 REGISTRY=reg.example IMAGE_TAG=abc123 ENVIRONMENT=prod "$@" \
     bash "$here/ecs-deploy.sh" > "$work/out.log" 2>&1
 }
 
 # run_deploy_without <VAR>: the same with <VAR> unset.
 run_deploy_without() {
-  env PATH="$work/bin:$PATH" AWS_REGION=eu-south-2 REGISTRY=reg.example IMAGE_TAG=abc123 ENVIRONMENT=prod \
+  env -u CONFIRM_PROTECTED PATH="$work/bin:$PATH" AWS_REGION=eu-south-2 REGISTRY=reg.example IMAGE_TAG=abc123 ENVIRONMENT=prod \
     env -u "$1" bash "$here/ecs-deploy.sh" > "$work/out.log" 2>&1
 }
 
@@ -225,19 +286,22 @@ check "the deployed tag is recorded in SSM" \
 check "the tag is recorded only after the services are checked" \
   '[ "$(line_of "ssm put-parameter")" -gt "$(last_line_of "describe-services .*deployments")" ]'
 check "every aws call names the region" '[ -s "$CALLS_LOG" ] && ! grep -qv -- "--region eu-south-2" "$CALLS_LOG"'
-check "nothing of the saas is touched" '! grep -q saas "$CALLS_LOG"'
+check "of the saas, only its latest revision is read" \
+  '[ "$(grep saas "$CALLS_LOG")" = "ecs describe-task-definition --task-definition erplora-prod-saas --region eu-south-2 --output json" ]'
 check "nothing of pre is touched" '! grep -Eq "erplora-pre|-pre |/erplora/pre/" "$CALLS_LOG" "$REGISTERED_LOG"'
 check "prod's services keep their desired count" '! grep -q "desired-count" "$CALLS_LOG"'
 check "every revision is read before any is registered" \
   '[ "$(last_line_of "describe-task-definition")" -lt "$(line_of "register-task-definition")" ]'
 
-# The calls of a prod deploy before pre existed: the same calls with the same arguments;
-# only the reads moved, so the three revisions are read (and checked) before any is registered.
-check "prod: the calls are exactly today's" \
+# Every call of a prod deploy, in order: the three revisions, the settings in force and the SaaS's
+# revision are read (and checked) before any is registered, and the settings are recorded last, with the tag.
+check "prod: the calls are exactly these" \
   '[ "$(sed -E "s|file://[^ ]*/|file://<workdir>/|" "$CALLS_LOG")" = "$(cat <<'"'"'CALLS'"'"'
 ecs describe-task-definition --task-definition erplora-prod-hub --include TAGS --region eu-south-2 --output json
 ecs describe-task-definition --task-definition erplora-prod-worker --include TAGS --region eu-south-2 --output json
 ecs describe-task-definition --task-definition erplora-prod-hub-migrate --include TAGS --region eu-south-2 --output json
+ssm get-parameter --name /erplora/prod/hub/app_env --query Parameter.Value --output text --region eu-south-2
+ecs describe-task-definition --task-definition erplora-prod-saas --region eu-south-2 --output json
 ecs register-task-definition --cli-input-json file://<workdir>/hub.json --region eu-south-2 --query taskDefinition.taskDefinitionArn --output text
 ecs register-task-definition --cli-input-json file://<workdir>/worker.json --region eu-south-2 --query taskDefinition.taskDefinitionArn --output text
 ecs register-task-definition --cli-input-json file://<workdir>/hub-migrate.json --region eu-south-2 --query taskDefinition.taskDefinitionArn --output text
@@ -251,6 +315,7 @@ ecs update-service --cluster erplora-prod --service worker --task-definition arn
 ecs wait services-stable --cluster erplora-prod --region eu-south-2 --services hub worker
 ecs describe-services --cluster erplora-prod --services hub --region eu-south-2 --query services[0].deployments[?status=='"'"'PRIMARY'"'"'] | [0].[taskDefinition, rolloutState] --output text
 ecs describe-services --cluster erplora-prod --services worker --region eu-south-2 --query services[0].deployments[?status=='"'"'PRIMARY'"'"'] | [0].[taskDefinition, rolloutState] --output text
+ssm put-parameter --name /erplora/prod/hub/app_env --value {"hub":{"PLATFORM_HUB_SLUG":"erplora","VERIFACTU_PRODUCTION_ENABLED":"true"},"worker":{"PLATFORM_HUB_SLUG":"erplora","VERIFACTU_PRODUCTION_ENABLED":"true"}} --type String --overwrite --region eu-south-2
 ssm put-parameter --name /erplora/prod/hub/image_tag --value abc123 --type String --overwrite --region eu-south-2
 CALLS
 )" ]'
@@ -345,6 +410,113 @@ run_deploy && status=0 || status=$?
 check "a base revision without a task role is refused" 'refused_base erplora-prod-hub'
 check "the error says what the revision carries" \
   'grep -q "::error::erplora-prod-hub .*Environment=prod.*task role none" "$work/out.log"'
+
+# --- the settings of deploy/app-env.json -------------------------------------
+# environment_of <family> <container>: the variables of that container in the revision registered.
+environment_of() {
+  jq -c --arg family "$1" --arg name "$2" \
+    'select(.family == $family) | .containerDefinitions[] | select(.name == $name) | .environment // [] | from_entries' \
+    "$REGISTERED_LOG"
+}
+setup
+edit_fixture app-env.json '.prod.hub.PLATFORM_HUB_SLUG = "erplora-cloud" | .prod.worker.PLATFORM_HUB_SLUG = "erplora-cloud"
+  | .prod.hub.VERIFACTU_ERPLORA_ROUTE_ENABLED = "false"'
+run_deploy && status=0 || status=$?
+check "settings: the deploy reads deploy/app-env.json of the commit it deploys" \
+  '[ "$status" -eq 0 ] && grep -qx "show abc123:deploy/app-env.json" "$GIT_LOG"'
+check "settings: hub and worker run the commit's settings next to Terraform's variables" \
+  '[ "$(environment_of erplora-prod-hub hub)" = "{\"DEBUG\":\"False\",\"PLATFORM_HUB_SLUG\":\"erplora-cloud\",\"VERIFACTU_PRODUCTION_ENABLED\":\"true\",\"VERIFACTU_ERPLORA_ROUTE_ENABLED\":\"false\"}" ] &&
+   [ "$(environment_of erplora-prod-worker worker)" = "{\"DEBUG\":\"False\",\"PLATFORM_HUB_SLUG\":\"erplora-cloud\",\"VERIFACTU_PRODUCTION_ENABLED\":\"true\"}" ]'
+check "settings: the sidecars and the migration keep their variables" \
+  '[ "$(environment_of erplora-prod-hub pgbouncer)" = "{}" ] && [ "$(environment_of erplora-prod-worker pgbouncer)" = "{}" ] &&
+   [ "$(environment_of erplora-prod-hub-migrate hub-migrate)" = "{}" ]'
+check "settings: the deploy records prod's settings of the file in /erplora/prod/hub/app_env" \
+  '[ "$(jq -S -c . "$APP_ENV_PUT")" = "$(jq -S -c .prod "$FIXTURES/app-env.json")" ]'
+check "settings: they are recorded once the services are checked, before the tag" \
+  'n="$(line_of "put-parameter --name /erplora/prod/hub/app_env ")" &&
+   [ "$n" -gt "$(last_line_of "describe-services .*deployments")" ] && [ "$n" -lt "$(line_of "/erplora/prod/hub/image_tag")" ]'
+
+setup
+edit_fixture app-env.json '.prod.worker |= del(.PLATFORM_HUB_SLUG)'
+run_deploy && status=0 || status=$?
+check "settings: a variable the file no longer gives leaves the revision" \
+  '[ "$status" -eq 0 ] && [ "$(environment_of erplora-prod-worker worker)" = "{\"DEBUG\":\"False\",\"VERIFACTU_PRODUCTION_ENABLED\":\"true\"}" ]'
+
+setup
+run_deploy ENVIRONMENT=pre && status=0 || status=$?
+check "pre: hub-pre and worker-pre get pre's settings" \
+  '[ "$status" -eq 0 ] &&
+   for f in hub worker; do [ "$(environment_of "erplora-pre-$f" "$f")" = "$(jq -c ".pre.\"$f\"" "$FIXTURES/app-env.json")" ] || exit 1; done'
+check "pre: records them in /erplora/pre/hub/app_env and never reads the SaaS" \
+  'grep -q "^ssm put-parameter --name /erplora/pre/hub/app_env " "$CALLS_LOG" && ! grep -q saas "$CALLS_LOG" &&
+   [ "$(jq -S -c . "$APP_ENV_PUT")" = "$(jq -S -c .pre "$FIXTURES/app-env.json")" ]'
+
+# refused_settings <where> [VAR=value...]: a deploy whose settings break a rule at <where> fails
+# before registering anything, and records nothing.
+refused_settings() {
+  local where="$1"
+  shift
+  run_deploy "$@" && status=0 || status=$?
+  refused_base "$where" && [ ! -e "$APP_ENV_PUT" ]
+}
+setup
+edit_fixture app-env.json '.prod.hub.DEBUG = "True"'
+check "settings: a variable that is not a setting of the file is refused" 'refused_settings prod.hub.DEBUG:'
+setup
+edit_fixture app-env.json '.prod.worker.VERIFACTU_PRODUCTION_ENABLED = true'
+check "settings: a value that is not text is refused" 'refused_settings prod.worker.VERIFACTU_PRODUCTION_ENABLED:'
+setup
+edit_fixture app-env.json '.prod.secrets = {"FISCAL_CERTIFICATE_KEY": "arn:aws:secretsmanager:eu-west-1:1:secret:fiscal"}'
+check "settings: a secrets section is refused" 'refused_settings prod.secrets:'
+setup
+edit_fixture app-env.json '.pre.hub.PLATFORM_HUB_SLUG = "3f9a1c0e7b2d4a6f8e1c3b5d7f9a0c2e4b6d8f0a"'
+check "settings: a prod deploy also refuses something like a secret in pre's settings" 'refused_settings pre.hub.PLATFORM_HUB_SLUG:'
+setup
+edit_fixture app-env.json '.pre.hub.VERIFACTU_PRODUCTION_ENABLED = "true" | .pre.worker.VERIFACTU_PRODUCTION_ENABLED = "true"'
+check "settings: pre never opens the AEAT's production environment" \
+  'refused_settings pre.hub.VERIFACTU_PRODUCTION_ENABLED: ENVIRONMENT=pre'
+setup
+edit_fixture erplora-prod-worker.json \
+  '.taskDefinition.containerDefinitions[0].environment += [{"name": "VERIFACTU_ERPLORA_ROUTE_ENABLED", "value": "true"}]'
+edit_fixture app-env.json '.prod.worker.VERIFACTU_ERPLORA_ROUTE_ENABLED = "false"'
+check "settings: a variable Terraform sets stays Terraform's" 'refused_settings prod.worker.VERIFACTU_ERPLORA_ROUTE_ENABLED:'
+setup
+rm "$FIXTURES/erplora_prod_hub_app_env.json"
+check "settings: without the settings in force nothing is registered" 'refused_settings /erplora/prod/hub/app_env:'
+
+# Charging real money while the hub does not send to the AEAT's production environment.
+setup
+edit_fixture app-env.json '.prod.hub.VERIFACTU_PRODUCTION_ENABLED = "false" | .prod.worker.VERIFACTU_PRODUCTION_ENABLED = "false"'
+jq -c .prod "$FIXTURES/app-env.json" > "$FIXTURES/erplora_prod_hub_app_env.json"
+check "settings: while the SaaS charges, the hub keeps sending to the AEAT" 'refused_settings prod.hub.VERIFACTU_PRODUCTION_ENABLED:'
+
+# The lock: opening the AEAT's production environment in prod takes the confirmation.
+lock_closed_in_force() {
+  edit_fixture erplora_prod_hub_app_env.json '.hub.VERIFACTU_PRODUCTION_ENABLED = "false" | .worker.VERIFACTU_PRODUCTION_ENABLED = "false"'
+  saas_charging false
+}
+setup
+lock_closed_in_force
+check "lock: opening the AEAT in prod without CONFIRM_PROTECTED registers nothing" \
+  'refused_settings prod.VERIFACTU_PRODUCTION_ENABLED: && grep -q "confirm_protected=VERIFACTU_PRODUCTION_ENABLED=true" "$work/out.log"'
+setup
+lock_closed_in_force
+check "lock: a confirmation of something else registers nothing" \
+  'refused_settings prod.VERIFACTU_PRODUCTION_ENABLED: CONFIRM_PROTECTED=VERIFACTU_PRODUCTION_ENABLED=false'
+setup
+lock_closed_in_force
+run_deploy CONFIRM_PROTECTED=VERIFACTU_PRODUCTION_ENABLED=true && status=0 || status=$?
+check "lock: with the exact confirmation it deploys and records the open lock" \
+  '[ "$status" -eq 0 ] && [ "$(jq -r .hub.VERIFACTU_PRODUCTION_ENABLED "$APP_ENV_PUT")" = true ] &&
+   [ "$(environment_of erplora-prod-worker worker | jq -r .VERIFACTU_PRODUCTION_ENABLED)" = true ]'
+
+# A release from before the file: its deploy keeps the settings in force.
+setup
+rm "$FIXTURES/app-env.json"
+run_deploy && status=0 || status=$?
+check "settings: a commit without deploy/app-env.json keeps the settings in force, with a warning" \
+  '[ "$status" -eq 0 ] && grep -q "::warning::abc123 has no deploy/app-env.json" "$work/out.log" &&
+   [ "$(jq -S -c . "$APP_ENV_PUT")" = "$(jq -S -c . "$FIXTURES/erplora_prod_hub_app_env.json")" ]'
 
 # --- polling the migration ----------------------------------------------------
 setup

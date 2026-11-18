@@ -10,6 +10,7 @@ import { expect, test } from '@playwright/test';
 import { api, A, capture, horizontalOverflow, shown, untilStill } from './helpers';
 import { rowAction } from './service-helpers';
 import { cleanUp, named, pick, post, rowOf, signedIn, TAG, VIEWPORTS } from './task-helpers';
+import { toastSaying } from './toast-helpers';
 
 test.beforeAll(cleanUp);
 test.afterAll(cleanUp);
@@ -58,7 +59,7 @@ test('a task for a person of Staff, from its project to done, live', async ({ br
 
     // TASK-F05: Start from the row, with its notice.
     await rowAction(page, 'task-tasks', taskId, 'start');
-    await expect(page.locator('ion-toast')).toContainText('Task started');
+    await expect(toastSaying(page, 'Task started')).toBeVisible();
     await expect(row).toContainText('In Progress');
     // The notice is still sliding in: the capture waits until nothing moves.
     await untilStill(page);

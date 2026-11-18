@@ -6,6 +6,7 @@
 import { type Browser, expect, type Page, test } from '@playwright/test';
 
 import { A, api, capture, login, shown } from './helpers';
+import { rowAction } from './service-helpers';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
 import { ensureIssuer, snapshotSeries } from './invoice-helpers';
 import { chargeByApi, cleanSales, drawerOff, numberRow, restoreDrawer, shots, stamp } from './sale-helpers';
@@ -58,7 +59,7 @@ test('SALE-F29: the ticket of a charged sale carries VeriFactu’s QR, «VERI*FA
   expect(record?.qr_url).toContain('https://prewww2.aeat.es/');
 
   await shown(page).locator('[data-testid=sales-table-search] input').fill(sale.number);
-  await shown(page).locator(`[data-testid=sales-table-row-${sale.id}-document]`).first().click();
+  await rowAction(page, 'sales-table', sale.id, 'document');
   const document = page.locator('[data-testid=sale-document-modal]');
   const qr = document.locator('[data-testid=sale-receipt-qr]');
   await expect(qr).toBeVisible();
@@ -102,7 +103,7 @@ test('SALE-F29 (hub#695): the ticket number never splits — whole on one line, 
       expect(sale.invoice_number).toMatch(/^TICKET-\d{4}-\d{6}$/);
     }
     await shown(page).locator('[data-testid=sales-table-search] input').fill(sale.number);
-    await shown(page).locator(`[data-testid=sales-table-row-${sale.id}-document]`).first().click();
+    await rowAction(page, 'sales-table', sale.id, 'document');
     const paper = page.locator('[data-testid=sale-document-modal] [data-testid=sale-receipt]');
     await expect(paper.locator('[data-testid=sale-receipt-number]')).toContainText(sale.invoice_number);
     await documentReady(page);

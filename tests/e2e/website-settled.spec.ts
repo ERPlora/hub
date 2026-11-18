@@ -1,13 +1,14 @@
 // flow: website-e2e — the website specs' wait
 // The website specs wait for the page to be at rest before each capture (`atRest`, website-helpers.ts). A wait that
 // asks the document alone for its animations leaves shadow roots out, and Ionic animates its overlays (`ion-modal`,
-// `ion-toast`) and an `ion-segment`'s indicator inside theirs: in the editor, right after it, the «Publish your
+// `ion-popover`) and an `ion-segment`'s indicator inside theirs: in the editor, right after it, the «Publish your
 // website?» dialog could still be sliding in. Here that dialog enters at a fifth of its speed (Chrome's own
 // control), and once `atRest` returns nothing may move, asked with the harness's own detector (`exposeMovingInPage`,
 // helpers.ts), at 390, 834 and 1440. The dialog is cancelled each time: the site is not published.
 import { type CDPSession, expect, type Page, test } from '@playwright/test';
 
-import { A, capture, exposeMovingInPage, hostPage, repeatedTop } from './helpers';
+import { A, capture, exposeMovingInPage, hostPage } from './helpers';
+import { repeatedTop } from './detectors';
 import { atRest } from './website-helpers';
 
 const KEY = 'FIX-HUB-WEBSITE-E2E-WAIT-BLIND-TO-SHADOW-ROOTS';

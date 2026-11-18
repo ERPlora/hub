@@ -6,9 +6,10 @@
 // are in euros, and the invoice issued in Poland keeps its złoty. Each width leaves a capture of Cash register,
 // Invoicing and Inventory, and one more back in Spain at 1440. What the run creates is deleted after it and `a`'s
 // registration put back.
-import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
+import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
 import { A, api, login, psql, registerBusinessIn, registrationOf, type Registration, shot, shown, untilStill } from './helpers';
+import { rowAction } from './service-helpers';
 import { createProduct, dialog, productsReady } from './inventory-helpers';
 import { ensureIssuer, issuedIds, issuerBackAndInvoicesGone, issuerNow, type IssuerOut, snapshotSeries } from './invoice-helpers';
 
@@ -46,9 +47,6 @@ async function issueInvoice(context: BrowserContext): Promise<{ id: string; numb
   issuedIds.add(created.data.id);
   return created.data;
 }
-
-/** The visible copy of `testid` (Ionic keeps each page of the stack mounted). */
-const visible = (page: Page, testid: string): Locator => page.locator(`[data-testid="${testid}"]:visible`).first();
 
 async function sessionsReady(page: Page): Promise<void> {
   await shown(page).locator(`[data-testid=cash-register-sessions-row][data-id="${sessionId}"]`).first().waitFor({ state: 'visible' });
@@ -111,7 +109,7 @@ test(`a business in Poland counts, invoices and prices in złoty in 390, 834 and
     await untilStill(page);
     await page.screenshot({ path: shot(`${KEY}-${size.name}`), fullPage: true });
 
-    await visible(page, `cash-register-sessions-row-${sessionId}-count`).click();
+    await rowAction(page, 'cash-register-sessions', sessionId, 'count');
     const count = dialog(page, 'cash-register-count');
     await expect(count).toBeVisible();
     // 5 zł is a coin of the zloty (a note of the euro); the 500 zł note leads.
@@ -124,7 +122,7 @@ test(`a business in Poland counts, invoices and prices in złoty in 390, 834 and
     await page.keyboard.press('Escape');
     await expect(count).toBeHidden();
 
-    await visible(page, `cash-register-sessions-row-${sessionId}-close`).click();
+    await rowAction(page, 'cash-register-sessions', sessionId, 'close');
     const close = dialog(page, 'cash-register-close');
     await expect(close).toBeVisible();
     await expect(close.locator('[data-testid=cash-register-close-expected]')).toContainText(/zł\s?100[.,]00|100[.,]00\s?zł/);

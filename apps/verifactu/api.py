@@ -20,7 +20,6 @@ from apps.verifactu.schemas import (
     ByInvoiceIn,
     CertificateUploadIn,
     ChainValidateIn,
-    ConfigUpdateIn,
     ContingencyListIn,
     ContingencyRetryIn,
     EventListIn,
@@ -46,12 +45,7 @@ router = Router(tags=["verifactu"])
 
 @bind(router, "verifactu.config.get", "/verifactu/config")
 async def config_get(request):
-    return await run_operation(request, queries.get_config)
-
-
-@bind(router, "verifactu.config.update", "/verifactu/config")
-async def config_update(request, data: ConfigUpdateIn):
-    return await run_operation(request, services.update_config, data)
+    return await run_operation(request, queries.config.get_config)
 
 
 @bind(router, "verifactu.config.go_live", "/verifactu/config/go_live")
@@ -102,7 +96,7 @@ async def representation_submit(request, data: RepresentationSubmitIn):
     },
 )
 async def representation_model(request):
-    model = await run_operation(request, queries.representation_model)
+    model = await run_operation(request, queries.authorisation.representation_model)
     accepts = request.headers.get("Accept", "")
     if "application/json" in accepts and "application/pdf" not in accepts:
         return model
@@ -118,17 +112,17 @@ async def representation_model(request):
 
 @bind(router, "verifactu.record.list", "/verifactu/records")
 async def record_list(request, params: Query[RecordListIn]):
-    return await run_operation(request, queries.list_records, params)
+    return await run_operation(request, queries.records.list_records, params)
 
 
 @bind(router, "verifactu.record.get", "/verifactu/records/detail")
 async def record_get(request, params: Query[RecordGetIn]):
-    return await run_operation(request, queries.get_record, params)
+    return await run_operation(request, queries.records.get_record, params)
 
 
 @bind(router, "verifactu.record.by_invoice", "/verifactu/records/by_invoice")
 async def record_by_invoice(request, params: Query[ByInvoiceIn]):
-    return await run_operation(request, queries.by_invoice, params)
+    return await run_operation(request, queries.records.by_invoice, params)
 
 
 @bind(router, "verifactu.record.create", "/verifactu/records", status=201)
@@ -161,7 +155,7 @@ async def record_reconcile(request, data: RecordReconcileIn):
 
 @bind(router, "verifactu.contingency.list", "/verifactu/contingency")
 async def contingency_list(request, params: Query[ContingencyListIn]):
-    return await run_operation(request, queries.list_queue, params)
+    return await run_operation(request, queries.contingency.list_queue, params)
 
 
 @bind(router, "verifactu.contingency.process", "/verifactu/contingency/process")
@@ -179,19 +173,19 @@ async def contingency_retry(request, data: ContingencyRetryIn):
 
 @bind(router, "verifactu.event.list", "/verifactu/events")
 async def event_list(request, params: Query[EventListIn]):
-    return await run_operation(request, queries.list_events, params)
+    return await run_operation(request, queries.events.list_events, params)
 
 
 @bind(
     router, "verifactu.stats.compliance_summary", "/verifactu/stats/compliance_summary"
 )
 async def stats_compliance(request):
-    return await run_operation(request, queries.compliance_summary)
+    return await run_operation(request, queries.stats.compliance_summary)
 
 
 @bind(router, "verifactu.stats.records_by_status", "/verifactu/stats/records_by_status")
 async def stats_by_status(request):
-    return await run_operation(request, queries.records_by_status)
+    return await run_operation(request, queries.stats.records_by_status)
 
 
 @bind(
@@ -200,12 +194,12 @@ async def stats_by_status(request):
     "/verifactu/stats/contingency_summary",
 )
 async def stats_contingency(request):
-    return await run_operation(request, queries.contingency_summary)
+    return await run_operation(request, queries.stats.contingency_summary)
 
 
 @bind(router, "verifactu.stats.events_recent", "/verifactu/stats/events_recent")
 async def stats_events_recent(request, params: Query[EventsRecentIn]):
-    return await run_operation(request, queries.events_recent, params)
+    return await run_operation(request, queries.stats.events_recent, params)
 
 
 # The AEAT and the chain
@@ -213,7 +207,7 @@ async def stats_events_recent(request, params: Query[EventsRecentIn]):
 
 @bind(router, "verifactu.aeat_record.list", "/verifactu/aeat_records")
 async def aeat_record_list(request, params: Query[AeatRecordListIn]):
-    return await run_operation(request, queries.list_aeat_records, params)
+    return await run_operation(request, queries.aeat_records.list_aeat_records, params)
 
 
 @bind(router, "verifactu.aeat.query", "/verifactu/aeat/query")
@@ -223,7 +217,7 @@ async def aeat_query(request, data: AeatQueryIn):
 
 @bind(router, "verifactu.chain.status", "/verifactu/chain/status")
 async def chain_status(request, params: Query[IssuerIn]):
-    return await run_operation(request, queries.chain_status, params)
+    return await run_operation(request, queries.chains.chain_status, params)
 
 
 @bind(router, "verifactu.chain.validate", "/verifactu/chain/validate")
@@ -246,7 +240,7 @@ async def chain_recover_manual(request, data: RecoverManualIn):
 
 @bind(router, "verifactu.diagnostic.last", "/verifactu/diagnostics/last")
 async def diagnostic_last(request):
-    return await run_operation(request, queries.last_diagnostic)
+    return await run_operation(request, queries.diagnostics.last_diagnostic)
 
 
 @bind(router, "verifactu.diagnostic.run", "/verifactu/diagnostics/run")

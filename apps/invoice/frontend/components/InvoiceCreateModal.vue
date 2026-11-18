@@ -124,7 +124,7 @@ async function issue(): Promise<void> {
   } catch {
     return; // The window shows `command.error`.
   }
-  void toastSuccess(t('invoice.create.done', { number: invoice.number }));
+  toastSuccess(t('invoice.create.done', { number: invoice.number }));
   open.value = false;
   emit('created', invoice);
 }

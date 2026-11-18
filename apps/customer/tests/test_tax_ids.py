@@ -16,6 +16,7 @@ from apps.customer.tax_ids import (
     InvalidTaxId,
     normalize_country,
     normalize_tax_id,
+    vat_number,
 )
 
 
@@ -47,6 +48,14 @@ def test_an_eu_vat_number_is_checked_with_its_country_prefix():
     assert normalize_tax_id("094259216", country="GR", id_type="02") == "EL094259216"
     with pytest.raises(InvalidTaxId):
         normalize_tax_id("FR40303265046", country="FR", id_type="02")
+
+
+def test_a_vat_number_is_the_compact_tax_id_after_its_countrys_vat_prefix_once():
+    assert vat_number("B27593136", "ES") == "ESB27593136"
+    assert vat_number(" b-275 931 36 ", "ES") == "ESB27593136"
+    assert vat_number("ESB27593136", "ES") == "ESB27593136"
+    assert vat_number("094259216", "GR") == "EL094259216"
+    assert vat_number("EL094259216", "GR") == "EL094259216"
 
 
 def test_a_foreign_document_of_another_kind_is_taken_as_written():

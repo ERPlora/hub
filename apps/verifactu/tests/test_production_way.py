@@ -67,7 +67,6 @@ def by_own_certificate(*, live: bool = False):
         "verifactu.certificate.upload",
         {"p12_base64": b64(make_p12()), "password": "secret"},
     )
-    run("verifactu.config.update", {"route": "own"})
     if live:
         run("verifactu.config.go_live")
 
@@ -177,13 +176,13 @@ def test_in_production_settings_say_the_closed_server_stops_new_documents(
 def test_an_unreadable_own_certificate_is_no_way_to_production(issuer, opened, how):
     by_own_certificate()
     lose_the_key(opened, how)
-    config = queries.config_row()
+    config = queries.route.config_row()
 
     assert (
-        queries.route_problem(config, Environment.PRODUCTION, A)
+        queries.route.route_problem(config, Environment.PRODUCTION, A)
         == "own_certificate_unreadable"
     )
-    assert queries.route_problem(config, Environment.TESTING, A) == ""
+    assert queries.route.route_problem(config, Environment.TESTING, A) == ""
     assert "own_certificate_unreadable" in codes(
         run("verifactu.config.get").live_blockers
     )
@@ -191,7 +190,7 @@ def test_an_unreadable_own_certificate_is_no_way_to_production(issuer, opened, h
         code_of(lambda: run("verifactu.config.go_live"))
         == "verifactu.own_certificate_unreadable"
     )
-    assert Config.objects.get().environment == Environment.TESTING
+    assert run("verifactu.config.get").environment == Environment.TESTING
 
 
 @pytest.mark.parametrize("how", ["missing", "rotated"])
@@ -233,12 +232,12 @@ def test_in_production_an_unreadable_certificate_seals_and_numbers_no_record(
 def test_without_the_gateway_production_has_no_way_to_the_aeat(issuer, opened):
     by_erplora()
     opened.VERIFACTU_GATEWAY_URL = ""
-    config = queries.config_row()
+    config = queries.route.config_row()
 
     assert (
-        queries.route_problem(config, Environment.PRODUCTION, A) == "gateway_unavailable"
+        queries.route.route_problem(config, Environment.PRODUCTION, A) == "gateway_unavailable"
     )
-    assert queries.route_problem(config, Environment.TESTING, A) == ""
+    assert queries.route.route_problem(config, Environment.TESTING, A) == ""
     assert "gateway_unavailable" in codes(run("verifactu.config.get").live_blockers)
     assert (
         code_of(lambda: run("verifactu.config.go_live"))

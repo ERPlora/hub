@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:364e7398f7b82b43e44f6b14dfd72c6c623f9ab572e7a799616cdcc04334000a -->
+<!-- generated from WORKBOOK.md sha256:02e44b0a80ffe235ab16f8d5e469a9143e2e036ee730250f0c5b473926e4c671 -->
 
 ## What it is for and who it is for
 
@@ -349,7 +349,9 @@ Screen: Inbox
 Steps:
 1. In **Filters**, choose **Status: Open** and **Unread** and press **Apply**: the conversations whose last message
    is the customer's are left.
-2. The Hub's bell counts **WhatsApp customers waiting for an answer** and leads to the **Inbox**; it also counts the
+2. The Hub's bell counts **WhatsApp customers waiting for an answer** ("N WhatsApp customers waiting for an answer",
+   with "Answer within 24 hours of their last message: after that, WhatsApp only lets you send an approved
+   template.") and leads with "Answer the customers" to the **Inbox**; it also counts the
    conversations an automatic answer could not answer, marked "Needs attention" next to the name (F20). It goes down
    by itself as soon as someone answers (from the Hub or from the phone), leaves it pending or closes it, and it does
    not show when nobody is waiting.

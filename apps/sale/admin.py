@@ -28,7 +28,7 @@ from apps.sale.models import (
     Settings,
     VoucherSession,
 )
-from apps.sale.services import lock_orders, lock_rows
+from apps.sale.services.orders import lock_orders, lock_rows
 
 AUDIT = ("id", "created_at", "updated_at")
 

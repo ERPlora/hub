@@ -8,7 +8,10 @@
 // flow: VERIFACTU-F32 BASE-F25
 import { expect, type Page, test } from '@playwright/test';
 
-import { A, api, appRow, hostPage, menuApps, psql, settledCapture, signedInSpanish, testid } from './helpers';
+import { appNote, expectSwitch } from './apps-switch-helpers';
+import { A, api, appRow, hostPage, psql, signedInSpanish, testid } from './helpers';
+import { settledCapture } from './screen';
+import { menuApps } from './topbar';
 
 const VIEWPORTS = {
   390: { width: 390, height: 844 },
@@ -29,12 +32,12 @@ const stored = (app: string) =>
 /** How many of `a`'s VeriFactu records are not in the AEAT yet (pending, or sent without an answer). */
 const stillToSend = () => Number(psql("select count(*) from verifactu_record where status in ('pending', 'sent')"));
 
-/** The list searched for `name` (the rows are paged): `id`'s row says `reason` and offers nothing to turn it off. */
+/** The list searched for `name` (the rows are paged): `id`'s row says `reason` and its switch stays on, still. */
 async function saysWhyItStaysOn(page: Page, name: string, id: string, reason: string, active: string): Promise<void> {
   await testid(page, 'apps-search').locator('input').fill(name);
   await expect(appRow(page, id).locator('[data-testid="apps-state"]')).toHaveText(active);
-  await expect(appRow(page, id).locator('[data-testid="apps-refusal"]')).toHaveText(reason);
-  await expect(testid(page, `apps-row-${id}-toggle`)).toHaveCount(0);
+  await expect(appNote(page, id)).toHaveText(reason);
+  await expectSwitch(page, id, { checked: true, disabled: true });
 }
 
 test.describe.configure({ mode: 'serial' });

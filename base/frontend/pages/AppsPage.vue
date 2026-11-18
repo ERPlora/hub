@@ -1,37 +1,28 @@
 <script setup lang="ts">
-// Apps: the business's apps over the live `base.app.list`, which the SaaS's
-// photo re-runs (a paid app bought on erplora.com turns up without reloading). Three tabs in the address, the old
-// hub's: «My apps» (`/apps`, the apps on, each with «Open»), «Add apps» (`#all`, the whole catalogue with what it
-// does, its price and what comes with it) and «Paid» (`#paid`, only what is bought apart). «Paid» and the price are
-// there only while some app is sold apart: with every app in every plan none is. There is no amount here:
-// a paid app without its right says it needs a subscription and, for whoever runs the business and only on the web,
-// links to erplora.com's Store, where it is bought (never inside the Hub: the stores refuse an app that sells).
-// Whoever runs the business turns an app on or off: «Turn on» asks first when
-// it brings others it needs, naming them; «Turn off» always asks, naming what goes with it, and one another app on
-// needs says which to turn off first. A refusal (another app needs it, the app's own reason, any other failure) is a
-// notice that stays until it is closed or the next change: its reason is often a long sentence of what to do first,
-// which a toast took away before it could be read. The counter says how many apps are on, as «My apps»
-// lists them, and how many of the plan's the business chose (`max_apps`; what came along or was born on does not
-// count, hub#1286); at the limit, the notice with «Upgrade plan» (erplora.com's plans,
-// only on the web). The menu of this screen is read again after each change; the other screens of the business
-// follow the live list (AppsFollower). «Upgrade plan» is the platform's PlanUpgradeLink, with the pass (BASE-F11), and the Store's link
-// by `openExternalLink` (the installed app opens nothing on a `_blank` link). In a business with its own database an app turned on
-// for the first time gets its tables first when its template lacked them: the answer says «creating», the toast
-// «Turning on…» and its row «Turning on…» until the live list says it is on; one that could not be set up says so with
-// «Retry» (`base.app.retry`); both can be turned off. What the server would always refuse is never offered (hub#618,
-// hub#694): the list says it beforehand (`refusal`), the row has no button and, for whoever runs the business, says why;
-// an app off that way is «Not available», not «Off».
+// Apps: the business's apps over the live `base.app.list`, which the SaaS's photo re-runs (a paid app bought on
+// erplora.com turns up without reloading). Three tabs in the address: «My apps» (`/apps`), «Add apps» (`#all`, the whole
+// catalogue) and «Paid» (`#paid`, only while some app is sold apart). A paid app without its right says it needs a
+// subscription and, for whoever runs the business and only on the web, «Upgrade plan» opens erplora.com's Store (the
+// stores refuse an app that sells inside the Hub). Whoever runs the business turns an app on or off with its switch: on
+// asks first when it brings others it needs; off always asks, naming what goes with it, and one another app on needs says
+// which to turn off first; the switch goes back to the real state when nothing changed. A refusal is a notice that stays
+// until it is closed or the next change (its reason is often a long sentence a toast took away). The counter says the
+// apps on and the plan's chosen ones (hub#1286); at the limit, the notice with the platform's PlanUpgradeLink (BASE-F11).
+// An app turned on before its tables exist in the business's database is «Turning on…», its switch waiting, until the
+// live list says it is on; one that could not be set up is off, says so and offers «Retry» (`base.app.retry`); both can
+// be given up from «⋮». What the server would always refuse is never offered (hub#618, hub#694): the switch cannot move
+// and, for whoever runs the business, the row says why; an app off that way is «Not available», not «Off».
 import {
   DataTable,
   EmptyState,
   InlineFeedback,
   StatusPill,
-  type DataTableAction,
   type DataTableColumn,
+  type DataTableToggleEvent,
   useConfirm,
 } from '@erplora/ui/components';
 import { type ApiError, useCommand, useLive } from '@erplora/ui/sdk';
-import { AppPage, HubIcon, openExternalLink, type ShellTab, toastSuccess, useSession, useSurface } from '@erplora/ui/shell';
+import { AppPage, openExternalLink, type ShellTab, toastSuccess, useSession, useSurface } from '@erplora/ui/shell';
 import { IonButton } from '@ionic/vue';
 import { computed, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
@@ -53,6 +44,7 @@ import {
   tabOf,
   turnsOnWith,
 } from '../lib/apps';
+import { appActions, appSwitch } from '../lib/apps-table';
 import PlanUpgradeLink from '../components/PlanUpgradeLink.vue';
 import { useBaseI18n } from '../lib/i18n';
 import type { AppRow } from '../operations';
@@ -145,14 +137,36 @@ function priceLabel(app: AppRow): string {
  *  turned off, under it, only for whoever runs the business. */
 const mandatoryLabel = computed(() => t('base.appsPage.mandatory', { country: data.value?.country_name ?? '' }));
 
+/** What the table offers on each row, for who reads it and the change on its way. */
+const tableState = computed(() => ({ t, mayManage: mayManage.value, mayBuy: mayBuy.value, pending: pending.value }));
+
 /** Whoever reads a row's reason gets a column with room for it: a sentence, not a strip of a dozen short lines. */
 const statesSayWhy = computed(() => mayManage.value && apps.value.some((app) => app.refusal));
 
+/** «Add apps» filters by state; «My apps» lists only what is on. */
+const stateFilter = computed(() =>
+  catalogue.value
+    ? {
+        type: 'select' as const,
+        options: (['on', 'off', 'blocked', 'creating', 'failed'] as const).map((value) => ({
+          value,
+          label: t(`base.appsPage.state.${value === 'on' ? 'installed' : value}`),
+        })),
+      }
+    : undefined,
+);
+
 const columns = computed<DataTableColumn<AppRow>[]>(() => [
-  { key: 'name', label: t('base.appsPage.columns.app'), cell: 'app', priority: 'high' },
+  {
+    key: 'name',
+    label: t('base.appsPage.columns.app'),
+    priority: 'high',
+    identity: { icon: (row) => row.icon, subtitle: (row) => priceLabel(row), testid: 'apps-plan' },
+  },
   {
     key: 'category',
     label: t('base.appsPage.columns.category'),
+    cardIcon: 'ion:pricetag-outline',
     format: (_, row) => row.category_label,
     filter: { type: 'select', options: categories.value },
   },
@@ -165,6 +179,7 @@ const columns = computed<DataTableColumn<AppRow>[]>(() => [
                 key: 'right',
                 label: t('base.appsPage.columns.price'),
                 cell: 'price',
+                cardIcon: 'ion:wallet-outline',
                 sortValue: (row) => priceLabel(row),
               },
             ] satisfies DataTableColumn<AppRow>[])
@@ -173,6 +188,7 @@ const columns = computed<DataTableColumn<AppRow>[]>(() => [
           key: 'requires',
           label: t('base.appsPage.columns.comesWith'),
           priority: 'low',
+          cardIcon: 'ion:cube-outline',
           format: (_, row) => comesWith(row, apps.value).join(', ') || '—',
         },
       ] satisfies DataTableColumn<AppRow>[])
@@ -181,59 +197,41 @@ const columns = computed<DataTableColumn<AppRow>[]>(() => [
     key: 'state',
     label: t('base.appsPage.columns.state'),
     cell: 'state',
+    toggle: appSwitch(tableState.value),
     ...(statesSayWhy.value ? { width: 'minmax(15rem, 1.5fr)' } : {}),
     sortValue: (row) => stateLabel(row),
-    filter: catalogue.value
-      ? {
-          type: 'select',
-          options: [
-            { value: 'on', label: t('base.appsPage.state.installed') },
-            { value: 'off', label: t('base.appsPage.state.off') },
-            { value: 'blocked', label: t('base.appsPage.state.blocked') },
-            { value: 'creating', label: t('base.appsPage.state.creating') },
-            { value: 'failed', label: t('base.appsPage.state.failed') },
-          ],
-        }
-      : undefined,
+    filter: stateFilter.value,
   },
 ]);
 
-const actions = computed<DataTableAction<AppRow>[]>(() => [
-  {
-    id: 'open',
-    label: t('base.appsPage.open'),
-    icon: 'ion:open-outline',
-    color: 'primary',
-    pinned: true,
-    hidden: (row) => !canOpen(row),
-  },
-  {
-    id: 'retry',
-    // A text button, as «Turn on»: what it does is its label.
-    label: t('base.appsPage.toggle.retry'),
-    color: 'primary',
-    hidden: (row) => !mayManage.value || !canRetry(row),
-    loading: (row) => pending.value === row.id,
-    disabled: (row) => pending.value !== null && pending.value !== row.id,
-  },
-  {
-    id: 'toggle',
-    // A text button: what it does is its label («Turn on», «Turn off»).
-    label: (row) => t(canTurnOn(row) ? 'base.appsPage.toggle.on' : 'base.appsPage.toggle.off'),
-    color: 'primary',
-    hidden: (row) => !mayManage.value || !(canTurnOn(row) || canTurnOff(row)),
-    loading: (row) => pending.value === row.id,
-    disabled: (row) => pending.value !== null && pending.value !== row.id,
-  },
-]);
+const actions = computed(() => appActions(tableState.value));
 
-/** «Open» and «Turn on/off», checked again on the answer now on screen: an app that just changed is not misread. */
+/** The row's actions, checked again on the answer now on screen: an app that just changed is not misread. */
 function onAction({ actionId, row }: { actionId: string; row: AppRow }): void {
   const current = apps.value.find((app) => app.id === row.id);
   if (!current) return;
   if (actionId === 'open' && canOpen(current)) void router.push(current.path as string);
-  if (actionId === 'toggle' && pending.value === null) void toggle(current);
+  if (actionId === 'plans' && mayBuy.value) openStore();
+  if (actionId === 'off' && pending.value === null) void toggle(current);
   if (actionId === 'retry' && pending.value === null && canRetry(current)) void change('retry', current);
+}
+
+/** The Store, opened as its link would be: a new tab, or the system browser in the installed app. */
+function openStore(): void {
+  const link = Object.assign(document.createElement('a'), { href: storeUrl.value, rel: 'noopener' });
+  link.target = '_blank';
+  link.addEventListener('click', (event) => openExternalLink(storeUrl.value, event));
+  document.body.append(link);
+  link.click();
+  link.remove();
+}
+
+/** The switch moved: on retries a failed app or turns one on; off turns it off. Nothing while another change is sent. */
+function onSwitch({ row, checked }: DataTableToggleEvent<AppRow>): void {
+  const current = apps.value.find((app) => app.id === row.id);
+  if (!current || pending.value !== null) return;
+  if (checked && canRetry(current)) void change('retry', current);
+  else if (checked ? canTurnOn(current) : canTurnOff(current)) void toggle(current);
 }
 
 /** «A», «A and B», «A, B and C», in the screen's language. */
@@ -292,7 +290,7 @@ async function change(kind: 'enable' | 'disable' | 'retry', app: AppRow): Promis
     const done = answer.state === 'creating' ? 'base.appsPage.turningOn' : on ? 'base.appsPage.turnedOn' : 'base.appsPage.turnedOff';
     const said = [t(done, { app: app.name })];
     if (along.length) said.push(t(on ? 'base.appsPage.alsoOn' : 'base.appsPage.alsoOff', { apps: listOf(along) }));
-    void toastSuccess(said.join(' '));
+    toastSuccess(said.join(' '));
     // The menu is the session's: read it again (the other screens of the business follow the live list).
     sessionChanged();
   } catch (error) {
@@ -400,6 +398,7 @@ const emptyHeading = computed(() => t(`base.appsPage.empty.${tab.value}`));
         :search-placeholder="searchPlaceholder"
         :views="['table', 'cards']"
         :card-title="(row: AppRow) => row.name"
+        card-title-column="name"
         :rows="rows"
         :columns="columns"
         :actions="actions"
@@ -407,56 +406,23 @@ const emptyHeading = computed(() => t(`base.appsPage.empty.${tab.value}`));
         :entity-label="{ one: t('base.appsPage.entity.one'), many: t('base.appsPage.entity.many') }"
         :labels="{ loading: t(catalogue ? 'base.appsPage.loadingCatalogue' : 'base.appsPage.loading') }"
         @action="onAction"
+        @toggle="onSwitch"
       >
-        <template #app="{ row }">
-          <span class="apps-name">
-            <HubIcon
-              class="apps-icon"
-              :name="(row as AppRow).icon"
-            />
-            <span
-              class="apps-name-text"
-              :title="(row as AppRow).name"
-            >{{ (row as AppRow).name }}</span>
-          </span>
-        </template>
         <template #price="{ row }">
           <span data-testid="apps-price">{{ priceLabel(row as AppRow) }}</span>
         </template>
         <template #state="{ row }">
-          <span class="apps-state">
-            <StatusPill
-              data-testid="apps-state"
-              :tone="stateTone(row as AppRow)"
-              :label="stateLabel(row as AppRow)"
-            />
-            <StatusPill
-              v-if="(row as AppRow).mandatory"
-              data-testid="apps-mandatory"
-              tone="info"
-              :label="mandatoryLabel"
-            />
-            <template v-if="(row as AppRow).state === 'blocked'">
-              <a
-                v-if="mayBuy"
-                class="apps-buy"
-                data-testid="apps-buy"
-                :href="storeUrl"
-                target="_blank"
-                rel="noopener"
-                @click="openExternalLink(storeUrl, $event)"
-              >{{ t('base.appsPage.buy') }}</a>
-              <span
-                v-else
-                class="apps-buy-where"
-              >{{ t('base.appsPage.buyWhere') }}</span>
-            </template>
-            <span
-              v-if="mayManage && (row as AppRow).refusal"
-              class="apps-refusal"
-              data-testid="apps-refusal"
-            >{{ (row as AppRow).refusal }}</span>
-          </span>
+          <StatusPill
+            data-testid="apps-state"
+            :tone="stateTone(row as AppRow)"
+            :label="stateLabel(row as AppRow)"
+          />
+          <StatusPill
+            v-if="(row as AppRow).mandatory"
+            data-testid="apps-mandatory"
+            tone="info"
+            :label="mandatoryLabel"
+          />
         </template>
         <template #empty>
           <EmptyState
@@ -471,37 +437,6 @@ const emptyHeading = computed(() => t(`base.appsPage.empty.${tab.value}`));
 </template>
 
 <style scoped>
-.apps-name {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-  font-weight: 600;
-}
-
-/* A long name in a narrow column («Ventas / TPV», «Facturación» at 834) ends in «…», never cut mid-letter; the whole
-   name on hover. */
-.apps-name-text {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.apps-icon {
-  flex: none;
-  width: 20px;
-  height: 20px;
-  color: var(--ion-color-primary);
-}
-
-.apps-state {
-  display: inline-flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 4px 8px;
-}
-
 .apps-counter {
   margin: 0 0 8px;
   color: var(--ion-color-medium-shade, #555);
@@ -512,25 +447,5 @@ const emptyHeading = computed(() => t(`base.appsPage.empty.${tab.value}`));
 .apps-limit-upgrade {
   color: var(--ion-color-primary);
   font-weight: 600;
-}
-
-.apps-buy {
-  color: var(--ion-color-primary);
-  font-size: 0.875rem;
-  font-weight: 600;
-}
-
-.apps-buy-where {
-  color: var(--ion-color-medium-shade, #555);
-  font-size: 0.8125rem;
-}
-
-/* Why it is not offered: a sentence of its own, under the pill, that wraps in the table's unwrapped cells. */
-.apps-refusal {
-  flex-basis: 100%;
-  color: var(--ep-text-muted);
-  font-size: 0.8125rem;
-  line-height: 1.3;
-  white-space: normal;
 }
 </style>

@@ -6,6 +6,7 @@ import { expect, type Locator, type Page, test } from '@playwright/test';
 
 import { cardOf, cleanUp, createCard, customersReady, e2eName, FLOW_VIEWPORTS, idFromUrl, inputOf, rowNamed, searchList } from './customer-helpers';
 import { A, login, shot, shown } from './helpers';
+import { toastSaying } from './toast-helpers';
 
 test.afterAll(() => cleanUp());
 
@@ -81,6 +82,6 @@ test('CUSTOMER-F04: clearing the country, with the mouse or the keyboard, saves 
   await expect(country).toHaveValue('');
 
   await shown(page).locator('[data-testid=customer-edit-save]').click();
-  await expect(page.locator('ion-toast').last()).toContainText(/Customer updated|Cliente actualizado/);
+  await expect(toastSaying(page, /Customer updated|Cliente actualizado/)).toBeVisible();
   await expect.poll(() => countryOf(context, card.id)).toBe('');
 });

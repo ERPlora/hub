@@ -95,7 +95,7 @@ def _log_in(
     request.session[SAAS_USER_ID_SESSION_KEY] = saas_user_id
     request.session[CREDENTIAL_SESSION_KEY] = credential
     if device is not None:
-        policy = queries.access_settings().pin_policy
+        policy = queries.access.access_settings().pin_policy
         request.session.set_expiry(timezone.now() + access.session_lifetime(device.mode, policy))
     _note_the_owner(request, saas_user_id, device=device, credential=credential)
 
@@ -193,7 +193,7 @@ def trust_device(request: HttpRequest, user) -> TrustedDevice:
     new token. Its last person in and entry are now's, and a notice of sessions it lost (``ended_reason``) is read.
     """
     now = timezone.now()
-    device = queries.device_of(request, for_update=True)
+    device = queries.devices.device_of(request, for_update=True)
     if device is None:
         token = access.new_device_token()
         device = TrustedDevice.objects.create(
@@ -217,8 +217,8 @@ def _entered(device: TrustedDevice, user, now: dt.datetime) -> None:
 
 
 def _label_of(user) -> str:
-    """How a person is named in this hub: its profile's name, else its account's (``base.queries.person_label``)."""
-    return queries.person_label(user)[:150]
+    """How a person is named in this hub: its profile's name, else its account's (``base.queries.people.person_label``)."""
+    return queries.people.person_label(user)[:150]
 
 
 def _end_other_devices(slug: str, device: TrustedDevice) -> None:
@@ -291,7 +291,7 @@ def ensure_hub_user(user) -> HubUser:
 def acting_hub_user(ctx: OperationContext) -> HubUser | None:
     """The ``HubUser`` of the person behind ``ctx``, made if missing, for what a write signs; ``None`` for the
     platform, an API key or nobody (no person)."""
-    if not queries.is_a_person(ctx.actor):
+    if not queries.people.is_a_person(ctx.actor):
         return None
     return ensure_hub_user(ctx.actor)
 

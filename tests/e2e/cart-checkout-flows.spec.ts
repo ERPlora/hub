@@ -24,7 +24,7 @@ import {
   signedIn,
   snap,
 } from './cart-checkout-helpers';
-import { rowAction } from './service-helpers';
+import { offersRowAction, rowAction } from './service-helpers';
 import { discardChanges } from './unsaved-back-helpers';
 
 test.beforeAll(cleanUp);
@@ -138,7 +138,7 @@ for (const [width, viewport] of Object.entries(FLOW_VIEWPORTS)) {
         expect((await post<{ expired: number }>(context, '/cart_checkout/carts/cleanup_expired', {})).expired).toBeGreaterThanOrEqual(1);
         expect(cartStatus(cart.id)).toBe('expired');
         await expect(row).toContainText('Expired');
-        await expect(view.locator(`[data-testid=cart-checkout-carts-row-${cart.id}-abandon]`)).toHaveCount(0);
+        await expect.poll(() => offersRowAction(page, 'cart-checkout-carts', cart.id, 'abandon')).toBe(false);
         await snap(page, 'CART_CHECKOUT-F07', width);
       });
 
@@ -147,7 +147,7 @@ for (const [width, viewport] of Object.entries(FLOW_VIEWPORTS)) {
         const row = rowOf(page, 'cart-checkout-carts', firstId);
         await expect(row).toContainText('Abandoned');
         expect(cartStatus(firstId)).toBe('abandoned');
-        await expect(page.locator(`[data-testid=cart-checkout-carts-row-${firstId}-abandon]`)).toHaveCount(0);
+        await expect.poll(() => offersRowAction(page, 'cart-checkout-carts', firstId, 'abandon')).toBe(false);
         await snap(page, 'CART_CHECKOUT-F05', width);
       });
 
@@ -189,7 +189,7 @@ for (const [width, viewport] of Object.entries(FLOW_VIEWPORTS)) {
         await rowAction(page, 'cart-checkout-orders', paid.id, 'pay');
         await expect(paidRow).toContainText('Paid');
         expect(psql(`select status || ' ' || (paid_at is not null) from cart_checkout_order where id = '${paid.id}'`)).toBe('paid true');
-        await expect(page.locator(`[data-testid=cart-checkout-orders-row-${paid.id}-pay]`)).toHaveCount(0);
+        await expect.poll(() => offersRowAction(page, 'cart-checkout-orders', paid.id, 'pay')).toBe(false);
         await snap(page, 'CART_CHECKOUT-F09', width);
       });
 

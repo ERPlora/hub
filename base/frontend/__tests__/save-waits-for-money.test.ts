@@ -140,7 +140,7 @@ describe('expectSaveWaitsForMoney: a window without FormModal (hub#921)', () => 
  *  one that asks nothing (`deaf`). */
 function ownNotice(retry: 'mute' | 'deaf') {
   const button = retry === 'deaf' ? [h('button', { 'data-testid': 'base-money-error-retry' }, 'Retry')] : [];
-  return h('div', { role: 'alert', 'data-testid': 'base-money-error' }, button);
+  return h('div', { 'data-testid': 'base-money-error' }, [h('div', { role: 'alert' }, button)]);
 }
 
 /** A window whose «Save» waits for the business's real money (`useBusinessMoney`), with FormModal (`form`) or as a sheet

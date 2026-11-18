@@ -1,10 +1,10 @@
 // flow: hub-e2e-capture — the e2e harness's screenshots
 // A screenshot taken right after `setViewportSize` can come before the browser painted the page at its new size: the
 // area the resize uncovered still holds the top of the page, so the capture repeats the topbar at its bottom. Such a
-// capture is evidence of a screen nobody saw. `repeatedTop` (helpers.ts) spots it; `capture` (helpers.ts) waits for
+// capture is evidence of a screen nobody saw. `repeatedTop` (detectors.ts) spots it; `capture` (helpers.ts) waits for
 // a painted frame, takes the screenshot again while it repeats the top, and fails saying so if it never stops;
 // `settled` (service-helpers.ts) waits for a painted frame too.
-// A spec that forgets to wait before `capture` could catch an Ionic overlay still entering (a toast sliding in), so
+// A spec that forgets to wait before `capture` could catch an overlay still entering (a toast sliding in), so
 // `capture` waits itself until nothing finite moves (`untilStill`, endless spinners aside), or fails naming what
 // still moves.
 // The same row over and over at both ends is a painted background, whatever its colours across: the assistant's
@@ -14,8 +14,11 @@ import { readFileSync, rmSync } from 'node:fs';
 
 import { expect, type Page, test } from '@playwright/test';
 
-import { A, api, capture, createItem, listReady, login, repeatedTop, shot, shown, uniqueName } from './helpers';
+import { A, api, capture, login, shot, shown, uniqueName } from './helpers';
+import { createItem, listReady } from './demo-items';
+import { repeatedTop } from './detectors';
 import { settled } from './service-helpers';
+import { newestToast, toastAnimationsRunning } from './toast-helpers';
 
 const TASK = 'FIX-HUB-E2E-SHOT-BEFORE-RESIZE-UNCHECKED';
 const WAIT_TASK = 'FIX-HUB-E2E-CAPTURE-WITHOUT-WAIT-UNCHECKED';
@@ -92,20 +95,10 @@ async function picture(
   return Buffer.from(base64, 'base64');
 }
 
-/** The finite animations running in the shadow root of the last `ion-toast` (its entrance), read on its own. */
-const toastMoving = (page: Page) =>
-  page.evaluate(() => {
-    const toast = [...document.querySelectorAll('ion-toast')].at(-1);
-    return (toast?.shadowRoot?.getAnimations() ?? []).filter(
-      (animation) => animation.playState === 'running' && animation.effect?.getTiming().iterations !== Infinity,
-    ).length;
-  });
-
-/** The box of the toast on screen (its `.toast-wrapper`, in its shadow root), in whole pixels inside the window. */
+/** The box of the toast on screen, where its stack moves it, in whole pixels inside the window. */
 const toastBox = (page: Page) =>
-  page.locator('ion-toast').last().evaluate((toast) => {
-    const box = toast.shadowRoot?.querySelector('.toast-wrapper')?.getBoundingClientRect();
-    if (!box) throw new Error('ion-toast without its .toast-wrapper');
+  newestToast(page).evaluate((toast) => {
+    const box = toast.getBoundingClientRect();
     const left = Math.max(0, Math.floor(box.left));
     const top = Math.max(0, Math.floor(box.top));
     return {
@@ -252,7 +245,7 @@ test('settled: a screenshot right after each resize and settled() is the page as
 });
 
 test.describe('capture: never a screenshot while something finite moves on the page', () => {
-  test('hub-e2e-capture: capture() right after a toast of Ionic shows up writes the toast at rest, at 390, 834 and 1440', async ({
+  test('hub-e2e-capture: capture() right after a toast shows up writes the toast at rest, at 390, 834 and 1440', async ({
     page,
     context,
   }) => {
@@ -275,11 +268,11 @@ test.describe('capture: never a screenshot while something finite moves on the p
         await settled(page);
         await devtools.send('Animation.setPlaybackRate', { playbackRate: 0.2 });
         await detail.getByTestId('demo-note-save').click();
-        await expect(page.locator('ion-toast').last()).toBeVisible();
+        await expect(newestToast(page)).toBeVisible();
         // No wait of the spec's own: capture() is the one that waits.
         const name = `${WAIT_TASK}-${size.label}`;
         const png = await capture(page, name);
-        expect.soft(await toastMoving(page), `the toast still entering once capture() returned at ${size.label}`).toBe(0);
+        expect.soft(await toastAnimationsRunning(page), `the toast still entering once capture() returned at ${size.label}`).toBe(0);
         await settled(page);
         const atRest = await capture(page, `${name}-at-rest`);
         const box = await toastBox(page);

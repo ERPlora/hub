@@ -9,8 +9,9 @@
 // What it creates is deleted after the file (`afterAll`).
 import { expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, api, login, shot, shown, THREE_SIZES_TALL_TABLET as VIEWPORTS } from './helpers';
-import { noHorizontalScroll } from './service-helpers';
+import { A, api, login, shot, shown } from './helpers';
+import { THREE_SIZES_TALL_TABLET as VIEWPORTS } from './screen';
+import { noHorizontalScroll, rowAction } from './service-helpers';
 import { cleanUp, freshCategory, pickSelect as pick, type Rule, rulesOf } from './tax-helpers';
 import { discardChanges } from './unsaved-back-helpers';
 
@@ -80,7 +81,7 @@ test('TAX-F04/F07: a rule is created, an overlapping one is refused on «Valid f
 
   // 3. «Set end date» 2026-05-31 on the rule in force.
   const [first] = await rulesOf(context, key);
-  await shown(page).locator(`[data-testid=tax-rules-row-${first.id}-end]`).click();
+  await rowAction(page, 'tax-rules', first.id, 'end');
   const end = page.locator('ion-modal[data-testid=tax-rule-end]');
   await expect(end).toBeVisible();
   await end.locator('[data-testid=tax-rule-end-valid_to] input').fill('2026-05-31');
@@ -136,7 +137,7 @@ test('TAX-F11/F03: the jurisdiction filter narrows to the Canary Islands rule; d
   // «Deactivate» asks first, then the rule leaves the active list.
   const regional = (await api<{ rows: Rule[] }>(context, A, 'GET', `/tax/rules?tax_category_key=${key}&region_code=CN`)).data.rows[0];
   expect(regional, 'the Canary Islands rule').toBeDefined();
-  await shown(page).locator(`[data-testid=tax-rules-row-${regional.id}-deactivate]`).click();
+  await rowAction(page, 'tax-rules', regional.id, 'deactivate');
   const confirm = page.locator('ion-modal[data-testid=tax-rule-deactivate]');
   await expect(confirm).toBeVisible();
   await expect(confirm).toContainText(/Deactivate tax rule|Desactivar regla fiscal/);

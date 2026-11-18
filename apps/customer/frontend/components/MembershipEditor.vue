@@ -124,7 +124,7 @@ async function save(): Promise<void> {
   saved.value = sending;
   ticked.value = now.filter((id) => !sending.includes(id));
   unticked.value = sending.filter((id) => !now.includes(id));
-  void toastSuccess(t(isGroups.value ? 'customer.membership.groupsSaved' : 'customer.membership.tagsSaved'));
+  toastSuccess(t(isGroups.value ? 'customer.membership.groupsSaved' : 'customer.membership.tagsSaved'));
 }
 </script>
 

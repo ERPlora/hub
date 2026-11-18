@@ -114,8 +114,8 @@ describe('SeriesPage', () => {
     expect(s.wrapper.findComponent(SeriesFormModal).exists()).toBe(false);
   });
 
-  // INVOICE-F21: without an issuer the screen says ONCE that nothing can be invoiced — the platform's strip over it
-  // (base's «Todavía no puedes facturar»), never a second notice of Invoicing's own saying the same under it.
+  // INVOICE-F21: without an issuer the hub says ONCE that nothing can be invoiced — base's «Todavía no puedes facturar»
+  // in the action center — never a notice of Invoicing's own on the screen saying the same.
   it('without an issuer, says once that nothing can be invoiced, with «Configurar» to the issuer, and nothing once it is set', async () => {
     const s = await setup({ platformNotice: true, locale: 'es' });
     await answerIssuer(s, false, { locale: 'es' });

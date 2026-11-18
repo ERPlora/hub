@@ -167,8 +167,8 @@ async function uploadAll(chosen: File[]): Promise<void> {
       : t('base.files.uploaded');
   // One notice for the batch (a second one would close the first): what was kept, then each refusal with its reason,
   // as sentences on one line.
-  if (failures.length) void toastError(joinSentences([done, ...failures]));
-  else if (done) void toastSuccess(done);
+  if (failures.length) toastError(joinSentences([done, ...failures]));
+  else if (done) toastSuccess(done);
 }
 
 function picked(event: Event): void {
@@ -215,7 +215,7 @@ async function makeFolder(): Promise<void> {
   try {
     await createFolder.run({ parent: folder.value, name: folderName.value });
     folderOpen.value = false;
-    void toastSuccess(t('base.files.newFolderDialog.done'));
+    toastSuccess(t('base.files.newFolderDialog.done'));
   } catch {
     // The dialog stays open with the sentence of why (folderError).
   }
@@ -254,7 +254,7 @@ async function download(item: FileItem): Promise<void> {
     const { blob, name } = await fetchFile(rawUrl(item.path), item.content_type);
     await saveFile(name || item.name, blob, t);
   } catch (failure) {
-    void toastError(t('base.files.downloadFailed', { name: item.name, reason: reasonOf(failure, item.name) }));
+    toastError(t('base.files.downloadFailed', { name: item.name, reason: reasonOf(failure, item.name) }));
   }
 }
 
@@ -281,7 +281,7 @@ async function doRename(): Promise<void> {
   try {
     const answer = await rename.run({ path: entry.path, name: renameName.value });
     renameOpen.value = false;
-    void toastSuccess(t('base.files.renameDialog.done'));
+    toastSuccess(t('base.files.renameDialog.done'));
     if (entry.folder) followTo(afterMove(folder.value, entry.path, answer.path));
   } catch {
     // The dialog stays open with the sentence of why (renameError).
@@ -308,7 +308,7 @@ function askMove(entry: Entry): void {
 
 async function relocate(entry: Entry, to: string): Promise<void> {
   const answer = await move.run({ path: entry.path, to });
-  void toastSuccess(t('base.files.moveDialog.done', { folder: folderLabel(to) }));
+  toastSuccess(t('base.files.moveDialog.done', { folder: folderLabel(to) }));
   if (entry.folder) followTo(afterMove(folder.value, entry.path, answer.path));
 }
 
@@ -340,7 +340,7 @@ async function dropOnFolder(to: string): Promise<void> {
   try {
     await relocate(entry, to);
   } catch (failure) {
-    void toastError(t('base.files.moveDialog.failed', { reason: reasonOf(failure) }));
+    toastError(t('base.files.moveDialog.failed', { reason: reasonOf(failure) }));
   }
 }
 
@@ -362,10 +362,10 @@ async function askDelete(entry: Entry): Promise<void> {
   if (!yes) return;
   try {
     await remove.run({ path: entry.path });
-    void toastSuccess(t(entry.folder ? 'base.files.deleteDialog.folderDone' : 'base.files.deleteDialog.fileDone'));
+    toastSuccess(t(entry.folder ? 'base.files.deleteDialog.folderDone' : 'base.files.deleteDialog.fileDone'));
     if (entry.folder) followTo(afterDelete(folder.value, entry.path));
   } catch (failure) {
-    void toastError(t('base.files.deleteDialog.failed', { reason: reasonOf(failure, entry.name) }));
+    toastError(t('base.files.deleteDialog.failed', { reason: reasonOf(failure, entry.name) }));
   }
 }
 </script>

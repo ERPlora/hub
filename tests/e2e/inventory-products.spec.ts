@@ -281,7 +281,7 @@ test('INVENTORY-F05: the «Not configured» chip keeps its icon in sight and rea
     for (const vp of CHIP_VIEWPORTS) {
       await page.setViewportSize({ width: vp.width, height: vp.height });
       await expect(marker).toBeVisible();
-      const options = { within: '[role=cell], .data-table__field-value', whole: vp.roomy, reads: 'Not configured', titled: true };
+      const options = { within: '[role=cell], .data-table__card-status', whole: vp.roomy, reads: 'Not configured', titled: true };
       const fit = await settledChipFit(marker, options, `list at ${vp.label}`);
       record(`FIX-INVENTORY-PRODUCTS-UNCONFIGURED-CHIP-CLIPPED-${vp.label}`, { ...fit.metrics, problems: fit.problems });
       await page.screenshot({ path: shot(`FIX-INVENTORY-PRODUCTS-UNCONFIGURED-CHIP-CLIPPED-${vp.label}`) });
@@ -313,7 +313,7 @@ test('INVENTORY-F05: the «Not configured» chip keeps its icon in sight and rea
       for (const vp of CHIP_VIEWPORTS) {
         await es.setViewportSize({ width: vp.width, height: vp.height });
         await expect(chip).toBeVisible();
-        const options = { within: '[role=cell], .data-table__field-value', whole: vp.roomy, reads: 'Sin configurar', titled: true };
+        const options = { within: '[role=cell], .data-table__card-status', whole: vp.roomy, reads: 'Sin configurar', titled: true };
         const fit = await settledChipFit(chip, options, `Spanish list at ${vp.label}`);
         record(`FIX-INVENTORY-PRODUCTS-UNCONFIGURED-CHIP-CLIPPED-es-${vp.label}`, { ...fit.metrics, problems: fit.problems });
         await capture(es, `FIX-INVENTORY-PRODUCTS-UNCONFIGURED-CHIP-CLIPPED-es-${vp.label}`);

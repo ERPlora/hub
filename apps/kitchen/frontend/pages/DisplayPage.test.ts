@@ -1,13 +1,13 @@
 // Kitchen → Display (WORKBOOK «Pantallas · Pantalla»; KITCHEN-F10 to F16): one bar with the three views
 // and their counts («Tickets», «Ready», «All-Day»), «Full screen» when the device offers it and, with
 // dishes of more than one station, the station buttons (remembered on this device). The cards of the
-// view; a tap marks or recalls a dish, the card's buttons mark ready, rush, recall and serve, scoped to
-// the station chosen. It rings for a new ticket or a rush (never for what was there when it opened). Empty,
-// loading and error states with the old words.
+// view; a tap marks or recalls a dish, the card's foot marks ready or serves and its «⋮» rushes and recalls, scoped
+// to the station chosen. It rings for a new ticket or a rush (never for what was there when it opened). Loading
+// (grey cards), empty and error states with the old words; reconnecting keeps the board in sight.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { board, item, NOW, SETTINGS, ticket } from '../__tests__/kitchen';
-import { click, EMPLOYEE, errorFrame, flush, type MountOptions, mountKitchen, VIEWER } from '../__tests__/mount-kitchen';
+import { BYE, click, EMPLOYEE, errorFrame, flush, type MountOptions, mountKitchen, PopoverStub, VIEWER } from '../__tests__/mount-kitchen';
 import DisplayPage from './DisplayPage.vue';
 
 const BOARD = 'kitchen.ticket.board';
@@ -35,7 +35,7 @@ vi.mock('../lib/chime', () => ({
 }));
 
 async function setup(options: MountOptions = {}) {
-  const m = await mountKitchen(DisplayPage, { path: '/kitchen/display', ...options });
+  const m = await mountKitchen(DisplayPage, { path: '/kitchen/display', stubs: { IonPopover: PopoverStub }, ...options });
   await m.live();
   const show = async (data = board(), match: Record<string, unknown> = {}) => {
     await m.result('kitchen.settings.get', SETTINGS);
@@ -47,8 +47,13 @@ async function setup(options: MountOptions = {}) {
   };
   /** The words inside an element (Ionic's segment hosts answer no textContent in happy-dom). */
   const words = (testid: string) => m.find(testid).element.innerHTML.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
-  const cards = () => m.wrapper.findAll('[data-testid^="kitchen-card-"][aria-label]').map((c) => c.attributes('data-testid'));
-  return { ...m, show, segment, cards, words };
+  const cards = () => m.wrapper.findAll('article[data-testid^="kitchen-card-"]').map((c) => c.attributes('data-testid'));
+  /** Opens a card's «⋮» and taps one of its steps. */
+  const more = async (id: string, step: 'rush' | 'recall') => {
+    await click(m.find(`kitchen-card-${id}-more`).element);
+    await click(m.find(`kitchen-card-${id}-${step}`).element);
+  };
+  return { ...m, show, segment, cards, words, more };
 }
 
 describe('DisplayPage', () => {
@@ -63,9 +68,11 @@ describe('DisplayPage', () => {
     vi.unstubAllGlobals();
   });
 
-  it('says it is loading, then paints the tickets being cooked with the views and their counts', async () => {
+  it('says it is loading over grey cards, then paints the tickets being cooked with the views and their counts', async () => {
     const s = await setup();
     expect(s.find('kitchen-display-loading').text()).toBe('Loading the display…');
+    expect(s.find('kitchen-display-loading').attributes('role')).toBe('status');
+    expect(s.find('kitchen-display-loading').findAll('ion-skeleton-text').length).toBeGreaterThan(0);
     await s.show(board({ cooking: [ticket('t1'), ticket('t2', { label: 'Table 9' })], ready: [ticket('t3', { status: 'ready' })] }));
     expect(s.cards()).toEqual(['kitchen-card-t1', 'kitchen-card-t2']);
     expect(s.find('kitchen-display-count-tickets').text()).toBe('2');
@@ -115,7 +122,7 @@ describe('DisplayPage', () => {
     expect(localStorage.getItem('kitchen.display.station')).toBe('st-grill');
   });
 
-  it('a tap and the card buttons go to the server, scoped to the station chosen', async () => {
+  it('a tap, the card\'s foot and its «⋮» go to the server, scoped to the station chosen', async () => {
     localStorage.setItem('kitchen.display.station', 'none');
     const s = await setup();
     const t = ticket('t1', { status: 'preparing', items: [item('i1'), item('i2', { status: 'ready' })] });
@@ -123,7 +130,7 @@ describe('DisplayPage', () => {
     s.answer(200, t);
     await click(s.find('kitchen-line-i1').element);
     await click(s.find('kitchen-card-t1-bump').element);
-    await click(s.find('kitchen-card-t1-rush').element);
+    await s.more('t1', 'rush');
     await click(s.find('kitchen-line-i2').element);
     expect(s.sent().map((call) => [call.path, call.body])).toEqual([
       ['/api/kitchen/items/bump', { ticket_id: 't1', item_ids: ['i1'], station: 'none' }],
@@ -154,7 +161,7 @@ describe('DisplayPage', () => {
     await click(s.find('kitchen-card-t1-bump').element);
     expect(s.find('kitchen-display-pass-warning').text()).toContain('The pass could not be printed.');
     s.answer(200, { ...t, priority: 'rush', print_error: 'No printer' });
-    await click(s.find('kitchen-card-t1-rush').element);
+    await s.more('t1', 'rush');
     expect(s.find('kitchen-display-rush-warning').text()).toContain('The urgent notice could not be printed.');
   });
 
@@ -195,6 +202,16 @@ describe('DisplayPage', () => {
     expect(s.find('kitchen-display-retry').exists()).toBe(true);
     // A full-size touch target (44 px) on the kitchen's screen, never the small button.
     expect((s.find('kitchen-display-retry').element as HTMLElement & { size?: string }).size).toBeUndefined();
+  });
+
+  it('keeps the board in sight while the live stream reconnects, and says so', async () => {
+    const s = await setup();
+    await s.show(board({ cooking: [ticket('t1')] }));
+    s.net.lastStream().push(BYE);
+    await flush();
+    expect(s.find('kitchen-display-reconnecting').text()).toContain('Reconnecting');
+    expect(s.cards()).toEqual(['kitchen-card-t1']);
+    expect(s.find('kitchen-display-loading').exists()).toBe(false);
   });
 
   it('is only to look at for whoever may not change tickets', async () => {

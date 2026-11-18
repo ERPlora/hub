@@ -14,7 +14,7 @@ import { type Browser, type BrowserContext, expect, type Page, test } from '@pla
 import { clockIn } from './attendance-helpers';
 import { A, api, type Credentials, EMPLOYEE, login, psql, shot, shown } from './helpers';
 import { noHorizontalScroll, settled, VIEWPORTS } from './schedule-helpers';
-import { rowAction } from './service-helpers';
+import { offersRowAction, rowAction } from './service-helpers';
 
 type Rows<T> = { rows: T[]; total: number };
 type Day = { id: string; member_name: string; status: string; clock_in_at: string };
@@ -130,7 +130,7 @@ for (const vp of VIEWPORTS) {
       await expect(records.locator('[data-testid=attendance-records-month]')).toBeVisible();
       await expect(records.locator('[data-testid=attendance-presence]')).toHaveCount(0);
       await expect(records.locator('[data-testid=attendance-records-person]')).toHaveCount(0);
-      await expect(records.locator(`[data-testid=attendance-records-row-${day.id}-correct]`)).toHaveCount(0);
+      expect(await offersRowAction(page, 'attendance-records', day.id, 'correct')).toBe(false);
       await snap(page, 'F06', vp.label);
       await rowAction(page, 'attendance-records', day.id, 'history');
       const history = page.locator('ion-modal[data-testid=attendance-history]');

@@ -4,7 +4,9 @@
 // «My apps» sheet in the topbar, and no Back on the list, the root of the app.
 import { type Page, expect, test } from '@playwright/test';
 
-import { A, api, createItem, horizontalOverflow, listReady, login, openApps, record, shot, shown, uniqueName } from './helpers';
+import { A, api, horizontalOverflow, login, MY_APPS_DOOR, record, shot, shown, uniqueName } from './helpers';
+import { createItem, listReady } from './demo-items';
+import { openApps } from './topbar';
 
 const VIEWPORTS = [
   { label: '390', width: 390, height: 844 },
@@ -19,7 +21,7 @@ async function chromeState(page: Page) {
     drawerButton: await bar.locator('ion-menu-button').isVisible(),
     railToggle: await bar.locator('[data-testid=topbar-rail]').isVisible(),
     back: await bar.locator('[data-testid=topbar-back]').isVisible(),
-    apps: await bar.locator('[data-testid=topbar-apps]').isVisible(),
+    apps: await bar.locator(MY_APPS_DOOR).isVisible(),
   };
 }
 

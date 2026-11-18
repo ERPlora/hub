@@ -97,9 +97,9 @@ async function retireDevice(row: DeviceOut): Promise<void> {
   retiring.value = row.id;
   try {
     await retire.run({ device_id: row.id });
-    void toastSuccess(t('printing.devices.retire.done'));
+    toastSuccess(t('printing.devices.retire.done'));
   } catch {
-    void toastError(refusal(retire.error.value, t('printing.devices.retire.failed'))?.message ?? t('printing.devices.retire.failed'));
+    toastError(refusal(retire.error.value, t('printing.devices.retire.failed'))?.message ?? t('printing.devices.retire.failed'));
   } finally {
     retiring.value = null;
   }

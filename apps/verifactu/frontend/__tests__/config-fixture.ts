@@ -28,7 +28,6 @@ export const CONFIG: ConfigOut = {
 
 export const CONFIG_WITHOUT_ERPLORA_ROUTE: ConfigOut = {
   ...CONFIG,
-  route: 'own',
   erplora_route_available: false,
 };
 

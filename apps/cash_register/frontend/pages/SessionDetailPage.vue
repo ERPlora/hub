@@ -50,7 +50,7 @@ async function printHere(): Promise<void> {
   try {
     await paper.printPaper(element, { title: `${kind} · ${shown.number}` });
   } catch (failure) {
-    void toastError(withReason(t('cash_register.detail.printFailed'), printRefusal(failure, t)));
+    toastError(withReason(t('cash_register.detail.printFailed'), printRefusal(failure, t)));
   }
 }
 
@@ -60,11 +60,11 @@ async function printReport(): Promise<void> {
     sent = await printing.run({ session_id: props.id });
   } catch (refused) {
     const message = (refused as { message?: string }).message;
-    void toastError(message ? `${t('cash_register.detail.printFailed')} ${message}` : t('cash_register.detail.printFailed'));
+    toastError(message ? `${t('cash_register.detail.printFailed')} ${message}` : t('cash_register.detail.printFailed'));
     return;
   }
   if (!sent.queued) return printHere();
-  void toastSuccess(sent.printer ? t('cash_register.detail.printQueued', { printer: sent.printer }) : t('cash_register.detail.printQueuedDefault'));
+  toastSuccess(sent.printer ? t('cash_register.detail.printQueued', { printer: sent.printer }) : t('cash_register.detail.printQueuedDefault'));
 }
 </script>
 

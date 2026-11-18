@@ -23,7 +23,8 @@ import { expect, type Locator, type Page, test } from '@playwright/test';
 
 import { demoBeingPrepared, migrationsAppliedAtSignUp } from './demo-born';
 import { doorOutcome, whyNoDemo } from './demo-door';
-import { api, collectProblems, createViaPage, HUB_DIR, listReady, rowNames, SAAS, shot, shown, turnOn, uniqueName } from './helpers';
+import { api, collectProblems, HUB_DIR, MY_APPS_DOOR, SAAS, shot, shown, turnOn, uniqueName } from './helpers';
+import { createViaPage, listReady, rowNames } from './demo-items';
 import { STACK } from './stack';
 
 const DEMO_HOST = new RegExp(`^http://(demo-[0-9a-f]{8})\\.localhost:${STACK.hubPort}/`);
@@ -66,7 +67,7 @@ async function startDemo(page: Page): Promise<string> {
     if (why) throw new Error(why);
     await page.getByTestId('demo-retry').click();
   }
-  await shown(page).locator('[data-testid=topbar-apps]').waitFor({ state: 'attached' });
+  await shown(page).locator(MY_APPS_DOOR).first().waitFor({ state: 'attached' });
   const slug = DEMO_HOST.exec(page.url())?.[1];
   if (!slug) throw new Error(`not on a demo host: ${page.url()}`);
   return slug;

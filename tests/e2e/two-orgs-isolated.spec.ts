@@ -3,7 +3,8 @@
 // and nowhere in a's.
 import { type Page, expect, test } from '@playwright/test';
 
-import { A, B, createViaPage, hostPage, listReady, psql, record, row, rowNames, shot, uniqueName, watchForRow } from './helpers';
+import { A, B, hostPage, psql, record, shot, uniqueName } from './helpers';
+import { createViaPage, listReady, row, rowNames, watchForRow } from './demo-items';
 
 const QUIET_MS = 2000;
 

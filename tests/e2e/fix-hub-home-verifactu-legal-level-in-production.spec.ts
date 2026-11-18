@@ -1,17 +1,18 @@
-// flow: «Termina de configurar tu negocio» and the Home's blocking strip (BASE-F01, BASE-F04) with VeriFactu's step
-// (VERIFACTU-F08)
+// flow: «Termina de configurar tu negocio» and the action center's «Todavía no puedes facturar» (BASE-F01, BASE-F04)
+// with VeriFactu's step (VERIFACTU-F08)
 // A hub in production whose way to the AEAT broke (ERPlora's signed
 // authorisation revoked) has every new sale refused, so its Home says so. «Configura VeriFactu» is «Necesario para
-// facturar» in «Termina de configurar tu negocio», and the strip «Todavía no puedes facturar» names it over the other
-// screens: to the owner with «Configurar», to the employee with «An administrator has to set this up.». In testing the
-// same hub stays «Importante» with no strip: it sells without a way.
+// facturar» in «Termina de configurar tu negocio», and the action center's «Todavía no puedes facturar» names it in its
+// sentence: to the owner with «Configurar VeriFactu», to the employee with no button and «An administrator has to set
+// this up.». In testing the same hub stays «Importante», out of that notice: it sells without a way.
 // Production is the configuration's environment, set in the database for the run: no local server opens real filing
 // and nothing is sent (the sale is refused before any record is made). The photo is sent the way the SaaS sends it
 // (`PUT /internal/hubs/{id}/state`, signed); what the run changes in VeriFactu's configuration and in `a`'s photo is
 // put back after it (or removed, if the run made it).
 import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, api, EMPLOYEE, horizontalOverflow, login, OWNER, shot, shown, untilStill } from './helpers';
+import { bellSays, bellTotal, featureNotice, noticeButton, noticeIn, openActionCenter } from './action-center';
+import { A, api, capture, EMPLOYEE, horizontalOverflow, login, OWNER, shown } from './helpers';
 import { keepVerifactu, putVerifactuBack, revokedIn } from './verifactu-helpers';
 
 const KEY = 'FIX-HUB-HOME-VERIFACTU-LEGAL-LEVEL-IN-PRODUCTION';
@@ -52,19 +53,25 @@ async function onHome(
 const card = (page: Page): Locator => shown(page).locator('[data-testid="setup-card"]');
 const row = (page: Page): Locator => card(page).locator(`[data-testid="setup-row"][data-key="${STEP}"]`);
 
-const strip = (page: Page): Locator => shown(page).locator('[data-testid="blocking-strip"]');
-/** The strip's line of the step (another ⛔, as the business's tax details, may stand beside it). */
-const named = (page: Page, title: string): Locator =>
-  strip(page).locator('[data-testid="blocking-item"]').filter({ hasText: title });
+/** «Todavía no puedes facturar» on top of the action center, once the bell has counted what the server says. */
+async function blockingNotice(page: Page, context: BrowserContext, title: string): Promise<Locator> {
+  await bellSays(page, await bellTotal(context));
+  const featured = await featureNotice(page, title);
+  await expect(featured.locator('h3')).toHaveText(title);
+  return featured;
+}
+
+/** The sentence of a notice: the steps it names (another ⛔, as the business's tax details, may stand beside them). */
+const sentence = (featured: Locator): Locator => featured.locator('.action-featured__body');
 
 test.describe.configure({ mode: 'serial' });
 
 for (const size of SIZES) {
-  test(`BASE-F01 VERIFACTU-F08 at ${size.label}: in production with the authorisation revoked, «Configura VeriFactu» is «Necesario para facturar» and the strip names it`, async ({ browser }) => {
+  test(`BASE-F01 VERIFACTU-F08 at ${size.label}: in production with the authorisation revoked, «Configura VeriFactu» is «Necesario para facturar» and «Todavía no puedes facturar» names it`, async ({ browser }) => {
     await revokedIn('production');
     const { context, page } = await onHome(browser, { width: size.width, height: size.height });
     try {
-      // The sale is refused from now on (what the strip warns of), and the Home says it is a wall.
+      // The sale is refused from now on (what the notice warns of), and the Home says it is a wall.
       const config = await api<{ environment: string; issue_blocker: { code: string } | null }>(context, A, 'GET', '/verifactu/config');
       expect(config.status).toBe(200);
       expect([config.data.environment, config.data.issue_blocker?.code]).toEqual(['production', 'representation_not_approved']);
@@ -79,39 +86,18 @@ for (const size of SIZES) {
       await card(page).locator('[data-testid="setup-toggle"]').click();
       await expect.poll(() => rows.count()).toBeGreaterThan(folded);
 
-      // On «Actividad» the strip stands over the screen: the consequence, the step and its «Configurar».
-      await page.goto(`${A}/#actividad`);
-      await expect(strip(page)).toBeVisible();
-      await expect(strip(page).locator('.blocking-strip-title')).toHaveText('Todavía no puedes facturar');
-      await expect(named(page, 'Configura VeriFactu')).toHaveCount(1);
-      const configure = named(page, 'Configura VeriFactu').locator(`[data-testid="blocking-configure-${STEP}"]`);
-      await expect(configure).toHaveText('Configurar');
-      await expect(shown(page).locator('[data-testid="home-activity-loading"]')).toHaveCount(0);
-      await untilStill(page);
+      // The action center's «Todavía no puedes facturar»: the consequence, the step and its «Configurar VeriFactu».
+      const featured = await blockingNotice(page, context, 'Todavía no puedes facturar');
+      await expect(sentence(featured)).toContainText('No se podrá emitir ningún tique ni factura hasta que configures esto:');
+      await expect(sentence(featured)).toContainText('Configura VeriFactu');
+      const configure = noticeButton(featured, 'Configurar VeriFactu');
+      await expect(configure).toBeVisible();
       const overflow = await horizontalOverflow(page);
       expect(overflow, `no sideways scroll at ${size.label}`).toBeLessThanOrEqual(0);
-      await page.screenshot({ path: shot(`${KEY}-${size.label}`) });
+      await capture(page, `${KEY}-${size.label}`);
 
       await configure.click();
       await expect(page).toHaveURL(`${A}/verifactu/config`);
-    } finally {
-      await context.close();
-    }
-  });
-}
-
-for (const size of SIZES.filter((s) => s.label !== '834')) {
-  test(`BASE-F01 VERIFACTU-F08 at ${size.label}: on VeriFactu's Configuration the strip names the step with no «Configurar» to that same screen`, async ({ browser }) => {
-    await revokedIn('production');
-    const { context, page } = await onHome(browser, { width: size.width, height: size.height });
-    try {
-      await page.goto(`${A}/verifactu/config`);
-      await expect(strip(page).locator('.blocking-strip-title')).toHaveText('Todavía no puedes facturar');
-      await expect(named(page, 'Configura VeriFactu')).toHaveCount(1);
-      await expect(strip(page).locator(`[data-testid="blocking-configure-${STEP}"]`)).toHaveCount(0);
-      await expect(named(page, 'Configura VeriFactu')).not.toContainText('Esto lo tiene que configurar un administrador.');
-      await untilStill(page);
-      await page.screenshot({ path: shot(`${KEY}-config-${size.label}`) });
     } finally {
       await context.close();
     }
@@ -124,31 +110,33 @@ test('BASE-F04 VERIFACTU-F08: in production the employee is told too, in English
   try {
     await expect(row(page).locator('.setup-row-title')).toHaveText('Set up VeriFactu');
     await expect(row(page).locator('[data-testid="setup-pill"]')).toHaveText('Needed to invoice');
-    await page.goto(`${A}/#actividad`);
-    await expect(strip(page).locator('.blocking-strip-title')).toHaveText('You cannot issue invoices yet');
-    await expect(named(page, 'Set up VeriFactu')).toHaveCount(1);
-    await expect(named(page, 'Set up VeriFactu').locator('.blocking-strip-note')).toHaveText('An administrator has to set this up.');
-    await expect(strip(page).locator(`[data-testid="blocking-configure-${STEP}"]`)).toHaveCount(0);
-    await expect(shown(page).locator('[data-testid="home-activity-loading"]')).toHaveCount(0);
-    await untilStill(page);
-    await page.screenshot({ path: shot(`${KEY}-employee-en-1440`) });
+    const featured = await blockingNotice(page, context, 'You cannot issue invoices yet');
+    await expect(sentence(featured)).toContainText('Set up VeriFactu');
+    await expect(sentence(featured)).toContainText('An administrator has to set this up.');
+    await expect(featured.locator('ion-button')).toHaveCount(0);
+    await capture(page, `${KEY}-employee-en-1440`);
   } finally {
     await context.close();
   }
 });
 
-test('BASE-F01: in testing the same revoked authorisation stays «Importante», out of the strip', async ({ browser }) => {
+test('BASE-F01: in testing the same revoked authorisation stays «Importante», out of «Todavía no puedes facturar»', async ({ browser }) => {
   await revokedIn('testing');
   const { context, page } = await onHome(browser, { width: 1440, height: 900 });
   try {
     const config = await api<{ environment: string; issue_blocker: unknown }>(context, A, 'GET', '/verifactu/config');
     expect([config.data.environment, config.data.issue_blocker]).toEqual(['testing', null]);
     await expect(row(page).locator('[data-testid="setup-pill"]')).toHaveText('Importante');
-    await page.goto(`${A}/#actividad`);
-    await expect(shown(page).locator('[data-testid="home-activity-loading"]')).toHaveCount(0);
-    // The business's tax details may be a wall of their own while the hub has no issuer;
-    // VeriFactu's step in testing never is: nothing else is in the strip.
-    await expect(strip(page).locator('[data-testid="blocking-item"]').filter({ hasNotText: 'Los datos de tu negocio' })).toHaveCount(0);
+    // The business's tax details may be a wall of their own while the hub has no issuer; VeriFactu's step in testing
+    // never is: the notice, when there is one, does not name it.
+    const setup = await api<{ blocking_pending: number }>(context, A, 'GET', '/home/setup');
+    if (setup.data.blocking_pending > 0) {
+      await expect(sentence(await blockingNotice(page, context, 'Todavía no puedes facturar'))).not.toContainText('VeriFactu');
+    } else {
+      const panel = await openActionCenter(page);
+      await expect(panel.locator('[data-testid=action-panel-loading]')).toHaveCount(0);
+      await expect(noticeIn(panel, 'Todavía no puedes facturar')).toHaveCount(0);
+    }
   } finally {
     await context.close();
   }
