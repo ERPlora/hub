@@ -229,10 +229,10 @@ def lock_problems(section, in_force, confirm):
         return []
     where = f"prod.{LOCK}"
     if not given:
-        message = f"changes what is in force: deploy again by hand with confirm_protected={','.join(changes)}"
+        message = f"changes what is in force: run it again by hand with confirm_protected={','.join(changes)}"
         return [Problem(where, "needs_confirmation", message)]
     changed = ",".join(changes) or "nothing protected"
-    message = f"confirm_protected says {','.join(given)}, but this deploy changes {changed}"
+    message = f"confirm_protected says {','.join(given)}, but the settings change {changed}"
     return [Problem(where, "confirmation_mismatch", message)]
 
 
