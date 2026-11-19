@@ -694,10 +694,10 @@ def cancel_until(appointment: Appointment) -> dt.datetime | None:
     ).astimezone(business_zone())
 
 
-def public_booking_out(appointment: Appointment) -> dict:
-    zone = business_zone()
+def public_booking_out(ctx: OperationContext, appointment: Appointment) -> dict:
+    zone, own = business_zone(), current_settings()
     until = cancel_until(appointment)
-    return {
+    return PublicBookingOut.owner(ctx, own.logo) | {
         "number": appointment.number,
         "status": appointment.status,
         "start": appointment.start.astimezone(zone),
@@ -707,7 +707,7 @@ def public_booking_out(appointment: Appointment) -> dict:
         "staff_name": appointment.staff_name,
         "can_cancel": until is not None and now() <= until,
         "cancel_until": until,
-        "cancellation_policy": current_settings().cancellation_policy,
+        "cancellation_policy": own.cancellation_policy,
     }
 
 
@@ -732,4 +732,4 @@ def public_booking_out(appointment: Appointment) -> dict:
     },
 )
 def public_booking(ctx: OperationContext, data: TokenIn) -> dict:
-    return public_booking_out(find_by_token(data.token).appointment)
+    return public_booking_out(ctx, find_by_token(data.token).appointment)
