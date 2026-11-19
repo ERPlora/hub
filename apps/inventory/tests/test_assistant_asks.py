@@ -125,6 +125,22 @@ def test_goods_said_as_a_quantity_in_a_unit_bring_the_reception_among_the_first_
     assert "inventory.stock.receive" not in offered_to(tools, phrase, language, synonyms=without)[:TOP]
 
 
+#: A quantity in a unit written off: the goods it names are also the stock a write-off acts on, so the reception the
+#: same words bring never pushes it out of the first ten (24th if they named only the goods).
+QUANTITY_OUT = [
+    ("es", "da de baja 2 kilos de harina por rotura"),
+    ("en", "write off 2 kilos of flour, they got wet"),
+]
+
+
+@HUB_DB
+@pytest.mark.parametrize("role", [Membership.Role.OWNER, Membership.Role.MANAGER])
+@pytest.mark.parametrize(("language", "phrase"), QUANTITY_OUT)
+def test_a_quantity_in_a_unit_written_off_keeps_the_write_off_among_the_first_ten(catalog_of, role, language, phrase):
+    assert comparable(phrase) not in probe_phrases()
+    assert_offered_with_room(catalog_of(role, language), "inventory.stock.write_off", phrase, language, room=TOP)
+
+
 #: What a quantity in a unit is not: money in or out of the drawer, what a sale line or a cart counts, the tills of a
 #: place. None of them names the stock nor the goods received.
 NO_QUANTITY_OF_GOODS = [
