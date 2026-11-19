@@ -779,9 +779,9 @@ vende, y si Menús no está activo el TPV no ofrece menús.
   `modifier.option`). `tests/test_assistant_asks.py` mide con las frases reales de la QA de la capa 2
   (`tests/e2e/qa/probes/*-es-combo-*.json` y las de preparar la venta), nunca con los propios `asks`, y con una frase
   propia por herramienta que solo la trae con sus asks; el empleado no recibe ninguna escritura. Trampas medidas:
-  «ordena» y «orden» tienen la raíz de «ordenador» y nombran también los dispositivos (ERPlora/live#61), «ejecutivo»
-  la de «ejecución» (Automatizaciones), «paso» es la palabra de los pasos de una automatización y «del día», «euros» o
-  «café» en los asks suben las herramientas de Menús en las peticiones de Ventas e Inventario que lo dicen.
+  «ejecutivo» tiene la raíz de «ejecución» (Automatizaciones), «paso» es la palabra de los pasos de una automatización
+  y «del día», «euros» o «café» en los asks suben las herramientas de Menús en las peticiones de Ventas e Inventario
+  que lo dicen. «ordena» y «orden» ya no nombran los dispositivos: «ordenador» tiene raíz propia en `live`.
 - **Tarjeta de confirmación del asistente** (BASE-F97, hub#669): nombra el registro que una escritura señala por su
   id con las marcas `refers` de `schemas.py`, leídas como quien pregunta: el menú por su `name` con
   `combo.combo.get` (`A_MENU`: el `id` de `ComboRefIn` y el `combo_id` de `_ComboOfIn`), el plato por su `name` con
