@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:a178d58653cc0f52d6429b8feae68b528b7aeebb0aef8f719326483c07fa516a -->
+<!-- generated from WORKBOOK.md sha256:200d0c1a0a44c33a2cca4b43b9c41d03f9e7605c5265be0a927abbbaa2a0bd5a -->
 
 ## What it is for and who it is for
 
@@ -932,8 +932,9 @@ Steps:
      chose.
   4. In "Add apps" they stay, with their icon, their name and "Off": from there they are turned on again
      (BASE-F24).
-  5. From the assistant ("Turn off the reservations app") the app is named as in BASE-F24, the high-risk card shows
-     its whole name and, if it was off already, the assistant says so and nothing changes.
+  5. From the assistant ("Turn off the reservations app", or without saying "app": "take Reservations off the menu",
+     "I don't want to see Reservations in the menu") the app is named as in BASE-F24, the high-risk card shows its
+     whole name and, if it was off already, the assistant says so and nothing changes.
 In: the business's apps, what each one needs and which ones the business chose.
 Out: the app turned off in this business, and the ones that came only with it, with their data intact.
 If it fails: if another running app needs it, nothing changes; if it cannot be turned off, it offers no "Turn off"
@@ -951,7 +952,8 @@ Steps:
      asking.
   3. The app comes back to "My apps" and to the menu, without reloading, with the data it had: "Reservations is
      on." and, if it came with others, "Also turned on: Tables.".
-  4. From the assistant ("Turn on the reservations app") the app is named as the person says it: by its name in any
+  4. From the assistant ("Turn on the reservations app", or without saying "app": "put Reservations back on the
+     menu") the app is named as the person says it: by its name in any
      language of the Hub, case and accents aside, or, if none is called so, by the only one with a word of its name
      that starts so ("booking" is Online booking). "Reservas" is Reservations, never Online booking (Reservas online)
      even though it starts the same. The card shows its whole name (BASE-F97), never its id, and if it was on
