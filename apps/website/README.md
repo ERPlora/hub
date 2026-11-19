@@ -51,7 +51,7 @@ producto actual no tenía página por negocio.
 | Fuera del Hub | Places API (New) de Google con `GOOGLE_PLACES_API_KEY` (Secrets Manager; ERPlora/aws#10) |
 | Paquete público | entrada `website` de Vite, en la raíz del Hub (`frontend/website.ts`: Bootstrap 5.3, su `collapse` y `apps/website/frontend/public/`) |
 
-Las decisiones de diseño (una fila por hub en la fase 1, la guarda única de lo público, render y caché, CSP, imágenes,
+Las decisiones de diseño (una web por negocio en su propia BD, la guarda única de lo público, render y caché, CSP, imágenes,
 reseñas de Google, paletas, plantillas y licencias) están en «Para quien lo mantiene» del WORKBOOK; las de la
 migración, en la ronda 2026-10-23 (CLOSE-WEBSITE) de `PLAN-HUB.md` (raíz de erplora-next), y la decisión de fondo en
 PLAN §29 y §30.
