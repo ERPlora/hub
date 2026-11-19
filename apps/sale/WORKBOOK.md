@@ -4,7 +4,8 @@ Alcance MVP: núcleo
 Estado de la app: completa (2026-10-31)
 Lo que no entra todavía: ver «Lo que queda fuera». La propina (SALE-G06) es de la app Propinas (`tip`), que añade
 su paso al cobro (SALE-F39, no hecho). Los alérgenos del plato en la línea (SALE-F40), parcial: la línea los guarda,
-pero el TPV todavía no los pinta. La alergia del cliente en la línea (SALE-F41), no hecho.
+pero el TPV todavía no los pinta. La alergia del cliente en la línea (SALE-F41), parcial: la línea la guarda y la
+comanda la lleva, pero el TPV todavía no tiene dónde marcarla.
 
 > Manual de usuario y especificación de la app `sale`. Se escribe **antes** que el código: no se
 > programa nada que no esté aquí, y cada flujo pasa a `Estado: hecho` cuando sus tests están en verde
@@ -322,7 +323,7 @@ cierra la ventana sin guardarlo. Con la ventana como se abrió, atrás la cierra
 | SALE-F38 | Vender un servicio de Servicios | peluquería | hecho |
 | SALE-F39 | Cobrar con lo que añade otra app (la propina) | común | no hecho |
 | SALE-F40 | Ver los alérgenos de un plato al pedirlo | común | parcial |
-| SALE-F41 | Marcar la alergia del cliente en una línea | restaurante | no hecho |
+| SALE-F41 | Marcar la alergia del cliente en una línea | restaurante | parcial |
 
 ### SALE-F01 Vender y cobrar en efectivo
 Estado: hecho
@@ -1392,7 +1393,9 @@ Leche a la línea; si el cliente tiene una alergia, se marca en la línea (SALE-
 Implicados: INVENTORY-F27, INVENTORY-F35, SALE-F11, SALE-F12, SALE-F41, KITCHEN-F32
 
 ### SALE-F41 Marcar la alergia del cliente en una línea
-Estado: no hecho — la línea todavía no guarda la alergia del cliente: hoy solo cabe como texto de la nota (SALE-F13)
+Estado: parcial — la línea guarda la alergia del cliente, la cuenta en vivo dice cuáles de esos alérgenos lleva el
+plato y la comanda enviada la lleva, también por el asistente y la API; la hoja del TPV todavía no tiene el bloque
+«Alergia del cliente» ni la línea la enseña (hub#1738), y Cocina todavía no la resalta (KITCHEN-F32)
 Vertical: restaurante
 Actor: empleado, responsable
 Pantalla: Vender
@@ -1490,6 +1493,7 @@ secciones, las notas rápidas y lo devolvible se pueden seguir en vivo.
 | Añade una línea a precio libre | precio libre | F09 | `sale.order.add_open_line` |
 | Cambia la cantidad, la invitación o la nota de una línea | montar la cuenta | F01, F10, F13, F15 | `sale.order.update_line` |
 | Cambia de quién es una línea | montar la cuenta | F16 | `sale.order.set_line_staff` |
+| Marca o quita la alergia del cliente en una línea sin enviar | montar la cuenta | F41 | `sale.order.set_line_allergy` |
 | Separa una línea de N unidades en N líneas | montar la cuenta | F27 | `sale.order.split_line` |
 | Quita una línea sin enviar | montar la cuenta | F01 | `sale.order.remove_line` |
 | Anula una línea ya enviada a cocina, con motivo | anular | F20 | `sale.order.void_line` |
@@ -1521,7 +1525,7 @@ secciones, las notas rápidas y lo devolvible se pueden seguir en vivo.
 | Venta con su documento | Un documento que no se pudo emitir en el cobro, la anulación o la devolución se emite después (reintento del cobro, «Emitir ahora» o la reacción de Facturación) | La venta, el documento, su número, la devolución (`refund_id`) o si es el de la anulación (`void`); uno por documento | `sale.sale.invoiced` |
 | Cuenta abierta | Abrir o dividir | La cuenta | `sale.order.opened` |
 | Cuenta cambiada | Cualquier cambio de líneas, descuentos o título | La cuenta | `sale.order.changed` |
-| Comanda enviada | Enviar a cocina | La cuenta, su título, el canal, la ronda, quién atiende y las líneas con sus notas y los alérgenos de su producto (en un menú, los de cada plato) | `sale.order.fired` |
+| Comanda enviada | Enviar a cocina | La cuenta, su título, el canal, la ronda, quién atiende y las líneas con sus notas, los alérgenos de su producto (en un menú, los de cada plato) y la alergia del cliente | `sale.order.fired` |
 | Cuenta cerrada | Cobrar lo último de una cuenta | La cuenta | `sale.order.completed` |
 | Cuenta anulada | Anular una cuenta abierta | La cuenta | `sale.order.voided` |
 | Cuentas juntadas | Juntar | La absorbida y la que queda | `sale.order.merged` |
@@ -2048,6 +2052,6 @@ título, sus pasos y «Si falla»: ahí no van nombres de código, incidencias, 
 - **Cobrar con propina**: es la app Propinas (`tip`, su `WORKBOOK.md`), con el paso del cobro que pinta Ventas
   (SALE-F39), las dos `no hecho`; el código va por las issues hijas de hub#562. Mientras, la propina en efectivo se
   anota en Caja como «Entrada» (CASH_REGISTER-F05).
-- **Los alérgenos del plato y la alergia del cliente** (F40 `parcial` y F41 `no hecho`): la línea ya guarda los
-  alérgenos de su producto, y la alergia del cliente la guardará por hub#1768; la línea y las hojas los enseñan por
+- **Los alérgenos del plato y la alergia del cliente** (F40 y F41 `parcial`): la línea ya guarda los alérgenos de
+  su producto y la alergia del cliente, y la comanda enviada los lleva; la línea y las hojas los enseñan por
   hub#1738; Cocina los resalta en KITCHEN-F32 (hub#1737). Mientras, una alergia va en la nota. Los alérgenos de un suplemento («+Queso» lleva leche) no entran: hub#1739.

@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:b31ecb9cec1794251c6819545326899bdbf4c1b899566e9ed5278125df029eef -->
+<!-- generated from WORKBOOK.md sha256:ae0627a6c8860e405e3c02ad17bbd25fe87144a0f1f6c35519d742492eed5d93 -->
 
 ## What it is for and who it is for
 
@@ -310,7 +310,7 @@ With the window as it opened, Back closes it without asking (BASE-F05).
 | SALE-F38 | Sell a service from Services | hair salon | done |
 | SALE-F39 | Charge with what another app adds (the tip) | common | not done |
 | SALE-F40 | See a dish's allergens when ordering it | common | partial |
-| SALE-F41 | Mark the customer's allergy on a line | restaurant | not done |
+| SALE-F41 | Mark the customer's allergy on a line | restaurant | partial |
 
 ### SALE-F01 Sell and charge in cash
 Status: done
@@ -1385,7 +1385,9 @@ same.
 Involved: INVENTORY-F27, INVENTORY-F35, SALE-F11, SALE-F12, SALE-F41, KITCHEN-F32
 
 ### SALE-F41 Mark the customer's allergy on a line
-Status: not done — the line does not keep the customer's allergy yet: today it only fits as text in the note (SALE-F13)
+Status: partial — the line keeps the customer's allergy, the live check says which of those allergens the dish
+contains and the order sent carries it, also through the assistant and the API; the till's sheet does not have the
+«Customer's allergy» block yet nor does the line show it (hub#1738), and Kitchen does not highlight it yet (KITCHEN-F32)
 Vertical: restaurant
 Actor: employee, manager
 Screen: Sell
@@ -1483,6 +1485,7 @@ the quick notes and what is refundable can be followed live.
 | Adds an open-price line | open price | F09 | `sale.order.add_open_line` |
 | Changes a line's quantity, comp or note | build the check | F01, F10, F13, F15 | `sale.order.update_line` |
 | Changes whose line it is | build the check | F16 | `sale.order.set_line_staff` |
+| Marks or takes off the customer's allergy on a line not sent yet | build the check | F41 | `sale.order.set_line_allergy` |
 | Splits a line of N units into N lines | build the check | F27 | `sale.order.split_line` |
 | Removes an unsent line | build the check | F01 | `sale.order.remove_line` |
 | Voids a line already sent to the kitchen, with a reason | void | F20 | `sale.order.void_line` |
@@ -1514,7 +1517,7 @@ the quick notes and what is refundable can be followed live.
 | Sale with its document | A document that could not be issued in the charge, the void or the refund is issued later (the charge's retry, "Issue now" or Invoicing's reaction) | The sale, the document, its number, the refund (`refund_id`) or whether it is the void's (`void`); one per document | `sale.sale.invoiced` |
 | Check opened | Open or split | The check | `sale.order.opened` |
 | Check changed | Any change of lines, discounts or title | The check | `sale.order.changed` |
-| Order sent | Send to the kitchen | The check, its title, the channel, the round, who serves and the lines with their notes and their product's allergens (in a menu, each dish's) | `sale.order.fired` |
+| Order sent | Send to the kitchen | The check, its title, the channel, the round, who serves and the lines with their notes, their product's allergens (in a menu, each dish's) and the customer's allergy | `sale.order.fired` |
 | Check closed | Charge the last of a check | The check | `sale.order.completed` |
 | Check voided | Void an open check | The check | `sale.order.voided` |
 | Checks merged | Merge | The absorbed one and the one that stays | `sale.order.merged` |

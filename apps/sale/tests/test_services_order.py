@@ -421,6 +421,8 @@ def test_firing_sends_the_pending_lines_as_a_round(coffee, steak):
             "modifiers": "",
             # SALE-F40: its product's allergens, frozen when it was ordered; the steak declares none.
             "allergens": [],
+            # SALE-F41: the customer's allergy the waiter marked on the line; none here.
+            "allergy": [],
             # SALE-F12: a menu's kitchen name and dishes (COMBO-F11); not a menu here.
             "kitchen_name": "",
             "components": [],

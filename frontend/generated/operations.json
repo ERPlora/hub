@@ -787,6 +787,10 @@
     "method": "post",
     "path": "/api/sale/orders/set_line_staff"
   },
+  "sale.order.set_line_allergy": {
+    "method": "post",
+    "path": "/api/sale/orders/set_line_allergy"
+  },
   "sale.order.split_line": {
     "method": "post",
     "path": "/api/sale/orders/split_line"
