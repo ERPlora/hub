@@ -10,12 +10,14 @@ import datetime as dt
 import hashlib
 import json
 import logging
+import threading
 
 import pytest
 from botocore.exceptions import ClientError
 from django.utils import timezone
 from live.meta import all_live_app_configs
 
+from base import worker
 from base.tenancy import fiscal_archive, offboarding
 from base.tenancy.context import use_hub
 from base.tenancy.tests import s3
@@ -99,16 +101,79 @@ def test_a_business_with_documents_is_archived_whole_before_anything_goes_and_ke
     assert manifest["business"]["id"] == str(hub.id)
     assert manifest["apps"] == ["cash_register", "invoice", "sale", "verifactu"]
     kept = objects(moto_s3, fiscal_archive_bucket)
-    assert set(kept) == {entry["key"] for entry in manifest["files"]} | {manifest_key}
-    for entry in manifest["files"]:
+    listed = manifest["files"] + manifest["documents"]
+    assert set(kept) == {entry["key"] for entry in listed} | {manifest_key}
+    for entry in listed:
         content = body(moto_s3, fiscal_archive_bucket, entry["key"])
         assert entry["bytes"] == len(content) == kept[entry["key"]]
         assert entry["sha256"] == hashlib.sha256(content).hexdigest()
-        assert entry["rows"] == len(content.splitlines())
+    for entry in manifest["files"]:
+        assert entry["rows"] == len(body(moto_s3, fiscal_archive_bucket, entry["key"]).splitlines())
     rows = archived_rows(moto_s3, fiscal_archive_bucket, manifest)
     assert {(row["model"], row["pk"]) for row in rows} == database_rows(hub, manifest["apps"])
     assert sum(manifest["models"].values()) == len(rows) == manifest["total"]["rows"]
-    assert manifest["total"]["files"] == len(manifest["files"])
+    assert [entry["app"] for entry in manifest["documents"]] == ["invoice"]
+    assert (manifest["total"]["files"], manifest["total"]["documents"]) == (len(listed), 1)
+    assert manifest["total"]["bytes"] == sum(entry["bytes"] for entry in listed)
+
+
+def printing(monkeypatch) -> list[tuple[str, bytes]]:
+    """Every page WeasyPrint prints from now on, with its PDF. A PDF carries the second its fonts were cut, so the same
+    page printed twice is not the same file: what went to the archive is told by what was printed."""
+    from apps.invoice import pdf
+
+    printed, render = [], pdf.render_pdf
+
+    def spied(html: str) -> bytes:
+        printed.append((html, render(html)))
+        return printed[-1][1]
+
+    monkeypatch.setattr(pdf, "render_pdf", spied)
+    return printed
+
+
+def invoice(number: int):
+    from apps.invoice.models import Invoice, InvoiceSeries
+
+    series, _ = InvoiceSeries.objects.get_or_create(code="FACT", year=2026, invoice_type="F1", prefix="FACT")
+    return Invoice.objects.create(
+        series=series,
+        series_code="FACT",
+        year=2026,
+        sequence=number,
+        number=f"FACT-2026-{number:06d}",
+        invoice_type="F1",
+        issue_date=DAY,
+        operation_date=DAY,
+        base_amount=1000,
+        tax_amount=210,
+        total_amount=1210,
+    )
+
+
+def test_each_invoice_goes_as_the_pdf_handed_over_in_the_folder_of_its_leaving_and_the_manifest_lists_it(
+    business, dumps_bucket, fiscal_archive_bucket, moto_s3, monkeypatch
+):
+    hub = business(left_days_ago=91, language="es")
+    with use_hub(hub):
+        made = [invoice(1), invoice(2)]
+    leaving = f"{hub.id.hex}/{hub.cancelled_at:{fiscal_archive.KEY_TIME}}"
+    printed = printing(monkeypatch)
+
+    run_pass()
+
+    manifest_key, manifest = manifest_of(moto_s3, fiscal_archive_bucket, hub)
+    assert manifest_key.startswith(f"{leaving}/")
+    assert [entry["key"] for entry in manifest["documents"]] == [f"{leaving}/invoice/{one.id}.pdf" for one in made]
+    s3 = client(moto_s3)
+    for entry, one, (html, content) in zip(manifest["documents"], made, printed, strict=True):
+        assert (entry["app"], entry["document"]) == ("invoice", one.number)
+        # The page of that invoice, in the business's language.
+        assert one.number in html and '<html lang="es">' in html
+        assert body(moto_s3, fiscal_archive_bucket, entry["key"]) == content
+        assert content.startswith(b"%PDF-")
+        assert (entry["bytes"], entry["sha256"]) == (len(content), hashlib.sha256(content).hexdigest())
+        assert s3.head_object(Bucket=fiscal_archive_bucket, Key=entry["key"])["ContentType"] == "application/pdf"
 
 
 def test_a_record_is_archived_as_it_is_stored_never_rebuilt(business, dumps_bucket, fiscal_archive_bucket, moto_s3):
@@ -145,7 +210,7 @@ def test_each_document_is_locked_by_the_bucket_and_written_once_with_its_checksu
 
     manifest_key, manifest = manifest_of(moto_s3, fiscal_archive_bucket, hub)
     assert [put["Key"] for put in puts][-1] == manifest_key
-    assert len(puts) == len(manifest["files"]) + 1
+    assert len(puts) == len(manifest["files"]) + len(manifest["documents"]) + 1
     for put in puts:
         assert put["ChecksumAlgorithm"] == "SHA256"
         assert put["ChecksumSHA256"] == base64.b64encode(hashlib.sha256(put["Body"]).digest()).decode()
@@ -186,15 +251,19 @@ def test_the_archive_of_one_business_holds_nothing_of_another(business, dumps_bu
     leaving, other = business(left_days_ago=91), business(left_days_ago=None)
     with use_hub(leaving):
         sale(1)
+        own = invoice(1)
     with use_hub(other):
         sale(2)
         sale(3)
+        invoice(1)
+        invoice(2)
 
     run_pass()
 
     _, manifest = manifest_of(moto_s3, fiscal_archive_bucket, leaving)
     rows = archived_rows(moto_s3, fiscal_archive_bucket, manifest)
-    assert {(row["model"], row["pk"]) for row in rows} == database_rows(leaving, ["sale"])
+    assert {(row["model"], row["pk"]) for row in rows} == database_rows(leaving, ["invoice", "sale"])
+    assert [entry["key"].rsplit("/", 1)[-1] for entry in manifest["documents"]] == [f"{own.id}.pdf"]
     assert all(key.startswith(f"{leaving.id.hex}/") for key in objects(moto_s3, fiscal_archive_bucket))
 
 
@@ -298,13 +367,14 @@ def test_an_archive_that_fails_marks_nothing_writes_no_manifest_and_says_why(
     assert any("fiscal_archive_failed" in record.getMessage() for record in caplog.records)
 
 
-@pytest.mark.parametrize("altered_file", [".jsonl", "/manifest.json"], ids=["a-table", "the-manifest"])
+@pytest.mark.parametrize("altered_file", [".jsonl", ".pdf", "/manifest.json"], ids=["a-table", "a-pdf", "the-manifest"])
 def test_a_document_that_does_not_read_back_as_written_marks_nothing(
     business, dumps_bucket, fiscal_archive_bucket, moto_s3, monkeypatch, altered_file
 ):
     hub = business(left_days_ago=91)
     with use_hub(hub):
         one_sale()
+        invoice(1)
     s3, read = client(moto_s3), []
     s3.meta.events.register("provide-client-params.s3.HeadObject", lambda params, **kwargs: read.append(params["Key"]))
 
@@ -325,21 +395,126 @@ def test_a_document_that_does_not_read_back_as_written_marks_nothing(
     assert bool(manifests) == (altered_file == "/manifest.json")
 
 
+def renewals(monkeypatch) -> list:
+    """Each renewal of the worker's lease from now on, by the business it renews."""
+    from base import services
+
+    renewed, renew = [], services.reset.renew_lease
+    monkeypatch.setattr(services.reset, "renew_lease", lambda hub_id, lease: renewed.append(hub_id) or renew(hub_id, lease))
+    return renewed
+
+
 def test_the_lease_is_renewed_after_each_file_of_the_archive(
     business, dumps_bucket, fiscal_archive_bucket, moto_s3, monkeypatch
 ):
-    from base import services
-
     hub = business(left_days_ago=91)
     with use_hub(hub):
         one_sale()
-    renewed, renew = [], services.reset.renew_lease
-    monkeypatch.setattr(services.reset, "renew_lease", lambda hub_id, lease: renewed.append(hub_id) or renew(hub_id, lease))
+        invoice(1)
+    renewed = renewals(monkeypatch)
+    s3, read = client(moto_s3), []
+    s3.meta.events.register("provide-client-params.s3.HeadObject", lambda params, **kwargs: read.append(len(renewed)))
+    monkeypatch.setattr(fiscal_archive, "client", lambda: s3)
 
     run_pass()
 
     _, manifest = manifest_of(moto_s3, fiscal_archive_bucket, hub)
-    assert renewed == [hub.pk] * (len(manifest["files"]) + 1)
+    # After each file and its manifest, and once for the page that lists the folder of the leaving.
+    assert renewed == [hub.pk] * (len(manifest["files"]) + len(manifest["documents"]) + 2)
+    # Each file is read back as soon as it is up, before the lease is renewed for it: never all of them at the end.
+    assert len(read) == len(renewed) - 1
+    assert read == sorted(set(read))
+
+
+def test_the_lease_is_renewed_after_each_page_of_the_pdfs_already_up(
+    business, dumps_bucket, fiscal_archive_bucket, moto_s3, monkeypatch
+):
+    hub = business(left_days_ago=91)
+    with use_hub(hub):
+        invoice(1)
+    monkeypatch.setattr("apps.invoice.pdf.render_pdf", lambda html: b"%PDF-")
+    monkeypatch.setattr(fiscal_archive, "LISTED_AT_ONCE", 1)
+    renewed = renewals(monkeypatch)
+
+    run_pass()
+
+    _, manifest = manifest_of(moto_s3, fiscal_archive_bucket, hub)
+    # Listed one key a page: one page for each table's file already up, besides each file and the manifest.
+    assert len(renewed) == 2 * len(manifest["files"]) + len(manifest["documents"]) + 1
+
+
+def stopped_after_its_first_pdf(hub, endpoint: str, monkeypatch) -> list[str]:
+    """A first attempt at ``hub``'s archive that the worker stops once its first PDF is up; every key it puts, and
+    then those of the attempts after it."""
+    s3, puts, stop = client(endpoint), [], threading.Event()
+
+    def put(params, **kwargs):
+        puts.append(params["Key"])
+        if params["Key"].endswith(".pdf"):
+            stop.set()
+
+    s3.meta.events.register("provide-client-params.s3.PutObject", put)
+    monkeypatch.setattr(fiscal_archive, "client", lambda: s3)
+    # A minute before the attempts after it: each attempt's prefix is its time, to the second.
+    earlier = timezone.now() - dt.timedelta(minutes=1)
+    with monkeypatch.context() as clock:
+        clock.setattr(timezone, "now", lambda: earlier)
+        worker._data(earlier, stop)
+    assert fresh(hub).fiscal_archived_at is None
+    assert [key for key in puts if key.endswith(".pdf")] == [puts[-1]]
+    return puts
+
+
+def test_a_stopped_archive_takes_up_the_pdfs_already_up_and_prints_none_twice(
+    business, dumps_bucket, fiscal_archive_bucket, moto_s3, monkeypatch
+):
+    hub = business(left_days_ago=91)
+    with use_hub(hub):
+        invoice(1)
+        invoice(2)
+    printed = printing(monkeypatch)
+    puts = stopped_after_its_first_pdf(hub, moto_s3, monkeypatch)
+    first = puts[-1]
+    renewed = renewals(monkeypatch)
+
+    run_pass()
+
+    _, manifest = manifest_of(moto_s3, fiscal_archive_bucket, hub)
+    pdfs = [key for key in puts if key.endswith(".pdf")]
+    assert len(pdfs) == len(set(pdfs)) == len(printed) == 2
+    # The lease is renewed after each file of the attempt, also after the PDF it found already up, and once for the
+    # page that lists the folder.
+    assert len(renewed) == len(manifest["files"]) + len(manifest["documents"]) + 2
+    assert [entry["key"] for entry in manifest["documents"]] == pdfs
+    assert manifest["documents"][0]["key"] == first
+    for entry in manifest["documents"]:
+        assert entry["sha256"] == hashlib.sha256(body(moto_s3, fiscal_archive_bucket, entry["key"])).hexdigest()
+    assert fresh(hub).last_error == "fiscal_archived: invoice"
+
+
+def test_a_pdf_of_an_earlier_attempt_kept_without_its_checksum_marks_nothing(
+    business, dumps_bucket, fiscal_archive_bucket, moto_s3, monkeypatch
+):
+    hub = business(left_days_ago=91)
+    with use_hub(hub):
+        invoice(1)
+        invoice(2)
+    first = stopped_after_its_first_pdf(hub, moto_s3, monkeypatch)[-1]
+    s3 = client(moto_s3)
+
+    def without_checksum(http_response, parsed, **kwargs):
+        if http_response.url.endswith(first.rsplit("/", 1)[-1]):
+            parsed.pop("ChecksumSHA256", None)
+
+    s3.meta.events.register("after-call.s3.HeadObject", without_checksum)
+    monkeypatch.setattr(fiscal_archive, "client", lambda: s3)
+
+    run_pass()
+
+    hub = fresh(hub)
+    assert (hub.fiscal_archived_at, hub.last_error.startswith("fiscal_archive_failed: ")) == (None, True)
+    assert first in hub.last_error
+    assert not [key for key in objects(moto_s3, fiscal_archive_bucket) if key.endswith("/manifest.json")]
 
 
 def test_a_failed_archive_is_written_whole_the_next_day(business, dumps_bucket, fiscal_archive_bucket, moto_s3, monkeypatch):

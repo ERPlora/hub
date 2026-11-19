@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:62b03743fdb668f86efa8f5d2d9e6eb8d6b255ced124569aa3d55d2b83a73844 -->
+<!-- generated from WORKBOOK.md sha256:734193012af6989ecd87a714b98b9897e7488ba3c614fd30d5f5a17e8c497cba -->
 
 ## What it is for and who it is for
 
@@ -671,7 +671,7 @@ If it fails: "Could not print the invoice", also if the VeriFactu record of an i
 be read (it is not printed without its QR). If the installed app does not open its print screen, the notice
 says why after a colon ("…: this version of the ERPlora app cannot print; update it", "…: the device's print
 service did not open"…).
-Involved: PRINTING-F08, VERIFACTU-F19
+Involved: PRINTING-F08, VERIFACTU-F19, BASE-F109 (the fiscal archive of a deleted business keeps this A4 as a PDF)
 
 ### INVOICE-F19 Mark an invoice as paid
 Status: done
