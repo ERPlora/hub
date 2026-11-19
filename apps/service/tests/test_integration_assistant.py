@@ -153,6 +153,7 @@ NAMED = {
     "service.category.update": {"id": "category", "parent_id": "parent"},
     "service.grant.adjust": {"id": "grant"},
     "service.grant.create": {"package_id": "package", "customer_id": "customer"},
+    "service.grant.link": {"id": "grant"},
     "service.grant.redeem": {"id": "grant", "service_id": "service", "member_id": "member"},
     "service.grant.void": {"id": "grant"},
     "service.package.delete": {"id": "package"},
@@ -173,6 +174,7 @@ OVER_SESSIONS = ("service.session.return", "service.session.settle")
 #: Services' own read names each by the read of its app, as whoever asks (``service.record.get``, hub#756).
 TILL = {
     "service.grant.create": {"sale_id": "sale", "sale_line_id": "sale_line"},
+    "service.grant.link": {"sale_id": "sale", "sale_line_id": "sale_line"},
     "service.grant.redeem": {"sale_id": "sale", "appointment_id": "appointment"},
     "service.session.hold": {"order_line_id": "check_line"},
     "service.session.return": {"reference": "refund"},
@@ -780,8 +782,8 @@ def test_whoever_may_run_a_write_reads_the_record_its_card_names():
                 if marked is None or not all(mine.has(registry[read].permission) for read in reads):
                     unread.append((role, name, datum))
     # Positive control: the owner and the admin run them all, the manager and the employee what their roles give them
-    # (the four roles that spend a session say who did it): 91, plus the settle's ``customer_id`` beside its ``ids`` for
-    # each of the four, plus the sale, its lines, the appointment and the refund of the five writes of the till: 6 for
-    # the employee, who gives back no session, and 7 for each of the other three (hub#756).
-    assert checked == 91 + 4 + 27
+    # (the four roles that spend a session say who did it): 94, plus the settle's ``customer_id`` beside its ``ids`` for
+    # each of the four, plus the sale, its lines, the appointment and the refund of the six writes of the till: 6 for
+    # the employee, who gives back no session and says no sale later, and 9 for each of the other three (hub#756).
+    assert checked == 94 + 4 + 33
     assert unread == []

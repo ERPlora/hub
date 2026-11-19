@@ -661,3 +661,22 @@ msgstr "Citas no está activa en este negocio."
 msgctxt "service"
 msgid "Void of sale %(number)s"
 msgstr "Anulación de la venta %(number)s"
+
+msgid "That voucher already says the sale that charged it."
+msgstr "Ese bono ya dice la venta que lo cobró."
+
+msgid "That voucher was given away: no sale charged it."
+msgstr "Ese bono se regaló: ninguna venta lo cobró."
+
+msgid "This voucher has expired: extend it with Adjust if sessions are still to be done."
+msgstr "Este bono ha caducado: alárgalo con Ajustar si aún se van a hacer sesiones."
+
+msgid ""
+"This voucher has no sessions left to do: what it cost still counts for "
+"whoever sold it."
+msgstr ""
+"Este bono ya no tiene sesiones por hacer: lo que costó sigue contando para "
+"quien lo vendió."
+
+msgid "Say which sale charged the voucher."
+msgstr "Di qué venta cobró el bono."
