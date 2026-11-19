@@ -29,7 +29,7 @@ from apps.sale.services.orders import _open_order, _out, _pending_line, _touch
             ),
             "es": (
                 "la hamburguesa de la mesa 4 es para un alérgico al gluten",
-                "marca en el postre una alergia a la leche y al huevo",
+                "el cliente del postre tiene alergia a la leche y al huevo",
                 "desmarca la alergia de la ensalada, que era un error",
             ),
         },
