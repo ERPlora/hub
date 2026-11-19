@@ -72,7 +72,28 @@ def _assistant_words(content) -> str:
     if isinstance(content, str):
         return content
     parts = content if isinstance(content, list) else []
-    return "\n".join(str(part.get("text", "")) for part in parts if isinstance(part, dict) and part.get("type") == "text")
+    texts = (part.get("text", "") for part in parts if isinstance(part, dict) and part.get("type") == "text")
+    return "\n".join(str(text) for text in texts)
+
+
+def _assistant_asked(messages: list[dict]) -> list[str]:
+    """What the person wrote, message by message. A file alone says nothing: the words written before it still count."""
+    said = (_assistant_words(m.get("content")) for m in messages if m.get("role") == "user")
+    return [words for words in said if words]
+
+
+def _assistant_ran(ctx: OperationContext, tools: dict, call, outcome: "shared.ToolOutcome") -> dict:
+    """What ran, or was refused, by its name: a write this person was not offered is named too. Named as its card
+    names it: an app by its name, the platform by its screen."""
+    op = shared.operation_of(call.name, tools) or shared.named(call.name)
+    if op is None:
+        named = {"name": call.name, "app": "", "app_name": "", "screen": "", "kind": ""}
+    else:
+        with translation.override(ctx.language):
+            app_name = assistant.cards.app_name(op)
+        screen = assistant.cards.screen(op)
+        named = {"name": op.name, "app": op.app_label, "app_name": app_name, "screen": screen, "kind": op.kind}
+    return {"call_id": call.call_id, **named, "outcome": outcome.outcome, "code": outcome.code}
 
 
 def _assistant_refusal(outcome: str, code: str, message: str) -> "shared.ToolOutcome":
@@ -179,28 +200,11 @@ def assistant_turn(ctx: OperationContext, data: AssistantTurnIn) -> dict:
         if decision is not None and decision.call_id == call.call_id:
             stopped = decision.stop
             decision = None
-        # What ran, or was refused, by its name: a write this person was not offered is named too.
-        op = shared.operation_of(call.name, tools) or shared.named(call.name)
         append.append({"role": "tool", "tool_call_id": call.call_id, "content": outcome.content})
-        with translation.override(ctx.language):
-            # Named as its card names it: an app by its name, the platform by its screen.
-            app_name = assistant.cards.app_name(op) if op else ""
-        executed.append(
-            {
-                "call_id": call.call_id,
-                "name": op.name if op else call.name,
-                "app": op.app_label if op else "",
-                "app_name": app_name,
-                "screen": assistant.cards.screen(op) if op else "",
-                "kind": op.kind if op else "",
-                "outcome": outcome.outcome,
-                "code": outcome.code,
-            }
-        )
+        executed.append(_assistant_ran(ctx, tools, call, outcome))
         pending.pop(0)
     messages = [*data.messages, *append]
-    # A file alone says nothing: the words the person wrote before it still count.
-    asked = [words for m in data.messages if m.get("role") == "user" and (words := _assistant_words(m.get("content")))]
+    asked = _assistant_asked(data.messages)
     business = _assistant_read(ctx, "base.business.get") or {}
     if card is not None:
         # The card paints an amount (its schema's ``money`` mark) in the business's currency, with its decimals.
