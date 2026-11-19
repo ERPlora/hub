@@ -112,7 +112,7 @@ def test_only_a_run_stopped_by_an_error_resumes_and_only_once(clock):
     with pytest.raises(Conflict) as again:
         run("flow.run.retry", {"id": str(failed.id)})
     assert again.value.code == "flow.run_not_resumable"
-    assert again.value.message == str(queries.RUN_NOT_RESUMABLE)
+    assert again.value.message == str(queries.runs.RUN_NOT_RESUMABLE)
     assert notes() == 1
 
 
@@ -148,7 +148,7 @@ def test_a_run_stopped_before_any_step_does_not_resume(clock):
     with pytest.raises(Conflict) as refused:
         run("flow.run.retry", {"id": str(stopped.id)})
     assert refused.value.code == "flow.run_not_resumable"
-    assert refused.value.message == str(queries.BEFORE_ANY_STEP)
+    assert refused.value.message == str(queries.runs.BEFORE_ANY_STEP)
 
 
 def test_a_run_that_lost_what_its_steps_left_does_not_resume(clock):

@@ -4157,7 +4157,11 @@ Implicados: BASE-F92, BASE-F93
   `frontend/main.ts`). El registro es `base.models.Approval` (`base.approval.list`).
 - Documentación de la API: `base/api_docs.py` recorta el OpenAPI de ninja a las rutas `expose_api` de las apps que
   tiene el negocio, con la llave como `bearer` y solo los esquemas que usan (`base.api_doc.get`, pedido una vez y no
-  en vivo: con todas las apps pasa de 1 MB, más que el tope de un resultado vivo); el ajuste es
+  en vivo: con todas las apps pasa de 1 MB, más que el tope de un resultado vivo). Cada esquema llega al documento
+  con el nombre de la app dueña delante (`table.SettingsOut`, `base.DeviceOut`; un paquete ajeno, con el suyo:
+  `pydantic.JsonValue`), puesto en un solo sitio, `config/openapi.py`: así dos apps con un esquema del mismo nombre
+  no se pisan y cada ruta enseña el suyo; `tests/test_guardrails_openapi_schema_names.py` cae si dos clases acaban
+  con el mismo nombre o un nombre llega con dos cuerpos distintos. El ajuste es
   `base.models.ApiSettings` (`base.api_doc.settings`, `base.api_doc.settings_update`). Sin Swagger UI: producción
   aplica Trusted Types; la página propia la lee y la descarga. La entrada «API» del menú lateral sale con el ajuste
   (`useApiDocsShown` de `base/frontend/lib/sidebar.ts`, que se suscribe a `base.api_doc.settings` solo con sesión).

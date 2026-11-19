@@ -56,7 +56,7 @@ def test_a_business_registered_without_a_name_is_named_by_nobody(salon):
 def test_the_page_tells_nothing_more_of_the_business_than_whose_it_is(salon):
     named(A, "Salón Lucía")
     assert set(public("page").model_dump()) == PAGE_FIELDS | OWNER_FIELDS
-    documented = api.get_openapi_schema()["components"]["schemas"]["PageOut"]["properties"]
+    documented = api.get_openapi_schema()["components"]["schemas"]["online_booking.PageOut"]["properties"]
     assert set(documented) == PAGE_FIELDS | OWNER_FIELDS
 
 
@@ -99,7 +99,7 @@ def test_a_filled_trap_field_books_nothing_and_never_says_why(client, anytime):
 def test_the_trap_field_is_no_part_of_the_documented_input():
     assert "website" in PublicBookIn.model_fields
     assert "website" not in PublicBookIn.model_json_schema()["properties"]
-    documented = api.get_openapi_schema()["components"]["schemas"]["PublicBookIn"]["properties"]
+    documented = api.get_openapi_schema()["components"]["schemas"]["online_booking.PublicBookIn"]["properties"]
     assert "website" not in documented and {"service_ids", "start", "name", "phone"} <= set(documented)
 
 

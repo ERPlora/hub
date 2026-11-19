@@ -12,7 +12,9 @@ from live.context import OperationContext
 from live.operations import operation
 
 from apps.flow.models import Flow, FlowRun, Question
-from apps.flow.queries import RESUME_DAYS, SYSTEM, resume_problem, say
+from apps.flow.queries.reads import SYSTEM
+from apps.flow.queries.reasons import say
+from apps.flow.queries.runs import RESUME_DAYS, resume_problem
 from apps.flow.schemas import ChangedOut, CustomerErasedIn, DueIn, DueOut
 
 from .engine import _finish, _own, _remember_read

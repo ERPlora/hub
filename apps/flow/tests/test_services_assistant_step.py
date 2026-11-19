@@ -352,7 +352,7 @@ def test_a_yes_to_a_change_whose_action_no_longer_exists_says_so_with_no_technic
 def test_an_action_with_no_words_of_its_own_is_named_by_its_verb_app_and_thing(language, label):
     # What the History says of it (``actionLabel`` of frontend/lib/phrasing.ts), never its id.
     with translation.override(language):
-        said = queries.say({"key": queries.ASSISTANT_GONE_KEY, "values": {"operation": "customer.tag.delete"}})
+        said = queries.reasons.say({"key": queries.reasons.ASSISTANT_GONE_KEY, "values": {"operation": "customer.tag.delete"}})
     assert label in said and "customer.tag.delete" not in said
 
 
