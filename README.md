@@ -291,9 +291,9 @@ de una app que su plantilla no traía (una portada después) se crean **la prime
   corren. **Apagar** nunca borra tablas; apagada mientras se crean, queda `off` con ellas hechas. Un blueprint que
   enciende una app que aún se prepara no carga sus datos y su informe dice que se vuelva a cargar en un minuto
   («Reintentar» del informe trae lo que faltó).
-- Desde S5 ningún negocio sin BD propia se sirve; solo el respaldo de la suite tiene alguno, y allí enciende al
-  momento (propuesta (i) de la ronda 2026-10-30). `seed_local_hubs` da a `a` y `b` las tablas de todas las apps y todas
-  encendidas (`provision(apps=…)`).
+- Un negocio sin BD propia no se sirve (su dirección responde 503 `base.hub_maintenance`), así que en él no se
+  enciende ninguna app. `seed_local_hubs` da a `a` y `b` las tablas de todas las apps y todas encendidas
+  (`provision(apps=…)`).
 
 
 ### Copias de los datos y uso nocturno (tajada S2b)
@@ -308,7 +308,7 @@ PLAN-DB, ronda 2026-10-30: decisión 2 y propuestas (a), (f), (j), (k), (l), (m)
   nada y deja `failed` con su motivo (`dumps_unavailable`, `dump_failed`, `emptying_failed`, `hub_not_ready`), y la
   pantalla ofrece «Volver a intentarlo». Cada paso llega en vivo (`base.hub.reset_progressed`, aviso tras el COMMIT en
   control) a `base.hub.dumps`. Sin bucket, 503 `base.dumps_unavailable`; con otro en marcha, 409
-  `base.reset_in_progress`; sin BD propia, 409 `base.reset_shared_database` como antes.
+  `base.reset_in_progress`.
 - **La baja**: `base.hub.cancel` de un negocio con su BD propia terminada lo deja debido y el worker lo copia una vez
   (`offboarding`); si falla, reintenta a 1 min, 5 min, 15 min y luego cada hora (`attempts`, `last_error`,
   `next_attempt_at`). La BD se conserva 90 días; pasados, el worker hace su copia final y la borra
@@ -323,7 +323,7 @@ PLAN-DB, ronda 2026-10-30: decisión 2 y propuestas (a), (f), (j), (k), (l), (m)
   apunta boto3 a otro S3 (los tests: el servidor de moto, `base/tenancy/tests/s3.py`); sin `HUB_DUMPS_BUCKET` no hay
   copias y el restablecimiento responde 503.
 - **Ajustes › Datos › Restablecer › «Copias»** (`base.hub.dumps`, vivo; `base.hub.dump_link` en cada «Descargar»):
-  las copias del negocio y su último restablecimiento; nada en un negocio que aún comparte BD.
+  las copias del negocio y su último restablecimiento.
 - **Uso nocturno** (`base/usage.py`, pase `_usage` del worker): a las 00:15 UTC mide el día que acabó (antes de que
   el SaaS lo pida a las 01:15 y fuera de la copia de Aurora de 02:00–03:00) para cada negocio con BD propia:
   `pg_database_size` desde el catálogo de su cluster (conexión de mantenimiento del migrador, sin abrir la BD del

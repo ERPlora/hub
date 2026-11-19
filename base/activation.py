@@ -407,8 +407,8 @@ def has_tables(hub: Any, label: str) -> bool:
 
 def _created_apps(hub: Any) -> frozenset[str] | None:
     """What control says now of ``hub``'s database, from the cache when it has it, else from its row (kept); ``None`` when
-    it says nothing: no row, no database of its own or a row never confirmed. A cache that does not answer is logged and
-    the row is read: never a guess."""
+    it says nothing: no row or a row never confirmed. A cache that does not answer is logged and the row is read: never
+    a guess."""
     key = CREATED_APPS_CACHE + hub.slug
     try:
         kept = cache.get(key)
@@ -424,8 +424,6 @@ def _created_apps(hub: Any) -> frozenset[str] | None:
     if row is None or CONFIRMED_BY not in (row.schema_apps or ()):
         return None
     created = services.apps.apps_created(row)
-    if created is None:
-        return None
     try:
         cache.set(key, sorted(created), OFF_APPS_TTL)
     except Exception:

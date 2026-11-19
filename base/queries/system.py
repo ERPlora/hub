@@ -11,7 +11,7 @@ from live.models import OutboxEvent
 from live.operations import AI, operation
 
 from base import system
-from base.models import EventDelivery, Hub
+from base.models import EventDelivery
 from base.permissions import ADMINISTER_HUB
 from base.relay import active_apps
 from base.schemas.failed_events import FailedEventIn, FailedEventListIn, FailedEventListOut, FailedEventOut
@@ -37,8 +37,7 @@ FAILED_EVENT_ERROR_LENGTH = 300
     ai=AI(
         description=(
             "Reads the status of this hub's system: the version of ERPlora it runs and when that version was published "
-            "(the hub updates itself, nobody installs anything), and whether its data is on the database every "
-            "business shares or on its own."
+            "(the hub updates itself, nobody installs anything)."
         ),
         asks={
             "en": ("which ERPlora version are we on?", "is the system up to date?"),
@@ -47,14 +46,8 @@ FAILED_EVENT_ERROR_LENGTH = 300
     ),
 )
 def system_status(ctx: OperationContext, data: SystemStatusIn) -> dict:
-    """The release (``base.system``: the commit, short) and its date, never made up, and where the business's data
-    lives (``Hub.db_name`` empty: a database shared with other businesses)."""
-    hub = Hub.objects.filter(slug=ctx.scope.key).first()
-    return {
-        "version": system.version(settings.APP_VERSION),
-        "released_at": system.released_at(settings.APP_RELEASED_AT),
-        "shared_database": not (hub is not None and hub.db_name),
-    }
+    """The release (``base.system``: the commit, short) and its date, never made up."""
+    return {"version": system.version(settings.APP_VERSION), "released_at": system.released_at(settings.APP_RELEASED_AT)}
 
 
 @operation(

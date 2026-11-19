@@ -402,14 +402,14 @@ def test_the_hub_says_the_size_of_its_database_last_measured(hub_a):
 
     database = plan_usage(hub_a).database
 
-    assert (database.available, database.bytes, database.day) == (True, 2048, DAY)
+    assert (database.bytes, database.day) == (2048, DAY)
 
 
 @HUB_DB
 def test_a_hub_with_its_own_database_not_measured_yet_says_so(hub_a):
     database = plan_usage(hub_a).database
 
-    assert (database.available, database.bytes, database.day) == (True, None, None)
+    assert (database.bytes, database.day) == (None, None)
 
 
 @HUB_DB
@@ -419,4 +419,4 @@ def test_a_hub_never_shows_the_size_measured_for_another(hub_a, hub_b):
 
     database = plan_usage(hub_a).database
 
-    assert (database.available, database.bytes, database.day) == (True, 10, DAY - dt.timedelta(days=1))
+    assert (database.bytes, database.day) == (10, DAY - dt.timedelta(days=1))

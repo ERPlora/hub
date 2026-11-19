@@ -1,3 +1,4 @@
+import { InlineFeedback } from '@erplora/ui/components';
 import { AppPage } from '@erplora/ui/shell';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -13,7 +14,7 @@ const DOCUMENT = {
   paths: { '/api/tax/categories': { get: { ...TAX_CATEGORY_LIST, responses: {} } } },
   components: { securitySchemes: { ApiKey: { type: 'http', scheme: 'bearer' } } },
 };
-const ANSWER = { document: DOCUMENT, apps: [{ id: 'tax', name: 'Taxes', read: true, write: false }], keys_available: true };
+const ANSWER = { document: DOCUMENT, apps: [{ id: 'tax', name: 'Taxes', read: true, write: false }] };
 
 const SHOWN = { docs_enabled: true, can_change: true };
 const HIDDEN = { docs_enabled: false, can_change: true };
@@ -53,12 +54,7 @@ describe('ApiDocsPage', () => {
     expect(route.text()).toContain('/api/tax/categories');
     expect(route.text()).toContain('Lists the tax categories.');
     expect(route.text()).toContain('limit');
-    expect(m.wrapper.find('[data-testid="api-docs-keys-soon"]').exists()).toBe(false);
-  });
-
-  it('says when this business cannot make keys yet', async () => {
-    const m = await open(Response.json({ ...ANSWER, keys_available: false }));
-    expect(m.wrapper.get('[data-testid="api-docs-keys-soon"]').text()).toContain('API keys are not available yet for this business');
+    expect(m.wrapper.findComponent(InlineFeedback).exists()).toBe(false);
   });
 
   it('«Download the OpenAPI file» saves the document', async () => {

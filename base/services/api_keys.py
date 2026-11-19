@@ -10,12 +10,12 @@ from django.http import HttpRequest
 from django.utils import timezone
 from django.utils.translation import gettext
 from live.context import OperationContext
-from live.errors import Conflict, InvalidPayload, NotFound, OperationError, PermissionDenied, Unauthorized
+from live.errors import Conflict, InvalidPayload, NotFound, OperationError, PermissionDenied
 from live.operations import AI, atomic, operation
 from live.outbox import record_event
 
 from base import api_keys, events, queries
-from base.models import ApiKey, ApiSettings, Hub
+from base.models import ApiKey, ApiSettings
 from base.permissions import ADMINISTER_HUB
 from base.schemas.api_keys import (
     ApiDocSettingsIn,
@@ -27,17 +27,7 @@ from base.schemas.api_keys import (
     ApiKeyTokenOut,
 )
 from base.services.devices import _actor_label, too_many_message
-from base.services.reset import has_own_database
 from base.throttle import client_key
-
-
-def _api_keys_available(ctx: OperationContext) -> None:
-    """A key lives in its hub's own database; while the business shares its database with others, a key of it would open
-    theirs too: none is made yet («not available yet», never the infrastructure's words)."""
-    if not has_own_database(Hub.objects.filter(slug=ctx.scope.key).first()):
-        raise Conflict(
-            gettext("API keys are not available yet for this business."), code="base.api_keys_unavailable"
-        )
 
 
 def _checked_scopes(ctx: OperationContext, data: ApiKeyCreateIn) -> dict:
@@ -78,7 +68,6 @@ def _new_token_for(key: ApiKey) -> str:
 )
 def api_key_create(ctx: OperationContext, data: ApiKeyCreateIn) -> dict:
     """«New API key»: its token once; the hub keeps its digest and its first characters."""
-    _api_keys_available(ctx)
     name = " ".join(data.name.split())
     if not name:
         message = gettext("Give the key a name.")
@@ -120,7 +109,6 @@ def _live_key(key_id: UUID) -> ApiKey:
 )
 def api_key_rotate(ctx: OperationContext, data: ApiKeyIdIn) -> dict:
     """«Rotate»: a new token, shown once; the old one stops at once (its digest is gone)."""
-    _api_keys_available(ctx)
     key = _live_key(data.id)
     token = _new_token_for(key)
     key.rotated_at = timezone.now()
@@ -157,7 +145,6 @@ def api_key_rotate(ctx: OperationContext, data: ApiKeyIdIn) -> dict:
 )
 def api_key_revoke(ctx: OperationContext, data: ApiKeyIdIn) -> dict:
     """«Revoke»: at once and for good; the key is kept, for the record."""
-    _api_keys_available(ctx)
     key = _live_key(data.id)
     key.revoked_at, key.revoked_by = timezone.now(), _actor_label(ctx)
     key.save(update_fields=["revoked_at", "revoked_by"])
@@ -172,17 +159,12 @@ API_KEY_LAST_USE_EVERY = dt.timedelta(minutes=1)
 def authenticate_api_key(request: HttpRequest, token: str, op) -> "api_keys.KeyCaller | None":
     """The caller of ``token`` on the published operation ``op``, in the request's hub (``base.api_keys.KeyDoor``).
 
-    401 ``base.api_keys_unavailable`` on a business that shares its database, where no key exists: a request
-    that brings one is refused for that reason, never let through by a session. ``None`` (the
-    session's door goes on) without a hub, or for a token nobody issued here (counted against the address); 429 once
-    the address tried too many, or the key passed its pace; 403 when the key may not do this on this app."""
+    ``None`` (the session's door goes on) without a hub, or for a token nobody issued here (counted against the
+    address); 429 once the address tried too many, or the key passed its pace; 403 when the key may not do this on this
+    app."""
     hub = getattr(request, "hub", None)
     if hub is None:
         return None
-    if not has_own_database(hub):
-        raise Unauthorized(
-            gettext("API keys are not available yet for this business."), code="base.api_keys_unavailable"
-        )
     address = client_key(request)
     wait = api_keys.KEY_ADDRESS_LIMIT.wait(hub.slug, address)
     if wait:

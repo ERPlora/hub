@@ -42,7 +42,6 @@ class ApiAppOut(Schema):
 
 
 class ApiKeyListOut(Schema):
-    available: bool = Field(description="False while the business shares its database with others: no key yet.")
     keys: list[ApiKeyOut]
     apps: list[ApiAppOut]
 
@@ -80,7 +79,6 @@ class ApiDocIn(Schema):
 class ApiDocOut(Schema):
     document: dict = Field(description="The OpenAPI document of what this business's apps publish.")
     apps: list[ApiAppOut] = Field(description="The apps in it (its tags), by name.")
-    keys_available: bool = Field(description="Whether this business can make API keys yet.")
 
 
 class ApiDocSettingsIn(Schema):

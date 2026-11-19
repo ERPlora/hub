@@ -1,11 +1,9 @@
 // Settings › Data › Reset: only for who administers the hub. «Undo an import»: one row per
 // import that can be undone, confirmed without typing, then what was removed per app; a refusal shows in the dialog
-// (the old screen said nothing). «Reset the business»: the plan per section, what never goes, and — when
-// the business has its own database — the sections ticked and, after typing its name, asked: the worker copies the
-// business's data first and only then empties them, and the live
-// `base.hub.dumps` tells each step (copying, emptying, done with what went, or failed with nothing emptied and «Try
-// again»), with the copies below (DumpsCard); on a shared database the screen says why it cannot instead of
-// offering the red button.
+// (the old screen said nothing). «Reset the business»: the plan per section, what never goes, and the sections ticked
+// and, after typing its name, asked: the worker copies the business's data first and only then empties them, and the
+// live `base.hub.dumps` tells each step (copying, emptying, done with what went, or failed with nothing emptied and
+// «Try again»), with the copies below (DumpsCard).
 import { ConfirmDialog } from '@erplora/ui/components';
 import { afterEach, describe, expect, it } from 'vitest';
 
@@ -21,7 +19,6 @@ afterEach(() => {
 const PLAN: HubReset = {
   dry_run: true,
   confirm_with: 'Bar Pepe',
-  available: true,
   sections: [
     { id: 'inventory', label: 'Inventory', rows: 14, datasets: [{ key: 'inventory.product', label: 'Products', rows: 12 }, { key: 'inventory.category', label: 'Categories', rows: 2 }] },
     { id: 'table', label: 'Tables', rows: 1, datasets: [{ key: 'table.table', label: 'Tables', rows: 1 }] },
@@ -30,7 +27,7 @@ const PLAN: HubReset = {
   status: 'planned',
 };
 
-const NO_DUMPS: HubDumps = { available: true, reset: null, dumps: [] };
+const NO_DUMPS: HubDumps = { reset: null, dumps: [] };
 
 const progress = (fields: Partial<ResetProgress>): HubDumps => ({
   ...NO_DUMPS,
@@ -258,16 +255,6 @@ describe('ResetPanel', () => {
     await settle();
     expect(confirm.props('open')).toBe(true);
     expect(confirm.props('error')).toMatchObject({ message: 'The name does not match.' });
-  });
-
-  it('in a business that shares its database, says the reset is not available yet (never the infrastructure) and offers no red button', async () => {
-    const m = await panel(plan({ available: false }));
-    expect(m.wrapper.get('[data-testid="reset-shared"]').text()).toContain('Resetting the business is not available yet');
-    expect(m.wrapper.find('[data-testid="reset-submit"]').exists()).toBe(false);
-    expect(m.wrapper.find('[data-testid="reset-section-inventory"]').exists()).toBe(false);
-    expect(m.wrapper.find('[data-testid="reset-copy-first"]').exists()).toBe(false);
-    // What each section has is still told.
-    expect(m.wrapper.findAll('[data-testid="reset-section"]')).toHaveLength(2);
   });
 
   it('says when there is nothing to reset, and when the plan could not be worked out (and retries)', async () => {

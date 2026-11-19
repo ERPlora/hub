@@ -98,7 +98,7 @@ def plan_usage(ctx: OperationContext, data: PlanUsageIn) -> dict:
             "used": activation.chosen_on(activation.states_of(ctx.scope), among=shown),
             "limit": app_limit(hub) if known else None,
         },
-        "database": _database_usage(hub, last),
+        "database": _database_usage(last),
         "files": _files_usage(state, known, last),
         "connections": _connections_usage(hub, known, counted),
         "requests": {"this_month": counted.requests_this_month, "since": counted.requests_since},
@@ -120,18 +120,15 @@ def _plan_slug(plan: dict) -> str | None:
 
 
 def _last_night(hub: Hub | None) -> HubUsageDaily | None:
-    """What the last night measured of a hub with its own database (``base.usage``)."""
-    if hub is None or not hub.db_name:
+    """What the last night measured of the hub (``base.usage``)."""
+    if hub is None:
         return None
     return HubUsageDaily.objects.filter(hub=hub).order_by("-day").first()
 
 
-def _database_usage(hub: Hub | None, last: HubUsageDaily | None) -> dict:
-    """The size of the business's own database the last night measured (``base.usage``); none while it shares
-    control's, whose size is never shown."""
-    if hub is None or not hub.db_name:
-        return {"available": False, "bytes": None, "day": None}
-    return {"available": True, "bytes": last.db_bytes if last else None, "day": last.day if last else None}
+def _database_usage(last: HubUsageDaily | None) -> dict:
+    """The size of the business's own database the last night measured (``base.usage``)."""
+    return {"bytes": last.db_bytes if last else None, "day": last.day if last else None}
 
 
 def _is_near(used: int, limit: int) -> bool:
@@ -227,8 +224,8 @@ def _activity_usage(hub: Hub | None, demo: bool, last: HubUsageDaily | None, cou
 
 def _apps_meters(ctx: OperationContext, hub: Hub | None, modules: Iterable[Any]) -> list[dict]:
     """What the apps on say their plan includes (``base.home.plan_meters``), read in the business's own database: none in
-    a demo, which is not measured, or without one."""
-    return [] if hub is None or hub.is_demo or not hub.db_name else home.plan_meters(ctx, modules)
+    a demo, which is not measured."""
+    return [] if hub is None or hub.is_demo else home.plan_meters(ctx, modules)
 
 
 def _plan_motives(ctx: OperationContext, hub: Hub | None, modules: Iterable[Any]) -> int:

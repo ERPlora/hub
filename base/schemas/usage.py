@@ -22,9 +22,6 @@ class LimitOut(Schema):
 class DatabaseUsageOut(Schema):
     """The size of the business's own database, as the last night measured it."""
 
-    available: bool = Field(
-        description="False while the business shares its database with others: it has no size of its own yet."
-    )
     bytes: int | None = Field(description="Its size in bytes; None before the first night measured it.")
     day: dt.date | None = Field(description="The day (UTC) it was measured; None before the first night.")
 
