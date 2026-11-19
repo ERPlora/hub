@@ -1379,7 +1379,7 @@ Los avisos llevan ids, nunca nombres ni contenidos.
   `fixed_by_app`, `fixed_data`) se lee de todas las apps instaladas, encendidas o no (`recipes.declarations()`
   sin negocio): una ejecución en curso que se reanuda con herramientas de otra app encendida nunca pierde lo que
   su app fijó (hub#447). El motor programado corre en el negocio de cada hub: el worker pasa
-  `Scope("host", <slug>)` a `scheduler.run_due` (`base.worker._serve_hub`).
+  `Scope("host", <slug>)` a `scheduler.run_due` (`base.hub_visits`).
 - **La excepción «Que me lo pregunte»**:
   `queries.catalog.ASK_FIRST` (`reservation.reservation.cancel` y `appointment.appointment.cancel`, hub#634; nunca lo
   que se hace en persona, `asks_first`)
@@ -1603,7 +1603,7 @@ Los avisos llevan ids, nunca nombres ni contenidos.
   real (`tests/test_relay.py`: una pasada del worker entrega el aviso de Clientes, la segunda no repite nada, y
   un aviso del negocio B arranca su ejecución en B y solo B lo oye).
 - **Dónde corre** (hub#602): el worker (`run_worker`) entra en cada negocio que sirve,
-  en su BD y en su propio ámbito (`base.worker._serve_hub`: `use_hub` y `Scope("host", slug)`), y allí corre cada minuto
+  en su BD y en su propio ámbito (`base.hub_visits`: `use_hub` y `Scope("host", slug)`), y allí corre cada minuto
   las dos tareas programadas (`fire_due`, `resume_due`) como el sistema: solo ve las automatizaciones de ese negocio
   (FLOW-F22 y F23). `WORKER_SCOPE_SLUG` solo queda para `base.scheduler.run_due` sin ámbito, el de los tests que
   llaman a una tarea directamente; una operación con el ámbito de otro negocio dentro de `use_hub` se rechaza (`HubContextMismatch`). El worker

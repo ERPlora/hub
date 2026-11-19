@@ -61,7 +61,7 @@ INTERVAL_SECONDS = 60.0
 HUBS_PASS_SECONDS = 20.0
 #: The region when the task does not say it: the platform's.
 DEFAULT_REGION = "eu-west-1"
-#: The ``Scope`` kind of a business's hub (``base.worker._serve_hub``).
+#: The ``Scope`` kind of a business's hub (``base.hub_visits``).
 HUB_SCOPE_KIND = "host"
 
 

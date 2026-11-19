@@ -569,8 +569,8 @@ def test_a_sign_up_while_frozen_waits_and_is_made_on_the_worker_s_first_tick_aft
 
     platform = system_context(REGISTRY_SCOPE)
     monkeypatch.setattr(catalog, "register_apps", lambda: RegisterResult(0, 0, 0, True))
-    for name in ("_relay", "_hubs", "_activations", "_reap"):
-        monkeypatch.setattr(worker, name, lambda now: None)
+    for target, name in ((worker, "_relay"), (worker.hub_visits.HubVisits, "serve"), (worker, "_activations"), (worker, "_reap")):
+        monkeypatch.setattr(target, name, lambda *_: None)
     hub = registry.hub()
     HubDue.mark_due(hub)
     with use_control():

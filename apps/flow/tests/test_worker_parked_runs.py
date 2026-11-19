@@ -4,7 +4,7 @@
 «Ask the assistant» and «Call another system» park their run with its wait already over (``resume_at`` = now): nobody
 holds it yet. Two ways reach it: the outbox relay (``flow.run.parked`` → ``flow.run.call``) and the minute's sweep
 (``flow.run.resume_due``), which is also what sends again a step whose process died. Here they go as production does:
-``base.worker._hubs``, each business in its own database and on its own scope, never the worker's fixed one
+``base.hub_visits``, each business in its own database and on its own scope, never the worker's fixed one
 (``WORKER_SCOPE_SLUG``), so what the customer gets never depends on the minute a tick lands on. Neither way gives two
 turns or two calls: the claim of the step holds it for one.
 
@@ -19,7 +19,6 @@ import time
 import pytest
 from django.conf import settings
 from django.utils import timezone
-from live import operations as live_operations
 from live.context import Scope, system_context
 from live.models import OutboxEvent
 
@@ -29,7 +28,7 @@ from apps.flow.models import Flow, FlowRun
 from apps.task.models import Task
 from apps.whatsapp_inbox.models import Message
 from apps.whatsapp_inbox.tests.conftest import inbound, system
-from base import outbound, worker
+from base import hub_visits, outbound
 from base.tenancy.context import use_control, use_hub
 from base.tenancy.tests import hubs
 from base.tests.fake_gateway import gateway  # noqa: F401 - the fixture
@@ -53,43 +52,27 @@ THREAD_WAIT_SECONDS = 10
 
 
 @pytest.fixture(autouse=True)
-def a_worker_just_started(monkeypatch):
-    """Nothing scheduled yet in this process, a pass that serves every hub however slow the machine, no retry pauses."""
-    monkeypatch.setattr(worker, "_synced", set())
-    monkeypatch.setattr(worker, "_next_hub", None)
-    monkeypatch.setattr(worker, "HUB_PASS_SECONDS", 3600)
+def every_hub_in_one_pass(monkeypatch):
+    """A pass that serves every hub however slow the machine, no retry pauses."""
+    monkeypatch.setattr(hub_visits, "HUB_PASS_SECONDS", 3600)
     monkeypatch.setattr(flow_gateway, "PAUSES", (0, 0))
 
 
 @pytest.fixture
-def tick(hub_a, hub_b):
+def tick(hub_a, hub_b, worker_visits):
     """``tick()``: one real pass of the worker over the hubs, past the minute of the last one, so ``flow.resume_due`` is
-    due in it. The first pass, here, writes each hub's schedule (each task due at its next time)."""
+    due in it. The first pass, here, writes each hub's schedule (each task due at its next time), as a process that
+    just started."""
     start = timezone.now()
     with use_control():
-        worker._hubs(start)
+        worker_visits.serve(start)
     minutes = itertools.count(2, 2)
 
     def one() -> None:
         with use_control():
-            worker._hubs(start + dt.timedelta(minutes=next(minutes)))
+            worker_visits.serve(start + dt.timedelta(minutes=next(minutes)))
 
     return one
-
-
-@pytest.fixture
-def told(monkeypatch):
-    """Every live notice sent after a COMMIT: ``(scope key, event names)``."""
-    sent: list[tuple[str, list[str]]] = []
-    real = live_operations.notify_hook
-
-    def hook(scope, names):
-        sent.append((scope.key, list(names)))
-        if real is not None:
-            real(scope, names)
-
-    monkeypatch.setattr(live_operations, "notify_hook", hook)
-    return sent
 
 
 class HeldJobs:
