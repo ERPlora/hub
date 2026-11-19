@@ -685,3 +685,25 @@ msgstr "PLATO ANULADO · %(label)s"
 #, python-format
 msgid "CANCELLED · %(label)s"
 msgstr "ANULADA · %(label)s"
+
+#: allergy.py:14
+msgid "!! ALLERGY !!"
+msgstr "!! ALERGIA !!"
+
+#: allergy.py:15
+#, python-format
+msgid "*** ALLERGY: %(names)s ***"
+msgstr "*** ALERGIA: %(names)s ***"
+
+#: allergy.py:16
+#, python-format
+msgid "*** CONTAINS: %(names)s ***"
+msgstr "*** LLEVA: %(names)s ***"
+
+#: models.py:410
+msgid "customer's allergy"
+msgstr "alergia del cliente"
+
+#: models.py:411
+msgid "allergy in the dish"
+msgstr "alergia en el plato"

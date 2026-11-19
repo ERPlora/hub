@@ -1395,7 +1395,8 @@ Implicados: INVENTORY-F27, INVENTORY-F35, SALE-F11, SALE-F12, SALE-F41, KITCHEN-
 ### SALE-F41 Marcar la alergia del cliente en una línea
 Estado: parcial — la línea guarda la alergia del cliente, la cuenta en vivo dice cuáles de esos alérgenos lleva el
 plato y la comanda enviada la lleva, también por el asistente y la API; la hoja del TPV todavía no tiene el bloque
-«Alergia del cliente» ni la línea la enseña (hub#1738), y Cocina todavía no la resalta (KITCHEN-F32)
+«Alergia del cliente» ni la línea la enseña (hub#1738), y en Cocina la imprime el papel pero la tarjeta todavía no
+la resalta (KITCHEN-F32)
 Vertical: restaurante
 Actor: empleado, responsable
 Pantalla: Vender
@@ -2054,4 +2055,4 @@ título, sus pasos y «Si falla»: ahí no van nombres de código, incidencias, 
   anota en Caja como «Entrada» (CASH_REGISTER-F05).
 - **Los alérgenos del plato y la alergia del cliente** (F40 y F41 `parcial`): la línea ya guarda los alérgenos de
   su producto y la alergia del cliente, y la comanda enviada los lleva; la línea y las hojas los enseñan por
-  hub#1738; Cocina los resalta en KITCHEN-F32 (hub#1737). Mientras, una alergia va en la nota. Los alérgenos de un suplemento («+Queso» lleva leche) no entran: hub#1739.
+  hub#1738; Cocina los guarda en cada plato y los imprime bajo él, y su tarjeta los resaltará por hub#1738 (KITCHEN-F32). Los alérgenos de un suplemento («+Queso» lleva leche) no entran: hub#1739.

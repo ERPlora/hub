@@ -50,10 +50,10 @@
 1031 apps/invoice/schemas/__init__.py ERPlora/erplora-next#74
 1756 apps/invoice/services.py ERPlora/erplora-next#74
 355 apps/kitchen/frontend/operations.d.ts ERPlora/erplora-next#74
-515 apps/kitchen/models.py ERPlora/erplora-next#74
-1621 apps/kitchen/queries.py ERPlora/erplora-next#74
+506 apps/kitchen/models.py ERPlora/erplora-next#74
+1609 apps/kitchen/queries.py ERPlora/erplora-next#74
 766 apps/kitchen/schemas.py ERPlora/erplora-next#74
-1718 apps/kitchen/services.py ERPlora/erplora-next#74
+1711 apps/kitchen/services.py ERPlora/erplora-next#74
 906 apps/modifier/queries.py ERPlora/erplora-next#74
 673 apps/modifier/schemas.py ERPlora/erplora-next#74
 687 apps/modifier/services.py ERPlora/erplora-next#74

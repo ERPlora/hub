@@ -8,7 +8,7 @@ on paper, with the waiter's note after them.
 
 Traps of the old product: the chain of options till → ticket → kitchen, end to end; the paper lost the options
 that the row had; the options travel to paper as a LIST, one line each, never a joined string; the note of the
-line, the only place an allergy lives, reaches card and paper.
+line reaches card and paper.
 """
 
 import pytest
