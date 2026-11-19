@@ -17,6 +17,7 @@ const SETTINGS: SettingsOut = {
   page_title: '',
   welcome_message: '',
   primary_color: '#6366f1',
+  logo: '',
   logo_url: '',
   require_email: false,
   max_upcoming_per_customer: 3,
@@ -49,6 +50,21 @@ async function setup(options: MountOptions = {}) {
   return { ...m, field, show: (data: unknown) => m.result(OP, data) };
 }
 
+type SettingsScreen = Awaited<ReturnType<typeof setup>>;
+
+const LOGO = { id: '0123456789abcdef.png', url: '/p/media/hub/online_booking/logo/0123456789abcdef.png' };
+const OLD_LOGO = { id: 'fedcba0987654321.png', url: '/p/media/hub/online_booking/logo/fedcba0987654321.png' };
+
+async function chooseLogo(s: SettingsScreen, file: File): Promise<void> {
+  const input = s.field('logo-file') as HTMLInputElement | null;
+  if (!input) throw new Error('The logo file input is missing');
+  let value = `C:\\fakepath\\${file.name}`;
+  Object.defineProperty(input, 'files', { value: [file], configurable: true });
+  Object.defineProperty(input, 'value', { get: () => value, set: (next: string) => (value = next), configurable: true });
+  input.dispatchEvent(new Event('change', { bubbles: true }));
+  await settle();
+}
+
 describe('SettingsPage', () => {
   it('paints the page settings and the booking rules with their labels', async () => {
     const s = await setup();
@@ -62,7 +78,65 @@ describe('SettingsPage', () => {
     ]);
     expect([s.field('primary_color').value, s.field('slot_interval').value, s.field('is_enabled').checked]).toEqual(['#6366f1', '15', false]);
     expect(s.field('auto_confirm_online').textContent).toBe("Confirm the customer's bookings automatically");
+    expect(s.field('logo_url') === null).toBe(true);
+    expect(s.field('logo-label')?.textContent).toBe('Logo');
+    expect(s.field('logo-empty') !== null).toBe(true);
     expect(s.field('save').disabled).toBe(true);
+  });
+
+  it('uploads a chosen logo, shows its preview and saves its id', async () => {
+    const s = await setup();
+    await s.show(SETTINGS);
+    s.answerBy({
+      '/api/online_booking/settings/logo': [201, LOGO],
+      '/api/online_booking/settings': [200, { ...SETTINGS, logo: LOGO.id, logo_url: LOGO.url }],
+    });
+    await chooseLogo(s, new File([new Uint8Array([1, 2, 3])], 'logo.png', { type: 'image/png' }));
+    expect(s.sent()[0]).toEqual({
+      method: 'POST',
+      path: '/api/online_booking/settings/logo',
+      query: {},
+      body: { filename: 'logo.png', content_type: 'image/png', data_base64: 'AQID' },
+    });
+    expect(s.field('logo-image').getAttribute('src')).toBe(LOGO.url);
+    await click(s.field('save'));
+    expect(s.sent().at(-1)?.body).toEqual({ logo: LOGO.id });
+  });
+
+  it('removes the current logo from the preview and saves an empty logo', async () => {
+    const s = await setup();
+    await s.show({ ...SETTINGS, logo: OLD_LOGO.id, logo_url: OLD_LOGO.url });
+    expect(s.field('logo-image').getAttribute('src')).toBe(OLD_LOGO.url);
+    s.answer(200, SETTINGS);
+    await click(s.field('logo-remove'));
+    expect(s.field('logo-image') === null).toBe(true);
+    expect(s.field('logo-empty') !== null).toBe(true);
+    await click(s.field('save'));
+    expect(s.sent().at(-1)?.body).toEqual({ logo: '' });
+  });
+
+  it('shows the server reason when it rejects the chosen logo', async () => {
+    const s = await setup({ locale: 'es' });
+    await s.show(SETTINGS);
+    s.answer(422, { error: { code: 'invalid_payload', message: 'Este archivo no es una imagen PNG.', fields: { data_base64: 'Este archivo no es una imagen PNG.' } } });
+    await chooseLogo(s, new File(['not a png'], 'logo.png', { type: 'image/png' }));
+    expect(s.field('logo-error')?.textContent).toContain('Este archivo no es una imagen PNG.');
+    expect(s.sent()).toHaveLength(1);
+    expect(s.field('logo-empty') !== null).toBe(true);
+  });
+
+  it('puts a refused logo under Logo until another one is chosen', async () => {
+    const s = await setup();
+    await s.show(SETTINGS);
+    const reason = 'That logo was not uploaded to this business: upload it again.';
+    s.answerBy({ '/api/online_booking/settings/logo': [201, LOGO] });
+    await chooseLogo(s, new File([new Uint8Array([1, 2, 3])], 'logo.png', { type: 'image/png' }));
+    s.answer(422, { error: { code: 'invalid_payload', message: reason, fields: { logo: reason } } });
+    await click(s.field('save'));
+    expect(s.field('logo-save-error')?.textContent).toContain(reason);
+    s.answerBy({ '/api/online_booking/settings/logo': [201, OLD_LOGO] });
+    await chooseLogo(s, new File([new Uint8Array([4, 5, 6])], 'other.png', { type: 'image/png' }));
+    expect(s.field('logo-save-error')).toBeNull();
   });
 
   it('saves only what was touched and changed, the page and the rules together, and says so', async () => {

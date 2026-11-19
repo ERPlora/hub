@@ -17,7 +17,7 @@ from apps.sale.queries.business import actor
 from apps.sale.queries.checkout import loose_lines
 from apps.sale.queries.orders import ORDER_CHANGED, find_order, order_detail
 from apps.sale.queries.service_lines import Booking
-from apps.sale.schemas import OrderOpenIn, OrderOut
+from apps.sale.schemas.orders import OrderOpenIn, OrderOut
 
 ORDER_UNAVAILABLE = _("That check is no longer open.")
 LINE_NOT_AVAILABLE = _(

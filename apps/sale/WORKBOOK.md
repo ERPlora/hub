@@ -1620,7 +1620,7 @@ es una línea.
 ## Para quien lo mantiene
 
 - Anatomía completa: `apps.py`, `models.py`, `migrations/` (`0002` siembra Efectivo y Tarjeta, con
-  reverso), `schemas.py`, `pricing.py` (la valoración, sin ORM), `queries.py`, `services/`,
+  reverso), `schemas/`, `pricing.py` (la valoración, sin ORM), `queries/`, `services/`,
   `events.py`, `live.py`, `api.py`, `admin.py`, `locale/`, `frontend/` y un `tests/test_<fichero>.py`
   por fichero, más `tests/test_integration_*.py` con Impuestos, Clientes, Inventario, Servicios,
   Facturación, Caja y Citas reales.
@@ -1838,7 +1838,7 @@ es una línea.
   la venta y de la devolución. Una venta se corrige con su anulación o sus devoluciones, como en caja
   (`tests/test_admin.py`). Lo que guarda no pasa por las operaciones ni deja aviso.
 - **Asistente**: cada operación declara `ai` (descripción; en las escrituras, `risk`: `high` en cobrar,
-  anular, devolver y descuentos) y cada campo de `schemas.py` su `description`. La tarjeta de
+  anular, devolver y descuentos) y cada campo de `schemas/` su `description`. La tarjeta de
   confirmación nombra cada dato por el `title` de su esquema (`gettext_noop`, con su `es` en el catálogo:
   «Importe a devolver» para `allocations`, «Línea», «Bono», «Cuenta de origen») o, si no lo tiene, por el
   `verbose_name` de su campo en el modelo; un dato sin ninguno sale con el nombre técnico y lo para

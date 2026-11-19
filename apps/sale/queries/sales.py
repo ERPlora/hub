@@ -12,7 +12,7 @@ from live.operations import AI, operation
 
 from apps.sale.models import FiscalStatus, Refund, RefundLine, Sale, SaleLine
 from apps.sale.queries.payment_methods import method_display_name
-from apps.sale.schemas import SaleByKeyIn, SaleByKeyOut, SaleListIn, SaleOut, SalePage, SaleRefIn
+from apps.sale.schemas.sales import SaleByKeyIn, SaleByKeyOut, SaleListIn, SaleOut, SalePage, SaleRefIn
 from base.business import currency_decimals
 from base.ordering import list_order
 
