@@ -19,7 +19,7 @@ from live import assistant as shared
 from live.context import Scope
 from live.operations import get, registry
 
-from apps.flow.queries import SYSTEM
+from apps.flow.queries.reads import SYSTEM
 from apps.flow.tests.conftest import HUB_DB, ctx_for, make_draft, make_flow, make_run
 from base import assistant
 from base.tenancy.context import use_hub

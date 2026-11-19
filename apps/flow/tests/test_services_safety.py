@@ -127,7 +127,7 @@ def test_seating_a_party_needs_a_person_at_the_door_so_no_automation_is_granted_
     # Seating is done by whoever receives the party, and it opens the table's check in Sales (market: OpenTable,
     # SevenRooms, Resy, Toast Tables, Yelp Guest Manager, TheFork Manager, CoverManager, Tock: automations confirm,
     # remind and release; none seats). Refused as what needs a person, when saved and when granted.
-    from apps.flow.queries import catalog_operations
+    from apps.flow.queries.catalog import catalog_operations
 
     assert "reservation.reservation.seat" not in catalog_operations(A)
     with pytest.raises(InvalidPayload) as refused:

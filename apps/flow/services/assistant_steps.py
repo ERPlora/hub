@@ -16,15 +16,11 @@ from live.outbox import record_event
 
 from apps.flow import document, events, gateway, recipes
 from apps.flow.models import Flow, FlowRun, Question
-from apps.flow.queries import (
-    ASSISTANT_GONE_KEY,
-    SYSTEM,
-    ask_first_catalog,
-    catalog_operations,
-    pinned_values,
-    TURN,
-    ASSISTANT_WANTS,
-)
+from apps.flow.queries.catalog import ask_first_catalog, catalog_operations
+from apps.flow.queries.pinned import pinned_values
+from apps.flow.queries.questions import ASSISTANT_WANTS
+from apps.flow.queries.reads import SYSTEM, TURN
+from apps.flow.queries.reasons import ASSISTANT_GONE_KEY
 from apps.flow.schemas import (
     AssistantRoundIn,
     AssistantRoundOut,
@@ -228,7 +224,7 @@ def _propose(  # noqa: PLR0913, PLR0917
 ) -> None:
     """«Ask me first»: the change waits in «Waiting for your answer» with what the assistant said, and the run on it;
     its title, its action and what it would send are said there for whoever reads it, as they read it
-    (``queries.question_row``). A yes makes it (``answer_question``), a no or silence cancels the run, as a question
+    (``queries.questions.question_row``). A yes makes it (``answer_question``), a no or silence cancels the run, as a question
     that stops on a no. One change waits at a time: ``later``, the calls of the same answer behind it, are not made,
     and the assistant hears so with the change's result. Each change it asks for is a question of its own
     (``<step>:<n>``), so a late yes to one never approves the next."""

@@ -22,7 +22,7 @@ from live.errors import InvalidPayload
 
 from apps.flow import gateway as flow_gateway
 from apps.flow.models import Flow, FlowRun, Question
-from apps.flow.queries import TURN
+from apps.flow.queries.reads import TURN
 from base.tests.fake_gateway import gateway  # noqa: F401 - the fixture
 
 from .conftest import A, CHAT, HUB_DB, NOON, QUOTA, ctx_for, make_flow, run
@@ -220,7 +220,7 @@ def test_a_tool_whose_fixed_datum_is_empty_is_not_used_and_the_history_says_why(
 
 
 def test_a_tool_whose_fixed_text_fills_in_to_nothing_in_this_run_is_not_used_either(gateway, worker, guests):
-    # The same rule as «Try it» (``queries.fixed_value``): a text whose data are all missing fills in to nothing, so
+    # The same rule as «Try it» (``queries.pinned.fixed_value``): a text whose data are all missing fills in to nothing, so
     # the tool is not used; never called with «on_behalf_of» blank.
     pinned = {CANCEL: {"on_behalf_of": "{{input.found}}{{input.customer}}"}}
     ran = asked(worker, gateway, guests, assistant(pinned=pinned), {"id": str(guests["other"].id)}, customer=None)

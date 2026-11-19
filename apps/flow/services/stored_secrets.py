@@ -10,7 +10,8 @@ from live.outbox import record_event
 
 from apps.flow import events, vault
 from apps.flow.models import Secret
-from apps.flow.queries import MANAGE, secret_row
+from apps.flow.queries.reads import MANAGE
+from apps.flow.queries.stored_secrets import secret_row
 from apps.flow.schemas import DeletedOut, SecretOut, SecretRefIn, SecretSetIn
 
 from .writes import _actor

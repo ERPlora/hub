@@ -30,7 +30,8 @@ from ninja import Field, Schema
 from apps.cart_checkout.tests.conftest import make_cart
 from apps.cart_checkout.tests.conftest import make_item as make_cart_line
 from apps.flow.models import Flow, FlowRun, Question
-from apps.flow.queries import CURRENCY_IN, _currency_data, _money_paths, step_data, step_fields, words_for
+from apps.flow.queries.catalog import step_data, step_fields
+from apps.flow.queries.values import CURRENCY_IN, _currency_data, _money_paths, words_for
 from apps.invoice.tests.conftest import ISSUER
 from apps.payment.tests.conftest import make_method
 from apps.pricing.tests.conftest import make_item as make_price
