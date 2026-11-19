@@ -865,7 +865,7 @@ la que solo se le autorizó reservar.
   ni deja aviso.
 - **Tarea programada**: `release_unconfirmed_reservations` (`reservation.reservation.release_unconfirmed`,
   cada 15 minutos, en UTC, `collapse`); la corre el worker como sistema en cada negocio con Reservas
-  encendida, en su BD y en su ámbito (`host`, su slug: `base.worker._serve_hub` → `base.scheduler.run_due`),
+  encendida, en su BD y en su ámbito (`host`, su slug: `base.hub_visits` → `base.scheduler.run_due`),
   así que su aviso vivo sale por el canal de ese negocio y no por el de otro (hub#551). Un ámbito que no
   es el del negocio activo no llega a liberar nada (`HubContextMismatch`).
 - **WhatsApp** (F17, F18): la conversación es la receta `reservation_from_whatsapp` de `whatsapp_inbox`

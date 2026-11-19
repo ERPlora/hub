@@ -1246,7 +1246,7 @@ corrigen borrando los datos de la conversación, nunca editando), con borrado pa
   lo recupera el barrido, que lo entrega con la misma clave. La tarea del worker `whatsapp_inbox.delivery.resume` (`*/5 * * * *`, `catch_up: collapse`, declarada en
   `apps.py`) retoma con `SKIP LOCKED`, de 50 en 50, los mensajes `queued`/`sending`, las plantillas
   `queued`/`sending` y los borrados `pending` (de números y de plantillas) con más de 2 minutos. El
-  worker la corre en cada negocio que sirve, en su BD y con su ámbito (`base.worker._serve_hub`): retoma lo de ese
+  worker la corre en cada negocio que sirve, en su BD y con su ámbito (`base.hub_visits`): retoma lo de ese
   negocio y lo entrega a erplora.com como ese negocio, con su contenido. «Reintentar» (`message.retry`) y volver a
   borrar un número ya borrado (`conversation.erase` por su id) entregan igual, como el negocio de quien lo pide. El
   hilo de la entrega trabaja en el contexto de BD de la operación que la pidió (`base.outbound`): una BD de hub solo
@@ -1600,7 +1600,7 @@ abierta sin su SDK; si no la manda, la puerta 11 tendría que sacar la cuenta de
   `whatsapp_inbox.channel.sync` con la versión de la foto.
 - El relay del outbox entrega `customer.customer.created/updated/merged/deleted/erased/restored` a
   `apps.whatsapp_inbox.events.react` (`base/relay.py`); el worker ejecuta la tarea `resume_deliveries` de
-  `apps.py` en cada negocio que sirve (`base.worker._serve_hub`), y el trabajo diferido de esta app corre en el
+  `apps.py` en cada negocio que sirve (`base.hub_visits`), y el trabajo diferido de esta app corre en el
   hub de la operación que lo pidió (`base.outbound`).
 - La campana de la barra superior lee `whatsapp_inbox.conversation.count_awaiting_reply` (la declaración `bell`
   de `apps.py`, con el permiso `whatsapp_inbox.view`), que comparte con `summary` la única definición de

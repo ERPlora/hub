@@ -3519,7 +3519,7 @@ Implicados: BASE-F92, BASE-F93
   `report["language"]` mientras espera). Lo que le toca entra en la misma transacción que la enciende:
   `base.app.activation_settle` (o `base.app.enable`, si tenía las tablas) llama a `services.blueprints._load_what_waited` →
   `blueprint.finish_waiting`, que reusa `apply`, con su orden y sus operaciones, en el hub activo. Si el worker muere, no
-  ha pasado ninguna de las dos cosas y el siguiente pase, o el barrido de `_serve_hub` si se perdió el aviso, hace las
+  ha pasado ninguna de las dos cosas y el siguiente pase, o el barrido de las visitas del worker (`base.hub_visits`) si se perdió el aviso, hace las
   dos: por eso sobrevive a un reinicio sin nada más. Cómo va la preparación (`setup_failed`) nunca se escribe: se lee de
   la fila de la app al describir la carga (`describe_load`). Lo que corta la espera: desactivar la app, deshacer la
   carga, reintentarla (la nueva toma el relevo) y restablecer el negocio (`services.blueprints._stop_waiting`). Un fichero no se

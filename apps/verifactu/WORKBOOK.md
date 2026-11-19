@@ -1398,7 +1398,7 @@ negocio, y una automatización sin nadie detrás, no ven esa línea. La marca de
   rectificativa de Facturación.
 - La tarea programada `process_queue` (`verifactu.contingency.process`, cada minuto, en UTC, `collapse`) la
   corre el worker (`base/scheduler.py`, desde `base/worker.py`, cada tick de 5 s) como el sistema, en cada negocio
-  que sirve, en su BD y con su ámbito (`base.worker._serve_hub`: `use_hub` y `Scope("host", slug)`): su reloj es una
+  que sirve, en su BD y con su ámbito (`base.hub_visits`: `use_hub` y `Scope("host", slug)`): su reloj es una
   fila de `base.TaskSchedule` en esa BD, que el worker escribe la primera vez que lo sirve desde que arrancó; cada
   pasada la toma con
   `select_for_update(skip_locked=True)` y mueve `next_run` en la misma transacción que el envío, así que dos
