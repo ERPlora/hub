@@ -121,3 +121,10 @@ class InvoiceConfig(LiveAppConfig):
         from apps.invoice import queries  # the models are not loaded yet when this module is
 
         return queries.keeps_fiscal_documents()
+
+    def fiscal_archive_documents(self, ctx):
+        """What goes to the fiscal archive beside the rows (``base.tenancy.fiscal_archive``): each invoice's A4 as a
+        PDF, as it was handed over."""
+        from apps.invoice.queries import fiscal_archive  # the models are not loaded yet when this module is
+
+        return fiscal_archive.documents(ctx)
