@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:963d8bc2b6f6bd47d86386895beb08862997272d6bba30eebb1e26ae9f7a34b9 -->
+<!-- generated from WORKBOOK.md sha256:534aa34cde269e5411e594079846ac72129b06bedae99617f7303937c9cdd803 -->
 
 ## What it is for and who it is for
 
@@ -68,8 +68,8 @@ in the diary.
 Title "Booking page settings". Three blocks and a **Save** button:
 
 - **Public page**: "Public page on", "Page title", "Welcome message", "Primary colour"
-  (`#RRGGBB`), "Logo" (a JPG, PNG or WebP image that is uploaded; it still shows as "Logo URL", which is no
-  longer taken, hub#1660), "Email required", "Upcoming bookings per mobile" (1 to 50), "Let the customer choose
+  (`#RRGGBB`), "Logo" (a JPG, PNG or WebP image uploaded with **Choose image**, replaced with **Replace image**
+  and removed with **Remove**), "Email required", "Upcoming bookings per mobile" (1 to 50), "Let the customer choose
   the professional", "Allow notes", "Confirmation message" and "Cancellation policy" (the text the customer
   reads).
 - **Booking rules** (they are the rules of Appointments, shared with WhatsApp): "Minimum booking notice
@@ -124,7 +124,7 @@ Dates and times show on the business's clock and in the format of the language o
 | ONLINE_BOOKING-F04 | Mark that she did not show up | done |
 | ONLINE_BOOKING-F05 | Cancel a booking | done |
 | ONLINE_BOOKING-F06 | Delete a booking | done |
-| ONLINE_BOOKING-F07 | Set up the booking page | partial — the logo is uploaded through the API; the Settings screen does not upload it yet (hub#1660) |
+| ONLINE_BOOKING-F07 | Set up the booking page | done |
 | ONLINE_BOOKING-F08 | See and search the bookings | done |
 | ONLINE_BOOKING-F09 | Follow the customer when two cards are merged | done (Appointments does it; the inbox reflects it) |
 | ONLINE_BOOKING-F10 | The customer sees her booking with her link | done |
@@ -244,7 +244,7 @@ If it fails: an appointment in progress, completed or charged is not deleted ("T
 Involved: APPOINTMENT-F11
 
 ### ONLINE_BOOKING-F07 Set up the booking page
-Status: partial — the logo is uploaded through the API; the Settings screen does not upload it yet (hub#1660)
+Status: done
 Actor: owner, administrator, assistant
 Screen: Settings
 Steps:

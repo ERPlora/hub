@@ -82,7 +82,7 @@
         "page_title": "Título de la página",
         "welcome_message": "Mensaje de bienvenida",
         "primary_color": "Color primario",
-        "logo_url": "URL del logo",
+        "logo": "Logo",
         "require_email": "Email obligatorio",
         "max_upcoming_per_customer": "Reservas próximas por móvil",
         "allow_staff_selection": "Permitir elegir profesional",

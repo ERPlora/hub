@@ -12,7 +12,7 @@ from django.utils import timezone, translation
 from live.errors import NotFound, PermissionDenied
 
 from apps.sale.models import PaymentMethod, Sale
-from apps.sale.schemas import BreakdownOut, PreviewLineOut, PreviewOut
+from apps.sale.schemas.checkout import BreakdownOut, PreviewLineOut, PreviewOut
 from apps.sale.tests.conftest import HUB_DB, ctx_for, run
 from base.tenancy.context import current_alias
 from base.tests.typed_operations import ts_fields

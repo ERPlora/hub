@@ -9,7 +9,7 @@ from live.errors import NotFound
 from live.operations import AI, operation
 
 from apps.sale.models import Order, OrderLine
-from apps.sale.schemas import OrderListIn, OrderOut, OrderPage, OrderRefIn
+from apps.sale.schemas.orders import OrderListIn, OrderOut, OrderPage, OrderRefIn
 from base.allergens import found_in
 
 ORDER_NOT_FOUND = _("That check does not exist.")

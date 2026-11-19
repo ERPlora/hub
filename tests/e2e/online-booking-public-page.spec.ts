@@ -9,14 +9,11 @@
 // owner makes the cast through each app's API; everything is named «E2E PB …» and removed before and after, and the
 // settings of the page and of Appointments put back. One screenshot per state and size
 // (`online-booking-public-<state>-<width>`).
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
-
 import { type Browser, expect, type Page, test } from '@playwright/test';
 
 import { aMonday } from './appointment-helpers';
-import { A, B, capture, HUB_DIR, psql } from './helpers';
-import { cast, keepTheBusiness } from './online-booking-helpers';
+import { A, B, capture, psql } from './helpers';
+import { BOOKING_LOGO, cast, keepTheBusiness } from './online-booking-helpers';
 import { FLOW_VIEWPORTS, noHorizontalScroll, ownerPage, post } from './service-helpers';
 
 const TAG = 'E2E PB';
@@ -25,13 +22,6 @@ const named = (label: string): string => `${TAG} ${label} ${RUN}`;
 /** A Spanish mobile unique to the run and to the size (`6` + eight digits). */
 const mobile = (n: number): string => `6${String(Date.now() + n * 7919).slice(-8)}`;
 const PAGE = `${A}/p/a/book`;
-/** The logo the owner uploads in Settings: ERPlora's own PNG. */
-const LOGO = {
-  filename: 'logo.png',
-  content_type: 'image/png',
-  data_base64: readFileSync(join(HUB_DIR, 'base', 'static', 'base', 'img', 'logo.png')).toString('base64'),
-};
-
 keepTheBusiness(TAG);
 
 /** A visitor without a session, in Spanish, at `viewport`; every CSP violation the page reports is kept. */
@@ -55,7 +45,7 @@ FLOW_VIEWPORTS.forEach((vp, index) => {
     const day = aMonday(index);
     try {
       const who = await cast(owner, named(vp.label), day);
-      const logo = await post<{ id: string; url: string }>(owner, '/online_booking/settings/logo', LOGO, 201);
+      const logo = await post<{ id: string; url: string }>(owner, '/online_booking/settings/logo', BOOKING_LOGO, 201);
       await post(owner, '/online_booking/settings', {
         page_title: named(`Salon ${vp.label}`),
         welcome_message: 'Tu próxima cita, sin llamar.',

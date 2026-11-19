@@ -25,7 +25,7 @@ from apps.sale.queries.order_lines import (
 from apps.sale.queries.orders import ORDER_CHANGED, find_order, pending_lines
 from apps.sale.queries.service_lines import Booking, freeze_service_line
 from apps.sale.queries.settings import current_settings
-from apps.sale.schemas import PreviewIn, PreviewOut
+from apps.sale.schemas.checkout import PreviewIn, PreviewOut
 from apps.tax.models import TaxCategory
 
 

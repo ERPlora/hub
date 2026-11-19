@@ -9,12 +9,10 @@ from live.ninja import bind, run_operation
 from ninja import Query, Router
 
 from apps.sale import queries, services
-from apps.sale.schemas import (
-    CompleteIn,
-    DepartmentIn,
-    DepartmentListIn,
-    DepartmentRefIn,
-    DepartmentUpdateIn,
+from apps.sale.schemas.checkout import CompleteIn, PreviewIn
+from apps.sale.schemas.figures import PeriodIn
+from apps.sale.schemas.line_allergy import OrderSetLineAllergyIn
+from apps.sale.schemas.orders import (
     OrderAddComboLineIn,
     OrderAddLineIn,
     OrderAddOpenLineIn,
@@ -34,25 +32,22 @@ from apps.sale.schemas import (
     OrderSplitIn,
     OrderUpdateLineIn,
     OrderVoidLineIn,
+)
+from apps.sale.schemas.refunds import RefundByKeyIn, RefundIn
+from apps.sale.schemas.sales import SaleByKeyIn, SaleListIn, SalePrintIn, LetterheadIn, SaleRefIn, VoidIn
+from apps.sale.schemas.settings import (
+    DepartmentIn,
+    DepartmentListIn,
+    DepartmentRefIn,
+    DepartmentUpdateIn,
     PaymentMethodIn,
     PaymentMethodListIn,
-    PeriodIn,
-    PreviewIn,
     QuickNoteIn,
     QuickNoteListIn,
     QuickNoteRefIn,
     QuickNoteUpdateIn,
-    RefundByKeyIn,
-    RefundIn,
-    SaleByKeyIn,
-    SaleListIn,
-    SalePrintIn,
-    LetterheadIn,
-    SaleRefIn,
     SettingsPatchIn,
-    VoidIn,
 )
-from apps.sale.schemas.line_allergy import OrderSetLineAllergyIn
 
 router = Router(tags=["sale"])
 

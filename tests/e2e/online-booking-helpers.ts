@@ -1,11 +1,32 @@
 // What the Online booking specs share: the cast (Appointments' salon, `openForACut`, with the booking page on), the
 // clean-up of a spec's rows by the name they carry, and the settings of Appointments and of the page read before a spec
 // and put back after it.
-import { type Browser, type BrowserContext, expect, test } from '@playwright/test';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
+import { type Browser, type BrowserContext, expect, type Page, test } from '@playwright/test';
 
 import { openForACut, salonCleanUp } from './appointment-helpers';
-import { A, api, psql } from './helpers';
+import { A, api, HUB_DIR, psql } from './helpers';
 import { ownerPage, post } from './service-helpers';
+
+export const BOOKING_LOGO = {
+  filename: 'logo.png',
+  content_type: 'image/png',
+  data_base64: readFileSync(join(HUB_DIR, 'base', 'static', 'base', 'img', 'logo.png')).toString('base64'),
+};
+
+export async function uploadBookingLogo(page: Page): Promise<{ id: string; url: string }> {
+  const uploaded = page.waitForResponse((response) => response.url().endsWith('/api/online_booking/settings/logo') && response.status() === 201);
+  await page.locator('[data-testid=ob-settings-logo-file]').setInputFiles({
+    name: BOOKING_LOGO.filename,
+    mimeType: BOOKING_LOGO.content_type,
+    buffer: Buffer.from(BOOKING_LOGO.data_base64, 'base64'),
+  });
+  const stored = (await (await uploaded).json()) as { id: string; url: string };
+  await expect(page.locator('[data-testid=ob-settings-logo-image]')).toHaveAttribute('src', stored.url);
+  return stored;
+}
 
 /** Removes every row a spec named `tag…`: its bookings, the salon (`salonCleanUp`) and its customers. */
 function cleanUp(tag: string): void {

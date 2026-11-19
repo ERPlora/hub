@@ -29,7 +29,8 @@ from apps.sale.queries.other_apps import call_services
 from apps.sale.queries.sales import sale_detail
 from apps.sale.queries.service_lines import Booking
 from apps.sale.queries.settings import current_settings
-from apps.sale.schemas import CompleteIn, SaleOut
+from apps.sale.schemas.checkout import CompleteIn
+from apps.sale.schemas.sales import SaleOut
 from apps.sale.services.charge_validation import (
     _check_discounts,
     _check_drawer,

@@ -1,7 +1,7 @@
 from django.utils.translation import gettext_noop
 from ninja import Field
 
-from apps.sale.schemas import OrderLineRefIn
+from apps.sale.schemas.orders import OrderLineRefIn
 from base.allergens import CODES, Allergens
 
 CUSTOMERS_ALLERGY = gettext_noop("Customer's allergy")

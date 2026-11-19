@@ -13,7 +13,7 @@ from apps.sale.models import Sale, Settings
 from apps.sale.queries.business import actor
 from apps.sale.queries.other_apps import call_services
 from apps.sale.queries.sales import find_sale, sale_detail
-from apps.sale.schemas import SaleOut, VoidIn
+from apps.sale.schemas.sales import SaleOut, VoidIn
 from apps.sale.services.documents import _fiscal_document, _issue_waiting_document
 
 ALREADY_VOIDED = _("This sale is already voided.")

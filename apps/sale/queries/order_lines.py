@@ -14,7 +14,7 @@ from apps.sale.queries.business import actor, missing_tax
 from apps.sale.queries.departments import _department_refused, find_department, find_tax_category
 from apps.sale.queries.line_parts import GRID_FALLBACK, WHOLE, check_grid, provisional_total
 from apps.sale.queries.other_apps import call_app
-from apps.sale.schemas import ComboLineFields, LineFields, OpenLineFields, ProductLineIn
+from apps.sale.schemas.lines import ComboLineFields, LineFields, OpenLineFields, ProductLineIn
 
 PRODUCT_NOT_AVAILABLE = _(
     "A product of the ticket is no longer in the catalog. Remove the line and add it again."

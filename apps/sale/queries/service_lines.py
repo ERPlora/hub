@@ -12,7 +12,7 @@ from apps.sale.queries.business import business_currency, missing_tax, money_tex
 from apps.sale.queries.line_parts import GRID_FALLBACK, check_grid
 from apps.sale.queries.order_lines import OPEN_PRICE_PERMISSION, new_line
 from apps.sale.queries.other_apps import call_app, call_services
-from apps.sale.schemas import ServiceLineFields
+from apps.sale.schemas.lines import ServiceLineFields
 
 BOOKED_PRICE_MISMATCH = _(
     "That is not the price the appointment booked for this service: it is cancelled, it is another "
