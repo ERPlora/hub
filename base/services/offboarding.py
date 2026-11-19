@@ -176,11 +176,12 @@ def offboarding_held(hub_id: UUID, now: dt.datetime, why: str, *, owner: str = L
 
 def fiscal_archive_kept(hub: Hub) -> bool:
     """Whether the fiscal documents of ``hub`` were archived after its 90 days, so for this leaving: an archive of an
-    earlier one (it came back since, and wrote more) does not count."""
+    earlier one (it came back since, and wrote more) does not count. An archive's time is kept to the second, so the
+    end of the 90 days is compared to the second too: one made right as they end counts."""
     return (
         hub.fiscal_archived_at is not None
         and hub.cancelled_at is not None
-        and hub.fiscal_archived_at >= hub.cancelled_at + OFFBOARDING_RETENTION
+        and hub.fiscal_archived_at >= (hub.cancelled_at + OFFBOARDING_RETENTION).replace(microsecond=0)
     )
 
 

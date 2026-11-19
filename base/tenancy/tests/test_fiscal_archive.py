@@ -213,6 +213,30 @@ def test_an_archived_business_is_not_archived_again(business, dumps_bucket, fisc
     assert objects(moto_s3, fiscal_archive_bucket) == written
 
 
+def test_an_archive_made_in_the_very_second_the_90_days_end_is_not_made_again(
+    business, dumps_bucket, fiscal_archive_bucket, moto_s3, monkeypatch
+):
+    hub = business(left_days_ago=91)
+    with use_hub(hub):
+        one_sale()
+    # The 90 days end 900 ms into a second and the pass comes 50 ms later: the archive's time, kept to the second, is
+    # earlier than that end.
+    ends = timezone.now().replace(microsecond=900_000)
+    type(hub).objects.filter(pk=hub.pk).update(cancelled_at=ends - dt.timedelta(days=90))
+    now = ends + dt.timedelta(milliseconds=50)
+    with monkeypatch.context() as clock:
+        clock.setattr(timezone, "now", lambda: now)
+        run_pass(now)
+    archived, written = fresh(hub).fiscal_archived_at, objects(moto_s3, fiscal_archive_bucket)
+    assert archived is not None
+
+    run_pass(now + dt.timedelta(days=1, minutes=1))
+
+    hub = fresh(hub)
+    assert (hub.fiscal_archived_at, hub.last_error) == (archived, "fiscal_archived: sale")
+    assert objects(moto_s3, fiscal_archive_bucket) == written
+
+
 def test_an_archive_of_an_earlier_leaving_does_not_count(business, dumps_bucket, fiscal_archive_bucket, moto_s3):
     hub = business(left_days_ago=91)
     with use_hub(hub):
@@ -274,16 +298,19 @@ def test_an_archive_that_fails_marks_nothing_writes_no_manifest_and_says_why(
     assert any("fiscal_archive_failed" in record.getMessage() for record in caplog.records)
 
 
+@pytest.mark.parametrize("altered_file", [".jsonl", "/manifest.json"], ids=["a-table", "the-manifest"])
 def test_a_document_that_does_not_read_back_as_written_marks_nothing(
-    business, dumps_bucket, fiscal_archive_bucket, moto_s3, monkeypatch
+    business, dumps_bucket, fiscal_archive_bucket, moto_s3, monkeypatch, altered_file
 ):
     hub = business(left_days_ago=91)
     with use_hub(hub):
         one_sale()
-    s3 = client(moto_s3)
+    s3, read = client(moto_s3), []
+    s3.meta.events.register("provide-client-params.s3.HeadObject", lambda params, **kwargs: read.append(params["Key"]))
 
     def altered(http_response, parsed, **kwargs):
-        parsed["ChecksumSHA256"] = base64.b64encode(hashlib.sha256(b"something else").digest()).decode()
+        if read[-1].endswith(altered_file):
+            parsed["ChecksumSHA256"] = base64.b64encode(hashlib.sha256(b"something else").digest()).decode()
 
     s3.meta.events.register("after-call.s3.HeadObject", altered)
     monkeypatch.setattr(fiscal_archive, "client", lambda: s3)
@@ -291,9 +318,28 @@ def test_a_document_that_does_not_read_back_as_written_marks_nothing(
     run_pass()
 
     hub = fresh(hub)
+    assert read[-1].endswith(altered_file)
     assert (hub.status, hub.fiscal_archived_at) == ("cancelled", None)
     assert hub.last_error.startswith("fiscal_archive_failed: ")
-    assert not [key for key in objects(moto_s3, fiscal_archive_bucket) if key.endswith("/manifest.json")]
+    manifests = [key for key in objects(moto_s3, fiscal_archive_bucket) if key.endswith("/manifest.json")]
+    assert bool(manifests) == (altered_file == "/manifest.json")
+
+
+def test_the_lease_is_renewed_after_each_file_of_the_archive(
+    business, dumps_bucket, fiscal_archive_bucket, moto_s3, monkeypatch
+):
+    from base import services
+
+    hub = business(left_days_ago=91)
+    with use_hub(hub):
+        one_sale()
+    renewed, renew = [], services.reset.renew_lease
+    monkeypatch.setattr(services.reset, "renew_lease", lambda hub_id, lease: renewed.append(hub_id) or renew(hub_id, lease))
+
+    run_pass()
+
+    _, manifest = manifest_of(moto_s3, fiscal_archive_bucket, hub)
+    assert renewed == [hub.pk] * (len(manifest["files"]) + 1)
 
 
 def test_a_failed_archive_is_written_whole_the_next_day(business, dumps_bucket, fiscal_archive_bucket, moto_s3, monkeypatch):
