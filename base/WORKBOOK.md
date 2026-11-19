@@ -4245,9 +4245,13 @@ Implicados: BASE-F92, BASE-F93
 - **La caché es un clúster** (hub#440): en AWS es ElastiCache Serverless, un Valkey en modo clúster, que rechaza
   con `CROSSSLOT` una llamada con varias claves de ranuras distintas (`get_many`, `set_many`, `delete_many`). Las
   claves que van juntas comparten una etiqueta de hash: lo que va entre la primera `{` y la siguiente `}`
-  (`base.files:{<hex>}:…`, `website:home:{<slug>}:…`). En local y en los tests la caché es
-  `base.cache.ClusterLocMemCache`, la memoria del proceso con esa misma regla y el mismo error: lo que fallaría en
-  AWS falla antes en el test.
+  (`base.files:{<hex>}:…`, `website:home:{<slug>}:…`). Sin Valkey la caché aplica esa misma regla con el
+  mismo error, así que lo que fallaría en AWS falla antes en local o en el test: en local es
+  `base.cache.ClusterFileBasedCache`, una carpeta del disco por BD de control (`<tmp>/erplora-hub-cache/<DB_NAME>`) que
+  comparten el `runserver` y el worker como comparten Valkey en AWS, y lo que uno olvida al confirmar un cambio (una app
+  que el worker deja encendida) ya no lo lee el otro (hub#707); en los tests es `base.cache.ClusterLocMemCache`, la
+  memoria del proceso. La carpeta sobrevive a reiniciar el `runserver`, como Valkey a un despliegue: lo guardado caduca
+  con su plazo, y para vaciarla basta borrarla.
 
 - **`Hub.cluster` vacío es el servidor por defecto** (hub#614), el de los settings: es un valor válido, no un dato por
   rellenar, y con él conecta, migra, mide y se traslada el hub (`base.tenancy.connections`, `credentials`, `migrator`,
