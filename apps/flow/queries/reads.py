@@ -1,5 +1,5 @@
-"""What the reads of Automations share with its writes: who may see, manage and answer, and where an
-«Ask the assistant» step keeps its conversation."""
+"""What the reads of Automations share with its writes: who may see, manage and answer, what only the platform
+runs, and where an «Ask the assistant» step keeps its conversation."""
 
 VIEW = "flow.view"
 MANAGE = "flow.manage"

@@ -1,5 +1,5 @@
-"""The questions automations wait on (``flow.question.*``, FLOW-F29), as «Waiting for your answer» shows
-them to whoever may answer."""
+"""The questions automations wait on (``flow.question.list`` and ``flow.question.get``, FLOW-F29), as «Waiting
+for your answer» shows them to whoever may answer."""
 
 import json
 from typing import Any
