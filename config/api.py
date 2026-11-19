@@ -46,7 +46,7 @@ def build_api(*, urls_namespace: str = "api", docs: bool | None = None) -> Owner
 api = build_api()
 # The api.py router of every app of ours: base (platform) and the modules of apps/.
 mount_app_routers(api)
-# Base's routers outside base/api.py: a module's help window, the Home's health row and what is new in ERPlora.
+# Base's routers outside base/api/: a module's help window, the Home's health row and what is new in ERPlora.
 api.add_router("", api_help.router)
 api.add_router("", api_home_health.router)
 api.add_router("", api_release_notes.router)

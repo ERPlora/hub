@@ -184,7 +184,7 @@ def test_an_anonymous_visitor_or_a_stranger_gets_no_list(client):
 def test_over_http(client, make_user):
     from django.urls import resolve
 
-    from base.api import router
+    from base.api.apps import router
 
     [route] = router.path_operations["/apps"].operations
     assert (route.methods, route.operation_id) == (["GET"], "base.app.list")
@@ -254,7 +254,7 @@ def test_each_business_its_own_plan(make_user, hub_b):
 def test_plan_usage_over_http(client, make_user):
     from django.urls import resolve
 
-    from base.api import router
+    from base.api.apps import router
 
     [route] = router.path_operations["/system/plan"].operations
     assert (route.methods, route.operation_id) == (["GET"], "base.plan.usage")
