@@ -187,7 +187,6 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
     // Reset: the plan per section, a box each, and «Reset the business» off until one is ticked (never pressed).
     const first = testid(page, 'reset-section').first();
     await expect(first).toBeVisible();
-    await expect(testid(page, 'reset-shared')).toHaveCount(0);
     const submit = testid(page, 'reset-submit');
     await expect(submit).toHaveAttribute('disabled');
     const box = first.locator('ion-checkbox');

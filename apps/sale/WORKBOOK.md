@@ -3,8 +3,8 @@ Prefijo: SALE
 Alcance MVP: núcleo
 Estado de la app: completa (2026-10-31)
 Lo que no entra todavía: ver «Lo que queda fuera». La propina (SALE-G06) es de la app Propinas (`tip`), que añade
-su paso al cobro (SALE-F39, no hecho). Los alérgenos del plato y la alergia del cliente en la línea, SALE-F40 y
-SALE-F41, no hecho.
+su paso al cobro (SALE-F39, no hecho). Los alérgenos del plato en la línea (SALE-F40), parcial: la línea los guarda,
+pero el TPV todavía no los pinta. La alergia del cliente en la línea (SALE-F41), no hecho.
 
 > Manual de usuario y especificación de la app `sale`. Se escribe **antes** que el código: no se
 > programa nada que no esté aquí, y cada flujo pasa a `Estado: hecho` cuando sus tests están en verde
@@ -321,7 +321,7 @@ cierra la ventana sin guardarlo. Con la ventana como se abrió, atrás la cierra
 | SALE-F37 | Añadir un medio de pago (Bizum, transferencia…) | común | hecho |
 | SALE-F38 | Vender un servicio de Servicios | peluquería | hecho |
 | SALE-F39 | Cobrar con lo que añade otra app (la propina) | común | no hecho |
-| SALE-F40 | Ver los alérgenos de un plato al pedirlo | común | no hecho |
+| SALE-F40 | Ver los alérgenos de un plato al pedirlo | común | parcial |
 | SALE-F41 | Marcar la alergia del cliente en una línea | restaurante | no hecho |
 
 ### SALE-F01 Vender y cobrar en efectivo
@@ -1365,7 +1365,8 @@ tique (3.000 €) y el del efectivo (1.000 €) miran el total de la venta, como
 Implicados: TIP-F02, TIP-F03, TIP-F04, CASH_REGISTER-F18, INVOICE-F01
 
 ### SALE-F40 Ver los alérgenos de un plato al pedirlo
-Estado: no hecho — el TPV todavía no recibe los alérgenos del producto ni la línea los guarda
+Estado: parcial — la línea guarda los alérgenos de su producto (en un menú, los de cada plato) y los llevan la cuenta
+en vivo y la comanda enviada, pero el TPV todavía no los pinta en la línea ni en las hojas (hub#1738)
 Vertical: común
 Actor: empleado, responsable
 Pantalla: Vender
@@ -1520,7 +1521,7 @@ secciones, las notas rápidas y lo devolvible se pueden seguir en vivo.
 | Venta con su documento | Un documento que no se pudo emitir en el cobro, la anulación o la devolución se emite después (reintento del cobro, «Emitir ahora» o la reacción de Facturación) | La venta, el documento, su número, la devolución (`refund_id`) o si es el de la anulación (`void`); uno por documento | `sale.sale.invoiced` |
 | Cuenta abierta | Abrir o dividir | La cuenta | `sale.order.opened` |
 | Cuenta cambiada | Cualquier cambio de líneas, descuentos o título | La cuenta | `sale.order.changed` |
-| Comanda enviada | Enviar a cocina | La cuenta, su título, el canal, la ronda, quién atiende y las líneas con sus notas | `sale.order.fired` |
+| Comanda enviada | Enviar a cocina | La cuenta, su título, el canal, la ronda, quién atiende y las líneas con sus notas y los alérgenos de su producto (en un menú, los de cada plato) | `sale.order.fired` |
 | Cuenta cerrada | Cobrar lo último de una cuenta | La cuenta | `sale.order.completed` |
 | Cuenta anulada | Anular una cuenta abierta | La cuenta | `sale.order.voided` |
 | Cuentas juntadas | Juntar | La absorbida y la que queda | `sale.order.merged` |
@@ -2047,6 +2048,6 @@ título, sus pasos y «Si falla»: ahí no van nombres de código, incidencias, 
 - **Cobrar con propina**: es la app Propinas (`tip`, su `WORKBOOK.md`), con el paso del cobro que pinta Ventas
   (SALE-F39), las dos `no hecho`; el código va por las issues hijas de hub#562. Mientras, la propina en efectivo se
   anota en Caja como «Entrada» (CASH_REGISTER-F05).
-- **Los alérgenos del plato y la alergia del cliente** (F40 y F41, `no hecho`): la línea los guarda por hub#1736, y
-  la línea y las hojas los enseñan por hub#1738; Cocina los resalta en KITCHEN-F32 (hub#1737). Mientras, una
-  alergia va en la nota. Los alérgenos de un suplemento («+Queso» lleva leche) no entran: hub#1739.
+- **Los alérgenos del plato y la alergia del cliente** (F40 `parcial` y F41 `no hecho`): la línea ya guarda los
+  alérgenos de su producto, y la alergia del cliente la guardará por hub#1768; la línea y las hojas los enseñan por
+  hub#1738; Cocina los resalta en KITCHEN-F32 (hub#1737). Mientras, una alergia va en la nota. Los alérgenos de un suplemento («+Queso» lleva leche) no entran: hub#1739.

@@ -7,7 +7,7 @@ it, the ``REACTIONS`` of their ``events.py`` (``"*"``: every event of the other 
 - **taken**: an event nobody took yet gets one delivery per app that is on and listens to it, and its
   ``delivered_at``, in one transaction (``base.services.relay_runs.relay_take_events``); an app turned on later never
   receives what came before. An app is on unless it is a paid one its business has no right to or one the
-  business turned off (``active_apps``: ``base.entitlement`` and ``base.activation``; ``base.session.me`` says the
+  business turned off (``base.apps_on``: ``base.entitlement`` and ``base.activation``; ``base.session.me`` says the
   same);
 - **delivered**: each delivery runs its app's reaction as the system, in the scope of the hub that recorded the
   event (the reaction's own notice goes to that hub's channel after the COMMIT), and is marked in the same
@@ -43,7 +43,8 @@ from live.live_registry import ALL_EVENTS
 from live.meta import all_live_app_configs
 from live.models import OutboxEvent
 
-from base import activation, entitlement
+# Before base.services: some of what it loads reads active_apps from this module while this one is still loading.
+from base.apps_on import active_apps
 from base.services import relay_runs
 from base.recovery import brought_back
 from base.tenancy.context import HUB_SCOPE_KIND
@@ -68,13 +69,6 @@ class RelayPass:
     taken: int
     delivered: int
     failed: int
-
-
-def active_apps(scope: Scope) -> frozenset[str]:
-    """The apps that are on in ``scope``: every installed app of ours but those its business has no right to
-    (``base.entitlement``: a paid module without it in the SaaS's photo) and those it turned off (``base.activation``)."""
-    left_out = entitlement.blocked_apps(scope) | activation.off_apps(scope)
-    return frozenset(config.label for config in all_live_app_configs() if config.label not in left_out)
 
 
 @cache

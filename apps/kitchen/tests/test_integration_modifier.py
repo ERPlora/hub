@@ -64,7 +64,7 @@ def kitchen_sheets():
 
 
 @HUB_DB_COMMITTED
-def test_the_options_of_a_dish_reach_its_card_and_its_paper_through_the_relay(relay, burger):
+def test_the_options_of_a_dish_reach_its_card_and_its_paper_through_the_relay(relay, burger, printers):
     dish, options = burger
     order = open_check("Table 4")
     add_line(
@@ -104,7 +104,7 @@ def test_the_options_of_a_dish_reach_its_card_and_its_paper_through_the_relay(re
 
 
 @HUB_DB_COMMITTED
-def test_a_dish_without_options_carries_none_on_card_or_paper(relay, product):
+def test_a_dish_without_options_carries_none_on_card_or_paper(relay, product, printers):
     order = open_check("Table 4")
     add_line(order.id, product("Fries"))
     fire(order.id)

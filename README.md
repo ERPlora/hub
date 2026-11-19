@@ -52,6 +52,7 @@ puede subir hasta que se le mergea `origin/main`.
 
 ```bash
 bash .github/scripts/smoke-e2e.sh    # los tests @smoke del commit en el que estás; rojo si uno falla o si pasan del tope
+bash .github/scripts/smoke-e2e.sh --spec tests/e2e/login-and-shell.spec.ts   # solo los @smoke de esas specs
 ```
 
 Recorre en el navegador lo que no se puede romper: entrar, las sesiones y los permisos, la separación entre negocios, la
@@ -69,11 +70,20 @@ nocturna»): sus worktrees, sus BD, los dos `runserver` y, pase lo que pase, la 
   pasada nocturna, así que ninguna espera a la otra. Un worker lo lleva a su carpeta y a sus puertos con `NIGHTLY_DIR` y
   `NIGHTLY_HUB_PORT`. Nunca escribe en GitHub; lo que deja está en `runs/<pasada>/` de esa carpeta (`night.log`, los
   registros de los dos `runserver` y `test-results/`).
-- **Salida**: 0 en verde; 1 en rojo (un test, el tope o un paso previo, como las dependencias o una BD); 2 con
-  argumentos, porque no lleva ninguno; 3 si ya corre otro humo en esa carpeta.
+- **`--spec`**: acota el humo a los tests `@smoke` de las specs que nombra, una o varias; nunca lo amplía.
+- **Salida**: 0 en verde; 1 en rojo (un test, el tope o un paso previo, como las dependencias o una BD); 2 con un
+  argumento que no sea `--spec tests/e2e/<nombre>.spec.ts`; 3 si ya corre otro humo en esa carpeta.
 - **Entrar en el humo**: un test se marca solo después de pasar 3 veces seguidas con este comando. Uno que falla sin
   nada roto frenaría todos los cambios: se queda fuera y, si es un fallo de verdad, va a su issue.
-- Hoy no frena ninguna fusión: se corre a mano.
+- **Frena la fusión**: el job `smoke` de `test.yml` corre este mismo comando en cada push, dentro del check `test / test`
+  que exige `main`, con la pila montada en el runner (el SaaS de su `origin/main` en `../saas`, las imágenes en
+  `../blueprints` y Postgres con `compose.yaml`). Un test `@smoke` en rojo deja el check en rojo y la PR no se fusiona.
+  Los grupos entran de uno en uno, tras tres pasadas seguidas en verde del job, y el job los nombra con `--spec`: hoy,
+  entrar, las sesiones, los permisos de un empleado, la separación entre negocios y la suspensión por impago. Con todos
+  dentro, el job correrá todos los `@smoke`, como en el Mac. El job tiene un tope de 10 minutos, el doble de lo que
+  tardan sus pasadas medidas con la pila incluida; un grupo que entra lo vuelve a medir. Lo que hace la pila sale en el
+  registro del job y, si falla, el artefacto `smoke` guarda además los registros de los dos `runserver` y las trazas de
+  Playwright.
 
 ## Registro de hubs y `/internal`
 
@@ -291,9 +301,9 @@ de una app que su plantilla no traía (una portada después) se crean **la prime
   corren. **Apagar** nunca borra tablas; apagada mientras se crean, queda `off` con ellas hechas. Un blueprint que
   enciende una app que aún se prepara no carga sus datos y su informe dice que se vuelva a cargar en un minuto
   («Reintentar» del informe trae lo que faltó).
-- Desde S5 ningún negocio sin BD propia se sirve; solo el respaldo de la suite tiene alguno, y allí enciende al
-  momento (propuesta (i) de la ronda 2026-10-30). `seed_local_hubs` da a `a` y `b` las tablas de todas las apps y todas
-  encendidas (`provision(apps=…)`).
+- Un negocio sin BD propia no se sirve (su dirección responde 503 `base.hub_maintenance`), así que en él no se
+  enciende ninguna app. `seed_local_hubs` da a `a` y `b` las tablas de todas las apps y todas encendidas
+  (`provision(apps=…)`).
 
 
 ### Copias de los datos y uso nocturno (tajada S2b)
@@ -308,7 +318,7 @@ PLAN-DB, ronda 2026-10-30: decisión 2 y propuestas (a), (f), (j), (k), (l), (m)
   nada y deja `failed` con su motivo (`dumps_unavailable`, `dump_failed`, `emptying_failed`, `hub_not_ready`), y la
   pantalla ofrece «Volver a intentarlo». Cada paso llega en vivo (`base.hub.reset_progressed`, aviso tras el COMMIT en
   control) a `base.hub.dumps`. Sin bucket, 503 `base.dumps_unavailable`; con otro en marcha, 409
-  `base.reset_in_progress`; sin BD propia, 409 `base.reset_shared_database` como antes.
+  `base.reset_in_progress`.
 - **La baja**: `base.hub.cancel` de un negocio con su BD propia terminada lo deja debido y el worker lo copia una vez
   (`offboarding`); si falla, reintenta a 1 min, 5 min, 15 min y luego cada hora (`attempts`, `last_error`,
   `next_attempt_at`). La BD se conserva 90 días; pasados, el worker hace su copia final y la borra
@@ -323,7 +333,7 @@ PLAN-DB, ronda 2026-10-30: decisión 2 y propuestas (a), (f), (j), (k), (l), (m)
   apunta boto3 a otro S3 (los tests: el servidor de moto, `base/tenancy/tests/s3.py`); sin `HUB_DUMPS_BUCKET` no hay
   copias y el restablecimiento responde 503.
 - **Ajustes › Datos › Restablecer › «Copias»** (`base.hub.dumps`, vivo; `base.hub.dump_link` en cada «Descargar»):
-  las copias del negocio y su último restablecimiento; nada en un negocio que aún comparte BD.
+  las copias del negocio y su último restablecimiento.
 - **Uso nocturno** (`base/usage.py`, pase `_usage` del worker): a las 00:15 UTC mide el día que acabó (antes de que
   el SaaS lo pida a las 01:15 y fuera de la copia de Aurora de 02:00–03:00) para cada negocio con BD propia:
   `pg_database_size` desde el catálogo de su cluster (conexión de mantenimiento del migrador, sin abrir la BD del

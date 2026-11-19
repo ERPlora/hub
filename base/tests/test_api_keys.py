@@ -4,8 +4,8 @@ Who runs the business creates a key with a name, a pace (requests a minute) and 
 write only, or per app, read and write — and sees its token once; the hub keeps only its digest. The key reaches only
 the operations its apps publish (``expose_api``), of the apps this business has, with the same checks as anyone; it is
 rotated (a new token, the old one stops at once) and revoked (at once, for good). A key lives in its hub's own
-database: a key of one business never opens another. A business without its own database cannot keep that frontier,
-so there its keys are «not available yet» and no token gets in.
+database: a key of one business never opens another. A business without its own database is not served at all, so
+no token gets in there.
 """
 
 import hashlib
@@ -80,7 +80,7 @@ CARTS = "/cart_checkout/carts"
 TAX_CATEGORIES = "/tax/categories"
 
 
-class TestNotYetAvailable:
+class TestWithoutItsOwnDatabase:
     """A business without its own database is not served at all: its door answers 503 before any key is read, made or
     accepted."""
 
@@ -112,7 +112,7 @@ class TestCreate:
         assert kept.token_digest == hashlib.sha256(token.encode()).hexdigest()
         assert token not in json.dumps([getattr(kept, field.attname) for field in ApiKey._meta.fields], default=str)
         listed = get(admin_on_a, host(hub_a), "/keys").json()
-        assert listed["available"] is True
+        assert set(listed) == {"keys", "apps"}
         assert "token" not in listed["keys"][0] and token not in json.dumps(listed)
         assert listed["keys"][0]["created_by"] == "Olga"
 

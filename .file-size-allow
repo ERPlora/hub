@@ -38,7 +38,6 @@
 579 apps/flow/frontend/operations.d.ts ERPlora/erplora-next#74
 1825 apps/flow/queries.py ERPlora/erplora-next#74
 1165 apps/flow/schemas.py ERPlora/erplora-next#74
-2453 apps/flow/services.py ERPlora/erplora-next#74
 784 apps/inventory/frontend/components/ProductFormModal.test.ts ERPlora/erplora-next#74
 487 apps/inventory/frontend/operations.d.ts ERPlora/erplora-next#74
 559 apps/inventory/frontend/pages/ProductsPage.test.ts ERPlora/erplora-next#74
@@ -83,8 +82,8 @@
 971 apps/sale/frontend/operations.d.ts ERPlora/erplora-next#74
 1073 apps/sale/frontend/pages/PosPage.test.ts ERPlora/erplora-next#74
 600 apps/sale/frontend/pages/SalesPage.test.ts ERPlora/erplora-next#74
-898 apps/sale/models.py ERPlora/erplora-next#74
-1717 apps/sale/schemas.py ERPlora/erplora-next#74
+886 apps/sale/models.py ERPlora/erplora-next#74
+1710 apps/sale/schemas.py ERPlora/erplora-next#74
 1560 apps/sale/tests/test_integration_service.py ERPlora/erplora-next#74
 562 apps/schedule/queries.py ERPlora/erplora-next#74
 668 apps/schedule/schemas.py ERPlora/erplora-next#74
@@ -118,9 +117,9 @@
 1032 apps/tax/tests/test_services.py ERPlora/erplora-next#74
 587 apps/verifactu/admin.py ERPlora/erplora-next#74
 588 apps/verifactu/envelope.py ERPlora/erplora-next#74
-403 apps/verifactu/frontend/operations.d.ts ERPlora/erplora-next#74
+401 apps/verifactu/frontend/operations.d.ts ERPlora/erplora-next#74
 747 apps/verifactu/models.py ERPlora/erplora-next#74
-841 apps/verifactu/schemas.py ERPlora/erplora-next#74
+840 apps/verifactu/schemas.py ERPlora/erplora-next#74
 1980 apps/verifactu/tests/test_services.py ERPlora/erplora-next#74
 577 apps/website/queries.py ERPlora/erplora-next#74
 563 apps/whatsapp_inbox/frontend/components/TemplateFormModal.test.ts ERPlora/erplora-next#74
@@ -138,7 +137,7 @@
 669 base/frontend/lib/home.test.ts ERPlora/erplora-next#74
 475 base/frontend/lib/home.ts ERPlora/erplora-next#74
 550 base/frontend/lib/system-back.test.ts ERPlora/erplora-next#74
-970 base/frontend/operations.d.ts ERPlora/erplora-next#74
+960 base/frontend/operations.d.ts ERPlora/erplora-next#74
 623 base/frontend/pages/FilesPage.test.ts ERPlora/erplora-next#74
 742 base/home.py ERPlora/erplora-next#74
 512 base/internal.py ERPlora/erplora-next#74

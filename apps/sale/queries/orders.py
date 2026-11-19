@@ -32,6 +32,16 @@ def pending_lines(order: Order) -> list[OrderLine]:
     return list(order.lines.live().unpaid().order_by("position", "id"))
 
 
+def dish_allergens(dish: dict) -> list[str]:
+    """What a dish of a menu froze; none on a menu ordered before its dishes kept them."""
+    return dish.get("allergens", [])
+
+
+def _combo_row(line: OrderLine) -> dict:
+    components = [{**dish, "allergens": dish_allergens(dish)} for dish in line.combo["components"]]
+    return {"combo_id": line.combo_id, **line.combo, "components": components}
+
+
 def order_line_row(line: OrderLine) -> dict:
     return {
         "id": line.id,
@@ -75,7 +85,8 @@ def order_line_row(line: OrderLine) -> dict:
             for own in line.modifier_lines
         ],
         "kitchen_text": line.kitchen_text,
-        "combo": {"combo_id": line.combo_id, **line.combo} if line.combo_id else None,
+        "allergens": line.allergens,
+        "combo": _combo_row(line) if line.combo_id else None,
     }
 
 

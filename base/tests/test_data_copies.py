@@ -220,7 +220,7 @@ def test_who_runs_the_business_sees_its_copies_and_how_its_reset_went(acme, hub_
 
     seen = call(person(hub.slug), "base.hub.dumps")
 
-    assert seen.available is True
+    assert set(seen.model_dump()) == {"reset", "dumps"}
     assert [(row.id, row.kind, row.bytes, row.created_at) for row in seen.dumps] == [
         (first.pk, "reset", 100, AT)
     ]

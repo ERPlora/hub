@@ -82,7 +82,7 @@ describe('ConfigPage', () => {
   });
 
   it('«My certificate» says whether it is loaded, whose it is and when it expires', async () => {
-    const s = await ownTab({ own_certificate: { ...LOADED, expires_in_days: 17, expires_at: '2026-11-01T10:00:00Z' } });
+    const s = await ownTab({ own_certificate: { ...LOADED, expires_in_days: 17, expires_soon: true, expires_at: '2026-11-01T10:00:00Z' } });
     const cert = s.find('verifactu-config-cert').text();
     expect(cert).toContain('Loaded');
     expect(cert).toContain('ACME SL');
@@ -90,6 +90,13 @@ describe('ConfigPage', () => {
     expect(cert).toContain('Representative of an entity');
     expect(s.find('verifactu-config-expiry').text()).toBe('Expires in 17 days: upload the renewed one here.');
     expect(s.find('verifactu-config-keys').text()).toContain('kept encrypted in this Hub');
+  });
+
+  it('warns of the expiry only when the server says it expires soon', async () => {
+    const soon = await ownTab({ own_certificate: { ...LOADED, expires_in_days: 45, expires_soon: true } });
+    expect(soon.find('verifactu-config-expiry').text()).toBe('Expires in 45 days: upload the renewed one here.');
+    const notYet = await ownTab({ own_certificate: { ...LOADED, expires_in_days: 17, expires_soon: false } });
+    expect(notYet.find('verifactu-config-expiry').exists()).toBe(false);
   });
 
   it('an expired certificate says so', async () => {
@@ -239,11 +246,13 @@ describe('ConfigPage', () => {
   });
 
   it.each([
-    { days: 351, label: 'Valid' },
-    { days: 17, label: 'Expires soon' },
-    { days: -1, label: 'Expired' },
-  ])('gives a certificate with $days days left the explicit status $label', async ({ days, label }) => {
-    const s = await setup({ ...CONFIG_WITHOUT_ERPLORA_ROUTE, own_certificate: { ...LOADED, expires_in_days: days } });
+    { days: 351, soon: false, label: 'Valid' },
+    { days: 17, soon: true, label: 'Expires soon' },
+    { days: 45, soon: true, label: 'Expires soon' },
+    { days: 17, soon: false, label: 'Valid' },
+    { days: -1, soon: false, label: 'Expired' },
+  ])('gives a certificate with $days days left, expiring soon $soon, the explicit status $label', async ({ days, soon, label }) => {
+    const s = await setup({ ...CONFIG_WITHOUT_ERPLORA_ROUTE, own_certificate: { ...LOADED, expires_in_days: days, expires_soon: soon } });
     expect(s.find('verifactu-config-cert-status').text()).toBe(label);
     expect(s.find('verifactu-config-cert').text()).toContain('ACME SL');
   });

@@ -2323,9 +2323,7 @@ Entra: lo que publican las apps del negocio.
 Sale: nada guardado. Crece o mengua con las apps del negocio.
 Si falla: oculta, «La documentación de la API está oculta en este negocio.» y, para quien administra, «Muéstrala en
 Ajustes › General»; si no llega, «No se pudo cargar la documentación.» con «Reintentar»; sin nada publicado,
-«Ninguna app de este negocio publica todavía su API.». Si el negocio aún no puede tener llaves: «Las API keys
-todavía no están disponibles para este negocio: puedes leer la documentación, pero aún ningún sistema puede
-llamarla.».
+«Ninguna app de este negocio publica todavía su API.».
 Implicados: BASE-F91, BASE-F86, BASE-F112 (dentro de la app)
 
 ### BASE-F91 Mostrar u ocultar la documentación de la API
@@ -3508,9 +3506,6 @@ Implicados: BASE-F92, BASE-F93
   encender por sus datos. `base.import.list` se re-ejecuta también con `APP_EVENTS`, y `ImportPanel` y
   `BlueprintCardPending` siguen esa lista. Tests: `base/tests/test_blueprint_waits_for_apps.py`, con dos BD reales y el
   worker de verdad; e2e `tests/e2e/base-template-waits-for-apps.spec.ts`.
-- Un negocio sin BD propia (`hub.db_name` vacío) recibe de `base.hub.reset` sin `dry_run` un 409
-  `base.reset_shared_database` (`available: false` en el plan). Ninguno de producción está así
-  (hub#602): ya nada alcanza esa rama, que se retira en hub#1626.
 - Frontend: `base/frontend/pages/SettingsPage.vue` (`/settings`, pestaña en el hash `#data`; `/import` y `/export`
   llevan aquí), `components/data/*` y `lib/data.ts`; la tarjeta `components/BlueprintCard.vue` («Ahora
   no» en `localStorage["hub-blueprint-card-dismissed"]`). Tests: `base/tests/test_blueprint.py`,
@@ -4115,10 +4110,9 @@ Implicados: BASE-F92, BASE-F93
 - Llaves de API: `base.models.ApiKey` en la BD del hub (token `erpk_live_` + 256 bits, se guarda su SHA-256 y su
   principio); `base/api_keys.py` pone la puerta de la llave (`KeyDoor`) delante de la sesión en toda ruta de una
   operación `expose_api`; la llave recibe el permiso de esa operación y nada más, con su ritmo por minuto y el freno
-  por dirección (`KEY_ADDRESS_LIMIT`). Solo con `hub.db_name` (BD propia), que tienen todos: sin
-  ella, `base.api_key.*` responde 409 `base.api_keys_unavailable` y un `Bearer` no entra (test A≠B en
-  `base/tests/test_api_keys.py`); esa rama, y el «Todavía no disponible» de sus pantallas, solo la alcanza el
-  respaldo de los tests, y se retira con él (hub#611).
+  por dirección (`KEY_ADDRESS_LIMIT`). La llave vive en la BD del negocio, así que la de uno nunca abre otro (test
+  A≠B en `base/tests/test_api_keys.py`); un negocio sin BD propia no se sirve y su dirección responde 503
+  `base.hub_maintenance`, con llave o sin ella.
 - Aprobación con PIN de un responsable: una app nombra sus órdenes aprobables en su `LiveAppConfig`
   (`approvals = {"sale.sale.void": _("Void a sale")}`; una consulta nunca, ni una orden `database=False`, que no abre
   transacción en la que gastar el pase: `base.E004` lo dice al arrancar). `base/approvals.py` pone su puerta

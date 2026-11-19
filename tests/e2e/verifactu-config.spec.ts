@@ -262,6 +262,16 @@ test('Mi certificado: an unrecognised authority is refused; a kept one shows its
       await expect(shown(p).locator('[data-testid=verifactu-config-cert]')).toContainText('Cargado');
     });
   }
+  await expect(own.locator('[data-testid=verifactu-config-expiry]')).toHaveCount(0);
+
+  // F34: within the server's notice period the screen warns; the server decides it, the screen paints it.
+  psql("update verifactu_owncertificate set expires_at = now() + interval '20 days 1 hour'");
+  await page.reload();
+  await shown(page).locator('[data-testid=verifactu-config-tab-own]').click();
+  await expect(own.locator('[data-testid=verifactu-config-expiry]')).toHaveText('Caduca en 20 días: sube aquí el renovado.');
+  await flowShots(page, 'F34-expires-soon', async (p) => {
+    await expect(shown(p).locator('[data-testid=verifactu-config-expiry]')).toBeVisible();
+  });
 
   await own.locator('[data-testid=verifactu-config-cert-remove]').click();
   // By its title: the shell keeps other dialogs in the page (the apps launcher is an ion-modal too).

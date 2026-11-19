@@ -8,9 +8,9 @@ from live.context import OperationContext
 from live.errors import Conflict, NotFound, PermissionDenied
 
 from apps.sale.models import OrderLine
-from apps.sale.queries.business import actor, business_currency, missing_tax, money_text
-from apps.sale.queries.line_parts import GRID_FALLBACK, check_grid, provisional_total
-from apps.sale.queries.order_lines import OPEN_PRICE_PERMISSION
+from apps.sale.queries.business import business_currency, missing_tax, money_text
+from apps.sale.queries.line_parts import GRID_FALLBACK, check_grid
+from apps.sale.queries.order_lines import OPEN_PRICE_PERMISSION, new_line
 from apps.sale.queries.other_apps import call_app, call_services
 from apps.sale.schemas import ServiceLineFields
 
@@ -171,22 +171,16 @@ def freeze_service_line(
             code="sale.tax_category_missing",
         )
     check_grid(data.quantity, GRID_FALLBACK, "ud")
-    line = OrderLine(
+    return new_line(
+        ctx,
+        data,
         service_id=service.id,
         name=service.name,
         sku=service.sku,
         is_service=True,
         unit="ud",
         increment=GRID_FALLBACK,
-        quantity=data.quantity,
         unit_price=_line_price(ctx, service, data, booking),
         cost=service.cost,
         tax_category_key=service.tax_category_key,
-        notes=data.notes,
-        staff_id=data.staff_id,
-        is_gift=data.is_gift,
-        gift_reason=data.gift_reason if data.is_gift else "",
-        created_by=actor(ctx),
     )
-    line.line_total = provisional_total(line)
-    return line

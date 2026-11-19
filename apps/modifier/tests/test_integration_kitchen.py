@@ -16,6 +16,7 @@ from live.context import OperationContext
 from live.meta import all_live_app_configs
 
 from apps.kitchen.models import TicketItem
+from apps.kitchen.tests.conftest import add_printers
 from apps.printing.models import PrintJob
 from base.tenancy.context import use_hub
 
@@ -73,6 +74,7 @@ def burger(factory_data):
 
 
 def test_the_kitchen_names_of_the_options_reach_the_card_and_the_paper_through_the_relay(tick, burger):
+    add_printers()
     ids = burger
     # Not the catalogue's order (Doneness before Extras, cheese before soda): the order the waiter tapped them.
     chosen = [ids["soda"], ids["cheese"], ids["rare"], ids["onion"]]
@@ -120,6 +122,7 @@ def test_renaming_or_deleting_an_option_after_the_round_never_rewrites_the_ticke
 
 
 def test_a_dish_without_options_carries_none_on_card_or_paper(tick, burger):
+    add_printers()
     make_product("Fries", "FRI", 300, FOOD)
     fired("FRI")
 

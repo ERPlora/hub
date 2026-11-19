@@ -4,7 +4,7 @@ import { errorFrame, flush, mountBase, subId } from '../__tests__/mount-base';
 import SystemRelease from './SystemRelease.vue';
 
 const OP = 'base.system.status';
-const STATUS = { version: '4da2a10', released_at: '2026-10-23T18:50:00Z', shared_database: true };
+const STATUS = { version: '4da2a10', released_at: '2026-10-23T18:50:00Z' };
 
 async function open(options: Parameters<typeof mountBase>[1] = {}) {
   const m = await mountBase(SystemRelease, options);

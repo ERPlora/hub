@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:d5e0fb75b485a354a00de65807074f9048637a5fbf363c08baa7c049751ae10b -->
+<!-- generated from WORKBOOK.md sha256:b31ecb9cec1794251c6819545326899bdbf4c1b899566e9ed5278125df029eef -->
 
 ## What it is for and who it is for
 
@@ -309,7 +309,7 @@ With the window as it opened, Back closes it without asking (BASE-F05).
 | SALE-F37 | Add a payment method (Bizum, bank transfer…) | common | done |
 | SALE-F38 | Sell a service from Services | hair salon | done |
 | SALE-F39 | Charge with what another app adds (the tip) | common | not done |
-| SALE-F40 | See a dish's allergens when ordering it | common | not done |
+| SALE-F40 | See a dish's allergens when ordering it | common | partial |
 | SALE-F41 | Mark the customer's allergy on a line | restaurant | not done |
 
 ### SALE-F01 Sell and charge in cash
@@ -1357,7 +1357,8 @@ ticket's cap (€3,000) and the cash cap (€1,000) look at the sale's total, as
 Involved: TIP-F02, TIP-F03, TIP-F04, CASH_REGISTER-F18, INVOICE-F01
 
 ### SALE-F40 See a dish's allergens when ordering it
-Status: not done — the till does not receive the product's allergens yet, nor does the line keep them
+Status: partial — the line keeps its product's allergens (in a menu, each dish's) and the live check and the order
+sent carry them, but the till does not paint them yet on the line or on the sheets (hub#1738)
 Vertical: common
 Actor: employee, manager
 Screen: Sell
@@ -1513,7 +1514,7 @@ the quick notes and what is refundable can be followed live.
 | Sale with its document | A document that could not be issued in the charge, the void or the refund is issued later (the charge's retry, "Issue now" or Invoicing's reaction) | The sale, the document, its number, the refund (`refund_id`) or whether it is the void's (`void`); one per document | `sale.sale.invoiced` |
 | Check opened | Open or split | The check | `sale.order.opened` |
 | Check changed | Any change of lines, discounts or title | The check | `sale.order.changed` |
-| Order sent | Send to the kitchen | The check, its title, the channel, the round, who serves and the lines with their notes | `sale.order.fired` |
+| Order sent | Send to the kitchen | The check, its title, the channel, the round, who serves and the lines with their notes and their product's allergens (in a menu, each dish's) | `sale.order.fired` |
 | Check closed | Charge the last of a check | The check | `sale.order.completed` |
 | Check voided | Void an open check | The check | `sale.order.voided` |
 | Checks merged | Merge | The absorbed one and the one that stays | `sale.order.merged` |

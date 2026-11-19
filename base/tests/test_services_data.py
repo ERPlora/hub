@@ -266,7 +266,8 @@ def test_the_plan_says_what_each_app_would_lose_and_what_to_type(owner):
 
     plan = call(owner, "base.hub.reset", dry_run=True)
 
-    assert (plan.dry_run, plan.available) == (True, True)
+    assert set(plan.model_dump()) == {"dry_run", "confirm_with", "sections", "apps", "status"}
+    assert plan.dry_run is True
     assert plan.confirm_with == "Bar Pepe"
     assert {(section.id, section.label, section.rows) for section in plan.sections} == {
         ("inventory", "Inventario", 22),

@@ -169,8 +169,6 @@ export interface PlanLimit {
 
 /** `base.DatabaseUsageOut`: the size of the business's own database, as the last night measured it (BASE-F40). */
 export interface DatabaseUsage {
-  /** False while the business shares its database with others: no size of its own yet. */
-  available: boolean;
   /** Its size in bytes; null before the first night measured it. */
   bytes: number | null;
   /** The day (UTC, `YYYY-MM-DD`) it was measured; null before the first night. */
@@ -409,8 +407,6 @@ export interface HubReset {
   dry_run: boolean;
   /** What to type to confirm: the business's name. */
   confirm_with: string;
-  /** False while the business shares its database with other hubs. */
-  available: boolean;
   sections: ResetSection[];
   /** Always empty: the worker empties after copying (`base.hub.dumps` says how it went). */
   apps: Removal[];
@@ -441,8 +437,6 @@ export interface HubDump {
 
 /** `base.HubDumpsOut`: the copies (newest first) and the last reset. */
 export interface HubDumps {
-  /** False while the business shares its database with others: no copy is ever made then. */
-  available: boolean;
   reset: ResetProgress | null;
   dumps: HubDump[];
 }
@@ -504,14 +498,12 @@ export interface Business {
 
 // ── System ───────────────
 
-/** `base.SystemStatusOut`: the release running and where the business's data lives. */
+/** `base.SystemStatusOut`: the release running. */
 export interface SystemStatus {
   /** The commit, short; `dev` locally. */
   version: string;
   /** When it was published (ISO 8601), or null: never made up. */
   released_at: string | null;
-  /** Whether the business still shares one database with others. */
-  shared_database: boolean;
 }
 
 /** `base.EventLogEntryOut`: an event between apps as System › Logs shows it. */
@@ -748,8 +740,6 @@ export interface ApiApp {
 
 /** `base.ApiKeyListOut`. */
 export interface ApiKeyList {
-  /** False while the business shares its database with others: no key yet. */
-  available: boolean;
   keys: ApiKeyRow[];
   apps: ApiApp[];
 }
@@ -946,7 +936,7 @@ declare module '@erplora/ui/sdk' {
     'base.approval.approvers': { input: { operation: string }; output: { people: Approver[]; pin_length: number } };
     'base.approval.export': { input: ApprovalExportQuery; output: ApprovalExport };
     'base.approval.approve': { input: ApprovalInput; output: ApprovalPass };
-    'base.api_doc.get': { input: NoInput; output: { document: Record<string, unknown>; apps: ApiApp[]; keys_available: boolean } };
+    'base.api_doc.get': { input: NoInput; output: { document: Record<string, unknown>; apps: ApiApp[] } };
     'base.api_doc.settings': { input: NoInput; output: { docs_enabled: boolean; can_change: boolean } };
     'base.api_doc.settings_update': { input: { docs_enabled: boolean }; output: { docs_enabled: boolean; can_change: boolean } };
     // Assistant; its turn is a stream the shared panel reads itself (@erplora/ui, Assistant/stream.ts).

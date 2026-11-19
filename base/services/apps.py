@@ -34,7 +34,6 @@ from base.permissions import ADMINISTER_HUB
 from base.schemas.apps import AppChangeIn, AppChangeOut
 from base.services.blueprints import _load_what_waited, _stop_waiting, _waiting_loads
 from base.services.photo import _sync_photo_blocks
-from base.services.reset import has_own_database
 from base.tenancy import migrator
 from control.models import HubDue
 
@@ -153,24 +152,21 @@ def _apps_without_migrations() -> frozenset[str]:
     return frozenset(activation.module_graph()) - set(_code_leaves())
 
 
-def apps_created(hub: Hub | None) -> frozenset[str] | None:
+def apps_created(hub: Hub) -> frozenset[str]:
     """The modules whose tables ``hub``'s own database has: what the migrator confirmed (``Hub.schema_apps``; the
-    worker's ``ensure_schema`` makes what it lacks and is a no-op for what it has) and those without migrations;
-    ``None`` for a hub that shares its database, where every app has them."""
-    if not has_own_database(hub):
-        return None
+    worker's ``ensure_schema`` makes what it lacks and is a no-op for what it has) and those without migrations."""
     return frozenset(hub.schema_apps or ()) | _apps_without_migrations()
 
 
 def _tables_first(
     changes: dict[str, activation.Activation],
     current: dict[str, activation.Activation],
-    created: frozenset[str] | None,
+    created: frozenset[str],
 ) -> dict[str, activation.Activation]:
     """``changes`` as they are written: when an app they turn on lacks its tables, every app they turn on is
     ``creating`` (one plan); an app already on stays on."""
     turning_on = [label for label, row in changes.items() if row.on and not current[label].on]
-    if created is None or all(label in created for label in turning_on):
+    if all(label in created for label in turning_on):
         return changes
     return {
         label: activation.Activation(CREATING, row.chosen) if label in turning_on else row
@@ -242,8 +238,8 @@ def app_enable(ctx: OperationContext, data: AppChangeIn) -> dict:
     paid one without its right (or needing one) is 402 ``app_entitlement_blocked``; one more chosen app at the plan's
     limit, 402 ``base.app_limit_reached`` (a lower limit than the chosen ones turns nothing off: it only refuses this);
     409 ``base.app_vetoed`` when it, or what would come along, refuses (``can_enable``, hub#694).
-    In a hub with its own database whose tables for it (or for what it needs) are not made yet, ``creating`` (202):
-    the worker makes them and turns it on; one that failed is tried again."""
+    While the hub's tables for it (or for what it needs) are not made yet, ``creating`` (202): the worker makes them
+    and turns it on; one that failed is tried again."""
     with activation.changing(ctx.scope.key):
         return _enable(ctx, data)
 
@@ -408,14 +404,13 @@ def _disable(ctx: OperationContext, data: AppChangeIn) -> dict:
 def app_retry(ctx: OperationContext, data: AppChangeIn) -> dict:
     """An app whose tables could not be made (``failed``) is ``creating`` again now, with what it needs
     that failed too, and its hub rung (the worker also tries again by itself). 409 ``base.app_not_failed`` for any
-    other app, and in a hub that shares its database, where nothing is ever made later; 409 ``base.app_vetoed``
-    when it refuses to go on (``can_enable``, as «Turn on»). The app by its name or its id, as ``base.app.enable`` takes
-    it (hub#539)."""
+    other app; 409 ``base.app_vetoed`` when it refuses to go on (``can_enable``, as «Turn on»). The app by its name or
+    its id, as ``base.app.enable`` takes it (hub#539)."""
     with activation.changing(ctx.scope.key):
         hub = _business_hub(ctx)
         app = _business_module(ctx, data.app, hub).label
-        current = _locked_states(ctx, activation.module_graph()) if has_own_database(hub) else None
-        if current is None or current[app].state != FAILED:
+        current = _locked_states(ctx, activation.module_graph())
+        if current[app].state != FAILED:
             raise Conflict(gettext("This app is not waiting to be set up again."), code="base.app_not_failed")
         graph = activation.module_graph()
         closure = {app, *activation.needs([app], graph)}

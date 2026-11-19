@@ -14,7 +14,7 @@ from apps.sale.queries.business import actor, missing_tax
 from apps.sale.queries.departments import _department_refused, find_department, find_tax_category
 from apps.sale.queries.line_parts import GRID_FALLBACK, WHOLE, check_grid, provisional_total
 from apps.sale.queries.other_apps import call_app
-from apps.sale.schemas import ComboLineFields, OpenLineFields, ProductLineIn
+from apps.sale.schemas import ComboLineFields, LineFields, OpenLineFields, ProductLineIn
 
 PRODUCT_NOT_AVAILABLE = _(
     "A product of the ticket is no longer in the catalog. Remove the line and add it again."
@@ -27,6 +27,22 @@ PRODUCT_SOLD_OUT = _("«%(name)s» is sold out.")
 OPEN_PRICE_PERMISSION = _(
     "Only someone who may sell at an open price can add this line: ask a manager."
 )
+
+
+def new_line(ctx: OperationContext, data: LineFields, **frozen) -> OrderLine:
+    """An unsaved row: what ``frozen`` copies of its product, menu, service or price, what every line takes from its
+    input (quantity, note, who serves it, comp) and its provisional total."""
+    line = OrderLine(
+        **frozen,
+        quantity=data.quantity,
+        notes=data.notes,
+        staff_id=data.staff_id,
+        is_gift=data.is_gift,
+        gift_reason=data.gift_reason if data.is_gift else "",
+        created_by=actor(ctx),
+    )
+    line.line_total = provisional_total(line)
+    return line
 
 
 def inventory_units(ctx: OperationContext) -> dict:
@@ -54,6 +70,17 @@ def _resolved_menu(ctx: OperationContext, request: dict) -> dict:
     return call_app(ctx, COMBO_RESOLVE, request, "sale.combo_unavailable").model_dump(mode="json")
 
 
+def _product(ctx: OperationContext, data: dict):
+    return call_app(ctx, "inventory.product.get", data, "sale.catalog_unavailable")
+
+
+def _with_allergens(ctx: OperationContext, menu: dict) -> dict:
+    """Menus' answer with each dish carrying the allergens Inventory declares for its product today (SALE-F40)."""
+    for dish in menu["components"]:
+        dish["allergens"] = _product(ctx, {"id": dish["product_id"]}).allergens
+    return menu
+
+
 def freeze_combo_line(ctx: OperationContext, data: ComboLineFields) -> OrderLine:
     """An unsaved row for a menu of Menus (SALE-F12): Menus checks the dishes picked and prices it; the line
     keeps its answer, and its amount as the price ordered. A menu is sold in whole units."""
@@ -66,24 +93,18 @@ def freeze_combo_line(ctx: OperationContext, data: ComboLineFields) -> OrderLine
             "choices": [choice.model_dump(exclude_none=True) for choice in data.choices],
         },
     )
-    line = OrderLine(
+    return new_line(
+        ctx,
+        data,
         combo_id=answer["combo_id"],
-        combo=answer,
+        combo=_with_allergens(ctx, answer),
         name=answer["name"],
         unit="ud",
         increment=WHOLE,
-        quantity=data.quantity,
         unit_price=answer["amount"],
         tax_category_key=answer["tax_category_key"] or "",
         kitchen_text=", ".join(_dish_label(dish) for dish in answer["components"])[:500],
-        notes=data.notes,
-        staff_id=data.staff_id,
-        is_gift=data.is_gift,
-        gift_reason=data.gift_reason if data.is_gift else "",
-        created_by=actor(ctx),
     )
-    line.line_total = provisional_total(line)
-    return line
 
 
 def refresh_combos(ctx: OperationContext, lines: Iterable[OrderLine]) -> None:
@@ -139,12 +160,7 @@ def freeze_product_line(
     """An unsaved row for a product of Inventory: its price, unit and category frozen from the catalog. Only a
     new line goes through here, so an article sold out since it was ordered is still charged (COMBO-F08)."""
     try:
-        product = call_app(
-            ctx,
-            "inventory.product.get",
-            {"id": data.product_id, "product": data.product},
-            "sale.catalog_unavailable",
-        )
+        product = _product(ctx, {"id": data.product_id, "product": data.product})
     except NotFound:
         raise Conflict(
             str(PRODUCT_NOT_AVAILABLE), code="sale.product_not_available"
@@ -165,7 +181,9 @@ def freeze_product_line(
     check_grid(data.quantity, unit[2], product.unit)
     chosen = _options(ctx, product, data.option_ids)
     picks = [pick.model_dump(mode="json") for pick in chosen.picks] if chosen else []
-    line = OrderLine(
+    return new_line(
+        ctx,
+        data,
         product_id=product.id,
         name=product.name,
         sku=product.sku,
@@ -179,21 +197,14 @@ def freeze_product_line(
         pricing_unit=product.pricing_unit,
         pricing_factor_num=priced_in[0],
         pricing_factor_den=priced_in[1],
-        quantity=data.quantity,
         unit_price=product.price + (chosen.folded_delta if chosen else 0),
         cost=product.cost,
         tax_category_key=product.tax_category_key,
         modifiers=picks,
         modifier_lines=[own.model_dump(mode="json") for own in chosen.own_lines] if chosen else [],
         kitchen_text=chosen.kitchen_text[:500] if chosen else "",
-        notes=data.notes,
-        staff_id=data.staff_id,
-        is_gift=data.is_gift,
-        gift_reason=data.gift_reason if data.is_gift else "",
-        created_by=actor(ctx),
+        allergens=product.allergens,
     )
-    line.line_total = provisional_total(line)
-    return line
 
 
 def freeze_open_line(ctx: OperationContext, data: OpenLineFields) -> OrderLine:
@@ -212,19 +223,13 @@ def freeze_open_line(ctx: OperationContext, data: OpenLineFields) -> OrderLine:
     with translation.override(ctx.language):
         name = data.name or (department.name if department else category.display_name)
     check_grid(data.quantity, GRID_FALLBACK, "ud")
-    line = OrderLine(
+    return new_line(
+        ctx,
+        data,
         department=department,
         name=name,
         unit="ud",
         increment=GRID_FALLBACK,
-        quantity=data.quantity,
         unit_price=data.unit_price,
         tax_category_key=category.key,
-        notes=data.notes,
-        staff_id=data.staff_id,
-        is_gift=data.is_gift,
-        gift_reason=data.gift_reason if data.is_gift else "",
-        created_by=actor(ctx),
     )
-    line.line_total = provisional_total(line)
-    return line

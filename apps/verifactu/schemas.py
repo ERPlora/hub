@@ -409,6 +409,7 @@ class CertificateOut(Schema):
     uploaded_at: dt.datetime | None = Field(description="When it was uploaded.")
     expires_at: dt.datetime | None = Field(description="When it expires.")
     expires_in_days: int | None = Field(description="Days left (negative: expired).")
+    expires_soon: bool = Field(description="It expires within the notice period and has not expired: the screen warns.")
 
 
 DocumentName = Literal[
@@ -483,9 +484,7 @@ class ConfigOut(Schema):
     account_url: str = Field(
         description="The ERPlora account, where the signed authorisation is managed."
     )
-    own_certificate: CertificateOut = Field(
-        description="The own certificate uploaded in this Hub (never its material)."
-    )
+    own_certificate: CertificateOut = Field(description="The own certificate uploaded in this Hub (never its material).")
     representation: RepresentationOut = Field(
         description="The signed authorisation, as the account says."
     )
