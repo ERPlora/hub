@@ -60,6 +60,8 @@ describe('ownerRequest', () => {
     ]);
     expect(request.url).toBe('https://openrouter.ai/api/v1/chat/completions');
     expect(request.body.temperature).toBe(0);
+    expect(request.body.reasoning).toEqual({ effort: 'minimal' });
+    expect(request.body.max_tokens).toBe(2000);
     expect(request.body.model).toBe(OWNER_DEFAULT);
     expect(request.body.usage).toEqual({ include: true });
     expect(request.body.messages[0]).toEqual({ role: 'system', content: ownerSystem(scenario) });
@@ -113,6 +115,15 @@ describe('askOwner', () => {
     const asked = askOwner({ fetcher, choice: ownerChoice({ QA_OPENROUTER_API_KEY: 'k' }), key: 'secret', timeoutMs: 20 }, scenario, transcript);
     await expect(asked).rejects.toThrow(/timed out|aborted/i);
     expect(signal?.aborted).toBe(true);
+  });
+
+  it('asks once more when the owner model says nothing, and fails when it says nothing again', async () => {
+    const answers = ['', 'En Postres'];
+    const fetcher = async () => new Response(JSON.stringify({ choices: [{ message: { content: answers.shift() } }], usage: { prompt_tokens: 5, completion_tokens: 2, cost: 0.001 } }));
+    const reply = await askOwner({ fetcher, choice: ownerChoice({ QA_OPENROUTER_API_KEY: 'k' }), key: 'secret' }, scenario, transcript);
+    expect(reply).toMatchObject({ say: 'En Postres', tokensIn: 10, tokensOut: 4, costUsd: 0.002 });
+    const silent = async () => new Response(JSON.stringify({ choices: [{ message: { content: '' } }], usage: {} }));
+    await expect(askOwner({ fetcher: silent, choice: ownerChoice({ QA_OPENROUTER_API_KEY: 'k' }), key: 'secret' }, scenario, transcript)).rejects.toThrow(/said nothing/);
   });
 
   it('fails with the status and what the API said, never with the key', async () => {

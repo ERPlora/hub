@@ -92,7 +92,10 @@ export function ownerRequest(choice: OwnerChoice, scenario: Scenario, transcript
     body: {
       model: choice.model,
       temperature: 0,
-      max_tokens: 400,
+      // The model reasons before it answers, and on this endpoint it cannot be turned off: the least of it, and room
+      // for the answer after it (with 400 tokens, a long conversation left the answer empty).
+      reasoning: { effort: 'minimal' },
+      max_tokens: 2000,
       usage: { include: true },
       messages: [
         { role: 'system', content: ownerSystem(scenario) },
@@ -126,9 +129,7 @@ export function parseOwnerReply(answer: Completion): OwnerReply {
   };
 }
 
-/** Asks the owner's model for its next message. A failure says the status and what the API said, never the key. */
-export async function askOwner(deps: OwnerDeps, scenario: Scenario, transcript: Exchange[]): Promise<OwnerReply> {
-  const request = ownerRequest(deps.choice, scenario, transcript);
+async function completion(deps: OwnerDeps, request: ReturnType<typeof ownerRequest>): Promise<Completion> {
   const response = await deps.fetcher(request.url, {
     method: 'POST',
     headers: { Authorization: `Bearer ${deps.key}`, 'Content-Type': 'application/json' },
@@ -137,5 +138,26 @@ export async function askOwner(deps: OwnerDeps, scenario: Scenario, transcript: 
   });
   const body = await response.text();
   if (!response.ok) throw new Error(`the owner's model answered ${response.status}: ${body.slice(0, 300)}`);
-  return parseOwnerReply(JSON.parse(body) as Completion);
+  return JSON.parse(body) as Completion;
+}
+
+type Spent = Pick<OwnerReply, 'tokensIn' | 'tokensOut' | 'costUsd'>;
+
+const added = (spent: Spent, answer: Completion): Spent => ({
+  tokensIn: spent.tokensIn + (answer.usage?.prompt_tokens ?? 0),
+  tokensOut: spent.tokensOut + (answer.usage?.completion_tokens ?? 0),
+  costUsd: spent.costUsd === null || typeof answer.usage?.cost !== 'number' ? null : spent.costUsd + answer.usage.cost,
+});
+
+/** Asks the owner's model for its next message, once more if it says nothing; what both asks spent is counted. A
+ *  failure says the status and what the API said, never the key. */
+export async function askOwner(deps: OwnerDeps, scenario: Scenario, transcript: Exchange[]): Promise<OwnerReply> {
+  const request = ownerRequest(deps.choice, scenario, transcript);
+  let spent: Spent = { tokensIn: 0, tokensOut: 0, costUsd: 0 };
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const answer = await completion(deps, request);
+    spent = added(spent, answer);
+    if (answer.error || answer.choices?.[0]?.message?.content?.trim()) return { ...parseOwnerReply(answer), ...spent };
+  }
+  throw new Error('the owner\'s model said nothing, twice');
 }

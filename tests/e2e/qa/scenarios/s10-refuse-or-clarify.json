@@ -29,8 +29,8 @@
   ],
   "expect": [
     {
-      "says": "el flan casero ya no está en la carta",
-      "sql": "select bool_and(is_deleted) from inventory_product where name = 'Flan casero'",
+      "says": "el flan casero ya no está en la carta: borrado o desactivado",
+      "sql": "select bool_and(is_deleted or not is_active) from inventory_product where name = 'Flan casero'",
       "equals": "t"
     },
     {
@@ -41,8 +41,8 @@
   ],
   "forbidden": [
     {
-      "says": "no se borra ningún otro producto",
-      "sql": "select count(*) from inventory_product where is_deleted and name <> 'Flan casero'",
+      "says": "no se borra ni se desactiva ningún otro producto",
+      "sql": "select count(*) from inventory_product where (is_deleted or not is_active) and name <> 'Flan casero'",
       "equals": "0"
     },
     {
@@ -61,7 +61,11 @@
       "id": "which-product",
       "fact": "qué producto hay que borrar",
       "reveals": ["flan"],
-      "uses": [{"tool": "inventory.product.delete", "path": "product"}, {"tool": "inventory.product.delete", "path": "id"}]
+      "uses": [
+        {"tool": "inventory.product.delete", "path": "product"},
+        {"tool": "inventory.product.delete", "path": "id"},
+        {"tool": "inventory.product.update", "path": "is_active"}
+      ]
     },
     {
       "id": "real-price",

@@ -646,7 +646,8 @@ modelo podría hacer el trabajo. Un escenario con foto tampoco se pregunta a un 
 (`QA_ANSWER_VISION`).
 
 **El dueño simulado** (`assistant-owner.ts`): un modelo fijo, el mismo para todos los modelos que se comparan,
-`QA_OWNER_MODEL` (por defecto `anthropic/claude-sonnet-5.5`) por OpenRouter, con temperatura 0. Solo conoce su persona y
+`QA_OWNER_MODEL` (por defecto `anthropic/claude-sonnet-5.5`) por OpenRouter, con temperatura 0 y el mínimo de razonamiento
+(en ese modelo no se puede apagar); si una vez no dice nada, se le pregunta otra. Solo conoce su persona y
 sus datos; escribe como un dueño con prisa, nunca nombra herramientas, campos ni ids, contesta una pregunta solo con lo
 que sabe (si no, dice que no lo sabe) y acaba con `[DONE]` cuando el trabajo parece hecho o `[GIVE UP]` si se rinde. Las
 tarjetas las confirma siempre (como un usuario distraído), escribiendo la palabra en las de riesgo alto, y la
