@@ -209,7 +209,7 @@ def _refuse_taken_name() -> Conflict:
         "asks": {
             "en": (
                 "add a new printer called Kitchen 2 on 192.168.1.50",
-                "add a receipt printer",
+                "add a thermal receipt printer",
                 "connect a bluetooth printer for labels",
             ),
             "es": (
@@ -258,7 +258,7 @@ def create_printer(ctx: OperationContext, data: PrinterIn) -> dict:
     ai={
         "asks": {
             "en": (
-                "change the IP, the paper and the name of the Caja 2 printer",
+                "plug the Caja 2 printer in by USB",
                 "rename the Till printer to Front desk",
                 "switch the kitchen printer to 58 mm paper",
                 "deactivate the old bar printer",
@@ -266,7 +266,7 @@ def create_printer(ctx: OperationContext, data: PrinterIn) -> dict:
             "es": (
                 "cambia la IP, el papel y el nombre de la impresora Caja 2",
                 "renombra la impresora de la caja como Recepción",
-                "pon la impresora de cocina con papel de 58 mm",
+                "pon rollos de 58 mm en la impresora de cocina",
                 "desactiva la impresora de la barra",
             ),
         },
@@ -372,7 +372,7 @@ def _chosen_printer(field: str, ref: str | None, usage: str) -> Printer | None:
             ),
             "es": (
                 "que el ticket se imprima solo al cobrar",
-                "manda los pedidos de cocina a la impresora Cocina 2",
+                "manda los pedidos de cocina a la impresora Cocina 2 por defecto",
                 "imprime dos copias de cada ticket",
                 "que se abra el cajón al cobrar",
             ),
@@ -491,13 +491,13 @@ def _new_job(ctx: OperationContext, **values) -> PrintJob:
     ai={
         "asks": {
             "en": (
-                "print this receipt on the Till printer",
+                "print out a copy of this order",
                 "print the label of this product",
                 "send this document to the kitchen printer",
             ),
             "es": (
                 "imprime este ticket en la impresora de la caja",
-                "imprime la etiqueta de este producto",
+                "imprime la etiqueta adhesiva de este producto",
                 "manda este documento a la impresora de cocina",
             ),
         },
@@ -576,13 +576,13 @@ def create_job(ctx: OperationContext, data: JobCreateIn) -> dict:
         "asks": {
             "en": (
                 "print a test page on the Caja 2 printer",
-                "test the kitchen printer",
+                "try out the kitchen printer",
                 "send a test ticket to the Till printer",
             ),
             "es": (
-                "saca una página de prueba en la impresora Caja 2",
-                "prueba la impresora de cocina",
-                "manda un ticket de prueba a la impresora de la caja",
+                "saca una página de prueba en la impresora Caja 2 para ver la calidad",
+                "imprime una hoja de prueba en la impresora de cocina",
+                "manda un ticket de prueba a la impresora de la caja, a ver si tira",
             ),
         },
         "description": "Print a test page on a printer, named by its name or id («test the kitchen printer»): the device "
@@ -894,7 +894,7 @@ def _reached_printers(ids: list) -> list[Printer]:
             ),
             "es": (
                 "deja este equipo encargado de la impresión de los tickets",
-                "este equipo se encargará de los trabajos de impresión",
+                "vincula esto a la impresión del local",
             ),
         },
         "description": "Set up the device the person is using to print, with its name and the printers it reaches: from "
@@ -1066,13 +1066,13 @@ def retry_job(ctx: OperationContext, data: JobRefIn) -> dict:
     ai={
         "asks": {
             "en": (
-                "cancel the print job of ticket T-000123",
-                "do not print that queued document",
+                "cancel the print job of the bar's order",
+                "call off printing that document",
                 "drop the stuck print from the queue",
             ),
             "es": (
                 "cancela la impresión del ticket T-000123",
-                "no imprimas ese documento que está en cola",
+                "no saques ese documento por la impresora",
                 "saca de la cola la impresión atascada",
             ),
         },

@@ -239,8 +239,8 @@ _PRINTER_SORT = {"name": Lower("name"), "usage": "usage", "kind": "kind", "creat
                 "which printers are inactive?",
             ),
             "es": (
-                "¿qué impresoras tengo?",
-                "enséñame las impresoras del negocio",
+                "¿qué impresoras tenemos instaladas?",
+                "enséñame el listado de impresoras del negocio",
                 "¿qué impresoras hay de cocina?",
             ),
         },
@@ -278,11 +278,11 @@ def list_printers(ctx: OperationContext, params: PrinterListIn) -> dict:
         "asks": {
             "en": (
                 "tell me about the kitchen printer",
-                "what IP does the Till printer have?",
+                "what are the address and port of the Till printer?",
             ),
             "es": (
                 "háblame de la impresora de cocina",
-                "¿qué IP tiene la impresora de la caja?",
+                "¿por qué puerto va la impresora de la caja?",
                 "¿de qué papel es la impresora Caja 2?",
             ),
         },
@@ -302,13 +302,13 @@ def get_printer(ctx: OperationContext, params: PrinterRefIn) -> dict:
     ai={
         "asks": {
             "en": (
-                "is the kitchen printer working?",
+                "is the kitchen printer working or offline?",
                 "why is the Till printer not printing?",
                 "when did the bar printer last print?",
             ),
             "es": (
                 "¿funciona la impresora de cocina?",
-                "¿por qué no imprime la impresora de la caja?",
+                "¿por qué se ha parado la impresora de la caja?",
                 "¿cuándo imprimió por última vez la de la barra?",
             ),
         },
@@ -418,7 +418,7 @@ def find_job(job_id: uuid.UUID | None, reference: str | None, *, lock: bool = Fa
             "es": (
                 "¿qué hay en la cola de impresión?",
                 "¿qué impresiones han fallado hoy?",
-                "enséñame las impresiones pendientes",
+                "enséñame las impresiones pendientes y atrasadas",
             ),
         },
         "description": "List the print queue, newest first: each job's document and number, function, printer, state "
@@ -463,11 +463,11 @@ def job_label(job: PrintJob, language: str) -> str:
         "asks": {
             "en": (
                 "what happened to the print job of ticket T-000123?",
-                "did ticket T-000123 print?",
+                "has the T-000123 ticket been printed yet?",
             ),
             "es": (
                 "¿qué pasó con la impresión del ticket T-000123?",
-                "¿se imprimió el ticket T-000123?",
+                "¿llegó a salir el ticket T-000123?",
                 "dime el estado de la impresión de la factura F-000045",
             ),
         },

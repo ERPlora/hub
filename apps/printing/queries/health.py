@@ -33,7 +33,7 @@ SEEN_WITHIN = dt.timedelta(seconds=90)
             ),
             "es": (
                 "¿funciona ahora mismo la impresora de tiques?",
-                "¿está conectada en este momento la impresora de los tiques?",
+                "¿está enchufada y conectada la impresora de los tiques?",
             ),
         },
         "description": "Whether the station of a function (receipt, kitchen, bar, label) answers right now: ok when a "
