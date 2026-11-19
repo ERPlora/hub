@@ -58,7 +58,7 @@ def test_the_code_opens_its_sale_also_typed_by_hand(ticket):
     assert sale_of_code(f"  {typed} ") == ticket
 
 
-@pytest.mark.parametrize("change", ["signature", "number", "garbage", "empty"])
+@pytest.mark.parametrize("change", ["signature", "number", "accented", "garbage", "empty"])
 def test_a_code_nobody_made_opens_nothing(ticket, change):
     code = receipt_code(ticket)
     number, signature = code.rsplit("-", 1)
@@ -66,6 +66,7 @@ def test_a_code_nobody_made_opens_nothing(ticket, change):
     other = {
         "signature": f"{number}-{flipped}",
         "number": f"20200101-0001-{signature}",
+        "accented": f"{number}-{signature[:-1]}Ñ",
         "garbage": "not-a-code",
         "empty": "",
     }[change]

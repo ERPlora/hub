@@ -107,7 +107,8 @@ def test_asking_twice_answers_the_same_full_invoice_without_spending_a_number(ti
 def test_a_code_that_opens_nothing_says_so_with_nobody_s_data(ticket, operation):
     code = receipt_code(ticket)
     forged = code[:-1] + ("2" if code[-1] != "2" else "3")
-    for wrong in (UNKNOWN, forged):
+    accented = code[:-1] + "Ñ"
+    for wrong in (UNKNOWN, forged, accented):
         response = door(operation, {"code": wrong, **CUSTOMER})
         assert response.status_code == 404, response.content
         assert response.json()["error"]["code"] == "invoice.code_not_found"

@@ -48,7 +48,9 @@ def sale_of_code(code: str) -> Sale | None:
     if sale is None:
         return None
     secrets = [settings.SECRET_KEY, *settings.SECRET_KEY_FALLBACKS]
-    if not any(hmac.compare_digest(signature, _signature(sale, secret)) for secret in secrets):
+    # As bytes: compare_digest refuses text with a character outside ASCII, and a typed code may carry one.
+    typed = signature.encode()
+    if not any(hmac.compare_digest(typed, _signature(sale, secret).encode()) for secret in secrets):
         return None
     return sale
 
