@@ -227,7 +227,7 @@ def test_the_people_against_the_plans_limit_and_the_devices_limit(make_user):
     assert usage["devices"] == {"used": 0, "limit": 2}
     # A's own database, not measured yet: its size comes with the night's measure (base/tests/test_usage.py,
     # BASE-F40); the rest of what this answer says of the business, in base/tests/test_plan_usage_figures.py.
-    assert usage["database"] == {"available": True, "bytes": None, "day": None}
+    assert usage["database"] == {"bytes": None, "day": None}
 
 
 def test_zero_in_the_plan_is_no_limit():

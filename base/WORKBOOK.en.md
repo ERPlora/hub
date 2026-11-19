@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:74c6a7013ada57cca0945630ff14655e9ccf16a2492d02522b241064d56df0e3 -->
+<!-- generated from WORKBOOK.md sha256:5e70a94e16538d3dbce71a9cbe6d15978ab31e643f5052bc75497271099214eb -->
 
 ## What it is for and who it is for
 
@@ -2313,9 +2313,7 @@ In: what the business's apps publish.
 Out: nothing saved. It grows or shrinks with the business's apps.
 If it fails: hidden, "The API documentation is hidden in this business." and, for whoever runs the business,
 "Show it in Settings › General"; if it does not arrive, "Could not load the documentation." with "Retry"; with
-nothing published, "None of this business’s apps publishes its API yet.". If the business cannot have keys yet:
-"API keys are not available yet for this business: you can read the documentation, but no system can call it
-yet.".
+nothing published, "None of this business’s apps publishes its API yet.".
 Involved: BASE-F91, BASE-F86, BASE-F112 (inside the app)
 
 ### BASE-F91 Show or hide the API documentation

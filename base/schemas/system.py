@@ -15,15 +15,13 @@ class SystemStatusIn(Schema):
 
 
 class SystemStatusOut(Schema):
-    """``base.system.status``: what runs and where the business's data lives. No usage figures: one service runs every
-    business, so CPU, memory and connections have no figure per business."""
+    """``base.system.status``: what runs. No usage figures: one service runs every business, so CPU, memory and
+    connections have no figure per business."""
 
     #: The release running: its commit, short (``APP_VERSION``); ``dev`` without one (local development).
     version: str
     #: When that release was published (``APP_RELEASED_AT``); ``None`` when it is not known, never made up.
     released_at: dt.datetime | None
-    #: Whether the business still shares one database with others; ``False`` once the hub has its own.
-    shared_database: bool
 
 
 class EventListIn(Schema):

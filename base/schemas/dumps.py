@@ -42,9 +42,6 @@ class HubDumpOut(Schema):
 class HubDumpsOut(Schema):
     """``base.hub.dumps``: the copies of the business's data (newest first) and its last reset."""
 
-    available: bool = Field(
-        description="False while the business shares its database with others: no copy is ever made then."
-    )
     reset: ResetStateOut | None
     dumps: list[HubDumpOut]
 

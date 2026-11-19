@@ -1,7 +1,7 @@
 // Settings › Data › Reset › «Copies»: the full copies of the
 // business's data ERPlora keeps for 90 days (one before each reset), newest first, each with its date, why it was made
 // and its size, and «Download», whose link (15 minutes) is asked on each click; what a copy is next to «Export». Its
-// states: reading, could not be read (with «Retry»), none yet; hidden while the business shares its database.
+// states: reading, could not be read (with «Retry»), none yet.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { flush, mountBase } from '../../__tests__/mount-base';
@@ -12,7 +12,6 @@ const data = vi.hoisted(() => ({ downloadFrom: vi.fn() }));
 vi.mock('../../lib/data', async (original) => ({ ...(await original<typeof import('../../lib/data')>()), ...data }));
 
 const DUMPS: HubDumps = {
-  available: true,
   reset: null,
   dumps: [
     { id: 'd2', kind: 'offboarding', created_at: '2026-10-31T10:20:00Z', bytes: 1.5 * 1024 * 1024 },
@@ -88,11 +87,6 @@ describe('DumpsCard', () => {
     expect(failed.wrapper.text()).toContain('The copies could not be read.');
     await failed.wrapper.get('[data-testid="dumps-retry"]').trigger('click');
     expect(failed.wrapper.emitted('retry')).toHaveLength(1);
-  });
-
-  it('is not shown while the business shares its database (it never gets a copy)', async () => {
-    const m = await card({ dumps: { available: false, reset: null, dumps: [] } });
-    expect(m.wrapper.find('[data-testid="dumps-card"]').exists()).toBe(false);
   });
 
   it('speaks Spanish', async () => {

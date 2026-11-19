@@ -1,4 +1,4 @@
-"""The reset of a business: ``base.hub.reset`` and ``base.hub.reset_apply`` (only with the hub's own database).
+"""The reset of a business: ``base.hub.reset`` and ``base.hub.reset_apply``.
 
 Asked by who runs it (``base.hub.reset``), done by the worker (``base.worker``, the data pass): a copy of its database
 first (``base.tenancy.dumps``, ``reset``) and, only if it was kept, the sections emptied in its database
@@ -41,16 +41,6 @@ def same_name(typed: str, name: str) -> bool:
     return tidy(typed) == tidy(name)
 
 
-def has_own_database(hub: Hub | None) -> bool:
-    """The hub keeps its business in its own database: emptying it touches no other hub.
-
-    Every business served has one (``base.tenancy.cut``); one without it (one that shared a database, before its cut)
-    is never served, and only the suite's tests written before the tenancy still run one (``base/tenancy/tests/legacy.py``),
-    where an app's rows are everyone's: a reset would empty them for all, so these refusals stay.
-    """
-    return bool(hub is not None and hub.db_name)
-
-
 @operation(
     "base.hub.reset",
     kind="command",
@@ -78,27 +68,16 @@ def hub_reset(ctx: OperationContext, data: HubResetIn) -> dict:
     a copy of its database first, by the worker, and only then the sections emptied («The reset of a business»,
     below).
 
-    Without the business's own database the reset is refused before anything of it is read; without a
-    bucket for its copy it is unavailable (503); while one runs, a second one waits for it (409)."""
+    Without a bucket for its copy it is unavailable (503); while one runs, a second one waits for it (409)."""
     from base.tenancy import dumps
 
     with translation.override(ctx.language):
-        hub = Hub.objects.filter(slug=ctx.scope.key).first()
-        available = has_own_database(hub)
-        if not data.dry_run and not available:
-            raise Conflict(
-                gettext(
-                    "Resetting the business is not available yet. Undo a load instead, or remove what you want "
-                    "from each app."
-                ),
-                code="base.reset_shared_database",
-            )
-        confirm_with = hub.name.strip() if hub and hub.name.strip() else ctx.scope.key
+        hub = Hub.objects.get(slug=ctx.scope.key)
+        confirm_with = hub.name.strip() or ctx.scope.key
         sections = blueprint.reset_plan(ctx)
         answer = {
             "dry_run": data.dry_run,
             "confirm_with": confirm_with,
-            "available": available,
             "sections": sections,
             "apps": [],
             "status": "planned",
@@ -211,15 +190,9 @@ def renew_lease(hub_id: UUID, lease: dt.timedelta, *, owner: str = LEASE_OWNER) 
 )
 def hub_reset_apply(ctx: OperationContext, data: HubResetApplyIn) -> dict:
     """Empty the sections of a reset whose copy was kept (``base.worker``), in the hub's own database, in one
-    transaction: every row of them goes, or none (a failure rolls back the rows already removed). Never on a
-    shared database; only the platform runs it, refused to anyone else first."""
+    transaction: every row of them goes, or none (a failure rolls back the rows already removed). Only the platform
+    runs it, refused to anyone else first."""
     internal_only(ctx)
-    hub = Hub.objects.filter(slug=ctx.scope.key).first()
-    if not has_own_database(hub):
-        raise Conflict(
-            gettext("Resetting the business is not available yet. Undo a load instead, or remove what you want from each app."),
-            code="base.reset_shared_database",
-        )
     chosen = list(dict.fromkeys(data.apps))
     with translation.override(ctx.language):
         removed = blueprint.reset(ctx, chosen)

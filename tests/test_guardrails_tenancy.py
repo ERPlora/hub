@@ -415,6 +415,7 @@ OWN_DATABASE_OPERATIONS: dict[str, dict] = {
     # A copy of the business's data.
     "base.hub.dump_link": {"id": ANY_KEY},
     # An app's tables made when it is turned on, in the hub's own database.
+    "base.app.enable": {"app": "printing"},
     "base.app.retry": {"app": "printing"},
 }
 #: ``base.hub.reset_apply`` (the worker's emptying of a reset) and ``base.app.activation_settle`` (the worker's step
@@ -429,6 +430,8 @@ OWN_DATABASE_READS: dict[str, dict] = {
     "base.hub.dumps": {},
     # System's size of the business's database (BASE-F40).
     "base.plan.usage": {},
+    "base.api_doc.get": {},
+    "base.system.status": {},
 }
 
 
@@ -486,6 +489,7 @@ def test_the_operations_that_need_the_own_database_are_the_base_s_doors():
         "base/queries/api_keys.py",
         "base/queries/dumps.py",
         "base/queries/usage.py",
+        "base/queries/system.py",
     }, defined
 
 
@@ -539,7 +543,7 @@ def test_in_a_hub_without_its_own_database_each_refuses_and_touches_no_business_
 
 @pytest.mark.django_db
 @pytest.mark.parametrize("name", sorted(OWN_DATABASE_READS))
-def test_in_a_hub_without_its_own_database_its_screen_reads_not_available_and_no_business_data(name, client, not_cut):
+def test_in_a_hub_without_its_own_database_its_screen_reads_nothing_of_any_business(name, client, not_cut):
     assert_refused_untouched(*_asked_at_its_door(client, not_cut, name, OWN_DATABASE_READS[name]))
 
 

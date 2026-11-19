@@ -3,8 +3,7 @@
 // business's data ERPlora keeps for 90 days, newest first — when, why (before a reset; when the business was deleted)
 // and how big — each with «Download», whose link (15 minutes, `base.hub.dump_link`) is asked on each click and handed
 // to the browser; and what a copy is next to «Export». ResetPanel reads the live `base.hub.dumps` and hands it here:
-// reading, could not read (with «Retry»), none yet; nothing while the business shares its database (it never gets a
-// copy, and the reset card already says why).
+// reading, could not read (with «Retry»), none yet.
 import { EmptyState, InlineFeedback } from '@erplora/ui/components';
 import { type ApiError, useLiveClient } from '@erplora/ui/sdk';
 import { IonButton, IonSkeletonText } from '@ionic/vue';
@@ -48,7 +47,6 @@ async function download(dump: HubDump): Promise<void> {
 
 <template>
   <section
-    v-if="failed || !dumps || dumps.available"
     class="data-card"
     data-testid="dumps-card"
   >
