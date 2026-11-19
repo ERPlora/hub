@@ -127,7 +127,7 @@ const wallOf = (moment: string): string => `${dayOf(moment)}T${timeOf(moment)}`;
 const booking = ref(false);
 const bookError = ref<ApiError | null>(null);
 const booked = ref<BookedOut | null>(null);
-const bookedLink = computed(() => (booked.value && door ? `/p/${door.slug}/book/${booked.value.token}` : ''));
+const bookedLink = computed(() => (booked.value && door ? new URL(`/p/${door.slug}/book/${booked.value.token}`, window.location.origin).href : ''));
 // What is picked or typed is told by the name the server refuses it with (`start` for the day and the time).
 const { fieldErrors, showsError, changed } = useRefusal(bookError);
 const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'ion-touched': !!message });

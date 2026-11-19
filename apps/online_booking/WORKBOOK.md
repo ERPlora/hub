@@ -97,9 +97,9 @@ servicios con su precio y su duración, profesional o «Sin preferencia», día,
 nota y **Reservar**. Junto a **Reservar**, el aviso de quién usa sus datos y el enlace a la política de privacidad.
 Si no hay nada que reservar online, solo sale el aviso, sin la invitación ni el formulario. Al reservar, el número
 de la cita, el mensaje de confirmación, **Ver mi reserva**, **Cancelar la reserva** y **Reservar otra**. Con la
-dirección de otro negocio, o la de este en la de otro, no hay página. La confirmación enseña la dirección completa de
-su enlace personal (`/p/<negocio>/book/<enlace>`). Al abrirla ve solo su reserva —número, servicios, día, hora,
-profesional y estado— y puede anularla con confirmación si la política todavía lo permite; una ya anulada o fuera de
+dirección de otro negocio, o la de este en la de otro, no hay página. La confirmación da como enlace la dirección
+completa de su reserva, con el origen del negocio (`https://<negocio>.erplora.com/p/<negocio>/book/<enlace>`). Al abrirla ve solo su reserva —número, servicios, día, hora,
+profesional y estado— y puede cancelarla con confirmación si la política todavía lo permite; una ya cancelada o fuera de
 plazo no ofrece esa acción. Un enlace que no existe da un aviso claro, sin datos ni formulario.
 
 ### Vista previa de la reserva (solo en desarrollo)
@@ -328,7 +328,7 @@ Pasos:
 1. Desde su enlace pulsa **Cancelar la reserva**, confirma el número y el momento de la cita y puede escribir un motivo.
 2. Pulsa de nuevo **Cancelar la reserva** en la confirmación. Se aplica la política de Citas: «Permitir que la clienta
    cancele su cita» y «Antelación mínima para cancelar». La cita queda **Cancelada**, la página dice «Esta reserva está
-   anulada.» y no vuelve a ofrecer la acción; el historial guarda «Lo pidió la clienta». La política vale igual cuando
+   cancelada.» y no vuelve a ofrecer la acción; el historial guarda «Lo pidió la clienta». La política vale igual cuando
    el equipo prueba el enlace desde la vista previa.
 Entra: el enlace de una reserva pendiente o confirmada, sin cobrar.
 Sale: `appointment.appointment.cancelled`.

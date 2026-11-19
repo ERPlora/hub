@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:14c1ead418a9bb41ceb78c423b0906905e903381fc5fed44180b1df3881c6c23 -->
+<!-- generated from WORKBOOK.md sha256:963d8bc2b6f6bd47d86386895beb08862997272d6bba30eebb1e26ae9f7a34b9 -->
 
 ## What it is for and who it is for
 
@@ -91,8 +91,8 @@ Settings and the flow: services with their price and length, professional or "No
 mobile, email, note and **Book**. Beside **Book**, the notice of who uses her details and the link to the privacy
 policy. With nothing to book online, only that notice shows, without the invitation or the form. Once booked, the
 appointment number, the confirmation message, **See my booking**, **Cancel the booking** and **Book another**. With
-another business's address, or this one's at another's, there is no page. The confirmation shows the full address of
-her personal link (`/p/<business>/book/<link>`). Opening it shows only her booking—number, services, day, time,
+another business's address, or this one's at another's, there is no page. The confirmation gives a clickable link to
+the full address of her booking, including the business's origin (`https://<business>.erplora.com/p/<business>/book/<link>`). Opening it shows only her booking—number, services, day, time,
 professional and status—and she can cancel it with confirmation if the policy still allows it; one already cancelled
 or past its notice does not offer that action. An unknown link gives a clear notice, with no details or form.
 

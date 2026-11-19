@@ -56,6 +56,7 @@ async function setup(answer: PublicBookingOut | ApiError | 'hang' = SEEN, locale
 
 function expectCancelled(s: Awaited<ReturnType<typeof setup>>): void {
   expect(s.inDoc('ob-preview-status')?.textContent).toContain('Cancelled');
+  expect(s.inDoc('ob-preview-status')?.textContent).not.toContain('It can no longer be cancelled online.');
   expect(s.inDoc('ob-personal-cancelled')?.textContent).toContain('This booking is cancelled.');
   expect(s.inDoc('ob-preview-cancel')).toBeNull();
 }
@@ -74,6 +75,15 @@ describe('PersonalBooking', () => {
     expect(s.inDoc('ob-preview')).toBeNull();
   });
 
+  it('places the booking and its status before the cancel action', async () => {
+    const s = await setup();
+    const status = s.inDoc('ob-preview-status');
+    const cancel = s.inDoc('ob-preview-cancel');
+    expect(status).not.toBeNull();
+    expect(cancel).not.toBeNull();
+    expect(status!.compareDocumentPosition(cancel!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
   it('asks for confirmation and only then cancels through the link, with its optional reason', async () => {
     const s = await setup();
     await click(s.inDoc('ob-preview-cancel'));
@@ -89,6 +99,14 @@ describe('PersonalBooking', () => {
   it('shows an already cancelled booking without offering to cancel it again', async () => {
     const s = await setup({ ...SEEN, status: 'cancelled', can_cancel: false, cancel_until: null });
     expectCancelled(s);
+  });
+
+  it('uses the app’s cancelled word in Spanish and shows only that message', async () => {
+    const s = await setup({ ...SEEN, status: 'cancelled', can_cancel: false, cancel_until: null }, 'es');
+    expect(s.inDoc('ob-preview-status')?.textContent).toContain('Cancelada');
+    expect(s.inDoc('ob-preview-status')?.textContent).not.toContain('Ya no se puede cancelar online.');
+    expect(s.inDoc('ob-personal-cancelled')?.textContent).toContain('Esta reserva está cancelada.');
+    expect(s.wrapper.text()).not.toContain('anulada');
   });
 
   it('shows a booking whose cancellation window has passed without the cancel action', async () => {

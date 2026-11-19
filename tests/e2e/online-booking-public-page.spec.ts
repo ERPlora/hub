@@ -125,9 +125,11 @@ FLOW_VIEWPORTS.forEach((vp, index) => {
       await page.locator('[data-testid=ob-preview-view]').click();
       const status = page.locator('[data-testid=ob-preview-status]');
       await expect(status).toContainText('Pendiente');
-      const link = (await page.locator('[data-testid=ob-preview-token]').textContent())?.match(/\/p\/a\/book\/[\w-]+/)?.[0];
-      expect(link).toBeTruthy();
-      await page.goto(`${A}${link}`);
+      const anchor = page.locator('[data-testid=ob-preview-token] a');
+      const address = await anchor.getAttribute('href');
+      expect(address).toContain(`${A}/p/a/book/`);
+      await expect(anchor).toHaveText(address ?? '');
+      await page.goto(address ?? '');
       await expect(status).toContainText('Pendiente');
       await expect(status).toContainText('10:00');
       await expect(page.locator('[data-testid=ob-preview-name]')).toHaveCount(0);
@@ -137,7 +139,7 @@ FLOW_VIEWPORTS.forEach((vp, index) => {
       await page.locator('[data-testid=ob-cancel-reason] textarea').fill('No puedo ir');
       await page.locator('[data-testid=ob-cancel-submit]').click();
       await expect(status).toContainText('Cancelada');
-      await expect(page.locator('[data-testid=ob-personal-cancelled]')).toContainText('Esta reserva está anulada.');
+      await expect(page.locator('[data-testid=ob-personal-cancelled]')).toContainText('Esta reserva está cancelada.');
       await expect(page.locator('[data-testid=ob-preview-cancel]')).toHaveCount(0);
       expect(psql(`select status || ' ' || cancelled_by_customer from appointment_appointment where number = '${number}'`)).toBe('cancelled true');
       await noHorizontalScroll(page, `the cancelled booking at ${vp.label}`);

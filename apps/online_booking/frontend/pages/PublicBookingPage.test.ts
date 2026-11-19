@@ -123,7 +123,7 @@ async function open(locale: 'en' | 'es' = 'en', token = '') {
   await settle();
   await settle();
   const el = (testid: string) => m.inDoc(`ob-preview-${testid}`) as HTMLElement | null;
-  return { ...m, el, text: () => m.wrapper.text() };
+  return { ...m, el, text: () => m.find('ob-preview').text() };
 }
 
 beforeEach(() => {
@@ -159,7 +159,7 @@ describe('PublicBookingPage', () => {
     ]);
     expect(s.el('status')?.textContent).toContain('Haircut');
     expect(s.el('title')).toBeNull();
-    expect(s.text()).not.toContain('Book your next visit');
+    expect(s.wrapper.text()).not.toContain('Book your next visit');
   });
 
   it('identifies the business with its name, logo and page colour', async () => {
@@ -262,7 +262,10 @@ describe('PublicBookingPage', () => {
     const s = await open();
     await booked(s);
     expect(s.el('booked')?.textContent).toContain('We have received your booking.');
-    expect(s.el('token')?.textContent).toContain(`/p/salon-lucia/book/${BOOKED.token}`);
+    const address = new URL(`/p/salon-lucia/book/${BOOKED.token}`, window.location.origin).href;
+    const link = s.el('token')?.querySelector('a');
+    expect(link?.textContent).toBe(address);
+    expect(link?.getAttribute('href')).toBe(address);
     const book = posted.find(({ op }) => op === 'online_booking.public.book');
     expect(book?.body).toMatchObject({ service_ids: ['v1'], start: '2030-03-05T10:00', name: 'Marta Gil', phone: '612 345 678', website: '' });
   });

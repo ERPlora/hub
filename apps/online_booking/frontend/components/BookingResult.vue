@@ -46,8 +46,42 @@ const startsAt = computed(() => {
     class="ob-result__token"
     data-testid="ob-preview-token"
   >
-    {{ $t('online_booking.preview.link') }}: <code>{{ link || booked.token }}</code>
+    {{ $t('online_booking.preview.link') }}:
+    <a
+      v-if="link"
+      :href="link"
+    >{{ link }}</a>
+    <code v-else>{{ booked.token }}</code>
   </p>
+  <div
+    v-if="seen"
+    data-testid="ob-preview-status"
+  >
+    <StatusPill
+      :label="t(`online_booking.bookings.status.${seen.status}`)"
+      :tone="STATUS_TONE[seen.status]"
+    />
+    <p><strong>{{ seen.number }}</strong></p>
+    <p>{{ seen.service_names }}</p>
+    <p>{{ startsAt }}</p>
+    <p v-if="seen.staff_name">
+      {{ seen.staff_name }}
+    </p>
+    <p v-if="seen.status !== 'cancelled'">
+      {{ seen.can_cancel ? $t('online_booking.preview.cancelUntil', { when: cancelUntil }) : $t('online_booking.preview.noCancel') }}
+    </p>
+    <p v-if="seen.cancellation_policy">
+      {{ $t('online_booking.preview.policy') }}: {{ seen.cancellation_policy }}
+    </p>
+  </div>
+  <InlineFeedback
+    v-if="seen?.status === 'cancelled'"
+    tone="neutral"
+    data-testid="ob-personal-cancelled"
+    role="status"
+  >
+    {{ $t('online_booking.door.cancelled') }}
+  </InlineFeedback>
   <div class="ob-result__actions">
     <ion-button
       v-if="booked && !personal"
@@ -83,35 +117,6 @@ const startsAt = computed(() => {
     data-testid="ob-preview-link-error"
   >
     {{ error }}
-  </InlineFeedback>
-  <div
-    v-if="seen"
-    data-testid="ob-preview-status"
-  >
-    <StatusPill
-      :label="t(`online_booking.bookings.status.${seen.status}`)"
-      :tone="STATUS_TONE[seen.status]"
-    />
-    <p><strong>{{ seen.number }}</strong></p>
-    <p>{{ seen.service_names }}</p>
-    <p>{{ startsAt }}</p>
-    <p v-if="seen.staff_name">
-      {{ seen.staff_name }}
-    </p>
-    <p>
-      {{ seen.can_cancel ? $t('online_booking.preview.cancelUntil', { when: cancelUntil }) : $t('online_booking.preview.noCancel') }}
-    </p>
-    <p v-if="seen.cancellation_policy">
-      {{ $t('online_booking.preview.policy') }}: {{ seen.cancellation_policy }}
-    </p>
-  </div>
-  <InlineFeedback
-    v-if="seen?.status === 'cancelled'"
-    tone="neutral"
-    data-testid="ob-personal-cancelled"
-    role="status"
-  >
-    {{ $t('online_booking.door.cancelled') }}
   </InlineFeedback>
 </template>
 
