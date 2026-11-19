@@ -159,3 +159,8 @@ async def device_retire(request, data: DeviceRefIn):
 @bind(router, "printing.device.coverage", "/printing/devices/coverage")
 async def device_coverage(request, params: Query[CoverageIn]):
     return await run_operation(request, queries.device_coverage, params)
+
+
+@bind(router, "printing.device.health", "/printing/devices/health")
+async def device_health(request, params: Query[CoverageIn]):
+    return await run_operation(request, queries.health.device_health, params)

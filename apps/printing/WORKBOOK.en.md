@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:2388ce265e570213734ef1774ad9624071305d4e66fa8364e7f5ed697c550a48 -->
+<!-- generated from WORKBOOK.md sha256:2dbdb17735489391bec4f9f704c553b5a6b450c18467d00b952a44f3ee0603f2 -->
 
 ## What it is for and who it is for
 
@@ -198,7 +198,7 @@ the window without saving. With the window as it opened, Back closes it without 
 | PRINTING-F18 | Take the paper out: the device picks up and confirms the jobs | common | done |
 | PRINTING-F19 | See the state of a printer | common | done |
 | PRINTING-F20 | How long the hub keeps the print jobs | common | done |
-| PRINTING-F21 | See in System who prints and where to get the ERPlora app | common | partial — it does not say whether the printer answers right now (hub#573) |
+| PRINTING-F21 | See in System who prints and where to get the ERPlora app | common | partial — the card does not say yet whether the printer answers right now (hub#573) |
 
 ### PRINTING-F01 See how printing is going
 Status: done
@@ -640,9 +640,9 @@ time.
 Involved: PRINTING-F01, PRINTING-F14
 
 ### PRINTING-F21 See in System who prints and where to get the ERPlora app
-Status: partial — it does not say whether the printer answers right now ("Printer ready", "Printer not connected" or
-"We could not check the printer"): Printing has no such read yet, the same one the Home's health row asks for
-(hub#573)
+Status: partial — the card does not say yet whether the printer answers right now ("Printer ready", "Printer not
+connected" or "We couldn't check the printer"): Printing already has that read, the same one it gives the Home's
+health row, but the card does not use it yet (hub#573)
 Actor: owner, administrator, manager, employee
 Screen: System · Usage and plan
 Steps:
@@ -663,7 +663,7 @@ Out: nothing saved.
 If it fails: if which cards apply cannot be read, none shows (never that of an app that is off) and the rest of the
 tab says its own; without erplora.com's addresses the download buttons do not show (never a button that leads
 nowhere).
-Involved: BASE-F39, PRINTING-F18
+Involved: BASE-F02, BASE-F39, PRINTING-F18
 
 ## Services: what goes in and what comes out
 
@@ -684,6 +684,7 @@ The other apps and the assistant use Printing through these operations, by their
 | A queue job by id or by its document's number (the most recent one), with its title as the queue puts it | view | F14, F16 | `printing.job.get` |
 | The queue summary per role, with the printer each one comes out of, how many jobs no device set up can take out and how many have waited a minute without a switched-on device | view | F01 | `printing.job.summary` |
 | Whether a role has a set-up device that prints it, switched on or not (the Home step), and how many of its jobs have waited a minute or more in the queue without a switched-on device to take them out (the bell) | view | F01 | `printing.device.coverage` |
+| Whether a role's station answers right now: ready (a set-up device that prints it gave signs in the last 90 s), not connected (set up, but silent) or not set up (none); for the Home's health row and the "Your printer" card | view | F21 | `printing.device.health` |
 
 ### What it offers: actions (they change data)
 
@@ -744,6 +745,7 @@ Nothing (`requires = []`). It reads nobody's models: whoever prints sends the do
 | Kitchen | Each station's order and its reprint, only if there is an active printer of its role | `printing.printer.list`, `printing.job.create` |
 | `base` (`/ws/print`) | Hand out and confirm jobs | `printing.job.claim`, `printing.job.complete`, `printing.job.fail` |
 | `base` (Home and bell) | "Set up your printer" and "Nothing is printing “…”" | `printing.device.coverage` |
+| `base` (the Home's health row) | "Printer ready", "Printer not connected" or "Printer not set up" | `printing.device.health` |
 
 ### Who may do what
 

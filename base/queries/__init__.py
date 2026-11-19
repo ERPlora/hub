@@ -13,6 +13,7 @@ from . import (
     devices as devices,
     dumps as dumps,
     files as files,
+    health as health,
     home as home,
     hubs as hubs,
     people as people,
