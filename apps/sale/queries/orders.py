@@ -10,6 +10,7 @@ from live.operations import AI, operation
 
 from apps.sale.models import Order, OrderLine
 from apps.sale.schemas import OrderListIn, OrderOut, OrderPage, OrderRefIn
+from base.allergens import found_in
 
 ORDER_NOT_FOUND = _("That check does not exist.")
 ORDER_CHANGED = _(
@@ -38,7 +39,10 @@ def dish_allergens(dish: dict) -> list[str]:
 
 
 def _combo_row(line: OrderLine) -> dict:
-    components = [{**dish, "allergens": dish_allergens(dish)} for dish in line.combo["components"]]
+    components = [
+        {**dish, "allergens": dish_allergens(dish), "allergy_in_dish": found_in(line.allergy, dish_allergens(dish))}
+        for dish in line.combo["components"]
+    ]
     return {"combo_id": line.combo_id, **line.combo, "components": components}
 
 
@@ -86,6 +90,8 @@ def order_line_row(line: OrderLine) -> dict:
         ],
         "kitchen_text": line.kitchen_text,
         "allergens": line.allergens,
+        "allergy": line.allergy,
+        "allergy_in_dish": found_in(line.allergy, line.allergens),
         "combo": _combo_row(line) if line.combo_id else None,
     }
 

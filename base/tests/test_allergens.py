@@ -143,6 +143,23 @@ def test_what_a_tool_or_an_integrator_reads_lists_the_fourteen_codes(schema):
     assert items["enum"] == THE_FOURTEEN
 
 
+
+# A customer's allergy against what a dish contains
+
+
+def test_a_dish_contains_those_of_the_allergy_it_declares_in_the_order_of_the_list():
+    assert allergens.found_in(["milk", "fish", "gluten"], ["sesame", "gluten", "milk"]) == ["gluten", "milk"]
+
+
+@pytest.mark.parametrize(("allergy", "dish"), [([], ["gluten"]), (["fish"], ["gluten"]), (["fish"], [])])
+def test_a_dish_contains_none_of_an_allergy_it_does_not_declare(allergy, dish):
+    assert allergens.found_in(allergy, dish) == []
+
+
+def test_what_a_tool_reads_of_an_allergy_lists_the_fourteen_codes():
+    properties = allergens.AllergyOut.model_json_schema()["properties"]
+    assert [properties[name]["items"]["enum"] for name in ("allergy", "allergy_in_dish")] == [THE_FOURTEEN] * 2
+
 # What a CSV cell says
 
 
