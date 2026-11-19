@@ -8,7 +8,6 @@ After its 90 days (``base.tenancy.offboarding``) ``archiving`` makes its final c
 """
 
 import datetime as dt
-from collections.abc import Iterable
 from uuid import UUID
 
 from django.db.models import Exists, OuterRef, Q
@@ -159,9 +158,10 @@ def offboarding_dropping(hub_id: UUID, now: dt.datetime, lease: dt.timedelta, *,
     return _next_step_out(hub_id, Hub.Status.DROPPING, now, lease, owner)
 
 
-def offboarding_held(hub_id: UUID, now: dt.datetime, apps: Iterable[str], *, owner: str = LEASE_OWNER) -> None:
-    """The business ``hub_id`` keeps fiscal documents (``apps``' own) that nothing archives yet: its database stays and
-    it stays ``cancelled``, looked at again after :data:`FISCAL_HOLD_RECHECK`. Its 90 days are not counted again."""
+def offboarding_held(hub_id: UUID, now: dt.datetime, why: str, *, owner: str = LEASE_OWNER) -> None:
+    """The business ``hub_id`` keeps fiscal documents, and ``why`` (``fiscal_archive_missing: <apps>``,
+    ``fiscal_archived: <apps>``…) says how their archive stands: its database stays and it stays ``cancelled``, looked
+    at again after :data:`FISCAL_HOLD_RECHECK`. Its 90 days are not counted again."""
     with _control_transaction():
         hub = Hub.objects.select_for_update().get(pk=hub_id)
         _holds(hub_id, owner, timezone.now())
@@ -169,9 +169,31 @@ def offboarding_held(hub_id: UUID, now: dt.datetime, apps: Iterable[str], *, own
             return
         hub.status = Hub.Status.CANCELLED
         hub.attempts = 0
-        hub.last_error = f"fiscal_archive_missing: {', '.join(apps)}"[:LAST_ERROR_MAX]
+        hub.last_error = why[:LAST_ERROR_MAX]
         hub.next_attempt_at = now + FISCAL_HOLD_RECHECK
         hub.save(update_fields=["status", "attempts", "last_error", "next_attempt_at", "updated_at"])
+
+
+def fiscal_archive_kept(hub: Hub) -> bool:
+    """Whether the fiscal documents of ``hub`` were archived after its 90 days, so for this leaving: an archive of an
+    earlier one (it came back since, and wrote more) does not count."""
+    return (
+        hub.fiscal_archived_at is not None
+        and hub.cancelled_at is not None
+        and hub.fiscal_archived_at >= hub.cancelled_at + OFFBOARDING_RETENTION
+    )
+
+
+def fiscal_archive_written(hub_id: UUID, made_at: dt.datetime, *, owner: str = LEASE_OWNER) -> None:
+    """The fiscal archive of the business ``hub_id``, made at ``made_at``, is whole and verified. One that came back
+    meanwhile has nothing to note."""
+    with _control_transaction():
+        hub = Hub.objects.select_for_update().get(pk=hub_id)
+        _holds(hub_id, owner, timezone.now())
+        if hub.status not in LEFT_STATUSES:
+            return
+        hub.fiscal_archived_at = made_at
+        hub.save(update_fields=["fiscal_archived_at", "updated_at"])
 
 
 def final_copy_kept(hub: Hub) -> bool:

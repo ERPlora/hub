@@ -433,7 +433,7 @@ En la pantalla Archivos:
 | BASE-F106 | El asistente sin conexión, con el servicio caído o sin plan | hecho |
 | BASE-F107 | Pasar la QA maestra del Hub | hecho |
 | BASE-F108 | Reportar un problema a soporte | hecho |
-| BASE-F109 | Borrar un negocio eliminado pasados sus 90 días | parcial — un negocio con documentos guarda su base de datos hasta que exista el archivo fiscal (hub#738) |
+| BASE-F109 | Borrar un negocio eliminado pasados sus 90 días | parcial — un negocio con documentos los escribe en el archivo fiscal, pero aún guarda su base de datos (hub#738) |
 | BASE-F110 | Abrir la web del negocio por su dominio propio | hecho |
 | BASE-F111 | Esperar a la base de datos cuando se corta un momento | hecho |
 | BASE-F112 | Guardar un archivo descargado dentro de la app | hecho |
@@ -2824,15 +2824,19 @@ para escribir directamente. En los dos casos lo escrito se queda y se puede volv
 Implicados: ACCOUNTS-F38, BASE-F40
 
 ### BASE-F109 Borrar un negocio eliminado pasados sus 90 días
-Estado: parcial — un negocio con documentos guarda su base de datos hasta que exista el archivo fiscal (hub#738)
+Estado: parcial — un negocio con documentos los escribe en el archivo fiscal, pero aún guarda su base de datos (hub#738)
 Actor: nadie: lo hace el Hub solo, sin que nadie pulse nada
 Pantalla: Ninguna; la dirección del negocio sigue diciendo «Este hub ya no está disponible.»
 Pasos:
   1. Un negocio eliminado en erplora.com (HUBS-F18, HUBS-F20) cumple 90 días. Hasta ese momento su base de datos se
      queda intacta y se puede recuperar.
   2. El Hub mira si guarda documentos: ventas, facturas, registros de VeriFactu, cobros, movimientos de caja, pedidos
-     de la tienda o compras de un cliente, en cualquier estado y aunque la app esté apagada. Si guarda alguno, se
-     detiene aquí: el negocio sigue eliminado, con su base de datos, y lo vuelve a mirar al día siguiente.
+     de la tienda o compras de un cliente, en cualquier estado y aunque la app esté apagada. Si guarda alguno, antes
+     los escribe en el archivo fiscal, donde se guardan 6 años sin que nadie los pueda borrar: cada tabla de esos
+     documentos tal como está guardada, sin rehacer nada, y al final una lista que cuenta las filas y lleva la huella
+     de cada fichero, que solo se escribe cuando todos se han vuelto a leer iguales. Lo hace una vez por baja, y si un
+     registro de VeriFactu aún espera la respuesta de la AEAT, espera a que llegue. Después se detiene: el negocio
+     sigue eliminado, con su base de datos, y lo vuelve a mirar al día siguiente.
   3. Sin documentos, hace la copia final de sus datos, que se guarda 90 días en el almacén de copias. Mientras se
      hace, el negocio aún se puede recuperar y erplora.com sigue viendo sus copias. Al terminar vuelve a mirar si
      guarda documentos, por si entró alguno durante la copia.
@@ -2843,14 +2847,18 @@ Pasos:
 Entra: el negocio eliminado y sus 90 días cumplidos. Nunca una demo, que se borra a su manera al caducar, el negocio
 de la plataforma ni uno que se está moviendo de servidor.
 Sale: la copia final, y la base de datos y los ficheros borrados, con el evento `base.hub.purged`; desde ahí
-erplora.com ya no lista sus copias. O, con documentos, la base de datos y los ficheros guardados y en la fila del
-negocio el motivo (`fiscal_archive_missing: <apps>`).
+erplora.com ya no lista sus copias. O, con documentos, su archivo fiscal escrito (en la fila, `fiscal_archived_at` y
+el motivo `fiscal_archived: <apps>`) y la base de datos y los ficheros guardados; donde no hay archivo fiscal, el motivo
+es `fiscal_archive_missing: <apps>`, y mientras un registro espera a la AEAT, `fiscal_archive_waiting: verifactu`.
 Si falla: una copia que falla no borra nada, y sin almacén de copias tampoco; una copia o un borrado que falla se
 reintenta (1 min, 5 min, 15 min y luego cada hora) con el error anotado en la fila, sin hacer otra copia si ya la había.
 Si el almacén no borra sus ficheros, el negocio sigue borrándose, sin marca, con `files_purge_failed` en la fila, y se
 reintenta igual. Si una app no se puede leer, la base de datos se queda. Una fila que no nombra la base de datos propia
 del negocio no borra nada (`invalid_database_name`). Un negocio recuperado durante la copia sigue abierto con su base
 de datos; ya borrándose, erplora.com recibe `hub_purged`. Si el Hub se apaga a media copia, el siguiente la retoma.
+Si el archivo fiscal no se puede escribir entero, o un fichero no se lee igual que se escribió, no se da por hecho: la
+fila dice `fiscal_archive_failed` con el motivo y se reintenta al día siguiente en otra carpeta del archivo (lo ya
+subido se queda, porque nadie lo puede borrar, y sin su lista final no cuenta).
 Implicados: HUBS-F18, HUBS-F19, HUBS-F20, PUBLIC-F34 (el mismo borrado de ficheros, al retirar una demo)
 
 ### BASE-F110 Abrir la web del negocio por su dominio propio
@@ -4401,8 +4409,8 @@ Implicados: BASE-F41
 
 - **Avisar por correo al dueño cuando debe ampliar (BASE-F40)**: el mercado lo da por supuesto, pero lo manda erplora.com
   (PLAN-SAAS §28) y lleva su flujo y su issue allí.
-- **El archivo fiscal y el borrado de un negocio con documentos (BASE-F109)**, hub#738: hasta que exista, guarda su
-  base de datos y sus ficheros pasados los 90 días.
+- **El borrado de un negocio con documentos (BASE-F109)**, hub#738: sus documentos ya van al archivo fiscal, pero
+  guarda su base de datos y sus ficheros pasados los 90 días hasta que ese borrado se active.
 - **La fila de salud del Inicio en pantalla (BASE-F02)**, hub#573: su lectura ya existe (`base.health.list`, con la
   impresora de Impresión); falta pintarla en el Inicio y que la Bandeja de WhatsApp declare cómo está su número.
 - **Las novedades en Sistema › Actualizaciones (BASE-F116)**: ya se leen por el asistente y por la API; falta

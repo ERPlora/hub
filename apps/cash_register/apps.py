@@ -152,9 +152,12 @@ class CashRegisterConfig(LiveAppConfig):
         }
     ]
 
+    fiscal_archive_models = ("Register", "Session", "Movement", "Count")
+
     def fiscal_documents_kept(self) -> bool:
-        """The platform asks (``base.tenancy.offboarding``) before it drops the database of a business that left:
-        its cash movements are documents nothing archives yet, so the database stays."""
+        """The platform asks (``base.tenancy.offboarding``) before it drops the database of a business that left: its
+        cash movements are documents to keep, so the database stays; they go to the fiscal archive first
+        (``fiscal_archive_models``)."""
         from apps.cash_register import queries  # the models are not loaded yet when this module is
 
         return queries.keeps_fiscal_documents()

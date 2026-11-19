@@ -175,9 +175,12 @@ class SaleConfig(LiveAppConfig):
         ),
     ]
 
+    fiscal_archive_models = ("Sale", "SaleLine", "SalePayment", "Refund", "RefundLine", "RefundPayment")
+
     def fiscal_documents_kept(self) -> bool:
-        """The platform asks (``base.tenancy.offboarding``) before it drops the database of a business that left:
-        its sales here are documents nothing archives yet, so the database stays."""
+        """The platform asks (``base.tenancy.offboarding``) before it drops the database of a business that left: its
+        sales here are documents to keep, so the database stays; they go to the fiscal archive first
+        (``fiscal_archive_models``)."""
         from apps.sale import queries  # the models are not loaded yet when this module is
 
         return queries.sales.keeps_fiscal_documents()
