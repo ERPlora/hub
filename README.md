@@ -327,7 +327,17 @@ PLAN-DB, ronda 2026-10-30: decisión 2 y propuestas (a), (f), (j), (k), (l), (m)
   (`offboarding`); si falla, reintenta a 1 min, 5 min, 15 min y luego cada hora (`attempts`, `last_error`,
   `next_attempt_at`). La BD se conserva 90 días; pasados, el worker hace su copia final y la borra
   (`DROP DATABASE … WITH (FORCE)`, `base/tenancy/offboarding.py`, BASE-F109, hub#599), salvo la de un negocio con
-  documentos fiscales, que se guarda hasta que exista el archivo fiscal (hub#738).
+  documentos fiscales, que se guarda (hub#738) después de escribirlos en el archivo fiscal.
+- **El archivo fiscal** (`base/tenancy/fiscal_archive.py`): con `FISCAL_ARCHIVE_BUCKET` (solo el worker lo tiene; aws
+  `s3_fiscal_archive.tf`, Object Lock en `COMPLIANCE` 6 años), el worker sube una vez por baja, en
+  `<hex>/<AAAAMMDDTHHMMSSZ>/`, un JSON Lines por modelo y parte con las filas de los modelos que cada app declara en
+  `fiscal_archive_models` (leídas tal cual por `base/services/fiscal_archive.py`) y, al final, `manifest.json` con las
+  filas, los bytes y el SHA-256 de cada fichero. Cada PUT lleva su SHA-256 e `If-None-Match: *`, ninguno pide
+  retención (la pone el bucket); el manifiesto solo se sube cuando todos los ficheros se han releído iguales, y solo
+  entonces se anota `fiscal_archived_at`. En la fila, `last_error` dice cómo va: `fiscal_archive_missing`,
+  `fiscal_archive_waiting` (un registro de VeriFactu sin respuesta de la AEAT), `fiscal_archive_failed` (al día
+  siguiente, en otra carpeta) o `fiscal_archived`. En local y en los tests, `FISCAL_ARCHIVE_ENDPOINT_URL` apunta a
+  otro S3 (moto, `base/tenancy/tests/s3.py`).
 - **La copia** (`dump_hub`): `pg_dump -Fc --no-owner --no-acl` de esa BD como el migrador, por conexión directa al
   escritor de su cluster (`migrator_conninfo`, nunca PgBouncer), con la contraseña en `PGPASSWORD` y nunca en la orden
   ni en un error, acotado a 15 min (el arriendo se renueva mientras corre) y a un fichero temporal; solo si termina

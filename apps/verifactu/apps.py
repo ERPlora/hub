@@ -192,9 +192,12 @@ class VerifactuConfig(LiveAppConfig):
 
         return queries.app_hooks.oldest_unsent_at()
 
+    fiscal_archive_models = ("Chain", "Record", "Event")
+
     def fiscal_documents_kept(self) -> bool:
-        """The platform asks (``base.tenancy.offboarding``) before it drops the database of a business that left:
-        its records for the tax authority here are documents nothing archives yet, so the database stays."""
+        """The platform asks (``base.tenancy.offboarding``) before it drops the database of a business that left: its
+        records for the tax authority here are documents to keep, so the database stays; they go to the fiscal archive
+        first (``fiscal_archive_models``)."""
         from apps.verifactu import queries  # the models are not loaded yet when this module is
 
         return queries.app_hooks.keeps_fiscal_documents()

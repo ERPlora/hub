@@ -69,10 +69,12 @@ class CartCheckoutConfig(LiveAppConfig):
         Nav("orders", _("Orders"), "ion:receipt-outline", "/cart_checkout/orders"),
     ]
 
+    fiscal_archive_models = ("Cart", "CartItem", "Order")
+
     def fiscal_documents_kept(self) -> bool:
-        """The platform asks (``base.tenancy.offboarding``) before it drops the database of a business that left:
-        its shop orders (no sale backs them: «paid» is a mark) are documents nothing archives yet, so the database
-        stays."""
+        """The platform asks (``base.tenancy.offboarding``) before it drops the database of a business that left: its
+        shop orders (no sale backs them: «paid» is a mark) are documents to keep, so the database stays; they go to the
+        fiscal archive first (``fiscal_archive_models``)."""
         from apps.cart_checkout import queries  # the models are not loaded yet when this module is
 
         return queries.keeps_fiscal_documents()
