@@ -8,10 +8,10 @@ a folder of that leaving, ``<hex>/<when it left>/``, and each attempt at it unde
 ``<when it was made>/`` (both ``AAAAMMDDTHHMMSSZ``): one JSON Lines file per model and part
 (``<app>.<model>-0001.jsonl``) and, last, ``manifest.json``, which names every file with its bytes and SHA-256 (a
 table's with its rows too). Beside the attempts, in ``<app>/``, the documents each app keeps as they were handed over
-(``fiscal_archive_documents`` on its config: each invoice's PDF), one file each. They are shared by every attempt of that
-leaving: one an attempt that stopped already left up is taken as S3 keeps it and never made again, as making them is
-what takes long (a PDF is about 150 ms). A key is never written twice (a key written again would be one more locked
-version): each PUT asks that none be there yet, and carries its SHA-256, which S3 checks and Object Lock requires.
+(``fiscal_archive_documents`` on its config: each invoice's PDF), one file each. They are shared by every attempt of
+that leaving: one an attempt that stopped already left up is taken as S3 keeps it and never made again, as making them
+is what takes long. A key is never written twice (a key written again would be one more locked version): each PUT asks
+that none be there yet, and carries its SHA-256, which S3 checks and Object Lock requires.
 
 Each file is read back (its size and checksum, as S3 keeps them) against what was written as soon as it is up, and the
 worker's lease is renewed after each; only once every one is, the manifest goes up and is read back too. An archive
@@ -21,6 +21,7 @@ and the next attempt starts a new prefix.
 Locally and in the tests the bucket is any S3 that boto3 reaches: ``FISCAL_ARCHIVE_ENDPOINT_URL`` points it elsewhere
 (the tests' moto server); in AWS it is empty and boto3 signs with the task's role.
 """
+
 import base64
 import datetime as dt
 import hashlib
@@ -112,7 +113,8 @@ def write(
     try:
         counts = archive.tables(hub, apps, documents)
         archive.handed_over(hub, apps)
-        archive.put(f"{archive.prefix}/manifest.json", _manifest(hub, apps, made_at, counts, archive), "application/json")
+        manifest = _manifest(hub, apps, made_at, counts, archive)
+        archive.put(f"{archive.prefix}/manifest.json", manifest, "application/json")
     except (ClientError, BotoCoreError) as refused:
         raise ArchiveFailed(f"S3 refused it: {refused}") from refused
     return made_at
