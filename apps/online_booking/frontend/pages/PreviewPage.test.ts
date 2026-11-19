@@ -9,6 +9,8 @@ import { business, click, ionChecked, ionValue, type MountOptions, mountOnlineBo
 import PreviewPage from './PreviewPage.vue';
 
 const PAGE: PageOut = {
+  business_name: 'Salón Lucía',
+  privacy_policy_url: 'https://erplora.com/legal/privacy/',
   title: 'Salón Lucía',
   welcome_message: 'Book your next visit',
   primary_color: '#6366f1',
