@@ -244,6 +244,8 @@ check("smoke runs the browser smoke with smoke-e2e.sh", smoke_words[:2] == ["bas
 check("smoke runs Playwright only through smoke-e2e.sh",
       not any(needle in smoke_runs for needle in ("pnpm e2e", "playwright", "nightly-e2e.sh")))
 smoke_specs = [smoke_words[index + 1] for index, word in enumerate(smoke_words[:-1]) if word == "--spec"]
+check("smoke's step is that command and its --spec, with nothing after them that could hide a red (as `|| true`)",
+      smoke_words[2:] == [word for spec in smoke_specs for word in ("--spec", spec)])
 repo = folder.resolve().parent.parent
 unsmoked = [spec for spec in smoke_specs if not (repo / spec).is_file() or "@smoke" not in (repo / spec).read_text()]
 check(f"every spec the smoke names exists and has a test tagged @smoke{': ' if unsmoked else ''}" + ", ".join(unsmoked),
