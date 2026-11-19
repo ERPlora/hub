@@ -68,6 +68,13 @@ describe('ModifierSheet', () => {
     expect(s.inDoc('pos-option-onion')?.textContent).not.toContain('€');
   });
 
+  it('names the product’s allergens and leaves a product without them unchanged', async () => {
+    const s = await setup({ product: product({ id: 'p1', name: 'Hamburguesa', price: 800, allergens: ['milk', 'gluten'] }) });
+    expect(s.inDoc('pos-options-allergens')?.textContent).toBe('Alérgenos: Gluten, Leche');
+    const plainProduct = await setup();
+    expect(plainProduct.inDoc('pos-options-allergens')).toBeNull();
+  });
+
   it('opens with the defaults chosen and «Add» waiting for the required group, saying so on a tap', async () => {
     const s = await setup();
     expect(s.inDoc('pos-option-onion')?.getAttribute('aria-pressed')).toBe('true');

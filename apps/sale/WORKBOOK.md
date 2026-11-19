@@ -3,9 +3,8 @@ Prefijo: SALE
 Alcance MVP: núcleo
 Estado de la app: completa (2026-10-31)
 Lo que no entra todavía: ver «Lo que queda fuera». La propina (SALE-G06) es de la app Propinas (`tip`), que añade
-su paso al cobro (SALE-F39, no hecho). Los alérgenos del plato en la línea (SALE-F40), parcial: la línea los guarda,
-pero el TPV todavía no los pinta. La alergia del cliente en la línea (SALE-F41), parcial: la línea la guarda y la
-comanda la lleva, pero el TPV todavía no tiene dónde marcarla.
+su paso al cobro (SALE-F39, no hecho). La alergia del cliente en la línea (SALE-F41) sigue parcial: el TPV la marca
+y la enseña, y la comanda la lleva, pero la tarjeta de Cocina todavía no la resalta.
 
 > Manual de usuario y especificación de la app `sale`. Se escribe **antes** que el código: no se
 > programa nada que no esté aquí, y cada flujo pasa a `Estado: hecho` cuando sus tests están en verde
@@ -322,7 +321,7 @@ cierra la ventana sin guardarlo. Con la ventana como se abrió, atrás la cierra
 | SALE-F37 | Añadir un medio de pago (Bizum, transferencia…) | común | hecho |
 | SALE-F38 | Vender un servicio de Servicios | peluquería | hecho |
 | SALE-F39 | Cobrar con lo que añade otra app (la propina) | común | no hecho |
-| SALE-F40 | Ver los alérgenos de un plato al pedirlo | común | parcial |
+| SALE-F40 | Ver los alérgenos de un plato al pedirlo | común | hecho |
 | SALE-F41 | Marcar la alergia del cliente en una línea | restaurante | parcial |
 
 ### SALE-F01 Vender y cobrar en efectivo
@@ -1366,17 +1365,16 @@ tique (3.000 €) y el del efectivo (1.000 €) miran el total de la venta, como
 Implicados: TIP-F02, TIP-F03, TIP-F04, CASH_REGISTER-F18, INVOICE-F01
 
 ### SALE-F40 Ver los alérgenos de un plato al pedirlo
-Estado: parcial — la línea guarda los alérgenos de su producto (en un menú, los de cada plato) y los llevan la cuenta
-en vivo y la comanda enviada, pero el TPV todavía no los pinta en la línea ni en las hojas (hub#1738)
+Estado: hecho
 Vertical: común
 Actor: empleado, responsable
 Pantalla: Vender
 Pasos:
-1. En **Vender**, toca un artículo con alérgenos declarados en Inventario (INVENTORY-F35). La línea entra como
+1. En **Vender**, toca un artículo con alérgenos declarados en Inventario. La línea entra como
    siempre y, debajo del nombre, dice «Alérgenos: Gluten, Leche», en el orden de la lista de los catorce. Un
    artículo sin alérgenos no lleva esa fila.
-2. Si el artículo abre su hoja de suplementos (SALE-F11), la hoja dice sus alérgenos debajo de su nombre, antes
-   de añadirlo. En la hoja de un menú (SALE-F12), cada elección dice los suyos junto a su nombre, y en la cuenta
+2. Si el artículo abre su hoja de suplementos, la hoja dice sus alérgenos debajo de su nombre, antes
+   de añadirlo. En la hoja de un menú, cada elección dice los suyos junto a su nombre, y en la cuenta
    cada plato del menú lleva los de su producto.
 3. Si el cliente pregunta, el camarero los lee en la línea; si el plato no le vale, quita la línea como cualquier
    otra antes de enviarla.
@@ -1389,14 +1387,15 @@ ni en la cuenta impresa para la mesa.
 Si falla: sin Inventario activo no hay alérgenos, y el precio libre y los servicios no los llevan. Un artículo sin
 alérgenos marcados no dice nada, porque el TPV no distingue «no lleva ninguno» de «no se han declarado»: por eso la
 ficha de Inventario dice «Sin alérgenos declarados». Un suplemento no tiene alérgenos propios: «+Queso» no añade
-Leche a la línea; si el cliente tiene una alergia, se marca en la línea (SALE-F41) y Cocina la ve igual.
+Leche a la línea; si el cliente tiene una alergia, se marca en la línea como alergia del cliente y Cocina la ve igual.
+Si la hoja de un menú no puede leer los alérgenos de sus platos, lo dice y ofrece «Reintentar»: así un plato sin
+fila no se toma por un plato sin alérgenos.
 Implicados: INVENTORY-F27, INVENTORY-F35, SALE-F11, SALE-F12, SALE-F41, KITCHEN-F32
 
 ### SALE-F41 Marcar la alergia del cliente en una línea
-Estado: parcial — la línea guarda la alergia del cliente, la cuenta en vivo dice cuáles de esos alérgenos lleva el
-plato y la comanda enviada la lleva, también por el asistente y la API; la hoja del TPV todavía no tiene el bloque
-«Alergia del cliente» ni la línea la enseña (hub#1738), y en Cocina la imprime el papel pero la tarjeta todavía no
-la resalta (KITCHEN-F32)
+Estado: parcial — el TPV la marca en la hoja de nota y la enseña en la línea, con la coincidencia del plato; la
+comanda enviada la lleva, también por el asistente y la API, y en Cocina la imprime el papel, pero la tarjeta
+todavía no la resalta (KITCHEN-F32)
 Vertical: restaurante
 Actor: empleado, responsable
 Pantalla: Vender
@@ -1406,9 +1405,9 @@ Pasos:
    rápidas y el cuadro de siempre (SALE-F13).
 2. Toca los alérgenos del cliente, uno o varios, y pulsa «Guardar». La línea dice, debajo del nombre, resaltado
    y antes de la nota, «Alergia: Gluten».
-3. Si el plato lleva alguno de esos alérgenos (SALE-F40), al guardar la hoja lo avisa y la línea lo dice
-   resaltado: «El plato lleva Gluten». No impide pedirlo, porque la cocina puede prepararlo sin él: el camarero lo
-   habla con el cliente y, si hace falta, quita la línea y pide otro plato.
+3. Si el plato lleva alguno de esos alérgenos (SALE-F40), al guardar la línea lo dice resaltado: «El plato lleva
+   Gluten». No impide pedirlo, porque la cocina puede prepararlo sin él: el camarero lo habla con el cliente y, si
+   hace falta, quita la línea y pide otro plato.
 4. En un menú, la alergia se marca en la línea del menú y vale para cada uno de sus platos; el aviso del paso 3
    nombra el plato que lleva el alérgeno («La hamburguesa lleva Gluten»).
 5. Envía la ronda (SALE-F20): la alergia va con cada plato a su estación, resaltada (KITCHEN-F32). Hasta enviarla,
@@ -2061,6 +2060,6 @@ título, sus pasos y «Si falla»: ahí no van nombres de código, incidencias, 
 - **Cobrar con propina**: es la app Propinas (`tip`, su `WORKBOOK.md`), con el paso del cobro que pinta Ventas
   (SALE-F39), las dos `no hecho`; el código va por las issues hijas de hub#562. Mientras, la propina en efectivo se
   anota en Caja como «Entrada» (CASH_REGISTER-F05).
-- **Los alérgenos del plato y la alergia del cliente** (F40 y F41 `parcial`): la línea ya guarda los alérgenos de
-  su producto y la alergia del cliente, y la comanda enviada los lleva; la línea y las hojas los enseñan por
-  hub#1738; Cocina los guarda en cada plato y los imprime bajo él, y su tarjeta los resaltará por hub#1738 (KITCHEN-F32). Los alérgenos de un suplemento («+Queso» lleva leche) no entran: hub#1739.
+- **La tarjeta de Cocina y los alérgenos de un suplemento**: la línea y las hojas del TPV ya enseñan los alérgenos
+  del plato y la alergia del cliente (F40 hecho; F41 parcial solo porque la tarjeta de Cocina aún no resalta la
+  alergia, hub#1738). Los alérgenos de un suplemento («+Queso» lleva leche) no entran: hub#1739.
