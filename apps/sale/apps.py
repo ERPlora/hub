@@ -177,4 +177,4 @@ class SaleConfig(LiveAppConfig):
         its sales here are documents nothing archives yet, so the database stays."""
         from apps.sale import queries  # the models are not loaded yet when this module is
 
-        return queries.keeps_fiscal_documents()
+        return queries.sales.keeps_fiscal_documents()

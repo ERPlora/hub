@@ -3684,7 +3684,7 @@ Implicados: BASE-F92, BASE-F93
   `tests/test_guardrails_money.py` no deja llamar a `format_currency` ni a `get_currency_symbol` de Babel fuera de él.
   Ventas, Facturación, Inventario, Tarifas, Impresión, Pagos y
   Carrito y pago la leen con `base.operations.business_currency(ctx.scope)`, sin copia propia (las `business_currency(ctx)`
-  de `apps/sale/queries.py` y `apps/cart_checkout/queries.py` solo la llaman); en pantalla, Pagos, Carrito y pago,
+  de `apps/sale/queries/business.py` y `apps/cart_checkout/queries.py` solo la llaman); en pantalla, Pagos, Carrito y pago,
   Clientes, Menús y combos, Citas y la vista previa de Reserva online la leen con `useBusinessMoney` (ninguna fija
   una moneda; la ficha de prueba de `base.business.get` es `base/frontend/__tests__/business.ts`). Pantallas: `SettingsPage.vue` (pestañas por hash `#business`, `#tickets`,
   `#data`; `#tax` abre Negocio; `lib/data.ts`) y `components/settings/{BusinessPanel,TicketsPanel,SettingsRow}.vue`.
@@ -4157,7 +4157,7 @@ Implicados: BASE-F92, BASE-F93
   quien ya tiene el permiso sigue con su contexto tal cual. Solo las llamadas directas de la orden aprobada: lo que
   esa otra orden llame a su vez va con el contexto que recibió. La huella y el gasto del pase no cambian
   (`base/tests/test_approved_calls.py`). Ventas aún lleva su copia (`approval_of`, `consequence_context` y `call_app`
-  de `apps/sale/queries.py`) y pasa a `call` en su FIX; Reservas y Mesas, sin órdenes aprobables, llevan su
+  de `apps/sale/queries/other_apps.py`) y pasa a `call` en su FIX; Reservas y Mesas, sin órdenes aprobables, llevan su
   `call_app` propio, al que no llega ninguna aprobación. En el cliente, `withApproval(() => command.run(input))` de
   `base/frontend/lib/approval.ts` abre el diálogo y repite la orden una vez (`getElevationToken` en
   `frontend/main.ts`). El registro es `base.models.Approval` (`base.approval.list`).

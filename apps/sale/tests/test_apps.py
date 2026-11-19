@@ -173,7 +173,7 @@ SALES = [*FIGURES, "sale.sale.reassigned", "sale.sale.invoiced"]
 
 def test_the_homes_panels_are_the_old_sales_dashboards_four():
     """The old module's four panels of the dashboard (its module.json ``widgets``): today's sales and tickets on
-    by default, the last seven days and the recent activity to turn on, each on a query of queries.py."""
+    by default, the last seven days and the recent activity to turn on, each on a query of the queries package."""
     panels = sale().widgets
     assert all(isinstance(panel, Widget) for panel in panels)
     assert [

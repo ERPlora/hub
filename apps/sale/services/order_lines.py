@@ -11,18 +11,12 @@ from live.outbox import record_event
 
 from apps.sale import events
 from apps.sale.models import Order, OrderLine
-from apps.sale.queries import (
-    Booking,
-    authoriser,
-    check_grid,
-    find_order,
-    freeze_combo_line,
-    freeze_open_line,
-    freeze_product_line,
-    freeze_service_line,
-    hold_departments,
-    provisional_total,
-)
+from apps.sale.queries.business import authoriser
+from apps.sale.queries.departments import hold_departments
+from apps.sale.queries.line_parts import check_grid, provisional_total
+from apps.sale.queries.order_lines import freeze_combo_line, freeze_open_line, freeze_product_line
+from apps.sale.queries.orders import find_order
+from apps.sale.queries.service_lines import Booking, freeze_service_line
 from apps.sale.schemas import (
     OrderAddLineIn,
     OrderAddOpenLineIn,

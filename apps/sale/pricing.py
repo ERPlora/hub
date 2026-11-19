@@ -173,7 +173,7 @@ def value(  # noqa: PLR0913, PLR0915
     category_name: Namer | None = None,
 ) -> Valuation:
     """``category_name`` names the category of a line refused for want of a rule (the till's in production,
-    ``queries.tax_category_name``); without one, as the arithmetic's own tests value, its key."""
+    ``queries.checkout.tax_category_name``); without one, as the arithmetic's own tests value, its key."""
     if not lines:
         raise Conflict(str(EMPTY_SALE), code="sale.empty_sale")
     amounts = [

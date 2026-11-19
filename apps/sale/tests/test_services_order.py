@@ -225,7 +225,7 @@ def test_an_open_price_line_takes_the_department_and_its_vat():
 
 def test_with_inventory_off_no_product_is_sold_and_an_open_price_still_is(coffee, monkeypatch):
     # Inventory is asked by name through the platform's door: off, the till's own 409, and an open price needs no catalog.
-    from apps.sale.queries import CATALOG_UNAVAILABLE
+    from apps.sale.queries.other_apps import CATALOG_UNAVAILABLE
     from base import activation
 
     monkeypatch.setattr(activation, "off_apps", lambda scope: frozenset({"inventory"}))
