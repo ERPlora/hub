@@ -35,6 +35,21 @@ def test_the_instructions_keep_ids_out_of_the_answer():
     ) in text
 
 
+def test_the_instructions_ask_for_a_missing_datum_and_leave_the_yes_to_the_card():
+    """An owner does not know which data a change needs (the tax category or the SKU of a product): told only never to
+    invent, the assistant is left to make one up, give up, or ask in the chat whether to go ahead instead of showing the
+    card.
+    It looks the datum up with its tools first and asks for it only when none gives it, one short question at a time,
+    as the panel's assistant of erplora.com does; a request that fits several records is asked about too."""
+    text = " ".join(assistant.prompt.instructions(language="es", currency="EUR", decimals=2, business="Bar Pepe", screens={}).split())
+    assert "That card is the only confirmation: never ask in your text whether to go ahead." in text
+    assert (
+        "Look up with your tools what a change needs; ask only for a datum its tool requires, that no tool gives and "
+        "the person has not said, one short question at a time, and never invent it."
+    ) in text
+    assert "If the request fits several records, ask which one." in text
+
+
 def test_the_instructions_set_the_language_the_money_and_the_screens():
     text = assistant.prompt.instructions(language="es", currency="EUR", decimals=2, business="Bar Pepe", screens={"/settings": "Ajustes"})
     # Off-topic questions (films, cinemas) would spend the business's allowance.
