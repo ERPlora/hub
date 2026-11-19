@@ -25,3 +25,7 @@ ITEM_EVENTS = [ITEM_ADDED, ITEM_UPDATED, ITEM_REMOVED]
 ORDER_EVENTS = [CHECKOUT_INITIATED, ORDER_PAID, ORDER_FAILED, ORDER_COMPLETED]
 CUSTOMER_EVENTS = [CUSTOMER_ERASED]
 ALL = CART_EVENTS + ITEM_EVENTS + ORDER_EVENTS + CUSTOMER_EVENTS
+
+#: The amounts its events bring (a line's total, an order's), in cents of the cart's currency (beside them): an
+#: automation says them as money in what a person reads.
+AMOUNTS = frozenset({"line_total", "total_amount"})

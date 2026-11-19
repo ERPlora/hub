@@ -34,6 +34,10 @@ ALL = [
     LINK_DETACHED,
 ]
 
+#: The amount an option's events bring, what it adds or takes off the price in cents of the business's currency:
+#: an automation says it as money in what a person reads.
+AMOUNTS = frozenset({"price_delta"})
+
 GROUP_EVENTS = [GROUP_CREATED, GROUP_UPDATED, GROUP_DELETED]
 OPTION_EVENTS = [OPTION_CREATED, OPTION_UPDATED, OPTION_DELETED]
 LINK_EVENTS = [LINK_ATTACHED, LINK_DETACHED]

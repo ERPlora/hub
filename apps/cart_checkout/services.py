@@ -408,8 +408,7 @@ def add_item(ctx: OperationContext, data: ItemAddIn) -> dict:
     )
     _recount(cart, actor)
     record_event(
-        ctx,
-        events.ITEM_ADDED,
+        ctx, events.ITEM_ADDED,
         {
             "item_id": str(item.id),
             "cart_id": str(cart.id),
@@ -417,6 +416,7 @@ def add_item(ctx: OperationContext, data: ItemAddIn) -> dict:
             "product_ref": item.product_ref,
             "quantity": _quantity(item.quantity),
             "line_total": item.line_total,
+            "currency": cart.currency,
         },
     )
     return _change(item, cart)

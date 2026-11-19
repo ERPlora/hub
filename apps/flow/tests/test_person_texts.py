@@ -15,7 +15,6 @@ import json
 from zoneinfo import ZoneInfo
 
 import pytest
-from django.utils import timezone
 from live.context import system_context
 from live.models import OutboxEvent
 from live.operations import Operation, registry
@@ -26,7 +25,6 @@ from apps.flow.models import Flow, FlowRun, Question
 from apps.flow.queries.values import words_for
 from apps.task.models import Task
 from apps.whatsapp_inbox.models import Message
-from apps.whatsapp_inbox.tests.conftest import connect, receive
 from base.models import Hub
 
 from .conftest import A, HUB_DB, ctx_for, make_flow, run
@@ -204,15 +202,6 @@ def test_trying_it_says_the_question_as_it_will_be_asked(clock):
 
 
 # ── «Send a message to a customer» (FLOW-F31) ─────────────────────────────────────────────────────────────────────────
-
-
-@pytest.fixture
-def chatting(settings):
-    """A WhatsApp conversation with Ana that wrote ten minutes ago: a text goes as it is."""
-    settings.SAAS_INTERNAL_URL = "http://saas.test"
-    settings.INTERNAL_SHARED_SECRET = "s3cret"
-    connect()
-    receive("wamid.IN", sent_at=(timezone.now() - dt.timedelta(minutes=10)).isoformat(), scope=A)
 
 
 def test_a_whatsapp_to_a_customer_says_each_datum_in_words(chatting):

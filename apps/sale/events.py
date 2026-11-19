@@ -69,6 +69,10 @@ ALL = [
     QUICK_NOTE_DELETED,
 ]
 
+#: The amounts its events bring (a charge's figures, a void's or a refund's total), in cents of the sale's currency:
+#: an automation says them as money in what a person reads.
+AMOUNTS = frozenset({"total", "subtotal", "tax_amount", "discount_amount", "gift_total"})
+
 #: The events that change what a sale says (lists, figures, documents).
 SALE_EVENTS = [SALE_COMPLETED, SALE_VOIDED, SALE_REFUNDED, SALE_REASSIGNED, SALE_INVOICED]
 #: The events that move the sales figures (what was sold, how many tickets): a charge, a void, a refund.

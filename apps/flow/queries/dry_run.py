@@ -166,7 +166,7 @@ def try_flow(ctx: OperationContext, data: TestIn) -> dict:  # noqa: C901, PLR091
     stopped = bool(trigger_failed)
     operations = catalog_operations(ctx.scope)
     # What a person would read is said as the person trying it reads it (who saves it, in their language).
-    say = words_for([step.model_dump() for step in tried.steps], ctx.language, ctx.scope, values)
+    say = words_for([step.model_dump() for step in tried.steps], ctx.language, ctx.scope, values, sample["event"])
     unknown_steps: set[str] = set()
     steps = []
     for step in tried.steps:
