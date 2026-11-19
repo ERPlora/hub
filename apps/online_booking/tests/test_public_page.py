@@ -4,6 +4,7 @@ link says whose booking it is too: the business's name and its logo."""
 
 import json
 
+import pytest
 from django.utils import translation
 
 from apps.appointment.models import Appointment
@@ -173,9 +174,10 @@ def test_her_link_still_names_the_business_once_she_cancels(client, anytime):
     assert public("booking", {"token": booked["token"]}).status == "cancelled"
 
 
-def test_a_link_that_does_not_exist_names_no_business(client, anytime):
+@pytest.mark.parametrize("operation", ["booking", "cancel"])
+def test_a_link_that_does_not_exist_names_no_business(client, anytime, operation):
     _, shown = booked_with_logo(client)
-    unknown = door(client, "online_booking.public.booking", {"token": TOKEN})
+    unknown = door(client, f"online_booking.public.{operation}", {"token": TOKEN})
     assert (unknown.status_code, unknown.json()["error"]["code"]) == (404, "online_booking.booking_not_found")
     said = json.dumps(unknown.json(), ensure_ascii=False)
     assert "Salón Lucía" not in said and LOGO not in said and shown not in said
