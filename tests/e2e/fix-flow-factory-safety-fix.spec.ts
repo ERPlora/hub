@@ -84,9 +84,9 @@ for (const viewport of VIEWPORTS) {
       const locked = editor.locator('[data-testid^=flow-trigger-filter-locked-]');
       await expect(locked).toHaveText([SET_BY, SET_BY]);
       await expect(editor.locator('[data-testid^=flow-trigger-filter-remove-]')).toHaveCount(0);
-      // Its steps say each app by its visible name, never its internal one (hub#476: at 390 one said «whatsapp_inbox»
-      // while the catalog was on its way).
-      await expect(editor.locator('[data-testid=flow-step-open-s1]')).toContainText('Look up: Read · WhatsApp inbox (message)');
+      // Its steps say each action in words, never with its app's internal name, also at 390 while the catalog is on
+      // its way.
+      await expect(editor.locator('[data-testid=flow-step-open-s1]')).toContainText('Look up: Read a WhatsApp message');
       await expect(editor.locator('[data-testid^=flow-step-open-]').filter({ hasText: 'whatsapp_inbox' })).toHaveCount(0);
       await locked.last().scrollIntoViewIfNeeded();
       await noHorizontalScroll(page, viewport.label);

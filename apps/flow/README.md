@@ -67,7 +67,8 @@ CI=1 pnpm e2e tests/e2e/flow-flows.spec.ts tests/e2e/flow-steps.spec.ts tests/e2
 - `test_integration_apps.py` y `test_integration_assistant.py` van contra las apps reales y el asistente;
   `test_concurrency.py`, con hilos, que un aviso, un horario o una espera arrancan una sola vez y que borrar a la
   vez nunca da un error del servidor; `test_field_words.py` exige que cada
-  dato de una operación tenga su palabra `flow.fields.<campo>` en `en` y `es`.
+  dato de una operación tenga su palabra `flow.fields.<campo>` en `en` y `es`, y `test_action_words.py`, que cada
+  acción y consulta que ofrece el editor tenga su frase `flow.actions.<app>__<entidad>__<acción>` en los dos.
 - 15 specs `tests/e2e/flow-*.spec.ts` y `fix-*flow*.spec.ts` (lista y galería, pasos, recetas, relevo, asistente,
   WhatsApp con el Graph de Meta de la e2e…); las de WhatsApp necesitan el SaaS de la pila (`tests/e2e/README.md`).
 
