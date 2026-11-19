@@ -8,7 +8,7 @@ import { type BrowserContext, type Page, expect, test } from '@playwright/test';
 import { formatDateTime } from '../../packages/ui/src/components/format/dateTime';
 import { type Figures, figuresAt, shownFigures, watchFigures } from './demo-figures';
 import { A, api, login, record, shot, shown } from './helpers';
-import { createItem, listReady, rowOf } from './demo-items';
+import { createItem, listReady, rowNames, rowOf } from './demo-items';
 import { decodeSubs } from './live-streams';
 
 type Sub = { op: string; params: Record<string, unknown> };
@@ -26,10 +26,8 @@ const listParams = (opened: Sub[][]) => opened.at(-1)?.find((s) => s.op === 'dem
 
 const rows = (page: Page) => shown(page).locator('[data-testid=demo-items-row]');
 
-const names = (page: Page) => shown(page).locator('[data-testid=demo-item-name]');
-
 /** Both filtered lists have two rows: only their names tell the new one from the one still on screen. */
-const sortedNames = async (page: Page) => (await names(page).allInnerTexts()).sort();
+const sortedNames = async (page: Page) => (await rowNames(page)).sort();
 
 /** Whitespace as text: ICU builds differ on the space before «AM» (U+0020 or U+202F). */
 const plain = (text: string) => text.replace(/\s+/g, ' ').trim();
@@ -84,7 +82,7 @@ test('status filter on the server and the «Updated» column painted by the shar
     await filterBy(page, 'Done');
     await expect.poll(() => listParams(opened)).toEqual({ search: prefix, status: 'done', limit: 50, offset: 0 });
     await expect.poll(() => sortedNames(page)).toEqual([...seeded.done].sort());
-    const doneNames = await names(page).allInnerTexts();
+    const doneNames = await rowNames(page);
     const doneBadges = await shown(page).locator('[data-testid=demo-item-status]').allInnerTexts();
     await page.screenshot({ path: shot('list-filters--done') });
 
@@ -92,7 +90,7 @@ test('status filter on the server and the «Updated» column painted by the shar
     await filterBy(page, 'Open');
     await expect.poll(() => listParams(opened)?.status).toBe('open');
     await expect.poll(() => sortedNames(page)).toEqual([...seeded.open].sort());
-    const openNames = await names(page).allInnerTexts();
+    const openNames = await rowNames(page);
     await filterBy(page, 'All');
     await expect.poll(() => listParams(opened)).toEqual({ search: prefix, limit: 50, offset: 0 });
     await expect(rows(page)).toHaveCount(4);
