@@ -190,3 +190,9 @@ def test_the_page_of_the_code_is_the_shell_for_a_visitor_without_a_session(ticke
     assert ticket.invoice_number not in page.content.decode()
     elsewhere = Client().get(f"/p/{B.key}/invoice/{receipt_code(ticket)}", HTTP_HOST=HOST, HTTP_ACCEPT="text/html")
     assert elsewhere.status_code == 404
+
+
+def test_no_automation_issues_from_the_page_alone():
+    from apps.flow.queries.catalog import ask_first_catalog
+
+    assert "invoice.public.substitute" not in ask_first_catalog(A)

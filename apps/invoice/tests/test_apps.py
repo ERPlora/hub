@@ -160,11 +160,10 @@ def test_every_operation_is_described_for_the_assistant():
         "invoice.issuer.update",
         "invoice.issuer.sync",
         "invoice.invoice.issue_platform",
+        "invoice.public.substitute",
     }
-    # The ticket's public page's two are the customer's, without a session, never the assistant's tools: at the
-    # counter it is invoice.invoice.substitute.
-    for name in ("invoice.public.ticket", "invoice.public.substitute"):
-        assert ops.pop(name).ai is INTERNAL, name
+    # The ticket's public page's read is the page's own, never an assistant tool.
+    assert ops.pop("invoice.public.ticket").ai is INTERNAL
     for name, op in ops.items():
         assert isinstance(op.ai, dict) and str(op.ai.get("description", "")).strip(), (
             name

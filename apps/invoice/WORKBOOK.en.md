@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:76369eb6b269b6f5ae57dfa7dcc57ea7de3177c4bd27b7067a1ad7ce8e2c3739 -->
+<!-- generated from WORKBOOK.md sha256:62b03743fdb668f86efa8f5d2d9e6eb8d6b255ced124569aa3d55d2b83a73844 -->
 
 ## What it is for and who it is for
 
@@ -900,4 +900,5 @@ notice delivery hands it these notices afterwards and, if that one stayed "pendi
 
 The roles arrive from the SaaS with a prefix (`hub_owner`, `hub_admin`, `hub_manager`, `hub_employee`).
 Receiving the issuer from the SaaS (`invoice.sync_issuer`) belongs to no role: only to the system. Whoever opens
-the ticket's public page holds `invoice.public`, without a session and without any other permission.
+the ticket's public page holds `invoice.public`, without a session and without any other permission; no automation
+issues from it alone (high risk, as replacing a ticket at the counter).

@@ -5,7 +5,7 @@ full invoice (F3) per ticket, and asking again answers that same one without spe
 with it."""
 
 from live.context import OperationContext
-from live.operations import INTERNAL, get, operation
+from live.operations import get, operation
 
 from apps.invoice.queries.public import PUBLIC, delegated, fiscal_record, ticket_of_code
 from apps.invoice.schemas.public import PublicIssueOut, PublicSubstituteIn
@@ -19,7 +19,13 @@ RECIPIENT = ("customer_name", "customer_country", "customer_id_type", "customer_
     permission=PUBLIC,
     input=PublicSubstituteIn,
     output=PublicIssueOut,
-    ai=INTERNAL,
+    # High, as invoice.invoice.substitute: no automation issues a fiscal document alone. Not a tool: at the counter the
+    # assistant uses invoice.invoice.substitute.
+    ai={
+        "description": "Not an assistant tool: the customer's own request from their ticket's public page, which "
+        "issues, as the system, the full invoice that replaces the ticket the code opens.",
+        "risk": "high",
+    },
 )
 def public_substitute(ctx: OperationContext, data: PublicSubstituteIn) -> dict:
     ticket = ticket_of_code(ctx, data.code)

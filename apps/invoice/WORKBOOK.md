@@ -902,7 +902,8 @@ lo reintenta a los 2, 4, 8… segundos hasta 8 veces; pasado eso, sale con «Emi
 
 Los papeles llegan del SaaS con prefijo (`hub_owner`, `hub_admin`, `hub_manager`, `hub_employee`).
 Recibir el emisor del SaaS (`invoice.sync_issuer`) no es de ningún papel: solo del sistema. `invoice.public` lo tiene
-cualquiera que abre la página pública del tique, sin sesión y sin ningún otro permiso.
+quien abre la página pública del tique, sin sesión y sin ningún otro permiso; ninguna automatización emite desde ella
+sola (riesgo alto, como sustituir un tique en el mostrador).
 
 ## Para quien lo mantiene
 

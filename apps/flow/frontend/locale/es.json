@@ -1398,7 +1398,6 @@
       "website__site__publish": "Publicar la página web",
       "website__site__save": "Guardar el borrador de la página web",
       "website__site__unpublish": "Desconectar la página web",
-      "invoice__public__substitute": "Emitir la factura completa que un cliente pide con el código de su tique",
       "invoice__public__ticket": "Leer el tique que abre un código de tique"
     },
     "facts": {

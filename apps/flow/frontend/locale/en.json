@@ -1398,7 +1398,6 @@
       "website__site__publish": "Publish the website",
       "website__site__save": "Save the website's draft",
       "website__site__unpublish": "Take the website offline",
-      "invoice__public__substitute": "Issue the full invoice a customer asks for with their ticket's code",
       "invoice__public__ticket": "Read the ticket a ticket's code opens"
     },
     "facts": {
