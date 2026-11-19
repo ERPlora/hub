@@ -11,7 +11,7 @@ pytestmark = [HUB_DB, pytest.mark.usefixtures("hub_a")]
 
 
 def test_me_is_bound_to_session_me():
-    from base.api import router
+    from base.api.home import router
 
     [route] = router.path_operations["/me"].operations
     assert (route.methods, route.operation_id) == (["GET"], "base.session.me")

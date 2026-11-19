@@ -173,7 +173,7 @@ def test_without_the_home_s_permission_it_is_refused(hubs):
 
 
 def test_its_route(client, make_user, hubs):
-    from base.api import router
+    from base.api.business import router
 
     [route] = router.path_operations["/business"].operations
     assert (route.methods, route.operation_id) == (["GET"], "base.business.get")
