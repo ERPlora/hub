@@ -7,6 +7,8 @@ import base64
 import hashlib
 import io
 
+from pathlib import Path
+
 import pytest
 from django.utils import translation
 from live.context import OperationContext, Scope
@@ -18,11 +20,13 @@ from base import public_images
 from base.models import Hub
 from base.schemas.public_images import ImageUploadIn
 from base.storage import hub_prefix
+from base.tests.po import catalogue_key, module_texts, po_entries
 from base.tests.test_images import hub_files as hub_files
 
 pytestmark = pytest.mark.django_db
 
 A = Scope("host", "a")
+BASE_PO = Path(public_images.__file__).parent / "locale" / "es" / "LC_MESSAGES" / "django.po"
 FOLDER = "online_booking/logo/"
 
 
@@ -120,6 +124,15 @@ def test_a_refusal_speaks_the_persons_language(hub_files):
         public_images.keep(ctx("es"), FOLDER, upload_of(picture("JPEG")))
 
     assert refused.value.fields == {"data_base64": "Este archivo no es una imagen PNG."}
+
+
+def test_every_refusal_has_its_spanish_in_the_platforms_catalogue():
+    with translation.override("en"):
+        refusals = {catalogue_key(text) for text in module_texts(public_images)}
+    entries = po_entries(BASE_PO)
+
+    assert len(refusals) == 5
+    assert {key for key in refusals if not entries.get(key, ("", False))[0] or entries[key][1]} == set()
 
 
 def test_an_upload_names_one_of_the_three_types_and_a_file_of_5_mb_at_most():
