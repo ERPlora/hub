@@ -13,7 +13,10 @@ from live.outbox import record_event
 
 from apps.flow import events, recipes
 from apps.flow.models import Flow
-from apps.flow.queries import MANAGE, grantable_operations, flow_row, recipe_flow
+from apps.flow.queries.catalog import grantable_operations
+from apps.flow.queries.flows import flow_row
+from apps.flow.queries.reads import MANAGE
+from apps.flow.queries.recipe_flows import recipe_flow
 from apps.flow.schemas import CreateIn, FlowOut, RecipeEnabledOut, RecipeRefIn
 
 from .flow_document import _apply_trigger, _next_fire, refresh_search_text

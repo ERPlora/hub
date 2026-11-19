@@ -18,21 +18,12 @@ from live.outbox import record_event
 from apps.flow import document, events
 from apps.flow.apps import RUN_ACTOR
 from apps.flow.models import Flow, FlowRun, Question
-from apps.flow.queries import (
-    HIGH_RISK_CODE,
-    LEAVES,
-    catalog_operations,
-    grantable_operations,
-    needs_a_person,
-    read_permissions,
-    map_params,
-    prepared,
-    say,
-    validation_fields,
-    TURN,
-    PERSON_PARAMS,
-    words_for,
-)
+from apps.flow.queries.catalog import catalog_operations, grantable_operations, needs_a_person, read_permissions
+from apps.flow.queries.problems import HIGH_RISK_CODE
+from apps.flow.queries.reads import TURN
+from apps.flow.queries.reasons import say
+from apps.flow.queries.runs import LEAVES
+from apps.flow.queries.values import map_params, prepared, validation_fields, PERSON_PARAMS, words_for
 
 from .writes import _actor
 
@@ -73,7 +64,7 @@ class StepFailed(Exception):
 
 
 def _own(code: str, key: str = "", *, fields: dict | None = None, technical: str = "", **values: Any) -> StepFailed:
-    """A failure in the engine's own words (``queries.REASONS[key or code]``), said now in the active language (the
+    """A failure in the engine's own words (``queries.reasons.REASONS[key or code]``), said now in the active language (the
     automation's) and kept by name and values for whoever reads it later."""
     reason = {"key": key or code, "values": values}
     return StepFailed(code, say(reason), fields=fields, technical=technical, reason=reason)

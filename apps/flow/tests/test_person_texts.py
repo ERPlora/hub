@@ -23,7 +23,7 @@ from ninja import Field, Schema
 
 from apps.cart_checkout.tests.conftest import make_cart
 from apps.flow.models import Flow, FlowRun, Question
-from apps.flow.queries import words_for
+from apps.flow.queries.values import words_for
 from apps.task.models import Task
 from apps.whatsapp_inbox.models import Message
 from apps.whatsapp_inbox.tests.conftest import connect, receive

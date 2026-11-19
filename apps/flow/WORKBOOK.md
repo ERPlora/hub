@@ -1336,7 +1336,7 @@ Los avisos llevan ids, nunca nombres ni contenidos.
   empates incluidos. Lo fija `test_ties_go_by_id_in_the_lists_own_direction`.
 - **Anatomía**: `apps.py`, `models.py`, `document.py` (el documento de una automatización: rutas de
   datos, plantillas `{{…}}`, condiciones, horarios y permisos que pide; puro, sin base de datos),
-  `schemas.py`, `queries.py`, `services/` (con el motor), `events.py`, `live.py`, `api.py`, `admin.py`,
+  `schemas.py`, `queries/`, `services/` (con el motor), `events.py`, `live.py`, `api.py`, `admin.py`,
   `locale/`, `frontend/` y un `tests/test_<fichero>.py` por fichero, más
   `tests/test_integration_apps.py` (Clientes, Ventas y Tareas de verdad) y `tests/test_concurrency.py`.
 - **Modelos**: `Flow` (nombre, encendida, disparador aplanado —`trigger_kind`, `trigger_event`,
@@ -1371,7 +1371,7 @@ Los avisos llevan ids, nunca nombres ni contenidos.
   ningún sistema del mercado sienta por una automatización) queda fuera y se rechaza
   al guardar, al conceder y al ejecutar con el código `flow.high_risk`. «Activas» son las
   que `base.relay.active_apps(ctx.scope)` resuelve con los derechos del SaaS y `base.activation.off_apps`, la
-  misma lectura que usa el relay y la guarda de operaciones; `queries.active_apps` solo descarta `flow` y
+  misma lectura que usa el relay y la guarda de operaciones; `queries.catalog.active_apps` solo descarta `flow` y
   devuelve sus configuraciones. Una acción de una app apagada después de guardarla deja la ejecución en
   `flow.action_unavailable`, sin borrar la automatización; se reanuda tras encenderla (hub#1054). El catálogo
   dice también las apps apagadas (`off_apps`), para que el editor explique un paso o un aviso que falta, y al
@@ -1381,13 +1381,13 @@ Los avisos llevan ids, nunca nombres ni contenidos.
   su app fijó (hub#447). El motor programado corre en el negocio de cada hub: el worker pasa
   `Scope("host", <slug>)` a `scheduler.run_due` (`base.worker._serve_hub`).
 - **La excepción «Que me lo pregunte»**:
-  `queries.ASK_FIRST` (`reservation.reservation.cancel` y `appointment.appointment.cancel`, hub#634; nunca lo
+  `queries.catalog.ASK_FIRST` (`reservation.reservation.cancel` y `appointment.appointment.cancel`, hub#634; nunca lo
   que se hace en persona, `asks_first`)
   entra en `ask_first_catalog`, sale en `flow.catalog.read` con `ask_first: true` (el editor no lo ofrece a
   «Hacer algo» ni a «Que lo haga por su cuenta»), se guarda solo como herramienta de un paso `assistant` con
   `mode: ask` (`operation_problem(…, asking=True)`), se concede solo si un paso así lo nombra (`asked_first`) y
   `_offered` no lo da en `auto`; un paso `command` sigue con `flow.high_risk` al guardar y al ejecutar. El sí lo
-  valida `_may_say_yes`: quien contesta tiene el permiso de la operación (`queries.yes_permission`: el que su app
+  valida `_may_say_yes`: quien contesta tiene el permiso de la operación (`queries.catalog.yes_permission`: el que su app
   declara en `ai.yes_permission` cuando el de la operación solo alcanza a «lo suyo»; Citas nombra
   `appointment.change_appointment`, porque el cambio de la automatización alcanza a las de todos, `is_own`) o
   `PermissionDenied` `flow.approval_beyond_you`, y la pregunta sigue pendiente; el cambio corre como `flow_run:<id>`,
@@ -1399,12 +1399,12 @@ Los avisos llevan ids, nunca nombres ni contenidos.
   borrados, VeriFactu y envíos a Hacienda no entran: mueven dinero o dejan un registro que no se deshace.
 - **Datos fijos de un paso `assistant`**: `AssistantStep.pinned`
   (`{herramienta: {entrada: valor}}`, opcional; sin él el paso se guarda sin esa clave, `exclude_none`). Al guardar,
-  `queries.pinned_problem` exige que la herramienta esté en `tools` y que la entrada sea de su `action_fields`, con
+  `queries.pinned.pinned_problem` exige que la herramienta esté en `tools` y que la entrada sea de su `action_fields`, con
   valor (`steps.<n>.pinned`, `invalid_payload`); `_reads`/`_call_only` leen sus `{{…}}` como los del encargo. Al
   correr, `services.assistant_steps._spec` los quita de `parameters` (`properties` y `required`) de lo que se ofrece al modelo,
   `_pinned` los resuelve con `document.resolve` sobre `{"input", "steps"}` y `_with_pinned` los pone encima de los
   argumentos del modelo, antes de `_propose` (la propuesta guardada, y su tarjeta, ya los llevan) o de `run_tool`;
-  vacío (`queries.fixed_value`: `None` o texto en blanco, la misma regla en «Probar») → `flow.pinned_empty` al
+  vacío (`queries.pinned.fixed_value`: `None` o texto en blanco, la misma regla en «Probar») → `flow.pinned_empty` al
   modelo y `assistant_pinned_empty` en el log, sin proponer ni ejecutar. «Probar» devuelve `pinned` por paso
   (`PinnedOut`: `filled`, `empty` o `unknown` si lee un paso que no corre en la prueba), cada `filled` con `said`,
   el dato de `base.assistant.cards.card` (la tarjeta de FLOW-F29) leído con el `ctx` de quien prueba: `null` si la tarjeta
@@ -1416,7 +1416,7 @@ Los avisos llevan ids, nunca nombres ni contenidos.
   (conectores sobre un atributo protegido), Salesforce Agentforce (input bindings), Merge (tool input overrides),
   Yeeflow y Beam («Custom value»/«static» frente a «fill with AI»): se oculta y se sobrescribe, nunca se rechaza.
 - **Los datos insertados en lo que lee una persona**:
-  `document.fill`/`resolve` meten cada dato tal cual (`true`, ISO, céntimos) salvo con un `say`; `queries.words_for`
+  `document.fill`/`resolve` meten cada dato tal cual (`true`, ISO, céntimos) salvo con un `say`; `queries.values.words_for`
   es el de lo que lee una persona — el título y los detalles de un paso `ask` (`_ask` y «Probar») y los datos de
   `PERSON_PARAMS` (`whatsapp_inbox.message.notify`: `text` y `template`, en `map_params`) —: un `bool` como «Sí»/«No»
   (`pgettext "datum"`), un día, una hora con segundos o un instante ISO (`base.home.moment`, a la hora del negocio)
@@ -1432,7 +1432,7 @@ Los avisos llevan ids, nunca nombres ni contenidos.
   su carrito, con `currency_decimals`; la del negocio, porque una regla no es de ninguna tarifa—, como un precio de
   tarifa responde la de su tarifa (`PriceItemOut.currency`, también en `add`, `update` y `list`; hub#915). Un importe
   en una moneda propia, distinta de la que responde su paso, lleva en su marca el nombre del dato de al lado que la da
-  (`queries.CURRENCY_IN`, `json_schema_extra={"money": True, "currency_in": "<dato>"}`) y sale solo en esa moneda;
+  (`queries.values.CURRENCY_IN`, `json_schema_extra={"money": True, "currency_in": "<dato>"}`) y sale solo en esa moneda;
   sin ese dato (una ejecución guardada antes de que su paso lo diera), con su cifra, nunca en la del negocio: los
   límites de la vista previa de un cobro (`sale.checkout.preview`: `cash_limit` y `ticket_limit`), en los euros de la
   ley que da `limits_currency` (hub#926). El trinquete
@@ -1448,20 +1448,20 @@ Los avisos llevan ids, nunca nombres ni contenidos.
   formateador. Gana lo más sencillo para quien escribe: en lo que lee una persona sale ya en palabras, sin sintaxis.
 - **Los datos del cambio que espera un sí**:
   `_propose` guarda en `Question.details` solo lo que dijo el asistente; `flow.question.list` añade `fields` con
-  `queries.question_row`, que lee con `queries.proposal_of` la propuesta que el paso `assistant` guarda en `run.outputs["_turn"]` (una a
+  `queries.questions.question_row`, que lee con `queries.questions.proposal_of` la propuesta que el paso `assistant` guarda en `run.outputs["_turn"]` (una a
   la vez, la misma que hace `_make_proposal` tras el sí) y la pasa por `base.assistant.cards.card` con el `ctx` de quien
   lee: fechas en su idioma y a la hora del negocio, listas cerradas por su etiqueta y registros por la lectura de
   su marca `refers`, ejecutada como esa persona (si no puede leerlo, el dato no sale). La pantalla los pinta con
   `fieldLines` del chat compartido (`@erplora/ui/components`), como la tarjeta del chat, sin los vacíos y con la
   moneda de `base.business.get`. Una pregunta de «Preguntar antes a alguien» no trae `fields`.
-- **La acción del cambio que espera un sí**: `queries.question_row` calcula al leer, con `ctx.language` de quien lee, el título
-  (`ASSISTANT_WANTS`, que vive en `queries.py` y `_propose` sigue guardando en `Question.title` para los avisos) y
-  `action`, con `queries.action_label` (el nombre del historial: `flow.actions.<op>` de `frontend/locale`; sin él,
+- **La acción del cambio que espera un sí**: `queries.questions.question_row` calcula al leer, con `ctx.language` de quien lee, el título
+  (`ASSISTANT_WANTS`, que vive en `queries/questions.py` y `_propose` sigue guardando en `Question.title` para los avisos) y
+  `action`, con `queries.reasons.action_label` (el nombre del historial: `flow.actions.<op>` de `frontend/locale`; sin él,
   su verbo, su app y su cosa, nunca vacío ni el nombre de la operación); así lo dice también una pregunta guardada
   antes, sin migración. Una pregunta de «Preguntar antes a alguien», o cuya acción ya no existe, lleva `action`
   vacío y su título tal cual. `QuestionInbox.vue` la pinta justo debajo del título. Un no o el silencio a ese
   cambio guardan en el motivo de la ejecución (`flow.question_rejected`, `flow.question_expired`) también su
-  `operation` (`services.questions._asked_for`, con `queries.proposal_held`), y `queries.say` dice entonces su acción en lugar
+  `operation` (`services.questions._asked_for`, con `queries.questions.proposal_held`), y `queries.reasons.say` dice entonces su acción en lugar
   del título (`NAMED_BY_ITS_ACTION`), en el idioma de quien lee el historial; sin la acción, el título guardado. Mercado: la tarjeta de
   confirmación del chat de `base` («¿Ejecutar esta acción?» y debajo la acción), Intercom Fin (título fijo «Fin
   requires your decision» y debajo la pregunta), Copilot Studio, Square Managerbot y Shopify Sidekick (lo que va a
@@ -1472,7 +1472,7 @@ Los avisos llevan ids, nunca nombres ni contenidos.
   marca `refers` (`names` de `base/schemas/assistant.py`; `base.E009` la comprueba al arrancar), a una lectura por id de
   flow ejecutada como quien confirma: la automatización (`FlowRefIn.id`, seis escrituras), `flow.flow.detail` por
   su `name`; el borrador (`DraftRefIn.id`, `CreateIn.draft_id`), `flow.draft.get` por su `name`; la ejecución
-  (`RunRefIn.id`), `flow.run.get` por su `label` (`queries.run_label`: el nombre de su automatización y su
+  (`RunRefIn.id`), `flow.run.get` por su `label` (`queries.runs.run_label`: el nombre de su automatización y su
   `started_at` con `_moment_words`, CLDR a la hora del negocio, como el Historial); la pregunta
   (`QuestionRefIn.id`, `AnswerIn`), `flow.question.get` por su `title`, que pide `flow.answer` y además
   `can_answer` de su rol (`flow.question_not_yours`) y solo da una que espera (`flow.question_closed`), como la
@@ -1502,8 +1502,8 @@ Los avisos llevan ids, nunca nombres ni contenidos.
   vendedor en su API de citas.
 - **El motivo de una parada, en el idioma de quien lo lee** (FLOW-F16; mismo patrón que `message_reason` de
   whatsapp_inbox, hub#384): la ejecución (`error_reason`) y la entrada del paso que falló (`error.reason`)
-  guardan el **nombre** del motivo propio del motor y sus datos (`queries.REASONS`: el código, salvo donde un
-  código dice cosas distintas, `flow.loop`/`flow.chain_too_long` y `flow.assistant_gone`), y `queries.say` lo
+  guardan el **nombre** del motivo propio del motor y sus datos (`queries.reasons.REASONS`: el código, salvo donde un
+  código dice cosas distintas, `flow.loop`/`flow.chain_too_long` y `flow.assistant_gone`), y `queries.reasons.say` lo
   dice al leer (`flow.run.list`, y lo que devuelven `flow.flow.run` y `flow.run.retry`) en el idioma de quien
   pregunta; `error_message` se guarda dicho en el de la automatización y es lo que se enseña de lo que no
   tiene nombre: lo que contestó la acción de otra app, tal cual. Una ejecución guardada antes de que hubiera
@@ -1649,12 +1649,12 @@ Los avisos llevan ids, nunca nombres ni contenidos.
   entradas que el paso no fija (lo que fijó el dueño gana). No escribe nada: se aplica donde se lee el paso —
   `services.assistant_steps._step_of` (al ofrecer las herramientas en `claim_assistant`, en `assistant_round` y en el sí de
   `answer_question`, que además vuelve a poner los datos fijos sobre la propuesta guardada en `_make_proposal`, o no
-  la hace si quedan vacíos), `queries.proposal_of` (la tarjeta de «Esperan tu respuesta»: un dato vacío no se pinta)
-  y `queries.flow_row` (el editor y la API los enseñan, y guardar los escribe) — y se escribe al hacer una copia
+  la hace si quedan vacíos), `queries.questions.proposal_of` (la tarjeta de «Esperan tu respuesta»: un dato vacío no se pinta)
+  y `queries.flows.flow_row` (el editor y la API los enseñan, y guardar los escribe) — y se escribe al hacer una copia
   (`duplicate_flow`, que no lleva `recipe`) y con `flow.recipe.repair`. Lo mismo con el «Solo cuando…»:
   `recipes.fixed_filter(flow)` le suma las claves que el de la receta de hoy tiene y él no, mientras arranque con el
   mismo aviso (`_missing`, sin huella: también una montada desde la versión de hoy a la que el dueño quitó la
-  cláusula); cuenta en `flow.run.react`, se lee en `queries.trigger_of` (editor, «Probar» y API) y se escribe al
+  cláusula); cuenta en `flow.run.react`, se lee en `queries.flows.trigger_of` (editor, «Probar» y API) y se escribe al
   copiar y con `flow.recipe.repair`. No hay aviso ni pausa: no hay caso en que aplicarlo pise al dueño, y un dato
   fijo que su paso ya no rellena queda vacío y su herramienta no se usa.
 - **Lo que fija su app no se quita desde la automatización** (hub#476): como el filtro y los datos fijos de la

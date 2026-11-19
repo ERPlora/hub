@@ -130,8 +130,8 @@ def test_a_recipe_set_aside_is_refused_with_its_reason_and_one_no_app_brings_is_
     assert missing.value.code == "flow.recipe_not_found"
     from apps.flow import queries
 
-    active = {label: config for label, config in queries.active_apps(A).items() if label != "task"}
-    monkeypatch.setattr(queries, "active_apps", lambda _scope: active)
+    active = {label: config for label, config in queries.catalog.active_apps(A).items() if label != "task"}
+    monkeypatch.setattr(queries.catalog, "active_apps", lambda _scope: active)
     with pytest.raises(Conflict) as aside:
         run("flow.recipe.enable", {"recipe": REF})
     assert (aside.value.code, aside.value.message) == (
