@@ -2,16 +2,20 @@
 // The booking page a customer opens without a session at `/p/<slug>/book` of the business's own host, in each of the
 // three sizes (apps/online_booking/WORKBOOK.md), with a Spanish browser: it says it is loading, books a service with no
 // preference of professional on a day and at a free time with her name and mobile (the appointment is in the diary,
-// pending, booked online), sees and cancels it right away on the same page, says when the business has nothing to book
+// pending, booked online), with the logo the owner uploaded served from the business's own address (none without one),
+// sees and cancels it right away on the same page, says when the business has nothing to book
 // online and when it does not take online bookings, with no menu of the team's, all under the strict CSP of every page
 // (no violation reported). Another business's slug on this host is not found, nor this one's on another host. The
 // owner makes the cast through each app's API; everything is named «E2E PB …» and removed before and after, and the
 // settings of the page and of Appointments put back. One screenshot per state and size
 // (`online-booking-public-<state>-<width>`).
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
 import { type Browser, expect, type Page, test } from '@playwright/test';
 
 import { aMonday } from './appointment-helpers';
-import { A, B, capture, psql } from './helpers';
+import { A, B, capture, HUB_DIR, psql } from './helpers';
 import { cast, keepTheBusiness } from './online-booking-helpers';
 import { FLOW_VIEWPORTS, noHorizontalScroll, ownerPage, post } from './service-helpers';
 
@@ -21,6 +25,12 @@ const named = (label: string): string => `${TAG} ${label} ${RUN}`;
 /** A Spanish mobile unique to the run and to the size (`6` + eight digits). */
 const mobile = (n: number): string => `6${String(Date.now() + n * 7919).slice(-8)}`;
 const PAGE = `${A}/p/a/book`;
+/** The logo the owner uploads in Settings: ERPlora's own PNG. */
+const LOGO = {
+  filename: 'logo.png',
+  content_type: 'image/png',
+  data_base64: readFileSync(join(HUB_DIR, 'base', 'static', 'base', 'img', 'logo.png')).toString('base64'),
+};
 
 keepTheBusiness(TAG);
 
@@ -45,10 +55,11 @@ FLOW_VIEWPORTS.forEach((vp, index) => {
     const day = aMonday(index);
     try {
       const who = await cast(owner, named(vp.label), day);
+      const logo = await post<{ id: string; url: string }>(owner, '/online_booking/settings/logo', LOGO, 201);
       await post(owner, '/online_booking/settings', {
         page_title: named(`Salon ${vp.label}`),
         welcome_message: 'Tu próxima cita, sin llamar.',
-        logo_url: `${A}/static/base/img/logo.png`,
+        logo: logo.id,
         primary_color: '#6366f1',
       }, 200);
 
@@ -68,6 +79,7 @@ FLOW_VIEWPORTS.forEach((vp, index) => {
       await expect(page.locator('[data-testid=ob-preview-title]')).toHaveText(named(`Salon ${vp.label}`));
       await expect(flow(page)).toContainText('Reserva online');
       await expect(page.locator('[data-testid=ob-preview-business-logo]')).toBeVisible();
+      await expect(page.locator('[data-testid=ob-preview-business-logo]')).toHaveAttribute('src', logo.url);
       await expect.poll(() => page.locator('[data-testid=ob-preview-business-logo]').evaluate((img: HTMLImageElement) => img.naturalWidth)).toBeGreaterThan(0);
       await expect(page.locator('[data-testid=ob-preview-privacy]')).toContainText('Tus datos los usará');
       await expect(page.locator('[data-testid=ob-preview-privacy] a')).toHaveAttribute('href', /\/legal\/privacy\/$/);
@@ -77,12 +89,14 @@ FLOW_VIEWPORTS.forEach((vp, index) => {
       await expect(page.locator('[data-testid=ob-preview-trap-input]')).toHaveAttribute('tabindex', '-1');
       await expect(page.locator('[data-testid=ob-preview-trap-input]')).toHaveAttribute('autocomplete', 'off');
       await shoot('form');
-      await post(owner, '/online_booking/settings', { logo_url: 'https://www.python.org/static/img/python-logo.png' }, 200);
+      // An address of somewhere else is no logo any more; without a logo, the page shows the business's name alone.
+      await post(owner, '/online_booking/settings', { logo_url: 'https://www.python.org/static/img/python-logo.png' }, 422);
+      await post(owner, '/online_booking/settings', { logo: '' }, 200);
       await page.goto(PAGE);
       await expect(page.locator('[data-testid=ob-preview-title]')).toBeVisible();
       await expect(page.locator('[data-testid=ob-preview-business-logo]')).toHaveCount(0);
-      await shoot('external-logo');
-      await post(owner, '/online_booking/settings', { logo_url: `${A}/static/base/img/logo.png` }, 200);
+      await shoot('no-logo');
+      await post(owner, '/online_booking/settings', { logo: logo.id }, 200);
       await page.goto(PAGE);
       await expect(page.locator('[data-testid=ob-preview-business-logo]')).toBeVisible();
       // A customer is no member of the team: no side menu, and no button to open one.

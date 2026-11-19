@@ -590,6 +590,7 @@ def test_every_routed_command_declares_whether_a_cut_may_repeat_it():
         "kitchen.ticket.set_rush",
         "kitchen.ticket.start",
         "online_booking.public.book",
+        "online_booking.settings.upload_logo",
         "payment.payment.create",
         "sale.order.fire",
         "sale.sale.complete",

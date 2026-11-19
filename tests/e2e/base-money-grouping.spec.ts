@@ -55,7 +55,7 @@ let groupId = '';
 /** The settings of the booking page, put back at the end: the preview answers only while the page is on. */
 let savedPage: Record<string, unknown> | null = null;
 /** What the page's settings read of Appointments: written there, not here. */
-const NOT_OF_THE_PAGE = ['timezone', 'min_booking_notice', 'max_advance_booking', 'slot_interval', 'auto_confirm_online', 'allow_customer_cancellation', 'cancellation_notice_hours'];
+const NOT_OF_THE_PAGE = ['timezone', 'logo_url', 'min_booking_notice', 'max_advance_booking', 'slot_interval', 'auto_confirm_online', 'allow_customer_cancellation', 'cancellation_notice_hours'];
 
 test.describe.configure({ mode: 'serial' });
 test.use({ actionTimeout: 30_000 });

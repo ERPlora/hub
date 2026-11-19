@@ -234,6 +234,7 @@ def test_the_settings_are_the_factory_ones_until_saved_with_the_rules_of_the_dia
         "page_title": "",
         "welcome_message": "",
         "primary_color": "#6366f1",
+        "logo": "",
         "logo_url": "",
         "require_email": False,
         "max_upcoming_per_customer": 3,

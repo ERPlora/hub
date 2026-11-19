@@ -1,5 +1,5 @@
-"""What only the public booking page needs: whose page it is (the business's name and the privacy policy its form
-links to) and the trap field of its form, which a person never sees and a robot fills in."""
+"""What only the public booking page needs: whose page it is (the business's name, its logo and the privacy policy its
+form links to) and the trap field of its form, which a person never sees and a robot fills in."""
 
 from django.conf import settings
 from django.utils.translation import gettext_lazy as _
@@ -8,6 +8,8 @@ from live.operations import get as get_operation
 from ninja import Field, Schema
 from pydantic import model_validator
 from pydantic.json_schema import SkipJsonSchema
+
+from apps.online_booking.logo import logo_url
 
 BUSINESS = "base.business.get"
 #: ERPlora's privacy policy on erplora.com. The business decides on its customers' details and ERPlora processes
@@ -20,14 +22,16 @@ NOT_TAKEN = _("We could not take this booking. Try again, or call the business."
 class PageOwnerOut(Schema):
     business_name: str = Field(description="The business's name, as erplora.com registered it; empty in a demo.")
     privacy_policy_url: str = Field(description="The privacy policy the booking form links to.")
+    logo_url: str = Field(description="Where the business's own address serves its logo; empty = none.")
 
     @classmethod
-    def owner(cls, ctx: OperationContext) -> dict:
+    def owner(cls, ctx: OperationContext, logo: str) -> dict:
         """Whose page it is, for ``ctx``'s business: read as the platform, as nobody signed in reads the page."""
         business = get_operation(BUSINESS)
         return {
             "business_name": business(system_context(ctx.scope), business.input()).name,
             "privacy_policy_url": f"{settings.SAAS_URL.rstrip('/')}{PRIVACY_POLICY_PATH}",
+            "logo_url": logo_url(ctx.scope, logo),
         }
 
 

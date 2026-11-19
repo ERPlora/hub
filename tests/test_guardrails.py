@@ -113,6 +113,10 @@ ORM_EXCEPTIONS: dict[str, str] = {
         "Pillow's Image.save writes a photo into a memory buffer, and the hub file store's save and delete keep and "
         "remove its file (storages, not the ORM): no model and no database."
     ),
+    "base/public_images.py": (
+        "The hub file store's save keeps an image a business shows to anyone (storages, not the ORM): no model and no "
+        "database; the app that uploads it keeps its own row or name."
+    ),
     "base/files.py": (
         "The Files module writes the business's files with Django's Storage API on STORAGES['hub_files'] (save, "
         "delete) under the hub's prefix: no model and no database (it imports neither, "
