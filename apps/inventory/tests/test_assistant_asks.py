@@ -7,12 +7,21 @@ the asks and the guard that no ask copies a probe of layer 2.
 """
 
 import pytest
+from django.apps import apps
 from live import assistant as shared
 from live.operations import AI, registry
 
+from base import assistant
 from base.models import Membership
 from base.tests.test_assistant_asks import assert_its_words_name
-from base.tests.test_assistant_asks import TOP, assert_offered_with_room, comparable, place_of_no_ask, probe_phrases
+from base.tests.test_assistant_asks import (
+    TOP,
+    assert_offered_with_room,
+    comparable,
+    offered_to,
+    place_of_no_ask,
+    probe_phrases,
+)
 
 from .conftest import HUB_DB
 
@@ -84,3 +93,94 @@ GOODS_IN = [
 def test_goods_received_in_the_hubs_words_bring_the_reception_among_the_first_ten(catalog_of, name, phrase):
     assert comparable(phrase) not in probe_phrases()
     assert_offered_with_room(catalog_of(Membership.Role.OWNER, "es"), name, phrase, room=TOP)
+
+
+#: Goods received said as a quantity in a unit, without «mercancía» nor «albarán»: since Cash register reads «una
+#: entrada» as a movement of the drawer, its movement came first and the reception fell far out of the tools a turn
+#: offers (102nd for the owner, 92nd for the manager, with «registra una entrada de 20 kilos de harina»). Each case
+#: says the unit that names the goods.
+QUANTITY_IN = [
+    ("es", "registra una entrada de 20 kilos de harina", "kilos de"),
+    ("es", "apunta una entrada de 20 kilos de harina", "kilos de"),
+    ("es", "registra una entrada de 5 cajas de leche", "cajas de"),
+    ("es", "apunta una entrada de 12 cajas de leche", "cajas de"),
+    ("es", "registra la entrada de 20 kilos de harina", "kilos de"),
+    ("en", "record an entry of 20 kilos of flour", "kilos of"),
+    ("en", "record an entry of 12 boxes of milk", "boxes of"),
+]
+
+
+@HUB_DB
+@pytest.mark.parametrize("role", [Membership.Role.OWNER, Membership.Role.MANAGER])
+@pytest.mark.parametrize(("language", "phrase", "unit"), QUANTITY_IN)
+def test_goods_said_as_a_quantity_in_a_unit_bring_the_reception_among_the_first_ten(
+    catalog_of, role, language, phrase, unit
+):
+    tools = catalog_of(role, language)
+    assert comparable(phrase) not in probe_phrases()
+    assert_offered_with_room(tools, "inventory.stock.receive", phrase, language, room=TOP)
+    counted = assistant.relevance.ranking(tools)["synonyms"]
+    without = tuple(tuple(word for word in group if word != unit) for group in counted)
+    assert without != counted  # positive control: the unit is one of the Hub's words
+    assert "inventory.stock.receive" not in offered_to(tools, phrase, language, synonyms=without)[:TOP]
+
+
+#: A quantity in a unit written off: the goods it names are also the stock a write-off acts on, so the reception the
+#: same words bring never pushes it out of the first ten (24th if they named only the goods).
+QUANTITY_OUT = [
+    ("es", "da de baja 2 kilos de harina por rotura"),
+    ("en", "write off 2 kilos of flour, they got wet"),
+]
+
+
+@HUB_DB
+@pytest.mark.parametrize("role", [Membership.Role.OWNER, Membership.Role.MANAGER])
+@pytest.mark.parametrize(("language", "phrase"), QUANTITY_OUT)
+def test_a_quantity_in_a_unit_written_off_keeps_the_write_off_among_the_first_ten(catalog_of, role, language, phrase):
+    assert comparable(phrase) not in probe_phrases()
+    assert_offered_with_room(catalog_of(role, language), "inventory.stock.write_off", phrase, language, room=TOP)
+
+
+#: What a quantity in a unit is not, in Spanish and in English: money in or out of the drawer, what a sale line or a cart
+#: counts, the tills of a place. None of them names the stock nor the goods received.
+NO_QUANTITY_OF_GOODS = [
+    "apúntame una entrada de 50 €",
+    "una salida de 20 € del cajón",
+    "añade 2 botellas de agua a la mesa 5",
+    "¿cuántas unidades de cada producto lleva el carrito de Nuria?",
+    "enséñame las cajas del local",
+    "medio kilo de jamón para la mesa 3",
+    "record a cash entry of 50 €",
+    "add 2 bottles of water to table 5",
+    "how many units of each product are in Nuria's cart?",
+    "half a kilo of ham for table 3",
+]
+
+
+def test_the_hub_reads_a_quantity_in_a_unit_as_the_stock_of_goods_and_an_amount_as_neither():
+    """Inventory's own words (its ``assistant_synonyms``): kilos, grams, litres, boxes or sacks of a product are its
+    stock (``inventory.stock``) and goods (``inventory.stock.receive``), and without the Hub's groups neither is
+    (positive control); an amount of money, bottles of a sale line, units in a cart and the tills of a place name
+    neither."""
+    stock, receive = shared.stem("stock"), shared.stem("receive")
+    said = [
+        "registra una entrada de 20 kilos de harina",
+        "apunta una entrada de 12 cajas de leche",
+        "han llegado 3 sacos de patatas",
+        "apunta una entrada de 500 gramos de azafrán",
+        "registra una entrada de 10 litros de aceite",
+        "apunta una entrada de 6 kg de queso",
+        "record an entry of 20 kg of flour",
+        "log 12 boxes of milk",
+        "record 500 grams of saffron",
+        "log 10 litres of oil",
+        "log 10 liters of oil",
+    ]
+    assert_its_words_name("inventory", [(phrase, wanted) for phrase in said for wanted in (stock, receive)])
+    own = apps.get_app_config("inventory").assistant_synonyms
+    named = [
+        phrase
+        for phrase in NO_QUANTITY_OF_GOODS
+        if any(stock in concept or receive in concept for concept in shared.asked([phrase], own).concepts)
+    ]
+    assert named == []
