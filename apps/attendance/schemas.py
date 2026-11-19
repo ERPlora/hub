@@ -157,7 +157,8 @@ class PositionIn(MemberRefIn):
 
 class ClockInIn(PositionIn):
     """Clock in. Whether the device is the counter POS or someone's own phone is not the caller's to
-    declare: the Hub knows it from the session's device (BASE-F62); one it does not know is the shared one."""
+    declare: the Hub knows it from the session's device, as Settings › This device marks it shared or personal; one
+    it does not know is the shared one."""
 
 
 class ClockOutIn(PositionIn):
