@@ -3,7 +3,7 @@
 One operation = one transaction, with its events in the outbox. A write on an automation locks its row
 (``select_for_update``) before it looks at it, so two saves, or a save and a run, wait for each other.
 What a document names (an event, an action, a read) is checked against the active apps
-(``queries.catalog_problems``) and refused by field; nothing fails in silence.
+(``queries.problems.catalog_problems``) and refused by field; nothing fails in silence.
 
 **The engine.** A run starts in ``flow.run.react`` (an event of another active app), ``flow.schedule.fire_due``
 (a schedule or a date), ``flow.flow.run`` (by hand) and goes on in ``flow.run.resume_due`` (after a

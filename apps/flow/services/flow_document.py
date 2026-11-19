@@ -12,7 +12,7 @@ from live.outbox import record_event
 
 from apps.flow import document, events, recipes
 from apps.flow.models import Flow
-from apps.flow.queries import catalog_problems
+from apps.flow.queries.problems import catalog_problems
 from base.business import business_zone
 
 PAST_DATE = _("That date and time has already passed.")

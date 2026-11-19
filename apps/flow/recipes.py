@@ -98,7 +98,7 @@ def declarations(scope: Scope | None = None) -> list[tuple[LiveAppConfig, dict]]
     ``scope``'s business (what the gallery offers), or, without one, every installed app's, on or off — what an app
     fixes on the automations built from its recipe holds while it is off (hub#447, FLOW-F36): a run already under way
     may be resumed with the tools of another app that is still on."""
-    apps = queries.active_apps(scope) if scope is not None else queries.installed_apps()
+    apps = queries.catalog.active_apps(scope) if scope is not None else queries.catalog.installed_apps()
     found: list[tuple[LiveAppConfig, dict]] = []
     for label, config in sorted(apps.items()):
         if not module_has_submodule(config.module, "recipes"):
@@ -180,10 +180,10 @@ def _problem(scope: Scope, config: LiveAppConfig, declared: Any) -> tuple[str, s
         first = error.errors()[0]
         where = ".".join(str(part) for part in first["loc"])
         return INVALID, str(NOT_A_RECIPE) % {"problem": f"{where}: {first['msg']}"}, ()
-    lacking = tuple(sorted(_apps_named(parsed) - set(queries.active_apps(scope))))
+    lacking = tuple(sorted(_apps_named(parsed) - set(queries.catalog.active_apps(scope))))
     if lacking:
         return NEEDS_APPS, str(NEEDS_APPS_MESSAGE) % {"apps": ", ".join(lacking)}, lacking
-    problems, _code = queries.catalog_problems(scope, parsed.trigger, parsed.steps)
+    problems, _code = queries.problems.catalog_problems(scope, parsed.trigger, parsed.steps)
     if problems:
         return INVALID, next(iter(problems.values())), ()
     needed = document.required_grants(built["steps"])

@@ -56,7 +56,7 @@ def test_no_automation_is_offered_or_granted_what_is_done_at_the_table(operation
     # Market: Toast, Square for Restaurants, Lightspeed Restaurant, TouchBistro, Odoo PoS, Revel, SpotOn and
     # Clover seat, split and move checks only from the server's till; their automations never do it.
     from apps.flow.models import Flow
-    from apps.flow.queries import catalog_operations
+    from apps.flow.queries.catalog import catalog_operations
 
     assert operation not in catalog_operations(A)
     with pytest.raises(InvalidPayload) as refused:

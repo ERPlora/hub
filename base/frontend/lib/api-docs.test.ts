@@ -12,7 +12,7 @@ const DOCUMENT = {
         operationId: 'cart_checkout.cart.cleanup_expired',
         summary: 'Cart Cleanup Expired',
         tags: ['cart_checkout'],
-        requestBody: { content: { 'application/json': { schema: { $ref: '#/components/schemas/CleanupIn' } } } },
+        requestBody: { content: { 'application/json': { schema: { $ref: '#/components/schemas/cart_checkout.CleanupIn' } } } },
         responses: { '200': { description: 'OK' } },
       },
     },
@@ -20,7 +20,7 @@ const DOCUMENT = {
       get: { operationId: 'cart_checkout.cart.list', summary: 'Cart List', tags: ['cart_checkout'], responses: {} },
     },
   },
-  components: { schemas: { CleanupIn: { type: 'object', properties: { days: { type: 'integer' } } } } },
+  components: { schemas: { 'cart_checkout.CleanupIn': { type: 'object', properties: { days: { type: 'integer' } } } } },
 };
 
 const APPS = [
@@ -47,7 +47,7 @@ describe('apiDocSections', () => {
       parameters: [{ name: 'limit', where: 'query', required: false, type: 'integer', description: 'How many.' }],
       body: null,
     });
-    expect(shop.routes[1].body).toEqual({ name: 'CleanupIn', schema: { type: 'object', properties: { days: { type: 'integer' } } } });
+    expect(shop.routes[1].body).toEqual({ name: 'cart_checkout.CleanupIn', schema: { type: 'object', properties: { days: { type: 'integer' } } } });
   });
 
   it('an app the document has but the list does not name keeps its id; none: no section', () => {

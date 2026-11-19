@@ -12,20 +12,16 @@ from live.outbox import record_event
 
 from apps.flow import events
 from apps.flow.models import Flow, FlowRun, Question
-from apps.flow.queries import (
+from apps.flow.queries.catalog import grantable_operations, needs_a_person, yes_permission
+from apps.flow.queries.questions import (
     QUESTION_CLOSED,
     QUESTION_NOT_FOUND,
     QUESTION_NOT_YOURS,
-    ANSWER,
-    SYSTEM,
-    action_label,
-    grantable_operations,
-    needs_a_person,
     can_answer,
-    TURN,
     proposal_held,
-    yes_permission,
 )
+from apps.flow.queries.reads import ANSWER, SYSTEM, TURN
+from apps.flow.queries.reasons import action_label
 from apps.flow.schemas import AnsweredOut, AnswerIn, DueIn, DueOut
 
 from .assistant_steps import _make_proposal, _step_of
@@ -39,7 +35,7 @@ APPROVAL_BEYOND_YOU = _("Only someone who may do it themselves can say yes to «
 
 def _asked_for(run: FlowRun) -> dict[str, str]:
     """For the reason of a question nobody said yes to: the operation of the assistant's change it asked about, kept so
-    the History names it by its action when it is read (``queries.say``); nothing for an «Ask someone first» one."""
+    the History names it by its action when it is read (``queries.reasons.say``); nothing for an «Ask someone first» one."""
     proposal = proposal_held(run)
     return {"operation": str(proposal["operation"])} if proposal and proposal.get("operation") else {}
 
