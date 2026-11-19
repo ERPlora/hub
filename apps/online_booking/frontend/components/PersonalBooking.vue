@@ -67,7 +67,8 @@ onMounted(load);
   >
     <div data-testid="ob-personal">
       <PublicBookingHeader
-        v-if="seen"
+        v-if="seen && (seen.business_name || seen.logo_url)"
+        class="ion-margin-bottom"
         :info="seen"
       />
       <p

@@ -9,7 +9,7 @@ type HeaderInfo = Pick<PageOut, 'business_name' | 'logo_url'> &
 
 const props = defineProps<{ info: HeaderInfo }>();
 const t = useT();
-const logoAlt = computed(() => t('online_booking.door.logoAlt', { business: props.info.business_name || props.info.title || '' }));
+const logoAlt = computed(() => t('online_booking.door.logoAlt', { business: props.info.business_name || props.info.title || t('online_booking.door.businessFallback') }));
 const logoUrl = computed(() => {
   const value = props.info.logo_url.trim();
   if (value.startsWith('/') && !value.startsWith('//')) return value;

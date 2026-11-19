@@ -125,6 +125,9 @@ FLOW_VIEWPORTS.forEach((vp, index) => {
       await expect(page.locator('[data-testid=ob-preview-name]')).toHaveCount(0);
       const personal = page.locator('[data-testid=ob-personal]');
       await expect(personal.locator('[data-testid=ob-preview-business-logo]')).toHaveAttribute('src', logo.url);
+      const logoBox = (await personal.locator('[data-testid=ob-preview-business-logo]').boundingBox())!;
+      const statusBox = (await status.boundingBox())!;
+      expect(Math.round(statusBox.y - (logoBox.y + logoBox.height))).toBeGreaterThanOrEqual(12);
       await shoot('personal');
       await post(owner, '/online_booking/settings', { logo: '' }, 200);
       await page.goto(address ?? '');

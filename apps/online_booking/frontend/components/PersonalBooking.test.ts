@@ -81,6 +81,20 @@ describe('PersonalBooking', () => {
     expect(logo?.getAttribute('alt')).toBe('Salón Lucía logo');
   });
 
+  it.each([
+    ['en', 'the business logo'],
+    ['es', 'Logo de este negocio'],
+  ] as const)('names the logo in %s when a demo has no business name', async (locale, alt) => {
+    const s = await setup({ ...SEEN, business_name: '', logo_url: '/p/media/online_booking/logo/salon.png' }, locale);
+    expect(s.inDoc('ob-preview-business-logo')?.getAttribute('alt')).toBe(alt);
+  });
+
+  it('leaves out an empty header when a demo has neither a business name nor a logo', async () => {
+    const s = await setup({ ...SEEN, business_name: '' });
+    expect(s.inDoc('ob-preview-status')).not.toBeNull();
+    expect(s.wrapper.find('.ob-business').exists()).toBe(false);
+  });
+
   it('loads only the booking behind the link and shows its service, time, professional and status', async () => {
     const s = await setup();
     expect(s.call).toHaveBeenCalledExactlyOnceWith('online_booking.public.booking', { token: TOKEN });
