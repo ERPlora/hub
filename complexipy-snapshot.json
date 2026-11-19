@@ -847,7 +847,7 @@
     "functions": [
       {
         "name": "app_activation_settle",
-        "complexity": 18
+        "complexity": 16
       }
     ]
   },
