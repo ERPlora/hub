@@ -440,6 +440,7 @@ En la pantalla Archivos:
 | BASE-F113 | Seguir avisando con la pantalla apagada (app de Android) | hecho |
 | BASE-F114 | Devolver un negocio a un momento pasado desde el admin de Hubs | hecho |
 | BASE-F115 | Ver la ayuda de la pantalla de un módulo | hecho |
+| BASE-F116 | Leer las novedades de ERPlora | parcial |
 
 ### BASE-F01 Ver lo que le falta por configurar al negocio
 Estado: hecho
@@ -1385,7 +1386,7 @@ Entra: la versión que corre y cuándo se publicó.
 Sale: nada guardado.
 Si falla: «No se pudo consultar el sistema» — «Las métricas y los registros no están disponibles ahora. Puedes
 volver a intentarlo.» con «Reintentar».
-Implicados: ninguno
+Implicados: BASE-F116
 
 ### BASE-F42 Ver el registro de sucesos del sistema
 Estado: hecho
@@ -3266,6 +3267,26 @@ disponible». Si el manual no está traducido al idioma de la persona, o su trad
 español.
 Implicados: BASE-F92, BASE-F93
 
+### BASE-F116 Leer las novedades de ERPlora
+Estado: parcial — las novedades ya se leen por el asistente y por la API, pero Sistema › Actualizaciones todavía no las
+enseña (hub#576)
+Actor: propietario, administrador, responsable, empleado
+Pantalla: Sistema · Actualizaciones
+Pasos:
+  1. En la pestaña «Actualizaciones», debajo de la versión y su fecha (BASE-F41), sale «Novedades»: lo que ha cambiado
+     en ERPlora que el negocio nota, lo más reciente primero. Quien no administra el negocio también las ve: no dicen
+     nada de él.
+  2. Cada novedad dice su día, si es algo nuevo, una mejora o un arreglo, un título corto y una o dos frases de lo que
+     se puede hacer ahora. Son notas escritas para el negocio, nunca la lista de cambios del código.
+  3. Salen las 20 más recientes; «Ver más» trae las anteriores.
+  4. Sin ninguna, dice «Todavía no hay novedades.».
+  5. Por el asistente, «¿qué hay de nuevo en ERPlora?» o «¿qué ha cambiado en la última actualización?» las lee igual,
+     en el idioma de la persona.
+Entra: las novedades de la versión que corre: viajan con ella, así que siempre son las suyas.
+Sale: nada guardado: las novedades solo se leen.
+Si falla: «No se pudieron cargar las novedades» con «Reintentar»; la versión y su fecha siguen a la vista.
+Implicados: BASE-F41
+
 ## Para quien lo mantiene
 
 - **Dominio propio de un negocio** (BASE-F110, HUBS-F17, PLAN-SAAS §37 punto 2; `base/custom_domains.py`,
@@ -3633,6 +3654,15 @@ Implicados: BASE-F92, BASE-F93
   `base.failed_event.list` (`GET /api/system/failed-events`: las `EventDelivery` `dead` del host, hasta 100, con
   `retryable` = su app está en `base.apps_on.active_apps`). Las tres filtran por `scope_kind`/`scope_key` del contexto
   (test de dos hubs en `base/tests/test_queries_system.py`).
+- Novedades (BASE-F116): `base.release_note.list` (`GET /api/system/release-notes`, `base.view_home`,
+  `database=False`, `ai=`) devuelve una página (`limit` hasta 100, 20 por defecto; `offset`; `total`) de las notas que
+  trae la imagen, la más reciente primero, en el idioma de la persona (sin él, en inglés). Cada nota es un fichero de
+  `base/release-notes/` llamado `<AAAA-MM-DD>-<nombre-en-minúsculas>.toml` (el día en que el cambio llega a los
+  negocios), con `kind` (`new`, `improved` o `fixed`) y una tabla por idioma del despliegue con `title` (hasta 80
+  caracteres) y `body` (hasta 400), en texto llano. `base/release_notes.py` las lee una vez por proceso (con `DEBUG`, en
+  cada llamada) y rechaza la que no lo cumple; `base/tests/test_release_notes.py` lee todas las del repositorio, así
+  que una nota rota no llega a la imagen. Se escribe una por cambio que nota un negocio (algo nuevo, una mejora o un
+  arreglo que se ve), en su lenguaje: nunca el título del commit ni los cambios internos.
 - Comandos (`base/services/`, `base.administer_hub`, `ai=` con `risk`), con el id en el cuerpo:
   `base.failed_event.retry` (`POST /api/system/failed-events/retry`: `pending`, `attempts` 0, solo a su `app_label`;
   409 `base.failed_event_app_off` si la app no está activa), `base.failed_event.retry_all` (`POST
@@ -4370,7 +4400,8 @@ Implicados: BASE-F92, BASE-F93
   base de datos y sus ficheros pasados los 90 días.
 - **La fila de salud del Inicio en pantalla (BASE-F02)**, hub#573: su lectura ya existe (`base.health.list`, con la
   impresora de Impresión); falta pintarla en el Inicio y que la Bandeja de WhatsApp declare cómo está su número.
-- **Las notas de cada versión (BASE-F41)**, hub#576.
+- **Las novedades en Sistema › Actualizaciones (BASE-F116)**: ya se leen por el asistente y por la API; falta
+  enseñarlas en la pantalla, hub#576.
 - **Los roles que trae una app (BASE-F82)**, hub#579, con la contradicción entre PLAN-HUB §3 (`RoleActivation`) y
   los cuatro roles de PLAN §22 sin resolver.
 - **La cola de PgBouncer de cada negocio en CloudWatch**, hub#572.
