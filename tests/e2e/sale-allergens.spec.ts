@@ -40,23 +40,10 @@ function cleanRun(): void {
   );
 }
 
-async function snap(page: Page, name: string, drawer = false): Promise<void> {
+async function snap(page: Page, name: string, prepare?: () => Promise<void>): Promise<void> {
   for (const size of SIZES) {
     await page.setViewportSize({ width: size.width, height: size.height });
-    if (drawer) await openTillCart(page);
-    await untilStill(page);
-    expect(await horizontalOverflow(page), `${name} at ${size.label}`).toBeLessThanOrEqual(0);
-    await capture(page, `sale-allergens-${name}-${size.label}`);
-  }
-  await page.setViewportSize({ width: 1440, height: 900 });
-  if (drawer) await openTillCart(page);
-}
-
-async function snapLine(page: Page, name: string, line: ReturnType<typeof lineOf>, focus = line): Promise<void> {
-  for (const size of SIZES) {
-    await page.setViewportSize({ width: size.width, height: size.height });
-    await openTillCart(page);
-    await focus.scrollIntoViewIfNeeded();
+    await prepare?.();
     await untilStill(page);
     expect(await horizontalOverflow(page), `${name} at ${size.label}`).toBeLessThanOrEqual(0);
     await capture(page, `sale-allergens-${name}-${size.label}`);
@@ -65,13 +52,27 @@ async function snapLine(page: Page, name: string, line: ReturnType<typeof lineOf
   await openTillCart(page);
 }
 
+async function snapLine(page: Page, name: string, focus: ReturnType<typeof lineOf>): Promise<void> {
+  return snap(page, name, async () => {
+    await openTillCart(page);
+    await focus.evaluate((element) => element.scrollIntoView({ block: 'center' }));
+  });
+}
+
 const lineOf = (page: Page, name: string) => shown(page).locator('[data-testid^=pos-line-]').filter({ hasText: name }).first();
 
-test.beforeAll(async ({ browser }) => {
+test.afterAll(() => {
+  cleanSales();
   cleanRun();
-  const context = await browser.newContext({ baseURL: A });
-  const page = await context.newPage();
+  cleanInventory();
+  restoreDrawer();
+});
+
+test('the waiter sees dish allergens and the customer allergy on lines and sheets', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
   await login(page, A, '/sale/pos');
+  const context = page.context();
+  cleanRun();
   await drawerOff(context);
   for (const [key, name, allergens] of [
     ['plate', 'Allergen plate', ['gluten', 'milk']],
@@ -89,19 +90,6 @@ test.beforeAll(async ({ browser }) => {
   for (const [key, course] of [['plate', 'Main'], ['flan', 'Dessert']] as const) {
     options[key] = (await post<{ id: string }>(context, '/combo/options', { combo: MENU, group: course, product: products[key].sku })).id;
   }
-  await context.close();
-});
-
-test.afterAll(() => {
-  cleanSales();
-  cleanRun();
-  cleanInventory();
-  restoreDrawer();
-});
-
-test('the waiter sees dish allergens and the customer allergy on lines and sheets', async ({ page }) => {
-  await page.setViewportSize({ width: 1440, height: 900 });
-  await login(page, A, '/sale/pos');
   await tillReady(page);
 
   await shown(page).locator(`[data-testid=pos-product-${products.plate.id}]`).click();
@@ -145,6 +133,6 @@ test('the waiter sees dish allergens and the customer allergy on lines and sheet
   const menuLine = lineOf(page, MENU);
   await expect(menuLine.locator('[data-testid*=-dish-allergens-]').filter({ hasText: 'Allergen plate' })).toContainText('Allergens: Gluten, Milk');
   await expect(menuLine.locator('[data-testid*=-dish-allergens-]').filter({ hasText: 'Flan' })).toContainText('Allergens: Egg, Milk');
-  await snapLine(page, 'menu-line', menuLine, menuLine.locator('[data-testid*=-dish-allergens-]').filter({ hasText: 'Flan' }));
-  await snap(page, 'lines', true);
+  await snapLine(page, 'menu-line', menuLine.locator('[data-testid*=-dish-allergens-]').filter({ hasText: 'Flan' }));
+  await snap(page, 'lines', () => openTillCart(page));
 });
