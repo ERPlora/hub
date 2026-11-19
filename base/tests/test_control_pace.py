@@ -32,6 +32,7 @@ from base.schemas.hub_registry import HubRegistryIn
 from base.tenancy import provision
 from base.tenancy.context import use_control, use_hub
 from base.tenancy.tests import hubs
+from base.tests.test_worker import Inline
 from control.models import Hub, HubDue
 
 pytestmark = [pytest.mark.django_db(transaction=True, databases=hubs.HUB_DATABASES)]
@@ -42,26 +43,10 @@ TICK = dt.timedelta(seconds=5)
 A_MINUTE = [START + TICK * step for step in range(1, 13)]
 
 
-class Inline:
-    """``worker.Background`` running its piece at once, in the loop's thread: the data and moves passes count."""
-
-    def __init__(self, name: str) -> None:
-        self.name = name
-
-    def busy(self) -> bool:
-        return False
-
-    def start(self, piece) -> bool:
-        piece()
-        return True
-
-    def join(self, timeout: float) -> bool:
-        return True
-
-
 @pytest.fixture
 def at_rest(hub_a, hub_b, monkeypatch):
-    """Two businesses served with no task due for a day, the slow passes inline, the night already measured."""
+    """Two businesses served with no task due for a day, the slow passes inline (the data and moves passes count),
+    the night already measured."""
     for hub in (hub_a, hub_b):
         with use_hub(Hub.objects.select_related("cluster").get(pk=hub.pk)):
             scheduler.sync(START)
