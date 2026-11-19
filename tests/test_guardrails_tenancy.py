@@ -36,8 +36,6 @@ BARE_ON_COMMIT_ALLOWED: dict[str, int] = {}
 #: Hub models that still have a ``hub_id`` column, each with its reason (the border between hubs is the database).
 HUB_ID_COLUMNS: dict[str, str] = {
     "base.hubidentity": "the identity of the hub's database itself.",
-    "website.site": "left from when hubs shared one database, so that a hub's website was not another's /.",
-    "website.image": "left from when hubs shared one database, with the site's.",
     "verifactu.config": "not tenancy: the business's id in the SaaS.",
 }
 

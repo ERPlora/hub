@@ -32,11 +32,14 @@ class CashRegisterConfig(LiveAppConfig):
     requires = ["sale"]
     default_auto_field = "django.db.models.BigAutoField"
     # What these words mean to the Hub's assistant (base.assistant.relevance.synonyms). An «arqueo», a «recuento» or a «conteo» of
-    # the drawer is a count (cash_register.count), and the «moneda» or «divisa» of the business is its currency
-    # (cash_register.currency).
+    # the drawer is a count (cash_register.count), the «moneda» or «divisa» of the business is its currency
+    # (cash_register.currency), and «una entrada», «una salida» or «un movimiento» is a movement
+    # (cash_register.movement). Those go as phrases: a bare «entrada» shares its stem with «entre» and «entra», and a
+    # bare «salida» is also a clock-out or a dish that left the pass.
     assistant_synonyms = (
         ("arqueo", "recuento", "conteo", "count"),
         ("divisa", "moneda", "currency"),
+        ("movement", "un movimiento", "una entrada", "una salida", "otro movimiento", "otra entrada", "otra salida"),
     )
     permissions = [
         "cash_register.view_session",
@@ -152,9 +155,12 @@ class CashRegisterConfig(LiveAppConfig):
         }
     ]
 
+    fiscal_archive_models = ("Register", "Session", "Movement", "Count")
+
     def fiscal_documents_kept(self) -> bool:
-        """The platform asks (``base.tenancy.offboarding``) before it drops the database of a business that left:
-        its cash movements are documents nothing archives yet, so the database stays."""
+        """The platform asks (``base.tenancy.offboarding``) before it drops the database of a business that left: its
+        cash movements are documents to keep, so the database stays; they go to the fiscal archive first
+        (``fiscal_archive_models``)."""
         from apps.cash_register import queries  # the models are not loaded yet when this module is
 
         return queries.keeps_fiscal_documents()

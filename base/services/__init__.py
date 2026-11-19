@@ -12,6 +12,7 @@ from . import (
     dumps as dumps,
     failed_events as failed_events,
     files as files,
+    fiscal_archive as fiscal_archive,
     hub_registry as hub_registry,
     offboarding as offboarding,
     people as people,
