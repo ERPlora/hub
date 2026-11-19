@@ -1370,11 +1370,11 @@ Vertical: común
 Actor: empleado, responsable
 Pantalla: Vender
 Pasos:
-1. En **Vender**, toca un artículo con alérgenos declarados en Inventario (INVENTORY-F35). La línea entra como
+1. En **Vender**, toca un artículo con alérgenos declarados en Inventario. La línea entra como
    siempre y, debajo del nombre, dice «Alérgenos: Gluten, Leche», en el orden de la lista de los catorce. Un
    artículo sin alérgenos no lleva esa fila.
-2. Si el artículo abre su hoja de suplementos (SALE-F11), la hoja dice sus alérgenos debajo de su nombre, antes
-   de añadirlo. En la hoja de un menú (SALE-F12), cada elección dice los suyos junto a su nombre, y en la cuenta
+2. Si el artículo abre su hoja de suplementos, la hoja dice sus alérgenos debajo de su nombre, antes
+   de añadirlo. En la hoja de un menú, cada elección dice los suyos junto a su nombre, y en la cuenta
    cada plato del menú lleva los de su producto.
 3. Si el cliente pregunta, el camarero los lee en la línea; si el plato no le vale, quita la línea como cualquier
    otra antes de enviarla.
@@ -1387,7 +1387,7 @@ ni en la cuenta impresa para la mesa.
 Si falla: sin Inventario activo no hay alérgenos, y el precio libre y los servicios no los llevan. Un artículo sin
 alérgenos marcados no dice nada, porque el TPV no distingue «no lleva ninguno» de «no se han declarado»: por eso la
 ficha de Inventario dice «Sin alérgenos declarados». Un suplemento no tiene alérgenos propios: «+Queso» no añade
-Leche a la línea; si el cliente tiene una alergia, se marca en la línea (SALE-F41) y Cocina la ve igual.
+Leche a la línea; si el cliente tiene una alergia, se marca en la línea como alergia del cliente y Cocina la ve igual.
 Implicados: INVENTORY-F27, INVENTORY-F35, SALE-F11, SALE-F12, SALE-F41, KITCHEN-F32
 
 ### SALE-F41 Marcar la alergia del cliente en una línea

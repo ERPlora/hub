@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:ba212ac5478069a6126a200186c4dcce10ed6d970e4c171b1afdca6c666cc27a -->
+<!-- generated from WORKBOOK.md sha256:852afa544d581c2d261646b59a3cbf384ef16e897f80249a5f3086fa5fd1e284 -->
 
 ## What it is for and who it is for
 
@@ -1362,11 +1362,11 @@ Vertical: common
 Actor: employee, manager
 Screen: Sell
 Steps:
-1. In **Sell**, tap an item with allergens declared in Inventory (INVENTORY-F35). The line goes in as always and,
+1. In **Sell**, tap an item with allergens declared in Inventory. The line goes in as always and,
    under the name, says "Allergens: Gluten, Milk", in the order of the list of the fourteen. An item without
    allergens has no such row.
-2. If the item opens its modifiers sheet (SALE-F11), the sheet says its allergens under its name, before adding it.
-   In the sheet of a menu (SALE-F12), each choice says its own next to its name, and on the check each dish of the
+2. If the item opens its modifiers sheet, the sheet says its allergens under its name, before adding it.
+   In the sheet of a menu, each choice says its own next to its name, and on the check each dish of the
    menu carries those of its product.
 3. If the customer asks, the waiter reads them on the line; if the dish does not suit them, they remove the line
    like any other before sending it.
@@ -1379,8 +1379,8 @@ ticket, on the invoice or on the printed bill for the table.
 If it fails: without Inventory active there are no allergens, and open-price lines and services do not carry them.
 An item with no allergens marked says nothing, because the till does not tell "has none" from "none declared": that
 is why Inventory's card says "No allergens declared". A modifier has no allergens of its own: "+Cheese" does not add
-Milk to the line; if the customer has an allergy, it is marked on the line (SALE-F41) and Kitchen sees it all the
-same.
+Milk to the line; if the customer has an allergy, it is marked on the line as the customer's allergy and Kitchen
+sees it all the same.
 Involved: INVENTORY-F27, INVENTORY-F35, SALE-F11, SALE-F12, SALE-F41, KITCHEN-F32
 
 ### SALE-F41 Mark the customer's allergy on a line
