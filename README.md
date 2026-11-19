@@ -451,8 +451,8 @@ http://127.0.0.1:8000/ws/print` contesta `101 Switching Protocols`. La e2e es `t
 
 Las puertas que comprueban una credencial cuentan los intentos que **rechazan** por quien llama
 (`base.throttle.client_key`: la IP que vio el ALB según `TRUSTED_PROXY_HOPS`, o su /64 si es IPv6, porque un cliente
-tiene la /64 entera) con `base.throttle.AttemptLimit`, en la caché de Django (Valkey en AWS; la memoria del proceso en
-local). La puerta comprueba **primero** la credencial: lo que acepta nunca cuenta ni se rechaza, así que un dispositivo
+tiene la /64 entera) con `base.throttle.AttemptLimit`, en la caché de Django (Valkey en AWS; en
+local, una carpeta del disco por BD de control, `base/cache.py`). La puerta comprueba **primero** la credencial: lo que acepta nunca cuenta ni se rechaza, así que un dispositivo
 con sesión válida no queda fuera porque otro de la misma red (la tablet con la sesión caducada) haya fallado. Pasado
 el tope, el siguiente intento **rechazado** de quien llama recibe la respuesta del límite hasta que acaba la ventana
 que abrió su primer rechazo. El rechazo que llega al tope queda en el log de `base.throttle` con su clave
