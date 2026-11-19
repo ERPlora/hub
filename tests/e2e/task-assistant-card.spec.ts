@@ -8,8 +8,8 @@
 // flow: TASK-F07 TASK-F10 TASK-F11 TASK-F14 BASE-F97
 import { type BrowserContext, expect, test } from '@playwright/test';
 
-import { AN_ID, cancel, cardSpec, datumOf, fieldsOf, ownerIn, VIEWPORTS } from './assistant-card-helpers';
-import { card, openPanel } from './assistant-real';
+import { AN_ID, cardSpec, datumOf, fieldsOf, VIEWPORTS } from './assistant-card-helpers';
+import { cancel, card, openPanelAtTheDesk, ownerIn } from './assistant-panel';
 import { A, api, capture, untilStill } from './helpers';
 import { cleanUp, named, post, TAG } from './task-helpers';
 
@@ -50,8 +50,7 @@ for (const language of ['es', 'en'] as const) {
   test(`task-assistant-card — in ${language}, a write of Tasks says which task, project or person, never by its id`, async ({ browser }) => {
     const [context, page] = await ownerIn(browser, language);
     const { project, task, ana } = await aTeam(context);
-    await page.setViewportSize({ width: 1440, height: 900 });
-    await openPanel(page);
+    await openPanelAtTheDesk(page);
 
     // «Borra la tarea limpiar el almacén», a dangerous write: the task by its title, titled as its list calls one, in
     // every size.

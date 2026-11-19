@@ -13,7 +13,7 @@
 import { expect, type Locator, type Page, test } from '@playwright/test';
 
 import { DICTATION, startProvider } from './assistant-provider';
-import { openPanel } from './assistant-real';
+import { box, openPanelAtHome, openPanelAtTheDesk, panel } from './assistant-panel';
 import { A, login, shot, THREE_SIZES as VIEWPORTS, untilStill } from './helpers';
 import { STACK } from './stack';
 
@@ -28,13 +28,11 @@ test.use({
   launchOptions: { args: ['--use-fake-ui-for-media-stream=deny', '--use-fake-device-for-media-stream'] },
 });
 
-const panel = (page: Page): Locator => page.locator('[data-testid="assistant-panel"]');
 const mic = (page: Page): Locator => panel(page).locator('[data-testid="assistant-mic"]');
 const problem = (page: Page): Locator => panel(page).locator('[data-testid="assistant-composer-problem"]');
-const box = (page: Page): Locator => panel(page).locator('[data-testid="assistant-input"] textarea');
 /** The Home with the assistant's panel open, and a tap on «Dictate by voice». */
 async function refuse(page: Page): Promise<void> {
-  await openPanel(page);
+  await openPanelAtHome(page);
   await mic(page).click();
 }
 
@@ -90,8 +88,7 @@ test('BASE-F94 — two taps while the browser asks for the microphone open one r
       };
     }, ASKING_MS);
     await login(page, A, '/');
-    await page.setViewportSize({ width: 1440, height: 900 });
-    await openPanel(page);
+    await openPanelAtTheDesk(page);
 
     await mic(page).click();
     await mic(page).click();

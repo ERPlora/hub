@@ -10,8 +10,8 @@
 // flow: KITCHEN-F03 KITCHEN-F04 KITCHEN-F11 KITCHEN-F18 KITCHEN-F22 BASE-F97
 import { type BrowserContext, expect, test } from '@playwright/test';
 
-import { cancel, cardSpec, datumOf, fieldsOf, ownerIn, VIEWPORTS } from './assistant-card-helpers';
-import { card, openPanel } from './assistant-real';
+import { cardSpec, datumOf, fieldsOf, VIEWPORTS } from './assistant-card-helpers';
+import { cancel, card, openPanelAtTheDesk, ownerIn } from './assistant-panel';
 import { A, api, capture, psql } from './helpers';
 import { cleanInventory, createProduct, stamp } from './inventory-helpers';
 import { cleanSales } from './sale-helpers';
@@ -85,8 +85,7 @@ for (const language of ['es', 'en'] as const) {
     const [context, page] = await ownerIn(browser, language);
     const { burger, station, ticket, check } = await aKitchen(context);
     const [burgerDish, omelette] = ticket.items;
-    await page.setViewportSize({ width: 1440, height: 900 });
-    await openPanel(page);
+    await openPanelAtTheDesk(page);
 
     // «Cancela la comanda de la mesa 4», a dangerous write: the ticket by its number (never its label), titled as its
     // list calls one, in every size.

@@ -7,8 +7,8 @@
 // flow: DEMO-F02 DEMO-F03 DEMO-F04 BASE-F97
 import { type BrowserContext, expect, test } from '@playwright/test';
 
-import { AN_ID, cancel, cardSpec, datumOf, fieldsOf, ownerIn, VIEWPORTS } from './assistant-card-helpers';
-import { card, openPanel } from './assistant-real';
+import { AN_ID, cardSpec, datumOf, fieldsOf, VIEWPORTS } from './assistant-card-helpers';
+import { cancel, card, openPanelAtTheDesk, ownerIn } from './assistant-panel';
 import { A, capture, psql, untilStill } from './helpers';
 import { createItem, itemDetail } from './demo-items';
 
@@ -46,8 +46,7 @@ for (const language of ['es', 'en'] as const) {
   test(`demo-assistant-card — in ${language}, a write of Demo says which item by its name, never by its id`, async ({ browser }) => {
     const [context, page] = await ownerIn(browser, language);
     const item = await anItem(context);
-    await page.setViewportSize({ width: 1440, height: 900 });
-    await openPanel(page);
+    await openPanelAtTheDesk(page);
 
     // «Borra el elemento Mesa 4», a dangerous write: the item by its name, titled as its screen calls one, in every size.
     const deleted = await datumOf(page, 'demo__item__delete', { id: item.id });
