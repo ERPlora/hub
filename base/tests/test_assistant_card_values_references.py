@@ -394,7 +394,6 @@ def test_no_list_of_texts_sent_as_they_are_is_named():
 #: number here, and none comes in.
 UNNAMED_REFERENCES = {
     "invoice": 1,
-    "verifactu": 6,
 }
 
 #: The closed lists (``enum`` of text) of the assistant's writes with a value the models give no label — of their app,
