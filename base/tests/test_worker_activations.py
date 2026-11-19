@@ -508,21 +508,27 @@ def test_the_sweep_of_the_hubs_served_rings_a_hub_whose_ring_was_lost(business, 
 
 @pytest.mark.parametrize(("active", "again"), [(True, dt.timedelta(minutes=10)), (False, dt.timedelta(days=1))])
 def test_the_sweep_looks_into_a_hub_only_at_its_pace(business, worker_visits, active, again):
-    """A visit looks into it (the business is visited every minute at least, its look)."""
+    """A visit looks into it (the business is visited every minute at least, its look). Two worker processes, each
+    with its own pace: one visits it a second before its time, the other right at it."""
     a = business("a")
     now = timezone.now()
     if active:
         visited(a, now.date() - dt.timedelta(days=6))
-    worker_visits.serve(now)  # looked into once: the first visit of the process
+    another_worker = worker.hub_visits.HubVisits()
+    try:
+        worker_visits.serve(now)  # looked into once by each: the first visit of the process
+        another_worker.serve(now)
 
-    with hubs.watched() as sent:
-        worker_visits.serve(now + dt.timedelta(minutes=1))
-        worker_visits.serve(now + again - dt.timedelta(minutes=1))
-    assert activation_reads(sent, a) == 0
+        with hubs.watched() as sent:
+            worker_visits.serve(now + dt.timedelta(minutes=1))
+            worker_visits.serve(now + again - dt.timedelta(seconds=1))
+        assert activation_reads(sent, a) == 0
 
-    with hubs.watched() as sent:
-        worker_visits.serve(now + again)
-    assert activation_reads(sent, a) > 0
+        with hubs.watched() as sent:
+            another_worker.serve(now + again)
+        assert activation_reads(sent, a) > 0
+    finally:
+        another_worker.close()
 
 
 # ── Rollback: a database ahead of this code holds back only what it is about ────────────────────────────────────

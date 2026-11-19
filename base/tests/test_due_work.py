@@ -14,9 +14,6 @@ from base.tenancy.tests import hubs
 
 pytestmark = pytest.mark.django_db(databases=hubs.HUB_DATABASES)
 
-NOW = timezone.now()
-
-
 def task(app_label: str, name: str, at: dt.datetime) -> None:
     TaskSchedule.objects.create(app_label=app_label, name=name, operation=f"{app_label}.x.run", cron="* * * * *", next_run=at)
 
@@ -32,15 +29,16 @@ def test_nothing_waiting_has_no_time(hub_a):
 
 
 def test_the_earliest_task_of_an_app_that_is_on_and_the_earliest_delivery_waiting(hub_a):
+    now = timezone.now()
     with use_hub(hub_a):
-        task("verifactu", "process_queue", NOW + dt.timedelta(minutes=1))
-        task("printing", "prune", NOW + dt.timedelta(minutes=30))
-        task("flow", "fire_due", NOW - dt.timedelta(days=3))  # off: it waits, untouched, for its app
-        delivery(EventDelivery.Status.PENDING, NOW + dt.timedelta(seconds=8))
-        delivery(EventDelivery.Status.PENDING, NOW + dt.timedelta(minutes=5))
-        delivery(EventDelivery.Status.DEAD, NOW - dt.timedelta(hours=1))
-        delivery(EventDelivery.Status.DELIVERED, NOW - dt.timedelta(hours=1))
+        task("verifactu", "process_queue", now + dt.timedelta(minutes=1))
+        task("printing", "prune", now + dt.timedelta(minutes=30))
+        task("flow", "fire_due", now - dt.timedelta(days=3))  # off: it waits, untouched, for its app
+        delivery(EventDelivery.Status.PENDING, now + dt.timedelta(seconds=8))
+        delivery(EventDelivery.Status.PENDING, now + dt.timedelta(minutes=5))
+        delivery(EventDelivery.Status.DEAD, now - dt.timedelta(hours=1))
+        delivery(EventDelivery.Status.DELIVERED, now - dt.timedelta(hours=1))
 
         due = due_work.next_due(frozenset({"verifactu", "printing"}))
 
-    assert due == due_work.DueWork(task_at=NOW + dt.timedelta(minutes=1), delivery_at=NOW + dt.timedelta(seconds=8))
+    assert due == due_work.DueWork(task_at=now + dt.timedelta(minutes=1), delivery_at=now + dt.timedelta(seconds=8))

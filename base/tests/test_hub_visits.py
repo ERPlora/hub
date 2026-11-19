@@ -377,6 +377,66 @@ def test_a_hub_that_failed_is_tried_again_at_the_next_pass(hub_a, worker_visits,
         assert OutboxEvent.objects.get(pk=lost.pk).delivered_at is not None
 
 
+def test_a_visit_after_a_notice_that_fails_is_tried_again_at_the_next_pass(hub_a, worker_visits, monkeypatch):
+    real, failures = relay.take, [RuntimeError("the database went away")]
+
+    def fails_once(now):
+        if failures:
+            raise failures.pop()
+        return real(now)
+
+    start = BEFORE_A_MINUTE
+    no_task_due_until_tomorrow(hub_a, start)
+    worker_visits.serve(start)
+    monkeypatch.setattr(relay, "take", fails_once)
+    create_an_item(hub_a)
+    assert serve_until(worker_visits, start + TICK, lambda: not failures)  # its notice heard, the visit failed
+
+    worker_visits.serve(start + 2 * TICK)  # long before the look
+
+    with use_hub(fresh(hub_a)):
+        assert not OutboxEvent.objects.filter(delivered_at__isnull=True).exists()
+
+
+def test_the_events_one_visit_had_no_room_for_are_taken_at_the_next_pass(hub_a, worker_visits, monkeypatch):
+    monkeypatch.setattr(relay, "TAKE_PER_TICK", 2)
+    start = BEFORE_A_MINUTE
+    no_task_due_until_tomorrow(hub_a, start)
+    worker_visits.serve(start)
+    for _ in range(3):
+        record(hub_a, hub_a.slug)
+
+    worker_visits.serve(start + LOOK)
+    with use_hub(fresh(hub_a)):
+        assert OutboxEvent.objects.filter(delivered_at__isnull=True).count() == 1
+
+    worker_visits.serve(start + LOOK + TICK)  # no notice and long before the next look
+
+    with use_hub(fresh(hub_a)):
+        assert not OutboxEvent.objects.filter(delivered_at__isnull=True).exists()
+
+
+def test_once_its_listen_is_made_again_every_business_is_visited_at_that_pass(hub_a):
+    class MadeAgain:
+        """An ear with nothing heard at first, then its connection made again: what was notified meanwhile is unknown."""
+
+        answers = [frozenset(), None]
+
+        def heard(self, channels):
+            return self.answers.pop(0)
+
+    visits = hub_visits.HubVisits(listener=MadeAgain())
+    start = BEFORE_A_MINUTE
+    no_task_due_until_tomorrow(hub_a, start)
+    visits.serve(start)
+    lost = record(hub_a, hub_a.slug)
+
+    visits.serve(start + TICK)  # long before the look
+
+    with use_hub(fresh(hub_a)):
+        assert OutboxEvent.objects.get(pk=lost.pk).delivered_at is not None
+
+
 def test_the_pass_leaves_no_hubs_connection_open(hub_a, hub_b, worker_visits):
     worker_visits.serve(timezone.now())
 
