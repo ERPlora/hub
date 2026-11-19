@@ -404,7 +404,7 @@ class ClosingSummaryIn(SessionRefIn):
 
 
 class ShiftReviewOut(Schema):
-    """What is still open when the drawer closes (CASH_REGISTER-F08): it warns, it never prevents."""
+    """What is still open when the drawer closes: it warns, it never prevents."""
 
     open_checks: int = Field(description="Checks still open in Sales.")
     open_check_labels: list[str] = Field(description="Their titles, at most 20.")
@@ -420,8 +420,8 @@ class ShiftReviewOut(Schema):
 
 
 class ClosingSummaryOut(Schema):
-    """What closing a session would give, before it closes (CASH_REGISTER-F09): nothing is written.
-    ``cash_register.session.close`` shows its number, drawer, expected and difference on its card (BASE-F98): their
+    """What closing a session would give, before it closes: nothing is written. ``cash_register.session.close``
+    shows its number, drawer, expected and difference on the card the assistant asks to confirm it with: their
     titles are the names the Cash register screens give them (the difference's is its model's), an amount says «in
     cents» to be shown as money and the difference is signed, to be shown with its sign as the screens write it."""
 
