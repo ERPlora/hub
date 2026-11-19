@@ -84,6 +84,34 @@ def no_dumps_bucket(monkeypatch, aws_test_credentials) -> None:
     monkeypatch.delenv("HUB_DUMPS_ENDPOINT_URL", raising=False)
 
 
+@pytest.fixture
+def fiscal_archive_bucket(moto_s3, aws_test_credentials, monkeypatch) -> str:
+    """The fiscal archive of this test, as aws's: Object Lock on, every object kept by the bucket's default retention in
+    ``COMPLIANCE`` mode (a day here, 6 years in prod), named as ``FISCAL_ARCHIVE_BUCKET``."""
+    name = f"erplora-test-fiscal-{uuid.uuid4().hex[:12]}"
+    s3 = client(moto_s3)
+    s3.create_bucket(
+        Bucket=name, CreateBucketConfiguration={"LocationConstraint": REGION}, ObjectLockEnabledForBucket=True
+    )
+    s3.put_object_lock_configuration(
+        Bucket=name,
+        ObjectLockConfiguration={
+            "ObjectLockEnabled": "Enabled",
+            "Rule": {"DefaultRetention": {"Mode": "COMPLIANCE", "Days": 1}},
+        },
+    )
+    monkeypatch.setenv("FISCAL_ARCHIVE_BUCKET", name)
+    monkeypatch.setenv("FISCAL_ARCHIVE_ENDPOINT_URL", moto_s3)
+    return name
+
+
+@pytest.fixture
+def no_fiscal_archive_bucket(monkeypatch, aws_test_credentials) -> None:
+    """No fiscal archive named: a process without ``FISCAL_ARCHIVE_BUCKET`` (the web, local development)."""
+    monkeypatch.setenv("FISCAL_ARCHIVE_BUCKET", "")
+    monkeypatch.delenv("FISCAL_ARCHIVE_ENDPOINT_URL", raising=False)
+
+
 def hub_files_entry(endpoint: str, bucket: str) -> dict:
     """The ``STORAGES`` entry of ``hub_files`` in AWS (:func:`base.storage.hub_files_storage`), on the session's S3."""
     entry = hub_files_storage({"AWS_STORAGE_BUCKET_NAME": bucket, "AWS_REGION": REGION}, Path("/nowhere"))

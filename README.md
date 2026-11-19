@@ -80,14 +80,16 @@ nocturna»): sus worktrees, sus BD, los dos `runserver` y, pase lo que pase, la 
   `../blueprints` y Postgres con `compose.yaml`). Un test `@smoke` en rojo deja el check en rojo y la PR no se fusiona.
   Los grupos entran de uno en uno, tras tres pasadas seguidas en verde del job, y el job los nombra con `--spec`: hoy,
   entrar, las sesiones, los permisos de un empleado, la separación entre negocios y la suspensión por impago; cobrar
-  en el TPV, la caja y la impresión del ticket; y el ticket con su QR, la factura y VeriFactu. Nada de este último
-  llega a la AEAT: el runner no tiene pasarela de envío ni certificados, y sus tests caen si un registro va al entorno
-  de producción de la AEAT. Tampoco pide un PDF al servidor (la factura se imprime desde el navegador), así que el job
-  no instala WeasyPrint. `.github/scripts/workflows.test.sh` lleva la lista de los grupos que ya están dentro y cae si
-  el job pierde o añade una spec por su cuenta. Con todos dentro, el job correrá todos los `@smoke`, como en el Mac. El
-  job tiene un tope de 19 minutos, el doble de lo que tarda su pasada medida más lenta con la pila incluida; un grupo
-  que entra lo vuelve a medir. Lo que hace la pila sale en el registro del job y, si falla, el artefacto `smoke` guarda
-  además los registros de los dos `runserver` y las trazas de Playwright.
+  en el TPV, la caja y la impresión del ticket; el ticket con su QR, la factura y VeriFactu; y la cocina y las mesas
+  (mandar la ronda a cocina desde el TPV, seguirla y meterle prisa, y sentar la cuenta del TPV en una mesa y
+  quitársela). Nada del grupo fiscal llega a la AEAT: el runner no tiene pasarela de envío ni certificados, y sus
+  tests caen si un registro va al entorno de producción de la AEAT. Tampoco pide un PDF al servidor (la factura se
+  imprime desde el navegador), así que el job no instala WeasyPrint. `.github/scripts/workflows.test.sh` lleva la
+  lista de los grupos que ya están dentro y cae si el job pierde o añade una spec por su cuenta. Con todos dentro, el
+  job correrá todos los `@smoke`, como en el Mac. El job tiene un tope de 27 minutos, el doble de lo que tarda su
+  pasada medida más lenta con la pila incluida; un grupo que entra lo vuelve a medir. Lo que hace la pila sale en el
+  registro del job y, si falla, el artefacto `smoke` guarda además los registros de los dos `runserver` y las trazas
+  de Playwright.
 
 ## Registro de hubs y `/internal`
 
@@ -327,7 +329,17 @@ PLAN-DB, ronda 2026-10-30: decisión 2 y propuestas (a), (f), (j), (k), (l), (m)
   (`offboarding`); si falla, reintenta a 1 min, 5 min, 15 min y luego cada hora (`attempts`, `last_error`,
   `next_attempt_at`). La BD se conserva 90 días; pasados, el worker hace su copia final y la borra
   (`DROP DATABASE … WITH (FORCE)`, `base/tenancy/offboarding.py`, BASE-F109, hub#599), salvo la de un negocio con
-  documentos fiscales, que se guarda hasta que exista el archivo fiscal (hub#738).
+  documentos fiscales, que se guarda (hub#738) después de escribirlos en el archivo fiscal.
+- **El archivo fiscal** (`base/tenancy/fiscal_archive.py`): con `FISCAL_ARCHIVE_BUCKET` (solo el worker lo tiene; aws
+  `s3_fiscal_archive.tf`, Object Lock en `COMPLIANCE` 6 años), el worker sube una vez por baja, en
+  `<hex>/<AAAAMMDDTHHMMSSZ>/`, un JSON Lines por modelo y parte con las filas de los modelos que cada app declara en
+  `fiscal_archive_models` (leídas tal cual por `base/services/fiscal_archive.py`) y, al final, `manifest.json` con las
+  filas, los bytes y el SHA-256 de cada fichero. Cada PUT lleva su SHA-256 e `If-None-Match: *`, ninguno pide
+  retención (la pone el bucket); el manifiesto solo se sube cuando todos los ficheros se han releído iguales, y solo
+  entonces se anota `fiscal_archived_at`. En la fila, `last_error` dice cómo va: `fiscal_archive_missing`,
+  `fiscal_archive_waiting` (un registro de VeriFactu sin respuesta de la AEAT), `fiscal_archive_failed` (al día
+  siguiente, en otra carpeta) o `fiscal_archived`. En local y en los tests, `FISCAL_ARCHIVE_ENDPOINT_URL` apunta a
+  otro S3 (moto, `base/tenancy/tests/s3.py`).
 - **La copia** (`dump_hub`): `pg_dump -Fc --no-owner --no-acl` de esa BD como el migrador, por conexión directa al
   escritor de su cluster (`migrator_conninfo`, nunca PgBouncer), con la contraseña en `PGPASSWORD` y nunca en la orden
   ni en un error, acotado a 15 min (el arriendo se renueva mientras corre) y a un fichero temporal; solo si termina

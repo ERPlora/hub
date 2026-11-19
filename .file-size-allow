@@ -119,7 +119,7 @@
 747 apps/verifactu/models.py ERPlora/erplora-next#74
 840 apps/verifactu/schemas.py ERPlora/erplora-next#74
 1980 apps/verifactu/tests/test_services.py ERPlora/erplora-next#74
-577 apps/website/queries.py ERPlora/erplora-next#74
+576 apps/website/queries.py ERPlora/erplora-next#74
 563 apps/whatsapp_inbox/frontend/components/TemplateFormModal.test.ts ERPlora/erplora-next#74
 430 apps/whatsapp_inbox/frontend/operations.d.ts ERPlora/erplora-next#74
 536 apps/whatsapp_inbox/models.py ERPlora/erplora-next#74
@@ -182,6 +182,6 @@
 539 tests/e2e/staff-flows.spec.ts ERPlora/erplora-next#74
 794 tests/e2e/table-flows.spec.ts ERPlora/erplora-next#74
 542 tests/e2e/verifactu-records.spec.ts ERPlora/erplora-next#74
-765 tests/e2e/website-flows.spec.ts ERPlora/erplora-next#74
+763 tests/e2e/website-flows.spec.ts ERPlora/erplora-next#74
 520 tests/e2e/whatsapp-graph.ts ERPlora/erplora-next#74
 1201 tests/test_no_internal_references.py ERPlora/erplora-next#74

@@ -254,9 +254,9 @@ SMOKE_GROUPS = {
         "two-orgs-isolated", "hub-suspended",
     ),
     "charging and the cash register": ("sale-pos", "sale-cash-gate", "cash-register-shift", "printing-sale"),
-    "the ticket's QR, the invoice and VeriFactu": (
-        "sale-fiscal-qr", "sale-invoice-chain", "invoice-sale", "invoice-manual", "verifactu-records",
-    ),
+    "the ticket's QR, the invoice and VeriFactu": ("sale-fiscal-qr", "sale-invoice-chain", "invoice-sale",
+                                                    "invoice-manual", "verifactu-records"),
+    "the kitchen and the tables": ("kitchen-pos", "sale-table"),
 }
 grouped = []
 for group, names in SMOKE_GROUPS.items():

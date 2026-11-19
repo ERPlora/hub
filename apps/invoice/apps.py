@@ -112,9 +112,12 @@ class InvoiceConfig(LiveAppConfig):
         ),
     ]
 
+    fiscal_archive_models = ("Issuer", "InvoiceSeries", "Invoice", "InvoiceLine")
+
     def fiscal_documents_kept(self) -> bool:
-        """The platform asks (``base.tenancy.offboarding``) before it drops the database of a business that left:
-        its invoices here are documents nothing archives yet, so the database stays."""
+        """The platform asks (``base.tenancy.offboarding``) before it drops the database of a business that left: its
+        invoices here are documents to keep, so the database stays; they go to the fiscal archive first
+        (``fiscal_archive_models``)."""
         from apps.invoice import queries  # the models are not loaded yet when this module is
 
         return queries.keeps_fiscal_documents()

@@ -92,20 +92,19 @@ class Hub(models.Model):
     ``status`` is the lifecycle of its database: ``requested`` → ``creating`` (its database cloned) → ``migrating`` (its
     schema checked) → ``seeding`` (what the sign-up brought) → ``ready``, or ``failed`` with its ``attempts``, its
     ``last_error`` and its ``next_attempt_at`` (1 min, 5 min, 15 min, then every hour) until it is ready; then
-    ``cancelled`` (the SaaS deleted the business; ``restore`` brings it back) or, for a demo, ``expired`` →
-    ``dropping`` → ``purged``. A business past its 90 days goes ``archiving`` (its final copy) → ``dropping`` →
-    ``purged`` (``base.tenancy.offboarding``), unless it keeps fiscal documents: then it stays ``cancelled``. The host
-    gate answers 404 to a slug without a row, 410 to one that is gone and 503 to one still
-    being prepared. ``state`` is the SaaS's last photo (``PUT …/state``) as it came, with its
-    monotonic ``state_version``: an older or equal one changes nothing. ``custom_domain`` is the own domain that photo
-    names, or empty (HUBS-F17; ``base.custom_domains``): not unique, because a domain moving between two businesses comes
-    in two photos in any order, and while both name it nobody has it. ``demo_session_key`` is the sha256 of the
-    SaaS's browser session that owns a demo, never the session key itself.
+    ``cancelled`` (the SaaS deleted the business; ``restore`` brings it back) or, for a demo, ``expired`` → ``dropping``
+    → ``purged``. A business past its 90 days goes ``archiving`` (its final copy) → ``dropping`` → ``purged``
+    (``base.tenancy.offboarding``), unless it keeps fiscal documents: then it stays ``cancelled``, written first to the
+    fiscal archive where one is named (``fiscal_archived_at``). The host gate answers 404 to a slug without a row, 410
+    to one that is gone and 503 to one still being prepared. ``state`` is the SaaS's last photo (``PUT …/state``) as it
+    came, with its monotonic ``state_version``: an older or equal one changes nothing. ``custom_domain`` is the own
+    domain that photo names, or empty (HUBS-F17; ``base.custom_domains``): not unique, because a domain moving between
+    two businesses comes in two photos in any order, and while both name it nobody has it. ``demo_session_key`` is the
+    sha256 of the SaaS's browser session that owns a demo, never the session key itself.
 
-    ``db_name`` is the hub's own database, or empty for a business not cut yet, which is not served
-    (``base.tenancy.cut``; ``base.tenancy.context.use_hub``);
-    ``schema_state`` and ``schema_apps`` are what the migrator confirmed of its schema; ``cluster`` the cluster
-    its database is on (none: the settings' own); ``is_platform`` marks ERPlora's own hub.
+    ``db_name`` is its own database, or empty for a business not cut yet, never served (``base.tenancy.cut``;
+    ``base.tenancy.context.use_hub``); ``schema_state`` and ``schema_apps`` are what the migrator confirmed of its
+    schema; ``cluster`` the cluster its database is on (none: the settings' own); ``is_platform`` marks ERPlora's hub.
     """
 
     class Status(models.TextChoices):
@@ -165,6 +164,7 @@ class Hub(models.Model):
     ready_at = models.DateTimeField(pgettext_lazy("hub registry", "ready at"), null=True, blank=True)
     cancelled_at = models.DateTimeField(pgettext_lazy("hub registry", "cancelled at"), null=True, blank=True)
     purged_at = models.DateTimeField(_("purged at"), null=True, blank=True)
+    fiscal_archived_at = models.DateTimeField(_("fiscal documents archived at"), null=True, blank=True)
     # «Reset the business»: asked by who runs it, done by the worker after it
     # copied the database (``base.tenancy.dumps``). ``reset_requested_at`` is set while it is to do; ``reset_sections``
     # keeps what was asked and how it went (``base.services``, «The reset of a business»), shown on Settings › Data.
