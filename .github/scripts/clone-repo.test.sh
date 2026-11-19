@@ -108,6 +108,13 @@ every_call_has_the_token() {
     [ "$(printf '%s' "$credentials" | base64 -d)" = "x-access-token:$TOKEN" ] || return 1
   done < "$work/calls"
 }
+# masked_first: the log opens by masking the credentials the first call carried, before git could print them.
+masked_first() {
+  local header
+  header="$(head -n 1 "$work/calls")"
+  header="${header%% args=*}"
+  [ "$(head -n 1 "$work/out.log")" = "::add-mask::${header##* }" ]
+}
 
 # --- clones -------------------------------------------------------------------------------------
 clone "ok"
@@ -121,6 +128,7 @@ check "the clone and the sparse checkout (which fetches the paths' files) both r
   '[ "$(calls clone)" = 1 ] && [ "$(calls sparse-checkout)" = 1 ] && every_call_has_the_token'
 check "the token is in neither git's arguments nor the clone's config" \
   '! grep -qF "$TOKEN" "$work/calls" && ! grep -rqiE "extraheader|basic" "$work/saas/.git/config"'
+check "the header's credentials are masked in the job's log before any call to GitHub" 'masked_first'
 
 # --- GitHub failing -----------------------------------------------------------------------------
 clone "fail ok" public/declaracion
@@ -134,6 +142,14 @@ check "a failed sparse checkout is retried from a new clone" \
 
 clone "hang ok"
 check "a hung attempt is cut at the attempt's timeout and retried" 'cloned && [ "$(calls clone)" = 2 ] && took_under 8'
+
+clone "hang ok" public/declaracion
+check "a hung partial clone is cut at the attempt's timeout and retried" \
+  'cloned && [ "$(calls clone)" = 2 ] && took_under 8'
+
+clone "ok hang ok" public/declaracion
+check "a hung sparse checkout is cut at the attempt's timeout and retried from a new clone" \
+  'cloned && [ "$(calls clone)" = 2 ] && [ "$(calls sparse-checkout)" = 2 ] && took_under 8'
 
 clone "fail"
 check "a clone that never passes ends in red with an ::error:: that names the repository, and no folder" \
