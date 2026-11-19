@@ -19,6 +19,7 @@ ROUTERS = (
     catalog_images.router,
 )
 
+# The areas' routers name no tags: ninja adds a child router's tags to its parent's, and base's routes would carry two.
 router = Router(tags=["base"])
 for area in ROUTERS:
     router.add_router("", area)
