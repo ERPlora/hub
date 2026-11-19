@@ -214,6 +214,8 @@ export interface PublicCancelIn extends TokenIn {
 }
 
 export interface PublicBookingOut {
+  business_name: string;
+  logo_url: string;
   number: string;
   status: BookingStatus;
   start: string;

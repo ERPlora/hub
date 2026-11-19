@@ -27,8 +27,8 @@ ALWAYS_THE_DEPLOYMENTS = frozenset(
 #: What still reads the deployment's clock, per file. An hour told to a person, only in hub#772.
 KNOWN_READINGS = {
     # hub#772: an invoice's dates and VeriFactu's records and notices; fiscal, so they change only on their own.
-    "apps/invoice/queries.py": 3,
-    "apps/invoice/services.py": 4,
+    "apps/invoice/queries/__init__.py": 3,
+    "apps/invoice/services/__init__.py": 4,
     "apps/verifactu/queries/route.py": 1,
     "apps/verifactu/services/aeat_query.py": 1,
     "apps/verifactu/services/chains.py": 1,

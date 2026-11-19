@@ -52,6 +52,8 @@ const BOOKED: BookedOut = {
   token: 't'.repeat(43),
 };
 const SEEN: PublicBookingOut = {
+  business_name: PAGE.business_name,
+  logo_url: PAGE.logo_url,
   number: BOOKED.number,
   status: 'confirmed',
   start: BOOKED.start,

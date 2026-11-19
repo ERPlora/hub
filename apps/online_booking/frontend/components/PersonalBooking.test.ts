@@ -17,6 +17,8 @@ vi.mock('@ionic/vue', async (importOriginal) => (await import('../../../../base/
 const TOKEN = 't'.repeat(43);
 const VISITOR: SessionMe = { user: null, permissions: [], menu: [], apps: [], language: 'en' };
 const SEEN: PublicBookingOut = {
+  business_name: 'Salón Lucía',
+  logo_url: '',
   number: 'APT-20300304-0001',
   status: 'confirmed',
   start: '2030-03-05T10:00:00+01:00',

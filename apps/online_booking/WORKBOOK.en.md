@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:534aa34cde269e5411e594079846ac72129b06bedae99617f7303937c9cdd803 -->
+<!-- generated from WORKBOOK.md sha256:fc66e625c9216c17f4b32c2c7186cc513e753b0069c105bf0a99d5c42a9da467 -->
 
 ## What it is for and who it is for
 
@@ -127,7 +127,7 @@ Dates and times show on the business's clock and in the format of the language o
 | ONLINE_BOOKING-F07 | Set up the booking page | done |
 | ONLINE_BOOKING-F08 | See and search the bookings | done |
 | ONLINE_BOOKING-F09 | Follow the customer when two cards are merged | done (Appointments does it; the inbox reflects it) |
-| ONLINE_BOOKING-F10 | The customer sees her booking with her link | done |
+| ONLINE_BOOKING-F10 | The customer sees her booking with her link | partial — it shows the booking, but not the business's name and logo yet |
 | ONLINE_BOOKING-F11 | The customer cancels her booking with her link | done |
 | ONLINE_BOOKING-F12 | Erase a customer's data (GDPR) | done |
 
@@ -298,20 +298,21 @@ If it fails: Appointments is never left halfway and the relay retries on its own
 Involved: APPOINTMENT-F23, CUSTOMER-F13
 
 ### ONLINE_BOOKING-F10 The customer sees her booking with her link
-Status: done
+Status: partial — the link shows the booking, but not the business's name and logo that its query already gives
 Actor: customer (no session)
 Screen: her link's page (`/p/<business>/book/<link>`, at the business's address); the booking page, once booked; in
 development, the preview
 Steps:
 1. She opens the link of her confirmation.
-2. She sees the number, the status, the day and the time, the services, the professional, the cancellation policy and whether
-   she can still cancel and until when. Never the card's name: whoever has the link does not find out
-   whom a mobile belongs to.
+2. She sees whose business it is, with its name and its logo if it has one, as on the booking page; and the number,
+   the status, the day and the time, the services, the professional, the cancellation policy and whether she can still
+   cancel and until when. Never the card's name: whoever has the link does not find out whom a mobile belongs to.
 In: the link she got when booking; the cancellation rules of Appointments.
-Out: nothing is written. The link stays valid even if the business switches the page off.
+Out: nothing is written. The link stays valid, and keeps saying whose business it is, even if the business switches the
+page off.
 If it fails: a link that does not exist, revoked, of a deleted booking or of another business: "That booking does not
-exist or its link is no longer valid.". The link's address with another business's name, or at another business's
-address, opens no page.
+exist or its link is no longer valid.", with no business's name or logo. The link's address with another business's
+name, or at another business's address, opens no page.
 Involved: APPOINTMENT-F06
 
 ### ONLINE_BOOKING-F11 The customer cancels her booking with her link
