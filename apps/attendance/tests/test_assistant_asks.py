@@ -12,14 +12,17 @@ import json
 from pathlib import Path
 
 import pytest
+from django.apps import apps
 from django.conf import settings
 from live import assistant as shared
 from live.operations import AI, registry
 
 from base import assistant
 from base.models import Membership
-from base.tests.test_assistant_asks import TOP
+from base.tests.test_assistant_asks import OWNER, TOP
+from base.tests.test_assistant_asks import assert_its_words_name, assert_offered_with_room, by_group_test
 from base.tests.test_assistant_asks import assert_reported_are_owner_probes, offered_place
+from base.tests.test_assistant_asks import comparable, offered_to, probe_phrases
 from base.tests.test_assistant_asks import english_coverage_test, english_words_test, own_words_test, probes_test
 from base.tests.test_assistant_asks import reported_test
 
@@ -155,3 +158,78 @@ def test_who_is_clocked_in_takes_no_place_from_how_many_people_use_the_hub(catal
     asks = shared.asks_of(tools["base.plan.usage"])["es"]
     places = {ask: offered_place(tools, "base.plan.usage", ask) for ask in asks}
     assert {ask: place for ask, place in places.items() if place is None or place > TOP - ROOM} == {}
+
+
+#: Clocking out or in said as a person says it, «registra» or «apunta» «mi salida» or «mi entrada». The tools' asks say
+#: «fíchame», so without Time clock's group of words none of these is among the first ten: creating an appointment, a
+#: cash movement or a WhatsApp note came first.
+CLOCKING_SAID = [
+    ("attendance.record.clock_out", "registra mi salida", "mi salida"),
+    ("attendance.record.clock_out", "apunta mi salida", "mi salida"),
+    ("attendance.record.clock_out", "quiero registrar mi salida", "mi salida"),
+    ("attendance.record.clock_in", "registra mi entrada", "mi entrada"),
+    ("attendance.record.clock_in", "apunta mi entrada", "mi entrada"),
+]
+
+test_clocking_said_as_a_person_says_it_brings_its_tool_by_time_clocks_group = in_hubs(by_group_test(CLOCKING_SAID))
+
+
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation) and of the person's role
+@pytest.mark.parametrize("role", tuple(Membership.Role))
+@pytest.mark.parametrize(("name", "phrase", "word"), CLOCKING_SAID)
+def test_whoever_clocks_is_offered_the_clock_by_mi_salida_or_mi_entrada(catalog_of, role, name, phrase, word):
+    assert_offered_with_room(catalog_of(role, "es"), name, phrase, room=TOP)
+
+
+#: The same said in English: «my departure», «my exit» or «my arrival» after «record» or «log».
+CLOCKING_SAID_EN = [
+    ("attendance.record.clock_out", "record my departure", "my departure"),
+    ("attendance.record.clock_out", "log my exit", "my exit"),
+    ("attendance.record.clock_in", "record my arrival", "my arrival"),
+]
+
+
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
+@pytest.mark.parametrize(("name", "phrase", "word"), CLOCKING_SAID_EN)
+def test_clocking_said_in_english_brings_its_tool_by_time_clocks_group(catalog_of, name, phrase, word):
+    tools = catalog_of(OWNER, "en")
+    assert comparable(phrase) not in probe_phrases()
+    assert_offered_with_room(tools, name, phrase, "en", room=TOP)
+    counted = assistant.relevance.ranking(tools)["synonyms"]
+    without = tuple(group for group in counted if word not in group)
+    assert len(without) == len(counted) - 1  # positive control: exactly its group is left out
+    assert name not in offered_to(tools, phrase, "en", synonyms=without)[:TOP]
+
+
+#: «Entrada» and «salida» said of anything but a person's own clocking: goods received, the drawer's money, a place in
+#: the waiting list, what left the kitchen's pass. «La salida de» and «su entrada» say those too.
+OTHER_EXITS = [
+    "registra la entrada de mercancía del albarán de hoy",
+    "registra su entrada de mercancía",
+    "apúntame una entrada de 50 € en el turno",
+    "registra la salida de 20 € de la caja",
+    "abre su entrada en la lista de espera",
+    "abre la entrada de Ana en la lista de espera",
+    "la comanda y su salida del pase",
+    "la 12 ya ha salido del pase",
+]
+
+
+def test_the_hub_reads_mi_salida_or_mi_entrada_as_clocking_and_no_other_exit():
+    """Time clock's own words (its ``assistant_synonyms``): «mi salida», «mi entrada» and their English are clocking
+    (``attendance.record.clock_*``), and without the Hub's groups none is (positive control); the other senses of
+    «entrada» and «salida» name no clocking."""
+    clock = shared.stem("clock")
+    assert_its_words_name(
+        "attendance",
+        [
+            ("registra mi salida", clock),
+            ("apunta mi entrada", clock),
+            ("record my departure", clock),
+            ("log my exit", clock),
+            ("log my arrival", clock),
+        ],
+    )
+    own = apps.get_app_config("attendance").assistant_synonyms
+    named = [said for said in OTHER_EXITS if any(clock in one for one in shared.asked([said], own).concepts)]
+    assert named == []
