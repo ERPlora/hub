@@ -9,6 +9,7 @@ import { PUBLIC_DOOR } from '../lib/door';
 import type { PublicBookingOut } from '../operations';
 import BookingResult from './BookingResult.vue';
 import CancelDialog from './CancelDialog.vue';
+import PublicBookingHeader from './PublicBookingHeader.vue';
 
 const props = defineProps<{ token: string }>();
 const door = inject(PUBLIC_DOOR);
@@ -65,6 +66,10 @@ onMounted(load);
     content-layout="detail"
   >
     <div data-testid="ob-personal">
+      <PublicBookingHeader
+        v-if="seen"
+        :info="seen"
+      />
       <p
         v-if="loading"
         data-testid="ob-personal-loading"
