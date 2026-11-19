@@ -22,7 +22,7 @@ pytestmark = HUB_DB
 
 def row(ctx) -> dict | None:
     """Printing's item of the health row for the person of ``ctx`` (``None``: not told)."""
-    items = [item for item in get("base.health.list")(ctx, HealthListIn()).model_dump(mode="json")["items"]]
+    items = get("base.health.list")(ctx, HealthListIn()).model_dump(mode="json")["items"]
     found = [item for item in items if item["app"] == "printing"]
     assert len(found) <= 1, found
     return found[0] if found else None
