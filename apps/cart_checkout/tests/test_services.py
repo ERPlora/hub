@@ -338,6 +338,7 @@ def test_adding_a_line_computes_its_total_and_the_cart_totals():
         "product_ref": "p-1",
         "quantity": "0.500",
         "line_total": 600,
+        "currency": "EUR",
     }
 
 
