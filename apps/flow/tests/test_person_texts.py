@@ -5,7 +5,8 @@ business's hour, and an amount the schema of the step that left it marks as mone
 that step answers, else the business's. What goes to a machine — another action's data, a call to another system, a
 condition — keeps each datum as it is.
 
-An event declares no schema: a number it brings is said as it is, never guessed as money. Nor are a description's words
+A number nobody declares an amount — neither the schema of the step that left it nor the app of the event that brought
+it (``events.AMOUNTS``, test_event_amounts.py) — is said as it is, never guessed as money. Nor are a description's words
 («in cents») nor a name in ``_cents``: only the mark says an amount (hub#498, as the assistant's card, BASE-F97).
 """
 
@@ -179,8 +180,8 @@ def test_an_amount_is_said_in_the_currency_its_step_answers(clock, monkeypatch, 
 
 
 def test_a_number_nobody_declares_money_is_said_as_it_is(clock):
-    # An event declares no schema: «12050» may be cents, a count or a code; it is never guessed. Nor is a text that is
-    # no ISO day, hour or instant read as one.
+    # What a run started by hand is given nobody declares: «12050» may be cents, a count or a code; it is never guessed.
+    # Nor is a text that is no ISO day, hour or instant read as one.
     clock(NOON)
     question = asked([ask(title="Total {{input.total}} · {{input.name}} · 2026")], "es")
     assert question.title == "Total 12050 · Ana · 2026"

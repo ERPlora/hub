@@ -6,7 +6,6 @@ keeps the figure, and a number no app declares is still said as it is. The net b
 and fails on an amount one brings that its app does not declare.
 """
 
-import ast
 import datetime as dt
 import json
 import uuid
@@ -14,6 +13,7 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 
 import pytest
+from django.apps import apps
 from live.context import system_context
 from live.meta import module_configs
 from live.models import OutboxEvent
@@ -26,6 +26,7 @@ from apps.task.models import Task
 from apps.whatsapp_inbox.models import Message
 
 from .conftest import A, HUB_DB, TASK_STEP, ctx_for, make_flow, run
+from .test_field_words import PayloadReader, services_source
 from .test_step_amounts import AMOUNTS_BY_NAME, money_names, steps
 
 pytestmark = HUB_DB
@@ -125,65 +126,11 @@ def test_an_amount_one_app_declares_is_no_amount_in_another_s_event():
 # ── The net: every amount an event brings is declared ───────────────────────────────────────────────────────────────
 
 
-def _keys(node: ast.Dict) -> tuple[set[str], set[str]]:
-    """The names a dict written in the code gives and the ``**name`` it spreads."""
-    names = {key.value for key in node.keys if isinstance(key, ast.Constant) and isinstance(key.value, str)}
-    spread = {value.id for key, value in zip(node.keys, node.values) if key is None and isinstance(value, ast.Name)}
-    return names, spread
-
-
-def _functions(trees: list[ast.Module]) -> list[ast.FunctionDef]:
-    return [node for tree in trees for node in ast.walk(tree) if isinstance(node, ast.FunctionDef)]
-
-
-def _built(payload: ast.expr, local: dict[str, ast.expr], returned: dict[str, set[str]]) -> ast.Dict | set[str]:
-    """What a payload is: a dict written in the call or in a variable of its function, or the names a function of the
-    app returns in a dict."""
-    payload = local.get(payload.id, payload) if isinstance(payload, ast.Name) else payload
-    if isinstance(payload, ast.Call) and isinstance(payload.func, ast.Name):
-        return returned.get(payload.func.id, set())
-    return payload if isinstance(payload, ast.Dict) else set()
-
-
-def recorded_data(source: list[str]) -> set[str]:
-    """The names of the data the events of an app's code (``source``) bring, as it writes them: a dict written in the
-    ``record_event`` call, in a variable of its function or returned by a function of the app, and the keywords a
-    function that adds them to its event (``**more``) is called with. What the code builds otherwise is not seen."""
-    functions = _functions([ast.parse(text) for text in source])
-    returned: dict[str, set[str]] = {}
-    for function in functions:
-        for node in ast.walk(function):
-            if isinstance(node, ast.Return) and isinstance(node.value, ast.Dict):
-                returned.setdefault(function.name, set()).update(_keys(node.value)[0])
-    names: set[str] = set()
-    spreading: set[str] = set()
-    for function in functions:
-        local = {
-            node.targets[0].id: node.value
-            for node in ast.walk(function)
-            if isinstance(node, ast.Assign) and len(node.targets) == 1 and isinstance(node.targets[0], ast.Name)
-        }
-        for node in ast.walk(function):
-            if isinstance(node, ast.Call) and getattr(node.func, "id", None) == "record_event" and len(node.args) > 2:
-                built = _built(node.args[2], local, returned)
-                given, spread = _keys(built) if isinstance(built, ast.Dict) else (built, set())
-                names |= given
-                if function.args.kwarg is not None and function.args.kwarg.arg in spread:
-                    spreading.add(function.name)
-    for function in functions:
-        for node in ast.walk(function):
-            if isinstance(node, ast.Call) and getattr(node.func, "id", None) in spreading:
-                names |= {keyword.arg for keyword in node.keywords if keyword.arg}
-    return names
-
-
-def _source(path: Path) -> list[str]:
-    """The code of a module, without its tests nor its migrations."""
-    return [
-        file.read_text()
-        for file in sorted(path.rglob("*.py"))
-        if not {"tests", "migrations"} & set(file.relative_to(path).parts)
-    ]
+def brought(path: str) -> set[str]:
+    """The data the events of the app at ``path`` bring, as its writes build them (``PayloadReader``, which fails on a
+    payload it cannot follow in ``test_field_words.py``), nested ones by their dotted path."""
+    source, name = services_source(Path(path))
+    return set(PayloadReader(source, name).keys) if source else set()
 
 
 #: The amounts an app's events bring that it does not declare, by app: Automations says them as a bare figure. Only ever
@@ -198,12 +145,8 @@ def test_every_amount_an_event_brings_is_declared_by_its_app():
     found: dict[str, list[str]] = {}
     for config in module_configs():
         label = config.label
-        brought = recorded_data(_source(Path(config.path)))
-        amounts = {
-            name
-            for name in brought
-            if name.endswith("_cents") or name in money.get(label, ()) or name in AMOUNTS_BY_NAME.get(label, ())
-        }
+        named = money.get(label, frozenset()) | AMOUNTS_BY_NAME.get(label, frozenset())
+        amounts = {key for key in brought(config.path) if key.endswith("_cents") or key.rsplit(".", 1)[-1] in named}
         if missing := sorted(amounts - event_amounts(f"{label}.any.event")):
             found[label] = missing
     assert found == UNDECLARED_EVENT_AMOUNTS
@@ -212,25 +155,10 @@ def test_every_amount_an_event_brings_is_declared_by_its_app():
 def test_every_amount_an_app_declares_is_one_its_events_bring():
     """A declared name no event of its app brings is a slip of the pen (``totl``), or an amount the app stopped sending."""
     for config in module_configs():
-        declared = event_amounts(f"{config.label}.any.event")
-        assert declared <= recorded_data(_source(Path(config.path))), config.label
+        assert event_amounts(f"{config.label}.any.event") <= brought(config.path), config.label
 
 
-ADDED = '''
-def _line(line):
-    return {"line_id": str(line.id), "unit_price": line.price}
-
-def _event(ctx, name, sale, **more):
-    record_event(ctx, name, {"id": str(sale.id), **more})
-
-def charge(ctx, sale, line):
-    record_event(ctx, "x.sale.charged", {"total": sale.total, "count": 2})
-    payload = {"tip": sale.tip}
-    record_event(ctx, "x.sale.tipped", payload)
-    record_event(ctx, "x.line.added", _line(line))
-    _event(ctx, "x.sale.voided", sale, refunded=sale.refunded)
-'''
-
-
-def test_the_net_sees_a_payload_written_in_the_call_in_a_variable_by_a_function_or_by_keywords():
-    assert recorded_data([ADDED]) == {"total", "count", "tip", "line_id", "unit_price", "id", "refunded"}
+def test_the_net_sees_the_amounts_of_a_sale_and_of_a_till():
+    # Positive control: what a charge and a till session bring is read.
+    assert {"total", "subtotal", "tax_amount", "currency"} <= brought(apps.get_app_config("sale").path)
+    assert {"opening_balance", "difference"} <= brought(apps.get_app_config("cash_register").path)

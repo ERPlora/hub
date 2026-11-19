@@ -549,7 +549,7 @@ deactivating and the rules, only from the Hub or the assistant.
 | Price list changed | Edit with some change, or its group deleted | `id` | `pricing.price_list.updated` |
 | General price list changed | Choose it or take it off | `id`, `is_default`, `previous_id` | `pricing.price_list.default_changed` |
 | Price list deactivated / reactivated | Deactivate / activate | `id` | `pricing.price_list.deactivated`, `…activated` |
-| Price put | Add, or recover it from a separate copy | `id`, `price_list_id`, `product_id` or `service_id`, `min_quantity`, `price` | `pricing.price_item.added` |
+| Price put | Add, or recover it from a separate copy | `id`, `price_list_id`, `product_id` or `service_id`, `min_quantity`, `price`, `currency` (its list's) | `pricing.price_item.added` |
 | Price changed | Edit, or a service's new name | `id` (or `service_id`) | `pricing.price_item.updated` |
 | Price removed | Remove, or the product deleted | `id`, `price_list_id` | `pricing.price_item.removed` |
 | New rule | Create | `id`, `code` | `pricing.rule.created` |
