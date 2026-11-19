@@ -847,6 +847,9 @@ msgstr "menú"
 msgid "menu as ordered"
 msgstr "menú tal como se pidió"
 
+msgid "allergens"
+msgstr "alérgenos"
+
 msgid "menu name"
 msgstr "nombre del menú"
 

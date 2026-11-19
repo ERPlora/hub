@@ -46,6 +46,11 @@ def _percent_range(
     )
 
 
+def _json_list(verbose_name) -> models.JSONField:
+    """A list kept as JSON; ``db_default``: a process still on the previous code inserts rows without it."""
+    return models.JSONField(verbose_name, default=list, blank=True, db_default=[], encoder=DjangoJSONEncoder)
+
+
 class PaymentMethod(UUIDModel):
     class Type(models.TextChoices):
         CASH = "cash", _("Cash")
@@ -358,20 +363,8 @@ class OrderLine(UUIDModel):
     # dish), ``modifier_lines`` the ones of another tax category, charged on a child line of their own (their
     # ``quantity`` is per unit of the dish), ``kitchen_text`` what the kitchen reads under the dish. Own context, here
     # and on the charged line: they are its «suplementos», not Clientes' «opciones» of the same English.
-    modifiers = models.JSONField(
-        pgettext_lazy("sale", "options"),
-        default=list,
-        blank=True,
-        db_default=[],
-        encoder=DjangoJSONEncoder,
-    )
-    modifier_lines = models.JSONField(
-        _("options on a line of their own"),
-        default=list,
-        blank=True,
-        db_default=[],
-        encoder=DjangoJSONEncoder,
-    )
+    modifiers = _json_list(pgettext_lazy("sale", "options"))
+    modifier_lines = _json_list(_("options on a line of their own"))
     kitchen_text = models.CharField(
         _("kitchen text"), max_length=500, blank=True, default="", db_default=""
     )
@@ -382,6 +375,9 @@ class OrderLine(UUIDModel):
     combo = models.JSONField(
         _("menu as ordered"), default=dict, blank=True, db_default={}, encoder=DjangoJSONEncoder
     )
+    # The allergens of its product (``base.allergens`` codes, in the order of the list), frozen when it is ordered as its
+    # options are; a menu has none of its own: each dish of ``combo`` keeps its product's.
+    allergens = _json_list(_("allergens"))
     line_total = models.BigIntegerField(_("line total"), default=0)
     round_no = models.PositiveIntegerField(_("round"), default=0)
     fired_at = models.DateTimeField(_("sent to the kitchen at"), null=True, blank=True)
@@ -658,13 +654,7 @@ class SaleLine(UUIDModel):
     )
     # SALE-F11: the names of the options charged inside the line (the receipt prints them under it), and, on
     # the child line of an option of another tax category, the line of the dish it hangs from.
-    modifiers = models.JSONField(
-        pgettext_lazy("sale", "options"),
-        default=list,
-        blank=True,
-        db_default=[],
-        encoder=DjangoJSONEncoder,
-    )
+    modifiers = _json_list(pgettext_lazy("sale", "options"))
     parent_line_id = models.UUIDField(
         _("line it hangs from"), null=True, blank=True
     )
@@ -674,9 +664,7 @@ class SaleLine(UUIDModel):
     combo_name = models.CharField(
         _("menu name"), max_length=200, blank=True, default="", db_default=""
     )
-    components = models.JSONField(
-        _("dishes"), default=list, blank=True, db_default=[], encoder=DjangoJSONEncoder
-    )
+    components = _json_list(_("dishes"))
     tax_category_key = models.CharField(_("tax category"), max_length=80)
     tax_rate = models.DecimalField(_("rate (%)"), max_digits=6, decimal_places=2)
     tax_country_code = models.CharField(_("tax country"), max_length=2)

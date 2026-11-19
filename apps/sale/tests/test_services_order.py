@@ -419,6 +419,8 @@ def test_firing_sends_the_pending_lines_as_a_round(coffee, steak):
             "staff_id": str(staff),
             # SALE-F11: the kitchen text of its options (MODIFIER-F08); none chosen here.
             "modifiers": "",
+            # SALE-F40: its product's allergens, frozen when it was ordered; the steak declares none.
+            "allergens": [],
             # SALE-F12: a menu's kitchen name and dishes (COMBO-F11); not a menu here.
             "kitchen_name": "",
             "components": [],
