@@ -326,7 +326,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
     }
   });
 
-  test(`BASE-F19 BASE-F23 BASE-F24 — «Desactivar» Reservas takes Mesas with it and «Activar» brings both back, naming it, at ${width}`, async ({ browser }) => {
+  test(`BASE-F19 BASE-F23 BASE-F24 — «Desactivar» Reservas takes Mesas with it and «Activar» brings both back, naming it, at ${width}${width === 1440 ? ' @smoke' : ''}`, async ({ browser }) => {
     await pushPhoto(GRATIS);
     const { context, page } = await signedInSpanish(browser, viewport, '/apps');
     try {

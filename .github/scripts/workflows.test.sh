@@ -249,15 +249,15 @@ check("smoke's step is that command and its --spec, with nothing after them that
 # The groups that already stop the merge, with their specs: a spec dropped from the job, or one named outside them,
 # turns this red. A group that enters adds its specs here and to the job in the same change.
 SMOKE_GROUPS = {
-    "signing in, sessions, permissions, isolation and suspension": (
-        "login-and-shell", "base-access", "base-sign-out", "base-session-revoke", "employee-permissions",
-        "two-orgs-isolated", "hub-suspended"),
+    "signing in, sessions, permissions, isolation and suspension": ("login-and-shell", "base-access", "base-sign-out",
+        "base-session-revoke", "employee-permissions", "two-orgs-isolated", "hub-suspended"),
     "charging and the cash register": ("sale-pos", "sale-cash-gate", "cash-register-shift", "printing-sale"),
     "the ticket's QR, the invoice and VeriFactu": ("sale-fiscal-qr", "sale-invoice-chain", "invoice-sale",
                                                     "invoice-manual", "verifactu-records"),
     "the kitchen and the tables": ("kitchen-pos", "sale-table"),
     "appointments, services and vouchers": ("appointment-agenda", "appointment-charge", "service-catalog",
                                             "service-vouchers", "sale-voucher"),
+    "sign-up, apps, the demo and live updates": ("base-sign-up-taxes-on", "base-app-activation", "demo", "two-tabs-live"),
 }
 grouped = []
 for group, names in SMOKE_GROUPS.items():
