@@ -284,10 +284,14 @@ def test_a_moves_pass_that_could_not_start_starts_at_the_next_pass(db):
     ear = Deaf()
     pace = control_pace.ControlPace(ear)
     pace.due(START)
-    pace.moved(START, started=False)  # the last one still runs: one at a time
+    pace.moved(START, started=True)
     pace.ran(START, worked=False)
+    ear.ring = True  # a second move asked while the first is copying
+    assert pace.due(START + TICK) and pace.moves_due(START + TICK)
+    pace.moved(START + TICK, started=False)  # the first one still runs: one at a time
+    pace.ran(START + TICK, worked=False)
 
-    look = START + dt.timedelta(seconds=control_pace.LOOK_SECONDS)
+    look = START + TICK + dt.timedelta(seconds=control_pace.LOOK_SECONDS)
     assert pace.due(look) and pace.moves_due(look)
     pace.moved(look, started=True)
     pace.ran(look, worked=False)
