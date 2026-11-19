@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:688b67c3424e740ecf6dc41c72e83eaf4e8a4187d9e5931e9e6a8f79dc946b6e -->
+<!-- generated from WORKBOOK.md sha256:499b414228143071aa3588bdb5941d6ec6dec0ed0b42a0c5f4de2064ad535a7c -->
 
 ## What it is for and who it is for
 
@@ -39,6 +39,11 @@ on it.
   issues no tax document; it covers service lines, not amounts; the expiry counts from the purchase; what
   was sold keeps the terms it was sold with; giving or correcting is a separate movement with a reason;
   only a voucher that has not been used is voided.
+- **The sale of a voucher said later** (Phorest, Square Appointments, DaySmart, Jane, MyTime and Pabau pay a
+  voucher's commission with each session, when it is done; Phorest redoes its commission report backwards when the
+  commission is assigned after the sale, and Fresha only takes a change to the open period when that period was already
+  paid out in the app): it counts from that moment for the sessions, and the line stops counting for whoever sold it on
+  the day of its sale, as if it had been said when granting it. This app records no commission payouts.
 - Decisions that rule here: ADR-0386 (a voucher covers lines; a gift card,
   amounts), ADR-0390 (ownership is born when it is sold, the clock starts at the purchase and it is not
   transferred) and ADR-0085 (VAT is linked through the tax category of Taxes).
@@ -213,6 +218,7 @@ With the window as it opened, Back closes it without asking (BASE-F05).
 | SERVICE-F33 | Know who can perform a service | done |
 | SERVICE-F34 | Choose a service's image from the library | done |
 | SERVICE-F35 | Upload the service's own photo | done |
+| SERVICE-F36 | Say later which sale charged a voucher | done (assistant and API); in **Sold vouchers**, not (see "What is left out") |
 
 ### SERVICE-F01 Add a service
 Status: done
@@ -491,7 +497,8 @@ Out: a sold voucher with the owner, the date, the amount and the "Uses" and the 
 catalogue frozen; the expiry counts from that moment (`service.grant.granted`). No tax document comes
 out: the sale of the voucher issues it. Saying the sale, that part of its line stops being production of whoever
 sold it: the commission goes on the sessions done (SALE-F28). Without saying it, the voucher is granted all the
-same, but its sessions count for nobody (SERVICE-F24): its money may already count for whoever sold it.
+same, but its sessions count for nobody (SERVICE-F24): its money may already count for whoever sold it. It can
+be said later (SERVICE-F36).
 If it fails: "Pick the customer this voucher belongs to…" if it is not said; "That package does not exist
 in this business." if the voucher was deleted or is deactivated; a purchase date in the future, "A voucher
 cannot be bought in the future." (extending a voucher is **Adjust**, SERVICE-F18), and one without a time
@@ -499,7 +506,7 @@ zone, asking for it; a customer name that fits several, the list to choose from.
 charged several lines: say which one paid for the voucher: …", "That line is not in that sale.", "That line has
 … left to pay for vouchers: it cannot pay for one of ….", and "That sale was voided: it paid for no voucher.";
 whoever cannot charge cannot say it. Nothing is granted.
-Involved: CUSTOMER-F01, SALE-F28, SERVICE-F24
+Involved: CUSTOMER-F01, SALE-F28, SERVICE-F24, SERVICE-F36
 
 ### SERVICE-F15 Look up a customer's vouchers
 Status: done (assistant and API)
@@ -716,7 +723,7 @@ what is left of the price paid ÷ the sessions it has left to deliver, to the ce
 100.00 € in 3 sessions is 33.33 + 33.34 + 33.33: what is delivered adds up to exactly what was paid, also
 with courtesies, corrections and sessions given back. A voucher given away (0 €) gives 0, and one with no
 limit has nothing to divide by and gives no value. A voucher with an amount that does not say the line that
-charged it gives 0 (SERVICE-F14), like those sold before this figure existed. Sales keeps it on the line for the
+charged it gives 0 (SERVICE-F14), like those sold before this figure existed, until it is said (SERVICE-F36). Sales keeps it on the line for the
 production of whoever does it (SALE-F28).
 If it fails: nothing is charged and the check stays the same if a session is no longer held ("The session
 held from «{name}» is no longer held (its day passed or it was released). Take the voucher off the line
@@ -953,6 +960,38 @@ no space left for that file: your plan includes <space>." and, if the store does
 could not be saved. Try again.".
 Involved: SERVICE-F01, SERVICE-F02, SERVICE-F04, SERVICE-F05, SERVICE-F09, INVENTORY-F31, INVENTORY-F33, BASE-F35
 
+### SERVICE-F36 Say later which sale charged a voucher
+Status: done (assistant and API); in **Sold vouchers**, not (see "What is left out")
+Actor: manager, assistant
+Screen: assistant
+Steps:
+1. Ask the assistant to say which sale charged a voucher already sold to a customer (the voucher, by its name or its
+   owner's) and, if that sale charged several lines, which of them.
+2. The assistant's confirmation card names the voucher, the sale by its number ("20261014-0007") and the line by what
+   it charges; confirm it.
+3. From that moment, its sessions count for whoever does them (SERVICE-F24).
+In: a sold voucher with an amount that does not say its sale yet, not voided, not expired and with sessions left to do
+(or unlimited); the sale and, if it charged several lines, the line (Sales).
+Out: the voucher says the sale and the line that charged it (`service.grant.sale_linked`). It counts **from that
+moment**:
+- The sessions already done keep what they were worth, 0: what a session is worth is fixed when it is done and never
+  moves again, and the day it was done does not change.
+- What is left of the price, which is all that was paid because those took nothing, is shared out among the sessions
+  still to do, as always (SERVICE-F24): a voucher of 100.00 € for 5 sessions with 2 done gives 33.33 + 33.34 + 33.33
+  to the three that are left.
+- That part of the line stops being production of whoever sold it just as if it had been said when granting it
+  (SERVICE-F14): on the day of that sale. So nothing counts twice and nobody's production goes below 0, and it is the
+  same day that voiding the voucher (SERVICE-F17) or refunding the sale (SALE-F28) moves.
+If it fails: "That voucher already says the sale that charged it."; "That voucher was given away: no sale charged it.";
+"This voucher has been voided: it can no longer be used."; "This voucher has expired: extend it with Adjust if sessions
+are still to be done."; "This voucher has no sessions left to do: what it cost still counts for whoever sold it.";
+with neither sale nor line, "Say which sale charged the voucher."; with Sales off, "Sales is not active in this
+business.". From the sale, the same as when granting it (SERVICE-F14): "That sale charged several lines: say which one
+paid for the voucher: …", "That line is not in that sale.", "That line has … left to pay for vouchers: it cannot pay
+for one of …." (also if it already paid for another voucher) and "That sale was voided: it paid for no voucher.";
+whoever cannot charge cannot say it. Nothing changes.
+Involved: SERVICE-F14, SERVICE-F17, SERVICE-F24, SALE-F28, STAFF-F21
+
 ## Services: what goes in and what comes out
 
 Everything can be asked for through the screens, the assistant (by voice or by text, with the session of
@@ -1020,6 +1059,7 @@ be followed live.
 | Changes a voucher (only what is sent; not the lines) | edit vouchers | F13 | `service.package.update` |
 | Deletes a voucher from the catalogue | delete vouchers | F13 | `service.package.delete` |
 | Grants a voucher to a customer and tells Sales which line paid for it | grant vouchers | F14 | `service.grant.create` |
+| Says which sale and which line charged a voucher already granted without them, with the same check of Sales | adjust vouchers | F36 | `service.grant.link` |
 | Voids an unused sold voucher | void vouchers | F17 | `service.grant.void` |
 | Gives or takes sessions, or extends the expiry | adjust vouchers | F18 | `service.grant.adjust` |
 | Spends a session and, if who did it is said, tells Sales to count what it is worth in their production | spend sessions | F21 | `service.grant.redeem` |
@@ -1042,6 +1082,7 @@ be followed live.
 | Professional assigned / changed / removed | Assign, change, remove (also when someone leaves) | The assignment, the service and the professional | `service.assignment.assigned`, `.updated`, `.removed` |
 | Voucher new / changed / deleted | Create, edit, delete | Which (`id`) | `service.package.created`, `.updated`, `.deleted` |
 | Voucher granted | Grant | The purchase, the voucher and the customer | `service.grant.granted` |
+| Sale of the voucher said later | Say its sale | The purchase, the voucher, the customer, the sale and the line | `service.grant.sale_linked` |
 | Voucher voided | Void | The purchase, the voucher and the customer, without the reason | `service.grant.voided` |
 | Voucher adjusted | Adjust | The purchase and the quantities, without the reason | `service.grant.adjusted` |
 | Session spent | Spend | The purchase, the session and the service | `service.grant.redeemed` |
@@ -1089,7 +1130,9 @@ with the session of whoever sells, as it does with Inventory.
   the session of whoever grants. `service.grant.create`, with an amount and a sale, calls `sale.sale.voucher_sold`
   (`sale_id`, `line_id`, `amount`) and keeps in `sale_line_id` the line it answers; `service.grant.void` calls
   `sale.sale.voucher_unsold` (`line_id`, `amount`). Without Sales in the business there is no figure to keep it
-  out of: it is not called, the voucher keeps no line and its sessions do not count.
+  out of: it is not called, the voucher keeps no line and its sessions do not count. `service.grant.link` (F36)
+  makes the same call to `sale.sale.voucher_sold` later, with the voucher's amount, and keeps the sale and the line;
+  without Sales it refuses (409 `service.sales_unavailable`), as there is no sale to say.
 - **The session spent outside the checkout with its professional (F21)**: the other one. `service.grant.redeem` with
   `member_id` or `member` calls `sale.voucher_session.record` (`session_id`, `staff_id`, `value`) with the session of
   whoever spends it (its Sales permission, "Build the check", is held by all four roles) and in the same transaction.
@@ -1124,7 +1167,7 @@ with the session of whoever sells, as it does with Inventory.
 | View sold vouchers, balances and movements | yes | yes | yes | yes | `service.view_package_balance` |
 | View vouchers with no customer | yes | yes | yes | no | `service.view_orphan_grant` |
 | Void sold vouchers | yes | yes | yes | no | `service.void_grant` |
-| Adjust sold vouchers | yes | yes | yes | no | `service.adjust_grant` |
+| Adjust sold vouchers and say their sale later | yes | yes | yes | no | `service.adjust_grant` |
 | Give sessions back when voiding or refunding a sale | yes | yes | yes | no | `service.return_session` |
 | Settings | yes | yes | no | no | `service.manage_settings` |
 
