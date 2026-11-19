@@ -63,8 +63,9 @@ RUN DEBUG=1 python manage.py compilemessages --ignore=packages \
 
 # 3) Runtime: read-only filesystem except /tmp (the sidecar writes its config there).
 FROM ${PYTHON_IMAGE}
-# PgBouncer and the PostgreSQL 18 client (psql for `manage.py dbshell`, pg_isready) from PGDG.
-ADD --chmod=644 https://www.postgresql.org/media/keys/ACCC4CF8.asc /usr/share/keyrings/pgdg.asc
+# PgBouncer and the PostgreSQL 18 client (psql for `manage.py dbshell`, pg_isready) from PGDG, signed with the
+# key kept in docker/ (fingerprint B97B0AFCAA1A47F044F244A07FCC7D46ACCC4CF8).
+COPY --chmod=644 docker/pgdg.asc /usr/share/keyrings/pgdg.asc
 RUN . /etc/os-release \
  && echo "deb [signed-by=/usr/share/keyrings/pgdg.asc] https://apt.postgresql.org/pub/repos/apt ${VERSION_CODENAME}-pgdg main" \
       > /etc/apt/sources.list.d/pgdg.list \
@@ -76,8 +77,9 @@ RUN . /etc/os-release \
 RUN apt-get update \
  && apt-get install -y --no-install-recommends libpango-1.0-0 libpangoft2-1.0-0 libharfbuzz-subset0 fonts-dejavu-core \
  && rm -rf /var/lib/apt/lists/*
-# CA bundle of RDS: TLS verify-full of the app (DB_SSLROOTCERT) and of PgBouncer towards Aurora.
-ADD --chmod=644 https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem /etc/ssl/certs/rds-global-bundle.pem
+# CA bundle of RDS: TLS verify-full of the app (DB_SSLROOTCERT) and of PgBouncer towards Aurora. A copy of
+# AWS's https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem.
+COPY --chmod=644 docker/rds-global-bundle.pem /etc/ssl/certs/rds-global-bundle.pem
 COPY --chmod=755 docker/pgbouncer-entrypoint.sh /usr/local/bin/pgbouncer-entrypoint
 COPY --chmod=755 docker/pgbouncer-healthcheck.sh /usr/local/bin/pgbouncer-healthcheck
 RUN useradd --system --uid 10001 --home-dir /app app
