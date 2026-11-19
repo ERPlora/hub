@@ -12,7 +12,7 @@ import { cleanUp, clearFilters, filterBy, named, ownerPage, pick, post, rowActio
 test.beforeAll(cleanUp);
 test.afterAll(cleanUp);
 
-test('Categories and services: create, a duplicate refused, a professional assigned, archive and restore', async ({ browser }) => {
+test('Categories and services: create, a duplicate refused, a professional assigned, archive and restore @smoke', async ({ browser }) => {
   const category = named('Hair');
   const service = named('Haircut');
   const { context, page } = await ownerPage(browser, '/service/categories');

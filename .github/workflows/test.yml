@@ -254,6 +254,11 @@ jobs:
           --spec tests/e2e/verifactu-records.spec.ts
           --spec tests/e2e/kitchen-pos.spec.ts
           --spec tests/e2e/sale-table.spec.ts
+          --spec tests/e2e/appointment-agenda.spec.ts
+          --spec tests/e2e/appointment-charge.spec.ts
+          --spec tests/e2e/service-catalog.spec.ts
+          --spec tests/e2e/service-vouchers.spec.ts
+          --spec tests/e2e/sale-voucher.spec.ts
       # The run's log, both runservers' logs and Playwright's output (each failed test's trace and screenshot).
       - if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
