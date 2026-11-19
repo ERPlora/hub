@@ -16,7 +16,7 @@ from live.errors import OperationError
 
 from apps.appointment.models import Appointment, History
 from apps.appointment.tests.test_concurrency import deleted_after_the_first_read_of
-from apps.customer.tests.conftest import reads
+from apps.customer.tests.conftest import reads, writes
 from apps.online_booking.models import Booking, Settings
 from base.tenancy.tests.concurrency import at_once, meanwhile
 
@@ -145,6 +145,19 @@ def test_a_booking_on_a_card_customers_merges_meanwhile_ends_on_the_kept_card(sa
     worker_loop()
 
     assert run("online_booking.booking.get", {"number": booked.number}).customer_id == salon.lucia.id
+
+
+def test_a_booking_that_arrives_while_customers_merges_its_card_is_made_on_the_kept_card(salon):
+    duplicate = make_customer("Lucia P.", phone=salon.lucia.phone)
+
+    def book():
+        return public("book", booking_data(salon, "10:00", phone="600 111 222", name="Lucia P."))
+
+    with meanwhile(writes("customer_customer"), book) as booked:
+        run("customer.customer.merge", {"id": str(salon.lucia.id), "absorbed_id": str(duplicate.id)})
+    assert codes(booked) == ["ok"]
+
+    assert Appointment.objects.get(number=booked[0].number).customer_id == salon.lucia.id
 
 
 def test_two_cancellations_at_once_with_the_same_link_cancel_once_and_refuse_the_other(salon):
