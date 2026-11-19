@@ -932,8 +932,9 @@ Pasos:
      está disponible (BASE-F26) y el contador de arriba resta las que se desactivan y, de las del plan, la que
      eligió el negocio.
   4. En «Añadir apps» siguen, con su icono, su nombre y «Desactivada»: desde ahí se vuelven a activar (BASE-F24).
-  5. Desde el asistente («Desactiva la app de reservas») la app se nombra como en BASE-F24, la tarjeta de riesgo alto
-     la pone con su nombre entero y, si ya estaba desactivada, el asistente lo dice y no cambia nada.
+  5. Desde el asistente («Desactiva la app de reservas», o sin decir «app»: «quita Reservas del menú», «no quiero ver
+     Reservas en el menú») la app se nombra como en BASE-F24, la tarjeta de riesgo alto la pone con su nombre entero
+     y, si ya estaba desactivada, el asistente lo dice y no cambia nada.
 Entra: las apps del negocio, lo que necesita cada una y cuáles eligió el negocio.
 Sale: la app apagada en este negocio, y las que llegaron solo con ella, con sus datos intactos.
 Si falla: si otra app en marcha la necesita, no cambia nada; si no se puede desactivar, no ofrece «Desactivar»
@@ -950,7 +951,8 @@ Pasos:
      sin preguntar.
   3. La app vuelve a «Mis apps» y al menú, sin recargar, con los datos que tenía: «Reservas está activada.» y, si
      llegó con otras, «También se ha activado: Mesas.».
-  4. Desde el asistente («Activa la app de reservas») la app se nombra como la dice la persona: por su nombre en
+  4. Desde el asistente («Activa la app de reservas», o sin decir «app»: «vuelve a poner Reservas en el menú») la app
+     se nombra como la dice la persona: por su nombre en
      cualquier idioma del Hub, sin mirar mayúsculas ni acentos, o, si ninguna se llama así, por la única con una
      palabra de su nombre que empieza así («booking» es Reservas online). «Reservas» es Reservas, nunca Reservas online
      aunque empiece igual. La tarjeta la pone con su nombre entero (BASE-F97), nunca con su identificador, y si ya
@@ -3931,7 +3933,12 @@ Implicados: BASE-F41
   `base/tests/test_catalog_unchanged_by_e017.py`), `relevant` (como mucho `MAX_TOOLS` = 40 por turno, por las palabras de las dos últimas
   preguntas; `base.setup.status` y `base.business.get` siempre; `ranking` lo ordena con las palabras propias del
   Hub: las de la plataforma, `SYNONYMS` («placa», «empleado»), y las que cada app declara en `assistant_synonyms` de
-  su `LiveAppConfig`, con su forma comprobada por `base.E018`; cuentan en todo turno, salvo las de una app fuera de
+  su `LiveAppConfig`, con su forma comprobada por `base.E018`; las de `base`, en el suyo, salen de los nombres de las
+  apps de la tienda en `en` y `es` (cada uno de los dos de «Ventas / TPV» o «Menús y combos»): el nombre junto a «del
+  menú», «en el menú», «al menú» o «disponible en el menú», delante o detrás («quita Tareas del menú», «quita del menú
+  Tareas», «put Tasks back on the menu»), es la app (`base.app`), y lo que sale del menú la apaga y lo que entra o
+  está en él la enciende; nunca la frase suelta, porque «los postres del menú vegano» o «quita la tarta del menú» son
+  de Menús y combos. Lo comprueba `base/tests/test_assistant_synonyms.py`; cuentan en todo turno, salvo las de una app fuera de
   la tienda, `listed = False` como Demo, que solo cuentan donde se ofrecen sus herramientas), la tarjeta (`card`: `ai={"risk": "high"}` pide
   `CONFIRM_WORD`, «CONFIRMAR» por `pgettext` con contexto `assistant` del catálogo de `live`, o el número de `ids`; sin `ids`, `blocked`; cada
   dato con su nombre en el idioma de la persona, `_label`: el `title` del esquema si un catálogo lo traduce, o tal
