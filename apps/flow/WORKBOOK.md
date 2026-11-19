@@ -1453,10 +1453,10 @@ Los avisos llevan ids, nunca nombres ni contenidos.
   Caja, Inventario, Facturación, Tarifas, Pagos, Carrito y pago y Modificadores; los de una tarifa y una línea de
   carrito traen su `currency`. Ni un nombre ni una descripción hacen un importe: un número que nadie declara sale tal
   cual (`test_person_texts.py`). La red `test_every_amount_an_event_brings_is_declared_by_its_app` de
-  `test_event_amounts.py` (trinquete `UNDECLARED_EVENT_AMOUNTS`, solo baja; hoy vacío) lee el código de cada app y
-  caza un dato de sus avisos que su app marca como dinero en una operación, que acaba en `_cents` o que nombra
-  `AMOUNTS_BY_NAME`, sin declarar: el que escribe la llamada a `record_event`, una variable de su función, una
-  función de la app que devuelve el diccionario o las palabras clave de una que lo amplía (`**more`). Lo que va a una
+  `test_event_amounts.py` (trinquete `UNDECLARED_EVENT_AMOUNTS`, solo baja; hoy vacío) lee los avisos de cada app con
+  el lector de sus datos de `test_field_words.py` (`PayloadReader`, que falla ante uno que no sabe seguir) y caza uno
+  sin declarar que su app marca como dinero en una operación, que acaba en `_cents` o que nombra `AMOUNTS_BY_NAME`;
+  otra caza un nombre declarado que ningún aviso de su app trae. Lo que va a una
   máquina — otra acción, «Llamar a otro sistema», condiciones, el encargo al asistente — no cambia. Mercado: HubSpot
   (los tokens salen con el formato de su tipo: fecha y moneda de la cuenta) y Mailchimp (formato de fecha de la
   audiencia en las etiquetas) dan el dato ya en palabras; Shopify Flow y Klaviyo (filtros `money`/`date` de Liquid),
