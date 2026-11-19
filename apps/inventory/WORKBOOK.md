@@ -1125,19 +1125,20 @@ librería que recupera si no tenía ninguna), y el aviso de producto recuperado 
 producto tal como vuelve.
 Si falla: no vuelve si el negocio ya hizo otro producto con su SKU o su EAN-13 desde que lo eliminó: se queda el que
 hizo, y la recuperación no lo cuenta ni lo crea. Un producto que el negocio ya no tiene en absoluto se crea de nuevo
-(INVENTORY-F01), sin stock, con la imagen de la librería que tenía en la copia. Sobre un producto vivo no falla:
+(INVENTORY-F01), sin stock, con la imagen de la librería y los alérgenos que tenía en la copia; el de una copia de
+antes de que los productos tuvieran alérgenos vuelve sin ninguno (INVENTORY-F35). Sobre un producto vivo no falla:
 responde bien y vuelve a avisar. Su foto propia no vuelve: se borró al eliminarlo (INVENTORY-F31). La imagen de la
 librería sí, porque eliminar se la deja; uno eliminado antes de que se la dejara, que se quedó sin ninguna, recupera
 la que tenía en la copia, salvo una que la librería ya no tiene. Sus reglas de descuento de Tarifas se vuelven a activar solas (PRICING-F14) y sus precios en las tarifas vuelven si se
 recupera también Tarifas (PRICING-F15), sus grupos de suplementos, si se recupera también Suplementos
 (MODIFIER-F10), y sus elecciones en los menús, si se recupera también Menús (COMBO-F15).
 Implicados: BASE-F114, INVENTORY-F01, INVENTORY-F03, INVENTORY-F04, INVENTORY-F07, INVENTORY-F16, INVENTORY-F29, INVENTORY-F30,
-PRICING-F14, PRICING-F15, MODIFIER-F09, MODIFIER-F10, COMBO-F13, COMBO-F15
+INVENTORY-F35, PRICING-F14, PRICING-F15, MODIFIER-F09, MODIFIER-F10, COMBO-F13, COMBO-F15
 
 ### INVENTORY-F35 Declarar los alérgenos de un producto
 Estado: parcial — el producto ya guarda sus alérgenos por el asistente y la API, y el catálogo, el CSV exportado, la
-importación por la API, la copia de seguridad y la plantilla los llevan; faltan el bloque del formulario, la línea de
-la ficha y que Importar productos reconozca la columna «Alérgenos»
+importación por la API, la copia de seguridad, la plantilla y la recuperación desde una copia aparte los llevan;
+faltan el bloque del formulario, la línea de la ficha y que Importar productos reconozca la columna «Alérgenos»
 Actor: administrador, responsable
 Pantalla: Productos, Ficha del producto, Importar productos
 Pasos:
@@ -1168,7 +1169,8 @@ Si falla: un alérgeno que no es de la lista se rechaza, también por el asisten
 que no se reconoce deja la fila como fallida con el motivo «Alérgeno no reconocido: <texto>». Quien solo puede ver
 productos lee la línea de la ficha, pero no tiene el formulario. Todo rechazo sale dentro del panel, como los del
 resto del formulario.
-Implicados: INVENTORY-F01, INVENTORY-F02, INVENTORY-F09, INVENTORY-F11, INVENTORY-F27, SALE-F40, SALE-F41, KITCHEN-F32
+Implicados: INVENTORY-F01, INVENTORY-F02, INVENTORY-F09, INVENTORY-F11, INVENTORY-F27, INVENTORY-F34, SALE-F40, SALE-F41,
+KITCHEN-F32
 
 ## Qué comparten los verticales
 
@@ -1357,9 +1359,12 @@ Lo que sigue es para quien cambia la app; quien la usa puede parar aquí.
   sin quitar ninguna otra categoría. Va aparte, con su propia cuenta, porque toca lo que el negocio tiene. Una categoría
   rehecha a mano (`created_by` de una persona) o conservada no se rellena. Las categorías y los enlaces se leen desde `0001_initial` y los
   productos desde `0005_product_image`, la que les dio la imagen (a una copia anterior se le niegan los productos con
-  `recover_copy_behind`); una migración que añada, quite o renombre una columna que se lee cambia también la lectura
-  y su `reads_since`. Tests: `tests/test_recovery.py`, de punta a punta
-  incluido, y el contrato de `base/tenancy/tests/test_recovery.py`.
+  `recover_copy_behind`). Sus alérgenos, de `0006_product_allergens`, no suben esa migración: están en
+  `copy_columns.LATER_PRODUCT_FIELDS` y se leen solo si la tabla de la copia tiene su columna (`pg_attribute`), así
+  que una copia anterior devuelve sus productos sin ellos. Una migración que añada, quite o renombre una columna que
+  se lee cambia también la lectura y su `reads_since`, salvo una columna nueva que pueda faltar en la copia, que va a
+  `copy_columns`. Tests: `tests/test_recovery.py`, de punta a punta incluido, `tests/test_copy_columns.py` y el
+  contrato de `base/tenancy/tests/test_recovery.py`.
   Las apps cuyos registros de la copia cuelgan de un producto (Tarifas, Suplementos, Menús) no emparejan a su manera:
   piden a `queries.products_standing_for` (`{id allí: SKU allí}`) el producto del negocio que hace de cada uno que ya
   no está vivo aquí: el vivo con su SKU que hizo una recuperación (`base.recovery.brought_back`), la de esta pasada u
