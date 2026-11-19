@@ -35,11 +35,13 @@ class CashRegisterConfig(LiveAppConfig):
     # the drawer is a count (cash_register.count), the «moneda» or «divisa» of the business is its currency
     # (cash_register.currency), and «una entrada», «una salida» or «un movimiento» is a movement
     # (cash_register.movement). Those go as phrases: a bare «entrada» shares its stem with «entre» and «entra», and a
-    # bare «salida» is also a clock-out or a dish that left the pass.
+    # bare «salida» is also a clock-out or a dish that left the pass. «Las cajas de la» barra or tienda are the tills
+    # (cash_register.register), which Inventory's «cajas de» goods would otherwise hide.
     assistant_synonyms = (
         ("arqueo", "recuento", "conteo", "count"),
         ("divisa", "moneda", "currency"),
         ("movement", "un movimiento", "una entrada", "una salida", "otro movimiento", "otra entrada", "otra salida"),
+        ("register", "cajas de la"),
     )
     permissions = [
         "cash_register.view_session",

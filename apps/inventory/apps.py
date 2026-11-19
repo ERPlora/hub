@@ -7,6 +7,11 @@ from apps.inventory.events import FIGURE_EVENTS, PRODUCT_EVENTS
 from base.allergens import ALLERGENS
 
 VIEW = "inventory.view_product"
+#: How a quantity of goods is said in a unit: what the assistant reads as goods and as their stock.
+QUANTITIES_OF_GOODS = (
+    "kilos de", "kg de", "gramos de", "litros de", "cajas de", "sacos de",
+    "kilos of", "kg of", "grams of", "litres of", "liters of", "boxes of",
+)
 
 
 class InventoryConfig(LiveAppConfig):
@@ -40,13 +45,15 @@ class InventoryConfig(LiveAppConfig):
     choices = {"allergens": ALLERGENS}
     # What these words mean to the Hub's assistant (base.assistant.relevance.synonyms). The «unidades» are the units of measure
     # (inventory.unit), and a «albarán», the «mercancía» or what «entran» (never «entrada»: its stem is that of «entre»)
-    # is the goods inventory.stock.receive records.
+    # is the goods inventory.stock.receive records. So are «20 kilos de» or «5 cajas de» a product, which are also its
+    # stock (inventory.stock); not the bottles, cans or units a sale line or a cart counts too.
     assistant_synonyms = (
         ("unidad", "unidades", "unit", "units"),
         (
             "albaran", "mercancia", "entran", "recibir", "recibe", "recibido", "receive", "received", "goods",
-            "delivery note",
+            "delivery note", *QUANTITIES_OF_GOODS,
         ),
+        ("stock", *QUANTITIES_OF_GOODS),
     )
     permissions = [
         "inventory.view_product",

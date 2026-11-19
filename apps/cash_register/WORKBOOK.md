@@ -831,7 +831,9 @@ Los papeles llegan del SaaS con prefijo (`hub_owner`, `hub_admin`, `hub_manager`
   (`count`), «moneda» o «divisa», la del negocio (`currency`), y «una entrada», «una salida» o «un
   movimiento» (también tras «otra» u «otro»), un movimiento de caja (`movement`, F05) (`assistant_synonyms`, en
   `apps.py`). Van como frase y no como palabra suelta: «entrada» suelta comparte raíz con «entre» y «entra», y
-  «salida» suelta es también un fichaje o un plato que sale del pase. La tarjeta de
+  «salida» suelta es también un fichaje o un plato que sale del pase. «Las cajas de la» barra o tienda son sus cajas
+  (`register`): Inventario lee «cajas de» como mercancía («5 cajas de leche») y, sin la frase de Caja, «¿qué cajas
+  de la tienda hay dadas de alta?» dejaría la lista de cajas fuera de las 10 primeras. La tarjeta de
   confirmación nombra cada dato por el `title` de su esquema (`gettext_noop`, con su `es` en el catálogo:
   «Cajón» para `register_name`, «Efectivo contado», «Notas de cierre») o, si no lo tiene, por el
   `verbose_name` de su campo en el modelo; un dato sin ninguno sale con el nombre técnico y lo para

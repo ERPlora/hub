@@ -1323,6 +1323,15 @@ Lo que sigue es para quien cambia la app; quien la usa puede parar aquí.
   descendente es la ascendente leída al revés, empates incluidos, y los CSV salen en el mismo orden. Lo fijan
   `test_ties_go_by_id_in_the_lists_own_direction` y `test_an_export_settles_its_ties_the_way_the_list_does`, por lista.
 
+- **Palabras del asistente** (`assistant_synonyms`, en `apps.py`): para el Hub, «unidades» son las unidades de medida
+  (`inventory.unit`), y «albarán», «mercancía» o lo que «entran», la mercancía que recibe `inventory.stock.receive`
+  (F13). También lo es una cantidad con su unidad («20 kilos de», «5 cajas de», «10 litros de», «3 sacos de», «500
+  gramos de», y en inglés «kilos of», «boxes of»…), que además es el stock del producto (`inventory.stock`, F14 y F15):
+  «registra una entrada de 20 kilos de harina» ofrece recibir la mercancía aunque Caja lea «una entrada» como un
+  movimiento del cajón. No entran las botellas, las latas ni las unidades, que cuentan también una línea de venta o un
+  carrito, ni «kilo de» suelto, de lo que se vende a peso; y como «cajas de» lo dice también quien nombra sus cajas
+  («las cajas de la tienda»), Caja lee «cajas de la» como sus cajas. Lo comprueba `tests/test_assistant_asks.py`.
+
 - **Recuperar desde una copia aparte** (BASE-F114): `apps.py` responde a la plataforma (`recoverable_from_copy`,
   `base.recovery.Recoverable`) con tres declaraciones, por este orden, leídas de la copia por SQL sobre los nombres de los
   modelos (la copia no es un negocio y no tiene alias). Primero las categorías vivas de la copia
