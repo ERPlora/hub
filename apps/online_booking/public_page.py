@@ -1,5 +1,8 @@
 """What only the public booking page needs: whose page it is (the business's name, its logo and the privacy policy its
-form links to) and the trap field of its form, which a person never sees and a robot fills in."""
+form links to) and the trap field of its form, which a person never sees and a robot fills in. The customer's personal
+link names the same business, with the same logo."""
+
+from typing import Annotated
 
 from django.conf import settings
 from django.utils.translation import gettext_lazy as _
@@ -19,20 +22,33 @@ PRIVACY_POLICY_PATH = "/legal/privacy/"
 NOT_TAKEN = _("We could not take this booking. Try again, or call the business.")
 
 
-class PageOwnerOut(Schema):
-    business_name: str = Field(description="The business's name, as erplora.com registered it; empty in a demo.")
-    privacy_policy_url: str = Field(description="The privacy policy the booking form links to.")
-    logo_url: str = Field(description="Where the business's own address serves its logo; empty = none.")
+BusinessName = Annotated[str, Field(description="The business's name, as erplora.com registered it; empty in a demo.")]
+LogoUrl = Annotated[str, Field(description="Where the business's own address serves its logo; empty = none.")]
+
+
+class LinkOwnerOut(Schema):
+    business_name: BusinessName
+    logo_url: LogoUrl
 
     @classmethod
     def owner(cls, ctx: OperationContext, logo: str) -> dict:
-        """Whose page it is, for ``ctx``'s business: read as the platform, as nobody signed in reads the page."""
+        """Whose page or link it is, for ``ctx``'s business: read as the platform, as nobody signed in reads it."""
         business = get_operation(BUSINESS)
         return {
             "business_name": business(system_context(ctx.scope), business.input()).name,
-            "privacy_policy_url": f"{settings.SAAS_URL.rstrip('/')}{PRIVACY_POLICY_PATH}",
             "logo_url": logo_url(ctx.scope, logo),
         }
+
+
+class PageOwnerOut(Schema):
+    business_name: BusinessName
+    privacy_policy_url: str = Field(description="The privacy policy the booking form links to.")
+    logo_url: LogoUrl
+
+    @classmethod
+    def owner(cls, ctx: OperationContext, logo: str) -> dict:
+        privacy = f"{settings.SAAS_URL.rstrip('/')}{PRIVACY_POLICY_PATH}"
+        return LinkOwnerOut.owner(ctx, logo) | {"privacy_policy_url": privacy}
 
 
 class TrapIn(Schema):
