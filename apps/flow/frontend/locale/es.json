@@ -1488,6 +1488,7 @@
       "allergens": "Alérgenos",
       "allergies": "Alergias",
       "allergy": "Alergia del cliente",
+      "allergy_in_dish": "Alergia en el plato",
       "allow_card": "Admite tarjeta",
       "allow_cash": "Admite efectivo",
       "allow_customer_cancellation": "El cliente puede cancelar",

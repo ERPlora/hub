@@ -83,18 +83,28 @@ class AllergensOut(Schema):
     allergens: list[Code] = Field(description="Its allergens, by their codes, in the order of the list.")
 
 
-class AllergyInDishOut(AllergensOut):
-    allergy_in_dish: list[Code] = Field(
+AllergyInDish = Annotated[
+    list[Code],
+    Field(
         description="The allergens of the customer's allergy the dish contains, in the order of the list; none if it "
         "contains none of them or there is no allergy."
-    )
+    ),
+]
+Allergy = Annotated[
+    list[Code],
+    Field(
+        description="The customer's allergy: the allergens, by their codes and in the order of the list, the person "
+        "it is for must not eat; none if no allergy was marked."
+    ),
+]
+
+
+class AllergyInDishOut(AllergensOut):
+    allergy_in_dish: AllergyInDish
 
 
 class AllergyOut(AllergyInDishOut):
-    allergy: list[Code] = Field(
-        description="The customer's allergy: the allergens, by their codes and in the order of the list, the person "
-        "it is for must not eat; none if no allergy was marked."
-    )
+    allergy: Allergy
 
 
 class AllergensCellIn(Schema):

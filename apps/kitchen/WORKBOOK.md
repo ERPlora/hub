@@ -228,7 +228,7 @@ cierra la ventana sin guardarlo. Con la ventana como se abrió, atrás la cierra
 | KITCHEN-F28 | Retirar las rondas de una cuenta eliminada o unida a otra | hecho |
 | KITCHEN-F29 | Anular un plato ya enviado con aviso a cocina | hecho |
 | KITCHEN-F31 | Dar a Caja las comandas que siguen en marcha | hecho |
-| KITCHEN-F32 | Resaltar la alergia del cliente en la tarjeta y en el papel | no hecho |
+| KITCHEN-F32 | Resaltar la alergia del cliente en la tarjeta y en el papel | parcial |
 
 ### KITCHEN-F01 Crear una estación
 Estado: hecho
@@ -367,8 +367,9 @@ Entra: de Ventas, los suplementos elegidos con su nombre de cocina (si no tiene,
 la línea y, si la línea va invitada, el motivo.
 Sale: los suplementos y la nota congelados en el plato: cambiar el catálogo después no cambia esta
 comanda.
-Si falla: una alergia solo existe como texto de la nota: no se resalta ni se distingue de otra nota. Un
-suplemento que se cobra en una línea aparte (otro IVA) sale igual bajo su plato.
+Si falla: una alergia escrita solo en la nota sale como cualquier nota; la que el camarero marca en la línea
+sale aparte, antes de los suplementos (KITCHEN-F32). Un suplemento que se cobra en una línea aparte (otro IVA)
+sale igual bajo su plato.
 Implicados: SALE-F11, SALE-F13, SALE-F20, MODIFIER-F08, KITCHEN-F08
 
 ### KITCHEN-F08 La comanda sale en papel en cada estación
@@ -788,8 +789,9 @@ estar incompleta.»). Con Cocina apagada no hay comandas pendientes. Nunca impid
 Implicados: CASH_REGISTER-F08, CASH_REGISTER-F09, KITCHEN-F10, KITCHEN-F13
 
 ### KITCHEN-F32 Resaltar la alergia del cliente en la tarjeta y en el papel
-Estado: no hecho — la comanda todavía no recibe la alergia del cliente ni los alérgenos del plato: hoy una alergia
-llega como texto de la nota (KITCHEN-F07)
+Estado: parcial — la comanda ya recibe y guarda la alergia y los alérgenos que coinciden, la pantalla y el detalle
+los reciben y el papel imprime los renglones del plato; falta que la tarjeta pinte la marca y el bloque (hub#1738)
+y que la app del dispositivo imprima `!! ALERGIA !!` en la cabecera de la hoja (ERPlora/app#63)
 Actor: empleado
 Pantalla: Pantalla, Comandas
 Pasos:
@@ -892,7 +894,9 @@ avisos de Ventas (`sale.order.*`).
 - **Ventas** (requisito): sus cuentas y sus líneas enviadas (`Order`, `OrderLine`: ronda, hora de
   envío, producto, nombre, cantidad, nota, categoría, anulación y su motivo, estado y hora de cierre de
   la cuenta, y lo que la línea congeló al pedirse: los suplementos con su nombre de cocina, `modifiers`,
-  y el menú con su `kitchen_name` y sus platos, `combo.components`), leídas con sus modelos; el envío,
+  y el menú con su `kitchen_name` y sus platos, `combo.components`; los alérgenos del producto, `allergens`, y en
+  un menú los de cada plato, `combo.components[].allergens`, y la alergia del cliente, `allergy`), leídas con sus
+  modelos; el envío,
   por su operación `sale.order.fire`. Un plato de un menú guarda la línea del menú y su número dentro de
   él (`menu_dish`); su id sale del de la línea (`queries.dish_id`), así que la comanda por recibir y la
   guardada comparten los ids de sus platos.
@@ -919,7 +923,13 @@ avisos de Ventas (`sale.order.*`).
      fired_at IS NOT NULL` y `sale_order(closed_at)`.
 - **A Impresión**: nada nuevo; usa `kitchen_order` tal como está. Cada plato lleva además sus
   suplementos (`modifiers`, una lista) y, si es de un menú, `combo_ref` (la línea del menú) y
-  `combo_name` (su cabecera), que la impresora de la app ya pinta (KITCHEN-F06, F07).
+  `combo_name` (su cabecera), que la impresora de la app ya pinta (KITCHEN-F06, F07). Un plato con alergia
+  lleva primero en `modifiers` sus renglones (`*** ALERGIA: … ***` y, si coincide, `*** LLEVA: … ***`), con los
+  nombres en el idioma del negocio y en mayúsculas, y la hoja lleva `allergy` (`!! ALERGIA !!`, vacío si ningún
+  plato de esa hoja la tiene) para la cabecera (KITCHEN-F32).
+- **A la app del dispositivo** (ERPlora/app): que la comanda pinte en su cabecera `priority`, `allergy` y la marca
+  de copia (`duplicate`), hoy sin pintar (ERPlora/app#63), y que las mayúsculas con tilde no salgan como «?»
+  (ERPlora/app#64).
 - **A Caja** (ya hecho): avisar al cerrar de las comandas sin servir con `kitchen.ticket.board`
   (CASH_REGISTER-F08, KITCHEN-F31).
 
@@ -945,7 +955,9 @@ que no tiene ningún papel: solo el sistema (`*`).
 
 - Anatomía completa: `apps.py`, `models.py`, `migrations/` (`0001_initial`; `0002_settings_row` crea la
   fila de ajustes con la hora desde la que Cocina recibe, con reverso; `0003_ticket_printed_at`;
-  `0004_item_options_and_menu`, los suplementos y el menú de cada plato), `schemas.py`, `queries.py`,
+  `0004_item_options_and_menu`, los suplementos y el menú de cada plato; `0005_item_allergy`, la alergia y los
+  alérgenos que coinciden de cada plato), `allergy.py` (la alergia de un plato y sus renglones en el papel),
+  `schemas.py`, `queries.py`,
   `services.py`, `events.py`, `live.py`, `api.py` (28 rutas: todas las operaciones salvo `receive` y
   `sync`, que son del sistema, y las dos lecturas internas de la tarjeta del asistente), `admin.py`, `locale/`, `frontend/` y un `tests/test_<fichero>.py` por
   fichero, más `test_integration_sale.py`, `test_integration_inventory.py`, `test_integration_combo.py`,
@@ -1067,6 +1079,5 @@ que no tiene ningún papel: solo el sistema (`*`).
 - Cursos de verdad, retener y lanzar (kitchen#71): fuera del MVP («Referencia adoptada»).
 - Vaciar de golpe las comandas cobradas antes de pasar la cocina a papel (kitchen#158): hoy se sirven a
   mano (KITCHEN-F26, F27). Comportamiento nuevo, después del MVP.
-- La alergia del cliente resaltada en la tarjeta y en el papel (KITCHEN-F32, `no hecho`, con INVENTORY-F35,
-  SALE-F40 y SALE-F41): la comanda y el papel, por hub#1737, y la tarjeta, por hub#1738. Hasta entonces, una
-  alergia es solo texto de la nota (KITCHEN-F07).
+- La alergia del cliente en la tarjeta (KITCHEN-F32, `parcial`): la marca de la cabecera y el bloque del plato, por
+  hub#1738; y `!! ALERGIA !!` en la cabecera del papel, por la app del dispositivo (ERPlora/app#63).
