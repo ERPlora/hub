@@ -33,7 +33,8 @@ class PageOwnerOut(Schema):
 
 class TrapIn(Schema):
     # Out of the OpenAPI and the assistant's tools: only the page's form sends it, and a person leaves it empty.
-    website: SkipJsonSchema[str] = Field("", description="The form's hidden field: empty, or the booking is refused.")
+    # Any value, not only text: a wrong type would be refused by name, and the refusal never names this field.
+    website: SkipJsonSchema[object] = Field("", description="The form's hidden field: empty, or the booking is refused.")
 
     @model_validator(mode="after")
     def _not_a_robot(self):

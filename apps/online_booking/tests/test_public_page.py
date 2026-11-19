@@ -101,3 +101,13 @@ def test_the_trap_field_is_no_part_of_the_documented_input():
     assert "website" not in PublicBookIn.model_json_schema()["properties"]
     documented = api.get_openapi_schema()["components"]["schemas"]["PublicBookIn"]["properties"]
     assert "website" not in documented and {"service_ids", "start", "name", "phone"} <= set(documented)
+
+
+def test_a_trap_field_filled_with_something_that_is_no_text_is_refused_the_same(client, anytime):
+    salon = open_salon()
+    for filled in (5, [SPAM], {"url": SPAM}):
+        refused = door(client, "online_booking.public.book", booking_data(salon, website=filled))
+        assert refused.status_code == 422, refused.content
+        assert refused.json()["error"]["message"] == str(public_page.NOT_TAKEN)
+        assert "website" not in refused.content.decode()
+    assert not Appointment.objects.exists() and not Booking.objects.exists()
