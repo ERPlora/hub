@@ -234,11 +234,7 @@ def test_only_who_manages_the_website_publishes_it():
     assert Site.objects.get().published_version == 0
 
 
-# One site per hub (the row names its hub)
-
-
-def hub_site(slug: str) -> Site:
-    return Site.objects.get(hub_id=Hub.objects.get(slug=slug).id)
+# One site per business, in its own database
 
 
 def test_each_hub_saves_and_publishes_its_own_site(hub_b):
@@ -247,8 +243,8 @@ def test_each_hub_saves_and_publishes_its_own_site(hub_b):
     with use_hub(hub_b):
         save(full_content(hero={"title": "Bea's barber shop"}), template="bold", ctx=ctx_for(scope=B))
         assert run("website.site.publish", ctx=ctx_for(scope=B)).published_version == 1
-        b = hub_site(B.key)
-    a = hub_site(A.key)
+        b = Site.objects.get()
+    a = Site.objects.get()
     assert (a.published_content["template"], a.published_content["content"]["hero"]["title"]) == (
         "modern",
         "Fresh food every day",
@@ -260,8 +256,8 @@ def test_each_hub_saves_and_publishes_its_own_site(hub_b):
     assert (a.published_version, b.published_version) == (1, 1)
     with use_hub(hub_b):
         run("website.site.unpublish", ctx=ctx_for(scope=B))
-        b_is_live = hub_site(B.key).is_live
-    assert (hub_site(A.key).is_live, b_is_live) == (True, False)
+        b_is_live = Site.objects.get().is_live
+    assert (Site.objects.get().is_live, b_is_live) == (True, False)
 
 
 @pytest.mark.usefixtures("website_manifest")
@@ -276,34 +272,26 @@ def test_the_team_of_another_hub_never_reads_nor_changes_this_hubs_site(hub_b):
         assert "Draft only" not in run("website.site.preview", ctx=b_admin).html
         save(full_content(hero={"title": "Overwritten"}), template="bold", ctx=b_admin)
         run("website.site.unpublish", ctx=b_admin)
-    a = hub_site(A.key)
+    a = Site.objects.get()
     assert (a.template, a.content["hero"]["title"], a.published_version, a.is_live) == ("modern", "Draft only", 1, True)
     assert run("website.site.get", ctx=ctx_for(scope=A)).content.hero.title == "Draft only"
 
 
-def test_a_site_kept_for_another_hub_in_this_database_is_never_this_hubs():
-    # Each write and read asks for its own hub's row: one that names another hub, even in this business's database,
-    # is neither read nor changed.
-    theirs = Site.objects.create(
-        hub_id=uuid.uuid7(), template="bold", content=full_content(hero={"title": "Theirs"}), published_version=3, is_live=True
-    )
+def test_the_site_kept_in_the_business_database_is_its_site():
+    # The business's database holds its one site: whatever row is there is read, changed and published.
+    Site.objects.create(template="bold", content=full_content(hero={"title": "Ours"}), published_version=3, is_live=True)
     seen = run("website.site.get")
-    assert (seen.template, seen.content.hero.title, seen.published_version, seen.is_live) == ("classic", "", 0, False)
-    # Nor is its publication what this hub's visitors see.
-    assert (published_page(A), live_version(A)) == (None, 0)
-    save(full_content(hero={"title": "Ours"}), template="modern")
-    theirs.refresh_from_db()
-    assert (theirs.template, theirs.content["hero"]["title"]) == ("bold", "Theirs")
-    assert hub_site(A.key).content["hero"]["title"] == "Ours"
+    assert (seen.template, seen.content.hero.title, seen.published_version, seen.is_live) == ("bold", "Ours", 3, True)
+    save(full_content(hero={"title": "Ours again"}), template="modern")
+    assert (Site.objects.get().template, Site.objects.count()) == ("modern", 1)
 
 
-def test_an_image_kept_for_another_hub_in_this_database_is_no_upload_of_this_hub():
-    theirs = Image.objects.create(
-        hub_id=uuid.uuid7(), key="theirs/logo.png", sha256="0" * 64, content_type="image/png", width=1, height=1, size=1
+def test_an_image_kept_in_the_business_database_is_its_upload():
+    image = Image.objects.create(
+        key=image_key_of(b"ours"), sha256="0" * 64, content_type="image/png", width=1, height=1, size=1
     )
-    with pytest.raises(InvalidPayload) as refused:
-        save(full_content(topbar={"logo": {"id": str(theirs.id), "url": ""}}))
-    assert set(refused.value.fields) == {"content.topbar.logo"}
+    save(full_content(topbar={"logo": {"id": str(image.id), "url": ""}}))
+    assert Site.objects.get().content["topbar"]["logo"]["id"] == str(image.id)
 
 
 def test_taking_offline_a_site_never_saved_keeps_it_unsaved():
@@ -377,11 +365,11 @@ def test_an_upload_belongs_to_its_hub(hub_files, hub_b):
     a_image = upload(raw, ctx=ctx_for(scope=A))
     with use_hub(hub_b):
         b_image = upload(raw, ctx=ctx_for(scope=B))
-        assert Image.objects.get(id=b_image.id).hub_id == Hub.objects.get(slug=B.key).id
         # The same file on each hub: each saves it with its own upload, never the other's.
         save(full_content(hero={"cover": {"id": str(b_image.id), "url": ""}}), ctx=ctx_for(scope=B))
     assert a_image.id != b_image.id
-    assert Image.objects.get(id=a_image.id).hub_id == Hub.objects.get(slug=A.key).id
+    # Each upload is kept in its own business's database only.
+    assert Image.objects.filter(id=a_image.id).exists() and not Image.objects.filter(id=b_image.id).exists()
     with pytest.raises(InvalidPayload) as refused:
         save(full_content(hero={"cover": {"id": str(b_image.id), "url": ""}}), ctx=ctx_for(scope=A))
     assert set(refused.value.fields) == {"content.hero.cover"}
@@ -532,7 +520,7 @@ def test_one_business_full_does_not_refuse_another_ones_image(hub_files, hub_b):
         upload(raw)
     with use_hub(hub_b):
         image = upload(raw, ctx=ctx_for(scope=B))
-        assert Image.objects.get(id=image.id).hub_id == Hub.objects.get(slug=B.key).id
+        assert Image.objects.filter(id=image.id).exists()
         # And B's own space is the one that counts: its plan, exactly filled by that image, refuses one more of its
         # images (A's plan, with room to spare for it, would let it through).
         another = png_bytes(colour=(30, 200, 30))
@@ -608,7 +596,7 @@ def test_two_first_saves_at_once_leave_one_site_and_neither_fails():
     assert not isinstance(second, Exception) and second.template == "bold", second
     assert waited, "the second save did not wait for the first one's row"
     assert Site.objects.count() == 1
-    assert hub_site(A.key).template == "bold"
+    assert Site.objects.get().template == "bold"
 
 
 # A hub with its own database
@@ -734,6 +722,6 @@ def test_each_hub_keeps_its_own_reviews(google, django_capture_on_commit_callbac
     with use_hub(hub_b):
         with django_capture_on_commit_callbacks(execute=True, using=current_alias()):
             save(full_content(reviews={"place_ref": PLACE_ID}), ctx=ctx_for(scope=B))
-        assert Site.objects.get(hub_id=Hub.objects.get(slug=B.key).id).reviews_snapshot["place_id"] == PLACE_ID
+        assert Site.objects.get().reviews_snapshot["place_id"] == PLACE_ID
     assert google[0][0] == B.key
 

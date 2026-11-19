@@ -14,9 +14,9 @@
   new place (a save) or that publishes (what was kept is dropped first), never inside a transaction; the public home
   asks too when nothing is kept (:func:`refresh_reviews`). A fresh answer is kept in the site's row.
 
-Every write acts on the site of the request's hub only (``hub_id``) and locks its row first, so two editors never
-interleave a save and a publication; the first save or publication of a hub creates its row, and another one at the
-same moment waits for it rather than failing on the duplicate.
+Every write acts on the business's one site and locks its row first, so two editors never interleave a save and a
+publication; the first save or publication of a business creates its row, and another one at the same moment waits for
+it rather than failing on the duplicate.
 """
 
 import uuid
@@ -57,13 +57,13 @@ def _actor(ctx: OperationContext) -> str:
     return str(ctx.actor)[:ACTOR_MAX_LENGTH] if ctx.actor is not None else ""
 
 
-def _locked_site(hub: uuid.UUID) -> tuple[Site, bool]:
-    """``hub``'s site, locked until the COMMIT, and whether this call created it.
+def _locked_site() -> tuple[Site, bool]:
+    """The business's site, locked until the COMMIT, and whether this call created it.
 
-    ``get_or_create`` first: a first write of the hub at the same moment as this one makes its INSERT wait for the
-    other's COMMIT, and then reads the other's row instead of failing on the duplicate."""
-    _site, created = Site.objects.get_or_create(hub_id=hub)
-    return Site.objects.select_for_update().get(hub_id=hub), created
+    ``get_or_create`` first: a first write of the business at the same moment as this one makes its INSERT wait for the
+    other's COMMIT (the table takes one row), and then reads the other's row instead of failing on the duplicate."""
+    _site, created = Site.objects.get_or_create()
+    return Site.objects.select_for_update().get(), created
 
 
 def _image_refs(content: Content) -> Iterator[tuple[str, ImageRef]]:
@@ -77,9 +77,9 @@ def _image_refs(content: Content) -> Iterator[tuple[str, ImageRef]]:
 
 
 def _with_image_urls(hub: uuid.UUID, content: Content) -> Content:
-    """``content`` with each image's URL written from its upload; 422 for an image that is no upload of ``hub``."""
+    """``content`` with each image's URL written from its upload; 422 for an image that is no upload of the business."""
     refs = list(_image_refs(content))
-    keys = dict(Image.objects.filter(hub_id=hub, id__in={ref.id for _path, ref in refs}).values_list("id", "key"))
+    keys = dict(Image.objects.filter(id__in={ref.id for _path, ref in refs}).values_list("id", "key"))
     refused: dict[str, str] = {}
     for path, ref in refs:
         ref.url = image_url(hub, keys[ref.id]) if ref.id in keys else ""
@@ -101,7 +101,7 @@ NO_CHANGES = pgettext_lazy("assistant card", "No changes")
 
 
 def _save_summary(ctx: OperationContext, arguments: dict, fields: list[dict]) -> list[dict]:
-    before = draft(current_site(hub_id(ctx.scope)))
+    before = draft(current_site())
     sent = SaveIn.model_validate(arguments).model_dump(mode="json")
     by_name = {field["name"]: field for field in fields}
     parts = []
@@ -178,9 +178,8 @@ def _save_summary(ctx: OperationContext, arguments: dict, fields: list[dict]) ->
     },
 )
 def save_site(ctx: OperationContext, data: SaveIn) -> dict:
-    hub = hub_id(ctx.scope)
-    site, created = _locked_site(hub)
-    content = _with_image_urls(hub, data.content)
+    site, created = _locked_site()
+    content = _with_image_urls(hub_id(ctx.scope), data.content)
     new = {"template": data.template, "theme": data.theme.model_dump(), "content": content.model_dump(mode="json")}
     place = reviews_place(new["content"])
     if place is not None and place != reviews_place(site.content or {}):
@@ -220,10 +219,9 @@ def save_site(ctx: OperationContext, data: SaveIn) -> dict:
     },
 )
 def publish_site(ctx: OperationContext, data: NoIn) -> dict:
-    hub = hub_id(ctx.scope)
-    site, _created = _locked_site(hub)
+    site, _created = _locked_site()
     now = draft(site)
-    content = _with_image_urls(hub, Content.model_validate(now["content"]))
+    content = _with_image_urls(hub_id(ctx.scope), Content.model_validate(now["content"]))
     previous = site.published_version
     site.published_content = {
         **now,
@@ -269,8 +267,7 @@ def publish_site(ctx: OperationContext, data: NoIn) -> dict:
 )
 def unpublish_site(ctx: OperationContext, data: NoIn) -> dict:
     # A hub that never saved its site has nothing online: no row is created for it.
-    hub = hub_id(ctx.scope)
-    site = Site.objects.select_for_update().filter(hub_id=hub).first() or Site(hub_id=hub)
+    site = Site.objects.select_for_update().first() or Site()
     if site.is_live:
         site.is_live = False
         site.updated_by = _actor(ctx)
@@ -307,7 +304,7 @@ def refresh_reviews(scope: Scope, content: dict, *, again: bool = False) -> dict
     asked = reviews.cached(scope.key, ref, address) is None
     payload = reviews.load(scope.key, ref, address)
     if asked and payload is not None:
-        Site.objects.filter(hub_id=hub_id(scope)).update(reviews_snapshot=payload)
+        Site.objects.update(reviews_snapshot=payload)
     return payload
 
 
@@ -335,7 +332,6 @@ def upload_image(ctx: OperationContext, data: ImageUploadIn) -> dict:
     # duplicate inside a savepoint on the alias the row goes to (the hub's own database), never on ``default``.
     image, _created = Image.objects.get_or_create(
         key=kept.key,
-        hub_id=hub,
         defaults={
             "sha256": kept.sha256,
             "content_type": data.content_type,
