@@ -96,7 +96,9 @@
         "queued": "The label is waiting in the print queue: no printer has the «Label» function. Give it to one in Printing.",
         "error": "Could not print the barcode label: {reason}"
       },
-      "photo": "Photo"
+      "photo": "Photo",
+      "allergens": "Allergens",
+      "noAllergens": "No allergens declared"
     },
     "form": {
       "newTitle": "New product",
@@ -111,6 +113,8 @@
       "threshold": "Low stock threshold",
       "ean13": "EAN-13",
       "description": "Description",
+      "allergens": "Allergens",
+      "allergensHint": "Mark the ones it has, also inside a sauce, a batter or a side.",
       "type": "Type",
       "physical": "Physical",
       "service": "Service",
