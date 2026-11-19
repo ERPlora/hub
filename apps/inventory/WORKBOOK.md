@@ -1330,7 +1330,12 @@ Lo que sigue es para quien cambia la app; quien la usa puede parar aquí.
   «registra una entrada de 20 kilos de harina» ofrece recibir la mercancía aunque Caja lea «una entrada» como un
   movimiento del cajón. No entran las botellas, las latas ni las unidades, que cuentan también una línea de venta o un
   carrito, ni «kilo de» suelto, de lo que se vende a peso; y como «cajas de» lo dice también quien nombra sus cajas
-  («las cajas de la tienda»), Caja lee «cajas de la» como sus cajas. Lo comprueba `tests/test_assistant_asks.py`.
+  («las cajas de la tienda»), Caja lee «cajas de la» como sus cajas. Lo que se apunta como llegado es también
+  mercancía y stock: «apunta que han llegado 12 unidades de tarta» (que se lee «apunta que llegan…»), y lo mismo con
+  «apúntame», «anota» y «registra que…». Nunca «llegan» ni «llegado» sueltos, que dice también la gente que llega («han
+  llegado dos más para la mesa 7», «ya llegan los de la reserva», «ha llegado la clienta de la cita»), ni «arrived» en
+  inglés. Quien apunta que ha llegado gente («apunta que han llegado los de la reserva de Luis») ve también la
+  recepción entre las herramientas que se le ofrecen. Lo comprueba `tests/test_assistant_asks.py`.
 
 - **Recuperar desde una copia aparte** (BASE-F114): `apps.py` responde a la plataforma (`recoverable_from_copy`,
   `base.recovery.Recoverable`) con tres declaraciones, por este orden, leídas de la copia por SQL sobre los nombres de los
