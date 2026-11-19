@@ -542,6 +542,11 @@ Los avisos nunca llevan la posición ni el motivo de una corrección (datos pers
   `base/tests/test_assistant_asks.py` comprueba que cada una trae su herramienta entre las diez primeras para
   cada rol, y `tests/test_assistant_asks.py`, que las frases reales de la QA del dueño
   (`tests/e2e/qa/probes/owner-es-attendance-*.json`) llegan a la suya sin ser una de sus `asks` (hub#1099).
+  Para el Hub, «mi salida» y «mi entrada» (en inglés, «my departure», «my exit» y «my arrival») son fichar
+  (`clock`, F01) (`assistant_synonyms`, en `apps.py`): «registra mi salida» o «apunta mi entrada» traen su
+  herramienta entre las diez primeras para cada papel. Van solo detrás de «mi»: «la salida de», «su entrada» o
+  «una salida» dicen también el dinero del cajón, la mercancía que entra, una entrada de la lista de espera o lo
+  que sale del pase, y `tests/test_assistant_asks.py` falla si el grupo las nombra.
   Ninguna descripción manda confirmar antes: la tarjeta de `attendance.record.correct` es la confirmación, y
   pedirlo en la descripción hace que el asistente pregunte en el chat sin sacarla (lo guarda
   `tests/test_guardrails_assistant.py` para todo el Hub).
