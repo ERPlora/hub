@@ -246,8 +246,26 @@ check("smoke runs Playwright only through smoke-e2e.sh",
 smoke_specs = [smoke_words[index + 1] for index, word in enumerate(smoke_words[:-1]) if word == "--spec"]
 check("smoke's step is that command and its --spec, with nothing after them that could hide a red (as `|| true`)",
       smoke_words[2:] == [word for spec in smoke_specs for word in ("--spec", spec)])
+# The groups that already stop the merge, with their specs: a spec dropped from the job, or one named outside them,
+# turns this red. A group that enters adds its specs here and to the job in the same change.
+SMOKE_GROUPS = {
+    "signing in, sessions, permissions, isolation and suspension": (
+        "login-and-shell", "base-access", "base-sign-out", "base-session-revoke", "employee-permissions",
+        "two-orgs-isolated", "hub-suspended",
+    ),
+    "charging and the cash register": ("sale-pos", "sale-cash-gate", "cash-register-shift", "printing-sale"),
+}
+grouped = []
+for group, names in SMOKE_GROUPS.items():
+    specs = [f"tests/e2e/{name}.spec.ts" for name in names]
+    grouped += specs
+    missing = [spec for spec in specs if spec not in smoke_specs]
+    check(f"smoke runs every spec of the group «{group}»{': missing ' if missing else ''}" + ", ".join(missing),
+          not missing)
+ungrouped = [spec for spec in smoke_specs if spec not in grouped]
+check(f"smoke names no spec outside those groups{': ' if ungrouped else ''}" + ", ".join(ungrouped), not ungrouped)
 repo = folder.resolve().parent.parent
-unsmoked = [spec for spec in smoke_specs if not (repo / spec).is_file() or "@smoke" not in (repo / spec).read_text()]
+unsmoked =[spec for spec in smoke_specs if not (repo / spec).is_file() or "@smoke" not in (repo / spec).read_text()]
 check(f"every spec the smoke names exists and has a test tagged @smoke{': ' if unsmoked else ''}" + ", ".join(unsmoked),
       not unsmoked)
 check("smoke has a timeout of its own, in whole minutes",
