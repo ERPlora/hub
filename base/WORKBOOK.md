@@ -327,7 +327,7 @@ En la pantalla Archivos:
 | ID | Flujo | Estado |
 |---|---|---|
 | BASE-F01 | Ver lo que le falta por configurar al negocio | hecho |
-| BASE-F02 | Ver el negocio de un vistazo al entrar | hecho |
+| BASE-F02 | Ver el negocio de un vistazo al entrar | parcial |
 | BASE-F03 | Ir a configurar desde «Termina de configurar tu negocio» | hecho |
 | BASE-F04 | Ver qué pasos de la lista tiene que configurar un administrador | hecho |
 | BASE-F05 | Abrir una app desde «Mis apps» | hecho |
@@ -477,7 +477,8 @@ nuestra: por tu parte no hay nada que hacer aún. Estamos en ello.».
 Implicados: INVENTORY-F28, BASE-F24, BASE-F25, VERIFACTU-F01, TAX-F17
 
 ### BASE-F02 Ver el negocio de un vistazo al entrar
-Estado: hecho
+Estado: parcial — la fila de salud del paso 5 todavía no se pinta en el Inicio, aunque el hub ya sabe qué decir de la
+impresora de tiques; y la Bandeja de WhatsApp todavía no dice cómo está su número (hub#573)
 Actor: propietario, administrador, responsable, empleado
 Pantalla: Inicio · Resumen
 Pasos:
@@ -489,12 +490,18 @@ Pasos:
      paneles.
   4. Al cambiar el idioma de la interfaz, los nombres de «Mis apps» y los textos del checklist cambian en el
      sitio, sin recargar ni reabrir la aplicación.
-  5. Abajo, dos pestañas: «Resumen» (lo anterior) y «Actividad».
-Entra: el nombre del negocio y la fecha del dispositivo.
+  5. Para quien administra el negocio, al pie de «Resumen», una fila con cómo está lo que el negocio necesita para
+     trabajar y «Ver sistema», que lleva a Sistema. Cada app encendida que la persona puede ver dice lo suyo: con
+     Impresión, «Impresora lista» si el dispositivo que saca los tiques ha dado señales en el último minuto y medio,
+     «Impresora sin conectar» si está dado de alta pero no responde, o «Impresora sin configurar» si no hay ninguno;
+     las dos últimas con «Configurar la impresión», que abre Impresión. Quien no administra el negocio no ve la fila.
+  6. Abajo, dos pestañas: «Resumen» (lo anterior) y «Actividad».
+Entra: el nombre del negocio, la fecha del dispositivo y lo que cada app encendida dice de sí misma.
 Sale: nada guardado.
 Si falla: una zona que no carga no tumba las demás; cada una dice lo suyo. En el móvil las zonas se
-apilan y «Mis apps» se pliega.
-Implicados: ninguno
+apilan y «Mis apps» se pliega. Lo que no se pudo comprobar sale en neutro, nunca como listo y sin botón,
+porque no es tarea de quien mira: «No hemos podido comprobar la impresora».
+Implicados: PRINTING-F21
 
 ### BASE-F03 Ir a configurar desde «Termina de configurar tu negocio»
 Estado: hecho
@@ -3366,6 +3373,20 @@ Implicados: BASE-F92, BASE-F93
   (`/app/download/<windows|linux|android>/`) van en `hub-home.app_downloads` (`base/spa.py`) para cualquier sesión, y
   `lib/app-downloads.ts` las ofrece solo en un navegador. Tests: `test_home.py`, `test_queries_home.py`, `test_spa.py`,
   `SystemAppCards.test.ts` y `app-downloads.test.ts`.
+- La fila de salud del Inicio (hub#573, BASE-F02): una app declara en su `LiveAppConfig` `health`, un diccionario con
+  `operation` (una consulta suya cuya primera fila dice `state`: `ok`, `no_signal` o `not_configured`), `params`, el
+  `permission` que hace falta para verla, `route` y `action` (dónde se arregla y con qué texto) y `titles`, el texto
+  traducible de cada estado y de `unknown`. `base.E021` (`base/home_health.py`) comprueba al arrancar que la consulta
+  existe y su salida tiene `state`, que el permiso es de la app, que la ruta empieza por `/` y que hay un título por
+  estado, ni uno más. `base.health.list` (`GET /api/home/health`, en `base/api_home_health.py`, que monta
+  `config/api.py`; no es herramienta del asistente) ejecuta la consulta de cada app encendida como la persona, solo
+  para quien tiene `base.administer_hub` (para el resto, lista vacía: el Inicio la pide para todos) y solo de las apps
+  cuyo permiso tiene. Devuelve `{key, app, state, title, action, route}`; `action` y `route` solo con `no_signal` o
+  `not_configured`. Si la consulta falla o contesta un estado que no conoce, `unknown` con el título de la app y sin
+  acción, y se anota en el log. No es viva: cambia con el paso del tiempo, sin evento. Impresión la declara con
+  `printing.device.health` de los tiques, la misma lectura que tiene la tarjeta «Tu impresora». Tests:
+  `test_home_health.py`, `test_queries_health.py`, `test_api_health.py` y
+  `apps/printing/tests/test_integration_home_health.py`.
 - Apps obligatorias por país (hub#997, BASE-F01): una app declara en su `LiveAppConfig`
   `mandatory = {"countries": "all" | ["ES", …], "platform_turns_on": bool}`: dónde tiene que estar encendida y si la
   plataforma puede encenderla sola al alta (Impuestos: `"all"`, sí; VeriFactu: `["ES"]`, nunca, porque ata al negocio
@@ -4348,8 +4369,8 @@ Implicados: BASE-F92, BASE-F93
   (PLAN-SAAS §28) y lleva su flujo y su issue allí.
 - **El archivo fiscal y el borrado de un negocio con documentos (BASE-F109)**, hub#738: hasta que exista, guarda su
   base de datos y sus ficheros pasados los 90 días.
-- **La fila de salud del Inicio (BASE-F02)**, hub#573: un punto de extensión más en `LiveAppConfig` y su uso en
-  Impresión y la Bandeja de WhatsApp.
+- **La fila de salud del Inicio en pantalla (BASE-F02)**, hub#573: su lectura ya existe (`base.health.list`, con la
+  impresora de Impresión); falta pintarla en el Inicio y que la Bandeja de WhatsApp declare cómo está su número.
 - **Las notas de cada versión (BASE-F41)**, hub#576.
 - **La cola de PgBouncer de cada negocio en CloudWatch**, hub#572.
 - **Peticiones a `@erplora/ui`** que siguen abiertas: [`UI-REQUESTS.md`](UI-REQUESTS.md) (los iconos de documento de

@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:0517531e2a701294735618c73c228a6f7eb0fece13260716c9ed716e7001bc3a -->
+<!-- generated from WORKBOOK.md sha256:4912e887e41458f9ea0ab111d8c784a361d802ba4d9af9da2e513a857d5d5284 -->
 
 ## What it is for and who it is for
 
@@ -323,7 +323,7 @@ On the Employees screens and the API documentation:
 | ID | Flow | Status |
 |---|---|---|
 | BASE-F01 | See what the business still has to set up | done |
-| BASE-F02 | See the business at a glance on coming in | done |
+| BASE-F02 | See the business at a glance on coming in | partial |
 | BASE-F03 | Go and set up from "Finish setting up your business" | done |
 | BASE-F04 | See which steps of the list an administrator has to set up | done |
 | BASE-F05 | Open an app from "My apps" | done |
@@ -475,7 +475,8 @@ side to do yet. We are on it.".
 Involved: INVENTORY-F28, BASE-F24, BASE-F25, VERIFACTU-F01, TAX-F17
 
 ### BASE-F02 See the business at a glance on coming in
-Status: done
+Status: partial — the health row of step 5 is not painted on the Home yet, although the hub already knows what to
+say about the receipt printer; and the WhatsApp Inbox does not say yet how its number is doing (hub#573)
 Actor: owner, administrator, manager, employee
 Screen: Home · Summary
 Steps:
@@ -487,12 +488,19 @@ Steps:
      panels.
   4. When the interface language changes, the names in "My apps" and the checklist's texts change in place,
      without reloading or reopening the application.
-  5. At the bottom, two tabs: "Summary" (the above) and "Activity".
-In: the business's name and the device's date.
+  5. For who administers the business, at the foot of "Summary", a row with how what the business needs to work
+     is doing and "See system", which leads to System. Each app on that the person can see says its own: with
+     Printing, "Printer ready" if the device that prints the receipts gave signs in the last minute and a half,
+     "Printer not connected" if it is set up but does not answer, or "Printer not set up" if there is none; the
+     last two with "Set up printing", which opens Printing. Whoever does not administer the business does not see
+     the row.
+  6. At the bottom, two tabs: "Summary" (the above) and "Activity".
+In: the business's name, the device's date and what each app on says about itself.
 Out: nothing saved.
 If it fails: a zone that does not load does not bring the others down; each one says its own. On a phone
-the zones stack and "My apps" folds.
-Involved: none
+the zones stack and "My apps" folds. What could not be checked shows as neutral, never as ready and without a
+button, because it is not the viewer's task: "We couldn't check the printer".
+Involved: PRINTING-F21
 
 ### BASE-F03 Go and set up from "Finish setting up your business"
 Status: done
