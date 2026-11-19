@@ -2836,7 +2836,7 @@ Pasos:
      de la tienda o compras de un cliente, en cualquier estado y aunque la app esté apagada. Si guarda alguno, antes
      los escribe en el archivo fiscal, donde se guardan 6 años sin que nadie los pueda borrar: cada tabla de esos
      documentos tal como está guardada, sin rehacer nada; el PDF de cada factura tal como se entregó al cliente, en su
-     idioma o en el del negocio y con el QR de VeriFactu si la AEAT ya la registró, uno por factura; y al final una
+     idioma o en el del negocio y con el QR de VeriFactu si tiene su registro, uno por factura; y al final una
      lista que cuenta las filas y los PDF y lleva la huella de cada fichero, que solo se escribe cuando todos se han
      vuelto a leer iguales. Lo hace una vez por baja, y si un registro de VeriFactu aún espera la respuesta de la AEAT,
      espera a que llegue. Después se detiene: el negocio sigue eliminado, con su base de datos, y lo vuelve a mirar al

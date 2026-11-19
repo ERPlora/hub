@@ -60,22 +60,19 @@ def pages(documents: dict[str, tuple[str, bytes]], printed: dict[bytes, str]) ->
     return {name: (called, printed[content]) for name, (called, content) in documents.items()}
 
 
-@pytest.mark.parametrize(
-    ("aeat", "with_qr"),
-    [("accepted", True), ("accepted_with_errors", True), ("rejected", False), ("pending", False)],
-)
-def test_each_invoice_is_kept_as_the_pdf_of_its_a4_with_its_qr_once_the_aeat_registered_it(
-    issuer, printer, aeat, with_qr
+@pytest.mark.parametrize("aeat", ["accepted", "accepted_with_errors", "rejected", "pending"])
+def test_each_invoice_is_kept_as_the_pdf_of_its_a4_with_the_qr_of_its_record_whatever_the_aeat_answered(
+    issuer, printer, aeat
 ):
     invoice = manual()
     Record.objects.filter(invoice_id=invoice.id).update(status=aeat)
 
     documents = kept()
 
-    assert pages(documents, printer) == {f"{invoice.id}.pdf": (invoice.number, page(invoice, qr=with_qr))}
+    assert pages(documents, printer) == {f"{invoice.id}.pdf": (invoice.number, page(invoice, qr=True))}
     assert documents[f"{invoice.id}.pdf"][1].startswith(b"%PDF-")
     assert page(invoice, qr=True) != page(invoice, qr=False)
-    assert ("QR tributario" in printer[documents[f"{invoice.id}.pdf"][1]]) is with_qr
+    assert "QR tributario" in printer[documents[f"{invoice.id}.pdf"][1]]
 
 
 def test_without_verifactu_an_invoice_is_kept_without_a_qr(issuer, printer, monkeypatch):
@@ -87,7 +84,10 @@ def test_without_verifactu_an_invoice_is_kept_without_a_qr(issuer, printer, monk
         invoice = manual()
     assert not Record.objects.exists()
 
-    assert pages(kept(), printer) == {f"{invoice.id}.pdf": (invoice.number, page(invoice))}
+    documents = kept()
+
+    assert pages(documents, printer) == {f"{invoice.id}.pdf": (invoice.number, page(invoice))}
+    assert "QR tributario" not in printer[documents[f"{invoice.id}.pdf"][1]]
 
 
 def test_an_invoice_is_printed_in_its_own_language_else_in_the_business_one(issuer, printer):
@@ -96,9 +96,9 @@ def test_an_invoice_is_printed_in_its_own_language_else_in_the_business_one(issu
 
     in_english, in_spanish = pages(kept("en"), printer), pages(kept("es"), printer)
 
-    assert in_english[f"{own.id}.pdf"][1] == page(own, language="es") != page(own, language="en")
-    assert in_english[f"{plain.id}.pdf"][1] == page(plain, language="en")
-    assert in_spanish[f"{plain.id}.pdf"][1] == page(plain, language="es")
+    assert in_english[f"{own.id}.pdf"][1] == page(own, language="es", qr=True) != page(own, language="en", qr=True)
+    assert in_english[f"{plain.id}.pdf"][1] == page(plain, language="en", qr=True)
+    assert in_spanish[f"{plain.id}.pdf"][1] == page(plain, language="es", qr=True)
 
 
 def test_every_invoice_is_kept_in_the_order_it_was_issued_read_a_page_at_a_time(issuer, monkeypatch):

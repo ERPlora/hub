@@ -413,9 +413,31 @@ def test_the_lease_is_renewed_after_each_file_of_the_archive(
     run_pass()
 
     _, manifest = manifest_of(moto_s3, fiscal_archive_bucket, hub)
-    assert renewed == [hub.pk] * (len(manifest["files"]) + len(manifest["documents"]) + 1)
+    # After each file and its manifest, and once for the page that lists the folder of the leaving.
+    assert renewed == [hub.pk] * (len(manifest["files"]) + len(manifest["documents"]) + 2)
     # Each file is read back as soon as it is up, before the lease is renewed for it: never all of them at the end.
-    assert read == list(range(len(renewed)))
+    assert len(read) == len(renewed) - 1
+    assert read == sorted(set(read))
+
+
+def test_the_lease_is_renewed_after_each_page_of_the_pdfs_already_up(
+    business, dumps_bucket, fiscal_archive_bucket, moto_s3, monkeypatch
+):
+    hub = business(left_days_ago=91)
+    with use_hub(hub):
+        invoice(1)
+    from base import services
+
+    monkeypatch.setattr("apps.invoice.pdf.render_pdf", lambda html: b"%PDF-")
+    monkeypatch.setattr(fiscal_archive, "LISTED_AT_ONCE", 1)
+    renewed, renew = [], services.reset.renew_lease
+    monkeypatch.setattr(services.reset, "renew_lease", lambda hub_id, lease: renewed.append(hub_id) or renew(hub_id, lease))
+
+    run_pass()
+
+    _, manifest = manifest_of(moto_s3, fiscal_archive_bucket, hub)
+    # Listed one key a page: one page for each table's file already up, besides each file and the manifest.
+    assert len(renewed) == 2 * len(manifest["files"]) + len(manifest["documents"]) + 1
 
 
 def stopped_after_its_first_pdf(hub, endpoint: str, monkeypatch) -> list[str]:
@@ -460,8 +482,9 @@ def test_a_stopped_archive_takes_up_the_pdfs_already_up_and_prints_none_twice(
     _, manifest = manifest_of(moto_s3, fiscal_archive_bucket, hub)
     pdfs = [key for key in puts if key.endswith(".pdf")]
     assert len(pdfs) == len(set(pdfs)) == len(printed) == 2
-    # The lease is renewed after each file of the attempt, also after the PDF it found already up.
-    assert len(renewed) == len(manifest["files"]) + len(manifest["documents"]) + 1
+    # The lease is renewed after each file of the attempt, also after the PDF it found already up, and once for the
+    # page that lists the folder.
+    assert len(renewed) == len(manifest["files"]) + len(manifest["documents"]) + 2
     assert [entry["key"] for entry in manifest["documents"]] == pdfs
     assert manifest["documents"][0]["key"] == first
     for entry in manifest["documents"]:

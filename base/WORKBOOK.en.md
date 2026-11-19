@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:59b6fd9bda83bb806ae11f6f5b149f564a76178a78f3d97efabccbbc4565f3fd -->
+<!-- generated from WORKBOOK.md sha256:b27b2097977aa0112978ba2855d02d442bf281d0c392627b9442ac50e14972b1 -->
 
 ## What it is for and who it is for
 
@@ -2823,7 +2823,7 @@ Steps:
      orders or a customer's purchases, in any status and even with the app turned off. If it keeps any, it first
      writes them to the fiscal archive, where they are kept for 6 years and nobody can delete them: each table of
      those documents as it is stored, with nothing rebuilt; the PDF of each invoice as it was handed to the customer,
-     in its own language or the business's and with the VeriFactu QR if the AEAT already registered it, one per
+     in its own language or the business's and with the VeriFactu QR if it has its record, one per
      invoice; and last a list that counts the rows and the PDFs and carries the fingerprint of each file, written only
      once every file has been read back the same. It does so once per deletion, and if a VeriFactu record still awaits
      the AEAT's answer, it waits for it. Then it stops: the business stays deleted, with its database, and is checked

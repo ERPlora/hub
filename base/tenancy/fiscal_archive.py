@@ -14,7 +14,7 @@ is what takes long. A key is never written twice (a key written again would be o
 that none be there yet, and carries its SHA-256, which S3 checks and Object Lock requires.
 
 Each file is read back (its size and checksum, as S3 keeps them) against what was written as soon as it is up, and the
-worker's lease is renewed after each; only once every one is, the manifest goes up and is read back too. An archive
+worker's lease is renewed after each, as after each page of the folder's listing; only once every one is, the manifest goes up and is read back too. An archive
 without its manifest is not one: what fails or stops halfway leaves its files where they are (nobody can delete them)
 and the next attempt starts a new prefix.
 
@@ -45,6 +45,8 @@ from base.tenancy.context import HUB_SCOPE_KIND, use_hub
 
 #: What the manifest says it is, should its shape ever change.
 FORMAT = "erplora-fiscal-archive/1"
+#: How many keys of a leaving's folder S3 lists at once (its most).
+LISTED_AT_ONCE = 1000
 #: The largest file of one model's rows; a larger table goes in parts. One part is held in memory at a time.
 PART_BYTES = 8 * 1024 * 1024
 #: The time in an archive's prefix: UTC, to the second.
@@ -222,9 +224,15 @@ class _Archive:
         return {"key": key, "bytes": head["ContentLength"], "sha256": base64.b64decode(kept).hex()}
 
     def _listed(self) -> set[str]:
-        """Every key already in the folder of this leaving."""
-        pages = self.s3.get_paginator("list_objects_v2").paginate(Bucket=self.target, Prefix=f"{self.folder}/")
-        return {item["Key"] for page in pages for item in page.get("Contents", [])}
+        """Every key already in the folder of this leaving, the lease renewed after each page of them."""
+        pages = self.s3.get_paginator("list_objects_v2").paginate(
+            Bucket=self.target, Prefix=f"{self.folder}/", PaginationConfig={"PageSize": LISTED_AT_ONCE}
+        )
+        up: set[str] = set()
+        for page in pages:
+            up.update(item["Key"] for item in page.get("Contents", []))
+            self.heartbeat()
+        return up
 
     def _going_on(self) -> None:
         if self.cancelled is not None and self.cancelled():
