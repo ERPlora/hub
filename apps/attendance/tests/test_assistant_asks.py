@@ -202,16 +202,21 @@ def test_clocking_said_in_english_brings_its_tool_by_time_clocks_group(catalog_o
 
 
 #: «Entrada» and «salida» said of anything but a person's own clocking: goods received, the drawer's money, a place in
-#: the waiting list, what left the kitchen's pass. «La salida de» and «su entrada» say those too.
+#: the waiting list, what left the kitchen's pass. «La salida de», «su entrada» and «una salida» say those too, and so
+#: do «arrival», «departure» and «exit» in English without «my».
 OTHER_EXITS = [
     "registra la entrada de mercancía del albarán de hoy",
     "registra su entrada de mercancía",
     "apúntame una entrada de 50 € en el turno",
     "registra la salida de 20 € de la caja",
+    "registra una salida de 15 € para hielo en el turno",
     "abre su entrada en la lista de espera",
     "abre la entrada de Ana en la lista de espera",
     "la comanda y su salida del pase",
     "la 12 ya ha salido del pase",
+    "the bank transfer has arrived",
+    "the departure of table 12's order from the pass",
+    "log the exit of 20 € from the drawer",
 ]
 
 
