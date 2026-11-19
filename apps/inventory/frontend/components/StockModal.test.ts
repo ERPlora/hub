@@ -6,7 +6,7 @@
 //     is missing;
 //   - «Write-off — <product>»: the quantity and its reason (waste, breakage, own consumption).
 // Quantities in the product's unit and its step; a refusal stays in the dialog under its field.
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 
 import {
   expectAmountLeftWaitsForMoney,
@@ -17,8 +17,6 @@ import type { Business } from '../../../../base/frontend/operations/business';
 import { business, errorFrame, flush, mountInventory, ok, POLISH, product, refusal, subId, UNITS } from '../__tests__/mount-inventory';
 import StockModal from './StockModal.vue';
 import { typeText } from '../__tests__/ionic-controls';
-
-vi.mock('@ionic/vue', async (importOriginal) => (await import('../../../../base/frontend/__tests__/modal')).mockIonicModal(importOriginal));
 
 afterEach(() => {
   document.body.innerHTML = '';

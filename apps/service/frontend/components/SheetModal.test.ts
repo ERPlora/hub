@@ -1,15 +1,10 @@
 // The sheet a voucher's lists open over the packages table (Sold vouchers, Movements, Vouchers with no
 // customer): its title and what it shows, its rows, «Close», and «Load more» with «Showing {shown} of
 // {total}» while there are more.
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import { click, mountService, settle } from '../__tests__/mount-service';
 import SheetModal from './SheetModal.vue';
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
 
 async function setup(props: Record<string, unknown> = {}, locale: 'en' | 'es' = 'en') {
   const m = await mountService(SheetModal, {

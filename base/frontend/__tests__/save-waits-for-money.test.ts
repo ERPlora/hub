@@ -11,18 +11,13 @@
 // all along.
 import { FormModal } from '@erplora/ui/components';
 import { IonButton } from '@ionic/vue';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import { defineComponent, h, nextTick, ref, shallowRef, watch } from 'vue';
 
 import BusinessMoneyError from '../components/BusinessMoneyError.vue';
 import { useBusinessMoney, useBusinessMoneyRead } from '../lib/money';
 import { flush, mountBase } from './mount-base';
 import { expectSaveWaitsForMoney, expectSaysMoneyUnreadable, moneyReadOf } from './save-waits-for-money';
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
 
 type Control = HTMLElement & { disabled?: boolean; errorText?: string };
 

@@ -7,11 +7,6 @@ import { h, ref } from 'vue';
 import { click, mountSale, settle } from '../../__tests__/mount-sale';
 import ParkSheet from './ParkSheet.vue';
 
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
-
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ['Date'] });
   vi.setSystemTime(new Date(2026, 9, 14, 13, 7));

@@ -12,18 +12,8 @@ import { click, EMPLOYEE, ionValue, mountSale } from '../../__tests__/mount-sale
 import type { SaleRow } from '../../operations';
 import VoidSaleModal from './VoidSaleModal.vue';
 
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  const { modalControllerStub } = await import('../../__tests__/approval-dialog');
-  const ionic = await importOriginal<typeof import('@ionic/vue')>();
-  return { ...ionic, IonModal: IonModalStub, modalController: modalControllerStub(ionic.modalController) };
-});
-vi.mock('@erplora/ui/shell', async (importOriginal) => ({
-  ...((await importOriginal()) as object),
-  toastSuccess: vi.fn(),
-}));
+vi.mock('@ionic/vue', async (importOriginal) => (await import('../../__tests__/approval-dialog')).ionicWithApprovalDialog(importOriginal));
 beforeEach(() => {
-  vi.mocked(toastSuccess).mockClear();
   approvalDialog.reset();
 });
 

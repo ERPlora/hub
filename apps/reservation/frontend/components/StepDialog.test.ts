@@ -1,16 +1,11 @@
 // The steps that ask first (RESERVATION-F09, F10, F20; the market: a confirmation naming whose booking
 // and when): «Cancel reservation» with an optional reason, «Mark no-show» and «Delete for good». A
 // refusal stays in the dialog; done, it closes and says which reservation changed.
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import { click, ionValue, mountReservation, settle } from '../__tests__/mount-reservation';
 import { reservationRow } from '../__tests__/rows';
 import StepDialog from './StepDialog.vue';
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
 
 async function setup(kind: 'cancel' | 'no_show' | 'delete', locale: 'en' | 'es' = 'en', row = reservationRow()) {
   const m = await mountReservation(StepDialog, { props: { open: false, kind, reservation: row }, locale });

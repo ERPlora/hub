@@ -1,7 +1,7 @@
 // «Note on <item>» (SALE-F13): the quick-note chips, the box (up to 255 characters, «e.g. medium rare…»)
 // with what the line already says, «The kitchen reads this note on the ticket.», «Remove» and «Save».
 // Saving trims the text; an empty note removes it. A refusal is read in the sheet.
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { h, ref } from 'vue';
 
 import { AllergenSelect } from '@erplora/ui/components';
@@ -9,11 +9,6 @@ import { AllergenSelect } from '@erplora/ui/components';
 import { click, mountSale, settle } from '../../__tests__/mount-sale';
 import LineNoteSheet from './LineNoteSheet.vue';
 import QuickNoteChips from './QuickNoteChips.vue';
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
 
 async function setup(props: Record<string, unknown> = {}, locale: 'en' | 'es' = 'en') {
   const open = ref(true);

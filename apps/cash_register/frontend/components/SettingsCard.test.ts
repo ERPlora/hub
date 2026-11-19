@@ -4,16 +4,10 @@
 // that fails shows no values (never the factory ones as if they were the business's). Whoever may not
 // change them sees them blocked, without «Save».
 import { toastSuccess } from '@erplora/ui/shell';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import { click, errorFrame, flush, ionToggle, ionValue, mountCash } from '../__tests__/mount-cash-register';
 import SettingsCard from './SettingsCard.vue';
-
-vi.mock('@erplora/ui/shell', async (importOriginal) => ({
-  ...((await importOriginal()) as object),
-  toastSuccess: vi.fn(),
-}));
-beforeEach(() => vi.mocked(toastSuccess).mockClear());
 
 const OP = 'cash_register.settings.get';
 const prop = (el: Element | null, name: string): unknown => (el as unknown as Record<string, unknown>)[name];

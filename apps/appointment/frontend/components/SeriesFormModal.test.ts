@@ -4,18 +4,13 @@
 // repeating appointment» applies from a date on, says how many booked appointments it reaches and how
 // many charged ones it leaves alone, and «Save from this occurrence on» sends only what changed.
 import { Combo } from '@erplora/ui/components';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import { itTellsTheCorrectedFieldApart } from '../../../../base/frontend/__tests__/same-words-refusal';
 import CustomerSearch from '../../../customer/frontend/components/CustomerSearch.vue';
 import type { RecurringOut } from '../operations';
 import { click, ionValue, mountAppointment, page, settle } from '../__tests__/mount-appointment';
 import SeriesFormModal from './SeriesFormModal.vue';
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
 
 type Control = HTMLElement & { label?: string; value?: unknown; disabled?: boolean };
 

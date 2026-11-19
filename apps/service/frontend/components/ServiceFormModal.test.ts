@@ -17,11 +17,6 @@ import { business, click, ionValue, JAPANESE, type MountOptions, mountService, p
 import ServiceFormModal from './ServiceFormModal.vue';
 import ServiceProfessionals from './ServiceProfessionals.vue';
 
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
-
 type Control = HTMLElement & { label?: string; value?: unknown; errorText?: string; disabled?: boolean };
 
 const CUT: ServiceOut = {

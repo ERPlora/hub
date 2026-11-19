@@ -1,16 +1,11 @@
 // APPOINTMENT-F05 «Cancelar una cita»: a confirmation (the market: Fresha, Timely, Phorest, Mangomint)
 // naming whose appointment and when, with an optional reason that stays in its history; «Cancel the
 // appointment» cancels it, «Keep it» leaves it. A refusal stays in the dialog.
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import type { AppointmentRow } from '../operations';
 import { click, ionValue, mountAppointment, settle } from '../__tests__/mount-appointment';
 import CancelDialog from './CancelDialog.vue';
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
 
 const ROW = {
   id: 'a1',

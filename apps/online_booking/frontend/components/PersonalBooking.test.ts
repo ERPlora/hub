@@ -12,8 +12,6 @@ import { PUBLIC_DOOR } from '../lib/door';
 import type { PublicBookingOut } from '../operations';
 import PersonalBooking from './PersonalBooking.vue';
 
-vi.mock('@ionic/vue', async (importOriginal) => (await import('../../../../base/frontend/__tests__/modal')).mockIonicModal(importOriginal));
-
 const TOKEN = 't'.repeat(43);
 const VISITOR: SessionMe = { user: null, permissions: [], menu: [], apps: [], language: 'en' };
 const SEEN: PublicBookingOut = {

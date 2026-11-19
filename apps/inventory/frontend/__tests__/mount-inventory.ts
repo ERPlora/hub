@@ -1,6 +1,5 @@
 // Test helper of the inventory's pages and components: `mountInShell` with its catalogues over base's, the dashboard,
-// its people and the hub's business; the API's answers and the catalogue's rows its tests share. Tests that open a
-// dialog mock `@ionic/vue`'s IonModal with `IonModalStub` (an overlay only presents itself in a real browser).
+// its people and the hub's business; the API's answers and the catalogue's rows its tests share.
 import type { SessionMe } from '@erplora/ui/shell';
 import { ApiError, type LiveClient, type OpName } from '@erplora/ui/sdk';
 import type { Component, Ref } from 'vue';

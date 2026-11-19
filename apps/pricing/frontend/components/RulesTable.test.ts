@@ -3,7 +3,7 @@
 // Status —, «Search code or name…», column filters, 50 a page by name. Whoever manages gets «+», Edit,
 // Deactivate (asking first) and Activate.
 import { DataTable, EmptyState } from '@erplora/ui/components';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import type { Component } from 'vue';
 
 import type { Business } from '../../../../base/frontend/operations/business';
@@ -12,11 +12,6 @@ import { click, EMPLOYEE, flush, mountPricing, type MountOptions, page, settle }
 import { itRetriesAFailedLoad, itStartsOnTheActiveOnes } from '../__tests__/table-checks';
 import RuleFormModal from './RuleFormModal.vue';
 import RulesTable from './RulesTable.vue';
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
 
 const OP = 'pricing.rule.list';
 const TEN = rule();

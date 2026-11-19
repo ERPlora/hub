@@ -3,7 +3,7 @@
 // «Search category…», by order and name. «New category» (whoever may add) and a row (whoever may edit)
 // open the form; Delete asks first, saying how many services will be left without a category.
 import { ConfirmDialog, DataTable, EmptyState } from '@erplora/ui/components';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import type { Component } from 'vue';
 
 import type { CategoryOut } from '../operations';
@@ -11,11 +11,6 @@ import { EMPLOYEE, flush, MANAGER, type MountOptions, mountService, page } from 
 import CategoryFormModal from '../components/CategoryFormModal.vue';
 import CategoriesPage from './CategoriesPage.vue';
 import { listFillProblems } from '../../../../frontend/testing/list-fill';
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
 
 const OP = 'service.category.list';
 const category = (id: string, over: Partial<CategoryOut> = {}): CategoryOut => ({

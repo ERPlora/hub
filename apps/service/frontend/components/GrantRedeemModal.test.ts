@@ -5,7 +5,7 @@
 // Spend sends `service.grant.redeem` with the voucher, the service, the professional and the note, and closes; a refusal
 // stays in the dialog. Something chosen or typed asks before any way out throws it away (hub#1023).
 import { Combo } from '@erplora/ui/components';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import { unsavedChangesIn } from '../../../../base/frontend/lib/system-back';
 import { click, flush, ionValue, mountService, settle } from '../__tests__/mount-service';
@@ -13,8 +13,6 @@ import { grant } from '../__tests__/grant';
 import { pkg } from '../__tests__/package';
 import type { GrantOut, PackageOut, RedeemCheckOut } from '../operations';
 import GrantRedeemModal from './GrantRedeemModal.vue';
-
-vi.mock('@ionic/vue', async (importOriginal) => (await import('../../../../base/frontend/__tests__/ion-modal-stub')).ionicWithModalStub(importOriginal));
 
 const CHECK = '/api/service/grants/redeem_check';
 const REDEEM = '/api/service/grants/redeem';

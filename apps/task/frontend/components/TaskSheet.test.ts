@@ -11,11 +11,6 @@ import { task } from '../__tests__/task';
 import TaskFormModal from './TaskFormModal.vue';
 import TaskSheet from './TaskSheet.vue';
 
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
-
 type Control = HTMLElement & { value?: unknown; disabled?: boolean; label?: string };
 
 const DETAIL = 'task.task.detail';

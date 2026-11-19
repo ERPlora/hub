@@ -5,17 +5,12 @@
 // and sending it again uses the same key (never twice).
 import { formatDateTime } from '@erplora/ui/components';
 import { applySurface } from '@erplora/ui/shell';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import { click, EMPLOYEE, flush, followUpgrade, ionValue, mountInbox, settle, SIGNED } from '../__tests__/mount-inbox';
 import type { ChannelOut, ConversationDetailOut } from '../operations';
 import MessageComposer from './MessageComposer.vue';
 import TemplateSendModal from './TemplateSendModal.vue';
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
 
 const NOW = new Date('2026-10-15T10:00:00Z');
 

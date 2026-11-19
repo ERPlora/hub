@@ -18,13 +18,8 @@ vi.mock('@erplora/ui/components', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@erplora/ui/components')>()),
   useConfirm: () => ({ confirm: mocks.confirm }),
 }));
-vi.mock('@erplora/ui/shell', async (importOriginal) => ({
-  ...((await importOriginal()) as object),
-  toastSuccess: vi.fn(),
-}));
 beforeEach(() => {
   mocks.confirm.mockReset();
-  vi.mocked(toastSuccess).mockClear();
 });
 
 const CONFIG: ConfigOut = { ...STARTING_CONFIG, production_open: true };

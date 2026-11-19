@@ -16,11 +16,6 @@ import CourseForm from '../components/CourseForm.vue';
 import type { ComboDetailOut, GroupOut } from '../operations';
 import MenuBuilderPage from './MenuBuilderPage.vue';
 
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
-
 const OP = 'combo.combo.get';
 
 const course = (id: string, name: string, sort_order: number): GroupOut => ({

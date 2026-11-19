@@ -1,16 +1,11 @@
 // «Details» of a check (WORKBOOK «Sesiones»; TABLE-F22): zone, server, status, guests, opened, closed, time,
 // charged, customer and notes, in the business's hours; a parked one says it has no table.
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import { mountTable, settle } from '../__tests__/mount-table';
 import { charged, NOW, sessionRow, SETTINGS } from '../__tests__/tables';
 import type { SessionOut } from '../operations';
 import SessionDetailModal from './SessionDetailModal.vue';
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
 
 async function detail(session: SessionOut, locale: 'en' | 'es' = 'en') {
   const m = await mountTable(SessionDetailModal, { props: { open: true, session, settings: SETTINGS, now: NOW }, locale });

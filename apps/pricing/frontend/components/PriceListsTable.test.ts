@@ -3,7 +3,7 @@
 // Status —, «Search code or name…», column filters, 50 a page by name. A row and its «Open» open the list;
 // whoever manages gets «+», Edit, Make general, Deactivate and Activate, each where it applies.
 import { DataTable, EmptyState } from '@erplora/ui/components';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import type { Component } from 'vue';
 
 import type { Business } from '../../../../base/frontend/operations/business';
@@ -13,11 +13,6 @@ import { itRetriesAFailedLoad, itStartsOnTheActiveOnes } from '../__tests__/tabl
 import ListConfirm from './ListConfirm.vue';
 import PriceListFormModal from './PriceListFormModal.vue';
 import PriceListsTable from './PriceListsTable.vue';
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
 
 const OP = 'pricing.price_list.list';
 const GENERAL = priceList({ id: 'l0', code: 'GEN', name: 'General', customer_group_id: null, customer_group_name: null, is_default: true, item_count: 5 });

@@ -4,7 +4,7 @@
 // no customer» for whoever may see them. A row offers Edit, Movements, Sold vouchers and Delete (with
 // its confirmation); in the deleted view only Movements and Sold vouchers, and the row opens the sales.
 import { ConfirmDialog, DataTable, EmptyState } from '@erplora/ui/components';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import type { Component } from 'vue';
 
 import { askToDelete, confirmDeletion } from '../../../../base/frontend/__tests__/table-delete';
@@ -16,11 +16,6 @@ import OrphansSheet from '../components/OrphansSheet.vue';
 import PackageFormModal from '../components/PackageFormModal.vue';
 import PackagesPage from './PackagesPage.vue';
 import { listFillProblems } from '../../../../frontend/testing/list-fill';
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
 
 const OP = 'service.package.list';
 const ROWS = [

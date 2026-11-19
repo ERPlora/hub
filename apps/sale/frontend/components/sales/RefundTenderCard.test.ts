@@ -2,18 +2,13 @@
 // «Already refunded» (when something was) and «Refundable», the server's figures; «Refund amount» to
 // edit what goes back on it (euros as typed); and, when the money cannot go back its own way, why, and
 // «Give it back through» to choose another method (searched on the server).
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import { ionValue, mountSale } from '../../__tests__/mount-sale';
 import { plain } from '../../lib/format';
 import type { TenderOption } from '../../operations';
 import PaymentMethodPicker from './PaymentMethodPicker.vue';
 import RefundTenderCard from './RefundTenderCard.vue';
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
 
 const prop = (el: Element, name: string): unknown => (el as unknown as Record<string, unknown>)[name];
 

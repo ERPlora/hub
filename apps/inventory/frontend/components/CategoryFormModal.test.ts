@@ -4,15 +4,10 @@
 // show — description, icon, colour, order — is left as it is); a refusal stays in the dialog with each
 // message under its field; «Cancel editing» leaves the category as it was.
 import { Combo, type ComboOption } from '@erplora/ui/components';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 
 import { category, flush, mountInventory, ok, refusal, TAX_CATEGORIES } from '../__tests__/mount-inventory';
 import CategoryFormModal from './CategoryFormModal.vue';
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
 
 afterEach(() => {
   document.body.innerHTML = '';

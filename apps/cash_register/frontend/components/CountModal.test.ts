@@ -4,22 +4,12 @@
 // «Register count» sends only the boxes counted (the server adds them up) and says «Count recorded ·
 // total counted …»; a closing count tells the page, which opens the close with it.
 import { toastSuccess } from '@erplora/ui/shell';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { click, ionValue, mountCash, settle } from '../__tests__/mount-cash-register';
 import { itReadsAmountsAsTheHub } from '../__tests__/money-field';
 import { plain } from '../lib/money';
 import CountModal from './CountModal.vue';
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
-vi.mock('@erplora/ui/shell', async (importOriginal) => ({
-  ...((await importOriginal()) as object),
-  toastSuccess: vi.fn(),
-}));
-beforeEach(() => vi.mocked(toastSuccess).mockClear());
 
 const prop = (el: Element | null, name: string): unknown => (el as unknown as Record<string, unknown>)[name];
 const SESSION = { id: 's1', number: 'S-261014-0001' };

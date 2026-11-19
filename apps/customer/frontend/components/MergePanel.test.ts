@@ -10,17 +10,8 @@ import { flush, json, type MountOptions, mountCustomer, refusal, sent } from '..
 import CustomerPicker from './CustomerPicker.vue';
 import MergePanel from './MergePanel.vue';
 
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { modalControllerStub } = await import('../__tests__/approval-dialog');
-  const ionic = await importOriginal<typeof import('@ionic/vue')>();
-  return { ...ionic, modalController: modalControllerStub(ionic.modalController) };
-});
-vi.mock('@erplora/ui/shell', async (importOriginal) => ({
-  ...((await importOriginal()) as object),
-  toastSuccess: vi.fn(),
-}));
+vi.mock('@ionic/vue', async (importOriginal) => (await import('../__tests__/approval-dialog')).ionicWithApprovalDialog(importOriginal));
 beforeEach(() => {
-  vi.mocked(toastSuccess).mockClear();
   approvalDialog.reset();
 });
 

@@ -2,7 +2,7 @@
 // and its dishes (the supplement with its sign), nothing picked to begin with, a course of one that swaps, a full
 // course that answers, and a button that names the course still short («Elige 1 en «Segundos»») until each
 // required course is complete, then sums the total live. It hands the dishes up; Menus prices them.
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import type { AllergenCode } from '@erplora/ui/components';
 import type { SaleComboOut } from '../../../../combo/frontend/operations';
@@ -10,11 +10,6 @@ import { click, mountSale, settle } from '../../__tests__/mount-sale';
 import { plain } from '../../lib/format';
 import { product, refused } from './__tests__/fixtures';
 import ComboSheet from './ComboSheet.vue';
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
 
 const dish = (id: string, name: string, price_delta = 0) => ({ id, product_id: `p-${id}`, product_name: name, sku: '', price_delta });
 

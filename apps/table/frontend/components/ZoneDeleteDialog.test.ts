@@ -1,17 +1,12 @@
 // «Delete zone?» (WORKBOOK «Zonas»; TABLE-F06): «N tables in this zone. A zone with tables cannot be
 // deleted: move or delete its tables first.», always said; with tables, «Delete zone» is off. Deleting
 // tells the page (`deleted`); a refusal stays in the dialog.
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import { click, mountTable, settle } from '../__tests__/mount-table';
 import { zoneRow } from '../__tests__/tables';
 import type { ZoneOut } from '../operations';
 import ZoneDeleteDialog from './ZoneDeleteDialog.vue';
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
 
 async function dialog(zone: ZoneOut, answers: Record<string, [number, unknown]> = {}, locale: 'en' | 'es' = 'en') {
   const m = await mountTable(ZoneDeleteDialog, { props: { open: true, zone, testid: 'zones-delete' }, answers, locale });

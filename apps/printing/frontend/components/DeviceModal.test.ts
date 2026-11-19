@@ -2,22 +2,12 @@
 // one check each. «Save» sets up the device the page runs on (or saves the one being edited) and says so; what is
 // missing is said before anything is sent, and a refusal is said at its field, in the server's words.
 import { toastSuccess } from '@erplora/ui/shell';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import { refusedWithTheSameWords, SAME_WORDS, SAME_WORDS_ES } from '../../../../base/frontend/__tests__/same-words-refusal';
 import { click, ionToggle, ionValue, mountPrinting } from '../__tests__/mount-printing';
 import type { DeviceOut, PrinterOut } from '../operations';
 import DeviceModal from './DeviceModal.vue';
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
-vi.mock('@erplora/ui/shell', async (importOriginal) => ({
-  ...((await importOriginal()) as object),
-  toastSuccess: vi.fn(),
-}));
-beforeEach(() => vi.mocked(toastSuccess).mockClear());
 
 const prop = (el: Element | null, name: string): unknown => (el as unknown as Record<string, unknown>)[name];
 

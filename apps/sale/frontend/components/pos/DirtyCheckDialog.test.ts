@@ -1,15 +1,10 @@
 // «You have a check in progress» (SALE-F17 step 4): before resuming another check while this one has
 // lines — «Park it and open», «Delete it and open» (only for whoever may void) or «Cancel».
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { h, ref } from 'vue';
 
 import { click, mountSale, settle } from '../../__tests__/mount-sale';
 import DirtyCheckDialog from './DirtyCheckDialog.vue';
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
 
 async function setup(props: Record<string, unknown> = {}, locale: 'en' | 'es' = 'en') {
   const open = ref(true);

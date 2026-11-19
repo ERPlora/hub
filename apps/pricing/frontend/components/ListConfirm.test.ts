@@ -2,16 +2,11 @@
 // it will apply to every customer and that the current one stops being general; «Deactivate {name}?» says
 // it stops applying to new sales and keeps its prices. Confirming runs the command and closes; a refusal
 // stays in the dialog.
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import { priceList } from '../__tests__/fixtures';
 import { click, mountPricing, settle } from '../__tests__/mount-pricing';
 import ListConfirm from './ListConfirm.vue';
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
 
 async function setup(action: 'default' | 'deactivate', locale: 'en' | 'es' = 'en') {
   const m = await mountPricing(ListConfirm, { props: { list: priceList({ customer_group_id: null }), action: null }, locale });

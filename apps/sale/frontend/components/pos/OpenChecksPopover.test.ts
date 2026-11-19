@@ -12,11 +12,7 @@ import OpenChecksPopover from './OpenChecksPopover.vue';
 
 const OP = 'sale.order.list';
 
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { modalControllerStub } = await import('../../__tests__/approval-dialog');
-  const ionic = await importOriginal<typeof import('@ionic/vue')>();
-  return { ...ionic, modalController: modalControllerStub(ionic.modalController) };
-});
+vi.mock('@ionic/vue', async (importOriginal) => (await import('../../__tests__/approval-dialog')).ionicWithApprovalDialog(importOriginal));
 beforeEach(() => {
   approvalDialog.reset();
 });

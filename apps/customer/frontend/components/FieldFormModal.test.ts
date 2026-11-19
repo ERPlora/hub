@@ -3,7 +3,7 @@
 // «Active». The server's refusals go under their field: a name taken, a select without options, a
 // type that cannot change once cards have values.
 import { toastSuccess } from '@erplora/ui/shell';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { defineComponent, h, ref } from 'vue';
 
 import { approvalDialog, approvalSettled, asksApproval } from '../__tests__/approval-dialog';
@@ -11,22 +11,9 @@ import { flush, json, mountCustomer, refusal, sent } from '../__tests__/mount-cu
 import type { FieldRow } from '../operations';
 import FieldFormModal from './FieldFormModal.vue';
 
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  const { modalControllerStub } = await import('../__tests__/approval-dialog');
-  const ionic = await importOriginal<typeof import('@ionic/vue')>();
-  return { ...ionic, IonModal: IonModalStub, modalController: modalControllerStub(ionic.modalController) };
-});
-vi.mock('@erplora/ui/shell', async (importOriginal) => ({
-  ...((await importOriginal()) as object),
-  toastSuccess: vi.fn(),
-}));
+vi.mock('@ionic/vue', async (importOriginal) => (await import('../__tests__/approval-dialog')).ionicWithApprovalDialog(importOriginal));
 beforeEach(() => {
-  vi.mocked(toastSuccess).mockClear();
   approvalDialog.reset();
-});
-afterEach(() => {
-  document.body.innerHTML = '';
 });
 
 const DYE: FieldRow = { id: 'f1', name: 'Dye', field_type: 'select', options: ['Blonde', 'Brown'], is_required: true, sort_order: 3, is_active: true };

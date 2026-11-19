@@ -4,7 +4,7 @@
 // what changed (an emptied tax category gives the dish's back). A supplement that is not an amount is
 // never sent; the server's refusals go under their field.
 import { Combo } from '@erplora/ui/components';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import { itTellsTheCorrectedFieldApart } from '../../../../base/frontend/__tests__/same-words-refusal';
 import type { Business } from '../../../../base/frontend/operations/business';
@@ -12,11 +12,6 @@ import type { GroupOut, OptionOut } from '../operations';
 import { expectSaveWaitsForMoney, expectWindowSaysMoneyUnreadable } from '../../../../base/frontend/__tests__/save-waits-for-money';
 import { business, click, ionChecked, ionValue, JAPANESE, KUWAITI, mountModifier, POLISH, settle } from '../__tests__/mount-modifier';
 import OptionFormModal from './OptionFormModal.vue';
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
 
 type Control = HTMLElement & { label?: string; value?: unknown; checked?: boolean; errorText?: string; helperText?: string; disabled?: boolean };
 

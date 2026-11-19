@@ -3,7 +3,7 @@
 // appointments — every one of them, in windows of 100 —, the agenda's rows, the blocks and the bookings
 // to confirm; a tapped slot books there, an appointment opens its panel, a drag moves it, and the row
 // actions run. An employee sees her own agenda, and is told when her account has no staff record.
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import type { AppointmentRow, LanesOut, SettingsOut } from '../operations';
 import { AppPage } from '@erplora/ui/shell';
@@ -18,11 +18,6 @@ import WeekBoard from '../components/WeekBoard.vue';
 import AgendaPage from './AgendaPage.vue';
 import { listFillProblems } from '../../../../frontend/testing/list-fill';
 import { errorFrame } from '../../../../packages/ui/src/sdk/__tests__/live-harness';
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
 
 const LIST = 'appointment.appointment.list';
 const SETTINGS: SettingsOut = {

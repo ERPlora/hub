@@ -3,16 +3,11 @@
 // currency (the server gives the business's one: the old module sent a literal EUR). A session
 // another cart has (409) or an email that is not one (422) goes under its field, and what was typed stays
 // (the old form-error-in-panel: the refusal travels with the form, never under it).
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import { itTellsTheCorrectedFieldApart } from '../../../../base/frontend/__tests__/same-words-refusal';
 import { click, ionValue, mountCartCheckout, settle } from '../__tests__/mount-cart-checkout';
 import CartFormModal from './CartFormModal.vue';
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
 
 type Control = HTMLElement & { label?: string; value?: unknown; errorText?: string; disabled?: boolean; placeholder?: string };
 

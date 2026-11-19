@@ -6,17 +6,12 @@
 // A class that charges no tax pins the rate to 0 % and says why; the server's refusals (an overlap
 // on «Valid from», a 422 per field) stay in the dialog under their field, with what was typed kept.
 import { Combo, type ComboOption } from '@erplora/ui/components';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import { itTellsTheCorrectedFieldApart } from '../../../../base/frontend/__tests__/same-words-refusal';
 import type { CategoryRowOut, RuleOut } from '../operations';
 import { click, ionValue, mountTax, settle } from '../__tests__/mount-tax';
 import RuleCreateModal from './RuleCreateModal.vue';
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
 
 type Control = HTMLElement & {
   label?: string;
