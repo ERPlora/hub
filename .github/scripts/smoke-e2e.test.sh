@@ -89,7 +89,12 @@ expect "nor choose another commit" 1 "$(calls "REF=$head ")"
 smoke NIGHTLY_DIR="$root/stack" NIGHTLY_HUB_PORT=20790
 expect "a worker moves it to its own folder and ports" 1 "$(calls "DIR=$root/stack PORT=20790")"
 
-for arguments in "--spec tests/e2e/sale-pos.spec.ts" "--grep ." "--publish"; do
+smoke -- --spec tests/e2e/login-and-shell.spec.ts --spec tests/e2e/two-orgs-isolated.spec.ts
+expect "--spec narrows it to those specs' @smoke tests" 1 \
+  "$(calls 'night args=--no-publish --spec tests/e2e/login-and-shell.spec.ts --spec tests/e2e/two-orgs-isolated.spec.ts GREP=@smoke ')"
+expect "and a narrowed smoke still ends green (0)" 0 "$status"
+
+for arguments in "--spec" "--spec --publish" "--spec tests/e2e/sale-pos.spec.ts --publish" "--grep ." "--publish"; do
   # shellcheck disable=SC2086 # the words of $arguments are the script's arguments
   smoke -- $arguments
   expect "the arguments '$arguments' are refused (2)" 2 "$status"
