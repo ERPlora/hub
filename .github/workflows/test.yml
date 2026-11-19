@@ -92,19 +92,20 @@ jobs:
           sudo apt-get install -y --no-install-recommends postgresql-client-18
           echo "/usr/lib/postgresql/18/bin" >> "$GITHUB_PATH"
       # apps/verifactu/tests/test_producer.py checks the producer's constants against the signed declaration
-      # the SaaS publishes, and fails in CI without it: ERPlora/saas is public, so its public/declaracion is
-      # fetched next to the Hub (../saas), as in the erplora-next tree. No token.
+      # the SaaS publishes, and fails in CI without it: its public/declaracion is fetched next to the Hub
+      # (../saas), as in the erplora-next tree. Every clone goes through clone-repo.sh, as the job's read-only
+      # token and with retries: GitHub refuses anonymous clones from its runners at times.
       - name: The SaaS's signed declaration
-        run: |
-          git clone --quiet --depth 1 --filter=blob:none --sparse https://github.com/ERPlora/saas.git ../saas
-          git -C ../saas sparse-checkout set public/declaracion
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash .github/scripts/clone-repo.sh ERPlora/saas ../saas public/declaracion
       # The seeds' images must be in the shared image library's manifest (base/tests/test_seed_images.py), and the
-      # templates load them from it: ERPlora/blueprints is public, so its img/ is fetched beside the Hub
-      # (../blueprints), where config/settings/web.py looks for it without a bucket (CATALOG_DIR). No token.
+      # templates load them from it: its img/ is fetched beside the Hub (../blueprints), where config/settings/web.py
+      # looks for it without a bucket (CATALOG_DIR).
       - name: The shared image library
-        run: |
-          git clone --quiet --depth 1 --filter=blob:none --sparse https://github.com/ERPlora/blueprints.git ../blueprints
-          git -C ../blueprints sparse-checkout set img
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash .github/scripts/clone-repo.sh ERPlora/blueprints ../blueprints img
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
           enable-cache: true
@@ -208,10 +209,11 @@ jobs:
       # goes through erplora.com), the shared image library in ../blueprints and compose.yaml's Postgres in .., which
       # the specs reach with `docker compose exec`. Each checkout gets the .env of a new one.
       - name: The SaaS, the image library and Postgres beside the Hub
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          git clone --quiet --depth 1 https://github.com/ERPlora/saas.git ../saas
-          git clone --quiet --depth 1 --filter=blob:none --sparse https://github.com/ERPlora/blueprints.git ../blueprints
-          git -C ../blueprints sparse-checkout set img
+          bash .github/scripts/clone-repo.sh ERPlora/saas ../saas
+          bash .github/scripts/clone-repo.sh ERPlora/blueprints ../blueprints img
           cp .env.example .env
           cp ../saas/.env.example ../saas/.env
           cat > ../compose.yaml <<'YAML'
