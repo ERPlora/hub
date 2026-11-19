@@ -5,7 +5,7 @@
 // paints it. It is the public booking page itself when that page gives it base's public door (`PUBLIC_DOOR`: the
 // calls, the money and the customer's words); without it, the team's preview on the dev server (routes.ts; WORKBOOK
 // «Vista previa de la reserva»), through the session.
-import { InlineFeedback, useRefusal } from '@erplora/ui/components';
+import { EmptyState, InlineFeedback, useRefusal } from '@erplora/ui/components';
 import { ApiError, useLiveClient } from '@erplora/ui/sdk';
 import { AppPage } from '@erplora/ui/shell';
 import { IonButton, IonCheckbox, IonInput, IonSelect, IonSelectOption, IonSpinner, IonTextarea } from '@ionic/vue';
@@ -200,7 +200,11 @@ const text = (value: unknown): string => (value === null || value === undefined 
       data-testid="ob-preview"
     >
       <h2>{{ heading }}</h2>
-      <p class="ob-preview__help">
+      <p
+        v-if="!door || !servicesLoaded || services.length > 0"
+        class="ob-preview__help"
+        data-testid="ob-preview-intro"
+      >
         {{ intro }}
       </p>
       <InlineFeedback
@@ -253,13 +257,12 @@ const text = (value: unknown): string => (value === null || value === undefined 
             {{ service.name }}
             <small v-if="priceAndLength(service)">{{ priceAndLength(service) }}</small>
           </ion-checkbox>
-          <p
+          <EmptyState
             v-if="servicesLoaded && !services.length"
             data-testid="ob-preview-no-services"
-            class="ob-preview__help"
-          >
-            {{ noServices }}
-          </p>
+            icon="ion:calendar-outline"
+            :message="noServices"
+          />
 
           <template v-if="!door || services.length">
             <ion-select

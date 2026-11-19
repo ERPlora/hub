@@ -139,8 +139,8 @@
       "intro": "Elige tus servicios, un día y una hora libre, y deja tu nombre y tu móvil.",
       "noServices": "Este negocio no tiene nada para reservar online ahora mismo.",
       "logoAlt": "Logo de {business}",
-      "businessFallback": "Este negocio",
-      "privacy": "{business} usará tus datos para gestionar esta reserva y ERPlora los tratará por su cuenta. Lee la",
+      "businessFallback": "este negocio",
+      "privacy": "{business} usará tus datos para gestionar esta reserva, y ERPlora los tratará por encargo de {business}. Lee la",
       "privacyLink": "política de privacidad",
       "website": "Sitio web"
     }

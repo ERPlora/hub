@@ -2,7 +2,6 @@
 import { IonButton, IonSpinner } from '@ionic/vue';
 import { openExternalLink } from '@erplora/ui/shell';
 import { computed, useId } from 'vue';
-import './booking-flow.css';
 
 import { useT } from '../composables/useT';
 
@@ -70,3 +69,37 @@ function typed(event: Event): void {
     </ion-button>
   </div>
 </template>
+
+<style scoped>
+.ob-public-submit {
+  display: grid;
+  gap: 12px;
+}
+.ob-public-submit__privacy {
+  margin: 0;
+  color: var(--ep-text-muted);
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+.ob-public-submit__privacy a {
+  color: var(--ion-color-primary);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.ob-public-submit__trap {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.ob-public-submit__button {
+  justify-self: start;
+}
+@media (max-width: 576px) {
+  .ob-public-submit__button {
+    width: 100%;
+  }
+}
+</style>

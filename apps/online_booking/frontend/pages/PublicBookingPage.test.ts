@@ -21,7 +21,7 @@ const PAGE: PageOut = {
   title: 'Salón Lucía',
   welcome_message: 'Book your next visit',
   primary_color: '#6366f1',
-  logo_url: 'https://example.com/salon-lucia.png',
+  logo_url: '/media/salon-lucia.png',
   require_email: false,
   allow_staff_selection: true,
   allow_notes: false,
@@ -152,9 +152,17 @@ describe('PublicBookingPage', () => {
     door();
     const s = await open();
     expect(s.el('business-name')?.textContent).toContain('Salón Lucía');
-    expect(s.el('business-logo')?.getAttribute('src')).toBe('https://example.com/salon-lucia.png');
+    expect(s.el('business-logo')?.getAttribute('src')).toBe('/media/salon-lucia.png');
     expect(s.el('business-logo')?.getAttribute('alt')).toBe('Salón Lucía logo');
     expect(s.el('page')?.getAttribute('style')).toContain('--ob-accent: #6366f1');
+  });
+
+  it('shows the business name without an img when the configured logo is external', async () => {
+    door({ ...ANSWERS, 'online_booking.public.page': [200, { ...PAGE, logo_url: 'https://example.com/salon-lucia.png' }] });
+    const s = await open();
+    expect(s.el('business-logo')).toBeNull();
+    expect(s.el('business-name')?.textContent).toBe('Salón Lucía');
+    expect(s.el('title')?.textContent).toBe('Salón Lucía');
   });
 
   it('writes the prices in the money the page’s HTML carries: złoty in a business in Poland', async () => {
@@ -177,7 +185,7 @@ describe('PublicBookingPage', () => {
   it('puts the privacy notice and its link beside Book, and keeps the trap out of reach', async () => {
     door();
     const s = await open();
-    expect(s.el('privacy')?.textContent).toContain('Salón Lucía will use your details to manage this booking');
+    expect(s.el('privacy')?.textContent).toContain('Your details will be used by Salón Lucía to manage this booking');
     const link = s.el('privacy')?.querySelector('a');
     expect(link?.getAttribute('href')).toBe('https://erplora.com/legal/privacy/');
     expect(link?.getAttribute('target')).toBe('_blank');
@@ -201,6 +209,8 @@ describe('PublicBookingPage', () => {
     door({ ...ANSWERS, 'online_booking.public.services': [200, page([], 0, 100)] });
     const s = await open();
     expect(s.el('no-services')?.textContent).toContain('This business has nothing to book online right now.');
+    expect(s.el('no-services')?.classList.contains('empty-state')).toBe(true);
+    expect(s.el('intro')).toBeNull();
     expect(s.text()).not.toContain('Settings');
     for (const field of ['staff', 'day', 'name', 'phone', 'email', 'book']) expect(s.el(field)).toBeNull();
   });

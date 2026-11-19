@@ -2,7 +2,6 @@
 import { InlineFeedback } from '@erplora/ui/components';
 import { IonButton } from '@ionic/vue';
 import { computed } from 'vue';
-import './booking-flow.css';
 
 import { dayOf, formatDay, formatTime, timeOf } from '../../../appointment/frontend/lib/clock';
 import { useLocale, useT } from '../composables/useT';
@@ -89,3 +88,14 @@ const cancelUntil = computed(() => {
     </p>
   </div>
 </template>
+
+<style scoped>
+.ob-result__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.ob-result__token {
+  overflow-wrap: anywhere;
+}
+</style>

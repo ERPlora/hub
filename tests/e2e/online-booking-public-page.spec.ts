@@ -77,6 +77,14 @@ FLOW_VIEWPORTS.forEach((vp, index) => {
       await expect(page.locator('[data-testid=ob-preview-trap-input]')).toHaveAttribute('tabindex', '-1');
       await expect(page.locator('[data-testid=ob-preview-trap-input]')).toHaveAttribute('autocomplete', 'off');
       await shoot('form');
+      await post(owner, '/online_booking/settings', { logo_url: 'https://www.python.org/static/img/python-logo.png' }, 200);
+      await page.goto(PAGE);
+      await expect(page.locator('[data-testid=ob-preview-title]')).toBeVisible();
+      await expect(page.locator('[data-testid=ob-preview-business-logo]')).toHaveCount(0);
+      await shoot('external-logo');
+      await post(owner, '/online_booking/settings', { logo_url: `${A}/static/base/img/logo.png` }, 200);
+      await page.goto(PAGE);
+      await expect(page.locator('[data-testid=ob-preview-business-logo]')).toBeVisible();
       // A customer is no member of the team: no side menu, and no button to open one.
       await expect(page.locator('ion-menu-button')).toBeHidden();
       await page.locator(`[data-testid=ob-preview-service-${who.service.id}]`).click();
@@ -115,6 +123,8 @@ FLOW_VIEWPORTS.forEach((vp, index) => {
         psql(`update service_service set allow_online_booking = false where id in (${online})`);
         await page.goto(PAGE);
         await expect(page.locator('[data-testid=ob-preview-no-services]')).toHaveText('Este negocio no tiene nada para reservar online ahora mismo.');
+        await expect(page.locator('[data-testid=ob-preview-no-services]')).toHaveClass(/empty-state/);
+        await expect(flow(page)).not.toContainText('Elige tus servicios, un día y una hora libre');
         await expect(page.locator('[data-testid=ob-preview-name]')).toHaveCount(0);
         await expect(page.locator('[data-testid=ob-preview-phone]')).toHaveCount(0);
         await expect(page.locator('[data-testid=ob-preview-book]')).toHaveCount(0);

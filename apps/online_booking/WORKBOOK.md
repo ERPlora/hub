@@ -89,13 +89,14 @@ Al guardar: «Configuración guardada.»; un rechazo sale debajo de su campo («
 
 ### Página de reservas (la clienta, sin sesión)
 Página `/p/<negocio>/book` en la dirección del negocio: la abre cualquiera, sin iniciar sesión ni ver nada del equipo
-(sin su menú). Arriba, el nombre del negocio, su logo y su color, «Reserva online» y «Elige tus servicios, un día y
-una hora libre, y deja tu nombre y tu móvil.»; debajo, el título y el mensaje de bienvenida de los Ajustes y el
-recorrido: servicios con su precio y su duración, profesional o «Sin preferencia», día, horas libres, nombre, móvil,
-email, nota y **Reservar**. Junto a **Reservar**, el aviso de quién usa sus datos y el enlace a la política de
-privacidad. Si no hay nada que reservar online, solo sale el aviso, sin el formulario. Al reservar, el número de la
-cita, el mensaje de confirmación, **Ver mi reserva**, **Cancelar la reserva** y **Reservar otra**. Con la dirección de
-otro negocio, o la de este en la de otro, no hay página.
+(sin su menú). Arriba, el nombre del negocio y su color; el logo aparece si su dirección es del propio origen y,
+si es externa, se queda el nombre sin imagen. También «Reserva online» y «Elige tus servicios, un día y una hora
+libre, y deja tu nombre y tu móvil.»; debajo, el título y el mensaje de bienvenida de los Ajustes y el recorrido:
+servicios con su precio y su duración, profesional o «Sin preferencia», día, horas libres, nombre, móvil, email,
+nota y **Reservar**. Junto a **Reservar**, el aviso de quién usa sus datos y el enlace a la política de privacidad.
+Si no hay nada que reservar online, solo sale el aviso, sin la invitación ni el formulario. Al reservar, el número
+de la cita, el mensaje de confirmación, **Ver mi reserva**, **Cancelar la reserva** y **Reservar otra**. Con la
+dirección de otro negocio, o la de este en la de otro, no hay página.
 
 ### Vista previa de la reserva (solo en desarrollo)
 Página `/online_booking/preview`, solo en el servidor de desarrollo: el mismo recorrido que la página de reservas
@@ -119,7 +120,7 @@ Fechas y horas salen en el reloj del negocio y con el formato del idioma de quie
 
 | ID | Flujo | Estado |
 |---|---|---|
-| ONLINE_BOOKING-F01 | La clienta reserva desde la página de reservas | hecho |
+| ONLINE_BOOKING-F01 | La clienta reserva desde la página de reservas | parcial — Ajustes aún no permite subir el logo al propio negocio |
 | ONLINE_BOOKING-F02 | Confirmar una reserva | hecho |
 | ONLINE_BOOKING-F03 | Completar una reserva | hecho |
 | ONLINE_BOOKING-F04 | Marcar que no se presentó | hecho |
@@ -133,11 +134,12 @@ Fechas y horas salen en el reloj del negocio y con el formato del idioma de quie
 | ONLINE_BOOKING-F12 | Borrar los datos de una clienta (RGPD) | hecho |
 
 ### ONLINE_BOOKING-F01 La clienta reserva desde la página de reservas
-Estado: hecho
+Estado: parcial — Ajustes aún no permite subir el logo al propio negocio
 Actor: clienta (sin sesión); propietario o administrador, con la vista previa o con el asistente
 Pantalla: página de reservas (`/p/<negocio>/book`); en desarrollo, también la vista previa
 Pasos:
-1. Abre la página del negocio: su nombre, título, mensaje de bienvenida, logo y color de los Ajustes.
+1. Abre la página del negocio: su nombre, título, mensaje de bienvenida y color; también el logo de los Ajustes si
+   su dirección es del propio origen (una dirección externa no crea una imagen y queda el nombre).
 2. Elige uno o varios servicios (hasta 5) de los **reservables online**, con su precio (en la moneda del negocio,
    la de su país —BASE-F50: «20,00 zł» en Polonia—, agrupado desde cuatro cifras: «1.234,56 €») y su duración si
    Servicios los enseña («Mostrar precios», «Mostrar duración»).
@@ -515,6 +517,8 @@ Cómo las expone la plataforma (la puerta pública `/p/` de `base`):
 
 ## Lo que queda fuera
 
+- **Subir el logo desde Ajustes**: hoy solo se guarda una URL externa y la página no la carga; falta guardar la imagen
+  en el propio negocio para que la clienta la vea.
 - **La página del enlace personal** (`/p/<slug>/book/<token>`): la clienta ve y cancela su reserva justo después
   de reservar, en la misma página, pero su enlace aún no abre una página propia.
 - **Verificar el móvil con un código (SMS o WhatsApp)**: falta un canal de envío; hasta entonces, cualquiera
