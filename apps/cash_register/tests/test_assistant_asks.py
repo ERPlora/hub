@@ -147,8 +147,8 @@ def test_money_coming_in_or_going_out_in_the_hubs_words_brings_the_movement_amon
     assert_offered_with_room(catalog_of(OWNER, "es"), name, phrase, room=TOP)
 
 
-#: A movement of the drawer said as a business says it, «una entrada», «una salida» or «un movimiento» of an amount, with
-#: or without the shift it goes in, by «apunta», «anota» or «mete». The tool's asks say neither «entrada» nor
+#: A movement of the drawer said as a business says it, «una entrada», «una salida» or «un movimiento» of an amount,
+#: with or without the shift it goes in, by «apunta», «anota» or «mete». The tool's asks say neither «entrada» nor
 #: «movimiento», so without the group none of these is among the first ten: shift and staff settings came first.
 MOVEMENT_SAID = [
     ("cash_register.movement.add", "apúntame una entrada de 50 € de cambio en el turno", "una entrada"),
@@ -195,8 +195,8 @@ def test_the_hub_reads_una_entrada_una_salida_or_un_movimiento_as_a_movement_and
         ],
     )
     own = apps.get_app_config("cash_register").assistant_synonyms
-    named = {phrase for phrase in OTHER_ENTRIES if any(movement in concept for concept in shared.asked([phrase], own).concepts)}
-    assert named == set()
+    named = [said for said in OTHER_ENTRIES if any(movement in one for one in shared.asked([said], own).concepts)]
+    assert named == []
 
 
 #: What makes the model answer in the chat and wait, so the card of a write never comes (hub#1105, hub#1138): a

@@ -33,9 +33,9 @@ class CashRegisterConfig(LiveAppConfig):
     default_auto_field = "django.db.models.BigAutoField"
     # What these words mean to the Hub's assistant (base.assistant.relevance.synonyms). An «arqueo», a «recuento» or a «conteo» of
     # the drawer is a count (cash_register.count), the «moneda» or «divisa» of the business is its currency
-    # (cash_register.currency), and «una entrada», «una salida» or «un movimiento» is a movement (cash_register.movement).
-    # Those go as phrases: a bare «entrada» shares its stem with «entre» and «entra», and a bare «salida» is also a
-    # clock-out or a dish that left the pass.
+    # (cash_register.currency), and «una entrada», «una salida» or «un movimiento» is a movement
+    # (cash_register.movement). Those go as phrases: a bare «entrada» shares its stem with «entre» and «entra», and a
+    # bare «salida» is also a clock-out or a dish that left the pass.
     assistant_synonyms = (
         ("arqueo", "recuento", "conteo", "count"),
         ("divisa", "moneda", "currency"),
