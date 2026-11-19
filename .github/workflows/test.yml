@@ -259,6 +259,10 @@ jobs:
           --spec tests/e2e/service-catalog.spec.ts
           --spec tests/e2e/service-vouchers.spec.ts
           --spec tests/e2e/sale-voucher.spec.ts
+          --spec tests/e2e/base-sign-up-taxes-on.spec.ts
+          --spec tests/e2e/base-app-activation.spec.ts
+          --spec tests/e2e/demo.spec.ts
+          --spec tests/e2e/two-tabs-live.spec.ts
       # The run's log, both runservers' logs and Playwright's output (each failed test's trace and screenshot).
       - if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
