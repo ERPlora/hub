@@ -105,7 +105,7 @@ def hubs_pass(monkeypatch) -> list[dt.datetime]:
     for the pace of control's steps, due on every tick (``base.control_pace``; ``test_control_pace.py``)."""
     passes: list[dt.datetime] = []
     monkeypatch.setattr(worker.hub_visits, "HubVisits", lambda ear: SimpleNamespace(serve=lambda now, look: passes.append(now), close=lambda: None))
-    every = SimpleNamespace(due=lambda now: True, moves_due=lambda now: True, ran=lambda now, worked: None, moved=lambda now, started: None)
+    every = SimpleNamespace(due=lambda now: True, moves_due=lambda now: True, ran=lambda now, worked: None, moved=lambda now, started: None, telling=lambda piece: piece)
     monkeypatch.setattr(worker.control_pace, "Ear", lambda: None)
     monkeypatch.setattr(worker.control_pace, "ControlPace", lambda ear: every)
     return passes

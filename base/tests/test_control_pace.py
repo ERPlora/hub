@@ -396,3 +396,79 @@ def test_a_business_turning_on_an_app_its_database_lacks_tells_the_worker(ear, h
 
     assert answer.state == "creating"
     assert soon(ear.rung)
+
+
+# ── A slow pass takes one hub at a time: the next one does not wait for the look ──────────────────────────────────
+
+
+def asked_after_the_second_tick(queue: list[str], *asked: str):
+    """After the second tick the staff asks for ``asked``, each an operation of the platform: its notice."""
+
+    def between(tick: int) -> bool:
+        if tick != 2:
+            return False
+        queue.extend(asked)
+        notify(control_pace.CHANNEL)
+        return True
+
+    return between
+
+
+def test_the_second_of_two_moves_asked_is_taken_at_the_tick_after_the_first_ended(at_rest, monkeypatch):
+    """``move.run_due`` moves one hub a pass (a copy takes a while): the one asked after it starts at the next tick,
+    as it did when the moves' pass started on every tick, not at the moves' look ten minutes later."""
+    queue, moved = [], []
+    monkeypatch.setattr(worker.move, "run_due", lambda now, cancelled=None: 1 if queue and not moved.append((queue.pop(0), now)) else 0)
+
+    run_the_worker(A_MINUTE, Counter(), between=asked_after_the_second_tick(queue, "first", "second"))
+
+    assert moved == [("first", A_MINUTE[2]), ("second", A_MINUTE[3])]
+
+
+def test_the_second_of_two_resets_asked_is_taken_at_the_tick_after_the_first_ended(at_rest, monkeypatch):
+    """The data pass takes one hub at a time (its copy takes a while): the next one due starts at the next tick, not
+    at the look a minute later."""
+    queue, taken = [], []
+
+    def claim(now, lease):
+        if queue:
+            taken.append((queue.pop(0), now))
+        return taken[-1][0] if taken and taken[-1][1] == now else None
+
+    monkeypatch.setattr(services.offboarding, "claim_next_data_hub", claim)
+    monkeypatch.setattr(services.provisioning, "registry_row", lambda hub_id: None)
+    monkeypatch.setattr(services.provisioning, "release_hub", lambda hub_id, now: None)
+
+    run_the_worker(A_MINUTE[:6], Counter(), between=asked_after_the_second_tick(queue, "first", "second"))
+
+    assert taken == [("first", A_MINUTE[2]), ("second", A_MINUTE[3])]
+
+
+def test_a_moves_pass_that_failed_starts_again_at_the_next_tick(at_rest, monkeypatch):
+    queue, passes = [], []
+
+    def run_due(now, cancelled=None):
+        passes.append(now)
+        if queue:
+            raise RuntimeError(f"the database went away during the {queue.pop()} move")
+        return 0
+
+    monkeypatch.setattr(worker.move, "run_due", run_due)
+
+    run_the_worker(A_MINUTE, Counter(), between=asked_after_the_second_tick(queue, "first"))
+
+    # Then it rests: nothing was left to move.
+    assert passes == [START, A_MINUTE[2], A_MINUTE[3]]
+
+
+def test_a_slow_pass_that_raises_tells_the_pace_too(db):
+    pace = control_pace.ControlPace(Deaf())
+    pace.ran(START, worked=False)
+
+    with pytest.raises(ZeroDivisionError):
+        pace.telling(lambda: 1 / 0)()
+
+    assert pace.due(START + TICK) and pace.moves_due(START + TICK)
+    pace.ran(START + TICK, worked=False)
+    pace.telling(lambda: False)()  # it found nothing to work on
+    assert not pace.due(START + 2 * TICK)

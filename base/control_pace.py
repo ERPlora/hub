@@ -10,13 +10,15 @@ on the tick when one of these says so:
 - the next time control keeps came: a hub due in ``hub_due`` then, or free then from another worker's lease, or a move
   asked for its night (``base.queries.due_work.next_on_control``, read at the end of each pass);
 - the last pass worked: what did not fit in its time budget is taken at the next tick;
+- a slow pass in a thread of its own (the data work, the moves) ended having worked or failed: each takes one hub at a
+  time, so the next one waiting starts at the next tick (:meth:`ControlPace.telling`);
 - ``LOOK_SECONDS`` passed since the last pass: what a notice lost, or the LISTEN down, did not say;
 - or this process never ran one.
 
 The moves' pass (a hub moved to another cluster, a restore, a separate copy, a recovery, and the drop of the copies they
 left after their days) starts in a pass only when it was asked (that pass's notice, or a move's night came), when the
-last one could not start because one still ran, or ``MOVES_LOOK_SECONDS`` after it last started: nobody waits on the
-rest of it.
+last one could not start because one still ran or ended having worked (one move, one restore a pass), or
+``MOVES_LOOK_SECONDS`` after it last started: nobody waits on the rest of it.
 
 Between two passes nothing is sent to control's database. The worker hears its channel on its one LISTEN, the one its
 visits hear the businesses' channels on (:class:`Ear`, over ``base.hub_listener.Listener``).
@@ -24,7 +26,8 @@ visits hear the businesses' channels on (:class:`Ear`, over ``base.hub_listener.
 
 import datetime as dt
 import logging
-from collections.abc import Collection
+import threading
+from collections.abc import Callable, Collection
 
 from django.db import close_old_connections
 
@@ -93,10 +96,14 @@ class ControlPace:
         self._asked = False
         self._moved_at: dt.datetime | None = None
         self._moves_waiting = False
+        self._more = threading.Event()
 
     def due(self, now: dt.datetime) -> bool:
         rung = self._ear.rung()
-        self._asked = rung or (self._next_at is not None and self._next_at <= now)
+        more = self._more.is_set()
+        if more:
+            self._more.clear()
+        self._asked = rung or more or (self._next_at is not None and self._next_at <= now)
         if self._asked or self._again or self._ran_at is None:
             return True
         return now - self._ran_at >= dt.timedelta(seconds=LOOK_SECONDS)
@@ -105,6 +112,20 @@ class ControlPace:
         if self._asked or self._moves_waiting or self._moved_at is None:
             return True
         return now - self._moved_at >= dt.timedelta(seconds=MOVES_LOOK_SECONDS)
+
+    def telling(self, piece: Callable[[], object]) -> Callable[[], None]:
+        """``piece`` for a slow pass's thread, which says when it ends that it worked or failed: the next tick runs a
+        pass, the moves' among its steps, that starts it again for the next hub waiting."""
+
+        def told() -> None:
+            worked = True
+            try:
+                worked = piece()
+            finally:
+                if worked:
+                    self._more.set()
+
+        return told
 
     def moved(self, now: dt.datetime, *, started: bool) -> None:
         """The moves' pass started at ``now``, or could not (one still runs: it starts at the next pass)."""

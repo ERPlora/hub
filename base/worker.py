@@ -40,17 +40,14 @@ visits' sweep (``base.hub_visits``).
 
 Then two slow passes of the data, each in a thread of its own (:class:`Background`, one piece at a time, its own
 connections closed when it ends): the loop starts them and goes on, so a copy of minutes never holds the relay, the
-tasks, VeriFactu or the hubs due. ``_data`` takes one hub with data work due
-(``base.services.offboarding.claim_next_data_hub``, under its lease): a reset asked (its database copied by
-``base.tenancy.dumps``, then, only if the copy was kept, its sections emptied by ``base.hub.reset_apply`` in its
-database), the copy of a business that left (tried again later when it fails), or, past its 90 days, its final copy and
-the drop of its database (``base.tenancy.offboarding``; not while it keeps fiscal documents); ``_usage`` measures the
-last UTC day once it ended (``base.usage``, 00:15 UTC, before the SaaS collects it at 01:15; once a night whichever
-worker claims it). Neither runs with ``databases_only``. On the way out the worker waits for them
-:data:`BACKGROUND_GRACE_SECONDS` at most: a copy hears the stop, kills ``pg_dump`` and gives its lease back, and its
-work stays due. A third thread moves the hubs asked to move to another cluster and drops the copies they left behind
-after their days (``_moves``, ``base.tenancy.move``), likewise, puts the hubs asked to be restored back as they were at
-a moment, from their copy (``base.tenancy.restore``), and makes the separate copies asked, without closing the business.
+tasks, VeriFactu or the hubs due. ``_data`` takes one hub with data work due (``claim_next_data_hub``, under its lease):
+a reset asked (its database copied, then, only if the copy was kept, its sections emptied by ``base.hub.reset_apply``),
+the copy of a business that left, or, past its 90 days, its final copy and the drop of its database
+(``base.tenancy.offboarding``; not while it keeps fiscal documents); ``_usage`` measures the last UTC day once it ended
+(``base.usage``, 00:15 UTC; once a night whichever worker claims it). Neither runs with ``databases_only``. A third
+thread (``_moves``) moves one hub asked to move to another cluster, restores one from its copy, makes one separate copy
+and drops the copies past their days. One that worked or failed has the next tick start it again, for the next hub
+waiting. On the way out the worker waits for them :data:`BACKGROUND_GRACE_SECONDS` at most: a copy hears the stop.
 
 Last in a pass, the hubs whose ``hub_due`` has come: their databases made, the demos that ended dropped
 (``base.tenancy.provision.run_due``; no new hub after ``provision.DUE_PASS_SECONDS``, though a clone it started
@@ -223,10 +220,11 @@ class Ticks:
     def _start_the_slow_passes(self, now: dt.datetime, changes: bool) -> None:
         if not self._databases_only:
             if changes:
-                self._slow["data"].start(partial(_data, now, self._stop))
+                self._slow["data"].start(self._pace.telling(partial(_data, now, self._stop)))
             self._slow["usage"].start(partial(_usage, now))
             if changes and self._pace.moves_due(now):
-                self._pace.moved(now, started=self._slow["move"].start(partial(_moves, now, self._stop)))
+                moves = self._pace.telling(partial(_moves, now, self._stop))
+                self._pace.moved(now, started=self._slow["move"].start(moves))
         self._emitter.start_due(now, self._slow["metrics"])
 
     def _reap_and_make(self, now: dt.datetime) -> bool:
@@ -404,21 +402,21 @@ def _code() -> migrator.CodeMigrations:
     return migrator.code_migrations()
 
 
-def _data(now: dt.datetime, stop: threading.Event | None = None) -> None:
+def _data(now: dt.datetime, stop: threading.Event | None = None) -> bool:
     """The data work of one hub due by ``now``, under its lease: a reset asked (its database copied, then its sections
     emptied), the copy of a business that left, or a business past its 90 days (``base.tenancy.offboarding``). It runs in
     the worker's data thread (:class:`Background`), one hub at a time: a copy takes a while, and the loop goes on
     meanwhile. A failure is logged and the work stays due (a lease lost is left to its holder); ``stop`` set stops the
-    copy in course (``pg_dump`` killed), its lease given back and the work left due for the next worker."""
+    copy in course, its lease given back. Whether it took a hub or failed to read them: the next tick looks again."""
     try:
         with use_control():
             hub_id = services.offboarding.claim_next_data_hub(now, provision.LEASE)
     except Exception:
         logger.exception("worker: the hubs with data work could not be read; the next tick tries again.")
         close_old_connections()
-        return
+        return True
     if hub_id is None:
-        return
+        return False
     try:
         with use_control():
             hub = services.provisioning.registry_row(hub_id)
@@ -443,6 +441,7 @@ def _data(now: dt.datetime, stop: threading.Event | None = None) -> None:
         if row is not None and row.db_name:
             close_hub_aliases(row)
         close_old_connections()
+    return True
 
 
 def _usage(now: dt.datetime) -> None:
@@ -468,13 +467,13 @@ def _usage(now: dt.datetime) -> None:
         logger.info("worker: measured the use of %d hub(s) on %s.", measured, day)
 
 
-def _moves(now: dt.datetime, stop: threading.Event | None = None) -> None:
+def _moves(now: dt.datetime, stop: threading.Event | None = None) -> bool:
     """Move the hub asked longest ago to its new cluster and drop the copies past their days
     (``base.tenancy.move.run_due``), then restore the hub asked longest ago from its copy (``base.tenancy.restore.run_due``),
     make the separate copy asked longest ago (``base.tenancy.restore.run_aside_due``) and bring back into its business
     what a made copy was asked to give back (``base.tenancy.recovery.run_due``), on control, in the worker's move thread
     (:class:`Background`); a failure is logged and the next pass tries again. ``stop`` set stops the copy in course and
-    leaves it for the next worker to go on."""
+    leaves it for the next worker to go on. Whether it worked on one, or failed: the next tick starts it again."""
     cancelled = stop.is_set if stop is not None else None
     try:
         with use_control():
@@ -484,11 +483,12 @@ def _moves(now: dt.datetime, stop: threading.Event | None = None) -> None:
             moved += recovery.run_due(now, cancelled=cancelled)
     except Exception:
         logger.exception("worker: the moves' pass failed; the next tick tries again.")
-    else:
-        if moved:
-            logger.info("worker: worked on the move, the restore, a separate copy or a recovery of %d hub(s).", moved)
+        return True
     finally:
         close_old_connections()
+    if moved:
+        logger.info("worker: worked on the move, the restore, a separate copy or a recovery of %d hub(s).", moved)
+    return bool(moved)
 
 
 def _heartbeat(hub) -> Callable[[], None]:

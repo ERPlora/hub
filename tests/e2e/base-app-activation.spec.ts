@@ -561,7 +561,7 @@ function schemaBack(): void {
 function ring(): void {
   psql(
     `insert into control_hubdue (hub_id, due_at, lease_owner) values ('${hubId}', now(), '') ` +
-      "on conflict (hub_id) do update set due_at = least(control_hubdue.due_at, excluded.due_at); select pg_notify('live_platform_registry', '')",
+      "on conflict (hub_id) do update set due_at = least(control_hubdue.due_at, excluded.due_at); select pg_notify('live_platform_registry', '*')",
   );
 }
 
