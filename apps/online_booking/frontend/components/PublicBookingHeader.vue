@@ -4,9 +4,12 @@ import { computed } from 'vue';
 import { useT } from '../composables/useT';
 import type { PageOut } from '../operations';
 
-const props = defineProps<{ info: PageOut }>();
+type HeaderInfo = Pick<PageOut, 'business_name' | 'logo_url'> &
+  Partial<Pick<PageOut, 'title' | 'welcome_message'>>;
+
+const props = defineProps<{ info: HeaderInfo }>();
 const t = useT();
-const logoAlt = computed(() => t('online_booking.door.logoAlt', { business: props.info.business_name || props.info.title }));
+const logoAlt = computed(() => t('online_booking.door.logoAlt', { business: props.info.business_name || props.info.title || t('online_booking.door.businessFallback') }));
 const logoUrl = computed(() => {
   const value = props.info.logo_url.trim();
   if (value.startsWith('/') && !value.startsWith('//')) return value;
@@ -39,6 +42,7 @@ const logoUrl = computed(() => {
         {{ info.business_name }}
       </p>
       <h3
+        v-if="info.title"
         class="ob-business__title"
         data-testid="ob-preview-title"
       >
