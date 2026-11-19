@@ -1,8 +1,8 @@
 """The «Operaciones» row of each app's README counts what the app really has.
 
-The row tells whoever integrates how many queries and actions the app has and, when it numbers them, how many routes
-it serves under ``/api/<app>/``. Those figures go stale without anyone noticing whenever an operation is added or
-removed, so they are held here against the operation registry and the API schema.
+The row tells whoever integrates how many queries and actions the app has and how many routes it serves under
+``/api/<app>/``. Those figures go stale without anyone noticing whenever an operation is added or removed, so they are
+held here against the operation registry and the API schema, for every app, a new one included.
 """
 
 import re
@@ -26,16 +26,17 @@ FIGURES = {
 
 
 def rows() -> dict[str, str]:
-    """The «Operaciones» row of every app README, by app."""
+    """The «Operaciones» row of every app's README, by app; empty when the app has no README or the README no row."""
     found = {}
-    for readme in sorted(APPS.glob("*/README.md")):
-        match = ROW.search(readme.read_text(encoding="utf-8"))
-        found[readme.parent.name] = match["text"] if match else ""
+    for app in sorted(path.parent for path in APPS.glob("*/apps.py")):
+        readme = app / "README.md"
+        match = ROW.search(readme.read_text(encoding="utf-8")) if readme.is_file() else None
+        found[app.name] = match["text"] if match else ""
     return found
 
 
 def stated(text: str) -> dict[str, int]:
-    """The figures a row states, by kind; the routes only when the row numbers them."""
+    """The figures a row states, by kind."""
     matches = {kind: pattern.search(text) for kind, pattern in FIGURES.items()}
     return {kind: int(match[1]) for kind, match in matches.items() if match}
 
@@ -53,8 +54,8 @@ def counted() -> dict[str, Counter]:
     return found
 
 
-def test_every_app_readme_states_its_queries_and_actions():
-    unreadable = sorted(app for app, text in rows().items() if not {"queries", "actions"} <= stated(text).keys())
+def test_every_app_readme_states_its_queries_actions_and_routes():
+    unreadable = sorted(app for app, text in rows().items() if stated(text).keys() != FIGURES.keys())
     assert unreadable == []
 
 
