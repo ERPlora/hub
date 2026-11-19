@@ -573,7 +573,7 @@ TITLED_IN_SPANISH = {
     **{f"schedule.special_day.{action}:id": "Día especial" for action in ("delete", "update")},
     **{f"service.assignment.{action}:id": "Profesional del servicio" for action in ("remove", "update")},
     **{f"service.category.{action}:id": "Categoría" for action in ("delete", "update")},
-    **{f"service.grant.{action}:id": "Bono vendido" for action in ("adjust", "redeem", "void")},
+    **{f"service.grant.{action}:id": "Bono vendido" for action in ("adjust", "link", "redeem", "void")},
     **{f"service.package.{action}:id": "Paquete" for action in ("delete", "update")},
     **{f"service.service.{action}:id": "Servicio" for action in ("archive", "restore", "set_image", "update")},
     "service.session.release:id": "Sesión del bono",

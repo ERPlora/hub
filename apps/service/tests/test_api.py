@@ -57,6 +57,7 @@ ROUTES = {
     ("POST", "/service/grants", "service.grant.create"),
     ("POST", "/service/grants/void", "service.grant.void"),
     ("POST", "/service/grants/adjust", "service.grant.adjust"),
+    ("POST", "/service/grants/link", "service.grant.link"),
     ("POST", "/service/grants/redeem", "service.grant.redeem"),
     ("GET", "/service/movements", "service.movement.list"),
 } | IMAGE_ROUTES

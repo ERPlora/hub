@@ -308,6 +308,39 @@ def test_a_second_voucher_on_a_line_waits_for_the_first_and_does_not_fit(coffee,
     assert SaleLine.objects.get(pk=sale.lines[0].id).voucher_sold_amount == total
 
 
+def test_the_sale_of_a_voucher_said_twice_at_once_leaves_its_line_once(coffee, last_session):
+    # SERVICE-F36: the line has room for the voucher twice, so nothing but the voucher's own row makes the second wait;
+    # read before the first COMMIT, it would say no sale yet and its seller would lose what it cost twice.
+    haircut, lucia, _grant = last_session
+    sale = charge("voucher-link-0001", lines=[{"product": "COF"}], payments=[{"method": "card"}])()
+    half = sale.lines[0].line_total // 2
+    package = svc(
+        "service.package.create", {"name": "Bono de Lucía", "max_uses": 3, "items": [{"service_id": str(haircut.id)}]}
+    )
+    grant = svc("service.grant.create", {"package_id": str(package.id), "customer_id": str(lucia.id), "amount": half})
+    say_its_sale = {"id": str(grant.id), "sale_id": str(sale.id)}
+    said, finish = threading.Event(), threading.Event()
+
+    def first():
+        with atomic():
+            svc("service.grant.link", say_its_sale)
+            said.set()
+            finish.wait(10)
+
+    def second():
+        said.wait(10)
+        return svc("service.grant.link", say_its_sale)
+
+    def let_the_first_commit():
+        said.wait(10)
+        time.sleep(0.5)
+        finish.set()
+
+    results = at_once(first, second, let_the_first_commit)
+    assert getattr(results[1], "code", None) == "service.grant_already_sold"
+    assert SaleLine.objects.get(pk=sale.lines[0].id).voucher_sold_amount == half
+
+
 def test_charging_a_check_and_voiding_it_at_once_spend_or_release_its_session(
     last_session,
 ):
