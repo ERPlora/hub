@@ -1,6 +1,7 @@
 // The online booking app's `routes.ts`: routes → pages and nothing else (main.ts reads the default export).
 // The old module's two sections (Bookings, Settings: apps.py `navigation`), the booking page base's public door serves
-// without a session (`/p/<slug>/book`) and, on the dev server only, its preview.
+// without a session (`/p/<slug>/book`, and `/p/<slug>/book/<token>` for a customer's personal link) and, on the dev
+// server only, its preview.
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -39,17 +40,20 @@ describe('online booking routes.ts', () => {
       ['/online_booking/bookings', true],
       ['/online_booking/settings', true],
       ['/p/:slug/book', false],
+      ['/p/:slug/book/:token', false],
       ['/online_booking/preview', true],
     ]);
   });
 
   it('paints the public page without the shell\'s menus: a customer is no member of the team', () => {
     expect(route('/p/:slug/book').meta?.chrome).toBe(false);
+    expect(route('/p/:slug/book/:token').meta?.chrome).toBe(false);
   });
 
   it('serves the public page on the path base names for it (apps.py `public_pages`)', () => {
     const [, page] = /public_pages = \{"([^"]+)"/.exec(APPS_PY) ?? [];
     expect(route('/p/:slug/book').path).toBe(`/p/:slug/${page}`);
+    expect(route('/p/:slug/book/:token').path).toBe(`/p/:slug/${page}/:token`);
   });
 
   it('every menu entry of apps.py has its page', () => {
@@ -68,6 +72,7 @@ describe('online booking routes.ts', () => {
     expect(await load(route('/online_booking/settings'))).toEqual({ name: 'SettingsPage' });
     expect(await load(route('/online_booking/preview'))).toEqual({ name: 'PreviewPage' });
     expect(await load(route('/p/:slug/book'))).toEqual({ name: 'PublicBookingPage' });
+    expect(await load(route('/p/:slug/book/:token'))).toEqual({ name: 'PublicBookingPage' });
   });
 
   it('imports types only at the top, so main.ts can glob it before the shell boots', () => {

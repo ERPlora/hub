@@ -94,6 +94,9 @@ urlpatterns = [
     path("internal/whatsapp/inbound", whatsapp_inbound, name="internal-whatsapp-inbound"),
     path("internal/whatsapp/status", whatsapp_status, name="internal-whatsapp-status"),
     path("internal/whatsapp/channel", whatsapp_channel, name="internal-whatsapp-channel"),
+    # A page with a key of its route's own (a customer's personal link): before the files, so that a business called
+    # «media» or «catalog» opens it too; their files' names never fit one slug segment.
+    path("p/<str:slug>/<str:name>/<slug:key>", open_page, name="public-page-key"),
     # The hub file store's files (base.media), on the hub's own host; /p is the public pages' prefix.
     path("p/media/<str:hub>/<path:name>", media, name="media"),
     # The shared image library (base.image_catalog): every hub's, so on any host and to anyone.
