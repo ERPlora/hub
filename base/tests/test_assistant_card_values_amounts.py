@@ -139,7 +139,7 @@ class InvoicedPreviewOut(Schema):
 @HUB_DB
 def test_an_amount_inside_a_datum_of_a_preview_is_said_in_the_currency_its_read_answers(monkeypatch):
     """As the amounts on top of «What will happen» (BASE-F98): an invoice keeps the currency it was issued in."""
-    from base.tests.test_assistant import count_preview, declaring
+    from base.tests.test_assistant_previews import count_preview, declaring
 
     Hub.objects.update_or_create(slug=A.key, defaults={"name": "Bar A", "country": "ES"})
     read = count_preview({"totals": {"due": 1200, "note": "R1"}, "currency": "USD"}, output=InvoicedPreviewOut)

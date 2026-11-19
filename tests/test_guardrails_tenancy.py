@@ -308,10 +308,16 @@ def test_the_modules_never_import_the_tenancy():
     assert offenders == [], f"A module never chooses its database: @operation and use_hub do (CLAUDE.md): {offenders}"
 
 
-def test_nothing_but_live_listens():
-    offenders = _everywhere(listen_touches)
+def test_nothing_but_live_and_the_worker_s_own_ear_listens():
+    # The worker serves no live stream, so live.broker never listens in its process: its ear is its one LISTEN.
+    files = [path for path in source_files(HUB_DIR) if str(path) != "base/hub_listener.py"]
 
-    assert offenders == [], f"One LISTEN per process, on control, in live.broker: {offenders}"
+    offenders = _offenders(lambda path: listen_touches((HUB_DIR / path).read_text()), files)
+
+    assert offenders == [], (
+        "One LISTEN per process, on control: live.broker's where the web runs, base.hub_listener's in the worker: "
+        f"{offenders}"
+    )
 
 
 def test_nothing_runs_on_a_shared_database_any_more():

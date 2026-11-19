@@ -294,12 +294,12 @@ def test_internal_calls_for_the_platform_hub_run_in_its_own_database(monkeypatch
 
 
 @pytest.mark.django_db(transaction=True)
-def test_the_worker_opens_a_context_for_each_pass(caplog):
+def test_the_worker_opens_a_context_for_each_pass(caplog, worker_visits):
     now = timezone.now()
 
     def passes():
         worker._relay(now)
-        worker._hubs(now)
+        worker_visits.serve(now)
         worker._reap(now)
 
     contextvars.Context().run(passes)

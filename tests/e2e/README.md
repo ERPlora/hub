@@ -329,11 +329,14 @@ CI=1 pnpm e2e tests/e2e/demo.spec.ts   # con las variables de la receta exportad
 Cada ejecución crea dos demos en la BD de la pila y las deja purgadas (lápidas `DEMO_TOMBSTONE_DAYS`); no gasta el
 tope de demos vivas (`MAX_CONCURRENT_DEMOS`).
 
-## El asistente (`base-assistant.spec.ts`)
+## El asistente (`base-assistant.spec.ts` y `base-assistant-card*.spec.ts`)
 
-Prueba el asistente del Hub (BASE-F92…F106) con sus dependencias de verdad: el Hub de la pila, la pasarela del SaaS de
-la pila (`/internal/assistant/*` y `/internal/speech/transcribe`) y, detrás, el proveedor falso
-`tests/e2e/assistant-provider.ts`, un servidor HTTP en 127.0.0.1 que habla la API de OpenAI y que la propia spec
+Prueban el asistente del Hub (BASE-F92…F106) en cuatro specs, por tema: el panel (`base-assistant.spec.ts`), la tarjeta
+de una escritura (`base-assistant-card.spec.ts`), cómo dice cada dato (`base-assistant-card-values.spec.ts`) y cómo
+nombra los registros (`base-assistant-card-records.spec.ts`). Lo que comparten, los ganchos de cada spec (`panelSpec`) y
+cómo se maneja el panel y su tarjeta, está en `assistant-panel.ts`. Corren con sus dependencias de verdad: el Hub de la
+pila, la pasarela del SaaS de la pila (`/internal/assistant/*` y `/internal/speech/transcribe`) y, detrás, el proveedor
+falso `tests/e2e/assistant-provider.ts`, un servidor HTTP en 127.0.0.1 que habla la API de OpenAI y que cada spec
 arranca en `E2E_AI_PROVIDER_PORT` (por defecto, el puerto del Hub + 2). Ningún test llega a un proveedor real ni
 escribe una clave real. Responde en el idioma que pide el mensaje de sistema del Hub («Answer in English» o «Answer in
 Spanish»: el de la persona o, en una automatización, el de quien la guardó), como un modelo de verdad; sin él, en inglés.
@@ -343,12 +346,12 @@ al SaaS de la pila:
 
 - **La BD del SaaS sembrada con ese proveedor**, desde su worktree y antes de la primera ejecución:
   `env DB_NAME=saas_e2e_<Hub+1> uv run python tests/e2e/panel/assistant_seed.py gateway http://127.0.0.1:<Hub+2>/v1`
-  (además de la siembra de la receta de arriba, como el resto de specs). La spec lo comprueba al arrancar y, si falta,
+  (además de la siembra de la receta de arriba, como el resto de specs). Cada spec lo comprueba al arrancar y, si falta,
   cae con «not seeded with this provider».
 - **`ASSISTANT_SERVICE_PROVIDER=e2e-local`** en el `runserver` del SaaS (con el resto de variables de la receta de
   arriba, también `E2E_RELAX_LOGIN_RATE_LIMIT=True`): sin ella el dictado responde 503.
 - **`E2E_SAAS_DB`** (la de la tabla de arriba), si la BD del SaaS no es `saas_e2e_<Hub+1>` (con el Hub en :8000, `saas`):
-  la spec fija en ella los mensajes del mes del negocio `a` antes de cada test, así que nunca gasta el cupo del plan.
+  cada spec fija en ella los mensajes del mes del negocio `a` antes de cada test, así que nunca gasta el cupo del plan.
 
 ```bash
 # El SaaS de la pila (8871), desde su worktree:
@@ -357,8 +360,9 @@ env DB_NAME=saas_e2e_8871 VITE_DEV_PORT=6071 ASSISTANT_SERVICE_PROVIDER=e2e-loca
   HUB_ADMIN_CALLBACK_URL='http://hubs.localhost:8870/auth/callback' HUB_INTERNAL_URL=http://localhost:8870 \
   EMAIL_FILE_PATH="$PWD/.mail-8871" E2E_RELAX_LOGIN_RATE_LIMIT=True DEMO_SPAWN_RATELIMIT=100/h \
   uv run python manage.py runserver 127.0.0.1:8871
-# La spec, con las variables de «Varias ejecuciones a la vez» exportadas (Hub en 8870):
-CI=1 pnpm e2e tests/e2e/base-assistant.spec.ts --workers=1
+# Las specs, con las variables de «Varias ejecuciones a la vez» exportadas (Hub en 8870):
+CI=1 pnpm e2e tests/e2e/base-assistant.spec.ts tests/e2e/base-assistant-card.spec.ts \
+  tests/e2e/base-assistant-card-values.spec.ts tests/e2e/base-assistant-card-records.spec.ts --workers=1
 ```
 
 La cuenta del e2e está en inglés: la spec comprueba las cadenas `en`.

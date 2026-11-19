@@ -86,7 +86,7 @@ test.afterAll(async ({ browser }) => {
   await provider?.close();
 });
 
-// ── The panel and its card (as base-assistant.spec.ts drives them) ──
+// ── The panel and its card (as assistant-panel.ts drives them) ──
 
 const panel = (page: Page): Locator => page.locator('[data-testid="assistant-panel"]');
 const box = (page: Page): Locator => panel(page).locator('[data-testid="assistant-input"] textarea');

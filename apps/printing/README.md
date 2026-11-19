@@ -41,8 +41,8 @@ mandan el documento ya compuesto, y la app de ERPlora del dispositivo lo imprime
 | `requires` | ninguna: se enciende sola |
 | La usan | Ventas, Facturación, Caja, Inventario y Cocina (llaman a `printing.job.create` por su nombre; ninguna la requiere: sin Impresión, el papel sale por el diálogo del dispositivo); `base` con `/ws/print`, el Inicio y la campana |
 | Pantallas | `/printing/printers`, `/printing/devices`, `/printing/jobs`, `/printing/settings`; `PrintHost.vue` (`/printing/print-host`, `meta.background`) corre de fondo en el dispositivo dado de alta |
-| Operaciones | 11 consultas (`queries.py`) y 15 acciones (`services.py`), todas con `ai=`; `printing.device.get`, `printing.device.seen` y `printing.job.prune` con `ai=INTERNAL` (las dos primeras, del canal del dispositivo; la última, del sistema); 23 rutas en `/api/printing/…` |
-| Hooks del Inicio | `setup` «Configura la impresora» y `bell` «Nadie está imprimiendo «…»» por función, con `printing.device.coverage`; `bell_refresh_every` de 30 s y `print_presence = "printing.device.seen"` |
+| Operaciones | 12 consultas (`queries/`) y 15 acciones (`services.py`), todas con `ai=`; `printing.device.get`, `printing.device.seen` y `printing.job.prune` con `ai=INTERNAL` (las dos primeras, del canal del dispositivo; la última, del sistema); 24 rutas en `/api/printing/…` |
+| Hooks del Inicio | `setup` «Configura la impresora» y `bell` «Nadie está imprimiendo «…»» por función, con `printing.device.coverage`; `bell_refresh_every` de 30 s; `health` «Impresora lista / sin conectar / sin configurar» de la fila de salud, con `printing.device.health`; y `print_presence = "printing.device.seen"` |
 | Eventos | 13, `printing.<entidad>.<hecho>` (`events.py`), solo con identificadores; no reacciona a ninguno |
 | Migraciones | `0001_initial`, `0002_print_device`, `0003_printdevice_last_seen_at`, `0004_printjob_document_type_labels` |
 | Admin | Django admin de ajustes, impresoras, trabajos y dispositivos en `hubs.erplora.com` (PLAN §17–§18) |

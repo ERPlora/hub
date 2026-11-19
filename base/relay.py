@@ -1,4 +1,4 @@
-"""The outbox relay, run by the worker on every tick.
+"""The outbox relay, run by the worker in each business it visits and on control on every tick.
 
 A command records its events in the outbox in its own
 transaction (``live.outbox.record_event``); the relay hands each one to the reactions of the apps that listen to
@@ -24,7 +24,7 @@ Both steps claim their rows with ``SKIP LOCKED``: the old worker and the new one
 transaction releases its connection, so the worker never idles holding one. The events recorded before the relay
 existed were taken without a delivery by its migration (``base/migrations/0006_event_delivery.py``): that old
 backlog is never applied. The worker runs it in each hub with its own database, under ``use_hub``
-(``base.worker._hubs``), and on control for control's own events (``of_hubs=False``: the registry's
+(``base.hub_visits``), and on control for control's own events (``of_hubs=False``: the registry's
 and the demos', which no app hears); what a business that shared a database recorded in control before its cut is never
 taken there (its cut copies its own events into its database, ``base.tenancy.cut``).
 """
@@ -163,10 +163,22 @@ def backoff(attempts: int) -> dt.timedelta:
 def run(now: dt.datetime, *, of_hubs: bool = True) -> RelayPass:
     """Take the new events, then run the deliveries due at ``now``, one transaction each. ``of_hubs=False`` (control's
     outbox): only the events of no hub, never a business's."""
+    taken = take(now, of_hubs=of_hubs)
+    delivered, failed = deliver_due(now, of_hubs=of_hubs)
+    return RelayPass(taken=taken, delivered=delivered, failed=failed)
+
+
+def take(now: dt.datetime, *, of_hubs: bool = True) -> int:
+    """Take the new events at ``now``, in one transaction; how many it took."""
     taken = relay_runs.relay_take_events(
         now, listeners=listeners, limit=TAKE_PER_TICK, max_depth=MAX_EVENT_DEPTH, of_hubs=of_hubs
     )
     close_old_connections()
+    return taken
+
+
+def deliver_due(now: dt.datetime, *, of_hubs: bool = True) -> tuple[int, int]:
+    """Run the deliveries due at ``now``, one transaction each; how many were done and how many failed."""
     delivered = failed = 0
     for _ in range(DELIVER_PER_TICK):
         outcome = relay_runs.relay_deliver_next(
@@ -186,4 +198,4 @@ def run(now: dt.datetime, *, of_hubs: bool = True) -> RelayPass:
             delivered += 1
         else:
             failed += 1
-    return RelayPass(taken=taken, delivered=delivered, failed=failed)
+    return delivered, failed

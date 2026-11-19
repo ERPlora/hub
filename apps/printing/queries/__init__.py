@@ -41,6 +41,8 @@ from apps.printing.schemas import (
 )
 from base.ordering import list_order
 
+from .health import SEEN_WITHIN
+
 #: Hand-outs a job gets before it fails (the old hub's ``MAX_ATTEMPTS``).
 MAX_ATTEMPTS = 5
 #: How long a device has to answer for a job it took (the old hub's ``DEFAULT_LEASE_SECONDS``).
@@ -50,9 +52,6 @@ WAITING_AFTER = dt.timedelta(minutes=1)
 #: A job that has waited this long with no device there to print it rings the bell: not every till that restarts
 #: (the old hub's ``UNDRAINED_ALERT_SECONDS``).
 STALLED_AFTER = dt.timedelta(seconds=60)
-#: A device set up here is there while its last news is this recent: its hello or a beat on base's /ws/print, asking for
-#: a job or being set up from it (the old hub's ``HOST_TTL_SECONDS``: three missed beats of 30 s).
-SEEN_WITHIN = dt.timedelta(seconds=90)
 #: The functions, in the order the screens and the summary show them.
 USAGES = [usage.value for usage in Usage]
 #: The settings' field of each function's printer.

@@ -130,8 +130,8 @@ def test_the_page_is_rendered_once_per_publication_and_a_new_one_shows_at_once(c
 
 
 def test_a_new_publication_shows_even_where_the_old_page_was_not_dropped(client):
-    # Another process's cache (the process's memory locally) never hears this one's COMMIT: the version in the key
-    # alone keeps it from serving the old page. Here no on_commit runs, so nothing drops the first page.
+    # A page kept where the COMMIT's drop never reached (the process died before it) is never served: the version in
+    # the key alone keeps it out. Here no on_commit runs, so nothing drops the first page.
     publish()
     assert "ws-classic" in visit(client).content.decode()
     publish(template="bold", hero={"title": "New season"})

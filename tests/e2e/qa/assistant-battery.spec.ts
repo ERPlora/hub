@@ -86,7 +86,7 @@ async function messages(context: BrowserContext): Promise<{ used: number; limit:
   return usage.data;
 }
 
-/** Sets this month's messages of `a` on erplora.com (the row its first question made), as base-assistant.spec.ts does. */
+/** Sets this month's messages of `a` on erplora.com (the row its first question made), as assistant-panel.ts does. */
 function setMonth(used: number): void {
   saasSql(
     `update assistant_assistantusage set messages = ${Math.trunc(used)} where hub_id = (select id from hubs_hub where slug = 'a') ` +
