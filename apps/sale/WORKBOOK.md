@@ -1388,6 +1388,8 @@ Si falla: sin Inventario activo no hay alérgenos, y el precio libre y los servi
 alérgenos marcados no dice nada, porque el TPV no distingue «no lleva ninguno» de «no se han declarado»: por eso la
 ficha de Inventario dice «Sin alérgenos declarados». Un suplemento no tiene alérgenos propios: «+Queso» no añade
 Leche a la línea; si el cliente tiene una alergia, se marca en la línea como alergia del cliente y Cocina la ve igual.
+Si la hoja de un menú no puede leer los alérgenos de sus platos, lo dice y ofrece «Reintentar»: así un plato sin
+fila no se toma por un plato sin alérgenos.
 Implicados: INVENTORY-F27, INVENTORY-F35, SALE-F11, SALE-F12, SALE-F41, KITCHEN-F32
 
 ### SALE-F41 Marcar la alergia del cliente en una línea

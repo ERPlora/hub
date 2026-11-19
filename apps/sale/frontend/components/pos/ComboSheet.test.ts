@@ -81,6 +81,23 @@ describe('ComboSheet', () => {
     expect(s.inDoc('pos-menu-dish-allergens-lentils')?.textContent).toBe('Alérgenos: Gluten');
   });
 
+  it('says it is reading the allergens until every dish has answered', async () => {
+    const waiting: ((answer: Response) => void)[] = [];
+    const s = await setup({}, () => new Promise<Response>((resolve) => waiting.push(resolve)) as never);
+    expect(s.inDoc('pos-menu-allergens-loading')?.textContent).toContain('Cargando alérgenos…');
+    for (const resolve of waiting) resolve(Response.json(product({ allergens: [] })));
+    await settle();
+    expect(s.inDoc('pos-menu-allergens-loading')).toBeNull();
+    expect(s.inDoc('pos-menu-allergens-error')).toBeNull();
+  });
+
+  it('someone who may not read the products gets the menu without allergens and without an error to retry', async () => {
+    const s = await setup({}, () => refused('permission_denied', 'Not allowed', 403));
+    await settle();
+    expect(s.inDoc('pos-menu-allergens-error')).toBeNull();
+    expect(s.inDoc('pos-menu-allergens-loading')).toBeNull();
+  });
+
   it('opens with nothing picked and the button naming the course still short; a tap marks it and adds nothing', async () => {
     const s = await setup();
     expect(s.inDoc('pos-menu-dish-lentils')?.getAttribute('aria-pressed')).toBe('false');

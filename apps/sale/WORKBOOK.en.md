@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:852afa544d581c2d261646b59a3cbf384ef16e897f80249a5f3086fa5fd1e284 -->
+<!-- generated from WORKBOOK.md sha256:2b1c76ca73a19b717e73a733ddfb6a753e51230451a8158000bd4dda774e9a8c -->
 
 ## What it is for and who it is for
 
@@ -1381,6 +1381,8 @@ An item with no allergens marked says nothing, because the till does not tell "h
 is why Inventory's card says "No allergens declared". A modifier has no allergens of its own: "+Cheese" does not add
 Milk to the line; if the customer has an allergy, it is marked on the line as the customer's allergy and Kitchen
 sees it all the same.
+If a menu's sheet cannot read the allergens of its dishes, it says so and offers "Retry": that way a dish with
+no row is not taken for a dish without allergens.
 Involved: INVENTORY-F27, INVENTORY-F35, SALE-F11, SALE-F12, SALE-F41, KITCHEN-F32
 
 ### SALE-F41 Mark the customer's allergy on a line

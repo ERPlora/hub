@@ -82,6 +82,19 @@ describe('LineNoteSheet', () => {
     expect(m.sheet().emitted('save')).toEqual([[{ note: 'No salt', allergy: ['gluten', 'milk'] }]]);
   });
 
+  it('opened again on another line, marks that line’s allergy and not the previous one', async () => {
+    const allergy = ref(['gluten']);
+    const m = await setup({ allergyEnabled: true, get allergy() { return allergy.value; } });
+    const select = () => m.wrapper.findComponent(AllergenSelect);
+    select().vm.$emit('update:modelValue', ['gluten', 'milk']);
+    m.open.value = false;
+    await settle();
+    allergy.value = ['fish'];
+    m.open.value = true;
+    await settle();
+    expect(select().props('modelValue')).toEqual(['fish']);
+  });
+
   it('without Kitchen, keeps the sheet as it was', async () => {
     const m = await setup();
     expect(m.wrapper.findComponent(AllergenSelect).exists()).toBe(false);
