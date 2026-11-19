@@ -393,7 +393,7 @@ def test_the_openapi_of_a_route_that_can_accept_documents_200_and_202_with_the_s
     assert {
         status: response["content"]["application/json"]["schema"]["$ref"]
         for status, response in served["paths"][path]["post"]["responses"].items()
-    } == {"200": "#/components/schemas/AppChangeOut", "202": "#/components/schemas/AppChangeOut"}
+    } == {"200": "#/components/schemas/base.AppChangeOut", "202": "#/components/schemas/base.AppChangeOut"}
 
 
 @HUB_DB  # the host gate reads business A's row (base.middleware)
