@@ -56,6 +56,13 @@ def test_only_a_device_that_reaches_the_functions_receipt_paper_makes_its_statio
     assert health() == "not_configured"
 
 
+def test_a_device_on_that_reaches_only_the_computers_printer_does_not_make_a_quiet_receipt_station_answer():
+    # The computer's printer of the receipts prints their A4 pages, not their paper: the till is the station.
+    reaches(printer("Till"), name="Counter", seen=dt.timedelta(minutes=10))
+    reaches(printer("Office", kind="system", address=""), name="Office")
+    assert health() == "no_signal"
+
+
 def test_a_station_on_beside_one_quiet_is_ok():
     till = printer("Till")
     reaches(till, name="Counter", seen=dt.timedelta(minutes=10))
