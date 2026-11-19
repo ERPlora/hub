@@ -14,7 +14,7 @@ from apps.sale.queries.business import actor, missing_tax
 from apps.sale.queries.departments import _department_refused, find_department, find_tax_category
 from apps.sale.queries.line_parts import GRID_FALLBACK, WHOLE, check_grid, provisional_total
 from apps.sale.queries.other_apps import call_app
-from apps.sale.schemas import ComboLineFields, OpenLineFields, ProductLineIn
+from apps.sale.schemas import ComboLineFields, LineFields, OpenLineFields, ProductLineIn
 
 PRODUCT_NOT_AVAILABLE = _(
     "A product of the ticket is no longer in the catalog. Remove the line and add it again."
@@ -27,6 +27,22 @@ PRODUCT_SOLD_OUT = _("«%(name)s» is sold out.")
 OPEN_PRICE_PERMISSION = _(
     "Only someone who may sell at an open price can add this line: ask a manager."
 )
+
+
+def new_line(ctx: OperationContext, data: LineFields, **frozen) -> OrderLine:
+    """An unsaved row: what ``frozen`` copies of its product, menu, service or price, what every line takes from its
+    input (quantity, note, who serves it, comp) and its provisional total."""
+    line = OrderLine(
+        **frozen,
+        quantity=data.quantity,
+        notes=data.notes,
+        staff_id=data.staff_id,
+        is_gift=data.is_gift,
+        gift_reason=data.gift_reason if data.is_gift else "",
+        created_by=actor(ctx),
+    )
+    line.line_total = provisional_total(line)
+    return line
 
 
 def inventory_units(ctx: OperationContext) -> dict:
@@ -77,24 +93,18 @@ def freeze_combo_line(ctx: OperationContext, data: ComboLineFields) -> OrderLine
             "choices": [choice.model_dump(exclude_none=True) for choice in data.choices],
         },
     )
-    line = OrderLine(
+    return new_line(
+        ctx,
+        data,
         combo_id=answer["combo_id"],
         combo=_with_allergens(ctx, answer),
         name=answer["name"],
         unit="ud",
         increment=WHOLE,
-        quantity=data.quantity,
         unit_price=answer["amount"],
         tax_category_key=answer["tax_category_key"] or "",
         kitchen_text=", ".join(_dish_label(dish) for dish in answer["components"])[:500],
-        notes=data.notes,
-        staff_id=data.staff_id,
-        is_gift=data.is_gift,
-        gift_reason=data.gift_reason if data.is_gift else "",
-        created_by=actor(ctx),
     )
-    line.line_total = provisional_total(line)
-    return line
 
 
 def refresh_combos(ctx: OperationContext, lines: Iterable[OrderLine]) -> None:
@@ -171,7 +181,9 @@ def freeze_product_line(
     check_grid(data.quantity, unit[2], product.unit)
     chosen = _options(ctx, product, data.option_ids)
     picks = [pick.model_dump(mode="json") for pick in chosen.picks] if chosen else []
-    line = OrderLine(
+    return new_line(
+        ctx,
+        data,
         product_id=product.id,
         name=product.name,
         sku=product.sku,
@@ -185,7 +197,6 @@ def freeze_product_line(
         pricing_unit=product.pricing_unit,
         pricing_factor_num=priced_in[0],
         pricing_factor_den=priced_in[1],
-        quantity=data.quantity,
         unit_price=product.price + (chosen.folded_delta if chosen else 0),
         cost=product.cost,
         tax_category_key=product.tax_category_key,
@@ -193,14 +204,7 @@ def freeze_product_line(
         modifier_lines=[own.model_dump(mode="json") for own in chosen.own_lines] if chosen else [],
         kitchen_text=chosen.kitchen_text[:500] if chosen else "",
         allergens=product.allergens,
-        notes=data.notes,
-        staff_id=data.staff_id,
-        is_gift=data.is_gift,
-        gift_reason=data.gift_reason if data.is_gift else "",
-        created_by=actor(ctx),
     )
-    line.line_total = provisional_total(line)
-    return line
 
 
 def freeze_open_line(ctx: OperationContext, data: OpenLineFields) -> OrderLine:
@@ -219,19 +223,13 @@ def freeze_open_line(ctx: OperationContext, data: OpenLineFields) -> OrderLine:
     with translation.override(ctx.language):
         name = data.name or (department.name if department else category.display_name)
     check_grid(data.quantity, GRID_FALLBACK, "ud")
-    line = OrderLine(
+    return new_line(
+        ctx,
+        data,
         department=department,
         name=name,
         unit="ud",
         increment=GRID_FALLBACK,
-        quantity=data.quantity,
         unit_price=data.unit_price,
         tax_category_key=category.key,
-        notes=data.notes,
-        staff_id=data.staff_id,
-        is_gift=data.is_gift,
-        gift_reason=data.gift_reason if data.is_gift else "",
-        created_by=actor(ctx),
     )
-    line.line_total = provisional_total(line)
-    return line
