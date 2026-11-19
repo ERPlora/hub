@@ -13,6 +13,7 @@ the platform (``base``, ``live``) and two businesses cloned from it, A and B.
 """
 
 import datetime as dt
+import logging
 import threading
 import uuid
 from collections.abc import Callable
@@ -613,6 +614,22 @@ def test_a_hub_that_fails_is_logged_and_the_others_are_served(business, monkeypa
 
     assert row(b).state == ON and row(a).state == CREATING
     assert "went away" in caplog.text
+
+
+def test_its_lines_are_in_the_workers_log_under_the_workers_name(django_db_blocker, monkeypatch, caplog):
+    failure = RuntimeError("control's database went away")
+
+    def unreadable(now):
+        raise failure
+
+    monkeypatch.setattr(worker_activations.services.activation, "activation_hubs", unreadable)
+
+    with caplog.at_level(logging.ERROR, logger="base.worker"), django_db_blocker.unblock():
+        run_pass()
+
+    assert [record.name for record in caplog.records if record.exc_info and record.exc_info[1] is failure] == [
+        "base.worker"
+    ]
 
 
 # ── migrate_hubs with a new migration of X touches A, never B (B's database is not even opened) ─────────────────
