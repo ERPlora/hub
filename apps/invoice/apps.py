@@ -48,7 +48,11 @@ class InvoiceConfig(LiveAppConfig):
         "invoice.rectify_invoice",
         "invoice.manage_series",
         "invoice.manage_issuer",
+        "invoice.public",
     ]
+    # The page base's public door serves without a session at /p/<slug>/invoice/<code> (INVOICE-F04): whoever opens
+    # it holds ``invoice.public`` and nothing else.
+    public_pages = {"invoice": "invoice.public"}
     # Keys are the customer roles as the SaaS sends them (``hub_`` prefix included). Receiving the
     # issuer from the SaaS (``invoice.sync_issuer``) is declared by no role: only the system holds it.
     role_permissions = {
