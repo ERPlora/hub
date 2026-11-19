@@ -3,6 +3,7 @@ import hashlib
 from decouple import config
 from psycopg_pool import ConnectionPool
 
+from base.cache import local_location
 from base.tenancy.names import MAX_CONTROL
 from config.settings.core import DEBUG, ERPLORA_ENVIRONMENT
 
@@ -135,8 +136,8 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 # Cache: the shared Valkey (TLS, rediss://) when VALKEY_URL is set, with a prefix per project and
 # environment (hub, pre-hub: pre shares prod's Valkey), a TTL on every key (never TIMEOUT=None) and
 # 2 s socket timeouts (a Valkey that hangs fails the call, not the request; Django hands OPTIONS to
-# redis-py); otherwise this process's memory, refusing what that Valkey (a cluster) refuses: a call on
-# keys of different hash slots (base/cache.py).
+# redis-py); otherwise a folder of the machine's disk per control database, shared by its web server and its worker as
+# Valkey is, refusing what that Valkey (a cluster) refuses: a call on keys of different hash slots (base/cache.py).
 
 VALKEY_URL = config("VALKEY_URL", default="")
 CACHE_KEY_PREFIX = "hub" if ERPLORA_ENVIRONMENT == "prod" else f"{ERPLORA_ENVIRONMENT}-hub"
@@ -150,6 +151,6 @@ CACHES = {
             "OPTIONS": {"socket_connect_timeout": 2, "socket_timeout": 2},
         }
         if VALKEY_URL
-        else {"BACKEND": "base.cache.ClusterLocMemCache"}
+        else {"BACKEND": "base.cache.ClusterFileBasedCache", "LOCATION": local_location(DATABASES["default"]["NAME"])}
     )
 }

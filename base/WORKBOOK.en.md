@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:4912e887e41458f9ea0ab111d8c784a361d802ba4d9af9da2e513a857d5d5284 -->
+<!-- generated from WORKBOOK.md sha256:48f0a2706e141226cdf65839e83ab10315264d1d9770e47d0931faa8a2cdda87 -->
 
 ## What it is for and who it is for
 
@@ -436,6 +436,7 @@ On the Employees screens and the API documentation:
 | BASE-F113 | Keep warning with the screen off (Android app) | done |
 | BASE-F114 | Put a business back as it was at a past moment from the Hub admin | done |
 | BASE-F115 | See the help of a module's screen | done |
+| BASE-F116 | Read what is new in ERPlora | partial |
 
 ### BASE-F01 See what the business still has to set up
 Status: done
@@ -1378,7 +1379,7 @@ In: the version running and when it was published.
 Out: nothing saved.
 If it fails: "We could not read the system" — "The figures and the logs are not available right now. You can
 try again." with "Retry".
-Involved: none
+Involved: BASE-F116
 
 ### BASE-F42 See the log of what happened in the system
 Status: done
@@ -3254,3 +3255,24 @@ and "Retry" asks for it again. The help already read stays stored until the page
 also from another tab of the module, and the video says "Offline: the video is not available". If the manual is not
 translated into the person's language, or its translation fell behind, the help comes in Spanish.
 Involved: BASE-F92, BASE-F93
+
+### BASE-F116 Read what is new in ERPlora
+Status: partial — what is new can already be read through the assistant and the API, but System › Updates does not
+show it yet (hub#576)
+Actor: owner, administrator, manager, employee
+Screen: System · Updates
+Steps:
+  1. In the "Updates" tab, below the version and its date (BASE-F41), comes "What's new": what has changed in ERPlora
+     that the business notices, the most recent first. Whoever does not run the business sees it too: it says nothing
+     about the business.
+  2. Each item says its day, whether it is something new, an improvement or a fix, a short title and one or two
+     sentences on what can be done now. They are notes written for the business, never the list of changes to the
+     code.
+  3. The 20 most recent come first; "See more" brings the earlier ones.
+  4. With none, it says "Nothing new yet.".
+  5. Through the assistant, "what's new in ERPlora?" or "what changed in the latest update?" reads them the same way,
+     in the person's language.
+In: what is new in the version running: it travels with it, so it is always its own.
+Out: nothing saved: what is new is only read.
+If it fails: "Could not load what's new" with "Retry"; the version and its date stay in view.
+Involved: BASE-F41

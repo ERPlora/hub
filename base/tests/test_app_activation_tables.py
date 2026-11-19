@@ -473,11 +473,10 @@ def test_a_blueprint_turns_on_an_app_still_to_set_up_and_waits_for_it(hub_a):
 
 
 @own
-def test_reading_the_apps_list_again_forgets_what_this_process_kept_so_the_menu_read_after_it_is_current(hub_a):
-    """The worker turns an app on in another process: where the cache is the process's own (local development, no
-    Valkey) its forgetting never reaches the web. The Apps list every screen follows (AppsFollower) is read again when
-    the live notice of the change arrives, before the session is: that read forgets this process's apps of the
-    business, so the menu read right after it has the app (``cache_inval <hex>:apps``)."""
+def test_reading_the_apps_list_again_forgets_what_the_cache_kept_so_the_menu_read_after_it_is_current(hub_a):
+    """Rows written outside an operation (by hand, as the e2e write them) are forgotten at no COMMIT. The Apps list
+    every screen follows (AppsFollower) forgets what the cache keeps of the business's apps when it is read, before the
+    session is, so the menu read right after it has the app."""
     from django.core.cache import cache
 
     given(hub_a, printing="on*", created=["printing"])
@@ -485,7 +484,7 @@ def test_reading_the_apps_list_again_forgets_what_this_process_kept_so_the_menu_
     cache.set(activation.OFF_APPS_CACHE + hub_a.slug, ["printing"], 60)
     cache.set(activation.CREATING_APPS_CACHE + hub_a.slug, [], 60)
     with use_hub(Hub.objects.get(pk=hub_a.pk)):
-        assert "printing" in activation.off_apps(scope)  # what this process kept before the worker's change
+        assert "printing" in activation.off_apps(scope)  # what the cache kept before the rows changed
 
         get("base.app.list")(as_admin(hub_a), get("base.app.list").input())
         me = get("base.session.me")(as_admin(hub_a), get("base.session.me").input()).model_dump(mode="json")

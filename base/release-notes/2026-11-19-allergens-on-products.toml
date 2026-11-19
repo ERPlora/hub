@@ -1,0 +1,9 @@
+kind = "new"
+
+[en]
+title = "Allergens on every product"
+body = "In Inventory › Products, mark which of the fourteen allergens that must be declared each product contains. The product sheet lists them, and exporting and importing the catalogue carry them in the «Allergens» column."
+
+[es]
+title = "Alérgenos en cada producto"
+body = "En Inventario › Productos, marca cuáles de los catorce alérgenos de declaración obligatoria lleva cada producto. La ficha del producto los enseña, y la exportación y la importación del catálogo los llevan en la columna «Alérgenos»."
