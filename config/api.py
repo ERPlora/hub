@@ -11,9 +11,10 @@ command through.
 from django.conf import settings
 from base import api_help, api_keys, approvals
 from live.ninja import install_error_handlers, mount_app_routers
-from ninja import NinjaAPI
 from ninja.openapi.docs import Swagger
 from ninja.security import django_auth
+
+from config.openapi import OwnerNamedNinjaAPI
 
 
 class NonceSwagger(Swagger):
@@ -22,14 +23,14 @@ class NonceSwagger(Swagger):
     template = "base/swagger.html"
 
 
-def build_api(*, urls_namespace: str = "api", docs: bool | None = None) -> NinjaAPI:
+def build_api(*, urls_namespace: str = "api", docs: bool | None = None) -> OwnerNamedNinjaAPI:
     """A NinjaAPI configured as the hub's: session auth with CSRF, error envelope, docs in DEBUG.
 
     Swagger only with DEBUG (by default): production enforces Trusted Types, which Swagger UI
     does not support.
     """
     with_docs = settings.DEBUG if docs is None else docs
-    api = NinjaAPI(
+    api = OwnerNamedNinjaAPI(
         title="ERPlora Hub API",
         version="1",
         openapi_url="/openapi.json",

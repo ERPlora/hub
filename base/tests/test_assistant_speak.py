@@ -283,4 +283,4 @@ def test_the_api_documents_the_mp3_and_the_json():
 
     content = api.get_openapi_schema()["paths"]["/api/assistant/speak"]["post"]["responses"][200]["content"]
     assert content["audio/mpeg"]["schema"] == {"type": "string", "format": "binary"}
-    assert content["application/json"]["schema"] == {"$ref": "#/components/schemas/AssistantSpeakOut"}
+    assert content["application/json"]["schema"] == {"$ref": "#/components/schemas/base.AssistantSpeakOut"}
