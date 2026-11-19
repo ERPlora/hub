@@ -28,12 +28,20 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import pytest
 from django.db import Error, connections
-from django.utils import timezone
 from live.operations import atomic
 
 from apps.verifactu import gateway
 from apps.verifactu.models import AeatRecord, Record
-from apps.verifactu.tests.conftest import HUB_DB_COMMITTED, A, FIXTURES, aeat_answer, manual, records_of, run
+from apps.verifactu.tests.conftest import (
+    FIXTURES,
+    HUB_DB_COMMITTED,
+    A,
+    aeat_answer,
+    manual,
+    records_of,
+    run,
+    schedule_alone,
+)
 from base import scheduler
 from base.models import TaskSchedule
 from base.tenancy.context import current_alias
@@ -197,9 +205,7 @@ def test_the_workers_pass_slower_than_the_cut_keeps_the_answer_and_moves_its_clo
     settings.WORKER_SCOPE_SLUG = A.key
     # The session of ``cluster_cut`` lives through the pass: released, it would reach the pool with its setting.
     monkeypatch.setattr(scheduler, "close_old_connections", lambda: None)
-    started = timezone.now()
-    scheduler.sync(started, declared=[task for task in scheduler.tasks() if task.app_label == "verifactu"])
-    minute = scheduler.next_after("* * * * *", started)
+    minute = schedule_alone(QUEUE)
     record = sealed_ticket()
 
     with cluster_cut():

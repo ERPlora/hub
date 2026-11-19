@@ -17,7 +17,7 @@ from django.utils import timezone
 
 from apps.verifactu import gateway
 from apps.verifactu.models import Record, SendControl
-from apps.verifactu.tests.conftest import A, HUB_DB, aeat_answer, manual, records_of, run
+from apps.verifactu.tests.conftest import A, HUB_DB, aeat_answer, manual, records_of, run, schedule_alone
 from base import scheduler
 
 pytestmark = HUB_DB
@@ -29,15 +29,12 @@ QUEUE = "verifactu.process_queue"
 
 @pytest.fixture
 def worker(settings, monkeypatch):
-    """The worker's scope and the gateway's address; the scheduler's tasks, as the worker schedules them."""
+    """The worker's scope and the gateway's address; the queue's task alone on the scheduler, and its first minute."""
     settings.WORKER_SCOPE_SLUG = A.key
     settings.VERIFACTU_GATEWAY_URL = URL
     # Inside the test's transaction a released connection could not be opened again.
     monkeypatch.setattr(scheduler, "close_old_connections", lambda: None)
-    started = timezone.now()
-    # VeriFactu's task alone: the other apps' tasks fall due on minutes of their own.
-    scheduler.sync(started, declared=[task for task in scheduler.tasks() if task.app_label == "verifactu"])
-    return scheduler.next_after("* * * * *", started)
+    return schedule_alone(QUEUE)
 
 
 @pytest.fixture
