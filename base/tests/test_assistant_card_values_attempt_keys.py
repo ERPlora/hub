@@ -77,7 +77,7 @@ class KeyedPreviewOut(Schema):
 def test_an_attempt_key_never_reaches_a_preview_either(monkeypatch):
     """«What will happen» of a dangerous card (BASE-F98) says its data by the same rule: a key its read answers is not
     there, even when its app names it among the preview's data."""
-    from base.tests.test_assistant import count_preview, declaring
+    from base.tests.test_assistant_previews import count_preview, declaring
 
     read = count_preview({"name": "Item 7", "idempotency_key": ATTEMPT}, output=KeyedPreviewOut)
     write = declaring({"operation": read.name, "fields": ["name", "idempotency_key"]})
