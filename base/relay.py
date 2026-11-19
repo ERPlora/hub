@@ -43,10 +43,9 @@ from live.live_registry import ALL_EVENTS
 from live.meta import all_live_app_configs
 from live.models import OutboxEvent
 
-# Before base.services: some of what it loads reads active_apps from this module while this one is still loading.
 from base.apps_on import active_apps
-from base.services import relay_runs
 from base.recovery import brought_back
+from base.services import relay_runs
 from base.tenancy.context import HUB_SCOPE_KIND
 
 #: How deep a chain of events may go (an event, the event its reaction records, …): the old Hub's.

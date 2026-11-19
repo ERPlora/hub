@@ -10,8 +10,8 @@ from live.context import OperationContext, Scope
 from live.meta import LiveAppConfig, module_configs
 from live.operations import Operation, operation, registry
 
+from base import apps_on
 from base import assistant as hub_assistant
-from base import relay
 from apps.flow.schemas import CatalogIn, CatalogOut
 
 from .reads import VIEW
@@ -36,8 +36,8 @@ def off_apps(scope: Scope) -> dict[str, LiveAppConfig]:
 
 
 def active_apps(scope: Scope) -> dict[str, LiveAppConfig]:
-    """The modules active in ``scope``'s business, but this one, as the platform's relay resolves them."""
-    active = relay.active_apps(scope)
+    """The modules active in ``scope``'s business, but this one, as the platform resolves them (``base.apps_on``)."""
+    active = apps_on.active_apps(scope)
     return {label: config for label, config in installed_apps().items() if label in active}
 
 

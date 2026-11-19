@@ -11,9 +11,9 @@ from live.models import OutboxEvent
 from live.operations import AI, operation
 
 from base import system
+from base.apps_on import active_apps
 from base.models import EventDelivery
 from base.permissions import ADMINISTER_HUB
-from base.relay import active_apps
 from base.schemas.failed_events import FailedEventIn, FailedEventListIn, FailedEventListOut, FailedEventOut
 from base.schemas.system import EventListIn, EventListOut, SystemStatusIn, SystemStatusOut
 

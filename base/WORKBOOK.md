@@ -3518,7 +3518,7 @@ Implicados: BASE-F92, BASE-F93
   requiere (cierre por `requires`, que solo conoce el Hub); un slug sin módulo se ignora y queda en el log; un hub de
   demo tiene todos. Lo bloqueado: 402 `app_entitlement_blocked` en toda operación de esa app
   (`LIVE["operation_database"] = base.entitlement.operation_database`, que delega en el de la tenencia), fuera de
-  `base.relay.active_apps` (relay e Inicio), `off` y sin menú en `base.session.me`. Sin ningún módulo de pago en el
+  `base.apps_on.active_apps` (relay e Inicio), `off` y sin menú en `base.session.me`. Sin ningún módulo de pago en el
   despliegue (hoy) no se lee nada. Tests: `base/tests/test_entitlement.py` (dos hubs, demo, fin del derecho, 402).
 - `base.app.list` (`GET /api/apps`, `base.view_home`, viva con `base.hub.state_applied`): los módulos de
   `home.shown_modules` desde su `LiveAppConfig` (nunca el catálogo del SaaS), con `right`, `state`, `path` (primera
@@ -3610,8 +3610,8 @@ Implicados: BASE-F92, BASE-F93
   `APP_RELEASED_AT` del entorno del despliegue; sin ellos, `dev` y `null`), `base.event.list` (`GET /api/system/events`:
   las 50 últimas `live.OutboxEvent` del host con su `EventDelivery` resumida y traducida; nunca el `payload`) y
   `base.failed_event.list` (`GET /api/system/failed-events`: las `EventDelivery` `dead` del host, hasta 100, con
-  `retryable` = su app está en `relay.active_apps`). Las tres filtran por `scope_kind`/`scope_key` del contexto (test de
-  dos hubs en `base/tests/test_queries_system.py`).
+  `retryable` = su app está en `base.apps_on.active_apps`). Las tres filtran por `scope_kind`/`scope_key` del contexto
+  (test de dos hubs en `base/tests/test_queries_system.py`).
 - Comandos (`base/services/`, `base.administer_hub`, `ai=` con `risk`), con el id en el cuerpo:
   `base.failed_event.retry` (`POST /api/system/failed-events/retry`: `pending`, `attempts` 0, solo a su `app_label`;
   409 `base.failed_event_app_off` si la app no está activa), `base.failed_event.retry_all` (`POST

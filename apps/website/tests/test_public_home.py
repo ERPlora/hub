@@ -243,13 +243,13 @@ def test_each_hub_shows_its_own_site_on_its_root(client, hub_b):
 
 
 def test_with_the_module_off_in_the_hub_neither_the_root_nor_the_public_api_show_its_site(client, monkeypatch):
-    # The same guard on every public path: the module on in this hub (``base.relay.active_apps``) and a live
+    # The same guard on every public path: the module on in this hub (``base.apps_on.active_apps``) and a live
     # publication of its own.
     publish()
-    from base import relay
+    from apps.website import queries
 
-    on = relay.active_apps
-    monkeypatch.setattr(relay, "active_apps", lambda scope: on(scope) - {"website"})
+    on = queries.active_apps
+    monkeypatch.setattr(queries, "active_apps", lambda scope: on(scope) - {"website"})
     assert jumps_to_the_login(visit(client))
     assert public_home.is_published(Hub.objects.get(slug=A.key)) is False
     for path in ("/api/website/public/site", "/api/website/public/catalog"):

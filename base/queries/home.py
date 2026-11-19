@@ -7,9 +7,9 @@ from live.context import OperationContext
 from live.operations import AI, INTERNAL, operation
 
 from base import activation, bell, home
+from base.apps_on import active_apps
 from base.models import EventDelivery, Hub, Membership
 from base.permissions import ADMINISTER_HUB, VIEW_HOME
-from base.relay import active_apps
 from base.schemas.home import (
     NoticeListIn,
     NoticeListOut,

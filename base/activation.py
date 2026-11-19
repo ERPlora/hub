@@ -33,7 +33,7 @@ The rules, without the database: ``base.services`` (``base.app.enable``, ``base.
   transaction of ``base.app.disable`` or ``base.app.enable``, and when ``base.app.list`` says it beforehand, in the
   language of who asks (``ctx.language``), so a hook that only calls ``gettext`` already answers in it.
 
-What is off is also out of everything that asks which apps are on (``base.relay.active_apps``): its operations answer
+What is off is also out of everything that asks which apps are on (``base.apps_on.active_apps``): its operations answer
 404 ``app_inactive`` (``base.entitlement.operation_database``), the relay and the Home leave it out and the menu does
 not list it. Its tables are never dropped: turned on again, it has its data.
 
@@ -370,8 +370,8 @@ def states_of(scope: Scope) -> dict[str, Activation]:
 
 
 def off_apps(scope: Scope) -> frozenset[str]:
-    """The modules off in ``scope``'s business: what ``base.relay.active_apps`` and the operations leave out (those whose
-    tables are still being made too: only ``on`` is active).
+    """The modules off in ``scope``'s business: what ``base.apps_on.active_apps`` and the operations leave out (those
+    whose tables are still being made too: only ``on`` is active).
 
     From the cache when it has them; else read from the rows and kept, unless the running change wrote them (not
     committed yet). A cache that does not answer is logged and the rows are read: never a guess."""

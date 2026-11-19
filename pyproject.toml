@@ -202,7 +202,6 @@ ignore_imports = [
     "base.meter -> base.services",
     "base.operations -> base.services.devices",
     "base.permissions -> base.tenancy.context",
-    "base.relay -> base.services.relay_runs",
     "base.services.devices -> base.middleware",
     "base.services.sessions -> base.middleware",
     "base.tenancy.context -> base.tenancy.connections",

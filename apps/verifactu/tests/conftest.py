@@ -28,6 +28,7 @@ from live.meta import all_live_app_configs, permissions_for_role
 from live.operations import get
 
 from apps.verifactu import gateway, trust
+from base import scheduler
 from base.tenancy.context import use_hub
 from base.tenancy.tests.business import (
     HOST,
@@ -240,6 +241,17 @@ def db_dsn(django_db_setup):
 @pytest.fixture
 def issuer(db):
     return run("invoice.issuer.update", ISSUER)
+
+
+#: Half a minute before minute 23, when VeriFactu's certificate check falls due.
+WORKER_STARTED = dt.datetime(2026, 11, 19, 3, 22, 30, tzinfo=dt.UTC)
+
+
+def schedule_alone(key: str) -> dt.datetime:
+    """Only the task ``key`` on the scheduler, written as the worker would at ``WORKER_STARTED``; its first time."""
+    (task,) = [task for task in scheduler.tasks() if task.key == key]
+    scheduler.sync(WORKER_STARTED, declared=[task])
+    return scheduler.next_after(task.cron, WORKER_STARTED)
 
 
 #: Each record a submission carries: (Alta | Anulacion, its own invoice number), never its RegistroAnterior's.

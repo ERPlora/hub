@@ -97,7 +97,7 @@ from django.utils import timezone
 from live.context import OperationContext, Scope
 from live.operations import get as get_operation
 
-from base import activation, catalog, metrics, outbound, queries, relay, scheduler, schemas, services, usage
+from base import activation, apps_on, catalog, metrics, outbound, queries, relay, scheduler, schemas, services, usage
 from base.services.demos import reap_demos
 from base.tenancy import dumps, migrator, move, offboarding, provision, recovery, restore
 from base.tenancy.connections import close_hub_aliases, close_this_threads_connections
@@ -587,7 +587,7 @@ def _serve_hub(hub, now: dt.datetime, *, active: bool = False) -> None:
                 scheduler.sync(now)
                 _synced.add(hub.pk)
             relay.run(now)
-            scheduler.run_due(now, scope=scope, active=relay.active_apps(scope))
+            scheduler.run_due(now, scope=scope, active=apps_on.active_apps(scope))
             if hub.status == Hub.Status.READY and _sweep_due(hub.pk, now, active):
                 _swept[hub.pk] = now
                 pending = queries.apps.activation_next_at(hub.slug)
