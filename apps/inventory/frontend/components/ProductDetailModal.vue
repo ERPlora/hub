@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // The product sheet (WORKBOOK «Ficha del producto»), the old detail modal: its photo on top, larger (or its initials,
-// INVENTORY-F32), SKU, Price, Stock («—» for
+// INVENTORY-F32), SKU, Price, Allergens, Stock («—» for
 // an article without stock control) and Status, and, with the permission to move stock and on a
 // physical product, «Receive stock», «Count stock» and, when it tracks its stock, «Write off stock»
 // (the page opens their dialog). For whoever can change products, «Mark sold out» or «Put back on sale»
@@ -9,7 +9,7 @@
 // «Print barcode» (INVENTORY-F25): each press asks Printing's queue for one label and the sheet says which
 // printer takes it, or that it waits for a «Label» printer; without the queue, the device's print dialog (the
 // browser's; inside the installed app, its print screen, hub#455), and a print refused says why.
-import { FormModal, InlineFeedback } from '@erplora/ui/components';
+import { formatAllergens, FormModal, InlineFeedback } from '@erplora/ui/components';
 import { ApiError, type OutputOf, useCommand } from '@erplora/ui/sdk';
 import { HubIcon, useSession } from '@erplora/ui/shell';
 import { IonButton, IonItem, IonLabel, IonList, IonNote } from '@ionic/vue';
@@ -34,6 +34,7 @@ const business = useBusinessMoney();
 const session = useSession();
 const canMove = computed(() => session.can('inventory.adjust_stock') && props.product?.product_type === 'physical');
 const canChange = computed(() => session.can('inventory.change_product'));
+const allergenText = computed(() => (props.product ? formatAllergens(props.product.allergens, locale.value) : ''));
 
 const status = computed(() => {
   const p = props.product;
@@ -126,6 +127,16 @@ async function setSoldOut(value: boolean): Promise<void> {
       v-if="product"
       lines="full"
     >
+      <ion-item data-testid="inventory-product-detail-allergens">
+        <ion-label>{{ $t('inventory.products.allergens') }}</ion-label>
+        <ion-note
+          slot="end"
+          class="product-detail__allergens"
+          :color="product.allergens.length ? undefined : 'medium'"
+        >
+          {{ allergenText || $t('inventory.products.noAllergens') }}
+        </ion-note>
+      </ion-item>
       <ion-item data-testid="inventory-product-detail-sku">
         <ion-label>{{ $t('inventory.common.sku') }}</ion-label>
         <ion-note slot="end">
@@ -248,6 +259,12 @@ async function setSoldOut(value: boolean): Promise<void> {
 </template>
 
 <style scoped>
+.product-detail__allergens {
+  max-inline-size: 65%;
+  text-align: end;
+  white-space: normal;
+}
+
 .product-detail__photo {
   width: 128px;
   height: 128px;
