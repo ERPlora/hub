@@ -143,6 +143,20 @@ def db_dsn(django_db_setup):
 # ── Builders of the kitchen ──────────────────────────────────────────────────────────────────────
 
 
+def add_printers(scope: Scope = A) -> None:
+    """An active kitchen printer and an active bar printer in ``scope``'s business, through Printing's operation:
+    a round goes to paper only where an active printer prints its function."""
+    for usage, address in (("kitchen", "10.0.0.2"), ("bar", "10.0.0.3")):
+        data = {"name": usage.title(), "kind": "network", "address": address, "usage": usage}
+        run("printing.printer.create", data, ctx_for(scope=scope))
+
+
+@pytest.fixture
+def printers(in_business_a):
+    """Business A prints: its kitchen and its bar each have an active printer."""
+    add_printers()
+
+
 def make_station(name: str = "Grill", **fields):
     from apps.kitchen.models import Station
 

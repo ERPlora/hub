@@ -161,7 +161,7 @@ def test_each_dish_of_a_menu_goes_to_its_own_station_under_the_menus_header(rela
 
 
 @HUB_DB_COMMITTED
-def test_on_paper_each_printer_gets_its_dishes_under_the_menus_header(relay, menu):
+def test_on_paper_each_printer_gets_its_dishes_under_the_menus_header(relay, menu, printers):
     options, _, _ = menu
     order = open_check("Table 4")
     (menu_line,) = add_menu(order.id, options["SAL"], options["STK"], options["FLA"]).lines

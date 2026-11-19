@@ -16,7 +16,8 @@ from django.utils import translation
 from live.context import system_context
 
 from apps.flow import gateway as flow_gateway
-from apps.flow import queries, services
+from apps.flow import queries
+from apps.flow.apps import RUN_ACTOR
 from apps.flow.models import Flow, FlowRun, Question
 from apps.task.models import Task
 from base.tests.fake_gateway import gateway, signed  # noqa: F401 - the fixture
@@ -521,7 +522,7 @@ def test_a_yes_makes_the_change_as_the_automation_never_as_who_answered(gateway,
     worker.request("flow.question.answer", {"id": str(question.id), "approve": True}, ctx_for("hub_owner", actor="owner"))
     worker()
     assert titles() == ["Call Ana"]
-    assert actors_of("task.task.created") == {f"{services.RUN_ACTOR}{ran.id}"}
+    assert actors_of("task.task.created") == {f"{RUN_ACTOR}{ran.id}"}
 
 
 def test_on_its_own_the_change_runs_as_the_automation_never_as_the_platform(gateway, clock, worker):
@@ -532,7 +533,7 @@ def test_on_its_own_the_change_runs_as_the_automation_never_as_the_platform(gate
     ran = start(worker, flow)
     worker()
     assert titles() == ["Call Ana"]
-    assert actors_of("task.task.created") == {f"{services.RUN_ACTOR}{ran.id}"}
+    assert actors_of("task.task.created") == {f"{RUN_ACTOR}{ran.id}"}
 
 
 def test_a_turn_another_process_holds_is_left_alone(gateway, clock, worker):

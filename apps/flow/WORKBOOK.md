@@ -1336,7 +1336,7 @@ Los avisos llevan ids, nunca nombres ni contenidos.
   empates incluidos. Lo fija `test_ties_go_by_id_in_the_lists_own_direction`.
 - **Anatomía**: `apps.py`, `models.py`, `document.py` (el documento de una automatización: rutas de
   datos, plantillas `{{…}}`, condiciones, horarios y permisos que pide; puro, sin base de datos),
-  `schemas.py`, `queries.py`, `services.py` (con el motor), `events.py`, `live.py`, `api.py`, `admin.py`,
+  `schemas.py`, `queries.py`, `services/` (con el motor), `events.py`, `live.py`, `api.py`, `admin.py`,
   `locale/`, `frontend/` y un `tests/test_<fichero>.py` por fichero, más
   `tests/test_integration_apps.py` (Clientes, Ventas y Tareas de verdad) y `tests/test_concurrency.py`.
 - **Modelos**: `Flow` (nombre, encendida, disparador aplanado —`trigger_kind`, `trigger_event`,
@@ -1401,7 +1401,7 @@ Los avisos llevan ids, nunca nombres ni contenidos.
   (`{herramienta: {entrada: valor}}`, opcional; sin él el paso se guarda sin esa clave, `exclude_none`). Al guardar,
   `queries.pinned_problem` exige que la herramienta esté en `tools` y que la entrada sea de su `action_fields`, con
   valor (`steps.<n>.pinned`, `invalid_payload`); `_reads`/`_call_only` leen sus `{{…}}` como los del encargo. Al
-  correr, `services._spec` los quita de `parameters` (`properties` y `required`) de lo que se ofrece al modelo,
+  correr, `services.assistant_steps._spec` los quita de `parameters` (`properties` y `required`) de lo que se ofrece al modelo,
   `_pinned` los resuelve con `document.resolve` sobre `{"input", "steps"}` y `_with_pinned` los pone encima de los
   argumentos del modelo, antes de `_propose` (la propuesta guardada, y su tarjeta, ya los llevan) o de `run_tool`;
   vacío (`queries.fixed_value`: `None` o texto en blanco, la misma regla en «Probar») → `flow.pinned_empty` al
@@ -1461,7 +1461,7 @@ Los avisos llevan ids, nunca nombres ni contenidos.
   antes, sin migración. Una pregunta de «Preguntar antes a alguien», o cuya acción ya no existe, lleva `action`
   vacío y su título tal cual. `QuestionInbox.vue` la pinta justo debajo del título. Un no o el silencio a ese
   cambio guardan en el motivo de la ejecución (`flow.question_rejected`, `flow.question_expired`) también su
-  `operation` (`services._asked_for`, con `queries.proposal_held`), y `queries.say` dice entonces su acción en lugar
+  `operation` (`services.questions._asked_for`, con `queries.proposal_held`), y `queries.say` dice entonces su acción en lugar
   del título (`NAMED_BY_ITS_ACTION`), en el idioma de quien lee el historial; sin la acción, el título guardado. Mercado: la tarjeta de
   confirmación del chat de `base` («¿Ejecutar esta acción?» y debajo la acción), Intercom Fin (título fijo «Fin
   requires your decision» y debajo la pregunta), Copilot Studio, Square Managerbot y Shopify Sidekick (lo que va a
@@ -1647,7 +1647,7 @@ Los avisos llevan ids, nunca nombres ni contenidos.
   (`recipes._declared`: lo que declara la app activa, apartada o no; sin validar ni huella, así que vale también
   para una montada desde la versión de hoy), solo para las herramientas que ese paso sigue ofreciendo y solo las
   entradas que el paso no fija (lo que fijó el dueño gana). No escribe nada: se aplica donde se lee el paso —
-  `services._step_of` (al ofrecer las herramientas en `claim_assistant`, en `assistant_round` y en el sí de
+  `services.assistant_steps._step_of` (al ofrecer las herramientas en `claim_assistant`, en `assistant_round` y en el sí de
   `answer_question`, que además vuelve a poner los datos fijos sobre la propuesta guardada en `_make_proposal`, o no
   la hace si quedan vacíos), `queries.proposal_of` (la tarjeta de «Esperan tu respuesta»: un dato vacío no se pinta)
   y `queries.flow_row` (el editor y la API los enseñan, y guardar los escribe) — y se escribe al hacer una copia
@@ -1661,7 +1661,7 @@ Los avisos llevan ids, nunca nombres ni contenidos.
   receta cuentan siempre, quitarlos desde la copia se guardaría y volvería en silencio al leerla.
   `recipes.fixed_by_app(flow)` dice qué fija la app activa de su receta (las rutas del filtro de la receta mientras
   arranque con su `event`, y por id de paso y herramienta los campos de su `pinned`) y sale en `FlowOut.fixed_by_app`
-  (`None` sin receta, y en una copia). `services._taken_off`, antes de `_check` en `flow.flow.update`, rechaza con
+  (`None` sin receta, y en una copia). `services.flow_document._taken_off`, antes de `_check` en `flow.flow.update`, rechaza con
   `flow.recipe_fixed` (422, por campo: `trigger.filter`, `steps.<n>.pinned`) un cambio que deja fuera una de esas
   rutas mientras arranca con ese aviso, o un campo (o lo deja vacío) mientras el paso de ese id ofrece su
   herramienta. En el editor, `TriggerCard` pasa a `ConditionRows` las rutas (`lockedBy`: sin quitar ni cambiar de
