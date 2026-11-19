@@ -66,6 +66,15 @@ def _assistant_read(ctx: OperationContext, name: str) -> dict | None:
         return None
 
 
+def _assistant_words(content) -> str:
+    """The words of a person's message, to choose its tools: a message that brings files comes as a list of parts,
+    and only its text parts are words."""
+    if isinstance(content, str):
+        return content
+    parts = content if isinstance(content, list) else []
+    return "\n".join(str(part.get("text", "")) for part in parts if isinstance(part, dict) and part.get("type") == "text")
+
+
 def _assistant_refusal(outcome: str, code: str, message: str) -> "shared.ToolOutcome":
     """A tool that did not run, told to the model in the same envelope as an operation's error."""
     return shared.ToolOutcome(outcome, code, shared.error_content(code, message))
@@ -190,7 +199,8 @@ def assistant_turn(ctx: OperationContext, data: AssistantTurnIn) -> dict:
         )
         pending.pop(0)
     messages = [*data.messages, *append]
-    asked = [str(m.get("content")) for m in data.messages if m.get("role") == "user" and isinstance(m.get("content"), str)]
+    # A file alone says nothing: the words the person wrote before it still count.
+    asked = [words for m in data.messages if m.get("role") == "user" and (words := _assistant_words(m.get("content")))]
     business = _assistant_read(ctx, "base.business.get") or {}
     if card is not None:
         # The card paints an amount (its schema's ``money`` mark) in the business's currency, with its decimals.
