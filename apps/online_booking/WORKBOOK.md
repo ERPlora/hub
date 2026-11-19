@@ -453,7 +453,13 @@ del equipo con su sesión abierta.
 - **Concurrencia**: `public.book` bloquea primero la fila de `Settings` (`page_settings(lock=True)`): las
   reservas públicas del hub van una tras otra, así que los límites por dispositivo, por negocio y por móvil
   y la ficha de un móvil nuevo se deciden sobre lo que escribió la anterior (sin fichas duplicadas). Además,
-  Citas bloquea la ficha del profesional antes de juzgar el hueco (`tests/test_concurrency.py`, con hilos).
+  Citas bloquea la ficha del profesional antes de juzgar el hueco. Las fichas vivas con el móvil se bloquean
+  en la misma lectura que las encuentra y por id, en el orden en que las bloquea una fusión: una fusión en
+  Clientes que llega a mitad de la reserva la espera y después mueve la cita a la ficha que se queda (antes,
+  la que caía entre leer y bloquear dejaba la reserva en 404 `customer.customer_unavailable`). Guardar los
+  Ajustes bloquea su fila: dos guardados a la vez conservan lo de cada uno. Cancelar con el enlace no bloquea
+  nada propio: Citas bloquea la cita al anularla, y de dos cancelaciones a la vez entra una y la otra recibe
+  409 `appointment.cannot_cancel` (`tests/test_concurrency.py`, con hilos y sesiones reales).
 - **Límites**: 5 por visitante y hora y 100 por negocio y hora (429; constantes de `services.py`), y las
   próximas por móvil de los Ajustes (409; 3 de fábrica); se cuentan sobre `Booking` y las citas, en la
   transacción de la reserva.
