@@ -15,6 +15,7 @@ from django.conf import settings
 from django.db import transaction
 from django.db.models import Count, Q
 from live.operations import atomic
+from live.outbox import notify
 
 from base import auth, registry, signing
 from base.models import Hub
@@ -65,6 +66,14 @@ def _control_transaction():
 
     with use_control(), atomic():
         yield
+
+
+def ring(hub: Hub, at: dt.datetime | None = None, *, told: str) -> None:
+    """``hub`` has work a business asked for (an app to set up, a reset) by ``at`` (now by default): due in ``hub_due``
+    then, in the caller's transaction on control, and the worker told on the platform's channel after control's COMMIT
+    (``base.control_pace``), so it does not wait for its look; ``told`` names what was asked."""
+    HubDue.mark_due(hub, at)
+    transaction.on_commit(partial(notify, registry.REGISTRY_SCOPE, [told]), robust=True)
 
 
 def registry_row(hub_id: UUID) -> Hub | None:

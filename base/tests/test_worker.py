@@ -1,19 +1,15 @@
 """The worker's loop.
 
-It registers the Hub's modules in the SaaS first: without its apps registered there is no release,
-so it does no work before that. A ``shared`` schema the SaaS has not migrated yet (the first deploy)
-is waited for, with a warning and a backoff of 5, 10, 20, 40 and then 60 s; any other failure stops
-the worker with 1. Then it names, as an error, each ready business still without its own database (it
-never serves one) and, on every tick until asked to stop (waking up at once: ECS gives it 30 s after
-SIGTERM), takes control's own outbox (``relay.run(of_hubs=False)``) and visits the hubs with their own
-database (``base.hub_visits``: their outbox and their tasks, in each; ``test_hub_visits.py``). A pass that fails is
-logged and the next tick tries again. On the first tick and then every ``REAPER_INTERVAL_SECONDS`` it purges the demos
-that ended (``reap_demos``); a reaper that fails is logged and never stops the worker. Every tick it
-makes the databases of the hubs due in ``hub_due`` and drops the demos that ended (``provision.run_due``),
-on control; a pass that fails is logged and the next tick tries again. No database here:
-``register_apps``, the scheduler, the relay, the reaper, the registry and the due pass are replaced; their own tests
-are ``test_register_apps.py``, ``test_scheduler.py``, ``test_relay.py``, ``test_services_demo.py`` and
-``base/tenancy/tests/test_provision.py``.
+It registers the Hub's modules in the SaaS first: without its apps registered there is no release, so it does no work
+before that. A ``shared`` schema the SaaS has not migrated yet (the first deploy) is waited for, with a warning and a
+backoff of 5, 10, 20, 40 and then 60 s; any other failure stops the worker with 1. Then it names, as an error, each
+ready business still without its own database (it never serves one) and ticks until asked to stop (waking up at once:
+ECS gives it 30 s after SIGTERM): it visits the hubs with their own database (``test_hub_visits.py``) and, in a pass of
+control's steps, takes control's own outbox, purges the demos that ended once a minute and makes the databases of the
+hubs due. Here every tick is such a pass; when they run is ``test_control_pace.py``'s. A pass that fails is logged and
+the next tick tries again. No database here: ``register_apps``, the scheduler, the relay, the reaper, the registry and
+the due pass are replaced; their own tests are ``test_register_apps.py``, ``test_scheduler.py``, ``test_relay.py``,
+``test_services_demo.py`` and ``base/tenancy/tests/test_provision.py``.
 """
 
 
@@ -105,9 +101,13 @@ class FakeDue:
 
 @pytest.fixture(autouse=True)
 def hubs_pass(monkeypatch) -> list[dt.datetime]:
-    """Stands in for the visits to the hubs with their own database (``base.hub_visits``; ``test_hub_visits.py``)."""
+    """Stands in for the visits to the hubs with their own database (``base.hub_visits``; ``test_hub_visits.py``), and
+    for the pace of control's steps, due on every tick (``base.control_pace``; ``test_control_pace.py``)."""
     passes: list[dt.datetime] = []
-    monkeypatch.setattr(worker.hub_visits, "HubVisits", lambda: SimpleNamespace(serve=passes.append, close=lambda: None))
+    monkeypatch.setattr(worker.hub_visits, "HubVisits", lambda ear: SimpleNamespace(serve=lambda now, look: passes.append(now), close=lambda: None))
+    every = SimpleNamespace(due=lambda now: True, moves_due=lambda now: True, ran=lambda now, worked: None, moved=lambda now, started: None)
+    monkeypatch.setattr(worker.control_pace, "Ear", lambda: None)
+    monkeypatch.setattr(worker.control_pace, "ControlPace", lambda ear: every)
     return passes
 
 
@@ -192,7 +192,7 @@ def reaper(monkeypatch) -> FakeReaper:
 
 
 class FakeFreeze:
-    """Stands in for ``worker._frozen``, the freeze switch read once a tick (hub#930): one answer per read, in order,
+    """Stands in for ``worker._frozen``, the freeze switch read once a pass: one answer per read, in order,
     the last one kept; counts the reads."""
 
     def __init__(self) -> None:
@@ -596,7 +596,7 @@ def test_a_reaper_that_fails_is_logged_and_never_stops_the_worker(monkeypatch, c
 # ── The outbox relay ─────────────────────────────────────────────────────────────────────────────
 
 
-def test_takes_control_s_own_outbox_on_every_tick_never_a_business_s(calls, outbox):
+def test_takes_control_s_own_outbox_in_each_pass_never_a_business_s(calls, outbox):
     stop = threading.Event()
     wait, _ = stop_after(stop, 3)
 
@@ -641,13 +641,13 @@ def every_pass(monkeypatch, order: list[str], due: FakeDue, outbox: FakeRelay) -
     the moves and the reaper keep their own fakes (``moves_pass``, ``reaper``)."""
     monkeypatch.setattr(provision, "run_due", lambda now: order.append("due") or due(now))
     monkeypatch.setattr(relay, "run", lambda now, of_hubs=True: order.append("relay") or outbox(now, of_hubs=of_hubs))
-    monkeypatch.setattr(worker.hub_visits, "HubVisits", lambda: SimpleNamespace(serve=lambda now: order.append("hubs"), close=lambda: None))
+    monkeypatch.setattr(worker.hub_visits, "HubVisits", lambda ear: SimpleNamespace(serve=lambda now, look: order.append("hubs"), close=lambda: None))
     monkeypatch.setattr(worker, "_activations", lambda now: order.append("activations"))
     monkeypatch.setattr(worker, "_data", lambda now, stop=None: order.append("data"))
     monkeypatch.setattr(worker, "_usage", lambda now: order.append("usage"))
 
 
-def test_takes_control_s_outbox_then_relays_the_hubs_own_then_makes_the_hubs_due_on_every_tick(
+def test_takes_control_s_outbox_then_relays_the_hubs_own_then_makes_the_hubs_due_in_each_pass(
     monkeypatch, calls, tasks, due, outbox
 ):
     """hub#471: the relay first, so a slow pass making databases never holds kitchen, stock or
@@ -678,7 +678,7 @@ def test_with_databases_only_it_makes_the_hubs_databases_and_apps_tables_and_dro
     monkeypatch.setattr(scheduler, "run_due", lambda now: order.append("tasks") or [])
     monkeypatch.setattr(provision, "run_due", lambda now: order.append("due") or due(now))
     monkeypatch.setattr(relay, "run", lambda now, of_hubs=True: order.append("relay") or outbox(now, of_hubs=of_hubs))
-    monkeypatch.setattr(worker.hub_visits, "HubVisits", lambda: SimpleNamespace(serve=lambda now: order.append("hubs"), close=lambda: None))
+    monkeypatch.setattr(worker.hub_visits, "HubVisits", lambda ear: SimpleNamespace(serve=lambda now, look: order.append("hubs"), close=lambda: None))
     monkeypatch.setattr(worker, "_reap", lambda now: order.append("reap"))
     monkeypatch.setattr(worker, "_activations", lambda now: order.append("activations"))
     monkeypatch.setattr(worker, "_data", lambda now, stop=None: order.append("data"))
@@ -723,8 +723,8 @@ def test_the_pass_that_makes_databases_gives_the_next_tick_its_turn():
     assert provision.DUE_PASS_SECONDS <= worker.TICK_SECONDS
 
 
-#: A demo is ready in under 5 s from its request. The worker takes a hub due on its next pass, so it never waits longer
-#: than that between passes.
+#: A demo is ready in under 5 s from its request. Its notice wakes the worker's pass at the next tick
+#: (``test_control_pace.py``), so it never waits longer than that between ticks.
 DEMO_READY_AIM_SECONDS = 5.0
 
 
@@ -733,10 +733,10 @@ def test_with_its_own_tick_it_takes_a_new_demo_within_five_seconds(monkeypatch, 
     """hub#1061: demo.spec.ts gave a demo 15 s (the worker's 5 s tick plus the 5 s a demo aims at, with room for a
     loaded machine) and dropped that clock: what it held of the tick is this fact, measured on the waits the loop asks
     for, never on the wall clock. ``run_worker`` passes no tick (``test_run_worker.py``), so this is the tick of
-    production and of the e2e's worker (``--databases-only``): it makes the hubs due on every pass and waits no longer
-    than 5 s between two."""
+    production and of the e2e's worker (``--databases-only``): it makes the hubs due in its passes and waits no longer
+    than 5 s between two ticks."""
     monkeypatch.setattr(worker, "_activations", lambda now: None)
-    monkeypatch.setattr(worker.hub_visits, "HubVisits", lambda: SimpleNamespace(serve=lambda now: None, close=lambda: None))
+    monkeypatch.setattr(worker.hub_visits, "HubVisits", lambda ear: SimpleNamespace(serve=lambda now, look: None, close=lambda: None))
     monkeypatch.setattr(worker, "_data", lambda now, stop=None: None)
     stop = threading.Event()
     wait, waits = stop_after(stop, 3)
@@ -840,7 +840,7 @@ def test_a_slow_pass_that_fails_is_logged_and_the_next_tick_starts_it_again(monk
 # ── A hub moved to another cluster (base.tenancy.move) ──────────────────────────────────────────────────────────────
 
 
-def test_the_moves_run_in_a_thread_of_their_own_every_tick_after_the_data_and_before_the_hubs_due(
+def test_the_moves_run_in_a_thread_of_their_own_in_a_pass_after_the_data_and_before_the_hubs_due(
     monkeypatch, calls, tasks, due, outbox
 ):
     order: list[str] = []
@@ -853,7 +853,7 @@ def test_the_moves_run_in_a_thread_of_their_own_every_tick_after_the_data_and_be
 
     monkeypatch.setattr(worker, "Background", Recorded)
     monkeypatch.setattr(provision, "run_due", lambda now: order.append("due") or due(now))
-    monkeypatch.setattr(worker.hub_visits, "HubVisits", lambda: SimpleNamespace(serve=lambda now: order.append("hubs"), close=lambda: None))
+    monkeypatch.setattr(worker.hub_visits, "HubVisits", lambda ear: SimpleNamespace(serve=lambda now, look: order.append("hubs"), close=lambda: None))
     monkeypatch.setattr(worker, "_data", lambda now, stop=None: order.append("data"))
     monkeypatch.setattr(worker, "_usage", lambda now: order.append("usage"))
     monkeypatch.setattr(worker, "_moves", lambda now, stop=None: order.append("moves"))
@@ -972,7 +972,7 @@ def test_frozen_it_makes_drops_moves_and_sets_up_nothing_while_the_relay_the_tas
     assert (due.passes, moves_pass, reaper.passes) == ([], [], [])
 
 
-def test_the_switch_is_read_once_a_tick(calls, freeze_switch):
+def test_the_switch_is_read_once_a_pass(calls, freeze_switch):
     ticks(3)
 
     assert freeze_switch.reads == 3

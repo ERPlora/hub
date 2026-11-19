@@ -1,12 +1,13 @@
 """The worker's visits to the businesses with a database of their own.
 
-On every tick of the worker (``base.worker``), :meth:`HubVisits.serve` reads on control the businesses it serves
-(``base.services.provisioning.hubs_to_serve``: ready ones and those that left but keep their database, whose records
-still to send must reach the AEAT; never one being made, dropped, moved or restored) and enters the database of each
-(``use_hub``), one at a time and for ``HUB_PASS_SECONDS`` at most, only when there is something to do there:
+On every tick of the worker (``base.worker``), :meth:`HubVisits.serve` enters the database of each business it serves
+(``use_hub``), one at a time and for ``HUB_PASS_SECONDS`` at most, only when there is something to do there. Which they
+are it reads on control at the worker's passes there (``look``, ``base.control_pace``; ready ones and those that left
+but keep their database, whose records still to send must reach the AEAT; never one being made, dropped, moved or
+restored: ``base.services.provisioning.hubs_to_serve``), and keeps between two. Something to do:
 
 - its channel was notified: an operation of the business committed (``live.outbox.notify`` after its COMMIT), heard on
-  the worker's own LISTEN (``base.hub_listener``);
+  the worker's own LISTEN (``base.hub_listener``, shared with control's steps: ``base.control_pace.Ear``);
 - the next run of a task of one of its apps that are on, or the next try of a delivery, came
   (``base.queries.due_work``, read when its last visit ended);
 - ``LOOK_SECONDS`` passed since its last visit: the look that finds what a lost notice, or a LISTEN down, did not say;
@@ -70,14 +71,30 @@ class HubVisits:
 
     def __init__(self, listener: Listener | None = None) -> None:
         self._ear = Listener() if listener is None else listener
+        self._hubs: list[Hub] | None = None
+        self._active: frozenset[str] = frozenset()
         self._known: dict = {}
         self._heard: set = set()
         self._swept: dict = {}
         self._next_hub = None
 
-    def serve(self, now: dt.datetime) -> None:
-        """Visit, at ``now``, the businesses served that have something to do; a failure to read them is logged and the
-        next tick tries again."""
+    def serve(self, now: dt.datetime, *, look: bool = True) -> None:
+        """Visit, at ``now``, the businesses served that have something to do; ``look``: read again on control which
+        they are, else the ones read last. A failure to read them is logged and the next tick tries again."""
+        if (look or self._hubs is None) and not self._read(now):
+            return
+        self._hear(self._hubs)
+        started = time.monotonic()
+        for hub in self._due(self._hubs, now):
+            self._visit(hub, now, active=hub.slug in self._active)
+            self._next_hub = hub.pk
+            if time.monotonic() - started > HUB_PASS_SECONDS:
+                break
+
+    def close(self) -> None:
+        self._ear.close()
+
+    def _read(self, now: dt.datetime) -> bool:
         try:
             with use_control():
                 hubs = services.provisioning.hubs_to_serve(now)
@@ -85,17 +102,9 @@ class HubVisits:
         except Exception:
             logger.exception("worker: the hubs to serve could not be read; the next tick tries again.")
             close_old_connections()
-            return
-        self._hear(hubs)
-        started = time.monotonic()
-        for hub in self._due(hubs, now):
-            self._visit(hub, now, active=hub.slug in active)
-            self._next_hub = hub.pk
-            if time.monotonic() - started > HUB_PASS_SECONDS:
-                break
-
-    def close(self) -> None:
-        self._ear.close()
+            return False
+        self._hubs, self._active = hubs, active
+        return True
 
     def _hear(self, hubs: list[Hub]) -> None:
         channels = {Scope("host", hub.slug).channel: hub.pk for hub in hubs}
