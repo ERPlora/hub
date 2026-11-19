@@ -1,0 +1,77 @@
+.ob-business {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.ob-business__logo {
+  width: 80px;
+  height: 80px;
+  flex: 0 0 auto;
+  object-fit: contain;
+  border-radius: var(--ep-radius-md);
+  background: var(--ep-surface-muted);
+  padding: 8px;
+}
+.ob-business__copy {
+  min-width: 0;
+}
+.ob-business__name {
+  margin: 0 0 4px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.ob-business__title {
+  margin: 0;
+}
+.ob-business__welcome {
+  margin: 8px 0 0;
+  color: var(--ep-text-muted);
+  white-space: pre-line;
+}
+.ob-public-submit {
+  display: grid;
+  gap: 12px;
+}
+.ob-public-submit__privacy {
+  margin: 0;
+  color: var(--ep-text-muted);
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+.ob-public-submit__privacy a {
+  color: var(--ion-color-primary);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.ob-public-submit__trap {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.ob-public-submit__button {
+  justify-self: start;
+}
+.ob-result__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.ob-result__token {
+  overflow-wrap: anywhere;
+}
+@media (max-width: 576px) {
+  .ob-business {
+    align-items: flex-start;
+    gap: 12px;
+  }
+  .ob-business__logo {
+    width: 64px;
+    height: 64px;
+  }
+  .ob-public-submit__button {
+    width: 100%;
+  }
+}
