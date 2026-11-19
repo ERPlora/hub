@@ -223,6 +223,15 @@ ignore_imports = [
 ]
 
 [[tool.importlinter.contracts]]
+id = "base-blueprint-no-relay"
+name = "base.blueprint does not import base.relay, which loads base.services, which loads base.blueprint"
+type = "forbidden"
+source_modules = ["base.blueprint"]
+forbidden_modules = ["base.relay"]
+allow_indirect_imports = true
+ignore_imports = ["**.tests.** -> **"]
+
+[[tool.importlinter.contracts]]
 id = "app-appointment"
 name = "apps.appointment imports only itself, base, live and the apps it requires"
 type = "forbidden"

@@ -59,9 +59,9 @@ from live.meta import module_configs
 from live.operations import atomic, get
 
 from base import activation, blueprint_products, images
+from base.apps_on import active_apps
 from base.catalog import template_apps
 from base.entitlement import blocked_apps
-from base.relay import active_apps
 
 logger = logging.getLogger(__name__)
 
