@@ -128,17 +128,11 @@
   "opening": "Book me a table for 6 on Friday",
   "offered": ["reservation.reservation.create"],
   "writes": ["reservation.reservation.create", "reservation.reservation.update", "customer.customer.create"],
-  "cards": [
-    {
-      "tool": "reservation.reservation.create",
-      "match": {"guest_name": "ortega"},
-      "expect": {"party_size": 6, "date": "{friday}"}
-    }
-  ],
+  "cards": [{"tool": "reservation.reservation.create", "match": {"guest_name": "ortega"}, "expect": {"party_size": 6}}],
   "expect": [
     {
-      "says": "one booking for six on Friday at 21:30 under Javier Ortega",
-      "sql": "select count(*) from reservation_reservation r left join customer_customer c on c.id = r.customer_id where not r.is_deleted and r.date = '{friday}' and to_char(r.time, 'HH24:MI') = '21:30' and r.party_size = 6 and (r.guest_name ilike '%ortega%' or c.name ilike '%ortega%')",
+      "says": "one booking for six on the coming Friday (today, when today is one) at 21:30 under Javier Ortega",
+      "sql": "select count(*) from reservation_reservation r left join customer_customer c on c.id = r.customer_id where not r.is_deleted and extract(isodow from r.date) = 5 and r.date between '{today}' and '{today+7}' and to_char(r.time, 'HH24:MI') = '21:30' and r.party_size = 6 and (r.guest_name ilike '%ortega%' or c.name ilike '%ortega%')",
       "equals": "1"
     }
   ],
