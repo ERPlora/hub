@@ -10,7 +10,8 @@ from decimal import Decimal
 
 from django.utils.translation import gettext
 
-from apps.sale.schemas import PreviewOut, SaleOut
+from apps.sale.schemas.checkout import PreviewOut
+from apps.sale.schemas.sales import SaleOut
 from base.business import money_text
 
 #: The legal texts of the fiscal QR (Orden HAC/1177/2024 art. 20.1.b and 21.1; RD 1619/2012 art. 6.5.b): the

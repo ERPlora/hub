@@ -3,8 +3,8 @@
 from live.context import OperationContext
 from live.operations import AI, operation
 
-from apps.sale.schemas import OrderOut
 from apps.sale.schemas.line_allergy import OrderSetLineAllergyIn
+from apps.sale.schemas.orders import OrderOut
 from apps.sale.services.orders import _open_order, _out, _pending_line, _touch
 
 

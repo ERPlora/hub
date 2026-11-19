@@ -17,7 +17,7 @@ from live.operations import get
 
 from apps.sale import paper
 from apps.sale.models import Order, OrderLine, SaleLine
-from apps.sale.schemas import PreviewLineOut
+from apps.sale.schemas.checkout import PreviewLineOut
 from apps.sale.tests.conftest import HOST, HUB_DB, B, ctx_for, run
 from apps.sale.tests.test_assistant_card_records import fields_of
 from apps.sale.tests.test_line_allergens import (

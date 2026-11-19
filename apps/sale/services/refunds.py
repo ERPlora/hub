@@ -16,7 +16,7 @@ from apps.sale.queries.other_apps import call_services
 from apps.sale.queries.payment_methods import held_methods, method_display_name
 from apps.sale.queries.refunds import tender_options
 from apps.sale.queries.sales import find_sale, returned_by_line, sessions_to_return
-from apps.sale.schemas import RefundIn, RefundOut
+from apps.sale.schemas.refunds import RefundIn, RefundOut
 from apps.sale.services.checkout import KEY_REUSED
 from apps.sale.services.documents import _fiscal_document, _issue_waiting_document
 
