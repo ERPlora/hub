@@ -125,6 +125,20 @@ describe('SettingsPage', () => {
     expect(s.field('logo-empty') !== null).toBe(true);
   });
 
+  it('puts a refused logo under Logo until another one is chosen', async () => {
+    const s = await setup();
+    await s.show(SETTINGS);
+    const reason = 'That logo was not uploaded to this business: upload it again.';
+    s.answerBy({ '/api/online_booking/settings/logo': [201, LOGO] });
+    await chooseLogo(s, new File([new Uint8Array([1, 2, 3])], 'logo.png', { type: 'image/png' }));
+    s.answer(422, { error: { code: 'invalid_payload', message: reason, fields: { logo: reason } } });
+    await click(s.field('save'));
+    expect(s.field('logo-save-error')?.textContent).toContain(reason);
+    s.answerBy({ '/api/online_booking/settings/logo': [201, OLD_LOGO] });
+    await chooseLogo(s, new File([new Uint8Array([4, 5, 6])], 'other.png', { type: 'image/png' }));
+    expect(s.field('logo-save-error')).toBeNull();
+  });
+
   it('saves only what was touched and changed, the page and the rules together, and says so', async () => {
     const s = await setup();
     await s.show(SETTINGS);
