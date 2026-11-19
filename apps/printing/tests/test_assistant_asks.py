@@ -168,7 +168,7 @@ OWN_WORDS_EN = [
     ("printing.device.register", "the counter tablet takes care of printing"),
     ("printing.device.retire", "the bar tablet is gone for good"),
     ("printing.device.retire", "we lost the patio tablet; it's out of service now"),
-    ("printing.device.update", "rename the bar tablet"),
+    ("printing.device.update", "give the bar tablet a different name"),
     ("printing.device.update", "the terrace tablet should reach the kitchen as well"),
     ("printing.job.cancel", "forget that job, it shouldn't come out"),
     ("printing.job.cancel", "drop that stuck one"),

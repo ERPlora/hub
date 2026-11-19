@@ -1684,10 +1684,9 @@ Los avisos llevan ids, nunca nombres ni contenidos.
   pregunta»); «borra» y «bórralo» tienen otra raíz que «borrador». `tests/test_assistant_asks.py` mide con las 30 frases
   reales de la QA de la capa 2 (`tests/e2e/qa/probes/owner-es-flow-2026-11-08.json`), nunca con los propios `asks`: cada
   una se ofrece, y con ella la lectura que encuentra su registro cuando la herramienta solo toma un id (el borrador, la
-  ejecución, la receta; sin ella el modelo pedía el id). Tres siguen sin ofrecerse cuando la automatización se nombra
-  solo por su nombre propio, porque `live` no da el peso del verbo pedido: «activa X» a `flow.flow.set_enabled`,
-  «renombra X» a `flow.flow.update` y «permite a X…» a `flow.flow.grant` (ERPlora/live#53; sus casos están marcados
-  `xfail(strict=True)` y se desmarcan cuando entre el arreglo). Con «la automatización» en la frase sí se ofrecen.
+  ejecución, la receta; sin ella el modelo pedía el id). También cuando la automatización se nombra solo por su
+  nombre propio: `live` da el peso del verbo pedido a la acción que lo hace dicho de otra forma, «activa X» a
+  `flow.flow.set_enabled`, «renombra X» a `flow.flow.update` (recibe `name`) y «permite a X…» a `flow.flow.grant`.
   Ninguna descripción manda confirmar antes: la tarjeta es la confirmación, y una descripción que lo pidiera haría
   que el asistente preguntara en el chat sin sacarla (hub#1175; lo guarda `tests/test_guardrails_assistant.py` para todo
   el Hub). La respuesta a una pregunta es la que dio la persona, nunca la del asistente.
