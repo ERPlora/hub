@@ -67,6 +67,7 @@ sus BD, los dos `runserver` y, pase lo que pase, la limpieza.
   El SaaS va en su `origin/main`.
 - **El tope**: 20 minutos para los tests (el tope global de Playwright), fijado con las pasadas medidas en el Mac
   cargado. Al llegar, Playwright corta y el humo sale en rojo. Subirlo es una decisión, no el arreglo de una pasada lenta.
+  En el job de GitHub, con todos los grupos dentro, los tests tardan de 11,9 a 14,2 minutos.
 - **Dónde**: `~/.erplora/hub-smoke-e2e/` y el puerto `9780` (el SaaS en el `9781`, como en la noche), aparte de la
   pasada nocturna, así que ninguna espera a la otra. Un worker lo lleva a su carpeta y a sus puertos con `NIGHTLY_DIR` y
   `NIGHTLY_HUB_PORT`. Nunca escribe en GitHub; lo que deja está en `runs/<pasada>/` de esa carpeta (`night.log`, los
@@ -93,8 +94,8 @@ sus BD, los dos `runserver` y, pase lo que pase, la limpieza.
   imprime desde el navegador), así que el job no instala WeasyPrint. `.github/scripts/workflows.test.sh` lleva la
   lista de los grupos que ya están dentro y cae si el job pierde o añade una spec por su cuenta. Con este último grupo
   están todos dentro: el job corre los mismos tests `@smoke` que este comando sin `--spec`, y una spec que se marque
-  después entra como un grupo, con sus tres pasadas. El job tiene un tope de 31 minutos, el doble de lo que tarda su
-  pasada medida más lenta con la pila incluida; un grupo que entra lo vuelve a medir. Lo que hace la pila sale en el
+  después entra como un grupo, con sus tres pasadas. El job tiene un tope de 34 minutos, el doble de lo que tarda su
+  pasada medida más lenta con la pila incluida; una spec que entra lo vuelve a medir. Lo que hace la pila sale en el
   registro del job y, si falla, el artefacto `smoke` guarda además los registros de los dos `runserver` y las trazas
   de Playwright.
 
