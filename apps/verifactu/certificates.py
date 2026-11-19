@@ -10,7 +10,7 @@ SaaS's gateway that presents with it (``fiscal_gateway/seal.py``):
 - a declared Extended Key Usage without clientAuth (nor anyExtendedKeyUsage) can never open the AEAT's mTLS
   connection: ``CertificateInvalid``, as a password that does not open it;
 - a self-signed certificate (its issuer is its own subject) was issued by no authority, and the AEAT never accepts
-  it: ``CertificateInvalid`` too.
+  it: ``CertificateInvalid`` too; and so is one that no authority of Spain's trusted list issued (``trust``).
 
 ``seal`` keeps the .p12 and its password together, encrypted with Fernet (AES-128-CBC + HMAC-SHA256, from
 ``cryptography``) under ``settings.FISCAL_CERTIFICATE_KEY``; ``open`` gives them back, or ``CertificateUnreadable``
@@ -36,7 +36,7 @@ from cryptography.x509.oid import ExtendedKeyUsageOID, NameOID
 from django.conf import settings
 from django.utils.translation import gettext_lazy as _
 
-from apps.verifactu import gateway
+from apps.verifactu import gateway, trust
 
 Kind = Literal["seal", "representative", "personal", "unknown"]
 
@@ -57,6 +57,10 @@ REFUSALS = {
     "incomplete": _("The file does not hold a certificate and its private key."),
     "self_signed": _(
         "No authority issued this certificate (it is self-signed), so the AEAT will not accept it. Use your "
+        "business's electronic certificate issued by a recognised authority, for example the FNMT."
+    ),
+    "untrusted_issuer": _(
+        "No authority the AEAT recognises issued this certificate, so the AEAT will not accept it. Use your "
         "business's electronic certificate issued by a recognised authority, for example the FNMT."
     ),
     "no_client_auth": _(
@@ -104,6 +108,8 @@ def inspect(p12: bytes, password: str) -> CertificateFacts:
         raise CertificateInvalid("incomplete")
     if certificate.issuer == certificate.subject:
         raise CertificateInvalid("self_signed")
+    if not trust.recognised(certificate):
+        raise CertificateInvalid("untrusted_issuer")
     if _declares_eku_without_client_auth(certificate):
         raise CertificateInvalid("no_client_auth")
     organization_id = _attribute(certificate, NameOID.ORGANIZATION_IDENTIFIER)

@@ -990,6 +990,14 @@ msgid "sealed certificate"
 msgstr "certificado cifrado"
 
 #: models.py
+msgid "issued by a recognised authority"
+msgstr "emitido por una entidad reconocida"
+
+#: models.py
+msgid "trusted list checked against"
+msgstr "lista de confianza con la que se comprobó"
+
+#: models.py
 msgid "own certificate"
 msgstr "certificado propio"
 
@@ -1004,6 +1012,14 @@ msgstr "Certificado propio de %(holder)s (%(holder_tax_id)s) subido; caduca el %
 #: models.py
 msgid "Own certificate of %(holder)s (%(holder_tax_id)s) removed."
 msgstr "Certificado propio de %(holder)s (%(holder_tax_id)s) quitado."
+
+#: models.py
+msgid ""
+"Own certificate of %(holder)s (%(holder_tax_id)s) no longer counts: no authority the AEAT recognises issued it. "
+"Upload a valid one."
+msgstr ""
+"El certificado propio de %(holder)s (%(holder_tax_id)s) ya no vale: no lo ha emitido una entidad que reconozca la "
+"AEAT. Sube uno válido."
 
 #: apps/verifactu/services/own_certificate.py
 msgid "This server cannot keep certificates yet: ERPlora has to set its storage key."
@@ -1031,6 +1047,14 @@ msgid ""
 "electronic certificate issued by a recognised authority, for example the FNMT."
 msgstr ""
 "Este certificado no lo ha emitido ninguna entidad (es autofirmado), así que la AEAT no lo aceptará. Usa el "
+"certificado electrónico de tu negocio emitido por una entidad reconocida, por ejemplo la FNMT."
+
+#: certificates.py
+msgid ""
+"No authority the AEAT recognises issued this certificate, so the AEAT will not accept it. Use your business's "
+"electronic certificate issued by a recognised authority, for example the FNMT."
+msgstr ""
+"Este certificado no lo ha emitido una entidad que reconozca la AEAT, así que la AEAT no lo aceptará. Usa el "
 "certificado electrónico de tu negocio emitido por una entidad reconocida, por ejemplo la FNMT."
 
 #: certificates.py

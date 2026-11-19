@@ -47,7 +47,7 @@ from apps.cash_register.schemas import (
     SettingsOut,
 )
 from apps.sale.models import RefundPayment, Sale, SalePayment
-from apps.sale.queries import business_currency
+from apps.sale.queries.business import business_currency
 from base.business import business_zone
 from base.ordering import list_order
 

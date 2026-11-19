@@ -31,12 +31,7 @@ from live.outbox import record_event
 
 from apps.customer.queries import find_customer
 from apps.invoice import events, fiscal, platform
-from apps.invoice.models import (
-    Invoice,
-    InvoiceLine,
-    InvoiceSeries,
-    Issuer,
-)
+from apps.invoice.models import Invoice, InvoiceLine, InvoiceSeries, Issuer
 from apps.invoice.queries import (
     FULL,
     RECTIFYING,
@@ -84,7 +79,9 @@ from apps.invoice.schemas import (
 from apps.invoice.schemas.platform import PlatformInvoiceIn, PlatformInvoiceOut
 from apps.sale import pricing
 from apps.sale.models import OrderLine, Refund, Sale, Settings
-from apps.sale.queries import TICKET_LIMIT, business_country, find_sale, money_text, tax_category_name
+from apps.sale.queries.business import TICKET_LIMIT, business_country, money_text
+from apps.sale.queries.checkout import tax_category_name
+from apps.sale.queries.sales import find_sale
 from apps.tax.models import TaxRule
 from apps.tax.queries import (
     business_tax_kind,
