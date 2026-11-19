@@ -540,7 +540,7 @@ def public_cancel(ctx: OperationContext, data: PublicCancelIn) -> dict:
         ),
     )
     return public_booking_out(
-        Appointment.objects.prefetch_related("lines").get(pk=appointment.pk)
+        ctx, Appointment.objects.prefetch_related("lines").get(pk=appointment.pk)
     )
 
 

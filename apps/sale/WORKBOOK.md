@@ -2007,6 +2007,14 @@ título, sus pasos y «Si falla»: ahí no van nombres de código, incidencias, 
   del cobro (`apps.tax.queries.business_today`), el mismo reloj que el de una venta, que hub#772 mueve entero. Una
   sesión nunca está en las dos: la del cobro no pasa por `service.grant.redeem`.
 
+- **El código del tique para pedir la factura completa** (INVOICE-F04, hub#500): toda venta cobrada como tique
+  tiene el suyo, `<número de la venta>-<firma>`, que calcula `apps.sale.queries.receipt_codes` (`receipt_code` y
+  `sale_of_code`): la firma, doce caracteres en base32 de Crockford, es el HMAC-SHA256 del id de la venta con la
+  clave secreta del servidor (y sus `SECRET_KEY_FALLBACKS` al leerlo). No se guarda: cada reimpresión da el mismo,
+  también para las ventas de antes, y el cobro no escribe nada más. Vale cuatro años desde el cobro. Lo lee
+  Facturación, que requiere Ventas, en su página pública (`invoice.public.*`); el papel del tique (SALE-F29) aún no
+  lo imprime (hub#500). La decisión, con el mercado, en el WORKBOOK de Facturación («Decisiones», 22).
+
 ### Lo que NO hace, a propósito
 
 - No guarda mesas ni clientes en la cuenta: el enlace cuenta–cliente es de Clientes y el de

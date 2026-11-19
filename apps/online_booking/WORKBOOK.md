@@ -74,8 +74,8 @@ coincide con la búsqueda.»). Se refresca sola cuando cambia una cita online en
 Título «Configuración de la página de reservas». Tres bloques y un botón **Guardar**:
 
 - **Página pública**: «Página pública activada», «Título de la página», «Mensaje de bienvenida», «Color
-  primario» (`#RRGGBB`), «Logo» (una imagen JPG, PNG o WebP que se sube; aún sale como «URL del logo», que ya no
-  se acepta, hub#1660), «Email obligatorio», «Reservas próximas por móvil» (1 a 50), «Permitir elegir
+  primario» (`#RRGGBB`), «Logo» (una imagen JPG, PNG o WebP que se sube con **Elegir imagen**, se cambia con
+  **Cambiar imagen** y se retira con **Quitar**), «Email obligatorio», «Reservas próximas por móvil» (1 a 50), «Permitir elegir
   profesional», «Permitir notas», «Mensaje de confirmación» y «Política de cancelación» (el texto que lee la
   clienta).
 - **Reglas de reserva** (son las de Citas, compartidas con WhatsApp): «Antelación mínima para reservar
@@ -127,10 +127,10 @@ Fechas y horas salen en el reloj del negocio y con el formato del idioma de quie
 | ONLINE_BOOKING-F04 | Marcar que no se presentó | hecho |
 | ONLINE_BOOKING-F05 | Cancelar una reserva | hecho |
 | ONLINE_BOOKING-F06 | Borrar una reserva | hecho |
-| ONLINE_BOOKING-F07 | Configurar la página de reservas | parcial — el logo se sube por la API; la pantalla de Ajustes aún no lo sube (hub#1660) |
+| ONLINE_BOOKING-F07 | Configurar la página de reservas | hecho |
 | ONLINE_BOOKING-F08 | Ver y buscar las reservas | hecho |
 | ONLINE_BOOKING-F09 | Seguir a la clienta cuando se fusionan dos fichas | hecho (lo hace Citas; la bandeja lo refleja) |
-| ONLINE_BOOKING-F10 | La clienta ve su reserva con su enlace | parcial — su enlace abre la página de reservas, que aún no enseña su reserva; la confirmación da el código del enlace, no su dirección |
+| ONLINE_BOOKING-F10 | La clienta ve su reserva con su enlace | parcial — su enlace abre la página de reservas, que aún no enseña su reserva ni de qué negocio es; la confirmación da el código del enlace, no su dirección |
 | ONLINE_BOOKING-F11 | La clienta cancela su reserva con su enlace | parcial — su enlace abre la página de reservas, que aún no enseña su reserva; la confirmación da el código del enlace, no su dirección |
 | ONLINE_BOOKING-F12 | Borrar los datos de una clienta (RGPD) | hecho |
 
@@ -246,7 +246,7 @@ Si falla: una cita en curso, completada o cobrada no se borra («Esta cita no se
 Implicados: APPOINTMENT-F11
 
 ### ONLINE_BOOKING-F07 Configurar la página de reservas
-Estado: parcial — el logo se sube por la API; la pantalla de Ajustes aún no lo sube (hub#1660)
+Estado: hecho
 Actor: propietario, administrador, asistente
 Pantalla: Ajustes
 Pasos:
@@ -301,21 +301,21 @@ Implicados: APPOINTMENT-F23, CUSTOMER-F13
 
 ### ONLINE_BOOKING-F10 La clienta ve su reserva con su enlace
 Estado: parcial — la ve con **Ver mi reserva** justo después de reservar; su enlace (`/p/<negocio>/book/<enlace>`)
-abre la página de reservas del negocio, que aún no enseña su reserva, y la confirmación da el código del enlace, no su
-dirección
+abre la página de reservas del negocio, que aún no enseña su reserva ni el nombre y el logo del negocio que ya da su
+consulta (hub#1799), y la confirmación da el código del enlace, no su dirección
 Actor: clienta (sin sesión)
 Pantalla: la de su enlace (`/p/<negocio>/book/<enlace>`, en la dirección del negocio); la página de reservas, tras
 reservar; en desarrollo, la vista previa
 Pasos:
 1. Abre el enlace de su confirmación.
-2. Ve el número, el estado, el día y la hora, los servicios, el profesional, la política de cancelación y si
-   todavía puede cancelar y hasta cuándo. Nunca el nombre de la ficha: quien tenga el enlace no averigua
-   a quién pertenece un móvil.
+2. Ve de qué negocio es, con su nombre y su logo si lo tiene, como en la página de reservas; y el número, el estado,
+   el día y la hora, los servicios, el profesional, la política de cancelación y si todavía puede cancelar y hasta
+   cuándo. Nunca el nombre de la ficha: quien tenga el enlace no averigua a quién pertenece un móvil.
 Entra: el enlace que recibió al reservar; las reglas de cancelación de Citas.
-Sale: nada se escribe. El enlace sigue valiendo aunque el negocio apague la página.
+Sale: nada se escribe. El enlace sigue valiendo, y diciendo de qué negocio es, aunque el negocio apague la página.
 Si falla: un enlace que no existe, revocado, de una reserva borrada o de otro negocio: «Esa reserva no existe o su
-enlace ya no es válido.». La dirección del enlace con el nombre de otro negocio, o en la dirección de otro, no abre
-ninguna página.
+enlace ya no es válido.», sin el nombre ni el logo de ningún negocio. La dirección del enlace con el nombre de otro
+negocio, o en la dirección de otro, no abre ninguna página.
 Implicados: APPOINTMENT-F06
 
 ### ONLINE_BOOKING-F11 La clienta cancela su reserva con su enlace
@@ -483,8 +483,8 @@ sus llamadas van a `POST /p/<slug>/api/<operación>`. Esta app le da las operaci
 | Servicios reservables online | `online_booking.public.services` | búsqueda, página (≤ 100) → servicios con categoría, precio y duración (o `null` si Servicios no los enseña) y sus profesionales (vacío si no se elige) |
 | Horas libres | `online_booking.public.slots` | servicios, día, profesional opcional → horas (con los profesionales libres si se elige) |
 | Reservar | `online_booking.public.book` | servicios, profesional opcional, hora de pared, nombre, móvil, email, nota y campo trampa vacío → número, estado, hora, servicios, profesional, mensaje y **`token`** (se enseña una vez) |
-| Ver la reserva | `online_booking.public.booking` | `token` → número, estado, hora, servicios, profesional, si puede cancelar y hasta cuándo (nunca el nombre de la ficha) |
-| Cancelar | `online_booking.public.cancel` | `token`, motivo → la reserva cancelada |
+| Ver la reserva | `online_booking.public.booking` | `token` → nombre y logo del negocio, número, estado, hora, servicios, profesional, si puede cancelar y hasta cuándo (nunca el nombre de la ficha) |
+| Cancelar | `online_booking.public.cancel` | `token`, motivo → la reserva cancelada, con lo mismo que da `public.booking` |
 
 Cómo las expone la plataforma (la puerta pública `/p/` de `base`):
 
@@ -526,6 +526,10 @@ Cómo las expone la plataforma (la puerta pública `/p/` de `base`):
   clienta, y el enlace del aviso (`privacy_policy_url`, la política de privacidad de ERPlora en
   `<SAAS_URL>/legal/privacy/`, que trata esos datos por encargo del negocio). La página pinta junto a **Reservar** el
   aviso con el nombre del negocio y ese enlace. De lo demás del negocio no da nada.
+- **De quién es el enlace**: `public.booking` y `public.cancel` dan el mismo nombre del negocio (`business_name`) y la
+  dirección de su logo (`logo_url`, vacía sin logo) que `public.page`, de la misma pieza (`LinkOwnerOut` de
+  `public_page.py`); el logo sale de los ajustes guardados aunque la página esté apagada. Un enlace que no existe da
+  el 404 `online_booking.booking_not_found` sin nada del negocio.
 
 ## Cómo son las páginas (para quien lo mantiene)
 
@@ -542,9 +546,6 @@ Cómo las expone la plataforma (la puerta pública `/p/` de `base`):
 
 ## Lo que queda fuera
 
-- **Subir el logo desde la pantalla de Ajustes** (hub#1660): el servidor ya lo guarda en el propio negocio
-  (`online_booking.settings.upload_logo`) y la página lo enseña, pero el campo sigue siendo «URL del logo», sin
-  **Elegir imagen**, **Cambiar imagen** ni **Quitar**.
 - **La reserva en la página del enlace personal** (`/p/<slug>/book/<token>`): el enlace ya abre la página de
   reservas del negocio, pero aún no enseña la reserva ni la cancela, y la confirmación da el código del enlace en vez
   de su dirección. La clienta la ve y la cancela justo después de reservar, en la misma página.

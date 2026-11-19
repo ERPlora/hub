@@ -1231,7 +1231,7 @@ negocio, y una automatización sin nadie detrás, no ven esa línea. La marca de
 
 ### Contrato con Facturación (lo que `invoice` tiene que hacer)
 
-1. **Dentro de la transacción de cada emisión** (`_issue` de `apps/invoice/services.py`, hecho), tras escribir el
+1. **Dentro de la transacción de cada emisión** (`_issue` de `apps/invoice/services/__init__.py`, hecho), tras escribir el
    documento y su aviso, Facturación llama por nombre a `verifactu.record.create` con
    `{"invoice_id": "<uuid del documento>"}` y **la misma sesión** (el sellado síncrono lo firma quien emite; el
    de la reacción, el sistema), en un savepoint, y contesta `verifactu_status`:

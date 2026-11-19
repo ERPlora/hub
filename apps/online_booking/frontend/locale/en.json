@@ -82,7 +82,7 @@
         "page_title": "Page title",
         "welcome_message": "Welcome message",
         "primary_color": "Primary colour",
-        "logo_url": "Logo URL",
+        "logo": "Logo",
         "require_email": "Email required",
         "max_upcoming_per_customer": "Upcoming bookings per mobile",
         "allow_staff_selection": "Let the customer choose the professional",
