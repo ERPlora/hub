@@ -1397,7 +1397,9 @@
       "website__site__preview": "Preview the website",
       "website__site__publish": "Publish the website",
       "website__site__save": "Save the website's draft",
-      "website__site__unpublish": "Take the website offline"
+      "website__site__unpublish": "Take the website offline",
+      "invoice__public__substitute": "Issue the full invoice a customer asks for with their ticket's code",
+      "invoice__public__ticket": "Read the ticket a ticket's code opens"
     },
     "facts": {
       "created": "created",
@@ -2744,7 +2746,8 @@
       "uploaded_at": "Uploaded on",
       "erased": "Deleted customer",
       "reserving": "Shown as reserved",
-      "running": "In progress"
+      "running": "In progress",
+      "issued": "Issued now"
     },
     "catalogError": "What automations can use here could not be read.",
     "errors": {

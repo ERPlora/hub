@@ -972,3 +972,17 @@ msgstr ""
 "Antes de tu primera venta, revisa el prefijo con el que saldrán tus números "
 "de factura. Si vienes de otro sistema, continúa su numeración en vez de "
 "empezar otra vez por el 1."
+
+#: apps/invoice/queries/public.py
+msgid "This code opens no ticket. Check it or ask for the invoice at the business."
+msgstr ""
+"Este código no abre ningún tique. Revísalo o pide la factura en el "
+"establecimiento."
+
+#: apps/invoice/queries/public.py
+msgid "This code has expired: ask for the invoice at the business."
+msgstr "Este código ha caducado: pide la factura en el establecimiento."
+
+#: apps/invoice/queries/public.py
+msgid "Your ticket is still being registered. Try again in a few minutes."
+msgstr "Tu tique aún se está registrando. Prueba otra vez en unos minutos."

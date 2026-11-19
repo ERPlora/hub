@@ -1397,7 +1397,9 @@
       "website__site__preview": "Ver la vista previa de la página web",
       "website__site__publish": "Publicar la página web",
       "website__site__save": "Guardar el borrador de la página web",
-      "website__site__unpublish": "Desconectar la página web"
+      "website__site__unpublish": "Desconectar la página web",
+      "invoice__public__substitute": "Emitir la factura completa que un cliente pide con el código de su tique",
+      "invoice__public__ticket": "Leer el tique que abre un código de tique"
     },
     "facts": {
       "created": "alta",
@@ -2744,7 +2746,8 @@
       "uploaded_at": "Subido el",
       "erased": "Cliente borrado",
       "reserving": "Se ve reservada",
-      "running": "En curso"
+      "running": "En curso",
+      "issued": "Emitida ahora"
     },
     "catalogError": "No se ha podido leer lo que pueden usar aquí las automatizaciones.",
     "errors": {

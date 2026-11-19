@@ -14,7 +14,7 @@ from live.meta import (
     module_configs,
     permissions_for_role,
 )
-from live.operations import registry
+from live.operations import INTERNAL, registry
 
 from apps.invoice import events as E
 from base import home
@@ -25,6 +25,7 @@ PERMISSIONS = [
     "invoice.rectify_invoice",
     "invoice.manage_series",
     "invoice.manage_issuer",
+    "invoice.public",
 ]
 
 
@@ -66,7 +67,7 @@ def test_invoice_is_in_the_store_and_in_both_verticals():
 
 
 def test_permissions():
-    # The product's four, plus configuring the issuer (the business's tax identity), new here.
+    # The product's four, plus configuring the issuer (the business's tax identity) and the ticket's public page.
     assert invoice().permissions == PERMISSIONS
 
 
@@ -146,6 +147,8 @@ def test_every_operation_is_described_for_the_assistant():
         "invoice.invoice.platform_status",
         "invoice.invoice.platform_document",
         "invoice.invoice.platform_health",
+        "invoice.public.ticket",
+        "invoice.public.substitute",
     }
     high = {
         "invoice.invoice.create",
@@ -158,6 +161,10 @@ def test_every_operation_is_described_for_the_assistant():
         "invoice.issuer.sync",
         "invoice.invoice.issue_platform",
     }
+    # The ticket's public page's two are the customer's, without a session, never the assistant's tools: at the
+    # counter it is invoice.invoice.substitute.
+    for name in ("invoice.public.ticket", "invoice.public.substitute"):
+        assert ops.pop(name).ai is INTERNAL, name
     for name, op in ops.items():
         assert isinstance(op.ai, dict) and str(op.ai.get("description", "")).strip(), (
             name
