@@ -96,7 +96,10 @@ servicios con su precio y su duración, profesional o «Sin preferencia», día,
 nota y **Reservar**. Junto a **Reservar**, el aviso de quién usa sus datos y el enlace a la política de privacidad.
 Si no hay nada que reservar online, solo sale el aviso, sin la invitación ni el formulario. Al reservar, el número
 de la cita, el mensaje de confirmación, **Ver mi reserva**, **Cancelar la reserva** y **Reservar otra**. Con la
-dirección de otro negocio, o la de este en la de otro, no hay página.
+dirección de otro negocio, o la de este en la de otro, no hay página. La confirmación enseña la dirección completa de
+su enlace personal (`/p/<negocio>/book/<enlace>`). Al abrirla ve solo su reserva —número, servicios, día, hora,
+profesional y estado— y puede anularla con confirmación si la política todavía lo permite; una ya anulada o fuera de
+plazo no ofrece esa acción. Un enlace que no existe da un aviso claro, sin datos ni formulario.
 
 ### Vista previa de la reserva (solo en desarrollo)
 Página `/online_booking/preview`, solo en el servidor de desarrollo: el mismo recorrido que la página de reservas
@@ -107,9 +110,9 @@ por la sesión del equipo. No forma parte de la versión de producción.
 
 | Estado | Qué ve la persona |
 |---|---|
-| Cargando | «Cargando…» en la tabla; «Cargando la configuración…» en Ajustes; «Cargando la página…» en la página de reservas. |
+| Cargando | «Cargando…» en la tabla; «Cargando la configuración…» en Ajustes; «Cargando la página…» en la página de reservas; «Cargando tu reserva…» en el enlace personal. |
 | Vacío | «Aún no hay reservas online.»; con filtros, «Ninguna reserva coincide con la búsqueda.»; en Ajustes sin servicios, «Todavía no hay servicios. Dalos de alta en Servicios.»; en la página de reservas sin nada que reservar online, solo «Este negocio no tiene nada para reservar online ahora mismo.», sin formulario. |
-| Error | El aviso de la tabla con «Reintentar»; el rechazo de una acción de fila, en su confirmación o encima de la tabla; un rechazo de Ajustes, debajo de su campo, sin perder lo tecleado; en la página de reservas, «No se pudo cargar la página» con el motivo («Este negocio no acepta reservas online ahora mismo.»), y el rechazo de una reserva encima de **Reservar** y debajo de su campo. |
+| Error | El aviso de la tabla con «Reintentar»; el rechazo de una acción de fila, en su confirmación o encima de la tabla; un rechazo de Ajustes, debajo de su campo, sin perder lo tecleado; en la página de reservas, «No se pudo cargar la página» con el motivo («Este negocio no acepta reservas online ahora mismo.»), y el rechazo de una reserva encima de **Reservar** y debajo de su campo. En el enlace personal, el motivo de la carga con «Reintentar» si puede repetirse, y el de anular dentro de su confirmación. |
 | Reconectando | Lo pintado se queda; una franja avisa «Reconectando…». |
 | App inactiva | «Esta app no está activa en este negocio». |
 | Sin permiso | No aparece lo que no puede hacer; si llega por otra puerta, «No tienes permiso». |
@@ -129,8 +132,8 @@ Fechas y horas salen en el reloj del negocio y con el formato del idioma de quie
 | ONLINE_BOOKING-F07 | Configurar la página de reservas | hecho |
 | ONLINE_BOOKING-F08 | Ver y buscar las reservas | hecho |
 | ONLINE_BOOKING-F09 | Seguir a la clienta cuando se fusionan dos fichas | hecho (lo hace Citas; la bandeja lo refleja) |
-| ONLINE_BOOKING-F10 | La clienta ve su reserva con su enlace | parcial — su enlace abre la página de reservas, que aún no enseña su reserva; la confirmación da el código del enlace, no su dirección |
-| ONLINE_BOOKING-F11 | La clienta cancela su reserva con su enlace | parcial — su enlace abre la página de reservas, que aún no enseña su reserva; la confirmación da el código del enlace, no su dirección |
+| ONLINE_BOOKING-F10 | La clienta ve su reserva con su enlace | hecho |
+| ONLINE_BOOKING-F11 | La clienta cancela su reserva con su enlace | hecho |
 | ONLINE_BOOKING-F12 | Borrar los datos de una clienta (RGPD) | hecho |
 
 ### ONLINE_BOOKING-F01 La clienta reserva desde la página de reservas
@@ -293,9 +296,7 @@ Si falla: Citas no se queda a medias y el relay lo reintenta solo.
 Implicados: APPOINTMENT-F23, CUSTOMER-F13
 
 ### ONLINE_BOOKING-F10 La clienta ve su reserva con su enlace
-Estado: parcial — la ve con **Ver mi reserva** justo después de reservar; su enlace (`/p/<negocio>/book/<enlace>`)
-abre la página de reservas del negocio, que aún no enseña su reserva, y la confirmación da el código del enlace, no su
-dirección
+Estado: hecho
 Actor: clienta (sin sesión)
 Pantalla: la de su enlace (`/p/<negocio>/book/<enlace>`, en la dirección del negocio); la página de reservas, tras
 reservar; en desarrollo, la vista previa
@@ -312,16 +313,16 @@ ninguna página.
 Implicados: APPOINTMENT-F06
 
 ### ONLINE_BOOKING-F11 La clienta cancela su reserva con su enlace
-Estado: parcial — la cancela con **Cancelar la reserva** justo después de reservar; su enlace
-(`/p/<negocio>/book/<enlace>`) abre la página de reservas del negocio, que aún no enseña su reserva ni la cancela
+Estado: hecho
 Actor: clienta (sin sesión)
 Pantalla: la de su enlace (`/p/<negocio>/book/<enlace>`, en la dirección del negocio); la página de reservas, tras
 reservar; en desarrollo, la vista previa
 Pasos:
-1. Desde su enlace pulsa **Cancelar la reserva** (motivo opcional).
-2. Se aplica la política de Citas: «Permitir que la clienta cancele su cita» y «Antelación mínima para
-   cancelar». La cita queda **Cancelada**, con «Lo pidió la clienta» en su historial. La política vale
-   igual cuando el equipo prueba el enlace desde la vista previa.
+1. Desde su enlace pulsa **Cancelar la reserva**, confirma el número y el momento de la cita y puede escribir un motivo.
+2. Pulsa de nuevo **Cancelar la reserva** en la confirmación. Se aplica la política de Citas: «Permitir que la clienta
+   cancele su cita» y «Antelación mínima para cancelar». La cita queda **Cancelada**, la página dice «Esta reserva está
+   anulada.» y no vuelve a ofrecer la acción; el historial guarda «Lo pidió la clienta». La política vale igual cuando
+   el equipo prueba el enlace desde la vista previa.
 Entra: el enlace de una reserva pendiente o confirmada, sin cobrar.
 Sale: `appointment.appointment.cancelled`.
 Si falla: «La cancelación online no está disponible. Ponte en contacto con el negocio.»; «Esta cita solo se
@@ -515,9 +516,10 @@ Cómo las expone la plataforma (la puerta pública `/p/` de `base`):
 - `frontend/pages/BookingsPage.vue` (bandeja), `SettingsPage.vue`, `PublicBookingPage.vue` (la página de reservas,
   sin sesión) y `PreviewPage.vue`: el recorrido de la clienta, que es la vista previa del equipo (solo en desarrollo)
   y, con la puerta de `PublicBookingPage.vue` (`PUBLIC_DOOR`, `frontend/lib/door.ts`: llamadas, dinero y textos de la
-  clienta), la página de reservas. `PublicBookingHeader.vue` pinta la identidad del negocio,
-  `PublicBookingSubmit.vue` el aviso de privacidad, el campo trampa y el envío, y `BookingResult.vue` la confirmación
-  y el recorrido del enlace personal.
+  clienta), la página de reservas. `PersonalBooking.vue` carga y anula la reserva del enlace personal;
+  `PublicBookingHeader.vue` pinta la identidad del negocio, `PublicBookingSubmit.vue` el aviso de privacidad, el campo
+  trampa y el envío, `BookingResult.vue` la confirmación y los datos de la reserva, y `CancelDialog.vue` la
+  confirmación de anular, tanto en la bandeja como en el enlace.
 - Los estados permitidos y el reloj se leen de `apps/appointment/frontend/lib/states.ts` y `clock.ts`: las
   mismas reglas que la agenda, sin copiarlas.
 - Datos solo por `useLive`/`useCommand` (el recorrido de la clienta, por el cliente de la API o el de la puerta: lo
@@ -527,9 +529,6 @@ Cómo las expone la plataforma (la puerta pública `/p/` de `base`):
 
 - **Subir el logo desde Ajustes**: hoy solo se guarda una URL externa y la página no la carga; falta guardar la imagen
   en el propio negocio para que la clienta la vea.
-- **La reserva en la página del enlace personal** (`/p/<slug>/book/<token>`): el enlace ya abre la página de
-  reservas del negocio, pero aún no enseña la reserva ni la cancela, y la confirmación da el código del enlace en vez
-  de su dirección. La clienta la ve y la cancela justo después de reservar, en la misma página.
 - **Verificar el móvil con un código (SMS o WhatsApp)**: falta un canal de envío; hasta entonces, cualquiera
   que sepa un teléfono puede reservar a su nombre (la cita sale con el nombre de esa ficha). Los límites
   frenan el abuso, no la suplantación.
