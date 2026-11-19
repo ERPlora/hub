@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:9e36c712cd70bfcd8e6696bab250fc74980113d5a9e159004a103740680d8975 -->
+<!-- generated from WORKBOOK.md sha256:3264337be3a77f0dfd8e927ee792d15feeebf99a072a61436f8de2fb1144db43 -->
 
 ## What it is for and who it is for
 
@@ -238,7 +238,7 @@ same, in the browser too (hub#1023).
 | INVENTORY-F08 | Group products into categories for the till | done |
 | INVENTORY-F29 | Mark an item as sold out | done |
 | INVENTORY-F34 | Recover a deleted product | done |
-| INVENTORY-F35 | Declare a product's allergens | partial — the interface is missing: the block of the form, the line of the card and the column in Import products |
+| INVENTORY-F35 | Declare a product's allergens | done |
 | | **Import and export** | |
 | INVENTORY-F09 | Import products from a CSV | done |
 | INVENTORY-F10 | Import categories from a CSV | done |
@@ -472,8 +472,8 @@ Steps:
    line; separated by commas or by semicolons, as Excel saves it in Spanish). Nothing is created yet.
 2. In "Check the import", each column comes with its field guessed from the header, in Spanish or
    English and with or without accents ("Name", "Code", "Price", "VAT"…). Change it or set "Do not
-   import". Name, SKU, Price, Cost, Stock, Threshold, EAN-13, Description, Unit and Tax category can be
-   imported; Name and SKU are required.
+   import". Name, SKU, Price, Cost, Stock, Threshold, EAN-13, Description, Allergens, Unit and Tax category
+   can be imported; Name and SKU are required.
 3. Look at the "First {n} rows of {total}" and at the rehearsal of the whole file: "{ready} rows ready
    · {failed} with problems" ("1 row ready" with one), with the line and the reason of the first ten.
 4. Tap "Import {n} products" ("Import 1 product" with one; or "Cancel", which leaves no trace).
@@ -1113,9 +1113,7 @@ Involved: BASE-F114, INVENTORY-F01, INVENTORY-F03, INVENTORY-F04, INVENTORY-F07,
 INVENTORY-F35, PRICING-F14, PRICING-F15, MODIFIER-F09, MODIFIER-F10, COMBO-F13, COMBO-F15
 
 ### INVENTORY-F35 Declare a product's allergens
-Status: partial — the product already keeps its allergens through the assistant and the API, and the catalogue, the
-exported CSV, the import through the API, the backup, the template and the recovery from a separate copy carry them;
-the block of the form, the line of the card and Import products recognising the "Allergens" column are missing
+Status: done
 Actor: administrator, manager
 Screen: Products, Product card, Import products
 Steps:
