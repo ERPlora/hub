@@ -327,7 +327,7 @@ En la pantalla Archivos:
 | ID | Flujo | Estado |
 |---|---|---|
 | BASE-F01 | Ver lo que le falta por configurar al negocio | hecho |
-| BASE-F02 | Ver el negocio de un vistazo al entrar | hecho |
+| BASE-F02 | Ver el negocio de un vistazo al entrar | parcial |
 | BASE-F03 | Ir a configurar desde «Termina de configurar tu negocio» | hecho |
 | BASE-F04 | Ver qué pasos de la lista tiene que configurar un administrador | hecho |
 | BASE-F05 | Abrir una app desde «Mis apps» | hecho |
@@ -440,6 +440,7 @@ En la pantalla Archivos:
 | BASE-F113 | Seguir avisando con la pantalla apagada (app de Android) | hecho |
 | BASE-F114 | Devolver un negocio a un momento pasado desde el admin de Hubs | hecho |
 | BASE-F115 | Ver la ayuda de la pantalla de un módulo | hecho |
+| BASE-F116 | Leer las novedades de ERPlora | parcial |
 
 ### BASE-F01 Ver lo que le falta por configurar al negocio
 Estado: hecho
@@ -477,7 +478,8 @@ nuestra: por tu parte no hay nada que hacer aún. Estamos en ello.».
 Implicados: INVENTORY-F28, BASE-F24, BASE-F25, VERIFACTU-F01, TAX-F17
 
 ### BASE-F02 Ver el negocio de un vistazo al entrar
-Estado: hecho
+Estado: parcial — la fila de salud del paso 5 todavía no se pinta en el Inicio, aunque el hub ya sabe qué decir de la
+impresora de tiques; y la Bandeja de WhatsApp todavía no dice cómo está su número (hub#573)
 Actor: propietario, administrador, responsable, empleado
 Pantalla: Inicio · Resumen
 Pasos:
@@ -489,12 +491,18 @@ Pasos:
      paneles.
   4. Al cambiar el idioma de la interfaz, los nombres de «Mis apps» y los textos del checklist cambian en el
      sitio, sin recargar ni reabrir la aplicación.
-  5. Abajo, dos pestañas: «Resumen» (lo anterior) y «Actividad».
-Entra: el nombre del negocio y la fecha del dispositivo.
+  5. Para quien administra el negocio, al pie de «Resumen», una fila con cómo está lo que el negocio necesita para
+     trabajar y «Ver sistema», que lleva a Sistema. Cada app encendida que la persona puede ver dice lo suyo: con
+     Impresión, «Impresora lista» si el dispositivo que saca los tiques ha dado señales en el último minuto y medio,
+     «Impresora sin conectar» si está dado de alta pero no responde, o «Impresora sin configurar» si no hay ninguno;
+     las dos últimas con «Configurar la impresión», que abre Impresión. Quien no administra el negocio no ve la fila.
+  6. Abajo, dos pestañas: «Resumen» (lo anterior) y «Actividad».
+Entra: el nombre del negocio, la fecha del dispositivo y lo que cada app encendida dice de sí misma.
 Sale: nada guardado.
 Si falla: una zona que no carga no tumba las demás; cada una dice lo suyo. En el móvil las zonas se
-apilan y «Mis apps» se pliega.
-Implicados: ninguno
+apilan y «Mis apps» se pliega. Lo que no se pudo comprobar sale en neutro, nunca como listo y sin botón,
+porque no es tarea de quien mira: «No hemos podido comprobar la impresora».
+Implicados: PRINTING-F21
 
 ### BASE-F03 Ir a configurar desde «Termina de configurar tu negocio»
 Estado: hecho
@@ -1378,7 +1386,7 @@ Entra: la versión que corre y cuándo se publicó.
 Sale: nada guardado.
 Si falla: «No se pudo consultar el sistema» — «Las métricas y los registros no están disponibles ahora. Puedes
 volver a intentarlo.» con «Reintentar».
-Implicados: ninguno
+Implicados: BASE-F116
 
 ### BASE-F42 Ver el registro de sucesos del sistema
 Estado: hecho
@@ -2167,7 +2175,8 @@ Pasos:
   1. En **Empleados › Roles**: «Estos son los roles de este negocio. Cada persona recibe uno al invitarla en
      erplora.com, y allí se cambia.».
   2. Una fila por rol: «Propietario», «Administrador», «Encargado» y «Empleado», con «Básico», «Siempre
-     disponible», cuántas personas lo tienen y cuántos permisos da.
+     disponible», cuántas personas lo tienen y cuántos permisos da. Son siempre estos cuatro, los de erplora.com:
+     ninguna app añade roles propios; cada app dice qué puede hacer cada uno de ellos en ella.
   3. Quien administra tiene «Cambiar roles en erplora.com» (en la app instalada, en el navegador del dispositivo; en la de Google Play no está).
 Entra: los roles y las personas del negocio.
 Sale: nada guardado.
@@ -3259,6 +3268,26 @@ disponible». Si el manual no está traducido al idioma de la persona, o su trad
 español.
 Implicados: BASE-F92, BASE-F93
 
+### BASE-F116 Leer las novedades de ERPlora
+Estado: parcial — las novedades ya se leen por el asistente y por la API, pero Sistema › Actualizaciones todavía no las
+enseña (hub#576)
+Actor: propietario, administrador, responsable, empleado
+Pantalla: Sistema · Actualizaciones
+Pasos:
+  1. En la pestaña «Actualizaciones», debajo de la versión y su fecha (BASE-F41), sale «Novedades»: lo que ha cambiado
+     en ERPlora que el negocio nota, lo más reciente primero. Quien no administra el negocio también las ve: no dicen
+     nada de él.
+  2. Cada novedad dice su día, si es algo nuevo, una mejora o un arreglo, un título corto y una o dos frases de lo que
+     se puede hacer ahora. Son notas escritas para el negocio, nunca la lista de cambios del código.
+  3. Salen las 20 más recientes; «Ver más» trae las anteriores.
+  4. Sin ninguna, dice «Todavía no hay novedades.».
+  5. Por el asistente, «¿qué hay de nuevo en ERPlora?» o «¿qué ha cambiado en la última actualización?» las lee igual,
+     en el idioma de la persona.
+Entra: las novedades de la versión que corre: viajan con ella, así que siempre son las suyas.
+Sale: nada guardado: las novedades solo se leen.
+Si falla: «No se pudieron cargar las novedades» con «Reintentar»; la versión y su fecha siguen a la vista.
+Implicados: BASE-F41
+
 ## Para quien lo mantiene
 
 - **Dominio propio de un negocio** (BASE-F110, HUBS-F17, PLAN-SAAS §37 punto 2; `base/custom_domains.py`,
@@ -3365,6 +3394,20 @@ Implicados: BASE-F92, BASE-F93
   (`/app/download/<windows|linux|android>/`) van en `hub-home.app_downloads` (`base/spa.py`) para cualquier sesión, y
   `lib/app-downloads.ts` las ofrece solo en un navegador. Tests: `test_home.py`, `test_queries_home.py`, `test_spa.py`,
   `SystemAppCards.test.ts` y `app-downloads.test.ts`.
+- La fila de salud del Inicio (hub#573, BASE-F02): una app declara en su `LiveAppConfig` `health`, un diccionario con
+  `operation` (una consulta suya cuya primera fila dice `state`: `ok`, `no_signal` o `not_configured`), `params`, el
+  `permission` que hace falta para verla, `route` y `action` (dónde se arregla y con qué texto) y `titles`, el texto
+  traducible de cada estado y de `unknown`. `base.E021` (`base/home_health.py`) comprueba al arrancar que la consulta
+  existe y su salida tiene `state`, que el permiso es de la app, que la ruta empieza por `/` y que hay un título por
+  estado, ni uno más. `base.health.list` (`GET /api/home/health`, en `base/api_home_health.py`, que monta
+  `config/api.py`; no es herramienta del asistente) ejecuta la consulta de cada app encendida como la persona, solo
+  para quien tiene `base.administer_hub` (para el resto, lista vacía: el Inicio la pide para todos) y solo de las apps
+  cuyo permiso tiene. Devuelve `{key, app, state, title, action, route}`; `action` y `route` solo con `no_signal` o
+  `not_configured`. Si la consulta falla o contesta un estado que no conoce, `unknown` con el título de la app y sin
+  acción, y se anota en el log. No es viva: cambia con el paso del tiempo, sin evento. Impresión la declara con
+  `printing.device.health` de los tiques, la misma lectura que tiene la tarjeta «Tu impresora». Tests:
+  `test_home_health.py`, `test_queries_health.py`, `test_api_health.py` y
+  `apps/printing/tests/test_integration_home_health.py`.
 - Apps obligatorias por país (hub#997, BASE-F01): una app declara en su `LiveAppConfig`
   `mandatory = {"countries": "all" | ["ES", …], "platform_turns_on": bool}`: dónde tiene que estar encendida y si la
   plataforma puede encenderla sola al alta (Impuestos: `"all"`, sí; VeriFactu: `["ES"]`, nunca, porque ata al negocio
@@ -3498,7 +3541,7 @@ Implicados: BASE-F92, BASE-F93
   `report["language"]` mientras espera). Lo que le toca entra en la misma transacción que la enciende:
   `base.app.activation_settle` (o `base.app.enable`, si tenía las tablas) llama a `services.blueprints._load_what_waited` →
   `blueprint.finish_waiting`, que reusa `apply`, con su orden y sus operaciones, en el hub activo. Si el worker muere, no
-  ha pasado ninguna de las dos cosas y el siguiente pase, o el barrido de `_serve_hub` si se perdió el aviso, hace las
+  ha pasado ninguna de las dos cosas y el siguiente pase, o el barrido de las visitas del worker (`base.hub_visits`) si se perdió el aviso, hace las
   dos: por eso sobrevive a un reinicio sin nada más. Cómo va la preparación (`setup_failed`) nunca se escribe: se lee de
   la fila de la app al describir la carga (`describe_load`). Lo que corta la espera: desactivar la app, deshacer la
   carga, reintentarla (la nueva toma el relevo) y restablecer el negocio (`services.blueprints._stop_waiting`). Un fichero no se
@@ -3612,6 +3655,15 @@ Implicados: BASE-F92, BASE-F93
   `base.failed_event.list` (`GET /api/system/failed-events`: las `EventDelivery` `dead` del host, hasta 100, con
   `retryable` = su app está en `base.apps_on.active_apps`). Las tres filtran por `scope_kind`/`scope_key` del contexto
   (test de dos hubs en `base/tests/test_queries_system.py`).
+- Novedades (BASE-F116): `base.release_note.list` (`GET /api/system/release-notes`, `base.view_home`,
+  `database=False`, `ai=`) devuelve una página (`limit` hasta 100, 20 por defecto; `offset`; `total`) de las notas que
+  trae la imagen, la más reciente primero, en el idioma de la persona (sin él, en inglés). Cada nota es un fichero de
+  `base/release-notes/` llamado `<AAAA-MM-DD>-<nombre-en-minúsculas>.toml` (el día en que el cambio llega a los
+  negocios), con `kind` (`new`, `improved` o `fixed`) y una tabla por idioma del despliegue con `title` (hasta 80
+  caracteres) y `body` (hasta 400), en texto llano. `base/release_notes.py` las lee una vez por proceso (con `DEBUG`, en
+  cada llamada) y rechaza la que no lo cumple; `base/tests/test_release_notes.py` lee todas las del repositorio, así
+  que una nota rota no llega a la imagen. Se escribe una por cambio que nota un negocio (algo nuevo, una mejora o un
+  arreglo que se ve), en su lenguaje: nunca el título del commit ni los cambios internos.
 - Comandos (`base/services/`, `base.administer_hub`, `ai=` con `risk`), con el id en el cuerpo:
   `base.failed_event.retry` (`POST /api/system/failed-events/retry`: `pending`, `attempts` 0, solo a su `app_label`;
   409 `base.failed_event_app_off` si la app no está activa), `base.failed_event.retry_all` (`POST
@@ -4096,9 +4148,10 @@ Implicados: BASE-F92, BASE-F93
   `test_assistant_gateway_log.py` (con la pasarela falsa de `base/tests/fake_gateway.py`); Vitest de `base/frontend/lib/assistant-hub.test.ts`,
   `components/AssistantSetupEmpty.test.ts`, `SetupChecklist.test.ts`, `ShellChrome.test.ts` y `frontend/main.test.ts`,
   y los del chat en `packages/ui/src/components/Assistant/*.test.ts` (`pnpm --filter @erplora/ui test`); e2e
-  `tests/e2e/base-assistant.spec.ts` contra un SaaS de verdad con su pasarela y el proveedor falso
-  `tests/e2e/assistant-provider.ts` (un servidor HTTP en 127.0.0.1 que habla la API de OpenAI; receta en
-  `tests/e2e/README.md`, «El asistente»): ningún test llega a un proveedor real.
+  `tests/e2e/base-assistant.spec.ts` (el panel) y `base-assistant-card.spec.ts`, `base-assistant-card-values.spec.ts`
+  y `base-assistant-card-records.spec.ts` (la tarjeta), con sus ayudantes en `tests/e2e/assistant-panel.ts`, contra un
+  SaaS de verdad con su pasarela y el proveedor falso `tests/e2e/assistant-provider.ts` (un servidor HTTP en 127.0.0.1
+  que habla la API de OpenAI; receta en `tests/e2e/README.md`, «El asistente»): ningún test llega a un proveedor real.
 - **Resumen propio de una escritura** (hub#693): `ai["summary"]` es un callable
   `(ctx, arguments, fields) -> list[dict]`; `base.assistant.cards.card` lo ejecuta solo con `ctx`, como esa persona y bajo
   `translation.override(language)`, con `fields` ya en ese idioma, y pone exactamente los campos que devuelve. Sin
@@ -4222,9 +4275,13 @@ Implicados: BASE-F92, BASE-F93
 - **La caché es un clúster** (hub#440): en AWS es ElastiCache Serverless, un Valkey en modo clúster, que rechaza
   con `CROSSSLOT` una llamada con varias claves de ranuras distintas (`get_many`, `set_many`, `delete_many`). Las
   claves que van juntas comparten una etiqueta de hash: lo que va entre la primera `{` y la siguiente `}`
-  (`base.files:{<hex>}:…`, `website:home:{<slug>}:…`). En local y en los tests la caché es
-  `base.cache.ClusterLocMemCache`, la memoria del proceso con esa misma regla y el mismo error: lo que fallaría en
-  AWS falla antes en el test.
+  (`base.files:{<hex>}:…`, `website:home:{<slug>}:…`). Sin Valkey la caché aplica esa misma regla con el
+  mismo error, así que lo que fallaría en AWS falla antes en local o en el test: en local es
+  `base.cache.ClusterFileBasedCache`, una carpeta del disco por BD de control (`<tmp>/erplora-hub-cache/<DB_NAME>`) que
+  comparten el `runserver` y el worker como comparten Valkey en AWS, y lo que uno olvida al confirmar un cambio (una app
+  que el worker deja encendida) ya no lo lee el otro (hub#707); en los tests es `base.cache.ClusterLocMemCache`, la
+  memoria del proceso. La carpeta sobrevive a reiniciar el `runserver`, como Valkey a un despliegue: lo guardado caduca
+  con su plazo, y para vaciarla basta borrarla.
 
 - **`Hub.cluster` vacío es el servidor por defecto** (hub#614), el de los settings: es un valor válido, no un dato por
   rellenar, y con él conecta, migra, mide y se traslada el hub (`base.tenancy.connections`, `credentials`, `migrator`,
@@ -4346,11 +4403,10 @@ Implicados: BASE-F92, BASE-F93
   (PLAN-SAAS §28) y lleva su flujo y su issue allí.
 - **El archivo fiscal y el borrado de un negocio con documentos (BASE-F109)**, hub#738: hasta que exista, guarda su
   base de datos y sus ficheros pasados los 90 días.
-- **La fila de salud del Inicio (BASE-F02)**, hub#573: un punto de extensión más en `LiveAppConfig` y su uso en
-  Impresión y la Bandeja de WhatsApp.
-- **Las notas de cada versión (BASE-F41)**, hub#576.
-- **Los roles que trae una app (BASE-F82)**, hub#579, con la contradicción entre PLAN-HUB §3 (`RoleActivation`) y
-  los cuatro roles de PLAN §22 sin resolver.
+- **La fila de salud del Inicio en pantalla (BASE-F02)**, hub#573: su lectura ya existe (`base.health.list`, con la
+  impresora de Impresión); falta pintarla en el Inicio y que la Bandeja de WhatsApp declare cómo está su número.
+- **Las novedades en Sistema › Actualizaciones (BASE-F116)**: ya se leen por el asistente y por la API; falta
+  enseñarlas en la pantalla, hub#576.
 - **La cola de PgBouncer de cada negocio en CloudWatch**, hub#572.
 - **Peticiones a `@erplora/ui`** que siguen abiertas: [`UI-REQUESTS.md`](UI-REQUESTS.md) (los iconos de documento de
   Archivos, los del cuadro del asistente y `useI18n` en el shell).
@@ -4382,6 +4438,8 @@ Implicados: BASE-F92, BASE-F93
   programas ni archivos de más de 25 MB.
 - No invita, no cambia el rol ni quita a nadie: es de erplora.com, que lleva las plazas del plan; el hub lo enseña y
   enlaza a «Miembros».
+- No deja que una app traiga roles propios ni encienda o apague roles: un negocio tiene siempre los cuatro de
+  erplora.com, que se dan al invitar, y cada app reparte entre ellos lo que se puede hacer en ella (BASE-F82).
 - No enseña nunca el token entero de una llave después de crearla o rotarla, ni guarda el PIN de quien aprueba.
 - El asistente no guarda la conversación en el servidor: vive en la pestaña de quien pregunta y se olvida al cerrar
   sesión o cambiar de usuario.

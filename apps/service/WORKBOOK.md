@@ -1251,7 +1251,7 @@ Los papeles llegan del SaaS con prefijo (`hub_owner`, `hub_admin`, `hub_manager`
   carrera.
 - **Tareas programadas**: `scheduled_tasks` del `AppConfig` declara `service.session.expire` cada
   hora (`0 * * * *`, UTC, `collapse`): la corre el worker (`base/scheduler.py`), en cada negocio y con su
-  ámbito (`base.worker._serve_hub`). Además, el saldo no cuenta una reserva vencida y reservar de nuevo la
+  ámbito (`base.hub_visits`). Además, el saldo no cuenta una reserva vencida y reservar de nuevo la
   misma línea marca antes la vencida.
 - **Bonos sin cliente** se calculan desde la ficha de Clientes (eliminada o anonimizada, y no unida a
   otra): no hace falta sellar nada al eliminarla. Unir dos fichas mueve los bonos con la reacción a

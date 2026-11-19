@@ -84,7 +84,7 @@ test.afterAll(async ({ browser }) => {
   await provider?.close();
 });
 
-// ── The panel and its card (as base-assistant.spec.ts drives them) ──
+// ── The panel and its card (as assistant-panel.ts drives them) ──
 
 const panel = (page: Page): Locator => page.locator('[data-testid="assistant-panel"]');
 const box = (page: Page): Locator => panel(page).locator('[data-testid="assistant-input"] textarea');
@@ -106,7 +106,7 @@ async function ask(page: Page, text: string): Promise<void> {
 }
 
 /** The dangerous card ready for its capture: «Confirmation» focused, its label floated, then one frame for the label's
- *  move to start, so `untilStill` waits for it (base-assistant.spec.ts). */
+ *  move to start, so `untilStill` waits for it (assistant-panel.ts). */
 async function confirmationReady(page: Page): Promise<void> {
   const field = card(page).locator('[data-testid="assistant-confirm-input"]');
   await expect(field).toHaveClass(/\bhas-focus\b/);
@@ -115,7 +115,7 @@ async function confirmationReady(page: Page): Promise<void> {
 }
 
 /** «Confirmation» as its capture must show it: focused, its label floated and, in the same frame, nothing moving on the
- *  page, the label's move included (base-assistant.spec.ts, rv-ui-35). */
+ *  page, the label's move included (assistant-panel.ts, rv-ui-35). */
 async function confirmationSettled(page: Page): Promise<boolean> {
   await exposeMovingInPage(page);
   return card(page)

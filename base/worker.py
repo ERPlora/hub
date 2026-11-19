@@ -11,12 +11,14 @@ no release, so it does no work before that. Two cases:
   ``task_failed`` rule reports it.
 
 Then it names, as an error, each ready business still without a database of its own (one that shared a database and
-was not cut yet, ``manage.py cut_shared_hubs``): it never serves one, nor runs it on control. Every tick (5 s), each hub
-with its own database gets its outbox relayed (``base.relay``: each new event to the reactions of the
-apps that listen to it, exactly once, in the scope of the hub that recorded it) and the tasks of its apps that are due
-run (``scheduler.run_due``: the VeriFactu queue every minute, and every other ``scheduled_tasks`` an
-app declares, each claimed with ``SKIP LOCKED``; its schedule written in its database once per process); control's own
-outbox (the registry's and the demos' events, which no app hears) is taken on control. A pass that fails (the database
+was not cut yet, ``manage.py cut_shared_hubs``): it never serves one, nor runs it on control. Every tick (5 s), the
+hubs with their own database that have something to do are visited (``base.hub_visits``: one whose channel was
+notified after a COMMIT, whose next task of an app on or next try of a delivery came, or not visited for a minute): its
+outbox relayed (``base.relay``: each new event to the reactions of the apps that listen to it, exactly once, in the
+scope of the hub that recorded it) and the tasks of its apps that are due run (``scheduler.run_due``: the VeriFactu
+queue every minute, and every other ``scheduled_tasks`` an app declares, each claimed with ``SKIP LOCKED``); a hub at
+rest is not entered between two of them. Control's own outbox (the registry's and the demos' events, which no app
+hears) is taken on control on every tick. A pass that fails (the database
 went away) is logged and the next tick tries again; a stop request ends the loop at once. What a reaction or a task
 leaves for after its COMMIT that waits on the network (a call to another system) runs off this loop, in
 ``base.outbound``'s threads, so it never holds the next delivery nor the next task; on its way out the worker gives
@@ -34,8 +36,8 @@ with why, and moves the hub's ring to the next of its apps to set up (or ends it
 30 s, and a request of a newer code than this worker's (``AppActivation.target``, or the app or what it needs already at
 a migration this code does not know: a deploy rolling) is left to a worker of that code, 60 s, and fails as
 ``code_behind`` after 10 minutes (a rollback: none is coming). The pass over ``hub_due`` leaves a ready hub's ring to
-it. A ring lost is found by the pass over the hubs served (``_hubs``), which looks into each ready one for apps still to
-set up every 10 minutes when it had a visit in the last 7 days, and once a day otherwise.
+it. A ring lost is found by the visits to the hubs served (``base.hub_visits``), which look into each ready one for apps
+still to set up every 10 minutes when it had a visit in the last 7 days, and once a day otherwise.
 
 Then two slow passes of the data, each in a
 thread of its own (:class:`Background`, one piece at a time, its own connections closed when it ends): the loop starts
@@ -52,12 +54,12 @@ asked to move to another cluster and drops the copies they left behind after the
 as they were at a moment, from their copy on a temporary cluster (``base.tenancy.restore``, hub#1198), and makes the
 separate copies of a moment asked, next to the business and without closing it (hub#1213).
 
-The order of a tick: control's own outbox first; then the hubs with their own database
-(``_hubs``): each one it serves (ready, or a business that left but keeps its database,
-whose records still to send must reach the AEAT), in its own database (``use_hub``) and one at a time, gets its outbox
-relayed, its apps' schedule written there once per process and the tasks due of its active apps run on its own scope
-(``host``, its slug: their live notices go on its channel), for ``HUB_PASS_SECONDS`` at most, the next tick going on
-after the last hub served; a hub that fails is logged and the others are served. Then the reaper, and last the hubs
+The order of a tick: control's own outbox first; then the visits to the hubs with their own database
+(``base.hub_visits``): each one it serves (ready, or a business that left but keeps its database,
+whose records still to send must reach the AEAT) and has something to do, in its own database (``use_hub``) and one at a
+time, gets its outbox relayed, its apps' schedule written there once per process and the tasks due of its active apps
+run on its own scope (``host``, its slug: their live notices go on its channel), within the visits' time budget, the
+next tick going on after the last hub visited; a hub that fails is logged and the others are served. Then the reaper, and last the hubs
 whose ``hub_due`` has come: their databases made, the demos that ended dropped (``base.tenancy.provision.run_due``; it
 takes no new hub after ``provision.DUE_PASS_SECONDS``, though a clone it started finishes); a hub made ready in a tick
 has its outbox relayed from the next one. Every pass releases its connections.
@@ -97,7 +99,7 @@ from django.utils import timezone
 from live.context import OperationContext, Scope
 from live.operations import get as get_operation
 
-from base import activation, apps_on, catalog, metrics, outbound, queries, relay, scheduler, schemas, services, usage
+from base import activation, catalog, hub_visits, metrics, outbound, queries, relay, schemas, services, usage
 from base.services.demos import reap_demos
 from base.tenancy import dumps, migrator, move, offboarding, provision, recovery, restore
 from base.tenancy.connections import close_hub_aliases, close_this_threads_connections
@@ -114,12 +116,6 @@ RETRY_FIRST_SECONDS = 5
 RETRY_MAX_SECONDS = 60
 #: How often the demo reaper purges the demos that ended (their hosts answer 410 from their end anyway).
 REAPER_INTERVAL_SECONDS = 60
-#: How long the pass over the hubs with their own database may go on in a tick; the next tick goes on from the next hub.
-HUB_PASS_SECONDS = 3.0
-#: The hubs whose schedule this process already wrote in their database (once per process: a release restarts it).
-_synced: set = set()
-#: The id of the last hub the pass served: the next pass starts after it, so every hub gets its turn.
-_next_hub = None
 #: How long the worker waits on its way out for its slow passes, all together (ECS kills the task 30 s after SIGTERM,
 #: and the calls in flight get OUTBOUND_GRACE_SECONDS after them).
 BACKGROUND_GRACE_SECONDS = 10.0
@@ -134,16 +130,8 @@ OUTBOUND_GRACE_SECONDS = 15
 #: How long the pass making the tables of the apps turned on may go on in a tick; a hub it started is always finished,
 #: and the next tick goes on after it.
 ACTIVATION_PASS_SECONDS = 10.0
-#: How often the pass over the hubs served (``_hubs``) looks into a hub for apps to set up whose ring was lost (between a
-#: COMMIT and its ring, or ended by another pass): an active one (a visit in the last 7 days) every 10 minutes, any
-#: other once a day.
-SWEEP_ACTIVE = dt.timedelta(minutes=10)
-SWEEP_ALL = dt.timedelta(days=1)
-ACTIVE_WINDOW = dt.timedelta(days=7)
 #: How long it waits for a hub's schema another run holds before putting the app off (``SchemaLocked``).
 ACTIVATION_LOCK_WAIT = 1.0
-#: When the sweep of the hubs served last looked into each one for apps to set up (``_serve_hub``), by hub id.
-_swept: dict = {}
 
 
 def run(  # noqa: C901, PLR0912, PLR0915
@@ -201,6 +189,7 @@ def run(  # noqa: C901, PLR0912, PLR0915
     data_pass, usage_pass, metrics_pass = Background("data"), Background("usage"), Background("metrics")
     # A hub's move to another cluster (base.tenancy.move): its copy takes a while too, in a thread of its own.
     move_pass = Background("move")
+    visits = hub_visits.HubVisits()
     was_frozen = False
     while not stop.is_set():
         now = clock()
@@ -211,7 +200,7 @@ def run(  # noqa: C901, PLR0912, PLR0915
             was_frozen = frozen
         if not databases_only:
             _relay(now)
-            _hubs(now)
+            visits.serve(now)
         if not frozen:
             _activations(now)
         if not databases_only:
@@ -233,6 +222,7 @@ def run(  # noqa: C901, PLR0912, PLR0915
     for runner in (data_pass, usage_pass, move_pass, metrics_pass):
         runner.join(max(0.0, deadline - time.monotonic()))
     outbound.stop(OUTBOUND_GRACE_SECONDS)
+    visits.close()
     logger.info("worker: stopped.")
     return 0
 
@@ -334,30 +324,6 @@ def _due(now: dt.datetime) -> None:
     finally:
         # The pass's connections (control's, and each hub's direct one) are not kept open while the worker idles.
         close_old_connections()
-
-
-def _hubs(now: dt.datetime) -> None:
-    """Relay the outbox and run the due tasks of the hubs with their own database, each in it, one at a time, for
-    :data:`HUB_PASS_SECONDS` at most; the next tick goes on after the last one served. A hub that fails is logged and
-    the others are served."""
-    global _next_hub
-    try:
-        with use_control():
-            hubs = services.provisioning.hubs_to_serve(now)
-            active = services.activation.hubs_visited_since((now - ACTIVE_WINDOW).date()) if hubs else frozenset()
-    except Exception:
-        logger.exception("worker: the hubs to serve could not be read; the next tick tries again.")
-        close_old_connections()
-        return
-    if not hubs:
-        return
-    start = next((index for index, hub in enumerate(hubs) if _next_hub is not None and hub.pk > _next_hub), 0)
-    started = time.monotonic()
-    for hub in hubs[start:] + hubs[:start]:
-        _serve_hub(hub, now, active=hub.slug in active)
-        _next_hub = hub.pk
-        if time.monotonic() - started > HUB_PASS_SECONDS:
-            break
 
 
 def _activations(now: dt.datetime) -> None:
@@ -576,38 +542,9 @@ def _offboarding_copy(hub, now: dt.datetime, cancelled: Callable[[], bool] | Non
     services.offboarding.offboarding_copied(hub.pk)
 
 
-def _serve_hub(hub, now: dt.datetime, *, active: bool = False) -> None:
-    """One hub's outbox relayed and its due tasks run, in its own database and on its own scope; its schedule written
-    there first, once per process; and, at the sweep's pace (``active``: a visit in the last 7 days), a ready hub with
-    apps still to set up rung again (a ring lost). A failure is logged; its connections are released either way."""
-    scope = Scope("host", hub.slug)
-    try:
-        with use_hub(hub):
-            if hub.pk not in _synced:
-                scheduler.sync(now)
-                _synced.add(hub.pk)
-            relay.run(now)
-            scheduler.run_due(now, scope=scope, active=apps_on.active_apps(scope))
-            if hub.status == Hub.Status.READY and _sweep_due(hub.pk, now, active):
-                _swept[hub.pk] = now
-                pending = queries.apps.activation_next_at(hub.slug)
-                if pending is not None:
-                    services.activation.ring_activations(hub, pending)
-    except Exception:
-        logger.exception("worker: the hub %s failed; the next tick tries it again.", hub.slug)
-    finally:
-        close_hub_aliases(hub)
-        close_old_connections()
-
-
-def _sweep_due(hub_id, now: dt.datetime, active: bool) -> bool:
-    last = _swept.get(hub_id)
-    return last is None or now - last >= (SWEEP_ACTIVE if active else SWEEP_ALL)
-
-
 def _relay(now: dt.datetime) -> None:
     """Take control's own outbox at ``now`` (the registry's and the demos' events: no app hears them); a failure is
-    logged and the next tick tries again. A hub's events are relayed in its own database (:func:`_serve_hub`)."""
+    logged and the next tick tries again. A hub's events are relayed in its own database (``base.hub_visits``)."""
     try:
         with use_control():
             done = relay.run(now, of_hubs=False)

@@ -1,4 +1,4 @@
-"""A fixed-window limit per key on Django's cache (Valkey in AWS, the process's memory locally), and its 429.
+"""A fixed-window limit per key on Django's cache (Valkey in AWS, the machine's disk locally), and its 429.
 
 A route that answers without a session (a hub's public website) counts its callers with :func:`allow`, by a key of
 its own (``"<app>:<hub slug>:<IP>"``, the IP by :func:`client_address`), and raises :class:`RateLimited` when it says

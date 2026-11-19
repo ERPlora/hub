@@ -35,7 +35,7 @@ type Check = { id: string; label: string; table_id: string | null; status: strin
 cardSpec(NEEDED, () => cleanRoom(TAG));
 
 
-/** The dangerous card ready for its capture, as base-assistant.spec.ts waits for it: «Confirmación» focused, its
+/** The dangerous card ready for its capture, as assistant-panel.ts waits for it: «Confirmación» focused, its
  *  label floated and nothing moving on the page, the label's move included, two frames apart. */
 async function confirmationSettled(page: Page): Promise<boolean> {
   const field = card(page).locator('[data-testid="assistant-confirm-input"]');
