@@ -28,6 +28,7 @@ from live.operations import get as get_operation
 
 from apps.invoice import fiscal
 from apps.invoice.document_issuer import document_issuer, issuer_vat_number
+from . import fiscal_archive as fiscal_archive
 from . import public as public
 from apps.invoice.models import (
     FACTORY_SERIES_NAMES,
@@ -1347,9 +1348,3 @@ def platform_health(ctx: OperationContext, data: PlatformHealthIn) -> dict:
     if settings.ERPLORA_ENVIRONMENT == "prod" and not verifactu.production_open:
         return {"ready": False, "detail": str(PLATFORM_REAL_FILING_CLOSED)}
     return {"ready": True, "detail": ""}
-
-
-def keeps_fiscal_documents() -> bool:
-    """Whether this database holds its invoices (``fiscal_documents_kept`` on this app's config), of any status: a draft counts
-    too, for what it asks is whether a database can go, and that cannot be undone."""
-    return Invoice.objects.exists()

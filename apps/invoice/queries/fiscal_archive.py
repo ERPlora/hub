@@ -1,31 +1,23 @@
-"""Each invoice as it was handed over, for the fiscal archive of a business that left (``fiscal_archive_documents`` on
-this app's config, which ``base.tenancy.fiscal_archive`` asks): the PDF of its A4, in its own language or else the
-business's, never marked as a copy, and with VeriFactu's QR once the AEAT registered it, as
-``invoice.invoice.platform_document`` prints it.
+"""What Invoicing reads for a business that left, as its config answers the platform (``fiscal_documents_kept`` and
+``fiscal_archive_documents``): whether its database holds invoices, and every one of them for the fiscal archive."""
 
-Every invoice, whatever its status, a page at a time by its key (UUIDv7: in the order they were issued). Each PDF is
-made only when the archive asks for it: one already up from an earlier attempt is never printed again.
+from collections.abc import Iterator
 
-This module holds no operation, so the package's ``__init__`` does not import it: the app's config does, when asked.
-"""
-
-from collections.abc import Callable, Iterator
-from functools import partial
-
-from django.utils import translation
-from live.context import OperationContext
-
-from apps.invoice import pdf
 from apps.invoice.models import Invoice
-from apps.invoice.queries import IN_THE_AEAT, record_of, render_document
 
 #: How many invoices are read at once.
 PAGE_ROWS = 500
 
 
-def documents(ctx: OperationContext) -> Iterator[tuple[str, str, Callable[[], bytes]]]:
-    """Each invoice by the name of its file (``<id>.pdf``), its number and how to print it, read in the database of
-    the active hub; ``ctx`` is the platform's, in the business's language."""
+def keeps_fiscal_documents() -> bool:
+    """Whether this database holds its invoices (``fiscal_documents_kept`` on this app's config), of any status: a draft
+    counts too, for what it asks is whether a database can go, and that cannot be undone."""
+    return Invoice.objects.exists()
+
+
+def invoices() -> Iterator[Invoice]:
+    """Every invoice of the active hub's database, whatever its status, a page at a time by its key (UUIDv7: in the
+    order they were issued)."""
     last = None
     while True:
         page = Invoice._base_manager.order_by("pk")
@@ -34,14 +26,5 @@ def documents(ctx: OperationContext) -> Iterator[tuple[str, str, Callable[[], by
         found = list(page[:PAGE_ROWS])
         if not found:
             return
-        for invoice in found:
-            yield f"{invoice.id}.pdf", invoice.number, partial(printed, ctx, invoice)
+        yield from found
         last = found[-1].pk
-
-
-def printed(ctx: OperationContext, invoice: Invoice) -> bytes:
-    """The PDF of ``invoice``'s A4 as it was handed over."""
-    record = record_of(ctx, invoice)
-    qr = {"url": record.qr_url, "svg": record.qr_svg} if record is not None and record.status in IN_THE_AEAT else None
-    with translation.override(invoice.language or ctx.language):
-        return pdf.render_pdf(render_document(invoice, qr=qr))
