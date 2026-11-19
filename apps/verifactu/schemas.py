@@ -22,7 +22,7 @@ from pydantic import (
     model_validator,
 )
 
-from apps.verifactu import chain
+from apps.verifactu import card_names, chain
 from apps.verifactu.models import Config, Event, OwnCertificate, Record
 
 T = TypeVar("T")
@@ -92,7 +92,7 @@ class NoInput(Schema):
 class RecordRefIn(Schema):
     """A record, by its id or by the number of its invoice (its latest record)."""
 
-    record_id: UUID | None = Field(None, description=RECORD_ID)
+    record_id: UUID | None = Field(None, description=RECORD_ID, json_schema_extra=card_names.A_RECORD)
     invoice_number: OptionalText(60) = Field(None, description=INVOICE_NUMBER)
 
     @model_validator(mode="after")
@@ -658,7 +658,7 @@ class RecordCreateIn(Schema):
 
     model_config = ConfigDict(extra="ignore")
 
-    invoice_id: UUID | None = Field(None, description="Id of the issued invoice.")
+    invoice_id: UUID | None = Field(None, description="Id of the issued invoice.", json_schema_extra=card_names.AN_INVOICE)
     number: OptionalText(60) = Field(
         None,
         title=gettext_noop("Invoice number"),
