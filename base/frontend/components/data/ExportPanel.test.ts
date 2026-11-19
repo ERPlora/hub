@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { insideTheAppSaving, outOfTheApp } from '../../__tests__/app-download';
 import { EMPLOYEE, flush, mountBase } from '../../__tests__/mount-base';
-import type { AppDatasets } from '../../operations';
+import type { AppDatasets } from '../../operations/blueprints';
 import ExportPanel from './ExportPanel.vue';
 
 const APPS: AppDatasets[] = [

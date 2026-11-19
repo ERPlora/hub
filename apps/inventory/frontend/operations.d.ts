@@ -4,7 +4,7 @@
 // `frontend/generated/operations.json`. One input per operation (ninja's parity): no path
 // parameters, a product or a category travels in the input. Money is whole cents; quantities and
 // other decimals are JSON strings on the way out («2.500») and a number or its string on the way in.
-import type { CatalogImage } from '../../../base/frontend/operations';
+import type { CatalogImage } from '../../../base/frontend/operations/catalog_images';
 import type { Page } from '../../../frontend/sdk-types';
 
 export type UnitCode = 'ud' | 'kg' | 'g' | 't' | 'l' | 'ml' | 'min' | 'h';

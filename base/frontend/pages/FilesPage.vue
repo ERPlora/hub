@@ -45,7 +45,7 @@ import {
 } from '../lib/files';
 import { useBaseI18n } from '../lib/i18n';
 import { useUnsavedFormOnOpen } from '../lib/unsaved-changes';
-import type { FileItem } from '../operations';
+import type { FileItem } from '../operations/files';
 
 /** A file or a folder of the open folder, as the actions take it. */
 interface Entry {

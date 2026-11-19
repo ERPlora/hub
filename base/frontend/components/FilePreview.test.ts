@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { flush, mountBase } from '../__tests__/mount-base';
 import { OFFICE_PREVIEW_MAX_BYTES } from '../lib/files';
-import type { FileItem } from '../operations';
+import type { FileItem } from '../operations/files';
 import FilePreview from './FilePreview.vue';
 
 const mocks = vi.hoisted(() => ({ renderPdf: vi.fn() }));

@@ -19,7 +19,7 @@ import { computed, getCurrentInstance, ref, watch } from 'vue';
 
 import { sessionChanged } from '../lib/access';
 import { useBaseI18n } from '../lib/i18n';
-import type { Preferences, Profile, ProfileLanguage, ProfileThemeMode } from '../operations';
+import type { Preferences, Profile, ProfileLanguage, ProfileThemeMode } from '../operations/profile';
 
 type DataForm = { first_name: string; last_name: string; contact_email: string };
 

@@ -21,7 +21,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { EMPLOYEE, flush, memoryStorage, mountBase, OWNER, tap } from '../__tests__/mount-base';
 import en from '../locale/en.json';
 import es from '../locale/es.json';
-import type { SetupItem, SetupStatus } from '../operations';
+import type { SetupItem, SetupStatus } from '../operations/home';
 import { approvalPass, withApproval } from './approval';
 import {
   actionKey,

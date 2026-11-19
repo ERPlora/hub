@@ -8,7 +8,7 @@ import { Combo } from '@erplora/ui/components';
 import { describe, expect, it, vi } from 'vitest';
 
 import { itTellsTheCorrectedFieldApart } from '../../../../base/frontend/__tests__/same-words-refusal';
-import type { Business } from '../../../../base/frontend/operations';
+import type { Business } from '../../../../base/frontend/operations/business';
 import type { ComboOut } from '../operations';
 import {
   expectAmountLeftWaitsForMoney,

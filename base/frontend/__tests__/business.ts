@@ -1,7 +1,7 @@
 // What the platform's `base.business.get` answers, for the tests of base and of every app whose screens paint the
 // business's money: one fixture, so a field the business gains is added once. Free of side effects: an app's test
 // helper imports it without mounting base.
-import type { Business } from '../operations';
+import type { Business } from '../operations/business';
 
 /** A business in Spain, in euros; `fields` change it. */
 export function business(fields: Partial<Business> = {}): Business {

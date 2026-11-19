@@ -15,7 +15,7 @@ import {
   subId,
   tap,
 } from '../__tests__/mount-base';
-import type { Person, Seats } from '../operations';
+import type { Person, Seats } from '../operations/people';
 import PeopleList from './PeopleList.vue';
 
 const MEMBERS_URL = 'http://localhost:8001/businesses/0199a1b2-0000-7000-8000-000000000001/members';

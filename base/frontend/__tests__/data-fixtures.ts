@@ -1,5 +1,5 @@
 // Rows of Settings › Data for its tests, shaped as base/schemas/ answers them.
-import type { BlueprintSummary, ImportRow, Template } from '../operations';
+import type { BlueprintSummary, ImportRow, Template } from '../operations/blueprints';
 
 export function template(key: string, fields: Partial<Template> = {}): Template {
   return {

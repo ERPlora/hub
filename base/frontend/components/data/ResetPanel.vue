@@ -10,7 +10,9 @@ import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
 import { useBaseI18n } from '../../lib/i18n';
-import type { BlueprintApp, HubReset, ImportRow, Removal, ResetProgress } from '../../operations';
+import type { BlueprintApp, ImportRow, Removal } from '../../operations/blueprints';
+import type { HubReset } from '../../operations/reset';
+import type { ResetProgress } from '../../operations/dumps';
 import DumpsCard from './DumpsCard.vue';
 import '../../data.css';
 

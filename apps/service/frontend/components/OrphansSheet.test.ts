@@ -4,7 +4,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import type { OrphanOut } from '../operations';
-import type { Business } from '../../../../base/frontend/operations';
+import type { Business } from '../../../../base/frontend/operations/business';
 import { business, JAPANESE, mountService, page, settle } from '../__tests__/mount-service';
 import OrphansSheet from './OrphansSheet.vue';
 

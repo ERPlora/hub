@@ -4,7 +4,7 @@
 import { HubIcon } from '@erplora/ui/shell';
 import { ref } from 'vue';
 
-import type { FileFolder } from '../operations';
+import type { FileFolder } from '../operations/files';
 
 defineOptions({ name: 'FileTree' });
 

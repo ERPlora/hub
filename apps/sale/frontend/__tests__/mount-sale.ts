@@ -12,7 +12,7 @@ import { mountInShell, overBase, settle } from '../../../../base/frontend/__test
 import { business, IN_YEN as JAPANESE } from '../../../../base/frontend/__tests__/business';
 import { expectSaveWaitsForMoney } from '../../../../base/frontend/__tests__/save-waits-for-money';
 import { HUB_ASSISTANT } from '../../../../base/frontend/lib/assistant-hub';
-import type { Business } from '../../../../base/frontend/operations';
+import type { Business } from '../../../../base/frontend/operations/business';
 import taxEn from '../../../tax/frontend/locale/en.json';
 import taxEs from '../../../tax/frontend/locale/es.json';
 import type { TaxSettingsOut, TerritoryTaxKind } from '../../../tax/frontend/operations';

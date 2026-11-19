@@ -2,7 +2,7 @@ import type { ActionNotice, ActionNoticeSource } from '@erplora/ui/shell';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { defineComponent, h } from 'vue';
 
-import type { SetupItem, SetupStatus } from '../operations';
+import type { SetupItem, SetupStatus } from '../operations/home';
 import type { BellCounter } from '../operations-bell';
 import { errorFrame, flush, mountBase, subId } from '../__tests__/mount-base';
 import { useHubActionNotices } from './action-notices';

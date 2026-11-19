@@ -12,7 +12,7 @@ import { computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
 import { useBaseI18n } from '../lib/i18n';
-import type { AppRow } from '../operations';
+import type { AppRow } from '../operations/apps';
 
 const { t } = useBaseI18n();
 const route = useRoute();

@@ -1,7 +1,7 @@
 // Employees' tabs go in the address hash, so Back and a saved link open the same one. API keys and Approvals are only
 // for whoever runs the business: for anyone else the tab does not exist and its hash opens Personal, never a blank
 // page. Also how each person gets in, and what a badge looks like before it is sent.
-import type { HubRole, PersonWays } from '../operations';
+import type { HubRole, PersonWays } from '../operations/people';
 
 export type EmployeesTab = 'personal' | 'roles' | 'apikeys' | 'approvals';
 

@@ -1,7 +1,7 @@
 import { HubIcon } from '@erplora/ui/shell';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { WidgetDef } from '../operations';
+import type { WidgetDef } from '../operations/home';
 import { business, errorFrame, flush, mountBase, POLISH, subId } from '../__tests__/mount-base';
 import WidgetPanel from './WidgetPanel.vue';
 

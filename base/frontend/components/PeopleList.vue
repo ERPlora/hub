@@ -13,7 +13,7 @@ import { type HubHome, readJsonBlock } from '../lib/home';
 import { useBaseI18n } from '../lib/i18n';
 import { managementOffered } from '../lib/management';
 import { accessKeys, roleKey } from '../lib/people';
-import type { Person } from '../operations';
+import type { Person } from '../operations/people';
 import PlanUpgradeLink from './PlanUpgradeLink.vue';
 
 const { t, locale } = useBaseI18n();

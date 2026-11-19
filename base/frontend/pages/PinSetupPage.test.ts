@@ -2,7 +2,7 @@ import { ApiError } from '@erplora/ui/sdk';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { flush, mountBase } from '../__tests__/mount-base';
-import type { Profile } from '../operations';
+import type { Profile } from '../operations/profile';
 import PinSetupPage from './PinSetupPage.vue';
 
 const access = vi.hoisted(() => ({ leaveTo: vi.fn() }));

@@ -11,7 +11,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { itTellsTheCorrectedFieldApart } from '../../../../base/frontend/__tests__/same-words-refusal';
 import { expectAmountLeftWaitsForMoney, expectWindowSaysMoneyUnreadable } from '../../../../base/frontend/__tests__/save-waits-for-money';
-import type { Business } from '../../../../base/frontend/operations';
+import type { Business } from '../../../../base/frontend/operations/business';
 import { localDay } from '../lib/format';
 import type { MethodOut, PaymentOut } from '../operations';
 import { business, click, errorFrame, ionValue, JAPANESE, mountPayment, page, POLISH, RECORDER, settle } from '../__tests__/mount-payment';

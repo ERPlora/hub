@@ -12,7 +12,7 @@ import { HubIcon } from '@erplora/ui/shell';
 import { IonSkeletonText } from '@ionic/vue';
 import { computed, defineAsyncComponent, onMounted, onUnmounted, ref, type Ref, shallowRef } from 'vue';
 
-import type { WidgetDef } from '../operations';
+import type { WidgetDef } from '../operations/home';
 import { appComponent } from '../lib/app-components';
 import { widgetView } from '../lib/home';
 import { useBaseI18n } from '../lib/i18n';

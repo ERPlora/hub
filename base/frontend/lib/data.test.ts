@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import en from '../locale/en.json';
-import type { AppDatasets, ImportRow, LoadReport, Template } from '../operations';
+import type { AppDatasets, ImportRow, LoadReport, Template } from '../operations/blueprints';
 import {
   downloadFrom,
   base64ToBlob,
