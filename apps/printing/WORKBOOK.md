@@ -977,7 +977,10 @@ Tests: `tests/test_queries_health.py` y `tests/test_integration_home_health.py`.
   fechas de solo lectura. Lo que guarda no pasa por las operaciones ni deja aviso.
 - **Asistente**: cada operación declara `ai` con sus `asks` (frases en `en` y `es`, `live.E020`: Impresión está en
   `LIVE_ASSISTANT_ASKS_REQUIRED`, hub#1086) y cada campo de `schemas.py` su `description`; la
-  impresora se nombra por su nombre y el trabajo por su número de documento. La tarjeta de
+  impresora se nombra por su nombre y el trabajo por su número de documento. Cada frase de ejemplo dice
+  una forma de pedirlo que no dice ninguna otra de su herramienta (en ningún idioma, sinónimos incluidos), y
+  `tests/test_assistant_asks.py` guarda una frase de una persona que depende de ella: sobrescribir una sola
+  frase de ejemplo con relleno hace caer una prueba (hub#1513). La tarjeta de
   confirmación nombra cada dato por el `title` de su esquema (`gettext_noop`, con su `es` en el catálogo:
   «Trabajo» para `job_id`, «Dispositivo», «Intento», «Error de impresión», «Referencia») o, si no lo tiene,
   por el `verbose_name` de su campo en el modelo; un dato sin ninguno sale con el nombre técnico y lo para
