@@ -251,6 +251,30 @@ def test_a_delivery_tried_again_wakes_its_business_at_its_next_try(hub_a, worker
     assert ("flow", EventDelivery.Status.DELIVERED, 2) in deliveries(hub_a)
 
 
+def test_between_two_looks_of_control_the_visits_read_nothing_there(hub_a, hub_b, worker_visits):
+    """The businesses served are read on control at the worker's passes there (``look``), not on every tick."""
+    for hub in (hub_a, hub_b):
+        no_task_due_until_tomorrow(hub, BEFORE_A_MINUTE)
+    worker_visits.serve(BEFORE_A_MINUTE)
+
+    with transactions() as counted:
+        for step in range(1, 12):
+            worker_visits.serve(BEFORE_A_MINUTE + TICK * step, look=False)
+
+    assert counted["default"] == 0
+
+
+def test_a_business_no_longer_served_is_left_from_the_next_look(hub_a, hub_b, worker_visits):
+    worker_visits.serve(BEFORE_A_MINUTE)
+    Hub.objects.filter(pk=hub_b.pk).update(status=Hub.Status.REQUESTED)
+    record(hub_b, hub_b.slug)
+
+    with hubs.watched() as sent:
+        worker_visits.serve(BEFORE_A_MINUTE + LOOK, look=True)
+
+    assert hubs.HUB_B_ALIAS not in sent
+
+
 def test_a_task_of_an_app_that_is_off_does_not_wake_its_business(hub_a, worker_visits):
     turn_off(hub_a, with_tasks())
     worker_visits.serve(BEFORE_A_MINUTE)
