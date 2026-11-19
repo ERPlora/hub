@@ -34,8 +34,8 @@ from base.permissions import ADMINISTER_HUB
 from base.schemas.apps import AppChangeIn, AppChangeOut
 from base.services.blueprints import _load_what_waited, _stop_waiting, _waiting_loads
 from base.services.photo import _sync_photo_blocks
+from base.services.provisioning import ring
 from base.tenancy import migrator
-from control.models import HubDue
 
 
 class AppLimitReached(OperationError):
@@ -175,9 +175,9 @@ def _tables_first(
 
 
 def _ring(hub: Hub) -> None:
-    """The hub has tables to make: due in ``hub_due`` now, so the worker takes it at its next tick (after the COMMIT of
-    the change that asked for them; on control)."""
-    HubDue.mark_due(hub, timezone.now())
+    """The hub has tables to make: due in ``hub_due`` now and the worker told, so it takes it at its next tick (after the
+    COMMIT of the change that asked for them; on control)."""
+    ring(hub, told=events.APP_ACTIVATION_REQUESTED)
 
 
 def _named(ctx: OperationContext, labels: Iterable[str]) -> list[dict[str, str]]:

@@ -4,6 +4,7 @@
 // buttons) marks it for a partial charge (SALE-F22). The amount is the server's `line_total`.
 import { describe, expect, it } from 'vitest';
 
+import type { AllergenCode } from '@erplora/ui/components';
 import { HubIcon } from '@erplora/ui/shell';
 
 import { click, mountSale } from '../../__tests__/mount-sale';
@@ -21,6 +22,23 @@ async function setup(over: Parameters<typeof line>[0] = {}, props: Record<string
   return mounted;
 }
 
+const menuDish = (id: string, allergens: AllergenCode[], allergy_in_dish: AllergenCode[] = []) => ({
+  option_id: id,
+  group_name: 'Mains',
+  product_id: id,
+  product_name: id,
+  category_id: null,
+  is_service: false,
+  quantity: 1,
+  price_delta: 0,
+  tax_category_key: null,
+  amount: null,
+  allergens,
+  allergy_in_dish,
+});
+
+const menu = (components: ReturnType<typeof menuDish>[]) => ({ combo_id: 'm1', kitchen_name: 'MENU', supply_kind: 'service' as const, split: false, components });
+
 describe('CartLine: what it shows', () => {
   it('names the dishes of a menu under it, in course order, with how many of each (SALE-F12)', async () => {
     const dish = (product_name: string, quantity = 1) => ({
@@ -34,6 +52,8 @@ describe('CartLine: what it shows', () => {
       price_delta: 0,
       tax_category_key: null,
       amount: null,
+      allergens: [],
+      allergy_in_dish: [],
     });
     const combo = { combo_id: 'm1', kitchen_name: 'MENU', supply_kind: 'service' as const, split: false, components: [dish('Lentejas'), dish('Café', 2)] };
     const m = await setup({ name: 'Menú del día', product_id: null, combo }, {}, 'es');
@@ -95,6 +115,35 @@ describe('CartLine: what it shows', () => {
   it('a professional whose name is not known yet is «the assigned professional»', async () => {
     const m = await setup({ staff_id: 's9' });
     expect(m.find('pos-line-l1-staff').text()).toBe('the assigned professional');
+  });
+
+  it('shows localized allergens, the allergy and only a real match', async () => {
+    const m = await setup({ allergens: ['milk', 'gluten'], allergy: ['gluten', 'fish'], allergy_in_dish: ['gluten'] }, {}, 'es');
+    expect(m.find('pos-line-l1-allergens').text()).toBe('Alérgenos: Gluten, Leche');
+    expect(m.find('pos-line-l1-allergy').text()).toContain('Alergia: Gluten, Pescado');
+    expect(m.find('pos-line-l1-allergy-match').text()).toBe('El plato lleva Gluten');
+    const noMatch = await setup({ allergens: ['milk'], allergy: ['gluten'], allergy_in_dish: [] }, {}, 'es');
+    expect(noMatch.find('pos-line-l1-allergy').text()).toContain('Alergia: Gluten');
+    expect(noMatch.find('pos-line-l1-allergy-match').exists()).toBe(false);
+    const plainLine = await setup({ allergens: [], allergy: [], allergy_in_dish: [] }, {}, 'es');
+    expect(plainLine.find('pos-line-l1-allergens').exists()).toBe(false);
+    expect(plainLine.find('pos-line-l1-allergy').exists()).toBe(false);
+  });
+
+  it('shows each menu dish with its own allergens and allergy match', async () => {
+    const combo = menu([menuDish('Burger', ['gluten', 'milk'], ['milk']), menuDish('Salad', [])]);
+    const m = await setup({ product_id: null, allergens: [], allergy: ['milk'], allergy_in_dish: [], combo }, {}, 'es');
+    expect(m.find('pos-line-l1-dish-allergens-Burger').text()).toBe('Burger · Alérgenos: Gluten, Leche');
+    expect(m.find('pos-line-l1-dish-allergens-Salad').exists()).toBe(false);
+    expect(m.find('pos-line-l1-allergy').text()).toContain('Burger lleva Leche');
+  });
+
+  it('in a menu, warns only on the dishes that carry the allergy, naming only what each carries', async () => {
+    const combo = menu([menuDish('Burger', ['gluten', 'milk'], ['milk']), menuDish('Salad', ['celery'])]);
+    const m = await setup({ product_id: null, allergens: [], allergy: ['gluten', 'fish', 'milk'], allergy_in_dish: [], combo }, {}, 'es');
+    expect(m.find('pos-line-l1-allergy-dish-match-Burger').text()).toBe('Burger lleva Leche');
+    expect(m.find('pos-line-l1-allergy-dish-match-Salad').exists()).toBe(false);
+    expect(m.find('pos-line-l1-allergy-match').exists()).toBe(false);
   });
 
   it('no professional line when the line has none (it goes with the check’s)', async () => {

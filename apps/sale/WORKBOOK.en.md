@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:9ead874ab26e51238d6f76f49defc1e1f744ef4a33607203e4919c3c2931a245 -->
+<!-- generated from WORKBOOK.md sha256:2b1c76ca73a19b717e73a733ddfb6a753e51230451a8158000bd4dda774e9a8c -->
 
 ## What it is for and who it is for
 
@@ -309,7 +309,7 @@ With the window as it opened, Back closes it without asking (BASE-F05).
 | SALE-F37 | Add a payment method (Bizum, bank transfer…) | common | done |
 | SALE-F38 | Sell a service from Services | hair salon | done |
 | SALE-F39 | Charge with what another app adds (the tip) | common | not done |
-| SALE-F40 | See a dish's allergens when ordering it | common | partial |
+| SALE-F40 | See a dish's allergens when ordering it | common | done |
 | SALE-F41 | Mark the customer's allergy on a line | restaurant | partial |
 
 ### SALE-F01 Sell and charge in cash
@@ -1357,17 +1357,16 @@ ticket's cap (€3,000) and the cash cap (€1,000) look at the sale's total, as
 Involved: TIP-F02, TIP-F03, TIP-F04, CASH_REGISTER-F18, INVOICE-F01
 
 ### SALE-F40 See a dish's allergens when ordering it
-Status: partial — the line keeps its product's allergens (in a menu, each dish's) and the live check and the order
-sent carry them, but the till does not paint them yet on the line or on the sheets (hub#1738)
+Status: done
 Vertical: common
 Actor: employee, manager
 Screen: Sell
 Steps:
-1. In **Sell**, tap an item with allergens declared in Inventory (INVENTORY-F35). The line goes in as always and,
+1. In **Sell**, tap an item with allergens declared in Inventory. The line goes in as always and,
    under the name, says "Allergens: Gluten, Milk", in the order of the list of the fourteen. An item without
    allergens has no such row.
-2. If the item opens its modifiers sheet (SALE-F11), the sheet says its allergens under its name, before adding it.
-   In the sheet of a menu (SALE-F12), each choice says its own next to its name, and on the check each dish of the
+2. If the item opens its modifiers sheet, the sheet says its allergens under its name, before adding it.
+   In the sheet of a menu, each choice says its own next to its name, and on the check each dish of the
    menu carries those of its product.
 3. If the customer asks, the waiter reads them on the line; if the dish does not suit them, they remove the line
    like any other before sending it.
@@ -1380,15 +1379,16 @@ ticket, on the invoice or on the printed bill for the table.
 If it fails: without Inventory active there are no allergens, and open-price lines and services do not carry them.
 An item with no allergens marked says nothing, because the till does not tell "has none" from "none declared": that
 is why Inventory's card says "No allergens declared". A modifier has no allergens of its own: "+Cheese" does not add
-Milk to the line; if the customer has an allergy, it is marked on the line (SALE-F41) and Kitchen sees it all the
-same.
+Milk to the line; if the customer has an allergy, it is marked on the line as the customer's allergy and Kitchen
+sees it all the same.
+If a menu's sheet cannot read the allergens of its dishes, it says so and offers "Retry": that way a dish with
+no row is not taken for a dish without allergens.
 Involved: INVENTORY-F27, INVENTORY-F35, SALE-F11, SALE-F12, SALE-F41, KITCHEN-F32
 
 ### SALE-F41 Mark the customer's allergy on a line
-Status: partial — the line keeps the customer's allergy, the live check says which of those allergens the dish
-contains and the order sent carries it, also through the assistant and the API; the till's sheet does not have the
-«Customer's allergy» block yet nor does the line show it (hub#1738), and in Kitchen the paper prints it but the card
-does not highlight it yet (KITCHEN-F32)
+Status: partial — the till marks it in the note sheet and shows it on the line, with the dish's match; the order sent
+carries it, also through the assistant and the API, and Kitchen's paper prints it, but the card does not highlight it
+yet (KITCHEN-F32)
 Vertical: restaurant
 Actor: employee, manager
 Screen: Sell
@@ -1398,9 +1398,9 @@ Steps:
    quick notes and the usual box (SALE-F13).
 2. Tap the customer's allergens, one or several, and tap "Save". The line says, under the name, highlighted and
    before the note, "Allergy: Gluten".
-3. If the dish has any of those allergens (SALE-F40), the sheet warns on saving and the line says it highlighted:
-   "The dish has Gluten". It does not stop the order, because the kitchen may prepare it without it: the waiter
-   talks it over with the customer and, if needed, removes the line and orders another dish.
+3. If the dish has any of those allergens (SALE-F40), on saving the line says it highlighted: "The dish has Gluten".
+   It does not stop the order, because the kitchen may prepare it without it: the waiter talks it over with the
+   customer and, if needed, removes the line and orders another dish.
 4. On a menu, the allergy is marked on the menu's line and counts for each of its dishes; the warning of step 3
    names the dish that has the allergen ("The burger has Gluten").
 5. Send the round (SALE-F20): the allergy goes with each dish to its station, highlighted (KITCHEN-F32). Until it is

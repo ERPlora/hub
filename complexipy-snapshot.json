@@ -622,16 +622,6 @@
     ]
   },
   {
-    "path": "base/worker.py",
-    "file_name": "worker.py",
-    "functions": [
-      {
-        "name": "run",
-        "complexity": 32
-      }
-    ]
-  },
-  {
     "path": "base/ws_print.py",
     "file_name": "ws_print.py",
     "functions": [

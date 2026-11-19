@@ -3,23 +3,34 @@
 // already says, «The kitchen reads this note on the ticket.», and «Remove» | «Save». Saving trims the
 // text; an empty note (or «Remove») takes it off. The page writes it (`sale.order.update_line`); a
 // refusal is read here, over the buttons. The box starts again from the line's note on every opening.
+import { AllergenSelect, type AllergenCode } from '@erplora/ui/components';
 import { IonButton } from '@ionic/vue';
 import { shallowRef, watch } from 'vue';
 
 import PosSheet from './PosSheet.vue';
 import QuickNoteChips from './QuickNoteChips.vue';
 
-const props = defineProps<{ name: string; note: string; pending: boolean; error: string | null }>();
+const props = withDefaults(
+  defineProps<{ name: string; note: string; pending: boolean; error: string | null; allergyEnabled?: boolean; allergy?: AllergenCode[] }>(),
+  { allergyEnabled: false, allergy: () => [] },
+);
 const open = defineModel<boolean>('open', { default: false });
-const emit = defineEmits<{ save: [note: string] }>();
+const emit = defineEmits<{ save: [change: { note: string; allergy?: AllergenCode[] }] }>();
 
 const text = shallowRef(props.note);
+const selectedAllergy = shallowRef<AllergenCode[]>([...props.allergy]);
 watch(
-  () => [open.value, props.note] as const,
-  ([isOpen, note]) => {
-    if (isOpen) text.value = note;
+  () => [open.value, props.note, props.allergy] as const,
+  ([isOpen, note, allergy]) => {
+    if (!isOpen) return;
+    text.value = note;
+    selectedAllergy.value = [...allergy];
   },
 );
+
+function save(note: string): void {
+  emit('save', { note, allergy: props.allergyEnabled ? selectedAllergy.value : undefined });
+}
 </script>
 
 <template>
@@ -28,6 +39,14 @@ watch(
     :title="$t('sale.pos.lineNoteOf', { name })"
     testid="pos-note"
   >
+    <AllergenSelect
+      v-if="allergyEnabled"
+      v-model="selectedAllergy"
+      :label="$t('sale.pos.customerAllergy')"
+      :helper-text="$t('sale.pos.customerAllergyHint')"
+      :disabled="pending"
+      testid="pos-note-allergy"
+    />
     <QuickNoteChips v-model="text" />
     <textarea
       v-model="text"
@@ -60,7 +79,7 @@ watch(
             color="medium"
             data-testid="pos-note-remove"
             :disabled="pending"
-            @click="emit('save', '')"
+            @click="save('')"
           >
             {{ $t('sale.pos.lineNoteRemove') }}
           </ion-button>
@@ -68,7 +87,7 @@ watch(
             class="pos-sheet-confirm"
             data-testid="pos-note-save"
             :disabled="pending"
-            @click="emit('save', text.trim())"
+            @click="save(text.trim())"
           >
             {{ $t('sale.pos.lineNoteSave') }}
           </ion-button>

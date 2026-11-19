@@ -9,44 +9,8 @@ import { describe, expect, it } from 'vitest';
 
 import { countryOptions, snapshotOf } from '../../../../customer/frontend/components/CustomerSearch.vue';
 import type { OrderLineOut } from '../../operations';
+import { line } from './__tests__/fixtures';
 import { initials, mergeableLine, mergeableServiceLine, noteHasChip, plusOne, shortTime, tileGradient, toggleNoteChip } from './till';
-
-const line = (over: Partial<OrderLineOut> = {}): OrderLineOut => ({
-  id: 'l1',
-  position: 1,
-  product_id: 'p1',
-  department_id: null,
-  name: 'Coffee',
-  sku: 'CAF',
-  is_service: false,
-  unit: 'ud',
-  quantity: '1.000',
-  unit_price: 150,
-  price_quantity: '1.000',
-  pricing_unit: 'ud',
-  tax_category_key: 'food',
-  discount_percent: '0.00',
-  discount_approved: false,
-  is_gift: false,
-  gift_reason: '',
-  notes: '',
-  staff_id: null,
-  service_id: null,
-  paid_by_voucher: false,
-  voucher_session_id: null,
-  voucher_grant_id: null,
-  voucher_name: '',
-  voucher_remaining: null,
-  voucher_hold_until: null,
-  line_total: 150,
-  round_no: 0,
-  fired_at: null,
-  modifiers: [],
-  modifier_lines: [],
-  kitchen_text: '',
-  combo: null,
-  ...over,
-});
 
 describe('tile', () => {
   it('initials: the first letters of the first two words, upper case', () => {
