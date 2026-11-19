@@ -8,8 +8,8 @@
 // flow: COMBO-F04 COMBO-F05 COMBO-F06 BASE-F97
 import { type BrowserContext, expect, test } from '@playwright/test';
 
-import { cancel, cardSpec, datumOf, fieldsOf, ownerIn, VIEWPORTS } from './assistant-card-helpers';
-import { card, openPanel } from './assistant-real';
+import { cardSpec, datumOf, fieldsOf, VIEWPORTS } from './assistant-card-helpers';
+import { cancel, card, openPanelAtTheDesk, ownerIn } from './assistant-panel';
 import { A, api, capture, psql, untilStill } from './helpers';
 import { createProduct, stamp } from './inventory-helpers';
 import { post } from './service-helpers';
@@ -66,8 +66,7 @@ for (const language of ['es', 'en'] as const) {
   test(`combo-assistant-card — in ${language}, a write of Menus says which menu, course, choice or product, never by its id`, async ({ browser }) => {
     const [context, page] = await ownerIn(browser, language);
     const { lentils, soup, menu, starters, mains, choice } = await aMenu(context);
-    await page.setViewportSize({ width: 1440, height: 900 });
-    await openPanel(page);
+    await openPanelAtTheDesk(page);
 
     // «Retira el menú del día», a dangerous write: the menu by its name (never its kitchen name), titled as its list
     // calls one, in every size.

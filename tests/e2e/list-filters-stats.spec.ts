@@ -8,7 +8,7 @@ import { type BrowserContext, type Page, expect, test } from '@playwright/test';
 import { formatDateTime } from '../../packages/ui/src/components/format/dateTime';
 import { type Figures, figuresAt, shownFigures, watchFigures } from './demo-figures';
 import { A, api, login, record, shot, shown } from './helpers';
-import { createItem, listReady, rowOf } from './demo-items';
+import { createItem, listReady, rowNames, rowOf } from './demo-items';
 import { decodeSubs } from './live-streams';
 
 type Sub = { op: string; params: Record<string, unknown> };
@@ -25,6 +25,9 @@ function trackSubscriptions(page: Page): Sub[][] {
 const listParams = (opened: Sub[][]) => opened.at(-1)?.find((s) => s.op === 'demo.item.list')?.params;
 
 const rows = (page: Page) => shown(page).locator('[data-testid=demo-items-row]');
+
+/** Both filtered lists have two rows: only their names tell the new one from the one still on screen. */
+const sortedNames = async (page: Page) => (await rowNames(page)).sort();
 
 /** Whitespace as text: ICU builds differ on the space before «AM» (U+0020 or U+202F). */
 const plain = (text: string) => text.replace(/\s+/g, ' ').trim();
@@ -78,16 +81,16 @@ test('status filter on the server and the «Updated» column painted by the shar
     // «Done»: the subscription is reopened with `status: done`; only the two done items come back.
     await filterBy(page, 'Done');
     await expect.poll(() => listParams(opened)).toEqual({ search: prefix, status: 'done', limit: 50, offset: 0 });
-    await expect(rows(page)).toHaveCount(2);
-    const doneNames = await shown(page).locator('[data-testid=demo-item-name]').allInnerTexts();
+    await expect.poll(() => sortedNames(page)).toEqual([...seeded.done].sort());
+    const doneNames = await rowNames(page);
     const doneBadges = await shown(page).locator('[data-testid=demo-item-status]').allInnerTexts();
     await page.screenshot({ path: shot('list-filters--done') });
 
     // «Open» and back to «All» (no `status` at all).
     await filterBy(page, 'Open');
     await expect.poll(() => listParams(opened)?.status).toBe('open');
-    await expect(rows(page)).toHaveCount(2);
-    const openNames = await shown(page).locator('[data-testid=demo-item-name]').allInnerTexts();
+    await expect.poll(() => sortedNames(page)).toEqual([...seeded.open].sort());
+    const openNames = await rowNames(page);
     await filterBy(page, 'All');
     await expect.poll(() => listParams(opened)).toEqual({ search: prefix, limit: 50, offset: 0 });
     await expect(rows(page)).toHaveCount(4);
@@ -110,9 +113,7 @@ test('status filter on the server and the «Updated» column painted by the shar
     await page.screenshot({ path: shot('list-filters--updated-column') });
 
     record('list-filters', { subscriptions: opened.map((subs) => subs.map((s) => s.params)), doneNames, doneBadges, openNames, headers, lang, cells });
-    expect([...doneNames].sort()).toEqual([...seeded.done].sort());
     expect(doneBadges).toEqual(['Done', 'Done']);
-    expect([...openNames].sort()).toEqual([...seeded.open].sort());
     expect(headers).toContain('Updated');
     expect(cells).toHaveLength(4);
     for (const cell of cells) {

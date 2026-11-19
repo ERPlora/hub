@@ -234,7 +234,7 @@ def test_it_is_a_read_that_tells_the_assistant_what_it_does():
 
 
 def test_it_is_bound_to_its_route():
-    from base.api import router
+    from base.api.locations import router
 
     [route] = router.path_operations["/locations"].operations
     assert (route.methods, route.operation_id) == (["GET"], "base.location.list")

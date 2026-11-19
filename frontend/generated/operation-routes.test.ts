@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { OPERATION_ROUTES } from './operation-routes';
 
 describe('OPERATION_ROUTES', () => {
-  it('binds base.session.me to GET /api/me (base/api.py)', () => {
+  it('binds base.session.me to GET /api/me (base/api/home.py)', () => {
     expect(OPERATION_ROUTES['base.session.me']).toEqual({ method: 'get', path: '/api/me' });
   });
 

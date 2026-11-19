@@ -9,8 +9,8 @@
 // flow: WHATSAPP_INBOX-F31 WHATSAPP_INBOX-F32 WHATSAPP_INBOX-F35 WHATSAPP_INBOX-F36 WHATSAPP_INBOX-F37 BASE-F97
 import { expect, test } from '@playwright/test';
 
-import { AN_ID, cancel, cardSpec, datumOf, ownerIn, VIEWPORTS } from './assistant-card-helpers';
-import { card, openPanel } from './assistant-real';
+import { AN_ID, cardSpec, datumOf, VIEWPORTS } from './assistant-card-helpers';
+import { cancel, card, openPanelAtTheDesk, ownerIn } from './assistant-panel';
 import { cleanUp as cleanCustomers, e2eName } from './customer-helpers';
 import { A, api, capture, psql, untilStill } from './helpers';
 import { post } from './pricing-helpers';
@@ -54,8 +54,7 @@ for (const language of ['es', 'en'] as const) {
     pushChannel({ status: 'connected', templates: [template(TEMPLATE)] });
     const kept = psql(`select id from whatsapp_inbox_template where name = '${TEMPLATE}' and deleted_at is null`);
     expect(kept, 'the photo brought no template').not.toBe('');
-    await page.setViewportSize({ width: 1440, height: 900 });
-    await openPanel(page);
+    await openPanelAtTheDesk(page);
 
     // «Cierra la conversación de Ana», a dangerous write: the conversation as the inbox calls it, in every size.
     const closed = await datumOf(page, 'whatsapp_inbox__conversation__set_status', { id: message.conversation_id, status: 'closed' });

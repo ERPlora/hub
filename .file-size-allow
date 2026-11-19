@@ -127,7 +127,6 @@
 1211 apps/whatsapp_inbox/schemas.py ERPlora/erplora-next#74
 2587 apps/whatsapp_inbox/services.py ERPlora/erplora-next#74
 1367 apps/whatsapp_inbox/tests/test_services.py ERPlora/erplora-next#74
-574 base/api.py ERPlora/erplora-next#74
 1403 base/blueprint.py ERPlora/erplora-next#74
 960 base/catalog.py ERPlora/erplora-next#74
 802 base/files.py ERPlora/erplora-next#74
@@ -175,7 +174,6 @@
 729 tests/e2e/helpers-login.test.ts ERPlora/erplora-next#74
 1071 tests/e2e/helpers.ts ERPlora/erplora-next#74
 531 tests/e2e/inventory-products.spec.ts ERPlora/erplora-next#74
-516 tests/e2e/invoice-assistant.spec.ts ERPlora/erplora-next#74
 694 tests/e2e/reservation-book.spec.ts ERPlora/erplora-next#74
 507 tests/e2e/sale-helpers.ts ERPlora/erplora-next#74
 539 tests/e2e/staff-flows.spec.ts ERPlora/erplora-next#74

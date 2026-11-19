@@ -1380,7 +1380,7 @@ def delete_entry(ctx: OperationContext, data: WaitlistRefIn) -> dict:
         "asks": {
             "en": (
                 "change the reservation settings to take bookings 30 days ahead",
-                "confirm the reservations automatically",
+                "enable automatic confirmation for reservations",
             ),
             "es": (
                 "deja reservar con hasta 30 días de antelación",

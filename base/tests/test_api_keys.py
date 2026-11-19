@@ -293,7 +293,7 @@ KEY_ROUTES = {
 
 
 def test_the_spas_route_map_names_every_route_of_the_keys():
-    from base.api import router
+    from base.api.people import router
 
     assert KEY_ROUTES <= bound_routes(router)
     mine = {op for _, _, op in KEY_ROUTES}

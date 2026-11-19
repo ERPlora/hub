@@ -5,77 +5,32 @@
 // README «El asistente») to change the issuer's tax ID and address; the card says them so at 390, 834 and 1440, and
 // «Cancel» changes nothing. (A series' «Activa» rides a normal card, a single line of values with no names:
 // apps/invoice/tests/test_i18n.py checks the name the server gives it.)
-import { execSync } from 'node:child_process';
 
-import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
+import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
-import { sentCard, type SentCard } from './assistant-card-helpers';
-import { type Provider, startProvider } from './assistant-provider';
-import { A, capture, login, REPO_DIR } from './helpers';
+import { askForACard, cancelAtComputerSize, card, openPanel, type SentCard, sentCard } from './assistant-panel';
+import { type Provider } from './assistant-provider';
+import { emptyMonth } from './assistant-real';
+import { A, capture, login, THREE_SIZES as VIEWPORTS } from './helpers';
 import { issuerNow } from './invoice-helpers';
-import { STACK } from './stack';
-import { openAssistant as openPanel } from './topbar';
+import { seededProvider } from './provider-helpers';
 
 const KEY = 'FIX-HUB-INVOICE-ES-TEXTS-SHADOWED-BY-AN-EARLIER-APP';
-const VIEWPORTS = [
-  { label: '390', width: 390, height: 844 },
-  { label: '834', width: 834, height: 1112 },
-  { label: '1440', width: 1440, height: 900 },
-];
-const PROVIDER_PORT = Number(process.env.E2E_AI_PROVIDER_PORT ?? STACK.hubPort + 2);
-/** The SaaS's database of this stack (README «Varias ejecuciones a la vez»: `saas_e2e_<Hub port + 1>`). */
-const SAAS_DB = process.env.E2E_SAAS_DB ?? (STACK.hubPort === 8000 ? 'saas' : `saas_e2e_${STACK.hubPort + 1}`);
 
 let provider: Provider;
 
-function saasSql(sql: string): string {
-  return execSync(`docker compose exec -T postgres psql -U hub -d ${SAAS_DB} -At -c "${sql}"`, {
-    cwd: REPO_DIR,
-    encoding: 'utf8',
-  }).trim();
-}
-
-/** The month's assistant messages of the business `a` back to none: a run never spends the plan's allowance. */
-function unspend(): void {
-  saasSql("delete from assistant_assistantusage where hub_id = (select id from hubs_hub where slug = 'a')");
-}
-
 test.beforeAll(async () => {
-  provider = await startProvider(PROVIDER_PORT);
-  const seeded = saasSql("select base_url from assistant_aiprovider where slug = 'e2e-local'");
-  expect(seeded, `the SaaS ${SAAS_DB} is not seeded with this provider: README «El asistente»`).toBe(provider.url);
+  provider = await seededProvider();
 });
 
 test.afterAll(async () => {
   await provider?.close();
-  unspend();
+  emptyMonth();
 });
 
 test.beforeEach(() => {
-  unspend();
+  emptyMonth();
 });
-
-// ── The assistant's panel (as invoice-assistant.spec.ts drives it) ──
-
-const panel = (page: Page): Locator => page.locator('[data-testid="assistant-panel"]');
-const box = (page: Page): Locator => panel(page).locator('[data-testid="assistant-input"] textarea');
-const answers = (page: Page): Locator => panel(page).locator('[data-testid="assistant-answer"]');
-const lastAnswer = (page: Page): Locator => panel(page).locator('[data-testid="assistant-bubble-assistant"]').last();
-const card = (page: Page): Locator => page.locator('ion-modal[data-testid="assistant-confirm"]');
-/** Writes `text` and sends it with Enter, without waiting for the turn to end (a card stops it half-way). */
-async function ask(page: Page, text: string): Promise<void> {
-  await expect(panel(page).locator('[data-testid="assistant-send"]')).toBeVisible({ timeout: 30_000 });
-  const before = await answers(page).count();
-  await box(page).fill(text);
-  await box(page).press('Enter');
-  await expect(answers(page)).toHaveCount(before + 1);
-}
-
-async function cancel(page: Page): Promise<void> {
-  await card(page).locator('[data-testid="assistant-confirm-cancel"]').click();
-  await expect(card(page)).toBeHidden();
-  await expect(lastAnswer(page)).toContainText('No lo he hecho.');
-}
 
 const labelsOf = (sent: SentCard) => Object.fromEntries(sent.fields.map((field) => [field.name, field.label]));
 
@@ -99,8 +54,7 @@ test('invoice-locale — in Spanish the dangerous card of changing the issuer sa
     // «Cambia el NIF y el domicilio del emisor»: both by the Issuer screen's words.
     const sent = sentCard(page);
     const issuer = { legal_name: 'e2e Peluquería Ana SL', tax_id: 'B76543214', address: 'Calle Sol 9' };
-    await ask(page, `E2E-ASK invoice__issuer__update ${JSON.stringify(issuer)}`);
-    await expect(card(page)).toBeVisible({ timeout: 30_000 });
+    await askForACard(page, `E2E-ASK invoice__issuer__update ${JSON.stringify(issuer)}`, { timeout: 30_000 });
     expect(labelsOf(await sent)).toMatchObject({ tax_id: 'NIF', address: 'Domicilio' });
     for (const viewport of VIEWPORTS) {
       await page.setViewportSize({ width: viewport.width, height: viewport.height });
@@ -110,8 +64,7 @@ test('invoice-locale — in Spanish the dangerous card of changing the issuer sa
       await expect(card(page)).not.toContainText('Dirección');
       await capture(page, `${KEY}-${viewport.label}`);
     }
-    await page.setViewportSize({ width: 1440, height: 900 });
-    await cancel(page);
+    await cancelAtComputerSize(page);
     // Cancelled: the issuer is as it was.
     expect(await issuerNow(context)).toEqual(issuerBefore);
   } finally {

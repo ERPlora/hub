@@ -431,7 +431,7 @@ def test_a_real_request_for_an_app_the_hub_lacks_answers_202_creating(client, ma
 def test_the_retry_route_is_bound_to_its_command(db):
     from django.urls import resolve
 
-    from base.api import router
+    from base.api.apps import router
 
     [route] = router.path_operations["/apps/retry"].operations
     assert (route.methods, route.operation_id) == (["POST"], "base.app.retry")

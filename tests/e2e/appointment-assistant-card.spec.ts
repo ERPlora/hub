@@ -11,8 +11,8 @@
 import { type BrowserContext, expect, test } from '@playwright/test';
 
 import { aMonday, openForACut, salonCleanUp } from './appointment-helpers';
-import { AN_ID, cancel, cardSpec, datumOf, ownerIn, VIEWPORTS } from './assistant-card-helpers';
-import { card, openPanel } from './assistant-real';
+import { AN_ID, cardSpec, datumOf, VIEWPORTS } from './assistant-card-helpers';
+import { cancel, card, openPanelAtTheDesk, ownerIn } from './assistant-panel';
 import { A, api, capture, psql } from './helpers';
 import { post } from './service-helpers';
 
@@ -108,8 +108,7 @@ for (const language of ['es', 'en'] as const) {
     expect(stillThere(diary)).toBe('1/1/1');
     const detail = await api<{ label: string }>(context, A, 'GET', `/appointment/appointments/detail?id=${diary.appointment.id}`);
     expect(detail.status).toBe(200);
-    await page.setViewportSize({ width: 1440, height: 900 });
-    await openPanel(page);
+    await openPanelAtTheDesk(page);
 
     // «Borra estas citas», dangerous: each appointment as the Agenda tells it, under «Citas», in every size.
     const deleted = await datumOf(page, 'appointment__appointment__bulk_delete', { ids: [diary.appointment.id] }, 'ids');
