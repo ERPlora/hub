@@ -79,18 +79,20 @@ def effective_environment(ctx: OperationContext, config: Config) -> str:
     return config.environment
 
 
+def _counted_certificate():
+    """The own certificate as it counts: never one the trusted list's check found no recognised authority issued
+    (until checked, it counts as it did when it was uploaded)."""
+    return OwnCertificate.objects.filter(singleton=True).exclude(issuer_recognised=False)
+
+
 def own_certificate() -> OwnCertificate | None:
-    """The business's own certificate, its sealed material left unread; ``None`` while none is uploaded."""
-    return OwnCertificate.objects.defer("sealed_blob").filter(singleton=True).first()
+    """The business's own certificate, its sealed material left unread; ``None`` while none counts."""
+    return _counted_certificate().defer("sealed_blob").first()
 
 
 def own_certificate_blob() -> bytes | None:
     """The sealed material of the own certificate (``certificates.material`` opens it); ``None`` without one."""
-    blob = (
-        OwnCertificate.objects.filter(singleton=True)
-        .values_list("sealed_blob", flat=True)
-        .first()
-    )
+    blob = _counted_certificate().values_list("sealed_blob", flat=True).first()
     return bytes(blob) if blob is not None else None
 
 
@@ -112,9 +114,9 @@ def own_certificate_readable(route: str) -> bool:
 
 
 def certificate_valid(now: dt.datetime | None = None) -> bool:
-    """Whether an own certificate is uploaded and has not expired."""
+    """Whether an own certificate counts and has not expired."""
     now = now or timezone.now()
-    return OwnCertificate.objects.filter(singleton=True, expires_at__gt=now).exists()
+    return _counted_certificate().filter(expires_at__gt=now).exists()
 
 
 def sending_route(config: Config, environment: str, scope: Scope | None) -> str:

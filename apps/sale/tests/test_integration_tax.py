@@ -422,7 +422,7 @@ def test_a_tax_category_of_the_business_without_a_rule_is_named_as_it_was_typed(
 
 
 def test_the_name_of_a_tax_category_is_the_one_taxes_shows(db):
-    from apps.sale.queries import tax_category_name
+    from apps.sale.queries.checkout import tax_category_name
 
     with translation.override("es"):
         shown = run("tax.category.get", {"key": "service.generic"}, ctx_for(language="es")).display_name

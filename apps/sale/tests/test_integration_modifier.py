@@ -233,7 +233,7 @@ def test_splitting_and_merging_carry_the_frozen_options_without_asking_again(bur
 
 
 def test_without_modifiers_a_line_with_options_is_refused_and_one_without_enters(burger, monkeypatch):
-    monkeypatch.setattr("apps.sale.queries.MODIFIER_RESOLVE", "modifier.selection.not_installed")
+    monkeypatch.setattr("apps.sale.queries.order_lines.MODIFIER_RESOLVE", "modifier.selection.not_installed")
     _, options = burger
     order_id = open_check()
     with pytest.raises(Conflict) as refused:

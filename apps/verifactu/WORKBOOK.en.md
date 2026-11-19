@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:d1612aa67b73df92eec3bb5a36f5eb599a6643371a6580cc77ac5b82d09d7f89 -->
+<!-- generated from WORKBOOK.md sha256:01415ffbfaf4f68d07ea8f4adf25a512754c2a151dbe6d0be164ae313f3cdf09 -->
 
 ## What it is for and who it is for
 
@@ -312,16 +312,24 @@ Steps:
 1. In **VeriFactu → Configuration**, tab "My certificate", tap "Choose the .p12 / .pfx file" and pick the
    business's certificate (1 MB at most).
 2. Type its password in "Certificate password" and tap "Upload the certificate".
-3. The Hub opens it with the password, reads holder, tax ID, kind and expiry and keeps it encrypted (Fernet)
-   together with the password in the hub's database. "Certificate uploaded: {holder} ({taxId})." shows and the tab
-   turns "Loaded". Uploading another one replaces the previous one.
+3. The Hub opens it with the password, checks that a recognised authority issued it (the authorities of qualified
+   certificates for signatures or seals in Spain's trusted list of providers), reads holder, tax ID, kind and expiry
+   and keeps it encrypted (Fernet) together with the password in the hub's database. "Certificate uploaded: {holder}
+   ({taxId})." shows and the tab turns "Loaded". Uploading another one replaces the previous one.
 4. While the business is in testing, from that moment its records go out with it (VERIFACTU-F04), also those the
    gateway had refused, and it can now go live with it (VERIFACTU-F08).
-5. In a business outside Spain it is not offered: on top it says "VeriFactu is only for businesses in Spain." and
+5. The kept certificate is checked again by itself, every hour, if it was not checked yet against the trusted list
+   the Hub carries (one uploaded before this check, or the list renewed). If no recognised authority issued it, it
+   no longer counts: the tab turns "Not loaded" and asks to upload a valid one, the route becomes the one without a
+   certificate (VERIFACTU-F04) and the events say "Own certificate of {holder} ({taxId}) no longer counts: no
+   authority the AEAT recognises issued it. Upload a valid one.". If the server cannot open it, it stays unchecked,
+   as it was.
+6. In a business outside Spain it is not offered: on top it says "VeriFactu is only for businesses in Spain." and
    the tab only shows the certificate's status, without uploading or removing it.
 In: the `.p12`/`.pfx` in base64 and its password (`verifactu.certificate.upload`).
 Out: the certificate kept (`OwnCertificate`), an event "Own certificate of … uploaded" and the notice
-`verifactu.config.changed`. The file and the password are never shown again: neither in the API, nor in the
+`verifactu.config.changed`; for a kept one that no longer counts, the event "Own certificate of … no longer counts"
+and the same notice (`verifactu.certificate.recheck`, the scheduled task). The file and the password are never shown again: neither in the API, nor in the
 admin, nor in the snapshot, nor in the server's logs.
 If it fails: the certificate is not kept (409):
 - with no storage key on the server, "This server cannot keep certificates yet: ERPlora has to set its storage
@@ -329,8 +337,10 @@ If it fails: the certificate is not kept (409):
 - with no issuer, "Set up the issuer first in Invoicing → Issuer." (`verifactu.issuer_missing`);
 - a wrong password or a file that is not a `.p12`, "The file is not a .p12/.pfx certificate that this password
   opens."; self-signed, "No authority issued this certificate (it is self-signed), so the AEAT will not accept it.
-  Use your business's electronic certificate issued by a recognised authority, for example the FNMT."; without
-  client-authentication use, "The certificate does not allow client authentication, so it cannot
+  Use your business's electronic certificate issued by a recognised authority, for example the FNMT."; issued by an
+  authority outside the trusted list, "No authority the AEAT recognises issued this certificate, so the AEAT will not
+  accept it. Use your business's electronic certificate issued by a recognised authority, for example the FNMT.";
+  without client-authentication use, "The certificate does not allow client authentication, so it cannot
   connect to the AEAT."; expired, "The certificate expired on {date}: upload a valid one."
   (all `verifactu.certificate_invalid`);
 - a holder other than Invoicing's issuer, "The certificate belongs to {tax ID}, not to this business's issuer {tax
@@ -361,10 +371,10 @@ Status: done — the route is not chosen: the certificate decides it and it is f
 Actor: administrator
 Screen: Settings
 Steps:
-1. The certificate decides the route. With an own certificate loaded and in force (VERIFACTU-F02), the records go
-   out with it; without it, in testing ERPlora files them with its seal, also in a demo business. While the business
-   is in testing, uploading, removing or letting the certificate expire changes the route of what has not gone out
-   yet.
+1. The certificate decides the route. With an own certificate loaded, in force and issued by a recognised
+   authority (VERIFACTU-F02), the records go out with it; without it, in testing ERPlora files them with its seal,
+   also in a demo business. While the business is in testing, uploading, removing or letting the certificate expire,
+   or its no longer counting when checked again, changes the route of what has not gone out yet.
 2. In **VeriFactu → Settings**, "Sending" says it in a sentence with its icon, along with what is missing (the
    Settings screen).
 3. On going live (VERIFACTU-F08), the route of that moment is fixed: with a valid certificate, the certificate, even

@@ -106,7 +106,6 @@ max-statements = 50
 "apps/printing/tests/test_integration_home.py" = ["F401"]
 "apps/printing/tests/test_models.py" = ["B017"]
 "apps/reservation/tests/test_services.py" = ["B023"]
-"apps/sale/queries.py" = ["F401"]
 "apps/sale/tests/conftest.py" = ["F401"]
 "apps/sale/tests/test_concurrency.py" = ["E731"]
 "apps/schedule/engine.py" = ["B905"]
