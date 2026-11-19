@@ -78,8 +78,8 @@ def test_spanish_texts_are_the_old_modules():
             "Una vez, en una fecha y hora",
             "Solo a mano",
         ]
-        assert str(services.UNTITLED) == "Automatización sin nombre"
-        assert str(services.DISABLED) == "Esta automatización está en pausa: enciéndela para ejecutarla."
+        assert str(services.flows.UNTITLED) == "Automatización sin nombre"
+        assert str(services.writes.DISABLED) == "Esta automatización está en pausa: enciéndela para ejecutarla."
         assert str(queries.FLOW_NOT_FOUND) == "Esa automatización no existe en este negocio."
 
 

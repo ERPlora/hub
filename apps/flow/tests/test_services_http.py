@@ -19,7 +19,7 @@ from cryptography.fernet import Fernet
 from live.context import system_context
 from live.errors import InvalidPayload
 
-from apps.flow import events, services, vault
+from apps.flow import events, http, services, vault
 from apps.flow.models import Flow, FlowRun, Question, Secret
 from apps.task.models import Task
 from base.models import EventDelivery
@@ -130,13 +130,13 @@ def test_the_worker_makes_the_call_only_once_its_delivery_is_committed(trusted, 
     flow = _manual(trusted, [_call(trusted)])
     worker.request("flow.flow.run", {"id": str(flow.id), "input": {}})
     delivery_when_called: list[str] = []
-    real_call = services.http.call
+    real_call = http.call
 
     def observing(*args, **kwargs):
         delivery_when_called.append(EventDelivery.objects.get(event__name=events.RUN_PARKED, app_label="flow").status)
         return real_call(*args, **kwargs)
 
-    monkeypatch.setattr(services.http, "call", observing)
+    monkeypatch.setattr(http, "call", observing)
     worker()
     assert delivery_when_called == [EventDelivery.Status.DELIVERED]
     assert FlowRun.objects.get().status == FlowRun.Status.SUCCEEDED
@@ -171,7 +171,7 @@ def test_a_granted_call_goes_out_after_the_commit_and_the_run_goes_on(trusted, c
     seen = Handler.seen[-1]
     assert (seen["method"], seen["path"]) == ("POST", "/orders?customer=Ana%20L%C3%B3pez")
     assert seen["headers"]["Authorization"] == f"Bearer {SECRET}"
-    key = str(uuid.uuid5(services.IDEMPOTENCY_NAMESPACE, f"{done.id}:s1"))
+    key = str(uuid.uuid5(services.calls.IDEMPOTENCY_NAMESPACE, f"{done.id}:s1"))
     assert seen["headers"]["Idempotency-Key"] == key
     assert json.loads(seen["body"]) == {"note": 'He said "hi"', "key": key}  # JSON-escaped inside JSON
     assert Task.objects.get().title == "Created true"
@@ -275,7 +275,7 @@ def test_without_the_servers_key_a_call_without_secrets_is_saved_tried_and_goes_
     seen = Handler.seen[-1]
     assert (seen["method"], seen["path"]) == ("POST", "/orders?customer=Ana")
     assert "Authorization" not in seen["headers"]
-    assert seen["headers"]["Idempotency-Key"] == str(uuid.uuid5(services.IDEMPOTENCY_NAMESPACE, f"{done.id}:s1"))
+    assert seen["headers"]["Idempotency-Key"] == str(uuid.uuid5(services.calls.IDEMPOTENCY_NAMESPACE, f"{done.id}:s1"))
     assert Task.objects.count() == 1
     assert run("flow.secret.list", {}).available is False
 
@@ -289,13 +289,13 @@ def test_a_call_left_half_way_is_sent_again_with_the_same_key(trusted, clock, dj
     claimed = run("flow.run.claim_call", {"id": str(ran.id)}, system)
     assert claimed.claimed is True  # …and dies again during the call
     assert run("flow.run.claim_call", {"id": str(ran.id)}, system).claimed is False  # someone else holds it
-    clock(NOON + dt.timedelta(minutes=services.CALL_LEASE_MINUTES, seconds=1))
+    clock(NOON + dt.timedelta(minutes=services.writes.CALL_LEASE_MINUTES, seconds=1))
     with django_capture_on_commit_callbacks(using=current_alias(), execute=True):
         run("flow.run.resume_due", {}, system)
     done = FlowRun.objects.get(pk=ran.id)
     assert done.status == FlowRun.Status.SUCCEEDED
     keys = [seen["headers"]["Idempotency-Key"] for seen in Handler.seen]
-    assert keys == [str(uuid.uuid5(services.IDEMPOTENCY_NAMESPACE, f"{done.id}:s1"))]
+    assert keys == [str(uuid.uuid5(services.calls.IDEMPOTENCY_NAMESPACE, f"{done.id}:s1"))]
 
 
 def test_an_answer_that_comes_late_changes_nothing(trusted, clock, django_capture_on_commit_callbacks):

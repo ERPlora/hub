@@ -61,37 +61,37 @@ async def flow_test(request, params: Query[TestIn]):
 
 @bind(router, "flow.flow.create", "/flow/flows", status=201)
 async def flow_create(request, data: CreateIn):
-    return await run_operation(request, services.create_flow, data)
+    return await run_operation(request, services.flows.create_flow, data)
 
 
 @bind(router, "flow.flow.update", "/flow/flows/update")
 async def flow_update(request, data: UpdateIn):
-    return await run_operation(request, services.update_flow, data)
+    return await run_operation(request, services.flows.update_flow, data)
 
 
 @bind(router, "flow.flow.set_enabled", "/flow/flows/set_enabled")
 async def flow_set_enabled(request, data: EnabledIn):
-    return await run_operation(request, services.set_enabled, data)
+    return await run_operation(request, services.flows.set_enabled, data)
 
 
 @bind(router, "flow.flow.duplicate", "/flow/flows/duplicate", status=201)
 async def flow_duplicate(request, data: FlowRefIn):
-    return await run_operation(request, services.duplicate_flow, data)
+    return await run_operation(request, services.flows.duplicate_flow, data)
 
 
 @bind(router, "flow.flow.delete", "/flow/flows/delete")
 async def flow_delete(request, data: FlowRefIn):
-    return await run_operation(request, services.delete_flow, data)
+    return await run_operation(request, services.flows.delete_flow, data)
 
 
 @bind(router, "flow.flow.grant", "/flow/flows/grant")
 async def flow_grant(request, data: GrantIn):
-    return await run_operation(request, services.grant, data)
+    return await run_operation(request, services.flows.grant, data)
 
 
 @bind(router, "flow.flow.run", "/flow/flows/run")
 async def flow_run(request, data: RunIn):
-    return await run_operation(request, services.run_now, data)
+    return await run_operation(request, services.runs.run_now, data)
 
 
 # Runs and drafts
@@ -109,7 +109,7 @@ async def run_get(request, params: Query[RunRefIn]):
 
 @bind(router, "flow.run.retry", "/flow/runs/retry")
 async def run_retry(request, data: RunRefIn):
-    return await run_operation(request, services.retry_run, data)
+    return await run_operation(request, services.runs.retry_run, data)
 
 
 @bind(router, "flow.draft.list", "/flow/drafts")
@@ -124,12 +124,12 @@ async def draft_get(request, params: Query[DraftRefIn]):
 
 @bind(router, "flow.draft.propose", "/flow/drafts", status=201)
 async def draft_propose(request, data: DraftProposeIn):
-    return await run_operation(request, services.propose_draft, data)
+    return await run_operation(request, services.drafts.propose_draft, data)
 
 
 @bind(router, "flow.draft.dismiss", "/flow/drafts/dismiss")
 async def draft_dismiss(request, data: DraftRefIn):
-    return await run_operation(request, services.dismiss_draft, data)
+    return await run_operation(request, services.drafts.dismiss_draft, data)
 
 
 # What the editor offers
@@ -155,12 +155,12 @@ async def secret_list(request):
 
 @bind(router, "flow.secret.set", "/flow/secrets")
 async def secret_set(request, data: SecretSetIn):
-    return await run_operation(request, services.set_secret, data)
+    return await run_operation(request, services.stored_secrets.set_secret, data)
 
 
 @bind(router, "flow.secret.delete", "/flow/secrets/delete")
 async def secret_delete(request, data: SecretRefIn):
-    return await run_operation(request, services.delete_secret, data)
+    return await run_operation(request, services.stored_secrets.delete_secret, data)
 
 
 # «Waiting for your answer» (FLOW-F29)
@@ -178,7 +178,7 @@ async def question_get(request, params: Query[QuestionRefIn]):
 
 @bind(router, "flow.question.answer", "/flow/questions/answer")
 async def question_answer(request, data: AnswerIn):
-    return await run_operation(request, services.answer_question, data)
+    return await run_operation(request, services.questions.answer_question, data)
 
 
 # The ready-made automations the apps bring (FLOW-F33 to F36)
@@ -191,19 +191,19 @@ async def recipe_list(request):
 
 @bind(router, "flow.recipe.enable", "/flow/recipes/enable")
 async def recipe_enable(request, data: RecipeRefIn):
-    return await run_operation(request, services.enable_recipe, data)
+    return await run_operation(request, services.recipe_flows.enable_recipe, data)
 
 
 @bind(router, "flow.recipe.disable", "/flow/recipes/disable")
 async def recipe_disable(request, data: RecipeRefIn):
-    return await run_operation(request, services.disable_recipe, data)
+    return await run_operation(request, services.recipe_flows.disable_recipe, data)
 
 
 @bind(router, "flow.recipe.restore", "/flow/recipes/restore")
 async def recipe_restore(request, data: RecipeRefIn):
-    return await run_operation(request, services.restore_recipe, data)
+    return await run_operation(request, services.recipe_flows.restore_recipe, data)
 
 
 @bind(router, "flow.recipe.repair", "/flow/recipes/repair")
 async def recipe_repair(request, data: RecipeRefIn):
-    return await run_operation(request, services.repair_recipe, data)
+    return await run_operation(request, services.recipe_flows.repair_recipe, data)
