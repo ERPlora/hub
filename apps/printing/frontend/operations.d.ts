@@ -1,4 +1,4 @@
-// Types of the printing app's operations for the SDK (`useLive`, `useCommand`), from apps/printing/schemas.py. Written
+// Types of the printing app's operations for the SDK (`useLive`, `useCommand`), from apps/printing/schemas/. Written
 // by hand, as `frontend/sdk-types.d.ts` is: nothing generates them from `/api/openapi.json`. Keep it in step with
 // schemas.py and with `frontend/generated/operations.json`. One input per operation (ninja's parity): no path
 // parameters. Dates are ISO 8601 strings.
