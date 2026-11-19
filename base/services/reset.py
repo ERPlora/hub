@@ -56,7 +56,7 @@ def same_name(typed: str, name: str) -> bool:
         ),
         risk="high",
         # Only for live.E020 (it checks the whole app): base.assistant.tools.NOT_FROM_CHAT keeps this out of the chat
-        # (pinned by base/tests/test_assistant.py).
+        # (pinned by base/tests/test_assistant_tools.py).
         asks={
             "en": ("wipe all the data and start over", "empty the business, I want to start from scratch"),
             "es": ("borra todos los datos y empezamos de cero", "vacía el negocio, quiero empezar de nuevo"),

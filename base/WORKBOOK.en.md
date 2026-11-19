@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:5e70a94e16538d3dbce71a9cbe6d15978ab31e643f5052bc75497271099214eb -->
+<!-- generated from WORKBOOK.md sha256:48f0a2706e141226cdf65839e83ab10315264d1d9770e47d0931faa8a2cdda87 -->
 
 ## What it is for and who it is for
 
@@ -323,7 +323,7 @@ On the Employees screens and the API documentation:
 | ID | Flow | Status |
 |---|---|---|
 | BASE-F01 | See what the business still has to set up | done |
-| BASE-F02 | See the business at a glance on coming in | done |
+| BASE-F02 | See the business at a glance on coming in | partial |
 | BASE-F03 | Go and set up from "Finish setting up your business" | done |
 | BASE-F04 | See which steps of the list an administrator has to set up | done |
 | BASE-F05 | Open an app from "My apps" | done |
@@ -436,6 +436,7 @@ On the Employees screens and the API documentation:
 | BASE-F113 | Keep warning with the screen off (Android app) | done |
 | BASE-F114 | Put a business back as it was at a past moment from the Hub admin | done |
 | BASE-F115 | See the help of a module's screen | done |
+| BASE-F116 | Read what is new in ERPlora | partial |
 
 ### BASE-F01 See what the business still has to set up
 Status: done
@@ -475,7 +476,8 @@ side to do yet. We are on it.".
 Involved: INVENTORY-F28, BASE-F24, BASE-F25, VERIFACTU-F01, TAX-F17
 
 ### BASE-F02 See the business at a glance on coming in
-Status: done
+Status: partial — the health row of step 5 is not painted on the Home yet, although the hub already knows what to
+say about the receipt printer; and the WhatsApp Inbox does not say yet how its number is doing (hub#573)
 Actor: owner, administrator, manager, employee
 Screen: Home · Summary
 Steps:
@@ -487,12 +489,19 @@ Steps:
      panels.
   4. When the interface language changes, the names in "My apps" and the checklist's texts change in place,
      without reloading or reopening the application.
-  5. At the bottom, two tabs: "Summary" (the above) and "Activity".
-In: the business's name and the device's date.
+  5. For who administers the business, at the foot of "Summary", a row with how what the business needs to work
+     is doing and "See system", which leads to System. Each app on that the person can see says its own: with
+     Printing, "Printer ready" if the device that prints the receipts gave signs in the last minute and a half,
+     "Printer not connected" if it is set up but does not answer, or "Printer not set up" if there is none; the
+     last two with "Set up printing", which opens Printing. Whoever does not administer the business does not see
+     the row.
+  6. At the bottom, two tabs: "Summary" (the above) and "Activity".
+In: the business's name, the device's date and what each app on says about itself.
 Out: nothing saved.
 If it fails: a zone that does not load does not bring the others down; each one says its own. On a phone
-the zones stack and "My apps" folds.
-Involved: none
+the zones stack and "My apps" folds. What could not be checked shows as neutral, never as ready and without a
+button, because it is not the viewer's task: "We couldn't check the printer".
+Involved: PRINTING-F21
 
 ### BASE-F03 Go and set up from "Finish setting up your business"
 Status: done
@@ -1370,7 +1379,7 @@ In: the version running and when it was published.
 Out: nothing saved.
 If it fails: "We could not read the system" — "The figures and the logs are not available right now. You can
 try again." with "Retry".
-Involved: none
+Involved: BASE-F116
 
 ### BASE-F42 See the log of what happened in the system
 Status: done
@@ -2156,7 +2165,8 @@ Steps:
   1. In **Employees › Roles**: "These are the roles of this business. Each person gets one when invited on
      erplora.com, and it is changed there.".
   2. A row per role: "Owner", "Administrator", "Manager" and "Employee", with "Basic", "Always available", how
-     many people have it and how many permissions it gives.
+     many people have it and how many permissions it gives. It is always these four, erplora.com's: no app adds
+     roles of its own; each app says what each of them can do in it.
   3. Whoever runs the business has "Change roles on erplora.com" (in the installed app, in the device's browser; the Google Play copy does not have it).
 In: the roles and the people of the business.
 Out: nothing saved.
@@ -3245,3 +3255,24 @@ and "Retry" asks for it again. The help already read stays stored until the page
 also from another tab of the module, and the video says "Offline: the video is not available". If the manual is not
 translated into the person's language, or its translation fell behind, the help comes in Spanish.
 Involved: BASE-F92, BASE-F93
+
+### BASE-F116 Read what is new in ERPlora
+Status: partial — what is new can already be read through the assistant and the API, but System › Updates does not
+show it yet (hub#576)
+Actor: owner, administrator, manager, employee
+Screen: System · Updates
+Steps:
+  1. In the "Updates" tab, below the version and its date (BASE-F41), comes "What's new": what has changed in ERPlora
+     that the business notices, the most recent first. Whoever does not run the business sees it too: it says nothing
+     about the business.
+  2. Each item says its day, whether it is something new, an improvement or a fix, a short title and one or two
+     sentences on what can be done now. They are notes written for the business, never the list of changes to the
+     code.
+  3. The 20 most recent come first; "See more" brings the earlier ones.
+  4. With none, it says "Nothing new yet.".
+  5. Through the assistant, "what's new in ERPlora?" or "what changed in the latest update?" reads them the same way,
+     in the person's language.
+In: what is new in the version running: it travels with it, so it is always its own.
+Out: nothing saved: what is new is only read.
+If it fails: "Could not load what's new" with "Retry"; the version and its date stay in view.
+Involved: BASE-F41

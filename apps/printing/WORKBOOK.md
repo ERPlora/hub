@@ -209,7 +209,7 @@ cierra sin preguntar (BASE-F05).
 | PRINTING-F18 | Sacar el papel: el dispositivo recoge y confirma los trabajos | común | hecho |
 | PRINTING-F19 | Ver el estado de una impresora | común | hecho |
 | PRINTING-F20 | Cuánto tiempo guarda el hub los trabajos de impresión | común | hecho |
-| PRINTING-F21 | Ver en Sistema quién imprime y dónde bajar la app de ERPlora | común | parcial — no dice si la impresora responde ahora (hub#573) |
+| PRINTING-F21 | Ver en Sistema quién imprime y dónde bajar la app de ERPlora | común | parcial — la tarjeta aún no dice si la impresora responde ahora (hub#573) |
 
 ### PRINTING-F01 Ver cómo va la impresión
 Estado: hecho
@@ -651,9 +651,9 @@ plazo.
 Implicados: PRINTING-F01, PRINTING-F14
 
 ### PRINTING-F21 Ver en Sistema quién imprime y dónde bajar la app de ERPlora
-Estado: parcial — no dice si la impresora responde ahora («Impresora lista», «Impresora sin conectar» o «No hemos
-podido comprobar la impresora»): Impresión no tiene todavía esa lectura, la misma que pide la fila de salud del
-Inicio (hub#573)
+Estado: parcial — la tarjeta aún no dice si la impresora responde ahora («Impresora lista», «Impresora sin conectar»
+o «No hemos podido comprobar la impresora»): Impresión ya tiene esa lectura, la misma que da a la fila de salud del
+Inicio, pero la tarjeta todavía no la usa (hub#573)
 Actor: propietario, administrador, responsable, empleado
 Pantalla: Sistema · Uso y plan
 Pasos:
@@ -674,7 +674,7 @@ Sale: nada guardado.
 Si falla: si no se puede leer qué tarjetas tocan, no sale ninguna (nunca la de una app apagada) y el resto de la
 pestaña dice lo suyo; sin las direcciones de erplora.com no salen los botones de descarga (nunca un botón que no
 lleva a ningún sitio).
-Implicados: BASE-F39, PRINTING-F18
+Implicados: BASE-F02, BASE-F39, PRINTING-F18
 
 ## Servicios: lo que entra y lo que sale
 
@@ -695,6 +695,7 @@ Las demás apps y el asistente usan Impresión por estas operaciones, por su nom
 | Un trabajo de la cola por id o por el número de su documento (el más reciente), con su título como lo pone la cola | ver | F14, F16 | `printing.job.get` |
 | El resumen de la cola por función, con la impresora por la que sale cada una, cuántos trabajos no puede sacar ningún dispositivo dado de alta y cuántos llevan un minuto sin dispositivo encendido | ver | F01 | `printing.job.summary` |
 | Si una función tiene un dispositivo dado de alta que la imprime, encendido o no (el paso del Inicio), y cuántos de sus trabajos llevan un minuto o más en cola sin un dispositivo encendido que los saque (la campana) | ver | F01 | `printing.device.coverage` |
+| Si la estación de una función responde ahora: lista (un dispositivo dado de alta que la imprime ha dado señales en los últimos 90 s), sin conectar (dado de alta, pero callado) o sin configurar (ninguno); para la fila de salud del Inicio y la tarjeta «Tu impresora» | ver | F21 | `printing.device.health` |
 
 ### Lo que ofrece: acciones (cambian datos)
 
@@ -755,6 +756,7 @@ Nada (`requires = []`). No lee modelos de nadie: quien imprime manda el document
 | Cocina | La comanda de cada estación y su reimpresión, solo si hay una impresora activa de su función | `printing.printer.list`, `printing.job.create` |
 | `base` (`/ws/print`) | Entregar y confirmar trabajos | `printing.job.claim`, `printing.job.complete`, `printing.job.fail` |
 | `base` (Inicio y campana) | «Configura la impresora» y «Nadie está imprimiendo «…»» | `printing.device.coverage` |
+| `base` (fila de salud del Inicio) | «Impresora lista», «Impresora sin conectar» o «Impresora sin configurar» | `printing.device.health` |
 
 ### Quién puede qué
 
@@ -809,8 +811,9 @@ Campos del documento que lee la impresora (los demás se ignoran):
   (`name`, `quantity`, `modifiers`, `notes`, `combo_name`, `combo_ref`); `modifiers` es una lista de textos que
   la impresora pinta un renglón cada uno, en negrita, antes de `notes`: Cocina pone primero los de la alergia del
   cliente (`*** ALERGIA: GLUTEN ***`, `*** LLEVA: GLUTEN ***`) y después los suplementos en el orden elegido
-  (KITCHEN-F32). `allergy` es la marca de la cabecera (`!! ALERGIA !!`, vacía sin alergia en la hoja); la app del
-  dispositivo aún no la pinta, ni el texto de `priority` ni `duplicate` (ERPlora/app#63).
+  (KITCHEN-F32). `allergy` es la marca de la cabecera (`!! ALERGIA !!`, vacía sin alergia en la hoja). La app del
+  dispositivo pinta bajo el número, en este orden, el texto de `priority` tal como llega (`HIGH`, el del contrato
+  anterior, sale como su marca de urgente), el de `allergy` y la marca de copia cuando `duplicate` es verdadero.
 - `barcode_label`: `product_name`, `barcode`, `price`.
 - `cash_session_report`: `receipt_id` (la sesión), `cashier`, `opening_balance`, `closing_balance`,
   `transactions` (`label`, `amount`).
@@ -882,9 +885,18 @@ canal llama a sus operaciones con el contexto de la sesión del dispositivo:
 `frontend/components/SystemPrinterCard.vue`, con `printing.view_settings` (`base.E015`); `base.system.cards` la lista
 solo con Impresión encendida y `SystemAppCards.vue` de `base` la monta bajo «Uso y plan». No lee nada de Impresión: las
 descargas salen de `hub-home.app_downloads` (`base/spa.py`) por `useAppDownloads` de `base`, solo en un navegador, y
-cada botón sale por `openExternalLink`. Cuando Impresión tenga la lectura de si la caja responde (hub#573), la tarjeta
-la enseña. Tests: `tests/test_apps.py`, `tests/test_integration_home.py` y
-`frontend/components/SystemPrinterCard.test.ts`.
+cada botón sale por `openExternalLink`. La lectura de si la estación de tiques responde ya existe
+(`printing.device.health`, abajo); la tarjeta aún no la enseña (hub#573). Tests: `tests/test_apps.py`,
+`tests/test_integration_home.py` y `frontend/components/SystemPrinterCard.test.ts`.
+
+**La fila de salud del Inicio** (hub#573, BASE-F02). `printing.device.health` (`queries/health.py`, con su esquema en
+`schemas/health.py`; `GET /api/printing/devices/health`) dice de una función `ok` si un dispositivo dado de alta que
+llega a una impresora activa suya en papel de tique ha dado señales en los últimos `SEEN_WITHIN` (90 s), `no_signal`
+si lo hay pero ninguno ha dado señales y `not_configured` si no hay ninguno. «Dado de alta» es el `configured` de
+`printing.device.coverage` y «ha dado señales», lo que la campana llama un dispositivo que está: las tres lecturas usan
+las mismas reglas. `SEEN_WITHIN` vive en `queries/health.py`. `PrintingConfig.health` la declara con los tiques, para
+quien ve Impresión (`printing.view_settings`), con «Configurar la impresión» hacia `/printing/printers` (`base.E021`).
+Tests: `tests/test_queries_health.py` y `tests/test_integration_home_health.py`.
 
 **Lo que se pide a cada app** (no se toca desde aquí):
 

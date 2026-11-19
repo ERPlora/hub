@@ -165,6 +165,35 @@ def outbound_pool(request, monkeypatch):
     assert pool.stop(grace=10), "a job of base.outbound was still running when the test ended"
 
 
+@pytest.fixture
+def told(monkeypatch):
+    """Every live notice sent after a COMMIT: ``(scope key, event names)``. A module that needs another kind of record
+    defines its own ``told``."""
+    from live import operations as live_operations
+
+    sent: list[tuple[str, list[str]]] = []
+    real = live_operations.notify_hook
+
+    def hook(scope, names):
+        sent.append((scope.key, list(names)))
+        if real is not None:
+            real(scope, names)
+
+    monkeypatch.setattr(live_operations, "notify_hook", hook)
+    return sent
+
+
+@pytest.fixture
+def worker_visits():
+    """The worker's visits to the hubs with their own database (``base.hub_visits``) as a process that has just
+    started: no hub's schedule written yet and nothing known of any; its LISTEN closed after the test."""
+    from base.hub_visits import HubVisits
+
+    visits = HubVisits()
+    yield visits
+    visits.close()
+
+
 class _NoSlowPasses:
     """``base.worker.Background`` in the tests: the worker's loop starts no slow pass. They run in threads of their own,
     on their own connections, so in a test they would commit outside its transaction (a nightly ``UsageRun`` the relay's

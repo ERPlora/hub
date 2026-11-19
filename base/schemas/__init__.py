@@ -21,6 +21,7 @@ from . import (
     people as people,
     profile as profile,
     public_images as public_images,
+    release_notes as release_notes,
     reset as reset,
     sessions as sessions,
     support as support,

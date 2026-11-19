@@ -505,9 +505,8 @@ def test_a_request_the_alb_forwarded_over_https_is_secure():
     assert not factory.get("/").is_secure()
 
 
-def test_the_cache_is_valkey_when_set_else_local_memory(load_settings):
-    # Local memory that refuses what the Valkey cluster of AWS refuses (base/cache.py, hub#440).
-    assert load_settings(**DEVELOPMENT_ENV)["CACHES"] == {"default": {"BACKEND": "base.cache.ClusterLocMemCache"}}
+def test_the_cache_is_valkey_when_set(load_settings):
+    # Without it, the disk of the control database: base/tests/test_cache_between_processes.py.
     loaded = load_settings(**PRODUCTION_ENV, VALKEY_URL="rediss://cache.example:6379")
     # A prefix per project on the shared Valkey, a TTL on every key (never TIMEOUT=None) and 2 s
     # socket timeouts, as saas-next's.
@@ -575,7 +574,7 @@ def test_a_valkey_that_hangs_fails_the_cache_call_within_two_seconds(
     assert (kwargs["socket_connect_timeout"], kwargs["socket_timeout"]) == (2, 2)
 
 
-def test_without_valkey_the_local_memory_cache_has_no_socket_to_time_out(load_settings):
+def test_without_valkey_the_local_cache_has_no_socket_to_time_out(load_settings):
     for env in (DEVELOPMENT_ENV, PRODUCTION_ENV):
         assert "OPTIONS" not in load_settings(**env)["CACHES"]["default"]
 

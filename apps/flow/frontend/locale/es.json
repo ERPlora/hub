@@ -1132,6 +1132,7 @@
       "printing__settings__update": "Cambiar los ajustes de impresión",
       "printing__device__coverage": "Comprobar si hay un dispositivo que imprima",
       "printing__device__detail": "Leer un dispositivo que imprime",
+      "printing__device__health": "Comprobar si la impresora responde ahora",
       "printing__device__get": "Leer si un dispositivo que imprime sigue en servicio",
       "printing__device__list": "Buscar los dispositivos que imprimen",
       "printing__device__seen": "Marcar como visto ahora un dispositivo que imprime",

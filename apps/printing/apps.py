@@ -106,6 +106,21 @@ class PrintingConfig(LiveAppConfig):
     # on: who prints, «Set up printing» and, in a browser, where to get the ERPlora app. base mounts
     # frontend/components/SystemPrinterCard.vue (base.E015 checks the name at start).
     system_cards = [{"key": "printer", "component": "SystemPrinterCard", "permission": "printing.view_settings"}]
+    # The Home's health row, for who runs the business (base.E021 checks it at start): whether the receipt station
+    # answers now, the reading «Your printer» shares.
+    health = {
+        "operation": "printing.device.health",
+        "params": {"usage": "receipt"},
+        "permission": "printing.view_settings",
+        "route": "/printing/printers",
+        "action": _("Set up printing"),
+        "titles": {
+            "ok": _("Printer ready"),
+            "no_signal": _("Printer not connected"),
+            "not_configured": _("Printer not set up"),
+            "unknown": _("We couldn't check the printer"),
+        },
+    }
     # The news that a device is there: base's /ws/print runs it at the hello and at every beat of a device that prints,
     # as the device's user (base.E006).
     print_presence = "printing.device.seen"

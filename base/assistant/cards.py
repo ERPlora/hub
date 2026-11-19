@@ -284,6 +284,7 @@ BASE_SCREENS = {
     "person": "employees",
     "plan": "system",
     "profile": "profile",
+    "release_note": "system",
     "role": "employees",
     "setup": "home",
     "support": "report",

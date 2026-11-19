@@ -334,7 +334,7 @@ def test_the_hub_reads_a_bono_as_a_voucher_of_services_and_an_asignacion_as_an_a
 #: Requests in the owner's words that are neither an ask nor a probe of layer 2: each brings its tool among the first
 #: ten only because the Hub reads «bono» as Services' voucher and «asigna» as an assignment.
 BY_THE_GROUPS = [
-    ("service.assignment.assign", "asigna los cortes de caballero a Marta, con 25 minutos"),
+    ("service.assignment.assign", "asigna a Marta la depilación"),
     ("service.assignment.update", "cambia la asignación de Lucas a los peinados: ahora tarda media hora"),
     ("service.package.list", "¿qué bonos hay para comprar?"),
 ]
