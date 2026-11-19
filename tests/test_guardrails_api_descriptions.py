@@ -21,7 +21,7 @@ from config.api import api
 CODE_NAME = re.compile(r"(?<![\w.])(?:apps|base|config|control|live|shared)(?:\.[A-Za-z_]\w*)+")
 #: A value the API sends or takes, quoted as the person reads it: data, not code.
 API_VALUE = re.compile(r"«[^»]*»")
-#: A documented flow's code (``CASH_REGISTER-F08``) or an issue of a repository (``hub#1208``, ``ERPlora/saas#12``).
+#: A documented flow's code (``CASH_REGISTER-F08``) or an issue of a repository (``hub#1208``), this one or another.
 INTERNAL_CODE = re.compile(r"\b[A-Z][A-Z0-9_]*-F\d+\b|\b[A-Za-z][\w.-]*#\d+\b")
 
 
