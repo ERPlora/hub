@@ -10,16 +10,10 @@ from live.outbox import record_event
 
 from apps.flow import document, events, recipes
 from apps.flow.models import Draft, Flow, FlowRun, Question
-from apps.flow.queries import (
-    HIGH_RISK_CODE,
-    MANAGE,
-    asked_first,
-    grantable_operations,
-    operation_problem,
-    flow_row,
-    live_flows,
-    resolve_flow,
-)
+from apps.flow.queries.catalog import asked_first, grantable_operations
+from apps.flow.queries.flows import flow_row, live_flows, resolve_flow
+from apps.flow.queries.problems import HIGH_RISK_CODE, operation_problem
+from apps.flow.queries.reads import MANAGE
 from apps.flow.schemas import CreateIn, DeletedOut, EnabledIn, FlowOut, FlowRefIn, GrantIn, UpdateIn
 
 from .drafts import _decide_draft

@@ -23,7 +23,7 @@ from live.models import OutboxEvent
 
 from apps.flow import queries
 from apps.flow.models import Flow, FlowRun, Question
-from apps.flow.queries import TURN
+from apps.flow.queries.reads import TURN
 
 from .conftest import A, CHAT, HUB_DB, ctx_for, run
 from .test_recipes import declaration, declared  # noqa: F401 - the fixture
@@ -409,7 +409,7 @@ def test_the_table_answer_turned_on_before_its_app_left_out_old_messages_never_a
 
 
 def app_name(label: str) -> str:
-    return str(queries.active_apps(A)[label].verbose_name)
+    return str(queries.catalog.active_apps(A)[label].verbose_name)
 
 
 def refused(flow_id: str, change: dict) -> InvalidPayload:

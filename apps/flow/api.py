@@ -41,22 +41,22 @@ router = Router(tags=["flow"])
 
 @bind(router, "flow.flow.list", "/flow/flows")
 async def flow_list(request, params: Query[FlowListIn]):
-    return await run_operation(request, queries.list_flows, params)
+    return await run_operation(request, queries.flows.list_flows, params)
 
 
 @bind(router, "flow.flow.detail", "/flow/flows/detail")
 async def flow_detail(request, params: Query[FlowRefIn]):
-    return await run_operation(request, queries.flow_detail, params)
+    return await run_operation(request, queries.flows.flow_detail, params)
 
 
 @bind(router, "flow.flow.status", "/flow/flows/status")
 async def flow_status(request, params: Query[StatusIn]):
-    return await run_operation(request, queries.flow_status, params)
+    return await run_operation(request, queries.flows.flow_status, params)
 
 
 @bind(router, "flow.flow.test", "/flow/flows/test")
 async def flow_test(request, params: Query[TestIn]):
-    return await run_operation(request, queries.try_flow, params)
+    return await run_operation(request, queries.dry_run.try_flow, params)
 
 
 @bind(router, "flow.flow.create", "/flow/flows", status=201)
@@ -99,12 +99,12 @@ async def flow_run(request, data: RunIn):
 
 @bind(router, "flow.run.list", "/flow/runs")
 async def run_list(request, params: Query[RunListIn]):
-    return await run_operation(request, queries.list_runs, params)
+    return await run_operation(request, queries.runs.list_runs, params)
 
 
 @bind(router, "flow.run.get", "/flow/runs/detail")
 async def run_get(request, params: Query[RunRefIn]):
-    return await run_operation(request, queries.get_run, params)
+    return await run_operation(request, queries.runs.get_run, params)
 
 
 @bind(router, "flow.run.retry", "/flow/runs/retry")
@@ -114,12 +114,12 @@ async def run_retry(request, data: RunRefIn):
 
 @bind(router, "flow.draft.list", "/flow/drafts")
 async def draft_list(request, params: Query[DraftListIn]):
-    return await run_operation(request, queries.list_drafts, params)
+    return await run_operation(request, queries.drafts.list_drafts, params)
 
 
 @bind(router, "flow.draft.get", "/flow/drafts/detail")
 async def draft_get(request, params: Query[DraftRefIn]):
-    return await run_operation(request, queries.get_draft, params)
+    return await run_operation(request, queries.drafts.get_draft, params)
 
 
 @bind(router, "flow.draft.propose", "/flow/drafts", status=201)
@@ -137,12 +137,12 @@ async def draft_dismiss(request, data: DraftRefIn):
 
 @bind(router, "flow.catalog.read", "/flow/catalog")
 async def catalog_read(request):
-    return await run_operation(request, queries.read_catalog)
+    return await run_operation(request, queries.catalog.read_catalog)
 
 
 @bind(router, "flow.event.sample", "/flow/events/sample")
 async def event_sample(request, params: Query[SampleIn]):
-    return await run_operation(request, queries.event_sample, params)
+    return await run_operation(request, queries.dry_run.event_sample, params)
 
 
 # Secrets (FLOW-F26): names only; a value goes in and never comes out.
@@ -150,7 +150,7 @@ async def event_sample(request, params: Query[SampleIn]):
 
 @bind(router, "flow.secret.list", "/flow/secrets")
 async def secret_list(request):
-    return await run_operation(request, queries.list_secrets)
+    return await run_operation(request, queries.stored_secrets.list_secrets)
 
 
 @bind(router, "flow.secret.set", "/flow/secrets")
@@ -168,12 +168,12 @@ async def secret_delete(request, data: SecretRefIn):
 
 @bind(router, "flow.question.list", "/flow/questions")
 async def question_list(request):
-    return await run_operation(request, queries.list_questions)
+    return await run_operation(request, queries.questions.list_questions)
 
 
 @bind(router, "flow.question.get", "/flow/questions/detail")
 async def question_get(request, params: Query[QuestionRefIn]):
-    return await run_operation(request, queries.get_question, params)
+    return await run_operation(request, queries.questions.get_question, params)
 
 
 @bind(router, "flow.question.answer", "/flow/questions/answer")
@@ -186,7 +186,7 @@ async def question_answer(request, data: AnswerIn):
 
 @bind(router, "flow.recipe.list", "/flow/recipes")
 async def recipe_list(request):
-    return await run_operation(request, queries.list_recipes)
+    return await run_operation(request, queries.recipe_flows.list_recipes)
 
 
 @bind(router, "flow.recipe.enable", "/flow/recipes/enable")

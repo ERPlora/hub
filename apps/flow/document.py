@@ -6,7 +6,7 @@ permissions its steps ask for (WORKBOOK «Para quien lo mantiene»). Pure: no da
   it points at. There is no index into a list: the old engine could not walk one either.
 - A **template** is text with ``{{path}}`` inside; it is always text, and a missing field is empty. Each datum goes
   in as the code keeps it («true», an ISO day, an amount in cents), for a machine; a text a person reads passes a
-  ``say`` that writes each one in words (``queries.words_for``, FLOW-F28 and F31).
+  ``say`` that writes each one in words (``queries.values.words_for``, FLOW-F28 and F31).
 - A **condition** is ``{path: {operator: value}}``, every comparison at once. A field that is not there
   never matches, except with ``exists: false``.
 - A **schedule** is every day, week (``weekday``, Monday 0) or month (``day``) at ``time``, read in the

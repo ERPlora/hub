@@ -230,7 +230,7 @@ def test_the_business_own_network_is_never_called(settings, server, clock, worke
     assert (failed.status, failed.error_code) == (FlowRun.Status.FAILED, "flow.http_blocked")
     assert Handler.seen == []
     # FLOW-F24: resuming runs the same steps, so the same address would be blocked again: it is not offered.
-    from apps.flow.queries import resume_problem
+    from apps.flow.queries.runs import resume_problem
 
     assert resume_problem(failed, NOON)[0] == "flow.run_not_resumable"
 
@@ -244,7 +244,7 @@ def test_a_secret_deleted_fails_the_step_before_any_call(trusted, clock, worker)
     assert "STRIPE_KEY" in failed.error_message
     assert Handler.seen == []
     # Saving the secret again fixes it: that run can be resumed (FLOW-F24).
-    from apps.flow.queries import resume_problem
+    from apps.flow.queries.runs import resume_problem
 
     assert resume_problem(failed, NOON) is None
 

@@ -78,40 +78,6 @@
     ]
   },
   {
-    "path": "apps/flow/queries.py",
-    "file_name": "queries.py",
-    "functions": [
-      {
-        "name": "step_data",
-        "complexity": 16
-      },
-      {
-        "name": "map_params",
-        "complexity": 17
-      },
-      {
-        "name": "operation_problem",
-        "complexity": 17
-      },
-      {
-        "name": "words_for",
-        "complexity": 20
-      },
-      {
-        "name": "_tried_pinned",
-        "complexity": 26
-      },
-      {
-        "name": "try_flow",
-        "complexity": 44
-      },
-      {
-        "name": "catalog_problems",
-        "complexity": 47
-      }
-    ]
-  },
-  {
     "path": "apps/flow/schemas.py",
     "file_name": "schemas.py",
     "functions": [
@@ -942,6 +908,58 @@
       {
         "name": "react",
         "complexity": 16
+      }
+    ]
+  },
+  {
+    "path": "apps/flow/queries/catalog.py",
+    "file_name": "catalog.py",
+    "functions": [
+      {
+        "name": "step_data",
+        "complexity": 16
+      }
+    ]
+  },
+  {
+    "path": "apps/flow/queries/dry_run.py",
+    "file_name": "dry_run.py",
+    "functions": [
+      {
+        "name": "_tried_pinned",
+        "complexity": 26
+      },
+      {
+        "name": "try_flow",
+        "complexity": 44
+      }
+    ]
+  },
+  {
+    "path": "apps/flow/queries/problems.py",
+    "file_name": "problems.py",
+    "functions": [
+      {
+        "name": "operation_problem",
+        "complexity": 17
+      },
+      {
+        "name": "catalog_problems",
+        "complexity": 47
+      }
+    ]
+  },
+  {
+    "path": "apps/flow/queries/values.py",
+    "file_name": "values.py",
+    "functions": [
+      {
+        "name": "map_params",
+        "complexity": 17
+      },
+      {
+        "name": "words_for",
+        "complexity": 20
       }
     ]
   }

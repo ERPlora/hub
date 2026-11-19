@@ -10,7 +10,7 @@ from live.operations import get, operation
 
 from apps.flow import document, http, vault
 from apps.flow.models import FlowRun, Secret
-from apps.flow.queries import SYSTEM
+from apps.flow.queries.reads import SYSTEM
 from apps.flow.schemas import ClaimCallOut, DueOut, RecordCallIn, RunRefIn
 from base import outbound
 
@@ -21,7 +21,7 @@ from .writes import CALL_LEASE_MINUTES
 #: A call's ``Idempotency-Key`` is ``uuid5(IDEMPOTENCY_NAMESPACE, "<run id>:<step id>")``: the same in every
 #: attempt of a run's step, another in every run.
 IDEMPOTENCY_NAMESPACE = uuid.UUID("0199f6a0-6b1f-7c3e-9a51-3f1b2c4d5e6f")
-#: How a call that did not answer 2xx ends: its code (and the name of its reason, ``queries.REASONS``).
+#: How a call that did not answer 2xx ends: its code (and the name of its reason, ``queries.reasons.REASONS``).
 _CALL_FAILURES = {
     http.STATUS: "flow.http_status",
     http.BLOCKED: "flow.http_blocked",
