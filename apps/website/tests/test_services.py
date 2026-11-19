@@ -18,7 +18,7 @@ from live.operations import atomic, get
 from PIL import Image as PILImage
 
 from apps.website.models import Image, Site
-from apps.website.queries import catalog_cache_key, live_version, page_cache_key, published_page
+from apps.website.queries import catalog_cache_key, page_cache_key
 from apps.website import reviews, services
 from apps.website.tests.conftest import (
     HUB_DB,
