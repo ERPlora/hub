@@ -196,8 +196,10 @@ def test_an_allergy_the_dish_does_not_contain_prints_no_contains_line(kitchen, p
     speaks("en")
     order = check_with(kitchen, ("burger", ["fish"]))
     run("kitchen.ticket.send", {"order_id": str(order.id)})
-    (dish,) = sheets()["kitchen"]["items"]
+    sheet = sheets()["kitchen"]
+    (dish,) = sheet["items"]
     assert dish["modifiers"] == ["*** ALLERGY: FISH ***"]
+    assert sheet["allergy"] == "!! ALLERGY !!"
 
 
 def test_each_dish_of_a_menu_prints_its_own_lines(kitchen, printers):

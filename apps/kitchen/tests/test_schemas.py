@@ -144,3 +144,10 @@ def test_the_reaction_to_sales_reads_the_check_and_ignores_the_rest():
         {"from_order_id": order, "to_order_id": order}
     )
     assert merged.order_id is None and merged.to_order_id == uuid.UUID(order)
+
+
+def test_a_route_with_nothing_said_asks_first_for_what_it_routes():
+    with pytest.raises(ValidationError) as refused:
+        schemas.RoutingSetIn.model_validate({})
+    (error,) = refused.value.errors()
+    assert error["msg"].endswith(str(schemas.SAY_PRODUCT_OR_CATEGORY))

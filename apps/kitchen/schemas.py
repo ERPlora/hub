@@ -671,7 +671,7 @@ class _Target(In):
         return self
 
 
-class RoutingSetIn(_Target, _StationNamed):
+class RoutingSetIn(_StationNamed, _Target):
     station_id: UUID | None = Field(None, description="The station it goes to.", json_schema_extra=A_STATION)
     station: Said | None = Field(None, description="The station by its name.")
 
