@@ -7,7 +7,7 @@ from live.operations import operation
 
 from apps.verifactu import erplora_route, gateway, producer
 from apps.verifactu.models import Config, Environment, Record
-from apps.verifactu.schemas import ConfigOut, NoInput
+from apps.verifactu.schemas import CertificateOut, ConfigOut, NoInput
 
 from .authorisation import representation_out
 from .reads import VIEW
@@ -25,12 +25,28 @@ from .route import (
     wait,
 )
 
+#: Days before its expiry from which the own certificate is announced as expiring soon (VERIFACTU-F34).
+EXPIRY_WARNING_DAYS = 30
+
+
+def certificate_out() -> CertificateOut:
+    certificate = own_certificate()
+    expires = certificate.expires_at if certificate else None
+    days = (expires - timezone.now()).days if expires else None
+    return CertificateOut(
+        loaded=certificate is not None,
+        holder=certificate.holder if certificate else "",
+        holder_tax_id=certificate.holder_tax_id if certificate else "",
+        kind=certificate.kind if certificate else "",
+        uploaded_at=certificate.uploaded_at if certificate else None,
+        expires_at=expires,
+        expires_in_days=days,
+        expires_soon=days is not None and 0 <= days <= EXPIRY_WARNING_DAYS,
+    )
+
 
 def config_out(config: Config, ctx: OperationContext) -> ConfigOut:
     nif, name = issuer_identity()
-    now = timezone.now()
-    certificate = own_certificate()
-    expires = certificate.expires_at if certificate else None
     refused = issue_problem(config, ctx.scope)
     return ConfigOut(
         environment=config.environment,
@@ -58,15 +74,7 @@ def config_out(config: Config, ctx: OperationContext) -> ConfigOut:
         declaration_version=producer.DECLARATION_VERSION,
         declaration_url=producer.declaration_url(),
         account_url=settings.SAAS_URL.rstrip("/"),
-        own_certificate={
-            "loaded": certificate is not None,
-            "holder": certificate.holder if certificate else "",
-            "holder_tax_id": certificate.holder_tax_id if certificate else "",
-            "kind": certificate.kind if certificate else "",
-            "uploaded_at": certificate.uploaded_at if certificate else None,
-            "expires_at": expires,
-            "expires_in_days": (expires - now).days if expires else None,
-        },
+        own_certificate=certificate_out(),
         representation=representation_out(config, nif),
         synced_at=config.synced_at,
         route_ready=not route_problem(config, config.environment, ctx.scope),

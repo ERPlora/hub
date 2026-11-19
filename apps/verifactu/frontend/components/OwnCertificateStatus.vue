@@ -15,7 +15,7 @@ const status = computed<{ tone: StatusPillTone; label: string }>(() => {
   if (cert.expires_in_days !== null && cert.expires_in_days < 0) {
     return { tone: 'danger', label: 'verifactu.config.expiredStatus' };
   }
-  if (cert.expires_in_days !== null && cert.expires_in_days <= 30) {
+  if (cert.expires_soon) {
     return { tone: 'warning', label: 'verifactu.config.expiringSoon' };
   }
   return { tone: 'success', label: 'verifactu.config.valid' };

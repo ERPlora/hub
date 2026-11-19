@@ -18,8 +18,6 @@ from .country import OUTSIDE_SPAIN, outside_spain
 
 #: The waits that are a past attempt's failure, kept on the record (the rest are computed when read).
 ATTEMPT_FAILURES = ("unreachable", "refused", "unknown", "aeat_fault", "xml_invalid")
-#: Days before its expiry from which the own certificate is announced (VERIFACTU-F34).
-EXPIRY_WARNING_DAYS = 30
 
 
 def config_row() -> Config:
