@@ -573,7 +573,7 @@ TITLED_IN_SPANISH = {
     **{f"schedule.special_day.{action}:id": "Día especial" for action in ("delete", "update")},
     **{f"service.assignment.{action}:id": "Profesional del servicio" for action in ("remove", "update")},
     **{f"service.category.{action}:id": "Categoría" for action in ("delete", "update")},
-    **{f"service.grant.{action}:id": "Bono vendido" for action in ("adjust", "redeem", "void")},
+    **{f"service.grant.{action}:id": "Bono vendido" for action in ("adjust", "link", "redeem", "void")},
     **{f"service.package.{action}:id": "Paquete" for action in ("delete", "update")},
     **{f"service.service.{action}:id": "Servicio" for action in ("archive", "restore", "set_image", "update")},
     "service.session.release:id": "Sesión del bono",
@@ -731,7 +731,7 @@ class WhenPreviewOut(Schema):
 def test_a_preview_says_a_moment_as_the_person_reads_it_too(monkeypatch):
     """«What will happen» of a dangerous card (BASE-F98) says its data by the same rule as what the write sends: a
     moment its read answers in ISO reaches the card as the person's language writes it, at the business's hour."""
-    from base.tests.test_assistant import count_preview, declaring
+    from base.tests.test_assistant_previews import count_preview, declaring
 
     read = count_preview({"name": "Item 7", "since": "2026-11-02T09:00:00Z"}, output=WhenPreviewOut)
     write = declaring({"operation": read.name, "fields": ["name", "since"]})

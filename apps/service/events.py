@@ -41,6 +41,7 @@ GRANT_ADJUSTED = "service.grant.adjusted"
 GRANT_REDEEMED = "service.grant.redeemed"
 GRANT_REASSIGNED = "service.grant.reassigned"
 GRANT_ERASED = "service.grant.erased"
+GRANT_SALE_LINKED = "service.grant.sale_linked"
 SESSION_RESERVED = "service.session.reserved"
 SESSION_RELEASED = "service.session.released"
 SESSION_SETTLED = "service.session.settled"
@@ -68,6 +69,7 @@ ALL = [
     GRANT_REDEEMED,
     GRANT_REASSIGNED,
     GRANT_ERASED,
+    GRANT_SALE_LINKED,
     SESSION_RESERVED,
     SESSION_RELEASED,
     SESSION_SETTLED,
@@ -87,6 +89,7 @@ GRANT_EVENTS = [
     GRANT_REDEEMED,
     GRANT_REASSIGNED,
     GRANT_ERASED,
+    GRANT_SALE_LINKED,
 ]
 #: The steps of a session of the till (SERVICE-F22–F27): each one moves a voucher's balance.
 SESSION_EVENTS = [
