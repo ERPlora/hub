@@ -52,6 +52,7 @@ puede subir hasta que se le mergea `origin/main`.
 
 ```bash
 bash .github/scripts/smoke-e2e.sh    # los tests @smoke del commit en el que estás; rojo si uno falla o si pasan del tope
+bash .github/scripts/smoke-e2e.sh --spec tests/e2e/login-and-shell.spec.ts   # solo los @smoke de esas specs
 ```
 
 Recorre en el navegador lo que no se puede romper: entrar, las sesiones y los permisos, la separación entre negocios, la
@@ -69,11 +70,18 @@ nocturna»): sus worktrees, sus BD, los dos `runserver` y, pase lo que pase, la 
   pasada nocturna, así que ninguna espera a la otra. Un worker lo lleva a su carpeta y a sus puertos con `NIGHTLY_DIR` y
   `NIGHTLY_HUB_PORT`. Nunca escribe en GitHub; lo que deja está en `runs/<pasada>/` de esa carpeta (`night.log`, los
   registros de los dos `runserver` y `test-results/`).
-- **Salida**: 0 en verde; 1 en rojo (un test, el tope o un paso previo, como las dependencias o una BD); 2 con
-  argumentos, porque no lleva ninguno; 3 si ya corre otro humo en esa carpeta.
+- **`--spec`**: acota el humo a los tests `@smoke` de las specs que nombra, una o varias; nunca lo amplía.
+- **Salida**: 0 en verde; 1 en rojo (un test, el tope o un paso previo, como las dependencias o una BD); 2 con un
+  argumento que no sea `--spec tests/e2e/<nombre>.spec.ts`; 3 si ya corre otro humo en esa carpeta.
 - **Entrar en el humo**: un test se marca solo después de pasar 3 veces seguidas con este comando. Uno que falla sin
   nada roto frenaría todos los cambios: se queda fuera y, si es un fallo de verdad, va a su issue.
-- Hoy no frena ninguna fusión: se corre a mano.
+- **Frena la fusión**: el job `smoke` de `test.yml` corre este mismo comando en cada push, dentro del check `test / test`
+  que exige `main`, con la pila montada en el runner (el SaaS de su `origin/main` en `../saas`, las imágenes en
+  `../blueprints` y Postgres con `compose.yaml`). Un test `@smoke` en rojo deja el check en rojo y la PR no se fusiona.
+  Los grupos entran de uno en uno, tras tres pasadas seguidas en verde del job, y el job los nombra con `--spec`: hoy,
+  entrar, las sesiones, los permisos de un empleado, la separación entre negocios y la suspensión por impago. Con todos
+  dentro, el job correrá todos los `@smoke`, como en el Mac. Si falla, el artefacto `smoke` de la ejecución guarda el
+  registro, los de los dos `runserver` y las trazas de Playwright.
 
 ## Registro de hubs y `/internal`
 
