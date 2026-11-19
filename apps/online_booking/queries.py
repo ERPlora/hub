@@ -477,13 +477,13 @@ def get_settings(ctx: OperationContext, data: NoIn) -> dict:
                 "enséñame el logo y la bienvenida que ve quien reserva por internet",
             ),
         },
-        "description": "What the public booking page shows: its title, texts, colour, logo and booking rules."
+        "description": "What the public booking page shows: whose it is, its title, texts, colour, logo and booking rules."
     },
 )
 def public_page(ctx: OperationContext, data: NoIn) -> dict:
     own = page_settings()
     rules = current_rules()
-    return {
+    return PageOut.owner(ctx) | {
         "title": own.page_title or str(DEFAULT_TITLE),
         "welcome_message": own.welcome_message,
         "primary_color": own.primary_color,

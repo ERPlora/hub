@@ -306,7 +306,7 @@ def test_a_menu_is_sold_in_whole_units_and_its_quantity_can_change(menu):
 
 def test_without_menus_a_menu_line_is_refused_and_the_check_stays_as_it_was(menu, monkeypatch):
     order_id = open_check()
-    monkeypatch.setattr("apps.sale.queries.COMBO_RESOLVE", "combo.combo.not_installed")
+    monkeypatch.setattr("apps.sale.queries.order_lines.COMBO_RESOLVE", "combo.combo.not_installed")
     with pytest.raises(Conflict) as refused:
         add_menu(order_id, choices(menu["LEN"], menu["HAK"]))
     assert refused.value.code == "sale.combo_unavailable"
@@ -374,7 +374,7 @@ def test_with_menus_off_at_the_charge_a_menu_ordered_is_charged_as_it_was_ordere
     """Menus switched off after a table ordered a menu: the check still charges what it froze."""
     order_id = open_check()
     add_menu(order_id, choices(menu["LEN"], menu["HAK"]))
-    monkeypatch.setattr("apps.sale.queries.COMBO_RESOLVE", "combo.combo.not_installed")
+    monkeypatch.setattr("apps.sale.queries.order_lines.COMBO_RESOLVE", "combo.combo.not_installed")
     sale = charge("combo-off-0001", order_id=order_id)
     assert sale.total == 1350
     assert [(row.name, row.tax_category_key, row.line_total) for row in sale.lines] == [("Menu of the day", FOOD, 1350)]

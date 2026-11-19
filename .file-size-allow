@@ -50,7 +50,7 @@
 463 apps/invoice/frontend/operations.d.ts ERPlora/erplora-next#74
 1356 apps/invoice/queries.py ERPlora/erplora-next#74
 1031 apps/invoice/schemas/__init__.py ERPlora/erplora-next#74
-1759 apps/invoice/services.py ERPlora/erplora-next#74
+1756 apps/invoice/services.py ERPlora/erplora-next#74
 355 apps/kitchen/frontend/operations.d.ts ERPlora/erplora-next#74
 515 apps/kitchen/models.py ERPlora/erplora-next#74
 1621 apps/kitchen/queries.py ERPlora/erplora-next#74
@@ -60,7 +60,7 @@
 673 apps/modifier/schemas.py ERPlora/erplora-next#74
 687 apps/modifier/services.py ERPlora/erplora-next#74
 736 apps/online_booking/queries.py ERPlora/erplora-next#74
-529 apps/online_booking/schemas.py ERPlora/erplora-next#74
+528 apps/online_booking/schemas.py ERPlora/erplora-next#74
 566 apps/online_booking/services.py ERPlora/erplora-next#74
 621 apps/payment/services.py ERPlora/erplora-next#74
 318 apps/pricing/frontend/operations.d.ts ERPlora/erplora-next#74
@@ -84,7 +84,6 @@
 1073 apps/sale/frontend/pages/PosPage.test.ts ERPlora/erplora-next#74
 600 apps/sale/frontend/pages/SalesPage.test.ts ERPlora/erplora-next#74
 898 apps/sale/models.py ERPlora/erplora-next#74
-2556 apps/sale/queries.py ERPlora/erplora-next#74
 1717 apps/sale/schemas.py ERPlora/erplora-next#74
 1560 apps/sale/tests/test_integration_service.py ERPlora/erplora-next#74
 562 apps/schedule/queries.py ERPlora/erplora-next#74

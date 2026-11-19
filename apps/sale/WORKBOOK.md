@@ -1775,7 +1775,7 @@ es una línea.
 - **Límites legales en España** (país del negocio, el de Impuestos: hoy `ES` para todos): nada en efectivo
   desde 1.000 € (100.000 céntimos), también repartido y también en una cuenta cobrada por partes (la
   operación es la cuenta entera: lo ya cobrado más lo que le queda, `operation_total` de la previsión); tique hasta 3.000 € con IVA (300.000), por
-  encima solo factura. Son de la ley española y van en euros (`queries.LIMITS_CURRENCY`, también en sus
+  encima solo factura. Son de la ley española y van en euros (`queries.business.LIMITS_CURRENCY`, también en sus
   avisos): `CASH_LIMIT` y `TICKET_LIMIT` solo tienen `ES`, y un negocio de otro país no lleva ninguno. La vista previa
   (`PreviewOut`) lo dice a su lado, `limits_currency`, y marca los dos como dinero en esa moneda
   (`IN_LIMITS_CURRENCY`: `money` y `currency_in`), para que quien los lea (Automatizaciones, FLOW-F11) no los tome por
@@ -1786,7 +1786,7 @@ es una línea.
   `base.operations.business_currency(ctx.scope)` (BASE-F50), que la lee como la plataforma (una API key solo trae
   los permisos de lo que cobra) y en el hub propio de ERPlora (sin negocio registrado en erplora.com) contesta la
   del país de su emisor (`PLATFORM_ISSUER_COUNTRY`), como sus facturas. Ventas no guarda copia propia de esa
-  pregunta: `queries.business_currency(ctx)` es una línea que la
+  pregunta: `queries.business.business_currency(ctx)` es una línea que la
   devuelve, y queda como la respuesta de Ventas que usa Caja (`requires = ["sale"]`) para contar en la moneda con
   la que cobra una venta ahora. `Sale.currency` se guarda al cobrar y no tiene valor por
   defecto (migración `0011`, sin datos); lo cobrado se pinta, se avisa (`money_text(cents, currency)`) y se imprime

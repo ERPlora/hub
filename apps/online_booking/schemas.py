@@ -25,6 +25,7 @@ from pydantic import (
 
 from apps.appointment.schemas import A_MEMBER, A_SERVICE, AN_APPOINTMENT
 from apps.customer.schemas import Email
+from apps.online_booking.public_page import PageOwnerOut, TrapIn
 
 T = TypeVar("T")
 
@@ -348,10 +349,8 @@ class SettingsOut(Schema):
 # ── The public page ────────────────────────────────────────────────────────────────────────────
 
 
-class PageOut(Schema):
-    title: str = Field(
-        description="The page's title (the business's, or the page's own)."
-    )
+class PageOut(PageOwnerOut):
+    title: str = Field(description="The page's own title, or «Book an appointment» in the visitor's language.")
     welcome_message: str
     primary_color: str
     logo_url: str
@@ -443,7 +442,7 @@ class PublicSlotsOut(Schema):
     slots: list[PublicSlotOut]
 
 
-class PublicBookIn(In):
+class PublicBookIn(In, TrapIn):
     service_ids: ServiceIds = Field(
         title=gettext_noop("Services"),
         description="The services to book (1 to 5), in order.",

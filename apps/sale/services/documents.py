@@ -9,7 +9,8 @@ from live.errors import Conflict, InvalidPayload, OperationError
 from live.operations import AI, operation
 
 from apps.sale.models import FiscalStatus, Sale, Settings
-from apps.sale.queries import call_app, find_sale, sale_detail
+from apps.sale.queries.other_apps import call_app
+from apps.sale.queries.sales import find_sale, sale_detail
 from apps.sale.schemas import SaleOut, SaleRefIn
 
 logger = logging.getLogger(__name__)
