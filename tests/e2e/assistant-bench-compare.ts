@@ -1,8 +1,10 @@
 // Compares the models of several bench reports (`.artifacts/qa/<run>/bench.json` of the Hub's probes, or the SaaS's
 // `.artifacts/qa/probes/<run>/bench.json`, which share the format): per model, the pass rate overall, by read or write
 // tool, by language and by app; the n/a; the failures split into the ranking's (the tool was not among the tools the
-// turn offered: the same for every model) and the model's, the model's by reason; the mean cost and tokens per turn,
-// the p50 and p95 latency; and the probes on which the models disagree. `pnpm -s qa:bench-compare <bench.json>…`.
+// turn offered: the same for every model) and the model's, the model's by reason; the money (total, per turn, per
+// 1,000 messages and per correct answer), the mean tokens, the seconds per turn (mean, p50, p95 and max, overall and
+// for reads and writes) and the mean rounds; and the probes on which the models disagree.
+// `pnpm -s qa:bench-compare <bench.json>…`.
 import { readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 
@@ -13,7 +15,24 @@ export interface Rate {
   asked: number;
 }
 
-export interface ModelSummary {
+/** Milliseconds per turn. */
+export interface Timing {
+  mean: number | null;
+  p50: number | null;
+  p95: number | null;
+  max: number | null;
+}
+
+/** USD; all null when a run of the model gave no prices. */
+export interface Money {
+  totalCostUsd: number | null;
+  meanCostUsd: number | null;
+  costPerThousandUsd: number | null;
+  /** The total over the probes it passed: what one correct answer costs. */
+  costPerPassUsd: number | null;
+}
+
+export interface ModelSummary extends Money {
   label: string;
   runs: string[];
   turns: number;
@@ -30,11 +49,11 @@ export interface ModelSummary {
   reasons: [string, number][];
   /** Whether every run of the model gave its prices: without them its cost is unknown. */
   priced: boolean;
-  meanCostUsd: number | null;
   meanTokensIn: number | null;
   meanTokensOut: number | null;
-  p50LatencyMs: number | null;
-  p95LatencyMs: number | null;
+  time: Timing;
+  timeByKind: Record<string, Timing>;
+  meanRounds: number | null;
   /** Turns asked and answered whose tokens came back as zero: the provider gave no usage. */
   usageMissing: number;
 }
@@ -79,6 +98,23 @@ function percentile(values: number[], p: number): number | null {
   return sorted[Math.max(0, Math.ceil((p / 100) * sorted.length) - 1)];
 }
 
+function timing(values: number[]): Timing {
+  return { mean: mean(values), p50: percentile(values, 50), p95: percentile(values, 95), max: values.length ? Math.max(...values) : null };
+}
+
+function timingByKind(turns: BenchTurn[]): Record<string, Timing> {
+  const kinds = [...new Set(turns.map((turn) => turn.kind))];
+  return Object.fromEntries(kinds.map((kind) => [kind, timing(known(turns.filter((turn) => turn.kind === kind).map((turn) => turn.latencyMs)))]));
+}
+
+function money(asked: BenchTurn[], passed: number, priced: boolean): Money {
+  if (!priced) return { totalCostUsd: null, meanCostUsd: null, costPerThousandUsd: null, costPerPassUsd: null };
+  const costs = known(asked.map((turn) => turn.costUsd));
+  const total = costs.reduce((sum, value) => sum + value, 0);
+  const each = mean(costs);
+  return { totalCostUsd: total, meanCostUsd: each, costPerThousandUsd: each === null ? null : each * 1000, costPerPassUsd: passed ? total / passed : null };
+}
+
 function counted(reasons: string[]): [string, number][] {
   const counts = new Map<string, number>();
   for (const reason of reasons) counts.set(reason, (counts.get(reason) ?? 0) + 1);
@@ -91,13 +127,13 @@ function summaryOf(label: string, reports: BenchReport[]): ModelSummary {
   const failed = asked.filter((turn) => turn.verdict === 'fail');
   const ofModel = failed.filter((turn) => turn.offered !== false);
   const priced = reports.every((report) => report.meta.model.priceIn !== null && report.meta.model.priceOut !== null);
-  const latencies = known(asked.map((turn) => turn.latencyMs));
+  const passed = asked.length - failed.length;
   return {
     label,
     runs: reports.map((report) => report.meta.run),
     turns: turns.length,
     asked: asked.length,
-    passed: asked.length - failed.length,
+    passed,
     failed: failed.length,
     na: turns.length - asked.length,
     rankingFailures: failed.length - ofModel.length,
@@ -107,11 +143,12 @@ function summaryOf(label: string, reports: BenchReport[]): ModelSummary {
     byApp: rates(asked, (turn) => turn.app),
     reasons: counted(ofModel.flatMap((turn) => [...new Set(turn.reasons.map(reasonOf))])),
     priced,
-    meanCostUsd: priced ? mean(known(asked.map((turn) => turn.costUsd))) : null,
+    ...money(asked, passed, priced),
     meanTokensIn: mean(known(asked.map((turn) => turn.tokensIn))),
     meanTokensOut: mean(known(asked.map((turn) => turn.tokensOut))),
-    p50LatencyMs: percentile(latencies, 50),
-    p95LatencyMs: percentile(latencies, 95),
+    time: timing(known(asked.map((turn) => turn.latencyMs))),
+    timeByKind: timingByKind(asked),
+    meanRounds: mean(asked.map((turn) => turn.rounds)),
     usageMissing: asked.filter((turn) => !turn.error && turn.tokensIn === 0 && turn.tokensOut === 0).length,
   };
 }
@@ -142,6 +179,14 @@ const percent = (rate: Rate): string => `${rate.passed}/${rate.asked} (${share(r
 const listed = (by: Record<string, Rate>): string => Object.entries(by).map(([key, rate]) => `${key} ${percent(rate)}`).join(' · ') || 'none';
 const seconds = (ms: number | null): string => (ms === null ? 'n/a' : `${(ms / 1000).toFixed(1)} s`);
 const rounded = (value: number | null): string => (value === null ? 'n/a' : value.toFixed(0));
+const usd = (value: number | null, digits = 6): string => (value === null ? 'n/a' : value.toFixed(digits));
+const times = (time: Timing | undefined): string =>
+  time ? `mean ${seconds(time.mean)} · p50 ${seconds(time.p50)} · p95 ${seconds(time.p95)} · max ${seconds(time.max)}` : 'none';
+
+function moneyLine(summary: ModelSummary): string {
+  if (!summary.priced) return '- Money: n/a (no prices given)';
+  return `- Money: total ${usd(summary.totalCostUsd)} USD · per turn ${usd(summary.meanCostUsd)} · per 1,000 messages ${usd(summary.costPerThousandUsd, 2)} · per correct answer ${usd(summary.costPerPassUsd)}`;
+}
 
 function modelLines(summary: ModelSummary): string[] {
   const cost = summary.priced ? `${summary.meanCostUsd?.toFixed(6) ?? 'n/a'} USD` : 'n/a (no prices given)';
@@ -156,7 +201,10 @@ function modelLines(summary: ModelSummary): string[] {
     `- By app: ${listed(summary.byApp)}`,
     `- Failures: ${summary.failed} = ${summary.rankingFailures} ranking (the tool was not offered: the same for every model) + ${summary.modelFailures} model; without the ranking's, ${percent(rest)}`,
     `- Model failures by reason: ${summary.reasons.map(([reason, count]) => `${count} × ${reason}`).join('; ') || 'none'}`,
-    `- Per turn: cost ${cost} · tokens ${rounded(summary.meanTokensIn)} in / ${rounded(summary.meanTokensOut)} out · latency p50 ${seconds(summary.p50LatencyMs)} · p95 ${seconds(summary.p95LatencyMs)}`,
+    `- Per turn: cost ${cost} · tokens ${rounded(summary.meanTokensIn)} in / ${rounded(summary.meanTokensOut)} out`,
+    moneyLine(summary),
+    `- Time per turn: ${times(summary.time)} · rounds ${summary.meanRounds?.toFixed(1) ?? 'n/a'}`,
+    `- Reads: ${times(summary.timeByKind.read)} · Writes: ${times(summary.timeByKind.write)}`,
     `- Turns with no tokens recorded: ${summary.usageMissing}`,
     '',
   ];

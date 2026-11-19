@@ -90,9 +90,22 @@ describe('summarize', () => {
     expect(b.reasons).toEqual([['the first tool called was <tool>, not <tool>', 1]]);
   });
 
-  it('gives the mean cost and tokens and the p50 and p95 latency of the turns asked', () => {
+  it('gives the mean cost and tokens of the turns asked', () => {
     expect(a.meanCostUsd).toBeCloseTo(0.005 / 3);
-    expect(a).toMatchObject({ meanTokensIn: 1000, meanTokensOut: 100, p50LatencyMs: 2000, p95LatencyMs: 3000, priced: true });
+    expect(a).toMatchObject({ meanTokensIn: 1000, meanTokensOut: 100, priced: true });
+  });
+
+  it('gives the money of the run: its total, per turn, per 1,000 messages and per correct answer', () => {
+    expect(a.totalCostUsd).toBeCloseTo(0.005);
+    expect(a.costPerThousandUsd).toBeCloseTo(5 / 3);
+    expect(a.costPerPassUsd).toBeCloseTo(0.005);
+    expect(b).toMatchObject({ totalCostUsd: null, costPerThousandUsd: null, costPerPassUsd: null });
+  });
+
+  it('gives the seconds per turn, overall and for reads and writes, and the mean rounds', () => {
+    expect(a.time).toEqual({ mean: 2000, p50: 2000, p95: 3000, max: 3000 });
+    expect(a.timeByKind).toEqual({ read: { mean: 1500, p50: 1000, p95: 2000, max: 2000 }, write: { mean: 3000, p50: 3000, p95: 3000, max: 3000 } });
+    expect(a.meanRounds).toBe(2);
   });
 
   it('gives no cost without the prices of the model, and counts the turns whose tokens never came', () => {
@@ -125,8 +138,11 @@ describe('renderComparison', () => {
     expect(text).toContain('Failures: 2 = 1 ranking (the tool was not offered: the same for every model) + 1 model');
     expect(text).toContain('cost 0.001667 USD');
     expect(text).toContain('cost n/a (no prices given)');
-    expect(text).toContain('latency p50 2.0 s · p95 3.0 s');
     expect(text).toContain('Turns with no tokens recorded: 1');
+    expect(text).toContain('- Money: total 0.005000 USD · per turn 0.001667 · per 1,000 messages 1.67 · per correct answer 0.005000');
+    expect(text).toContain('- Money: n/a (no prices given)');
+    expect(text).toContain('- Time per turn: mean 2.0 s · p50 2.0 s · p95 3.0 s · max 3.0 s · rounds 2.0');
+    expect(text).toContain('- Reads: mean 1.5 s · p50 1.0 s · p95 2.0 s · max 2.0 s · Writes: mean 3.0 s · p50 3.0 s · p95 3.0 s · max 3.0 s');
   });
 
   it('lists the probes the models disagree on', () => {

@@ -552,8 +552,9 @@ QA_ANSWER_KIND=anthropic QA_ANSWER_MODEL=<id> QA_ANSWER_KEY_ENV=QA_ANTHROPIC_API
   QA_ANSWER_PRICE_IN=<USD> QA_ANSWER_PRICE_OUT=<USD> QA_PROBES_SAMPLE=150 QA_PROBES_SEED=7 \
   CI=1 pnpm e2e tests/e2e/qa/assistant-probes.spec.ts
 # El resumen: por modelo, el acierto total, en lecturas y escrituras, por idioma y por app; los N/A; los fallos del
-# ranking aparte de los del modelo y estos por motivo; coste y tokens medios por turno; latencia p50 y p95; y las
-# sondas en las que los modelos no coinciden
+# ranking aparte de los del modelo y estos por motivo; el gasto total, por turno, por 1.000 mensajes y por respuesta
+# correcta; los tokens medios; los segundos por turno (media, p50, p95 y máximo, en total y en lecturas y escrituras)
+# y las rondas medias; y las sondas en las que los modelos no coinciden
 pnpm -s qa:bench-compare tests/e2e/.artifacts/qa/<ejecución 1>/bench.json tests/e2e/.artifacts/qa/<ejecución 2>/bench.json
 ```
 
