@@ -4411,6 +4411,7 @@ Implicados: BASE-F41
   (PLAN-SAAS §28) y lleva su flujo y su issue allí.
 - **El borrado de un negocio con documentos (BASE-F109)**, hub#738: sus documentos ya van al archivo fiscal, pero
   guarda su base de datos y sus ficheros pasados los 90 días hasta que ese borrado se active.
+- **El PDF de cada factura en el archivo fiscal (BASE-F109)**, hub#1821: hoy van sus datos y el XML de VeriFactu.
 - **La fila de salud del Inicio en pantalla (BASE-F02)**, hub#573: su lectura ya existe (`base.health.list`, con la
   impresora de Impresión); falta pintarla en el Inicio y que la Bandeja de WhatsApp declare cómo está su número.
 - **Las novedades en Sistema › Actualizaciones (BASE-F116)**: ya se leen por el asistente y por la API; falta
