@@ -1841,7 +1841,12 @@ es una línea.
   confirmación nombra cada dato por el `title` de su esquema (`gettext_noop`, con su `es` en el catálogo:
   «Importe a devolver» para `allocations`, «Línea», «Bono», «Cuenta de origen») o, si no lo tiene, por el
   `verbose_name` de su campo en el modelo; un dato sin ninguno sale con el nombre técnico y lo para
-  `tests/test_integration_assistant.py` (`test_i18n.py` exige el `es` de cada `title`).
+  `tests/test_integration_assistant.py` (`test_i18n.py` exige el `es` de cada `title`). Para el Hub,
+  «para marcarlo rápido» o «para marcarla rápido» es una nota rápida (`quick`, F36) (`assistant_synonyms`, en
+  `apps.py`): «deja preparado el aviso «Sin cilantro» para marcarlo rápido al apuntar platos» trae su alta entre
+  las diez primeras a quien prepara la caja. Va solo tras «para»: «quiero marcarla rápido como pagada» es una
+  factura, y «un aviso rápido» o «rápido» sueltos son también un mensaje a un cliente o cobrar deprisa;
+  `tests/test_assistant_synonyms.py` falla si el grupo los nombra.
 - **La tecla «Hablar»** (`frontend/components/pos/SpeakKey.vue`; PLAN §30 punto 4,
   PLAN-HUB §8): sin operación propia ni dictado propio; usa el del asistente de la plataforma,
   `useDictation` del chat compartido de `@erplora/ui/components` (PLAN-HUB §18): una
