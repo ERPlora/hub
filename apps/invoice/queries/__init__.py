@@ -28,6 +28,7 @@ from live.operations import get as get_operation
 
 from apps.invoice import fiscal
 from apps.invoice.document_issuer import document_issuer, issuer_vat_number
+from . import public as public
 from apps.invoice.models import (
     FACTORY_SERIES_NAMES,
     Invoice,
@@ -92,9 +93,7 @@ RECTIFIES_NOTE = _("Rectifies invoice %(number)s. Reason: %(reason)s")
 RECTIFIES_NOTE_NO_REASON = _("Rectifies invoice %(number)s.")
 CANNOT_RECTIFY_RECTIFICATION = _("A rectifying invoice cannot be rectified.")
 ALREADY_CANCELLED = _("The invoice is already cancelled.")
-SUBSTITUTED = _(
-    "This ticket was already replaced by a full invoice: rectify the full invoice."
-)
+SUBSTITUTED = _("This ticket was already replaced by a full invoice: rectify the full invoice.")
 RECTIFY_DATE = _(
     "A rectifying invoice is dated the day it is issued: today, and never earlier than the invoice it "
     "corrects. Nothing was issued. Send it without a date and it will be dated today."

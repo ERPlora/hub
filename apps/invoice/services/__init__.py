@@ -32,6 +32,7 @@ from live.outbox import record_event
 from apps.customer.queries import find_customer
 from apps.invoice import events, fiscal, platform
 from apps.invoice.models import Invoice, InvoiceLine, InvoiceSeries, Issuer
+from . import public as public
 from apps.invoice.queries import (
     FULL,
     RECTIFYING,
@@ -98,9 +99,7 @@ ISSUER_MISSING = _(
     "Set up the issuer (the business's legal name, tax ID and address) in Invoicing → Issuer before issuing "
     "documents."
 )
-RECIPIENT_INCOMPLETE = _(
-    "A full invoice needs the customer's name, tax ID and address."
-)
+RECIPIENT_INCOMPLETE = _("A full invoice needs the customer's name, tax ID and address.")
 FIELD_REQUIRED = _("This field is required.")
 TOO_LONG = _(
     "VeriFactu's record holds at most %(max)s characters here: shorten it (on the customer's card)."
