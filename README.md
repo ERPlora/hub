@@ -80,8 +80,10 @@ nocturna»): sus worktrees, sus BD, los dos `runserver` y, pase lo que pase, la 
   `../blueprints` y Postgres con `compose.yaml`). Un test `@smoke` en rojo deja el check en rojo y la PR no se fusiona.
   Los grupos entran de uno en uno, tras tres pasadas seguidas en verde del job, y el job los nombra con `--spec`: hoy,
   entrar, las sesiones, los permisos de un empleado, la separación entre negocios y la suspensión por impago. Con todos
-  dentro, el job correrá todos los `@smoke`, como en el Mac. Si falla, el artefacto `smoke` de la ejecución guarda el
-  registro, los de los dos `runserver` y las trazas de Playwright.
+  dentro, el job correrá todos los `@smoke`, como en el Mac. El job tiene un tope de 10 minutos, el doble de lo que
+  tardan sus pasadas medidas con la pila incluida; un grupo que entra lo vuelve a medir. Lo que hace la pila sale en el
+  registro del job y, si falla, el artefacto `smoke` guarda además los registros de los dos `runserver` y las trazas de
+  Playwright.
 
 ## Registro de hubs y `/internal`
 
