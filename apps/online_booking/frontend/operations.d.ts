@@ -113,6 +113,8 @@ export type SettingsIn = Partial<Omit<SettingsOut, 'timezone'>>;
 // ── The public page ────────────────────────────────────────────────────────────────────────────
 
 export interface PageOut {
+  business_name: string;
+  privacy_policy_url: string;
   title: string;
   welcome_message: string;
   primary_color: string;
@@ -176,6 +178,7 @@ export interface PublicBookIn {
   phone: string;
   email?: string;
   notes?: string;
+  website?: string;
 }
 
 export interface BookedOut {

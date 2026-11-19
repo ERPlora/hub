@@ -89,12 +89,14 @@ Al guardar: «Configuración guardada.»; un rechazo sale debajo de su campo («
 
 ### Página de reservas (la clienta, sin sesión)
 Página `/p/<negocio>/book` en la dirección del negocio: la abre cualquiera, sin iniciar sesión ni ver nada del equipo
-(sin su menú). Arriba, «Reserva online» y «Elige tus servicios, un día y una hora libre, y deja tu nombre y tu
-móvil.»; debajo, el título y el mensaje de bienvenida de los Ajustes, con su color, y el recorrido: servicios con su
-precio y su duración, profesional o «Sin preferencia», día, horas libres, nombre, móvil, email, nota y **Reservar**.
-Al reservar, el número de la cita, el mensaje de confirmación, **Ver mi reserva**, **Cancelar la reserva** y
-**Reservar otra**. Con la dirección de otro negocio, o la de este en la de otro, no hay página. Aún sin el logo de los
-Ajustes ni el aviso de privacidad del formulario (hub#1660).
+(sin su menú). Arriba, el nombre del negocio y su color; el logo aparece si su dirección es del propio origen y,
+si es externa, se queda el nombre sin imagen. También «Reserva online» y «Elige tus servicios, un día y una hora
+libre, y deja tu nombre y tu móvil.»; debajo, el título y el mensaje de bienvenida de los Ajustes y el recorrido:
+servicios con su precio y su duración, profesional o «Sin preferencia», día, horas libres, nombre, móvil, email,
+nota y **Reservar**. Junto a **Reservar**, el aviso de quién usa sus datos y el enlace a la política de privacidad.
+Si no hay nada que reservar online, solo sale el aviso, sin la invitación ni el formulario. Al reservar, el número
+de la cita, el mensaje de confirmación, **Ver mi reserva**, **Cancelar la reserva** y **Reservar otra**. Con la
+dirección de otro negocio, o la de este en la de otro, no hay página.
 
 ### Vista previa de la reserva (solo en desarrollo)
 Página `/online_booking/preview`, solo en el servidor de desarrollo: el mismo recorrido que la página de reservas
@@ -106,7 +108,7 @@ por la sesión del equipo. No forma parte de la versión de producción.
 | Estado | Qué ve la persona |
 |---|---|
 | Cargando | «Cargando…» en la tabla; «Cargando la configuración…» en Ajustes; «Cargando la página…» en la página de reservas. |
-| Vacío | «Aún no hay reservas online.»; con filtros, «Ninguna reserva coincide con la búsqueda.»; en Ajustes sin servicios, «Todavía no hay servicios. Dalos de alta en Servicios.»; en la página de reservas sin nada que reservar online, «Este negocio no tiene nada para reservar online ahora mismo.». |
+| Vacío | «Aún no hay reservas online.»; con filtros, «Ninguna reserva coincide con la búsqueda.»; en Ajustes sin servicios, «Todavía no hay servicios. Dalos de alta en Servicios.»; en la página de reservas sin nada que reservar online, solo «Este negocio no tiene nada para reservar online ahora mismo.», sin formulario. |
 | Error | El aviso de la tabla con «Reintentar»; el rechazo de una acción de fila, en su confirmación o encima de la tabla; un rechazo de Ajustes, debajo de su campo, sin perder lo tecleado; en la página de reservas, «No se pudo cargar la página» con el motivo («Este negocio no acepta reservas online ahora mismo.»), y el rechazo de una reserva encima de **Reservar** y debajo de su campo. |
 | Reconectando | Lo pintado se queda; una franja avisa «Reconectando…». |
 | App inactiva | «Esta app no está activa en este negocio». |
@@ -118,7 +120,7 @@ Fechas y horas salen en el reloj del negocio y con el formato del idioma de quie
 
 | ID | Flujo | Estado |
 |---|---|---|
-| ONLINE_BOOKING-F01 | La clienta reserva desde la página de reservas | parcial — reserva, sin el logo ni el aviso de privacidad (hub#1660) |
+| ONLINE_BOOKING-F01 | La clienta reserva desde la página de reservas | parcial — Ajustes aún no permite subir el logo al propio negocio |
 | ONLINE_BOOKING-F02 | Confirmar una reserva | hecho |
 | ONLINE_BOOKING-F03 | Completar una reserva | hecho |
 | ONLINE_BOOKING-F04 | Marcar que no se presentó | hecho |
@@ -132,11 +134,12 @@ Fechas y horas salen en el reloj del negocio y con el formato del idioma de quie
 | ONLINE_BOOKING-F12 | Borrar los datos de una clienta (RGPD) | hecho |
 
 ### ONLINE_BOOKING-F01 La clienta reserva desde la página de reservas
-Estado: parcial — reserva, sin el logo ni el aviso de privacidad (hub#1660)
+Estado: parcial — Ajustes aún no permite subir el logo al propio negocio
 Actor: clienta (sin sesión); propietario o administrador, con la vista previa o con el asistente
 Pantalla: página de reservas (`/p/<negocio>/book`); en desarrollo, también la vista previa
 Pasos:
-1. Abre la página del negocio: título, mensaje de bienvenida, logo y color de los Ajustes.
+1. Abre la página del negocio: su nombre, título, mensaje de bienvenida y color; también el logo de los Ajustes si
+   su dirección es del propio origen (una dirección externa no crea una imagen y queda el nombre).
 2. Elige uno o varios servicios (hasta 5) de los **reservables online**, con su precio (en la moneda del negocio,
    la de su país —BASE-F50: «20,00 zł» en Polonia—, agrupado desde cuatro cifras: «1.234,56 €») y su duración si
    Servicios los enseña («Mostrar precios», «Mostrar duración»).
@@ -455,10 +458,10 @@ sus llamadas van a `POST /p/<slug>/api/<operación>`. Esta app le da las operaci
 
 | Qué | Operación | Entrada → salida |
 |---|---|---|
-| Textos y reglas de la página | `online_booking.public.page` | nada → título, bienvenida, color, logo, email obligatorio, elegir profesional, notas, política de cancelación, antelaciones, si la clienta puede cancelar, zona horaria |
+| Textos y reglas de la página | `online_booking.public.page` | nada → nombre del negocio, enlace de privacidad, título, bienvenida, color, logo, email obligatorio, elegir profesional, notas, política de cancelación, antelaciones, si la clienta puede cancelar, zona horaria |
 | Servicios reservables online | `online_booking.public.services` | búsqueda, página (≤ 100) → servicios con categoría, precio y duración (o `null` si Servicios no los enseña) y sus profesionales (vacío si no se elige) |
 | Horas libres | `online_booking.public.slots` | servicios, día, profesional opcional → horas (con los profesionales libres si se elige) |
-| Reservar | `online_booking.public.book` | servicios, profesional opcional, hora de pared, nombre, móvil, email, nota → número, estado, hora, servicios, profesional, mensaje y **`token`** (se enseña una vez) |
+| Reservar | `online_booking.public.book` | servicios, profesional opcional, hora de pared, nombre, móvil, email, nota y campo trampa vacío → número, estado, hora, servicios, profesional, mensaje y **`token`** (se enseña una vez) |
 | Ver la reserva | `online_booking.public.booking` | `token` → número, estado, hora, servicios, profesional, si puede cancelar y hasta cuándo (nunca el nombre de la ficha) |
 | Cancelar | `online_booking.public.cancel` | `token`, motivo → la reserva cancelada |
 
@@ -479,9 +482,10 @@ Cómo las expone la plataforma (la puerta pública `/p/` de `base`):
   `SECRET_KEY` de la última IP de `X-Forwarded-For`, la que añade el ALB, o de `REMOTE_ADDR` sin proxy). La
   IP no se guarda.
 - **Antispam de la página**: el campo trampa (honeypot) es `website` de `online_booking.public.book`, fuera del
-  OpenAPI y de las herramientas del asistente: la página lo lleva oculto y vacío; relleno, la reserva entera se rechaza
-  (422 `invalid_payload`, sin campo y sin decir por qué) antes de leer ni escribir nada. La página aún no lo pinta y la
-  espera mínima de envío aún no está (hub#1660); los límites de esta app no dependen de ellos.
+  OpenAPI y de las herramientas del asistente: la página lo lleva fuera de la vista, vacío y fuera del alcance del
+  teclado y de los lectores de pantalla; relleno, la reserva entera se rechaza (422 `invalid_payload`, sin campo y sin
+  decir por qué) antes de leer ni escribir nada. La página espera además tres segundos desde que se abre antes de
+  enviar una reserva; los límites de esta app no dependen de ninguna de las dos medidas.
 - **Enlace personal**: `token` de 43 caracteres (`secrets.token_urlsafe(32)`); se guarda solo su hash
   (SHA-256). Va en la URL de la confirmación (`/p/<slug>/book/<token>`, una página que aún no existe), nunca en un
   log, y la página lo pasa a `public.booking`/`public.cancel` en el cuerpo, nunca en una query string.
@@ -495,15 +499,17 @@ Cómo las expone la plataforma (la puerta pública `/p/` de `base`):
 - **Privacidad**: `online_booking.public.page` da el nombre del negocio (`business_name`, el que registró en
   erplora.com, leído de `base.business.get` como la plataforma; vacío en una demo), que decide sobre los datos de la
   clienta, y el enlace del aviso (`privacy_policy_url`, la política de privacidad de ERPlora en
-  `<SAAS_URL>/legal/privacy/`, que trata esos datos por encargo del negocio). De lo demás del negocio no da nada. La
-  página aún no pinta el aviso ni el texto legal del formulario (hub#1660).
+  `<SAAS_URL>/legal/privacy/`, que trata esos datos por encargo del negocio). La página pinta junto a **Reservar** el
+  aviso con el nombre del negocio y ese enlace. De lo demás del negocio no da nada.
 
 ## Cómo son las páginas (para quien lo mantiene)
 
 - `frontend/pages/BookingsPage.vue` (bandeja), `SettingsPage.vue`, `PublicBookingPage.vue` (la página de reservas,
   sin sesión) y `PreviewPage.vue`: el recorrido de la clienta, que es la vista previa del equipo (solo en desarrollo)
   y, con la puerta de `PublicBookingPage.vue` (`PUBLIC_DOOR`, `frontend/lib/door.ts`: llamadas, dinero y textos de la
-  clienta), la página de reservas.
+  clienta), la página de reservas. `PublicBookingHeader.vue` pinta la identidad del negocio,
+  `PublicBookingSubmit.vue` el aviso de privacidad, el campo trampa y el envío, y `BookingResult.vue` la confirmación
+  y el recorrido del enlace personal.
 - Los estados permitidos y el reloj se leen de `apps/appointment/frontend/lib/states.ts` y `clock.ts`: las
   mismas reglas que la agenda, sin copiarlas.
 - Datos solo por `useLive`/`useCommand` (el recorrido de la clienta, por el cliente de la API o el de la puerta: lo
@@ -511,9 +517,10 @@ Cómo las expone la plataforma (la puerta pública `/p/` de `base`):
 
 ## Lo que queda fuera
 
+- **Subir el logo desde Ajustes**: hoy solo se guarda una URL externa y la página no la carga; falta guardar la imagen
+  en el propio negocio para que la clienta la vea.
 - **La página del enlace personal** (`/p/<slug>/book/<token>`): la clienta ve y cancela su reserva justo después
   de reservar, en la misma página, pero su enlace aún no abre una página propia.
-- **El logo, el aviso de privacidad y el campo trampa de la página de reservas** (hub#1660).
 - **Verificar el móvil con un código (SMS o WhatsApp)**: falta un canal de envío; hasta entonces, cualquiera
   que sepa un teléfono puede reservar a su nombre (la cita sale con el nombre de esa ficha). Los límites
   frenan el abuso, no la suplantación.
