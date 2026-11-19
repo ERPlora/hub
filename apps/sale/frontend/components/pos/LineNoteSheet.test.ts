@@ -4,6 +4,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import { h, ref } from 'vue';
 
+import { AllergenSelect } from '@erplora/ui/components';
+
 import { click, mountSale, settle } from '../../__tests__/mount-sale';
 import LineNoteSheet from './LineNoteSheet.vue';
 import QuickNoteChips from './QuickNoteChips.vue';
@@ -52,7 +54,7 @@ describe('LineNoteSheet', () => {
     m.box().value = '  rare, no salt ';
     m.box().dispatchEvent(new Event('input'));
     await click(m.find('pos-note-save').element);
-    expect(m.sheet().emitted('save')).toEqual([['rare, no salt']]);
+    expect(m.sheet().emitted('save')).toEqual([[{ note: 'rare, no salt', allergy: undefined }]]);
   });
 
   it('a chip writes into the box', async () => {
@@ -66,7 +68,36 @@ describe('LineNoteSheet', () => {
     const m = await setup({}, 'es');
     expect(m.find('pos-note-remove').text()).toBe('Quitar');
     await click(m.find('pos-note-remove').element);
-    expect(m.sheet().emitted('save')).toEqual([['']]);
+    expect(m.sheet().emitted('save')).toEqual([[{ note: '', allergy: undefined }]]);
+  });
+
+  it('with Kitchen, marks the customer allergy together with the note', async () => {
+    const m = await setup({ allergyEnabled: true, allergy: ['gluten'] }, 'es');
+    const select = m.wrapper.findComponent(AllergenSelect);
+    expect(select.exists()).toBe(true);
+    expect(select.props('label')).toBe('Alergia del cliente');
+    expect(select.props('modelValue')).toEqual(['gluten']);
+    select.vm.$emit('update:modelValue', ['gluten', 'milk']);
+    await click(m.find('pos-note-save').element);
+    expect(m.sheet().emitted('save')).toEqual([[{ note: 'No salt', allergy: ['gluten', 'milk'] }]]);
+  });
+
+  it('opened again on another line, marks that line’s allergy and not the previous one', async () => {
+    const allergy = ref(['gluten']);
+    const m = await setup({ allergyEnabled: true, get allergy() { return allergy.value; } });
+    const select = () => m.wrapper.findComponent(AllergenSelect);
+    select().vm.$emit('update:modelValue', ['gluten', 'milk']);
+    m.open.value = false;
+    await settle();
+    allergy.value = ['fish'];
+    m.open.value = true;
+    await settle();
+    expect(select().props('modelValue')).toEqual(['fish']);
+  });
+
+  it('without Kitchen, keeps the sheet as it was', async () => {
+    const m = await setup();
+    expect(m.wrapper.findComponent(AllergenSelect).exists()).toBe(false);
   });
 
   it('a refusal is read in the sheet and the buttons wait while saving', async () => {

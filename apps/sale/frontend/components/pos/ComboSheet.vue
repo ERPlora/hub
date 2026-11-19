@@ -6,13 +6,16 @@
 // once each one is complete it says «Add · <total>», the closed price plus the supplements (a preview: Menus prices
 // the line on the server). The dishes go up, each once with how many times; the server's refusal is read over the
 // button.
-import { IonButton } from '@ionic/vue';
+import { type AllergenCode, InlineFeedback } from '@erplora/ui/components';
+import { useCommand } from '@erplora/ui/sdk';
+import { IonButton, IonSpinner } from '@ionic/vue';
 import { computed, shallowRef, watch } from 'vue';
 
 import type { SaleComboOut } from '../../../../combo/frontend/operations';
 import { useLocale, useT } from '../../composables/useT';
 import { comboChoices, comboShort, comboTotal } from '../../lib/comboChoice';
 import { formatMoney, useBusinessMoney } from '../../lib/format';
+import { refusal } from '../../lib/refusal';
 import { choose, type Choice, initialChoice, unchoose } from '../../lib/modifierChoice';
 import type { ComboChoiceIn } from '../../operations';
 import ChoiceGroupSection, { type SectionGroup } from './ChoiceGroupSection.vue';
@@ -29,19 +32,48 @@ const business = useBusinessMoney();
 const groups = computed(() => props.combo?.groups ?? []);
 const choice = shallowRef<Choice>(initialChoice([]));
 const attention = shallowRef<string | null>(null);
+const productDetail = useCommand('inventory.product.get');
+const dishAllergens = shallowRef<Record<string, readonly AllergenCode[]>>({});
+const allergensStatus = shallowRef<'idle' | 'loading' | 'ready' | 'error'>('idle');
+let allergenRequest = 0;
+
+async function loadAllergens(): Promise<void> {
+  const combo = props.combo;
+  if (!open.value || !combo) return;
+  const request = ++allergenRequest;
+  allergensStatus.value = 'loading';
+  const ids = [...new Set(combo.groups.flatMap((group) => group.options.map((option) => option.product_id)))];
+  try {
+    const products = await Promise.all(ids.map((id) => productDetail.run({ id })));
+    if (request !== allergenRequest) return;
+    dishAllergens.value = Object.fromEntries(products.map((product) => [product.id, product.allergens]));
+    allergensStatus.value = 'ready';
+  } catch (error) {
+    if (request !== allergenRequest) return;
+    const code = refusal(error, '')?.code;
+    allergensStatus.value = code && ['app_inactive', 'permission_denied'].includes(code) ? 'ready' : 'error';
+  }
+}
 
 watch(
   () => [open.value, props.combo] as const,
   ([isOpen]) => {
+    allergenRequest += 1;
+    dishAllergens.value = {};
+    allergensStatus.value = 'idle';
     if (!isOpen) return;
     choice.value = initialChoice([]);
     attention.value = null;
+    void loadAllergens();
   },
   { immediate: true },
 );
 
 const sections = computed<SectionGroup[]>(() =>
-  groups.value.map((group) => ({ ...group, options: group.options.map((option) => ({ ...option, label: option.product_name })) })),
+  groups.value.map((group) => ({
+    ...group,
+    options: group.options.map((option) => ({ ...option, label: option.product_name, allergens: dishAllergens.value[option.product_id] ?? [] })),
+  })),
 );
 const short = computed(() => comboShort(groups.value, choice.value));
 const total = computed(() => (props.combo ? formatMoney(comboTotal(props.combo, choice.value), locale.value, business.value) : ''));
@@ -72,6 +104,30 @@ function add(): void {
     :title="combo?.name ?? ''"
     testid="pos-menu"
   >
+    <p
+      v-if="allergensStatus === 'loading'"
+      class="pos-sheet-hint"
+      role="status"
+      data-testid="pos-menu-allergens-loading"
+    >
+      <IonSpinner name="dots" /> {{ t('sale.pos.allergensLoading') }}
+    </p>
+    <InlineFeedback
+      v-else-if="allergensStatus === 'error'"
+      tone="danger"
+      data-testid="pos-menu-allergens-error"
+    >
+      {{ t('sale.pos.allergensLoadFailed') }}
+      <template #actions>
+        <IonButton
+          fill="outline"
+          data-testid="pos-menu-allergens-retry"
+          @click="loadAllergens"
+        >
+          {{ t('sale.live.retry') }}
+        </IonButton>
+      </template>
+    </InlineFeedback>
     <ChoiceGroupSection
       v-for="group in sections"
       :key="group.id"

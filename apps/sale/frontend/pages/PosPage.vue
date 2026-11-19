@@ -14,7 +14,7 @@
 // `/sale/pos?order=<id>` (Appointments' «Charge», APPOINTMENT-F17) puts that check on the till as
 // resuming it from «Open checks» does; one no longer open is said and the till carries on as it was.
 // Nothing about money is decided here.
-import { InlineFeedback } from '@erplora/ui/components';
+import { InlineFeedback, type AllergenCode } from '@erplora/ui/components';
 import { ApiError, type OutputOf, useCommand, useLive } from '@erplora/ui/sdk';
 import { AppPage, toast, toastError, toastSuccess, toastWarning, useSession } from '@erplora/ui/shell';
 import { IonButton, IonSpinner } from '@ionic/vue';
@@ -316,10 +316,10 @@ const addPricedService = (cents: number) => {
 };
 
 const noting = shallowRef<OrderLineOut | null>(null);
-const saveNote = (note: string) =>
+const saveNote = ({ note, allergy }: { note: string; allergy?: AllergenCode[] }) =>
   noting.value &&
   fromSheet(
-    () => till.setNote(noting.value as OrderLineOut, note),
+    () => till.setNote(noting.value as OrderLineOut, note, allergy),
     () => (noting.value = null),
   );
 
@@ -776,6 +776,8 @@ onBeforeUnmount(() => {
         :open="!!noting"
         :name="noting?.name ?? ''"
         :note="noting?.notes ?? ''"
+        :allergy-enabled="kitchenActive"
+        :allergy="noting?.allergy ?? []"
         :pending="sheetPending"
         :error="sheetError"
         @update:open="(open) => !open && (noting = null)"

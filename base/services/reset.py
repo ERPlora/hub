@@ -27,7 +27,7 @@ from base.permissions import ADMINISTER_HUB
 from base.registry import internal_only
 from base.schemas.reset import HubResetApplyIn, HubResetApplyOut, HubResetIn, HubResetOut
 from base.services.blueprints import _stop_waiting, _waiting_loads, _who
-from base.services.provisioning import LEASE_OWNER, ProvisioningStopped, _control_transaction, _leased
+from base.services.provisioning import LEASE_OWNER, ProvisioningStopped, _control_transaction, _leased, ring
 from control.models import HubDue
 
 
@@ -142,7 +142,7 @@ def reset_requested(hub_id: UUID, apps: list[str], *, language: str, requested_b
             "finished_at": None,
         }
         hub.save(update_fields=["reset_requested_at", "reset_sections", "updated_at"])
-        HubDue.mark_due(hub, now)
+        ring(hub, now, told=events.HUB_RESET_PROGRESSED)
 
 
 def reset_moved(hub_id: UUID, *, state: str, owner: str = LEASE_OWNER, **changes) -> Hub:

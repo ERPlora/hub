@@ -354,10 +354,10 @@ describe('useTill: the lines', () => {
     ]);
   });
 
-  it('a note goes to the line and the sheet learns it went', async () => {
+  it('a note and the customer allergy go to their existing operations', async () => {
     const s = await withCheck();
-    expect(await s.till().setNote(line({ id: 'l1' }), 'No ice')).toEqual({ ok: true });
-    expect(s.calls().at(-1)).toEqual(['/update_line', { order_id: 'o1', line_id: 'l1', notes: 'No ice' }]);
+    expect(await s.till().setNote(line({ id: 'l1' }), 'No ice', ['gluten', 'milk'])).toEqual({ ok: true });
+    expect(s.calls().slice(-2)).toEqual([['/update_line', { order_id: 'o1', line_id: 'l1', notes: 'No ice' }], ['/set_line_allergy', { order_id: 'o1', line_id: 'l1', allergy: ['gluten', 'milk'] }]]);
   });
 
   it('moves a line to another professional; a refusal says it stays with the one it had', async () => {

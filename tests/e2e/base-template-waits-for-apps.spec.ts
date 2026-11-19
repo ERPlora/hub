@@ -39,12 +39,12 @@ function heldBack(): void {
   );
 }
 
-/** Its time comes: the row is due and the worker is told, as `base.app.enable` tells it after its COMMIT. */
+/** Its time comes: the row is due and the worker is told, as `base.app.enable` tells it after its COMMIT: its notice. */
 function released(): void {
   psql(`update base_appactivation set next_attempt_at = null where host = 'a' and app = '${APP}'`);
   psql(
     `insert into control_hubdue (hub_id, due_at, lease_owner) values ('${hubId}', now(), '') ` +
-      'on conflict (hub_id) do update set due_at = least(control_hubdue.due_at, excluded.due_at)',
+      "on conflict (hub_id) do update set due_at = least(control_hubdue.due_at, excluded.due_at); select pg_notify('live_platform_registry', '*')",
   );
 }
 
