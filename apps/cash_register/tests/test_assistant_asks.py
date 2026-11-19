@@ -199,6 +199,23 @@ def test_the_hub_reads_una_entrada_una_salida_or_un_movimiento_as_a_movement_and
     assert named == []
 
 
+#: The tills of a place said as «las cajas de la tienda»: Inventory reads «cajas de» as boxes of goods, so without Cash
+#: register's own phrase the stock's tools came before the list of the tills (12th).
+TILLS_SAID = [("cash_register.register.list", "¿qué cajas de la tienda hay dadas de alta?", "cajas de la")]
+
+test_the_tills_of_a_place_bring_their_list_by_cash_registers_group = in_hubs(by_group_test(TILLS_SAID))
+
+
+def test_the_hub_reads_las_cajas_de_la_tienda_as_its_tills():
+    """Cash register's own words (its ``assistant_synonyms``): «las cajas de la» barra, terraza or tienda are the tills
+    (``cash_register.register``), and without the Hub's groups they are not (positive control)."""
+    register = shared.stem("register")
+    assert_its_words_name(
+        "cash_register",
+        [("¿qué cajas de la tienda hay dadas de alta?", register), ("cierra las cajas de la terraza", register)],
+    )
+
+
 #: What makes the model answer in the chat and wait, so the card of a write never comes (hub#1105, hub#1138): a
 #: description that tells it to ask first, or to tell the person something and only then run the write (the employee's
 #: close stopped at its summary: «tell the person its summary, then close»). Whatever it tells the person before a
