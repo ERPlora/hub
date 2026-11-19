@@ -9,7 +9,7 @@ import { ConfirmDialog } from '@erplora/ui/components';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { GroupOut, LinkOut, OptionOut } from '../operations';
-import type { Business } from '../../../../base/frontend/operations';
+import type { Business } from '../../../../base/frontend/operations/business';
 import { business, click, EMPLOYEE, errorFrame, flush, mountModifier, page, POLISH, settle } from '../__tests__/mount-modifier';
 import GroupSheet from './GroupSheet.vue';
 import LinkFormModal from './LinkFormModal.vue';

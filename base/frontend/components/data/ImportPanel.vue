@@ -11,7 +11,7 @@ import { computed, ref, watch } from 'vue';
 import { sessionChanged } from '../../lib/access';
 import { bytesToBase64, MAX_FILE_BYTES, somethingPending } from '../../lib/data';
 import { useBaseI18n } from '../../lib/i18n';
-import type { BlueprintSource, BlueprintSummary, ImportRow, Template } from '../../operations';
+import type { BlueprintSource, BlueprintSummary, ImportRow, Template } from '../../operations/blueprints';
 import BlueprintReview from './BlueprintReview.vue';
 import ImportReport from './ImportReport.vue';
 import TemplateCatalog from './TemplateCatalog.vue';

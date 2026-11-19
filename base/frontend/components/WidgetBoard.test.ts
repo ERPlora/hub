@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { WidgetDef } from '../operations';
+import type { WidgetDef } from '../operations/home';
 import { accessibleName, errorFrame, flush, memoryStorage, mountBase, subId } from '../__tests__/mount-base';
 import { widget as homeWidget } from '../__tests__/home-fixtures';
 import WidgetBoard from './WidgetBoard.vue';

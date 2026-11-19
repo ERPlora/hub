@@ -16,7 +16,7 @@
 import type { AssistantApproval, AssistantConfig, AssistantSpeech } from '@erplora/ui/components';
 import { parseErrorEnvelope, readCookie, readSpaConfig } from '@erplora/ui/sdk';
 
-import type { SetupStatus } from '../operations';
+import type { SetupStatus } from '../operations/home';
 import en from '../locale/en.json';
 import { type AskApproval, approvalPass, questionOf, withApproval } from './approval';
 import { type HubHome, readJsonBlock } from './home';

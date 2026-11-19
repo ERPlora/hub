@@ -6,7 +6,7 @@
 import { Combo, type ComboOption } from '@erplora/ui/components';
 import { describe, expect, it, vi } from 'vitest';
 
-import type { Business } from '../../../../base/frontend/operations';
+import type { Business } from '../../../../base/frontend/operations/business';
 import { business, click, ionChecked, ionValue, mountCombo, page, POLISH, settle } from '../__tests__/mount-combo';
 import type { GroupOut } from '../operations';
 import BulkAddModal from './BulkAddModal.vue';

@@ -12,7 +12,7 @@ import { business, click, errorFrame, flush, ionValue, JAPANESE, mountCash } fro
 import { itReadsAmountsAsTheHub, itReadsWhatWasLeftOnceTheMoneyArrives } from '../__tests__/money-field';
 import { expectWindowSaysMoneyUnreadable } from '../../../../base/frontend/__tests__/save-waits-for-money';
 import { plain } from '../lib/money';
-import type { Business } from '../../../../base/frontend/operations';
+import type { Business } from '../../../../base/frontend/operations/business';
 import CloseSessionForm from './CloseSessionForm.vue';
 
 vi.mock('@erplora/ui/shell', async (importOriginal) => ({

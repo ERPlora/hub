@@ -7,7 +7,7 @@ import { Combo } from '@erplora/ui/components';
 import { describe, expect, it, vi } from 'vitest';
 
 import { itTellsTheCorrectedFieldApart } from '../../../../base/frontend/__tests__/same-words-refusal';
-import type { Business } from '../../../../base/frontend/operations';
+import type { Business } from '../../../../base/frontend/operations/business';
 import type { GroupOut, OptionOut } from '../operations';
 import { expectSaveWaitsForMoney, expectWindowSaysMoneyUnreadable } from '../../../../base/frontend/__tests__/save-waits-for-money';
 import { business, click, ionChecked, ionValue, JAPANESE, KUWAITI, mountModifier, POLISH, settle } from '../__tests__/mount-modifier';

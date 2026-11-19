@@ -6,7 +6,7 @@
 import { StatusPill } from '@erplora/ui/components';
 import { describe, expect, it, vi } from 'vitest';
 
-import type { Business } from '../../../../base/frontend/operations';
+import type { Business } from '../../../../base/frontend/operations/business';
 import { business, click, flush, MANAGER, EMPLOYEE, mountService, OWNER, page, POLISH, settle } from '../__tests__/mount-service';
 import { grant } from '../__tests__/grant';
 import { PACKAGE } from '../__tests__/package';

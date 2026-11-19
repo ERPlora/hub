@@ -9,7 +9,7 @@ import { toastError, toastSuccess } from '@erplora/ui/shell';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { h, ref } from 'vue';
 
-import type { Business } from '../../../../../base/frontend/operations';
+import type { Business } from '../../../../../base/frontend/operations/business';
 import { business, click, errorFrame, JAPANESE, mountSale, settle } from '../../__tests__/mount-sale';
 import { PrintRefused } from '../../../../../base/frontend/lib/print-paper';
 import { printPaper } from '../../lib/print';

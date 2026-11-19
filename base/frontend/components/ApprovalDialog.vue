@@ -12,7 +12,7 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { createBadgeReader } from '../lib/access';
 import { APPROVED, type ApprovalQuestion } from '../lib/approval';
 import { useBaseI18n } from '../lib/i18n';
-import type { ApprovalInput } from '../operations';
+import type { ApprovalInput } from '../operations/approvals';
 import PinDoor from './PinDoor.vue';
 
 const props = defineProps<{ question: ApprovalQuestion }>();

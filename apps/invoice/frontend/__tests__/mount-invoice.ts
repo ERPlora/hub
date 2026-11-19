@@ -9,7 +9,8 @@ import type { OpName } from '@erplora/ui/sdk';
 import type { Component } from 'vue';
 
 import { memoryRouter, mountInShell, overBase } from '../../../../base/frontend/__tests__/mount-in-shell';
-import type { Business, SetupStatus } from '../../../../base/frontend/operations';
+import type { Business } from '../../../../base/frontend/operations/business';
+import type { SetupStatus } from '../../../../base/frontend/operations/home';
 import { ComposableHost } from './composable-host';
 import { withHubNotices } from './hub-notices-host';
 import en from '../locale/en.json';

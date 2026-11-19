@@ -8,7 +8,7 @@ import { AppPage } from '@erplora/ui/shell';
 import { describe, expect, it, vi } from 'vitest';
 import type { Component } from 'vue';
 
-import type { Business } from '../../../../base/frontend/operations';
+import type { Business } from '../../../../base/frontend/operations/business';
 import { business, POLISH, priceItem, priceList } from '../__tests__/fixtures';
 import { click, EMPLOYEE, errorFrame, flush, mountPricing, type MountOptions, page, settle } from '../__tests__/mount-pricing';
 import ListConfirm from '../components/ListConfirm.vue';

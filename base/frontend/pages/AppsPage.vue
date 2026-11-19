@@ -47,7 +47,7 @@ import {
 import { appActions, appSwitch } from '../lib/apps-table';
 import PlanUpgradeLink from '../components/PlanUpgradeLink.vue';
 import { useBaseI18n } from '../lib/i18n';
-import type { AppRow } from '../operations';
+import type { AppRow } from '../operations/apps';
 
 const { t, locale } = useBaseI18n();
 const { confirm } = useConfirm();

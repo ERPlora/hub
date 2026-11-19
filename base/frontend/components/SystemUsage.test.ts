@@ -5,7 +5,7 @@
 import { applySurface } from '@erplora/ui/shell';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import type { AssistantUsage, PlanMeter, PlanUsage } from '../operations';
+import type { AssistantUsage, PlanMeter, PlanUsage } from '../operations/usage';
 import { errorFrame, flush, followPass, mountBase, passRefused, placedUpgrade, SIGNED, subId } from '../__tests__/mount-base';
 import SystemUsage from './SystemUsage.vue';
 

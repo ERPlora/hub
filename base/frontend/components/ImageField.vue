@@ -13,7 +13,7 @@ import { ref, shallowRef } from 'vue';
 
 import { useBaseI18n } from '../lib/i18n';
 import { type ImageDraft, readPhoto } from '../lib/item-image';
-import type { CatalogImage } from '../operations';
+import type { CatalogImage } from '../operations/catalog_images';
 import ImageLibraryModal from './ImageLibraryModal.vue';
 import ItemImage from './ItemImage.vue';
 

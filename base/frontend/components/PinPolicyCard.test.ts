@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { EMPLOYEE, errorFrame, flush, mountBase, subId } from '../__tests__/mount-base';
-import type { AccessSettings } from '../operations';
+import type { AccessSettings } from '../operations/access';
 import PinPolicyCard from './PinPolicyCard.vue';
 
 const FACTORY: AccessSettings = { pin_policy: 'per_shift', pin_inactivity_minutes: 5, pin_length: 4, can_change: true };

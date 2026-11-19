@@ -1,7 +1,7 @@
 import { mount } from '@vue/test-utils';
 import { describe, expect, it } from 'vitest';
 
-import type { FileFolder } from '../operations';
+import type { FileFolder } from '../operations/files';
 import FileTree from './FileTree.vue';
 
 const TREE: FileFolder[] = [

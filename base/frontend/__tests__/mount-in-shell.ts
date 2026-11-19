@@ -26,7 +26,7 @@ import {
 import { OPERATION_ROUTES } from '../../../frontend/generated/operation-routes';
 import baseEn from '../locale/en.json';
 import baseEs from '../locale/es.json';
-import type { Business } from '../operations';
+import type { Business } from '../operations/business';
 
 export { BYE, errorFrame, flush, HELLO, resultFrame } from '../../../packages/ui/src/sdk/__tests__/live-harness';
 export type { LiveClient };

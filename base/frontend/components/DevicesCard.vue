@@ -9,7 +9,7 @@ import { computed, ref } from 'vue';
 
 import { leaveTo } from '../lib/access';
 import { useBaseI18n } from '../lib/i18n';
-import type { DeviceRow } from '../operations';
+import type { DeviceRow } from '../operations/devices';
 import '../settings.css';
 
 const { t, locale } = useBaseI18n();

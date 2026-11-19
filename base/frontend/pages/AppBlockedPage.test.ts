@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { defineComponent } from 'vue';
 
 import { EMPLOYEE, errorFrame, flush, mountBase, subId } from '../__tests__/mount-base';
-import type { AppList, AppRow } from '../operations';
+import type { AppList, AppRow } from '../operations/apps';
 import AppBlockedPage from './AppBlockedPage.vue';
 
 function app(id: string, fields: Partial<AppRow> = {}): AppRow {

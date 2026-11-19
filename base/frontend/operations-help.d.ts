@@ -1,5 +1,5 @@
 // Types of `base.help.get` for the SDK (`useLive`, `client.api.call`): the help window of a module. Written by hand, as
-// the rest of base's (`operations.d.ts`); keep it in step with base/schemas/app_help.py and
+// the rest of base's (`operations/`); keep it in step with base/schemas/app_help.py and
 // `frontend/generated/operations.json`. Every text is markdown for the assistant's markdown tree.
 
 /** `base.HelpScreenOut`: one tab of the module (its menu entry); `text`, the summary of its WORKBOOK section. */

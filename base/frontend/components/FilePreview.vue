@@ -27,7 +27,7 @@ import {
 import { useBaseI18n } from '../lib/i18n';
 import { type DocumentNode, readDocument, readSheets } from '../lib/office';
 import { renderPdf } from '../lib/pdf';
-import type { FileItem } from '../operations';
+import type { FileItem } from '../operations/files';
 import FileDocument from './FileDocument.vue';
 import FileJsonTree from './FileJsonTree.vue';
 import FileSheets from './FileSheets.vue';

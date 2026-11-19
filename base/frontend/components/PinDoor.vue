@@ -4,7 +4,7 @@
 import { UserAvatar } from '@erplora/ui/components';
 import { computed, ref, watch } from 'vue';
 
-import type { PinPerson } from '../operations';
+import type { PinPerson } from '../operations/access';
 import { useBaseI18n } from '../lib/i18n';
 import PinPad from './PinPad.vue';
 

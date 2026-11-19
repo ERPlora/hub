@@ -3,7 +3,7 @@
 // the panels this browser keeps on, and «My apps» in the order this browser opens them.
 import { formatDateTime, formatMoney, type Money } from '@erplora/ui/components';
 
-import type { SetupItem, SetupStatus, WidgetDef } from '../operations';
+import type { SetupItem, SetupStatus, WidgetDef } from '../operations/home';
 
 // ── Heading ─────────────────────────────────────────────────────────────────────────────────────────────────
 

@@ -13,7 +13,7 @@ import { useLive } from '@erplora/ui/sdk';
 import { computed, ref } from 'vue';
 
 import { useBaseI18n } from '../lib/i18n';
-import type { ApprovalExportQuery, ApprovalRow } from '../operations';
+import type { ApprovalExportQuery, ApprovalRow } from '../operations/approvals';
 import ApprovalsExportButton from './ApprovalsExportButton.vue';
 
 const { t, locale } = useBaseI18n();

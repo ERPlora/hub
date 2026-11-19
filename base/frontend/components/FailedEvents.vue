@@ -11,7 +11,7 @@ import { computed, ref } from 'vue';
 import { useBaseI18n } from '../lib/i18n';
 import { failureKey } from '../lib/system';
 import { useUnsavedFormOnOpen } from '../lib/unsaved-changes';
-import type { FailedEvent } from '../operations';
+import type { FailedEvent } from '../operations/failed_events';
 
 /** The most the list shows; «Resend all» reaches the ones beyond it too. */
 const SHOWN = 100;

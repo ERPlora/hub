@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { EMPLOYEE, errorFrame, flush, installedApp, leaveInstalledApp, mountBase, subId, tap } from '../__tests__/mount-base';
-import type { HubRoleRow } from '../operations';
+import type { HubRoleRow } from '../operations/people';
 import RolesList from './RolesList.vue';
 
 const MEMBERS_URL = 'http://localhost:8001/businesses/0199a1b2-0000-7000-8000-000000000001/members';

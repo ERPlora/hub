@@ -6,7 +6,7 @@ import type { SessionMe } from '@erplora/ui/shell';
 import type { Component } from 'vue';
 
 import { mountInShell, type MountOptions } from '../../../../base/frontend/__tests__/mount-in-shell';
-import type { Business } from '../../../../base/frontend/operations';
+import type { Business } from '../../../../base/frontend/operations/business';
 import en from '../locale/en.json';
 import es from '../locale/es.json';
 

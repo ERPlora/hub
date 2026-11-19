@@ -12,7 +12,7 @@ import { type HubHome, readJsonBlock } from '../lib/home';
 import { useBaseI18n } from '../lib/i18n';
 import { managementOffered } from '../lib/management';
 import { roleKey } from '../lib/people';
-import type { HubRoleRow } from '../operations';
+import type { HubRoleRow } from '../operations/people';
 
 const { t, locale } = useBaseI18n();
 const session = useSession();

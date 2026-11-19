@@ -12,7 +12,7 @@ import { ref } from 'vue';
 import { downloadFrom } from '../../lib/data';
 import { formatSize } from '../../lib/files';
 import { useBaseI18n } from '../../lib/i18n';
-import type { HubDump, HubDumps } from '../../operations';
+import type { HubDump, HubDumps } from '../../operations/dumps';
 import '../../data.css';
 
 defineProps<{ dumps?: HubDumps; failed?: boolean }>();

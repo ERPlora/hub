@@ -3,7 +3,7 @@ import { toastError, toastSuccess } from '@erplora/ui/shell';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { EMPLOYEE, errorFrame, flush, mountBase, OWNER, subId } from '../__tests__/mount-base';
-import type { FileItem, FilesListing } from '../operations';
+import type { FileItem, FilesListing } from '../operations/files';
 import FilesPage from './FilesPage.vue';
 
 const mocks = vi.hoisted(() => ({ confirm: vi.fn(), saveFile: vi.fn(async () => true), syncSearchbarInputName: vi.fn() }));

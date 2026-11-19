@@ -1,5 +1,5 @@
 // Rows of the pricing app as the server sends them, for the page and component tests.
-import type { Business } from '../../../../base/frontend/operations';
+import type { Business } from '../../../../base/frontend/operations/business';
 import type { PriceItemOut, PriceListOut, RuleOut } from '../operations';
 
 /** The hub's business (`base.business.get`, the platform's): one in Spain, in euros, unless a test says another
