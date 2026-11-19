@@ -4,7 +4,8 @@ from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext
 from live.operations import AI, operation
 
-from apps.sale.schemas import BusinessDayOut, EmptyIn
+from apps.sale.schemas.fields import EmptyIn
+from apps.sale.schemas.figures import BusinessDayOut
 from apps.tax.queries import business_jurisdiction, business_tax_kind, business_today
 from apps.tax.schemas import TAX_KIND_NAMES
 from base.approvals import approval_of, digest

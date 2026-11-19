@@ -13,7 +13,7 @@ from live.operations import AI, operation
 from apps.sale.models import FACTORY_METHOD_NAMES, PaymentMethod, Settings
 from apps.sale.queries.rows import held
 from apps.sale.queries.settings import current_settings
-from apps.sale.schemas import PaymentMethodListIn, PaymentMethodPage
+from apps.sale.schemas.settings import PaymentMethodListIn, PaymentMethodPage
 
 METHOD_NOT_AVAILABLE = _("That payment method is not available in this business.")
 METHOD_AMBIGUOUS = _(

@@ -14,7 +14,7 @@ import { computed, ref, watch } from 'vue';
 import type { SortDir } from '../operations';
 import { type ListWindow, MAX_WINDOW, useLiveWindows } from './useLiveWindows';
 
-/** The largest page the server serves (`schemas.PageIn.limit`). */
+/** The largest page the server serves (`schemas.fields.PageIn.limit`). */
 export const MAX_LIMIT = MAX_WINDOW;
 
 export type { ListWindow };

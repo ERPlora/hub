@@ -11,7 +11,7 @@ from apps.sale import pricing
 from apps.sale.models import OrderLine
 from apps.sale.queries.line_parts import provisional_total
 from apps.sale.queries.other_apps import call_services
-from apps.sale.schemas import OrderApplyVoucherIn, OrderLineRefIn, OrderOut
+from apps.sale.schemas.orders import OrderApplyVoucherIn, OrderLineRefIn, OrderOut
 from apps.sale.services.discounts import DISCOUNT_OUT_OF_RANGE
 from apps.sale.services.orders import _open_order, _out, _pending_line, _touch
 

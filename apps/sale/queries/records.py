@@ -14,7 +14,7 @@ from apps.sale.queries.departments import find_department, find_quick_note
 from apps.sale.queries.orders import find_order
 from apps.sale.queries.other_apps import call_app
 from apps.sale.queries.payment_methods import find_method, method_display_name
-from apps.sale.schemas import RecordRefIn
+from apps.sale.schemas.records import RecordRefIn
 from base.schemas.assistant import RecordNameOut
 
 LINE_NOT_FOUND = _("That line does not exist.")
@@ -95,7 +95,7 @@ RECORD_NAMES = {
     ai=INTERNAL,
 )
 def get_record(ctx: OperationContext, data: RecordRefIn) -> dict:
-    """The name of one record a write of Sales names, by its id, for the assistant's card (``schemas.A_*``): the screen
-    says it by that name, and the model never needs this read, it names them from its own reads."""
+    """The name of one record a write of Sales names, by its id, for the assistant's card (``schemas.fields.A_*``): the
+    screen says it by that name, and the model never needs this read, it names them from its own reads."""
     field = next(name for name in RECORD_NAMES if getattr(data, name) is not None)
     return {"name": RECORD_NAMES[field](ctx, getattr(data, field))}

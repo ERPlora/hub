@@ -1,0 +1,35 @@
+"""The record a write of Sales names by its id, for the assistant's card (``sale.record.get``)."""
+
+from uuid import UUID
+
+from ninja import Field
+from pydantic import model_validator
+
+from apps.sale.schemas.fields import ONE_RECORD, Closed
+from base.schemas.assistant import exactly_one
+
+
+class RecordRefIn(Closed):
+    """One record of Sales, or of an app it asks, that the assistant's card names by its id: exactly one
+    (``sale.record.get``)."""
+
+    department_id: UUID | None = Field(None, description="A section of the open price.")
+    quick_note_id: UUID | None = Field(None, description="A quick note.")
+    method_id: UUID | None = Field(None, description="A payment method.")
+    order_id: UUID | None = Field(None, description="An open check.")
+    line_id: UUID | None = Field(None, description="A line of an open check.")
+    sale_line_id: UUID | None = Field(None, description="A line of a sale.")
+    payment_id: UUID | None = Field(None, description="A tender of a sale.")
+    refund_id: UUID | None = Field(None, description="A refund of a sale.")
+    product_id: UUID | None = Field(None, description="A product of Inventory.")
+    service_id: UUID | None = Field(None, description="A service of Services.")
+    combo_id: UUID | None = Field(None, description="A menu of Menus.")
+    dish_id: UUID | None = Field(None, description="A choice of a menu of Menus.")
+    modifier_id: UUID | None = Field(None, description="An option of Modifiers.")
+    staff_id: UUID | None = Field(None, description="A member of Staff.")
+    appointment_id: UUID | None = Field(None, description="An appointment of Appointments.")
+    grant_id: UUID | None = Field(None, description="A voucher sold, of Services.")
+
+    @model_validator(mode="after")
+    def _one(self):
+        return exactly_one(self, ONE_RECORD)
