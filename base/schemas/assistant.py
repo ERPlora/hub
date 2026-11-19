@@ -68,8 +68,8 @@ class RecordNameOut(Schema):
 class AssistantCallIn(Schema):
     """A tool the model asked for, as the gateway gave it: its id, its name (``demo__item__create``) and its
     arguments as the model wrote them (JSON text); ``shown``, set by the Hub on the one whose card waits, the
-    fingerprint of what that card showed, which the panel gives back with the calls that wait (hub#1208: the yes is
-    for that card)."""
+    fingerprint of what that card showed, which the panel gives back with the calls that wait, so that the yes is
+    for that card alone."""
 
     call_id: str = Field(min_length=1, max_length=200)
     name: str = Field(min_length=1, max_length=200)
@@ -166,8 +166,8 @@ class AssistantCardOut(Schema):
     money: AssistantMoneyOut | None = Field(default=None, description="The business's currency, for its amounts.")
     preview: list[AssistantFieldOut] | None = Field(
         default=None,
-        description="What a dangerous write will do, as the read its app declares answers it for this person (BASE-F98); "
-        "none when its app declares no preview.",
+        description="What a dangerous write will do, as the read its app declares answers it for this person; none "
+        "when its app declares no preview.",
     )
 
 

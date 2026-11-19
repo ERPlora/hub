@@ -8,8 +8,8 @@ from pydantic import Field
 
 
 class SupportReportIn(Schema):
-    """What the person writes to erplora.com's support (BASE-F108), with the limits of erplora.com's own page
-    (ACCOUNTS-F38); the account, the business and the browser go with it on their own."""
+    """What the person writes to erplora.com's support from «Report a problem», with the limits of erplora.com's own
+    form for it; the account, the business and the browser go with it on their own."""
 
     subject: str = Field(max_length=150, title=gettext_noop("Report subject"))
     description: str = Field(max_length=5000, title=gettext_noop("What happened?"))

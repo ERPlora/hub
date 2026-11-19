@@ -829,7 +829,7 @@ class LastRunOut(Schema):
 
 class FixedByAppOut(Schema):
     """What its app fixes today on an automation built from one of its recipes, which is not taken off from the
-    automation (FLOW-F36): the data its «Only when…» has a condition on while it starts on ``event``, and, by step id
+    automation: the data its «Only when…» has a condition on while it starts on ``event``, and, by step id
     and tool, the fixed data of its «Ask the assistant» steps. Another value of the owner's goes; leaving one out is
     refused (``flow.recipe_fixed``)."""
 
@@ -977,7 +977,7 @@ class PinnedOut(Schema):
     field: str = Field(description="The datum of that tool it fixes.")
     said: AssistantFieldOut | None = Field(
         None,
-        description="What it would be in this trial, as the card of the change says it (FLOW-F29), read as whoever "
+        description="What it would be in this trial, as the card of the change says it, read as whoever "
         "tries it: a record by its name, never by its id. Null when empty, unknown, or a record they may not read "
         "(the card leaves it out).",
     )
@@ -1088,12 +1088,12 @@ class QuestionOut(Schema):
     created_at: dt.datetime
     action: str = Field(
         "",
-        description="What the change the assistant wants (FLOW-F38) does, as the History names it, in the language of "
-        "whoever asks («Cancel a reservation»); '' for a question an «Ask someone first» step asks.",
+        description="What the change the assistant wants in this step does, as the History names it, in the language "
+        "of whoever asks («Cancel a reservation»); '' for a question an «Ask someone first» step asks.",
     )
     fields: list[AssistantFieldOut] = Field(
         default_factory=list,
-        description="The data of the change the assistant wants (FLOW-F38), as its confirmation card in the chat says "
+        description="The data of the assistant's change in this step, as its confirmation card in the chat says "
         "them, read for whoever asks: a moment in their language at the business's hour, a record by its name only "
         "if they may read it, an amount in cents as `money`; none for a question an «Ask someone first» step asks.",
     )
