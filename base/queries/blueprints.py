@@ -87,7 +87,7 @@ def blueprint_list(ctx: OperationContext, data: BlueprintListIn) -> dict:
         ),
         risk="high",
         # Only for live.E020 (it checks the whole app): base.assistant.tools.NOT_FROM_CHAT keeps this out of the chat
-        # (pinned by base/tests/test_assistant.py).
+        # (pinned by base/tests/test_assistant_tools.py).
         asks={
             "en": ("make a backup of the whole business", "export my menu as a template for the other bar"),
             "es": ("haz una copia de seguridad del negocio", "exporta mi carta como plantilla para el otro local"),
