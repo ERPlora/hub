@@ -39,10 +39,12 @@ class SaleConfig(LiveAppConfig):
     # What these words mean to the Hub's assistant (base.assistant.relevance.synonyms). A «cuenta», a check or a tab is a table's
     # open check (sale.order), never the person's account (what it is in erplora.com's panel); a ticket or a receipt is
     # a sale's, as the till's screens say («Tiques hoy», «Tique medio», the «Tique» it prints), never the kitchen's,
-    # which is its «comanda».
+    # which is its «comanda». A text set up «para marcarlo rápido» is a quick note (sale.quick_note), only after «para»:
+    # «quiero marcarla rápido como pagada» marks an invoice, and «un aviso rápido» is also a message to a customer.
     assistant_synonyms = (
         ("cuenta", "check", "tab", "order"),
         ("ticket", "tique", "recibo", "receipt", "sale"),
+        ("quick", "para marcarlo rápido", "para marcarla rápido"),
     )
     permissions = [
         "sale.view_sale",
