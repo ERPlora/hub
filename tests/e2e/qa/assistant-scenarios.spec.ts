@@ -36,6 +36,8 @@ import { A, ARTIFACTS, capture, HUB_DIR, hostPage, psql, REPO_DIR } from '../hel
 const REAL = process.env.QA_REAL_PROVIDER === '1';
 const GOLDEN = process.env.QA_SCENARIOS_GOLDEN === '1';
 test.skip(!REAL && !GOLDEN, 'scenarios: QA_REAL_PROVIDER=1 with the model, or QA_SCENARIOS_GOLDEN=1 for their golden paths (tests/e2e/README.md)');
+// A card whose button never becomes usable ends the conversation with why, instead of holding the test to its timeout.
+test.use({ actionTimeout: 60_000 });
 
 const RUN = (process.env.QA_SCENARIOS_RUN || process.env.PW_RUN_ID || 'run').replace(/[^A-Za-z0-9._-]/g, '-');
 const QA_DIR = join(ARTIFACTS, 'qa', RUN);

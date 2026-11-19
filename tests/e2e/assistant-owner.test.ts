@@ -103,6 +103,18 @@ describe('askOwner', () => {
     expect((seen[0].init.headers as Record<string, string>).Authorization).toBe('Bearer secret');
   });
 
+  it('gives up on an owner model that does not answer, so a conversation never waits for ever', async () => {
+    let signal: AbortSignal | undefined;
+    const fetcher = (_url: string, init: RequestInit) =>
+      new Promise<Response>((_resolve, reject) => {
+        signal = init.signal ?? undefined;
+        signal?.addEventListener('abort', () => reject(signal?.reason as Error));
+      });
+    const asked = askOwner({ fetcher, choice: ownerChoice({ QA_OPENROUTER_API_KEY: 'k' }), key: 'secret', timeoutMs: 20 }, scenario, transcript);
+    await expect(asked).rejects.toThrow(/timed out|aborted/i);
+    expect(signal?.aborted).toBe(true);
+  });
+
   it('fails with the status and what the API said, never with the key', async () => {
     const fetcher = async () => new Response('{"error":{"message":"model not found"}}', { status: 404 });
     await expect(askOwner({ fetcher, choice: ownerChoice({ QA_OPENROUTER_API_KEY: 'k' }), key: 'secret' }, scenario, transcript)).rejects.toThrow(/404.*model not found/);

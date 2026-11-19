@@ -40,6 +40,8 @@ export interface OwnerDeps {
   fetcher: (url: string, init: RequestInit) => Promise<Response>;
   choice: OwnerChoice;
   key: string;
+  /** How long the owner's model may take to answer (2 minutes by default). */
+  timeoutMs?: number;
 }
 
 type Env = Record<string, string | undefined>;
@@ -131,6 +133,7 @@ export async function askOwner(deps: OwnerDeps, scenario: Scenario, transcript: 
     method: 'POST',
     headers: { Authorization: `Bearer ${deps.key}`, 'Content-Type': 'application/json' },
     body: JSON.stringify(request.body),
+    signal: AbortSignal.timeout(deps.timeoutMs ?? 120_000),
   });
   const body = await response.text();
   if (!response.ok) throw new Error(`the owner's model answered ${response.status}: ${body.slice(0, 300)}`);
