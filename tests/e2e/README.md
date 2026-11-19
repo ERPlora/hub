@@ -526,6 +526,29 @@ mismas sondas, así que todos los modelos contestan las mismas frases: se compar
 corpus. Una sonda `decide: confirm` escribe en `a`; para comparar en igualdad, cada modelo en una pila con su BD recién
 creada.
 
+**La preparación de una muestra** (`qa/setup.json`, `assistant-setup.ts`). Muchas sondas nombran registros de `a`
+(«Comedor QA», «Fichaje QA», el carrito «QA-WEB-1») que en una pila recién creada solo harían antes otras sondas
+confirmadas o una ejecución anterior; sin ellos, una muestra falla casi siempre con «no lo encuentro», sea cual sea el
+modelo. Por eso una ejecución con `QA_PROBES_SAMPLE`, una sola vez y antes de la primera sonda (tras encender las apps),
+hace esos registros con las herramientas del propio Hub y datos fijos, como la dueña de `a` y sin ningún modelo: cada
+paso es una llamada confirmada de una herramienta (`live.assistant.run_tool`), con su validación y sus permisos. Las
+fechas se escriben como `{today}`, `{today+N}` o `{year}` y salen del día de la ejecución en Madrid. Un nombre cuenta
+como hecho solo si su paso salió bien y su resultado lo nombra; lo que falló queda en `setup-run.json` de la ejecución y
+en los datos de `bench.json`. Después, una regla igual para todos los modelos deja fuera de la nota (N/A, con el motivo)
+las sondas que no pueden aprobar en esa pila:
+
+- las de los ficheros de preparación del corpus (`*-preparation-*.json`): la preparación hace lo mismo que ellas;
+- las que nombran un registro que la preparación no hizo: un nombre que acaba en «QA» (fuera de «…», que es un valor
+  nuevo), un código `QA-…`, un número con fecha (`OS-20261109-0001`, `20261109-0001`) o `product.qa`; así salen, por
+  ejemplo, las de conversaciones de WhatsApp (solo llegan de fuera), las de un dispositivo de impresión (se da de alta
+  desde el propio dispositivo) y las que citan un número de un día ya pasado;
+- y las que crean (`create`, `bulk_create`, `place`, `register`, `open`, `add`, `issue`) algo que la preparación ya hizo
+  con el mismo tipo de registro, porque saldrían duplicadas. Una sonda que crea un registro nuevo sí cuenta: lo que
+  nombra puede ser el registro que crea.
+
+Una sonda que no nombra nada así cuenta siempre, aunque pida datos que la pila no tiene («la factura de prueba»): esos
+fallos se ven en los motivos y son iguales para todos los modelos. Sin muestra no hay preparación y no cambia nada.
+
 **El registro** (`bench.json`, `assistant-bench.ts`): los datos de la ejecución (modelo, tipo de API, dirección, precios,
 reserva, fecha, ficheros, tamaño del corpus y muestra con su semilla) y una fila por sonda: id, frase, rol, idioma,
 superficie (`hub`), expectativa, si la herramienta lee o escribe, la herramienta y sus `lookups`, las herramientas que

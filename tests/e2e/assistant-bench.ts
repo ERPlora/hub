@@ -76,6 +76,8 @@ export interface BenchMeta {
   /** The probes of the files, before any sample. */
   corpus: number;
   sample: { size: number; seed: number } | null;
+  /** The setup a sampled run made before its first probe (assistant-setup.ts), and the steps of it that failed. */
+  setup?: { file: string; failed: { step: number; tool: string; why: string }[] } | null;
 }
 
 export interface BenchReport {

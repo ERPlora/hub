@@ -8,7 +8,9 @@
 // QA_OPENAI_API_KEY; never in the repo, the report or a screenshot) and the stack's SaaS (E2E_SAAS_DIR) running with
 // ASSISTANT_SERVICE_PROVIDER=openai (README «Las sondas del asistente»). A probe that does not fit the catalogue (empty
 // phrase, a copy of an ask, a tool the role holds or lacks) is n.a.: no turn is asked. The QA_ANSWER_* variables
-// choose the model that answers (assistant-seed.ts) and QA_PROBES_SAMPLE a sample of the files (assistant-sample.ts).
+// choose the model that answers (assistant-seed.ts) and QA_PROBES_SAMPLE a sample of the files (assistant-sample.ts);
+// a sampled run first makes the records its probes name (qa/setup.json, assistant-setup.ts) and leaves out of the score
+// the probes whose record the setup cannot make.
 // Writes `.artifacts/qa/<run>/assistant-probes.md` (the report), its JSON, `.artifacts/qa/<run>/<probe>.png` and
 // `.artifacts/qa/<run>/bench.json`, the record of each turn that compares models (assistant-bench.ts).
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
@@ -63,6 +65,17 @@ import {
   TURN_MS,
 } from '../assistant-real';
 import { sampleChoice, sampleProbes } from '../assistant-sample';
+import {
+  isPreparation,
+  madridToday,
+  missingFor,
+  parseSetup,
+  parseSetupRun,
+  setupCommand,
+  type SetupRun,
+  settled,
+  withDates,
+} from '../assistant-setup';
 import { answerChoice } from '../assistant-seed';
 import { A, api, ARTIFACTS, capture, type Credentials, EMPLOYEE, HUB_DIR, hostPage, OWNER } from '../helpers';
 import { STACK } from '../stack';
@@ -77,6 +90,7 @@ const STATE = join(QA_DIR, 'assistant-probes.json');
 const REPORT = join(QA_DIR, 'assistant-probes.md');
 const BENCH = join(QA_DIR, 'bench.json');
 const CORPUS = join(HUB_DIR, 'tests', 'e2e', 'qa', 'probes');
+const SETUP = join(HUB_DIR, 'tests', 'e2e', 'qa', 'setup.json');
 
 /** The probe files of the run: `QA_PROBES` (files or folders, comma-separated), else every file of the corpus. */
 function probeFiles(): string[] {
@@ -95,6 +109,10 @@ const FILES = probeFiles();
 const CORPUS_PROBES: Probe[] = loadedProbes(FILES.map((path) => ({ source: relative(HUB_DIR, path), text: readFileSync(path, 'utf8') })));
 const SAMPLE = sampleChoice(process.env);
 const PROBES: Probe[] = SAMPLE ? sampleProbes(CORPUS_PROBES, SAMPLE) : CORPUS_PROBES;
+/** The probes of the corpus's preparation files: with a setup, it makes what they made, so they are not scored. */
+const PREPARATION = new Set(
+  loadedProbes(FILES.filter(isPreparation).map((path) => ({ source: relative(HUB_DIR, path), text: readFileSync(path, 'utf8') }))).map((probe) => probe.id),
+);
 
 /** Who signs in for each role: the SaaS's demo accounts, and the two members the run seeds. */
 const PEOPLE: Record<Role, Credentials> = { owner: OWNER, employee: EMPLOYEE, ...MEMBERS };
@@ -103,6 +121,8 @@ interface State {
   run: string;
   meta: ProbeMeta;
   prepared: boolean;
+  /** What the setup of a sampled run made, once, before its first probe. */
+  setup?: SetupRun;
   outcomes: Record<string, ProbeOutcome>;
 }
 
@@ -182,11 +202,30 @@ function unfinished(probe: Probe, bodies: string[], latencyMs: number, error: Er
   bench(outcome, { bodies, latencyMs, usage, error: why });
 }
 
+/** The setup of a sampled run (qa/setup.json), dated today, run in `a` as its owner by the Hub's tools; what it made. */
+function setUp(): SetupRun {
+  const steps = withDates(parseSetup(readFileSync(SETUP, 'utf8'), relative(HUB_DIR, SETUP)), madridToday(new Date()));
+  const file = join(QA_DIR, 'setup-steps.json');
+  writeFileSync(file, JSON.stringify(steps));
+  const command = setupCommand(file, process.env);
+  const made = settled(steps, parseSetupRun(run(command.file, command.args, HUB_DIR, command.env)));
+  writeFileSync(join(QA_DIR, 'setup-run.json'), JSON.stringify(made, null, 2));
+  return made;
+}
+
+/** Why the setup leaves `probe` out of the score (empty: it counts); nothing without a setup. */
+function unscored(probe: Probe): string[] {
+  if (!state.setup) return [];
+  if (PREPARATION.has(probe.id)) return ['a probe of the corpus’s preparation: the setup makes what it made'];
+  return missingFor(probe, state.setup);
+}
+
 /** The probe's turn into the run's bench report. */
 function bench(outcome: ProbeOutcome, measured: Omit<Measured, 'kind' | 'offered'>): void {
   const kept = existsSync(BENCH) ? (JSON.parse(readFileSync(BENCH, 'utf8')) as BenchReport) : null;
   const turn = benchTurn(outcome, { ...measured, kind: toolKind(outcome.probe, catalogs), offered: offered[outcome.probe.id] ?? null });
-  const report = withTurn(kept, benchMeta, turn, PROBES.map((probe) => probe.id));
+  const setup = state.setup ? { file: relative(HUB_DIR, SETUP), failed: state.setup.failed } : null;
+  const report = withTurn(kept, { ...benchMeta, setup }, turn, PROBES.map((probe) => probe.id));
   writeFileSync(BENCH, redact(JSON.stringify(report, null, 2), SECRETS));
 }
 
@@ -227,6 +266,7 @@ test.beforeAll(async ({ browser }) => {
   } finally {
     await context.close();
   }
+  if (SAMPLE) state.setup = setUp();
   state.prepared = true;
   writeState(state);
 });
@@ -235,7 +275,7 @@ for (const probe of PROBES) {
   test(`${probe.id} — ${probe.expect} ${probe.tool} as ${probe.role} (${probe.language}) — ${probe.phrase}`, async ({ browser }) => {
     test.setTimeout(TURN_MS + 180_000);
     const screenshot = join(QA_DIR, `${probe.id}.png`);
-    const problems = problemsOf(probe, catalogs);
+    const problems = [...problemsOf(probe, catalogs), ...unscored(probe)];
     if (problems.length) {
       const outcome: ProbeOutcome = { probe, answer: '', observed: observe([]), decided: 'none', notices: [], screenshot: '', problems };
       save(outcome);
