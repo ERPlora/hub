@@ -395,17 +395,23 @@ def test_a_document_that_does_not_read_back_as_written_marks_nothing(
     assert bool(manifests) == (altered_file == "/manifest.json")
 
 
+def renewals(monkeypatch) -> list:
+    """Each renewal of the worker's lease from now on, by the business it renews."""
+    from base import services
+
+    renewed, renew = [], services.reset.renew_lease
+    monkeypatch.setattr(services.reset, "renew_lease", lambda hub_id, lease: renewed.append(hub_id) or renew(hub_id, lease))
+    return renewed
+
+
 def test_the_lease_is_renewed_after_each_file_of_the_archive(
     business, dumps_bucket, fiscal_archive_bucket, moto_s3, monkeypatch
 ):
-    from base import services
-
     hub = business(left_days_ago=91)
     with use_hub(hub):
         one_sale()
         invoice(1)
-    renewed, renew = [], services.reset.renew_lease
-    monkeypatch.setattr(services.reset, "renew_lease", lambda hub_id, lease: renewed.append(hub_id) or renew(hub_id, lease))
+    renewed = renewals(monkeypatch)
     s3, read = client(moto_s3), []
     s3.meta.events.register("provide-client-params.s3.HeadObject", lambda params, **kwargs: read.append(len(renewed)))
     monkeypatch.setattr(fiscal_archive, "client", lambda: s3)
@@ -426,12 +432,9 @@ def test_the_lease_is_renewed_after_each_page_of_the_pdfs_already_up(
     hub = business(left_days_ago=91)
     with use_hub(hub):
         invoice(1)
-    from base import services
-
     monkeypatch.setattr("apps.invoice.pdf.render_pdf", lambda html: b"%PDF-")
     monkeypatch.setattr(fiscal_archive, "LISTED_AT_ONCE", 1)
-    renewed, renew = [], services.reset.renew_lease
-    monkeypatch.setattr(services.reset, "renew_lease", lambda hub_id, lease: renewed.append(hub_id) or renew(hub_id, lease))
+    renewed = renewals(monkeypatch)
 
     run_pass()
 
@@ -469,13 +472,10 @@ def test_a_stopped_archive_takes_up_the_pdfs_already_up_and_prints_none_twice(
     with use_hub(hub):
         invoice(1)
         invoice(2)
-    from base import services
-
     printed = printing(monkeypatch)
     puts = stopped_after_its_first_pdf(hub, moto_s3, monkeypatch)
     first = puts[-1]
-    renewed, renew = [], services.reset.renew_lease
-    monkeypatch.setattr(services.reset, "renew_lease", lambda hub_id, lease: renewed.append(hub_id) or renew(hub_id, lease))
+    renewed = renewals(monkeypatch)
 
     run_pass()
 
