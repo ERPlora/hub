@@ -216,11 +216,13 @@ APP_IN_THE_MENU = [
     ("es", "base.app.enable", "no encuentro Inventario en el menú, vuelve a ponerlo"),
     ("es", "base.app.enable", "vuelve a poner Tareas en el menú"),
     ("es", "base.app.enable", "quiero que vuelva a salir Citas en el menú"),
+    ("es", "base.app.enable", "vuelve a poner Caja en el menú"),
     ("en", "base.app.disable", "take Reservations out of the menu, we don't use it"),
     ("en", "base.app.disable", "remove Tasks from the menu"),
     ("en", "base.app.disable", "hide Customers from the menu"),
     ("en", "base.app.enable", "put Tasks back on the menu"),
     ("en", "base.app.enable", "I can't find Inventory in the menu, put it back"),
+    ("en", "base.app.enable", "add Kitchen to the menu"),
 ]
 
 #: The owner's probe of layer 2 that asks for an app back «disponible en el menú»: it came 23rd.
