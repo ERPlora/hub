@@ -59,16 +59,16 @@ def test_a_booking_is_named_by_id_number_or_customer():
     assert "Say which booking" in str(error.value)
 
 
-def test_the_page_settings_check_the_colour_and_the_logo_address():
+def test_the_page_settings_check_the_colour_and_name_the_logo_an_upload_answered():
     assert SettingsIn(primary_color="#A1b2C3").primary_color == "#A1b2C3"
-    assert SettingsIn(logo_url="").logo_url == ""
-    assert (
-        SettingsIn(logo_url="https://salon.example/logo.png").logo_url
-        == "https://salon.example/logo.png"
-    )
+    assert SettingsIn(logo="").logo == ""
+    assert SettingsIn(logo="0123456789abcdef.webp").logo == "0123456789abcdef.webp"
     with pytest.raises(ValidationError) as error:
-        SettingsIn(primary_color="red", logo_url="javascript:alert(1)")
-    assert fields_of(error.value) == {"primary_color", "logo_url"}
+        SettingsIn(primary_color="red", logo="https://salon.example/logo.png")
+    assert fields_of(error.value) == {"primary_color", "logo"}
+    with pytest.raises(ValidationError) as error:
+        SettingsIn(logo_url="https://salon.example/logo.png")
+    assert fields_of(error.value) == {"logo_url"}
 
 
 def test_the_limit_per_customer_is_one_to_fifty():

@@ -20,6 +20,7 @@ from . import (
     hub_registry as hub_registry,
     people as people,
     profile as profile,
+    public_images as public_images,
     reset as reset,
     sessions as sessions,
     support as support,
