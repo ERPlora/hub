@@ -204,6 +204,28 @@ def _build_xml(record: Record, system: producer.SystemInfo) -> None:
     record.xml_built_at = timezone.now()
 
 
+def _fingerprint_of(record: Record) -> str:
+    """The fingerprint of a chained record from its own fields: what sealing writes and chain validation checks."""
+    if record.record_type == Record.Type.ANULACION:
+        return chain.anulacion_hash(
+            issuer_nif=record.issuer_nif,
+            number=record.invoice_number,
+            issue_date=record.issue_date,
+            previous_hash=record.previous_fingerprint,
+            generated_at=record.generated_at,
+        )
+    return chain.alta_hash(
+        issuer_nif=record.issuer_nif,
+        number=record.invoice_number,
+        issue_date=record.issue_date,
+        invoice_type=record.invoice_type,
+        tax_amount=record.tax_amount,
+        total_amount=record.total_amount,
+        previous_hash=record.previous_fingerprint,
+        generated_at=record.generated_at,
+    )
+
+
 def _seal(ctx: OperationContext, config: Config, record: Record) -> Record:
     """Chain ``record`` (its figures set) in its chain: number, previous link, fingerprint, QR and XML."""
     head = _lock_chain(record.issuer_nif, record.environment)
@@ -219,26 +241,10 @@ def _seal(ctx: OperationContext, config: Config, record: Record) -> Record:
     record.created_at = now
     record.next_attempt_at = now
     record.created_by = _actor(ctx)
+    record.fingerprint = _fingerprint_of(record)
     if record.record_type == Record.Type.ANULACION:
-        record.fingerprint = chain.anulacion_hash(
-            issuer_nif=record.issuer_nif,
-            number=record.invoice_number,
-            issue_date=record.issue_date,
-            previous_hash=record.previous_fingerprint,
-            generated_at=record.generated_at,
-        )
         total = record.invoice.total_amount
     else:
-        record.fingerprint = chain.alta_hash(
-            issuer_nif=record.issuer_nif,
-            number=record.invoice_number,
-            issue_date=record.issue_date,
-            invoice_type=record.invoice_type,
-            tax_amount=record.tax_amount,
-            total_amount=record.total_amount,
-            previous_hash=record.previous_fingerprint,
-            generated_at=record.generated_at,
-        )
         total = record.total_amount
     record.qr_url = chain.qr_url(
         issuer_nif=record.issuer_nif,

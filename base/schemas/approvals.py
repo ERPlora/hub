@@ -81,7 +81,7 @@ class ApprovalListOut(Schema):
 
 
 class ApprovalExportIn(Schema):
-    """What Employees › Approvals keeps on screen: its search and its filters (BASE-F85); none, the whole record."""
+    """What Employees › Approvals keeps on screen to export: its search and its filters; none, the whole record."""
 
     search: str = Field("", max_length=200, description="Words of the action, or of who approved or who asked.")
     at_from: dt.date | None = Field(None, description="From this day, in the business's time zone.")

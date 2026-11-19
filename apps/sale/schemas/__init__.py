@@ -450,7 +450,7 @@ class ProductLineIn(LineFields):
 
 
 class ComboChoiceIn(Closed):
-    """A dish picked in a menu of Menus (COMBO-F08): by the choice's id, or by its product (and course)."""
+    """A dish picked in a menu of Menus: by the choice's id, or by its product (and course)."""
 
     option_id: UUID | None = Field(None, description="The choice's id (combo.combo.for_sale).", json_schema_extra=A_DISH)
     product: Said | None = Field(

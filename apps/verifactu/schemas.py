@@ -743,7 +743,7 @@ class RecoverManualIn(IssuerIn):
 
 
 class CertificateUploadIn(Schema):
-    """The business's own certificate (VERIFACTU-F02): kept sealed in the hub's database, never shown again."""
+    """The business's own certificate: kept sealed in the hub's database, never shown again."""
 
     p12_base64: SecretStr = Field(
         title=gettext_noop("Business certificate (.p12 / .pfx)"),
