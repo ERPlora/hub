@@ -12,7 +12,6 @@ from apps.website.schemas import (
     SECTIONS,
     TEMPLATES,
     Content,
-    ImageUploadIn,
     QrIn,
     SaveIn,
     Theme,
@@ -199,12 +198,6 @@ def test_save_names_one_of_the_four_templates():
     assert saved.template == "bold"
     with pytest.raises(pydantic.ValidationError):
         SaveIn.model_validate({"template": "fancy", "theme": {}, "content": {}})
-
-
-def test_an_upload_is_a_jpeg_png_or_webp_in_base64():
-    ImageUploadIn.model_validate({"filename": "logo.png", "content_type": "image/png", "data_base64": "aGk="})
-    with pytest.raises(pydantic.ValidationError):
-        ImageUploadIn.model_validate({"filename": "x.gif", "content_type": "image/gif", "data_base64": "aGk="})
 
 
 def test_the_qr_comes_as_png_or_svg():

@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:ebc55fdcd8aea5a991792673967698b6704452b6f62b271f306046f3fd2f1621 -->
+<!-- generated from WORKBOOK.md sha256:cccd2311349032960ccdce403852b508046b92220c703cf3ab053fb13bc5e4a1 -->
 
 ## What it is for and who it is for
 
@@ -68,9 +68,10 @@ in the diary.
 Title "Booking page settings". Three blocks and a **Save** button:
 
 - **Public page**: "Public page on", "Page title", "Welcome message", "Primary colour"
-  (`#RRGGBB`), "Logo URL", "Email required", "Upcoming bookings per mobile" (1 to 50),
-  "Let the customer choose the professional", "Allow notes", "Confirmation message" and "Cancellation policy"
-  (the text the customer reads).
+  (`#RRGGBB`), "Logo" (a JPG, PNG or WebP image that is uploaded; it still shows as "Logo URL", which is no
+  longer taken, hub#1660), "Email required", "Upcoming bookings per mobile" (1 to 50), "Let the customer choose
+  the professional", "Allow notes", "Confirmation message" and "Cancellation policy" (the text the customer
+  reads).
 - **Booking rules** (they are the rules of Appointments, shared with WhatsApp): "Minimum booking notice
   (minutes)", "Book at most this far ahead (days)" (0 = no limit), "Slot interval
   (minutes)", "Confirm the customer's bookings automatically", "Let the customer cancel her booking"
@@ -83,8 +84,8 @@ On saving: "Settings saved."; a refusal shows under its field ("Could not save")
 
 ### Booking page (the customer, no session)
 Page `/p/<business>/book` at the business's address: anyone opens it, without signing in or seeing anything of the
-team's (no menu of theirs). At the top, the business's name and colour; the logo shows when its address is
-same-origin, while an external address leaves the name without an image. Also "Book online" and "Choose your
+team's (no menu of theirs). At the top, the business's name, its logo (the one uploaded in Settings, served from the
+business's own address; without a logo, only the name) and its colour. Also "Book online" and "Choose your
 services, a day and a free time, then leave your name and mobile."; below, the title and welcome message of the
 Settings and the flow: services with their price and length, professional or "No preference", day, free times, name,
 mobile, email, note and **Book**. Beside **Book**, the notice of who uses her details and the link to the privacy
@@ -114,13 +115,13 @@ Dates and times show on the business's clock and in the format of the language o
 
 | ID | Flow | Status |
 |---|---|---|
-| ONLINE_BOOKING-F01 | The customer books from the booking page | partial — Settings cannot upload the logo to the business yet |
+| ONLINE_BOOKING-F01 | The customer books from the booking page | done |
 | ONLINE_BOOKING-F02 | Confirm a booking | done |
 | ONLINE_BOOKING-F03 | Complete a booking | done |
 | ONLINE_BOOKING-F04 | Mark that she did not show up | done |
 | ONLINE_BOOKING-F05 | Cancel a booking | done |
 | ONLINE_BOOKING-F06 | Delete a booking | done |
-| ONLINE_BOOKING-F07 | Set up the booking page | done |
+| ONLINE_BOOKING-F07 | Set up the booking page | partial — the logo is uploaded through the API; the Settings screen does not upload it yet (hub#1660) |
 | ONLINE_BOOKING-F08 | See and search the bookings | done |
 | ONLINE_BOOKING-F09 | Follow the customer when two cards are merged | done (Appointments does it; the inbox reflects it) |
 | ONLINE_BOOKING-F10 | The customer sees her booking with her link | partial — her link opens the business's booking page, which does not show her booking yet; the confirmation gives the link's code, not its address |
@@ -128,12 +129,12 @@ Dates and times show on the business's clock and in the format of the language o
 | ONLINE_BOOKING-F12 | Erase a customer's data (GDPR) | done |
 
 ### ONLINE_BOOKING-F01 The customer books from the booking page
-Status: partial — Settings cannot upload the logo to the business yet
+Status: done
 Actor: customer (no session); owner or administrator, with the preview or with the assistant
 Screen: booking page (`/p/<business>/book`); in development, the preview too
 Steps:
-1. She opens the business's page: its name, title, welcome message and colour; also the logo from Settings when its
-   address is same-origin (an external address creates no image and leaves the name).
+1. She opens the business's page: its name, its logo (the one from Settings, from the business's own address; without
+   a logo, only the name), title, welcome message and colour.
 2. She picks one or several services (up to 5) among those **booked online**, with their price (in the
    business's currency, its country's —BASE-F50: "20,00 zł" in Poland—, grouped from four digits: "1.234,56 €")
    and their duration if Services shows them ("Show prices", "Show duration").
@@ -240,21 +241,27 @@ If it fails: an appointment in progress, completed or charged is not deleted ("T
 Involved: APPOINTMENT-F11
 
 ### ONLINE_BOOKING-F07 Set up the booking page
-Status: done
+Status: partial — the logo is uploaded through the API; the Settings screen does not upload it yet (hub#1660)
 Actor: owner, administrator, assistant
 Screen: Settings
 Steps:
 1. Change the fields of **Public page** and of **Booking rules** and press **Save**: "Settings
    saved.". Only what changes is saved, all together or nothing.
    What is changed while it is saving is not lost: it stays on screen, still to save (hub#914).
-2. In **Services booked online**, touch a service's switch: it is saved at once in
+2. In **Logo**, choose a JPG, PNG or WebP image (up to 5 MB and 8000 pixels a side): it is uploaded at once and
+   shows in the thumbnail; the page shows it when **Save** is pressed. **Remove** and **Save** leave the page without
+   a logo. The page loads it from the business's own address, never from another.
+3. In **Services booked online**, touch a service's switch: it is saved at once in
    Services.
 In: the saved settings (or the out-of-the-box ones: page off, email not required, 3 upcoming bookings per
 mobile, choosing a professional and notes allowed) and the rules of Appointments.
 Out: `online_booking.settings.updated` (if something of the page changes) and `appointment.settings.updated` (if
 a rule changes); a service's switch, `service.service.updated`.
-If it fails: a colour that is not `#RRGGBB`, a URL that is not `http(s)://…`, a number out of range or a text
-too long, under its field; nothing is saved. As in the form windows, the notice goes as soon as something is
+If it fails: a colour that is not `#RRGGBB`, a logo that was not uploaded to this business ("That logo was not
+uploaded to this business: upload it again."), a number out of range or a text too long, under its field; nothing is
+saved. On uploading the logo, a file that is not a JPG, PNG or WebP image, weighs more than 5 MB or measures more
+than 8000 pixels a side is refused under **Logo** ("This file is not a PNG image.", "The image may weigh 5 MB at
+most."), and one that does not fit in the plan's space, with the notice of Files. As in the form windows, the notice goes as soon as something is
 changed and a field's reason as soon as that field is corrected; both come back if the next try is refused
 too. A refusal that names no field stays until the next try (hub#854).
 Involved: APPOINTMENT-F19, SERVICE-F02
@@ -363,6 +370,7 @@ asked for as "Olga's internet booking" or "what I have in the inbox".
 | Cancels, with a reason | change bookings (+ change appointments) | F05 | `online_booking.booking.cancel` |
 | Deletes | delete bookings (+ delete appointments) | F06 | `online_booking.booking.delete` |
 | Saves the settings (and the rules of Appointments) | settings (+ Appointments settings for the rules) | F07 | `online_booking.settings.update` |
+| Uploads the page's logo (JPG, PNG or WebP, up to 5 MB); it shows once the settings are saved | settings | F07 | `online_booking.settings.upload_logo` |
 | Books and cancels from the page (public) | `online_booking.public` | F01, F11 | `online_booking.public.book`, `.cancel` |
 
 No-show, cancel and delete are **high risk** for the assistant: its card asks for confirmation before doing

@@ -23,6 +23,8 @@ function cleanUp(tag: string): void {
 
 /** The diary's rules the page's settings also change: put back with Appointments' settings, not the page's. */
 const RULES = ['min_booking_notice', 'max_advance_booking', 'slot_interval', 'auto_confirm_online', 'allow_customer_cancellation', 'cancellation_notice_hours'];
+/** What the settings say but never take: the zone and where the logo is served (the logo itself is `logo`). */
+const READ_ONLY = ['timezone', 'logo_url'];
 
 /** What the business had before a spec: the rules of Appointments and the page's own settings. */
 interface Settings {
@@ -38,7 +40,7 @@ async function readSettings(browser: Browser): Promise<Settings> {
     expect([rules.status, page.status]).toEqual([200, 200]);
     return {
       rules: Object.fromEntries(Object.entries(rules.data).filter(([key]) => key !== 'timezone')),
-      page: Object.fromEntries(Object.entries(page.data).filter(([key]) => key !== 'timezone' && !RULES.includes(key))),
+      page: Object.fromEntries(Object.entries(page.data).filter(([key]) => !READ_ONLY.includes(key) && !RULES.includes(key))),
     };
   } finally {
     await context.close();

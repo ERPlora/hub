@@ -1371,6 +1371,10 @@
     "method": "post",
     "path": "/api/online_booking/settings"
   },
+  "online_booking.settings.upload_logo": {
+    "method": "post",
+    "path": "/api/online_booking/settings/logo"
+  },
   "online_booking.public.page": {
     "method": "get",
     "path": "/api/online_booking/public/page"

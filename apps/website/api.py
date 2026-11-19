@@ -16,13 +16,12 @@ from ninja.decorators import decorate_view
 
 from apps.website import queries, services
 from apps.website.csp import preview_policy
-from apps.website.schemas import CategoriesIn, ImageUploadIn, QrIn, SaveIn
+from apps.website.schemas import CategoriesIn, QrIn, SaveIn
+from base.public_images import MAX_UPLOAD_BODY
 from base.request_body import accept_body_up_to
+from base.schemas.public_images import ImageUploadIn
 
 router = Router(tags=["website"])
-
-#: The upload's body: 5 MB of image in base64 (6 990 508 characters) and its JSON around it.
-MAX_UPLOAD_BODY = 7_100_000
 
 
 # The editor
