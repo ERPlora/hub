@@ -76,7 +76,7 @@ test.beforeEach(() => {
   unspend();
 });
 
-// ── The assistant's panel (as base-assistant.spec.ts drives it) ──
+// ── The assistant's panel (as assistant-panel.ts drives it) ──
 
 const panel = (page: Page): Locator => page.locator('[data-testid="assistant-panel"]');
 const box = (page: Page): Locator => panel(page).locator('[data-testid="assistant-input"] textarea');

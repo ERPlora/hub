@@ -6,7 +6,7 @@ import { type Browser, type BrowserContext, expect, type Locator, type Page, tes
 import type { Provider } from './assistant-provider';
 import { saasSql } from './assistant-real';
 import { A, capture, EMPLOYEE, exposeMovingInPage, login, THREE_SIZES as VIEWPORTS, turnOffTurnedOn, turnOnMissing, untilStill } from './helpers';
-import { seededProvider } from './provider-helpers';
+import { providerSpec } from './provider-helpers';
 import { assistantDoor, openAssistant } from './topbar';
 
 /** This month's messages of the business `a` on erplora.com. */
@@ -22,22 +22,14 @@ export function spend(messages: number): void {
   );
 }
 
-/** Registers the hooks of a spec of the panel: the e2e's provider started before its tests and closed after them, and
- *  no message of `a` spent this month before each test. Gives the provider once they have run. */
+/** Registers the hooks of a spec of the panel: the e2e's provider started before its tests and closed after them
+ *  (`providerSpec`, with nothing else to clean), and no message of `a` spent this month before each test. Gives the
+ *  provider once they have run. */
 export function panelSpec(): () => Provider {
-  let provider: Provider;
-  test.beforeAll(async () => {
-    provider = await seededProvider();
-  });
-
-  test.afterAll(async () => {
-    await provider?.close();
-  });
-
   test.beforeEach(() => {
     spend(0);
   });
-  return () => provider;
+  return providerSpec(() => undefined);
 }
 
 // ── The panel ──
