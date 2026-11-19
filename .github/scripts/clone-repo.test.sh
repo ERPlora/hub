@@ -92,6 +92,10 @@ calls() { grep -c "^$1 " "$work/calls" || true; }
 took_under() { [ "$elapsed" -lt "$1" ]; }
 took_at_least() { [ "$elapsed" -ge "$1" ]; }
 cloned() { [ "$status" -eq 0 ] && [ "$(git -C "$work/saas" rev-parse --is-shallow-repository)" = true ]; }
+# not_downloaded <path>: the clone does not hold the file at <path> (rev-list prints it as missing, without fetching it).
+not_downloaded() {
+  git -C "$work/saas" rev-list --objects --missing=print HEAD | grep -qx "?$(git -C "$root/source" rev-parse "HEAD:$1")"
+}
 refused() { [ "$status" -ne 0 ] && [ ! -e "$work/saas" ] && grep -qE "::error::.*$1" "$work/out.log"; }
 lower() { printf '%s' "$1" | tr '[:upper:]' '[:lower:]'; }
 # every_call_has_the_token: each logged call carried "Authorization: Basic <base64 of x-access-token:<token>>".
@@ -111,8 +115,8 @@ check "a clone without paths brings the whole tree, at depth 1" \
   'cloned && [ -f "$work/saas/public/declaracion/v1" ] && [ -f "$work/saas/other/file" ]'
 
 clone "ok" public/declaracion
-check "a clone with paths checks out only those, at depth 1" \
-  'cloned && [ -f "$work/saas/public/declaracion/v1" ] && [ ! -e "$work/saas/other" ]'
+check "a clone with paths checks out and downloads only those, at depth 1" \
+  'cloned && [ -f "$work/saas/public/declaracion/v1" ] && [ ! -e "$work/saas/other" ] && not_downloaded other/file'
 check "the clone and the sparse checkout (which fetches the paths' files) both reach GitHub as the job's token" \
   '[ "$(calls clone)" = 1 ] && [ "$(calls sparse-checkout)" = 1 ] && every_call_has_the_token'
 check "the token is in neither git's arguments nor the clone's config" \
