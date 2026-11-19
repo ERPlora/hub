@@ -23,8 +23,9 @@ from live.models import OutboxEvent
 from live.operations import get as get_operation
 
 from apps.whatsapp_inbox.models import Channel, Message
-from base import activation, internal, relay
+from base import activation, apps_on, internal
 from base.models import AppActivation, Hub
+from base.services import photo as photo_service
 from base.tenancy import context
 from base.tenancy.context import use_hub
 from base.tenancy.identity import HubIdentityMismatch
@@ -278,8 +279,8 @@ def test_a_business_that_does_not_open_answers_as_its_host(client, acme, path, c
 @pytest.mark.parametrize("path", DOORS)
 def test_the_app_off_in_the_business_is_404_app_inactive(client, acme, path, monkeypatch):
     with use_hub(acme):
-        every = relay.active_apps(ACME)
-    monkeypatch.setattr(relay, "active_apps", lambda scope: every - {"whatsapp_inbox"})
+        every = apps_on.active_apps(ACME)
+    monkeypatch.setattr(internal.apps_on, "active_apps", lambda scope: every - {"whatsapp_inbox"})
 
     answer = post(client, path, door_body(path))
 
@@ -289,14 +290,14 @@ def test_the_app_off_in_the_business_is_404_app_inactive(client, acme, path, mon
 
 def test_the_app_is_asked_about_the_business_of_the_body(client, acme, other, monkeypatch):
     with use_hub(acme):
-        every = relay.active_apps(ACME)
+        every = apps_on.active_apps(ACME)
     asked = []
 
     def active(scope):
         asked.append(scope)
         return every if scope == ACME else every - {"whatsapp_inbox"}
 
-    monkeypatch.setattr(relay, "active_apps", active)
+    monkeypatch.setattr(internal.apps_on, "active_apps", active)
 
     assert post(client, INBOUND, message(hub=OTHER.key)).status_code == 404
     assert post(client, INBOUND, message(hub=ACME.key)).status_code == 200
@@ -413,7 +414,7 @@ def test_a_database_that_fails_asking_for_the_apps_is_503_and_logged(
     def failing(scope):
         raise failure
 
-    monkeypatch.setattr(relay, "active_apps", failing)
+    monkeypatch.setattr(internal.apps_on, "active_apps", failing)
     door = production()
 
     answer = post(door, path, door_body(path, hub=hub_a.slug), host=PRIVATE_NAME)
@@ -520,8 +521,8 @@ def test_an_older_photo_does_not_apply_its_whatsapp(client, acme):
 
 def test_with_the_app_off_the_photo_applies_and_its_whatsapp_is_ignored(client, acme, monkeypatch):
     with use_hub(acme):
-        every = relay.active_apps(ACME)
-    monkeypatch.setattr(relay, "active_apps", lambda scope: every - {"whatsapp_inbox"})
+        every = apps_on.active_apps(ACME)
+    monkeypatch.setattr(photo_service, "active_apps", lambda scope: every - {"whatsapp_inbox"})
 
     answer = signed(client, "put", STATE_PATH, photo(5, whatsapp=channel_state()))
 

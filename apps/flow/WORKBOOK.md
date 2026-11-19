@@ -1370,7 +1370,7 @@ Los avisos llevan ids, nunca nombres ni contenidos.
   se hace en persona (`ai.in_person`: sentar a una reserva en la puerta, `reservation.reservation.seat`;
   ningún sistema del mercado sienta por una automatización) queda fuera y se rechaza
   al guardar, al conceder y al ejecutar con el código `flow.high_risk`. «Activas» son las
-  que `base.relay.active_apps(ctx.scope)` resuelve con los derechos del SaaS y `base.activation.off_apps`, la
+  que `base.apps_on.active_apps(ctx.scope)` resuelve con los derechos del SaaS y `base.activation.off_apps`, la
   misma lectura que usa el relay y la guarda de operaciones; `queries.catalog.active_apps` solo descarta `flow` y
   devuelve sus configuraciones. Una acción de una app apagada después de guardarla deja la ejecución en
   `flow.action_unavailable`, sin borrar la automatización; se reanuda tras encenderla (hub#1054). El catálogo

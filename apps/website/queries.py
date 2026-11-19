@@ -10,7 +10,7 @@
   reviews are those kept (``apps.website.reviews``: a read never asks Google).
 - **The catalog** (``read_catalog``): Inventory's products on sale or Services' offered services, read by their
   operations' names with a context that may read them (as ``apps.flow`` does), only while that app is on in the hub
-  (``base.relay.active_apps``, the website's own guard); an app that is off or not there leaves the catalog empty,
+  (``base.apps_on.active_apps``, the website's own guard); an app that is off or not there leaves the catalog empty,
   never an error.
 - ``published_page`` and ``live_version`` are what ``public_home`` reads; ``page_cache_key`` and
   ``catalog_cache_key`` name what is cached, and ``forget_cached`` drops a version's entries.
@@ -60,12 +60,12 @@ from apps.website.schemas import (
     SiteOut,
     Theme,
 )
-from base import relay
+from base.apps_on import active_apps
 from base.operations import business_currency, hub_id
 from base.registry import hub_by_slug
 from base.throttle import RateLimited, allow, client_address
 
-#: The app's label: what ``base.relay.active_apps`` names when the module is on in a hub.
+#: The app's label: what ``base.apps_on.active_apps`` names when the module is on in a hub.
 WEBSITE = "website"
 NOT_PUBLISHED = _("This website is not published.")
 IMAGE_NOT_FOUND = _("This image was not uploaded to this business's website: upload it again.")
@@ -329,9 +329,9 @@ def _count_visitor(ctx: OperationContext) -> None:
 def _live(scope: Scope) -> QuerySet[Site]:
     """The live publication of ``scope``'s hub: the one guard of every public path, the API's reads and ``/``.
 
-    404 ``app_inactive`` while the module is off in the hub (``base.relay.active_apps``), 404 for a scope that is no
+    404 ``app_inactive`` while the module is off in the hub (``base.apps_on.active_apps``), 404 for a scope that is no
     hub; then only that hub's row, and only while it is published and online."""
-    if WEBSITE not in relay.active_apps(scope):
+    if WEBSITE not in active_apps(scope):
         raise AppInactive(str(MODULE_OFF))
     return Site.objects.filter(LIVE, hub_id=hub_id(scope))
 
@@ -518,7 +518,7 @@ def read_catalog(ctx: OperationContext, section: CatalogSection) -> dict[str, An
 
 def _source_on(scope: Scope, source: str) -> bool:
     """Whether the catalog's ``source`` (an app's label) is on in ``scope``'s hub, as the website's own guard asks."""
-    return source in relay.active_apps(scope)
+    return source in active_apps(scope)
 
 
 def _rows(ctx: OperationContext, name: str, limit: int = MAX_ITEMS, **params: Any) -> Iterator[Any]:

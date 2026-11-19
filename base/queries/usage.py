@@ -14,10 +14,10 @@ from live.errors import OperationError
 from live.operations import AI, INTERNAL, operation
 
 from base import activation, files, home, meter
+from base.apps_on import active_apps
 from base.models import Hub, Membership, SessionOwner
 from base.permissions import ADMINISTER_HUB
 from base.registry import internal_only
-from base.relay import active_apps
 from base.schemas.usage import PlanUsageIn, PlanUsageOut, UsageListIn, UsageListOut
 from base.tenancy import limits as tenancy_limits
 from control.models import HubActivityDaily, HubUsageDaily, HubVisit, UsageRun

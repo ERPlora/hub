@@ -10,6 +10,7 @@ from live.errors import InvalidPayload, NotFound
 from live.operations import AI, operation
 
 from base import blueprint, home
+from base.apps_on import active_apps
 from base.models import Hub, ImportBatch
 from base.permissions import ADMINISTER_HUB
 from base.schemas.blueprints import (
@@ -97,7 +98,7 @@ def blueprint_export(ctx: OperationContext, data: BlueprintExportIn) -> dict:
     """The file of the apps and datasets chosen, in base64 for the screen to save."""
     with translation.override(ctx.language):
         hub = Hub.objects.filter(slug=ctx.scope.key).first()
-        on = blueprint.active_apps(ctx.scope)
+        on = active_apps(ctx.scope)
         shown = {config.label for config in home.shown_modules(demo_hub=bool(hub and hub.is_demo))}
         registered = list(dict.fromkeys(data.apps))
         missing = [app for app in registered if app not in shown or app not in on]
@@ -210,7 +211,7 @@ def dataset_list(ctx: OperationContext, data: DatasetListIn) -> dict:
     """Every app on, with its datasets and their rows: what an export can take."""
     with translation.override(ctx.language):
         hub = Hub.objects.filter(slug=ctx.scope.key).first()
-        on = blueprint.active_apps(ctx.scope)
+        on = active_apps(ctx.scope)
         counts = blueprint.counts(ctx)
         apps = [
             {

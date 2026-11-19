@@ -3,7 +3,7 @@
 - **The catalog** (``catalog_events``, ``catalog_operations``): what the active apps declare, never a
   name made up here. Events are each app's ``events.ALL``; actions and reads are its registered
   operations whose permission the app declares (a person can be granted it: platform-only reactions
-  are left out). ``active_apps`` asks ``base.relay.active_apps`` for the business's active apps, the same
+  are left out). ``active_apps`` asks ``base.apps_on.active_apps`` for the business's active apps, the same
   activation and entitlement check the relay and the operation gate use.
 - **Values** (``map_params``): a step's params for what the run knows (``document.resolve``), leaving out
   what came out empty, so an optional field keeps its default. What a person reads (``PERSON_PARAMS``, a question's

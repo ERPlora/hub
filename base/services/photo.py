@@ -8,6 +8,7 @@ from live.context import Scope, system_context
 from live.errors import InvalidPayload
 from live.operations import get as get_operation
 
+from base.apps_on import active_apps
 from base.models import Hub
 from base.schemas.hub_registry import HubStateIn
 from base.schemas.sessions import HubUserSyncIn
@@ -21,8 +22,6 @@ VERIFACTU_APP = "verifactu"
 
 
 def _sync_verifactu(hub: Hub, data: HubStateIn) -> None:
-    # base.relay imports this module: asked when the photo comes, not when this module loads.
-    from base import relay
     from base.tenancy.context import use_hub
 
     sync = get_operation("verifactu.config.sync")
@@ -38,7 +37,7 @@ def _sync_verifactu(hub: Hub, data: HubStateIn) -> None:
     # Off in the business (base.activation), its block waits: turning VeriFactu on applies the photo kept then.
     scope = Scope("host", hub.slug)
     with use_hub(hub):
-        if VERIFACTU_APP in relay.active_apps(scope):
+        if VERIFACTU_APP in active_apps(scope):
             sync(system_context(scope), payload)
 
 
@@ -47,15 +46,13 @@ WHATSAPP_APP = "whatsapp_inbox"
 
 
 def _sync_whatsapp(hub: Hub, data: HubStateIn) -> None:
-    # base.relay imports this module: asked when the photo comes, not when this module loads.
-    from base import relay
     from base.tenancy.context import use_hub
 
     scope = Scope("host", hub.slug)
     # Which apps are on is the business's (its database): asked inside it. Off, the block is not read: it waits for
     # the app (turning it on applies the photo kept then).
     with use_hub(hub):
-        if WHATSAPP_APP not in relay.active_apps(scope):
+        if WHATSAPP_APP not in active_apps(scope):
             return
         sync = get_operation("whatsapp_inbox.channel.sync")
         try:
@@ -104,11 +101,9 @@ def apply_kept_photo(hub: Hub) -> None:
     """Inside ``use_hub(hub)``: apply the SaaS's photo kept on its row (its seeding: the photo came while its database
     was being made): its people (``base.hub_user.sync``, which leaves out whoever it no longer lists) and the blocks
     that belong to the apps it has on."""
-    from base import relay
-
     photo = hub.state if isinstance(hub.state, dict) else {}
     if hub.state_version and photo.get("members") is not None:
         hub_user_sync(
             system_context(Scope("host", hub.slug)), HubUserSyncIn(members=photo["members"], left=[])
         )
-    _sync_photo_blocks(hub, relay.active_apps(Scope("host", hub.slug)))
+    _sync_photo_blocks(hub, active_apps(Scope("host", hub.slug)))

@@ -500,7 +500,7 @@ nombres, las demás secciones cuyo contenido cambia («Contenido: Cabecera, Cont
   del estado es hub#689. Las claves del almacén (`hub-<id>/website/img/…`) y de la caché (`website:home:{<slug>}:…`) también llevan el hub. La e2e
   desconecta la página al terminar para no dejar `/` de `a` con ella (las demás e2e esperan el salto al login).
 - **El catálogo, solo de una app activa**: `queries._source_on` pregunta a
-  `base.relay.active_apps` (la misma pregunta que la guarda de lo público), no a `apps.is_installed`: una
+  `base.apps_on.active_apps` (la misma pregunta que la guarda de lo público), no a `apps.is_installed`: una
   app instalada puede estar apagada en el negocio (BASE-F23), y una que nunca encendió no tiene sus tablas. Con la fuente
   apagada, `read_catalog` y `website.catalog.categories` devuelven vacío, nunca un error, y el editor lista la fuente
   guardada sin dejar elegirla, con la nota `fields.sourceOff*` (`WebsitePage.test.ts`, «a catalog saved from an app
@@ -510,7 +510,7 @@ nombres, las demás secciones cuyo contenido cambia («Contenido: Cabecera, Cont
   `/favicon.ico` al hub, que es la SPA de `base` y le dejaba una cookie `csrftoken` al visitante: la página dejaba de
   ser «sin cookies» (lo cazó `website-flows.spec.ts`, WEBSITE-F10).
 - **Una sola guarda para lo público**: `/` (`public_home.is_published`) y la API pública (`website.public.*`) pasan por
-  `queries._live`: el módulo encendido en el hub (`base.relay.active_apps`; con él
+  `queries._live`: el módulo encendido en el hub (`base.apps_on.active_apps`; con él
   apagado la API responde 404 `app_inactive` y `/` salta al login) y una publicación en línea de ese hub (si no,
   404 `website.not_published`).
 - Anatomía completa: `apps.py`, `models.py`, `schemas.py`, `render.py`, `csp.py`, `public_home.py`, `storage.py`,
