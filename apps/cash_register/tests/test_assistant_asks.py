@@ -208,12 +208,16 @@ test_the_tills_of_a_place_bring_their_list_by_cash_registers_group = in_hubs(by_
 
 def test_the_hub_reads_las_cajas_de_la_tienda_as_its_tills():
     """Cash register's own words (its ``assistant_synonyms``): «las cajas de la» barra, terraza or tienda are the tills
-    (``cash_register.register``), and without the Hub's groups they are not (positive control)."""
+    (``cash_register.register``), and without the Hub's groups they are not (positive control); boxes of goods are not
+    tills."""
     register = shared.stem("register")
     assert_its_words_name(
         "cash_register",
         [("¿qué cajas de la tienda hay dadas de alta?", register), ("cierra las cajas de la terraza", register)],
     )
+    own = apps.get_app_config("cash_register").assistant_synonyms
+    boxes_of_goods = ["registra una entrada de 5 cajas de leche", "han llegado 4 cajas de cerveza"]
+    assert [said for said in boxes_of_goods if any(register in one for one in shared.asked([said], own).concepts)] == []
 
 
 #: What makes the model answer in the chat and wait, so the card of a write never comes (hub#1105, hub#1138): a

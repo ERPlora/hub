@@ -141,8 +141,8 @@ def test_a_quantity_in_a_unit_written_off_keeps_the_write_off_among_the_first_te
     assert_offered_with_room(catalog_of(role, language), "inventory.stock.write_off", phrase, language, room=TOP)
 
 
-#: What a quantity in a unit is not: money in or out of the drawer, what a sale line or a cart counts, the tills of a
-#: place. None of them names the stock nor the goods received.
+#: What a quantity in a unit is not, in Spanish and in English: money in or out of the drawer, what a sale line or a cart
+#: counts, the tills of a place. None of them names the stock nor the goods received.
 NO_QUANTITY_OF_GOODS = [
     "apúntame una entrada de 50 €",
     "una salida de 20 € del cajón",
@@ -150,6 +150,10 @@ NO_QUANTITY_OF_GOODS = [
     "¿cuántas unidades de cada producto lleva el carrito de Nuria?",
     "enséñame las cajas del local",
     "medio kilo de jamón para la mesa 3",
+    "record a cash entry of 50 €",
+    "add 2 bottles of water to table 5",
+    "how many units of each product are in Nuria's cart?",
+    "half a kilo of ham for table 3",
 ]
 
 
@@ -165,8 +169,12 @@ def test_the_hub_reads_a_quantity_in_a_unit_as_the_stock_of_goods_and_an_amount_
         "han llegado 3 sacos de patatas",
         "apunta una entrada de 500 gramos de azafrán",
         "registra una entrada de 10 litros de aceite",
+        "apunta una entrada de 6 kg de queso",
         "record an entry of 20 kg of flour",
         "log 12 boxes of milk",
+        "record 500 grams of saffron",
+        "log 10 litres of oil",
+        "log 10 liters of oil",
     ]
     assert_its_words_name("inventory", [(phrase, wanted) for phrase in said for wanted in (stock, receive)])
     own = apps.get_app_config("inventory").assistant_synonyms
