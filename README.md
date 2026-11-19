@@ -57,8 +57,9 @@ bash .github/scripts/smoke-e2e.sh --spec tests/e2e/login-and-shell.spec.ts   # s
 
 Recorre en el navegador lo que no se puede romper: entrar, las sesiones y los permisos, la separación entre negocios, la
 suspensión por impago, cobrar y la caja, la impresión, el ticket con QR, la factura, VeriFactu, la cocina y las mesas, las
-citas, el alta de un negocio y la demo. Usa la misma pila que la pasada nocturna (`tests/e2e/README.md`, «La pasada
-nocturna»): sus worktrees, sus BD, los dos `runserver` y, pase lo que pase, la limpieza.
+citas, los servicios y los bonos, el alta de un negocio y la demo. Usa la misma pila que la pasada nocturna
+(`tests/e2e/README.md`, «La pasada nocturna»): sus worktrees, sus BD, los dos `runserver` y, pase lo que pase, la
+limpieza.
 
 - **Qué tests**: los que llevan `@smoke` al final de su título; se marca el test concreto, nunca la spec entera.
   `pnpm e2e --list --grep @smoke` los lista.
@@ -80,13 +81,15 @@ nocturna»): sus worktrees, sus BD, los dos `runserver` y, pase lo que pase, la 
   `../blueprints` y Postgres con `compose.yaml`). Un test `@smoke` en rojo deja el check en rojo y la PR no se fusiona.
   Los grupos entran de uno en uno, tras tres pasadas seguidas en verde del job, y el job los nombra con `--spec`: hoy,
   entrar, las sesiones, los permisos de un empleado, la separación entre negocios y la suspensión por impago; cobrar
-  en el TPV, la caja y la impresión del ticket; el ticket con su QR, la factura y VeriFactu; y la cocina y las mesas
+  en el TPV, la caja y la impresión del ticket; el ticket con su QR, la factura y VeriFactu; la cocina y las mesas
   (mandar la ronda a cocina desde el TPV, seguirla y meterle prisa, y sentar la cuenta del TPV en una mesa y
-  quitársela). Nada del grupo fiscal llega a la AEAT: el runner no tiene pasarela de envío ni certificados, y sus
+  quitársela); y las citas, los servicios y los bonos (reservar en la agenda, cobrar la cita en el TPV al precio del
+  profesional, dar de alta un servicio con quien lo hace, crear un bono, venderlo y ajustarlo, y pagar con él un corte
+  en el TPV). Nada del grupo fiscal llega a la AEAT: el runner no tiene pasarela de envío ni certificados, y sus
   tests caen si un registro va al entorno de producción de la AEAT. Tampoco pide un PDF al servidor (la factura se
   imprime desde el navegador), así que el job no instala WeasyPrint. `.github/scripts/workflows.test.sh` lleva la
   lista de los grupos que ya están dentro y cae si el job pierde o añade una spec por su cuenta. Con todos dentro, el
-  job correrá todos los `@smoke`, como en el Mac. El job tiene un tope de 27 minutos, el doble de lo que tarda su
+  job correrá todos los `@smoke`, como en el Mac. El job tiene un tope de 31 minutos, el doble de lo que tarda su
   pasada medida más lenta con la pila incluida; un grupo que entra lo vuelve a medir. Lo que hace la pila sale en el
   registro del job y, si falla, el artefacto `smoke` guarda además los registros de los dos `runserver` y las trazas
   de Playwright.

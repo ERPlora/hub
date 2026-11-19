@@ -251,20 +251,20 @@ check("smoke's step is that command and its --spec, with nothing after them that
 SMOKE_GROUPS = {
     "signing in, sessions, permissions, isolation and suspension": (
         "login-and-shell", "base-access", "base-sign-out", "base-session-revoke", "employee-permissions",
-        "two-orgs-isolated", "hub-suspended",
-    ),
+        "two-orgs-isolated", "hub-suspended"),
     "charging and the cash register": ("sale-pos", "sale-cash-gate", "cash-register-shift", "printing-sale"),
     "the ticket's QR, the invoice and VeriFactu": ("sale-fiscal-qr", "sale-invoice-chain", "invoice-sale",
                                                     "invoice-manual", "verifactu-records"),
     "the kitchen and the tables": ("kitchen-pos", "sale-table"),
+    "appointments, services and vouchers": ("appointment-agenda", "appointment-charge", "service-catalog",
+                                            "service-vouchers", "sale-voucher"),
 }
 grouped = []
 for group, names in SMOKE_GROUPS.items():
     specs = [f"tests/e2e/{name}.spec.ts" for name in names]
     grouped += specs
-    missing = [spec for spec in specs if spec not in smoke_specs]
-    check(f"smoke runs every spec of the group «{group}»{': missing ' if missing else ''}" + ", ".join(missing),
-          not missing)
+    missing = ", ".join(spec for spec in specs if spec not in smoke_specs)
+    check(f"smoke runs every spec of the group «{group}»{': missing ' if missing else ''}{missing}", not missing)
 ungrouped = [spec for spec in smoke_specs if spec not in grouped]
 check(f"smoke names no spec outside those groups{': ' if ungrouped else ''}" + ", ".join(ungrouped), not ungrouped)
 repo = folder.resolve().parent.parent
