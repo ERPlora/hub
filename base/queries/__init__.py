@@ -19,6 +19,7 @@ from . import (
     hubs as hubs,
     people as people,
     profile as profile,
+    release_notes as release_notes,
     sessions as sessions,
     system as system,
     usage as usage,
