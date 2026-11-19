@@ -27,7 +27,7 @@ from live.context import OperationContext, Scope, system_context
 from live.meta import all_live_app_configs, permissions_for_role
 from live.operations import get
 
-from apps.verifactu import gateway
+from apps.verifactu import gateway, trust
 from base.tenancy.context import use_hub
 from base.tenancy.tests.business import (
     HOST,
@@ -389,12 +389,12 @@ def make_p12(
     password: bytes = b"secret",
     eseal: bool = False,
     self_signed: bool = False,
+    unrecognised: bool = False,
 ) -> bytes:
     """A .p12 made for the test (never a real certificate) whose subject and usages are the ones asked: ``None``
-    leaves an attribute (or the Extended Key Usage) out. ``TEST_AUTHORITY`` issues it, or its own key signs it."""
-    while len(_KEYS) < 2:
-        _KEYS.append(rsa.generate_private_key(public_exponent=65537, key_size=2048))
-    key, authority_key = _KEYS
+    leaves an attribute (or the Extended Key Usage) out. ``TEST_AUTHORITY`` issues it, or its own key signs it; with
+    ``unrecognised``, an authority under the same name but another key, which no trusted list names."""
+    key, authority_key, rogue_key = _keys()
     attributes = [x509.NameAttribute(NameOID.COMMON_NAME, "ACME SL")]
     if org_id:
         attributes.append(x509.NameAttribute(NameOID.ORGANIZATION_IDENTIFIER, org_id))
@@ -422,10 +422,45 @@ def make_p12(
         builder = builder.add_extension(
             x509.UnrecognizedExtension(QC_STATEMENTS, QC_TYPE_ESEAL), critical=False
         )
-    cert = builder.sign(key if self_signed else authority_key, hashes.SHA256())
+    signer = key if self_signed else rogue_key if unrecognised else authority_key
+    cert = builder.sign(signer, hashes.SHA256())
     return pkcs12.serialize_key_and_certificates(
         b"test", key, cert, None, serialization.BestAvailableEncryption(password)
     )
+
+
+def _keys() -> list:
+    while len(_KEYS) < 3:
+        _KEYS.append(rsa.generate_private_key(public_exponent=65537, key_size=2048))
+    return _KEYS
+
+
+def authority_certificate() -> x509.Certificate:
+    """The CA certificate of ``TEST_AUTHORITY``, made by the test: what a trusted list would name."""
+    authority_key = _keys()[1]
+    now = dt.datetime.now(dt.UTC)
+    return (
+        x509.CertificateBuilder()
+        .subject_name(TEST_AUTHORITY)
+        .issuer_name(TEST_AUTHORITY)
+        .public_key(authority_key.public_key())
+        .serial_number(2)
+        .not_valid_before(now - dt.timedelta(days=3650))
+        .not_valid_after(now + dt.timedelta(days=3650))
+        .add_extension(x509.BasicConstraints(ca=True, path_length=0), critical=True)
+        .sign(authority_key, hashes.SHA256())
+    )
+
+
+def recognise_test_authority(monkeypatch) -> None:
+    """The kept trusted list, as the tests see it: ``TEST_AUTHORITY`` and nothing else."""
+    recognised = (trust.Authority(authority_certificate()),)
+    monkeypatch.setattr(trust, "authorities", lambda: recognised)
+
+
+@pytest.fixture(autouse=True)
+def trusts_the_test_authority(monkeypatch):
+    recognise_test_authority(monkeypatch)
 
 
 def b64(data: bytes) -> str:

@@ -120,7 +120,7 @@
 587 apps/verifactu/admin.py ERPlora/erplora-next#74
 588 apps/verifactu/envelope.py ERPlora/erplora-next#74
 403 apps/verifactu/frontend/operations.d.ts ERPlora/erplora-next#74
-748 apps/verifactu/models.py ERPlora/erplora-next#74
+747 apps/verifactu/models.py ERPlora/erplora-next#74
 841 apps/verifactu/schemas.py ERPlora/erplora-next#74
 1980 apps/verifactu/tests/test_services.py ERPlora/erplora-next#74
 577 apps/website/queries.py ERPlora/erplora-next#74
