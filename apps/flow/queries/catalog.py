@@ -58,6 +58,16 @@ def _events_of(apps: dict[str, LiveAppConfig]) -> dict[str, LiveAppConfig]:
     return found
 
 
+def event_amounts(event: str) -> frozenset[str]:
+    """The data the events of ``event``'s app bring that it declares as amounts (``events.AMOUNTS``), in whole minor
+    units of their currency; none when its app declares none or is not installed."""
+    config = installed_apps().get(event.split(".", 1)[0])
+    module_name = f"{config.name}.events" if config else ""
+    if not module_name or find_spec(module_name) is None:
+        return frozenset()
+    return frozenset(getattr(importlib.import_module(module_name), "AMOUNTS", ()))
+
+
 def grantable_operations(scope: Scope) -> dict[str, Operation]:
     """``{operation name: operation}`` of the active apps whose permission the app declares: what a
     person can be granted (the platform-only reactions are left out)."""

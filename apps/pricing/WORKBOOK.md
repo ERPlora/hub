@@ -555,7 +555,7 @@ desactivar y las reglas, solo desde el Hub o el asistente.
 | Tarifa cambiada | Editar con algún cambio, o su grupo borrado | `id` | `pricing.price_list.updated` |
 | Tarifa general cambiada | Elegirla o quitarla | `id`, `is_default`, `previous_id` | `pricing.price_list.default_changed` |
 | Tarifa desactivada / reactivada | Desactivar / activar | `id` | `pricing.price_list.deactivated`, `…activated` |
-| Precio puesto | Añadir, o recuperarlo desde una copia aparte | `id`, `price_list_id`, `product_id` o `service_id`, `min_quantity`, `price` | `pricing.price_item.added` |
+| Precio puesto | Añadir, o recuperarlo desde una copia aparte | `id`, `price_list_id`, `product_id` o `service_id`, `min_quantity`, `price`, `currency` (la de su tarifa) | `pricing.price_item.added` |
 | Precio cambiado | Editar, o el nombre nuevo de un servicio | `id` (o `service_id`) | `pricing.price_item.updated` |
 | Precio quitado | Quitar, o el producto borrado | `id`, `price_list_id` | `pricing.price_item.removed` |
 | Regla nueva | Crear | `id`, `code` | `pricing.rule.created` |

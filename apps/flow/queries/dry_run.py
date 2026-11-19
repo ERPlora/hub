@@ -1,13 +1,14 @@
 """The last time an event really happened here (``flow.event.sample``), and «Try it» (``flow.flow.test``),
 which walks an automation's steps against it and executes nothing."""
 
+import dataclasses
 from typing import Any
 
 import pydantic
 from live.context import OperationContext
 from live.errors import InvalidPayload
 from live.models import OutboxEvent
-from live.operations import operation, registry
+from live.operations import Operation, operation, registry
 
 from apps.flow import document, vault
 from base import assistant as hub_assistant
@@ -105,21 +106,132 @@ def _clauses(failed: list[dict]) -> list[dict]:
     ]
 
 
-def _try_call(step: Any, values: dict, grants: list[str], unknown_steps: set[str]) -> dict:
+@dataclasses.dataclass
+class _Walk:
+    """What «Try it» knows as it walks an automation's steps: the data a step reads, the steps whose answer is not known
+    here (they would call, ask or act), whether a condition already stopped the run, and how a text a person reads
+    says each datum."""
+
+    ctx: OperationContext
+    grants: list[str]
+    values: dict
+    say: document.Say
+    operations: dict[str, Operation]
+    stopped: bool = False
+    unknown: set[str] = dataclasses.field(default_factory=set)
+
+    def reads_unknown(self, paths: list[str]) -> bool:
+        """Whether one of ``paths`` reads the answer of a step not known here."""
+        return any(path.startswith("steps.") and path.split(".")[1] in self.unknown for path in paths)
+
+
+def _try_call(walk: _Walk, step: Any) -> dict:
     """What «Try it» says of a call: where it would go and with what — every secret as ``vault.MASK`` and
     the call's key as «…» (it is known when it runs) —, never calling."""
     reads = [
         path
         for path in document.references([step.url, *step.headers.values(), step.body])
-        if path.startswith("steps.") and path.split(".")[1] in unknown_steps
+        if path.startswith("steps.") and path.split(".")[1] in walk.unknown
     ]
     if reads:
         return {"outcome": "cannot_tell", "unknown": reads}
     masked = dict.fromkeys(document.secret_names(step.model_dump()), vault.MASK)
-    url, headers, body = document.render_call(step.model_dump(), values, masked, "…")
+    url, headers, body = document.render_call(step.model_dump(), walk.values, masked, "…")
     params = {"method": step.method, "url": url, "headers": headers, "body": body, "host": document.host_of(step.url)}
-    granted = document.http_grant(step.url) in grants
+    granted = document.http_grant(step.url) in walk.grants
     return {"outcome": "would_call" if granted else "not_allowed", "params": params}
+
+
+def _tried_ask(walk: _Walk, step: Any) -> dict:
+    """The question «Ask someone first» would ask, its texts as the person will read them; nothing is asked."""
+    texts = {"title": document.fill(step.title, walk.values, walk.say), "details": document.fill(step.details, walk.values, walk.say)}
+    return {"outcome": "would_ask", "params": texts | {"role": step.role, "hours": step.hours}}
+
+
+def _tried_assistant(walk: _Walk, step: Any) -> dict:
+    """What «Ask the assistant» would ask it, and the data it fixes; nothing is asked."""
+    asked = {"prompt": document.fill(step.prompt, walk.values), "tools": list(step.tools), "mode": step.mode}
+    pinned = _tried_pinned(walk.ctx, step, walk.values, walk.unknown)
+    return {"outcome": "would_ask_assistant", "params": asked, "pinned": pinned}
+
+
+#: The steps whose answer is not known here — a call, a question, the assistant —: a step after them that reads it
+#: cannot be told.
+_ANSWERED_LATER = {"http": _try_call, "ask": _tried_ask, "assistant": _tried_assistant}
+
+
+def _tried_condition(walk: _Walk, step: Any) -> dict:
+    """Whether a «Continue only if…» would let the run go on; one that reads a step not known here cannot be told."""
+    if walk.reads_unknown(list(step.when)):
+        return {"outcome": "cannot_tell"}
+    failed = document.failed_clauses(step.when, walk.values)
+    walk.stopped = bool(failed)
+    return {"outcome": "stops_here" if failed else "would_run", "failed": _clauses(failed)}
+
+
+def _skipped(walk: _Walk, step: Any) -> list[dict]:
+    """The clauses of a step's «Only run if…» that do not hold; none when it has none or reads a step not known here."""
+    run_if = getattr(step, "run_if", None)
+    if not run_if or walk.reads_unknown([*run_if, *document.references(list(run_if.values()))]):
+        return []
+    return document.failed_clauses(run_if, walk.values)
+
+
+def _action_outcome(walk: _Walk, step: Any, mapped: dict, unknown: list[str]) -> dict:
+    """What an action or a read would do with ``mapped``: refused before it runs (it needs a person, it is not
+    available or not allowed, its data say no), not told (it reads a step not known here) or run."""
+    op = walk.operations.get(step.operation)
+    grantable = grantable_operations(walk.ctx.scope).get(step.operation)
+    if grantable is not None and needs_a_person(grantable):
+        return {"outcome": "high_risk"}
+    if op is None or op.kind != step.kind:
+        return {"outcome": "unavailable"}
+    if step.operation not in walk.grants:
+        return {"outcome": "not_allowed"}
+    if unknown:
+        return {"outcome": "cannot_tell"}
+    try:
+        op.input.model_validate(prepared(op, step.kind, getattr(step, "result", "first"), mapped))
+    except pydantic.ValidationError as invalid:
+        return {"outcome": "refused", "errors": validation_fields(invalid)}
+    return {"outcome": "would_run"}
+
+
+def _tried_action(walk: _Walk, step: Any) -> dict:
+    """An action's or a read's data as it would get them, and what it would do with them."""
+    walk.unknown.add(step.id)
+    mapped, empty, unknown = map_params(
+        step.params, walk.values, walk.unknown, say=walk.say, person=PERSON_PARAMS.get(step.operation, ())
+    )
+    return {"params": mapped, "empty": empty, "unknown": unknown} | _action_outcome(walk, step, mapped, unknown)
+
+
+def _tried_step(walk: _Walk, step: Any) -> dict:
+    """What one step would do, in order: not reached once a condition stopped the run, skipped when its «Only run if…»
+    does not hold, else what its kind does."""
+    out: dict[str, Any] = {"id": step.id, "kind": step.kind, "operation": getattr(step, "operation", "")}
+    if walk.stopped:
+        return out | {"outcome": "not_reached"}
+    if skipped := _skipped(walk, step):
+        return out | {"outcome": "skipped", "failed": _clauses(skipped)}
+    if step.kind == "delay":
+        return out | {"outcome": "waits", "seconds": step.seconds}
+    if step.kind == "condition":
+        return out | _tried_condition(walk, step)
+    if answered_later := _ANSWERED_LATER.get(step.kind):
+        said = answered_later(walk, step)
+        walk.unknown.add(step.id)
+        return out | said
+    return out | _tried_action(walk, step)
+
+
+def _tried_document(document_json: str) -> TestDocumentIn:
+    """The automation to try, or ``InvalidPayload`` naming the first datum of it that does not hold."""
+    try:
+        return TestDocumentIn.model_validate_json(document_json)
+    except pydantic.ValidationError as invalid:
+        fields = {f"document.{key}": message for key, message in validation_fields(invalid).items()}
+        raise InvalidPayload(next(iter(fields.values())), fields=fields) from None
 
 
 @operation(
@@ -144,13 +256,9 @@ def _try_call(step: Any, values: dict, grants: list[str], unknown_steps: set[str
         "would refuse, where a condition would stop it and what it is not allowed yet. Executes nothing."
     },
 )
-def try_flow(ctx: OperationContext, data: TestIn) -> dict:  # noqa: C901, PLR0912, PLR0915
+def try_flow(ctx: OperationContext, data: TestIn) -> dict:
     grants = resolve_flow(data.id, None).grants if data.id is not None else []
-    try:
-        tried = TestDocumentIn.model_validate_json(data.document)
-    except pydantic.ValidationError as invalid:
-        fields = {f"document.{key}": message for key, message in validation_fields(invalid).items()}
-        raise InvalidPayload(next(iter(fields.values())), fields=fields) from None
+    tried = _tried_document(data.document)
     trigger = tried.trigger
     sample = (
         sample_of(ctx, trigger.event)
@@ -163,97 +271,12 @@ def try_flow(ctx: OperationContext, data: TestIn) -> dict:  # noqa: C901, PLR091
         if trigger.kind == "event" and sample["found"]
         else []
     )
-    stopped = bool(trigger_failed)
-    operations = catalog_operations(ctx.scope)
     # What a person would read is said as the person trying it reads it (who saves it, in their language).
-    say = words_for([step.model_dump() for step in tried.steps], ctx.language, ctx.scope, values)
-    unknown_steps: set[str] = set()
-    steps = []
-    for step in tried.steps:
-        out: dict[str, Any] = {
-            "id": step.id,
-            "kind": step.kind,
-            "operation": getattr(step, "operation", ""),
-        }
-        if stopped:
-            steps.append(out | {"outcome": "not_reached"})
-            continue
-        run_if = getattr(step, "run_if", None)
-        if run_if and not any(
-            path.startswith("steps.") and path.split(".")[1] in unknown_steps
-            for path in [*run_if, *document.references(list(run_if.values()))]
-        ):
-            skipped = document.failed_clauses(run_if, values)
-            if skipped:
-                steps.append(out | {"outcome": "skipped", "failed": _clauses(skipped)})
-                continue
-        if step.kind == "delay":
-            steps.append(out | {"outcome": "waits", "seconds": step.seconds})
-            continue
-        if step.kind == "http":
-            steps.append(out | _try_call(step, values, grants, unknown_steps))
-            unknown_steps.add(step.id)
-            continue
-        if step.kind == "ask":
-            # Nothing is asked; what the person would answer is not known here.
-            texts = {"title": document.fill(step.title, values, say), "details": document.fill(step.details, values, say)}
-            steps.append(out | {"outcome": "would_ask", "params": texts | {"role": step.role, "hours": step.hours}})
-            unknown_steps.add(step.id)
-            continue
-        if step.kind == "assistant":
-            # Nothing is asked: what the assistant would answer is not known here.
-            asked = {"prompt": document.fill(step.prompt, values), "tools": list(step.tools), "mode": step.mode}
-            pinned = _tried_pinned(ctx, step, values, unknown_steps)
-            steps.append(out | {"outcome": "would_ask_assistant", "params": asked, "pinned": pinned})
-            unknown_steps.add(step.id)
-            continue
-        if step.kind == "condition":
-            reads = list(step.when)
-            if any(
-                path.startswith("steps.") and path.split(".")[1] in unknown_steps
-                for path in reads
-            ):
-                steps.append(out | {"outcome": "cannot_tell"})
-                continue
-            failed = document.failed_clauses(step.when, values)
-            stopped = bool(failed)
-            steps.append(
-                out
-                | {
-                    "outcome": "stops_here" if failed else "would_run",
-                    "failed": _clauses(failed),
-                }
-            )
-            continue
-        unknown_steps.add(step.id)
-        op = operations.get(step.operation)
-        mapped, empty, unknown = map_params(
-            step.params, values, unknown_steps, say=say, person=PERSON_PARAMS.get(step.operation, ())
-        )
-        out |= {"params": mapped, "empty": empty, "unknown": unknown}
-        grantable = grantable_operations(ctx.scope).get(step.operation)
-        if grantable is not None and needs_a_person(grantable):
-            steps.append(out | {"outcome": "high_risk"})
-        elif op is None or op.kind != step.kind:
-            steps.append(out | {"outcome": "unavailable"})
-        elif step.operation not in grants:
-            steps.append(out | {"outcome": "not_allowed"})
-        elif unknown:
-            steps.append(out | {"outcome": "cannot_tell"})
-        else:
-            try:
-                op.input.model_validate(
-                    prepared(op, step.kind, getattr(step, "result", "first"), mapped)
-                )
-            except pydantic.ValidationError as invalid:
-                steps.append(
-                    out | {"outcome": "refused", "errors": validation_fields(invalid)}
-                )
-            else:
-                steps.append(out | {"outcome": "would_run"})
+    say = words_for([step.model_dump() for step in tried.steps], ctx.language, ctx.scope, values, sample["event"])
+    walk = _Walk(ctx, grants, values, say, catalog_operations(ctx.scope), stopped=bool(trigger_failed))
     return {
         "sample": sample,
         "starts": not trigger_failed,
         "trigger_failed": _clauses(trigger_failed),
-        "steps": steps,
+        "steps": [_tried_step(walk, step) for step in tried.steps],
     }
