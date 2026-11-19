@@ -3,8 +3,8 @@
 // the environment (QA_QWEN_API_KEY, QA_OPENAI_API_KEY; never in the repo, the report or a screenshot) and the stack's
 // SaaS checkout (E2E_SAAS_DIR) running with ASSISTANT_SERVICE_PROVIDER=openai (README «La QA del asistente con el modelo
 // real»). Once per run it registers the Hub's apps in the SaaS (`register_apps`), sets the real providers through the
-// SaaS's operations (assistant-battery.ts, `SEED_PY`), indexes the documentation (`index_docs`) and empties this
-// month's messages of `a`. Each item asks in a new conversation, records what went over the wire
+// SaaS's operations (assistant-seed.ts, `SEED_PY`: the QA_ANSWER_* variables choose the model that answers), indexes
+// the documentation (`index_docs`) and empties this month's messages of `a`. Each item asks in a new conversation, records what went over the wire
 // (`/api/assistant/turn`), decides the card as a person would, checks the record through the Hub's API and writes
 // `.artifacts/qa/<run>/assistant-battery-B.md` (the report) and `.artifacts/qa/<run>/<item>-<slug>.png`. The test fails when the
 // automatic verdict does; the wording is for a person to read in the report.

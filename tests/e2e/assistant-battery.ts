@@ -1,6 +1,6 @@
 // The QA battery of the Hub's assistant with the real model and the real documentation index: its items, how a streamed turn of
-// `/api/assistant/turn` is read, the automatic verdict of each item, the report and the seed of the real providers on
-// the stack's SaaS. Pure, so Vitest proves it (assistant-battery.test.ts); qa/assistant-battery.spec.ts drives Chrome
+// `/api/assistant/turn` is read, the automatic verdict of each item, the report and the cleanup of what the seed
+// (assistant-seed.ts) leaves on the stack's SaaS. Pure, so Vitest proves it (assistant-battery.test.ts); qa/assistant-battery.spec.ts drives Chrome
 // with it, only with QA_REAL_PROVIDER=1 (never in CI: it spends real tokens). An answer's wording is never judged
 // here: what a person must read is listed per item for the human review.
 
@@ -91,11 +91,6 @@ export interface Meta {
 /** The tools every turn is offered whatever is asked (`base/assistant/relevance.py`, `ALWAYS`): none of them is the business's. */
 export const ALWAYS = ['base.setup.status', 'base.business.get', 'base.docs.search'];
 const DOCS_SEARCH = 'base.docs.search';
-
-/** The OpenAI-compatible address of the Qwen workspace erplora.com answers with. */
-export const QWEN_ADDRESS = 'https://ws-7mg25evt3ic2ow02.eu-central-1.maas.aliyuncs.com/compatible-mode/v1';
-export const ANSWER_MODEL = 'qwen3.7-plus';
-export const FALLBACK_MODEL = 'gpt-5.4-mini';
 
 export const ITEMS: readonly Item[] = [
   { id: 'B21', slug: 'empleado-pin', question: '¿Cómo doy de alta a un empleado con su PIN?', language: 'es', check: 'howto', decide: 'cancel', human: 'Steps match the Hub (Team, PIN) and cite the docs.' },
@@ -403,74 +398,7 @@ export function guardSaasDatabase(name: string): void {
   }
 }
 
-/**
- * The SaaS side of the seed (`manage.py shell -c` in the stack's SaaS, DEBUG only): the real providers set through the
- * gateway's own operations, as ERPlora's staff does in the admin. `openai` (the services' provider: embeddings, and the
- * fallback model) by `assistant.credential.import` as the platform; `qwen`, an OpenAI-compatible provider at the Qwen
- * workspace, is added as the admin's form adds it (no operation adds a provider) and its key, models and the policy go
- * through `credential_save`, `model_select` and `policy_update` as a member of the staff. The keys come from the
- * environment and are never printed; it prints the models and the services' provider as one line of JSON.
- */
-export const SEED_PY = `
-import json, os
-from django.conf import settings
-from django.contrib.auth import get_user_model
-from django.contrib.auth.models import Permission
-from live.context import OperationContext, Scope
-from assistant import services
-from assistant.models import AIModel, AIProvider, AIProviderCredential
-from assistant.schemas import CredentialImportIn, CredentialIn, ModelSelectIn, PolicyIn
-
-if not settings.DEBUG:
-    raise SystemExit("the real-provider seed only runs with DEBUG=True")
-qwen_secret = os.environ["QA_QWEN_API_KEY"].strip()
-openai_secret = os.environ["QA_OPENAI_API_KEY"].strip()
-services.credential_import(
-    services.platform_context(), CredentialImportIn(kind="openai", api_key=openai_secret, label="qa", force=True)
-)
-User = get_user_model()
-staff = User.objects.filter(email="${QA_STAFF_EMAIL}").first()
-if staff is None:
-    staff = User.objects.create_user(email="${QA_STAFF_EMAIL}", password=None, is_staff=True, language="en")
-staff.user_permissions.add(*Permission.objects.filter(content_type__app_label="assistant"))
-staff = User.objects.get(pk=staff.pk)
-ctx = OperationContext(scope=Scope("user", str(staff.pk)), actor=staff, permissions=frozenset({"assistant.manage"}), language="en")
-qwen, _created = AIProvider.objects.update_or_create(
-    slug="qwen", defaults={"name": "Qwen", "kind": "openai", "base_url": os.environ["QA_QWEN_ADDRESS"], "is_enabled": True}
-)
-kept = AIProviderCredential.objects.filter(provider=qwen, label="qa").first()
-services.credential_save(ctx, CredentialIn(provider=qwen.pk, id=kept.pk if kept else None, label="qa", is_active=True, api_key=qwen_secret))
-openai = AIProvider.objects.get(slug="openai")
-for provider, model in ((qwen, os.environ["QA_ANSWER_MODEL"]), (openai, os.environ["QA_FALLBACK_MODEL"])):
-    services.model_select(ctx, ModelSelectIn(provider=provider.pk, listed=[{"model_id": model, "display_name": model}], selected=[model]))
-answer = AIModel.objects.get(provider=qwen, model_id=os.environ["QA_ANSWER_MODEL"])
-fallback = AIModel.objects.get(provider=openai, model_id=os.environ["QA_FALLBACK_MODEL"])
-services.policy_update(ctx, PolicyIn(active_model=answer.pk, fallback_model=fallback.pk))
-print(json.dumps({"model": "qwen/" + answer.model_id, "fallback": "openai/" + fallback.model_id, "service": settings.ASSISTANT_SERVICE_PROVIDER}))
-`;
-
 type Env = Record<string, string | undefined>;
-
-/** How the seed runs from the stack's SaaS checkout: on `saasDatabase`, the keys only in the environment. */
-export function seedCommand(env: Env, saasDatabase: string): { file: string; args: string[]; env: Record<string, string> } {
-  guardSaasDatabase(saasDatabase);
-  for (const name of ['QA_QWEN_API_KEY', 'QA_OPENAI_API_KEY']) {
-    if (!env[name]?.trim()) throw new Error(`${name} is not set: export it before a run with the real provider (tests/e2e/README.md).`);
-  }
-  const base = Object.fromEntries(Object.entries(env).filter((entry): entry is [string, string] => entry[1] !== undefined));
-  return {
-    file: 'uv',
-    args: ['run', 'python', 'manage.py', 'shell', '-c', SEED_PY],
-    env: {
-      ...base,
-      DB_NAME: saasDatabase,
-      ASSISTANT_SERVICE_PROVIDER: 'openai',
-      QA_QWEN_ADDRESS: QWEN_ADDRESS,
-      QA_ANSWER_MODEL: ANSWER_MODEL,
-      QA_FALLBACK_MODEL: FALLBACK_MODEL,
-    },
-  };
-}
 
 /**
  * What a run leaves behind on the stack's SaaS, taken out again once it ends, failed or not (`manage.py shell -c`,

@@ -7,14 +7,30 @@
 // QA_REAL_PROVIDER=1: it spends real tokens and never runs in CI. Needs the keys in the environment (QA_QWEN_API_KEY,
 // QA_OPENAI_API_KEY; never in the repo, the report or a screenshot) and the stack's SaaS (E2E_SAAS_DIR) running with
 // ASSISTANT_SERVICE_PROVIDER=openai (README «Las sondas del asistente»). A probe that does not fit the catalogue (empty
-// phrase, a copy of an ask, a tool the role holds or lacks) is n.a.: no turn is asked. Writes
-// `.artifacts/qa/<run>/assistant-probes.md` (the report), its JSON and `.artifacts/qa/<run>/<probe>.png`.
+// phrase, a copy of an ask, a tool the role holds or lacks) is n.a.: no turn is asked. The QA_ANSWER_* variables
+// choose the model that answers (assistant-seed.ts) and QA_PROBES_SAMPLE a sample of the files (assistant-sample.ts).
+// Writes `.artifacts/qa/<run>/assistant-probes.md` (the report), its JSON, `.artifacts/qa/<run>/<probe>.png` and
+// `.artifacts/qa/<run>/bench.json`, the record of each turn that compares models (assistant-bench.ts).
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
 
 import { type BrowserContext, expect, test } from '@playwright/test';
 
 import { observe, redact } from '../assistant-battery';
+import {
+  benchModel,
+  type BenchMeta,
+  type BenchReport,
+  benchTurn,
+  type Measured,
+  offeredCommand,
+  parseOffered,
+  parseUsage,
+  toolKind,
+  type Usage,
+  USAGE_SQL,
+  withTurn,
+} from '../assistant-bench';
 import {
   type Catalog,
   catalogKey,
@@ -41,10 +57,13 @@ import {
   openPanel,
   run,
   SAAS_DIR,
+  saasSql,
   SECRETS,
   seedRealProviders,
   TURN_MS,
 } from '../assistant-real';
+import { sampleChoice, sampleProbes } from '../assistant-sample';
+import { answerChoice } from '../assistant-seed';
 import { A, api, ARTIFACTS, capture, type Credentials, EMPLOYEE, HUB_DIR, hostPage, OWNER } from '../helpers';
 import { STACK } from '../stack';
 
@@ -56,6 +75,7 @@ const RUN = (process.env.QA_PROBES_RUN || process.env.PW_RUN_ID || 'run').replac
 const QA_DIR = join(ARTIFACTS, 'qa', RUN);
 const STATE = join(QA_DIR, 'assistant-probes.json');
 const REPORT = join(QA_DIR, 'assistant-probes.md');
+const BENCH = join(QA_DIR, 'bench.json');
 const CORPUS = join(HUB_DIR, 'tests', 'e2e', 'qa', 'probes');
 
 /** The probe files of the run: `QA_PROBES` (files or folders, comma-separated), else every file of the corpus. */
@@ -72,7 +92,9 @@ function probeFiles(): string[] {
 }
 
 const FILES = probeFiles();
-const PROBES: Probe[] = loadedProbes(FILES.map((path) => ({ source: relative(HUB_DIR, path), text: readFileSync(path, 'utf8') })));
+const CORPUS_PROBES: Probe[] = loadedProbes(FILES.map((path) => ({ source: relative(HUB_DIR, path), text: readFileSync(path, 'utf8') })));
+const SAMPLE = sampleChoice(process.env);
+const PROBES: Probe[] = SAMPLE ? sampleProbes(CORPUS_PROBES, SAMPLE) : CORPUS_PROBES;
 
 /** Who signs in for each role: the SaaS's demo accounts, and the two members the run seeds. */
 const PEOPLE: Record<Role, Credentials> = { owner: OWNER, employee: EMPLOYEE, ...MEMBERS };
@@ -125,6 +147,49 @@ function prepare(): State {
   return state;
 }
 
+/** The run's bench report as the spec starts it; a run asked again keeps the one it began with. */
+const benchMeta: BenchMeta = {
+  product: 'hub',
+  run: RUN,
+  date: new Date().toISOString(),
+  model: benchModel(answerChoice(process.env)),
+  files: FILES.map((path) => relative(HUB_DIR, path)),
+  corpus: CORPUS_PROBES.length,
+  sample: SAMPLE,
+};
+
+/** The tools a turn offers each probe's phrase, ranked by the Hub as the turn ranks them (assistant-bench.ts). */
+function rankProbes(): Record<string, string[]> {
+  const file = join(QA_DIR, 'offered-probes.json');
+  writeFileSync(file, JSON.stringify(PROBES.map(({ id, role, language, phrase }) => ({ id, role, language, phrase }))));
+  const command = offeredCommand(file, process.env);
+  return parseOffered(run(command.file, command.args, HUB_DIR, command.env));
+}
+
+/** What `a` spent in the stack's SaaS since the probe emptied its month. */
+const spent = (): Usage => parseUsage(saasSql(USAGE_SQL));
+
+/** A turn that never ended is the model's failure too: its record says why, with what it streamed and spent. */
+function unfinished(probe: Probe, bodies: string[], latencyMs: number, error: Error): void {
+  const outcome: ProbeOutcome = { probe, answer: '', observed: observe(bodies), decided: 'none', notices: [], screenshot: '', problems: [] };
+  let why = `did not finish: ${error.message.split('\n')[0]}`;
+  let usage: Usage | null = null;
+  try {
+    usage = spent();
+  } catch (unread) {
+    why += `; its usage could not be read: ${(unread as Error).message.split('\n')[0]}`;
+  }
+  bench(outcome, { bodies, latencyMs, usage, error: why });
+}
+
+/** The probe's turn into the run's bench report. */
+function bench(outcome: ProbeOutcome, measured: Omit<Measured, 'kind' | 'offered'>): void {
+  const kept = existsSync(BENCH) ? (JSON.parse(readFileSync(BENCH, 'utf8')) as BenchReport) : null;
+  const turn = benchTurn(outcome, { ...measured, kind: toolKind(outcome.probe, catalogs), offered: offered[outcome.probe.id] ?? null });
+  const report = withTurn(kept, benchMeta, turn, PROBES.map((probe) => probe.id));
+  writeFileSync(BENCH, redact(JSON.stringify(report, null, 2), SECRETS));
+}
+
 /** Every app of `a` on, as the exported catalogue assumes: turned on until none is left or none more can be. */
 async function everyAppOn(context: BrowserContext): Promise<void> {
   let refused: string[] = [];
@@ -145,6 +210,7 @@ async function everyAppOn(context: BrowserContext): Promise<void> {
 
 let state: State;
 const catalogs: Record<string, Catalog> = {};
+let offered: Record<string, string[]> = {};
 
 // The real keys and the QA accounts never stay in the stack's SaaS, whether the run passed or not.
 test.afterAll(() => cleanUpRealProviders(QA_EMAILS));
@@ -153,6 +219,7 @@ test.beforeAll(async ({ browser }) => {
   test.setTimeout(900_000);
   state = prepare();
   for (const { role, language } of catalogsNeeded(PROBES)) catalogs[catalogKey(role, language)] = exportCatalog(role, language);
+  offered = rankProbes();
   if (state.prepared) return;
   const { context } = await hostPage(browser, A, { next: '/' });
   try {
@@ -170,7 +237,9 @@ for (const probe of PROBES) {
     const screenshot = join(QA_DIR, `${probe.id}.png`);
     const problems = problemsOf(probe, catalogs);
     if (problems.length) {
-      save({ probe, answer: '', observed: observe([]), decided: 'none', notices: [], screenshot: '', problems });
+      const outcome: ProbeOutcome = { probe, answer: '', observed: observe([]), decided: 'none', notices: [], screenshot: '', problems };
+      save(outcome);
+      bench(outcome, { bodies: [], latencyMs: null, usage: null, error: null });
       test.skip(true, `the probe does not fit the catalogue: ${problems.join('; ')}`);
       return;
     }
@@ -183,7 +252,16 @@ for (const probe of PROBES) {
     try {
       await context.addCookies([{ name: 'django_language', value: probe.language, domain: new URL(A).hostname, path: '/' }]);
       await openPanel(page);
-      const { bodies, decided } = await converse(page, probe.phrase, probe.decide ?? 'cancel', probe.id);
+      const bodies: string[] = [];
+      const started = Date.now();
+      let said: Awaited<ReturnType<typeof converse>>;
+      try {
+        said = await converse(page, probe.phrase, probe.decide ?? 'cancel', probe.id, bodies);
+      } catch (error) {
+        unfinished(probe, bodies, Date.now() - started, error as Error);
+        throw error;
+      }
+      const { decided } = said;
       const outcome: ProbeOutcome = {
         probe,
         answer: await answerOf(page),
@@ -199,6 +277,7 @@ for (const probe of PROBES) {
         outcome.screenshot = `(not captured: ${(error as Error).message.slice(0, 200)})`;
       }
       save(outcome);
+      bench(outcome, { bodies, latencyMs: said.endedAt - started, usage: spent(), error: null });
       const verdict = probeVerdict(outcome);
       expect(verdict.verdict, `${probe.id}: ${verdict.reasons.join('; ')} (chosen: ${verdict.chosen})`).toBe('PASS');
     } finally {
