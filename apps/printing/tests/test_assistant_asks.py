@@ -1,19 +1,23 @@
 """What layer 1 of the assistant's QA says of Printing: how many tools it offers, the writes the real-model QA found
-unreachable, and a person's own words for each ask of its tools.
+unreachable, and a person's own words for each ask of its tools, so that overwriting any one ask fails a test.
 
 Every ask of every tool of printing bringing its tool among the first ten, role by role, in English and in Spanish, out
 of the catalogue of a business with every app on and ranked as a turn ranks, is ``base/tests/test_assistant_asks.py``'s
 (printing is listed in ``LIVE_ASSISTANT_ASKS_REQUIRED``), as ``live.E020`` over its asks.
 """
 
+import dataclasses
+from collections.abc import Callable
 
 import pytest
+from live import assistant as shared
 from live.operations import AI, registry
 
 from apps.invoice.tests.conftest import in_hubs
 from base.models import Membership
-from base.tests.test_assistant_asks import assert_its_asks_bring, english_coverage_test, place_of_no_ask
-from base.tests.test_assistant_asks import english_words_test, own_words_test, said_in_spanish_too_test
+from base.tests.test_assistant_asks import assert_its_asks_bring, assert_its_asks_lift, place_of_no_ask
+from base.tests.test_assistant_asks import english_coverage_test, english_words_test, own_words_test
+from base.tests.test_assistant_asks import said_in_spanish_too_test, said_only_in_english
 
 from .conftest import HUB_DB
 
@@ -215,3 +219,64 @@ test_the_english_asks_that_say_nothing_new_keep_saying_nothing_new = said_in_spa
 test_each_tool_has_its_own_english_words = english_coverage_test(
     "printing", list(dict(OWN_WORDS_EN).items()), also=SAID_IN_SPANISH_TOO
 )
+
+
+#: Every tool of Printing, once: ``test_each_tool_has_its_own_english_words`` holds them to the registry.
+TOOLS = sorted({*dict(OWN_WORDS_EN), *SAID_IN_SPANISH_TOO})
+FILLER = "zzqxfiller"
+
+
+def overwritten(tools: dict, name: str, language: str, index: int) -> dict:
+    """``tools`` with ask ``index`` of tool ``name`` in ``language`` overwritten with filler, its other asks kept."""
+    op = tools[name]
+    asks = shared.asks_of(op)
+    said = {**asks, language: tuple(FILLER if at == index else ask for at, ask in enumerate(asks[language]))}
+    return {**tools, name: dataclasses.replace(op, ai=dataclasses.replace(op.ai_spec(), asks=said))}
+
+
+def fails(check: Callable[..., None], *args) -> bool:
+    try:
+        check(*args)
+    except AssertionError:
+        return True
+    return False
+
+
+def phrases_of(name: str) -> list[tuple[str, Callable[..., None], str]]:
+    """The phrases this module ranks as a person's own words for tool ``name``, with their language and check."""
+    return [
+        *(("es", assert_its_asks_bring, phrase) for tool, phrase in OWN_WORDS_ES if tool == name),
+        *((language, assert_its_asks_bring, phrase) for language, tool, phrase in OWN_WORDS if tool == name),
+        *(("en", assert_its_asks_lift, phrase) for tool, phrase in OWN_WORDS_EN if tool == name),
+    ]
+
+
+def caught(tools: dict, name: str, language: str, index: int, phrases: list) -> bool:
+    """Whether overwriting that one ask fails a test of this module."""
+    if language == "en" and name in SAID_IN_SPANISH_TOO:
+        return said_only_in_english(overwritten(tools["en"], name, "en", index)[name]) != []
+    return any(
+        fails(check, overwritten(tools[said], name, language, index), name, phrase, said)
+        for said, check, phrase in phrases
+    )
+
+
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
+@pytest.mark.parametrize("name", TOOLS)
+def test_overwriting_any_one_ask_of_printing_fails_a_phrase_that_depends_on_it(catalog_of, name):
+    """Each ask says a way of asking that no other ask of its tool says, and a phrase here depends on it: an ask that
+    only repeats the others' words could be changed into anything without a test seeing it."""
+    tools = {language: catalog_of(Membership.Role.OWNER, language) for language in ("es", "en")}
+    phrases = [
+        (said, check, phrase)
+        for said, check, phrase in phrases_of(name)
+        if not fails(check, tools[said], name, phrase, said)
+    ]
+    assert phrases  # positive control: the tool's phrases pass with its asks as they are
+    unseen = [
+        f"{language}[{index}] {ask}"
+        for language, asks in sorted(shared.asks_of(registry[name]).items())
+        for index, ask in enumerate(asks)
+        if not caught(tools, name, language, index, phrases)
+    ]
+    assert unseen == []
