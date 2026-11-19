@@ -973,7 +973,7 @@ class DeletedOut(Schema):
 
 
 class PrintLabelOut(Schema):
-    """INVENTORY-F25: the label put in Printing's queue."""
+    """The barcode label put in Printing's queue."""
 
     job_id: UUID = Field(description="The print job of the label, in Printing's queue.")
     printer_name: str | None = Field(
