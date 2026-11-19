@@ -167,6 +167,9 @@ msgstr ""
 "Demasiadas reservas desde este dispositivo en la última hora. Inténtalo más "
 "tarde o llama al negocio."
 
+msgid "We could not take this booking. Try again, or call the business."
+msgstr "No hemos podido hacer esta reserva. Inténtalo de nuevo o llama al negocio."
+
 msgid ""
 "This business is receiving many online bookings right now. Try again in a "
 "few minutes."
