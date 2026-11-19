@@ -181,9 +181,9 @@ jobs:
   # specs already in. With every group in, the job runs every @smoke test, as on the Mac.
   smoke:
     runs-on: ubuntu-24.04
-    # Measured from 6 to 7.5 minutes a run, the stack included: twice the slowest, as GitHub's runners vary that much on
-    # the same commit. A group that enters measures it again.
-    timeout-minutes: 15
+    # Measured from 7 min 49 s to 9 min 17 s a run, the stack included: twice the slowest, as GitHub's runners vary that
+    # much on the same commit. A group that enters measures it again.
+    timeout-minutes: 19
     permissions:
       contents: read
     steps:
@@ -247,6 +247,11 @@ jobs:
           --spec tests/e2e/sale-cash-gate.spec.ts
           --spec tests/e2e/cash-register-shift.spec.ts
           --spec tests/e2e/printing-sale.spec.ts
+          --spec tests/e2e/sale-fiscal-qr.spec.ts
+          --spec tests/e2e/sale-invoice-chain.spec.ts
+          --spec tests/e2e/invoice-sale.spec.ts
+          --spec tests/e2e/invoice-manual.spec.ts
+          --spec tests/e2e/verifactu-records.spec.ts
       # The run's log, both runservers' logs and Playwright's output (each failed test's trace and screenshot).
       - if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

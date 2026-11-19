@@ -1164,6 +1164,14 @@ comprobando antes que la cuenta y la autorización estén listas») se ofrece pa
 cuenta» (la de ERPlora) se lee como la cuenta de una mesa y van delante las escrituras de Ventas que la toman (`xfail`
 estricto en el test hasta ERPlora/live#76; sin «la cuenta y», la misma frase la trae la 6.ª).
 
+La tarjeta de confirmación de una escritura (BASE-F97) dice qué registro toca por el número de su factura, como la
+lista de registros y la ficha: reintentar, reenviar, preguntar a la AEAT, subsanar o anular el registro de una factura
+sale «Registro: TICKET-2026-000012», nunca su id. Sellar una factura por su id la dice por su número, como Facturación
+(«Factura: TICKET-2026-000012»). Lo lee `verifactu.record.get` (o `invoice.invoice.get`) como la persona que pregunta,
+en una transacción de solo lectura: quien no puede ver los registros o las facturas, un id que no existe o el de otro
+negocio, y una automatización sin nadie detrás, no ven esa línea. La marca de cada dato está en `card_names.py`
+(`base.E009` la comprueba al arrancar). Test: `test_card_names.py`.
+
 ### La cadena, la huella y el QR
 
 - **Huella** (`chain.py`): SHA-256 en hexadecimal **mayúsculas** de
