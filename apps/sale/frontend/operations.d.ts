@@ -1,5 +1,5 @@
-// Types of the sale app's operations for the SDK (`useLive`, `useCommand`), from apps/sale/schemas.py. Written by hand,
-// as the other apps' are: nothing generates them from `/api/openapi.json`. Keep it in step with schemas.py and with
+// Types of the sale app's operations for the SDK (`useLive`, `useCommand`), from apps/sale/schemas/. Written by hand,
+// as the other apps' are: nothing generates them from `/api/openapi.json`. Keep it in step with schemas/ and with
 // `frontend/generated/operations.json`. One input per operation (ninja's parity): no path parameters, ids travel in the
 // input. Money is whole cents (numbers); decimals (quantities, percentages, rates) are JSON strings on the way out
 // («2.000», «21.00»); dates ISO.

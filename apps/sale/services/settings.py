@@ -22,7 +22,7 @@ from apps.sale.queries.departments import (
 )
 from apps.sale.queries.payment_methods import allowed_types, payment_method_row
 from apps.sale.queries.settings import current_settings, settings_row
-from apps.sale.schemas import (
+from apps.sale.schemas.settings import (
     DepartmentIn,
     DepartmentOut,
     DepartmentRefIn,

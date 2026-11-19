@@ -7,7 +7,7 @@ from apps.cart_checkout.schemas import ItemRefIn as CartItemRefIn
 from apps.demo.schemas import ItemRefIn as DemoItemRefIn
 from apps.printing.schemas import DeviceOut as PrintingDeviceOut
 from apps.printing.schemas import JobCreateIn
-from apps.sale.schemas import SettingsOut as SaleSettingsOut
+from apps.sale.schemas.settings import SettingsOut as SaleSettingsOut
 from apps.table.schemas import SettingsIn as TableSettingsIn
 from apps.table.schemas import SettingsOut as TableSettingsOut
 from base.schemas.devices import DeviceOut as BaseDeviceOut

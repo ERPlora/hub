@@ -17,7 +17,7 @@ from apps.sale.queries.line_parts import check_grid, provisional_total
 from apps.sale.queries.order_lines import freeze_combo_line, freeze_open_line, freeze_product_line
 from apps.sale.queries.orders import find_order
 from apps.sale.queries.service_lines import Booking, freeze_service_line
-from apps.sale.schemas import (
+from apps.sale.schemas.orders import (
     OrderAddLineIn,
     OrderAddOpenLineIn,
     OrderAddComboLineIn,

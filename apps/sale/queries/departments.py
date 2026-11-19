@@ -11,7 +11,8 @@ from live.operations import AI, operation
 
 from apps.sale.models import Department, OrderLine, QuickNote
 from apps.sale.queries.rows import held
-from apps.sale.schemas import DepartmentListIn, DepartmentPage, OpenLineFields, QuickNoteListIn, QuickNotePage
+from apps.sale.schemas.lines import OpenLineFields
+from apps.sale.schemas.settings import DepartmentListIn, DepartmentPage, QuickNoteListIn, QuickNotePage
 from apps.tax.models import TaxCategory
 from apps.tax.queries import business_jurisdiction, business_today, category_by_reference, current_rates
 from base.ordering import list_order
