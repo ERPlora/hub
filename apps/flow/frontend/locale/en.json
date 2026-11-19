@@ -1091,6 +1091,7 @@
       "online_booking__public__slots": "Look for free times on the public page",
       "online_booking__settings__get": "Read the online booking settings",
       "online_booking__settings__update": "Change the online booking settings",
+      "online_booking__settings__upload_logo": "Upload the booking page's logo",
       "payment__method__activate": "Turn on a payment method",
       "payment__method__create": "Create a payment method",
       "payment__method__deactivate": "Turn off a payment method",

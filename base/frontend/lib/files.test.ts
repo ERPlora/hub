@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest';
 
 import en from '../locale/en.json';
 import es from '../locale/es.json';
-import type { FileItem } from '../operations';
+import type { FileItem } from '../operations/files';
 import {
   afterDelete,
   afterMove,

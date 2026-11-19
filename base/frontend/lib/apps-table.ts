@@ -2,7 +2,7 @@
 // page hands over who reads it and the change on its way, and turns what is pressed into the server's operations.
 import type { DataTableAction, DataTableColumnToggle } from '@erplora/ui/components';
 
-import type { AppRow } from '../operations';
+import type { AppRow } from '../operations/apps';
 import { canOpen, canRetry, canTurnOff, canTurnOn } from './apps';
 
 export interface AppsTableState {

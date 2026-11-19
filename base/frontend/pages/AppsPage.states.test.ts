@@ -6,7 +6,7 @@ import { app } from '../__tests__/app-row';
 import { appActionLabel, flip, freshEachTest, LIST, type Mounted, noteOf, open, PLANS, pressAppAction, rowOf, STORE, switchState, TAX } from '../__tests__/apps-page';
 import { confirmSpy } from '../__tests__/apps-page-spies';
 import { EMPLOYEE } from '../__tests__/mount-base';
-import type { AppList, AppRow } from '../operations';
+import type { AppList, AppRow } from '../operations/apps';
 
 vi.mock('@erplora/ui/components', async (importOriginal) => (await import('../__tests__/apps-page-spies')).componentsWithConfirmSpy(importOriginal));
 vi.mock('@erplora/ui/shell', async (importOriginal) => (await import('../__tests__/toast-spies')).shellWithToastSpies(importOriginal));

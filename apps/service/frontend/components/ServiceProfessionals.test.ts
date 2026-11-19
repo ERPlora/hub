@@ -11,7 +11,7 @@ import { describe, expect, it } from 'vitest';
 
 import { expectAmountLeftWaitsForMoney, expectSaveWaitsForMoney } from '../../../../base/frontend/__tests__/save-waits-for-money';
 import type { AssignmentOut } from '../operations';
-import type { Business } from '../../../../base/frontend/operations';
+import type { Business } from '../../../../base/frontend/operations/business';
 import { business, click, errorFrame, flush, ionChecked, ionValue, JAPANESE, mountService, page, POLISH } from '../__tests__/mount-service';
 import ServiceProfessionals from './ServiceProfessionals.vue';
 

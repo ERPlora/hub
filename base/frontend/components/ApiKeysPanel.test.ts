@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { errorFrame, flush, mountBase, subId } from '../__tests__/mount-base';
-import type { ApiKeyList, ApiKeyRow } from '../operations';
+import type { ApiKeyList, ApiKeyRow } from '../operations/api_keys';
 import ApiKeysPanel from './ApiKeysPanel.vue';
 
 vi.mock('@erplora/ui/shell', async (importOriginal) => ({

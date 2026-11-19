@@ -2,7 +2,7 @@ import * as components from '@erplora/ui/components';
 import { describe, expect, it, vi } from 'vitest';
 
 import { setupItem as item, setupStatus as status, widget } from '../__tests__/home-fixtures';
-import type { WidgetDef } from '../operations';
+import type { WidgetDef } from '../operations/home';
 import {
   activeWidgetKeys,
   blockingItems,

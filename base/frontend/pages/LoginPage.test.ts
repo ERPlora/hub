@@ -3,7 +3,7 @@ import { applySurface } from '@erplora/ui/shell';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { flush, mountBase } from '../__tests__/mount-base';
-import type { AccessDoor } from '../operations';
+import type { AccessDoor } from '../operations/access';
 import LoginPage from './LoginPage.vue';
 
 const access = vi.hoisted(() => ({ enterWith: vi.fn(), leaveTo: vi.fn() }));

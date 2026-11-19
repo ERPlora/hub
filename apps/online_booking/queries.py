@@ -104,7 +104,6 @@ _OWN_FIELDS = (
     "page_title",
     "welcome_message",
     "primary_color",
-    "logo_url",
     "require_email",
     "max_upcoming_per_customer",
     "allow_staff_selection",
@@ -144,10 +143,11 @@ def page_settings(*, lock: bool = False) -> Settings:
     return settings
 
 
-def settings_out(own: Settings) -> dict:
+def settings_out(ctx: OperationContext, own: Settings) -> dict:
     rules = current_rules()
     return {
         **{field: getattr(own, field) for field in _OWN_FIELDS},
+        **SettingsOut.logo_of(ctx.scope, own.logo),
         **{field: getattr(rules, field) for field in RULE_FIELDS},
         "timezone": zone_name(),
     }
@@ -454,7 +454,7 @@ def get_booking(ctx: OperationContext, data: BookingRefIn) -> dict:
     },
 )
 def get_settings(ctx: OperationContext, data: NoIn) -> dict:
-    return settings_out(current_settings())
+    return settings_out(ctx, current_settings())
 
 
 # ── The public page ──────────────────────────────────────────────────────────────────────────
@@ -483,11 +483,10 @@ def get_settings(ctx: OperationContext, data: NoIn) -> dict:
 def public_page(ctx: OperationContext, data: NoIn) -> dict:
     own = page_settings()
     rules = current_rules()
-    return PageOut.owner(ctx) | {
+    return PageOut.owner(ctx, own.logo) | {
         "title": own.page_title or str(DEFAULT_TITLE),
         "welcome_message": own.welcome_message,
         "primary_color": own.primary_color,
-        "logo_url": own.logo_url,
         "require_email": own.require_email,
         "allow_staff_selection": own.allow_staff_selection,
         "allow_notes": own.allow_notes,

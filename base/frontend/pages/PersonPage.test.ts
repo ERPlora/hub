@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { errorFrame, flush, installedApp, leaveInstalledApp, mountBase, subId, tap } from '../__tests__/mount-base';
-import type { PersonDetail } from '../operations';
+import type { PersonDetail } from '../operations/people';
 import PersonPage from './PersonPage.vue';
 
 vi.mock('@erplora/ui/shell', async (importOriginal) => ({

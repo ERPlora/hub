@@ -14,7 +14,7 @@ import {
   expectSaveWaitsForMoney,
   expectWindowSaysMoneyUnreadable,
 } from '../../../../base/frontend/__tests__/save-waits-for-money';
-import type { Business } from '../../../../base/frontend/operations';
+import type { Business } from '../../../../base/frontend/operations/business';
 import { unsavedChangesIn } from '../../../../base/frontend/lib/system-back';
 import { ionModalStubOf } from '../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub';
 import {

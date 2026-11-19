@@ -6,7 +6,7 @@
 // «Upload photo» asks the field for the device's picker and closes too.
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import type { CatalogImage, CatalogImagePage } from '../operations';
+import type { CatalogImage, CatalogImagePage } from '../operations/catalog_images';
 import { flush, mountBase } from '../__tests__/mount-base';
 import ImageLibraryModal from './ImageLibraryModal.vue';
 

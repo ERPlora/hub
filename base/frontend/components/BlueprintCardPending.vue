@@ -8,7 +8,7 @@ import { computed, watch } from 'vue';
 
 import { pendingApps, somethingPending } from '../lib/data';
 import { useBaseI18n } from '../lib/i18n';
-import type { ImportRow } from '../operations';
+import type { ImportRow } from '../operations/blueprints';
 import '../home.css';
 
 const props = defineProps<{ load: ImportRow }>();

@@ -13,7 +13,7 @@ import {
   expectSaveWaitsForMoney,
   expectWindowSaysMoneyUnreadable,
 } from '../../../../base/frontend/__tests__/save-waits-for-money';
-import type { Business } from '../../../../base/frontend/operations';
+import type { Business } from '../../../../base/frontend/operations/business';
 import { business, errorFrame, flush, mountInventory, ok, POLISH, product, refusal, subId, UNITS } from '../__tests__/mount-inventory';
 import StockModal from './StockModal.vue';
 

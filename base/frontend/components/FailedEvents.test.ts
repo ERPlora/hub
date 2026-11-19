@@ -2,7 +2,7 @@ import { toastError, toastSuccess } from '@erplora/ui/shell';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { errorFrame, flush, mountBase, subId } from '../__tests__/mount-base';
-import type { FailedEvent } from '../operations';
+import type { FailedEvent } from '../operations/failed_events';
 import FailedEvents from './FailedEvents.vue';
 
 const mocks = vi.hoisted(() => ({ confirm: vi.fn() }));

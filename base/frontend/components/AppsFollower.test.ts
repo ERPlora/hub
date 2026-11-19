@@ -8,7 +8,7 @@ import { ref } from 'vue';
 
 import { flush, mountBase, OWNER } from '../__tests__/mount-base';
 import { sessionChanged } from '../lib/access';
-import type { AppList, AppRow } from '../operations';
+import type { AppList, AppRow } from '../operations/apps';
 import AppsFollower from './AppsFollower.vue';
 
 const me = ref<SessionMe | undefined>();

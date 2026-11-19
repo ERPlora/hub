@@ -9,7 +9,8 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import { load } from '../../__tests__/data-fixtures';
 import { EMPLOYEE, flush, mountBase } from '../../__tests__/mount-base';
-import type { HubDumps, HubReset, ResetProgress } from '../../operations';
+import type { HubDumps, ResetProgress } from '../../operations/dumps';
+import type { HubReset } from '../../operations/reset';
 import ResetPanel from './ResetPanel.vue';
 
 afterEach(() => {

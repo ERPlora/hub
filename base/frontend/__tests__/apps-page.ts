@@ -6,7 +6,7 @@ import { app } from './app-row';
 import { confirmSpy } from './apps-page-spies';
 import { flush, mountBase } from './mount-base';
 import { sessionChanged } from '../lib/access';
-import type { AppList } from '../operations';
+import type { AppList } from '../operations/apps';
 import AppsPage from '../pages/AppsPage.vue';
 
 const PopoverStub = { props: { isOpen: Boolean }, template: '<div v-if="isOpen"><slot /></div>' };

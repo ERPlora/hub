@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import type { Component } from 'vue';
 
 import { errorFrame, flush, mountBase, subId } from '../__tests__/mount-base';
-import type { EventLogEntry } from '../operations';
+import type { EventLogEntry } from '../operations/system';
 import SystemLog from './SystemLog.vue';
 
 const OP = 'base.event.list';

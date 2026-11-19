@@ -7,9 +7,9 @@
   and puts it online; after the COMMIT the previous version's cached page goes.
 - ``website.site.unpublish`` takes it offline (``/`` jumps to the login again); publishing again goes on from the
   next version.
-- ``website.image.upload`` keeps an image (jpeg, png or webp, 5 MB and 8000 px a side at most, checked with Pillow)
-  in the hub file store under its content hash, within the plan's space for files as Files counts it (409
-  ``base.file_no_space`` with Files' words); the same image again is the same file and takes no more.
+- ``website.image.upload`` keeps an image as every public image of a business is kept (``base.public_images``: jpeg,
+  png or webp, 5 MB and 8000 px a side at most, under its content hash, within the plan's space as Files counts it),
+  and its row; the same image again is the same file and the same row.
 - Google's reviews of the reviews section's place (``apps.website.reviews``) are asked after the COMMIT that names a
   new place (a save) or that publishes (what was kept is dropped first), never inside a transaction; the public home
   asks too when nothing is kept (:func:`refresh_reviews`). A fresh answer is kept in the site's row.
@@ -19,58 +19,38 @@ interleave a save and a publication; the first save or publication of a hub crea
 same moment waits for it rather than failing on the duplicate.
 """
 
-import base64
-import binascii
-import hashlib
-import io
 import uuid
 from collections.abc import Iterator
 from functools import partial
 from typing import Any
 
-from django.core.files.base import ContentFile
-from django.core.files.storage import storages
 from django.utils import timezone
-from django.utils.translation import gettext_lazy as _
 from django.utils.translation import pgettext_lazy
 from live.context import OperationContext, Scope
 from live.errors import InvalidPayload
 from live.operations import INTERNAL, on_commit, operation
 from live.outbox import record_event
-from PIL import Image as PILImage
-from PIL import UnidentifiedImageError
 
 from apps.website import events, reviews
 from apps.website.choices import SECTION_LABELS
 from apps.website.models import ACTOR_MAX_LENGTH, Image, Site
 from apps.website.queries import IMAGE_NOT_FOUND, current_site, draft, forget_cached, read_catalog, site_out
 from apps.website.schemas import (
-    MAX_IMAGE_BYTES,
     Content,
     ImageOut,
     ImageRef,
-    ImageUploadIn,
     NoIn,
     PublicationOut,
     SaveIn,
     SiteOut,
 )
-from apps.website.storage import image_key, image_url
+from apps.website.storage import FOLDER, image_url
+from base import public_images
 from base.operations import business_currency, hub_id
-from base.queries.files import refuse_past_the_plans_space
+from base.schemas.public_images import ImageUploadIn
 
-#: The longest side of an image the website takes, in pixels.
-MAX_IMAGE_SIDE = 8000
-#: What Pillow calls each type the website takes.
-PILLOW_FORMATS = {"image/jpeg": "JPEG", "image/png": "PNG", "image/webp": "WEBP"}
 #: The parts of the content that hold one image (the gallery holds a list of them).
 IMAGE_FIELDS = (("topbar", "logo"), ("hero", "cover"), ("about", "image"))
-
-NOT_BASE64 = _("The file did not arrive whole: choose it again.")
-EMPTY_FILE = _("The file is empty.")
-TOO_HEAVY = _("The image may weigh 5 MB at most.")
-NOT_THAT_TYPE = _("This file is not a %(type)s image.")
-TOO_LARGE = _("The image may be %(side)s pixels a side at most.")
 
 
 def _actor(ctx: OperationContext) -> str:
@@ -338,40 +318,7 @@ def _publication(site: Site) -> dict[str, Any]:
 # Images
 
 
-def _refuse_file(message: str) -> InvalidPayload:
-    return InvalidPayload(message, fields={"data_base64": message})
-
-
-def _decoded(data: ImageUploadIn) -> bytes:
-    try:
-        raw = base64.b64decode(data.data_base64, validate=True)
-    except (binascii.Error, ValueError):
-        raise _refuse_file(str(NOT_BASE64)) from None
-    if not raw:
-        raise _refuse_file(str(EMPTY_FILE))
-    if len(raw) > MAX_IMAGE_BYTES:
-        raise _refuse_file(str(TOO_HEAVY))
-    return raw
-
-
-def _measured(raw: bytes, content_type: str) -> tuple[int, int]:
-    """The image's width and height, once Pillow read it whole as the type it claims to be."""
-    not_that_type = str(NOT_THAT_TYPE) % {"type": PILLOW_FORMATS[content_type]}
-    try:
-        with PILImage.open(io.BytesIO(raw)) as image:
-            image_format, (width, height) = image.format, image.size
-            if image_format != PILLOW_FORMATS[content_type]:
-                raise _refuse_file(not_that_type)
-            if max(width, height) > MAX_IMAGE_SIDE:
-                raise _refuse_file(str(TOO_LARGE) % {"side": MAX_IMAGE_SIDE})
-            image.verify()
-    except (UnidentifiedImageError, OSError, SyntaxError, PILImage.DecompressionBombError):
-        raise _refuse_file(not_that_type) from None
-    return width, height
-
-
-# Not an assistant tool (no ``ai=``): it takes the file in base64, up to 5 MB; the editor uploads it.
-# Not an assistant tool: a file the screen uploads.
+# Not an assistant tool: it takes the file in base64, up to 5 MB; the editor uploads it.
 @operation(
     "website.image.upload",
     kind="command",
@@ -383,31 +330,21 @@ def _measured(raw: bytes, content_type: str) -> tuple[int, int]:
 )
 def upload_image(ctx: OperationContext, data: ImageUploadIn) -> dict:
     hub = hub_id(ctx.scope)
-    raw = _decoded(data)
-    width, height = _measured(raw, data.content_type)
-    sha = hashlib.sha256(raw).hexdigest()
-    key = image_key(hub, sha, data.content_type)
-    store = storages["hub_files"]
-    kept = store.exists(key)
-    if not kept:
-        # Files' own check of the plan's space: the hub's prefix already counts its files and its apps' images.
-        refuse_past_the_plans_space(ctx, store, len(raw))
+    kept = public_images.keep(ctx, FOLDER, data)
     # The same file, uploaded at the same moment by someone else: theirs is ours. ``get_or_create`` recovers from the
     # duplicate inside a savepoint on the alias the row goes to (the hub's own database), never on ``default``.
     image, _created = Image.objects.get_or_create(
-        key=key,
+        key=kept.key,
         hub_id=hub,
         defaults={
-            "sha256": sha,
+            "sha256": kept.sha256,
             "content_type": data.content_type,
-            "width": width,
-            "height": height,
-            "size": len(raw),
+            "width": kept.width,
+            "height": kept.height,
+            "size": kept.size,
             "filename": data.filename,
         },
     )
-    if not kept:
-        store.save(key, ContentFile(raw))
     record_event(ctx, events.IMAGE_UPLOADED, {"id": str(image.id)})
     return {
         "id": image.id,

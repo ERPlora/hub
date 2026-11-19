@@ -2,7 +2,7 @@ import { ApiError } from '@erplora/ui/sdk';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { errorFrame, flush, mountBase, subId } from '../__tests__/mount-base';
-import type { AccessDoor } from '../operations';
+import type { AccessDoor } from '../operations/access';
 import SwitchUserPage from './SwitchUserPage.vue';
 
 const access = vi.hoisted(() => ({ enterWith: vi.fn(), replaceWith: vi.fn(), announceSwitch: vi.fn() }));

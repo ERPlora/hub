@@ -1,7 +1,7 @@
 // What the Home reads, for the tests of the Home and of its pieces: a panel as `base.widget.catalog` answers it, and a
 // step of the setup checklist and the checklist as `base.setup.status` does. One fixture each, so a field they gain is
 // added once.
-import type { SetupItem, SetupStatus, WidgetDef } from '../operations';
+import type { SetupItem, SetupStatus, WidgetDef } from '../operations/home';
 
 /** A KPI panel of the demo app, its app taken from `key`'s prefix and titled by it; `fields` change it. */
 export function widget(key: string, fields: Partial<WidgetDef> = {}): WidgetDef {

@@ -13,7 +13,7 @@ import { useRoute } from 'vue-router';
 import PinDoor from '../components/PinDoor.vue';
 import { createBadgeReader, enterWith, leaveTo, nextWithHash, safeNext } from '../lib/access';
 import { useBaseI18n } from '../lib/i18n';
-import type { AccessDoor } from '../operations';
+import type { AccessDoor } from '../operations/access';
 
 const REREAD_MS = 60_000;
 

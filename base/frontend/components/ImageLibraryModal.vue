@@ -28,7 +28,7 @@ import {
 import { computed, ref, shallowRef, watch } from 'vue';
 
 import { useBaseI18n } from '../lib/i18n';
-import type { CatalogImage } from '../operations';
+import type { CatalogImage } from '../operations/catalog_images';
 
 /** The library's sectors, in its order (`blueprints/img/<folder>`). */
 const FOLDERS = ['hospitality', 'beauty_hair', 'beauty_body', 'retail', 'fitness', 'wellness_spa'] as const;

@@ -5,7 +5,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { flush, mountBase } from '../../__tests__/mount-base';
-import type { HubDumps } from '../../operations';
+import type { HubDumps } from '../../operations/dumps';
 import DumpsCard from './DumpsCard.vue';
 
 const data = vi.hoisted(() => ({ downloadFrom: vi.fn() }));

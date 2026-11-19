@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { errorFrame, flush, mountBase, subId } from '../__tests__/mount-base';
-import type { DeviceRow } from '../operations';
+import type { DeviceRow } from '../operations/devices';
 import DevicesCard from './DevicesCard.vue';
 
 const access = vi.hoisted(() => ({ leaveTo: vi.fn() }));

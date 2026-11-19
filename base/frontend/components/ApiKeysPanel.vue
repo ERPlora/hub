@@ -20,7 +20,7 @@ import { computed, onBeforeUnmount, ref } from 'vue';
 
 import { useBaseI18n } from '../lib/i18n';
 import { useUnsavedFormOnOpen } from '../lib/unsaved-changes';
-import type { ApiKeyInput, ApiKeyMode, ApiKeyRow, ApiKind } from '../operations';
+import type { ApiKeyInput, ApiKeyMode, ApiKeyRow, ApiKind } from '../operations/api_keys';
 import FieldGroup from './FieldGroup.vue';
 
 const MODES: readonly ApiKeyMode[] = ['full', 'read', 'write', 'per_app'];

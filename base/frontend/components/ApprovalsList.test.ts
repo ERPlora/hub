@@ -2,7 +2,7 @@ import { DataTable } from '@erplora/ui/components';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { errorFrame, flush, mountBase, subId } from '../__tests__/mount-base';
-import type { ApprovalRow } from '../operations';
+import type { ApprovalRow } from '../operations/approvals';
 import ApprovalsExportButton from './ApprovalsExportButton.vue';
 import ApprovalsList from './ApprovalsList.vue';
 

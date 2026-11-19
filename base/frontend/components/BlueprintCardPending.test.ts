@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import { load, waitingLoad } from '../__tests__/data-fixtures';
 import { flush, mountBase } from '../__tests__/mount-base';
-import type { ImportRow } from '../operations';
+import type { ImportRow } from '../operations/blueprints';
 import BlueprintCardPending from './BlueprintCardPending.vue';
 
 afterEach(() => {

@@ -57,8 +57,8 @@
 906 apps/modifier/queries.py ERPlora/erplora-next#74
 673 apps/modifier/schemas.py ERPlora/erplora-next#74
 687 apps/modifier/services.py ERPlora/erplora-next#74
-736 apps/online_booking/queries.py ERPlora/erplora-next#74
-528 apps/online_booking/schemas.py ERPlora/erplora-next#74
+735 apps/online_booking/queries.py ERPlora/erplora-next#74
+515 apps/online_booking/schemas.py ERPlora/erplora-next#74
 566 apps/online_booking/services/__init__.py ERPlora/erplora-next#74
 621 apps/payment/services.py ERPlora/erplora-next#74
 318 apps/pricing/frontend/operations.d.ts ERPlora/erplora-next#74
@@ -136,7 +136,6 @@
 669 base/frontend/lib/home.test.ts ERPlora/erplora-next#74
 475 base/frontend/lib/home.ts ERPlora/erplora-next#74
 550 base/frontend/lib/system-back.test.ts ERPlora/erplora-next#74
-960 base/frontend/operations.d.ts ERPlora/erplora-next#74
 623 base/frontend/pages/FilesPage.test.ts ERPlora/erplora-next#74
 742 base/home.py ERPlora/erplora-next#74
 512 base/internal.py ERPlora/erplora-next#74

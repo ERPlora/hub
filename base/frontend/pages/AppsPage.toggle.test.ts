@@ -23,7 +23,7 @@ import {
 } from '../__tests__/apps-page';
 import { confirmSpy } from '../__tests__/apps-page-spies';
 import { EMPLOYEE, flush, followPass, passRefused, placedUpgrade, SIGNED } from '../__tests__/mount-base';
-import type { AppList } from '../operations';
+import type { AppList } from '../operations/apps';
 
 vi.mock('@erplora/ui/components', async (importOriginal) => (await import('../__tests__/apps-page-spies')).componentsWithConfirmSpy(importOriginal));
 vi.mock('@erplora/ui/shell', async (importOriginal) => (await import('../__tests__/toast-spies')).shellWithToastSpies(importOriginal));

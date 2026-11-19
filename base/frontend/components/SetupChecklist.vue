@@ -11,7 +11,7 @@ import { computed, ref } from 'vue';
 
 import { useRouter } from 'vue-router';
 
-import type { SetupItem } from '../operations';
+import type { SetupItem } from '../operations/home';
 import { useAssistant } from '@erplora/ui/components';
 import { checklistView, MAX_VISIBLE_ROWS, PHONE_MAX_VISIBLE_ROWS } from '../lib/home';
 import { useBaseI18n } from '../lib/i18n';

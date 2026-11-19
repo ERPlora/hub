@@ -2,7 +2,7 @@
 // business whether to upgrade, and its rows, the fullest first. Pure functions: the screen only paints them.
 import { describe, expect, it } from 'vitest';
 
-import type { AssistantUsage, PlanMeter, PlanUsage } from '../operations';
+import type { AssistantUsage, PlanMeter, PlanUsage } from '../operations/usage';
 import { NEAR_PERCENT, usageRows, verdictOf } from './plan-usage';
 
 const GB = 1024 ** 3;

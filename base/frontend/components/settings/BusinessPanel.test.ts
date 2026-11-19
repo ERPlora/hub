@@ -2,7 +2,7 @@ import type { SessionMe } from '@erplora/ui/shell';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { EMPLOYEE, errorFrame, flush, installedApp, leaveInstalledApp, mountBase, OWNER, subId, tap } from '../../__tests__/mount-base';
-import type { Business } from '../../operations';
+import type { Business } from '../../operations/business';
 import BusinessPanel from './BusinessPanel.vue';
 
 const BUSINESS: Business = {
