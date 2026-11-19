@@ -16,7 +16,7 @@ from live.models import OutboxEvent
 from apps.kitchen.models import KitchenSettings, LogEntry, Station, Ticket, TicketItem
 from base.tenancy.context import use_hub
 
-from .conftest import HUB_DB, HUB_DB_COMMITTED, A, B, add_line, charge, ctx_for, fire, fired_round, make_station
+from .conftest import HUB_DB, HUB_DB_COMMITTED, A, B, add_line, add_printers, charge, ctx_for, fire, fired_round, make_station
 from .conftest import open_check, route_product, run
 
 pytestmark = HUB_DB
@@ -138,7 +138,7 @@ def test_the_dishes_keep_the_station_they_went_to(clock, product):
 # ── Sending from the till (KITCHEN-F18, F08) ─────────────────────────────────────────────────────
 
 
-def test_sending_fires_the_check_and_opens_an_urgent_ticket_on_paper(clock, product):
+def test_sending_fires_the_check_and_opens_an_urgent_ticket_on_paper(clock, product, printers):
     bar = make_station("Bar", printer_usage="bar")
     screen = make_station("Pastry", destination="display")
     beer, cake = product("Beer"), product("Cake")
@@ -215,7 +215,7 @@ def test_sending_only_services_is_refused_and_sends_nothing(clock, product):
 
 
 def test_receiving_the_fire_event_opens_the_ticket_once_with_what_only_the_send_knows(
-    clock, product
+    clock, product, printers
 ):
     order = open_check("Table 4")
     add_line(order.id, product("Burger"))
@@ -273,7 +273,7 @@ def test_a_round_of_services_only_opens_nothing(clock, product):
 
 
 def test_without_printing_permission_the_ticket_opens_and_says_why_no_paper(
-    clock, product
+    clock, product, printers
 ):
     order = open_check("Table 4")
     add_line(order.id, product("Burger"))
@@ -283,14 +283,14 @@ def test_without_printing_permission_the_ticket_opens_and_says_why_no_paper(
         {"order_id": str(order.id)},
         ctx_for(permissions=permissions),
     )
-    assert ticket.saved and "printing.print" in ticket.print_error
+    assert ticket.saved and "printing.view_settings" in ticket.print_error
     assert jobs() == []
 
 
 # ── A ticket by hand (KITCHEN-F23) ───────────────────────────────────────────────────────────────
 
 
-def test_a_ticket_by_hand_takes_the_next_number_and_routes_its_dishes(clock, product):
+def test_a_ticket_by_hand_takes_the_next_number_and_routes_its_dishes(clock, product, printers):
     grill = make_station("Grill")
     burger = product("Burger")
     route_product(burger.id, grill)
@@ -426,7 +426,7 @@ def test_a_step_off_the_path_is_refused_without_writing(clock, product, action, 
     assert Ticket.objects.get().status == status and names() == before
 
 
-def test_the_pass_prints_when_a_ticket_is_ready_if_asked(clock, product):
+def test_the_pass_prints_when_a_ticket_is_ready_if_asked(clock, product, printers):
     KitchenSettings.objects.update(print_pass=True)
     _, lines = fired_round(product, "Burger")
     run("kitchen.ticket.ready", {"ticket_id": str(lines[0].id)})
@@ -438,7 +438,7 @@ def test_the_pass_prints_when_a_ticket_is_ready_if_asked(clock, product):
     )
 
 
-def test_the_pass_prints_when_a_void_leaves_the_ticket_ready(clock, product):
+def test_the_pass_prints_when_a_void_leaves_the_ticket_ready(clock, product, printers):
     # F17 «every time a ticket turns ready»: also when the till voids the last dish still to cook.
     KitchenSettings.objects.update(print_pass=True)
     order = open_check("Table 4")
@@ -561,7 +561,7 @@ def test_the_dishes_of_a_served_ticket_do_not_move(clock, product):
 # ── Rush, reprint, cancel, delete (KITCHEN-F09, F14, F22, F24) ───────────────────────────────────
 
 
-def test_rushing_prints_a_short_notice_where_dishes_are_still_to_do(clock, product):
+def test_rushing_prints_a_short_notice_where_dishes_are_still_to_do(clock, product, printers):
     grill, bar = make_station("Grill"), make_station("Bar", printer_usage="bar")
     burger, beer = product("Burger"), product("Beer")
     route_product(burger.id, grill)
@@ -610,7 +610,7 @@ def test_a_ticket_that_is_not_cooking_is_not_rushed(clock, product):
     assert refused.value.code == "kitchen.ticket_not_cooking"
 
 
-def test_reprinting_a_ticket_that_went_to_paper_prints_a_copy_every_time(clock, product):
+def test_reprinting_a_ticket_that_went_to_paper_prints_a_copy_every_time(clock, product, printers):
     order = open_check("Table 4")
     add_line(order.id, product("Burger"))
     ticket = run("kitchen.ticket.send", {"order_id": str(order.id)})
@@ -622,7 +622,7 @@ def test_reprinting_a_ticket_that_went_to_paper_prints_a_copy_every_time(clock, 
     assert [action for action, _ in log(ticket.id)][-2:] == ["reprinted", "reprinted"]
 
 
-def test_printing_a_ticket_that_never_went_to_paper_prints_it_as_the_first_sheet(clock, product):
+def test_printing_a_ticket_that_never_went_to_paper_prints_it_as_the_first_sheet(clock, product, printers):
     # F09: a round only Sales fired was never printed: «Reprint» prints it, not as a copy.
     _, lines = fired_round(product, "Burger")
     run("kitchen.ticket.reprint", {"ticket_id": str(lines[0].id)})
@@ -643,7 +643,7 @@ def test_reprinting_a_ticket_with_nothing_on_paper_says_so(clock, product):
     assert refused.value.code == "kitchen.nothing_on_paper"
 
 
-def test_cancelling_keeps_a_voided_dish_voided_and_prints_the_void_slip(clock, product):
+def test_cancelling_keeps_a_voided_dish_voided_and_prints_the_void_slip(clock, product, printers):
     order = open_check("Table 4")
     add_line(order.id, product("Burger"))
     add_line(order.id, product("Fries"))
@@ -981,6 +981,8 @@ def received(session, timeout=1.0, stop_after=None):
 def test_a_ticket_made_in_b_wakes_b_only(listen, hub_b):
     from live.outbox import channel_for
 
+    with use_hub(hub_b):
+        add_printers(B)
     on_a, on_b = listen(A), listen(B)
     with use_hub(hub_b):
         run("kitchen.ticket.create", {"items": [{"name": "Staff meal"}]}, ctx_for(scope=B))

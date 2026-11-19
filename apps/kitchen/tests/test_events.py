@@ -143,7 +143,7 @@ def saved(ticket_id) -> str:
 
 
 @HUB_DB_COMMITTED
-def test_a_round_sales_fires_alone_is_saved_and_printed_by_the_relay_once(relay, clock, product):
+def test_a_round_sales_fires_alone_is_saved_and_printed_by_the_relay_once(relay, clock, product, printers):
     """KITCHEN-F05, F08: Sales' command only records ``sale.order.fired``; the tick opens the ticket with its
     priority, its History and its sheet; a second tick changes nothing."""
     order = open_check("Table 4")
@@ -164,7 +164,7 @@ def test_a_round_sales_fires_alone_is_saved_and_printed_by_the_relay_once(relay,
 
 
 @HUB_DB_COMMITTED
-def test_a_beer_sold_at_the_bar_without_a_table_prints_at_the_bar_never_as_takeaway(relay, product):
+def test_a_beer_sold_at_the_bar_without_a_table_prints_at_the_bar_never_as_takeaway(relay, product, printers):
     """KITCHEN-F04, F05, F08: a drink routed to the bar, fired with no title and no channel, opens
     a «dine in» ticket whose sheet goes to the bar's printer, never the kitchen's nor as «takeaway»."""
     from apps.printing.models import PrintJob
@@ -185,7 +185,7 @@ def test_a_beer_sold_at_the_bar_without_a_table_prints_at_the_bar_never_as_takea
 
 
 @HUB_DB_COMMITTED
-def test_a_round_the_kitchen_sends_is_not_printed_twice_when_the_relay_brings_its_fire(relay, product):
+def test_a_round_the_kitchen_sends_is_not_printed_twice_when_the_relay_brings_its_fire(relay, product, printers):
     """KITCHEN-F18, F08: the send prints its sheet in its own transaction; the relay later hands the kitchen the
     same round (``sale.order.fired``), and the queue keeps one sheet per printer."""
     order = open_check("Table 4")
@@ -242,7 +242,7 @@ def test_voiding_a_check_cancels_its_rounds_through_the_relay(relay, clock, prod
 
 @HUB_DB_COMMITTED
 def test_a_printed_round_whose_check_is_deleted_in_the_till_prints_its_cancel_slip_through_the_relay(
-    relay, clock, product
+    relay, clock, product, printers
 ):
     """KITCHEN-F22, F28: the round went to paper; deleting its check in the till cancels it, and the
     tick prints the «CANCELLED» slip of what was left, so the kitchen stops cooking it."""
@@ -267,7 +267,7 @@ def test_a_printed_round_whose_check_is_deleted_in_the_till_prints_its_cancel_sl
 
 
 @HUB_DB_COMMITTED
-def test_a_line_voided_in_the_till_strikes_its_dish_and_prints_its_slip_through_the_relay(relay, clock, product):
+def test_a_line_voided_in_the_till_strikes_its_dish_and_prints_its_slip_through_the_relay(relay, clock, product, printers):
     """KITCHEN-F29: the tick brings the voided line; its dish is struck with the reason, the rest of the
     round cooks on, and the station that had it on paper gets its void slip."""
     order = open_check("Table 4")
