@@ -1,14 +1,14 @@
 // What the e2e that reach the assistant through the e2e's provider share (assistant-provider.ts, an OpenAI-compatible
 // server this process starts; the stack's SaaS seeded with it, README «El asistente»): the provider started and checked
-// against the SaaS, the worker's relay played one tick at a time from a process of its own, and what the assistant was
-// asked.
+// against the SaaS, the hooks of a spec that asks it, the worker's relay played one tick at a time from a process of its
+// own, and what the assistant was asked.
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 
 import { expect, type Page, test } from '@playwright/test';
 
 import { type Provider, startProvider } from './assistant-provider';
-import { saasSql } from './assistant-real';
+import { emptyMonth, saasSql } from './assistant-real';
 import { parkedEvent, RELAY, runNowAsksTheAssistant } from './flow-helpers';
 import { HUB_DIR, psql } from './helpers';
 import { STACK } from './stack';
@@ -36,6 +36,28 @@ export function providerSpec(cleanUp: () => void): () => Provider {
     await provider?.close();
   });
   return () => provider;
+}
+
+/** This month's messages of the business `a` on erplora.com. */
+export function spend(messages: number): void {
+  emptyMonth();
+  if (messages === 0) return;
+  saasSql(
+    'insert into assistant_assistantusage (id, demo, month, messages, tokens_input, tokens_output, tokens_embedding, ' +
+      'transcriptions, speech_characters, cost_usd, created_at, updated_at, hub_id) ' +
+      `select gen_random_uuid(), '', date_trunc('month', now() at time zone 'UTC')::date, ${messages}, 0, 0, 0, 0, 0, 0, ` +
+      `now(), now(), id from hubs_hub where slug = 'a'`,
+  );
+}
+
+/** Registers the hooks of a spec of the panel: the provider started before its tests and closed after them
+ *  (`providerSpec`, with nothing else to clean), and no message of `a` spent this month before each test. Gives the
+ *  provider once they have run. */
+export function panelSpec(): () => Provider {
+  test.beforeEach(() => {
+    spend(0);
+  });
+  return providerSpec(() => undefined);
 }
 
 /** One tick of the worker's relay (in `a`'s database: the e2e stack's worker relays nothing): the outbox event `id` handed
