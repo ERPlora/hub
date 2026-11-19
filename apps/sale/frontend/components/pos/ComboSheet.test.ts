@@ -4,9 +4,11 @@
 // required course is complete, then sums the total live. It hands the dishes up; Menus prices them.
 import { describe, expect, it, vi } from 'vitest';
 
+import type { AllergenCode } from '@erplora/ui/components';
 import type { SaleComboOut } from '../../../../combo/frontend/operations';
 import { click, mountSale, settle } from '../../__tests__/mount-sale';
 import { plain } from '../../lib/format';
+import { product } from './__tests__/fixtures';
 import ComboSheet from './ComboSheet.vue';
 
 vi.mock('@ionic/vue', async (importOriginal) => {
@@ -32,10 +34,16 @@ const MENU: SaleComboOut = {
 
 async function setup(props: Record<string, unknown> = {}) {
   const m = await mountSale(ComboSheet, {
-    props: { open: true, combo: MENU, pending: false, error: null, ...props },
+    props: { open: false, combo: MENU, pending: false, error: null, ...props },
     locale: 'es',
   });
+  m.net.onApi((call) => {
+    const id = new URL(call.url, 'http://test').searchParams.get('id') ?? '';
+    const allergens: AllergenCode[] = id === 'p-lentils' ? ['gluten'] : id === 'p-hake' ? ['fish', 'milk'] : [];
+    return Response.json(product({ id, name: id, allergens }));
+  });
   await m.live();
+  await m.wrapper.setProps({ open: true });
   await settle();
   return m;
 }
@@ -49,6 +57,14 @@ describe('ComboSheet', () => {
     expect(s.inDoc('pos-menu-dish-lentils')?.textContent).toContain('Lentejas');
     expect(plain(s.inDoc('pos-menu-dish-steak')?.textContent ?? '')).toContain('+2,00 €');
     expect(s.inDoc('pos-menu-dish-hake')?.textContent).not.toContain('€');
+  });
+
+  it('shows the allergens of each dish from the existing product reads', async () => {
+    const s = await setup();
+    await settle();
+    expect(s.inDoc('pos-menu-dish-allergens-lentils')?.textContent).toBe('Alérgenos: Gluten');
+    expect(s.inDoc('pos-menu-dish-allergens-hake')?.textContent).toBe('Alérgenos: Pescado, Leche');
+    expect(s.inDoc('pos-menu-dish-allergens-salad')).toBeNull();
   });
 
   it('opens with nothing picked and the button naming the course still short; a tap marks it and adds nothing', async () => {
