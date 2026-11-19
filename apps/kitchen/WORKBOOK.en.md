@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:15880d013dfb224aee8cf56036e4b47a4295e83d924107220fe1c9ba0ba5199e -->
+<!-- generated from WORKBOOK.md sha256:13238ea706585db546ecf6243347bc5df8b78f34193322289bdef9c6759acdc3 -->
 
 ## What it is for and who it is for
 
@@ -220,7 +220,7 @@ With the window as it opened, Back closes it without asking (BASE-F05).
 | KITCHEN-F28 | Withdraw the rounds of a check deleted or merged into another | done |
 | KITCHEN-F29 | Void a dish already sent, with a notice to the kitchen | done |
 | KITCHEN-F31 | Give Cash register the tickets still under way | done |
-| KITCHEN-F32 | Highlight the customer's allergy on the card and on paper | not done |
+| KITCHEN-F32 | Highlight the customer's allergy on the card and on paper | partial |
 
 ### KITCHEN-F01 Create a station
 Status: done
@@ -361,8 +361,9 @@ In: from Sales, the modifiers chosen with their kitchen name (if they have none,
 line's note and, if the line is on the house, the reason.
 Out: the modifiers and the note frozen on the dish: changing the catalogue afterwards does not change this
 ticket.
-If it fails: an allergy only exists as text in the note: it is not highlighted or told apart from another
-note. A modifier charged on a separate line (another VAT) comes out the same under its dish.
+If it fails: an allergy written only in the note comes out like any note; the one the waiter marks on the line
+comes out on its own, before the modifiers (KITCHEN-F32). A modifier charged on a separate line (another VAT)
+comes out the same under its dish.
 Involved: SALE-F11, SALE-F13, SALE-F20, MODIFIER-F08, KITCHEN-F08
 
 ### KITCHEN-F08 The ticket comes out on paper at each station
@@ -783,8 +784,9 @@ register.
 Involved: CASH_REGISTER-F08, CASH_REGISTER-F09, KITCHEN-F10, KITCHEN-F13
 
 ### KITCHEN-F32 Highlight the customer's allergy on the card and on paper
-Status: not done — the ticket does not receive the customer's allergy or the dish's allergens yet: today an allergy
-arrives as text in the note (KITCHEN-F07)
+Status: partial — the ticket already receives and keeps the allergy and the matching allergens, the display and the
+detail receive them and the paper prints the dish's lines; the card does not paint the mark and the block yet
+(hub#1738) and the device's app does not print `!! ALERGIA !!` in the sheet's header yet (ERPlora/app#63)
 Actor: employee
 Screen: Display, Tickets
 Steps:

@@ -21,6 +21,7 @@ from django.utils.translation import gettext_noop
 from ninja import Field, Schema
 from pydantic import ConfigDict, StringConstraints, field_validator, model_validator
 
+from base.allergens import Allergy, AllergyInDish
 from base.schemas.assistant import names
 
 T = TypeVar("T")
@@ -179,16 +180,18 @@ class ItemRefIn(In):
     id: UUID = Field(description="The dish's id, as its ticket gives it.")
 
 
-class StationRefIn(In):
-    station_id: UUID | None = Field(None, description="The station's id.", json_schema_extra=A_STATION)
-    station: Said | None = Field(
-        None, description="The station's name («grill»), when its id is not known."
-    )
-
+class _StationNamed(In):
     @model_validator(mode="after")
     def _station_named(self):
         _named(self.station_id, self.station, SAY_WHICH_STATION)
         return self
+
+
+class StationRefIn(_StationNamed):
+    station_id: UUID | None = Field(None, description="The station's id.", json_schema_extra=A_STATION)
+    station: Said | None = Field(
+        None, description="The station's name («grill»), when its id is not known."
+    )
 
 
 StationScope = Annotated[
@@ -249,6 +252,8 @@ class ItemOut(Schema):
     )
     void_reason: str = Field(description="Why the till voided it.")
     ready_at: dt.datetime | None = Field(description="When it was marked ready.")
+    allergy: Allergy
+    allergy_in_dish: AllergyInDish
 
 
 class TicketOut(Schema):
@@ -666,14 +671,9 @@ class _Target(In):
         return self
 
 
-class RoutingSetIn(_Target):
+class RoutingSetIn(_Target, _StationNamed):
     station_id: UUID | None = Field(None, description="The station it goes to.", json_schema_extra=A_STATION)
     station: Said | None = Field(None, description="The station by its name.")
-
-    @model_validator(mode="after")
-    def _station_named(self):
-        _named(self.station_id, self.station, SAY_WHICH_STATION)
-        return self
 
 
 class RoutingClearIn(_Target):

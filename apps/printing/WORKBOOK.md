@@ -805,9 +805,12 @@ Campos del documento que lee la impresora (los demás se ignoran):
   `receipt_id`, `customer_name`, `customer_tax_id` y `tax_breakdown` no vacío (422 si falta).
 - `prebill`: lo mismo sin número, QR ni pago, con `notice`; exige `items` no vacío. La app del dispositivo no
   pinta `vat_number` en este papel: Ventas manda el NIF como última línea de `business_address` (SALE-F21).
-- `kitchen_order`: `order_number`, `round_number`, `table`, `waiter`, `label`, `priority`, `items`
-  (`name`, `quantity`, `modifiers`, `notes`, `combo_name`, `combo_ref`); `modifiers` es una lista de textos,
-  los suplementos en el orden elegido, que la impresora pinta un renglón cada uno, antes de `notes`.
+- `kitchen_order`: `order_number`, `round_number`, `table`, `waiter`, `label`, `priority`, `allergy`, `items`
+  (`name`, `quantity`, `modifiers`, `notes`, `combo_name`, `combo_ref`); `modifiers` es una lista de textos que
+  la impresora pinta un renglón cada uno, en negrita, antes de `notes`: Cocina pone primero los de la alergia del
+  cliente (`*** ALERGIA: GLUTEN ***`, `*** LLEVA: GLUTEN ***`) y después los suplementos en el orden elegido
+  (KITCHEN-F32). `allergy` es la marca de la cabecera (`!! ALERGIA !!`, vacía sin alergia en la hoja); la app del
+  dispositivo aún no la pinta, ni el texto de `priority` ni `duplicate` (ERPlora/app#63).
 - `barcode_label`: `product_name`, `barcode`, `price`.
 - `cash_session_report`: `receipt_id` (la sesión), `cashier`, `opening_balance`, `closing_balance`,
   `transactions` (`label`, `amount`).

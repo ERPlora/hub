@@ -1487,6 +1487,7 @@
       "allergens": "Allergens",
       "allergies": "Allergies",
       "allergy": "Customer's allergy",
+      "allergy_in_dish": "Allergy in the dish",
       "allow_card": "Allow card",
       "allow_cash": "Allow cash",
       "allow_customer_cancellation": "Allow customer cancellation",

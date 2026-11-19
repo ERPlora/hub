@@ -45,7 +45,7 @@ sabe de mesas ni de clientes: pinta e imprime la etiqueta que le da la cuenta.
 | Operaciones | 12 consultas (`queries.py`) y 20 acciones (`services.py`), todas con `ai=`; 28 rutas en `/api/kitchen/…` (sin ruta: `kitchen.ticket.receive` y `kitchen.ticket.sync`, del sistema, y `kitchen.item.get` y `kitchen.station.get`) |
 | Eventos | 18, `kitchen.<entidad>.<hecho>` (`events.py`); `REACTIONS` a `sale.order.fired` (`kitchen.ticket.receive`) y a `sale.order.completed`, `sale.order.voided` y `sale.order.line_voided` (`kitchen.ticket.sync`), por el relay del outbox |
 | Tareas programadas | ninguna |
-| Migraciones | `0001_initial`, `0002_settings_row`, `0003_ticket_printed_at`, `0004_item_options_and_menu` |
+| Migraciones | `0001_initial`, `0002_settings_row`, `0003_ticket_printed_at`, `0004_item_options_and_menu`, `0005_item_allergy` |
 | Admin | Django admin con CRUD en `hubs.erplora.com` (PLAN §17–§18); eliminar una estación entra en la misma fila que las escrituras de Cocina |
 
 Las decisiones de diseño (asentar lo que hizo Ventas en cada lectura y escritura, el id de la comanda = el de su
@@ -61,16 +61,17 @@ pnpm test apps/kitchen apps/sale/frontend/components/pos apps/cash_register/fron
 pnpm e2e tests/e2e/kitchen-*.spec.ts tests/e2e/printing-kitchen.spec.ts
 ```
 
-- `test_integration_sale.py`, `test_integration_inventory.py`, `test_integration_combo.py` y
-  `test_integration_modifier.py` van contra las apps reales; `test_concurrency.py`, con hilos contra Postgres (dos
+- `test_integration_sale.py`, `test_integration_inventory.py`, `test_integration_combo.py`,
+  `test_integration_modifier.py` y `test_allergy.py` van contra las apps reales; `test_concurrency.py`, con hilos contra Postgres (dos
   envíos de la misma cuenta, eliminar una estación mientras se escribe).
 - Las e2e de Cocina recorren el TPV, la pantalla, la lista, las estaciones, el historial y los ajustes; las de Ventas
   borran con `cleanSales` (`tests/e2e/sale-helpers.ts`) las comandas de las cuentas que limpian.
 
 ## Qué queda fuera
 
-- Cursos con retener y lanzar (kitchen#71), vaciar de golpe lo cobrado antes de pasar a papel (kitchen#158) y los
-  alérgenos de punta a punta (hub#1195, que sustituye a pm#115 del tablero viejo): «Lo que queda fuera» del WORKBOOK.
+- Cursos con retener y lanzar (kitchen#71), vaciar de golpe lo cobrado antes de pasar a papel (kitchen#158) y, de la
+  alergia del cliente, la tarjeta (hub#1738) y la marca de la cabecera del papel, que pinta la app del dispositivo
+  (ERPlora/app#63): «Lo que queda fuera» del WORKBOOK.
 - Lo que sigue pedido a Ventas: el aviso propio del cambio de título y dos índices parciales («Lo que pide a otras
   apps» del WORKBOOK).
 - Los iconos, los composables compartidos y el selector de color de [`UI-REQUESTS.md`](UI-REQUESTS.md).
