@@ -15,7 +15,15 @@ from live.operations import registry
 from base import assistant
 from base.models import Membership
 from base.tenancy.tests.business import HUB_DB, in_business_a
-from base.tests.test_assistant_asks import members, offered_place
+from base.tests.test_assistant_asks import (
+    TOP,
+    comparable,
+    members,
+    offered_place,
+    offered_to,
+    place_of_no_ask,
+    probe_phrases,
+)
 
 __all__ = ["in_business_a"]
 
@@ -192,3 +200,120 @@ def test_what_an_app_declares_is_checked_at_start_and_never_read_when_malformed(
         for group in getattr(config, assistant.relevance.SYNONYMS_ATTRIBUTE, ())
     )
     assert assistant.relevance.synonyms() == (*assistant.relevance.SYNONYMS, *others)
+
+
+# ── An app said with the menu it leaves or is in: base's own words (its ``assistant_synonyms``) ─────────────────────
+
+#: How a person who does not know that a module is called an app asks to turn it off or on: by its name, with the menu
+#: it leaves or is in. Without base's words none of them is among the first ten, and most are not offered at all: the
+#: tools of the app named and, by «menú», those of Menus and combos come first.
+APP_IN_THE_MENU = [
+    ("es", "base.app.disable", "no quiero ver Reservas en el menú"),
+    ("es", "base.app.disable", "quita Tareas del menú, no la usamos"),
+    ("es", "base.app.disable", "saca Inventario del menú"),
+    ("es", "base.app.disable", "oculta Mesas del menú"),
+    ("es", "base.app.disable", "quita del menú Control horario, no lo usamos"),
+    ("es", "base.app.enable", "no encuentro Inventario en el menú, vuelve a ponerlo"),
+    ("es", "base.app.enable", "vuelve a poner Tareas en el menú"),
+    ("es", "base.app.enable", "quiero que vuelva a salir Citas en el menú"),
+    ("es", "base.app.enable", "vuelve a poner Caja en el menú"),
+    ("en", "base.app.disable", "take Reservations out of the menu, we don't use it"),
+    ("en", "base.app.disable", "remove Tasks from the menu"),
+    ("en", "base.app.disable", "hide Customers from the menu"),
+    ("en", "base.app.enable", "put Tasks back on the menu"),
+    ("en", "base.app.enable", "I can't find Inventory in the menu, put it back"),
+    ("en", "base.app.enable", "add Kitchen to the menu"),
+]
+
+#: The owner's probe of layer 2 that asks for an app back «disponible en el menú»: it came 23rd.
+APP_BACK_IN_THE_MENU_PROBE = "quiero volver a tener Reservas disponible en el menú con todo lo que tenía"
+
+#: «Del menú», «en el menú» and «al menú» said of a menu of Menus and combos, or of what it offers: none names an app.
+MENUS_OF_COMBOS = [
+    "quita los postres del menú vegano",
+    "quita la tarta de queso del menú",
+    "añade el flan al menú del día",
+    "ya no damos sopa en el menú infantil",
+    "pon la paella en el menú de los domingos",
+    "take the soup off the menu",
+    "put the lentils in Starters of the menu of the day",
+]
+
+
+def base_groups() -> tuple[tuple[str, ...], ...]:
+    return said_by(apps.get_app_config("base"))
+
+
+def names(phrase: str, wanted: str) -> bool:
+    """Whether base's words read ``phrase`` as naming the stem of ``wanted``."""
+    return any(shared.stem(wanted) in concept for concept in concepts(phrase, base_groups()))
+
+
+@pytest.fixture
+def owner_catalog(make_user):
+    """``owner_catalog(language)``: the catalogue of business A's owner (every app on), who asks in ``language``."""
+    of = members(make_user, "menu")
+    return lambda language: assistant.tools.catalog(of(Membership.Role.OWNER, language))
+
+
+def without_base_groups(tools: dict) -> tuple:
+    counted = assistant.relevance.ranking(tools)["synonyms"]
+    without = tuple(group for group in counted if group not in base_groups())
+    assert len(without) == len(counted) - len(base_groups()) > 0  # positive control: exactly base's groups are left out
+    return without
+
+
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
+@pytest.mark.parametrize(("language", "name", "phrase"), APP_IN_THE_MENU)
+def test_an_app_said_with_the_menu_brings_turning_it_off_or_on_among_the_first_ten(
+    owner_catalog, language, name, phrase
+):
+    tools = owner_catalog(language)
+    assert comparable(phrase) not in probe_phrases()
+    place = place_of_no_ask(tools, name, phrase, language)
+    assert place is not None and place <= TOP, place
+    assert name not in offered_to(tools, phrase, language, synonyms=without_base_groups(tools))[:TOP]
+
+
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
+def test_the_probe_that_asks_for_an_app_back_in_the_menu_brings_turning_it_on_among_the_first_ten(owner_catalog):
+    tools = owner_catalog("es")
+    assert probe_phrases()[comparable(APP_BACK_IN_THE_MENU_PROBE)] == "qa20261108.owner.es.base.app.enable"
+    assert offered_place(tools, "base.app.enable", APP_BACK_IN_THE_MENU_PROBE) <= TOP
+    without = without_base_groups(tools)
+    assert offered_place(tools, "base.app.enable", APP_BACK_IN_THE_MENU_PROBE, synonyms=without) > TOP
+
+
+@pytest.mark.parametrize(
+    ("phrase", "switch"),
+    [
+        ("quita Tareas del menú", "disable"),
+        ("quita del menú Tareas", "disable"),
+        ("take the Time clock off the menu", "disable"),
+        ("vuelve a poner Tareas en el menú", "enable"),
+        ("añade al menú Reservas online", "enable"),
+        ("put Price Lists back on the menu", "enable"),
+        ("quiero Caja disponible en el menú", "enable"),
+        # An app with two names joined («Ventas / TPV», «Menús y combos») is said by either.
+        ("quita Ventas del menú", "disable"),
+        ("quita TPV del menú", "disable"),
+        ("pon Menús en el menú", "enable"),
+    ],
+)
+def test_base_reads_an_apps_name_beside_the_menu_as_the_app_and_where_it_goes_as_its_switch(phrase, switch):
+    other = {"disable": "enable", "enable": "disable"}[switch]
+    assert names(phrase, "app") and names(phrase, switch) and not names(phrase, other)
+    # Positive control: neither live nor the platform's words read it so.
+    for without in (assistant.relevance.SYNONYMS, ()):
+        assert not any(shared.stem("app") in concept for concept in concepts(phrase, without)), phrase
+
+
+@pytest.mark.parametrize("phrase", MENUS_OF_COMBOS)
+def test_base_reads_no_app_in_a_menu_of_menus_and_combos(phrase):
+    assert not any(names(phrase, word) for word in ("app", "enable", "disable"))
+
+
+def test_base_words_name_an_app_only_beside_a_name_of_an_app_of_the_store(demo):
+    assert names("quita Tareas del menú", "app")  # positive control
+    assert not names(f"quita {demo.verbose_name} del menú", "app")  # out of the store, never shown to a customer
+    assert not names("quita Base del menú", "app")  # the platform is no app a business turns on or off
