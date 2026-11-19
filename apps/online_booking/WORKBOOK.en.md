@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:fc66e625c9216c17f4b32c2c7186cc513e753b0069c105bf0a99d5c42a9da467 -->
+<!-- generated from WORKBOOK.md sha256:327f08dc48125b43e5773813faa6f77283358ed19d872fb739427aeba1a997be -->
 
 ## What it is for and who it is for
 
@@ -92,8 +92,8 @@ mobile, email, note and **Book**. Beside **Book**, the notice of who uses her de
 policy. With nothing to book online, only that notice shows, without the invitation or the form. Once booked, the
 appointment number, the confirmation message, **See my booking**, **Cancel the booking** and **Book another**. With
 another business's address, or this one's at another's, there is no page. The confirmation gives a clickable link to
-the full address of her booking, including the business's origin (`https://<business>.erplora.com/p/<business>/book/<link>`). Opening it shows only her booking—number, services, day, time,
-professional and status—and she can cancel it with confirmation if the policy still allows it; one already cancelled
+the full address of her booking, including the business's origin (`https://<business>.erplora.com/p/<business>/book/<link>`). Opening it shows the business's header—its name and its logo if it has one—and only her booking: number, services, day, time,
+professional and status, and she can cancel it with confirmation if the policy still allows it; one already cancelled
 or past its notice does not offer that action. An unknown link gives a clear notice, with no details or form.
 
 ### Booking preview (development only)
@@ -127,7 +127,7 @@ Dates and times show on the business's clock and in the format of the language o
 | ONLINE_BOOKING-F07 | Set up the booking page | done |
 | ONLINE_BOOKING-F08 | See and search the bookings | done |
 | ONLINE_BOOKING-F09 | Follow the customer when two cards are merged | done (Appointments does it; the inbox reflects it) |
-| ONLINE_BOOKING-F10 | The customer sees her booking with her link | partial — it shows the booking, but not the business's name and logo yet |
+| ONLINE_BOOKING-F10 | The customer sees her booking with her link | done |
 | ONLINE_BOOKING-F11 | The customer cancels her booking with her link | done |
 | ONLINE_BOOKING-F12 | Erase a customer's data (GDPR) | done |
 
@@ -298,7 +298,7 @@ If it fails: Appointments is never left halfway and the relay retries on its own
 Involved: APPOINTMENT-F23, CUSTOMER-F13
 
 ### ONLINE_BOOKING-F10 The customer sees her booking with her link
-Status: partial — the link shows the booking, but not the business's name and logo that its query already gives
+Status: done
 Actor: customer (no session)
 Screen: her link's page (`/p/<business>/book/<link>`, at the business's address); the booking page, once booked; in
 development, the preview

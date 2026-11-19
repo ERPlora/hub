@@ -467,6 +467,7 @@ def test_try_says_when_it_would_not_even_start_or_stop_at_a_condition():
     result = try_(BIG_SALE)
     assert result.starts is False
     assert [clause.path for clause in result.trigger_failed] == ["input.total"]
+    assert [step.outcome for step in result.steps] == ["not_reached"] * 4
     outbox("sale.sale.completed", {"total": 20000})
     result = try_(BIG_SALE)
     assert result.starts is True

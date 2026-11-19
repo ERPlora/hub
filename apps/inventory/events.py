@@ -45,6 +45,10 @@ ALL = [
     CONFIG_UPDATED,
 ]
 
+#: The amounts a product's events bring, in cents of the business's currency: an automation says them as money in
+#: what a person reads.
+AMOUNTS = frozenset({"price", "cost"})
+
 #: A product added, changed, deleted or restored: what may change how many active products there are («Your catalog»).
 PRODUCT_EVENTS = [PRODUCT_CREATED, PRODUCT_UPDATED, PRODUCT_DELETED, PRODUCT_RESTORED]
 #: What re-runs the Panel's figures and its low-stock list, and with them the Home's panels: the settings decide which

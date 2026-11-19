@@ -152,8 +152,9 @@ def test_every_operation_is_a_tool_of_the_assistant():
     # + a service made again from a separate copy with who performed it: service.recover, no tool either,
     # + and a category made again from it: category.recover, no tool either,
     # + and what the business kept put back into it: service.return_to_category, category.return_to_parent, neither,
-    # + and which service stands for one of the copy's, which Price Lists asks: service.standing_for, no tool either.
-    assert len(operations) == 57
+    # + and which service stands for one of the copy's, which Price Lists asks: service.standing_for, no tool either,
+    # + and saying later which sale charged a voucher granted without it: grant.link.
+    assert len(operations) == 58
     for op in operations:
         if op.name in NO_TOOL:
             assert op.ai is INTERNAL, op.name

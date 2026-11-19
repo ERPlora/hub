@@ -872,16 +872,6 @@
     ]
   },
   {
-    "path": "apps/flow/services/engine.py",
-    "file_name": "engine.py",
-    "functions": [
-      {
-        "name": "_advance",
-        "complexity": 38
-      }
-    ]
-  },
-  {
     "path": "apps/flow/services/flow_document.py",
     "file_name": "flow_document.py",
     "functions": [
@@ -928,10 +918,6 @@
       {
         "name": "_tried_pinned",
         "complexity": 26
-      },
-      {
-        "name": "try_flow",
-        "complexity": 44
       }
     ]
   },
