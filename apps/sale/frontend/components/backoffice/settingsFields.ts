@@ -1,5 +1,5 @@
 // The till settings as the Settings page paints them (SALE-F34): one control per field of the server's
-// `SettingsFields` (apps/sale/schemas.py), in its order, with the limits the server takes. Labels and
+// `SettingsFields` (apps/sale/schemas/settings.py), in its order, with the limits the server takes. Labels and
 // explanations live in the catalogue under `sale.settings.fields.<key>.label` / `.description`.
 import type { DocumentType, SettingsFields } from '../../operations';
 

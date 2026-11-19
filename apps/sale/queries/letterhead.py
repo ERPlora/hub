@@ -10,7 +10,7 @@ from live.operations import AI, UnknownOperation, get, operation
 from apps.sale import paper
 from apps.sale.queries.sales import find_sale
 from apps.sale.queries.settings import current_settings
-from apps.sale.schemas import LetterheadIn, LetterheadOut
+from apps.sale.schemas.sales import LetterheadIn, LetterheadOut
 
 #: What the papers read of other apps, by name: Invoicing is no ``requires`` of Sales.
 ISSUER = "invoice.issuer.get"

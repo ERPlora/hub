@@ -19,7 +19,8 @@ from apps.sale.queries.business import CASH_LIMIT, LIMITS_CURRENCY, business_cou
 from apps.sale.queries.line_parts import ratio_of
 from apps.sale.queries.other_apps import call_app
 from apps.sale.queries.payment_methods import METHOD_NOT_AVAILABLE, allowed_types, find_method, held_methods
-from apps.sale.schemas import COUNTRY_CODE, CompleteIn
+from apps.sale.schemas.checkout import CompleteIn
+from apps.sale.schemas.fields import COUNTRY_CODE
 from apps.sale.services.discounts import DISCOUNTS_NOT_ALLOWED, DISCOUNT_OVER_LIMIT, _cap
 
 logger = logging.getLogger(__name__)

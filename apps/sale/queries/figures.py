@@ -14,7 +14,8 @@ from live.operations import AI, operation
 
 from apps.sale import pricing
 from apps.sale.models import Refund, RefundLine, Sale, SaleLine, VoucherSession
-from apps.sale.schemas import ByStaffOut, EmptyIn, LastDaysOut, PeriodIn, StatsOut, TodayOut
+from apps.sale.schemas.fields import EmptyIn
+from apps.sale.schemas.figures import ByStaffOut, LastDaysOut, PeriodIn, StatsOut, TodayOut
 from apps.tax.queries import business_tax_kind, business_today
 from apps.tax.schemas import TAX_KIND_NAMES
 

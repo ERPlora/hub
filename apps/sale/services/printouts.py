@@ -19,7 +19,9 @@ from apps.sale.queries.letterhead import business_letterhead
 from apps.sale.queries.orders import find_order
 from apps.sale.queries.sales import find_sale, sale_detail
 from apps.sale.queries.settings import current_settings
-from apps.sale.schemas import OrderRefIn, PaperOut, PreviewIn, SaleOut, SalePrintIn
+from apps.sale.schemas.checkout import PreviewIn
+from apps.sale.schemas.orders import OrderRefIn
+from apps.sale.schemas.sales import PaperOut, SaleOut, SalePrintIn
 
 logger = logging.getLogger(__name__)
 

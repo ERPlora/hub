@@ -89,7 +89,7 @@ def test_spanish_texts():
         assert str(queries.departments.DEPARTMENT_NOT_FOUND) == (
             "Esa sección ya no está en este negocio. Recarga la lista y vuelve a intentarlo."
         )
-        assert str(schemas.SAY_WHICH_DEPARTMENT_ROW) == (
+        assert str(schemas.fields.SAY_WHICH_DEPARTMENT_ROW) == (
             "Di qué sección: su id o su nombre."
         )
 
