@@ -1,36 +1,11 @@
-// What the specs of the Hub's assistant (base-assistant.spec.ts and base-assistant-card*.spec.ts) share: the hooks
-// that start the e2e's provider and leave `a` with no message spent this month before each test, and the way they
-// drive the panel and its card.
-import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
+// How the specs of the Hub's assistant drive its panel and its card, as a person does: open the panel, ask, decide
+// the card, and wait for the dangerous card to settle before its capture; and the card as the server sends it. The
+// hooks of a spec of the panel are in provider-helpers.ts, those of a spec of the card in assistant-card-helpers.ts.
+import { type Browser, type BrowserContext, expect, type Locator, type Page } from '@playwright/test';
 
-import type { Provider } from './assistant-provider';
-import { saasSql } from './assistant-real';
+import { DONE } from './assistant-provider';
 import { A, capture, EMPLOYEE, exposeMovingInPage, login, THREE_SIZES as VIEWPORTS, turnOffTurnedOn, turnOnMissing, untilStill } from './helpers';
-import { providerSpec } from './provider-helpers';
 import { assistantDoor, openAssistant } from './topbar';
-
-/** This month's messages of the business `a` on erplora.com. */
-export function spend(messages: number): void {
-  const hub = "(select id from hubs_hub where slug = 'a')";
-  saasSql(`delete from assistant_assistantusage where hub_id = ${hub}`);
-  if (messages === 0) return;
-  saasSql(
-    'insert into assistant_assistantusage (id, demo, month, messages, tokens_input, tokens_output, tokens_embedding, ' +
-      'transcriptions, speech_characters, cost_usd, created_at, updated_at, hub_id) ' +
-      `select gen_random_uuid(), '', date_trunc('month', now() at time zone 'UTC')::date, ${messages}, 0, 0, 0, 0, 0, 0, ` +
-      `now(), now(), id from hubs_hub where slug = 'a'`,
-  );
-}
-
-/** Registers the hooks of a spec of the panel: the e2e's provider started before its tests and closed after them
- *  (`providerSpec`, with nothing else to clean), and no message of `a` spent this month before each test. Gives the
- *  provider once they have run. */
-export function panelSpec(): () => Provider {
-  test.beforeEach(() => {
-    spend(0);
-  });
-  return providerSpec(() => undefined);
-}
 
 // ── The panel ──
 
@@ -41,12 +16,37 @@ export const answers = (page: Page): Locator => panel(page).locator('[data-testi
 /** The last answer's bubble: its words. */
 export const lastAnswer = (page: Page): Locator => panel(page).locator('[data-testid="assistant-bubble-assistant"]').last();
 export const card = (page: Page): Locator => page.locator('ion-modal[data-testid="assistant-confirm"]');
+/** «Send», offered again once a turn has ended. */
+export const send = (page: Page): Locator => panel(page).locator('[data-testid="assistant-send"]');
+/** The receipts under the answers: what the Hub says it did with each write. */
+export const receipts = (page: Page): Locator => panel(page).locator('[data-testid="assistant-receipt"]');
+/** «What will happen» on the dangerous card: what the write would leave, as the app's preview says it. */
+export const previewBlock = (page: Page): Locator => card(page).locator('[data-testid="assistant-confirm-preview"]');
+/** What is left of the month's messages, under the box. */
+export const foot = (page: Page): Locator => panel(page).locator('[data-testid="assistant-usage"]');
 
 /** Answers the card with its button (`submit` or `cancel`) and waits until it has gone: while Ionic dismisses a modal,
  *  its focus trap keeps the keyboard inside it. */
 export async function decide(page: Page, button: 'submit' | 'cancel'): Promise<void> {
   await card(page).locator(`[data-testid="assistant-confirm-${button}"]`).click();
   await expect(card(page)).toBeHidden();
+}
+
+/** Cancels the card: nothing is done. */
+export const cancel = (page: Page): Promise<void> => decide(page, 'cancel');
+
+/** Cancels the Spanish card: nothing was done, and the answer says so. */
+export async function cancelInSpanish(page: Page): Promise<void> {
+  await cancel(page);
+  await expect(lastAnswer(page)).toContainText('No lo he hecho.');
+}
+
+/** The word typed in the card that asks for it and the card confirmed: the assistant says it is done. */
+export async function confirmedWithTheWord(page: Page): Promise<void> {
+  await card(page).locator('[data-testid="assistant-confirm-input"] input').fill('confirm');
+  await expect(card(page).locator('[data-testid="assistant-confirm-submit"] button')).toBeEnabled();
+  await decide(page, 'submit');
+  await expect(lastAnswer(page)).toContainText(DONE.en);
 }
 
 export async function home(page: Page): Promise<void> {
@@ -60,11 +60,16 @@ export async function openPanel(page: Page): Promise<void> {
   await expect(box(page)).toBeVisible();
 }
 
+/** The home, loaded again, with the panel open. */
+export async function openPanelAtHome(page: Page): Promise<void> {
+  await home(page);
+  await openPanel(page);
+}
+
 /** The panel open on the home at a computer's size. */
 export async function openPanelAtTheDesk(page: Page): Promise<void> {
   await page.setViewportSize({ width: 1440, height: 900 });
-  await home(page);
-  await openPanel(page);
+  await openPanelAtHome(page);
 }
 
 /** The owner signed in, with the panel open on the home at a computer's size. */
@@ -73,27 +78,76 @@ export async function panelAtTheDesk(page: Page): Promise<void> {
   await openPanelAtTheDesk(page);
 }
 
+/** The Hub's language cookie, as the sign-in sets it: the pages loaded after it are in `language`. */
+async function speaking(context: BrowserContext, language: string): Promise<void> {
+  await context.addCookies([{ name: 'django_language', value: language, domain: new URL(A).hostname, path: '/' }]);
+}
+
 /** The panel open on the home at a computer's size, with the app in Spanish: where a card's words are looked at. */
 export async function openPanelInSpanish(page: Page): Promise<void> {
-  await page.context().addCookies([{ name: 'django_language', value: 'es', domain: new URL(A).hostname, path: '/' }]);
+  await speaking(page.context(), 'es');
   await openPanelAtTheDesk(page);
+}
+
+/** The owner of `a`, signed in, with the app in `language` from the next page loaded. */
+export async function ownerIn(browser: Browser, language: string): Promise<[BrowserContext, Page]> {
+  const context = await browser.newContext();
+  const page = await context.newPage();
+  await login(page, A, '/');
+  await speaking(context, language);
+  return [context, page];
 }
 
 /** Writes `text` and sends it with Enter; resolves when the turn has ended (the composer offers «Send» again). */
 export async function ask(page: Page, text: string, options: { settle?: boolean } = {}): Promise<void> {
   // The previous turn has ended (its text may arrive before its end): while one runs, Enter sends nothing.
-  await expect(panel(page).locator('[data-testid="assistant-send"]')).toBeVisible({ timeout: 30_000 });
+  await expect(send(page)).toBeVisible({ timeout: 30_000 });
   const before = await answers(page).count();
   await box(page).fill(text);
   await box(page).press('Enter');
   await expect(answers(page)).toHaveCount(before + 1);
-  if (options.settle ?? true) await expect(panel(page).locator('[data-testid="assistant-send"]')).toBeVisible({ timeout: 30_000 });
+  if (options.settle ?? true) await expect(send(page)).toBeVisible({ timeout: 30_000 });
 }
 
-/** Asks for what needs the person's say (`text`): its card comes up, while the turn may still run. */
-export async function askForACard(page: Page, text: string): Promise<void> {
+/** Asks for what needs the person's say (`text`): its card comes up within `timeout` (Playwright's by default), while
+ *  the turn may still run. */
+export async function askForACard(page: Page, text: string, options: { timeout?: number } = {}): Promise<void> {
   await ask(page, text, { settle: false });
-  await expect(card(page)).toBeVisible();
+  await expect(card(page)).toBeVisible(options);
+}
+
+/** A card as the server sends it: each datum by its label and in words, a list `named` when the screen says its items
+ *  (live.assistant.NAMED). */
+export type SentCard = { fields: { name: string; label: string; kind: string; value: unknown; named?: boolean; money?: unknown }[] };
+
+/** The card of the confirm frame of a turn's answer (`text/event-stream`: one `data: <JSON>` per frame), if any. */
+export function confirmedCard(stream: string): SentCard | undefined {
+  const frames = stream
+    .split('\n')
+    .filter((line) => line.startsWith('data:'))
+    .map((line) => JSON.parse(line.slice(5)) as { type: string; card?: SentCard });
+  return frames.find((frame) => frame.type === 'confirm')?.card;
+}
+
+/** The card the server sends for the person to confirm, as it arrives: the answer of the turn that carries it (a first
+ *  turn may only ask for the tool). */
+export async function sentCard(page: Page): Promise<SentCard> {
+  const answer = await page.waitForResponse(
+    async (response) => response.url().endsWith('/api/assistant/turn') && confirmedCard(await response.text()) !== undefined,
+  );
+  return confirmedCard(await answer.text())!;
+}
+
+/** Asks for the price write `tool` with `data`: its card comes up, and the server sends its price as 15.00 in the minor
+ *  unit of a list in dollars, with that currency's two decimals. */
+export async function askForAPriceInDollars(page: Page, tool: string, data: Record<string, unknown>): Promise<void> {
+  const sent = sentCard(page);
+  await askForACard(page, `E2E-ASK ${tool} ${JSON.stringify(data)}`);
+  expect((await sent).fields.find((field) => field.name === 'price')).toMatchObject({
+    kind: 'money',
+    value: 1500,
+    money: { currency: 'USD', decimals: 2 },
+  });
 }
 
 /** The last answer captured at each size, as `<key>-<size>`. */
@@ -170,8 +224,7 @@ export async function signedInWith(browser: Browser, needed: readonly string[]):
 /** Cancels the Spanish card at a computer's size: nothing was done, and the answer says so. */
 export async function cancelAtComputerSize(page: Page): Promise<void> {
   await page.setViewportSize({ width: 1440, height: 900 });
-  await decide(page, 'cancel');
-  await expect(lastAnswer(page)).toContainText('No lo he hecho.');
+  await cancelInSpanish(page);
 }
 
 /** The page saved as `name` once nothing moves. */

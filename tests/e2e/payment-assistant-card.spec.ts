@@ -8,8 +8,8 @@
 // flow: PAYMENT-F02 PAYMENT-F05 PAYMENT-F08 BASE-F97
 import { type BrowserContext, expect, test } from '@playwright/test';
 
-import { cancel, cardSpec, datumOf, fieldsOf, ownerIn, VIEWPORTS } from './assistant-card-helpers';
-import { card, openPanel } from './assistant-real';
+import { cardSpec, datumOf, fieldsOf, VIEWPORTS } from './assistant-card-helpers';
+import { cancel, card, openPanelAtTheDesk, ownerIn } from './assistant-panel';
 import { A, api, capture, psql } from './helpers';
 import { post } from './service-helpers';
 
@@ -75,8 +75,7 @@ for (const language of ['es', 'en'] as const) {
     const [context, page] = await ownerIn(browser, language);
     const books = await someBooks(context);
     const before = await asTheyAre(context, books);
-    await page.setViewportSize({ width: 1440, height: 900 });
-    await openPanel(page);
+    await openPanelAtTheDesk(page);
 
     // «Cancela el pago PAY-…», a dangerous write: the payment by its reference, titled as the list calls one, in every
     // size.

@@ -7,8 +7,8 @@
 // flow: SERVICE-F17 SERVICE-F32 MODIFIER-F04 MODIFIER-F05 BASE-F97
 import { type BrowserContext, expect, test } from '@playwright/test';
 
-import { AN_ID, cancel, cardSpec, datumOf, ownerIn, VIEWPORTS } from './assistant-card-helpers';
-import { card, openPanel } from './assistant-real';
+import { AN_ID, cardSpec, datumOf, VIEWPORTS } from './assistant-card-helpers';
+import { cancel, card, openPanelAtTheDesk, ownerIn } from './assistant-panel';
 import { A, api, capture, psql, untilStill } from './helpers';
 import { createProduct, post, stamp } from './pricing-helpers';
 
@@ -91,8 +91,7 @@ for (const language of ['es', 'en'] as const) {
   test(`service-assistant-card — in ${language}, voiding a voucher and removing a professional name which, never by their id`, async ({ browser }) => {
     const [context, page] = await ownerIn(browser, language);
     const salon = await aSalon(context, `${RUN}${language}`);
-    await page.setViewportSize({ width: 1440, height: 900 });
-    await openPanel(page);
+    await openPanelAtTheDesk(page);
 
     // «Anula ese bono», a dangerous write: the voucher by its package, its owner and the day it was sold.
     const voided = await datumOf(page, 'service__grant__void', { id: salon.grant.id, reason: 'Sold by mistake' });
@@ -130,8 +129,7 @@ for (const language of ['es', 'en'] as const) {
   test(`modifier-assistant-card — in ${language}, deleting an option and detaching a group name which, never by their id`, async ({ browser }) => {
     const [context, page] = await ownerIn(browser, language);
     const sauces = await aGroup(context, `${RUN}${language}`);
-    await page.setViewportSize({ width: 1440, height: 900 });
-    await openPanel(page);
+    await openPanelAtTheDesk(page);
 
     // «Borra el alioli», a dangerous write: the option by its name and its group, as two groups may have one with that name.
     const deleted = await datumOf(page, 'modifier__option__delete', { id: sauces.option.id });

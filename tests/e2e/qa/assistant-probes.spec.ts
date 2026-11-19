@@ -32,13 +32,13 @@ import {
   renderProbeReport,
   type Role,
 } from '../assistant-probes';
+import { openPanelAtHome } from '../assistant-panel';
 import {
   answerOf,
   cleanUpRealProviders,
   converse,
   emptyMonth,
   noticesOf,
-  openPanel,
   run,
   SAAS_DIR,
   SECRETS,
@@ -182,7 +182,7 @@ for (const probe of PROBES) {
     });
     try {
       await context.addCookies([{ name: 'django_language', value: probe.language, domain: new URL(A).hostname, path: '/' }]);
-      await openPanel(page);
+      await openPanelAtHome(page);
       const { bodies, decided } = await converse(page, probe.phrase, probe.decide ?? 'cancel', probe.id);
       const outcome: ProbeOutcome = {
         probe,

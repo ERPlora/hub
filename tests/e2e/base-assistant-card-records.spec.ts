@@ -2,9 +2,10 @@
 // base-assistant.spec.ts: as their own screens name them, never by the id.
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
-import { ownerIn, thisDeviceNamed } from './assistant-card-helpers';
-import { askForACard, cancelAtComputerSize, captureConfirmation, captureStill, card, leave, openPanelAtTheDesk, openPanelInSpanish, panelSpec, signedInWith } from './assistant-panel';
+import { thisDeviceNamed } from './assistant-card-helpers';
+import { askForACard, cancelAtComputerSize, captureConfirmation, captureStill, card, leave, openPanelAtTheDesk, openPanelInSpanish, ownerIn, signedInWith } from './assistant-panel';
 import { A, api, login, THREE_SIZES as VIEWPORTS, turnOnMissing } from './helpers';
+import { panelSpec } from './provider-helpers';
 
 panelSpec();
 

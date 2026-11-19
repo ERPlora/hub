@@ -9,11 +9,12 @@ import {  } from 'node:child_process';
 
 import { expect, test } from '@playwright/test';
 
-import { answers, ask, box, freshPage, home, lastAnswer, lastAnswerAtEachSize, openPanel, openPanelAtTheDesk, panel, panelAtTheDesk, panelSpec, shots, spend } from './assistant-panel';
+import { answers, ask, box, freshPage, home, lastAnswer, lastAnswerAtEachSize, openPanel, openPanelAtTheDesk, panel, panelAtTheDesk, shots } from './assistant-panel';
 import { CLAIM_ANSWER, DICTATION, GREETING } from './assistant-provider';
 import { saasSql } from './assistant-real';
 import { A, capture, login, shot, shown, THREE_SIZES as VIEWPORTS, untilStill, upgradeLandsInside } from './helpers';
 import {  } from './stack';
+import { panelSpec, spend } from './provider-helpers';
 import { pressAssistant, topbarMore, topbarMoreMenu } from './topbar';
 
 const provider = panelSpec();
