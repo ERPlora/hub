@@ -28,7 +28,7 @@ from live.outbox import record_event
 
 from apps.inventory.models import Category, Product
 from apps.inventory.queries import held
-from apps.kitchen import events
+from apps.kitchen import allergy, events
 from apps.kitchen.models import (
     ACTOR_MAX_LENGTH,
     CategoryRoute,
@@ -100,6 +100,7 @@ from apps.kitchen.schemas import (
     TicketSyncIn,
 )
 from apps.sale.models import OrderLine
+from base.queries.catalog_images import business_language
 
 logger = logging.getLogger(__name__)
 
@@ -249,6 +250,8 @@ def save_round(ctx: OperationContext, rnd, route) -> Ticket:
                 unit=item.unit,
                 notes=item.notes[:255],
                 modifiers=item.modifiers,
+                allergy=item.allergy,
+                allergy_in_dish=item.allergy_in_dish,
                 station_id=item.station_id,
                 station_name=item.station_name,
                 destination=item.destination,
@@ -260,16 +263,7 @@ def save_round(ctx: OperationContext, rnd, route) -> Ticket:
         ]
     )
     write_log(ticket.id, LogAction.RECEIVED, at=view.received_at)
-    record_event(
-        ctx,
-        events.TICKET_RECEIVED,
-        {
-            "ticket_id": str(ticket.id),
-            "number": ticket.number,
-            "order_id": str(ticket.order_id),
-            "round_no": ticket.round_no,
-        },
-    )
+    _ticket_event(ctx, events.TICKET_RECEIVED, ticket, order_id=str(ticket.order_id), round_no=ticket.round_no)
     return ticket
 
 
@@ -505,12 +499,11 @@ def print_ticket(
 ) -> object:
     """One sheet per printer of ``items`` (the ones that go to paper); the first refusal, if any."""
     outcome = UNAVAILABLE
+    language = business_language(ctx)
     for (usage, printer), dishes in _paper(items).items():
-        document = _sheet(
-            ticket,
-            [] if sheet.get("empty") else dishes,
-            **{k: v for k, v in sheet.items() if k != "empty"},
-        )
+        shown = [] if sheet.get("empty") else dishes
+        document = _sheet(ticket, shown, **{k: v for k, v in sheet.items() if k != "empty"})
+        document = allergy.on_paper(document, shown, language)
         result = _print(
             ctx,
             key=f"kitchen-{ticket.id}-{key}-{usage}-{printer}",

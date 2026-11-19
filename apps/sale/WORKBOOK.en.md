@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:ae0627a6c8860e405e3c02ad17bbd25fe87144a0f1f6c35519d742492eed5d93 -->
+<!-- generated from WORKBOOK.md sha256:9ead874ab26e51238d6f76f49defc1e1f744ef4a33607203e4919c3c2931a245 -->
 
 ## What it is for and who it is for
 
@@ -1387,7 +1387,8 @@ Involved: INVENTORY-F27, INVENTORY-F35, SALE-F11, SALE-F12, SALE-F41, KITCHEN-F3
 ### SALE-F41 Mark the customer's allergy on a line
 Status: partial — the line keeps the customer's allergy, the live check says which of those allergens the dish
 contains and the order sent carries it, also through the assistant and the API; the till's sheet does not have the
-«Customer's allergy» block yet nor does the line show it (hub#1738), and Kitchen does not highlight it yet (KITCHEN-F32)
+«Customer's allergy» block yet nor does the line show it (hub#1738), and in Kitchen the paper prints it but the card
+does not highlight it yet (KITCHEN-F32)
 Vertical: restaurant
 Actor: employee, manager
 Screen: Sell

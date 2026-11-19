@@ -21,7 +21,7 @@ import datetime as dt
 import re
 from collections import defaultdict
 from collections.abc import Callable, Iterable
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass, field, fields, replace
 from decimal import Decimal
 from uuid import UUID
 
@@ -33,6 +33,7 @@ from live.context import OperationContext
 from live.errors import Conflict, NotFound
 from live.operations import INTERNAL, operation
 
+from apps.kitchen.allergy import frozen
 from apps.kitchen.models import (
     CategoryRoute,
     DayCounter,
@@ -179,6 +180,8 @@ class ItemView:
     total: int
     facts: LineFacts | None = None
     modifiers: list[str] = field(default_factory=list)
+    allergy: list[str] = field(default_factory=list)
+    allergy_in_dish: list[str] = field(default_factory=list)
     menu_name: str = ""
     menu_dish: int = 0
 
@@ -194,6 +197,10 @@ class ItemView:
     @property
     def to_do(self) -> bool:
         return self.status in TO_DO
+
+
+#: What a saved dish keeps of its view, by the same names: all of it but what Sales says of its line today.
+SAVED = tuple(column.name for column in fields(ItemView) if column.name != "facts")
 
 
 @dataclass
@@ -245,30 +252,7 @@ class Change:
 
 
 def _item_view(item: TicketItem, facts: LineFacts | None) -> ItemView:
-    return ItemView(
-        id=item.id,
-        position=item.position,
-        sale_line_id=item.sale_line_id,
-        product_id=item.product_id,
-        category_id=item.category_id,
-        name=item.name,
-        quantity=item.quantity,
-        unit=item.unit,
-        notes=item.notes,
-        station_id=item.station_id,
-        station_name=item.station_name,
-        destination=item.destination,
-        printer_usage=item.printer_usage,
-        printer_name=item.printer_name,
-        status=item.status,
-        void_reason=item.void_reason,
-        ready_at=item.ready_at,
-        total=item.total,
-        facts=facts,
-        modifiers=list(item.modifiers),
-        menu_name=item.menu_name,
-        menu_dish=item.menu_dish,
-    )
+    return ItemView(**{name: getattr(item, name) for name in SAVED}, facts=facts)
 
 
 def line_facts(line_ids: Iterable[UUID]) -> dict[UUID, LineFacts]:
@@ -530,6 +514,7 @@ def dish_of(
         total=line.line_total,
         facts=facts,
         modifiers=line_options(line),
+        **frozen(line.allergy, line.allergens),
     )
 
 
@@ -556,6 +541,7 @@ def dishes_of_menu(
                 unit="ud",
                 total=line.line_total if number == 1 else 0,
                 modifiers=[],
+                **frozen(line.allergy, dish.get("allergens", [])),
                 menu_name=header,
                 menu_dish=number,
             )
@@ -820,6 +806,8 @@ def item_out(item: ItemView, stations: dict[UUID, Station]) -> dict:
         "unit": item.unit,
         "notes": item.notes,
         "modifiers": item.modifiers,
+        "allergy": item.allergy,
+        "allergy_in_dish": item.allergy_in_dish,
         "menu_name": item.menu_name,
         "menu_line_id": item.menu_line_id,
         "station_id": item.station_id,
