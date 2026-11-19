@@ -11,7 +11,7 @@ import type {
   LoadReport,
   RetryBlocked,
   Template,
-} from '../operations';
+} from '../operations/blueprints';
 
 // ── The address ──────────────────────────────────────────────────────────────────────────────────────────────────
 

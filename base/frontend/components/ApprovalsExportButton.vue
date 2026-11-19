@@ -11,7 +11,7 @@ import { ref } from 'vue';
 
 import { saveFile } from '../lib/download';
 import { useBaseI18n } from '../lib/i18n';
-import type { ApprovalExportQuery } from '../operations';
+import type { ApprovalExportQuery } from '../operations/approvals';
 
 const props = defineProps<{ query: ApprovalExportQuery }>();
 

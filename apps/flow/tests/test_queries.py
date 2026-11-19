@@ -135,19 +135,19 @@ def test_the_catalog_offers_what_a_step_leaves_inside_an_object_never_inside_a_l
     assert "invoice.lines" in invoice
     assert not [path for path in invoice if path.startswith(("invoice.lines.", "invoice.tax_breakdown."))]
     # The same paths the engine resolves, for every action and read: nothing walked twice.
-    operations = queries.ask_first_catalog(A)
+    operations = queries.catalog.ask_first_catalog(A)
     for name, action in actions.items():
-        assert action.outputs[: len(queries.step_data(operations[name]))] == list(queries.step_data(operations[name])), name
+        assert action.outputs[: len(queries.catalog.step_data(operations[name]))] == list(queries.catalog.step_data(operations[name])), name
 
 
 def test_what_a_step_leaves_is_read_from_one_build_of_its_schema(monkeypatch):
     """The catalog walks some 500 operations on every read: what a step leaves, inside its objects too, comes from a
     single build of its output's schema (a second one per operation cost the editor half a second more)."""
-    op = queries.ask_first_catalog(A)["cart_checkout.item.add"]
+    op = queries.catalog.ask_first_catalog(A)["cart_checkout.item.add"]
     built = []
     schema = op.output.model_json_schema
     monkeypatch.setattr(op.output, "model_json_schema", lambda *args, **kwargs: built.append(1) or schema(*args, **kwargs))
-    assert "item.unit_price" in queries.action_outputs(op)
+    assert "item.unit_price" in queries.catalog.action_outputs(op)
     assert len(built) == 1
 
 
@@ -217,7 +217,7 @@ def test_the_list_searches_the_name_the_event_and_the_actions():
         "task.task.create": ["Welcome"],
         "nothing": [],
     }
-    from apps.flow.services import refresh_search_text
+    from apps.flow.services.flow_document import refresh_search_text
 
     for flow in Flow.objects.all():
         refresh_search_text(flow)
@@ -467,6 +467,7 @@ def test_try_says_when_it_would_not_even_start_or_stop_at_a_condition():
     result = try_(BIG_SALE)
     assert result.starts is False
     assert [clause.path for clause in result.trigger_failed] == ["input.total"]
+    assert [step.outcome for step in result.steps] == ["not_reached"] * 4
     outbox("sale.sale.completed", {"total": 20000})
     result = try_(BIG_SALE)
     assert result.starts is True
@@ -499,10 +500,10 @@ def test_try_says_what_the_action_would_refuse_and_what_it_is_not_allowed():
 def test_try_says_an_action_of_an_app_that_is_not_here_is_unavailable(monkeypatch):
     active = {
         label: config
-        for label, config in queries.active_apps(A).items()
+        for label, config in queries.catalog.active_apps(A).items()
         if label != "task"
     }
-    monkeypatch.setattr(queries, "active_apps", lambda _scope: active)
+    monkeypatch.setattr(queries.catalog, "active_apps", lambda _scope: active)
     outbox("sale.sale.completed", {"total": 20000})
     document = {"trigger": {"kind": "manual"}, "steps": [TASK_STEP]}
     assert try_(document).steps[0].outcome == "unavailable"
@@ -563,11 +564,11 @@ def test_a_typed_declaration_needs_a_person_as_its_dictionary_did():
             expose_api=False, ai=ai, fn=lambda ctx, data: {},
         )
 
-    assert queries.needs_a_person(declared(AI(description="Voids the task.", risk="high")))
-    assert not queries.needs_a_person(declared(AI(description="Adds a task.")))
-    assert not queries.needs_a_person(declared(INTERNAL))
-    assert queries.needs_a_person(declared({"description": "Seats a party.", "in_person": True}))
-    assert not queries.asks_first(declared(INTERNAL))
+    assert queries.catalog.needs_a_person(declared(AI(description="Voids the task.", risk="high")))
+    assert not queries.catalog.needs_a_person(declared(AI(description="Adds a task.")))
+    assert not queries.catalog.needs_a_person(declared(INTERNAL))
+    assert queries.catalog.needs_a_person(declared({"description": "Seats a party.", "in_person": True}))
+    assert not queries.catalog.asks_first(declared(INTERNAL))
 
 
 def test_try_says_an_action_that_needs_a_person_is_not_for_automations():
@@ -630,8 +631,8 @@ def test_a_recipe_turned_on_says_which_automation_it_is_and_how_it_is():
 
 
 def test_a_recipe_this_business_cannot_offer_is_listed_apart_with_its_reason(monkeypatch):
-    active = {label: config for label, config in queries.active_apps(A).items() if label != "task"}
-    monkeypatch.setattr(queries, "active_apps", lambda _scope: active)
+    active = {label: config for label, config in queries.catalog.active_apps(A).items() if label != "task"}
+    monkeypatch.setattr(queries.catalog, "active_apps", lambda _scope: active)
     listed = run("flow.recipe.list")
     assert GAP not in {recipe.ref for recipe in listed.recipes}
     aside = next(item for item in listed.set_aside if item.ref == GAP)

@@ -9,9 +9,6 @@ from django.utils import timezone, translation
 
 from config import testing
 
-# The suite's fallback, on only for the tests .legacy-fallback-allow names (base/tenancy/tests/legacy_allow.py).
-pytest_plugins = ["base.tenancy.tests.legacy_allow"]
-
 ENTRY = "frontend/main.ts"
 
 
@@ -76,26 +73,21 @@ LOCAL_HUBS = ("a", "b")
 
 @pytest.fixture(autouse=True)
 def local_hubs(request):
-    """The local hubs ``a`` and ``b``, ready, in the registry (``base.Hub``) of every test that uses the database, with
-    every app on (``base.activation.every_on``), as the developer's database has them after ``seed_local_hubs``.
+    """The local hubs ``a`` and ``b``, ready, in the registry (``base.Hub``) of every test that uses the database, as
+    rows without a database of their own: their hosts answer 503 maintenance, as a business not cut yet does.
 
-    The host gate (``base.middleware``) answers 404 to a slug without a row, so a test on ``a.localhost`` needs it.
-    A hub is born with every app off: a test of a new hub creates its own row, and one about how a
-    hub is born clears ``a``'s rows. A test without the database gets nothing (and a test without it that asks
-    ``a.localhost`` for a hub's page fails: it must say ``django_db``).
+    The host gate (``base.middleware``) answers 404 to a slug without a row. A test that works in a business enters
+    one with a database of its own (``base/tenancy/tests/hubs.py``: ``hub_a``, ``hub_b``). A test without the database
+    gets nothing.
     """
     marked = request.node.get_closest_marker("django_db") is not None
     if not (marked or {"db", "transactional_db"} & set(request.fixturenames)):
         return
     request.getfixturevalue("transactional_db" if "transactional_db" in request.fixturenames else "db")
     from base.models import Hub
-    from base.tenancy.tests.legacy import use_legacy
 
-    # Written in the fallback's tables explicitly: a test that only finds them there does not lean on the fallback.
-    with use_legacy():
-        for slug in LOCAL_HUBS:
-            Hub.objects.get_or_create(slug=slug, defaults={"status": Hub.Status.READY})
-            _every_app_on(slug)
+    for slug in LOCAL_HUBS:
+        Hub.objects.get_or_create(slug=slug, defaults={"status": Hub.Status.READY})
 
 
 def _every_app_on(slug):
@@ -173,6 +165,35 @@ def outbound_pool(request, monkeypatch):
     assert pool.stop(grace=10), "a job of base.outbound was still running when the test ended"
 
 
+@pytest.fixture
+def told(monkeypatch):
+    """Every live notice sent after a COMMIT: ``(scope key, event names)``. A module that needs another kind of record
+    defines its own ``told``."""
+    from live import operations as live_operations
+
+    sent: list[tuple[str, list[str]]] = []
+    real = live_operations.notify_hook
+
+    def hook(scope, names):
+        sent.append((scope.key, list(names)))
+        if real is not None:
+            real(scope, names)
+
+    monkeypatch.setattr(live_operations, "notify_hook", hook)
+    return sent
+
+
+@pytest.fixture
+def worker_visits():
+    """The worker's visits to the hubs with their own database (``base.hub_visits``) as a process that has just
+    started: no hub's schedule written yet and nothing known of any; its LISTEN closed after the test."""
+    from base.hub_visits import HubVisits
+
+    visits = HubVisits()
+    yield visits
+    visits.close()
+
+
 class _NoSlowPasses:
     """``base.worker.Background`` in the tests: the worker's loop starts no slow pass. They run in threads of their own,
     on their own connections, so in a test they would commit outside its transaction (a nightly ``UsageRun`` the relay's
@@ -201,36 +222,6 @@ def worker_slow_passes(request, monkeypatch):
 
 
 # ── The tenancy: a control database and one database per hub ───────────────────────────────────────────────────────
-
-
-@pytest.fixture(autouse=True)
-def legacy_worker(request, monkeypatch):
-    """The worker's loop serves only the hubs with their own database. A test that still leans on the suite's fallback
-    and runs it on its businesses (on control's test database) gets a pass of its own instead of the one over control's
-    outbox: their tasks and their events' relay (``base/tenancy/tests/legacy.py``, ``worker_pass``). Not for a test
-    that runs as production (not listed in ``.legacy-fallback-allow``, or ``no_test_fallback``) nor for the worker's
-    own (``production_worker``)."""
-    from base.tenancy import context
-
-    if (
-        context._test_fallback is None
-        or "no_test_fallback" in request.fixturenames
-        or request.node.get_closest_marker("production_worker")
-    ):
-        return
-    from base import worker
-    from base.tenancy.tests import legacy_allow
-
-    monkeypatch.setattr(worker, "_relay", legacy_allow.worker_pass)
-
-
-@pytest.fixture
-def no_test_fallback(monkeypatch):
-    """The test runs as production does: without a context, a hub's model or operation fails (``HubContextMissing``)
-    and a business without its own database is not entered (``HubWithoutDatabase``)."""
-    from base.tenancy import context
-
-    monkeypatch.setattr(context, "_test_fallback", None)
 
 
 @pytest.fixture(scope="session")

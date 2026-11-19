@@ -64,8 +64,8 @@ msgstr "mensaje de bienvenida"
 msgid "primary colour"
 msgstr "color primario"
 
-msgid "logo URL"
-msgstr "URL del logo"
+msgid "logo"
+msgstr "logo"
 
 msgid "email required"
 msgstr "email obligatorio"
@@ -154,8 +154,8 @@ msgstr "El final no puede ser anterior al inicio."
 msgid "Write the colour as #RRGGBB (for example #6366f1)."
 msgstr "Escribe el color como #RRGGBB (por ejemplo #6366f1)."
 
-msgid "Write a web address that starts with http:// or https://."
-msgstr "Escribe una dirección web que empiece por http:// o https://."
+msgid "That logo was not uploaded to this business: upload it again."
+msgstr "Ese logo no se subió a este negocio: vuelve a subirlo."
 
 msgid "Each service only once."
 msgstr "Cada servicio solo una vez."
@@ -166,6 +166,9 @@ msgid ""
 msgstr ""
 "Demasiadas reservas desde este dispositivo en la última hora. Inténtalo más "
 "tarde o llama al negocio."
+
+msgid "We could not take this booking. Try again, or call the business."
+msgstr "No hemos podido hacer esta reserva. Inténtalo de nuevo o llama al negocio."
 
 msgid ""
 "This business is receiving many online bookings right now. Try again in a "

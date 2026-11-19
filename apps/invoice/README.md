@@ -48,7 +48,7 @@ Sirve igual al restaurante y a la peluquería.
 | Quién la lee | VeriFactu (el aviso `invoice.invoice.issued` y la factura; `invoice.invoice.create` para su factura de prueba), Ventas (emite dentro de su cobro, anulación y devolución), Ventas e Impresión (`invoice.issuer.get`), la plataforma (los dos pasos del Inicio) |
 | Pantallas | `/invoice/invoices` (y la ficha `/invoice/invoices/<id>`), `/invoice/series` y `/invoice/issuer` |
 | Inicio | los pasos «Los datos de tu negocio» (`invoice.issuer.get`, `required=True`) y «Tu numeración de facturas» (`invoice.numbering.status`, recomendado) |
-| Operaciones | 17 consultas (`queries.py`) y 13 acciones (`services.py`), todas con `ai=`; 25 con ruta en `/api/invoice/…` (`invoice.issuer.sync` y las cuatro del hub de plataforma no tienen ruta: solo el sistema) |
+| Operaciones | 18 consultas (`queries/`) y 14 acciones (`services/`), todas con `ai=`; 25 con ruta en `/api/invoice/…` (`invoice.issuer.sync` y las cuatro del hub de plataforma no tienen ruta: solo el sistema; las dos de la página pública del tique, `invoice.public.ticket` e `invoice.public.substitute`, tampoco: se llaman por la puerta pública de `base`, sin sesión) |
 | Eventos | 6, `invoice.invoice.{issued,rectified,paid}`, `invoice.series.{created,updated}` e `invoice.issuer.updated` (`events.py`); reacciona a `sale.sale.completed`, `sale.sale.refunded` y `sale.sale.voided` |
 | Migraciones | `0001_initial` … `0006_customer_id_type_choices` |
 | Admin | Django admin en `hubs.erplora.com`: series y emisor editables; facturas y líneas en solo lectura, sin alta ni borrado (solo las notas) |

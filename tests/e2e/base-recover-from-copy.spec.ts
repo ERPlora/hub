@@ -49,13 +49,15 @@
 // that category and performed by that professional again; in its Agenda, the appointment's «History» ends in
 // «Restored» (APPOINTMENT-F10).
 // The stack's worker serves databases only (no moves' thread), so the spec plays its passes, as the specs play the
-// relay.
-import { spawnSync } from 'node:child_process';
+// relay, in one `manage.py shell` opened before the tests (`manage-shell.ts`). What the business has and loses goes
+// through its apps' API with the owner's session, as in the other specs, but for what no person does.
+import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
-import { expect, type Page, test } from '@playwright/test';
-
-import { capture, HUB_DIR, psql } from './helpers';
-import { ownerPage, rowAction } from './service-helpers';
+import { WORKER_START_TIMEOUT_MS } from './global-setup';
+import { capture, OWNER, psql } from './helpers';
+import { GENERIC } from './inventory-helpers';
+import { openShell, type Shell } from './manage-shell';
+import { ownerPage, post, rowAction } from './service-helpers';
 import { STACK } from './stack';
 
 const KEY = 'BASE-F114-RECOVER';
@@ -71,58 +73,43 @@ const HUBS = `${PLATFORM}/admin/control/hub/`;
 const TEMPORARY = 'e2e-recover-temporary';
 const RUN = Date.now().toString(36);
 
-/** `code` run by `manage.py shell` of this checkout on the stack's database, in `hub`'s own when given (its cards),
- *  else on control (the registry: the separate copy, the staff's session, the worker's pass); its last line. */
-function shell(code: string, hub?: string): string {
-  const where = hub ? ['--hub', hub] : [];
-  const out = spawnSync('uv', ['run', 'python', 'manage.py', 'shell', ...where, '-c', code], {
-    cwd: HUB_DIR,
-    env: process.env,
-    encoding: 'utf8',
-  });
-  if (out.status !== 0) throw new Error(`The shell of manage.py exited with ${out.status}:\n${out.stdout}\n${out.stderr}`);
-  return out.stdout.trim().split('\n').at(-1) ?? '';
+/** POST `path` of `a`'s API with the owner's session in `business`; the id of what it made, if it made one. */
+async function inA(business: BrowserContext, path: string, body: Record<string, unknown>, status = 200): Promise<string> {
+  return (await post<{ id?: string }>(business, path, body, status)).id ?? '';
 }
 
-/** `operation` run in `a` with `input`, as the platform runs an operation in a business; what it answers's id. */
-function inA(operation: string, input: Record<string, unknown>): string {
-  return shell(
+/** What `path` of `a`'s API makes (201) with `body`; its id. */
+const made = (business: BrowserContext, path: string, body: Record<string, unknown>): Promise<string> =>
+  inA(business, path, body, 201);
+
+/** What the platform runs in `a` as the system, each operation with its input: the worker's relay (the stack's worker
+ *  relays nothing) and what no person does. */
+async function bySystem(calls: [string, Record<string, unknown>][]): Promise<void> {
+  await shell.run(
     [
       'import json',
+      'from base.registry import hub_by_slug',
+      'from base.tenancy.context import use_hub',
       'from live.context import OperationContext, Scope',
       'from live.operations import get',
       'ctx = OperationContext(scope=Scope("host", "a"), actor="system", permissions=frozenset({"*"}), language="en")',
-      `op = get(${JSON.stringify(operation)})`,
-      `print(getattr(op(ctx, op.input(**json.loads(${JSON.stringify(JSON.stringify(input))}))), "id", ""))`,
+      'with use_hub(hub_by_slug("a")):',
+      `    for name, data in json.loads(${JSON.stringify(JSON.stringify(calls))}):`,
+      '        op = get(name)',
+      '        op(ctx, op.input(**data))',
     ].join('\n'),
-    'a',
   );
 }
 
-/** A card of `a` made by Customers' create; its id. */
-function aCard(name: string, email: string): string {
-  return inA('customer.customer.create', { name, email });
+/** A product of `a` made by Inventory's create, in `category`; its id. */
+function aProduct(business: BrowserContext, name: string, sku: string, category: string): Promise<string> {
+  return made(business, '/inventory/products', { name, sku, price: 250, tax_category_key: GENERIC, category_ids: [category] });
 }
 
-/** The key of the first active tax category of `a`. */
-function aTaxKey(): string {
-  return shell('from apps.tax.models import TaxCategory\nprint(TaxCategory.objects.filter(is_active=True).order_by("key").first().key)', 'a');
-}
-
-/** A product of `a` made by Inventory's create, in `category`, with the first active tax category of `a`; its id. */
-function aProduct(name: string, sku: string, category: string): string {
-  return inA('inventory.product.create', { name, sku, price: 250, tax_category_key: aTaxKey(), category_ids: [category] });
-}
-
-/** A service of `a` made by Services' create, in `category`, with the first active tax category of `a`; its id. */
-function aService(name: string, category: string): string {
-  return inA('service.service.create', {
-    name,
-    price: 2500,
-    duration_minutes: 45,
-    category_id: category,
-    tax_category_key: aTaxKey(),
-  });
+/** A service of `a` made by Services' create, in `category`; its id. */
+function aService(business: BrowserContext, name: string, category: string): Promise<string> {
+  const service = { name, price: 2500, duration_minutes: 45, category_id: category, tax_category_key: 'service.generic' };
+  return made(business, '/service/services', service);
 }
 
 /** A Monday one to two weeks ahead at `hhmm` on the business's wall clock (open by default, never in the past). */
@@ -135,16 +122,16 @@ function aMondayAt(hhmm: string): string {
 
 /** An appointment of `a` booked by the agenda's create for a card of its own, with a professional and a service of its
  *  own (no category: the spec's category is deleted); its id. */
-function anAppointment(label: string): string {
-  const customer = aCard(`Booked ${label} ${RUN}`, `booked-${label}-${RUN}@example.com`);
-  const staff = inA('staff.member.create', { first_name: 'Booked', last_name: `${label} ${RUN}` });
-  const service = inA('service.service.create', {
+async function anAppointment(business: BrowserContext, label: string): Promise<string> {
+  const customer = await made(business, '/customer/customers', { name: `Booked ${label} ${RUN}`, email: `booked-${label}-${RUN}@example.com` });
+  const staff = await made(business, '/staff/members', { first_name: 'Booked', last_name: `${label} ${RUN}` });
+  const service = await made(business, '/service/services', {
     name: `Cut ${label} ${RUN}`,
     price: 2000,
     duration_minutes: 30,
-    tax_category_key: aTaxKey(),
+    tax_category_key: 'service.generic',
   });
-  return inA('appointment.appointment.create', {
+  return made(business, '/appointment/appointments', {
     customer_id: customer,
     staff_id: staff,
     services: [{ service_id: service }],
@@ -154,11 +141,11 @@ function anAppointment(label: string): string {
 
 /** Control's side, by `step`: `setup` makes the staff member and the temporary cluster once and opens the staff
  *  member's session (its key), `make` runs the worker's pass of the separate copies (the latest copy of `a`, made;
- *  its copy goes through a dumps bucket of its own, on the tests' S3 server),
- *  `recover` runs its pass of the recoveries, and `clean` drops the copies of `a` with their rows and the temporary
- *  cluster. */
-function control(step: 'setup' | 'make' | 'recover' | 'clean'): string {
-  return shell(
+ *  its copy goes through a dumps bucket of its own, on a tests' S3 server emptied first: its state lives in the
+ *  shell), `recover` runs its pass of the recoveries, and `clean` drops the copies of `a` with their rows and the
+ *  temporary cluster. Its last line. */
+async function control(step: 'setup' | 'make' | 'recover' | 'clean'): Promise<string> {
+  const out = await shell.run(
     [
       'from django.contrib.auth import get_user_model',
       'from django.db import connections',
@@ -177,17 +164,20 @@ function control(step: 'setup' | 'make' | 'recover' | 'clean'): string {
       '    client.force_login(root)',
       '    print(client.cookies["sessionid"].value)',
       'elif step == "make":',
-      '    import os',
+      '    import os, urllib.request',
+      '    from unittest import mock',
       '    from moto.server import ThreadedMotoServer',
       '    from base.tenancy.tests.s3 import FAKE_CREDENTIALS, REGION, client',
       '    s3 = ThreadedMotoServer(ip_address="127.0.0.1", port=0, verbose=False)',
       '    s3.start()',
       '    try:',
       '        endpoint = "http://%s:%d" % s3.get_host_and_port()',
-      '        os.environ.pop("AWS_PROFILE", None)',
-      '        os.environ.update(FAKE_CREDENTIALS, AWS_REGION=REGION, HUB_DUMPS_BUCKET="e2e-copies", HUB_DUMPS_ENDPOINT_URL=endpoint)',
-      '        client(endpoint).create_bucket(Bucket="e2e-copies", CreateBucketConfiguration={"LocationConstraint": REGION})',
-      '        restore.run_aside_due(source=lambda copied: copied.db_name)',
+      '        urllib.request.urlopen(urllib.request.Request(endpoint + "/moto-api/reset", method="POST"))',
+      '        dumps = dict(FAKE_CREDENTIALS, AWS_REGION=REGION, HUB_DUMPS_BUCKET="e2e-copies", HUB_DUMPS_ENDPOINT_URL=endpoint)',
+      '        with mock.patch.dict(os.environ, dumps):',
+      '            os.environ.pop("AWS_PROFILE", None)',
+      '            client(endpoint).create_bucket(Bucket="e2e-copies", CreateBucketConfiguration={"LocationConstraint": REGION})',
+      '            restore.run_aside_due(source=lambda copied: copied.db_name)',
       '    finally:',
       '        s3.stop()',
       '    made = RestoredCopy.objects.filter(hub=hub).order_by("-asked_at").first()',
@@ -205,10 +195,7 @@ function control(step: 'setup' | 'make' | 'recover' | 'clean'): string {
       .join('\n')
       .replace('TEMPORARY', JSON.stringify(TEMPORARY)),
   );
-}
-
-async function asStaff(page: Page): Promise<void> {
-  await page.context().addCookies([{ name: 'sessionid', value: control('setup'), domain: 'hubs.localhost', path: '/' }]);
+  return out.split('\n').at(-1) ?? '';
 }
 
 /** The moment of a copy as the page asks it: now, to the second, in UTC («2026-11-09T14:30:00Z»). */
@@ -226,65 +213,84 @@ async function runOn(page: Page, url: string, value: string, action: string): Pr
 
 test.describe.configure({ mode: 'serial' });
 
-test.afterAll(() => {
-  control('clean');
+/** The spec's `manage.py shell` on control, open from before the first test to after the last, and the staff member's
+ *  session, opened once for every size. */
+let shell: Shell;
+let staffSession: string;
+
+test.beforeAll(async () => {
+  // Django's start, before the tests' time and bounded as the run's worker's is.
+  test.setTimeout(WORKER_START_TIMEOUT_MS);
+  shell = await openShell();
+  staffSession = await control('setup');
+});
+
+test.afterAll(async () => {
+  // A shell that never opened made nothing to clean.
+  if (!shell) return;
+  await control('clean');
+  await shell.close();
 });
 
 for (const { label, viewport } of SIZES) {
   test(`${KEY}: at ${label}, the staff choose a separate copy and the customer, the product, the service and the appointment the business lost come back`, async ({ browser }) => {
     test.slow();
+    const { context: business, page: landing } = await ownerPage(browser, '/appointment/agenda', viewport);
+    // Only its session is needed: the business runs one transaction at a time, and an open page's live queries would
+    // take it from the requests below.
+    await landing.close();
     const name = `Recovered ${label} ${RUN}`;
     const email = `recovered-${label}-${RUN}@example.com`;
-    const card = aCard(name, email);
+    const card = await made(business, '/customer/customers', { name, email });
     // What hangs from the cards: a group both are in, and a tag and a custom field's value of the second.
-    const group = inA('customer.group.create', { name: `VIP ${label} ${RUN}` });
+    const group = await made(business, '/customer/groups', { name: `VIP ${label} ${RUN}` });
     const tagName = `Regular ${label} ${RUN}`;
-    const tag = inA('customer.tag.create', { name: tagName, color: 'success' });
-    const field = inA('customer.field.create', { name: `Size ${label} ${RUN}` });
+    const tag = await made(business, '/customer/tags', { name: tagName, color: 'success' });
+    const field = await made(business, '/customer/fields', { name: `Size ${label} ${RUN}` });
     const goneEmail = `gone-${label}-${RUN}@example.com`;
-    const goneCard = aCard(`Gone ${label} ${RUN}`, goneEmail);
-    inA('customer.customer.set_groups', { id: card, group_ids: [group] });
-    inA('customer.customer.set_groups', { id: goneCard, group_ids: [group] });
-    inA('customer.customer.set_tags', { id: goneCard, tag_ids: [tag] });
-    inA('customer.customer.update', { id: goneCard, field_values: [{ field_id: field, value: 'M' }] });
+    const goneCard = await made(business, '/customer/customers', { name: `Gone ${label} ${RUN}`, email: goneEmail });
+    await inA(business, '/customer/customers/set_groups', { id: card, group_ids: [group] });
+    await inA(business, '/customer/customers/set_groups', { id: goneCard, group_ids: [group] });
+    await inA(business, '/customer/customers/set_tags', { id: goneCard, tag_ids: [tag] });
+    await inA(business, '/customer/customers/update', { id: goneCard, field_values: [{ field_id: field, value: 'M' }] });
     const sku = `REC-${label}-${RUN}`;
-    const shelf = inA('inventory.category.create', { name, color: '#33aa66' });
-    const product = aProduct(name, sku, shelf);
-    const priceList = inA('pricing.price_list.create', { code: `REC-${label}-${RUN}`, name });
-    inA('pricing.price_item.add', { price_list_id: priceList, product_id: product, price: 900 });
-    const sauces = inA('modifier.group.create', { name: `Sauces ${label} ${RUN}` });
-    inA('modifier.link.attach', { group_id: sauces, product_id: product });
+    const shelf = await made(business, '/inventory/categories', { name, color: '#33aa66' });
+    const product = await aProduct(business, name, sku, shelf);
+    const priceList = await made(business, '/pricing/price_lists', { code: `REC-${label}-${RUN}`, name });
+    await made(business, '/pricing/price_items', { price_list_id: priceList, product_id: product, price: 900 });
+    const sauces = await made(business, '/modifier/groups', { name: `Sauces ${label} ${RUN}` });
+    await made(business, '/modifier/links/attach', { group_id: sauces, product_id: product });
     // Kept by the business, which takes this option away from it after the copy.
-    const alioli = inA('modifier.option.create', {
+    const alioli = await made(business, '/modifier/options', {
       group_id: sauces, name: 'Alioli', price_delta: 50, is_default: true, sort_order: 1,
     });
-    const extras = inA('modifier.group.create', { name: `Extras ${label} ${RUN}` });
-    inA('modifier.option.create', { group_id: extras, name: 'Cheese', price_delta: 100 });
-    inA('modifier.link.attach', { group_id: extras, category_id: shelf });
-    const menu = inA('combo.combo.create', { name: `Menu ${label} ${RUN}`, price: 1350, tax_category_key: aTaxKey() });
-    const mains = inA('combo.group.create', { combo_id: menu, name: 'Mains' });
-    inA('combo.option.create', { group_id: mains, product_id: product, price_delta: 150 });
+    const extras = await made(business, '/modifier/groups', { name: `Extras ${label} ${RUN}` });
+    await made(business, '/modifier/options', { group_id: extras, name: 'Cheese', price_delta: 100 });
+    await made(business, '/modifier/links/attach', { group_id: extras, category_id: shelf });
+    const menu = await made(business, '/combo/combos', { name: `Menu ${label} ${RUN}`, price: 1350, tax_category_key: GENERIC });
+    const mains = await made(business, '/combo/groups', { combo_id: menu, name: 'Mains' });
+    await made(business, '/combo/options', { group_id: mains, product_id: product, price_delta: 150 });
     // Kept live by the business: deleting the category takes it out of it.
-    const kept = aProduct(`Kept ${label} ${RUN}`, `KEPT-${label}-${RUN}`, shelf);
-    const category = inA('service.category.create', { name, color: '#cc0066' });
-    const service = aService(name, category);
+    const kept = await aProduct(business, `Kept ${label} ${RUN}`, `KEPT-${label}-${RUN}`, shelf);
+    const category = await made(business, '/service/categories', { name, color: '#cc0066' });
+    const service = await aService(business, name, category);
     // Kept by the business: deleting the category leaves them without one; the second it moves to another one.
-    const keptService = aService(`Kept ${label} ${RUN}`, category);
-    const movedService = aService(`Moved ${label} ${RUN}`, category);
+    const keptService = await aService(business, `Kept ${label} ${RUN}`, category);
+    const movedService = await aService(business, `Moved ${label} ${RUN}`, category);
     // And a subcategory of it, which deleting the category moves up to the root.
-    const keptSubcategory = inA('service.category.create', { name: `Under ${label} ${RUN}`, parent_id: category });
-    const professional = inA('staff.member.create', { first_name: 'Recovered', last_name: `${label} ${RUN}` });
-    inA('service.assignment.assign', { service_id: service, member_id: professional, custom_duration: 50, custom_price: 2800 });
+    const keptSubcategory = await made(business, '/service/categories', { name: `Under ${label} ${RUN}`, parent_id: category });
+    const professional = await made(business, '/staff/members', { first_name: 'Recovered', last_name: `${label} ${RUN}` });
+    await inA(business, '/service/assignments/assign', { service_id: service, member_id: professional, custom_duration: 50, custom_price: 2800 });
     // And one who performed it too and leaves the business before it comes back.
-    const leaving = inA('staff.member.create', { first_name: 'Leaving', last_name: `${label} ${RUN}` });
-    inA('service.assignment.assign', { service_id: service, member_id: leaving });
-    const appointment = anAppointment(label);
+    const leaving = await made(business, '/staff/members', { first_name: 'Leaving', last_name: `${label} ${RUN}` });
+    await inA(business, '/service/assignments/assign', { service_id: service, member_id: leaving });
+    const appointment = await anAppointment(business, label);
     const number = psql(`select number from appointment_appointment where id = '${appointment}'`);
     const hubId = psql("select id from base_hub where slug = 'a'");
 
     const context = await browser.newContext({ viewport });
     const page = await context.newPage();
-    await asStaff(page);
+    await context.addCookies([{ name: 'sessionid', value: staffSession, domain: 'hubs.localhost', path: '/' }]);
 
     // Hubs › tick `a` › «Restore to a separate copy…»: the temporary cluster and the moment, then «Make the copies».
     await runOn(page, HUBS, hubId, 'restore_aside');
@@ -296,26 +302,29 @@ for (const { label, viewport } of SIZES) {
     await capture(page, `${KEY}-${label}-0-copy-asked`, { fullPage: true });
     await page.locator('input[type="submit"][value="Make the copies"]').click();
     await expect(page.locator('.messagelist .success')).toContainText('1 hub will get a separate copy');
-    const copy = control('make');
+    const copy = await control('make');
     // Lost since: the card, the product, the product's category and the service's category deleted in the business.
-    inA('customer.customer.delete', { id: card });
-    inA('inventory.product.delete', { id: product });
-    inA('pricing.catalog.forget_product', { id: product });
-    inA('modifier.link.drop_product', { id: product });
-    inA('combo.option.drop_product', { id: product });
+    await inA(business, '/customer/customers/delete', { id: card });
+    await inA(business, '/inventory/products/delete', { id: product });
+    await inA(business, '/inventory/categories/delete', { id: shelf });
+    await bySystem([
+      ['pricing.catalog.forget_product', { id: product }],
+      ['modifier.link.drop_product', { id: product }],
+      ['combo.option.drop_product', { id: product }],
+      ['modifier.link.drop_category', { id: shelf }],
+    ]);
     // And the option taken away from the group it keeps.
-    inA('modifier.option.delete', { id: alioli });
+    await inA(business, '/modifier/options/delete', { id: alioli });
     // And the menu it was offered in, withdrawn with its course.
-    inA('combo.combo.delete', { id: menu });
-    inA('inventory.category.delete', { id: shelf });
-    inA('modifier.link.drop_category', { id: shelf });
+    await inA(business, '/combo/combos/delete', { id: menu });
     // And the group the category asked for, deleted by Modifiers with its option.
-    inA('modifier.group.delete', { id: extras });
-    inA('service.category.delete', { id: category });
-    const elsewhere = inA('service.category.create', { name: `Elsewhere ${label} ${RUN}` });
-    inA('service.service.update', { id: movedService, category_id: elsewhere });
-    inA('appointment.appointment.delete', { id: appointment });
-    inA('staff.member.terminate', { id: leaving });
+    await inA(business, '/modifier/groups/delete', { id: extras });
+    await inA(business, '/service/categories/delete', { id: category });
+    const elsewhere = await made(business, '/service/categories', { name: `Elsewhere ${label} ${RUN}` });
+    await inA(business, '/service/services/update', { id: movedService, category_id: elsewhere });
+    // And the appointment, deleted by the platform: its history then holds a line of a person and lines of no one.
+    await bySystem([['appointment.appointment.delete', { id: appointment }]]);
+    await inA(business, '/staff/members/terminate', { id: leaving });
     expect(psql(`select count(*) from customer_customer where email = '${email}' and deleted_at is null`)).toBe('0');
     expect(psql(`select count(*) from inventory_product where sku = '${sku}' and not is_deleted`)).toBe('0');
     expect(psql(`select count(*) from pricing_priceitem where product_id = '${product}'`)).toBe('0');
@@ -332,7 +341,8 @@ for (const { label, viewport } of SIZES) {
       psql(`delete from ${table} where customer_id = '${goneCard}'`);
     }
     psql(`delete from customer_customer where id = '${goneCard}'`);
-    inA('customer.tag.delete', { id: tag });
+    await inA(business, '/customer/tags/delete', { id: tag });
+    await business.close();
     expect(psql(`select count(*) from customer_customertag where name = '${tagName}'`)).toBe('0');
     // And the service gone from the business altogether, who performed it with it: no operation deletes one (it is
     // archived), a lost database does.
@@ -369,7 +379,7 @@ for (const { label, viewport } of SIZES) {
     await capture(page, `${KEY}-${label}-3-asked`);
 
     // The worker's pass, then Recoveries says what came back.
-    expect(control('recover')).toBe('1');
+    expect(await control('recover')).toBe('1');
     await page.goto(RECOVERIES);
     const recovered = page.locator('#result_list tbody tr').first();
     await expect(recovered).toContainText('Done');
@@ -470,13 +480,15 @@ for (const { label, viewport } of SIZES) {
     expect(psql(`select count(*) from appointment_appointment where customer_name = 'Booked ${label} ${RUN}'`)).toBe('1');
     await context.close();
 
-    // In the business's Agenda, its «History» keeps its lines and ends in «Restored» (APPOINTMENT-F10). The system booked
-    // and deleted it and the recovery brought it back: each line says the platform did it, never its internal mark.
+    // In the business's Agenda, its «History» keeps its lines and ends in «Restored» (APPOINTMENT-F10). The owner booked
+    // it, and that line names the owner; the platform deleted it and the recovery brought it back, and those lines say
+    // the platform did it, never its internal mark.
     const agenda = await ownerPage(browser, `/appointment/agenda?date=${aMondayAt('10:00').slice(0, 10)}`, viewport);
     await rowAction(agenda.page, 'appointment-list', appointment, 'history');
     const history = agenda.page.locator('ion-modal[data-testid=appointment-history-modal]');
+    const owner = OWNER.email.replaceAll('.', '\\.');
     await expect(history.locator('[data-testid=appointment-history-entry]')).toHaveText([
-      /^Booked.* · Done by the platform$/,
+      new RegExp(`^Booked.* · ${owner}$`),
       /^Deleted.* · Done by the platform$/,
       /^Restored.* · Done by the platform$/,
     ]);

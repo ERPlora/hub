@@ -79,8 +79,9 @@ from apps.inventory.schemas import (
     UnitListIn,
     UnitPage,
 )
+from apps.inventory.copy_columns import LATER_PRODUCT_FIELDS, later_product_fields
 from apps.tax.models import TaxCategory
-from base import images
+from base import allergens, images
 from base import operations as platform
 from base.business import money_text
 from base.queries.catalog_images import business_language, image_library
@@ -105,6 +106,7 @@ PRODUCT_HEADERS = (
     _("Threshold"),
     _("EAN-13"),
     _("Description"),
+    _("Allergens"),
     _("Unit"),
     _("Tax category"),
     _("Active"),
@@ -829,6 +831,7 @@ def export_products(ctx: OperationContext, params: ProductFiltersIn) -> dict:
             quantity_text(product.low_stock_threshold),
             _text_cell(product.ean13 or ""),
             _text_cell(product.description),
+            allergens.names(product.allergens),
             product.unit,
             _text_cell(product.tax_category.key if product.tax_category else ""),
             str(YES if product.is_active else NO),
@@ -909,21 +912,12 @@ def _products(settings: Settings):
 
 
 def _product_row(product: Product, urls: images.Urls) -> dict:
+    """What the till reads of the product (``_sale_row``) and what only the back office does."""
     fields = (
-        "id",
-        "name",
-        "sku",
         "ean13",
         "description",
-        "product_type",
-        "price",
-        "cost",
         "stock",
         "low_stock_threshold",
-        "unit",
-        "price_quantity",
-        "pricing_unit",
-        "tax_category_id",
         "track_stock",
         "is_active",
         "is_sold_out",
@@ -931,13 +925,9 @@ def _product_row(product: Product, urls: images.Urls) -> dict:
         "updated_at",
     )
     return {
+        **_sale_row(product, urls),
         **{field: getattr(product, field) for field in fields},
-        "tax_category_key": product.tax_category.key if product.tax_category else None,
-        "needs_tax_setup": needs_tax_setup(product),
-        "tracks_stock": product.tracks,
         "category_ids": [link.category_id for link in product.live_links],
-        "image": product.image,
-        "image_url": urls(product.image),
     }
 
 
@@ -953,6 +943,7 @@ def _sale_row(product: Product, urls: images.Urls) -> dict:
         "unit",
         "price_quantity",
         "pricing_unit",
+        "allergens",
     )
     return {
         **{field: getattr(product, field) for field in fields},
@@ -1097,10 +1088,9 @@ def _csv(filename, headers, rows) -> dict:
 #: and its tax category, by its key here.
 CATEGORY_FIELDS = ("name", "slug", "description", "icon", "color", "order")
 
-#: What ``inventory.product.recover`` takes of a product of a separate copy (``products_in_copy``): its create's, each
-#: a column since ``0001_initial``, and the image it showed, one since ``0005_product_image``, the migration its
-#: declaration names (``reads_since``). Not its stock (the copy's balance is
-#: another day's: a count says today's, INVENTORY-F14) nor its «sold out» (a day's state).
+#: What ``inventory.product.recover`` takes of a product of a separate copy (``products_in_copy``) that every copy it
+#: reads holds (``reads_since``), besides the later fields a copy may predate (``copy_columns``). Not its stock (a
+#: count says today's, INVENTORY-F14) nor its «sold out» (a day's state).
 PRODUCT_FIELDS = (
     "name",
     "sku",
@@ -1144,7 +1134,7 @@ def products_in_copy(conn) -> list[dict]:
     table = Product._meta.db_table
     if conn.execute("SELECT to_regclass(%s)", [table]).fetchone()[0] is None:
         return []
-    read = ("id", *PRODUCT_FIELDS, "tax_category")
+    read = ("id", *PRODUCT_FIELDS, *later_product_fields(conn, table), "tax_category")
     copy_categories = category_names_in_copy(conn)
     products = [
         dict(zip(read, row, strict=True)) | {"category_ids": [], "copy_categories": copy_categories}
@@ -1352,7 +1342,7 @@ def products_standing_for(skus: dict[UUID, str]) -> dict[UUID, UUID]:
 
 def _as_created(product: dict, tax_key: str | None, categories: dict[UUID, UUID]) -> dict:
     """``product`` of the copy as ``inventory.product.recover`` takes it in the business, with its ``id`` there."""
-    created = {field: product[field] for field in ("id", *PRODUCT_FIELDS)}
+    created = {field: product[field] for field in ("id", *PRODUCT_FIELDS, *LATER_PRODUCT_FIELDS) if field in product}
     created["category_ids"] = [categories[one] for one in product["category_ids"] if one in categories]
     if tax_key is not None:
         created["tax_category_key"] = tax_key

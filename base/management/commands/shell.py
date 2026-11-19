@@ -9,7 +9,7 @@ from django.core.management import CommandError
 from django.core.management.commands.shell import Command as DjangoShell
 
 from base.registry import hub_by_slug
-from base.tenancy.context import serves_hubs_without_database, use_control, use_hub
+from base.tenancy.context import use_control, use_hub
 
 
 class Command(DjangoShell):
@@ -25,7 +25,7 @@ class Command(DjangoShell):
         hub = hub_by_slug(slug)
         if hub is None:
             raise CommandError(f"{slug!r} names no hub of the registry.")
-        if not hub.db_name and not serves_hubs_without_database():
+        if not hub.db_name:
             raise CommandError(f"{slug} has no database of its own yet: manage.py cut_shared_hubs gives it one.")
         with use_hub(hub):
             return super().handle(**options)

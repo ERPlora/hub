@@ -18,22 +18,8 @@ import { join } from 'node:path';
 
 import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import {
-  A,
-  api,
-  capture,
-  dropPlanFromPhoto,
-  horizontalOverflow,
-  hostPage,
-  HUB_DIR,
-  MAIL_DIR,
-  OWNER,
-  psql,
-  restorePhotoFrom,
-  SAAS,
-  settled,
-  topbarApps,
-} from './helpers';
+import { A, api, capture, horizontalOverflow, hostPage, HUB_DIR, MAIL_DIR, OWNER, psql, SAAS, settled, topbarApps } from './helpers';
+import { dropPlanFromPhoto, restorePhotoFrom } from './business';
 import { readMailCode } from './mail';
 import { atRest, openSection, photo } from './website-helpers';
 
@@ -52,8 +38,6 @@ const PHONE = '+34 600 123 456';
 const PLACE_ID = 'ChIJN1t_tDeuEmsRUsoyG83frY4';
 /** Where `a`'s photo waits while the spec runs without its plan (`dropPlanFromPhoto`). */
 const PHOTO_BACKUP = 'e2e_backup_website_flows_photo';
-/** The site's row of hub `a`, by its id read from control's registry first: a statement on `a`'s tables cannot read it. */
-const siteRow = (): string => `hub_id = '${psql("select id from base_hub where slug = 'a'")}'`;
 
 interface Rows<T> {
   rows: T[];
@@ -129,7 +113,7 @@ async function reset(page: Page, body: Record<string, unknown> = baseline()): Pr
   await page.goto('about:blank');
   await saveSite(body);
   await unpublishApi();
-  psql(`update website_site set reviews_snapshot = '{}'::jsonb where ${siteRow()}`);
+  psql(`update website_site set reviews_snapshot = '{}'::jsonb`);
   await page.setViewportSize(WIDE);
   await page.goto(`${A}/website`);
   await expect(page.getByTestId('website-editor')).toBeVisible({ timeout: 30_000 });
@@ -245,7 +229,7 @@ test.afterAll(async () => {
     if (!owner) return;
     await saveSite(baseline());
     await unpublishApi();
-    psql(`update website_site set reviews_snapshot = '{}'::jsonb where ${siteRow()}`);
+    psql(`update website_site set reviews_snapshot = '{}'::jsonb`);
     await owner.context.close();
   } finally {
     restorePhotoFrom(PHOTO_BACKUP);
@@ -748,7 +732,7 @@ test('WEBSITE-F12: the business’s Google Maps link is checked, and its rating 
   };
   // In base64: `psql()` hands the SQL to a shell inside double quotes, where the JSON's own quotes would end it.
   const encoded = Buffer.from(JSON.stringify(answer), 'utf8').toString('base64');
-  psql(`update website_site set reviews_snapshot = convert_from(decode('${encoded}', 'base64'), 'UTF8')::jsonb where ${siteRow()}`);
+  psql(`update website_site set reviews_snapshot = convert_from(decode('${encoded}', 'base64'), 'UTF8')::jsonb`);
   await page.reload();
   await openSection(page, 'reviews');
   await expect(status).toHaveAttribute('data-state', 'ready');

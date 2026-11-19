@@ -31,7 +31,7 @@ from live.context import system_context
 
 from base.models import DemoCode, Hub, Membership
 from base.registry import REGISTRY_SCOPE
-from base.schemas import DemoCodeIn, DemoCreateIn
+from base.schemas.demos import DemoCodeIn, DemoCreateIn
 from base.services.demos import demo_code_create, demo_create
 from base.tenancy import connections as tenancy_connections
 from base.tenancy.context import use_hub
@@ -39,7 +39,7 @@ from base.tenancy.tests import hubs
 from base.tests.test_middleware import through_the_jump
 
 #: How a test of the way in runs: as production does, the business ``hub_a`` on a database of its own.
-ON_HUB_A = [pytest.mark.django_db(databases=hubs.HUB_DATABASES), pytest.mark.usefixtures("no_test_fallback", "hub_a")]
+ON_HUB_A = [pytest.mark.django_db(databases=hubs.HUB_DATABASES), pytest.mark.usefixtures("hub_a")]
 pytestmark = ON_HUB_A
 
 #: The slugs of the root conftest's ``hub_a`` and ``hub_b``.

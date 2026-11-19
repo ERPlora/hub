@@ -1253,7 +1253,6 @@ def test_with_sales_off_the_session_is_spent_and_says_who_did_it_all_the_same(ha
 
 
 @pytest.mark.django_db(databases=hubs.HUB_DATABASES)
-@pytest.mark.usefixtures("no_test_fallback")
 def test_a_session_outside_the_till_in_one_business_counts_nothing_in_another(hub_a, hub_b):
     in_a, in_b = ctx_for(scope=Scope("host", hub_a.slug)), ctx_for(scope=Scope("host", hub_b.slug))
     with use_hub(hub_b):
@@ -1270,7 +1269,6 @@ def test_a_session_outside_the_till_in_one_business_counts_nothing_in_another(hu
 
 
 @pytest.mark.django_db(databases=hubs.HUB_DATABASES)
-@pytest.mark.usefixtures("no_test_fallback")
 def test_a_session_in_one_business_counts_nothing_in_another(hub_a, hub_b):
     in_a, in_b = ctx_for(scope=Scope("host", hub_a.slug)), ctx_for(scope=Scope("host", hub_b.slug))
     ana, seller = uuid7(), uuid7()

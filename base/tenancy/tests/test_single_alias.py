@@ -12,6 +12,7 @@ import json
 import pytest
 from django.contrib.auth import get_user_model, login
 from django.contrib.sessions.backends.db import SessionStore
+from django.db import DEFAULT_DB_ALIAS, connections
 from django.db.backends.utils import CursorWrapper
 from django.test import RequestFactory
 from live.context import OperationContext, Scope
@@ -19,14 +20,9 @@ from live.executor import Executor, Stream, Subscription
 from live.models import OutboxEvent
 from live.operations import get as get_operation
 
-from apps.demo.models import Item
-from base import api_keys
-from base.models import ApiKey, Membership
+from base.models import Membership
 from base.tenancy import context
 from base.tenancy.tests import hubs
-from base.tenancy.tests.legacy import use_legacy
-
-pytestmark = pytest.mark.usefixtures("no_test_fallback")
 
 HUB_DB = pytest.mark.django_db(databases=hubs.HUB_DATABASES)
 HUB_DB_COMMITTED = pytest.mark.django_db(databases=hubs.HUB_DATABASES, transaction=True)
@@ -65,8 +61,6 @@ def test_an_operation_as_a_reaches_a_and_never_b(hub_a, hub_b):
     with hubs.watched() as sent:
         names = listed(hub_a)
 
-    # The watch is scoped: the rest of the test still runs as production (no fallback).
-    assert context._test_fallback is None
     assert names == ["Of A"]
     assert touches(sent, hubs.HUB_A_ALIAS)
     assert hubs.HUB_B_ALIAS not in sent
@@ -187,25 +181,8 @@ def test_the_watch_fails_a_block_that_reaches_any_other_hub(hub_a, hub_b):
         with hubs.assert_only_alias(hubs.HUB_A_ALIAS):
             listed(hub_b)
 
-    # What the old shared stage left in control's tables is no hub's own either: a hub's table read there fails it.
+    # Control's database holds no business's data: a statement there that names a hub's table fails it too.
     with pytest.raises(AssertionError, match="demo_item"):
-        with hubs.assert_only_alias(hubs.HUB_A_ALIAS), use_legacy():
-            list(Item.objects.all())
+        with hubs.assert_only_alias(hubs.HUB_A_ALIAS), connections[DEFAULT_DB_ALIAS].cursor() as cursor:
+            cursor.execute("""SELECT to_regclass('"demo_item"')""")
 
-
-@HUB_DB
-def test_a_key_planted_in_the_shared_tables_never_opens_a_hub_with_its_own_database(client, hub_a):
-    # A key row left in control's shared tables (by hand, or by a business before its cut) is nobody's: A looks
-    # for its keys in its own database only.
-    token = api_keys.new_token()
-    with use_legacy():
-        ApiKey.objects.create(
-            name="Planted", prefix=token[: api_keys.PREFIX_LENGTH], token_digest=api_keys.digest(token), mode="full"
-        )
-
-    with hubs.assert_only_alias(hubs.HUB_A_ALIAS) as sent:
-        refused = client.get("/api/demo/items", HTTP_HOST=f"{hub_a.slug}.localhost", HTTP_AUTHORIZATION=f"Bearer {token}")
-
-    assert refused.status_code == 401
-    assert touches(sent, hubs.HUB_A_ALIAS, "base_apikey")
-    assert not touches(sent, "default", "base_apikey")

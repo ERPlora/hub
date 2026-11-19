@@ -33,7 +33,7 @@ The rules, without the database: ``base.services`` (``base.app.enable``, ``base.
   transaction of ``base.app.disable`` or ``base.app.enable``, and when ``base.app.list`` says it beforehand, in the
   language of who asks (``ctx.language``), so a hook that only calls ``gettext`` already answers in it.
 
-What is off is also out of everything that asks which apps are on (``base.relay.active_apps``): its operations answer
+What is off is also out of everything that asks which apps are on (``base.apps_on.active_apps``): its operations answer
 404 ``app_inactive`` (``base.entitlement.operation_database``), the relay and the Home leave it out and the menu does
 not list it. Its tables are never dropped: turned on again, it has its data.
 
@@ -370,8 +370,8 @@ def states_of(scope: Scope) -> dict[str, Activation]:
 
 
 def off_apps(scope: Scope) -> frozenset[str]:
-    """The modules off in ``scope``'s business: what ``base.relay.active_apps`` and the operations leave out (those whose
-    tables are still being made too: only ``on`` is active).
+    """The modules off in ``scope``'s business: what ``base.apps_on.active_apps`` and the operations leave out (those
+    whose tables are still being made too: only ``on`` is active).
 
     From the cache when it has them; else read from the rows and kept, unless the running change wrote them (not
     committed yet). A cache that does not answer is logged and the rows are read: never a guess."""
@@ -383,7 +383,7 @@ def off_apps(scope: Scope) -> frozenset[str]:
 def creating_apps(scope: Scope) -> frozenset[str]:
     """The modules whose tables ``scope``'s business is getting (``creating``), kept with :func:`off_apps`: the session
     tells them «activating». None in the platform, nor in a hub without a database of its own, where nothing is made
-    later (only the test suite's fallback keeps one)."""
+    later."""
     if is_platform(scope):
         return frozenset()
     return _kept(scope)[1]
@@ -407,8 +407,8 @@ def has_tables(hub: Any, label: str) -> bool:
 
 def _created_apps(hub: Any) -> frozenset[str] | None:
     """What control says now of ``hub``'s database, from the cache when it has it, else from its row (kept); ``None`` when
-    it says nothing: no row, no database of its own or a row never confirmed. A cache that does not answer is logged and
-    the row is read: never a guess."""
+    it says nothing: no row or a row never confirmed. A cache that does not answer is logged and the row is read: never
+    a guess."""
     key = CREATED_APPS_CACHE + hub.slug
     try:
         kept = cache.get(key)
@@ -423,9 +423,7 @@ def _created_apps(hub: Any) -> frozenset[str] | None:
     row = provisioning.registry_row(hub.pk)
     if row is None or CONFIRMED_BY not in (row.schema_apps or ()):
         return None
-    created = services.apps_created(row)
-    if created is None:
-        return None
+    created = services.apps.apps_created(row)
     try:
         cache.set(key, sorted(created), OFF_APPS_TTL)
     except Exception:

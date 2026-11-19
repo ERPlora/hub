@@ -70,6 +70,7 @@ const INVOICE: InvoiceOut = {
   operation_date: '2026-10-13',
   issuer_name: 'Peluquería Ana SL',
   issuer_tax_id: 'B12345674',
+  issuer_vat_number: 'B12345674',
   issuer_address: 'Calle Mayor 1',
   issuer_country: 'ES',
   customer_id: null,

@@ -7,14 +7,10 @@ its list (a question, only by whom it was asked of), and each is of the business
 import datetime as dt
 
 import pytest
-from django.contrib.auth import get_user_model
-from django.core.cache import cache
 from live.errors import NotFound, PermissionDenied
 
 from apps.flow.models import Draft, Flow, FlowRun, Question
-from base.models import Membership
-from base.tenancy import context
-from base.tenancy.context import use_hub
+from base.tests.reads_by_id import read_own, read_theirs
 
 from .conftest import HUB_DB, ctx_for, make_draft, make_flow, make_run, run
 
@@ -147,44 +143,15 @@ ROUTES = [
 ]
 
 
-@pytest.fixture
-def as_in_production(monkeypatch):
-    """Every request opens its own database context, as in production (``base/tenancy/tests/conftest.py``)."""
-    monkeypatch.setattr(context, "_test_fallback", None)
-    cache.clear()
-    yield
-    cache.clear()
-
-
-def signed_in(client, hub):
-    user, _ = get_user_model().objects.get_or_create(username="saas:1", defaults={"first_name": "Olga"})
-    Membership.objects.get_or_create(user=user, host=hub.slug, defaults={"role": "hub_admin"})
-    client.force_login(user)
-    return client
-
-
-def read(client, hub, path: str, record_id) -> tuple[int, dict]:
-    answer = client.get(f"/api{path}", {"id": str(record_id)}, HTTP_HOST=f"{hub.slug}.localhost:8000")
-    return answer.status_code, answer.json()
+@HUB_DB
+@pytest.mark.parametrize(("path", "made", "named"), ROUTES)
+def test_the_api_reads_one_of_this_business_by_its_id_with_what_names_it(client, hub_a, path, made, named):
+    assert read_own(client, hub_a, path, made)[named]
 
 
 @HUB_DB
 @pytest.mark.parametrize(("path", "made", "named"), ROUTES)
-def test_the_api_reads_one_of_this_business_by_its_id_with_what_names_it(client, hub_a, as_in_production, path, made, named):
-    signed_in(client, hub_a)
-    with use_hub(hub_a):
-        record = made()
-    status, body = read(client, hub_a, path, record.id)
-    assert status == 200, body
-    assert body["id"] == str(record.id) and body[named]
-
-
-@HUB_DB
-@pytest.mark.parametrize(("path", "made", "named"), ROUTES)
-def test_another_businesss_record_is_not_there(client, hub_a, hub_b, as_in_production, path, made, named):
-    with use_hub(hub_b):
-        theirs = made()
-    signed_in(client, hub_a)
-    status, body = read(client, hub_a, path, theirs.id)
+def test_another_businesss_record_is_not_there(client, hub_a, hub_b, path, made, named):
+    status, body = read_theirs(client, hub_a, hub_b, path, made)
     # The code its writes answer too: «not_found» (an automation, a draft, a run), «flow.question_not_found».
     assert status == 404 and body["error"]["code"].endswith("not_found"), body

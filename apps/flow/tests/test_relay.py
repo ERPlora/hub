@@ -27,7 +27,7 @@ from apps.flow import gateway as flow_gateway
 from apps.flow import http
 from apps.flow.models import Flow, FlowRun
 from apps.task.models import Task
-from base import catalog, relay, scheduler, worker
+from base import catalog, hub_visits, relay, scheduler, worker
 from base.catalog import RegisterResult
 from base.models import EventDelivery
 from base.tenancy.context import use_hub
@@ -66,9 +66,7 @@ def worker_loop(monkeypatch):
     """The worker without the SaaS (``register_apps``), as a fresh process (no business served yet, A first), in a pass
     that serves every business however slow the machine."""
     monkeypatch.setattr(catalog, "register_apps", lambda: REGISTERED)
-    monkeypatch.setattr(worker, "_synced", set())
-    monkeypatch.setattr(worker, "_next_hub", None)
-    monkeypatch.setattr(worker, "HUB_PASS_SECONDS", 3600)
+    monkeypatch.setattr(hub_visits, "HUB_PASS_SECONDS", 3600)
     return tick
 
 

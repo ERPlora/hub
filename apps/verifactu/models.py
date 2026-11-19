@@ -99,7 +99,7 @@ class Config(UUIDModel):
     # contract step drops it: the tasks of the previous deployment still read it while the new one rolls out.
     live_paid = models.BooleanField(_("live option in the plan"), default=False)
     # From the ERPlora account's photo: the business's commercial status; going live needs it active
-    # (``queries.live_problems``).
+    # (``queries.route.live_problems``).
     hub_status = models.CharField(
         _("business status"),
         max_length=10,
@@ -133,7 +133,8 @@ class Config(UUIDModel):
 
 
 class OwnCertificate(UUIDModel):
-    """The business's own certificate (VERIFACTU-F02): one at most, its material sealed (``certificates.seal``)."""
+    """The business's own certificate (VERIFACTU-F02): one at most, its material sealed (``certificates.seal``). It
+    counts unless the check against the trusted list (``checked_list``, its number) found no recognised issuer."""
 
     class Kind(models.TextChoices):
         SEAL = "seal", _("Electronic seal")
@@ -151,6 +152,8 @@ class OwnCertificate(UUIDModel):
         _("uploaded by"), max_length=ACTOR_MAX_LENGTH, blank=True
     )
     sealed_blob = models.BinaryField(_("sealed certificate"), editable=False)
+    issuer_recognised = models.BooleanField(_("issued by a recognised authority"), null=True, editable=False)
+    checked_list = models.PositiveIntegerField(_("trusted list checked against"), null=True, editable=False)
 
     class Meta:
         verbose_name = _("own certificate")
@@ -680,26 +683,22 @@ EVENT_MESSAGES = {
         "(%(found)s records found).",
         "found",
     ),
-    "chain_continued_manually": _(
-        "Chain continued manually for %(issuer_nif)s after invoice %(invoice_number)s."
-    ),
+    "chain_continued_manually": _("Chain continued manually for %(issuer_nif)s after invoice %(invoice_number)s."),
     "connection_ok": _("Connection test (%(environment)s): this business can send."),
-    "connection_blocked": _(
-        "Connection test (%(environment)s): it cannot send yet: %(why)s."
-    ),
+    "connection_blocked": _("Connection test (%(environment)s): it cannot send yet: %(why)s."),
     "certificate_uploaded": _(
         "Own certificate of %(holder)s (%(holder_tax_id)s) uploaded; it expires on %(expires_on)s."
     ),
-    "certificate_removed": _(
-        "Own certificate of %(holder)s (%(holder_tax_id)s) removed."
+    "certificate_removed": _("Own certificate of %(holder)s (%(holder_tax_id)s) removed."),
+    "certificate_refused": _(
+        "Own certificate of %(holder)s (%(holder_tax_id)s) no longer counts: no authority the AEAT recognises "
+        "issued it. Upload a valid one."
     ),
     "route_own": _("From now on you send with your own certificate."),
     "route_erplora": _("From now on ERPlora files on your behalf."),
     "went_live": _("The business went live: records go to the real AEAT."),
     "back_to_testing": _("The business went back to the AEAT's test environment."),
-    "account_synced": _(
-        "Data received from your ERPlora account (version %(version)s)."
-    ),
+    "account_synced": _("Data received from your ERPlora account (version %(version)s)."),
     "representation_submitted": _(
         "Representation authorisation no. %(version)s sent to ERPlora for review."
     ),

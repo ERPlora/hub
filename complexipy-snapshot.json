@@ -78,68 +78,12 @@
     ]
   },
   {
-    "path": "apps/flow/queries.py",
-    "file_name": "queries.py",
-    "functions": [
-      {
-        "name": "step_data",
-        "complexity": 16
-      },
-      {
-        "name": "map_params",
-        "complexity": 17
-      },
-      {
-        "name": "operation_problem",
-        "complexity": 17
-      },
-      {
-        "name": "words_for",
-        "complexity": 20
-      },
-      {
-        "name": "_tried_pinned",
-        "complexity": 26
-      },
-      {
-        "name": "try_flow",
-        "complexity": 44
-      },
-      {
-        "name": "catalog_problems",
-        "complexity": 47
-      }
-    ]
-  },
-  {
     "path": "apps/flow/schemas.py",
     "file_name": "schemas.py",
     "functions": [
       {
         "name": "document_problems",
         "complexity": 19
-      }
-    ]
-  },
-  {
-    "path": "apps/flow/services.py",
-    "file_name": "services.py",
-    "functions": [
-      {
-        "name": "react",
-        "complexity": 16
-      },
-      {
-        "name": "_taken_off",
-        "complexity": 20
-      },
-      {
-        "name": "answer_question",
-        "complexity": 21
-      },
-      {
-        "name": "_advance",
-        "complexity": 38
       }
     ]
   },
@@ -206,7 +150,7 @@
     ]
   },
   {
-    "path": "apps/invoice/services.py",
+    "path": "apps/invoice/services/__init__.py",
     "file_name": "services.py",
     "functions": [
       {
@@ -342,28 +286,6 @@
     ]
   },
   {
-    "path": "apps/sale/services.py",
-    "file_name": "services.py",
-    "functions": [
-      {
-        "name": "_refund_legs",
-        "complexity": 17
-      },
-      {
-        "name": "_fiscal_document",
-        "complexity": 19
-      },
-      {
-        "name": "_legs",
-        "complexity": 33
-      },
-      {
-        "name": "_complete",
-        "complexity": 41
-      }
-    ]
-  },
-  {
     "path": "apps/sale/tests/test_admin.py",
     "file_name": "test_admin.py",
     "functions": [
@@ -448,34 +370,6 @@
       {
         "name": "_reply",
         "complexity": 17
-      }
-    ]
-  },
-  {
-    "path": "apps/verifactu/queries.py",
-    "file_name": "queries.py",
-    "functions": [
-      {
-        "name": "list_records",
-        "complexity": 16
-      }
-    ]
-  },
-  {
-    "path": "apps/verifactu/services.py",
-    "file_name": "services.py",
-    "functions": [
-      {
-        "name": "_representation_payload",
-        "complexity": 19
-      },
-      {
-        "name": "_check_declarable",
-        "complexity": 21
-      },
-      {
-        "name": "_send_chain",
-        "complexity": 52
       }
     ]
   },
@@ -620,28 +514,6 @@
     ]
   },
   {
-    "path": "base/services/__init__.py",
-    "file_name": "__init__.py",
-    "functions": [
-      {
-        "name": "_enable",
-        "complexity": 18
-      },
-      {
-        "name": "app_activation_settle",
-        "complexity": 18
-      },
-      {
-        "name": "_assistant_answer",
-        "complexity": 19
-      },
-      {
-        "name": "assistant_turn",
-        "complexity": 27
-      }
-    ]
-  },
-  {
     "path": "base/tenancy/cut.py",
     "file_name": "cut.py",
     "functions": [
@@ -688,16 +560,6 @@
       {
         "name": "FakeGateway::_handler",
         "complexity": 28
-      }
-    ]
-  },
-  {
-    "path": "base/tests/po.py",
-    "file_name": "po.py",
-    "functions": [
-      {
-        "name": "module_texts",
-        "complexity": 21
       }
     ]
   },
@@ -892,6 +754,198 @@
       {
         "name": "app_list",
         "complexity": 21
+      }
+    ]
+  },
+  {
+    "path": "apps/sale/services/charge_validation.py",
+    "file_name": "charge_validation.py",
+    "functions": [
+      {
+        "name": "_legs",
+        "complexity": 33
+      }
+    ]
+  },
+  {
+    "path": "apps/sale/services/checkout.py",
+    "file_name": "checkout.py",
+    "functions": [
+      {
+        "name": "_complete",
+        "complexity": 41
+      }
+    ]
+  },
+  {
+    "path": "apps/sale/services/documents.py",
+    "file_name": "documents.py",
+    "functions": [
+      {
+        "name": "_fiscal_document",
+        "complexity": 19
+      }
+    ]
+  },
+  {
+    "path": "apps/sale/services/refunds.py",
+    "file_name": "refunds.py",
+    "functions": [
+      {
+        "name": "_refund_legs",
+        "complexity": 17
+      }
+    ]
+  },
+  {
+    "path": "apps/verifactu/queries/records.py",
+    "file_name": "records.py",
+    "functions": [
+      {
+        "name": "list_records",
+        "complexity": 16
+      }
+    ]
+  },
+  {
+    "path": "base/services/activation.py",
+    "file_name": "activation.py",
+    "functions": [
+      {
+        "name": "app_activation_settle",
+        "complexity": 16
+      }
+    ]
+  },
+  {
+    "path": "base/services/apps.py",
+    "file_name": "apps.py",
+    "functions": [
+      {
+        "name": "_enable",
+        "complexity": 18
+      }
+    ]
+  },
+  {
+    "path": "base/services/assistant.py",
+    "file_name": "assistant.py",
+    "functions": [
+      {
+        "name": "_assistant_answer",
+        "complexity": 19
+      },
+      {
+        "name": "assistant_turn",
+        "complexity": 27
+      }
+    ]
+  },
+  {
+    "path": "apps/verifactu/services/authorisation.py",
+    "file_name": "authorisation.py",
+    "functions": [
+      {
+        "name": "_representation_payload",
+        "complexity": 19
+      }
+    ]
+  },
+  {
+    "path": "apps/verifactu/services/sealing.py",
+    "file_name": "sealing.py",
+    "functions": [
+      {
+        "name": "_check_declarable",
+        "complexity": 21
+      }
+    ]
+  },
+  {
+    "path": "apps/verifactu/services/sending.py",
+    "file_name": "sending.py",
+    "functions": [
+      {
+        "name": "_send_chain",
+        "complexity": 52
+      }
+    ]
+  },
+  {
+    "path": "apps/flow/services/flow_document.py",
+    "file_name": "flow_document.py",
+    "functions": [
+      {
+        "name": "_taken_off",
+        "complexity": 20
+      }
+    ]
+  },
+  {
+    "path": "apps/flow/services/questions.py",
+    "file_name": "questions.py",
+    "functions": [
+      {
+        "name": "answer_question",
+        "complexity": 21
+      }
+    ]
+  },
+  {
+    "path": "apps/flow/services/runs.py",
+    "file_name": "runs.py",
+    "functions": [
+      {
+        "name": "react",
+        "complexity": 16
+      }
+    ]
+  },
+  {
+    "path": "apps/flow/queries/catalog.py",
+    "file_name": "catalog.py",
+    "functions": [
+      {
+        "name": "step_data",
+        "complexity": 16
+      }
+    ]
+  },
+  {
+    "path": "apps/flow/queries/dry_run.py",
+    "file_name": "dry_run.py",
+    "functions": [
+      {
+        "name": "_tried_pinned",
+        "complexity": 26
+      }
+    ]
+  },
+  {
+    "path": "apps/flow/queries/problems.py",
+    "file_name": "problems.py",
+    "functions": [
+      {
+        "name": "operation_problem",
+        "complexity": 17
+      },
+      {
+        "name": "catalog_problems",
+        "complexity": 47
+      }
+    ]
+  },
+  {
+    "path": "apps/flow/queries/values.py",
+    "file_name": "values.py",
+    "functions": [
+      {
+        "name": "map_params",
+        "complexity": 17
+      },
+      {
+        "name": "words_for",
+        "complexity": 20
       }
     ]
   }

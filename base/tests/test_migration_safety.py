@@ -152,6 +152,12 @@ ACCEPTED = {
         "AddConstraint",
         "template.whatsapp_inbox_template_live_name_language_unique",
     ),
+    # The website's one site per database: both constraints are on the new column singleton, which the code of
+    # before never names, so its database default (true) passes the check. The code of before inserts a site only
+    # when none names its hub, and every site of before does: the single-row index refuses at most a second site of
+    # the same business made during the deploy itself, which a business must never have.
+    ("website", "0006_one_site_per_database", "AddConstraint", "site.website_site_single_row"),
+    ("website", "0006_one_site_per_database", "AddConstraint", "site.website_site_singleton"),
     # The contract of the move to base.HubUser, a later deploy's, once no code from before the move runs (written here,
     # not applied): the old columns to control's users, which the move took out of the state and nobody writes any
     # more, leave the database through

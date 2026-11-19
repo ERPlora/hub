@@ -4,7 +4,8 @@
 // `frontend/generated/operations.json`. One input per operation (ninja's parity): no path
 // parameters, a product or a category travels in the input. Money is whole cents; quantities and
 // other decimals are JSON strings on the way out («2.500») and a number or its string on the way in.
-import type { CatalogImage } from '../../../base/frontend/operations';
+import type { AllergenCode } from '@erplora/ui/components';
+import type { CatalogImage } from '../../../base/frontend/operations/catalog_images';
 import type { Page } from '../../../frontend/sdk-types';
 
 export type UnitCode = 'ud' | 'kg' | 'g' | 't' | 'l' | 'ml' | 'min' | 'h';
@@ -141,6 +142,7 @@ export interface ProductIn {
   /** `null` follows the business's setting. */
   track_stock?: boolean | null;
   category_ids?: string[];
+  allergens?: AllergenCode[];
   /** Absent: active. An inactive one stays out of the till until it is activated. */
   is_active?: boolean;
 }
@@ -162,6 +164,7 @@ export interface ProductPatchIn extends ProductRefIn {
   track_stock?: boolean;
   /** All of its categories: replaces the ones it had. */
   category_ids?: string[];
+  allergens?: AllergenCode[];
 }
 
 /** One CSV row, its columns mapped to our fields, each cell as written in the file. */
@@ -175,6 +178,7 @@ export interface ProductImportRowIn {
   low_stock_threshold?: string;
   ean13?: string;
   description?: string;
+  allergens?: string;
   unit?: string;
   tax_category_key?: string;
 }
@@ -266,65 +270,48 @@ export interface ConfigPatchIn {
 
 // ── Outputs ───────────────────────────────────────────────────────────────────────────────────
 
-export interface ProductOut {
+export interface SaleProductOut {
   id: string;
   name: string;
   sku: string;
-  ean13: string | null;
-  description: string;
   product_type: ProductType;
   /** Cents, per `price_quantity` of `pricing_unit`. */
   price: number;
   cost: number;
-  stock: string;
-  low_stock_threshold: string;
-  unit: UnitCode;
-  price_quantity: string;
-  pricing_unit: UnitCode;
   tax_category_id: string | null;
   tax_category_key: string | null;
   needs_tax_setup: boolean;
-  /** Its own decision; `null` follows the business. */
-  track_stock: boolean | null;
+  unit: UnitCode;
+  price_quantity: string;
+  pricing_unit: UnitCode;
   /** Whether stock control applies to it now. */
   tracks_stock: boolean;
-  is_active: boolean;
-  /** Sold out («86», INVENTORY-F29): active, but the till does not offer it. The server always sends it;
-   *  optional only so that the products other apps' tests typed before it still compile. */
-  is_sold_out?: boolean;
-  category_ids: string[];
+  allergens: AllergenCode[];
   /** `catalog:<folder>/<name>`, `file:inventory/products/<uuid7 hex>.webp` or `''`. The server
    *  always sends both; optional only so that the products other apps' tests typed before them still compile. */
   image?: string;
   /** `/p/catalog/…` or `/p/media/<hub>/…`; `''`: none, show the initials (INVENTORY-F32). */
   image_url?: string;
+}
+
+export interface ProductOut extends SaleProductOut {
+  ean13: string | null;
+  description: string;
+  stock: string;
+  low_stock_threshold: string;
+  /** Its own decision; `null` follows the business. */
+  track_stock: boolean | null;
+  is_active: boolean;
+  /** Sold out («86», INVENTORY-F29): active, but the till does not offer it. The server always sends it;
+   *  optional only so that the products other apps' tests typed before it still compile. */
+  is_sold_out?: boolean;
+  category_ids: string[];
   created_at: string;
   updated_at: string;
 }
 
 export interface ProductsOut {
   rows: ProductOut[];
-}
-
-export interface SaleProductOut {
-  id: string;
-  name: string;
-  sku: string;
-  product_type: ProductType;
-  price: number;
-  cost: number;
-  tax_category_id: string | null;
-  tax_category_key: string | null;
-  needs_tax_setup: boolean;
-  unit: UnitCode;
-  price_quantity: string;
-  pricing_unit: UnitCode;
-  tracks_stock: boolean;
-  /** `catalog:<folder>/<name>`, `file:inventory/products/<uuid7 hex>.webp` or `''`. The server
-   *  always sends both; optional only so that the products other apps' tests typed before them still compile. */
-  image?: string;
-  /** `/p/catalog/…` or `/p/media/<hub>/…`; `''`: none, show the initials (INVENTORY-F32). */
-  image_url?: string;
 }
 
 /** INVENTORY-F30: the library's best images for the product's name, titled in the business's language. */

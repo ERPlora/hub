@@ -10,9 +10,9 @@ from live.meta import module_configs
 from live.operations import AI, operation, registry as operation_registry
 
 from base import activation, api_docs, entitlement
-from base.models import ApiKey, ApiSettings, Hub
+from base.models import ApiKey, ApiSettings
 from base.permissions import ADMINISTER_HUB, VIEW_HOME
-from base.schemas import (
+from base.schemas.api_keys import (
     ApiDocIn,
     ApiDocOut,
     ApiDocSettingsIn,
@@ -89,12 +89,8 @@ def api_apps(ctx: OperationContext) -> list[dict[str, Any]]:
     ),
 )
 def api_key_list(ctx: OperationContext, data: ApiKeyListIn) -> dict:
-    """Employees › API keys: every key, the newest first, and the apps a key per app may reach. While
-    the business shares its database with others, none is available (``base.services.has_own_database``)."""
-    hub = Hub.objects.filter(slug=ctx.scope.key).first()
-    available = bool(hub is not None and hub.db_name)
-    keys = [api_key_out(key) for key in ApiKey.objects.all()] if available else []
-    return {"available": available, "keys": keys, "apps": api_apps(ctx)}
+    """Employees › API keys: every key, the newest first, and the apps a key per app may reach."""
+    return {"keys": [api_key_out(key) for key in ApiKey.objects.all()], "apps": api_apps(ctx)}
 
 
 @operation(
@@ -115,9 +111,8 @@ def api_key_list(ctx: OperationContext, data: ApiKeyListIn) -> dict:
     ),
 )
 def api_key_detail(ctx: OperationContext, data: ApiKeyIdIn) -> dict:
-    """One key of Employees › API keys; none while the business shares its database (``api_key_list``)."""
-    hub = Hub.objects.filter(slug=ctx.scope.key).first()
-    key = ApiKey.objects.filter(pk=data.id).first() if hub is not None and hub.db_name else None
+    """One key of Employees › API keys."""
+    key = ApiKey.objects.filter(pk=data.id).first()
     if key is None:
         raise NotFound(gettext("That key no longer exists. Refresh the list and try again."))
     return api_key_out(key)
@@ -167,10 +162,5 @@ def api_doc_get(ctx: OperationContext, data: ApiDocIn) -> dict:
     """The API's documentation: what the apps this business has publish; not given while hidden."""
     if not api_docs_enabled():
         raise Conflict(gettext("The API documentation is hidden in this business."), code="base.api_docs_hidden")
-    hub = Hub.objects.filter(slug=ctx.scope.key).first()
     apps = api_apps(ctx)
-    return {
-        "document": api_docs.public_document({app["id"] for app in apps}),
-        "apps": apps,
-        "keys_available": bool(hub is not None and hub.db_name),
-    }
+    return {"document": api_docs.public_document({app["id"] for app in apps}), "apps": apps}

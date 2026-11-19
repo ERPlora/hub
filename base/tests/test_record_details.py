@@ -8,26 +8,15 @@ import json
 
 import pytest
 from django.contrib.auth import get_user_model
-from django.core.cache import cache
 from django.utils import timezone
 from live.models import OutboxEvent
 
 from base import access
 from base.models import EventDelivery, ImportBatch, Membership, TrustedDevice
-from base.tenancy import context
 from base.tenancy.context import use_hub
 from base.tenancy.tests import hubs
 
 pytestmark = pytest.mark.django_db(databases=hubs.HUB_DATABASES)
-
-
-@pytest.fixture(autouse=True)
-def as_in_production(monkeypatch):
-    """Every request opens its own database context, as in production (``base/tenancy/tests/conftest.py``)."""
-    monkeypatch.setattr(context, "_test_fallback", None)
-    cache.clear()
-    yield
-    cache.clear()
 
 
 def signed_in(client, hub, role: str = "hub_admin", username: str = "saas:1"):

@@ -34,6 +34,7 @@ from base.internal import (
     whatsapp_status,
 )
 from base.media import media
+from base.public_door import call, open_page
 from base.spa import spa, spa_route
 from config.api import api
 
@@ -93,10 +94,16 @@ urlpatterns = [
     path("internal/whatsapp/inbound", whatsapp_inbound, name="internal-whatsapp-inbound"),
     path("internal/whatsapp/status", whatsapp_status, name="internal-whatsapp-status"),
     path("internal/whatsapp/channel", whatsapp_channel, name="internal-whatsapp-channel"),
+    # A page with a key of its route's own (a customer's personal link): before the files, so that a business called
+    # «media» or «catalog» opens it too; their files' names never fit one slug segment.
+    path("p/<str:slug>/<str:name>/<slug:key>", open_page, name="public-page-key"),
     # The hub file store's files (base.media), on the hub's own host; /p is the public pages' prefix.
     path("p/media/<str:hub>/<path:name>", media, name="media"),
     # The shared image library (base.image_catalog): every hub's, so on any host and to anyone.
     path("p/catalog/<str:folder>/<str:name>", catalog_image, name="catalog-image"),
+    # The pages the apps give the business's customers, without a session (base.public_door), and their calls.
+    path("p/<str:slug>/api/<str:operation>", call, name="public-call"),
+    path("p/<str:slug>/<str:name>", open_page, name="public-page"),
     # Last: every other path, save one that names a file (/robots.txt, /favicon.ico), which is a plain 404.
     re_path(spa_route(NON_SPA_PREFIXES), spa, name="spa"),
 ]

@@ -411,12 +411,16 @@ WAYS_LOST = {
 
 @pytest.mark.parametrize("lost", sorted(WAYS_LOST))
 def test_in_production_without_a_way_to_the_aeat_the_charge_is_refused(
-    issuer, bar, settings, lost
+    issuer, bar, settings, monkeypatch, lost
 ):
     # A business that files for real never charges a sale whose ticket could never reach the AEAT, whether the route
     # lost it (the authorisation, the own certificate) or the server (the key that opens the certificate, ERPlora's
     # gateway, real filing). The refusal is not a document that waits: it reaches the cashier as it is and nothing is
-    # charged, numbered or sealed. The charge never stays «pending».
+    # charged, numbered or sealed. The charge never stays «pending». The own certificate is the test's, its authority
+    # recognised here as a real one is by the trusted list.
+    from apps.verifactu.tests.conftest import recognise_test_authority
+
+    recognise_test_authority(monkeypatch)
     settings.ERPLORA_ENVIRONMENT = "prod"
     settings.VERIFACTU_PRODUCTION_ENABLED = True
     settings.VERIFACTU_GATEWAY_URL = "http://saas.internal:8001"
@@ -437,26 +441,26 @@ def test_sales_refuses_as_without_a_way_exactly_the_codes_verifactu_raises_today
     # A code VeriFactu no longer raises (the paid live option's, retired with it)
     # is dead code in Sales: each one Sales treats as «no way to the AEAT» is one the test above makes VeriFactu
     # raise for real, and each way lost it walks is one Sales refuses.
-    from apps.sale.services import NO_WAY_TO_THE_AEAT
+    from apps.sale.services.documents import NO_WAY_TO_THE_AEAT
 
     assert NO_WAY_TO_THE_AEAT == {f"verifactu.{lost}" for lost in WAYS_LOST}
 
 
 def test_sales_refuses_every_problem_verifactu_can_find_on_the_route():
     # Bound to VeriFactu's source, not to this file's table (the test above): a wait code ``route_problem`` (or
-    # what it calls in ``apps.verifactu.queries``) returns tomorrow that Sales does not refuse would be a sale
+    # what it calls in ``apps.verifactu.queries.route``) returns tomorrow that Sales does not refuse would be a sale
     # charged whose ticket never reaches the AEAT. It shows up here first; then ``WAYS_LOST`` asks for the real way
     # to lose it. The same for a code VeriFactu retires: dead in Sales. Testing's refusals are no exception, as
     # there is none (``_refuse_without_a_way`` only refuses in production).
     import ast
     import inspect
 
-    from apps.sale.services import NO_WAY_TO_THE_AEAT
-    from apps.verifactu import queries
+    from apps.sale.services.documents import NO_WAY_TO_THE_AEAT
+    from apps.verifactu.queries import route
 
     functions = {
         node.name: node
-        for node in ast.parse(inspect.getsource(queries)).body
+        for node in ast.parse(inspect.getsource(route)).body
         if isinstance(node, ast.FunctionDef)
     }
     problems, seen, pending = set(), set(), ["route_problem"]

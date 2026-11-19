@@ -2,7 +2,7 @@
 // business whether to upgrade, and its rows, the fullest first. Pure functions: the screen only paints them.
 import { describe, expect, it } from 'vitest';
 
-import type { AssistantUsage, PlanMeter, PlanUsage } from '../operations';
+import type { AssistantUsage, PlanMeter, PlanUsage } from '../operations/usage';
 import { NEAR_PERCENT, usageRows, verdictOf } from './plan-usage';
 
 const GB = 1024 ** 3;
@@ -14,7 +14,7 @@ const USAGE: PlanUsage = {
   people: { used: 1, limit: 5 },
   devices: { used: 1, limit: 3 },
   apps: { used: 2, limit: 10 },
-  database: { available: true, bytes: 5 * 1024 * 1024, day: '2026-10-30' },
+  database: { bytes: 5 * 1024 * 1024, day: '2026-10-30' },
   files: { bytes: GB, day: '2026-10-30', limit: 5 * GB, percent: 20, status: 'within' },
   connections: { peak_today: 1, limit: 3, busy_last_7_days: 0, busy_since: null, bigger_plan_gives_more: true },
   requests: { this_month: 100, since: null },

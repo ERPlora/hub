@@ -327,7 +327,7 @@ En la pantalla Archivos:
 | ID | Flujo | Estado |
 |---|---|---|
 | BASE-F01 | Ver lo que le falta por configurar al negocio | hecho |
-| BASE-F02 | Ver el negocio de un vistazo al entrar | hecho |
+| BASE-F02 | Ver el negocio de un vistazo al entrar | parcial |
 | BASE-F03 | Ir a configurar desde «Termina de configurar tu negocio» | hecho |
 | BASE-F04 | Ver qué pasos de la lista tiene que configurar un administrador | hecho |
 | BASE-F05 | Abrir una app desde «Mis apps» | hecho |
@@ -433,13 +433,14 @@ En la pantalla Archivos:
 | BASE-F106 | El asistente sin conexión, con el servicio caído o sin plan | hecho |
 | BASE-F107 | Pasar la QA maestra del Hub | hecho |
 | BASE-F108 | Reportar un problema a soporte | hecho |
-| BASE-F109 | Borrar un negocio eliminado pasados sus 90 días | parcial — un negocio con documentos guarda su base de datos hasta que exista el archivo fiscal (hub#738) |
+| BASE-F109 | Borrar un negocio eliminado pasados sus 90 días | parcial — un negocio con documentos los escribe en el archivo fiscal, pero aún guarda su base de datos (hub#738) |
 | BASE-F110 | Abrir la web del negocio por su dominio propio | hecho |
 | BASE-F111 | Esperar a la base de datos cuando se corta un momento | hecho |
 | BASE-F112 | Guardar un archivo descargado dentro de la app | hecho |
 | BASE-F113 | Seguir avisando con la pantalla apagada (app de Android) | hecho |
 | BASE-F114 | Devolver un negocio a un momento pasado desde el admin de Hubs | hecho |
 | BASE-F115 | Ver la ayuda de la pantalla de un módulo | hecho |
+| BASE-F116 | Leer las novedades de ERPlora | parcial |
 
 ### BASE-F01 Ver lo que le falta por configurar al negocio
 Estado: hecho
@@ -477,7 +478,8 @@ nuestra: por tu parte no hay nada que hacer aún. Estamos en ello.».
 Implicados: INVENTORY-F28, BASE-F24, BASE-F25, VERIFACTU-F01, TAX-F17
 
 ### BASE-F02 Ver el negocio de un vistazo al entrar
-Estado: hecho
+Estado: parcial — la fila de salud del paso 5 todavía no se pinta en el Inicio, aunque el hub ya sabe qué decir de la
+impresora de tiques; y la Bandeja de WhatsApp todavía no dice cómo está su número (hub#573)
 Actor: propietario, administrador, responsable, empleado
 Pantalla: Inicio · Resumen
 Pasos:
@@ -489,12 +491,18 @@ Pasos:
      paneles.
   4. Al cambiar el idioma de la interfaz, los nombres de «Mis apps» y los textos del checklist cambian en el
      sitio, sin recargar ni reabrir la aplicación.
-  5. Abajo, dos pestañas: «Resumen» (lo anterior) y «Actividad».
-Entra: el nombre del negocio y la fecha del dispositivo.
+  5. Para quien administra el negocio, al pie de «Resumen», una fila con cómo está lo que el negocio necesita para
+     trabajar y «Ver sistema», que lleva a Sistema. Cada app encendida que la persona puede ver dice lo suyo: con
+     Impresión, «Impresora lista» si el dispositivo que saca los tiques ha dado señales en el último minuto y medio,
+     «Impresora sin conectar» si está dado de alta pero no responde, o «Impresora sin configurar» si no hay ninguno;
+     las dos últimas con «Configurar la impresión», que abre Impresión. Quien no administra el negocio no ve la fila.
+  6. Abajo, dos pestañas: «Resumen» (lo anterior) y «Actividad».
+Entra: el nombre del negocio, la fecha del dispositivo y lo que cada app encendida dice de sí misma.
 Sale: nada guardado.
 Si falla: una zona que no carga no tumba las demás; cada una dice lo suyo. En el móvil las zonas se
-apilan y «Mis apps» se pliega.
-Implicados: ninguno
+apilan y «Mis apps» se pliega. Lo que no se pudo comprobar sale en neutro, nunca como listo y sin botón,
+porque no es tarea de quien mira: «No hemos podido comprobar la impresora».
+Implicados: PRINTING-F21
 
 ### BASE-F03 Ir a configurar desde «Termina de configurar tu negocio»
 Estado: hecho
@@ -1378,7 +1386,7 @@ Entra: la versión que corre y cuándo se publicó.
 Sale: nada guardado.
 Si falla: «No se pudo consultar el sistema» — «Las métricas y los registros no están disponibles ahora. Puedes
 volver a intentarlo.» con «Reintentar».
-Implicados: ninguno
+Implicados: BASE-F116
 
 ### BASE-F42 Ver el registro de sucesos del sistema
 Estado: hecho
@@ -2167,7 +2175,8 @@ Pasos:
   1. En **Empleados › Roles**: «Estos son los roles de este negocio. Cada persona recibe uno al invitarla en
      erplora.com, y allí se cambia.».
   2. Una fila por rol: «Propietario», «Administrador», «Encargado» y «Empleado», con «Básico», «Siempre
-     disponible», cuántas personas lo tienen y cuántos permisos da.
+     disponible», cuántas personas lo tienen y cuántos permisos da. Son siempre estos cuatro, los de erplora.com:
+     ninguna app añade roles propios; cada app dice qué puede hacer cada uno de ellos en ella.
   3. Quien administra tiene «Cambiar roles en erplora.com» (en la app instalada, en el navegador del dispositivo; en la de Google Play no está).
 Entra: los roles y las personas del negocio.
 Sale: nada guardado.
@@ -2323,9 +2332,7 @@ Entra: lo que publican las apps del negocio.
 Sale: nada guardado. Crece o mengua con las apps del negocio.
 Si falla: oculta, «La documentación de la API está oculta en este negocio.» y, para quien administra, «Muéstrala en
 Ajustes › General»; si no llega, «No se pudo cargar la documentación.» con «Reintentar»; sin nada publicado,
-«Ninguna app de este negocio publica todavía su API.». Si el negocio aún no puede tener llaves: «Las API keys
-todavía no están disponibles para este negocio: puedes leer la documentación, pero aún ningún sistema puede
-llamarla.».
+«Ninguna app de este negocio publica todavía su API.».
 Implicados: BASE-F91, BASE-F86, BASE-F112 (dentro de la app)
 
 ### BASE-F91 Mostrar u ocultar la documentación de la API
@@ -2817,15 +2824,19 @@ para escribir directamente. En los dos casos lo escrito se queda y se puede volv
 Implicados: ACCOUNTS-F38, BASE-F40
 
 ### BASE-F109 Borrar un negocio eliminado pasados sus 90 días
-Estado: parcial — un negocio con documentos guarda su base de datos hasta que exista el archivo fiscal (hub#738)
+Estado: parcial — un negocio con documentos los escribe en el archivo fiscal, pero aún guarda su base de datos (hub#738)
 Actor: nadie: lo hace el Hub solo, sin que nadie pulse nada
 Pantalla: Ninguna; la dirección del negocio sigue diciendo «Este hub ya no está disponible.»
 Pasos:
   1. Un negocio eliminado en erplora.com (HUBS-F18, HUBS-F20) cumple 90 días. Hasta ese momento su base de datos se
      queda intacta y se puede recuperar.
   2. El Hub mira si guarda documentos: ventas, facturas, registros de VeriFactu, cobros, movimientos de caja, pedidos
-     de la tienda o compras de un cliente, en cualquier estado y aunque la app esté apagada. Si guarda alguno, se
-     detiene aquí: el negocio sigue eliminado, con su base de datos, y lo vuelve a mirar al día siguiente.
+     de la tienda o compras de un cliente, en cualquier estado y aunque la app esté apagada. Si guarda alguno, antes
+     los escribe en el archivo fiscal, donde se guardan 6 años sin que nadie los pueda borrar: cada tabla de esos
+     documentos tal como está guardada, sin rehacer nada, y al final una lista que cuenta las filas y lleva la huella
+     de cada fichero, que solo se escribe cuando todos se han vuelto a leer iguales. Lo hace una vez por baja, y si un
+     registro de VeriFactu aún espera la respuesta de la AEAT, espera a que llegue. Después se detiene: el negocio
+     sigue eliminado, con su base de datos, y lo vuelve a mirar al día siguiente.
   3. Sin documentos, hace la copia final de sus datos, que se guarda 90 días en el almacén de copias. Mientras se
      hace, el negocio aún se puede recuperar y erplora.com sigue viendo sus copias. Al terminar vuelve a mirar si
      guarda documentos, por si entró alguno durante la copia.
@@ -2836,14 +2847,18 @@ Pasos:
 Entra: el negocio eliminado y sus 90 días cumplidos. Nunca una demo, que se borra a su manera al caducar, el negocio
 de la plataforma ni uno que se está moviendo de servidor.
 Sale: la copia final, y la base de datos y los ficheros borrados, con el evento `base.hub.purged`; desde ahí
-erplora.com ya no lista sus copias. O, con documentos, la base de datos y los ficheros guardados y en la fila del
-negocio el motivo (`fiscal_archive_missing: <apps>`).
+erplora.com ya no lista sus copias. O, con documentos, su archivo fiscal escrito (en la fila, `fiscal_archived_at` y
+el motivo `fiscal_archived: <apps>`) y la base de datos y los ficheros guardados; donde no hay archivo fiscal, el motivo
+es `fiscal_archive_missing: <apps>`, y mientras un registro espera a la AEAT, `fiscal_archive_waiting: verifactu`.
 Si falla: una copia que falla no borra nada, y sin almacén de copias tampoco; una copia o un borrado que falla se
 reintenta (1 min, 5 min, 15 min y luego cada hora) con el error anotado en la fila, sin hacer otra copia si ya la había.
 Si el almacén no borra sus ficheros, el negocio sigue borrándose, sin marca, con `files_purge_failed` en la fila, y se
 reintenta igual. Si una app no se puede leer, la base de datos se queda. Una fila que no nombra la base de datos propia
 del negocio no borra nada (`invalid_database_name`). Un negocio recuperado durante la copia sigue abierto con su base
 de datos; ya borrándose, erplora.com recibe `hub_purged`. Si el Hub se apaga a media copia, el siguiente la retoma.
+Si el archivo fiscal no se puede escribir entero, o un fichero no se lee igual que se escribió, no se da por hecho: la
+fila dice `fiscal_archive_failed` con el motivo y se reintenta al día siguiente en otra carpeta del archivo (lo ya
+subido se queda, porque nadie lo puede borrar, y sin su lista final no cuenta).
 Implicados: HUBS-F18, HUBS-F19, HUBS-F20, PUBLIC-F34 (el mismo borrado de ficheros, al retirar una demo)
 
 ### BASE-F110 Abrir la web del negocio por su dominio propio
@@ -3261,6 +3276,26 @@ disponible». Si el manual no está traducido al idioma de la persona, o su trad
 español.
 Implicados: BASE-F92, BASE-F93
 
+### BASE-F116 Leer las novedades de ERPlora
+Estado: parcial — las novedades ya se leen por el asistente y por la API, pero Sistema › Actualizaciones todavía no las
+enseña (hub#576)
+Actor: propietario, administrador, responsable, empleado
+Pantalla: Sistema · Actualizaciones
+Pasos:
+  1. En la pestaña «Actualizaciones», debajo de la versión y su fecha (BASE-F41), sale «Novedades»: lo que ha cambiado
+     en ERPlora que el negocio nota, lo más reciente primero. Quien no administra el negocio también las ve: no dicen
+     nada de él.
+  2. Cada novedad dice su día, si es algo nuevo, una mejora o un arreglo, un título corto y una o dos frases de lo que
+     se puede hacer ahora. Son notas escritas para el negocio, nunca la lista de cambios del código.
+  3. Salen las 20 más recientes; «Ver más» trae las anteriores.
+  4. Sin ninguna, dice «Todavía no hay novedades.».
+  5. Por el asistente, «¿qué hay de nuevo en ERPlora?» o «¿qué ha cambiado en la última actualización?» las lee igual,
+     en el idioma de la persona.
+Entra: las novedades de la versión que corre: viajan con ella, así que siempre son las suyas.
+Sale: nada guardado: las novedades solo se leen.
+Si falla: «No se pudieron cargar las novedades» con «Reintentar»; la versión y su fecha siguen a la vista.
+Implicados: BASE-F41
+
 ## Para quien lo mantiene
 
 - **Dominio propio de un negocio** (BASE-F110, HUBS-F17, PLAN-SAAS §37 punto 2; `base/custom_domains.py`,
@@ -3367,6 +3402,20 @@ Implicados: BASE-F92, BASE-F93
   (`/app/download/<windows|linux|android>/`) van en `hub-home.app_downloads` (`base/spa.py`) para cualquier sesión, y
   `lib/app-downloads.ts` las ofrece solo en un navegador. Tests: `test_home.py`, `test_queries_home.py`, `test_spa.py`,
   `SystemAppCards.test.ts` y `app-downloads.test.ts`.
+- La fila de salud del Inicio (hub#573, BASE-F02): una app declara en su `LiveAppConfig` `health`, un diccionario con
+  `operation` (una consulta suya cuya primera fila dice `state`: `ok`, `no_signal` o `not_configured`), `params`, el
+  `permission` que hace falta para verla, `route` y `action` (dónde se arregla y con qué texto) y `titles`, el texto
+  traducible de cada estado y de `unknown`. `base.E021` (`base/home_health.py`) comprueba al arrancar que la consulta
+  existe y su salida tiene `state`, que el permiso es de la app, que la ruta empieza por `/` y que hay un título por
+  estado, ni uno más. `base.health.list` (`GET /api/home/health`, en `base/api_home_health.py`, que monta
+  `config/api.py`; no es herramienta del asistente) ejecuta la consulta de cada app encendida como la persona, solo
+  para quien tiene `base.administer_hub` (para el resto, lista vacía: el Inicio la pide para todos) y solo de las apps
+  cuyo permiso tiene. Devuelve `{key, app, state, title, action, route}`; `action` y `route` solo con `no_signal` o
+  `not_configured`. Si la consulta falla o contesta un estado que no conoce, `unknown` con el título de la app y sin
+  acción, y se anota en el log. No es viva: cambia con el paso del tiempo, sin evento. Impresión la declara con
+  `printing.device.health` de los tiques, la misma lectura que tiene la tarjeta «Tu impresora». Tests:
+  `test_home_health.py`, `test_queries_health.py`, `test_api_health.py` y
+  `apps/printing/tests/test_integration_home_health.py`.
 - Apps obligatorias por país (hub#997, BASE-F01): una app declara en su `LiveAppConfig`
   `mandatory = {"countries": "all" | ["ES", …], "platform_turns_on": bool}`: dónde tiene que estar encendida y si la
   plataforma puede encenderla sola al alta (Impuestos: `"all"`, sí; VeriFactu: `["ES"]`, nunca, porque ata al negocio
@@ -3498,20 +3547,16 @@ Implicados: BASE-F92, BASE-F93
 - Una plantilla espera a sus apps (hub#609; BASE-F31–F33, F38): una app `creating` queda en su informe como `waiting`, y
   esa fila de `ImportBatch` es todo el estado (sin columna, ni cola, ni migración; el idioma de quien cargó va en
   `report["language"]` mientras espera). Lo que le toca entra en la misma transacción que la enciende:
-  `base.app.activation_settle` (o `base.app.enable`, si tenía las tablas) llama a `services._load_what_waited` →
+  `base.app.activation_settle` (o `base.app.enable`, si tenía las tablas) llama a `services.blueprints._load_what_waited` →
   `blueprint.finish_waiting`, que reusa `apply`, con su orden y sus operaciones, en el hub activo. Si el worker muere, no
-  ha pasado ninguna de las dos cosas y el siguiente pase, o el barrido de `_serve_hub` si se perdió el aviso, hace las
+  ha pasado ninguna de las dos cosas y el siguiente pase, o el barrido de las visitas del worker (`base.hub_visits`) si se perdió el aviso, hace las
   dos: por eso sobrevive a un reinicio sin nada más. Cómo va la preparación (`setup_failed`) nunca se escribe: se lee de
   la fila de la app al describir la carga (`describe_load`). Lo que corta la espera: desactivar la app, deshacer la
-  carga, reintentarla (la nueva toma el relevo) y restablecer el negocio (`services._stop_waiting`). Un fichero no se
+  carga, reintentarla (la nueva toma el relevo) y restablecer el negocio (`services.blueprints._stop_waiting`). Un fichero no se
   guarda, así que no espera. Una carga que rompe deja la app encendida y su fila en `failed`: una app no se queda sin
   encender por sus datos. `base.import.list` se re-ejecuta también con `APP_EVENTS`, y `ImportPanel` y
   `BlueprintCardPending` siguen esa lista. Tests: `base/tests/test_blueprint_waits_for_apps.py`, con dos BD reales y el
   worker de verdad; e2e `tests/e2e/base-template-waits-for-apps.spec.ts`.
-- Un negocio sin BD propia (`hub.db_name` vacío) recibe de `base.hub.reset` sin `dry_run` un 409
-  `base.reset_shared_database` (`available: false` en el plan). Ninguno de producción está así
-  (hub#602): solo lo alcanza el respaldo de los tests escritos antes de la tenencia
-  (`base/tenancy/tests/legacy.py`), y la rama se va con él (hub#611).
 - Frontend: `base/frontend/pages/SettingsPage.vue` (`/settings`, pestaña en el hash `#data`; `/import` y `/export`
   llevan aquí), `components/data/*` y `lib/data.ts`; la tarjeta `components/BlueprintCard.vue` («Ahora
   no» en `localStorage["hub-blueprint-card-dismissed"]`). Tests: `base/tests/test_blueprint.py`,
@@ -3524,7 +3569,7 @@ Implicados: BASE-F92, BASE-F93
   requiere (cierre por `requires`, que solo conoce el Hub); un slug sin módulo se ignora y queda en el log; un hub de
   demo tiene todos. Lo bloqueado: 402 `app_entitlement_blocked` en toda operación de esa app
   (`LIVE["operation_database"] = base.entitlement.operation_database`, que delega en el de la tenencia), fuera de
-  `base.relay.active_apps` (relay e Inicio), `off` y sin menú en `base.session.me`. Sin ningún módulo de pago en el
+  `base.apps_on.active_apps` (relay e Inicio), `off` y sin menú en `base.session.me`. Sin ningún módulo de pago en el
   despliegue (hoy) no se lee nada. Tests: `base/tests/test_entitlement.py` (dos hubs, demo, fin del derecho, 402).
 - `base.app.list` (`GET /api/apps`, `base.view_home`, viva con `base.hub.state_applied`): los módulos de
   `home.shown_modules` desde su `LiveAppConfig` (nunca el catálogo del SaaS), con `right`, `state`, `path` (primera
@@ -3554,7 +3599,7 @@ Implicados: BASE-F92, BASE-F93
   preguntar a erplora.com, con los mismos umbrales. Una app dice qué incluye su plan declarando `plan_meter` en su
   `LiveAppConfig` (`home.plan_meters`, comprobado por `base.E013`): `base` no lee tablas de otra app. `base/meter.py`
   cuenta en la memoria de cada proceso que atiende peticiones y lo vuelca cada 60 s y al salir
-  (`services.activity_recorded`, `services.people_seen`): peticiones en `HubDatabaseMiddleware`, personas en
+  (`services.usage.activity_recorded`, `services.usage.people_seen`): peticiones en `HubDatabaseMiddleware`, personas en
   `HubContextBuilder.from_request`, pico en `Limiter.take`, fuera de su lock. «Sin hueco» solo cuando llega a un cliente
   (`HubBusy.reached_client`, gancho de `live`): nunca un reintento del ejecutor vivo. Solo lo arranca `config/asgi.py`: lo
   que hace el worker no es la petición de nadie. Una lectura suma lo que su proceso aún no ha volcado (`meter.unflushed`).
@@ -3616,8 +3661,17 @@ Implicados: BASE-F92, BASE-F93
   `APP_RELEASED_AT` del entorno del despliegue; sin ellos, `dev` y `null`), `base.event.list` (`GET /api/system/events`:
   las 50 últimas `live.OutboxEvent` del host con su `EventDelivery` resumida y traducida; nunca el `payload`) y
   `base.failed_event.list` (`GET /api/system/failed-events`: las `EventDelivery` `dead` del host, hasta 100, con
-  `retryable` = su app está en `relay.active_apps`). Las tres filtran por `scope_kind`/`scope_key` del contexto (test de
-  dos hubs en `base/tests/test_queries_system.py`).
+  `retryable` = su app está en `base.apps_on.active_apps`). Las tres filtran por `scope_kind`/`scope_key` del contexto
+  (test de dos hubs en `base/tests/test_queries_system.py`).
+- Novedades (BASE-F116): `base.release_note.list` (`GET /api/system/release-notes`, `base.view_home`,
+  `database=False`, `ai=`) devuelve una página (`limit` hasta 100, 20 por defecto; `offset`; `total`) de las notas que
+  trae la imagen, la más reciente primero, en el idioma de la persona (sin él, en inglés). Cada nota es un fichero de
+  `base/release-notes/` llamado `<AAAA-MM-DD>-<nombre-en-minúsculas>.toml` (el día en que el cambio llega a los
+  negocios), con `kind` (`new`, `improved` o `fixed`) y una tabla por idioma del despliegue con `title` (hasta 80
+  caracteres) y `body` (hasta 400), en texto llano. `base/release_notes.py` las lee una vez por proceso (con `DEBUG`, en
+  cada llamada) y rechaza la que no lo cumple; `base/tests/test_release_notes.py` lee todas las del repositorio, así
+  que una nota rota no llega a la imagen. Se escribe una por cambio que nota un negocio (algo nuevo, una mejora o un
+  arreglo que se ve), en su lenguaje: nunca el título del commit ni los cambios internos.
 - Comandos (`base/services/`, `base.administer_hub`, `ai=` con `risk`), con el id en el cuerpo:
   `base.failed_event.retry` (`POST /api/system/failed-events/retry`: `pending`, `attempts` 0, solo a su `app_label`;
   409 `base.failed_event_app_off` si la app no está activa), `base.failed_event.retry_all` (`POST
@@ -3656,7 +3710,7 @@ Implicados: BASE-F92, BASE-F93
   browser notices that are no error»). `POST /api/error-report` (`base/error_report.py`, fuera de ninja: un beacon no lleva CSRF) exige
   sesión, 30 por minuto y persona (`base.rate_limited`), cuerpo ≤ 16 KB y JSON, y escribe una línea `frontend.error
   {json}` en ERROR del logger `base.error_report` (host, usuario, pantalla, mensaje y traza recortados); el logging
-  va a la consola y de ahí a CloudWatch (`config/settings.py` `LOGGING`). Tests: `base/tests/test_error_report.py`,
+  va a la consola y de ahí a CloudWatch (`config/settings/observability.py` `LOGGING`). Tests: `base/tests/test_error_report.py`,
   `base/frontend/lib/error-report.test.ts`.
 - Pantalla: `SystemPage.vue` con `SystemUsage.vue`, `SystemRelease.vue`, `FailedEvents.vue` (descartar en
   `ConfirmDialog` con motivo; reenviar todos con `confirm`) y `SystemLog.vue` (`DataTable` con tarjetas en el móvil).
@@ -3685,7 +3739,7 @@ Implicados: BASE-F92, BASE-F93
   `tests/test_guardrails_money.py` no deja llamar a `format_currency` ni a `get_currency_symbol` de Babel fuera de él.
   Ventas, Facturación, Inventario, Tarifas, Impresión, Pagos y
   Carrito y pago la leen con `base.operations.business_currency(ctx.scope)`, sin copia propia (las `business_currency(ctx)`
-  de `apps/sale/queries.py` y `apps/cart_checkout/queries.py` solo la llaman); en pantalla, Pagos, Carrito y pago,
+  de `apps/sale/queries/business.py` y `apps/cart_checkout/queries.py` solo la llaman); en pantalla, Pagos, Carrito y pago,
   Clientes, Menús y combos, Citas y la vista previa de Reserva online la leen con `useBusinessMoney` (ninguna fija
   una moneda; la ficha de prueba de `base.business.get` es `base/frontend/__tests__/business.ts`). Pantallas: `SettingsPage.vue` (pestañas por hash `#business`, `#tickets`,
   `#data`; `#tax` abre Negocio; `lib/data.ts`) y `components/settings/{BusinessPanel,TicketsPanel,SettingsRow}.vue`.
@@ -3845,6 +3899,22 @@ Implicados: BASE-F92, BASE-F93
   otra. Lo que no cumple no se sirve y `base.E010` lo dice al arrancar. Una app que guarde archivos para enseñarlos los
   declara ahí, sin tocar `base/`. Tests: `base/tests/test_media.py` (miembro, visitante, otro hub, app apagada, `..` y la
   carpeta de otra app) y, por app, el suyo (`apps/whatsapp_inbox/tests/test_template_header_file.py`).
+- **La puerta pública `/p/<slug>/<página>`** (`base/public_door.py`): las páginas sin sesión que una app da a los
+  clientes del negocio, en el host de su hub. La app la pide en su `LiveAppConfig` con `public_pages = {"<página>":
+  "<permiso>"}`, un permiso suyo (uno de otra app, o que no declara, no abre nada: la puerta se lo da a cualquiera; ni
+  una página que también da otra app; `base.E020` lo dice al arrancar);
+  hoy, Reservas online (`{"book": "online_booking.public"}`). `GET /p/<slug>/<página>` es el HTML del shell
+  (`base.spa.shell`), con el dinero del negocio en el bloque `public-door`, y la ruta de la app de ese camino pinta la
+  página; `GET /p/<slug>/<página>/<clave>` (un solo segmento de letras, cifras, `-` y `_`: el enlace personal de una
+  clienta) es el mismo HTML, para la ruta de la página que lee la clave; la puerta no la lee ni dice si abre algo, y la
+  ruta va antes de las de `/p/media` y `/p/catalog` para que un negocio que se llame así también abra la suya; `POST /p/<slug>/api/<operación>` corre en el proceso una operación de esa app que pide justo ese permiso,
+  como nadie (`actor=None`) y con ese permiso y ningún otro, también con una sesión abierta, con la entrada en el
+  cuerpo JSON (nunca en la query) y la respuesta o el sobre de error del API, en el idioma del visitante; lleva el
+  token CSRF del HTML. El negocio es el del Host: un `<slug>` que no es el suyo, una página que ninguna app da, una
+  operación fuera de la página o la app apagada en el negocio, 404. Tests: `base/tests/test_public_door.py` (otro
+  negocio por slug y por host, app apagada, permiso ajeno, CSP, CSRF, el visitante por `X-Forwarded-For`, y el enlace
+  personal: su HTML, el de otro negocio y el token de otro negocio, que da lo mismo que uno inventado) y el e2e
+  `tests/e2e/online-booking-public-page.spec.ts`.
 - **Asistente** (BASE-F92…F106): es **plataforma** dentro de `base/`, no un
   módulo `kind="app"`: lo traen todos los planes (el cupo mensual llega en la foto; 0 = sin asistente) y sus piezas son
   del shell y del Inicio. Las mecánicas que no dependen de la pasarela son de `live.assistant` (las mismas del panel
@@ -3921,7 +3991,7 @@ Implicados: BASE-F92, BASE-F93
   escritura que su esquema marca `json_schema_extra={"currency": True}` (`CURRENCY`, siempre sobre un texto; vale
   para los importes de su mismo objeto y de lo que cuelga de él; hoy `currency` de `payment.payment.create`) o, sobre
   el dato que nombra un registro con moneda propia, la lectura de su app que la da
-  (`base.schemas.in_currency_of("<query>", by="<su entrada>", code="<el dato de su respuesta>")`, que es
+  (`base.schemas.assistant.in_currency_of("<query>", by="<su entrada>", code="<el dato de su respuesta>")`, que es
   `{"currency": {"read", "by", "code"}}`; hoy `cart_id`, `session_token` y `customer` de las escrituras de Carrito y
   pago, con `cart_checkout.cart.get`; `price_list_id` y `price_list` de `pricing.price_item.add`, con
   `pricing.price_list.get`, e `id` de `pricing.price_item.update`, con `pricing.price_item.get`), corrida como la persona (`_run`, como el nombre de un registro) solo si el objeto lleva
@@ -4086,9 +4156,10 @@ Implicados: BASE-F92, BASE-F93
   `test_assistant_gateway_log.py` (con la pasarela falsa de `base/tests/fake_gateway.py`); Vitest de `base/frontend/lib/assistant-hub.test.ts`,
   `components/AssistantSetupEmpty.test.ts`, `SetupChecklist.test.ts`, `ShellChrome.test.ts` y `frontend/main.test.ts`,
   y los del chat en `packages/ui/src/components/Assistant/*.test.ts` (`pnpm --filter @erplora/ui test`); e2e
-  `tests/e2e/base-assistant.spec.ts` contra un SaaS de verdad con su pasarela y el proveedor falso
-  `tests/e2e/assistant-provider.ts` (un servidor HTTP en 127.0.0.1 que habla la API de OpenAI; receta en
-  `tests/e2e/README.md`, «El asistente»): ningún test llega a un proveedor real.
+  `tests/e2e/base-assistant.spec.ts` (el panel) y `base-assistant-card.spec.ts`, `base-assistant-card-values.spec.ts`
+  y `base-assistant-card-records.spec.ts` (la tarjeta), con sus ayudantes en `tests/e2e/assistant-panel.ts`, contra un
+  SaaS de verdad con su pasarela y el proveedor falso `tests/e2e/assistant-provider.ts` (un servidor HTTP en 127.0.0.1
+  que habla la API de OpenAI; receta en `tests/e2e/README.md`, «El asistente»): ningún test llega a un proveedor real.
 - **Resumen propio de una escritura** (hub#693): `ai["summary"]` es un callable
   `(ctx, arguments, fields) -> list[dict]`; `base.assistant.cards.card` lo ejecuta solo con `ctx`, como esa persona y bajo
   `translation.override(language)`, con `fields` ya en ese idioma, y pone exactamente los campos que devuelve. Sin
@@ -4103,10 +4174,9 @@ Implicados: BASE-F92, BASE-F93
 - Llaves de API: `base.models.ApiKey` en la BD del hub (token `erpk_live_` + 256 bits, se guarda su SHA-256 y su
   principio); `base/api_keys.py` pone la puerta de la llave (`KeyDoor`) delante de la sesión en toda ruta de una
   operación `expose_api`; la llave recibe el permiso de esa operación y nada más, con su ritmo por minuto y el freno
-  por dirección (`KEY_ADDRESS_LIMIT`). Solo con `hub.db_name` (BD propia), que tienen todos: sin
-  ella, `base.api_key.*` responde 409 `base.api_keys_unavailable` y un `Bearer` no entra (test A≠B en
-  `base/tests/test_api_keys.py`); esa rama, y el «Todavía no disponible» de sus pantallas, solo la alcanza el
-  respaldo de los tests, y se retira con él (hub#611).
+  por dirección (`KEY_ADDRESS_LIMIT`). La llave vive en la BD del negocio, así que la de uno nunca abre otro (test
+  A≠B en `base/tests/test_api_keys.py`); un negocio sin BD propia no se sirve y su dirección responde 503
+  `base.hub_maintenance`, con llave o sin ella.
 - Aprobación con PIN de un responsable: una app nombra sus órdenes aprobables en su `LiveAppConfig`
   (`approvals = {"sale.sale.void": _("Void a sale")}`; una consulta nunca, ni una orden `database=False`, que no abre
   transacción en la que gastar el pase: `base.E004` lo dice al arrancar). `base/approvals.py` pone su puerta
@@ -4127,7 +4197,7 @@ Implicados: BASE-F92, BASE-F93
   número y `money` de un entero, y los mismos huecos en `en` y `es`. Hoy la declaran `demo` (`demo.item.add_line`) y
   Ventas (los descuentos y el cobro por encima del máximo de SALE-F14, y el precio libre de SALE-F09).
   `base.approval.approve` comprueba el PIN o la placa como la puerta del PIN (`queries.access.pin_owner`,
-  `services.badge_owner`, `PIN_PERSON_LIMIT`/`PIN_ADDRESS_LIMIT`) y que quien aprueba tenga el permiso, y devuelve un
+  `services.devices.badge_owner`, `PIN_PERSON_LIMIT`/`PIN_ADDRESS_LIMIT`) y que quien aprueba tenga el permiso, y devuelve un
   pase de un uso (120 s, `X-Elevation-Token`); la puerta marca la petición con él (`Approved`), `base.operations`
   añade ese permiso a esa llamada y el pase se gasta en la transacción de la propia orden: `LIVE["operation_database"]`
   (`base/entitlement.py`) abre esa transacción en `base/approval_spend.py` y gasta el pase dentro
@@ -4145,13 +4215,17 @@ Implicados: BASE-F92, BASE-F93
   quien ya tiene el permiso sigue con su contexto tal cual. Solo las llamadas directas de la orden aprobada: lo que
   esa otra orden llame a su vez va con el contexto que recibió. La huella y el gasto del pase no cambian
   (`base/tests/test_approved_calls.py`). Ventas aún lleva su copia (`approval_of`, `consequence_context` y `call_app`
-  de `apps/sale/queries.py`) y pasa a `call` en su FIX; Reservas y Mesas, sin órdenes aprobables, llevan su
+  de `apps/sale/queries/other_apps.py`) y pasa a `call` en su FIX; Reservas y Mesas, sin órdenes aprobables, llevan su
   `call_app` propio, al que no llega ninguna aprobación. En el cliente, `withApproval(() => command.run(input))` de
   `base/frontend/lib/approval.ts` abre el diálogo y repite la orden una vez (`getElevationToken` en
   `frontend/main.ts`). El registro es `base.models.Approval` (`base.approval.list`).
 - Documentación de la API: `base/api_docs.py` recorta el OpenAPI de ninja a las rutas `expose_api` de las apps que
   tiene el negocio, con la llave como `bearer` y solo los esquemas que usan (`base.api_doc.get`, pedido una vez y no
-  en vivo: con todas las apps pasa de 1 MB, más que el tope de un resultado vivo); el ajuste es
+  en vivo: con todas las apps pasa de 1 MB, más que el tope de un resultado vivo). Cada esquema llega al documento
+  con el nombre de la app dueña delante (`table.SettingsOut`, `base.DeviceOut`; un paquete ajeno, con el suyo:
+  `pydantic.JsonValue`), puesto en un solo sitio, `config/openapi.py`: así dos apps con un esquema del mismo nombre
+  no se pisan y cada ruta enseña el suyo; `tests/test_guardrails_openapi_schema_names.py` cae si dos clases acaban
+  con el mismo nombre o un nombre llega con dos cuerpos distintos. El ajuste es
   `base.models.ApiSettings` (`base.api_doc.settings`, `base.api_doc.settings_update`). Sin Swagger UI: producción
   aplica Trusted Types; la página propia la lee y la descarga. La entrada «API» del menú lateral sale con el ajuste
   (`useApiDocsShown` de `base/frontend/lib/sidebar.ts`, que se suscribe a `base.api_doc.settings` solo con sesión).
@@ -4209,9 +4283,13 @@ Implicados: BASE-F92, BASE-F93
 - **La caché es un clúster** (hub#440): en AWS es ElastiCache Serverless, un Valkey en modo clúster, que rechaza
   con `CROSSSLOT` una llamada con varias claves de ranuras distintas (`get_many`, `set_many`, `delete_many`). Las
   claves que van juntas comparten una etiqueta de hash: lo que va entre la primera `{` y la siguiente `}`
-  (`base.files:{<hex>}:…`, `website:home:{<slug>}:…`). En local y en los tests la caché es
-  `base.cache.ClusterLocMemCache`, la memoria del proceso con esa misma regla y el mismo error: lo que fallaría en
-  AWS falla antes en el test.
+  (`base.files:{<hex>}:…`, `website:home:{<slug>}:…`). Sin Valkey la caché aplica esa misma regla con el
+  mismo error, así que lo que fallaría en AWS falla antes en local o en el test: en local es
+  `base.cache.ClusterFileBasedCache`, una carpeta del disco por BD de control (`<tmp>/erplora-hub-cache/<DB_NAME>`) que
+  comparten el `runserver` y el worker como comparten Valkey en AWS, y lo que uno olvida al confirmar un cambio (una app
+  que el worker deja encendida) ya no lo lee el otro (hub#707); en los tests es `base.cache.ClusterLocMemCache`, la
+  memoria del proceso. La carpeta sobrevive a reiniciar el `runserver`, como Valkey a un despliegue: lo guardado caduca
+  con su plazo, y para vaciarla basta borrarla.
 
 - **`Hub.cluster` vacío es el servidor por defecto** (hub#614), el de los settings: es un valor válido, no un dato por
   rellenar, y con él conecta, migra, mide y se traslada el hub (`base.tenancy.connections`, `credentials`, `migrator`,
@@ -4331,13 +4409,13 @@ Implicados: BASE-F92, BASE-F93
 
 - **Avisar por correo al dueño cuando debe ampliar (BASE-F40)**: el mercado lo da por supuesto, pero lo manda erplora.com
   (PLAN-SAAS §28) y lleva su flujo y su issue allí.
-- **El archivo fiscal y el borrado de un negocio con documentos (BASE-F109)**, hub#738: hasta que exista, guarda su
-  base de datos y sus ficheros pasados los 90 días.
-- **La fila de salud del Inicio (BASE-F02)**, hub#573: un punto de extensión más en `LiveAppConfig` y su uso en
-  Impresión y la Bandeja de WhatsApp.
-- **Las notas de cada versión (BASE-F41)**, hub#576.
-- **Los roles que trae una app (BASE-F82)**, hub#579, con la contradicción entre PLAN-HUB §3 (`RoleActivation`) y
-  los cuatro roles de PLAN §22 sin resolver.
+- **El borrado de un negocio con documentos (BASE-F109)**, hub#738: sus documentos ya van al archivo fiscal, pero
+  guarda su base de datos y sus ficheros pasados los 90 días hasta que ese borrado se active.
+- **El PDF de cada factura en el archivo fiscal (BASE-F109)**, hub#1821: hoy van sus datos y el XML de VeriFactu.
+- **La fila de salud del Inicio en pantalla (BASE-F02)**, hub#573: su lectura ya existe (`base.health.list`, con la
+  impresora de Impresión); falta pintarla en el Inicio y que la Bandeja de WhatsApp declare cómo está su número.
+- **Las novedades en Sistema › Actualizaciones (BASE-F116)**: ya se leen por el asistente y por la API; falta
+  enseñarlas en la pantalla, hub#576.
 - **La cola de PgBouncer de cada negocio en CloudWatch**, hub#572.
 - **Peticiones a `@erplora/ui`** que siguen abiertas: [`UI-REQUESTS.md`](UI-REQUESTS.md) (los iconos de documento de
   Archivos, los del cuadro del asistente y `useI18n` en el shell).
@@ -4369,6 +4447,8 @@ Implicados: BASE-F92, BASE-F93
   programas ni archivos de más de 25 MB.
 - No invita, no cambia el rol ni quita a nadie: es de erplora.com, que lleva las plazas del plan; el hub lo enseña y
   enlaza a «Miembros».
+- No deja que una app traiga roles propios ni encienda o apague roles: un negocio tiene siempre los cuatro de
+  erplora.com, que se dan al invitar, y cada app reparte entre ellos lo que se puede hacer en ella (BASE-F82).
 - No enseña nunca el token entero de una llave después de crearla o rotarla, ni guarda el PIN de quien aprueba.
 - El asistente no guarda la conversación en el servidor: vive en la pestaña de quien pregunta y se olvida al cerrar
   sesión o cambiar de usuario.

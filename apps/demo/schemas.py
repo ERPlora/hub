@@ -10,7 +10,7 @@ from django.utils.translation import gettext_noop
 from ninja import Field, Schema
 from pydantic import StringConstraints, ValidationInfo, field_validator
 
-from base.schemas import names, unless_given
+from base.schemas.assistant import names, unless_given
 
 T = TypeVar("T")
 
@@ -53,16 +53,12 @@ class ItemListIn(PageIn):
 
 
 class ItemRefIn(Schema):
-    """An item by its ``id`` or, when the id is not known, by its name as a person says it (``called``; the same name
-    in any case before one that contains it: ``queries.find_item``). The id wins.
-
-    The name travels as ``called``, not as ``item``: a turn ranks a tool 1 higher for each datum it takes that the
-    question names (``live.assistant.relevant``), and «item» (and «elemento», Demo's ``assistant_synonyms``) is what the
-    cart's and the price lists' items are called too (``cart_checkout``, ``pricing``), so an ``item`` datum would lift
-    Demo's four tools in their requests (measured on hub#1162: three asks of ``inventory.product.bulk_create`` went
-    from 4th to 8th); ``called`` moves no ask nor probe of the Hub."""
+    """An item, by its id or, when the id is not known, by its name as a person says it (the exact name, in any case,
+    before one that only contains it); the id wins."""
 
     id: UUID | None = Field(None, title=T_ITEM, json_schema_extra=AN_ITEM)
+    # Not ``item``: the assistant ranks a tool higher for each datum the question names, and the cart's and the price
+    # lists' lines are called items too, so an ``item`` datum would lift Demo's tools in their requests.
     called: Name | None = Field(
         None,
         validate_default=True,

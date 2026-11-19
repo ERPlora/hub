@@ -17,18 +17,12 @@ from django.http import HttpResponse
 from base import files, queries, services
 from base.auth_views import with_language_cookie
 from base.request_body import accept_body_up_to
-from base.schemas import (
-    AccessSettingsUpdateIn,
-    AvatarIn,
-    BlueprintExportIn,
-    BlueprintImportIn,
-    BlueprintSourceIn,
-    DeviceByIdIn,
-    DeviceModeIn,
-    DeviceRenameIn,
-    FailedEventDiscardIn,
-    FailedEventIn,
-    FailedEventListIn,
+from base.schemas.access import AccessSettingsUpdateIn
+from base.schemas.blueprints import BlueprintExportIn, BlueprintImportIn, BlueprintSourceIn, ImportIdIn, ImportUndoIn
+from base.schemas.devices import DeviceByIdIn, DeviceModeIn, DeviceRenameIn, PinSetIn
+from base.schemas.dumps import HubDumpLinkIn
+from base.schemas.failed_events import FailedEventDiscardIn, FailedEventIn, FailedEventListIn
+from base.schemas.files import (
     FileDeleteIn,
     FileFolderCreateIn,
     FileListIn,
@@ -36,16 +30,13 @@ from base.schemas import (
     FileReadIn,
     FileRenameIn,
     FileUploadIn,
-    HubDumpLinkIn,
-    HubResetIn,
-    ImportIdIn,
-    ImportUndoIn,
-    PinSetIn,
-    PreferencesIn,
-    ProfileUpdateIn,
 )
+from base.schemas.profile import AvatarIn, PreferencesIn, ProfileUpdateIn
+from base.schemas.reset import HubResetIn
 
-from base.schemas import ApiKeyCreateIn, ApiKeyIdIn, ApprovalExportIn, ApprovalIn, ApproversIn, BadgeSetIn, PersonIn  # noqa: E402
+from base.schemas.api_keys import ApiKeyCreateIn, ApiKeyIdIn  # noqa: E402
+from base.schemas.approvals import ApprovalExportIn, ApprovalIn, ApproversIn  # noqa: E402
+from base.schemas.people import BadgeSetIn, PersonIn  # noqa: E402
 
 router = Router(tags=["base"])
 
@@ -87,7 +78,7 @@ async def app_list(request):
 # Turning an app on or off, with the plan's limit: the app by its name or its id in the body; which app
 # a name names, by ``base.app.get``. While a hub's own database gets the app's tables the same answer
 # comes with 202: accepted, the worker finishes it. Both codes are in the OpenAPI, with the same schema.
-from base.schemas import AppChangeIn, AppRefIn  # noqa: E402
+from base.schemas.apps import AppChangeIn, AppRefIn  # noqa: E402
 
 
 @bind(router, "base.app.get", "/apps/detail")
@@ -101,17 +92,17 @@ def _accepted_while_creating(answer):
 
 @bind(router, "base.app.enable", "/apps/enable", status=(200, 202))
 async def app_enable(request, data: AppChangeIn):
-    return _accepted_while_creating(await run_operation(request, services.app_enable, data))
+    return _accepted_while_creating(await run_operation(request, services.apps.app_enable, data))
 
 
 @bind(router, "base.app.disable", "/apps/disable")
 async def app_disable(request, data: AppChangeIn):
-    return await run_operation(request, services.app_disable, data)
+    return await run_operation(request, services.apps.app_disable, data)
 
 
 @bind(router, "base.app.retry", "/apps/retry", status=(200, 202))
 async def app_retry(request, data: AppChangeIn):
-    return _accepted_while_creating(await run_operation(request, services.app_retry, data))
+    return _accepted_while_creating(await run_operation(request, services.apps.app_retry, data))
 
 
 @bind(router, "base.plan.usage", "/system/plan")
@@ -132,13 +123,13 @@ async def blueprint_list(request):
 @bind(router, "base.blueprint.inspect", "/settings/data/blueprints/inspect")
 @decorate_view(accept_body_up_to(MAX_BLUEPRINT_BODY))
 async def blueprint_inspect(request, data: BlueprintSourceIn):
-    return await run_operation(request, services.blueprint_inspect, data)
+    return await run_operation(request, services.blueprints.blueprint_inspect, data)
 
 
 @bind(router, "base.blueprint.import", "/settings/data/blueprints/import")
 @decorate_view(accept_body_up_to(MAX_BLUEPRINT_BODY))
 async def blueprint_import(request, data: BlueprintImportIn):
-    return await run_operation(request, services.blueprint_import, data)
+    return await run_operation(request, services.blueprints.blueprint_import, data)
 
 
 @bind(router, "base.blueprint.export", "/settings/data/export")
@@ -158,7 +149,7 @@ async def import_detail(request, data: Query[ImportIdIn]):
 
 @bind(router, "base.import.undo", "/settings/data/imports/undo")
 async def import_undo(request, data: ImportUndoIn):
-    return await run_operation(request, services.import_undo, data)
+    return await run_operation(request, services.blueprints.import_undo, data)
 
 
 @bind(router, "base.dataset.list", "/settings/data/datasets")
@@ -168,7 +159,7 @@ async def dataset_list(request):
 
 @bind(router, "base.hub.reset", "/settings/data/reset")
 async def hub_reset(request, data: HubResetIn):
-    return await run_operation(request, services.hub_reset, data)
+    return await run_operation(request, services.reset.hub_reset, data)
 
 
 @bind(router, "base.hub.dumps", "/settings/data/dumps")
@@ -219,17 +210,17 @@ async def failed_event_detail(request, data: Query[FailedEventIn]):
 
 @bind(router, "base.failed_event.retry", "/system/failed-events/retry")
 async def failed_event_retry(request, data: FailedEventIn):
-    return await run_operation(request, services.failed_event_retry, data)
+    return await run_operation(request, services.failed_events.failed_event_retry, data)
 
 
 @bind(router, "base.failed_event.retry_all", "/system/failed-events/retry_all")
 async def failed_event_retry_all(request):
-    return await run_operation(request, services.failed_event_retry_all)
+    return await run_operation(request, services.failed_events.failed_event_retry_all)
 
 
 @bind(router, "base.failed_event.discard", "/system/failed-events/discard")
 async def failed_event_discard(request, data: FailedEventDiscardIn):
-    return await run_operation(request, services.failed_event_discard, data)
+    return await run_operation(request, services.failed_events.failed_event_discard, data)
 
 
 # ── Files ──────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -268,27 +259,27 @@ async def file_read(request, params: Query[FileReadIn]):
 @bind(router, "base.file.upload", "/files/upload")
 @decorate_view(accept_body_up_to(MAX_FILE_BODY))
 async def file_upload(request, data: FileUploadIn):
-    return await run_operation(request, services.file_upload, data)
+    return await run_operation(request, services.files.file_upload, data)
 
 
 @bind(router, "base.file.create_folder", "/files/folder")
 async def file_create_folder(request, data: FileFolderCreateIn):
-    return await run_operation(request, services.file_create_folder, data)
+    return await run_operation(request, services.files.file_create_folder, data)
 
 
 @bind(router, "base.file.rename", "/files/rename")
 async def file_rename(request, data: FileRenameIn):
-    return await run_operation(request, services.file_rename, data)
+    return await run_operation(request, services.files.file_rename, data)
 
 
 @bind(router, "base.file.move", "/files/move")
 async def file_move(request, data: FileMoveIn):
-    return await run_operation(request, services.file_move, data)
+    return await run_operation(request, services.files.file_move, data)
 
 
 @bind(router, "base.file.delete", "/files/delete")
 async def file_delete(request, data: FileDeleteIn):
-    return await run_operation(request, services.file_delete, data)
+    return await run_operation(request, services.files.file_delete, data)
 
 
 # ── The way in ─────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -302,7 +293,7 @@ async def access_door(request):
 
 @bind(router, "base.pin.set", "/me/pin")
 async def pin_set(request, data: PinSetIn):
-    return await run_operation(request, services.pin_set, data)
+    return await run_operation(request, services.devices.pin_set, data)
 
 
 @bind(router, "base.device.current", "/device")
@@ -312,7 +303,7 @@ async def device_current(request):
 
 @bind(router, "base.device.mode_set", "/device/mode")
 async def device_mode_set(request, data: DeviceModeIn):
-    return await run_operation(request, services.device_mode_set, data)
+    return await run_operation(request, services.devices.device_mode_set, data)
 
 
 @bind(router, "base.device.list", "/devices")
@@ -327,17 +318,17 @@ async def device_detail(request, data: Query[DeviceByIdIn]):
 
 @bind(router, "base.device.rename", "/devices/rename")
 async def device_rename(request, data: DeviceRenameIn):
-    return await run_operation(request, services.device_rename, data)
+    return await run_operation(request, services.devices.device_rename, data)
 
 
 @bind(router, "base.device.remove", "/devices/remove")
 async def device_remove(request, data: DeviceByIdIn):
-    return await run_operation(request, services.device_remove, data)
+    return await run_operation(request, services.devices.device_remove, data)
 
 
 @bind(router, "base.device.prune", "/devices/prune")
 async def device_prune(request):
-    return await run_operation(request, services.device_prune)
+    return await run_operation(request, services.devices.device_prune)
 
 
 @bind(router, "base.access.settings", "/access/settings")
@@ -347,7 +338,7 @@ async def access_settings(request):
 
 @bind(router, "base.access.settings_update", "/access/settings/update")
 async def access_settings_update(request, data: AccessSettingsUpdateIn):
-    return await run_operation(request, services.access_settings_update, data)
+    return await run_operation(request, services.profile.access_settings_update, data)
 
 
 @bind(router, "base.profile.get", "/me/profile")
@@ -357,13 +348,13 @@ async def profile_get(request):
 
 @bind(router, "base.profile.update", "/me/profile/update")
 async def profile_update(request, data: ProfileUpdateIn):
-    return await run_operation(request, services.profile_update, data)
+    return await run_operation(request, services.profile.profile_update, data)
 
 
 # The language applies at once: the answer leaves its cookie, as the login does (base.auth_views._with_language).
 @bind(router, "base.profile.preferences_set", "/me/preferences")
 async def preferences_set(request, response: HttpResponse, data: PreferencesIn):
-    answer = await run_operation(request, services.preferences_set, data)
+    answer = await run_operation(request, services.profile.preferences_set, data)
     with_language_cookie(response, answer.language)
     return answer
 
@@ -375,12 +366,12 @@ MAX_AVATAR_BODY = 2_900_000
 @bind(router, "base.profile.avatar_set", "/me/avatar")
 @decorate_view(accept_body_up_to(MAX_AVATAR_BODY))
 async def avatar_set(request, data: AvatarIn):
-    return await run_operation(request, services.avatar_set, data)
+    return await run_operation(request, services.profile.avatar_set, data)
 
 
 @bind(router, "base.profile.avatar_remove", "/me/avatar/remove")
 async def avatar_remove(request):
-    return await run_operation(request, services.avatar_remove)
+    return await run_operation(request, services.profile.avatar_remove)
 
 
 # ── People and permissions: people, roles ───────────────────────────────────────────────────────────────────────────
@@ -398,17 +389,17 @@ async def person_detail(request, data: Query[PersonIn]):
 
 @bind(router, "base.person.pin_remove", "/people/pin/remove")
 async def person_pin_remove(request, data: PersonIn):
-    return await run_operation(request, services.person_pin_remove, data)
+    return await run_operation(request, services.people.person_pin_remove, data)
 
 
 @bind(router, "base.person.badge_set", "/people/badge")
 async def person_badge_set(request, data: BadgeSetIn):
-    return await run_operation(request, services.person_badge_set, data)
+    return await run_operation(request, services.people.person_badge_set, data)
 
 
 @bind(router, "base.person.badge_remove", "/people/badge/remove")
 async def person_badge_remove(request, data: PersonIn):
-    return await run_operation(request, services.person_badge_remove, data)
+    return await run_operation(request, services.people.person_badge_remove, data)
 
 
 @bind(router, "base.role.list", "/roles")
@@ -431,17 +422,17 @@ async def api_key_detail(request, data: Query[ApiKeyIdIn]):
 
 @bind(router, "base.api_key.create", "/keys")
 async def api_key_create(request, data: ApiKeyCreateIn):
-    return await run_operation(request, services.api_key_create, data)
+    return await run_operation(request, services.api_keys.api_key_create, data)
 
 
 @bind(router, "base.api_key.rotate", "/keys/rotate")
 async def api_key_rotate(request, data: ApiKeyIdIn):
-    return await run_operation(request, services.api_key_rotate, data)
+    return await run_operation(request, services.api_keys.api_key_rotate, data)
 
 
 @bind(router, "base.api_key.revoke", "/keys/revoke")
 async def api_key_revoke(request, data: ApiKeyIdIn):
-    return await run_operation(request, services.api_key_revoke, data)
+    return await run_operation(request, services.api_keys.api_key_revoke, data)
 
 
 # ── People and permissions: a manager's approval ───────────────────────────────────────────────────────────────────
@@ -464,11 +455,11 @@ async def approval_approvers(request, data: Query[ApproversIn]):
 
 @bind(router, "base.approval.approve", "/approvals")
 async def approval_approve(request, data: ApprovalIn):
-    return await run_operation(request, services.approval_approve, data)
+    return await run_operation(request, services.approvals.approval_approve, data)
 
 
 # ── People and permissions: the API's documentation ────────────────────────────────────────────────────────────────
-from base.schemas import ApiDocSettingsUpdateIn  # noqa: E402
+from base.schemas.api_keys import ApiDocSettingsUpdateIn  # noqa: E402
 
 
 @bind(router, "base.api_doc.get", "/api-docs")
@@ -483,14 +474,14 @@ async def api_doc_settings(request):
 
 @bind(router, "base.api_doc.settings_update", "/api-docs/settings/update")
 async def api_doc_settings_update(request, data: ApiDocSettingsUpdateIn):
-    return await run_operation(request, services.api_doc_settings_update, data)
+    return await run_operation(request, services.api_keys.api_doc_settings_update, data)
 
 
 # ── Assistant ───────────────────────────────────────────────────────────────────────────────────────────────────
 
 from base import assistant  # noqa: E402 - the assistant's block keeps its imports with it
-from base.schemas import AssistantReportIn, AssistantSpeakIn, AssistantTranscribeIn, AssistantTurnIn  # noqa: E402
-from base.schemas import SaasPassIn, SupportReportIn  # noqa: E402
+from base.schemas.assistant import AssistantReportIn, AssistantSpeakIn, AssistantTranscribeIn, AssistantTurnIn  # noqa: E402
+from base.schemas.support import SaasPassIn, SupportReportIn  # noqa: E402
 
 #: A turn's body: the conversation and the attachments of its last question, in base64 (the gateway takes 32 MB).
 MAX_ASSISTANT_TURN_BODY = 32 * 1024 * 1024
@@ -505,7 +496,7 @@ MAX_ASSISTANT_AUDIO_BODY = 3_000_000
 async def assistant_turn(request, data: AssistantTurnIn):
     # What its tools wait on erplora.com for (a search in ERPlora's documentation) goes before its transaction.
     with assistant.gateway.prepared_docs(await assistant.gateway.prepare(request, data)):
-        plan = await run_operation(request, services.assistant_turn, data)
+        plan = await run_operation(request, services.assistant.assistant_turn, data)
     return assistant.gateway.turn_response(request, plan.model_dump(mode="json"))
 
 
@@ -516,23 +507,23 @@ async def assistant_usage(request):
 
 @bind(router, "base.assistant.report", "/assistant/report")
 async def assistant_report(request, data: AssistantReportIn):
-    return await run_operation(request, services.assistant_report, data)
+    return await run_operation(request, services.assistant.assistant_report, data)
 
 
 @bind(router, "base.support.report", "/support/report")
 async def support_report(request, data: SupportReportIn):
-    return await run_operation(request, services.support_report, data)
+    return await run_operation(request, services.support.support_report, data)
 
 
 @bind(router, "base.saas_pass.create", "/saas-pass")
 async def saas_pass_create(request, data: SaasPassIn):
-    return await run_operation(request, services.saas_pass_create, data)
+    return await run_operation(request, services.support.saas_pass_create, data)
 
 
 @bind(router, "base.assistant.transcribe", "/assistant/transcribe")
 @decorate_view(accept_body_up_to(MAX_ASSISTANT_AUDIO_BODY))
 async def assistant_transcribe(request, data: AssistantTranscribeIn):
-    return await run_operation(request, services.assistant_transcribe, data)
+    return await run_operation(request, services.assistant.assistant_transcribe, data)
 
 
 # The panel plays the mp3 itself (a ``blob:`` of the answer, CSP ``media-src``); an integration that accepts only JSON
@@ -551,7 +542,7 @@ async def assistant_transcribe(request, data: AssistantTranscribeIn):
     },
 )
 async def assistant_speak(request, data: AssistantSpeakIn):
-    spoken = await run_operation(request, services.assistant_speak, data)
+    spoken = await run_operation(request, services.assistant.assistant_speak, data)
     accepts = request.headers.get("Accept", "")
     if "application/json" in accepts and "audio/mpeg" not in accepts:
         return spoken
@@ -570,7 +561,7 @@ async def location_list(request):
 
 # ── The shared image library (base.image_catalog) ──────────────────────────────────────────────────────────────────
 
-from base.schemas import CatalogImageRefIn, CatalogImageSearchIn  # noqa: E402
+from base.schemas.catalog_images import CatalogImageRefIn, CatalogImageSearchIn  # noqa: E402
 
 
 @bind(router, "base.catalog_image.search", "/catalog/images")

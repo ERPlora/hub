@@ -17,7 +17,7 @@ from live.outbox import channel_for
 
 from base import access, events
 from base.models import Credential, Membership, TrustedDevice
-from base.schemas import AccessDoorIn, AccessSettingsUpdateIn
+from base.schemas.access import AccessDoorIn, AccessSettingsUpdateIn
 from base.tenancy.context import use_hub
 from base.tenancy.tests import hubs
 from base.tests.test_auth_views import ON_HUB_A

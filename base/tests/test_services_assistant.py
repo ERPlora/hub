@@ -20,8 +20,9 @@ from base.models import Hub, Membership
 from base.tenancy import context
 from base.tenancy.tests.business import HUB_DB, HUB_DB_COMMITTED, A, in_business_a
 from base.tests.fake_gateway import gateway
-from base.tests.test_assistant import SECRET_SET, PricedPreviewOut, count_preview, declaring
-from base.tests.test_assistant import settle  # a dangerous write with its preview
+from base.tests.test_assistant import SECRET_SET
+from base.tests.test_assistant_previews import PricedPreviewOut, count_preview, declaring
+from base.tests.test_assistant_previews import settle  # a dangerous write with its preview
 
 #: The fixtures these tests take from elsewhere.
 __all__ = ["gateway", "in_business_a", "settle"]

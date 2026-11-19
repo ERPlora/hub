@@ -9,7 +9,7 @@ import { itTellsTheCorrectedFieldApart } from '../../../../base/frontend/__tests
 import { click, expectWaitsForTheYen, ionValue, mountCash, settle } from '../__tests__/mount-cash-register';
 import { itReadsAmountsAsTheHub, itReadsWhatWasLeftOnceTheMoneyArrives } from '../__tests__/money-field';
 import { expectWindowSaysMoneyUnreadable } from '../../../../base/frontend/__tests__/save-waits-for-money';
-import type { Business } from '../../../../base/frontend/operations';
+import type { Business } from '../../../../base/frontend/operations/business';
 import OpenSessionModal from './OpenSessionModal.vue';
 
 vi.mock('@ionic/vue', async (importOriginal) => {

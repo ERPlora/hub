@@ -17,11 +17,7 @@ hub again in theirs).
 
 Without any of them, a hub's model or operation fails with :class:`HubContextMissing`: it never falls back to
 ``default``. A model of a module whose tables the hub's database does not have yet is :class:`AppNotCreated`
-(``base.tenancy.router``). ``_test_fallback`` is the one exception, set only by the suite, and only for the tests
-``.legacy-fallback-allow`` names (``base/tenancy/tests/legacy_allow.py``): the tests written before the tenancy keep
-every business of theirs (``db_name=""``) in control's test database (``base/tenancy/tests/legacy.py``), so under it
-they run without a context and such a business is entered there (:func:`serves_hubs_without_database`). Never outside
-the tests.
+(``base.tenancy.router``). The tests run the same way: every business of theirs has a database of its own.
 """
 
 from collections.abc import Iterator
@@ -61,8 +57,7 @@ class AppNotCreated(AppInactive):
 
 @dataclass(frozen=True)
 class DatabaseContext:
-    """What runs now: a hub (``hub``, its alias) or the platform (``control``); the suite's fallback has a kind of its
-    own (``base/tenancy/tests/legacy.py``)."""
+    """What runs now: a hub (``hub``, its alias) or the platform (``control``)."""
 
     kind: str
     alias: str
@@ -72,18 +67,6 @@ class DatabaseContext:
 CONTROL_DATABASE = DatabaseContext(kind=CONTROL, alias=DEFAULT_DB_ALIAS)
 
 _current: ContextVar[DatabaseContext | None] = ContextVar("tenancy_database_context", default=None)
-#: Set only by the suite, for the tests that still need it: what a test written before the tenancy runs on without a
-#: context.
-_test_fallback: DatabaseContext | None = None
-#: How many times the code leaned on the fallback where production refuses or behaves otherwise: the suite reads it to
-#: tell the tests that still need the fallback from the ones that only have it on.
-_test_fallback_entries = 0
-
-
-def _leaning_on_the_fallback() -> DatabaseContext:
-    global _test_fallback_entries
-    _test_fallback_entries += 1
-    return _test_fallback
 
 
 @contextmanager
@@ -98,18 +81,14 @@ def _entered(active: DatabaseContext) -> Iterator[DatabaseContext]:
 @contextmanager
 def use_hub(hub) -> Iterator[DatabaseContext]:
     """Work on ``hub``'s database until the block ends; :class:`HubWithoutDatabase` for a business without one."""
-    if hub.db_name:
-        from base.tenancy import connections
-
-        alias = connections.open_hub_alias(hub)
-    elif _test_fallback is not None:
-        # The suite's tests written before the tenancy: their businesses' rows are in control's test database.
-        alias = _leaning_on_the_fallback().alias
-    else:
+    if not hub.db_name:
         raise HubWithoutDatabase(
             f"The business {hub.slug or hub.id} has no database of its own yet: it is not served until "
             "manage.py cut_shared_hubs gives it one (base.tenancy.cut)."
         )
+    from base.tenancy import connections
+
+    alias = connections.open_hub_alias(hub)
     with _entered(DatabaseContext(kind=HUB, alias=alias, hub=hub)) as active:
         yield active
 
@@ -117,22 +96,6 @@ def use_hub(hub) -> Iterator[DatabaseContext]:
 def use_control() -> Iterator[DatabaseContext]:
     """Work as the platform until the block ends: control's models and outbox, no hub's."""
     return _entered(CONTROL_DATABASE)
-
-
-def use_admin_without_a_business() -> AbstractContextManager[DatabaseContext]:
-    """Where the admin works with no business chosen (``base.middleware``): control. Under the suite's fallback, the
-    fallback itself: control's test database, with the rows of every business of the tests written before the
-    tenancy, as the admin showed them before every business had a database of its own."""
-    return use_control() if _test_fallback is None else _entered(_leaning_on_the_fallback())
-
-
-def serves_hubs_without_database() -> bool:
-    """Whether a business without a database of its own is entered and served: never in production, only under
-    the suite's fallback (``_test_fallback``), where the tests written before the tenancy keep their businesses."""
-    if _test_fallback is None:
-        return False
-    _leaning_on_the_fallback()
-    return True
 
 
 def use_again(active: DatabaseContext) -> AbstractContextManager[DatabaseContext]:
@@ -146,14 +109,12 @@ def use_again(active: DatabaseContext) -> AbstractContextManager[DatabaseContext
 
 def peek() -> DatabaseContext | None:
     """The active context, ``None`` without one: for who goes on without it (a migration's ``RunPython``)."""
-    return _current.get() or _test_fallback
+    return _current.get()
 
 
 def current() -> DatabaseContext:
     """The active context; ``HubContextMissing`` without one."""
     active = _current.get()
-    if active is None and _test_fallback is not None:
-        active = _leaning_on_the_fallback()
     if active is None:
         raise HubContextMissing(
             "No database context: wrap this in use_hub(hub) or use_control() (base.tenancy.context)."
@@ -177,7 +138,7 @@ def operation_database(op, ctx) -> Iterator[str]:
 
     A platform operation (the registry, the demos) runs on control, from anywhere. A hub's runs in the hub of the
     active context, and only if it is that hub (``HubContextMismatch`` for another one's); without one, or in
-    control's, ``HubContextMissing``. The suite's fallback runs any hub's on control's test database.
+    control's, ``HubContextMissing``.
     """
     if ctx.scope.kind == PLATFORM_SCOPE_KIND:
         with use_control() as active:

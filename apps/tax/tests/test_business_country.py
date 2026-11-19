@@ -23,7 +23,7 @@ from apps.tax import queries
 from apps.tax.models import TaxRule, TaxSettings
 from apps.tax.schemas import FACTORY_COUNTRIES
 from base.models import Hub
-from base.schemas import SetupStatusIn
+from base.schemas.home import SetupStatusIn
 from base.tenancy.context import use_hub
 from base.tenancy.tests import hubs
 
@@ -38,7 +38,7 @@ PORTUGUESE_RULE = {"country_code": "PT", "tax_category_key": GENERIC, "rate_pct"
 
 
 @pytest.fixture(autouse=True)
-def as_production(no_test_fallback):
+def as_production():
     """Without ``use_hub`` a hub's model fails: nothing falls back on a database the two businesses share."""
 
 

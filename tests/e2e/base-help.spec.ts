@@ -10,6 +10,7 @@ const SIZES = [
   { label: '1440', width: 1440, height: 900 },
 ] as const;
 const SHOTS = '/tmp/help-window-shots';
+const FIX_SHOTS = '/tmp/help-fix-shots';
 
 let context: BrowserContext;
 let page: Page;
@@ -28,6 +29,14 @@ async function snap(name: string): Promise<void> {
   writeFileSync(`${SHOTS}/${name}.png`, png);
 }
 
+async function snapHeader(name: string): Promise<void> {
+  const header = page.locator('ion-header.app-topbar').last();
+  await expect(header).toBeVisible();
+  const clip = (await header.boundingBox())!;
+  const png = await capture(page, name, { clip });
+  writeFileSync(`${FIX_SHOTS}/${name}.png`, png);
+}
+
 async function theme(dark: boolean): Promise<void> {
   await page.evaluate((enabled) => document.documentElement.classList.toggle('ion-palette-dark', enabled), dark);
   await settled(page);
@@ -44,6 +53,13 @@ async function openHelp(): Promise<void> {
 async function closeHelp(): Promise<void> {
   await page.getByTestId('help-close').click();
   await expect(modal()).toBeHidden();
+}
+
+async function askAssistant(question: string): Promise<void> {
+  await page.getByTestId('help-ask-assistant').click();
+  await expect(modal()).toBeHidden();
+  await expect(page.getByTestId('assistant-panel')).toHaveAttribute('data-open', 'true');
+  await expect(page.getByTestId('assistant-input').locator('textarea')).toHaveValue(question);
 }
 
 async function checkSummaryLayout(): Promise<void> {
@@ -78,6 +94,8 @@ test.describe.configure({ mode: 'serial' });
 test.beforeAll(async ({ browser }) => {
   rmSync(SHOTS, { recursive: true, force: true });
   mkdirSync(SHOTS, { recursive: true });
+  rmSync(FIX_SHOTS, { recursive: true, force: true });
+  mkdirSync(FIX_SHOTS, { recursive: true });
   ({ context, page } = await signedInSpanish(browser, { width: 1440, height: 900 }, '/table/floor-plan'));
   page.on('request', (request) => {
     const url = new URL(request.url());
@@ -200,13 +218,42 @@ test('a flow expands, search filters and clears, and the assistant receives only
   await first.click();
   await expect(first).toHaveAttribute('aria-expanded', 'true');
   const turnsBefore = assistantTurns.length;
-  await page.getByTestId('help-ask-assistant').click();
-  await expect(modal()).toBeHidden();
-  await expect(page.getByTestId('assistant-panel')).toHaveAttribute('data-open', 'true');
-  await expect(page.getByTestId('assistant-input').locator('textarea')).toHaveValue(`¿Cómo hago esto: ${flowTitle}?`);
+  const question = `¿Cómo hago esto: ${flowTitle}?`;
+  await askAssistant(question);
   expect(assistantTurns).toHaveLength(turnsBefore);
   await expect(page.getByTestId('assistant-thread')).not.toContainText(flowTitle);
   await page.getByTestId('assistant-close').click();
+
+  await openHelp();
+  await first.click();
+  await expect(first).toHaveAttribute('aria-expanded', 'true');
+  await askAssistant(question);
+  expect(assistantTurns).toHaveLength(turnsBefore);
+  await page.getByTestId('assistant-close').click();
+});
+
+test('the help and assistant icons share a colour in light and dark at desktop and phone sizes', async () => {
+  await atTables();
+  for (const width of [1440, 390]) {
+    for (const dark of [false, true]) {
+      const mode = dark ? 'dark' : 'light';
+      await page.setViewportSize({ width, height: width === 390 ? 844 : 900 });
+      await theme(dark);
+      const assistant = page.getByTestId('assistant-button');
+      if (width === 390) await page.getByTestId('topbar-more').click();
+      await expect(assistant).toBeVisible();
+      const helpColour = await page.getByTestId('help-button').locator('ion-icon').evaluate(
+        (icon) => getComputedStyle(icon).color,
+      );
+      const assistantColour = await assistant.locator('ion-icon').evaluate((icon) => getComputedStyle(icon).color);
+      expect(helpColour).toBe(assistantColour);
+      if (width === 390) {
+        await page.keyboard.press('Escape');
+        await expect(page.getByTestId('topbar-more-menu')).toBeHidden();
+      }
+      await snapHeader(`header-${width}-${mode}`);
+    }
+  }
 });
 
 test('an aborted help request shows the error and retry loads the same window', async () => {

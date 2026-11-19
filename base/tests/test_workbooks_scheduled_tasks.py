@@ -1,8 +1,8 @@
 """No manual of an app tells that the scheduled tasks run on one fixed scope (hub#805, hub#626).
 
 Since the tenancy's cut (hub#602) the worker enters each business it serves, in its own database and on its own scope
-(``base.worker._serve_hub``), and ``settings.WORKER_SCOPE_SLUG`` only stays for ``base.scheduler.run_due`` without a
-scope, which is the suite's tests written before the tenancy. Whoever maintains an app, or reviews it against its
+(``base.hub_visits``), and ``settings.WORKER_SCOPE_SLUG`` only stays for ``base.scheduler.run_due`` without a
+scope, which only a test that runs the tasks directly calls. Whoever maintains an app, or reviews it against its
 WORKBOOK, starts from what its WORKBOOK and its README say; both languages are read, whatever the case, with the text's
 line breaks undone.
 """
@@ -23,7 +23,7 @@ FIXED_SCOPE = (
     "fixed scope",
     "over a single hub",
 )
-#: Flows says what the setting stays for: the tests written before the tenancy, and only them.
+#: Flows says what the setting stays for: the tests that run the tasks directly, and only them.
 SAYS_WHAT_IT_STAYS_FOR = {"apps/flow/WORKBOOK.md"}
 
 

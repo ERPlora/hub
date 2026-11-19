@@ -25,7 +25,8 @@ class Settings(UUIDModel):
     primary_color = models.CharField(
         _("primary colour"), max_length=7, default="#6366f1"
     )
-    logo_url = models.CharField(_("logo URL"), max_length=500, blank=True)
+    # The uploaded logo's file name (``apps.online_booking.logo``); empty = none.
+    logo = models.CharField(_("logo"), max_length=32, blank=True, default="", db_default="")
     # The mobile is always required: it is how the customer is recognised (Customers); the email is optional
     # unless the business asks for it (the market: Square, Timely, Mangomint).
     require_email = models.BooleanField(_("email required"), default=False)

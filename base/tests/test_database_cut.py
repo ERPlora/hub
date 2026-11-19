@@ -1,6 +1,6 @@
 """A business's Hub while the database is cut for a moment (BASE-F111).
 
-The whole chain of the Hub, against the real Postgres, as production runs it (``no_test_fallback``): ``pg_terminate_backend``
+The whole chain of the Hub, against the real Postgres, as production runs it: ``pg_terminate_backend``
 is the server cutting a connection right before a statement of the request, ``default_transaction_read_only`` the old
 writer refusing writes during a switchover. The piece itself, and what it never repeats, is tested in ``live``
 (``tests/test_database_cut.py``); here, that the Hub is wired to it, on control and on a business's own database: control's
@@ -42,7 +42,6 @@ from base.tenancy.tests import hubs
 from base.tests.test_internal import signed
 
 pytestmark = [
-    pytest.mark.usefixtures("no_test_fallback"),
     pytest.mark.django_db(databases=hubs.HUB_DATABASES, transaction=True),
 ]
 
@@ -591,6 +590,7 @@ def test_every_routed_command_declares_whether_a_cut_may_repeat_it():
         "kitchen.ticket.set_rush",
         "kitchen.ticket.start",
         "online_booking.public.book",
+        "online_booking.settings.upload_logo",
         "payment.payment.create",
         "sale.order.fire",
         "sale.sale.complete",
@@ -641,7 +641,7 @@ NOT_UNDONE_BY_A_ROLLBACK = {
     "apps.invoice.services._take_number": "numbers an invoice",
     "apps.kitchen.services.take_number": "numbers a kitchen ticket",
     "apps.payment.services._number": "numbers a payment",
-    "apps.sale.services._number": "numbers a sale",
+    "apps.sale.services.checkout._number": "numbers a sale",
     "apps.table.services._next_number": "numbers a table",
     "apps.task.services._next_number": "numbers a task",
     "base.images.keep_photo": "keeps a file under a new name",

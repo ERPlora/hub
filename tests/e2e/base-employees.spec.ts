@@ -106,10 +106,9 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
   test(`API keys and Approvals at ${width}`, async ({ browser }) => {
     const { context, page } = await signedIn(browser, viewport, '/employees#apikeys');
     const problems = await collectProblems(page);
-    // Hub `a` has its own database: its keys can be made, and the way to the
-    // documentation. None is made here: the business stays as the other specs find it.
+    // Its keys can be made, and the way to the documentation. None is made here: the business stays as the other
+    // specs find it.
     await expect(testid(page, 'api-keys-new')).toBeVisible();
-    await expect(testid(page, 'api-keys-unavailable')).toHaveCount(0);
     await expect(testid(page, 'api-keys-docs')).toHaveAttribute('href', '/api-docs');
     await snap(page, 'BASE-G146', width);
     await tab(page, 'approvals');
@@ -157,8 +156,6 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
     await testid(page, 'api-docs-open').click();
     await expect(page).toHaveURL(/\/api-docs$/);
     await expect(shown(page).locator('[data-testid="api-docs-section"]').first()).toBeVisible();
-    // `a` has its own database: its keys can be made, so no «coming soon» (a shared one says it: ApiDocsPage.test.ts).
-    await expect(testid(page, 'api-docs-keys-soon')).toHaveCount(0);
     const route = shown(page).locator('[data-testid="api-docs-route"]').first();
     await route.locator('summary').click();
     await expect(route).toHaveAttribute('open', '');

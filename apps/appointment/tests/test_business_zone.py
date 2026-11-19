@@ -6,7 +6,7 @@ import datetime as dt
 import pytest
 from live.operations import get
 
-from apps.flow.queries import words_for
+from apps.flow.queries.values import words_for
 from base import assistant
 
 from .conftest import A, HUB_DB, make_appointment, pin_clock, run

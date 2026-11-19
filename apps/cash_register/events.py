@@ -32,6 +32,10 @@ ALL = [
     COUNT_ADDED,
 ]
 
+#: The amounts its events bring (a session's balances and difference, a movement, a count), in cents of the
+#: business's currency: an automation says them as money in what a person reads.
+AMOUNTS = frozenset({"opening_balance", "expected_balance", "closing_balance", "difference", "amount", "total"})
+
 # The Sales app's events (its WORKBOOK fixes them): a charge, a void and a refund change the open shift.
 SALE_COMPLETED = "sale.sale.completed"
 SALE_VOIDED = "sale.sale.voided"

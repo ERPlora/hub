@@ -1,5 +1,5 @@
 // Fixtures of the kitchen app's frontend tests: what the server answers, as schemas.py shapes it.
-import type { Business } from '../../../../base/frontend/operations';
+import type { Business } from '../../../../base/frontend/operations/business';
 import type { BoardOut, ItemOut, LogOut, RouteOut, SettingsOut, StationOut, TicketOut, TicketRowOut } from '../operations';
 
 export const SETTINGS: SettingsOut = {

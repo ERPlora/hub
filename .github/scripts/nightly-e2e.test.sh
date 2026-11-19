@@ -205,7 +205,7 @@ run_script() {
   : > "$CALLS_LOG"
   : > "$BODIES_LOG"
   : > "$FAKE_PIDS"
-  env PATH="$root/bin:$PATH" HOME="$home" HUB_REPO="$hub_clone" ERPLORA_ROOT="$root/erplora" GH_REPO=ERPlora/hub \
+  env -u GITHUB_ACTIONS PATH="$root/bin:$PATH" HOME="$home" HUB_REPO="$hub_clone" ERPLORA_ROOT="$root/erplora" GH_REPO=ERPlora/hub \
     NIGHTLY_START_SECONDS=5 FAKE_E2E_EXIT=1 FAKE_RESULTS="$red_report" \
     ${settings[@]+"${settings[@]}"} bash "$here/nightly-e2e.sh" "$@"
 }
@@ -284,6 +284,12 @@ expect "and that log has what the night did" 1 "$(grep -lF 'Pruebas de navegador
 night FAKE_E2E_EXIT=0 FAKE_RESULTS="$green_report"
 expect "a green night ends green (0)" 0 "$status"
 expect "and writes no issue" 0 "$(gh_writes)"
+expect "out of a terminal and of GitHub Actions (launchd), what it did goes only to its log" 0 \
+  "$(grep -c 'night over: success' "$root/out" || true)"
+night GITHUB_ACTIONS=true FAKE_E2E_EXIT=0 FAKE_RESULTS="$green_report"
+expect "in GitHub Actions, what it did also goes to the job's log" 1 "$(grep -c 'night over: success' "$root/out" || true)"
+this_run="$(sed -n 's/.* nightly-e2e: night in \(.*\), Hub on .*/\1/p' "$root/out")"
+expect "and still to its own" 1 "$(grep -c 'night over: success' "${this_run:-none}/night.log" 2> /dev/null || true)"
 night FAKE_E2E_EXIT=0 FAKE_RESULTS="$green_report" \
   OPEN_ISSUES='[{"number": 9, "title": "Pruebas de navegador del Hub en rojo en la pasada nocturna"}]'
 expect "a green night with the issue open closes it" 1 "$(grep -c '^gh issue close 9 --reason completed' "$CALLS_LOG" || true)"

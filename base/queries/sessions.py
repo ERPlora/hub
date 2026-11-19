@@ -8,7 +8,7 @@ from live.operations import INTERNAL, operation
 
 from base import activation, entitlement, home
 from base.models import Hub, HubUser
-from base.schemas import SessionMeIn, SessionMeOut
+from base.schemas.sessions import SessionMeIn, SessionMeOut
 
 from .apps import _can_see
 from .people import hub_user_of, person_label

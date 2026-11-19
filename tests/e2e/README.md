@@ -24,6 +24,23 @@ tiene las cuentas de demo con las que entran las specs (abajo, «Varias ejecucio
 worker: `--workers=N` pisa el `workers: 1` de `playwright.config.ts`, y dos specs a la vez sobre la misma pila se
 borran los datos. Para correr en paralelo, otra pila (abajo, «Varias ejecuciones a la vez»).
 
+## Las ayudas compartidas
+
+Una spec importa cada ayuda del módulo que la lleva; ninguno reexporta lo de otro. `helpers.ts` sigue en la lista de
+tamaño (`.file-size-allow`) porque lleva todo lo que importan de él los ficheros de esa lista, que no pueden ganar ni
+una línea de import; lo que no importa ninguno de ellos está en los demás módulos:
+
+| Módulo | Qué lleva |
+|---|---|
+| `helpers.ts` | `api`, los hubs `A` y `B`, las cuentas `OWNER` y `EMPLOYEE`, `login` y las páginas que abre (`hostPage`, `signedInSpanish`), el SaaS por el que pasa el login y los pasos del viaje (`SAAS`, `SAAS_SIGN_IN`, `SAAS_CODE`, la carpeta de su correo, `runningTimeout`), la puerta de «Mis apps» (`MY_APPS_DOOR`, `topbarApps`), `collectProblems`, las carpetas `HUB_DIR` y `REPO_DIR`, la página a la vista (`shown`, `testid`, `appRow`), la espera de «nada se mueve» (`settled`, `untilStill`, `painted`), `scrolledTo`, las capturas (`capture`, `shot`, `record`), `horizontalOverflow`, las apps de la spec (`turnOn`, `turnOnMissing`, `turnOffTurnedOn`), `upgradeLandsInside`, el registro del negocio (`registrationOf`, `registerBusinessIn`), `psql` y los elementos de la demo que borran (`clearItems`, `uniqueName`) |
+| `business.ts` | el negocio de la spec, vaciado y devuelto: lo que trae una plantilla (`emptyOfTemplateData`), el plan de su foto (`dropPlanFromPhoto`, `restorePhotoFrom`) y quién ha entrado (`usernameOf`) |
+| `screen.ts` | más de la pantalla: el tamaño de la tableta alta, `iconStates`, `settledCapture` y `capturedFitting` |
+| `detectors.ts` | los dos detectores que corren en la página: qué se mueve (`movingInPage`) y si una captura repite su parte de arriba (`repeatedTop`) |
+| `demo-items.ts` | los elementos de la app de demo: crearlos y leerlos por la API, y la lista |
+| `dev-server.ts` | el `runserver` y su Vite: si contestan, quién escucha en un puerto y arrancarlo otra vez |
+| `topbar.ts` | la barra de arriba: «Mis apps», el asistente y `compactBar` |
+| `live-streams.ts` | los `/api/live` que abre una página, con `decodeSubs` |
+
 ## El login
 
 `login()` de `helpers.ts` hace el login de verdad: el hub manda al SaaS, el SaaS pide la cuenta y el código que
@@ -116,9 +133,9 @@ a la sentencia del hub.
 | Variable | Qué aísla | Quién la lee |
 |---|---|---|
 | `E2E_HUB_PORT` | puerto del `runserver` del Hub | las specs (`stack.ts`) |
-| `VITE_DEV_PORT` | puerto del Vite del Hub | `config/settings.py` (entorno o `.env`; `runserver` se la pasa a su Vite), `vite.config.ts` y specs (solo el entorno) |
-| `SAAS_URL` | el SaaS propio, donde va el login | `config/settings.py`, specs |
-| `DB_NAME` | la BD de control de la ejecución (y, por su nombre, las de sus hubs: `<DB_NAME>_<hex>`) | `config/settings.py`, specs (`psql()`) |
+| `VITE_DEV_PORT` | puerto del Vite del Hub | `config/settings/core.py` (entorno o `.env`; `runserver` se la pasa a su Vite), `vite.config.ts` y specs (solo el entorno) |
+| `SAAS_URL` | el SaaS propio, donde va el login | `config/settings/saas_contract.py`, specs |
+| `DB_NAME` | la BD de control de la ejecución (y, por su nombre, las de sus hubs: `<DB_NAME>_<hex>`) | `config/settings/backends.py`, specs (`psql()`) |
 | `E2E_MAIL_DIR` | la carpeta de correo del SaaS propio (código de acceso) | specs (`mail.ts`) |
 | `E2E_SAAS_DB` | la BD del SaaS propio, si no es `saas_e2e_<Hub+1>` (con el Hub en `:8000`, `saas`) | `global-setup.ts` y las specs que la leen (`stack.ts`) |
 
@@ -154,7 +171,7 @@ Reglas que el e2e hace cumplir:
   llevó unos 3, hub#759).
 - Los negocios de la pila van con los límites de Gratis (una transacción a la vez, `base.tenancy.limits`): con la máquina
   cargada, la página que una spec acaba de abrir puede ocupar ese hueco más de lo que espera el servidor, y el Hub contesta
-  503 `base.hub_busy` a la preparación que viene detrás. Ese 503 no ejecutó nada, así que `api` (`hub-api.ts`, el camino de
+  503 `base.hub_busy` a la preparación que viene detrás. Ese 503 no ejecutó nada, así que `api` (`helpers.ts`, el camino de
   todos los ayudantes al API del Hub: `turnOn`, `manualFlow`, `createProduct`, los `post` de las specs…) repite la misma
   petición tras el `Retry-After` del servidor (1 s), hasta 6 intentos, y deja una línea por intento en la salida; si sigue
   ocupado, falla con `HubStillBusy` diciendo la ruta, los intentos y la respuesta. Cualquier otra respuesta, también otro
@@ -175,13 +192,13 @@ Lo que no puede comprobar el e2e, y lo pide la receta:
   `E2E_SAAS_PORT=<Hub+1>`), con `env -u DB_NAME` al crearla y `DB_NAME=saas_e2e_<Hub+1>` en su `runserver`: la `saas` del
   `.env` es de la pila compartida y puede ir atrasada de migraciones (su login cae con un 500), y con el `DB_NAME` del Hub
   exportado el SaaS abre la BD del Hub (su login cae con `relation "django_site" does not exist`).
-- **Sus límites por dirección subidos** (`E2E_RELAX_LOGIN_RATE_LIMIT=True` en su `runserver`; `config/settings.py` del
+- **Sus límites por dirección subidos** (`E2E_RELAX_LOGIN_RATE_LIMIT=True` en su `runserver`; `config/settings/accounts.py` del
   SaaS, solo con `DEBUG`): todas las specs entran y se dan de alta desde `127.0.0.1`, y sin la marca una pasada entera
   cae con «429 · Too many attempts» en el login o en la 11.ª alta de la hora (10 por hora y dirección). Cada cuenta
   conserva su propio límite, y el freno de saltos al hub (`HUB_LOGIN_RATELIMIT`, arriba) no cambia. El e2e no lo puede
   comprobar: la marca vive en el entorno del proceso del SaaS, el SaaS no la dice por ninguna ruta y probarla gastaría
   los intentos que protege. Con ella va **`DEMO_SPAWN_RATELIMIT=100/h`**, el tope de demos nuevas por dirección, que
-  la marca no toca: el SaaS deja 3 por hora (`config/settings.py` del SaaS; producción se queda así) y cada pasada de
+  la marca no toca: el SaaS deja 3 por hora (`config/settings/public.py` del SaaS; producción se queda así) y cada pasada de
   `demo.spec.ts` abre dos desde `127.0.0.1`, así que la segunda pasada de la hora se quedaba esperando la demo y caía
   con la espera agotada (hub#1048). Sin Valkey, la cuenta vive en la memoria de ese `runserver` y solo se borra al
   reiniciarlo. Si falta, `demo.spec.ts` cae diciendo `state=throttled` y esta variable; `demo-door.test.ts` exige que
@@ -312,11 +329,14 @@ CI=1 pnpm e2e tests/e2e/demo.spec.ts   # con las variables de la receta exportad
 Cada ejecución crea dos demos en la BD de la pila y las deja purgadas (lápidas `DEMO_TOMBSTONE_DAYS`); no gasta el
 tope de demos vivas (`MAX_CONCURRENT_DEMOS`).
 
-## El asistente (`base-assistant.spec.ts`)
+## El asistente (`base-assistant.spec.ts` y `base-assistant-card*.spec.ts`)
 
-Prueba el asistente del Hub (BASE-F92…F106) con sus dependencias de verdad: el Hub de la pila, la pasarela del SaaS de
-la pila (`/internal/assistant/*` y `/internal/speech/transcribe`) y, detrás, el proveedor falso
-`tests/e2e/assistant-provider.ts`, un servidor HTTP en 127.0.0.1 que habla la API de OpenAI y que la propia spec
+Prueban el asistente del Hub (BASE-F92…F106) en cuatro specs, por tema: el panel (`base-assistant.spec.ts`), la tarjeta
+de una escritura (`base-assistant-card.spec.ts`), cómo dice cada dato (`base-assistant-card-values.spec.ts`) y cómo
+nombra los registros (`base-assistant-card-records.spec.ts`). Lo que comparten, los ganchos de cada spec (`panelSpec`) y
+cómo se maneja el panel y su tarjeta, está en `assistant-panel.ts`. Corren con sus dependencias de verdad: el Hub de la
+pila, la pasarela del SaaS de la pila (`/internal/assistant/*` y `/internal/speech/transcribe`) y, detrás, el proveedor
+falso `tests/e2e/assistant-provider.ts`, un servidor HTTP en 127.0.0.1 que habla la API de OpenAI y que cada spec
 arranca en `E2E_AI_PROVIDER_PORT` (por defecto, el puerto del Hub + 2). Ningún test llega a un proveedor real ni
 escribe una clave real. Responde en el idioma que pide el mensaje de sistema del Hub («Answer in English» o «Answer in
 Spanish»: el de la persona o, en una automatización, el de quien la guardó), como un modelo de verdad; sin él, en inglés.
@@ -326,12 +346,12 @@ al SaaS de la pila:
 
 - **La BD del SaaS sembrada con ese proveedor**, desde su worktree y antes de la primera ejecución:
   `env DB_NAME=saas_e2e_<Hub+1> uv run python tests/e2e/panel/assistant_seed.py gateway http://127.0.0.1:<Hub+2>/v1`
-  (además de la siembra de la receta de arriba, como el resto de specs). La spec lo comprueba al arrancar y, si falta,
+  (además de la siembra de la receta de arriba, como el resto de specs). Cada spec lo comprueba al arrancar y, si falta,
   cae con «not seeded with this provider».
 - **`ASSISTANT_SERVICE_PROVIDER=e2e-local`** en el `runserver` del SaaS (con el resto de variables de la receta de
   arriba, también `E2E_RELAX_LOGIN_RATE_LIMIT=True`): sin ella el dictado responde 503.
 - **`E2E_SAAS_DB`** (la de la tabla de arriba), si la BD del SaaS no es `saas_e2e_<Hub+1>` (con el Hub en :8000, `saas`):
-  la spec fija en ella los mensajes del mes del negocio `a` antes de cada test, así que nunca gasta el cupo del plan.
+  cada spec fija en ella los mensajes del mes del negocio `a` antes de cada test, así que nunca gasta el cupo del plan.
 
 ```bash
 # El SaaS de la pila (8871), desde su worktree:
@@ -340,8 +360,9 @@ env DB_NAME=saas_e2e_8871 VITE_DEV_PORT=6071 ASSISTANT_SERVICE_PROVIDER=e2e-loca
   HUB_ADMIN_CALLBACK_URL='http://hubs.localhost:8870/auth/callback' HUB_INTERNAL_URL=http://localhost:8870 \
   EMAIL_FILE_PATH="$PWD/.mail-8871" E2E_RELAX_LOGIN_RATE_LIMIT=True DEMO_SPAWN_RATELIMIT=100/h \
   uv run python manage.py runserver 127.0.0.1:8871
-# La spec, con las variables de «Varias ejecuciones a la vez» exportadas (Hub en 8870):
-CI=1 pnpm e2e tests/e2e/base-assistant.spec.ts --workers=1
+# Las specs, con las variables de «Varias ejecuciones a la vez» exportadas (Hub en 8870):
+CI=1 pnpm e2e tests/e2e/base-assistant.spec.ts tests/e2e/base-assistant-card.spec.ts \
+  tests/e2e/base-assistant-card-values.spec.ts tests/e2e/base-assistant-card-records.spec.ts --workers=1
 ```
 
 La cuenta del e2e está en inglés: la spec comprueba las cadenas `en`.
@@ -584,7 +605,7 @@ profundidad, pide las animaciones por su cuenta (`getAnimations`) más veces de 
 (las esperas propias que quedaban al llegar el guardarraíl), y un fichero nuevo no lo hace ninguna: «nada se mueve» se
 espera con `settled(page)` o `untilStill(page)`, que miran también los shadow roots. Cuenta toda referencia en el código,
 sin los comentarios: la llamada, guardada con otro nombre (`const a = document.getAnimations`), entre corchetes
-(`document['getAnimations']()`) o dentro de una cadena que va a `page.evaluate`. Solo `helpers.ts` (el detector) y las dos
+(`document['getAnimations']()`) o dentro de una cadena que va a `page.evaluate`. Solo `detectors.ts` (el detector) y las dos
 specs que lo miden desde fuera (`settled.spec.ts` y `helpers-capture.spec.ts`) tienen su número fijo en el propio test.
 Al retirar una copia, baja su número en el JSON (o quita su línea). Los `<app>-wait.test.ts` (Ventas, Cocina, Menús,
 Modificadores, Tareas) siguen: prohíben además, en los ficheros de su app, las esperas fijas y los recuentos propios.

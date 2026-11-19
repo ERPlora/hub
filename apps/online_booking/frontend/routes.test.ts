@@ -1,6 +1,7 @@
 // The online booking app's `routes.ts`: routes → pages and nothing else (main.ts reads the default export).
-// The old module's two sections (Bookings, Settings: apps.py `navigation`) and, on the dev server only, the
-// preview of the public booking page.
+// The old module's two sections (Bookings, Settings: apps.py `navigation`), the booking page base's public door serves
+// without a session (`/p/<slug>/book`, and `/p/<slug>/book/<token>` for a customer's personal link) and, on the dev
+// server only, its preview.
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -16,6 +17,7 @@ import routes from './routes';
 vi.mock('./pages/BookingsPage.vue', () => ({ default: { name: 'BookingsPage' } }));
 vi.mock('./pages/SettingsPage.vue', () => ({ default: { name: 'SettingsPage' } }));
 vi.mock('./pages/PreviewPage.vue', () => ({ default: { name: 'PreviewPage' } }));
+vi.mock('./pages/PublicBookingPage.vue', () => ({ default: { name: 'PublicBookingPage' } }));
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const SOURCE = readFileSync(join(HERE, 'routes.ts'), 'utf8');
@@ -33,12 +35,25 @@ async function load(r: RouteRecordRaw): Promise<RouteComponent> {
 }
 
 describe('online booking routes.ts', () => {
-  it('maps the inbox and the settings behind a session (and the preview in dev)', () => {
+  it('maps the inbox and the settings behind a session, the public page without one (and the preview in dev)', () => {
     expect(routes.map((r) => [r.path, r.meta?.auth])).toEqual([
       ['/online_booking/bookings', true],
       ['/online_booking/settings', true],
+      ['/p/:slug/book', false],
+      ['/p/:slug/book/:token', false],
       ['/online_booking/preview', true],
     ]);
+  });
+
+  it('paints the public page without the shell\'s menus: a customer is no member of the team', () => {
+    expect(route('/p/:slug/book').meta?.chrome).toBe(false);
+    expect(route('/p/:slug/book/:token').meta?.chrome).toBe(false);
+  });
+
+  it('serves the public page on the path base names for it (apps.py `public_pages`)', () => {
+    const [, page] = /public_pages = \{"([^"]+)"/.exec(APPS_PY) ?? [];
+    expect(route('/p/:slug/book').path).toBe(`/p/:slug/${page}`);
+    expect(route('/p/:slug/book/:token').path).toBe(`/p/:slug/${page}/:token`);
   });
 
   it('every menu entry of apps.py has its page', () => {
@@ -56,6 +71,8 @@ describe('online booking routes.ts', () => {
     expect(await load(route('/online_booking/bookings'))).toEqual({ name: 'BookingsPage' });
     expect(await load(route('/online_booking/settings'))).toEqual({ name: 'SettingsPage' });
     expect(await load(route('/online_booking/preview'))).toEqual({ name: 'PreviewPage' });
+    expect(await load(route('/p/:slug/book'))).toEqual({ name: 'PublicBookingPage' });
+    expect(await load(route('/p/:slug/book/:token'))).toEqual({ name: 'PublicBookingPage' });
   });
 
   it('imports types only at the top, so main.ts can glob it before the shell boots', () => {

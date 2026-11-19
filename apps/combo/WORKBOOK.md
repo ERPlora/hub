@@ -779,9 +779,9 @@ vende, y si Menús no está activo el TPV no ofrece menús.
   `modifier.option`). `tests/test_assistant_asks.py` mide con las frases reales de la QA de la capa 2
   (`tests/e2e/qa/probes/*-es-combo-*.json` y las de preparar la venta), nunca con los propios `asks`, y con una frase
   propia por herramienta que solo la trae con sus asks; el empleado no recibe ninguna escritura. Trampas medidas:
-  «ordena» y «orden» tienen la raíz de «ordenador» y nombran también los dispositivos (ERPlora/live#61), «ejecutivo»
-  la de «ejecución» (Automatizaciones), «paso» es la palabra de los pasos de una automatización y «del día», «euros» o
-  «café» en los asks suben las herramientas de Menús en las peticiones de Ventas e Inventario que lo dicen.
+  «ejecutivo» tiene la raíz de «ejecución» (Automatizaciones), «paso» es la palabra de los pasos de una automatización
+  y «del día», «euros» o «café» en los asks suben las herramientas de Menús en las peticiones de Ventas e Inventario
+  que lo dicen. «ordena» y «orden» ya no nombran los dispositivos: «ordenador» tiene raíz propia en `live`.
 - **Tarjeta de confirmación del asistente** (BASE-F97, hub#669): nombra el registro que una escritura señala por su
   id con las marcas `refers` de `schemas.py`, leídas como quien pregunta: el menú por su `name` con
   `combo.combo.get` (`A_MENU`: el `id` de `ComboRefIn` y el `combo_id` de `_ComboOfIn`), el plato por su `name` con
@@ -803,7 +803,7 @@ vende, y si Menús no está activo el TPV no ofrece menús.
   plato o una elección por su id o por su nombre dentro del menú declaran el `check` de su propio registro
   (`combo.group.update` y `combo.group.delete`, `combo.group.get`; `combo.option.update` y `combo.option.delete`,
   `combo.option.get`; el del menú leería el id del plato como el de un menú; hub#1231). Todo dato dicho por su nombre
-  lleva su marca leída por ese nombre, con `as_said` (`base.schemas.names`, hub#1245): el `combo` de `_ComboOfIn`
+  lleva su marca leída por ese nombre, con `as_said` (`base.schemas.assistant.names`, hub#1245): el `combo` de `_ComboOfIn`
   (`A_MENU_BY_NAME`), el `group` con su menú (`A_COURSE_BY_NAME`, `within` `combo_id` y `combo`), el `product` de una
   elección con su menú y su plato (`A_CHOICE_BY_NAME`) y el producto de Inventario (`A_PRODUCT_BY_NAME`: el `product`
   de `OptionIn` y el `new_product`), nunca con el `id` de la escritura, que es su propio registro. Lo que no se puede
@@ -813,7 +813,7 @@ vende, y si Menús no está activo el TPV no ofrece menús.
   `test_every_write_that_takes_a_menu_or_a_course_by_its_name_reads_it_and_says_it_as_said_when_it_cannot` y
   `test_a_choice_is_read_by_its_product_with_its_menu_and_its_course_and_a_product_of_inventory_by_its_name`). Cada
   dato dicho por su nombre se deja sin leer junto al id con que la escritura toma su registro en su lugar
-  (`base.schemas.unless_given`, hub#1250): el suyo y el del registro que lo contiene (el menú de un plato es el del
+  (`base.schemas.assistant.unless_given`, hub#1250): el suyo y el del registro que lo contiene (el menú de un plato es el del
   plato). La lista exacta de cada escritura, en `UNLESS` de `tests/test_assistant_yes_for_its_card.py`. Igual con los
   ids que la escritura no mira porque llega el de su registro (hub#1278): el `combo_id` de `GroupRefIn` junto al `id`
   del plato, el de `_GroupOfIn` junto a `group_id`, y en `OptionRefIn` el `combo_id` junto a `id` o `group_id` y el
@@ -824,8 +824,7 @@ vende, y si Menús no está activo el TPV no ofrece menús.
   modelo.
 - El admin de Django del Hub tiene **CRUD completo** sobre los tres modelos (PLAN §17); una
   escritura cruda del admin no deja aviso.
-- Tenencia: el ámbito es la primera parte del Host y cada negocio tiene su propia BD: los datos de `a` no se ven en `b`. Solo los tests escritos antes de la tenencia guardan `a` y `b`
-  en la misma BD de test (`base/tenancy/tests/legacy.py`).
+- Tenencia: el ámbito es la primera parte del Host y cada negocio tiene su propia BD: los datos de `a` no se ven en `b`.
 - En el navegador: `tests/e2e/combo-menus.spec.ts` (oculto, con Inventario e Impuestos de verdad), que
   borra lo suyo (`E2E Combo …`, `E2E-CMB-…`) antes y después, y `tests/e2e/combo-till.spec.ts` (el TPV de
   Ventas, Cocina e Inventario de verdad y un paso del relay: COMBO-F07–F11), que borra `e2e Combo …` y

@@ -10,6 +10,8 @@ a business already with its own database is left alone, and a cut that broke is 
 
 These tests make real databases next to the session's (``base/tenancy/tests/hubs.py``) and read control's tables of the
 hubs' apps from another connection, so they write committed rows (no test case; ``django_db_blocker``) and clean up.
+Those tables are made first, as control held them before the cut (``base/tenancy/tests/before_the_cut.py``), and their
+rows written on control's database by name.
 """
 
 import datetime as dt
@@ -32,12 +34,12 @@ from base.tenancy import connections as tenancy_connections
 from base.tenancy import cut, identity, names
 from base.tenancy.context import use_control, use_hub
 from base.tenancy.tests import hubs
-from base.tenancy.tests.legacy import use_legacy
+from base.tenancy.tests.before_the_cut import drop_hub_tables, make_hub_tables
 from base.tenancy.tests.s3 import aws_test_credentials, body, dumps_bucket, moto_s3, no_dumps_bucket, objects  # noqa: F401
 from control.models import Hub
 
-pytestmark = pytest.mark.usefixtures("no_test_fallback")
-
+#: Where a business kept its rows before the cut: control's database, named.
+CONTROL = "default"
 ALICE = uuid.UUID("01a17000-0000-7000-8000-0000000000a1")
 PRINTER = {"kind": Printer.Kind.NETWORK, "address": "10.0.0.9", "port": 9100, "usage": Usage.choices[0][0]}
 
@@ -89,28 +91,26 @@ def phase_one(django_db_blocker, hub_databases):
     def rows_of(slug: str) -> SimpleNamespace:
         """A printer reached by a device (a many-to-many row with a serial key), a person, the apps' rows and two
         events: one of ``slug`` and one of another business; all in control's tables, as before the cut."""
-        with use_legacy():
-            printer = Printer.objects.create(name=f"Bar {slug}", **PRINTER)
-            device = PrintDevice.objects.create(name=f"Till {slug}")
-            device.printers.add(printer)
-            person = HubUser.objects.create(username=f"saas:{uuid.uuid7()}", name="Bob", account_id=uuid.uuid7())
-            AppActivation.objects.create(host=slug, app="printing", state="on", chosen=True)
-            own = OutboxEvent.objects.create(scope_kind="host", scope_key=slug, name="printing.printer.created")
-            delivery = EventDelivery.objects.create(event=own, app_label="flow", next_attempt_at=timezone.now())
-            other = OutboxEvent.objects.create(
-                scope_kind="host", scope_key="elsewhere", name="printing.printer.created"
-            )
+        printer = Printer.objects.using(CONTROL).create(name=f"Bar {slug}", **PRINTER)
+        device = PrintDevice.objects.using(CONTROL).create(name=f"Till {slug}")
+        device.printers.add(printer)
+        person = HubUser.objects.using(CONTROL).create(username=f"saas:{uuid.uuid7()}", name="Bob", account_id=uuid.uuid7())
+        AppActivation.objects.using(CONTROL).create(host=slug, app="printing", state="on", chosen=True)
+        own = OutboxEvent.objects.using(CONTROL).create(scope_kind="host", scope_key=slug, name="printing.printer.created")
+        delivery = EventDelivery.objects.using(CONTROL).create(event=own, app_label="flow", next_attempt_at=timezone.now())
+        other = OutboxEvent.objects.using(CONTROL).create(
+            scope_kind="host", scope_key="elsewhere", name="printing.printer.created"
+        )
         return SimpleNamespace(printer=printer, device=device, person=person, own=own, delivery=delivery, other=other)
 
     with django_db_blocker.unblock():
+        drop_hub_tables()
+        make_hub_tables()
         yield SimpleNamespace(business=business, rows_of=rows_of)
         with hubs._maintenance() as conn:
             for row in made:
                 hubs._drop(conn, names.hub_db_name(control, row.id), control)
-        with use_legacy():
-            OutboxEvent.objects.filter(created_at__gte=started).delete()
-            for model in (AppActivation, HubUser, PrintDevice, Printer):
-                model.objects.all().delete()
+        drop_hub_tables()
         Hub.objects.filter(pk__in=[row.pk for row in made]).delete()
         with use_control():
             OutboxEvent.objects.filter(created_at__gte=started).delete()
@@ -265,13 +265,10 @@ def test_control_s_rows_are_copied_only_once_into_one_business(phase_one):
 
 
 @pytest.fixture
-def hubs_tables_renamed(phase_one, settings):
+def hubs_tables_renamed(phase_one):
     """Control's tables of the hubs' apps renamed, committed (the cut reads them from another connection), as
     ``control/0007`` leaves them with production's routers; their names back after the test, before ``phase_one`` cleans
     its rows up."""
-    settings.DATABASE_ROUTERS = [
-        router for router in settings.DATABASE_ROUTERS if router != "base.tenancy.tests.legacy.LegacyTablesRouter"
-    ]
     migration = importlib.import_module("control.migrations.0007_hub_tables_renamed_shared")
     pairs = [(table, f"{table}{migration.SUFFIX}") for table in migration.left_behind("default")]
     assert pairs
@@ -446,7 +443,7 @@ def test_a_cut_s_last_step_refuses_a_business_that_got_its_database_meanwhile(ph
     from live.operations import get
 
     from base import registry
-    from base.schemas import HubCutFinishIn
+    from base.schemas.hub_registry import HubCutFinishIn
 
     hub = phase_one.business("raced")
     made = names.hub_db_name(tenancy_connections.control_name(), hub.id)
@@ -492,7 +489,7 @@ def test_the_last_step_of_a_second_copy_all_is_refused_even_when_two_runs_raced(
     from live.operations import get
 
     from base import registry
-    from base.schemas import HubCutFinishIn
+    from base.schemas.hub_registry import HubCutFinishIn
 
     first, second = phase_one.business("first"), phase_one.business("second")
     run("--copy-all", first.slug, "--no-dump")
@@ -527,16 +524,18 @@ def test_without_a_cluster_with_room_the_cut_says_so_and_makes_nothing(phase_one
     assert fresh(aurora).db_name == "" and databases() == before
 
 
-def test_only_the_platform_finishes_a_cut(phase_one):
+@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
+def test_only_the_platform_finishes_a_cut(hub_a):
     from live.context import OperationContext, Scope
     from live.errors import PermissionDenied
     from live.operations import get
 
-    from base.schemas import HubCutFinishIn
+    from base.schemas.hub_registry import HubCutFinishIn
 
-    hub = phase_one.business("asked")
-    owner = OperationContext(scope=Scope("host", hub.slug), actor="saas:1", permissions=frozenset({"*"}), language="en")
-    with use_legacy(), pytest.raises(PermissionDenied):
+    hub = Hub.objects.create(slug="asked", status=Hub.Status.READY, db_name="")
+    # Whoever runs a business, inside it (its assistant, an API key of theirs): never the platform.
+    owner = OperationContext(scope=Scope("host", hub_a.slug), actor="saas:1", permissions=frozenset({"*"}), language="en")
+    with use_hub(hub_a), pytest.raises(PermissionDenied):
         get("base.hub.cut_finish")(
             owner, HubCutFinishIn(id=hub.id, mode=cut.RECREATE, database="x", schema_apps={}, copied={}, dump="")
         )
@@ -547,7 +546,7 @@ def test_only_the_platform_finishes_a_cut(phase_one):
 
 
 def finish_input(hub: Hub, mode: str = cut.RECREATE):
-    from base.schemas import HubCutFinishIn
+    from base.schemas.hub_registry import HubCutFinishIn
 
     made = names.hub_db_name(tenancy_connections.control_name(), hub.id)
     return HubCutFinishIn(id=hub.id, mode=mode, database=made, schema_apps={}, copied={}, dump="")
@@ -760,13 +759,8 @@ def test_the_dry_run_warns_of_the_platform_s_fiscal_rows_a_copy_all_would_take(p
     from apps.invoice.models import Issuer
 
     aurora = phase_one.business("aurora")
-    with use_legacy():
-        Issuer.objects.create(legal_name="ERPLORA CLOUD SL", tax_id="B12345674", address="Avda. de Lisboa, 17")
-    try:
-        said = run("--dry-run", "--copy-all", aurora.slug)
-    finally:
-        with use_legacy():
-            Issuer.objects.all().delete()
+    Issuer.objects.using(CONTROL).create(legal_name="ERPLORA CLOUD SL", tax_id="B12345674", address="Avda. de Lisboa, 17")
+    said = run("--dry-run", "--copy-all", aurora.slug)
 
     assert "Warning: control holds fiscal rows" in said
     assert "issuer ERPLORA CLOUD SL (B12345674)" in said and "VeriFactu records: 0" in said

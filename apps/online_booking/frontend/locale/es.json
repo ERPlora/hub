@@ -82,7 +82,7 @@
         "page_title": "Título de la página",
         "welcome_message": "Mensaje de bienvenida",
         "primary_color": "Color primario",
-        "logo_url": "URL del logo",
+        "logo": "Logo",
         "require_email": "Email obligatorio",
         "max_upcoming_per_customer": "Reservas próximas por móvil",
         "allow_staff_selection": "Permitir elegir profesional",
@@ -133,6 +133,21 @@
       "again": "Reservar otra",
       "policy": "Política de cancelación",
       "minutes": "{n} min"
+    },
+    "door": {
+      "title": "Reserva online",
+      "intro": "Elige tus servicios, un día y una hora libre, y deja tu nombre y tu móvil.",
+      "noServices": "Este negocio no tiene nada para reservar online ahora mismo.",
+      "logoAlt": "Logo de {business}",
+      "businessFallback": "este negocio",
+      "privacy": "Tus datos los usará {business} para gestionar esta reserva, y ERPlora los tratará por encargo de {business}. Lee la",
+      "privacyLink": "política de privacidad",
+      "website": "Sitio web",
+      "loadingBooking": "Cargando tu reserva…",
+      "cancelled": "Esta reserva está cancelada.",
+      "cancel": {
+        "message": "¿Cancelar la reserva {number} ({when})?"
+      }
     }
   }
 }

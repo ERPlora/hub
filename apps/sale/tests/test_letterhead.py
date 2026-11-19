@@ -121,7 +121,7 @@ def test_whoever_can_see_the_sales_reads_it_even_without_rights_over_invoicing(c
 
 
 def test_without_invoicing_the_paper_goes_with_the_header(monkeypatch):
-    monkeypatch.setattr("apps.sale.queries.ISSUER", "invoice.issuer.not_installed")
+    monkeypatch.setattr("apps.sale.queries.letterhead.ISSUER", "invoice.issuer.not_installed")
     run("invoice.issuer.update", ISSUER)
     run("sale.settings.update", {"receipt_header": "Bar Ana"})
     assert identity() == ("Bar Ana", "", [])
@@ -140,7 +140,6 @@ def test_with_invoicing_off_the_paper_goes_with_the_header(monkeypatch):
 
 
 @pytest.mark.django_db(databases=hubs.HUB_DATABASES)
-@pytest.mark.usefixtures("no_test_fallback")
 def test_one_business_never_prints_the_issuer_of_another(hub_a, hub_b):
     """Each business in its own database, as production: the issuer written in A does not head B's paper."""
     in_a, in_b = ctx_for(scope=Scope("host", hub_a.slug)), ctx_for(scope=Scope("host", hub_b.slug))

@@ -23,7 +23,7 @@ def test_the_factory_settings_keep_the_page_off_and_ask_only_for_the_mobile():
     assert settings.page_title == ""
     assert settings.welcome_message == ""
     assert settings.primary_color == "#6366f1"
-    assert settings.logo_url == ""
+    assert settings.logo == ""
     assert settings.require_email is False
     assert settings.max_upcoming_per_customer == 3
     assert settings.allow_staff_selection is True

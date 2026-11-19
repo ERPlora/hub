@@ -38,9 +38,9 @@ _sends_amount = shared.sends_amount
 #: The mark of the datum that names the currency of the amounts beside it, at any depth below it: a payment in dollars.
 #: ``True`` on a text, an ISO 4217 code; on a datum that names a record in a currency of its own (a cart, a price list),
 #: the read of its app that answers it — ``{"read": "<a query>", "by": "<its input>", "code": "<the datum of its
-#: answer that gives the currency>"}`` (``base.schemas.in_currency_of``) —, run as the person, as a record's name
-#: (``REFERS``). Without one, or empty, the business's. As Stripe, Square or Shopify show an amount: in the currency of
-#: its operation, with that currency's decimals. ``base.E011`` checks it at start.
+#: answer that gives the currency>"}`` (``base.schemas.assistant.in_currency_of``) —, run as the person, as a record's
+#: name (``REFERS``). Without one, or empty, the business's. As Stripe, Square or Shopify show an amount: in the currency
+#: of its operation, with that currency's decimals. ``base.E011`` checks it at start.
 CURRENCY = "currency"
 
 
@@ -284,6 +284,7 @@ BASE_SCREENS = {
     "person": "employees",
     "plan": "system",
     "profile": "profile",
+    "release_note": "system",
     "role": "employees",
     "setup": "home",
     "support": "report",

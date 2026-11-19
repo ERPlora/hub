@@ -15,7 +15,7 @@ vi.mock('@ionic/vue', async (importOriginal) => ({
   },
 }));
 
-import type { DeviceNoticeRow } from '../operations';
+import type { DeviceNoticeRow } from '../operations/home';
 import { flush, memoryStorage, mountBase } from '../__tests__/mount-base';
 import DeviceNotices from './DeviceNotices.vue';
 

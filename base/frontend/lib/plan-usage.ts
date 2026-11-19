@@ -17,7 +17,7 @@
 //   a business on its first day has no files measured, and an app with no number never will.
 //
 // The bell's row tells the same from the server, without what waits on erplora.com (`base.queries._plan_motives`).
-import type { AssistantUsage, PlanMeter, PlanUsage } from '../operations';
+import type { AssistantUsage, PlanMeter, PlanUsage } from '../operations/usage';
 
 /** From here on what a plan includes is close to its limit: the server's `base.queries.NEAR_PERCENT`. */
 export const NEAR_PERCENT = 80;

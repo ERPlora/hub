@@ -270,7 +270,7 @@ class TestThePlanSaysTheDevicesInUse:
         Hub.objects.filter(pk=hub_a.pk).update(state={"plan": {"max_users": 5, "max_devices": 3}})
 
     def devices(self, slug=A):
-        from base.schemas import PlanUsageIn
+        from base.schemas.usage import PlanUsageIn
 
         ctx = OperationContext(
             scope=Scope("host", slug), actor="ana", permissions=frozenset({"base.administer_hub"}), language="en"

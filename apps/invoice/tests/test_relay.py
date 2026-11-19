@@ -33,8 +33,6 @@ def tick(monkeypatch, factory_data):
     own database as a fresh process would (no hub served yet), without releasing control's connection."""
     monkeypatch.setattr(catalog, "register_apps", lambda: REGISTERED)
     monkeypatch.setattr(BaseDatabaseWrapper, "close_if_unusable_or_obsolete", lambda self: None)
-    monkeypatch.setattr(worker, "_synced", set())
-    monkeypatch.setattr(worker, "_next_hub", None)
 
     def once(at: dt.datetime) -> None:
         stop = threading.Event()

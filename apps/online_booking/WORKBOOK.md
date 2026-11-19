@@ -48,7 +48,8 @@ del negocio.
 3. En **Personal** y **Horarios**, lo mismo que pide la agenda: profesionales reservables, su horario y el
    del negocio. La página ofrece solo las horas que la agenda daría a la clienta.
 4. Abre **Reservas online → Ajustes**, enciende **Página pública activada** y pulsa **Guardar**. Mientras
-   está apagada, la página dice que el negocio no acepta reservas online.
+   está apagada, la página dice que el negocio no acepta reservas online. La dirección que se da a las clientas
+   es `https://<negocio>.erplora.com/p/<negocio>/book`.
 5. Todas las horas son las del **reloj del negocio**, en su zona horaria.
 
 ## Pantallas
@@ -73,9 +74,10 @@ coincide con la búsqueda.»). Se refresca sola cuando cambia una cita online en
 Título «Configuración de la página de reservas». Tres bloques y un botón **Guardar**:
 
 - **Página pública**: «Página pública activada», «Título de la página», «Mensaje de bienvenida», «Color
-  primario» (`#RRGGBB`), «URL del logo», «Email obligatorio», «Reservas próximas por móvil» (1 a 50),
-  «Permitir elegir profesional», «Permitir notas», «Mensaje de confirmación» y «Política de cancelación»
-  (el texto que lee la clienta).
+  primario» (`#RRGGBB`), «Logo» (una imagen JPG, PNG o WebP que se sube con **Elegir imagen**, se cambia con
+  **Cambiar imagen** y se retira con **Quitar**), «Email obligatorio», «Reservas próximas por móvil» (1 a 50), «Permitir elegir
+  profesional», «Permitir notas», «Mensaje de confirmación» y «Política de cancelación» (el texto que lee la
+  clienta).
 - **Reglas de reserva** (son las de Citas, compartidas con WhatsApp): «Antelación mínima para reservar
   (minutos)», «Reservar como máximo con esta antelación (días)» (0 = sin límite), «Intervalo entre huecos
   (minutos)», «Confirmar automáticamente las reservas de la clienta», «Permitir que la clienta cancele su
@@ -86,18 +88,32 @@ Título «Configuración de la página de reservas». Tres bloques y un botón *
 
 Al guardar: «Configuración guardada.»; un rechazo sale debajo de su campo («No se pudo guardar»).
 
+### Página de reservas (la clienta, sin sesión)
+Página `/p/<negocio>/book` en la dirección del negocio: la abre cualquiera, sin iniciar sesión ni ver nada del equipo
+(sin su menú). Arriba, el nombre del negocio, su logo (el que se sube en Ajustes, servido desde la dirección del
+propio negocio; sin logo, solo el nombre) y su color. También «Reserva online» y «Elige tus servicios, un día y una hora
+libre, y deja tu nombre y tu móvil.»; debajo, el título y el mensaje de bienvenida de los Ajustes y el recorrido:
+servicios con su precio y su duración, profesional o «Sin preferencia», día, horas libres, nombre, móvil, email,
+nota y **Reservar**. Junto a **Reservar**, el aviso de quién usa sus datos y el enlace a la política de privacidad.
+Si no hay nada que reservar online, solo sale el aviso, sin la invitación ni el formulario. Al reservar, el número
+de la cita, el mensaje de confirmación, **Ver mi reserva**, **Cancelar la reserva** y **Reservar otra**. Con la
+dirección de otro negocio, o la de este en la de otro, no hay página. La confirmación da como enlace la dirección
+completa de su reserva, con el origen del negocio (`https://<negocio>.erplora.com/p/<negocio>/book/<enlace>`). Al abrirla ve la cabecera del negocio —su nombre y su logo si lo tiene— y solo su reserva: número, servicios, día, hora,
+profesional y estado, y puede cancelarla con confirmación si la política todavía lo permite; una ya cancelada o fuera de
+plazo no ofrece esa acción. Un enlace que no existe da un aviso claro, sin datos ni formulario.
+
 ### Vista previa de la reserva (solo en desarrollo)
-Página `/online_booking/preview`, solo en el servidor de desarrollo: hace el recorrido de la página pública
-(servicio → profesional → día y hora → datos → reservar → ver y cancelar con el enlace) con las mismas
-operaciones que llamará la página pública de `base`. No forma parte de la versión de producción.
+Página `/online_booking/preview`, solo en el servidor de desarrollo: el mismo recorrido que la página de reservas
+(servicio → profesional → día y hora → datos → reservar → ver y cancelar con el enlace), con las mismas operaciones,
+por la sesión del equipo. No forma parte de la versión de producción.
 
 ## Estados de cada pantalla
 
 | Estado | Qué ve la persona |
 |---|---|
-| Cargando | «Cargando…» en la tabla; «Cargando la configuración…» en Ajustes. |
-| Vacío | «Aún no hay reservas online.»; con filtros, «Ninguna reserva coincide con la búsqueda.»; en Ajustes sin servicios, «Todavía no hay servicios. Dalos de alta en Servicios.». |
-| Error | El aviso de la tabla con «Reintentar»; el rechazo de una acción de fila, en su confirmación o encima de la tabla; un rechazo de Ajustes, debajo de su campo, sin perder lo tecleado. |
+| Cargando | «Cargando…» en la tabla; «Cargando la configuración…» en Ajustes; «Cargando la página…» en la página de reservas; «Cargando tu reserva…» en el enlace personal. |
+| Vacío | «Aún no hay reservas online.»; con filtros, «Ninguna reserva coincide con la búsqueda.»; en Ajustes sin servicios, «Todavía no hay servicios. Dalos de alta en Servicios.»; en la página de reservas sin nada que reservar online, solo «Este negocio no tiene nada para reservar online ahora mismo.», sin formulario. |
+| Error | El aviso de la tabla con «Reintentar»; el rechazo de una acción de fila, en su confirmación o encima de la tabla; un rechazo de Ajustes, debajo de su campo, sin perder lo tecleado; en la página de reservas, «No se pudo cargar la página» con el motivo («Este negocio no acepta reservas online ahora mismo.»), y el rechazo de una reserva encima de **Reservar** y debajo de su campo. En el enlace personal, el motivo de la carga con «Reintentar» si puede repetirse, y el de anular dentro de su confirmación. |
 | Reconectando | Lo pintado se queda; una franja avisa «Reconectando…». |
 | App inactiva | «Esta app no está activa en este negocio». |
 | Sin permiso | No aparece lo que no puede hacer; si llega por otra puerta, «No tienes permiso». |
@@ -108,7 +124,7 @@ Fechas y horas salen en el reloj del negocio y con el formato del idioma de quie
 
 | ID | Flujo | Estado |
 |---|---|---|
-| ONLINE_BOOKING-F01 | La clienta reserva desde la página de reservas | hecho (operaciones y vista previa; la página pública es de `base`) |
+| ONLINE_BOOKING-F01 | La clienta reserva desde la página de reservas | hecho |
 | ONLINE_BOOKING-F02 | Confirmar una reserva | hecho |
 | ONLINE_BOOKING-F03 | Completar una reserva | hecho |
 | ONLINE_BOOKING-F04 | Marcar que no se presentó | hecho |
@@ -117,16 +133,17 @@ Fechas y horas salen en el reloj del negocio y con el formato del idioma de quie
 | ONLINE_BOOKING-F07 | Configurar la página de reservas | hecho |
 | ONLINE_BOOKING-F08 | Ver y buscar las reservas | hecho |
 | ONLINE_BOOKING-F09 | Seguir a la clienta cuando se fusionan dos fichas | hecho (lo hace Citas; la bandeja lo refleja) |
-| ONLINE_BOOKING-F10 | La clienta ve su reserva con su enlace | hecho (operación; la página es de `base`) |
-| ONLINE_BOOKING-F11 | La clienta cancela su reserva con su enlace | hecho (operación; la página es de `base`) |
+| ONLINE_BOOKING-F10 | La clienta ve su reserva con su enlace | hecho |
+| ONLINE_BOOKING-F11 | La clienta cancela su reserva con su enlace | hecho |
 | ONLINE_BOOKING-F12 | Borrar los datos de una clienta (RGPD) | hecho |
 
 ### ONLINE_BOOKING-F01 La clienta reserva desde la página de reservas
-Estado: hecho (operaciones y vista previa; la página pública es de `base`)
+Estado: hecho
 Actor: clienta (sin sesión); propietario o administrador, con la vista previa o con el asistente
-Pantalla: página pública de reservas (`base`); en desarrollo, la vista previa
+Pantalla: página de reservas (`/p/<negocio>/book`); en desarrollo, también la vista previa
 Pasos:
-1. Abre la página del negocio: título, mensaje de bienvenida, logo y color de los Ajustes.
+1. Abre la página del negocio: su nombre, su logo (el de los Ajustes, desde la dirección del propio negocio; sin
+   logo, solo el nombre), título, mensaje de bienvenida y color.
 2. Elige uno o varios servicios (hasta 5) de los **reservables online**, con su precio (en la moneda del negocio,
    la de su país —BASE-F50: «20,00 zł» en Polonia—, agrupado desde cuatro cifras: «1.234,56 €») y su duración si
    Servicios los enseña («Mostrar precios», «Mostrar duración»).
@@ -157,7 +174,8 @@ obligatorio; una nota cuando el negocio no las admite; **límites anti-abuso**: 
 desde el mismo dispositivo («…Inténtalo más tarde o llama al negocio.») o más de 100 en una hora en el
 negocio («…Inténtalo dentro de unos minutos.»), o más
 reservas online próximas con el mismo móvil de las que permiten los Ajustes (3 de fábrica: «Este móvil ya
-tiene reservas próximas…», sin decir cuántas). Dos clientas que reservan a la vez la misma hora del mismo
+tiene reservas próximas…», sin decir cuántas); el campo oculto del formulario relleno, que solo rellena un robot
+(«No hemos podido hacer esta reserva. Inténtalo de nuevo o llama al negocio.», sin decir por qué). Dos clientas que reservan a la vez la misma hora del mismo
 profesional: entra una y la otra recibe «Esa hora ya no está libre». En la vista previa, como en las ventanas de
 formulario, el aviso se quita en cuanto se cambia algo y el motivo de un campo en cuanto se corrige ese campo;
 los dos vuelven si el siguiente intento también se rechaza. Un rechazo sin campo se queda hasta el siguiente
@@ -238,14 +256,20 @@ Pasos:
 1. Cambia los campos de **Página pública** y de **Reglas de reserva** y pulsa **Guardar**: «Configuración
    guardada.». Se guarda solo lo que cambia, todo junto o nada.
    Lo que se cambia mientras se está guardando no se pierde: se queda en pantalla, por guardar (hub#914).
-2. En **Servicios reservables online**, toca el interruptor de un servicio: se guarda al momento en
+2. En **Logo**, elige una imagen JPG, PNG o WebP (hasta 5 MB y 8000 píxeles por lado): se sube al momento y sale
+   en la miniatura; la página la enseña cuando se pulsa **Guardar**. **Quitar** y **Guardar** dejan la página sin
+   logo. La página lo carga desde la dirección del negocio, nunca desde otra.
+3. En **Servicios reservables online**, toca el interruptor de un servicio: se guarda al momento en
    Servicios.
 Entra: los ajustes guardados (o los de fábrica: página apagada, email no obligatorio, 3 reservas próximas por
 móvil, elegir profesional y notas permitidos) y las reglas de Citas.
 Sale: `online_booking.settings.updated` (si cambia algo de la página) y `appointment.settings.updated` (si
 cambia una regla); el interruptor de un servicio, `service.service.updated`.
-Si falla: un color que no es `#RRGGBB`, una URL que no es `http(s)://…`, un número fuera de rango o un texto
-demasiado largo, debajo de su campo; no se guarda nada. Como en las ventanas de formulario, el aviso se quita
+Si falla: un color que no es `#RRGGBB`, un logo que no se subió a este negocio («Ese logo no se subió a este
+negocio: vuelve a subirlo.»), un número fuera de rango o un texto demasiado largo, debajo de su campo; no se guarda
+nada. Al subir el logo, un archivo que no es una imagen JPG, PNG o WebP, que pesa más de 5 MB o que mide más de
+8000 píxeles por lado se rechaza debajo de **Logo** («Este archivo no es una imagen PNG.», «La imagen puede pesar 5 MB
+como mucho.»), y uno que no cabe en el espacio del plan, con el aviso de Archivos. Como en las ventanas de formulario, el aviso se quita
 en cuanto se cambia algo y el motivo de un campo en cuanto se corrige ese campo; los dos vuelven si el
 siguiente intento también se rechaza. Un rechazo sin campo se queda hasta el siguiente intento (hub#854).
 Implicados: APPOINTMENT-F19, SERVICE-F02
@@ -279,29 +303,33 @@ Si falla: Citas no se queda a medias y el relay lo reintenta solo.
 Implicados: APPOINTMENT-F23, CUSTOMER-F13
 
 ### ONLINE_BOOKING-F10 La clienta ve su reserva con su enlace
-Estado: hecho (operación; la página es de `base`)
+Estado: hecho
 Actor: clienta (sin sesión)
-Pantalla: la página de su reserva (`base`); en desarrollo, la vista previa
+Pantalla: la de su enlace (`/p/<negocio>/book/<enlace>`, en la dirección del negocio); la página de reservas, tras
+reservar; en desarrollo, la vista previa
 Pasos:
 1. Abre el enlace de su confirmación.
-2. Ve el número, el estado, el día y la hora, los servicios, el profesional, la política de cancelación y si
-   todavía puede cancelar y hasta cuándo. Nunca el nombre de la ficha: quien tenga el enlace no averigua
-   a quién pertenece un móvil.
+2. Ve de qué negocio es, con su nombre y su logo si lo tiene, como en la página de reservas; y el número, el estado,
+   el día y la hora, los servicios, el profesional, la política de cancelación y si todavía puede cancelar y hasta
+   cuándo. Nunca el nombre de la ficha: quien tenga el enlace no averigua a quién pertenece un móvil.
 Entra: el enlace que recibió al reservar; las reglas de cancelación de Citas.
-Sale: nada se escribe. El enlace sigue valiendo aunque el negocio apague la página.
-Si falla: un enlace que no existe, revocado o de una reserva borrada: «Esa reserva no existe o su enlace ya
-no es válido.».
+Sale: nada se escribe. El enlace sigue valiendo, y diciendo de qué negocio es, aunque el negocio apague la página.
+Si falla: un enlace que no existe, revocado, de una reserva borrada o de otro negocio: «Esa reserva no existe o su
+enlace ya no es válido.», sin el nombre ni el logo de ningún negocio. La dirección del enlace con el nombre de otro
+negocio, o en la dirección de otro, no abre ninguna página.
 Implicados: APPOINTMENT-F06
 
 ### ONLINE_BOOKING-F11 La clienta cancela su reserva con su enlace
-Estado: hecho (operación; la página es de `base`)
+Estado: hecho
 Actor: clienta (sin sesión)
-Pantalla: la página de su reserva (`base`); en desarrollo, la vista previa
+Pantalla: la de su enlace (`/p/<negocio>/book/<enlace>`, en la dirección del negocio); la página de reservas, tras
+reservar; en desarrollo, la vista previa
 Pasos:
-1. Desde su enlace pulsa **Cancelar la reserva** (motivo opcional).
-2. Se aplica la política de Citas: «Permitir que la clienta cancele su cita» y «Antelación mínima para
-   cancelar». La cita queda **Cancelada**, con «Lo pidió la clienta» en su historial. La política vale
-   igual cuando el equipo prueba el enlace desde la vista previa.
+1. Desde su enlace pulsa **Cancelar la reserva**, confirma el número y el momento de la cita y puede escribir un motivo.
+2. Pulsa de nuevo **Cancelar la reserva** en la confirmación. Se aplica la política de Citas: «Permitir que la clienta
+   cancele su cita» y «Antelación mínima para cancelar». La cita queda **Cancelada**, la página dice «Esta reserva está
+   cancelada.» y no vuelve a ofrecer la acción; el historial guarda «Lo pidió la clienta». La política vale igual cuando
+   el equipo prueba el enlace desde la vista previa.
 Entra: el enlace de una reserva pendiente o confirmada, sin cobrar.
 Sale: `appointment.appointment.cancelled`.
 Si falla: «La cancelación online no está disponible. Ponte en contacto con el negocio.»; «Esta cita solo se
@@ -348,6 +376,7 @@ como «la reserva de internet de Olga» o «lo que tengo en la bandeja».
 | Cancela, con motivo | cambiar reservas (+ cambiar citas) | F05 | `online_booking.booking.cancel` |
 | Borra | borrar reservas (+ borrar citas) | F06 | `online_booking.booking.delete` |
 | Guarda la configuración (y las reglas de Citas) | ajustes (+ ajustes de Citas para las reglas) | F07 | `online_booking.settings.update` |
+| Sube el logo de la página (JPG, PNG o WebP, hasta 5 MB); se enseña al guardar la configuración | ajustes | F07 | `online_booking.settings.upload_logo` |
 | Reserva y cancela desde la página (públicas) | `online_booking.public` | F01, F11 | `online_booking.public.book`, `.cancel` |
 
 No-show, cancelar y borrar son de **riesgo alto** para el asistente: su tarjeta pide la confirmación antes de
@@ -380,6 +409,9 @@ El resto de hechos (confirmada, cancelada, completada, no presentada, borrada) s
 | Configurar la página | sí | sí | no | no | `online_booking.manage_settings` |
 | Probar la página pública (vista previa) | sí | sí | no | no | `online_booking.public` |
 
+La página de reservas no pide sesión: quien la abre tiene `online_booking.public` y nada más, también si es alguien
+del equipo con su sesión abierta.
+
 ## Para quien lo mantiene
 
 - **Decisión de diseño** (ver «Decisiones de mercado»): Reservas online **no guarda reservas propias**. Una
@@ -396,9 +428,16 @@ El resto de hechos (confirmada, cancelada, completada, no presentada, borrada) s
   lo guarda la página con `service.service.update`, con el permiso de quien lo toca.
 - Modelos (UUIDv7, sin `hub_id`): `Settings` (una fila; sin ella, los de fábrica) y `Booking` (una por cita
   reservada desde la página: la cita, el hash del enlace y la huella del visitante). Cada negocio tiene su propia
-  BD, así que la fila única de `Settings` (y las `Booking`) es la de ese negocio; solo el respaldo de los tests
-  escritos antes de la tenencia (`base/tenancy/tests/legacy.py`) guarda `a` y `b` en la misma BD y les hace
-  compartirla.
+  BD, así que la fila única de `Settings` (y las `Booking`) es la de ese negocio.
+- **El logo** (`logo.py`, `services/logo.py`): `online_booking.settings.upload_logo` lo guarda como toda imagen que
+  un negocio enseña a cualquiera (`base.public_images`, la misma subida que Página web), sin pasar por el asistente
+  (lleva el fichero), en la carpeta pública `online_booking/logo/` de su prefijo (`public_media`), que `/p/media/`
+  sirve desde la dirección del negocio: la única de la que la CSP de la página carga imágenes. `Settings.logo`
+  guarda el nombre del fichero (`<16 hex>.<jpg|png|webp>`) y `settings.update` solo acepta uno subido a este
+  negocio (422 en `logo`); `logo_url` de `settings.get` y de `public.page` es su dirección, del propio negocio.
+  Subir no cambia la página: la cambia **Guardar**. La dirección externa de antes (`logo_url`) ya no se acepta
+  (422 en `logo_url`); su columna salió del modelo sin copiar nada, porque la página nunca la enseñó, y se borra
+  de la base en un despliegue posterior.
 - **Operaciones públicas**: permiso `online_booking.public` (contrato arriba). Para lo que piden a otras
   apps usan `delegated(ctx)`: el mismo contexto con los permisos justos de Citas, Clientes, Servicios,
   Horarios y Personal (como `appointment.queries.reader`), y como actor «online booking» cuando no hay
@@ -434,23 +473,29 @@ El resto de hechos (confirmada, cancelada, completada, no presentada, borrada) s
 
 ### Contrato con la página pública (para `base`)
 
-La página sin sesión (`/p/<slug>/book` en el host del hub, plantillas de Django, pendiente del bloque de la web
-pública) **no es de esta app**: la sirve `base`. Esta app le da las operaciones:
+La página sin sesión (`/p/<slug>/book` en el host del hub) la sirve la puerta pública de `base`
+(`base/public_door.py`), que la app pide en su `LiveAppConfig` con `public_pages = {"book": "online_booking.public"}`:
+`GET /p/<slug>/book` es el HTML del shell, que pinta `PublicBookingPage.vue` (la ruta `/p/:slug/book` de esta app), y
+sus llamadas van a `POST /p/<slug>/api/<operación>`. Esta app le da las operaciones:
 
 | Qué | Operación | Entrada → salida |
 |---|---|---|
-| Textos y reglas de la página | `online_booking.public.page` | nada → título, bienvenida, color, logo, email obligatorio, elegir profesional, notas, política de cancelación, antelaciones, si la clienta puede cancelar, zona horaria |
+| Textos y reglas de la página | `online_booking.public.page` | nada → nombre del negocio, enlace de privacidad, título, bienvenida, color, logo, email obligatorio, elegir profesional, notas, política de cancelación, antelaciones, si la clienta puede cancelar, zona horaria |
 | Servicios reservables online | `online_booking.public.services` | búsqueda, página (≤ 100) → servicios con categoría, precio y duración (o `null` si Servicios no los enseña) y sus profesionales (vacío si no se elige) |
 | Horas libres | `online_booking.public.slots` | servicios, día, profesional opcional → horas (con los profesionales libres si se elige) |
-| Reservar | `online_booking.public.book` | servicios, profesional opcional, hora de pared, nombre, móvil, email, nota → número, estado, hora, servicios, profesional, mensaje y **`token`** (se enseña una vez) |
-| Ver la reserva | `online_booking.public.booking` | `token` → número, estado, hora, servicios, profesional, si puede cancelar y hasta cuándo (nunca el nombre de la ficha) |
-| Cancelar | `online_booking.public.cancel` | `token`, motivo → la reserva cancelada |
+| Reservar | `online_booking.public.book` | servicios, profesional opcional, hora de pared, nombre, móvil, email, nota y campo trampa vacío → número, estado, hora, servicios, profesional, mensaje y **`token`** (se enseña una vez) |
+| Ver la reserva | `online_booking.public.booking` | `token` → nombre y logo del negocio, número, estado, hora, servicios, profesional, si puede cancelar y hasta cuándo (nunca el nombre de la ficha) |
+| Cancelar | `online_booking.public.cancel` | `token`, motivo → la reserva cancelada, con lo mismo que da `public.booking` |
 
 Cómo las expone la plataforma (la puerta pública `/p/` de `base`):
 
 - **Contexto**: `base` llama a la operación en el propio proceso, sin ruta ninja anónima, con
   `OperationContext(scope=<hub del Host>, actor=None, permissions={"online_booking.public"}, request=<la
-  petición>)`. Nada sale del cuerpo de la petición: el hub lo da el Host y el visitante, la petición.
+  petición>)`, también si quien la abre tiene sesión. Solo corre las operaciones de esta app que piden justo ese
+  permiso; cualquier otra, un `<slug>` que no es el del Host o la app apagada en el negocio, 404. El hub lo da el
+  Host y el visitante, la petición; del cuerpo JSON sale solo la entrada de la operación. Las llamadas llevan el
+  token CSRF que deja el HTML de la página. El HTML lleva además el dinero del negocio (bloque `public-door`): la
+  clienta no tiene sesión para leer `base.business.get`.
 - **Permiso**: `online_booking.public` no lo tiene ningún rol salvo propietario y administrador (para la
   vista previa); el empleado y el responsable no. La operación pública se apoya, para lo que pide a Citas,
   Clientes y Servicios, en un contexto delegado con solo lo que necesita (reservar, ver horas, crear o
@@ -458,11 +503,18 @@ Cómo las expone la plataforma (la puerta pública `/p/` de `base`):
 - **Visitante**: los límites por dispositivo se cuentan con una huella del visitante (HMAC con la
   `SECRET_KEY` de la última IP de `X-Forwarded-For`, la que añade el ALB, o de `REMOTE_ADDR` sin proxy). La
   IP no se guarda.
-- **Antispam de la página**: el campo trampa (honeypot) y la espera mínima de envío son de la plantilla de
-  `base`; los límites de esta app no dependen de ellos.
+- **Antispam de la página**: el campo trampa (honeypot) es `website` de `online_booking.public.book`, fuera del
+  OpenAPI y de las herramientas del asistente: la página lo lleva fuera de la vista, vacío y fuera del alcance del
+  teclado y de los lectores de pantalla; relleno, la reserva entera se rechaza (422 `invalid_payload`, sin campo y sin
+  decir por qué) antes de leer ni escribir nada. La página espera además tres segundos desde que se abre antes de
+  enviar una reserva; los límites de esta app no dependen de ninguna de las dos medidas.
 - **Enlace personal**: `token` de 43 caracteres (`secrets.token_urlsafe(32)`); se guarda solo su hash
-  (SHA-256). `base` lo pone en la URL de la confirmación (`/p/<slug>/book/<token>`), nunca en un log, y al
-  llamar a `public.booking`/`public.cancel` lo pasa en el cuerpo o en una cabecera, no en una query string.
+  (SHA-256). Su dirección es `/p/<slug>/book/<token>`: la puerta sirve en ella el mismo HTML que en `/p/<slug>/book`
+  (`GET /p/<slug>/<página>/<clave>`, con la clave en un solo segmento de letras, cifras, `-` y `_`), sin leer la clave
+  ni decir si abre algo, y la ruta `/p/:slug/book/:token` de esta app pinta `PublicBookingPage.vue`, que pasa el token
+  a `public.booking`/`public.cancel` en el cuerpo, nunca en una query string. La dirección, con el token, queda como
+  cualquier otra en el registro de acceso del servidor y del balanceador, y en el aviso «Not Found» de Django si da 404.
+  El token de otro negocio no existe en la base de este: da lo mismo que uno inventado.
   Las rutas de sesión de esta app (`/api/online_booking/public/booking?token=…`, solo dueño y administrador,
   para la vista previa) lo llevan en la query: aceptado, porque no son la puerta pública.
 - **Enlace con la página apagada**: ver y cancelar con el enlace siguen funcionando aunque el negocio apague
@@ -470,20 +522,32 @@ Cómo las expone la plataforma (la puerta pública `/p/` de `base`):
 - **Errores**: el sobre único `{"error": {"code", "message", "fields"?}}` en el idioma del visitante; 404
   `online_booking.page_disabled` y `online_booking.booking_not_found`, 409 con el código de Citas o de esta
   app, 422 por campo y 429 `online_booking.too_many_bookings` / `online_booking.busy`.
-- **Privacidad**: el aviso de privacidad y el texto legal del formulario son de la plantilla de `base`.
+- **Privacidad**: `online_booking.public.page` da el nombre del negocio (`business_name`, el que registró en
+  erplora.com, leído de `base.business.get` como la plataforma; vacío en una demo), que decide sobre los datos de la
+  clienta, y el enlace del aviso (`privacy_policy_url`, la política de privacidad de ERPlora en
+  `<SAAS_URL>/legal/privacy/`, que trata esos datos por encargo del negocio). La página pinta junto a **Reservar** el
+  aviso con el nombre del negocio y ese enlace. De lo demás del negocio no da nada.
+- **De quién es el enlace**: `public.booking` y `public.cancel` dan el mismo nombre del negocio (`business_name`) y la
+  dirección de su logo (`logo_url`, vacía sin logo) que `public.page`, de la misma pieza (`LinkOwnerOut` de
+  `public_page.py`); el logo sale de los ajustes guardados aunque la página esté apagada. Un enlace que no existe da
+  el 404 `online_booking.booking_not_found` sin nada del negocio.
 
 ## Cómo son las páginas (para quien lo mantiene)
 
-- `frontend/pages/BookingsPage.vue` (bandeja), `SettingsPage.vue` y `PreviewPage.vue` (solo en desarrollo).
+- `frontend/pages/BookingsPage.vue` (bandeja), `SettingsPage.vue`, `PublicBookingPage.vue` (la página de reservas,
+  sin sesión) y `PreviewPage.vue`: el recorrido de la clienta, que es la vista previa del equipo (solo en desarrollo)
+  y, con la puerta de `PublicBookingPage.vue` (`PUBLIC_DOOR`, `frontend/lib/door.ts`: llamadas, dinero y textos de la
+  clienta), la página de reservas. `PersonalBooking.vue` carga y anula la reserva del enlace personal;
+  `PublicBookingHeader.vue` pinta la identidad del negocio, `PublicBookingSubmit.vue` el aviso de privacidad, el campo
+  trampa y el envío, `BookingResult.vue` la confirmación y los datos de la reserva, y `CancelDialog.vue` la
+  confirmación de anular, tanto en la bandeja como en el enlace.
 - Los estados permitidos y el reloj se leen de `apps/appointment/frontend/lib/states.ts` y `clock.ts`: las
   mismas reglas que la agenda, sin copiarlas.
-- Datos solo por `useLive`/`useCommand` (la vista previa, por el cliente de la API: lo público no se sigue en
-  vivo); listas en ventanas de 100.
+- Datos solo por `useLive`/`useCommand` (el recorrido de la clienta, por el cliente de la API o el de la puerta: lo
+  público no se sigue en vivo); listas en ventanas de 100.
 
 ## Lo que queda fuera
 
-- **La página pública sin sesión** (`/p/<slug>/book`): es de `base` (bloque de la web pública); aquí está su
-  contrato y la vista previa.
 - **Verificar el móvil con un código (SMS o WhatsApp)**: falta un canal de envío; hasta entonces, cualquiera
   que sepa un teléfono puede reservar a su nombre (la cita sale con el nombre de esa ficha). Los límites
   frenan el abuso, no la suplantación.
@@ -517,6 +581,8 @@ leída, (S) solo el extracto del buscador).
 | ¿La reserva online es una cita de la agenda (que ocupa el hueco) o una solicitud aparte que se convierte al aceptarla? | **Una cita de la agenda desde el primer momento**, Pendiente si el negocio confirma a mano, Confirmada si no (ajuste, automática de fábrica); la bandeja lista las pendientes; rechazar = cancelar (libera el hueco). Una solicitud aparte duplica la lógica de huecos y abre la doble reserva | Square (F) squareup.com/help/us/en/article/8444-accept-or-decline-appointments · Odoo (F) odoo.com/documentation/18.0/applications/productivity/appointments.html · SimplyBook.me (F) help.simplybook.me/wiki/Approve_Bookings_custom_feature · Cal.com (F) cal.com/docs/how-to-guides/how-to-set-up-requires-confirmation · Wix Bookings (S) support.wix.com/en/article/wix-bookings-requiring-approval-for-appointments · Vagaro (F) vagaro.com/learn/the-quickstart-guide-to-vagaro · MyTime (S) help.mytime.com/support/solutions/articles/31000175045 · Booksy (F) biz.booksy.com/blog/don-t-overpay-for-your-booking-system · foro: Calendly (F) community.calendly.com/how-do-i-40/approve-bookings-5906, Square (F) community.squareup.com/t5/Questions-How-To/Is-there-a-way-to-make-it-so-that-I-have-to-accept-an/m-p/123405 |
 | ¿Qué pide el formulario y cómo se reconoce a la clienta? | **Nombre y móvil obligatorios, email opcional** (ajuste); la ficha se reconoce por el **móvil en E.164**, se enlaza o se crea, y la página nunca cambia una ficha que existe; sin código SMS en la v1 | Fresha (F) fresha.com/help-center/knowledge-base/online-presence/102398-learn-how-clients-book-appointments-online · Square (S) community.squareup.com/t5/Questions-How-To/Appointments-Client-Code-needed-to-book-online/m-p/130880 · Mangomint (F) mangomint.com/learn/online-booking-from-the-clients-perspective · Timely (S) help.gettimely.com/article/827-client-login-faq · Acuity (F) acuityscheduling.com/learn/how-clients-book-with-acuity · Microsoft Bookings (F) learn.microsoft.com/en-us/microsoft-365/bookings/define-service-offerings · Google Calendar (F) support.google.com/calendar/answer/10729749 · SimplyBook.me (S) tech-support.simplybook.me/t/719-cant-book-using-new-simplybook-account-client-phone-value-is-wrong/725 · foro: Square, fichas duplicadas (S) community.squareup.com/t5/Appointments-Bookings/Customer-Profile-Duplication/td-p/829070 |
 | ¿Qué antiabuso lleva la página pública? | **Límite de reservas próximas por móvil (ajuste), límite por dispositivo y hora, límite por negocio y hora, y la confirmación manual como válvula**; campo trampa en la plantilla. Sin reCAPTCHA (choca con la CSP, nada por CDN) ni SMS por reserva (coste). Bloquear clienta, a Clientes | SimplyBook.me (F) help.simplybook.me/wiki/Anti-Fraud/Spam_Protection_Custom_Feature · Cal.com (F) cal.com/help/event-types/booker-active-booking-limit · Fresha (F) fresha.com/help-center/knowledge-base/clients/346-block-clients-from-booking · Timely (S) help.gettimely.com/hc/en-gb/articles/4410438923031-How-to-block-a-client · Calendly (F) calendly.com/help/abuse-prevention · Google Calendar (F) support.google.com/calendar/answer/11902347 · Square (F) squareup.com/help/us/en/article/5351-manage-your-square-appointments-account-settings · Vagaro (F) vagaro.com/pro/updates/limit-customer-booking · Microsoft Bookings (F) learn.microsoft.com/en-us/microsoft-365/bookings/define-service-offerings |
+| ¿A qué política de privacidad enlaza el formulario de reserva? (2026-11-19) | **A la de ERPlora en erplora.com, junto al nombre del negocio**: el negocio decide sobre los datos de su clienta y ERPlora los trata por su encargo, como dice esa política. Es lo de las herramientas en las que el responsable es el negocio (Square, Calendly, SimplyBook.me; Microsoft Bookings, sin enlace propio, nombra al negocio); los marketplaces (Fresha, Booksy, Treatwell) enlazan la suya porque el responsable son ellos. Un enlace propio del negocio (Microsoft Bookings, Appointedd) sería un ajuste nuevo: no entra en esta versión | Square (S) squareup.com/legal/privacy-no-account-archive · foro Square (S) community.squareup.com/t5/Using-Square/Privacy-Policy-Link-when-booking-appointment/td-p/304895 · Calendly (S) calendly.com/privacy · SimplyBook.me (S) ovhi.simplybook.me/en/gdpr-compliance · Microsoft Bookings (S) github.com/microsoftgraph/microsoft-graph-docs-contrib/blob/main/api-reference/beta/resources/bookingpagesettings.md · Appointedd (F) support.appointedd.com/en/articles/1856059-how-to-link-your-privacy-policy-in-your-online-booking-tools · Setmore (S) support.setmore.com/en/articles/490929-add-booking-policy-terms-conditions · Fresha (S) terms.fresha.com/partner-terms · Booksy (S) booksy.com/en-ie/p/information-obligation · Treatwell (S) treatwell.es/en/info/privacy-policy |
+| ¿El logo de la página es una dirección o una imagen que se sube? ¿Y las direcciones ya guardadas? (2026-11-19) | **Una imagen que se sube** en los ajustes, con **Cambiar** y **Quitar**, servida desde la dirección del negocio, la única que deja cargar la CSP de la página. Las direcciones guardadas **no se copian ni se siguen leyendo**: nunca se vieron (la CSP las bloqueaba) y descargarlas desde el servidor abriría la puerta a pedir cualquier dirección; el negocio sube su logo. Discourse cambió sus campos de logo por dirección a subida y su respaldo a la dirección antigua cuando el logo nuevo estaba vacío le dio fallos: aquí no hay respaldo | Square (S) squareup.com/help/us/en/article/8425-promote-your-brand-and-services-on-your-booking-site · Acuity (S) help.acuityscheduling.com/hc/articles/31039924251661 · Calendly (S) calendly.com/help/account-settings-overview · Setmore (S) support.setmore.com/en/articles/9756019-your-brand · Fresha (S) fresha.com/help-center/knowledge-base/online-presence/266-create-your-online-profile · Shopify (S) help.shopify.com/en/manual/online-store/images/theme-images · Odoo (S) hibou.io/docs/website-ecommerce-72/websites-1445 · Salonist (S) help.salonist.io/en/articles/9158245-how-to-add-logo-on-the-online-booking-page · foro: Discourse (S) meta.discourse.org/t/logo-upload-is-not-working-in-wizard-or-site-settings/102119 |
 | ¿Cómo gestiona su reserva la clienta sin cuenta? | **Enlace secreto en la confirmación** que enseña la cita y la cancela; el corte en horas lo aplica el servidor y, pasado, «contacta con el negocio» | Square (F) community.squareup.com/t5/Using-Square/How-do-clients-cancel-their-own-appointments/m-p/21338 y squareup.com/gb/en/appointments/features/cancellation-policy · Treatwell (F) treatwell.es/en/info/booking-terms-and-conditions · SimplyBook.me (F) help.simplybook.me/wiki/Cancellation_Policy_custom_feature · Acuity (F) acuityscheduling.com/learn/how-clients-book-with-acuity · Odoo (F) odoo.com/documentation/19.0/applications/productivity/appointments.html · Microsoft Bookings (F) learn.microsoft.com/en-us/microsoft-365/bookings/set-scheduling-policies · Fresha (S) fresha.com/help-center/knowledge-base/calendar/102184-manage-online-bookings-settings · Calendly (F, sin corte: queja en su foro) calendly.com/help/how-to-add-a-cancellation-policy |
 | «Sin preferencia» de profesional | **Estándar**; se asigna al **primer profesional libre por un orden fijo del equipo** (determinista, se puede probar); el negocio puede ocultar la elección | Fresha (F) fresha.com/help-center/knowledge-base/calendar/102178-set-up-new-appointment-assignment · Square (F) squareup.com/help/us/en/article/5351-manage-your-square-appointments-account-settings · Mangomint (F) mangomint.com/learn/adjusting-staff-selection-options-in-online-booking · SimplyBook.me (F) help.simplybook.me/wiki/Any_Employee_Selector_custom_feature · Timely (S) help.gettimely.com/hc/en-gb/articles/1500002268342 · Acuity (S) help.acuityscheduling.com/hc/articles/16676903042829 · Microsoft Bookings (F) learn.microsoft.com/en-us/microsoft-365/bookings/define-service-offerings · Odoo (F) odoo.com/documentation/18.0/applications/productivity/appointments.html · Calendly (S) help.calendly.com/hc/en-us/articles/4402432846999 |
 | ¿Dónde viven antelaciones, intervalo y confirmación automática? | **En los ajustes de reserva online del negocio, un solo bloque**, que solo ata al canal de la clienta (la agenda interna no). Aquí son las reglas de Citas (que ya solo atan a la clienta y valen también para WhatsApp) y se editan desde los Ajustes de esta app | Square (F) squareup.com/help/us/en/article/5351-manage-your-square-appointments-account-settings · Fresha (S) fresha.com/help-center/knowledge-base/calendar/102184-manage-online-bookings-settings · Phorest (S) phorest.helpjuice.com/305579-your-checklist-for-going-live-with-online-bookings-gb · Vagaro (F) vagaro.com/learn/the-quickstart-guide-to-vagaro · Timely (S) help.gettimely.com/hc/en-gb/articles/33525019868183 · Microsoft Bookings (F) learn.microsoft.com/en-us/microsoft-365/bookings/set-scheduling-policies · Odoo (F) odoo.com/documentation/19.0/applications/productivity/appointments.html · Google Calendar (F) support.google.com/calendar/answer/10729749 · Calendly (S) help.calendly.com/hc/en-us/articles/1500004754122 |

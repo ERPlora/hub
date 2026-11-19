@@ -7,7 +7,8 @@ import { join } from 'node:path';
 
 import { expect, type Page, test } from '@playwright/test';
 
-import { A, api, ARTIFACTS, emptyOfTemplateData, horizontalOverflow, hostPage, shot, shown, untilStill } from './helpers';
+import { A, api, ARTIFACTS, horizontalOverflow, hostPage, shot, shown, untilStill } from './helpers';
+import { emptyOfTemplateData } from './business';
 
 // A control that never comes fails in half a minute and says which, instead of eating the whole test.
 test.use({ actionTimeout: 30_000 });
@@ -186,7 +187,6 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
     // Reset: the plan per section, a box each, and «Reset the business» off until one is ticked (never pressed).
     const first = testid(page, 'reset-section').first();
     await expect(first).toBeVisible();
-    await expect(testid(page, 'reset-shared')).toHaveCount(0);
     const submit = testid(page, 'reset-submit');
     await expect(submit).toHaveAttribute('disabled');
     const box = first.locator('ion-checkbox');

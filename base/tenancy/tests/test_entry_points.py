@@ -1,6 +1,6 @@
 """Every way into the Hub opens its database context itself.
 
-Without the suite's fallback (``no_test_fallback``), as in production: a request on a hub's host runs in
+As in production: a request on a hub's host runs in
 ``use_hub(request.hub)``; on the platform host, in the hub chosen for the admin or, with none, on control (a hub's page
 there asks to choose one); a business without its own database (before its cut) answers 503 and runs
 nothing; a live re-execution enters its stream's hub in the executor's thread; the registry's operations run on
@@ -26,9 +26,6 @@ from base.models import Membership
 from base.operations import HostClosed, HubContextBuilder
 from base.tenancy import context, identity
 from base.tenancy.tests import hubs
-from base.tenancy.tests.legacy import use_legacy
-
-pytestmark = pytest.mark.usefixtures("no_test_fallback")
 
 HUB_DB = pytest.mark.django_db(databases=hubs.HUB_DATABASES)
 
@@ -43,11 +40,9 @@ def api_post(client, host, path, data):
     return client.post(f"/api{path}", json.dumps(data), content_type="application/json", HTTP_HOST=host)
 
 
-def items_in(hub=None) -> list[str]:
-    """The demo items of ``hub``'s database (``None``: what the old shared stage left in control's tables), read as the
-    code would."""
-    entered = use_legacy() if hub is None else context.use_hub(hub)
-    with entered:
+def items_in(hub) -> list[str]:
+    """The demo items of ``hub``'s database, read as the code would."""
+    with context.use_hub(hub):
         return sorted(Item.objects.values_list("name", flat=True))
 
 
@@ -64,11 +59,10 @@ def test_a_request_on_a_business_without_its_own_database_answers_503_and_runs_n
 
     assert created.status_code == 503
     assert created.json()["error"]["code"] == "base.hub_maintenance"
-    assert items_in() == []
 
 
 @HUB_DB
-def test_a_request_on_a_hub_with_its_database_writes_there_and_nowhere_else(client, hub_a):
+def test_a_request_on_a_hub_with_its_database_writes_there_and_nowhere_else(client, hub_a, hub_b):
     client.force_login(member(hub_a.slug))
 
     created = api_post(client, f"{hub_a.slug}.localhost", "/demo/items", {"name": "Own"})
@@ -77,7 +71,7 @@ def test_a_request_on_a_hub_with_its_database_writes_there_and_nowhere_else(clie
     assert created.status_code == 201
     assert [row["name"] for row in listed.json()["rows"]] == ["Own"]
     assert items_in(hub_a) == ["Own"]
-    assert items_in() == []
+    assert items_in(hub_b) == []
 
 
 @HUB_DB
@@ -123,10 +117,10 @@ def test_a_hub_whose_database_cannot_be_reached_now_is_503_without_the_mismatch_
     assert [record for record in caplog.records if record.levelname == "WARNING" and "base.hub_unreachable" in record.getMessage()]
 
 
-@pytest.mark.django_db
-def test_the_admin_without_a_chosen_hub_works_on_control_and_a_hubs_page_asks_to_choose_one(client):
-    with use_legacy():
-        Item.objects.create(name="Left on control")
+@HUB_DB
+def test_the_admin_without_a_chosen_hub_works_on_control_and_a_hubs_page_asks_to_choose_one(client, hub_a):
+    with context.use_hub(hub_a):
+        Item.objects.create(name="Of tenant a")
     client.force_login(get_user_model().objects.create_superuser("root", "root@example.com", "pw"))
 
     page = client.get("/admin/demo/item/", HTTP_HOST="hubs.localhost", follow=True)
@@ -134,7 +128,7 @@ def test_the_admin_without_a_chosen_hub_works_on_control_and_a_hubs_page_asks_to
 
     assert page.redirect_chain == [("/admin/", 302)]
     assert "Choose a business first" in page.content.decode()
-    assert "Left on control" not in page.content.decode()
+    assert "Of tenant a" not in page.content.decode()
     assert registry.status_code == 200
 
 
@@ -149,18 +143,18 @@ def test_the_admin_on_a_chosen_business_without_its_own_database_answers_503(cli
 
 
 @HUB_DB
-def test_the_admin_with_a_chosen_hub_works_on_its_database(client, hub_a):
+def test_the_admin_with_a_chosen_hub_works_on_its_database(client, hub_a, hub_b):
     with context.use_hub(hub_a):
         Item.objects.create(name="Of tenant a")
-    with use_legacy():
-        Item.objects.create(name="Of phase one")
+    with context.use_hub(hub_b):
+        Item.objects.create(name="Of tenant b")
     client.force_login(get_user_model().objects.create_superuser("root", "root@example.com", "pw"))
     client.get(f"/admin/hub/{hub_a.slug}/", HTTP_HOST="hubs.localhost")
 
     page = client.get("/admin/demo/item/", HTTP_HOST="hubs.localhost").content.decode()
 
     assert "Of tenant a" in page
-    assert "Of phase one" not in page
+    assert "Of tenant b" not in page
 
 
 # ── The live executor and the print socket: a thread of their own ─────────────────────────────────────────────────
@@ -219,10 +213,11 @@ def test_the_print_socket_runs_its_hubs_code_inside_its_hub(hub_b):
 
 @pytest.mark.django_db
 def test_the_registrys_operations_run_on_control_and_their_events_land_there(client, settings):
-    from base.registry import REGISTRY_SCOPE
-    from base.schemas import HubSeedLocalIn
-    from base.services.hub_registry import hub_seed_local
     from live.context import system_context
+
+    from base.registry import REGISTRY_SCOPE
+    from base.schemas.hub_registry import HubSeedLocalIn
+    from base.services.hub_registry import hub_seed_local
 
     answer = hub_seed_local(system_context(REGISTRY_SCOPE), HubSeedLocalIn(slugs=["c"]))
 
@@ -233,8 +228,9 @@ def test_the_registrys_operations_run_on_control_and_their_events_land_there(cli
 
 @HUB_DB
 def test_a_hubs_operation_never_runs_inside_another_hub(hub_a, hub_b):
-    from base.tenancy.context import HubContextMismatch
     from live.operations import get as get_operation
+
+    from base.tenancy.context import HubContextMismatch
 
     op = get_operation("demo.item.create")
     as_b = OperationContext(scope=Scope("host", hub_b.slug), actor="system", permissions=frozenset({"*"}))
@@ -256,7 +252,7 @@ def test_internal_calls_for_a_business_enter_it(monkeypatch, hub_b):
         return None, internal.refuse(418, "probe", "seen")
 
     monkeypatch.setattr(internal, "_operation_call", call)
-    monkeypatch.setattr(internal.relay, "active_apps", lambda scope: frozenset({photo.WHATSAPP_APP}))
+    monkeypatch.setattr(internal.apps_on, "active_apps", lambda scope: frozenset({photo.WHATSAPP_APP}))
     request = type("Request", (), {"body": json.dumps({"hub": hub_b.slug}).encode()})()
 
     internal._whatsapp_call(request, "whatsapp_inbox.message.receive")
@@ -298,12 +294,12 @@ def test_internal_calls_for_the_platform_hub_run_in_its_own_database(monkeypatch
 
 
 @pytest.mark.django_db(transaction=True)
-def test_the_worker_opens_a_context_for_each_pass(caplog):
+def test_the_worker_opens_a_context_for_each_pass(caplog, worker_visits):
     now = timezone.now()
 
     def passes():
         worker._relay(now)
-        worker._hubs(now)
+        worker_visits.serve(now)
         worker._reap(now)
 
     contextvars.Context().run(passes)
@@ -391,6 +387,6 @@ async def test_an_asgi_request_runs_in_its_hub_too(async_client, hub_a, own_data
     created = await asgi_post(async_client, f"{slug}.localhost", "/api/demo/items", {"name": "Async"})
 
     assert created.status_code == (201 if own_database else 503)
-    assert await sync_to_async(items_in)(hub_a if own_database else None) == (["Async"] if own_database else [])
+    assert await sync_to_async(items_in)(hub_a) == (["Async"] if own_database else [])
     # The connections of the ASGI handler's thread, not the test's: closed before the databases are flushed.
     await sync_to_async(connections.close_all)()

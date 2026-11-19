@@ -1,12 +1,12 @@
-// Shared steps of the browser specs: the real login per host (Hub → SaaS → /auth/callback),
-// the demo's API for setup, the list's readiness, the measurements file and the control of the dev
-// server (runserver + Vite).
+// The helpers the browser specs share: the hub's API, the real login through the stack's SaaS, the page on view,
+// the one wait for «nothing moves», the captures, the apps a spec turns on, the business's registration and the SQL
+// on the stack's databases.
 //
 // The local hubs `a` and `b` answer only once they are rows of the registry (`base.Hub`): without them every
 // host is a 404. `manage.py seed_local_hubs` (DEBUG only, idempotent) adds them;
 // `database.ts` runs it on an e2e database and `global-setup.ts` checks it (`seed_local_hubs --check`) before
 // the first spec. The shared `hub` database needs it once, by hand.
-import { execSync, spawn } from 'node:child_process';
+import { execSync } from 'node:child_process';
 import { createHmac } from 'node:crypto';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -26,23 +26,74 @@ import {
 } from '@playwright/test';
 
 import { turnOffRecorded, turnOnRecording } from './apps-turned-on';
-import { api } from './hub-api';
+import { movingInPage, repeatedTop } from './detectors';
 import { hubDatabases, plan } from './hub-databases';
 import { mailDirFrom, readMailCode } from './mail';
 import { withRetry } from './retry';
 import { STACK } from './stack';
 
-// The hub's API (setup and evidence), which every spec takes from here.
-export { api };
+// The hub's API for the e2e helpers (setup and server-side evidence, never the check), and a hub busy for a moment.
+// The stack's businesses run with Free's limits (one transaction at once, `base.tenancy.limits`): with the machine
+// loaded, the page a spec just opened can hold that place past the server's wait, and the hub answers 503
+// `base.hub_busy` («Too many requests. Try again in a moment.»). That answer ran nothing (`HubBusy` is refused before
+// any statement: `OperationError.retry_after`), so the same request goes again after the server's `Retry-After`, a few
+// times; a hub that stays busy fails, saying so (hub#795). Any other answer is the caller's to check.
+
+/** Tries in all, the first included: about 15 s at most (each try waits up to 2 s for a place, then the pause). */
+const HUB_BUSY_TRIES = 6;
+/** The pause before another try: the server's `Retry-After` (`RETRY_AFTER_SECONDS`, `base.tenancy.limits`). */
+const HUB_BUSY_PAUSE_MS = 1000;
+
+/** The hub still had no place for the request after every try. */
+class HubStillBusy extends Error {
+  override name = 'HubStillBusy';
+}
+
+/** The hub's 503 `base.hub_busy`: its error envelope, never another 503 (a business being moved, a database down). */
+function isHubBusy(status: number, data: unknown): boolean {
+  return status === 503 && (data as { error?: { code?: unknown } } | null)?.error?.code === 'base.hub_busy';
+}
+
+/** The demo's API with the context's session (setup and server-side evidence, never the check). */
+export async function api<T>(
+  context: BrowserContext,
+  origin: string,
+  method: 'GET' | 'POST',
+  path: string,
+  body?: unknown,
+): Promise<{ status: number; data: T }> {
+  // The context also holds the SaaS's cookies (host `localhost`), and Playwright hands them to
+  // `a.localhost` too: the token is the hub host's own.
+  const host = new URL(origin).hostname;
+  const cookies = await context.cookies(origin);
+  const csrf = cookies.find((c) => c.name === 'csrftoken' && c.domain === host)?.value ?? '';
+  const url = `${origin}/api${path}`;
+  const headers = { 'X-CSRFToken': csrf, Accept: 'application/json' };
+  const route = `${method} /api${path}`;
+  return withRetry(
+    async (attempt) => {
+      const res =
+        method === 'GET'
+          ? await context.request.get(url, { headers })
+          : await context.request.post(url, { headers, data: body ?? {} });
+      const text = await res.text();
+      const answer = { status: res.status(), data: (text ? JSON.parse(text) : null) as T };
+      if (isHubBusy(answer.status, answer.data)) {
+        throw new HubStillBusy(`${route}: the hub was still busy after ${attempt} tries, ${HUB_BUSY_PAUSE_MS} ms apart: ${answer.status} ${text}`);
+      }
+      return answer;
+    },
+    {
+      attempts: HUB_BUSY_TRIES,
+      isRetryable: (error) => error instanceof HubStillBusy,
+      delayMs: HUB_BUSY_PAUSE_MS,
+      onRetry: (_error, attempt) =>
+        console.warn(`${route}: the hub is busy (503 base.hub_busy); trying again in ${HUB_BUSY_PAUSE_MS} ms (${attempt + 1} of ${HUB_BUSY_TRIES})`),
+    },
+  );
+}
 
 export const A = STACK.hub('a');
-
-/** The three sizes with the taller tablet, 834×1194. */
-export const THREE_SIZES_TALL_TABLET = [
-  { label: '390', width: 390, height: 844 },
-  { label: '834', width: 834, height: 1194 },
-  { label: '1440', width: 1440, height: 900 },
-] as const;
 
 /** The three sizes the e2e looks at a screen in: a phone, a tablet and a desk. */
 export const THREE_SIZES = [
@@ -57,49 +108,9 @@ export const HUB_DIR = join(HERE, '..', '..');
 export const REPO_DIR = join(HUB_DIR, '..');
 export const ARTIFACTS = join(HERE, '.artifacts');
 const METRICS = join(ARTIFACTS, 'metrics');
-const RUNSERVER_LOG = `/tmp/erplora-hub-runserver-${STACK.hubPort}.log`;
-
-export interface Item {
-  id: string;
-  name: string;
-  status: 'open' | 'done';
-  note: string;
-}
-
-/** Every `ion-icon` on screen: its name and whether its shadow root painted an `<svg>`. */
-export async function iconStates(page: Page): Promise<{ name: string; painted: boolean }[]> {
-  return page.evaluate(() =>
-    [...document.querySelectorAll('ion-icon')]
-      .filter((el) => el.getBoundingClientRect().width > 0)
-      .map((el) => ({
-        name: el.getAttribute('name') ?? '(icon prop)',
-        painted: !!el.shadowRoot?.querySelector('svg'),
-      })),
-  );
-}
 
 /** How long `untilStill` waits for the page to stop moving: Ionic's overlays enter in well under a second. */
 const STILL_TIMEOUT_MS = 10_000;
-
-/**
- * What moves on the page now (run in the page, so self-contained): every finite animation running in the document
- * and in every open shadow root under it, however deep. `document.getAnimations()` leaves shadow roots out, and Ionic
- * animates its overlays (`ion-modal`, `ion-popover`), an `ion-progress-bar`'s bar or an `ion-segment`'s
- * indicator inside theirs. Endless ones (spinners, a shimmer) never stop, so they never count.
- */
-function movingInPage(): string[] {
-  const roots: Array<Document | ShadowRoot> = [document];
-  const moving: string[] = [];
-  for (const root of roots) {
-    for (const element of root.querySelectorAll('*')) if (element.shadowRoot) roots.push(element.shadowRoot);
-    for (const animation of root.getAnimations()) {
-      if (animation.playState !== 'running' || animation.effect?.getTiming().iterations === Infinity) continue;
-      const target = (animation.effect as KeyframeEffect | null)?.target;
-      moving.push(`${root instanceof ShadowRoot ? `${root.host.localName} › ` : ''}${target?.localName ?? '?'}`);
-    }
-  }
-  return moving;
-}
 
 /**
  * Puts `movingInPage` in the page as `window.__movingInPage`, for a probe that runs in the page frame by frame and has
@@ -134,54 +145,6 @@ export async function untilStill(page: Page, message = 'untilStill(): still movi
 export function shot(name: string): string {
   mkdirSync(ARTIFACTS, { recursive: true });
   return join(ARTIFACTS, `${name}.png`);
-}
-
-/** The fewest rows `repeatedTop` counts as a stripe. */
-const STRIPE_MIN_ROWS = 8;
-
-/**
- * How many rows at the bottom of `png`, a screenshot of `page`, repeat the first rows of the image: 0 when none. It is
- * what a capture taken before the browser painted the page at its new size shows (the area the resize uncovered,
- * filled with the top of the page): evidence of a screen nobody saw. A stripe whose rows are each one flat colour (a
- * background at both ends, a hairline across it) does not count, nor one that is the same row over and over, whatever
- * its colours across: a background crossed by a border (the assistant's panel, all the screen on a phone, with its left
- * border; a card's veil over it). The top of the page a capture before the paint repeats is its topbar, rows unlike
- * each other. Decoded in `page`'s browser: the e2e has no image library. Ported from erplora.com's e2e (`repeatedTop`
- * of its tests/e2e/panel/fixtures.ts).
- */
-export async function repeatedTop(page: Page, png: Buffer): Promise<number> {
-  return page.evaluate(
-    async ({ base64, minRows }) => {
-      const bytes = Uint8Array.from(atob(base64), (char) => char.charCodeAt(0));
-      const bitmap = await createImageBitmap(new Blob([bytes], { type: 'image/png' }));
-      const { width, height } = bitmap;
-      const context = new OffscreenCanvas(width, height).getContext('2d');
-      if (!context) throw new Error('repeatedTop: no 2d context to read the screenshot');
-      context.drawImage(bitmap, 0, 0);
-      const pixels = new Uint32Array(context.getImageData(0, 0, width, height).data.buffer);
-      const sameRow = (a: number, b: number) => {
-        for (let x = 0; x < width; x++) if (pixels[a * width + x] !== pixels[b * width + x]) return false;
-        return true;
-      };
-      const flatRow = (row: number) => {
-        for (let x = 1; x < width; x++) if (pixels[row * width + x] !== pixels[row * width]) return false;
-        return true;
-      };
-      for (let rows = Math.floor(height / 2); rows >= minRows; rows--) {
-        let repeated = true;
-        let flat = true;
-        let uniform = true;
-        for (let row = 0; row < rows && repeated; row++) {
-          repeated = sameRow(height - rows + row, row);
-          flat &&= flatRow(row);
-          uniform &&= sameRow(row, 0);
-        }
-        if (repeated && !flat && !uniform) return rows;
-      }
-      return 0;
-    },
-    { base64: png.toString('base64'), minRows: STRIPE_MIN_ROWS },
-  );
 }
 
 /**
@@ -902,70 +865,11 @@ export async function saveSessionForTheSweep(context: BrowserContext): Promise<v
   if (process.env.E2E_SAVE_STORAGE_STATE) await context.storageState({ path: process.env.E2E_SAVE_STORAGE_STATE });
 }
 
-/** The capture once the screen settled and nothing scrolls sideways. */
-export async function settledCapture(page: Page, name: string): Promise<void> {
-  await expect(shown(page).locator('ion-skeleton-text:visible')).toHaveCount(0);
-  expect(await horizontalOverflow(page), `${name}: no sideways scroll`).toBeLessThanOrEqual(0);
-  await capture(page, name);
-}
-
 /** What the page on screen marks with this `data-testid`. */
 export const testid = (page: Page, id: string): Locator => shown(page).locator(`[data-testid="${id}"]`);
 
 /** `id`'s row in the Apps screen. */
 export const appRow = (page: Page, id: string): Locator => shown(page).locator(`[data-testid="apps-row"][data-id="${id}"]`);
-
-export async function createItem(context: BrowserContext, origin: string, name: string): Promise<Item> {
-  const res = await api<Item>(context, origin, 'POST', '/demo/items', { name });
-  expect(res.status, `create ${name}`).toBe(201);
-  return res.data;
-}
-
-export async function itemDetail(
-  context: BrowserContext,
-  origin: string,
-  id: string,
-): Promise<Item & { lines: { text: string; client_line_id: string | null }[] }> {
-  const res = await api<Item & { lines: { text: string; client_line_id: string | null }[] }>(
-    context,
-    origin,
-    'GET',
-    `/demo/items/detail?id=${id}`,
-  );
-  expect(res.status).toBe(200);
-  return res.data;
-}
-
-/** What a template brings, last first (tables before their zones, products before their categories), each with
- * the operation's route that lists it and the one that takes a row away: the server's own (`base.blueprint`). */
-const TEMPLATE_DATA = [
-  ['/table/tables', '/table/tables/delete'],
-  ['/table/zones', '/table/zones/delete'],
-  ['/service/services', '/service/services/archive'],
-  ['/service/categories', '/service/categories/delete'],
-  ['/inventory/products', '/inventory/products/delete'],
-  ['/inventory/categories', '/inventory/categories/delete'],
-] as const;
-
-/**
- * Takes away every row a template brings from the business at `origin`, through the apps' operations (their apps
- * on), until the server says the business is empty.
- */
-export async function emptyOfTemplateData(context: BrowserContext, origin: string): Promise<void> {
-  for (let pass = 0; pass < 5; pass += 1) {
-    for (const [list, remove] of TEMPLATE_DATA) {
-      const rows = await api<{ rows: { id: string }[] }>(context, origin, 'GET', `${list}?limit=100&offset=0`);
-      expect(rows.status, list).toBe(200);
-      for (const row of rows.data.rows) {
-        const res = await api(context, origin, 'POST', remove, { id: row.id });
-        expect(res.status, `${remove} ${row.id}`).toBeLessThan(300);
-      }
-    }
-    const catalogue = await api<{ empty: boolean }>(context, origin, 'GET', '/settings/data/blueprints');
-    if (catalogue.data.empty) return;
-  }
-  throw new Error('the business could not be emptied of what a template brings');
-}
 
 /** How long the run's worker may take to make an app's tables in a business's own database: its tick, the
  *  migrations of the app and what it needs, and its settle. */
@@ -1050,91 +954,6 @@ export const MY_APPS_DOOR = '[data-testid=topbar-apps], [data-testid=topbar-more
 /** The way to «My apps»: there once the authenticated shell is painted (every page of the stack has its own). */
 export const topbarApps = (page: Page): Locator => page.locator(MY_APPS_DOOR).first();
 
-/** Whether the page is a phone's (under 768 px): the shell folds «My apps» and the assistant into «⋮». */
-export const compactBar = (page: Page): boolean => (page.viewportSize()?.width ?? 1280) < 768;
-
-/** The page still, with nothing past its right edge at the size `label`, then captured as `name`. */
-export async function capturedFitting(page: Page, name: string, label: string): Promise<void> {
-  await untilStill(page);
-  const overflow = await horizontalOverflow(page);
-  expect(overflow, `no sideways scroll at ${label}`).toBeLessThanOrEqual(0);
-  await capture(page, name);
-}
-
-/** Waits until the list painted its first result (empty state or rows). */
-export async function listReady(page: Page): Promise<void> {
-  await shown(page)
-    .locator('[data-testid=demo-items-empty], [data-testid=demo-items-row]')
-    .first()
-    .waitFor({ state: 'visible' });
-}
-
-export async function rowNames(page: Page): Promise<string[]> {
-  return shown(page).locator('[data-testid=demo-item-name]').allInnerTexts();
-}
-
-export const row = (page: Page, name: string): Locator =>
-  shown(page).locator('[data-testid=demo-items-row]', { has: page.getByText(name, { exact: true }) });
-
-/** The row (or card) of the item `id` on the list shown. */
-export const rowOf = (page: Page, id: string): Locator => shown(page).locator(`[data-testid=demo-items-row][data-id="${id}"]`);
-
-/** From the list: «New item» → `/demo/items/new`, types the name and arms a click-time probe on
- *  «Save» (not clicked yet): `__saveClickedAt` (`Date.now()`) and `__saveClickedPageMs` (`performance.now()`, the
- *  page's clock, which Resource Timing uses). */
-export async function fillNewItem(page: Page, name: string): Promise<Locator> {
-  await shown(page).locator('[data-testid=demo-items-add]').click();
-  await page.waitForURL(/\/demo\/items\/new$/);
-  const form = shown(page).locator('[data-testid=demo-form]');
-  await form.locator('[data-testid=demo-form-name] input').fill(name);
-  const save = form.locator('[data-testid=demo-form-save]');
-  await save.evaluate((el) => {
-    const w = window as unknown as Record<string, number>;
-    el.addEventListener(
-      'click',
-      () => {
-        w.__saveClickedAt = Date.now();
-        w.__saveClickedPageMs = performance.now();
-      },
-      { capture: true, once: true },
-    );
-  });
-  return save;
-}
-
-/** Creates an item through the «New item» page and waits until it is back on the list. */
-export async function createViaPage(page: Page, name: string): Promise<void> {
-  const save = await fillNewItem(page, name);
-  await save.click();
-  await page.waitForURL(/\/demo\/items$/, { timeout: 10_000 });
-  await listReady(page);
-}
-
-/** In-page probe: the `Date.now()` at which a row named `name` shows up (read by `appearedAt`). */
-export async function watchForRow(page: Page, name: string): Promise<void> {
-  await page.evaluate((wanted) => {
-    const w = window as unknown as { __rowSeen?: Record<string, number> };
-    w.__rowSeen ??= {};
-    const seen = w.__rowSeen;
-    const check = (): boolean => {
-      const found = [...document.querySelectorAll('[data-testid=demo-item-name]')].some(
-        (el) => el.textContent?.trim() === wanted,
-      );
-      if (found && seen[wanted] === undefined) seen[wanted] = Date.now();
-      return found;
-    };
-    if (check()) return;
-    const observer = new MutationObserver(() => {
-      if (check()) observer.disconnect();
-    });
-    observer.observe(document.body, { subtree: true, childList: true, characterData: true });
-  }, name);
-}
-
-export async function appearedAt(page: Page, name: string): Promise<number | undefined> {
-  return page.evaluate((wanted) => (window as unknown as { __rowSeen?: Record<string, number> }).__rowSeen?.[wanted], name);
-}
-
 /** Collects CSP violations (in-page listener), console errors and uncaught page errors. */
 export async function collectProblems(
   page: Page,
@@ -1161,83 +980,6 @@ export async function collectProblems(
     warnings,
     page: pageErrors,
   });
-}
-
-// ── Dev server control ──────────────────────────────────────────────────────────────────────────
-
-/** Pids LISTENING on a TCP port (never the browser's client sockets). */
-export function listeningPids(port: number): number[] {
-  try {
-    return execSync(`lsof -ti tcp:${port} -sTCP:LISTEN`, { encoding: 'utf8' })
-      .split(/\s+/)
-      .filter(Boolean)
-      .map(Number);
-  } catch {
-    return [];
-  }
-}
-
-export async function healthy(): Promise<boolean> {
-  try {
-    const res = await fetch(STACK.healthz, { signal: AbortSignal.timeout(1500) });
-    return res.ok;
-  } catch {
-    return false;
-  }
-}
-
-/**
- * runserver's Vite (`pnpm run dev` in hub-next) answers. It starts after Django: `healthy()` alone
- * lets a page load HTML whose module scripts point at a Vite that is not listening yet, and that page
- * stays blank (nothing retries a failed module script).
- */
-export async function viteReady(): Promise<boolean> {
-  try {
-    const res = await fetch(STACK.viteClient, { signal: AbortSignal.timeout(1500) });
-    return res.ok;
-  } catch {
-    return false;
-  }
-}
-
-export async function waitFor(check: () => Promise<boolean> | boolean, timeoutMs: number, stepMs = 250): Promise<number> {
-  const start = Date.now();
-  for (;;) {
-    if (await check()) return Date.now() - start;
-    if (Date.now() - start > timeoutMs) throw new Error(`condition not met within ${timeoutMs} ms`);
-    await new Promise((r) => setTimeout(r, stepMs));
-  }
-}
-
-/**
- * Starts `manage.py runserver 127.0.0.1:<E2E_HUB_PORT>` detached (it outlives the test run), with this
- * run's environment (`VITE_DEV_PORT`, `SAAS_URL`, `DB_NAME`).
- */
-export function startRunserver(): void {
-  const child = spawn(
-    '/bin/bash',
-    ['-c', `cd '${HUB_DIR}' && nohup uv run python manage.py runserver 127.0.0.1:${STACK.hubPort} >> ${RUNSERVER_LOG} 2>&1 &`],
-    { detached: true, stdio: 'ignore' },
-  );
-  child.unref();
-}
-
-/**
- * Rows of `pg_stat_activity` named `live-listener` (the process-level LISTEN connection) on this run's
- * database: another stack beside it (another checkout's runserver) has its own.
- */
-export function listenerRows(): { pid: number; backend_start: string }[] {
-  const out = execSync(
-    `docker compose exec -T postgres psql -U hub -d ${STACK.database} -At -F '|' -c "select pid, backend_start from pg_stat_activity where application_name='live-listener' and datname = current_database() order by pid"`,
-    { cwd: REPO_DIR, encoding: 'utf8' },
-  );
-  return out
-    .split('\n')
-    .filter(Boolean)
-    .map((line) => {
-      const [pid, start] = line.split('|');
-      return { pid: Number(pid), backend_start: start };
-    });
 }
 
 /** `sql` on the database `database` of compose's Postgres, as its superuser `hub`. */
@@ -1272,19 +1014,6 @@ export function psql(sql: string, hub = 'a'): string {
     .join('\n');
 }
 
-/**
- * The username of whoever is signed in on `context`. Not by email: a hub database kept from a stack whose SaaS was
- * created again holds an older account with the same email (a new SaaS, new users), and the email names both.
- */
-export async function usernameOf(context: BrowserContext): Promise<string> {
-  const me = await api<{ user: { id: string } | null }>(context, A, 'GET', '/me');
-  expect(me.status, 'GET /api/me').toBe(200);
-  const id = me.data.user?.id ?? '';
-  expect(id, 'the person signed in').not.toBe('');
-  // `/api/me` names the person of the business's database (base.HubUser), whose username is the session's.
-  return psql(`SELECT username FROM base_hubuser WHERE id = '${id}'`);
-}
-
 /** The usernames of every account of `email` (control's ``auth_user``), quoted for the `in (…)` of a statement on a
  * hub's tables, which cannot read control's; `null` when it has none, which matches nothing. */
 export function usernamesOf(email: string): string {
@@ -1295,33 +1024,6 @@ export function usernamesOf(email: string): string {
  * the person the hub's; '' when it has none yet. */
 export function hubUserIdOf(email: string, hub = 'a'): string {
   return psql(`select id from base_hubuser where username in (${usernamesOf(email)})`, hub);
-}
-
-/** Takes the plan out of `a`'s photo while a spec runs, keeping the photo in its scratch table `backup` (next to the
- * registry) for `restorePhotoFrom`: for a spec that signs in from more than one browser. With a plan in the photo
- * (erplora.com's Free covers one device, as its seed or a run of the WhatsApp specs can leave it), every entry from
- * another browser ends the sessions of the others on `a`, and the next request of the first gets a 401. */
-export function dropPlanFromPhoto(backup: string): void {
-  psql(`drop table if exists ${backup}; create table ${backup} as select id, state from base_hub where slug = 'a'`);
-  psql("update base_hub set state = state - 'plan' where slug = 'a'");
-}
-
-/** `a`'s photo as `dropPlanFromPhoto` found it, and its scratch table `backup` dropped; nothing when it kept none. */
-export function restorePhotoFrom(backup: string): void {
-  if (psql(`select to_regclass('${backup}') is not null`) !== 't') return;
-  psql(`update base_hub h set state = b.state from ${backup} b where b.id = h.id; drop table ${backup}`);
-}
-
-/** Decodes the `s=` of a `/api/live` URL (base64url JSON) into its subscriptions. */
-export function decodeSubs(url: string): unknown[] {
-  const s = new URL(url).searchParams.get('s') ?? '';
-  const json = Buffer.from(s.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf8');
-  try {
-    const value: unknown = JSON.parse(json);
-    return Array.isArray(value) ? value : [value];
-  } catch {
-    return [json];
-  }
 }
 
 // ── The business's registration (flow business-currency) ──────────────────────────────────────────

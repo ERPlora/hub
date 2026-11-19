@@ -4,22 +4,8 @@
 // message under its field; an edit sends only what changed.
 import { type Page, expect, test } from '@playwright/test';
 
-import {
-  A,
-  api,
-  createItem,
-  createViaPage,
-  itemDetail,
-  listReady,
-  login,
-  record,
-  row,
-  rowNames,
-  rowOf,
-  shot,
-  shown,
-  uniqueName,
-} from './helpers';
+import { A, api, login, record, shot, shown, uniqueName } from './helpers';
+import { createItem, createViaPage, itemDetail, listReady, row, rowNames, rowOf } from './demo-items';
 
 const sameDocument = async (page: Page) =>
   (await page.evaluate(() => (window as unknown as { __doc?: string }).__doc)) === 'original';

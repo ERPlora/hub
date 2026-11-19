@@ -580,29 +580,29 @@ def test_the_configuration_starts_in_testing_through_erplora(issuer, settings):
 def test_production_opens_only_in_prod_with_the_flag(settings, env, flag, open_):
     settings.ERPLORA_ENVIRONMENT = env
     settings.VERIFACTU_PRODUCTION_ENABLED = flag
-    assert queries.production_open() is open_
+    assert queries.route.production_open() is open_
 
 
 def test_erplora_route_in_production_needs_only_the_approved_authorisation(server_ready):
     # No plan gates production any more; ERPlora's route files with the approved authorisation alone, whatever the
     # retired ``live_paid`` column still holds.
     config = Config(route="erplora", representation_status="approved", live_paid=False)
-    assert queries.route_problem(config, "production", A) == ""
+    assert queries.route.route_problem(config, "production", A) == ""
     config.representation_status = "submitted"
-    assert queries.route_problem(config, "production", A) == "representation_not_approved"
-    assert queries.route_problem(config, "testing", A) == ""
+    assert queries.route.route_problem(config, "production", A) == "representation_not_approved"
+    assert queries.route.route_problem(config, "testing", A) == ""
 
 
 def test_what_was_sealed_leaves_while_the_route_can_carry_it(server_ready):
     # What was sealed goes to the AEAT while the route can carry it (every ticket with a QR reaches the AEAT).
     config = Config(route="erplora", representation_status="approved")
-    assert queries.route_problem(config, "production", A) == ""
+    assert queries.route.route_problem(config, "production", A) == ""
     config.representation_status = "revoked"
-    assert queries.route_problem(config, "production", A) == "representation_not_approved"
-    assert queries.route_problem(config, "testing", A) == ""
+    assert queries.route.route_problem(config, "production", A) == "representation_not_approved"
+    assert queries.route.route_problem(config, "testing", A) == ""
     # Live with its own certificate's route fixed, it waits for a certificate and never falls back to the seal.
     live = Config(environment="production", route="own", representation_status="approved")
-    assert queries.route_problem(live, "production", A) == "own_certificate_missing"
+    assert queries.route.route_problem(live, "production", A) == "own_certificate_missing"
 
 
 def test_the_configuration_says_why_new_sales_are_refused_only_in_production(
@@ -633,13 +633,13 @@ def test_own_route_in_production_needs_only_its_valid_certificate(server_ready):
     # As in the old Hub (an_own_certificate_needs_no_grant_to_go_live): the business files with its own
     # certificate, so ERPlora's approval does not apply.
     config = Config(environment="production", route="own")
-    assert queries.route_problem(config, "production", A) == "own_certificate_missing"
+    assert queries.route.route_problem(config, "production", A) == "own_certificate_missing"
     own_certificate(days=-1)
-    assert queries.route_problem(config, "production", A) == "own_certificate_missing"
+    assert queries.route.route_problem(config, "production", A) == "own_certificate_missing"
     OwnCertificate.objects.all().delete()
     own_certificate()
-    assert queries.route_problem(config, "production", A) == ""
-    assert queries.route_problem(config, "testing", A) == ""
+    assert queries.route.route_problem(config, "production", A) == ""
+    assert queries.route.route_problem(config, "testing", A) == ""
 
 
 def test_the_configuration_lists_everything_that_keeps_it_from_going_live(
@@ -753,11 +753,36 @@ def test_the_certificate_says_whose_it_is_and_when_it_expires(issuer):
 
 def test_without_a_certificate_it_says_not_loaded(issuer):
     certificate = run("verifactu.config.get").own_certificate
-    assert (certificate.loaded, certificate.holder, certificate.expires_at) == (
+    assert (certificate.loaded, certificate.holder, certificate.expires_at, certificate.expires_soon) == (
         False,
         "",
         None,
+        False,
     )
+
+
+def certificate_expiring_in(days: int) -> None:
+    OwnCertificate.objects.create(
+        holder="ANA LOPEZ",
+        holder_tax_id="12345678Z",
+        kind="personal",
+        expires_at=timezone.now() + dt.timedelta(days=days, hours=1),
+        sealed_blob=b"sealed",
+        uploaded_by="ana",
+    )
+
+
+@pytest.mark.parametrize(("days", "soon"), [(31, False), (30, True), (0, True), (-1, False)])
+def test_the_certificate_expires_soon_from_thirty_days_before_until_it_expires(issuer, days, soon):
+    certificate_expiring_in(days)
+    certificate = run("verifactu.config.get").own_certificate
+    assert (certificate.expires_in_days, certificate.expires_soon) == (days, soon)
+
+
+def test_the_warning_follows_the_server_s_notice_period(issuer, monkeypatch):
+    monkeypatch.setattr(queries.config, "EXPIRY_WARNING_DAYS", 10)
+    certificate_expiring_in(20)
+    assert run("verifactu.config.get").own_certificate.expires_soon is False
 
 
 def test_with_a_production_record_it_cannot_go_back(three):

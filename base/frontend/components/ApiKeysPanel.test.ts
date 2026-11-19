@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { errorFrame, flush, mountBase, subId } from '../__tests__/mount-base';
-import type { ApiKeyList, ApiKeyRow } from '../operations';
+import type { ApiKeyList, ApiKeyRow } from '../operations/api_keys';
 import ApiKeysPanel from './ApiKeysPanel.vue';
 
 vi.mock('@erplora/ui/shell', async (importOriginal) => ({
@@ -39,7 +39,6 @@ const APPS = [
   { id: 'tax', name: 'Taxes', read: true, write: true },
 ];
 const LIST: ApiKeyList = {
-  available: true,
   keys: [
     key(),
     key({ id: '0199aaaa-0000-7000-8000-000000000002', name: 'Tienda', mode: 'per_app', scopes: { cart_checkout: ['read', 'write'] }, last_used_at: '2026-10-23T10:00:00Z' }),
@@ -112,25 +111,18 @@ describe('ApiKeysPanel', () => {
 
   it('none yet is said, with what a key is for', async () => {
     const m = await open({ locale: 'es' });
-    await m.result(m.call, 'base.api_key.list', { available: true, keys: [], apps: APPS });
+    await m.result(m.call, 'base.api_key.list', { keys: [], apps: APPS });
     expect(m.wrapper.text()).toContain('Aún no hay API keys. Crea una para que un sistema externo pueda leer o escribir datos de tu negocio.');
   });
 
-  it('leads to the API’s documentation, with keys or without them yet', async () => {
-    for (const available of [true, false]) {
+  it('leads to the API’s documentation and offers a new key, with keys or with none yet', async () => {
+    for (const keys of [LIST.keys, []]) {
       const m = await open();
-      await m.result(m.call, 'base.api_key.list', { ...LIST, available, keys: available ? LIST.keys : [] });
-      expect(m.wrapper.get('[data-testid="api-keys-docs"]').attributes('href'), String(available)).toBe('/api-docs');
+      await m.result(m.call, 'base.api_key.list', { ...LIST, keys });
+      expect(m.wrapper.get('[data-testid="api-keys-docs"]').attributes('href'), String(keys.length)).toBe('/api-docs');
+      expect(m.wrapper.find('[data-testid="api-keys-new"]').exists(), String(keys.length)).toBe(true);
       m.wrapper.unmount();
     }
-  });
-
-  it('a business that cannot have keys yet is told so, with nothing to create', async () => {
-    const m = await open({ locale: 'es' });
-    await m.result(m.call, 'base.api_key.list', { available: false, keys: [], apps: APPS });
-    expect(m.wrapper.get('[data-testid="api-keys-unavailable"]').text()).toContain('Las API keys todavía no están disponibles en este negocio.');
-    expect(m.wrapper.find('[data-testid="api-keys-new"]').exists()).toBe(false);
-    expect(m.wrapper.find('[data-testid="api-keys-row"]').exists()).toBe(false);
   });
 
   it('a list that cannot be read says so with «Retry», never «no keys»', async () => {

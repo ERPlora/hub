@@ -45,6 +45,11 @@ depende de él.
   documento fiscal; cubre líneas de servicio, no importes; la caducidad cuenta desde la compra; lo
   vendido conserva las condiciones con que se vendió; regalar o corregir es un movimiento aparte con
   motivo; anular solo un bono que no se ha usado.
+- **La venta de un bono dicha después** (Phorest, Square Appointments, DaySmart, Jane, MyTime y Pabau pagan la
+  comisión de un bono con cada sesión, al hacerla; Phorest rehace su informe de comisiones hacia atrás cuando la
+  comisión se asigna después de la venta, y Fresha solo lleva un cambio al periodo abierto cuando ese periodo ya se
+  liquidó en la app): vale desde ese momento para las sesiones, y la línea deja de contar para quien lo vendió en el día
+  de su venta, como si se hubiera dicho al concederlo. Esta app no registra liquidaciones de comisiones.
 - Decisiones que mandan aquí: ADR-0386 (un bono cubre líneas; una tarjeta regalo,
   importes), ADR-0390 (la titularidad nace al venderlo, el reloj arranca en la compra y no se
   transfiere) y ADR-0085 (el IVA se enlaza por la categoría fiscal de Impuestos).
@@ -222,6 +227,7 @@ cierra la ventana sin guardarlo. Con la ventana como se abrió, atrás la cierra
 | SERVICE-F33 | Saber quién puede hacer un servicio | hecho |
 | SERVICE-F34 | Elegir la imagen de un servicio desde la librería | hecho |
 | SERVICE-F35 | Subir una foto propia del servicio | hecho |
+| SERVICE-F36 | Decir después qué venta cobró un bono | hecho (asistente y API); en **Bonos vendidos**, no (ver «Lo que queda fuera») |
 
 ### SERVICE-F01 Dar de alta un servicio
 Estado: hecho
@@ -495,7 +501,8 @@ Sale: un bono vendido con la titular, la fecha, el importe y los «Usos» y la �
 congelados; la caducidad cuenta desde ese momento (`service.grant.granted`). No sale ningún documento
 fiscal: lo emite la venta del bono. Diciendo la venta, esa parte de su línea deja de ser producción de quien
 lo vendió: la comisión va sobre las sesiones hechas (SALE-F28). Sin decirla, el bono se concede igual, pero
-sus sesiones no cuentan para nadie (SERVICE-F24): su dinero puede estar ya contado en quien lo vendió.
+sus sesiones no cuentan para nadie (SERVICE-F24): su dinero puede estar ya contado en quien lo vendió. Se puede
+decir después (SERVICE-F36).
 Si falla: «Elige el cliente al que pertenece el bono…» si no se dice; «Ese paquete no existe en este
 negocio.» si el bono se eliminó o está desactivado; una fecha de compra futura, «Un bono no se puede
 comprar en el futuro.» (alargar un bono es **Ajustar**, SERVICE-F18), y una sin zona horaria, que la
@@ -503,7 +510,7 @@ diga; un nombre de clienta que vale para varias, la lista para elegir. De la ven
 líneas: di cuál pagó el bono: …», «Esa línea no es de esa venta.», «A esa línea le quedan … para pagar
 bonos: no puede pagar uno de ….» y «Esa venta se anuló: no pagó ningún bono.»; quien no puede cobrar no puede
 decirlo. Nada se concede.
-Implicados: CUSTOMER-F01, SALE-F28, SERVICE-F24
+Implicados: CUSTOMER-F01, SALE-F28, SERVICE-F24, SERVICE-F36
 
 ### SERVICE-F15 Consultar los bonos de una clienta
 Estado: hecho (asistente y API)
@@ -715,7 +722,7 @@ lo que queda del precio pagado ÷ las sesiones que le quedan por entregar, al c�
 100,00 € en 3 sesiones son 33,33 + 33,34 + 33,33: lo entregado suma justo lo pagado, también con
 cortesías, correcciones y sesiones devueltas. Un bono regalado (0 €) da 0, y uno sin límite no tiene
 entre qué dividir y no da valor. Un bono con importe que no dice la línea que lo cobró da 0 (SERVICE-F14), como
-los vendidos antes de existir esta cifra. Ventas lo guarda en la línea para la producción de quien la hace
+los vendidos antes de existir esta cifra, hasta que se diga (SERVICE-F36). Ventas lo guarda en la línea para la producción de quien la hace
 (SALE-F28).
 Si falla: nada se cobra y la cuenta sigue igual si una sesión ya no está reservada («La sesión
 reservada de «{name}» ya no está reservada (pasó su día o se soltó). Quita el bono de la línea y vuelve
@@ -950,6 +957,36 @@ queda con la foto que tenía; el motivo es, sin espacio en el plan, «No queda e
 plan incluye <espacio>.» y, si el almacén no contesta, «No se pudo guardar la foto. Inténtalo de nuevo.».
 Implicados: SERVICE-F01, SERVICE-F02, SERVICE-F04, SERVICE-F05, SERVICE-F09, INVENTORY-F31, INVENTORY-F33, BASE-F35
 
+### SERVICE-F36 Decir después qué venta cobró un bono
+Estado: hecho (asistente y API); en **Bonos vendidos**, no (ver «Lo que queda fuera»)
+Actor: responsable, asistente
+Pantalla: asistente
+Pasos:
+1. Pide al asistente que diga qué venta cobró un bono ya vendido a una clienta (el bono, por su nombre o el de su
+   titular) y, si esa venta cobró varias líneas, cuál de ellas.
+2. La tarjeta de confirmación nombra el bono, la venta por su número («20261014-0007») y la línea por lo que cobra;
+   confírmala.
+3. Desde ese momento, sus sesiones cuentan para quien las hace (SERVICE-F24).
+Entra: un bono vendido con importe que todavía no dice su venta, sin anular, sin caducar y con sesiones por hacer (o
+sin límite); la venta y, si cobró varias líneas, la línea (Ventas).
+Sale: el bono dice la venta y la línea que lo cobraron (`service.grant.sale_linked`). Vale **desde ese momento**:
+- Las sesiones ya hechas se quedan con lo que valían, 0: lo que vale una sesión se fija al hacerla y ya no se mueve, y
+  el día en que se hizo no cambia.
+- Lo que queda del precio, que es todo lo pagado porque esas no se llevaron nada, se reparte entre las sesiones que
+  faltan, como siempre (SERVICE-F24): un bono de 100,00 € de 5 sesiones con 2 hechas da 33,33 + 33,34 + 33,33 a las
+  tres que quedan.
+- Esa parte de la línea deja de ser producción de quien lo vendió igual que si se hubiera dicho al concederlo
+  (SERVICE-F14): en el día de esa venta. Así nada cuenta dos veces y la producción de nadie baja de 0, y es el mismo
+  día que mueven anular el bono (SERVICE-F17) o devolver la venta (SALE-F28).
+Si falla: «Ese bono ya dice la venta que lo cobró.»; «Ese bono se regaló: ninguna venta lo cobró.»; «Este bono está
+anulado: ya no se puede usar.»; «Este bono ha caducado: alárgalo con Ajustar si aún se van a hacer sesiones.»;
+«Este bono ya no tiene sesiones por hacer: lo que costó sigue contando para quien lo vendió.»; sin venta ni línea,
+«Di qué venta cobró el bono.»; con Ventas apagada, «Ventas no está activa en este negocio.». De la venta, los mismos
+que al concederlo (SERVICE-F14): «Esa venta cobró varias líneas: di cuál pagó el bono: …», «Esa línea no es de esa
+venta.», «A esa línea le quedan … para pagar bonos: no puede pagar uno de ….» (también si ya pagó otro bono) y «Esa
+venta se anuló: no pagó ningún bono.»; quien no puede cobrar no puede decirlo. Nada cambia.
+Implicados: SERVICE-F14, SERVICE-F17, SERVICE-F24, SALE-F28, STAFF-F21
+
 ## Servicios: lo que entra y lo que sale
 
 Todo se puede pedir por las pantallas, el asistente (por voz o por texto, con la sesión de quien
@@ -1017,6 +1054,7 @@ sesión, se pueden seguir en vivo.
 | Cambia un bono (solo lo enviado; las líneas no) | editar bonos | F13 | `service.package.update` |
 | Elimina un bono del catálogo | eliminar bonos | F13 | `service.package.delete` |
 | Concede un bono a una clienta y le dice a Ventas qué línea lo pagó | conceder bonos | F14 | `service.grant.create` |
+| Dice qué venta y qué línea cobraron un bono ya concedido sin ellas, con la misma comprobación de Ventas | ajustar bonos | F36 | `service.grant.link` |
 | Anula un bono vendido sin usar | anular bonos | F17 | `service.grant.void` |
 | Regala o quita sesiones, o alarga la caducidad | ajustar bonos | F18 | `service.grant.adjust` |
 | Gasta una sesión y, si se dice quién la hizo, le dice a Ventas que cuente lo que vale en su producción | gastar sesiones | F21 | `service.grant.redeem` |
@@ -1039,6 +1077,7 @@ sesión, se pueden seguir en vivo.
 | Profesional asignado / cambiado / quitado | Asignar, cambiar, quitar (también al dar de baja a alguien) | La asignación, el servicio y el profesional | `service.assignment.assigned`, `.updated`, `.removed` |
 | Bono nuevo / cambiado / eliminado | Crear, editar, eliminar | Cuál (`id`) | `service.package.created`, `.updated`, `.deleted` |
 | Bono concedido | Conceder | La compra, el bono y la clienta | `service.grant.granted` |
+| Venta del bono dicha después | Decir su venta | La compra, el bono, la clienta, la venta y la línea | `service.grant.sale_linked` |
 | Bono anulado | Anular | La compra, el bono y la clienta, sin el motivo | `service.grant.voided` |
 | Bono ajustado | Ajustar | La compra y las cantidades, sin el motivo | `service.grant.adjusted` |
 | Sesión gastada | Gastar | La compra, la sesión y el servicio | `service.grant.redeemed` |
@@ -1086,7 +1125,9 @@ con la sesión de quien vende, como hace con Inventario.
   nombre y con la sesión de quien concede. `service.grant.create`, con importe y venta, llama a `sale.sale.voucher_sold`
   (`sale_id`, `line_id`, `amount`) y guarda en `sale_line_id` la línea que le devuelve; `service.grant.void` llama a
   `sale.sale.voucher_unsold` (`line_id`, `amount`). Sin Ventas en el negocio no hay cifra de la que apartarla:
-  no se llama, el bono no guarda línea y sus sesiones no cuentan.
+  no se llama, el bono no guarda línea y sus sesiones no cuentan. `service.grant.link` (F36) hace después la
+  misma llamada a `sale.sale.voucher_sold`, con el importe del bono, y guarda la venta y la línea; sin Ventas se niega
+  (409 `service.sales_unavailable`), porque no hay venta que decir.
 - **La sesión gastada fuera del cobro con su profesional (F21)**: la otra. `service.grant.redeem` con `member_id` o
   `member` llama a `sale.voucher_session.record` (`session_id`, `staff_id`, `value`) con la sesión de quien la gasta
   (su permiso de Ventas, «Montar la cuenta», lo tienen los cuatro papeles) y en la misma transacción. `value` es el de
@@ -1121,7 +1162,7 @@ con la sesión de quien vende, como hace con Inventario.
 | Ver bonos vendidos, saldos y movimientos | sí | sí | sí | sí | `service.view_package_balance` |
 | Ver bonos sin cliente | sí | sí | sí | no | `service.view_orphan_grant` |
 | Anular bonos vendidos | sí | sí | sí | no | `service.void_grant` |
-| Ajustar bonos vendidos | sí | sí | sí | no | `service.adjust_grant` |
+| Ajustar bonos vendidos y decir después su venta | sí | sí | sí | no | `service.adjust_grant` |
 | Devolver sesiones al anular o devolver una venta | sí | sí | sí | no | `service.return_session` |
 | Ajustes | sí | sí | no | no | `service.manage_settings` |
 
@@ -1134,7 +1175,7 @@ Los papeles llegan del SaaS con prefijo (`hub_owner`, `hub_admin`, `hub_manager`
   lista y con los vacíos al final en las dos: la descendente es la ascendente leída al revés, empates incluidos. Lo fija
   `test_ties_read_backwards_in_a_descending_list`, por lista.
 - Anatomía completa de una app (copia de `apps/tax`): `apps.py`, `models.py`, `migrations/`,
-  `schemas.py`, `queries.py`, `services.py`, `events.py`, `live.py`, `api.py`, `admin.py`, `locale/`,
+  `schemas/`, `queries.py`, `services/`, `events.py`, `live.py`, `api.py`, `admin.py`, `locale/`,
   `frontend/` y un `tests/test_<fichero>.py` por fichero, más `tests/test_integration_tax.py`,
   `test_integration_staff.py`, `test_integration_customer.py` (con las apps reales, sin dobles),
   `test_relay.py` (los avisos de Clientes y Personal por el relay real del worker, con dos hubs) y
@@ -1251,7 +1292,7 @@ Los papeles llegan del SaaS con prefijo (`hub_owner`, `hub_admin`, `hub_manager`
   carrera.
 - **Tareas programadas**: `scheduled_tasks` del `AppConfig` declara `service.session.expire` cada
   hora (`0 * * * *`, UTC, `collapse`): la corre el worker (`base/scheduler.py`), en cada negocio y con su
-  ámbito (`base.worker._serve_hub`). Además, el saldo no cuenta una reserva vencida y reservar de nuevo la
+  ámbito (`base.hub_visits`). Además, el saldo no cuenta una reserva vencida y reservar de nuevo la
   misma línea marca antes la vencida.
 - **Bonos sin cliente** se calculan desde la ficha de Clientes (eliminada o anonimizada, y no unida a
   otra): no hace falta sellar nada al eliminarla. Unir dos fichas mueve los bonos con la reacción a
@@ -1308,9 +1349,9 @@ Los papeles llegan del SaaS con prefijo (`hub_owner`, `hub_admin`, `hub_manager`
   (`tests/test_integration_assistant.py`, hub#756).
 - El admin de Django del Hub tiene **CRUD completo** sobre todos los modelos (PLAN §17);
   una escritura cruda del admin no pasa por las reglas ni deja aviso, salvo la del árbol de categorías.
-- Tenencia: el ámbito es la primera parte del Host y cada negocio tiene su propia BD: los datos de `a` no se ven en `b`. Solo los tests escritos antes de la tenencia guardan `a` y `b`
-  en la misma BD de test (`base/tenancy/tests/legacy.py`). Cada negocio enciende y apaga sus
-  apps (BASE-F23, BASE-F24; `base.relay.active_apps`): los rechazos por «Servicios no activa» de F24, F26 y F27
+- Tenencia: el ámbito es la primera parte del Host y cada negocio tiene su propia BD: los datos de `a` no se ven en `b`.
+  Cada negocio enciende y apaga sus
+  apps (BASE-F23, BASE-F24; `base.apps_on.active_apps`): los rechazos por «Servicios no activa» de F24, F26 y F27
   los ve un negocio que apaga Servicios y sigue cobrando en Ventas, que no la tiene en sus `requires`.
 - Quién lee el catálogo, contado por sus llamadas (`rg '"service\.' apps`): Citas
   (`service.service.list_for_sale`, `service.assignment.eligible` y los modelos, que requiere), Ventas
@@ -1351,8 +1392,8 @@ Los papeles llegan del SaaS con prefijo (`hub_owner`, `hub_admin`, `hub_manager`
   devolver su venta (F27)**: toda línea del TPV necesita una categoría fiscal y un bono del catálogo
   no la tiene. Mientras, el bono se cobra a precio libre (con
   la sección de su IVA) y se concede con la concesión (asistente o API, F14) diciendo la venta.
-- **Enlazar a su venta un bono concedido sin decirla** (F14, hub#786): el bono sigue sin contar para quien hace
-  sus sesiones. Le pasa también a los vendidos antes de esa cifra.
+- **Decir en la pantalla la venta de un bono ya concedido** (F36, hub#786): en **Bonos vendidos** todavía no hay
+  acción para hacerlo; por ahora se dice con el asistente o la API.
 - **Importar servicios desde un fichero**: el alta de golpe es del asistente y la API.
 
 ## Lo que NO hace, a propósito

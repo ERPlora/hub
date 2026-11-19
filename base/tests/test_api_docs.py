@@ -104,8 +104,7 @@ class TestTheDocument:
         assert document["components"]["securitySchemes"] == {"ApiKey": {"type": "http", "scheme": "bearer"}}
         assert document["security"] == [{"ApiKey": []}]
         assert all("security" not in op for op in operations)
-        # A business is served only from its own database, where its keys live.
-        assert answer["keys_available"] is True
+        assert set(answer) == {"document", "apps"}
         assert {app["id"] for app in answer["apps"]} == {tag for op in operations for tag in op["tags"]}
         carts = document["paths"]["/api/cart_checkout/carts"]["get"]
         assert carts["description"] == operation_registry["cart_checkout.cart.list"].ai["description"]

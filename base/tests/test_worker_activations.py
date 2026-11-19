@@ -35,27 +35,15 @@ from base.tenancy.tests import hubs
 from base.tenancy.tests.hubs import opened_at  # noqa: F401 (a fixture)
 from control.models import Hub, HubDue
 
-pytestmark = pytest.mark.usefixtures("no_test_fallback")
-
 #: An app without ``requires``, with migrations of its own.
 APP = "printing"
 #: This module's template: the platform's apps and no other.
 VERTICAL = "w6activation"
 
 
-@pytest.fixture
-def no_test_fallback(monkeypatch):
-    from base.tenancy import context
-
-    monkeypatch.setattr(context, "_test_fallback", None)
-
-
 @pytest.fixture(autouse=True)
 def nothing_checked_yet(monkeypatch):
     monkeypatch.setattr(identity, "_verified", set())
-    monkeypatch.setattr(worker, "_swept", {})
-    monkeypatch.setattr(worker, "_synced", set())
-    monkeypatch.setattr(worker, "_next_hub", None)
 
 
 @pytest.fixture(autouse=True)
@@ -198,11 +186,9 @@ def tables_failing(monkeypatch) -> Callable[[], None]:
 # (A ``django_db`` test: pytest-django sets the test databases up for the session before any of this module's.)
 
 
-@pytest.mark.django_db
-def test_what_is_due_is_creating_unless_put_off_and_failed_once_its_next_try_came():
-    from base.tenancy.tests.legacy import use_legacy
-
-    with use_legacy():
+@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
+def test_what_is_due_is_creating_unless_put_off_and_failed_once_its_next_try_came(hub_a):
+    with use_hub(hub_a):
         _what_is_due()
 
 
@@ -507,16 +493,13 @@ def visited(hub: Hub, day) -> None:
     HubVisit.objects.create(host=hub.slug, day=day, saas_user_id="saas:1")
 
 
-def test_the_sweep_of_the_hubs_served_rings_a_hub_whose_ring_was_lost(business):
-    from base.tenancy.context import use_control
-
+def test_the_sweep_of_the_hubs_served_rings_a_hub_whose_ring_was_lost(business, worker_visits):
     a = business("a")
     turn_on(a)
     HubDue.objects.filter(hub_id=a.pk).delete()
     now = timezone.now()
 
-    with use_control():
-        worker._hubs(now)
+    worker_visits.serve(now)
     assert due_at(a) is not None and due_at(a) <= timezone.now()
 
     run_pass(timezone.now())
@@ -524,24 +507,28 @@ def test_the_sweep_of_the_hubs_served_rings_a_hub_whose_ring_was_lost(business):
 
 
 @pytest.mark.parametrize(("active", "again"), [(True, dt.timedelta(minutes=10)), (False, dt.timedelta(days=1))])
-def test_the_sweep_looks_into_a_hub_only_at_its_pace(business, active, again):
-    from base.tenancy.context import use_control
-
+def test_the_sweep_looks_into_a_hub_only_at_its_pace(business, worker_visits, active, again):
+    """A visit looks into it (the business is visited every minute at least, its look). Two worker processes, each
+    with its own pace: one visits it a second before its time, the other right at it."""
     a = business("a")
     now = timezone.now()
     if active:
         visited(a, now.date() - dt.timedelta(days=6))
-    with use_control():
-        worker._hubs(now)  # looked into once: the first pass of the process
+    another_worker = worker.hub_visits.HubVisits()
+    try:
+        worker_visits.serve(now)  # looked into once by each: the first visit of the process
+        another_worker.serve(now)
 
         with hubs.watched() as sent:
-            worker._hubs(now + dt.timedelta(minutes=1))
-            worker._hubs(now + again - dt.timedelta(seconds=1))
+            worker_visits.serve(now + dt.timedelta(minutes=1))
+            worker_visits.serve(now + again - dt.timedelta(seconds=1))
         assert activation_reads(sent, a) == 0
 
         with hubs.watched() as sent:
-            worker._hubs(now + again)
+            another_worker.serve(now + again)
         assert activation_reads(sent, a) > 0
+    finally:
+        another_worker.close()
 
 
 # ── Rollback: a database ahead of this code holds back only what it is about ────────────────────────────────────

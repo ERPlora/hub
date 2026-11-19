@@ -48,10 +48,10 @@ def automation() -> str:
 
 
 def test_the_narrow_send_is_an_action_an_automation_may_take_and_the_inbox_s_own_send_is_not():
-    catalog = queries.catalog_operations(A)
+    catalog = queries.catalog.catalog_operations(A)
     assert NOTIFY in catalog
     assert "whatsapp_inbox.message.send" not in catalog
-    fields = {field["name"] for field in queries.action_fields(catalog[NOTIFY])}
+    fields = {field["name"] for field in queries.catalog.action_fields(catalog[NOTIFY])}
     assert {"phone", "text", "template"} <= fields
 
 
@@ -131,7 +131,7 @@ def test_without_the_file_it_asks_for_nothing_is_sent_and_the_history_says_why()
 
 
 @HUB_DB
-@pytest.mark.usefixtures("hub_files", "no_test_fallback")
+@pytest.mark.usefixtures("hub_files")
 def test_a_file_of_another_business_is_never_sent(hub_a, hub_b):
     """Another business's file lives in its own database: an automation here that names it finds none and sends
     nothing."""

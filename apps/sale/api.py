@@ -9,12 +9,10 @@ from live.ninja import bind, run_operation
 from ninja import Query, Router
 
 from apps.sale import queries, services
-from apps.sale.schemas import (
-    CompleteIn,
-    DepartmentIn,
-    DepartmentListIn,
-    DepartmentRefIn,
-    DepartmentUpdateIn,
+from apps.sale.schemas.checkout import CompleteIn, PreviewIn
+from apps.sale.schemas.figures import PeriodIn
+from apps.sale.schemas.line_allergy import OrderSetLineAllergyIn
+from apps.sale.schemas.orders import (
     OrderAddComboLineIn,
     OrderAddLineIn,
     OrderAddOpenLineIn,
@@ -34,23 +32,21 @@ from apps.sale.schemas import (
     OrderSplitIn,
     OrderUpdateLineIn,
     OrderVoidLineIn,
+)
+from apps.sale.schemas.refunds import RefundByKeyIn, RefundIn
+from apps.sale.schemas.sales import SaleByKeyIn, SaleListIn, SalePrintIn, LetterheadIn, SaleRefIn, VoidIn
+from apps.sale.schemas.settings import (
+    DepartmentIn,
+    DepartmentListIn,
+    DepartmentRefIn,
+    DepartmentUpdateIn,
     PaymentMethodIn,
     PaymentMethodListIn,
-    PeriodIn,
-    PreviewIn,
     QuickNoteIn,
     QuickNoteListIn,
     QuickNoteRefIn,
     QuickNoteUpdateIn,
-    RefundByKeyIn,
-    RefundIn,
-    SaleByKeyIn,
-    SaleListIn,
-    SalePrintIn,
-    LetterheadIn,
-    SaleRefIn,
     SettingsPatchIn,
-    VoidIn,
 )
 
 router = Router(tags=["sale"])
@@ -61,42 +57,42 @@ router = Router(tags=["sale"])
 
 @bind(router, "sale.sale.list", "/sale/sales")
 async def sale_list(request, params: Query[SaleListIn]):
-    return await run_operation(request, queries.list_sales, params)
+    return await run_operation(request, queries.sales.list_sales, params)
 
 
 @bind(router, "sale.sale.get", "/sale/sales/detail")
 async def sale_get(request, params: Query[SaleRefIn]):
-    return await run_operation(request, queries.get_sale, params)
+    return await run_operation(request, queries.sales.get_sale, params)
 
 
 @bind(router, "sale.sale.by_idempotency_key", "/sale/sales/by_key")
 async def sale_by_key(request, params: Query[SaleByKeyIn]):
-    return await run_operation(request, queries.sale_by_key, params)
+    return await run_operation(request, queries.sales.sale_by_key, params)
 
 
 @bind(router, "sale.sale.stats", "/sale/sales/stats")
 async def sale_stats(request, params: Query[PeriodIn]):
-    return await run_operation(request, queries.stats, params)
+    return await run_operation(request, queries.figures.stats, params)
 
 
 @bind(router, "sale.sale.today", "/sale/sales/today")
 async def sale_today(request):
-    return await run_operation(request, queries.today)
+    return await run_operation(request, queries.figures.today)
 
 
 @bind(router, "sale.sale.last_7_days", "/sale/sales/last_7_days")
 async def sale_last_7_days(request):
-    return await run_operation(request, queries.last_7_days)
+    return await run_operation(request, queries.figures.last_7_days)
 
 
 @bind(router, "sale.sale.by_staff", "/sale/sales/by_staff")
 async def sale_by_staff(request, params: Query[PeriodIn]):
-    return await run_operation(request, queries.by_staff, params)
+    return await run_operation(request, queries.figures.by_staff, params)
 
 
 @bind(router, "sale.sale.complete", "/sale/sales", status=201)
 async def sale_complete(request, data: CompleteIn):
-    return await run_operation(request, services.complete, data)
+    return await run_operation(request, services.checkout.complete, data)
 
 
 @bind(
@@ -106,32 +102,32 @@ async def sale_complete(request, data: CompleteIn):
     status=201,
 )
 async def sale_complete_over_limit(request, data: CompleteIn):
-    return await run_operation(request, services.complete_over_limit, data)
+    return await run_operation(request, services.checkout.complete_over_limit, data)
 
 
 @bind(router, "sale.sale.void", "/sale/sales/void")
 async def sale_void(request, data: VoidIn):
-    return await run_operation(request, services.void_sale, data)
+    return await run_operation(request, services.voids.void_sale, data)
 
 
 @bind(router, "sale.sale.print", "/sale/sales/print")
 async def sale_print(request, data: SalePrintIn):
-    return await run_operation(request, services.print_sale, data)
+    return await run_operation(request, services.printouts.print_sale, data)
 
 
 @bind(router, "sale.sale.refund", "/sale/sales/refund")
 async def sale_refund(request, data: RefundIn):
-    return await run_operation(request, services.refund, data)
+    return await run_operation(request, services.refunds.refund, data)
 
 
 @bind(router, "sale.sale.issue_documents", "/sale/sales/issue_documents")
 async def sale_issue_documents(request, data: SaleRefIn):
-    return await run_operation(request, services.issue_documents, data)
+    return await run_operation(request, services.documents.issue_documents, data)
 
 
 @bind(router, "sale.checkout.preview", "/sale/checkout/preview")
 async def checkout_preview(request, params: Query[PreviewIn]):
-    return await run_operation(request, queries.preview, params)
+    return await run_operation(request, queries.checkout.preview, params)
 
 
 # Open checks
@@ -139,119 +135,124 @@ async def checkout_preview(request, params: Query[PreviewIn]):
 
 @bind(router, "sale.order.list", "/sale/orders")
 async def order_list(request, params: Query[OrderListIn]):
-    return await run_operation(request, queries.list_orders, params)
+    return await run_operation(request, queries.orders.list_orders, params)
 
 
 @bind(router, "sale.order.get", "/sale/orders/detail")
 async def order_get(request, params: Query[OrderRefIn]):
-    return await run_operation(request, queries.get_order, params)
+    return await run_operation(request, queries.orders.get_order, params)
 
 
 @bind(router, "sale.order.open", "/sale/orders", status=201)
 async def order_open(request, data: OrderOpenIn):
-    return await run_operation(request, services.open_order, data)
+    return await run_operation(request, services.orders.open_order, data)
 
 
 @bind(router, "sale.order.add_line", "/sale/orders/add_line")
 async def order_add_line(request, data: OrderAddLineIn):
-    return await run_operation(request, services.add_line, data)
+    return await run_operation(request, services.order_lines.add_line, data)
 
 
 @bind(router, "sale.order.add_open_line", "/sale/orders/add_open_line")
 async def order_add_open_line(request, data: OrderAddOpenLineIn):
-    return await run_operation(request, services.add_open_line, data)
+    return await run_operation(request, services.order_lines.add_open_line, data)
 
 
 @bind(router, "sale.order.add_service_line", "/sale/orders/add_service_line")
 async def order_add_service_line(request, data: OrderAddServiceLineIn):
-    return await run_operation(request, services.add_service_line, data)
+    return await run_operation(request, services.order_lines.add_service_line, data)
 
 
 @bind(router, "sale.order.add_combo_line", "/sale/orders/add_combo_line")
 async def order_add_combo_line(request, data: OrderAddComboLineIn):
-    return await run_operation(request, services.add_combo_line, data)
+    return await run_operation(request, services.order_lines.add_combo_line, data)
 
 
 @bind(router, "sale.order.apply_voucher", "/sale/orders/apply_voucher")
 async def order_apply_voucher(request, data: OrderApplyVoucherIn):
-    return await run_operation(request, services.apply_voucher, data)
+    return await run_operation(request, services.line_vouchers.apply_voucher, data)
 
 
 @bind(router, "sale.order.remove_voucher", "/sale/orders/remove_voucher")
 async def order_remove_voucher(request, data: OrderLineRefIn):
-    return await run_operation(request, services.remove_voucher, data)
+    return await run_operation(request, services.line_vouchers.remove_voucher, data)
 
 
 @bind(router, "sale.order.update_line", "/sale/orders/update_line")
 async def order_update_line(request, data: OrderUpdateLineIn):
-    return await run_operation(request, services.update_line, data)
+    return await run_operation(request, services.order_lines.update_line, data)
 
 
 @bind(router, "sale.order.set_line_staff", "/sale/orders/set_line_staff")
 async def order_set_line_staff(request, data: OrderSetLineStaffIn):
-    return await run_operation(request, services.set_line_staff, data)
+    return await run_operation(request, services.order_lines.set_line_staff, data)
+
+
+@bind(router, "sale.order.set_line_allergy", "/sale/orders/set_line_allergy")
+async def order_set_line_allergy(request, data: OrderSetLineAllergyIn):
+    return await run_operation(request, services.line_allergy.set_line_allergy, data)
 
 
 @bind(router, "sale.order.split_line", "/sale/orders/split_line")
 async def order_split_line(request, data: OrderLineRefIn):
-    return await run_operation(request, services.split_line, data)
+    return await run_operation(request, services.order_lines.split_line, data)
 
 
 @bind(router, "sale.order.remove_line", "/sale/orders/remove_line")
 async def order_remove_line(request, data: OrderLineRefIn):
-    return await run_operation(request, services.remove_line, data)
+    return await run_operation(request, services.order_lines.remove_line, data)
 
 
 @bind(router, "sale.order.void_line", "/sale/orders/void_line")
 async def order_void_line(request, data: OrderVoidLineIn):
-    return await run_operation(request, services.void_line, data)
+    return await run_operation(request, services.order_lines.void_line, data)
 
 
 @bind(router, "sale.order.fire", "/sale/orders/fire")
 async def order_fire(request, data: OrderFireIn):
-    return await run_operation(request, services.fire, data)
+    return await run_operation(request, services.order_actions.fire, data)
 
 
 @bind(router, "sale.order.print_bill", "/sale/orders/print_bill")
 async def order_print_bill(request, data: OrderRefIn):
-    return await run_operation(request, services.print_bill, data)
+    return await run_operation(request, services.printouts.print_bill, data)
 
 
 @bind(router, "sale.order.split", "/sale/orders/split")
 async def order_split(request, data: OrderSplitIn):
-    return await run_operation(request, services.split, data)
+    return await run_operation(request, services.order_actions.split, data)
 
 
 @bind(router, "sale.order.merge", "/sale/orders/merge")
 async def order_merge(request, data: OrderMergeIn):
-    return await run_operation(request, services.merge, data)
+    return await run_operation(request, services.order_actions.merge, data)
 
 
 @bind(router, "sale.order.void", "/sale/orders/void")
 async def order_void(request, data: OrderRefIn):
-    return await run_operation(request, services.void_order, data)
+    return await run_operation(request, services.order_actions.void_order, data)
 
 
 @bind(router, "sale.order.void_ordered", "/sale/orders/void_ordered")
 async def order_void_ordered(request, data: OrderRefIn):
-    return await run_operation(request, services.void_ordered, data)
+    return await run_operation(request, services.order_actions.void_ordered, data)
 
 
 @bind(router, "sale.order.set_discount", "/sale/orders/set_discount")
 async def order_set_discount(request, data: OrderSetDiscountIn):
-    return await run_operation(request, services.set_discount, data)
+    return await run_operation(request, services.discounts.set_discount, data)
 
 
 @bind(
     router, "sale.order.set_discount_over_limit", "/sale/orders/set_discount_over_limit"
 )
 async def order_set_discount_over_limit(request, data: OrderSetDiscountIn):
-    return await run_operation(request, services.set_discount_over_limit, data)
+    return await run_operation(request, services.discounts.set_discount_over_limit, data)
 
 
 @bind(router, "sale.order.set_line_discount", "/sale/orders/set_line_discount")
 async def order_set_line_discount(request, data: OrderSetLineDiscountIn):
-    return await run_operation(request, services.set_line_discount, data)
+    return await run_operation(request, services.discounts.set_line_discount, data)
 
 
 @bind(
@@ -260,17 +261,17 @@ async def order_set_line_discount(request, data: OrderSetLineDiscountIn):
     "/sale/orders/set_line_discount_over_limit",
 )
 async def order_set_line_discount_over_limit(request, data: OrderSetLineDiscountIn):
-    return await run_operation(request, services.set_line_discount_over_limit, data)
+    return await run_operation(request, services.discounts.set_line_discount_over_limit, data)
 
 
 @bind(router, "sale.order.set_label", "/sale/orders/set_label")
 async def order_set_label(request, data: OrderSetLabelIn):
-    return await run_operation(request, services.set_label, data)
+    return await run_operation(request, services.order_actions.set_label, data)
 
 
 @bind(router, "sale.order.set_appointment", "/sale/orders/set_appointment")
 async def order_set_appointment(request, data: OrderSetAppointmentIn):
-    return await run_operation(request, services.set_appointment, data)
+    return await run_operation(request, services.order_actions.set_appointment, data)
 
 
 # Payment methods and settings
@@ -278,32 +279,32 @@ async def order_set_appointment(request, data: OrderSetAppointmentIn):
 
 @bind(router, "sale.payment_method.list", "/sale/payment_methods")
 async def payment_method_list(request, params: Query[PaymentMethodListIn]):
-    return await run_operation(request, queries.list_payment_methods, params)
+    return await run_operation(request, queries.payment_methods.list_payment_methods, params)
 
 
 @bind(router, "sale.payment_method.create", "/sale/payment_methods", status=201)
 async def payment_method_create(request, data: PaymentMethodIn):
-    return await run_operation(request, services.create_payment_method, data)
+    return await run_operation(request, services.settings.create_payment_method, data)
 
 
 @bind(router, "sale.settings.get", "/sale/settings")
 async def settings_get(request):
-    return await run_operation(request, queries.get_settings)
+    return await run_operation(request, queries.settings.get_settings)
 
 
 @bind(router, "sale.settings.update", "/sale/settings")
 async def settings_update(request, data: SettingsPatchIn):
-    return await run_operation(request, services.update_settings, data)
+    return await run_operation(request, services.settings.update_settings, data)
 
 
 @bind(router, "sale.pos_settings.get", "/sale/pos_settings")
 async def pos_settings_get(request):
-    return await run_operation(request, queries.get_pos_settings)
+    return await run_operation(request, queries.settings.get_pos_settings)
 
 
 @bind(router, "sale.letterhead.get", "/sale/letterhead")
 async def letterhead_get(request, params: Query[LetterheadIn]):
-    return await run_operation(request, queries.get_letterhead, params)
+    return await run_operation(request, queries.letterhead.get_letterhead, params)
 
 
 # Departments and quick notes
@@ -311,42 +312,42 @@ async def letterhead_get(request, params: Query[LetterheadIn]):
 
 @bind(router, "sale.department.list", "/sale/departments")
 async def department_list(request, params: Query[DepartmentListIn]):
-    return await run_operation(request, queries.list_departments, params)
+    return await run_operation(request, queries.departments.list_departments, params)
 
 
 @bind(router, "sale.department.create", "/sale/departments", status=201)
 async def department_create(request, data: DepartmentIn):
-    return await run_operation(request, services.create_department, data)
+    return await run_operation(request, services.settings.create_department, data)
 
 
 @bind(router, "sale.department.update", "/sale/departments/update")
 async def department_update(request, data: DepartmentUpdateIn):
-    return await run_operation(request, services.update_department, data)
+    return await run_operation(request, services.settings.update_department, data)
 
 
 @bind(router, "sale.department.delete", "/sale/departments/delete")
 async def department_delete(request, data: DepartmentRefIn):
-    return await run_operation(request, services.delete_department, data)
+    return await run_operation(request, services.settings.delete_department, data)
 
 
 @bind(router, "sale.quick_note.list", "/sale/quick_notes")
 async def quick_note_list(request, params: Query[QuickNoteListIn]):
-    return await run_operation(request, queries.list_quick_notes, params)
+    return await run_operation(request, queries.departments.list_quick_notes, params)
 
 
 @bind(router, "sale.quick_note.create", "/sale/quick_notes", status=201)
 async def quick_note_create(request, data: QuickNoteIn):
-    return await run_operation(request, services.create_quick_note, data)
+    return await run_operation(request, services.settings.create_quick_note, data)
 
 
 @bind(router, "sale.quick_note.update", "/sale/quick_notes/update")
 async def quick_note_update(request, data: QuickNoteUpdateIn):
-    return await run_operation(request, services.update_quick_note, data)
+    return await run_operation(request, services.settings.update_quick_note, data)
 
 
 @bind(router, "sale.quick_note.delete", "/sale/quick_notes/delete")
 async def quick_note_delete(request, data: QuickNoteRefIn):
-    return await run_operation(request, services.delete_quick_note, data)
+    return await run_operation(request, services.settings.delete_quick_note, data)
 
 
 # The business day and refunds
@@ -354,19 +355,19 @@ async def quick_note_delete(request, data: QuickNoteRefIn):
 
 @bind(router, "sale.business_day.get", "/sale/business_day")
 async def business_day(request):
-    return await run_operation(request, queries.business_day)
+    return await run_operation(request, queries.business.business_day)
 
 
 @bind(router, "sale.refund.list", "/sale/refunds")
 async def refund_list(request, params: Query[SaleRefIn]):
-    return await run_operation(request, queries.list_refunds, params)
+    return await run_operation(request, queries.refunds.list_refunds, params)
 
 
 @bind(router, "sale.refund.options", "/sale/refunds/options")
 async def refund_options(request, params: Query[SaleRefIn]):
-    return await run_operation(request, queries.refund_options, params)
+    return await run_operation(request, queries.refunds.refund_options, params)
 
 
 @bind(router, "sale.refund.by_idempotency_key", "/sale/refunds/by_key")
 async def refund_by_key(request, params: Query[RefundByKeyIn]):
-    return await run_operation(request, queries.refund_by_key, params)
+    return await run_operation(request, queries.refunds.refund_by_key, params)

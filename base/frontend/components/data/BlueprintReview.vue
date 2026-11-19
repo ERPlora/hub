@@ -7,7 +7,7 @@ import { IonButton, IonCheckbox } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
 
 import { useBaseI18n } from '../../lib/i18n';
-import type { BlueprintSummary } from '../../operations';
+import type { BlueprintSummary } from '../../operations/blueprints';
 import '../../data.css';
 
 const props = withDefaults(defineProps<{ summary: BlueprintSummary; pending?: boolean; error?: string }>(), {

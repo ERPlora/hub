@@ -836,13 +836,6 @@ msgstr "Esta importación ya no existe."
 msgid "This load was undone already."
 msgstr "Esta importación ya se deshizo."
 
-msgid ""
-"Resetting the business is not available yet. Undo a load instead, or remove"
-" what you want from each app."
-msgstr ""
-"Restablecer el negocio todavía no está disponible. Deshaz una importación o "
-"quita lo que quieras desde cada app."
-
 msgid "Choose what to empty."
 msgstr "Elige qué vaciar."
 
@@ -1684,10 +1677,6 @@ msgstr "Esa placa ya la lleva otra persona. La placa dice quién está en la caj
 msgid "This person has no badge to remove."
 msgstr "Esta persona no tiene placa que quitar."
 
-#: services.py:2002
-msgid "API keys are not available yet for this business."
-msgstr "Las API keys todavía no están disponibles para este negocio."
-
 #: services.py:2014
 msgid "Choose at least one app and what the key may do on it."
 msgstr "Elige al menos una app y qué puede hacer la key en ella."
@@ -1826,19 +1815,19 @@ msgctxt "base"
 msgid "Help"
 msgstr "Ayuda"
 
-#: base/schemas.py
+#: base/schemas/support.py
 msgid "Report subject"
 msgstr "Asunto del informe"
 
-#: base/schemas.py
+#: base/schemas/support.py
 msgid "Where to go"
 msgstr "A dónde ir"
 
-#: base/schemas.py
+#: base/schemas/support.py
 msgid "What happened?"
 msgstr "¿Qué pasó?"
 
-#: base/schemas.py
+#: base/schemas/support.py
 msgid "Screen"
 msgstr "Pantalla"
 
@@ -1993,35 +1982,35 @@ msgstr[0] "Has llegado al límite de %(count)s app de tu plan. Mejora el plan o 
 msgstr[1] "Has llegado al límite de %(count)s apps de tu plan. Mejora el plan o desactiva una."
 msgstr[2] "Has llegado al límite de %(count)s apps de tu plan. Mejora el plan o desactiva una."
 
-#: base/schemas.py
+#: base/schemas/blueprints.py
 msgid "Template"
 msgstr "Plantilla"
 
-#: base/schemas.py
+#: base/schemas/blueprints.py base/schemas/files.py
 msgid "File"
 msgstr "Archivo"
 
-#: base/schemas.py
+#: base/schemas/blueprints.py
 msgid "Apps to load"
 msgstr "Apps que se cargan"
 
-#: base/schemas.py
+#: base/schemas/people.py
 msgid "Person"
 msgstr "Persona"
 
-#: base/schemas.py
+#: base/schemas/files.py
 msgid "Folder"
 msgstr "Carpeta"
 
-#: base/schemas.py
+#: base/schemas/files.py
 msgid "In folder"
 msgstr "En la carpeta"
 
-#: base/schemas.py
+#: base/schemas/files.py
 msgid "File or folder"
 msgstr "Archivo o carpeta"
 
-#: base/schemas.py
+#: base/schemas/files.py
 msgid "Move to"
 msgstr "Mover a"
 
@@ -2099,6 +2088,28 @@ msgstr "La foto pesa más de 2 MB. Elige una más ligera."
 #: images.py
 msgid "The photo could not be saved. Try again."
 msgstr "No se pudo guardar la foto. Inténtalo de nuevo."
+
+#: public_images.py
+msgid "The file did not arrive whole: choose it again."
+msgstr "El archivo no llegó entero: vuelve a elegirlo."
+
+#: public_images.py
+msgid "The file is empty."
+msgstr "El archivo está vacío."
+
+#: public_images.py
+msgid "The image may weigh 5 MB at most."
+msgstr "La imagen puede pesar 5 MB como mucho."
+
+#: public_images.py
+#, python-format
+msgid "This file is not a %(type)s image."
+msgstr "Este archivo no es una imagen %(type)s."
+
+#: public_images.py
+#, python-format
+msgid "The image may be %(side)s pixels a side at most."
+msgstr "La imagen puede medir %(side)s píxeles por lado como mucho."
 
 #: blueprint.py
 msgid "The file holds a photo that is not a WebP image of up to 2 MB, so it cannot be read."
@@ -2208,9 +2219,6 @@ msgstr "migración de destino"
 msgctxt "app activation"
 msgid "The last migration of the code that asked for its tables: an older worker leaves it."
 msgstr "La última migración del código que pidió sus tablas: un worker más antiguo la deja."
-
-msgid "This business shares its database: its apps are turned on at once."
-msgstr "Este negocio comparte su base de datos: sus apps se encienden al momento."
 
 #: middleware.py
 msgid ""
@@ -2337,3 +2345,82 @@ msgstr "Ajustes"
 #: queries/app_help.py
 msgid "This app has no help yet."
 msgstr "Esta app aún no tiene ayuda."
+
+#: allergens.py
+msgctxt "allergen"
+msgid "Gluten"
+msgstr "Gluten"
+
+#: allergens.py
+msgctxt "allergen"
+msgid "Crustaceans"
+msgstr "Crustáceos"
+
+#: allergens.py
+msgctxt "allergen"
+msgid "Egg"
+msgstr "Huevo"
+
+#: allergens.py
+msgctxt "allergen"
+msgid "Fish"
+msgstr "Pescado"
+
+#: allergens.py
+msgctxt "allergen"
+msgid "Peanut"
+msgstr "Cacahuete"
+
+#: allergens.py
+msgctxt "allergen"
+msgid "Soy"
+msgstr "Soja"
+
+#: allergens.py
+msgctxt "allergen"
+msgid "Milk"
+msgstr "Leche"
+
+#: allergens.py
+msgctxt "allergen"
+msgid "Tree nuts"
+msgstr "Frutos de cáscara"
+
+#: allergens.py
+msgctxt "allergen"
+msgid "Celery"
+msgstr "Apio"
+
+#: allergens.py
+msgctxt "allergen"
+msgid "Mustard"
+msgstr "Mostaza"
+
+#: allergens.py
+msgctxt "allergen"
+msgid "Sesame"
+msgstr "Sésamo"
+
+#: allergens.py
+msgctxt "allergen"
+msgid "Sulphites"
+msgstr "Sulfitos"
+
+#: allergens.py
+msgctxt "allergen"
+msgid "Lupin"
+msgstr "Altramuces"
+
+#: allergens.py
+msgctxt "allergen"
+msgid "Molluscs"
+msgstr "Moluscos"
+
+#: allergens.py
+msgid "That allergen is not one of the fourteen that must be declared."
+msgstr "Ese alérgeno no es uno de los catorce de declaración obligatoria."
+
+#: allergens.py
+#, python-format
+msgid "Allergen not recognized: %(text)s"
+msgstr "Alérgeno no reconocido: %(text)s"

@@ -48,7 +48,11 @@ class InvoiceConfig(LiveAppConfig):
         "invoice.rectify_invoice",
         "invoice.manage_series",
         "invoice.manage_issuer",
+        "invoice.public",
     ]
+    # The page base's public door serves without a session at /p/<slug>/invoice/<code> (INVOICE-F04): whoever opens
+    # it holds ``invoice.public`` and nothing else.
+    public_pages = {"invoice": "invoice.public"}
     # Keys are the customer roles as the SaaS sends them (``hub_`` prefix included). Receiving the
     # issuer from the SaaS (``invoice.sync_issuer``) is declared by no role: only the system holds it.
     role_permissions = {
@@ -108,9 +112,12 @@ class InvoiceConfig(LiveAppConfig):
         ),
     ]
 
+    fiscal_archive_models = ("Issuer", "InvoiceSeries", "Invoice", "InvoiceLine")
+
     def fiscal_documents_kept(self) -> bool:
-        """The platform asks (``base.tenancy.offboarding``) before it drops the database of a business that left:
-        its invoices here are documents nothing archives yet, so the database stays."""
+        """The platform asks (``base.tenancy.offboarding``) before it drops the database of a business that left: its
+        invoices here are documents to keep, so the database stays; they go to the fiscal archive first
+        (``fiscal_archive_models``)."""
         from apps.invoice import queries  # the models are not loaded yet when this module is
 
         return queries.keeps_fiscal_documents()

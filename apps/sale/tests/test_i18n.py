@@ -69,27 +69,27 @@ def test_spanish_texts():
         assert str(models.FACTORY_METHOD_NAMES["Cash"]) == "Efectivo"
         assert str(models.FACTORY_METHOD_NAMES["Card"]) == "Tarjeta"
         assert (
-            str(services.CUSTOMER_REQUIRED)
+            str(services.checkout.CUSTOMER_REQUIRED)
             == "Este negocio exige un cliente en cada venta."
         )
         assert (
-            str(services.DISCOUNTS_NOT_ALLOWED) == "Este negocio no permite descuentos."
+            str(services.discounts.DISCOUNTS_NOT_ALLOWED) == "Este negocio no permite descuentos."
         )
         # SALE-F27 and F32 (WORKBOOK).
-        assert str(services.VOUCHER_NEEDS_ONE_UNIT) == (
+        assert str(services.line_vouchers.VOUCHER_NEEDS_ONE_UNIT) == (
             "Un bono paga una línea de una unidad: separa la línea antes."
         )
-        assert str(services.REFUND_NOTHING) == (
+        assert str(services.refunds.REFUND_NOTHING) == (
             "Una devolución tiene que devolver dinero o la sesión de un bono."
         )
-        assert str(queries.SERVICES_UNAVAILABLE).startswith(
+        assert str(queries.other_apps.SERVICES_UNAVAILABLE).startswith(
             "Servicios no está activa en este negocio"
         )
         # The open price's families are «secciones» everywhere the user reads.
-        assert str(queries.DEPARTMENT_NOT_FOUND) == (
+        assert str(queries.departments.DEPARTMENT_NOT_FOUND) == (
             "Esa sección ya no está en este negocio. Recarga la lista y vuelve a intentarlo."
         )
-        assert str(schemas.SAY_WHICH_DEPARTMENT_ROW) == (
+        assert str(schemas.fields.SAY_WHICH_DEPARTMENT_ROW) == (
             "Di qué sección: su id o su nombre."
         )
 

@@ -7,7 +7,9 @@ import { type BrowserContext, type Page, expect, test } from '@playwright/test';
 
 import { formatDateTime } from '../../packages/ui/src/components/format/dateTime';
 import { type Figures, figuresAt, shownFigures, watchFigures } from './demo-figures';
-import { A, api, createItem, decodeSubs, listReady, login, record, rowOf, shot, shown } from './helpers';
+import { A, api, login, record, shot, shown } from './helpers';
+import { createItem, listReady, rowOf } from './demo-items';
+import { decodeSubs } from './live-streams';
 
 type Sub = { op: string; params: Record<string, unknown> };
 

@@ -27,6 +27,7 @@ from live.operations import get
 from apps.combo.models import ChoiceOption
 from apps.inventory.models import Product, StockMovement
 from apps.kitchen.models import Ticket
+from apps.kitchen.tests.conftest import add_printers
 from base.models import EventDelivery
 from base.tenancy.context import use_hub
 
@@ -295,6 +296,7 @@ def kitchen_paper() -> dict[str, list[dict]]:
 def test_combo_f11_a_menu_fired_reaches_each_station_under_its_kitchen_name_through_the_relay(tick, till_menu):
     """The kitchen gets the dishes the table chose, each at its own station, under the
     menu's kitchen name, on the card and on paper; the service is never cooked."""
+    add_printers()
     station("Cold")
     station("Grill")
     station("Bar", usage="bar")

@@ -35,6 +35,11 @@ describe('HelpEntry', () => {
     expect(notReady.wrapper.findComponent(HelpWindow).exists()).toBe(false);
   });
 
+  it('uses the default Ionic topbar colour like the assistant button', async () => {
+    await setup();
+    expect(buttonInDoc().getAttribute('fill')).toBeNull();
+  });
+
   it('uses the Spanish accessible name', async () => {
     await setup('table', 'es');
     expect(accessibleName(buttonInDoc())).toBe('Ayuda');

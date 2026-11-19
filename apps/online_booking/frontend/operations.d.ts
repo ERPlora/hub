@@ -86,11 +86,23 @@ export interface DeletedOut {
 
 // ── Settings ───────────────────────────────────────────────────────────────────────────────────
 
+export interface LogoOut {
+  id: string;
+  url: string;
+}
+
+export interface LogoUploadIn {
+  filename: string;
+  content_type: 'image/jpeg' | 'image/png' | 'image/webp';
+  data_base64: string;
+}
+
 export interface SettingsOut {
   is_enabled: boolean;
   page_title: string;
   welcome_message: string;
   primary_color: string;
+  logo: string;
   logo_url: string;
   require_email: boolean;
   max_upcoming_per_customer: number;
@@ -108,11 +120,13 @@ export interface SettingsOut {
 }
 
 /** Only what is sent changes, all of it or nothing. */
-export type SettingsIn = Partial<Omit<SettingsOut, 'timezone'>>;
+export type SettingsIn = Partial<Omit<SettingsOut, 'timezone' | 'logo_url'>>;
 
 // ── The public page ────────────────────────────────────────────────────────────────────────────
 
 export interface PageOut {
+  business_name: string;
+  privacy_policy_url: string;
   title: string;
   welcome_message: string;
   primary_color: string;
@@ -176,6 +190,7 @@ export interface PublicBookIn {
   phone: string;
   email?: string;
   notes?: string;
+  website?: string;
 }
 
 export interface BookedOut {
@@ -199,6 +214,8 @@ export interface PublicCancelIn extends TokenIn {
 }
 
 export interface PublicBookingOut {
+  business_name: string;
+  logo_url: string;
   number: string;
   status: BookingStatus;
   start: string;
@@ -230,6 +247,7 @@ declare module '@erplora/ui/sdk' {
     'online_booking.booking.delete': { input: BookingRefIn; output: DeletedOut };
     'online_booking.settings.get': { input: NoIn; output: SettingsOut };
     'online_booking.settings.update': { input: SettingsIn; output: SettingsOut };
+    'online_booking.settings.upload_logo': { input: LogoUploadIn; output: LogoOut };
     'online_booking.public.page': { input: NoIn; output: PageOut };
     'online_booking.public.services': { input: PublicServicesIn; output: Page<PublicServiceOut> };
     'online_booking.public.slots': { input: PublicSlotsIn; output: PublicSlotsOut };

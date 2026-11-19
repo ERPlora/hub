@@ -250,6 +250,7 @@ Escape y tocar fuera del panel (hub#1023).
 | INVENTORY-F08 | Agrupar productos en categorías para el TPV | hecho |
 | INVENTORY-F29 | Marcar un artículo como agotado | hecho |
 | INVENTORY-F34 | Recuperar un producto eliminado | hecho |
+| INVENTORY-F35 | Declarar los alérgenos de un producto | hecho |
 | | **Importar y exportar** | |
 | INVENTORY-F09 | Importar productos desde un CSV | hecho |
 | INVENTORY-F10 | Importar categorías desde un CSV | hecho |
@@ -487,8 +488,8 @@ Pasos:
    crea nada todavía.
 2. En «Revisa la importación», cada columna trae su campo adivinado por la cabecera, en español o
    inglés y con o sin tildes («Nombre», «Código», «Precio», «IVA»…). Cámbialo o pon «No importar».
-   Se pueden importar Nombre, SKU, Precio, Coste, Stock, Umbral, EAN-13, Descripción, Unidad y
-   Categoría fiscal; Nombre y SKU son obligatorias.
+   Se pueden importar Nombre, SKU, Precio, Coste, Stock, Umbral, EAN-13, Descripción, Alérgenos,
+   Unidad y Categoría fiscal; Nombre y SKU son obligatorias.
 3. Mira las «Primeras {n} filas de {total}» y el ensayo de todo el fichero: «{ready} filas listas
    · {failed} con problemas» («1 fila lista» con una), con la línea y el motivo de las diez primeras.
 4. Pulsa «Importar {n} productos» («Importar 1 producto» con uno; o «Cancelar», que no deja rastro).
@@ -551,7 +552,7 @@ Pasos:
    productos).
 Entra: los productos o las categorías que cumplen la búsqueda y los filtros.
 Sale: el fichero, con las mismas cabeceras que reconoce la importación (Nombre, SKU, Precio, Coste,
-Stock, Umbral, EAN-13, Descripción, Unidad, Categoría fiscal, Activo) y las cifras como se leen en
+Stock, Umbral, EAN-13, Descripción, Alérgenos, Unidad, Categoría fiscal, Activo) y las cifras como se leen en
 pantalla (2,20 €, 3 unidades), de modo que se puede volver a importar sin cambiar nada. No guarda
 ni avisa nada.
 Si falla: sin productos, el fichero lleva solo la cabecera. Sin permiso de exportar, el botón no
@@ -925,8 +926,8 @@ Pantalla: ninguna
 Pasos:
 1. Al abrir el TPV, Ventas pide a Inventario los productos activos (los agotados, para enseñarlos en
    gris), las categorías, qué categorías tiene cada producto y las unidades. Al cobrar, pide el
-   catálogo de venta entero: precio, coste, categoría fiscal, unidad y si cada artículo lleva control
-   de stock.
+   catálogo de venta entero: precio, coste, categoría fiscal, unidad, alérgenos y si cada artículo lleva
+   control de stock.
 2. Cocina pide los productos y las categorías para elegir qué envía a cada estación.
 3. Menús pide los productos que se pueden poner como componente: los activos, también los agotados
    hoy (un menú se monta con ellos); al vender, no ofrece una elección cuyo producto está agotado.
@@ -1124,14 +1125,50 @@ librería que recupera si no tenía ninguna), y el aviso de producto recuperado 
 producto tal como vuelve.
 Si falla: no vuelve si el negocio ya hizo otro producto con su SKU o su EAN-13 desde que lo eliminó: se queda el que
 hizo, y la recuperación no lo cuenta ni lo crea. Un producto que el negocio ya no tiene en absoluto se crea de nuevo
-(INVENTORY-F01), sin stock, con la imagen de la librería que tenía en la copia. Sobre un producto vivo no falla:
+(INVENTORY-F01), sin stock, con la imagen de la librería y los alérgenos que tenía en la copia; el de una copia de
+antes de que los productos tuvieran alérgenos vuelve sin ninguno (INVENTORY-F35). Sobre un producto vivo no falla:
 responde bien y vuelve a avisar. Su foto propia no vuelve: se borró al eliminarlo (INVENTORY-F31). La imagen de la
 librería sí, porque eliminar se la deja; uno eliminado antes de que se la dejara, que se quedó sin ninguna, recupera
 la que tenía en la copia, salvo una que la librería ya no tiene. Sus reglas de descuento de Tarifas se vuelven a activar solas (PRICING-F14) y sus precios en las tarifas vuelven si se
 recupera también Tarifas (PRICING-F15), sus grupos de suplementos, si se recupera también Suplementos
 (MODIFIER-F10), y sus elecciones en los menús, si se recupera también Menús (COMBO-F15).
 Implicados: BASE-F114, INVENTORY-F01, INVENTORY-F03, INVENTORY-F04, INVENTORY-F07, INVENTORY-F16, INVENTORY-F29, INVENTORY-F30,
-PRICING-F14, PRICING-F15, MODIFIER-F09, MODIFIER-F10, COMBO-F13, COMBO-F15
+INVENTORY-F35, PRICING-F14, PRICING-F15, MODIFIER-F09, MODIFIER-F10, COMBO-F13, COMBO-F15
+
+### INVENTORY-F35 Declarar los alérgenos de un producto
+Estado: hecho
+Actor: administrador, responsable
+Pantalla: Productos, Ficha del producto, Importar productos
+Pasos:
+1. En **Productos**, abre el formulario con **+** o con «Editar». Debajo de «Descripción» sale el bloque
+   «Alérgenos», con la nota «Marca los que lleva, también dentro de una salsa, un rebozado o una guarnición.»
+   y los catorce alérgenos de declaración obligatoria, cada uno por su nombre y siempre en este orden: Gluten,
+   Crustáceos, Huevo, Pescado, Cacahuete, Soja, Leche, Frutos de cáscara, Apio, Mostaza, Sésamo, Sulfitos,
+   Altramuces y Moluscos. En el alta no sale ninguno marcado.
+2. Toca los que lleva el producto: cada toque marca o desmarca uno. No hay otros: es la lista del reglamento
+   europeo y no se amplía.
+3. Pulsa «Guardar» o «Guardar cambios», como en el alta y en la edición (INVENTORY-F01, INVENTORY-F02). Un
+   alérgeno marcado sin guardar pregunta antes de cerrar el panel, como cualquier otro campo.
+4. La **ficha del producto** dice «Alérgenos: Gluten, Leche», en el orden de la lista, o «Sin alérgenos
+   declarados» si no tiene ninguno marcado.
+5. Para tener la carta entera por escrito, exporta el catálogo (INVENTORY-F11): el fichero lleva la columna
+   «Alérgenos», con sus nombres separados por comas («Gluten, Leche») y vacía si no tiene ninguno. La
+   importación (INVENTORY-F09) reconoce esa columna en los productos que crea, con los nombres en español o en
+   inglés, con o sin tildes y en mayúsculas o minúsculas; un SKU que ya existe se omite como siempre y sus
+   alérgenos no cambian.
+Entra: el producto; la lista de los catorce alérgenos.
+Sale: el producto con sus alérgenos, en el mismo paso que el resto del formulario: o se guarda todo o nada.
+Inventario avisa del cambio como de cualquier otro, y el catálogo que leen el TPV y Cocina (INVENTORY-F27) lleva
+los alérgenos de cada producto. Lo mismo se hace por el asistente o la API, con los mismos permisos («marca gluten
+y leche en la hamburguesa» pide antes la tarjeta de confirmación). Un cambio vale para lo que se pida desde ese
+momento: una línea ya pedida conserva los alérgenos que tenía al pedirla (SALE-F40).
+Si falla: un alérgeno que no es de la lista se rechaza, también por el asistente o la API, y no se guarda nada
+(«Ese alérgeno no es uno de los catorce de declaración obligatoria.»). En la importación, una celda con un nombre
+que no se reconoce deja la fila como fallida con el motivo «Alérgeno no reconocido: <texto>». Quien solo puede ver
+productos lee la línea de la ficha, pero no tiene el formulario. Todo rechazo sale dentro del panel, como los del
+resto del formulario.
+Implicados: INVENTORY-F01, INVENTORY-F02, INVENTORY-F09, INVENTORY-F11, INVENTORY-F27, INVENTORY-F34, SALE-F40, SALE-F41,
+KITCHEN-F32
 
 ## Qué comparten los verticales
 
@@ -1175,7 +1212,7 @@ puede ver, o lo que ya no existe, no sale.
 |---|---|---|---|
 | Los productos con su stock y si están agotados, con búsqueda, filtros (nombre, SKU, precio, stock, estado, agotado) y páginas; «a la venta» da lo que ofrece el TPV | ver productos | F03, F05, F27, F29 | `inventory.product.list` |
 | La ficha completa de un producto (por su id, su SKU o su nombre) | ver productos | F02, F25 | `inventory.product.get` |
-| El catálogo de venta entero: productos a la venta (activos y no agotados) con precio, coste, categoría fiscal, unidad y si llevan control de stock | ver productos | F27 | `inventory.product.list_for_sale` |
+| El catálogo de venta entero: productos a la venta (activos y no agotados) con precio, coste, categoría fiscal, unidad, alérgenos y si llevan control de stock | ver productos | F27 | `inventory.product.list_for_sale` |
 | Los productos en su umbral o por debajo, del que menos tiene al que más | ver productos | F17 | `inventory.product.list_low_stock` |
 | Qué categorías tiene cada producto activo | ver productos | F08, F27 | `inventory.product_category.list` |
 | Las categorías, con cuántos productos activos tiene cada una (agotados incluidos, lo que enseña el TPV) | ver categorías | F06, F27 | `inventory.category.list` |
@@ -1190,9 +1227,9 @@ puede ver, o lo que ya no existe, no sale.
 
 | Qué hace | Quién puede | Confirmación en el asistente | Flujos | Servicio |
 |---|---|---|---|---|
-| Da de alta un producto, con sus categorías y su stock inicial | dar de alta productos | un clic | F01, F20, F26 | `inventory.product.create` |
-| Da de alta muchos productos de una vez y dice qué fila entró, cuál se omitió y cuál falló | importar productos | un clic | F09 | `inventory.product.bulk_create` |
-| Cambia un producto: datos, activo o inactivo, control de stock y categorías | cambiar productos | un clic | F02, F03, F05, F08, F20 | `inventory.product.update` |
+| Da de alta un producto, con sus categorías, sus alérgenos y su stock inicial | dar de alta productos | un clic | F01, F20, F26, F35 | `inventory.product.create` |
+| Da de alta muchos productos de una vez y dice qué fila entró, cuál se omitió y cuál falló | importar productos | un clic | F09, F35 | `inventory.product.bulk_create` |
+| Cambia un producto: datos, alérgenos, activo o inactivo, control de stock y categorías | cambiar productos | un clic | F02, F03, F05, F08, F20, F35 | `inventory.product.update` |
 | Elimina un producto | eliminar productos | escribir para confirmar | F04 | `inventory.product.delete` |
 | Devuelve al catálogo un producto eliminado, tal como era (solo el sistema, al recuperar desde una copia aparte) | sistema | no es del asistente: solo lo hace la plataforma | F34 | `inventory.product.restore` |
 | Marca un producto como agotado o lo vuelve a poner a la venta | cambiar productos | un clic | F29 | `inventory.product.set_sold_out` |
@@ -1205,7 +1242,7 @@ puede ver, o lo que ya no existe, no sale.
 | Cambia una categoría | cambiar categorías | un clic | F06 | `inventory.category.update` |
 | Elimina una categoría y desvincula sus productos | eliminar categorías | escribir para confirmar | F07 | `inventory.category.delete` |
 | Devuelve una categoría eliminada, como una nueva, con los productos eliminados que tenía (solo el sistema, al recuperar desde una copia aparte) | sistema | no es del asistente: solo lo hace la plataforma | F07, F34 | `inventory.category.recover` |
-| Exporta productos o categorías a CSV | exportar productos | un clic | F11 | `inventory.product.export`, `inventory.category.export` |
+| Exporta productos o categorías a CSV | exportar productos | un clic | F11, F35 | `inventory.product.export`, `inventory.category.export` |
 | Registra una recepción de mercancía (uno o varios productos, coste y albarán) | mover stock | un clic | F13 | `inventory.stock.receive` |
 | Aplica un recuento: el saldo pasa a ser lo contado, con motivo | mover stock | un clic | F14 | `inventory.stock.count` |
 | Da de baja una cantidad sin venta (merma, rotura, consumo propio), con motivo | mover stock | un clic | F15 | `inventory.stock.write_off` |
@@ -1320,9 +1357,12 @@ Lo que sigue es para quien cambia la app; quien la usa puede parar aquí.
   sin quitar ninguna otra categoría. Va aparte, con su propia cuenta, porque toca lo que el negocio tiene. Una categoría
   rehecha a mano (`created_by` de una persona) o conservada no se rellena. Las categorías y los enlaces se leen desde `0001_initial` y los
   productos desde `0005_product_image`, la que les dio la imagen (a una copia anterior se le niegan los productos con
-  `recover_copy_behind`); una migración que añada, quite o renombre una columna que se lee cambia también la lectura
-  y su `reads_since`. Tests: `tests/test_recovery.py`, de punta a punta
-  incluido, y el contrato de `base/tenancy/tests/test_recovery.py`.
+  `recover_copy_behind`). Sus alérgenos, de `0006_product_allergens`, no suben esa migración: están en
+  `copy_columns.LATER_PRODUCT_FIELDS` y se leen solo si la tabla de la copia tiene su columna (`pg_attribute`), así
+  que una copia anterior devuelve sus productos sin ellos. Una migración que añada, quite o renombre una columna que
+  se lee cambia también la lectura y su `reads_since`, salvo una columna nueva que pueda faltar en la copia, que va a
+  `copy_columns`. Tests: `tests/test_recovery.py`, de punta a punta incluido, `tests/test_copy_columns.py` y el
+  contrato de `base/tenancy/tests/test_recovery.py`.
   Las apps cuyos registros de la copia cuelgan de un producto (Tarifas, Suplementos, Menús) no emparejan a su manera:
   piden a `queries.products_standing_for` (`{id allí: SKU allí}`) el producto del negocio que hace de cada uno que ya
   no está vivo aquí: el vivo con su SKU que hizo una recuperación (`base.recovery.brought_back`), la de esta pasada u
@@ -1579,6 +1619,8 @@ Las hace cumplir la app por cualquier puerta (pantalla, asistente, API).
 - Las peticiones a `@erplora/ui` de `UI-REQUESTS.md` (iconos, `KpiCard`, `Combo` múltiple, importar y
   exportar CSV y panel lateral del `DataTable`, formateadores, `useI18n` y ayudas de test): ninguna rompe
   un flujo y cada una tiene su sustituto en uso.
+- **Los alérgenos del producto** (F35, `no hecho`): el servidor, con el catálogo y el CSV, va por hub#1735, y el
+  formulario y la ficha, por hub#1738. Los de un suplemento son de Suplementos (hub#1739).
 
 ## Lo que NO hace, a propósito
 
@@ -1597,6 +1639,11 @@ Las hace cumplir la app por cualquier puerta (pantalla, asistente, API).
 - No enseña en el TPV cuántas unidades quedan, ni marca un artículo agotado sola cuando su stock llega
   a cero, ni lo vuelve a poner a la venta al recibir mercancía: la marca «Agotado» la pone y la quita
   una persona (F29).
+- No declara más alérgenos que los catorce de declaración obligatoria (anexo II del Reglamento (UE)
+  1169/2011), ni guarda «puede contener trazas» (F35): ese aviso es voluntario y ninguno de los TPV de
+  referencia lo guarda; lo que no es de la lista se escribe en la descripción.
+- No deduce los alérgenos de unos ingredientes (no hace recetas) ni los trae la plantilla del sector (F12):
+  dependen de la receta de cada cocina, y los declara el negocio producto a producto.
 
 ## Dudas abiertas
 

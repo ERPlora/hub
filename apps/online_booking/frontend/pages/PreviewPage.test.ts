@@ -9,6 +9,8 @@ import { business, click, ionChecked, ionValue, type MountOptions, mountOnlineBo
 import PreviewPage from './PreviewPage.vue';
 
 const PAGE: PageOut = {
+  business_name: 'Salón Lucía',
+  privacy_policy_url: 'https://erplora.com/legal/privacy/',
   title: 'Salón Lucía',
   welcome_message: 'Book your next visit',
   primary_color: '#6366f1',
@@ -50,6 +52,8 @@ const BOOKED: BookedOut = {
   token: 't'.repeat(43),
 };
 const SEEN: PublicBookingOut = {
+  business_name: PAGE.business_name,
+  logo_url: PAGE.logo_url,
   number: BOOKED.number,
   status: 'confirmed',
   start: BOOKED.start,
@@ -194,7 +198,7 @@ describe('PreviewPage', () => {
     await settle();
     expect(s.sent().at(-1)).toMatchObject({ method: 'POST', path: '/api/online_booking/public/cancel', body: { token: 't'.repeat(43) } });
     expect(s.el('status')?.textContent).toContain('Cancelled');
-    expect(s.el('status')?.textContent).toContain('It can no longer be cancelled online.');
+    expect(s.el('status')?.textContent).not.toContain('It can no longer be cancelled online.');
   });
 
   it('puts a refusal under its field, and a refused time above the button', async () => {

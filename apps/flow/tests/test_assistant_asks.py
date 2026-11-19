@@ -60,12 +60,6 @@ TOOLS = THE_QUESTIONS | {
     "flow.secret.list",
     "flow.secret.delete",
 }
-#: live weighs the action asked only when the tool's name spells it, and knows no verb of granting: «activa» is
-#: ``enable``, never the ``enabled`` of ``set_enabled``; «renombra» is ``rename``, never an ``update`` that takes the
-#: name; «permite a…» asks for nothing. Named by its own name and not as «la automatización», none of the three comes
-#: among the tools a turn offers, whatever its asks say short of copying the probe.
-LIVE_53 = pytest.mark.xfail(strict=True, reason="ERPlora/live#53: no enable/rename/grant weight for set_enabled/update/grant")
-AWAITS_LIVE = {"flow.flow.set_enabled", "flow.flow.update", "flow.flow.grant"}
 
 #: The requests of hub#1106's QA as the owner said them (``tests/e2e/qa/probes/owner-es-flow-2026-11-08.json``), and
 #: nothing of the tools' ``asks``: before Automations said its asks, none of these tools was among the ones a turn offers
@@ -83,20 +77,13 @@ REPORTED = [
         "flow.flow.create",
         "crea desde ese borrador la automatización Crear ejemplo QA al cobrar, pausada y sin permisos todavía",
     ),
-    pytest.param(
-        "flow.flow.grant",
-        "permite a Crear ejemplo QA al cobrar leer la venta y crear elementos de Demo, nada más",
-        marks=LIVE_53,
-    ),
-    pytest.param(
-        "flow.flow.set_enabled", "activa Crear ejemplo QA al cobrar ya que tiene los permisos mínimos", marks=LIVE_53
-    ),
+    ("flow.flow.grant", "permite a Crear ejemplo QA al cobrar leer la venta y crear elementos de Demo, nada más"),
+    ("flow.flow.set_enabled", "activa Crear ejemplo QA al cobrar ya que tiene los permisos mínimos"),
     ("flow.flow.run", "ejecuta ahora Crear ejemplo QA al cobrar sin datos de entrada"),
     ("flow.draft.dismiss", "descarta el borrador que no llegué a convertir en automatización, conservando su registro"),
-    pytest.param(
+    (
         "flow.flow.update",
         "renombra Crear ejemplo QA al cobrar como «Crear ejemplo diario QA», sin tocar pasos ni permisos",
-        marks=LIVE_53,
     ),
     ("flow.recipe.disable", "pausa la primera receta activa sin borrar sus permisos ni historial"),
     # The QA blamed the data for these three (no sale to read, nothing set up yet), but no turn offered their tool
@@ -203,8 +190,7 @@ def test_only_who_runs_the_business_is_offered_the_automations(catalog_of):
 def test_the_reported_requests_are_the_owners_probes_of_layer_2():
     """Each phrase above is word for word the owner's probe of its tool: the test measures what layer 2 measures."""
     phrases = probe_phrases()
-    reported = [(param.values if hasattr(param, "values") else param) for param in REPORTED]
-    assert [phrases.get(comparable(phrase)) for _, phrase in reported] == [f"owner.es.{name}" for name, _ in reported]
+    assert [phrases.get(comparable(phrase)) for _, phrase in REPORTED] == [f"owner.es.{name}" for name, _ in REPORTED]
     assert {probe["tool"] for probe in PROBES} == TOOLS  # positive control: one probe per tool, all read
 
 
@@ -217,14 +203,7 @@ def test_the_reported_request_is_offered_its_tool_and_the_read_that_finds_it(cat
 
 
 @HUB_DB  # the catalogue is of the apps on in the business (base.activation)
-@pytest.mark.parametrize(
-    "probe",
-    [
-        pytest.param(probe, marks=LIVE_53) if probe["tool"] in AWAITS_LIVE else probe
-        for probe in PROBES
-    ],
-    ids=[probe["id"] for probe in PROBES],
-)
+@pytest.mark.parametrize("probe", PROBES, ids=[probe["id"] for probe in PROBES])
 def test_every_probe_of_automations_offers_its_tool_without_being_one_of_its_asks(catalog_of, probe):
     """The owner's thirty phrases of layer 2, the ones the model answered right too: a tool of Automations that a new ask
     elsewhere pushes out of the ones a turn offers fails here before the real-model QA sees it."""
@@ -290,10 +269,9 @@ NAMED = [
 
 @HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize(("name", "phrase"), NAMED)
-def test_what_waits_for_live_is_offered_when_the_request_names_the_automation(catalog_of, name, phrase):
+def test_enabling_renaming_and_granting_are_offered_when_the_request_names_the_automation(catalog_of, name, phrase):
     tools = catalog_of(Membership.Role.OWNER, "es")
     assert nobodys_words(tools, phrase)
-    assert {name for name, _ in NAMED} == AWAITS_LIVE  # positive control: the same three the probes wait for
     assert name in offered_to(tools, phrase)[:TOP]
 
 

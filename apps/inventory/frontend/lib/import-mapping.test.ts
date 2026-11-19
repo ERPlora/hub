@@ -35,8 +35,8 @@ describe('guessMapping (products)', () => {
   });
 
   it("recognises the export's own headers in both languages (Activo / Active is not imported)", () => {
-    const es = ['Nombre', 'SKU', 'Precio', 'Coste', 'Stock', 'Umbral', 'EAN-13', 'Descripción', 'Unidad', 'Categoría fiscal', 'Activo'];
-    const en = ['Name', 'SKU', 'Price', 'Cost', 'Stock', 'Threshold', 'EAN-13', 'Description', 'Unit', 'Tax category', 'Active'];
+    const es = ['Nombre', 'SKU', 'Precio', 'Coste', 'Stock', 'Umbral', 'EAN-13', 'Descripción', 'Alérgenos', 'Unidad', 'Categoría fiscal', 'Activo'];
+    const en = ['Name', 'SKU', 'Price', 'Cost', 'Stock', 'Threshold', 'EAN-13', 'Description', 'Allergens', 'Unit', 'Tax category', 'Active'];
     const fields = [...PRODUCT_IMPORT_FIELDS, ''];
     expect(guessMapping(es, PRODUCT_IMPORT_ALIASES)).toEqual(fields);
     expect(guessMapping(en, PRODUCT_IMPORT_ALIASES)).toEqual(fields);

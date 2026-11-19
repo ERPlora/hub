@@ -9,7 +9,7 @@
 import { useLive } from '@erplora/ui/sdk';
 import { type Component, computed, defineAsyncComponent, reactive } from 'vue';
 
-import type { SystemCardDef } from '../operations';
+import type { SystemCardDef } from '../operations/home';
 import { appComponent } from '../lib/app-components';
 
 const { data, status } = useLive('base.system.cards', {});

@@ -82,7 +82,7 @@ DJANGO_ATOMIC_ALLOWED: dict[str, str] = {
         "are control's, the alias of its own transaction. The registry block is left as it is here."
     ),
     "base/services/sessions.py::open_session_from_saas": CONTROL_LOGIN,
-    "base/services/__init__.py::open_session_on_device": CONTROL_LOGIN,
+    "base/services/devices.py::open_session_on_device": CONTROL_LOGIN,
     "base/services/sessions.py::open_admin_session_from_saas": (
         "Only control's models (the staff copy, its groups, Django's session), on the platform host: control's "
         "transaction."
@@ -348,7 +348,7 @@ def test_the_scanner_lets_lives_atomic_and_the_rest_of_transaction_be():
 def test_the_scan_reads_the_apps_and_base_but_not_the_tenancy_the_migrations_nor_the_tests():
     files = {str(path) for path in scanned_files()}
 
-    assert {"apps/sale/services.py", "apps/task/admin.py", "base/services/__init__.py", "base/catalog.py"} <= files
+    assert {"apps/sale/services/checkout.py", "apps/task/admin.py", "base/services/__init__.py", "base/catalog.py"} <= files
     assert not any(path.startswith("base/tenancy/") for path in files)
     assert not any("/migrations/" in path or "/tests/" in path for path in files)
 
@@ -378,12 +378,6 @@ def test_every_listed_function_still_uses_djangos_atomic():
 
 
 HUB_DB = pytest.mark.django_db(databases=hubs.HUB_DATABASES)
-
-
-@pytest.fixture
-def no_test_fallback(monkeypatch):
-    """As production: without a context a hub's model fails (``base/tenancy/tests/conftest.py`` has the same one)."""
-    monkeypatch.setattr(context, "_test_fallback", None)
 
 
 class Empty(Schema):
@@ -424,7 +418,6 @@ def recover(ctx, data) -> dict:
 
 
 @HUB_DB
-@pytest.mark.usefixtures("no_test_fallback")
 def test_an_operation_in_a_recovers_from_an_integrity_error_in_a_savepoint_of_a_and_never_opens_one_on_control(
     hub_a, hub_b
 ):
@@ -450,7 +443,6 @@ def test_an_operation_in_a_recovers_from_an_integrity_error_in_a_savepoint_of_a_
 
 
 @HUB_DB
-@pytest.mark.usefixtures("no_test_fallback")
 def test_outside_an_operation_atomic_opens_in_the_active_context_and_refuses_without_one(hub_a):
     with context.use_hub(hub_a):
         in_a = current_alias()

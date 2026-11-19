@@ -3,7 +3,7 @@
 // naming whose booking and when, with an optional reason kept in the appointment's history. «Cancel the
 // booking» cancels it (its time becomes free); «Keep it» leaves it. A refusal stays in the dialog.
 import { FormModal } from '@erplora/ui/components';
-import { useCommand } from '@erplora/ui/sdk';
+import { ApiError, useCommand } from '@erplora/ui/sdk';
 import { IonTextarea } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
 
@@ -11,9 +11,15 @@ import { dayOf, formatDay, formatTime, timeOf } from '../../../appointment/front
 import { useUnsavedFormOnOpen } from '../../../../base/frontend/lib/unsaved-changes';
 
 import { useLocale, useT } from '../composables/useT';
-import type { BookingRow } from '../operations';
+import type { BookingRow, PublicBookingOut } from '../operations';
 
-const props = defineProps<{ booking: BookingRow | null }>();
+const props = withDefaults(defineProps<{
+  booking: BookingRow | PublicBookingOut | null;
+  token?: string;
+  pending?: boolean;
+  error?: ApiError | null;
+}>(), { token: '', pending: false, error: null });
+const emit = defineEmits<{ confirm: [reason: string] }>();
 const open = defineModel<boolean>('open', { default: false });
 
 const t = useT();
@@ -32,12 +38,20 @@ const message = computed(() => {
   const item = props.booking;
   if (!item) return '';
   const when = `${formatDay(dayOf(item.start), locale.value)} · ${formatTime(timeOf(item.start), locale.value)}`;
-  const customer = item.customer_name || t('online_booking.bookings.erasedCustomer');
-  return t('online_booking.bookings.cancel.message', { customer, when });
+  if (props.token) return t('online_booking.door.cancel.message', { number: item.number, when });
+  const customer = 'customer_name' in item ? item.customer_name : '';
+  return t('online_booking.bookings.cancel.message', { customer: customer || t('online_booking.bookings.erasedCustomer'), when });
 });
+const pending = computed(() => (props.token ? props.pending : cancel.pending.value));
+const error = computed(() => (props.token ? props.error : cancel.error.value));
 
 async function confirm(): Promise<void> {
   if (!props.booking) return;
+  if (props.token) {
+    emit('confirm', reason.value.trim());
+    return;
+  }
+  if (!('id' in props.booking)) return;
   try {
     await cancel.run({ id: props.booking.id, reason: reason.value.trim() });
   } catch {
@@ -58,8 +72,8 @@ async function confirm(): Promise<void> {
     :submit-label="$t('online_booking.bookings.cancel.confirm')"
     :cancel-label="$t('online_booking.bookings.cancel.keep')"
     submit-color="danger"
-    :pending="cancel.pending.value"
-    :error="cancel.error.value"
+    :pending="pending"
+    :error="error"
     @submit="confirm"
   >
     <p>{{ message }}</p>

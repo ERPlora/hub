@@ -10,7 +10,7 @@ import { useRouter } from 'vue-router';
 
 import { pendingApps, RETRY_BLOCKED_KEY, statusPill, stillLoading } from '../../lib/data';
 import { useBaseI18n } from '../../lib/i18n';
-import type { ImportRow } from '../../operations';
+import type { ImportRow } from '../../operations/blueprints';
 import '../../data.css';
 
 const props = withDefaults(

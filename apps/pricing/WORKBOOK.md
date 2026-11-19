@@ -555,7 +555,7 @@ desactivar y las reglas, solo desde el Hub o el asistente.
 | Tarifa cambiada | Editar con algún cambio, o su grupo borrado | `id` | `pricing.price_list.updated` |
 | Tarifa general cambiada | Elegirla o quitarla | `id`, `is_default`, `previous_id` | `pricing.price_list.default_changed` |
 | Tarifa desactivada / reactivada | Desactivar / activar | `id` | `pricing.price_list.deactivated`, `…activated` |
-| Precio puesto | Añadir, o recuperarlo desde una copia aparte | `id`, `price_list_id`, `product_id` o `service_id`, `min_quantity`, `price` | `pricing.price_item.added` |
+| Precio puesto | Añadir, o recuperarlo desde una copia aparte | `id`, `price_list_id`, `product_id` o `service_id`, `min_quantity`, `price`, `currency` (la de su tarifa) | `pricing.price_item.added` |
 | Precio cambiado | Editar, o el nombre nuevo de un servicio | `id` (o `service_id`) | `pricing.price_item.updated` |
 | Precio quitado | Quitar, o el producto borrado | `id`, `price_list_id` | `pricing.price_item.removed` |
 | Regla nueva | Crear | `id`, `code` | `pricing.rule.created` |
@@ -702,8 +702,7 @@ Ventas **no** requiere Tarifas y Tarifas no toca Ventas. Lo que se pide a Ventas
 - Cantidades de las reglas: `Article.measure` (la cantidad en `pricing_unit`, con las fracciones exactas
   de `UNIT_SPECS`); el importe de la línea usa además `price_quantity` (`Article.ratio`). Los tramos de
   una tarifa siguen en la unidad propia del producto, que la tabla pinta junto a la cantidad («500 g»).
-- Tenencia: el ámbito es la primera parte del Host y cada negocio tiene su propia BD: los datos de `a` no se ven en `b`. Solo los tests escritos antes de la tenencia guardan `a` y `b`
-  en la misma BD de test (`base/tenancy/tests/legacy.py`).
+- Tenencia: el ámbito es la primera parte del Host y cada negocio tiene su propia BD: los datos de `a` no se ven en `b`.
 - `PriceItem.product`, `DiscountRule.product` y `DiscountRule.category` van en `CASCADE` hacia Inventario: el
   borrado físico de un producto o de una categoría (el admin del Hub) en un hub donde Tarifas nunca se creó pasa
   por alto la relación con sus tablas, que no existen (`base/tenancy/deletion.py`). El grupo de clientes es un

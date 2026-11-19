@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:445f7a278f1b7b84574ff69079e27be9588e00f522c8e7679d5607430a56581d -->
+<!-- generated from WORKBOOK.md sha256:3264337be3a77f0dfd8e927ee792d15feeebf99a072a61436f8de2fb1144db43 -->
 
 ## What it is for and who it is for
 
@@ -238,6 +238,7 @@ same, in the browser too (hub#1023).
 | INVENTORY-F08 | Group products into categories for the till | done |
 | INVENTORY-F29 | Mark an item as sold out | done |
 | INVENTORY-F34 | Recover a deleted product | done |
+| INVENTORY-F35 | Declare a product's allergens | done |
 | | **Import and export** | |
 | INVENTORY-F09 | Import products from a CSV | done |
 | INVENTORY-F10 | Import categories from a CSV | done |
@@ -471,8 +472,8 @@ Steps:
    line; separated by commas or by semicolons, as Excel saves it in Spanish). Nothing is created yet.
 2. In "Check the import", each column comes with its field guessed from the header, in Spanish or
    English and with or without accents ("Name", "Code", "Price", "VAT"…). Change it or set "Do not
-   import". Name, SKU, Price, Cost, Stock, Threshold, EAN-13, Description, Unit and Tax category can be
-   imported; Name and SKU are required.
+   import". Name, SKU, Price, Cost, Stock, Threshold, EAN-13, Description, Allergens, Unit and Tax category
+   can be imported; Name and SKU are required.
 3. Look at the "First {n} rows of {total}" and at the rehearsal of the whole file: "{ready} rows ready
    · {failed} with problems" ("1 row ready" with one), with the line and the reason of the first ten.
 4. Tap "Import {n} products" ("Import 1 product" with one; or "Cancel", which leaves no trace).
@@ -533,7 +534,7 @@ Steps:
    products).
 In: the products or the categories that match the search and the filters.
 Out: the file, with the same headers the import recognises (Name, SKU, Price, Cost, Stock, Threshold,
-EAN-13, Description, Unit, Tax category, Active) and the figures as they read on screen (€2.20, 3
+EAN-13, Description, Allergens, Unit, Tax category, Active) and the figures as they read on screen (€2.20, 3
 units), so it can be imported back without changing anything. It neither saves nor tells anything.
 If it fails: with no products, the file carries only the header. Without permission to export, the
 button does not show and the app does not hand it over through any other door. A text a spreadsheet
@@ -902,7 +903,8 @@ Screen: none
 Steps:
 1. When the till opens, Sales asks Inventory for the active products (the sold-out ones, to show them in
    grey), the categories, which categories each product has and the units. When charging, it asks for
-   the whole sales catalog: price, cost, tax category, unit and whether each item has stock control.
+   the whole sales catalog: price, cost, tax category, unit, allergens and whether each item has stock
+   control.
 2. Kitchen asks for the products and the categories to choose what it sends to each station.
 3. Menus asks for the products that can be set as a component: the active ones, also those sold out
    today (a menu is built with them); when selling, it does not offer a choice whose product is sold out.
@@ -1098,7 +1100,8 @@ library it gets back if it had none), and the product-recovered notice (`invento
 product as it comes back.
 If it fails: it does not come back if the business has already made another product with its SKU or its EAN-13 since
 it deleted it: the one it made stays, and the recovery neither counts nor creates it. A product the business no longer
-has at all is created again (INVENTORY-F01), with no stock, with the image of the library it had in the copy. On a
+has at all is created again (INVENTORY-F01), with no stock, with the image of the library and the allergens it had
+in the copy; one from a copy made before products had allergens comes back without any (INVENTORY-F35). On a
 live product it does not fail: it answers well and announces again. Its own photo does not come back: it was erased
 when it was deleted (INVENTORY-F31). The image of the library does, because deleting leaves it; one deleted before
 deleting left it, which was left without any, gets back the one it had in the copy, unless the library no longer has
@@ -1107,7 +1110,41 @@ themselves (PRICING-F14) and its prices in the price lists come back if Price Li
 its modifier groups, if Modifiers is recovered too (MODIFIER-F10), and its choices in the menus, if Menus is recovered
 too (COMBO-F15).
 Involved: BASE-F114, INVENTORY-F01, INVENTORY-F03, INVENTORY-F04, INVENTORY-F07, INVENTORY-F16, INVENTORY-F29, INVENTORY-F30,
-PRICING-F14, PRICING-F15, MODIFIER-F09, MODIFIER-F10, COMBO-F13, COMBO-F15
+INVENTORY-F35, PRICING-F14, PRICING-F15, MODIFIER-F09, MODIFIER-F10, COMBO-F13, COMBO-F15
+
+### INVENTORY-F35 Declare a product's allergens
+Status: done
+Actor: administrator, manager
+Screen: Products, Product card, Import products
+Steps:
+1. In **Products**, open the form with **+** or with "Edit". Under "Description" comes the "Allergens" block, with
+   the note "Mark the ones it has, also inside a sauce, a batter or a side." and the fourteen allergens that must be
+   declared, each by its name and always in this order: Gluten, Crustaceans, Egg, Fish, Peanut, Soy, Milk, Tree
+   nuts, Celery, Mustard, Sesame, Sulphites, Lupin and Molluscs. When creating, none comes marked.
+2. Tap the ones the product has: each tap marks or unmarks one. There are no others: it is the list of the European
+   regulation and it is not extended.
+3. Tap "Save" or "Save changes", as when creating and editing (INVENTORY-F01, INVENTORY-F02). An allergen marked and
+   not saved asks before the panel closes, like any other field.
+4. The **product card** says "Allergens: Gluten, Milk", in the order of the list, or "No allergens declared" if it
+   has none marked.
+5. To have the whole menu in writing, export the catalogue (INVENTORY-F11): the file carries the "Allergens" column,
+   with their names separated by commas ("Gluten, Milk") and empty if it has none. The import (INVENTORY-F09)
+   recognises that column in the products it creates, with the names in Spanish or in English, with or without
+   accents and in upper or lower case; a SKU that already exists is skipped as always and its allergens do not
+   change.
+In: the product; the list of the fourteen allergens.
+Out: the product with its allergens, in the same step as the rest of the form: either everything is saved or
+nothing. Inventory tells of the change as of any other, and the catalogue the till and Kitchen read
+(INVENTORY-F27) carries each product's allergens. The same is done through the assistant or the API, with the same
+permissions ("mark gluten and milk on the burger" asks for the confirmation card first). A change counts for what
+is ordered from that moment on: a line already ordered keeps the allergens it had when it was ordered (SALE-F40).
+If it fails: an allergen that is not on the list is refused, also through the assistant or the API, and nothing is
+saved ("That allergen is not one of the fourteen that must be declared."). In the import, a cell with a name that
+is not recognised leaves the row as failed with the reason "Allergen not recognised: <text>". Whoever can only see
+products reads the line of the card, but has no form. Every refusal shows inside the panel, like those of the rest
+of the form.
+Involved: INVENTORY-F01, INVENTORY-F02, INVENTORY-F09, INVENTORY-F11, INVENTORY-F27, INVENTORY-F34, SALE-F40, SALE-F41,
+KITCHEN-F32
 
 ## What the verticals share
 
@@ -1151,7 +1188,7 @@ or what no longer exists, is left out.
 |---|---|---|---|
 | The products with their stock and whether they are sold out, with search, filters (name, SKU, price, stock, status, sold out) and pages; "on sale" gives what the till offers | view products | F03, F05, F27, F29 | `inventory.product.list` |
 | A product's full card (by its id, its SKU or its name) | view products | F02, F25 | `inventory.product.get` |
-| The whole sales catalog: products on sale (active and not sold out) with price, cost, tax category, unit and whether they have stock control | view products | F27 | `inventory.product.list_for_sale` |
+| The whole sales catalog: products on sale (active and not sold out) with price, cost, tax category, unit, allergens and whether they have stock control | view products | F27 | `inventory.product.list_for_sale` |
 | The products at their threshold or below, from the one with least to the one with most | view products | F17 | `inventory.product.list_low_stock` |
 | Which categories each active product has | view products | F08, F27 | `inventory.product_category.list` |
 | The categories, with how many active products each one has (sold-out ones included, what the till shows) | view categories | F06, F27 | `inventory.category.list` |
@@ -1166,9 +1203,9 @@ or what no longer exists, is left out.
 
 | What it does | Who can | Confirmation in the assistant | Flows | Service |
 |---|---|---|---|---|
-| Creates a product, with its categories and its initial stock | create products | one tap | F01, F20, F26 | `inventory.product.create` |
-| Creates many products at once and says which row went in, which was skipped and which failed | import products | one tap | F09 | `inventory.product.bulk_create` |
-| Changes a product: data, active or inactive, stock control and categories | change products | one tap | F02, F03, F05, F08, F20 | `inventory.product.update` |
+| Creates a product, with its categories, its allergens and its initial stock | create products | one tap | F01, F20, F26, F35 | `inventory.product.create` |
+| Creates many products at once and says which row went in, which was skipped and which failed | import products | one tap | F09, F35 | `inventory.product.bulk_create` |
+| Changes a product: data, allergens, active or inactive, stock control and categories | change products | one tap | F02, F03, F05, F08, F20, F35 | `inventory.product.update` |
 | Deletes a product | delete products | type to confirm | F04 | `inventory.product.delete` |
 | Gives a deleted product back to the catalog, as it was (the system only, when recovering from a separate copy) | system | not the assistant's: only the platform does it | F34 | `inventory.product.restore` |
 | Marks a product as sold out or puts it back on sale | change products | one tap | F29 | `inventory.product.set_sold_out` |
@@ -1181,7 +1218,7 @@ or what no longer exists, is left out.
 | Changes a category | change categories | one tap | F06 | `inventory.category.update` |
 | Deletes a category and unlinks its products | delete categories | type to confirm | F07 | `inventory.category.delete` |
 | Gives a deleted category back, as a new one, with the deleted products it had (the system only, when recovering from a separate copy) | system | not the assistant's: only the platform does it | F07, F34 | `inventory.category.recover` |
-| Exports products or categories to CSV | export products | one tap | F11 | `inventory.product.export`, `inventory.category.export` |
+| Exports products or categories to CSV | export products | one tap | F11, F35 | `inventory.product.export`, `inventory.category.export` |
 | Records a goods receipt (one or several products, cost and delivery note) | move stock | one tap | F13 | `inventory.stock.receive` |
 | Applies a count: the balance becomes what was counted, with a reason | move stock | one tap | F14 | `inventory.stock.count` |
 | Writes off a quantity without a sale (waste, breakage, own consumption), with a reason | move stock | one tap | F15 | `inventory.stock.write_off` |

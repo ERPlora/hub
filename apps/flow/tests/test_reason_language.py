@@ -163,11 +163,11 @@ def test_every_reason_of_the_engine_is_said_in_english_and_in_spanish():
         "count": 9,
         "max": 8,
     }
-    assert len(queries.REASONS) >= 25  # positive control: the engine's reasons are all named
-    for key in queries.REASONS:
+    assert len(queries.reasons.REASONS) >= 25  # positive control: the engine's reasons are all named
+    for key in queries.reasons.REASONS:
         reason = {"key": key, "values": values}
         with translation.override("en"):
-            english = queries.say(reason)
+            english = queries.reasons.say(reason)
         with translation.override("es"):
-            spanish = queries.say(reason)
+            spanish = queries.reasons.say(reason)
         assert english and spanish and english != spanish, key

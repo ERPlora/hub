@@ -24,7 +24,7 @@ from pydantic import (
 
 from apps.modifier.models import MAX_CHOICES, MAX_DELTA, MAX_OPTIONS, NAME_MAX_LENGTH
 from base.recovery import RecoveredOut
-from base.schemas import names, unless_given
+from base.schemas.assistant import names, unless_given
 
 T = TypeVar("T")
 

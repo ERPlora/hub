@@ -1,4 +1,4 @@
-"""The open check (SALE-F01, F09, F10, F13–F18, F20, F23, F24, F26): every write of ``services.py``
+"""The open check (SALE-F01, F09, F10, F13–F18, F20, F23, F24, F26): every write of ``services/``
 that builds a check, with Inventory's real catalog and tax's real categories.
 
 Every write locks the check first and raises its version; a line keeps the price it was ordered at.
@@ -225,7 +225,7 @@ def test_an_open_price_line_takes_the_department_and_its_vat():
 
 def test_with_inventory_off_no_product_is_sold_and_an_open_price_still_is(coffee, monkeypatch):
     # Inventory is asked by name through the platform's door: off, the till's own 409, and an open price needs no catalog.
-    from apps.sale.queries import CATALOG_UNAVAILABLE
+    from apps.sale.queries.other_apps import CATALOG_UNAVAILABLE
     from base import activation
 
     monkeypatch.setattr(activation, "off_apps", lambda scope: frozenset({"inventory"}))
@@ -419,6 +419,10 @@ def test_firing_sends_the_pending_lines_as_a_round(coffee, steak):
             "staff_id": str(staff),
             # SALE-F11: the kitchen text of its options (MODIFIER-F08); none chosen here.
             "modifiers": "",
+            # SALE-F40: its product's allergens, frozen when it was ordered; the steak declares none.
+            "allergens": [],
+            # SALE-F41: the customer's allergy the waiter marked on the line; none here.
+            "allergy": [],
             # SALE-F12: a menu's kitchen name and dishes (COMBO-F11); not a menu here.
             "kitchen_name": "",
             "components": [],
@@ -956,11 +960,11 @@ def test_sessions_are_released_in_the_order_of_their_voucher_like_settle_locks_t
     # release goes by voucher id (then session id), the order service.session.settle locks them in.
     from types import SimpleNamespace
 
-    from apps.sale import services
+    from apps.sale.services import line_vouchers
 
     released = []
     monkeypatch.setattr(
-        services,
+        line_vouchers,
         "call_services",
         lambda ctx, name, data: released.append((name, data["id"])),
     )
@@ -972,7 +976,7 @@ def test_sessions_are_released_in_the_order_of_their_voucher_like_settle_locks_t
         SimpleNamespace(voucher_session_id=third, voucher_grant_id=low),
         SimpleNamespace(voucher_session_id=first, voucher_grant_id=high),
     ]
-    services._release_vouchers(ctx_for(), lines)
+    line_vouchers._release_vouchers(ctx_for(), lines)
     assert released == [
         ("service.session.release", third),
         ("service.session.release", min(first, second)),

@@ -29,7 +29,7 @@ from pydantic import BaseModel, ConfigDict
 from apps.demo.models import Item
 from apps.demo.schemas import ItemIn
 from base.models import Hub, Membership
-from base.schemas import (
+from base.schemas.home import (
     NoticeListIn,
     NoticeListOut,
     SetupStatusIn,

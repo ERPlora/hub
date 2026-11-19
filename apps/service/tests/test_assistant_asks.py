@@ -120,6 +120,7 @@ OWN_WORDS = [
     ("service.grant.redeem", "Pilar ha gastado una sesión de su bono de pedicuras"),
     ("service.grant.void", "el bono de Pilar se vendió por equivocación"),
     ("service.grant.adjust", "dale a Pilar dos semanas más de bono"),
+    ("service.grant.link", "el bono de Pilar lo cobramos en la venta de ayer"),
     ("service.movement.list", "¿quién ha tocado el bono de láser?"),
     ("service.session.get", "¿qué pasó con la sesión retenida de Inés?"),
     ("service.session.hold", "guárdale a Pilar una sesión del bono para el tinte"),
@@ -163,6 +164,7 @@ FOUND_BY = {
     "service.grant.void_check": "service.grant.list",
     "service.grant.adjust": "service.grant.list",
     "service.grant.adjust_check": "service.grant.list",
+    "service.grant.link": "service.grant.list",
     "service.grant.redeem": "service.grant.list",
     "service.grant.redeem_check": "service.grant.list",
     "service.session.get": "sale.order.get",
@@ -248,6 +250,7 @@ OWN_WORDS_EN = [
     ("service.category.update", "Nails should go inside Hair"),
     ("service.grant.adjust", "give Pilar two more weeks on hers"),
     ("service.grant.adjust_check", "could Marta's get a later expiry?"),
+    ("service.grant.link", "Marta's voucher was paid last week at the counter"),
     ("service.grant.create", "Inés is taking the five-massage one"),
     ("service.grant.get", "details of Marta's, with its balance"),
     ("service.grant.list", "what has Inés bought?"),
@@ -331,7 +334,7 @@ def test_the_hub_reads_a_bono_as_a_voucher_of_services_and_an_asignacion_as_an_a
 #: Requests in the owner's words that are neither an ask nor a probe of layer 2: each brings its tool among the first
 #: ten only because the Hub reads «bono» as Services' voucher and «asigna» as an assignment.
 BY_THE_GROUPS = [
-    ("service.assignment.assign", "asigna los cortes de caballero a Marta, con 25 minutos"),
+    ("service.assignment.assign", "asigna a Marta la depilación"),
     ("service.assignment.update", "cambia la asignación de Lucas a los peinados: ahora tarda media hora"),
     ("service.package.list", "¿qué bonos hay para comprar?"),
 ]

@@ -87,8 +87,9 @@ ERPlora no inventa flujos: adopta los que el mercado ya probó.
 
 - Al encender Cocina se encienden con ella **Ventas** e **Inventario**. **Mesas** y **Clientes** no
   hacen falta: sin Mesas, la comanda lleva la etiqueta de la cuenta o su tipo.
-- Para que salga papel hace falta **Impresión** con una impresora de la función «Cocina» (o «Barra»)
-  dada de alta (PRINTING-F04). Sin Impresión, Cocina funciona solo con la pantalla.
+- Para que salga papel hace falta **Impresión** con una impresora activa de la función «Cocina» (o
+  «Barra») dada de alta (PRINTING-F04). Sin Impresión, o sin ninguna impresora activa de esa función,
+  Cocina funciona solo con la pantalla: no manda nada a la cola de impresión y la campana no avisa.
 - Configuración inicial, paso a paso:
   1. En **Cocina → Estaciones**, crea las estaciones reales (Plancha, Barra, Postres) con su destino
      (pantalla, papel o ambos) y su impresora (KITCHEN-F01).
@@ -227,6 +228,7 @@ cierra la ventana sin guardarlo. Con la ventana como se abrió, atrás la cierra
 | KITCHEN-F28 | Retirar las rondas de una cuenta eliminada o unida a otra | hecho |
 | KITCHEN-F29 | Anular un plato ya enviado con aviso a cocina | hecho |
 | KITCHEN-F31 | Dar a Caja las comandas que siguen en marcha | hecho |
+| KITCHEN-F32 | Resaltar la alergia del cliente en la tarjeta y en el papel | parcial |
 
 ### KITCHEN-F01 Crear una estación
 Estado: hecho
@@ -365,8 +367,9 @@ Entra: de Ventas, los suplementos elegidos con su nombre de cocina (si no tiene,
 la línea y, si la línea va invitada, el motivo.
 Sale: los suplementos y la nota congelados en el plato: cambiar el catálogo después no cambia esta
 comanda.
-Si falla: una alergia solo existe como texto de la nota: no se resalta ni se distingue de otra nota. Un
-suplemento que se cobra en una línea aparte (otro IVA) sale igual bajo su plato.
+Si falla: una alergia escrita solo en la nota sale como cualquier nota; la que el camarero marca en la línea
+sale aparte, antes de los suplementos (KITCHEN-F32). Un suplemento que se cobra en una línea aparte (otro IVA)
+sale igual bajo su plato.
 Implicados: SALE-F11, SALE-F13, SALE-F20, MODIFIER-F08, KITCHEN-F08
 
 ### KITCHEN-F08 La comanda sale en papel en cada estación
@@ -376,16 +379,19 @@ Pantalla: ninguna
 Pasos:
 1. Al recibir la ronda, Cocina pide a Impresión una hoja por impresora: los platos de cada estación
    que no es «Solo pantalla», por su función («Cocina», «Barra») o por la impresora concreta de la
-   estación; un plato sin estación, por «Cocina». Vale igual para la ronda que envía el camarero
-   (KITCHEN-F18) y para la que Ventas envía sola, que se imprime cuando llega a Cocina.
+   estación; un plato sin estación, por «Cocina». Si ninguna impresora activa tiene esa función (y la
+   estación no nombra una impresora concreta), no pide hoja: esos platos se ven solo en la pantalla.
+   Vale igual para la ronda que envía el camarero (KITCHEN-F18) y para la que Ventas envía sola, que se
+   imprime cuando llega a Cocina.
 2. La hoja lleva la etiqueta, el número, la ronda, el camarero y cada plato con su cantidad, sus
    suplementos (uno por renglón) y su nota, y los platos de un menú sangrados bajo su cabecera
    (KITCHEN-F06, F07); si la ronda va urgente, `!! URGENTE !!`.
 Entra: los platos con el destino y la impresora congelados al recibir.
 Sale: un trabajo por impresora en la cola de Impresión, una sola vez aunque se pida dos veces: la ronda
 que envió Cocina no vuelve a imprimirse cuando le llega el aviso de Ventas.
-Si falla: nunca bloquea al camarero. Sin Impresión no sale papel y no se avisa (la cocina trabaja con
-la pantalla). Si Impresión rechaza el trabajo, la comanda sigue en la pantalla y se puede reimprimir
+Si falla: nunca bloquea al camarero. Sin Impresión, o sin ninguna impresora activa de la función de
+sus platos, no sale papel, no se manda nada a la cola y no se avisa (la cocina trabaja con la
+pantalla); vale también para el pase y el aviso de urgencia. Si Impresión rechaza el trabajo, la comanda sigue en la pantalla y se puede reimprimir
 (KITCHEN-F09); en el TPV, el camarero ve «Comanda N enviada a cocina, pero no se imprimió. Revisa la
 impresora de cocina en Impresión.» (KITCHEN-F18).
 Implicados: KITCHEN-F05, KITCHEN-F06, KITCHEN-F07, KITCHEN-F09, KITCHEN-F18, SALE-F20, PRINTING-F04, PRINTING-F10, PRINTING-F18
@@ -400,8 +406,9 @@ Pasos:
    papel sale como su primera hoja, sin «copia».
 Entra: la comanda.
 Sale: trabajos nuevos en la cola de Impresión (cada reimpresión es un trabajo distinto).
-Si falla: «No se pudo imprimir la comanda: <motivo>», con el motivo de Impresión; sin Impresión,
-«Impresión no está activa en este negocio.».
+Si falla: «No se pudo imprimir la comanda: <motivo>», con el motivo de Impresión; sin Impresión, o
+sin ninguna impresora activa de la función de sus platos, «Ninguna impresora imprime esta comanda:
+activa Impresión y añade una impresora de cocina o de barra activa.» y no se manda nada a la cola.
 Implicados: KITCHEN-F08, KITCHEN-F21, PRINTING-F11
 
 ### KITCHEN-F10 Ver el tablero de cocina
@@ -781,6 +788,38 @@ puede estar incompleta («No se ha podido comprobar lo que queda pendiente, así
 estar incompleta.»). Con Cocina apagada no hay comandas pendientes. Nunca impide cerrar la caja.
 Implicados: CASH_REGISTER-F08, CASH_REGISTER-F09, KITCHEN-F10, KITCHEN-F13
 
+### KITCHEN-F32 Resaltar la alergia del cliente en la tarjeta y en el papel
+Estado: parcial — la comanda ya recibe y guarda la alergia y los alérgenos que coinciden, la pantalla y el detalle
+los reciben y el papel imprime los renglones del plato; falta que la tarjeta pinte la marca y el bloque (hub#1738)
+y que la app del dispositivo imprima `!! ALERGIA !!` en la cabecera de la hoja (ERPlora/app#63)
+Actor: empleado
+Pantalla: Pantalla, Comandas
+Pasos:
+1. En el TPV, el camarero marca la alergia del cliente en la línea de su plato (SALE-F41) y envía la ronda
+   (KITCHEN-F18).
+2. En la tarjeta, la cabecera lleva la marca «Alergia», en rojo, junto a «Urgente» y «VIP», si alguno de sus
+   platos tiene una alergia marcada. Cada estación la ve solo si la tiene uno de sus platos.
+3. Debajo del nombre de ese plato, antes de sus suplementos y de su nota, sale un bloque propio en rojo: «Alergia:
+   Gluten». Si el plato lleva ese alérgeno según Inventario (SALE-F40), el bloque añade «El plato lleva Gluten». Un
+   plato sin alergia marcada no lleva bloque, aunque tenga alérgenos: la pantalla no repite los de cada plato.
+4. En un menú, el bloque sale en cada uno de sus platos, y «El plato lleva» nombra solo los alérgenos de ese plato.
+5. En el papel de la estación (KITCHEN-F08), la cabecera lleva `!! ALERGIA !!` (debajo de `!! URGENTE !!` si la
+   ronda va urgente) y, justo debajo del plato y antes de sus suplementos, `*** ALERGIA: GLUTEN ***` y, si lo
+   lleva, `*** LLEVA: GLUTEN ***`, cada uno en su renglón y en mayúsculas, para que se distinga sin color. La
+   reimpresión (KITCHEN-F09) sale igual.
+6. El cocinero sigue como siempre: marcar listo, recuperar y entregar no cambian (KITCHEN-F11 a KITCHEN-F13), y el
+   bloque sigue a la vista mientras el plato está en la pantalla. En **Comandas**, el detalle de la comanda lo
+   enseña también en su plato.
+Entra: de Ventas, por cada línea enviada, la alergia del cliente y los alérgenos congelados de su producto
+(SALE-F40, SALE-F41).
+Sale: la alergia y los alérgenos que coinciden, congelados en el plato como sus suplementos: cambiar la línea o el
+catálogo después no cambia esta comanda (avisa: comanda recibida).
+Si falla: si la hoja no se imprime, la alergia sigue en la pantalla y la comanda se reimprime como cualquier otra
+(KITCHEN-F09). Sin alergia marcada, el plato sale como hoy, con su nota tal cual. Una alergia que el cliente dice
+después de enviar no llega sola: se avisa de viva voz (SALE-F41). Una comanda hecha a mano (KITCHEN-F23) no lleva
+bloque de alergia: es para lo que no pasa por el TPV, y su nota sigue ahí.
+Implicados: SALE-F20, SALE-F40, SALE-F41, INVENTORY-F35, KITCHEN-F05, KITCHEN-F06, KITCHEN-F07, KITCHEN-F08, KITCHEN-F09
+
 ## Para quien lo mantiene
 
 ### Lo que ofrece: consultas (leen, no cambian nada)
@@ -855,15 +894,19 @@ avisos de Ventas (`sale.order.*`).
 - **Ventas** (requisito): sus cuentas y sus líneas enviadas (`Order`, `OrderLine`: ronda, hora de
   envío, producto, nombre, cantidad, nota, categoría, anulación y su motivo, estado y hora de cierre de
   la cuenta, y lo que la línea congeló al pedirse: los suplementos con su nombre de cocina, `modifiers`,
-  y el menú con su `kitchen_name` y sus platos, `combo.components`), leídas con sus modelos; el envío,
+  y el menú con su `kitchen_name` y sus platos, `combo.components`; los alérgenos del producto, `allergens`, y en
+  un menú los de cada plato, `combo.components[].allergens`, y la alergia del cliente, `allergy`), leídas con sus
+  modelos; el envío,
   por su operación `sale.order.fire`. Un plato de un menú guarda la línea del menú y su número dentro de
   él (`menu_dish`); su id sale del de la línea (`queries.dish_id`), así que la comanda por recibir y la
   guardada comparten los ids de sus platos.
 - **Inventario** (requisito): los productos y las categorías del enrutado (claves ajenas) y sus
   listas para elegirlos (`inventory.product.list`, `inventory.category.list`).
 - **Impresión** (opcional): `printing.job.create` por nombre, con el documento `kitchen_order`
-  («Contrato con la plataforma» de Impresión). Sin Impresión (`UnknownOperation`, `app_inactive`) no
-  sale papel y no es un error; otro rechazo se dice en la pantalla y no deshace la acción.
+  («Contrato con la plataforma» de Impresión). Antes de cada hoja sin impresora concreta pregunta con
+  `printing.printer.list` (`usage`, `is_active: true`, `limit: 1`) si hay una impresora activa de su
+  función; si no la hay, no pide la hoja. Sin Impresión (`UnknownOperation`, `app_inactive`) o sin esa
+  impresora no sale papel y no es un error; otro rechazo se dice en la pantalla y no deshace la acción.
 
 ### Lo que pide a otras apps
 
@@ -880,7 +923,13 @@ avisos de Ventas (`sale.order.*`).
      fired_at IS NOT NULL` y `sale_order(closed_at)`.
 - **A Impresión**: nada nuevo; usa `kitchen_order` tal como está. Cada plato lleva además sus
   suplementos (`modifiers`, una lista) y, si es de un menú, `combo_ref` (la línea del menú) y
-  `combo_name` (su cabecera), que la impresora de la app ya pinta (KITCHEN-F06, F07).
+  `combo_name` (su cabecera), que la impresora de la app ya pinta (KITCHEN-F06, F07). Un plato con alergia
+  lleva primero en `modifiers` sus renglones (`*** ALERGIA: … ***` y, si coincide, `*** LLEVA: … ***`), con los
+  nombres en el idioma del negocio y en mayúsculas, y la hoja lleva `allergy` (`!! ALERGIA !!`, vacío si ningún
+  plato de esa hoja la tiene) para la cabecera (KITCHEN-F32).
+- **A la app del dispositivo** (ERPlora/app): que la comanda pinte en su cabecera `priority`, `allergy` y la marca
+  de copia (`duplicate`), hoy sin pintar (ERPlora/app#63), y que las mayúsculas con tilde no salgan como «?»
+  (ERPlora/app#64).
 - **A Caja** (ya hecho): avisar al cerrar de las comandas sin servir con `kitchen.ticket.board`
   (CASH_REGISTER-F08, KITCHEN-F31).
 
@@ -906,7 +955,9 @@ que no tiene ningún papel: solo el sistema (`*`).
 
 - Anatomía completa: `apps.py`, `models.py`, `migrations/` (`0001_initial`; `0002_settings_row` crea la
   fila de ajustes con la hora desde la que Cocina recibe, con reverso; `0003_ticket_printed_at`;
-  `0004_item_options_and_menu`, los suplementos y el menú de cada plato), `schemas.py`, `queries.py`,
+  `0004_item_options_and_menu`, los suplementos y el menú de cada plato; `0005_item_allergy`, la alergia y los
+  alérgenos que coinciden de cada plato), `allergy.py` (la alergia de un plato y sus renglones en el papel),
+  `schemas.py`, `queries.py`,
   `services.py`, `events.py`, `live.py`, `api.py` (28 rutas: todas las operaciones salvo `receive` y
   `sync`, que son del sistema, y las dos lecturas internas de la tarjeta del asistente), `admin.py`, `locale/`, `frontend/` y un `tests/test_<fichero>.py` por
   fichero, más `test_integration_sale.py`, `test_integration_inventory.py`, `test_integration_combo.py`,
@@ -1028,5 +1079,5 @@ que no tiene ningún papel: solo el sistema (`*`).
 - Cursos de verdad, retener y lanzar (kitchen#71): fuera del MVP («Referencia adoptada»).
 - Vaciar de golpe las comandas cobradas antes de pasar la cocina a papel (kitchen#158): hoy se sirven a
   mano (KITCHEN-F26, F27). Comportamiento nuevo, después del MVP.
-- Alérgenos de punta a punta (hub#1195): hoy una alergia es solo texto de la nota (KITCHEN-F07).
-  Comportamiento nuevo, después del MVP.
+- La alergia del cliente en la tarjeta (KITCHEN-F32, `parcial`): la marca de la cabecera y el bloque del plato, por
+  hub#1738; y `!! ALERGIA !!` en la cabecera del papel, por la app del dispositivo (ERPlora/app#63).

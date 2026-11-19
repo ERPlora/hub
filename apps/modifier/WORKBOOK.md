@@ -623,7 +623,7 @@ Los papeles llegan del SaaS con prefijo (`hub_owner`, `hub_admin`, `hub_manager`
   de dibujar la tarjeta, el turno busca el registro como lo hará la escritura, un nombre que encaja con varios grupos o
   con ninguno vuelve al modelo, y la huella de la tarjeta lleva el id de lo encontrado, así que el «sí» vale solo para
   ello (hub#1208, hub#1218; `tests/test_assistant_yes_for_its_card.py`, con el trinquete de las escrituras que
-  comprueban y las que leen el grupo o la opción por su nombre). La marca lleva `as_said` (`base.schemas.names`,
+  comprueban y las que leen el grupo o la opción por su nombre). La marca lleva `as_said` (`base.schemas.assistant.names`,
   hub#1245): lo que no se puede leer (vale para varios, para ninguno, sin persona) sale como se dijo, así que el
   `group` de `_OwningGroup` y de `LinkIn` (`modifier.option.create`, `modifier.link.attach`, sin lectura cuya entrada
   quepa en la suya, `base.E012`) también la lleva: su huella lleva el grupo encontrado y el «sí» vale solo para él. El
@@ -631,7 +631,7 @@ Los papeles llegan del SaaS con prefijo (`hub_owner`, `hub_admin`, `hub_manager`
   `check`, `modifier.link.detach` por el asistente rechaza antes de la tarjeta un
   enganche a algo borrado (`modifier.link.get` solo lee `LIVE_LINK`); la operación lo sigue soltando por su id. Junto
   al id con que la escritura toma su registro en su lugar (el del grupo, la opción o el enganche, o `group_id`), la
-  tarjeta deja sin leer el nombre (`base.schemas.unless_given`, hub#1250); el `group` de `OptionRefIn` solo junto a
+  tarjeta deja sin leer el nombre (`base.schemas.assistant.unless_given`, hub#1250); el `group` de `OptionRefIn` solo junto a
   `group_id`, porque la opción por su id se busca en ese grupo (`UNLESS` de `tests/test_assistant_yes_for_its_card.py`).
   Junto al `id` del enganche, `modifier.link.detach` deja sin leer también `group_id`, `product_id` y `category_id`, que
   `detach_link` no mira (hub#1278; `UNLESS_BY_ID`, que recorre todo dato leído por id). El `product` y la `category` de
@@ -645,12 +645,6 @@ Los papeles llegan del SaaS con prefijo (`hub_owner`, `hub_admin`, `hub_manager`
   opciones por defecto dentro del máximo, las 100 opciones por grupo); la base de datos sí le rechaza
   nombres repetidos, un máximo por debajo del mínimo, una opción con IVA propio que no vale más de cero y
   enganches vacíos, dobles o repetidos.
-- **Señalado, sin resolver aquí**:
-  - `apps/modifier/tests/test_events.py` (`test_the_reaction_runs_as_the_system_scope_given`) da por bueno que la
-    reacción de un ámbito B borre los enganches que creó A: solo pasa bajo el respaldo de los tests, que guarda
-    `a` y `b` en la misma BD de test (`base/tenancy/tests/legacy.py`). En producción cada negocio tiene su BD
-    y la reacción solo ve los suyos; el test tendrá que decirlo cuando se retire el
-    respaldo (hub#611).
 
 - **Páginas** (`frontend/`): `pages/GroupsPage.vue` (la tabla, `useLiveList` en ventanas de hasta 100),
   `components/GroupSheet.vue` (la hoja: `modifier.group.get` vivo y dos `useSheetList` de 20 en 20),

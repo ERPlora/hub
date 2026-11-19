@@ -30,7 +30,7 @@ from apps.cash_register.tests.conftest import (
     open_session,
     run,
 )
-from base.schemas import SetupStatusIn, WidgetListIn
+from base.schemas.home import SetupStatusIn, WidgetListIn
 from base.tenancy.context import use_hub
 
 STEP = "cash_register.drawer"

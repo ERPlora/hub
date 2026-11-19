@@ -1,8 +1,7 @@
 <script setup lang="ts">
 // Only for whoever administers the hub. Undoing an import is confirmed without typing, because it can be imported
 // again. Resetting the business asks for its name; the worker copies the business's data first and only then empties
-// the chosen sections, and `base.hub.dumps` tells each step live. While one reset runs, no second one is offered. When
-// the server says a reset is not available (`plan.available`), the screen says so and offers no red button.
+// the chosen sections, and `base.hub.dumps` tells each step live. While one reset runs, no second one is offered.
 import { ConfirmDialog, EmptyState, type FormModalError, InlineFeedback } from '@erplora/ui/components';
 import { type ApiError, useLive, useLiveClient } from '@erplora/ui/sdk';
 import { useSession } from '@erplora/ui/shell';
@@ -11,7 +10,9 @@ import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
 import { useBaseI18n } from '../../lib/i18n';
-import type { BlueprintApp, HubReset, ImportRow, Removal, ResetProgress } from '../../operations';
+import type { BlueprintApp, ImportRow, Removal } from '../../operations/blueprints';
+import type { HubReset } from '../../operations/reset';
+import type { ResetProgress } from '../../operations/dumps';
 import DumpsCard from './DumpsCard.vue';
 import '../../data.css';
 
@@ -266,7 +267,7 @@ function exportFirst(): void {
         {{ t('base.data.reset.keeps') }}
       </p>
       <p
-        v-if="plan?.available"
+        v-if="plan"
         class="data-hint"
         data-testid="reset-copy-first"
       >
@@ -303,14 +304,6 @@ function exportFirst(): void {
         />
       </div>
       <template v-else>
-        <InlineFeedback
-          v-if="!plan.available"
-          tone="info"
-          class="data-result"
-          data-testid="reset-shared"
-        >
-          {{ t('base.data.reset.shared') }}
-        </InlineFeedback>
         <p
           v-if="!plan.sections.length"
           class="data-hint"
@@ -329,7 +322,6 @@ function exportFirst(): void {
             :data-id="section.id"
           >
             <ion-checkbox
-              v-if="plan.available"
               :data-testid="`reset-section-${section.id}`"
               :checked="chosen.has(section.id)"
               :aria-label="section.label"
@@ -410,7 +402,7 @@ function exportFirst(): void {
           </p>
         </InlineFeedback>
         <div
-          v-if="plan.available && plan.sections.length"
+          v-if="plan.sections.length"
           class="data-actions"
         >
           <span

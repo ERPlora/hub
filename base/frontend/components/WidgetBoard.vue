@@ -23,7 +23,7 @@ import {
 } from '@ionic/vue';
 import { computed, ref } from 'vue';
 
-import type { WidgetDef } from '../operations';
+import type { WidgetDef } from '../operations/home';
 import { activeWidgetKeys, BOARD_STORAGE_KEY, readJsonBlock } from '../lib/home';
 import { useBaseI18n } from '../lib/i18n';
 import WidgetPanel from './WidgetPanel.vue';

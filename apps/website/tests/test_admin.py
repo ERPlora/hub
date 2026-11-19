@@ -2,8 +2,6 @@
 take a site offline (``is_live``); its content goes through the editor's operations, which validate it and write its
 images' URLs."""
 
-import uuid
-
 import pytest
 from django.contrib import admin
 from django.contrib.auth import get_user_model
@@ -50,21 +48,21 @@ def test_nothing_is_added_or_deleted_from_the_admin(superuser):
 
 @HUB_DB
 def test_only_whether_the_site_is_live_can_change(superuser):
-    site = Site.objects.create(hub_id=uuid.uuid7())
+    site = Site.objects.create()
     request = request_by(superuser)
     site_admin = admin.site._registry[Site]
     assert site_admin.has_change_permission(request, site)
     concrete = {field.name for field in Site._meta.get_fields() if field.concrete}
-    assert set(site_admin.get_readonly_fields(request, site)) == concrete - {"is_live"}
+    assert set(site_admin.get_readonly_fields(request, site)) == concrete - {"is_live", "singleton"}
     image_admin = admin.site._registry[Image]
     assert not image_admin.has_change_permission(request)
 
 
-def test_the_staff_see_whose_hub_each_row_is():
-    # The list says which hub each row belongs to.
+def test_the_admin_names_no_business_column():
+    # The staff open the admin of one business's database: every row there is that business's.
     for model in MODELS:
         model_admin = admin.site._registry[model]
-        assert "hub_id" in model_admin.list_display and "hub_id" in model_admin.fields, model
+        assert "hub_id" not in model_admin.list_display and "hub_id" not in model_admin.fields, model
 
 
 @HUB_DB
@@ -72,10 +70,8 @@ def test_the_admin_in_spanish_says_the_websites_own_words(hub_staff):
     """The staff read the site and its images in Página web's words: the site is «Página web» and feminine
     («Actualizada el», «Actualizada por», like its «Publicada el»), an image «Creada el»; not Clientes' «Web» nor Demo's
     and Clientes' masculine."""
-    site = Site.objects.create(hub_id=uuid.uuid7(), updated_by="ana")
-    Image.objects.create(
-        hub_id=site.hub_id, key="a/logo.png", sha256="0" * 64, content_type="image/png", width=1, height=1, size=1
-    )
+    site = Site.objects.create(updated_by="ana")
+    Image.objects.create(key="a/logo.png", sha256="0" * 64, content_type="image/png", width=1, height=1, size=1)
     spanish = {"HTTP_HOST": PLATFORM_HOST, "HTTP_ACCEPT_LANGUAGE": "es"}
     change = hub_staff.get(f"/admin/website/site/{site.pk}/change/", **spanish)
     images = hub_staff.get("/admin/website/image/", **spanish)

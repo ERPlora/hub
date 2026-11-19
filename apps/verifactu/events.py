@@ -1,6 +1,6 @@
 """Events of the verifactu app (``verifactu.<entity>.<fact>``) and its reaction to Invoicing's.
 
-services.py records them in the outbox, in the command's transaction; live.py names the ones that re-run each
+services/ records them in the outbox, in the command's transaction; live.py names the ones that re-run each
 live query. A rejection or an acceptance with errors carries no amounts.
 
 Reaction: an issued invoice (``invoice.invoice.issued``, Invoicing's notice of every F1, F2, F3 and R1–R5) is
@@ -63,7 +63,7 @@ REACTIONS = {INVOICE_ISSUED: "verifactu.record.create"}
 def react(scope: Scope, name: str, payload: dict[str, Any]):
     """Run this app's reaction to the event ``name`` of ``scope`` as the system; ``None`` if it has none, or when the
     business is outside Spain, where VeriFactu seals nothing (delivered, never a failed delivery retried)."""
-    from apps.verifactu.queries import outside_spain  # the models are not loaded yet when this module is
+    from apps.verifactu.queries.country import outside_spain  # the models are not loaded yet when this module is
 
     operation_name = REACTIONS.get(name)
     if operation_name is None or outside_spain(scope):

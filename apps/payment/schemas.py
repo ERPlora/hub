@@ -24,7 +24,7 @@ from apps.payment.models import (
     INVOICE_REF_MAX_LENGTH,
     NAME_MAX_LENGTH,
 )
-from base.schemas import names
+from base.schemas.assistant import names
 
 T = TypeVar("T")
 

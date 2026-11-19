@@ -1,0 +1,26 @@
+{
+  "prod": {
+    "hub": {
+      "PLATFORM_HUB_SLUG": "erplora",
+      "VERIFACTU_PRODUCTION_ENABLED": "true",
+      "VERIFACTU_ERPLORA_ROUTE_ENABLED": "false"
+    },
+    "worker": {
+      "PLATFORM_HUB_SLUG": "erplora",
+      "VERIFACTU_PRODUCTION_ENABLED": "true",
+      "VERIFACTU_ERPLORA_ROUTE_ENABLED": "false"
+    }
+  },
+  "pre": {
+    "hub": {
+      "PLATFORM_HUB_SLUG": "erplora",
+      "VERIFACTU_PRODUCTION_ENABLED": "false",
+      "VERIFACTU_ERPLORA_ROUTE_ENABLED": "false"
+    },
+    "worker": {
+      "PLATFORM_HUB_SLUG": "erplora",
+      "VERIFACTU_PRODUCTION_ENABLED": "false",
+      "VERIFACTU_ERPLORA_ROUTE_ENABLED": "false"
+    }
+  }
+}

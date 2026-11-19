@@ -13,7 +13,7 @@ from ninja import Schema
 from pydantic import Field
 
 from apps.demo.models import Item
-from base.schemas import names
+from base.schemas.assistant import names
 from base.tenancy import context
 from base.tenancy.tests.business import HUB_DB, in_business_a
 from base.tests.test_services_assistant import ASK, MANAGER, asked, call, turn

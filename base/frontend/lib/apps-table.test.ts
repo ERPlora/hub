@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import type { AppRow } from '../operations';
+import type { AppRow } from '../operations/apps';
 import { appActions, appSwitch, type AppsTableState } from './apps-table';
 
 function app(fields: Partial<AppRow> = {}): AppRow {

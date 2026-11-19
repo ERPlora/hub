@@ -25,6 +25,8 @@ from pydantic import (
 
 from apps.appointment.schemas import A_MEMBER, A_SERVICE, AN_APPOINTMENT
 from apps.customer.schemas import Email
+from apps.online_booking.logo import LogoFieldsOut, LogoName
+from apps.online_booking.public_page import LinkOwnerOut, PageOwnerOut, TrapIn
 
 T = TypeVar("T")
 
@@ -38,7 +40,6 @@ SAY_WHICH_BOOKING = _(
 )
 END_BEFORE_START = _("The end cannot be before the start.")
 NOT_A_COLOUR = _("Write the colour as #RRGGBB (for example #6366f1).")
-NOT_AN_ADDRESS = _("Write a web address that starts with http:// or https://.")
 SAME_SERVICE_TWICE = _("Each service only once.")
 
 # The assistant's card names the record a write acts on as the diary (Citas) names it, read as whoever asks and never
@@ -73,19 +74,8 @@ def _colour(value: str) -> str:
     return value
 
 
-def _address(value: str) -> str:
-    if value and not re.match(r"^https?://[^\s]+$", value):
-        raise ValueError(str(NOT_AN_ADDRESS))
-    return value
-
-
 Colour = Annotated[
     str, StringConstraints(strip_whitespace=True, max_length=7), AfterValidator(_colour)
-]
-Address = Annotated[
-    str,
-    StringConstraints(strip_whitespace=True, max_length=500),
-    AfterValidator(_address),
 ]
 Text = _text(MAX_TEXT)
 
@@ -261,8 +251,8 @@ class SettingsIn(In):
     primary_color: Colour | None = Field(
         None, description="The page's colour, as #RRGGBB."
     )
-    logo_url: Address | None = Field(
-        None, description="The address (http/https) of the business's logo."
+    logo: LogoName | None = Field(
+        None, description="The logo, as online_booking.settings.upload_logo answered it; empty = no logo."
     )
     require_email: bool | None = Field(
         None, description="The customer must leave her email."
@@ -324,12 +314,11 @@ class SettingsIn(In):
     )
 
 
-class SettingsOut(Schema):
+class SettingsOut(LogoFieldsOut):
     is_enabled: bool
     page_title: str
     welcome_message: str
     primary_color: str
-    logo_url: str
     require_email: bool
     max_upcoming_per_customer: int
     allow_staff_selection: bool
@@ -348,13 +337,10 @@ class SettingsOut(Schema):
 # ── The public page ────────────────────────────────────────────────────────────────────────────
 
 
-class PageOut(Schema):
-    title: str = Field(
-        description="The page's title (the business's, or the page's own)."
-    )
+class PageOut(PageOwnerOut):
+    title: str = Field(description="The page's own title, or «Book an appointment» in the visitor's language.")
     welcome_message: str
     primary_color: str
-    logo_url: str
     require_email: bool
     allow_staff_selection: bool
     allow_notes: bool
@@ -443,7 +429,7 @@ class PublicSlotsOut(Schema):
     slots: list[PublicSlotOut]
 
 
-class PublicBookIn(In):
+class PublicBookIn(In, TrapIn):
     service_ids: ServiceIds = Field(
         title=gettext_noop("Services"),
         description="The services to book (1 to 5), in order.",
@@ -497,7 +483,7 @@ class PublicCancelIn(TokenIn):
     reason: _text(500) = Field("", description="Why she cancels (optional).")
 
 
-class PublicBookingOut(Schema):
+class PublicBookingOut(LinkOwnerOut):
     number: str
     status: Status
     start: dt.datetime

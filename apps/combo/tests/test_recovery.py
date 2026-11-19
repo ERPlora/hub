@@ -481,7 +481,6 @@ def created_by(hub) -> list[str]:
         return list(OutboxEvent.objects.filter(name="combo.option.created").order_by("created_at", "id").values_list("actor", flat=True))
 
 
-@pytest.mark.usefixtures("no_test_fallback")
 class TestChoicesComeBack:
     def a_business(self, recoveries, every_app_on):
         """A business whose menu of the day offers a burger as a main with a supplement and fries, sold out today, as a

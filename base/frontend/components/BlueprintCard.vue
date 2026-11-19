@@ -17,7 +17,7 @@ import { useRouter } from 'vue-router';
 import { sessionChanged } from '../lib/access';
 import { cardOutcome, cardTemplates } from '../lib/data';
 import { useBaseI18n } from '../lib/i18n';
-import type { ImportRow, Template } from '../operations';
+import type { ImportRow, Template } from '../operations/blueprints';
 import BlueprintCardPending from './BlueprintCardPending.vue';
 import '../home.css';
 

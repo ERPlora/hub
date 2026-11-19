@@ -3,7 +3,7 @@
 // only chooses what each tab lists and how an app's company is named. Turning an app on or off is the
 // server's too (`base.app.enable`, `base.app.disable`): here only when each is offered and what the dialog names —
 // what comes along, what goes with it, and what has to go off first.
-import type { AppRow } from '../operations';
+import type { AppRow } from '../operations/apps';
 
 /** «My apps», «Add apps» (the whole catalogue) and «Paid» (what is bought apart, on erplora.com). */
 export type AppsTab = 'mine' | 'all' | 'paid';

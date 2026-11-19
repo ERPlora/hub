@@ -5,7 +5,7 @@
 import { applySurface } from '@erplora/ui/shell';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import type { AssistantUsage, PlanMeter, PlanUsage } from '../operations';
+import type { AssistantUsage, PlanMeter, PlanUsage } from '../operations/usage';
 import { errorFrame, flush, followPass, mountBase, passRefused, placedUpgrade, SIGNED, subId } from '../__tests__/mount-base';
 import SystemUsage from './SystemUsage.vue';
 
@@ -20,7 +20,7 @@ const FIGURES: PlanUsage = {
   people: { used: 3, limit: 5 },
   devices: { used: 1, limit: 3 },
   apps: { used: 7, limit: 10 },
-  database: { available: true, bytes: 312 * 1024 * 1024, day: '2026-10-30' },
+  database: { bytes: 312 * 1024 * 1024, day: '2026-10-30' },
   files: { bytes: 2 * GB, day: '2026-10-30', limit: 5 * GB, percent: 40, status: 'within' },
   connections: { peak_today: 2, limit: 3, busy_last_7_days: 0, busy_since: null, bigger_plan_gives_more: true },
   requests: { this_month: 18420, since: null },
@@ -499,7 +499,7 @@ describe('SystemUsage', () => {
         figures({
           requests: { this_month: null, since: null },
           activity: { active_now: 0, last_30_days: null, day: null },
-          database: { available: true, bytes: null, day: null },
+          database: { bytes: null, day: null },
         }),
       );
       expect(m.part('info-requests').text()).toContain('Not measured today yet.');

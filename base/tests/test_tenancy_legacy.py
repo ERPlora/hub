@@ -14,7 +14,6 @@ from base.tests.test_outbound import as_system, command
 
 pytestmark = [
     pytest.mark.django_db(databases=hubs.HUB_DATABASES),
-    pytest.mark.usefixtures("no_test_fallback"),
 ]
 
 

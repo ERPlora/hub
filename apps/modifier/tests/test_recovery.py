@@ -641,7 +641,6 @@ def attached(hub) -> int:
         return OutboxEvent.objects.filter(name="modifier.link.attached").count()
 
 
-@pytest.mark.usefixtures("no_test_fallback")
 class TestGroupsComeBack:
     def a_business(self, recoveries, every_app_on):
         """A business with a burger that asks for «Sauces» and «Extras», by their screens' operations: the hub, the
@@ -851,7 +850,6 @@ class TestGroupsComeBack:
         assert hung(hub) == [("Extras", burger), ("Sauces", burger)]
 
 
-@pytest.mark.usefixtures("no_test_fallback")
 class TestCategoryGroupsComeBack:
     def a_business(self, recoveries, every_app_on):
         """A business whose category «Mains» asks for «Sauces» and «Extras», by their screens' operations: the hub,

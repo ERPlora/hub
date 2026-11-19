@@ -33,7 +33,7 @@ from apps.appointment.tests.conftest import (  # noqa: F401 - anytime is a fixtu
 )
 from apps.customer.models import Customer
 from apps.flow.models import Flow, FlowRun, Question
-from apps.flow.queries import TURN
+from apps.flow.queries.reads import TURN
 from apps.reservation.models import Reservation, WaitlistEntry
 from apps.reservation.tests.conftest import make_reservation, open_week, set_rules
 from apps.whatsapp_inbox.models import Conversation, Message

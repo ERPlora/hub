@@ -455,7 +455,7 @@ sin vínculo con Inventario, y el cliente es un email y un nombre sin vínculo c
   las listas, el detalle, el filtro y las guardas de las acciones. `cart_checkout.cart.cleanup_expired`
   lo guarda; la tarea `expire_overdue_carts` (cada 15 min, en UTC, `catch_up: collapse`) la declara
   `apps.py` y la corre el worker del Hub (`base.scheduler`; `tests/test_scheduled_expiry.py`), en
-  cada negocio, en su BD y con su ámbito (`base.worker._serve_hub`): su aviso llega a las listas abiertas en
+  cada negocio, en su BD y con su ámbito (`base.hub_visits`): su aviso llega a las listas abiertas en
   ese negocio y a ninguna de otro (`base/tests/test_scheduled_task_notice_channel.py`).
 - **Numeración sin huecos**: `OS-AAAAMMDD-NNNN` con el día del negocio, en su zona (`base.business.business_zone`, hub#771; un cambio
   de zona sigue la cuenta de ese día, nunca repite número), del contador del día subido con `UPDATE … RETURNING` dentro de la transacción del pedido; nunca una secuencia. Todas las

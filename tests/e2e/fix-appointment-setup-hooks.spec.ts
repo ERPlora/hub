@@ -8,7 +8,9 @@
 import { type Browser, type BrowserContext, expect, test } from '@playwright/test';
 
 import { bellSays, bellTotal, featureNotice, noticeButton, noticeIn, openActionCenter } from './action-center';
-import { A, api, capturedFitting, login, psql, shown } from './helpers';
+import { aMonday } from './appointment-helpers';
+import { A, api, login, psql, shown } from './helpers';
+import { capturedFitting } from './screen';
 import { homeRead, spanishOwnerOnMyApps as spanishOwner } from './home-helpers';
 import { FLOW_VIEWPORTS, post } from './service-helpers';
 
@@ -16,13 +18,6 @@ const KEY = 'FIX-APPOINTMENT-SETUP-HOOKS';
 const TAG = 'E2E Bell';
 const RUN = Date.now().toString(36);
 const named = (label: string): string => `${TAG} ${label} ${RUN}`;
-
-/** A Monday `weeks` + five weeks ahead (inside the 90 days of advance), as `YYYY-MM-DD`. */
-function aMonday(weeks: number): string {
-  const day = new Date();
-  day.setUTCDate(day.getUTCDate() + 35 + 7 * weeks + ((8 - day.getUTCDay()) % 7));
-  return day.toISOString().slice(0, 10);
-}
 
 function cleanUp(): void {
   const customers = `select id from customer_customer where name like '${TAG}%'`;

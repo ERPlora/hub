@@ -19,7 +19,7 @@ from live.operations import get
 from apps.sale.tests.test_business_currency import platform
 from base.events import HUB_REGISTERED
 from base.models import Hub
-from base.schemas import BusinessIn, BusinessOut
+from base.schemas.business import BusinessIn, BusinessOut
 from base.tenancy.context import use_hub
 from base.tenancy.tests.business import A, B, HOST, HUB_DB, in_business_a
 

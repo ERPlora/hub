@@ -1,9 +1,9 @@
 """hub-next settings: env through decouple, Postgres with a pool, CSP per DEBUG, WhiteNoise, LIVE."""
 
 import hashlib
+import importlib
 import os
 import re
-import runpy
 import secrets
 import subprocess
 import sys
@@ -20,8 +20,8 @@ from live.csp import YOUTUBE_NOCOOKIE, base_policy, debug_policy, with_frames
 from live.slugs import is_reserved_hub_slug
 from psycopg_pool import ConnectionPool
 
-SETTINGS_FILE = Path(__file__).resolve().parents[1] / "settings.py"
-BASE_DIR = SETTINGS_FILE.parents[1]
+SETTINGS_PACKAGE = "config.settings"
+BASE_DIR = Path(__file__).resolve().parents[2]
 ENV_KEYS = (
     "ASSISTANT_SERVER_VOICE",
     "DEBUG",
@@ -88,17 +88,17 @@ PRODUCTION_ENV = {
 
 @pytest.fixture
 def load_settings(monkeypatch, tmp_path):
-    """Run settings.py again with only the given environment (no .env file) and return its globals."""
-
+    """Import config.settings anew with only the given environment (no .env file); its old modules return after."""
     def load(**env: str) -> dict:
         for key in ENV_KEYS:
             monkeypatch.delenv(key, raising=False)
         for key, value in env.items():
             monkeypatch.setenv(key, value)
-        monkeypatch.setattr(
-            decouple, "config", decouple.AutoConfig(search_path=str(tmp_path))
-        )
-        return runpy.run_path(str(SETTINGS_FILE))
+        monkeypatch.setattr(decouple, "config", decouple.AutoConfig(search_path=str(tmp_path)))
+        monkeypatch.setattr(sys.modules["config"], "settings", sys.modules["config"].settings)
+        for name in [name for name in sys.modules if name.split(".")[:2] == SETTINGS_PACKAGE.split(".")]:
+            monkeypatch.delitem(sys.modules, name)
+        return vars(importlib.import_module(SETTINGS_PACKAGE))
 
     return load
 
@@ -505,9 +505,8 @@ def test_a_request_the_alb_forwarded_over_https_is_secure():
     assert not factory.get("/").is_secure()
 
 
-def test_the_cache_is_valkey_when_set_else_local_memory(load_settings):
-    # Local memory that refuses what the Valkey cluster of AWS refuses (base/cache.py, hub#440).
-    assert load_settings(**DEVELOPMENT_ENV)["CACHES"] == {"default": {"BACKEND": "base.cache.ClusterLocMemCache"}}
+def test_the_cache_is_valkey_when_set(load_settings):
+    # Without it, the disk of the control database: base/tests/test_cache_between_processes.py.
     loaded = load_settings(**PRODUCTION_ENV, VALKEY_URL="rediss://cache.example:6379")
     # A prefix per project on the shared Valkey, a TTL on every key (never TIMEOUT=None) and 2 s
     # socket timeouts, as saas-next's.
@@ -575,7 +574,7 @@ def test_a_valkey_that_hangs_fails_the_cache_call_within_two_seconds(
     assert (kwargs["socket_connect_timeout"], kwargs["socket_timeout"]) == (2, 2)
 
 
-def test_without_valkey_the_local_memory_cache_has_no_socket_to_time_out(load_settings):
+def test_without_valkey_the_local_cache_has_no_socket_to_time_out(load_settings):
     for env in (DEVELOPMENT_ENV, PRODUCTION_ENV):
         assert "OPTIONS" not in load_settings(**env)["CACHES"]["default"]
 
@@ -1161,18 +1160,11 @@ def test_production_shared_alias_without_its_password_refuses_to_start(load_sett
         load_settings(**PRODUCTION_ENV, SHARED_DB_USER="hub_shared")
 
 
-def test_the_shared_router_goes_first(load_settings):
-    # The TenantRouter goes after it and never touches `shared`. The tests put one of theirs in front, for their
-    # businesses written before the tenancy only (base/tenancy/tests/legacy.py): never production's settings.
-    assert settings.DATABASE_ROUTERS == [
-        "base.tenancy.tests.legacy.LegacyTablesRouter",
-        "base.routers.SharedRouter",
-        "base.tenancy.router.TenantRouter",
-    ]
-    assert load_settings(**PRODUCTION_ENV)["DATABASE_ROUTERS"] == [
-        "base.routers.SharedRouter",
-        "base.tenancy.router.TenantRouter",
-    ]
+def test_the_shared_router_goes_first_and_the_tests_route_as_production_does(load_settings):
+    # The TenantRouter goes after it and never touches `shared`.
+    routers = ["base.routers.SharedRouter", "base.tenancy.router.TenantRouter"]
+    assert load_settings(**PRODUCTION_ENV)["DATABASE_ROUTERS"] == routers
+    assert settings.DATABASE_ROUTERS == routers
 
 
 def test_the_static_files_finders_add_the_documentation_images_of_the_modules():

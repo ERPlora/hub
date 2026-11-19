@@ -1,7 +1,5 @@
 // The business's API keys from end to end (BASE-F86 create and copy the token, BASE-F89 see the keys and what each
-// may do, BASE-F87 rotate, BASE-F88 revoke), in the three viewports, as the
-// owner of hub `a`, which has its own database: a business that still shares
-// control's database says «Not available yet» instead (ApiKeysPanel.test.ts, base/tests/test_api_keys.py).
+// may do, BASE-F87 rotate, BASE-F88 revoke), in the three viewports, as the owner of hub `a`.
 //
 // Each viewport makes one read-only key, sees its token once and copies it, finds it in the list with what it may do,
 // calls the API with it from a context with no session (only the token opens the door), rotates it (the new token

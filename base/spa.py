@@ -63,7 +63,7 @@ def spa_route(prefixes: tuple[str, ...]) -> str:
 def spa(request: HttpRequest) -> HttpResponse:
     if not request.user.is_authenticated and request.path_info == "/" and public_home.website_enabled(request):
         return public_home.respond(request)
-    return _shell(request)
+    return shell(request)
 
 
 def _widgets(request: HttpRequest) -> dict | None:
@@ -80,10 +80,11 @@ def _may_manage(request: HttpRequest) -> bool:
     return get_builder().from_request(request).has(OPEN_MANAGEMENT)
 
 
-def _shell(request: HttpRequest) -> HttpResponse:
-    """The SPA's HTML (``render_spa``: never cached, with the CSRF cookie the SDK sends back)."""
+def shell(request: HttpRequest, *, blocks: dict | None = None) -> HttpResponse:
+    """The SPA's HTML (``render_spa``: never cached, with the CSRF cookie the SDK sends back), with ``blocks`` embedded
+    beside the session's (the public door's page puts the business's money there)."""
     me = run_operation_sync(request, queries.sessions.session_me)
-    extra_json = {SESSION_ME_ID: me.model_dump(mode="json")}
+    extra_json = {**(blocks or {}), SESSION_ME_ID: me.model_dump(mode="json")}
     hub = getattr(request, "hub", None)
     if hub is not None and request.user.is_authenticated:
         way_in = queries.access.shell_access(request, hub.slug)

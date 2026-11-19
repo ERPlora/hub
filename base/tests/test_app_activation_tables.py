@@ -350,7 +350,7 @@ def test_the_session_tells_an_app_being_created_activating_and_keeps_it_out_of_t
 
 
 def answers_over_http(client, monkeypatch, route: str, command: str, state: str, status: int) -> None:
-    """An owner of business A posts to ``route`` while its command (``base.services.<command>``) answers ``state``:
+    """An owner of business A posts to ``route`` while its command (``base.services.apps.<command>``) answers ``state``:
     the route answers ``status`` with the command's answer."""
     import json
 
@@ -358,7 +358,7 @@ def answers_over_http(client, monkeypatch, route: str, command: str, state: str,
 
     from base import services
     from base.models import Membership
-    from base.schemas import AppChangeIn, AppChangeOut
+    from base.schemas.apps import AppChangeIn, AppChangeOut
 
     class Answering:
         input = AppChangeIn
@@ -366,7 +366,7 @@ def answers_over_http(client, monkeypatch, route: str, command: str, state: str,
         def __call__(self, ctx, data):
             return AppChangeOut(app=data.app, state=state, chosen=True, along=[], already=False)
 
-    monkeypatch.setattr(services, command, Answering())
+    monkeypatch.setattr(services.apps, command, Answering())
     user = get_user_model().objects.create(username="ana")
     Membership.objects.create(user=user, host=A.key, role=Membership.Role.OWNER)
     client.force_login(user)
@@ -393,7 +393,7 @@ def test_the_openapi_of_a_route_that_can_accept_documents_200_and_202_with_the_s
     assert {
         status: response["content"]["application/json"]["schema"]["$ref"]
         for status, response in served["paths"][path]["post"]["responses"].items()
-    } == {"200": "#/components/schemas/AppChangeOut", "202": "#/components/schemas/AppChangeOut"}
+    } == {"200": "#/components/schemas/base.AppChangeOut", "202": "#/components/schemas/base.AppChangeOut"}
 
 
 @HUB_DB  # the host gate reads business A's row (base.middleware)
@@ -440,11 +440,11 @@ def test_the_retry_route_is_bound_to_its_command(db):
 
 @own
 def test_an_app_being_created_or_failed_is_out_of_the_relay_and_the_tasks_until_it_is_on(hub_a):
-    from base import relay
+    from base import apps_on
 
     given(hub_a, printing="creating*", website="failed*", flow="on*", created=["flow"])
     with use_hub(Hub.objects.get(pk=hub_a.pk)):
-        active = relay.active_apps(Scope("host", hub_a.slug))
+        active = apps_on.active_apps(Scope("host", hub_a.slug))
 
     assert "flow" in active
     assert not {"printing", "website"} & active
@@ -473,11 +473,10 @@ def test_a_blueprint_turns_on_an_app_still_to_set_up_and_waits_for_it(hub_a):
 
 
 @own
-def test_reading_the_apps_list_again_forgets_what_this_process_kept_so_the_menu_read_after_it_is_current(hub_a):
-    """The worker turns an app on in another process: where the cache is the process's own (local development, no
-    Valkey) its forgetting never reaches the web. The Apps list every screen follows (AppsFollower) is read again when
-    the live notice of the change arrives, before the session is: that read forgets this process's apps of the
-    business, so the menu read right after it has the app (``cache_inval <hex>:apps``)."""
+def test_reading_the_apps_list_again_forgets_what_the_cache_kept_so_the_menu_read_after_it_is_current(hub_a):
+    """Rows written outside an operation (by hand, as the e2e write them) are forgotten at no COMMIT. The Apps list
+    every screen follows (AppsFollower) forgets what the cache keeps of the business's apps when it is read, before the
+    session is, so the menu read right after it has the app."""
     from django.core.cache import cache
 
     given(hub_a, printing="on*", created=["printing"])
@@ -485,7 +484,7 @@ def test_reading_the_apps_list_again_forgets_what_this_process_kept_so_the_menu_
     cache.set(activation.OFF_APPS_CACHE + hub_a.slug, ["printing"], 60)
     cache.set(activation.CREATING_APPS_CACHE + hub_a.slug, [], 60)
     with use_hub(Hub.objects.get(pk=hub_a.pk)):
-        assert "printing" in activation.off_apps(scope)  # what this process kept before the worker's change
+        assert "printing" in activation.off_apps(scope)  # what the cache kept before the rows changed
 
         get("base.app.list")(as_admin(hub_a), get("base.app.list").input())
         me = get("base.session.me")(as_admin(hub_a), get("base.session.me").input()).model_dump(mode="json")

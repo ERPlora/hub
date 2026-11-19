@@ -60,7 +60,7 @@ def declared(monkeypatch):
     """``declared(*declarations)``: what the apps declare, instead of their recipes.py (by app label)."""
 
     def plant(*found: tuple[str, dict]) -> None:
-        apps = queries.active_apps(A)
+        apps = queries.catalog.active_apps(A)
         monkeypatch.setattr(
             recipes, "declarations", lambda _scope=None: [(apps[label], recipe) for label, recipe in found]
         )
@@ -70,9 +70,9 @@ def declared(monkeypatch):
 
 def without(monkeypatch, *labels: str) -> None:
     """The business at work without the apps ``labels``."""
-    real = queries.active_apps
+    real = queries.catalog.active_apps
     monkeypatch.setattr(
-        queries,
+        queries.catalog,
         "active_apps",
         lambda scope: {label: config for label, config in real(scope).items() if label not in labels},
     )

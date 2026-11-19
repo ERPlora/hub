@@ -105,14 +105,14 @@ def test_erploras_own_hub_reads_its_country_from_the_platform_too(settings, monk
     # (here, an answer other than ``PLATFORM_ISSUER_COUNTRY``). ERPlora's own hub is here the business ``A``.
     settings.PLATFORM_HUB_SLUG = A.key
     settings.PLATFORM_ISSUER_COUNTRY = "ES"
-    assert not queries.outside_spain(A)
+    assert not queries.country.outside_spain(A)
 
-    business = get(queries.BUSINESS)
+    business = get(queries.country.BUSINESS)
     answer = business.fn
     monkeypatch.setattr(business, "fn", lambda ctx, data: {**answer(ctx, data), "country": "PL"})
 
-    assert queries.business_country(A) == "PL"
-    assert queries.outside_spain(A)
+    assert queries.country.business_country(A) == "PL"
+    assert queries.country.outside_spain(A)
 
 
 def test_a_scope_with_no_registry_row_is_in_spain(hub_a):
@@ -120,8 +120,8 @@ def test_a_scope_with_no_registry_row_is_in_spain(hub_a):
     # answers ``NotFound``) is in ERPlora's market, Spain: ``""``, not a country of its own, so VeriFactu seals and
     # sends for it as for a demo.
     Hub.objects.filter(pk=hub_a.pk).delete()
-    assert queries.business_country(A) == ""
-    assert not queries.outside_spain(A)
+    assert queries.country.business_country(A) == ""
+    assert not queries.country.outside_spain(A)
 
 
 # (c) The queue
@@ -220,7 +220,7 @@ def test_records_that_will_never_be_sent_do_not_keep_verifactu_on_outside_spain(
     # In Spain a record still to send vetoes turning it off (VERIFACTU-F32); outside Spain it is never sent, so turning
     # VeriFactu off stops nothing: it goes off, and the record is kept as it is.
     record = sealed_in_spain()
-    assert queries.disable_refusal(ctx_for()) is not None
+    assert queries.app_hooks.disable_refusal(ctx_for()) is not None
     business_in("PL")
     turn_off = get("base.app.disable")
     administrator = OperationContext(scope=A, actor="ana", permissions=frozenset({"*"}))

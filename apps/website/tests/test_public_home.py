@@ -130,8 +130,8 @@ def test_the_page_is_rendered_once_per_publication_and_a_new_one_shows_at_once(c
 
 
 def test_a_new_publication_shows_even_where_the_old_page_was_not_dropped(client):
-    # Another process's cache (the process's memory locally) never hears this one's COMMIT: the version in the key
-    # alone keeps it from serving the old page. Here no on_commit runs, so nothing drops the first page.
+    # A page kept where the COMMIT's drop never reached (the process died before it) is never served: the version in
+    # the key alone keeps it out. Here no on_commit runs, so nothing drops the first page.
     publish()
     assert "ws-classic" in visit(client).content.decode()
     publish(template="bold", hero={"title": "New season"})
@@ -243,13 +243,13 @@ def test_each_hub_shows_its_own_site_on_its_root(client, hub_b):
 
 
 def test_with_the_module_off_in_the_hub_neither_the_root_nor_the_public_api_show_its_site(client, monkeypatch):
-    # The same guard on every public path: the module on in this hub (``base.relay.active_apps``) and a live
+    # The same guard on every public path: the module on in this hub (``base.apps_on.active_apps``) and a live
     # publication of its own.
     publish()
-    from base import relay
+    from apps.website import queries
 
-    on = relay.active_apps
-    monkeypatch.setattr(relay, "active_apps", lambda scope: on(scope) - {"website"})
+    on = queries.active_apps
+    monkeypatch.setattr(queries, "active_apps", lambda scope: on(scope) - {"website"})
     assert jumps_to_the_login(visit(client))
     assert public_home.is_published(Hub.objects.get(slug=A.key)) is False
     for path in ("/api/website/public/site", "/api/website/public/catalog"):

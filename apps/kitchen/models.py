@@ -94,6 +94,14 @@ def _in(field: str, choices) -> Q:
     return Q(**{f"{field}__in": choices.values})
 
 
+def _destination() -> models.CharField:
+    return models.CharField(_("destination"), max_length=8, choices=Destination.choices, default=Destination.BOTH)
+
+
+def _printer_usage() -> models.CharField:
+    return models.CharField(_("printer function"), max_length=8, choices=PrinterUsage.choices, default=PrinterUsage.KITCHEN)
+
+
 class Audited(UUIDModel):
     """Who created and last changed a row, and when."""
 
@@ -117,18 +125,8 @@ class Station(Audited):
 
     name = models.CharField(_("name"), max_length=80)
     color = models.CharField(_("colour"), max_length=7, default="#F97316")
-    destination = models.CharField(
-        _("destination"),
-        max_length=8,
-        choices=Destination.choices,
-        default=Destination.BOTH,
-    )
-    printer_usage = models.CharField(
-        _("printer function"),
-        max_length=8,
-        choices=PrinterUsage.choices,
-        default=PrinterUsage.KITCHEN,
-    )
+    destination = _destination()
+    printer_usage = _printer_usage()
     #: A given printer of Printing, by its name; empty = the printer of the function.
     printer_name = models.CharField(_("printer"), max_length=100, blank=True)
     sort_order = models.PositiveIntegerField(_("position"), default=0)
@@ -408,6 +406,9 @@ class TicketItem(UUIDModel):
     notes = models.CharField(_("note"), max_length=255, blank=True)
     #: The options chosen in the till, by their kitchen names, in the order chosen (KITCHEN-F07).
     modifiers = models.JSONField(_("options"), default=list, blank=True, db_default=[])
+    #: The customer's allergy marked on its line in the till, and those of it the dish contains (KITCHEN-F32).
+    allergy = models.JSONField(_("customer's allergy"), default=list, blank=True, db_default=[])
+    allergy_in_dish = models.JSONField(_("allergy in the dish"), default=list, blank=True, db_default=[])
     station = models.ForeignKey(
         Station,
         on_delete=models.SET_NULL,
@@ -417,18 +418,8 @@ class TicketItem(UUIDModel):
         verbose_name=_("station"),
     )
     station_name = models.CharField(_("station name"), max_length=80, blank=True)
-    destination = models.CharField(
-        _("destination"),
-        max_length=8,
-        choices=Destination.choices,
-        default=Destination.BOTH,
-    )
-    printer_usage = models.CharField(
-        _("printer function"),
-        max_length=8,
-        choices=PrinterUsage.choices,
-        default=PrinterUsage.KITCHEN,
-    )
+    destination = _destination()
+    printer_usage = _printer_usage()
     printer_name = models.CharField(_("printer"), max_length=100, blank=True)
     status = models.CharField(
         _("status"), max_length=10, choices=Status.choices, default=Status.PENDING

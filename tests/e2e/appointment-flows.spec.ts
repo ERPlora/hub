@@ -11,19 +11,13 @@
 // removed before and after, and the settings of Citas are put back at the end.
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
+import { aMonday } from './appointment-helpers';
 import { A, api, psql, shot, shown } from './helpers';
 import { FLOW_VIEWPORTS, ownerPage, pick, post, rowAction, settled } from './service-helpers';
 
 const TAG = 'E2E Apf';
 const RUN = Date.now().toString(36);
 const named = (label: string): string => `${TAG} ${label} ${RUN}`;
-
-/** A Monday `weeks` + five weeks ahead (inside the 90 days of advance), as `YYYY-MM-DD`. */
-function aMonday(weeks: number): string {
-  const day = new Date();
-  day.setUTCDate(day.getUTCDate() + 35 + 7 * weeks + ((8 - day.getUTCDay()) % 7));
-  return day.toISOString().slice(0, 10);
-}
 
 /** Two days ago, as `YYYY-MM-DD`: a day whose appointments are already in the past on the business's clock. */
 const PAST = new Date(Date.now() - 2 * 86_400_000).toISOString().slice(0, 10);

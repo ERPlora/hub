@@ -24,7 +24,7 @@ from base.tests.test_session_revoke import acme
 
 __all__ = ["acme"]
 
-pytestmark = [HUB_DB_COMMITTED, pytest.mark.usefixtures("no_test_fallback")]
+pytestmark = [HUB_DB_COMMITTED]
 
 ACME = A
 

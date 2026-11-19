@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:74c6a7013ada57cca0945630ff14655e9ccf16a2492d02522b241064d56df0e3 -->
+<!-- generated from WORKBOOK.md sha256:a178d58653cc0f52d6429b8feae68b528b7aeebb0aef8f719326483c07fa516a -->
 
 ## What it is for and who it is for
 
@@ -323,7 +323,7 @@ On the Employees screens and the API documentation:
 | ID | Flow | Status |
 |---|---|---|
 | BASE-F01 | See what the business still has to set up | done |
-| BASE-F02 | See the business at a glance on coming in | done |
+| BASE-F02 | See the business at a glance on coming in | partial |
 | BASE-F03 | Go and set up from "Finish setting up your business" | done |
 | BASE-F04 | See which steps of the list an administrator has to set up | done |
 | BASE-F05 | Open an app from "My apps" | done |
@@ -429,13 +429,14 @@ On the Employees screens and the API documentation:
 | BASE-F106 | The assistant without a connection, with the service down or without a plan | done |
 | BASE-F107 | Pass the master QA of the Hub | done |
 | BASE-F108 | Report a problem to support | done |
-| BASE-F109 | Delete a deleted business after its 90 days | partial — a business with documents keeps its database until the fiscal archive exists (hub#738) |
+| BASE-F109 | Delete a deleted business after its 90 days | partial — a business with documents writes them to the fiscal archive, but still keeps its database (hub#738) |
 | BASE-F110 | Open the business's website on its own domain | done |
 | BASE-F111 | Wait for the database when it is cut for a moment | done |
 | BASE-F112 | Save a downloaded file inside the app | done |
 | BASE-F113 | Keep warning with the screen off (Android app) | done |
 | BASE-F114 | Put a business back as it was at a past moment from the Hub admin | done |
 | BASE-F115 | See the help of a module's screen | done |
+| BASE-F116 | Read what is new in ERPlora | partial |
 
 ### BASE-F01 See what the business still has to set up
 Status: done
@@ -475,7 +476,8 @@ side to do yet. We are on it.".
 Involved: INVENTORY-F28, BASE-F24, BASE-F25, VERIFACTU-F01, TAX-F17
 
 ### BASE-F02 See the business at a glance on coming in
-Status: done
+Status: partial — the health row of step 5 is not painted on the Home yet, although the hub already knows what to
+say about the receipt printer; and the WhatsApp Inbox does not say yet how its number is doing (hub#573)
 Actor: owner, administrator, manager, employee
 Screen: Home · Summary
 Steps:
@@ -487,12 +489,19 @@ Steps:
      panels.
   4. When the interface language changes, the names in "My apps" and the checklist's texts change in place,
      without reloading or reopening the application.
-  5. At the bottom, two tabs: "Summary" (the above) and "Activity".
-In: the business's name and the device's date.
+  5. For who administers the business, at the foot of "Summary", a row with how what the business needs to work
+     is doing and "See system", which leads to System. Each app on that the person can see says its own: with
+     Printing, "Printer ready" if the device that prints the receipts gave signs in the last minute and a half,
+     "Printer not connected" if it is set up but does not answer, or "Printer not set up" if there is none; the
+     last two with "Set up printing", which opens Printing. Whoever does not administer the business does not see
+     the row.
+  6. At the bottom, two tabs: "Summary" (the above) and "Activity".
+In: the business's name, the device's date and what each app on says about itself.
 Out: nothing saved.
 If it fails: a zone that does not load does not bring the others down; each one says its own. On a phone
-the zones stack and "My apps" folds.
-Involved: none
+the zones stack and "My apps" folds. What could not be checked shows as neutral, never as ready and without a
+button, because it is not the viewer's task: "We couldn't check the printer".
+Involved: PRINTING-F21
 
 ### BASE-F03 Go and set up from "Finish setting up your business"
 Status: done
@@ -1370,7 +1379,7 @@ In: the version running and when it was published.
 Out: nothing saved.
 If it fails: "We could not read the system" — "The figures and the logs are not available right now. You can
 try again." with "Retry".
-Involved: none
+Involved: BASE-F116
 
 ### BASE-F42 See the log of what happened in the system
 Status: done
@@ -2156,7 +2165,8 @@ Steps:
   1. In **Employees › Roles**: "These are the roles of this business. Each person gets one when invited on
      erplora.com, and it is changed there.".
   2. A row per role: "Owner", "Administrator", "Manager" and "Employee", with "Basic", "Always available", how
-     many people have it and how many permissions it gives.
+     many people have it and how many permissions it gives. It is always these four, erplora.com's: no app adds
+     roles of its own; each app says what each of them can do in it.
   3. Whoever runs the business has "Change roles on erplora.com" (in the installed app, in the device's browser; the Google Play copy does not have it).
 In: the roles and the people of the business.
 Out: nothing saved.
@@ -2313,9 +2323,7 @@ In: what the business's apps publish.
 Out: nothing saved. It grows or shrinks with the business's apps.
 If it fails: hidden, "The API documentation is hidden in this business." and, for whoever runs the business,
 "Show it in Settings › General"; if it does not arrive, "Could not load the documentation." with "Retry"; with
-nothing published, "None of this business’s apps publishes its API yet.". If the business cannot have keys yet:
-"API keys are not available yet for this business: you can read the documentation, but no system can call it
-yet.".
+nothing published, "None of this business’s apps publishes its API yet.".
 Involved: BASE-F91, BASE-F86, BASE-F112 (inside the app)
 
 ### BASE-F91 Show or hide the API documentation
@@ -2803,15 +2811,19 @@ write to directly. In both cases what was written stays and can be sent again.
 Involved: ACCOUNTS-F38, BASE-F40
 
 ### BASE-F109 Delete a deleted business after its 90 days
-Status: partial — a business with documents keeps its database until the fiscal archive exists (hub#738)
+Status: partial — a business with documents writes them to the fiscal archive, but still keeps its database (hub#738)
 Actor: nobody: the Hub does it by itself, nobody presses anything
 Screen: None; the business's address goes on saying "This hub is no longer available."
 Steps:
   1. A business deleted on erplora.com (HUBS-F18, HUBS-F20) reaches its 90 days. Until then its database stays intact
      and it can be restored.
   2. The Hub checks whether it keeps documents: sales, invoices, VeriFactu records, payments, cash movements, shop
-     orders or a customer's purchases, in any status and even with the app turned off. If it keeps any, it stops here:
-     the business stays deleted, with its database, and is checked again the next day.
+     orders or a customer's purchases, in any status and even with the app turned off. If it keeps any, it first
+     writes them to the fiscal archive, where they are kept for 6 years and nobody can delete them: each table of
+     those documents as it is stored, with nothing rebuilt, and last a list that counts the rows and carries the
+     fingerprint of each file, written only once every file has been read back the same. It does so once per
+     deletion, and if a VeriFactu record still awaits the AEAT's answer, it waits for it. Then it stops: the business
+     stays deleted, with its database, and is checked again the next day.
   3. Without documents, it makes the final copy of its data, kept for 90 days in the copies store. Meanwhile the
      business can still be restored and erplora.com still sees its copies. When it ends it checks again for
      documents, in case one came in during the copy.
@@ -2822,15 +2834,19 @@ Steps:
 In: the deleted business and its 90 days over. Never a demo, which is deleted its own way when it expires, the
 platform's business or one moving to another server.
 Out: the final copy, and the database and the files gone, with the event `base.hub.purged`; from there erplora.com no
-longer lists its copies. Or, with documents, the database and the files kept and on the business's row the reason
-(`fiscal_archive_missing: <apps>`).
+longer lists its copies. Or, with documents, its fiscal archive written (on the row, `fiscal_archived_at` and the
+reason `fiscal_archived: <apps>`) and the database and the files kept; where there is no fiscal archive, the reason is
+`fiscal_archive_missing: <apps>`, and while a record awaits the AEAT, `fiscal_archive_waiting: verifactu`.
 If it fails: a copy that fails drops nothing, and neither does having no copies store; a copy or a drop that fails is
 tried again (1 min, 5 min, 15 min, then every hour) with the error noted on the row, with no second copy if there
 already was one. If the store does not delete its files, the business stays being dropped, with no mark and
 `files_purge_failed` on the row, and it is tried again the same way. If an app cannot be read, the database stays. A row
 that does not name the business's own database drops nothing (`invalid_database_name`). A business restored during the
 copy stays open with its database; once it is being dropped, erplora.com gets `hub_purged`. If the Hub shuts down
-mid-copy, the next one takes it up.
+mid-copy, the next one takes it up. If the fiscal archive cannot be written whole, or a file does not read back as it
+was written, it is not taken as done: the row says `fiscal_archive_failed` with the reason and it is tried again the
+next day in another folder of the archive (what was already up stays, since nobody can delete it, and without its final
+list it does not count).
 Involved: HUBS-F18, HUBS-F19, HUBS-F20, PUBLIC-F34 (the same deletion of files, when a demo is retired)
 
 ### BASE-F110 Open the business's website on its own domain
@@ -3247,3 +3263,24 @@ and "Retry" asks for it again. The help already read stays stored until the page
 also from another tab of the module, and the video says "Offline: the video is not available". If the manual is not
 translated into the person's language, or its translation fell behind, the help comes in Spanish.
 Involved: BASE-F92, BASE-F93
+
+### BASE-F116 Read what is new in ERPlora
+Status: partial — what is new can already be read through the assistant and the API, but System › Updates does not
+show it yet (hub#576)
+Actor: owner, administrator, manager, employee
+Screen: System · Updates
+Steps:
+  1. In the "Updates" tab, below the version and its date (BASE-F41), comes "What's new": what has changed in ERPlora
+     that the business notices, the most recent first. Whoever does not run the business sees it too: it says nothing
+     about the business.
+  2. Each item says its day, whether it is something new, an improvement or a fix, a short title and one or two
+     sentences on what can be done now. They are notes written for the business, never the list of changes to the
+     code.
+  3. The 20 most recent come first; "See more" brings the earlier ones.
+  4. With none, it says "Nothing new yet.".
+  5. Through the assistant, "what's new in ERPlora?" or "what changed in the latest update?" reads them the same way,
+     in the person's language.
+In: what is new in the version running: it travels with it, so it is always its own.
+Out: nothing saved: what is new is only read.
+If it fails: "Could not load what's new" with "Retry"; the version and its date stay in view.
+Involved: BASE-F41

@@ -31,7 +31,7 @@ from pydantic import (
 
 from apps.tax.choices import COUNTRY_CODES
 from apps.tax.models import CATEGORY_KEY_MAX_LENGTH, CATEGORY_KEY_RE, TaxAlias, TaxRule
-from base.schemas import names
+from base.schemas.assistant import names
 
 T = TypeVar("T")
 #: The countries the factory catalogue brings rules for (TAX-F16, migration 0002): Spain, and no other. A business of
@@ -489,8 +489,8 @@ class CalculateIn(_RegionOfTheCountry, Schema):
     tax_category_key: CategoryRef = Field(description=CATEGORY_REF)
     country_code: OptionalCountry = Field(
         None,
-        description=COUNTRY + " Empty = the business's country and region (TAX-F11); naming one asks for "
-        "that country alone, with the region given.",
+        description=COUNTRY + " Empty = the business's country and region (a region may have a tax of its own, "
+        "as IGIC in the Canary Islands); naming one asks for that country alone, with the region given.",
     )
     region_code: OptionalRegion = Field(
         None, description=REGION + " Empty with no country = the business's."

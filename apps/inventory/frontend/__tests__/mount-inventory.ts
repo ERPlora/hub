@@ -8,7 +8,7 @@ import type { Component, Ref } from 'vue';
 import type { ApiCall, StreamCall } from '../../../../packages/ui/src/sdk/__tests__/live-harness';
 import { flush, mountInShell, overBase, page, resultFrame } from '../../../../base/frontend/__tests__/mount-in-shell';
 import { business } from '../../../../base/frontend/__tests__/business';
-import type { Business } from '../../../../base/frontend/operations';
+import type { Business } from '../../../../base/frontend/operations/business';
 import en from '../locale/en.json';
 import es from '../locale/es.json';
 
@@ -173,6 +173,7 @@ export function product(overrides: Record<string, unknown> = {}) {
     is_active: true,
     is_sold_out: false,
     category_ids: [],
+    allergens: [],
     created_at: '2026-10-13T10:00:00Z',
     updated_at: '2026-10-13T10:00:00Z',
     ...overrides,

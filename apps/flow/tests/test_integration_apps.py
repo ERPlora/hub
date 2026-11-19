@@ -36,7 +36,7 @@ def without_cash_register(monkeypatch):
     """Sell as a business without Cash register, as Sales' own tests do (its till asks an operation
     nobody declares)."""
     monkeypatch.setattr(
-        "apps.sale.services.DRAWER_CHECK", "cash_register.session.not_installed"
+        "apps.sale.services.charge_validation.DRAWER_CHECK", "cash_register.session.not_installed"
     )
 
 

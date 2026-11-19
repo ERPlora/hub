@@ -27,7 +27,7 @@ from pydantic import (
 
 from apps.task.models import TEXT_MAX_LENGTH, TITLE_MAX_LENGTH, Task
 from base.business import business_zone
-from base.schemas import names, unless_given
+from base.schemas.assistant import names, unless_given
 
 T = TypeVar("T")
 

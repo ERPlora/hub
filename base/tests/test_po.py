@@ -6,6 +6,7 @@ behaviour is tested here, once; what each app keeps is its own guard, and the la
 """
 
 import ast
+import sys
 from importlib import import_module
 from pathlib import Path
 from importlib.util import module_from_spec, spec_from_file_location
@@ -306,6 +307,72 @@ def test_a_module_keeps_its_lazy_texts_alone_or_as_the_values_of_a_dict(tmp_path
             "In a pair",
             "In the second",
         ]
+
+
+@pytest.fixture
+def write_package(tmp_path, monkeypatch):
+    """Writes a package of ``files`` (path inside it → source) under ``tmp_path`` and imports it, as an app's
+    ``services/`` or ``queries/`` once split: what the test imports is forgotten afterwards."""
+    monkeypatch.syspath_prepend(str(tmp_path))
+    written = []
+
+    def write(name: str, files: dict[str, str]) -> ModuleType:
+        for inner, source in files.items():
+            path = tmp_path / name / inner
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(source, encoding="utf-8")
+        written.append(name)
+        return import_module(name)
+
+    yield write
+    for name in [name for name in sys.modules if name.split(".")[0] in written]:
+        del sys.modules[name]
+
+
+def test_a_package_gives_the_texts_of_every_module_under_it(write_package):
+    """A gate split into a package keeps its messages in its modules, and its ``__init__.py`` only imports them: the
+    package is read as one file, nested packages and modules it does not import too, so an app's guard keeps seeing a
+    new message without being told where it went."""
+    services = write_package(
+        "split_gate",
+        {
+            "__init__.py": (
+                "from django.utils.translation import gettext_lazy as _\n"
+                "from . import orders as orders\n"
+                'OWN = _("In the package itself")\n'
+            ),
+            "orders.py": 'from django.utils.translation import gettext_lazy as _\nREFUSED = _("In a module")\n',
+            "refunds/__init__.py": "",
+            "refunds/reasons.py": (
+                "from django.utils.translation import pgettext_lazy\n"
+                "from split_gate.orders import REFUSED\n"
+                'REASONS = {"late": pgettext_lazy("refund", "In a nested package")}\n'
+            ),
+        },
+    )
+    with translation.override("en"):
+        assert [str(text) for text in module_texts(services)] == [
+            "In the package itself",
+            "In a module",
+            "In a nested package",
+        ]
+
+
+def test_a_module_of_a_package_that_cannot_be_imported_fails_instead_of_being_left_out(write_package):
+    """Its texts would leave the check without a word: the guard fails, as it fails on a catalogue it cannot read."""
+    services = write_package("broken_gate", {"__init__.py": "", "orders.py": "import no_such_module\n"})
+    with pytest.raises(ModuleNotFoundError):
+        module_texts(services)
+
+
+def test_the_split_write_gate_of_sale_gives_the_messages_of_its_modules():
+    """Ventas' ``services/`` is a package whose ``__init__.py`` only imports its modules: read whole, its messages are
+    there, so its guard can pass the package as it passed the file."""
+    from apps.sale import services
+
+    with translation.override("en"):
+        texts = {catalogue_key(text) for text in module_texts(services)}
+    assert catalogue_key(services.checkout.CUSTOMER_REQUIRED) in texts
 
 
 def test_the_titles_of_an_apps_operations_are_only_the_ones_it_wrote():

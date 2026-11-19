@@ -398,7 +398,6 @@ def test_a_text_header_goes_as_it_always_went(delivered):
 @pytest.mark.parametrize("sample", ["none", "another_kind", "another_business"])
 @respx.mock
 @HUB_DB
-@pytest.mark.usefixtures("no_test_fallback")
 def test_a_file_header_needs_its_file_of_its_kind_and_of_its_business(hub_a, hub_b, sample):
     with use_hub(hub_a):
         system(
@@ -620,7 +619,6 @@ def test_a_header_file_is_read_by_its_id_as_it_was_kept():
 
 
 @HUB_DB
-@pytest.mark.usefixtures("no_test_fallback")
 def test_a_header_file_of_another_business_is_not_there(hub_a, hub_b):
     with use_hub(hub_b):
         theirs = upload(OTHER_JPEG, name="de-b.jpg", ctx=ctx_for(scope=Scope("host", hub_b.slug)))

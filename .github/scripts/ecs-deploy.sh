@@ -9,9 +9,10 @@
 #      that is not of this environment: tag Environment=<environment> and task and execution roles
 #      erplora-<environment>-* (the deploy roles can register any family: ECS takes no resource
 #      there, so this guard keeps pre's role from turning a prod revision into its own and back);
-#   1. registers a new revision of each family from that one, with its tags, changing only the image
-#      of the containers that run the hub image (the app and its pgbouncer sidecar); Terraform owns
-#      the rest of the definition;
+#   1. registers a new revision of each family from that one, with its tags, changing only the image of the
+#      containers that run the hub image (the app and its pgbouncer sidecar) and the app's settings, exactly
+#      those of deploy/app-env.json in that commit, which deploy/app_env.py checks first, refusing any that break a
+#      rule (in prod, changing VERIFACTU_PRODUCTION_ENABLED takes CONFIRM_PROTECTED); Terraform owns the rest;
 #   2. runs the migration (hub-migrate) on the new revision and polls it until it is STOPPED; if it
 #      fails, never ran or outlasts MIGRATE_TIMEOUT_SECONDS (the task is left running), the deploy
 #      stops before any service changes;
@@ -22,15 +23,15 @@
 #      A FAILED rollout or another revision as PRIMARY (with rollback = true the circuit breaker
 #      puts the old one back and the wait still succeeds) fails at once; a rollout that outlasts
 #      ROLLOUT_TIMEOUT_SECONDS fails too;
-#   4. records the tag in /erplora/<environment>/hub/image_tag, so the revisions Terraform registers,
-#      and with them the scheduled tasks, keep running it (ERPlora/aws README, "Imagen").
+#   4. records the settings in /erplora/<environment>/hub/app_env and the tag in .../image_tag, so the revisions
+#      Terraform registers, and with them the scheduled tasks, keep them (ERPlora/aws README, "Ajustes de la app").
 # Never db-bootstrap: the deploy role cannot pass its roles (ERPlora/aws stacks/prod/deploy_role.tf).
 # Rollback: the circuit breaker reverts a broken deploy; back to the previous revisions, the
 #   rollback workflow (ecs-rollback.sh); back to a release, the deploy workflow with that release.
 #
 # Env: AWS_REGION, REGISTRY (ECR registry host), IMAGE_TAG (image tag = commit SHA), ENVIRONMENT
 #      (prod | pre); optional CLUSTER (erplora-<environment>), POLL_SECONDS (15),
-#      MIGRATE_TIMEOUT_SECONDS (3600), ROLLOUT_TIMEOUT_SECONDS (600).
+#      MIGRATE_TIMEOUT_SECONDS (3600), ROLLOUT_TIMEOUT_SECONDS (600), CONFIRM_PROTECTED (NAME=value).
 set -euo pipefail
 
 for var in AWS_REGION REGISTRY IMAGE_TAG ENVIRONMENT; do
@@ -160,13 +161,10 @@ migrate() {
   fi
 }
 
-# Every revision is read and checked before any is registered.
-for name in "${families[@]}"; do
-  prepare "$name"
-done
-for name in "${families[@]}"; do
-  register "$name"
-done
+# Every revision is read and checked, and gets its settings, before any is registered.
+for name in "${families[@]}"; do prepare "$name"; done
+python3 "$(dirname "$0")/../../deploy/app_env.py" "$workdir" "$ENVIRONMENT" "$IMAGE_TAG" "$AWS_REGION" --confirm="${CONFIRM_PROTECTED:-}"
+for name in "${families[@]}"; do register "$name"; done
 
 # One-off tasks run like the worker: same subnets, its security group, public IP.
 network="$(aws ecs describe-services --cluster "$CLUSTER" --services "worker$suffix" --region "$AWS_REGION" \
@@ -222,6 +220,8 @@ while :; do
 done
 echo "services stable on the new revisions"
 
+aws ssm put-parameter --name "/erplora/$ENVIRONMENT/$PROJECT/app_env" --value "$(< "$workdir/app_env.json")" \
+  --type String --overwrite --region "$AWS_REGION" > /dev/null
 aws ssm put-parameter --name "/erplora/$ENVIRONMENT/$PROJECT/image_tag" --value "$IMAGE_TAG" \
   --type String --overwrite --region "$AWS_REGION" > /dev/null
-echo "recorded $IMAGE_TAG in /erplora/$ENVIRONMENT/$PROJECT/image_tag"
+echo "recorded its settings and $IMAGE_TAG in /erplora/$ENVIRONMENT/$PROJECT/app_env and image_tag"

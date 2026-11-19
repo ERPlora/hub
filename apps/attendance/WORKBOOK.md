@@ -522,7 +522,7 @@ Los avisos nunca llevan la posición ni el motivo de una corrección (datos pers
   correr sola a partir de ahí, sin preguntar cada segundo. Una jornada «Por revisar» sin salida no tiene
   tiempo trabajado (vacío): contar «hasta ahora» sumaría días que nadie trabajó.
 - La revisión de jornadas olvidadas es la tarea programada `review_stale` (`*/15 * * * *`, `collapse`,
-  en UTC): la corre el worker como sistema, en cada negocio y con su ámbito (`base.worker._serve_hub`;
+  en UTC): la corre el worker como sistema, en cada negocio y con su ámbito (`base.hub_visits`;
   `tests/test_scheduled_review.py` la pasa por `base.scheduler`) y la aplica también `clock_in` a la
   persona que ficha, para no depender del worker.
 - La reacción a `staff.member.terminated` (ATTENDANCE-F13) se la entrega el relay del outbox del worker
@@ -549,8 +549,8 @@ Los avisos nunca llevan la posición ni el motivo de una corrección (datos pers
   en **solo lectura** (salvo la nota interna de la jornada), sin alta ni borrado: una hora solo cambia
   con `attendance.record.correct`, que deja rastro. Contradice el «CRUD completo sobre todas sus
   tablas» del admin; lo impone el art. 34.9 ET, como en `invoice` lo impone el RD 1619/2012.
-- Tenencia: el ámbito es la primera parte del Host y cada negocio tiene su propia BD: los datos de `a` no se ven en `b`. Solo los tests escritos antes de la tenencia guardan `a` y `b`
-  en la misma BD de test (`base/tenancy/tests/legacy.py`). El PIN y el modo de cada dispositivo
+- Tenencia: el ámbito es la primera parte del Host y cada negocio tiene su propia BD: los datos de `a` no se ven en `b`.
+  El PIN y el modo de cada dispositivo
   (compartido o personal) son de `base` (BASE-F55, BASE-F62): Control horario solo lee el modo.
 
 ## Lo que queda fuera

@@ -6,7 +6,7 @@ temporary cluster, which has no alias), never through the ORM: each production r
 its life at the AEAT (its status, when it was sent, when it last changed). A record the copy lacks or has otherwise
 stops the restore, since putting the copy back would repeat numbers the AEAT already has. The AEAT's test environment
 files nothing, so its records never count; a database the app was never set up in has nothing to say. The read is the
-app's own (``queries.record_states``); its config's ``fiscal_record_states`` answers the platform with it.
+app's own (``queries.app_hooks.record_states``); its config's ``fiscal_record_states`` answers the platform with it.
 """
 
 import datetime as dt
@@ -43,7 +43,7 @@ def test_each_production_record_says_its_status_when_it_was_sent_and_when_it_las
     sent.refresh_from_db()
     waiting.refresh_from_db()
 
-    assert queries.record_states(direct()) == {
+    assert queries.app_hooks.record_states(direct()) == {
         sent.pk: (Record.Status.ACCEPTED, sent.transmitted_at, sent.updated_at),
         waiting.pk: (Record.Status.PENDING, None, waiting.updated_at),
     }
@@ -52,7 +52,7 @@ def test_each_production_record_says_its_status_when_it_was_sent_and_when_it_las
 def test_a_record_of_the_aeats_test_environment_never_counts():
     record(Record.Status.ACCEPTED, timezone.now(), environment=Environment.TESTING)
 
-    assert queries.record_states(direct()) == {}
+    assert queries.app_hooks.record_states(direct()) == {}
 
 
 def test_a_database_without_its_table_has_nothing_to_say():
@@ -60,7 +60,7 @@ def test_a_database_without_its_table_has_nothing_to_say():
         # Undone with the test's transaction.
         cursor.execute("DROP TABLE verifactu_record CASCADE")
 
-    assert queries.record_states(direct()) == {}
+    assert queries.app_hooks.record_states(direct()) == {}
 
 
 def test_the_app_answers_the_platforms_question_with_its_records():

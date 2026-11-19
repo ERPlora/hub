@@ -1,4 +1,4 @@
-// The Fernet keys an e2e stack's runserver seals with (config/settings.py): `FISCAL_CERTIFICATE_KEY`, a business's own
+// The Fernet keys an e2e stack's runserver seals with (config/settings/businesses.py): `FISCAL_CERTIFICATE_KEY`, a business's own
 // VeriFactu certificate, and `FLOW_SECRETS_KEY`, the secrets of the automations. Without the first the Hub refuses
 // every upload (409 verifactu.certificate_storage_unavailable), and «Mi certificado» of verifactu-config.spec.ts failed
 // on every stack whose .env lacked it; without the second the «Secrets» box of «Call another system» says
@@ -23,7 +23,7 @@ export type FernetKeyName = keyof typeof KEYS;
 /** How to make one by hand (`.env.example`): what apps.verifactu.certificates.generate_key() does. */
 const GENERATE = 'uv run python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"';
 
-/** The checkout's .env: config/settings.py reads it through python-decouple, which looks for one from config/ up. */
+/** The checkout's .env: config/settings reads it through python-decouple, which looks for one from config/settings/ up. */
 export const ENV_FILE = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '.env');
 
 /** Where the run's key comes from: the environment, the .env as it was, or one generated into the .env now. */

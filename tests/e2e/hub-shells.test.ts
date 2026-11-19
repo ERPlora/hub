@@ -19,11 +19,11 @@ const WITHOUT_A_HUB: Record<string, { calls: number; on: string }> = {
   },
   'assistant-battery.ts': { calls: 2, on: "the SaaS's providers and accounts" },
   'assistant-probes.ts': { calls: 1, on: "the SaaS's accounts" },
-  'base-recover-from-copy.spec.ts': {
-    calls: 1,
-    on: "control's registry: the separate copy, the staff member's session and the worker's recovery pass (its cards, products and services, with --hub a)",
-  },
   'fix-hub-csp-whatsapp-media-gate.spec.ts': { calls: 1, on: "control's registry of hubs" },
+  'manage-shell.ts': {
+    calls: 1,
+    on: "control's registry and the platform's passes a spec plays in its open shell (a business's own, by use_hub)",
+  },
   'whatsapp-inbox-offered-options.spec.ts': { calls: 1, on: "the SaaS's WhatsApp number" },
   'whatsapp-inbox-plan-cap.spec.ts': { calls: 1, on: "the SaaS's plan of the business" },
 };

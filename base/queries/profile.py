@@ -10,7 +10,7 @@ from live.operations import AI, operation
 from base.models import Hub, Membership, Profile
 from base.operations import hub_id
 from base.permissions import VIEW_HOME
-from base.schemas import ProfileIn, ProfileOut
+from base.schemas.profile import ProfileIn, ProfileOut
 from base.storage import media_url
 
 from .access import access_settings, has_pin

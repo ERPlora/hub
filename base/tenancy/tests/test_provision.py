@@ -36,7 +36,7 @@ from live.operations import get as get_operation
 from base import activation, services
 from base.activation import Activation
 from base.models import AppActivation, Location
-from base.schemas import SetupStatusIn
+from base.schemas.home import SetupStatusIn
 from base.tenancy import connections as tenancy_connections
 from base.tenancy import identity, migrator, names, ops, provision
 from base.tenancy.context import use_control, use_hub
@@ -51,8 +51,6 @@ from base.tenancy.tests.s3 import (  # noqa: F401
     spy_on_the_purge,
 )
 from control.models import Cluster, Hub, HubDue
-
-pytestmark = pytest.mark.usefixtures("no_test_fallback")
 
 HUB_DIR = Path(__file__).resolve().parents[3]
 
@@ -571,8 +569,8 @@ def test_a_sign_up_while_frozen_waits_and_is_made_on_the_worker_s_first_tick_aft
 
     platform = system_context(REGISTRY_SCOPE)
     monkeypatch.setattr(catalog, "register_apps", lambda: RegisterResult(0, 0, 0, True))
-    for name in ("_relay", "_hubs", "_activations", "_reap"):
-        monkeypatch.setattr(worker, name, lambda now: None)
+    for target, name in ((worker, "_relay"), (worker.hub_visits.HubVisits, "serve"), (worker, "_activations"), (worker, "_reap")):
+        monkeypatch.setattr(target, name, lambda *_: None)
     hub = registry.hub()
     HubDue.mark_due(hub)
     with use_control():
@@ -641,7 +639,7 @@ def test_a_photo_that_arrives_while_it_is_seeded_is_in_its_database_when_it_is_r
 
     from base.models import HubUser
     from base.registry import REGISTRY_SCOPE
-    from base.schemas import HubStateIn
+    from base.schemas.hub_registry import HubStateIn
 
     hub = registry.hub()
     late = uuid.uuid7()

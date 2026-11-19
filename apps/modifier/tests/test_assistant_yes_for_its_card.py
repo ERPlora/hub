@@ -23,7 +23,7 @@ from apps.modifier.models import ModifierGroup, ModifierLink, ModifierOption
 from apps.modifier.tests.conftest import GENERIC, HUB_DB, A, B, ctx_for, make_category, make_product, run
 from apps.modifier.tests.test_integration_assistant import TITLES, modifier_writes
 from base import assistant
-from base.schemas import names
+from base.schemas.assistant import names
 from base.tenancy.context import use_hub
 from base.tests.test_assistant_yes_for_its_card import (
     read_as,

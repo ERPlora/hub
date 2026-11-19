@@ -29,7 +29,7 @@ from django.utils import timezone
 
 from apps.verifactu.models import Environment, Record
 from apps.verifactu.tests.test_fiscal_backlog import record
-from base import activation, metrics, queries, relay
+from base import activation, metrics, queries
 from base.metrics import FISCAL_NAMESPACE, HUBS_NAMESPACE, Emitter, FiscalBacklog, Metric, StuckActivations
 from base.models import AppActivation
 from base.tenancy.context import use_control, use_hub
@@ -38,14 +38,6 @@ from control.models import Hub
 
 NOW = dt.datetime(2026, 11, 1, 10, 0, tzinfo=dt.UTC)
 DIMENSIONS = [{"Name": "Environment", "Value": "prod"}]
-
-
-@pytest.fixture
-def no_test_fallback(monkeypatch):
-    """The metrics run in the worker's thread, which has no database context: each read opens its own."""
-    from base.tenancy import context
-
-    monkeypatch.setattr(context, "_test_fallback", None)
 
 
 def never() -> threading.Event:
@@ -66,7 +58,6 @@ def logged_once_with_its_trace(caplog, said: str) -> None:
 
 
 @pytest.mark.django_db
-@pytest.mark.usefixtures("no_test_fallback")
 def test_with_every_hub_ready_the_registry_measures_zero():
     assert metrics.registry_metrics(timezone.now(), never()) == [
         Metric(HUBS_NAMESPACE, "HubsRequestedAgeSeconds", 0.0, "Seconds"),
@@ -76,7 +67,6 @@ def test_with_every_hub_ready_the_registry_measures_zero():
 
 
 @pytest.mark.django_db
-@pytest.mark.usefixtures("no_test_fallback")
 def test_the_registry_measures_the_stuck_sign_up_the_failed_hubs_and_the_demo_left_to_drop():
     now = timezone.now()
     with use_control():
@@ -119,13 +109,11 @@ def oldest_age(found: list[Metric]) -> float:
 
 
 @hub_db
-@pytest.mark.usefixtures("no_test_fallback")
 def test_with_no_record_to_send_anywhere_the_backlog_is_zero(hub_a, hub_b):
     assert oldest_age(FiscalBacklog()(timezone.now(), never())) == 0.0
 
 
 @hub_db
-@pytest.mark.usefixtures("no_test_fallback")
 def test_a_business_still_without_its_own_database_is_never_read(hub_a, hub_b, caplog):
     """There is no shared database to read: a business still without its own answers 503 and keeps no records
     anywhere the worker reads; were it read, its failure would wait since then and page (``_failed``)."""
@@ -142,7 +130,6 @@ def test_a_business_still_without_its_own_database_is_never_read(hub_a, hub_b, c
 
 
 @hub_db
-@pytest.mark.usefixtures("no_test_fallback")
 def test_the_oldest_record_of_every_hub_with_its_own_database_is_measured(hub_a, hub_b):
     now = timezone.now()
     with use_hub(hub_a):
@@ -154,7 +141,6 @@ def test_the_oldest_record_of_every_hub_with_its_own_database_is_measured(hub_a,
 
 
 @hub_db
-@pytest.mark.usefixtures("no_test_fallback")
 def test_a_record_of_the_aeats_test_environment_never_pages(hub_a, hub_b):
     now = timezone.now()
     with use_hub(hub_a):
@@ -164,21 +150,19 @@ def test_a_record_of_the_aeats_test_environment_never_pages(hub_a, hub_b):
 
 
 @hub_db
-@pytest.mark.usefixtures("no_test_fallback")
 def test_a_hub_where_the_app_is_off_is_never_asked(hub_a, hub_b, monkeypatch):
     now = timezone.now()
     with use_hub(hub_a):
         pending(now - dt.timedelta(minutes=30))
-    real = relay.active_apps
+    real = metrics.active_apps
     monkeypatch.setattr(
-        relay, "active_apps", lambda scope: real(scope) - {"verifactu"} if scope.key == hub_a.slug else real(scope)
+        metrics, "active_apps", lambda scope: real(scope) - {"verifactu"} if scope.key == hub_a.slug else real(scope)
     )
 
     assert oldest_age(FiscalBacklog()(now, never())) == 0.0
 
 
 @hub_db
-@pytest.mark.usefixtures("no_test_fallback")
 def test_a_hub_still_being_prepared_is_never_entered(hub_a, hub_b):
     now = timezone.now()
     with use_hub(hub_a):
@@ -189,7 +173,6 @@ def test_a_hub_still_being_prepared_is_never_entered(hub_a, hub_b):
 
 
 @hub_db
-@pytest.mark.usefixtures("no_test_fallback")
 def test_within_its_budget_the_hubs_are_read_in_turn_and_each_ones_last_reading_kept(hub_a, hub_b):
     """A budget of nothing reads one hub per pass: the first pass a, the next b; a's reading counts in both."""
     now = timezone.now()
@@ -209,7 +192,6 @@ def test_within_its_budget_the_hubs_are_read_in_turn_and_each_ones_last_reading_
 
 
 @hub_db
-@pytest.mark.usefixtures("no_test_fallback")
 def test_a_hub_no_longer_served_is_forgotten(hub_a, hub_b):
     now = timezone.now()
     with use_hub(hub_b):
@@ -223,21 +205,20 @@ def test_a_hub_no_longer_served_is_forgotten(hub_a, hub_b):
 
 
 @hub_db
-@pytest.mark.usefixtures("no_test_fallback")
 def test_a_hub_that_cannot_be_read_keeps_its_last_reading_and_is_logged(hub_a, hub_b, monkeypatch, caplog):
     now = timezone.now()
     with use_hub(hub_a):
         pending(now - dt.timedelta(minutes=20))
     backlog = FiscalBacklog()
     assert oldest_age(backlog(now, never())) == pytest.approx(1200.0, abs=1)
-    real = relay.active_apps
+    real = metrics.active_apps
 
     def broken(scope):
         if scope.key == hub_a.slug:
             raise RuntimeError("database gone")
         return real(scope)
 
-    monkeypatch.setattr(relay, "active_apps", broken)
+    monkeypatch.setattr(metrics, "active_apps", broken)
     with caplog.at_level(logging.ERROR, logger="base.metrics"):
         assert oldest_age(backlog(now, never())) == pytest.approx(1200.0, abs=1)
 
@@ -247,7 +228,6 @@ def test_a_hub_that_cannot_be_read_keeps_its_last_reading_and_is_logged(hub_a, h
 
 
 @hub_db
-@pytest.mark.usefixtures("no_test_fallback")
 def test_a_busy_free_hub_never_read_waits_since_its_first_failure_and_pages_once_that_ages(
     hub_a, hub_b, monkeypatch, caplog
 ):
@@ -280,21 +260,20 @@ def test_a_busy_free_hub_never_read_waits_since_its_first_failure_and_pages_once
 
 
 @hub_db
-@pytest.mark.usefixtures("no_test_fallback")
 def test_a_hub_last_read_with_nothing_to_send_that_cannot_be_read_waits_since_its_first_failure(
     hub_a, hub_b, monkeypatch
 ):
     now = timezone.now()
     backlog = FiscalBacklog()
     assert oldest_age(backlog(now, never())) == 0.0
-    real = relay.active_apps
+    real = metrics.active_apps
 
     def broken(scope):
         if scope.key == hub_a.slug:
             raise RuntimeError("database gone")
         return real(scope)
 
-    monkeypatch.setattr(relay, "active_apps", broken)
+    monkeypatch.setattr(metrics, "active_apps", broken)
 
     assert oldest_age(backlog(now + dt.timedelta(minutes=1), never())) == 0.0
     # Still failing 7 minutes later: it waits since the first failure, never since the last one.
@@ -302,7 +281,6 @@ def test_a_hub_last_read_with_nothing_to_send_that_cannot_be_read_waits_since_it
 
 
 @hub_db
-@pytest.mark.usefixtures("no_test_fallback")
 def test_each_hubs_connection_is_closed_once_read(hub_a, hub_b):
     FiscalBacklog()(timezone.now(), never())
 
@@ -311,13 +289,12 @@ def test_each_hubs_connection_is_closed_once_read(hub_a, hub_b):
 
 
 @hub_db
-@pytest.mark.usefixtures("no_test_fallback")
 def test_a_stop_ends_the_pass_before_the_next_hub(hub_a, hub_b, monkeypatch):
     stop = threading.Event()
     stop.set()
     entered: list[str] = []
-    real = relay.active_apps
-    monkeypatch.setattr(relay, "active_apps", lambda scope: entered.append(scope.key) or real(scope))
+    real = metrics.active_apps
+    monkeypatch.setattr(metrics, "active_apps", lambda scope: entered.append(scope.key) or real(scope))
 
     FiscalBacklog()(timezone.now(), stop)
 
@@ -325,7 +302,6 @@ def test_a_stop_ends_the_pass_before_the_next_hub(hub_a, hub_b, monkeypatch):
 
 
 @hub_db
-@pytest.mark.usefixtures("no_test_fallback")
 def test_a_registry_that_cannot_be_read_leaves_the_measure_out(hub_a, hub_b, monkeypatch):
     """Without the list of the businesses to read, a reading of none would say nothing waits and hide them all."""
     from base.services import provisioning
@@ -380,7 +356,6 @@ def stuck_count(found: list[Metric]) -> float:
 
 
 @hub_db
-@pytest.mark.usefixtures("no_test_fallback")
 def test_with_every_app_on_or_off_the_count_is_zero(hub_a, hub_b):
     now = timezone.now()
     waiting(hub_a, "website", activation.OFF, now - dt.timedelta(hours=2))
@@ -389,7 +364,6 @@ def test_with_every_app_on_or_off_the_count_is_zero(hub_a, hub_b):
 
 
 @hub_db
-@pytest.mark.usefixtures("no_test_fallback")
 def test_an_app_making_its_tables_for_over_10_minutes_or_failed_counts_in_every_business(hub_a, hub_b):
     """Asked 11 minutes ago and still ``creating``: stuck. Asked 9 minutes ago: still within its time. ``failed``: an
     error the business already sees, counted at once (each retry moves its ``changed_at``). ``on``: never. Each
@@ -405,7 +379,6 @@ def test_an_app_making_its_tables_for_over_10_minutes_or_failed_counts_in_every_
 
 
 @hub_db
-@pytest.mark.usefixtures("no_test_fallback")
 def test_a_business_that_left_is_never_counted(hub_a, hub_b):
     """A business that left keeps its database while its records still go to the tax authority (``hubs_to_serve``),
     but nobody waits there for an app."""
@@ -417,7 +390,6 @@ def test_a_business_that_left_is_never_counted(hub_a, hub_b):
 
 
 @hub_db
-@pytest.mark.usefixtures("no_test_fallback")
 def test_an_app_no_longer_in_the_code_never_counts(hub_a, hub_b):
     now = timezone.now()
     with use_hub(hub_a):
@@ -427,7 +399,6 @@ def test_an_app_no_longer_in_the_code_never_counts(hub_a, hub_b):
 
 
 @hub_db
-@pytest.mark.usefixtures("no_test_fallback")
 def test_a_business_that_cannot_be_read_keeps_its_last_count_and_is_logged(hub_a, hub_b, monkeypatch, caplog):
     now = timezone.now()
     waiting(hub_a, "website", activation.FAILED, now)
@@ -450,7 +421,6 @@ def test_a_business_that_cannot_be_read_keeps_its_last_count_and_is_logged(hub_a
 
 
 @hub_db
-@pytest.mark.usefixtures("no_test_fallback")
 def test_a_business_never_read_that_cannot_be_read_counts_nothing(hub_a, hub_b, monkeypatch):
     """Unlike the fiscal backlog, a business that cannot be read is no stuck app: that alarm already pages for it."""
 

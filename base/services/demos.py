@@ -31,7 +31,7 @@ from live.slugs import DEMO_SLUG_PREFIX
 from base import auth, events, files, registry
 from base.models import DemoCode, Hub, Membership
 from base.registry import internal_only
-from base.schemas import DemoCodeIn, DemoCodeOut, DemoCreateIn, DemoOut, DemoSlugIn, DemoStatusOut
+from base.schemas.demos import DemoCodeIn, DemoCodeOut, DemoCreateIn, DemoOut, DemoSlugIn, DemoStatusOut
 from base.services.provisioning import _control_transaction
 from base.services.sessions import InactiveUser, MODEL_BACKEND, ensure_hub_user
 from base.tenancy import names as database_names

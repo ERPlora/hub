@@ -10,7 +10,7 @@ import pytest
 from live.context import Scope, system_context
 from live.operations import get
 
-from base.schemas import NoticeListIn
+from base.schemas.home import NoticeListIn
 from base.tenancy.context import use_hub
 
 from .conftest import A, HUB_DB, add_line, ctx_for, fire, fired_round, open_check, run
@@ -54,7 +54,6 @@ def test_a_round_fired_by_sales_tells_the_device_before_and_after_it_is_saved(cl
 
 
 @HUB_DB
-@pytest.mark.usefixtures("no_test_fallback")
 def test_a_round_fired_in_b_never_tells_a(hub_a, hub_b):
     in_a, in_b = ctx_for(scope=Scope("host", hub_a.slug)), ctx_for(scope=Scope("host", hub_b.slug))
     with use_hub(hub_b):

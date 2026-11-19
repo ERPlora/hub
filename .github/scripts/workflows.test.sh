@@ -85,25 +85,50 @@ check("build tests the image before it pushes it", before(build, "docker/image.t
 check("the deploy never moves the environment back to an older commit",
       before(deploy_job, "deploy-order.sh", "ecs-deploy.sh"))
 check("the workflow only reads", deploy.get("permissions") == {"contents": "read"})
+
+# --- deploy.yml: the settings of deploy/app-env.json and the confirmation of a protected one ------
+# PyYAML reads the key `on` as true (YAML 1.1).
+dispatch = (deploy.get("on") or deploy.get(True) or {}).get("workflow_dispatch") or {}
+confirm_input = (dispatch.get("inputs") or {}).get("confirm_protected") or {}
+check("a manual deploy takes the confirmation of a protected setting, empty by default",
+      confirm_input.get("type") == "string" and confirm_input.get("default") == ""
+      and confirm_input.get("required") is False)
+ecs_step = next((step for step in steps(deploy_job) if "ecs-deploy.sh" in str(step.get("run", ""))), {})
+check("the deploy hands the confirmation to ecs-deploy.sh in its environment, never inline in the script",
+      (ecs_step.get("env") or {}).get("CONFIRM_PROTECTED") == "${{ inputs.confirm_protected }}"
+      and "inputs.confirm_protected" not in str(ecs_step.get("run", "")))
+checkout = next((step for step in steps(deploy_job) if "actions/checkout" in str(step.get("uses", ""))), {})
+check("the deploy checks out the whole history: it reads deploy/app-env.json of the commit it deploys",
+      (checkout.get("with") or {}).get("fetch-depth") == 0)
+
+# --- rollback.yml: the same confirmation as a deploy -------------------------------------------
+rollback_dispatch = (rollback.get("on") or rollback.get(True) or {}).get("workflow_dispatch") or {}
+rollback_confirm = (rollback_dispatch.get("inputs") or {}).get("confirm_protected") or {}
+check("a rollback takes the confirmation of a protected setting, empty by default",
+      rollback_confirm.get("type") == "string" and rollback_confirm.get("default") == ""
+      and rollback_confirm.get("required") is False)
+rollback_job = (rollback.get("jobs") or {}).get("rollback", {})
+rollback_step = next((step for step in steps(rollback_job) if "ecs-rollback.sh" in str(step.get("run", ""))), {})
+check("the rollback hands the confirmation to ecs-rollback.sh in its environment, never inline in the script",
+      (rollback_step.get("env") or {}).get("CONFIRM_PROTECTED") == "${{ inputs.confirm_protected }}"
+      and "inputs.confirm_protected" not in str(rollback_step.get("run", "")))
 check("only build and deploy get an OIDC token",
       sorted(name for name, job in jobs.items() if (job.get("permissions") or {}).get("id-token") == "write")
       == ["build", "deploy"])
 
-# --- test.yml: three independent jobs behind the required check "test / test" ------------------
+# --- test.yml: four independent jobs behind the required check "test / test" -------------------
 tjobs = test.get("jobs", {})
-check("test.yml has the jobs python, frontend, scripts, legacy-fallback and test",
-      {"python", "frontend", "scripts", "legacy-fallback", "test"} <= set(tjobs))
-check("python, frontend and scripts wait for nothing",
-      all(not needs(tjobs.get(name, {})) for name in ("python", "frontend", "scripts")))
-check("test (the required check) needs python, frontend, scripts and legacy-fallback",
-      set(needs(tjobs.get("test", {}))) == {"python", "frontend", "scripts", "legacy-fallback"})
+TEST_JOBS = ("python", "frontend", "scripts", "smoke")
+check("test.yml has the jobs python, frontend, scripts, smoke and test", {*TEST_JOBS, "test"} <= set(tjobs))
+check("python, frontend, scripts and smoke wait for nothing", all(not needs(tjobs.get(name, {})) for name in TEST_JOBS))
+check("test (the required check) needs python, frontend, scripts and smoke",
+      set(needs(tjobs.get("test", {}))) == set(TEST_JOBS))
 check("test reports even when a job fails or is cancelled", str(tjobs.get("test", {}).get("if", "")) == "always()")
 # A red shard of python's matrix (or a red job) only turns "test / test" red if test reads every job's result and
 # nothing turns a failure into a pass on the way: no continue-on-error, on a job or on a step (hub#1185).
 test_results = "\n".join(str((step.get("env") or {}).get("RESULTS", "")) for step in steps(tjobs.get("test", {})))
-check("test reads the result of python (every shard), frontend, scripts and legacy-fallback",
-      all(f"{name}=${{{{ needs.{name}.result }}}}" in test_results
-          for name in ("python", "frontend", "scripts", "legacy-fallback")))
+check("test reads the result of python (every shard), frontend, scripts and smoke",
+      all(f"{name}=${{{{ needs.{name}.result }}}}" in test_results for name in TEST_JOBS))
 check("no job or step of test.yml continues on error, so no red shard is hidden",
       not any("continue-on-error" in job or any("continue-on-error" in step for step in steps(job))
               for job in tjobs.values()))
@@ -112,7 +137,7 @@ check("python runs pytest over a Postgres service",
       "pytest" in python_runs and "postgres" in (tjobs.get("python", {}).get("services") or {}))
 check("pytest runs in parallel (pytest-xdist)", "pytest" in python_runs and " -n " in python_runs)
 # The seeds' images are checked against the shared library's manifest (base/tests/test_seed_images.py): ERPlora/blueprints
-# is public and fetched beside the Hub, where config/settings.py looks for it (CATALOG_DIR), before pytest runs.
+# is public and fetched beside the Hub, where config/settings/web.py looks for it (CATALOG_DIR), before pytest runs.
 check("python fetches ERPlora/blueprints into ../blueprints before pytest",
       "ERPlora/blueprints.git ../blueprints" in python_runs
       and python_runs.index("ERPlora/blueprints.git") < python_runs.index("pytest"))
@@ -174,25 +199,6 @@ check("the shard warns before the job's timeout, with room to add a shard",
       warn_minutes.isdigit() and 0 < int(warn_minutes) <= python_job.get("timeout-minutes", 0) * 2 // 3)
 check("each shard runs pytest in parallel (pytest-xdist)", " -n " in " ".join(shard_run[5:]) + " ")
 check("pytest runs only through pytest-shard.sh", "pytest " not in python_runs.replace(str(shard_step.get("run")), ""))
-# A listed test of .legacy-fallback-allow whose cases the shards spread over several jobs is judged by none of them
-# (base/tenancy/tests/legacy_allow.py only judges a test a run ran every case of): each shard writes what it saw of the
-# listed tests and uploads it, even when one of its tests fails, and legacy-fallback joins the views of every shard.
-report = next((after for word, after in zip(shard_run, shard_run[1:]) if word == "--legacy-fallback-report"), "")
-report = report.strip('"').replace("$RUNNER_TEMP", "${{ runner.temp }}")
-upload = next((step for step in python_steps if str(step.get("uses", "")).startswith("actions/upload-artifact@")), None)
-upload_with = (upload or {}).get("with") or {}
-check("each shard writes its view of the listed tests and uploads it, even when one of its tests fails",
-      report.endswith(".json") and upload is not None and upload_with.get("path") == report
-      and python_steps.index(upload) > python_steps.index(shard_step) and "!cancelled()" in str(upload.get("if")))
-check("each shard's view is an artifact of its own, which a rerun of the shard replaces",
-      "${{ strategy.job-index }}" in str(upload_with.get("name")) and upload_with.get("overwrite") is True)
-fallback = tjobs.get("legacy-fallback", {})
-download = next((step for step in steps(fallback) if str(step.get("uses", "")).startswith("actions/download-artifact@")), {})
-views = str(upload_with.get("name", "")).split("${{")[0]
-check("legacy-fallback waits for every shard and joins their views, also when a shard is red",
-      needs(fallback) == ["python"] and "!cancelled()" in str(fallback.get("if")) and views != ""
-      and (download.get("with") or {}).get("pattern") == f"{views}*"
-      and before(fallback, "actions/download-artifact", "python -m base.tenancy.tests.legacy_allow"))
 lock = (folder.resolve().parent.parent / "uv.lock").read_text()
 check("pytest-split, which pytest-shard.sh runs, is locked in uv.lock", '\nname = "pytest-split"\n' in lock)
 # tests/test_guardrails_size.py compares the size allow list with the one where the branch left origin/main, and fails
@@ -225,6 +231,57 @@ check("setup-uv caches by uv.lock",
       bool(setup_uv) and all(str((step.get("with") or {}).get("enable-cache")).lower() == "true"
                              and (step.get("with") or {}).get("cache-dependency-glob") == "uv.lock"
                              for step in setup_uv))
+
+# --- test.yml: the browser smoke stops the merge ----------------------------------------------------
+# A change that breaks a critical walk in the browser turns "test / test" red: the job smoke runs smoke-e2e.sh (the
+# tests tagged @smoke, narrowed with --spec while the groups enter one at a time) on the stack nightly-e2e.sh builds,
+# with the SaaS beside the Hub because every login goes through erplora.com.
+smoke_job = tjobs.get("smoke", {})
+smoke_runs = runs(smoke_job)
+smoke_step = next((step for step in steps(smoke_job) if "smoke-e2e.sh" in str(step.get("run", ""))), {})
+smoke_words = str(smoke_step.get("run", "")).split()
+check("smoke runs the browser smoke with smoke-e2e.sh", smoke_words[:2] == ["bash", ".github/scripts/smoke-e2e.sh"])
+check("smoke runs Playwright only through smoke-e2e.sh",
+      not any(needle in smoke_runs for needle in ("pnpm e2e", "playwright", "nightly-e2e.sh")))
+smoke_specs = [smoke_words[index + 1] for index, word in enumerate(smoke_words[:-1]) if word == "--spec"]
+check("smoke's step is that command and its --spec, with nothing after them that could hide a red (as `|| true`)",
+      smoke_words[2:] == [word for spec in smoke_specs for word in ("--spec", spec)])
+# The groups that already stop the merge, with their specs: a spec dropped from the job, or one named outside them,
+# turns this red. A group that enters adds its specs here and to the job in the same change.
+SMOKE_GROUPS = {
+    "signing in, sessions, permissions, isolation and suspension": (
+        "login-and-shell", "base-access", "base-sign-out", "base-session-revoke", "employee-permissions",
+        "two-orgs-isolated", "hub-suspended",
+    ),
+    "charging and the cash register": ("sale-pos", "sale-cash-gate", "cash-register-shift", "printing-sale"),
+    "the ticket's QR, the invoice and VeriFactu": (
+        "sale-fiscal-qr", "sale-invoice-chain", "invoice-sale", "invoice-manual", "verifactu-records",
+    ),
+}
+grouped = []
+for group, names in SMOKE_GROUPS.items():
+    specs = [f"tests/e2e/{name}.spec.ts" for name in names]
+    grouped += specs
+    missing = [spec for spec in specs if spec not in smoke_specs]
+    check(f"smoke runs every spec of the group «{group}»{': missing ' if missing else ''}" + ", ".join(missing),
+          not missing)
+ungrouped = [spec for spec in smoke_specs if spec not in grouped]
+check(f"smoke names no spec outside those groups{': ' if ungrouped else ''}" + ", ".join(ungrouped), not ungrouped)
+repo = folder.resolve().parent.parent
+unsmoked = [spec for spec in smoke_specs if not (repo / spec).is_file() or "@smoke" not in (repo / spec).read_text()]
+check(f"every spec the smoke names exists and has a test tagged @smoke{': ' if unsmoked else ''}" + ", ".join(unsmoked),
+      not unsmoked)
+check("smoke has a timeout of its own, in whole minutes",
+      isinstance(smoke_job.get("timeout-minutes"), int) and smoke_job.get("timeout-minutes") > 0)
+# The specs reach the stack's Postgres with `docker compose exec` (tests/e2e/global-setup.ts), and nightly-e2e.sh takes
+# the SaaS from ../saas, as in the erplora-next tree.
+check("smoke starts Postgres with docker compose before the smoke", before(smoke_job, "docker compose", "smoke-e2e.sh"))
+check("smoke clones ERPlora/saas into ../saas before the smoke", before(smoke_job, "ERPlora/saas.git ../saas", "smoke-e2e.sh"))
+uploads = [step for step in steps(smoke_job) if str(step.get("uses", "")).startswith("actions/upload-artifact@")]
+smoke_dir = str((smoke_step.get("env") or {}).get("NIGHTLY_DIR", ""))
+check("a red smoke keeps the run's log and Playwright's traces (NIGHTLY_DIR/runs/)",
+      bool(smoke_dir) and any(str(step.get("if", "")) == "failure()"
+                              and (step.get("with") or {}).get("path") == f"{smoke_dir}/runs/" for step in uploads))
 
 # --- ci.yml: a newer push supersedes the run of the older one -----------------------------------
 check("ci.yml runs test.yml", (ci.get("jobs", {}).get("test") or {}).get("uses") == "./.github/workflows/test.yml")

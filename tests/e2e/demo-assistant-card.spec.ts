@@ -9,7 +9,8 @@ import { type BrowserContext, expect, test } from '@playwright/test';
 
 import { AN_ID, cancel, cardSpec, datumOf, fieldsOf, ownerIn, VIEWPORTS } from './assistant-card-helpers';
 import { card, openPanel } from './assistant-real';
-import { A, capture, createItem, itemDetail, psql, untilStill } from './helpers';
+import { A, capture, psql, untilStill } from './helpers';
+import { createItem, itemDetail } from './demo-items';
 
 /** A business is born with every app off. */
 const NEEDED = ['demo'];

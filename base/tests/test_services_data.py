@@ -22,8 +22,8 @@ from live.errors import Conflict, InvalidPayload, NotFound, OperationError, Perm
 from live.models import OutboxEvent
 from live.operations import get
 
-from apps.verifactu.queries import enable_refusal
-from base import activation, blueprint, events as base_events, relay, services
+from apps.verifactu.queries.app_hooks import enable_refusal
+from base import activation, apps_on, blueprint, events as base_events, services
 from base.catalog import template_apps
 from base.models import AppActivation, Hub, ImportBatch, Membership
 from base.permissions import permissions_for
@@ -266,7 +266,8 @@ def test_the_plan_says_what_each_app_would_lose_and_what_to_type(owner):
 
     plan = call(owner, "base.hub.reset", dry_run=True)
 
-    assert (plan.dry_run, plan.available) == (True, True)
+    assert set(plan.model_dump()) == {"dry_run", "confirm_with", "sections", "apps", "status"}
+    assert plan.dry_run is True
     assert plan.confirm_with == "Bar Pepe"
     assert {(section.id, section.label, section.rows) for section in plan.sections} == {
         ("inventory", "Inventario", 22),
@@ -413,7 +414,7 @@ def born():
 
 
 def modules_on(scope=A):
-    return set(relay.active_apps(scope)) & set(activation.module_graph())
+    return set(apps_on.active_apps(scope)) & set(activation.module_graph())
 
 
 def chosen(host=A.key):
@@ -485,7 +486,7 @@ def test_an_app_beyond_the_plans_limit_stays_off_says_why_and_the_rest_loads(bor
 
     assert chosen() == {"inventory"}
     assert "table" not in modules_on()
-    with pytest.raises(services.AppLimitReached) as refused:
+    with pytest.raises(services.apps.AppLimitReached) as refused:
         call(born, "base.app.enable", app="table")
     report = {app.id: app for app in loaded.report.apps}
     assert (report["inventory"].status, report["inventory"].reason) == ("applied", "")

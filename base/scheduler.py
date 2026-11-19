@@ -12,15 +12,16 @@ A port of the old Hub's ``crates/runtime/src/scheduler.rs``. Every ``LiveAppConf
   task goes on from the next time after now.
 
 ``sync`` writes the declarations to ``TaskSchedule`` when the worker starts, keeping the clock of the
-tasks it already knew (``seed_module_tasks``); ``run_due`` runs, on every tick, what is due
+tasks it already knew (``seed_module_tasks``); ``run_due`` runs what is due when the worker visits the business
 (``process_once``): each row is claimed with ``SKIP LOCKED`` and its ``next_run`` moves in the same
 transaction as the task's writes (``base.services.relay_runs.run_next_due_task``). A task that raises is logged
 and rescheduled; the others still run. ``check_scheduled_tasks`` (``base.E001``–``E003``) refuses a
 declaration the engine could not run, at ``manage.py check`` and before every command.
 
-Every hub has its own schedule in its own database: the worker's pass over the hubs (``base.worker``) writes it once
-per process and runs, under ``use_hub(hub)``, the tasks of its active apps on its own scope (hub#471).
-Without a ``scope`` (the suite's tests written before the tenancy) they run on ``settings.WORKER_SCOPE_SLUG``'s.
+Every hub has its own schedule in its own database: the worker's visits (``base.hub_visits``) write it once per
+process and run, under ``use_hub(hub)``, the tasks of its active apps on its own scope (hub#471), waking the hub when
+the next of them is due.
+Without a ``scope`` (a test that runs the tasks directly) they run on ``settings.WORKER_SCOPE_SLUG``'s.
 """
 
 import datetime as dt
@@ -105,23 +106,20 @@ def sync(now: dt.datetime, *, declared: list[ScheduledTask] | None = None) -> No
 def run_due(now: dt.datetime, *, scope: Scope | None = None, active: frozenset[str] | None = None) -> list[str]:
     """Run every task due at ``now``, one transaction each; return those that ran (``<app>.<name>``).
 
-    ``scope``: whose they are, the system's scope they run on (a hub's own, ``host`` and its slug, in the worker's pass
-    over the hubs: their live notices go on its channel); without one, ``WORKER_SCOPE_SLUG``'s (the suite's tests
-    written before the tenancy). ``active``: the apps that are on there; a task of another app is not run (it moves to
-    its next time). The connections are released after each task, so the worker never idles holding one.
+    ``scope``: whose they are, the system's scope they run on (a hub's own, ``host`` and its slug, in the worker's visit
+    to the hub: their live notices go on its channel); without one, ``WORKER_SCOPE_SLUG``'s (a test that runs
+    the tasks directly). ``active``: the apps that are on there; a task of another app is not even claimed: it costs no
+    transaction and waits for its app. The connections are released after each task, so the worker never idles holding
+    one.
     """
     scope = Scope("host", settings.WORKER_SCOPE_SLUG) if scope is None else scope
 
     def execute(name: str) -> None:
-        if active is not None and name.split(".", 1)[0] not in active:
-            return
         _execute(name, scope=scope)
 
     ran: list[str] = []
     for _ in range(MAX_PER_TICK):
-        outcome = relay_runs.run_next_due_task(
-            now, execute=execute, reschedule=next_after
-        )
+        outcome = relay_runs.run_next_due_task(now, execute=execute, reschedule=next_after, apps=active)
         close_old_connections()
         if outcome is None:
             break

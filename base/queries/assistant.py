@@ -9,7 +9,7 @@ from pydantic import ValidationError
 
 from base import assistant
 from base.permissions import VIEW_HOME
-from base.schemas import AssistantUsageIn, AssistantUsageOut, DocsSearchIn, DocsSearchOut
+from base.schemas.assistant import AssistantUsageIn, AssistantUsageOut, DocsSearchIn, DocsSearchOut
 
 
 # ── Assistant ───────────────────────────────────────────────────────────────────────────────────────────────────

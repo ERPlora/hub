@@ -55,8 +55,8 @@ msgstr "Minimalista"
 msgid "Bold"
 msgstr "Llamativa"
 
-msgid "hub"
-msgstr "hub"
+msgid "single row"
+msgstr "fila única"
 
 msgid "template"
 msgstr "plantilla"
@@ -274,21 +274,6 @@ msgid ""
 "This image was not uploaded to this business's website: upload it again."
 msgstr ""
 "Esta imagen no se subió a la página web de este negocio: vuelve a subirla."
-
-msgid "The file did not arrive whole: choose it again."
-msgstr "El archivo no llegó entero: vuelve a elegirlo."
-
-msgid "The file is empty."
-msgstr "El archivo está vacío."
-
-msgid "The image may weigh 5 MB at most."
-msgstr "La imagen puede pesar 5 MB como mucho."
-
-msgid "This file is not a %(type)s image."
-msgstr "Este archivo no es una imagen %(type)s."
-
-msgid "The image may be %(side)s pixels a side at most."
-msgstr "La imagen puede medir %(side)s píxeles por lado como mucho."
 
 msgctxt "website"
 msgid "Nothing to show here yet."

@@ -6,7 +6,7 @@ import { DataTable, EmptyState } from '@erplora/ui/components';
 import { describe, expect, it, vi } from 'vitest';
 import type { Component } from 'vue';
 
-import type { Business } from '../../../../base/frontend/operations';
+import type { Business } from '../../../../base/frontend/operations/business';
 import { business, POLISH, rule } from '../__tests__/fixtures';
 import { click, EMPLOYEE, flush, mountPricing, type MountOptions, page, settle } from '../__tests__/mount-pricing';
 import { itRetriesAFailedLoad, itStartsOnTheActiveOnes } from '../__tests__/table-checks';

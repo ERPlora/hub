@@ -10,7 +10,8 @@
 // way in into the PIN pad: base-access.spec.ts), and everything this file creates goes with it (`afterAll`).
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, api, EMPLOYEE, login, OWNER, psql, shot, shown, untilStill, usernameOf, usernamesOf } from './helpers';
+import { A, api, EMPLOYEE, login, OWNER, psql, shot, shown, untilStill, usernamesOf } from './helpers';
+import { usernameOf } from './business';
 import { cleanInventory, createProduct } from './inventory-helpers';
 import { snapshotSeries } from './invoice-helpers';
 import { chargeByApi, cleanSales, drawerOff, restoreDrawer, type SaleOut, stamp } from './sale-helpers';

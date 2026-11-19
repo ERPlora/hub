@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:143c337e93ce25a99c8f3795fd84a7c45f041015483f1494eb0d6866ae30f71a -->
+<!-- generated from WORKBOOK.md sha256:9ead874ab26e51238d6f76f49defc1e1f744ef4a33607203e4919c3c2931a245 -->
 
 ## What it is for and who it is for
 
@@ -309,6 +309,8 @@ With the window as it opened, Back closes it without asking (BASE-F05).
 | SALE-F37 | Add a payment method (Bizum, bank transfer…) | common | done |
 | SALE-F38 | Sell a service from Services | hair salon | done |
 | SALE-F39 | Charge with what another app adds (the tip) | common | not done |
+| SALE-F40 | See a dish's allergens when ordering it | common | partial |
+| SALE-F41 | Mark the customer's allergy on a line | restaurant | partial |
 
 ### SALE-F01 Sell and charge in cash
 Status: done
@@ -1354,6 +1356,68 @@ notice with "Retry" (TIP-F02); the retry uses the same attempt key and never cha
 ticket's cap (€3,000) and the cash cap (€1,000) look at the sale's total, as always: the tip is no price.
 Involved: TIP-F02, TIP-F03, TIP-F04, CASH_REGISTER-F18, INVOICE-F01
 
+### SALE-F40 See a dish's allergens when ordering it
+Status: partial — the line keeps its product's allergens (in a menu, each dish's) and the live check and the order
+sent carry them, but the till does not paint them yet on the line or on the sheets (hub#1738)
+Vertical: common
+Actor: employee, manager
+Screen: Sell
+Steps:
+1. In **Sell**, tap an item with allergens declared in Inventory (INVENTORY-F35). The line goes in as always and,
+   under the name, says "Allergens: Gluten, Milk", in the order of the list of the fourteen. An item without
+   allergens has no such row.
+2. If the item opens its modifiers sheet (SALE-F11), the sheet says its allergens under its name, before adding it.
+   In the sheet of a menu (SALE-F12), each choice says its own next to its name, and on the check each dish of the
+   menu carries those of its product.
+3. If the customer asks, the waiter reads them on the line; if the dish does not suit them, they remove the line
+   like any other before sending it.
+4. Send to the kitchen and charge as always: the allergens do not change the price or the payment.
+In: from Inventory, each product's allergens, with the till's catalogue (INVENTORY-F27).
+Out: the line with its product's allergens frozen when it is ordered, like its modifiers: if Inventory changes them
+afterwards, the line keeps the ones it had (announces: check changed). They travel to Kitchen with the line when the
+round is sent, where they are crossed with the customer's allergy (SALE-F41, KITCHEN-F32). They do not show on the
+ticket, on the invoice or on the printed bill for the table.
+If it fails: without Inventory active there are no allergens, and open-price lines and services do not carry them.
+An item with no allergens marked says nothing, because the till does not tell "has none" from "none declared": that
+is why Inventory's card says "No allergens declared". A modifier has no allergens of its own: "+Cheese" does not add
+Milk to the line; if the customer has an allergy, it is marked on the line (SALE-F41) and Kitchen sees it all the
+same.
+Involved: INVENTORY-F27, INVENTORY-F35, SALE-F11, SALE-F12, SALE-F41, KITCHEN-F32
+
+### SALE-F41 Mark the customer's allergy on a line
+Status: partial — the line keeps the customer's allergy, the live check says which of those allergens the dish
+contains and the order sent carries it, also through the assistant and the API; the till's sheet does not have the
+«Customer's allergy» block yet nor does the line show it (hub#1738), and in Kitchen the paper prints it but the card
+does not highlight it yet (KITCHEN-F32)
+Vertical: restaurant
+Actor: employee, manager
+Screen: Sell
+Steps:
+1. With Kitchen active, the customer mentions an allergy. On the line of their dish, tap "Note": the sheet has at the
+   top the "Customer's allergy" block, with the fourteen allergens by their name and none marked, and below it the
+   quick notes and the usual box (SALE-F13).
+2. Tap the customer's allergens, one or several, and tap "Save". The line says, under the name, highlighted and
+   before the note, "Allergy: Gluten".
+3. If the dish has any of those allergens (SALE-F40), the sheet warns on saving and the line says it highlighted:
+   "The dish has Gluten". It does not stop the order, because the kitchen may prepare it without it: the waiter
+   talks it over with the customer and, if needed, removes the line and orders another dish.
+4. On a menu, the allergy is marked on the menu's line and counts for each of its dishes; the warning of step 3
+   names the dish that has the allergen ("The burger has Gluten").
+5. Send the round (SALE-F20): the allergy goes with each dish to its station, highlighted (KITCHEN-F32). Until it is
+   sent, it is changed by going back to the sheet; unmarking them all removes it.
+In: the fourteen allergens; the line's frozen allergens (SALE-F40).
+Out: the line with the customer's allergy (announces: check changed); when the round is sent, it goes to Kitchen
+with the line (announces: order sent) and stays frozen on the dish. It does not show on the ticket, on the invoice,
+on the printed bill for the table or on the customer record.
+If it fails: if it is not saved, "That change to the line could not be saved. The line is back as it was.", as with
+the note. A line already sent has no note button: if the customer mentions it afterwards, the kitchen is told out
+loud or the dish is voided with its reason (SALE-F20) and ordered again with the allergy. Without Kitchen active the
+sheet has no block, because there is no kitchen order to carry it, and the note still works. An allergen that is
+not on the list is refused, also through the assistant or the API.
+Through the assistant: "the burger on table 4 is for someone allergic to gluten" marks the allergy on that line after
+the confirmation card, which says the check, the dish and the allergens by their name.
+Involved: SALE-F13, SALE-F20, SALE-F40, INVENTORY-F35, KITCHEN-F32
+
 ## What the verticals share
 
 | Shared piece | Flows that use it |
@@ -1422,6 +1486,7 @@ the quick notes and what is refundable can be followed live.
 | Adds an open-price line | open price | F09 | `sale.order.add_open_line` |
 | Changes a line's quantity, comp or note | build the check | F01, F10, F13, F15 | `sale.order.update_line` |
 | Changes whose line it is | build the check | F16 | `sale.order.set_line_staff` |
+| Marks or takes off the customer's allergy on a line not sent yet | build the check | F41 | `sale.order.set_line_allergy` |
 | Splits a line of N units into N lines | build the check | F27 | `sale.order.split_line` |
 | Removes an unsent line | build the check | F01 | `sale.order.remove_line` |
 | Voids a line already sent to the kitchen, with a reason | void | F20 | `sale.order.void_line` |
@@ -1453,7 +1518,7 @@ the quick notes and what is refundable can be followed live.
 | Sale with its document | A document that could not be issued in the charge, the void or the refund is issued later (the charge's retry, "Issue now" or Invoicing's reaction) | The sale, the document, its number, the refund (`refund_id`) or whether it is the void's (`void`); one per document | `sale.sale.invoiced` |
 | Check opened | Open or split | The check | `sale.order.opened` |
 | Check changed | Any change of lines, discounts or title | The check | `sale.order.changed` |
-| Order sent | Send to the kitchen | The check, its title, the channel, the round, who serves and the lines with their notes | `sale.order.fired` |
+| Order sent | Send to the kitchen | The check, its title, the channel, the round, who serves and the lines with their notes, their product's allergens (in a menu, each dish's) and the customer's allergy | `sale.order.fired` |
 | Check closed | Charge the last of a check | The check | `sale.order.completed` |
 | Check voided | Void an open check | The check | `sale.order.voided` |
 | Checks merged | Merge | The absorbed one and the one that stays | `sale.order.merged` |

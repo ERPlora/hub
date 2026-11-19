@@ -44,7 +44,7 @@ pantalla **y** el motor que las ejecuta. Sirve igual a la peluquería y al resta
 | `requires` | `[]`: las acciones y consultas de otras apps se llaman por el nombre de su operación, nunca por sus modelos |
 | Permisos | `flow.view`, `flow.manage` (dueño y administrador: `flow.*`), `flow.answer` (empleado) y `flow.answer_manager` (encargado) |
 | Pantallas | `/flow/automations`, `/flow/automations/new`, `/flow/automations/:id` y `/flow/guide` |
-| Operaciones | 15 consultas (`queries.py`) y 28 acciones (`services.py`), todas con `ai=`; 31 rutas en `/api/flow/…` (`api.py`) |
+| Operaciones | 15 consultas (`queries/`) y 29 acciones (`services/`), todas con `ai=`; 31 rutas en `/api/flow/…` (`api.py`) |
 | Eventos | 18 propios (`flow.flow.*`, `flow.run.*`, `flow.draft.*`, `flow.secret.*` y `flow.question.*`; `events.py`); reacciona a los avisos de todas las apps activas (FLOW-F21) y a su propio `flow.run.parked` (FLOW-F27) |
 | De otras apps | el paso «Enviar un mensaje» usa las plantillas, los archivos de cabecera y el envío estrecho de la Bandeja de WhatsApp (`whatsapp_inbox.*`, por nombre) |
 | Migraciones | `0001_initial` … `0006_flowrun_error_reason` |
@@ -67,7 +67,8 @@ CI=1 pnpm e2e tests/e2e/flow-flows.spec.ts tests/e2e/flow-steps.spec.ts tests/e2
 - `test_integration_apps.py` y `test_integration_assistant.py` van contra las apps reales y el asistente;
   `test_concurrency.py`, con hilos, que un aviso, un horario o una espera arrancan una sola vez y que borrar a la
   vez nunca da un error del servidor; `test_field_words.py` exige que cada
-  dato de una operación tenga su palabra `flow.fields.<campo>` en `en` y `es`.
+  dato de una operación tenga su palabra `flow.fields.<campo>` en `en` y `es`, y `test_action_words.py`, que cada
+  acción y consulta que ofrece el editor tenga su frase `flow.actions.<app>__<entidad>__<acción>` en los dos.
 - 15 specs `tests/e2e/flow-*.spec.ts` y `fix-*flow*.spec.ts` (lista y galería, pasos, recetas, relevo, asistente,
   WhatsApp con el Graph de Meta de la e2e…); las de WhatsApp necesitan el SaaS de la pila (`tests/e2e/README.md`).
 

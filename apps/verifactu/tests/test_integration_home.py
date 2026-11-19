@@ -31,7 +31,7 @@ from apps.verifactu.tests.conftest import (
     manual,
     run,
 )
-from base.schemas import SetupStatusIn, WidgetListIn
+from base.schemas.home import SetupStatusIn, WidgetListIn
 
 STEP = "verifactu.sending_route"
 PANELS = ["verifactu.pending", "verifactu.contingency", "verifactu.by_status", "verifactu.events"]

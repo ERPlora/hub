@@ -92,7 +92,7 @@ from apps.inventory.schemas import (
     WriteOffIn,
 )
 from apps.tax.models import TaxCategory
-from base import images
+from base import allergens, images
 from base import operations as platform
 
 SKU_TAKEN = _("That SKU already exists in the catalog.")
@@ -142,7 +142,7 @@ _PRODUCT_CONSTRAINTS = {
 }
 
 
-# Products (INVENTORY-F01 to F05, F08, F20, F26)
+# Products (INVENTORY-F01 to F05, F08, F20, F26, F35)
 
 
 @operation(
@@ -189,6 +189,7 @@ def create_product(ctx: OperationContext, data: ProductIn) -> dict:
         sku=data.sku,
         ean13=data.ean13 or None,
         description=data.description,
+        allergens=data.allergens,
         product_type=data.product_type,
         price=data.price,
         cost=data.cost,
@@ -204,16 +205,7 @@ def create_product(ctx: OperationContext, data: ProductIn) -> dict:
     )
     _save(product)
     _link(product, categories)
-    record_event(
-        ctx,
-        events.PRODUCT_CREATED,
-        {
-            "id": str(product.id),
-            "sku": product.sku,
-            "name": product.name,
-            "category_ids": sorted(str(category.id) for category in categories),
-        },
-    )
+    record_event(ctx, events.PRODUCT_CREATED, _created_payload(product, categories))
     for category in sorted(categories, key=lambda category: category.id):
         _record_link(ctx, events.PRODUCT_CATEGORIZED, product.id, category.id)
     if data.initial_stock:
@@ -294,9 +286,7 @@ def bulk_create_products(ctx: OperationContext, data: ProductImportIn) -> dict:
         stock = outcome.pop("stock")
         product = Product(**outcome, created_by=_actor(ctx), updated_by=_actor(ctx))
         _save(product)
-        record_event(
-            ctx, events.PRODUCT_CREATED, {"id": str(product.id), "sku": product.sku, "name": product.name, "category_ids": []}
-        )
+        record_event(ctx, events.PRODUCT_CREATED, _created_payload(product, []))
         if stock:
             _move(ctx, product, StockMovement.Type.INITIAL, stock)
         report.append(_row(row.line, sku, "created", id=product.id))
@@ -1326,6 +1316,15 @@ def _record_link(ctx: OperationContext, name: str, product_id: UUID, category_id
     record_event(ctx, name, {"product_id": str(product_id), "category_id": str(category_id)})
 
 
+def _created_payload(product: Product, categories: list[Category]) -> dict:
+    return {
+        "id": str(product.id),
+        "sku": product.sku,
+        "name": product.name,
+        "category_ids": sorted(str(category.id) for category in categories),
+    }
+
+
 def _product_payload(product: Product) -> dict:
     return {
         "id": str(product.id),
@@ -1497,7 +1496,7 @@ def _check_product_row(  # noqa: PLR0911, PLR0913, PLR0917
         return str(ROW_TAX_CATEGORY_MISSING)
     if key not in tax_categories:
         return str(ROW_TAX_CATEGORY_UNKNOWN) % {"text": key}
-    return {
+    return allergens.read_into(row.allergens, {
         "name": name,
         "sku": sku,
         "ean13": ean13 or None,
@@ -1509,7 +1508,7 @@ def _check_product_row(  # noqa: PLR0911, PLR0913, PLR0917
         "unit": unit,
         "pricing_unit": unit,
         "tax_category": tax_categories[key],
-    }
+    })
 
 
 def _unguarded(text: str) -> str:

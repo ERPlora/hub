@@ -11,8 +11,8 @@ from live.errors import Conflict
 
 from apps.printing.models import PrintJob
 from apps.sale.models import Sale
-from apps.sale.queries import business_currency as sales_business_currency
-from apps.sale.queries import money_text
+from apps.sale.queries.business import business_currency as sales_business_currency
+from apps.sale.queries.business import money_text
 from apps.sale.tests.conftest import HUB_DB, A, B, ctx_for, run
 from base import operations as base_operations
 from base.models import Hub
@@ -250,7 +250,7 @@ def test_what_a_sale_can_give_back_is_said_in_its_own_currency(coffee):
 # ── One way to the currency ─────────────────────────
 # Sales asks the one question every app that charges asks (``base.operations.business_currency``, BASE-F50), on
 # ERPlora's own hub too, never a copy of its own that drifts in silence (here, an answer other than the one of the
-# business's or the issuer's country). ``queries.business_currency`` stays as Sales' public answer (Cash register
+# business's or the issuer's country). ``queries.business.business_currency`` stays as Sales' public answer (Cash register
 # counts with it, ``requires = ["sale"]``), and it is base's.
 
 
