@@ -10,16 +10,19 @@ over the asks and the guard that no ask copies a probe of layer 2.
 import re
 
 import pytest
+from django.apps import apps
 from live import assistant as shared
 from live.operations import AI, Operation, registry
 
 from apps.cash_register.tests.conftest import HUB_DB
+from apps.invoice.tests.conftest import in_hubs
 from base import assistant
 from base.models import Membership
 from base.tests.test_assistant_asks import (
     assert_its_words_name,
     TOP,
     assert_offered_with_room,
+    by_group_test,
     comparable,
     offered_to,
     place_of_no_ask,
@@ -127,13 +130,73 @@ def test_the_reported_request_is_offered_the_read_it_needs_first(catalog_of, rol
 #: Money coming into the drawer said as a business says it, in words that are none of the tool's asks nor a probe:
 #: «entran» with an amount is cash in the till, not goods received (the Hub's delivery-note group also holds «entran»).
 MONEY_IN = [("cash_register.movement.add", "registra que entran 100 € en el turno")]
+#: Money taken out said as «una salida» of an amount already brings the movement among the first ten without the
+#: Hub's group of movements, with or without the shift it goes in: the group keeps it there.
+MONEY_OUT = [
+    ("cash_register.movement.add", "apúntame una salida de 50 €"),
+    ("cash_register.movement.add", "mete una salida de 20 € en el turno"),
+]
 
 
 @HUB_DB
-@pytest.mark.parametrize(("name", "phrase"), MONEY_IN)
-def test_money_coming_in_in_the_hubs_words_brings_the_movement_among_the_first_ten(catalog_of, name, phrase):
+@pytest.mark.parametrize(("name", "phrase"), MONEY_IN + MONEY_OUT)
+def test_money_coming_in_or_going_out_in_the_hubs_words_brings_the_movement_among_the_first_ten(
+    catalog_of, name, phrase
+):
     assert comparable(phrase) not in probe_phrases()
     assert_offered_with_room(catalog_of(OWNER, "es"), name, phrase, room=TOP)
+
+
+#: A movement of the drawer said as a business says it, «una entrada», «una salida» or «un movimiento» of an amount,
+#: with or without the shift it goes in, by «apunta», «anota» or «mete». The tool's asks say neither «entrada» nor
+#: «movimiento», so without the group none of these is among the first ten: shift and staff settings came first.
+MOVEMENT_SAID = [
+    ("cash_register.movement.add", "apúntame una entrada de 50 € de cambio en el turno", "una entrada"),
+    ("cash_register.movement.add", "apúntame una entrada de 50 €", "una entrada"),
+    ("cash_register.movement.add", "anota en el turno una entrada de 50 € de cambio", "una entrada"),
+    ("cash_register.movement.add", "mete una entrada de 50 € en el turno", "una entrada"),
+    ("cash_register.movement.add", "mete una entrada de 50 €", "una entrada"),
+    ("cash_register.movement.add", "apúntame una salida de 50 € en el turno", "una salida"),
+    ("cash_register.movement.add", "apúntame un movimiento de 50 € en el turno", "un movimiento"),
+]
+
+test_a_movement_said_as_a_business_says_it_brings_its_tool_by_cash_registers_group = in_hubs(
+    by_group_test(MOVEMENT_SAID)
+)
+
+#: «Entrada» and «salida» said of anything but the drawer's money: a clock-in or a clock-out, goods received, a place
+#: in the waiting list, what left the kitchen's pass. A bare «entrada» also shares its stem with «entre» and «entra».
+OTHER_ENTRIES = [
+    "ficha mi salida",
+    "registra mi entrada",
+    "apunta la salida de Ana a las 18:00",
+    "registra la entrada de mercancía del albarán de hoy",
+    "han entrado 12 unidades de tarta",
+    "abre la entrada de Ana en la lista de espera",
+    "la 12 ya ha salido del pase",
+    "ventas entre el lunes y el viernes",
+]
+
+
+def test_the_hub_reads_una_entrada_una_salida_or_un_movimiento_as_a_movement_and_no_other_entry():
+    """Cash register's own words (its ``assistant_synonyms``): «una entrada», «una salida» or «un movimiento», also
+    after «otra» or «otro», is a movement of the drawer (``cash_register.movement``), and without the Hub's groups
+    none is (positive control); the other senses of «entrada» and «salida» name no movement."""
+    movement = shared.stem("movement")
+    assert_its_words_name(
+        "cash_register",
+        [
+            ("apúntame una entrada de 50 € de cambio en el turno", movement),
+            ("registra una salida de 15 € para hielo en el turno", movement),
+            ("apúntame un movimiento de 50 € en el turno", movement),
+            ("apunta otra entrada de 20 € en la caja", movement),
+            ("anota otra salida de 10 € para hielo", movement),
+            ("anota otro movimiento de 10 € en la caja", movement),
+        ],
+    )
+    own = apps.get_app_config("cash_register").assistant_synonyms
+    named = [said for said in OTHER_ENTRIES if any(movement in one for one in shared.asked([said], own).concepts)]
+    assert named == []
 
 
 #: What makes the model answer in the chat and wait, so the card of a write never comes (hub#1105, hub#1138): a
