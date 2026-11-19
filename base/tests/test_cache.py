@@ -120,3 +120,15 @@ def test_an_increment_of_a_key_that_never_expires_leaves_it_so(backend, monkeypa
     assert cache.incr("generation") == 1
     now[0] += 10 * 365 * 86_400
     assert cache.get("generation") == 1
+
+
+def test_an_increment_of_a_key_past_its_expiry_finds_nothing_to_add_to(backend, monkeypatch):
+    # The key is still on disk, unread since it expired: the increment must not bring it back.
+    now = [1_000_000.0]
+    monkeypatch.setattr(time, "time", lambda: now[0])
+    cache = backend()
+    cache.set("count", 1, 60)
+    now[0] += 61
+    with pytest.raises(ValueError):
+        cache.incr("count")
+    assert cache.get("count") is None
