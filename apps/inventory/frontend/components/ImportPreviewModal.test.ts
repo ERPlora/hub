@@ -66,6 +66,7 @@ describe('ImportPreviewModal', () => {
     const options = [...selects[0].querySelectorAll('ion-select-option')].map((o) => o.textContent?.trim());
     expect(options.slice(0, 3)).toEqual(['Do not import', 'Name *', 'SKU *']);
     expect(options).toContain('Tax category');
+    expect(options).toContain('Allergens');
   });
 
   it('picking a field for a column asks the importer', async () => {
@@ -122,6 +123,8 @@ describe('ImportPreviewModal', () => {
     const s = await setup({}, 'es');
     expect(s.el('inventory-import-preview')?.getAttribute('aria-label')).toBe('Revisa la importación');
     expect(s.summary()).toBe('5 filas listas · 12 con problemas');
+    const options = [...s.all('inventory-import-column')[0].querySelectorAll('ion-select-option')].map((o) => o.textContent?.trim());
+    expect(options).toContain('Alérgenos');
   });
 });
 

@@ -488,8 +488,8 @@ Pasos:
    crea nada todavía.
 2. En «Revisa la importación», cada columna trae su campo adivinado por la cabecera, en español o
    inglés y con o sin tildes («Nombre», «Código», «Precio», «IVA»…). Cámbialo o pon «No importar».
-   Se pueden importar Nombre, SKU, Precio, Coste, Stock, Umbral, EAN-13, Descripción, Unidad y
-   Categoría fiscal; Nombre y SKU son obligatorias.
+   Se pueden importar Nombre, SKU, Precio, Coste, Stock, Umbral, EAN-13, Descripción, Alérgenos,
+   Unidad y Categoría fiscal; Nombre y SKU son obligatorias.
 3. Mira las «Primeras {n} filas de {total}» y el ensayo de todo el fichero: «{ready} filas listas
    · {failed} con problemas» («1 fila lista» con una), con la línea y el motivo de las diez primeras.
 4. Pulsa «Importar {n} productos» («Importar 1 producto» con uno; o «Cancelar», que no deja rastro).
@@ -1136,9 +1136,7 @@ Implicados: BASE-F114, INVENTORY-F01, INVENTORY-F03, INVENTORY-F04, INVENTORY-F0
 INVENTORY-F35, PRICING-F14, PRICING-F15, MODIFIER-F09, MODIFIER-F10, COMBO-F13, COMBO-F15
 
 ### INVENTORY-F35 Declarar los alérgenos de un producto
-Estado: parcial — el producto ya guarda sus alérgenos por el asistente y la API, y el catálogo, el CSV exportado, la
-importación por la API, la copia de seguridad, la plantilla y la recuperación desde una copia aparte los llevan;
-faltan el bloque del formulario, la línea de la ficha y que Importar productos reconozca la columna «Alérgenos»
+Estado: hecho
 Actor: administrador, responsable
 Pantalla: Productos, Ficha del producto, Importar productos
 Pasos:

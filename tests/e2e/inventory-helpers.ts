@@ -27,6 +27,7 @@ export interface Product {
   is_active: boolean;
   is_sold_out: boolean;
   category_ids: string[];
+  allergens: string[];
 }
 
 /** Deletes every `E2E` product, movement, category, link and learned text and `e2e.inv_*` tax category. */

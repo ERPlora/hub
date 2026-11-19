@@ -96,7 +96,9 @@
         "queued": "La etiqueta espera en la cola de impresión: ninguna impresora tiene la función «Etiqueta». Asígnasela a una en Impresión.",
         "error": "No se pudo imprimir la etiqueta del código de barras: {reason}"
       },
-      "photo": "Foto"
+      "photo": "Foto",
+      "allergens": "Alérgenos",
+      "noAllergens": "Sin alérgenos declarados"
     },
     "form": {
       "newTitle": "Nuevo producto",
@@ -111,6 +113,8 @@
       "threshold": "Umbral stock bajo",
       "ean13": "EAN-13",
       "description": "Descripción",
+      "allergens": "Alérgenos",
+      "allergensHint": "Marca los que lleva, también dentro de una salsa, un rebozado o una guarnición.",
       "type": "Tipo",
       "physical": "Físico",
       "service": "Servicio",

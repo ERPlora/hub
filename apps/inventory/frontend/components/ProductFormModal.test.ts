@@ -6,7 +6,6 @@
 // category are missing; amounts and quantities are read as typed; an edit sends only what changed;
 // a refusal stays in the dialog under its field. «Tax category» and «Categories» are `Combo` fields of
 // @erplora/ui that search the server (TaxCategorySelect, ProductCategoriesField).
-import { Combo, type ComboOption } from '@erplora/ui/components';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
@@ -33,82 +32,13 @@ import {
   type ApiCall,
 } from '../__tests__/mount-inventory';
 import ProductFormModal from './ProductFormModal.vue';
+import { CATEGORIES, searches, setup } from '../__tests__/product-form';
 
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
+vi.mock('@ionic/vue', async (importOriginal) => (await import('../../../../base/frontend/__tests__/modal')).mockIonicModal(importOriginal));
 
 afterEach(() => {
   document.body.innerHTML = '';
 });
-
-type Control = HTMLElement & { value?: unknown; errorText?: string; disabled?: boolean; label?: string; helperText?: string; checked?: boolean };
-
-const CATEGORIES = page([category(), category({ id: 'c2', name: 'Food', slug: 'food' })], 2, 100);
-
-/** What the server answers the Combo searches: the tax categories and the product categories. */
-const searches = (categories: unknown) => (call: ApiCall) =>
-  ok(call.url.startsWith('/api/tax/categories') ? TAX_CATEGORIES : categories);
-
-async function setup(
-  props: Record<string, unknown> = {},
-  options: { locale?: 'en' | 'es'; categories?: unknown; taxes?: unknown; api?: (call: ApiCall) => Response | Promise<Response>; business?: Business | null } = {},
-) {
-  const m = await mountInventory(ProductFormModal, {
-    props: { open: true, product: null, units: UNITS.rows, ...props },
-    locale: options.locale,
-    attach: true,
-    business: options.business,
-    api: options.api ?? searches(options.categories ?? CATEGORIES),
-  });
-  const call = await m.live();
-  await m.result(call, 'tax.category.list', options.taxes ?? TAX_CATEGORIES);
-  await m.result(call, 'inventory.category.list', options.categories ?? CATEGORIES);
-  const el = (id: string) => document.querySelector<Control>(`[data-testid="${id}"]`);
-  async function type(id: string, value: string) {
-    const field = el(id)!;
-    field.value = value;
-    field.dispatchEvent(new CustomEvent('ionInput', { detail: { value } }));
-    await flush();
-  }
-  async function pick(id: string, value: unknown) {
-    const field = el(id)!;
-    field.value = value;
-    field.dispatchEvent(new CustomEvent('ionChange', { detail: { value } }));
-    await flush();
-  }
-  /** Picks, in the Combo `id`, the option of `key` it offers on opening. */
-  async function choose(id: string, key: string) {
-    const combo = m.wrapper.findAllComponents(Combo).find((c) => c.props('testid') === id);
-    if (!combo) throw new Error(`${id} is not a Combo`);
-    const option = (await (combo.props('search') as (q: string) => Promise<ComboOption[]>)('')).find((o) => o.id === key);
-    if (!option) throw new Error(`${id} offers no ${key}`);
-    combo.vm.$emit('update:modelValue', option);
-    await flush();
-  }
-  async function check(id: string, checked: boolean) {
-    const field = el(id)!;
-    field.checked = checked;
-    field.dispatchEvent(new CustomEvent('ionChange', { detail: { checked } }));
-    await flush();
-  }
-  async function submit() {
-    el('inventory-product-form-submit')!.click();
-    await flush();
-  }
-  async function fillRequired() {
-    await type('inventory-product-name', 'Coffee');
-    await type('inventory-product-sku', 'CAF-1');
-    await type('inventory-product-price', '2,20');
-    await choose('inventory-product-tax', 'product.generic');
-  }
-  const sent = (path: string) => m.body(m.calls(path).at(-1)!) as Record<string, unknown>;
-  const chips = () => [...document.querySelectorAll('[data-testid^="inventory-product-categories-chip-"]')].map((c) => c.textContent?.trim());
-  /** `base.business.get` answers now (the form opened with `business: null`, before it did); `rev` 2+ is a change. */
-  const answer = (fields: Partial<Business>, rev = 1) => m.result(call, 'base.business.get', business(fields), rev);
-  return { ...m, el, type, pick, choose, check, submit, fillRequired, sent, chips, answer };
-}
 
 const JAPANESE: Partial<Business> = { country: 'JP', country_name: 'Japan', currency: 'JPY', currency_label: 'JPY · Japanese Yen', currency_decimals: 0 };
 const KUWAITI: Partial<Business> = { country: 'KW', country_name: 'Kuwait', currency: 'KWD', currency_label: 'KWD · Kuwaiti Dinar', currency_decimals: 3 };
@@ -193,6 +123,7 @@ describe('ProductFormModal: new product', () => {
       unit: 'kg',
       track_stock: null,
       category_ids: ['c2'],
+      allergens: [],
     });
     expect(s.wrapper.emitted('update:open')).toEqual([[false]]);
   });
