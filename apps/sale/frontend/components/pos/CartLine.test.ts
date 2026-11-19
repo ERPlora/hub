@@ -22,6 +22,23 @@ async function setup(over: Parameters<typeof line>[0] = {}, props: Record<string
   return mounted;
 }
 
+const menuDish = (id: string, allergens: AllergenCode[], allergy_in_dish: AllergenCode[] = []) => ({
+  option_id: id,
+  group_name: 'Mains',
+  product_id: id,
+  product_name: id,
+  category_id: null,
+  is_service: false,
+  quantity: 1,
+  price_delta: 0,
+  tax_category_key: null,
+  amount: null,
+  allergens,
+  allergy_in_dish,
+});
+
+const menu = (components: ReturnType<typeof menuDish>[]) => ({ combo_id: 'm1', kitchen_name: 'MENU', supply_kind: 'service' as const, split: false, components });
+
 describe('CartLine: what it shows', () => {
   it('names the dishes of a menu under it, in course order, with how many of each (SALE-F12)', async () => {
     const dish = (product_name: string, quantity = 1) => ({
@@ -114,25 +131,19 @@ describe('CartLine: what it shows', () => {
   });
 
   it('shows each menu dish with its own allergens and allergy match', async () => {
-    const dish = (id: string, allergens: AllergenCode[], allergy_in_dish: AllergenCode[] = []) => ({
-      option_id: id,
-      group_name: 'Mains',
-      product_id: id,
-      product_name: id,
-      category_id: null,
-      is_service: false,
-      quantity: 1,
-      price_delta: 0,
-      tax_category_key: null,
-      amount: null,
-      allergens,
-      allergy_in_dish,
-    });
-    const combo = { combo_id: 'm1', kitchen_name: 'MENU', supply_kind: 'service' as const, split: false, components: [dish('Burger', ['gluten', 'milk'], ['milk']), dish('Salad', [])] };
+    const combo = menu([menuDish('Burger', ['gluten', 'milk'], ['milk']), menuDish('Salad', [])]);
     const m = await setup({ product_id: null, allergens: [], allergy: ['milk'], allergy_in_dish: [], combo }, {}, 'es');
     expect(m.find('pos-line-l1-dish-allergens-Burger').text()).toBe('Burger · Alérgenos: Gluten, Leche');
     expect(m.find('pos-line-l1-dish-allergens-Salad').exists()).toBe(false);
     expect(m.find('pos-line-l1-allergy').text()).toContain('Burger lleva Leche');
+  });
+
+  it('in a menu, warns only on the dishes that carry the allergy, naming only what each carries', async () => {
+    const combo = menu([menuDish('Burger', ['gluten', 'milk'], ['milk']), menuDish('Salad', ['celery'])]);
+    const m = await setup({ product_id: null, allergens: [], allergy: ['gluten', 'fish', 'milk'], allergy_in_dish: [], combo }, {}, 'es');
+    expect(m.find('pos-line-l1-allergy-dish-match-Burger').text()).toBe('Burger lleva Leche');
+    expect(m.find('pos-line-l1-allergy-dish-match-Salad').exists()).toBe(false);
+    expect(m.find('pos-line-l1-allergy-match').exists()).toBe(false);
   });
 
   it('no professional line when the line has none (it goes with the check’s)', async () => {

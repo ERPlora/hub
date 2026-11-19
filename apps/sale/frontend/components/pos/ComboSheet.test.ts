@@ -8,7 +8,7 @@ import type { AllergenCode } from '@erplora/ui/components';
 import type { SaleComboOut } from '../../../../combo/frontend/operations';
 import { click, mountSale, settle } from '../../__tests__/mount-sale';
 import { plain } from '../../lib/format';
-import { product } from './__tests__/fixtures';
+import { product, refused } from './__tests__/fixtures';
 import ComboSheet from './ComboSheet.vue';
 
 vi.mock('@ionic/vue', async (importOriginal) => {
@@ -32,16 +32,18 @@ const MENU: SaleComboOut = {
   ],
 };
 
-async function setup(props: Record<string, unknown> = {}) {
+const withAllergens = (call: { url: string }) => {
+  const id = new URL(call.url, 'http://test').searchParams.get('id') ?? '';
+  const allergens: AllergenCode[] = id === 'p-lentils' ? ['gluten'] : id === 'p-hake' ? ['fish', 'milk'] : [];
+  return Response.json(product({ id, name: id, allergens }));
+};
+
+async function setup(props: Record<string, unknown> = {}, answer: (call: { url: string }) => Response = withAllergens) {
   const m = await mountSale(ComboSheet, {
     props: { open: false, combo: MENU, pending: false, error: null, ...props },
     locale: 'es',
   });
-  m.net.onApi((call) => {
-    const id = new URL(call.url, 'http://test').searchParams.get('id') ?? '';
-    const allergens: AllergenCode[] = id === 'p-lentils' ? ['gluten'] : id === 'p-hake' ? ['fish', 'milk'] : [];
-    return Response.json(product({ id, name: id, allergens }));
-  });
+  m.net.onApi(answer);
   await m.live();
   await m.wrapper.setProps({ open: true });
   await settle();
@@ -65,6 +67,18 @@ describe('ComboSheet', () => {
     expect(s.inDoc('pos-menu-dish-allergens-lentils')?.textContent).toBe('Alérgenos: Gluten');
     expect(s.inDoc('pos-menu-dish-allergens-hake')?.textContent).toBe('Alérgenos: Pescado, Leche');
     expect(s.inDoc('pos-menu-dish-allergens-salad')).toBeNull();
+  });
+
+  it('says when the allergens could not be read, and «Retry» reads them again', async () => {
+    let failing = true;
+    const s = await setup({}, (call) => (failing ? refused('internal_error', 'Internal error', 500) : withAllergens(call)));
+    await settle();
+    expect(s.inDoc('pos-menu-allergens-error')?.textContent).toContain('No se han podido cargar los alérgenos.');
+    failing = false;
+    await click(s.inDoc('pos-menu-allergens-retry'));
+    await settle();
+    expect(s.inDoc('pos-menu-allergens-error')).toBeNull();
+    expect(s.inDoc('pos-menu-dish-allergens-lentils')?.textContent).toBe('Alérgenos: Gluten');
   });
 
   it('opens with nothing picked and the button naming the course still short; a tap marks it and adds nothing', async () => {
