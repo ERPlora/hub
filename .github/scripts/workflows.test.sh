@@ -254,6 +254,9 @@ SMOKE_GROUPS = {
         "two-orgs-isolated", "hub-suspended",
     ),
     "charging and the cash register": ("sale-pos", "sale-cash-gate", "cash-register-shift", "printing-sale"),
+    "the ticket's QR, the invoice and VeriFactu": (
+        "sale-fiscal-qr", "sale-invoice-chain", "invoice-sale", "invoice-manual", "verifactu-records",
+    ),
 }
 grouped = []
 for group, names in SMOKE_GROUPS.items():
@@ -265,7 +268,7 @@ for group, names in SMOKE_GROUPS.items():
 ungrouped = [spec for spec in smoke_specs if spec not in grouped]
 check(f"smoke names no spec outside those groups{': ' if ungrouped else ''}" + ", ".join(ungrouped), not ungrouped)
 repo = folder.resolve().parent.parent
-unsmoked =[spec for spec in smoke_specs if not (repo / spec).is_file() or "@smoke" not in (repo / spec).read_text()]
+unsmoked = [spec for spec in smoke_specs if not (repo / spec).is_file() or "@smoke" not in (repo / spec).read_text()]
 check(f"every spec the smoke names exists and has a test tagged @smoke{': ' if unsmoked else ''}" + ", ".join(unsmoked),
       not unsmoked)
 check("smoke has a timeout of its own, in whole minutes",

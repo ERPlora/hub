@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:44549c033b48af80ccfc3fbdd1f97ce3d7e257f8b07728c6599bdf534f7e0d02 -->
+<!-- generated from WORKBOOK.md sha256:cccd2311349032960ccdce403852b508046b92220c703cf3ab053fb13bc5e4a1 -->
 
 ## What it is for and who it is for
 
@@ -84,12 +84,14 @@ On saving: "Settings saved."; a refusal shows under its field ("Could not save")
 
 ### Booking page (the customer, no session)
 Page `/p/<business>/book` at the business's address: anyone opens it, without signing in or seeing anything of the
-team's (no menu of theirs). At the top, "Book online" and "Choose your services, a day and a free time, then leave
-your name and mobile."; below, the title and the welcome message of the Settings, in its colour, and the flow:
-services with their price and length, professional or "No preference", day, free times, name, mobile, email, note
-and **Book**. Once booked, the appointment number, the confirmation message, **See my booking**, **Cancel the
-booking** and **Book another**. With another business's address, or this one's at another's, there is no page. Still
-without the logo of the Settings or the form's privacy notice (hub#1660).
+team's (no menu of theirs). At the top, the business's name, its logo (the one uploaded in Settings, served from the
+business's own address; without a logo, only the name) and its colour. Also "Book online" and "Choose your
+services, a day and a free time, then leave your name and mobile."; below, the title and welcome message of the
+Settings and the flow: services with their price and length, professional or "No preference", day, free times, name,
+mobile, email, note and **Book**. Beside **Book**, the notice of who uses her details and the link to the privacy
+policy. With nothing to book online, only that notice shows, without the invitation or the form. Once booked, the
+appointment number, the confirmation message, **See my booking**, **Cancel the booking** and **Book another**. With
+another business's address, or this one's at another's, there is no page.
 
 ### Booking preview (development only)
 Page `/online_booking/preview`, only on the development server: the same flow as the booking page
@@ -101,7 +103,7 @@ operations, through the team's session. It is not part of the production version
 | State | What the person sees |
 |---|---|
 | Loading | "Loading…" in the table; "Loading settings…" in Settings; "Loading the page…" on the booking page. |
-| Empty | "No online bookings yet."; with filters, "No booking matches the search."; in Settings without services, "No services yet. Add them in Services."; on the booking page with nothing to book online, "This business has nothing to book online right now.". |
+| Empty | "No online bookings yet."; with filters, "No booking matches the search."; in Settings without services, "No services yet. Add them in Services."; on the booking page with nothing to book online, only "This business has nothing to book online right now.", without the form. |
 | Error | The table's notice with "Retry"; the refusal of a row action, in its confirmation or above the table; a refusal in Settings, under its field, without losing what was typed; on the booking page, "The page could not be loaded" with the reason ("This business does not take online bookings right now."), and a booking's refusal above **Book** and under its field. |
 | Reconnecting | What is drawn stays; a strip warns "Reconnecting…". |
 | App inactive | "This app is not active in this business". |
@@ -113,25 +115,26 @@ Dates and times show on the business's clock and in the format of the language o
 
 | ID | Flow | Status |
 |---|---|---|
-| ONLINE_BOOKING-F01 | The customer books from the booking page | partial — she books, without the logo or the privacy notice (hub#1660) |
+| ONLINE_BOOKING-F01 | The customer books from the booking page | done |
 | ONLINE_BOOKING-F02 | Confirm a booking | done |
 | ONLINE_BOOKING-F03 | Complete a booking | done |
 | ONLINE_BOOKING-F04 | Mark that she did not show up | done |
 | ONLINE_BOOKING-F05 | Cancel a booking | done |
 | ONLINE_BOOKING-F06 | Delete a booking | done |
-| ONLINE_BOOKING-F07 | Set up the booking page | partial — the logo is uploaded through the API; the screen does not upload it yet (hub#1660) |
+| ONLINE_BOOKING-F07 | Set up the booking page | partial — the logo is uploaded through the API; the Settings screen does not upload it yet (hub#1660) |
 | ONLINE_BOOKING-F08 | See and search the bookings | done |
 | ONLINE_BOOKING-F09 | Follow the customer when two cards are merged | done (Appointments does it; the inbox reflects it) |
-| ONLINE_BOOKING-F10 | The customer sees her booking with her link | partial — right after booking; her link does not open a page yet |
-| ONLINE_BOOKING-F11 | The customer cancels her booking with her link | partial — right after booking; her link does not open a page yet |
+| ONLINE_BOOKING-F10 | The customer sees her booking with her link | partial — her link opens the business's booking page, which does not show her booking yet; the confirmation gives the link's code, not its address |
+| ONLINE_BOOKING-F11 | The customer cancels her booking with her link | partial — her link opens the business's booking page, which does not show her booking yet; the confirmation gives the link's code, not its address |
 | ONLINE_BOOKING-F12 | Erase a customer's data (GDPR) | done |
 
 ### ONLINE_BOOKING-F01 The customer books from the booking page
-Status: partial — she books, without the logo or the privacy notice (hub#1660)
+Status: done
 Actor: customer (no session); owner or administrator, with the preview or with the assistant
 Screen: booking page (`/p/<business>/book`); in development, the preview too
 Steps:
-1. She opens the business's page: title, welcome message, logo and colour from the Settings.
+1. She opens the business's page: its name, its logo (the one from Settings, from the business's own address; without
+   a logo, only the name), title, welcome message and colour.
 2. She picks one or several services (up to 5) among those **booked online**, with their price (in the
    business's currency, its country's —BASE-F50: "20,00 zł" in Poland—, grouped from four digits: "1.234,56 €")
    and their duration if Services shows them ("Show prices", "Show duration").
@@ -238,7 +241,7 @@ If it fails: an appointment in progress, completed or charged is not deleted ("T
 Involved: APPOINTMENT-F11
 
 ### ONLINE_BOOKING-F07 Set up the booking page
-Status: partial — the logo is uploaded through the API; the screen does not upload it yet (hub#1660)
+Status: partial — the logo is uploaded through the API; the Settings screen does not upload it yet (hub#1660)
 Actor: owner, administrator, assistant
 Screen: Settings
 Steps:
@@ -292,9 +295,11 @@ If it fails: Appointments is never left halfway and the relay retries on its own
 Involved: APPOINTMENT-F23, CUSTOMER-F13
 
 ### ONLINE_BOOKING-F10 The customer sees her booking with her link
-Status: partial — she sees it with **See my booking** right after booking; her link does not open a page yet
+Status: partial — she sees it with **See my booking** right after booking; her link (`/p/<business>/book/<link>`)
+opens the business's booking page, which does not show her booking yet, and the confirmation gives the link's code, not
+its address
 Actor: customer (no session)
-Screen: the booking page, once booked; her booking's page (`/p/<business>/book/<link>`), not yet; in
+Screen: her link's page (`/p/<business>/book/<link>`, at the business's address); the booking page, once booked; in
 development, the preview
 Steps:
 1. She opens the link of her confirmation.
@@ -303,14 +308,16 @@ Steps:
    whom a mobile belongs to.
 In: the link she got when booking; the cancellation rules of Appointments.
 Out: nothing is written. The link stays valid even if the business switches the page off.
-If it fails: a link that does not exist, revoked or of a deleted booking: "That booking does not exist or its link is no
-longer valid.".
+If it fails: a link that does not exist, revoked, of a deleted booking or of another business: "That booking does not
+exist or its link is no longer valid.". The link's address with another business's name, or at another business's
+address, opens no page.
 Involved: APPOINTMENT-F06
 
 ### ONLINE_BOOKING-F11 The customer cancels her booking with her link
-Status: partial — she cancels it with **Cancel the booking** right after booking; her link does not open a page yet
+Status: partial — she cancels it with **Cancel the booking** right after booking; her link
+(`/p/<business>/book/<link>`) opens the business's booking page, which does not show her booking yet nor cancel it
 Actor: customer (no session)
-Screen: the booking page, once booked; her booking's page (`/p/<business>/book/<link>`), not yet; in
+Screen: her link's page (`/p/<business>/book/<link>`, at the business's address); the booking page, once booked; in
 development, the preview
 Steps:
 1. From her link she presses **Cancel the booking** (optional reason).

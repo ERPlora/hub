@@ -43,6 +43,7 @@ ROUTES = {
     ("POST", "/sale/orders/remove_voucher", "sale.order.remove_voucher"),
     ("POST", "/sale/orders/update_line", "sale.order.update_line"),
     ("POST", "/sale/orders/set_line_staff", "sale.order.set_line_staff"),
+    ("POST", "/sale/orders/set_line_allergy", "sale.order.set_line_allergy"),
     ("POST", "/sale/orders/split_line", "sale.order.split_line"),
     ("POST", "/sale/orders/remove_line", "sale.order.remove_line"),
     ("POST", "/sale/orders/void_line", "sale.order.void_line"),

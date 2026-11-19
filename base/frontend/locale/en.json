@@ -1405,6 +1405,7 @@
           "set_guests": "Change",
           "set_image": "Change",
           "set_label": "Change",
+          "set_line_allergy": "Change",
           "set_line_discount": "Change",
           "set_line_discount_over_limit": "Change",
           "set_line_staff": "Change",

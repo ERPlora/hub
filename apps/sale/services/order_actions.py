@@ -128,6 +128,7 @@ def fire(ctx: OperationContext, data: OrderFireIn) -> dict:
                     "staff_id": str(line.staff_id) if line.staff_id else None,
                     "modifiers": line.kitchen_text,
                     "allergens": line.allergens,
+                    "allergy": line.allergy,
                     "kitchen_name": line.combo.get("kitchen_name", "") if line.combo_id else "",
                     "components": [
                         {

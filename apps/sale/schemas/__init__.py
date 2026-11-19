@@ -19,7 +19,7 @@ from pydantic import ConfigDict, StringConstraints, field_validator, model_valid
 
 from apps.customer.tax_ids import InvalidCountry, normalize_country
 from apps.tax.schemas import TerritoryTaxKind
-from base.allergens import AllergensOut
+from base.allergens import AllergyInDishOut, AllergyOut
 from base.schemas.assistant import exactly_one, names
 
 T = TypeVar("T")
@@ -776,7 +776,7 @@ class ModifierLineOut(Schema):
     quantity: int = Field(description="How many per unit of the dish.")
 
 
-class ComboDishOut(AllergensOut):
+class ComboDishOut(AllergyInDishOut):
     option_id: UUID = Field(description="The choice of Menus picked.")
     group_name: str = Field(description="Its course, when it was ordered.")
     product_id: UUID = Field(description="Its product (Inventory).")
@@ -799,7 +799,7 @@ class ComboLineOut(Schema):
     components: list[ComboDishOut] = Field(description="Its dishes, course by course.")
 
 
-class OrderLineOut(AllergensOut):
+class OrderLineOut(AllergyOut):
     id: UUID = Field(description="The line's id.")
     position: int = Field(description="Its place in the check.")
     product_id: UUID | None = Field(description="Inventory's product, if it is one.")

@@ -8,7 +8,9 @@ business that has the app on and only when ``<slug>`` is that business's own (``
 business is never read from the address, so another's slug is not found.
 
 - ``GET /p/<slug>/<page>``: the SPA's HTML (``base.spa.shell``), whose route of the same path paints the page, with the
-  business's money (``public-door``) for its prices: a visitor has no session to ask for it.
+  business's money (``public-door``) for its prices: a visitor has no session to ask for it. ``GET
+  /p/<slug>/<page>/<key>`` is the same HTML, for a route of the page that reads the key (a customer's personal link):
+  the door never reads it, so the HTML is the same whether the key opens anything or not.
 - ``POST /p/<slug>/api/<operation>``: an operation asking exactly the page's permission (one of that app's), run in
   this process as nobody signed in, with that permission and nothing else, whoever is signed in. Its input is the JSON
   body, never the query string, which servers log (a customer's personal link travels in it); its answer, the
@@ -101,7 +103,7 @@ def _problems(config) -> list[str]:
 
 
 @require_safe
-def open_page(request: HttpRequest, slug: str, name: str) -> HttpResponse:
+def open_page(request: HttpRequest, slug: str, name: str, key: str = "") -> HttpResponse:
     _opened(request, slug, pages().get(name))
     currency = business.currency_of(request.hub.country)
     money = {"currency": currency, "currency_decimals": business.currency_decimals(currency)}

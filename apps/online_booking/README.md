@@ -5,9 +5,9 @@ reserva **es una cita de Citas** con el origen «Reserva online» (`source = "on
 reservas ni estados propios, solo la configuración de la página, el enlace personal de la clienta y la huella
 del dispositivo para los límites.
 
-- **Estado**: la clienta reserva sin sesión en `/p/<slug>/book` (la sirve la puerta pública de `base`); `F01`, `F07`,
-  `F10` y `F11` están `parcial` (sin el logo ni el aviso de privacidad en pantalla, hub#1660; su enlace personal aún
-  no abre una página) y los demás, `hecho`.
+- **Estado**: la clienta reserva sin sesión en `/p/<slug>/book` (la sirve la puerta pública de `base`); `F07`, `F10`
+  y `F11` están `parcial` (la pantalla de Ajustes aún no sube el logo, hub#1660; su enlace personal abre la página de
+  reservas, que aún no enseña su reserva) y los demás, `hecho`.
 - **Especificación**: [`WORKBOOK.md`](WORKBOOK.md) (en inglés, [`WORKBOOK.en.md`](WORKBOOK.en.md), hasta
   «Para quien lo mantiene»). Lo que se cambie de la app se cambia antes allí.
 - **Peticiones a `@erplora/ui` y a la plataforma** que siguen abiertas: [`UI-REQUESTS.md`](UI-REQUESTS.md).
@@ -70,10 +70,10 @@ pnpm e2e tests/e2e/online-booking-flow.spec.ts
 
 ## Qué queda fuera
 
-- **La página del enlace personal** (`/p/<slug>/book/<token>`): la clienta ve y cancela su reserva justo después de
-  reservar, pero su enlace aún no abre una página.
-- **En pantalla, la subida del logo en Ajustes y la página de reservas con el logo, el aviso de privacidad y el campo
-  trampa**: hub#1660 (el servidor ya los da).
+- **La reserva en la página del enlace personal** (`/p/<slug>/book/<token>`): el enlace abre la página de reservas,
+  que aún no enseña la reserva ni la cancela; la clienta la ve y la cancela justo después de reservar.
+- **Subir el logo desde la pantalla de Ajustes**: hub#1660 (el servidor ya lo guarda en el propio negocio y la página
+  lo enseña).
 - Verificar el móvil con un código, bloquear a una clienta, elección de profesional obligatoria, mover la
   reserva desde el enlace, avisos a la clienta, depósito, lista de espera, calendario externo y márgenes entre
   citas: «Lo que queda fuera» del WORKBOOK.

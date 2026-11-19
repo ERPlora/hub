@@ -45,7 +45,12 @@ FLOW_VIEWPORTS.forEach((vp, index) => {
     const day = aMonday(index);
     try {
       const who = await cast(owner, named(vp.label), day);
-      await post(owner, '/online_booking/settings', { page_title: named(`Salon ${vp.label}`), welcome_message: '' }, 200);
+      await post(owner, '/online_booking/settings', {
+        page_title: named(`Salon ${vp.label}`),
+        welcome_message: 'Tu próxima cita, sin llamar.',
+        logo_url: `${A}/static/base/img/logo.png`,
+        primary_color: '#6366f1',
+      }, 200);
 
       // Loading: the page holds its business's answer (then every call goes through).
       let release: () => void = () => {};
@@ -62,6 +67,24 @@ FLOW_VIEWPORTS.forEach((vp, index) => {
       // Booking: the service, no preference, the day and a free time, name and mobile; pending, in the diary.
       await expect(page.locator('[data-testid=ob-preview-title]')).toHaveText(named(`Salon ${vp.label}`));
       await expect(flow(page)).toContainText('Reserva online');
+      await expect(page.locator('[data-testid=ob-preview-business-logo]')).toBeVisible();
+      await expect.poll(() => page.locator('[data-testid=ob-preview-business-logo]').evaluate((img: HTMLImageElement) => img.naturalWidth)).toBeGreaterThan(0);
+      await expect(page.locator('[data-testid=ob-preview-privacy]')).toContainText('Tus datos los usará');
+      await expect(page.locator('[data-testid=ob-preview-privacy] a')).toHaveAttribute('href', /\/legal\/privacy\/$/);
+      const trap = page.locator('[data-testid=ob-preview-trap]');
+      await expect(trap).toBeHidden();
+      await expect(trap).toHaveAttribute('aria-hidden', 'true');
+      await expect(page.locator('[data-testid=ob-preview-trap-input]')).toHaveAttribute('tabindex', '-1');
+      await expect(page.locator('[data-testid=ob-preview-trap-input]')).toHaveAttribute('autocomplete', 'off');
+      await shoot('form');
+      await post(owner, '/online_booking/settings', { logo_url: 'https://www.python.org/static/img/python-logo.png' }, 200);
+      await page.goto(PAGE);
+      await expect(page.locator('[data-testid=ob-preview-title]')).toBeVisible();
+      await expect(page.locator('[data-testid=ob-preview-business-logo]')).toHaveCount(0);
+      await shoot('external-logo');
+      await post(owner, '/online_booking/settings', { logo_url: `${A}/static/base/img/logo.png` }, 200);
+      await page.goto(PAGE);
+      await expect(page.locator('[data-testid=ob-preview-business-logo]')).toBeVisible();
       // A customer is no member of the team: no side menu, and no button to open one.
       await expect(page.locator('ion-menu-button')).toBeHidden();
       await page.locator(`[data-testid=ob-preview-service-${who.service.id}]`).click();
@@ -100,6 +123,11 @@ FLOW_VIEWPORTS.forEach((vp, index) => {
         psql(`update service_service set allow_online_booking = false where id in (${online})`);
         await page.goto(PAGE);
         await expect(page.locator('[data-testid=ob-preview-no-services]')).toHaveText('Este negocio no tiene nada para reservar online ahora mismo.');
+        await expect(page.locator('[data-testid=ob-preview-no-services]')).toHaveClass(/empty-state/);
+        await expect(flow(page)).not.toContainText('Elige tus servicios, un día y una hora libre');
+        await expect(page.locator('[data-testid=ob-preview-name]')).toHaveCount(0);
+        await expect(page.locator('[data-testid=ob-preview-phone]')).toHaveCount(0);
+        await expect(page.locator('[data-testid=ob-preview-book]')).toHaveCount(0);
         await shoot('empty');
       } finally {
         psql(`update service_service set allow_online_booking = true where id in (${online})`);

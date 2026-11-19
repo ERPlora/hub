@@ -52,6 +52,7 @@ from apps.sale.schemas import (
     SettingsPatchIn,
     VoidIn,
 )
+from apps.sale.schemas.line_allergy import OrderSetLineAllergyIn
 
 router = Router(tags=["sale"])
 
@@ -190,6 +191,11 @@ async def order_update_line(request, data: OrderUpdateLineIn):
 @bind(router, "sale.order.set_line_staff", "/sale/orders/set_line_staff")
 async def order_set_line_staff(request, data: OrderSetLineStaffIn):
     return await run_operation(request, services.order_lines.set_line_staff, data)
+
+
+@bind(router, "sale.order.set_line_allergy", "/sale/orders/set_line_allergy")
+async def order_set_line_allergy(request, data: OrderSetLineAllergyIn):
+    return await run_operation(request, services.line_allergy.set_line_allergy, data)
 
 
 @bind(router, "sale.order.split_line", "/sale/orders/split_line")

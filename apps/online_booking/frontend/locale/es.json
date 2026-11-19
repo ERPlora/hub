@@ -137,7 +137,12 @@
     "door": {
       "title": "Reserva online",
       "intro": "Elige tus servicios, un día y una hora libre, y deja tu nombre y tu móvil.",
-      "noServices": "Este negocio no tiene nada para reservar online ahora mismo."
+      "noServices": "Este negocio no tiene nada para reservar online ahora mismo.",
+      "logoAlt": "Logo de {business}",
+      "businessFallback": "este negocio",
+      "privacy": "Tus datos los usará {business} para gestionar esta reserva, y ERPlora los tratará por encargo de {business}. Lee la",
+      "privacyLink": "política de privacidad",
+      "website": "Sitio web"
     }
   }
 }

@@ -69,14 +69,14 @@ describe('events and actions in words', () => {
   });
 
   it('an app it cannot name yet is left out, never its internal name; with its catalog, its visible name', () => {
-    // The editor at 390 painted «Look up: Read · whatsapp_inbox (message)» while its catalog was still on its way
-    // (the catalog it sees then is none): the same with one that could not be read or an app that is not on.
-    const read: Step = { id: 's1', kind: 'query', operation: 'whatsapp_inbox.message.get', params: {}, result: 'first' };
-    expect(describeStep(read, [read], null, phrasing())).toBe('Look up: Read (message)');
-    expect(actionLabel('whatsapp_inbox.message.get', CATALOG, phrasing('es'))).toBe('Leer (message)');
+    // An action without words of its own while the catalog is still on its way (none), could not be read or its app
+    // is not on: «Read (media)», never «Read · whatsapp_inbox (media)».
+    const read: Step = { id: 's1', kind: 'query', operation: 'whatsapp_inbox.media.get', params: {}, result: 'first' };
+    expect(describeStep(read, [read], null, phrasing())).toBe('Look up: Read (media)');
+    expect(actionLabel('whatsapp_inbox.media.get', CATALOG, phrasing('es'))).toBe('Leer (media)');
     expect(eventLabel('whatsapp_inbox.message.flagged', null, phrasing())).toBe('Message flagged');
     const inbox = { ...CATALOG, events: [...CATALOG.events, { name: 'whatsapp_inbox.message.received', app: 'whatsapp_inbox', app_name: 'WhatsApp inbox' }] } as CatalogOut;
-    expect(describeStep(read, [read], inbox, phrasing())).toBe('Look up: Read · WhatsApp inbox (message)');
+    expect(describeStep(read, [read], inbox, phrasing())).toBe('Look up: Read · WhatsApp inbox (media)');
   });
 
   it('a known action has its phrase; another says its verb, app and subject', () => {

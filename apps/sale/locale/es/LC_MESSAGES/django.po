@@ -850,6 +850,12 @@ msgstr "menú tal como se pidió"
 msgid "allergens"
 msgstr "alérgenos"
 
+msgid "customer's allergy"
+msgstr "alergia del cliente"
+
+msgid "Customer's allergy"
+msgstr "Alergia del cliente"
+
 msgid "menu name"
 msgstr "nombre del menú"
 

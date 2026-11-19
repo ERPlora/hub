@@ -202,6 +202,7 @@ describe('OPERATION_ROUTES', () => {
       'sale.order.remove_voucher': { method: 'post', path: '/api/sale/orders/remove_voucher' },
       'sale.order.update_line': { method: 'post', path: '/api/sale/orders/update_line' },
       'sale.order.set_line_staff': { method: 'post', path: '/api/sale/orders/set_line_staff' },
+      'sale.order.set_line_allergy': { method: 'post', path: '/api/sale/orders/set_line_allergy' },
       'sale.order.split_line': { method: 'post', path: '/api/sale/orders/split_line' },
       'sale.order.remove_line': { method: 'post', path: '/api/sale/orders/remove_line' },
       'sale.order.void_line': { method: 'post', path: '/api/sale/orders/void_line' },

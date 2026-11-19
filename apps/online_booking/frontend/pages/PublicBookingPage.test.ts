@@ -16,10 +16,12 @@ import PublicBookingPage from './PublicBookingPage.vue';
 
 const VISITOR: SessionMe = { user: null, permissions: [], menu: [], apps: [], language: 'en' };
 const PAGE: PageOut = {
+  business_name: 'Salón Lucía',
+  privacy_policy_url: 'https://erplora.com/legal/privacy/',
   title: 'Salón Lucía',
   welcome_message: 'Book your next visit',
   primary_color: '#6366f1',
-  logo_url: '',
+  logo_url: '/media/salon-lucia.png',
   require_email: false,
   allow_staff_selection: true,
   allow_notes: false,
@@ -146,6 +148,23 @@ describe('PublicBookingPage', () => {
     expect(s.client.stream.subscriptions('base.business.get')).toEqual([]);
   });
 
+  it('identifies the business with its name, logo and page colour', async () => {
+    door();
+    const s = await open();
+    expect(s.el('business-name')?.textContent).toContain('Salón Lucía');
+    expect(s.el('business-logo')?.getAttribute('src')).toBe('/media/salon-lucia.png');
+    expect(s.el('business-logo')?.getAttribute('alt')).toBe('Salón Lucía logo');
+    expect(s.el('page')?.getAttribute('style')).toContain('--ob-accent: #6366f1');
+  });
+
+  it('shows the business name without an img when the configured logo is external', async () => {
+    door({ ...ANSWERS, 'online_booking.public.page': [200, { ...PAGE, logo_url: 'https://example.com/salon-lucia.png' }] });
+    const s = await open();
+    expect(s.el('business-logo')).toBeNull();
+    expect(s.el('business-name')?.textContent).toBe('Salón Lucía');
+    expect(s.el('title')?.textContent).toBe('Salón Lucía');
+  });
+
   it('writes the prices in the money the page’s HTML carries: złoty in a business in Poland', async () => {
     document.getElementById('public-door')?.remove();
     moneyBlock('PLN');
@@ -163,6 +182,23 @@ describe('PublicBookingPage', () => {
     expect(s.text()).not.toMatch(/vista previa|desarrollo/i);
   });
 
+  it('puts the privacy notice and its link beside Book, and keeps the trap out of reach', async () => {
+    door();
+    const s = await open();
+    expect(s.el('privacy')?.textContent).toContain('Your details will be used by Salón Lucía to manage this booking');
+    const link = s.el('privacy')?.querySelector('a');
+    expect(link?.getAttribute('href')).toBe('https://erplora.com/legal/privacy/');
+    expect(link?.getAttribute('target')).toBe('_blank');
+    expect(link?.getAttribute('rel')).toContain('noopener');
+    expect(s.el('trap')?.getAttribute('aria-hidden')).toBe('true');
+    const trap = s.el('trap-input') as HTMLInputElement;
+    expect(trap.tabIndex).toBe(-1);
+    expect(trap.getAttribute('autocomplete')).toBe('off');
+    expect(trap.value).toBe('');
+    expect(s.el('trap')?.hidden).toBe(true);
+    expect(s.el('trap')?.classList.contains('ob-public-submit__trap')).toBe(true);
+  });
+
   it('says it is loading while the business has not answered', async () => {
     door({ 'online_booking.public.page': 'hang' });
     const s = await open();
@@ -173,7 +209,10 @@ describe('PublicBookingPage', () => {
     door({ ...ANSWERS, 'online_booking.public.services': [200, page([], 0, 100)] });
     const s = await open();
     expect(s.el('no-services')?.textContent).toContain('This business has nothing to book online right now.');
+    expect(s.el('no-services')?.classList.contains('empty-state')).toBe(true);
+    expect(s.el('intro')).toBeNull();
     expect(s.text()).not.toContain('Settings');
+    for (const field of ['staff', 'day', 'name', 'phone', 'email', 'book']) expect(s.el(field)).toBeNull();
   });
 
   it('says why the page does not open: a business that does not take online bookings', async () => {
@@ -183,14 +222,24 @@ describe('PublicBookingPage', () => {
     expect(s.el('error')?.textContent).toContain(message);
   });
 
-  async function booked(s: Awaited<ReturnType<typeof open>>): Promise<void> {
+  async function fillBooking(s: Awaited<ReturnType<typeof open>>): Promise<void> {
     await ionChecked(s.el('service-v1'), true);
     await ionValue(s.el('day'), '2030-03-05', 'ionChange');
     await settle();
     await click(s.el('time-10:00'));
     await ionValue(s.el('name'), 'Marta Gil', 'ionInput');
     await ionValue(s.el('phone'), '612 345 678', 'ionInput');
-    await click(s.el('book'));
+  }
+
+  async function booked(s: Awaited<ReturnType<typeof open>>): Promise<void> {
+    await fillBooking(s);
+    const clock = vi.spyOn(Date, 'now');
+    clock.mockReturnValue(Date.now() + 4000);
+    try {
+      await click(s.el('book'));
+    } finally {
+      clock.mockRestore();
+    }
     await settle();
   }
 
@@ -200,7 +249,26 @@ describe('PublicBookingPage', () => {
     await booked(s);
     expect(s.el('booked')?.textContent).toContain('We have received your booking.');
     const book = posted.find(({ op }) => op === 'online_booking.public.book');
-    expect(book?.body).toMatchObject({ service_ids: ['v1'], start: '2030-03-05T10:00', name: 'Marta Gil', phone: '612 345 678' });
+    expect(book?.body).toMatchObject({ service_ids: ['v1'], start: '2030-03-05T10:00', name: 'Marta Gil', phone: '612 345 678', website: '' });
+  });
+
+  it('waits three seconds from opening the page before sending a booking', async () => {
+    door();
+    const s = await open();
+    await fillBooking(s);
+    vi.useFakeTimers();
+    try {
+      s.el('book')!.dispatchEvent(new MouseEvent('click', { bubbles: true, composed: true }));
+      await Promise.resolve();
+      await Promise.resolve();
+      expect(posted.filter(({ op }) => op === 'online_booking.public.book')).toHaveLength(0);
+      await vi.advanceTimersByTimeAsync(3000);
+      vi.useRealTimers();
+      await settle();
+      expect(posted.filter(({ op }) => op === 'online_booking.public.book')).toHaveLength(1);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('right after booking she sees it and cancels it through the door, its link in the body', async () => {
