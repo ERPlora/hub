@@ -16,6 +16,7 @@ from apps.verifactu.queries.route import config_row, issuer_identity
 from apps.verifactu.schemas import ChainValidateIn, ChainValidationOut, RecoverFromAeatIn, RecoverManualIn, RecoveryOut
 
 from .aeat_query import _query_aeat
+from .sealing import _fingerprint_of
 from .sending import _unsent
 from .writes import CONFIGURE, _event, _lock_chain
 
@@ -24,27 +25,6 @@ PENDING_IN_CHAIN = _("The pending records of this chain have to go out first.")
 NOTHING_TO_RECOVER = _(
     "The AEAT has no records of that issuer this month: there is nothing to recover."
 )
-
-
-def _fingerprint_of(record: Record) -> str:
-    if record.record_type == Record.Type.ANULACION:
-        return chain.anulacion_hash(
-            issuer_nif=record.issuer_nif,
-            number=record.invoice_number,
-            issue_date=record.issue_date,
-            previous_hash=record.previous_fingerprint,
-            generated_at=record.generated_at,
-        )
-    return chain.alta_hash(
-        issuer_nif=record.issuer_nif,
-        number=record.invoice_number,
-        issue_date=record.issue_date,
-        invoice_type=record.invoice_type,
-        tax_amount=record.tax_amount,
-        total_amount=record.total_amount,
-        previous_hash=record.previous_fingerprint,
-        generated_at=record.generated_at,
-    )
 
 
 @operation(
