@@ -44,7 +44,7 @@ pantalla **y** el motor que las ejecuta. Sirve igual a la peluquería y al resta
 | `requires` | `[]`: las acciones y consultas de otras apps se llaman por el nombre de su operación, nunca por sus modelos |
 | Permisos | `flow.view`, `flow.manage` (dueño y administrador: `flow.*`), `flow.answer` (empleado) y `flow.answer_manager` (encargado) |
 | Pantallas | `/flow/automations`, `/flow/automations/new`, `/flow/automations/:id` y `/flow/guide` |
-| Operaciones | 15 consultas (`queries.py`) y 28 acciones (`services/`), todas con `ai=`; 31 rutas en `/api/flow/…` (`api.py`) |
+| Operaciones | 15 consultas (`queries.py`) y 29 acciones (`services/`), todas con `ai=`; 31 rutas en `/api/flow/…` (`api.py`) |
 | Eventos | 18 propios (`flow.flow.*`, `flow.run.*`, `flow.draft.*`, `flow.secret.*` y `flow.question.*`; `events.py`); reacciona a los avisos de todas las apps activas (FLOW-F21) y a su propio `flow.run.parked` (FLOW-F27) |
 | De otras apps | el paso «Enviar un mensaje» usa las plantillas, los archivos de cabecera y el envío estrecho de la Bandeja de WhatsApp (`whatsapp_inbox.*`, por nombre) |
 | Migraciones | `0001_initial` … `0006_flowrun_error_reason` |

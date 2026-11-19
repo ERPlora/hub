@@ -2651,6 +2651,7 @@
       "company": "Is a company",
       "documents": "Documents",
       "expires_in_days": "Days until it expires",
+      "expires_soon": "Expires soon",
       "history": "History",
       "holder": "Holder",
       "holder_tax_id": "Holder's tax ID",
