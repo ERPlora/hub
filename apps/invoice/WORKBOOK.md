@@ -675,7 +675,7 @@ Si falla: «No se pudo imprimir la factura», también si no se puede leer el re
 factura que lo tiene (no se imprime sin su QR). Si la app instalada no abre su pantalla de impresión, el
 aviso dice por qué tras dos puntos («…: esta versión de la app de ERPlora no puede imprimir; actualízala»,
 «…: el servicio de impresión del dispositivo no se abrió»…).
-Implicados: PRINTING-F08, VERIFACTU-F19
+Implicados: PRINTING-F08, VERIFACTU-F19, BASE-F109 (el archivo fiscal de una baja guarda este A4 en PDF)
 
 ### INVOICE-F19 Marcar una factura como pagada
 Estado: hecho

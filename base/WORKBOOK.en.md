@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:200d0c1a0a44c33a2cca4b43b9c41d03f9e7605c5265be0a927abbbaa2a0bd5a -->
+<!-- generated from WORKBOOK.md sha256:59b6fd9bda83bb806ae11f6f5b149f564a76178a78f3d97efabccbbc4565f3fd -->
 
 ## What it is for and who it is for
 
@@ -2822,10 +2822,12 @@ Steps:
   2. The Hub checks whether it keeps documents: sales, invoices, VeriFactu records, payments, cash movements, shop
      orders or a customer's purchases, in any status and even with the app turned off. If it keeps any, it first
      writes them to the fiscal archive, where they are kept for 6 years and nobody can delete them: each table of
-     those documents as it is stored, with nothing rebuilt, and last a list that counts the rows and carries the
-     fingerprint of each file, written only once every file has been read back the same. It does so once per
-     deletion, and if a VeriFactu record still awaits the AEAT's answer, it waits for it. Then it stops: the business
-     stays deleted, with its database, and is checked again the next day.
+     those documents as it is stored, with nothing rebuilt; the PDF of each invoice as it was handed to the customer,
+     in its own language or the business's and with the VeriFactu QR if the AEAT already registered it, one per
+     invoice; and last a list that counts the rows and the PDFs and carries the fingerprint of each file, written only
+     once every file has been read back the same. It does so once per deletion, and if a VeriFactu record still awaits
+     the AEAT's answer, it waits for it. Then it stops: the business stays deleted, with its database, and is checked
+     again the next day.
   3. Without documents, it makes the final copy of its data, kept for 90 days in the copies store. Meanwhile the
      business can still be restored and erplora.com still sees its copies. When it ends it checks again for
      documents, in case one came in during the copy.
@@ -2845,11 +2847,13 @@ already was one. If the store does not delete its files, the business stays bein
 `files_purge_failed` on the row, and it is tried again the same way. If an app cannot be read, the database stays. A row
 that does not name the business's own database drops nothing (`invalid_database_name`). A business restored during the
 copy stays open with its database; once it is being dropped, erplora.com gets `hub_purged`. If the Hub shuts down
-mid-copy, the next one takes it up. If the fiscal archive cannot be written whole, or a file does not read back as it
-was written, it is not taken as done: the row says `fiscal_archive_failed` with the reason and it is tried again the
-next day in another folder of the archive (what was already up stays, since nobody can delete it, and without its final
-list it does not count).
-Involved: HUBS-F18, HUBS-F19, HUBS-F20, PUBLIC-F34 (the same deletion of files, when a demo is retired)
+mid-copy, the next one takes it up. If it shuts down mid-way through the fiscal archive, the next attempt for that
+deletion uses the PDFs already uploaded and does not make them again. If the fiscal archive cannot be written whole, or
+a file does not read back as it was written, it is not taken as done: the row says `fiscal_archive_failed` with the
+reason and it is tried again the next day in another folder of the archive (what was already up stays, since nobody can
+delete it, and without its final list it does not count).
+Involved: HUBS-F18, HUBS-F19, HUBS-F20, PUBLIC-F34 (the same deletion of files, when a demo is retired), INVOICE-F18
+(each invoice's A4 that goes to the archive)
 
 ### BASE-F110 Open the business's website on its own domain
 Status: done (the address and what it serves; connecting the domain is erplora.com's HUBS-F17, which shows it on the panel)

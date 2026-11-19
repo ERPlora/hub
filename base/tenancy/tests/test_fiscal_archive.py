@@ -251,15 +251,19 @@ def test_the_archive_of_one_business_holds_nothing_of_another(business, dumps_bu
     leaving, other = business(left_days_ago=91), business(left_days_ago=None)
     with use_hub(leaving):
         sale(1)
+        own = invoice(1)
     with use_hub(other):
         sale(2)
         sale(3)
+        invoice(1)
+        invoice(2)
 
     run_pass()
 
     _, manifest = manifest_of(moto_s3, fiscal_archive_bucket, leaving)
     rows = archived_rows(moto_s3, fiscal_archive_bucket, manifest)
-    assert {(row["model"], row["pk"]) for row in rows} == database_rows(leaving, ["sale"])
+    assert {(row["model"], row["pk"]) for row in rows} == database_rows(leaving, ["invoice", "sale"])
+    assert [entry["key"].rsplit("/", 1)[-1] for entry in manifest["documents"]] == [f"{own.id}.pdf"]
     assert all(key.startswith(f"{leaving.id.hex}/") for key in objects(moto_s3, fiscal_archive_bucket))
 
 

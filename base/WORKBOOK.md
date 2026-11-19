@@ -2835,10 +2835,12 @@ Pasos:
   2. El Hub mira si guarda documentos: ventas, facturas, registros de VeriFactu, cobros, movimientos de caja, pedidos
      de la tienda o compras de un cliente, en cualquier estado y aunque la app esté apagada. Si guarda alguno, antes
      los escribe en el archivo fiscal, donde se guardan 6 años sin que nadie los pueda borrar: cada tabla de esos
-     documentos tal como está guardada, sin rehacer nada, y al final una lista que cuenta las filas y lleva la huella
-     de cada fichero, que solo se escribe cuando todos se han vuelto a leer iguales. Lo hace una vez por baja, y si un
-     registro de VeriFactu aún espera la respuesta de la AEAT, espera a que llegue. Después se detiene: el negocio
-     sigue eliminado, con su base de datos, y lo vuelve a mirar al día siguiente.
+     documentos tal como está guardada, sin rehacer nada; el PDF de cada factura tal como se entregó al cliente, en su
+     idioma o en el del negocio y con el QR de VeriFactu si la AEAT ya la registró, uno por factura; y al final una
+     lista que cuenta las filas y los PDF y lleva la huella de cada fichero, que solo se escribe cuando todos se han
+     vuelto a leer iguales. Lo hace una vez por baja, y si un registro de VeriFactu aún espera la respuesta de la AEAT,
+     espera a que llegue. Después se detiene: el negocio sigue eliminado, con su base de datos, y lo vuelve a mirar al
+     día siguiente.
   3. Sin documentos, hace la copia final de sus datos, que se guarda 90 días en el almacén de copias. Mientras se
      hace, el negocio aún se puede recuperar y erplora.com sigue viendo sus copias. Al terminar vuelve a mirar si
      guarda documentos, por si entró alguno durante la copia.
@@ -2858,10 +2860,12 @@ Si el almacén no borra sus ficheros, el negocio sigue borrándose, sin marca, c
 reintenta igual. Si una app no se puede leer, la base de datos se queda. Una fila que no nombra la base de datos propia
 del negocio no borra nada (`invalid_database_name`). Un negocio recuperado durante la copia sigue abierto con su base
 de datos; ya borrándose, erplora.com recibe `hub_purged`. Si el Hub se apaga a media copia, el siguiente la retoma.
-Si el archivo fiscal no se puede escribir entero, o un fichero no se lee igual que se escribió, no se da por hecho: la
-fila dice `fiscal_archive_failed` con el motivo y se reintenta al día siguiente en otra carpeta del archivo (lo ya
-subido se queda, porque nadie lo puede borrar, y sin su lista final no cuenta).
-Implicados: HUBS-F18, HUBS-F19, HUBS-F20, PUBLIC-F34 (el mismo borrado de ficheros, al retirar una demo)
+Si se apaga a medio archivo fiscal, el siguiente intento de esa baja aprovecha los PDF que ya subió y no los vuelve a
+hacer. Si el archivo fiscal no se puede escribir entero, o un fichero no se lee igual que se escribió, no se da por
+hecho: la fila dice `fiscal_archive_failed` con el motivo y se reintenta al día siguiente en otra carpeta del archivo
+(lo ya subido se queda, porque nadie lo puede borrar, y sin su lista final no cuenta).
+Implicados: HUBS-F18, HUBS-F19, HUBS-F20, PUBLIC-F34 (el mismo borrado de ficheros, al retirar una demo), INVOICE-F18
+(el A4 de cada factura que va al archivo)
 
 ### BASE-F110 Abrir la web del negocio por su dominio propio
 Estado: hecho (la dirección y lo que sirve; conectar el dominio es HUBS-F17 de erplora.com, que lo enseña en el panel)
