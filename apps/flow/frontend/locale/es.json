@@ -2651,6 +2651,7 @@
       "company": "Es una sociedad",
       "documents": "Documentos",
       "expires_in_days": "Días hasta que caduca",
+      "expires_soon": "Caduca pronto",
       "history": "Historial",
       "holder": "Titular",
       "holder_tax_id": "NIF del titular",

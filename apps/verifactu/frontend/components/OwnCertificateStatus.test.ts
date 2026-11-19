@@ -16,9 +16,16 @@ describe('OwnCertificateStatus', () => {
   it.each([
     { certificate: {}, label: 'No certificate uploaded' },
     { certificate: { ...LOADED_CERTIFICATE, expires_in_days: 351 }, label: 'Valid' },
-    { certificate: { ...LOADED_CERTIFICATE, expires_in_days: 17 }, label: 'Expires soon' },
+    { certificate: { ...LOADED_CERTIFICATE, expires_in_days: 17, expires_soon: true }, label: 'Expires soon' },
     { certificate: { ...LOADED_CERTIFICATE, expires_in_days: -1 }, label: 'Expired' },
   ])('shows the explicit status $label', async ({ certificate, label }) => {
     expect((await setup(certificate)).text()).toBe(label);
+  });
+
+  it.each([
+    { days: 45, soon: true, label: 'Expires soon' },
+    { days: 17, soon: false, label: 'Valid' },
+  ])('says $label with $days days left when the server says expires_soon is $soon', async ({ days, soon, label }) => {
+    expect((await setup({ ...LOADED_CERTIFICATE, expires_in_days: days, expires_soon: soon })).text()).toBe(label);
   });
 });
