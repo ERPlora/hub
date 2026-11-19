@@ -34,7 +34,7 @@ const business = useBusinessMoney();
 const session = useSession();
 const canMove = computed(() => session.can('inventory.adjust_stock') && props.product?.product_type === 'physical');
 const canChange = computed(() => session.can('inventory.change_product'));
-const allergenText = computed(() => (props.product ? formatAllergens(props.product.allergens ?? [], locale.value) : ''));
+const allergenText = computed(() => (props.product ? formatAllergens(props.product.allergens, locale.value) : ''));
 
 const status = computed(() => {
   const p = props.product;
@@ -132,7 +132,7 @@ async function setSoldOut(value: boolean): Promise<void> {
         <ion-note
           slot="end"
           class="product-detail__allergens"
-          :color="product.allergens?.length ? undefined : 'medium'"
+          :color="product.allergens.length ? undefined : 'medium'"
         >
           {{ allergenText || $t('inventory.products.noAllergens') }}
         </ion-note>

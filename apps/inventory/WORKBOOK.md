@@ -250,7 +250,7 @@ Escape y tocar fuera del panel (hub#1023).
 | INVENTORY-F08 | Agrupar productos en categorías para el TPV | hecho |
 | INVENTORY-F29 | Marcar un artículo como agotado | hecho |
 | INVENTORY-F34 | Recuperar un producto eliminado | hecho |
-| INVENTORY-F35 | Declarar los alérgenos de un producto | parcial — falta la interfaz: el bloque del formulario, la línea de la ficha y la columna en Importar productos |
+| INVENTORY-F35 | Declarar los alérgenos de un producto | hecho |
 | | **Importar y exportar** | |
 | INVENTORY-F09 | Importar productos desde un CSV | hecho |
 | INVENTORY-F10 | Importar categorías desde un CSV | hecho |

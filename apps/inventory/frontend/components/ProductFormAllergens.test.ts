@@ -66,6 +66,19 @@ describe('ProductFormModal: allergens', () => {
     expect(s.sent('/api/inventory/products/update')).toEqual({ id: 'p1', allergens: ['egg'] });
   });
 
+  it('opens an edit with the product’s allergens marked and keeps them when another is added', async () => {
+    const s = await setup({ product: product({ allergens: ['milk'] }) });
+    const marked = [...s.el('inventory-product-allergens')!.querySelectorAll<HTMLElement & { checked: boolean }>('ion-checkbox')]
+      .filter((checkbox) => checkbox.checked)
+      .map((checkbox) => checkbox.textContent?.trim());
+    expect(marked).toEqual(['Milk']);
+
+    await mark('inventory-product-allergens', 'egg', true);
+    s.net.onApi(() => ok(product({ allergens: ['egg', 'milk'] })));
+    await s.submit();
+    expect(s.sent('/api/inventory/products/update')).toEqual({ id: 'p1', allergens: ['egg', 'milk'] });
+  });
+
   it('shows a field refusal inside the block', async () => {
     const s = await setup({ product: product({ allergens: ['milk'] }) });
     await mark('inventory-product-allergens', 'fish', true);

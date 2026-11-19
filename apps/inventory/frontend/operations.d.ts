@@ -295,8 +295,6 @@ export interface SaleProductOut {
 }
 
 export interface ProductOut extends SaleProductOut {
-  /** The server always sends it; optional for fixtures typed before it. */
-  allergens?: AllergenCode[];
   ean13: string | null;
   description: string;
   stock: string;

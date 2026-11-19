@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:cbaea428e5bb4c1258b1c9ebc4b236b270f44ebabba816bb32a80302bf303867 -->
+<!-- generated from WORKBOOK.md sha256:3264337be3a77f0dfd8e927ee792d15feeebf99a072a61436f8de2fb1144db43 -->
 
 ## What it is for and who it is for
 
@@ -238,7 +238,7 @@ same, in the browser too (hub#1023).
 | INVENTORY-F08 | Group products into categories for the till | done |
 | INVENTORY-F29 | Mark an item as sold out | done |
 | INVENTORY-F34 | Recover a deleted product | done |
-| INVENTORY-F35 | Declare a product's allergens | partial — the interface is missing: the block of the form, the line of the card and the column in Import products |
+| INVENTORY-F35 | Declare a product's allergens | done |
 | | **Import and export** | |
 | INVENTORY-F09 | Import products from a CSV | done |
 | INVENTORY-F10 | Import categories from a CSV | done |
