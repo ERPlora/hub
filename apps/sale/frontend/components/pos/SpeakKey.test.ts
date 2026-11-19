@@ -22,12 +22,6 @@ import { computed, ref, toRaw, toValue } from 'vue';
 import { EMPLOYEE, mountSale, settle } from '../../__tests__/mount-sale';
 import SpeakKey from './SpeakKey.vue';
 
-vi.mock('@erplora/ui/shell', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@erplora/ui/shell')>()),
-  toast: vi.fn(),
-  toastWarning: vi.fn(),
-}));
-
 // The shared assistant's dictation, the real one unless a test swaps it for one it drives (`fakeDictation`).
 vi.mock('@erplora/ui/components', async (importOriginal) => {
   const real = await importOriginal<typeof import('@erplora/ui/components')>();
@@ -69,8 +63,6 @@ beforeEach(() => {
 
 afterEach(() => {
   installAssistant(undefined);
-  vi.mocked(toast).mockClear();
-  vi.mocked(toastWarning).mockClear();
   // Back to the real dictation, also when a swapped one was never taken.
   vi.mocked(useDictation).mockReset();
   vi.restoreAllMocks();

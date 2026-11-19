@@ -2,16 +2,11 @@
 // (the old screen used the browser's prompt), named after the payment, with «Cancel payment» in red and
 // «Keep it»; it cannot be pressed without a reason. The server's refusal (a payment that finished in the
 // meantime) stays in the form.
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import type { PaymentOut } from '../operations';
 import { click, ionValue, mountPayment, settle } from '../__tests__/mount-payment';
 import CancelPaymentModal from './CancelPaymentModal.vue';
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
 
 type Control = HTMLElement & { label?: string; value?: unknown; errorText?: string; disabled?: boolean };
 

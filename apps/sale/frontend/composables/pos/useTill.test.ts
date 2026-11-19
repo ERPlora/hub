@@ -14,16 +14,7 @@ import type { OrderOut, SettingsOut } from '../../operations';
 import { CURRENT_CHECK_KEY } from './useCurrentCheck';
 import { type Till, useTill } from './useTill';
 
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { modalControllerStub } = await import('../../__tests__/approval-dialog');
-  const ionic = await importOriginal<typeof import('@ionic/vue')>();
-  return { ...ionic, modalController: modalControllerStub(ionic.modalController) };
-});
-vi.mock('@erplora/ui/shell', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@erplora/ui/shell')>()),
-  toastError: vi.fn(),
-  toastInfo: vi.fn(),
-}));
+vi.mock('@ionic/vue', async (importOriginal) => (await import('../../__tests__/approval-dialog')).ionicWithApprovalDialog(importOriginal));
 
 beforeEach(() => {
   vi.stubGlobal('localStorage', memoryStorage());
@@ -31,8 +22,6 @@ beforeEach(() => {
 });
 afterEach(() => {
   vi.unstubAllGlobals();
-  vi.mocked(toastError).mockClear();
-  vi.mocked(toastInfo).mockClear();
 });
 
 async function setup(options: { settings?: Partial<SettingsOut>; session?: typeof MANAGER; locale?: 'en' | 'es' } = {}) {

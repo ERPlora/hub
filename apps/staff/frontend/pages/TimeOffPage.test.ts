@@ -6,7 +6,7 @@
 // only their own pending request. «+» registers anyone's (managers) or asks for one's own (employee).
 // Whoever has a linked record switches to «My time off» (`staff.time_off.mine`, with the reason).
 import { ConfirmDialog, DataTable, EmptyState, StatusPill } from '@erplora/ui/components';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import type { Component } from 'vue';
 
 import type { TimeOffDetailOut, TimeOffOut } from '../operations';
@@ -14,11 +14,6 @@ import { EMPLOYEE, errorFrame, flush, type MountOptions, mountStaff, page, settl
 import TimeOffFormModal from '../components/TimeOffFormModal.vue';
 import TimeOffPage from './TimeOffPage.vue';
 import { listFillProblems } from '../../../../frontend/testing/list-fill';
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
 
 const OP = 'staff.time_off.list';
 const off = (id: string, over: Partial<TimeOffOut> = {}): TimeOffOut => ({

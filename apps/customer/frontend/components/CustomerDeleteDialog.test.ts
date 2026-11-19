@@ -2,22 +2,12 @@
 // «Delete {name}? …» with Cancel and Delete; confirmed, the card is deleted (its data kept) and
 // «Customer {name} deleted» is said. A refusal stays in the dialog.
 import { toastSuccess } from '@erplora/ui/shell';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import { defineComponent, h, ref } from 'vue';
 
 import { flush, json, mountCustomer, refusal, sent } from '../__tests__/mount-customer';
 import CustomerDeleteDialog from './CustomerDeleteDialog.vue';
 
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
-vi.mock('@erplora/ui/shell', async (importOriginal) => ({
-  ...((await importOriginal()) as object),
-  toastSuccess: vi.fn(),
-}));
-
-beforeEach(() => vi.mocked(toastSuccess).mockClear());
 afterEach(() => {
   document.body.innerHTML = '';
 });

@@ -13,18 +13,10 @@ import { click, EMPLOYEE, ionValue, mountVerifactu, settle } from '../__tests__/
 import type { ConfigOut, RepresentationOut } from '../operations';
 import RepresentationGrant from './RepresentationGrant.vue';
 
-vi.mock('@erplora/ui/shell', async (importOriginal) => ({
-  ...((await importOriginal()) as object),
-  toastSuccess: vi.fn(),
-  toastError: vi.fn(),
-}));
-
 /** The files the page handed the browser through a link. */
 let downloads: BrowserDownload[];
 
 beforeEach(() => {
-  vi.mocked(toastSuccess).mockClear();
-  vi.mocked(toastError).mockClear();
   downloads = browserDownloads();
 });
 

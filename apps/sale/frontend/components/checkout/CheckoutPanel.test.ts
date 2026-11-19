@@ -6,7 +6,7 @@
 // card, split, the legal limits, invoice and its recipient abroad, part of a check, a refusal, a lost
 // answer, a read that fails.
 import { toastWarning } from '@erplora/ui/shell';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import type { CustomerSnapshot } from '../../../../customer/frontend/components/CustomerSearch.vue';
 import {
@@ -32,12 +32,6 @@ import CheckoutPanel from './CheckoutPanel.vue';
 import CheckoutSide from './CheckoutSide.vue';
 import { previewLine } from './__tests__/vouchers';
 import VoucherLines from './VoucherLines.vue';
-
-vi.mock('@erplora/ui/shell', async (importOriginal) => ({
-  ...((await importOriginal()) as object),
-  toastWarning: vi.fn(),
-}));
-beforeEach(() => vi.mocked(toastWarning).mockClear());
 
 const PREVIEW_OP = 'sale.checkout.preview';
 const METHODS_OP = 'sale.payment_method.list';

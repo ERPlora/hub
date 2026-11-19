@@ -2,16 +2,11 @@
 // Description, «Add». It closes when the server saved the category (the live list paints it); a
 // refusal keeps it open with each message under its field (a malformed key, a 422; a key that
 // exists, the 409 `tax.category_exists` under Key) and nothing is lost of what was typed.
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import { itTellsTheCorrectedFieldApart } from '../../../../base/frontend/__tests__/same-words-refusal';
 import { click, ionValue, mountTax, settle } from '../__tests__/mount-tax';
 import CategoryCreateModal from './CategoryCreateModal.vue';
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
 
 type Control = HTMLElement & { label?: string; value?: unknown; placeholder?: string; fill?: string; errorText?: string; disabled?: boolean };
 

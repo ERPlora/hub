@@ -11,11 +11,6 @@ import { business, click, ionChecked, ionValue, mountCombo, page, POLISH, settle
 import type { GroupOut } from '../operations';
 import BulkAddModal from './BulkAddModal.vue';
 
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
-
 /** What the shared `syncSearchbarInputName` was asked to name, written down at each call: the searchbar it
  *  names (the first one under the root it gets) and the name it reads then. */
 const named = vi.hoisted(() => [] as { bar: Element | null; name: string }[]);

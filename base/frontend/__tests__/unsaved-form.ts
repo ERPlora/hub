@@ -1,5 +1,5 @@
 // The unsaved-changes contract of a form window (BASE-F05), exercised through its own controls. With the IonModal stub of
-// @erplora/ui (`vi.mock('@ionic/vue', …)` in the window's test), as every window test does.
+// @erplora/ui, which the hub setup (vitest.setup.ts) gives every test.
 //   - `expectUnsavedFormAsksBeforeClosing` — the whole contract of a form window: Android's Back holds it while
 //     something is typed (hub#1015, hub#1020) and so do its own ways out (hub#1156): «Cancel», the «×», Escape and a tap
 //     outside ask «Discard changes?», and «Keep editing» leaves it open with what was typed. A FormModal, or a window that

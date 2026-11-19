@@ -16,11 +16,6 @@ import InboxPage from './InboxPage.vue';
 import source from './InboxPage.vue?raw';
 import { listFillProblems } from '../../../../frontend/testing/list-fill';
 
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
-
 const LIST = 'whatsapp_inbox.conversation.list';
 const CHANNEL = 'whatsapp_inbox.channel.get';
 

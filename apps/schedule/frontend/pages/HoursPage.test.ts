@@ -5,7 +5,7 @@
 // of the screen: loading, error with Retry, reconnecting, app inactive, read-only for an employee.
 import { DataTable, InlineFeedback } from '@erplora/ui/components';
 import { AppPage } from '@erplora/ui/shell';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import type { Component } from 'vue';
 
 import type { WeekDayOut, WeekOut } from '../operations';
@@ -13,11 +13,6 @@ import { EMPLOYEE, errorFrame, flush, type MountOptions, mountSchedule, settle }
 import DayHoursModal from '../components/DayHoursModal.vue';
 import HoursPage from './HoursPage.vue';
 import { listFillProblems } from '../../../../frontend/testing/list-fill';
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
 
 const OP = 'schedule.week.get';
 const NINE_TO_SIX = [{ open_time: '09:00:00', close_time: '18:00:00' }];

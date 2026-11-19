@@ -1,16 +1,11 @@
 // The plan's «+» (WORKBOOK «Plano de sala»; TABLE-F01, F02): «Add», with Zone («New zone…») and «Add zone»
 // — the new zone goes last and becomes the chosen one —, and «Table number» («Auto-numbered» when left
 // empty) with «Add table», off while there is no zone. Each action owns its field; a refusal stays here.
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import { click, ionValue, mountTable, settle } from '../__tests__/mount-table';
 import { tableRow, zoneRow } from '../__tests__/tables';
 import AddModal from './AddModal.vue';
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
 
 type Control = HTMLElement & { placeholder?: string; disabled?: boolean };
 

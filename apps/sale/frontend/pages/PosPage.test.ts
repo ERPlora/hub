@@ -25,18 +25,6 @@ import { CURRENT_CHECK_KEY } from '../composables/pos/useCurrentCheck';
 import { plain } from '../lib/format';
 import PosPage from './PosPage.vue';
 
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
-vi.mock('@erplora/ui/shell', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@erplora/ui/shell')>()),
-  toast: vi.fn(),
-  toastError: vi.fn(),
-  toastInfo: vi.fn(),
-  toastSuccess: vi.fn(),
-  toastWarning: vi.fn(),
-}));
 // The other workers' pieces, by their contracts: stubbed here.
 vi.mock('../components/checkout/CheckoutSheet.vue', async () => {
   const { h } = await import('vue');
@@ -75,7 +63,6 @@ vi.mock('../../../customer/frontend/components/CustomerSearch.vue', async () => 
 beforeEach(() => vi.stubGlobal('localStorage', memoryStorage()));
 afterEach(() => {
   vi.unstubAllGlobals();
-  for (const spy of [toast, toastError, toastInfo, toastSuccess, toastWarning]) vi.mocked(spy).mockClear();
 });
 
 const CHECK = order({ id: 'o1', version: 1, lines: [line({ id: 'l1', product_id: 'p1' })] });

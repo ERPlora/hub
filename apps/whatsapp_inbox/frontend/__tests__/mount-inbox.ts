@@ -1,7 +1,5 @@
 // Test helper of the WhatsApp inbox's pages and components: `mountInShell` with its catalogues over Customers' (for its
 // CustomerSearch), the inbox and its people.
-// Dialogs: a test that opens one mocks `@ionic/vue`'s IonModal with FormModal's `ionModalStub` (imported
-// from its own file in the mock factory: this helper loads @ionic/vue, the factory must not).
 import type { SessionMe } from '@erplora/ui/shell';
 import { vi } from 'vitest';
 import type { Component } from 'vue';

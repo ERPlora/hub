@@ -6,7 +6,7 @@
 // with «Load more»; loading, empty and error states per section; a warning when the group asks for more
 // options than it has.
 import { ConfirmDialog } from '@erplora/ui/components';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import type { GroupOut, LinkOut, OptionOut } from '../operations';
 import type { Business } from '../../../../base/frontend/operations/business';
@@ -14,11 +14,6 @@ import { business, click, EMPLOYEE, errorFrame, flush, mountModifier, page, POLI
 import GroupSheet from './GroupSheet.vue';
 import LinkFormModal from './LinkFormModal.vue';
 import OptionFormModal from './OptionFormModal.vue';
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
 
 const SAUCES: GroupOut = {
   id: 'g1',

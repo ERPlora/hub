@@ -5,7 +5,7 @@
 import { formatDateTime } from '@erplora/ui/components';
 import { toastSuccess } from '@erplora/ui/shell';
 import { IonInput, IonSelect, IonTextarea } from '@ionic/vue';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import type { Component } from 'vue';
 
 import { errorFrame, flush, json, type MountOptions, mountCustomer, refusal, sent, subId } from '../__tests__/mount-customer';
@@ -13,11 +13,6 @@ import { formatDay } from '../lib/dates';
 import type { HealthOut } from '../operations';
 import HealthPanel from './HealthPanel.vue';
 
-vi.mock('@erplora/ui/shell', async (importOriginal) => ({
-  ...((await importOriginal()) as object),
-  toastSuccess: vi.fn(),
-}));
-beforeEach(() => vi.mocked(toastSuccess).mockClear());
 afterEach(() => {
   document.body.innerHTML = '';
 });

@@ -4,7 +4,7 @@
 // offers Edit and Deactivate, or Activate when it is deactivated. A method is never deleted.
 import { DataTable, type DataTableAction, EmptyState, StatusPill } from '@erplora/ui/components';
 import { AppPage } from '@erplora/ui/shell';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import type { Component } from 'vue';
 
 import type { MethodOut } from '../operations';
@@ -12,11 +12,6 @@ import { EMPLOYEE, flush, type MountOptions, mountPayment, page } from '../__tes
 import MethodFormModal from '../components/MethodFormModal.vue';
 import MethodsPage from './MethodsPage.vue';
 import { listFillProblems } from '../../../../frontend/testing/list-fill';
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
 
 const OP = 'payment.method.list';
 const method = (id: string, over: Partial<MethodOut> = {}): MethodOut => ({

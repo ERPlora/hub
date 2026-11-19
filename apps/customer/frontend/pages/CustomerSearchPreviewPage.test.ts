@@ -1,16 +1,12 @@
 // The preview of the till's customer search (dev server only, routes.ts): CustomerSearch as Sales will
 // mount it, and what it hands the sale, so it can be driven end to end before Sales exists.
 import { AppPage } from '@erplora/ui/shell';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 
 import { flush, mountCustomer } from '../__tests__/mount-customer';
 import CustomerSearch from '../components/CustomerSearch.vue';
 import CustomerSearchPreviewPage from './CustomerSearchPreviewPage.vue';
 
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
 afterEach(() => {
   document.body.innerHTML = '';
 });

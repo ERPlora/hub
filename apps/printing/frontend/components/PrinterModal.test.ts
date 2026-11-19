@@ -2,23 +2,13 @@
 // queue; none for the system printer), paper, role and whether it is active. «Save» adds it or saves it and
 // says so; a refusal is said at its field, in the server's words.
 import { toastSuccess } from '@erplora/ui/shell';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import { itTellsTheCorrectedFieldApart, refusedWithTheSameWords } from '../../../../base/frontend/__tests__/same-words-refusal';
 import { click, ionToggle, ionValue, mountPrinting, settle } from '../__tests__/mount-printing';
 import type { PrinterDraft } from '../lib/discovery';
 import type { PrinterOut } from '../operations';
 import PrinterModal from './PrinterModal.vue';
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
-vi.mock('@erplora/ui/shell', async (importOriginal) => ({
-  ...((await importOriginal()) as object),
-  toastSuccess: vi.fn(),
-}));
-beforeEach(() => vi.mocked(toastSuccess).mockClear());
 
 const prop = (el: Element | null, name: string): unknown => (el as unknown as Record<string, unknown>)[name];
 

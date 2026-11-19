@@ -2,15 +2,10 @@
 // the settings, so nobody else subscribes): it follows `inventory.config.get` and saves through
 // `inventory.config.update`. Its whole behaviour is specified in pages/SettingsPage.test.ts.
 import { IonToggle } from '@ionic/vue';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import { mountInventory } from '../__tests__/mount-inventory';
 import SettingsForm from './SettingsForm.vue';
-
-vi.mock('@erplora/ui/shell', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@erplora/ui/shell')>()),
-  toastSuccess: vi.fn(),
-}));
 
 describe('SettingsForm', () => {
   it('follows inventory.config.get and paints its two switches once it arrives', async () => {

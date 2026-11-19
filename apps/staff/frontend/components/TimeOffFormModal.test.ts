@@ -5,16 +5,11 @@
 // `staff.time_off.request`. The server judges: an overlap (409) is said on top, a 422 under its field,
 // and the dialog keeps what was typed.
 import { Combo, type ComboOption } from '@erplora/ui/components';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import { itTellsTheCorrectedFieldApart } from '../../../../base/frontend/__tests__/same-words-refusal';
 import { click, EMPLOYEE, ionChecked, ionValue, mountStaff, type MountOptions, page, settle } from '../__tests__/mount-staff';
 import TimeOffFormModal from './TimeOffFormModal.vue';
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
 
 type Control = HTMLElement & { label?: string; value?: unknown; checked?: boolean; type?: string; errorText?: string; disabled?: boolean };
 

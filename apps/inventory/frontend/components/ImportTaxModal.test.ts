@@ -1,15 +1,10 @@
 // «CSV tax categories» (WORKBOOK INVENTORY-F09, step 2): one block per fiscal text Taxes did not
 // recognise (or «Rows with no tax category»), each with «Pick» (a tax category of Taxes), «Create»
 // (Key and Name) or «Skip», and «Confirm & import»; «Cancel» imports nothing.
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 
 import { flush, mountInventory, TAX_CATEGORIES } from '../__tests__/mount-inventory';
 import ImportTaxModal from './ImportTaxModal.vue';
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
 
 afterEach(() => {
   document.body.innerHTML = '';

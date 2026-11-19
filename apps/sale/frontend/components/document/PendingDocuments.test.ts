@@ -3,14 +3,12 @@
 // to whoever may charge, offers «Issue now» (`sale.sale.issue_documents`); a refusal says why, worded by
 // the server, and the notice stays. Once issued, the live sale drops the notice by itself.
 import { toastSuccess } from '@erplora/ui/shell';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import { click, EMPLOYEE, mountSale, settle } from '../../__tests__/mount-sale';
 import { refused } from '../pos/__tests__/fixtures';
 import { saleOut } from './__tests__/fixtures';
 import PendingDocuments from './PendingDocuments.vue';
-
-vi.mock('@erplora/ui/shell', async (importOriginal) => (await import('../../../../../base/frontend/__tests__/toast-spies')).shellWithToastSpies(importOriginal));
 
 async function setup(options: { locale?: 'en' | 'es'; session?: typeof EMPLOYEE } = {}) {
   // A command, nothing live: no stream to open.

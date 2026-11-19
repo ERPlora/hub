@@ -13,11 +13,6 @@ import { entryRow, reservationRow } from '../__tests__/rows';
 import WaitlistFormModal from '../components/WaitlistFormModal.vue';
 import WaitlistPage from './WaitlistPage.vue';
 
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
-
 const OP = 'reservation.waitlist.list';
 const WAITING = entryRow();
 const CONTACTED = entryRow({ id: 'w2', guest_name: '', is_contacted: true, preferred_time: '21:30:00' });

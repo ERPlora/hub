@@ -10,8 +10,6 @@ import { defineComponent, h } from 'vue';
 import { flush, installedApp, leaveInstalledApp, mountBase, tap } from '../__tests__/mount-base';
 import { SIGN_TIMEOUT_MS, type SaasPassNext, useSaasPass } from './saas-pass';
 
-vi.mock('@erplora/ui/shell', async (importOriginal) => (await import('../__tests__/toast-spies')).shellWithToastSpies(importOriginal));
-
 const USUAL = 'https://erplora.com/dashboard/store/plans?business=b1';
 const SIGNED = 'https://erplora.com/hub-pass/?pass=abc%3A123';
 

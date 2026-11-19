@@ -6,7 +6,7 @@
 // a row opens the card; «Delete» on a row (owner, admin) asks first. Every state of the screen.
 import { DataTable, EmptyState, InlineFeedback } from '@erplora/ui/components';
 import { AppPage, toastSuccess } from '@erplora/ui/shell';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Component } from 'vue';
 
 import {
@@ -34,15 +34,6 @@ import CustomerListPage from './CustomerListPage.vue';
 import source from './CustomerListPage.vue?raw';
 import { listFillProblems } from '../../../../frontend/testing/list-fill';
 
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
-vi.mock('@erplora/ui/shell', async (importOriginal) => ({
-  ...((await importOriginal()) as object),
-  toastSuccess: vi.fn(),
-}));
-
 const row = (id: string, name: string, extra: Record<string, unknown> = {}) => ({
   id,
   name,
@@ -65,7 +56,6 @@ const LIST = 'customer.customer.list';
 afterEach(() => {
   document.body.innerHTML = '';
 });
-beforeEach(() => vi.mocked(toastSuccess).mockClear());
 
 async function setup(options: MountOptions = {}) {
   const m = await mountCustomer(CustomerListPage, { attachTo: document.body, ...options });

@@ -3,17 +3,12 @@
 // typed key: a wrong key would put the wrong VAT on an import) and the Origin, «Learned» to begin with; «Add». A
 // repeated alias (409) is said under Alias; the dialog closes when the server saved it.
 import { Combo, type ComboOption } from '@erplora/ui/components';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import { itTellsTheCorrectedFieldApart } from '../../../../base/frontend/__tests__/same-words-refusal';
 import type { CategoryRowOut } from '../operations';
 import { click, ionValue, mountTax, settle } from '../__tests__/mount-tax';
 import AliasCreateModal from './AliasCreateModal.vue';
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
 
 type Control = HTMLElement & { label?: string; value?: unknown; placeholder?: string; fill?: string; errorText?: string; disabled?: boolean };
 

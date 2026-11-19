@@ -12,11 +12,6 @@ import FlowGallery from '../components/FlowGallery.vue';
 import QuestionInbox from '../components/QuestionInbox.vue';
 import AutomationsPage from './AutomationsPage.vue';
 
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
-
 const CATALOG = { events: [], actions: [] };
 const flow = (id: string, over: Partial<FlowOut> = {}) => ({ id, name: id, enabled: false, missing_grants: [], trigger: { kind: 'manual' }, steps: [], ...over }) as FlowOut;
 

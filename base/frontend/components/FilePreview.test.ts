@@ -16,10 +16,6 @@ vi.mock('@erplora/ui/sdk', async (importOriginal) => ({
   fetchFile: vi.fn(),
 }));
 vi.mock('../lib/pdf', () => ({ renderPdf: mocks.renderPdf }));
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
 
 function item(name: string, preview: FileItem['preview'], content_type = 'text/plain'): FileItem {
   return { path: `Facturas/${name}`, name, size: 10, modified: null, content_type, preview };

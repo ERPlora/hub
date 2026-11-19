@@ -1,16 +1,11 @@
 // The «Close session · S-…» window around its body (CloseSessionForm), which only exists — and only reads —
 // while the window is open. A closed session closes the window; «Cancel» too. «Close session» waits in grey until the
 // business has answered its money (hub#921).
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import { expectWaitsForTheYen, flush, ionValue, mountCash } from '../__tests__/mount-cash-register';
 import CloseSessionForm from './CloseSessionForm.vue';
 import CloseSessionModal from './CloseSessionModal.vue';
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
 
 const SESSION = { id: 's1', number: 'S-261014-0001' };
 

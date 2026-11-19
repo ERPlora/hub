@@ -1,7 +1,7 @@
 // The amount of a service without a fixed price (SALE-F38, SERVICE-F03): «Amount of <service>», its price
 // as the suggestion (one tap types it), the keypad, and «Add <amount>», which waits for an amount. The
 // server keeps it within the service's minimum and maximum: its refusal is read over the button.
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import { business, click, expectWaitsForTheYen, JAPANESE, mountSale, settle } from '../../__tests__/mount-sale';
 import { expectWindowSaysMoneyUnreadable } from '../../../../../base/frontend/__tests__/save-waits-for-money';
@@ -9,11 +9,6 @@ import { plain } from '../../lib/format';
 import { service } from './__tests__/fixtures';
 import PosNumpad from './PosNumpad.vue';
 import ServicePriceSheet from './ServicePriceSheet.vue';
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
 
 const COLOUR = service({ id: 'sv2', name: 'Color', pricing_type: 'from', price: 6500, min_price: 4000, max_price: 9000 });
 

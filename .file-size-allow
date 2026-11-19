@@ -7,7 +7,7 @@
 227 .github/scripts/ecs-deploy.sh ERPlora/erplora-next#74
 172 .github/scripts/ecs-rollback.sh ERPlora/erplora-next#74
 382 .github/scripts/nightly-e2e.sh ERPlora/erplora-next#74
-534 apps/appointment/frontend/components/AppointmentFormModal.test.ts ERPlora/erplora-next#74
+529 apps/appointment/frontend/components/AppointmentFormModal.test.ts ERPlora/erplora-next#74
 462 apps/appointment/frontend/operations.d.ts ERPlora/erplora-next#74
 531 apps/appointment/models.py ERPlora/erplora-next#74
 1660 apps/appointment/queries.py ERPlora/erplora-next#74
@@ -28,7 +28,7 @@
 740 apps/combo/schemas.py ERPlora/erplora-next#74
 923 apps/combo/services.py ERPlora/erplora-next#74
 543 apps/customer/frontend/operations.d.ts ERPlora/erplora-next#74
-543 apps/customer/frontend/pages/CustomerListPage.test.ts ERPlora/erplora-next#74
+533 apps/customer/frontend/pages/CustomerListPage.test.ts ERPlora/erplora-next#74
 1130 apps/customer/queries.py ERPlora/erplora-next#74
 1300 apps/customer/schemas.py ERPlora/erplora-next#74
 1882 apps/customer/services.py ERPlora/erplora-next#74
@@ -37,9 +37,9 @@
 506 apps/demo/frontend/pages/ItemListPage.test.ts ERPlora/erplora-next#74
 579 apps/flow/frontend/operations.d.ts ERPlora/erplora-next#74
 1165 apps/flow/schemas.py ERPlora/erplora-next#74
-715 apps/inventory/frontend/components/ProductFormModal.test.ts ERPlora/erplora-next#74
+713 apps/inventory/frontend/components/ProductFormModal.test.ts ERPlora/erplora-next#74
 474 apps/inventory/frontend/operations.d.ts ERPlora/erplora-next#74
-559 apps/inventory/frontend/pages/ProductsPage.test.ts ERPlora/erplora-next#74
+555 apps/inventory/frontend/pages/ProductsPage.test.ts ERPlora/erplora-next#74
 1349 apps/inventory/queries.py ERPlora/erplora-next#74
 982 apps/inventory/schemas.py ERPlora/erplora-next#74
 1584 apps/inventory/services.py ERPlora/erplora-next#74
@@ -75,12 +75,12 @@
 891 apps/reservation/schemas.py ERPlora/erplora-next#74
 1521 apps/reservation/services.py ERPlora/erplora-next#74
 1035 apps/reservation/tests/test_services.py ERPlora/erplora-next#74
-719 apps/sale/frontend/components/checkout/CheckoutPanel.test.ts ERPlora/erplora-next#74
-615 apps/sale/frontend/composables/pos/useTill.test.ts ERPlora/erplora-next#74
+713 apps/sale/frontend/components/checkout/CheckoutPanel.test.ts ERPlora/erplora-next#74
+604 apps/sale/frontend/composables/pos/useTill.test.ts ERPlora/erplora-next#74
 438 apps/sale/frontend/composables/pos/useTill.ts ERPlora/erplora-next#74
 971 apps/sale/frontend/operations.d.ts ERPlora/erplora-next#74
-1073 apps/sale/frontend/pages/PosPage.test.ts ERPlora/erplora-next#74
-600 apps/sale/frontend/pages/SalesPage.test.ts ERPlora/erplora-next#74
+1060 apps/sale/frontend/pages/PosPage.test.ts ERPlora/erplora-next#74
+587 apps/sale/frontend/pages/SalesPage.test.ts ERPlora/erplora-next#74
 867 apps/sale/models.py ERPlora/erplora-next#74
 1560 apps/sale/tests/test_integration_service.py ERPlora/erplora-next#74
 562 apps/schedule/queries.py ERPlora/erplora-next#74
@@ -94,7 +94,7 @@
 1238 apps/service/tests/test_queries.py ERPlora/erplora-next#74
 1602 apps/service/tests/test_recovery.py ERPlora/erplora-next#74
 1095 apps/service/tests/test_services.py ERPlora/erplora-next#74
-617 apps/staff/frontend/components/MemberFormModal.test.ts ERPlora/erplora-next#74
+612 apps/staff/frontend/components/MemberFormModal.test.ts ERPlora/erplora-next#74
 512 apps/staff/frontend/operations.d.ts ERPlora/erplora-next#74
 1177 apps/staff/queries.py ERPlora/erplora-next#74
 1088 apps/staff/schemas.py ERPlora/erplora-next#74
@@ -120,7 +120,7 @@
 840 apps/verifactu/schemas.py ERPlora/erplora-next#74
 1980 apps/verifactu/tests/test_services.py ERPlora/erplora-next#74
 576 apps/website/queries.py ERPlora/erplora-next#74
-563 apps/whatsapp_inbox/frontend/components/TemplateFormModal.test.ts ERPlora/erplora-next#74
+558 apps/whatsapp_inbox/frontend/components/TemplateFormModal.test.ts ERPlora/erplora-next#74
 430 apps/whatsapp_inbox/frontend/operations.d.ts ERPlora/erplora-next#74
 536 apps/whatsapp_inbox/models.py ERPlora/erplora-next#74
 1136 apps/whatsapp_inbox/queries.py ERPlora/erplora-next#74
@@ -134,7 +134,7 @@
 669 base/frontend/lib/home.test.ts ERPlora/erplora-next#74
 475 base/frontend/lib/home.ts ERPlora/erplora-next#74
 550 base/frontend/lib/system-back.test.ts ERPlora/erplora-next#74
-623 base/frontend/pages/FilesPage.test.ts ERPlora/erplora-next#74
+616 base/frontend/pages/FilesPage.test.ts ERPlora/erplora-next#74
 742 base/home.py ERPlora/erplora-next#74
 512 base/internal.py ERPlora/erplora-next#74
 539 base/middleware.py ERPlora/erplora-next#74

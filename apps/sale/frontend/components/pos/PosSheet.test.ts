@@ -1,17 +1,12 @@
 // The till's sheets (open price, note, discount, void, park, who serves…; spec «Sheets»): an
 // `ion-modal` with the title and ✕, the big figure on top, the middle that scrolls and the foot with
 // the confirm button always in view. A tap outside or Escape closes it.
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { h, ref } from 'vue';
 
 import { ionModalStubOf } from '../../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub';
 import { click, mountSale, settle } from '../../__tests__/mount-sale';
 import PosSheet from './PosSheet.vue';
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
 
 async function setup(initial = true) {
   const open = ref(initial);

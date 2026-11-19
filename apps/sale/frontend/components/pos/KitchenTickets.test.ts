@@ -2,16 +2,11 @@
 // check's kitchen tickets live and opens «Order tickets», a card per round as the kitchen answers them (the newest
 // round first), with the time in the business's zone. «Mark rush» there rushes the round through the kitchen's
 // own operation; a refusal is read on top of the sheet, and a rush whose notice did not print says so.
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import { click, errorFrame, flush, MANAGER, mountSale, settle } from '../../__tests__/mount-sale';
 import { deferred, kitchenItem, kitchenTicket, refused } from './__tests__/fixtures';
 import KitchenTickets from './KitchenTickets.vue';
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
 
 const BY_ORDER = 'kitchen.ticket.by_order';
 const SETTINGS = 'kitchen.settings.get';

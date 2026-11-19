@@ -17,16 +17,7 @@ import { plain } from '../../lib/format';
 import { line, order, preview } from './__tests__/fixtures';
 import PrebillModal from './PrebillModal.vue';
 
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
 vi.mock('../../lib/print', () => ({ printPaper: vi.fn() }));
-vi.mock('@erplora/ui/shell', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@erplora/ui/shell')>()),
-  toastError: vi.fn(),
-  toastSuccess: vi.fn(),
-}));
 
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ['Date'] });
@@ -35,8 +26,6 @@ beforeEach(() => {
 afterEach(() => {
   vi.useRealTimers();
   vi.mocked(printPaper).mockReset();
-  vi.mocked(toastError).mockClear();
-  vi.mocked(toastSuccess).mockClear();
 });
 
 const CHECK = order({

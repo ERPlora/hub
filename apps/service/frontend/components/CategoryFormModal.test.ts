@@ -3,17 +3,12 @@
 // «Editing category — {name}» with «Save changes», which sends only what changed. A category is never
 // offered as its own parent. A name already taken (409) goes under Name; what was typed stays.
 import { Combo } from '@erplora/ui/components';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import { itTellsTheCorrectedFieldApart } from '../../../../base/frontend/__tests__/same-words-refusal';
 import type { CategoryOut } from '../operations';
 import { click, ionValue, mountService, page, settle } from '../__tests__/mount-service';
 import CategoryFormModal from './CategoryFormModal.vue';
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
 
 type Control = HTMLElement & { label?: string; value?: unknown; errorText?: string; disabled?: boolean };
 

@@ -18,15 +18,8 @@ import SessionDetailPage from './SessionDetailPage.vue';
 
 const OP = 'cash_register.session.get';
 
-vi.mock('@erplora/ui/shell', async (importOriginal) => ({
-  ...((await importOriginal()) as object),
-  toastSuccess: vi.fn(),
-  toastError: vi.fn(),
-}));
 afterEach(() => {
   vi.restoreAllMocks();
-  vi.mocked(toastSuccess).mockClear();
-  vi.mocked(toastError).mockClear();
 });
 
 const QUEUED = { report: 'z', queued: true, job_id: 'j1', printer: 'Counter' };

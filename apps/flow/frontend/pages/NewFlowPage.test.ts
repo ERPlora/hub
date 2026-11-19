@@ -1,18 +1,13 @@
 // The page of a new automation (`/flow/automations/new`): blank, or the assistant's draft of the link
 // (`?draft=`) with its name, trigger and steps; a draft no longer waiting says so. Once saved, the
 // address becomes the automation's, on the same tab.
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import type { DraftOut, FlowOut } from '../operations';
 import { mountFlow, page, settle } from '../__tests__/mount-flow';
 import FlowEditor from '../components/FlowEditor.vue';
 import { takeSaved } from '../lib/justSaved';
 import NewFlowPage from './NewFlowPage.vue';
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
 
 const DRAFT = {
   id: 'd1',

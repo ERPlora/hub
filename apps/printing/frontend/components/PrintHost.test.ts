@@ -10,11 +10,6 @@ import { flush, mountPrinting } from '../__tests__/mount-printing';
 import type { DeviceOut } from '../operations';
 import PrintHost from './PrintHost.vue';
 
-vi.mock('@erplora/ui/shell', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@erplora/ui/shell')>()),
-  toastError: vi.fn(),
-}));
-
 const OP = 'printing.device.list';
 
 class FakeSocket {
@@ -62,7 +57,6 @@ let invoke: ReturnType<typeof vi.fn>;
 beforeEach(() => {
   FakeSocket.made = [];
   vi.stubGlobal('WebSocket', FakeSocket);
-  vi.mocked(toastError).mockClear();
   invoke = vi.fn(async () => null);
 });
 
