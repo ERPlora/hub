@@ -15,7 +15,7 @@ from live.outbox import record_event
 from apps.sale import events
 from apps.sale.models import Order, OrderLine
 from apps.sale.queries.business import actor
-from apps.sale.queries.orders import ORDER_CHANGED, ORDER_NOT_FOUND, find_order, order_detail
+from apps.sale.queries.orders import ORDER_CHANGED, ORDER_NOT_FOUND, dish_allergens, find_order, order_detail
 from apps.sale.schemas import (
     OrderFireIn,
     OrderFireOut,
@@ -127,6 +127,7 @@ def fire(ctx: OperationContext, data: OrderFireIn) -> dict:
                     "category_id": str(line.category_id) if line.category_id else None,
                     "staff_id": str(line.staff_id) if line.staff_id else None,
                     "modifiers": line.kitchen_text,
+                    "allergens": line.allergens,
                     "kitchen_name": line.combo.get("kitchen_name", "") if line.combo_id else "",
                     "components": [
                         {
@@ -134,6 +135,7 @@ def fire(ctx: OperationContext, data: OrderFireIn) -> dict:
                             "product_name": dish["product_name"],
                             "category_id": dish["category_id"],
                             "quantity": f"{dish['quantity'] * line.quantity:.3f}",
+                            "allergens": dish_allergens(dish),
                         }
                         for dish in (line.combo.get("components", []) if line.combo_id else [])
                     ],

@@ -54,6 +54,17 @@ def _resolved_menu(ctx: OperationContext, request: dict) -> dict:
     return call_app(ctx, COMBO_RESOLVE, request, "sale.combo_unavailable").model_dump(mode="json")
 
 
+def _product(ctx: OperationContext, data: dict):
+    return call_app(ctx, "inventory.product.get", data, "sale.catalog_unavailable")
+
+
+def _with_allergens(ctx: OperationContext, menu: dict) -> dict:
+    """Menus' answer with each dish carrying the allergens Inventory declares for its product today (SALE-F40)."""
+    for dish in menu["components"]:
+        dish["allergens"] = _product(ctx, {"id": dish["product_id"]}).allergens
+    return menu
+
+
 def freeze_combo_line(ctx: OperationContext, data: ComboLineFields) -> OrderLine:
     """An unsaved row for a menu of Menus (SALE-F12): Menus checks the dishes picked and prices it; the line
     keeps its answer, and its amount as the price ordered. A menu is sold in whole units."""
@@ -68,7 +79,7 @@ def freeze_combo_line(ctx: OperationContext, data: ComboLineFields) -> OrderLine
     )
     line = OrderLine(
         combo_id=answer["combo_id"],
-        combo=answer,
+        combo=_with_allergens(ctx, answer),
         name=answer["name"],
         unit="ud",
         increment=WHOLE,
@@ -139,12 +150,7 @@ def freeze_product_line(
     """An unsaved row for a product of Inventory: its price, unit and category frozen from the catalog. Only a
     new line goes through here, so an article sold out since it was ordered is still charged (COMBO-F08)."""
     try:
-        product = call_app(
-            ctx,
-            "inventory.product.get",
-            {"id": data.product_id, "product": data.product},
-            "sale.catalog_unavailable",
-        )
+        product = _product(ctx, {"id": data.product_id, "product": data.product})
     except NotFound:
         raise Conflict(
             str(PRODUCT_NOT_AVAILABLE), code="sale.product_not_available"
@@ -186,6 +192,7 @@ def freeze_product_line(
         modifiers=picks,
         modifier_lines=[own.model_dump(mode="json") for own in chosen.own_lines] if chosen else [],
         kitchen_text=chosen.kitchen_text[:500] if chosen else "",
+        allergens=product.allergens,
         notes=data.notes,
         staff_id=data.staff_id,
         is_gift=data.is_gift,
