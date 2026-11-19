@@ -256,79 +256,99 @@ def _skipped(ctx: OperationContext, run: FlowRun, step: dict, data: dict, now: d
     return True
 
 
-def _advance(ctx: OperationContext, run: FlowRun, flow: Flow, now: dt.datetime) -> None:  # noqa: C901, PLR0911, PLR0912
+def _data(run: FlowRun) -> dict:
+    """What a step of ``run`` reads: what started it and what the steps before it left."""
+    return {"input": run.input, "steps": run.outputs}
+
+
+def _wait(ctx: OperationContext, run: FlowRun, flow: Flow, step: dict, now: dt.datetime) -> None:
+    """Parks the run on a «Wait» step until its time comes."""
+    until = now + dt.timedelta(seconds=step["seconds"])
+    _log(
+        run,
+        step,
+        "waiting",
+        now,
+        seconds=step["seconds"],
+        until=until.isoformat(),
+    )
+    run.step_index += 1
+    run.status = FlowRun.Status.WAITING
+    run.resume_at = until
+    run.save()
+    record_event(
+        ctx,
+        events.RUN_PARKED,
+        {
+            "id": str(run.id),
+            "flow_id": str(flow.id),
+            "resume_at": until.isoformat(),
+        },
+    )
+
+
+def _condition(ctx: OperationContext, run: FlowRun, step: dict, now: dt.datetime) -> bool:
+    """Applies a «Continue only if…» step: ``True`` when the run goes on, ``False`` when it stopped there."""
+    if not document.readable(step.get("when")):
+        failure = _own("flow.condition_unreadable")
+        _fail(ctx, run, {**step, "on_error": "stop"}, failure, now)
+        return False
+    failed = document.failed_clauses(step["when"], _data(run))
+    if failed:
+        _log(run, step, "stopped", now, failed=failed)
+        _finish(ctx, run, FlowRun.Status.STOPPED, now)
+        return False
+    _log(run, step, "passed", now)
+    run.step_index += 1
+    return True
+
+
+def _act(ctx: OperationContext, run: FlowRun, flow: Flow, step: dict, now: dt.datetime) -> bool:
+    """Runs an action or a read step and keeps what it leaves: ``True`` when the run goes on (also after a failure
+    the step lets it go past), ``False`` when it failed."""
+    try:
+        left, outcome, extras = _operation_step(ctx, run, flow, step, _data(run))
+    except StepFailed as failure:
+        return _fail(ctx, run, step, failure, now)
+    except OperationError as refused:
+        return _fail(ctx, run, step, StepFailed(refused.code, refused.message), now)
+    run.outputs = {**run.outputs, step["id"]: left}
+    _log(run, step, outcome, now, **extras)
+    run.step_index += 1
+    return True
+
+
+def _step(ctx: OperationContext, run: FlowRun, flow: Flow, step: dict, now: dt.datetime) -> bool:
+    """Runs one step of ``run``: ``True`` when the run goes on with the next one, ``False`` when it ends, waits or
+    fails here."""
+    kind = step["kind"]
+    if kind != "condition":
+        skipped = _skipped(ctx, run, step, _data(run), now)
+        if skipped is not False:
+            # Skipped, the run goes on with the next step; with an «Only if…» it cannot read, it stopped.
+            return bool(skipped)
+    if kind == "condition":
+        return _condition(ctx, run, step, now)
+    if kind == "http":
+        return not _park_call(ctx, run, flow, step, now)
+    if kind == "delay":
+        _wait(ctx, run, flow, step, now)
+    elif kind == "ask":
+        _ask(ctx, run, flow, step, now)
+    elif kind == "assistant":
+        _park_assistant(ctx, run, flow, step, now)
+    else:
+        return _act(ctx, run, flow, step, now)
+    return False
+
+
+def _advance(ctx: OperationContext, run: FlowRun, flow: Flow, now: dt.datetime) -> None:
     """Runs ``run``'s steps from ``step_index`` until it ends, waits or fails."""
     steps = run.definition.get("steps", [])
     with translation.override(flow.language):
         while run.step_index < len(steps):
-            step = steps[run.step_index]
-            data = {"input": run.input, "steps": run.outputs}
-            if step["kind"] != "condition":
-                skipped = _skipped(ctx, run, step, data, now)
-                if skipped is None:
-                    return
-                if skipped:
-                    continue
-            if step["kind"] == "delay":
-                until = now + dt.timedelta(seconds=step["seconds"])
-                _log(
-                    run,
-                    step,
-                    "waiting",
-                    now,
-                    seconds=step["seconds"],
-                    until=until.isoformat(),
-                )
-                run.step_index += 1
-                run.status = FlowRun.Status.WAITING
-                run.resume_at = until
-                run.save()
-                record_event(
-                    ctx,
-                    events.RUN_PARKED,
-                    {
-                        "id": str(run.id),
-                        "flow_id": str(flow.id),
-                        "resume_at": until.isoformat(),
-                    },
-                )
+            if not _step(ctx, run, flow, steps[run.step_index], now):
                 return
-            if step["kind"] == "condition":
-                if not document.readable(step.get("when")):
-                    failure = _own("flow.condition_unreadable")
-                    _fail(ctx, run, {**step, "on_error": "stop"}, failure, now)
-                    return
-                failed = document.failed_clauses(step["when"], data)
-                if failed:
-                    _log(run, step, "stopped", now, failed=failed)
-                    _finish(ctx, run, FlowRun.Status.STOPPED, now)
-                    return
-                _log(run, step, "passed", now)
-                run.step_index += 1
-                continue
-            if step["kind"] == "http":
-                if _park_call(ctx, run, flow, step, now):
-                    return
-                continue
-            if step["kind"] == "ask":
-                _ask(ctx, run, flow, step, data, now)
-                return
-            if step["kind"] == "assistant":
-                _park_assistant(ctx, run, flow, step, now)
-                return
-            try:
-                left, outcome, extras = _operation_step(ctx, run, flow, step, data)
-            except StepFailed as failure:
-                if _fail(ctx, run, step, failure, now):
-                    continue
-                return
-            except OperationError as refused:
-                if _fail(ctx, run, step, StepFailed(refused.code, refused.message), now):
-                    continue
-                return
-            run.outputs = {**run.outputs, step["id"]: left}
-            _log(run, step, outcome, now, **extras)
-            run.step_index += 1
         _finish(ctx, run, FlowRun.Status.SUCCEEDED, now)
 
 
@@ -392,10 +412,11 @@ def _back_to_assistant(ctx: OperationContext, run: FlowRun, flow: Flow, step: di
     _mark_calling(ctx, run, flow, step, "thinking", now)
 
 
-def _ask(ctx: OperationContext, run: FlowRun, flow: Flow, step: dict, data: dict, now: dt.datetime) -> None:  # noqa: PLR0913, PLR0917
+def _ask(ctx: OperationContext, run: FlowRun, flow: Flow, step: dict, now: dt.datetime) -> None:
     """Leaves the step's question, its texts filled in now, in «Waiting for your answer» and parks the run on it. A
     question the run already asked at this step (a run resumed onto it) is not asked twice."""
     expires = now + dt.timedelta(hours=int(step.get("hours", 72)))
+    data = _data(run)
     # Its texts are read by a person: each datum in words, in the language of whoever saved the automation.
     say = words_for(run.definition["steps"], flow.language, ctx.scope, data, run.event_name)
     question, _created = Question.objects.get_or_create(
