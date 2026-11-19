@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // The product form (WORKBOOK «Productos», INVENTORY-F01/F02/F05/F08/F20/F26), the old table's side
 // panel as a dialog (FormModal; UI-REQUESTS.md asks for DataTable's side panel). New: Name, SKU,
-// Price, «Cost (<currency>)», «Initial stock», «Low stock threshold» (empty = 10), EAN-13, Description, «Type»,
+// Price, «Cost (<currency>)», «Initial stock», «Low stock threshold» (empty = 10), EAN-13, Description, «Allergens», «Type»,
 // «Track stock for this item» (physical only; follows the hub until touched), «Unit of measure»,
 // «Tax category» (required, none chosen in advance) and «Categories» (when there are any; both search
 // the server, TaxCategorySelect and ProductCategoriesField), saved in one go. «Save» waits in grey until the business
@@ -15,7 +15,7 @@
 // of the dialog — «Cancel» («Cancel editing»), its «×», Escape, a tap outside and, on the installed app, Android's Back —
 // asks «Discard changes?» («Keep editing» / «Discard changes») instead of closing it (hub#1015, hub#1023:
 // `useUnsavedChanges` of base, its question as the FormModal's `canDismiss`); as it opened, they close it at once.
-import { FormModal, InlineFeedback, MoneyInput, moneyFieldText, parseMoney } from '@erplora/ui/components';
+import { AllergenSelect, type AllergenCode, FormModal, InlineFeedback, MoneyInput, moneyFieldText, parseMoney } from '@erplora/ui/components';
 import { type InputOf, type OutputOf, useCommand } from '@erplora/ui/sdk';
 import { useSession } from '@erplora/ui/shell';
 import { IonButton, IonCheckbox, IonInput, IonNote, IonSelect, IonSelectOption, IonTextarea } from '@ionic/vue';
@@ -52,6 +52,7 @@ interface Fields {
   unit: UnitCode;
   tax: string;
   categories: string[];
+  allergens: AllergenCode[];
 }
 
 /** The threshold a product gets when the field is left empty (WORKBOOK INVENTORY-F01). */
@@ -101,6 +102,7 @@ function fieldsOf(product: Product | null): Fields {
     unit: product?.unit ?? 'ud',
     tax: product?.tax_category_key ?? '',
     categories: [...(product?.category_ids ?? [])],
+    allergens: [...(product?.allergens ?? [])],
   };
 }
 
@@ -215,6 +217,7 @@ async function save(): Promise<void> {
         ...(now.unit !== was.unit ? { unit: now.unit } : {}),
         ...(now.track !== was.track && now.track !== null ? { track_stock: now.track } : {}),
         ...(now.categories.join() !== was.categories.join() ? { category_ids: now.categories } : {}),
+        ...(now.allergens.join() !== was.allergens.join() ? { allergens: now.allergens } : {}),
       };
       saved = await update.run(patch);
     } else {
@@ -232,6 +235,7 @@ async function save(): Promise<void> {
         unit: now.unit,
         track_stock: now.type === 'service' ? null : now.track,
         category_ids: now.categories,
+        allergens: now.allergens,
       });
     }
   } catch {
@@ -368,6 +372,15 @@ function retryPhoto(): void {
         :error-text="fields.description"
         :class="invalid('description')"
         @update:model-value="set('description', text($event))"
+      />
+      <AllergenSelect
+        testid="inventory-product-allergens"
+        :model-value="form.allergens"
+        :label="$t('inventory.form.allergens')"
+        :helper-text="$t('inventory.form.allergensHint')"
+        :error-text="fields.allergens"
+        :disabled="pending"
+        @update:model-value="set('allergens', $event)"
       />
       <ion-select
         v-if="!editing"

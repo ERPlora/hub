@@ -104,16 +104,19 @@ function moneyBlock(currency: string): void {
   document.body.append(script);
 }
 
-async function open(locale: 'en' | 'es' = 'en') {
+async function open(locale: 'en' | 'es' = 'en', token = '') {
   const router = createRouter({
     history: createMemoryHistory(),
-    routes: [{ path: '/p/:slug/book', component: { template: '<div />' }, meta: { auth: false, chrome: false } }],
+    routes: [
+      { path: '/p/:slug/book', component: { template: '<div />' }, meta: { auth: false, chrome: false } },
+      { path: '/p/:slug/book/:token', component: { template: '<div />' }, meta: { auth: false, chrome: false } },
+    ],
   });
   const m = await mountInShell(
     PublicBookingPage,
     { locale, session: VISITOR },
     {
-      path: '/p/salon-lucia/book',
+      path: `/p/salon-lucia/book${token ? `/${token}` : ''}`,
       session: VISITOR,
       router,
       messages: { en: { ...appointmentEn, ...en }, es: { ...appointmentEs, ...es } },
@@ -148,6 +151,17 @@ describe('PublicBookingPage', () => {
     expect(posted[1].body).toEqual({ limit: 100 });
     expect(s.sent()).toEqual([]);
     expect(s.client.stream.subscriptions('base.business.get')).toEqual([]);
+  });
+
+  it('opens a personal link as that booking, without loading the general page or its services', async () => {
+    door({ 'online_booking.public.booking': [200, SEEN] });
+    const s = await open('en', BOOKED.token);
+    expect(posted.map(({ op, body }) => [op, body])).toEqual([
+      ['online_booking.public.booking', { token: BOOKED.token }],
+    ]);
+    expect(s.el('status')?.textContent).toContain('Haircut');
+    expect(s.el('title')).toBeNull();
+    expect(s.wrapper.text()).not.toContain('Book your next visit');
   });
 
   it('identifies the business with its name, logo and page colour', async () => {
@@ -250,6 +264,10 @@ describe('PublicBookingPage', () => {
     const s = await open();
     await booked(s);
     expect(s.el('booked')?.textContent).toContain('We have received your booking.');
+    const address = new URL(`/p/salon-lucia/book/${BOOKED.token}`, window.location.origin).href;
+    const link = s.el('token')?.querySelector('a');
+    expect(link?.textContent).toBe(address);
+    expect(link?.getAttribute('href')).toBe(address);
     const book = posted.find(({ op }) => op === 'online_booking.public.book');
     expect(book?.body).toMatchObject({ service_ids: ['v1'], start: '2030-03-05T10:00', name: 'Marta Gil', phone: '612 345 678', website: '' });
   });

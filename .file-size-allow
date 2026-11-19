@@ -37,8 +37,8 @@
 506 apps/demo/frontend/pages/ItemListPage.test.ts ERPlora/erplora-next#74
 579 apps/flow/frontend/operations.d.ts ERPlora/erplora-next#74
 1165 apps/flow/schemas.py ERPlora/erplora-next#74
-784 apps/inventory/frontend/components/ProductFormModal.test.ts ERPlora/erplora-next#74
-487 apps/inventory/frontend/operations.d.ts ERPlora/erplora-next#74
+715 apps/inventory/frontend/components/ProductFormModal.test.ts ERPlora/erplora-next#74
+474 apps/inventory/frontend/operations.d.ts ERPlora/erplora-next#74
 559 apps/inventory/frontend/pages/ProductsPage.test.ts ERPlora/erplora-next#74
 1349 apps/inventory/queries.py ERPlora/erplora-next#74
 982 apps/inventory/schemas.py ERPlora/erplora-next#74

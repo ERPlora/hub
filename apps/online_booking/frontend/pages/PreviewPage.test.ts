@@ -198,7 +198,7 @@ describe('PreviewPage', () => {
     await settle();
     expect(s.sent().at(-1)).toMatchObject({ method: 'POST', path: '/api/online_booking/public/cancel', body: { token: 't'.repeat(43) } });
     expect(s.el('status')?.textContent).toContain('Cancelled');
-    expect(s.el('status')?.textContent).toContain('It can no longer be cancelled online.');
+    expect(s.el('status')?.textContent).not.toContain('It can no longer be cancelled online.');
   });
 
   it('puts a refusal under its field, and a refused time above the button', async () => {

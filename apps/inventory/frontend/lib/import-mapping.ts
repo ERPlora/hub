@@ -12,6 +12,7 @@ export const PRODUCT_IMPORT_FIELDS = [
   'low_stock_threshold',
   'ean13',
   'description',
+  'allergens',
   'unit',
   'tax_category_key',
 ] as const;
@@ -44,6 +45,7 @@ export const PRODUCT_IMPORT_ALIASES: Readonly<Record<ProductImportField, readonl
   low_stock_threshold: ['threshold', 'umbral', 'low stock threshold', 'umbral stock bajo', 'minimo', 'stock minimo', 'min stock', 'reorder point'],
   ean13: ['ean13', 'ean 13', 'ean', 'barcode', 'codigo de barras', 'codigo barras', 'gtin'],
   description: ['description', 'descripcion', 'detalle', 'notas'],
+  allergens: ['allergens', 'alergenos'],
   unit: ['unit', 'unidad', 'unit code', 'unidad de medida', 'medida', 'uom'],
   tax_category_key: TAX_HEADERS,
 };

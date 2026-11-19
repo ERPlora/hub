@@ -46,6 +46,7 @@ const FIELD_KEYS: Record<ProductImportField, string> = {
   low_stock_threshold: 'inventory.form.threshold',
   ean13: 'inventory.form.ean13',
   description: 'inventory.form.description',
+  allergens: 'inventory.form.allergens',
   unit: 'inventory.form.unit',
   tax_category_key: 'inventory.tax.label',
 };
