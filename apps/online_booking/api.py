@@ -9,6 +9,7 @@ route.
 
 from live.ninja import bind, run_operation
 from ninja import Query, Router
+from ninja.decorators import decorate_view
 
 from apps.online_booking import queries, services
 from apps.online_booking.schemas import (
@@ -22,6 +23,9 @@ from apps.online_booking.schemas import (
     SettingsIn,
     TokenIn,
 )
+from base.public_images import MAX_UPLOAD_BODY
+from base.request_body import accept_body_up_to
+from base.schemas.public_images import ImageUploadIn
 
 router = Router(tags=["online_booking"])
 
@@ -75,6 +79,13 @@ async def settings_get(request):
 @bind(router, "online_booking.settings.update", "/online_booking/settings")
 async def settings_update(request, data: SettingsIn):
     return await run_operation(request, services.update_settings, data)
+
+
+# The logo's file comes in base64, more than Django's ceiling for any other view.
+@bind(router, "online_booking.settings.upload_logo", "/online_booking/settings/logo", status=201)
+@decorate_view(accept_body_up_to(MAX_UPLOAD_BODY))
+async def settings_upload_logo(request, data: ImageUploadIn):
+    return await run_operation(request, services.logo.upload_logo, data)
 
 
 # The public page (session routes: the preview)

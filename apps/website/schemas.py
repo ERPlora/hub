@@ -21,6 +21,7 @@ from pydantic import AfterValidator, ConfigDict, StringConstraints, field_valida
 
 from apps.website import reviews
 from apps.website.palettes import own_colours
+from base.schemas.public_images import ImageType
 
 
 #: The fixed sections, in the order every template paints them.
@@ -35,10 +36,6 @@ MODES = ("light", "dark", "auto")
 CATALOG_SOURCES = ("inventory", "service")
 #: The days of the opening hours, Monday first.
 DAYS = ("mon", "tue", "wed", "thu", "fri", "sat", "sun")
-#: The image types the website takes (Pillow checks the bytes are one of them).
-IMAGE_TYPES = ("image/jpeg", "image/png", "image/webp")
-#: The largest image, in bytes (before base64).
-MAX_IMAGE_BYTES = 5 * 1024 * 1024
 MAX_CATEGORIES = 50
 #: The most photos the gallery shows.
 MAX_GALLERY_IMAGES = 12
@@ -48,7 +45,6 @@ PaletteId = Literal["ocean", "forest", "terracotta", "slate", "rose", "sand", "m
 Mode = Literal["light", "dark", "auto"]
 CatalogSource = Literal["inventory", "service"]
 Day = Literal["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
-ImageType = Literal["image/jpeg", "image/png", "image/webp"]
 PriceKind = Literal["fixed", "from", "hourly", "free", "none"]
 StarKind = Literal["on", "half", "off"]
 ReviewsState = Literal["empty", "unavailable", "waiting", "failed", "ready"]
@@ -381,13 +377,6 @@ class SaveIn(Strict):
     template: Template = Field(description="classic, modern, minimal or bold.")
     theme: Theme = Field(default_factory=Theme, description="The page's colours (a palette) and its mode.")
     content: Content = Field(default_factory=Content, description="What each section says; the same in any template.")
-
-
-class ImageUploadIn(Strict):
-    filename: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)]
-    content_type: ImageType = Field(description="image/jpeg, image/png or image/webp.")
-    # 5 MB of bytes is 6 990 508 characters of base64.
-    data_base64: str = Field(max_length=7_000_000, description="The file, in base64 (5 MB at most).")
 
 
 class CategoriesIn(Schema):

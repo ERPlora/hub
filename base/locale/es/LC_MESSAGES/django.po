@@ -2089,6 +2089,28 @@ msgstr "La foto pesa más de 2 MB. Elige una más ligera."
 msgid "The photo could not be saved. Try again."
 msgstr "No se pudo guardar la foto. Inténtalo de nuevo."
 
+#: public_images.py
+msgid "The file did not arrive whole: choose it again."
+msgstr "El archivo no llegó entero: vuelve a elegirlo."
+
+#: public_images.py
+msgid "The file is empty."
+msgstr "El archivo está vacío."
+
+#: public_images.py
+msgid "The image may weigh 5 MB at most."
+msgstr "La imagen puede pesar 5 MB como mucho."
+
+#: public_images.py
+#, python-format
+msgid "This file is not a %(type)s image."
+msgstr "Este archivo no es una imagen %(type)s."
+
+#: public_images.py
+#, python-format
+msgid "The image may be %(side)s pixels a side at most."
+msgstr "La imagen puede medir %(side)s píxeles por lado como mucho."
+
 #: blueprint.py
 msgid "The file holds a photo that is not a WebP image of up to 2 MB, so it cannot be read."
 msgstr "El fichero trae una foto que no es una imagen WebP de hasta 2 MB, así que no se puede leer."

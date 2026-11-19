@@ -26,6 +26,7 @@ ROUTES = {
     ("POST", "/online_booking/bookings/delete", "online_booking.booking.delete"),
     ("GET", "/online_booking/settings", "online_booking.settings.get"),
     ("POST", "/online_booking/settings", "online_booking.settings.update"),
+    ("POST", "/online_booking/settings/logo", "online_booking.settings.upload_logo"),
     ("GET", "/online_booking/public/page", "online_booking.public.page"),
     ("GET", "/online_booking/public/services", "online_booking.public.services"),
     ("GET", "/online_booking/public/slots", "online_booking.public.slots"),

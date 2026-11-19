@@ -1091,6 +1091,7 @@
       "online_booking__public__slots": "Buscar horas libres en la página pública",
       "online_booking__settings__get": "Leer los ajustes de la reserva online",
       "online_booking__settings__update": "Cambiar los ajustes de la reserva online",
+      "online_booking__settings__upload_logo": "Subir el logo de la página de reservas",
       "payment__method__activate": "Activar un método de pago",
       "payment__method__create": "Crear un método de pago",
       "payment__method__deactivate": "Desactivar un método de pago",

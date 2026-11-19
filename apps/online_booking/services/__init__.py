@@ -69,6 +69,8 @@ from apps.online_booking.schemas import (
 from apps.service.models import Service
 from apps.staff.models import Member
 
+from .logo import check_logo
+
 #: Run only by the platform (events.py): outside ``online_booking.*``, so no role and no API key holds it.
 SYSTEM = "system.online_booking"
 CHANGE = "online_booking.change_booking"
@@ -309,11 +311,7 @@ def delete_booking(ctx: OperationContext, data: BookingRefIn) -> dict:
     },
 )
 def update_settings(ctx: OperationContext, data: SettingsIn) -> dict:
-    sent = {
-        field: getattr(data, field)
-        for field in data.model_fields_set
-        if getattr(data, field) is not None
-    }
+    sent = data.model_dump(exclude_unset=True, exclude_none=True)
     rules = {field: value for field, value in sent.items() if field in RULE_FIELDS}
     settings = Settings.objects.select_for_update().first() or Settings()
     changed = {
@@ -321,6 +319,8 @@ def update_settings(ctx: OperationContext, data: SettingsIn) -> dict:
         for field, value in sent.items()
         if field not in RULE_FIELDS and getattr(settings, field) != value
     }
+    if "logo" in changed:
+        check_logo(ctx, changed["logo"])
     if changed:
         for field, value in changed.items():
             setattr(settings, field, value)
@@ -330,7 +330,7 @@ def update_settings(ctx: OperationContext, data: SettingsIn) -> dict:
     if rules:
         # The diary's own operation, with the caller's right to change its settings: all or nothing.
         get("appointment.settings.update")(ctx, RulesIn(**rules))
-    return settings_out(settings)
+    return settings_out(ctx, settings)
 
 
 # ── The public booking (F01) ─────────────────────────────────────────────────────────────────
