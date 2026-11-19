@@ -557,11 +557,11 @@ function schemaBack(): void {
   );
 }
 
-/** The worker is told `a` has work due now, as `base.app.enable` tells it after its COMMIT. */
+/** The worker is told `a` has work due now, as `base.app.enable` tells it after its COMMIT: due, and its notice. */
 function ring(): void {
   psql(
     `insert into control_hubdue (hub_id, due_at, lease_owner) values ('${hubId}', now(), '') ` +
-      'on conflict (hub_id) do update set due_at = least(control_hubdue.due_at, excluded.due_at)',
+      "on conflict (hub_id) do update set due_at = least(control_hubdue.due_at, excluded.due_at); select pg_notify('live_platform_registry', '')",
   );
 }
 
