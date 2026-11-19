@@ -42,7 +42,7 @@ def receipt_code(sale: Sale) -> str | None:
 def sale_of_code(code: str) -> Sale | None:
     """The sale of this business whose ticket carries ``code`` (as typed); none when it opens nothing."""
     number, _, signature = code.strip().upper().translate(_TYPED).rpartition("-")
-    if not number or len(signature) != SIGNATURE_LENGTH:
+    if not number:
         return None
     sale = Sale.objects.filter(number=number, document_type=SaleSettings.DocumentType.TICKET).first()
     if sale is None:
