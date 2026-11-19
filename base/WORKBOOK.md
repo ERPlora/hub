@@ -4361,8 +4361,9 @@ Implicados: BASE-F41
   copia…» dicen debajo de cada hub el tamaño de su base (el que mide la lista, `control.cluster.sizes`, una vez por
   petición) y hasta cuánto puede estar cerrado (`base.tenancy.move.longest_closure`: las dos mitades de la copia a
   `COPY_SLOWEST_BYTES_PER_SECOND`, 10 MB/s, cada una con su `COPY_TIMEOUT_SECONDS`, en minutos enteros; un tamaño que
-  no se lee cuenta como el plazo entero), y el aviso suma los elegidos, que se copian uno tras otro: cada uno se cierra
-  al pedirlo y espera cerrado su turno (hub#1532). La copia aparte no cierra nada y no lo dice. Tests:
+  no se lee cuenta como el plazo entero), y el aviso suma los elegidos, que se copian uno tras otro: es lo que tardan
+  todos. En un traslado, cada negocio sigue abierto hasta que empieza su copia (hub#1532); en una restauración, aún se
+  cierra al pedirla y espera cerrado su turno (hub#1863). La copia aparte no cierra nada y no lo dice. Tests:
   `base/tenancy/tests/test_move_closure.py` y `control/tests/test_admin_closure.py`.
 - **Un negocio de cualquier tamaño se restaura o se copia aparte** (hub#1524): la copia del clúster temporal pasa por el
   bucket de volcados como la de un traslado, nunca por el disco del worker: `pg_dump` la sube según la hace
@@ -4433,6 +4434,8 @@ Implicados: BASE-F41
 - **Las novedades en Sistema › Actualizaciones (BASE-F116)**: ya se leen por el asistente y por la API; falta
   enseñarlas en la pantalla, hub#576.
 - **La cola de PgBouncer de cada negocio en CloudWatch**, hub#572.
+- **Restaurar varios negocios a la vez sin cerrar los que esperan su turno (BASE-F114)**, hub#1863: hoy cada uno se
+  cierra al pedirlo, como hacía el traslado antes de hub#1532.
 - **Peticiones a `@erplora/ui`** que siguen abiertas: [`UI-REQUESTS.md`](UI-REQUESTS.md) (los iconos de documento de
   Archivos, los del cuadro del asistente y `useI18n` en el shell).
 
