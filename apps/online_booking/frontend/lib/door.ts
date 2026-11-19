@@ -22,6 +22,7 @@ export const PUBLIC_OPERATIONS = [
 export interface PublicDoor {
   api: ApiClient;
   money: ComputedRef<Money | undefined>;
+  slug: string;
 }
 
 /** Given by the public page to the booking flow it paints: without it, the flow is the team's preview. */
@@ -63,5 +64,6 @@ export function openDoor(config: SpaConfig, slug: string, deps: DoorDeps = brows
   return {
     api,
     money: computed(() => (block ? { currency: block.currency, decimals: block.currency_decimals } : undefined)),
+    slug,
   };
 }

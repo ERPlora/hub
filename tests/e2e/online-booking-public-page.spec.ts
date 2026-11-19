@@ -111,14 +111,36 @@ FLOW_VIEWPORTS.forEach((vp, index) => {
       expect(appointment).toBe(`pending online ${who.member.id} online booking`);
       await shoot('booked');
 
-      // Right after booking she sees it and cancels it, as the customer: «the customer asked» in the diary.
+      // Her confirmation carries the address; opening it shows only her booking, and cancelling asks first.
       await page.locator('[data-testid=ob-preview-view]').click();
       const status = page.locator('[data-testid=ob-preview-status]');
       await expect(status).toContainText('Pendiente');
+      const anchor = page.locator('[data-testid=ob-preview-token] a');
+      const address = await anchor.getAttribute('href');
+      expect(address).toContain(`${A}/p/a/book/`);
+      await expect(anchor).toHaveText(address ?? '');
+      await page.goto(address ?? '');
+      await expect(status).toContainText('Pendiente');
+      await expect(status).toContainText('10:00');
+      await expect(page.locator('[data-testid=ob-preview-name]')).toHaveCount(0);
+      await shoot('personal');
       await page.locator('[data-testid=ob-preview-cancel]').click();
+      await expect(page.locator('[data-testid=ob-cancel]')).toBeVisible();
+      await page.locator('[data-testid=ob-cancel-reason] textarea').fill('No puedo ir');
+      await page.locator('[data-testid=ob-cancel-submit]').click();
       await expect(status).toContainText('Cancelada');
+      await expect(page.locator('[data-testid=ob-personal-cancelled]')).toContainText('Esta reserva está cancelada.');
+      await expect(page.locator('[data-testid=ob-preview-cancel]')).toHaveCount(0);
       expect(psql(`select status || ' ' || cancelled_by_customer from appointment_appointment where number = '${number}'`)).toBe('cancelled true');
       await noHorizontalScroll(page, `the cancelled booking at ${vp.label}`);
+      await shoot('cancelled');
+
+      // An unknown link says so without showing anybody's booking or the booking form.
+      await page.goto(`${PAGE}/enlace-que-no-existe`);
+      await expect(page.locator('[data-testid=ob-personal-error]')).toContainText('Esa reserva no existe o su enlace ya no es válido.');
+      await expect(page.locator('[data-testid=ob-preview-name]')).toHaveCount(0);
+      await expect(page.locator('[data-testid=ob-preview-status]')).toHaveCount(0);
+      await shoot('not-found');
 
       // Empty: nothing of the business is booked online.
       const online = psql(`select string_agg(quote_literal(id::text), ',') from service_service where allow_online_booking`);

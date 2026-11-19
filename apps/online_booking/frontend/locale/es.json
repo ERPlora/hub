@@ -142,7 +142,12 @@
       "businessFallback": "este negocio",
       "privacy": "Tus datos los usará {business} para gestionar esta reserva, y ERPlora los tratará por encargo de {business}. Lee la",
       "privacyLink": "política de privacidad",
-      "website": "Sitio web"
+      "website": "Sitio web",
+      "loadingBooking": "Cargando tu reserva…",
+      "cancelled": "Esta reserva está cancelada.",
+      "cancel": {
+        "message": "¿Cancelar la reserva {number} ({when})?"
+      }
     }
   }
 }

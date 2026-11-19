@@ -142,7 +142,12 @@
       "businessFallback": "the business",
       "privacy": "Your details will be used by {business} to manage this booking, and ERPlora will process them on behalf of {business}. Read the",
       "privacyLink": "privacy policy",
-      "website": "Website"
+      "website": "Website",
+      "loadingBooking": "Loading your booking…",
+      "cancelled": "This booking is cancelled.",
+      "cancel": {
+        "message": "Cancel booking {number} ({when})?"
+      }
     }
   }
 }

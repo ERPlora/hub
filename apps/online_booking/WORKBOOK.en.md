@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:6e385b6a7646ab3d34318e54d5ed17f8fc73a2aaea885b8ecd95bea4930ed69b -->
+<!-- generated from WORKBOOK.md sha256:fc66e625c9216c17f4b32c2c7186cc513e753b0069c105bf0a99d5c42a9da467 -->
 
 ## What it is for and who it is for
 
@@ -91,7 +91,10 @@ Settings and the flow: services with their price and length, professional or "No
 mobile, email, note and **Book**. Beside **Book**, the notice of who uses her details and the link to the privacy
 policy. With nothing to book online, only that notice shows, without the invitation or the form. Once booked, the
 appointment number, the confirmation message, **See my booking**, **Cancel the booking** and **Book another**. With
-another business's address, or this one's at another's, there is no page.
+another business's address, or this one's at another's, there is no page. The confirmation gives a clickable link to
+the full address of her booking, including the business's origin (`https://<business>.erplora.com/p/<business>/book/<link>`). Opening it shows only her booking—number, services, day, time,
+professional and status—and she can cancel it with confirmation if the policy still allows it; one already cancelled
+or past its notice does not offer that action. An unknown link gives a clear notice, with no details or form.
 
 ### Booking preview (development only)
 Page `/online_booking/preview`, only on the development server: the same flow as the booking page
@@ -102,9 +105,9 @@ operations, through the team's session. It is not part of the production version
 
 | State | What the person sees |
 |---|---|
-| Loading | "Loading…" in the table; "Loading settings…" in Settings; "Loading the page…" on the booking page. |
+| Loading | "Loading…" in the table; "Loading settings…" in Settings; "Loading the page…" on the booking page; "Loading your booking…" on the personal link. |
 | Empty | "No online bookings yet."; with filters, "No booking matches the search."; in Settings without services, "No services yet. Add them in Services."; on the booking page with nothing to book online, only "This business has nothing to book online right now.", without the form. |
-| Error | The table's notice with "Retry"; the refusal of a row action, in its confirmation or above the table; a refusal in Settings, under its field, without losing what was typed; on the booking page, "The page could not be loaded" with the reason ("This business does not take online bookings right now."), and a booking's refusal above **Book** and under its field. |
+| Error | The table's notice with "Retry"; the refusal of a row action, in its confirmation or above the table; a refusal in Settings, under its field, without losing what was typed; on the booking page, "The page could not be loaded" with the reason ("This business does not take online bookings right now."), and a booking's refusal above **Book** and under its field. On the personal link, the loading reason with "Retry" when it can be repeated, and a cancellation refusal inside its confirmation. |
 | Reconnecting | What is drawn stays; a strip warns "Reconnecting…". |
 | App inactive | "This app is not active in this business". |
 | No permission | What they cannot do does not appear; if they get there another way, "You do not have permission". |
@@ -124,8 +127,8 @@ Dates and times show on the business's clock and in the format of the language o
 | ONLINE_BOOKING-F07 | Set up the booking page | done |
 | ONLINE_BOOKING-F08 | See and search the bookings | done |
 | ONLINE_BOOKING-F09 | Follow the customer when two cards are merged | done (Appointments does it; the inbox reflects it) |
-| ONLINE_BOOKING-F10 | The customer sees her booking with her link | partial — her link opens the business's booking page, which does not show her booking yet nor whose business it is; the confirmation gives the link's code, not its address |
-| ONLINE_BOOKING-F11 | The customer cancels her booking with her link | partial — her link opens the business's booking page, which does not show her booking yet; the confirmation gives the link's code, not its address |
+| ONLINE_BOOKING-F10 | The customer sees her booking with her link | partial — it shows the booking, but not the business's name and logo yet |
+| ONLINE_BOOKING-F11 | The customer cancels her booking with her link | done |
 | ONLINE_BOOKING-F12 | Erase a customer's data (GDPR) | done |
 
 ### ONLINE_BOOKING-F01 The customer books from the booking page
@@ -295,9 +298,7 @@ If it fails: Appointments is never left halfway and the relay retries on its own
 Involved: APPOINTMENT-F23, CUSTOMER-F13
 
 ### ONLINE_BOOKING-F10 The customer sees her booking with her link
-Status: partial — she sees it with **See my booking** right after booking; her link (`/p/<business>/book/<link>`)
-opens the business's booking page, which does not show her booking yet nor the business's name and logo that its query
-already gives (hub#1799), and the confirmation gives the link's code, not its address
+Status: partial — the link shows the booking, but not the business's name and logo that its query already gives
 Actor: customer (no session)
 Screen: her link's page (`/p/<business>/book/<link>`, at the business's address); the booking page, once booked; in
 development, the preview
@@ -315,16 +316,16 @@ name, or at another business's address, opens no page.
 Involved: APPOINTMENT-F06
 
 ### ONLINE_BOOKING-F11 The customer cancels her booking with her link
-Status: partial — she cancels it with **Cancel the booking** right after booking; her link
-(`/p/<business>/book/<link>`) opens the business's booking page, which does not show her booking yet nor cancel it
+Status: done
 Actor: customer (no session)
 Screen: her link's page (`/p/<business>/book/<link>`, at the business's address); the booking page, once booked; in
 development, the preview
 Steps:
-1. From her link she presses **Cancel the booking** (optional reason).
-2. The policy of Appointments applies: "Let the customer cancel her booking" and "Minimum notice to
-   cancel". The appointment becomes **Cancelled**, with "requested by the customer" in its history. The policy applies
-   the same when the team tries the link from the preview.
+1. From her link she presses **Cancel the booking**, confirms the booking's number and time, and may write a reason.
+2. She presses **Cancel the booking** again in the confirmation. The policy of Appointments applies: "Let the customer
+   cancel her booking" and "Minimum notice to cancel". The appointment becomes **Cancelled**, the page says "This
+   booking is cancelled." and does not offer the action again; its history records "requested by the customer". The
+   policy applies the same when the team tries the link from the preview.
 In: the link of a pending or confirmed booking, not charged.
 Out: `appointment.appointment.cancelled`.
 If it fails: "Online cancellation is not available. Please contact the business."; "This appointment can only
