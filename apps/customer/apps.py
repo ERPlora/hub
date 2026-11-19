@@ -91,10 +91,12 @@ class CustomerConfig(LiveAppConfig):
         ),
     ]
 
+    fiscal_archive_models = ("Purchase",)
+
     def fiscal_documents_kept(self) -> bool:
-        """The platform asks (``base.tenancy.offboarding``) before it drops the database of a business that left:
-        the card sales of its customers (a manual entry has no sale behind it) are documents nothing archives yet, so
-        the database stays."""
+        """The platform asks (``base.tenancy.offboarding``) before it drops the database of a business that left: the
+        card sales of its customers (a manual entry has no sale behind it) are documents to keep, so the database stays;
+        they go to the fiscal archive first (``fiscal_archive_models``)."""
         from apps.customer import queries  # the models are not loaded yet when this module is
 
         return queries.keeps_fiscal_documents()
