@@ -831,8 +831,13 @@ Los papeles llegan del SaaS con prefijo (`hub_owner`, `hub_admin`, `hub_manager`
   (`count`), «moneda» o «divisa», la del negocio (`currency`), y «una entrada», «una salida» o «un
   movimiento» (también tras «otra» u «otro»), un movimiento de caja (`movement`, F05) (`assistant_synonyms`, en
   `apps.py`). Van como frase y no como palabra suelta: «entrada» suelta comparte raíz con «entre» y «entra», y
-  «salida» suelta es también un fichaje o un plato que sale del pase. «Las cajas de la» barra o tienda son sus cajas
-  (`register`): Inventario lee «cajas de» como mercancía («5 cajas de leche») y, sin la frase de Caja, «¿qué cajas
+  «salida» suelta es también un fichaje o un plato que sale del pase. Varios movimientos dichos por su número
+  antes del importe también lo son: de dos a cinco, en letra o en cifra, delante de «entradas de», «salidas de» o
+  «movimientos de» («apúntame dos entradas de 20 € en el turno», «anota 2 salidas de 10 €») y, en inglés, de
+  «entries of» («two entries of 20 €»). Siempre con su «de» u «of»: «vende dos entradas para el concierto», «apunta
+  dos entradas en la lista de espera» o «add two entries to the waitlist» no son movimientos, y la prueba negativa
+  `OTHER_COUNTED` cae si alguien mete la frase sin él o «entradas» o «entries» sueltas. «Las cajas de la» barra
+  o tienda son sus cajas (`register`): Inventario lee «cajas de» como mercancía («5 cajas de leche») y, sin la frase de Caja, «¿qué cajas
   de la tienda hay dadas de alta?» dejaría la lista de cajas fuera de las 10 primeras. La tarjeta de
   confirmación nombra cada dato por el `title` de su esquema (`gettext_noop`, con su `es` en el catálogo:
   «Cajón» para `register_name`, «Efectivo contado», «Notas de cierre») o, si no lo tiene, por el

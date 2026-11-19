@@ -199,6 +199,81 @@ def test_the_hub_reads_una_entrada_una_salida_or_un_movimiento_as_a_movement_and
     assert named == []
 
 
+#: Several movements said by how many come before their amount: «dos entradas de 20 €», «2 salidas de 10 €», «two
+#: entries of 20 €». Main offered the movement 58th for the first one and 167th for «two entries of 20 €», behind the
+#: staff's shifts: no phrase of the group said a count. «log 3 cash outs of 10 €» already came 5th, by «cash».
+SEVERAL_MOVEMENTS_SAID = [
+    ("es", "apúntame dos entradas de 20 € en el turno"),
+    ("es", "anota 2 entradas de 50 € en el turno"),
+    ("es", "apúntame dos salidas de 10 € en el turno"),
+    ("es", "apúntame cuatro entradas de 10 € en el turno"),
+    ("es", "apúntame dos movimientos de 20 € en el turno"),
+    ("en", "two entries of 20 €"),
+    ("en", "record three entries of 10 € in the shift"),
+    ("en", "log 3 cash outs of 10 €"),
+]
+
+
+@HUB_DB
+@pytest.mark.parametrize("role", tuple(Membership.Role))
+@pytest.mark.parametrize(("language", "phrase"), SEVERAL_MOVEMENTS_SAID)
+def test_several_movements_said_by_their_count_bring_the_movement_among_the_first_ten(
+    catalog_of, role, language, phrase
+):
+    assert comparable(phrase) not in probe_phrases()
+    assert_offered_with_room(catalog_of(role, language), "cash_register.movement.add", phrase, language, room=TOP)
+
+
+test_several_movements_said_by_their_count_bring_their_tool_by_cash_registers_group = in_hubs(
+    by_group_test(
+        [
+            ("cash_register.movement.add", "apúntame dos entradas de 20 € en el turno", "dos entradas de"),
+            ("cash_register.movement.add", "anota 2 entradas de 50 € en el turno", "2 entradas de"),
+            ("cash_register.movement.add", "apúntame dos movimientos de 20 € en el turno", "dos movimientos de"),
+        ]
+    )
+)
+
+#: Every count the group says, in words and in figures, before each kind of movement.
+COUNTS = {
+    "es": ("dos", "tres", "cuatro", "cinco", "2", "3", "4", "5"),
+    "en": ("two", "three", "four", "five", "2", "3", "4", "5"),
+}
+COUNTED_SAID = [
+    *(
+        f"apúntame {count} {kind} de 20 € en el turno"
+        for count in COUNTS["es"]
+        for kind in ("entradas", "salidas", "movimientos")
+    ),
+    *(f"record {count} entries of 20 € in the shift" for count in COUNTS["en"]),
+]
+#: «Entradas» and «entries» of anything but the drawer's money, said without a count, or with one but not before «de»
+#: or «of»: tickets of a concert, places in the waiting list, goods received. A bare «entradas» shares its stem with
+#: «entre» and «entra», and a bare «entries» names the waiting list's.
+OTHER_COUNTED = [
+    "vende dos entradas para el concierto",
+    "¿cuántas entradas del concierto quedan?",
+    "apunta dos entradas en la lista de espera para esta noche",
+    "registra las entradas de mercancía del albarán de hoy",
+    "¿a qué hora entra Ana?",
+    "ventas entre el lunes y el viernes",
+    "add two entries to the waitlist for tonight",
+    "delete two entries from the waitlist",
+    "show the entries of the waitlist",
+]
+
+
+def test_the_hub_reads_a_count_of_entradas_salidas_or_movimientos_before_their_amount_as_movements():
+    """Cash register's own words (its ``assistant_synonyms``): a count of «entradas», «salidas» or «movimientos» said
+    before «de», or of «entries» before «of», is movements of the drawer (``cash_register.movement``), and without the
+    Hub's groups none is (positive control); the other senses of «entradas» and «entries» name no movement."""
+    movement = shared.stem("movement")
+    assert_its_words_name("cash_register", [(said, movement) for said in COUNTED_SAID])
+    own = apps.get_app_config("cash_register").assistant_synonyms
+    named = [said for said in OTHER_COUNTED if any(movement in one for one in shared.asked([said], own).concepts)]
+    assert named == []
+
+
 #: The tills of a place said as «las cajas de la tienda»: Inventory reads «cajas de» as boxes of goods, so without Cash
 #: register's own phrase the stock's tools came before the list of the tills (12th).
 TILLS_SAID = [("cash_register.register.list", "¿qué cajas de la tienda hay dadas de alta?", "cajas de la")]
