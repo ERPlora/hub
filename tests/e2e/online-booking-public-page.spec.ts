@@ -69,7 +69,7 @@ FLOW_VIEWPORTS.forEach((vp, index) => {
       await expect(flow(page)).toContainText('Reserva online');
       await expect(page.locator('[data-testid=ob-preview-business-logo]')).toBeVisible();
       await expect.poll(() => page.locator('[data-testid=ob-preview-business-logo]').evaluate((img: HTMLImageElement) => img.naturalWidth)).toBeGreaterThan(0);
-      await expect(page.locator('[data-testid=ob-preview-privacy]')).toContainText('usará tus datos para gestionar esta reserva');
+      await expect(page.locator('[data-testid=ob-preview-privacy]')).toContainText('Tus datos los usará');
       await expect(page.locator('[data-testid=ob-preview-privacy] a')).toHaveAttribute('href', /\/legal\/privacy\/$/);
       const trap = page.locator('[data-testid=ob-preview-trap]');
       await expect(trap).toBeHidden();

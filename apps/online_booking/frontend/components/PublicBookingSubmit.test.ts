@@ -47,9 +47,16 @@ describe('PublicBookingSubmit', () => {
   it('speaks Spanish with the business as the controller and ERPlora acting for it', async () => {
     const s = await setup('es');
     const notice = s.inDoc('ob-preview-privacy')?.textContent;
-    expect(notice).toContain('Salón Lucía usará tus datos para gestionar esta reserva');
+    expect(notice).toContain('Tus datos los usará Salón Lucía para gestionar esta reserva');
     expect(notice).toContain('ERPlora los tratará por encargo de Salón Lucía');
     expect(notice).toContain('política de privacidad');
     expect(notice).not.toContain('por su cuenta');
+  });
+
+  it('starts the Spanish notice as a sentence when a demo has no registered business name', async () => {
+    const s = await setup('es', '');
+    const notice = s.inDoc('ob-preview-privacy')?.textContent?.trim();
+    expect(notice).toMatch(/^Tus datos los usará este negocio para gestionar esta reserva/);
+    expect(notice).toContain('ERPlora los tratará por encargo de este negocio');
   });
 });
