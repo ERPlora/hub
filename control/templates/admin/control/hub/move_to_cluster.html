@@ -9,6 +9,7 @@ the copy's time limit). Confirmed, each is asked through control.hub.move; the w
   Each hub chosen closes while its database is copied to the cluster you choose, and opens again there: in its next
   night, starting between {{ start }} and {{ end }} of the business's time, or now. How long depends on the size of its
   database, as said under each one, and if its copy runs past {{ limit }}, it is stopped and undone. The hubs are copied
-  one after another: one asked with others also stays closed while those before it are copied.
+  one after another, and each stays open until its own copy starts; one asked for the night whose turn has not come by
+  {{ end }} waits for its next night.
 {% endblocktranslate %}{% endblock intro %}
 {% block submit %}{% translate 'Move them' %}{% endblock submit %}

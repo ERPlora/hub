@@ -141,7 +141,7 @@
 693 base/models.py ERPlora/erplora-next#74
 508 base/tenancy/bootstrap.py ERPlora/erplora-next#74
 835 base/tenancy/migrator.py ERPlora/erplora-next#74
-777 base/tenancy/move.py ERPlora/erplora-next#74
+775 base/tenancy/move.py ERPlora/erplora-next#74
 1419 base/tenancy/tests/test_move.py ERPlora/erplora-next#74
 1180 base/tenancy/tests/test_provision.py ERPlora/erplora-next#74
 1201 base/tenancy/tests/test_recovery.py ERPlora/erplora-next#74
@@ -153,7 +153,7 @@
 849 base/ws_print.py ERPlora/erplora-next#74
 990 control/admin.py ERPlora/erplora-next#74
 625 control/models.py ERPlora/erplora-next#74
-1017 control/services.py ERPlora/erplora-next#74
+1015 control/services.py ERPlora/erplora-next#74
 1549 control/tests/test_admin.py ERPlora/erplora-next#74
 1220 control/tests/test_services.py ERPlora/erplora-next#74
 109 docker/pgbouncer-entrypoint.sh ERPlora/erplora-next#74

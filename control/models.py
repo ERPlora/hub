@@ -170,9 +170,8 @@ class Hub(models.Model):
     # keeps what was asked and how it went (``base.services``, «The reset of a business»), shown on Settings › Data.
     reset_requested_at = models.DateTimeField(_("reset asked"), null=True, blank=True)
     reset_sections = models.JSONField(_("reset"), null=True, blank=True)
-    # Its move to another cluster: asked in the Hub admin
-    # (``control.hub.move``) and done by the worker (``base.tenancy.move``). Set while it is to do: its host answers 503
-    # «maintenance» meanwhile, and the cluster cannot be deleted.
+    # Its move to another cluster, started by the worker (``base.tenancy.move``) when its turn came. Set while it is to
+    # do: its host answers 503 «maintenance» meanwhile, and the cluster cannot be deleted.
     moving_to = models.ForeignKey(
         Cluster,
         on_delete=models.PROTECT,
@@ -184,8 +183,9 @@ class Hub(models.Model):
     # Its move is to be undone (``control.hub.move_cancel``, or an undo that could not finish): the worker puts it back
     # on its origin on its next pass, never taking it forward. Its restore's too (below): its own database back.
     move_undo_asked_at = models.DateTimeField(_("move undo asked"), null=True, blank=True)
-    # A move asked for the business's night (``control.hub.move`` with ``when="at_night"``): nothing closes until the
-    # worker starts it at ``move_scheduled_for`` (``base.tenancy.move.launch_due``), when ``moving_to`` takes its place.
+    # A move asked in the Hub admin (``control.hub.move``) and not started: nothing closes until the worker starts it
+    # when its turn comes (``base.tenancy.move.run_due``), and ``moving_to`` takes its place. ``move_scheduled_for`` is
+    # the moment it may start, in the business's night; empty when asked now.
     move_scheduled_to = models.ForeignKey(
         Cluster,
         on_delete=models.PROTECT,

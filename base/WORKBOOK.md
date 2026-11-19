@@ -4311,23 +4311,28 @@ Implicados: BASE-F41
 
 - **«Mover a otro clúster…» de madrugada** (hub#1508, parte de hub#931) es `control.admin.HubAdmin.move_to_cluster`
   con «Cuándo»: «En su próxima madrugada» (marcada de entrada, como la «próxima ventana de mantenimiento» de RDS) o
-  «Ahora» (lo de siempre; también lo que hace `control.hub.move` sin `when`). La de madrugada deja en el hub
-  `move_scheduled_to` y `move_scheduled_for` (`control.services.night_start`: arranca entre las 03:00 y las 05:00 de
-  su `Hub.timezone`, o de la del despliegue si no tiene una válida; dentro de esa franja, en el acto) y el negocio
-  sigue abierto: la lista de Hubs lo dice en la columna del clúster, con la hora en su reloj. La franja acota el
-  arranque, no el final, como la ventana de AWS; sale del mercado (Square actualiza a las 03:00 de la hora del
-  negocio; Business Central y Azure SQL ponen su ventana en la hora local del entorno; RDS, «Apply immediately» o
-  «next maintenance window»). La arranca el worker al principio de `base.tenancy.move.run_due` (`launch_due`), con el
-  arriendo del hub (`claim_hub`, el de `HubDue`) y en una transacción sobre su fila bloqueada
-  (`control.services.start_scheduled_move`): si en su reloj ya no es de madrugada (el worker estuvo parado, la zona
-  cambió) la deja para la siguiente; si una comprobación de `control.hub.move` la rechaza en ese momento (clúster
-  cerrado o lleno, base que no está en su servidor, en restauración…), la quita y lo dice en `Hub.last_error`
-  (`move_not_started: <código>: …`); si no, pone `moving_to` y el mismo pase la mueve. Cuenta para el hueco del
-  clúster destino y lo protege de borrarse. «Cancelar el traslado» la quita mientras no ha empezado
-  (`control.hub.scheduled_move_cancelled`), sin cerrar nada. Tests: `control/tests/test_services.py::TestTheNight` y
-  `::TestMoveAtNight`, `base/tenancy/tests/test_move.py::TestAMoveAskedForTheNight` (dos BD reales y el arriendo) y
-  `control/tests/test_admin.py::TestMoveToCluster` y `::TestCancelTheMove`. El aviso al negocio de que esa noche se
-  le traslada no existe todavía (hub#1510).
+  «Ahora» (también lo que hace `control.hub.move` sin `when`). Pedirlo no cierra nada (hub#1532): deja en el hub
+  `move_scheduled_to` y, la de madrugada, `move_scheduled_for` (`control.services.night_start`: arranca entre las
+  03:00 y las 05:00 de su `Hub.timezone`, o de la del despliegue si no tiene una válida; dentro de esa franja, en el
+  acto); la de «Ahora» lo deja vacío: arranca en cuanto le llega el turno. El negocio sigue abierto: la lista de Hubs
+  lo dice en la columna del clúster, con la hora en su reloj o «esperando su turno». La franja acota el arranque, no el
+  final, como la ventana de AWS; sale del mercado (Square actualiza a las 03:00 de la hora del negocio; Business
+  Central y Azure SQL ponen su ventana en la hora local del entorno; RDS, «Apply immediately» o «next maintenance
+  window»). El worker copia un negocio por pase (`base.tenancy.move.run_due`): primero uno que ya se está moviendo
+  (cortado por un despliegue, o por deshacer) y si no, el pedido que antes puede arrancar (los de «Ahora» delante); lo
+  arranca con el arriendo del hub (`claim_hub`, el de `HubDue`) y en una transacción sobre su fila bloqueada
+  (`control.services.start_scheduled_move`): si es de madrugada y en su reloj ya no lo es (el worker estuvo parado, la
+  zona cambió o su turno llegó pasadas las 05:00 porque iban otros delante) lo deja para la siguiente, abierto; si una
+  comprobación de `control.hub.move` lo rechaza en ese momento (clúster cerrado o lleno, base que no está en su
+  servidor, en restauración…), lo quita y lo dice en `Hub.last_error` (`move_not_started: <código>: …`); si no, pone
+  `moving_to` (solo desde ahí su host responde 503 «mantenimiento») y el mismo pase lo copia. Uno al que el pase no
+  llega sigue pedido y abierto, y lo coge un pase siguiente. Cuenta para el hueco del clúster destino y lo protege de
+  borrarse. «Cancelar el traslado» lo quita mientras no ha empezado (`control.hub.scheduled_move_cancelled`), sin
+  cerrar nada. Tests: `control/tests/test_services.py::TestTheNight` y `::TestMoveAtNight`,
+  `base/tenancy/tests/test_move.py::TestAMoveAskedForTheNight` (dos BD reales y el arriendo),
+  `control/tests/test_move_turns.py` (varios a la vez, «Ahora» y de madrugada) y
+  `control/tests/test_admin.py::TestMoveToCluster` y `::TestCancelTheMove`. El aviso al negocio de que esa noche se le
+  traslada no existe todavía (hub#1510).
 - **Un negocio de cualquier tamaño se traslada** (hub#1509): la copia pasa por el bucket de volcados
   (`HUB_DUMPS_BUCKET`), nunca por el disco del worker, así que `control.hub.move` no rechaza por tamaño (solo
   comprueba que la base está en su servidor). El negocio está en mantenimiento mientras dura la copia, y por eso se

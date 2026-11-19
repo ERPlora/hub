@@ -1,8 +1,9 @@
 // flow: ninguno — operación de plataforma (hub#1508, part of hub#931): in the Hub admin, «Move to cluster…» asks when,
 // with the business's next night first, and says under the hub how long it can stay closed by the size of its database
-// (hub#1527); asked so, the business stays open, the hubs' list says where and when it goes on the business's own clock,
-// and «Cancel the move» takes it away — at a phone's, a tablet's and a desktop's width, and the confirmation page in
-// Spanish too. The e2e stack's worker makes databases only: nothing starts the move.
+// (hub#1527); asked so, or now, the business stays open until the worker starts its copy, the hubs' list says where it
+// goes and when (or that it waits its turn), and «Cancel the move» takes it away — at a phone's, a tablet's and a
+// desktop's width, and the confirmation page in Spanish too. The e2e stack's worker makes databases only: nothing starts
+// the move.
 import { expect, type Page, test } from '@playwright/test';
 
 import { ADMIN_PAGE_SIZES, adminPage, CLOSURE_SAID, inControl, staffSession } from './admin-list-helpers';
@@ -58,7 +59,7 @@ function rowOfA(page: Page) {
 }
 
 for (const { label, viewport } of ADMIN_PAGE_SIZES) {
-  test(`${KEY}: at ${label}, a move asked for the business's night leaves it open, says when, and is cancelled`, async ({ browser }) => {
+  test(`${KEY}: at ${label}, a move asked for the night or now leaves it open until its turn and is cancelled`, async ({ browser }) => {
     inControl(UNSCHEDULE);
     const page = await adminPage(browser, session, viewport, 'en');
 
@@ -88,10 +89,22 @@ for (const { label, viewport } of ADMIN_PAGE_SIZES) {
 
     await runOnA(page, 'cancel_the_move');
     await expect(page.locator('.messagelist .success')).toContainText(
-      '1 move asked for the night was cancelled: the hub stays where it is, open.',
+      '1 move not started yet was cancelled: the hub stays where it is, open.',
     );
     await expect(rowOfA(page).locator('td.field-on_cluster')).not.toContainText(CLUSTER);
     await capture(page, `${KEY}-${label}-3-cancelled`, { fullPage: true });
+
+    await runOnA(page, 'move_to_cluster');
+    await page.getByLabel('Now', { exact: true }).check();
+    await page.locator('select[name="cluster"]').selectOption((await target.getAttribute('value', { timeout: 10_000 })) ?? '');
+    await page.locator('input[type="submit"][value="Move them"]').click();
+    await expect(page.locator('.messagelist .success')).toContainText(`1 hub will move to ${CLUSTER}: closed while it moves`);
+    await expect(rowOfA(page).locator('td.field-on_cluster')).toContainText(`(to ${CLUSTER}, waiting for its turn)`);
+    const waiting = await page.request.get(`${STACK.hub('a')}/`, { maxRedirects: 0 });
+    expect(waiting.status(), 'asked now, the business is open until its copy starts').not.toBe(503);
+    await capture(page, `${KEY}-${label}-4-asked-now`, { fullPage: true });
+    await runOnA(page, 'cancel_the_move');
+    await expect(page.locator('.messagelist .success')).toContainText('1 move not started yet was cancelled');
     await page.context().close();
   });
 }

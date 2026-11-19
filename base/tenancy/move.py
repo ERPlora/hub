@@ -1,13 +1,13 @@
 """A hub's database moved to another cluster.
 
-The Hub admin asks (``control.hub.move``: ``Hub.moving_to``; its host answers 503 «maintenance» from then on,
-``base.registry``); the worker moves it here (:func:`run_due`, in its own thread), one hub at a time, under the hub's
-lease (``hub_due``, provisioning's: :data:`LEASE`, renewed while it copies). A database of any size moves: its copy
-goes through the dumps bucket (``base.tenancy.dumps``), never through a file of the worker, with the business in
-maintenance for as long as it takes (:data:`COPY_TIMEOUT_SECONDS` for each half). Without a bucket nothing is closed and
-the move ends there, with why. A move asked for the business's night is started by the same pass first
-(:func:`launch_due`), under the same lease, once it is night on the business's own clock; the pass then moves it as any
-other.
+The Hub admin asks (``control.hub.move``: ``Hub.move_scheduled_to``, nothing closed); the worker moves it here
+(:func:`run_due`, in its own thread), one hub at a time, under the hub's lease (``hub_due``, provisioning's:
+:data:`LEASE`, renewed while it copies). Each move starts when its turn comes (``control.services.start_scheduled_move``:
+``Hub.moving_to``), and only then its host answers 503 «maintenance» (``base.registry``): the others asked with it stay
+open meanwhile. One asked for the business's night starts only in its night on its own clock, and one whose turn comes
+after it waits for the next. A database of any size moves: its copy goes through the dumps bucket
+(``base.tenancy.dumps``), never through a file of the worker, with the business in maintenance for as long as it takes
+(:data:`COPY_TIMEOUT_SECONDS` for each half). Without a bucket nothing is closed and the move ends there, with why.
 
 1. **Closed.** On the origin (its cluster, or the settings' own server), ``CONNECT`` and ``TEMPORARY`` are taken from
    the environment's ``hub_app`` and ``hub_admin`` (``base.tenancy.ops.environment_roles``) and every other session on
@@ -130,44 +130,42 @@ def run_due(
     roles: bootstrap.Names | None = None,
     cancelled: Callable[[], bool] | None = None,
 ) -> int:
-    """The worker's pass: start the moves asked for a night that came (:func:`launch_due`), move the hub asked longest
-    ago whose lease nobody else holds (one a pass: a copy takes a while), then drop the copies past their days; how many
-    hubs it worked on. ``roles``: the app's roles the origin is closed to (default the environment's); ``cancelled``:
-    whether the worker is stopping."""
+    """The worker's pass: move one hub whose lease nobody else holds (a copy takes a while), one already moving (its host
+    closed: cut short, or to be undone) before one only asked, whose move starts here (:func:`_started`), then drop the
+    copies past their days; how many hubs it worked on. One the pass does not reach stays asked, open, for the next.
+    ``roles``: the app's roles the origin is closed to (default the environment's); ``cancelled``: whether the worker is
+    stopping."""
     now = now or timezone.now()
-    launch_due(now)
     worked = 0
-    for hub_id in control_services.hubs_moving():
+    for hub_id in [*control_services.hubs_moving(), *control_services.moves_scheduled_due(now)]:
         if services.provisioning.claim_hub(hub_id, now, LEASE) is None:
             continue
         try:
-            move_hub(hub_id, now=now, roles=roles, cancelled=cancelled)
-            worked = 1
+            if _started(hub_id, now):
+                move_hub(hub_id, now=now, roles=roles, cancelled=cancelled)
+                worked = 1
         finally:
             services.provisioning.release_hub(hub_id, timezone.now())
-        break
+        if worked:
+            break
     drop_old_copies(now)
     drop_leftovers(now)
     return worked
 
 
-def launch_due(now: dt.datetime) -> int:
-    """Start each move asked for a night that is due by ``now`` whose hub's lease nobody else holds
-    (``control.services.start_scheduled_move``): one whose night has not come on the business's clock waits for it, one
-    refused says why; a failure of one is logged and it is tried again on the next pass. How many started."""
-    started = 0
-    for hub_id in control_services.moves_scheduled_due(now):
-        if services.provisioning.claim_hub(hub_id, now, LEASE) is None:
-            continue
-        try:
-            if control_services.start_scheduled_move(hub_id, now, owner=services.provisioning.LEASE_OWNER):
-                started += 1
-                logger.info("move: the move of %s asked for its night started.", hub_id)
-        except Exception:
-            logger.exception("move: the move of %s asked for its night could not start; the next pass retries.", hub_id)
-        finally:
-            services.provisioning.release_hub(hub_id, timezone.now())
-    return started
+def _started(hub_id, now: dt.datetime) -> bool:
+    """Whether ``hub_id``, its lease held, is moving: already, or its move asked starts now
+    (``control.services.start_scheduled_move``). One whose night has not come waits for it, one refused says why, and a
+    failure is logged for the next pass to try again."""
+    try:
+        if control_services.start_scheduled_move(hub_id, now, owner=services.provisioning.LEASE_OWNER):
+            logger.info("move: the move of %s started.", hub_id)
+            return True
+    except Exception:
+        logger.exception("move: the move of %s could not start; the next pass retries.", hub_id)
+        return False
+    hub = control_services.moving_row(hub_id)
+    return hub is not None and hub.moving_to_id is not None
 
 
 #: What ``last_error`` says after the reason of a move that could not be undone yet.

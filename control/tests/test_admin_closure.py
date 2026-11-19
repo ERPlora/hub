@@ -1,7 +1,7 @@
 """«Move to cluster…» and «Restore from a copy…» say how long each hub chosen can stay closed, by the size of its
 database: under each one on their confirmation page, and in what the staff is told once it is asked. The hubs are
-copied one after another, so what the staff is told of several is the time of all of them; a size that cannot be
-read is counted as the largest. Never «a few minutes» whatever the size: a large database keeps its business closed
+copied one after another, so what the staff is told of several is the time of all of them, each moved open until its
+own copy starts; a size that cannot be read is counted as the largest. Never «a few minutes» whatever the size: a large database keeps its business closed
 up to the copy's time limit. «Restore to a separate copy…» closes nothing, and says nothing of it.
 """
 
@@ -87,7 +87,8 @@ class TestItsPage:
         html = choose(client, a_hub(sizes, "acme", SMALL))
 
         assert "if its copy runs past 2 hours, it is stopped and undone" in html
-        assert "copied one after another" in html
+        assert "copied one after another, and each stays open until its own copy starts" in html
+        assert "whose turn has not come by 05:00 waits for its next night" in html
 
     def test_a_hub_whose_size_cannot_be_read_is_counted_as_the_largest(self, client, root, sizes, target, monkeypatch):
         hub = a_hub(sizes, "acme", SMALL)
@@ -119,14 +120,16 @@ class TestWhatTheStaffIsTold:
 
         assert told(html) == "1 hub will move to cluster-2: closed while it moves, for up to 1 hour, 7 minutes."
 
-    def test_several_asked_now_add_up_as_they_move_one_after_another(self, client, root, sizes, target):
+    def test_several_asked_now_add_up_as_they_move_one_after_another_each_open_until_its_turn(
+        self, client, root, sizes, target
+    ):
         small, large = a_hub(sizes, "acme", SMALL), a_hub(sizes, "bistro", LARGE)
 
         html = choose(client, small, large, apply="yes", cluster=str(target.pk), when="now")
 
         assert told(html) == (
-            "2 hubs will move to cluster-2, one after another: each closed until its own move ends, for up to "
-            "1 hour, 8 minutes in all."
+            "2 hubs will move to cluster-2, one after another: each open until its own move starts and closed only "
+            "while it moves; all of them take up to 1 hour, 8 minutes."
         )
 
     def test_asked_for_the_night_they_add_up_too(self, client, root, sizes, target, monkeypatch):
@@ -136,7 +139,8 @@ class TestWhatTheStaffIsTold:
         html = choose(client, small, large, apply="yes", cluster=str(target.pk), when="at_night")
 
         assert told(html).endswith(
-            "open until then, and closed while they move one after another, for up to 1 hour, 8 minutes in all."
+            "in its next night or, if its turn has not come by then, in the one after: each open until its own move "
+            "starts and closed only while it moves; all of them take up to 1 hour, 8 minutes."
         )
 
     def test_a_hub_the_operation_refuses_does_not_count(self, client, root, sizes, target):
@@ -154,7 +158,8 @@ class TestInSpanish:
 
         assert notes(html) == ["95,4 MB: cerrado hasta 1 minuto", "18,6 GB: cerrado hasta 1 hora, 7 minutos"]
         assert "si su copia pasa de 2 horas, se para y se deshace" in html
-        assert "se copian uno tras otro" in html and "unos minutos" not in html
+        assert "se copian uno tras otro, y cada uno sigue abierto hasta que empieza su copia" in html
+        assert "unos minutos" not in html
 
     def test_a_size_that_cannot_be_read_says_so(self, client, root, sizes, target, monkeypatch):
         hub = a_hub(sizes, "acme", SMALL)
@@ -170,8 +175,8 @@ class TestInSpanish:
 
         assert told(one) == "1 hub se moverá a cluster-2: cerrado mientras se mueve, hasta 1 hora, 7 minutos."
         assert told(two) == (
-            "2 hubs se moverán a cluster-2, uno tras otro: cada uno cerrado hasta que acaba su traslado, hasta "
-            "1 hora, 8 minutos en total."
+            "2 hubs se moverán a cluster-2, uno tras otro: cada uno abierto hasta que empieza su traslado y cerrado "
+            "solo mientras se mueve; todos juntos tardan hasta 1 hora, 8 minutos."
         )
 
     def test_what_the_staff_is_told_of_the_night(self, client, root, sizes, target, monkeypatch):
@@ -182,7 +187,8 @@ class TestInSpanish:
         one = choose(client, a_hub(sizes, "corner", LARGE), **night)
 
         assert told(two).endswith(
-            "abiertos hasta entonces y cerrados mientras se mueven uno tras otro, hasta 1 hora, 8 minutos en total."
+            "o, si no le llega el turno, en la siguiente: cada uno abierto hasta que empieza su traslado y cerrado solo "
+            "mientras se mueve; todos juntos tardan hasta 1 hora, 8 minutos."
         )
         assert told(one).endswith("abierto hasta entonces y cerrado mientras se mueve, hasta 1 hora, 7 minutos.")
 

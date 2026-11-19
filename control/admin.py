@@ -15,11 +15,11 @@ hubs with their database.
   in a warning and its hubs show no size.
 
 - **«Move to cluster…»** asks ``control.hub.move`` for each chosen hub, with an open cluster and when: in the business's
-  next night (first, as a database's maintenance waits for its window) or now. One asked for the night stays open and
-  its cluster says where and when it goes, on the business's own clock, until the worker starts it; «Cancel the move»
-  takes it away until then, and undoes a started one. Its page says under each hub how long it can stay closed by the
-  size of its database (``base.tenancy.move.longest_closure``), and what the staff is told adds them up, as the hubs
-  move one after another.
+  next night (first, as a database's maintenance waits for its window) or now. The hubs move one after another, each
+  open until the worker starts its own move, and its cluster says where it goes and, for the night, when, on the
+  business's own clock; «Cancel the move» takes it away until then, and undoes a started one. Its page says under each
+  hub how long it can stay closed by the size of its database (``base.tenancy.move.longest_closure``), and what the
+  staff is told adds them up: how long all of them take.
 - **«Restore from a copy…»** (BASE-F114) asks ``control.hub.restore`` for each chosen hub, with the temporary
   cluster its copy is on and the moment it is of; the worker restores it (``base.tenancy.restore``), or refuses it for
   its fiscal records, and then the hub's page says why in its ``last_error``, as the worker noted it. While it is
@@ -146,26 +146,26 @@ def closure_said(hub: Hub) -> str:
 
 
 def closed_for(hubs: list[Hub]) -> str:
-    """How long ``hubs`` can stay closed in all, copied one after another, as the staff is told."""
+    """How long moving all of ``hubs`` can take, copied one after another, as the staff is told."""
     return a_span(sum((longest_closure(getattr(hub, "database_bytes", None)) for hub in hubs), dt.timedelta()))
 
 
 def move_said(when: str, count: int) -> str:
     """What the staff is told of ``count`` hubs asked to move ``when``; ``closed``: how long all of them take, as they
-    move one after another."""
+    move one after another, each closed only while it moves."""
     if when == MOVE_AT_NIGHT:
         return ngettext(
             "%(count)d hub will move to %(cluster)s in its next night, starting between %(start)s and %(end)s on "
             "its own clock: open until then, and closed while it moves, for up to %(closed)s.",
-            "%(count)d hubs will move to %(cluster)s in their next night, each starting between %(start)s and "
-            "%(end)s on its own clock: open until then, and closed while they move one after another, for up to "
-            "%(closed)s in all.",
+            "%(count)d hubs will move to %(cluster)s one after another, each starting between %(start)s and %(end)s "
+            "on its own clock, in its next night or, if its turn has not come by then, in the one after: each open "
+            "until its own move starts and closed only while it moves; all of them take up to %(closed)s.",
             count,
         )
     return ngettext(
         "%(count)d hub will move to %(cluster)s: closed while it moves, for up to %(closed)s.",
-        "%(count)d hubs will move to %(cluster)s, one after another: each closed until its own move ends, for up to "
-        "%(closed)s in all.",
+        "%(count)d hubs will move to %(cluster)s, one after another: each open until its own move starts and closed "
+        "only while it moves; all of them take up to %(closed)s.",
         count,
     )
 
@@ -571,8 +571,8 @@ class HubAdmin(AsksFirst, base_admin.HubAdmin):
 
     @admin.action(description=gettext_lazy("Cancel the move"), permissions=["move"])
     def cancel_the_move(self, request: HttpRequest, queryset) -> None:
-        """Ask the worker to undo each chosen hub's move (``control.hub.move_cancel``): back on its own cluster. One
-        asked for the night that has not started is taken away: it stays where it is, open."""
+        """Ask the worker to undo each chosen hub's move (``control.hub.move_cancel``): back on its own cluster. One that
+        has not started is taken away: it stays where it is, open."""
         ctx = staff_context(request)
         answers: list = []
         self.ask_each(request, queryset, lambda hub: answers.append(hub_move_cancel(ctx, HubIdIn(id=hub.pk))))
@@ -592,8 +592,8 @@ class HubAdmin(AsksFirst, base_admin.HubAdmin):
             self.message_user(
                 request,
                 ngettext(
-                    "%(count)d move asked for the night was cancelled: the hub stays where it is, open.",
-                    "%(count)d moves asked for the night were cancelled: each hub stays where it is, open.",
+                    "%(count)d move not started yet was cancelled: the hub stays where it is, open.",
+                    "%(count)d moves not started yet were cancelled: each hub stays where it is, open.",
                     unscheduled,
                 )
                 % {"count": unscheduled},
@@ -708,13 +708,13 @@ class HubAdmin(AsksFirst, base_admin.HubAdmin):
             return f"{here} → {hub.moving_to.name}"
         if hub.restoring_from_id:
             return f"{here} ← {hub.restoring_from.name}"
-        if hub.move_scheduled_to_id:
-            return pgettext("scheduled move", "%(here)s (to %(there)s at %(moment)s)") % {
-                "here": here,
-                "there": hub.move_scheduled_to.name,
-                "moment": on_its_clock(hub.move_scheduled_for, hub.timezone),
-            }
-        return here
+        if not hub.move_scheduled_to_id:
+            return here
+        there = {"here": here, "there": hub.move_scheduled_to.name}
+        if hub.move_scheduled_for is None:
+            return pgettext("scheduled move", "%(here)s (to %(there)s, waiting for its turn)") % there
+        moment = on_its_clock(hub.move_scheduled_for, hub.timezone)
+        return pgettext("scheduled move", "%(here)s (to %(there)s at %(moment)s)") % (there | {"moment": moment})
 
     @admin.display(description=pgettext_lazy("hub database", "size"))
     def database_size(self, hub: Hub) -> str:

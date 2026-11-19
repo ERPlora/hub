@@ -10,18 +10,18 @@ CLUSTER_UPDATED = "control.cluster.updated"
 #: Closed to new hubs: the ones on it stay where they are.
 CLUSTER_CLOSED = "control.cluster.closed"
 CLUSTER_DELETED = "control.cluster.deleted"
-#: A hub was asked to move to another cluster (``id``, ``slug``, ``from``: its cluster or empty, ``to``); the worker
-#: moves it (``base.tenancy.move``).
+#: A hub was asked to move to another cluster now (``id``, ``slug``, ``from``: its cluster or empty, ``to``); open until
+#: the worker starts its move, when its turn comes (``base.tenancy.move``).
 HUB_MOVE_REQUESTED = "control.hub.move_requested"
 
-#: A hub was asked to move in its next night (``id``, ``slug``, ``from``, ``to``, ``at``: when it starts); open until
-#: the worker starts it (``base.tenancy.move.launch_due``).
+#: A hub was asked to move in its next night (``id``, ``slug``, ``from``, ``to``, ``at``: when it may start); open until
+#: the worker starts its move, when its turn comes (``base.tenancy.move``).
 HUB_MOVE_SCHEDULED = "control.hub.move_scheduled"
 
 #: A move was asked to be undone (``id``, ``slug``); the worker puts the hub back on its origin.
 HUB_MOVE_CANCEL_REQUESTED = "control.hub.move_cancel_requested"
 
-#: A move asked for the night was cancelled before it started (``id``, ``slug``, ``to``): nothing was closed.
+#: A move was cancelled before it started (``id``, ``slug``, ``to``): nothing was closed.
 HUB_SCHEDULED_MOVE_CANCELLED = "control.hub.scheduled_move_cancelled"
 
 #: A hub was asked to be put back as it was at a moment (``id``, ``slug``, ``from``: the temporary cluster its copy is

@@ -548,13 +548,13 @@ class TestMoveToCluster:
 
         html = self.choose(client, first, second, apply="yes", cluster=str(target.pk), when="now").content.decode()
 
-        assert "2 hubs will move to cluster-2, one after another: each closed until its own move ends" in html
+        assert "2 hubs will move to cluster-2, one after another: each open until its own move starts" in html
         for hub in (first, second):
             hub.refresh_from_db()
-            assert hub.moving_to_id == target.pk
+            assert (hub.moving_to_id, hub.move_scheduled_to_id) == (None, target.pk)
         assert len(events("control.hub.move_requested")) == 2
         on_cluster = row_of(page(client, HUBS), ">acme<")
-        assert "cluster-2" in on_cluster
+        assert "(to cluster-2, waiting for its turn)" in on_cluster
 
     def test_a_hub_the_operation_refuses_is_named_and_the_others_move(self, client, root):
         ready, preparing = self.a_hub("acme"), self.a_hub("bistro", status=Hub.Status.REQUESTED)
@@ -575,7 +575,7 @@ class TestMoveToCluster:
 
         html = self.choose(client, first, second, apply="yes", cluster=str(target.pk), when="at_night").content.decode()
 
-        assert "2 hubs will move to cluster-2 in their next night, each starting between 03:00 and 05:00" in html
+        assert "2 hubs will move to cluster-2 one after another, each starting between 03:00 and 05:00" in html
         for hub in (first, second):
             hub.refresh_from_db()
             assert (hub.moving_to_id, hub.move_scheduled_to_id) == (None, target.pk)
@@ -646,7 +646,7 @@ class TestCancelTheMove:
             follow=True,
         ).content.decode()
 
-        assert "1 move asked for the night was cancelled: the hub stays where it is, open." in html
+        assert "1 move not started yet was cancelled: the hub stays where it is, open." in html
         assert "1 move will be undone: the hub goes back to its cluster" in html
         tonight.refresh_from_db()
         assert (tonight.move_scheduled_to_id, tonight.move_scheduled_for, tonight.move_undo_asked_at) == (None, None, None)
@@ -1395,14 +1395,14 @@ def test_the_move_at_night_speaks_spanish(client, root):
     assert "En su próxima madrugada, entre las 03:00 y las 05:00 de la hora del negocio" in html
     assert re.search(r'value="now"[^>]*>\s*Ahora</label>', html) and "Cuándo" in html
     with translation.override("es"):
-        assert gettext("This hub already has a move asked for the night: cancel it first.") == (
-            "Este hub ya tiene un traslado programado para la madrugada: cancélalo primero."
+        assert gettext("This hub already has a move asked that has not started: cancel it first.") == (
+            "Este hub ya tiene un traslado pedido que aún no ha empezado: cancélalo primero."
         )
         assert ngettext(
-            "%(count)d move asked for the night was cancelled: the hub stays where it is, open.",
-            "%(count)d moves asked for the night were cancelled: each hub stays where it is, open.",
+            "%(count)d move not started yet was cancelled: the hub stays where it is, open.",
+            "%(count)d moves not started yet were cancelled: each hub stays where it is, open.",
             2,
-        ) % {"count": 2} == "Se han cancelado 2 traslados programados para la madrugada: cada hub se queda donde está, abierto."
+        ) % {"count": 2} == "Se han cancelado 2 traslados que aún no habían empezado: cada hub se queda donde está, abierto."
         assert str(Hub._meta.get_field("move_scheduled_for").verbose_name) == "traslado programado para"
 
 

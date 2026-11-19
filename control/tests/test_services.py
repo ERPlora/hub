@@ -413,8 +413,8 @@ class TestMove:
         out = services.hub_move(admin_ctx, HubMoveIn(hub=hub.pk, cluster=new.pk))
 
         hub.refresh_from_db()
-        assert (hub.moving_to_id, hub.cluster_id, hub.last_error) == (new.pk, old.pk, "")
-        assert (out.id, out.cluster, out.moving_to) == (hub.pk, old.pk, new.pk)
+        assert (hub.moving_to_id, hub.move_scheduled_to_id, hub.cluster_id, hub.last_error) == (None, new.pk, old.pk, "")
+        assert (out.id, out.cluster, out.moving_to, out.scheduled_to) == (hub.pk, old.pk, None, new.pk)
         assert small == [(old, [hub.db_name])]
         assert events("control.hub.move_requested") == [
             {"id": str(hub.pk), "slug": "acme", "from": str(old.pk), "to": str(new.pk)}
@@ -428,7 +428,7 @@ class TestMove:
 
         out = services.hub_move(admin_ctx, HubMoveIn(hub=hub.pk, cluster=new.pk))
 
-        assert (out.cluster, out.moving_to) == (None, new.pk)
+        assert (out.cluster, out.moving_to, out.scheduled_to) == (None, None, new.pk)
         assert small == [(None, [hub.db_name])]
         assert events("control.hub.move_requested")[0]["from"] == ""
 
@@ -478,7 +478,7 @@ class TestMove:
             assert refused.value.code == code
         full.max_hubs = 3
         full.save(update_fields=["max_hubs"])
-        assert services.hub_move(admin_ctx, HubMoveIn(hub=hub.pk, cluster=full.pk)).moving_to == full.pk
+        assert services.hub_move(admin_ctx, HubMoveIn(hub=hub.pk, cluster=full.pk)).scheduled_to == full.pk
 
     def test_a_demo_never_moves(self, admin_ctx, small):
         from control.schemas import HubMoveIn
@@ -535,7 +535,7 @@ class TestMove:
         new = a_cluster()
         hub = self.a_hub(db_name=hub_databases.a)
 
-        assert services.hub_move(admin_ctx, HubMoveIn(hub=hub.pk, cluster=new.pk)).moving_to == new.pk
+        assert services.hub_move(admin_ctx, HubMoveIn(hub=hub.pk, cluster=new.pk)).scheduled_to == new.pk
 
     def test_support_may_not_and_unknown_ones_are_not_found(self, admin_ctx, small):
         from control.schemas import HubMoveIn
@@ -696,7 +696,7 @@ class TestMoveAtNight:
         hub.refresh_from_db()
         assert hub.move_scheduled_for == dt.datetime(2026, 11, 17, 8, 0, tzinfo=dt.UTC)
 
-    def test_a_move_now_is_still_asked_at_once(self, admin_ctx, small):
+    def test_a_move_now_is_asked_with_no_moment_and_closes_nothing(self, admin_ctx, small):
         from control.schemas import HubMoveIn
 
         new = a_cluster()
@@ -705,8 +705,8 @@ class TestMoveAtNight:
         out = services.hub_move(admin_ctx, HubMoveIn(hub=hub.pk, cluster=new.pk))
 
         hub.refresh_from_db()
-        assert (hub.moving_to_id, hub.move_scheduled_to_id, hub.move_scheduled_for) == (new.pk, None, None)
-        assert (out.scheduled_to, out.scheduled_for) == (None, None)
+        assert (hub.moving_to_id, hub.move_scheduled_to_id, hub.move_scheduled_for) == (None, new.pk, None)
+        assert (out.scheduled_to, out.scheduled_for) == (new.pk, None)
 
     def test_it_is_refused_for_what_a_move_now_is_refused_for(self, admin_ctx, monkeypatch):
         from control import queries
