@@ -257,3 +257,27 @@ def test_migration_0006_runs_its_python_both_ways_after_base_knows_the_business(
     [step] = [op for op in one_site.Migration.operations if op.__class__.__name__ == "RunPython"]
     assert step.code is one_site.drop_rows_of_other_businesses
     assert step.reverse_code is one_site.name_the_business_again
+
+
+# 0002 and 0003 ran while several businesses shared the table
+
+
+FOREST = {"palette": "forest", "custom": None, "mode": "auto"}
+
+
+@pytest.mark.parametrize(
+    ("function", "theme", "expected"),
+    [
+        (migration.to_palettes, OLD, NEW),
+        (overrides.to_overrides, {"palette": "custom", "custom": TWEAK, "mode": "dark"}, {"palette": "ocean", "custom": TWEAK, "mode": "dark"}),
+    ],
+)
+def test_a_site_is_never_written_with_the_theme_of_another_row(database, function, theme, expected):
+    alias = database.alias
+    old = migrate(database, BEFORE)
+    OldSite = old.get_model(APP, "Site")
+    changed = OldSite.objects.using(alias).create(hub_id=uuid.uuid7(), theme=theme)
+    untouched = OldSite.objects.using(alias).create(hub_id=uuid.uuid7(), theme=FOREST)
+    with database.schema_editor() as editor:
+        function(old, editor)
+    assert dict(OldSite.objects.using(alias).values_list("id", "theme")) == {changed.id: expected, untouched.id: FOREST}
