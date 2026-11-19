@@ -147,7 +147,7 @@ OWN_WORDS_ES = [
     ("printing.printer.update", "que Barra 3 pase a llamarse Recepción"),
     ("printing.settings.get", "¿qué opciones están activadas en los ajustes?"),
     ("printing.settings.get", "¿cuál dejamos elegida para el mostrador?"),
-    ("printing.settings.get", "¿cómo está configurado todo?"),
+    ("printing.settings.get", "¿cómo tengo configurada cada función?"),
     ("printing.settings.update", "que se imprima solo"),
     ("printing.settings.update", "las etiquetas, que las mande a Cocina 2"),
     ("printing.settings.update", "dos de cada, por favor"),
