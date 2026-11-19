@@ -57,6 +57,7 @@ async function setup(answer: PublicBookingOut | ApiError | 'hang' = SEEN, locale
 }
 
 function expectCancelled(s: Awaited<ReturnType<typeof setup>>): void {
+  expect(s.inDoc('ob-preview-business-name')?.textContent).toBe('Salón Lucía');
   expect(s.inDoc('ob-preview-status')?.textContent).toContain('Cancelled');
   expect(s.inDoc('ob-preview-status')?.textContent).not.toContain('It can no longer be cancelled online.');
   expect(s.inDoc('ob-personal-cancelled')?.textContent).toContain('This booking is cancelled.');
@@ -64,6 +65,36 @@ function expectCancelled(s: Awaited<ReturnType<typeof setup>>): void {
 }
 
 describe('PersonalBooking', () => {
+  it('shows the business name without a logo when the booking response has none', async () => {
+    const s = await setup();
+    expect(s.inDoc('ob-preview-business-name')?.textContent).toBe('Salón Lucía');
+    expect(s.inDoc('ob-preview-business-logo')).toBeNull();
+    expect(s.call).not.toHaveBeenCalledWith('online_booking.public.page', expect.anything());
+  });
+
+  it('shows the business logo with its accessible alternative text', async () => {
+    const logoUrl = '/p/media/online_booking/logo/salon.png';
+    const s = await setup({ ...SEEN, logo_url: logoUrl });
+    const logo = s.inDoc('ob-preview-business-logo');
+    expect(s.inDoc('ob-preview-business-name')?.textContent).toBe('Salón Lucía');
+    expect(logo?.getAttribute('src')).toBe(logoUrl);
+    expect(logo?.getAttribute('alt')).toBe('Salón Lucía logo');
+  });
+
+  it.each([
+    ['en', 'the business logo'],
+    ['es', 'Logo de este negocio'],
+  ] as const)('names the logo in %s when a demo has no business name', async (locale, alt) => {
+    const s = await setup({ ...SEEN, business_name: '', logo_url: '/p/media/online_booking/logo/salon.png' }, locale);
+    expect(s.inDoc('ob-preview-business-logo')?.getAttribute('alt')).toBe(alt);
+  });
+
+  it('leaves out an empty header when a demo has neither a business name nor a logo', async () => {
+    const s = await setup({ ...SEEN, business_name: '' });
+    expect(s.inDoc('ob-preview-status')).not.toBeNull();
+    expect(s.wrapper.find('.ob-business').exists()).toBe(false);
+  });
+
   it('loads only the booking behind the link and shows its service, time, professional and status', async () => {
     const s = await setup();
     expect(s.call).toHaveBeenCalledExactlyOnceWith('online_booking.public.booking', { token: TOKEN });
@@ -140,6 +171,8 @@ describe('PersonalBooking', () => {
     expect(s.wrapper.text()).not.toContain('APT-20300304-0001');
     expect(s.inDoc('ob-preview-status')).toBeNull();
     expect(s.inDoc('ob-preview-cancel')).toBeNull();
+    expect(s.inDoc('ob-preview-business-name')).toBeNull();
+    expect(s.inDoc('ob-preview-business-logo')).toBeNull();
     expect(s.inDoc('ob-preview')).toBeNull();
   });
 
