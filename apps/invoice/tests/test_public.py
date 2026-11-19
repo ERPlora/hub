@@ -182,3 +182,11 @@ def test_the_full_invoice_is_sealed_for_the_aeat_test_environment_only(ticket):
     assert record.qr_url.startswith(QR_HOSTS[TESTING] + "/")
     assert answer["record"]["qr_url"] == record.qr_url
     assert answer["record"]["qr_svg"].startswith("data:image/svg+xml;base64,")
+
+
+def test_the_page_of_the_code_is_the_shell_for_a_visitor_without_a_session(ticket):
+    page = Client().get(f"/p/{A.key}/invoice/{receipt_code(ticket)}", HTTP_HOST=HOST, HTTP_ACCEPT="text/html")
+    assert page.status_code == 200
+    assert ticket.invoice_number not in page.content.decode()
+    elsewhere = Client().get(f"/p/{B.key}/invoice/{receipt_code(ticket)}", HTTP_HOST=HOST, HTTP_ACCEPT="text/html")
+    assert elsewhere.status_code == 404
