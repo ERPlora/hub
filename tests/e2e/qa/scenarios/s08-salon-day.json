@@ -1,0 +1,258 @@
+{
+  "id": "s08-salon-day",
+  "title": "Peluquería: servicios de una lista pegada, una cita para una clienta nueva y el horario de un empleado",
+  "vertical": "hair_salon",
+  "seed": "hair_salon.es",
+  "language": "es",
+  "setup": [
+    {
+      "tool": "staff.role.create",
+      "arguments": {"name": "Estilista"}
+    },
+    {
+      "tool": "staff.member.create",
+      "arguments": {"first_name": "Lucía", "last_name": "Romero", "role": "Estilista"}
+    },
+    {
+      "tool": "staff.member.create",
+      "arguments": {"first_name": "Daniel", "last_name": "Pérez", "role": "Estilista"}
+    },
+    {
+      "tool": "staff.schedule.create",
+      "arguments": {
+        "member": "Lucía Romero",
+        "name": "Horario habitual",
+        "is_default": true,
+        "days": [
+          {"weekday": 0, "start_time": "10:00", "end_time": "19:00"},
+          {"weekday": 1, "start_time": "10:00", "end_time": "19:00"},
+          {"weekday": 2, "start_time": "10:00", "end_time": "19:00"},
+          {"weekday": 3, "start_time": "10:00", "end_time": "19:00"},
+          {"weekday": 4, "start_time": "10:00", "end_time": "19:00"}
+        ]
+      }
+    },
+    {
+      "tool": "staff.schedule.create",
+      "arguments": {
+        "member": "Daniel Pérez",
+        "name": "Horario habitual",
+        "is_default": true,
+        "days": [
+          {"weekday": 1, "start_time": "10:00", "end_time": "19:00"},
+          {"weekday": 2, "start_time": "10:00", "end_time": "19:00"},
+          {"weekday": 3, "start_time": "10:00", "end_time": "19:00"},
+          {"weekday": 4, "start_time": "10:00", "end_time": "19:00"},
+          {"weekday": 5, "start_time": "10:00", "end_time": "19:00"}
+        ]
+      }
+    },
+    {
+      "tool": "schedule.week.set_day",
+      "arguments": {
+        "weekday": 0,
+        "is_closed": false,
+        "intervals": [{"open_time": "09:30", "close_time": "20:00"}]
+      }
+    },
+    {
+      "tool": "schedule.week.set_day",
+      "arguments": {
+        "weekday": 1,
+        "is_closed": false,
+        "intervals": [{"open_time": "09:30", "close_time": "20:00"}]
+      }
+    },
+    {
+      "tool": "schedule.week.set_day",
+      "arguments": {
+        "weekday": 2,
+        "is_closed": false,
+        "intervals": [{"open_time": "09:30", "close_time": "20:00"}]
+      }
+    },
+    {
+      "tool": "schedule.week.set_day",
+      "arguments": {
+        "weekday": 3,
+        "is_closed": false,
+        "intervals": [{"open_time": "09:30", "close_time": "20:00"}]
+      }
+    },
+    {
+      "tool": "schedule.week.set_day",
+      "arguments": {
+        "weekday": 4,
+        "is_closed": false,
+        "intervals": [{"open_time": "09:30", "close_time": "20:00"}]
+      }
+    },
+    {
+      "tool": "schedule.week.set_day",
+      "arguments": {
+        "weekday": 5,
+        "is_closed": false,
+        "intervals": [{"open_time": "09:30", "close_time": "20:00"}]
+      }
+    },
+    {
+      "tool": "schedule.week.set_day",
+      "arguments": {"weekday": 6, "is_closed": true, "intervals": []}
+    }
+  ],
+  "owner": {
+    "persona": "Elena, dueña de la peluquería Elena Estilistas, en Granada. Trabajan con ella Lucía Romero y Daniel Pérez.",
+    "goal": "Que los tres servicios nuevos queden dados de alta, que Carla Méndez tenga su cita y que el horario de Daniel cambie solo el sábado.",
+    "upFront": [
+      "Hay tres servicios nuevos: Barba, 12 €, 20 minutos; Corte y barba, 22 €, 45 minutos; Alisado de keratina, 90 €.",
+      "Apúntame a Carla Méndez, una clienta nueva, para un corte de mujer con Lucía el martes a las 11.",
+      "Daniel, a partir de ahora, los sábados sale a las 15:00 en vez de a las 19:00; el resto de días sigue igual."
+    ],
+    "ifAsked": [
+      "El alisado de keratina dura dos horas.",
+      "El teléfono de Carla es el 612 345 678.",
+      "Los servicios llevan el IVA normal de los servicios, el 21 %."
+    ]
+  },
+  "attachments": [],
+  "opening": "Hola, te pego los servicios nuevos: Barba, 12 €, 20 min. Corte y barba, 22 €, 45 min. Alisado de keratina, 90 €. Dalos de alta",
+  "offered": ["service.service.create"],
+  "writes": [
+    "service.service.create",
+    "service.service.bulk_create",
+    "service.service.update",
+    "customer.customer.create",
+    "customer.customer.update",
+    "appointment.appointment.create",
+    "staff.schedule.update",
+    "staff.schedule.create"
+  ],
+  "cards": [],
+  "expect": [
+    {
+      "says": "los tres servicios nuevos están con su precio y su duración",
+      "sql": "select count(*) from service_service s join (values ('barba', 1200, 20), ('corte y barba', 2200, 45), ('alisado de keratina', 9000, 120)) as w(name, price, minutes) on lower(s.name) = w.name and s.price = w.price and s.duration_minutes = w.minutes where s.archived_at is null",
+      "equals": "3"
+    },
+    {
+      "says": "cada servicio nuevo está una sola vez",
+      "sql": "select count(*) from service_service where archived_at is null and lower(name) in ('barba', 'corte y barba', 'alisado de keratina')",
+      "equals": "3"
+    },
+    {
+      "says": "los servicios nuevos llevan el impuesto de los servicios",
+      "sql": "select count(*) from service_service s join tax_taxcategory t on t.id = s.tax_category_id where lower(s.name) in ('barba', 'corte y barba', 'alisado de keratina') and t.key = 'service.generic'",
+      "equals": "3"
+    },
+    {
+      "says": "Carla Méndez es clienta, una sola vez",
+      "sql": "select count(*) from customer_customer where deleted_at is null and name ilike '%carla m_ndez%'",
+      "equals": "1"
+    },
+    {
+      "says": "Carla tiene su corte de mujer con Lucía el martes a las 11:00",
+      "sql": "select count(*) from appointment_appointment a join appointment_appointmentservice x on x.appointment_id = a.id join staff_member m on m.id = a.staff_id join customer_customer c on c.id = a.customer_id where a.deleted_at is null and c.name ilike '%carla%' and m.first_name = 'Lucía' and x.name = 'Corte de mujer' and to_char(a.start at time zone 'Europe/Madrid', 'YYYY-MM-DD HH24:MI') = '{tuesday} 11:00'",
+      "equals": "1"
+    },
+    {
+      "says": "Daniel sale a las 15:00 los sábados",
+      "sql": "select string_agg(to_char(d.start_time, 'HH24:MI') || '-' || to_char(d.end_time, 'HH24:MI'), ',') from staff_scheduleday d join staff_schedule s on s.id = d.schedule_id join staff_member m on m.id = s.member_id where m.first_name = 'Daniel' and s.is_active and d.weekday = 5",
+      "equals": "10:00-15:00"
+    }
+  ],
+  "forbidden": [
+    {
+      "says": "el resto de la semana de Daniel no cambia",
+      "sql": "select string_agg(d.weekday || ' ' || to_char(d.start_time, 'HH24:MI') || '-' || to_char(d.end_time, 'HH24:MI'), ',' order by d.weekday) from staff_scheduleday d join staff_schedule s on s.id = d.schedule_id join staff_member m on m.id = s.member_id where m.first_name = 'Daniel' and s.is_active and d.weekday <> 5",
+      "equals": "1 10:00-19:00,2 10:00-19:00,3 10:00-19:00,4 10:00-19:00"
+    },
+    {
+      "says": "el horario de Lucía no cambia",
+      "sql": "select md5(string_agg(d.weekday || to_char(d.start_time, 'HH24:MI') || to_char(d.end_time, 'HH24:MI'), ',' order by d.weekday)) from staff_scheduleday d join staff_schedule s on s.id = d.schedule_id join staff_member m on m.id = s.member_id where m.first_name = 'Lucía'",
+      "unchanged": true
+    },
+    {
+      "says": "los servicios que ya había no cambian",
+      "sql": "select md5(string_agg(id::text || name || price || coalesce(duration_minutes, 0) || coalesce(archived_at::text, ''), ',' order by id)) from service_service where lower(name) not in ('barba', 'corte y barba', 'alisado de keratina')",
+      "unchanged": true
+    },
+    {
+      "says": "una sola cita",
+      "sql": "select count(*) from appointment_appointment where deleted_at is null",
+      "equals": "1"
+    }
+  ],
+  "mustAsk": [
+    {
+      "id": "keratin-duration",
+      "fact": "cuánto dura el alisado de keratina",
+      "reveals": ["dos horas", "2 horas", "120"],
+      "uses": [
+        {
+          "tool": "service.service.create",
+          "path": "duration_minutes",
+          "where": {"name": "keratina"}
+        },
+        {"tool": "service.service.bulk_create", "path": "services[name~keratina].duration_minutes"},
+        {
+          "tool": "service.service.update",
+          "path": "duration_minutes",
+          "where": {"service": "keratina"}
+        }
+      ]
+    }
+  ],
+  "maxTurns": 12,
+  "golden": [
+    {
+      "tool": "service.service.bulk_create",
+      "arguments": {
+        "services": [
+          {"name": "Barba", "price": 1200, "duration_minutes": 20, "tax_category_key": "service.generic"},
+          {"name": "Corte y barba", "price": 2200, "duration_minutes": 45, "tax_category_key": "service.generic"},
+          {
+            "name": "Alisado de keratina",
+            "price": 9000,
+            "duration_minutes": 120,
+            "tax_category_key": "service.generic"
+          }
+        ]
+      }
+    },
+    {
+      "tool": "customer.customer.create",
+      "arguments": {"name": "Carla Méndez", "phone": "+34612345678"}
+    },
+    {
+      "tool": "appointment.appointment.create",
+      "arguments": {
+        "customer": "Carla Méndez",
+        "services": [{"service": "Corte de mujer"}],
+        "staff": "Lucía Romero",
+        "start": "{tuesday} 11:00"
+      }
+    },
+    {
+      "id": "daniel",
+      "tool": "staff.schedule.list",
+      "arguments": {"member": "Daniel Pérez"}
+    },
+    {
+      "tool": "staff.schedule.update",
+      "arguments": {
+        "id": {
+          "$ref": "daniel",
+          "where": {"name": "Horario habitual"},
+          "take": "id"
+        },
+        "days": [
+          {"weekday": 1, "start_time": "10:00", "end_time": "19:00"},
+          {"weekday": 2, "start_time": "10:00", "end_time": "19:00"},
+          {"weekday": 3, "start_time": "10:00", "end_time": "19:00"},
+          {"weekday": 4, "start_time": "10:00", "end_time": "19:00"},
+          {"weekday": 5, "start_time": "10:00", "end_time": "15:00"}
+        ]
+      }
+    }
+  ]
+}

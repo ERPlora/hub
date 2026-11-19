@@ -1,0 +1,163 @@
+{
+  "id": "s03-delivery-note-pdf",
+  "title": "Un albarán en PDF: stock y coste, con un producto que no está en el catálogo",
+  "vertical": "restaurant",
+  "seed": "restaurant.es",
+  "language": "es",
+  "setup": [],
+  "owner": {
+    "persona": "Lola, encargada del bar Los Naranjos, en Málaga. Acaba de llegar el pedido de bebidas y lo está colocando en el almacén.",
+    "goal": "Que lo que llegó en el albarán entre en el stock con lo que ha costado cada cosa, también lo que no teníamos.",
+    "upFront": [
+      "Acaba de llegar el pedido de bebidas: te paso el albarán.",
+      "Mete en el stock lo que ha llegado y actualiza lo que nos cuesta cada cosa."
+    ],
+    "ifAsked": [
+      "La tónica es nueva, no la teníamos: hay que darla de alta.",
+      "La tónica va con las demás bebidas.",
+      "La tónica la vendemos a 2,50 €.",
+      "El código del producto me da igual."
+    ]
+  },
+  "attachments": [
+    {
+      "kind": "pdf",
+      "name": "albaran-bebidas-del-sur.pdf",
+      "note": {
+        "supplier": "Distribuciones Bebidas del Sur S.L.",
+        "number": "ALB-2026-0412",
+        "date": "{today}",
+        "lines": [
+          {"product": "Agua mineral", "quantity": "48", "unitCost": "0,38"},
+          {"product": "Refresco", "quantity": "24", "unitCost": "0,62"},
+          {"product": "Tónica", "quantity": "24", "unitCost": "0,55"}
+        ]
+      }
+    }
+  ],
+  "opening": "Ha llegado el pedido, te paso el albarán. Mételo en el stock",
+  "offered": ["inventory.stock.receive"],
+  "writes": ["inventory.stock.receive", "inventory.product.create", "inventory.product.update"],
+  "cards": [{"tool": "inventory.product.create", "match": {"name": "nica"}, "expect": {"price": 250}}],
+  "expect": [
+    {
+      "says": "el agua mineral: el stock sube a 96",
+      "sql": "select stock::int from inventory_product where sku = 'BEB-01'",
+      "equals": "96"
+    },
+    {
+      "says": "el agua mineral: el coste pasa a 0,38 €",
+      "sql": "select cost from inventory_product where sku = 'BEB-01'",
+      "equals": "38"
+    },
+    {
+      "says": "el agua mineral: entra una sola vez",
+      "sql": "select count(*) from inventory_stockmovement m join inventory_product p on p.id = m.product_id where p.sku = 'BEB-01' and m.movement_type = 'reception'",
+      "equals": "1"
+    },
+    {
+      "says": "el refresco: el stock sube a 72",
+      "sql": "select stock::int from inventory_product where sku = 'BEB-02'",
+      "equals": "72"
+    },
+    {
+      "says": "el refresco: el coste pasa a 0,62 €",
+      "sql": "select cost from inventory_product where sku = 'BEB-02'",
+      "equals": "62"
+    },
+    {
+      "says": "el refresco: entra una sola vez",
+      "sql": "select count(*) from inventory_stockmovement m join inventory_product p on p.id = m.product_id where p.sku = 'BEB-02' and m.movement_type = 'reception'",
+      "equals": "1"
+    },
+    {
+      "says": "la tónica está dada de alta una sola vez",
+      "sql": "select count(*) from inventory_product where not is_deleted and name ilike '%nica%'",
+      "equals": "1"
+    },
+    {
+      "says": "la tónica se vende a 2,50 €",
+      "sql": "select price from inventory_product where not is_deleted and name ilike '%nica%'",
+      "equals": "250"
+    },
+    {
+      "says": "la tónica tiene 24 en stock",
+      "sql": "select stock::int from inventory_product where not is_deleted and name ilike '%nica%'",
+      "equals": "24"
+    },
+    {
+      "says": "la tónica cuesta 0,55 €",
+      "sql": "select cost from inventory_product where not is_deleted and name ilike '%nica%'",
+      "equals": "55"
+    },
+    {
+      "says": "la tónica está en Bebidas",
+      "sql": "select count(*) from inventory_product p join inventory_productcategory pc on pc.product_id = p.id join inventory_category c on c.id = pc.category_id where not p.is_deleted and p.name ilike '%nica%' and c.name = 'Bebidas'",
+      "equals": "1"
+    }
+  ],
+  "forbidden": [
+    {
+      "says": "los demás productos no cambian de precio, coste ni stock",
+      "sql": "select md5(string_agg(id::text || price || cost || stock || is_deleted::text, ',' order by id)) from inventory_product where sku not in ('BEB-01', 'BEB-02') and name not ilike '%nica%'",
+      "unchanged": true
+    },
+    {
+      "says": "ningún otro movimiento de stock",
+      "sql": "select count(*) from inventory_stockmovement where movement_type <> 'reception'",
+      "unchanged": true
+    }
+  ],
+  "mustAsk": [
+    {
+      "id": "tonica-price",
+      "fact": "a cuánto se vende la tónica, que el albarán no dice",
+      "reveals": ["2,50", "2.50", "2,5"],
+      "uses": [
+        {
+          "tool": "inventory.product.create",
+          "path": "price",
+          "where": {"name": "nica"}
+        },
+        {
+          "tool": "inventory.product.update",
+          "path": "price",
+          "where": {"product": "nica"}
+        }
+      ]
+    }
+  ],
+  "maxTurns": 10,
+  "golden": [
+    {
+      "id": "cats",
+      "tool": "inventory.category.list",
+      "arguments": {"search": "Bebidas"}
+    },
+    {
+      "tool": "inventory.product.create",
+      "arguments": {
+        "name": "Tónica",
+        "sku": "BEB-04",
+        "price": 250,
+        "tax_category_key": {
+          "$ref": "cats",
+          "where": {"name": "Bebidas"},
+          "take": "tax_category_key"
+        },
+        "category_ids": [{"$ref": "cats", "where": {"name": "Bebidas"}, "take": "id"}]
+      }
+    },
+    {
+      "tool": "inventory.stock.receive",
+      "arguments": {
+        "reference": "ALB-2026-0412",
+        "items": [
+          {"product": "BEB-01", "qty": "48", "unit_cost": 38},
+          {"product": "BEB-02", "qty": "24", "unit_cost": 62},
+          {"product": "BEB-04", "qty": "24", "unit_cost": 55}
+        ]
+      }
+    }
+  ]
+}

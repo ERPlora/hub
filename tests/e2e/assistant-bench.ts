@@ -5,6 +5,7 @@
 // `.artifacts/qa/<run>/bench.json`; assistant-bench-compare.ts reads several of them. Pure, so Vitest proves it.
 import { type Frame, parseFrames } from './assistant-battery.ts';
 import { type Catalog, catalogKey, type Probe, type ProbeOutcome, probeVerdict } from './assistant-probes.ts';
+import type { ScenarioRow } from './assistant-scenario-bench.ts';
 import type { AnswerChoice } from './assistant-seed.ts';
 
 export type BenchVerdict = 'pass' | 'fail' | 'n/a';
@@ -65,6 +66,8 @@ export interface BenchModel {
   priceIn: number | null;
   priceOut: number | null;
   fallback: string | null;
+  /** Whether it sees images (the seed writes it on its model). */
+  vision?: boolean;
 }
 
 export interface BenchMeta {
@@ -78,12 +81,16 @@ export interface BenchMeta {
   sample: { size: number; seed: number } | null;
   /** The setup a sampled run made before its first probe (assistant-setup.ts), and the steps of it that failed. */
   setup?: { file: string; failed: { step: number; tool: string; why: string }[] } | null;
+  /** A scenario run's simulated owner (assistant-owner.ts), the same model for every assistant compared. */
+  owner?: { model: string } | null;
 }
 
 export interface BenchReport {
   schema: 1;
   meta: BenchMeta;
   turns: BenchTurn[];
+  /** A scenario run's scenarios (assistant-scenario-bench.ts); its `turns` are empty. */
+  scenarios?: ScenarioRow[];
 }
 
 /** What the spec measured around one probe, besides what the verdict reads. */
@@ -109,6 +116,7 @@ export function benchModel(choice: AnswerChoice): BenchModel {
     priceIn: choice.priceIn,
     priceOut: choice.priceOut,
     fallback: choice.fallback,
+    vision: choice.vision,
   };
 }
 

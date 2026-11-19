@@ -20,6 +20,7 @@ export const SECRETS = [
   process.env.QA_QWEN_API_KEY ?? '',
   process.env.QA_OPENAI_API_KEY ?? '',
   process.env[process.env.QA_ANSWER_KEY_ENV ?? ''] ?? '',
+  process.env.QA_OPENROUTER_API_KEY ?? '',
 ];
 /** A real model may think for a while: one turn, card included. */
 export const TURN_MS = 240_000;

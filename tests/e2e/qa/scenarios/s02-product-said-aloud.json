@@ -1,0 +1,64 @@
+{
+  "id": "s02-product-said-aloud",
+  "title": "Un producto dicho de palabra: la categoría y el impuesto se buscan o se preguntan",
+  "vertical": "restaurant",
+  "seed": "restaurant.es",
+  "language": "es",
+  "setup": [],
+  "owner": {
+    "persona": "Marta, dueña del restaurante La Esquina, un sitio de menú del día en Sevilla. Escribe entre servicio y servicio, con prisa.",
+    "goal": "Que la tarta de zanahoria quede en la carta para venderla a 5,50 €, como un postre más.",
+    "upFront": ["La tarta de zanahoria se vende a 5,50 €."],
+    "ifAsked": [
+      "Es un postre: va con los otros postres de la carta.",
+      "Es comida y lleva el mismo IVA que el resto de postres.",
+      "No tiene código propio: el programa puede ponerle el que quiera."
+    ]
+  },
+  "attachments": [],
+  "opening": "Añade la tarta de zanahoria a 5,50",
+  "offered": ["inventory.product.create"],
+  "writes": ["inventory.product.create", "inventory.product.update"],
+  "cards": [{ "tool": "inventory.product.create", "match": { "name": "zanahoria" }, "expect": { "price": 550 } }],
+  "expect": [
+    { "says": "la tarta de zanahoria está una sola vez en la carta", "sql": "select count(*) from inventory_product where name ilike '%zanahoria%' and not is_deleted", "equals": "1" },
+    { "says": "se vende a 5,50 €", "sql": "select price from inventory_product where name ilike '%zanahoria%' and not is_deleted", "equals": "550" },
+    { "says": "lleva el impuesto de la comida", "sql": "select t.key from inventory_product p join tax_taxcategory t on t.id = p.tax_category_id where p.name ilike '%zanahoria%' and not p.is_deleted", "equals": "restaurant.food" },
+    { "says": "está en Postres", "sql": "select count(*) from inventory_productcategory pc join inventory_product p on p.id = pc.product_id join inventory_category c on c.id = pc.category_id where p.name ilike '%zanahoria%' and not p.is_deleted and c.name = 'Postres'", "equals": "1" }
+  ],
+  "forbidden": [
+    { "says": "ningún otro producto cambia", "sql": "select md5(string_agg(id::text || name || price || cost || coalesce(tax_category_id::text, '') || is_deleted::text, ',' order by id)) from inventory_product where name not ilike '%zanahoria%'", "unchanged": true },
+    { "says": "ninguna categoría cambia", "sql": "select md5(string_agg(id::text || name || is_deleted::text, ',' order by id)) from inventory_category", "unchanged": true }
+  ],
+  "mustAsk": [
+    {
+      "id": "category",
+      "fact": "en qué categoría va",
+      "reveals": ["postre"],
+      "uses": [{ "tool": "inventory.product.create", "path": "category_ids" }, { "tool": "inventory.product.update", "path": "category_ids" }],
+      "resolvers": ["inventory.category.list"]
+    },
+    {
+      "id": "tax",
+      "fact": "qué impuesto lleva",
+      "reveals": ["iva", "comida"],
+      "uses": [{ "tool": "inventory.product.create", "path": "tax_category_key" }, { "tool": "inventory.product.update", "path": "tax_category_key" }],
+      "resolvers": ["tax.category.list", "tax.alias.resolve", "inventory.category.list"]
+    }
+  ],
+  "maxTurns": 6,
+  "golden": [
+    { "id": "cats", "tool": "inventory.category.list", "arguments": { "search": "Postres" } },
+    { "id": "taxes", "tool": "tax.category.list", "arguments": { "search": "comida" } },
+    {
+      "tool": "inventory.product.create",
+      "arguments": {
+        "name": "Tarta de zanahoria",
+        "sku": "POS-03",
+        "price": 550,
+        "tax_category_key": { "$ref": "taxes", "where": { "key": "restaurant.food" }, "take": "key" },
+        "category_ids": [{ "$ref": "cats", "where": { "name": "Postres" }, "take": "id" }]
+      }
+    }
+  ]
+}

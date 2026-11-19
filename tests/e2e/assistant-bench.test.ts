@@ -240,7 +240,7 @@ describe('withTurn', () => {
 });
 
 describe('benchModel', () => {
-  it('names the model that answers by its kind and id, with its address, prices and fallback', () => {
+  it('names the model that answers by its kind and id, with its address, prices, fallback and whether it sees images', () => {
     expect(benchModel(answerChoice({}))).toEqual({
       label: 'openai/qwen3.7-plus + gpt-5.4-mini',
       provider: 'qwen',
@@ -250,6 +250,7 @@ describe('benchModel', () => {
       priceIn: null,
       priceOut: null,
       fallback: 'gpt-5.4-mini',
+      vision: false,
     });
   });
 });
