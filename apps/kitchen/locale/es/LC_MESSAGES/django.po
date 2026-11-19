@@ -618,8 +618,12 @@ msgid "Nothing on this check is cooked: services do not go to the kitchen."
 msgstr "Nada de esta cuenta se cocina: los servicios no van a cocina."
 
 #: services.py:119
-msgid "Printing is not active in this business."
-msgstr "Impresión no está activa en este negocio."
+msgid ""
+"No printer prints this ticket: turn on Printing and add an active kitchen or "
+"bar printer."
+msgstr ""
+"Ninguna impresora imprime esta comanda: activa Impresión y añade una "
+"impresora de cocina o de barra activa."
 
 #: services.py:120
 #, python-format

@@ -318,7 +318,8 @@ Pasos:
 Entra: la función de cada impresora y, si hay varias, la elegida.
 Sale: cada documento sale por la impresora de su función. Una impresora no se borra: la cola la nombra.
 Si falla: si ninguna impresora activa tiene la función, el trabajo **espera** en la cola sin
-impresora («En cola, sin impresora») y sale en cuanto una la tenga. En ajustes, una impresora de otra
+impresora («En cola, sin impresora») y sale en cuanto una la tenga; la comanda de Cocina no, porque
+Cocina entonces no la manda (PRINTING-F10). En ajustes, una impresora de otra
 función o inactiva se rechaza: «Esa impresora no tiene esta función.», «Esa impresora está inactiva.».
 Implicados: PRINTING-F01, PRINTING-F06, INVENTORY-F25
 
@@ -430,8 +431,10 @@ Pasos:
    saca (PRINTING-F18).
 Entra: la comanda de Cocina (mesa, camarero, ronda y platos).
 Sale: un trabajo por impresora en la cola de Impresión.
-Si falla: la comanda no se desvía a la impresora de tiques: sin impresora con su función, espera en la
-cola («En cola, sin impresora») y sale en cuanto una la tenga. El papel nunca bloquea al camarero.
+Si falla: la comanda no se desvía a la impresora de tiques. Si ninguna impresora activa tiene su
+función, Cocina no la manda a la cola: la cocina trabaja con su pantalla y la campana no avisa. Si la
+impresora existe pero ningún dispositivo encendido la saca, espera en la cola y la campana avisa
+(PRINTING-F01). El papel nunca bloquea al camarero.
 Implicados: KITCHEN-F08, KITCHEN-F18, PRINTING-F04, PRINTING-F18
 
 ### PRINTING-F11 Reimprimir una comanda
@@ -443,7 +446,8 @@ Pasos:
 2. Cocina pide a Impresión otra hoja por cada impresora de sus platos, marcada como copia (KITCHEN-F09).
 Entra: la comanda.
 Sale: un trabajo nuevo con otra clave cada vez, en la cola de la impresora de su función.
-Si falla: como PRINTING-F10; si Impresión la rechaza, Cocina dice su motivo.
+Si falla: como PRINTING-F10, salvo que sin ninguna impresora activa de su función Cocina lo dice y no
+manda nada a la cola; si Impresión la rechaza, Cocina dice su motivo.
 Implicados: KITCHEN-F09, PRINTING-F10
 
 ### PRINTING-F12 Imprimir la etiqueta de un código de barras
@@ -748,7 +752,7 @@ Nada (`requires = []`). No lee modelos de nadie: quien imprime manda el document
 | Facturación | La página A4 de una factura, para la impresora del sistema | `printing.job.create` |
 | Caja | Informe X y Z | `printing.job.create` |
 | Inventario | Etiqueta de código de barras | `printing.job.create` |
-| Cocina | La comanda de cada estación y su reimpresión | `printing.job.create` |
+| Cocina | La comanda de cada estación y su reimpresión, solo si hay una impresora activa de su función | `printing.printer.list`, `printing.job.create` |
 | `base` (`/ws/print`) | Entregar y confirmar trabajos | `printing.job.claim`, `printing.job.complete`, `printing.job.fail` |
 | `base` (Inicio y campana) | «Configura la impresora» y «Nadie está imprimiendo «…»» | `printing.device.coverage` |
 
@@ -926,6 +930,9 @@ la enseña. Tests: `tests/test_apps.py`, `tests/test_integration_home.py` y
   compatible); si no, la primera activa con esa función por nombre; si no, ninguna: espera, y la
   recoge el primer dispositivo con una impresora compatible de esa función. Compatible: la del sistema
   imprime `a4` y las térmicas `receipt`. Reintentar vuelve a elegir si la suya ya no está activa.
+  Cocina no llega a ese «ninguna»: sin impresora activa de la función no pide la hoja. La migración
+  `0005_cancel_kitchen_orders_without_printer` canceló, sin quién ni motivo y con el documento vaciado,
+  las comandas de Cocina que esperaban sin impresora en un negocio sin ninguna activa de su función.
 - **Buscar impresoras** (PRINTING-F02): la ventana llama a `erplora_discover_printers` de la app, que solo
   busca para el hub vinculado (`hub_link.rs` de `ERPlora/app`; lo vincula el SaaS al abrir el negocio desde la
   app, `/shell/` con `?shell=1`, saas#66); otra página recibe `not_the_linked_hub` y la ventana lo dice. El

@@ -38,7 +38,6 @@
 579 apps/flow/frontend/operations.d.ts ERPlora/erplora-next#74
 1825 apps/flow/queries.py ERPlora/erplora-next#74
 1165 apps/flow/schemas.py ERPlora/erplora-next#74
-2453 apps/flow/services.py ERPlora/erplora-next#74
 784 apps/inventory/frontend/components/ProductFormModal.test.ts ERPlora/erplora-next#74
 487 apps/inventory/frontend/operations.d.ts ERPlora/erplora-next#74
 559 apps/inventory/frontend/pages/ProductsPage.test.ts ERPlora/erplora-next#74
@@ -60,7 +59,7 @@
 673 apps/modifier/schemas.py ERPlora/erplora-next#74
 687 apps/modifier/services.py ERPlora/erplora-next#74
 736 apps/online_booking/queries.py ERPlora/erplora-next#74
-529 apps/online_booking/schemas.py ERPlora/erplora-next#74
+528 apps/online_booking/schemas.py ERPlora/erplora-next#74
 566 apps/online_booking/services.py ERPlora/erplora-next#74
 621 apps/payment/services.py ERPlora/erplora-next#74
 318 apps/pricing/frontend/operations.d.ts ERPlora/erplora-next#74

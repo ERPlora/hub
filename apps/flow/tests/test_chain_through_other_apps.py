@@ -14,7 +14,7 @@ from live.models import OutboxEvent
 
 from apps.customer.models import Customer
 from apps.flow.models import FlowRun
-from apps.flow.services import RUN_ACTOR
+from apps.flow.apps import RUN_ACTOR
 from apps.task.models import Task
 from apps.whatsapp_inbox.tests.conftest import receive
 

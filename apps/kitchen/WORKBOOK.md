@@ -87,8 +87,9 @@ ERPlora no inventa flujos: adopta los que el mercado ya probó.
 
 - Al encender Cocina se encienden con ella **Ventas** e **Inventario**. **Mesas** y **Clientes** no
   hacen falta: sin Mesas, la comanda lleva la etiqueta de la cuenta o su tipo.
-- Para que salga papel hace falta **Impresión** con una impresora de la función «Cocina» (o «Barra»)
-  dada de alta (PRINTING-F04). Sin Impresión, Cocina funciona solo con la pantalla.
+- Para que salga papel hace falta **Impresión** con una impresora activa de la función «Cocina» (o
+  «Barra») dada de alta (PRINTING-F04). Sin Impresión, o sin ninguna impresora activa de esa función,
+  Cocina funciona solo con la pantalla: no manda nada a la cola de impresión y la campana no avisa.
 - Configuración inicial, paso a paso:
   1. En **Cocina → Estaciones**, crea las estaciones reales (Plancha, Barra, Postres) con su destino
      (pantalla, papel o ambos) y su impresora (KITCHEN-F01).
@@ -377,16 +378,19 @@ Pantalla: ninguna
 Pasos:
 1. Al recibir la ronda, Cocina pide a Impresión una hoja por impresora: los platos de cada estación
    que no es «Solo pantalla», por su función («Cocina», «Barra») o por la impresora concreta de la
-   estación; un plato sin estación, por «Cocina». Vale igual para la ronda que envía el camarero
-   (KITCHEN-F18) y para la que Ventas envía sola, que se imprime cuando llega a Cocina.
+   estación; un plato sin estación, por «Cocina». Si ninguna impresora activa tiene esa función (y la
+   estación no nombra una impresora concreta), no pide hoja: esos platos se ven solo en la pantalla.
+   Vale igual para la ronda que envía el camarero (KITCHEN-F18) y para la que Ventas envía sola, que se
+   imprime cuando llega a Cocina.
 2. La hoja lleva la etiqueta, el número, la ronda, el camarero y cada plato con su cantidad, sus
    suplementos (uno por renglón) y su nota, y los platos de un menú sangrados bajo su cabecera
    (KITCHEN-F06, F07); si la ronda va urgente, `!! URGENTE !!`.
 Entra: los platos con el destino y la impresora congelados al recibir.
 Sale: un trabajo por impresora en la cola de Impresión, una sola vez aunque se pida dos veces: la ronda
 que envió Cocina no vuelve a imprimirse cuando le llega el aviso de Ventas.
-Si falla: nunca bloquea al camarero. Sin Impresión no sale papel y no se avisa (la cocina trabaja con
-la pantalla). Si Impresión rechaza el trabajo, la comanda sigue en la pantalla y se puede reimprimir
+Si falla: nunca bloquea al camarero. Sin Impresión, o sin ninguna impresora activa de la función de
+sus platos, no sale papel, no se manda nada a la cola y no se avisa (la cocina trabaja con la
+pantalla); vale también para el pase y el aviso de urgencia. Si Impresión rechaza el trabajo, la comanda sigue en la pantalla y se puede reimprimir
 (KITCHEN-F09); en el TPV, el camarero ve «Comanda N enviada a cocina, pero no se imprimió. Revisa la
 impresora de cocina en Impresión.» (KITCHEN-F18).
 Implicados: KITCHEN-F05, KITCHEN-F06, KITCHEN-F07, KITCHEN-F09, KITCHEN-F18, SALE-F20, PRINTING-F04, PRINTING-F10, PRINTING-F18
@@ -401,8 +405,9 @@ Pasos:
    papel sale como su primera hoja, sin «copia».
 Entra: la comanda.
 Sale: trabajos nuevos en la cola de Impresión (cada reimpresión es un trabajo distinto).
-Si falla: «No se pudo imprimir la comanda: <motivo>», con el motivo de Impresión; sin Impresión,
-«Impresión no está activa en este negocio.».
+Si falla: «No se pudo imprimir la comanda: <motivo>», con el motivo de Impresión; sin Impresión, o
+sin ninguna impresora activa de la función de sus platos, «Ninguna impresora imprime esta comanda:
+activa Impresión y añade una impresora de cocina o de barra activa.» y no se manda nada a la cola.
 Implicados: KITCHEN-F08, KITCHEN-F21, PRINTING-F11
 
 ### KITCHEN-F10 Ver el tablero de cocina
@@ -894,8 +899,10 @@ avisos de Ventas (`sale.order.*`).
 - **Inventario** (requisito): los productos y las categorías del enrutado (claves ajenas) y sus
   listas para elegirlos (`inventory.product.list`, `inventory.category.list`).
 - **Impresión** (opcional): `printing.job.create` por nombre, con el documento `kitchen_order`
-  («Contrato con la plataforma» de Impresión). Sin Impresión (`UnknownOperation`, `app_inactive`) no
-  sale papel y no es un error; otro rechazo se dice en la pantalla y no deshace la acción.
+  («Contrato con la plataforma» de Impresión). Antes de cada hoja sin impresora concreta pregunta con
+  `printing.printer.list` (`usage`, `is_active: true`, `limit: 1`) si hay una impresora activa de su
+  función; si no la hay, no pide la hoja. Sin Impresión (`UnknownOperation`, `app_inactive`) o sin esa
+  impresora no sale papel y no es un error; otro rechazo se dice en la pantalla y no deshace la acción.
 
 ### Lo que pide a otras apps
 
