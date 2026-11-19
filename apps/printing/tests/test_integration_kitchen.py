@@ -117,6 +117,14 @@ def test_each_function_goes_to_paper_only_where_it_has_a_printer():
     assert nothing_printing("bar") == 0
 
 
+def test_a_station_that_names_its_printer_prints_on_it_with_no_printer_of_its_function():
+    printer("Till")
+    send(burger_and_a_beer_at_the_bar(printer_name="Till").id)
+    (drinks,) = sheets()
+    assert (drinks.usage, drinks.printer.name) == ("bar", "Till")
+    assert [item["name"] for item in drinks.document["items"]] == ["Beer"]
+
+
 def test_another_business_kitchen_printer_does_not_send_this_one_to_paper(hub_b):
     with use_hub(hub_b):
         data = {"name": "Grill printer", "kind": "network", "address": "10.0.0.2", "usage": "kitchen"}

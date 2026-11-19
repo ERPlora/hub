@@ -70,6 +70,14 @@ def test_the_orders_an_active_printer_of_their_function_can_print_stay_in_the_qu
     assert queued["items"] == [ITEM]
 
 
+def test_an_order_sent_to_a_printer_by_name_stays_on_it_with_no_printer_of_its_function():
+    printer("Till")
+    queued = enqueue("kitchen_order", {"items": [ITEM]}, usage="bar", printer="Till", source_app="kitchen")
+    job = PrintJob.objects.get(pk=queued.job.id)
+    MIGRATION.forwards(global_apps, _SchemaEditor())
+    assert (state(job)[:2], job.printer.name) == (("pending", False), "Till")
+
+
 def test_the_other_papers_and_the_jobs_that_ended_are_not_touched():
     receipt = PrintJob.objects.get(pk=enqueue(source_app="sale").job.id)
     failed = kitchen_order()
