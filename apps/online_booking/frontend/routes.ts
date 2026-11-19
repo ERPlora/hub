@@ -21,6 +21,12 @@ const routes: RouteRecordRaw[] = [
     component: () => import('./pages/PublicBookingPage.vue'),
     meta: { auth: false, chrome: false },
   },
+  // A customer's personal link: the same page, with her booking's token for its calls' body.
+  {
+    path: '/p/:slug/book/:token',
+    component: () => import('./pages/PublicBookingPage.vue'),
+    meta: { auth: false, chrome: false },
+  },
   // The same flow for the team, through its session, on the dev server only.
   ...(import.meta.env.DEV
     ? [

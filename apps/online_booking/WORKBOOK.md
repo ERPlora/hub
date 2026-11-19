@@ -129,8 +129,8 @@ Fechas y horas salen en el reloj del negocio y con el formato del idioma de quie
 | ONLINE_BOOKING-F07 | Configurar la página de reservas | hecho |
 | ONLINE_BOOKING-F08 | Ver y buscar las reservas | hecho |
 | ONLINE_BOOKING-F09 | Seguir a la clienta cuando se fusionan dos fichas | hecho (lo hace Citas; la bandeja lo refleja) |
-| ONLINE_BOOKING-F10 | La clienta ve su reserva con su enlace | parcial — justo después de reservar; su enlace aún no abre una página |
-| ONLINE_BOOKING-F11 | La clienta cancela su reserva con su enlace | parcial — justo después de reservar; su enlace aún no abre una página |
+| ONLINE_BOOKING-F10 | La clienta ve su reserva con su enlace | parcial — su enlace abre la página de reservas, que aún no enseña su reserva; la confirmación da el código del enlace, no su dirección |
+| ONLINE_BOOKING-F11 | La clienta cancela su reserva con su enlace | parcial — su enlace abre la página de reservas, que aún no enseña su reserva; la confirmación da el código del enlace, no su dirección |
 | ONLINE_BOOKING-F12 | Borrar los datos de una clienta (RGPD) | hecho |
 
 ### ONLINE_BOOKING-F01 La clienta reserva desde la página de reservas
@@ -293,10 +293,12 @@ Si falla: Citas no se queda a medias y el relay lo reintenta solo.
 Implicados: APPOINTMENT-F23, CUSTOMER-F13
 
 ### ONLINE_BOOKING-F10 La clienta ve su reserva con su enlace
-Estado: parcial — la ve con **Ver mi reserva** justo después de reservar; su enlace aún no abre una página
+Estado: parcial — la ve con **Ver mi reserva** justo después de reservar; su enlace (`/p/<negocio>/book/<enlace>`)
+abre la página de reservas del negocio, que aún no enseña su reserva, y la confirmación da el código del enlace, no su
+dirección
 Actor: clienta (sin sesión)
-Pantalla: la página de reservas, tras reservar; la de su reserva (`/p/<negocio>/book/<enlace>`), aún no; en
-desarrollo, la vista previa
+Pantalla: la de su enlace (`/p/<negocio>/book/<enlace>`, en la dirección del negocio); la página de reservas, tras
+reservar; en desarrollo, la vista previa
 Pasos:
 1. Abre el enlace de su confirmación.
 2. Ve el número, el estado, el día y la hora, los servicios, el profesional, la política de cancelación y si
@@ -304,15 +306,17 @@ Pasos:
    a quién pertenece un móvil.
 Entra: el enlace que recibió al reservar; las reglas de cancelación de Citas.
 Sale: nada se escribe. El enlace sigue valiendo aunque el negocio apague la página.
-Si falla: un enlace que no existe, revocado o de una reserva borrada: «Esa reserva no existe o su enlace ya
-no es válido.».
+Si falla: un enlace que no existe, revocado, de una reserva borrada o de otro negocio: «Esa reserva no existe o su
+enlace ya no es válido.». La dirección del enlace con el nombre de otro negocio, o en la dirección de otro, no abre
+ninguna página.
 Implicados: APPOINTMENT-F06
 
 ### ONLINE_BOOKING-F11 La clienta cancela su reserva con su enlace
-Estado: parcial — la cancela con **Cancelar la reserva** justo después de reservar; su enlace aún no abre una página
+Estado: parcial — la cancela con **Cancelar la reserva** justo después de reservar; su enlace
+(`/p/<negocio>/book/<enlace>`) abre la página de reservas del negocio, que aún no enseña su reserva ni la cancela
 Actor: clienta (sin sesión)
-Pantalla: la página de reservas, tras reservar; la de su reserva (`/p/<negocio>/book/<enlace>`), aún no; en
-desarrollo, la vista previa
+Pantalla: la de su enlace (`/p/<negocio>/book/<enlace>`, en la dirección del negocio); la página de reservas, tras
+reservar; en desarrollo, la vista previa
 Pasos:
 1. Desde su enlace pulsa **Cancelar la reserva** (motivo opcional).
 2. Se aplica la política de Citas: «Permitir que la clienta cancele su cita» y «Antelación mínima para
@@ -487,8 +491,12 @@ Cómo las expone la plataforma (la puerta pública `/p/` de `base`):
   decir por qué) antes de leer ni escribir nada. La página espera además tres segundos desde que se abre antes de
   enviar una reserva; los límites de esta app no dependen de ninguna de las dos medidas.
 - **Enlace personal**: `token` de 43 caracteres (`secrets.token_urlsafe(32)`); se guarda solo su hash
-  (SHA-256). Va en la URL de la confirmación (`/p/<slug>/book/<token>`, una página que aún no existe), nunca en un
-  log, y la página lo pasa a `public.booking`/`public.cancel` en el cuerpo, nunca en una query string.
+  (SHA-256). Su dirección es `/p/<slug>/book/<token>`: la puerta sirve en ella el mismo HTML que en `/p/<slug>/book`
+  (`GET /p/<slug>/<página>/<clave>`, con la clave en un solo segmento de letras, cifras, `-` y `_`), sin leer la clave
+  ni decir si abre algo, y la ruta `/p/:slug/book/:token` de esta app pinta `PublicBookingPage.vue`, que pasa el token
+  a `public.booking`/`public.cancel` en el cuerpo, nunca en una query string. Ningún log de la app lo escribe aparte;
+  la dirección, como cualquier otra, queda en el registro de acceso del servidor y del balanceador. El token de otro
+  negocio no existe en la base de este: da lo mismo que uno inventado.
   Las rutas de sesión de esta app (`/api/online_booking/public/booking?token=…`, solo dueño y administrador,
   para la vista previa) lo llevan en la query: aceptado, porque no son la puerta pública.
 - **Enlace con la página apagada**: ver y cancelar con el enlace siguen funcionando aunque el negocio apague
@@ -519,8 +527,9 @@ Cómo las expone la plataforma (la puerta pública `/p/` de `base`):
 
 - **Subir el logo desde Ajustes**: hoy solo se guarda una URL externa y la página no la carga; falta guardar la imagen
   en el propio negocio para que la clienta la vea.
-- **La página del enlace personal** (`/p/<slug>/book/<token>`): la clienta ve y cancela su reserva justo después
-  de reservar, en la misma página, pero su enlace aún no abre una página propia.
+- **La reserva en la página del enlace personal** (`/p/<slug>/book/<token>`): el enlace ya abre la página de
+  reservas del negocio, pero aún no enseña la reserva ni la cancela, y la confirmación da el código del enlace en vez
+  de su dirección. La clienta la ve y la cancela justo después de reservar, en la misma página.
 - **Verificar el móvil con un código (SMS o WhatsApp)**: falta un canal de envío; hasta entonces, cualquiera
   que sepa un teléfono puede reservar a su nombre (la cita sale con el nombre de esa ficha). Los límites
   frenan el abuso, no la suplantación.

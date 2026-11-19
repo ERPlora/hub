@@ -3845,12 +3845,15 @@ Implicados: BASE-F92, BASE-F93
   una página que también da otra app; `base.E020` lo dice al arrancar);
   hoy, Reservas online (`{"book": "online_booking.public"}`). `GET /p/<slug>/<página>` es el HTML del shell
   (`base.spa.shell`), con el dinero del negocio en el bloque `public-door`, y la ruta de la app de ese camino pinta la
-  página; `POST /p/<slug>/api/<operación>` corre en el proceso una operación de esa app que pide justo ese permiso,
+  página; `GET /p/<slug>/<página>/<clave>` (un solo segmento de letras, cifras, `-` y `_`: el enlace personal de una
+  clienta) es el mismo HTML, para la ruta de la página que lee la clave; la puerta no la lee ni dice si abre algo, y la
+  ruta va antes de las de `/p/media` y `/p/catalog` para que un negocio que se llame así también abra la suya; `POST /p/<slug>/api/<operación>` corre en el proceso una operación de esa app que pide justo ese permiso,
   como nadie (`actor=None`) y con ese permiso y ningún otro, también con una sesión abierta, con la entrada en el
   cuerpo JSON (nunca en la query) y la respuesta o el sobre de error del API, en el idioma del visitante; lleva el
   token CSRF del HTML. El negocio es el del Host: un `<slug>` que no es el suyo, una página que ninguna app da, una
   operación fuera de la página o la app apagada en el negocio, 404. Tests: `base/tests/test_public_door.py` (otro
-  negocio por slug y por host, app apagada, permiso ajeno, CSP, CSRF, el visitante por `X-Forwarded-For`) y el e2e
+  negocio por slug y por host, app apagada, permiso ajeno, CSP, CSRF, el visitante por `X-Forwarded-For`, y el enlace
+  personal: su HTML, el de otro negocio y el token de otro negocio, que da lo mismo que uno inventado) y el e2e
   `tests/e2e/online-booking-public-page.spec.ts`.
 - **Asistente** (BASE-F92…F106): es **plataforma** dentro de `base/`, no un
   módulo `kind="app"`: lo traen todos los planes (el cupo mensual llega en la foto; 0 = sin asistente) y sus piezas son

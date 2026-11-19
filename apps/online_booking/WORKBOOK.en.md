@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:a3c955d4520cc2d2b9e91fc4717c2c561fbdcc032f3c72d60603a175ab7f6583 -->
+<!-- generated from WORKBOOK.md sha256:ebc55fdcd8aea5a991792673967698b6704452b6f62b271f306046f3fd2f1621 -->
 
 ## What it is for and who it is for
 
@@ -123,8 +123,8 @@ Dates and times show on the business's clock and in the format of the language o
 | ONLINE_BOOKING-F07 | Set up the booking page | done |
 | ONLINE_BOOKING-F08 | See and search the bookings | done |
 | ONLINE_BOOKING-F09 | Follow the customer when two cards are merged | done (Appointments does it; the inbox reflects it) |
-| ONLINE_BOOKING-F10 | The customer sees her booking with her link | partial — right after booking; her link does not open a page yet |
-| ONLINE_BOOKING-F11 | The customer cancels her booking with her link | partial — right after booking; her link does not open a page yet |
+| ONLINE_BOOKING-F10 | The customer sees her booking with her link | partial — her link opens the business's booking page, which does not show her booking yet; the confirmation gives the link's code, not its address |
+| ONLINE_BOOKING-F11 | The customer cancels her booking with her link | partial — her link opens the business's booking page, which does not show her booking yet; the confirmation gives the link's code, not its address |
 | ONLINE_BOOKING-F12 | Erase a customer's data (GDPR) | done |
 
 ### ONLINE_BOOKING-F01 The customer books from the booking page
@@ -288,9 +288,11 @@ If it fails: Appointments is never left halfway and the relay retries on its own
 Involved: APPOINTMENT-F23, CUSTOMER-F13
 
 ### ONLINE_BOOKING-F10 The customer sees her booking with her link
-Status: partial — she sees it with **See my booking** right after booking; her link does not open a page yet
+Status: partial — she sees it with **See my booking** right after booking; her link (`/p/<business>/book/<link>`)
+opens the business's booking page, which does not show her booking yet, and the confirmation gives the link's code, not
+its address
 Actor: customer (no session)
-Screen: the booking page, once booked; her booking's page (`/p/<business>/book/<link>`), not yet; in
+Screen: her link's page (`/p/<business>/book/<link>`, at the business's address); the booking page, once booked; in
 development, the preview
 Steps:
 1. She opens the link of her confirmation.
@@ -299,14 +301,16 @@ Steps:
    whom a mobile belongs to.
 In: the link she got when booking; the cancellation rules of Appointments.
 Out: nothing is written. The link stays valid even if the business switches the page off.
-If it fails: a link that does not exist, revoked or of a deleted booking: "That booking does not exist or its link is no
-longer valid.".
+If it fails: a link that does not exist, revoked, of a deleted booking or of another business: "That booking does not
+exist or its link is no longer valid.". The link's address with another business's name, or at another business's
+address, opens no page.
 Involved: APPOINTMENT-F06
 
 ### ONLINE_BOOKING-F11 The customer cancels her booking with her link
-Status: partial — she cancels it with **Cancel the booking** right after booking; her link does not open a page yet
+Status: partial — she cancels it with **Cancel the booking** right after booking; her link
+(`/p/<business>/book/<link>`) opens the business's booking page, which does not show her booking yet nor cancel it
 Actor: customer (no session)
-Screen: the booking page, once booked; her booking's page (`/p/<business>/book/<link>`), not yet; in
+Screen: her link's page (`/p/<business>/book/<link>`, at the business's address); the booking page, once booked; in
 development, the preview
 Steps:
 1. From her link she presses **Cancel the booking** (optional reason).
