@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:4d59f62c8d70f1e59e182212240e812a95aabf3b3a61ce72d2b29dbc1e4b4580 -->
+<!-- generated from WORKBOOK.md sha256:d9506e7ad424ba10ea0597f4a71bbd5ead1c99eac478f17f6e38895041269dfb -->
 
 ## What it is for and who it is for
 
@@ -162,7 +162,8 @@ email missing; a note when the business does not take them; **anti-abuse limits*
 from the same device ("…Try again later, or call the business.") or more than 100 in an hour in the
 business ("…Try again in a few minutes."), or more
 upcoming online bookings with the same mobile than the Settings allow (3 out of the box: "This mobile already
-has upcoming bookings…", without saying how many). Two customers who book the same time of the same
+has upcoming bookings…", without saying how many); the form's hidden field filled in, which only a robot fills
+("We could not take this booking. Try again, or call the business.", without saying why). Two customers who book the same time of the same
 professional at once: one gets in and the other gets "That time is no longer free". In the preview, as in the
 form windows, the notice goes as soon as something is changed and a field's reason as soon as that field is
 corrected; both come back if the next try is refused too. A refusal that names no field stays until the next

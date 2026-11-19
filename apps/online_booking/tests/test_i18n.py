@@ -7,7 +7,7 @@ from pathlib import Path
 from django.apps import apps
 from django.utils import translation
 
-from apps.online_booking import queries, schemas, services
+from apps.online_booking import public_page, queries, schemas, services
 from apps.online_booking.models import Booking, Settings
 from base.tests.po import (
     catalogue_key,
@@ -32,7 +32,7 @@ def visible_texts() -> set[str]:
     config = apps.get_app_config("online_booking")
     lazies = [
         *config_texts(config),
-        *module_texts(queries, services, schemas),
+        *module_texts(queries, services, schemas, public_page),
     ]
     lazies += model_texts(MODELS)
     with translation.override("en"):
