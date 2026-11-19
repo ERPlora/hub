@@ -74,8 +74,8 @@ coincide con la búsqueda.»). Se refresca sola cuando cambia una cita online en
 Título «Configuración de la página de reservas». Tres bloques y un botón **Guardar**:
 
 - **Página pública**: «Página pública activada», «Título de la página», «Mensaje de bienvenida», «Color
-  primario» (`#RRGGBB`), «Logo» (una imagen JPG, PNG o WebP que se sube; aún sale como «URL del logo», que ya no
-  se acepta, hub#1660), «Email obligatorio», «Reservas próximas por móvil» (1 a 50), «Permitir elegir
+  primario» (`#RRGGBB`), «Logo» (una imagen JPG, PNG o WebP que se sube con **Elegir imagen**, se cambia con
+  **Cambiar imagen** y se retira con **Quitar**), «Email obligatorio», «Reservas próximas por móvil» (1 a 50), «Permitir elegir
   profesional», «Permitir notas», «Mensaje de confirmación» y «Política de cancelación» (el texto que lee la
   clienta).
 - **Reglas de reserva** (son las de Citas, compartidas con WhatsApp): «Antelación mínima para reservar
@@ -127,7 +127,7 @@ Fechas y horas salen en el reloj del negocio y con el formato del idioma de quie
 | ONLINE_BOOKING-F04 | Marcar que no se presentó | hecho |
 | ONLINE_BOOKING-F05 | Cancelar una reserva | hecho |
 | ONLINE_BOOKING-F06 | Borrar una reserva | hecho |
-| ONLINE_BOOKING-F07 | Configurar la página de reservas | parcial — el logo se sube por la API; la pantalla de Ajustes aún no lo sube (hub#1660) |
+| ONLINE_BOOKING-F07 | Configurar la página de reservas | hecho |
 | ONLINE_BOOKING-F08 | Ver y buscar las reservas | hecho |
 | ONLINE_BOOKING-F09 | Seguir a la clienta cuando se fusionan dos fichas | hecho (lo hace Citas; la bandeja lo refleja) |
 | ONLINE_BOOKING-F10 | La clienta ve su reserva con su enlace | parcial — su enlace abre la página de reservas, que aún no enseña su reserva ni de qué negocio es; la confirmación da el código del enlace, no su dirección |
@@ -246,7 +246,7 @@ Si falla: una cita en curso, completada o cobrada no se borra («Esta cita no se
 Implicados: APPOINTMENT-F11
 
 ### ONLINE_BOOKING-F07 Configurar la página de reservas
-Estado: parcial — el logo se sube por la API; la pantalla de Ajustes aún no lo sube (hub#1660)
+Estado: hecho
 Actor: propietario, administrador, asistente
 Pantalla: Ajustes
 Pasos:
@@ -546,9 +546,6 @@ Cómo las expone la plataforma (la puerta pública `/p/` de `base`):
 
 ## Lo que queda fuera
 
-- **Subir el logo desde la pantalla de Ajustes** (hub#1660): el servidor ya lo guarda en el propio negocio
-  (`online_booking.settings.upload_logo`) y la página lo enseña, pero el campo sigue siendo «URL del logo», sin
-  **Elegir imagen**, **Cambiar imagen** ni **Quitar**.
 - **La reserva en la página del enlace personal** (`/p/<slug>/book/<token>`): el enlace ya abre la página de
   reservas del negocio, pero aún no enseña la reserva ni la cancela, y la confirmación da el código del enlace en vez
   de su dirección. La clienta la ve y la cancela justo después de reservar, en la misma página.
