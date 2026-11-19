@@ -86,7 +86,7 @@ nocturna»): sus worktrees, sus BD, los dos `runserver` y, pase lo que pase, la 
   tests caen si un registro va al entorno de producción de la AEAT. Tampoco pide un PDF al servidor (la factura se
   imprime desde el navegador), así que el job no instala WeasyPrint. `.github/scripts/workflows.test.sh` lleva la
   lista de los grupos que ya están dentro y cae si el job pierde o añade una spec por su cuenta. Con todos dentro, el
-  job correrá todos los `@smoke`, como en el Mac. El job tiene un tope de 19 minutos, el doble de lo que tarda su
+  job correrá todos los `@smoke`, como en el Mac. El job tiene un tope de 27 minutos, el doble de lo que tarda su
   pasada medida más lenta con la pila incluida; un grupo que entra lo vuelve a medir. Lo que hace la pila sale en el
   registro del job y, si falla, el artefacto `smoke` guarda además los registros de los dos `runserver` y las trazas
   de Playwright.
