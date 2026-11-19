@@ -48,7 +48,7 @@ por `/internal`.
 ## Lo que queda fuera
 
 El detalle está en «Lo que queda fuera» del [`WORKBOOK.md`](WORKBOOK.md): el archivo fiscal antes de borrar un negocio
-con documentos (hub#738), la fila de salud del Inicio en pantalla (hub#573), las notas de versión (hub#576), los roles que trae una
-app (hub#579) y la cola de PgBouncer de cada negocio en CloudWatch (hub#572). Ya no están fuera, cerradas después del
-cierre de la app: las cifras de uso y el aviso de ampliar (hub#603), el pase a erplora.com (saas#190) y la vista previa
-de .xlsx y .docx (hub#578).
+con documentos (hub#738), la fila de salud del Inicio en pantalla (hub#573), las notas de versión (hub#576) y la cola
+de PgBouncer de cada negocio en CloudWatch (hub#572). Ya no están fuera, cerradas después del cierre de la app: las
+cifras de uso y el aviso de ampliar (hub#603), el pase a erplora.com (saas#190), la vista previa de .xlsx y .docx
+(hub#578) y los roles que trae una app, que son siempre los cuatro de erplora.com (hub#579).

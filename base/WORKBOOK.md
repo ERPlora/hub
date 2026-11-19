@@ -2174,7 +2174,8 @@ Pasos:
   1. En **Empleados › Roles**: «Estos son los roles de este negocio. Cada persona recibe uno al invitarla en
      erplora.com, y allí se cambia.».
   2. Una fila por rol: «Propietario», «Administrador», «Encargado» y «Empleado», con «Básico», «Siempre
-     disponible», cuántas personas lo tienen y cuántos permisos da.
+     disponible», cuántas personas lo tienen y cuántos permisos da. Son siempre estos cuatro, los de erplora.com:
+     ninguna app añade roles propios; cada app dice qué puede hacer cada uno de ellos en ella.
   3. Quien administra tiene «Cambiar roles en erplora.com» (en la app instalada, en el navegador del dispositivo; en la de Google Play no está).
 Entra: los roles y las personas del negocio.
 Sale: nada guardado.
@@ -4371,8 +4372,6 @@ Implicados: BASE-F92, BASE-F93
 - **La fila de salud del Inicio en pantalla (BASE-F02)**, hub#573: su lectura ya existe (`base.health.list`, con la
   impresora de Impresión); falta pintarla en el Inicio y que la Bandeja de WhatsApp declare cómo está su número.
 - **Las notas de cada versión (BASE-F41)**, hub#576.
-- **Los roles que trae una app (BASE-F82)**, hub#579, con la contradicción entre PLAN-HUB §3 (`RoleActivation`) y
-  los cuatro roles de PLAN §22 sin resolver.
 - **La cola de PgBouncer de cada negocio en CloudWatch**, hub#572.
 - **Peticiones a `@erplora/ui`** que siguen abiertas: [`UI-REQUESTS.md`](UI-REQUESTS.md) (los iconos de documento de
   Archivos, los del cuadro del asistente y `useI18n` en el shell).
@@ -4404,6 +4403,8 @@ Implicados: BASE-F92, BASE-F93
   programas ni archivos de más de 25 MB.
 - No invita, no cambia el rol ni quita a nadie: es de erplora.com, que lleva las plazas del plan; el hub lo enseña y
   enlaza a «Miembros».
+- No deja que una app traiga roles propios ni encienda o apague roles: un negocio tiene siempre los cuatro de
+  erplora.com, que se dan al invitar, y cada app reparte entre ellos lo que se puede hacer en ella (BASE-F82).
 - No enseña nunca el token entero de una llave después de crearla o rotarla, ni guarda el PIN de quien aprueba.
 - El asistente no guarda la conversación en el servidor: vive en la pestaña de quien pregunta y se olvida al cerrar
   sesión o cambiar de usuario.

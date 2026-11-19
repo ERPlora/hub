@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:69358b6390714b64d956e77528cfa7d5117d25624065f5548bb630fd3258f9f3 -->
+<!-- generated from WORKBOOK.md sha256:4912e887e41458f9ea0ab111d8c784a361d802ba4d9af9da2e513a857d5d5284 -->
 
 ## What it is for and who it is for
 
@@ -2164,7 +2164,8 @@ Steps:
   1. In **Employees › Roles**: "These are the roles of this business. Each person gets one when invited on
      erplora.com, and it is changed there.".
   2. A row per role: "Owner", "Administrator", "Manager" and "Employee", with "Basic", "Always available", how
-     many people have it and how many permissions it gives.
+     many people have it and how many permissions it gives. It is always these four, erplora.com's: no app adds
+     roles of its own; each app says what each of them can do in it.
   3. Whoever runs the business has "Change roles on erplora.com" (in the installed app, in the device's browser; the Google Play copy does not have it).
 In: the roles and the people of the business.
 Out: nothing saved.
