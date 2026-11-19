@@ -494,9 +494,9 @@ Cómo las expone la plataforma (la puerta pública `/p/` de `base`):
   (SHA-256). Su dirección es `/p/<slug>/book/<token>`: la puerta sirve en ella el mismo HTML que en `/p/<slug>/book`
   (`GET /p/<slug>/<página>/<clave>`, con la clave en un solo segmento de letras, cifras, `-` y `_`), sin leer la clave
   ni decir si abre algo, y la ruta `/p/:slug/book/:token` de esta app pinta `PublicBookingPage.vue`, que pasa el token
-  a `public.booking`/`public.cancel` en el cuerpo, nunca en una query string. Ningún log de la app lo escribe aparte;
-  la dirección, como cualquier otra, queda en el registro de acceso del servidor y del balanceador. El token de otro
-  negocio no existe en la base de este: da lo mismo que uno inventado.
+  a `public.booking`/`public.cancel` en el cuerpo, nunca en una query string. La dirección, con el token, queda como
+  cualquier otra en el registro de acceso del servidor y del balanceador, y en el aviso «Not Found» de Django si da 404.
+  El token de otro negocio no existe en la base de este: da lo mismo que uno inventado.
   Las rutas de sesión de esta app (`/api/online_booking/public/booking?token=…`, solo dueño y administrador,
   para la vista previa) lo llevan en la query: aceptado, porque no son la puerta pública.
 - **Enlace con la página apagada**: ver y cancelar con el enlace siguen funcionando aunque el negocio apague
