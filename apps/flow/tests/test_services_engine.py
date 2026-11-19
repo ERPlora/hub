@@ -343,7 +343,7 @@ def test_an_action_whose_app_is_gone_is_unavailable(django_capture_on_commit_cal
 
 
 def test_a_scheduled_run_on_the_worker_s_pass_stops_at_an_action_whose_app_is_off(monkeypatch, django_capture_on_commit_callbacks):
-    """The worker runs a hub's due schedules on that hub's own scope (``base.worker._serve_hub``): there, Tasks is off,
+    """The worker runs a hub's due schedules on that hub's own scope (``base.hub_visits``): there, Tasks is off,
     so the step stops as unavailable and nothing is created; on the platform's scope nothing would be off."""
     from live.context import system_context
 

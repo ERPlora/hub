@@ -30,8 +30,6 @@ def tick(monkeypatch, settings):
     as a process that has served no hub yet."""
     settings.VERIFACTU_GATEWAY_URL = ""
     monkeypatch.setattr(catalog, "register_apps", lambda: REGISTERED)
-    monkeypatch.setattr(worker, "_synced", set())
-    monkeypatch.setattr(worker, "_next_hub", None)
 
     def one_tick() -> None:
         stop = threading.Event()

@@ -5,8 +5,8 @@ so it does no work before that. A ``shared`` schema the SaaS has not migrated ye
 is waited for, with a warning and a backoff of 5, 10, 20, 40 and then 60 s; any other failure stops
 the worker with 1. Then it names, as an error, each ready business still without its own database (it
 never serves one) and, on every tick until asked to stop (waking up at once: ECS gives it 30 s after
-SIGTERM), takes control's own outbox (``relay.run(of_hubs=False)``) and serves each hub with its own
-database (``_hubs``: its outbox and its tasks, in it; ``test_worker_hubs.py``). A pass that fails is
+SIGTERM), takes control's own outbox (``relay.run(of_hubs=False)``) and visits the hubs with their own
+database (``base.hub_visits``: their outbox and their tasks, in each; ``test_hub_visits.py``). A pass that fails is
 logged and the next tick tries again. On the first tick and then every ``REAPER_INTERVAL_SECONDS`` it purges the demos
 that ended (``reap_demos``); a reaper that fails is logged and never stops the worker. Every tick it
 makes the databases of the hubs due in ``hub_due`` and drops the demos that ended (``provision.run_due``),
@@ -21,6 +21,7 @@ import datetime as dt
 import logging
 import threading
 import time
+from types import SimpleNamespace
 
 import pytest
 from django.db import DatabaseError
@@ -104,9 +105,9 @@ class FakeDue:
 
 @pytest.fixture(autouse=True)
 def hubs_pass(monkeypatch) -> list[dt.datetime]:
-    """Stands in for the pass over the hubs with their own database (``worker._hubs``; ``test_worker_hubs.py``)."""
+    """Stands in for the visits to the hubs with their own database (``base.hub_visits``; ``test_hub_visits.py``)."""
     passes: list[dt.datetime] = []
-    monkeypatch.setattr(worker, "_hubs", passes.append)
+    monkeypatch.setattr(worker.hub_visits, "HubVisits", lambda: SimpleNamespace(serve=passes.append, close=lambda: None))
     return passes
 
 
@@ -443,16 +444,15 @@ def stop_after(stop: threading.Event, ticks: int):
 
 
 def test_the_loop_runs_no_task_of_its_own_each_hub_runs_its_own_in_its_pass(calls, tasks, hubs_pass):
-    """There is no shared database to run every hub's tasks on: each hub's run in its own database, in the
-    pass over the hubs (``_serve_hub``, ``test_worker_hubs.py``), every tick."""
+    """There is no shared database to run every hub's tasks on: each hub's run in its own database, in its visits
+    (``base.hub_visits``, ``test_hub_visits.py``), looked for every tick."""
     stop = threading.Event()
     wait, waits = stop_after(stop, 3)
 
     assert worker.run(stop, tick_seconds=TICK, wait=wait, clock=clock(0, 1, 2)) == 0
 
     assert (tasks.synced, tasks.ticks) == ([], [])
-    assert hubs_pass == [ten(0), ten(1), ten(2)]
-    assert waits == [TICK] * 3
+    assert (hubs_pass, waits) == ([ten(0), ten(1), ten(2)], [TICK] * 3)
 
 
 def test_the_ticks_start_once_the_apps_are_registered(monkeypatch, hubs_pass):
@@ -641,7 +641,7 @@ def every_pass(monkeypatch, order: list[str], due: FakeDue, outbox: FakeRelay) -
     the moves and the reaper keep their own fakes (``moves_pass``, ``reaper``)."""
     monkeypatch.setattr(provision, "run_due", lambda now: order.append("due") or due(now))
     monkeypatch.setattr(relay, "run", lambda now, of_hubs=True: order.append("relay") or outbox(now, of_hubs=of_hubs))
-    monkeypatch.setattr(worker, "_hubs", lambda now: order.append("hubs"))
+    monkeypatch.setattr(worker.hub_visits, "HubVisits", lambda: SimpleNamespace(serve=lambda now: order.append("hubs"), close=lambda: None))
     monkeypatch.setattr(worker, "_activations", lambda now: order.append("activations"))
     monkeypatch.setattr(worker, "_data", lambda now, stop=None: order.append("data"))
     monkeypatch.setattr(worker, "_usage", lambda now: order.append("usage"))
@@ -678,7 +678,7 @@ def test_with_databases_only_it_makes_the_hubs_databases_and_apps_tables_and_dro
     monkeypatch.setattr(scheduler, "run_due", lambda now: order.append("tasks") or [])
     monkeypatch.setattr(provision, "run_due", lambda now: order.append("due") or due(now))
     monkeypatch.setattr(relay, "run", lambda now, of_hubs=True: order.append("relay") or outbox(now, of_hubs=of_hubs))
-    monkeypatch.setattr(worker, "_hubs", lambda now: order.append("hubs"))
+    monkeypatch.setattr(worker.hub_visits, "HubVisits", lambda: SimpleNamespace(serve=lambda now: order.append("hubs"), close=lambda: None))
     monkeypatch.setattr(worker, "_reap", lambda now: order.append("reap"))
     monkeypatch.setattr(worker, "_activations", lambda now: order.append("activations"))
     monkeypatch.setattr(worker, "_data", lambda now, stop=None: order.append("data"))
@@ -736,7 +736,7 @@ def test_with_its_own_tick_it_takes_a_new_demo_within_five_seconds(monkeypatch, 
     production and of the e2e's worker (``--databases-only``): it makes the hubs due on every pass and waits no longer
     than 5 s between two."""
     monkeypatch.setattr(worker, "_activations", lambda now: None)
-    monkeypatch.setattr(worker, "_hubs", lambda now: None)
+    monkeypatch.setattr(worker.hub_visits, "HubVisits", lambda: SimpleNamespace(serve=lambda now: None, close=lambda: None))
     monkeypatch.setattr(worker, "_data", lambda now, stop=None: None)
     stop = threading.Event()
     wait, waits = stop_after(stop, 3)
@@ -853,7 +853,7 @@ def test_the_moves_run_in_a_thread_of_their_own_every_tick_after_the_data_and_be
 
     monkeypatch.setattr(worker, "Background", Recorded)
     monkeypatch.setattr(provision, "run_due", lambda now: order.append("due") or due(now))
-    monkeypatch.setattr(worker, "_hubs", lambda now: order.append("hubs"))
+    monkeypatch.setattr(worker.hub_visits, "HubVisits", lambda: SimpleNamespace(serve=lambda now: order.append("hubs"), close=lambda: None))
     monkeypatch.setattr(worker, "_data", lambda now, stop=None: order.append("data"))
     monkeypatch.setattr(worker, "_usage", lambda now: order.append("usage"))
     monkeypatch.setattr(worker, "_moves", lambda now, stop=None: order.append("moves"))

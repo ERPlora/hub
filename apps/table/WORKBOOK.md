@@ -1114,7 +1114,7 @@ Ventas (`sale.add_sale`), que tienen los cuatro papeles.
   recorrido, retenciones y ajustes; ids y fechas en solo lectura. Lo que guarda no pasa por las
   operaciones ni deja aviso.
 - **Tarea programada**: `expire_table_holds` (`table.hold.expire`, cada hora, en UTC, `collapse`): la
-  corre el worker (`base/scheduler.py`), en cada negocio y con su ámbito (`base.worker._serve_hub`).
+  corre el worker (`base/scheduler.py`), en cada negocio y con su ámbito (`base.hub_visits`).
 
 ### Lo que NO hace, a propósito
 

@@ -2,7 +2,7 @@
 
 import datetime as dt
 import logging
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Collection, Iterable
 from contextvars import ContextVar
 from functools import partial
 
@@ -51,8 +51,11 @@ def run_next_due_task(
     *,
     execute: Callable[[str], object],
     reschedule: Callable[[str, dt.datetime], dt.datetime],
+    apps: Collection[str] | None = None,
 ) -> tuple[str, bool] | None:
-    """Claim one task due at ``now``, run it and move its ``next_run``, all in one transaction.
+    """Claim one task due at ``now``, run it and move its ``next_run``, all in one transaction. With ``apps`` (those on
+    in the business), only a task of one of them: another app's is left as it is, untouched, and runs once when its app
+    is on again.
 
     ``SELECT … FOR UPDATE SKIP LOCKED``: a second worker (a deploy overlaps the old one and the new one)
     skips the row this one holds, and once it commits the row is no longer due. ``execute(operation)``
@@ -63,12 +66,10 @@ def run_next_due_task(
     or ``None`` when nothing is due.
     """
     with atomic():
-        row = (
-            TaskSchedule.objects.select_for_update(skip_locked=True)
-            .filter(next_run__lte=now)
-            .order_by("next_run", "app_label", "name")
-            .first()
-        )
+        due = TaskSchedule.objects.select_for_update(skip_locked=True).filter(next_run__lte=now)
+        if apps is not None:
+            due = due.filter(app_label__in=list(apps))
+        row = due.order_by("next_run", "app_label", "name").first()
         if row is None:
             return None
         ran = True
