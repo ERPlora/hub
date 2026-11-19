@@ -79,8 +79,11 @@ nocturna»): sus worktrees, sus BD, los dos `runserver` y, pase lo que pase, la 
   que exige `main`, con la pila montada en el runner (el SaaS de su `origin/main` en `../saas`, las imágenes en
   `../blueprints` y Postgres con `compose.yaml`). Un test `@smoke` en rojo deja el check en rojo y la PR no se fusiona.
   Los grupos entran de uno en uno, tras tres pasadas seguidas en verde del job, y el job los nombra con `--spec`: hoy,
-  entrar, las sesiones, los permisos de un empleado, la separación entre negocios y la suspensión por impago, y cobrar
-  en el TPV, la caja y la impresión del ticket. `.github/scripts/workflows.test.sh` lleva la lista de los grupos que ya
+  entrar, las sesiones, los permisos de un empleado, la separación entre negocios y la suspensión por impago; cobrar
+  en el TPV, la caja y la impresión del ticket; y el ticket con su QR, la factura y VeriFactu. Nada de ese grupo llega
+  a la AEAT: el runner no tiene pasarela de envío ni certificados, y los tests exigen el entorno de pruebas de la AEAT.
+  Tampoco pide un PDF al servidor (la factura se imprime desde el navegador), así que el job no instala WeasyPrint.
+  `.github/scripts/workflows.test.sh` lleva la lista de los grupos que ya
   están dentro y cae si el job pierde o añade una spec por su cuenta. Con todos dentro, el job correrá todos los
   `@smoke`, como en el Mac. El job tiene un tope de 15 minutos, el doble de lo que tarda su pasada medida más lenta con
   la pila incluida; un grupo que entra lo vuelve a medir. Lo que hace la pila sale en el
