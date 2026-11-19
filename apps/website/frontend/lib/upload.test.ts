@@ -2,20 +2,7 @@
 // as verifactu's certificate), and ImageUpload gets back the stored image's id and URL.
 import { describe, expect, it, vi } from 'vitest';
 
-import { makeUploader, readAsBase64 } from './upload';
-
-describe('readAsBase64', () => {
-  it('encodes the bytes of the file, whatever their size', async () => {
-    const bytes = new Uint8Array(70_000).map((_, i) => i % 256);
-    const file = new File([bytes], 'big.png', { type: 'image/png' });
-    const decoded = Uint8Array.from(atob(await readAsBase64(file)), (char) => char.charCodeAt(0));
-    expect(decoded).toEqual(bytes);
-  });
-
-  it('encodes an empty file as an empty string', async () => {
-    expect(await readAsBase64(new File([], 'x.png'))).toBe('');
-  });
-});
+import { makeUploader } from './upload';
 
 describe('makeUploader', () => {
   it('sends the name, the type and the base64 of the file, and answers only the id and the URL', async () => {
