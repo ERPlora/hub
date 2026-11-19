@@ -7,6 +7,18 @@ from live.meta import Category, LiveAppConfig, Nav, SetupCheck, SetupStep, Widge
 
 from apps.cash_register.events import SESSION_EVENTS, SETTINGS_UPDATED
 
+#: Several movements said by how many come before their amount: «dos entradas de» 20 €, «3 salidas de» 10 €, «two
+#: entries of» 20 €. Only before «de» or «of»: «dos entradas para el concierto» and «two entries to the waitlist» are
+#: no movement.
+COUNTED_MOVEMENTS = (
+    *(
+        f"{count} {kind} de"
+        for count in ("dos", "tres", "cuatro", "cinco", "2", "3", "4", "5")
+        for kind in ("entradas", "salidas", "movimientos")
+    ),
+    *(f"{count} entries of" for count in ("two", "three", "four", "five", "2", "3", "4", "5")),
+)
+
 
 class CashRegisterConfig(LiveAppConfig):
     name = "apps.cash_register"
@@ -33,14 +45,23 @@ class CashRegisterConfig(LiveAppConfig):
     default_auto_field = "django.db.models.BigAutoField"
     # What these words mean to the Hub's assistant (base.assistant.relevance.synonyms). An «arqueo», a «recuento» or a «conteo» of
     # the drawer is a count (cash_register.count), the «moneda» or «divisa» of the business is its currency
-    # (cash_register.currency), and «una entrada», «una salida» or «un movimiento» is a movement
-    # (cash_register.movement). Those go as phrases: a bare «entrada» shares its stem with «entre» and «entra», and a
-    # bare «salida» is also a clock-out or a dish that left the pass. «Las cajas de la» barra or tienda are the tills
-    # (cash_register.register), which Inventory's «cajas de» goods would otherwise hide.
+    # (cash_register.currency), and «una entrada», «una salida» or «un movimiento», or several of them by their count,
+    # is a movement (cash_register.movement). Those go as phrases: a bare «entrada» shares its stem with «entre» and
+    # «entra», and a bare «salida» is also a clock-out or a dish that left the pass. «Las cajas de la» barra or tienda
+    # are the tills (cash_register.register), which Inventory's «cajas de» goods would otherwise hide.
     assistant_synonyms = (
         ("arqueo", "recuento", "conteo", "count"),
         ("divisa", "moneda", "currency"),
-        ("movement", "un movimiento", "una entrada", "una salida", "otro movimiento", "otra entrada", "otra salida"),
+        (
+            "movement",
+            "un movimiento",
+            "una entrada",
+            "una salida",
+            "otro movimiento",
+            "otra entrada",
+            "otra salida",
+            *COUNTED_MOVEMENTS,
+        ),
         ("register", "cajas de la"),
     )
     permissions = [
