@@ -81,7 +81,7 @@ export function cleanUpRealProviders(emails: string[]): void {
   run(command.file, command.args, SAAS_DIR, command.env);
 }
 
-// ── The panel (as base-assistant.spec.ts reads it) ──
+// ── The panel (as assistant-panel.ts reads it) ──
 
 export const panel = (page: Page): Locator => page.locator('[data-testid="assistant-panel"]');
 export const box = (page: Page): Locator => panel(page).locator('[data-testid="assistant-input"] textarea');
