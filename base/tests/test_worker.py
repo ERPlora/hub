@@ -22,7 +22,7 @@ from types import SimpleNamespace
 import pytest
 from django.db import DatabaseError
 
-from base import catalog, outbound, relay, scheduler, worker
+from base import catalog, outbound, relay, scheduler, worker, worker_data
 from base.catalog import CatalogError, RegisterResult, SharedSchemaNotReady
 from base.tenancy import context, provision
 
@@ -891,7 +891,7 @@ def test_the_moves_pass_runs_on_control_and_hears_the_stop(monkeypatch):
     monkeypatch.setattr(move, "run_due", run_due)
     monkeypatch.setattr(restore, "run_due", lambda now, *, cancelled: seen.append(("restores", cancelled())) or 0)
 
-    worker._moves(ten(0), stop)
+    worker_data._moves(ten(0), stop)
 
     assert seen == [(context.CONTROL, False), (context.CONTROL, True), ("restores", True)]
 
@@ -905,7 +905,7 @@ def test_the_moves_pass_restores_the_hubs_asked_too_on_control(monkeypatch):
     monkeypatch.setattr(move, "run_due", lambda now, *, cancelled: 0)
     monkeypatch.setattr(restore, "run_due", lambda now, *, cancelled: seen.append((context.current().kind, now)) or 1)
 
-    worker._moves(ten(0), threading.Event())
+    worker_data._moves(ten(0), threading.Event())
 
     assert seen == [(context.CONTROL, ten(0))]
 
@@ -923,7 +923,7 @@ def test_the_moves_pass_brings_back_what_a_business_lost_from_its_copy_too_on_co
         recovery, "run_due", lambda now, *, cancelled: seen.append((context.current().kind, now, cancelled())) or 1
     )
 
-    worker._moves(ten(0), threading.Event())
+    worker_data._moves(ten(0), threading.Event())
 
     assert seen == ["asides", (context.CONTROL, ten(0), False)]
 
@@ -940,7 +940,7 @@ def test_a_moves_pass_that_fails_is_logged_and_the_next_tick_tries_again(monkeyp
     monkeypatch.setattr(move, "run_due", run_due)
 
     with caplog.at_level(logging.ERROR, logger="base.worker"):
-        worker._moves(ten(0), threading.Event())
+        worker_data._moves(ten(0), threading.Event())
 
     [record] = [r for r in caplog.records if r.name == "base.worker"]
     assert "move" in record.getMessage() and record.exc_info[1] is failure

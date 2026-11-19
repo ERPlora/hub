@@ -27,7 +27,7 @@ from django.test.utils import CaptureQueriesContext
 from live.context import OperationContext, Scope
 from live.operations import get
 
-from base import services, usage, worker
+from base import services, usage, worker, worker_data
 from base.models import Membership
 from base.storage import hub_prefix
 from base.tenancy.context import use_hub
@@ -178,11 +178,11 @@ def test_the_day_to_measure_is_the_last_utc_day_that_ended_a_quarter_of_an_hour_
 
 @pytest.mark.django_db(transaction=True, databases=hubs.HUB_DATABASES)
 def test_the_worker_measures_the_day_that_ended_once(hub_a, monkeypatch):
-    monkeypatch.setattr(worker, "_measured", None)
+    monkeypatch.setattr(worker_data, "_measured", None)
 
-    worker._usage(NIGHT - dt.timedelta(minutes=1))  # 00:14: the day before DAY, which nobody measured in this test
-    worker._usage(NIGHT)
-    worker._usage(NIGHT + dt.timedelta(minutes=1))
+    worker_data._usage(NIGHT - dt.timedelta(minutes=1))  # 00:14: the day before DAY, which nobody measured in this test
+    worker_data._usage(NIGHT)
+    worker_data._usage(NIGHT + dt.timedelta(minutes=1))
 
     assert set(UsageRun.objects.values_list("day", flat=True)) == {DAY - dt.timedelta(days=1), DAY}
     assert HubUsageDaily.objects.filter(day=DAY).count() == 1
@@ -190,7 +190,7 @@ def test_the_worker_measures_the_day_that_ended_once(hub_a, monkeypatch):
 
 @pytest.mark.django_db(transaction=True, databases=hubs.HUB_DATABASES)
 def test_a_measurement_that_fails_is_logged_and_the_next_tick_tries_again(hub_a, monkeypatch, caplog):
-    monkeypatch.setattr(worker, "_measured", None)
+    monkeypatch.setattr(worker_data, "_measured", None)
     real = usage.measure
     failures = [RuntimeError("the catalog went away")]
 
@@ -202,8 +202,8 @@ def test_a_measurement_that_fails_is_logged_and_the_next_tick_tries_again(hub_a,
     monkeypatch.setattr(usage, "measure", measure)
 
     with caplog.at_level(logging.ERROR, logger="base.worker"):
-        worker._usage(NIGHT)
-    worker._usage(NIGHT)
+        worker_data._usage(NIGHT)
+    worker_data._usage(NIGHT)
 
     assert "the nightly measurement failed" in caplog.text
     assert HubUsageDaily.objects.filter(day=DAY).count() == 1
@@ -217,7 +217,7 @@ def run_the_loop_once(monkeypatch) -> None:
     from base.catalog import RegisterResult
 
     monkeypatch.setattr(catalog, "register_apps", lambda: RegisterResult(written=0, retired=0, docs_changed=0, skipped=True))
-    monkeypatch.setattr(worker, "_measured", None)
+    monkeypatch.setattr(worker_data, "_measured", None)
     stop = threading.Event()
     assert worker.run(stop, tick_seconds=0, wait=lambda seconds: stop.set()) == 0
 

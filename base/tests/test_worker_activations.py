@@ -25,7 +25,7 @@ from live.models import OutboxEvent
 from live.operations import get
 from psycopg import sql
 
-from base import activation, events, worker
+from base import activation, events, worker, worker_activations
 from base.activation import CREATING, FAILED, OFF, ON
 from base.models import AppActivation
 from base.tenancy import connections as tenancy_connections
@@ -163,7 +163,7 @@ def recorded(hub: Hub) -> set[str]:
 
 
 def run_pass(now: dt.datetime | None = None) -> None:
-    worker._activations(now or timezone.now())
+    worker_activations._activations(now or timezone.now())
 
 
 def run_pass_at(at: dt.datetime) -> None:
@@ -336,12 +336,12 @@ def test_two_workers_at_once_on_one_hub_never_collide_and_it_goes_on_once(busine
         return real(hub, **kwargs)
 
     monkeypatch.setattr(migrator, "ensure_schema", together)
-    monkeypatch.setattr(worker, "ACTIVATION_LOCK_WAIT", 30.0)
+    monkeypatch.setattr(worker_activations, "ACTIVATION_LOCK_WAIT", 30.0)
     failures: list[BaseException] = []
 
     def one_worker():
         try:
-            worker._activate(fresh(a), timezone.now())
+            worker_activations._activate(fresh(a), timezone.now())
         except BaseException as error:  # noqa: BLE001 - what a thread raised is asserted below
             failures.append(error)
         finally:
@@ -600,14 +600,14 @@ def test_a_hub_that_fails_is_logged_and_the_others_are_served(business, monkeypa
     a, b = business("a"), business("b")
     turn_on(a)
     turn_on(b)
-    real = worker._activate_in
+    real = worker_activations._activate_in
 
     def broken(hub, now):
         if hub.pk == a.pk:
             raise RuntimeError("the hub's database went away")
         return real(hub, now)
 
-    monkeypatch.setattr(worker, "_activate_in", broken)
+    monkeypatch.setattr(worker_activations, "_activate_in", broken)
 
     run_pass()
 
