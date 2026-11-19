@@ -194,6 +194,7 @@ territorio no cuentan como cambio, ni una rectificativa ya emitida: atrás cierr
 | INVOICE-F01 | El tique (factura simplificada) que nace al cobrar | hecho — Ventas lo pide dentro del mismo cobro |
 | INVOICE-F02 | La factura completa al cobrar a un cliente con NIF | hecho — Ventas lo pide dentro del mismo cobro |
 | INVOICE-F03 | Emitir una factura a mano | hecho |
+| INVOICE-F04 | El cliente pide la factura completa de su tique | parcial — el servidor ya la emite con el código del tique; faltan el código en el papel y la página pública |
 | INVOICE-F05 | Pasar un tique a factura completa desde el mostrador | hecho |
 | INVOICE-F06 | Una venta cobrada que no se ha podido facturar | hecho |
 | INVOICE-F07 | Anular una venta cobrada que ya tiene su tique | hecho — Ventas la pide dentro de la misma anulación |
@@ -314,6 +315,30 @@ pudo leer el territorio fiscal del negocio: escribe el tipo de cada línea.»; l
 con el impuesto del territorio. Si la moneda no se puede leer, la ventana lo dice («No se ha podido leer la moneda del negocio», con el
 motivo) y ofrece «Reintentar», que la vuelve a pedir; en cuanto llega, «Emitir factura» se enciende (hub#938).
 Implicados: TAX-F18, CUSTOMER-F17, TAX-F11
+
+### INVOICE-F04 El cliente pide la factura completa de su tique
+Estado: parcial — Facturación ya la emite con el código del tique; faltan el código en el papel del tique (SALE-F29) y la página pública donde el cliente escribe sus datos (hub#500)
+Actor: cliente, sin cuenta
+Pantalla: la página pública del negocio `/p/<negocio>/invoice/<código>` (aún no se pinta)
+Pasos:
+1. El tique lleva su código para pedir la factura completa, que es también el final de la dirección que lo abre.
+2. El cliente la abre en su móvil, sin iniciar sesión, y ve el número, la fecha y el total de su tique; si ya la
+   pidió, ve su factura completa.
+3. Escribe su nombre o razón social, su país, el tipo de documento (solo fuera de España), su NIF y su domicilio,
+   y pide la factura.
+4. Facturación emite, como el sistema, la factura completa que sustituye al tique (F3), igual que en INVOICE-F05,
+   y el cliente la ve en A4, desde donde la imprime o la guarda en PDF (INVOICE-F18).
+Entra: el código del tique y los datos fiscales que escribe el cliente.
+Sale: la F3, una sola por tique, como en INVOICE-F05 (avisa `invoice.invoice.issued`). El código no se gasta:
+desde entonces abre esa misma F3, hasta que caduca a los cuatro años del cobro.
+Si falla: un código que no existe, que está mal escrito o que es de otro negocio, «Este código no abre ningún
+tique. Revísalo o pide la factura en el establecimiento.», sin datos de nadie; uno caducado, «Este código ha
+caducado: pide la factura en el establecimiento.»; un tique que aún no tiene su documento fiscal, «Tu tique aún
+se está registrando. Prueba otra vez en unos minutos.»; diez códigos que no abren nada en una hora desde la misma
+conexión, «Demasiadas peticiones. Inténtalo de nuevo en un momento.» hasta que pasa la hora (un código bueno no
+cuenta). Los datos del cliente se comprueban como en INVOICE-F05, y un tique anulado o devuelto se rechaza igual.
+Si el tique ya tiene su F3, responde con ella sin emitir otra ni gastar número, aunque se escriban otros datos.
+Implicados: SALE-F29, INVOICE-F05, INVOICE-F18
 
 ### INVOICE-F05 Pasar un tique a factura completa desde el mostrador
 Estado: hecho
@@ -755,6 +780,7 @@ cliente por su nombre, su teléfono o su correo (como en Clientes) y una serie p
 |---|---|---|---|
 | Las facturas, con búsqueda, filtros, orden y páginas (hasta 100) | ver | F16 | `invoice.invoice.list` |
 | Una factura con sus líneas, desglose y enlaces, por su id o su número | ver | F17 | `invoice.invoice.get` |
+| El tique que abre su código (número, fecha y total) y, si ya la tiene, su factura completa con su QR de VeriFactu | la página pública | F04 | `invoice.public.ticket` |
 | La factura vigente de una venta | ver | F20 | `invoice.invoice.by_source` |
 | El documento imprimible (HTML A4) de una factura | ver | F18 | `invoice.invoice.document` |
 | La rectificativa que emitiría rectificar una factura, sin emitirla ni gastar número (lo que el asistente enseña antes de su confirmación y dentro de ella) | rectificar | F08 | `invoice.invoice.rectification_preview` |
@@ -780,6 +806,7 @@ Todas se pueden seguir en vivo.
 | Emite una factura a mano | emitir | F03 | `invoice.invoice.create` |
 | Emite la factura de una venta cobrada (también la reacción a su cobro) | emitir | F01, F02, F06 | `invoice.invoice.create_from_sale` |
 | Sustituye un tique por una factura completa | emitir | F04, F05 | `invoice.invoice.substitute` |
+| Emite, con el código del tique y los datos del cliente, la factura completa que lo sustituye, y la devuelve con su QR de VeriFactu | la página pública | F04 | `invoice.public.substitute` |
 | Marca pagada una factura emitida | emitir | F19 | `invoice.invoice.mark_paid` |
 | Rectifica una factura | rectificar | F08 | `invoice.invoice.rectify` |
 | Emite la rectificativa de una devolución (también la reacción a ella) | rectificar | F09, F10 | `invoice.invoice.rectify_from_refund` |
@@ -871,9 +898,11 @@ lo reintenta a los 2, 4, 8… segundos hasta 8 veces; pasado eso, sale con «Emi
 | Rectificar (a mano, por devolución y por anulación) | sí | sí | sí | no | `invoice.rectify_invoice` |
 | Crear y cambiar series | sí | sí | sí | no | `invoice.manage_series` |
 | Configurar el emisor | sí | sí | no | no | `invoice.manage_issuer` |
+| Pedir la factura completa de un tique con su código (la página pública, sin sesión) | sí | sí | no | no | `invoice.public` |
 
 Los papeles llegan del SaaS con prefijo (`hub_owner`, `hub_admin`, `hub_manager`, `hub_employee`).
-Recibir el emisor del SaaS (`invoice.sync_issuer`) no es de ningún papel: solo del sistema.
+Recibir el emisor del SaaS (`invoice.sync_issuer`) no es de ningún papel: solo del sistema. `invoice.public` lo tiene
+cualquiera que abre la página pública del tique, sin sesión y sin ningún otro permiso.
 
 ## Para quien lo mantiene
 
@@ -1201,6 +1230,43 @@ Recibir el emisor del SaaS (`invoice.sync_issuer`) no es de ningún papel: solo 
     factura sin su registro de alta no se emite ni se imprime; solo un error transitorio de la base de
     datos la deja «pendiente» de la reacción, y sin VeriFactu en el negocio sale sin registro.
 
+22. **El código del tique para pedir la factura completa (INVOICE-F04)**:
+    - **Qué es**: el número de la venta y doce caracteres más, `<venta>-<firma>` (`20261119-0012-K7Q2M9XD3FPA`).
+      La firma son los primeros 60 bits, en base32 de Crockford (sin I, L, O ni U), del HMAC-SHA256 del id de la
+      venta con la clave secreta del servidor. Nadie puede fabricarlo sin la clave, y uno de otro negocio no abre
+      nada aquí: su venta tiene otro id. No se guarda en ningún sitio: lo calcula Ventas
+      (`apps.sale.queries.receipt_codes`) para toda venta cobrada como tique, también las de antes, sin migración
+      ni relleno, y lo vuelve a calcular igual en cada reimpresión. Al teclearlo se aceptan minúsculas, la O por
+      el 0 y la I o la L por el 1. Si se cambia la clave secreta, los tiques impresos siguen valiendo mientras la
+      vieja siga en `SECRET_KEY_FALLBACKS`.
+    - **Cuánto dura**: cuatro años desde el cobro. Ninguna norma fija otro plazo para pedir la factura
+      completa que el cliente puede exigir (art. 7.2 y 7.3 RD 1619/2012); cuatro años es el plazo de
+      prescripción (art. 66 LGT) y el que el art. 15.3 da a la rectificativa.
+    - **Si se gasta**: no. Emite la F3 una sola vez (lo garantiza `invoice.invoice.substitute`, que la página
+      llama como el sistema) y después abre siempre esa misma F3, como el enlace del cliente a su factura.
+    - **Una segunda petición**: la misma F3 (`issued: false`, `already: true`), sin gastar número, aunque traiga
+      otros datos: corregirlos es rectificar en el mostrador (INVOICE-F08).
+    - **Intentos**: diez códigos que no abren nada por conexión y hora (`base.throttle.AttemptLimit`, la del
+      inicio de sesión); un código bueno, caducado o no, no cuenta.
+    - **Mercado**: gana el QR del tique que abre una página sin cuenta, donde el cliente escribe sus datos y
+      recibe la factura, con un enlace que no caduca a los pocos días y que, la segunda vez, lleva a la factura
+      ya emitida (Odoo, Qamarero). Los portales de México cierran el plazo al mes porque allí lo no facturado
+      entra en la factura global del SAT, que en España no existe; Square, Lightspeed y Toast no tienen
+      autofactura (la hace el personal desde el tique).
+
+    | Producto | Cómo lo resuelve | Fuente |
+    |---|---|---|
+    | Odoo TPV | QR en el tique, formulario de datos y «Get my invoice»; el enlace no caduca y la segunda visita va a la factura ya emitida | https://www.odoo.com/documentation/18.0/applications/sales/point_of_sale/receipts_invoices.html · https://github.com/odoo/odoo/blob/18.0/addons/point_of_sale/controllers/main.py |
+    | Qamarero (hostelería) | QR en el tique: con la cuenta cerrada, pedir la factura | https://qamarero.com/novedades/2023-03-14/ |
+    | IKEA España | la factura se pide después con el tique, sin plazo publicado | https://www.ikea.com/es/es/customer-service/facturas-y-tickets-pub45f94310/ |
+    | Mercadona | «Solicitar factura» en su portal con el código del tique | https://www.cronista.com/espana/actualidad-es/mercadona-la-ultima-novedad-para-solicitar-las-facturas-de-la-compra |
+    | Autofactura en México | el folio del tique, un plazo del comercio por la factura global y el control de tiques ya facturados | https://senhub.mx/blog/autofactura-portal-clientes |
+    | Shopify (Sufio) | «Ver factura» en la página del pedido, sin caducidad | https://sufio.com/news/view-invoices-new-customer-accounts/ |
+    | Square | sin autofactura: el vendedor guarda el NIF del cliente y emite | https://squareup.com/help/gb/en/article/7054 |
+    | Lightspeed | el QR del tique es para pagar; la factura desde un tique la hace el personal | https://k-series-support.lightspeedhq.com/hc/en-us/articles/1260804607150 |
+    | Toast | el enlace del recibo digital, sin autofactura | https://support.toasttab.com/en/article/Reprint-and-Resend-Receipt-from-Payment-Terminal |
+    | RD 1619/2012 | art. 7.2 y 7.3 (el cliente la exige), 15.3 (cuatro años) y 15.6 (la sustitutiva no es rectificativa) | https://www.boe.es/buscar/act.php?id=BOE-A-2012-14696 |
+
 ### Lo que NO hace, a propósito
 
 - No envía nada a la AEAT ni calcula la huella ni el QR: eso es VeriFactu.
@@ -1218,9 +1284,9 @@ Recibir el emisor del SaaS (`invoice.sync_issuer`) no es de ningún papel: solo 
 
 Lo que no entra tiene su issue abierta:
 
-- **hub#500** — El cliente no puede pedir él mismo la factura completa de su tique: faltan la
-  página pública de `base` bajo `/p/` y el código en el tique de Ventas; Facturación ya emite la F3
-  (`invoice.invoice.substitute`).
+- **hub#500** — El cliente no puede pedir él mismo la factura completa de su tique (INVOICE-F04): faltan el
+  código en el papel del tique de Ventas y la página pública que lo abre; Facturación ya da sus dos operaciones
+  por la puerta pública (`invoice.public.ticket` e `invoice.public.substitute`).
 - **hub#501** — El emisor de Facturación no se rellena con los datos fiscales de la cuenta de ERPlora:
   la foto del SaaS no lleva el bloque `issuer` y `base.hub.state_apply` no llama a
   `invoice.issuer.sync`, que ya existe; y el flujo choca con «Dos identidades» de PLAN-SAAS (los datos fiscales

@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:d7fe1051ab3a80b2405028ddb09bd9f42b61909349c063750e2ad5f8698b778e -->
+<!-- generated from WORKBOOK.md sha256:76369eb6b269b6f5ae57dfa7dcc57ea7de3177c4bd27b7067a1ad7ce8e2c3739 -->
 
 ## What it is for and who it is for
 
@@ -187,6 +187,7 @@ rectifying invoice already issued: Back closes its result (BASE-F05).
 | INVOICE-F01 | The ticket (simplified invoice) born when charging | done — Sales asks for it within the same charge |
 | INVOICE-F02 | The full invoice when charging a customer with a tax ID | done — Sales asks for it within the same charge |
 | INVOICE-F03 | Issue an invoice by hand | done |
+| INVOICE-F04 | The customer asks for the full invoice of their ticket | partial — the server already issues it with the ticket's code; the code on the paper and the public page are missing |
 | INVOICE-F05 | Turn a ticket into a full invoice at the counter | done |
 | INVOICE-F06 | A charged sale that could not be invoiced | done |
 | INVOICE-F07 | Void a charged sale that already has its ticket | done — Sales asks for it within the same void |
@@ -306,6 +307,31 @@ read the business’s tax territory: type the rate of each line."; the invoice i
 territory's tax. If the currency cannot be read, the window says so ("The business's currency could not be read", with the
 reason) and offers "Retry", which asks for it again; as soon as it arrives, "Issue invoice" lights up (hub#938).
 Involved: TAX-F18, CUSTOMER-F17, TAX-F11
+
+### INVOICE-F04 The customer asks for the full invoice of their ticket
+Status: partial — Invoicing already issues it with the ticket's code; the code on the ticket's paper (SALE-F29) and the public page where the customer types their details are missing (hub#500)
+Actor: customer, without an account
+Screen: the business's public page `/p/<business>/invoice/<code>` (not painted yet)
+Steps:
+1. The ticket carries its code to ask for the full invoice, which is also the end of the address that opens it.
+2. The customer opens it on their phone, without signing in, and sees their ticket's number, date and total; if
+   they already asked for it, they see their full invoice.
+3. They type their name or company name, their country, the kind of document (only outside Spain), their tax ID
+   and their address, and ask for the invoice.
+4. Invoicing issues, as the system, the full invoice that replaces the ticket (F3), as in INVOICE-F05, and the
+   customer sees it in A4, from where they print it or save it as a PDF (INVOICE-F18).
+In: the ticket's code and the tax details the customer types.
+Out: the F3, one per ticket, as in INVOICE-F05 (notifies `invoice.invoice.issued`). The code is not spent: from
+then on it opens that same F3, until it expires four years after the charge.
+If it fails: a code that does not exist, is mistyped or belongs to another business, «This code opens no ticket.
+Check it or ask for the invoice at the business.», with nobody's data; an expired one, «This code has expired:
+ask for the invoice at the business.»; a ticket that does not have its fiscal document yet, «Your ticket is still
+being registered. Try again in a few minutes.»; ten codes that open nothing within an hour from the same
+connection, «Too many requests. Try again in a moment.» until the hour is over (a right code does not count). The
+customer's details are checked as in INVOICE-F05, and a voided or refunded ticket is refused the same way. If the
+ticket already has its F3, it answers with it without issuing another or spending a number, even if other
+details are typed.
+Involved: SALE-F29, INVOICE-F05, INVOICE-F18
 
 ### INVOICE-F05 Turn a ticket into a full invoice at the counter
 Status: done
@@ -750,6 +776,7 @@ name, their phone or their email (as in Customers) and a series by its code.
 |---|---|---|---|
 | The invoices, with search, filters, sorting and pages (up to 100) | view | F16 | `invoice.invoice.list` |
 | An invoice with its lines, breakdown and links, by its id or its number | view | F17 | `invoice.invoice.get` |
+| The ticket its code opens (number, date and total) and, if it has one, its full invoice with its VeriFactu QR | the public page | F04 | `invoice.public.ticket` |
 | The current invoice of a sale | view | F20 | `invoice.invoice.by_source` |
 | The printable document (A4 HTML) of an invoice | view | F18 | `invoice.invoice.document` |
 | The rectifying invoice that rectifying an invoice would issue, without issuing it or using a number (what the assistant shows before its confirmation and inside it) | rectify | F08 | `invoice.invoice.rectification_preview` |
@@ -775,6 +802,7 @@ All of them can be followed live.
 | Issues an invoice by hand | issue | F03 | `invoice.invoice.create` |
 | Issues the invoice of a charged sale (also the reaction to its charge) | issue | F01, F02, F06 | `invoice.invoice.create_from_sale` |
 | Replaces a ticket by a full invoice | issue | F04, F05 | `invoice.invoice.substitute` |
+| Issues, with the ticket's code and the customer's details, the full invoice that replaces it, and answers it with its VeriFactu QR | the public page | F04 | `invoice.public.substitute` |
 | Marks an issued invoice as paid | issue | F19 | `invoice.invoice.mark_paid` |
 | Rectifies an invoice | rectify | F08 | `invoice.invoice.rectify` |
 | Issues the rectifying invoice of a refund (also the reaction to it) | rectify | F09, F10 | `invoice.invoice.rectify_from_refund` |
@@ -868,6 +896,8 @@ notice delivery hands it these notices afterwards and, if that one stayed "pendi
 | Rectify (by hand, by refund and by void) | yes | yes | yes | no | `invoice.rectify_invoice` |
 | Create and change series | yes | yes | yes | no | `invoice.manage_series` |
 | Set up the issuer | yes | yes | no | no | `invoice.manage_issuer` |
+| Ask for the full invoice of a ticket with its code (the public page, without a session) | yes | yes | no | no | `invoice.public` |
 
 The roles arrive from the SaaS with a prefix (`hub_owner`, `hub_admin`, `hub_manager`, `hub_employee`).
-Receiving the issuer from the SaaS (`invoice.sync_issuer`) belongs to no role: only to the system.
+Receiving the issuer from the SaaS (`invoice.sync_issuer`) belongs to no role: only to the system. Whoever opens
+the ticket's public page holds `invoice.public`, without a session and without any other permission.
