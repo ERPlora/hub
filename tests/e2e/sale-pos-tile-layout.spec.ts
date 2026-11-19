@@ -54,7 +54,7 @@ for (const viewport of [{ width: 1440, height: 900 }, { width: 390, height: 844 
     await login(page, A, '/sale/pos');
     for (const [name, path, ready] of [
       ['home', '/', '[data-testid=home-my-app]'],
-      ['datatable', '/demo/items', '.data-table__row--data, .data-table__empty'],
+      ['datatable', '/demo/items', '.data-table__row--data, .data-table__card, .data-table__empty'],
       ['pos', '/sale/pos', '[data-testid^=pos-product-]'],
     ] as const) {
       await page.goto(`${A}${path}`);
