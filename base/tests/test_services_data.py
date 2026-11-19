@@ -23,7 +23,7 @@ from live.models import OutboxEvent
 from live.operations import get
 
 from apps.verifactu.queries.app_hooks import enable_refusal
-from base import activation, blueprint, events as base_events, relay, services
+from base import activation, apps_on, blueprint, events as base_events, services
 from base.catalog import template_apps
 from base.models import AppActivation, Hub, ImportBatch, Membership
 from base.permissions import permissions_for
@@ -414,7 +414,7 @@ def born():
 
 
 def modules_on(scope=A):
-    return set(relay.active_apps(scope)) & set(activation.module_graph())
+    return set(apps_on.active_apps(scope)) & set(activation.module_graph())
 
 
 def chosen(host=A.key):

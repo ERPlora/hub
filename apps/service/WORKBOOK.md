@@ -1310,7 +1310,7 @@ Los papeles llegan del SaaS con prefijo (`hub_owner`, `hub_admin`, `hub_manager`
   una escritura cruda del admin no pasa por las reglas ni deja aviso, salvo la del árbol de categorías.
 - Tenencia: el ámbito es la primera parte del Host y cada negocio tiene su propia BD: los datos de `a` no se ven en `b`.
   Cada negocio enciende y apaga sus
-  apps (BASE-F23, BASE-F24; `base.relay.active_apps`): los rechazos por «Servicios no activa» de F24, F26 y F27
+  apps (BASE-F23, BASE-F24; `base.apps_on.active_apps`): los rechazos por «Servicios no activa» de F24, F26 y F27
   los ve un negocio que apaga Servicios y sigue cobrando en Ventas, que no la tiene en sus `requires`.
 - Quién lee el catálogo, contado por sus llamadas (`rg '"service\.' apps`): Citas
   (`service.service.list_for_sale`, `service.assignment.eligible` y los modelos, que requiere), Ventas

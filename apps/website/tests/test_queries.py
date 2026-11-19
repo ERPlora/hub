@@ -145,11 +145,11 @@ def test_a_category_filter_keeps_only_those_categories(products_catalog):
 
 
 def source_off(monkeypatch, label: str) -> None:
-    """``label`` off in every hub (``base.relay.active_apps``), the website and the rest still on."""
-    from base import relay
+    """``label`` off in every hub (``base.apps_on.active_apps``), the website and the rest still on."""
+    from apps.website import queries
 
-    real = relay.active_apps
-    monkeypatch.setattr(relay, "active_apps", lambda scope: real(scope) - {label})
+    real = queries.active_apps
+    monkeypatch.setattr(queries, "active_apps", lambda scope: real(scope) - {label})
 
 
 def test_a_source_whose_app_is_off_in_the_hub_is_an_empty_catalog_not_an_error(monkeypatch, products_catalog):

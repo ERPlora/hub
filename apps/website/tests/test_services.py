@@ -212,10 +212,10 @@ def test_publish_snapshots_only_the_chosen_categories(services_catalog):
 
 def test_publish_with_the_catalogs_app_off_leaves_an_empty_catalog_not_an_error(monkeypatch, services_catalog):
     # flow: WEBSITE-F05 — Services has offered services, but it is off in the hub: none of them is copied.
-    from base import relay
+    from apps.website import queries
 
-    real = relay.active_apps
-    monkeypatch.setattr(relay, "active_apps", lambda scope: real(scope) - {"service"})
+    real = queries.active_apps
+    monkeypatch.setattr(queries, "active_apps", lambda scope: real(scope) - {"service"})
     save()
     run("website.site.publish")
     assert Site.objects.get().published_content["catalog"] == {"source": "service", "show_prices": True, "groups": []}

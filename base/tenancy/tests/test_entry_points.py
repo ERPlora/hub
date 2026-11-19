@@ -252,7 +252,7 @@ def test_internal_calls_for_a_business_enter_it(monkeypatch, hub_b):
         return None, internal.refuse(418, "probe", "seen")
 
     monkeypatch.setattr(internal, "_operation_call", call)
-    monkeypatch.setattr(internal.relay, "active_apps", lambda scope: frozenset({photo.WHATSAPP_APP}))
+    monkeypatch.setattr(internal.apps_on, "active_apps", lambda scope: frozenset({photo.WHATSAPP_APP}))
     request = type("Request", (), {"body": json.dumps({"hub": hub_b.slug}).encode()})()
 
     internal._whatsapp_call(request, "whatsapp_inbox.message.receive")

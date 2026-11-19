@@ -95,7 +95,7 @@ def test_without_a_website_to_show_the_domain_serves_nothing(client, connected, 
         run("website.site.unpublish")
     elif state == "app_off":
         publish()
-        monkeypatch.setattr(queries.relay, "active_apps", lambda scope: frozenset())
+        monkeypatch.setattr(queries, "active_apps", lambda scope: frozenset())
     response = visit(client)
     assert response.status_code == 404
     assert "auth/login" not in response.content.decode()
