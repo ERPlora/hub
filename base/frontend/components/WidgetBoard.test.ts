@@ -136,11 +136,14 @@ describe('WidgetBoard', () => {
     expect(s.inDoc('widgets-active')).toBeNull();
   });
 
-  it('with no app offering panels the picker says so', async () => {
-    const s = await setup('es');
+  it.each([
+    ['en', 'No active app offers widgets yet.'],
+    ['es', 'Ninguna app activa ofrece widgets todavía.'],
+  ] as const)('with no app offering panels the picker says so (%s)', async (locale, said) => {
+    const s = await setup(locale);
     await s.show([]);
     await s.customize();
-    expect(s.inDoc('widgets-none')!.textContent?.trim()).toBe('Ninguna app activa ofrece widgets todavía.');
+    expect(s.inDoc('widgets-none')!.textContent?.trim()).toBe(said);
   });
 
   it('a failed read says so, with «Retry»', async () => {
