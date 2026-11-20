@@ -23,9 +23,9 @@
 // maximum is `SLOT_SENTINEL`) and a day open in Schedules («E2E Fsm …»), and goes.
 import { spawnSync } from 'node:child_process';
 
-import { type Browser, type BrowserContext, expect, type Page, test } from '@playwright/test';
+import { type Browser, type BrowserContext, expect, test } from '@playwright/test';
 
-import { choose, confirmDialog, signedIn } from './flow-helpers';
+import { choose, confirmDialog, openRun, signedIn } from './flow-helpers';
 import { aMonday } from './appointment-helpers';
 import { A, api, HUB_DIR, login, psql, shot, shown } from './helpers';
 import { FLOW_VIEWPORTS, noHorizontalScroll, post, rowAction, settled } from './service-helpers';
@@ -126,13 +126,6 @@ const sentTo = (phone: string): string[] =>
 
 /** Gone to erplora.com: no longer queued nor on its way (Meta's answer, through erplora.com, is in it). */
 const handedOver = (row: string): boolean => !/^[a-z]+\|(queued|sending)\|/.test(row);
-
-async function openRun(page: Page, status: string) {
-  const run = shown(page).locator('[data-testid^=flow-run-]').filter({ hasText: status }).first();
-  await expect(run).toBeVisible();
-  await run.locator('[data-testid^=flow-run-toggle-]').click();
-  return run;
-}
 
 for (const viewport of FLOW_VIEWPORTS) {
   test(`FLOW-F31: «Send a message» writes to the customer's exact number at ${viewport.label}`, async ({ browser }) => {

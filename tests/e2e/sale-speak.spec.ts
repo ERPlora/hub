@@ -7,48 +7,15 @@
 // provider and run with `ASSISTANT_SERVICE_PROVIDER=e2e-local` (README «El asistente»).
 // flow: SALE-F01
 // flow: BASE-F94
-import { execSync } from 'node:child_process';
-
 import { expect, type Locator, type Page, test } from '@playwright/test';
 
-import { DICTATION, type Provider, startProvider } from './assistant-provider';
-import { A, EMPLOYEE, login, REPO_DIR, shot, untilStill } from './helpers';
-import { STACK } from './stack';
+import { answers, box, cancel, card, panel, receipts, send } from './assistant-panel';
+import { DICTATION } from './assistant-provider';
+import { A, EMPLOYEE, login, shot, THREE_SIZES as VIEWPORTS, untilStill } from './helpers';
+import { chats, panelSpec } from './provider-helpers';
 import { toastSaying } from './toast-helpers';
 
-const VIEWPORTS = [
-  { label: '390', width: 390, height: 844 },
-  { label: '834', width: 834, height: 1112 },
-  { label: '1440', width: 1440, height: 900 },
-];
-
-const PROVIDER_PORT = Number(process.env.E2E_AI_PROVIDER_PORT ?? STACK.hubPort + 2);
-/** The SaaS's database of this stack (README «Varias ejecuciones a la vez»: `saas_e2e_<Hub port + 1>`). */
-const SAAS_DB = process.env.E2E_SAAS_DB ?? (STACK.hubPort === 8000 ? 'saas' : `saas_e2e_${STACK.hubPort + 1}`);
-
-let provider: Provider;
-
-function saasSql(sql: string): string {
-  return execSync(`docker compose exec -T postgres psql -U hub -d ${SAAS_DB} -At -c "${sql}"`, {
-    cwd: REPO_DIR,
-    encoding: 'utf8',
-  }).trim();
-}
-
-test.beforeAll(async () => {
-  provider = await startProvider(PROVIDER_PORT);
-  const seeded = saasSql("select base_url from assistant_aiprovider where slug = 'e2e-local'");
-  expect(seeded, `the SaaS ${SAAS_DB} is not seeded with this provider: README «El asistente»`).toBe(provider.url);
-});
-
-test.afterAll(async () => {
-  await provider?.close();
-});
-
-test.beforeEach(() => {
-  // This month's messages of the business `a`: none, so a run never spends the plan's allowance.
-  saasSql("delete from assistant_assistantusage where hub_id = (select id from hubs_hub where slug = 'a')");
-});
+const provider = panelSpec();
 
 // The browser's fake microphone: a worker-wide launch option, so for the whole file.
 test.use({
@@ -57,12 +24,8 @@ test.use({
 });
 
 const key = (page: Page): Locator => page.locator('[data-testid="pos-speak"]');
-const panel = (page: Page): Locator => page.locator('[data-testid="assistant-panel"]');
-const box = (page: Page): Locator => panel(page).locator('[data-testid="assistant-input"] textarea');
-const answers = (page: Page): Locator => panel(page).locator('[data-testid="assistant-answer"]');
-const card = (page: Page): Locator => page.locator('ion-modal[data-testid="assistant-confirm"]');
-const asked = (): number => provider.seen.filter((seen) => seen.path === '/v1/chat/completions').length;
-const transcribed = (): number => provider.seen.filter((seen) => seen.path === '/v1/audio/transcriptions').length;
+const asked = (): number => chats(provider()).length;
+const transcribed = (): number => provider().seen.filter((seen) => seen.path === '/v1/audio/transcriptions').length;
 
 async function till(page: Page): Promise<void> {
   await page.goto(`${A}/sale/pos`);
@@ -109,9 +72,9 @@ test('SALE-F01 / BASE-F94 — «Speak» dictates into the assistant: the words w
   // The cashier sends it: erplora.com answers. `DICTATION` asks for a write the cashier may not make, and the
   // assistant, acting as the cashier, does not make it and says so.
   const questions = asked();
-  await panel(page).locator('[data-testid="assistant-send"]').click();
+  await send(page).click();
   await expect(answers(page)).toHaveCount(1, { timeout: 30_000 });
-  await expect(panel(page).locator('[data-testid="assistant-receipt"]').last()).toContainText('Not done, not allowed: Create in Demo');
+  await expect(receipts(page).last()).toContainText('Not done, not allowed: Create in Demo');
   expect(asked()).toBeGreaterThan(questions);
   await expect(card(page)).toBeHidden();
 });
@@ -122,10 +85,9 @@ test('SALE-F01 / BASE-F94 — a write dictated by whoever may make it stops on i
   await till(page);
   await speak(page);
   await expect(answers(page)).toHaveCount(0);
-  await panel(page).locator('[data-testid="assistant-send"]').click();
+  await send(page).click();
   await expect(card(page)).toBeVisible({ timeout: 30_000 });
-  await card(page).locator('[data-testid="assistant-confirm-cancel"]').click();
-  await expect(card(page)).toBeHidden();
+  await cancel(page);
   await expect(answers(page)).toHaveCount(1, { timeout: 30_000 });
 });
 
