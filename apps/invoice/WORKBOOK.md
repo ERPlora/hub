@@ -159,7 +159,8 @@ actual», «Activa» y «Predet.»; buscador «Buscar código, nombre…». Por 
 tarjetas. **+** abre «Nueva serie de numeración»; «Editar» (o pulsar la fila) abre «Editar serie
 {código}» (INVOICE-F12, INVOICE-F13). Sin emisor, lo dice el mismo aviso «Todavía no puedes facturar» de la
 campana que en **Facturas**, una sola vez, y ninguno en la pantalla.
-Vacía: «Aún no hay series. Crea la primera para numerar tus facturas.». Cargando: «Cargando series…».
+Vacía: «Aún no hay series. Se crean solas con tu primera venta; crea una solo para cambiar el prefijo o seguir
+la numeración de otro sistema.». Cargando: «Cargando series…».
 Error: «No se pudieron cargar las series» con «Reintentar».
 
 ### Emisor

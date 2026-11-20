@@ -130,10 +130,12 @@ describe('SeriesPage', () => {
     expectAnAdministratorToSetUpTheIssuer(s);
   });
 
-  it('empty, it says so; an error says it with Retry', async () => {
+  it('empty, it says the series are born with the first sale; an error says it with Retry', async () => {
     const s = await setup();
     await s.show({ rows: [], total: 0, limit: 50, offset: 0 });
-    expect(s.wrapper.findComponent(EmptyState).props('heading')).toBe('No series yet. Create the first one to number your invoices.');
+    expect(s.wrapper.findComponent(EmptyState).props('heading')).toBe(
+      'No series yet. They are created on their own with your first sale; create one only to change the prefix or continue another system’s numbering.',
+    );
     const failing = await setup();
     failing.call.push(errorFrame(failing.subId(OP), 'invoice.boom'));
     await flush();

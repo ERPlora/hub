@@ -251,7 +251,7 @@
         "one": "serie",
         "many": "series"
       },
-      "empty": "Aún no hay series. Crea la primera para numerar tus facturas.",
+      "empty": "Aún no hay series. Se crean solas con tu primera venta; crea una solo para cambiar el prefijo o seguir la numeración de otro sistema.",
       "noResults": "Sin resultados",
       "loading": "Cargando series…",
       "loadError": "No se pudieron cargar las series",

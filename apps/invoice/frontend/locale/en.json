@@ -251,7 +251,7 @@
         "one": "series",
         "many": "series"
       },
-      "empty": "No series yet. Create the first one to number your invoices.",
+      "empty": "No series yet. They are created on their own with your first sale; create one only to change the prefix or continue another system’s numbering.",
       "noResults": "No results",
       "loading": "Loading series…",
       "loadError": "Could not load the series",
