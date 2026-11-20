@@ -13,7 +13,7 @@ from base import bell
 from base.schemas.bell import BellCounterOut, BellCountersOut
 from base.tests.typed_operations import ts_fields
 
-OPERATIONS_TS = Path(__file__).resolve().parents[1] / "frontend" / "operations-bell.d.ts"
+OPERATIONS_TS = Path(__file__).resolve().parents[1] / "frontend" / "operations-bell.ts"
 
 
 def counter(**fields):

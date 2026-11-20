@@ -3384,7 +3384,7 @@ Implicados: BASE-F41
   de la plataforma (`FAILED_EVENTS`, urgente, y `PLAN_LIMITS`); `base.bell.counters` los devuelve en el idioma de la
   persona, y un plazo que no es una fecha y hora ISO deja el contador fuera, como un número que no es entero.
   `live.E024` comprueba la gravedad, los textos y que `due` nombre un campo de la respuesta. El esquema vive en
-  `base/schemas/bell.py` y sus tipos en `base/frontend/operations-bell.d.ts`. Tests: `test_bell.py` (también que cada
+  `base/schemas/bell.py` y sus tipos en `base/frontend/operations-bell.ts`. Tests: `test_bell.py` (también que cada
   contador de los módulos dice sus palabras en inglés y en español y que los tipos siguen al esquema),
   `test_queries_home_bell.py` y los de cada app (`test_integration_home.py` de Citas e Impresión, `test_home_hooks.py`
   de WhatsApp).

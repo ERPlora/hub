@@ -395,7 +395,7 @@ def test_nobody_without_the_view_permission(orders):
 
 # ── The typed operations declare the schema fields ─────────────────────────────────────────────
 
-OPERATIONS_TS = Path(__file__).resolve().parents[1] / "frontend" / "operations.d.ts"
+OPERATIONS_TS = Path(__file__).resolve().parents[1] / "frontend" / "operations.ts"
 
 
 @pytest.mark.parametrize(

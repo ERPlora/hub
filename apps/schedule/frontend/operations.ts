@@ -1,5 +1,5 @@
 // Types of the schedule app's operations for the SDK (`useLive`, `useCommand`), from apps/schedule/schemas.py. Written
-// by hand, as `frontend/sdk-types.d.ts` is: nothing generates them from `/api/openapi.json`. Keep it in step with
+// by hand, as `frontend/sdk-types.ts` is: nothing generates them from `/api/openapi.json`. Keep it in step with
 // schemas.py and with `frontend/generated/operations.json`. One input per operation (ninja's parity): no path
 // parameters. Times are `HH:MM:SS` on the way out (`HH:MM` is accepted in); dates are ISO `YYYY-MM-DD`; a span's
 // date-times are the business's wall clock without offset (`2026-08-17T22:00:00`).

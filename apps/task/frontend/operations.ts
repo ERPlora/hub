@@ -1,5 +1,5 @@
 // Types of the task app's operations for the SDK (`useLive`, `useCommand`), from apps/task/schemas.py. Written by hand,
-// as `frontend/sdk-types.d.ts` is: nothing generates them from `/api/openapi.json`. Keep it in step with schemas.py and
+// as `frontend/sdk-types.ts` is: nothing generates them from `/api/openapi.json`. Keep it in step with schemas.py and
 // with `frontend/generated/operations.json`. One input per operation (ninja's parity): no path parameters, ids travel
 // in the input. Dates are ISO `YYYY-MM-DD`; moments, ISO date-times.
 import type { Page } from '../../../frontend/sdk-types';

@@ -1,5 +1,5 @@
 // Types of the flow app's operations for the SDK (`useLive`, `useCommand`, `client.api.call`), from
-// apps/flow/schemas.py. Written by hand, as `frontend/sdk-types.d.ts` is: nothing generates them from
+// apps/flow/schemas.py. Written by hand, as `frontend/sdk-types.ts` is: nothing generates them from
 // `/api/openapi.json`. Keep it in step with schemas.py and with `frontend/generated/operations.json`. One input per
 // operation (ninja's parity): no path parameters, an automation's `id` (or its name, `flow`) travels in the input.
 // Dates are ISO strings.
