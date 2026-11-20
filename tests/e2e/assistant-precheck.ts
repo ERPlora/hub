@@ -5,6 +5,7 @@
 // proves it (assistant-precheck.test.ts).
 import type { AttachedFile } from './assistant-fixtures.ts';
 import type { Scenario } from './assistant-scenario.ts';
+import { hubShellCommand, type ShellCommand } from './assistant-setup.ts';
 
 export type ContentPart =
   | { type: 'text'; text: string }
@@ -58,17 +59,8 @@ print(json.dumps([tool["name"] for tool in answer.model_dump(mode="json")["tools
 `;
 
 /** How the precheck runs from the Hub's checkout, the opening's content in `file`. */
-export function offeredTurnCommand(
-  opening: { file: string; language: string },
-  env: Record<string, string | undefined>,
-): { file: string; args: string[]; env: Record<string, string> } {
-  const base = Object.fromEntries(Object.entries(env).filter((entry): entry is [string, string] => entry[1] !== undefined));
-  return {
-    file: 'uv',
-    args: ['run', 'python', 'manage.py', 'shell', '--hub', 'a', '-c', OFFERED_TURN_PY],
-    env: { ...base, QA_OPENING_FILE: opening.file, QA_OPENING_LANGUAGE: opening.language },
-  };
-}
+export const offeredTurnCommand = (opening: { file: string; language: string }, env: Record<string, string | undefined>): ShellCommand =>
+  hubShellCommand(OFFERED_TURN_PY, env, { QA_OPENING_FILE: opening.file, QA_OPENING_LANGUAGE: opening.language });
 
 /** The offered tools by operation name, from the shell's last line. */
 export function parseOfferedTurn(output: string): string[] {

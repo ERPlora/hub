@@ -17,7 +17,7 @@ import { join, relative } from 'node:path';
 import { type Browser, expect, type Page, test } from '@playwright/test';
 
 import { QA_STAFF_EMAIL, redact } from '../assistant-battery';
-import { benchModel, type BenchMeta, type BenchReport, parseUsage, USAGE_SQL } from '../assistant-bench';
+import { type BenchMeta, type BenchReport, hubRunMeta, parseUsage, USAGE_SQL } from '../assistant-bench';
 import { type AttachedFile, attachmentFile, renderWith } from '../assistant-fixtures';
 import { goldenCommand, parseStepResults, runSteps, type StepsRun } from '../assistant-golden';
 import { askOwner, type Exchange, ownerChoice, type OwnerDeps } from '../assistant-owner';
@@ -112,11 +112,7 @@ function goldenProblem(scenario: Scenario): string | null {
 
 function bench(scenario: Scenario, measured: ScenarioMeasured): void {
   const meta: BenchMeta = {
-    product: 'hub',
-    run: RUN,
-    date: new Date().toISOString(),
-    model: benchModel(answerChoice(process.env)),
-    files: FILES.map((path) => relative(HUB_DIR, path)),
+    ...hubRunMeta(RUN, FILES.map((path) => relative(HUB_DIR, path)), process.env),
     corpus: SCENARIOS.length,
     sample: null,
     owner: { model: ownerChoice(process.env).model },

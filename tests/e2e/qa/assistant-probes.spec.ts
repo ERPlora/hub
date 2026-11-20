@@ -20,10 +20,10 @@ import { type Browser, type BrowserContext, expect, type Page, test } from '@pla
 
 import { observe, redact } from '../assistant-battery';
 import {
-  benchModel,
   type BenchMeta,
   type BenchReport,
   benchTurn,
+  hubRunMeta,
   type Measured,
   notAsked,
   offeredCommand,
@@ -77,7 +77,6 @@ import {
   settled,
   withDates,
 } from '../assistant-setup';
-import { answerChoice } from '../assistant-seed';
 import { A, api, ARTIFACTS, capture, type Credentials, EMPLOYEE, HUB_DIR, hostPage, OWNER } from '../helpers';
 import { STACK } from '../stack';
 
@@ -170,11 +169,7 @@ function prepare(): State {
 
 /** The run's bench report as the spec starts it; a run asked again keeps the one it began with. */
 const benchMeta: BenchMeta = {
-  product: 'hub',
-  run: RUN,
-  date: new Date().toISOString(),
-  model: benchModel(answerChoice(process.env)),
-  files: FILES.map((path) => relative(HUB_DIR, path)),
+  ...hubRunMeta(RUN, FILES.map((path) => relative(HUB_DIR, path)), process.env),
   corpus: CORPUS_PROBES.length,
   sample: SAMPLE,
 };

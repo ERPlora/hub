@@ -47,12 +47,7 @@ describe('cardsOf', () => {
         title: 'Crear producto (Inventario)',
         risk: 'normal',
         arguments: { name: 'Tarta de zanahoria', price: 550 },
-        fields: [
-          { name: 'name', label: 'Nombre', kind: 'text', value: 'Tarta de zanahoria' },
-          { name: 'price', label: 'Precio', kind: 'money', value: 550 },
-          { name: 'category_ids', label: 'Categorías', kind: 'list', value: ['Postres'] },
-          { name: 'extra', label: 'Más', kind: 'object', value: { a: 1 } },
-        ],
+        fields: CARD.fields,
       },
     ]);
   });

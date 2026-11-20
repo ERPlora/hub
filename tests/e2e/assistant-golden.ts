@@ -5,6 +5,7 @@
 // an earlier step's result (`{"$ref": "<id>", "where": {...}, "take": "id"}`), so the steps run in batches of one shell
 // each. Pure but for the executor it is given, so Vitest proves it (assistant-golden.test.ts).
 import type { ToolStep } from './assistant-scenario.ts';
+import { hubShellCommand, type ShellCommand } from './assistant-setup.ts';
 
 /** What one step answered: the outcome and code of the tool, its content (the result's JSON), and whether a card
  *  showed (and was confirmed) on the way. */
@@ -176,17 +177,10 @@ print(json.dumps(results))
 `;
 
 /** How a batch runs from the Hub's checkout: its steps in `file`, as the setup or as the golden path. */
-export function goldenCommand(
+export const goldenCommand = (
   batch: { file: string; mode: 'setup' | 'golden'; language: string },
   env: Record<string, string | undefined>,
-): { file: string; args: string[]; env: Record<string, string> } {
-  const base = Object.fromEntries(Object.entries(env).filter((entry): entry is [string, string] => entry[1] !== undefined));
-  return {
-    file: 'uv',
-    args: ['run', 'python', 'manage.py', 'shell', '--hub', 'a', '-c', GOLDEN_PY],
-    env: { ...base, QA_GOLDEN_FILE: batch.file, QA_GOLDEN_MODE: batch.mode, QA_GOLDEN_LANGUAGE: batch.language },
-  };
-}
+): ShellCommand => hubShellCommand(GOLDEN_PY, env, { QA_GOLDEN_FILE: batch.file, QA_GOLDEN_MODE: batch.mode, QA_GOLDEN_LANGUAGE: batch.language });
 
 /** What each step answered, from the shell's last line; anything else is the shell's failure, quoted. */
 export function parseStepResults(output: string): StepRun[] {

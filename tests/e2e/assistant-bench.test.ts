@@ -11,6 +11,7 @@ import {
   type BenchMeta,
   benchTurn,
   callsOf,
+  hubRunMeta,
   type Measured,
   notAsked,
   OFFERED_PY,
@@ -261,5 +262,19 @@ describe('benchModel', () => {
       fallback: 'gpt-5.4-mini',
       vision: false,
     });
+  });
+});
+
+describe('hubRunMeta', () => {
+  it('starts a Hub run with its name, when it began, the model that answers and the files it asks', () => {
+    const meta = hubRunMeta('run-1', ['tests/e2e/qa/probes/owner-es-customer.json'], {});
+    expect(meta).toEqual({
+      product: 'hub',
+      run: 'run-1',
+      date: expect.any(String),
+      model: benchModel(answerChoice({})),
+      files: ['tests/e2e/qa/probes/owner-es-customer.json'],
+    });
+    expect(Number.isNaN(Date.parse(meta.date))).toBe(false);
   });
 });

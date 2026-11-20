@@ -3,7 +3,7 @@
 // score (assistant-scenario-score.ts), the checks, the conversation, every call with its arguments and every card the
 // owner confirmed, and the money and time of the assistant (the business's usage row) apart from the simulated owner's
 // (assistant-owner.ts). Pure, so Vitest proves it (assistant-scenario-bench.test.ts).
-import type { BenchCall, BenchMeta, BenchReport, Usage } from './assistant-bench.ts';
+import { type BenchCall, type BenchMeta, type BenchReport, keptReport, type Usage } from './assistant-bench.ts';
 import type { Exchange } from './assistant-owner.ts';
 import type { Scenario } from './assistant-scenario.ts';
 import type { AskOutcome, CheckResult, ScenarioScore, ScenarioTurn, SeenCard } from './assistant-scenario-score.ts';
@@ -99,10 +99,7 @@ export function scenarioRow(scenario: Scenario, measured: ScenarioMeasured): Sce
 
 /** The run's report with `row` in it (a scenario asked again replaces its row), in the order of the run's scenarios. */
 export function withScenario(report: BenchReport | null, meta: BenchMeta, row: ScenarioRow, order: string[]): BenchReport {
-  const kept = report && report.meta.run === meta.run ? report : null;
-  if (kept && kept.meta.model.label !== meta.model.label) {
-    throw new Error(`the run ${meta.run} was answered by ${kept.meta.model.label}, not ${meta.model.label}: ask it in a new run`);
-  }
+  const kept = keptReport(report, meta);
   const rows = [...(kept?.scenarios ?? []).filter((earlier) => earlier.scenario !== row.scenario), row];
   const place = (earlier: ScenarioRow) => order.indexOf(earlier.scenario);
   return { schema: 1, meta: kept?.meta ?? meta, turns: [], scenarios: rows.sort((a, b) => place(a) - place(b)) };
