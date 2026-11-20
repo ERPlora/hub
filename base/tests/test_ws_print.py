@@ -165,7 +165,7 @@ async def fresh_live():
 
 
 @pytest.fixture
-async def sockets():
+async def sockets(live_runs_ended):
     """Sockets opened by a test; those still open are disconnected after it (a failed test included)."""
     opened: list[Socket] = []
 
