@@ -14,7 +14,6 @@ import {
   EmptyState,
   InlineFeedback,
   StatusPill,
-  withRowNames,
 } from '@erplora/ui/components';
 import { useCommand, useLive } from '@erplora/ui/sdk';
 import { AppPage, useSession } from '@erplora/ui/shell';
@@ -118,7 +117,7 @@ const columns = computed<DataTableColumn<WaitlistOut>[]>(() => [
 ]);
 
 const actions = computed<DataTableAction<WaitlistOut>[]>(() =>
-  withRowNames<WaitlistOut>(guestOf, canChange.value
+  canChange.value
     ? [
         {
           id: 'contact',
@@ -137,7 +136,7 @@ const actions = computed<DataTableAction<WaitlistOut>[]>(() =>
         },
         { id: 'remove', label: t('reservation.waitlist.actions.remove'), icon: 'trash-outline', color: 'danger' },
       ]
-    : []),
+    : [],
 );
 
 const update = useCommand('reservation.waitlist.update');

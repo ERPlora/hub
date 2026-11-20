@@ -17,6 +17,7 @@ import en from '../locale/en.json';
 import ReservationFormModal from '../components/ReservationFormModal.vue';
 import StepDialog from '../components/StepDialog.vue';
 import ReservationsPage from './ReservationsPage.vue';
+import { rowButtonNames } from '../../../../base/frontend/__tests__/mount-base';
 
 const OP = 'reservation.reservation.list';
 /** Thursday 15 October 2026, 12:00 in Madrid. */
@@ -51,15 +52,9 @@ describe('ReservationsPage: whom an action is for', () => {
   it('each row action tells a screen reader whose reservation it is, its short words first', async () => {
     const s = await setup();
     await s.show([PENDING, SEATED]);
-    const named = s.prop<Array<{ id: string; ariaLabel?: (row: unknown) => string }>>('actions').map((a) => [a.id, a.ariaLabel?.(PENDING), a.ariaLabel?.(SEATED)]);
-    expect(named).toEqual([
-      ['confirm', 'Confirm: Ana García', 'Confirm: Deleted customer'],
-      ['seat', 'Seat: Ana García', 'Seat: Deleted customer'],
-      ['complete', 'Complete: Ana García', 'Complete: Deleted customer'],
-      ['cancel', 'Cancel: Ana García', 'Cancel: Deleted customer'],
-      ['no_show', 'No-show: Ana García', 'No-show: Deleted customer'],
-      ['edit', 'Edit: Ana García', 'Edit: Deleted customer'],
-      ['delete', 'Delete: Ana García', 'Delete: Deleted customer'],
+    expect(['r1', 'r2'].map((id) => rowButtonNames(s.wrapper.element, `reservation-list-row-${id}`))).toEqual([
+      { confirm: 'Confirm: Ana García', seat: 'Seat: Ana García' },
+      { complete: 'Complete: Deleted customer', edit: 'Edit: Deleted customer' },
     ]);
   });
 });

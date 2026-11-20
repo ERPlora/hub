@@ -9,6 +9,7 @@ import type { Component } from 'vue';
 import { flush, mountCash } from '../__tests__/mount-cash-register';
 import RegisterModal from './RegisterModal.vue';
 import RegistersCard from './RegistersCard.vue';
+import { rowButtonNames } from '../../../../base/frontend/__tests__/mount-base';
 
 const OP = 'cash_register.register.list';
 const PAGE = {
@@ -30,6 +31,15 @@ async function setup(editable = true) {
 }
 
 describe('RegistersCard', () => {
+  it('each drawer’s actions tell a screen reader which drawer they are for', async () => {
+    const s = await setup();
+    await s.result(OP, PAGE);
+    expect(['r1', 'r2'].map((id) => rowButtonNames(s.wrapper.element, `cash-register-registers-row-${id}`))).toEqual([
+      { rename: 'Rename: Bar', toggle: 'Deactivate: Bar' },
+      { rename: 'Rename: Terrace', toggle: 'Activate: Terrace' },
+    ]);
+  });
+
   it('lists the drawers by name with whether they are active', async () => {
     const s = await setup();
     expect(s.params(OP)).toEqual([{ limit: 100 }]);

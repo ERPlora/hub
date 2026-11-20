@@ -14,6 +14,7 @@ import { EMPLOYEE, errorFrame, flush, type MountOptions, mountStaff, page, settl
 import TimeOffFormModal from '../components/TimeOffFormModal.vue';
 import TimeOffPage from './TimeOffPage.vue';
 import { listFillProblems } from '../../../../frontend/testing/list-fill';
+import { rowButtonNames } from '../../../../base/frontend/__tests__/mount-base';
 
 const OP = 'staff.time_off.list';
 const off = (id: string, over: Partial<TimeOffOut> = {}): TimeOffOut => ({
@@ -60,11 +61,9 @@ describe('TimeOffPage: who it is for', () => {
   it('each row action tells a screen reader whose time off it is, its short words first', async () => {
     const s = await setup();
     await s.show(page(ROWS));
-    const named = s.prop<Array<{ id: string; ariaLabel?: (row: TimeOffOut) => string }>>('actions').map((a) => [a.id, ...ROWS.slice(0, 2).map((row) => a.ariaLabel?.(row))]);
-    expect(named).toEqual([
-      ['approve', 'Approve: Ana López', 'Approve: Bea Ruiz'],
-      ['reject', 'Reject: Ana López', 'Reject: Bea Ruiz'],
-      ['cancel', 'Cancel: Ana López', 'Cancel: Bea Ruiz'],
+    expect(['t1', 't2'].map((id) => rowButtonNames(s.wrapper.element, `staff-time-off-row-${id}`))).toEqual([
+      { approve: 'Approve: Ana López', reject: 'Reject: Ana López' },
+      { cancel: 'Cancel: Bea Ruiz' },
     ]);
   });
 });

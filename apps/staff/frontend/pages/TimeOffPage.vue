@@ -18,7 +18,6 @@ import {
   EmptyState,
   InlineFeedback,
   StatusPill,
-  withRowNames,
 } from '@erplora/ui/components';
 import { useCommand, useLive, useLiveClient } from '@erplora/ui/sdk';
 import { AppPage, useSession } from '@erplora/ui/shell';
@@ -159,7 +158,7 @@ function cancellable(row: TimeOffOut): boolean {
   return canRequest.value && row.status === 'pending' && ownId.value !== null && row.member_id === ownId.value;
 }
 
-const actions = computed<DataTableAction<TimeOffOut>[]>(() => withRowNames((row: TimeOffOut) => row.member_name, [
+const actions = computed<DataTableAction<TimeOffOut>[]>(() => [
   ...(canManage.value
     ? [
         {
@@ -182,7 +181,7 @@ const actions = computed<DataTableAction<TimeOffOut>[]>(() => withRowNames((row:
   ...(canManage.value || canRequest.value
     ? [{ id: 'cancel', label: t('staff.timeOff.actions.cancel'), icon: 'ban-outline', color: 'danger', hidden: (row: TimeOffOut) => !cancellable(row) }]
     : []),
-]));
+]);
 
 const approval = useCommand('staff.time_off.approve');
 const rejection = useCommand('staff.time_off.reject');

@@ -14,7 +14,6 @@ import {
   EmptyState,
   formatMoney,
   InlineFeedback,
-  withRowNames,
 } from '@erplora/ui/components';
 import { AppPage, useSession } from '@erplora/ui/shell';
 import { computed, ref, watch } from 'vue';
@@ -108,12 +107,12 @@ const filterFields = computed<DataTableFilterField[]>(() => [
  *  it does not filter. */
 const filterErrors = computed(() => amountFilterErrors(filters.value, SPENT_ENDS, { t, locale: locale.value, money: money.value }));
 
-const actions = computed<DataTableAction<CustomerRow>[]>(() => withRowNames((row: CustomerRow) => row.name, [
+const actions = computed<DataTableAction<CustomerRow>[]>(() => [
   { id: 'open', label: t('customer.list.view'), icon: 'ion:chevron-forward-outline', pinned: true },
   ...(canDelete.value
     ? [{ id: 'delete', label: t('customer.common.delete'), icon: 'ion:trash-outline', color: 'danger' }]
     : []),
-]));
+]);
 
 const creating = ref(false);
 const deleting = ref<{ id: string; name: string } | null>(null);

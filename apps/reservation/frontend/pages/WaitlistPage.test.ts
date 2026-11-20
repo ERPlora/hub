@@ -12,6 +12,7 @@ import { flush, ionValue, type MountOptions, mountReservation, page } from '../_
 import { entryRow, reservationRow } from '../__tests__/rows';
 import WaitlistFormModal from '../components/WaitlistFormModal.vue';
 import WaitlistPage from './WaitlistPage.vue';
+import { rowButtonNames } from '../../../../base/frontend/__tests__/mount-base';
 
 const OP = 'reservation.waitlist.list';
 const WAITING = entryRow();
@@ -41,11 +42,9 @@ describe('WaitlistPage: whom an action is for', () => {
   it('each row action tells a screen reader whose entry it is, its short words first', async () => {
     const s = await setup();
     await s.result(OP, page([WAITING, CONVERTED]));
-    const named = s.prop<Array<{ id: string; ariaLabel?: (row: unknown) => string }>>('actions').map((a) => [a.id, a.ariaLabel?.(WAITING), a.ariaLabel?.(CONVERTED)]);
-    expect(named).toEqual([
-      ['contact', 'Contacted: Luis Pérez', 'Contacted: Pepa'],
-      ['convert', 'Convert: Luis Pérez', 'Convert: Pepa'],
-      ['remove', 'Remove: Luis Pérez', 'Remove: Pepa'],
+    expect(['w1', 'w3'].map((id) => rowButtonNames(s.wrapper.element, `reservation-waitlist-row-${id}`))).toEqual([
+      { contact: 'Contacted: Luis Pérez', convert: 'Convert: Luis Pérez' },
+      { remove: 'Remove: Pepa' },
     ]);
   });
 });
