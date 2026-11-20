@@ -11,7 +11,9 @@ from live.outbox import record_event
 from apps.verifactu import events
 from apps.verifactu.models import Event, Record
 from apps.verifactu.queries.records import find_record, summary
-from apps.verifactu.schemas import ContingencyRetryIn, NoInput, RecordSummaryOut, TransmitOut
+from apps.verifactu.schemas.contingency import ContingencyRetryIn, TransmitOut
+from apps.verifactu.schemas.fields import NoInput
+from apps.verifactu.schemas.records import RecordSummaryOut
 
 from .records import NOT_IN_QUEUE
 from .sending import _back_in_the_queue, _send, _unsent

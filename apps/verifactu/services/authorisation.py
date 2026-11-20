@@ -14,7 +14,8 @@ from apps.verifactu.queries.authorisation import saas_unreachable
 from apps.verifactu.queries.config import config_out
 from apps.verifactu.queries.country import refuse_outside_spain
 from apps.verifactu.queries.route import config_row, issuer_configured, issuer_identity
-from apps.verifactu.schemas import ConfigOut, RepresentationSubmitIn
+from apps.verifactu.schemas.authorisation import RepresentationSubmitIn
+from apps.verifactu.schemas.config import ConfigOut
 
 from .writes import CONFIGURE, ISSUER_MISSING, _changed, _config, _event
 

@@ -7,12 +7,12 @@ from live.context import OperationContext
 from live.operations import operation
 
 from apps.verifactu.models import Event, Record
-from apps.verifactu.schemas import (
+from apps.verifactu.schemas.fields import NoInput
+from apps.verifactu.schemas.stats import (
     ComplianceSummaryOut,
     ContingencySummaryOut,
     EventsOut,
     EventsRecentIn,
-    NoInput,
     RecordsByStatusOut,
 )
 

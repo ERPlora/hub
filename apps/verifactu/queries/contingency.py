@@ -5,7 +5,8 @@ from live.context import OperationContext
 from live.operations import operation
 
 from apps.verifactu.models import Record, wait_reason_text
-from apps.verifactu.schemas import ContingencyListIn, Page, QueueRowOut
+from apps.verifactu.schemas.contingency import ContingencyListIn, QueueRowOut
+from apps.verifactu.schemas.fields import Page
 
 from .reads import VIEW, page
 

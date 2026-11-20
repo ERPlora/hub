@@ -4,7 +4,8 @@ from live.context import OperationContext
 from live.operations import operation
 
 from apps.verifactu.models import Chain
-from apps.verifactu.schemas import ChainOut, ChainStatusOut, IssuerIn
+from apps.verifactu.schemas.chains import ChainOut, ChainStatusOut
+from apps.verifactu.schemas.fields import IssuerIn
 
 from .reads import VIEW
 from .route import config_row, issuer_identity

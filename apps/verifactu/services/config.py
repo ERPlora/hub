@@ -20,7 +20,8 @@ from apps.verifactu.queries.route import (
     route_problem,
     sending_route,
 )
-from apps.verifactu.schemas import ConfigOut, ConfigSyncIn, ConfigSyncOut, NoInput
+from apps.verifactu.schemas.config import ConfigOut, ConfigSyncIn, ConfigSyncOut
+from apps.verifactu.schemas.fields import NoInput
 
 from .authorisation import _representation_step
 from .sending import _back_in_the_queue

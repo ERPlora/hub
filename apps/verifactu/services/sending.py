@@ -23,7 +23,7 @@ from apps.verifactu.queries.route import (
     sending_route,
     system_for,
 )
-from apps.verifactu.schemas import TransmitOut
+from apps.verifactu.schemas.contingency import TransmitOut
 
 from .sealing import INVALID_RECORD, _build_xml
 from .writes import _config, _event

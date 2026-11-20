@@ -1110,7 +1110,7 @@ que manda la cuenta (`verifactu.sync_config`) no es de ningún papel: solo del s
 
 `apps.py`, `models.py` (`Config`, `OwnCertificate`, `Chain`, `SendControl`, `Record`, `Event`, `AeatRecord`),
 `migrations/`,
-`schemas.py`, `services/`, `queries/`, `api.py`, `live.py`, `events.py`, `admin.py`, `locale/`,
+`schemas/`, `services/`, `queries/`, `api.py`, `live.py`, `events.py`, `admin.py`, `locale/`,
 `frontend/` y, puros y sin ORM: `chain.py` (formatos, huella, QR), `envelope.py` (el XML: `RegistroAlta`,
 `RegistroAnulacion`, el sobre y la consulta), `xsd.py` (validación con los esquemas de `xsd/`), `aeat.py`
 (lectura de las respuestas de la AEAT y de la consulta), `gateway.py` (cliente de la pasarela del SaaS),

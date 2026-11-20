@@ -12,10 +12,10 @@ from live.operations import operation
 from apps.invoice.models import Invoice
 from apps.verifactu import chain, envelope
 from apps.verifactu.models import Record
-from apps.verifactu.schemas import (
+from apps.verifactu.schemas.fields import Page
+from apps.verifactu.schemas.records import (
     ByInvoiceIn,
     ByInvoiceOut,
-    Page,
     RecordGetIn,
     RecordListIn,
     RecordOut,
