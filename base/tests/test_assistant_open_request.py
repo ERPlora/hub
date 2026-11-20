@@ -65,8 +65,8 @@ def test_a_write_the_model_asked_for_closes_its_request(owner):
         *request,
         *asked_for(CREATE, {"name": "Tarta de zanahoria", "price": 550}),
         assistant("Hecho: la tarta de zanahoria ya está en la carta."),
-        person("¿Cuánto he vendido hoy?"),
-        assistant("Hoy llevas 320 €."),
+        person("Gracias."),
+        assistant("De nada."),
         person("¿Y ayer?"),
     )
 
