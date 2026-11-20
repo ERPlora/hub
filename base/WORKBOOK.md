@@ -4132,9 +4132,7 @@ Implicados: BASE-F41
   mandan contestar el «cómo se hace» solo con lo que devuelve y terminar la respuesta con el `cite` de cada extracto
   usado, al menos uno, tal cual y en su propia línea, y decir que la documentación no lo cubre si no devuelve nada; la
   regla de no inventar un registro sigue. Su pantalla de recibo es `help` («Ayuda»; el chat solo pinta recibos de escrituras). Necesita la
-  puerta de ERPlora/saas#178 desplegada: sin ella contesta 503. Tests: `base/tests/test_queries_docs_search.py`,
-  `test_assistant.py` (catálogo, `ALWAYS`, instrucciones, «Ayuda») y `test_api_assistant.py` (el turno, y que la
-  pasarela se espera fuera de su transacción).
+  puerta de ERPlora/saas#178 desplegada: sin ella contesta 503.
 - Panel: el chat compartido de `@erplora/ui/components` (`packages/ui/src/components/Assistant/`; el SaaS
   monta el mismo con sus herramientas): `AssistantPanel`, `AssistantMessage`, `AssistantMarkdown`,
   `AssistantComposer`, `AssistantConfirm` sobre `ConfirmDialog`, `AssistantReport` sobre `FormModal`, `AssistantEmpty`
@@ -4164,14 +4162,9 @@ Implicados: BASE-F41
   `kind`, la excepción o `no_done`). Nunca lo que la persona dijo, dictó o se le contestó. El 30/10 una producción
   sin proveedores contestaba 503 `assistant.no_model` y `assistant.provider_not_configured` a todo, y el Hub no lo
   decía.
-- Tests: `base/tests/test_assistant.py`, `test_services_assistant.py`, `test_api_assistant.py` y
-  `test_assistant_gateway_log.py` (con la pasarela falsa de `base/tests/fake_gateway.py`); Vitest de `base/frontend/lib/assistant-hub.test.ts`,
-  `components/AssistantSetupEmpty.test.ts`, `SetupChecklist.test.ts`, `ShellChrome.test.ts` y `frontend/main.test.ts`,
-  y los del chat en `packages/ui/src/components/Assistant/*.test.ts` (`pnpm --filter @erplora/ui test`); e2e
-  `tests/e2e/base-assistant.spec.ts` (el panel) y `base-assistant-card.spec.ts`, `base-assistant-card-values.spec.ts`
-  y `base-assistant-card-records.spec.ts` (la tarjeta), con sus ayudantes en `tests/e2e/assistant-panel.ts`, contra un
-  SaaS de verdad con su pasarela y el proveedor falso `tests/e2e/assistant-provider.ts` (un servidor HTTP en 127.0.0.1
-  que habla la API de OpenAI; receta en `tests/e2e/README.md`, «El asistente»): ningún test llega a un proveedor real.
+- Ningún test del asistente llega a un proveedor real: los de Python hablan con una pasarela falsa y los e2e, con un
+  SaaS de verdad y su pasarela, detrás de la cual hay un proveedor falso que habla la API de OpenAI (receta en
+  `tests/e2e/README.md`, «El asistente»).
 - **Resumen propio de una escritura** (hub#693): `ai["summary"]` es un callable
   `(ctx, arguments, fields) -> list[dict]`; `base.assistant.cards.card` lo ejecuta solo con `ctx`, como esa persona y bajo
   `translation.override(language)`, con `fields` ya en ese idioma, y pone exactamente los campos que devuelve. Sin
