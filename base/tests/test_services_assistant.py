@@ -494,6 +494,21 @@ def test_past_its_last_round_the_turn_stops_and_says_why():
     assert plan["stop"] == "assistant.too_many_steps"
 
 
+def test_past_its_last_round_a_write_still_waits_for_the_answer_to_its_card():
+    write = call("demo.item.create", {"name": "Mesa 4"})
+    plan = turn(write, messages=[*answered_rounds(shared.MAX_ROUNDS), asked(write)])
+    assert plan["confirm"] is not None
+    assert plan["stop"] == ""
+
+
+def test_past_its_last_round_the_model_still_hears_that_the_person_stopped():
+    write = call("demo.item.create", {"name": "Mesa 4"})
+    stop = {"call_id": "c1", "accepted": False, "stop": True}
+    plan = turn(write, messages=[*answered_rounds(shared.MAX_ROUNDS), asked(write)], decision=stop)
+    assert plan["executed"][0]["outcome"] == "cancelled"
+    assert plan["stop"] == ""
+
+
 # ── The setup ────────────────────────────────────────────────────────────────────────────────────────────────────
 
 
