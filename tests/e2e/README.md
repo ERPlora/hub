@@ -631,6 +631,13 @@ borra la copia; si una ejecución se corta antes, la copia se queda y la siguien
 a medias. Sin copia nunca se borra la base de `a`. Copiar y reponer cierra las conexiones a esa base: la pila es solo de
 esta ejecución.
 
+**Un nombre por ejecución.** Las instrucciones del asistente empiezan por el nombre del negocio, y la caché de prompts de
+algunos proveedores cobra a una fracción (y a veces contesta antes) lo que ya vio igual. Si todas las ejecuciones usan el
+mismo `a` con el mismo nombre, una repetición sale más barata que la primera conversación de un negocio de verdad. Por eso
+el `beforeAll` pone al negocio su nombre seguido del id de la ejecución («La Esquina · <ejecución>», o solo el id si no
+tiene nombre; `assistant-run-name.ts`) y el `afterAll` le devuelve el suyo. Dentro de una conversación la caché sigue
+funcionando como en producción. La caché solo cambia coste y tiempo, nunca la respuesta.
+
 **El camino dorado va primero, siempre.** Antes de preguntar al modelo, cada escenario corre su camino dorado en el negocio
 recién preparado, **por el propio turno del asistente** (`base.assistant.turn`: una lectura se ejecuta; una escritura
 saca su tarjeta y se ejecuta con el sí, escribiendo la palabra si la pide, como en el chat) y sus `expect` y `forbidden`
