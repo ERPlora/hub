@@ -174,8 +174,8 @@ class AssistantCardOut(Schema):
 class AssistantTurnOut(Schema):
     """The turn made ready (the route streams it, ``text/event-stream``): the tools' results to keep (``append``),
     what ran (``executed``), the card of the write that waits (``confirm``) with what still waits (``pending``), and
-    what goes to the gateway (``messages``, ``tools``, ``instructions``, ``continuation``); ``stop``, why it goes no
-    further (``assistant.too_many_steps``)."""
+    what goes to the gateway (``messages``, ``tools``, ``instructions``, ``continuation``; no tool on the last round of
+    the request); ``stop``, why it goes no further (``assistant.too_many_steps``)."""
 
     messages: list[dict[str, Any]]
     append: list[dict[str, Any]]
