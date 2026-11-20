@@ -19,10 +19,21 @@ from apps.invoice.tests.conftest import catalog_of
 from base.models import Membership
 from base.tenancy.tests.business import HOST, HUB_DB, HUB_DB_COMMITTED, A, B, in_business_a
 from base.tenancy.tests.concurrency import hub_staff, plan_with_room
+from base.tests.live_runs import live_runs_ended
 
-#: The marks, scopes and fixtures of the businesses' own databases, and the assistant's catalogue of a person of
-#: business A, that these tests take from here.
-__all__ = ["B", "HOST", "HUB_DB", "HUB_DB_COMMITTED", "catalog_of", "hub_staff", "in_business_a", "plan_with_room"]
+#: The marks, scopes and fixtures of the businesses' own databases, the assistant's catalogue of a person of business
+#: A, and the end of the live runs that base's print socket (``sockets``) waits for, that these tests take from here.
+__all__ = [
+    "B",
+    "HOST",
+    "HUB_DB",
+    "HUB_DB_COMMITTED",
+    "catalog_of",
+    "hub_staff",
+    "in_business_a",
+    "live_runs_ended",
+    "plan_with_room",
+]
 
 
 def ctx_for(

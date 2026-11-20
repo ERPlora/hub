@@ -4,10 +4,18 @@ committed test's business database is emptied after it with a ``TRUNCATE`` that 
 import threading
 import time
 
+import pytest
 from live.executor import executor
 
 #: The name the live executor gives its threads (``live.executor``).
 THREAD_PREFIX = "live-query"
+
+
+@pytest.fixture
+def live_runs_ended():
+    """After the test, before the businesses' databases are emptied, every live run has ended."""
+    yield
+    end_the_live_runs()
 
 
 def end_the_live_runs(wait: float = 5.0) -> None:
