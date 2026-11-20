@@ -259,7 +259,8 @@ mismo con su pasada.
 - **Monta la pila de la receta de arriba, sola**: worktrees sueltos de `origin/main` del Hub (o del commit que diga
   `NIGHTLY_HUB_REF`, aunque no esté subido) y del SaaS en
   `~/.erplora/hub-nightly-e2e/` (de los checkouts compartidos solo hace `fetch`), con su `.env`; sus BD `hub_e2e_9770` y
-  `saas_e2e_9771`; la siembra (cuentas de demo con los ids de `a` y `b`, y el proveedor falso del asistente); los dos
+  `saas_e2e_9771`; la siembra (cuentas de demo con los ids de `a` y `b`, el proveedor falso del asistente y la taxonomía
+  del SaaS, que siembra también cada despliegue y pide la QA maestra, abajo); los dos
   `runserver` con las variables de la receta, del asistente y de WhatsApp; y `CI=1 pnpm e2e` con el tope global de Playwright
   (`NIGHTLY_MAX_MINUTES`, 360); con `NIGHTLY_GREP`, solo los tests cuyo título casa con ese patrón (`--grep` de
   Playwright). Las specs que gastan tokens de verdad (`QA_REAL_PROVIDER`) se quedan fuera. El humo de navegador
@@ -751,7 +752,8 @@ y, además, **su taxonomía**, que en cada despliegue siembra `saas-migrate`:
 env DB_NAME=saas_e2e_8871 uv run python manage.py seed_taxonomy
 ```
 
-Sin ella la spec cae al empezar con «no business type of the restaurant vertical». Da de alta una cuenta por ejecución:
+Sin ella la spec cae al empezar con «no business type of the restaurant vertical». La pila de la pasada nocturna (y la
+del humo) ya la siembra en su paso «la siembra del SaaS»: con `nightly-e2e.sh` no hace falta a mano. Da de alta una cuenta por ejecución:
 con `E2E_RELAX_LOGIN_RATE_LIMIT=True` en el SaaS (la receta) las altas no tienen tope práctico; sin la marca, el SaaS deja
 10 por hora y dirección, y tras varias ejecuciones seguidas hay que reiniciar su `runserver` (la caché local es de
 memoria). Deja `APP-BASE-10-BASE-G152-<idioma>-<pantalla>-<ancho>.png` en `.artifacts/`.
