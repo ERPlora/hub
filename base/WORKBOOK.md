@@ -3934,10 +3934,11 @@ Implicados: BASE-F41
   solo alcanza `*`; `live.meta.declared_permissions`: ni siquiera un superusuario las recibe, diga lo que diga su
   `ai=`). Fuera también las `base.assistant.*` y `NOT_FROM_CHAT` = `base.hub.reset` y `base.blueprint.export`; que el
   catálogo de dueño, encargado, empleado y superusuario no se movió con E017 lo guarda
-  `base/tests/test_catalog_unchanged_by_e017.py`), `relevant` (como mucho `MAX_TOOLS` = 40 por turno, por las palabras de las dos últimas
-  preguntas; `base.setup.status` y `base.business.get` siempre; `ranking` lo ordena con las palabras propias del
-  Hub: las de la plataforma, `SYNONYMS` («placa», «empleado»), y las que cada app declara en `assistant_synonyms` de
-  su `LiveAppConfig`, con su forma comprobada por `base.E018`; las de `base`, en el suyo, salen de los nombres de las
+  `base/tests/test_catalog_unchanged_by_e017.py`), `relevant` (como mucho `MAX_TOOLS` = 40 por turno, por las
+  palabras de la petición que sigue abierta: lo que la persona escribió desde que el modelo pidió su última escritura,
+  con sus respuestas a las preguntas del asistente, y nunca menos de sus dos últimos mensajes; `base.setup.status` y
+  `base.business.get` siempre; `ranking` lo ordena con las palabras propias del Hub: las de la plataforma, `SYNONYMS`
+  («placa», «empleado»), y las que cada app declara en `assistant_synonyms` de su `LiveAppConfig`, con su forma comprobada por `base.E018`; las de `base`, en el suyo, salen de los nombres de las
   apps de la tienda en `en` y `es` (cada uno de los dos de «Ventas / TPV» o «Menús y combos»): el nombre junto a «del
   menú», «en el menú», «al menú» o «disponible en el menú», delante o detrás («quita Tareas del menú», «quita del menú
   Tareas», «put Tasks back on the menu»), es la app (`base.app`), y lo que sale del menú la apaga y lo que entra o
