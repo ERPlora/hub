@@ -8,7 +8,7 @@ from live.operations import operation
 
 from apps.flow import vault
 from apps.flow.models import Secret
-from apps.flow.schemas import SecretListIn, SecretPageOut
+from apps.flow.schemas.stored_secrets import SecretListIn, SecretPageOut
 
 from .reads import MANAGE
 

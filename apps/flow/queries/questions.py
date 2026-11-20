@@ -13,7 +13,7 @@ from live.operations import Operation, operation, registry
 from apps.flow import recipes
 from base import assistant as hub_assistant
 from apps.flow.models import FlowRun, Question
-from apps.flow.schemas import QuestionListIn, QuestionOut, QuestionPageOut, QuestionRefIn
+from apps.flow.schemas.questions import QuestionListIn, QuestionOut, QuestionPageOut, QuestionRefIn
 
 from .pinned import pinned_values
 from .reads import ANSWER, MANAGE, ROLE_PERMISSION, TURN

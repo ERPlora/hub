@@ -36,6 +36,11 @@ NOT_CONFIRMED = "Not confirmed by the person: nothing was done."
 STOPPED = "The person stopped this request: nothing more was done."
 NOT_AVAILABLE = "This tool is not available to this person here: nothing was done."
 NOT_FROM_THE_CHAT = "This cannot be done from the chat (it names no record): nothing was done. Say where it is done."
+#: What the model hears on the last round of a request, the one that offers it no tool.
+LAST_ROUND = (
+    "This request has used all its steps: no more tools. Answer the person now: say what was done and what is left, "
+    "for them to ask for it in another message."
+)
 
 
 def _assistant_screens(ctx: OperationContext) -> dict[str, str]:
@@ -225,7 +230,8 @@ def assistant_turn(ctx: OperationContext, data: AssistantTurnIn) -> dict:
     only on what that card showed (hub#1208: the call it waits on goes back with its ``shown``); a tool this person
     was not offered never runs. Then what goes to the gateway: the tools of what was asked, by relevance,
     and the instructions (with the person's role and the writes a manager must approve, hub#585; with the checklist,
-    read again, in ``setup``). Past ``shared.MAX_ROUNDS`` rounds of tools it goes no further (``stop``)."""
+    read again, in ``setup``). The round that reaches ``shared.MAX_ROUNDS`` offers no tool, so the model answers with
+    what was done and what is left; past it, the turn goes no further (``stop``)."""
     if ctx.actor is None:
         raise Unauthorized(gettext("Sign in to talk to the assistant."))
     tools = assistant.tools.catalog(ctx)
@@ -252,28 +258,18 @@ def assistant_turn(ctx: OperationContext, data: AssistantTurnIn) -> dict:
         pending.pop(0)
     messages = [*data.messages, *append]
     still_open = data.messages[_assistant_opened(data.messages, tools) :]
-    asked = _assistant_asked(still_open)
     business = _assistant_read(ctx, "base.business.get") or {}
     if card is not None:
         # The card paints an amount (its schema's ``money`` mark) in the business's currency, with its decimals.
         currency = business.get("currency") or "EUR"
         card["money"] = {"currency": currency, "decimals": business.get("currency_decimals", 2)}
-    offered = assistant.relevance.relevant(tools, asked, ctx.language, searched=_assistant_searched(still_open))
-    text = assistant.prompt.instructions(
-        language=ctx.language,
-        currency=business.get("currency") or "EUR",
-        decimals=business.get("currency_decimals", 2),
-        business=business.get("name") or "",
-        screens=_assistant_screens(ctx),
-        role=_assistant_role(ctx),
-        # What is offered without its permission is a write a manager may approve (``assistant.tools.catalog``).
-        approvable=[op.name for op in offered if not ctx.has(op.permission)],
+    rounds = _assistant_rounds(messages, card, stopped)
+    last = rounds == shared.MAX_ROUNDS
+    offered = [] if last else assistant.relevance.relevant(
+        tools, _assistant_asked(still_open), ctx.language, searched=_assistant_searched(still_open)
     )
-    if data.setup:
-        text += "\n\n" + assistant.prompt.setup_block(_assistant_read(ctx, "base.setup.status"))
-    stop = ""
-    if card is None and not stopped and shared.rounds(messages) >= shared.MAX_ROUNDS:
-        stop = "assistant.too_many_steps"
+    text = _assistant_instructions(ctx, business, offered, setup=data.setup, last=last)
+    stop = "assistant.too_many_steps" if rounds > shared.MAX_ROUNDS else ""
     return {
         "messages": messages,
         "append": append,
@@ -285,6 +281,32 @@ def assistant_turn(ctx: OperationContext, data: AssistantTurnIn) -> dict:
         "continuation": data.continuation,
         "stop": stop,
     }
+
+
+def _assistant_rounds(messages: list[dict], card: dict | None, stopped: bool) -> int:
+    """The rounds of tools of the request that count against ``shared.MAX_ROUNDS``: none while a write's card waits
+    for its answer, nor once the person stopped the request, which the model still has to hear."""
+    return 0 if card is not None or stopped else shared.rounds(messages)
+
+
+def _assistant_instructions(ctx: OperationContext, business: dict, offered: list, *, setup: bool, last: bool) -> str:
+    """The model's instructions for this round: with the checklist, read again, in ``setup``, and with ``LAST_ROUND``
+    on the last round of the request."""
+    text = assistant.prompt.instructions(
+        language=ctx.language,
+        currency=business.get("currency") or "EUR",
+        decimals=business.get("currency_decimals", 2),
+        business=business.get("name") or "",
+        screens=_assistant_screens(ctx),
+        role=_assistant_role(ctx),
+        # What is offered without its permission is a write a manager may approve (``assistant.tools.catalog``).
+        approvable=[op.name for op in offered if not ctx.has(op.permission)],
+    )
+    if setup:
+        text += "\n\n" + assistant.prompt.setup_block(_assistant_read(ctx, "base.setup.status"))
+    if last:
+        text += "\n\n" + LAST_ROUND
+    return text
 
 
 def _assistant_role(ctx: OperationContext) -> str:

@@ -78,8 +78,8 @@
     ]
   },
   {
-    "path": "apps/flow/schemas.py",
-    "file_name": "schemas.py",
+    "path": "apps/flow/schemas/steps.py",
+    "file_name": "steps.py",
     "functions": [
       {
         "name": "document_problems",

@@ -13,7 +13,8 @@ from live.operations import operation
 from apps.flow import document, recipes
 from base.ordering import list_order_for
 from apps.flow.models import Flow, FlowRun
-from apps.flow.schemas import FlowListIn, FlowOut, FlowRefIn, Page, StatusIn, StatusOut
+from apps.flow.schemas.fields import Page
+from apps.flow.schemas.flows import FlowListIn, FlowOut, FlowRefIn, StatusIn, StatusOut
 
 from .reads import VIEW
 

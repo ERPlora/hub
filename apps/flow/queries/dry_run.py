@@ -13,7 +13,7 @@ from live.operations import Operation, operation, registry
 from apps.flow import document, vault
 from base import assistant as hub_assistant
 from base.business import currency_decimals
-from apps.flow.schemas import SampleIn, SampleOut, TestDocumentIn, TestIn, TestOut
+from apps.flow.schemas.dry_run import SampleIn, SampleOut, TestDocumentIn, TestIn, TestOut
 
 from .catalog import catalog_operations, grantable_operations, needs_a_person
 from .flows import resolve_flow
