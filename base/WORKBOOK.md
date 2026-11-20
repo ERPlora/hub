@@ -2411,6 +2411,11 @@ Pasos:
      leer» la para. Si ERPlora tiene activadas sus propias voces (hoy no), la cabecera del panel deja elegir entre las
      dos del idioma de la pantalla (la primera, hasta que se elige otra; el dispositivo recuerda la elección) y la «Voz
      del dispositivo».
+  9. Si le pide algo que se hace con los datos del negocio («sube un 5 % las bebidas», «da de alta la tónica a
+     2,50 €»), el asistente lo hace con las mismas acciones que esa persona tiene en las pantallas de sus apps, y lo
+     que cambia algo, con la confirmación de BASE-F97. Si entre las que tiene a mano para ese mensaje no está la que
+     hace falta, la busca entre todas las de esa persona y la usa en el paso siguiente; solo si no existe dice en qué
+     pantalla se hace.
 Entra: lo que escribe la persona; la conversación entera viaja con cada pregunta (BASE-F102).
 Sale: la pregunta a erplora.com, que la responde y la cuenta en los mensajes del mes (BASE-F104).
 Si falla: sin conexión, con el servicio caído, sin plan o sin mensajes: BASE-F106 y BASE-F104. Si la documentación no
