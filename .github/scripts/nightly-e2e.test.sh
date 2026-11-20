@@ -67,7 +67,7 @@ case "$*" in
       "HUB_INTERNAL_URL=${HUB_INTERNAL_URL:-} EMAIL_FILE_PATH=${EMAIL_FILE_PATH:-}" \
       "ASSISTANT_SERVICE_PROVIDER=${ASSISTANT_SERVICE_PROVIDER:-} E2E_RELAX_LOGIN_RATE_LIMIT=${E2E_RELAX_LOGIN_RATE_LIMIT:-}" \
       "DEMO_SPAWN_RATELIMIT=${DEMO_SPAWN_RATELIMIT:-} HUB_CALLBACK_TEMPLATE=${HUB_CALLBACK_TEMPLATE:-}" \
-      "HUB_ADMIN_CALLBACK_URL=${HUB_ADMIN_CALLBACK_URL:-} HTTPS_PROXY=${HTTPS_PROXY:-} CATALOG_DIR=${CATALOG_DIR:-}" \
+      "HUB_ADMIN_CALLBACK_URL=${HUB_ADMIN_CALLBACK_URL:-} HTTPS_PROXY=${HTTPS_PROXY:-} OPENAI_API_KEY=${OPENAI_API_KEY:-} CATALOG_DIR=${CATALOG_DIR:-}" \
       >> "$FAKE_CALLS"
     echo "$$" >> "$FAKE_PIDS"
     exec sleep 120 ;;
@@ -267,7 +267,7 @@ expect "the taxonomy goes into the migrated database, before the servers start" 
   "$([ "$(line_of 'database saas')" -lt "$(line_of 'manage saas seed_taxonomy')" ] &&
     [ "$(line_of 'manage saas seed_taxonomy')" -lt "$(line_of 'runserver')" ] && echo 1 || echo 0)"
 expect "the SaaS runs as the e2e README says" 1 \
-  "$(calls "runserver saas 127.0.0.1:9771 DB_NAME=saas_e2e_9771 VITE_DEV_PORT=9776 SAAS_URL= HUB_INTERNAL_URL=http://localhost:9770 EMAIL_FILE_PATH=$nightly/saas/.mail-9771 ASSISTANT_SERVICE_PROVIDER=e2e-local E2E_RELAX_LOGIN_RATE_LIMIT=True DEMO_SPAWN_RATELIMIT=100/h HUB_CALLBACK_TEMPLATE=http://{slug}.localhost:9770/auth/callback HUB_ADMIN_CALLBACK_URL=http://hubs.localhost:9770/auth/callback HTTPS_PROXY=http://127.0.0.1:9779")"
+  "$(calls "runserver saas 127.0.0.1:9771 DB_NAME=saas_e2e_9771 VITE_DEV_PORT=9776 SAAS_URL= HUB_INTERNAL_URL=http://localhost:9770 EMAIL_FILE_PATH=$nightly/saas/.mail-9771 ASSISTANT_SERVICE_PROVIDER=e2e-local E2E_RELAX_LOGIN_RATE_LIMIT=True DEMO_SPAWN_RATELIMIT=100/h HUB_CALLBACK_TEMPLATE=http://{slug}.localhost:9770/auth/callback HUB_ADMIN_CALLBACK_URL=http://hubs.localhost:9770/auth/callback HTTPS_PROXY=http://127.0.0.1:9779 OPENAI_API_KEY=sk-e2e-0000000000000000000000000000e2e1")"
 expect "the Hub runs on its port and database" 1 \
   "$(calls "runserver hub 127.0.0.1:9770 DB_NAME=hub_e2e_9770 VITE_DEV_PORT=9775 SAAS_URL=http://localhost:9771")"
 expect "the Hub's runserver sees the blueprints" 1 "$(calls_re "^runserver hub .*CATALOG_DIR=$root/erplora/blueprints/img\$")"
