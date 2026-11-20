@@ -5,7 +5,7 @@
 // whoever keeps the series; anyone else only looks. Every state of the screen.
 import { DataTable, EmptyState } from '@erplora/ui/components';
 import { AppPage } from '@erplora/ui/shell';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import type { Component } from 'vue';
 
 import { answerIssuer, EMPLOYEE, errorFrame, flush, type MountOptions, mountInvoice } from '../__tests__/mount-invoice';
@@ -14,11 +14,6 @@ import SeriesFormModal from '../components/SeriesFormModal.vue';
 import type { SeriesOut } from '../operations';
 import SeriesPage from './SeriesPage.vue';
 import { listFillProblems } from '../../../../frontend/testing/list-fill';
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
 
 const OP = 'invoice.series.list';
 

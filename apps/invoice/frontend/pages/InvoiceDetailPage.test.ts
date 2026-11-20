@@ -5,7 +5,7 @@
 // and Notes; the lines, the breakdown and the totals; «Mark as paid», «Rectify» and «Full invoice» where
 // they apply and for whoever may. It follows `invoice.invoice.get` live: a payment or a rectification made
 // elsewhere shows by itself.
-import { AppPage } from '@erplora/ui/shell';
+import { AppPage, toastError, toastSuccess } from '@erplora/ui/shell';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { click, EMPLOYEE, errorFrame, flush, type MountOptions, mountInvoice, OWNER } from '../__tests__/mount-invoice';
@@ -18,26 +18,15 @@ import { plain } from '../lib/format';
 import type { InvoiceOut } from '../operations';
 import InvoiceDetailPage from './InvoiceDetailPage.vue';
 
-const mocks = vi.hoisted(() => ({ confirm: vi.fn(), print: vi.fn(), sent: vi.fn(), failed: vi.fn() }));
+const mocks = vi.hoisted(() => ({ confirm: vi.fn(), print: vi.fn() }));
 vi.mock('@erplora/ui/components', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@erplora/ui/components')>()),
   useConfirm: () => ({ confirm: mocks.confirm }),
-}));
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
-vi.mock('@erplora/ui/shell', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@erplora/ui/shell')>()),
-  toastSuccess: mocks.sent,
-  toastError: mocks.failed,
 }));
 vi.mock('../../../sale/frontend/lib/print', () => ({ printPaper: mocks.print }));
 beforeEach(() => {
   mocks.confirm.mockReset();
   mocks.print.mockReset();
-  mocks.sent.mockReset();
-  mocks.failed.mockReset();
 });
 
 const OP = 'invoice.invoice.get';
@@ -208,7 +197,7 @@ describe('InvoiceDetailPage: its actions', () => {
     mocks.print.mockRejectedValueOnce(new PrintRefused('refused', 'print_document_refused'));
     await click(s.find('invoice-detail-print').element);
     await flush();
-    expect(mocks.failed).toHaveBeenCalledExactlyOnceWith('Could not print the invoice: the document is empty or too large to print');
+    expect(toastError).toHaveBeenCalledExactlyOnceWith('Could not print the invoice: the document is empty or too large to print');
   });
 
   it('a second press while the app prints waits for it (hub#455)', async () => {
@@ -237,7 +226,7 @@ describe('InvoiceDetailPage: its actions', () => {
     expect(s.sent()).toEqual([
       { method: 'POST', path: '/api/invoice/invoices/print', query: {}, body: { invoice_id: 'i1', duplicate: true } },
     ]);
-    expect(mocks.sent).toHaveBeenCalledWith('Sent to Office.');
+    expect(toastSuccess).toHaveBeenCalledWith('Sent to Office.');
     expect(mocks.print).not.toHaveBeenCalled();
   });
 
@@ -255,7 +244,7 @@ describe('InvoiceDetailPage: its actions', () => {
       await flush();
       expect(s.sent().find((call) => call.path === '/api/invoice/invoices/print')?.body).toEqual({ invoice_id: 'i1', duplicate: false });
       expect(mocks.print).toHaveBeenCalledOnce();
-      expect(mocks.sent).not.toHaveBeenCalled();
+      expect(toastSuccess).not.toHaveBeenCalled();
       s.wrapper.unmount();
     }
   });
@@ -388,6 +377,6 @@ describe('InvoiceDetailPage: its VeriFactu record (INVOICE-F17, F18; VERIFACTU-F
     await click(s.find('invoice-detail-print').element);
     await flush();
     expect(mocks.print).not.toHaveBeenCalled();
-    expect(mocks.failed).toHaveBeenCalledWith('Could not print the invoice');
+    expect(toastError).toHaveBeenCalledWith('Could not print the invoice');
   });
 });

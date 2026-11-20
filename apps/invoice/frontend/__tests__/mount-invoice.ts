@@ -1,7 +1,5 @@
 // Test helper of the invoice app's pages and components: `mountInShell` with its catalogues over base's, the invoices
 // and its people.
-// Dialogs: a test that opens one mocks `@ionic/vue`'s IonModal with FormModal's `ionModalStub` (imported
-// from its own file in the mock factory: this helper loads @ionic/vue, the factory must not).
 // `platformNotice` mounts a page as the hub does: with base's source of the action center beside it (`actionNotices`,
 // frontend/main.ts), whose notices `notices()` gives.
 import type { ActionNotice, ActionNoticeSource, SessionMe } from '@erplora/ui/shell';

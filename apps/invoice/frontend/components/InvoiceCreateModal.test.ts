@@ -10,7 +10,7 @@
 // Melilla, VAT elsewhere; it starts at the territory's general rate (`invoice.invoice.line_defaults`, live);
 // without a rule of its own tax, the person types it.
 import { toastSuccess } from '@erplora/ui/shell';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { defineComponent, h } from 'vue';
 
 import { expectWindowSaysMoneyUnreadable } from '../../../../base/frontend/__tests__/save-waits-for-money';
@@ -19,16 +19,6 @@ import { business, click, errorFrame, flush, ionValue, JAPANESE, mountInvoice, P
 import InvoiceCreateModal from './InvoiceCreateModal.vue';
 import InvoiceLinesEditor from './InvoiceLinesEditor.vue';
 import RecipientFields from './RecipientFields.vue';
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
-vi.mock('@erplora/ui/shell', async (importOriginal) => ({
-  ...((await importOriginal()) as object),
-  toastSuccess: vi.fn(),
-}));
-beforeEach(() => vi.mocked(toastSuccess).mockClear());
 
 /** The series select, as a stub the test drives (its own test follows the live list). */
 const SeriesSelectStub = defineComponent({

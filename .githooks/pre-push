@@ -3,7 +3,8 @@
 #   1. The machine's global pre-push runs first, with the same arguments and input: a repository's core.hooksPath
 #      hides it, and its checks would stop running unnoticed.
 #   2. Every pushed commit is checked out in a temporary worktree and `scripts/checks.sh fast` runs there, with the
-#      Python environment of this checkout: what is checked is what is pushed, never the working tree.
+#      Python environment of this checkout, which also lends its node_modules and submodules: what is checked is what
+#      is pushed, never the working tree.
 # A red check stops the push, and nothing switches it off. Tests: tests/test_githooks.py.
 set -u
 
@@ -31,6 +32,7 @@ fi
 # uv reads a relative UV_PROJECT_ENVIRONMENT from the project's folder, and the checks run in another one.
 environment=${UV_PROJECT_ENVIRONMENT:-.venv}
 case "$environment" in /*) ;; *) environment="$PWD/$environment" ;; esac
+checkout=$PWD
 
 checked=
 while read -r local_ref local_sha _; do
@@ -56,7 +58,7 @@ while read -r local_ref local_sha _; do
   echo "pre-push: scripts/checks.sh fast on $short ($local_ref)" >&2
   # The checks run as in a fresh clone: no variable of this push points git at another repository.
   if ! (cd "$tree" && unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_PREFIX GIT_COMMON_DIR \
-    && UV_PROJECT_ENVIRONMENT="$environment" bash scripts/checks.sh fast >&2); then
+    && UV_PROJECT_ENVIRONMENT="$environment" CHECKS_DEPENDENCIES_FROM="$checkout" bash scripts/checks.sh fast >&2); then
     echo "pre-push: scripts/checks.sh fast failed on $short ($local_ref): push aborted" >&2
     exit 1
   fi
