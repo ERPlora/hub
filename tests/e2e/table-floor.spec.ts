@@ -255,8 +255,7 @@ test('Serve the room with the real till: seat, transfer, merge, charge and close
     const till = shown(page);
     await expect(till.locator('[data-testid=pos-check-title]')).toHaveValue('Table 2');
     await expect(page).toHaveURL(/\/sale\/pos(\?|$)/);
-    await expect(till.locator('[data-testid=pos-total]')).toContainText(/3[.,]00/);
-    await chargeByCard(page, card);
+    await chargeByCard(page, card, /3[.,]00/);
     await page.goto(`${A}/table/floor-plan`);
     await chooseZone(page, SERVICE);
     await expect(tile(page, two.id)).toContainText('Available', { timeout: 15_000 });
