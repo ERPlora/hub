@@ -41,6 +41,10 @@ ALL = [
     RULE_DEACTIVATED,
     RULE_ACTIVATED,
 ]
+
+#: The amount a price added to a list brings, in cents of the list's currency (beside it): an automation says it
+#: as money in what a person reads.
+AMOUNTS = frozenset({"price"})
 PRICE_LIST_EVENTS = [
     PRICE_LIST_CREATED,
     PRICE_LIST_UPDATED,

@@ -1,7 +1,5 @@
 // Test helper of the flow app's pages and components: `mountInShell` with its catalogues over base's and the shared
 // assistant's (as the shell merges them: the assistant's card speaks with their words), the automations and its people.
-// Dialogs: a test that opens one mocks `@ionic/vue`'s IonModal with FormModal's `IonModalStub`
-// (imported from its own file in the mock factory: this helper loads @ionic/vue, the factory must not).
 import { assistantMessages } from '@erplora/ui/components';
 import type { SessionMe } from '@erplora/ui/shell';
 import type { Component } from 'vue';

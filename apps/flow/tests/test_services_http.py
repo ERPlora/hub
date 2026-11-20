@@ -201,6 +201,19 @@ def test_a_call_to_an_address_not_granted_never_goes_out(trusted, clock, worker)
     assert Handler.seen == []
 
 
+def test_a_call_not_granted_that_carries_on_never_goes_out_and_the_run_goes_on(trusted, clock, worker):
+    clock(NOON)
+    steps = [
+        _call(trusted, on_error="continue"),
+        TASK_STEP | {"id": "s2", "params": {"title": "Refused: {{steps.s1.error_code}}"}},
+    ]
+    flow = _manual(trusted, steps, grants=["task.task.create"])
+    _, done = _run_now(flow, {}, worker)
+    assert done.status == FlowRun.Status.SUCCEEDED
+    assert Task.objects.get().title == "Refused: flow.not_allowed"
+    assert Handler.seen == []
+
+
 def test_an_answer_that_is_not_2xx_stops_the_run_or_carries_on(trusted, clock, worker):
     clock(NOON)
     flow = _manual(trusted, [_call(trusted, url=f"{trusted}/status/503")])

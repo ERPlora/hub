@@ -14,11 +14,6 @@ import type { GroupOut, OptionOut } from '../operations';
 import BulkAddModal from './BulkAddModal.vue';
 import CourseCard from './CourseCard.vue';
 
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
-
 const option = (fields: Partial<OptionOut>): OptionOut => ({
   id: 'o1',
   group_id: 'g1',

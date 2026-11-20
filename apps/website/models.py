@@ -1,14 +1,12 @@
-"""Models of the website app: the site (one row per hub) and the images uploaded for it.
+"""Models of the website app: the business's site (one row) and the images uploaded for it.
 
 ``Site`` holds the draft the owner edits (``template``, ``theme``, ``content``) and what visitors see
 (``published_content``: the template, theme and content of the last publication, with the catalog's snapshot), so a
 change of the draft never reaches the public page until it is published. ``published_version`` goes up on every
 publication and names the cached HTML (``public_home``). ``is_live`` says whether ``/`` shows it.
 
-Each row names its hub in ``hub_id``, the registry's ``Hub.id`` (``base.operations.hub_id``; no foreign key: the
-registry lives in the control database). Each hub's database holds its one site and its own images, so the column
-always holds the same value, and the operations and ``/`` only ever read and write the request hub's rows. The images'
-keys and the cache keys carry the hub too.
+The business's database holds its one site (``singleton``) and its own images: no row says whose it is. The images'
+keys and the cache keys carry the hub, for the file store and the cache, which every business shares.
 """
 
 from django.db import models
@@ -27,7 +25,7 @@ class Site(UUIDModel):
         MINIMAL = "minimal", _("Minimal")
         BOLD = "bold", _("Bold")
 
-    hub_id = models.UUIDField(_("hub"), unique=True, editable=False)
+    singleton = models.BooleanField(_("single row"), default=True, db_default=True, editable=False)
     template = models.CharField(_("template"), max_length=16, choices=Template.choices, default=Template.CLASSIC)
     theme = models.JSONField(_("theme"), default=dict, blank=True)
     content = models.JSONField(_("content"), default=dict, blank=True)
@@ -47,6 +45,8 @@ class Site(UUIDModel):
         verbose_name = _("website")
         verbose_name_plural = _("websites")
         constraints = [
+            models.UniqueConstraint(fields=["singleton"], name="website_site_single_row"),
+            models.CheckConstraint(condition=Q(singleton=True), name="website_site_singleton"),
             models.CheckConstraint(
                 condition=Q(template__in=["classic", "modern", "minimal", "bold"]), name="website_site_template_valid"
             ),
@@ -58,9 +58,8 @@ class Site(UUIDModel):
 
 
 class Image(UUIDModel):
-    """An image uploaded for a hub's site, kept in ``storages["hub_files"]`` under its hub and content hash."""
+    """An image uploaded for the business's site, kept in ``storages["hub_files"]`` under its hub and content hash."""
 
-    hub_id = models.UUIDField(_("hub"), db_index=True, editable=False)
     key = models.CharField(_("key"), max_length=255, unique=True)
     sha256 = models.CharField(_("SHA-256"), max_length=64)
     content_type = models.CharField(_("content type"), max_length=32)

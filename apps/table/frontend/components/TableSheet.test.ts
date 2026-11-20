@@ -5,18 +5,13 @@
 // - occupied: guests, since when, who serves, the customer, and Charge (to the till with its check),
 //   Transfer, Merge (pick the destination on the plan), Split check, Guests, Remove table and Close table;
 //   with two checks, which one first.
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import { click, EMPLOYEE, ionChecked, mountTable, resultFrame, settle } from '../__tests__/mount-table';
 import { NOW, occupied, SETTINGS, tableRow } from '../__tests__/tables';
 import type { TableOut } from '../operations';
 import CustomerSearch from '../../../customer/frontend/components/CustomerSearch.vue';
 import TableSheet from './TableSheet.vue';
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
 
 const SESSION = { id: 's1', status: 'open' };
 

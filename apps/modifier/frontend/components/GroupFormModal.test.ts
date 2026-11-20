@@ -2,17 +2,12 @@
 // more = required)» and «Maximum (0 = no ceiling)», plus «An option can be chosen more than once» and
 // Order, with «Create»; Edit opens «Editing group — {name}» with «Save», which sends only what changed.
 // A refusal goes under its field (a taken name, a maximum below the minimum) and what was typed stays.
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import { itTellsTheCorrectedFieldApart } from '../../../../base/frontend/__tests__/same-words-refusal';
 import type { GroupOut } from '../operations';
 import { click, ionChecked, ionValue, mountModifier, settle } from '../__tests__/mount-modifier';
 import GroupFormModal from './GroupFormModal.vue';
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
 
 type Control = HTMLElement & { label?: string; value?: unknown; checked?: boolean; errorText?: string; helperText?: string; disabled?: boolean };
 

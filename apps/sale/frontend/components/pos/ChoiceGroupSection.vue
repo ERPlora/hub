@@ -1,10 +1,9 @@
 <script lang="ts">
 import type { ChoiceGroup } from '../../lib/modifierChoice';
 
-/** A group as the section paints it: each choice with the label it shows. */
 export interface SectionGroup extends ChoiceGroup {
   readonly name: string;
-  readonly options: readonly { readonly id: string; readonly label: string; readonly price_delta: number }[];
+  readonly options: readonly { readonly id: string; readonly label: string; readonly price_delta: number; readonly allergens?: readonly string[] }[];
 }
 </script>
 
@@ -21,6 +20,7 @@ import { computed } from 'vue';
 import { useLocale, useT } from '../../composables/useT';
 import { signedMoney, useBusinessMoney } from '../../lib/format';
 import { type Choice, countOf, ruleOf } from '../../lib/modifierChoice';
+import AllergenRow from './AllergenRow.vue';
 
 const props = defineProps<{ kind: 'options' | 'menu'; group: SectionGroup; choice: Choice; attention: string | null }>();
 const emit = defineEmits<{ tap: [optionId: string]; less: [optionId: string] }>();
@@ -84,10 +84,13 @@ function supplement(cents: number): string {
           :data-testid="`${hook.choice}-${option.id}`"
           @click="emit('tap', option.id)"
         >
-          <span
-            class="pos-options__label"
-            :data-testid="`${hook.name}-${option.id}`"
-          >{{ option.label }}</span>
+          <span class="pos-options__label">
+            <span :data-testid="`${hook.name}-${option.id}`">{{ option.label }}</span>
+            <AllergenRow
+              :codes="option.allergens ?? []"
+              :testid="`${hook.choice}-allergens-${option.id}`"
+            />
+          </span>
           <span
             v-if="option.price_delta"
             class="pos-options__delta"

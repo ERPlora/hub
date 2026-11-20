@@ -2,16 +2,11 @@
 // after the order (the old screen sent «Cancelled by operator», in English, without asking), with «Fail
 // order» in red and «Keep it»; it cannot be pressed without a reason. The server's refusal (an order
 // completed in the meantime) stays in the form, with the reason typed.
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import type { OrderOut } from '../operations';
 import { click, ionValue, mountCartCheckout, settle } from '../__tests__/mount-cart-checkout';
 import FailOrderModal from './FailOrderModal.vue';
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
 
 type Control = HTMLElement & { label?: string; value?: unknown; errorText?: string; disabled?: boolean };
 

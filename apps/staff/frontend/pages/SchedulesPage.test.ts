@@ -4,17 +4,12 @@
 // staff member», which opens Staff.
 import { Combo, type ComboOption } from '@erplora/ui/components';
 import { AppPage } from '@erplora/ui/shell';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import { click, flush, type MountOptions, mountStaff, page, settle } from '../__tests__/mount-staff';
 import MemberSchedules from '../components/MemberSchedules.vue';
 import SchedulesPage from './SchedulesPage.vue';
 import { listFillProblems } from '../../../../frontend/testing/list-fill';
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
 
 const FIRST = { rows: [{ id: 'm1', full_name: 'Ana López' }], total: 2, limit: 1, offset: 0 };
 

@@ -9,8 +9,8 @@
 // flow: TAX-F04 TAX-F06 TAX-F07 TAX-F08 TAX-F12 BASE-F97
 import { type BrowserContext, expect, test } from '@playwright/test';
 
-import { cancel, cardSpec, datumOf, fieldsOf, ownerIn, VIEWPORTS } from './assistant-card-helpers';
-import { card, openPanel } from './assistant-real';
+import { cardSpec, datumOf, fieldsOf, VIEWPORTS } from './assistant-card-helpers';
+import { cancel, card, openPanelAtTheDesk, ownerIn } from './assistant-panel';
 import { A, api, capture, untilStill } from './helpers';
 import { cleanUp, createRule, freshCategory, rulesOf } from './tax-helpers';
 
@@ -60,8 +60,7 @@ for (const language of ['es', 'en'] as const) {
     const [context, page] = await ownerIn(browser, language);
     const { key, name, rule } = await aRule(context);
     const said = `${name} · ${words.spain} · ${words.rate('10')}`;
-    await page.setViewportSize({ width: 1440, height: 900 });
-    await openPanel(page);
+    await openPanelAtTheDesk(page);
 
     // «Desactiva esta regla», a dangerous write: the rule by its category, country and rate (never its id nor its
     // category's key), titled as the Rules list calls one, in every size.

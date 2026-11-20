@@ -2,7 +2,7 @@
 // — When, Severity, Type and Message (composed by the server in the reader's language) —, the newest first, search
 // «Search type or message…» and the filters of type, severity and day. It follows itself.
 import { DataTable, EmptyState } from '@erplora/ui/components';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import type { Component } from 'vue';
 
 import { flush, type MountOptions, mountVerifactu } from '../__tests__/mount-verifactu';
@@ -10,11 +10,6 @@ import { plain } from '../lib/format';
 import type { EventOut } from '../operations';
 import EventsPage from './EventsPage.vue';
 import { listFillProblems } from '../../../../frontend/testing/list-fill';
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
 
 const OP = 'verifactu.event.list';
 const EVENT: EventOut = {

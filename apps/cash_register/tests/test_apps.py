@@ -214,14 +214,30 @@ def test_the_step_speaks_the_language_of_whoever_reads_it():
         spanish = (str(step.title), str(step.description))
     assert english == (
         "Your cash drawer",
-        "Decide how the till opens and closes: the opening float, the closing count and the POS screen that stays "
-        "locked until the drawer is open.",
+        "Decide how the till opens and closes: the opening float, the closing count and whether charging in cash "
+        "needs an open session.",
     )
     assert spanish == (
         "Tu caja",
-        "Decide cómo se abre y se cierra la caja: el fondo inicial, el arqueo de cierre y la pantalla del TPV que "
-        "queda bloqueada hasta abrirla.",
+        "Decide cómo se abre y se cierra la caja: el fondo inicial, el arqueo de cierre y si cobrar en efectivo "
+        "exige una sesión abierta.",
     )
+
+
+def test_the_step_promises_no_locked_till_only_the_cash_refusal():
+    """With the cash register on and no session open, Sales still sells and charges by card or any other way:
+    it only refuses the charges with a cash part (CASH_REGISTER-F04). No screen of the till is locked, so the
+    step must not promise one."""
+    (step,) = config().setup
+    for language, locked, cash, session in (
+        ("en", "locked", "in cash", "session"),
+        ("es", "bloquead", "en efectivo", "sesión"),
+    ):
+        with translation.override(language):
+            description = str(step.description)
+        assert locked not in description.lower(), (language, description)
+        assert cash in description, (language, description)
+        assert session in description, (language, description)
 
 
 def test_the_step_is_refreshed_when_the_settings_are_saved():

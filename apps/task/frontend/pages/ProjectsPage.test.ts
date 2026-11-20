@@ -4,7 +4,7 @@
 // project's sheet; «+» (whoever manages projects) opens «New project».
 import { DataTable, EmptyState } from '@erplora/ui/components';
 import { AppPage } from '@erplora/ui/shell';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import type { Component } from 'vue';
 
 import { EMPLOYEE, flush, mountTask, type MountOptions, page } from '../__tests__/mount-task';
@@ -14,11 +14,6 @@ import ProjectFormModal from '../components/ProjectFormModal.vue';
 import ProjectSheet from '../components/ProjectSheet.vue';
 import ProjectsPage from './ProjectsPage.vue';
 import { listFillProblems } from '../../../../frontend/testing/list-fill';
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
 
 const OP = 'task.project.list';
 const ROWS = [project(), project({ id: 'p2', code: 'refit', name: 'Summer refit', color: '', is_active: false })];

@@ -2,18 +2,13 @@
 // (the ticket can switch to a fixed amount with the currency button), «Apply −N %» / «Apply −<amount>»
 // and «Remove». It hands the discount up; the page picks the door (the manager's above the cap) and a
 // refusal is read in the sheet.
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import { click, errorFrame, expectWaitsForTheYen, settle } from '../../__tests__/mount-sale';
 import { expectWindowSaysMoneyUnreadable } from '../../../../../base/frontend/__tests__/save-waits-for-money';
 import { plain } from '../../lib/format';
 import { mountDiscountSheet } from './__tests__/discount-sheet';
 import DiscountSheet from './DiscountSheet.vue';
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
 
 /** How the sheet is mounted: `business: null`, `base.business.get` never answers (its money unknown, hub#921). */
 type Options = { business?: null };

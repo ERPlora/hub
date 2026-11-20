@@ -4,15 +4,10 @@
 // settings were read (never a value that was not read); a failure says so with «Retry». An employee reads.
 import { InlineFeedback } from '@erplora/ui/components';
 import { AppPage } from '@erplora/ui/shell';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import { EMPLOYEE, errorFrame, flush, ionValue, type MountOptions, mountSchedule, settle } from '../__tests__/mount-schedule';
 import SettingsPage from './SettingsPage.vue';
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
 
 const OP = 'schedule.settings.get';
 const SETTINGS = { week_starts_on: 1, hours_confirmed: false, timezone: 'Europe/Madrid' };

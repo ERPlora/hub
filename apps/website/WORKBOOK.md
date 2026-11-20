@@ -490,14 +490,17 @@ nombres, las demás secciones cuyo contenido cambia («Contenido: Cabecera, Cont
   piezas `_footer_columns.html` y `_credit.html`, que usa también `minimal`, con otro marco): cada plantilla dice sus clases en
   una línea y el enlace **Entrar** (`login_url`) se escribe en dos sitios, la barra y el pie, nunca en cuatro ficheros.
 
-- **Una fila por hub (PLAN §29)**: `Site` e `Image` llevan `hub_id` (el `Hub.id` del registro,
-  `base.operations.hub_id`; sin clave foránea, porque el registro vive en la BD de control). `Site.hub_id` es único:
-  un hub tiene una sola web. Toda operación lee y escribe solo la fila del hub de la petición (guardar, publicar, desconectar, subir, previsualizar,
-  leer), y `/` y la API pública solo enseñan la web publicada de su propio hub: lo que publica un hub nunca sale en
-  otro, y el equipo de un hub no lee ni cambia la web de otro. La primera escritura de un hub crea su fila
-  (`get_or_create` y después `select_for_update`): dos primeras escrituras a la vez no fallan, la segunda espera a la
-  primera. Cada BD de hub guarda su única fila, así que la columna lleva siempre el mismo valor; retirarla
-  del estado es hub#689. Las claves del almacén (`hub-<id>/website/img/…`) y de la caché (`website:home:{<slug>}:…`) también llevan el hub. La e2e
+- **Una web por negocio, en su propia BD**: la BD de cada negocio guarda su única web (`Site.singleton`, único, como
+  los ajustes de las demás apps) y sus imágenes, y ninguna fila dice de qué negocio es. Toda operación lee y escribe la
+  web de la BD del negocio de la petición (guardar, publicar, desconectar, subir, previsualizar, leer), y `/` y la API
+  pública solo enseñan la web publicada de su propio negocio: lo que publica uno nunca sale en otro, y el equipo de uno
+  no lee ni cambia la web de otro. La primera escritura crea la fila (`get_or_create` y después `select_for_update`):
+  dos primeras escrituras a la vez no fallan, la segunda espera a la primera. La columna `hub_id` de antes sale del
+  estado en la migración `0006` y sigue en la BD (las tablas y columnas no se borran): el código anterior la escribe
+  mientras dura el despliegue, las filas nuevas la dejan vacía y la vuelta atrás se la rellena con el negocio de la BD.
+  Esa misma migración borra las filas que nombraban a otro negocio, copiadas al partir las tablas compartidas y que
+  ninguna lectura veía; los originales siguen en la BD de control. Las claves del almacén (`hub-<id>/website/img/…`) y
+  de la caché (`website:home:{<slug>}:…`) sí llevan el hub, porque el almacén y la caché son de todos. La e2e
   desconecta la página al terminar para no dejar `/` de `a` con ella (las demás e2e esperan el salto al login).
 - **El catálogo, solo de una app activa**: `queries._source_on` pregunta a
   `base.apps_on.active_apps` (la misma pregunta que la guarda de lo público), no a `apps.is_installed`: una
@@ -517,9 +520,10 @@ nombres, las demás secciones cuyo contenido cambia («Contenido: Cabecera, Cont
   `qr.py`, `reviews.py`, `queries.py`, `services.py`, `events.py`, `live.py`, `api.py`, `admin.py`, `locale/`, `templates/website/`
   y `frontend/`, con un `tests/test_<fichero>.py` por fichero. **Sin `views.py` ni `urls.py`** (PLAN §29): `/` es de
   `base` y `/p/media/…` también.
-- Modelos: `Site` (una por hub, `hub_id` único: `template`, `theme`, `content` = borrador; `published_content` =
-  plantilla, tema, contenido y la copia del catálogo de la última publicación; `published_version`, `published_at`,
-  `is_live`; `reviews_snapshot` = la última respuesta buena de Google para la sección de reseñas) e `Image` (`hub_id` con índice, `key` única, `sha256`, tipo, ancho, alto y tamaño). UUIDv7.
+- Modelos: `Site` (una por BD de negocio, `singleton` único: `template`, `theme`, `content` = borrador;
+  `published_content` = plantilla, tema, contenido y la copia del catálogo de la última publicación; `published_version`,
+  `published_at`, `is_live`; `reviews_snapshot` = la última respuesta buena de Google para la sección de reseñas) e
+  `Image` (`key` única, `sha256`, tipo, ancho, alto, tamaño y nombre del fichero). UUIDv7.
 - **Contenido = JSON validado** por `schemas.Content` (nueve secciones cerradas; topbar, hero y footer sin
   `hidden`); `render_site` lo valida otra vez antes de pintar: una fila escrita a mano no cuela marcado. Lo que
   escribe el propietario pasa por el escape de Django, y el texto de Sobre nosotros por `live.markdown` (nh3, sin

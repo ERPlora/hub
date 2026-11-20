@@ -1,6 +1,4 @@
-"""The website's tables: one site per hub (the draft and what is published) and the images uploaded for it."""
-
-import uuid
+"""The website's tables: the business's one site (the draft and what is published) and the images uploaded for it."""
 
 import pytest
 from django.db import IntegrityError
@@ -13,7 +11,7 @@ pytestmark = HUB_DB
 
 
 def test_a_new_site_starts_classic_never_published_and_offline():
-    site = Site.objects.create(hub_id=uuid.uuid7())
+    site = Site.objects.create()
     assert site.id.version == 7
     assert (site.template, site.theme, site.content, site.published_content) == ("classic", {}, {}, {})
     assert (site.published_version, site.published_at, site.is_live) == (0, None, False)
@@ -22,32 +20,28 @@ def test_a_new_site_starts_classic_never_published_and_offline():
     assert site.reviews_snapshot == {}
 
 
-def test_each_hub_has_one_site_at_most():
-    # The row names its hub, and a hub has one row.
-    a, b = uuid.uuid7(), uuid.uuid7()
-    Site.objects.create(hub_id=a)
-    Site.objects.create(hub_id=b)
-    with pytest.raises(IntegrityError), atomic():
-        Site.objects.create(hub_id=a)
-    assert Site.objects.count() == 2
-
-
-def test_a_site_always_names_its_hub_and_it_never_changes_by_hand():
+def test_the_business_database_holds_one_site_at_most():
+    Site.objects.create()
     with pytest.raises(IntegrityError), atomic():
         Site.objects.create()
-    assert Site._meta.get_field("hub_id").editable is False
+    assert Site.objects.count() == 1
+    assert Site._meta.get_field("singleton").editable is False
+
+
+def test_the_site_and_its_images_name_no_business():
+    # The database is the business's: no row says whose it is.
+    assert "hub_id" not in {field.name for field in Site._meta.get_fields()}
+    assert "hub_id" not in {field.name for field in Image._meta.get_fields()}
 
 
 def test_the_template_is_one_of_the_four():
     assert [value for value, _label in Site.Template.choices] == ["classic", "modern", "minimal", "bold"]
     with pytest.raises(IntegrityError), atomic():
-        Site.objects.create(hub_id=uuid.uuid7(), template="fancy")
+        Site.objects.create(template="fancy")
 
 
-def test_an_image_keeps_its_hub_key_hash_and_size_and_a_key_is_stored_once():
-    hub = uuid.uuid7()
+def test_an_image_keeps_its_key_hash_and_size_and_a_key_is_stored_once():
     image = Image.objects.create(
-        hub_id=hub,
         key="hub-0123/website/img/abcdef0123456789.png",
         sha256="a" * 64,
         content_type="image/png",
@@ -57,10 +51,5 @@ def test_an_image_keeps_its_hub_key_hash_and_size_and_a_key_is_stored_once():
     )
     assert image.id.version == 7
     assert image.created_at is not None
-    assert Image.objects.get(id=image.id).hub_id == hub
-    # The uploads of a hub are looked up by its id.
-    assert Image._meta.get_field("hub_id").db_index and Image._meta.get_field("hub_id").editable is False
     with pytest.raises(IntegrityError), atomic():
-        Image.objects.create(
-            hub_id=hub, key=image.key, sha256="a" * 64, content_type="image/png", width=1, height=1, size=1
-        )
+        Image.objects.create(key=image.key, sha256="a" * 64, content_type="image/png", width=1, height=1, size=1)

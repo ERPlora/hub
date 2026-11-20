@@ -3,7 +3,7 @@
 // zone…», column filters, list or cards, 50 a page. «+» (whoever may add) and Edit open the zone's dialog;
 // Delete (owner and admin) asks first and is off for a zone with tables.
 import { DataTable, EmptyState } from '@erplora/ui/components';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import type { Component } from 'vue';
 
 import { EMPLOYEE, flush, MANAGER, type MountOptions, mountTable, page } from '../__tests__/mount-table';
@@ -12,11 +12,6 @@ import ZoneDeleteDialog from '../components/ZoneDeleteDialog.vue';
 import ZoneFormModal from '../components/ZoneFormModal.vue';
 import ZonesPage from './ZonesPage.vue';
 import { listFillProblems } from '../../../../frontend/testing/list-fill';
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
 
 const OP = 'table.zone.list';
 const ROWS = [

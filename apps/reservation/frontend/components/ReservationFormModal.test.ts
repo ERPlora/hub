@@ -5,7 +5,7 @@
 // under it, and what was typed stays. «Edit reservation» sends only what changed (or `no_table`), and a
 // finished reservation only changes its notes.
 import { Combo, ConfirmDialog, InlineFeedback } from '@erplora/ui/components';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import { itTellsTheCorrectedFieldApart } from '../../../../base/frontend/__tests__/same-words-refusal';
 import CustomerSearch from '../../../customer/frontend/components/CustomerSearch.vue';
@@ -13,11 +13,6 @@ import { click, ionValue, mountReservation, settle } from '../__tests__/mount-re
 import { freeTable, reservationRow } from '../__tests__/rows';
 import en from '../locale/en.json';
 import ReservationFormModal from './ReservationFormModal.vue';
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
 
 type Control = HTMLElement & { label?: string; value?: unknown; errorText?: string; disabled?: boolean };
 

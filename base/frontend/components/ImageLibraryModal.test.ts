@@ -4,16 +4,11 @@
 // 60 at a time with «Load more»; each image with its title under it. Loading, empty («No image matches your search…»)
 // and error («The image library could not be loaded.» with «Retry») states. A tap on an image hands it up and closes;
 // «Upload photo» asks the field for the device's picker and closes too.
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 
 import type { CatalogImage, CatalogImagePage } from '../operations/catalog_images';
 import { flush, mountBase } from '../__tests__/mount-base';
 import ImageLibraryModal from './ImageLibraryModal.vue';
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
 
 afterEach(() => {
   document.body.innerHTML = '';

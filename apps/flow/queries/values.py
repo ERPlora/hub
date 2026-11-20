@@ -20,7 +20,7 @@ from base.business import babel_locale, money_text
 from base.home import ISO_HOUR, moment
 from base.operations import business_currency
 
-from .catalog import step_data
+from .catalog import event_amounts, step_data
 
 #: The data of an action a person reads, by action: a message to a customer (FLOW-F31), its text and its template's
 #: values. Each datum inserted in them is said in words (``words_for``); every other action's data go to a machine.
@@ -76,6 +76,12 @@ def _currency_data(path: str, prop: dict) -> tuple[str | None, ...]:
     return (*around, None)
 
 
+def _event_currencies(event: str) -> dict[str, tuple[str | None, ...]]:
+    """The amounts ``event`` brings that its app declares (``event_amounts``), by path (``input.<datum>``), each with
+    the paths of the data that give its currency: the ``currency`` the event brings beside it, else the business's."""
+    return {f"input.{name}": (f"input.{ANSWERED_CURRENCY}", None) for name in event_amounts(event)}
+
+
 def _money_paths(steps: list[dict]) -> frozenset[str]:
     """The paths (``steps.<id>.<field>``, ``steps.<id>.item.unit_price``) of the amounts the steps' actions and reads
     mark in what they leave."""
@@ -114,15 +120,17 @@ def _moment_words(text: str, language: str) -> str | None:
     return format_time(when.replace(tzinfo=None), "short", locale=locale)
 
 
-def words_for(steps: list[dict], language: str, scope: Scope, data: dict | None = None) -> document.Say:
+def words_for(
+    steps: list[dict], language: str, scope: Scope, data: dict | None = None, event: str = ""
+) -> document.Say:
     """How a text a person reads — a question (FLOW-F28), a message to a customer (FLOW-F31) — says each datum it
     inserts, as the assistant's card says it (BASE-F97): a yes or no as «Yes»/«No», an ISO day, hour or instant as
     ``language`` writes it at the business's hour, and an amount the schema of the step that left it marks as money —
     on its answer or inside an object of it — in the currency the object that holds it answers in ``data``, else its
     step, else the business (``_currency_data``) — one in a currency of its own (``CURRENCY_IN``), only in the one its
-    datum gives —; anything else as it is. An event declares no schema: a number it brings is never guessed as
-    money."""
-    money = _money_currencies(steps)
+    datum gives —, or one the app of the ``event`` that started the run declares, in the currency it brings, else the
+    business's; anything else as it is. A number nobody declares an amount is never guessed as money."""
+    money = {**_money_currencies(steps), **_event_currencies(event)}
     business = functools.cache(lambda: _currency(scope))
 
     def currency(path: str) -> str | None:

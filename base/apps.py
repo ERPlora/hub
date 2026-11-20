@@ -4,8 +4,47 @@ A LiveAppConfig of kind "platform": always on, never turned on or off by a hub, 
 requires, category, premium or menu of its own).
 """
 
+import re
+from functools import cached_property
+
+from django.conf import settings
+from django.utils import translation
 from django.utils.translation import gettext_lazy as _
-from live.meta import LiveAppConfig
+from live.meta import LiveAppConfig, all_live_app_configs
+
+#: Where an app is said to go, beside its name: out of the menu turns it off, into it or in it turns it on.
+OUT_OF_THE_MENU = ("del menu", "from the menu", "out of the menu", "off the menu")
+INTO_THE_MENU = (
+    "al menu",
+    "en el menu",
+    "disponible en el menu",
+    "to the menu",
+    "in the menu",
+    "on the menu",
+    "back on the menu",
+    "back in the menu",
+    "back to the menu",
+    "available in the menu",
+    "available on the menu",
+)
+#: What joins the two names of one app («Ventas / TPV», «Menús y combos», «Sales & POS»): each is said alone.
+_JOINED_NAMES = re.compile(r"\s*[/&]\s*|\s+(?:y|and)\s+")
+
+
+def store_app_names() -> list[str]:
+    """The names of the apps a business turns on or off, in every language of the Hub, lowercase."""
+    found = set()
+    for config in all_live_app_configs():
+        if config.kind == "app" and config.listed:
+            for language, _label in settings.LANGUAGES:
+                with translation.override(language):
+                    found.update(_JOINED_NAMES.split(str(config.verbose_name).lower()))
+    return sorted(found)
+
+
+def beside_names(names: list[str], places: tuple[str, ...]) -> tuple[str, ...]:
+    """Each place said after each name and before it («Tareas del menú», «del menú Tareas»)."""
+    return tuple(phrase for name in names for place in places for phrase in (f"{name} {place}", f"{place} {name}"))
 
 
 class BaseConfig(LiveAppConfig):
@@ -32,6 +71,18 @@ class BaseConfig(LiveAppConfig):
         "hub_manager": ["base.view_home", "base.view_files", "base.open_management"],
         "hub_employee": ["base.view_home", "base.view_files"],
     }
+
+    @cached_property
+    def assistant_synonyms(self) -> tuple[tuple[str, ...], ...]:
+        """What base's words mean to the Hub's assistant (``base.assistant.relevance.synonyms``): an app's name said
+        with the menu («quita Tareas del menú», «put Tasks back on the menu») is the app, turned off or on. Only beside
+        a name: «los postres del menú vegano» is a menu of Menus and combos."""
+        names = store_app_names()
+        return (
+            ("app", *beside_names(names, OUT_OF_THE_MENU + INTO_THE_MENU)),
+            ("disable", *beside_names(names, OUT_OF_THE_MENU)),
+            ("enable", *beside_names(names, INTO_THE_MENU)),
+        )
 
     def ready(self) -> None:
         # Importing the scheduler registers the check of the apps' scheduled tasks (tag "base"), the print channel the

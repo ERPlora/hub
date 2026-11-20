@@ -12,11 +12,6 @@ vi.mock('@erplora/ui/components', async (importOriginal) => ({
   useConfirm: () => ({ confirm: mocks.confirm }),
   syncSearchbarInputName: mocks.syncSearchbarInputName,
 }));
-vi.mock('@erplora/ui/shell', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@erplora/ui/shell')>()),
-  toastSuccess: vi.fn(),
-  toastError: vi.fn(),
-}));
 vi.mock('@erplora/ui/sdk', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@erplora/ui/sdk')>()),
   fetchFile: vi.fn(),
@@ -102,8 +97,6 @@ beforeEach(() => {
   mocks.confirm.mockReset();
   mocks.saveFile.mockReset();
   vi.mocked(fetchFile).mockReset();
-  vi.mocked(toastSuccess).mockClear();
-  vi.mocked(toastError).mockClear();
 });
 
 afterEach(() => {

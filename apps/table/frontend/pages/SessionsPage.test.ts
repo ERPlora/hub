@@ -14,11 +14,6 @@ import SessionDetailModal from '../components/SessionDetailModal.vue';
 import SessionsPage from './SessionsPage.vue';
 import { listFillProblems } from '../../../../frontend/testing/list-fill';
 
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
-
 const OP = 'table.session.list';
 const OPEN = sessionRow({ id: 's1', opened_at: '2026-10-14T18:30:00Z' }); // 70 min: amber
 const LATE = sessionRow({ id: 's2', table_number: '7', opened_at: '2026-10-14T18:00:00Z' }); // 100 min: red

@@ -1,16 +1,11 @@
 // RESERVATION-F02: «Add blocked date» — the Date, the Reason and «Whole day» (on); off, From and Until.
 // «Block date». A date already blocked at that time goes on top.
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import { itTellsTheCorrectedFieldApart } from '../../../../base/frontend/__tests__/same-words-refusal';
 import { click, ionChecked, ionValue, mountReservation, settle } from '../__tests__/mount-reservation';
 import { blockedRow } from '../__tests__/rows';
 import BlockedDateFormModal from './BlockedDateFormModal.vue';
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
 
 type Control = HTMLElement & { label?: string; value?: unknown; errorText?: string };
 

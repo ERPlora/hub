@@ -4,16 +4,6 @@ import { errorFrame, flush, mountBase, subId } from '../__tests__/mount-base';
 import type { ApiKeyList, ApiKeyRow } from '../operations/api_keys';
 import ApiKeysPanel from './ApiKeysPanel.vue';
 
-vi.mock('@erplora/ui/shell', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@erplora/ui/shell')>()),
-  toastSuccess: vi.fn(),
-  toastError: vi.fn(),
-}));
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
-
 // Shaped like a real token (`erpk_live_` + URL-safe base64) without looking like a leaked one to the secrets hook.
 const TOKEN = 'erpk_live_test-token-shown-once_0123456789-abcdefghij';
 

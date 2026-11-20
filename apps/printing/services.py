@@ -793,7 +793,7 @@ def claim_job(ctx: OperationContext, data: JobClaimIn) -> dict:
                 "the print job is done on this device",
             ),
             "es": (
-                "este equipo confirma que el trabajo salió en papel",
+                "este dispositivo dice que el trabajo de impresión ya salió en papel",
                 "el trabajo de impresión ya está hecho en este equipo",
             ),
         },

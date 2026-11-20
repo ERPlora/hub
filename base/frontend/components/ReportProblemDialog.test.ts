@@ -2,16 +2,11 @@
 // (ReportProblemModal), which sends `base.support.report` with the screen the person is on; erplora.com answers the
 // address support writes back to. A refusal (the limit, erplora.com out of reach) is said in it, and what was typed
 // stays.
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 
 import { flush, mountBase } from '../__tests__/mount-base';
 import { openReportProblem, reportProblemOpen } from '../lib/report-problem';
 import ReportProblemDialog from './ReportProblemDialog.vue';
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
 
 afterEach(() => {
   reportProblemOpen.value = false;

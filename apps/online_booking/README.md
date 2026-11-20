@@ -63,7 +63,8 @@ pnpm e2e tests/e2e/online-booking-flow.spec.ts
 
 - `tests/test_integration_diary.py` y `test_integration_customer.py` van contra Citas, Clientes, Servicios y
   Personal reales, sin dobles; `tests/test_concurrency.py`, con hilos contra Postgres (dos clientas a la vez,
-  la misma hora: entra una); `tests/test_relay.py`, con el bucle real del relay del worker (F09 y F12).
+  la misma hora: entra una; dos guardados de los Ajustes, una fusión de la ficha a mitad de la reserva y dos
+  cancelaciones con el mismo enlace); `tests/test_relay.py`, con el bucle real del relay del worker (F09 y F12).
 - `online-booking-flow.spec.ts` recorre los diez flujos con pantalla en 390, 834 y 1440, por la vista previa;
   `online-booking-public-page.spec.ts`, la página sin sesión en los tres tamaños (cargando, reservar, ver y cancelar
   justo después, vacía y cerrada) y que otro negocio no la ve.

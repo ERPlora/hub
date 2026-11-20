@@ -9,7 +9,6 @@ import type { AppList, AppRow } from '../operations/apps';
 const ids = (wrapper: Mounted['wrapper']) => idsOf({ wrapper } as Mounted);
 
 vi.mock('@erplora/ui/components', async (importOriginal) => (await import('../__tests__/apps-page-spies')).componentsWithConfirmSpy(importOriginal));
-vi.mock('@erplora/ui/shell', async (importOriginal) => (await import('../__tests__/toast-spies')).shellWithToastSpies(importOriginal));
 vi.mock('../lib/access', async (importOriginal) => (await import('../__tests__/apps-page-spies')).accessWithSessionSpy(importOriginal));
 
 freshEachTest();

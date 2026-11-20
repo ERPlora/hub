@@ -14,17 +14,10 @@ import ReceiptPaper from './ReceiptPaper.vue';
 import ReprintJob from './ReprintJob.vue';
 import SaleDocument from './SaleDocument.vue';
 
-vi.mock('@erplora/ui/shell', async (importOriginal) => ({
-  ...((await importOriginal()) as object),
-  toastError: vi.fn(),
-  toastSuccess: vi.fn(),
-}));
 vi.mock('../../lib/print', () => ({ printPaper: vi.fn() }));
 
 beforeEach(() => {
   vi.mocked(printPaper).mockReset();
-  vi.mocked(toastError).mockClear();
-  vi.mocked(toastSuccess).mockClear();
 });
 
 async function setup(locale: 'en' | 'es' = 'en') {

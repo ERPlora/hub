@@ -3,7 +3,7 @@
 // column filters (zone, capacity, status), list or cards, 50 a page. «+» opens «New table» (Number,
 // Capacity, Zone); Edit and a row open «Edit table»; Delete (owner and admin) asks first.
 import { ConfirmDialog, DataTable, EmptyState } from '@erplora/ui/components';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import type { Component } from 'vue';
 
 import { EMPLOYEE, flush, MANAGER, type MountOptions, mountTable, page } from '../__tests__/mount-table';
@@ -11,11 +11,6 @@ import { occupied, tableRow, zoneRow } from '../__tests__/tables';
 import TableFormModal from '../components/TableFormModal.vue';
 import TablesPage from './TablesPage.vue';
 import { listFillProblems } from '../../../../frontend/testing/list-fill';
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
 
 const OP = 'table.table.list';
 const ROWS = [tableRow({ id: 't2', number: '2', name: 'Window' }), occupied({ id: 't10', number: '10', zone_name: 'Terrace', zone_id: 'z2' })];

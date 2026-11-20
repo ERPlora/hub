@@ -8,8 +8,8 @@
 // flow: CUSTOMER-F05 CUSTOMER-F06 CUSTOMER-F13 CUSTOMER-F19 CUSTOMER-F27 BASE-F97
 import { type BrowserContext, expect, test } from '@playwright/test';
 
-import { AN_ID, cancel, cardSpec, datumOf, ownerIn, VIEWPORTS } from './assistant-card-helpers';
-import { card, openPanel } from './assistant-real';
+import { AN_ID, cardSpec, datumOf, VIEWPORTS } from './assistant-card-helpers';
+import { cancel, card, openPanelAtTheDesk, ownerIn } from './assistant-panel';
 import { cleanUp as cleanCustomers, e2eName, PREFIX } from './customer-helpers';
 import { A, api, capture, psql, untilStill } from './helpers';
 import { post } from './pricing-helpers';
@@ -49,8 +49,7 @@ for (const language of ['es', 'en'] as const) {
   test(`customer-assistant-card — in ${language}, a write of Customers says which card, group or order, never by its id`, async ({ browser }) => {
     const [context, page] = await ownerIn(browser, language);
     const file = await aFile(context);
-    await page.setViewportSize({ width: 1440, height: 900 });
-    await openPanel(page);
+    await openPanelAtTheDesk(page);
 
     // «Añade una nota a Ana», the case the issue names: whose card it is, in every size (a write that is not dangerous
     // is said in one line, «Añadir en Clientes: Ana López · …»).

@@ -3,18 +3,13 @@
 // «Active» switch — with «Edit series», «Book appointments» and «Delete» (asked first) per row, and add.
 // Booking runs turn after turn until the window is booked, then says what was booked and skipped.
 import { ConfirmDialog, DataTable } from '@erplora/ui/components';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import type { Component } from 'vue';
 
 import type { MaterializeOut, RecurringOut } from '../operations';
 import { ionChecked, mountAppointment, page, settle } from '../__tests__/mount-appointment';
 import SeriesFormModal from './SeriesFormModal.vue';
 import SeriesList from './SeriesList.vue';
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
 
 const OP = 'appointment.recurring.list';
 const series = (id: string, over: Partial<RecurringOut> = {}): RecurringOut => ({

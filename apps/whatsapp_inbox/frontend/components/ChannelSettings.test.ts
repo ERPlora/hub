@@ -1,15 +1,10 @@
 // The body of «Channel settings» (WHATSAPP_INBOX-F01, F02, F13, F27): mounted by SettingsPage only for
 // whoever configures, so nobody else subscribes to the channel or the templates. Its whole behaviour is
 // pinned in pages/SettingsPage.test.ts; here, that it follows both and paints the three blocks.
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import { mountInbox } from '../__tests__/mount-inbox';
 import ChannelSettings from './ChannelSettings.vue';
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
 
 describe('ChannelSettings', () => {
   it('follows the channel and the templates, and paints the number, the month and the templates', async () => {

@@ -11,12 +11,22 @@ pytestmark = [HUB_DB, pytest.mark.usefixtures("hub_a")]
 
 
 def test_me_is_bound_to_session_me():
-    from base.api import router
+    from base.api.home import router
 
     [route] = router.path_operations["/me"].operations
     assert (route.methods, route.operation_id) == (["GET"], "base.session.me")
     assert route.auth_param is None  # anonymous visitors get user: null, not a 401
     assert resolve("/api/me").url_name
+
+
+def test_every_route_of_base_is_tagged_base_once_in_the_openapi_document():
+    from config.api import api
+
+    paths = api.get_openapi_schema(path_prefix="/api/")["paths"]
+    routes = [route for methods in paths.values() for route in methods.values()]
+    tags = [route["tags"] for route in routes if route["operationId"].startswith("base.")]
+    assert tags
+    assert tags == [["base"]] * len(tags)
 
 
 def test_anonymous(client):

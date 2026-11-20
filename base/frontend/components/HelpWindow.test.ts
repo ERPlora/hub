@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { createAssistant, installAssistant, useAssistant } from '@erplora/ui/components';
 
@@ -7,8 +7,6 @@ import { EMPLOYEE, flush, help, memoryStorage, mountBase } from '../__tests__/mo
 import { resetHelpCache } from '../lib/help';
 import HelpContent from './HelpContent.vue';
 import HelpWindow from './HelpWindow.vue';
-
-vi.mock('@ionic/vue', async (importOriginal) => (await import('../__tests__/modal')).mockIonicModal(importOriginal));
 
 interface SetupOptions {
   app?: string;

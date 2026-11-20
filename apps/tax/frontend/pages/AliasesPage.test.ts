@@ -4,7 +4,7 @@
 // for whoever can manage; every state of the screen.
 import { DataTable, EmptyState } from '@erplora/ui/components';
 import { AppPage } from '@erplora/ui/shell';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import type { Component } from 'vue';
 
 import type { AliasOut, CategoryRowOut } from '../operations';
@@ -14,11 +14,6 @@ import SetupNotice from '../components/SetupNotice.vue';
 import AliasesPage from './AliasesPage.vue';
 import source from './AliasesPage.vue?raw';
 import { listFillProblems } from '../../../../frontend/testing/list-fill';
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
 
 const OP = 'tax.alias.list';
 

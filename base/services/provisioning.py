@@ -15,6 +15,7 @@ from django.conf import settings
 from django.db import transaction
 from django.db.models import Count, Q
 from live.operations import atomic
+from live.outbox import notify
 
 from base import auth, registry, signing
 from base.models import Hub
@@ -65,6 +66,14 @@ def _control_transaction():
 
     with use_control(), atomic():
         yield
+
+
+def ring(hub: Hub, at: dt.datetime | None = None, *, told: str) -> None:
+    """``hub`` has work a business asked for (an app to set up, a reset) by ``at`` (now by default): due in ``hub_due``
+    then, in the caller's transaction on control, and the worker told on the platform's channel after control's COMMIT
+    (``base.control_pace``), so it does not wait for its look; ``told`` names what was asked."""
+    HubDue.mark_due(hub, at)
+    transaction.on_commit(partial(notify, registry.REGISTRY_SCOPE, [told]), robust=True)
 
 
 def registry_row(hub_id: UUID) -> Hub | None:
@@ -134,7 +143,7 @@ def claim_hub(hub_id: UUID, now: dt.datetime, lease: dt.timedelta, *, owner: str
 def claim_next_due_hub(now: dt.datetime, lease: dt.timedelta, *, owner: str = LEASE_OWNER) -> UUID | None:
     """Take for ``owner`` the lease of the hub due longest by ``now`` that nobody holds: one at a time, right before
     it is worked on, so no lease runs out while it waits its turn in a pass. Never a ready hub's (a demo whose time is
-    up aside): its ring is its apps' to set up (``base.worker._activations``), which keep their own time, or its
+    up aside): its ring is its apps' to set up (``base.worker_activations._activations``), which keep their own time, or its
     data work's, whose pass takes it."""
     with _control_transaction():
         due = (

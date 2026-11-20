@@ -15,7 +15,9 @@ from live.operations import registry
 
 from apps.sale.tests.conftest import HUB_DB, ctx_for
 from base import assistant
-from base.tests.test_assistant_asks import assert_its_asks_bring, comparable, offered_place, offered_to, probe_phrases
+from base.models import Membership
+from base.tests.test_assistant_asks import TOP, assert_its_asks_bring, assert_offered_with_room
+from base.tests.test_assistant_asks import by_group_test, comparable, offered_place, offered_to, probe_phrases
 from base.tests.test_assistant_asks import probes_of_layer_2, without_its_asks
 
 LANGUAGES = ("en", "es")
@@ -43,18 +45,26 @@ def test_what_the_employee_may_not_do_is_not_in_their_catalogue():
     assert "sale.sale.void" in employee
 
 
-#: How the owner asks layer 2 what the till takes: live reads no «abonar» as paying, so nothing in it names
-#: the payment methods, while «clientes» names the customers and «caja» the till; only the asks of
-#: ``sale.payment_method.list`` bring it, and ahead of them.
+#: How the owner asks layer 2 what the till takes: «abonarme» says paying, as the payments (``payment.payment.*``)
+#: do, «clientes» names the customers and «caja» the till; the payment methods come ahead of the customers and the
+#: till by their words, and ahead of the payments by their asks.
 PAYING_AT_THE_TILL = ("es", "sale.payment_method.list", "¿de qué maneras pueden abonarme los clientes en caja?")
+
+#: A quick note asked for without saying «nota rápida»: what the till's waiter taps, «para marcarlo rápido».
+PREPARING_A_QUICK_NOTE = (
+    "es",
+    "sale.quick_note.create",
+    "deja preparado el aviso «Sin cilantro QA» para marcarlo rápido al apuntar platos",
+)
 
 #: The owner's requests of layer 2 that were not offered their tool, word for word as the probes of
 #: ``tests/e2e/qa/probes/owner-es-sale-2026-11-08.json`` say them: the record named by its bare name («Chuches QA»),
-#: what the asks of each tool bring among the first ten.
+#: what the asks of each tool, or sale's own words, bring among the first ten.
 LAYER_2 = [
     ("es", "sale.department.update", "renombra Chuches QA como Golosinas QA y déjala la primera de la lista"),
     ("es", "sale.quick_note.update", "donde pone «Sin cilantro QA» escribe mejor «Nada de cilantro QA»"),
     PAYING_AT_THE_TILL,
+    PREPARING_A_QUICK_NOTE,
 ]
 
 #: The requests of the real-model QA, each as a person says it: a record of the QA's data names what it is («the
@@ -165,9 +175,9 @@ def test_the_asks_of_the_payment_methods_of_the_till_take_no_place_from_the_paym
 #: la línea» with one word changed); and, for ``sale.department.update`` and ``sale.quick_note.update``, one for each of
 #: their asks in each language, which falls out without that ask alone (it shares two of its stems at most, and fewer
 #: than half of its own), and the English twins of the probes of ``LAYER_2``; and so for ``sale.payment_method.list``,
-#: but for «¿con qué me pueden pagar?», which ``PAYING_AT_THE_TILL`` needs instead (the asks of many other tools say
-#: «pueden»), and «¿se puede pagar con Bizum?», which says no word the others do not («Bizum» is in «do we accept
-#: Bizum?»).
+#: but for «¿con qué me pueden pagar?», whose «pagar» brings the tool without its asks and whose «pueden» the asks of
+#: many other tools say, and «¿se puede pagar con Bizum?», which says no word the others do not («Bizum» is in «do
+#: we accept Bizum?»).
 OWN_WORDS = [
     ("en", "sale.payment_method.list", "would we take an Amex card?"),
     ("en", "sale.payment_method.list", "are cheques from regulars accepted?"),
@@ -175,7 +185,7 @@ OWN_WORDS = [
     ("en", "sale.payment_method.list", "tourists want to settle up, what else is there?"),
     ("es", "sale.payment_method.list", "¿aceptamos el cheque gourmet?"),
     ("es", "sale.payment_method.list", "¿qué maneras tenemos, además del efectivo?"),
-    ("es", "sale.payment_method.list", "¿con qué abonan los turistas normalmente?"),
+    ("es", "sale.payment_method.list", "¿con qué medios nos saldan los turistas normalmente?"),
     ("es", "sale.order.remove_voucher", "no lo uses en esta cuenta, mejor lo guarda"),
     ("en", "sale.order.remove_voucher", "she would rather not use it on the haircut"),
     ("en", "sale.department.update", "soft drinks belong on the standard band"),
@@ -203,6 +213,34 @@ OWN_WORDS = [
 @pytest.mark.parametrize(("language", "name", "phrase"), OWN_WORDS)
 def test_a_request_in_the_persons_own_words_reaches_its_tool_by_its_asks(language, name, phrase):
     assert_its_asks_bring(assistant.tools.catalog(ctx_for("hub_owner", language=language)), name, phrase, language)
+
+
+@pytest.fixture
+def catalog_of():
+    """``catalog_of(role, language)``: the assistant's catalogue of a person of business A with ``role``."""
+    return lambda role, language: assistant.tools.catalog(ctx_for(role, language=language))
+
+
+#: A quick note set up as a person asks for it, the text the waiter will tap «para marcarlo rápido» or «para marcarla
+#: rápido». The tool's asks say «notas» and «marcar», so without sale's group of words none of these is among the
+#: first ten: the settings of other apps and their alerts came first.
+QUICK_NOTE_SAID = [
+    ("sale.quick_note.create", "prepara un aviso «sin gluten» para marcarlo rápido", "para marcarlo rápido"),
+    ("sale.quick_note.create", "deja listo el aviso «sin gluten» para marcarlo rápido", "para marcarlo rápido"),
+    ("sale.quick_note.create", "prepara «para llevar» para marcarla rápido", "para marcarla rápido"),
+]
+
+test_a_quick_note_said_as_a_person_says_it_brings_its_tool_by_sales_group = by_group_test(QUICK_NOTE_SAID)
+
+#: Who sets up the till's quick notes (``sale.manage_settings``); the employee does not.
+SETS_UP_THE_TILL = (Membership.Role.OWNER, Membership.Role.ADMIN, Membership.Role.MANAGER)
+
+
+@HUB_DB
+@pytest.mark.parametrize("role", SETS_UP_THE_TILL)
+@pytest.mark.parametrize("phrase", [PREPARING_A_QUICK_NOTE[2], *(phrase for _, phrase, _ in QUICK_NOTE_SAID)])
+def test_whoever_sets_up_the_till_is_offered_the_quick_note_by_para_marcarlo_rapido(catalog_of, role, phrase):
+    assert_offered_with_room(catalog_of(role, "es"), "sale.quick_note.create", phrase, room=TOP)
 
 
 def test_no_qa_probe_is_an_ask():

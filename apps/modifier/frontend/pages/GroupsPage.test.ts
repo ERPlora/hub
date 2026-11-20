@@ -4,7 +4,7 @@
 // then name, 50 a page. «New group» and Edit (whoever may manage) open the form; Delete asks first, saying
 // what goes with it; a row opens the group's sheet, to everyone. Empty: «No modifier groups yet.».
 import { ConfirmDialog, DataTable, EmptyState } from '@erplora/ui/components';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { type Component, defineComponent } from 'vue';
 
 import { askToDelete, confirmDeletion } from '../../../../base/frontend/__tests__/table-delete';
@@ -14,11 +14,6 @@ import GroupFormModal from '../components/GroupFormModal.vue';
 import GroupSheet from '../components/GroupSheet.vue';
 import GroupsPage from './GroupsPage.vue';
 import { listFillProblems } from '../../../../frontend/testing/list-fill';
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
 
 const OP = 'modifier.group.list';
 const group = (id: string, over: Partial<GroupOut> = {}): GroupOut => ({

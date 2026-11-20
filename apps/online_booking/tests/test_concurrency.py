@@ -1,8 +1,12 @@
 """Two customers booking the same time at once: real sessions in threads, real row locks.
 
 Citas locks the professional's staff record before judging the time, so two online bookings of the same
-professional at the same time wait for each other: one enters, the other sees it and is refused. One mobile
-booking twice at once waits on its card's lock, so its limit of upcoming bookings holds.
+professional at the same time wait for each other: one enters, the other sees it and is refused. The public
+bookings of the business wait for each other on the page's settings row, so one mobile booking twice at once keeps
+its limit of upcoming bookings.
+
+Two saves of the settings, a merge of the card a booking is made on and two cancellations with the same link each
+wait for the row the other one holds.
 
 A booking's detail that a deletion lands in the middle of answers what it read or 404, never a 500.
 """
@@ -10,12 +14,23 @@ A booking's detail that a deletion lands in the middle of answers what it read o
 import pytest
 from live.errors import OperationError
 
-from apps.appointment.models import Appointment
+from apps.appointment.models import Appointment, History
 from apps.appointment.tests.test_concurrency import deleted_after_the_first_read_of
-from apps.online_booking.models import Booking
-from base.tenancy.tests.concurrency import at_once
+from apps.customer.tests.conftest import reads, writes
+from apps.online_booking.models import Booking, Settings
+from base.tenancy.tests.concurrency import at_once, meanwhile
 
-from .conftest import HUB_DB_COMMITTED, TUESDAY, at, booking_data, make_appointment, make_page, public, run
+from .conftest import (
+    HUB_DB_COMMITTED,
+    TUESDAY,
+    at,
+    booking_data,
+    make_appointment,
+    make_customer,
+    make_page,
+    public,
+    run,
+)
 
 #: Several sessions of business A at once, on a plan with room for them: on Free's one transaction at a time the second
 #: booking would wait for its turn, never for the first one's lock.
@@ -100,6 +115,66 @@ def test_one_device_six_times_at_once_five_enter(salon):
     results = at_once(*calls)
     assert codes(results) == ["ok"] * 5 + ["online_booking.too_many_bookings"]
     assert Appointment.objects.count() == 5
+
+
+# ── A second write that starts right after the first one read its row ──────────────────────────
+
+
+def save_settings(fields: dict):
+    return lambda: run("online_booking.settings.update", fields)
+
+
+def test_two_saves_of_the_settings_at_once_keep_what_each_one_sent(salon):
+    with meanwhile(reads("online_booking_settings"), save_settings({"allow_notes": False})) as other:
+        save_settings({"require_email": True})()
+    assert codes(other) == ["ok"]
+    saved = Settings.objects.get()
+    assert (saved.require_email, saved.allow_notes) == (True, False)
+
+
+def test_a_booking_on_a_card_customers_merges_meanwhile_ends_on_the_kept_card(salon, worker_loop):
+    duplicate = make_customer("Lucia P.", phone="+34699999999")
+
+    def merge():
+        return run("customer.customer.merge", {"id": str(salon.lucia.id), "absorbed_id": str(duplicate.id)})
+
+    with meanwhile(reads("customer_customer"), merge) as merged:
+        booked = public("book", booking_data(salon, "10:00", phone="699 999 999", name="Lucia P."))
+    assert codes(merged) == ["ok"]
+
+    worker_loop()
+
+    assert run("online_booking.booking.get", {"number": booked.number}).customer_id == salon.lucia.id
+
+
+def test_a_booking_that_arrives_while_customers_merges_its_card_is_made_on_the_kept_card(salon):
+    duplicate = make_customer("Lucia P.", phone=salon.lucia.phone)
+
+    def book():
+        return public("book", booking_data(salon, "10:00", phone="600 111 222", name="Lucia P."))
+
+    with meanwhile(writes("customer_customer"), book) as booked:
+        run("customer.customer.merge", {"id": str(salon.lucia.id), "absorbed_id": str(duplicate.id)})
+    assert codes(booked) == ["ok"]
+
+    assert Appointment.objects.get(number=booked[0].number).customer_id == salon.lucia.id
+
+
+def test_two_cancellations_at_once_with_the_same_link_cancel_once_and_refuse_the_other(salon):
+    booked = public("book", booking_data(salon, "10:00"))
+
+    def cancel():
+        return public("cancel", {"token": booked.token})
+
+    with meanwhile(reads("appointment_appointment"), cancel) as other:
+        try:
+            first = cancel()
+        except OperationError as error:
+            first = error
+    assert codes([first, *other]) == ["appointment.cannot_cancel", "ok"]
+    appointment = Appointment.objects.get(number=booked.number)
+    assert appointment.status == "cancelled"
+    assert History.objects.filter(appointment=appointment, action="cancelled").count() == 1
 
 
 # ── A deletion that lands in the middle of a booking's detail ────────────────────────────────────

@@ -1,17 +1,12 @@
 // Price Lists (WORKBOOK «Pantallas · Tarifas»): the old module's one screen, «Price lists» on top and
 // «Discount rules» under it, each with its own table.
 import { AppPage } from '@erplora/ui/shell';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import { mountPricing } from '../__tests__/mount-pricing';
 import PriceListsTable from '../components/PriceListsTable.vue';
 import RulesTable from '../components/RulesTable.vue';
 import ListsPage from './ListsPage.vue';
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
 
 describe('ListsPage', () => {
   it('stacks «Price lists» and «Discount rules» under the title «Price Lists»', async () => {

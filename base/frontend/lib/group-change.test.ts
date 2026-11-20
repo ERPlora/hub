@@ -3,17 +3,12 @@
 // `<fieldset name="<key>">` (or the FieldGroup that paints one) says each change the person makes to it, and only that
 // refusal goes.
 import { FormModal, type FormModalError } from '@erplora/ui/components';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { type Component, defineComponent, h, nextTick } from 'vue';
 
 import { flush, mountBase } from '../__tests__/mount-base';
 import FieldGroup from '../components/FieldGroup.vue';
 import { useGroupChange } from './group-change';
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
 
 const RISING = 'Each tier starts at a higher quantity than the one before.';
 const TAKEN = 'That code is taken.';

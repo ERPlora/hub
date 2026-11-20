@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:26fdf12c67137fa95a580dbcd7fd546931098cc86c09c82b2ef4ae3a2bd3166a -->
+<!-- generated from WORKBOOK.md sha256:f8aef28d4bb338bbb100567a09e4e120902a75527410830c1a89072198404d6a -->
 
 ## What it is for and who it is for
 
@@ -178,7 +178,7 @@ Screen: Home: Finish setting up your business; Cash register settings
 Steps:
 1. While the cash register settings have never been saved, on the **Home** the "Finish setting up your
    business" list brings the step "Your cash drawer" ("Decide how the till opens and closes: the opening
-   float, the closing count and the POS screen that stays locked until the drawer is open."), marked
+   float, the closing count and whether charging in cash needs an open session."), marked
    "Recommended". Its "Set up" leads to **Cash register → Settings**, which also opens from the menu.
 2. Turn on or off "Turn on the cash register", "Require an opening float", "Require a count to close",
    "Allow a negative balance", "Blind count" and "Daily auto-close" with its time.

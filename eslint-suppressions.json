@@ -303,11 +303,6 @@
       "count": 1
     }
   },
-  "apps/sale/frontend/components/pos/CartLine.vue": {
-    "vue/max-lines-per-block": {
-      "count": 1
-    }
-  },
   "apps/sale/frontend/components/pos/PosItemTile.vue": {
     "vue/max-lines-per-block": {
       "count": 1

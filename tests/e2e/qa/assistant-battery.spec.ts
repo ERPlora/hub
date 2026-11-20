@@ -14,15 +14,13 @@ import { join } from 'node:path';
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
 import { ITEMS, type Meta, observe, type Outcome, QA_STAFF_EMAIL, redact, renderReport, verdictOf } from '../assistant-battery';
+import { foot, openPanelAtHome, panel } from '../assistant-panel';
 import {
   answerOf,
   cleanUpRealProviders,
   converse,
   emptyMonth,
-  foot,
   noticesOf,
-  openPanel,
-  panel,
   saasSql,
   SECRETS,
   seedRealProviders,
@@ -86,7 +84,7 @@ async function messages(context: BrowserContext): Promise<{ used: number; limit:
   return usage.data;
 }
 
-/** Sets this month's messages of `a` on erplora.com (the row its first question made), as assistant-panel.ts does. */
+/** Sets this month's messages of `a` on erplora.com (the row its first question made), as `spend` (provider-helpers.ts) does. */
 function setMonth(used: number): void {
   saasSql(
     `update assistant_assistantusage set messages = ${Math.trunc(used)} where hub_id = (select id from hubs_hub where slug = 'a') ` +
@@ -189,7 +187,7 @@ for (const item of ITEMS) {
       precondition = ' (B29 left none: «Ana QA» created through the API first)';
     }
     const countBefore = record ? await record.count(context) : 0;
-    await openPanel(page);
+    await openPanelAtHome(page);
     const usedBefore = item.check === 'quota' ? (await messages(context)).used : 0;
 
     const { bodies, decided } = await converse(page, item.question, item.decide, item.id);
@@ -222,7 +220,7 @@ for (const item of ITEMS) {
       setMonth(limit - 5);
       let asked = false;
       try {
-        await openPanel(page);
+        await openPanelAtHome(page);
         await expect(foot(page)).toBeVisible().catch(() => undefined);
         const footBefore = await footText(page);
         asked = true;

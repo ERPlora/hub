@@ -6,7 +6,7 @@
 // allow them (the diary's rules). Changes come back through the stream.
 import { ConfirmDialog, DataTable, EmptyState, InlineFeedback } from '@erplora/ui/components';
 import { AppPage } from '@erplora/ui/shell';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import type { Component } from 'vue';
 
 import type { BookingRow } from '../operations';
@@ -14,11 +14,6 @@ import { EMPLOYEE, flush, MANAGER, type MountOptions, mountOnlineBooking, page, 
 import CancelDialog from '../components/CancelDialog.vue';
 import BookingsPage from './BookingsPage.vue';
 import { listFillProblems } from '../../../../frontend/testing/list-fill';
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
 
 const OP = 'online_booking.booking.list';
 const booking = (id: string, over: Partial<BookingRow> = {}): BookingRow => ({

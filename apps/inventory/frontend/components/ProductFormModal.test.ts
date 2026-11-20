@@ -34,8 +34,6 @@ import {
 import ProductFormModal from './ProductFormModal.vue';
 import { CATEGORIES, searches, setup } from '../__tests__/product-form';
 
-vi.mock('@ionic/vue', async (importOriginal) => (await import('../../../../base/frontend/__tests__/modal')).mockIonicModal(importOriginal));
-
 afterEach(() => {
   document.body.innerHTML = '';
 });

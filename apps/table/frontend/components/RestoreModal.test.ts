@@ -1,15 +1,10 @@
 // «Seat again» a parked check (WORKBOOK «Sesiones»; TABLE-F24): the tables free right now (available or
 // reserved, in service), live, to pick one; «Seat» seats it there. With none free, it says so.
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import { click, ionValue, mountTable, page, settle } from '../__tests__/mount-table';
 import { occupied, sessionRow, tableRow } from '../__tests__/tables';
 import RestoreModal from './RestoreModal.vue';
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
 
 const OP = 'table.table.list';
 type Control = HTMLElement & { value?: unknown; disabled?: boolean };

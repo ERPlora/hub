@@ -13,7 +13,7 @@ import { cleanUp, filterBy, named, ownerPage, pick, post, rowAction, VIEWPORTS, 
 test.beforeAll(cleanUp);
 test.afterAll(cleanUp);
 
-test('Vouchers: create, sold, adjusted, voided, movements, orphans and delete; settings saved', async ({ browser }) => {
+test('Vouchers: create, sold, adjusted, voided, movements, orphans and delete; settings saved @smoke', async ({ browser }) => {
   const bono = named('Bono');
   const { context, page } = await ownerPage(browser, '/service/packages');
   const settings = await api<{ default_duration: number }>(context, A, 'GET', '/service/settings');

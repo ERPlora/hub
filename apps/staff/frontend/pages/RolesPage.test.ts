@@ -5,7 +5,7 @@
 // roles; everyone else only reads. Changes come back through the stream.
 import { DataTable, EmptyState } from '@erplora/ui/components';
 import { AppPage } from '@erplora/ui/shell';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import type { Component } from 'vue';
 
 import type { RoleOut } from '../operations';
@@ -13,11 +13,6 @@ import { EMPLOYEE, flush, type MountOptions, mountStaff, page } from '../__tests
 import RoleFormModal from '../components/RoleFormModal.vue';
 import RolesPage from './RolesPage.vue';
 import { listFillProblems } from '../../../../frontend/testing/list-fill';
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
 
 const OP = 'staff.role.list';
 const role = (id: string, over: Partial<RoleOut> = {}): RoleOut => ({

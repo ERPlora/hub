@@ -4,7 +4,7 @@
 // «Save», and sends only what changed. No VAT chosen: «Choose the VAT this section charges.» under it.
 // It closes once the server saved it; a refusal keeps it open with what was typed (a category the server
 // does not know under «VAT charged», a department another device deleted on top).
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import { itTellsTheCorrectedFieldApart, refusedWithTheSameWords, SAME_WORDS } from '../../../../../base/frontend/__tests__/same-words-refusal';
 import { unsavedChangesIn } from '../../../../../base/frontend/lib/system-back';
@@ -12,11 +12,6 @@ import { click, ionValue, mountSale, settle, taxSettings } from '../../__tests__
 import { plain } from '../../lib/format';
 import type { DepartmentOut } from '../../operations';
 import DepartmentFormModal from './DepartmentFormModal.vue';
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
 
 type Control = HTMLElement & {
   label?: string;

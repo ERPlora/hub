@@ -1,17 +1,17 @@
 // The browser and stack side of the assistant's QA with the REAL model, shared by qa/assistant-battery.spec.ts (the
 // battery of the QA plan) and qa/assistant-probes.spec.ts (layer 2: the probes): the commands of the stack's Hub and
-// SaaS (keys never in their output), the once-per-run seed of the real providers and the documentation index, and the
-// assistant's panel as a person uses it (open it, ask, decide the card, read the answer). What can be proved without a
-// browser lives in assistant-battery.ts and assistant-probes.ts, with their Vitest tests.
+// SaaS (keys never in their output), the once-per-run seed of the real providers and the documentation index, and a
+// whole conversation in the panel (assistant-panel.ts) as a real model leads it: ask, decide the card, read the answer.
+// What can be proved without a browser lives in assistant-battery.ts and assistant-probes.ts, with their Vitest tests.
 import { execFileSync } from 'node:child_process';
 
-import { expect, type Locator, type Page, type Response } from '@playwright/test';
+import { expect, type Page, type Response } from '@playwright/test';
 
 import { cleanupCommand, type Meta, observe, redact } from './assistant-battery';
+import { answers, box, card, panel, send } from './assistant-panel';
 import { seedCommand } from './assistant-seed';
-import { A, HUB_DIR, REPO_DIR } from './helpers';
+import { HUB_DIR, REPO_DIR } from './helpers';
 import { STACK } from './stack';
-import { openAssistant } from './topbar';
 
 /** The checkout of the stack's SaaS (`E2E_SAAS_DIR`). */
 export const SAAS_DIR = process.env.E2E_SAAS_DIR ?? '';
@@ -84,22 +84,6 @@ export function cleanUpRealProviders(emails: string[]): void {
   if (!SAAS_DIR) return;
   const command = cleanupCommand(process.env, STACK.saasDatabase, emails);
   run(command.file, command.args, SAAS_DIR, command.env);
-}
-
-// ── The panel (as assistant-panel.ts reads it) ──
-
-export const panel = (page: Page): Locator => page.locator('[data-testid="assistant-panel"]');
-export const box = (page: Page): Locator => panel(page).locator('[data-testid="assistant-input"] textarea');
-export const answers = (page: Page): Locator => panel(page).locator('[data-testid="assistant-answer"]');
-export const card = (page: Page): Locator => page.locator('ion-modal[data-testid="assistant-confirm"]');
-export const send = (page: Page): Locator => panel(page).locator('[data-testid="assistant-send"]');
-export const foot = (page: Page): Locator => panel(page).locator('[data-testid="assistant-usage"]');
-
-/** The Hub's home with the assistant's panel open and its box ready. */
-export async function openPanel(page: Page): Promise<void> {
-  await page.goto(`${A}/`);
-  await openAssistant(page);
-  await expect(box(page)).toBeVisible();
 }
 
 /**

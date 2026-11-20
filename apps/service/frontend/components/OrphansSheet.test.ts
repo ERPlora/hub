@@ -1,17 +1,12 @@
 // SERVICE-F30 «Rescatar los bonos sin cliente»: the sheet follows `service.grant.list_orphans` live, the
 // most recent first: what is left («1 session left», «3 sessions left», «No session limit» or «Fully used»), the
 // voucher, the amount, when the card was deleted, «Expired» if it is, and the customer's reference.
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import type { OrphanOut } from '../operations';
 import type { Business } from '../../../../base/frontend/operations/business';
 import { business, JAPANESE, mountService, page, settle } from '../__tests__/mount-service';
 import OrphansSheet from './OrphansSheet.vue';
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
 
 const OP = 'service.grant.list_orphans';
 const orphan = (id: string, over: Partial<OrphanOut> = {}): OrphanOut => ({

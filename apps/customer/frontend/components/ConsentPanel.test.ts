@@ -4,18 +4,12 @@
 // stores THAT sentence; «Withdraw» is one tap, no dialog. Below, everything that was decided.
 import { formatDateTime } from '@erplora/ui/components';
 import { toastSuccess } from '@erplora/ui/shell';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import { pageOf } from '../__tests__/fixtures';
 import { errorFrame, flush, json, type MountOptions, mountCustomer, refusal, sent, subId } from '../__tests__/mount-customer';
 import type { ConsentRow, ConsentStateRow } from '../operations';
 import ConsentPanel from './ConsentPanel.vue';
-
-vi.mock('@erplora/ui/shell', async (importOriginal) => ({
-  ...((await importOriginal()) as object),
-  toastSuccess: vi.fn(),
-}));
-beforeEach(() => vi.mocked(toastSuccess).mockClear());
 
 const STATE: ConsentStateRow[] = [
   {

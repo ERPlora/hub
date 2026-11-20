@@ -533,7 +533,7 @@ def test_every_routed_command_declares_whether_a_cut_may_repeat_it():
 
     root = Path(__file__).resolve().parents[2]
     routed = set()
-    for path in [*root.glob("apps/*/api.py"), *root.glob("base/api.py")]:
+    for path in [*root.glob("apps/*/api.py"), *root.glob("base/api/*.py")]:
         for node in ast.walk(ast.parse(path.read_text())):
             if isinstance(node, ast.Call) and ast.unparse(node.func) == "bind" and len(node.args) >= 2:
                 routed.add(ast.literal_eval(node.args[1]))

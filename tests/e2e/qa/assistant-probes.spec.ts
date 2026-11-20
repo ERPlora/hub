@@ -51,13 +51,13 @@ import {
   renderProbeReport,
   type Role,
 } from '../assistant-probes';
+import { openPanelAtHome } from '../assistant-panel';
 import {
   answerOf,
   cleanUpRealProviders,
   converse,
   emptyMonth,
   noticesOf,
-  openPanel,
   run,
   SAAS_DIR,
   saasSql,
@@ -238,7 +238,7 @@ async function pageFor(browser: Browser, probe: Probe): Promise<{ context: Brows
     emptyMonth();
     opened = await hostPage(browser, A, { next: '/', credentials: PEOPLE[probe.role], viewport: { width: 1440, height: 900 } });
     await opened.context.addCookies([{ name: 'django_language', value: probe.language, domain: new URL(A).hostname, path: '/' }]);
-    await openPanel(opened.page);
+    await openPanelAtHome(opened.page);
     return opened;
   } catch (error) {
     await opened?.context.close();

@@ -3,16 +3,11 @@
 // shows the text as it will go out; «Send» waits until everything is filled in, sends it through
 // erplora.com and closes. A refusal (no marketing consent, the window, erplora.com down) stays on top
 // of the dialog with what was typed.
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import { click, flush, ionValue, mountInbox, settle } from '../__tests__/mount-inbox';
 import type { TemplateOut } from '../operations';
 import TemplateSendModal from './TemplateSendModal.vue';
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
 
 const OP = 'whatsapp_inbox.template.list';
 

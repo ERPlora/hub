@@ -3,7 +3,7 @@
 // override…», filters behind the table's funnel by its dates, reason and status, 50 a page by start. «+» opens «New override»; a
 // row or «Edit» opens «Edit · {reason}»; «Delete» asks first. An employee only reads.
 import { ConfirmDialog, DataTable, EmptyState } from '@erplora/ui/components';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import type { Component } from 'vue';
 
 import type { OverrideOut } from '../operations';
@@ -11,11 +11,6 @@ import { flush, type MountOptions, mountSchedule, page, settle } from '../__test
 import { itNamesTheListThatDoesNotLoad, itOnlyReadsForAnEmployee } from '../__tests__/list-checks';
 import OverrideFormModal from './OverrideFormModal.vue';
 import OverridesList from './OverridesList.vue';
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
 
 const OP = 'schedule.override.list';
 const ROWS: OverrideOut[] = [

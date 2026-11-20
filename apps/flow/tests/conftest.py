@@ -129,6 +129,17 @@ def clock(monkeypatch):
 
 
 @pytest.fixture
+def chatting(settings):
+    """A WhatsApp conversation with the customer at ``+34600111222`` who wrote ten minutes ago: a text goes as it is."""
+    from apps.whatsapp_inbox.tests.conftest import connect, receive
+
+    settings.SAAS_INTERNAL_URL = "http://saas.test"
+    settings.INTERNAL_SHARED_SECRET = "s3cret"
+    connect()
+    receive("wamid.IN", sent_at=(timezone.now() - dt.timedelta(minutes=10)).isoformat(), scope=A)
+
+
+@pytest.fixture
 def db_dsn(django_db_setup):
     """DSN of control's test database, where the live notices go after the COMMIT, for raw psycopg sessions."""
     params = connections["default"].settings_dict

@@ -438,8 +438,13 @@ Pasos:
    sale en dólares) y, si no da ninguna, en la del paso; un precio de una tarifa, en la de su tarifa; el
    descuento fijo de una regla, que no es de ninguna tarifa, en la del negocio; el límite de pago en efectivo o
    de tique de la vista previa de un cobro, en euros, la moneda en que la ley los fija, también en un negocio
-   que cobra en otra («1.000,00 €»); si no da ninguna, en la del negocio («120,50 €»). Un número que trae el aviso sale tal cual,
-   porque el aviso no dice si es dinero. Lo que va a otra acción, a otro sistema o a un «Solo sigue si…» lleva
+   que cobra en otra («1.000,00 €»); si no da ninguna, en la del negocio («120,50 €»). Un importe que trae el
+   aviso sale igual, en la moneda que trae el aviso y, si no trae ninguna, en la del negocio: el total y las demás
+   cifras de una venta cobrada, el total de una venta anulada o devuelta, el total de una factura emitida, el importe
+   de un pago, las cifras de una sesión, un movimiento o un arqueo de caja, el precio y el coste de un producto, lo
+   que suma o resta una opción de un modificador, un precio puesto en una tarifa (en la de su tarifa) y el total de
+   una línea de un carrito o de un pedido (en la de su carrito). Otro número que trae el aviso (el número de un tique,
+   cuántos artículos lleva) sale tal cual. Lo que va a otra acción, a otro sistema o a un «Solo sigue si…» lleva
    cada dato tal cual.
 Entra: las acciones y consultas de las apps activas, el último aviso real de ese tipo y lo que dejan los
 pasos anteriores. Los datos se nombran en el idioma de la pantalla («Número de venta», «Teléfono del
@@ -929,7 +934,7 @@ Pasos:
    está en formato internacional): solo lo recibe la conversación de WhatsApp de justo ese número
    internacional, nunca una nueva. Un número escrito a mano incompleto no le llega a nadie.
 3. Escribe el «Mensaje», con datos insertados: sale tal cual si el cliente te escribió en las últimas 24 horas,
-   con cada dato en palabras (FLOW-F11: un sí o un no, una fecha y una hora, un importe de un paso anterior),
+   con cada dato en palabras (FLOW-F11: un sí o un no, una fecha y una hora, un importe del aviso o de un paso anterior),
    también en los huecos de la plantilla.
 4. Elige la «Plantilla» entre tus plantillas aprobadas por Meta (debajo se ve su texto) y rellena un dato por
    cada hueco: pasadas las 24 horas, WhatsApp solo deja pasar una plantilla aprobada. Sin plantillas
@@ -1440,7 +1445,18 @@ Los avisos llevan ids, nunca nombres ni contenidos.
   su nombre o su descripción, que se llama como un dato que su app ya marca como dinero en una entrada o una salida
   (también en la rama de un `Cents | None`) o que nombra `AMOUNTS_BY_NAME` (los importes sin gemelo marcado). Una
   hora sin segundos («21:00») ya la escribió su app para una
-  persona y se deja. Un aviso no declara esquema: su número sale tal cual (`test_person_texts.py`). Lo que va a una
+  persona y se deja. Un importe que trae un aviso (`{{input.<dato>}}`) sale como dinero cuando la app del aviso lo
+  declara en su `events.AMOUNTS` (los nombres de los datos de sus avisos que son importes en la unidad menor de su
+  moneda; un nombre es el mismo importe en todos los avisos de la app), que lee `queries.catalog.event_amounts`:
+  `words_for` recibe el aviso que arrancó la ejecución (`FlowRun.event_name`; en «Probar», el del disparador), en la
+  moneda que trae el aviso a su lado (`input.currency`) o, si no trae ninguna, en la del negocio. Lo declaran Ventas,
+  Caja, Inventario, Facturación, Tarifas, Pagos, Carrito y pago y Modificadores; los de una tarifa y una línea de
+  carrito traen su `currency`. Ni un nombre ni una descripción hacen un importe: un número que nadie declara sale tal
+  cual (`test_person_texts.py`). La red `test_every_amount_an_event_brings_is_declared_by_its_app` de
+  `test_event_amounts.py` (trinquete `UNDECLARED_EVENT_AMOUNTS`, solo baja; hoy vacío) lee los avisos de cada app con
+  el lector de sus datos de `test_field_words.py` (`PayloadReader`, que falla ante uno que no sabe seguir) y caza uno
+  sin declarar que su app marca como dinero en una operación, que acaba en `_cents` o que nombra `AMOUNTS_BY_NAME`;
+  otra caza un nombre declarado que ningún aviso de su app trae. Lo que va a una
   máquina — otra acción, «Llamar a otro sistema», condiciones, el encargo al asistente — no cambia. Mercado: HubSpot
   (los tokens salen con el formato de su tipo: fecha y moneda de la cuenta) y Mailchimp (formato de fecha de la
   audiencia en las etiquetas) dan el dato ya en palabras; Shopify Flow y Klaviyo (filtros `money`/`date` de Liquid),

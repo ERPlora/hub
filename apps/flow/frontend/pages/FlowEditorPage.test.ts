@@ -1,18 +1,13 @@
 // The page of a saved automation (`/flow/automations/:id`): follows it live and opens the editor on the
 // tab of the link; one that does not exist says so; ← goes back to the list.
 import { AppPage } from '@erplora/ui/shell';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import type { FlowOut } from '../operations';
 import { errorFrame, mountFlow, settle } from '../__tests__/mount-flow';
 import FlowEditor from '../components/FlowEditor.vue';
 import { markSaved } from '../lib/justSaved';
 import FlowEditorPage from './FlowEditorPage.vue';
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
 
 const FLOW = { id: 'f1', name: 'Big sale', enabled: false, trigger: { kind: 'manual' }, steps: [], grants: [], missing_grants: [], required_grants: [] } as unknown as FlowOut;
 

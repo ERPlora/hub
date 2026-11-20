@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:48f0a2706e141226cdf65839e83ab10315264d1d9770e47d0931faa8a2cdda87 -->
+<!-- generated from WORKBOOK.md sha256:b27b2097977aa0112978ba2855d02d442bf281d0c392627b9442ac50e14972b1 -->
 
 ## What it is for and who it is for
 
@@ -429,7 +429,7 @@ On the Employees screens and the API documentation:
 | BASE-F106 | The assistant without a connection, with the service down or without a plan | done |
 | BASE-F107 | Pass the master QA of the Hub | done |
 | BASE-F108 | Report a problem to support | done |
-| BASE-F109 | Delete a deleted business after its 90 days | partial — a business with documents keeps its database until the fiscal archive exists (hub#738) |
+| BASE-F109 | Delete a deleted business after its 90 days | partial — a business with documents writes them to the fiscal archive, but still keeps its database (hub#738) |
 | BASE-F110 | Open the business's website on its own domain | done |
 | BASE-F111 | Wait for the database when it is cut for a moment | done |
 | BASE-F112 | Save a downloaded file inside the app | done |
@@ -932,8 +932,9 @@ Steps:
      chose.
   4. In "Add apps" they stay, with their icon, their name and "Off": from there they are turned on again
      (BASE-F24).
-  5. From the assistant ("Turn off the reservations app") the app is named as in BASE-F24, the high-risk card shows
-     its whole name and, if it was off already, the assistant says so and nothing changes.
+  5. From the assistant ("Turn off the reservations app", or without saying "app": "take Reservations off the menu",
+     "I don't want to see Reservations in the menu") the app is named as in BASE-F24, the high-risk card shows its
+     whole name and, if it was off already, the assistant says so and nothing changes.
 In: the business's apps, what each one needs and which ones the business chose.
 Out: the app turned off in this business, and the ones that came only with it, with their data intact.
 If it fails: if another running app needs it, nothing changes; if it cannot be turned off, it offers no "Turn off"
@@ -951,7 +952,8 @@ Steps:
      asking.
   3. The app comes back to "My apps" and to the menu, without reloading, with the data it had: "Reservations is
      on." and, if it came with others, "Also turned on: Tables.".
-  4. From the assistant ("Turn on the reservations app") the app is named as the person says it: by its name in any
+  4. From the assistant ("Turn on the reservations app", or without saying "app": "put Reservations back on the
+     menu") the app is named as the person says it: by its name in any
      language of the Hub, case and accents aside, or, if none is called so, by the only one with a word of its name
      that starts so ("booking" is Online booking). "Reservas" is Reservations, never Online booking (Reservas online)
      even though it starts the same. The card shows its whole name (BASE-F97), never its id, and if it was on
@@ -2811,15 +2813,21 @@ write to directly. In both cases what was written stays and can be sent again.
 Involved: ACCOUNTS-F38, BASE-F40
 
 ### BASE-F109 Delete a deleted business after its 90 days
-Status: partial — a business with documents keeps its database until the fiscal archive exists (hub#738)
+Status: partial — a business with documents writes them to the fiscal archive, but still keeps its database (hub#738)
 Actor: nobody: the Hub does it by itself, nobody presses anything
 Screen: None; the business's address goes on saying "This hub is no longer available."
 Steps:
   1. A business deleted on erplora.com (HUBS-F18, HUBS-F20) reaches its 90 days. Until then its database stays intact
      and it can be restored.
   2. The Hub checks whether it keeps documents: sales, invoices, VeriFactu records, payments, cash movements, shop
-     orders or a customer's purchases, in any status and even with the app turned off. If it keeps any, it stops here:
-     the business stays deleted, with its database, and is checked again the next day.
+     orders or a customer's purchases, in any status and even with the app turned off. If it keeps any, it first
+     writes them to the fiscal archive, where they are kept for 6 years and nobody can delete them: each table of
+     those documents as it is stored, with nothing rebuilt; the PDF of each invoice as it was handed to the customer,
+     in its own language or the business's and with the VeriFactu QR if it has its record, one per
+     invoice; and last a list that counts the rows and the PDFs and carries the fingerprint of each file, written only
+     once every file has been read back the same. It does so once per deletion, and if a VeriFactu record still awaits
+     the AEAT's answer, it waits for it. Then it stops: the business stays deleted, with its database, and is checked
+     again the next day.
   3. Without documents, it makes the final copy of its data, kept for 90 days in the copies store. Meanwhile the
      business can still be restored and erplora.com still sees its copies. When it ends it checks again for
      documents, in case one came in during the copy.
@@ -2830,16 +2838,22 @@ Steps:
 In: the deleted business and its 90 days over. Never a demo, which is deleted its own way when it expires, the
 platform's business or one moving to another server.
 Out: the final copy, and the database and the files gone, with the event `base.hub.purged`; from there erplora.com no
-longer lists its copies. Or, with documents, the database and the files kept and on the business's row the reason
-(`fiscal_archive_missing: <apps>`).
+longer lists its copies. Or, with documents, its fiscal archive written (on the row, `fiscal_archived_at` and the
+reason `fiscal_archived: <apps>`) and the database and the files kept; where there is no fiscal archive, the reason is
+`fiscal_archive_missing: <apps>`, and while a record awaits the AEAT, `fiscal_archive_waiting: verifactu`.
 If it fails: a copy that fails drops nothing, and neither does having no copies store; a copy or a drop that fails is
 tried again (1 min, 5 min, 15 min, then every hour) with the error noted on the row, with no second copy if there
 already was one. If the store does not delete its files, the business stays being dropped, with no mark and
 `files_purge_failed` on the row, and it is tried again the same way. If an app cannot be read, the database stays. A row
 that does not name the business's own database drops nothing (`invalid_database_name`). A business restored during the
 copy stays open with its database; once it is being dropped, erplora.com gets `hub_purged`. If the Hub shuts down
-mid-copy, the next one takes it up.
-Involved: HUBS-F18, HUBS-F19, HUBS-F20, PUBLIC-F34 (the same deletion of files, when a demo is retired)
+mid-copy, the next one takes it up. If it shuts down mid-way through the fiscal archive, the next attempt for that
+deletion uses the PDFs already uploaded and does not make them again. If the fiscal archive cannot be written whole, or
+a file does not read back as it was written, it is not taken as done: the row says `fiscal_archive_failed` with the
+reason and it is tried again the next day in another folder of the archive (what was already up stays, since nobody can
+delete it, and without its final list it does not count).
+Involved: HUBS-F18, HUBS-F19, HUBS-F20, PUBLIC-F34 (the same deletion of files, when a demo is retired), INVOICE-F18
+(each invoice's A4 that goes to the archive)
 
 ### BASE-F110 Open the business's website on its own domain
 Status: done (the address and what it serves; connecting the domain is erplora.com's HUBS-F17, which shows it on the panel)

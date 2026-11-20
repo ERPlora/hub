@@ -8,23 +8,18 @@
 // turns on are turned off again.
 // flow: table-assistant-card
 // flow: TABLE-F04 TABLE-F15 BASE-F97
-import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
+import { type Browser, type BrowserContext, expect, type Page, test } from '@playwright/test';
 
 import { NOT_DONE } from './assistant-provider';
-import { ask, cardSpec, ownerIn } from './assistant-card-helpers';
-import { card, openPanel, panel } from './assistant-real';
-import { A, api, capture, untilStill } from './helpers';
+import { cardSpec } from './assistant-card-helpers';
+import { askForACard, cancelAtComputerSize, card, decide, lastAnswer, openPanelAtTheDesk, ownerIn } from './assistant-panel';
+import { A, api, capture, THREE_SIZES as VIEWPORTS, untilStill } from './helpers';
 import { cleanRoom } from './sale-helpers';
 
 const KEY = 'FIX-HUB-TABLE-ASSISTANT-CARD-LEAVES-OUT-ITS-RECORDS';
 const TAG = 'E2ETac';
 const TERRACE = `${TAG}Terraza`;
 const ROOM = `${TAG}Comedor`;
-const VIEWPORTS = [
-  { label: '390', width: 390, height: 844 },
-  { label: '834', width: 834, height: 1112 },
-  { label: '1440', width: 1440, height: 900 },
-];
 /** The apps a table needs, in the order they require each other: a business is born with every app off. */
 const NEEDED = ['customer', 'tax', 'sale', 'table'];
 
@@ -35,13 +30,6 @@ type Check = { id: string; label: string; table_id: string | null; order_id: str
 const cleanup = (): void => cleanRoom(TAG);
 
 cardSpec(NEEDED, cleanup);
-
-const lastAnswer = (page: Page): Locator => panel(page).locator('[data-testid="assistant-bubble-assistant"]').last();
-
-async function decide(page: Page, button: 'submit' | 'cancel'): Promise<void> {
-  await card(page).locator(`[data-testid="assistant-confirm-${button}"]`).click();
-  await expect(card(page)).toBeHidden();
-}
 
 /** The owner in `language`, with table 5 of the terrace and table 2 of the dining room made through Tables' API:
  *  `[context, page, the terrace, the dining room, table 5, table 2]`. */
@@ -78,10 +66,8 @@ test('table-assistant-card — in Spanish taking a table to another zone names t
   const [context, page, terrace, room, five] = await ownerWithARoom(browser, 'es');
   // The name the card says, as the room's screens say it: the number with its zone.
   expect(five.label).toBe(`5 (${TERRACE})`);
-  await page.setViewportSize({ width: 1440, height: 900 });
-  await openPanel(page);
-  await ask(page, `E2E-ASK table__table__update ${JSON.stringify({ id: five.id, move_to_zone_id: room })}`);
-  await expect(card(page)).toBeVisible();
+  await openPanelAtTheDesk(page);
+  await askForACard(page, `E2E-ASK table__table__update ${JSON.stringify({ id: five.id, move_to_zone_id: room })}`);
   for (const vp of VIEWPORTS) {
     await page.setViewportSize({ width: vp.width, height: vp.height });
     await expect(card(page)).toContainText(`Cambiar en Mesas: 5 (${TERRACE}) · ${ROOM}`);
@@ -89,9 +75,7 @@ test('table-assistant-card — in Spanish taking a table to another zone names t
     await untilStill(page);
     await capture(page, `${KEY}-${vp.label}`);
   }
-  await page.setViewportSize({ width: 1440, height: 900 });
-  await decide(page, 'cancel');
-  await expect(lastAnswer(page)).toContainText('No lo he hecho.');
+  await cancelAtComputerSize(page);
   expect((await tableNow(context, five.id)).zone_id).toBe(terrace);
   if (process.env.E2E_SAVE_STORAGE_STATE) await context.storageState({ path: process.env.E2E_SAVE_STORAGE_STATE });
   await context.close();
@@ -102,10 +86,8 @@ test('table-assistant-card — in English transferring a check names the check b
   const seated = await api<Check>(context, A, 'POST', '/table/sessions/open', { table_id: five.id, guests_count: 2 });
   expect(seated.status, JSON.stringify(seated.data)).toBe(201);
   expect(seated.data.label).toBe(`5 (${TERRACE})`);
-  await page.setViewportSize({ width: 1440, height: 900 });
-  await openPanel(page);
-  await ask(page, `E2E-ASK table__session__transfer ${JSON.stringify({ id: seated.data.id, to_table_id: two.id })}`);
-  await expect(card(page)).toBeVisible();
+  await openPanelAtTheDesk(page);
+  await askForACard(page, `E2E-ASK table__session__transfer ${JSON.stringify({ id: seated.data.id, to_table_id: two.id })}`);
   await expect(card(page)).toContainText(`5 (${TERRACE})`);
   await expect(card(page)).toContainText(`Destination table: 2 (${ROOM})`);
   for (const id of [seated.data.id, two.id]) await expect(card(page)).not.toContainText(id);

@@ -666,14 +666,13 @@ def public_slots(ctx: OperationContext, data: PublicSlotsIn) -> dict:
     }
 
 
-def find_by_token(token: str, *, lock: bool = False) -> Booking:
+def find_by_token(token: str) -> Booking:
     """The live booking whose link is ``token`` (404 ``online_booking.booking_not_found`` otherwise)."""
-    rows = Booking.objects.select_related("appointment").filter(
-        token_hash=hash_token(token), appointment__deleted_at__isnull=True
+    found = (
+        Booking.objects.select_related("appointment")
+        .filter(token_hash=hash_token(token), appointment__deleted_at__isnull=True)
+        .first()
     )
-    if lock:
-        rows = rows.select_for_update(of=("self",))
-    found = rows.first()
     if found is None:
         raise NotFound(str(BOOKING_NOT_FOUND), code="online_booking.booking_not_found")
     return found

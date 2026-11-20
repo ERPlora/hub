@@ -46,6 +46,8 @@ from apps.service.schemas import (
     SettingsIn,
     VoidIn,
 )
+from apps.service.schemas.grant_sales import GrantSaleIn
+from apps.service.services import grant_sales
 from base.request_body import accept_body_up_to
 
 router = Router(tags=["service"])
@@ -262,6 +264,11 @@ async def grant_void(request, data: VoidIn):
 @bind(router, "service.grant.adjust", "/service/grants/adjust")
 async def grant_adjust(request, data: AdjustIn):
     return await run_operation(request, services.adjust_grant, data)
+
+
+@bind(router, "service.grant.link", "/service/grants/link")
+async def grant_link_sale(request, data: GrantSaleIn):
+    return await run_operation(request, grant_sales.link_sale, data)
 
 
 @bind(router, "service.grant.redeem", "/service/grants/redeem")

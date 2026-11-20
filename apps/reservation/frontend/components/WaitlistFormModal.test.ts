@@ -1,18 +1,13 @@
 // RESERVATION-F14: «Add guest» puts somebody on the waitlist — the Customer (Customers' search) or the
 // guest's Name and, if given, Phone, the Date, the preferred Time, the Party and notes. A refusal goes on
 // top, a bad field under it.
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import CustomerSearch from '../../../customer/frontend/components/CustomerSearch.vue';
 import { itTellsTheCorrectedFieldApart } from '../../../../base/frontend/__tests__/same-words-refusal';
 import { click, ionValue, mountReservation, settle } from '../__tests__/mount-reservation';
 import { entryRow } from '../__tests__/rows';
 import WaitlistFormModal from './WaitlistFormModal.vue';
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
 
 type Control = HTMLElement & { label?: string; value?: unknown; errorText?: string; disabled?: boolean };
 

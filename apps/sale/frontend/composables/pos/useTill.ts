@@ -20,6 +20,7 @@ import { refusal } from '../../lib/refusal';
 import type { ComboChoiceIn, OpenLineIn, OrderLineOut, OrderOut, SettingsOut } from '../../operations';
 import { useT } from '../useT';
 import { useCurrentCheck } from './useCurrentCheck';
+import { useLineNote } from './useLineNote';
 
 /** What a sheet needs to know of its write: done, or the words of the refusal. */
 export type WriteResult = { ok: true } | { ok: false; message: string };
@@ -61,7 +62,7 @@ export interface Till {
   sendToKitchen(rush: boolean, waiter?: string | null): Promise<WriteResult & { round?: number; printed?: boolean; code?: string }>;
   setQuantity(line: OrderLineOut, quantity: string): Promise<void>;
   toggleGift(line: OrderLineOut): Promise<void>;
-  setNote(line: OrderLineOut, notes: string): Promise<WriteResult>;
+  setNote: ReturnType<typeof useLineNote>;
   setLineStaff(line: OrderLineOut, staffId: string | null): Promise<void>;
   setLineDiscount(line: OrderLineOut, percent: string): Promise<WriteResult>;
   setTicketDiscount(discount: { percent: string; amount: number }): Promise<WriteResult>;
@@ -304,8 +305,7 @@ export function useTill(options: TillOptions): Till {
       ),
     );
 
-  const setNote = (line: OrderLineOut, notes: string) =>
-    attempt((id) => updateLine.run({ order_id: id, line_id: line.id, notes }), 'sale.pos.lineChangeFailed');
+  const setNote = useLineNote(attempt);
 
   const setLineStaff = (line: OrderLineOut, staffId: string | null) =>
     toast(attempt((id) => lineStaff.run({ order_id: id, line_id: line.id, staff_id: staffId }), 'sale.pos.lineStaffFailed'));
