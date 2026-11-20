@@ -2,22 +2,12 @@
 // only reads what can go back) while the window is open. A refund recorded closes it.
 import { FormModal } from '@erplora/ui/components';
 import { toastError } from '@erplora/ui/shell';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import { flush, ionValue, mountSale } from '../../__tests__/mount-sale';
 import type { SaleRow } from '../../operations';
 import RefundForm from './RefundForm.vue';
 import RefundModal from './RefundModal.vue';
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
-vi.mock('@erplora/ui/shell', async (importOriginal) => ({
-  ...((await importOriginal()) as object),
-  toastSuccess: vi.fn(),
-  toastError: vi.fn(),
-}));
 
 const SALE = { id: 's1', number: '20261014-0007' } as SaleRow;
 const REFUND_OPTIONS = {

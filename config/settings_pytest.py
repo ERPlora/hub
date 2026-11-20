@@ -16,7 +16,7 @@ import os
 os.environ["VITE_DEV_PORT"] = "5173"
 # A cut of the database (live.database_cut, BASE-F111) is waited for 1 s in the suite, not production's 20: a test that
 # makes the database unreachable gets its 503 without a 20 s sleep. The default itself is tested by importing
-# config.settings anew (config/tests/test_settings.py), and each test of the cut sets its own limit.
+# config.settings anew (config/tests/test_settings_databases.py), and each test of the cut sets its own limit.
 os.environ.setdefault("DB_CUT_WAIT_SECONDS", "1")
 
 from config.settings import *  # noqa: E402, F403

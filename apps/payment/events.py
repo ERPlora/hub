@@ -24,3 +24,7 @@ PAYMENT_EVENTS = [
 ]
 METHOD_EVENTS = [METHOD_CREATED, METHOD_UPDATED, METHOD_DEACTIVATED, METHOD_ACTIVATED]
 ALL = PAYMENT_EVENTS + METHOD_EVENTS
+
+#: The amount a payment's events bring, in cents of its currency (beside it): an automation says it as money in
+#: what a person reads.
+AMOUNTS = frozenset({"amount"})

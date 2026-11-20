@@ -49,6 +49,7 @@ def test_the_events_of_the_workbook():
         "GRANT_REDEEMED": "service.grant.redeemed",
         "GRANT_REASSIGNED": "service.grant.reassigned",
         "GRANT_ERASED": "service.grant.erased",
+        "GRANT_SALE_LINKED": "service.grant.sale_linked",
         "SESSION_RESERVED": "service.session.reserved",
         "SESSION_RELEASED": "service.session.released",
         "SESSION_SETTLED": "service.session.settled",

@@ -10,11 +10,6 @@ import { click, flush, mountPrinting } from '../__tests__/mount-printing';
 import { draftOf, type FoundPrinter } from '../lib/discovery';
 import DiscoverPrintersModal from './DiscoverPrintersModal.vue';
 
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
-
 type Win = { __TAURI__?: unknown };
 
 const EPSON: FoundPrinter = { id: 'network:192.168.1.50:9100', name: 'EPSON TM-T20III', type: 'network', category: 'unknown', status: 'ready', paper_width: 80 };

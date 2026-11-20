@@ -13,14 +13,6 @@ import { ionModalStubOf } from '../../../../../packages/ui/src/components/FormMo
 import CheckoutPanel from './CheckoutPanel.vue';
 import CheckoutSheet from './CheckoutSheet.vue';
 
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
-vi.mock('@erplora/ui/shell', async (importOriginal) => ({
-  ...((await importOriginal()) as object),
-  toastWarning: vi.fn(),
-}));
 beforeEach(() => vi.clearAllMocks());
 
 const PREVIEW: PreviewOut = {

@@ -15,11 +15,6 @@ import ProductDetailModal from './ProductDetailModal.vue';
 const device = vi.hoisted(() => ({ printLabel: vi.fn() }));
 vi.mock('../lib/print-label', () => device);
 
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
-
 afterEach(() => {
   document.body.innerHTML = '';
   device.printLabel.mockReset();

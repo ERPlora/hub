@@ -7,6 +7,14 @@ from apps.inventory.events import FIGURE_EVENTS, PRODUCT_EVENTS
 from base.allergens import ALLERGENS
 
 VIEW = "inventory.view_product"
+#: How a quantity of goods is said in a unit: what the assistant reads as goods and as their stock.
+QUANTITIES_OF_GOODS = (
+    "kilos de", "kg de", "gramos de", "litros de", "cajas de", "sacos de",
+    "kilos of", "kg of", "grams of", "litres of", "liters of", "boxes of",
+)
+#: Goods noted down as arrived («apunta que han llegado…» is read «apunta que llegan…»), never «llegan» alone: people
+#: arrive too («han llegado dos más para la mesa 7»).
+GOODS_NOTED_AS_ARRIVED = ("apunta que llegan", "apuntame que llegan", "anota que llegan", "registra que llegan")
 
 
 class InventoryConfig(LiveAppConfig):
@@ -40,13 +48,16 @@ class InventoryConfig(LiveAppConfig):
     choices = {"allergens": ALLERGENS}
     # What these words mean to the Hub's assistant (base.assistant.relevance.synonyms). The «unidades» are the units of measure
     # (inventory.unit), and a «albarán», the «mercancía» or what «entran» (never «entrada»: its stem is that of «entre»)
-    # is the goods inventory.stock.receive records.
+    # is the goods inventory.stock.receive records. So are «20 kilos de» or «5 cajas de» a product, and what is noted
+    # down as arrived, which are also its stock (inventory.stock); not the bottles, cans or units a sale line or a cart
+    # counts too.
     assistant_synonyms = (
         ("unidad", "unidades", "unit", "units"),
         (
             "albaran", "mercancia", "entran", "recibir", "recibe", "recibido", "receive", "received", "goods",
-            "delivery note",
+            "delivery note", *QUANTITIES_OF_GOODS, *GOODS_NOTED_AS_ARRIVED,
         ),
+        ("stock", *QUANTITIES_OF_GOODS, *GOODS_NOTED_AS_ARRIVED),
     )
     permissions = [
         "inventory.view_product",

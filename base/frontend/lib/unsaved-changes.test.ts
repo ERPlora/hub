@@ -12,11 +12,6 @@ import { flush, mountBase } from '../__tests__/mount-base';
 import { unsavedChangesIn } from './system-back';
 import { keepTouched, useSheetWaysOut, useUnsavedChanges, useUnsavedForm, useUnsavedFormOnOpen } from './unsaved-changes';
 
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
-
 afterEach(() => {
   document.body.innerHTML = '';
 });

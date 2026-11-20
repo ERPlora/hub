@@ -6,7 +6,7 @@
 // {name}» for whoever can change; «Delete» asks ««{name}» will be deleted…» first. An employee only
 // reads.
 import { ConfirmDialog, DataTable, EmptyState } from '@erplora/ui/components';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import type { Component } from 'vue';
 
 import type { SpecialDayOut } from '../operations';
@@ -14,11 +14,6 @@ import { errorFrame, flush, type MountOptions, mountSchedule, page, settle } fro
 import { itNamesTheListThatDoesNotLoad, itOnlyReadsForAnEmployee } from '../__tests__/list-checks';
 import SpecialDayFormModal from './SpecialDayFormModal.vue';
 import SpecialDaysList from './SpecialDaysList.vue';
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
 
 const OP = 'schedule.special_day.list';
 const day = (id: string, over: Partial<SpecialDayOut> = {}): SpecialDayOut => ({

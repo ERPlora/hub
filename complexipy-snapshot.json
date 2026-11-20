@@ -622,16 +622,6 @@
     ]
   },
   {
-    "path": "base/worker.py",
-    "file_name": "worker.py",
-    "functions": [
-      {
-        "name": "run",
-        "complexity": 32
-      }
-    ]
-  },
-  {
     "path": "base/ws_print.py",
     "file_name": "ws_print.py",
     "functions": [
@@ -834,10 +824,6 @@
       {
         "name": "_assistant_answer",
         "complexity": 19
-      },
-      {
-        "name": "assistant_turn",
-        "complexity": 27
       }
     ]
   },
@@ -868,16 +854,6 @@
       {
         "name": "_send_chain",
         "complexity": 52
-      }
-    ]
-  },
-  {
-    "path": "apps/flow/services/engine.py",
-    "file_name": "engine.py",
-    "functions": [
-      {
-        "name": "_advance",
-        "complexity": 38
       }
     ]
   },
@@ -928,10 +904,6 @@
       {
         "name": "_tried_pinned",
         "complexity": 26
-      },
-      {
-        "name": "try_flow",
-        "complexity": 44
       }
     ]
   },

@@ -14,7 +14,7 @@ import { execSync } from 'node:child_process';
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
 import { type Provider, startProvider } from './assistant-provider';
-import { openPanel } from './assistant-real';
+import { card, openPanelAtTheDesk, panel } from './assistant-panel';
 import { A, api, EMPLOYEE, login, OWNER, psql, REPO_DIR, shot, shown, untilStill, usernamesOf } from './helpers';
 import { createItem } from './demo-items';
 import { STACK } from './stack';
@@ -101,16 +101,13 @@ test.afterAll(async () => {
   await provider?.close();
 });
 
-const panel = (page: Page): Locator => page.locator('[data-testid="assistant-panel"]');
-const card = (page: Page): Locator => page.locator('ion-modal[data-testid="assistant-confirm"]');
 /** «An approval is needed», over the screen that asked. */
 const approval = (page: Page): Locator => page.locator('ion-modal').filter({ has: page.getByTestId('approval-action') });
 const escaped = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 test('BASE-F84: the dialog says the figures of the very line it approves, and a manager approves it with their PIN', async () => {
   const { page } = employee;
-  await page.setViewportSize({ width: 1440, height: 900 });
-  await openPanel(page);
+  await openPanelAtTheDesk(page);
   const box = panel(page).locator('[data-testid="assistant-input"] textarea');
   await box.fill(`E2E-ASK demo__item__add_line {"id":"${itemId}","text":"${LINE_TEXT}","qty":"2.5"}`);
   await box.press('Enter');

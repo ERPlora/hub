@@ -1,5 +1,6 @@
-"""When the worker has something to do next in a business's own database (``base.queries.due_work``): the next run of a
-task of one of its apps that are on and the next try of a delivery waiting, read in one transaction."""
+"""When the worker has something to do next (``base.queries.due_work``): in a business's own database, the next run of a
+task of one of its apps that are on and the next try of a delivery waiting; on control, the next time a hub is due in
+``hub_due`` or free from a lease, or a move asked for its night comes. Each read in one transaction."""
 
 import datetime as dt
 
@@ -9,8 +10,9 @@ from live.models import OutboxEvent
 
 from base.models import EventDelivery, TaskSchedule
 from base.queries import due_work
-from base.tenancy.context import use_hub
+from base.tenancy.context import use_control, use_hub
 from base.tenancy.tests import hubs
+from control.models import Cluster, Hub, HubDue
 
 pytestmark = pytest.mark.django_db(databases=hubs.HUB_DATABASES)
 
@@ -42,3 +44,27 @@ def test_the_earliest_task_of_an_app_that_is_on_and_the_earliest_delivery_waitin
         due = due_work.next_due(frozenset({"verifactu", "printing"}))
 
     assert due == due_work.DueWork(task_at=now + dt.timedelta(minutes=1), delivery_at=now + dt.timedelta(seconds=8))
+
+
+def test_control_keeps_no_time_when_nothing_is_to_come(hub_a):
+    now = timezone.now()
+    HubDue.mark_due(hub_a, now - dt.timedelta(minutes=1))  # due already: the pass just offered it
+
+    with use_control():
+        assert due_work.next_on_control(now) is None
+
+
+def test_the_first_time_to_come_of_a_hub_due_a_lease_running_out_and_a_move_asked_for_its_night(hub_a, hub_b):
+    now = timezone.now()
+    HubDue.mark_due(hub_a, now + dt.timedelta(minutes=9))
+    HubDue.mark_due(hub_b, now - dt.timedelta(minutes=1))
+    HubDue.objects.filter(pk=hub_b.pk).update(lease_until=now + dt.timedelta(minutes=4))  # another worker's
+    elsewhere = Cluster.objects.create(name="elsewhere", host="writer-elsewhere.example")
+    Hub.objects.filter(pk=hub_a.pk).update(move_scheduled_to=elsewhere, move_scheduled_for=now + dt.timedelta(minutes=6))
+
+    with use_control():
+        assert due_work.next_on_control(now) == now + dt.timedelta(minutes=4)
+        HubDue.objects.filter(pk=hub_b.pk).update(lease_until=None)
+        assert due_work.next_on_control(now) == now + dt.timedelta(minutes=6)
+        Hub.objects.filter(pk=hub_a.pk).update(move_scheduled_to=None, move_scheduled_for=None)
+        assert due_work.next_on_control(now) == now + dt.timedelta(minutes=9)

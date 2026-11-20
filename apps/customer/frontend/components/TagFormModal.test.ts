@@ -1,7 +1,7 @@
 // «New tag» and «Edit · {name}» (CUSTOMER-F28): Name and Color; editing adds «Active». A name taken
 // by another active tag is said under «Name».
 import { toastSuccess } from '@erplora/ui/shell';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { defineComponent, h, ref } from 'vue';
 
 import { approvalDialog, approvalSettled, asksApproval } from '../__tests__/approval-dialog';
@@ -9,22 +9,9 @@ import { flush, json, mountCustomer, refusal, sent } from '../__tests__/mount-cu
 import type { TagRow } from '../operations';
 import TagFormModal from './TagFormModal.vue';
 
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  const { modalControllerStub } = await import('../__tests__/approval-dialog');
-  const ionic = await importOriginal<typeof import('@ionic/vue')>();
-  return { ...ionic, IonModal: IonModalStub, modalController: modalControllerStub(ionic.modalController) };
-});
-vi.mock('@erplora/ui/shell', async (importOriginal) => ({
-  ...((await importOriginal()) as object),
-  toastSuccess: vi.fn(),
-}));
+vi.mock('@ionic/vue', async (importOriginal) => (await import('../__tests__/approval-dialog')).ionicWithApprovalDialog(importOriginal));
 beforeEach(() => {
-  vi.mocked(toastSuccess).mockClear();
   approvalDialog.reset();
-});
-afterEach(() => {
-  document.body.innerHTML = '';
 });
 
 const LOYAL: TagRow = { id: 't1', name: 'Loyal', color: 'success', is_active: true, customer_count: 2 };

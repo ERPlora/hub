@@ -6,8 +6,8 @@
 // flow: WEBSITE-F01 WEBSITE-F02 WEBSITE-F03 BASE-F97
 import { expect, test } from '@playwright/test';
 
-import { cancel, cardSpec, fieldsOf, ownerIn, VIEWPORTS } from './assistant-card-helpers';
-import { card, openPanel } from './assistant-real';
+import { cardSpec, fieldsOf, VIEWPORTS } from './assistant-card-helpers';
+import { cancel, card, openPanelAtTheDesk, ownerIn } from './assistant-panel';
 import { A, api, capture, untilStill } from './helpers';
 import { type Site } from './website-helpers';
 
@@ -21,8 +21,7 @@ const EXPECTED = {
 for (const language of ['es', 'en'] as const) {
   test(`website-assistant-card — in ${language}, saving the site sums up its changes instead of dumping the whole draft`, async ({ browser }) => {
     const [context, page] = await ownerIn(browser, language);
-    await page.setViewportSize({ width: 1440, height: 900 });
-    await openPanel(page);
+    await openPanelAtTheDesk(page);
     const found = await api<Site>(context, A, 'GET', '/website/site');
     expect(found.status).toBe(200);
     const before: Pick<Site, 'template' | 'theme' | 'content'> = {

@@ -223,6 +223,7 @@ def test_a_product_s_price_is_put_in_a_list_by_their_names():
             "service_id": None,
             "min_quantity": "10.000",
             "price": 1200,
+            "currency": "EUR",
         }
     ]
 

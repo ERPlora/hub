@@ -4,17 +4,12 @@
 // a call) —; «Send to Meta for review» waits for what Meta needs and sends it. A row opens «Edit template —
 // {name}» with what Meta has (or the changes still on their way), its verdict and its reason; name and
 // language never change, and the category only while Meta has not approved it. A refusal stays in the dialog.
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import { itTellsTheCorrectedFieldApart, refusedWithTheSameWords, SAME_WORDS } from '../../../../base/frontend/__tests__/same-words-refusal';
 import { click, flush, ionValue, mountInbox, settle } from '../__tests__/mount-inbox';
 import type { TemplateOut } from '../operations';
 import TemplateFormModal from './TemplateFormModal.vue';
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
 
 const ID = 'whatsapp-inbox-template-editor';
 

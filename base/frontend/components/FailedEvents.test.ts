@@ -10,15 +10,6 @@ vi.mock('@erplora/ui/components', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@erplora/ui/components')>()),
   useConfirm: () => ({ confirm: mocks.confirm }),
 }));
-vi.mock('@erplora/ui/shell', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@erplora/ui/shell')>()),
-  toastSuccess: vi.fn(),
-  toastError: vi.fn(),
-}));
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
 
 const OP = 'base.failed_event.list';
 
@@ -56,8 +47,6 @@ const posted = (m: Awaited<ReturnType<typeof open>>) =>
 
 beforeEach(() => {
   mocks.confirm.mockReset();
-  vi.mocked(toastSuccess).mockClear();
-  vi.mocked(toastError).mockClear();
 });
 
 afterEach(() => {

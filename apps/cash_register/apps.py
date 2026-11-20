@@ -7,6 +7,18 @@ from live.meta import Category, LiveAppConfig, Nav, SetupCheck, SetupStep, Widge
 
 from apps.cash_register.events import SESSION_EVENTS, SETTINGS_UPDATED
 
+#: Several movements said by how many come before their amount: «dos entradas de» 20 €, «3 salidas de» 10 €, «two
+#: entries of» 20 €. Only before «de» or «of»: «dos entradas para el concierto» and «two entries to the waitlist» are
+#: no movement.
+COUNTED_MOVEMENTS = (
+    *(
+        f"{count} {kind} de"
+        for count in ("dos", "tres", "cuatro", "cinco", "2", "3", "4", "5")
+        for kind in ("entradas", "salidas", "movimientos")
+    ),
+    *(f"{count} entries of" for count in ("two", "three", "four", "five", "2", "3", "4", "5")),
+)
+
 
 class CashRegisterConfig(LiveAppConfig):
     name = "apps.cash_register"
@@ -32,11 +44,25 @@ class CashRegisterConfig(LiveAppConfig):
     requires = ["sale"]
     default_auto_field = "django.db.models.BigAutoField"
     # What these words mean to the Hub's assistant (base.assistant.relevance.synonyms). An «arqueo», a «recuento» or a «conteo» of
-    # the drawer is a count (cash_register.count), and the «moneda» or «divisa» of the business is its currency
-    # (cash_register.currency).
+    # the drawer is a count (cash_register.count), the «moneda» or «divisa» of the business is its currency
+    # (cash_register.currency), and «una entrada», «una salida» or «un movimiento», or several of them by their count,
+    # is a movement (cash_register.movement). Those go as phrases: a bare «entrada» shares its stem with «entre» and
+    # «entra», and a bare «salida» is also a clock-out or a dish that left the pass. «Las cajas de la» barra or tienda
+    # are the tills (cash_register.register), which Inventory's «cajas de» goods would otherwise hide.
     assistant_synonyms = (
         ("arqueo", "recuento", "conteo", "count"),
         ("divisa", "moneda", "currency"),
+        (
+            "movement",
+            "un movimiento",
+            "una entrada",
+            "una salida",
+            "otro movimiento",
+            "otra entrada",
+            "otra salida",
+            *COUNTED_MOVEMENTS,
+        ),
+        ("register", "cajas de la"),
     )
     permissions = [
         "cash_register.view_session",
@@ -97,8 +123,8 @@ class CashRegisterConfig(LiveAppConfig):
             configured_when=[SetupCheck(field="updated_at", truthy=True)],
             title=_("Your cash drawer"),
             description=_(
-                "Decide how the till opens and closes: the opening float, the closing count and the POS screen that "
-                "stays locked until the drawer is open."
+                "Decide how the till opens and closes: the opening float, the closing count and whether charging in "
+                "cash needs an open session."
             ),
             icon="ion:cash-outline",
             route="/cash_register/settings",
@@ -152,9 +178,12 @@ class CashRegisterConfig(LiveAppConfig):
         }
     ]
 
+    fiscal_archive_models = ("Register", "Session", "Movement", "Count")
+
     def fiscal_documents_kept(self) -> bool:
-        """The platform asks (``base.tenancy.offboarding``) before it drops the database of a business that left:
-        its cash movements are documents nothing archives yet, so the database stays."""
+        """The platform asks (``base.tenancy.offboarding``) before it drops the database of a business that left: its
+        cash movements are documents to keep, so the database stays; they go to the fiscal archive first
+        (``fiscal_archive_models``)."""
         from apps.cash_register import queries  # the models are not loaded yet when this module is
 
         return queries.keeps_fiscal_documents()

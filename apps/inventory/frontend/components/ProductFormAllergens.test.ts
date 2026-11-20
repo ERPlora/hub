@@ -1,9 +1,7 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 
 import { flush, ok, product, refusal } from '../__tests__/mount-inventory';
 import { setup } from '../__tests__/product-form';
-
-vi.mock('@ionic/vue', async (importOriginal) => (await import('../../../../base/frontend/__tests__/modal')).mockIonicModal(importOriginal));
 
 afterEach(() => {
   document.body.innerHTML = '';

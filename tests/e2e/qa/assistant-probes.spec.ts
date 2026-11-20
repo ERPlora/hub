@@ -16,7 +16,7 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
 
-import { type BrowserContext, expect, test } from '@playwright/test';
+import { type Browser, type BrowserContext, expect, type Page, test } from '@playwright/test';
 
 import { observe, redact } from '../assistant-battery';
 import {
@@ -25,6 +25,7 @@ import {
   type BenchReport,
   benchTurn,
   type Measured,
+  notAsked,
   offeredCommand,
   parseOffered,
   parseUsage,
@@ -50,13 +51,13 @@ import {
   renderProbeReport,
   type Role,
 } from '../assistant-probes';
+import { openPanelAtHome } from '../assistant-panel';
 import {
   answerOf,
   cleanUpRealProviders,
   converse,
   emptyMonth,
   noticesOf,
-  openPanel,
   run,
   SAAS_DIR,
   saasSql,
@@ -229,6 +230,25 @@ function bench(outcome: ProbeOutcome, measured: Omit<Measured, 'kind' | 'offered
   writeFileSync(BENCH, redact(JSON.stringify(report, null, 2), SECRETS));
 }
 
+/** The probe's page: signed in as its role, in its language, the assistant's panel open. A failure here is not the
+ *  model's: the probe is recorded as not asked, with why, and the test fails with the error. */
+async function pageFor(browser: Browser, probe: Probe): Promise<{ context: BrowserContext; page: Page }> {
+  let opened: { context: BrowserContext; page: Page } | undefined;
+  try {
+    emptyMonth();
+    opened = await hostPage(browser, A, { next: '/', credentials: PEOPLE[probe.role], viewport: { width: 1440, height: 900 } });
+    await opened.context.addCookies([{ name: 'django_language', value: probe.language, domain: new URL(A).hostname, path: '/' }]);
+    await openPanelAtHome(opened.page);
+    return opened;
+  } catch (error) {
+    await opened?.context.close();
+    const outcome = notAsked(probe, error as Error);
+    save(outcome);
+    bench(outcome, { bodies: [], latencyMs: null, usage: null, error: null });
+    throw error;
+  }
+}
+
 /** Every app of `a` on, as the exported catalogue assumes: turned on until none is left or none more can be. */
 async function everyAppOn(context: BrowserContext): Promise<void> {
   let refused: string[] = [];
@@ -283,15 +303,8 @@ for (const probe of PROBES) {
       test.skip(true, `the probe does not fit the catalogue: ${problems.join('; ')}`);
       return;
     }
-    emptyMonth();
-    const { context, page } = await hostPage(browser, A, {
-      next: '/',
-      credentials: PEOPLE[probe.role],
-      viewport: { width: 1440, height: 900 },
-    });
+    const { context, page } = await pageFor(browser, probe);
     try {
-      await context.addCookies([{ name: 'django_language', value: probe.language, domain: new URL(A).hostname, path: '/' }]);
-      await openPanel(page);
       const bodies: string[] = [];
       const started = Date.now();
       let said: Awaited<ReturnType<typeof converse>>;

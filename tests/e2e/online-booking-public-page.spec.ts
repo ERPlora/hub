@@ -111,7 +111,7 @@ FLOW_VIEWPORTS.forEach((vp, index) => {
       expect(appointment).toBe(`pending online ${who.member.id} online booking`);
       await shoot('booked');
 
-      // Her confirmation carries the address; opening it shows only her booking, and cancelling asks first.
+      // Her confirmation carries the address; opening it shows the business and only her booking, and cancelling asks first.
       await page.locator('[data-testid=ob-preview-view]').click();
       const status = page.locator('[data-testid=ob-preview-status]');
       await expect(status).toContainText('Pendiente');
@@ -123,7 +123,20 @@ FLOW_VIEWPORTS.forEach((vp, index) => {
       await expect(status).toContainText('Pendiente');
       await expect(status).toContainText('10:00');
       await expect(page.locator('[data-testid=ob-preview-name]')).toHaveCount(0);
+      const personal = page.locator('[data-testid=ob-personal]');
+      await expect(personal.locator('[data-testid=ob-preview-business-logo]')).toHaveAttribute('src', logo.url);
+      const logoBox = (await personal.locator('[data-testid=ob-preview-business-logo]').boundingBox())!;
+      const statusBox = (await status.boundingBox())!;
+      expect(Math.round(statusBox.y - (logoBox.y + logoBox.height))).toBeGreaterThanOrEqual(12);
       await shoot('personal');
+      await post(owner, '/online_booking/settings', { logo: '' }, 200);
+      await page.goto(address ?? '');
+      await expect(status).toContainText('Pendiente');
+      await expect(personal.locator('[data-testid=ob-preview-business-logo]')).toHaveCount(0);
+      await shoot('personal-no-logo');
+      await post(owner, '/online_booking/settings', { logo: logo.id }, 200);
+      await page.goto(address ?? '');
+      await expect(status).toContainText('Pendiente');
       await page.locator('[data-testid=ob-preview-cancel]').click();
       await expect(page.locator('[data-testid=ob-cancel]')).toBeVisible();
       await page.locator('[data-testid=ob-cancel-reason] textarea').fill('No puedo ir');
@@ -131,6 +144,7 @@ FLOW_VIEWPORTS.forEach((vp, index) => {
       await expect(status).toContainText('Cancelada');
       await expect(page.locator('[data-testid=ob-personal-cancelled]')).toContainText('Esta reserva está cancelada.');
       await expect(page.locator('[data-testid=ob-preview-cancel]')).toHaveCount(0);
+      await expect(personal.locator('[data-testid=ob-preview-business-logo]')).toHaveAttribute('src', logo.url);
       expect(psql(`select status || ' ' || cancelled_by_customer from appointment_appointment where number = '${number}'`)).toBe('cancelled true');
       await noHorizontalScroll(page, `the cancelled booking at ${vp.label}`);
       await shoot('cancelled');
@@ -140,6 +154,8 @@ FLOW_VIEWPORTS.forEach((vp, index) => {
       await expect(page.locator('[data-testid=ob-personal-error]')).toContainText('Esa reserva no existe o su enlace ya no es válido.');
       await expect(page.locator('[data-testid=ob-preview-name]')).toHaveCount(0);
       await expect(page.locator('[data-testid=ob-preview-status]')).toHaveCount(0);
+      await expect(page.locator('[data-testid=ob-preview-business-name]')).toHaveCount(0);
+      await expect(page.locator('[data-testid=ob-preview-business-logo]')).toHaveCount(0);
       await shoot('not-found');
 
       // Empty: nothing of the business is booked online.

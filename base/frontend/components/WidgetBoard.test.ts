@@ -5,11 +5,6 @@ import { accessibleName, errorFrame, flush, memoryStorage, mountBase, subId } fr
 import { widget as homeWidget } from '../__tests__/home-fixtures';
 import WidgetBoard from './WidgetBoard.vue';
 
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
-
 /** A panel titled «Panel <key>», small. */
 function widget(key: string, fields: Partial<WidgetDef> = {}): WidgetDef {
   return homeWidget(key, { title: `Panel ${key}`, size: 'sm', ...fields });

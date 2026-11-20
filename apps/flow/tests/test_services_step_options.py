@@ -8,6 +8,7 @@ are the real ones of Tasks and Customers.
 """
 
 import datetime as dt
+import json
 from zoneinfo import ZoneInfo
 
 import pydantic
@@ -137,14 +138,22 @@ def test_a_step_without_options_is_saved_as_it_was():
 def test_try_it_says_a_step_would_be_skipped(clock):
     clock(NOON)
     flow = _manual([TASK_STEP | {"run_if": {"input.total": {"gt": 10000}}}])
-    import json
-
     tried = run(
         "flow.flow.test",
         {"id": str(flow.id), "document": json.dumps({"trigger": {"kind": "manual"}, "steps": flow.steps})},
     )
     assert tried.steps[0].outcome == "skipped"
     assert [clause.model_dump() for clause in tried.steps[0].failed] == [{"path": "input.total", "op": "gt", "value": 10000}]
+
+
+def test_try_it_does_not_judge_an_only_if_that_reads_a_step_it_cannot_know(clock):
+    clock(NOON)
+    flow = _manual([TASK_STEP, TASK_STEP | {"id": "s2", "run_if": {"steps.s1.failed": {"eq": True}}}])
+    tried = run(
+        "flow.flow.test",
+        {"id": str(flow.id), "document": json.dumps({"trigger": {"kind": "manual"}, "steps": flow.steps})},
+    )
+    assert [step.outcome for step in tried.steps] == ["would_run", "would_run"]
 
 
 def test_a_skipped_step_of_a_failed_run_does_not_prevent_resuming_it(clock):

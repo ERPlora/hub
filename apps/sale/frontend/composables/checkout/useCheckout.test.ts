@@ -12,11 +12,7 @@ import { EMPLOYEE, flush, MANAGER, mountSale } from '../../__tests__/mount-sale'
 import type { CompleteIn, SaleOut } from '../../operations';
 import { RECOVERY_DELAY_MS, useCheckout } from './useCheckout';
 
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { modalControllerStub } = await import('../../__tests__/approval-dialog');
-  const ionic = await importOriginal<typeof import('@ionic/vue')>();
-  return { ...ionic, modalController: modalControllerStub(ionic.modalController) };
-});
+vi.mock('@ionic/vue', async (importOriginal) => (await import('../../__tests__/approval-dialog')).ionicWithApprovalDialog(importOriginal));
 beforeEach(() => {
   approvalDialog.reset();
 });

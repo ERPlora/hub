@@ -3,7 +3,7 @@
 // business spent (its usage row in the stack's SaaS, emptied before each probe), the latency, and whether the
 // probe's tool was among the tools the turn offered (a ranking failure is the same for every model). The report is
 // `.artifacts/qa/<run>/bench.json`; assistant-bench-compare.ts reads several of them. Pure, so Vitest proves it.
-import { type Frame, parseFrames } from './assistant-battery.ts';
+import { type Frame, observe, parseFrames } from './assistant-battery.ts';
 import { type Catalog, catalogKey, type Probe, type ProbeOutcome, probeVerdict } from './assistant-probes.ts';
 import type { ScenarioRow } from './assistant-scenario-bench.ts';
 import type { AnswerChoice } from './assistant-seed.ts';
@@ -206,6 +206,13 @@ export function benchTurn(outcome: ProbeOutcome, measured: Measured): BenchTurn 
     latencyMs: asked ? measured.latencyMs : null,
     error: measured.error ?? (observed.errors.join(', ') || null),
   };
+}
+
+/** A probe whose page failed before its question (sign-in, the panel): not asked, so not the model's; the reason says
+ *  why, and its record stays out of the score. */
+export function notAsked(probe: Probe, error: Error): ProbeOutcome {
+  const problems = [`the page failed before the question: ${error.message.split('\n')[0]}`];
+  return { probe, answer: '', observed: observe([]), decided: 'none', notices: [], screenshot: '', problems };
 }
 
 /** What `a` spent this month in the stack's SaaS, as one line `tokens in|tokens out|embedding tokens|cost`. */

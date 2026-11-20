@@ -2,16 +2,11 @@
 // «Terminate {name}? …», «Last day (today if empty)» and «Reason (optional)» (up to 500), and the red
 // «Terminate». It sends `staff.member.terminate` with the day only when one is given; a refusal stays
 // in the dialog.
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import type { MemberOut } from '../operations';
 import { click, ionValue, mountStaff, settle } from '../__tests__/mount-staff';
 import TerminateDialog from './TerminateDialog.vue';
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
 
 type Control = HTMLElement & { label?: string; value?: unknown; type?: string; disabled?: boolean; color?: string; errorText?: string };
 

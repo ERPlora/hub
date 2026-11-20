@@ -3,22 +3,17 @@
 // that is no longer active is still shown on the cards that have it. Who cannot manage cards only sees.
 import { toastSuccess } from '@erplora/ui/shell';
 import { IonCheckbox } from '@ionic/vue';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { errorFrame, flush, json, type MountOptions, mountCustomer, refusal, sent, subId } from '../__tests__/mount-customer';
 import { pageOf } from '../__tests__/fixtures';
 import { namesGiven } from '../__tests__/searchbar-name';
 import MembershipEditor from './MembershipEditor.vue';
 
-vi.mock('@erplora/ui/shell', async (importOriginal) => ({
-  ...((await importOriginal()) as object),
-  toastSuccess: vi.fn(),
-}));
 vi.mock('@erplora/ui/components', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@erplora/ui/components')>()),
   syncSearchbarInputName: (await import('../__tests__/searchbar-name')).recordSearchbarName,
 }));
-beforeEach(() => vi.mocked(toastSuccess).mockClear());
 
 const group = (id: string, name: string, is_active = true) => ({ id, name, description: '', color: 'primary', sort_order: 0, is_active, customer_count: 1 });
 const GROUPS = pageOf([group('g1', 'VIP'), group('g2', 'Staff'), group('g3', 'Old', false), group('g4', 'Retired', false)]);

@@ -30,7 +30,7 @@ from apps.appointment.schemas import CancelIn as AppointmentCancelIn
 from apps.appointment.schemas import SettingsIn as RulesIn
 from apps.customer.models import Customer
 from apps.customer.phones import InvalidPhone, to_e164
-from apps.customer.queries import business_country, find_customer
+from apps.customer.queries import business_country
 from apps.customer.schemas import CustomerIn
 from apps.customer.search import normalize
 from apps.online_booking.events import BOOKING_CREATED, SETTINGS_UPDATED
@@ -367,14 +367,13 @@ def _check_limits(visitor: str) -> None:
 
 def _card_for(ctx: OperationContext, name: str, phone: str, email: str) -> Customer:
     """The customer's card: the live one with her mobile (her name first), locked; or a new one."""
-    cards = list(Customer.objects.live().filter(phone=phone).order_by("name", "id"))
+    # Locked in the read that finds them, in id order as a merge locks them: a merge waits for the booking.
+    found = Customer.objects.live().select_for_update().filter(phone=phone).order_by("id").values_list("id", flat=True)
+    cards = list(Customer.objects.filter(pk__in=list(found)).order_by("name", "id"))
     wanted = normalize(name)
-    card = next(
-        (card for card in cards if normalize(card.name) == wanted),
-        cards[0] if cards else None,
-    )
+    card = next((card for card in cards if normalize(card.name) == wanted), cards[0] if cards else None)
     if card is not None:
-        return find_customer(ctx, card.id, None, lock=True)
+        return card
     create = get("customer.customer.create")
     created = create(
         ctx, CustomerIn(name=name, phone=phone, email=email, source="website")
@@ -528,7 +527,7 @@ def public_book(ctx: OperationContext, data: PublicBookIn) -> dict:
     },
 )
 def public_cancel(ctx: OperationContext, data: PublicCancelIn) -> dict:
-    appointment = find_by_token(data.token, lock=True).appointment
+    appointment = find_by_token(data.token).appointment
     cancel = get("appointment.appointment.cancel")
     cancel(
         delegated(ctx),

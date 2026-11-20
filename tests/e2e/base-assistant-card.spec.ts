@@ -2,9 +2,10 @@
 // asks to type its word and says what will happen, and what the person may not do is refused.
 import { expect, test } from '@playwright/test';
 
-import { answers, ask, askForACard, cancelAtComputerSize, captureConfirmation, card, confirmationReady, confirmationSettled, decide, freshPage, lastAnswer, lastAnswerAtEachSize, openPanelAtTheDesk, panel, panelAtTheDesk, panelSpec, shots } from './assistant-panel';
+import { answers, ask, askForACard, cancelAtComputerSize, captureConfirmation, card, confirmationReady, confirmationSettled, decide, freshPage, lastAnswer, lastAnswerAtEachSize, openPanelAtTheDesk, panel, panelAtTheDesk, shots } from './assistant-panel';
 import { DONE, NOT_DONE, STEPS_SAID } from './assistant-provider';
 import { A, api, EMPLOYEE, login, THREE_SIZES as VIEWPORTS } from './helpers';
+import { panelSpec } from './provider-helpers';
 
 const provider = panelSpec();
 

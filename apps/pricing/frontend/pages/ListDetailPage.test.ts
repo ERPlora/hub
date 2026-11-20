@@ -5,7 +5,7 @@
 // «+» adds a price, a row is edited or removed (asking first). A list that does not exist says so.
 import { DataTable, EmptyState } from '@erplora/ui/components';
 import { AppPage } from '@erplora/ui/shell';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import type { Component } from 'vue';
 
 import type { Business } from '../../../../base/frontend/operations/business';
@@ -15,11 +15,6 @@ import ListConfirm from '../components/ListConfirm.vue';
 import PriceItemFormModal from '../components/PriceItemFormModal.vue';
 import PriceListFormModal from '../components/PriceListFormModal.vue';
 import ListDetailPage from './ListDetailPage.vue';
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
 
 const LIST = 'pricing.price_list.get';
 const ITEMS = 'pricing.price_item.list';

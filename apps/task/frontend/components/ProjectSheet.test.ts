@@ -4,17 +4,12 @@
 // {shown} of {total}. Find the rest in Tasks.», and «Add task», which creates it inside the project.
 // A refusal stays inside the sheet. An employee only reads it.
 import { ConfirmDialog } from '@erplora/ui/components';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import { click, EMPLOYEE, errorFrame, expectSheetDiscardsOnClose, ionValue, mountTask, OWNER, page, settle } from '../__tests__/mount-task';
 import { project } from '../__tests__/project';
 import { task } from '../__tests__/task';
 import ProjectSheet from './ProjectSheet.vue';
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
 
 type Control = HTMLElement & { value?: unknown; disabled?: boolean; label?: string };
 

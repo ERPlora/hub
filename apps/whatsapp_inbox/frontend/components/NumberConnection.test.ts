@@ -7,11 +7,6 @@ import { click, flush, mountInbox, settle } from '../__tests__/mount-inbox';
 import type { ChannelOut, ChannelPrepareOut } from '../operations';
 import NumberConnection from './NumberConnection.vue';
 
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
-
 const CHANNEL: ChannelOut = {
   status: 'not_connected',
   phone_number: '',

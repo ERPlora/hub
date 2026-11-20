@@ -4,17 +4,12 @@
 // the task loaded and «Save», which sends only what changed (the assignee has its own buttons in the
 // sheet). Refusals stay in the dialog, under their field.
 import { Combo } from '@erplora/ui/components';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import { itTellsTheCorrectedFieldApart } from '../../../../base/frontend/__tests__/same-words-refusal';
 import type { TaskOut } from '../operations';
 import { click, ionValue, mountTask, settle } from '../__tests__/mount-task';
 import TaskFormModal from './TaskFormModal.vue';
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
 
 type Control = HTMLElement & { label?: string; value?: unknown; errorText?: string; disabled?: boolean };
 

@@ -6,16 +6,11 @@
 // and says «Create schedule»; editing replaces the
 // whole week and says «Save». The server judges: a day's problem goes under that day's row, a week
 // without working days on top of the week, a date under its field.
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import type { ScheduleOut, SettingsOut } from '../operations';
 import { click, ionChecked, ionValue, mountStaff, settle } from '../__tests__/mount-staff';
 import ScheduleFormModal from './ScheduleFormModal.vue';
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
 
 type Control = HTMLElement & { label?: string; value?: unknown; checked?: boolean; type?: string; placeholder?: string; errorText?: string };
 

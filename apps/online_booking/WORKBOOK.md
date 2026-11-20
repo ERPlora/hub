@@ -98,8 +98,8 @@ nota y **Reservar**. Junto a **Reservar**, el aviso de quién usa sus datos y el
 Si no hay nada que reservar online, solo sale el aviso, sin la invitación ni el formulario. Al reservar, el número
 de la cita, el mensaje de confirmación, **Ver mi reserva**, **Cancelar la reserva** y **Reservar otra**. Con la
 dirección de otro negocio, o la de este en la de otro, no hay página. La confirmación da como enlace la dirección
-completa de su reserva, con el origen del negocio (`https://<negocio>.erplora.com/p/<negocio>/book/<enlace>`). Al abrirla ve solo su reserva —número, servicios, día, hora,
-profesional y estado— y puede cancelarla con confirmación si la política todavía lo permite; una ya cancelada o fuera de
+completa de su reserva, con el origen del negocio (`https://<negocio>.erplora.com/p/<negocio>/book/<enlace>`). Al abrirla ve la cabecera del negocio —su nombre y su logo si lo tiene— y solo su reserva: número, servicios, día, hora,
+profesional y estado, y puede cancelarla con confirmación si la política todavía lo permite; una ya cancelada o fuera de
 plazo no ofrece esa acción. Un enlace que no existe da un aviso claro, sin datos ni formulario.
 
 ### Vista previa de la reserva (solo en desarrollo)
@@ -133,7 +133,7 @@ Fechas y horas salen en el reloj del negocio y con el formato del idioma de quie
 | ONLINE_BOOKING-F07 | Configurar la página de reservas | hecho |
 | ONLINE_BOOKING-F08 | Ver y buscar las reservas | hecho |
 | ONLINE_BOOKING-F09 | Seguir a la clienta cuando se fusionan dos fichas | hecho (lo hace Citas; la bandeja lo refleja) |
-| ONLINE_BOOKING-F10 | La clienta ve su reserva con su enlace | parcial — ya enseña la reserva, pero aún no el nombre y el logo del negocio |
+| ONLINE_BOOKING-F10 | La clienta ve su reserva con su enlace | hecho |
 | ONLINE_BOOKING-F11 | La clienta cancela su reserva con su enlace | hecho |
 | ONLINE_BOOKING-F12 | Borrar los datos de una clienta (RGPD) | hecho |
 
@@ -303,7 +303,7 @@ Si falla: Citas no se queda a medias y el relay lo reintenta solo.
 Implicados: APPOINTMENT-F23, CUSTOMER-F13
 
 ### ONLINE_BOOKING-F10 La clienta ve su reserva con su enlace
-Estado: parcial — el enlace ya enseña la reserva, pero aún no el nombre y el logo del negocio que da su consulta
+Estado: hecho
 Actor: clienta (sin sesión)
 Pantalla: la de su enlace (`/p/<negocio>/book/<enlace>`, en la dirección del negocio); la página de reservas, tras
 reservar; en desarrollo, la vista previa
@@ -453,7 +453,13 @@ del equipo con su sesión abierta.
 - **Concurrencia**: `public.book` bloquea primero la fila de `Settings` (`page_settings(lock=True)`): las
   reservas públicas del hub van una tras otra, así que los límites por dispositivo, por negocio y por móvil
   y la ficha de un móvil nuevo se deciden sobre lo que escribió la anterior (sin fichas duplicadas). Además,
-  Citas bloquea la ficha del profesional antes de juzgar el hueco (`tests/test_concurrency.py`, con hilos).
+  Citas bloquea la ficha del profesional antes de juzgar el hueco. Las fichas vivas con el móvil se bloquean
+  en la misma lectura que las encuentra y por id, en el orden en que las bloquea una fusión: una fusión en
+  Clientes que llega a mitad de la reserva la espera y después mueve la cita a la ficha que se queda (antes,
+  la que caía entre leer y bloquear dejaba la reserva en 404 `customer.customer_unavailable`). Guardar los
+  Ajustes bloquea su fila: dos guardados a la vez conservan lo de cada uno. Cancelar con el enlace no bloquea
+  nada propio: Citas bloquea la cita al anularla, y de dos cancelaciones a la vez entra una y la otra recibe
+  409 `appointment.cannot_cancel` (`tests/test_concurrency.py`, con hilos y sesiones reales).
 - **Límites**: 5 por visitante y hora y 100 por negocio y hora (429; constantes de `services.py`), y las
   próximas por móvil de los Ajustes (409; 3 de fábrica); se cuentan sobre `Booking` y las citas, en la
   transacción de la reserva.

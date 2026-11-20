@@ -18,11 +18,10 @@
   when they are painted, never kept with the snapshot: it is in every key of what is cached, so a business whose
   country (hence its currency) changes on erplora.com is never shown the old one until an entry expires.
 
-Every read is of the request hub's own row (``hub_id``).
+Every read is of the business's own database, which holds its one site and its images.
 """
 
 import base64
-import uuid
 from collections.abc import Iterator
 from dataclasses import replace
 from typing import Any
@@ -61,7 +60,7 @@ from apps.website.schemas import (
     Theme,
 )
 from base.apps_on import active_apps
-from base.operations import business_currency, hub_id
+from base.operations import business_currency
 from base.registry import hub_by_slug
 from base.throttle import RateLimited, allow, client_address
 
@@ -96,9 +95,9 @@ SERVICE_PRICE_KINDS = {"fixed": "fixed", "from": "from", "hourly": "hourly", "fr
 # The site
 
 
-def current_site(hub: uuid.UUID) -> Site:
-    """``hub``'s saved site, or the factory one (unsaved: classic, empty, never published) while nobody saved it."""
-    return Site.objects.filter(hub_id=hub).first() or Site(hub_id=hub)
+def current_site() -> Site:
+    """The business's saved site, or the factory one (unsaved: classic, empty, never published) while nobody saved it."""
+    return Site.objects.first() or Site()
 
 
 def draft(site: Site) -> dict[str, Any]:
@@ -179,7 +178,7 @@ def shown_reviews(slug: str, content: dict, snapshot: dict | None) -> dict | Non
     },
 )
 def get_site(ctx: OperationContext, data: NoIn) -> dict:
-    return site_out(ctx, current_site(hub_id(ctx.scope)))
+    return site_out(ctx, current_site())
 
 
 # Not an assistant tool (no ``ai=``): an HTML page for the editor's frame; the assistant reads website.site.get.
@@ -194,7 +193,7 @@ def get_site(ctx: OperationContext, data: NoIn) -> dict:
     ai=INTERNAL,
 )
 def preview_site(ctx: OperationContext, data: NoIn) -> dict:
-    site = current_site(hub_id(ctx.scope))
+    site = current_site()
     now = draft(site)
     catalog = read_catalog(ctx, Content.model_validate(now["content"]).catalog)
     html = render_site(
@@ -284,7 +283,7 @@ def list_categories(ctx: OperationContext, data: CategoriesIn) -> dict:
 def get_image(ctx: OperationContext, data: ImageIn) -> dict:
     """An image of this business's website by the name of its file; one uploaded before it was kept, by its format and
     size («PNG 1200 × 800»)."""
-    image = Image.objects.filter(hub_id=hub_id(ctx.scope), id=data.id).first()
+    image = Image.objects.filter(id=data.id).first()
     if image is None:
         raise NotFound(str(IMAGE_NOT_FOUND), code="website.image_not_found")
     kind = image.content_type.rpartition("/")[2].upper()
@@ -329,11 +328,11 @@ def _count_visitor(ctx: OperationContext) -> None:
 def _live(scope: Scope) -> QuerySet[Site]:
     """The live publication of ``scope``'s hub: the one guard of every public path, the API's reads and ``/``.
 
-    404 ``app_inactive`` while the module is off in the hub (``base.apps_on.active_apps``), 404 for a scope that is no
-    hub; then only that hub's row, and only while it is published and online."""
+    404 ``app_inactive`` while the module is off in the hub (``base.apps_on.active_apps``); then its site, and only
+    while it is published and online."""
     if WEBSITE not in active_apps(scope):
         raise AppInactive(str(MODULE_OFF))
-    return Site.objects.filter(LIVE, hub_id=hub_id(scope))
+    return Site.objects.filter(LIVE)
 
 
 def _live_site(scope: Scope) -> Site:

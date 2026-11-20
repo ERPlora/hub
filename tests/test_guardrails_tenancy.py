@@ -36,8 +36,6 @@ BARE_ON_COMMIT_ALLOWED: dict[str, int] = {}
 #: Hub models that still have a ``hub_id`` column, each with its reason (the border between hubs is the database).
 HUB_ID_COLUMNS: dict[str, str] = {
     "base.hubidentity": "the identity of the hub's database itself.",
-    "website.site": "left from when hubs shared one database, so that a hub's website was not another's /.",
-    "website.image": "left from when hubs shared one database, with the site's.",
     "verifactu.config": "not tenancy: the business's id in the SaaS.",
 }
 
@@ -518,11 +516,12 @@ def not_cut(client):
 
 def _asked_at_its_door(client, hub, name: str, payload: dict):
     """``name`` asked through its route on ``hub``'s host, as its screen asks it; ``(response, sent)``."""
-    from base.api import router
+    from base.api import ROUTERS
     from base.tenancy.tests import hubs
     from base.tests.routes import bound_routes
 
-    [(method, path)] = [(method, path) for method, path, operation in bound_routes(router) if operation == name]
+    routes = {route for router in ROUTERS for route in bound_routes(router)}
+    [(method, path)] = [(method, path) for method, path, operation in routes if operation == name]
     host = f"{hub.slug}.localhost"
     with hubs.watched() as sent:
         if method == "GET":

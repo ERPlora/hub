@@ -1,11 +1,13 @@
 // Not a test of the hub (no `.test.ts`: the suite never collects it): vitest.setup.test.ts runs it on its own,
 // with the hub's config, and reads how each test ended. Each one ends in the state its name says, and the hub
 // setup (vitest.setup.ts) must fail exactly those that leave a real timer armed, paint the shell's icons as the
-// app does, attach Ionic's elements as a browser would, and still end, by their budgets, those that never end.
-import { IonButton, IonIcon, IonToggle } from '@ionic/vue';
+// app does, attach Ionic's elements and present an open modal as a browser would, turn the shell's toasts into spies
+// that each test starts with unused, and still end, by their budgets, those that never end.
+import { toastSuccess } from '@erplora/ui/shell';
+import { IonButton, IonIcon, IonModal, IonToggle } from '@ionic/vue';
 import { mount } from '@vue/test-utils';
 import { afterAll, beforeAll, expect, it, vi } from 'vitest';
-import { defineComponent, h, onBeforeUnmount, onMounted, ref } from 'vue';
+import { defineComponent, h, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
 
 const MINUTE = 60_000;
 
@@ -146,6 +148,21 @@ it('attaches Ionic elements without the errors happy-dom alone makes them log', 
   } finally {
     error.mockRestore();
   }
+});
+
+it('presents an inline modal that is open, as a browser does', async () => {
+  mount(() => h(IonModal, { isOpen: true }, () => h('p', 'Inside the modal')), { attachTo: document.body });
+  await nextTick();
+  expect(document.body.textContent).toContain('Inside the modal');
+});
+
+it('says a success in a toast, which the test reads from the shell', () => {
+  toastSuccess('Saved');
+  expect(toastSuccess).toHaveBeenCalledWith('Saved');
+});
+
+it('starts with no toast said by the test before it', () => {
+  expect(toastSuccess).not.toHaveBeenCalled();
 });
 
 // The time budgets (vite.config.ts and the setup, hub#765) stretch with the machine's load, and still end what never

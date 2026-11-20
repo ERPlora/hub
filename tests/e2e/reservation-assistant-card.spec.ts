@@ -5,8 +5,8 @@
 // flow: RESERVATION-F01 RESERVATION-F02 RESERVATION-F06 RESERVATION-F08 RESERVATION-F09 RESERVATION-F10 RESERVATION-F15 RESERVATION-F20 RESERVATION-F23 BASE-F97
 import { type BrowserContext, expect, test } from '@playwright/test';
 
-import { cancel, cardSpec, datumOf, ownerIn, VIEWPORTS } from './assistant-card-helpers';
-import { card, openPanel } from './assistant-real';
+import { cardSpec, datumOf, VIEWPORTS } from './assistant-card-helpers';
+import { cancel, card, openPanelAtTheDesk, ownerIn } from './assistant-panel';
 import { cleanUp as customersCleanUp } from './customer-helpers';
 import { A, api, capture, psql } from './helpers';
 import { post } from './service-helpers';
@@ -135,8 +135,7 @@ for (const language of ['es', 'en'] as const) {
     const books = await makeBooks(context);
     const [room, terrace] = await makeSevens(context);
     expect([room.label, terrace.label]).toEqual([`7 (${ROOM})`, `7 (${TERRACE})`]);
-    await page.setViewportSize({ width: 1440, height: 900 });
-    await openPanel(page);
+    await openPanelAtTheDesk(page);
 
     // A normal write paints its first three data in one line (BASE-F97): booking carries its table as its fifth datum,
     // a change says its reservation and, right after it, the new table.
@@ -174,8 +173,7 @@ for (const language of ['es', 'en'] as const) {
   test(`reservation-assistant-card — in ${language}, every dangerous write titles its record`, async ({ browser }) => {
     const [context, page] = await ownerIn(browser, language);
     const books = await makeBooks(context);
-    await page.setViewportSize({ width: 1440, height: 900 });
-    await openPanel(page);
+    await openPanelAtTheDesk(page);
 
     const cases = [
       { action: 'delete', tool: 'reservation__reservation__delete', record: books.reservation, title: words.reservation, data: {} },

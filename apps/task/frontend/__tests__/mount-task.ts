@@ -1,6 +1,4 @@
 // Test helper of the task app's pages and components: `mountInShell` with its catalogues, the task list and its people.
-// Dialogs: a test that opens one mocks `@ionic/vue`'s IonModal with FormModal's `IonModalStub`
-// (imported from its own file in the mock factory: this helper loads @ionic/vue, the factory must not).
 import type { SessionMe } from '@erplora/ui/shell';
 import { expect } from 'vitest';
 import type { Component } from 'vue';

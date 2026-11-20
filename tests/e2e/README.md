@@ -333,8 +333,8 @@ tope de demos vivas (`MAX_CONCURRENT_DEMOS`).
 
 Prueban el asistente del Hub (BASE-F92…F106) en cuatro specs, por tema: el panel (`base-assistant.spec.ts`), la tarjeta
 de una escritura (`base-assistant-card.spec.ts`), cómo dice cada dato (`base-assistant-card-values.spec.ts`) y cómo
-nombra los registros (`base-assistant-card-records.spec.ts`). Lo que comparten, los ganchos de cada spec (`panelSpec`) y
-cómo se maneja el panel y su tarjeta, está en `assistant-panel.ts`. Corren con sus dependencias de verdad: el Hub de la
+nombra los registros (`base-assistant-card-records.spec.ts`). Sus ganchos (`panelSpec`) están en `provider-helpers.ts`, y
+cómo se maneja el panel y su tarjeta, en `assistant-panel.ts`, del que lo importan todas las specs del asistente. Corren con sus dependencias de verdad: el Hub de la
 pila, la pasarela del SaaS de la pila (`/internal/assistant/*` y `/internal/speech/transcribe`) y, detrás, el proveedor
 falso `tests/e2e/assistant-provider.ts`, un servidor HTTP en 127.0.0.1 que habla la API de OpenAI y que cada spec
 arranca en `E2E_AI_PROVIDER_PORT` (por defecto, el puerto del Hub + 2). Ningún test llega a un proveedor real ni

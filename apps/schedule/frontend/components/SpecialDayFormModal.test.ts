@@ -3,16 +3,11 @@
 // year» and Notes — and «Add day» (the old words); a row opens «Edit · {name}» with «Save». «Add day»
 // waits for a date and a name. The server's refusal goes under its field (the 409 of a taken date under
 // Date) and what was typed stays.
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import type { SpecialDayOut } from '../operations';
 import { click, ionChecked, ionValue, mountSchedule, settle } from '../__tests__/mount-schedule';
 import SpecialDayFormModal from './SpecialDayFormModal.vue';
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
 
 type Control = HTMLElement & { label?: string; value?: unknown; checked?: boolean; disabled?: boolean; errorText?: string; type?: string; placeholder?: string };
 

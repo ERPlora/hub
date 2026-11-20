@@ -433,7 +433,7 @@ En la pantalla Archivos:
 | BASE-F106 | El asistente sin conexión, con el servicio caído o sin plan | hecho |
 | BASE-F107 | Pasar la QA maestra del Hub | hecho |
 | BASE-F108 | Reportar un problema a soporte | hecho |
-| BASE-F109 | Borrar un negocio eliminado pasados sus 90 días | parcial — un negocio con documentos guarda su base de datos hasta que exista el archivo fiscal (hub#738) |
+| BASE-F109 | Borrar un negocio eliminado pasados sus 90 días | parcial — un negocio con documentos los escribe en el archivo fiscal, pero aún guarda su base de datos (hub#738) |
 | BASE-F110 | Abrir la web del negocio por su dominio propio | hecho |
 | BASE-F111 | Esperar a la base de datos cuando se corta un momento | hecho |
 | BASE-F112 | Guardar un archivo descargado dentro de la app | hecho |
@@ -932,8 +932,9 @@ Pasos:
      está disponible (BASE-F26) y el contador de arriba resta las que se desactivan y, de las del plan, la que
      eligió el negocio.
   4. En «Añadir apps» siguen, con su icono, su nombre y «Desactivada»: desde ahí se vuelven a activar (BASE-F24).
-  5. Desde el asistente («Desactiva la app de reservas») la app se nombra como en BASE-F24, la tarjeta de riesgo alto
-     la pone con su nombre entero y, si ya estaba desactivada, el asistente lo dice y no cambia nada.
+  5. Desde el asistente («Desactiva la app de reservas», o sin decir «app»: «quita Reservas del menú», «no quiero ver
+     Reservas en el menú») la app se nombra como en BASE-F24, la tarjeta de riesgo alto la pone con su nombre entero
+     y, si ya estaba desactivada, el asistente lo dice y no cambia nada.
 Entra: las apps del negocio, lo que necesita cada una y cuáles eligió el negocio.
 Sale: la app apagada en este negocio, y las que llegaron solo con ella, con sus datos intactos.
 Si falla: si otra app en marcha la necesita, no cambia nada; si no se puede desactivar, no ofrece «Desactivar»
@@ -950,7 +951,8 @@ Pasos:
      sin preguntar.
   3. La app vuelve a «Mis apps» y al menú, sin recargar, con los datos que tenía: «Reservas está activada.» y, si
      llegó con otras, «También se ha activado: Mesas.».
-  4. Desde el asistente («Activa la app de reservas») la app se nombra como la dice la persona: por su nombre en
+  4. Desde el asistente («Activa la app de reservas», o sin decir «app»: «vuelve a poner Reservas en el menú») la app
+     se nombra como la dice la persona: por su nombre en
      cualquier idioma del Hub, sin mirar mayúsculas ni acentos, o, si ninguna se llama así, por la única con una
      palabra de su nombre que empieza así («booking» es Reservas online). «Reservas» es Reservas, nunca Reservas online
      aunque empiece igual. La tarjeta la pone con su nombre entero (BASE-F97), nunca con su identificador, y si ya
@@ -2824,15 +2826,21 @@ para escribir directamente. En los dos casos lo escrito se queda y se puede volv
 Implicados: ACCOUNTS-F38, BASE-F40
 
 ### BASE-F109 Borrar un negocio eliminado pasados sus 90 días
-Estado: parcial — un negocio con documentos guarda su base de datos hasta que exista el archivo fiscal (hub#738)
+Estado: parcial — un negocio con documentos los escribe en el archivo fiscal, pero aún guarda su base de datos (hub#738)
 Actor: nadie: lo hace el Hub solo, sin que nadie pulse nada
 Pantalla: Ninguna; la dirección del negocio sigue diciendo «Este hub ya no está disponible.»
 Pasos:
   1. Un negocio eliminado en erplora.com (HUBS-F18, HUBS-F20) cumple 90 días. Hasta ese momento su base de datos se
      queda intacta y se puede recuperar.
   2. El Hub mira si guarda documentos: ventas, facturas, registros de VeriFactu, cobros, movimientos de caja, pedidos
-     de la tienda o compras de un cliente, en cualquier estado y aunque la app esté apagada. Si guarda alguno, se
-     detiene aquí: el negocio sigue eliminado, con su base de datos, y lo vuelve a mirar al día siguiente.
+     de la tienda o compras de un cliente, en cualquier estado y aunque la app esté apagada. Si guarda alguno, antes
+     los escribe en el archivo fiscal, donde se guardan 6 años sin que nadie los pueda borrar: cada tabla de esos
+     documentos tal como está guardada, sin rehacer nada; el PDF de cada factura tal como se entregó al cliente, en su
+     idioma o en el del negocio y con el QR de VeriFactu si tiene su registro, uno por factura; y al final una
+     lista que cuenta las filas y los PDF y lleva la huella de cada fichero, que solo se escribe cuando todos se han
+     vuelto a leer iguales. Lo hace una vez por baja, y si un registro de VeriFactu aún espera la respuesta de la AEAT,
+     espera a que llegue. Después se detiene: el negocio sigue eliminado, con su base de datos, y lo vuelve a mirar al
+     día siguiente.
   3. Sin documentos, hace la copia final de sus datos, que se guarda 90 días en el almacén de copias. Mientras se
      hace, el negocio aún se puede recuperar y erplora.com sigue viendo sus copias. Al terminar vuelve a mirar si
      guarda documentos, por si entró alguno durante la copia.
@@ -2843,15 +2851,21 @@ Pasos:
 Entra: el negocio eliminado y sus 90 días cumplidos. Nunca una demo, que se borra a su manera al caducar, el negocio
 de la plataforma ni uno que se está moviendo de servidor.
 Sale: la copia final, y la base de datos y los ficheros borrados, con el evento `base.hub.purged`; desde ahí
-erplora.com ya no lista sus copias. O, con documentos, la base de datos y los ficheros guardados y en la fila del
-negocio el motivo (`fiscal_archive_missing: <apps>`).
+erplora.com ya no lista sus copias. O, con documentos, su archivo fiscal escrito (en la fila, `fiscal_archived_at` y
+el motivo `fiscal_archived: <apps>`) y la base de datos y los ficheros guardados; donde no hay archivo fiscal, el motivo
+es `fiscal_archive_missing: <apps>`, y mientras un registro espera a la AEAT, `fiscal_archive_waiting: verifactu`.
 Si falla: una copia que falla no borra nada, y sin almacén de copias tampoco; una copia o un borrado que falla se
 reintenta (1 min, 5 min, 15 min y luego cada hora) con el error anotado en la fila, sin hacer otra copia si ya la había.
 Si el almacén no borra sus ficheros, el negocio sigue borrándose, sin marca, con `files_purge_failed` en la fila, y se
 reintenta igual. Si una app no se puede leer, la base de datos se queda. Una fila que no nombra la base de datos propia
 del negocio no borra nada (`invalid_database_name`). Un negocio recuperado durante la copia sigue abierto con su base
 de datos; ya borrándose, erplora.com recibe `hub_purged`. Si el Hub se apaga a media copia, el siguiente la retoma.
-Implicados: HUBS-F18, HUBS-F19, HUBS-F20, PUBLIC-F34 (el mismo borrado de ficheros, al retirar una demo)
+Si se apaga a medio archivo fiscal, el siguiente intento de esa baja aprovecha los PDF que ya subió y no los vuelve a
+hacer. Si el archivo fiscal no se puede escribir entero, o un fichero no se lee igual que se escribió, no se da por
+hecho: la fila dice `fiscal_archive_failed` con el motivo y se reintenta al día siguiente en otra carpeta del archivo
+(lo ya subido se queda, porque nadie lo puede borrar, y sin su lista final no cuenta).
+Implicados: HUBS-F18, HUBS-F19, HUBS-F20, PUBLIC-F34 (el mismo borrado de ficheros, al retirar una demo), INVOICE-F18
+(el A4 de cada factura que va al archivo)
 
 ### BASE-F110 Abrir la web del negocio por su dominio propio
 Estado: hecho (la dirección y lo que sirve; conectar el dominio es HUBS-F17 de erplora.com, que lo enseña en el panel)
@@ -3317,7 +3331,7 @@ Implicados: BASE-F41
   Facturación y Verifactu conservan la suya, en zona fiscal validada (hub#789). Sus pruebas por lista usan
   `base/tests/ordering.py`.
 - Las tres consultas vivas del Inicio son de `base/queries/`, con permiso `base.view_home` y ruta ninja en
-  `base/api.py` (`GET /api/home/setup`, `/home/widgets`, `/home/bell`): `base.setup.status` (también
+  `base/api/home.py` (`GET /api/home/setup`, `/home/widgets`, `/home/bell`): `base.setup.status` (también
   herramienta del asistente, `ai=`), `base.widget.list` y `base.bell.counters`. Las reglas puras viven en
   `base/home.py` (sin ORM).
 - Punto de extensión: cada módulo declara en su `LiveAppConfig` `setup` (`SetupStep`), `widgets`
@@ -3528,7 +3542,7 @@ Implicados: BASE-F41
   partes que viajan (`inventory.category`, `inventory.product`, `service.category`, `service.service`, `table.zone`,
   `table.table` y `customer.customer`, personal: solo en una copia), cada una leída y escrita por las operaciones
   de su app (nunca su ORM; las filas se enlazan por nombre, gh:hub#2626). Lo que ya existe se salta.
-- Operaciones (permiso `base.administer_hub`, ruta en `base/api.py` bajo `/api/settings/data/`): consultas
+- Operaciones (permiso `base.administer_hub`, ruta en `base/api/data.py` bajo `/api/settings/data/`): consultas
   `base.blueprint.list` (con `empty`, viva), `base.blueprint.export` (GET, el fichero en base64),
   `base.import.list` (con `unfinished`, viva) y `base.dataset.list`; órdenes `base.blueprint.inspect` (no escribe;
   orden porque su entrada es un fichero), `base.blueprint.import` (plantilla, fichero o `retry_of`),
@@ -3773,7 +3787,7 @@ Implicados: BASE-F41
   cerró la suya (`notice=device_limit`); si no, el salto de siempre a la entrada de erplora.com, que devuelve dentro
   mientras su sesión vive (BASE-F13, `tests/e2e/helpers-login-hub-session.spec.ts`). `/auth/logout` en una caja con
   pinpad vuelve a `/login`.
-- Operaciones (`base/queries/`, `base/services/`; rutas en `base/api.py` y `frontend/generated/operations.json`):
+- Operaciones (`base/queries/`, `base/services/`; rutas en `base/api/access.py` y `frontend/generated/operations.json`):
   `base.access.door` (sin sesión: la cookie decide; nunca da caras a quien el PIN no dejaría entrar, ni correos:
   `queries.people.face_name`, gh:hub#2536), `base.access.faces` (viva, `base.view_home`), `base.pin.set` (freno
   `PIN_CHANGE_LIMIT`, 30 en 1 h; 409 `base.pin_taken`, 403 `base.pin_current_wrong`), `base.device.current` y
@@ -3923,7 +3937,12 @@ Implicados: BASE-F41
   `base/tests/test_catalog_unchanged_by_e017.py`), `relevant` (como mucho `MAX_TOOLS` = 40 por turno, por las palabras de las dos últimas
   preguntas; `base.setup.status` y `base.business.get` siempre; `ranking` lo ordena con las palabras propias del
   Hub: las de la plataforma, `SYNONYMS` («placa», «empleado»), y las que cada app declara en `assistant_synonyms` de
-  su `LiveAppConfig`, con su forma comprobada por `base.E018`; cuentan en todo turno, salvo las de una app fuera de
+  su `LiveAppConfig`, con su forma comprobada por `base.E018`; las de `base`, en el suyo, salen de los nombres de las
+  apps de la tienda en `en` y `es` (cada uno de los dos de «Ventas / TPV» o «Menús y combos»): el nombre junto a «del
+  menú», «en el menú», «al menú» o «disponible en el menú», delante o detrás («quita Tareas del menú», «quita del menú
+  Tareas», «put Tasks back on the menu»), es la app (`base.app`), y lo que sale del menú la apaga y lo que entra o
+  está en él la enciende; nunca la frase suelta, porque «los postres del menú vegano» o «quita la tarta del menú» son
+  de Menús y combos. Lo comprueba `base/tests/test_assistant_synonyms.py`; cuentan en todo turno, salvo las de una app fuera de
   la tienda, `listed = False` como Demo, que solo cuentan donde se ofrecen sus herramientas), la tarjeta (`card`: `ai={"risk": "high"}` pide
   `CONFIRM_WORD`, «CONFIRMAR» por `pgettext` con contexto `assistant` del catálogo de `live`, o el número de `ids`; sin `ids`, `blocked`; cada
   dato con su nombre en el idioma de la persona, `_label`: el `title` del esquema si un catálogo lo traduce, o tal
@@ -4043,7 +4062,7 @@ Implicados: BASE-F41
   con ese permiso más y gasta el pase en su transacción (`_assistant_approved` + `base.approval_spend`), y arma las
   instrucciones con las pantallas que puede enlazar
   y, con `setup`, la lista de `base.setup.status` releída), `base.assistant.usage` (query), `base.assistant.report`,
-  `base.assistant.transcribe` y `base.assistant.speak` (command). Rutas en `base/api.py` (`/api/assistant/turn`,
+  `base.assistant.transcribe` y `base.assistant.speak` (command). Rutas en `base/api/assistant.py` (`/api/assistant/turn`,
   `usage`, `report`, `transcribe`, `speak`): el turno responde en streaming (`text/event-stream`, `turn_response`) a
   **una** petición `fetch` + `ReadableStream` que se cierra al acabar (tramas `text`, `executed`, `confirm`, `usage`,
   `error` y `done`), no una segunda SSE permanente (PLAN §14). El navegador nunca habla con la pasarela ni con un
@@ -4401,8 +4420,9 @@ Implicados: BASE-F41
 
 - **Avisar por correo al dueño cuando debe ampliar (BASE-F40)**: el mercado lo da por supuesto, pero lo manda erplora.com
   (PLAN-SAAS §28) y lleva su flujo y su issue allí.
-- **El archivo fiscal y el borrado de un negocio con documentos (BASE-F109)**, hub#738: hasta que exista, guarda su
-  base de datos y sus ficheros pasados los 90 días.
+- **El borrado de un negocio con documentos (BASE-F109)**, hub#738: sus documentos ya van al archivo fiscal, pero
+  guarda su base de datos y sus ficheros pasados los 90 días hasta que ese borrado se active.
+- **El PDF de cada factura en el archivo fiscal (BASE-F109)**, hub#1821: hoy van sus datos y el XML de VeriFactu.
 - **La fila de salud del Inicio en pantalla (BASE-F02)**, hub#573: su lectura ya existe (`base.health.list`, con la
   impresora de Impresión); falta pintarla en el Inicio y que la Bandeja de WhatsApp declare cómo está su número.
 - **Las novedades en Sistema › Actualizaciones (BASE-F116)**: ya se leen por el asistente y por la API; falta

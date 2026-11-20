@@ -501,8 +501,7 @@ def add_price_item(ctx: OperationContext, data: PriceItemIn) -> dict:
         item.service_id, item.service_name = service.id, service.name
     _save_item(item)
     record_event(
-        ctx,
-        events.PRICE_ITEM_ADDED,
+        ctx, events.PRICE_ITEM_ADDED,
         {
             "id": str(item.id),
             "price_list_id": str(price_list.id),
@@ -510,6 +509,7 @@ def add_price_item(ctx: OperationContext, data: PriceItemIn) -> dict:
             "service_id": str(item.service_id) if item.service_id else None,
             "min_quantity": _quantity(item.min_quantity),
             "price": item.price,
+            "currency": price_list.currency,
         },
     )
     return item_row(item)

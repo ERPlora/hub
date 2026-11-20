@@ -8,8 +8,6 @@ import { browserDownloads, insideTheAppSaving, outOfTheApp } from '../../../../b
 import { mountWebsite, settle } from '../__tests__/mount-website';
 import ShareDialog from './ShareDialog.vue';
 
-vi.mock('@erplora/ui/shell', async (importOriginal) => (await import('../../../../base/frontend/__tests__/toast-spies')).shellWithToastSpies(importOriginal));
-
 /** The hub's answer to the QR's address, as `website.qr.get` serves it: the image, as an attachment with its name. */
 function servesTheQr(): ReturnType<typeof vi.fn> {
   const fetch = vi.fn(async (url: string) => {

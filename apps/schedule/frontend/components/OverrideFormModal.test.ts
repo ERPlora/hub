@@ -2,17 +2,12 @@
 // (closed to begin with) and the interval editor when open — and «Add override»; a row opens «Edit ·
 // {reason}» with «Save». It waits for both dates and a reason. A range over another override (409) is
 // said under From, an end before the start (422) under To.
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import { itTellsTheCorrectedFieldApart } from '../../../../base/frontend/__tests__/same-words-refusal';
 import type { OverrideOut } from '../operations';
 import { click, ionValue, mountSchedule, settle } from '../__tests__/mount-schedule';
 import OverrideFormModal from './OverrideFormModal.vue';
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
 
 type Control = HTMLElement & { label?: string; value?: unknown; disabled?: boolean; errorText?: string; type?: string };
 

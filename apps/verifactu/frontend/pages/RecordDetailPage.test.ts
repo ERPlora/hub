@@ -15,19 +15,8 @@ vi.mock('@erplora/ui/components', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@erplora/ui/components')>()),
   useConfirm: () => ({ confirm: mocks.confirm }),
 }));
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
-vi.mock('@erplora/ui/shell', async (importOriginal) => ({
-  ...((await importOriginal()) as object),
-  toastSuccess: vi.fn(),
-  toastWarning: vi.fn(),
-}));
 beforeEach(() => {
   mocks.confirm.mockReset();
-  vi.mocked(toastSuccess).mockClear();
-  vi.mocked(toastWarning).mockClear();
 });
 
 const OP = 'verifactu.record.get';

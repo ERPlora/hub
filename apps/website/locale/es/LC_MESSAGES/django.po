@@ -55,8 +55,8 @@ msgstr "Minimalista"
 msgid "Bold"
 msgstr "Llamativa"
 
-msgid "hub"
-msgstr "hub"
+msgid "single row"
+msgstr "fila única"
 
 msgid "template"
 msgstr "plantilla"

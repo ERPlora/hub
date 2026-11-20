@@ -7,7 +7,7 @@
 // CUSTOMER-F25: a customer who is not there yet is created from the same search («+ New customer «…»»,
 // walk-in) and stays chosen, and what was already chosen for the appointment is kept, also when it fails.
 import { Combo, ConfirmDialog } from '@erplora/ui/components';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import { itTellsTheCorrectedFieldApart } from '../../../../base/frontend/__tests__/same-words-refusal';
 import CustomerSearch from '../../../customer/frontend/components/CustomerSearch.vue';
@@ -16,11 +16,6 @@ import { business, click, ionValue, mountAppointment, page, POLISH, settle } fro
 import AppointmentFormModal from './AppointmentFormModal.vue';
 import AppointmentHistory from './AppointmentHistory.vue';
 import FreeSlots from './FreeSlots.vue';
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
 
 type Control = HTMLElement & { label?: string; value?: unknown; errorText?: string; disabled?: boolean };
 

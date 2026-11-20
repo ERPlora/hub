@@ -2,17 +2,12 @@
 // or removes sessions (only with a limit; removing up to what is left) and/or extends the expiry (only
 // when it expires; up to 366 days), with a required Reason and the preview of what is left after.
 // Adjust sends `service.grant.adjust` with signed sessions and closes; a refusal stays in the dialog.
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import { itTellsTheCorrectedFieldApart } from '../../../../base/frontend/__tests__/same-words-refusal';
 import { click, ionValue, mountService, settle } from '../__tests__/mount-service';
 import { grant } from '../__tests__/grant';
 import GrantAdjustModal from './GrantAdjustModal.vue';
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
 
 type Control = HTMLElement & { label?: string; disabled?: boolean; helperText?: string; value?: unknown };
 

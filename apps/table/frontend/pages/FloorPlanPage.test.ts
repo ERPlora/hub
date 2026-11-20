@@ -20,11 +20,6 @@ import ZoneFormModal from '../components/ZoneFormModal.vue';
 import type { TableOut } from '../operations';
 import FloorPlanPage from './FloorPlanPage.vue';
 
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
-
 const TABLES = 'table.table.list';
 const ZONES = [zoneRow({ id: 'z1', name: 'Dining room' }), zoneRow({ id: 'z2', name: 'Terrace', sort_order: 1 }), zoneRow({ id: 'z3', name: 'Old bar', is_active: false })];
 const FREE = tableRow({ id: 't1', number: '1' });

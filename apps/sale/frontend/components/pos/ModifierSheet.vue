@@ -14,10 +14,11 @@ import { useLocale, useT } from '../../composables/useT';
 import { formatMoney, useBusinessMoney } from '../../lib/format';
 import { addedCents, choose, type Choice, chosenIds, initialChoice, missingGroup, unchoose } from '../../lib/modifierChoice';
 import ChoiceGroupSection, { type SectionGroup } from './ChoiceGroupSection.vue';
+import AllergenRow from './AllergenRow.vue';
 import PosSheet from './PosSheet.vue';
 
 const props = defineProps<{
-  product: Pick<ProductOut, 'id' | 'name' | 'price'> | null;
+  product: Pick<ProductOut, 'id' | 'name' | 'price' | 'allergens'> | null;
   groups: readonly TargetGroupOut[];
   pending: boolean;
   error: string | null;
@@ -75,6 +76,10 @@ function add(): void {
     :title="product?.name ?? ''"
     testid="pos-options"
   >
+    <AllergenRow
+      :codes="product?.allergens ?? []"
+      testid="pos-options-allergens"
+    />
     <ChoiceGroupSection
       v-for="group in sections"
       :key="group.id"

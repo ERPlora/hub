@@ -187,7 +187,7 @@ Pantalla: Inicio: Termina de configurar tu negocio; Ajustes de Caja
 Pasos:
 1. Mientras los ajustes de caja no se han guardado nunca, en el **Inicio** la lista «Termina de
    configurar tu negocio» trae el paso «Tu caja» («Decide cómo se abre y se cierra la caja: el fondo
-   inicial, el arqueo de cierre y la pantalla del TPV que queda bloqueada hasta abrirla.»), marcado
+   inicial, el arqueo de cierre y si cobrar en efectivo exige una sesión abierta.»), marcado
    «Recomendado». Su «Configurar» lleva a **Caja → Ajustes**, que también se abre desde el menú.
 2. Enciende o apaga «Activar caja», «Exigir fondo de apertura», «Exigir recuento al cierre», «Permitir
    saldo negativo», «Arqueo ciego» y «Cierre automático diario» con su hora.
@@ -828,7 +828,17 @@ Los papeles llegan del SaaS con prefijo (`hub_owner`, `hub_admin`, `hub_manager`
   `schemas.py` su `description`. `tests/test_assistant_asks.py` comprueba con las frases reales de la QA
   del asistente (hub#1087) que cada una llega a su herramienta y, si nombra «el turno abierto», también
   a `session.current`, que da su número; para el Hub, «arqueo», «recuento» y «conteo» son el arqueo
-  (`count`) y «moneda» o «divisa», la del negocio (`currency`) (`assistant_synonyms`, en `apps.py`). La tarjeta de
+  (`count`), «moneda» o «divisa», la del negocio (`currency`), y «una entrada», «una salida» o «un
+  movimiento» (también tras «otra» u «otro»), un movimiento de caja (`movement`, F05) (`assistant_synonyms`, en
+  `apps.py`). Van como frase y no como palabra suelta: «entrada» suelta comparte raíz con «entre» y «entra», y
+  «salida» suelta es también un fichaje o un plato que sale del pase. Varios movimientos dichos por su número
+  antes del importe también lo son: de dos a cinco, en letra o en cifra, delante de «entradas de», «salidas de» o
+  «movimientos de» («apúntame dos entradas de 20 € en el turno», «anota 2 salidas de 10 €») y, en inglés, de
+  «entries of» («two entries of 20 €»). Siempre con su «de» u «of»: «vende dos entradas para el concierto», «apunta
+  dos entradas en la lista de espera» o «add two entries to the waitlist» no son movimientos, y la prueba negativa
+  `OTHER_COUNTED` cae si alguien mete la frase sin él o «entradas» o «entries» sueltas. «Las cajas de la» barra
+  o tienda son sus cajas (`register`): Inventario lee «cajas de» como mercancía («5 cajas de leche») y, sin la frase de Caja, «¿qué cajas
+  de la tienda hay dadas de alta?» dejaría la lista de cajas fuera de las 10 primeras. La tarjeta de
   confirmación nombra cada dato por el `title` de su esquema (`gettext_noop`, con su `es` en el catálogo:
   «Cajón» para `register_name`, «Efectivo contado», «Notas de cierre») o, si no lo tiene, por el
   `verbose_name` de su campo en el modelo; un dato sin ninguno sale con el nombre técnico y lo para
