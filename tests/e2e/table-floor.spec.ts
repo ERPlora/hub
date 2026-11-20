@@ -249,16 +249,20 @@ test('Serve the room with the real till: seat, transfer, merge, charge and close
 
     // «Charge» goes to the till with the table's check: waited for by what the till shows, not by its URL (the till
     // drops `?order=` as soon as it has loaded the check, sometimes before a URL check sees it). Charged whole there,
-    // by card, the table is free on the plan.
+    // by card, the table frees itself on a plan another device keeps open (live, no reload).
+    const plan = await ownerPage(browser, '/table/floor-plan');
+    await chooseZone(plan.page, SERVICE);
+    await expect(tile(plan.page, two.id)).toContainText('Occupied');
     await tile(page, two.id).click();
     await page.locator('[data-testid=table-sheet-action-charge]').click();
     const till = shown(page);
     await expect(till.locator('[data-testid=pos-check-title]')).toHaveValue('Table 2');
     await expect(page).toHaveURL(/\/sale\/pos(\?|$)/);
     await chargeByCard(page, card, /3[.,]00/);
+    await expect(tile(plan.page, two.id)).toContainText('Available', { timeout: 15_000 });
+    await plan.context.close();
     await page.goto(`${A}/table/floor-plan`);
     await chooseZone(page, SERVICE);
-    await expect(tile(page, two.id)).toContainText('Available', { timeout: 15_000 });
 
     // A party that leaves without ordering: «Close table» closes it, its empty check is voided.
     await tile(page, one.id).click();
