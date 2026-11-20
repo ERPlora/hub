@@ -31,7 +31,7 @@ COMMAND = {
 
 
 def test_the_four_triggers():
-    parsed = schemas.CreateIn.model_validate(
+    parsed = schemas.flows.CreateIn.model_validate(
         {
             "name": "A",
             "trigger": {
@@ -43,7 +43,7 @@ def test_the_four_triggers():
     )
     assert parsed.trigger.kind == "event"
     assert parsed.trigger.filter == {"input.total": {"gte": 10000}}
-    week = schemas.CreateIn.model_validate(
+    week = schemas.flows.CreateIn.model_validate(
         {
             "name": "B",
             "trigger": {
@@ -59,22 +59,22 @@ def test_the_four_triggers():
         4,
         "18:00",
     )
-    once = schemas.CreateIn.model_validate(
+    once = schemas.flows.CreateIn.model_validate(
         {"name": "C", "trigger": {"kind": "at", "at": "2026-11-01T09:00:00+01:00"}}
     )
     assert once.trigger.at == dt.datetime(2026, 11, 1, 8, 0, tzinfo=dt.UTC)
-    assert schemas.CreateIn.model_validate({"name": "D"}).trigger.kind == "manual"
+    assert schemas.flows.CreateIn.model_validate({"name": "D"}).trigger.kind == "manual"
 
 
 def test_an_event_trigger_needs_a_well_formed_event_name():
     found = errors(
-        schemas.CreateIn, {"name": "A", "trigger": {"kind": "event", "event": ""}}
+        schemas.flows.CreateIn, {"name": "A", "trigger": {"kind": "event", "event": ""}}
     )
     assert found == {
         "trigger.event.event": "Value error, Choose what has to happen for it to start."
     }
     found = errors(
-        schemas.CreateIn,
+        schemas.flows.CreateIn,
         {"name": "A", "trigger": {"kind": "event", "event": "sale completed"}},
     )
     assert "trigger.event.event" in found
@@ -82,25 +82,25 @@ def test_an_event_trigger_needs_a_well_formed_event_name():
 
 def test_a_schedule_needs_its_day_and_a_valid_time():
     assert errors(
-        schemas.CreateIn,
+        schemas.flows.CreateIn,
         {
             "name": "A",
             "trigger": {"kind": "schedule", "every": "week", "time": "18:00"},
         },
     ) == {"trigger.schedule": "Value error, Choose the day of the week."}
     assert errors(
-        schemas.CreateIn,
+        schemas.flows.CreateIn,
         {
             "name": "A",
             "trigger": {"kind": "schedule", "every": "month", "time": "18:00"},
         },
     ) == {"trigger.schedule": "Value error, Choose the day of the month."}
     assert "trigger.schedule.time" in errors(
-        schemas.CreateIn,
+        schemas.flows.CreateIn,
         {"name": "A", "trigger": {"kind": "schedule", "every": "day", "time": "25:00"}},
     )
     assert "trigger.schedule.day" in errors(
-        schemas.CreateIn,
+        schemas.flows.CreateIn,
         {
             "name": "A",
             "trigger": {
@@ -115,7 +115,7 @@ def test_a_schedule_needs_its_day_and_a_valid_time():
 
 def test_a_date_needs_its_offset():
     found = errors(
-        schemas.CreateIn,
+        schemas.flows.CreateIn,
         {"name": "A", "trigger": {"kind": "at", "at": "2026-11-01T09:00:00"}},
     )
     assert "trigger.at.at" in found
@@ -123,7 +123,7 @@ def test_a_date_needs_its_offset():
 
 def test_a_condition_needs_a_known_operator_on_a_path():
     assert "trigger.event.filter" in errors(
-        schemas.CreateIn,
+        schemas.flows.CreateIn,
         {
             "name": "A",
             "trigger": {
@@ -134,7 +134,7 @@ def test_a_condition_needs_a_known_operator_on_a_path():
         },
     )
     assert "trigger.event.filter" in errors(
-        schemas.CreateIn,
+        schemas.flows.CreateIn,
         {
             "name": "A",
             "trigger": {
@@ -145,7 +145,7 @@ def test_a_condition_needs_a_known_operator_on_a_path():
         },
     )
     assert "trigger.event.filter" in errors(
-        schemas.CreateIn,
+        schemas.flows.CreateIn,
         {
             "name": "A",
             "trigger": {
@@ -161,7 +161,7 @@ def test_a_condition_needs_a_known_operator_on_a_path():
 
 
 def test_the_four_steps():
-    parsed = schemas.CreateIn.model_validate(
+    parsed = schemas.flows.CreateIn.model_validate(
         {
             "name": "A",
             "steps": [
@@ -192,7 +192,7 @@ def test_the_four_steps():
 
 def test_a_step_needs_its_action():
     found = errors(
-        schemas.CreateIn, {"name": "A", "steps": [COMMAND | {"operation": ""}]}
+        schemas.flows.CreateIn, {"name": "A", "steps": [COMMAND | {"operation": ""}]}
     )
     assert found == {
         "steps.0.command.operation": "Value error, Choose what this step does."
@@ -200,11 +200,11 @@ def test_a_step_needs_its_action():
 
 
 def test_step_ids_are_unique_and_well_formed():
-    assert errors(schemas.CreateIn, {"name": "A", "steps": [COMMAND, COMMAND]}) == {
+    assert errors(schemas.flows.CreateIn, {"name": "A", "steps": [COMMAND, COMMAND]}) == {
         "steps": "Value error, Two steps have the id «s1»."
     }
     assert "steps.0.command.id" in errors(
-        schemas.CreateIn, {"name": "A", "steps": [COMMAND | {"id": "Step 1"}]}
+        schemas.flows.CreateIn, {"name": "A", "steps": [COMMAND | {"id": "Step 1"}]}
     )
 
 
@@ -213,7 +213,7 @@ def test_a_step_reads_only_what_an_earlier_step_left():
         COMMAND | {"params": {"title": "steps.s2.id"}},
         COMMAND | {"id": "s2"},
     ]
-    assert errors(schemas.CreateIn, {"name": "A", "steps": later}) == {
+    assert errors(schemas.flows.CreateIn, {"name": "A", "steps": later}) == {
         "steps": "Value error, Step 1 reads «steps.s2.id», which no earlier step leaves."
     }
     after_a_condition = [
@@ -221,7 +221,7 @@ def test_a_step_reads_only_what_an_earlier_step_left():
         COMMAND | {"id": "s2", "params": {"title": "{{steps.s1.x}}"}},
     ]
     assert "steps" in errors(
-        schemas.CreateIn, {"name": "A", "steps": after_a_condition}
+        schemas.flows.CreateIn, {"name": "A", "steps": after_a_condition}
     )
 
 
@@ -231,19 +231,19 @@ def test_a_condition_compares_only_with_data_it_already_has():
         {"id": "s1", "kind": "condition", "when": {"input.total": {"gt": "steps.s2.total"}}},
         COMMAND | {"id": "s2"},
     ]
-    assert errors(schemas.CreateIn, {"name": "A", "steps": later}) == {
+    assert errors(schemas.flows.CreateIn, {"name": "A", "steps": later}) == {
         "steps": "Value error, Step 1 reads «steps.s2.total», which no earlier step leaves."
     }
     earlier = [
         COMMAND,
         {"id": "s2", "kind": "condition", "when": {"input.total": {"gt": "steps.s1.total"}}},
     ]
-    schemas.CreateIn.model_validate({"name": "A", "steps": earlier})
+    schemas.flows.CreateIn.model_validate({"name": "A", "steps": earlier})
 
 
 def test_a_template_reads_only_paths():
     found = errors(
-        schemas.CreateIn,
+        schemas.flows.CreateIn,
         {"name": "A", "steps": [COMMAND | {"params": {"title": "Hi {{foo}}"}}]},
     )
     assert found == {
@@ -254,26 +254,26 @@ def test_a_template_reads_only_paths():
 def test_a_wait_is_one_minute_to_thirty_days():
     for seconds in (59, 30 * 24 * 3600 + 1):
         assert "steps.0.delay.seconds" in errors(
-            schemas.CreateIn,
+            schemas.flows.CreateIn,
             {"name": "A", "steps": [{"id": "s1", "kind": "delay", "seconds": seconds}]},
         )
 
 
 def test_at_most_fifty_steps():
     steps = [{"id": f"s{n}", "kind": "delay", "seconds": 60} for n in range(51)]
-    assert "steps" in errors(schemas.CreateIn, {"name": "A", "steps": steps})
+    assert "steps" in errors(schemas.flows.CreateIn, {"name": "A", "steps": steps})
 
 
 def test_an_unknown_step_kind_is_refused():
     assert "steps.0" in errors(
-        schemas.CreateIn,
+        schemas.flows.CreateIn,
         {"name": "A", "steps": [{"id": "s1", "kind": "ai", "prompt": "x"}]},
     )
 
 
 def test_document_problems_is_what_an_update_checks_too():
-    problems = schemas.document_problems(
-        [schemas.CommandStep.model_validate(COMMAND | {"params": {"title": "steps.s9.id"}})]
+    problems = schemas.steps.document_problems(
+        [schemas.steps.CommandStep.model_validate(COMMAND | {"params": {"title": "steps.s9.id"}})]
     )
     assert problems == ["Step 1 reads «steps.s9.id», which no earlier step leaves."]
 
@@ -282,7 +282,7 @@ def test_document_problems_is_what_an_update_checks_too():
 
 
 def test_a_draft_proposes_commands_conditions_and_waits_only():
-    ok = schemas.DraftProposeIn.model_validate(
+    ok = schemas.drafts.DraftProposeIn.model_validate(
         {
             "name": "Call who did not come",
             "definition": {
@@ -298,22 +298,22 @@ def test_a_draft_proposes_commands_conditions_and_waits_only():
     assert ok.definition.steps[0].operation == "task.task.create"
     query = {"id": "s1", "kind": "query", "operation": "customer.customer.detail"}
     assert "definition.steps.0" in errors(
-        schemas.DraftProposeIn,
+        schemas.drafts.DraftProposeIn,
         {"name": "A", "definition": {"steps": [query]}, "notes": []},
     )
 
 
 def test_a_draft_has_one_to_eight_steps_and_at_most_eight_notes():
     assert "definition.steps" in errors(
-        schemas.DraftProposeIn, {"name": "A", "definition": {"steps": []}, "notes": []}
+        schemas.drafts.DraftProposeIn, {"name": "A", "definition": {"steps": []}, "notes": []}
     )
     nine = [COMMAND | {"id": f"s{n}"} for n in range(9)]
     assert "definition.steps" in errors(
-        schemas.DraftProposeIn,
+        schemas.drafts.DraftProposeIn,
         {"name": "A", "definition": {"steps": nine}, "notes": []},
     )
     assert "notes" in errors(
-        schemas.DraftProposeIn,
+        schemas.drafts.DraftProposeIn,
         {"name": "A", "definition": {"steps": [COMMAND]}, "notes": ["x"] * 9},
     )
 
@@ -322,18 +322,18 @@ def test_a_draft_has_one_to_eight_steps_and_at_most_eight_notes():
 
 
 def test_a_flow_is_named_by_its_id_or_its_name():
-    assert schemas.FlowRefIn.model_validate({"flow": "welcome"}).flow == "welcome"
-    assert errors(schemas.FlowRefIn, {}) == {
+    assert schemas.flows.FlowRefIn.model_validate({"flow": "welcome"}).flow == "welcome"
+    assert errors(schemas.flows.FlowRefIn, {}) == {
         "flow": "Value error, Say which automation: its id or its name."
     }
 
 
 def test_lists_take_at_most_100_rows_and_refuse_unknown_filters():
-    assert "limit" in errors(schemas.FlowListIn, {"limit": 101})
-    assert "colour" in errors(schemas.FlowListIn, {"colour": "red"})
-    assert schemas.FlowListIn.model_validate({}).sort == "-updated_at"
+    assert "limit" in errors(schemas.flows.FlowListIn, {"limit": 101})
+    assert "colour" in errors(schemas.flows.FlowListIn, {"colour": "red"})
+    assert schemas.flows.FlowListIn.model_validate({}).sort == "-updated_at"
     assert (
-        schemas.RunListIn.model_validate(
+        schemas.runs.RunListIn.model_validate(
             {"flow_id": "0199e7a0-0000-7000-8000-000000000000"}
         ).limit
         == 20
@@ -341,27 +341,27 @@ def test_lists_take_at_most_100_rows_and_refuse_unknown_filters():
 
 
 def test_a_manual_run_takes_its_input():
-    parsed = schemas.RunIn.model_validate(
+    parsed = schemas.runs.RunIn.model_validate(
         {"flow": "Welcome", "input": {"customer_id": "c-1"}}
     )
     assert parsed.input == {"customer_id": "c-1"}
 
 
 def test_the_name_is_trimmed_and_at_most_120_characters():
-    assert schemas.CreateIn.model_validate({"name": "  Welcome  "}).name == "Welcome"
-    assert "name" in errors(schemas.CreateIn, {"name": "x" * 121})
+    assert schemas.flows.CreateIn.model_validate({"name": "  Welcome  "}).name == "Welcome"
+    assert "name" in errors(schemas.flows.CreateIn, {"name": "x" * 121})
 
 
 def test_turning_on_is_only_set_enabled_s_which_the_assistant_confirms():
     # Create and update carry no switch.
-    assert "enabled" in errors(schemas.CreateIn, {"name": "A", "enabled": True})
-    assert "enabled" in errors(schemas.UpdateIn, {"flow": "A", "enabled": True})
+    assert "enabled" in errors(schemas.flows.CreateIn, {"name": "A", "enabled": True})
+    assert "enabled" in errors(schemas.flows.UpdateIn, {"flow": "A", "enabled": True})
 
 
 def test_a_draft_reads_only_what_its_earlier_steps_leave():
     # The same check as a person's document.
     later = [COMMAND | {"params": {"title": "steps.s2.id"}}, COMMAND | {"id": "s2"}]
-    found = errors(schemas.DraftProposeIn, {"name": "A", "definition": {"steps": later}, "notes": []})
+    found = errors(schemas.drafts.DraftProposeIn, {"name": "A", "definition": {"steps": later}, "notes": []})
     assert found == {"definition.steps": "Value error, Step 1 reads «steps.s2.id», which no earlier step leaves."}
 
 
@@ -370,7 +370,7 @@ def test_a_step_the_hub_does_not_have_is_refused():
     # module's «agent»: a document that names one is refused, never kept to fail later.
     for kind in ("agent", "message"):
         with pytest.raises(pydantic.ValidationError):
-            schemas.CreateIn.model_validate({"steps": [{"id": "s1", "kind": kind, "prompt": "Answer the customer"}]})
+            schemas.flows.CreateIn.model_validate({"steps": [{"id": "s1", "kind": kind, "prompt": "Answer the customer"}]})
 
 
 ASSISTANT = {"id": "s1", "kind": "assistant", "prompt": "Answer {{input.name}} with the free slots"}
@@ -379,7 +379,7 @@ ASSISTANT = {"id": "s1", "kind": "assistant", "prompt": "Answer {{input.name}} w
 def test_an_assistant_step_keeps_its_task_its_tools_how_it_changes_things_and_its_rounds():
     # FLOW-F37: «Ask the assistant»
     # is a step; by default a change it wants waits for a person (old module's policy) and it has 6 rounds.
-    kept = schemas.CreateIn.model_validate({"steps": [ASSISTANT | {"tools": ["task.task.list", "task.task.create"]}]})
+    kept = schemas.flows.CreateIn.model_validate({"steps": [ASSISTANT | {"tools": ["task.task.list", "task.task.create"]}]})
     step = kept.steps[0]
     assert (step.kind, step.tools, step.mode, step.max_rounds) == (
         "assistant",
@@ -387,7 +387,7 @@ def test_an_assistant_step_keeps_its_task_its_tools_how_it_changes_things_and_it
         "ask",
         6,
     )
-    assert schemas.CreateIn.model_validate({"steps": [ASSISTANT | {"mode": "auto", "max_rounds": 10}]}).steps[0].mode == "auto"
+    assert schemas.flows.CreateIn.model_validate({"steps": [ASSISTANT | {"mode": "auto", "max_rounds": 10}]}).steps[0].mode == "auto"
 
 
 @pytest.mark.parametrize(
@@ -401,29 +401,29 @@ def test_an_assistant_step_keeps_its_task_its_tools_how_it_changes_things_and_it
     ],
 )
 def test_an_assistant_step_without_its_task_or_out_of_bounds_is_refused(more, field):
-    assert field in errors(schemas.CreateIn, {"steps": [ASSISTANT | more]})
+    assert field in errors(schemas.flows.CreateIn, {"steps": [ASSISTANT | more]})
 
 
 def test_an_assistant_step_never_hands_a_secret_to_the_assistant():
     # What the step asks reaches the model, so a secret is never written in it.
-    found = errors(schemas.CreateIn, {"steps": [ASSISTANT | {"prompt": "Use {{secret.STRIPE_KEY}}"}]})
+    found = errors(schemas.flows.CreateIn, {"steps": [ASSISTANT | {"prompt": "Use {{secret.STRIPE_KEY}}"}]})
     assert found == {"steps": "Value error, Step 1 reads «secret.STRIPE_KEY»: a secret or the call's key only go in «Call another system»."}
 
 
 def test_what_the_assistant_answered_is_read_by_the_steps_after_it():
     later = COMMAND | {"id": "s2", "params": {"title": "{{steps.s1.text}}"}}
-    assert schemas.CreateIn.model_validate({"steps": [ASSISTANT, later]}).steps[1].params == {"title": "{{steps.s1.text}}"}
+    assert schemas.flows.CreateIn.model_validate({"steps": [ASSISTANT, later]}).steps[1].params == {"title": "{{steps.s1.text}}"}
 
 
 @pytest.mark.parametrize(
     ("schema", "title"),
     [
-        (schemas.FlowRefIn, "Automation"),
-        (schemas.GrantIn, "Automation"),
-        (schemas.RunIn, "Automation"),
-        (schemas.EnabledIn, "Automation"),
-        (schemas.AnswerIn, "Question"),
-        (schemas.RunRefIn, "Automation run"),
+        (schemas.flows.FlowRefIn, "Automation"),
+        (schemas.flows.GrantIn, "Automation"),
+        (schemas.runs.RunIn, "Automation"),
+        (schemas.flows.EnabledIn, "Automation"),
+        (schemas.questions.AnswerIn, "Question"),
+        (schemas.runs.RunRefIn, "Automation run"),
     ],
 )
 def test_a_dangerous_write_titles_the_record_it_names(schema, title):

@@ -9,7 +9,8 @@ from live.errors import NotFound
 from live.operations import operation
 
 from apps.flow.models import Draft
-from apps.flow.schemas import DraftListIn, DraftOut, DraftRefIn, Page
+from apps.flow.schemas.drafts import DraftListIn, DraftOut, DraftRefIn
+from apps.flow.schemas.fields import Page
 
 from .reads import VIEW
 

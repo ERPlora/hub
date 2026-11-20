@@ -25,7 +25,7 @@ from live.operations import get
 from apps.customer.models import Customer
 from apps.flow import events
 from apps.flow.models import Flow, FlowRun, Question
-from apps.flow.schemas import RunRefIn
+from apps.flow.schemas.runs import RunRefIn
 from apps.task.models import Task
 from base.tenancy.context import use_hub
 

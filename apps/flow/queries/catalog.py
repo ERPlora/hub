@@ -12,7 +12,7 @@ from live.operations import Operation, operation, registry
 
 from base import apps_on
 from base import assistant as hub_assistant
-from apps.flow.schemas import CatalogIn, CatalogOut
+from apps.flow.schemas.catalog import CatalogIn, CatalogOut
 
 from .reads import VIEW
 

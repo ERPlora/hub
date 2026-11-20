@@ -17,7 +17,8 @@ from apps.flow.queries.catalog import active_apps
 from apps.flow.queries.flows import live_flows, resolve_flow
 from apps.flow.queries.reads import MANAGE, SYSTEM
 from apps.flow.queries.runs import RUN_NOT_FOUND, resume_problem, run_row
-from apps.flow.schemas import DueIn, DueOut, ReactIn, ReactOut, RunIn, RunOut, RunRefIn
+from apps.flow.schemas.fields import DueIn, DueOut
+from apps.flow.schemas.runs import ReactIn, ReactOut, RunIn, RunOut, RunRefIn
 from base import outbound
 from base.business import business_zone
 from base.recovery import brought_back
