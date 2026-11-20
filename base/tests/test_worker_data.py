@@ -23,7 +23,7 @@ from live.errors import PermissionDenied
 from live.models import OutboxEvent
 from live.operations import get
 
-from base import blueprint, services, worker
+from base import blueprint, services, worker_data
 from base.services import provisioning
 from base.models import Membership
 from base.permissions import permissions_for
@@ -83,7 +83,7 @@ def data_reset_events(hub: Hub) -> list[dict]:
 
 
 def run_pass(now: dt.datetime | None = None) -> None:
-    worker._data(now or timezone.now())
+    worker_data._data(now or timezone.now())
 
 
 def test_a_reset_is_copied_first_then_emptied_and_the_screen_hears_each_step(hub_a, dumps_bucket, moto_s3, told):

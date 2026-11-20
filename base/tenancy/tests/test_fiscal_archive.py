@@ -17,7 +17,7 @@ from botocore.exceptions import ClientError
 from django.utils import timezone
 from live.meta import all_live_app_configs
 
-from base import worker
+from base import worker_data
 from base.tenancy import fiscal_archive, offboarding
 from base.tenancy.context import use_hub
 from base.tenancy.tests import s3
@@ -459,7 +459,7 @@ def stopped_after_its_first_pdf(hub, endpoint: str, monkeypatch) -> list[str]:
     earlier = timezone.now() - dt.timedelta(minutes=1)
     with monkeypatch.context() as clock:
         clock.setattr(timezone, "now", lambda: earlier)
-        worker._data(earlier, stop)
+        worker_data._data(earlier, stop)
     assert fresh(hub).fiscal_archived_at is None
     assert [key for key in puts if key.endswith(".pdf")] == [puts[-1]]
     return puts
