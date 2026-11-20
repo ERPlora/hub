@@ -10,9 +10,9 @@ from functools import partial
 from django.utils import translation
 from live.context import OperationContext
 
-from apps.invoice import pdf
 from apps.invoice.models import Invoice
 from apps.invoice.queries import fiscal_archive, record_of, render_document
+from base import pdf
 
 
 def documents(ctx: OperationContext) -> Iterator[tuple[str, str, Callable[[], bytes]]]:

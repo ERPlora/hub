@@ -3,8 +3,6 @@ off are Staff's, written by Staff's own operations; the agenda reads them throug
 ``staff.availability.for_member`` and reacts to a professional leaving (``staff.member.terminated``).
 """
 
-import datetime as dt
-
 import pytest
 from live.errors import Conflict
 from live.models import OutboxEvent

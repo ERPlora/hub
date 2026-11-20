@@ -1,7 +1,5 @@
 // Test helper of the kitchen app's pages and components: `mountInShell` with its catalogues, the display and its people.
-// Dialogs: a test that opens a popover passes `stubs: { IonPopover: PopoverStub }`; one that opens a modal mocks
-// `@ionic/vue`'s IonModal with FormModal's `IonModalStub` (imported from its own file in the mock factory: this helper
-// loads @ionic/vue, the factory must not).
+// A test that opens a popover passes `stubs: { IonPopover: PopoverStub }`.
 import type { SessionMe } from '@erplora/ui/shell';
 import { type Component, defineComponent } from 'vue';
 

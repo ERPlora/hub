@@ -50,7 +50,6 @@ from apps.service.queries import (
     find_grant,
     find_package,
     find_service,
-    grants,
     session_rows,
     held_rows,
     load_assignment,

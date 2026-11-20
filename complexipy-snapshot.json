@@ -878,16 +878,6 @@
     ]
   },
   {
-    "path": "apps/flow/services/runs.py",
-    "file_name": "runs.py",
-    "functions": [
-      {
-        "name": "react",
-        "complexity": 16
-      }
-    ]
-  },
-  {
     "path": "apps/flow/queries/catalog.py",
     "file_name": "catalog.py",
     "functions": [

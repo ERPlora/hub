@@ -4,15 +4,10 @@
 // with one it runs `invoice.invoice.rectify` (no date: the server dates it today) and shows the result in
 // the same window, with «Close». A rectifying or cancelled invoice only says why; a refusal is read inside
 // the window in the server's words.
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import { click, ionValue, mountInvoice } from '../__tests__/mount-invoice';
 import RectifyModal from './RectifyModal.vue';
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
 
 const prop = (el: Element | null, name: string): unknown => (el as unknown as Record<string, unknown>)[name];
 

@@ -14,7 +14,7 @@ from apps.verifactu.models import AeatRecord, Config, Event, Record, wait_reason
 from apps.verifactu.queries.aeat_records import aeat_row
 from apps.verifactu.queries.country import refuse_outside_spain
 from apps.verifactu.queries.route import config_row, issuer_identity, own_certificate_material, presenter, sending_route
-from apps.verifactu.schemas import AeatQueryIn, AeatQueryOut
+from apps.verifactu.schemas.aeat_records import AeatQueryIn, AeatQueryOut
 
 from .sending import CANNOT_SEND, _outlast_the_gateway
 from .writes import TRANSMIT, _event

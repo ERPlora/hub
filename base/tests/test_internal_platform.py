@@ -266,3 +266,16 @@ def test_the_pdf_of_an_invoice_that_never_arrived_is_404(client, platform_hub):
     answer = get(client, f"{ROOT}/{BODY['id']}/pdf")
 
     assert (answer.status_code, code(answer)) == (404, "invoice.platform_unknown")
+
+
+def test_without_weasyprint_s_libraries_the_pdf_is_503(client, platform_hub, monkeypatch):
+    post(client, BODY)
+
+    def missing():
+        raise OSError("cannot load library 'libpango-1.0-0'")
+
+    monkeypatch.setattr("base.pdf._weasyprint", missing)
+
+    answer = get(client, f"{ROOT}/{BODY['id']}/pdf")
+
+    assert (answer.status_code, code(answer)) == (503, "internal.pdf_unavailable")

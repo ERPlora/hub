@@ -13,7 +13,13 @@ from apps.verifactu import aeat, chain, events
 from apps.verifactu.models import Chain, Event, Record
 from apps.verifactu.queries.country import refuse_outside_spain
 from apps.verifactu.queries.route import config_row, issuer_identity
-from apps.verifactu.schemas import ChainValidateIn, ChainValidationOut, RecoverFromAeatIn, RecoverManualIn, RecoveryOut
+from apps.verifactu.schemas.chains import (
+    ChainValidateIn,
+    ChainValidationOut,
+    RecoverFromAeatIn,
+    RecoverManualIn,
+    RecoveryOut,
+)
 
 from .aeat_query import _query_aeat
 from .sealing import _fingerprint_of

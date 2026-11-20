@@ -141,7 +141,7 @@ def test_the_gallery_holds_up_to_twelve_uploaded_images_in_their_order():
 def test_the_reviews_name_a_place_on_google_maps_by_its_link_or_its_place_id():
     assert Content().reviews.model_dump() == {"hidden": False, "title": "", "place_ref": ""}
     place = "ChIJN1t_tDeuEmsRUsoyG83frY4"
-    for ref in (place, f"https://www.google.com/maps/place/Manoli/@40.41,-3.70,17z", "https://maps.app.goo.gl/AbC1"):
+    for ref in (place, "https://www.google.com/maps/place/Manoli/@40.41,-3.70,17z", "https://maps.app.goo.gl/AbC1"):
         assert Content.model_validate({"reviews": {"place_ref": f" {ref} "}}).reviews.place_ref == ref
     for ref in ("Peluquería Manoli", "https://evil.example/maps/place/x/", "https://www.google.com/maps/@40.4,-3.7,15z"):
         with pytest.raises(pydantic.ValidationError) as refused:

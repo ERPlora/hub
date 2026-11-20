@@ -472,24 +472,80 @@ def test_a_blueprint_turns_on_an_app_still_to_set_up_and_waits_for_it(hub_a):
     assert (report["retry"], report["retry_blocked"]) == (False, "waiting")
 
 
+def menu_of(hub) -> set[str]:
+    """The apps in the menu of ``hub``'s owner (``base.session.me``), inside the hub's database."""
+    op = get("base.session.me")
+    return {entry["id"] for entry in op(as_admin(hub), op.input()).model_dump(mode="json")["menu"]}
+
+
 @own
-def test_reading_the_apps_list_again_forgets_what_the_cache_kept_so_the_menu_read_after_it_is_current(hub_a):
-    """Rows written outside an operation (by hand, as the e2e write them) are forgotten at no COMMIT. The Apps list
-    every screen follows (AppsFollower) forgets what the cache keeps of the business's apps when it is read, before the
-    session is, so the menu read right after it has the app."""
-    from django.core.cache import cache
+def test_reading_the_apps_list_twice_leaves_the_cache_so_the_menu_after_it_reads_no_row(hub_a):
+    """Every screen follows the Apps list (AppsFollower). Reading it leaves what the cache keeps of the business's apps:
+    the menu read after the second read is answered from the cache, without reading the rows again."""
+    from django.db import connections
+    from django.test.utils import CaptureQueriesContext
+
+    from base.tenancy.context import current_alias
 
     given(hub_a, printing="on*", created=["printing"])
-    scope = Scope("host", hub_a.slug)
-    cache.set(activation.OFF_APPS_CACHE + hub_a.slug, ["printing"], 60)
-    cache.set(activation.CREATING_APPS_CACHE + hub_a.slug, [], 60)
+    app_list = get("base.app.list")
     with use_hub(Hub.objects.get(pk=hub_a.pk)):
-        assert "printing" in activation.off_apps(scope)  # what the cache kept before the rows changed
+        app_list(as_admin(hub_a), app_list.input())
+        menu_of(hub_a)  # reads the rows once and keeps them
+        app_list(as_admin(hub_a), app_list.input())
+        with CaptureQueriesContext(connections[current_alias()]) as captured:
+            menu = menu_of(hub_a)
 
-        get("base.app.list")(as_admin(hub_a), get("base.app.list").input())
-        me = get("base.session.me")(as_admin(hub_a), get("base.session.me").input()).model_dump(mode="json")
+    assert [query["sql"] for query in captured.captured_queries if "base_appactivation" in query["sql"]] == []
+    assert "printing" in menu
 
-    assert {app["label"]: app["state"] for app in me["apps"]}["printing"] == "on"
+
+@own
+def test_turning_an_app_on_forgets_the_cache_at_its_commit_so_the_menu_after_it_has_the_app(
+    hub_a, django_capture_on_commit_callbacks
+):
+    given(hub_a, created=["printing"])
+    hub = Hub.objects.get(pk=hub_a.pk)
+    with use_hub(hub):
+        assert "printing" not in menu_of(hub_a)  # kept off in the cache
+
+    with django_capture_on_commit_callbacks(using=hubs.HUB_A_ALIAS) as on_the_hub:
+        assert run(hub_a, "base.app.enable", "printing")["state"] == ON
+    with use_hub(hub):
+        assert "printing" not in menu_of(hub_a)  # nothing forgotten before the COMMIT
+        for callback in on_the_hub:
+            callback()
+
+        assert "printing" in menu_of(hub_a)
+
+
+@own
+def test_the_workers_step_forgets_the_cache_at_its_commit_so_an_app_that_failed_is_no_longer_activating(
+    hub_a, django_capture_on_commit_callbacks
+):
+    from live.context import system_context
+
+    def session_state() -> str:
+        op = get("base.session.me")
+        apps = op(as_admin(hub_a), op.input()).model_dump(mode="json")["apps"]
+        return {app["label"]: app["state"] for app in apps}["printing"]
+
+    given(hub_a, printing="creating*")
+    hub = Hub.objects.get(pk=hub_a.pk)
+    settle = get("base.app.activation_settle")
+    failed = settle.input.model_validate({"apps": ["printing"], "outcome": "failed", "error": "schema_failed: boom"})
+    with use_hub(hub):
+        assert session_state() == "activating"  # kept in the cache
+
+    with django_capture_on_commit_callbacks(using=hubs.HUB_A_ALIAS) as on_the_hub, use_hub(hub):
+        settle(system_context(Scope("host", hub_a.slug)), failed)
+    with use_hub(hub):
+        assert session_state() == "activating"  # nothing forgotten before the COMMIT
+        for callback in on_the_hub:
+            callback()
+
+        assert session_state() == "off"
+    assert rows_of(hub_a)["printing"] == (FAILED, True)
 
 
 @own

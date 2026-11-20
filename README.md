@@ -31,15 +31,28 @@ git config core.hooksPath .githooks   # una vez por clon, cuando su HEAD ya trae
 scripts/checks.sh fast                # lo mismo que corre el gancho, a mano, sobre el árbol de trabajo
 ```
 
-`scripts/checks.sh fast` pasa en unos segundos, sin red ni base de datos, los tests de guardarraíles del tamaño de
-cada fichero, de ruff, de los contratos de import-linter y de la complejidad cognitiva, con sus listas de excepciones,
-que solo encogen (`.file-size-allow`, las de `pyproject.toml` y `complexipy-snapshot.json`). Su salida dice qué
-fichero incumple y por qué.
+`scripts/checks.sh fast` pasa primero, en unos segundos y sin red ni base de datos, los tests de guardarraíles del
+tamaño de cada fichero, de ruff, de los contratos de import-linter y de la complejidad cognitiva, con sus listas de
+excepciones, que solo encogen (`.file-size-allow`, las de `pyproject.toml` y `complexipy-snapshot.json`). Después
+comprueba lo que toca el cambio: lo que difiere de donde la rama salió de `origin/main` (en `origin/main`, del commit
+anterior) o del commit que se le pase (`scripts/checks.sh fast <commit>`), con lo no commiteado y los ficheros nuevos.
+
+- ESLint sobre sus ficheros TypeScript, JavaScript y Vue y, si toca alguno, la comprobación de tipos (`pnpm typecheck`)
+  y las pruebas de Vitest relacionadas (`vitest related`).
+- pytest sobre sus ficheros de prueba y sobre el `test_<módulo>.py` de cada módulo tocado (también
+  `test_<paquete>_<módulo>.py`, para un módulo de un paquete como `services/`) en la carpeta `tests/` más cercana,
+  contra el Postgres de `compose.yaml` y en una base de pruebas propia de cada checkout (`TEST_DB_NAME` la cambia).
+
+Corren todas, y cualquier rojo hace fallar el comando; su salida dice qué fichero incumple y por qué. La pasada completa
+(la suite entera, el build y el humo de navegador) la hace la CI.
 
 El gancho `.githooks/pre-push` corre primero el `pre-push` global de la máquina, con los mismos argumentos y la misma
 entrada, y después `scripts/checks.sh fast` sobre cada commit que se sube, sacado en un worktree temporal con el
-entorno de Python de este checkout (`.venv`, o el de `UV_PROJECT_ENVIRONMENT`): se comprueba lo que se sube, nunca el
-árbol de trabajo. Un rojo para el push, y no hay variable para saltárselo; sin el entorno (`uv sync`) también se para.
+entorno de Python de este checkout (`.venv`, o el de `UV_PROJECT_ENVIRONMENT`), que además le presta su `node_modules`
+y `packages/ui` (en el commit que registra lo que se sube): se comprueba lo que se sube, nunca el árbol de trabajo. Un
+rojo para el push, y no hay variable para saltárselo; sin el entorno (`uv sync`) también se para, y si a ESLint, a los
+tipos o a Vitest les falta `node_modules` o `packages/ui`, el comando lo dice (`pnpm install`, `git submodule update
+--init`) y falla.
 `commit-msg`, `pre-commit` y `applypatch-msg` pasan el turno a los ganchos globales del mismo nombre, que
 `core.hooksPath` dejaría de correr. La suite de la CI vuelve a pasar estos tests al fusionar, así que un clon sin el
 gancho no se salta nada. Sus tests: `tests/test_githooks.py` y `tests/test_checks.py`.
@@ -83,8 +96,8 @@ sus BD, los dos `runserver` y, pase lo que pase, la limpieza.
   Los grupos entran de uno en uno, tras tres pasadas seguidas en verde del job, y el job los nombra con `--spec`: hoy,
   entrar, las sesiones, los permisos de un empleado, la separación entre negocios y la suspensión por impago; cobrar
   en el TPV, la caja y la impresión del ticket; el ticket con su QR, la factura y VeriFactu; la cocina y las mesas
-  (mandar la ronda a cocina desde el TPV, seguirla y meterle prisa, y sentar la cuenta del TPV en una mesa y
-  quitársela); las citas, los servicios y los bonos (reservar en la agenda, cobrar la cita en el TPV al precio del
+  (mandar la ronda a cocina desde el TPV, seguirla y meterle prisa, sentar la cuenta del TPV en una mesa y
+  quitársela, y servir una mesa desde el plano hasta cobrar su cuenta en el TPV y verla libre); las citas, los servicios y los bonos (reservar en la agenda, cobrar la cita en el TPV al precio del
   profesional, dar de alta un servicio con quien lo hace, crear un bono, venderlo y ajustarlo, y pagar con él un corte
   en el TPV); y el alta, las apps, la demo y lo vivo (dar de alta en erplora.com un negocio de España, que nace con
   Impuestos y sin VeriFactu; desactivar Reservas, que se lleva Mesas, y volver a activarlas; entrar en la demo desde

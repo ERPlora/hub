@@ -510,7 +510,9 @@ pasarela no podría presentarlo.
 Cerrar la vía de ERPlora en el servidor no saca de producción a quien ya está en ella ni le cambia la vía: sigue
 sellando, enviando y anulando con el sello de ERPlora, porque la AEAT solo acepta una anulación presentada con el mismo
 sello; subir después un certificado tampoco la cambia. El paso «Configura VeriFactu» del Inicio, con la vía cerrada,
-solo se da por hecho con el certificado propio.
+solo se da por hecho con el certificado propio y solo habla de él: «Sube el certificado del negocio para enviar tus
+facturas a la AEAT.» (con la vía abierta, «Firma la autorización para que ERPlora envíe tus facturas a la AEAT, o sube
+el certificado del negocio.»).
 Se comprueba en este orden y la primera causa da el 409 con su código: el servidor cerrado → un negocio de
 demostración → el emisor → la vía (con certificado válido, el certificado, que no pide otorgamiento; sin él, la de
 ERPlora, abierta en el servidor y con el otorgamiento aprobado) → la cuenta.
@@ -1110,7 +1112,7 @@ que manda la cuenta (`verifactu.sync_config`) no es de ningún papel: solo del s
 
 `apps.py`, `models.py` (`Config`, `OwnCertificate`, `Chain`, `SendControl`, `Record`, `Event`, `AeatRecord`),
 `migrations/`,
-`schemas.py`, `services/`, `queries/`, `api.py`, `live.py`, `events.py`, `admin.py`, `locale/`,
+`schemas/`, `services/`, `queries/`, `api.py`, `live.py`, `events.py`, `admin.py`, `locale/`,
 `frontend/` y, puros y sin ORM: `chain.py` (formatos, huella, QR), `envelope.py` (el XML: `RegistroAlta`,
 `RegistroAnulacion`, el sobre y la consulta), `xsd.py` (validación con los esquemas de `xsd/`), `aeat.py`
 (lectura de las respuestas de la AEAT y de la consulta), `gateway.py` (cliente de la pasarela del SaaS),
@@ -1131,6 +1133,8 @@ production, scope)` sobre la vía que tendría en producción, `queries.route.se
 este servidor abre o, sin él, la vía ERPlora abierta en el servidor (`erplora_route.closed`) con el otorgamiento
 aprobado; ya en producción, la vía fijada, sin mirar el interruptor; la exención del hub de ERPlora incluida; lo que le
 falte al servidor no cuenta, no es tarea del negocio),
+descripción según la vía de ERPlora para el negocio que lee el Inicio (`erplora_route.step_description`, perezosa: la
+misma `erplora_route.available` que da `erplora_route_available` a Configuración; con ella cerrada, solo el certificado),
 permiso `verifactu.configure`, ruta `/verifactu/config`, `refresh_on` `verifactu.config.changed`, `countries`
 `(SPAIN,)` (`apps.py`; hub#682: un negocio de otro país no lo ve, ni su muro en producción; uno sin país cuenta como
 España por `base.business.country_or_market`, que también lee `queries.country.outside_spain`: una sola regla). **Paneles** (permiso
@@ -1159,10 +1163,11 @@ WhatsApp) o «waiting» (la de «waiter»). Hasta ERPlora/live#71 el asistente l
 `tests/test_assistant_asks.py` mide con las frases reales de la QA de la capa 2
 (`tests/e2e/qa/probes/*-es-verifactu-*.json`), nunca con los propios asks, y con una frase propia por herramienta que
 solo la trae con sus asks; el empleado no recibe las escrituras que no puede hacer, y ningún test sale de la máquina
-(ni la AEAT de pruebas ni la de producción). Límite medido: la sonda de pasar a producción («activa el envío real…
-comprobando antes que la cuenta y la autorización estén listas») se ofrece pasado el 30.º puesto de 40, porque «la
-cuenta» (la de ERPlora) se lee como la cuenta de una mesa y van delante las escrituras de Ventas que la toman (`xfail`
-estricto en el test hasta ERPlora/live#76; sin «la cuenta y», la misma frase la trae la 6.ª).
+(ni la AEAT de pruebas ni la de producción). Hasta ERPlora/live#76, la sonda de pasar a producción («activa el envío
+real… comprobando antes que la cuenta y la autorización estén listas») se ofrecía la 34.ª de 40: «la cuenta» (la de
+ERPlora) se leía como la cuenta de una mesa y pasaban delante las escrituras de Ventas que la toman. Lo que se nombra de
+pasada, en la parte de la frase que abre con un gerundio («comprobando…»), ya no cuenta como lo que «activa» enciende, y
+la sonda trae la herramienta la 8.ª.
 
 La tarjeta de confirmación de una escritura (BASE-F97) dice qué registro toca por el número de su factura, como la
 lista de registros y la ficha: reintentar, reenviar, preguntar a la AEAT, subsanar o anular el registro de una factura

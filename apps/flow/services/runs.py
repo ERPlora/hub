@@ -23,7 +23,7 @@ from base.business import business_zone
 from base.recovery import brought_back
 
 from .calls import _dispatcher
-from .engine import _advance, _finish, _log, _own, _start
+from .engine import StepFailed, _advance, _finish, _go_on, _log, _own, _start
 from .writes import DISABLED, _actor
 
 
@@ -79,23 +79,8 @@ def react(ctx: OperationContext, data: ReactIn) -> dict:
             continue
         # What its recipe excludes today counts too, whenever it was built (FLOW-F36).
         wanted = recipes.fixed_filter(flow)
-        if not document.readable(wanted):
-            # Never «does not hold» in silence: the owner reads why in its history.
-            run = _start(
-                ctx,
-                flow,
-                kind=Flow.Trigger.EVENT,
-                key=key,
-                input=data.payload,
-                now=now,
-                event_name=data.event,
-                chain=chain,
-            )
-            started += 1
-            with translation.override(flow.language):
-                _finish(ctx, run, FlowRun.Status.FAILED, now, _own("flow.filter_unreadable"))
-            continue
-        if not document.holds(wanted, {"input": data.payload, "steps": {}}):
+        readable = document.readable(wanted)
+        if readable and not document.holds(wanted, {"input": data.payload, "steps": {}}):
             skipped += 1
             continue
         run = _start(
@@ -110,17 +95,23 @@ def react(ctx: OperationContext, data: ReactIn) -> dict:
         )
         started += 1
         with translation.override(flow.language):
-            if str(flow.id) in chain:
-                _finish(ctx, run, FlowRun.Status.FAILED, now, _own("flow.loop_stopped", "flow.loop"))
-                continue
-            if len(chain) >= document.MAX_CHAIN:
-                too_long = _own(
-                    "flow.loop_stopped", "flow.chain_too_long", count=len(chain) + 1, max=document.MAX_CHAIN
-                )
-                _finish(ctx, run, FlowRun.Status.FAILED, now, too_long)
+            # Never «does not hold» in silence: the owner reads why in its history.
+            failure = _looped(flow, chain) if readable else _own("flow.filter_unreadable")
+            if failure is not None:
+                _finish(ctx, run, FlowRun.Status.FAILED, now, failure)
                 continue
         _advance(ctx, run, flow, now)
     return {"started": started, "skipped": skipped}
+
+
+def _looped(flow: Flow, chain: list[str]) -> StepFailed | None:
+    """Why a run an event started stops before doing anything: ``flow`` is already in the chain of automations that
+    caused the event, or the chain is too long; ``None`` when it goes on."""
+    if str(flow.id) in chain:
+        return _own("flow.loop_stopped", "flow.loop")
+    if len(chain) >= document.MAX_CHAIN:
+        return _own("flow.loop_stopped", "flow.chain_too_long", count=len(chain) + 1, max=document.MAX_CHAIN)
+    return None
 
 
 @operation(
@@ -197,12 +188,7 @@ def resume_due(ctx: OperationContext, data: DueIn) -> dict:
         if waited and waited[-1].get("outcome") == "waiting":
             waited[-1]["outcome"] = "waited"
         run.log = waited
-        run.status = FlowRun.Status.RUNNING
-        run.resume_at = None
-        record_event(
-            ctx, events.RUN_RESUMED, {"id": str(run.id), "flow_id": str(flow.id)}
-        )
-        _advance(ctx, run, flow, now)
+        _go_on(ctx, run, flow, now)
         resumed += 1
     # A call (or a turn of the assistant) whose lease ran out never answered (the process died): it goes again.
     stuck = (

@@ -4,23 +4,13 @@
 // `invoice.invoice.substitute` by the ticket's id, says so, closes and hands the new F3 to the page. A
 // refusal is read inside the window; one of a field, under it.
 import { toastSuccess } from '@erplora/ui/shell';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { defineComponent, h } from 'vue';
 
 import { click, ionValue, mountInvoice, settle } from '../__tests__/mount-invoice';
 import { type Recipient, recipientFrom } from '../lib/recipient';
 import RecipientFields from './RecipientFields.vue';
 import SubstituteModal from './SubstituteModal.vue';
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
-vi.mock('@erplora/ui/shell', async (importOriginal) => ({
-  ...((await importOriginal()) as object),
-  toastSuccess: vi.fn(),
-}));
-beforeEach(() => vi.mocked(toastSuccess).mockClear());
 
 const CustomerSearchStub = defineComponent({ name: 'CustomerSearch', setup: () => () => h('div') });
 const TICKET = { id: 't1', number: 'TICKET-2026-000004' };

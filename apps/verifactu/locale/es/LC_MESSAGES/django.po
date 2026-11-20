@@ -849,15 +849,15 @@ msgstr "Registro no encontrado."
 msgid "Invoice not found."
 msgstr "Factura no encontrada."
 
-#: schemas.py:28
+#: apps/verifactu/schemas/fields.py
 msgid "Say which record: its id or the number of its invoice."
 msgstr "Di qué registro: su id o el número de su factura."
 
-#: schemas.py:29
+#: apps/verifactu/schemas/records.py
 msgid "Say which invoice: its id or its number."
 msgstr "Di qué factura: su id o su número."
 
-#: schemas.py:30
+#: apps/verifactu/schemas/chains.py
 msgid "The fingerprint must be 64 hexadecimal characters."
 msgstr "La huella debe tener 64 caracteres hexadecimales."
 
@@ -1194,7 +1194,7 @@ msgstr "ERPlora no ha admitido el otorgamiento tal como está."
 msgid "ERPlora has not linked this business yet. Try again in a few minutes."
 msgstr "ERPlora todavía no ha vinculado este negocio. Inténtalo en unos minutos."
 
-#: apps/verifactu/schemas.py
+#: apps/verifactu/schemas/own_certificate.py
 msgid "The certificate file has to be 1 MB at most."
 msgstr "El fichero del certificado tiene que ocupar 1 MB como máximo."
 
@@ -1221,14 +1221,6 @@ msgstr ""
 #: apps/verifactu/apps.py
 msgid "Set up VeriFactu"
 msgstr "Configura VeriFactu"
-
-#: apps/verifactu/apps.py
-msgid ""
-"Sign the authorisation for ERPlora to send your invoices to the AEAT, or "
-"upload your business certificate."
-msgstr ""
-"Firma la autorización para que ERPlora envíe tus facturas a la AEAT, o sube "
-"el certificado del negocio."
 
 #: apps/verifactu/apps.py
 msgid "VeriFactu pending"
@@ -1270,51 +1262,51 @@ msgstr ""
 "este negocio no está en España: VeriFactu solo es para negocios de España, "
 "así que no se envía nada a la AEAT"
 
-#: apps/verifactu/schemas.py
+#: apps/verifactu/schemas/aeat_records.py
 msgid "Year"
 msgstr "Año"
 
-#: apps/verifactu/schemas.py
+#: apps/verifactu/schemas/aeat_records.py
 msgid "Month"
 msgstr "Mes"
 
-#: apps/verifactu/schemas.py
+#: apps/verifactu/schemas/own_certificate.py
 msgid "Business certificate (.p12 / .pfx)"
 msgstr "Certificado del negocio (.p12 / .pfx)"
 
-#: apps/verifactu/schemas.py
+#: apps/verifactu/schemas/authorisation.py
 msgid "ID number of the person signing"
 msgstr "NIF/NIE de quien firma"
 
-#: apps/verifactu/schemas.py
+#: apps/verifactu/schemas/authorisation.py
 msgid "Full name of the person signing"
 msgstr "Nombre y apellidos de quien firma"
 
-#: apps/verifactu/schemas.py
+#: apps/verifactu/schemas/authorisation.py
 msgid "Identity document"
 msgstr "Documento de identidad"
 
-#: apps/verifactu/schemas.py
+#: apps/verifactu/schemas/authorisation.py
 msgid "Signed model"
 msgstr "Modelo firmado"
 
-#: apps/verifactu/schemas.py
+#: apps/verifactu/schemas/authorisation.py
 msgid "Copy of the identity document"
 msgstr "Copia del documento de identidad"
 
-#: apps/verifactu/schemas.py
+#: apps/verifactu/schemas/authorisation.py
 msgid "Signature sample"
 msgstr "Muestra de firma"
 
-#: apps/verifactu/schemas.py
+#: apps/verifactu/schemas/authorisation.py
 msgid "Proof of representation"
 msgstr "Justificante de representación"
 
-#: apps/verifactu/schemas.py
+#: apps/verifactu/schemas/own_certificate.py
 msgid "Certificate password"
 msgstr "Contraseña del certificado"
 
-#: apps/verifactu/schemas.py
+#: apps/verifactu/schemas/records.py
 msgid "Invoice number"
 msgstr "Número de factura"
 
@@ -1326,3 +1318,15 @@ msgstr "De momento ERPlora no presenta por cuenta de los negocios: presenta con 
 msgid "To go live, upload your own certificate: ERPlora does not file on behalf of businesses for now."
 msgstr ""
 "Para pasar a producción, sube tu propio certificado: de momento ERPlora no presenta por cuenta de los negocios."
+
+#: erplora_route.py
+msgid ""
+"Sign the authorisation for ERPlora to send your invoices to the AEAT, or "
+"upload your business certificate."
+msgstr ""
+"Firma la autorización para que ERPlora envíe tus facturas a la AEAT, o sube "
+"el certificado del negocio."
+
+#: erplora_route.py
+msgid "Upload your business certificate to send your invoices to the AEAT."
+msgstr "Sube el certificado del negocio para enviar tus facturas a la AEAT."

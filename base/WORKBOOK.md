@@ -343,7 +343,7 @@ En la pantalla Archivos:
 | BASE-F15 | Abrir una app desde Apps | hecho |
 | BASE-F16 | Buscar una app en el catálogo | hecho |
 | BASE-F17 | Saber cuánto cuesta una app antes de tenerla | hecho |
-| BASE-F18 | Instalar una app | hecho |
+| BASE-F18 | Activar una app | hecho |
 | BASE-F19 | Saber qué más viene con una app | hecho |
 | BASE-F20 | Intentar usar una app que necesita suscripción | hecho |
 | BASE-F21 | Ver por qué no se ha podido activar una app y reintentarlo | hecho |
@@ -619,7 +619,7 @@ Entra: los paneles que esta persona puede poner.
 Sale: el tablero elegido, guardado en este navegador: lo comparten las personas que usan este dispositivo
 y no viaja a otro.
 Si falla: un panel guardado cuya app se apagó desaparece del tablero sin aviso. Sin ninguna app que
-ofrezca paneles: «Ninguna app instalada ofrece widgets todavía.».
+ofrezca paneles: «Ninguna app activa ofrece widgets todavía.».
 Implicados: ninguno
 
 ### BASE-F08 Mantener los paneles al día sin recargar
@@ -785,7 +785,7 @@ Pantalla: Apps
 Pasos:
   1. En Apps, pulsa «Añadir apps» (todas las apps de ERPlora) o «De pago» (solo las que se contratan aparte).
   2. Mientras llega: «Cargando el catálogo…». Después, una fila por app con «App», «Categoría», «Descripción»,
-     «Precio», «Viene con» y «Estado» («Instalada» o «Necesita suscripción»), con los nombres y las
+     «Precio», «Viene con» y «Estado» («Activa» o «Necesita suscripción»), con los nombres y las
      descripciones en el idioma de quien mira. Una app que el país del negocio exige lleva «Obligatoria en España» (o
      el país del negocio) junto a su estado, también desactivada: así se ve cuál falta por activar (hub#997).
   3. Busca en «Buscar apps para añadir…» (en «De pago», «Buscar apps de pago…») por nombre, descripción o
@@ -814,7 +814,7 @@ Sale: nada guardado. El hub no cobra ni enseña importes: el precio y la compra 
 Si falla: sin la lista, como en «Mis apps» (BASE-F14).
 Implicados: APPS-F01, APPS-F07
 
-### BASE-F18 Instalar una app
+### BASE-F18 Activar una app
 Estado: hecho
 Actor: administrador
 Pantalla: Apps
@@ -823,7 +823,7 @@ Pasos:
      recargar, en cuanto se contrata en erplora.com (BASE-F20).
   2. En «Añadir apps», quien administra busca una app que el negocio no usa, «Desactivada», y pulsa «Activar». Si
      necesita otras apps que están desactivadas, antes le pregunta nombrándolas (BASE-F19).
-  3. La app pasa a «Instalada» al momento y sale en «Mis apps» y, sin recargar, en el menú de todos los
+  3. La app pasa a «Activa» al momento y sale en «Mis apps» y, sin recargar, en el menú de todos los
      dispositivos del negocio. El contador de arriba suma las apps que se activan y una de las del plan: al activar
      Tareas, de «26 apps activadas · 16 de 20 de tu plan» a «27 apps activadas · 17 de 20 de tu plan»; las que
      llegan con ella suman a las activadas, no a las del plan.
@@ -866,7 +866,7 @@ Pasos:
      suscripción», y no está en «Mis apps» ni en el menú.
   2. Quien administra el negocio, en el navegador, ve a su lado «Mejorar plan», que abre la Tienda de
      erplora.com de este negocio en una pestaña nueva: allí ve el precio y la contrata.
-  3. En cuanto erplora.com se lo dice al hub, la app pasa a «Instalada» y aparece en «Mis apps» y en el menú, sin
+  3. En cuanto erplora.com se lo dice al hub, la app pasa a «Activa» y aparece en «Mis apps» y en el menú, sin
      recargar.
   4. Quien no administra el negocio, y cualquiera en la app instalada, ve «Se contrata en erplora.com, desde tu
      cuenta de ERPlora.» y ningún botón: el hub nunca vende.
@@ -3384,7 +3384,7 @@ Implicados: BASE-F41
   de la plataforma (`FAILED_EVENTS`, urgente, y `PLAN_LIMITS`); `base.bell.counters` los devuelve en el idioma de la
   persona, y un plazo que no es una fecha y hora ISO deja el contador fuera, como un número que no es entero.
   `live.E024` comprueba la gravedad, los textos y que `due` nombre un campo de la respuesta. El esquema vive en
-  `base/schemas/bell.py` y sus tipos en `base/frontend/operations-bell.d.ts`. Tests: `test_bell.py` (también que cada
+  `base/schemas/bell.py` y sus tipos en `base/frontend/operations-bell.ts`. Tests: `test_bell.py` (también que cada
   contador de los módulos dice sus palabras en inglés y en español y que los tipos siguen al esquema),
   `test_queries_home_bell.py` y los de cada app (`test_integration_home.py` de Citas e Impresión, `test_home_hooks.py`
   de WhatsApp).
@@ -4132,9 +4132,7 @@ Implicados: BASE-F41
   mandan contestar el «cómo se hace» solo con lo que devuelve y terminar la respuesta con el `cite` de cada extracto
   usado, al menos uno, tal cual y en su propia línea, y decir que la documentación no lo cubre si no devuelve nada; la
   regla de no inventar un registro sigue. Su pantalla de recibo es `help` («Ayuda»; el chat solo pinta recibos de escrituras). Necesita la
-  puerta de ERPlora/saas#178 desplegada: sin ella contesta 503. Tests: `base/tests/test_queries_docs_search.py`,
-  `test_assistant.py` (catálogo, `ALWAYS`, instrucciones, «Ayuda») y `test_api_assistant.py` (el turno, y que la
-  pasarela se espera fuera de su transacción).
+  puerta de ERPlora/saas#178 desplegada: sin ella contesta 503.
 - Panel: el chat compartido de `@erplora/ui/components` (`packages/ui/src/components/Assistant/`; el SaaS
   monta el mismo con sus herramientas): `AssistantPanel`, `AssistantMessage`, `AssistantMarkdown`,
   `AssistantComposer`, `AssistantConfirm` sobre `ConfirmDialog`, `AssistantReport` sobre `FormModal`, `AssistantEmpty`
@@ -4164,14 +4162,9 @@ Implicados: BASE-F41
   `kind`, la excepción o `no_done`). Nunca lo que la persona dijo, dictó o se le contestó. El 30/10 una producción
   sin proveedores contestaba 503 `assistant.no_model` y `assistant.provider_not_configured` a todo, y el Hub no lo
   decía.
-- Tests: `base/tests/test_assistant.py`, `test_services_assistant.py`, `test_api_assistant.py` y
-  `test_assistant_gateway_log.py` (con la pasarela falsa de `base/tests/fake_gateway.py`); Vitest de `base/frontend/lib/assistant-hub.test.ts`,
-  `components/AssistantSetupEmpty.test.ts`, `SetupChecklist.test.ts`, `ShellChrome.test.ts` y `frontend/main.test.ts`,
-  y los del chat en `packages/ui/src/components/Assistant/*.test.ts` (`pnpm --filter @erplora/ui test`); e2e
-  `tests/e2e/base-assistant.spec.ts` (el panel) y `base-assistant-card.spec.ts`, `base-assistant-card-values.spec.ts`
-  y `base-assistant-card-records.spec.ts` (la tarjeta), con sus ayudantes en `tests/e2e/assistant-panel.ts`, contra un
-  SaaS de verdad con su pasarela y el proveedor falso `tests/e2e/assistant-provider.ts` (un servidor HTTP en 127.0.0.1
-  que habla la API de OpenAI; receta en `tests/e2e/README.md`, «El asistente»): ningún test llega a un proveedor real.
+- Ningún test del asistente llega a un proveedor real: los de Python hablan con una pasarela falsa y los e2e, con un
+  SaaS de verdad y su pasarela, detrás de la cual hay un proveedor falso que habla la API de OpenAI (receta en
+  `tests/e2e/README.md`, «El asistente»).
 - **Resumen propio de una escritura** (hub#693): `ai["summary"]` es un callable
   `(ctx, arguments, fields) -> list[dict]`; `base.assistant.cards.card` lo ejecuta solo con `ctx`, como esa persona y bajo
   `translation.override(language)`, con `fields` ya en ese idioma, y pone exactamente los campos que devuelve. Sin

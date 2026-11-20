@@ -9,7 +9,10 @@ from django.db import connections
 
 from base import auth
 from base.models import Membership
+from base.tests.live_runs import live_runs_ended
 from shared.models import App, AppDoc
+
+__all__ = ["live_runs_ended"]
 
 SECRET = "test-internal-secret"
 ANA = {"user_id": "42", "email": "ana@example.com", "name": "Ana", "locale": "es", "role": "hub_manager"}

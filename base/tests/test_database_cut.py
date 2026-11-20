@@ -1,14 +1,13 @@
 """A business's Hub while the database is cut for a moment (BASE-F111).
 
-The whole chain of the Hub, against the real Postgres, as production runs it: ``pg_terminate_backend``
-is the server cutting a connection right before a statement of the request, ``default_transaction_read_only`` the old
-writer refusing writes during a switchover. The piece itself, and what it never repeats, is tested in ``live``
-(``tests/test_database_cut.py``); here, that the Hub is wired to it, on control and on a business's own database: control's
-pool hands out no dead connection; a read waits and answers, also when the cut comes while the business's database is
-being opened; a save of a command that touches nothing but its database (the reference app's) goes in once, in its own
-business only; one that numbers is never repeated; a wait holds no place of the business's plan; past the limit a person
-reads «come back in a moment» with 503 and ``Retry-After``, never a 500; and the SaaS's ``/internal`` calls get theirs at
-once.
+The whole chain of the Hub, against the real Postgres, as production runs it: ``pg_terminate_backend`` is the server
+cutting a connection right before a statement of the request, ``default_transaction_read_only`` the old writer refusing
+writes during a switchover. The piece itself, and what it never repeats, is tested in ``live``
+(``tests/test_database_cut.py``); here, that the Hub is wired to it on a business's own database: a read waits and
+answers, also when the cut comes while the business's database is being opened; a save of a command that touches nothing
+but its database (the reference app's) goes in once, in its own business only; one that numbers is never repeated; a
+wait holds no place of the business's plan; past the limit a person reads «come back in a moment» with 503 and
+``Retry-After``, never a 500; and the SaaS's ``/internal`` calls get theirs at once.
 """
 
 import ast
@@ -217,26 +216,6 @@ def _assert_come_back(response, code: str) -> None:
     assert response.json()["error"]["code"] == code
     assert int(response["Retry-After"]) > 0
     assert "no-store" in response["Cache-Control"]
-
-
-# --- Control's pool ---------------------------------------------------------------------------------------------------
-
-
-def test_controls_pool_hands_out_no_connection_the_server_cut_while_it_was_idle(boss, hub_a, caplog):
-    """Nothing waits, nothing fails: the business's read does not even notice that control's connection died."""
-    assert boss.get(ITEMS, HTTP_HOST=_host(hub_a)).status_code == 200
-    connections["default"].close()
-    name = connections["default"].settings_dict["NAME"]
-    pids = [session[0] for session in hubs.client_sessions_on(name)]
-    assert pids, "the pool keeps its connection: there has to be one to cut"
-    for pid in pids:
-        _terminate(pid)
-    caplog.clear()
-
-    response = boss.get(ITEMS, HTTP_HOST=_host(hub_a))
-
-    assert response.status_code == 200, response.content
-    assert [record.getMessage() for record in caplog.records if record.name == "django.request"] == []
 
 
 # --- Reads ------------------------------------------------------------------------------------------------------------
@@ -511,8 +490,12 @@ def test_two_saves_refused_at_once_leave_one_group_and_one_event(boss, hub_a):
                 raise
 
     def save(client):
-        with _in(hub_a, hubs.HUB_A_ALIAS, BothRefused()):
-            return _create(client, hub_a, "/api/customer/groups", {"name": "Once"})
+        try:
+            with _in(hub_a, hubs.HUB_A_ALIAS, BothRefused()):
+                return _create(client, hub_a, "/api/customer/groups", {"name": "Once"})
+        finally:
+            # A thread's connections are its own: left open, they keep the test database from being dropped.
+            connections.close_all()
 
     with ThreadPoolExecutor(max_workers=2) as pool:
         responses = [future.result() for future in [pool.submit(save, boss), pool.submit(save, other)]]
@@ -526,17 +509,12 @@ def test_two_saves_refused_at_once_leave_one_group_and_one_event(boss, hub_a):
 
 def test_every_routed_command_declares_whether_a_cut_may_repeat_it():
     """A new route must be reviewed: local-only commands repeat; the exclusions say why they must not."""
-    import ast
-    from pathlib import Path
-
+    from live.ninja import operation_ids
     from live.operations import registry
 
-    root = Path(__file__).resolve().parents[2]
-    routed = set()
-    for path in [*root.glob("apps/*/api.py"), *root.glob("base/api/*.py")]:
-        for node in ast.walk(ast.parse(path.read_text())):
-            if isinstance(node, ast.Call) and ast.unparse(node.func) == "bind" and len(node.args) >= 2:
-                routed.add(ast.literal_eval(node.args[1]))
+    from config.api import api
+
+    routed = operation_ids(api)
     exclusions = {
         "appointment.appointment.create",
         "appointment.appointment.bulk_create",

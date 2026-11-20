@@ -4,17 +4,11 @@
 // owner and the admin save it (`invoice.issuer.update`); a refusal goes under its field; anyone else only
 // looks.
 import { toastSuccess } from '@erplora/ui/shell';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import { click, errorFrame, flush, ionValue, MANAGER, type MountOptions, mountInvoice } from '../__tests__/mount-invoice';
 import type { IssuerOut } from '../operations';
 import IssuerPage from './IssuerPage.vue';
-
-vi.mock('@erplora/ui/shell', async (importOriginal) => ({
-  ...((await importOriginal()) as object),
-  toastSuccess: vi.fn(),
-}));
-beforeEach(() => vi.mocked(toastSuccess).mockClear());
 
 const OP = 'invoice.issuer.get';
 const prop = (el: Element | null, name: string): unknown => (el as unknown as Record<string, unknown>)[name];

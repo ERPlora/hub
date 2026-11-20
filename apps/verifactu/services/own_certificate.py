@@ -15,7 +15,9 @@ from apps.verifactu import certificates, events, trust
 from apps.verifactu.models import Environment, Event, OwnCertificate
 from apps.verifactu.queries.config import config_out
 from apps.verifactu.queries.route import config_row, issuer_configured, issuer_identity, own_certificate
-from apps.verifactu.schemas import CertificateUploadIn, ConfigOut, NoInput
+from apps.verifactu.schemas.config import ConfigOut
+from apps.verifactu.schemas.fields import NoInput
+from apps.verifactu.schemas.own_certificate import CertificateUploadIn
 
 from .sending import _back_in_the_queue, _unsent
 from .writes import CONFIGURE, ISSUER_MISSING, _actor, _event

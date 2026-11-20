@@ -266,7 +266,7 @@ SMOKE_GROUPS = {
     "charging and the cash register": ("sale-pos", "sale-cash-gate", "cash-register-shift", "printing-sale"),
     "the ticket's QR, the invoice and VeriFactu": ("sale-fiscal-qr", "sale-invoice-chain", "invoice-sale",
                                                     "invoice-manual", "verifactu-records"),
-    "the kitchen and the tables": ("kitchen-pos", "sale-table"),
+    "the kitchen and the tables": ("kitchen-pos", "sale-table", "table-floor"),
     "appointments, services and vouchers": ("appointment-agenda", "appointment-charge", "service-catalog",
                                             "service-vouchers", "sale-voucher"),
     "sign-up, apps, the demo and live updates": ("base-sign-up-taxes-on", "base-app-activation", "demo", "two-tabs-live"),

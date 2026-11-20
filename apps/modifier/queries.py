@@ -18,7 +18,7 @@ from live.errors import Conflict, NotFound
 from live.operations import operation
 from psycopg import sql
 
-from apps.inventory.models import Product, ProductCategory, Unit
+from apps.inventory.models import ProductCategory, Unit
 from apps.inventory.queries import (
     categories_standing_for,
     category_names_in_copy,

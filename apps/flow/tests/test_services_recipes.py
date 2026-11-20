@@ -14,6 +14,7 @@
 import pytest
 from live.errors import Conflict, NotFound, PermissionDenied
 from live.models import OutboxEvent
+from pydantic import ValidationError
 
 from apps.flow import recipes
 from apps.flow.models import Flow, FlowRun
@@ -144,9 +145,9 @@ def test_a_recipe_set_aside_is_refused_with_its_reason_and_one_no_app_brings_is_
 def test_a_reference_that_is_not_one_is_refused_by_field():
     from apps.flow.schemas import RecipeRefIn
 
-    with pytest.raises(Exception):
+    with pytest.raises(ValidationError):
         RecipeRefIn.model_validate({"recipe": "appointment"})
-    with pytest.raises(Exception):
+    with pytest.raises(ValidationError):
         RecipeRefIn.model_validate({"recipe": "Appointment/../x"})
 
 

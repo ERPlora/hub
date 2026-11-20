@@ -14,17 +14,15 @@ from ninja.decorators import decorate_view
 
 from apps.verifactu import queries, representation, services
 from base.request_body import accept_body_up_to
-from apps.verifactu.schemas import (
-    AeatQueryIn,
-    AeatRecordListIn,
+from apps.verifactu.schemas.aeat_records import AeatQueryIn, AeatRecordListIn
+from apps.verifactu.schemas.authorisation import RepresentationSubmitIn
+from apps.verifactu.schemas.chains import ChainValidateIn, RecoverFromAeatIn, RecoverManualIn
+from apps.verifactu.schemas.contingency import ContingencyListIn, ContingencyRetryIn
+from apps.verifactu.schemas.events import EventListIn
+from apps.verifactu.schemas.fields import IssuerIn
+from apps.verifactu.schemas.own_certificate import CertificateUploadIn
+from apps.verifactu.schemas.records import (
     ByInvoiceIn,
-    CertificateUploadIn,
-    ChainValidateIn,
-    ContingencyListIn,
-    ContingencyRetryIn,
-    EventListIn,
-    EventsRecentIn,
-    IssuerIn,
     RecordCancelIn,
     RecordCorrectIn,
     RecordCreateIn,
@@ -32,10 +30,8 @@ from apps.verifactu.schemas import (
     RecordListIn,
     RecordReconcileIn,
     RecordTransmitIn,
-    RecoverFromAeatIn,
-    RecoverManualIn,
-    RepresentationSubmitIn,
 )
+from apps.verifactu.schemas.stats import EventsRecentIn
 
 router = Router(tags=["verifactu"])
 

@@ -2,7 +2,7 @@
 // «Route» in a station's row leaves it chosen), a product or a category of the catalogue, searched as the
 // person types, and «Save routing». A refusal (a switched-off station) shows in the dialog.
 import { Combo } from '@erplora/ui/components';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import type { Component } from 'vue';
 
 import { route, station } from '../__tests__/kitchen';
@@ -11,11 +11,6 @@ import RouteFormModal from './RouteFormModal.vue';
 
 /** A prop of a mounted component, whatever its type (a generic component's props read as `never`). */
 const prop = (wrapper: { props: () => unknown }, name: string): unknown => (wrapper.props() as Record<string, unknown>)[name];
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
 
 type Control = HTMLElement & { value?: unknown; disabled?: boolean };
 

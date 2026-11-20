@@ -68,7 +68,7 @@
 331 apps/printing/frontend/operations.d.ts ERPlora/erplora-next#74
 752 apps/printing/queries/__init__.py ERPlora/erplora-next#74
 578 apps/printing/schemas/__init__.py ERPlora/erplora-next#74
-1122 apps/printing/services.py ERPlora/erplora-next#74
+1121 apps/printing/services.py ERPlora/erplora-next#74
 1115 apps/printing/tests/test_services.py ERPlora/erplora-next#74
 390 apps/reservation/frontend/operations.d.ts ERPlora/erplora-next#74
 1034 apps/reservation/queries.py ERPlora/erplora-next#74
@@ -90,7 +90,7 @@
 622 apps/service/models.py ERPlora/erplora-next#74
 2081 apps/service/queries.py ERPlora/erplora-next#74
 1446 apps/service/schemas/__init__.py ERPlora/erplora-next#74
-1970 apps/service/services/__init__.py ERPlora/erplora-next#74
+1969 apps/service/services/__init__.py ERPlora/erplora-next#74
 1238 apps/service/tests/test_queries.py ERPlora/erplora-next#74
 1602 apps/service/tests/test_recovery.py ERPlora/erplora-next#74
 1095 apps/service/tests/test_services.py ERPlora/erplora-next#74
@@ -117,7 +117,6 @@
 588 apps/verifactu/envelope.py ERPlora/erplora-next#74
 401 apps/verifactu/frontend/operations.d.ts ERPlora/erplora-next#74
 747 apps/verifactu/models.py ERPlora/erplora-next#74
-840 apps/verifactu/schemas.py ERPlora/erplora-next#74
 1980 apps/verifactu/tests/test_services.py ERPlora/erplora-next#74
 576 apps/website/queries.py ERPlora/erplora-next#74
 558 apps/whatsapp_inbox/frontend/components/TemplateFormModal.test.ts ERPlora/erplora-next#74
@@ -136,7 +135,7 @@
 550 base/frontend/lib/system-back.test.ts ERPlora/erplora-next#74
 616 base/frontend/pages/FilesPage.test.ts ERPlora/erplora-next#74
 742 base/home.py ERPlora/erplora-next#74
-512 base/internal.py ERPlora/erplora-next#74
+510 base/internal.py ERPlora/erplora-next#74
 539 base/middleware.py ERPlora/erplora-next#74
 693 base/models.py ERPlora/erplora-next#74
 508 base/tenancy/bootstrap.py ERPlora/erplora-next#74

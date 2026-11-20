@@ -20,6 +20,7 @@ import { QA_STAFF_EMAIL, redact } from '../assistant-battery';
 import { type BenchMeta, type BenchReport, hubRunMeta, parseUsage, USAGE_SQL } from '../assistant-bench';
 import { type AttachedFile, attachmentFile, renderWith } from '../assistant-fixtures';
 import { goldenCommand, parseStepResults, runSteps, type StepsRun } from '../assistant-golden';
+import { ownName, renameSql, runBusinessName } from '../assistant-run-name';
 import { askOwner, type Exchange, ownerChoice, type OwnerDeps } from '../assistant-owner';
 import { openPanelAtHome } from '../assistant-panel';
 import { notRunnable, offeredTurnCommand, openingContent, parseOfferedTurn, SENT_SQL } from '../assistant-precheck';
@@ -50,6 +51,7 @@ const SCENARIOS = loadedScenarios(FILES.map((path) => ({ source: relative(HUB_DI
 const ORDER = SCENARIOS.map((scenario) => scenario.id);
 let business = '';
 /** `a`'s own database, the one every scenario starts from a copy of. */
+const businessName = (): string => psql("select name from base_hub where slug = 'a'");
 const businessDb = (): string => (business ||= psql("select db_name from base_hub where slug = 'a'"));
 
 type Checks = { expect: CheckResult[]; forbidden: CheckResult[] };
@@ -231,9 +233,12 @@ test.beforeAll(async ({ browser }) => {
   // A copy left by a run that never reached its afterAll is the clean business: `a` goes back to it, not the reverse.
   if (hasCopy()) putBack();
   else onServer(snapshotStatements(businessDb()), REPO_DIR);
+  // A name of its own for this run, so a provider's prompt cache never carries one run into the next (assistant-run-name.ts).
+  psql(renameSql(runBusinessName(businessName(), RUN)));
 });
 
 test.afterAll(() => {
+  psql(renameSql(ownName(businessName())));
   if (hasCopy()) onServer([...restoreStatements(businessDb()), ...dropCopyStatements(businessDb())], REPO_DIR);
   if (REAL) cleanUpRealProviders([QA_STAFF_EMAIL]);
 });

@@ -2,8 +2,9 @@
 
 pre-push runs the machine's global pre-push first, with the same arguments and input, and then
 ``scripts/checks.sh fast`` on every pushed commit, checked out in a temporary worktree with the Python environment of
-the checkout that pushes. A red check stops the push. commit-msg, pre-commit and applypatch-msg hand over to the global
-hook of their name, which a repository's core.hooksPath would otherwise hide.
+the checkout that pushes, which also lends its node_modules and submodules. A red check stops the push. commit-msg,
+pre-commit and applypatch-msg hand over to the global hook of their name, which a repository's core.hooksPath would
+otherwise hide.
 
 Each test pushes from a throwaway repository, with these hooks and a stand-in for the command that records where and
 how it ran and exits with the code its commit carries in ``verdict``.
@@ -22,6 +23,7 @@ ZERO = "0" * 40
 STAND_IN = """#!/usr/bin/env bash
 printf '%s|%s|%s\\n' "$*" "$PWD" "${UV_PROJECT_ENVIRONMENT:-}" >> "$CHECKS_LOG"
 git rev-parse HEAD >> "$CHECKS_LOG.heads"
+printf '%s\n' "${CHECKS_DEPENDENCIES_FROM:-}" >> "$CHECKS_LOG.dependencies"
 exit "$(cat verdict)"
 """
 RECORDER = """#!/usr/bin/env bash
@@ -43,7 +45,7 @@ class Sandbox:
         self.env = {
             key: value
             for key, value in os.environ.items()
-            if not key.startswith("GIT_") and key != "UV_PROJECT_ENVIRONMENT"
+            if not key.startswith("GIT_") and key not in {"UV_PROJECT_ENVIRONMENT", "CHECKS_DEPENDENCIES_FROM"}
         }
         self.env.update(
             HOME=str(root),
@@ -191,6 +193,13 @@ def test_the_checks_use_the_python_environment_of_the_checkout_that_pushes(sandb
     sandbox.commit(verdict=0)
     assert sandbox.push("main").returncode == 0
     assert [Path(environment) for _, _, environment in sandbox.checks()] == [sandbox.work / folder]
+
+
+def test_the_checks_borrow_node_modules_and_the_submodules_of_the_checkout_that_pushes(sandbox):
+    sandbox.commit(verdict=0)
+    assert sandbox.push("main").returncode == 0
+    lenders = Path(f"{sandbox.checks_log}.dependencies").read_text(encoding="utf-8").splitlines()
+    assert [Path(lender) for lender in lenders] == [sandbox.work]
 
 
 def test_without_that_environment_the_push_stops_and_none_is_created(sandbox):

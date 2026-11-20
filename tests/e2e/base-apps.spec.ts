@@ -124,14 +124,14 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
 
     // Every app in every plan: nothing is sold apart, so there is no «Paid» tab and «Add apps»
     // has no «Price» (it would say «Free» on every row), neither in the table nor in the phone's cards; «Comes with»
-    // still names what an app brings (BASE-F19). The demo is «Installed» in the catalogue.
+    // still names what an app brings (BASE-F19). The demo is «Active» in the catalogue.
     const labels = shown(page).locator('[role="columnheader"], .data-table__card-meta-label');
     await expect(labels.filter({ hasText: /^Category$/ }).first()).toHaveText('Category');
     await expect(labels.filter({ hasText: /^Price$/ })).toHaveCount(0);
     await expect(shown(page).locator('[data-testid="apps-price"]')).toHaveCount(0);
     await expect(testid(page, 'tab-all')).toBeVisible();
     await expect(testid(page, 'tab-paid')).toHaveCount(0);
-    await expect(appRow(page, 'demo').locator('[data-testid="apps-state"]')).toContainText('Installed');
+    await expect(appRow(page, 'demo').locator('[data-testid="apps-state"]')).toContainText('Active');
     await snap(page, 'BASE-G70', width);
     // An old link to «Paid» (`#paid`) opens «Add apps», where whatever was sold apart would be.
     await page.goto(`${A}/apps#paid`);

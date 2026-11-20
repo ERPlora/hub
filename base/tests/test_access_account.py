@@ -12,7 +12,6 @@ there, inside its context.
 import datetime as dt
 from urllib.parse import parse_qs, urlsplit
 
-import pytest
 from django.test import Client
 from django.utils import timezone
 

@@ -7,7 +7,9 @@ from live.operations import operation
 
 from apps.verifactu import erplora_route, gateway, producer
 from apps.verifactu.models import Config, Environment, Record
-from apps.verifactu.schemas import CertificateOut, ConfigOut, NoInput
+from apps.verifactu.schemas.config import ConfigOut
+from apps.verifactu.schemas.fields import NoInput
+from apps.verifactu.schemas.own_certificate import CertificateOut
 
 from .authorisation import representation_out
 from .reads import VIEW

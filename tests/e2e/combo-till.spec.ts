@@ -19,6 +19,7 @@ import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
 import { A, api, capture, horizontalOverflow, HUB_DIR, login, psql, shown, untilStill } from './helpers';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
+import { chargeByCard } from './sale-charge-helpers';
 import { cleanSales, drawerOff, expectFirstTile, restoreDrawer, stamp, tillGrid } from './sale-helpers';
 import { toastSaying } from './toast-helpers';
 
@@ -118,17 +119,6 @@ async function offer(context: BrowserContext, id: string): Promise<Record<string
 }
 
 const lineOf = (page: Page, name: string) => shown(page).locator('[data-testid^=pos-line-]').filter({ hasText: name }).first();
-
-async function chargeByCard(page: Page): Promise<ReturnType<Page['locator']>> {
-  await shown(page).locator('[data-testid=pos-charge]').click();
-  const checkout = page.locator('[data-testid=sale-checkout-modal]');
-  await checkout.locator(`[data-testid=sale-checkout-method-${card}]`).click();
-  await checkout.locator('[data-testid=sale-checkout-confirm]').click();
-  await expect(checkout).toBeHidden();
-  const receipt = page.locator('[data-testid=sale-document-modal] [data-testid=sale-receipt]');
-  await expect(receipt).toBeVisible();
-  return receipt;
-}
 
 test.describe.configure({ mode: 'serial' });
 
@@ -239,7 +229,7 @@ test('COMBO-F07, COMBO-F08: the menu goes first in «All», its sheet asks every
   await expect(line).toContainText(products.LEN.name);
   await expect(line).toContainText(/16[.,]50/);
 
-  const receipt = await chargeByCard(page);
+  const receipt = await chargeByCard(page, card);
   await expect(receipt.locator('[data-testid=sale-receipt-line]').filter({ hasText: MENU })).toContainText(/16[.,]50/);
   const dishes = receipt.locator('[data-testid=sale-receipt-dish]');
   await expect(dishes).toHaveCount(3);
@@ -262,7 +252,7 @@ test('COMBO-F09: a pack to take away is split per dish on the receipt, each at i
   await sheet.locator('[data-testid=pos-menu-add]').click();
   await expect(sheet).toBeHidden();
 
-  const receipt = await chargeByCard(page);
+  const receipt = await chargeByCard(page, card);
   await expect(receipt.locator('[data-testid=sale-receipt-menu-head]')).toHaveText(PACK);
   const lines = receipt.locator('[data-testid=sale-receipt-line]');
   await expect(lines.filter({ hasText: products.SAN.name })).toContainText(/4[.,]15/);
