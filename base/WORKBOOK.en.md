@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:02773e56ba289be8126c7f66ec262507feb10564ff78f7c5c20eafd1a42ce776 -->
+<!-- generated from WORKBOOK.md sha256:9c69ae25574f82633127d38a24858407e29db7c0f3f75af4afe5e2afa8676cff -->
 
 ## What it is for and who it is for
 
@@ -2393,6 +2393,11 @@ Steps:
      stops it. If ERPlora has its own voices turned on (not today), the panel's header lets the person choose between
      the two for the screen's language (the first one, until another is chosen; the device remembers the choice) and
      the "Device voice".
+  9. If they ask for something done with the business's data ("raise the drinks by 5 %", "add the tonic water at
+     €2.50"), the assistant does it with the same actions that person has on the screens of their apps, and what
+     changes something with the confirmation of BASE-F97. If the one it needs is not among those it has at hand for
+     that message, it searches all of that person's for it and uses it in the next step; only when there is none does
+     it say on which screen it is done.
 In: what the person writes; the whole conversation travels with each question (BASE-F102).
 Out: the question to erplora.com, which answers it and counts it in the month's messages (BASE-F104).
 If it fails: without a connection, with the service down, without a plan or without messages: BASE-F106 and BASE-F104.

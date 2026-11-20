@@ -868,8 +868,8 @@ agenda tuya que enseñar.».
   crea por `appointment.appointment.create`. La clienta se casa por la regla de
   Clientes (`customer.queries.card_in_business`: la misma ficha, aquella en la que se unió o la que se volvió a crear;
   la plataforma recupera las apps en el orden de sus `requires`, así que Clientes va antes). Cada servicio, por la regla
-  de Servicios (hub#1341): `appointments_in_copy` lleva en cada cita la lista ENTERA de `service.queries.services_in_copy`
-  (leída una vez, la misma en todas) y `appointments_not_in_business` la pasa a `service.queries.services_in_business`,
+  de Servicios (hub#1341): `appointments_in_copy` lleva en cada cita la lista ENTERA de `service.queries.recovery.services_in_copy`
+  (leída una vez, la misma en todas) y `appointments_not_in_business` la pasa a `service.queries.recovery.services_in_business`,
   nunca solo los servicios de las citas (los nombres no son únicos: un servicio que la copia también tenía nunca es el
   perdido hecho otra vez); el mismo, o el que se volvió a crear, a mano o recuperado antes por Servicios (que va antes,
   por los `requires`); sin pareja, el de la copia, que la reserva rechaza (`service.service_not_found`). El profesional,

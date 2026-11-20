@@ -1,7 +1,9 @@
-"""What the assistant used this month (``base.assistant.usage``) and the search in the help docs (``base.docs.search``)."""
+"""What the assistant used this month (``base.assistant.usage``), the search of the tools a turn did not offer
+(``base.assistant.find_tools``) and the search in the help docs (``base.docs.search``)."""
 
 from django.utils import translation
 from django.utils.translation import gettext, pgettext
+from live import assistant as shared
 from live.context import OperationContext
 from live.errors import OperationError
 from live.operations import AI, operation
@@ -9,7 +11,14 @@ from pydantic import ValidationError
 
 from base import assistant
 from base.permissions import VIEW_HOME
-from base.schemas.assistant import AssistantUsageIn, AssistantUsageOut, DocsSearchIn, DocsSearchOut
+from base.schemas.assistant import (
+    AssistantUsageIn,
+    AssistantUsageOut,
+    DocsSearchIn,
+    DocsSearchOut,
+    FindToolsIn,
+    FindToolsOut,
+)
 
 
 # ── Assistant ───────────────────────────────────────────────────────────────────────────────────────────────────
@@ -40,6 +49,32 @@ def assistant_usage(ctx: OperationContext, data: AssistantUsageIn) -> dict:
         "resets_at": usage.get("resets_at"),
         "demo": bool(usage.get("demo")),
     }
+
+
+@operation(
+    "base.assistant.find_tools",
+    kind="query",
+    permission=VIEW_HOME,
+    input=FindToolsIn,
+    output=FindToolsOut,
+    ai=AI(
+        description=(
+            "Finds the tools for a task when none of the tools you were given does it: describe the task in a few "
+            "words («list the products of a category», «create a product», «change an employee's schedule»). Returns "
+            f"up to {assistant.relevance.FOUND} tools, best first, with what each does; from your next step you can "
+            "call them. Search before you say that something cannot be done here; if none fits, search again in other "
+            "words."
+        ),
+        asks={
+            "en": ("what else can you do with the stock?", "can you also change the staff's schedules?"),
+            "es": ("¿qué más puedes hacer con el inventario?", "¿también puedes cambiar los horarios del personal?"),
+        },
+    ),
+)
+def find_tools(ctx: OperationContext, data: FindToolsIn) -> dict:
+    """The tools of the person's catalogue that do the task ``data.query`` describes: none they may not use."""
+    found = assistant.relevance.found(assistant.tools.catalog(ctx), data.query, ctx.language)
+    return {"tools": [{"name": shared.tool_name(op.name), "description": shared.description(op)} for op in found]}
 
 
 @operation(
@@ -90,3 +125,4 @@ def docs_search(ctx: OperationContext, data: DocsSearchIn) -> DocsSearchOut:
             for excerpt in found.results
         ]
     )
+

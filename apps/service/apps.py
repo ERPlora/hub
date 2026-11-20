@@ -140,10 +140,10 @@ class ServiceConfig(LiveAppConfig):
     def recoverable_from_copy(self) -> list:
         """The platform asks (``base.tenancy.recovery``) what a separate copy of the business gives back when the staff
         recovers from it (BASE-F114), in this order: first the categories the business lacks
-        (``queries.categories_in_copy``, ``queries.categories_not_in_business``), each made again by
+        (``queries.recovery.categories_in_copy``, ``queries.recovery.categories_not_in_business``), each made again by
         ``service.category.recover``: created by ``service.category.create``, the screen's own, parents first;
         then the services the copy offers and the business
-        lacks (``queries.recoverable_services_in_copy``, ``queries.services_not_in_business``), each made again by
+        lacks (``queries.recovery.recoverable_services_in_copy``, ``queries.recovery.services_not_in_business``), each made again by
         ``service.service.recover``: created by ``service.service.create``, the screen's own, in its category (the same
         one, or the one brought back just before with its name), and assigned to each professional who performed it
         there and the business still has, by ``service.assignment.assign``, the screen's own too; last, what a category
@@ -156,29 +156,29 @@ class ServiceConfig(LiveAppConfig):
             Recoverable(
                 label=_("Service categories"),
                 reads_since="0001_initial",
-                read=queries.categories_in_copy,
-                missing=queries.categories_not_in_business,
+                read=queries.recovery.categories_in_copy,
+                missing=queries.recovery.categories_not_in_business,
                 create="service.category.recover",
             ),
             Recoverable(
                 label=self.verbose_name,
                 reads_since="0003_service_image",
-                read=queries.recoverable_services_in_copy,
-                missing=queries.services_not_in_business,
+                read=queries.recovery.recoverable_services_in_copy,
+                missing=queries.recovery.services_not_in_business,
                 create="service.service.recover",
             ),
             Recoverable(
                 label=_("Service links to categories"),
                 reads_since="0001_initial",
-                read=queries.categories_in_copy,
-                missing=queries.service_links_not_in_business,
+                read=queries.recovery.categories_in_copy,
+                missing=queries.recovery.service_links_not_in_business,
                 create="service.service.return_to_category",
             ),
             Recoverable(
                 label=_("Subcategory links to categories"),
                 reads_since="0001_initial",
-                read=queries.categories_in_copy,
-                missing=queries.subcategory_links_not_in_business,
+                read=queries.recovery.categories_in_copy,
+                missing=queries.recovery.subcategory_links_not_in_business,
                 create="service.category.return_to_parent",
             ),
         ]
