@@ -53,19 +53,25 @@ export function parseSetup(text: string, source: string): SetupStep[] {
 export const madridToday = (now: Date): string =>
   new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Madrid', year: 'numeric', month: '2-digit', day: '2-digit' }).format(now);
 
-function shifted(today: string, days: number): string {
+/** `today` (YYYY-MM-DD) moved by `days`. */
+export function shifted(today: string, days: number): string {
   const day = new Date(`${today}T00:00:00Z`);
   day.setUTCDate(day.getUTCDate() + days);
   return day.toISOString().slice(0, 10);
 }
 
-function dated(value: unknown, today: string): unknown {
-  if (value === '{year}') return Number(today.slice(0, 4));
-  if (typeof value === 'string') return value.replace(/\{today([+-]\d+)?\}/g, (_, days?: string) => shifted(today, Number(days ?? 0)));
-  if (Array.isArray(value)) return value.map((item) => dated(item, today));
-  if (isObject(value)) return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, dated(item, today)]));
+/** `value` with `change` applied to every text inside it, at any depth. */
+export function mapStrings(value: unknown, change: (text: string) => unknown): unknown {
+  if (typeof value === 'string') return change(value);
+  if (Array.isArray(value)) return value.map((item) => mapStrings(item, change));
+  if (isObject(value)) return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, mapStrings(item, change)]));
   return value;
 }
+
+const dated = (value: unknown, today: string): unknown =>
+  mapStrings(value, (text) =>
+    text === '{year}' ? Number(today.slice(0, 4)) : text.replace(/\{today([+-]\d+)?\}/g, (_, days?: string) => shifted(today, Number(days ?? 0))),
+  );
 
 /** The steps with `{today}`, `{today+N}`, `{today-N}` and `{year}` written as the day of the run. */
 export function withDates(steps: SetupStep[], today: string): SetupStep[] {
@@ -155,11 +161,17 @@ for step in steps:
 print(json.dumps(results))
 `;
 
-/** How the setup runs from the Hub's checkout, its steps (dated) in `file`. */
-export function setupCommand(file: string, env: Record<string, string | undefined>): { file: string; args: string[]; env: Record<string, string> } {
+export type ShellCommand = { file: string; args: string[]; env: Record<string, string> };
+
+/** How `script` runs in the Hub's shell on `a`, from its checkout: `env` without its unset variables, `extra` on top. */
+export function hubShellCommand(script: string, env: Record<string, string | undefined>, extra: Record<string, string>): ShellCommand {
   const base = Object.fromEntries(Object.entries(env).filter((entry): entry is [string, string] => entry[1] !== undefined));
-  return { file: 'uv', args: ['run', 'python', 'manage.py', 'shell', '--hub', 'a', '-c', SETUP_PY], env: { ...base, QA_SETUP_FILE: file } };
+  return { file: 'uv', args: ['run', 'python', 'manage.py', 'shell', '--hub', 'a', '-c', script], env: { ...base, ...extra } };
 }
+
+/** How the setup runs from the Hub's checkout, its steps (dated) in `file`. */
+export const setupCommand = (file: string, env: Record<string, string | undefined>): ShellCommand =>
+  hubShellCommand(SETUP_PY, env, { QA_SETUP_FILE: file });
 
 /** What each step answered, from the shell's output (its last line). */
 export function parseSetupRun(output: string): StepResult[] {

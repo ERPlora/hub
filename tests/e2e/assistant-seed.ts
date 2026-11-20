@@ -30,6 +30,8 @@ export interface AnswerChoice {
   priceOut: number | null;
   /** OpenAI's model in reserve, or null: a model under test answers alone. */
   fallback: string | null;
+  /** Whether it sees images (`AIModel.supports_vision`): only when QA_ANSWER_VISION=1 says so. */
+  vision: boolean;
 }
 
 const PRODUCTION: AnswerChoice = {
@@ -42,6 +44,7 @@ const PRODUCTION: AnswerChoice = {
   priceIn: null,
   priceOut: null,
   fallback: FALLBACK_MODEL,
+  vision: false,
 };
 
 const given = (env: Env, name: string): string => env[name]?.trim() ?? '';
@@ -52,6 +55,12 @@ function price(env: Env, name: string): number {
     throw new Error(`${name} is a price in USD per million tokens, 0 or more (tests/e2e/README.md).`);
   }
   return value;
+}
+
+function vision(env: Env): boolean {
+  const value = given(env, 'QA_ANSWER_VISION');
+  if (value && value !== '1' && value !== '0') throw new Error('QA_ANSWER_VISION is 1 or 0: whether the model under test sees images.');
+  return value === '1';
 }
 
 /** The model that answers the run, from the QA_ANSWER_* variables (tests/e2e/README.md, «Comparar modelos»). */
@@ -78,6 +87,7 @@ export function answerChoice(env: Env): AnswerChoice {
     priceIn: price(env, 'QA_ANSWER_PRICE_IN'),
     priceOut: price(env, 'QA_ANSWER_PRICE_OUT'),
     fallback: null,
+    vision: vision(env),
   };
 }
 
@@ -136,6 +146,7 @@ prices = {"price_input_per_1m": os.environ["QA_SEED_PRICE_IN"], "price_output_pe
 prices = {field: Decimal(value) for field, value in prices.items() if value}
 if prices:
     AIModel.objects.filter(pk=answer.pk).update(**prices)
+AIModel.objects.filter(pk=answer.pk).update(supports_vision=os.environ["QA_SEED_VISION"] == "1")
 openai = AIProvider.objects.get(slug="openai")
 fallback = chosen(openai, os.environ["QA_SEED_FALLBACK_MODEL"]) if os.environ["QA_SEED_FALLBACK_MODEL"] else None
 services.policy_update(ctx, PolicyIn(active_model=answer.pk, fallback_model=fallback.pk if fallback else None))
@@ -172,6 +183,7 @@ export function seedCommand(env: Env, saasDatabase: string): { file: string; arg
       QA_SEED_PRICE_IN: asText(choice.priceIn),
       QA_SEED_PRICE_OUT: asText(choice.priceOut),
       QA_SEED_FALLBACK_MODEL: choice.fallback ?? '',
+      QA_SEED_VISION: choice.vision ? '1' : '0',
     },
   };
 }
