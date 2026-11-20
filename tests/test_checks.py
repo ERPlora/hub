@@ -19,6 +19,9 @@ from pathlib import Path
 import pytest
 
 REPO = Path(__file__).resolve().parent.parent
+#: The checkout with the node_modules and packages/ui the frontend checks borrow: this one, or the one that lends them
+#: to the hook's worktree when these tests run there.
+LENDER = Path(os.environ.get("CHECKS_DEPENDENCIES_FROM") or REPO)
 COMMAND = "scripts/checks.sh"
 HELPERS = ("scripts/checks.py",)
 KNOTTY = "".join(
@@ -148,14 +151,14 @@ def test_fast_runs_the_touched_tests_and_those_of_each_touched_module_on_a_datab
 
 
 @pytest.mark.skipif(
-    not (REPO / "node_modules").is_dir() or not (REPO / "packages/ui/package.json").is_file(),
+    not (LENDER / "node_modules").is_dir() or not (LENDER / "packages/ui/package.json").is_file(),
     reason="needs this checkout's node_modules and packages/ui (pnpm install, git submodule update --init)",
 )
 def test_fast_runs_eslint_the_typecheck_and_the_related_vitest_tests_of_the_touched_frontend_files(head_tree):
     commit(head_tree, {PROBE_TS: "export const answer = 42;\n", "apps/demo/frontend/probe.test.ts": PROBE_TS_TEST})
     (head_tree / PROBE_TS).write_text(BROKEN_TS, encoding="utf-8")
     (head_tree / "apps/demo/unused.py").write_text(BREAKS["apps/demo/unused.py"], encoding="utf-8")
-    done = checks(head_tree, "fast", "HEAD", CHECKS_DEPENDENCIES_FROM=str(REPO))
+    done = checks(head_tree, "fast", "HEAD", CHECKS_DEPENDENCIES_FROM=str(LENDER))
     output = done.stdout + done.stderr
     assert done.returncode == 1, output[-6000:]
     reports = {
