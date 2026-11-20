@@ -18,7 +18,9 @@ from live.outbox import record_event
 
 from apps.service import events
 from apps.service.models import Grant
-from apps.service.queries import SALES_UNAVAILABLE, balance, find_grant, load_grant, lock_grant, redeem_refusal
+from apps.service.queries.grant_checks import redeem_refusal
+from apps.service.queries.grants import balance, find_grant, load_grant, lock_grant
+from apps.service.queries.records import SALES_UNAVAILABLE
 from apps.service.schemas import GrantOut
 from apps.service.schemas.grant_sales import GrantSaleIn
 from base.operations import call
@@ -27,7 +29,7 @@ VOUCHER_SOLD = "sale.sale.voucher_sold"
 
 GRANT_ALREADY_SOLD = _("That voucher already says the sale that charged it.")
 GRANT_GIVEN_AWAY = _("That voucher was given away: no sale charged it.")
-#: Why a voucher with no session left to count says no sale (``queries.redeem_refusal``) → its code and its message.
+#: Why a voucher with no session left to count says no sale (``queries.grant_checks.redeem_refusal``) → its code and its message.
 NOTHING_LEFT_TO_COUNT = {
     "voided": ("service.grant_voided", _("This voucher was voided: it can no longer be used.")),
     "expired": (

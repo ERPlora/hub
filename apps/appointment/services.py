@@ -120,7 +120,7 @@ from apps.customer.phones import InvalidPhone, to_e164
 from apps.customer.queries import business_country, find_customer
 from apps.customer.services import lock_customers
 from apps.service.models import Service
-from apps.service.queries import needs_tax_setup
+from apps.service.queries.catalog import needs_tax_setup
 from apps.staff.models import Member
 from apps.staff.queries import resolve_member
 

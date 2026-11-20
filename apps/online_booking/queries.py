@@ -55,7 +55,7 @@ from apps.online_booking.schemas import (
     TokenIn,
 )
 from apps.service.models import Service
-from apps.service.queries import current_settings as service_settings
+from apps.service.queries.settings import current_settings as service_settings
 from apps.staff.models import Member
 from apps.staff.queries import resolve_member
 from base.ordering import list_order

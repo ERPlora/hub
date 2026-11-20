@@ -1175,7 +1175,7 @@ Los papeles llegan del SaaS con prefijo (`hub_owner`, `hub_admin`, `hub_manager`
   lista y con los vacíos al final en las dos: la descendente es la ascendente leída al revés, empates incluidos. Lo fija
   `test_ties_read_backwards_in_a_descending_list`, por lista.
 - Anatomía completa de una app (copia de `apps/tax`): `apps.py`, `models.py`, `migrations/`,
-  `schemas/`, `queries.py`, `services/`, `events.py`, `live.py`, `api.py`, `admin.py`, `locale/`,
+  `schemas/`, `queries/`, `services/`, `events.py`, `live.py`, `api.py`, `admin.py`, `locale/`,
   `frontend/` y un `tests/test_<fichero>.py` por fichero, más `tests/test_integration_tax.py`,
   `test_integration_staff.py`, `test_integration_customer.py` (con las apps reales, sin dobles),
   `test_relay.py` (los avisos de Clientes y Personal por el relay real del worker, con dos hubs) y
@@ -1210,12 +1210,12 @@ Los papeles llegan del SaaS con prefijo (`hub_owner`, `hub_admin`, `hub_manager`
 - **Recuperar desde una copia aparte** (BASE-F114, hub#1283, hub#1322, hub#1323, hub#1364): `apps.py` responde a la
   plataforma (`recoverable_from_copy`, `base.tenancy.recovery`) con lo que devuelve una copia aparte del negocio, en
   cuatro declaraciones que se devuelven en su orden. Primero sus categorías vivas que el negocio no tiene
-  (`queries.categories_not_in_business`: eliminadas o perdidas, y no hechas otra vez, es decir, sin otra viva con su
+  (`queries.recovery.categories_not_in_business`: eliminadas o perdidas, y no hechas otra vez, es decir, sin otra viva con su
   nombre sin distinguir mayúsculas ni espacios, que es único entre las vivas), cada una hecha otra vez por
   `service.category.recover` (solo el sistema, sin ruta ni herramienta del asistente), padres primero: creada por
   `service.category.create` dentro de su padre por su id si el negocio lo tiene (el mismo o hecho otra vez), por su
   nombre si vuelve también (se acaba de crear y aquí aún no tiene id), y en la raíz si la copia no lo tenía vivo; y con
-  lo que tenía dentro en la copia (`service_ids` de `queries.categories_in_copy`, archivados también, y sus
+  lo que tenía dentro en la copia (`service_ids` de `queries.recovery.categories_in_copy`, archivados también, y sus
   subcategorías vivas, `subcategory_ids`) que el negocio conserva con el mismo id donde lo dejó eliminarla
   (SERVICE-F08): el servicio sin categoría y la subcategoría colgando de donde colgaba la eliminada (`stands_for`, la
   fila eliminada que el negocio guarda con el id de la copia; la raíz si ya no la tiene: el «Eliminar» del admin de
@@ -1224,8 +1224,8 @@ Los papeles llegan del SaaS con prefijo (`hub_owner`, `hub_admin`, `hub_manager`
   subcategorías (`left_out`: `service.service_moved`, `service.subcategory_moved`, `service.subcategory_loop`), que
   Recuperaciones anota en la categoría. Lo demás vuelve a ella al final, en las dos últimas declaraciones, que
   Recuperaciones cuenta aparte (hub#1462): cada servicio por `service.service.return_to_category`
-  (`queries.service_links_not_in_business`) y cada subcategoría por `service.category.return_to_parent`
-  (`queries.subcategory_links_not_in_business`), solo el sistema; cogen primero la categoría (o el árbol, `lock_tree`)
+  (`queries.recovery.service_links_not_in_business`) y cada subcategoría por `service.category.return_to_parent`
+  (`queries.recovery.subcategory_links_not_in_business`), solo el sistema; cogen primero la categoría (o el árbol, `lock_tree`)
   y después la fila, y la cambian como la pantalla, con su `service.service.updated` o `service.category.updated`. Solo
   se rellena la categoría que trajo la recuperación en marcha (su `created_by` es el actor de esa recuperación; si no,
   `service.category_brought_earlier`): una que el negocio conserva o rehízo a mano, o la que trajo una recuperación
@@ -1233,9 +1233,9 @@ Los papeles llegan del SaaS con prefijo (`hub_owner`, `hub_admin`, `hub_manager`
   toca mientras esa misma recuperación sigue en marcha (`base.recovery.at_work`, hub#1494) sí se lee, y su enlace lo
   rechaza (`service.service_changed`, `service.subcategory_changed`, también si lo cambia entre la lectura y su enlace)
   para que Recuperaciones lo cuente «sin crear» con su porqué, igual que lo que mueve mientras tanto
-  (`service.service_moved`, `service.subcategory_moved`, `service.subcategory_loop`). `queries.categories_in_copy`
+  (`service.service_moved`, `service.subcategory_moved`, `service.subcategory_loop`). `queries.recovery.categories_in_copy`
   las lee por SQL. Después sus servicios en oferta que el negocio no tiene
-  (`queries.services_not_in_business`), cada uno hecho otra vez por `service.service.recover` (solo el sistema, sin
+  (`queries.recovery.services_not_in_business`), cada uno hecho otra vez por `service.service.recover` (solo el sistema, sin
   ruta ni herramienta del asistente), todo o nada: el servicio, por `service.service.create` con la clave de su
   categoría fiscal y su categoría aquí (`_category_held`): la misma si sigue viva, si no la viva con su nombre en la
   copia (la que acaba de volver o una hecha a mano), si no ninguna; su imagen de la copia (`ServiceRecoverIn.image`,
@@ -1247,9 +1247,9 @@ Los papeles llegan del SaaS con prefijo (`hub_owner`, `hub_admin`, `hub_manager`
   con sus minutos y su precio propios, principal solo si el negocio no le ha dado otro servicio principal desde
   entonces, y apagado por `service.assignment.update` si lo estaba. Va en la misma operación, y no en una declaración
   más, para que solo se asigne en los servicios que vuelven: en uno que el negocio conserva o rehízo a mano no se toca
-  nada. `queries.services_in_copy` lee por SQL sobre los nombres del modelo (la copia no es un negocio y no tiene
+  nada. `queries.recovery.services_in_copy` lee por SQL sobre los nombres del modelo (la copia no es un negocio y no tiene
   alias) todos los servicios de la copia, en oferta o archivados (`is_active`), con el nombre de su categoría allí
-  (`category_name`), y `queries.recoverable_services_in_copy` les añade quién los hacía allí (`assignments`). Un servicio de la copia lo tiene el negocio (`queries.services_in_business`, `{id en la
+  (`category_name`), y `queries.recovery.recoverable_services_in_copy` les añade quién los hacía allí (`assignments`). Un servicio de la copia lo tiene el negocio (`queries.recovery.services_in_business`, `{id en la
   copia: id en el negocio}`, con la lista entera de la copia) si es el mismo, en oferta o archivado, o, si la copia lo
   tenía en oferta, uno hecho otra vez: un servicio que no es ninguno de la copia, con el mismo nombre (sin distinguir
   mayúsculas ni espacios) en la categoría a la que volvería. Los nombres no son únicos: cada hecho otra vez responde por
@@ -1257,7 +1257,7 @@ Los papeles llegan del SaaS con prefijo (`hub_owner`, `hub_admin`, `hub_manager`
   Es lo que usa la recuperación de otra app (Citas, hub#1284) para emparejar un servicio de la copia con el del negocio;
   uno que la copia tenía archivado solo se empareja por su id. Un servicio hecho otra vez guarda por cuál de la copia lo
   hizo `service.service.recover` (`Service.stands_for`, de `0007_service_stands_for`; vacío en el que hace la pantalla), y
-  `queries.services_standing_for` (`{id en la copia: id en el negocio}`) dice con él qué servicio hace de cada uno de la
+  `queries.recovery.services_standing_for` (`{id en la copia: id en el negocio}`) dice con él qué servicio hace de cada uno de la
   copia que el negocio ya no tiene: el que hizo una recuperación por él, archivado o renombrado después también; uno
   hecho a mano no hace de ninguno. Lo pide Tarifas, que no requiere Servicios, por `service.service.standing_for`
   (solo el sistema, sin ruta ni herramienta del asistente) para poner los precios de la copia (PRICING-F15, hub#1459).
