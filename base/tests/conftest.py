@@ -9,6 +9,7 @@ from django.db import connections
 
 from base import auth
 from base.models import Membership
+from base.tests.live_runs import end_the_live_runs
 from shared.models import App, AppDoc
 
 SECRET = "test-internal-secret"
@@ -26,6 +27,13 @@ def no_connection_left_from_an_earlier_test(request):
     marked = request.node.get_closest_marker("django_db") is not None
     if not (marked or {"db", "transactional_db"} & set(request.fixturenames)):
         connections.close_all()
+
+
+@pytest.fixture
+def live_runs_ended():
+    """After the test, before the businesses' databases are emptied, every live run has ended."""
+    yield
+    end_the_live_runs()
 
 
 @pytest.fixture
