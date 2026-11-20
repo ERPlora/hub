@@ -6,13 +6,13 @@
 // up the tasks with the read the step names (a read asks nobody) and answers; the history says it.
 // And the Hub's chat leaves a draft automation (FLOW-F17), which waits in Automations.
 // flow: FLOW-F37 FLOW-F38 FLOW-F39 FLOW-F17
-import { expect, type Page, test } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 
 import { box, card, decide, lastAnswer, panel } from './assistant-panel';
 import { DONE } from './assistant-provider';
 import { emptyMonth, saasSql } from './assistant-real';
 import { capture, psql, shown } from './helpers';
-import { confirmDialog, idFromUrl, signedIn } from './flow-helpers';
+import { confirmDialog, idFromUrl, openRun, signedIn } from './flow-helpers';
 import { chats, providerSpec, workerAsks } from './provider-helpers';
 import { noHorizontalScroll, settled, VIEWPORTS } from './schedule-helpers';
 import { pick } from './task-helpers';
@@ -36,14 +36,6 @@ function cleanUp(): void {
 }
 
 const provider = providerSpec(cleanUp);
-
-/** The run of the history that says `status`, opened. */
-async function openRun(page: Page, status: string) {
-  const run = shown(page).locator('[data-testid^=flow-run-]').filter({ hasText: status }).first();
-  await expect(run).toBeVisible();
-  await run.locator('[data-testid^=flow-run-toggle-]').click();
-  return run;
-}
 
 for (const viewport of VIEWPORTS) {
   test(`FLOW-F37 «Ask the assistant» is added, saved and run, and the history tells what it did at ${viewport.label}`, async ({ browser }) => {
