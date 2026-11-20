@@ -129,7 +129,7 @@ def test_an_option_with_its_own_tax_category_is_worth_more_than_zero_also_in_the
     group = ModifierGroup.objects.create(name="Drinks")
     generic = TaxCategory.objects.get(key="product.generic")
     for delta in (0, -100):
-        assert refused(lambda: ModifierOption.objects.create(group=group, name=f"Soda {delta}", price_delta=delta, tax_category=generic))
+        assert refused(lambda delta=delta: ModifierOption.objects.create(group=group, name=f"Soda {delta}", price_delta=delta, tax_category=generic))
     ModifierOption.objects.create(group=group, name="Soda", price_delta=1, tax_category=generic)
     ModifierOption.objects.create(group=group, name="Water", price_delta=0)
 

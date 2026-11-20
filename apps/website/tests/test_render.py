@@ -545,7 +545,7 @@ def test_the_reviews_show_googles_rating_count_five_cards_and_its_two_buttons(te
         on = 5 - index % 2
         assert card.count("ws-icon ws-icon-star text-warning") == on and card.count("ws-icon ws-icon-star") == 5, index
         assert f'aria-label="{on} out of 5 stars"' in card
-    assert (f"https://www.google.com/maps/contrib/0", "_blank", "Cliente 0") in links(cards[0])
+    assert ("https://www.google.com/maps/contrib/0", "_blank", "Cliente 0") in links(cards[0])
     # Django's «2 months» keeps its number and its unit together (a no-break space).
     assert ("https://www.google.com/maps/reviews/r0", "_blank", "2\u00a0months ago") in links(cards[0])
     assert "Muy bien, número 0" in cards[0]

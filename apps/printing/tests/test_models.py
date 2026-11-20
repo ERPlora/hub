@@ -4,6 +4,7 @@ import hashlib
 
 import pytest
 from django.db import IntegrityError
+from django.db.models import ProtectedError
 from live.operations import atomic
 
 from apps.printing.models import PrintDevice, Printer, PrintJob, Settings
@@ -127,7 +128,7 @@ def test_the_factory_job_is_pending_with_one_copy():
 def test_a_printer_with_jobs_is_never_deleted():
     till = a_printer()
     a_job(printer=till)
-    with pytest.raises(Exception), atomic():
+    with pytest.raises(ProtectedError), atomic():
         till.delete()
 
 
@@ -149,7 +150,7 @@ def test_a_device_reaches_printers_and_one_with_jobs_is_never_deleted():
     till.printers.add(a_printer())
     assert [p.name for p in till.printers.all()] == ["Till"]
     a_job(print_device=till, device="Till")
-    with pytest.raises(Exception), atomic():
+    with pytest.raises(ProtectedError), atomic():
         till.delete()
 
 

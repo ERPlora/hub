@@ -979,7 +979,7 @@ def test_the_channel_never_touches_a_booking_that_is_not_the_guests(week, action
     data = {"party_size": 3} if action == "update" else {}
     before = events()
     for target in (other.id, walk_in.id, gone.id, "01a15d83-0000-7000-8000-000000000000"):
-        error = refusal(lambda: on_behalf(f"reservation.reservation.{action}", {"id": str(target), **data}, hers.customer_id))
+        error = refusal(lambda target=target: on_behalf(f"reservation.reservation.{action}", {"id": str(target), **data}, hers.customer_id))
         assert (error.code, error.message) == (
             "reservation.customer_mismatch",
             "That reservation belongs to a different guest, so it cannot be managed on their behalf.",

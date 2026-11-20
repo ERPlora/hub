@@ -12,17 +12,15 @@ The hub is ``hub_a``, on a database of its own as every business is: its devices
 read there, inside its context.
 """
 
-import json
 from urllib.parse import parse_qs, urlsplit
 
 import pytest
 from django.contrib.auth.hashers import make_password
 from django.contrib.sessions.models import Session
-from django.test import Client
 from django.utils import timezone
 
 from base import access
-from base.models import AccessSettings, Credential, Hub, Membership, TrustedDevice
+from base.models import AccessSettings, Credential, TrustedDevice
 from base.tenancy.context import use_hub
 from base.tests.test_access_account import enter
 from base.tests.test_auth_views import A, B, HOST, ON_HUB_A, demo, host_of  # noqa: F401 (demo: a fixture)

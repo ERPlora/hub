@@ -49,7 +49,6 @@ from apps.printing.queries import (
     find_job,
     find_printer,
     first_held,
-    is_stale,
     job_row,
     printer_row,
     retryable,

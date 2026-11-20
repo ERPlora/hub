@@ -654,7 +654,7 @@ def test_only_a_pending_or_confirmed_uncharged_appointment_moves(salon):
         )
         refused(
             "appointment.cannot_reschedule",
-            lambda: run(
+            lambda item=item: run(
                 "appointment.appointment.reschedule",
                 {"id": str(item.id), "start": wall(MONDAY, "15:00")},
             ),
@@ -878,7 +878,7 @@ def test_cancelling_keeps_the_reason_and_frees_the_time(salon):
         )
         refused(
             "appointment.cannot_cancel",
-            lambda: run("appointment.appointment.cancel", {"id": str(item.id)}),
+            lambda item=item: run("appointment.appointment.cancel", {"id": str(item.id)}),
         )
     charged = make_appointment(
         salon.lucia, salon.ana, [salon.cut], at(MONDAY, "15:00"), sale_id=uuid.uuid7()
@@ -942,7 +942,7 @@ def test_deleting_archives_and_refuses_what_happened_or_was_charged(salon):
         )
         refused(
             "appointment.cannot_delete",
-            lambda: run("appointment.appointment.delete", {"id": str(item.id)}),
+            lambda item=item: run("appointment.appointment.delete", {"id": str(item.id)}),
         )
 
 

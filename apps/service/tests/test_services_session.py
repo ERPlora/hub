@@ -12,6 +12,7 @@ from django.utils import timezone
 from live.errors import Conflict, NotFound, PermissionDenied
 from live.operations import get
 from live.models import OutboxEvent
+from pydantic import ValidationError
 
 from apps.service.models import Redemption
 from apps.service.schemas import (
@@ -408,11 +409,11 @@ def test_charging_a_session_that_does_not_exist_is_404(lucia):
 
 def test_settle_takes_one_to_a_hundred_sessions():
     op = get("service.session.settle")
-    with pytest.raises(Exception):
+    with pytest.raises(ValidationError):
         op.input.model_validate(
             {"ids": [], "sale_id": str(uuid.uuid7()), "customer_id": None}
         )
-    with pytest.raises(Exception):
+    with pytest.raises(ValidationError):
         op.input.model_validate(
             {
                 "ids": [str(uuid.uuid7()) for _ in range(101)],

@@ -25,7 +25,7 @@ from live.outbox import channel_for
 
 from apps.printing.models import PrintDevice, PrintJob
 from apps.printing.tests.conftest import A, B, HUB_DB, HUB_DB_COMMITTED, ctx_for, enqueue, printer, run
-from apps.printing.tests.test_services import SPARE_ID, TILL_ID, answer, on_device, register, take
+from apps.printing.tests.test_services import SPARE_ID, TILL_ID, answer, register, take
 from base.permissions import VIEW_HOME
 from base.schemas.home import SetupStatusIn, SystemCardsIn
 from base.schemas.bell import BellCountersIn
