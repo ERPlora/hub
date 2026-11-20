@@ -57,7 +57,13 @@
   ],
   "opening": "Te paso la carta de otoño, da de alta todo lo que hay en el Excel",
   "offered": ["inventory.product.bulk_create"],
-  "writes": ["inventory.product.bulk_create", "inventory.product.create", "inventory.product.update"],
+  "writes": [
+    "inventory.product.bulk_create",
+    "inventory.product.create",
+    "inventory.product.update",
+    "inventory.product_category.add",
+    "inventory.product_category.remove"
+  ],
   "cards": [{"tool": "inventory.product.create", "match": {"name": "pulpo"}, "expect": {"price": 1450}}],
   "expect": [
     {
@@ -154,6 +160,16 @@
           "tool": "inventory.product.update",
           "path": "category_ids",
           "where": {"product": "albondigas"}
+        },
+        {
+          "tool": "inventory.product_category.add",
+          "path": "category",
+          "where": {"product": "albondigas"}
+        },
+        {
+          "tool": "inventory.product_category.add",
+          "path": "category_id",
+          "where": {"product": "albondigas"}
         }
       ]
     },
@@ -170,6 +186,16 @@
         {
           "tool": "inventory.product.update",
           "path": "category_ids",
+          "where": {"product": "tinto de verano"}
+        },
+        {
+          "tool": "inventory.product_category.add",
+          "path": "category",
+          "where": {"product": "tinto de verano"}
+        },
+        {
+          "tool": "inventory.product_category.add",
+          "path": "category_id",
           "where": {"product": "tinto de verano"}
         }
       ]

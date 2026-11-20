@@ -37,7 +37,12 @@
   ],
   "opening": "Ha llegado el pedido, te paso el albarán. Mételo en el stock",
   "offered": ["inventory.stock.receive"],
-  "writes": ["inventory.stock.receive", "inventory.product.create", "inventory.product.update"],
+  "writes": [
+    "inventory.stock.receive",
+    "inventory.product.create",
+    "inventory.product.update",
+    "inventory.product_category.add"
+  ],
   "cards": [{"tool": "inventory.product.create", "match": {"name": "nica"}, "expect": {"price": 250}}],
   "expect": [
     {

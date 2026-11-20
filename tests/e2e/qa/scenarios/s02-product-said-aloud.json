@@ -18,7 +18,7 @@
   "attachments": [],
   "opening": "Añade la tarta de zanahoria a 5,50",
   "offered": ["inventory.product.create"],
-  "writes": ["inventory.product.create", "inventory.product.update"],
+  "writes": ["inventory.product.create", "inventory.product.update", "inventory.product_category.add"],
   "cards": [{ "tool": "inventory.product.create", "match": { "name": "zanahoria" }, "expect": { "price": 550 } }],
   "expect": [
     { "says": "la tarta de zanahoria está una sola vez en la carta", "sql": "select count(*) from inventory_product where name ilike '%zanahoria%' and not is_deleted", "equals": "1" },
@@ -35,7 +35,12 @@
       "id": "category",
       "fact": "en qué categoría va",
       "reveals": ["postre"],
-      "uses": [{ "tool": "inventory.product.create", "path": "category_ids" }, { "tool": "inventory.product.update", "path": "category_ids" }],
+      "uses": [
+        { "tool": "inventory.product.create", "path": "category_ids" },
+        { "tool": "inventory.product.update", "path": "category_ids" },
+        { "tool": "inventory.product_category.add", "path": "category" },
+        { "tool": "inventory.product_category.add", "path": "category_id" }
+      ],
       "resolvers": ["inventory.category.list"]
     },
     {
