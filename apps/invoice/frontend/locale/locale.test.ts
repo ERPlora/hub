@@ -45,7 +45,9 @@ describe('invoice catalogues (en source + es)', () => {
     expect(ES.get('invoice.rectify.cancelled')).toBe('La factura ya está cancelada.');
     expect(ES.get('invoice.create.title')).toBe('Nueva factura manual');
     expect(ES.get('invoice.create.submit')).toBe('Emitir factura');
-    expect(ES.get('invoice.series.empty')).toBe('Aún no hay series. Crea la primera para numerar tus facturas.');
+    expect(ES.get('invoice.series.empty')).toBe(
+      'Aún no hay series. Se crean solas con tu primera venta; crea una solo para cambiar el prefijo o seguir la numeración de otro sistema.',
+    );
     expect(ES.get('invoice.series.loading')).toBe('Cargando series…');
     expect(ES.get('invoice.series.search')).toBe('Buscar código, nombre…');
     expect(ES.get('invoice.series.form.createTitle')).toBe('Nueva serie de numeración');
