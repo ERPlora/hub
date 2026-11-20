@@ -115,9 +115,9 @@ def _functions(message: dict) -> list[dict]:
 
 
 def _assistant_searched(still_open: list[dict]) -> list[str]:
-    """The tasks the model searched the person's tools for (``base.tool.search``) in the request still open
+    """The tasks the model searched the person's tools for (``base.assistant.find_tools``) in the request still open
     (``_assistant_opened``), in order; a search its operation refuses searched nothing."""
-    search = get_operation(assistant.relevance.TOOL_SEARCH)
+    search = get_operation(assistant.relevance.FIND_TOOLS)
     queries = []
     for function in (function for message in still_open for function in _functions(message)):
         if function.get("name") != shared.tool_name(search.name):
@@ -229,6 +229,8 @@ def assistant_turn(ctx: OperationContext, data: AssistantTurnIn) -> dict:
     if ctx.actor is None:
         raise Unauthorized(gettext("Sign in to talk to the assistant."))
     tools = assistant.tools.catalog(ctx)
+    # The assistant's own search of the person's tools runs as one of them, but never ranks among them.
+    runs = {**tools, assistant.relevance.FIND_TOOLS: get_operation(assistant.relevance.FIND_TOOLS)}
     pending = list(data.pending)
     decision = data.decision
     stopped = False
@@ -237,7 +239,7 @@ def assistant_turn(ctx: OperationContext, data: AssistantTurnIn) -> dict:
     card = None
     while pending:
         call = pending[0]
-        outcome, card, shown = _assistant_answer(ctx, tools, call, decision, stopped=stopped)
+        outcome, card, shown = _assistant_answer(ctx, runs, call, decision, stopped=stopped)
         if outcome is None:
             # The call its card waits on goes back with what the card showed: the yes comes with it (hub#1208).
             pending[0] = call.model_copy(update={"shown": shown})
@@ -246,7 +248,7 @@ def assistant_turn(ctx: OperationContext, data: AssistantTurnIn) -> dict:
             stopped = decision.stop
             decision = None
         append.append({"role": "tool", "tool_call_id": call.call_id, "content": outcome.content})
-        executed.append(_assistant_ran(ctx, tools, call, outcome))
+        executed.append(_assistant_ran(ctx, runs, call, outcome))
         pending.pop(0)
     messages = [*data.messages, *append]
     still_open = data.messages[_assistant_opened(data.messages, tools) :]

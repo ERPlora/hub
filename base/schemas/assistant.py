@@ -1,4 +1,4 @@
-"""Schemas of the assistant (``base.assistant.*``, ``base.docs.search``, ``base.tool.search``), and the marks an app's
+"""Schemas of the assistant (``base.assistant.*``, ``base.docs.search``), and the marks an app's
 schemas give the data its card names (``names``, ``unless_given``, ``in_currency_of``) and the names it reads
 (``exactly_one``, ``RecordNameOut``)."""
 
@@ -249,7 +249,7 @@ class DocsSearchOut(Schema):
     results: list[DocsExcerptOut]
 
 
-class ToolSearchIn(Schema):
+class FindToolsIn(Schema):
     query: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=300)] = Field(
         description="The task, in a few words: «list the products of a category», «create a product»."
     )
@@ -260,7 +260,7 @@ class FoundToolOut(Schema):
     description: str = Field(description="What the tool does.")
 
 
-class ToolSearchOut(Schema):
+class FindToolsOut(Schema):
     tools: list[FoundToolOut] = Field(description="The tools found, best first.")
 
 

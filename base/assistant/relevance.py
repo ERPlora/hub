@@ -8,16 +8,16 @@ from types import MappingProxyType
 from django.core import checks
 from live import assistant as shared
 from live.meta import LiveAppConfig, all_live_app_configs
-from live.operations import Operation
+from live.operations import Operation, get
 
 #: The search in ERPlora's documentation (saas ASSISTANT-F28): how ERPlora works is answered from it, never from memory.
 DOCS_SEARCH = "base.docs.search"
-#: The search in the person's whole catalogue: a turn offers only the tools its words name best, so the model looks
-#: for the one it lacks and the next round offers what it found (``relevant``'s ``searched``).
-TOOL_SEARCH = "base.tool.search"
-#: Always offered when the person may read them: the checklist, the business's own data, the documentation (a
-#: how-to question, «¿cómo abro la caja?», shares no word with its tool) and the search of the tools.
-ALWAYS = ("base.setup.status", "base.business.get", DOCS_SEARCH, TOOL_SEARCH)
+#: Always offered when the person may read them: the checklist, the business's own data and the documentation (a
+#: how-to question, «¿cómo abro la caja?», shares no word with its tool).
+ALWAYS = ("base.setup.status", "base.business.get", DOCS_SEARCH)
+#: The assistant's own search of the person's whole catalogue, last in every turn: a turn offers only the tools its
+#: words name best, so the model looks for the one it lacks and the next round offers what it found.
+FIND_TOOLS = "base.assistant.find_tools"
 #: The tools a search finds at most.
 FOUND = 10
 #: How a person names each app in a turn: its id, its name and its menu (``live.assistant.app_words``). The QA of the
@@ -114,9 +114,11 @@ def relevant(
     tools: dict[str, Operation], texts: Iterable[str], language: str, *, searched: Iterable[str] = ()
 ) -> list[Operation]:
     """The tools of what ``texts`` ask, best first, at most ``MAX_TOOLS`` (``live.assistant.relevant``), as ``ranking``
-    says; what the model ``searched`` for goes right after ``ALWAYS``, the latest search first, so the tool it found is
-    never left out."""
+    says, with the search of the rest last (``FIND_TOOLS``: it never ranks, so no tool loses its place to it); what the
+    model ``searched`` for goes right after ``ALWAYS``, the latest search first, so the tool it found is never left
+    out."""
     ranked = shared.relevant(tools, texts, language, **ranking(tools))
     searches = [op for query in reversed(list(searched)) for op in found(tools, query, language)]
     first = [op for op in ranked if op.name in ALWAYS]
-    return list({op.name: op for op in [*first, *searches, *ranked]}.values())[: shared.MAX_TOOLS]
+    kept = list({op.name: op for op in [*first, *searches, *ranked]}.values())[: shared.MAX_TOOLS - 1]
+    return [*kept, get(FIND_TOOLS)]

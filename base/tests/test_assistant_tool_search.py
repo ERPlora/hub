@@ -1,12 +1,10 @@
-"""The search the assistant always has at hand (``base.tool.search``): a turn offers only the forty tools that best
-match the person's words, so when none of them does what was asked, the model searches the person's whole catalogue
-for the task and the next round of the same request offers what it found.
+"""The search the assistant has in every turn (``base.assistant.find_tools``): a turn offers only the forty tools that
+best match the person's words, so when none of them does what was asked, the model searches the person's whole
+catalogue for the task and the next round of the same request offers what it found.
 
 Before it, a phrase that shared no word with the tool it needed left that tool out of the turn, and the model answered
 that it could not do it («No puedo listar los productos de la categoría Bebidas desde aquí»).
 """
-
-import json
 
 import pytest
 from live import assistant as shared
@@ -15,12 +13,13 @@ from live.operations import get
 from base import assistant
 from base.tenancy.tests.business import HUB_DB, in_business_a
 from base.tests.assistant_context import EMPLOYEE, MANAGER, ctx, owner_of_a
+from base.tests.test_services_assistant import asked, call
 
 __all__ = ["in_business_a"]
 
 pytestmark = HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 
-SEARCH = "base.tool.search"
+SEARCH = "base.assistant.find_tools"
 
 
 def searched(context, query: str) -> list[dict]:
@@ -32,24 +31,8 @@ def names(tools: list[dict]) -> list[str]:
     return [tool["name"] for tool in tools]
 
 
-def search_call(query: str, call_id: str = "s1") -> dict:
-    return {"call_id": call_id, "name": shared.tool_name(SEARCH), "arguments": json.dumps({"query": query})}
-
-
-def write_call(name: str, arguments: dict, call_id: str) -> dict:
-    return {"call_id": call_id, "name": shared.tool_name(name), "arguments": json.dumps(arguments)}
-
-
-def asked_for(*calls: dict) -> dict:
-    """The model's message that asked for ``calls``, as the browser keeps it."""
-    return {
-        "role": "assistant",
-        "content": "",
-        "tool_calls": [
-            {"id": c["call_id"], "type": "function", "function": {"name": c["name"], "arguments": c["arguments"]}}
-            for c in calls
-        ],
-    }
+def search_call(query: str) -> dict:
+    return call(SEARCH, {"query": query}, "s1")
 
 
 def answer(call: dict, content: str = "{}") -> dict:
@@ -66,11 +49,21 @@ def turn(context, *messages: dict, pending: tuple[dict, ...] = ()) -> dict:
 
 
 @pytest.mark.parametrize("permissions", [EMPLOYEE, MANAGER, {"*"}])
-def test_the_tool_search_is_always_at_hand_for_everybody(permissions):
-    assert SEARCH in assistant.relevance.ALWAYS
-    tools = assistant.tools.catalog(ctx(permissions))
-    assert SEARCH in tools
-    assert SEARCH in [op.name for op in assistant.relevance.relevant(tools, ["zzz"], "es")]
+def test_every_turn_offers_the_search_to_everybody(permissions):
+    plan = turn(ctx(permissions), user("zzz"))
+    assert names(plan["tools"])[-1] == shared.tool_name(SEARCH)
+
+
+def test_the_search_is_the_assistants_own_and_takes_no_place_from_the_persons_tools(make_user):
+    """It is no tool of the person's (``base.assistant.*``): it never ranks, so every tool a turn offers keeps the place
+    its words give it, and the search takes the last one."""
+    tools = assistant.tools.catalog(owner_of_a(make_user, "es"))
+    assert SEARCH not in tools
+    ranking = assistant.relevance.ranking(tools)
+    for said in ("Sube un 5 % las bebidas", "¿Qué vendí hoy?"):
+        ranked = [op.name for op in shared.relevant(tools, [said], "es", **ranking)]
+        offered = [op.name for op in assistant.relevance.relevant(tools, [said], "es")]
+        assert offered == [*ranked[: shared.MAX_TOOLS - 1], SEARCH]
 
 
 def test_a_search_finds_the_tools_of_the_task_described_with_what_each_does(make_user):
@@ -88,7 +81,7 @@ def test_a_search_never_finds_what_the_person_may_not_use():
 def test_a_search_never_finds_what_every_turn_already_offers(make_user):
     found = names(searched(owner_of_a(make_user, "en"), "search the help and the documentation"))
     assert found
-    assert not set(found) & {shared.tool_name(name) for name in assistant.relevance.ALWAYS}
+    assert not set(found) & {shared.tool_name(name) for name in (*assistant.relevance.ALWAYS, SEARCH)}
 
 
 #: What a person said that left out the tool it needed, and the task the model searches for then, as a model writes
@@ -142,7 +135,7 @@ def test_the_tool_a_phrase_left_out_is_offered_once_the_model_searches_for_it(
     assert shared.tool_name(SEARCH) in names(turn(context, user(said))["tools"])
     for task in tasks:
         call = search_call(task)
-        plan = turn(context, user(said), asked_for(call), pending=(call,))
+        plan = turn(context, user(said), asked(call), pending=(call,))
         assert [row["outcome"] for row in plan["executed"]] == ["ok"], task
         assert shared.tool_name(expected) in names(plan["tools"]), task
         assert len(plan["tools"]) <= shared.MAX_TOOLS
@@ -151,7 +144,7 @@ def test_the_tool_a_phrase_left_out_is_offered_once_the_model_searches_for_it(
 def test_a_search_the_model_wrote_wrong_finds_nothing_and_the_turn_goes_on(make_user):
     context = owner_of_a(make_user, "es")
     call = {"call_id": "s1", "name": shared.tool_name(SEARCH), "arguments": "list the products"}
-    plan = turn(context, user("Sube un 5 % las bebidas"), asked_for(call), pending=(call,))
+    plan = turn(context, user("Sube un 5 % las bebidas"), asked(call), pending=(call,))
     assert [row["outcome"] for row in plan["executed"]] != ["ok"]  # the model hears its search was not done
     assert names(plan["tools"]) == names(turn(context, user("Sube un 5 % las bebidas"))["tools"])
 
@@ -160,7 +153,7 @@ def test_a_search_of_a_request_already_done_no_longer_takes_a_place_in_the_turn(
     """A write the model asked for closes the request: what it searched for before is not what is asked now."""
     context = owner_of_a(make_user, "es")
     search = search_call("ver los productos de una categoría")
-    write = write_call("inventory.product.update", {"name": "Agua", "price": "1.60"}, "w1")
+    write = call("inventory.product.update", {"name": "Agua", "price": "1.60"}, "w1")
     later = [answer(write), {"role": "assistant", "content": "Hecho."}, user("Gracias."), user("¿Qué vendí hoy?")]
-    done = [user("Sube un 5 % las bebidas"), asked_for(search), answer(search), asked_for(write)]
+    done = [user("Sube un 5 % las bebidas"), asked(search), answer(search), asked(write)]
     assert names(turn(context, *done, *later)["tools"]) == names(turn(context, *later)["tools"])
