@@ -8,6 +8,7 @@ import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
 import { A, api, capture, login, psql, shown, untilStill } from './helpers';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
+import { chargeByCard } from './sale-charge-helpers';
 import { cleanSales, drawerOff, expectFirstTile, openTillCart, restoreDrawer, stamp } from './sale-helpers';
 import { toastSaying } from './toast-helpers';
 
@@ -196,14 +197,7 @@ test('SALE-F12: a menu from «All» is composed course by course, charged by car
   const line = lineOf(page, MENU);
   await expect(line).toContainText(`${lentils.name}, ${hake.name}`);
 
-  await shown(page).locator('[data-testid=pos-charge]').click();
-  const checkout = page.locator('[data-testid=sale-checkout-modal]');
-  await expect(checkout.locator('[data-testid=sale-checkout-total]')).toContainText(/13[.,]50/);
-  await checkout.locator(`[data-testid=sale-checkout-method-${card}]`).click();
-  await checkout.locator('[data-testid=sale-checkout-confirm]').click();
-  await expect(checkout).toBeHidden();
-  const receipt = page.locator('[data-testid=sale-document-modal] [data-testid=sale-receipt]');
-  await expect(receipt).toBeVisible();
+  const receipt = await chargeByCard(page, card, /13[.,]50/);
   await expect(receipt.locator('[data-testid=sale-receipt-line]').filter({ hasText: MENU })).toContainText(/13[.,]50/);
   await expect(receipt.locator('[data-testid=sale-receipt-dish]')).toHaveText([lentils.name, hake.name]);
   await shots(page, 'SALE-F12-receipt', async () => {

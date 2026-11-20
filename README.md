@@ -96,8 +96,8 @@ sus BD, los dos `runserver` y, pase lo que pase, la limpieza.
   Los grupos entran de uno en uno, tras tres pasadas seguidas en verde del job, y el job los nombra con `--spec`: hoy,
   entrar, las sesiones, los permisos de un empleado, la separación entre negocios y la suspensión por impago; cobrar
   en el TPV, la caja y la impresión del ticket; el ticket con su QR, la factura y VeriFactu; la cocina y las mesas
-  (mandar la ronda a cocina desde el TPV, seguirla y meterle prisa, y sentar la cuenta del TPV en una mesa y
-  quitársela); las citas, los servicios y los bonos (reservar en la agenda, cobrar la cita en el TPV al precio del
+  (mandar la ronda a cocina desde el TPV, seguirla y meterle prisa, sentar la cuenta del TPV en una mesa y
+  quitársela, y servir una mesa desde el plano hasta cobrar su cuenta en el TPV y verla libre); las citas, los servicios y los bonos (reservar en la agenda, cobrar la cita en el TPV al precio del
   profesional, dar de alta un servicio con quien lo hace, crear un bono, venderlo y ajustarlo, y pagar con él un corte
   en el TPV); y el alta, las apps, la demo y lo vivo (dar de alta en erplora.com un negocio de España, que nace con
   Impuestos y sin VeriFactu; desactivar Reservas, que se lleva Mesas, y volver a activarlas; entrar en la demo desde

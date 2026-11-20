@@ -256,6 +256,7 @@ jobs:
           --spec tests/e2e/verifactu-records.spec.ts
           --spec tests/e2e/kitchen-pos.spec.ts
           --spec tests/e2e/sale-table.spec.ts
+          --spec tests/e2e/table-floor.spec.ts
           --spec tests/e2e/appointment-agenda.spec.ts
           --spec tests/e2e/appointment-charge.spec.ts
           --spec tests/e2e/service-catalog.spec.ts
