@@ -3,7 +3,32 @@
 // of a business in its cache for a minute (`base.activation`), it makes the Hub read them now.
 import { type BrowserContext, expect, test } from '@playwright/test';
 
+import { WORKER_START_TIMEOUT_MS } from './global-setup';
 import { A, api, psql } from './helpers';
+import { openShell, type Shell } from './manage-shell';
+
+/** What writes `a`'s apps by hand (`base_appactivation`, or control's `base_hub.schema_apps`): it runs `sql` (`psql`)
+ *  and then has the Hub forget what its cache keeps of `a`'s apps (`base.activation.forget`), as the COMMIT of a change
+ *  of them does; without it the Hub would read the old ones for a minute. It forgets in the spec's own `manage.py
+ *  shell` (`manage-shell.ts`), which every process of the stack shares the cache with: open before the spec's first
+ *  test and closed after its last one, before the `afterAll` hooks the spec declares after calling this. */
+export function appRowsWriter(): (sql: string) => Promise<void> {
+  let shell: Shell | undefined;
+  test.beforeAll(async () => {
+    // Django's start, before the tests' time and bounded as the run's worker's is.
+    test.setTimeout(WORKER_START_TIMEOUT_MS);
+    shell = await openShell();
+  });
+  test.afterAll(async () => {
+    await shell?.close();
+    shell = undefined;
+  });
+  return async (sql) => {
+    if (!shell) throw new Error("The spec's shell is not open: write a's apps inside its tests and their hooks.");
+    psql(sql);
+    await shell.run("from base import activation\nactivation.forget('a')");
+  };
+}
 
 /** Tasks turned `first` and then `then` in `a` through Apps (`/api/apps/<enable|disable>`): a change the Hub forgets
  * its cache of the apps off for, at its COMMIT, leaving the rest as it was (Tasks needs only Staff). */

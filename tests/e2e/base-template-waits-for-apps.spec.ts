@@ -9,6 +9,7 @@
 // flow: BASE-F31 BASE-F32 BASE-F33 BASE-F38
 import { type Browser, type BrowserContext, expect, type Page, test } from '@playwright/test';
 
+import { appRowsWriter } from './app-rows-helpers';
 import { A, api, APP_SET_UP_MS, hostPage, psql, shown, signedInSpanish, testid } from './helpers';
 import { emptyOfTemplateData } from './business';
 import { settledCapture } from './screen';
@@ -29,11 +30,12 @@ const SERVICES = 8;
 
 let hubId = '';
 let leaf = '';
+const writeApps = appRowsWriter();
 
 /** Control believes `a`'s database lacks Services, and its row is being set up, put off so nothing happens yet. */
-function heldBack(): void {
+async function heldBack(): Promise<void> {
   psql(`update base_hub set schema_apps = schema_apps - '${APP}' where slug = 'a'`);
-  psql(
+  await writeApps(
     `update base_appactivation set state = 'creating', chosen = true, attempts = 0, last_error = '', ` +
       `next_attempt_at = now() + interval '10 minutes' where host = 'a' and app = '${APP}'`,
   );
@@ -49,26 +51,20 @@ function released(): void {
 }
 
 /** As a failure leaves the row: its next try far off. */
-function failing(): void {
-  psql(
+async function failing(): Promise<void> {
+  await writeApps(
     `update base_appactivation set state = 'failed', attempts = 1, last_error = 'schema_failed: e2e', ` +
       `next_attempt_at = now() + interval '1 hour' where host = 'a' and app = '${APP}'`,
   );
 }
 
 /** `a` as the run found it: Services on, and control knowing its tables. */
-function backToNormal(): void {
+async function backToNormal(): Promise<void> {
   psql(`update base_hub set schema_apps = schema_apps || jsonb_build_object('${APP}', '${leaf}') where slug = 'a'`);
-  psql(
+  await writeApps(
     `update base_appactivation set state = 'on', attempts = 0, last_error = '', next_attempt_at = null ` +
       `where host = 'a' and app = '${APP}'`,
   );
-}
-
-/** The rows were written here, not by an operation: reading the Apps list makes the Hub's process forget what it kept of
- * them, as the live notice of a real change does (`base.app.list`). */
-async function appsReadAgain(context: BrowserContext): Promise<void> {
-  expect((await api(context, A, 'GET', '/apps')).status).toBe(200);
 }
 
 const snap = (page: Page, key: string, width: number): Promise<void> =>
@@ -96,11 +92,10 @@ test.beforeAll(() => {
 });
 
 // Once the tests are over, `a` is emptied again of what the template brought: every later spec uses the same business.
+// Its apps are as the run found them: each test put them back.
 test.afterAll(async ({ browser }) => {
   const { context } = await hostPage(browser, A, { next: '/' });
   try {
-    backToNormal();
-    await appsReadAgain(context);
     await emptyOfTemplateData(context, A);
   } finally {
     await context.close();
@@ -117,15 +112,13 @@ async function withHeldBack(
   test.setTimeout(240_000);
   const { context, page } = await signedInSpanish(browser, viewport, next);
   try {
-    await appsReadAgain(context);
     await emptyOfTemplateData(context, A);
-    heldBack();
-    await appsReadAgain(context);
+    await heldBack();
     await page.reload();
     await body(context, page);
   } finally {
     await context.close();
-    backToNormal();
+    await backToNormal();
   }
 }
 
@@ -190,7 +183,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
     await withHeldBack(browser, viewport, '/settings#data', async (context, page) => {
       await loadIt(page);
 
-      failing();
+      await failing();
       await page.reload();
 
       await expect(testid(page, 'report-failing')).toContainText('Servicios');
