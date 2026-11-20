@@ -12,7 +12,7 @@ from live.errors import NotFound
 from live.operations import INTERNAL, Operation, operation, registry
 
 from base import assistant as hub_assistant
-from apps.flow.schemas import OperationNameOut, OperationRefIn
+from apps.flow.schemas.catalog import OperationNameOut, OperationRefIn
 
 from .problems import HIGH_RISK, HIGH_RISK_CODE, UNKNOWN_ACTION
 from .reads import VIEW

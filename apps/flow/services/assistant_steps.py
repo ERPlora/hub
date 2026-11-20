@@ -19,14 +19,9 @@ from apps.flow.queries.pinned import pinned_values
 from apps.flow.queries.questions import ASSISTANT_WANTS
 from apps.flow.queries.reads import SYSTEM, TURN
 from apps.flow.queries.reasons import ASSISTANT_GONE_KEY
-from apps.flow.schemas import (
-    AssistantRoundIn,
-    AssistantRoundOut,
-    ClaimAssistantOut,
-    DueOut,
-    RecordAssistantIn,
-    RunRefIn,
-)
+from apps.flow.schemas.assistant_steps import AssistantRoundIn, AssistantRoundOut, ClaimAssistantOut, RecordAssistantIn
+from apps.flow.schemas.fields import DueOut
+from apps.flow.schemas.runs import RunRefIn
 from base import assistant as hub_assistant, outbound
 
 from .engine import (

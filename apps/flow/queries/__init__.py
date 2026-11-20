@@ -11,7 +11,7 @@
 - **«Try it»** (``flow.flow.test``) walks the steps against the last real event of this business and
   executes nothing: it validates each action's data against the action's own schema.
 - **One record by its id** (an automation, a draft, a run, a question waiting for an answer), with the words its
-  screen names it by: what the assistant's card says instead of the id (schemas.py, ``names``).
+  screen names it by: what the assistant's card says instead of the id (schemas/fields.py, ``names``).
 """
 
 from . import (
