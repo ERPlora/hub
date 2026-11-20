@@ -5,21 +5,11 @@
 // Saving runs `invoice.series.create` or `invoice.series.update` (only what changed), says so and closes; a
 // refusal stays in the window, under its field when it is one.
 import { toastSuccess } from '@erplora/ui/shell';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import { click, flush, ionValue, mountInvoice } from '../__tests__/mount-invoice';
 import type { SeriesOut } from '../operations';
 import SeriesFormModal from './SeriesFormModal.vue';
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
-vi.mock('@erplora/ui/shell', async (importOriginal) => ({
-  ...((await importOriginal()) as object),
-  toastSuccess: vi.fn(),
-}));
-beforeEach(() => vi.mocked(toastSuccess).mockClear());
 
 const prop = (el: Element | null, name: string): unknown => (el as unknown as Record<string, unknown>)[name];
 

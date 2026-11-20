@@ -1,16 +1,11 @@
 // A ticket's detail (WORKBOOK «Pantallas · Comandas»): tapping a row opens it, live
 // (`kitchen.ticket.get`): its destination, type, status, waiter and when it was sent, its notes and its
 // dishes with their quantity, station and state (a voided one with its reason).
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import { item, SETTINGS, ticket } from '../__tests__/kitchen';
 import { errorFrame, flush, mountKitchen, settle } from '../__tests__/mount-kitchen';
 import TicketDetailModal from './TicketDetailModal.vue';
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
 
 async function setup(locale: 'en' | 'es' = 'en') {
   const m = await mountKitchen(TicketDetailModal, { props: { open: true, ticketId: 't1', timezone: SETTINGS.timezone }, locale });

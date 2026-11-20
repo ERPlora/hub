@@ -15,11 +15,6 @@ import type { TicketRowOut } from '../operations';
 import TicketsPage from './TicketsPage.vue';
 import { listFillProblems } from '../../../../frontend/testing/list-fill';
 
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
-
 const OP = 'kitchen.ticket.list';
 const PENDING = row('t1');
 const READY = row('t2', { number: '20261014-0013', short_number: '0013', status: 'ready', label: 'Table 9' });
