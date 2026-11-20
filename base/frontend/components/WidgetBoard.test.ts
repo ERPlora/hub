@@ -140,7 +140,7 @@ describe('WidgetBoard', () => {
     const s = await setup('es');
     await s.show([]);
     await s.customize();
-    expect(s.inDoc('widgets-none')!.textContent?.trim()).toBe('Ninguna app instalada ofrece widgets todavía.');
+    expect(s.inDoc('widgets-none')!.textContent?.trim()).toBe('Ninguna app activa ofrece widgets todavía.');
   });
 
   it('a failed read says so, with «Retry»', async () => {

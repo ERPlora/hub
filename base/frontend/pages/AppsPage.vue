@@ -114,7 +114,7 @@ function stateLabel(app: AppRow): string {
   if (app.state === 'off') return t(app.refusal ? 'base.appsPage.state.unavailable' : 'base.appsPage.state.off');
   if (app.state === 'creating') return t('base.appsPage.state.creating');
   if (app.state === 'failed') return t('base.appsPage.state.failed');
-  return t(catalogue.value ? 'base.appsPage.state.installed' : 'base.appsPage.state.on');
+  return t('base.appsPage.state.on');
 }
 
 function stateTone(app: AppRow): 'success' | 'info' | 'warning' | 'danger' | 'neutral' {
@@ -150,7 +150,7 @@ const stateFilter = computed(() =>
         type: 'select' as const,
         options: (['on', 'off', 'blocked', 'creating', 'failed'] as const).map((value) => ({
           value,
-          label: t(`base.appsPage.state.${value === 'on' ? 'installed' : value}`),
+          label: t(`base.appsPage.state.${value}`),
         })),
       }
     : undefined,
