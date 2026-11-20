@@ -3,6 +3,7 @@ database, outside Django, that LISTENs on the channel of every business the work
 which of them were notified since it last asked. Real LISTEN and NOTIFY on the session's control database."""
 
 import logging
+import threading
 import time
 
 import psycopg
@@ -29,6 +30,20 @@ def heard_soon(ear, channels, *, seconds: float = 3.0) -> frozenset[str] | None:
         if heard is None or heard or time.monotonic() >= deadline:
             return heard
         time.sleep(0.05)
+
+
+def gone_soon(pid: int, *, seconds: float = 3.0) -> bool:
+    """Whether the server process ``pid`` leaves ``pg_stat_activity`` within ``seconds`` of real time: the server ends
+    it on its own a moment after the client has closed the connection."""
+    deadline = time.monotonic() + seconds
+    with connection.cursor() as cursor:
+        while True:
+            cursor.execute("SELECT 1 FROM pg_stat_activity WHERE pid = %s", [pid])
+            if cursor.fetchone() is None:
+                return True
+            if time.monotonic() >= deadline:
+                return False
+            time.sleep(0.05)
 
 
 @pytest.fixture
@@ -99,13 +114,21 @@ def test_a_connection_it_cannot_make_is_logged_and_tried_again_after_a_pause_tha
     ear.close()
 
 
-def test_close_ends_its_connection(ear):
+def closed_a_moment_later() -> psycopg.Connection:
+    """A real connection whose server process ends a moment after ``close()`` returns, as it may on a busy machine."""
+    conn = hub_listener.connect()
+    close = conn.close
+    conn.close = lambda: threading.Timer(0.3, close).start()
+    return conn
+
+
+@pytest.mark.parametrize("connect", [hub_listener.connect, closed_a_moment_later], ids=["now", "a_moment_later"])
+def test_close_ends_its_connection(connect):
+    ear = hub_listener.Listener(connect=connect)
     ear.heard({A})
     pid = ear.pid
 
     ear.close()
 
-    with connection.cursor() as cursor:
-        cursor.execute("SELECT count(*) FROM pg_stat_activity WHERE pid = %s", [pid])
-        assert cursor.fetchone()[0] == 0
+    assert gone_soon(pid)
     assert ear.pid is None
