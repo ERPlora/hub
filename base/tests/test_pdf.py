@@ -1,12 +1,12 @@
-"""The PDF of a document (``apps.invoice.pdf``): WeasyPrint prints the same A4 HTML ``render_document`` writes, offline.
+"""A whole HTML page printed as PDF with WeasyPrint, offline (``base.pdf``).
 
-Nothing outside the page is ever fetched: the document is whole (its styles inline, its QR a ``data:`` URI), and a
-URL among the SaaS's texts must never make the server call anywhere.
+Nothing outside the page is ever fetched: a page carries its styles inline and its images as ``data:`` URIs, and a URL
+among the texts it prints must never make the server call anywhere.
 """
 
 import pytest
 
-from apps.invoice import pdf
+from base import pdf
 
 
 def test_a_page_becomes_a_pdf():

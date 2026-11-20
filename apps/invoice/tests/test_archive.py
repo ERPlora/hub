@@ -13,13 +13,14 @@ from django.utils import translation
 from live.context import system_context
 from live.operations import UnknownOperation
 
-from apps.invoice import pdf, services
+from apps.invoice import services
 from apps.invoice.models import Invoice
 from apps.invoice.queries import fiscal_archive, render_document
 from apps.invoice.tests.conftest import A, HUB_DB
 from apps.invoice.tests.test_integration_verifactu import manual
 from apps.verifactu import chain
 from apps.verifactu.models import Record
+from base import pdf
 
 pytestmark = HUB_DB
 

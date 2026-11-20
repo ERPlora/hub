@@ -1,9 +1,8 @@
-"""The PDF of a document: WeasyPrint prints the A4 HTML ``queries.render_document`` writes (the platform hub's PDF
-of ERPlora's invoices), offline and outside any transaction.
+"""A whole HTML page as PDF: WeasyPrint prints it offline, and its callers do so outside any transaction.
 
-Nothing outside the page is fetched: the document is whole (its styles inline, VeriFactu's QR a ``data:`` URI), so
-the fetcher allows ``data:`` alone and a URL among the texts it prints never makes the server call anywhere (it is
-left out with a warning). WeasyPrint needs Pango and HarfBuzz (the image installs them, Dockerfile); it is imported
+Nothing outside the page is fetched: a page carries its styles inline and its images as ``data:`` URIs, so the
+fetcher allows ``data:`` alone and a URL among the texts it prints never makes the server call anywhere (it is left
+out with a warning). WeasyPrint needs Pango and HarfBuzz (the image installs them, Dockerfile); it is imported
 when a PDF is asked for, so a machine without them still runs everything else. On a Mac, Homebrew's library
 directories are offered to the loader (its ``ctypes.util.find_library`` reads them at that moment).
 """
