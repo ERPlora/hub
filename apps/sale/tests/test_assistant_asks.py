@@ -45,9 +45,9 @@ def test_what_the_employee_may_not_do_is_not_in_their_catalogue():
     assert "sale.sale.void" in employee
 
 
-#: How the owner asks layer 2 what the till takes: live reads no «abonar» as paying, so nothing in it names
-#: the payment methods, while «clientes» names the customers and «caja» the till; only the asks of
-#: ``sale.payment_method.list`` bring it, and ahead of them.
+#: How the owner asks layer 2 what the till takes: «abonarme» says paying, as the payments (``payment.payment.*``)
+#: do, «clientes» names the customers and «caja» the till; the payment methods come ahead of the customers and the
+#: till by their words, and ahead of the payments by their asks.
 PAYING_AT_THE_TILL = ("es", "sale.payment_method.list", "¿de qué maneras pueden abonarme los clientes en caja?")
 
 #: A quick note asked for without saying «nota rápida»: what the till's waiter taps, «para marcarlo rápido».
@@ -175,9 +175,9 @@ def test_the_asks_of_the_payment_methods_of_the_till_take_no_place_from_the_paym
 #: la línea» with one word changed); and, for ``sale.department.update`` and ``sale.quick_note.update``, one for each of
 #: their asks in each language, which falls out without that ask alone (it shares two of its stems at most, and fewer
 #: than half of its own), and the English twins of the probes of ``LAYER_2``; and so for ``sale.payment_method.list``,
-#: but for «¿con qué me pueden pagar?», which ``PAYING_AT_THE_TILL`` needs instead (the asks of many other tools say
-#: «pueden»), and «¿se puede pagar con Bizum?», which says no word the others do not («Bizum» is in «do we accept
-#: Bizum?»).
+#: but for «¿con qué me pueden pagar?», whose «pagar» brings the tool without its asks and whose «pueden» the asks of
+#: many other tools say, and «¿se puede pagar con Bizum?», which says no word the others do not («Bizum» is in «do
+#: we accept Bizum?»).
 OWN_WORDS = [
     ("en", "sale.payment_method.list", "would we take an Amex card?"),
     ("en", "sale.payment_method.list", "are cheques from regulars accepted?"),
@@ -185,7 +185,7 @@ OWN_WORDS = [
     ("en", "sale.payment_method.list", "tourists want to settle up, what else is there?"),
     ("es", "sale.payment_method.list", "¿aceptamos el cheque gourmet?"),
     ("es", "sale.payment_method.list", "¿qué maneras tenemos, además del efectivo?"),
-    ("es", "sale.payment_method.list", "¿con qué abonan los turistas normalmente?"),
+    ("es", "sale.payment_method.list", "¿con qué medios nos saldan los turistas normalmente?"),
     ("es", "sale.order.remove_voucher", "no lo uses en esta cuenta, mejor lo guarda"),
     ("en", "sale.order.remove_voucher", "she would rather not use it on the haircut"),
     ("en", "sale.department.update", "soft drinks belong on the standard band"),
