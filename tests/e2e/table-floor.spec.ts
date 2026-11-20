@@ -1,20 +1,21 @@
 // Tables in Chrome (apps/table/WORKBOOK.md), with the real Sales, Inventory and Customers apps: the owner
 // draws a zone and its tables on the floor plan (Edit plan: «+», a drag that stays after a reload, «Edit
-// table», a long table by its width and height), serves it (Service: seats a party, transfers it, merges two tables, charges in Sales — the plan
-// frees the table by itself, live — and closes an empty table), and reads the checks in Sessions, the
-// zones in Zones and the tables in Tables. Every screen in three viewports. What a run creates lives in a
+// table», a long table by its width and height), serves a room of its own (Service: seats a party, transfers it,
+// merges two tables, charges the table's check in the till and finds the table free, and closes an empty table),
+// and reads the checks in Sessions, the zones in Zones and the tables in Tables. Every screen in three viewports. What a run creates lives in a
 // zone named «E2E Tbl <stamp>…» and its checks; `afterAll` removes all of it, sales included.
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
 import { A, api, capture, psql, settled, shot, shown } from './helpers';
 import { cleanInventory, createProduct } from './inventory-helpers';
-import { chargeByApi, cleanSales } from './sale-helpers';
+import { cleanSales } from './sale-helpers';
 import { ownerPage, post } from './service-helpers';
 
 const STAMP = Date.now().toString(36).toUpperCase();
 const ZONE = `E2E Tbl ${STAMP} Terrace`;
 const HALL = `E2E Tbl ${STAMP} Hall`;
 const PATIO = `E2E Tbl ${STAMP} Patio`;
+const SERVICE = `E2E Tbl ${STAMP} Service`;
 const LONG = `E2E Tbl ${STAMP} Long`;
 const VIEWPORTS = [
   { label: '390', width: 390, height: 844 },
@@ -39,9 +40,8 @@ interface TableRow {
 /** Every check of Sales a run's tables held: the empty ones (voided on close or merged) carry no E2E line. */
 const orders = new Set<string>();
 
-async function tableByNumber(context: BrowserContext, number: string): Promise<TableRow> {
-  const zone = encodeURIComponent(ZONE);
-  const res = await api<TableRow>(context, A, 'GET', `/table/tables/detail?table=${number}&zone=${zone}`);
+async function tableByNumber(context: BrowserContext, number: string, zone = ZONE): Promise<TableRow> {
+  const res = await api<TableRow>(context, A, 'GET', `/table/tables/detail?table=${number}&zone=${encodeURIComponent(zone)}`);
   expect(res.status, `table ${number}`).toBe(200);
   for (const check of res.data.checks) if (check.order_id) orders.add(check.order_id);
   return res.data;
@@ -88,8 +88,8 @@ async function shots(page: Page, name: string, ready: () => Promise<void>): Prom
 const tile = (page: Page, id: string) => shown(page).locator(`[data-testid=table-floor-tile-${id}]`);
 const sheet = (page: Page) => page.locator('ion-modal[data-testid=table-sheet]');
 
-async function chooseZone(page: Page): Promise<void> {
-  const zoneId = psql(`select id from table_zone where name = '${ZONE}'`);
+async function chooseZone(page: Page, zone = ZONE): Promise<void> {
+  const zoneId = psql(`select id from table_zone where name = '${zone}'`);
   await shown(page).locator(`[data-testid=table-floor-zone-tab-${zoneId}]`).click();
 }
 
@@ -191,13 +191,19 @@ test('A long table: «Edit table» takes its width and height, and the plan pain
   }
 });
 
-test('Serve the room with the real till: seat, transfer, merge, charge and close', async ({ browser }) => {
+test('Serve the room with the real till: seat, transfer, merge, charge and close @smoke', async ({ browser }) => {
   const { context, page } = await ownerPage(browser, '/table/floor-plan');
   try {
-    await chooseZone(page);
-    const one = await tableByNumber(context, '1');
-    const two = await tableByNumber(context, '2');
+    // A room of its own, made through the API: the browser smoke runs this test without the ones before it.
+    const zone = await post<{ id: string }>(context, '/table/zones', { name: SERVICE });
+    for (const [number, capacity] of [['1', 6], ['2', 4]] as const) await post(context, '/table/tables', { zone_id: zone.id, number, capacity });
+    const table = (number: string) => tableByNumber(context, number, SERVICE);
+    await chooseZone(page, SERVICE);
+    const one = await table('1');
+    const two = await table('2');
     const coffee = await createProduct(context, { name: `E2E Tbl coffee ${STAMP}`, sku: `E2E-TBL-${STAMP}`, price: 150 });
+    const methods = await api<{ rows: { id: string; type: string }[] }>(context, A, 'GET', '/sale/payment_methods');
+    const card = methods.data.rows.find((row) => row.type === 'card')!.id;
 
     // Seat three at table 1: its check opens in Sales titled «Table 1».
     await tile(page, one.id).click();
@@ -207,22 +213,13 @@ test('Serve the room with the real till: seat, transfer, merge, charge and close
     await expect(tile(page, one.id)).toContainText('Occupied');
     await expect(tile(page, one.id)).toContainText('3/6 pax');
     await expect(tile(page, one.id)).toContainText('0:00');
-    const seated = await tableByNumber(context, '1');
+    const seated = await table('1');
     const orderId = seated.checks[0].order_id!;
     const check = await api<{ label: string; status: string }>(context, A, 'GET', `/sale/orders/detail?order_id=${orderId}`);
     expect([check.data.label, check.data.status]).toEqual(['Table 1', 'open']);
     await shots(page, 'table-floor-service', async () => {
       await expect(tile(page, one.id)).toContainText('Occupied');
     });
-
-    // Charge goes to the till with the table's check: waited for by what the till shows, not by its URL (the
-    // till drops `?order=` as soon as it has loaded the check, sometimes before a URL check sees it).
-    await tile(page, one.id).click();
-    await page.locator('[data-testid=table-sheet-action-charge]').click();
-    await expect(shown(page).locator('[data-testid=pos-check-title]')).toHaveValue('Table 1');
-    await expect(page).toHaveURL(/\/sale\/pos(\?|$)/);
-    await page.goto(`${A}/table/floor-plan`);
-    await chooseZone(page);
 
     // Transfer the party to table 2: the plan picks a free table.
     await tile(page, one.id).click();
@@ -231,13 +228,13 @@ test('Serve the room with the real till: seat, transfer, merge, charge and close
     await tile(page, two.id).click();
     await expect(tile(page, two.id)).toContainText('Occupied');
     await expect(tile(page, one.id)).toContainText('Available');
-    expect((await tableByNumber(context, '2')).checks[0].order_id).toBe(orderId);
+    expect((await table('2')).checks[0].order_id).toBe(orderId);
 
     // Seat table 1 again and merge it into table 2: one check of Sales with every line.
     await tile(page, one.id).click();
     await page.locator('[data-testid=table-guests-quick-2]').click();
     await expect(tile(page, one.id)).toContainText('Occupied');
-    const second = (await tableByNumber(context, '1')).checks[0].order_id!;
+    const second = (await table('1')).checks[0].order_id!;
     for (const id of [orderId, second]) {
       const added = await api(context, A, 'POST', '/sale/orders/add_line', { order_id: id, product_id: coffee.id, quantity: '1' });
       expect(added.status).toBe(200);
@@ -249,15 +246,30 @@ test('Serve the room with the real till: seat, transfer, merge, charge and close
     const merged = await api<{ lines: unknown[] }>(context, A, 'GET', `/sale/orders/detail?order_id=${orderId}`);
     expect(merged.data.lines).toHaveLength(2);
 
-    // Charged in Sales, the table frees itself on the plan (live, no reload).
-    await chargeByApi(context, { order_id: orderId, payments: [{ method: 'card' }] });
+    // «Charge» goes to the till with the table's check: waited for by what the till shows, not by its URL (the till
+    // drops `?order=` as soon as it has loaded the check, sometimes before a URL check sees it). Charged whole there,
+    // by card, the table is free on the plan.
+    await tile(page, two.id).click();
+    await page.locator('[data-testid=table-sheet-action-charge]').click();
+    const till = shown(page);
+    await expect(till.locator('[data-testid=pos-check-title]')).toHaveValue('Table 2');
+    await expect(page).toHaveURL(/\/sale\/pos(\?|$)/);
+    await expect(till.locator('[data-testid=pos-total]')).toContainText(/3[.,]00/);
+    await till.locator('[data-testid=pos-charge]').click();
+    const checkout = page.locator('[data-testid=sale-checkout-modal]');
+    await checkout.locator(`[data-testid=sale-checkout-method-${card}]`).click();
+    await checkout.locator('[data-testid=sale-checkout-confirm]').click();
+    await expect(checkout).toBeHidden();
+    await expect(page.locator('[data-testid=sale-document-modal] [data-testid=sale-receipt]')).toBeVisible();
+    await page.goto(`${A}/table/floor-plan`);
+    await chooseZone(page, SERVICE);
     await expect(tile(page, two.id)).toContainText('Available', { timeout: 15_000 });
 
     // A party that leaves without ordering: «Close table» closes it, its empty check is voided.
     await tile(page, one.id).click();
     await page.locator('[data-testid=table-guests-quick-1]').click();
     await expect(tile(page, one.id)).toContainText('Occupied');
-    await tableByNumber(context, '1');
+    await table('1');
     await tile(page, one.id).click();
     await page.locator('[data-testid=table-sheet-action-close]').click();
     await page.locator('[data-testid=table-sheet-close-confirm]').click();
