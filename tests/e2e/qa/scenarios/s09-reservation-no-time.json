@@ -1,0 +1,184 @@
+{
+  "id": "s09-reservation-no-time",
+  "title": "A booking for six on Friday, said without a time",
+  "vertical": "restaurant",
+  "seed": "restaurant.en",
+  "language": "en",
+  "setup": [
+    {
+      "tool": "schedule.week.set_day",
+      "arguments": {
+        "weekday": 0,
+        "is_closed": false,
+        "intervals": [{"open_time": "12:30", "close_time": "16:30"}, {"open_time": "19:30", "close_time": "23:59"}]
+      }
+    },
+    {
+      "tool": "schedule.week.set_day",
+      "arguments": {
+        "weekday": 1,
+        "is_closed": false,
+        "intervals": [{"open_time": "12:30", "close_time": "16:30"}, {"open_time": "19:30", "close_time": "23:59"}]
+      }
+    },
+    {
+      "tool": "schedule.week.set_day",
+      "arguments": {
+        "weekday": 2,
+        "is_closed": false,
+        "intervals": [{"open_time": "12:30", "close_time": "16:30"}, {"open_time": "19:30", "close_time": "23:59"}]
+      }
+    },
+    {
+      "tool": "schedule.week.set_day",
+      "arguments": {
+        "weekday": 3,
+        "is_closed": false,
+        "intervals": [{"open_time": "12:30", "close_time": "16:30"}, {"open_time": "19:30", "close_time": "23:59"}]
+      }
+    },
+    {
+      "tool": "schedule.week.set_day",
+      "arguments": {
+        "weekday": 4,
+        "is_closed": false,
+        "intervals": [{"open_time": "12:30", "close_time": "16:30"}, {"open_time": "19:30", "close_time": "23:59"}]
+      }
+    },
+    {
+      "tool": "schedule.week.set_day",
+      "arguments": {
+        "weekday": 5,
+        "is_closed": false,
+        "intervals": [{"open_time": "12:30", "close_time": "16:30"}, {"open_time": "19:30", "close_time": "23:59"}]
+      }
+    },
+    {
+      "tool": "schedule.week.set_day",
+      "arguments": {
+        "weekday": 6,
+        "is_closed": false,
+        "intervals": [{"open_time": "12:30", "close_time": "16:30"}, {"open_time": "19:30", "close_time": "23:59"}]
+      }
+    },
+    {
+      "tool": "reservation.time_slot.create",
+      "arguments": {"day_of_week": 0, "start_time": "13:00", "end_time": "16:00", "max_reservations": 10}
+    },
+    {
+      "tool": "reservation.time_slot.create",
+      "arguments": {"day_of_week": 0, "start_time": "20:00", "end_time": "23:30", "max_reservations": 10}
+    },
+    {
+      "tool": "reservation.time_slot.create",
+      "arguments": {"day_of_week": 1, "start_time": "13:00", "end_time": "16:00", "max_reservations": 10}
+    },
+    {
+      "tool": "reservation.time_slot.create",
+      "arguments": {"day_of_week": 1, "start_time": "20:00", "end_time": "23:30", "max_reservations": 10}
+    },
+    {
+      "tool": "reservation.time_slot.create",
+      "arguments": {"day_of_week": 2, "start_time": "13:00", "end_time": "16:00", "max_reservations": 10}
+    },
+    {
+      "tool": "reservation.time_slot.create",
+      "arguments": {"day_of_week": 2, "start_time": "20:00", "end_time": "23:30", "max_reservations": 10}
+    },
+    {
+      "tool": "reservation.time_slot.create",
+      "arguments": {"day_of_week": 3, "start_time": "13:00", "end_time": "16:00", "max_reservations": 10}
+    },
+    {
+      "tool": "reservation.time_slot.create",
+      "arguments": {"day_of_week": 3, "start_time": "20:00", "end_time": "23:30", "max_reservations": 10}
+    },
+    {
+      "tool": "reservation.time_slot.create",
+      "arguments": {"day_of_week": 4, "start_time": "13:00", "end_time": "16:00", "max_reservations": 10}
+    },
+    {
+      "tool": "reservation.time_slot.create",
+      "arguments": {"day_of_week": 4, "start_time": "20:00", "end_time": "23:30", "max_reservations": 10}
+    },
+    {
+      "tool": "reservation.time_slot.create",
+      "arguments": {"day_of_week": 5, "start_time": "13:00", "end_time": "16:00", "max_reservations": 10}
+    },
+    {
+      "tool": "reservation.time_slot.create",
+      "arguments": {"day_of_week": 5, "start_time": "20:00", "end_time": "23:30", "max_reservations": 10}
+    },
+    {
+      "tool": "reservation.time_slot.create",
+      "arguments": {"day_of_week": 6, "start_time": "13:00", "end_time": "16:00", "max_reservations": 10}
+    },
+    {
+      "tool": "reservation.time_slot.create",
+      "arguments": {"day_of_week": 6, "start_time": "20:00", "end_time": "23:30", "max_reservations": 10}
+    }
+  ],
+  "owner": {
+    "persona": "Tom, the English owner of The Olive Tree, a restaurant in Málaga. A regular has just phoned to book.",
+    "goal": "That the table for Javier Ortega's party of six is booked for this Friday.",
+    "upFront": ["The booking is for six people this Friday.", "It is under the name Javier Ortega."],
+    "ifAsked": ["They come at half past nine in the evening, 21:30.", "His phone number is 654 321 987.", "Any table is fine."]
+  },
+  "attachments": [],
+  "opening": "Book me a table for 6 on Friday",
+  "offered": ["reservation.reservation.create"],
+  "writes": ["reservation.reservation.create", "reservation.reservation.update", "customer.customer.create"],
+  "cards": [{"tool": "reservation.reservation.create", "match": {"guest_name": "ortega"}, "expect": {"party_size": 6}}],
+  "expect": [
+    {
+      "says": "one booking for six on the coming Friday (today, when today is one) at 21:30 under Javier Ortega",
+      "sql": "select count(*) from reservation_reservation r left join customer_customer c on c.id = r.customer_id where not r.is_deleted and extract(isodow from r.date) = 5 and r.date between '{today}' and '{today+7}' and to_char(r.time, 'HH24:MI') = '21:30' and r.party_size = 6 and (r.guest_name ilike '%ortega%' or c.name ilike '%ortega%')",
+      "equals": "1"
+    }
+  ],
+  "forbidden": [
+    {
+      "says": "no other booking",
+      "sql": "select count(*) from reservation_reservation where not is_deleted",
+      "equals": "1"
+    },
+    {
+      "says": "the opening hours and service times do not change",
+      "sql": "select md5(string_agg(day_of_week || to_char(start_time, 'HH24:MI') || to_char(end_time, 'HH24:MI') || max_reservations, ',' order by day_of_week, start_time)) from reservation_timeslot",
+      "unchanged": true
+    }
+  ],
+  "mustAsk": [
+    {
+      "id": "time",
+      "fact": "the time of the booking",
+      "reveals": ["21:30", "half past nine", "9:30"],
+      "uses": [
+        {"tool": "reservation.reservation.create", "path": "time"},
+        {"tool": "reservation.reservation.update", "path": "time"}
+      ]
+    },
+    {
+      "id": "phone",
+      "fact": "the guest's phone number",
+      "reveals": ["654"],
+      "uses": [
+        {"tool": "reservation.reservation.create", "path": "guest_phone"},
+        {"tool": "reservation.reservation.update", "path": "guest_phone"}
+      ]
+    }
+  ],
+  "maxTurns": 6,
+  "golden": [
+    {
+      "tool": "reservation.reservation.create",
+      "arguments": {
+        "date": "{friday}",
+        "time": "21:30",
+        "party_size": 6,
+        "guest_name": "Javier Ortega",
+        "guest_phone": "654321987"
+      }
+    }
+  ]
+}

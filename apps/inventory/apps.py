@@ -50,7 +50,9 @@ class InventoryConfig(LiveAppConfig):
     # (inventory.unit), and a «albarán», the «mercancía» or what «entran» (never «entrada»: its stem is that of «entre»)
     # is the goods inventory.stock.receive records. So are «20 kilos de» or «5 cajas de» a product, and what is noted
     # down as arrived, which are also its stock (inventory.stock); not the bottles, cans or units a sale line or a cart
-    # counts too.
+    # counts too. A restaurant's «carta» is its products, in the very group live says for them (with fewer words it would
+    # be a second concept, and «los productos de la carta» would count the products twice). What broke is the breakage
+    # a write-off records, «roto» or «broken» (never «break» nor «breakage»: their stem is a staff member's break).
     assistant_synonyms = (
         ("unidad", "unidades", "unit", "units"),
         (
@@ -58,6 +60,8 @@ class InventoryConfig(LiveAppConfig):
             "delivery note", *QUANTITIES_OF_GOODS, *GOODS_NOTED_AS_ARRIVED,
         ),
         ("stock", *QUANTITIES_OF_GOODS, *GOODS_NOTED_AS_ARRIVED),
+        ("carta", "producto", "articulo", "product"),
+        ("roto", "rota", "rotos", "rotas", "rotura", "broke", "broken"),
     )
     permissions = [
         "inventory.view_product",

@@ -90,7 +90,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
     try {
       // On, outside Spain: nothing binds it, so it can go off and nothing is refused.
       await findIt(page);
-      await expect(stateOf(page)).toHaveText('Instalada');
+      await expect(stateOf(page)).toHaveText('Activa');
       await expect(reasonOf(page)).toHaveCount(0);
       await settledCapture(page, `${KEY}-pl-on-${width}`);
 
@@ -128,7 +128,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
         await expect(askOn).toContainText('¿Activar VeriFactu?');
         await askOn.getByRole('button', { name: 'Activar', exact: true }).click();
       }
-      await expect(stateOf(page)).toHaveText('Instalada');
+      await expect(stateOf(page)).toHaveText('Activa');
       await expect(reasonOf(page)).toHaveText(NEVER_OFF_ES);
       await expectSwitch(page, 'verifactu', { checked: true, disabled: true });
       await settledCapture(page, `${KEY}-es-on-${width}`);

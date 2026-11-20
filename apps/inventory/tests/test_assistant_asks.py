@@ -13,6 +13,7 @@ from live.operations import AI, registry
 
 from base import assistant
 from base.models import Membership
+from base.tests.assistant_context import offered, owner_of_a
 from base.tests.test_assistant_asks import assert_its_words_name
 from base.tests.test_assistant_asks import (
     TOP,
@@ -244,3 +245,40 @@ def test_the_hub_reads_a_quantity_in_a_unit_as_the_stock_of_goods_and_an_amount_
         if any(stock in concept or receive in concept for concept in shared.asked([phrase], own).concepts)
     ]
     assert named == []
+
+
+def offered_by_a_turn(make_user, language: str, text: str) -> list[str]:
+    """The tools a turn of the assistant offers the owner of business A for ``text``, said alone."""
+    return offered(owner_of_a(make_user, language), {"role": "user", "content": text})
+
+
+@HUB_DB
+def test_taking_one_product_off_the_menu_and_repricing_another_brings_both_writes(make_user):
+    tools = offered_by_a_turn(make_user, "es", "Quita el flan casero de la carta y pon el café con leche a 1,90 €")
+
+    assert {"inventory__product__delete", "inventory__product__update"} <= set(tools)
+
+
+@HUB_DB
+def test_putting_a_product_with_the_other_desserts_of_the_menu_brings_a_way_to_its_category(make_user):
+    tools = offered_by_a_turn(make_user, "es", "Sí, ponla con los otros postres de la carta, como un postre más.")
+
+    assert {"inventory__category__list", "inventory__product_category__add"} & set(tools)
+
+
+@HUB_DB
+def test_bottles_that_got_broken_bring_the_write_off(make_user):
+    assert "inventory__stock__write_off" in offered_by_a_turn(make_user, "en", "Three bottles of water got broken")
+
+
+def test_the_hub_reads_the_menu_as_the_products_and_what_broke_as_breakage():
+    """Inventory's own words: a restaurant's «carta» is its products, and «roto» and «broken» are one word, the
+    breakage a write-off records; neither the platform's words nor live alone say so (positive control)."""
+    assert_its_words_name(
+        "inventory",
+        [
+            ("quita el flan casero de la carta", shared.stem("product")),
+            ("se han roto tres botellas de agua", shared.stem("broke")),
+            ("three bottles of water got broken", shared.stem("roto")),
+        ],
+    )

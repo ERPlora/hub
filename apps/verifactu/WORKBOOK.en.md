@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:01415ffbfaf4f68d07ea8f4adf25a512754c2a151dbe6d0be164ae313f3cdf09 -->
+<!-- generated from WORKBOOK.md sha256:cfd826d874bdeb4612ca6895f22a3a416f0071e53f16f1c028c3b7355a286fac -->
 
 ## What it is for and who it is for
 
@@ -504,7 +504,9 @@ authorisation or no valid certificate waits, because the gateway could not file 
 Closing the ERPlora route on the server neither takes anyone already live through it out of production nor changes
 their route: it keeps sealing, sending and cancelling with ERPlora's seal, because the AEAT only takes a cancellation
 filed with the same seal; uploading a certificate afterwards does not change it either. With the route closed, the
-Home's "Set up VeriFactu" step is only done with the own certificate.
+Home's "Set up VeriFactu" step is only done with the own certificate and only speaks of it: "Upload your business
+certificate to send your invoices to the AEAT." (with the route open, "Sign the authorisation for ERPlora to send your
+invoices to the AEAT, or upload your business certificate.").
 It is checked in this order and the first cause gives the 409 with its code: the closed server → a demo
 business → the issuer → the route (with a valid certificate, the certificate, which needs no authorisation; without
 it, ERPlora's, open on the server and with the approved authorisation) → the account.

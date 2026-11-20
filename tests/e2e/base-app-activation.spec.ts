@@ -238,7 +238,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
       await search(page, 'Tasks');
       await expect(appRow(page, 'task').locator('[data-testid="apps-state"]')).toHaveText('Off');
       await flipApp(page, 'task');
-      await expect(appRow(page, 'task').locator('[data-testid="apps-state"]')).toHaveText('Installed');
+      await expect(appRow(page, 'task').locator('[data-testid="apps-state"]')).toHaveText('Active');
       await expect(testid(page, 'apps-counter')).toHaveText('27 apps turned on · 17 of 20 in your plan');
       await expect.poll(() => menuApps(page), { message: 'the menu follows without a reload' }).toContain('Tasks');
       await snap(page, 'on-again', width);
@@ -310,7 +310,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
       await flipApp(page, 'flow');
       await expect(toastSaying(page, 'Automatizaciones está activada.')).toBeVisible();
       await expect(page.locator('.ep-confirm-dialog:visible')).toHaveCount(0);
-      await expect(appRow(page, 'flow').locator('[data-testid="apps-state"]')).toHaveText('Instalada');
+      await expect(appRow(page, 'flow').locator('[data-testid="apps-state"]')).toHaveText('Activa');
       await expect(testid(page, 'apps-counter')).toHaveText('27 apps activadas · 17 de 20 de tu plan');
       expect(stored('flow')).toBe('on:true');
       await expect.poll(() => menuApps(page), { message: 'the menu follows without a reload' }).toContain('Automatizaciones');
@@ -368,7 +368,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
       await page.screenshot({ path: shot(`FIX-HUB-BASE-APP-ACTIVATION-BASE-F19-${width}`) });
       await askOn.getByRole('button', { name: 'Activar' }).click();
       await expect(toastSaying(page, 'Reservas está activada. También se ha activado: Mesas.')).toBeVisible();
-      await expect(appRow(page, 'reservation').locator('[data-testid="apps-state"]')).toHaveText('Instalada');
+      await expect(appRow(page, 'reservation').locator('[data-testid="apps-state"]')).toHaveText('Activa');
       await expect(testid(page, 'apps-counter')).toHaveText('27 apps activadas · 17 de 20 de tu plan');
       // Reservations chosen; Tables came along with it, so it does not count.
       expect([stored('reservation'), stored('table')]).toEqual(['on:true', 'on:false']);
@@ -588,7 +588,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
       await expect(toastSaying(page, 'Turning on Printing… It will be ready in a moment.')).toBeVisible();
 
       // The worker sets it up and turns it on: the row and the topbar's «My apps» follow without a reload.
-      await expect(state).toHaveText('Installed', { timeout: SET_UP_MS });
+      await expect(state).toHaveText('Active', { timeout: SET_UP_MS });
       expect(stored(PRINTING)).toBe('on:true');
       expect(psql(`select schema_apps ? '${PRINTING}' from base_hub where slug = 'a'`)).toBe('t');
       // The menu is the session's: AppsFollower reads it again when the live list changes, a moment after.
@@ -611,7 +611,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
       // Its time comes: the worker turns it on and the screen says so, live.
       psql(`update base_appactivation set next_attempt_at = null where host = 'a' and app = '${PRINTING}'`);
       ring();
-      await expect(state).toHaveText('Installed', { timeout: SET_UP_MS });
+      await expect(state).toHaveText('Active', { timeout: SET_UP_MS });
 
       // «Could not turn on», as a failure leaves the row: «Retry» sets it up again through the worker.
       await writeApps(
@@ -626,7 +626,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
       await testid(page, `apps-row-${PRINTING}-retry`).click();
       expect((await retried).status()).toBe(202);
       await expect(toastSaying(page, 'Turning on Printing… It will be ready in a moment.')).toBeVisible();
-      await expect(state).toHaveText('Installed', { timeout: SET_UP_MS });
+      await expect(state).toHaveText('Active', { timeout: SET_UP_MS });
       expect(psql(`select attempts || ':' || last_error from base_appactivation where host = 'a' and app = '${PRINTING}'`)).toBe(
         '0:',
       );

@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:b27b2097977aa0112978ba2855d02d442bf281d0c392627b9442ac50e14972b1 -->
+<!-- generated from WORKBOOK.md sha256:02773e56ba289be8126c7f66ec262507feb10564ff78f7c5c20eafd1a42ce776 -->
 
 ## What it is for and who it is for
 
@@ -339,7 +339,7 @@ On the Employees screens and the API documentation:
 | BASE-F15 | Open an app from Apps | done |
 | BASE-F16 | Look for an app in the catalogue | done |
 | BASE-F17 | Know how much an app costs before having it | done |
-| BASE-F18 | Install an app | done |
+| BASE-F18 | Turn on an app | done |
 | BASE-F19 | Know what else comes with an app | done |
 | BASE-F20 | Try to use an app that needs a subscription | done |
 | BASE-F21 | See why an app could not be turned on and try again | done |
@@ -615,7 +615,7 @@ In: the panels this person may put.
 Out: the chosen board, kept in this browser: the people who use this device share it and it does not
 travel to another one.
 If it fails: a kept panel whose app was turned off disappears from the board without notice. Without any
-app offering panels: "No installed app offers widgets yet.".
+app offering panels: "No active app offers widgets yet.".
 Involved: none
 
 ### BASE-F08 Keep the panels up to date without reloading
@@ -784,7 +784,7 @@ Screen: Apps
 Steps:
   1. In Apps, they tap "Add apps" (every ERPlora app) or "Paid" (only the ones subscribed to separately).
   2. While it arrives: "Loading the catalogue…". Then one row per app with "App", "Category", "Description",
-     "Price", "Comes with" and "Status" ("Installed" or "Needs a subscription"), with the names and the
+     "Price", "Comes with" and "Status" ("Active" or "Needs a subscription"), with the names and the
      descriptions in the language of whoever looks. An app the business's country requires shows "Mandatory in
      Spain" (or the business's country) next to its status, off too: that way it shows which one is still to be
      turned on (hub#997).
@@ -813,7 +813,7 @@ Out: nothing saved. The hub neither charges nor shows amounts: the price and the
 If it fails: without the list, as in "My apps" (BASE-F14).
 Involved: APPS-F01, APPS-F07
 
-### BASE-F18 Install an app
+### BASE-F18 Turn on an app
 Status: done
 Actor: administrator
 Screen: Apps
@@ -822,7 +822,7 @@ Steps:
      without reloading, as soon as it is subscribed to on erplora.com (BASE-F20).
   2. In "Add apps", whoever runs the business looks for an app the business does not use, "Off", and presses "Turn
      on". If it needs other apps that are off, it asks first, naming them (BASE-F19).
-  3. The app becomes "Installed" at once and shows in "My apps" and, without reloading, in the menu of every device
+  3. The app becomes "Active" at once and shows in "My apps" and, without reloading, in the menu of every device
      of the business. The counter at the top adds the apps turned on and one of the plan's: turning Tasks on, from
      "26 apps turned on · 16 of 20 in your plan" to "27 apps turned on · 17 of 20 in your plan"; the ones that come
      along with it add to the apps turned on, not to the plan's.
@@ -865,7 +865,7 @@ Steps:
      subscription", and is neither in "My apps" nor in the menu.
   2. Whoever runs the business, in the browser, sees "Upgrade plan" next to it, which opens this
      business's Store on erplora.com in a new tab: there they see the price and subscribe.
-  3. As soon as erplora.com tells the hub, the app becomes "Installed" and shows in "My apps" and in the menu,
+  3. As soon as erplora.com tells the hub, the app becomes "Active" and shows in "My apps" and in the menu,
      without reloading.
   4. Whoever does not run the business, and anyone in the installed app, sees "Subscribed to on erplora.com,
      from your ERPlora account." and no button: the hub never sells.

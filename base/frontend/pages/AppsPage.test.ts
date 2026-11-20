@@ -60,8 +60,25 @@ describe('AppsPage', () => {
     expect(invoice.text()).toContain('What invoice does.');
     expect(invoice.text()).toContain('Free');
     expect(invoice.text()).toContain('Taxes');
-    expect(invoice.text()).toContain('Installed');
+    expect(invoice.find('[data-testid="apps-state"]').text()).toBe('Active');
     expect(m.wrapper.find('[data-testid="apps-row"][data-id="stock"]').text()).toContain('Needs a subscription');
+  });
+
+  it.each([
+    ['en', 'Active'],
+    ['es', 'Activa'],
+  ] as const)('an app that is on reads the same in both lists and in the state filter (%s)', async (locale, active) => {
+    const stateOf = (m: Mounted) => m.wrapper.find('[data-testid="apps-row"][data-id="invoice"] [data-testid="apps-state"]').text();
+    const mine = await open('/apps', { locale });
+    await mine.result(mine.call, 'base.app.list', LIST);
+    expect(stateOf(mine)).toBe(active);
+    const all = await open('/apps#all', { locale });
+    await all.result(all.call, 'base.app.list', LIST);
+    expect(stateOf(all)).toBe(active);
+    await all.wrapper.find('[data-testid="apps-filters-toggle"]').trigger('click');
+    await flush();
+    const filter = all.wrapper.findAll('[data-testid="apps-filter-state"] ion-select-option').map((option) => option.text());
+    expect(filter).toContain(active);
   });
 
   it('shows the plan under the app name, and «Open» as a named icon button in the list', async () => {

@@ -4,7 +4,8 @@ from live.context import OperationContext
 from live.operations import operation
 
 from apps.verifactu.models import Event
-from apps.verifactu.schemas import DiagnosticLastOut, NoInput
+from apps.verifactu.schemas.diagnostics import DiagnosticLastOut
+from apps.verifactu.schemas.fields import NoInput
 
 from .reads import VIEW
 from .route import wait

@@ -58,7 +58,7 @@
       "add": "Añadir {widget}",
       "remove": "Quitar {widget}",
       "empty": "Panel vacío. Pulsa ⋮ para añadir widgets.",
-      "none": "Ninguna app instalada ofrece widgets todavía.",
+      "none": "Ninguna app activa ofrece widgets todavía.",
       "noData": "Sin datos",
       "error": "No disponible",
       "loadError": "No se han podido cargar los paneles",
@@ -128,7 +128,6 @@
       },
       "state": {
         "on": "Activa",
-        "installed": "Instalada",
         "blocked": "Necesita suscripción",
         "off": "Desactivada",
         "creating": "Activándose…",

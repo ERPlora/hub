@@ -11,7 +11,8 @@ from live.operations import operation
 
 from apps.verifactu import erplora_route, representation
 from apps.verifactu.models import Config, Event
-from apps.verifactu.schemas import NoInput, RepresentationModelOut
+from apps.verifactu.schemas.authorisation import RepresentationModelOut
+from apps.verifactu.schemas.fields import NoInput
 
 from .route import issuer_model_details
 

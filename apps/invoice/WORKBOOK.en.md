@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:734193012af6989ecd87a714b98b9897e7488ba3c614fd30d5f5a17e8c497cba -->
+<!-- generated from WORKBOOK.md sha256:a1dcd8ac78f63c5b8ef0834680d9b943c43cdcd770916f6b5b15f1f5adab8669 -->
 
 ## What it is for and who it is for
 
@@ -152,7 +152,8 @@ prefix, the format and the counter of the numbering of one invoice type and one 
 "New numbering series"; "Edit" (or tapping the row) opens "Edit series {code}" (INVOICE-F12,
 INVOICE-F13). Without an issuer, the same bell's notice "You cannot issue invoices yet" as in **Invoices** says
 it, once, and none on the screen.
-Empty: "No series yet. Create the first one to number your invoices.". Loading: "Loading series…".
+Empty: "No series yet. They are created on their own with your first sale; create one only to change the prefix or
+continue another system’s numbering.". Loading: "Loading series…".
 Error: "Could not load the series" with "Retry".
 
 ### Issuer

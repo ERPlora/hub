@@ -1,0 +1,90 @@
+{
+  "id": "s05-raise-drinks",
+  "title": "Subir un 5 % las bebidas, producto a producto",
+  "vertical": "restaurant",
+  "seed": "restaurant.es",
+  "language": "es",
+  "setup": [],
+  "owner": {
+    "persona": "Antonio, dueño del restaurante Casa Antonio, en Valencia. El proveedor ha subido los precios y él quiere repercutirlo en la carta.",
+    "goal": "Que los precios de las bebidas suban un 5 %, sin tocar nada más.",
+    "upFront": ["Quiero subir un 5 % el precio de las bebidas."],
+    "ifAsked": [
+      "Solo lo que está en Bebidas: los cafés y los vinos y cervezas se quedan como están.",
+      "Si sale medio céntimo, redondea hacia arriba."
+    ]
+  },
+  "attachments": [],
+  "opening": "Sube un 5 % las bebidas",
+  "offered": ["inventory.product.list", "inventory.product.update"],
+  "writes": ["inventory.product.update"],
+  "cards": [
+    {
+      "tool": "inventory.product.update",
+      "match": {"product": "agua"},
+      "expect": {"price": 210}
+    },
+    {
+      "tool": "inventory.product.update",
+      "match": {"product": "BEB-01"},
+      "expect": {"price": 210}
+    }
+  ],
+  "expect": [
+    {
+      "says": "el agua mineral pasa de 2,00 € a 2,10 €",
+      "sql": "select price from inventory_product where sku = 'BEB-01'",
+      "equals": "210"
+    },
+    {
+      "says": "el refresco pasa de 2,50 € a 2,63 € (o 2,62)",
+      "sql": "select price in (262, 263) from inventory_product where sku = 'BEB-02'",
+      "equals": "t"
+    },
+    {
+      "says": "el zumo de naranja pasa de 3,50 € a 3,68 € (o 3,67)",
+      "sql": "select price in (367, 368) from inventory_product where sku = 'BEB-03'",
+      "equals": "t"
+    }
+  ],
+  "forbidden": [
+    {
+      "says": "ningún otro producto cambia de precio",
+      "sql": "select md5(string_agg(id::text || price || is_deleted::text, ',' order by id)) from inventory_product where not (sku in ('BEB-01', 'BEB-02', 'BEB-03'))",
+      "unchanged": true
+    },
+    {
+      "says": "las bebidas no cambian más que de precio",
+      "sql": "select md5(string_agg(id::text || name || cost || stock || is_deleted::text || coalesce(tax_category_id::text, ''), ',' order by id)) from inventory_product where sku in ('BEB-01', 'BEB-02', 'BEB-03')",
+      "unchanged": true
+    }
+  ],
+  "mustAsk": [
+    {
+      "id": "which-drinks",
+      "fact": "qué productos son las bebidas",
+      "reveals": ["solo lo que está en bebidas", "los cafés"],
+      "uses": [{"tool": "inventory.product.update", "path": "price"}],
+      "resolvers": ["inventory.product.list", "inventory.category.list"]
+    }
+  ],
+  "maxTurns": 8,
+  "golden": [
+    {
+      "tool": "inventory.product.list",
+      "arguments": {"category": "Bebidas"}
+    },
+    {
+      "tool": "inventory.product.update",
+      "arguments": {"product": "BEB-01", "price": 210}
+    },
+    {
+      "tool": "inventory.product.update",
+      "arguments": {"product": "BEB-02", "price": 263}
+    },
+    {
+      "tool": "inventory.product.update",
+      "arguments": {"product": "BEB-03", "price": 368}
+    }
+  ]
+}

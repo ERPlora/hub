@@ -7,15 +7,21 @@ import { execFileSync } from 'node:child_process';
 
 import { expect, type Page, type Response } from '@playwright/test';
 
-import { cleanupCommand, type Meta, observe, redact, seedCommand } from './assistant-battery';
+import { cleanupCommand, type Meta, observe, redact } from './assistant-battery';
 import { answers, box, card, panel, send } from './assistant-panel';
+import { seedCommand } from './assistant-seed';
 import { HUB_DIR, REPO_DIR } from './helpers';
 import { STACK } from './stack';
 
 /** The checkout of the stack's SaaS (`E2E_SAAS_DIR`). */
 export const SAAS_DIR = process.env.E2E_SAAS_DIR ?? '';
-/** The keys of the real providers: taken out of every output, report and state written. */
-export const SECRETS = [process.env.QA_QWEN_API_KEY ?? '', process.env.QA_OPENAI_API_KEY ?? ''];
+/** The keys of the real providers, a model under test's too: taken out of every output, report and state written. */
+export const SECRETS = [
+  process.env.QA_QWEN_API_KEY ?? '',
+  process.env.QA_OPENAI_API_KEY ?? '',
+  process.env[process.env.QA_ANSWER_KEY_ENV ?? ''] ?? '',
+  process.env.QA_OPENROUTER_API_KEY ?? '',
+];
 /** A real model may think for a while: one turn, card included. */
 export const TURN_MS = 240_000;
 
@@ -44,7 +50,7 @@ export function emptyMonth(): void {
 
 /**
  * Once per run: the Hub's apps registered in the SaaS (`register_apps`: their documentation), the real providers set
- * through the SaaS's own operations (`SEED_PY`), the documentation indexed (`index_docs`, idempotent) and the chunks
+ * through the SaaS's own operations (`SEED_PY` of assistant-seed.ts), the documentation indexed (`index_docs`, idempotent) and the chunks
  * counted per source. Returns what the report says of them.
  */
 export function seedRealProviders(): Omit<Meta, 'run'> {
@@ -83,7 +89,8 @@ export function cleanUpRealProviders(emails: string[]): void {
 
 /**
  * Asks `question` and follows the turn to its end: a card is confirmed (typing its word when it asks one) or cancelled
- * as `decide` says; returns every streamed answer of `/api/assistant/turn` and what was decided. `label` names the
+ * as `decide` says; returns every streamed answer of `/api/assistant/turn` (also kept in `bodies`, so a turn that
+ * never ends still shows what it streamed), what was decided and when the last answer had come. `label` names the
  * question in a timeout.
  */
 export async function converse(
@@ -91,12 +98,21 @@ export async function converse(
   question: string,
   decide: 'confirm' | 'cancel',
   label: string,
-): Promise<{ bodies: string[]; decided: 'confirmed' | 'cancelled' | 'none' }> {
-  const bodies: string[] = [];
+  bodies: string[] = [],
+): Promise<{ bodies: string[]; decided: 'confirmed' | 'cancelled' | 'none'; endedAt: number }> {
   const reading: Promise<void>[] = [];
+  let endedAt = Date.now();
   const heard = (response: Response) => {
     if (!response.url().endsWith('/api/assistant/turn')) return;
-    reading.push(response.text().then((text) => void bodies.push(text), () => undefined));
+    reading.push(
+      response.text().then(
+        (text) => {
+          bodies.push(text);
+          endedAt = Date.now();
+        },
+        () => undefined,
+      ),
+    );
   };
   page.on('response', heard);
   let decided: 'confirmed' | 'cancelled' | 'none' = 'none';
@@ -133,7 +149,7 @@ export async function converse(
   } finally {
     page.off('response', heard);
   }
-  return { bodies, decided };
+  return { bodies, decided, endedAt };
 }
 
 /** Every answer of the assistant in the panel, as a person reads it. */

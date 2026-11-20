@@ -824,10 +824,6 @@
       {
         "name": "_assistant_answer",
         "complexity": 19
-      },
-      {
-        "name": "assistant_turn",
-        "complexity": 27
       }
     ]
   },
