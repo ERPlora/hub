@@ -23,7 +23,7 @@ from live.errors import Conflict
 from live.models import OutboxEvent
 from live.operations import get
 
-from base import blueprint, events, services, worker
+from base import blueprint, events, services, worker_activations
 from base.activation import CREATING, FAILED, OFF, ON
 from base.models import AppActivation, ImportBatch
 from base.tenancy import migrator
@@ -320,7 +320,7 @@ def test_a_worker_that_dies_loading_leaves_it_all_to_do_and_a_later_worker_does_
 
 
 def fail_the_schema():
-    return mock.patch.object(worker.migrator, "ensure_schema", side_effect=RuntimeError("the schema broke"))
+    return mock.patch.object(worker_activations.migrator, "ensure_schema", side_effect=RuntimeError("the schema broke"))
 
 
 def test_an_app_that_cannot_be_set_up_says_so_and_its_data_loads_when_the_worker_manages_by_itself(business):

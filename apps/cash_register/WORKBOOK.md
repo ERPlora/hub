@@ -187,7 +187,7 @@ Pantalla: Inicio: Termina de configurar tu negocio; Ajustes de Caja
 Pasos:
 1. Mientras los ajustes de caja no se han guardado nunca, en el **Inicio** la lista «Termina de
    configurar tu negocio» trae el paso «Tu caja» («Decide cómo se abre y se cierra la caja: el fondo
-   inicial, el arqueo de cierre y la pantalla del TPV que queda bloqueada hasta abrirla.»), marcado
+   inicial, el arqueo de cierre y si cobrar en efectivo exige una sesión abierta.»), marcado
    «Recomendado». Su «Configurar» lleva a **Caja → Ajustes**, que también se abre desde el menú.
 2. Enciende o apaga «Activar caja», «Exigir fondo de apertura», «Exigir recuento al cierre», «Permitir
    saldo negativo», «Arqueo ciego» y «Cierre automático diario» con su hora.
