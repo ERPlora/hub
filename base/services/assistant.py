@@ -76,10 +76,27 @@ def _assistant_words(content) -> str:
     return "\n".join(str(text) for text in texts)
 
 
-def _assistant_asked(messages: list[dict]) -> list[str]:
-    """What the person wrote, message by message. A file alone says nothing: the words written before it still count."""
-    said = (_assistant_words(m.get("content")) for m in messages if m.get("role") == "user")
-    return [words for words in said if words]
+def _assistant_asked(messages: list[dict], tools: dict) -> list[str]:
+    """What the person wrote in the request still open, message by message: everything since the model last asked for a
+    write, which closes what it was asked for, and never fewer than their last two messages. The answers to the
+    assistant's questions about a request name none of its tools («no tiene código, ponle tú uno»), so its first words
+    must still count. A file alone says nothing: the words written before it still count."""
+    closed = max((at for at, message in enumerate(messages) if _asks_for_a_write(message, tools)), default=-1)
+    said = [
+        (at, words)
+        for at, message in enumerate(messages)
+        if message.get("role") == "user" and (words := _assistant_words(message.get("content")))
+    ]
+    still_open = [words for at, words in said if at > closed]
+    return still_open if len(still_open) >= 2 else [words for _, words in said[-2:]]
+
+
+def _asks_for_a_write(message: dict, tools: dict) -> bool:
+    """Whether ``message`` is the model's asking for a write among ``tools``."""
+    calls = message.get("tool_calls") if message.get("role") == "assistant" else None
+    asked = (call.get("function") for call in calls if isinstance(call, dict)) if isinstance(calls, list) else ()
+    names = (function.get("name") for function in asked if isinstance(function, dict))
+    return any((op := shared.operation_of(str(name), tools)) is not None and op.kind == "command" for name in names)
 
 
 def _assistant_ran(ctx: OperationContext, tools: dict, call, outcome: "shared.ToolOutcome") -> dict:
@@ -204,13 +221,13 @@ def assistant_turn(ctx: OperationContext, data: AssistantTurnIn) -> dict:
         executed.append(_assistant_ran(ctx, tools, call, outcome))
         pending.pop(0)
     messages = [*data.messages, *append]
-    asked = _assistant_asked(data.messages)
+    asked = _assistant_asked(data.messages, tools)
     business = _assistant_read(ctx, "base.business.get") or {}
     if card is not None:
         # The card paints an amount (its schema's ``money`` mark) in the business's currency, with its decimals.
         currency = business.get("currency") or "EUR"
         card["money"] = {"currency": currency, "decimals": business.get("currency_decimals", 2)}
-    offered = assistant.relevance.relevant(tools, asked[-2:], ctx.language)
+    offered = assistant.relevance.relevant(tools, asked, ctx.language)
     text = assistant.prompt.instructions(
         language=ctx.language,
         currency=business.get("currency") or "EUR",
