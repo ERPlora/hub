@@ -2,7 +2,6 @@
 gets, its scheduled task and the assistant's contract of every operation (``ai`` and described input
 fields)."""
 
-from pathlib import Path
 
 from django.apps import apps
 from django.conf import settings
@@ -13,6 +12,7 @@ from live.operations import registry
 
 from apps.attendance import events as E
 from apps.attendance import queries, services  # noqa: F401  (importing them registers the operations)
+from base.tests.shell_icons import shell_icon_registry
 
 # Clocking someone else in or out (ATTENDANCE-F12) is a permission of its own.
 PERMISSIONS = [
@@ -221,7 +221,7 @@ def test_the_panel_is_refreshed_by_the_events_that_re_run_its_query():
 def test_the_panels_icon_is_registered_in_the_shell():
     icons = [panel.icon for panel in attendance().widgets]
     assert icons == ["ion:time-outline"]
-    shell = (Path(settings.BASE_DIR) / "packages/ui/src/shell/icons.ts").read_text()
+    shell = shell_icon_registry()
     for icon in icons:
         assert f"'{icon.removeprefix('ion:')}':" in shell, icon
 

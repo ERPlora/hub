@@ -1,10 +1,8 @@
 """The staff app declares its module metadata, its menu entries, its permissions, what each role gets,
 the assistant's contract of every operation (``ai`` and described input fields) and its panels of the Home."""
 
-from pathlib import Path
 
 from django.apps import apps
-from django.conf import settings
 from django.utils import translation
 from live.live_registry import live_registry
 from live.meta import Category, LiveAppConfig, Nav, Widget, module_configs, permissions_for_role
@@ -12,6 +10,7 @@ from live.operations import INTERNAL, registry
 
 from apps.staff import events as E
 from apps.staff import queries, services  # noqa: F401  (importing them registers the operations)
+from base.tests.shell_icons import shell_icon_registry
 
 # The old module's permissions, one by one (module.json), plus asking for one's own time off.
 PERMISSIONS = [
@@ -341,7 +340,7 @@ def test_the_panels_icons_are_registered_in_the_shell():
     # The old airplane and hourglass are not registered: UI-REQUESTS.md asks for them.
     icons = [panel.icon for panel in staff().widgets]
     assert icons == ["ion:people-outline", "ion:log-out-outline", "ion:time-outline", "ion:calendar-outline", "ion:shield-outline"]
-    shell = (Path(settings.BASE_DIR) / "packages/ui/src/shell/icons.ts").read_text()
+    shell = shell_icon_registry()
     for icon in icons:
         assert f"'{icon.removeprefix('ion:')}':" in shell, icon
 

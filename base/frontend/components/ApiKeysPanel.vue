@@ -12,6 +12,7 @@ import {
   type FormModalError,
   InlineFeedback,
   StatusPill,
+  withRowNames,
 } from '@erplora/ui/components';
 import { ApiError, useCommand, useLive } from '@erplora/ui/sdk';
 import { toastSuccess } from '@erplora/ui/shell';
@@ -57,10 +58,10 @@ const columns = computed<DataTableColumn<ApiKeyRow>[]>(() => [
   { key: 'rate_per_minute', label: t('base.apiKeys.columns.limit'), format: (value) => `${value as number}/min`, align: 'right', width: '7rem' },
 ]);
 
-const actions = computed<DataTableAction<ApiKeyRow>[]>(() => [
+const actions = computed<DataTableAction<ApiKeyRow>[]>(() => withRowNames((row: ApiKeyRow) => row.name, [
   { id: 'rotate', label: t('base.apiKeys.rotate'), icon: 'ion:refresh-outline', hidden: (row) => row.revoked_at !== null },
   { id: 'revoke', label: t('base.apiKeys.revoke'), icon: 'ion:ban-outline', color: 'danger', hidden: (row) => row.revoked_at !== null },
-]);
+]));
 
 // ── Errors, from their code ──
 const ERRORS: Readonly<Record<string, string>> = Object.freeze({

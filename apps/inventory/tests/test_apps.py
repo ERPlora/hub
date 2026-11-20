@@ -1,10 +1,8 @@
 """The inventory app declares its module metadata, its menu entry, its permissions, what each role gets and its
 hooks of the Home."""
 
-from pathlib import Path
 
 from django.apps import apps
-from django.conf import settings
 from django.utils import translation
 from live.live_registry import live_registry
 from live.meta import (
@@ -21,6 +19,7 @@ from live.operations import AI, INTERNAL, registry
 
 from apps.inventory import events as E
 from base import home
+from base.tests.shell_icons import shell_icon_registry
 
 PERMISSIONS = [
     "inventory.view_product",
@@ -320,7 +319,7 @@ def test_the_hooks_icons_are_registered_in_the_shell():
         "ion:cube-outline",
         "ion:arrow-down-outline",
     ]
-    shell = (Path(settings.BASE_DIR) / "packages/ui/src/shell/icons.ts").read_text()
+    shell = shell_icon_registry()
     for icon in icons:
         assert f"'{icon.removeprefix('ion:')}':" in shell, icon
 

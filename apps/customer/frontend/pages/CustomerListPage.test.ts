@@ -328,7 +328,7 @@ describe('CustomerListPage: actions by permission', () => {
     expect(s.testid('customer-list-add').text()).toBe('Add');
     expect(s.testid('customer-import').exists()).toBe(true);
     expect(s.testid('customer-export').exists()).toBe(true);
-    expect(s.prop<{ id: string }[]>('actions').map((a) => a.id)).toEqual(['open', 'delete']);
+    expect(s.prop<{ id: string; ariaLabel?: (row: unknown) => string }[]>('actions').map((a) => [a.id, ...PAGE.rows.map((row) => a.ariaLabel?.(row))])).toEqual([['open', 'View: Ana García', 'View: Luis'], ['delete', 'Delete: Ana García', 'Delete: Luis']]);
   });
 
   it('the employee views, adds and imports, but neither exports nor deletes (role_permissions)', async () => {

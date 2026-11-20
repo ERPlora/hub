@@ -1,7 +1,6 @@
 """The cash register app declares its module metadata, its menu, its permissions, what each role gets,
 its scheduled task (the daily auto-close the worker runs) and its hooks of the Home."""
 
-from pathlib import Path
 
 from django.apps import apps
 from django.conf import settings
@@ -21,6 +20,7 @@ from live.operations import registry
 
 from apps.cash_register import events as E
 from base import home
+from base.tests.shell_icons import shell_icon_registry
 
 PERMISSIONS = [
     "cash_register.view_session",
@@ -67,7 +67,7 @@ def test_it_is_a_free_module_of_the_sales_group_with_a_registered_icon():
     assert config().premium is False
     assert config().icon == "ion:cash-outline"
     # Registered in the shell (ION_ICONS): an unregistered icon paints nothing.
-    icons = (Path(settings.BASE_DIR) / "packages/ui/src/shell/icons.ts").read_text()
+    icons = shell_icon_registry()
     for icon in [config().icon, *(entry.icon for entry in config().navigation)]:
         assert f"'{icon.removeprefix('ion:')}'" in icons, icon
 
@@ -346,7 +346,7 @@ def test_the_hooks_icons_are_registered_in_the_shell():
     (step,) = config().setup
     icons = [step.icon, *(panel.icon for panel in config().widgets)]
     assert icons == ["ion:cash-outline", "ion:cash-outline", "ion:swap-vertical-outline"]
-    shell = (Path(settings.BASE_DIR) / "packages/ui/src/shell/icons.ts").read_text()
+    shell = shell_icon_registry()
     for icon in icons:
         assert f"'{icon.removeprefix('ion:')}':" in shell, icon
 

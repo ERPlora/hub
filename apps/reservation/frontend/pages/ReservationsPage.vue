@@ -16,6 +16,7 @@ import {
   EmptyState,
   InlineFeedback,
   StatusPill,
+  withRowNames,
 } from '@erplora/ui/components';
 import { useCommand, useLive } from '@erplora/ui/sdk';
 import { AppPage, useSession } from '@erplora/ui/shell';
@@ -163,14 +164,14 @@ const ACTIONS: ReadonlyArray<{ id: RowAction; key: string; icon: string; color?:
 ];
 
 const actions = computed<DataTableAction<ReservationOut>[]>(() =>
-  ACTIONS.filter((action) => (action.id === 'delete' ? canDelete.value : canChange.value)).map((action) => ({
+  withRowNames(guestOf, ACTIONS.filter((action) => (action.id === 'delete' ? canDelete.value : canChange.value)).map((action) => ({
     id: action.id,
     label: t(`reservation.actions.${action.key}`),
     icon: action.icon,
     color: action.color,
     showLabel: action.showLabel,
     hidden: (row: ReservationOut) => !allows(action.id, row.status),
-  })),
+  }))),
 );
 
 // The booking panel and the steps that ask first

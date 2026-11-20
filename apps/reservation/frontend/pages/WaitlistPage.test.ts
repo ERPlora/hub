@@ -37,6 +37,19 @@ async function setup(options: MountOptions = {}) {
   return { ...m, table, prop, rows, cells, action, visible, dialog, list: () => m.params(OP) };
 }
 
+describe('WaitlistPage: whom an action is for', () => {
+  it('each row action tells a screen reader whose entry it is, its short words first', async () => {
+    const s = await setup();
+    await s.result(OP, page([WAITING, CONVERTED]));
+    const named = s.prop<Array<{ id: string; ariaLabel?: (row: unknown) => string }>>('actions').map((a) => [a.id, a.ariaLabel?.(WAITING), a.ariaLabel?.(CONVERTED)]);
+    expect(named).toEqual([
+      ['contact', 'Contacted: Luis Pérez', 'Contacted: Pepa'],
+      ['convert', 'Convert: Luis Pérez', 'Convert: Pepa'],
+      ['remove', 'Remove: Luis Pérez', 'Remove: Pepa'],
+    ]);
+  });
+});
+
 describe('WaitlistPage', () => {
   beforeEach(() => {
     vi.useFakeTimers({ toFake: ['Date'] });

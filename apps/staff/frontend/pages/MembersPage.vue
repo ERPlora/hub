@@ -16,6 +16,7 @@ import {
   EmptyState,
   InlineFeedback,
   StatusPill,
+  withRowNames,
 } from '@erplora/ui/components';
 import { useCommand, useLive, useLiveClient } from '@erplora/ui/sdk';
 import { AppPage, HubIcon, useSession } from '@erplora/ui/shell';
@@ -136,7 +137,7 @@ const columns = computed<DataTableColumn<MemberOut>[]>(() => [
 /** What a row action was refused: above the table (a form's refusal stays in its dialog). */
 const pageError = ref('');
 
-const actions = computed<DataTableAction<MemberOut>[]>(() => [
+const actions = computed<DataTableAction<MemberOut>[]>(() => withRowNames((row: MemberOut) => row.full_name, [
   ...(canChange.value ? [{ id: 'edit', label: t('staff.members.actions.edit'), icon: 'create-outline' }] : []),
   ...(canDelete.value
     ? [
@@ -149,7 +150,7 @@ const actions = computed<DataTableAction<MemberOut>[]>(() => [
         { id: 'terminate', label: t('staff.members.actions.terminate'), icon: 'person-remove-outline', color: 'danger' },
       ]
     : []),
-]);
+]));
 
 const editing = ref<MemberOut | null>(null);
 const formOpen = ref(false);

@@ -47,6 +47,23 @@ async function setup(options: MountOptions = {}) {
   return { ...m, table, prop, rows, cells, show, action, visible, list: () => m.params(OP) };
 }
 
+describe('ReservationsPage: whom an action is for', () => {
+  it('each row action tells a screen reader whose reservation it is, its short words first', async () => {
+    const s = await setup();
+    await s.show([PENDING, SEATED]);
+    const named = s.prop<Array<{ id: string; ariaLabel?: (row: unknown) => string }>>('actions').map((a) => [a.id, a.ariaLabel?.(PENDING), a.ariaLabel?.(SEATED)]);
+    expect(named).toEqual([
+      ['confirm', 'Confirm: Ana García', 'Confirm: Deleted customer'],
+      ['seat', 'Seat: Ana García', 'Seat: Deleted customer'],
+      ['complete', 'Complete: Ana García', 'Complete: Deleted customer'],
+      ['cancel', 'Cancel: Ana García', 'Cancel: Deleted customer'],
+      ['no_show', 'No-show: Ana García', 'No-show: Deleted customer'],
+      ['edit', 'Edit: Ana García', 'Edit: Deleted customer'],
+      ['delete', 'Delete: Ana García', 'Delete: Deleted customer'],
+    ]);
+  });
+});
+
 describe('ReservationsPage', () => {
   beforeEach(() => {
     vi.useFakeTimers({ toFake: ['Date'] });

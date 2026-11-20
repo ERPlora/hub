@@ -22,6 +22,7 @@ from live.meta import (
 from apps.verifactu import erplora_route
 from apps.verifactu import events as E
 from base import home
+from base.tests.shell_icons import shell_icon_registry
 
 PERMISSIONS = [
     "verifactu.view_record",
@@ -421,7 +422,7 @@ def test_the_hooks_icons_are_registered_in_the_shell():
         "ion:list-outline",
         "ion:time-outline",
     ]
-    shell = (Path(settings.BASE_DIR) / "packages/ui/src/shell/icons.ts").read_text()
+    shell = shell_icon_registry()
     for icon in icons:
         name = icon.removeprefix("ion:")
         assert f"'{name}'" in shell, icon

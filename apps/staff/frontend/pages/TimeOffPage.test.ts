@@ -56,6 +56,19 @@ async function setup(options: MountOptions = {}) {
   return { ...m, table, prop, rows, cells, shownActions, action, list: () => m.params(OP), show: (data: unknown) => m.result(OP, data) };
 }
 
+describe('TimeOffPage: who it is for', () => {
+  it('each row action tells a screen reader whose time off it is, its short words first', async () => {
+    const s = await setup();
+    await s.show(page(ROWS));
+    const named = s.prop<Array<{ id: string; ariaLabel?: (row: TimeOffOut) => string }>>('actions').map((a) => [a.id, ...ROWS.slice(0, 2).map((row) => a.ariaLabel?.(row))]);
+    expect(named).toEqual([
+      ['approve', 'Approve: Ana López', 'Approve: Bea Ruiz'],
+      ['reject', 'Reject: Ana López', 'Reject: Bea Ruiz'],
+      ['cancel', 'Cancel: Ana López', 'Cancel: Bea Ruiz'],
+    ]);
+  });
+});
+
 describe('TimeOffPage: the live list', () => {
   it('follows the requests, newest first, 50 from the first', async () => {
     const s = await setup();
