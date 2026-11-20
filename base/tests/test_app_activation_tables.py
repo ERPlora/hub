@@ -520,6 +520,35 @@ def test_turning_an_app_on_forgets_the_cache_at_its_commit_so_the_menu_after_it_
 
 
 @own
+def test_the_workers_step_forgets_the_cache_at_its_commit_so_an_app_that_failed_is_no_longer_activating(
+    hub_a, django_capture_on_commit_callbacks
+):
+    from live.context import system_context
+
+    def session_state() -> str:
+        op = get("base.session.me")
+        apps = op(as_admin(hub_a), op.input()).model_dump(mode="json")["apps"]
+        return {app["label"]: app["state"] for app in apps}["printing"]
+
+    given(hub_a, printing="creating*")
+    hub = Hub.objects.get(pk=hub_a.pk)
+    settle = get("base.app.activation_settle")
+    failed = settle.input.model_validate({"apps": ["printing"], "outcome": "failed", "error": "schema_failed: boom"})
+    with use_hub(hub):
+        assert session_state() == "activating"  # kept in the cache
+
+    with django_capture_on_commit_callbacks(using=hubs.HUB_A_ALIAS) as on_the_hub, use_hub(hub):
+        settle(system_context(Scope("host", hub_a.slug)), failed)
+    with use_hub(hub):
+        assert session_state() == "activating"  # nothing forgotten before the COMMIT
+        for callback in on_the_hub:
+            callback()
+
+        assert session_state() == "off"
+    assert rows_of(hub_a)["printing"] == (FAILED, True)
+
+
+@own
 def test_only_the_platform_settles_what_the_worker_made(hub_a):
     from live.errors import PermissionDenied
 
