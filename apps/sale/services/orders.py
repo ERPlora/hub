@@ -13,8 +13,11 @@ from live.outbox import record_event
 
 from apps.sale import events
 from apps.sale.models import Order, OrderLine
-from apps.sale.queries import Booking, ORDER_CHANGED, actor, find_order, loose_lines, order_detail
-from apps.sale.schemas import OrderOpenIn, OrderOut
+from apps.sale.queries.business import actor
+from apps.sale.queries.checkout import loose_lines
+from apps.sale.queries.orders import ORDER_CHANGED, find_order, order_detail
+from apps.sale.queries.service_lines import Booking
+from apps.sale.schemas.orders import OrderOpenIn, OrderOut
 
 ORDER_UNAVAILABLE = _("That check is no longer open.")
 LINE_NOT_AVAILABLE = _(
@@ -40,7 +43,7 @@ def lock_rows(model, ids) -> list:
     """Locks the departments or payment methods ``ids`` in id order; those still there.
 
     A write that names one (an open-price line at a department, a tender of a payment method) holds it before it
-    writes what points at it (``queries.held``), and the Hub admin's «Delete» (admin.py) locks it here before Django
+    writes what points at it (``queries.rows.held``), and the Hub admin's «Delete» (admin.py) locks it here before Django
     checks what protects it: whichever comes second waits. The deletion then finds what the write wrote and answers
     «Cannot delete», or the write finds the row gone, instead of either failing at its COMMIT. Several rows are taken
     in id order, as the writes hold them: the two never wait in a circle.

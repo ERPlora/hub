@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { errorFrame, mountBase, subId } from '../__tests__/mount-base';
-import type { SetupItem } from '../operations';
+import type { SetupItem } from '../operations/home';
 import AssistantSetupEmpty from './AssistantSetupEmpty.vue';
 
 function step(fields: Partial<SetupItem>): SetupItem {

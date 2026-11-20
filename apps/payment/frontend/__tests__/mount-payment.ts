@@ -1,13 +1,11 @@
 // Test helper of the payment app's pages and components: `mountInShell` with its catalogues, the payments, its people
 // and the hub's business (`base.business.get`: one in Spain unless a test says another).
-// Dialogs: a test that opens one mocks `@ionic/vue`'s IonModal with FormModal's `IonModalStub`
-// (imported from its own file in the mock factory: this helper loads @ionic/vue, the factory must not).
 import type { SessionMe } from '@erplora/ui/shell';
 import type { Component } from 'vue';
 
 import { type BusinessMountOptions, mountInShell } from '../../../../base/frontend/__tests__/mount-in-shell';
 import { business as baseBusiness } from '../../../../base/frontend/__tests__/business';
-import type { Business } from '../../../../base/frontend/operations';
+import type { Business } from '../../../../base/frontend/operations/business';
 import en from '../locale/en.json';
 import es from '../locale/es.json';
 

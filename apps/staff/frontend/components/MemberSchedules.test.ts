@@ -5,18 +5,13 @@
 // «Delete the schedule "{name}"? …». A refused action is said above the table.
 import { ConfirmDialog, DataTable, EmptyState } from '@erplora/ui/components';
 import { pressRowAction } from '@erplora/ui/testing/data-table';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import type { Component } from 'vue';
 
 import type { ScheduleOut } from '../operations';
 import { EMPLOYEE, errorFrame, flush, type MountOptions, mountStaff, page, settle } from '../__tests__/mount-staff';
 import MemberSchedules from './MemberSchedules.vue';
 import ScheduleFormModal from './ScheduleFormModal.vue';
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
 
 const OP = 'staff.schedule.list';
 const schedule = (id: string, over: Partial<ScheduleOut> = {}): ScheduleOut => ({

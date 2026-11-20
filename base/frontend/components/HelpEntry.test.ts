@@ -1,11 +1,9 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 
 import { accessibleName, flush, help, mountBase } from '../__tests__/mount-base';
 import { embedHubHome, forgetHubHome } from '../__tests__/hub-home';
 import HelpEntry from './HelpEntry.vue';
 import HelpWindow from './HelpWindow.vue';
-
-vi.mock('@ionic/vue', async (importOriginal) => (await import('../__tests__/modal')).mockIonicModal(importOriginal));
 
 afterEach(forgetHubHome);
 

@@ -1,8 +1,6 @@
 // Test helper of the sale app's pages and components: `mountInShell` with its catalogues over base's and Taxes' (whose
 // `useTaxName` names the territory's tax on every sale screen), the till, its people and the hub's business; the shared
 // assistant configured as the Hub boots it (main.ts), for the till's «Speak», which dictates to it.
-// Dialogs: a test that opens one mocks `@ionic/vue`'s IonModal with FormModal's `ionModalStub` (imported
-// from its own file in the mock factory: this helper loads @ionic/vue, the factory must not).
 import { configureAssistant } from '@erplora/ui/components';
 import type { SessionMe } from '@erplora/ui/shell';
 import type { Component } from 'vue';
@@ -12,7 +10,7 @@ import { mountInShell, overBase, settle } from '../../../../base/frontend/__test
 import { business, IN_YEN as JAPANESE } from '../../../../base/frontend/__tests__/business';
 import { expectSaveWaitsForMoney } from '../../../../base/frontend/__tests__/save-waits-for-money';
 import { HUB_ASSISTANT } from '../../../../base/frontend/lib/assistant-hub';
-import type { Business } from '../../../../base/frontend/operations';
+import type { Business } from '../../../../base/frontend/operations/business';
 import taxEn from '../../../tax/frontend/locale/en.json';
 import taxEs from '../../../tax/frontend/locale/es.json';
 import type { TaxSettingsOut, TerritoryTaxKind } from '../../../tax/frontend/operations';

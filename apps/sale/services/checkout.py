@@ -13,28 +13,24 @@ from live.outbox import record_event
 
 from apps.sale import events
 from apps.sale.models import Order, OrderLine, Sale, SaleCounter, SaleLine, SalePayment, Settings, sale_number
-from apps.sale.queries import (
+from apps.sale.queries.business import (
     LIMITS_CURRENCY,
-    Booking,
-    ORDER_CHANGED,
     TICKET_LIMIT,
     actor,
-    breakdown_rows,
     business_country,
     business_currency,
-    call_services,
-    charge_parts,
-    current_settings,
-    find_order,
-    lines_to_charge,
-    loose_lines,
     money_text,
-    operation_total,
-    refresh_combos,
-    sale_detail,
-    valuate,
 )
-from apps.sale.schemas import CompleteIn, SaleOut
+from apps.sale.queries.checkout import breakdown_rows, lines_to_charge, loose_lines, operation_total, valuate
+from apps.sale.queries.line_parts import charge_parts
+from apps.sale.queries.order_lines import refresh_combos
+from apps.sale.queries.orders import ORDER_CHANGED, find_order
+from apps.sale.queries.other_apps import call_services
+from apps.sale.queries.sales import sale_detail
+from apps.sale.queries.service_lines import Booking
+from apps.sale.queries.settings import current_settings
+from apps.sale.schemas.checkout import CompleteIn
+from apps.sale.schemas.sales import SaleOut
 from apps.sale.services.charge_validation import (
     _check_discounts,
     _check_drawer,

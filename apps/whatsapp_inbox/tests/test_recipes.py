@@ -30,7 +30,7 @@ def assert_grants_are_offerable(recipe: recipes.Recipe, built: dict) -> None:
     assert operations[-1] == "whatsapp_inbox.message.notify"
     assert "whatsapp_inbox.message.send" not in operations
     assert recipes.grants(recipe) == document.required_grants(built["steps"])
-    catalog = queries.catalog_operations(A)
+    catalog = queries.catalog.catalog_operations(A)
     assert all(name in catalog for name in recipes.grants(recipe))
 
 
@@ -223,8 +223,8 @@ def test_an_answer_asks_the_assistant_ask_me_first_with_only_what_it_needs(ref):
     assert step["mode"] == "ask"
     assert step["tools"] == TOOLS[ref]
     assert recipes.grants(offered()[ref]) == document.required_grants(recipes.build(offered()[ref], "en")["steps"])
-    assert all(name in queries.ask_first_catalog(A) for name in recipes.grants(offered()[ref]))
-    catalog = queries.catalog_operations(A)
+    assert all(name in queries.catalog.ask_first_catalog(A) for name in recipes.grants(offered()[ref]))
+    catalog = queries.catalog.catalog_operations(A)
     assert {name for name in recipes.grants(offered()[ref]) if name not in catalog} == ASKED_FIRST[ref]
 
 
@@ -507,7 +507,7 @@ def test_what_the_booking_answer_fixes_holds_while_whatsapp_is_off(django_captur
     flow.save(update_fields=["steps"])
     with django_capture_on_commit_callbacks(execute=True, using=current_alias()):
         run("base.app.disable", {"app": "whatsapp_inbox"})
-    assert "whatsapp_inbox" not in queries.active_apps(A)
+    assert "whatsapp_inbox" not in queries.catalog.active_apps(A)
 
     shown = run("flow.flow.detail", {"id": flow_id}).model_dump(mode="json")
     assert next(step for step in shown["steps"] if step["kind"] == "assistant").get("pinned") == fixed

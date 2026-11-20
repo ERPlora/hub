@@ -20,17 +20,16 @@
 // flow: CASH_REGISTER-F07
 // flow: BASE-F97
 // flow: base-assistant-card-verbs
-import { execSync } from 'node:child_process';
 
-import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
+import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
-import { NOT_DONE, type Provider, startProvider } from './assistant-provider';
-import { confirmedWithTheWord } from './assistant-card-helpers';
-import { A, api, capture, EMPLOYEE, exposeMovingInPage, login, psql, REPO_DIR, shot, shown, untilStill } from './helpers';
+import { NOT_DONE, type Provider } from './assistant-provider';
+import { askForACard, cancelAtComputerSize, cancelInSpanish, captureConfirmation, card, confirmedWithTheWord, decide, lastAnswer, openPanel, panel, previewBlock, receipts } from './assistant-panel';
+import { emptyMonth } from './assistant-real';
+import { A, api, capture, EMPLOYEE, login, psql, shot, shown, THREE_SIZES as VIEWPORTS, untilStill } from './helpers';
 import { createProduct, type Product } from './inventory-helpers';
+import { seededProvider } from './provider-helpers';
 import { cleanDocumentsOf, stamp } from './sale-helpers';
-import { STACK } from './stack';
-import { openAssistant as openPanel } from './topbar';
 
 const KEY = 'FIX-CASH_REGISTER-NO-VOICE-CLOSE-WITH-ASSISTANT';
 const PREVIEW_KEY = 'FIX-HUB-CASH_REGISTER-ASSISTANT-CLOSE-CARD-WITHOUT-PREVIEW';
@@ -40,14 +39,6 @@ const RUN = stamp();
 const SKU = `E2E-CRA-${RUN}`;
 /** The drawer this file opens its shifts on: the card names it. */
 const DRAWER = `E2E Barra ${RUN}`;
-const VIEWPORTS = [
-  { label: '390', width: 390, height: 844 },
-  { label: '834', width: 834, height: 1112 },
-  { label: '1440', width: 1440, height: 900 },
-];
-const PROVIDER_PORT = Number(process.env.E2E_AI_PROVIDER_PORT ?? STACK.hubPort + 2);
-/** The SaaS's database of this stack (README «Varias ejecuciones a la vez»: `saas_e2e_<Hub port + 1>`). */
-const SAAS_DB = process.env.E2E_SAAS_DB ?? (STACK.hubPort === 8000 ? 'saas' : `saas_e2e_${STACK.hubPort + 1}`);
 
 let provider: Provider;
 let shirt: Product;
@@ -73,18 +64,6 @@ interface Detail {
   expected_balance: number | null;
   closing_balance: number | null;
   difference: number | null;
-}
-
-function saasSql(sql: string): string {
-  return execSync(`docker compose exec -T postgres psql -U hub -d ${SAAS_DB} -At -c "${sql}"`, {
-    cwd: REPO_DIR,
-    encoding: 'utf8',
-  }).trim();
-}
-
-/** The month's assistant messages of the business `a` back to none: a run never spends the plan's allowance. */
-function unspend(): void {
-  saasSql("delete from assistant_assistantusage where hub_id = (select id from hubs_hub where slug = 'a')");
 }
 
 async function owner(browser: import('@playwright/test').Browser): Promise<{ context: BrowserContext; page: Page }> {
@@ -138,9 +117,7 @@ async function shiftWithACashSale(context: BrowserContext, float: number): Promi
 }
 
 test.beforeAll(async ({ browser }) => {
-  provider = await startProvider(PROVIDER_PORT);
-  const seeded = saasSql("select base_url from assistant_aiprovider where slug = 'e2e-local'");
-  expect(seeded, `the SaaS ${SAAS_DB} is not seeded with this provider: README «El asistente»`).toBe(provider.url);
+  provider = await seededProvider();
   const { context } = await owner(browser);
   shirt = await createProduct(context, { name: `E2E Shirt ${RUN}`, sku: SKU, price: 1210, tax_category_key: 'product.generic' });
   const read = await api<Record<string, unknown>>(context, A, 'GET', '/cash_register/settings');
@@ -178,11 +155,11 @@ test.afterAll(async ({ browser }) => {
     psql(`delete from cash_register_register r where r.id = '${drawerId}' and not exists (select 1 from cash_register_session s where s.register_id = r.id)`);
   }
   cleanSaleAndProduct();
-  unspend();
+  emptyMonth();
 });
 
 test.beforeEach(() => {
-  unspend();
+  emptyMonth();
 });
 
 /** Deletes this run's sales (they sold its SKU) and its product. The fiscal documents Invoicing issued for those
@@ -207,29 +184,6 @@ function cleanSaleAndProduct(): void {
   );
 }
 
-// ── The assistant's panel (as base-assistant.spec.ts drives it) ──
-
-const panel = (page: Page): Locator => page.locator('[data-testid="assistant-panel"]');
-const box = (page: Page): Locator => panel(page).locator('[data-testid="assistant-input"] textarea');
-const answers = (page: Page): Locator => panel(page).locator('[data-testid="assistant-answer"]');
-const lastAnswer = (page: Page): Locator => panel(page).locator('[data-testid="assistant-bubble-assistant"]').last();
-const receipts = (page: Page): Locator => panel(page).locator('[data-testid="assistant-receipt"]');
-const card = (page: Page): Locator => page.locator('ion-modal[data-testid="assistant-confirm"]');
-const previewBlock = (page: Page): Locator => card(page).locator('[data-testid="assistant-confirm-preview"]');
-/** Writes `text` and sends it with Enter, without waiting for the turn to end (a card stops it half-way). */
-async function ask(page: Page, text: string): Promise<void> {
-  await expect(panel(page).locator('[data-testid="assistant-send"]')).toBeVisible({ timeout: 30_000 });
-  const before = await answers(page).count();
-  await box(page).fill(text);
-  await box(page).press('Enter');
-  await expect(answers(page)).toHaveCount(before + 1);
-}
-
-async function decide(page: Page, button: 'submit' | 'cancel'): Promise<void> {
-  await card(page).locator(`[data-testid="assistant-confirm-${button}"]`).click();
-  await expect(card(page)).toBeHidden();
-}
-
 /** What the model was told of the close's summary: the last tool result the gateway sent the provider, as sent. */
 function toldSummary(): { raw: string; summary: Record<string, unknown> } {
   const chat = provider.seen.filter((seen) => seen.path === '/v1/chat/completions').at(-1)?.body;
@@ -249,8 +203,7 @@ test('CASH_REGISTER-F09 — «close the drawer with 250 € counted»: the summa
   expect(shift.expected_balance).toBe(expected);
 
   await openPanel(page);
-  await ask(page, 'E2E-CLOSE-CASH 25000 cierra la caja con 250 € contados');
-  await expect(card(page)).toBeVisible({ timeout: 30_000 });
+  await askForACard(page, 'E2E-CLOSE-CASH 25000 cierra la caja con 250 € contados', { timeout: 30_000 });
   // The summary, before the card: the session, the counted cash, the expected and the difference.
   const summary = lastAnswer(page);
   await expect(summary.locator('strong').first()).toHaveText(shift.number);
@@ -304,8 +257,7 @@ test('CASH_REGISTER-F09 — «close the drawer with 250 € counted»: the summa
   await page.setViewportSize({ width: 1440, height: 900 });
 
   // Asked again, the word typed: it closes, as the person, with the three amounts frozen.
-  await ask(page, 'E2E-CLOSE-CASH 25000 cierra la caja con 250 € contados');
-  await expect(card(page)).toBeVisible({ timeout: 30_000 });
+  await askForACard(page, 'E2E-CLOSE-CASH 25000 cierra la caja con 250 € contados', { timeout: 30_000 });
   await expect(previewBlock(page).locator('li')).toHaveText(willHappen);
   await confirmedWithTheWord(page);
   await expect(receipts(page).last()).toContainText('Done: Close in Cash register');
@@ -339,8 +291,7 @@ test('BASE-F97 — in Spanish, the close card writes the difference over with it
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto(`${A}/cash_register/sessions`);
   await openPanel(page);
-  await ask(page, 'E2E-CLOSE-CASH 25000 cierra la caja con 250 € contados');
-  await expect(card(page)).toBeVisible({ timeout: 30_000 });
+  await askForACard(page, 'E2E-CLOSE-CASH 25000 cierra la caja con 250 € contados', { timeout: 30_000 });
   const willHappen = [
     `Sesión: ${shift.number}`,
     `Cajón: ${DRAWER}`,
@@ -373,8 +324,7 @@ test('CASH_REGISTER-F07 — with the blind count on, a cashier asking to close g
   await page.setViewportSize({ width: 1440, height: 900 });
   await login(page, A, '/cash_register/sessions', EMPLOYEE);
   await openPanel(page);
-  await ask(page, 'E2E-CLOSE-CASH 25000 cierra la caja con 250 € contados');
-  await expect(card(page)).toBeVisible({ timeout: 30_000 });
+  await askForACard(page, 'E2E-CLOSE-CASH 25000 cierra la caja con 250 € contados', { timeout: 30_000 });
   const summary = lastAnswer(page);
   await expect(summary.locator('strong').first()).toHaveText(shift.number);
   await expect(summary).toContainText(`Counted: ${euros(25000)}`);
@@ -402,38 +352,6 @@ test('CASH_REGISTER-F07 — with the blind count on, a cashier asking to close g
 
 // ── The record a write names by its id, by its name ──
 
-/** The dangerous card ready for its capture: «Confirmación» focused, its label floated, then one frame for the label's
- *  move to start, so `untilStill` waits for it (base-assistant.spec.ts). */
-async function confirmationReady(page: Page): Promise<void> {
-  const field = card(page).locator('[data-testid="assistant-confirm-input"]');
-  await expect(field).toHaveClass(/\bhas-focus\b/);
-  await expect(field).toHaveClass(/\blabel-floating\b/);
-  await page.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))));
-}
-
-/** «Confirmación» as its capture must show it: focused, its label floated and, in the same frame, nothing moving on the
- *  page, the label's move included (base-assistant.spec.ts, rv-ui-35). */
-async function confirmationSettled(page: Page): Promise<boolean> {
-  await exposeMovingInPage(page);
-  return card(page)
-    .locator('[data-testid="assistant-confirm-input"]')
-    .evaluate(async (field) => {
-      const label = field.querySelector('.label-text-wrapper');
-      const look = () =>
-        label && `${JSON.stringify(label.getBoundingClientRect())} ${getComputedStyle(label).transform} ${getComputedStyle(label).opacity}`;
-      const before = look();
-      await new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)));
-      const moving = (window as unknown as { __movingInPage: () => string[] }).__movingInPage();
-      return (
-        field.classList.contains('has-focus') &&
-        field.classList.contains('label-floating') &&
-        label !== null &&
-        look() === before &&
-        moving.length === 0
-      );
-    });
-}
-
 /** The owner in Spanish (the Hub's language cookie, as the sign-in sets it), on «Caja». */
 async function ownerInSpanish(browser: import('@playwright/test').Browser): Promise<{ context: BrowserContext; page: Page }> {
   const { context, page } = await owner(browser);
@@ -447,8 +365,7 @@ test('cash-register-assistant-card, base-assistant-card-verbs — in Spanish a c
   const { context, page } = await ownerInSpanish(browser);
   const shift = await shiftWithACashSale(context, 10000);
   await openPanel(page);
-  await ask(page, `E2E-ASK cash_register__count__add ${JSON.stringify({ session_id: shift.id, total: 12000 })}`);
-  await expect(card(page)).toBeVisible({ timeout: 30_000 });
+  await askForACard(page, `E2E-ASK cash_register__count__add ${JSON.stringify({ session_id: shift.id, total: 12000 })}`, { timeout: 30_000 });
   for (const vp of VIEWPORTS) {
     await page.setViewportSize({ width: vp.width, height: vp.height });
     await expect(card(page)).toBeVisible();
@@ -457,14 +374,9 @@ test('cash-register-assistant-card, base-assistant-card-verbs — in Spanish a c
     await expect(card(page)).not.toContainText('Añadir');
     await expect(card(page)).toContainText(`Sesión: ${shift.number}`);
     await expect(card(page)).not.toContainText(shift.id);
-    await confirmationReady(page);
-    await untilStill(page);
-    expect(await confirmationSettled(page), `${RECORDS_KEY}-${vp.label} caught before it settled`).toBe(true);
-    await capture(page, `${RECORDS_KEY}-${vp.label}`);
+    await captureConfirmation(page, `${RECORDS_KEY}-${vp.label}`);
   }
-  await page.setViewportSize({ width: 1440, height: 900 });
-  await decide(page, 'cancel');
-  await expect(lastAnswer(page)).toContainText('No lo he hecho.');
+  await cancelAtComputerSize(page);
   const counts = await api<{ total: number }>(context, A, 'GET', `/cash_register/counts?session_id=${shift.id}`);
   expect(counts.data.total).toBe(0);
   await context.close();
@@ -474,14 +386,12 @@ test('cash-register-assistant-card — in Spanish renaming a drawer by its id na
   const { context, page } = await ownerInSpanish(browser);
   await openPanel(page);
   const renamed = `E2E Terraza ${RUN}`;
-  await ask(page, `E2E-ASK cash_register__register__update ${JSON.stringify({ register_id: drawerId, name: renamed })}`);
-  await expect(card(page)).toBeVisible({ timeout: 30_000 });
+  await askForACard(page, `E2E-ASK cash_register__register__update ${JSON.stringify({ register_id: drawerId, name: renamed })}`, { timeout: 30_000 });
   // Renaming is not dangerous: its card says the action with its data, the drawer it renames first.
   await expect(card(page)).toContainText(`Cambiar en Caja: ${DRAWER} · ${renamed}`);
   await expect(card(page)).not.toContainText(drawerId);
   await capture(page, `${RECORDS_KEY}-drawer-1440`);
-  await decide(page, 'cancel');
-  await expect(lastAnswer(page)).toContainText('No lo he hecho.');
+  await cancelInSpanish(page);
   // The drawer's own read, the one the card names it by: unchanged.
   const drawer = await api<{ name: string }>(context, A, 'GET', `/cash_register/registers/detail?register_id=${drawerId}`);
   expect([drawer.status, drawer.data.name]).toEqual([200, DRAWER]);

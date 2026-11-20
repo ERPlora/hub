@@ -18,11 +18,6 @@ import ReservationFormModal from '../components/ReservationFormModal.vue';
 import StepDialog from '../components/StepDialog.vue';
 import ReservationsPage from './ReservationsPage.vue';
 
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
-
 const OP = 'reservation.reservation.list';
 /** Thursday 15 October 2026, 12:00 in Madrid. */
 const NOW = new Date('2026-10-15T10:00:00Z');

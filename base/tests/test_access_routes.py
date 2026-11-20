@@ -1,6 +1,6 @@
-"""The SPA's op → route map (``frontend/generated/operations.json``) names every route of the way in as ``base/api.py``
-binds it: the pages call them by operation, never by address. And each of its operations tells the assistant what it
-does, or that it is not the assistant's to run."""
+"""The SPA's op → route map (``frontend/generated/operations.json``) names every route of the way in as
+``base/api/access.py`` binds it: the pages call them by operation, never by address. And each of its operations tells
+the assistant what it does, or that it is not the assistant's to run."""
 
 import pytest
 from live.assistant import description
@@ -28,7 +28,7 @@ ROUTES = {
 
 
 def test_base_api_binds_each_route_of_the_way_in_to_its_operation():
-    from base.api import router
+    from base.api.access import router
 
     assert ROUTES <= bound_routes(router)
 

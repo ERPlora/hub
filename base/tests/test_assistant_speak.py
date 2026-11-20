@@ -211,7 +211,7 @@ def post(client, body, **extra):
 
 
 def test_the_route_is_bound_to_its_operation():
-    from base.api import router
+    from base.api.assistant import router
 
     [route] = router.path_operations["/assistant/speak"].operations
     assert (route.methods, route.operation_id) == (["POST"], "base.assistant.speak")
@@ -283,4 +283,4 @@ def test_the_api_documents_the_mp3_and_the_json():
 
     content = api.get_openapi_schema()["paths"]["/api/assistant/speak"]["post"]["responses"][200]["content"]
     assert content["audio/mpeg"]["schema"] == {"type": "string", "format": "binary"}
-    assert content["application/json"]["schema"] == {"$ref": "#/components/schemas/AssistantSpeakOut"}
+    assert content["application/json"]["schema"] == {"$ref": "#/components/schemas/base.AssistantSpeakOut"}

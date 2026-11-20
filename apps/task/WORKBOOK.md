@@ -542,7 +542,7 @@ cliente o a un compañero).
   tienen lectura cuya entrada quepa en la suya (`base.E012`), así que van sin `check`, pero con la misma marca
   `names(…, as_said=True)`: la tarjeta los lee por su nombre, su id va en la huella y un nombre que vale para varios
   sale tal como se dijo, nunca fuera de la tarjeta (hub#1245). Junto al id con que la escritura toma su registro en
-  su lugar, la tarjeta deja sin leer el nombre (`base.schemas.unless_given`, hub#1250), y en `TaskPatchIn` al revés:
+  su lugar, la tarjeta deja sin leer el nombre (`base.schemas.assistant.unless_given`, hub#1250), y en `TaskPatchIn` al revés:
   el `project_id` junto a un `project` (`UNLESS` de `tests/test_assistant_yes_for_its_card.py`).
   Tareas no tiene listas cerradas sin etiqueta en sus escrituras: el estado y la prioridad salen con las de sus
   modelos.

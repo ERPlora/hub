@@ -17,7 +17,7 @@ from live.operations import get
 from apps.verifactu.tests.conftest import business_in
 from apps.verifactu.tests.test_app_enable import verifactu_off
 from base import activation
-from base.schemas import SetupStatusIn
+from base.schemas.home import SetupStatusIn
 from base.tenancy import context
 from base.tenancy.tests import hubs
 from control.models import Hub

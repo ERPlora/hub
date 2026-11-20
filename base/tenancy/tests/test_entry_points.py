@@ -216,7 +216,7 @@ def test_the_registrys_operations_run_on_control_and_their_events_land_there(cli
     from live.context import system_context
 
     from base.registry import REGISTRY_SCOPE
-    from base.schemas import HubSeedLocalIn
+    from base.schemas.hub_registry import HubSeedLocalIn
     from base.services.hub_registry import hub_seed_local
 
     answer = hub_seed_local(system_context(REGISTRY_SCOPE), HubSeedLocalIn(slugs=["c"]))
@@ -252,7 +252,7 @@ def test_internal_calls_for_a_business_enter_it(monkeypatch, hub_b):
         return None, internal.refuse(418, "probe", "seen")
 
     monkeypatch.setattr(internal, "_operation_call", call)
-    monkeypatch.setattr(internal.relay, "active_apps", lambda scope: frozenset({photo.WHATSAPP_APP}))
+    monkeypatch.setattr(internal.apps_on, "active_apps", lambda scope: frozenset({photo.WHATSAPP_APP}))
     request = type("Request", (), {"body": json.dumps({"hub": hub_b.slug}).encode()})()
 
     internal._whatsapp_call(request, "whatsapp_inbox.message.receive")
@@ -294,12 +294,12 @@ def test_internal_calls_for_the_platform_hub_run_in_its_own_database(monkeypatch
 
 
 @pytest.mark.django_db(transaction=True)
-def test_the_worker_opens_a_context_for_each_pass(caplog):
+def test_the_worker_opens_a_context_for_each_pass(caplog, worker_visits):
     now = timezone.now()
 
     def passes():
         worker._relay(now)
-        worker._hubs(now)
+        worker_visits.serve(now)
         worker._reap(now)
 
     contextvars.Context().run(passes)

@@ -104,7 +104,6 @@ _OWN_FIELDS = (
     "page_title",
     "welcome_message",
     "primary_color",
-    "logo_url",
     "require_email",
     "max_upcoming_per_customer",
     "allow_staff_selection",
@@ -144,10 +143,11 @@ def page_settings(*, lock: bool = False) -> Settings:
     return settings
 
 
-def settings_out(own: Settings) -> dict:
+def settings_out(ctx: OperationContext, own: Settings) -> dict:
     rules = current_rules()
     return {
         **{field: getattr(own, field) for field in _OWN_FIELDS},
+        **SettingsOut.logo_of(ctx.scope, own.logo),
         **{field: getattr(rules, field) for field in RULE_FIELDS},
         "timezone": zone_name(),
     }
@@ -454,7 +454,7 @@ def get_booking(ctx: OperationContext, data: BookingRefIn) -> dict:
     },
 )
 def get_settings(ctx: OperationContext, data: NoIn) -> dict:
-    return settings_out(current_settings())
+    return settings_out(ctx, current_settings())
 
 
 # ── The public page ──────────────────────────────────────────────────────────────────────────
@@ -477,17 +477,16 @@ def get_settings(ctx: OperationContext, data: NoIn) -> dict:
                 "enséñame el logo y la bienvenida que ve quien reserva por internet",
             ),
         },
-        "description": "What the public booking page shows: its title, texts, colour, logo and booking rules."
+        "description": "What the public booking page shows: whose it is, its title, texts, colour, logo and booking rules."
     },
 )
 def public_page(ctx: OperationContext, data: NoIn) -> dict:
     own = page_settings()
     rules = current_rules()
-    return {
+    return PageOut.owner(ctx, own.logo) | {
         "title": own.page_title or str(DEFAULT_TITLE),
         "welcome_message": own.welcome_message,
         "primary_color": own.primary_color,
-        "logo_url": own.logo_url,
         "require_email": own.require_email,
         "allow_staff_selection": own.allow_staff_selection,
         "allow_notes": own.allow_notes,
@@ -667,14 +666,13 @@ def public_slots(ctx: OperationContext, data: PublicSlotsIn) -> dict:
     }
 
 
-def find_by_token(token: str, *, lock: bool = False) -> Booking:
+def find_by_token(token: str) -> Booking:
     """The live booking whose link is ``token`` (404 ``online_booking.booking_not_found`` otherwise)."""
-    rows = Booking.objects.select_related("appointment").filter(
-        token_hash=hash_token(token), appointment__deleted_at__isnull=True
+    found = (
+        Booking.objects.select_related("appointment")
+        .filter(token_hash=hash_token(token), appointment__deleted_at__isnull=True)
+        .first()
     )
-    if lock:
-        rows = rows.select_for_update(of=("self",))
-    found = rows.first()
     if found is None:
         raise NotFound(str(BOOKING_NOT_FOUND), code="online_booking.booking_not_found")
     return found
@@ -695,10 +693,10 @@ def cancel_until(appointment: Appointment) -> dt.datetime | None:
     ).astimezone(business_zone())
 
 
-def public_booking_out(appointment: Appointment) -> dict:
-    zone = business_zone()
+def public_booking_out(ctx: OperationContext, appointment: Appointment) -> dict:
+    zone, own = business_zone(), current_settings()
     until = cancel_until(appointment)
-    return {
+    return PublicBookingOut.owner(ctx, own.logo) | {
         "number": appointment.number,
         "status": appointment.status,
         "start": appointment.start.astimezone(zone),
@@ -708,7 +706,7 @@ def public_booking_out(appointment: Appointment) -> dict:
         "staff_name": appointment.staff_name,
         "can_cancel": until is not None and now() <= until,
         "cancel_until": until,
-        "cancellation_policy": current_settings().cancellation_policy,
+        "cancellation_policy": own.cancellation_policy,
     }
 
 
@@ -733,4 +731,4 @@ def public_booking_out(appointment: Appointment) -> dict:
     },
 )
 def public_booking(ctx: OperationContext, data: TokenIn) -> dict:
-    return public_booking_out(find_by_token(data.token).appointment)
+    return public_booking_out(ctx, find_by_token(data.token).appointment)

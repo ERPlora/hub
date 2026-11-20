@@ -1,18 +1,13 @@
 // PAYMENT-F01 and F08: «New method» asks for Name, Type (Bank transfer unless chosen) and Account, with
 // «Create method»; a row opens «Editing method — {name}» with «Save», which sends only what changed. A
 // name another method has (409) goes under Name, and what was typed stays.
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import { itTellsTheCorrectedFieldApart } from '../../../../base/frontend/__tests__/same-words-refusal';
 import { unsavedChangesIn } from '../../../../base/frontend/lib/system-back';
 import type { MethodOut } from '../operations';
 import { click, ionValue, mountPayment, settle } from '../__tests__/mount-payment';
 import MethodFormModal from './MethodFormModal.vue';
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
 
 type Control = HTMLElement & { label?: string; value?: unknown; errorText?: string; disabled?: boolean; helperText?: string };
 

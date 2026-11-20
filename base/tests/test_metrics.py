@@ -29,7 +29,7 @@ from django.utils import timezone
 
 from apps.verifactu.models import Environment, Record
 from apps.verifactu.tests.test_fiscal_backlog import record
-from base import activation, metrics, queries, relay
+from base import activation, metrics, queries
 from base.metrics import FISCAL_NAMESPACE, HUBS_NAMESPACE, Emitter, FiscalBacklog, Metric, StuckActivations
 from base.models import AppActivation
 from base.tenancy.context import use_control, use_hub
@@ -154,9 +154,9 @@ def test_a_hub_where_the_app_is_off_is_never_asked(hub_a, hub_b, monkeypatch):
     now = timezone.now()
     with use_hub(hub_a):
         pending(now - dt.timedelta(minutes=30))
-    real = relay.active_apps
+    real = metrics.active_apps
     monkeypatch.setattr(
-        relay, "active_apps", lambda scope: real(scope) - {"verifactu"} if scope.key == hub_a.slug else real(scope)
+        metrics, "active_apps", lambda scope: real(scope) - {"verifactu"} if scope.key == hub_a.slug else real(scope)
     )
 
     assert oldest_age(FiscalBacklog()(now, never())) == 0.0
@@ -211,14 +211,14 @@ def test_a_hub_that_cannot_be_read_keeps_its_last_reading_and_is_logged(hub_a, h
         pending(now - dt.timedelta(minutes=20))
     backlog = FiscalBacklog()
     assert oldest_age(backlog(now, never())) == pytest.approx(1200.0, abs=1)
-    real = relay.active_apps
+    real = metrics.active_apps
 
     def broken(scope):
         if scope.key == hub_a.slug:
             raise RuntimeError("database gone")
         return real(scope)
 
-    monkeypatch.setattr(relay, "active_apps", broken)
+    monkeypatch.setattr(metrics, "active_apps", broken)
     with caplog.at_level(logging.ERROR, logger="base.metrics"):
         assert oldest_age(backlog(now, never())) == pytest.approx(1200.0, abs=1)
 
@@ -266,14 +266,14 @@ def test_a_hub_last_read_with_nothing_to_send_that_cannot_be_read_waits_since_it
     now = timezone.now()
     backlog = FiscalBacklog()
     assert oldest_age(backlog(now, never())) == 0.0
-    real = relay.active_apps
+    real = metrics.active_apps
 
     def broken(scope):
         if scope.key == hub_a.slug:
             raise RuntimeError("database gone")
         return real(scope)
 
-    monkeypatch.setattr(relay, "active_apps", broken)
+    monkeypatch.setattr(metrics, "active_apps", broken)
 
     assert oldest_age(backlog(now + dt.timedelta(minutes=1), never())) == 0.0
     # Still failing 7 minutes later: it waits since the first failure, never since the last one.
@@ -293,8 +293,8 @@ def test_a_stop_ends_the_pass_before_the_next_hub(hub_a, hub_b, monkeypatch):
     stop = threading.Event()
     stop.set()
     entered: list[str] = []
-    real = relay.active_apps
-    monkeypatch.setattr(relay, "active_apps", lambda scope: entered.append(scope.key) or real(scope))
+    real = metrics.active_apps
+    monkeypatch.setattr(metrics, "active_apps", lambda scope: entered.append(scope.key) or real(scope))
 
     FiscalBacklog()(timezone.now(), stop)
 

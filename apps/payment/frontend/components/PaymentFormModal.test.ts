@@ -7,20 +7,15 @@
 // in the business's currency, with its decimals, and the field says which («Amount (PLN)»); the payment is
 // recorded in it by the server, never in a euro fixed in the screen.
 import { InlineFeedback } from '@erplora/ui/components';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import { itTellsTheCorrectedFieldApart } from '../../../../base/frontend/__tests__/same-words-refusal';
 import { expectAmountLeftWaitsForMoney, expectWindowSaysMoneyUnreadable } from '../../../../base/frontend/__tests__/save-waits-for-money';
-import type { Business } from '../../../../base/frontend/operations';
+import type { Business } from '../../../../base/frontend/operations/business';
 import { localDay } from '../lib/format';
 import type { MethodOut, PaymentOut } from '../operations';
 import { business, click, errorFrame, ionValue, JAPANESE, mountPayment, page, POLISH, RECORDER, settle } from '../__tests__/mount-payment';
 import PaymentFormModal from './PaymentFormModal.vue';
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
 
 type Control = HTMLElement & { label?: string; value?: unknown; errorText?: string; disabled?: boolean; placeholder?: string };
 

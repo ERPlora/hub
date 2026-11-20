@@ -10,7 +10,7 @@ from live.operations import AI, operation
 from base import image_catalog
 from base.models import Hub
 from base.permissions import VIEW_HOME
-from base.schemas import CatalogImageOut, CatalogImagePage, CatalogImageRefIn, CatalogImageSearchIn
+from base.schemas.catalog_images import CatalogImageOut, CatalogImagePage, CatalogImageRefIn, CatalogImageSearchIn
 
 
 # ── The shared image library (base.image_catalog) ──────────────────────────────────────────────────────────────────

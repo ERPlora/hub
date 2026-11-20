@@ -20,7 +20,7 @@ from live.outbox import channel_for
 
 from apps.schedule.models import ScheduleSettings, WeekDay
 from apps.schedule.tests.conftest import HUB_DB, HUB_DB_COMMITTED, A, B
-from base.schemas import SetupStatusIn
+from base.schemas.home import SetupStatusIn
 from base.tenancy.context import use_hub
 
 STEP = "schedule.hours"

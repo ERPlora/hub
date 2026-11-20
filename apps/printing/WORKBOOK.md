@@ -209,7 +209,7 @@ cierra sin preguntar (BASE-F05).
 | PRINTING-F18 | Sacar el papel: el dispositivo recoge y confirma los trabajos | común | hecho |
 | PRINTING-F19 | Ver el estado de una impresora | común | hecho |
 | PRINTING-F20 | Cuánto tiempo guarda el hub los trabajos de impresión | común | hecho |
-| PRINTING-F21 | Ver en Sistema quién imprime y dónde bajar la app de ERPlora | común | parcial — no dice si la impresora responde ahora (hub#573) |
+| PRINTING-F21 | Ver en Sistema quién imprime y dónde bajar la app de ERPlora | común | parcial — la tarjeta aún no dice si la impresora responde ahora (hub#573) |
 
 ### PRINTING-F01 Ver cómo va la impresión
 Estado: hecho
@@ -318,7 +318,8 @@ Pasos:
 Entra: la función de cada impresora y, si hay varias, la elegida.
 Sale: cada documento sale por la impresora de su función. Una impresora no se borra: la cola la nombra.
 Si falla: si ninguna impresora activa tiene la función, el trabajo **espera** en la cola sin
-impresora («En cola, sin impresora») y sale en cuanto una la tenga. En ajustes, una impresora de otra
+impresora («En cola, sin impresora») y sale en cuanto una la tenga; la comanda de Cocina no, porque
+Cocina entonces no la manda (PRINTING-F10). En ajustes, una impresora de otra
 función o inactiva se rechaza: «Esa impresora no tiene esta función.», «Esa impresora está inactiva.».
 Implicados: PRINTING-F01, PRINTING-F06, INVENTORY-F25
 
@@ -430,8 +431,10 @@ Pasos:
    saca (PRINTING-F18).
 Entra: la comanda de Cocina (mesa, camarero, ronda y platos).
 Sale: un trabajo por impresora en la cola de Impresión.
-Si falla: la comanda no se desvía a la impresora de tiques: sin impresora con su función, espera en la
-cola («En cola, sin impresora») y sale en cuanto una la tenga. El papel nunca bloquea al camarero.
+Si falla: la comanda no se desvía a la impresora de tiques. Si ninguna impresora activa tiene su
+función, Cocina no la manda a la cola: la cocina trabaja con su pantalla y la campana no avisa. Si la
+impresora existe pero ningún dispositivo encendido la saca, espera en la cola y la campana avisa
+(PRINTING-F01). El papel nunca bloquea al camarero.
 Implicados: KITCHEN-F08, KITCHEN-F18, PRINTING-F04, PRINTING-F18
 
 ### PRINTING-F11 Reimprimir una comanda
@@ -443,7 +446,8 @@ Pasos:
 2. Cocina pide a Impresión otra hoja por cada impresora de sus platos, marcada como copia (KITCHEN-F09).
 Entra: la comanda.
 Sale: un trabajo nuevo con otra clave cada vez, en la cola de la impresora de su función.
-Si falla: como PRINTING-F10; si Impresión la rechaza, Cocina dice su motivo.
+Si falla: como PRINTING-F10, salvo que sin ninguna impresora activa de su función Cocina lo dice y no
+manda nada a la cola; si Impresión la rechaza, Cocina dice su motivo.
 Implicados: KITCHEN-F09, PRINTING-F10
 
 ### PRINTING-F12 Imprimir la etiqueta de un código de barras
@@ -647,9 +651,9 @@ plazo.
 Implicados: PRINTING-F01, PRINTING-F14
 
 ### PRINTING-F21 Ver en Sistema quién imprime y dónde bajar la app de ERPlora
-Estado: parcial — no dice si la impresora responde ahora («Impresora lista», «Impresora sin conectar» o «No hemos
-podido comprobar la impresora»): Impresión no tiene todavía esa lectura, la misma que pide la fila de salud del
-Inicio (hub#573)
+Estado: parcial — la tarjeta aún no dice si la impresora responde ahora («Impresora lista», «Impresora sin conectar»
+o «No hemos podido comprobar la impresora»): Impresión ya tiene esa lectura, la misma que da a la fila de salud del
+Inicio, pero la tarjeta todavía no la usa (hub#573)
 Actor: propietario, administrador, responsable, empleado
 Pantalla: Sistema · Uso y plan
 Pasos:
@@ -670,7 +674,7 @@ Sale: nada guardado.
 Si falla: si no se puede leer qué tarjetas tocan, no sale ninguna (nunca la de una app apagada) y el resto de la
 pestaña dice lo suyo; sin las direcciones de erplora.com no salen los botones de descarga (nunca un botón que no
 lleva a ningún sitio).
-Implicados: BASE-F39, PRINTING-F18
+Implicados: BASE-F02, BASE-F39, PRINTING-F18
 
 ## Servicios: lo que entra y lo que sale
 
@@ -691,6 +695,7 @@ Las demás apps y el asistente usan Impresión por estas operaciones, por su nom
 | Un trabajo de la cola por id o por el número de su documento (el más reciente), con su título como lo pone la cola | ver | F14, F16 | `printing.job.get` |
 | El resumen de la cola por función, con la impresora por la que sale cada una, cuántos trabajos no puede sacar ningún dispositivo dado de alta y cuántos llevan un minuto sin dispositivo encendido | ver | F01 | `printing.job.summary` |
 | Si una función tiene un dispositivo dado de alta que la imprime, encendido o no (el paso del Inicio), y cuántos de sus trabajos llevan un minuto o más en cola sin un dispositivo encendido que los saque (la campana) | ver | F01 | `printing.device.coverage` |
+| Si la estación de una función responde ahora: lista (un dispositivo dado de alta que la imprime ha dado señales en los últimos 90 s), sin conectar (dado de alta, pero callado) o sin configurar (ninguno); para la fila de salud del Inicio y la tarjeta «Tu impresora» | ver | F21 | `printing.device.health` |
 
 ### Lo que ofrece: acciones (cambian datos)
 
@@ -748,9 +753,10 @@ Nada (`requires = []`). No lee modelos de nadie: quien imprime manda el document
 | Facturación | La página A4 de una factura, para la impresora del sistema | `printing.job.create` |
 | Caja | Informe X y Z | `printing.job.create` |
 | Inventario | Etiqueta de código de barras | `printing.job.create` |
-| Cocina | La comanda de cada estación y su reimpresión | `printing.job.create` |
+| Cocina | La comanda de cada estación y su reimpresión, solo si hay una impresora activa de su función | `printing.printer.list`, `printing.job.create` |
 | `base` (`/ws/print`) | Entregar y confirmar trabajos | `printing.job.claim`, `printing.job.complete`, `printing.job.fail` |
 | `base` (Inicio y campana) | «Configura la impresora» y «Nadie está imprimiendo «…»» | `printing.device.coverage` |
+| `base` (fila de salud del Inicio) | «Impresora lista», «Impresora sin conectar» o «Impresora sin configurar» | `printing.device.health` |
 
 ### Quién puede qué
 
@@ -801,9 +807,13 @@ Campos del documento que lee la impresora (los demás se ignoran):
   `receipt_id`, `customer_name`, `customer_tax_id` y `tax_breakdown` no vacío (422 si falta).
 - `prebill`: lo mismo sin número, QR ni pago, con `notice`; exige `items` no vacío. La app del dispositivo no
   pinta `vat_number` en este papel: Ventas manda el NIF como última línea de `business_address` (SALE-F21).
-- `kitchen_order`: `order_number`, `round_number`, `table`, `waiter`, `label`, `priority`, `items`
-  (`name`, `quantity`, `modifiers`, `notes`, `combo_name`, `combo_ref`); `modifiers` es una lista de textos,
-  los suplementos en el orden elegido, que la impresora pinta un renglón cada uno, antes de `notes`.
+- `kitchen_order`: `order_number`, `round_number`, `table`, `waiter`, `label`, `priority`, `allergy`, `items`
+  (`name`, `quantity`, `modifiers`, `notes`, `combo_name`, `combo_ref`); `modifiers` es una lista de textos que
+  la impresora pinta un renglón cada uno, en negrita, antes de `notes`: Cocina pone primero los de la alergia del
+  cliente (`*** ALERGIA: GLUTEN ***`, `*** LLEVA: GLUTEN ***`) y después los suplementos en el orden elegido
+  (KITCHEN-F32). `allergy` es la marca de la cabecera (`!! ALERGIA !!`, vacía sin alergia en la hoja). La app del
+  dispositivo pinta bajo el número, en este orden, el texto de `priority` tal como llega (`HIGH`, el del contrato
+  anterior, sale como su marca de urgente), el de `allergy` y la marca de copia cuando `duplicate` es verdadero.
 - `barcode_label`: `product_name`, `barcode`, `price`.
 - `cash_session_report`: `receipt_id` (la sesión), `cashier`, `opening_balance`, `closing_balance`,
   `transactions` (`label`, `amount`).
@@ -875,9 +885,18 @@ canal llama a sus operaciones con el contexto de la sesión del dispositivo:
 `frontend/components/SystemPrinterCard.vue`, con `printing.view_settings` (`base.E015`); `base.system.cards` la lista
 solo con Impresión encendida y `SystemAppCards.vue` de `base` la monta bajo «Uso y plan». No lee nada de Impresión: las
 descargas salen de `hub-home.app_downloads` (`base/spa.py`) por `useAppDownloads` de `base`, solo en un navegador, y
-cada botón sale por `openExternalLink`. Cuando Impresión tenga la lectura de si la caja responde (hub#573), la tarjeta
-la enseña. Tests: `tests/test_apps.py`, `tests/test_integration_home.py` y
-`frontend/components/SystemPrinterCard.test.ts`.
+cada botón sale por `openExternalLink`. La lectura de si la estación de tiques responde ya existe
+(`printing.device.health`, abajo); la tarjeta aún no la enseña (hub#573). Tests: `tests/test_apps.py`,
+`tests/test_integration_home.py` y `frontend/components/SystemPrinterCard.test.ts`.
+
+**La fila de salud del Inicio** (hub#573, BASE-F02). `printing.device.health` (`queries/health.py`, con su esquema en
+`schemas/health.py`; `GET /api/printing/devices/health`) dice de una función `ok` si un dispositivo dado de alta que
+llega a una impresora activa suya en papel de tique ha dado señales en los últimos `SEEN_WITHIN` (90 s), `no_signal`
+si lo hay pero ninguno ha dado señales y `not_configured` si no hay ninguno. «Dado de alta» es el `configured` de
+`printing.device.coverage` y «ha dado señales», lo que la campana llama un dispositivo que está: las tres lecturas usan
+las mismas reglas. `SEEN_WITHIN` vive en `queries/health.py`. `PrintingConfig.health` la declara con los tiques, para
+quien ve Impresión (`printing.view_settings`), con «Configurar la impresión» hacia `/printing/printers` (`base.E021`).
+Tests: `tests/test_queries_health.py` y `tests/test_integration_home_health.py`.
 
 **Lo que se pide a cada app** (no se toca desde aquí):
 
@@ -926,6 +945,9 @@ la enseña. Tests: `tests/test_apps.py`, `tests/test_integration_home.py` y
   compatible); si no, la primera activa con esa función por nombre; si no, ninguna: espera, y la
   recoge el primer dispositivo con una impresora compatible de esa función. Compatible: la del sistema
   imprime `a4` y las térmicas `receipt`. Reintentar vuelve a elegir si la suya ya no está activa.
+  Cocina no llega a ese «ninguna»: sin impresora activa de la función no pide la hoja. La migración
+  `0005_cancel_kitchen_orders_without_printer` canceló, sin quién ni motivo y con el documento vaciado,
+  las comandas de Cocina que esperaban sin impresora en un negocio sin ninguna activa de su función.
 - **Buscar impresoras** (PRINTING-F02): la ventana llama a `erplora_discover_printers` de la app, que solo
   busca para el hub vinculado (`hub_link.rs` de `ERPlora/app`; lo vincula el SaaS al abrir el negocio desde la
   app, `/shell/` con `?shell=1`, saas#66); otra página recibe `not_the_linked_hub` y la ventana lo dice. El

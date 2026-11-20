@@ -10,9 +10,9 @@
 // flow: ONLINE_BOOKING-F01 ONLINE_BOOKING-F02 ONLINE_BOOKING-F05 BASE-F97
 import { type BrowserContext, expect, test } from '@playwright/test';
 
-import { cancel, cardSpec, datumOf, fieldsOf, ownerIn, VIEWPORTS } from './assistant-card-helpers';
+import { cardSpec, datumOf, fieldsOf, VIEWPORTS } from './assistant-card-helpers';
+import { answers, cancel, card, openPanelAtTheDesk, ownerIn } from './assistant-panel';
 import { NOT_DONE } from './assistant-provider';
-import { answers, card, openPanel } from './assistant-real';
 import { aMonday, openForACut, salonCleanUp } from './appointment-helpers';
 import { A, api, capture, psql } from './helpers';
 import { post } from './service-helpers';
@@ -86,8 +86,7 @@ for (const language of ['es', 'en'] as const) {
     expect(label).toContain(`${TAG} Lucía`);
     expect(label).toContain('10:00');
     expect(label).toContain(member.full_name);
-    await page.setViewportSize({ width: 1440, height: 900 });
-    await openPanel(page);
+    await openPanelAtTheDesk(page);
 
     // «Cancela la reserva de Lucía», a dangerous write: the booking as the diary says it, titled as the list calls one,
     // in every size.

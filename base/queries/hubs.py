@@ -15,16 +15,8 @@ from base.models import Hub, Location
 from base.operations import is_platform_hub
 from base.permissions import VIEW_HOME
 from base.registry import hub_answer, internal_only
-from base.schemas import (
-    BusinessIn,
-    BusinessOut,
-    HubGetIn,
-    HubGetOut,
-    HubsBySlugIn,
-    HubsBySlugOut,
-    LocationListIn,
-    LocationListOut,
-)
+from base.schemas.business import BusinessIn, BusinessOut, LocationListIn, LocationListOut
+from base.schemas.hub_registry import HubGetIn, HubGetOut, HubsBySlugIn, HubsBySlugOut
 
 
 # Not an assistant tool: the platform's door (/internal, the SaaS), no person.

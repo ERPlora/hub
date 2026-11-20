@@ -23,7 +23,7 @@ from live.outbox import channel_for
 from apps.whatsapp_inbox.models import Conversation
 from apps.whatsapp_inbox.tests.conftest import HUB_DB, HUB_DB_COMMITTED, A, B, NOW, card, connect, ctx_for, receive, run
 from base.permissions import VIEW_HOME
-from base.schemas import NoticeListIn
+from base.schemas.home import NoticeListIn
 from base.schemas.bell import BellCountersIn
 from base.tenancy.context import use_hub
 

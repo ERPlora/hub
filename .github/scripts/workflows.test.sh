@@ -116,20 +116,19 @@ check("only build and deploy get an OIDC token",
       sorted(name for name, job in jobs.items() if (job.get("permissions") or {}).get("id-token") == "write")
       == ["build", "deploy"])
 
-# --- test.yml: three independent jobs behind the required check "test / test" ------------------
+# --- test.yml: four independent jobs behind the required check "test / test" -------------------
 tjobs = test.get("jobs", {})
-check("test.yml has the jobs python, frontend, scripts and test",
-      {"python", "frontend", "scripts", "test"} <= set(tjobs))
-check("python, frontend and scripts wait for nothing",
-      all(not needs(tjobs.get(name, {})) for name in ("python", "frontend", "scripts")))
-check("test (the required check) needs python, frontend and scripts",
-      set(needs(tjobs.get("test", {}))) == {"python", "frontend", "scripts"})
+TEST_JOBS = ("python", "frontend", "scripts", "smoke")
+check("test.yml has the jobs python, frontend, scripts, smoke and test", {*TEST_JOBS, "test"} <= set(tjobs))
+check("python, frontend, scripts and smoke wait for nothing", all(not needs(tjobs.get(name, {})) for name in TEST_JOBS))
+check("test (the required check) needs python, frontend, scripts and smoke",
+      set(needs(tjobs.get("test", {}))) == set(TEST_JOBS))
 check("test reports even when a job fails or is cancelled", str(tjobs.get("test", {}).get("if", "")) == "always()")
 # A red shard of python's matrix (or a red job) only turns "test / test" red if test reads every job's result and
 # nothing turns a failure into a pass on the way: no continue-on-error, on a job or on a step (hub#1185).
 test_results = "\n".join(str((step.get("env") or {}).get("RESULTS", "")) for step in steps(tjobs.get("test", {})))
-check("test reads the result of python (every shard), frontend and scripts",
-      all(f"{name}=${{{{ needs.{name}.result }}}}" in test_results for name in ("python", "frontend", "scripts")))
+check("test reads the result of python (every shard), frontend, scripts and smoke",
+      all(f"{name}=${{{{ needs.{name}.result }}}}" in test_results for name in TEST_JOBS))
 check("no job or step of test.yml continues on error, so no red shard is hidden",
       not any("continue-on-error" in job or any("continue-on-error" in step for step in steps(job))
               for job in tjobs.values()))
@@ -137,11 +136,10 @@ python_runs, frontend_runs, scripts_runs = (runs(tjobs.get(name, {})) for name i
 check("python runs pytest over a Postgres service",
       "pytest" in python_runs and "postgres" in (tjobs.get("python", {}).get("services") or {}))
 check("pytest runs in parallel (pytest-xdist)", "pytest" in python_runs and " -n " in python_runs)
-# The seeds' images are checked against the shared library's manifest (base/tests/test_seed_images.py): ERPlora/blueprints
-# is public and fetched beside the Hub, where config/settings/web.py looks for it (CATALOG_DIR), before pytest runs.
-check("python fetches ERPlora/blueprints into ../blueprints before pytest",
-      "ERPlora/blueprints.git ../blueprints" in python_runs
-      and python_runs.index("ERPlora/blueprints.git") < python_runs.index("pytest"))
+# Before pytest, beside the Hub: the SaaS's signed declaration (apps/verifactu/tests/test_producer.py) and the shared
+# image library, where config/settings/web.py looks for it (CATALOG_DIR; base/tests/test_seed_images.py).
+for clone in ("ERPlora/saas ../saas public/declaracion", "ERPlora/blueprints ../blueprints img"):
+    check(f"python clones {clone} before pytest", before(tjobs.get("python", {}), f"clone-repo.sh {clone}", "pytest"))
 # WeasyPrint's libraries are installed without Ubuntu's mirror (hub#1222: a DNS outage of the mirror kept every run red
 # for hours, and retries alone would spend minutes the python job does not have): their .deb files come from GitHub's
 # cache, one entry per runner image and per test.yml, through apt-install.sh, which only goes to the mirror without
@@ -217,21 +215,86 @@ check("scripts runs actionlint, shellcheck and the script tests",
 actionlint_step = next((step for step in steps(tjobs.get("scripts", {})) if "actionlint" in str(step.get("run", ""))), {})
 check("actionlint is downloaded with download-tool.sh",
       "bash .github/scripts/download-tool.sh" in str(actionlint_step.get("run", "")))
-bare_curls = [
-    f"{path.name}: {step.get('name') or str(step.get('run'))[:40]!r}"
-    for path in sorted(folder.glob("*.yml"))
-    for job in (yaml.safe_load(path.read_text()).get("jobs") or {}).values()
-    for step in steps(job)
-    if "curl " in str(step.get("run", "")) and "--retry-all-errors" not in str(step.get("run", ""))
-]
-check(f"every curl of the workflows retries a passing error (--retry-all-errors){': ' if bare_curls else ''}"
-      + ", ".join(bare_curls), not bare_curls)
+all_steps = [(path.name, job, step) for path in sorted(folder.glob("*.yml"))
+             for job in (yaml.safe_load(path.read_text()).get("jobs") or {}).values() for step in steps(job)]
+
+
+def listed(found):
+    """The steps found, as "<workflow>: <step>", after a colon, or nothing."""
+    return (": " if found else "") + ", ".join(f"{name}: {step.get('name') or str(step.get('run'))[:40]!r}"
+                                               for name, _, step in found)
+
+
+bare_curls = [(name, job, step) for name, job, step in all_steps
+              if "curl " in str(step.get("run", "")) and "--retry-all-errors" not in str(step.get("run", ""))]
+check("every curl of the workflows retries a passing error (--retry-all-errors)" + listed(bare_curls), not bare_curls)
+# GitHub limits anonymous clones from its shared runners and refuses them with a 403, which turned PRs red: every
+# clone goes through clone-repo.sh, which sends the job's token and retries a failed attempt; that token only reads.
+bare_clones = [found for found in all_steps if "git clone" in str(found[2].get("run", ""))]
+check("no workflow runs git clone itself: clones go through clone-repo.sh" + listed(bare_clones), not bare_clones)
+clones = [found for found in all_steps if "clone-repo.sh" in str(found[2].get("run", ""))]
+anonymous = [found for found in clones if (found[2].get("env") or {}).get("GH_TOKEN") != "${{ github.token }}"]
+check("every clone goes as the job's token (GH_TOKEN: ${{ github.token }})" + listed(anonymous), bool(clones) and not anonymous)
+writers = [found for found in clones if found[1].get("permissions") != {"contents": "read"}]
+check("and that token only reads (the job's permissions: contents: read)" + listed(writers), not writers)
 setup_uv = [step for job in tjobs.values() for step in steps(job) if "astral-sh/setup-uv" in str(step.get("uses", ""))]
 check("setup-uv is used", bool(setup_uv))
 check("setup-uv caches by uv.lock",
       bool(setup_uv) and all(str((step.get("with") or {}).get("enable-cache")).lower() == "true"
                              and (step.get("with") or {}).get("cache-dependency-glob") == "uv.lock"
                              for step in setup_uv))
+
+# --- test.yml: the browser smoke stops the merge ----------------------------------------------------
+# A change that breaks a critical walk in the browser turns "test / test" red: the job smoke runs smoke-e2e.sh (the
+# tests tagged @smoke, narrowed with --spec while the groups enter one at a time) on the stack nightly-e2e.sh builds,
+# with the SaaS beside the Hub because every login goes through erplora.com.
+smoke_job = tjobs.get("smoke", {})
+smoke_runs = runs(smoke_job)
+smoke_step = next((step for step in steps(smoke_job) if "smoke-e2e.sh" in str(step.get("run", ""))), {})
+smoke_words = str(smoke_step.get("run", "")).split()
+check("smoke runs the browser smoke with smoke-e2e.sh", smoke_words[:2] == ["bash", ".github/scripts/smoke-e2e.sh"])
+check("smoke runs Playwright only through smoke-e2e.sh",
+      not any(needle in smoke_runs for needle in ("pnpm e2e", "playwright", "nightly-e2e.sh")))
+smoke_specs = [smoke_words[index + 1] for index, word in enumerate(smoke_words[:-1]) if word == "--spec"]
+check("smoke's step is that command and its --spec, with nothing after them that could hide a red (as `|| true`)",
+      smoke_words[2:] == [word for spec in smoke_specs for word in ("--spec", spec)])
+# The groups that already stop the merge, with their specs: a spec dropped from the job, or one named outside them,
+# turns this red. A group that enters adds its specs here and to the job in the same change.
+SMOKE_GROUPS = {
+    "signing in, sessions, permissions, isolation and suspension": ("login-and-shell", "base-access", "base-sign-out",
+        "base-session-revoke", "employee-permissions", "two-orgs-isolated", "hub-suspended"),
+    "charging and the cash register": ("sale-pos", "sale-cash-gate", "cash-register-shift", "printing-sale"),
+    "the ticket's QR, the invoice and VeriFactu": ("sale-fiscal-qr", "sale-invoice-chain", "invoice-sale",
+                                                    "invoice-manual", "verifactu-records"),
+    "the kitchen and the tables": ("kitchen-pos", "sale-table"),
+    "appointments, services and vouchers": ("appointment-agenda", "appointment-charge", "service-catalog",
+                                            "service-vouchers", "sale-voucher"),
+    "sign-up, apps, the demo and live updates": ("base-sign-up-taxes-on", "base-app-activation", "demo", "two-tabs-live"),
+}
+grouped = []
+for group, names in SMOKE_GROUPS.items():
+    specs = [f"tests/e2e/{name}.spec.ts" for name in names]
+    grouped += specs
+    missing = ", ".join(spec for spec in specs if spec not in smoke_specs)
+    check(f"smoke runs every spec of the group «{group}»{': missing ' if missing else ''}{missing}", not missing)
+ungrouped = [spec for spec in smoke_specs if spec not in grouped]
+check(f"smoke names no spec outside those groups{': ' if ungrouped else ''}" + ", ".join(ungrouped), not ungrouped)
+repo = folder.resolve().parent.parent
+unsmoked = [spec for spec in smoke_specs if not (repo / spec).is_file() or "@smoke" not in (repo / spec).read_text()]
+check(f"every spec the smoke names exists and has a test tagged @smoke{': ' if unsmoked else ''}" + ", ".join(unsmoked),
+      not unsmoked)
+check("smoke has a timeout of its own, in whole minutes",
+      isinstance(smoke_job.get("timeout-minutes"), int) and smoke_job.get("timeout-minutes") > 0)
+# The specs reach the stack's Postgres with `docker compose exec` (tests/e2e/global-setup.ts), and nightly-e2e.sh takes
+# the SaaS from ../saas, as in the erplora-next tree.
+check("smoke starts Postgres with docker compose before the smoke", before(smoke_job, "docker compose", "smoke-e2e.sh"))
+check("smoke clones ERPlora/saas into ../saas before the smoke",
+      before(smoke_job, "clone-repo.sh ERPlora/saas ../saas", "smoke-e2e.sh"))
+uploads = [step for step in steps(smoke_job) if str(step.get("uses", "")).startswith("actions/upload-artifact@")]
+smoke_dir = str((smoke_step.get("env") or {}).get("NIGHTLY_DIR", ""))
+check("a red smoke keeps the run's log and Playwright's traces (NIGHTLY_DIR/runs/)",
+      bool(smoke_dir) and any(str(step.get("if", "")) == "failure()"
+                              and (step.get("with") or {}).get("path") == f"{smoke_dir}/runs/" for step in uploads))
 
 # --- ci.yml: a newer push supersedes the run of the older one -----------------------------------
 check("ci.yml runs test.yml", (ci.get("jobs", {}).get("test") or {}).get("uses") == "./.github/workflows/test.yml")

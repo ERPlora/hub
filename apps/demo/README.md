@@ -41,7 +41,7 @@ optimista e idempotente, permisos por papel) y es la que se copia para escribir 
 | `requires` | ninguno; no lee ni llama a otras apps |
 | Permisos | `demo.view` (todos los papeles) y `demo.manage` (todos menos el empleado) |
 | Pantallas | `/demo/items`, `/demo/items/new`, `/demo/items/:id`, `/demo/items/:id/edit` |
-| Operaciones | 4 consultas (`queries.py`: `list`, `detail`, `stats` y `open_count`, la del contador de la campana) y 4 acciones (`services.py`: `create`, `update`, `delete`, `add_line`), todas con `ai=` (`risk = "high"` solo en `delete`); rutas en `/api/demo/items…`, sin parámetros en la ruta |
+| Operaciones | 4 consultas (`queries.py`: `list`, `detail`, `stats` y `open_count`, la del contador de la campana) y 4 acciones (`services.py`: `create`, `update`, `delete`, `add_line`), todas con `ai=` (`risk = "high"` solo en `delete`); 7 rutas en `/api/demo/items…`, sin parámetros en la ruta (`open_count` no tiene ruta) |
 | Eventos | 4, `demo.item.<hecho>` (`events.py`); sin `REACTIONS`: no escucha a nadie |
 | Ganchos del Inicio | `setup` (`first_item`), `widgets` (`open_items`, `kpi`) y `bell` (`open_items`) |
 | Tareas programadas | ninguna |

@@ -17,7 +17,7 @@ from django.utils.translation import gettext
 from live.context import OperationContext, Scope
 from live.errors import PermissionDenied
 
-from base.schemas import HubOut
+from base.schemas.hub_registry import HubOut
 from control.models import Hub
 
 #: The scope of the registry's operations (``base.hub.*``): the platform's, never a hub's.

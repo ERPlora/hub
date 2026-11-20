@@ -13,7 +13,7 @@ from live.operations import AI, operation
 from base import access
 from base.models import SessionOwner, TrustedDevice
 from base.permissions import ADMINISTER_HUB, VIEW_HOME
-from base.schemas import DeviceByIdIn, DeviceCurrentIn, DeviceCurrentOut, DeviceListIn, DeviceListOut, DeviceOut
+from base.schemas.devices import DeviceByIdIn, DeviceCurrentIn, DeviceCurrentOut, DeviceListIn, DeviceListOut, DeviceOut
 
 
 def device_of(request: HttpRequest | None, *, for_update: bool = False) -> TrustedDevice | None:

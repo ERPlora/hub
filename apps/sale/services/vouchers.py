@@ -10,8 +10,16 @@ from live.outbox import record_event
 
 from apps.sale import events
 from apps.sale.models import SaleLine, VoucherSession
-from apps.sale.queries import COUNTED, find_sale, money_text
-from apps.sale.schemas import VoucherLineOut, VoucherSessionIn, VoucherSessionOut, VoucherSoldIn, VoucherUnsoldIn
+from apps.sale.queries.business import money_text
+from apps.sale.queries.figures import COUNTED
+from apps.sale.queries.sales import find_sale
+from apps.sale.schemas.vouchers import (
+    VoucherLineOut,
+    VoucherSessionIn,
+    VoucherSessionOut,
+    VoucherSoldIn,
+    VoucherUnsoldIn,
+)
 from apps.tax.queries import business_today
 
 SALE_LINE_NOT_FOUND = _("That line is not in that sale.")

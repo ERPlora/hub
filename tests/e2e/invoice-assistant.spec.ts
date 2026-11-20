@@ -16,29 +16,20 @@
 // never «Do this»)
 // flow: invoice-assistant-card (the card names the invoice, the
 // series and the customer a write names by its id, and the kind of a foreign recipient's document, never raw)
-import { execSync } from 'node:child_process';
 
-import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
+import { type BrowserContext, expect, test } from '@playwright/test';
 
-import { CANNOT_RECTIFY, NOT_DONE, type Provider, startProvider } from './assistant-provider';
-import { confirmedWithTheWord, type SentCard, sentCard } from './assistant-card-helpers';
-import { A, api, capture, login, psql, registerBusinessIn, registrationOf, REPO_DIR, shot, shown, untilStill } from './helpers';
+import { CANNOT_RECTIFY, NOT_DONE, type Provider } from './assistant-provider';
+import { ask, askForACard, cancelAtComputerSize, cancelInSpanish, card, confirmedWithTheWord, decide, lastAnswer, openPanel, panel, previewBlock, receipts, type SentCard, sentCard } from './assistant-panel';
+import { emptyMonth } from './assistant-real';
+import { A, api, capture, login, psql, registerBusinessIn, registrationOf, shot, shown, THREE_SIZES as VIEWPORTS, untilStill } from './helpers';
 import { cleanInvoices, ensureIssuer, type InvoiceOut, invoiceOf, issuedIds, snapshotSeries } from './invoice-helpers';
+import { seededProvider } from './provider-helpers';
 import { stamp } from './sale-helpers';
-import { STACK } from './stack';
-import { openAssistant as openPanel } from './topbar';
 
 const KEY = 'FIX-INVOICE-NO-VOICE-RECTIFY-WITH-ASSISTANT';
 const RUN = stamp();
 const REASON = 'el precio estaba mal';
-const VIEWPORTS = [
-  { label: '390', width: 390, height: 844 },
-  { label: '834', width: 834, height: 1112 },
-  { label: '1440', width: 1440, height: 900 },
-];
-const PROVIDER_PORT = Number(process.env.E2E_AI_PROVIDER_PORT ?? STACK.hubPort + 2);
-/** The SaaS's database of this stack (README «Varias ejecuciones a la vez»: `saas_e2e_<Hub port + 1>`). */
-const SAAS_DB = process.env.E2E_SAAS_DB ?? (STACK.hubPort === 8000 ? 'saas' : `saas_e2e_${STACK.hubPort + 1}`);
 
 let provider: Provider;
 
@@ -50,18 +41,6 @@ interface Preview {
   base_amount: number;
   tax_amount: number;
   total_amount: number;
-}
-
-function saasSql(sql: string): string {
-  return execSync(`docker compose exec -T postgres psql -U hub -d ${SAAS_DB} -At -c "${sql}"`, {
-    cwd: REPO_DIR,
-    encoding: 'utf8',
-  }).trim();
-}
-
-/** The month's assistant messages of the business `a` back to none: a run never spends the plan's allowance. */
-function unspend(): void {
-  saasSql("delete from assistant_assistantusage where hub_id = (select id from hubs_hub where slug = 'a')");
 }
 
 /** An invoice (F1) issued by hand, 100.00 € + 21 % VAT, recorded for the cleanup. */
@@ -86,9 +65,7 @@ async function anInvoice(context: BrowserContext): Promise<InvoiceOut> {
 }
 
 test.beforeAll(async ({ browser }) => {
-  provider = await startProvider(PROVIDER_PORT);
-  const seeded = saasSql("select base_url from assistant_aiprovider where slug = 'e2e-local'");
-  expect(seeded, `the SaaS ${SAAS_DB} is not seeded with this provider: README «El asistente»`).toBe(provider.url);
+  provider = await seededProvider();
   const context = await browser.newContext({ baseURL: A });
   const page = await context.newPage();
   await login(page, A, '/invoice/invoices');
@@ -102,35 +79,13 @@ test.afterAll(async () => {
   try {
     cleanInvoices();
   } finally {
-    unspend();
+    emptyMonth();
   }
 });
 
 test.beforeEach(() => {
-  unspend();
+  emptyMonth();
 });
-
-// ── The assistant's panel (as base-assistant.spec.ts drives it) ──
-
-const panel = (page: Page): Locator => page.locator('[data-testid="assistant-panel"]');
-const box = (page: Page): Locator => panel(page).locator('[data-testid="assistant-input"] textarea');
-const answers = (page: Page): Locator => panel(page).locator('[data-testid="assistant-answer"]');
-const lastAnswer = (page: Page): Locator => panel(page).locator('[data-testid="assistant-bubble-assistant"]').last();
-const receipts = (page: Page): Locator => panel(page).locator('[data-testid="assistant-receipt"]');
-const card = (page: Page): Locator => page.locator('ion-modal[data-testid="assistant-confirm"]');
-/** Writes `text` and sends it with Enter, without waiting for the turn to end (a card stops it half-way). */
-async function ask(page: Page, text: string): Promise<void> {
-  await expect(panel(page).locator('[data-testid="assistant-send"]')).toBeVisible({ timeout: 30_000 });
-  const before = await answers(page).count();
-  await box(page).fill(text);
-  await box(page).press('Enter');
-  await expect(answers(page)).toHaveCount(before + 1);
-}
-
-async function decide(page: Page, button: 'submit' | 'cancel'): Promise<void> {
-  await card(page).locator(`[data-testid="assistant-confirm-${button}"]`).click();
-  await expect(card(page)).toBeHidden();
-}
 
 /** What the model was told of the preview: the last tool result the gateway sent the provider, as sent. */
 function toldPreview(): Record<string, unknown> {
@@ -140,7 +95,6 @@ function toldPreview(): Record<string, unknown> {
 }
 
 const euros = (cents: number) => `${(cents / 100).toFixed(2)} €`;
-const previewBlock = (page: Page): Locator => card(page).locator('[data-testid="assistant-confirm-preview"]');
 const asked = (number: string) => `E2E-RECTIFY ${number} rectifica la factura ${number} porque ${REASON}`;
 /** The card says a rectification's kind by the name the models give it, never by its code (hub#708). */
 const KIND_R1 = {
@@ -158,8 +112,7 @@ test('INVOICE-F08 — «rectify invoice <number> because the price was wrong»: 
   expect([expected.invoice_type, expected.total_amount]).toEqual(['R1', -12100]);
 
   await openPanel(page);
-  await ask(page, asked(invoice.number));
-  await expect(card(page)).toBeVisible({ timeout: 30_000 });
+  await askForACard(page, asked(invoice.number), { timeout: 30_000 });
   // The preview, before the card: the original, the type, the reason, the next number and the amounts in negative.
   const preview = lastAnswer(page);
   await expect(preview.locator('strong').first()).toHaveText(invoice.number);
@@ -217,8 +170,7 @@ test('INVOICE-F08 — «rectify invoice <number> because the price was wrong»: 
   await page.setViewportSize({ width: 1440, height: 900 });
 
   // Asked again, the word typed: the rectifying invoice the preview said is issued, as the person.
-  await ask(page, asked(invoice.number));
-  await expect(card(page)).toBeVisible({ timeout: 30_000 });
+  await askForACard(page, asked(invoice.number), { timeout: 30_000 });
   await confirmedWithTheWord(page);
   await expect(receipts(page).last()).toHaveText('Done: Rectify in Invoicing');
   const after = await invoiceOf(context, invoice.id);
@@ -265,8 +217,7 @@ test('BASE-F97 — in Spanish the card and the receipt of rectifying say «Recti
   await page.goto(`${A}/invoice/invoices`);
   const invoice = await anInvoice(context);
   await openPanel(page);
-  await ask(page, asked(invoice.number));
-  await expect(card(page)).toBeVisible({ timeout: 30_000 });
+  await askForACard(page, asked(invoice.number), { timeout: 30_000 });
   await expect(card(page)).toContainText('¿Ejecutar esta acción?');
   await expect(card(page)).not.toContainText('Hacer esto');
   const sentence = card(page).locator('.assistant-confirm-text').first();
@@ -278,9 +229,7 @@ test('BASE-F97 — in Spanish the card and the receipt of rectifying say «Recti
     await untilStill(page);
     await page.screenshot({ path: shot(`${FIX}-${vp.label}`) });
   }
-  await page.setViewportSize({ width: 1440, height: 900 });
-  await decide(page, 'cancel');
-  await expect(lastAnswer(page)).toContainText('No lo he hecho.');
+  await cancelAtComputerSize(page);
   await expect(receipts(page).last()).toHaveText('No se hizo, cancelado: Rectificar en Facturación');
   expect((await invoiceOf(context, invoice.id)).status).toBe('issued');
   await context.close();
@@ -309,8 +258,7 @@ test('INVOICE-F08 — in Spanish the rectification card shows what will happen: 
   ];
 
   await openPanel(page);
-  await ask(page, asked(invoice.number));
-  await expect(card(page)).toBeVisible({ timeout: 30_000 });
+  await askForACard(page, asked(invoice.number), { timeout: 30_000 });
   await expect(card(page)).toContainText('¿Ejecutar esta acción?');
   for (const vp of VIEWPORTS) {
     await page.setViewportSize({ width: vp.width, height: vp.height });
@@ -324,14 +272,12 @@ test('INVOICE-F08 — in Spanish the rectification card shows what will happen: 
   await page.setViewportSize({ width: 1440, height: 900 });
 
   // «Cancelar»: nothing is issued, and the number the card said is still the next one (it was never taken).
-  await decide(page, 'cancel');
-  await expect(lastAnswer(page)).toContainText('No lo he hecho.');
+  await cancelInSpanish(page);
   expect((await invoiceOf(context, invoice.id)).status).toBe('issued');
   expect((await previewOf(context, invoice.number)).next_number).toBe(said);
 
   // Asked again, the word typed: the rectifying invoice carries exactly the number the card said.
-  await ask(page, asked(invoice.number));
-  await expect(card(page)).toBeVisible({ timeout: 30_000 });
+  await askForACard(page, asked(invoice.number), { timeout: 30_000 });
   await expect(previewBlock(page).locator('li')).toHaveText(lines);
   await card(page).locator('[data-testid="assistant-confirm-input"] input').fill('CONFIRMAR');
   await decide(page, 'submit');
@@ -373,8 +319,7 @@ test('BASE-F97 — with the business moved to Poland, the rectification card say
         // The receipt of the turn asked in English, read now in Spanish: whole in Spanish, the app by its menu.
         await expect(receipts(page)).toHaveText(['No se hizo, cancelado: Rectificar en Facturación']);
       }
-      await ask(page, asked(invoice.number));
-      await expect(card(page)).toBeVisible({ timeout: 30_000 });
+      await askForACard(page, asked(invoice.number), { timeout: 30_000 });
       const said = (await previewOf(context, invoice.number)).next_number;
       const lines =
         language === 'en'
@@ -419,7 +364,7 @@ test('INVOICE-F08 — asked to rectify a rectifying invoice, the assistant says 
   const rectifying = done.data.invoice.number;
 
   await openPanel(page);
-  await ask(page, asked(rectifying));
+  await ask(page, asked(rectifying), { settle: false });
   await expect(lastAnswer(page)).toContainText(CANNOT_RECTIFY.en);
   await expect(lastAnswer(page)).toContainText('A rectifying invoice cannot be rectified.');
   await expect(card(page)).toBeHidden();
@@ -468,11 +413,11 @@ test('invoice-assistant-card — in Spanish issuing an invoice names the custome
     // document in words.
     let sent = sentCard(page);
     const line = { description: `e2e Corte ${RUN}`, quantity: '1', unit_price: 10000, tax_rate: '21' };
-    await ask(
+    await askForACard(
       page,
       `E2E-ASK invoice__invoice__create ${JSON.stringify({ customer_id: customer.data.id, series_id: invoice.series_id, customer_id_type: '02', lines: [line] })}`,
+      { timeout: 30_000 },
     );
-    await expect(card(page)).toBeVisible({ timeout: 30_000 });
     let fields = await sent;
     expect(saidBy(fields)).toMatchObject({
       customer_id: ['Cliente', name],
@@ -489,14 +434,11 @@ test('invoice-assistant-card — in Spanish issuing an invoice names the custome
       await untilStill(page);
       await capture(page, `${CARD_KEY}-${vp.label}`);
     }
-    await page.setViewportSize({ width: 1440, height: 900 });
-    await decide(page, 'cancel');
-    await expect(lastAnswer(page)).toContainText('No lo he hecho.');
+    await cancelAtComputerSize(page);
 
     // «Marca como pagada esa factura»: the invoice by its number.
     sent = sentCard(page);
-    await ask(page, `E2E-ASK invoice__invoice__mark_paid ${JSON.stringify({ invoice_id: invoice.id })}`);
-    await expect(card(page)).toBeVisible({ timeout: 30_000 });
+    await askForACard(page, `E2E-ASK invoice__invoice__mark_paid ${JSON.stringify({ invoice_id: invoice.id })}`, { timeout: 30_000 });
     fields = await sent;
     expect(saidBy(fields)).toMatchObject({ invoice_id: ['Factura', invoice.number] });
     expect(JSON.stringify(fields)).not.toMatch(AN_ID);
@@ -504,8 +446,7 @@ test('invoice-assistant-card — in Spanish issuing an invoice names the custome
     await expect(card(page)).not.toContainText(AN_ID);
     await untilStill(page);
     await capture(page, `${CARD_KEY}-mark-paid-1440`);
-    await decide(page, 'cancel');
-    await expect(lastAnswer(page)).toContainText('No lo he hecho.');
+    await cancelInSpanish(page);
     // Cancelled: nothing paid, and no invoice for the customer.
     expect((await invoiceOf(context, invoice.id)).status).toBe('issued');
     expect(psql(`select count(*) from invoice_invoice where customer_id = '${customer.data.id}'`)).toBe('0');

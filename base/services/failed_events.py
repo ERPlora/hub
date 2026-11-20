@@ -15,9 +15,10 @@ from live.operations import AI, operation
 from live.outbox import record_event
 
 from base import events, system
+from base.apps_on import active_apps
 from base.models import EventDelivery
 from base.permissions import ADMINISTER_HUB
-from base.schemas import (
+from base.schemas.failed_events import (
     FailedEventCountOut,
     FailedEventDiscardIn,
     FailedEventIn,
@@ -46,10 +47,8 @@ from base.schemas import (
 )
 def failed_event_retry(ctx: OperationContext, data: FailedEventIn) -> dict:
     """``pending`` again, due now, attempts at zero; the relay takes it on its next tick."""
-    from base import relay  # base.relay imports this module
-
     delivery = _failed_event(ctx, data.id)
-    if delivery.app_label not in relay.active_apps(ctx.scope):
+    if delivery.app_label not in active_apps(ctx.scope):
         raise Conflict(
             gettext("%(app)s is not on in this business: turn it on, then resend the event.")
             % {"app": system.app_name(delivery.app_label)},
@@ -80,15 +79,13 @@ def failed_event_retry(ctx: OperationContext, data: FailedEventIn) -> dict:
 )
 def failed_event_retry_all(ctx: OperationContext, data: FailedEventRetryAllIn) -> dict:
     """Every ``dead`` delivery of the hub whose app is on; another worker's rows wait (``SKIP LOCKED``)."""
-    from base import relay  # base.relay imports this module
-
     ids = list(
         EventDelivery.objects.select_for_update(skip_locked=True, of=("self",))
         .filter(
             status=EventDelivery.Status.DEAD,
             event__scope_kind=ctx.scope.kind,
             event__scope_key=ctx.scope.key,
-            app_label__in=relay.active_apps(ctx.scope),
+            app_label__in=active_apps(ctx.scope),
         )
         .values_list("pk", flat=True)
     )

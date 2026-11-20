@@ -1,0 +1,542 @@
+{
+  "id": "s01-menu-from-excel",
+  "title": "La carta nueva desde un Excel de 25 platos, con precios y categorías que faltan",
+  "vertical": "restaurant",
+  "seed": "restaurant.es",
+  "language": "es",
+  "setup": [],
+  "owner": {
+    "persona": "Rafael, dueño de la taberna El Patio, en Córdoba. Ha preparado la carta de otoño en un Excel y quiere tenerla lista para el fin de semana.",
+    "goal": "Que los 25 platos y bebidas del Excel queden dados de alta, cada uno con su precio y en su categoría de la carta, sin tocar lo que ya había.",
+    "upFront": [
+      "Te paso la carta nueva en un Excel.",
+      "Son platos y bebidas nuevos: lo que ya teníamos en la carta se queda como está."
+    ],
+    "ifAsked": [
+      "El pulpo a la gallega va a 14,50 €.",
+      "El helado artesano va a 3,80 €.",
+      "Las albóndigas en salsa son un plato principal.",
+      "El tinto de verano va con los vinos y cervezas.",
+      "Los códigos de los productos me dan igual: que el programa ponga los que quiera."
+    ]
+  },
+  "attachments": [
+    {
+      "kind": "xlsx",
+      "name": "carta-otono.xlsx",
+      "sheet": "Carta",
+      "rows": [
+        ["Producto", "Categoría", "Precio"],
+        ["Gildas", "Entrantes", 3.5],
+        ["Pimientos de Padrón", "Entrantes", 6.0],
+        ["Salmorejo", "Entrantes", 5.5],
+        ["Huevos rotos con jamón", "Entrantes", 9.5],
+        ["Tabla de quesos", "Entrantes", 12.0],
+        ["Pulpo a la gallega", "Entrantes", null],
+        ["Calamares a la romana", "Entrantes", 8.5],
+        ["Secreto ibérico", "Principales", 15.5],
+        ["Merluza en salsa verde", "Principales", 16.0],
+        ["Arroz negro", "Principales", 14.0],
+        ["Rabo de toro", "Principales", 17.5],
+        ["Pollo al ajillo", "Principales", 11.0],
+        ["Risotto de setas", "Principales", 13.5],
+        ["Albóndigas en salsa", null, 10.5],
+        ["Torrija", "Postres", 4.5],
+        ["Arroz con leche", "Postres", 4.0],
+        ["Coulant de chocolate", "Postres", 5.5],
+        ["Helado artesano", "Postres", null],
+        ["Limonada casera", "Bebidas", 3.0],
+        ["Té helado", "Bebidas", 2.8],
+        ["Agua con gas", "Bebidas", 2.2],
+        ["Tinto de verano", null, 3.2],
+        ["Copa de cava", "Vinos y cervezas", 4.5],
+        ["Vermut de grifo", "Vinos y cervezas", 3.5],
+        ["Cerveza de trigo", "Vinos y cervezas", 3.2]
+      ]
+    }
+  ],
+  "opening": "Te paso la carta de otoño, da de alta todo lo que hay en el Excel",
+  "offered": ["inventory.product.bulk_create"],
+  "writes": [
+    "inventory.product.bulk_create",
+    "inventory.product.create",
+    "inventory.product.update",
+    "inventory.product_category.add",
+    "inventory.product_category.remove"
+  ],
+  "cards": [{"tool": "inventory.product.create", "match": {"name": "pulpo"}, "expect": {"price": 1450}}],
+  "expect": [
+    {
+      "says": "los 25 productos del Excel están, una vez cada uno",
+      "sql": "select count(*) from inventory_product where not is_deleted and lower(name) in ('gildas', 'pimientos de padrón', 'salmorejo', 'huevos rotos con jamón', 'tabla de quesos', 'pulpo a la gallega', 'calamares a la romana', 'secreto ibérico', 'merluza en salsa verde', 'arroz negro', 'rabo de toro', 'pollo al ajillo', 'risotto de setas', 'albóndigas en salsa', 'torrija', 'arroz con leche', 'coulant de chocolate', 'helado artesano', 'limonada casera', 'té helado', 'agua con gas', 'tinto de verano', 'copa de cava', 'vermut de grifo', 'cerveza de trigo')",
+      "equals": "25"
+    },
+    {
+      "says": "cada uno con su precio, también los dos que faltaban",
+      "sql": "select count(*) from inventory_product p join (values ('gildas', 350), ('pimientos de padrón', 600), ('salmorejo', 550), ('huevos rotos con jamón', 950), ('tabla de quesos', 1200), ('pulpo a la gallega', 1450), ('calamares a la romana', 850), ('secreto ibérico', 1550), ('merluza en salsa verde', 1600), ('arroz negro', 1400), ('rabo de toro', 1750), ('pollo al ajillo', 1100), ('risotto de setas', 1350), ('albóndigas en salsa', 1050), ('torrija', 450), ('arroz con leche', 400), ('coulant de chocolate', 550), ('helado artesano', 380), ('limonada casera', 300), ('té helado', 280), ('agua con gas', 220), ('tinto de verano', 320), ('copa de cava', 450), ('vermut de grifo', 350), ('cerveza de trigo', 320)) as w(name, price) on lower(p.name) = w.name and p.price = w.price where not p.is_deleted",
+      "equals": "25"
+    },
+    {
+      "says": "el pulpo a la gallega a 14,50 €",
+      "sql": "select price from inventory_product where not is_deleted and lower(name) = 'pulpo a la gallega'",
+      "equals": "1450"
+    },
+    {
+      "says": "el helado artesano a 3,80 €",
+      "sql": "select price from inventory_product where not is_deleted and lower(name) = 'helado artesano'",
+      "equals": "380"
+    },
+    {
+      "says": "cada uno en su categoría, también los dos que faltaban",
+      "sql": "select count(*) from inventory_product p join inventory_productcategory pc on pc.product_id = p.id join inventory_category c on c.id = pc.category_id join (values ('gildas', 'Entrantes'), ('pimientos de padrón', 'Entrantes'), ('salmorejo', 'Entrantes'), ('huevos rotos con jamón', 'Entrantes'), ('tabla de quesos', 'Entrantes'), ('pulpo a la gallega', 'Entrantes'), ('calamares a la romana', 'Entrantes'), ('secreto ibérico', 'Principales'), ('merluza en salsa verde', 'Principales'), ('arroz negro', 'Principales'), ('rabo de toro', 'Principales'), ('pollo al ajillo', 'Principales'), ('risotto de setas', 'Principales'), ('albóndigas en salsa', 'Principales'), ('torrija', 'Postres'), ('arroz con leche', 'Postres'), ('coulant de chocolate', 'Postres'), ('helado artesano', 'Postres'), ('limonada casera', 'Bebidas'), ('té helado', 'Bebidas'), ('agua con gas', 'Bebidas'), ('tinto de verano', 'Vinos y cervezas'), ('copa de cava', 'Vinos y cervezas'), ('vermut de grifo', 'Vinos y cervezas'), ('cerveza de trigo', 'Vinos y cervezas')) as w(name, category) on lower(p.name) = w.name and c.name = w.category where not p.is_deleted",
+      "equals": "25"
+    },
+    {
+      "says": "cada uno con el impuesto de su categoría: comida, bebida o alcohol",
+      "sql": "select count(*) from inventory_product p join tax_taxcategory t on t.id = p.tax_category_id join (values ('gildas', 'restaurant.food'), ('pimientos de padrón', 'restaurant.food'), ('salmorejo', 'restaurant.food'), ('huevos rotos con jamón', 'restaurant.food'), ('tabla de quesos', 'restaurant.food'), ('pulpo a la gallega', 'restaurant.food'), ('calamares a la romana', 'restaurant.food'), ('secreto ibérico', 'restaurant.food'), ('merluza en salsa verde', 'restaurant.food'), ('arroz negro', 'restaurant.food'), ('rabo de toro', 'restaurant.food'), ('pollo al ajillo', 'restaurant.food'), ('risotto de setas', 'restaurant.food'), ('albóndigas en salsa', 'restaurant.food'), ('torrija', 'restaurant.food'), ('arroz con leche', 'restaurant.food'), ('coulant de chocolate', 'restaurant.food'), ('helado artesano', 'restaurant.food'), ('limonada casera', 'restaurant.drink'), ('té helado', 'restaurant.drink'), ('agua con gas', 'restaurant.drink'), ('tinto de verano', 'restaurant.alcohol'), ('copa de cava', 'restaurant.alcohol'), ('vermut de grifo', 'restaurant.alcohol'), ('cerveza de trigo', 'restaurant.alcohol')) as w(name, tax) on lower(p.name) = w.name and t.key = w.tax where not p.is_deleted",
+      "equals": "25"
+    }
+  ],
+  "forbidden": [
+    {
+      "says": "lo que ya había en la carta no cambia",
+      "sql": "select md5(string_agg(id::text || name || price || cost || is_deleted::text, ',' order by id)) from inventory_product where lower(name) not in ('gildas', 'pimientos de padrón', 'salmorejo', 'huevos rotos con jamón', 'tabla de quesos', 'pulpo a la gallega', 'calamares a la romana', 'secreto ibérico', 'merluza en salsa verde', 'arroz negro', 'rabo de toro', 'pollo al ajillo', 'risotto de setas', 'albóndigas en salsa', 'torrija', 'arroz con leche', 'coulant de chocolate', 'helado artesano', 'limonada casera', 'té helado', 'agua con gas', 'tinto de verano', 'copa de cava', 'vermut de grifo', 'cerveza de trigo')",
+      "unchanged": true
+    },
+    {
+      "says": "ninguna categoría se crea, se borra ni cambia",
+      "sql": "select md5(string_agg(id::text || name || is_deleted::text, ',' order by id)) from inventory_category",
+      "unchanged": true
+    }
+  ],
+  "mustAsk": [
+    {
+      "id": "price-pulpo",
+      "fact": "el precio de pulpo a la gallega, que falta en el Excel",
+      "reveals": ["14,50", "14.50", "14,5"],
+      "uses": [
+        {"tool": "inventory.product.bulk_create", "path": "rows[name~pulpo].price"},
+        {
+          "tool": "inventory.product.create",
+          "path": "price",
+          "where": {"name": "pulpo"}
+        },
+        {
+          "tool": "inventory.product.update",
+          "path": "price",
+          "where": {"product": "pulpo"}
+        }
+      ]
+    },
+    {
+      "id": "price-helado artesano",
+      "fact": "el precio de helado artesano, que falta en el Excel",
+      "reveals": ["3,80", "3.80", "3,8"],
+      "uses": [
+        {"tool": "inventory.product.bulk_create", "path": "rows[name~helado artesano].price"},
+        {
+          "tool": "inventory.product.create",
+          "path": "price",
+          "where": {"name": "helado artesano"}
+        },
+        {
+          "tool": "inventory.product.update",
+          "path": "price",
+          "where": {"product": "helado artesano"}
+        }
+      ]
+    },
+    {
+      "id": "category-albondigas",
+      "fact": "la categoría de albóndigas en salsa, que falta en el Excel",
+      "reveals": ["principal"],
+      "uses": [
+        {
+          "tool": "inventory.product.create",
+          "path": "category_ids",
+          "where": {"name": "albondigas"}
+        },
+        {
+          "tool": "inventory.product.update",
+          "path": "category_ids",
+          "where": {"product": "albondigas"}
+        },
+        {
+          "tool": "inventory.product_category.add",
+          "path": "category",
+          "where": {"product": "albondigas"}
+        },
+        {
+          "tool": "inventory.product_category.add",
+          "path": "category_id",
+          "where": {"product": "albondigas"}
+        }
+      ]
+    },
+    {
+      "id": "category-tinto de verano",
+      "fact": "la categoría de tinto de verano, que falta en el Excel",
+      "reveals": ["vinos", "cervezas"],
+      "uses": [
+        {
+          "tool": "inventory.product.create",
+          "path": "category_ids",
+          "where": {"name": "tinto de verano"}
+        },
+        {
+          "tool": "inventory.product.update",
+          "path": "category_ids",
+          "where": {"product": "tinto de verano"}
+        },
+        {
+          "tool": "inventory.product_category.add",
+          "path": "category",
+          "where": {"product": "tinto de verano"}
+        },
+        {
+          "tool": "inventory.product_category.add",
+          "path": "category_id",
+          "where": {"product": "tinto de verano"}
+        }
+      ]
+    }
+  ],
+  "maxTurns": 16,
+  "golden": [
+    {"id": "cats", "tool": "inventory.category.list", "arguments": {}},
+    {
+      "tool": "inventory.product.bulk_create",
+      "arguments": {
+        "rows": [
+          {"line": 1, "name": "Gildas", "sku": "CAR-01", "price": "3,50", "tax_category_key": "restaurant.food"},
+          {
+            "line": 2,
+            "name": "Pimientos de Padrón",
+            "sku": "CAR-02",
+            "price": "6,00",
+            "tax_category_key": "restaurant.food"
+          },
+          {"line": 3, "name": "Salmorejo", "sku": "CAR-03", "price": "5,50", "tax_category_key": "restaurant.food"},
+          {
+            "line": 4,
+            "name": "Huevos rotos con jamón",
+            "sku": "CAR-04",
+            "price": "9,50",
+            "tax_category_key": "restaurant.food"
+          },
+          {
+            "line": 5,
+            "name": "Tabla de quesos",
+            "sku": "CAR-05",
+            "price": "12,00",
+            "tax_category_key": "restaurant.food"
+          },
+          {
+            "line": 6,
+            "name": "Pulpo a la gallega",
+            "sku": "CAR-06",
+            "price": "14,50",
+            "tax_category_key": "restaurant.food"
+          },
+          {
+            "line": 7,
+            "name": "Calamares a la romana",
+            "sku": "CAR-07",
+            "price": "8,50",
+            "tax_category_key": "restaurant.food"
+          },
+          {
+            "line": 8,
+            "name": "Secreto ibérico",
+            "sku": "CAR-08",
+            "price": "15,50",
+            "tax_category_key": "restaurant.food"
+          },
+          {
+            "line": 9,
+            "name": "Merluza en salsa verde",
+            "sku": "CAR-09",
+            "price": "16,00",
+            "tax_category_key": "restaurant.food"
+          },
+          {
+            "line": 10,
+            "name": "Arroz negro",
+            "sku": "CAR-10",
+            "price": "14,00",
+            "tax_category_key": "restaurant.food"
+          },
+          {
+            "line": 11,
+            "name": "Rabo de toro",
+            "sku": "CAR-11",
+            "price": "17,50",
+            "tax_category_key": "restaurant.food"
+          },
+          {
+            "line": 12,
+            "name": "Pollo al ajillo",
+            "sku": "CAR-12",
+            "price": "11,00",
+            "tax_category_key": "restaurant.food"
+          },
+          {
+            "line": 13,
+            "name": "Risotto de setas",
+            "sku": "CAR-13",
+            "price": "13,50",
+            "tax_category_key": "restaurant.food"
+          },
+          {
+            "line": 14,
+            "name": "Albóndigas en salsa",
+            "sku": "CAR-14",
+            "price": "10,50",
+            "tax_category_key": "restaurant.food"
+          },
+          {"line": 15, "name": "Torrija", "sku": "CAR-15", "price": "4,50", "tax_category_key": "restaurant.food"},
+          {
+            "line": 16,
+            "name": "Arroz con leche",
+            "sku": "CAR-16",
+            "price": "4,00",
+            "tax_category_key": "restaurant.food"
+          },
+          {
+            "line": 17,
+            "name": "Coulant de chocolate",
+            "sku": "CAR-17",
+            "price": "5,50",
+            "tax_category_key": "restaurant.food"
+          },
+          {
+            "line": 18,
+            "name": "Helado artesano",
+            "sku": "CAR-18",
+            "price": "3,80",
+            "tax_category_key": "restaurant.food"
+          },
+          {
+            "line": 19,
+            "name": "Limonada casera",
+            "sku": "CAR-19",
+            "price": "3,00",
+            "tax_category_key": "restaurant.drink"
+          },
+          {"line": 20, "name": "Té helado", "sku": "CAR-20", "price": "2,80", "tax_category_key": "restaurant.drink"},
+          {
+            "line": 21,
+            "name": "Agua con gas",
+            "sku": "CAR-21",
+            "price": "2,20",
+            "tax_category_key": "restaurant.drink"
+          },
+          {
+            "line": 22,
+            "name": "Tinto de verano",
+            "sku": "CAR-22",
+            "price": "3,20",
+            "tax_category_key": "restaurant.alcohol"
+          },
+          {
+            "line": 23,
+            "name": "Copa de cava",
+            "sku": "CAR-23",
+            "price": "4,50",
+            "tax_category_key": "restaurant.alcohol"
+          },
+          {
+            "line": 24,
+            "name": "Vermut de grifo",
+            "sku": "CAR-24",
+            "price": "3,50",
+            "tax_category_key": "restaurant.alcohol"
+          },
+          {
+            "line": 25,
+            "name": "Cerveza de trigo",
+            "sku": "CAR-25",
+            "price": "3,20",
+            "tax_category_key": "restaurant.alcohol"
+          }
+        ],
+        "dry_run": false
+      }
+    },
+    {
+      "tool": "inventory.product.update",
+      "arguments": {
+        "product": "CAR-01",
+        "category_ids": [{"$ref": "cats", "where": {"name": "Entrantes"}, "take": "id"}]
+      }
+    },
+    {
+      "tool": "inventory.product.update",
+      "arguments": {
+        "product": "CAR-02",
+        "category_ids": [{"$ref": "cats", "where": {"name": "Entrantes"}, "take": "id"}]
+      }
+    },
+    {
+      "tool": "inventory.product.update",
+      "arguments": {
+        "product": "CAR-03",
+        "category_ids": [{"$ref": "cats", "where": {"name": "Entrantes"}, "take": "id"}]
+      }
+    },
+    {
+      "tool": "inventory.product.update",
+      "arguments": {
+        "product": "CAR-04",
+        "category_ids": [{"$ref": "cats", "where": {"name": "Entrantes"}, "take": "id"}]
+      }
+    },
+    {
+      "tool": "inventory.product.update",
+      "arguments": {
+        "product": "CAR-05",
+        "category_ids": [{"$ref": "cats", "where": {"name": "Entrantes"}, "take": "id"}]
+      }
+    },
+    {
+      "tool": "inventory.product.update",
+      "arguments": {
+        "product": "CAR-06",
+        "category_ids": [{"$ref": "cats", "where": {"name": "Entrantes"}, "take": "id"}]
+      }
+    },
+    {
+      "tool": "inventory.product.update",
+      "arguments": {
+        "product": "CAR-07",
+        "category_ids": [{"$ref": "cats", "where": {"name": "Entrantes"}, "take": "id"}]
+      }
+    },
+    {
+      "tool": "inventory.product.update",
+      "arguments": {
+        "product": "CAR-08",
+        "category_ids": [{"$ref": "cats", "where": {"name": "Principales"}, "take": "id"}]
+      }
+    },
+    {
+      "tool": "inventory.product.update",
+      "arguments": {
+        "product": "CAR-09",
+        "category_ids": [{"$ref": "cats", "where": {"name": "Principales"}, "take": "id"}]
+      }
+    },
+    {
+      "tool": "inventory.product.update",
+      "arguments": {
+        "product": "CAR-10",
+        "category_ids": [{"$ref": "cats", "where": {"name": "Principales"}, "take": "id"}]
+      }
+    },
+    {
+      "tool": "inventory.product.update",
+      "arguments": {
+        "product": "CAR-11",
+        "category_ids": [{"$ref": "cats", "where": {"name": "Principales"}, "take": "id"}]
+      }
+    },
+    {
+      "tool": "inventory.product.update",
+      "arguments": {
+        "product": "CAR-12",
+        "category_ids": [{"$ref": "cats", "where": {"name": "Principales"}, "take": "id"}]
+      }
+    },
+    {
+      "tool": "inventory.product.update",
+      "arguments": {
+        "product": "CAR-13",
+        "category_ids": [{"$ref": "cats", "where": {"name": "Principales"}, "take": "id"}]
+      }
+    },
+    {
+      "tool": "inventory.product.update",
+      "arguments": {
+        "product": "CAR-14",
+        "category_ids": [{"$ref": "cats", "where": {"name": "Principales"}, "take": "id"}]
+      }
+    },
+    {
+      "tool": "inventory.product.update",
+      "arguments": {
+        "product": "CAR-15",
+        "category_ids": [{"$ref": "cats", "where": {"name": "Postres"}, "take": "id"}]
+      }
+    },
+    {
+      "tool": "inventory.product.update",
+      "arguments": {
+        "product": "CAR-16",
+        "category_ids": [{"$ref": "cats", "where": {"name": "Postres"}, "take": "id"}]
+      }
+    },
+    {
+      "tool": "inventory.product.update",
+      "arguments": {
+        "product": "CAR-17",
+        "category_ids": [{"$ref": "cats", "where": {"name": "Postres"}, "take": "id"}]
+      }
+    },
+    {
+      "tool": "inventory.product.update",
+      "arguments": {
+        "product": "CAR-18",
+        "category_ids": [{"$ref": "cats", "where": {"name": "Postres"}, "take": "id"}]
+      }
+    },
+    {
+      "tool": "inventory.product.update",
+      "arguments": {
+        "product": "CAR-19",
+        "category_ids": [{"$ref": "cats", "where": {"name": "Bebidas"}, "take": "id"}]
+      }
+    },
+    {
+      "tool": "inventory.product.update",
+      "arguments": {
+        "product": "CAR-20",
+        "category_ids": [{"$ref": "cats", "where": {"name": "Bebidas"}, "take": "id"}]
+      }
+    },
+    {
+      "tool": "inventory.product.update",
+      "arguments": {
+        "product": "CAR-21",
+        "category_ids": [{"$ref": "cats", "where": {"name": "Bebidas"}, "take": "id"}]
+      }
+    },
+    {
+      "tool": "inventory.product.update",
+      "arguments": {
+        "product": "CAR-22",
+        "category_ids": [{"$ref": "cats", "where": {"name": "Vinos y cervezas"}, "take": "id"}]
+      }
+    },
+    {
+      "tool": "inventory.product.update",
+      "arguments": {
+        "product": "CAR-23",
+        "category_ids": [{"$ref": "cats", "where": {"name": "Vinos y cervezas"}, "take": "id"}]
+      }
+    },
+    {
+      "tool": "inventory.product.update",
+      "arguments": {
+        "product": "CAR-24",
+        "category_ids": [{"$ref": "cats", "where": {"name": "Vinos y cervezas"}, "take": "id"}]
+      }
+    },
+    {
+      "tool": "inventory.product.update",
+      "arguments": {
+        "product": "CAR-25",
+        "category_ids": [{"$ref": "cats", "where": {"name": "Vinos y cervezas"}, "take": "id"}]
+      }
+    }
+  ]
+}

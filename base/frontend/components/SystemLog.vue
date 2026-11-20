@@ -7,7 +7,7 @@ import { useLive } from '@erplora/ui/sdk';
 import { computed } from 'vue';
 
 import { useBaseI18n } from '../lib/i18n';
-import type { EventLogEntry } from '../operations';
+import type { EventLogEntry } from '../operations/system';
 
 const LEVELS = ['info', 'warning', 'error'] as const;
 const TONE: Record<EventLogEntry['level'], StatusPillTone> = { info: 'neutral', warning: 'warning', error: 'danger' };

@@ -483,3 +483,23 @@ msgstr[2] "No saldrán hasta que un dispositivo con la app de ERPlora abierta pu
 #: apps.py
 msgid "See the printers"
 msgstr "Ver las impresoras"
+
+#: apps.py
+msgid "Set up printing"
+msgstr "Configurar la impresión"
+
+#: apps.py
+msgid "Printer ready"
+msgstr "Impresora lista"
+
+#: apps.py
+msgid "Printer not connected"
+msgstr "Impresora sin conectar"
+
+#: apps.py
+msgid "Printer not set up"
+msgstr "Impresora sin configurar"
+
+#: apps.py
+msgid "We couldn't check the printer"
+msgstr "No hemos podido comprobar la impresora"

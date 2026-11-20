@@ -18,7 +18,7 @@ from ninja import Field, Schema
 from pydantic import AfterValidator, StringConstraints, ValidationInfo, field_validator
 
 from base.business import business_zone
-from base.schemas import names
+from base.schemas.assistant import names
 
 T = TypeVar("T")
 
@@ -157,7 +157,8 @@ class PositionIn(MemberRefIn):
 
 class ClockInIn(PositionIn):
     """Clock in. Whether the device is the counter POS or someone's own phone is not the caller's to
-    declare: the Hub knows it from the session's device (BASE-F62); one it does not know is the shared one."""
+    declare: the Hub knows it from the session's device, as Settings › This device marks it shared or personal; one
+    it does not know is the shared one."""
 
 
 class ClockOutIn(PositionIn):

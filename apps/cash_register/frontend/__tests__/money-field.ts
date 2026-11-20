@@ -11,7 +11,7 @@ import { MoneyInput, type Money, parseMoney } from '@erplora/ui/components';
 import { expect, it } from 'vitest';
 
 import { expectAmountLeftWaitsForMoney } from '../../../../base/frontend/__tests__/save-waits-for-money';
-import type { Business } from '../../../../base/frontend/operations';
+import type { Business } from '../../../../base/frontend/operations/business';
 import { business, ionValue, mountCash, POLISH, settle } from './mount-cash-register';
 
 type Mounted = Pick<Awaited<ReturnType<typeof mountCash>>, 'inDoc' | 'answer' | 'sent' | 'result'>;

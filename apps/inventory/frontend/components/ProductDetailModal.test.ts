@@ -15,11 +15,6 @@ import ProductDetailModal from './ProductDetailModal.vue';
 const device = vi.hoisted(() => ({ printLabel: vi.fn() }));
 vi.mock('../lib/print-label', () => device);
 
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
-
 afterEach(() => {
   document.body.innerHTML = '';
   device.printLabel.mockReset();
@@ -55,6 +50,14 @@ describe('ProductDetailModal', () => {
     const s = await setup();
     expect(s.el('inventory-product-detail')?.getAttribute('aria-label')).toBe('Coffee');
     expect([s.value('sku'), s.value('price'), s.value('stock'), s.value('status')]).toEqual(['CAF-1', formatMoney(220, 'en'), '5', 'Yes']);
+  });
+
+  it('shows the declared allergens in list order, or says there are none', async () => {
+    const s = await setup({ product: product({ allergens: ['milk', 'gluten'] }) });
+    expect(s.value('allergens')).toBe('Gluten, Milk');
+    unmount(s);
+    const none = await setup({ product: product({ allergens: [] }) });
+    expect(none.value('allergens')).toBe('No allergens declared');
   });
 
   it('an article without stock control shows «—»; one without tax category says why it is not sold', async () => {
@@ -186,7 +189,9 @@ describe('ProductDetailModal', () => {
   });
 
   it('speaks Spanish', async () => {
-    const s = await setup({ product: product({ is_active: false }) }, { locale: 'es' });
+    const s = await setup({ product: product({ is_active: false, allergens: ['milk', 'gluten'] }) }, { locale: 'es' });
+    expect(s.value('allergens')).toBe('Gluten, Leche');
+    expect(s.el('inventory-product-detail-allergens')?.querySelector('ion-label')?.textContent?.trim()).toBe('Alérgenos');
     expect(s.value('status')).toBe('No');
     expect(s.el('inventory-product-detail-receive')?.textContent?.trim()).toBe('Recibir stock');
     expect(s.el('inventory-product-detail-sold-out')?.textContent?.trim()).toBe('Marcar agotado');

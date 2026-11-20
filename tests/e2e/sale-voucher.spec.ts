@@ -120,7 +120,7 @@ async function openCharge(page: Page) {
   return sheet;
 }
 
-test('SALE-F38, F27: a haircut from «Services» paid with Lucía’s voucher is charged at 0,00 € and the session is spent', async ({ page, context }) => {
+test('SALE-F38, F27: a haircut from «Services» paid with Lucía’s voucher is charged at 0,00 € and the session is spent @smoke', async ({ page, context }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await login(page, A, '/sale/pos');
   await tillReady(page);

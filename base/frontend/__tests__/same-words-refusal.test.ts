@@ -5,7 +5,7 @@
 // other's mark away), and a test that does not refuse the fields with the same words at all (it would prove nothing).
 import { FormModal, type FormModalError } from '@erplora/ui/components';
 import { IonButton, IonInput, IonSelect, IonSelectOption, IonTextarea } from '@ionic/vue';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { defineComponent, h, nextTick, ref } from 'vue';
 
 import { flush, mountBase } from './mount-base';
@@ -16,11 +16,6 @@ import {
   refusedWithTheSameWords,
   SAME_WORDS,
 } from './same-words-refusal';
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
 
 const KEYS = ['title', 'notes', 'kind'] as const;
 

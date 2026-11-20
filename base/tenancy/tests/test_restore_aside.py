@@ -630,15 +630,15 @@ class TestTheCopiesGoAfterTheirDays:
         assert fresh(waiting).status == "copying"
 
     def test_the_worker_makes_and_drops_them_in_its_moves_pass(self, asides, monkeypatch):
-        from base import worker
+        from base import worker_data
 
         made = a_hub_with_its_copy(asides)[1]
         old = a_hub_with_its_copy(asides)[1]
         monkeypatch.setattr(restore, "source_name", asides.source)
 
-        worker._moves(AT)
+        worker_data._moves(AT)
         RestoredCopy.objects.filter(pk=made.pk).update(made_at=AT - dt.timedelta(days=move.MOVED_COPY_DAYS))
-        worker._moves(AT)
+        worker_data._moves(AT)
 
         assert not RestoredCopy.objects.filter(pk=made.pk).exists() and aside_absent(made)
         assert fresh(old).status == "made" and marker(old.db_name) == [AS_THEN]

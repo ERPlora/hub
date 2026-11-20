@@ -18,6 +18,7 @@ from . import (
     checkout as checkout,
     discounts as discounts,
     documents as documents,
+    line_allergy as line_allergy,
     line_vouchers as line_vouchers,
     order_actions as order_actions,
     order_lines as order_lines,

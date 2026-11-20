@@ -19,7 +19,7 @@ from ninja import Field, Schema
 from pydantic import StringConstraints, ValidationInfo, field_validator
 
 from apps.whatsapp_inbox.models import NAMED_VARIABLE
-from base.schemas import names
+from base.schemas.assistant import names
 
 T = TypeVar("T")
 

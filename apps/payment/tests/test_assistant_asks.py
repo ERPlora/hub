@@ -248,7 +248,7 @@ OWN_WORDS_EN = [
     ("payment.method.create", "we'll send outgoing payments from BBVA too"),
     ("payment.method.get", "I need the whole Santander reference for a supplier"),
     ("payment.method.list", "where do our supplier payments leave from?"),
-    ("payment.method.update", "rename the Unicaja account to Main"),
+    ("payment.method.update", "give the Unicaja account the name Main"),
     ("payment.payment.approve", "give the Iberdrola draft the go-ahead"),
     ("payment.payment.cancel", "we gave him cash, call off the transfer"),
     ("payment.payment.get", "show me everything on the Endesa one"),

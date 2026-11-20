@@ -78,68 +78,12 @@
     ]
   },
   {
-    "path": "apps/flow/queries.py",
-    "file_name": "queries.py",
-    "functions": [
-      {
-        "name": "step_data",
-        "complexity": 16
-      },
-      {
-        "name": "map_params",
-        "complexity": 17
-      },
-      {
-        "name": "operation_problem",
-        "complexity": 17
-      },
-      {
-        "name": "words_for",
-        "complexity": 20
-      },
-      {
-        "name": "_tried_pinned",
-        "complexity": 26
-      },
-      {
-        "name": "try_flow",
-        "complexity": 44
-      },
-      {
-        "name": "catalog_problems",
-        "complexity": 47
-      }
-    ]
-  },
-  {
     "path": "apps/flow/schemas.py",
     "file_name": "schemas.py",
     "functions": [
       {
         "name": "document_problems",
         "complexity": 19
-      }
-    ]
-  },
-  {
-    "path": "apps/flow/services.py",
-    "file_name": "services.py",
-    "functions": [
-      {
-        "name": "react",
-        "complexity": 16
-      },
-      {
-        "name": "_taken_off",
-        "complexity": 20
-      },
-      {
-        "name": "answer_question",
-        "complexity": 21
-      },
-      {
-        "name": "_advance",
-        "complexity": 38
       }
     ]
   },
@@ -206,7 +150,7 @@
     ]
   },
   {
-    "path": "apps/invoice/services.py",
+    "path": "apps/invoice/services/__init__.py",
     "file_name": "services.py",
     "functions": [
       {
@@ -678,16 +622,6 @@
     ]
   },
   {
-    "path": "base/worker.py",
-    "file_name": "worker.py",
-    "functions": [
-      {
-        "name": "run",
-        "complexity": 32
-      }
-    ]
-  },
-  {
     "path": "base/ws_print.py",
     "file_name": "ws_print.py",
     "functions": [
@@ -869,7 +803,7 @@
     "functions": [
       {
         "name": "app_activation_settle",
-        "complexity": 18
+        "complexity": 16
       }
     ]
   },
@@ -890,10 +824,6 @@
       {
         "name": "_assistant_answer",
         "complexity": 19
-      },
-      {
-        "name": "assistant_turn",
-        "complexity": 27
       }
     ]
   },
@@ -924,6 +854,84 @@
       {
         "name": "_send_chain",
         "complexity": 52
+      }
+    ]
+  },
+  {
+    "path": "apps/flow/services/flow_document.py",
+    "file_name": "flow_document.py",
+    "functions": [
+      {
+        "name": "_taken_off",
+        "complexity": 20
+      }
+    ]
+  },
+  {
+    "path": "apps/flow/services/questions.py",
+    "file_name": "questions.py",
+    "functions": [
+      {
+        "name": "answer_question",
+        "complexity": 21
+      }
+    ]
+  },
+  {
+    "path": "apps/flow/services/runs.py",
+    "file_name": "runs.py",
+    "functions": [
+      {
+        "name": "react",
+        "complexity": 16
+      }
+    ]
+  },
+  {
+    "path": "apps/flow/queries/catalog.py",
+    "file_name": "catalog.py",
+    "functions": [
+      {
+        "name": "step_data",
+        "complexity": 16
+      }
+    ]
+  },
+  {
+    "path": "apps/flow/queries/dry_run.py",
+    "file_name": "dry_run.py",
+    "functions": [
+      {
+        "name": "_tried_pinned",
+        "complexity": 26
+      }
+    ]
+  },
+  {
+    "path": "apps/flow/queries/problems.py",
+    "file_name": "problems.py",
+    "functions": [
+      {
+        "name": "operation_problem",
+        "complexity": 17
+      },
+      {
+        "name": "catalog_problems",
+        "complexity": 47
+      }
+    ]
+  },
+  {
+    "path": "apps/flow/queries/values.py",
+    "file_name": "values.py",
+    "functions": [
+      {
+        "name": "map_params",
+        "complexity": 17
+      },
+      {
+        "name": "words_for",
+        "complexity": 20
       }
     ]
   }

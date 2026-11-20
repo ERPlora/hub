@@ -30,6 +30,10 @@ ALL = [
     SERIES_UPDATED,
     ISSUER_UPDATED,
 ]
+
+#: The amounts its events bring (an issued invoice's total, what a rectification leaves to rectify), in cents of
+#: the business's currency: an automation says them as money in what a person reads.
+AMOUNTS = frozenset({"total", "remaining"})
 #: Every event that changes what a document says (lists, detail, the sale's document).
 INVOICE_EVENTS = [INVOICE_ISSUED, INVOICE_RECTIFIED, INVOICE_PAID]
 #: Every event that changes a series or its counter.

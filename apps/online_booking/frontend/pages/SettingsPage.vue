@@ -1,22 +1,19 @@
 <script setup lang="ts">
-// Online booking → Settings (WORKBOOK «Ajustes»; ONLINE_BOOKING-F07), only for whoever may save them. The values
-// come live (`online_booking.settings.get`: the factory ones until the business saves, and the diary's booking
-// rules). The form is every settings page's (`useSettingsForm`, hub#867): a change saved elsewhere repaints
-// every field the person has not touched, «Save» sends only the fields touched and changed
-// (`online_booking.settings.update`: the page's and the diary's, all or nothing), and a refusal says itself as
-// a FormModal does. Below, the offered services with their «Online booking» switch, saved at once in Services.
-import { EmptyState, InlineFeedback, SettingsFormFooter, SettingsNumberField, useSettingsForm } from '@erplora/ui/components';
+// The booking page and diary settings, with the logo uploaded here and applied by «Save». The services'
+// online-booking switches save independently.
+import { EmptyState, ImageUpload, type ImageUploadValue, InlineFeedback, SettingsFormFooter, SettingsNumberField, useSettingsForm } from '@erplora/ui/components';
 import { type ApiError, useCommand, useLive } from '@erplora/ui/sdk';
 import { AppPage, useSession } from '@erplora/ui/shell';
 import { IonInput, IonSpinner, IonTextarea, IonToggle } from '@ionic/vue';
-import { computed, ref } from 'vue';
+import { computed, ref, shallowRef } from 'vue';
 
+import { readAsBase64 } from '../../../../base/frontend/lib/upload';
 import PageNotices from '../components/PageNotices.vue';
 import { useT } from '../composables/useT';
-import type { SettingsOut } from '../operations';
+import type { LogoUploadIn, SettingsOut } from '../operations';
 import { onlineBookingTabs } from '../tabs';
 
-const TEXTS = ['page_title', 'primary_color', 'logo_url'] as const;
+const TEXTS = ['page_title', 'primary_color'] as const;
 const LONG_TEXTS = ['welcome_message', 'confirmation_message', 'cancellation_policy'] as const;
 const PAGE_SWITCHES = ['is_enabled', 'require_email', 'allow_staff_selection', 'allow_notes'] as const;
 const PAGE_NUMBERS = ['max_upcoming_per_customer'] as const;
@@ -24,7 +21,7 @@ const RULE_NUMBERS = ['min_booking_notice', 'max_advance_booking', 'slot_interva
 const RULE_SWITCHES = ['auto_confirm_online', 'allow_customer_cancellation'] as const;
 const NUMBERS = [...PAGE_NUMBERS, ...RULE_NUMBERS] as const;
 const SWITCHES = [...PAGE_SWITCHES, ...RULE_SWITCHES] as const;
-const STRINGS = [...TEXTS, ...LONG_TEXTS] as const;
+const STRINGS = [...TEXTS, 'logo', ...LONG_TEXTS] as const;
 /** The most services the section lists at once (the server's cap on a page). */
 const SERVICE_WINDOW = 100;
 
@@ -41,6 +38,7 @@ const settingsForm = useSettingsForm(
   { toForm, numbers: NUMBERS },
 );
 const { form, fieldErrors, set } = settingsForm;
+const uploadLogoCommand = useCommand('online_booking.settings.upload_logo');
 
 function toForm(settings: SettingsOut): Form {
   return {
@@ -48,6 +46,27 @@ function toForm(settings: SettingsOut): Form {
     ...(Object.fromEntries(NUMBERS.map((field) => [field, String(settings[field])])) as Record<(typeof NUMBERS)[number], string>),
     ...(Object.fromEntries(SWITCHES.map((field) => [field, settings[field]])) as Record<(typeof SWITCHES)[number], boolean>),
   };
+}
+
+const uploadedLogo = shallowRef<ImageUploadValue | null>(null);
+const logoValue = computed<ImageUploadValue | null>(() => {
+  const id = form.value?.logo;
+  if (!id) return null;
+  if (uploadedLogo.value?.id === id) return uploadedLogo.value;
+  return { id, url: data.value?.logo_url ?? '' };
+});
+
+async function uploadLogo(file: File): Promise<ImageUploadValue> {
+  return uploadLogoCommand.run({
+    filename: file.name,
+    content_type: file.type as LogoUploadIn['content_type'],
+    data_base64: await readAsBase64(file),
+  });
+}
+
+function onLogo(value: ImageUploadValue | null): void {
+  uploadedLogo.value = value;
+  set('logo', value?.id ?? '');
 }
 
 const text = (value: unknown): string => (value === null || value === undefined ? '' : String(value));
@@ -145,6 +164,22 @@ async function toggleService(event: Event, id: string, online: boolean): Promise
           :class="invalid(fieldErrors[field])"
           @ion-input="set(field, text($event.detail.value))"
         />
+        <ImageUpload
+          :model-value="logoValue"
+          :label="t('online_booking.settings.fields.logo')"
+          :upload="uploadLogo"
+          :disabled="settingsForm.pending.value"
+          testid="ob-settings-logo"
+          @update:model-value="onLogo"
+        />
+        <InlineFeedback
+          v-if="fieldErrors.logo"
+          tone="danger"
+          data-testid="ob-settings-logo-save-error"
+          :heading="$t('online_booking.settings.saveError')"
+        >
+          {{ fieldErrors.logo }}
+        </InlineFeedback>
         <ion-textarea
           v-for="field in LONG_TEXTS"
           :key="field"

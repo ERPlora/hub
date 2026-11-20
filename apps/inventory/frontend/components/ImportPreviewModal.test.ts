@@ -4,17 +4,12 @@
 // ready · {failed} with problems» with up to ten reasons), and «Import {n} products» / «Cancel»; one
 // row or product is said in the singular (hub#1124).
 // Without Name and SKU mapped it says so and cannot import.
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 
 import { flush, mountInventory } from '../__tests__/mount-inventory';
 import { parseCsv } from '../lib/csv';
 import { emptyReport } from '../lib/import-report';
 import ImportPreviewModal from './ImportPreviewModal.vue';
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
 
 afterEach(() => {
   document.body.innerHTML = '';
@@ -66,6 +61,7 @@ describe('ImportPreviewModal', () => {
     const options = [...selects[0].querySelectorAll('ion-select-option')].map((o) => o.textContent?.trim());
     expect(options.slice(0, 3)).toEqual(['Do not import', 'Name *', 'SKU *']);
     expect(options).toContain('Tax category');
+    expect(options).toContain('Allergens');
   });
 
   it('picking a field for a column asks the importer', async () => {
@@ -122,6 +118,8 @@ describe('ImportPreviewModal', () => {
     const s = await setup({}, 'es');
     expect(s.el('inventory-import-preview')?.getAttribute('aria-label')).toBe('Revisa la importación');
     expect(s.summary()).toBe('5 filas listas · 12 con problemas');
+    const options = [...s.all('inventory-import-column')[0].querySelectorAll('ion-select-option')].map((o) => o.textContent?.trim());
+    expect(options).toContain('Alérgenos');
   });
 });
 

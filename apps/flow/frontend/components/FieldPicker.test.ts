@@ -3,15 +3,10 @@
 // one tap picks it. Without data it says what to do first; while the catalog is read, «Loading…»; if it could not
 // be read, the error with «Retry» (hub#969).
 import { ApiError } from '@erplora/ui/sdk';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import { click, mountFlow, settle, TASK_CATALOG, TASK_STEPS } from '../__tests__/mount-flow';
 import FieldPicker from './FieldPicker.vue';
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
 
 async function setup(choices: unknown[], more: Record<string, unknown> = {}) {
   const m = await mountFlow(FieldPicker, { props: { open: true, choices, steps: TASK_STEPS, catalog: TASK_CATALOG, ...more } });

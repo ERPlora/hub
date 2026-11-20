@@ -52,6 +52,11 @@ def in_order(codes: list[str]) -> list[str]:
     return [code for code in CODES if code in codes]
 
 
+def found_in(allergy: list[str], allergens: list[str]) -> list[str]:
+    """Those of a customer's ``allergy`` a dish of these ``allergens`` contains, in the order of the list."""
+    return [code for code in CODES if code in allergy and code in allergens]
+
+
 Code = Annotated[str, WithJsonSchema({"type": "string", "enum": list(CODES)})]
 Allergens = Annotated[list[Code], AfterValidator(in_order)]
 
@@ -76,6 +81,30 @@ class AllergensPatchIn(Schema):
 
 class AllergensOut(Schema):
     allergens: list[Code] = Field(description="Its allergens, by their codes, in the order of the list.")
+
+
+AllergyInDish = Annotated[
+    list[Code],
+    Field(
+        description="The allergens of the customer's allergy the dish contains, in the order of the list; none if it "
+        "contains none of them or there is no allergy."
+    ),
+]
+Allergy = Annotated[
+    list[Code],
+    Field(
+        description="The customer's allergy: the allergens, by their codes and in the order of the list, the person "
+        "it is for must not eat; none if no allergy was marked."
+    ),
+]
+
+
+class AllergyInDishOut(AllergensOut):
+    allergy_in_dish: AllergyInDish
+
+
+class AllergyOut(AllergyInDishOut):
+    allergy: Allergy
 
 
 class AllergensCellIn(Schema):

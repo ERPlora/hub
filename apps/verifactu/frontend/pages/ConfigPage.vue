@@ -3,8 +3,8 @@
 // the two routes as tabs. «ERPlora files for you» (opens by default): «Representation authorisation», its state (not
 // signed, under review, approved, returned with the review's note, revoked) and the procedure to sign it and send it
 // from here (`RepresentationGrant`); what the account has not sent yet is said so. «My certificate»: «Loaded» /
-// «Not loaded», holder, its tax ID, kind, uploaded and expiry dates and the warning 30 days before it expires (or that
-// it expired); who configures VeriFactu uploads the .p12/.pfx here with its password («Upload the certificate») or
+// «Not loaded», holder, its tax ID, kind, uploaded and expiry dates and the warning when the server says it expires soon
+// (or that it expired); who configures VeriFactu uploads the .p12/.pfx here with its password («Upload the certificate») or
 // removes it («Remove», asking first in a card). When ERPlora's route is unavailable, the tabs and authorisation
 // disappear and the certificate is the only card, with an explicit status and no warning in testing.
 // It is kept encrypted in the hub's database and never shown again.
@@ -24,7 +24,6 @@ import { fileToBase64 } from '../lib/files';
 import { refusal } from '../lib/refusal';
 import { verifactuTabs } from '../tabs';
 
-const EXPIRY_WARNING_DAYS = 30;
 /** A business certificate weighs a few KB; anything over 1 MB is not one. */
 const MAX_CERTIFICATE_BYTES = 1024 * 1024;
 
@@ -52,7 +51,7 @@ const expiry = computed(() => {
   const cert = config.value?.own_certificate;
   if (!cert?.loaded || cert.expires_in_days === null) return null;
   if (cert.expires_in_days < 0) return { tone: 'danger' as const, text: t('verifactu.config.expired') };
-  if (cert.expires_in_days <= EXPIRY_WARNING_DAYS) return { tone: 'warning' as const, text: t('verifactu.config.expiresSoon', { n: cert.expires_in_days }) };
+  if (cert.expires_soon) return { tone: 'warning' as const, text: t('verifactu.config.expiresSoon', { n: cert.expires_in_days }) };
   return null;
 });
 

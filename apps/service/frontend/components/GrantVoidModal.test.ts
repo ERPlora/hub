@@ -1,16 +1,11 @@
 // SERVICE-F17 «Anular un bono vendido por error»: «Void this voucher?» says whose voucher and for how
 // much, that it stays as voided and that the money is refunded in Sales; the Reason is required (Void
 // stays off without it); Void sends `service.grant.void` and closes; a refusal stays in the dialog.
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import { business, click, ionValue, JAPANESE, type MountOptions, mountService, POLISH, settle } from '../__tests__/mount-service';
 import { grant } from '../__tests__/grant';
 import GrantVoidModal from './GrantVoidModal.vue';
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
 
 type Control = HTMLElement & { label?: string; disabled?: boolean; helperText?: string };
 

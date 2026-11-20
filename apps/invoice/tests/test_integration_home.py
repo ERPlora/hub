@@ -19,7 +19,7 @@ from live.outbox import channel_for
 
 from apps.invoice.models import InvoiceSeries, Issuer
 from apps.invoice.tests.conftest import A, B, HUB_DB, HUB_DB_COMMITTED, ISSUER, ctx_for, run
-from base.schemas import SetupStatusIn
+from base.schemas.home import SetupStatusIn
 from base.tenancy.context import use_hub
 
 IDENTITY = "invoice.business_identity"

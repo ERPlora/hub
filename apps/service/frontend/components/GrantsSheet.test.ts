@@ -4,9 +4,9 @@
 // the expiry, what was given or corrected afterwards and, on a voided one, who, when and why. Adjust
 // and Void show where they apply and for whoever may; they open their dialogs.
 import { StatusPill } from '@erplora/ui/components';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
-import type { Business } from '../../../../base/frontend/operations';
+import type { Business } from '../../../../base/frontend/operations/business';
 import { business, click, flush, MANAGER, EMPLOYEE, mountService, OWNER, page, POLISH, settle } from '../__tests__/mount-service';
 import { grant } from '../__tests__/grant';
 import { PACKAGE } from '../__tests__/package';
@@ -14,11 +14,6 @@ import GrantAdjustModal from './GrantAdjustModal.vue';
 import GrantRedeemModal from './GrantRedeemModal.vue';
 import GrantVoidModal from './GrantVoidModal.vue';
 import GrantsSheet from './GrantsSheet.vue';
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
 
 const OP = 'service.grant.list';
 const ROWS = [

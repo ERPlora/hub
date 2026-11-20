@@ -147,7 +147,7 @@ test('CASH_REGISTER-F01: «Tu caja» pending on the factory values, done when th
     await unfolded(page);
     await expect(row(page).locator('.setup-row-title')).toHaveText('Tu caja');
     await expect(row(page).locator('.setup-row-desc')).toHaveText(
-      'Decide cómo se abre y se cierra la caja: el fondo inicial, el arqueo de cierre y la pantalla del TPV que queda bloqueada hasta abrirla.',
+      'Decide cómo se abre y se cierra la caja: el fondo inicial, el arqueo de cierre y si cobrar en efectivo exige una sesión abierta.',
     );
     await expect(row(page).locator('[data-testid="setup-pill"]')).toHaveText('Recomendado');
 

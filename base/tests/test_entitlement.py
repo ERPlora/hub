@@ -5,7 +5,7 @@ photo (``Hub.state``), straight or through the ``requires`` of one that is there
 passed is no right. A slug the Hub has no module for is ignored and logged. A demo's hub (no photo, no billing) has
 every app. What a business has no right to is blocked everywhere: its operations answer 402
 ``app_entitlement_blocked`` (``LIVE["operation_database"]``) and the relay and the Home leave it out
-(``base.relay.active_apps``).
+(``base.apps_on.active_apps``).
 """
 
 import datetime as dt
@@ -22,10 +22,10 @@ from live.operations import Operation, get
 from pydantic import BaseModel, ConfigDict
 
 from base import entitlement, registry
+from base.apps_on import active_apps
 from base.entitlement import EntitlementBlocked
 from base.models import Hub
-from base.relay import active_apps
-from base.schemas import HubStateIn
+from base.schemas.hub_registry import HubStateIn
 from base.tenancy.context import use_hub
 from base.tenancy.tests.business import A, B, HUB_DB
 
@@ -162,7 +162,7 @@ def test_a_host_without_a_row_has_no_paid_app(modules):
 @HUB_DB
 def test_the_relay_and_the_home_leave_out_what_is_blocked(modules, monkeypatch, hub_a):
     """``active_apps``: what the relay delivers to and the Home asks: every installed app but the blocked ones."""
-    monkeypatch.setattr("base.relay.all_live_app_configs", lambda: [*CONFIGS, SimpleNamespace(label="base")])
+    monkeypatch.setattr("base.apps_on.all_live_app_configs", lambda: [*CONFIGS, SimpleNamespace(label="base")])
     keep(A.key, photo("stock"))
 
     with use_hub(hub_a):

@@ -8,7 +8,7 @@ import { IonLabel, IonSegment, IonSegmentButton, IonToggle } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
 
 import { useBaseI18n } from '../lib/i18n';
-import type { AccessSettings, IdleMinutes } from '../operations';
+import type { AccessSettings, IdleMinutes } from '../operations/access';
 import '../settings.css';
 
 const STOPS: IdleMinutes[] = [1, 5, 10, 15, 30];

@@ -9,7 +9,7 @@ import { toastError, toastSuccess } from '@erplora/ui/shell';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { h, ref } from 'vue';
 
-import type { Business } from '../../../../../base/frontend/operations';
+import type { Business } from '../../../../../base/frontend/operations/business';
 import { business, click, errorFrame, JAPANESE, mountSale, settle } from '../../__tests__/mount-sale';
 import { PrintRefused } from '../../../../../base/frontend/lib/print-paper';
 import { printPaper } from '../../lib/print';
@@ -17,16 +17,7 @@ import { plain } from '../../lib/format';
 import { line, order, preview } from './__tests__/fixtures';
 import PrebillModal from './PrebillModal.vue';
 
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
 vi.mock('../../lib/print', () => ({ printPaper: vi.fn() }));
-vi.mock('@erplora/ui/shell', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@erplora/ui/shell')>()),
-  toastError: vi.fn(),
-  toastSuccess: vi.fn(),
-}));
 
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ['Date'] });
@@ -35,8 +26,6 @@ beforeEach(() => {
 afterEach(() => {
   vi.useRealTimers();
   vi.mocked(printPaper).mockReset();
-  vi.mocked(toastError).mockClear();
-  vi.mocked(toastSuccess).mockClear();
 });
 
 const CHECK = order({
@@ -109,7 +98,7 @@ describe('PrebillModal', () => {
   });
 
   it('names the dishes of a menu under it, as the ticket will (SALE-F12)', async () => {
-    const dish = (product_name: string) => ({ option_id: product_name, group_name: 'Mains', product_id: product_name, product_name, category_id: null, is_service: false, quantity: 1, price_delta: 0, tax_category_key: null, amount: null });
+    const dish = (product_name: string) => ({ option_id: product_name, group_name: 'Mains', product_id: product_name, product_name, category_id: null, is_service: false, quantity: 1, price_delta: 0, tax_category_key: null, amount: null, allergens: [], allergy_in_dish: [] });
     const combo = { combo_id: 'm1', kitchen_name: 'MENU', supply_kind: 'service' as const, split: false, components: [dish('Lentils'), dish('Hake')] };
     const menu = line({ id: 'l3', name: 'Menu of the day', product_id: null, unit_price: 1350, line_total: 1350, combo });
     const m = await setup({ order: { ...CHECK, lines: [menu] } }, 'es');

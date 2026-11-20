@@ -225,7 +225,7 @@ def test_an_open_price_line_takes_the_department_and_its_vat():
 
 def test_with_inventory_off_no_product_is_sold_and_an_open_price_still_is(coffee, monkeypatch):
     # Inventory is asked by name through the platform's door: off, the till's own 409, and an open price needs no catalog.
-    from apps.sale.queries import CATALOG_UNAVAILABLE
+    from apps.sale.queries.other_apps import CATALOG_UNAVAILABLE
     from base import activation
 
     monkeypatch.setattr(activation, "off_apps", lambda scope: frozenset({"inventory"}))
@@ -419,6 +419,10 @@ def test_firing_sends_the_pending_lines_as_a_round(coffee, steak):
             "staff_id": str(staff),
             # SALE-F11: the kitchen text of its options (MODIFIER-F08); none chosen here.
             "modifiers": "",
+            # SALE-F40: its product's allergens, frozen when it was ordered; the steak declares none.
+            "allergens": [],
+            # SALE-F41: the customer's allergy the waiter marked on the line; none here.
+            "allergy": [],
             # SALE-F12: a menu's kitchen name and dishes (COMBO-F11); not a menu here.
             "kitchen_name": "",
             "components": [],

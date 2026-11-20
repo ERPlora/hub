@@ -399,7 +399,7 @@ export function renderProbeReport(outcomes: ProbeOutcome[], meta: ProbeMeta): st
 // ── The skeleton generator (`pnpm qa:probes`) ──
 
 /** A small seeded generator (mulberry32): the same seed draws the same sample. */
-function random(seed: number): () => number {
+export function random(seed: number): () => number {
   let state = seed >>> 0;
   return () => {
     state = (state + 0x6d2b79f5) >>> 0;
@@ -410,7 +410,7 @@ function random(seed: number): () => number {
   };
 }
 
-function shuffled<T>(items: T[], next: () => number): T[] {
+export function shuffled<T>(items: T[], next: () => number): T[] {
   const out = [...items];
   for (let i = out.length - 1; i > 0; i--) {
     const j = Math.floor(next() * (i + 1));
@@ -578,15 +578,15 @@ export const MEMBERS: Record<'manager' | 'admin', Credentials> = {
 export const MEMBERS_PY = `
 import json
 from django.conf import settings
-from accounts import services as account_services
-from hubs import services
+from accounts.services import demo_accounts
+from hubs.services import demo_businesses
 from hubs.models import HubMember
 
 if not settings.DEBUG:
     raise SystemExit("the QA members' seed only runs with DEBUG=True")
-manager = account_services.seed_demo_customer("${MEMBERS.manager.email}", "${MEMBERS.manager.password}")
-admin = account_services.seed_demo_customer("${MEMBERS.admin.email}", "${MEMBERS.admin.password}")
-services.seed_demo_business("a", {manager: HubMember.Role.MANAGER, admin: HubMember.Role.ADMIN})
+manager = demo_accounts.seed_demo_customer("${MEMBERS.manager.email}", "${MEMBERS.manager.password}")
+admin = demo_accounts.seed_demo_customer("${MEMBERS.admin.email}", "${MEMBERS.admin.password}")
+demo_businesses.seed_demo_business("a", {manager: HubMember.Role.MANAGER, admin: HubMember.Role.ADMIN})
 print(json.dumps({"manager": manager.email, "admin": admin.email}))
 `;
 

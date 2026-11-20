@@ -3,8 +3,8 @@
 // the environment (QA_QWEN_API_KEY, QA_OPENAI_API_KEY; never in the repo, the report or a screenshot) and the stack's
 // SaaS checkout (E2E_SAAS_DIR) running with ASSISTANT_SERVICE_PROVIDER=openai (README «La QA del asistente con el modelo
 // real»). Once per run it registers the Hub's apps in the SaaS (`register_apps`), sets the real providers through the
-// SaaS's operations (assistant-battery.ts, `SEED_PY`), indexes the documentation (`index_docs`) and empties this
-// month's messages of `a`. Each item asks in a new conversation, records what went over the wire
+// SaaS's operations (assistant-seed.ts, `SEED_PY`: the QA_ANSWER_* variables choose the model that answers), indexes
+// the documentation (`index_docs`) and empties this month's messages of `a`. Each item asks in a new conversation, records what went over the wire
 // (`/api/assistant/turn`), decides the card as a person would, checks the record through the Hub's API and writes
 // `.artifacts/qa/<run>/assistant-battery-B.md` (the report) and `.artifacts/qa/<run>/<item>-<slug>.png`. The test fails when the
 // automatic verdict does; the wording is for a person to read in the report.
@@ -14,15 +14,13 @@ import { join } from 'node:path';
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
 import { ITEMS, type Meta, observe, type Outcome, QA_STAFF_EMAIL, redact, renderReport, verdictOf } from '../assistant-battery';
+import { foot, openPanelAtHome, panel } from '../assistant-panel';
 import {
   answerOf,
   cleanUpRealProviders,
   converse,
   emptyMonth,
-  foot,
   noticesOf,
-  openPanel,
-  panel,
   saasSql,
   SECRETS,
   seedRealProviders,
@@ -86,7 +84,7 @@ async function messages(context: BrowserContext): Promise<{ used: number; limit:
   return usage.data;
 }
 
-/** Sets this month's messages of `a` on erplora.com (the row its first question made), as base-assistant.spec.ts does. */
+/** Sets this month's messages of `a` on erplora.com (the row its first question made), as `spend` (provider-helpers.ts) does. */
 function setMonth(used: number): void {
   saasSql(
     `update assistant_assistantusage set messages = ${Math.trunc(used)} where hub_id = (select id from hubs_hub where slug = 'a') ` +
@@ -189,7 +187,7 @@ for (const item of ITEMS) {
       precondition = ' (B29 left none: «Ana QA» created through the API first)';
     }
     const countBefore = record ? await record.count(context) : 0;
-    await openPanel(page);
+    await openPanelAtHome(page);
     const usedBefore = item.check === 'quota' ? (await messages(context)).used : 0;
 
     const { bodies, decided } = await converse(page, item.question, item.decide, item.id);
@@ -222,7 +220,7 @@ for (const item of ITEMS) {
       setMonth(limit - 5);
       let asked = false;
       try {
-        await openPanel(page);
+        await openPanelAtHome(page);
         await expect(foot(page)).toBeVisible().catch(() => undefined);
         const footBefore = await footText(page);
         asked = true;

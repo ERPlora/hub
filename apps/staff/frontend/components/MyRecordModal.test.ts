@@ -2,16 +2,11 @@
 // from Staff and reads it — name, role, email, phone, employee ID, status, bookable, hire date and,
 // theirs only, their hourly rate and commission (never the HR notes). Read only: «Close».
 import { FormModal } from '@erplora/ui/components';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import type { MemberMineOut } from '../operations';
 import { BUSINESS, business, click, JAPANESE, mountStaff, POLISH, settle } from '../__tests__/mount-staff';
 import MyRecordModal from './MyRecordModal.vue';
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
 
 const MINE: MemberMineOut = {
   id: 'm2',

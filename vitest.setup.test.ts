@@ -195,6 +195,9 @@ describe('the hub setup', { timeout: BUDGET }, () => {
     'paints an icon the shell registers without a warning',
     'warns about an icon the shell does not register',
     'attaches Ionic elements without the errors happy-dom alone makes them log',
+    'presents an inline modal that is open, as a browser does',
+    'says a success in a toast, which the test reads from the shell',
+    'starts with no toast said by the test before it',
   ])(
     'passes the test that %s',
     (title) => {

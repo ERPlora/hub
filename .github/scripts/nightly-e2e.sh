@@ -157,7 +157,7 @@ echo "$$" > "$lock/pid"
 run="$NIGHTLY_DIR/runs/$(date +%Y%m%d-%H%M%S)-$$"
 mkdir -p "$run"
 log="$run/night.log"
-if [ -t 1 ]; then exec > >(tee -a "$log") 2>&1; else exec >> "$log" 2>&1; fi
+if [ -t 1 ] || [ "${GITHUB_ACTIONS:-}" = true ]; then exec > >(tee -a "$log") 2>&1; else exec >> "$log" 2>&1; fi
 
 HUB_PORT="$PORT"
 SAAS_PORT=$((PORT + 1))

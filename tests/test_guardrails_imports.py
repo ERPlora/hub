@@ -6,9 +6,9 @@ import-linter checks the contracts of pyproject.toml's ``[tool.importlinter]`` (
   requires; every other app and the ``config``, ``control`` and ``shared`` packages are out of its reach. Only direct
   imports count, so an app may use what a required app uses in turn.
 - ``base`` imports no app.
-- ``acyclic_siblings``: no two children of ``base``, ``base.tenancy``, ``control``, an app or a ``services`` or
-  ``queries`` package import each other, directly or round a longer circle. An import inside a function counts the
-  same as one at the top of the module.
+- ``acyclic_siblings``: no two children of ``base``, ``base.tenancy``, ``control``, an app or a ``services``,
+  ``queries`` or ``schemas`` package import each other, directly or round a longer circle. An import inside a
+  function counts the same as one at the top of the module.
 
 Tests are out of every contract (``**.tests.** -> **``): they may import whatever they check. What broke a contract
 when it came in is frozen in that contract's ``ignore_imports``, which import-linter fails as soon as an entry matches
@@ -37,15 +37,18 @@ BASE_CONTRACT = "base-imports-no-app"
 CYCLES_CONTRACT = "no-sibling-cycles"
 CYCLE_ANCESTORS = {
     "base",
+    "base.api",
     "base.tenancy",
     "base.services",
     "base.queries",
+    "base.schemas",
     "control",
     "control.services",
     "control.queries",
     "apps.*",
     "apps.*.services",
     "apps.*.queries",
+    "apps.*.schemas",
 }
 NO_CONTRACTS_AT_BASE = (
     "pyproject.toml had no import contracts where the branch left origin/main: this is the commit that brings them"

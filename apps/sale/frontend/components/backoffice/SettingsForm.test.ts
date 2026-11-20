@@ -4,18 +4,12 @@
 // may not change them sees the values blocked, no «Save» and «You do not have permission to change these
 // settings…»; a read the server refuses or that fails shows no values at all (never the factory ones).
 import { toastSuccess } from '@erplora/ui/shell';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import { BYE, click, errorFrame, flush, ionValue, mountSale, taxSettings } from '../../__tests__/mount-sale';
 import type { SettingsOut } from '../../operations';
 import SettingsField from './SettingsField.vue';
 import SettingsForm from './SettingsForm.vue';
-
-vi.mock('@erplora/ui/shell', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@erplora/ui/shell')>()),
-  toastSuccess: vi.fn(),
-}));
-beforeEach(() => vi.mocked(toastSuccess).mockClear());
 
 type Control = HTMLElement & { checked?: boolean; value?: unknown; disabled?: boolean; errorText?: string };
 

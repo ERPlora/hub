@@ -29,7 +29,7 @@ from storages.utils import clean_name, safe_join
 
 from base import files, registry
 from base.models import Hub
-from base.schemas import HubStateIn
+from base.schemas.hub_registry import HubStateIn
 from base.storage import hub_prefix
 from base.tenancy.tests import business
 from base.tenancy.tests.business import HUB_DB, in_business_a

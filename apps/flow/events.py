@@ -1,6 +1,6 @@
 """Events of the flow app (``flow.<entity>.<fact>``) and its reaction to every other app's events.
 
-services.py records them in the outbox, in the command's transaction; live.py names the ones that re-run
+services/ records them in the outbox, in the command's transaction; live.py names the ones that re-run
 each live query. They carry ids (and a run's status), never a name or what an event brought.
 
 Reactions: flow is the one app that listens to EVERY event (FLOW-F21): each one may start the

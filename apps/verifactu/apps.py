@@ -153,14 +153,21 @@ class VerifactuConfig(LiveAppConfig):
         ),
     ]
     # The queue's send (VERIFACTU-F20): the phase-2 worker runs it on every hub as the system, every minute
-    # (cron in UTC); each chain waits the TiempoEsperaEnvio the AEAT answered.
+    # (cron in UTC); each chain waits the TiempoEsperaEnvio the AEAT answered. Every hour, the kept own certificate
+    # is checked against the trusted list it was not checked against yet (VERIFACTU-F02).
     scheduled_tasks = [
         {
             "name": "process_queue",
             "operation": "verifactu.contingency.process",
             "cron": "* * * * *",
             "catch_up": "collapse",
-        }
+        },
+        {
+            "name": "recheck_certificate",
+            "operation": "verifactu.certificate.recheck",
+            "cron": "23 * * * *",
+            "catch_up": "collapse",
+        },
     ]
 
     def can_enable(self, ctx) -> str | None:
@@ -185,9 +192,12 @@ class VerifactuConfig(LiveAppConfig):
 
         return queries.app_hooks.oldest_unsent_at()
 
+    fiscal_archive_models = ("Chain", "Record", "Event")
+
     def fiscal_documents_kept(self) -> bool:
-        """The platform asks (``base.tenancy.offboarding``) before it drops the database of a business that left:
-        its records for the tax authority here are documents nothing archives yet, so the database stays."""
+        """The platform asks (``base.tenancy.offboarding``) before it drops the database of a business that left: its
+        records for the tax authority here are documents to keep, so the database stays; they go to the fiscal archive
+        first (``fiscal_archive_models``)."""
         from apps.verifactu import queries  # the models are not loaded yet when this module is
 
         return queries.app_hooks.keeps_fiscal_documents()

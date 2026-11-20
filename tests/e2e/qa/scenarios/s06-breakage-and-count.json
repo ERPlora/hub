@@ -1,0 +1,65 @@
+{
+  "id": "s06-breakage-and-count",
+  "title": "Breakage and a stock count, said in English",
+  "vertical": "restaurant",
+  "seed": "restaurant.en",
+  "language": "en",
+  "setup": [],
+  "owner": {
+    "persona": "Sarah, an English owner of the Harbour Café in Marbella. She is closing the stockroom at the end of the day.",
+    "goal": "That the stock shows the three bottles of water that broke, and the soft drinks she has just counted.",
+    "upFront": ["Three bottles of mineral water broke.", "I have just counted the soft drinks: there are 40 left."],
+    "ifAsked": ["A box fell while unloading the delivery.", "I mean the usual mineral water and soft drinks on the menu."]
+  },
+  "attachments": [],
+  "opening": "Three bottles of water got broken, and I just counted the soft drinks, there are 40 left",
+  "offered": ["inventory.stock.write_off", "inventory.stock.count"],
+  "writes": ["inventory.stock.write_off", "inventory.stock.count"],
+  "cards": [{"tool": "inventory.stock.count", "match": {"product": "soft"}, "expect": {"stock": 40}}],
+  "expect": [
+    {
+      "says": "the mineral water goes down to 45",
+      "sql": "select stock::int from inventory_product where sku = 'DRI-01'",
+      "equals": "45"
+    },
+    {
+      "says": "the three bottles are written off as broken, once",
+      "sql": "select string_agg(m.qty::int::text, ',') from inventory_stockmovement m join inventory_product p on p.id = m.product_id where p.sku = 'DRI-01' and m.movement_type = 'write_off'",
+      "equals": "-3"
+    },
+    {
+      "says": "the soft drinks are counted at 40",
+      "sql": "select stock::int from inventory_product where sku = 'DRI-02'",
+      "equals": "40"
+    },
+    {
+      "says": "the count is recorded as a count, once",
+      "sql": "select count(*) from inventory_stockmovement m join inventory_product p on p.id = m.product_id where p.sku = 'DRI-02' and m.movement_type = 'count'",
+      "equals": "1"
+    }
+  ],
+  "forbidden": [
+    {
+      "says": "no other stock changes",
+      "sql": "select md5(string_agg(id::text || stock || price || cost, ',' order by id)) from inventory_product where sku not in ('DRI-01', 'DRI-02')",
+      "unchanged": true
+    },
+    {
+      "says": "nothing is received, sold or written off besides",
+      "sql": "select count(*) from inventory_stockmovement where movement_type not in ('write_off', 'count')",
+      "unchanged": true
+    }
+  ],
+  "mustAsk": [],
+  "maxTurns": 6,
+  "golden": [
+    {
+      "tool": "inventory.stock.write_off",
+      "arguments": {"product": "DRI-01", "qty": "3", "reason": "Broken bottles: a box fell while unloading"}
+    },
+    {
+      "tool": "inventory.stock.count",
+      "arguments": {"product": "DRI-02", "stock": "40", "reason": "End of day stock count"}
+    }
+  ]
+}

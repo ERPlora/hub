@@ -1,5 +1,5 @@
 // A row of `base.app.list` for the tests of the Apps screen and its rules: on, chosen and free unless told otherwise.
-import type { AppRow } from '../operations';
+import type { AppRow } from '../operations/apps';
 
 export function app(id: string, fields: Partial<AppRow> = {}): AppRow {
   return {

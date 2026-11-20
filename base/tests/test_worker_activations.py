@@ -13,6 +13,7 @@ the platform (``base``, ``live``) and two businesses cloned from it, A and B.
 """
 
 import datetime as dt
+import logging
 import threading
 import uuid
 from collections.abc import Callable
@@ -25,7 +26,7 @@ from live.models import OutboxEvent
 from live.operations import get
 from psycopg import sql
 
-from base import activation, events, worker
+from base import activation, events, worker, worker_activations
 from base.activation import CREATING, FAILED, OFF, ON
 from base.models import AppActivation
 from base.tenancy import connections as tenancy_connections
@@ -44,9 +45,6 @@ VERTICAL = "w6activation"
 @pytest.fixture(autouse=True)
 def nothing_checked_yet(monkeypatch):
     monkeypatch.setattr(identity, "_verified", set())
-    monkeypatch.setattr(worker, "_swept", {})
-    monkeypatch.setattr(worker, "_synced", set())
-    monkeypatch.setattr(worker, "_next_hub", None)
 
 
 @pytest.fixture(autouse=True)
@@ -166,7 +164,7 @@ def recorded(hub: Hub) -> set[str]:
 
 
 def run_pass(now: dt.datetime | None = None) -> None:
-    worker._activations(now or timezone.now())
+    worker_activations._activations(now or timezone.now())
 
 
 def run_pass_at(at: dt.datetime) -> None:
@@ -339,12 +337,12 @@ def test_two_workers_at_once_on_one_hub_never_collide_and_it_goes_on_once(busine
         return real(hub, **kwargs)
 
     monkeypatch.setattr(migrator, "ensure_schema", together)
-    monkeypatch.setattr(worker, "ACTIVATION_LOCK_WAIT", 30.0)
+    monkeypatch.setattr(worker_activations, "ACTIVATION_LOCK_WAIT", 30.0)
     failures: list[BaseException] = []
 
     def one_worker():
         try:
-            worker._activate(fresh(a), timezone.now())
+            worker_activations._activate(fresh(a), timezone.now())
         except BaseException as error:  # noqa: BLE001 - what a thread raised is asserted below
             failures.append(error)
         finally:
@@ -496,16 +494,13 @@ def visited(hub: Hub, day) -> None:
     HubVisit.objects.create(host=hub.slug, day=day, saas_user_id="saas:1")
 
 
-def test_the_sweep_of_the_hubs_served_rings_a_hub_whose_ring_was_lost(business):
-    from base.tenancy.context import use_control
-
+def test_the_sweep_of_the_hubs_served_rings_a_hub_whose_ring_was_lost(business, worker_visits):
     a = business("a")
     turn_on(a)
     HubDue.objects.filter(hub_id=a.pk).delete()
     now = timezone.now()
 
-    with use_control():
-        worker._hubs(now)
+    worker_visits.serve(now)
     assert due_at(a) is not None and due_at(a) <= timezone.now()
 
     run_pass(timezone.now())
@@ -513,24 +508,28 @@ def test_the_sweep_of_the_hubs_served_rings_a_hub_whose_ring_was_lost(business):
 
 
 @pytest.mark.parametrize(("active", "again"), [(True, dt.timedelta(minutes=10)), (False, dt.timedelta(days=1))])
-def test_the_sweep_looks_into_a_hub_only_at_its_pace(business, active, again):
-    from base.tenancy.context import use_control
-
+def test_the_sweep_looks_into_a_hub_only_at_its_pace(business, worker_visits, active, again):
+    """A visit looks into it (the business is visited every minute at least, its look). Two worker processes, each
+    with its own pace: one visits it a second before its time, the other right at it."""
     a = business("a")
     now = timezone.now()
     if active:
         visited(a, now.date() - dt.timedelta(days=6))
-    with use_control():
-        worker._hubs(now)  # looked into once: the first pass of the process
+    another_worker = worker.hub_visits.HubVisits()
+    try:
+        worker_visits.serve(now)  # looked into once by each: the first visit of the process
+        another_worker.serve(now)
 
         with hubs.watched() as sent:
-            worker._hubs(now + dt.timedelta(minutes=1))
-            worker._hubs(now + again - dt.timedelta(seconds=1))
+            worker_visits.serve(now + dt.timedelta(minutes=1))
+            worker_visits.serve(now + again - dt.timedelta(seconds=1))
         assert activation_reads(sent, a) == 0
 
         with hubs.watched() as sent:
-            worker._hubs(now + again)
+            another_worker.serve(now + again)
         assert activation_reads(sent, a) > 0
+    finally:
+        another_worker.close()
 
 
 # ── Rollback: a database ahead of this code holds back only what it is about ────────────────────────────────────
@@ -602,19 +601,35 @@ def test_a_hub_that_fails_is_logged_and_the_others_are_served(business, monkeypa
     a, b = business("a"), business("b")
     turn_on(a)
     turn_on(b)
-    real = worker._activate_in
+    real = worker_activations._activate_in
 
     def broken(hub, now):
         if hub.pk == a.pk:
             raise RuntimeError("the hub's database went away")
         return real(hub, now)
 
-    monkeypatch.setattr(worker, "_activate_in", broken)
+    monkeypatch.setattr(worker_activations, "_activate_in", broken)
 
     run_pass()
 
     assert row(b).state == ON and row(a).state == CREATING
     assert "went away" in caplog.text
+
+
+def test_its_lines_are_in_the_workers_log_under_the_workers_name(django_db_blocker, monkeypatch, caplog):
+    failure = RuntimeError("control's database went away")
+
+    def unreadable(now):
+        raise failure
+
+    monkeypatch.setattr(worker_activations.services.activation, "activation_hubs", unreadable)
+
+    with caplog.at_level(logging.ERROR, logger="base.worker"), django_db_blocker.unblock():
+        run_pass()
+
+    assert [record.name for record in caplog.records if record.exc_info and record.exc_info[1] is failure] == [
+        "base.worker"
+    ]
 
 
 # ── migrate_hubs with a new migration of X touches A, never B (B's database is not even opened) ─────────────────

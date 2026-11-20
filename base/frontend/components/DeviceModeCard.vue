@@ -9,7 +9,7 @@ import { IonItem, IonLabel, IonList, IonNote, IonRadio, IonRadioGroup } from '@i
 import { computed, ref, watch } from 'vue';
 
 import { useBaseI18n } from '../lib/i18n';
-import type { DeviceMode } from '../operations';
+import type { DeviceMode } from '../operations/devices';
 import '../settings.css';
 
 const { t } = useBaseI18n();

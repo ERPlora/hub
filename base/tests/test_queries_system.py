@@ -14,7 +14,6 @@ from live.models import OutboxEvent
 from live.operations import get
 
 from base.models import EventDelivery
-from base.tenancy.context import use_hub
 from base.tenancy.tests.business import HOST, HUB_DB, A, B, in_business_a
 from base.tests.routes import assert_bound
 
@@ -68,24 +67,14 @@ def test_each_query_is_for_who_runs_the_business_and_told_to_the_assistant(name)
 # ── base.system.status ───────────────────────────────────────────────────────────────────────────────────
 
 
-def test_the_status_says_the_release_and_where_the_data_lives(settings):
+def test_the_status_says_the_release(settings):
     settings.APP_VERSION = "4da2a10c9e1f5b7d8a6c3e2f1b0a9d8c7e6f5a4b"
     settings.APP_RELEASED_AT = "2026-10-23T20:50:00+02:00"
 
     assert run("base.system.status", ADMIN) == {
         "version": "4da2a10",
         "released_at": "2026-10-23T18:50:00Z",
-        # Business A on its own database.
-        "shared_database": False,
     }
-
-
-def test_a_hub_with_its_own_database_says_so(settings, hub_b):
-    settings.APP_VERSION, settings.APP_RELEASED_AT = "", ""
-
-    with use_hub(hub_b):
-        assert run("base.system.status", ADMIN, scope=B)["shared_database"] is False
-    assert run("base.system.status", ADMIN)["shared_database"] is False
 
 
 def test_without_a_release_it_runs_the_development_build_and_never_makes_up_a_date(settings):
@@ -98,7 +87,7 @@ def test_without_a_release_it_runs_the_development_build_and_never_makes_up_a_da
 
 def test_the_status_carries_no_error_text(settings):
     """No error text travels with the status: the verbatim error of a rollback could reach any session."""
-    assert set(run("base.system.status", ADMIN)) == {"version", "released_at", "shared_database"}
+    assert set(run("base.system.status", ADMIN)) == {"version", "released_at"}
 
 
 # ── base.event.list: the log of events between apps ─────────────────────────────────────────────────────────

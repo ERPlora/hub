@@ -20,7 +20,7 @@ from pydantic import ConfigDict, StringConstraints, model_validator
 from base.allergens import AllergensCellIn, AllergensIn, AllergensOut, AllergensPatchIn
 from base.images import MAX_UPLOAD_BASE64
 from base.recovery import ImageInCopyIn
-from base.schemas import CatalogImageOut, names
+from base.schemas import assistant, catalog_images
 
 T = TypeVar("T")
 
@@ -130,8 +130,8 @@ ProductSearch = Annotated[str | None, Field(max_length=200, description="Part of
 
 # The assistant's card names the record a write acts on by these reads (base/assistant/cards.py ``REFERS``), run as whoever
 # asks, never by its id: a product and a category by their name, as the screens' «Delete» dialogs and forms say them.
-A_PRODUCT = names("inventory.product.get")
-A_CATEGORY = names("inventory.category.get")
+A_PRODUCT = assistant.names("inventory.product.get")
+A_CATEGORY = assistant.names("inventory.category.get")
 
 
 # Pages: every list is paginated, limit ≤ 100.
@@ -180,7 +180,7 @@ class ProductSoldOutIn(ProductRefIn):
 # The product's image (base.images): one of the shared library or a photo of its own.
 
 #: An image a write sets: the assistant's card names it by its title in the library, never by its reference.
-AN_IMAGE = names("base.catalog_image.get", by="reference", name=("title",))
+AN_IMAGE = assistant.names("base.catalog_image.get", by="reference", name=("title",))
 
 
 class ProductImageIn(ProductRefIn):
@@ -770,7 +770,7 @@ ProductPage = Page[ProductOut]
 class ProductImageSuggestOut(Schema):
     product_id: UUID = Field(description="The product the images are proposed for.")
     query: str = Field(description="What was looked for in the library: the product's name.")
-    rows: list[CatalogImageOut] = Field(
+    rows: list[catalog_images.CatalogImageOut] = Field(
         description="The library's images that match its name, the best first; none is set until one is chosen."
     )
 
@@ -973,7 +973,7 @@ class DeletedOut(Schema):
 
 
 class PrintLabelOut(Schema):
-    """INVENTORY-F25: the label put in Printing's queue."""
+    """The barcode label put in Printing's queue."""
 
     job_id: UUID = Field(description="The print job of the label, in Printing's queue.")
     printer_name: str | None = Field(

@@ -19,6 +19,10 @@
     "method": "get",
     "path": "/api/home/notices"
   },
+  "base.health.list": {
+    "method": "get",
+    "path": "/api/home/health"
+  },
   "base.app.list": {
     "method": "get",
     "path": "/api/apps"
@@ -787,6 +791,10 @@
     "method": "post",
     "path": "/api/sale/orders/set_line_staff"
   },
+  "sale.order.set_line_allergy": {
+    "method": "post",
+    "path": "/api/sale/orders/set_line_allergy"
+  },
   "sale.order.split_line": {
     "method": "post",
     "path": "/api/sale/orders/split_line"
@@ -1366,6 +1374,10 @@
   "online_booking.settings.update": {
     "method": "post",
     "path": "/api/online_booking/settings"
+  },
+  "online_booking.settings.upload_logo": {
+    "method": "post",
+    "path": "/api/online_booking/settings/logo"
   },
   "online_booking.public.page": {
     "method": "get",
@@ -2574,6 +2586,10 @@
   "printing.device.coverage": {
     "method": "get",
     "path": "/api/printing/devices/coverage"
+  },
+  "printing.device.health": {
+    "method": "get",
+    "path": "/api/printing/devices/health"
   },
   "modifier.group.list": {
     "method": "get",

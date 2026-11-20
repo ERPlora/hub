@@ -3,8 +3,8 @@ Prefijo: SALE
 Alcance MVP: núcleo
 Estado de la app: completa (2026-10-31)
 Lo que no entra todavía: ver «Lo que queda fuera». La propina (SALE-G06) es de la app Propinas (`tip`), que añade
-su paso al cobro (SALE-F39, no hecho). Los alérgenos del plato y la alergia del cliente en la línea, SALE-F40 y
-SALE-F41, no hecho.
+su paso al cobro (SALE-F39, no hecho). La alergia del cliente en la línea (SALE-F41) sigue parcial: el TPV la marca
+y la enseña, y la comanda la lleva, pero la tarjeta de Cocina todavía no la resalta.
 
 > Manual de usuario y especificación de la app `sale`. Se escribe **antes** que el código: no se
 > programa nada que no esté aquí, y cada flujo pasa a `Estado: hecho` cuando sus tests están en verde
@@ -321,8 +321,8 @@ cierra la ventana sin guardarlo. Con la ventana como se abrió, atrás la cierra
 | SALE-F37 | Añadir un medio de pago (Bizum, transferencia…) | común | hecho |
 | SALE-F38 | Vender un servicio de Servicios | peluquería | hecho |
 | SALE-F39 | Cobrar con lo que añade otra app (la propina) | común | no hecho |
-| SALE-F40 | Ver los alérgenos de un plato al pedirlo | común | no hecho |
-| SALE-F41 | Marcar la alergia del cliente en una línea | restaurante | no hecho |
+| SALE-F40 | Ver los alérgenos de un plato al pedirlo | común | hecho |
+| SALE-F41 | Marcar la alergia del cliente en una línea | restaurante | parcial |
 
 ### SALE-F01 Vender y cobrar en efectivo
 Estado: hecho
@@ -1365,16 +1365,16 @@ tique (3.000 €) y el del efectivo (1.000 €) miran el total de la venta, como
 Implicados: TIP-F02, TIP-F03, TIP-F04, CASH_REGISTER-F18, INVOICE-F01
 
 ### SALE-F40 Ver los alérgenos de un plato al pedirlo
-Estado: no hecho — el TPV todavía no recibe los alérgenos del producto ni la línea los guarda
+Estado: hecho
 Vertical: común
 Actor: empleado, responsable
 Pantalla: Vender
 Pasos:
-1. En **Vender**, toca un artículo con alérgenos declarados en Inventario (INVENTORY-F35). La línea entra como
+1. En **Vender**, toca un artículo con alérgenos declarados en Inventario. La línea entra como
    siempre y, debajo del nombre, dice «Alérgenos: Gluten, Leche», en el orden de la lista de los catorce. Un
    artículo sin alérgenos no lleva esa fila.
-2. Si el artículo abre su hoja de suplementos (SALE-F11), la hoja dice sus alérgenos debajo de su nombre, antes
-   de añadirlo. En la hoja de un menú (SALE-F12), cada elección dice los suyos junto a su nombre, y en la cuenta
+2. Si el artículo abre su hoja de suplementos, la hoja dice sus alérgenos debajo de su nombre, antes
+   de añadirlo. En la hoja de un menú, cada elección dice los suyos junto a su nombre, y en la cuenta
    cada plato del menú lleva los de su producto.
 3. Si el cliente pregunta, el camarero los lee en la línea; si el plato no le vale, quita la línea como cualquier
    otra antes de enviarla.
@@ -1387,11 +1387,15 @@ ni en la cuenta impresa para la mesa.
 Si falla: sin Inventario activo no hay alérgenos, y el precio libre y los servicios no los llevan. Un artículo sin
 alérgenos marcados no dice nada, porque el TPV no distingue «no lleva ninguno» de «no se han declarado»: por eso la
 ficha de Inventario dice «Sin alérgenos declarados». Un suplemento no tiene alérgenos propios: «+Queso» no añade
-Leche a la línea; si el cliente tiene una alergia, se marca en la línea (SALE-F41) y Cocina la ve igual.
+Leche a la línea; si el cliente tiene una alergia, se marca en la línea como alergia del cliente y Cocina la ve igual.
+Si la hoja de un menú no puede leer los alérgenos de sus platos, lo dice y ofrece «Reintentar»: así un plato sin
+fila no se toma por un plato sin alérgenos.
 Implicados: INVENTORY-F27, INVENTORY-F35, SALE-F11, SALE-F12, SALE-F41, KITCHEN-F32
 
 ### SALE-F41 Marcar la alergia del cliente en una línea
-Estado: no hecho — la línea todavía no guarda la alergia del cliente: hoy solo cabe como texto de la nota (SALE-F13)
+Estado: parcial — el TPV la marca en la hoja de nota y la enseña en la línea, con la coincidencia del plato; la
+comanda enviada la lleva, también por el asistente y la API, y en Cocina la imprime el papel, pero la tarjeta
+todavía no la resalta (KITCHEN-F32)
 Vertical: restaurante
 Actor: empleado, responsable
 Pantalla: Vender
@@ -1401,9 +1405,9 @@ Pasos:
    rápidas y el cuadro de siempre (SALE-F13).
 2. Toca los alérgenos del cliente, uno o varios, y pulsa «Guardar». La línea dice, debajo del nombre, resaltado
    y antes de la nota, «Alergia: Gluten».
-3. Si el plato lleva alguno de esos alérgenos (SALE-F40), al guardar la hoja lo avisa y la línea lo dice
-   resaltado: «El plato lleva Gluten». No impide pedirlo, porque la cocina puede prepararlo sin él: el camarero lo
-   habla con el cliente y, si hace falta, quita la línea y pide otro plato.
+3. Si el plato lleva alguno de esos alérgenos (SALE-F40), al guardar la línea lo dice resaltado: «El plato lleva
+   Gluten». No impide pedirlo, porque la cocina puede prepararlo sin él: el camarero lo habla con el cliente y, si
+   hace falta, quita la línea y pide otro plato.
 4. En un menú, la alergia se marca en la línea del menú y vale para cada uno de sus platos; el aviso del paso 3
    nombra el plato que lleva el alérgeno («La hamburguesa lleva Gluten»).
 5. Envía la ronda (SALE-F20): la alergia va con cada plato a su estación, resaltada (KITCHEN-F32). Hasta enviarla,
@@ -1489,6 +1493,7 @@ secciones, las notas rápidas y lo devolvible se pueden seguir en vivo.
 | Añade una línea a precio libre | precio libre | F09 | `sale.order.add_open_line` |
 | Cambia la cantidad, la invitación o la nota de una línea | montar la cuenta | F01, F10, F13, F15 | `sale.order.update_line` |
 | Cambia de quién es una línea | montar la cuenta | F16 | `sale.order.set_line_staff` |
+| Marca o quita la alergia del cliente en una línea sin enviar | montar la cuenta | F41 | `sale.order.set_line_allergy` |
 | Separa una línea de N unidades en N líneas | montar la cuenta | F27 | `sale.order.split_line` |
 | Quita una línea sin enviar | montar la cuenta | F01 | `sale.order.remove_line` |
 | Anula una línea ya enviada a cocina, con motivo | anular | F20 | `sale.order.void_line` |
@@ -1520,7 +1525,7 @@ secciones, las notas rápidas y lo devolvible se pueden seguir en vivo.
 | Venta con su documento | Un documento que no se pudo emitir en el cobro, la anulación o la devolución se emite después (reintento del cobro, «Emitir ahora» o la reacción de Facturación) | La venta, el documento, su número, la devolución (`refund_id`) o si es el de la anulación (`void`); uno por documento | `sale.sale.invoiced` |
 | Cuenta abierta | Abrir o dividir | La cuenta | `sale.order.opened` |
 | Cuenta cambiada | Cualquier cambio de líneas, descuentos o título | La cuenta | `sale.order.changed` |
-| Comanda enviada | Enviar a cocina | La cuenta, su título, el canal, la ronda, quién atiende y las líneas con sus notas | `sale.order.fired` |
+| Comanda enviada | Enviar a cocina | La cuenta, su título, el canal, la ronda, quién atiende y las líneas con sus notas, los alérgenos de su producto (en un menú, los de cada plato) y la alergia del cliente | `sale.order.fired` |
 | Cuenta cerrada | Cobrar lo último de una cuenta | La cuenta | `sale.order.completed` |
 | Cuenta anulada | Anular una cuenta abierta | La cuenta | `sale.order.voided` |
 | Cuentas juntadas | Juntar | La absorbida y la que queda | `sale.order.merged` |
@@ -1614,7 +1619,7 @@ es una línea.
 ## Para quien lo mantiene
 
 - Anatomía completa: `apps.py`, `models.py`, `migrations/` (`0002` siembra Efectivo y Tarjeta, con
-  reverso), `schemas.py`, `pricing.py` (la valoración, sin ORM), `queries.py`, `services/`,
+  reverso), `schemas/`, `pricing.py` (la valoración, sin ORM), `queries/`, `services/`,
   `events.py`, `live.py`, `api.py`, `admin.py`, `locale/`, `frontend/` y un `tests/test_<fichero>.py`
   por fichero, más `tests/test_integration_*.py` con Impuestos, Clientes, Inventario, Servicios,
   Facturación, Caja y Citas reales.
@@ -1775,7 +1780,7 @@ es una línea.
 - **Límites legales en España** (país del negocio, el de Impuestos: hoy `ES` para todos): nada en efectivo
   desde 1.000 € (100.000 céntimos), también repartido y también en una cuenta cobrada por partes (la
   operación es la cuenta entera: lo ya cobrado más lo que le queda, `operation_total` de la previsión); tique hasta 3.000 € con IVA (300.000), por
-  encima solo factura. Son de la ley española y van en euros (`queries.LIMITS_CURRENCY`, también en sus
+  encima solo factura. Son de la ley española y van en euros (`queries.business.LIMITS_CURRENCY`, también en sus
   avisos): `CASH_LIMIT` y `TICKET_LIMIT` solo tienen `ES`, y un negocio de otro país no lleva ninguno. La vista previa
   (`PreviewOut`) lo dice a su lado, `limits_currency`, y marca los dos como dinero en esa moneda
   (`IN_LIMITS_CURRENCY`: `money` y `currency_in`), para que quien los lea (Automatizaciones, FLOW-F11) no los tome por
@@ -1786,7 +1791,7 @@ es una línea.
   `base.operations.business_currency(ctx.scope)` (BASE-F50), que la lee como la plataforma (una API key solo trae
   los permisos de lo que cobra) y en el hub propio de ERPlora (sin negocio registrado en erplora.com) contesta la
   del país de su emisor (`PLATFORM_ISSUER_COUNTRY`), como sus facturas. Ventas no guarda copia propia de esa
-  pregunta: `queries.business_currency(ctx)` es una línea que la
+  pregunta: `queries.business.business_currency(ctx)` es una línea que la
   devuelve, y queda como la respuesta de Ventas que usa Caja (`requires = ["sale"]`) para contar en la moneda con
   la que cobra una venta ahora. `Sale.currency` se guarda al cobrar y no tiene valor por
   defecto (migración `0011`, sin datos); lo cobrado se pinta, se avisa (`money_text(cents, currency)`) y se imprime
@@ -1832,11 +1837,16 @@ es una línea.
   la venta y de la devolución. Una venta se corrige con su anulación o sus devoluciones, como en caja
   (`tests/test_admin.py`). Lo que guarda no pasa por las operaciones ni deja aviso.
 - **Asistente**: cada operación declara `ai` (descripción; en las escrituras, `risk`: `high` en cobrar,
-  anular, devolver y descuentos) y cada campo de `schemas.py` su `description`. La tarjeta de
+  anular, devolver y descuentos) y cada campo de `schemas/` su `description`. La tarjeta de
   confirmación nombra cada dato por el `title` de su esquema (`gettext_noop`, con su `es` en el catálogo:
   «Importe a devolver» para `allocations`, «Línea», «Bono», «Cuenta de origen») o, si no lo tiene, por el
   `verbose_name` de su campo en el modelo; un dato sin ninguno sale con el nombre técnico y lo para
-  `tests/test_integration_assistant.py` (`test_i18n.py` exige el `es` de cada `title`).
+  `tests/test_integration_assistant.py` (`test_i18n.py` exige el `es` de cada `title`). Para el Hub,
+  «para marcarlo rápido» o «para marcarla rápido» es una nota rápida (`quick`, F36) (`assistant_synonyms`, en
+  `apps.py`): «deja preparado el aviso «Sin cilantro» para marcarlo rápido al apuntar platos» trae su alta entre
+  las diez primeras a quien prepara la caja. Va solo tras «para»: «quiero marcarla rápido como pagada» es una
+  factura, y «un aviso rápido» o «rápido» sueltos son también un mensaje a un cliente o cobrar deprisa;
+  `tests/test_assistant_synonyms.py` falla si el grupo los nombra.
 - **La tecla «Hablar»** (`frontend/components/pos/SpeakKey.vue`; PLAN §30 punto 4,
   PLAN-HUB §8): sin operación propia ni dictado propio; usa el del asistente de la plataforma,
   `useDictation` del chat compartido de `@erplora/ui/components` (PLAN-HUB §18): una
@@ -2001,6 +2011,14 @@ título, sus pasos y «Si falla»: ahí no van nombres de código, incidencias, 
   del cobro (`apps.tax.queries.business_today`), el mismo reloj que el de una venta, que hub#772 mueve entero. Una
   sesión nunca está en las dos: la del cobro no pasa por `service.grant.redeem`.
 
+- **El código del tique para pedir la factura completa** (INVOICE-F04, hub#500): toda venta cobrada como tique
+  tiene el suyo, `<número de la venta>-<firma>`, que calcula `apps.sale.queries.receipt_codes` (`receipt_code` y
+  `sale_of_code`): la firma, doce caracteres en base32 de Crockford, es el HMAC-SHA256 del id de la venta con la
+  clave secreta del servidor (y sus `SECRET_KEY_FALLBACKS` al leerlo). No se guarda: cada reimpresión da el mismo,
+  también para las ventas de antes, y el cobro no escribe nada más. Vale cuatro años desde el cobro. Lo lee
+  Facturación, que requiere Ventas, en su página pública (`invoice.public.*`); el papel del tique (SALE-F29) aún no
+  lo imprime (hub#500). La decisión, con el mercado, en el WORKBOOK de Facturación («Decisiones», 22).
+
 ### Lo que NO hace, a propósito
 
 - No guarda mesas ni clientes en la cuenta: el enlace cuenta–cliente es de Clientes y el de
@@ -2047,6 +2065,6 @@ título, sus pasos y «Si falla»: ahí no van nombres de código, incidencias, 
 - **Cobrar con propina**: es la app Propinas (`tip`, su `WORKBOOK.md`), con el paso del cobro que pinta Ventas
   (SALE-F39), las dos `no hecho`; el código va por las issues hijas de hub#562. Mientras, la propina en efectivo se
   anota en Caja como «Entrada» (CASH_REGISTER-F05).
-- **Los alérgenos del plato y la alergia del cliente** (F40 y F41, `no hecho`): la línea los guarda por hub#1736, y
-  la línea y las hojas los enseñan por hub#1738; Cocina los resalta en KITCHEN-F32 (hub#1737). Mientras, una
-  alergia va en la nota. Los alérgenos de un suplemento («+Queso» lleva leche) no entran: hub#1739.
+- **La tarjeta de Cocina y los alérgenos de un suplemento**: la línea y las hojas del TPV ya enseñan los alérgenos
+  del plato y la alergia del cliente (F40 hecho; F41 parcial solo porque la tarjeta de Cocina aún no resalta la
+  alergia, hub#1738). Los alérgenos de un suplemento («+Queso» lleva leche) no entran: hub#1739.

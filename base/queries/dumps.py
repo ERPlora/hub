@@ -11,7 +11,8 @@ from base import blueprint
 from base.models import Hub
 from base.permissions import ADMINISTER_HUB
 from base.registry import internal_only
-from base.schemas import HubDumpLinkIn, HubDumpLinkOut, HubDumpsIn, HubDumpsOut, HubGetIn, InternalDumpsOut
+from base.schemas.dumps import HubDumpLinkIn, HubDumpLinkOut, HubDumpsIn, HubDumpsOut, InternalDumpsOut
+from base.schemas.hub_registry import HubGetIn
 from control.models import HubDump
 
 
@@ -78,13 +79,10 @@ def gets_copies(hub: Hub) -> bool:
 def hub_dumps(ctx: OperationContext, data: HubDumpsIn) -> dict:
     """Settings › Data's «Copies»: the copies of the business's own database, without their links
     (``base.hub.dump_link`` gives one on each click), and how its last reset went (``base.services``, «The reset of a
-    business»). While the business shares its database with others, nothing."""
+    business»)."""
     with translation.override(ctx.language):
-        hub = Hub.objects.filter(slug=ctx.scope.key).first()
-        if hub is None or not hub.db_name:
-            return {"available": False, "reset": None, "dumps": []}
+        hub = Hub.objects.get(slug=ctx.scope.key)
         return {
-            "available": True,
             "reset": _reset_state(hub),
             "dumps": [
                 {"id": dump.pk, "kind": dump.kind, "created_at": dump.created_at, "bytes": dump.bytes}
@@ -109,7 +107,7 @@ def hub_dump_link(ctx: OperationContext, data: HubDumpLinkIn) -> dict:
 
     with translation.override(ctx.language):
         hub = Hub.objects.filter(slug=ctx.scope.key).first()
-        dump = _kept_dumps(hub).filter(pk=data.id).first() if hub is not None and hub.db_name else None
+        dump = _kept_dumps(hub).filter(pk=data.id).first() if hub is not None else None
         if dump is None:
             raise NotFound(gettext("This copy is no longer kept."))
         try:

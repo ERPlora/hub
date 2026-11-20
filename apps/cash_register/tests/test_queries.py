@@ -10,6 +10,7 @@ from live.errors import NotFound, PermissionDenied
 
 from apps.cash_register.models import Count, Session
 from apps.cash_register.queries import DENOMINATIONS, count_total, currency_decimals
+from apps.kitchen.tests.conftest import add_printers
 from base.tests.ordering import assert_reads_backwards, listed_with
 
 from apps.cash_register.tests.conftest import HUB_DB, A, ctx_for, open_session, run
@@ -581,6 +582,7 @@ def test_the_close_summary_needs_the_permission_to_close():
 
 def test_the_close_summary_carries_what_is_still_pending_in_sales_the_kitchen_and_printing():
     open_session(10000)
+    add_printers()
     run("sale.order.open", {"label": "Table 4"})
     run("sale.order.open", {"label": "Table 7"})
     run("kitchen.ticket.create", {"label": "Terrace 2", "items": [{"name": "Burger"}]})
@@ -594,7 +596,7 @@ def test_the_close_summary_carries_what_is_still_pending_in_sales_the_kitchen_an
     review = summarize(closing_balance=10000).pending
     assert (review.open_checks, sorted(review.open_check_labels)) == (2, ["Table 4", "Table 7"])
     assert (review.unserved, review.unserved_labels) == (1, ["Terrace 2"])
-    # The receipt waiting, and the kitchen ticket's own paper (the kitchen queues it, with no printer to take it).
+    # The receipt waiting, and the kitchen ticket's own paper (queued on the kitchen printer, with no device to print it).
     assert (review.prints, review.print_usages) == (2, ["receipt", "kitchen"])
     assert review.incomplete is False
 

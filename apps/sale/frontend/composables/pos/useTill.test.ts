@@ -14,16 +14,7 @@ import type { OrderOut, SettingsOut } from '../../operations';
 import { CURRENT_CHECK_KEY } from './useCurrentCheck';
 import { type Till, useTill } from './useTill';
 
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { modalControllerStub } = await import('../../__tests__/approval-dialog');
-  const ionic = await importOriginal<typeof import('@ionic/vue')>();
-  return { ...ionic, modalController: modalControllerStub(ionic.modalController) };
-});
-vi.mock('@erplora/ui/shell', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@erplora/ui/shell')>()),
-  toastError: vi.fn(),
-  toastInfo: vi.fn(),
-}));
+vi.mock('@ionic/vue', async (importOriginal) => (await import('../../__tests__/approval-dialog')).ionicWithApprovalDialog(importOriginal));
 
 beforeEach(() => {
   vi.stubGlobal('localStorage', memoryStorage());
@@ -31,8 +22,6 @@ beforeEach(() => {
 });
 afterEach(() => {
   vi.unstubAllGlobals();
-  vi.mocked(toastError).mockClear();
-  vi.mocked(toastInfo).mockClear();
 });
 
 async function setup(options: { settings?: Partial<SettingsOut>; session?: typeof MANAGER; locale?: 'en' | 'es' } = {}) {
@@ -354,10 +343,10 @@ describe('useTill: the lines', () => {
     ]);
   });
 
-  it('a note goes to the line and the sheet learns it went', async () => {
+  it('a note and the customer allergy go to their existing operations', async () => {
     const s = await withCheck();
-    expect(await s.till().setNote(line({ id: 'l1' }), 'No ice')).toEqual({ ok: true });
-    expect(s.calls().at(-1)).toEqual(['/update_line', { order_id: 'o1', line_id: 'l1', notes: 'No ice' }]);
+    expect(await s.till().setNote(line({ id: 'l1' }), 'No ice', ['gluten', 'milk'])).toEqual({ ok: true });
+    expect(s.calls().slice(-2)).toEqual([['/update_line', { order_id: 'o1', line_id: 'l1', notes: 'No ice' }], ['/set_line_allergy', { order_id: 'o1', line_id: 'l1', allergy: ['gluten', 'milk'] }]]);
   });
 
   it('moves a line to another professional; a refusal says it stays with the one it had', async () => {

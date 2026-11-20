@@ -16,17 +16,6 @@ import type { CompleteIn, PaymentMethodOut, SaleOut } from '../operations';
 import DocumentModal from '../components/document/DocumentModal.vue';
 import PosPage from './PosPage.vue';
 
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
-vi.mock('@erplora/ui/shell', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@erplora/ui/shell')>()),
-  toast: vi.fn(),
-  toastWarning: vi.fn(),
-  toastError: vi.fn(),
-  toastSuccess: vi.fn(),
-}));
 vi.mock('../../../customer/frontend/components/CustomerSearch.vue', async () => {
   const { h } = await import('vue');
   return {
@@ -43,8 +32,6 @@ vi.mock('../../../customer/frontend/components/CustomerSearch.vue', async () => 
 beforeEach(() => vi.stubGlobal('localStorage', memoryStorage()));
 afterEach(() => {
   vi.unstubAllGlobals();
-  vi.mocked(toastError).mockClear();
-  vi.mocked(toastSuccess).mockClear();
 });
 
 const TWO = order({ id: 'o1', version: 2, lines: [line({ id: 'l1' }), line({ id: 'l2', product_id: 'p2', name: 'Tea' })] });

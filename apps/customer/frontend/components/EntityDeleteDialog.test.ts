@@ -2,29 +2,16 @@
 // consequence («The customers who have it lose it.», «The values saved on the cards are deleted
 // too.»); confirmed, it deletes and says «Group {name} deleted». A refusal stays in the dialog.
 import { toastSuccess } from '@erplora/ui/shell';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { defineComponent, h, ref } from 'vue';
 
 import { approvalDialog, approvalSettled, asksApproval } from '../__tests__/approval-dialog';
 import { flush, json, mountCustomer, refusal, sent } from '../__tests__/mount-customer';
 import EntityDeleteDialog from './EntityDeleteDialog.vue';
 
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  const { modalControllerStub } = await import('../__tests__/approval-dialog');
-  const ionic = await importOriginal<typeof import('@ionic/vue')>();
-  return { ...ionic, IonModal: IonModalStub, modalController: modalControllerStub(ionic.modalController) };
-});
-vi.mock('@erplora/ui/shell', async (importOriginal) => ({
-  ...((await importOriginal()) as object),
-  toastSuccess: vi.fn(),
-}));
+vi.mock('@ionic/vue', async (importOriginal) => (await import('../__tests__/approval-dialog')).ionicWithApprovalDialog(importOriginal));
 beforeEach(() => {
-  vi.mocked(toastSuccess).mockClear();
   approvalDialog.reset();
-});
-afterEach(() => {
-  document.body.innerHTML = '';
 });
 
 async function setup(kind: 'groups' | 'tags' | 'fields') {

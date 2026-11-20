@@ -233,11 +233,6 @@
       "count": 1
     }
   },
-  "apps/online_booking/frontend/pages/PreviewPage.vue": {
-    "vue/max-lines-per-block": {
-      "count": 1
-    }
-  },
   "apps/payment/frontend/composables/useServerTable.ts": {
     "max-lines-per-function": {
       "count": 1
@@ -305,11 +300,6 @@
   },
   "apps/sale/frontend/components/document/__tests__/fixtures.ts": {
     "max-lines-per-function": {
-      "count": 1
-    }
-  },
-  "apps/sale/frontend/components/pos/CartLine.vue": {
-    "vue/max-lines-per-block": {
       "count": 1
     }
   },

@@ -13,16 +13,15 @@ from live.operations import AI, UnknownOperation, atomic, get, operation
 
 from apps.sale import paper
 from apps.sale.models import FiscalStatus, Sale
-from apps.sale.queries import (
-    business_currency,
-    business_letterhead,
-    current_settings,
-    find_order,
-    find_sale,
-    preview,
-    sale_detail,
-)
-from apps.sale.schemas import OrderRefIn, PaperOut, PreviewIn, SaleOut, SalePrintIn
+from apps.sale.queries.business import business_currency
+from apps.sale.queries.checkout import preview
+from apps.sale.queries.letterhead import business_letterhead
+from apps.sale.queries.orders import find_order
+from apps.sale.queries.sales import find_sale, sale_detail
+from apps.sale.queries.settings import current_settings
+from apps.sale.schemas.checkout import PreviewIn
+from apps.sale.schemas.orders import OrderRefIn
+from apps.sale.schemas.sales import PaperOut, SaleOut, SalePrintIn
 
 logger = logging.getLogger(__name__)
 

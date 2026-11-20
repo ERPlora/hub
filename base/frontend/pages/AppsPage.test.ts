@@ -4,12 +4,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { app } from '../__tests__/app-row';
 import { appActionLabel, freshEachTest, ids as idsOf, INVOICE, LIST, type Mounted, noteOf, open, PLANS, REPORTS, STOCK, STORE, TAX } from '../__tests__/apps-page';
 import { EMPLOYEE, errorFrame, flush, OWNER, subId } from '../__tests__/mount-base';
-import type { AppList, AppRow } from '../operations';
+import type { AppList, AppRow } from '../operations/apps';
 
 const ids = (wrapper: Mounted['wrapper']) => idsOf({ wrapper } as Mounted);
 
 vi.mock('@erplora/ui/components', async (importOriginal) => (await import('../__tests__/apps-page-spies')).componentsWithConfirmSpy(importOriginal));
-vi.mock('@erplora/ui/shell', async (importOriginal) => (await import('../__tests__/toast-spies')).shellWithToastSpies(importOriginal));
 vi.mock('../lib/access', async (importOriginal) => (await import('../__tests__/apps-page-spies')).accessWithSessionSpy(importOriginal));
 
 freshEachTest();

@@ -32,6 +32,7 @@ from apps.flow.tests.test_relay import heard, listen, worker_loop
 from apps.inventory.models import Product, StockMovement
 from apps.invoice.models import Invoice
 from apps.kitchen.models import Ticket
+from apps.kitchen.tests.conftest import add_printers
 from apps.printing.models import PrintJob
 from apps.sale.tests.conftest import db_dsn
 from apps.verifactu.models import Record
@@ -214,6 +215,7 @@ def test_a_refund_puts_its_units_back_once_with_one_rectification(worker_loop, t
 
 @HUB_DB_COMMITTED
 def test_a_round_fired_at_the_till_reaches_the_kitchen_once(worker_loop, factory_data):
+    add_printers()
     burger = run(
         "inventory.product.create",
         {"name": "Burger", "sku": "BURGER", "price": 1200, "tax_category_key": "restaurant.food"},

@@ -5,10 +5,6 @@ import { errorFrame, flush, mountBase, subId } from '../__tests__/mount-base';
 import { toastSuccess } from '@erplora/ui/shell';
 import ApprovalDialog from './ApprovalDialog.vue';
 
-vi.mock('@erplora/ui/shell', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@erplora/ui/shell')>()),
-  toastSuccess: vi.fn(),
-}));
 vi.mock('@ionic/vue', async (importOriginal) => {
   const ionic = await importOriginal<typeof import('@ionic/vue')>();
   return { ...ionic, modalController: { ...ionic.modalController, dismiss: vi.fn(() => Promise.resolve(true)) } };

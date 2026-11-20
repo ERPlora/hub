@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:bff5f70590005a8b6b514d95403ef07c31be5dd747798e44245b516a69e73113 -->
+<!-- generated from WORKBOOK.md sha256:3264337be3a77f0dfd8e927ee792d15feeebf99a072a61436f8de2fb1144db43 -->
 
 ## What it is for and who it is for
 
@@ -238,7 +238,7 @@ same, in the browser too (hub#1023).
 | INVENTORY-F08 | Group products into categories for the till | done |
 | INVENTORY-F29 | Mark an item as sold out | done |
 | INVENTORY-F34 | Recover a deleted product | done |
-| INVENTORY-F35 | Declare a product's allergens | partial — the interface is missing: the block of the form, the line of the card and the column in Import products |
+| INVENTORY-F35 | Declare a product's allergens | done |
 | | **Import and export** | |
 | INVENTORY-F09 | Import products from a CSV | done |
 | INVENTORY-F10 | Import categories from a CSV | done |
@@ -472,8 +472,8 @@ Steps:
    line; separated by commas or by semicolons, as Excel saves it in Spanish). Nothing is created yet.
 2. In "Check the import", each column comes with its field guessed from the header, in Spanish or
    English and with or without accents ("Name", "Code", "Price", "VAT"…). Change it or set "Do not
-   import". Name, SKU, Price, Cost, Stock, Threshold, EAN-13, Description, Unit and Tax category can be
-   imported; Name and SKU are required.
+   import". Name, SKU, Price, Cost, Stock, Threshold, EAN-13, Description, Allergens, Unit and Tax category
+   can be imported; Name and SKU are required.
 3. Look at the "First {n} rows of {total}" and at the rehearsal of the whole file: "{ready} rows ready
    · {failed} with problems" ("1 row ready" with one), with the line and the reason of the first ten.
 4. Tap "Import {n} products" ("Import 1 product" with one; or "Cancel", which leaves no trace).
@@ -1100,7 +1100,8 @@ library it gets back if it had none), and the product-recovered notice (`invento
 product as it comes back.
 If it fails: it does not come back if the business has already made another product with its SKU or its EAN-13 since
 it deleted it: the one it made stays, and the recovery neither counts nor creates it. A product the business no longer
-has at all is created again (INVENTORY-F01), with no stock, with the image of the library it had in the copy. On a
+has at all is created again (INVENTORY-F01), with no stock, with the image of the library and the allergens it had
+in the copy; one from a copy made before products had allergens comes back without any (INVENTORY-F35). On a
 live product it does not fail: it answers well and announces again. Its own photo does not come back: it was erased
 when it was deleted (INVENTORY-F31). The image of the library does, because deleting leaves it; one deleted before
 deleting left it, which was left without any, gets back the one it had in the copy, unless the library no longer has
@@ -1109,12 +1110,10 @@ themselves (PRICING-F14) and its prices in the price lists come back if Price Li
 its modifier groups, if Modifiers is recovered too (MODIFIER-F10), and its choices in the menus, if Menus is recovered
 too (COMBO-F15).
 Involved: BASE-F114, INVENTORY-F01, INVENTORY-F03, INVENTORY-F04, INVENTORY-F07, INVENTORY-F16, INVENTORY-F29, INVENTORY-F30,
-PRICING-F14, PRICING-F15, MODIFIER-F09, MODIFIER-F10, COMBO-F13, COMBO-F15
+INVENTORY-F35, PRICING-F14, PRICING-F15, MODIFIER-F09, MODIFIER-F10, COMBO-F13, COMBO-F15
 
 ### INVENTORY-F35 Declare a product's allergens
-Status: partial — the product already keeps its allergens through the assistant and the API, and the catalogue, the
-exported CSV, the import through the API, the backup and the template carry them; the block of the form, the line of
-the card and Import products recognising the "Allergens" column are missing
+Status: done
 Actor: administrator, manager
 Screen: Products, Product card, Import products
 Steps:
@@ -1144,7 +1143,8 @@ saved ("That allergen is not one of the fourteen that must be declared."). In th
 is not recognised leaves the row as failed with the reason "Allergen not recognised: <text>". Whoever can only see
 products reads the line of the card, but has no form. Every refusal shows inside the panel, like those of the rest
 of the form.
-Involved: INVENTORY-F01, INVENTORY-F02, INVENTORY-F09, INVENTORY-F11, INVENTORY-F27, SALE-F40, SALE-F41, KITCHEN-F32
+Involved: INVENTORY-F01, INVENTORY-F02, INVENTORY-F09, INVENTORY-F11, INVENTORY-F27, INVENTORY-F34, SALE-F40, SALE-F41,
+KITCHEN-F32
 
 ## What the verticals share
 

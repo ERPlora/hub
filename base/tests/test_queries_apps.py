@@ -16,7 +16,7 @@ from live.operations import get
 
 from base.events import HUB_STATE_APPLIED
 from base.models import Hub
-from base.schemas import AppListIn, AppListOut
+from base.schemas.apps import AppListIn, AppListOut
 from base.tenancy.context import use_hub
 from base.tenancy.tests.business import HOST, HUB_DB, A, B, in_business_a
 
@@ -184,7 +184,7 @@ def test_an_anonymous_visitor_or_a_stranger_gets_no_list(client):
 def test_over_http(client, make_user):
     from django.urls import resolve
 
-    from base.api import router
+    from base.api.apps import router
 
     [route] = router.path_operations["/apps"].operations
     assert (route.methods, route.operation_id) == (["GET"], "base.app.list")
@@ -199,14 +199,14 @@ def test_over_http(client, make_user):
 
 
 def plan_usage(*permissions, scope=A):
-    from base.schemas import PlanUsageIn
+    from base.schemas.usage import PlanUsageIn
 
     ctx = OperationContext(scope=scope, actor="ana", permissions=frozenset(permissions), language="en")
     return get("base.plan.usage")(ctx, PlanUsageIn()).model_dump(mode="json")
 
 
 def test_plan_usage_is_for_who_runs_the_business():
-    from base.schemas import PlanUsageIn, PlanUsageOut
+    from base.schemas.usage import PlanUsageIn, PlanUsageOut
 
     op = get("base.plan.usage")
     assert (op.kind, op.permission, op.input, op.output) == ("query", "base.administer_hub", PlanUsageIn, PlanUsageOut)
@@ -227,7 +227,7 @@ def test_the_people_against_the_plans_limit_and_the_devices_limit(make_user):
     assert usage["devices"] == {"used": 0, "limit": 2}
     # A's own database, not measured yet: its size comes with the night's measure (base/tests/test_usage.py,
     # BASE-F40); the rest of what this answer says of the business, in base/tests/test_plan_usage_figures.py.
-    assert usage["database"] == {"available": True, "bytes": None, "day": None}
+    assert usage["database"] == {"bytes": None, "day": None}
 
 
 def test_zero_in_the_plan_is_no_limit():
@@ -254,7 +254,7 @@ def test_each_business_its_own_plan(make_user, hub_b):
 def test_plan_usage_over_http(client, make_user):
     from django.urls import resolve
 
-    from base.api import router
+    from base.api.apps import router
 
     [route] = router.path_operations["/system/plan"].operations
     assert (route.methods, route.operation_id) == (["GET"], "base.plan.usage")

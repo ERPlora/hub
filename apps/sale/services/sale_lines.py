@@ -3,7 +3,7 @@
 
 
 from apps.sale.models import OrderLine, Sale, SaleLine
-from apps.sale.queries import combo_name, dishes_of, folded_names, is_child
+from apps.sale.queries.line_parts import combo_name, dishes_of, folded_names, is_child
 
 
 def _voucher_value(line: OrderLine, session_values: dict) -> int:

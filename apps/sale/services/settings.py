@@ -11,20 +11,18 @@ from live.outbox import record_event
 
 from apps.sale import events
 from apps.sale.models import Department, PaymentMethod, QuickNote, Settings
-from apps.sale.queries import (
-    actor,
-    allowed_types,
-    current_settings,
+from apps.sale.queries.business import actor
+from apps.sale.queries.departments import (
     department_rates,
     department_row,
     find_department,
     find_quick_note,
     find_tax_category,
-    payment_method_row,
     quick_note_row,
-    settings_row,
 )
-from apps.sale.schemas import (
+from apps.sale.queries.payment_methods import allowed_types, payment_method_row
+from apps.sale.queries.settings import current_settings, settings_row
+from apps.sale.schemas.settings import (
     DepartmentIn,
     DepartmentOut,
     DepartmentRefIn,

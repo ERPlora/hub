@@ -19,7 +19,7 @@ from live.operations import get
 from apps.sale.tests.test_business_currency import platform
 from base.events import HUB_REGISTERED
 from base.models import Hub
-from base.schemas import BusinessIn, BusinessOut
+from base.schemas.business import BusinessIn, BusinessOut
 from base.tenancy.context import use_hub
 from base.tenancy.tests.business import A, B, HOST, HUB_DB, in_business_a
 
@@ -173,7 +173,7 @@ def test_without_the_home_s_permission_it_is_refused(hubs):
 
 
 def test_its_route(client, make_user, hubs):
-    from base.api import router
+    from base.api.business import router
 
     [route] = router.path_operations["/business"].operations
     assert (route.methods, route.operation_id) == (["GET"], "base.business.get")

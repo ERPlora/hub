@@ -1,6 +1,7 @@
 // VeriFactu's Configuration and Settings in Chrome, in Spanish (apps/verifactu/WORKBOOK.md), against the real Hub:
-//   - VERIFACTU-F02, F03: «Mi certificado» uploads a .p12 made for the test (never a real certificate), shows its
-//     holder, NIF and expiry, and removes it after asking;
+//   - VERIFACTU-F02, F03: «Mi certificado» refuses a .p12 made for the test (never a real certificate), which no
+//     recognised authority issued, and shows the holder, NIF and expiry of one kept as a recognised one, and removes
+//     it after asking (verifactu-certificate-helpers.ts);
 //   - VERIFACTU-F05: «Lo remite ERPlora» refuses a signed model that is no PDF (by its bytes, not its name) with the
 //     Spanish text, and takes four minimal PDFs on to ERPlora's account. The spec points VeriFactu at a hub id no
 //     SaaS registered (`unknownToTheSaas`), so the SaaS answers 404 and the Hub says «not linked yet»: the Hub's own
@@ -19,7 +20,6 @@
 // The photo is the SaaS's, sent here the way the SaaS sends it, to `a`'s row of the registry (`base_hub`). What the
 // run changes in VeriFactu's configuration, the own certificate and that row's photo is put back after it (or
 // removed, if the run made it), and so is the issuer.
-import { execFileSync } from 'node:child_process';
 import { createHmac, randomUUID } from 'node:crypto';
 import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -28,10 +28,11 @@ import { inflateSync } from 'node:zlib';
 
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
-import { A, capture, HUB_DIR, login, psql, saveSessionForTheSweep, shot, shown, topbarApps } from './helpers';
+import { A, capture, login, psql, saveSessionForTheSweep, shot, shown, topbarApps } from './helpers';
 import { cleanInvoices, ensureIssuer, FLOW_VIEWPORTS, type IssuerOut, snapshotSeries } from './invoice-helpers';
 import { STACK } from './stack';
 import { toastSaying } from './toast-helpers';
+import { HOLDER, keepCertificate, makeP12 } from './verifactu-certificate-helpers';
 
 /** The secret `/internal` is signed with; the local default of both projects. */
 const SECRET = process.env.INTERNAL_SHARED_SECRET || 'local-internal-shared-secret';
@@ -113,41 +114,6 @@ async function pushPhoto(representation: Representation): Promise<void> {
  *  that id. The next photo puts `a`'s back, and `restoreConfig` the one before the run. */
 function unknownToTheSaas(): void {
   psql(`update verifactu_config set hub_id = '${randomUUID()}'`);
-}
-
-/** A .p12 made here (issued by a test authority, the issuer's NIF as its organisation identifier), valid for a year. */
-function makeP12(path: string): void {
-  const script = join(DIR, 'make_p12.py');
-  writeFileSync(
-    script,
-    `import datetime as dt, sys
-from cryptography import x509
-from cryptography.hazmat.primitives import hashes, serialization
-from cryptography.hazmat.primitives.asymmetric import rsa
-from cryptography.hazmat.primitives.serialization import pkcs12
-from cryptography.x509.oid import ExtendedKeyUsageOID, NameOID
-
-out, password, nif = sys.argv[1], sys.argv[2].encode(), sys.argv[3]
-key, authority_key = (rsa.generate_private_key(public_exponent=65537, key_size=2048) for _ in range(2))
-authority = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, "E2E TEST AUTHORITY")])
-name = x509.Name([
-    x509.NameAttribute(NameOID.COMMON_NAME, "E2E PELUQUERIA ANA SL"),
-    x509.NameAttribute(NameOID.ORGANIZATION_IDENTIFIER, "VATES-" + nif),
-    x509.NameAttribute(NameOID.SERIAL_NUMBER, "12345678Z"),
-])
-now = dt.datetime.now(dt.UTC)
-cert = (
-    x509.CertificateBuilder().subject_name(name).issuer_name(authority).public_key(key.public_key())
-    .serial_number(x509.random_serial_number())
-    .not_valid_before(now - dt.timedelta(days=1)).not_valid_after(now + dt.timedelta(days=365))
-    .add_extension(x509.ExtendedKeyUsage([ExtendedKeyUsageOID.CLIENT_AUTH]), critical=False)
-    .sign(authority_key, hashes.SHA256())
-)
-data = pkcs12.serialize_key_and_certificates(b"e2e", key, cert, None, serialization.BestAvailableEncryption(password))
-open(out, "wb").write(data)
-`,
-  );
-  execFileSync('uv', ['run', 'python', script, path, PASSWORD, ISSUER_NIF], { cwd: HUB_DIR, stdio: 'pipe' });
 }
 
 /** The smallest file the Hub takes as a PDF: it reads the bytes, never the name. */
@@ -259,9 +225,9 @@ test.afterAll(() => {
   cleanInvoices();
 });
 
-test('Mi certificado: upload a .p12, see its holder and expiry, remove it', async ({ browser }) => {
+test('Mi certificado: an unrecognised authority is refused; a kept one shows its holder and expiry, and is removed', async ({ browser }) => {
   const p12 = join(DIR, 'negocio.p12');
-  makeP12(p12);
+  makeP12(DIR, p12, ISSUER_NIF, PASSWORD);
   const { context, page } = await spanishPage(browser, '/verifactu/config');
   const view = shown(page);
   await view.locator('[data-testid=verifactu-config-tab-own]').click();
@@ -273,9 +239,18 @@ test('Mi certificado: upload a .p12, see its holder and expiry, remove it', asyn
   await expect(own.locator('[data-testid=verifactu-config-cert-picked]')).toHaveText('negocio.p12');
   await own.locator('[data-testid=verifactu-config-cert-password] input').fill(PASSWORD);
   await own.locator('[data-testid=verifactu-config-cert-upload]').click();
+  await expect(own.locator('[data-testid=verifactu-config-cert-error]')).toContainText('no lo ha emitido una entidad que reconozca la AEAT');
+  await expect(cert).toContainText('Sin cargar');
+  expect(psql('select count(*) from verifactu_owncertificate')).toBe('0');
+  await flowShots(page, 'F02-refused', async (p) => {
+    await expect(shown(p).locator('[data-testid=verifactu-config-cert]')).toContainText('Sin cargar');
+  });
 
+  keepCertificate(ISSUER_NIF, PASSWORD);
+  await page.reload();
+  await shown(page).locator('[data-testid=verifactu-config-tab-own]').click();
   await expect(cert).toContainText('Cargado');
-  await expect(cert).toContainText('E2E PELUQUERIA ANA SL');
+  await expect(cert).toContainText(HOLDER);
   await expect(cert).toContainText(ISSUER_NIF);
   await expect(cert.locator('dt', { hasText: 'Caduca el' })).toBeVisible();
   await expect(cert.locator('dd').last()).toContainText(String(new Date().getFullYear() + 1));
@@ -287,6 +262,16 @@ test('Mi certificado: upload a .p12, see its holder and expiry, remove it', asyn
       await expect(shown(p).locator('[data-testid=verifactu-config-cert]')).toContainText('Cargado');
     });
   }
+  await expect(own.locator('[data-testid=verifactu-config-expiry]')).toHaveCount(0);
+
+  // F34: within the server's notice period the screen warns; the server decides it, the screen paints it.
+  psql("update verifactu_owncertificate set expires_at = now() + interval '20 days 1 hour'");
+  await page.reload();
+  await shown(page).locator('[data-testid=verifactu-config-tab-own]').click();
+  await expect(own.locator('[data-testid=verifactu-config-expiry]')).toHaveText('Caduca en 20 días: sube aquí el renovado.');
+  await flowShots(page, 'F34-expires-soon', async (p) => {
+    await expect(shown(p).locator('[data-testid=verifactu-config-expiry]')).toBeVisible();
+  });
 
   await own.locator('[data-testid=verifactu-config-cert-remove]').click();
   // By its title: the shell keeps other dialogs in the page (the apps launcher is an ion-modal too).
@@ -462,14 +447,10 @@ test('VERIFACTU-F06: an authorisation in review offers «Volver a enviar», whic
 
 test('VERIFACTU-F04: Settings says who files, the own certificate once loaded and the seal again without it', async ({ browser }) => {
   await pushPhoto('none');
-  const p12 = join(DIR, 'negocio-f04.p12');
-  makeP12(p12);
+  keepCertificate(ISSUER_NIF, PASSWORD);
   const { context, page } = await spanishPage(browser, '/verifactu/config');
   const own = shown(page).locator('[data-testid=verifactu-config-own]');
   await shown(page).locator('[data-testid=verifactu-config-tab-own]').click();
-  await own.locator('[data-testid=verifactu-config-cert-file]').setInputFiles(p12);
-  await own.locator('[data-testid=verifactu-config-cert-password] input').fill(PASSWORD);
-  await own.locator('[data-testid=verifactu-config-cert-upload]').click();
   await expect(own.locator('[data-testid=verifactu-config-cert]')).toContainText('Cargado');
 
   await page.goto(`${A}/verifactu/settings`);

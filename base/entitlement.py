@@ -10,7 +10,7 @@
 
 What a business has no right to is **blocked**: its operations answer 402 ``app_entitlement_blocked``
 (:func:`operation_database`, ``LIVE["operation_database"]``), the relay and the Home leave it out
-(``base.relay.active_apps``), ``base.session.me`` gives it ``off`` and no menu, and Apps says it needs a subscription,
+(``base.apps_on.active_apps``), ``base.session.me`` gives it ``off`` and no menu, and Apps says it needs a subscription,
 bought on erplora.com. The Hub never asks the SaaS on a request: it reads the photo it keeps. Without any paid module
 in the deployment (today), nothing is read at all.
 """

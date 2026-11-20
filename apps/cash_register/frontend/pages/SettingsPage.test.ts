@@ -2,17 +2,12 @@
 // width of a settings page, under the app's tabs. Whoever lacks `cash_register.manage_settings` sees them
 // blocked.
 import { AppPage } from '@erplora/ui/shell';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import { EMPLOYEE, mountCash } from '../__tests__/mount-cash-register';
 import RegistersCard from '../components/RegistersCard.vue';
 import SettingsCard from '../components/SettingsCard.vue';
 import SettingsPage from './SettingsPage.vue';
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
 
 describe('SettingsPage', () => {
   it('is Cash register’s settings page, with its tabs, the settings and the drawers', async () => {

@@ -23,7 +23,7 @@ from live.models import OutboxEvent
 from live.operations import get
 
 from apps.verifactu.queries.app_hooks import enable_refusal
-from base import activation, blueprint, events as base_events, relay, services
+from base import activation, apps_on, blueprint, events as base_events, registry, services
 from base.catalog import template_apps
 from base.models import AppActivation, Hub, ImportBatch, Membership
 from base.permissions import permissions_for
@@ -266,7 +266,8 @@ def test_the_plan_says_what_each_app_would_lose_and_what_to_type(owner):
 
     plan = call(owner, "base.hub.reset", dry_run=True)
 
-    assert (plan.dry_run, plan.available) == (True, True)
+    assert set(plan.model_dump()) == {"dry_run", "confirm_with", "sections", "apps", "status"}
+    assert plan.dry_run is True
     assert plan.confirm_with == "Bar Pepe"
     assert {(section.id, section.label, section.rows) for section in plan.sections} == {
         ("inventory", "Inventario", 22),
@@ -292,10 +293,15 @@ def test_a_business_without_its_own_database_is_never_entered_so_no_reset_reache
     assert total(owner, "table.table.list") == 10
 
 
-def test_resetting_asks_the_worker_for_a_copy_first_and_removes_nothing_yet(owner, own_database):
+def test_resetting_asks_the_worker_for_a_copy_first_and_removes_nothing_yet(
+    owner, own_database, monkeypatch, django_capture_on_commit_callbacks
+):
     call(owner, "base.blueprint.import", template="restaurant.es")
+    told = []
+    monkeypatch.setattr(services.provisioning, "notify", lambda scope, names: told.append((scope, names)))
 
-    answer = call(owner, "base.hub.reset", apps=["table", "inventory", "table"], confirm=A.key)
+    with django_capture_on_commit_callbacks(execute=True):
+        answer = call(owner, "base.hub.reset", apps=["table", "inventory", "table"], confirm=A.key)
 
     assert (answer.status, answer.dry_run, answer.apps) == ("copying", False, [])
     assert {section.id for section in answer.sections} == {"inventory", "table"}  # nothing removed yet
@@ -314,6 +320,8 @@ def test_resetting_asks_the_worker_for_a_copy_first_and_removes_nothing_yet(owne
         "finished_at": None,
     }
     assert HubDue.objects.get(hub__slug=A.key).due_at <= timezone.now()
+    # The worker is told on the platform's channel after control's COMMIT: it does not wait for its look.
+    assert told == [(registry.REGISTRY_SCOPE, [base_events.HUB_RESET_PROGRESSED])]
 
 
 def test_the_worker_empties_the_sections_asked_and_nothing_else(owner, own_database):
@@ -413,7 +421,7 @@ def born():
 
 
 def modules_on(scope=A):
-    return set(relay.active_apps(scope)) & set(activation.module_graph())
+    return set(apps_on.active_apps(scope)) & set(activation.module_graph())
 
 
 def chosen(host=A.key):

@@ -102,7 +102,7 @@ from live.errors import OperationError
 from live.operations import get as get_operation
 from pydantic import ValidationError
 
-from base import registry, relay, services
+from base import apps_on, registry, services
 from base.registry import REGISTRY_SCOPE
 from base.tenancy.context import HubWithoutDatabase, use_hub
 from base.tenancy.identity import HubIdentityMismatch
@@ -341,7 +341,7 @@ def _whatsapp_call(request: HttpRequest, name: str) -> HttpResponse:  # noqa: PL
     try:
         with use_hub(hub):
             # Which apps are on is the business's (its database): asked inside it, as the photo asks it.
-            if services.photo.WHATSAPP_APP not in relay.active_apps(scope):
+            if services.photo.WHATSAPP_APP not in apps_on.active_apps(scope):
                 return refuse(404, "app_inactive", "WhatsApp is not on in this business.")
             answer, refused = _operation_call(name, body, system_context(scope))
     except HubIdentityMismatch:

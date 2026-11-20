@@ -18,7 +18,7 @@ import {
 } from '@erplora/ui/sdk';
 import { computed, type ComputedRef, type EffectScope, effectScope, onScopeDispose, shallowRef, watch } from 'vue';
 
-/** The server's cap on a list's `limit` (`schemas.PageIn.limit`). */
+/** The server's cap on a list's `limit` (`schemas.fields.PageIn.limit`). */
 export const MAX_WINDOW = 100;
 
 /** One live window of rows. */

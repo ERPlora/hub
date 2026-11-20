@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import { load, summary, template, waitingLoad } from '../../__tests__/data-fixtures';
 import { EMPLOYEE, flush, mountBase } from '../../__tests__/mount-base';
-import type { ImportRow } from '../../operations';
+import type { ImportRow } from '../../operations/blueprints';
 import { SESSION_CHANGED } from '../../lib/access';
 import ImportPanel from './ImportPanel.vue';
 

@@ -2,16 +2,11 @@
 // with Day, Closed, Open 24 hours and the interval editor, and «Save day» sends
 // `schedule.week.set_day`, which replaces the day's intervals. A line half filled is said in the form
 // and nothing is sent; the server's refusal (overlaps…) goes under the intervals; what was typed stays.
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import type { WeekDayOut } from '../operations';
 import { click, ionChecked, ionValue, mountSchedule, settle } from '../__tests__/mount-schedule';
 import DayHoursModal from './DayHoursModal.vue';
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
 
 type Control = HTMLElement & { label?: string; value?: unknown; checked?: boolean; disabled?: boolean; errorText?: string };
 

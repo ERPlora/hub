@@ -11,6 +11,7 @@
     "lint": "eslint .",
     "e2e": "playwright test -c tests/e2e/playwright.config.ts",
     "qa:probes": "node tests/e2e/assistant-probes.ts",
+    "qa:bench-compare": "node tests/e2e/assistant-bench-compare.ts",
     "gen:app-icons": "node scripts/app-icons.mjs"
   },
   "dependencies": {

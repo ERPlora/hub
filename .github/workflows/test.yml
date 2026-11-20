@@ -1,10 +1,10 @@
 name: test
 
 # The tests of every push (ci.yml on any branch but main and pre; deploy.yml on main and pre before
-# it deploys), in three jobs that run side by side: python (pytest over Postgres, in a matrix of shards,
-# each spread over its runner's CPUs with pytest-xdist), frontend (the SPA's lint, typecheck, Vitest and build) and
-# scripts (workflow and script lints and the script tests). The job `test` waits for the three: called as the job
-# `test`, its check is "test / test", the one main and pre require.
+# it deploys), in four jobs that run side by side: python (pytest over Postgres, in a matrix of shards,
+# each spread over its runner's CPUs with pytest-xdist), frontend (the SPA's lint, typecheck, Vitest and build),
+# scripts (workflow and script lints and the script tests) and smoke (the browser smoke). The job `test` waits for the
+# four: called as the job `test`, its check is "test / test", the one main and pre require.
 
 on:
   workflow_call:
@@ -92,19 +92,20 @@ jobs:
           sudo apt-get install -y --no-install-recommends postgresql-client-18
           echo "/usr/lib/postgresql/18/bin" >> "$GITHUB_PATH"
       # apps/verifactu/tests/test_producer.py checks the producer's constants against the signed declaration
-      # the SaaS publishes, and fails in CI without it: ERPlora/saas is public, so its public/declaracion is
-      # fetched next to the Hub (../saas), as in the erplora-next tree. No token.
+      # the SaaS publishes, and fails in CI without it: its public/declaracion is fetched next to the Hub
+      # (../saas), as in the erplora-next tree. Every clone goes through clone-repo.sh, as the job's read-only
+      # token and with retries: GitHub refuses anonymous clones from its runners at times.
       - name: The SaaS's signed declaration
-        run: |
-          git clone --quiet --depth 1 --filter=blob:none --sparse https://github.com/ERPlora/saas.git ../saas
-          git -C ../saas sparse-checkout set public/declaracion
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash .github/scripts/clone-repo.sh ERPlora/saas ../saas public/declaracion
       # The seeds' images must be in the shared image library's manifest (base/tests/test_seed_images.py), and the
-      # templates load them from it: ERPlora/blueprints is public, so its img/ is fetched beside the Hub
-      # (../blueprints), where config/settings/web.py looks for it without a bucket (CATALOG_DIR). No token.
+      # templates load them from it: its img/ is fetched beside the Hub (../blueprints), where config/settings/web.py
+      # looks for it without a bucket (CATALOG_DIR).
       - name: The shared image library
-        run: |
-          git clone --quiet --depth 1 --filter=blob:none --sparse https://github.com/ERPlora/blueprints.git ../blueprints
-          git -C ../blueprints sparse-checkout set img
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash .github/scripts/clone-repo.sh ERPlora/blueprints ../blueprints img
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
           enable-cache: true
@@ -175,10 +176,108 @@ jobs:
       - name: Script tests
         run: for t in .github/scripts/*.test.sh; do bash "$t"; done
 
-  # The check main and pre require ("test / test"): green only when the three jobs are. It runs even
+  # The browser smoke (smoke-e2e.sh, README «El humo de navegador»): the tests tagged @smoke, in the runner's Chrome, on
+  # the stack nightly-e2e.sh builds around this commit, so a change that breaks one of those walks cannot be merged.
+  # The smoke's groups enter here one at a time, each after three green runs in a row of this job: --spec names the
+  # specs already in. Every group is in, so the job runs every @smoke test, as on the Mac.
+  smoke:
+    runs-on: ubuntu-24.04
+    # Measured from 14 min 12 s to 16 min 34 s a run, the stack included: twice the slowest, as GitHub's runners vary
+    # that much on the same commit. A spec that enters measures it again.
+    timeout-minutes: 34
+    permissions:
+      contents: read
+    steps:
+      # The whole history, as nightly-e2e.sh expects of a clone: it fetches origin and checks this commit out in a
+      # worktree of its own, with its submodules.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        with:
+          version: 10.34.7 # the Dockerfile's PNPM_VERSION and package.json's packageManager
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: pnpm
+      # The erplora-next tree nightly-e2e.sh expects around the Hub: the SaaS of origin/main in ../saas (every login
+      # goes through erplora.com), the shared image library in ../blueprints and compose.yaml's Postgres in .., which
+      # the specs reach with `docker compose exec`. Each checkout gets the .env of a new one.
+      - name: The SaaS, the image library and Postgres beside the Hub
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          bash .github/scripts/clone-repo.sh ERPlora/saas ../saas
+          bash .github/scripts/clone-repo.sh ERPlora/blueprints ../blueprints img
+          cp .env.example .env
+          cp ../saas/.env.example ../saas/.env
+          cat > ../compose.yaml <<'YAML'
+          services:
+            postgres:
+              image: pgvector/pgvector:pg18
+              environment:
+                POSTGRES_USER: hub
+                POSTGRES_PASSWORD: hub
+                POSTGRES_DB: hub
+              ports:
+                - "5432:5432"
+              healthcheck:
+                test: ["CMD-SHELL", "pg_isready -U hub -d hub"]
+                interval: 2s
+                timeout: 3s
+                retries: 30
+          YAML
+          docker compose -f ../compose.yaml up -d --wait
+      - name: The browser smoke
+        env:
+          NIGHTLY_DIR: ${{ runner.temp }}/hub-smoke-e2e
+        run: >-
+          bash .github/scripts/smoke-e2e.sh
+          --spec tests/e2e/login-and-shell.spec.ts
+          --spec tests/e2e/base-access.spec.ts
+          --spec tests/e2e/base-sign-out.spec.ts
+          --spec tests/e2e/base-session-revoke.spec.ts
+          --spec tests/e2e/employee-permissions.spec.ts
+          --spec tests/e2e/two-orgs-isolated.spec.ts
+          --spec tests/e2e/hub-suspended.spec.ts
+          --spec tests/e2e/sale-pos.spec.ts
+          --spec tests/e2e/sale-cash-gate.spec.ts
+          --spec tests/e2e/cash-register-shift.spec.ts
+          --spec tests/e2e/printing-sale.spec.ts
+          --spec tests/e2e/sale-fiscal-qr.spec.ts
+          --spec tests/e2e/sale-invoice-chain.spec.ts
+          --spec tests/e2e/invoice-sale.spec.ts
+          --spec tests/e2e/invoice-manual.spec.ts
+          --spec tests/e2e/verifactu-records.spec.ts
+          --spec tests/e2e/kitchen-pos.spec.ts
+          --spec tests/e2e/sale-table.spec.ts
+          --spec tests/e2e/appointment-agenda.spec.ts
+          --spec tests/e2e/appointment-charge.spec.ts
+          --spec tests/e2e/service-catalog.spec.ts
+          --spec tests/e2e/service-vouchers.spec.ts
+          --spec tests/e2e/sale-voucher.spec.ts
+          --spec tests/e2e/base-sign-up-taxes-on.spec.ts
+          --spec tests/e2e/base-app-activation.spec.ts
+          --spec tests/e2e/demo.spec.ts
+          --spec tests/e2e/two-tabs-live.spec.ts
+      # The run's log, both runservers' logs and Playwright's output (each failed test's trace and screenshot).
+      - if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: smoke
+          path: ${{ runner.temp }}/hub-smoke-e2e/runs/
+          if-no-files-found: ignore
+          retention-days: 14
+
+  # The check main and pre require ("test / test"): green only when the four jobs are. It runs even
   # when one fails or the run is cancelled, so the check never ends up skipped (which counts as passed).
   test:
-    needs: [python, frontend, scripts]
+    needs: [python, frontend, scripts, smoke]
     if: always()
     runs-on: ubuntu-24.04
     timeout-minutes: 5
@@ -189,6 +288,7 @@ jobs:
         env:
           RESULTS: >-
             python=${{ needs.python.result }} frontend=${{ needs.frontend.result }} scripts=${{ needs.scripts.result }}
+            smoke=${{ needs.smoke.result }}
         run: |
           failed=""
           for result in $RESULTS; do
@@ -200,4 +300,4 @@ jobs:
             echo "::error::not every test job passed:$failed"
             exit 1
           fi
-          echo "python, frontend and scripts passed"
+          echo "python, frontend, scripts and smoke passed"

@@ -82,7 +82,7 @@ def test_a_step_acts_only_with_its_own_permission_so_an_operation_s_checks_still
 def test_the_step_context_holds_its_operation_s_permission_and_its_app_s_reads():
     flow = make_flow()
     started = FlowRun.objects.create(flow=flow, flow_version=1, trigger_kind="manual", trigger_key="k")
-    ctx = services._step_context(ctx_for(scope=A), started, flow, get("task.task.create"))
+    ctx = services.engine._step_context(ctx_for(scope=A), started, flow, get("task.task.create"))
     assert ctx.permissions == frozenset({"task.add", "task.view", "task.view_all"})
     assert ctx.actor == f"flow_run:{started.id}"
     assert not ctx.has("task.delete") and not ctx.has("customer.view")
@@ -112,7 +112,7 @@ def test_a_step_that_books_by_phone_still_holds_nothing_of_customers():
     # card up nor make one on its own.
     flow = make_flow(grants=["reservation.reservation.create"])
     started = FlowRun.objects.create(flow=flow, flow_version=1, trigger_kind="manual", trigger_key="k")
-    ctx = services._step_context(ctx_for(scope=A), started, flow, get("reservation.reservation.create"))
+    ctx = services.engine._step_context(ctx_for(scope=A), started, flow, get("reservation.reservation.create"))
     assert not ctx.has("customer.view") and not ctx.has("customer.manage")
     with pytest.raises(PermissionDenied):
         run("customer.customer.by_phone", {"phone": "600111222"}, ctx)
@@ -127,7 +127,7 @@ def test_seating_a_party_needs_a_person_at_the_door_so_no_automation_is_granted_
     # Seating is done by whoever receives the party, and it opens the table's check in Sales (market: OpenTable,
     # SevenRooms, Resy, Toast Tables, Yelp Guest Manager, TheFork Manager, CoverManager, Tock: automations confirm,
     # remind and release; none seats). Refused as what needs a person, when saved and when granted.
-    from apps.flow.queries import catalog_operations
+    from apps.flow.queries.catalog import catalog_operations
 
     assert "reservation.reservation.seat" not in catalog_operations(A)
     with pytest.raises(InvalidPayload) as refused:

@@ -48,7 +48,7 @@ function cleanUp(): void {
 test.beforeAll(cleanUp);
 test.afterAll(cleanUp);
 
-test('«Charge» ends on the till with the appointment’s check, at the price booked, and «Go to the check» returns to it', async ({ browser }) => {
+test('«Charge» ends on the till with the appointment’s check, at the price booked, and «Go to the check» returns to it @smoke', async ({ browser }) => {
   const { context, page } = await ownerPage(browser, '/appointment/agenda');
   try {
     const customer = await post<{ id: string; name: string }>(context, '/customer/customers', {

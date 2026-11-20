@@ -850,7 +850,7 @@ la que solo se le autorizó reservar.
   descripción le dice al modelo que pregunte antes: la tarjeta es la confirmación (BASE-F97), y un «Ask
   first.» hacía que contestara en el chat sin sacarla (hub#1105; lo vigila
   `tests/test_assistant_asks.py`). Cada id que nombra un registro en una
-  escritura lleva su marca `refers` (`names` de `base/schemas/`; `base.E009` la comprueba al arrancar):
+  escritura lleva su marca `refers` (`names` de `base/schemas/assistant.py`; `base.E009` la comprueba al arrancar):
   los de Reservas, la lectura por id de su registro (`reservation.reservation.get`, `.waitlist.get`,
   `.time_slot.get`, `.blocked_date.get`), que da su `label` en el idioma de quien la pide (`queries.py`,
   `*_label`: día mediano y hora corta de CLDR, como dice la tarjeta una fecha); el cliente
@@ -865,7 +865,7 @@ la que solo se le autorizó reservar.
   ni deja aviso.
 - **Tarea programada**: `release_unconfirmed_reservations` (`reservation.reservation.release_unconfirmed`,
   cada 15 minutos, en UTC, `collapse`); la corre el worker como sistema en cada negocio con Reservas
-  encendida, en su BD y en su ámbito (`host`, su slug: `base.worker._serve_hub` → `base.scheduler.run_due`),
+  encendida, en su BD y en su ámbito (`host`, su slug: `base.hub_visits` → `base.scheduler.run_due`),
   así que su aviso vivo sale por el canal de ese negocio y no por el de otro (hub#551). Un ámbito que no
   es el del negocio activo no llega a liberar nada (`HubContextMismatch`).
 - **WhatsApp** (F17, F18): la conversación es la receta `reservation_from_whatsapp` de `whatsapp_inbox`

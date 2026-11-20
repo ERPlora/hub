@@ -18,7 +18,7 @@ from live.outbox import channel_for
 from apps.inventory.schemas import ProductIn, ProductPatchIn, ProductRefIn
 from apps.inventory.tests.conftest import A, B, HOST, HUB_DB, HUB_DB_COMMITTED, ctx_for, ctx_with
 from apps.tax.models import TaxCategory
-from base.schemas import SetupStatusIn, WidgetListIn
+from base.schemas.home import SetupStatusIn, WidgetListIn
 from base.tenancy.context import use_hub
 
 STEP = "inventory.catalog"

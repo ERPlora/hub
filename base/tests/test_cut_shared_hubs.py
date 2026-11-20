@@ -443,7 +443,7 @@ def test_a_cut_s_last_step_refuses_a_business_that_got_its_database_meanwhile(ph
     from live.operations import get
 
     from base import registry
-    from base.schemas import HubCutFinishIn
+    from base.schemas.hub_registry import HubCutFinishIn
 
     hub = phase_one.business("raced")
     made = names.hub_db_name(tenancy_connections.control_name(), hub.id)
@@ -489,7 +489,7 @@ def test_the_last_step_of_a_second_copy_all_is_refused_even_when_two_runs_raced(
     from live.operations import get
 
     from base import registry
-    from base.schemas import HubCutFinishIn
+    from base.schemas.hub_registry import HubCutFinishIn
 
     first, second = phase_one.business("first"), phase_one.business("second")
     run("--copy-all", first.slug, "--no-dump")
@@ -530,7 +530,7 @@ def test_only_the_platform_finishes_a_cut(hub_a):
     from live.errors import PermissionDenied
     from live.operations import get
 
-    from base.schemas import HubCutFinishIn
+    from base.schemas.hub_registry import HubCutFinishIn
 
     hub = Hub.objects.create(slug="asked", status=Hub.Status.READY, db_name="")
     # Whoever runs a business, inside it (its assistant, an API key of theirs): never the platform.
@@ -546,7 +546,7 @@ def test_only_the_platform_finishes_a_cut(hub_a):
 
 
 def finish_input(hub: Hub, mode: str = cut.RECREATE):
-    from base.schemas import HubCutFinishIn
+    from base.schemas.hub_registry import HubCutFinishIn
 
     made = names.hub_db_name(tenancy_connections.control_name(), hub.id)
     return HubCutFinishIn(id=hub.id, mode=mode, database=made, schema_apps={}, copied={}, dump="")

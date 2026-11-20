@@ -4,18 +4,13 @@
 // Until and «General list» (not with a group). A row's Edit opens «Editing price list — {name}» and sends
 // only what changed (no group = `customer_group_id: null`). Refusals stay in the dialog, under their field.
 import { Combo } from '@erplora/ui/components';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import { itTellsTheCorrectedFieldApart } from '../../../../base/frontend/__tests__/same-words-refusal';
-import type { Business } from '../../../../base/frontend/operations';
+import type { Business } from '../../../../base/frontend/operations/business';
 import { business, POLISH, priceList } from '../__tests__/fixtures';
 import { click, ionChecked, ionValue, mountPricing, settle } from '../__tests__/mount-pricing';
 import PriceListFormModal from './PriceListFormModal.vue';
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
 
 type Control = HTMLElement & { label?: string; value?: unknown; errorText?: string; disabled?: boolean; checked?: boolean };
 

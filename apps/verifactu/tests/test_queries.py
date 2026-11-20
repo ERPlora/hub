@@ -753,11 +753,36 @@ def test_the_certificate_says_whose_it_is_and_when_it_expires(issuer):
 
 def test_without_a_certificate_it_says_not_loaded(issuer):
     certificate = run("verifactu.config.get").own_certificate
-    assert (certificate.loaded, certificate.holder, certificate.expires_at) == (
+    assert (certificate.loaded, certificate.holder, certificate.expires_at, certificate.expires_soon) == (
         False,
         "",
         None,
+        False,
     )
+
+
+def certificate_expiring_in(days: int) -> None:
+    OwnCertificate.objects.create(
+        holder="ANA LOPEZ",
+        holder_tax_id="12345678Z",
+        kind="personal",
+        expires_at=timezone.now() + dt.timedelta(days=days, hours=1),
+        sealed_blob=b"sealed",
+        uploaded_by="ana",
+    )
+
+
+@pytest.mark.parametrize(("days", "soon"), [(31, False), (30, True), (0, True), (-1, False)])
+def test_the_certificate_expires_soon_from_thirty_days_before_until_it_expires(issuer, days, soon):
+    certificate_expiring_in(days)
+    certificate = run("verifactu.config.get").own_certificate
+    assert (certificate.expires_in_days, certificate.expires_soon) == (days, soon)
+
+
+def test_the_warning_follows_the_server_s_notice_period(issuer, monkeypatch):
+    monkeypatch.setattr(queries.config, "EXPIRY_WARNING_DAYS", 10)
+    certificate_expiring_in(20)
+    assert run("verifactu.config.get").own_certificate.expires_soon is False
 
 
 def test_with_a_production_record_it_cannot_go_back(three):

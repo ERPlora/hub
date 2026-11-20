@@ -3,20 +3,11 @@
 // live list paints the card by itself; refused, the dialog stays open with what was typed and the
 // reason under its field (a phone that is not one of its country: F11).
 import { toastSuccess } from '@erplora/ui/shell';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import { defineComponent, h, ref } from 'vue';
 
 import { flush, json, mountCustomer, refusal, sent } from '../__tests__/mount-customer';
 import CustomerCreateModal from './CustomerCreateModal.vue';
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
-vi.mock('@erplora/ui/shell', async (importOriginal) => ({
-  ...((await importOriginal()) as object),
-  toastSuccess: vi.fn(),
-}));
 
 const PHONE_INVALID =
   'Not a valid phone of its country: check the digits or write it with its international prefix (+44…).';
@@ -48,7 +39,6 @@ async function setup(locale: 'en' | 'es' = 'en') {
   return { ...m, open, created, el, type, save };
 }
 
-beforeEach(() => vi.mocked(toastSuccess).mockClear());
 afterEach(() => {
   document.body.innerHTML = '';
 });

@@ -5,12 +5,19 @@ import { useLiveClient } from '@erplora/ui/sdk';
 import { provide } from 'vue';
 import { useRoute } from 'vue-router';
 
+import PersonalBooking from '../components/PersonalBooking.vue';
 import { openDoor, PUBLIC_DOOR } from '../lib/door';
 import PreviewPage from './PreviewPage.vue';
 
-provide(PUBLIC_DOOR, openDoor(useLiveClient().config, String(useRoute().params.slug)));
+const route = useRoute();
+const token = String(route.params.token ?? '');
+provide(PUBLIC_DOOR, openDoor(useLiveClient().config, String(route.params.slug)));
 </script>
 
 <template>
-  <PreviewPage />
+  <PersonalBooking
+    v-if="token"
+    :token="token"
+  />
+  <PreviewPage v-else />
 </template>

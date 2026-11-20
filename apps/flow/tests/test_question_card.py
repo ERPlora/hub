@@ -16,9 +16,9 @@ from ninja import Field, Schema
 
 from apps.flow import gateway as flow_gateway
 from apps.flow.models import Flow, Question
-from apps.flow.queries import TURN
+from apps.flow.queries.reads import TURN
 from base.models import Hub, Membership
-from base.schemas import names
+from base.schemas.assistant import names
 from base.tenancy.context import use_hub
 from base.tests.fake_gateway import gateway  # noqa: F401 - the fixture
 
@@ -217,7 +217,7 @@ def test_a_question_an_automation_step_asks_has_no_data_of_a_change(clock):
 
 
 # --- The action it waits on -----------------------------------------------------------------------------------------
-# The card says the action first, as the History names it (``queries.action_label``), and its title, in the language
+# The card says the action first, as the History names it (``queries.reasons.action_label``), and its title, in the language
 # of whoever reads it, never a bare «The assistant wants to change something in «Reservations»» — also for a question
 # that was already waiting, since both come from the change it waits on, never from what was kept.
 

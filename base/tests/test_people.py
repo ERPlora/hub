@@ -421,10 +421,10 @@ PEOPLE_ROUTES = {
 
 
 class TestTheRoutes:
-    """The SPA calls each operation by its name: the hand-written map names the route ``base/api.py`` binds."""
+    """The SPA calls each operation by its name: the hand-written map names the route ``base/api/people.py`` binds."""
 
     def test_the_spas_route_map_names_every_route_of_people_and_roles(self):
-        from base.api import router
+        from base.api.people import router
 
         assert PEOPLE_ROUTES <= bound_routes(router)
         mine = {op for _, _, op in PEOPLE_ROUTES}

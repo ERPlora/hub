@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { errorFrame, flush, mountBase, subId } from '../__tests__/mount-base';
 import { onSessionChanged } from '../lib/access';
-import type { Profile } from '../operations';
+import type { Profile } from '../operations/profile';
 import ProfilePage from './ProfilePage.vue';
 
 const shell = vi.hoisted(() => ({ applyUserThemePreferences: vi.fn(), resetUserThemePreferences: vi.fn() }));

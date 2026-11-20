@@ -273,6 +273,22 @@ def test_minutes_missed_while_stopped_collapse_into_one_run(ticks):
 
 
 @HUB_DB
+def test_a_task_of_an_app_that_is_off_is_neither_run_nor_moved_and_runs_once_when_it_is_on_again(
+    monkeypatch, ticks
+):
+    elsewhere = []
+    fake_operation(monkeypatch, "other.task.tick", lambda ctx, data: elsewhere.append(ctx))
+    scheduler.sync(at(9, 59, 30), declared=[task("tick"), task("tick", app="other")])
+
+    assert scheduler.run_due(at(10, 5), scope=A, active=frozenset({"test"})) == ["test.tick"]
+    assert (elsewhere, next_run("tick", app="other")) == ([], at(10, 0))
+
+    # Turned on again after its times passed: they collapse into one run, as after the worker stopped.
+    assert scheduler.run_due(at(10, 5, 30), scope=A, active=frozenset({"test", "other"})) == ["other.tick"]
+    assert next_run("tick", app="other") == at(10, 6)
+
+
+@HUB_DB
 def test_a_task_runs_as_the_system_on_the_workers_scope(settings, ticks):
     settings.WORKER_SCOPE_SLUG = A.key
     scheduler.sync(at(9, 59), declared=[task("tick")])

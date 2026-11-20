@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { insideTheAppSaving, outOfTheApp } from '../../__tests__/app-download';
 import { EMPLOYEE, flush, mountBase } from '../../__tests__/mount-base';
-import type { AppDatasets } from '../../operations';
+import type { AppDatasets } from '../../operations/blueprints';
 import ExportPanel from './ExportPanel.vue';
 
 const APPS: AppDatasets[] = [
@@ -22,8 +22,6 @@ const APPS: AppDatasets[] = [
 
 const FILE = { filename: 'bar-pepe_en.blueprint.zip', content_type: 'application/zip', content_base64: 'UEsDBA==' };
 
-vi.mock('@erplora/ui/shell', async (importOriginal) => (await import('../../__tests__/toast-spies')).shellWithToastSpies(importOriginal));
-
 let clicked: string[] = [];
 
 beforeEach(() => {
@@ -37,8 +35,6 @@ beforeEach(() => {
 
 afterEach(() => {
   outOfTheApp();
-  vi.mocked(toastSuccess).mockClear();
-  vi.mocked(toastError).mockClear();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
   document.head.innerHTML = '';

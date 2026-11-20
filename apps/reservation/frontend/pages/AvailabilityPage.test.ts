@@ -12,11 +12,6 @@ import BlockedDateFormModal from '../components/BlockedDateFormModal.vue';
 import SlotFormModal from '../components/SlotFormModal.vue';
 import AvailabilityPage from './AvailabilityPage.vue';
 
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
-
 const DAY = dayOut({
   hours_restricted: true,
   spans: [{ start: '2026-10-15T13:00:00', end: '2026-10-15T16:00:00' }],

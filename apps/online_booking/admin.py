@@ -27,7 +27,7 @@ class SettingsAdmin(admin.ModelAdmin):
         "page_title",
         "welcome_message",
         "primary_color",
-        "logo_url",
+        "logo",
         "require_email",
         "max_upcoming_per_customer",
         "allow_staff_selection",

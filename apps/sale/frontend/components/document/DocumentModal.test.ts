@@ -17,21 +17,10 @@ import DocumentModal from './DocumentModal.vue';
 import ReceiptPaper from './ReceiptPaper.vue';
 import source from './DocumentModal.vue?raw';
 
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
-vi.mock('@erplora/ui/shell', async (importOriginal) => ({
-  ...((await importOriginal()) as object),
-  toastError: vi.fn(),
-  toastSuccess: vi.fn(),
-}));
 vi.mock('../../lib/print', () => ({ printPaper: vi.fn() }));
 
 beforeEach(() => {
   vi.mocked(printPaper).mockReset();
-  vi.mocked(toastError).mockClear();
-  vi.mocked(toastSuccess).mockClear();
 });
 afterEach(() => {
   vi.restoreAllMocks();

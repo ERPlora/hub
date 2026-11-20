@@ -6,15 +6,10 @@
 import { Combo, type ComboOption } from '@erplora/ui/components';
 import { describe, expect, it, vi } from 'vitest';
 
-import type { Business } from '../../../../base/frontend/operations';
+import type { Business } from '../../../../base/frontend/operations/business';
 import { business, click, ionChecked, ionValue, mountCombo, page, POLISH, settle } from '../__tests__/mount-combo';
 import type { GroupOut } from '../operations';
 import BulkAddModal from './BulkAddModal.vue';
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
 
 /** What the shared `syncSearchbarInputName` was asked to name, written down at each call: the searchbar it
  *  names (the first one under the root it gets) and the name it reads then. */

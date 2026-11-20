@@ -15,7 +15,8 @@
 import { expect, type Locator, type Page, test } from '@playwright/test';
 
 import { GREETING, type Provider } from './assistant-provider';
-import { emptyMonth, openPanel, panel } from './assistant-real';
+import { box, openPanelAtTheDesk, panel } from './assistant-panel';
+import { emptyMonth } from './assistant-real';
 import { A, capture, login, THREE_SIZES as VIEWPORTS } from './helpers';
 import { seededProvider } from './provider-helpers';
 
@@ -35,7 +36,6 @@ test.beforeEach(() => {
   emptyMonth();
 });
 
-const box = (page: Page): Locator => panel(page).locator('[data-testid="assistant-input"] textarea');
 const lastAnswer = (page: Page): Locator => panel(page).locator('[data-testid="assistant-answer"]').last();
 const voice = (page: Page): Locator => panel(page).locator('[data-testid="assistant-voice"]');
 const listen = (page: Page): Locator => lastAnswer(page).locator('[data-testid="assistant-listen"]');
@@ -78,8 +78,7 @@ const serverVoice = (page: Page): Promise<boolean> =>
 async function answered(page: Page): Promise<void> {
   await login(page, A, '/');
   await page.context().addCookies([{ name: 'django_language', value: 'es', domain: new URL(A).hostname, path: '/' }]);
-  await page.setViewportSize({ width: 1440, height: 900 });
-  await openPanel(page);
+  await openPanelAtTheDesk(page);
   await box(page).fill('Hola');
   await box(page).press('Enter');
   await expect(lastAnswer(page).locator('[data-testid="assistant-bubble-assistant"]')).toHaveText(GREETING.es);

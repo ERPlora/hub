@@ -52,12 +52,14 @@ puede subir hasta que se le mergea `origin/main`.
 
 ```bash
 bash .github/scripts/smoke-e2e.sh    # los tests @smoke del commit en el que estás; rojo si uno falla o si pasan del tope
+bash .github/scripts/smoke-e2e.sh --spec tests/e2e/login-and-shell.spec.ts   # solo los @smoke de esas specs
 ```
 
 Recorre en el navegador lo que no se puede romper: entrar, las sesiones y los permisos, la separación entre negocios, la
 suspensión por impago, cobrar y la caja, la impresión, el ticket con QR, la factura, VeriFactu, la cocina y las mesas, las
-citas, el alta de un negocio y la demo. Usa la misma pila que la pasada nocturna (`tests/e2e/README.md`, «La pasada
-nocturna»): sus worktrees, sus BD, los dos `runserver` y, pase lo que pase, la limpieza.
+citas, los servicios y los bonos, el alta de un negocio, activar y desactivar apps, la demo y la actualización en vivo
+entre pestañas. Usa la misma pila que la pasada nocturna (`tests/e2e/README.md`, «La pasada nocturna»): sus worktrees,
+sus BD, los dos `runserver` y, pase lo que pase, la limpieza.
 
 - **Qué tests**: los que llevan `@smoke` al final de su título; se marca el test concreto, nunca la spec entera.
   `pnpm e2e --list --grep @smoke` los lista.
@@ -65,15 +67,37 @@ nocturna»): sus worktrees, sus BD, los dos `runserver` y, pase lo que pase, la 
   El SaaS va en su `origin/main`.
 - **El tope**: 20 minutos para los tests (el tope global de Playwright), fijado con las pasadas medidas en el Mac
   cargado. Al llegar, Playwright corta y el humo sale en rojo. Subirlo es una decisión, no el arreglo de una pasada lenta.
+  En el job de GitHub, con todos los grupos dentro, los tests tardan de 11,9 a 14,2 minutos.
 - **Dónde**: `~/.erplora/hub-smoke-e2e/` y el puerto `9780` (el SaaS en el `9781`, como en la noche), aparte de la
   pasada nocturna, así que ninguna espera a la otra. Un worker lo lleva a su carpeta y a sus puertos con `NIGHTLY_DIR` y
   `NIGHTLY_HUB_PORT`. Nunca escribe en GitHub; lo que deja está en `runs/<pasada>/` de esa carpeta (`night.log`, los
   registros de los dos `runserver` y `test-results/`).
-- **Salida**: 0 en verde; 1 en rojo (un test, el tope o un paso previo, como las dependencias o una BD); 2 con
-  argumentos, porque no lleva ninguno; 3 si ya corre otro humo en esa carpeta.
+- **`--spec`**: acota el humo a los tests `@smoke` de las specs que nombra, una o varias; nunca lo amplía.
+- **Salida**: 0 en verde; 1 en rojo (un test, el tope o un paso previo, como las dependencias o una BD); 2 con un
+  argumento que no sea `--spec tests/e2e/<nombre>.spec.ts`; 3 si ya corre otro humo en esa carpeta.
 - **Entrar en el humo**: un test se marca solo después de pasar 3 veces seguidas con este comando. Uno que falla sin
   nada roto frenaría todos los cambios: se queda fuera y, si es un fallo de verdad, va a su issue.
-- Hoy no frena ninguna fusión: se corre a mano.
+- **Frena la fusión**: el job `smoke` de `test.yml` corre este mismo comando en cada push, dentro del check `test / test`
+  que exige `main`, con la pila montada en el runner (el SaaS de su `origin/main` en `../saas`, las imágenes en
+  `../blueprints` y Postgres con `compose.yaml`). Un test `@smoke` en rojo deja el check en rojo y la PR no se fusiona.
+  Los grupos entran de uno en uno, tras tres pasadas seguidas en verde del job, y el job los nombra con `--spec`: hoy,
+  entrar, las sesiones, los permisos de un empleado, la separación entre negocios y la suspensión por impago; cobrar
+  en el TPV, la caja y la impresión del ticket; el ticket con su QR, la factura y VeriFactu; la cocina y las mesas
+  (mandar la ronda a cocina desde el TPV, seguirla y meterle prisa, y sentar la cuenta del TPV en una mesa y
+  quitársela); las citas, los servicios y los bonos (reservar en la agenda, cobrar la cita en el TPV al precio del
+  profesional, dar de alta un servicio con quien lo hace, crear un bono, venderlo y ajustarlo, y pagar con él un corte
+  en el TPV); y el alta, las apps, la demo y lo vivo (dar de alta en erplora.com un negocio de España, que nace con
+  Impuestos y sin VeriFactu; desactivar Reservas, que se lleva Mesas, y volver a activarlas; entrar en la demo desde
+  la puerta del SaaS hasta que termina, y ver en otra pestaña, sin recargar, un elemento recién creado).
+  Nada del grupo fiscal llega a la AEAT: el runner no tiene pasarela de envío ni certificados, y sus
+  tests caen si un registro va al entorno de producción de la AEAT. Tampoco pide un PDF al servidor (la factura se
+  imprime desde el navegador), así que el job no instala WeasyPrint. `.github/scripts/workflows.test.sh` lleva la
+  lista de los grupos que ya están dentro y cae si el job pierde o añade una spec por su cuenta. Con este último grupo
+  están todos dentro: el job corre los mismos tests `@smoke` que este comando sin `--spec`, y una spec que se marque
+  después entra como un grupo, con sus tres pasadas. El job tiene un tope de 34 minutos, el doble de lo que tarda su
+  pasada medida más lenta con la pila incluida; una spec que entra lo vuelve a medir. Lo que hace la pila sale en el
+  registro del job y, si falla, el artefacto `smoke` guarda además los registros de los dos `runserver` y las trazas
+  de Playwright.
 
 ## Registro de hubs y `/internal`
 
@@ -291,9 +315,9 @@ de una app que su plantilla no traía (una portada después) se crean **la prime
   corren. **Apagar** nunca borra tablas; apagada mientras se crean, queda `off` con ellas hechas. Un blueprint que
   enciende una app que aún se prepara no carga sus datos y su informe dice que se vuelva a cargar en un minuto
   («Reintentar» del informe trae lo que faltó).
-- Desde S5 ningún negocio sin BD propia se sirve; solo el respaldo de la suite tiene alguno, y allí enciende al
-  momento (propuesta (i) de la ronda 2026-10-30). `seed_local_hubs` da a `a` y `b` las tablas de todas las apps y todas
-  encendidas (`provision(apps=…)`).
+- Un negocio sin BD propia no se sirve (su dirección responde 503 `base.hub_maintenance`), así que en él no se
+  enciende ninguna app. `seed_local_hubs` da a `a` y `b` las tablas de todas las apps y todas encendidas
+  (`provision(apps=…)`).
 
 
 ### Copias de los datos y uso nocturno (tajada S2b)
@@ -302,18 +326,28 @@ PLAN-DB, ronda 2026-10-30: decisión 2 y propuestas (a), (f), (j), (k), (l), (m)
 
 - **Restablecer el negocio** (`base.hub.reset`, Ajustes › Datos): sin `dry_run` ya no vacía en la petición; anota lo
   pedido en el registro (`Hub.reset_requested_at`, `Hub.reset_sections`), lo deja debido en `hub_due` y responde
-  `status: "copying"`. El worker (`base/worker.py`, pase `_data`, bajo el arriendo del hub) copia la BD del negocio
+  `status: "copying"`. El worker (`base/worker_data.py`, pase `_data`, bajo el arriendo del hub) copia la BD del negocio
   (`base/tenancy/dumps.py`) y, solo si la copia quedó guardada, vacía las secciones en su BD con
   `base.hub.reset_apply` (una transacción: todo o nada) y anota `base.hub.data_reset`; si la copia falla no vacía
   nada y deja `failed` con su motivo (`dumps_unavailable`, `dump_failed`, `emptying_failed`, `hub_not_ready`), y la
   pantalla ofrece «Volver a intentarlo». Cada paso llega en vivo (`base.hub.reset_progressed`, aviso tras el COMMIT en
   control) a `base.hub.dumps`. Sin bucket, 503 `base.dumps_unavailable`; con otro en marcha, 409
-  `base.reset_in_progress`; sin BD propia, 409 `base.reset_shared_database` como antes.
+  `base.reset_in_progress`.
 - **La baja**: `base.hub.cancel` de un negocio con su BD propia terminada lo deja debido y el worker lo copia una vez
   (`offboarding`); si falla, reintenta a 1 min, 5 min, 15 min y luego cada hora (`attempts`, `last_error`,
   `next_attempt_at`). La BD se conserva 90 días; pasados, el worker hace su copia final y la borra
   (`DROP DATABASE … WITH (FORCE)`, `base/tenancy/offboarding.py`, BASE-F109, hub#599), salvo la de un negocio con
-  documentos fiscales, que se guarda hasta que exista el archivo fiscal (hub#738).
+  documentos fiscales, que se guarda (hub#738) después de escribirlos en el archivo fiscal.
+- **El archivo fiscal** (`base/tenancy/fiscal_archive.py`): con `FISCAL_ARCHIVE_BUCKET` (solo el worker lo tiene; aws
+  `s3_fiscal_archive.tf`, Object Lock en `COMPLIANCE` 6 años), el worker sube una vez por baja, en
+  `<hex>/<AAAAMMDDTHHMMSSZ>/`, un JSON Lines por modelo y parte con las filas de los modelos que cada app declara en
+  `fiscal_archive_models` (leídas tal cual por `base/services/fiscal_archive.py`) y, al final, `manifest.json` con las
+  filas, los bytes y el SHA-256 de cada fichero. Cada PUT lleva su SHA-256 e `If-None-Match: *`, ninguno pide
+  retención (la pone el bucket); el manifiesto solo se sube cuando todos los ficheros se han releído iguales, y solo
+  entonces se anota `fiscal_archived_at`. En la fila, `last_error` dice cómo va: `fiscal_archive_missing`,
+  `fiscal_archive_waiting` (un registro de VeriFactu sin respuesta de la AEAT), `fiscal_archive_failed` (al día
+  siguiente, en otra carpeta) o `fiscal_archived`. En local y en los tests, `FISCAL_ARCHIVE_ENDPOINT_URL` apunta a
+  otro S3 (moto, `base/tenancy/tests/s3.py`).
 - **La copia** (`dump_hub`): `pg_dump -Fc --no-owner --no-acl` de esa BD como el migrador, por conexión directa al
   escritor de su cluster (`migrator_conninfo`, nunca PgBouncer), con la contraseña en `PGPASSWORD` y nunca en la orden
   ni en un error, acotado a 15 min (el arriendo se renueva mientras corre) y a un fichero temporal; solo si termina
@@ -323,7 +357,7 @@ PLAN-DB, ronda 2026-10-30: decisión 2 y propuestas (a), (f), (j), (k), (l), (m)
   apunta boto3 a otro S3 (los tests: el servidor de moto, `base/tenancy/tests/s3.py`); sin `HUB_DUMPS_BUCKET` no hay
   copias y el restablecimiento responde 503.
 - **Ajustes › Datos › Restablecer › «Copias»** (`base.hub.dumps`, vivo; `base.hub.dump_link` en cada «Descargar»):
-  las copias del negocio y su último restablecimiento; nada en un negocio que aún comparte BD.
+  las copias del negocio y su último restablecimiento.
 - **Uso nocturno** (`base/usage.py`, pase `_usage` del worker): a las 00:15 UTC mide el día que acabó (antes de que
   el SaaS lo pida a las 01:15 y fuera de la copia de Aurora de 02:00–03:00) para cada negocio con BD propia:
   `pg_database_size` desde el catálogo de su cluster (conexión de mantenimiento del migrador, sin abrir la BD del
@@ -437,8 +471,8 @@ http://127.0.0.1:8000/ws/print` contesta `101 Switching Protocols`. La e2e es `t
 
 Las puertas que comprueban una credencial cuentan los intentos que **rechazan** por quien llama
 (`base.throttle.client_key`: la IP que vio el ALB según `TRUSTED_PROXY_HOPS`, o su /64 si es IPv6, porque un cliente
-tiene la /64 entera) con `base.throttle.AttemptLimit`, en la caché de Django (Valkey en AWS; la memoria del proceso en
-local). La puerta comprueba **primero** la credencial: lo que acepta nunca cuenta ni se rechaza, así que un dispositivo
+tiene la /64 entera) con `base.throttle.AttemptLimit`, en la caché de Django (Valkey en AWS; en
+local, una carpeta del disco por BD de control, `base/cache.py`). La puerta comprueba **primero** la credencial: lo que acepta nunca cuenta ni se rechaza, así que un dispositivo
 con sesión válida no queda fuera porque otro de la misma red (la tablet con la sesión caducada) haya fallado. Pasado
 el tope, el siguiente intento **rechazado** de quien llama recibe la respuesta del límite hasta que acaba la ventana
 que abrió su primer rechazo. El rechazo que llega al tope queda en el log de `base.throttle` con su clave

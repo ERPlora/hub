@@ -250,7 +250,7 @@ Escape y tocar fuera del panel (hub#1023).
 | INVENTORY-F08 | Agrupar productos en categorías para el TPV | hecho |
 | INVENTORY-F29 | Marcar un artículo como agotado | hecho |
 | INVENTORY-F34 | Recuperar un producto eliminado | hecho |
-| INVENTORY-F35 | Declarar los alérgenos de un producto | parcial — falta la interfaz: el bloque del formulario, la línea de la ficha y la columna en Importar productos |
+| INVENTORY-F35 | Declarar los alérgenos de un producto | hecho |
 | | **Importar y exportar** | |
 | INVENTORY-F09 | Importar productos desde un CSV | hecho |
 | INVENTORY-F10 | Importar categorías desde un CSV | hecho |
@@ -488,8 +488,8 @@ Pasos:
    crea nada todavía.
 2. En «Revisa la importación», cada columna trae su campo adivinado por la cabecera, en español o
    inglés y con o sin tildes («Nombre», «Código», «Precio», «IVA»…). Cámbialo o pon «No importar».
-   Se pueden importar Nombre, SKU, Precio, Coste, Stock, Umbral, EAN-13, Descripción, Unidad y
-   Categoría fiscal; Nombre y SKU son obligatorias.
+   Se pueden importar Nombre, SKU, Precio, Coste, Stock, Umbral, EAN-13, Descripción, Alérgenos,
+   Unidad y Categoría fiscal; Nombre y SKU son obligatorias.
 3. Mira las «Primeras {n} filas de {total}» y el ensayo de todo el fichero: «{ready} filas listas
    · {failed} con problemas» («1 fila lista» con una), con la línea y el motivo de las diez primeras.
 4. Pulsa «Importar {n} productos» («Importar 1 producto» con uno; o «Cancelar», que no deja rastro).
@@ -1125,19 +1125,18 @@ librería que recupera si no tenía ninguna), y el aviso de producto recuperado 
 producto tal como vuelve.
 Si falla: no vuelve si el negocio ya hizo otro producto con su SKU o su EAN-13 desde que lo eliminó: se queda el que
 hizo, y la recuperación no lo cuenta ni lo crea. Un producto que el negocio ya no tiene en absoluto se crea de nuevo
-(INVENTORY-F01), sin stock, con la imagen de la librería que tenía en la copia. Sobre un producto vivo no falla:
+(INVENTORY-F01), sin stock, con la imagen de la librería y los alérgenos que tenía en la copia; el de una copia de
+antes de que los productos tuvieran alérgenos vuelve sin ninguno (INVENTORY-F35). Sobre un producto vivo no falla:
 responde bien y vuelve a avisar. Su foto propia no vuelve: se borró al eliminarlo (INVENTORY-F31). La imagen de la
 librería sí, porque eliminar se la deja; uno eliminado antes de que se la dejara, que se quedó sin ninguna, recupera
 la que tenía en la copia, salvo una que la librería ya no tiene. Sus reglas de descuento de Tarifas se vuelven a activar solas (PRICING-F14) y sus precios en las tarifas vuelven si se
 recupera también Tarifas (PRICING-F15), sus grupos de suplementos, si se recupera también Suplementos
 (MODIFIER-F10), y sus elecciones en los menús, si se recupera también Menús (COMBO-F15).
 Implicados: BASE-F114, INVENTORY-F01, INVENTORY-F03, INVENTORY-F04, INVENTORY-F07, INVENTORY-F16, INVENTORY-F29, INVENTORY-F30,
-PRICING-F14, PRICING-F15, MODIFIER-F09, MODIFIER-F10, COMBO-F13, COMBO-F15
+INVENTORY-F35, PRICING-F14, PRICING-F15, MODIFIER-F09, MODIFIER-F10, COMBO-F13, COMBO-F15
 
 ### INVENTORY-F35 Declarar los alérgenos de un producto
-Estado: parcial — el producto ya guarda sus alérgenos por el asistente y la API, y el catálogo, el CSV exportado, la
-importación por la API, la copia de seguridad y la plantilla los llevan; faltan el bloque del formulario, la línea de
-la ficha y que Importar productos reconozca la columna «Alérgenos»
+Estado: hecho
 Actor: administrador, responsable
 Pantalla: Productos, Ficha del producto, Importar productos
 Pasos:
@@ -1168,7 +1167,8 @@ Si falla: un alérgeno que no es de la lista se rechaza, también por el asisten
 que no se reconoce deja la fila como fallida con el motivo «Alérgeno no reconocido: <texto>». Quien solo puede ver
 productos lee la línea de la ficha, pero no tiene el formulario. Todo rechazo sale dentro del panel, como los del
 resto del formulario.
-Implicados: INVENTORY-F01, INVENTORY-F02, INVENTORY-F09, INVENTORY-F11, INVENTORY-F27, SALE-F40, SALE-F41, KITCHEN-F32
+Implicados: INVENTORY-F01, INVENTORY-F02, INVENTORY-F09, INVENTORY-F11, INVENTORY-F27, INVENTORY-F34, SALE-F40, SALE-F41,
+KITCHEN-F32
 
 ## Qué comparten los verticales
 
@@ -1323,6 +1323,20 @@ Lo que sigue es para quien cambia la app; quien la usa puede parar aquí.
   descendente es la ascendente leída al revés, empates incluidos, y los CSV salen en el mismo orden. Lo fijan
   `test_ties_go_by_id_in_the_lists_own_direction` y `test_an_export_settles_its_ties_the_way_the_list_does`, por lista.
 
+- **Palabras del asistente** (`assistant_synonyms`, en `apps.py`): para el Hub, «unidades» son las unidades de medida
+  (`inventory.unit`), y «albarán», «mercancía» o lo que «entran», la mercancía que recibe `inventory.stock.receive`
+  (F13). También lo es una cantidad con su unidad («20 kilos de», «5 cajas de», «10 litros de», «3 sacos de», «500
+  gramos de», y en inglés «kilos of», «boxes of»…), que además es el stock del producto (`inventory.stock`, F14 y F15):
+  «registra una entrada de 20 kilos de harina» ofrece recibir la mercancía aunque Caja lea «una entrada» como un
+  movimiento del cajón. No entran las botellas, las latas ni las unidades, que cuentan también una línea de venta o un
+  carrito, ni «kilo de» suelto, de lo que se vende a peso; y como «cajas de» lo dice también quien nombra sus cajas
+  («las cajas de la tienda»), Caja lee «cajas de la» como sus cajas. Lo que se apunta como llegado es también
+  mercancía y stock: «apunta que han llegado 12 unidades de tarta» (que se lee «apunta que llegan…»), y lo mismo con
+  «apúntame», «anota» y «registra que…». Nunca «llegan» ni «llegado» sueltos, que dice también la gente que llega («han
+  llegado dos más para la mesa 7», «ya llegan los de la reserva», «ha llegado la clienta de la cita»), ni «arrived» en
+  inglés. Quien apunta que ha llegado gente («apunta que han llegado los de la reserva de Luis») ve también la
+  recepción entre las herramientas que se le ofrecen. Lo comprueba `tests/test_assistant_asks.py`.
+
 - **Recuperar desde una copia aparte** (BASE-F114): `apps.py` responde a la plataforma (`recoverable_from_copy`,
   `base.recovery.Recoverable`) con tres declaraciones, por este orden, leídas de la copia por SQL sobre los nombres de los
   modelos (la copia no es un negocio y no tiene alias). Primero las categorías vivas de la copia
@@ -1357,9 +1371,12 @@ Lo que sigue es para quien cambia la app; quien la usa puede parar aquí.
   sin quitar ninguna otra categoría. Va aparte, con su propia cuenta, porque toca lo que el negocio tiene. Una categoría
   rehecha a mano (`created_by` de una persona) o conservada no se rellena. Las categorías y los enlaces se leen desde `0001_initial` y los
   productos desde `0005_product_image`, la que les dio la imagen (a una copia anterior se le niegan los productos con
-  `recover_copy_behind`); una migración que añada, quite o renombre una columna que se lee cambia también la lectura
-  y su `reads_since`. Tests: `tests/test_recovery.py`, de punta a punta
-  incluido, y el contrato de `base/tenancy/tests/test_recovery.py`.
+  `recover_copy_behind`). Sus alérgenos, de `0006_product_allergens`, no suben esa migración: están en
+  `copy_columns.LATER_PRODUCT_FIELDS` y se leen solo si la tabla de la copia tiene su columna (`pg_attribute`), así
+  que una copia anterior devuelve sus productos sin ellos. Una migración que añada, quite o renombre una columna que
+  se lee cambia también la lectura y su `reads_since`, salvo una columna nueva que pueda faltar en la copia, que va a
+  `copy_columns`. Tests: `tests/test_recovery.py`, de punta a punta incluido, `tests/test_copy_columns.py` y el
+  contrato de `base/tenancy/tests/test_recovery.py`.
   Las apps cuyos registros de la copia cuelgan de un producto (Tarifas, Suplementos, Menús) no emparejan a su manera:
   piden a `queries.products_standing_for` (`{id allí: SKU allí}`) el producto del negocio que hace de cada uno que ya
   no está vivo aquí: el vivo con su SKU que hizo una recuperación (`base.recovery.brought_back`), la de esta pasada u

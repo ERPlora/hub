@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { EMPLOYEE, errorFrame, flush, mountBase, subId } from '../__tests__/mount-base';
-import type { DeviceCurrent } from '../operations';
+import type { DeviceCurrent } from '../operations/devices';
 import DeviceModeCard from './DeviceModeCard.vue';
 
 const SHARED: DeviceCurrent = { known: true, mode: 'shared', mode_set_by: '', mode_set_at: null };

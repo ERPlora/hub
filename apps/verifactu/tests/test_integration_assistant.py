@@ -18,7 +18,7 @@ from live.operations import get, registry
 from pydantic import BaseModel, SecretBytes, SecretStr
 
 from apps.verifactu.models import Record
-from apps.verifactu.tests.conftest import HUB_DB, ctx_for
+from apps.verifactu.tests.conftest import HUB_DB, ctx_for, manual
 from base import assistant
 from base.tests.test_assistant import technical_names
 
@@ -48,14 +48,16 @@ def test_no_datum_of_a_write_of_verifactu_reaches_a_spanish_card_by_its_technica
     assert technical_names(writes) == {}
 
 
-def test_the_card_names_the_invoice_of_a_record_as_the_records_do():
+@HUB_DB
+def test_the_card_names_the_invoice_of_a_record_as_the_records_do(issuer):
     """The invoice a record is sealed for, by its id or its number: the number as every other write and the records
-    name it («Número de factura»), never a bare «Número»."""
+    name it («Número de factura»), never a bare «Número»; the one its id names, as «Factura»."""
     create = get("verifactu.record.create")
+    invoice = manual(series_code="TICKET")
     for language in ("es", "en"):
         with translation.override(language):
             invoice_number = capfirst(str(Record._meta.get_field("invoice_number").verbose_name))
-        card = assistant.cards.card(create, {"invoice_id": "x", "number": "F-1"}, language)
+        card = assistant.cards.card(create, {"invoice_id": str(invoice.id), "number": "F-1"}, language, ctx_for())
         assert labels(card) == [{"es": "Factura", "en": "Invoice"}[language], invoice_number]
     assert invoice_number == "Invoice number"
 

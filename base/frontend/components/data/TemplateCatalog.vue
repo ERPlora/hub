@@ -7,7 +7,7 @@ import { computed, ref } from 'vue';
 
 import { templateMatches } from '../../lib/data';
 import { useBaseI18n } from '../../lib/i18n';
-import type { Template } from '../../operations';
+import type { Template } from '../../operations/blueprints';
 
 const props = withDefaults(defineProps<{ busy?: string }>(), { busy: '' });
 const emit = defineEmits<{ use: [template: Template] }>();

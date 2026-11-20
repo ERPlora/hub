@@ -12,10 +12,6 @@ import type { SessionMe } from '@erplora/ui/shell';
 import CustomerSearch, { type CustomerSnapshot, snapshotOf } from './CustomerSearch.vue';
 import source from './CustomerSearch.vue?raw';
 
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
 // No timer may outlive a test: Vitest tears the page's window down at the end of the file, and a timer
 // still armed then (Ionic's searchbar arms one for 300 ms when it loads) fires into a missing
 // `requestAnimationFrame`: an «Unhandled error» and exit 1 with every test green. Fake timeouts that follow

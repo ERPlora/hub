@@ -20,7 +20,8 @@ ALWAYS = ("base.setup.status", "base.business.get", DOCS_SEARCH)
 APP_WORDS = shared.app_words
 #: What a word of the platform means in the Hub and nowhere else (``live.assistant`` keeps what it means in any
 #: business): a «placa» is a person's badge (``base.person.badge_*``) and an «empleado» or «empleada» a ``base.person``.
-#: What an app's own words mean the app says itself, in its ``LiveAppConfig`` (``SYNONYMS_ATTRIBUTE``), never here.
+#: What an app's own words mean the app says itself, in its ``LiveAppConfig`` (``SYNONYMS_ATTRIBUTE``), never here; so
+#: does base for the words built from the apps' names («quita Tareas del menú»: ``base.apps.BaseConfig``).
 SYNONYMS = (
     ("placa", "badge"),
     ("empleado", "empleada", "employee", "person"),

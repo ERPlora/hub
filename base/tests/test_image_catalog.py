@@ -24,7 +24,7 @@ from live.operations import get
 from PIL import Image as PILImage
 
 from base import image_catalog
-from base.schemas import CatalogImageRefIn, CatalogImageSearchIn
+from base.schemas.catalog_images import CatalogImageRefIn, CatalogImageSearchIn
 from base.tenancy.tests.business import HOST, HUB_DB, A, in_business_a
 from base.tests.routes import assert_bound
 

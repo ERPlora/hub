@@ -46,6 +46,16 @@ def _percent_range(
     )
 
 
+def _actor(verbose_name) -> models.CharField:
+    """Who did something, as the operation's actor names them; empty when there is none."""
+    return models.CharField(verbose_name, max_length=ACTOR_MAX_LENGTH, blank=True)
+
+
+def _json_list(verbose_name) -> models.JSONField:
+    """A list kept as JSON; ``db_default``: a process still on the previous code inserts rows without it."""
+    return models.JSONField(verbose_name, default=list, blank=True, db_default=[], encoder=DjangoJSONEncoder)
+
+
 class PaymentMethod(UUIDModel):
     class Type(models.TextChoices):
         CASH = "cash", _("Cash")
@@ -63,9 +73,7 @@ class PaymentMethod(UUIDModel):
     sort_order = models.PositiveIntegerField(_("position"), default=0)
     created_at = models.DateTimeField(_("created at"), auto_now_add=True)
     updated_at = models.DateTimeField(_("updated at"), auto_now=True)
-    created_by = models.CharField(
-        _("created by"), max_length=ACTOR_MAX_LENGTH, blank=True
-    )
+    created_by = _actor(_("created by"))
 
     class Meta:
         verbose_name = _("payment method")
@@ -134,9 +142,7 @@ class Settings(UUIDModel):
         _("promotional QR text"), max_length=200, blank=True
     )
     updated_at = models.DateTimeField(_("updated at"), auto_now=True)
-    updated_by = models.CharField(
-        _("updated by"), max_length=ACTOR_MAX_LENGTH, blank=True
-    )
+    updated_by = _actor(_("updated by"))
 
     class Meta:
         verbose_name = _("till settings")
@@ -173,9 +179,7 @@ class Department(UUIDModel):
     deleted_at = models.DateTimeField(_("deleted at"), null=True, blank=True)
     created_at = models.DateTimeField(_("created at"), auto_now_add=True)
     updated_at = models.DateTimeField(_("updated at"), auto_now=True)
-    created_by = models.CharField(
-        _("created by"), max_length=ACTOR_MAX_LENGTH, blank=True
-    )
+    created_by = _actor(_("created by"))
 
     class Meta:
         verbose_name = _("department")
@@ -195,9 +199,7 @@ class QuickNote(UUIDModel):
     deleted_at = models.DateTimeField(_("deleted at"), null=True, blank=True)
     created_at = models.DateTimeField(_("created at"), auto_now_add=True)
     updated_at = models.DateTimeField(_("updated at"), auto_now=True)
-    created_by = models.CharField(
-        _("created by"), max_length=ACTOR_MAX_LENGTH, blank=True
-    )
+    created_by = _actor(_("created by"))
 
     class Meta:
         verbose_name = _("quick note")
@@ -235,9 +237,7 @@ class Order(UUIDModel):
     )
     # In whole minor units of the business's currency (not always the cent): its name never says the unit.
     discount_amount = models.PositiveBigIntegerField(_("fixed-amount discount"), default=0)
-    discount_approved_by = models.CharField(
-        _("discount approved by"), max_length=ACTOR_MAX_LENGTH, blank=True
-    )
+    discount_approved_by = _actor(_("discount approved by"))
     # Σ of the live unpaid lines' totals, before the ticket discount: what the till paints, never fiscal.
     provisional_total = models.BigIntegerField(_("provisional total"), default=0)
     version = models.PositiveIntegerField(_("version"), default=1)
@@ -248,13 +248,9 @@ class Order(UUIDModel):
     )
     created_at = models.DateTimeField(_("created at"), auto_now_add=True)
     updated_at = models.DateTimeField(_("updated at"), auto_now=True)
-    created_by = models.CharField(
-        _("created by"), max_length=ACTOR_MAX_LENGTH, blank=True
-    )
+    created_by = _actor(_("created by"))
     closed_at = models.DateTimeField(_("closed at"), null=True, blank=True)
-    voided_by = models.CharField(
-        _("voided by"), max_length=ACTOR_MAX_LENGTH, blank=True
-    )
+    voided_by = _actor(_("voided by"))
     # A check joined with another (SALE-F24) ends voided and names the one that stays: a till that had it on
     # screen follows that one instead of saying it was closed on another device.
     merged_into_id = models.UUIDField(
@@ -333,9 +329,7 @@ class OrderLine(UUIDModel):
     discount_percent = models.DecimalField(
         _("discount (%)"), default=Decimal("0"), **PERCENT
     )
-    discount_approved_by = models.CharField(
-        _("discount approved by"), max_length=ACTOR_MAX_LENGTH, blank=True
-    )
+    discount_approved_by = _actor(_("discount approved by"))
     is_gift = models.BooleanField(_("comp"), default=False)
     gift_reason = models.CharField(_("comp reason"), max_length=200, blank=True)
     notes = models.CharField(_("note"), max_length=255, blank=True)
@@ -358,20 +352,8 @@ class OrderLine(UUIDModel):
     # dish), ``modifier_lines`` the ones of another tax category, charged on a child line of their own (their
     # ``quantity`` is per unit of the dish), ``kitchen_text`` what the kitchen reads under the dish. Own context, here
     # and on the charged line: they are its «suplementos», not Clientes' «opciones» of the same English.
-    modifiers = models.JSONField(
-        pgettext_lazy("sale", "options"),
-        default=list,
-        blank=True,
-        db_default=[],
-        encoder=DjangoJSONEncoder,
-    )
-    modifier_lines = models.JSONField(
-        _("options on a line of their own"),
-        default=list,
-        blank=True,
-        db_default=[],
-        encoder=DjangoJSONEncoder,
-    )
+    modifiers = _json_list(pgettext_lazy("sale", "options"))
+    modifier_lines = _json_list(_("options on a line of their own"))
     kitchen_text = models.CharField(
         _("kitchen text"), max_length=500, blank=True, default="", db_default=""
     )
@@ -382,6 +364,11 @@ class OrderLine(UUIDModel):
     combo = models.JSONField(
         _("menu as ordered"), default=dict, blank=True, db_default={}, encoder=DjangoJSONEncoder
     )
+    # The allergens of its product (``base.allergens`` codes, in the order of the list), frozen when it is ordered as its
+    # options are; a menu has none of its own: each dish of ``combo`` keeps its product's.
+    allergens = _json_list(_("allergens"))
+    # The customer's allergy the waiter marks before the line is sent (SALE-F41), ``base.allergens`` codes.
+    allergy = _json_list(_("customer's allergy"))
     line_total = models.BigIntegerField(_("line total"), default=0)
     round_no = models.PositiveIntegerField(_("round"), default=0)
     fired_at = models.DateTimeField(_("sent to the kitchen at"), null=True, blank=True)
@@ -395,14 +382,10 @@ class OrderLine(UUIDModel):
     )
     removed_at = models.DateTimeField(_("removed at"), null=True, blank=True)
     void_reason = models.CharField(_("void reason"), max_length=255, blank=True)
-    voided_by = models.CharField(
-        _("voided by"), max_length=ACTOR_MAX_LENGTH, blank=True
-    )
+    voided_by = _actor(_("voided by"))
     created_at = models.DateTimeField(_("created at"), auto_now_add=True)
     updated_at = models.DateTimeField(_("updated at"), auto_now=True)
-    created_by = models.CharField(
-        _("created by"), max_length=ACTOR_MAX_LENGTH, blank=True
-    )
+    created_by = _actor(_("created by"))
 
     objects = OrderLineQuerySet.as_manager()
 
@@ -548,9 +531,7 @@ class Sale(UUIDModel):
     voided_at = models.DateTimeField(
         pgettext_lazy("sale", "voided at"), null=True, blank=True
     )
-    voided_by = models.CharField(
-        _("voided by"), max_length=ACTOR_MAX_LENGTH, blank=True
-    )
+    voided_by = _actor(_("voided by"))
     void_reason = models.CharField(_("void reason"), max_length=500, blank=True)
     # The fiscal document Invoicing issued for it (F2 ticket, F1 invoice) and for its void (R5, R1):
     # ids of Invoicing without a foreign key (Invoicing is no requirement of Sales).
@@ -563,9 +544,7 @@ class Sale(UUIDModel):
     )
     void_invoice_status = _fiscal_status(_("rectifying invoice of the void"))
     created_at = models.DateTimeField(_("charged at"), default=timezone.now)
-    created_by = models.CharField(
-        _("charged by"), max_length=ACTOR_MAX_LENGTH, blank=True
-    )
+    created_by = _actor(_("charged by"))
 
     class Meta:
         verbose_name = _("sale")
@@ -658,13 +637,7 @@ class SaleLine(UUIDModel):
     )
     # SALE-F11: the names of the options charged inside the line (the receipt prints them under it), and, on
     # the child line of an option of another tax category, the line of the dish it hangs from.
-    modifiers = models.JSONField(
-        pgettext_lazy("sale", "options"),
-        default=list,
-        blank=True,
-        db_default=[],
-        encoder=DjangoJSONEncoder,
-    )
+    modifiers = _json_list(pgettext_lazy("sale", "options"))
     parent_line_id = models.UUIDField(
         _("line it hangs from"), null=True, blank=True
     )
@@ -674,9 +647,7 @@ class SaleLine(UUIDModel):
     combo_name = models.CharField(
         _("menu name"), max_length=200, blank=True, default="", db_default=""
     )
-    components = models.JSONField(
-        _("dishes"), default=list, blank=True, db_default=[], encoder=DjangoJSONEncoder
-    )
+    components = _json_list(_("dishes"))
     tax_category_key = models.CharField(_("tax category"), max_length=80)
     tax_rate = models.DecimalField(_("rate (%)"), max_digits=6, decimal_places=2)
     tax_country_code = models.CharField(_("tax country"), max_length=2)
@@ -781,9 +752,7 @@ class Refund(UUIDModel):
         _("attempt key"), max_length=128, unique=True, null=True, blank=True
     )
     created_at = models.DateTimeField(_("refunded at"), default=timezone.now)
-    created_by = models.CharField(
-        _("refunded by"), max_length=ACTOR_MAX_LENGTH, blank=True
-    )
+    created_by = _actor(_("refunded by"))
     # Its rectifying invoice (R1, R5), as Invoicing answered in the same transaction.
     invoice_number = models.CharField(_("rectifying invoice"), max_length=60, blank=True)
     invoice_type = models.CharField(_("rectifying invoice type"), max_length=2, blank=True)

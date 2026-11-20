@@ -284,6 +284,7 @@ export interface ConfigOut {
     uploaded_at: string | null;
     expires_at: string | null;
     expires_in_days: number | null;
+    expires_soon: boolean;
   };
   representation: RepresentationOut;
   synced_at: string | null;
@@ -383,10 +384,7 @@ declare module '@erplora/ui/sdk' {
     'verifactu.contingency.process': { input: NoInput; output: TransmitOut };
     'verifactu.contingency.retry': { input: RecordRefIn; output: RecordSummaryOut };
     'verifactu.event.list': { input: EventListIn; output: Page<EventOut> };
-    'verifactu.stats.compliance_summary': {
-      input: NoInput;
-      output: { unsent_count: number; pending_count: number; rejected_count: number; accepted_count: number; total: number; environment: Environment };
-    };
+    'verifactu.stats.compliance_summary': { input: NoInput; output: { unsent_count: number; pending_count: number; rejected_count: number; accepted_count: number; total: number; environment: Environment } };
     'verifactu.stats.records_by_status': { input: NoInput; output: { rows: { status: RecordStatus; label: string; total: number }[] } };
     'verifactu.stats.contingency_summary': { input: NoInput; output: { queued_count: number; overdue_count: number; severity: 'ok' | 'warning' | 'danger' } };
     'verifactu.stats.events_recent': { input: { limit?: number }; output: { rows: EventOut[] } };

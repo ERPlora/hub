@@ -36,7 +36,7 @@ from live.operations import get as get_operation
 from base import activation, services
 from base.activation import Activation
 from base.models import AppActivation, Location
-from base.schemas import SetupStatusIn
+from base.schemas.home import SetupStatusIn
 from base.tenancy import connections as tenancy_connections
 from base.tenancy import identity, migrator, names, ops, provision
 from base.tenancy.context import use_control, use_hub
@@ -555,10 +555,9 @@ def test_a_failed_hub_made_due_early_for_something_else_waits_for_its_retry(regi
 def test_a_sign_up_while_frozen_waits_and_is_made_on_the_worker_s_first_tick_after_the_freeze_is_lifted(
     registry, monkeypatch, told
 ):
-    """The staff freezes the platform for a database upgrade; a
-    business that signs up meanwhile is kept waiting, its database not made, and the worker makes it on its own on the
-    first tick after the freeze is lifted. Every other pass of the tick is left out: their own tests are
-    ``base/tests/test_worker.py``'s."""
+    """The staff freezes the platform for a database upgrade; a business that signs up meanwhile is kept waiting, its
+    database not made, and the worker makes it on its own on the first tick after the freeze is lifted, which notifies
+    it. Every other pass of the tick is left out: their own tests are ``base/tests/test_worker.py``'s."""
     from live.context import system_context
 
     from base import catalog, worker
@@ -569,8 +568,8 @@ def test_a_sign_up_while_frozen_waits_and_is_made_on_the_worker_s_first_tick_aft
 
     platform = system_context(REGISTRY_SCOPE)
     monkeypatch.setattr(catalog, "register_apps", lambda: RegisterResult(0, 0, 0, True))
-    for name in ("_relay", "_hubs", "_activations", "_reap"):
-        monkeypatch.setattr(worker, name, lambda now: None)
+    for target, name in ((worker, "_relay"), (worker.hub_visits.HubVisits, "serve"), (worker, "_activations"), (worker, "_reap")):
+        monkeypatch.setattr(target, name, lambda *_, **__: None)
     hub = registry.hub()
     HubDue.mark_due(hub)
     with use_control():
@@ -583,6 +582,7 @@ def test_a_sign_up_while_frozen_waits_and_is_made_on_the_worker_s_first_tick_aft
         if len(seen) == 1:
             with use_control():
                 freeze_set(platform, FreezeIn(frozen=False))
+            stop.wait(0.3)  # its notice reaches the worker's LISTEN; two real ticks are 5 s apart
         else:
             stop.set()
         return stop.is_set()
@@ -639,7 +639,7 @@ def test_a_photo_that_arrives_while_it_is_seeded_is_in_its_database_when_it_is_r
 
     from base.models import HubUser
     from base.registry import REGISTRY_SCOPE
-    from base.schemas import HubStateIn
+    from base.schemas.hub_registry import HubStateIn
 
     hub = registry.hub()
     late = uuid.uuid7()

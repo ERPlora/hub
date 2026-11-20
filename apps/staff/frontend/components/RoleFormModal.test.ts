@@ -3,16 +3,11 @@
 // no longer offered in the records, the ones holding it keep it). New sends `staff.role.create`; Edit
 // sends only what changed with `staff.role.update`. A name already taken (409) is said on top; a 422
 // goes under its field; the dialog keeps what was typed.
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import type { RoleOut } from '../operations';
 import { click, ionChecked, ionValue, mountStaff, settle } from '../__tests__/mount-staff';
 import RoleFormModal from './RoleFormModal.vue';
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
 
 type Control = HTMLElement & { label?: string; value?: unknown; checked?: boolean; placeholder?: string; errorText?: string; disabled?: boolean };
 

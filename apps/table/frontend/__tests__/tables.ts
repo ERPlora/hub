@@ -1,5 +1,5 @@
 // Rows of the table app's lists, as the server answers them, for the page and component tests.
-import type { Business } from '../../../../base/frontend/operations';
+import type { Business } from '../../../../base/frontend/operations/business';
 import type { SessionOut, TableOut, ZoneOut } from '../operations';
 
 export function tableRow(overrides: Partial<TableOut> = {}): TableOut {

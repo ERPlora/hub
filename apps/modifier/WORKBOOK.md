@@ -623,7 +623,7 @@ Los papeles llegan del SaaS con prefijo (`hub_owner`, `hub_admin`, `hub_manager`
   de dibujar la tarjeta, el turno busca el registro como lo hará la escritura, un nombre que encaja con varios grupos o
   con ninguno vuelve al modelo, y la huella de la tarjeta lleva el id de lo encontrado, así que el «sí» vale solo para
   ello (hub#1208, hub#1218; `tests/test_assistant_yes_for_its_card.py`, con el trinquete de las escrituras que
-  comprueban y las que leen el grupo o la opción por su nombre). La marca lleva `as_said` (`base.schemas.names`,
+  comprueban y las que leen el grupo o la opción por su nombre). La marca lleva `as_said` (`base.schemas.assistant.names`,
   hub#1245): lo que no se puede leer (vale para varios, para ninguno, sin persona) sale como se dijo, así que el
   `group` de `_OwningGroup` y de `LinkIn` (`modifier.option.create`, `modifier.link.attach`, sin lectura cuya entrada
   quepa en la suya, `base.E012`) también la lleva: su huella lleva el grupo encontrado y el «sí» vale solo para él. El
@@ -631,7 +631,7 @@ Los papeles llegan del SaaS con prefijo (`hub_owner`, `hub_admin`, `hub_manager`
   `check`, `modifier.link.detach` por el asistente rechaza antes de la tarjeta un
   enganche a algo borrado (`modifier.link.get` solo lee `LIVE_LINK`); la operación lo sigue soltando por su id. Junto
   al id con que la escritura toma su registro en su lugar (el del grupo, la opción o el enganche, o `group_id`), la
-  tarjeta deja sin leer el nombre (`base.schemas.unless_given`, hub#1250); el `group` de `OptionRefIn` solo junto a
+  tarjeta deja sin leer el nombre (`base.schemas.assistant.unless_given`, hub#1250); el `group` de `OptionRefIn` solo junto a
   `group_id`, porque la opción por su id se busca en ese grupo (`UNLESS` de `tests/test_assistant_yes_for_its_card.py`).
   Junto al `id` del enganche, `modifier.link.detach` deja sin leer también `group_id`, `product_id` y `category_id`, que
   `detach_link` no mira (hub#1278; `UNLESS_BY_ID`, que recorre todo dato leído por id). El `product` y la `category` de

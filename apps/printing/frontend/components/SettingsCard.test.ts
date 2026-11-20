@@ -4,17 +4,11 @@
 // is on) and «Save settings», which sends only what changed. A read that fails shows no values; whoever may
 // not change them sees them blocked, without «Save settings».
 import { resolveIcon, toastSuccess } from '@erplora/ui/shell';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import { ADMIN, click, errorFrame, flush, ionToggle, ionValue, mountPrinting } from '../__tests__/mount-printing';
 import type { PrinterOut, SettingsOut } from '../operations';
 import SettingsCard from './SettingsCard.vue';
-
-vi.mock('@erplora/ui/shell', async (importOriginal) => ({
-  ...((await importOriginal()) as object),
-  toastSuccess: vi.fn(),
-}));
-beforeEach(() => vi.mocked(toastSuccess).mockClear());
 
 const OP = 'printing.settings.get';
 const PRINTERS = 'printing.printer.list';

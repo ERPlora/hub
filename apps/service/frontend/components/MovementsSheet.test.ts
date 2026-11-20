@@ -3,17 +3,12 @@
 // service on the line»), each Courtesy and Correction (with what moved, who and why), the date, the
 // customer, the professional who did a session (hub#1236) and the sale.
 import { StatusPill } from '@erplora/ui/components';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import type { MovementOut } from '../operations';
 import { mountService, page, settle } from '../__tests__/mount-service';
 import { PACKAGE } from '../__tests__/package';
 import MovementsSheet from './MovementsSheet.vue';
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
 
 const OP = 'service.movement.list';
 const movement = (id: string, over: Partial<MovementOut> = {}): MovementOut => ({

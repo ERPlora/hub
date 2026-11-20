@@ -16,7 +16,7 @@ from live.operations import get
 from live.outbox import channel_for
 
 from apps.table.tests.conftest import HUB_DB, HUB_DB_COMMITTED, A, B, ctx_for, make_session, make_table, make_zone, run
-from base.schemas import SetupStatusIn
+from base.schemas.home import SetupStatusIn
 from base.tenancy.context import use_hub
 
 STEP = "table.tables"

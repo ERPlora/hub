@@ -3,17 +3,12 @@
 // reason. The screen checks first what it can (a clock-out after the clock-in, a reason of 3) and sends
 // `attendance.record.correct`; an untouched time keeps the stored instant, a changed one goes as the
 // business's wall clock. The server's refusal (an overlap, a second open day) stays in the dialog.
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import { itTellsTheCorrectedFieldApart } from '../../../../base/frontend/__tests__/same-words-refusal';
 import { click, errorFrame, ionValue, mountAttendance, settle } from '../__tests__/mount-attendance';
 import type { RecordOut } from '../operations';
 import CorrectionModal from './CorrectionModal.vue';
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
 
 type Control = HTMLElement & { label?: string; value?: unknown; type?: string; errorText?: string; disabled?: boolean };
 

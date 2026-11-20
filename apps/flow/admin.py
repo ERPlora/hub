@@ -1,7 +1,7 @@
 """Django admin of the flow app: full CRUD on every model, for the platform's staff, but the secrets.
 
 The Hub admin has full CRUD over all of a hub's tables. A raw admin write records no event and checks nothing against
-the active apps: to run, grant or switch an automation with its rules, use its operations (services.py). A secret
+the active apps: to run, grant or switch an automation with its rules, use its operations (services/). A secret
 (FLOW-F26) shows only its name and can only be deleted: its value is sealed with the server's key by
 ``flow.secret.set``, and an admin form would neither seal it nor ever show it.
 """

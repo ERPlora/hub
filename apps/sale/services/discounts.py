@@ -9,8 +9,10 @@ from live.operations import AI, operation
 
 from apps.sale import pricing
 from apps.sale.models import Settings
-from apps.sale.queries import authoriser, current_settings, provisional_total
-from apps.sale.schemas import OrderOut, OrderSetDiscountIn, OrderSetLineDiscountIn
+from apps.sale.queries.business import authoriser
+from apps.sale.queries.line_parts import provisional_total
+from apps.sale.queries.settings import current_settings
+from apps.sale.schemas.orders import OrderOut, OrderSetDiscountIn, OrderSetLineDiscountIn
 from apps.sale.services.orders import _guard_covered, _out, _pending_line, _still_open, _touch
 
 DISCOUNTS_NOT_ALLOWED = _("This business does not allow discounts.")

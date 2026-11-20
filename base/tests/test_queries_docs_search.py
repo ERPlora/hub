@@ -18,7 +18,7 @@ from live.operations import AI, get
 from pydantic import ValidationError
 
 from base import assistant
-from base.schemas import AssistantCallIn
+from base.schemas.assistant import AssistantCallIn
 from base.tenancy.tests.business import HUB_DB, HUB_DB_COMMITTED, A, in_business_a
 from base.tests.fake_gateway import gateway, signed
 

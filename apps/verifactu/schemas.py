@@ -22,7 +22,7 @@ from pydantic import (
     model_validator,
 )
 
-from apps.verifactu import chain
+from apps.verifactu import card_names, chain
 from apps.verifactu.models import Config, Event, OwnCertificate, Record
 
 T = TypeVar("T")
@@ -92,7 +92,7 @@ class NoInput(Schema):
 class RecordRefIn(Schema):
     """A record, by its id or by the number of its invoice (its latest record)."""
 
-    record_id: UUID | None = Field(None, description=RECORD_ID)
+    record_id: UUID | None = Field(None, description=RECORD_ID, json_schema_extra=card_names.A_RECORD)
     invoice_number: OptionalText(60) = Field(None, description=INVOICE_NUMBER)
 
     @model_validator(mode="after")
@@ -409,6 +409,7 @@ class CertificateOut(Schema):
     uploaded_at: dt.datetime | None = Field(description="When it was uploaded.")
     expires_at: dt.datetime | None = Field(description="When it expires.")
     expires_in_days: int | None = Field(description="Days left (negative: expired).")
+    expires_soon: bool = Field(description="It expires within the notice period and has not expired: the screen warns.")
 
 
 DocumentName = Literal[
@@ -483,9 +484,7 @@ class ConfigOut(Schema):
     account_url: str = Field(
         description="The ERPlora account, where the signed authorisation is managed."
     )
-    own_certificate: CertificateOut = Field(
-        description="The own certificate uploaded in this Hub (never its material)."
-    )
+    own_certificate: CertificateOut = Field(description="The own certificate uploaded in this Hub (never its material).")
     representation: RepresentationOut = Field(
         description="The signed authorisation, as the account says."
     )
@@ -659,7 +658,7 @@ class RecordCreateIn(Schema):
 
     model_config = ConfigDict(extra="ignore")
 
-    invoice_id: UUID | None = Field(None, description="Id of the issued invoice.")
+    invoice_id: UUID | None = Field(None, description="Id of the issued invoice.", json_schema_extra=card_names.AN_INVOICE)
     number: OptionalText(60) = Field(
         None,
         title=gettext_noop("Invoice number"),
@@ -744,7 +743,7 @@ class RecoverManualIn(IssuerIn):
 
 
 class CertificateUploadIn(Schema):
-    """The business's own certificate (VERIFACTU-F02): kept sealed in the hub's database, never shown again."""
+    """The business's own certificate: kept sealed in the hub's database, never shown again."""
 
     p12_base64: SecretStr = Field(
         title=gettext_noop("Business certificate (.p12 / .pfx)"),

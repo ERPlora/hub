@@ -326,7 +326,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
     }
   });
 
-  test(`BASE-F19 BASE-F23 BASE-F24 — «Desactivar» Reservas takes Mesas with it and «Activar» brings both back, naming it, at ${width}`, async ({ browser }) => {
+  test(`BASE-F19 BASE-F23 BASE-F24 — «Desactivar» Reservas takes Mesas with it and «Activar» brings both back, naming it, at ${width}${width === 1440 ? ' @smoke' : ''}`, async ({ browser }) => {
     await pushPhoto(GRATIS);
     const { context, page } = await signedInSpanish(browser, viewport, '/apps');
     try {
@@ -557,11 +557,11 @@ function schemaBack(): void {
   );
 }
 
-/** The worker is told `a` has work due now, as `base.app.enable` tells it after its COMMIT. */
+/** The worker is told `a` has work due now, as `base.app.enable` tells it after its COMMIT: due, and its notice. */
 function ring(): void {
   psql(
     `insert into control_hubdue (hub_id, due_at, lease_owner) values ('${hubId}', now(), '') ` +
-      'on conflict (hub_id) do update set due_at = least(control_hubdue.due_at, excluded.due_at)',
+      "on conflict (hub_id) do update set due_at = least(control_hubdue.due_at, excluded.due_at); select pg_notify('live_platform_registry', '*')",
   );
 }
 

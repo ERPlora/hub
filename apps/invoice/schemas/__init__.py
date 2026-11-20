@@ -40,7 +40,7 @@ from apps.invoice.models import (
     InvoiceType,
 )
 from apps.invoice.schemas.document_issuer import DocumentIssuerOut
-from base.schemas import names
+from base.schemas.assistant import names
 
 T = TypeVar("T")
 
@@ -868,10 +868,10 @@ class PreviewLineOut(Schema):
 
 
 class RectificationPreviewOut(Schema):
-    """The rectifying invoice that rectifying would issue now, before it is issued (INVOICE-F08): nothing is written.
-    ``invoice.invoice.rectify`` shows its type, next number and amounts on its card (BASE-F98): their titles are the
-    names the Facturas screens give them, its type a closed list said by its name, and an amount says «in cents» to be
-    shown as money."""
+    """The rectifying invoice that rectifying would issue now, before it is issued: nothing is written.
+    ``invoice.invoice.rectify`` shows its type, next number and amounts on the card the assistant asks to confirm it
+    with: their titles are the names the Invoicing screens give them, its type a closed list said by its name, and an
+    amount says «in cents» to be shown as money."""
 
     original: RectifiedOut = Field(description="The invoice it rectifies.")
     invoice_type: InvoiceTypeCode = Field(

@@ -40,7 +40,7 @@ producto actual no tenía página por negocio.
 | `LiveAppConfig` | `kind = "app"`, icono `ion:globe-outline`, categoría `organization`, gratuita (`premium = False`) |
 | Verticales | `hair_salon` y `restaurant` (entra en sus plantillas) |
 | `requires` | `[]` |
-| Usa de otras apps | Inventario y Servicios por el nombre de sus consultas (`inventory.product.list_for_sale`, `inventory.category.list`, `inventory.product_category.list`, `service.service.list_for_sale`, `service.category.list`), solo con la app activa en el hub (`base.relay.active_apps`). De la plataforma: `base.operations.hub_id`, `base.operations.business_currency` (la moneda de los precios en la vista previa y el catálogo público), `base.business.currency_of` (la misma moneda en la página pública, de la fila del registro que el host ya cargó, sin una transacción por visita) y `base.business.currency_decimals` (sus decimales), `storages["hub_files"]`, `base.media` (`/p/media/…`), `base.throttle` y la zona horaria del hub (`control.Hub.timezone`, el «hoy» del horario; Madrid si está vacía) |
+| Usa de otras apps | Inventario y Servicios por el nombre de sus consultas (`inventory.product.list_for_sale`, `inventory.category.list`, `inventory.product_category.list`, `service.service.list_for_sale`, `service.category.list`), solo con la app activa en el hub (`base.apps_on.active_apps`). De la plataforma: `base.operations.hub_id`, `base.operations.business_currency` (la moneda de los precios en la vista previa y el catálogo público), `base.business.currency_of` (la misma moneda en la página pública, de la fila del registro que el host ya cargó, sin una transacción por visita) y `base.business.currency_decimals` (sus decimales), `storages["hub_files"]`, `base.media` (`/p/media/…`), `base.throttle` y la zona horaria del hub (`control.Hub.timezone`, el «hoy» del horario; Madrid si está vacía) |
 | La usa | `base.public_home`: la entrada `/` del host del hub carga `apps/website/public_home.py` (`is_published`, `respond`) por `import_module`; ninguna app de negocio la lee |
 | Pantallas | `/website` (editor, vista previa y «Compartir y QR») y la página pública en `/` |
 | Operaciones | 9 consultas (`queries.py`) y 4 acciones (`services.py`); 11 con su ruta en `/api/website/…` (las 3 `website.public.*` sin sesión) y `expose_api`, y `website.category.get` y `website.image.get` sin ruta; todas con `ai=`: 5 herramientas del asistente y las demás `INTERNAL` |
@@ -51,7 +51,7 @@ producto actual no tenía página por negocio.
 | Fuera del Hub | Places API (New) de Google con `GOOGLE_PLACES_API_KEY` (Secrets Manager; ERPlora/aws#10) |
 | Paquete público | entrada `website` de Vite, en la raíz del Hub (`frontend/website.ts`: Bootstrap 5.3, su `collapse` y `apps/website/frontend/public/`) |
 
-Las decisiones de diseño (una fila por hub en la fase 1, la guarda única de lo público, render y caché, CSP, imágenes,
+Las decisiones de diseño (una web por negocio en su propia BD, la guarda única de lo público, render y caché, CSP, imágenes,
 reseñas de Google, paletas, plantillas y licencias) están en «Para quien lo mantiene» del WORKBOOK; las de la
 migración, en la ronda 2026-10-23 (CLOSE-WEBSITE) de `PLAN-HUB.md` (raíz de erplora-next), y la decisión de fondo en
 PLAN §29 y §30.

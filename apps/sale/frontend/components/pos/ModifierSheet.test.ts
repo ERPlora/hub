@@ -2,18 +2,13 @@
 // and its options with their supplement, the defaults already chosen, a counter where an option repeats, and
 // «Add · <price>», which waits (and says so) while a required group is short. It hands the ids up, in the
 // order chosen; the server values them.
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import type { TargetGroupOut } from '../../../../modifier/frontend/operations';
 import { click, mountSale, settle } from '../../__tests__/mount-sale';
 import { plain } from '../../lib/format';
 import { product } from './__tests__/fixtures';
 import ModifierSheet from './ModifierSheet.vue';
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
 
 const option = (id: string, name: string, price_delta = 0, is_default = false) => ({
   id,
@@ -66,6 +61,13 @@ describe('ModifierSheet', () => {
     expect(plain(s.inDoc('pos-option-cheese')?.textContent ?? '')).toContain('+1,00 €');
     expect(plain(s.inDoc('pos-option-meat')?.textContent ?? '')).toContain('−2,00 €');
     expect(s.inDoc('pos-option-onion')?.textContent).not.toContain('€');
+  });
+
+  it('names the product’s allergens and leaves a product without them unchanged', async () => {
+    const s = await setup({ product: product({ id: 'p1', name: 'Hamburguesa', price: 800, allergens: ['milk', 'gluten'] }) });
+    expect(s.inDoc('pos-options-allergens')?.textContent).toBe('Alérgenos: Gluten, Leche');
+    const plainProduct = await setup();
+    expect(plainProduct.inDoc('pos-options-allergens')).toBeNull();
   });
 
   it('opens with the defaults chosen and «Add» waiting for the required group, saying so on a tap', async () => {

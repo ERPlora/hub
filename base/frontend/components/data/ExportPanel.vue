@@ -33,7 +33,7 @@ import {
 import { saveFile } from '../../lib/download';
 import { type HubHome, readJsonBlock } from '../../lib/home';
 import { useBaseI18n } from '../../lib/i18n';
-import type { AppDatasets, BlueprintPurpose } from '../../operations';
+import type { AppDatasets, BlueprintPurpose } from '../../operations/blueprints';
 import '../../data.css';
 
 /** The languages a file can be written in: the ones the Hub speaks. */

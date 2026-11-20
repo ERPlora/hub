@@ -9,11 +9,12 @@ command through.
 """
 
 from django.conf import settings
-from base import api_help, api_keys, approvals
+from base import api_help, api_home_health, api_keys, api_release_notes, approvals
 from live.ninja import install_error_handlers, mount_app_routers
-from ninja import NinjaAPI
 from ninja.openapi.docs import Swagger
 from ninja.security import django_auth
+
+from config.openapi import OwnerNamedNinjaAPI
 
 
 class NonceSwagger(Swagger):
@@ -22,14 +23,14 @@ class NonceSwagger(Swagger):
     template = "base/swagger.html"
 
 
-def build_api(*, urls_namespace: str = "api", docs: bool | None = None) -> NinjaAPI:
+def build_api(*, urls_namespace: str = "api", docs: bool | None = None) -> OwnerNamedNinjaAPI:
     """A NinjaAPI configured as the hub's: session auth with CSRF, error envelope, docs in DEBUG.
 
     Swagger only with DEBUG (by default): production enforces Trusted Types, which Swagger UI
     does not support.
     """
     with_docs = settings.DEBUG if docs is None else docs
-    api = NinjaAPI(
+    api = OwnerNamedNinjaAPI(
         title="ERPlora Hub API",
         version="1",
         openapi_url="/openapi.json",
@@ -45,8 +46,10 @@ def build_api(*, urls_namespace: str = "api", docs: bool | None = None) -> Ninja
 api = build_api()
 # The api.py router of every app of ours: base (platform) and the modules of apps/.
 mount_app_routers(api)
-# A module's help window: base's one router outside base/api.py.
+# Base's routers outside base/api/: a module's help window, the Home's health row and what is new in ERPlora.
 api.add_router("", api_help.router)
+api.add_router("", api_home_health.router)
+api.add_router("", api_release_notes.router)
 # The business's API keys (``erpk_live``) open the routes of the operations the apps publish (``expose_api``).
 api_keys.install(api)
 # A manager's PIN lets one refused command through (``base.approvals``): its door, before the session's.

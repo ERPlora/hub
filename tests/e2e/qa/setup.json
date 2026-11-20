@@ -1,0 +1,931 @@
+{
+  "steps": [
+    {
+      "tool": "inventory.product.create",
+      "arguments": {
+        "name": "Café",
+        "sku": "QA-CAFE",
+        "price": 180,
+        "cost": 55,
+        "tax_category_key": "restaurant.food",
+        "initial_stock": "50"
+      },
+      "provides": [
+        "QA-CAFE"
+      ]
+    },
+    {
+      "tool": "inventory.product.create",
+      "arguments": {
+        "name": "Cruasán",
+        "sku": "QA-CRUASAN",
+        "price": 160,
+        "cost": 45,
+        "tax_category_key": "restaurant.food",
+        "initial_stock": "50"
+      },
+      "provides": [
+        "QA-CRUASAN"
+      ]
+    },
+    {
+      "tool": "inventory.product.create",
+      "arguments": {
+        "name": "Lentejas",
+        "sku": "QA-LENTEJAS",
+        "price": 450,
+        "cost": 120,
+        "tax_category_key": "restaurant.food",
+        "initial_stock": "50"
+      },
+      "provides": [
+        "QA-LENTEJAS"
+      ]
+    },
+    {
+      "tool": "inventory.product.create",
+      "arguments": {
+        "name": "Merluza",
+        "sku": "QA-MERLUZA",
+        "price": 890,
+        "cost": 320,
+        "tax_category_key": "restaurant.food",
+        "initial_stock": "50"
+      },
+      "provides": [
+        "QA-MERLUZA"
+      ]
+    },
+    {
+      "tool": "inventory.product.create",
+      "arguments": {
+        "name": "Flan",
+        "sku": "QA-FLAN",
+        "price": 240,
+        "cost": 70,
+        "tax_category_key": "restaurant.food",
+        "initial_stock": "50"
+      },
+      "provides": [
+        "QA-FLAN"
+      ]
+    },
+    {
+      "tool": "inventory.product.create",
+      "arguments": {
+        "name": "Té QA",
+        "sku": "QA-TE",
+        "price": 150,
+        "tax_category_key": "restaurant.food",
+        "initial_stock": "20"
+      },
+      "provides": [
+        "Té QA"
+      ]
+    },
+    {
+      "tool": "table.zone.create",
+      "arguments": {
+        "name": "Comedor QA",
+        "color": "success",
+        "description": "Sala principal QA"
+      },
+      "provides": [
+        "Comedor QA"
+      ]
+    },
+    {
+      "tool": "table.table.bulk_create",
+      "arguments": {
+        "zone": "Comedor QA",
+        "count": 6,
+        "start_number": 1,
+        "capacity": 4,
+        "shape": "square"
+      },
+      "provides": []
+    },
+    {
+      "tool": "table.zone.create",
+      "arguments": {
+        "name": "Zona vacía QA",
+        "color": "medium"
+      },
+      "provides": [
+        "Zona vacía QA"
+      ]
+    },
+    {
+      "tool": "customer.customer.create",
+      "arguments": {
+        "name": "Ana QA",
+        "phone": "611 222 333",
+        "email": "ana.qa@example.com"
+      },
+      "provides": [
+        "Ana QA"
+      ]
+    },
+    {
+      "tool": "sale.order.open",
+      "arguments": {
+        "label": "Cuenta QA",
+        "lines": [
+          {
+            "product": "Café",
+            "quantity": 2
+          },
+          {
+            "product": "Cruasán",
+            "quantity": 1
+          }
+        ]
+      },
+      "provides": [
+        "Cuenta QA"
+      ]
+    },
+    {
+      "tool": "table.session.open",
+      "arguments": {
+        "table": "1",
+        "zone": "Comedor QA",
+        "guests_count": 2,
+        "notes": "cumpleaños QA"
+      },
+      "provides": []
+    },
+    {
+      "tool": "schedule.week.set_day",
+      "arguments": {
+        "weekday": 0,
+        "is_closed": false,
+        "intervals": [
+          {
+            "open_time": "09:00",
+            "close_time": "23:30"
+          }
+        ]
+      },
+      "provides": []
+    },
+    {
+      "tool": "schedule.week.set_day",
+      "arguments": {
+        "weekday": 1,
+        "is_closed": false,
+        "intervals": [
+          {
+            "open_time": "09:00",
+            "close_time": "23:30"
+          }
+        ]
+      },
+      "provides": []
+    },
+    {
+      "tool": "schedule.week.set_day",
+      "arguments": {
+        "weekday": 2,
+        "is_closed": false,
+        "intervals": [
+          {
+            "open_time": "09:00",
+            "close_time": "23:30"
+          }
+        ]
+      },
+      "provides": []
+    },
+    {
+      "tool": "schedule.week.set_day",
+      "arguments": {
+        "weekday": 3,
+        "is_closed": false,
+        "intervals": [
+          {
+            "open_time": "09:00",
+            "close_time": "23:30"
+          }
+        ]
+      },
+      "provides": []
+    },
+    {
+      "tool": "schedule.week.set_day",
+      "arguments": {
+        "weekday": 4,
+        "is_closed": false,
+        "intervals": [
+          {
+            "open_time": "09:00",
+            "close_time": "23:30"
+          }
+        ]
+      },
+      "provides": []
+    },
+    {
+      "tool": "schedule.week.set_day",
+      "arguments": {
+        "weekday": 5,
+        "is_closed": false,
+        "intervals": [
+          {
+            "open_time": "09:00",
+            "close_time": "23:30"
+          }
+        ]
+      },
+      "provides": []
+    },
+    {
+      "tool": "schedule.week.set_day",
+      "arguments": {
+        "weekday": 6,
+        "is_closed": false,
+        "intervals": [
+          {
+            "open_time": "09:00",
+            "close_time": "23:30"
+          }
+        ]
+      },
+      "provides": []
+    },
+    {
+      "tool": "reservation.time_slot.create",
+      "arguments": {
+        "day_of_week": 0,
+        "start_time": "12:00",
+        "end_time": "23:00",
+        "max_covers": 20
+      },
+      "provides": []
+    },
+    {
+      "tool": "reservation.time_slot.create",
+      "arguments": {
+        "day_of_week": 1,
+        "start_time": "12:00",
+        "end_time": "23:00",
+        "max_covers": 20
+      },
+      "provides": []
+    },
+    {
+      "tool": "reservation.time_slot.create",
+      "arguments": {
+        "day_of_week": 2,
+        "start_time": "12:00",
+        "end_time": "23:00",
+        "max_covers": 20
+      },
+      "provides": []
+    },
+    {
+      "tool": "reservation.time_slot.create",
+      "arguments": {
+        "day_of_week": 3,
+        "start_time": "12:00",
+        "end_time": "23:00",
+        "max_covers": 20
+      },
+      "provides": []
+    },
+    {
+      "tool": "reservation.time_slot.create",
+      "arguments": {
+        "day_of_week": 4,
+        "start_time": "12:00",
+        "end_time": "23:00",
+        "max_covers": 20
+      },
+      "provides": []
+    },
+    {
+      "tool": "reservation.time_slot.create",
+      "arguments": {
+        "day_of_week": 5,
+        "start_time": "12:00",
+        "end_time": "23:00",
+        "max_covers": 20
+      },
+      "provides": []
+    },
+    {
+      "tool": "reservation.time_slot.create",
+      "arguments": {
+        "day_of_week": 6,
+        "start_time": "12:00",
+        "end_time": "23:00",
+        "max_covers": 20
+      },
+      "provides": []
+    },
+    {
+      "tool": "reservation.reservation.create",
+      "arguments": {
+        "customer": "Ana QA",
+        "date": "{today}",
+        "time": "21:00",
+        "party_size": 2,
+        "duration_minutes": 120,
+        "table": "2",
+        "zone": "Comedor QA"
+      },
+      "provides": []
+    },
+    {
+      "tool": "reservation.reservation.confirm",
+      "arguments": {
+        "guest": "Ana QA",
+        "day": "{today}"
+      },
+      "provides": []
+    },
+    {
+      "tool": "reservation.waitlist.create",
+      "arguments": {
+        "customer": "Ana QA",
+        "date": "{today+1}",
+        "preferred_time": "20:00",
+        "party_size": 2
+      },
+      "provides": []
+    },
+    {
+      "tool": "reservation.blocked_date.create",
+      "arguments": {
+        "date": "{today+10}",
+        "reason": "Cierre QA",
+        "is_full_day": true
+      },
+      "provides": [
+        "Cierre QA"
+      ]
+    },
+    {
+      "tool": "staff.role.create",
+      "arguments": {
+        "name": "Coordinación QA"
+      },
+      "provides": [
+        "Coordinación QA"
+      ]
+    },
+    {
+      "tool": "staff.member.create",
+      "arguments": {
+        "first_name": "Laura",
+        "last_name": "QA",
+        "is_bookable": true
+      },
+      "provides": [
+        "Laura QA"
+      ]
+    },
+    {
+      "tool": "staff.member.create",
+      "arguments": {
+        "first_name": "Fichaje",
+        "last_name": "QA",
+        "is_bookable": true
+      },
+      "provides": [
+        "Fichaje QA"
+      ]
+    },
+    {
+      "tool": "staff.member.create",
+      "arguments": {
+        "first_name": "Personal",
+        "last_name": "QA",
+        "is_bookable": true
+      },
+      "provides": [
+        "Personal QA"
+      ]
+    },
+    {
+      "tool": "staff.member.create",
+      "arguments": {
+        "first_name": "Ayudante Uno",
+        "last_name": "QA",
+        "is_bookable": true
+      },
+      "provides": [
+        "Ayudante Uno QA"
+      ]
+    },
+    {
+      "tool": "attendance.record.clock_in",
+      "arguments": {
+        "member": "Fichaje QA"
+      },
+      "provides": []
+    },
+    {
+      "tool": "attendance.record.clock_out",
+      "arguments": {
+        "member": "Fichaje QA"
+      },
+      "provides": []
+    },
+    {
+      "tool": "staff.time_off.create",
+      "arguments": {
+        "member": "Personal QA",
+        "leave_type": "training",
+        "start_date": "2026-11-20",
+        "end_date": "2026-11-20",
+        "reason": "formación QA"
+      },
+      "provides": []
+    },
+    {
+      "tool": "service.category.create",
+      "arguments": {
+        "name": "Peluquería QA"
+      },
+      "provides": [
+        "Peluquería QA"
+      ]
+    },
+    {
+      "tool": "service.service.create",
+      "arguments": {
+        "name": "Corte QA",
+        "duration_minutes": 30,
+        "price": 1200,
+        "tax_category_key": "restaurant.food"
+      },
+      "provides": [
+        "Corte QA"
+      ]
+    },
+    {
+      "tool": "service.service.create",
+      "arguments": {
+        "name": "Masaje QA",
+        "duration_minutes": 30,
+        "price": 2000,
+        "tax_category_key": "service.generic"
+      },
+      "provides": [
+        "Masaje QA"
+      ]
+    },
+    {
+      "tool": "service.package.create",
+      "arguments": {
+        "name": "Bono QA",
+        "fixed_price": 3000,
+        "items": [
+          {
+            "service": "Corte QA",
+            "sessions": 3
+          }
+        ]
+      },
+      "provides": [
+        "Bono QA"
+      ]
+    },
+    {
+      "tool": "service.grant.create",
+      "arguments": {
+        "package": "Bono QA",
+        "customer": "Ana QA"
+      },
+      "provides": []
+    },
+    {
+      "tool": "appointment.appointment.create",
+      "arguments": {
+        "customer": "Ana QA",
+        "staff": "Laura QA",
+        "services": [
+          {
+            "service": "Corte QA"
+          }
+        ],
+        "start": "{today+1} 11:00"
+      },
+      "provides": []
+    },
+    {
+      "tool": "appointment.recurring.create",
+      "arguments": {
+        "customer": "Ana QA",
+        "staff": "Laura QA",
+        "services": [
+          {
+            "service": "Corte QA"
+          }
+        ],
+        "start_date": "{today+2}",
+        "frequency": "weekly",
+        "time": "10:00",
+        "max_occurrences": 6
+      },
+      "provides": []
+    },
+    {
+      "tool": "customer.consent.grant",
+      "arguments": {
+        "customer": "Ana QA",
+        "channel": "email",
+        "notice_text": "Acepto recibir ofertas por correo QA",
+        "notice_version": "1",
+        "source": "counter"
+      },
+      "provides": []
+    },
+    {
+      "tool": "sale.order.open",
+      "arguments": {
+        "label": "Cuenta bonos QA",
+        "service_lines": [
+          {
+            "service": "Corte QA"
+          }
+        ]
+      },
+      "provides": [
+        "Cuenta bonos QA"
+      ]
+    },
+    {
+      "tool": "combo.combo.create",
+      "arguments": {
+        "name": "Menú QA",
+        "price": 1200,
+        "tax_category_key": "restaurant.food"
+      },
+      "provides": [
+        "Menú QA"
+      ]
+    },
+    {
+      "tool": "combo.group.create",
+      "arguments": {
+        "combo": "Menú QA",
+        "name": "Primero",
+        "min_choices": 1,
+        "max_choices": 1
+      },
+      "provides": []
+    },
+    {
+      "tool": "combo.group.create",
+      "arguments": {
+        "combo": "Menú QA",
+        "name": "Segundo",
+        "min_choices": 1,
+        "max_choices": 1
+      },
+      "provides": []
+    },
+    {
+      "tool": "combo.group.create",
+      "arguments": {
+        "combo": "Menú QA",
+        "name": "Postre",
+        "min_choices": 1,
+        "max_choices": 1
+      },
+      "provides": []
+    },
+    {
+      "tool": "combo.group.create",
+      "arguments": {
+        "combo": "Menú QA",
+        "name": "Platos QA",
+        "min_choices": 1,
+        "max_choices": 1
+      },
+      "provides": [
+        "Platos QA"
+      ]
+    },
+    {
+      "tool": "modifier.group.create",
+      "arguments": {
+        "name": "Endulzante QA",
+        "kitchen_name": "ENDULZANTE QA",
+        "min_choices": 0,
+        "max_choices": 1
+      },
+      "provides": [
+        "Endulzante QA"
+      ]
+    },
+    {
+      "tool": "modifier.option.create",
+      "arguments": {
+        "group": "Endulzante QA",
+        "name": "Sin azúcar QA",
+        "is_default": true
+      },
+      "provides": [
+        "Sin azúcar QA"
+      ]
+    },
+    {
+      "tool": "modifier.link.attach",
+      "arguments": {
+        "product": "Café",
+        "group": "Endulzante QA"
+      },
+      "provides": []
+    },
+    {
+      "tool": "payment.method.create",
+      "arguments": {
+        "name": "Banco QA",
+        "method_type": "transfer",
+        "bank_account_ref": "ES91 2100 0418 4502 0005 1332"
+      },
+      "provides": [
+        "Banco QA"
+      ]
+    },
+    {
+      "tool": "cash_register.register.create",
+      "arguments": {
+        "name": "Barra QA"
+      },
+      "provides": [
+        "Barra QA"
+      ]
+    },
+    {
+      "tool": "cash_register.session.open",
+      "arguments": {
+        "register_name": "Barra QA",
+        "opening_balance": 10000
+      },
+      "provides": []
+    },
+    {
+      "tool": "sale.department.create",
+      "arguments": {
+        "name": "Chuches QA",
+        "tax_category_key": "restaurant.food"
+      },
+      "provides": [
+        "Chuches QA"
+      ]
+    },
+    {
+      "tool": "pricing.price_list.create",
+      "arguments": {
+        "code": "MAYORISTA-QA",
+        "name": "Mayorista QA"
+      },
+      "provides": [
+        "Mayorista QA"
+      ]
+    },
+    {
+      "tool": "pricing.price_item.add",
+      "arguments": {
+        "price_list": "Mayorista QA",
+        "product": "Café",
+        "price": 160,
+        "min_quantity": "1"
+      },
+      "provides": []
+    },
+    {
+      "tool": "invoice.series.create",
+      "arguments": {
+        "code": "MANUALQA",
+        "name": "Manual QA",
+        "invoice_type": "F1",
+        "year": "{year}"
+      },
+      "provides": [
+        "Manual QA"
+      ]
+    },
+    {
+      "tool": "tax.category.create",
+      "arguments": {
+        "key": "product.qa",
+        "name": "Productos QA",
+        "description": "solo para pruebas QA"
+      },
+      "provides": [
+        "product.qa"
+      ]
+    },
+    {
+      "tool": "tax.rule.create",
+      "arguments": {
+        "country_code": "ES",
+        "tax_category_key": "product.qa",
+        "rate_pct": "21",
+        "operation_class": "subject",
+        "valid_from": "2026-01-01"
+      },
+      "provides": []
+    },
+    {
+      "tool": "tax.rule.deactivate",
+      "arguments": {
+        "country_code": "ES",
+        "tax_category_key": "product.qa"
+      },
+      "provides": []
+    },
+    {
+      "tool": "cart_checkout.cart.create",
+      "arguments": {
+        "session_token": "QA-WEB-1",
+        "customer_name": "Web QA",
+        "customer_email": "web.qa@example.com"
+      },
+      "provides": [
+        "QA-WEB-1"
+      ]
+    },
+    {
+      "tool": "cart_checkout.item.add",
+      "arguments": {
+        "session_token": "QA-WEB-1",
+        "product_ref": "QA-CAFE",
+        "product_name": "Café",
+        "sku": "QA-CAFE",
+        "quantity": 1,
+        "unit_price": 180
+      },
+      "provides": []
+    },
+    {
+      "tool": "kitchen.ticket.create",
+      "arguments": {
+        "label": "Comida personal QA",
+        "items": [
+          {
+            "name": "Comida personal",
+            "quantity": 1
+          }
+        ]
+      },
+      "provides": [
+        "Comida personal QA"
+      ]
+    },
+    {
+      "tool": "kitchen.ticket.start",
+      "arguments": {
+        "ticket": "Comida personal QA"
+      },
+      "provides": []
+    },
+    {
+      "tool": "kitchen.item.bump",
+      "arguments": {
+        "ticket": "Comida personal QA"
+      },
+      "provides": []
+    },
+    {
+      "tool": "printing.printer.create",
+      "arguments": {
+        "name": "Caja QA",
+        "kind": "network",
+        "address": "192.168.1.50",
+        "usage": "receipt"
+      },
+      "provides": [
+        "Caja QA"
+      ]
+    },
+    {
+      "tool": "schedule.special_day.create",
+      "arguments": {
+        "date": "2026-12-24",
+        "name": "Festivo QA",
+        "is_closed": true,
+        "recurring_yearly": true
+      },
+      "provides": [
+        "Festivo QA"
+      ]
+    },
+    {
+      "tool": "schedule.override.create",
+      "arguments": {
+        "start_date": "2026-11-16",
+        "end_date": "2026-11-18",
+        "reason": "Cambio QA",
+        "is_closed": true
+      },
+      "provides": [
+        "Cambio QA"
+      ]
+    },
+    {
+      "tool": "task.task.create",
+      "arguments": {
+        "title": "Revisar almacén QA"
+      },
+      "provides": [
+        "Revisar almacén QA"
+      ]
+    },
+    {
+      "tool": "demo.item.create",
+      "arguments": {
+        "name": "Ejemplo QA",
+        "note": "abierto en QA"
+      },
+      "provides": [
+        "Ejemplo QA"
+      ]
+    },
+    {
+      "tool": "flow.flow.create",
+      "arguments": {
+        "name": "Crear ejemplo QA al cobrar",
+        "trigger": {
+          "kind": "event",
+          "event": "sale.sale.completed"
+        },
+        "steps": [
+          {
+            "id": "item",
+            "kind": "command",
+            "operation": "demo.item.create",
+            "params": {
+              "name": "Venta QA"
+            }
+          }
+        ]
+      },
+      "provides": [
+        "Crear ejemplo QA al cobrar"
+      ]
+    },
+    {
+      "tool": "flow.flow.grant",
+      "arguments": {
+        "flow": "Crear ejemplo QA al cobrar",
+        "operations": [
+          "sale.sale.get",
+          "demo.item.create"
+        ]
+      },
+      "provides": []
+    },
+    {
+      "tool": "customer.customer.create",
+      "arguments": {
+        "name": "Cliente Factura QA",
+        "tax_id": "B12345674",
+        "company_name": "Cliente Factura QA SL",
+        "address": "Calle Sol 2",
+        "city": "Madrid",
+        "postal_code": "28002",
+        "country": "ES",
+        "email": "factura.qa@example.com"
+      },
+      "provides": [
+        "Cliente Factura QA"
+      ]
+    },
+    {
+      "tool": "invoice.issuer.update",
+      "arguments": {
+        "legal_name": "Restaurante QA SL",
+        "tax_id": "B12345674",
+        "address": "Calle Mayor 1",
+        "postal_code": "28001",
+        "city": "Madrid",
+        "province": "Madrid",
+        "country": "ES"
+      },
+      "provides": []
+    },
+    {
+      "tool": "invoice.invoice.create",
+      "arguments": {
+        "customer": "factura.qa@example.com",
+        "lines": [
+          {
+            "description": "Servicio QA",
+            "quantity": "1",
+            "unit_price": 10000,
+            "tax_category_key": "service.generic"
+          }
+        ]
+      },
+      "provides": [
+        "Cliente Factura QA"
+      ]
+    }
+  ]
+}

@@ -6,7 +6,7 @@ import type { ActionNotice, ActionNoticeSource, NoticeAction } from '@erplora/ui
 import { computed } from 'vue';
 import { useRouter } from 'vue-router';
 
-import type { SetupItem, SetupStatus } from '../operations';
+import type { SetupItem, SetupStatus } from '../operations/home';
 import type { BellCounter } from '../operations-bell';
 import { useBellCounters } from './bell-counters';
 import { blockingItems } from './home';

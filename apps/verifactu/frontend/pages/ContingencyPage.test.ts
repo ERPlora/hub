@@ -3,7 +3,7 @@
 // Next attempt, Last error — with «Retry» and «View» per row. The result of a pass is said under the button.
 import { DataTable, EmptyState } from '@erplora/ui/components';
 import { toastSuccess } from '@erplora/ui/shell';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import type { Component } from 'vue';
 
 import { click, EMPLOYEE, flush, type MountOptions, mountVerifactu } from '../__tests__/mount-verifactu';
@@ -11,12 +11,6 @@ import { plain } from '../lib/format';
 import type { QueueRowOut } from '../operations';
 import ContingencyPage from './ContingencyPage.vue';
 import { listFillProblems } from '../../../../frontend/testing/list-fill';
-
-vi.mock('@erplora/ui/shell', async (importOriginal) => ({
-  ...((await importOriginal()) as object),
-  toastSuccess: vi.fn(),
-}));
-beforeEach(() => vi.mocked(toastSuccess).mockClear());
 
 const OP = 'verifactu.contingency.list';
 const ROW: QueueRowOut = {

@@ -1,11 +1,9 @@
 // Handing the person the CSV the server wrote (ATTENDANCE-F10): a Blob with a BOM, so a spreadsheet reads the accents
 // of the names as UTF-8, saved by the Hub's `saveFile` — a link in a browser, the app's Downloads inside it (hub#1041).
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import { browserDownloads, insideTheAppSaving, keyText, outOfTheAppAfterEach } from '../../../../base/frontend/__tests__/app-download';
 import { saveCsv } from './download';
-
-vi.mock('@erplora/ui/shell', async (importOriginal) => (await import('../../../../base/frontend/__tests__/toast-spies')).shellWithToastSpies(importOriginal));
 
 outOfTheAppAfterEach();
 

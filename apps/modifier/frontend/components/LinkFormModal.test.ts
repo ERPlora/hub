@@ -2,16 +2,11 @@
 // of each in Inventory (a product by its name or SKU). «Apply» sends `modifier.link.attach` with the id
 // picked; a link that already exists is said in the dialog.
 import { Combo } from '@erplora/ui/components';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import type { GroupOut } from '../operations';
 import { click, mountModifier, page, settle } from '../__tests__/mount-modifier';
 import LinkFormModal from './LinkFormModal.vue';
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
 
 type Control = HTMLElement & { value?: unknown; disabled?: boolean };
 

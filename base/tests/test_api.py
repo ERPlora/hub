@@ -11,12 +11,22 @@ pytestmark = [HUB_DB, pytest.mark.usefixtures("hub_a")]
 
 
 def test_me_is_bound_to_session_me():
-    from base.api import router
+    from base.api.home import router
 
     [route] = router.path_operations["/me"].operations
     assert (route.methods, route.operation_id) == (["GET"], "base.session.me")
     assert route.auth_param is None  # anonymous visitors get user: null, not a 401
     assert resolve("/api/me").url_name
+
+
+def test_every_route_of_base_is_tagged_base_once_in_the_openapi_document():
+    from config.api import api
+
+    paths = api.get_openapi_schema(path_prefix="/api/")["paths"]
+    routes = [route for methods in paths.values() for route in methods.values()]
+    tags = [route["tags"] for route in routes if route["operationId"].startswith("base.")]
+    assert tags
+    assert tags == [["base"]] * len(tags)
 
 
 def test_anonymous(client):
@@ -71,7 +81,8 @@ def test_the_list_of_an_owner_over_http(client, make_user, settings):
 
 
 def test_an_anonymous_visitor_gets_no_home(client):
-    for path in ("/api/home/setup", "/api/home/widgets", "/api/home/bell", "/api/home/notices", "/api/system/cards"):
+    home = ("/api/home/setup", "/api/home/widgets", "/api/home/bell", "/api/home/notices", "/api/home/health")
+    for path in (*home, "/api/system/cards"):
         response = client.get(path, HTTP_HOST=HOST)
         assert response.status_code in (401, 403), path
 
@@ -80,6 +91,7 @@ def test_the_spas_route_map_names_every_base_route():
     from base.tests.test_access_routes import ROUTES as WAY_IN
     from base.tests.test_api_keys import KEY_ROUTES as KEYS
     from base.tests.test_api_docs import API_DOC_ROUTES as API_DOCS
+    from base.tests.test_api_health import HEALTH_ROUTES as HEALTH
     from base.tests.test_api_help import HELP_ROUTES as HELP
     from base.tests.test_approvals import APPROVAL_ROUTES as APPROVALS
     from base.tests.test_files_api import ROUTES as FILES
@@ -124,7 +136,7 @@ def test_the_spas_route_map_names_every_base_route():
         ("POST", "/api/assistant/speak", "base.assistant.speak"),
         ("POST", "/api/support/report", "base.support.report"),
         ("POST", "/api/saas-pass", "base.saas_pass.create"),
-    } | {(method, f"/api{path}", op) for method, path, op in WAY_IN | PEOPLE | KEYS | APPROVALS | API_DOCS | LOCATIONS | CATALOG_IMAGES | HELP}
+    } | {(method, f"/api{path}", op) for method, path, op in WAY_IN | PEOPLE | KEYS | APPROVALS | API_DOCS | LOCATIONS | CATALOG_IMAGES | HELP | HEALTH}
 
 
 # Settings › Data: the blueprints, the loads, the export and the reset. Reading what a file brings goes by POST (a

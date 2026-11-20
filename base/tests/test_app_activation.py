@@ -21,11 +21,11 @@ from live.operations import atomic, get
 
 from apps.flow.tests.test_relay import heard, listen
 from apps.sale.tests.conftest import db_dsn
-from base import activation, events, relay
+from base import activation, apps_on, events
 from base.activation import OFF, ON, Activation
 from base.entitlement import EntitlementBlocked
 from base.models import AppActivation, Hub
-from base.schemas import AppChangeIn, AppChangeOut
+from base.schemas.apps import AppChangeIn, AppChangeOut
 from base.tenancy import inventory
 from base.tenancy.context import current_alias, use_hub
 from base.tenancy.tests.business import HOST, HUB_DB, HUB_DB_COMMITTED, A, B, in_business_a
@@ -137,7 +137,7 @@ def test_a_business_that_never_changed_anything_has_every_app_off_and_writes_not
         label: ("off", False) for label in activation.module_graph()
     }
     assert (document["max_apps"], document["enabled"]) == (None, 0)
-    assert relay.active_apps(A).isdisjoint(activation.module_graph())
+    assert apps_on.active_apps(A).isdisjoint(activation.module_graph())
     assert rows() == {}
 
 
@@ -162,7 +162,7 @@ def test_erploras_own_hub_has_every_app_on_and_the_worker_scope_is_not_the_platf
     scope = Scope("host", "erplora")
     assert activation.off_apps(scope) == frozenset()
     assert activation.states_of(scope) == activation.every_on(graph)
-    assert {"invoice", "verifactu", "whatsapp_inbox"} <= relay.active_apps(scope)
+    assert {"invoice", "verifactu", "whatsapp_inbox"} <= apps_on.active_apps(scope)
     assert activation.off_apps(Scope("host", "worker-scope")) == frozenset(graph)
     assert activation.off_apps(Scope("host", "c")) == frozenset(graph)
 
@@ -171,7 +171,7 @@ def test_erploras_own_hub_has_every_app_on_and_the_worker_scope_is_not_the_platf
 
 
 def modules_on(scope):
-    return set(relay.active_apps(scope)) & set(activation.module_graph())
+    return set(apps_on.active_apps(scope)) & set(activation.module_graph())
 
 
 @HUB_DB
@@ -179,7 +179,7 @@ def test_a_business_the_saas_registers_is_born_with_every_app_off():
     from live.context import system_context
 
     from base import registry
-    from base.schemas import HubRegistryIn
+    from base.schemas.hub_registry import HubRegistryIn
 
     get("base.hub.register")(
         system_context(registry.REGISTRY_SCOPE),
@@ -201,7 +201,7 @@ def test_a_demo_is_born_with_every_app_off():
     from live.context import system_context
 
     from base import registry
-    from base.schemas import DemoCreateIn
+    from base.schemas.demos import DemoCreateIn
 
     demo = get("base.demo.create")(
         system_context(registry.REGISTRY_SCOPE),
@@ -1027,13 +1027,13 @@ def test_the_relay_the_home_and_the_assistant_leave_out_an_app_off(django_captur
     from base import assistant
 
     set_rows(task="on*", staff="on")
-    assert "task" in relay.active_apps(A)
+    assert "task" in apps_on.active_apps(A)
     with django_capture_on_commit_callbacks(execute=True, using=current_alias()):  # its COMMIT forgets the cache
         disable("task")
-    assert "task" not in relay.active_apps(A) and "staff" not in relay.active_apps(A)
-    assert "base" in relay.active_apps(A)
+    assert "task" not in apps_on.active_apps(A) and "staff" not in apps_on.active_apps(A)
+    assert "base" in apps_on.active_apps(A)
     with use_hub(hub_b):
-        assert "task" in relay.active_apps(B)
+        assert "task" in apps_on.active_apps(B)
     assert "task" not in assistant.tools.active_apps(A)
     assert not any(op.app_label == "task" for op in assistant.tools.catalog(ctx()).values())
 
@@ -1265,7 +1265,7 @@ def test_with_the_cache_warm_the_operations_read_no_row():
     with CaptureQueriesContext(connections[current_alias()]) as captured:  # the business's own database
         for _ in range(3):
             task_list_as()
-            assert "task" in relay.active_apps(A)
+            assert "task" in apps_on.active_apps(A)
             get("base.session.me")(ctx(), get("base.session.me").input())
 
     assert activation_reads(captured) == []

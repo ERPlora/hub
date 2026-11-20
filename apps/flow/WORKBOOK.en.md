@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:ad24a182c25f96f53562b0d72aee74657553b9ace4bcc644ecf87d8e6d75e53c -->
+<!-- generated from WORKBOOK.md sha256:feb021abf28fbcfd82adcd1c04e5c2b4e2ae7673884472c0798f68ab08a8e632 -->
 
 ## What it is for and who it is for
 
@@ -425,9 +425,14 @@ Steps:
    yen comes out in dollars) and, if it gives none, in the step's; a price of a price list, in its list's; the
    fixed discount of a rule, which belongs to no price list, in the business's; the cash payment limit or the
    ticket limit of a charge preview, in euros, the currency the law sets them in, also in a business that charges
-   in another one ("1.000,00 €"); if it gives none, in the business's ("120,50 €"). A number the notice brings comes out as it
-   is, because the notice does not say whether it is money. What goes to another action, to another system or
-   to an "Only continue if…" carries each piece of data as it is.
+   in another one ("1.000,00 €"); if it gives none, in the business's ("120,50 €"). An amount the notice brings
+   comes out the same way, in the currency the notice brings and, if it brings none, in the business's: the total
+   and the other figures of a charged sale, the total of a voided or refunded sale, the total of an issued invoice,
+   the amount of a payment, the figures of a till session, movement or count, the price and the cost of a product,
+   what an option of a modifier adds or takes off, a price put in a price list (in its list's) and the total of a
+   line of a cart or of an order (in its cart's). Any other number the notice brings (a ticket's number, how many
+   items it has) comes out as it is. What goes to another action, to another system or to an "Only continue if…"
+   carries each piece of data as it is.
 In: the actions and queries of the active apps, the last real notice of that kind and what the previous
 steps leave. Data are named in the screen's language ("Sale number", "Customer phone") and with the word of the
 app they belong to ("Section", as in Sales & POS; "Override", as in Schedule), never with their internal name;
@@ -912,8 +917,8 @@ Steps:
    already in international format): only the WhatsApp conversation of exactly that international number
    gets it, never a new one. An incomplete number typed by hand reaches nobody.
 3. Write the "Message", with inserted data: it goes as it is if the customer wrote to you in the last 24
-   hours, with each piece of data in words (FLOW-F11: a yes or a no, a date and a time, an amount of a
-   previous step), also in the template's blanks.
+   hours, with each piece of data in words (FLOW-F11: a yes or a no, a date and a time, an amount of the
+   notice or of a previous step), also in the template's blanks.
 4. Choose the "Template" among your templates approved by Meta (its text shows below) and fill in a piece of
    data for each blank: after 24 hours, WhatsApp only lets an approved template through. With no approved
    templates it says so: "You have no approved templates yet: create one in WhatsApp › Settings.". If the one

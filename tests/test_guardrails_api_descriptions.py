@@ -5,6 +5,9 @@ name an operation (``base.app.get``: the ``operationId`` an integrator calls) or
 as «base.team»; it never names a module, a function or a constant of the Hub's code (``base.usage``,
 ``live.assistant.NAMED``): whoever integrates does not have that code, and the name stops existing as soon as the code
 moves to another module.
+
+Nor does it cite the code of one of the Hub's own documented flows (``BASE-F62``) or an issue of its tracker
+(``hub#1208``): whoever integrates cannot look either up, so a description says what they stand for in plain words.
 """
 
 import re
@@ -18,6 +21,8 @@ from config.api import api
 CODE_NAME = re.compile(r"(?<![\w.])(?:apps|base|config|control|live|shared)(?:\.[A-Za-z_]\w*)+")
 #: A value the API sends or takes, quoted as the person reads it: data, not code.
 API_VALUE = re.compile(r"«[^»]*»")
+#: A documented flow's code (``CASH_REGISTER-F08``) or an issue of a repository (``hub#1208``), this one or another.
+INTERNAL_CODE = re.compile(r"\b[A-Z][A-Z0-9_]*-F\d+\b|\b[A-Za-z][\w.-]*#\d+\b")
 
 
 def code_names(text: str) -> list[str]:
@@ -47,6 +52,26 @@ def documented() -> list[tuple[str, str]]:
 def test_no_description_of_the_api_names_the_hubs_code():
     named = [(where, name) for where, text in documented() for name in code_names(text)]
     assert named == []
+
+
+def test_no_description_of_the_api_cites_a_flow_or_an_issue():
+    cited = [(where, code) for where, text in documented() for code in INTERNAL_CODE.findall(text)]
+    assert cited == []
+
+
+@pytest.mark.parametrize(
+    ("text", "codes"),
+    [
+        ("Empty = the business's country and region (TAX-F11).", ["TAX-F11"]),
+        ("What is still open when the drawer closes (CASH_REGISTER-F08, F09).", ["CASH_REGISTER-F08"]),
+        ("the fingerprint of what that card showed (hub#1208: the yes is for that card).", ["hub#1208"]),
+        ("As ERPlora/erplora-next#74 and pm#43 say.", ["erplora-next#74", "pm#43"]),
+        ("Its number («12», «#0012», «20261014-0012»), as the card shows it (#0012).", []),
+        ("Country, ISO 3166-1 alpha-2 (ES, PT…); a key F1 to F12; a range A-F; UTF-8.", []),
+    ],
+)
+def test_a_flow_or_an_issue_is_told_from_a_ticket_number_and_prose(text, codes):
+    assert INTERNAL_CODE.findall(text) == codes
 
 
 def test_the_query_parameters_of_an_operation_are_read_too():

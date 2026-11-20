@@ -2,16 +2,11 @@
 // with every correction, newest first — who (or «System»), when, «Before» → «After» and the «Reason» —,
 // or «This working day has never been corrected.». It reads `attendance.correction.list` when it opens;
 // nothing in it can be edited.
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import { click, mountAttendance, settle } from '../__tests__/mount-attendance';
 import type { CorrectionOut, RecordOut } from '../operations';
 import HistoryModal from './HistoryModal.vue';
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
 
 const DAY = { id: 'r1', member_name: 'Bea Ruiz', work_date: '2026-10-05', status: 'closed' } as RecordOut;
 

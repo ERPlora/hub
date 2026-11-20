@@ -82,7 +82,7 @@
         "page_title": "Page title",
         "welcome_message": "Welcome message",
         "primary_color": "Primary colour",
-        "logo_url": "Logo URL",
+        "logo": "Logo",
         "require_email": "Email required",
         "max_upcoming_per_customer": "Upcoming bookings per mobile",
         "allow_staff_selection": "Let the customer choose the professional",
@@ -137,7 +137,17 @@
     "door": {
       "title": "Book online",
       "intro": "Choose your services, a day and a free time, then leave your name and mobile.",
-      "noServices": "This business has nothing to book online right now."
+      "noServices": "This business has nothing to book online right now.",
+      "logoAlt": "{business} logo",
+      "businessFallback": "the business",
+      "privacy": "Your details will be used by {business} to manage this booking, and ERPlora will process them on behalf of {business}. Read the",
+      "privacyLink": "privacy policy",
+      "website": "Website",
+      "loadingBooking": "Loading your booking…",
+      "cancelled": "This booking is cancelled.",
+      "cancel": {
+        "message": "Cancel booking {number} ({when})?"
+      }
     }
   }
 }

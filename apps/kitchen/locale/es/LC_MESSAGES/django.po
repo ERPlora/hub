@@ -618,8 +618,12 @@ msgid "Nothing on this check is cooked: services do not go to the kitchen."
 msgstr "Nada de esta cuenta se cocina: los servicios no van a cocina."
 
 #: services.py:119
-msgid "Printing is not active in this business."
-msgstr "Impresión no está activa en este negocio."
+msgid ""
+"No printer prints this ticket: turn on Printing and add an active kitchen or "
+"bar printer."
+msgstr ""
+"Ninguna impresora imprime esta comanda: activa Impresión y añade una "
+"impresora de cocina o de barra activa."
 
 #: services.py:120
 #, python-format
@@ -681,3 +685,25 @@ msgstr "PLATO ANULADO · %(label)s"
 #, python-format
 msgid "CANCELLED · %(label)s"
 msgstr "ANULADA · %(label)s"
+
+#: allergy.py:14
+msgid "!! ALLERGY !!"
+msgstr "!! ALERGIA !!"
+
+#: allergy.py:15
+#, python-format
+msgid "*** ALLERGY: %(names)s ***"
+msgstr "*** ALERGIA: %(names)s ***"
+
+#: allergy.py:16
+#, python-format
+msgid "*** CONTAINS: %(names)s ***"
+msgstr "*** LLEVA: %(names)s ***"
+
+#: models.py:410
+msgid "customer's allergy"
+msgstr "alergia del cliente"
+
+#: models.py:411
+msgid "allergy in the dish"
+msgstr "alergia en el plato"

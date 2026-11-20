@@ -6,21 +6,17 @@
 //     is missing;
 //   - «Write-off — <product>»: the quantity and its reason (waste, breakage, own consumption).
 // Quantities in the product's unit and its step; a refusal stays in the dialog under its field.
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 
 import {
   expectAmountLeftWaitsForMoney,
   expectSaveWaitsForMoney,
   expectWindowSaysMoneyUnreadable,
 } from '../../../../base/frontend/__tests__/save-waits-for-money';
-import type { Business } from '../../../../base/frontend/operations';
+import type { Business } from '../../../../base/frontend/operations/business';
 import { business, errorFrame, flush, mountInventory, ok, POLISH, product, refusal, subId, UNITS } from '../__tests__/mount-inventory';
 import StockModal from './StockModal.vue';
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
+import { typeText } from '../__tests__/ionic-controls';
 
 afterEach(() => {
   document.body.innerHTML = '';
@@ -43,12 +39,7 @@ async function setup(
   const call = await m.live();
   await flush();
   const el = (id: string) => document.querySelector<Control>(`[data-testid="${id}"]`);
-  async function type(id: string, value: string) {
-    const field = el(id)!;
-    field.value = value;
-    field.dispatchEvent(new CustomEvent('ionInput', { detail: { value } }));
-    await flush();
-  }
+  const type = (id: string, value: string) => typeText(el, id, value);
   async function submit() {
     el('inventory-stock-form-submit')!.click();
     await flush();

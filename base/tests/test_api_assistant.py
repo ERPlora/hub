@@ -126,7 +126,7 @@ def test_after_too_many_rounds_it_stops_and_says_why(client, make_user, gateway)
 
 def test_a_turn_too_heavy_is_refused_before_it_is_read(client, make_user):
     client.force_login(make_user("ana", host=A.key, role="hub_employee"))
-    from base.api import MAX_ASSISTANT_TURN_BODY
+    from base.api.assistant import MAX_ASSISTANT_TURN_BODY
 
     response = client.post(
         "/api/assistant/turn", b"x", content_type="application/json", CONTENT_LENGTH=MAX_ASSISTANT_TURN_BODY + 1, **HOST

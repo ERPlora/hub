@@ -11,10 +11,6 @@ import { namesGiven } from '../../__tests__/searchbar-name';
 import { page } from './__tests__/fixtures';
 import StaffPicker from './StaffPicker.vue';
 
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
 vi.mock('@erplora/ui/components', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@erplora/ui/components')>()),
   syncSearchbarInputName: (await import('../../__tests__/searchbar-name')).recordSearchbarName,

@@ -15,7 +15,7 @@ from live.operations import get
 from live.outbox import channel_for
 
 from apps.sale.tests.conftest import HUB_DB, A, B, ctx_for, run
-from base.schemas import WidgetListIn
+from base.schemas.home import WidgetListIn
 from base.tenancy.context import use_hub
 from base.tenancy.tests import hubs
 

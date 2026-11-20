@@ -14,7 +14,7 @@ import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
 import { aMonday } from './appointment-helpers';
 import { A, api, psql, shot, shown } from './helpers';
-import { type Cast, cast, keepTheBusiness } from './online-booking-helpers';
+import { type Cast, cast, keepTheBusiness, uploadBookingLogo } from './online-booking-helpers';
 import { filterBy, FLOW_VIEWPORTS, noHorizontalScroll, ownerPage, rowAction, settled } from './service-helpers';
 
 const TAG = 'E2E OB';
@@ -118,14 +118,31 @@ FLOW_VIEWPORTS.forEach((vp, index) => {
     try {
       const who = await cast(context, named(vp.label), day);
 
-      // ONLINE_BOOKING-F07: the page's title saved and said so; the service's «Online booking» off and on again.
+      // ONLINE_BOOKING-F07: an invalid image says why; a valid one is uploaded, shown, saved, removed and restored.
       await page.goto('/online_booking/settings');
       let view = shown(page);
+      const fileInput = view.locator('[data-testid=ob-settings-logo-file]');
+      const refused = page.waitForResponse((response) => response.url().endsWith('/api/online_booking/settings/logo') && response.status() === 422);
+      await fileInput.setInputFiles({ name: 'logo.png', mimeType: 'image/png', buffer: Buffer.from('not a png') });
+      await refused;
+      await expect(view.locator('[data-testid=ob-settings-logo-error]')).toHaveText('This file is not a PNG image.');
+      const stored = await uploadBookingLogo(page);
+      await expect(view.locator('[data-testid=ob-settings-logo-image]')).toHaveAttribute('src', stored.url);
       await view.locator('[data-testid=ob-settings-page_title] input').fill(named(`Salon ${vp.label}`));
       await view.locator('[data-testid=ob-settings-save]').click();
       await expect(view.locator('[data-testid=ob-settings-saved]')).toContainText('Settings saved.');
-      const saved = await api<{ page_title: string }>(context, A, 'GET', '/online_booking/settings');
-      expect(saved.data.page_title).toBe(named(`Salon ${vp.label}`));
+      const saved = await api<{ page_title: string; logo: string; logo_url: string }>(context, A, 'GET', '/online_booking/settings');
+      expect([saved.data.page_title, saved.data.logo, saved.data.logo_url]).toEqual([named(`Salon ${vp.label}`), stored.id, stored.url]);
+      await view.locator('[data-testid=ob-settings-logo-remove]').click();
+      const removed = page.waitForResponse((response) => response.url().endsWith('/api/online_booking/settings') && response.request().method() === 'POST' && response.status() === 200);
+      await view.locator('[data-testid=ob-settings-save]').click();
+      await removed;
+      await expect(view.locator('[data-testid=ob-settings-logo-empty]')).toBeVisible();
+      await uploadBookingLogo(page);
+      await view.locator('[data-testid=ob-settings-save]').click();
+      await expect(view.locator('[data-testid=ob-settings-saved]')).toContainText('Settings saved.');
+      const restoredSettings = await api<{ logo: string }>(context, A, 'GET', '/online_booking/settings');
+      expect(restoredSettings.data.logo).toBe(stored.id);
       const online = `select allow_online_booking from service_service where id = '${who.service.id}'`;
       const toggle = view.locator(`[data-testid=ob-settings-service-${who.service.id}]`);
       await toggle.scrollIntoViewIfNeeded();
@@ -137,6 +154,12 @@ FLOW_VIEWPORTS.forEach((vp, index) => {
       await expect(toggle).toBeEnabled();
       await switchesFit(page);
       await capture('ONLINE_BOOKING-F07');
+
+      // The public page shows the logo saved in Settings; the development preview then runs the same booking flow.
+      await page.goto('/p/a/book');
+      view = shown(page);
+      await expect(view.locator('[data-testid=ob-preview-business-logo]')).toHaveAttribute('src', stored.url);
+      await expect.poll(() => view.locator('[data-testid=ob-preview-business-logo]').evaluate((image: HTMLImageElement) => image.naturalWidth)).toBeGreaterThan(0);
 
       // ONLINE_BOOKING-F01: the preview of the public page — the service, no preference, the day and a free
       // time, name and mobile; pending (manual confirmation), in the diary, and her card created by her mobile.

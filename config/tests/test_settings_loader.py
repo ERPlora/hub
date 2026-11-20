@@ -5,9 +5,7 @@ import sys
 import decouple
 import pytest
 
-from config.tests import test_settings
-
-load_settings = test_settings.load_settings
+from config.tests import settings_env
 
 
 def settings_modules() -> dict:
@@ -32,7 +30,7 @@ def own_settings_back(monkeypatch):
 def test_a_load_replaces_the_settings_only_while_its_test_runs(own_settings_back, load_settings):
     before = sys.modules["config.settings"]
 
-    loaded = load_settings(**test_settings.PRODUCTION_ENV)
+    loaded = load_settings(**settings_env.PRODUCTION_ENV)
 
     assert loaded["DEBUG"] is False
     assert sys.modules["config.settings"] is not before
@@ -41,8 +39,8 @@ def test_a_load_replaces_the_settings_only_while_its_test_runs(own_settings_back
 
 
 def test_two_loads_in_one_test_leave_nothing_behind(own_settings_back, load_settings):
-    load_settings(**test_settings.PRODUCTION_ENV)
-    assert load_settings(**test_settings.DEVELOPMENT_ENV)["DEBUG"] is True
+    load_settings(**settings_env.PRODUCTION_ENV)
+    assert load_settings(**settings_env.DEVELOPMENT_ENV)["DEBUG"] is True
     own_settings_back()
 
 

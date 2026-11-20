@@ -320,16 +320,24 @@ Pasos:
 1. En **VeriFactu → Configuración**, pestaña «Mi certificado», pulsa «Elegir el fichero .p12 / .pfx» y elige el
    certificado del negocio (como mucho 1 MB).
 2. Escribe su contraseña en «Contraseña del certificado» y pulsa «Subir el certificado».
-3. El Hub lo abre con la contraseña, lee titular, NIF, tipo y caducidad y lo guarda cifrado (Fernet) junto con
-   la contraseña en la base de datos del hub. Sale «Certificado subido: {titular} ({NIF}).» y la pestaña pasa a
-   «Cargado». Subir otro sustituye al anterior.
+3. El Hub lo abre con la contraseña, comprueba que lo ha emitido una entidad reconocida (las autoridades de
+   certificados cualificados de firma o de sello de la lista de confianza de prestadores de España), lee titular,
+   NIF, tipo y caducidad y lo guarda cifrado (Fernet) junto con la contraseña en la base de datos del hub. Sale
+   «Certificado subido: {titular} ({NIF}).» y la pestaña pasa a «Cargado». Subir otro sustituye al anterior.
 4. Mientras el negocio está en pruebas, desde ese momento sus registros salen con él (VERIFACTU-F04), también los que
    la pasarela había rechazado, y ya puede pasar a producción con él (VERIFACTU-F08).
-5. En un negocio de fuera de España no se ofrece: arriba dice «VeriFactu solo es para negocios de España.» y la pestaña solo enseña el estado del
+5. El certificado guardado se vuelve a comprobar solo, cada hora, si aún no se comprobó con la lista de confianza que
+   trae el Hub (uno subido antes de esta comprobación, o la lista renovada). Si no lo ha emitido una entidad
+   reconocida, deja de valer: la pestaña pasa a «Sin cargar» y pide subir uno válido, la vía pasa a ser la de sin
+   certificado (VERIFACTU-F04) y en los eventos queda «El certificado propio de {titular} ({NIF}) ya no vale: no lo ha
+   emitido una entidad que reconozca la AEAT. Sube uno válido.». Si el servidor no puede abrirlo, se queda sin
+   comprobar, como estaba.
+6. En un negocio de fuera de España no se ofrece: arriba dice «VeriFactu solo es para negocios de España.» y la pestaña solo enseña el estado del
    certificado, sin subirlo ni quitarlo.
 Entra: el `.p12`/`.pfx` en base64 y su contraseña (`verifactu.certificate.upload`).
 Sale: el certificado guardado (`OwnCertificate`), un evento «Certificado propio de … subido» y el aviso
-`verifactu.config.changed`. El fichero y la contraseña no se vuelven a mostrar: ni en la API, ni en el admin,
+`verifactu.config.changed`; el de uno guardado que deja de valer, el evento «El certificado propio de … ya no vale» y
+el mismo aviso (`verifactu.certificate.recheck`, la tarea programada). El fichero y la contraseña no se vuelven a mostrar: ni en la API, ni en el admin,
 ni en la foto, ni en los registros del servidor.
 Si falla: el certificado no se guarda (409):
 - sin clave de almacenamiento en el servidor, «Este servidor aún no puede guardar certificados: ERPlora tiene
@@ -338,7 +346,9 @@ Si falla: el certificado no se guarda (409):
 - contraseña mala o fichero que no es un `.p12`, «El fichero no es un certificado .p12/.pfx que abra esta
   contraseña.»; autofirmado, «Este certificado no lo ha emitido ninguna entidad (es autofirmado), así que la AEAT
   no lo aceptará. Usa el certificado electrónico de tu negocio emitido por una entidad reconocida, por ejemplo la
-  FNMT.»; sin uso de autenticación de cliente, «El certificado no permite la autenticación de cliente,
+  FNMT.»; emitido por una entidad que no es de la lista de confianza, «Este certificado no lo ha emitido una entidad
+  que reconozca la AEAT, así que la AEAT no lo aceptará. Usa el certificado electrónico de tu negocio emitido por una
+  entidad reconocida, por ejemplo la FNMT.»; sin uso de autenticación de cliente, «El certificado no permite la autenticación de cliente,
   así que no puede conectar con la AEAT.»; caducado, «El certificado caducó el {fecha}: sube uno vigente.»
   (todos `verifactu.certificate_invalid`);
 - titular distinto del emisor de Facturación, «El certificado es de {NIF}, no del emisor de este negocio,
@@ -369,9 +379,10 @@ Estado: hecho — la vía no se elige: la decide el certificado y queda fijada a
 Actor: administrador
 Pantalla: Ajustes
 Pasos:
-1. La vía la decide el certificado. Con un certificado propio cargado y vigente (VERIFACTU-F02), los registros salen
-   con él; sin él, en pruebas los remite ERPlora con su sello, también en un negocio de demostración. Mientras el
-   negocio está en pruebas, subir, quitar o dejar caducar el certificado cambia la vía de lo que aún no ha salido.
+1. La vía la decide el certificado. Con un certificado propio cargado, vigente y emitido por una entidad reconocida
+   (VERIFACTU-F02), los registros salen con él; sin él, en pruebas los remite ERPlora con su sello, también en un
+   negocio de demostración. Mientras el negocio está en pruebas, subir, quitar o dejar caducar el certificado, o que
+   deje de valer al volver a comprobarlo, cambia la vía de lo que aún no ha salido.
 2. En **VeriFactu → Ajustes**, «Envío» lo dice en una frase con su icono y lo que falta (la pantalla Ajustes).
 3. Al pasar a producción (VERIFACTU-F08), la vía de ese momento queda fijada: con un certificado válido, el
    certificado, aunque también esté aprobada la autorización; sin él, la de ERPlora. Desde entonces, subir, quitar o
@@ -1153,6 +1164,14 @@ comprobando antes que la cuenta y la autorización estén listas») se ofrece pa
 cuenta» (la de ERPlora) se lee como la cuenta de una mesa y van delante las escrituras de Ventas que la toman (`xfail`
 estricto en el test hasta ERPlora/live#76; sin «la cuenta y», la misma frase la trae la 6.ª).
 
+La tarjeta de confirmación de una escritura (BASE-F97) dice qué registro toca por el número de su factura, como la
+lista de registros y la ficha: reintentar, reenviar, preguntar a la AEAT, subsanar o anular el registro de una factura
+sale «Registro: TICKET-2026-000012», nunca su id. Sellar una factura por su id la dice por su número, como Facturación
+(«Factura: TICKET-2026-000012»). Lo lee `verifactu.record.get` (o `invoice.invoice.get`) como la persona que pregunta,
+en una transacción de solo lectura: quien no puede ver los registros o las facturas, un id que no existe o el de otro
+negocio, y una automatización sin nadie detrás, no ven esa línea. La marca de cada dato está en `card_names.py`
+(`base.E009` la comprueba al arrancar). Test: `test_card_names.py`.
+
 ### La cadena, la huella y el QR
 
 - **Huella** (`chain.py`): SHA-256 en hexadecimal **mayúsculas** de
@@ -1212,7 +1231,7 @@ estricto en el test hasta ERPlora/live#76; sin «la cuenta y», la misma frase l
 
 ### Contrato con Facturación (lo que `invoice` tiene que hacer)
 
-1. **Dentro de la transacción de cada emisión** (`_issue` de `apps/invoice/services.py`, hecho), tras escribir el
+1. **Dentro de la transacción de cada emisión** (`_issue` de `apps/invoice/services/__init__.py`, hecho), tras escribir el
    documento y su aviso, Facturación llama por nombre a `verifactu.record.create` con
    `{"invoice_id": "<uuid del documento>"}` y **la misma sesión** (el sellado síncrono lo firma quien emite; el
    de la reacción, el sistema), en un savepoint, y contesta `verifactu_status`:
@@ -1317,7 +1336,13 @@ estricto en el test hasta ERPlora/live#76; sin «la cuenta y», la misma frase l
   `FISCAL_CERTIFICATE_KEY` (variable de entorno; en AWS, Secrets Manager en `hub` y `worker`). Sin clave, la
   subida se rechaza a la vista; con la clave cambiada, el guardado no se abre y los registros por la vía propia
   esperan con `own_certificate_unreadable` sin llamar a la pasarela. Al subirlo se rechaza el autofirmado (emisor
-  igual al sujeto); la cadena no se valida contra la lista de prestadores reconocidos (hub#1707).
+  igual al sujeto) y el que no ha firmado una autoridad de la lista de confianza (`trust.py`): las de certificados
+  cualificados (`CA/QC`) de firma o de sello de la TSL de España, también las retiradas para lo que emitieron antes de
+  su retirada. La lista va dentro de la app (`trusted_authorities.json`, sin red al comprobar) y se renueva con
+  `manage.py verifactu_trusted_list` (la descarga de `https://tsl.digital.gob.es/TSL.xml`, o `--file` con una copia
+  guardada; nunca vuelve a una lista más antigua), y el fichero nuevo entra en una PR. La fila guarda si su emisor
+  es reconocido y con qué lista (`issuer_recognised`, `checked_list`); la tarea `recheck_certificate` (cada hora,
+  `verifactu.certificate.recheck`) comprueba la que no lo está con la lista de ahora.
 - **Producción**: además de lo de VERIFACTU-F08, el despliegue tiene que ser `prod` (`ERPLORA_ENVIRONMENT`; en
   `pre` nunca) y el servidor tener `VERIFACTU_PRODUCTION_ENABLED` a verdadero. Cerrado de nuevo, ningún registro de
   producción sale (esperan con `production_closed`, sin llamar a la pasarela) y no se emite nada nuevo en producción
@@ -1373,7 +1398,7 @@ estricto en el test hasta ERPlora/live#76; sin «la cuenta y», la misma frase l
   rectificativa de Facturación.
 - La tarea programada `process_queue` (`verifactu.contingency.process`, cada minuto, en UTC, `collapse`) la
   corre el worker (`base/scheduler.py`, desde `base/worker.py`, cada tick de 5 s) como el sistema, en cada negocio
-  que sirve, en su BD y con su ámbito (`base.worker._serve_hub`: `use_hub` y `Scope("host", slug)`): su reloj es una
+  que sirve, en su BD y con su ámbito (`base.hub_visits`: `use_hub` y `Scope("host", slug)`): su reloj es una
   fila de `base.TaskSchedule` en esa BD, que el worker escribe la primera vez que lo sirve desde que arrancó; cada
   pasada la toma con
   `select_for_update(skip_locked=True)` y mueve `next_run` en la misma transacción que el envío, así que dos

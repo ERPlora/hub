@@ -8,7 +8,7 @@ from live.operations import AI, operation
 from base import files
 from base.models import Hub
 from base.operations import hub_id
-from base.schemas import FileListIn, FileListOut, FileOut, FileReadIn
+from base.schemas.files import FileListIn, FileListOut, FileOut, FileReadIn
 
 
 # ── Files ──────────────────────────────────────────────────────────────────────────────────────────────────────

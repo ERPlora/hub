@@ -2,22 +2,12 @@
 // card matching the search and filters, not just the page shown; the server builds the file and
 // checks the permission.
 import { toastError, toastSuccess } from '@erplora/ui/shell';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { browserDownloads, insideTheAppSaving, outOfTheApp } from '../../../../base/frontend/__tests__/app-download';
 import { flush, json, mountCustomer, refusal, sent } from '../__tests__/mount-customer';
 import CustomerExportButton from './CustomerExportButton.vue';
 
-vi.mock('@erplora/ui/shell', async (importOriginal) => ({
-  ...((await importOriginal()) as object),
-  toastError: vi.fn(),
-  toastSuccess: vi.fn(),
-}));
-
-beforeEach(() => {
-  vi.mocked(toastError).mockClear();
-  vi.mocked(toastSuccess).mockClear();
-});
 afterEach(() => {
   outOfTheApp();
   vi.restoreAllMocks();

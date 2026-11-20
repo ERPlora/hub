@@ -34,7 +34,7 @@ from apps.table.models import (
     MIN_BOX,
     MIN_MINUTES,
 )
-from base.schemas import names
+from base.schemas.assistant import names
 
 T = TypeVar("T")
 

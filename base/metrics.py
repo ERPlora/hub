@@ -41,7 +41,8 @@ from django.db import close_old_connections
 from live.context import Scope
 from live.meta import all_live_app_configs
 
-from base import queries, relay
+from base import queries
+from base.apps_on import active_apps
 from base.services import provisioning
 from base.tenancy.connections import close_hub_aliases
 from base.tenancy.context import use_control, use_hub
@@ -60,7 +61,7 @@ INTERVAL_SECONDS = 60.0
 HUBS_PASS_SECONDS = 20.0
 #: The region when the task does not say it: the platform's.
 DEFAULT_REGION = "eu-west-1"
-#: The ``Scope`` kind of a business's hub (``base.worker._serve_hub``).
+#: The ``Scope`` kind of a business's hub (``base.hub_visits``).
 HUB_SCOPE_KIND = "host"
 
 
@@ -189,7 +190,7 @@ class FiscalBacklog(HubReadings):
     what = "fiscal backlog"
 
     def read(self, hub, now: dt.datetime) -> dt.datetime | None:
-        return fiscal_pending_since(relay.active_apps(Scope(HUB_SCOPE_KIND, hub.slug)))
+        return fiscal_pending_since(active_apps(Scope(HUB_SCOPE_KIND, hub.slug)))
 
     def metrics(self, readings: list, now: dt.datetime) -> list[Metric]:
         oldest = min((since for since in readings if since is not None), default=None)

@@ -2,16 +2,11 @@
 // dialog — what it means, the last day the rule applies (its current end, if any, to begin with) and
 // «Save end date». It sends `tax.rule.end` for that rule; a refusal (an end before the start, an
 // overlap) stays in the dialog under the date, with the server's words.
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import type { RuleOut } from '../operations';
 import { click, ionValue, mountTax, settle } from '../__tests__/mount-tax';
 import RuleEndModal from './RuleEndModal.vue';
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
 
 type Control = HTMLElement & { label?: string; value?: unknown; type?: string; fill?: string; errorText?: string; disabled?: boolean };
 

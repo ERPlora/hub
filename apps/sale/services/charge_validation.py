@@ -15,19 +15,12 @@ from apps.customer.queries import find_customer
 from apps.customer.tax_ids import IdTypeRequired, InvalidCountry, InvalidTaxId, normalize_country, normalize_tax_id
 from apps.sale import pricing
 from apps.sale.models import OrderLine, PaymentMethod, Settings
-from apps.sale.queries import (
-    CASH_LIMIT,
-    LIMITS_CURRENCY,
-    METHOD_NOT_AVAILABLE,
-    allowed_types,
-    business_country,
-    call_app,
-    find_method,
-    held_methods,
-    money_text,
-    ratio_of,
-)
-from apps.sale.schemas import COUNTRY_CODE, CompleteIn
+from apps.sale.queries.business import CASH_LIMIT, LIMITS_CURRENCY, business_country, money_text
+from apps.sale.queries.line_parts import ratio_of
+from apps.sale.queries.other_apps import call_app
+from apps.sale.queries.payment_methods import METHOD_NOT_AVAILABLE, allowed_types, find_method, held_methods
+from apps.sale.schemas.checkout import CompleteIn
+from apps.sale.schemas.fields import COUNTRY_CODE
 from apps.sale.services.discounts import DISCOUNTS_NOT_ALLOWED, DISCOUNT_OVER_LIMIT, _cap
 
 logger = logging.getLogger(__name__)

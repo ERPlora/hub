@@ -23,7 +23,7 @@ from live.errors import Conflict
 from live.models import OutboxEvent
 from live.operations import get
 
-from base import blueprint, events, services, worker
+from base import blueprint, events, services, worker_activations
 from base.activation import CREATING, FAILED, OFF, ON
 from base.models import AppActivation, ImportBatch
 from base.tenancy import migrator
@@ -292,7 +292,9 @@ class WorkerDied(BaseException):
     """Not an ``Exception``: nothing in the worker catches it, as nothing catches a killed process."""
 
 
-def test_a_worker_that_dies_loading_leaves_it_all_to_do_and_a_later_worker_does_it_though_its_ring_was_lost(business):
+def test_a_worker_that_dies_loading_leaves_it_all_to_do_and_a_later_worker_does_it_though_its_ring_was_lost(
+    business, worker_visits
+):
     hub = business("a")
     load = load_template(hub)
 
@@ -306,7 +308,7 @@ def test_a_worker_that_dies_loading_leaves_it_all_to_do_and_a_later_worker_does_
     # A new process, the hub's ring lost with it: the sweep finds it again.
     HubDue.objects.filter(hub_id=hub.pk).delete()
     now = timezone.now()
-    worker._serve_hub(fresh(hub), now, active=True)
+    worker_visits.serve(now)
     run_pass(now + dt.timedelta(seconds=1))
 
     assert row(hub, "service").state == ON
@@ -318,7 +320,7 @@ def test_a_worker_that_dies_loading_leaves_it_all_to_do_and_a_later_worker_does_
 
 
 def fail_the_schema():
-    return mock.patch.object(worker.migrator, "ensure_schema", side_effect=RuntimeError("the schema broke"))
+    return mock.patch.object(worker_activations.migrator, "ensure_schema", side_effect=RuntimeError("the schema broke"))
 
 
 def test_an_app_that_cannot_be_set_up_says_so_and_its_data_loads_when_the_worker_manages_by_itself(business):

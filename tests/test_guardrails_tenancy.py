@@ -36,8 +36,6 @@ BARE_ON_COMMIT_ALLOWED: dict[str, int] = {}
 #: Hub models that still have a ``hub_id`` column, each with its reason (the border between hubs is the database).
 HUB_ID_COLUMNS: dict[str, str] = {
     "base.hubidentity": "the identity of the hub's database itself.",
-    "website.site": "left from when hubs shared one database, so that a hub's website was not another's /.",
-    "website.image": "left from when hubs shared one database, with the site's.",
     "verifactu.config": "not tenancy: the business's id in the SaaS.",
 }
 
@@ -308,10 +306,16 @@ def test_the_modules_never_import_the_tenancy():
     assert offenders == [], f"A module never chooses its database: @operation and use_hub do (CLAUDE.md): {offenders}"
 
 
-def test_nothing_but_live_listens():
-    offenders = _everywhere(listen_touches)
+def test_nothing_but_live_and_the_worker_s_own_ear_listens():
+    # The worker serves no live stream, so live.broker never listens in its process: its ear is its one LISTEN.
+    files = [path for path in source_files(HUB_DIR) if str(path) != "base/hub_listener.py"]
 
-    assert offenders == [], f"One LISTEN per process, on control, in live.broker: {offenders}"
+    offenders = _offenders(lambda path: listen_touches((HUB_DIR / path).read_text()), files)
+
+    assert offenders == [], (
+        "One LISTEN per process, on control: live.broker's where the web runs, base.hub_listener's in the worker: "
+        f"{offenders}"
+    )
 
 
 def test_nothing_runs_on_a_shared_database_any_more():
@@ -383,7 +387,7 @@ def test_a_new_bare_on_commit_in_the_modules_is_caught_listed_file_or_not():
     assert on_commit_problems({}) == {}
     assert on_commit_problems({"apps/demo/services.py": 1}) == {"apps/demo/services.py": (1, 0)}
     # Moved off (flow's and the inbox's through base.outbound, website's to live.operations.on_commit): none comes back.
-    assert on_commit_problems({"apps/flow/services.py": 1}) == {"apps/flow/services.py": (1, 0)}
+    assert on_commit_problems({"apps/flow/services/calls.py": 1}) == {"apps/flow/services/calls.py": (1, 0)}
     assert on_commit_problems({"apps/whatsapp_inbox/services.py": 1}) == {"apps/whatsapp_inbox/services.py": (1, 0)}
     assert on_commit_problems({"apps/website/services.py": 4}) == {"apps/website/services.py": (4, 0)}
 
@@ -415,6 +419,7 @@ OWN_DATABASE_OPERATIONS: dict[str, dict] = {
     # A copy of the business's data.
     "base.hub.dump_link": {"id": ANY_KEY},
     # An app's tables made when it is turned on, in the hub's own database.
+    "base.app.enable": {"app": "printing"},
     "base.app.retry": {"app": "printing"},
 }
 #: ``base.hub.reset_apply`` (the worker's emptying of a reset) and ``base.app.activation_settle`` (the worker's step
@@ -429,6 +434,8 @@ OWN_DATABASE_READS: dict[str, dict] = {
     "base.hub.dumps": {},
     # System's size of the business's database (BASE-F40).
     "base.plan.usage": {},
+    "base.api_doc.get": {},
+    "base.system.status": {},
 }
 
 
@@ -486,6 +493,7 @@ def test_the_operations_that_need_the_own_database_are_the_base_s_doors():
         "base/queries/api_keys.py",
         "base/queries/dumps.py",
         "base/queries/usage.py",
+        "base/queries/system.py",
     }, defined
 
 
@@ -508,11 +516,12 @@ def not_cut(client):
 
 def _asked_at_its_door(client, hub, name: str, payload: dict):
     """``name`` asked through its route on ``hub``'s host, as its screen asks it; ``(response, sent)``."""
-    from base.api import router
+    from base.api import ROUTERS
     from base.tenancy.tests import hubs
     from base.tests.routes import bound_routes
 
-    [(method, path)] = [(method, path) for method, path, operation in bound_routes(router) if operation == name]
+    routes = {route for router in ROUTERS for route in bound_routes(router)}
+    [(method, path)] = [(method, path) for method, path, operation in routes if operation == name]
     host = f"{hub.slug}.localhost"
     with hubs.watched() as sent:
         if method == "GET":
@@ -539,7 +548,7 @@ def test_in_a_hub_without_its_own_database_each_refuses_and_touches_no_business_
 
 @pytest.mark.django_db
 @pytest.mark.parametrize("name", sorted(OWN_DATABASE_READS))
-def test_in_a_hub_without_its_own_database_its_screen_reads_not_available_and_no_business_data(name, client, not_cut):
+def test_in_a_hub_without_its_own_database_its_screen_reads_nothing_of_any_business(name, client, not_cut):
     assert_refused_untouched(*_asked_at_its_door(client, not_cut, name, OWN_DATABASE_READS[name]))
 
 

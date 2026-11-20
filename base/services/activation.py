@@ -9,9 +9,7 @@ from uuid import UUID
 
 from django.db.models import Q
 from django.utils import timezone
-from django.utils.translation import gettext
 from live.context import OperationContext
-from live.errors import Conflict
 from live.operations import INTERNAL, operation
 from live.operations import on_commit as after_commit
 from live.outbox import record_event
@@ -20,12 +18,11 @@ from base import activation, events, queries, registry
 from base.activation import CREATING, FAILED, ON
 from base.models import AppActivation, Hub
 from base.registry import internal_only
-from base.schemas import AppActivationSettleIn, AppActivationSettleOut
+from base.schemas.apps import AppActivationSettleIn, AppActivationSettleOut
 from base.services.apps import _business_hub, _locked_states, _write_states, apps_created
 from base.services.blueprints import _load_what_waited
 from base.services.photo import _sync_photo_blocks
 from base.services.provisioning import LAST_ERROR_MAX, _control_transaction, offboarding_due
-from base.services.reset import has_own_database
 from control.models import HubDue, HubVisit
 
 logger = logging.getLogger(__name__)
@@ -114,17 +111,11 @@ def app_activation_settle(ctx: OperationContext, data: AppActivationSettleIn) ->
     tables made): ``created`` turns on those whose tables the hub now has (``base.app.enabled``, one per app the business
     chose, with what came along; then their photo's blocks, as an app turned on at once) and leaves the rest ``failed``;
     ``failed`` leaves them ``failed`` with ``attempts`` + 1, the error and the next try (1, 5, 15 min, then every hour;
-    ``base.app.activation_failed``); ``locked`` and ``newer_code`` put them off (30 s, 60 s), still ``creating``. Never
-    on a shared database (409 ``base.app_shared_database``); only the platform runs it, anyone else refused
-    before anything is read (as ``base.hub.reset_apply``)."""
+    ``base.app.activation_failed``); ``locked`` and ``newer_code`` put them off (30 s, 60 s), still ``creating``. Only
+    the platform runs it, anyone else refused before anything is read (as ``base.hub.reset_apply``)."""
     internal_only(ctx)
     host = ctx.scope.key
     hub = _business_hub(ctx)
-    if not has_own_database(hub):
-        raise Conflict(
-            gettext("This business shares its database: its apps are turned on at once."),
-            code="base.app_shared_database",
-        )
     with activation.changing(host):
         graph = activation.module_graph()
         current = _locked_states(ctx, graph)
@@ -142,7 +133,7 @@ def app_activation_settle(ctx: OperationContext, data: AppActivationSettleIn) ->
             AppActivation.objects.filter(host=host, app__in=asked).update(next_attempt_at=now + dt.timedelta(seconds=wait))
             return {"on": [], "failed": [], "waiting": asked}
         created = apps_created(hub)
-        made = [label for label in asked if data.outcome == "created" and (created is None or label in created)]
+        made = [label for label in asked if data.outcome == "created" and label in created]
         failed = behind or [label for label in asked if label not in made]
         if made:
             _write_states(host, {label: activation.Activation(ON, current[label].chosen) for label in made})

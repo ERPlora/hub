@@ -82,14 +82,14 @@ def test_spanish_texts():
         assert str(services.refunds.REFUND_NOTHING) == (
             "Una devolución tiene que devolver dinero o la sesión de un bono."
         )
-        assert str(queries.SERVICES_UNAVAILABLE).startswith(
+        assert str(queries.other_apps.SERVICES_UNAVAILABLE).startswith(
             "Servicios no está activa en este negocio"
         )
         # The open price's families are «secciones» everywhere the user reads.
-        assert str(queries.DEPARTMENT_NOT_FOUND) == (
+        assert str(queries.departments.DEPARTMENT_NOT_FOUND) == (
             "Esa sección ya no está en este negocio. Recarga la lista y vuelve a intentarlo."
         )
-        assert str(schemas.SAY_WHICH_DEPARTMENT_ROW) == (
+        assert str(schemas.fields.SAY_WHICH_DEPARTMENT_ROW) == (
             "Di qué sección: su id o su nombre."
         )
 

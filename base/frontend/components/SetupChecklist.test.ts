@@ -2,7 +2,7 @@ import { IonProgressBar } from '@ionic/vue';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { setupItem, setupStatus } from '../__tests__/home-fixtures';
-import type { SetupItem, SetupStatus } from '../operations';
+import type { SetupItem, SetupStatus } from '../operations/home';
 import { errorFrame, flush, memoryStorage, mountBase, subId } from '../__tests__/mount-base';
 import { createAssistant, installAssistant } from '@erplora/ui/components';
 import SetupChecklist from './SetupChecklist.vue';

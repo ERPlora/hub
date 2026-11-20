@@ -30,7 +30,7 @@ from apps.cash_register.tests.conftest import (
     open_session,
     run,
 )
-from base.schemas import SetupStatusIn, WidgetListIn
+from base.schemas.home import SetupStatusIn, WidgetListIn
 from base.tenancy.context import use_hub
 
 STEP = "cash_register.drawer"
@@ -88,8 +88,8 @@ def test_a_drawer_on_its_factory_values_has_your_cash_drawer_pending_and_it_lead
     }
     assert (item["title"], item["description"]) == (
         "Your cash drawer",
-        "Decide how the till opens and closes: the opening float, the closing count and the POS screen that stays "
-        "locked until the drawer is open.",
+        "Decide how the till opens and closes: the opening float, the closing count and whether charging in cash "
+        "needs an open session.",
     )
 
 
@@ -199,8 +199,8 @@ def test_a_spanish_request_reads_the_step_and_the_panels_in_spanish(client, make
     (item,) = [item for item in setup.json()["items"] if item["key"] == STEP]
     assert (item["title"], item["description"]) == (
         "Tu caja",
-        "Decide cómo se abre y se cierra la caja: el fondo inicial, el arqueo de cierre y la pantalla del TPV que "
-        "queda bloqueada hasta abrirla.",
+        "Decide cómo se abre y se cierra la caja: el fondo inicial, el arqueo de cierre y si cobrar en efectivo "
+        "exige una sesión abierta.",
     )
     widgets = client.get("/api/home/widgets", HTTP_HOST=HOST, HTTP_ACCEPT_LANGUAGE="es")
     assert widgets.status_code == 200

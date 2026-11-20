@@ -1,13 +1,11 @@
 // Test helper of the combo app's pages and components: `mountInShell` with its catalogues over base's, the menus, its
 // people and the hub's business.
-// Dialogs: a test that opens one mocks `@ionic/vue`'s IonModal with FormModal's `IonModalStub`
-// (imported from its own file in the mock factory: this helper loads @ionic/vue, the factory must not).
 import type { SessionMe } from '@erplora/ui/shell';
 import type { Component } from 'vue';
 
 import { type BusinessMountOptions, mountInShell, overBase } from '../../../../base/frontend/__tests__/mount-in-shell';
 import { business } from '../../../../base/frontend/__tests__/business';
-import type { Business } from '../../../../base/frontend/operations';
+import type { Business } from '../../../../base/frontend/operations/business';
 import en from '../locale/en.json';
 import es from '../locale/es.json';
 
