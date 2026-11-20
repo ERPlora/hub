@@ -1,5 +1,5 @@
 version = 1
-revision = 3
+revision = 5
 requires-python = ">=3.14"
 resolution-markers = [
     "platform_python_implementation == 'PyPy' and sys_platform == 'win32'",
@@ -681,6 +681,7 @@ requires-dist = [
 
 [package.metadata.requires-dev]
 dev = [
+    { name = "complexipy", specifier = ">=9.0.0" },
     { name = "pytest", specifier = ">=9" },
     { name = "pytest-asyncio", specifier = ">=1.4" },
     { name = "pytest-django", specifier = ">=4.14" },
