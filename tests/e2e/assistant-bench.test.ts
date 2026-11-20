@@ -12,6 +12,7 @@ import {
   benchTurn,
   callsOf,
   type Measured,
+  notAsked,
   OFFERED_PY,
   offeredCommand,
   parseOffered,
@@ -172,6 +173,14 @@ describe('benchTurn', () => {
   it('does not say whether a refused tool was offered: the role never holds it', () => {
     const refused = outcome([], { probe: { ...PROBE, expect: 'refused', role: 'employee' }, answer: 'No tienes permiso: pídeselo al propietario.' });
     expect(benchTurn(refused, { ...MEASURED, bodies: [] }).offered).toBeNull();
+  });
+});
+
+describe('notAsked', () => {
+  it('records a probe whose page failed before its question as not asked, with why, never as the model’s failure', () => {
+    const outcome = notAsked(PROBE, new Error('expect(locator).toBeVisible() failed\n  Locator: …'));
+    expect(outcome.problems).toEqual(['the page failed before the question: expect(locator).toBeVisible() failed']);
+    expect(benchTurn(outcome, { ...MEASURED, bodies: [], latencyMs: null, usage: null })).toMatchObject({ verdict: 'n/a', calls: [], tokensIn: null });
   });
 });
 
