@@ -2658,8 +2658,9 @@ Pasos:
   3. Cada acción que cambia algo pide su propia tarjeta (BASE-F97), una detrás de otra: aceptar la primera no acepta
      las siguientes. Si detrás esperan más, la tarjeta lleva «Cancelar todo», que cancela esta y las que faltan.
   4. Si cancela una, el asistente lo sabe y decide cómo seguir. Lo ya hecho se queda hecho.
-  5. Una petición admite como mucho seis rondas: es un freno contra los bucles, no un cupo. Pasadas, «He parado: esto
-     necesitaba demasiados pasos. Pídelo por partes.».
+  5. Una petición admite como mucho seis rondas: es un freno contra los bucles, no un cupo. En la sexta el asistente
+     ya no puede hacer nada más y contesta con lo que ha hecho y lo que falta, para pedirlo en otro mensaje. Si aun así
+     intenta seguir, «He parado: esto necesitaba demasiados pasos. Pídelo por partes.».
 Entra: la petición; el resultado de cada acción, que vuelve al asistente.
 Sale: tantas acciones como tarjetas aceptadas, cada una en su app y con su recibo.
 Si falla: si una acción falla a mitad, el asistente lo recibe y lo cuenta; las anteriores no se deshacen. Con la red
@@ -4056,8 +4057,9 @@ Implicados: BASE-F41
   todas las herramientas del Hub, sin excepciones (hub#1175 arregló las nueve que quedaban en Control horario,
   Automatizaciones, Personal y Facturación); lo citado («…», `código`, nombres con punto) y lo negado no cuentan.
 - Operaciones del asistente, todas con `base.view_home` y `ai=` «Not an assistant tool»: `base.assistant.turn`
-  (command: corre las lecturas pendientes, para en la tarjeta de una escritura hasta su `decision`, corta a las
-  `MAX_ROUNDS` = 6 rondas con `assistant.too_many_steps`; la llamada que espera su tarjeta vuelve con `shown`, la
+  (command: corre las lecturas pendientes, para en la tarjeta de una escritura hasta su `decision`; la ronda que llega
+  a `MAX_ROUNDS` = 6 va a la pasarela sin herramientas y con `LAST_ROUND` en las instrucciones, para que el modelo
+  conteste con lo hecho y lo que falta, y pasada esa ronda corta con `assistant.too_many_steps`; la llamada que espera su tarjeta vuelve con `shown`, la
   huella de lo que enseñó (`assistant.fingerprint`: sus datos y «Lo que va a pasar» como los ve la persona, más el id
   de cada registro que leyó, por sus datos marcados con `names(…)` —por id o por nombre— y por su `check`), y el
   panel la devuelve tal cual con el «sí»; con él la tarjeta se vuelve a dibujar y, si la huella no coincide (o no

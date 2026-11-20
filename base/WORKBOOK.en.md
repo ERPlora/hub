@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:9c69ae25574f82633127d38a24858407e29db7c0f3f75af4afe5e2afa8676cff -->
+<!-- generated from WORKBOOK.md sha256:ecdf68afb57249853edbf2546e6368d966395004d439ca1547db1976de9b7d65 -->
 
 ## What it is for and who it is for
 
@@ -2646,8 +2646,9 @@ Steps:
      does not accept the next ones. If more wait behind it, the card carries "Cancel all", which cancels this one and
      those left.
   4. If they cancel one, the assistant knows and decides how to go on. What was already done stays done.
-  5. A request allows six rounds at most: it is a brake against loops, not an allowance. Past them, "I stopped: this
-     needed too many steps. Ask for it in parts.".
+  5. A request allows six rounds at most: it is a brake against loops, not an allowance. On the sixth the assistant
+     can do nothing more and answers with what it has done and what is left, to ask for it in another message. If it
+     still tries to go on, "I stopped: this needed too many steps. Ask for it in parts.".
 In: the request; the result of each action, which goes back to the assistant.
 Out: as many actions as cards accepted, each in its app and with its receipt.
 If it fails: if an action fails half way, the assistant gets it and tells it; the earlier ones are not undone. With
