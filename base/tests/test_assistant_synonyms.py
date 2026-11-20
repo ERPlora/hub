@@ -27,10 +27,11 @@ from base.tests.test_assistant_asks import (
 
 __all__ = ["in_business_a"]
 
-#: The words of an item («elemento»), a word only Demo says (``demo.item``), in requests of other apps' tools.
+#: The words of an item («elemento»), a word only Demo says (``demo.item``), in requests of other apps' tools that name
+#: no product otherwise (Inventory reads «la carta» as its products).
 ELEMENT_REQUESTS = [
     ("inventory.product.delete", "borra el elemento «Tarta de queso» del inventario"),
-    ("inventory.product.create", "añade un elemento nuevo a la carta: tarta de queso a 5 euros"),
+    ("inventory.product.create", "añade un elemento nuevo: tarta de queso a 5 euros"),
 ]
 
 
