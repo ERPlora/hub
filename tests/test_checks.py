@@ -168,11 +168,11 @@ def test_fast_runs_eslint_the_typecheck_and_the_related_vitest_tests_of_the_touc
     assert missing == [], output[-8000:]
 
 
-@pytest.mark.parametrize(
-    "lent, lacking",
-    [((), "node_modules: run pnpm install"), (("node_modules",), "packages/ui: run git submodule update --init")],
-)
-def test_the_frontend_checks_fail_naming_what_the_tree_lacks(head_tree, tmp_path, lent, lacking):
+FIXES = {"node_modules": "pnpm install", "packages/ui": "git submodule update --init"}
+
+
+@pytest.mark.parametrize("lent, lacking", [((), {"node_modules", "packages/ui"}), (("node_modules",), {"packages/ui"})])
+def test_the_frontend_checks_fail_naming_what_the_tree_lacks_and_did_not_borrow(head_tree, tmp_path, lent, lacking):
     checkout = tmp_path / "checkout"
     for folder in lent:
         (checkout / folder).mkdir(parents=True)
@@ -180,7 +180,8 @@ def test_the_frontend_checks_fail_naming_what_the_tree_lacks(head_tree, tmp_path
     done = checks(head_tree, "fast", "HEAD", CHECKS_DEPENDENCIES_FROM=str(checkout))
     output = done.stdout + done.stderr
     assert done.returncode == 1, output[-4000:]
-    assert lacking in output, output[-4000:]
+    named = {name for name, fix in FIXES.items() if f"{name}: run {fix}" in output}
+    assert named == lacking, output[-4000:]
 
 
 def load_helper():
