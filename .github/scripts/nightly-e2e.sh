@@ -9,7 +9,7 @@
 #
 # A night builds the stack of tests/e2e/README.md («Varias ejecuciones a la vez») by itself: detached worktrees of
 # the Hub and the SaaS in NIGHTLY_DIR (the shared checkouts only get a fetch), their e2e databases,
-# the SaaS seeded with the ids of `a` and `b` and the fake assistant provider, both runservers and `pnpm e2e`.
+# the SaaS seeded (the ids of `a` and `b`, the fake assistant provider, its taxonomy), both runservers and `pnpm e2e`.
 # Whatever happens, it then stops what listens on the stack's ports, drops both databases and removes the worktrees.
 # A step before the specs that fails is a red night too, and the issue names it. Each night's log and Playwright's
 # output (results.json, traces, failure screenshots) stay in NIGHTLY_DIR/runs/<night>/, the newest NIGHTLY_KEEP_RUNS.
@@ -224,6 +224,7 @@ clear_earlier_night() { stop_stack && drop_hub_database && drop_saas_database; }
 
 hub_database() { (cd "$hub_wt" && env "${hub_env[@]}" node tests/e2e/database.ts); }
 saas_database() { (cd "$saas_wt" && env E2E_SAAS_PORT="$SAAS_PORT" node tests/e2e/database.ts); }
+in_saas() { (cd "$saas_wt" && env DB_NAME="$SAAS_DB" "$@"); } # <VAR=value...> <command...>: on the SaaS's database
 
 seed_saas() {
   local ids
@@ -234,10 +235,9 @@ seed_saas() {
     return 1
   }
   # shellcheck disable=SC2086 # the two ids, a's first, are two arguments
-  (cd "$saas_wt" && env DB_NAME="$SAAS_DB" HUB_INTERNAL_URL="http://127.0.0.1:$HUB_PORT" \
-    uv run python tests/e2e/panel/whatsapp_hub_seed.py $ids) &&
-    (cd "$saas_wt" && env DB_NAME="$SAAS_DB" \
-      uv run python tests/e2e/panel/assistant_seed.py gateway "http://127.0.0.1:$PROVIDER_PORT/v1")
+  in_saas HUB_INTERNAL_URL="http://127.0.0.1:$HUB_PORT" uv run python tests/e2e/panel/whatsapp_hub_seed.py $ids &&
+    in_saas uv run python tests/e2e/panel/assistant_seed.py gateway "http://127.0.0.1:$PROVIDER_PORT/v1" &&
+    in_saas uv run python manage.py seed_taxonomy # the business types, as every deploy seeds them after migrating
 }
 
 start_server() { # <dir> <log> <env and command...>: its own process group, so stopping it stops its Vite too
