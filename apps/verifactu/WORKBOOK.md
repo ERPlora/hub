@@ -510,7 +510,9 @@ pasarela no podría presentarlo.
 Cerrar la vía de ERPlora en el servidor no saca de producción a quien ya está en ella ni le cambia la vía: sigue
 sellando, enviando y anulando con el sello de ERPlora, porque la AEAT solo acepta una anulación presentada con el mismo
 sello; subir después un certificado tampoco la cambia. El paso «Configura VeriFactu» del Inicio, con la vía cerrada,
-solo se da por hecho con el certificado propio.
+solo se da por hecho con el certificado propio y solo habla de él: «Sube el certificado del negocio para enviar tus
+facturas a la AEAT.» (con la vía abierta, «Firma la autorización para que ERPlora envíe tus facturas a la AEAT, o sube
+el certificado del negocio.»).
 Se comprueba en este orden y la primera causa da el 409 con su código: el servidor cerrado → un negocio de
 demostración → el emisor → la vía (con certificado válido, el certificado, que no pide otorgamiento; sin él, la de
 ERPlora, abierta en el servidor y con el otorgamiento aprobado) → la cuenta.
@@ -1131,6 +1133,8 @@ production, scope)` sobre la vía que tendría en producción, `queries.route.se
 este servidor abre o, sin él, la vía ERPlora abierta en el servidor (`erplora_route.closed`) con el otorgamiento
 aprobado; ya en producción, la vía fijada, sin mirar el interruptor; la exención del hub de ERPlora incluida; lo que le
 falte al servidor no cuenta, no es tarea del negocio),
+descripción según la vía de ERPlora para el negocio que lee el Inicio (`erplora_route.step_description`, perezosa: la
+misma `erplora_route.available` que da `erplora_route_available` a Configuración; con ella cerrada, solo el certificado),
 permiso `verifactu.configure`, ruta `/verifactu/config`, `refresh_on` `verifactu.config.changed`, `countries`
 `(SPAIN,)` (`apps.py`; hub#682: un negocio de otro país no lo ve, ni su muro en producción; uno sin país cuenta como
 España por `base.business.country_or_market`, que también lee `queries.country.outside_spain`: una sola regla). **Paneles** (permiso

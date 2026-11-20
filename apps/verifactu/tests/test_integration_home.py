@@ -120,6 +120,39 @@ def test_the_step_is_in_spanish_for_a_spanish_reader(issuer):
 
 
 @HUB_DB
+def test_with_erploras_route_closed_the_step_only_asks_for_the_business_certificate(issuer, settings):
+    """Where ERPlora does not file on behalf of businesses, VeriFactu → Configuration only offers the business's own
+    certificate, and the step says the same, in the reader's language."""
+    settings.VERIFACTU_ERPLORA_ROUTE_ENABLED = False
+    assert run("verifactu.config.get").erplora_route_available is False
+
+    english = steps(ctx_for("hub_owner"))[STEP]["description"]
+    spanish = steps(ctx_for("hub_owner", language="es"))[STEP]["description"]
+
+    assert (english, spanish) == (
+        "Upload your business certificate to send your invoices to the AEAT.",
+        "Sube el certificado del negocio para enviar tus facturas a la AEAT.",
+    )
+
+
+@HUB_DB
+@pytest.mark.parametrize(
+    ("switch", "platform_hub"), [(True, None), (False, A.key)], ids=["route open", "ERPlora's own hub"]
+)
+def test_where_configuration_offers_erploras_route_the_step_still_offers_the_authorisation(
+    issuer, settings, switch, platform_hub
+):
+    settings.VERIFACTU_ERPLORA_ROUTE_ENABLED = switch
+    if platform_hub:
+        settings.PLATFORM_HUB_SLUG = platform_hub
+    assert run("verifactu.config.get").erplora_route_available is True
+
+    assert steps(ctx_for("hub_owner"))[STEP]["description"] == (
+        "Sign the authorisation for ERPlora to send your invoices to the AEAT, or upload your business certificate."
+    )
+
+
+@HUB_DB
 @pytest.mark.parametrize("role", ["hub_manager", "hub_employee"])
 def test_whoever_cannot_configure_verifactu_is_not_told_about_the_step(issuer, role):
     # In testing a functional step goes to whoever can do it; the legal level, which reaches everybody, is base's

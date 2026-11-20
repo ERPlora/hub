@@ -1223,14 +1223,6 @@ msgid "Set up VeriFactu"
 msgstr "Configura VeriFactu"
 
 #: apps/verifactu/apps.py
-msgid ""
-"Sign the authorisation for ERPlora to send your invoices to the AEAT, or "
-"upload your business certificate."
-msgstr ""
-"Firma la autorización para que ERPlora envíe tus facturas a la AEAT, o sube "
-"el certificado del negocio."
-
-#: apps/verifactu/apps.py
 msgid "VeriFactu pending"
 msgstr "Pendientes VeriFactu"
 
@@ -1326,3 +1318,15 @@ msgstr "De momento ERPlora no presenta por cuenta de los negocios: presenta con 
 msgid "To go live, upload your own certificate: ERPlora does not file on behalf of businesses for now."
 msgstr ""
 "Para pasar a producción, sube tu propio certificado: de momento ERPlora no presenta por cuenta de los negocios."
+
+#: erplora_route.py
+msgid ""
+"Sign the authorisation for ERPlora to send your invoices to the AEAT, or "
+"upload your business certificate."
+msgstr ""
+"Firma la autorización para que ERPlora envíe tus facturas a la AEAT, o sube "
+"el certificado del negocio."
+
+#: erplora_route.py
+msgid "Upload your business certificate to send your invoices to the AEAT."
+msgstr "Sube el certificado del negocio para enviar tus facturas a la AEAT."
