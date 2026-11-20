@@ -3,11 +3,12 @@
 // VeriFactu already on stays as it is and can go off, with what it needs; once off, «Add apps» says «No disponible» with
 // the reason and offers no «Activar», and the server refuses it when asked directly, changing nothing. Back in Spain it
 // is «Desactivada» with its «Activar» again, it goes on, and from then on Apps says it never goes off (hub#618). In
-// English too, at 1440. Each step leaves a capture. `a`'s rows and its registration are put back after each test.
+// English too, at 1440. Each step leaves a capture. `a`'s rows and its registration are put back after each test, and
+// the Hub made to read the rows again.
 // flow: VERIFACTU-F01 VERIFACTU-F32 BASE-F25
-import { expect, type Page, test } from '@playwright/test';
+import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
-import { appRowsCopy } from './app-rows-helpers';
+import { appRowsCopy, bounceTasks } from './app-rows-helpers';
 import { appNote, expectSwitch, flipApp } from './apps-switch-helpers';
 import {
   A,
@@ -38,6 +39,8 @@ const NEVER_OFF_ES = 'VeriFactu no se puede desactivar una vez activada: la ley 
 const appRows = appRowsCopy('e2e_apps_refused_outside_spain_rows');
 
 let registration: Registration;
+/** The owner's session of `a`, with no page open: what makes the Hub forget its cache after each test. */
+let owner: BrowserContext | undefined;
 
 const verifactu = (page: Page) => appRow(page, 'verifactu');
 const stateOf = (page: Page) => verifactu(page).locator('[data-testid="apps-state"]');
@@ -55,15 +58,27 @@ async function findIt(page: Page): Promise<void> {
 
 test.describe.configure({ mode: 'serial' });
 
-test.beforeAll(() => {
+test.beforeAll(async ({ browser }) => {
   registration = registrationOf('a');
   expect(stored(), 'VeriFactu on in a (seed_local_hubs: every app on)').toMatch(/^on:/);
   appRows.keep();
+  // Without a page: any screen reads the list of apps, and that read alone would hide a cache left behind.
+  const signedIn = await hostPage(browser, A);
+  await signedIn.page.close();
+  owner = signedIn.context;
+});
+
+test.afterAll(async () => {
+  await owner?.close();
 });
 
 test.afterEach(async () => {
   await registerBusinessIn(registration, registration.country);
   appRows.putBack();
+  // Rows written by hand reach no operation: the Hub would keep reading this test's apps from its cache for a minute,
+  // and the next spec's «My apps» with them.
+  if (!owner) throw new Error("the owner's session of a was never opened");
+  await bounceTasks(owner, 'disable', 'enable');
 });
 
 for (const [label, viewport] of Object.entries(VIEWPORTS)) {
