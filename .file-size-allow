@@ -158,8 +158,7 @@
 109 docker/pgbouncer-entrypoint.sh ERPlora/erplora-next#74
 652 frontend/form-modal-field-names.test.ts ERPlora/erplora-next#74
 563 frontend/main.test.ts ERPlora/erplora-next#74
-505 tests/e2e/assistant-battery.ts ERPlora/erplora-next#74
-618 tests/e2e/assistant-probes.test.ts ERPlora/erplora-next#74
+617 tests/e2e/assistant-probes.test.ts ERPlora/erplora-next#74
 636 tests/e2e/assistant-probes.ts ERPlora/erplora-next#74
 514 tests/e2e/base-access.spec.ts ERPlora/erplora-next#74
 638 tests/e2e/base-app-activation.spec.ts ERPlora/erplora-next#74

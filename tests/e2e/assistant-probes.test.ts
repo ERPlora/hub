@@ -565,9 +565,8 @@ describe('membersCommand', () => {
     expect(MEMBERS.manager).toEqual({ email: 'qa-manager@example.com', password: 'manager' });
     expect(MEMBERS.admin).toEqual({ email: 'qa-admin@example.com', password: 'admin' });
     expect(MEMBERS_PY).toContain('if not settings.DEBUG');
-    expect(MEMBERS_PY).toContain('seed_demo_business("a"');
-    expect(MEMBERS_PY).toContain('HubMember.Role.MANAGER');
-    expect(MEMBERS_PY).toContain('HubMember.Role.ADMIN');
+    expect(MEMBERS_PY).toContain('demo_businesses.seed_demo_business("a"');
+    for (const said of ['demo_accounts.seed_demo_customer(', 'HubMember.Role.MANAGER', 'HubMember.Role.ADMIN']) expect(MEMBERS_PY).toContain(said);
     const command = membersCommand({ PATH: '/bin', DB_NAME: 'hub_e2e_1' }, 'saas_e2e_2');
     expect(command.file).toBe('uv');
     expect(command.args.slice(0, 5)).toEqual(['run', 'python', 'manage.py', 'shell', '-c']);

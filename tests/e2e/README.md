@@ -396,8 +396,9 @@ huellas de la búsqueda; sin `e2e-local`), y en el entorno de la ejecución:
 
 En cada invocación, antes del primer punto: `register_apps` del Hub en el esquema `shared` de la BD del SaaS de la
 pila (la documentación de las apps), los proveedores reales por las operaciones del propio SaaS (`SEED_PY` de
-`assistant-battery.ts`: `qwen`, compatible con OpenAI, contesta con `qwen3.7-plus`; `openai`, de reserva con
-`gpt-5.4-mini` y de las huellas) e `index_docs` (idempotente: solo calcula lo nuevo); una vez por ejecución, los mensajes
+`assistant-seed.ts`: `qwen`, compatible con OpenAI, contesta con `qwen3.7-plus`; `openai`, de reserva con
+`gpt-5.4-mini` y de las huellas; con `QA_ANSWER_MODEL`, el modelo a prueba, abajo «Comparar modelos») e `index_docs`
+(idempotente: solo calcula lo nuevo); una vez por ejecución, los mensajes
 del mes de `a` a cero. Al acabar, pase o falle, su `afterAll` saca del SaaS de la pila las claves (las de etiqueta `qa`) y
 la cuenta de personal con la que siembra (`CLEANUP_PY`): las claves nunca se quedan en la BD. Se niega a sembrar en la BD
 compartida `saas` o en una que no sea `…e2e…`. Cada punto pregunta en una conversación nueva, en `es` (C37 en `en`), guarda lo que pasó por
@@ -459,7 +460,9 @@ la batería; por eso cada invocación vuelve a sembrarlas. Tampoco escribe nunca
 sea `…e2e…`: se niega antes de sembrar. Cada
 sonda entra con su rol, en una conversación nueva y con su idioma, vacía antes los mensajes del mes de `a` y escribe
 `.artifacts/qa/<ejecución>/assistant-probes.md` (el informe: PASS, FAIL y N/A, la herramienta que eligió el modelo y
-los 300 primeros caracteres de la respuesta), su JSON y `.artifacts/qa/<ejecución>/<sonda>.png`; nada de eso se sube.
+los 300 primeros caracteres de la respuesta), su JSON, `.artifacts/qa/<ejecución>/<sonda>.png` y
+`.artifacts/qa/<ejecución>/bench.json` (el registro de cada turno con el que se comparan modelos, abajo); nada de eso se
+sube.
 El veredicto (`probeVerdict`) y la carga de los ficheros están en `assistant-probes.ts`, probados con Vitest en
 `assistant-probes.test.ts`.
 
@@ -488,6 +491,95 @@ pnpm -s qa:probes --role owner --language en --all --out probes-owner-en.json
 la vuelta entera: pila propia sobre `origin/main`, catálogo y esqueleto por rol e idioma, escribe las frases (nuevas,
 ambiguas, como las diría esa persona; nunca las `asks`), corre la spec, abre una issue por fallo del producto (no de la
 sonda) y sube las sondas nuevas en una PR. Por defecto, 2 herramientas por app y rol; «completa» = `--all`.
+
+## Comparar modelos (`QA_ANSWER_*`, `QA_PROBES_SAMPLE`, `pnpm qa:bench-compare`)
+
+El asistente llama a operaciones que mueven dinero y documentos fiscales, así que un modelo se elige por su acierto
+primero y por su precio después. El examen son las sondas de arriba: la misma spec las pregunta al modelo que se elija y
+deja un registro por turno que se puede comparar entre ejecuciones. Lo mismo vale para el panel del SaaS (su
+`tests/e2e/README.md`, «Sondas del asistente»): sus informes tienen el mismo formato y este mismo comando los compara.
+
+**Qué modelo contesta.** Sin ninguna variable `QA_ANSWER_*`, el de producción: Qwen (`qwen3.7-plus`) con
+`gpt-5.4-mini` de reserva. Con `QA_ANSWER_MODEL`, el modelo a prueba, en un proveedor propio del SaaS de la pila
+(`qa-answer`) y **sin reserva**: un turno en el que falla cuenta como fallo suyo, nunca como respuesta de otro modelo
+(`assistant-seed.ts`, probado en `assistant-seed.test.ts`).
+
+| Variable | Qué dice |
+|---|---|
+| `QA_ANSWER_MODEL` | el id del modelo en la API del proveedor; activa la comparación |
+| `QA_ANSWER_KIND` | la API que habla: `openai`, `anthropic`, `gemini` o `deepseek` (un servicio compatible con OpenAI es `openai` con su dirección) |
+| `QA_ANSWER_BASE_URL` | opcional: su dirección (https); sin ella, la de su API |
+| `QA_ANSWER_KEY_ENV` | el **nombre** de la variable que guarda la clave (`QA_QWEN_API_KEY`, `QA_ANTHROPIC_API_KEY`…), nunca la clave |
+| `QA_ANSWER_PRICE_IN`, `QA_ANSWER_PRICE_OUT` | USD por millón de tokens de entrada y de salida; se escriben en el modelo como en el admin |
+| `QA_PROBES_SAMPLE`, `QA_PROBES_SEED` | cuántas sondas del corpus y con qué semilla (1 por defecto) |
+
+Si con `QA_ANSWER_MODEL` falta alguna variable, la ejecución se niega diciendo cuáles; sin ella, cualquier otra
+`QA_ANSWER_*` también la para (nunca contesta Qwen en silencio). La clave se lee solo del entorno, la siembra la guarda con la etiqueta `qa` (el
+`afterAll` la borra) y se tapa en todo lo que se escribe. La búsqueda en la documentación sigue con `openai`
+(`QA_OPENAI_API_KEY`). Para medir Qwen en las mismas condiciones que los demás, sin reserva, se le nombra como modelo a
+prueba: `QA_ANSWER_KIND=openai`, `QA_ANSWER_MODEL=qwen3.7-plus`, `QA_ANSWER_BASE_URL` con la dirección de Qwen
+(`QWEN_ADDRESS` de `assistant-seed.ts`) y `QA_ANSWER_KEY_ENV=QA_QWEN_API_KEY`.
+
+**La muestra** (`assistant-sample.ts`): `QA_PROBES_SAMPLE` sondas de los ficheros, primero una de cada app, rol, idioma
+y expectativa, y después cada una cerca de su parte del corpus. El mismo corpus y la misma semilla dan siempre las
+mismas sondas, así que todos los modelos contestan las mismas frases: se comparan ejecuciones sobre el mismo commit del
+corpus. Una sonda `decide: confirm` escribe en `a`; para comparar en igualdad, cada modelo en una pila con su BD recién
+creada.
+
+**La preparación de una muestra** (`qa/setup.json`, `assistant-setup.ts`). Muchas sondas nombran registros de `a`
+(«Comedor QA», «Fichaje QA», el carrito «QA-WEB-1») que en una pila recién creada solo harían antes otras sondas
+confirmadas o una ejecución anterior; sin ellos, una muestra falla casi siempre con «no lo encuentro», sea cual sea el
+modelo. Por eso una ejecución con `QA_PROBES_SAMPLE`, una sola vez y antes de la primera sonda (tras encender las apps),
+hace esos registros con las herramientas del propio Hub y datos fijos, como la dueña de `a` y sin ningún modelo: cada
+paso es una llamada confirmada de una herramienta (`live.assistant.run_tool`), con su validación y sus permisos. Las
+fechas se escriben como `{today}`, `{today+N}` o `{year}` y salen del día de la ejecución en Madrid. Un nombre cuenta
+como hecho solo si su paso salió bien y su resultado lo nombra; lo que falló queda en `setup-run.json` de la ejecución y
+en los datos de `bench.json`. Después, una regla igual para todos los modelos deja fuera de la nota (N/A, con el motivo)
+las sondas que no pueden aprobar en esa pila:
+
+- las de los ficheros de preparación del corpus (`*-preparation-*.json`): la preparación hace lo mismo que ellas;
+- las que nombran un registro que la preparación no hizo: un nombre que acaba en «QA» (fuera de «…», que es un valor
+  nuevo), un código `QA-…`, un número con fecha (`OS-20261109-0001`, `20261109-0001`) o `product.qa`; así salen, por
+  ejemplo, las de conversaciones de WhatsApp (solo llegan de fuera), las de un dispositivo de impresión (se da de alta
+  desde el propio dispositivo) y las que citan un número de un día ya pasado;
+- y las que crean (`create`, `bulk_create`, `place`, `register`, `open`, `add`, `issue`) algo que la preparación ya hizo
+  con el mismo tipo de registro, porque saldrían duplicadas. Una sonda que crea un registro nuevo sí cuenta: lo que
+  nombra puede ser el registro que crea.
+
+Una sonda que no nombra nada así cuenta siempre, aunque pida datos que la pila no tiene («la factura de prueba»): esos
+fallos se ven en los motivos y son iguales para todos los modelos. Sin muestra no hay preparación y no cambia nada.
+
+**El registro** (`bench.json`, `assistant-bench.ts`): los datos de la ejecución (modelo, tipo de API, dirección, precios,
+reserva, fecha, ficheros, tamaño del corpus y muestra con su semilla) y una fila por sonda: id, frase, rol, idioma,
+superficie (`hub`), expectativa, si la herramienta lee o escribe, la herramienta y sus `lookups`, las herramientas que
+llamó el modelo **en orden y con sus argumentos** y cómo acabó cada una, si salió tarjeta, el veredicto y sus motivos,
+las peticiones del turno (`rounds`), los tokens de entrada, salida y huellas, el coste, la latencia y el error si lo hubo.
+
+- **Tokens y coste por turno**: la fila de uso del mes de `a` en el SaaS de la pila, que la spec vacía antes de cada
+  sonda; lo que hay después es lo de ese turno. `costUsd` suma la respuesta (con los precios del modelo) y las huellas
+  de la búsqueda (`tokensEmbedding`). Si el proveedor no devuelve el uso, la pasarela apunta 0: el resumen lo cuenta como
+  «Turns with no tokens recorded». Sin precios, el coste sale `n/a`, no cero.
+- **Si la herramienta se ofreció** (`offered`): la spec ordena la frase en el Hub como la primera ronda del turno
+  (`base.assistant.relevance`, con el catálogo del rol y todas las apps encendidas). Un fallo con `offered: false` es del
+  ranking (el modelo no tuvo la herramienta) y es igual para todos los modelos; en una `refused` no aplica.
+- **Latencia**: del envío de la frase a la última respuesta del turno, tarjeta incluida.
+- **Lo que no se ve desde el navegador**: las herramientas que corre erplora.com (fecha, tipo de cambio, búsqueda web) no
+  salen en `calls`, y `rounds` cuenta las peticiones del navegador, no las vueltas al modelo dentro del SaaS.
+- Una ejecución es de un modelo: volver a preguntar sondas (`QA_PROBES_RUN`) con otro modelo se niega.
+
+```bash
+# El modelo de producción, 150 sondas con la semilla 7:
+QA_PROBES_SAMPLE=150 QA_PROBES_SEED=7 CI=1 pnpm e2e tests/e2e/qa/assistant-probes.spec.ts
+# Otro modelo, las mismas 150 sondas, sin reserva (en una pila con su BD recién creada):
+QA_ANSWER_KIND=anthropic QA_ANSWER_MODEL=<id> QA_ANSWER_KEY_ENV=QA_ANTHROPIC_API_KEY QA_ANTHROPIC_API_KEY=… \
+  QA_ANSWER_PRICE_IN=<USD> QA_ANSWER_PRICE_OUT=<USD> QA_PROBES_SAMPLE=150 QA_PROBES_SEED=7 \
+  CI=1 pnpm e2e tests/e2e/qa/assistant-probes.spec.ts
+# El resumen: por modelo, el acierto total, en lecturas y escrituras, por idioma y por app; los N/A; los fallos del
+# ranking aparte de los del modelo y estos por motivo; el gasto total, por turno, por 1.000 mensajes y por respuesta
+# correcta; los tokens medios; los segundos por turno (media, p50, p95 y máximo, en total y en lecturas y escrituras)
+# y las rondas medias; y las sondas en las que los modelos no coinciden
+pnpm -s qa:bench-compare tests/e2e/.artifacts/qa/<ejecución 1>/bench.json tests/e2e/.artifacts/qa/<ejecución 2>/bench.json
+```
 
 ## WhatsApp (`whatsapp-*.spec.ts`)
 

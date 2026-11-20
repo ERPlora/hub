@@ -17,8 +17,10 @@ const WITHOUT_A_HUB: Record<string, { calls: number; on: string }> = {
     calls: 1,
     on: "control's registry: the rows a spec of the platform's admin lists (separate copies, recoveries) and its staff member's session",
   },
-  'assistant-battery.ts': { calls: 2, on: "the SaaS's providers and accounts" },
+  'assistant-battery.ts': { calls: 1, on: "the SaaS's keys and accounts a run left" },
+  'assistant-bench.ts': { calls: 1, on: "the tools a turn offers a phrase: the catalogue of a role, no business's data" },
   'assistant-probes.ts': { calls: 1, on: "the SaaS's accounts" },
+  'assistant-seed.ts': { calls: 1, on: "the SaaS's providers and the staff account that sets them" },
   'fix-hub-csp-whatsapp-media-gate.spec.ts': { calls: 1, on: "control's registry of hubs" },
   'manage-shell.ts': {
     calls: 1,
