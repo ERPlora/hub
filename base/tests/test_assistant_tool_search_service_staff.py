@@ -7,14 +7,14 @@ found.
 """
 
 import pytest
-from live import assistant as shared
 
 from base.tenancy.tests.business import HUB_DB, in_business_a
-from base.tests.assistant_context import offered, owner_of_a
 from base.tests.test_assistant_tool_search import (
     test_the_tool_a_phrase_left_out_is_offered_once_the_model_searches_for_it as offered_once_searched,
 )
-from base.tests.test_assistant_tool_search import user
+from base.tests.test_assistant_tool_search_cash_stock import (
+    test_the_phrase_alone_offers_the_tool_it_asks_for as offered_for_the_phrase_alone,
+)
 
 __all__ = ["in_business_a"]
 
@@ -79,9 +79,7 @@ SEARCHED = [
 
 @pytest.mark.parametrize(("language", "said", "expected"), OFFERED)
 def test_the_phrase_alone_offers_the_tool_it_asks_for(make_user, language, said, expected):
-    tools = offered(owner_of_a(make_user, language), user(said))
-    for name in expected:
-        assert shared.tool_name(name) in tools, name
+    offered_for_the_phrase_alone(make_user, language, said, expected)  # the same check as the till's own cases
 
 
 @pytest.mark.parametrize(("language", "said", "tasks", "expected"), SEARCHED)
