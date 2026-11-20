@@ -186,7 +186,7 @@ def test_a_sound_frontend_change_passes_with_the_borrowed_dependencies(head_tree
     assert f"checks: pnpm exec vitest related --run --passWithNoTests {PROBE_TS}" in output, output[-4000:]
 
 
-FIXES ={"node_modules": "pnpm install", "packages/ui": "git submodule update --init"}
+FIXES = {"node_modules": "pnpm install", "packages/ui": "git submodule update --init"}
 
 
 @pytest.mark.parametrize("lent, lacking", [((), {"node_modules", "packages/ui"}), (("node_modules",), {"packages/ui"})])
