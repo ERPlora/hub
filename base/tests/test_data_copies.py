@@ -40,7 +40,7 @@ HUB_ID = uuid.UUID("0199c4b0-0000-7000-8000-0000000000d1")
 OTHER_ID = uuid.UUID("0199c4b0-0000-7000-8000-0000000000d2")
 #: An hour before the test, to the minute (``at``, read when each test runs, never at import): the copies are made
 #: around it, within their 90 days whenever the suite runs.
-AT: dt.datetime
+AT = dt.datetime.min
 
 
 @pytest.fixture(autouse=True)

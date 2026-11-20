@@ -445,4 +445,4 @@ def test_the_settings_ranges_are_kept_by_the_database():
         ("overtime_threshold", 0),
         ("overtime_threshold", 169),
     ):
-        violates("staff_settings_ranges", lambda: StaffSettings.objects.create(**{field: value}))
+        violates("staff_settings_ranges", lambda field=field, value=value: StaffSettings.objects.create(**{field: value}))

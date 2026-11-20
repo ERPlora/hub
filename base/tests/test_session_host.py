@@ -8,7 +8,6 @@ only. A session with no host noted stays valid where it is used until it expires
 The hubs are ``hub_a`` and ``hub_b``, each on a database of its own, as every business is.
 """
 
-import pytest
 from django.contrib.auth import get_user_model, login
 from django.contrib.sessions.backends.db import SessionStore
 from django.test import RequestFactory
