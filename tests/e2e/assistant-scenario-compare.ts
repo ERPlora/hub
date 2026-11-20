@@ -88,23 +88,34 @@ function modelLines(summary: ScenarioSummary): string[] {
   ];
 }
 
-function cell(row: ScenarioRow | undefined): string {
-  if (!row) return '—';
-  if (row.status === 'not_runnable') return 'not runnable';
-  if (row.status === 'excluded') return 'excluded';
+const wrongOf = (count: number): string => (count ? `, ${count} wrong write${count === 1 ? '' : 's'}` : '');
+
+function single(row: ScenarioRow): string {
   if (row.done) return 'done';
-  const wrong = row.wrongWrites ? `, ${row.wrongWrites} wrong write${row.wrongWrites === 1 ? '' : 's'}` : '';
-  return `${Math.round(100 * row.fraction)} %${wrong}`;
+  return `${Math.round(100 * row.fraction)} %${wrongOf(row.wrongWrites)}`;
+}
+
+/** A model's runs of one scenario: one run as it ended, several as how many were done and the mean share. */
+function cell(rows: ScenarioRow[]): string {
+  const scored = rows.filter((row) => row.status === 'scored');
+  if (!scored.length) return rows.length ? rows[0].status.replace('_', ' ') : '—';
+  if (scored.length === 1) return single(scored[0]);
+  const done = scored.filter((row) => row.done).length;
+  const share = Math.round((100 * scored.reduce((sum, row) => sum + row.fraction, 0)) / scored.length);
+  return `${done}/${scored.length} done · ${share} %${wrongOf(scored.reduce((sum, row) => sum + row.wrongWrites, 0))}`;
 }
 
 function table(reports: BenchReport[], labels: string[]): string[] {
-  const byModel = new Map(labels.map((label) => [label, new Map<string, ScenarioRow>()]));
-  for (const report of reports) for (const row of report.scenarios ?? []) byModel.get(report.meta.model.label)?.set(row.scenario, row);
+  const byModel = new Map(labels.map((label) => [label, new Map<string, ScenarioRow[]>()]));
+  for (const report of reports) {
+    const rows = byModel.get(report.meta.model.label);
+    for (const row of report.scenarios ?? []) rows?.set(row.scenario, [...(rows.get(row.scenario) ?? []), row]);
+  }
   const ids = [...new Set(reports.flatMap((report) => (report.scenarios ?? []).map((row) => row.scenario)))];
   return [
     `| Scenario | ${labels.join(' | ')} |`,
     `|---|${labels.map(() => '---').join('|')}|`,
-    ...ids.map((id) => `| ${id} | ${labels.map((label) => cell(byModel.get(label)?.get(id))).join(' | ')} |`),
+    ...ids.map((id) => `| ${id} | ${labels.map((label) => cell(byModel.get(label)?.get(id) ?? [])).join(' | ')} |`),
   ];
 }
 

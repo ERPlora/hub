@@ -105,6 +105,16 @@ describe('renderScenarios', () => {
     expect(text).toContain('| s01 | 100 %, 2 wrong writes |');
   });
 
+  it('puts every run of a model in its cell: how many were done and the mean share, not just the last run', () => {
+    const runs = [
+      { ...report('m1', [row('s01'), row('s02', { done: false, fraction: 0.5, wrongWrites: 1 })]), meta: { ...report('m1', []).meta, run: 'r1' } },
+      { ...report('m1', [row('s01', { done: false, fraction: 0.2 }), row('s02', { done: false, fraction: 1 })]), meta: { ...report('m1', []).meta, run: 'r2' } },
+    ];
+    const text = renderScenarios(runs);
+    expect(text).toContain('| s01 | 1/2 done · 60 % |');
+    expect(text).toContain('| s02 | 0/2 done · 75 %, 1 wrong write |');
+  });
+
   it('is empty without scenario reports', () => {
     expect(renderScenarios([])).toBe('');
   });
