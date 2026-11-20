@@ -21,8 +21,9 @@ import { benchModel, type BenchMeta, type BenchReport, parseUsage, USAGE_SQL } f
 import { type AttachedFile, attachmentFile, renderWith } from '../assistant-fixtures';
 import { goldenCommand, parseStepResults, runSteps, type StepsRun } from '../assistant-golden';
 import { askOwner, type Exchange, ownerChoice, type OwnerDeps } from '../assistant-owner';
+import { openPanelAtHome } from '../assistant-panel';
 import { notRunnable, offeredTurnCommand, openingContent, parseOfferedTurn, SENT_SQL } from '../assistant-precheck';
-import { cleanUpRealProviders, converse, emptyMonth, openPanel, run, saasSql, SECRETS, seedRealProviders, TURN_MS } from '../assistant-real';
+import { cleanUpRealProviders, converse, emptyMonth, run, saasSql, SECRETS, seedRealProviders, TURN_MS } from '../assistant-real';
 import { type Check, loadedScenarios, type Scenario, type ToolStep } from '../assistant-scenario';
 import { datedScenario } from '../assistant-scenario-dates';
 import { type EndedBy, type ScenarioMeasured, scenarioRow, withScenario } from '../assistant-scenario-bench';
@@ -207,7 +208,7 @@ async function asked(browser: Browser, scenario: Scenario, files: AttachedFile[]
   const { context, page } = await hostPage(browser, A, { next: '/', viewport: { width: 1440, height: 900 } });
   try {
     await context.addCookies([{ name: 'django_language', value: scenario.language, domain: new URL(A).hostname, path: '/' }]);
-    await openPanel(page);
+    await openPanelAtHome(page);
     const talked = await conversation(page, scenario, files, deps);
     const wallMs = Date.now() - started;
     await capture(page, `qa/${RUN}/${scenario.id}`).catch(() => undefined);
