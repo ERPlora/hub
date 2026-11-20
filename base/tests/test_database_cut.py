@@ -509,17 +509,12 @@ def test_two_saves_refused_at_once_leave_one_group_and_one_event(boss, hub_a):
 
 def test_every_routed_command_declares_whether_a_cut_may_repeat_it():
     """A new route must be reviewed: local-only commands repeat; the exclusions say why they must not."""
-    import ast
-    from pathlib import Path
-
+    from live.ninja import operation_ids
     from live.operations import registry
 
-    root = Path(__file__).resolve().parents[2]
-    routed = set()
-    for path in [*root.glob("apps/*/api.py"), *root.glob("base/api/*.py")]:
-        for node in ast.walk(ast.parse(path.read_text())):
-            if isinstance(node, ast.Call) and ast.unparse(node.func) == "bind" and len(node.args) >= 2:
-                routed.add(ast.literal_eval(node.args[1]))
+    from config.api import api
+
+    routed = operation_ids(api)
     exclusions = {
         "appointment.appointment.create",
         "appointment.appointment.bulk_create",
