@@ -187,6 +187,23 @@ def test_the_frontend_checks_fail_naming_what_the_tree_lacks_and_did_not_borrow(
     assert named == lacking, output[-4000:]
 
 
+@pytest.mark.parametrize(
+    "probe, text",
+    [
+        ("apps/demo/frontend/Probe.vue", "<template><p>probe</p></template>\n"),
+        ("apps/demo/frontend/probe.js", "export const answer = 42;\n"),
+        ("apps/demo/frontend/probe.mjs", "export const answer = 42;\n"),
+    ],
+    ids=["vue", "js", "mjs"],
+)
+def test_a_touched_vue_or_javascript_file_runs_the_frontend_checks_too(head_tree, probe, text):
+    (head_tree / probe).write_text(text, encoding="utf-8")
+    done = checks(head_tree, "fast", "HEAD")
+    output = done.stdout + done.stderr
+    assert done.returncode == 1, output[-4000:]
+    assert f"node_modules: run {FIXES['node_modules']}" in output, output[-4000:]
+
+
 def load_helper():
     spec = importlib.util.spec_from_file_location("checks", REPO / HELPERS[0])
     module = importlib.util.module_from_spec(spec)
@@ -217,6 +234,19 @@ def test_by_default_the_change_is_what_differs_from_where_head_left_origin_main(
     subprocess.run(["git", "update-ref", "-d", "refs/remotes/origin/main"], check=True)
     with pytest.raises(SystemExit, match="origin/main"):
         helper.comparison_point(None)
+
+
+def test_a_module_of_a_package_runs_the_tests_named_after_it_and_after_its_package(tmp_path, monkeypatch):
+    helper = load_helper()
+    monkeypatch.chdir(tmp_path)
+    for path in ("shop/services/orders.py", "shop/tests/test_orders.py", "shop/tests/test_services_orders.py"):
+        (tmp_path / path).parent.mkdir(parents=True, exist_ok=True)
+        (tmp_path / path).write_text("", encoding="utf-8")
+
+    assert helper.tests_of(Path("shop/services/orders.py")) == [
+        Path("shop/tests/test_orders.py"),
+        Path("shop/tests/test_services_orders.py"),
+    ]
 
 
 @pytest.mark.parametrize("args", [(), ("slow",)])
