@@ -10,6 +10,7 @@ What the change touches is what differs from the commit the command is given, un
 Each test here gives it the HEAD of a tree of its own, so that it checks only what the test writes.
 """
 
+import importlib.util
 import os
 import subprocess
 import sys
@@ -134,9 +135,12 @@ def test_fast_runs_the_touched_tests_and_those_of_each_touched_module_on_a_datab
     commit(head_tree, {PROBE_MODULE: "ANSWER = 42\n", "apps/demo/tests/test_probe.py": PROBE_TEST})
     (head_tree / PROBE_MODULE).write_text("ANSWER = 41\n", encoding="utf-8")
     (head_tree / "apps/demo/tests/test_broken.py").write_text(BROKEN_TEST, encoding="utf-8")
+    # A red guardrail first: every check still runs.
+    (head_tree / "apps/demo/unused.py").write_text(BREAKS["apps/demo/unused.py"], encoding="utf-8")
     done = checks(head_tree, "fast", "HEAD", database=True)
     output = done.stdout + done.stderr
     assert done.returncode == 1, output[-6000:]
+    assert REPORTS["ruff"] in output, output[-6000:]
     assert "FAILED apps/demo/tests/test_probe.py::test_the_answer" in output, output[-6000:]
     assert "FAILED apps/demo/tests/test_broken.py::test_broken" in output, output[-6000:]
     # The database of the run is its own, never the suite's default nor another checkout's.
@@ -150,10 +154,12 @@ def test_fast_runs_the_touched_tests_and_those_of_each_touched_module_on_a_datab
 def test_fast_runs_eslint_the_typecheck_and_the_related_vitest_tests_of_the_touched_frontend_files(head_tree):
     commit(head_tree, {PROBE_TS: "export const answer = 42;\n", "apps/demo/frontend/probe.test.ts": PROBE_TS_TEST})
     (head_tree / PROBE_TS).write_text(BROKEN_TS, encoding="utf-8")
+    (head_tree / "apps/demo/unused.py").write_text(BREAKS["apps/demo/unused.py"], encoding="utf-8")
     done = checks(head_tree, "fast", "HEAD", CHECKS_DEPENDENCIES_FROM=str(REPO))
     output = done.stdout + done.stderr
     assert done.returncode == 1, output[-6000:]
     reports = {
+        "ruff": REPORTS["ruff"],
         "eslint": "max-params",
         "typecheck": f"{PROBE_TS}(1,14): error TS2322",
         "vitest": "FAIL  apps/demo/frontend/probe.test.ts > the answer",
@@ -175,6 +181,38 @@ def test_the_frontend_checks_fail_naming_what_the_tree_lacks(head_tree, tmp_path
     output = done.stdout + done.stderr
     assert done.returncode == 1, output[-4000:]
     assert lacking in output, output[-4000:]
+
+
+def load_helper():
+    spec = importlib.util.spec_from_file_location("checks", REPO / HELPERS[0])
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_by_default_the_change_is_what_differs_from_where_head_left_origin_main(tmp_path, monkeypatch):
+    helper = load_helper()
+    monkeypatch.chdir(tmp_path)
+    for variable in [key for key in os.environ if key.startswith("GIT_")]:
+        monkeypatch.delenv(variable)
+    subprocess.run(["git", "init", "-q"], check=True)
+    commit(tmp_path, {"kept.txt": "1\n", "gone.txt": "1\n"})
+    left = helper.git("rev-parse", "HEAD").strip()
+    subprocess.run(["git", "update-ref", "refs/remotes/origin/main", left], check=True)
+    commit(tmp_path, {"added.txt": "1\n"})
+    (tmp_path / "kept.txt").write_text("2\n", encoding="utf-8")
+    (tmp_path / "gone.txt").unlink()
+    (tmp_path / "untracked.txt").write_text("1\n", encoding="utf-8")
+
+    assert helper.comparison_point(None) == left
+    assert helper.touched(left) == ["added.txt", "kept.txt", "untracked.txt"]
+
+    subprocess.run(["git", "update-ref", "refs/remotes/origin/main", "HEAD"], check=True)
+    assert helper.comparison_point(None) == left, "on origin/main itself, HEAD's parent"
+
+    subprocess.run(["git", "update-ref", "-d", "refs/remotes/origin/main"], check=True)
+    with pytest.raises(SystemExit, match="origin/main"):
+        helper.comparison_point(None)
 
 
 @pytest.mark.parametrize("args", [(), ("slow",)])
