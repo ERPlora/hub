@@ -8,6 +8,7 @@ import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
 import { A, api, capture, psql, settled, shot, shown } from './helpers';
 import { cleanInventory, createProduct } from './inventory-helpers';
+import { chargeByCard } from './sale-charge-helpers';
 import { cleanSales } from './sale-helpers';
 import { ownerPage, post } from './service-helpers';
 
@@ -255,12 +256,7 @@ test('Serve the room with the real till: seat, transfer, merge, charge and close
     await expect(till.locator('[data-testid=pos-check-title]')).toHaveValue('Table 2');
     await expect(page).toHaveURL(/\/sale\/pos(\?|$)/);
     await expect(till.locator('[data-testid=pos-total]')).toContainText(/3[.,]00/);
-    await till.locator('[data-testid=pos-charge]').click();
-    const checkout = page.locator('[data-testid=sale-checkout-modal]');
-    await checkout.locator(`[data-testid=sale-checkout-method-${card}]`).click();
-    await checkout.locator('[data-testid=sale-checkout-confirm]').click();
-    await expect(checkout).toBeHidden();
-    await expect(page.locator('[data-testid=sale-document-modal] [data-testid=sale-receipt]')).toBeVisible();
+    await chargeByCard(page, card);
     await page.goto(`${A}/table/floor-plan`);
     await chooseZone(page, SERVICE);
     await expect(tile(page, two.id)).toContainText('Available', { timeout: 15_000 });
