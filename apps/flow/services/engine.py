@@ -434,6 +434,11 @@ def _ask(ctx: OperationContext, run: FlowRun, flow: Flow, step: dict, now: dt.da
         },
     )
     _log(run, step, "asking", now, role=question.role, until=question.expires_at.isoformat())
+    _park_on_question(ctx, run, flow, question)
+
+
+def _park_on_question(ctx: OperationContext, run: FlowRun, flow: Flow, question: Question) -> None:
+    """Parks ``run`` in «Waiting for your answer» on ``question`` until it expires."""
     run.status = FlowRun.Status.ASKING
     run.resume_at = question.expires_at
     run.save()
