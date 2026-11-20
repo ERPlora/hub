@@ -17,7 +17,7 @@ from botocore.exceptions import ClientError
 from django.utils import timezone
 from live.meta import all_live_app_configs
 
-from base import worker_data
+from base import pdf, worker_data
 from base.tenancy import fiscal_archive, offboarding
 from base.tenancy.context import use_hub
 from base.tenancy.tests import s3
@@ -120,8 +120,6 @@ def test_a_business_with_documents_is_archived_whole_before_anything_goes_and_ke
 def printing(monkeypatch) -> list[tuple[str, bytes]]:
     """Every page WeasyPrint prints from now on, with its PDF. A PDF carries the second its fonts were cut, so the same
     page printed twice is not the same file: what went to the archive is told by what was printed."""
-    from apps.invoice import pdf
-
     printed, render = [], pdf.render_pdf
 
     def spied(html: str) -> bytes:
@@ -432,7 +430,7 @@ def test_the_lease_is_renewed_after_each_page_of_the_pdfs_already_up(
     hub = business(left_days_ago=91)
     with use_hub(hub):
         invoice(1)
-    monkeypatch.setattr("apps.invoice.pdf.render_pdf", lambda html: b"%PDF-")
+    monkeypatch.setattr(pdf, "render_pdf", lambda html: b"%PDF-")
     monkeypatch.setattr(fiscal_archive, "LISTED_AT_ONCE", 1)
     renewed = renewals(monkeypatch)
 
