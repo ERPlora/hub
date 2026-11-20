@@ -123,6 +123,70 @@ LEFT_OUT = [
         "staff.schedule.update",
         id="hub-1896",
     ),
+    pytest.param(
+        "es",
+        "cambia «Sin cilantro» por «Nada de cilantro»",
+        ("change a quick note", "cambiar una nota rápida"),
+        "sale.quick_note.update",
+        id="hub-1201",
+    ),
+    pytest.param(
+        "en",
+        'change "Well done" to "Medium"',
+        ("change a text", "cambiar un texto"),
+        "sale.quick_note.update",
+        id="live-167",
+    ),
+    pytest.param(
+        "es",
+        "sustituye «Poco hecho» por «Al punto»",
+        ("replace a text", "sustituir un texto"),
+        "sale.quick_note.update",
+        id="live-168",
+    ),
+    pytest.param(
+        "es",
+        "registra una entrada de 12 unidades de tarta",
+        ("receive goods into stock", "recibir mercancía"),
+        "inventory.stock.receive",
+        id="hub-1834",
+    ),
+    pytest.param(
+        "es",
+        "quita Fichajes del menú",
+        ("turn off an app", "desactivar una app"),
+        "base.app.disable",
+        id="hub-1837",
+    ),
+    pytest.param(
+        "es",
+        "apunta que ha llegado el pedido de harina",
+        ("record received stock", "registrar la entrada de mercancía"),
+        "inventory.stock.receive",
+        id="hub-1848",
+    ),
+    pytest.param(
+        "en",
+        "record an entry of 20 € in the shift",
+        ("add a cash movement", "apuntar un movimiento de caja"),
+        "cash_register.movement.add",
+        id="hub-1852",
+    ),
+    pytest.param(
+        "es",
+        "Me he quedado sin tinte: que no se pueda reservar el tinte de raíz hasta que me llegue el pedido",
+        ("change a service", "cambiar un servicio"),
+        "service.service.update",
+        id="hub-1903",
+    ),
+    pytest.param(
+        "es",
+        "Carmen Ruiz se ha mudado y ya no viene: anula la cita que tenía el jueves y márcala como inactiva, sin "
+        "borrar su ficha",
+        ("change a customer's card", "cambiar la ficha de una clienta"),
+        "customer.customer.update",
+        id="hub-1904",
+    ),
 ]
 
 
