@@ -6,29 +6,20 @@
 // up the tasks with the read the step names (a read asks nobody) and answers; the history says it.
 // And the Hub's chat leaves a draft automation (FLOW-F17), which waits in Automations.
 // flow: FLOW-F37 FLOW-F38 FLOW-F39 FLOW-F17
-import { execFile, execSync } from 'node:child_process';
-import { promisify } from 'node:util';
-
 import { expect, type Page, test } from '@playwright/test';
 
-import { DONE, type Provider, startProvider } from './assistant-provider';
-import { capture, HUB_DIR, psql, REPO_DIR, shown } from './helpers';
-import { confirmDialog, idFromUrl, parkedEvent, RELAY, signedIn } from './flow-helpers';
+import { box, card, decide, lastAnswer, panel } from './assistant-panel';
+import { DONE } from './assistant-provider';
+import { emptyMonth, saasSql } from './assistant-real';
+import { capture, psql, shown } from './helpers';
+import { confirmDialog, idFromUrl, signedIn } from './flow-helpers';
+import { chats, providerSpec, workerAsks } from './provider-helpers';
 import { noHorizontalScroll, settled, VIEWPORTS } from './schedule-helpers';
-import { STACK } from './stack';
 import { pick } from './task-helpers';
 import { toastSaying } from './toast-helpers';
 import { openAssistant } from './topbar';
 
 const TAG = 'E2E FlowAI';
-const PROVIDER_PORT = Number(process.env.E2E_AI_PROVIDER_PORT ?? STACK.hubPort + 2);
-const SAAS_DB = process.env.E2E_SAAS_DB ?? (STACK.hubPort === 8000 ? 'saas' : `saas_e2e_${STACK.hubPort + 1}`);
-
-let provider: Provider;
-
-function saasSql(sql: string): string {
-  return execSync(`docker compose exec -T postgres psql -U hub -d ${SAAS_DB} -At -c "${sql}"`, { cwd: REPO_DIR, encoding: 'utf8' }).trim();
-}
 
 function cleanUp(): void {
   const flows = `select id from flow_flow where name like '${TAG}%'`;
@@ -41,30 +32,10 @@ function cleanUp(): void {
     ].join('; '),
   );
   // The month's messages of the business `a`: a run never spends the plan's allowance.
-  saasSql("delete from assistant_assistantusage where hub_id = (select id from hubs_hub where slug = 'a')");
+  emptyMonth();
 }
 
-test.beforeAll(async () => {
-  provider = await startProvider(PROVIDER_PORT);
-  const seeded = saasSql("select base_url from assistant_aiprovider where slug = 'e2e-local'");
-  expect(seeded, `the SaaS ${SAAS_DB} is not seeded with this provider: README «El asistente»`).toBe(provider.url);
-  cleanUp();
-});
-
-test.afterAll(async () => {
-  cleanUp();
-  await provider?.close();
-});
-
-/** The worker's part of the step (FLOW-F38): the newest `flow.run.parked` of the automation, handed to flow's reaction
- *  as the outbox relay does on every tick (`RELAY`); the assistant is asked after that COMMIT. Unlike `workerCalls`, it
- *  does not block this process while it waits: the provider the SaaS asks lives here, and must answer. */
-async function workerAsks(flowId: string): Promise<void> {
-  await promisify(execFile)('uv', ['run', 'python', 'manage.py', 'shell', '--hub', 'a', '-c', RELAY], {
-    cwd: HUB_DIR,
-    env: { ...process.env, FLOW_EVENT: parkedEvent(flowId) },
-  });
-}
+const provider = providerSpec(cleanUp);
 
 /** The run of the history that says `status`, opened. */
 async function openRun(page: Page, status: string) {
@@ -117,14 +88,14 @@ for (const viewport of VIEWPORTS) {
       // «Run now» answered without asking: the run waits for the worker, which asks the assistant.
       const waiting = await openRun(page, 'Waiting for the assistant');
       await expect(waiting).toContainText('Asked the assistant; it answers in a moment.');
-      const before = provider.seen.filter((seen) => seen.path === '/v1/chat/completions').length;
+      const before = chats(provider()).length;
       await workerAsks(flowId);
       // The same run, still open, now finished: what the assistant did, step by step.
       const done = shown(page).locator('[data-testid^=flow-run-]').filter({ hasText: 'Finished well' }).first();
       await expect(done).toContainText('The assistant used «Look for tasks».');
       await expect(done).toContainText(`The assistant answered: «${DONE.en}»`);
       // Two turns of the model through the SaaS: the task, and the answer to its read; nobody was asked.
-      const turns = provider.seen.filter((seen) => seen.path === '/v1/chat/completions').slice(before);
+      const turns = chats(provider()).slice(before);
       expect(turns).toHaveLength(2);
       expect(JSON.stringify(turns[0].body)).toContain('task__task__list');
       expect(psql(`select count(*) from flow_question where flow_id = '${flowId}'`)).toBe('0');
@@ -150,19 +121,16 @@ for (const viewport of VIEWPORTS) {
         definition: { trigger: { kind: 'manual' }, steps: [{ id: 's1', kind: 'command', operation: 'task.task.create', params: { title: 'Call back' } }] },
         notes: ['I did not know who to assign it to.'],
       };
-      const panel = await openAssistant(page);
-      const box = panel.locator('[data-testid="assistant-input"] textarea');
-      await expect(box).toBeVisible();
-      await box.fill(`E2E-ASK flow__draft__propose ${JSON.stringify(draft)}`);
-      await box.press('Enter');
-      const card = page.locator('ion-modal[data-testid="assistant-confirm"]');
-      await expect(card).toBeVisible();
-      await card.locator('[data-testid="assistant-confirm-submit"]').click();
-      await expect(card).toBeHidden();
-      await expect(panel.locator('[data-testid="assistant-bubble-assistant"]').last()).toContainText(DONE.en);
+      await openAssistant(page);
+      await expect(box(page)).toBeVisible();
+      await box(page).fill(`E2E-ASK flow__draft__propose ${JSON.stringify(draft)}`);
+      await box(page).press('Enter');
+      await expect(card(page)).toBeVisible();
+      await decide(page, 'submit');
+      await expect(lastAnswer(page)).toContainText(DONE.en);
       // The chat stays open from page to page; on a phone it covers the page, so it is closed to look at Automations.
-      await panel.locator('[data-testid="assistant-close"]').click();
-      await expect(panel).not.toHaveAttribute('data-open', 'true');
+      await panel(page).locator('[data-testid="assistant-close"]').click();
+      await expect(panel(page)).not.toHaveAttribute('data-open', 'true');
       await page.goto('/flow/automations');
       await expect(shown(page).locator('[data-testid=flow-drafts]')).toContainText(name);
       expect(psql(`select count(*) from flow_flow where name = '${name}'`)).toBe('0');

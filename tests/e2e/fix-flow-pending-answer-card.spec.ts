@@ -8,22 +8,17 @@
 // instant of what the run brought asks it in words («Paid: Yes», the day and the hour as the owner's language writes
 // them at the business's hour), never «true» or an ISO moment.
 // flow: FLOW-F29 FLOW-F38 FLOW-F28
-import { execFile, execSync } from 'node:child_process';
-import { promisify } from 'node:util';
-
 import { expect, test } from '@playwright/test';
 
-import { type Provider, startProvider } from './assistant-provider';
-import { A, api, capture, HUB_DIR, psql, REPO_DIR, shown } from './helpers';
-import { manualFlow, parkedEvent, RELAY, signedIn } from './flow-helpers';
+import { emptyMonth } from './assistant-real';
+import { A, api, capture, psql, shown } from './helpers';
+import { manualFlow, signedIn } from './flow-helpers';
+import { providerSpec, workerAsks } from './provider-helpers';
 import { noHorizontalScroll, settled, VIEWPORTS } from './schedule-helpers';
-import { STACK } from './stack';
 import { toastSaying } from './toast-helpers';
 
 const KEY = 'FIX-HUB-FLOW-PENDING-ANSWER-CARD-SHOWS-RAW-VALUES';
 const TAG = 'E2E FlowCard';
-const PROVIDER_PORT = Number(process.env.E2E_AI_PROVIDER_PORT ?? STACK.hubPort + 2);
-const SAAS_DB = process.env.E2E_SAAS_DB ?? (STACK.hubPort === 8000 ? 'saas' : `saas_e2e_${STACK.hubPort + 1}`);
 const BOOK = 'appointment.appointment.create';
 /** A service and a professional by ids that name nothing in this business: the card leaves them out. */
 const SERVICE = '0192f0b2-2222-7000-8000-000000000002';
@@ -31,12 +26,6 @@ const MEMBER = '0192f0b2-3333-7000-8000-000000000003';
 
 /** What a datum never shows: an id, a day or a time as ISO 8601 writes them, or a list or an object as code. */
 const RAW = [/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i, /\d{4}-\d{2}-\d{2}|\d{2}:\d{2}:\d{2}/, /\[\{|\{\}|\btrue\b/];
-
-let provider: Provider;
-
-function saasSql(sql: string): string {
-  return execSync(`docker compose exec -T postgres psql -U hub -d ${SAAS_DB} -At -c "${sql}"`, { cwd: REPO_DIR, encoding: 'utf8' }).trim();
-}
 
 function cleanUp(): void {
   const flows = `select id from flow_flow where name like '${TAG}%'`;
@@ -47,29 +36,10 @@ function cleanUp(): void {
       `delete from flow_flow where id in (${flows})`,
     ].join('; '),
   );
-  saasSql("delete from assistant_assistantusage where hub_id = (select id from hubs_hub where slug = 'a')");
+  emptyMonth();
 }
 
-test.beforeAll(async () => {
-  provider = await startProvider(PROVIDER_PORT);
-  const seeded = saasSql("select base_url from assistant_aiprovider where slug = 'e2e-local'");
-  expect(seeded, `the SaaS ${SAAS_DB} is not seeded with this provider: README «El asistente»`).toBe(provider.url);
-  cleanUp();
-});
-
-test.afterAll(async () => {
-  cleanUp();
-  await provider?.close();
-});
-
-/** The worker's part of the step (FLOW-F38), as in fix-flow-assistant-step.spec.ts: it never blocks this process,
- *  where the provider the SaaS asks lives. */
-async function workerAsks(flowId: string): Promise<void> {
-  await promisify(execFile)('uv', ['run', 'python', 'manage.py', 'shell', '--hub', 'a', '-c', RELAY], {
-    cwd: HUB_DIR,
-    env: { ...process.env, FLOW_EVENT: parkedEvent(flowId) },
-  });
-}
+providerSpec(cleanUp);
 
 for (const viewport of VIEWPORTS) {
   test(`FLOW-F29 the assistant's change says each datum in words in «Waiting for your answer», at ${viewport.label}`, async ({ browser }) => {
