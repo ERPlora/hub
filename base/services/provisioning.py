@@ -143,7 +143,7 @@ def claim_hub(hub_id: UUID, now: dt.datetime, lease: dt.timedelta, *, owner: str
 def claim_next_due_hub(now: dt.datetime, lease: dt.timedelta, *, owner: str = LEASE_OWNER) -> UUID | None:
     """Take for ``owner`` the lease of the hub due longest by ``now`` that nobody holds: one at a time, right before
     it is worked on, so no lease runs out while it waits its turn in a pass. Never a ready hub's (a demo whose time is
-    up aside): its ring is its apps' to set up (``base.worker._activations``), which keep their own time, or its
+    up aside): its ring is its apps' to set up (``base.worker_activations._activations``), which keep their own time, or its
     data work's, whose pass takes it."""
     with _control_transaction():
         due = (

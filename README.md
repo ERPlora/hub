@@ -326,7 +326,7 @@ PLAN-DB, ronda 2026-10-30: decisión 2 y propuestas (a), (f), (j), (k), (l), (m)
 
 - **Restablecer el negocio** (`base.hub.reset`, Ajustes › Datos): sin `dry_run` ya no vacía en la petición; anota lo
   pedido en el registro (`Hub.reset_requested_at`, `Hub.reset_sections`), lo deja debido en `hub_due` y responde
-  `status: "copying"`. El worker (`base/worker.py`, pase `_data`, bajo el arriendo del hub) copia la BD del negocio
+  `status: "copying"`. El worker (`base/worker_data.py`, pase `_data`, bajo el arriendo del hub) copia la BD del negocio
   (`base/tenancy/dumps.py`) y, solo si la copia quedó guardada, vacía las secciones en su BD con
   `base.hub.reset_apply` (una transacción: todo o nada) y anota `base.hub.data_reset`; si la copia falla no vacía
   nada y deja `failed` con su motivo (`dumps_unavailable`, `dump_failed`, `emptying_failed`, `hub_not_ready`), y la

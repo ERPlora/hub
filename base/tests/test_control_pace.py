@@ -25,6 +25,7 @@ from live.context import Scope, system_context
 from live.operations import get as get_operation
 
 from base import catalog, control_pace, events, hub_listener, queries, registry, scheduler, services, worker
+from base import worker_activations, worker_data
 from base.catalog import RegisterResult
 from base.hub_listener import Listener
 from base.models import AppActivation, TaskSchedule
@@ -53,7 +54,7 @@ def at_rest(hub_a, hub_b, monkeypatch):
             TaskSchedule.objects.update(next_run=START + dt.timedelta(days=1))
     monkeypatch.setattr(catalog, "register_apps", lambda: SKIPPED)
     monkeypatch.setattr(worker, "Background", Inline)
-    monkeypatch.setattr(worker, "_measured", dt.date.max)
+    monkeypatch.setattr(worker_data, "_measured", dt.date.max)
 
 
 @contextmanager
@@ -98,9 +99,9 @@ def every_tick_before(now: dt.datetime) -> None:
     with use_control():
         services.provisioning.hubs_to_serve(now)
         services.activation.hubs_visited_since(now.date())
-    worker._activations(now)
-    worker._data(now)
-    worker._moves(now)
+    worker_activations._activations(now)
+    worker_data._data(now)
+    worker_data._moves(now)
     worker._due(now)
 
 
@@ -418,7 +419,7 @@ def test_the_second_of_two_moves_asked_is_taken_at_the_tick_after_the_first_ende
     """``move.run_due`` moves one hub a pass (a copy takes a while): the one asked after it starts at the next tick,
     as it did when the moves' pass started on every tick, not at the moves' look ten minutes later."""
     queue, moved = [], []
-    monkeypatch.setattr(worker.move, "run_due", lambda now, cancelled=None: 1 if queue and not moved.append((queue.pop(0), now)) else 0)
+    monkeypatch.setattr(worker_data.move, "run_due", lambda now, cancelled=None: 1 if queue and not moved.append((queue.pop(0), now)) else 0)
 
     run_the_worker(A_MINUTE, Counter(), between=asked_after_the_second_tick(queue, "first", "second"))
 
@@ -453,7 +454,7 @@ def test_a_moves_pass_that_failed_starts_again_at_the_next_tick(at_rest, monkeyp
             raise RuntimeError(f"the database went away during the {queue.pop()} move")
         return 0
 
-    monkeypatch.setattr(worker.move, "run_due", run_due)
+    monkeypatch.setattr(worker_data.move, "run_due", run_due)
 
     run_the_worker(A_MINUTE, Counter(), between=asked_after_the_second_tick(queue, "first"))
 
