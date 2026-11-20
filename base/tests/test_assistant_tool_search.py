@@ -157,3 +157,14 @@ def test_a_search_of_a_request_already_done_no_longer_takes_a_place_in_the_turn(
     later = [answer(write), {"role": "assistant", "content": "Hecho."}, user("Gracias."), user("¿Qué vendí hoy?")]
     done = [user("Sube un 5 % las bebidas"), asked(search), answer(search), asked(write)]
     assert names(turn(context, *done, *later)["tools"]) == names(turn(context, *later)["tools"])
+
+
+def test_the_latest_search_is_offered_first_when_the_model_searched_several_times(make_user):
+    """A model that found nothing fitting searches again in other words: what it found last is never left out."""
+    context = owner_of_a(make_user, "en")
+    tasks = ["list the customers", "open the cash register", "list the reservations", "list the tables"]
+    earlier = [call(SEARCH, {"query": task}, f"s{at}") for at, task in enumerate(tasks)]
+    latest = call(SEARCH, {"query": "create a product"}, "s9")
+    messages = [user("The tonic water is new"), *(m for c in earlier for m in (asked(c), answer(c))), asked(latest)]
+    plan = turn(context, *messages, pending=(latest,))
+    assert shared.tool_name("inventory.product.create") in names(plan["tools"])
