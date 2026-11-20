@@ -13,15 +13,15 @@ from apps.verifactu.models import Record
 from apps.verifactu.queries.country import refuse_outside_spain
 from apps.verifactu.queries.records import can_cancel, can_correct, find_invoice, find_record, summary
 from apps.verifactu.queries.route import effective_environment
-from apps.verifactu.schemas import (
+from apps.verifactu.schemas.contingency import TransmitOut
+from apps.verifactu.schemas.records import (
+    ReconcileOut,
     RecordCancelIn,
     RecordCorrectIn,
     RecordCreateIn,
     RecordCreateOut,
     RecordReconcileIn,
     RecordTransmitIn,
-    ReconcileOut,
-    TransmitOut,
 )
 
 from .aeat_query import _query_aeat

@@ -8,7 +8,8 @@ from live.context import OperationContext
 from live.operations import operation
 
 from apps.verifactu.models import Event
-from apps.verifactu.schemas import EventListIn, EventOut, Page
+from apps.verifactu.schemas.events import EventListIn, EventOut
+from apps.verifactu.schemas.fields import Page
 
 from .reads import VIEW, page
 
