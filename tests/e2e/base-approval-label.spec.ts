@@ -9,15 +9,14 @@
 // the write as written (`E2E-ASK`); the SaaS must be seeded with it (README of this folder, «El asistente»). The
 // owner's PIN exists only while this file runs, after the employee has entered (a PIN in hub `a` turns every browser's
 // way in into the PIN pad), and everything this file creates goes with it (`afterAll`).
-import { execSync } from 'node:child_process';
-
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { type Provider, startProvider } from './assistant-provider';
-import { card, openPanelAtTheDesk, panel } from './assistant-panel';
-import { A, api, EMPLOYEE, login, OWNER, psql, REPO_DIR, shot, shown, untilStill, usernamesOf } from './helpers';
+import { type Provider } from './assistant-provider';
+import { box, card, openPanelAtTheDesk } from './assistant-panel';
+import { emptyMonth } from './assistant-real';
+import { A, api, EMPLOYEE, login, OWNER, psql, shot, shown, THREE_SIZES as VIEWPORTS, untilStill, usernamesOf } from './helpers';
 import { createItem } from './demo-items';
-import { STACK } from './stack';
+import { seededProvider } from './provider-helpers';
 import { toastSaying } from './toast-helpers';
 
 const KEY = 'FIX-HUB-BASE-APPROVAL-LABEL-WITHOUT-DISCOUNT-FIGURE';
@@ -26,16 +25,6 @@ const OWNER_PIN = '2580';
 const LINE_TEXT = `Café con leche ${Date.now().toString(36)}`;
 const SAID_ES = `Se aprueba: Añadir una línea: 2,5 × ${LINE_TEXT}`;
 const SAID_EN = `Add a line: 2.5 × ${LINE_TEXT}`;
-/** A phone, a tablet and a desk (the SaaS panel's `VIEWPORTS`). */
-const VIEWPORTS = [
-  { label: '390', width: 390, height: 844 },
-  { label: '834', width: 834, height: 1112 },
-  { label: '1440', width: 1440, height: 900 },
-];
-
-const PROVIDER_PORT = Number(process.env.E2E_AI_PROVIDER_PORT ?? STACK.hubPort + 2);
-/** The SaaS's database of this stack (README «Varias ejecuciones a la vez»: `saas_e2e_<Hub port + 1>`). */
-const SAAS_DB = process.env.E2E_SAAS_DB ?? (STACK.hubPort === 8000 ? 'saas' : `saas_e2e_${STACK.hubPort + 1}`);
 
 test.describe.configure({ mode: 'serial' });
 
@@ -44,18 +33,6 @@ let owner: { context: BrowserContext; page: Page };
 let employee: { context: BrowserContext; page: Page };
 let started = '';
 let itemId = '';
-
-function saasSql(sql: string): string {
-  return execSync(`docker compose exec -T postgres psql -U hub -d ${SAAS_DB} -At -c "${sql}"`, {
-    cwd: REPO_DIR,
-    encoding: 'utf8',
-  }).trim();
-}
-
-/** None of this month's assistant messages of the business `a` spent: a run never uses up the plan's allowance. */
-function unspent(): void {
-  saasSql("delete from assistant_assistantusage where hub_id = (select id from hubs_hub where slug = 'a')");
-}
 
 /** Every account of `email` (their usernames, read from control's): the cleanup leaves none of them with what this file made. */
 const accountsOf = (email: string): string => usernamesOf(email);
@@ -66,10 +43,8 @@ function forgetThePin(): void {
 }
 
 test.beforeAll(async ({ browser }) => {
-  provider = await startProvider(PROVIDER_PORT);
-  const seeded = saasSql("select base_url from assistant_aiprovider where slug = 'e2e-local'");
-  expect(seeded, `the SaaS ${SAAS_DB} is not seeded with this provider: README «El asistente»`).toBe(provider.url);
-  unspent();
+  provider = await seededProvider();
+  emptyMonth();
   started = psql('SELECT now()::text');
   const context = await browser.newContext({ baseURL: A });
   owner = { context, page: await context.newPage() };
@@ -95,7 +70,7 @@ test.afterAll(async () => {
     );
   }
   if (itemId) await api(owner.context, A, 'POST', '/demo/items/delete', { id: itemId });
-  unspent();
+  emptyMonth();
   await employee?.context.close();
   await owner?.context.close();
   await provider?.close();
@@ -108,9 +83,8 @@ const escaped = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/g, '\
 test('BASE-F84: the dialog says the figures of the very line it approves, and a manager approves it with their PIN', async () => {
   const { page } = employee;
   await openPanelAtTheDesk(page);
-  const box = panel(page).locator('[data-testid="assistant-input"] textarea');
-  await box.fill(`E2E-ASK demo__item__add_line {"id":"${itemId}","text":"${LINE_TEXT}","qty":"2.5"}`);
-  await box.press('Enter');
+  await box(page).fill(`E2E-ASK demo__item__add_line {"id":"${itemId}","text":"${LINE_TEXT}","qty":"2.5"}`);
+  await box(page).press('Enter');
   await expect(card(page)).toBeVisible({ timeout: 30_000 });
   await card(page).locator('[data-testid="assistant-confirm-submit"]').click();
 

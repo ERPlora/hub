@@ -8,10 +8,10 @@
 // guard: no call leaves the machine); a question is built (F28) and the
 // employee answers it in «Waiting for your answer», which is all they see of the app (F29). What a run
 // creates is tagged `E2E FlowG` and goes.
-import { expect, type Page, test } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 
 import { A, api, EMPLOYEE, psql, shot, shown } from './helpers';
-import { choose, confirmDialog, idFromUrl, manualFlow, signedIn, workerCalls } from './flow-helpers';
+import { choose, confirmDialog, idFromUrl, manualFlow, openRun, signedIn, workerCalls } from './flow-helpers';
 import { noHorizontalScroll, settled, VIEWPORTS } from './schedule-helpers';
 import { pick } from './task-helpers';
 import { toastSaying } from './toast-helpers';
@@ -34,14 +34,6 @@ function cleanUp(): void {
 
 test.beforeAll(cleanUp);
 test.afterAll(cleanUp);
-
-/** The run of the history that says `status`, opened. */
-async function openRun(page: Page, status: string) {
-  const run = shown(page).locator('[data-testid^=flow-run-]').filter({ hasText: status }).first();
-  await expect(run).toBeVisible();
-  await run.locator('[data-testid^=flow-run-toggle-]').click();
-  return run;
-}
 
 async function taskTitles(context: Parameters<typeof api>[0], search: string): Promise<string[]> {
   const tasks = await api<{ rows: { title: string }[] }>(context, A, 'GET', `/task/tasks?search=${encodeURIComponent(search)}`);

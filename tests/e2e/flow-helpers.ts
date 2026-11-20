@@ -160,6 +160,14 @@ export async function runNowAsksTheAssistant(page: Page): Promise<void> {
   await expect(toastSaying(page, 'the assistant is on it')).toBeVisible();
 }
 
+/** The run of the history that says `status`, opened. */
+export async function openRun(page: Page, status: string): Promise<Locator> {
+  const run = shown(page).locator('[data-testid^=flow-run-]').filter({ hasText: status }).first();
+  await expect(run).toBeVisible();
+  await run.locator('[data-testid^=flow-run-toggle-]').click();
+  return run;
+}
+
 /** The owner's yes to `question`, a card of «Waiting for your answer»: the automation carries on and the card leaves. */
 export async function approve(page: Page, question: Locator): Promise<void> {
   await question.locator('[data-testid^=flow-question-yes-]').click();
