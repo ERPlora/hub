@@ -1,6 +1,7 @@
 {
   // The Vitest tests of the SPA and their helpers (`__tests__/`, `frontend/testing/`): the SPA's setup plus
-  // Node's types, because they run in Node (happy-dom). The `.d.ts` carry the operations' types of the SDK.
+  // Node's types, because they run in Node (happy-dom). The operations' type files are listed by name: some only add
+  // their operations to the SDK (`declare module '@erplora/ui/sdk'`) and nothing imports them.
   "extends": "./tsconfig.app.json",
   "compilerOptions": { "types": ["vite/client", "node"] },
   "include": [
@@ -12,8 +13,12 @@
     "apps/*/frontend/**/__tests__/**/*",
     "frontend/testing/**/*",
     "frontend/**/*.d.ts",
-    "base/frontend/**/*.d.ts",
+    "frontend/sdk-types.ts",
+    "base/frontend/operations-*.ts",
+    "base/frontend/operations/*.ts",
     "apps/*/frontend/**/*.d.ts",
+    "apps/*/frontend/operations.ts",
+    "apps/*/frontend/operations/*.ts",
     "packages/ui/src/shell/shims.d.ts"
   ],
   "exclude": ["node_modules", "frontend/dist"]

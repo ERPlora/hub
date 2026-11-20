@@ -1,5 +1,5 @@
 // Types of the tax app's operations for the SDK (`useLive`, `useCommand`), from apps/tax/schemas.py. Written by hand,
-// as `frontend/sdk-types.d.ts` is: nothing generates them from `/api/openapi.json`. Keep it in step with schemas.py and
+// as `frontend/sdk-types.ts` is: nothing generates them from `/api/openapi.json`. Keep it in step with schemas.py and
 // with `frontend/generated/operations.json`. One input per operation (ninja's parity): no path parameters, a rule's
 // `id` travels in the input. Decimals (`rate_pct`) are JSON strings on the way out («21.00»); dates are ISO
 // `YYYY-MM-DD`.

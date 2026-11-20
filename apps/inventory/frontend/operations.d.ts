@@ -1,5 +1,5 @@
 // Types of the inventory app's operations for the SDK (`useLive`, `useCommand`, `client.api.call`),
-// from apps/inventory/schemas.py. Written by hand, as `frontend/sdk-types.d.ts` is, until they are
+// from apps/inventory/schemas.py. Written by hand, as `frontend/sdk-types.ts` is, until they are
 // generated from `/api/openapi.json`. Keep it in step with schemas.py and with
 // `frontend/generated/operations.json`. One input per operation (ninja's parity): no path
 // parameters, a product or a category travels in the input. Money is whole cents; quantities and

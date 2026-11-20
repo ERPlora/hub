@@ -1,5 +1,5 @@
 // Types of the customer app's operations for the SDK (`useLive`, `useCommand`, `client.api.call`). Written by hand from
-// apps/customer/schemas.py, like frontend/sdk-types.d.ts: nothing generates them from `/api/openapi.json`. Keep them in
+// apps/customer/schemas.py, like frontend/sdk-types.ts: nothing generates them from `/api/openapi.json`. Keep them in
 // step with `frontend/generated/operations.json`. One input per operation: no path parameters, ids travel in the query
 // string (GET) or the body. Money is in cents; dates are ISO 8601 strings (`YYYY-MM-DD` for a day).
 
