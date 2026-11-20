@@ -9,13 +9,11 @@ the asks and the guard that no ask copies a probe of layer 2.
 import pytest
 from django.apps import apps
 from live import assistant as shared
-from live.context import OperationContext
-from live.operations import AI, get, registry
+from live.operations import AI, registry
 
 from base import assistant
 from base.models import Membership
-from base.permissions import permissions_for
-from base.tenancy.tests.business import A
+from base.tests.assistant_context import offered, owner_of_a
 from base.tests.test_assistant_asks import assert_its_words_name
 from base.tests.test_assistant_asks import (
     TOP,
@@ -250,12 +248,8 @@ def test_the_hub_reads_a_quantity_in_a_unit_as_the_stock_of_goods_and_an_amount_
 
 
 def offered_by_a_turn(make_user, language: str, text: str) -> list[str]:
-    """The tools a turn of the assistant offers the owner of business A for ``text``, said alone, by their tool names."""
-    user = make_user("olga", host=A.key, role=Membership.Role.OWNER)
-    ctx = OperationContext(scope=A, actor=user, permissions=permissions_for(user, A), language=language)
-    op = get("base.assistant.turn")
-    plan = op(ctx, op.input(messages=[{"role": "user", "content": text}])).model_dump(mode="json")
-    return [tool["name"] for tool in plan["tools"]]
+    """The tools a turn of the assistant offers the owner of business A for ``text``, said alone."""
+    return offered(owner_of_a(make_user, language), {"role": "user", "content": text})
 
 
 @HUB_DB

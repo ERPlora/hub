@@ -6,12 +6,9 @@ import json
 
 import pytest
 from live import assistant as shared
-from live.context import OperationContext
-from live.operations import get
 
-from base.models import Membership
-from base.permissions import permissions_for
-from base.tenancy.tests.business import HUB_DB, A, in_business_a
+from base.tenancy.tests.business import HUB_DB, in_business_a
+from base.tests.assistant_context import offered, owner_of_a
 
 __all__ = ["in_business_a"]
 
@@ -22,14 +19,7 @@ CREATE = shared.tool_name("inventory.product.create")
 
 @pytest.fixture
 def owner(make_user):
-    user = make_user("olga", host=A.key, role=Membership.Role.OWNER)
-    return OperationContext(scope=A, actor=user, permissions=permissions_for(user, A), language="es")
-
-
-def offered(ctx: OperationContext, *messages: dict) -> list[str]:
-    op = get("base.assistant.turn")
-    plan = op(ctx, op.input(messages=list(messages))).model_dump(mode="json")
-    return [tool["name"] for tool in plan["tools"]]
+    return owner_of_a(make_user)
 
 
 def person(text: str) -> dict:
