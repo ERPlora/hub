@@ -151,7 +151,6 @@ forbidden_modules = ["apps"]
 allow_indirect_imports = true
 ignore_imports = [
     "**.tests.** -> **",
-    "base.internal -> apps.invoice.pdf",
 ]
 
 [[tool.importlinter.contracts]]

@@ -13,7 +13,8 @@ commit, in a temporary worktree.
 Every check runs, and any red one fails the command. The whole suite is the CI's (.github/workflows/test.yml).
 
 A tree without node_modules or packages/ui (the hook's worktree) borrows them from the checkout CHECKS_DEPENDENCIES_FROM
-names: a link to its node_modules, and packages/ui at the commit this tree records, out of that checkout's clone of it.
+names: its node_modules as a folder of links into that checkout's, and packages/ui at the commit this tree records, out
+of that checkout's clone of it.
 Python reaches packages/live through the environment's editable install. A frontend check that still lacks one of them
 fails naming it, never skipped.
 """
@@ -85,12 +86,29 @@ def unpack(clone: Path, into: Path) -> None:
         tar.extractall(into, filter="data")
 
 
+def mirror(lender: Path, folder: Path) -> None:
+    """``folder`` as a directory of links into the lender's. A link of its own is copied as it is, so that a relative
+    one resolves inside this tree: pnpm links the workspace's package as ``@erplora/ui -> ../../packages/ui``, and
+    a link to the lender's packages/ui would give the typecheck two copies of its types. Anything else is linked whole.
+    """
+    folder.mkdir()
+    for entry in (lender / folder).iterdir():
+        if entry.is_symlink():
+            (folder / entry.name).symlink_to(os.readlink(entry))
+        elif entry.name.startswith("@") and entry.is_dir():
+            mirror(lender, folder / entry.name)
+        else:
+            (folder / entry.name).symlink_to(entry)
+
+
 def borrow(lender: Path) -> None:
     if not (UI / "package.json").is_file() and (lender / UI).is_dir():
         unpack(lender / UI, UI)
-    for folder in (Path("node_modules"), UI / "node_modules"):
-        if folder.parent.is_dir() and not folder.exists() and (lender / folder).is_dir():
-            folder.symlink_to(lender / folder)
+    modules = Path("node_modules")
+    if not modules.exists() and (lender / modules).is_dir():
+        mirror(lender, modules)
+    if UI.is_dir() and not (UI / modules).exists() and (lender / UI / modules).is_dir():
+        (UI / modules).symlink_to(lender / UI / modules)
 
 
 def run(command: list[str], **env: str) -> bool:

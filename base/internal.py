@@ -102,7 +102,7 @@ from live.errors import OperationError
 from live.operations import get as get_operation
 from pydantic import ValidationError
 
-from base import apps_on, registry, services
+from base import apps_on, pdf, registry, services
 from base.registry import REGISTRY_SCOPE
 from base.tenancy.context import HubWithoutDatabase, use_hub
 from base.tenancy.identity import HubIdentityMismatch
@@ -500,10 +500,8 @@ def platform_invoice_pdf(request: HttpRequest, invoice_id: UUID) -> HttpResponse
     document, refused = _platform_call("invoice.invoice.platform_document", {"id": str(invoice_id)})
     if refused is not None:
         return refused
-    from apps.invoice.pdf import render_pdf
-
     try:
-        printed = render_pdf(document.html)
+        printed = pdf.render_pdf(document.html)
     except OSError as missing:
         # WeasyPrint's libraries are missing on this server (the image installs them).
         return refuse(503, "internal.pdf_unavailable", f"The PDF cannot be printed here: {missing}")

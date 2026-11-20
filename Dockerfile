@@ -72,7 +72,7 @@ RUN . /etc/os-release \
  && apt-get update \
  && apt-get install -y --no-install-recommends pgbouncer postgresql-client-18 \
  && rm -rf /var/lib/apt/lists/*
-# WeasyPrint (apps/invoice/pdf.py, the PDF of ERPlora's invoices): Pango and HarfBuzz's subsetter, as its
+# WeasyPrint (base/pdf.py, the PDF of ERPlora's invoices): Pango and HarfBuzz's subsetter, as its
 # documentation lists them for Debian; DejaVu, the fonts the A4 prints with (the image has none).
 RUN apt-get update \
  && apt-get install -y --no-install-recommends libpango-1.0-0 libpangoft2-1.0-0 libharfbuzz-subset0 fonts-dejavu-core \
