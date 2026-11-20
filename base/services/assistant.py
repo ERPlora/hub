@@ -2,6 +2,7 @@
 """
 
 import base64
+import contextlib
 import dataclasses
 import json
 
@@ -13,6 +14,7 @@ from live.context import OperationContext
 from live.errors import OperationError, Unauthorized
 from live.operations import get as get_operation
 from live.operations import operation
+from pydantic import ValidationError
 
 from base import approvals as approval_rules
 from base import assistant, queries
@@ -76,27 +78,53 @@ def _assistant_words(content) -> str:
     return "\n".join(str(text) for text in texts)
 
 
-def _assistant_asked(messages: list[dict], tools: dict) -> list[str]:
-    """What the person wrote in the request still open, message by message: everything since the model last asked for a
-    write, which closes what it was asked for, and never fewer than their last two messages. The answers to the
-    assistant's questions about a request name none of its tools («no tiene código, ponle tú uno»), so its first words
-    must still count. A file alone says nothing: the words written before it still count."""
-    closed = max((at for at, message in enumerate(messages) if _asks_for_a_write(message, tools)), default=-1)
-    said = [
-        (at, words)
-        for at, message in enumerate(messages)
+def _assistant_asked(still_open: list[dict]) -> list[str]:
+    """What the person wrote in the request still open (``_assistant_opened``), message by message. A file alone says
+    nothing: the words written before it still count."""
+    return [
+        words
+        for message in still_open
         if message.get("role") == "user" and (words := _assistant_words(message.get("content")))
     ]
-    still_open = [words for at, words in said if at > closed]
-    return still_open if len(still_open) >= 2 else [words for _, words in said[-2:]]
+
+
+def _assistant_opened(messages: list[dict], tools: dict) -> int:
+    """Where the request still open starts: after the model last asked for a write, which closes what it was asked for,
+    and never after the person's second-to-last message. The answers to the assistant's questions about a request name
+    none of its tools («no tiene código, ponle tú uno»), so its first words must still count."""
+    closed = max((at for at, message in enumerate(messages) if _asks_for_a_write(message, tools)), default=-1)
+    said = [
+        at
+        for at, message in enumerate(messages)
+        if message.get("role") == "user" and _assistant_words(message.get("content"))
+    ]
+    return min(closed + 1, said[-2]) if len(said) >= 2 else 0
 
 
 def _asks_for_a_write(message: dict, tools: dict) -> bool:
     """Whether ``message`` is the model's asking for a write among ``tools``."""
+    names = (function.get("name") for function in _functions(message))
+    return any((op := shared.operation_of(str(name), tools)) is not None and op.kind == "command" for name in names)
+
+
+def _functions(message: dict) -> list[dict]:
+    """The tools the model asked for in ``message``, as the gateway wrote each: its ``name`` and ``arguments``."""
     calls = message.get("tool_calls") if message.get("role") == "assistant" else None
     asked = (call.get("function") for call in calls if isinstance(call, dict)) if isinstance(calls, list) else ()
-    names = (function.get("name") for function in asked if isinstance(function, dict))
-    return any((op := shared.operation_of(str(name), tools)) is not None and op.kind == "command" for name in names)
+    return [function for function in asked if isinstance(function, dict)]
+
+
+def _assistant_searched(still_open: list[dict]) -> list[str]:
+    """The tasks the model searched the person's tools for (``base.tool.search``) in the request still open
+    (``_assistant_opened``), in order; a search its operation refuses searched nothing."""
+    search = get_operation(assistant.relevance.TOOL_SEARCH)
+    queries = []
+    for function in (function for message in still_open for function in _functions(message)):
+        if function.get("name") != shared.tool_name(search.name):
+            continue
+        with contextlib.suppress(ValidationError):
+            queries.append(search.input.model_validate_json(str(function.get("arguments") or "{}")).query)
+    return queries
 
 
 def _assistant_ran(ctx: OperationContext, tools: dict, call, outcome: "shared.ToolOutcome") -> dict:
@@ -221,13 +249,14 @@ def assistant_turn(ctx: OperationContext, data: AssistantTurnIn) -> dict:
         executed.append(_assistant_ran(ctx, tools, call, outcome))
         pending.pop(0)
     messages = [*data.messages, *append]
-    asked = _assistant_asked(data.messages, tools)
+    still_open = data.messages[_assistant_opened(data.messages, tools) :]
+    asked = _assistant_asked(still_open)
     business = _assistant_read(ctx, "base.business.get") or {}
     if card is not None:
         # The card paints an amount (its schema's ``money`` mark) in the business's currency, with its decimals.
         currency = business.get("currency") or "EUR"
         card["money"] = {"currency": currency, "decimals": business.get("currency_decimals", 2)}
-    offered = assistant.relevance.relevant(tools, asked, ctx.language)
+    offered = assistant.relevance.relevant(tools, asked, ctx.language, searched=_assistant_searched(still_open))
     text = assistant.prompt.instructions(
         language=ctx.language,
         currency=business.get("currency") or "EUR",
