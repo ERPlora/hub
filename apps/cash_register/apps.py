@@ -123,8 +123,8 @@ class CashRegisterConfig(LiveAppConfig):
             configured_when=[SetupCheck(field="updated_at", truthy=True)],
             title=_("Your cash drawer"),
             description=_(
-                "Decide how the till opens and closes: the opening float, the closing count and the POS screen that "
-                "stays locked until the drawer is open."
+                "Decide how the till opens and closes: the opening float, the closing count and whether charging in "
+                "cash needs an open session."
             ),
             icon="ion:cash-outline",
             route="/cash_register/settings",
