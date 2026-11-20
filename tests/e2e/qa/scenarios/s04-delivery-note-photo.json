@@ -108,8 +108,8 @@
       "unchanged": true
     },
     {
-      "says": "ningún otro movimiento de stock",
-      "sql": "select count(*) from inventory_stockmovement where movement_type <> 'reception'",
+      "says": "ningún otro movimiento de stock (la tónica nueva puede nacer con lo que llegó)",
+      "sql": "select count(*) from inventory_stockmovement m join inventory_product p on p.id = m.product_id where m.movement_type <> 'reception' and p.name not ilike '%nica%'",
       "unchanged": true
     }
   ],

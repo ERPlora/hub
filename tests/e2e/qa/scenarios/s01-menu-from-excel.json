@@ -129,20 +129,20 @@
       ]
     },
     {
-      "id": "price-helado",
+      "id": "price-helado artesano",
       "fact": "el precio de helado artesano, que falta en el Excel",
       "reveals": ["3,80", "3.80", "3,8"],
       "uses": [
-        {"tool": "inventory.product.bulk_create", "path": "rows[name~helado].price"},
+        {"tool": "inventory.product.bulk_create", "path": "rows[name~helado artesano].price"},
         {
           "tool": "inventory.product.create",
           "path": "price",
-          "where": {"name": "helado"}
+          "where": {"name": "helado artesano"}
         },
         {
           "tool": "inventory.product.update",
           "path": "price",
-          "where": {"product": "helado"}
+          "where": {"product": "helado artesano"}
         }
       ]
     },
