@@ -4,8 +4,8 @@
 // topbar's «My apps» (the menu), and its screens say why they do not open; on again, it is back. With 20 chosen apps on, the
 // 21st is refused with the plan's notice and «Upgrade plan» (erplora.com's plans). Each flow leaves a capture at each
 // width. The photo is sent the way the SaaS sends it (`PUT /internal/hubs/{id}/state`,
-// signed); `a`'s photo is put back after the run and its rows of `base_appactivation` are put back before and after
-// each test to every app on with the roots chosen, as `seed_local_hubs` leaves the local hubs (a business is born with
+// signed); `a`'s photo is put back after the run and its rows of `base_appactivation` are put back after each test
+// to every app on with the roots chosen, as `seed_local_hubs` leaves the local hubs (a business is born with
 // every app off: `a` stands for a hub from before that, which kept them on).
 // In Spanish, each flow with its capture: «Activar» an app the business does not use (BASE-F18); «Desactivar»
 // Reservations names Tables, which came along only with it, and «Activar» brings both back, naming it (BASE-F19,
@@ -20,6 +20,7 @@ import { createHmac } from 'node:crypto';
 
 import { type Browser, expect, type Page, test } from '@playwright/test';
 
+import { appRowsWriter } from './app-rows-helpers';
 import { expectSwitch, flipApp } from './apps-switch-helpers';
 import {
   A,
@@ -53,6 +54,7 @@ const SECRET = process.env.INTERNAL_SHARED_SECRET || 'local-internal-shared-secr
 const BACKUP = 'e2e_base_app_activation_photo_before';
 /** Gratis: 20 apps the business chooses. */
 const GRATIS = { slug: 'free', max_users: 0, max_devices: 0, max_apps: 20 };
+const writeApps = appRowsWriter();
 
 let hubId = '';
 let version = Math.floor(Date.now() / 1000);
@@ -77,7 +79,7 @@ const ROWS = 'e2e_base_app_activation_rows';
 
 /** `a` back to every app on, its roots chosen: the rows `seed_local_hubs` wrote, kept at the start of the run. */
 const baseline = () =>
-  psql(`delete from base_appactivation where host = 'a'; insert into base_appactivation select * from ${ROWS}`);
+  writeApps(`delete from base_appactivation where host = 'a'; insert into base_appactivation select * from ${ROWS}`);
 
 test.beforeAll(() => {
   hubId = psql("select id from base_hub where slug = 'a'");
@@ -107,7 +109,6 @@ test.beforeAll(() => {
 test.afterAll(() => {
   // The ticket BASE-F25 issued, with its VeriFactu record, and the numbering as the run found it.
   cleanInvoices();
-  baseline();
   psql(
     [
       `update base_hub h set state = b.state, state_version = b.state_version from ${BACKUP} b where b.id = h.id`,
@@ -117,7 +118,6 @@ test.afterAll(() => {
   );
 });
 
-test.beforeEach(baseline);
 test.afterEach(baseline);
 
 /** The list searched for `name`: the rows are paged, an app far down the list is not on screen. */
@@ -260,7 +260,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
         "('a', 'website', 'off', false)",
       ];
       // In place of the rows `baseline` put back (every app on).
-      psql(
+      await writeApps(
         "delete from base_appactivation where host = 'a'; " +
           'insert into base_appactivation (id, host, app, state, chosen, changed_at) ' +
           `select gen_random_uuid(), v.host, v.app, v.state, v.chosen, now() from (values ${values.join(', ')}) as v(host, app, state, chosen)`,
@@ -475,7 +475,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
 
   test(`BASE-F14 BASE-F23 BASE-F25 — an app mandatory in Spain says so, never goes off and stays on when Sales goes, at ${width}`, async ({ browser }) => {
     await pushPhoto(GRATIS);
-    psql(
+    await writeApps(
       [
         "update base_appactivation set state = 'off', chosen = false where host = 'a'",
         "update base_appactivation set state = 'on', chosen = (app = 'sale') where host = 'a' and app in ('sale', 'tax', 'customer')",
@@ -537,7 +537,7 @@ const SCHEMA = 'e2e_base_app_activation_schema_apps';
 const PRINTING = 'printing';
 
 /** Control believes `a`'s database lacks Printing, and Printing is off. */
-function printingNotMadeYet(): void {
+async function printingNotMadeYet(): Promise<void> {
   psql(
     [
       `drop table if exists ${SCHEMA}`,
@@ -545,7 +545,7 @@ function printingNotMadeYet(): void {
       `update base_hub set schema_apps = schema_apps - '${PRINTING}' where slug = 'a'`,
     ].join('; '),
   );
-  psql(`update base_appactivation set state = 'off', chosen = false where host = 'a' and app = '${PRINTING}'`);
+  await writeApps(`update base_appactivation set state = 'off', chosen = false where host = 'a' and app = '${PRINTING}'`);
 }
 
 function schemaBack(): void {
@@ -573,7 +573,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
 
   test(`BASE-F21 BASE-F22 — an app the business's database lacks is set up, then on, live, at ${width}`, async ({ browser }) => {
     test.setTimeout(180_000);
-    printingNotMadeYet();
+    await printingNotMadeYet();
     const { context, page } = await signedIn(browser, viewport, '/apps#all');
     try {
       await search(page, 'Printing');
@@ -596,7 +596,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
       await snap(page, 'S3-on', width);
 
       // «Turning on…», as the worker leaves it: no «Open», its switch waiting on, and «Turn off» in «⋮» to change its mind.
-      psql(
+      await writeApps(
         `update base_appactivation set state = 'creating', next_attempt_at = now() + interval '10 minutes' ` +
           `where host = 'a' and app = '${PRINTING}'`,
       );
@@ -614,7 +614,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
       await expect(state).toHaveText('Active', { timeout: SET_UP_MS });
 
       // «Could not turn on», as a failure leaves the row: «Retry» sets it up again through the worker.
-      psql(
+      await writeApps(
         `update base_appactivation set state = 'failed', attempts = 1, last_error = 'schema_failed: e2e', ` +
           `next_attempt_at = now() + interval '1 hour' where host = 'a' and app = '${PRINTING}'`,
       );
