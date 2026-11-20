@@ -44,6 +44,17 @@ OFFERED = [
         ("online_booking.booking.no_show", "reservation.reservation.no_show"),
         id="live-120-no-show",
     ),
+    pytest.param(
+        "es", "apunta que han llegado los de la reserva de Luis", ("reservation.reservation.seat",), id="live-120-seat"
+    ),
+    pytest.param("es", "apunta que han llegado dos más a la mesa 7", ("table.session.set_guests",), id="live-120-guests"),
+    pytest.param("es", "apunta que han llegado Pedro y Ana", ("attendance.record.clock_in",), id="live-120-clock-in"),
+    pytest.param(
+        "es",
+        "apunta que han llegado las dos clientas de la cita de las 10",
+        ("appointment.appointment.start",),
+        id="live-120-appointment",
+    ),
 ]
 
 #: What a phrase's own words leave out, and the task the model searches for then, in English and in Spanish.
