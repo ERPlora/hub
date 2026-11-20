@@ -511,6 +511,7 @@ deja un registro por turno que se puede comparar entre ejecuciones. Lo mismo val
 | `QA_ANSWER_BASE_URL` | opcional: su dirección (https); sin ella, la de su API |
 | `QA_ANSWER_KEY_ENV` | el **nombre** de la variable que guarda la clave (`QA_QWEN_API_KEY`, `QA_ANTHROPIC_API_KEY`…), nunca la clave |
 | `QA_ANSWER_PRICE_IN`, `QA_ANSWER_PRICE_OUT` | USD por millón de tokens de entrada y de salida; se escriben en el modelo como en el admin |
+| `QA_ANSWER_VISION` | opcional: `1` si el modelo ve imágenes (la siembra marca «imágenes» en su modelo; sin ella, o con `0`, no las ve y una foto le llega como una nota) |
 | `QA_PROBES_SAMPLE`, `QA_PROBES_SEED` | cuántas sondas del corpus y con qué semilla (1 por defecto) |
 
 Si con `QA_ANSWER_MODEL` falta alguna variable, la ejecución se niega diciendo cuáles; sin ella, cualquier otra
@@ -578,6 +579,107 @@ QA_ANSWER_KIND=anthropic QA_ANSWER_MODEL=<id> QA_ANSWER_KEY_ENV=QA_ANTHROPIC_API
 # ranking aparte de los del modelo y estos por motivo; el gasto total, por turno, por 1.000 mensajes y por respuesta
 # correcta; los tokens medios; los segundos por turno (media, p50, p95 y máximo, en total y en lecturas y escrituras)
 # y las rondas medias; y las sondas en las que los modelos no coinciden
+pnpm -s qa:bench-compare tests/e2e/.artifacts/qa/<ejecución 1>/bench.json tests/e2e/.artifacts/qa/<ejecución 2>/bench.json
+```
+
+## Los escenarios del asistente: el trabajo entero (`qa/assistant-scenarios.spec.ts`)
+
+Las sondas miden qué herramienta elige el modelo para una frase; un **escenario** mide si el trabajo acaba bien hecho,
+como en el uso real: una conversación entera en el chat de verdad, con varios mensajes de un dueño que habla de su
+negocio y no sabe nada de herramientas, a veces con un archivo adjunto por el botón del chat y a veces dejándose un dato
+que el asistente tiene que **preguntar** en vez de inventar. Lo que cuenta es el estado final de la base de datos del
+negocio, no la redacción de las respuestas.
+
+**El formato** (`qa/scenarios/*.json`, uno por escenario; lo lee `assistant-scenario.ts`, probado en
+`assistant-scenario.test.ts`):
+
+- `id` (`s<NN>-<palabras>`), `title`, `vertical` (`restaurant` o `hair_salon`), `seed` (la plantilla de la vertical que
+  se carga en el negocio con `base.blueprint.import`: `restaurant.es`, `restaurant.en`, `hair_salon.es`) y `language`
+  (`es` o `en`: el del dueño y el de la interfaz);
+- `setup`: lo que el trabajo necesita y la plantilla no trae (el emisor de las facturas, el personal y sus horarios, el
+  horario del negocio, los turnos de reservas…), como llamadas a las herramientas del Hub, sin modelo;
+- `owner`: quién es (`persona`), qué quiere en palabras llanas (`goal`), lo que dice de entrada (`upFront`) y lo que solo
+  dice si se lo preguntan (`ifAsked`);
+- `attachments`: los archivos que adjunta, hechos por los fixtures de `assistant-fixtures.ts` en cada ejecución y nunca
+  guardados en el repo: un `.xlsx` de verdad (`xlsx`, con sus filas), o un albarán (`note`) impreso por el navegador como
+  PDF de texto (`pdf`) o como una foto de móvil del papel sobre el mostrador (`photo`, `.jpg` o `.png`);
+- `opening`: el primer mensaje, igual para todos los modelos; `maxTurns`: los mensajes del dueño como mucho;
+- `expect`: el estado final, como comprobaciones SQL sobre la base del negocio (`sql` da un solo valor; `equals` es el
+  valor esperado, o `unchanged: true` pide el mismo valor que antes del trabajo). Sin comillas dobles, `$` ni acentos
+  graves en el SQL: viaja por la shell hasta `psql()`;
+- `forbidden`: lo que no puede pasar, con la misma forma (otros productos que cambian, un borrado, otra reserva…);
+- `writes`: las herramientas que el trabajo puede usar para escribir; cualquier otra escritura que se ejecute cuenta como
+  no deseada. `cards`: tarjetas cuyos valores se comparan (`match` elige la tarjeta por sus argumentos, `expect` dice lo
+  que tiene que llevar);
+- `mustAsk`: los datos que hay que preguntar: cómo los revela el dueño (`reveals`), las llamadas que los usarían
+  (`uses`: herramienta, ruta en sus argumentos como `rows[name~pulpo].price`, y `where` si es de un solo registro) y las
+  lecturas que pueden encontrarlos sin preguntar (`resolvers`). Un dato que el dueño dice de entrada no puede estar aquí:
+  el formato lo rechaza;
+- `offered`: las herramientas que el turno tiene que ofrecer al mensaje de apertura (con sus archivos, si los lleva)
+  para que el trabajo se pueda empezar; vacío cuando lo correcto es preguntar antes de hacer nada;
+- `golden`: el camino dorado, las llamadas que haría un asistente perfecto. Un paso puede tomar un valor del resultado de
+  otro anterior: `{"$ref": "<id del paso>", "where": {"name": "Bebidas"}, "take": "id"}` (`assistant-golden.ts`).
+
+Las fechas se escriben `{today}`, `{today+N}` o con el día de la semana (`{friday}`: el siguiente, nunca hoy) y salen del
+día de la ejecución en Madrid.
+
+**El negocio de partida.** Cada escenario empieza del mismo negocio: en el `beforeAll` la dueña entra una vez en `a` y se
+copia la base de `a` a `<base de a>_qa` (`assistant-snapshot.ts`); antes de cada escenario se vuelve a poner esa copia,
+se carga su plantilla y se hace su `setup` (por el ejecutor de herramientas del asistente, `live.assistant.run_tool`). Así
+lo que hizo o rompió un modelo en un escenario nunca cambia el siguiente. El `afterAll` deja `a` como lo encontró y
+borra la copia; si una ejecución se corta antes, la copia se queda y la siguiente vuelve a ella en vez de copiar un negocio
+a medias. Sin copia nunca se borra la base de `a`. Copiar y reponer cierra las conexiones a esa base: la pila es solo de
+esta ejecución.
+
+**El camino dorado va primero, siempre.** Antes de preguntar al modelo, cada escenario corre su camino dorado en el negocio
+recién preparado, **por el propio turno del asistente** (`base.assistant.turn`: una lectura se ejecuta; una escritura
+saca su tarjeta y se ejecuta con el sí, escribiendo la palabra si la pide, como en el chat) y sus `expect` y `forbidden`
+tienen que cumplirse. Si no, el escenario sale **excluido** con el motivo, igual para todos los modelos: ningún modelo
+podría aprobarlo en esa pila. Si el motivo es un defecto de una herramienta, va a su issue. Después se vuelve a poner la
+copia y se pregunta al modelo.
+
+**No ejecutable** (`assistant-precheck.ts`): antes de preguntar se pide al turno del asistente, como la dueña y sin
+modelo, qué herramientas ofrece al mensaje de apertura tal como lo manda el chat (texto y archivos). Si falta alguna de
+`offered`, el escenario sale «not runnable: tools not offered on the attached message» (o «… on the opening message»,
+sin archivos), aparte de los fallos del modelo: las herramientas se eligen por las palabras de la persona, así que ningún
+modelo podría hacer el trabajo. Un escenario con foto tampoco se pregunta a un modelo que no ve imágenes
+(`QA_ANSWER_VISION`).
+
+**El dueño simulado** (`assistant-owner.ts`): un modelo fijo, el mismo para todos los modelos que se comparan,
+`QA_OWNER_MODEL` (por defecto `anthropic/claude-sonnet-5.5`) por OpenRouter, con temperatura 0 y el mínimo de razonamiento
+(en ese modelo no se puede apagar); si una vez no dice nada, se le pregunta otra. Solo conoce su persona y
+sus datos; escribe como un dueño con prisa, nunca nombra herramientas, campos ni ids, contesta una pregunta solo con lo
+que sabe (si no, dice que no lo sabe) y acaba con `[DONE]` cuando el trabajo parece hecho o `[GIVE UP]` si se rinde. Las
+tarjetas las confirma siempre (como un usuario distraído), escribiendo la palabra en las de riesgo alto, y la
+conversación le dice qué confirmó. Su gasto se apunta aparte del del asistente. La clave es `QA_OPENROUTER_API_KEY`, del
+`.env` de la raíz de erplora-next: se exporta en el mismo comando que lanza la spec y nunca se imprime.
+
+**La nota de cada escenario** (`assistant-scenario-score.ts`): si el trabajo quedó hecho (todo `expect` y ningún
+`forbidden`) y qué parte (`fraction`); las escrituras malas (lo prohibido que pasó, las no deseadas y las tarjetas con un
+valor equivocado); para cada dato de `mustAsk`, si el asistente lo preguntó antes de usarlo (`asked`), lo encontró con una
+lectura (`resolved`), lo inventó (`invented`) o no lo usó (`unused`); los mensajes del dueño, el tiempo, los tokens y el
+coste del asistente (la fila de uso de `a`, vaciada al empezar; los mensajes del mes se ponen a cero antes de cada
+mensaje del dueño, así que el cupo nunca corta una conversación) y los errores. Todo, con la conversación, cada llamada
+con sus argumentos y cada tarjeta, va a `.artifacts/qa/<ejecución>/bench.json` (`scenarios`, `assistant-scenario-bench.ts`),
+y `pnpm qa:bench-compare` lo pone por modelo: trabajos hechos, parte media del trabajo, datos inventados, escrituras
+malas, coste por trabajo terminado y tiempo por trabajo (`assistant-scenario-compare.ts`).
+
+**Nada llega a la AEAT.** La ejecución se niega si el Hub de la pila tiene `VERIFACTU_GATEWAY_URL` (sin pasarela, un
+registro fiscal se queda en local), y cada escenario acaba comprobando que ningún registro de `verifactu_record` salió
+del negocio. Ningún escenario llama a las herramientas que envían o consultan a la AEAT.
+
+Pide lo mismo que las sondas (pila propia, el SaaS con `ASSISTANT_SERVICE_PROVIDER=openai`, `E2E_SAAS_DIR`, las claves en
+el entorno y las variables `QA_ANSWER_*` del modelo a prueba), más la clave del dueño. Cada modelo, en una ejecución suya.
+
+```bash
+# Solo los caminos dorados: sin modelo, sin claves ni SaaS sembrado (comprueba que cada escenario se puede hacer):
+QA_SCENARIOS_GOLDEN=1 CI=1 pnpm e2e tests/e2e/qa/assistant-scenarios.spec.ts
+# Con el modelo a prueba (aquí Qwen sin reserva), dos escenarios:
+export QA_REAL_PROVIDER=1 E2E_SAAS_DIR=<saas-wt> QA_QWEN_API_KEY=… QA_OPENAI_API_KEY=… QA_OPENROUTER_API_KEY=…
+QA_ANSWER_KIND=openai QA_ANSWER_MODEL=qwen3.7-plus QA_ANSWER_BASE_URL=<QWEN_ADDRESS> QA_ANSWER_KEY_ENV=QA_QWEN_API_KEY \
+  QA_ANSWER_PRICE_IN=0.276 QA_ANSWER_PRICE_OUT=1.101 CI=1 pnpm e2e tests/e2e/qa/assistant-scenarios.spec.ts --grep 's02|s05'
+# Otros ficheros de escenarios, o repetir escenarios en el informe de una ejecución anterior:
+QA_SCENARIOS=<a.json>,<b.json> QA_SCENARIOS_RUN=<id> CI=1 pnpm e2e tests/e2e/qa/assistant-scenarios.spec.ts
 pnpm -s qa:bench-compare tests/e2e/.artifacts/qa/<ejecución 1>/bench.json tests/e2e/.artifacts/qa/<ejecución 2>/bench.json
 ```
 

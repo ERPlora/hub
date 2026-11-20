@@ -29,6 +29,7 @@ describe('answerChoice', () => {
       priceIn: null,
       priceOut: null,
       fallback: 'gpt-5.4-mini',
+      vision: false,
     });
   });
 
@@ -43,7 +44,14 @@ describe('answerChoice', () => {
       priceIn: 3,
       priceOut: 15.5,
       fallback: null,
+      vision: false,
     });
+  });
+
+  it('lets a model under test see images only when QA_ANSWER_VISION says it does', () => {
+    expect(answerChoice({ ...COMPARED, QA_ANSWER_VISION: '1' }).vision).toBe(true);
+    expect(answerChoice({ ...COMPARED, QA_ANSWER_VISION: '0' }).vision).toBe(false);
+    expect(() => answerChoice({ ...COMPARED, QA_ANSWER_VISION: 'yes' })).toThrow(/QA_ANSWER_VISION is 1 or 0/);
   });
 
   it('leaves the address to the kind when QA_ANSWER_BASE_URL is not set', () => {
@@ -89,6 +97,7 @@ describe('seedCommand', () => {
       QA_SEED_PRICE_IN: '',
       QA_SEED_PRICE_OUT: '',
       QA_SEED_FALLBACK_MODEL: 'gpt-5.4-mini',
+      QA_SEED_VISION: '0',
     });
   });
 
@@ -104,6 +113,7 @@ describe('seedCommand', () => {
       QA_SEED_PRICE_IN: '3',
       QA_SEED_PRICE_OUT: '15.5',
       QA_SEED_FALLBACK_MODEL: '',
+      QA_SEED_VISION: '0',
     });
     expect(command.args.join(' ')).not.toContain('sk-ant-secret');
   });
@@ -136,6 +146,11 @@ describe('SEED_PY', () => {
     expect(SEED_PY).toContain('full_clean()');
     expect(SEED_PY).toContain(`"${QA_STAFF_EMAIL}"`);
     expect(SEED_PY.match(/label="qa"/g)?.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('writes on the answering model whether it sees images, both ways, so an earlier run never leaves it on', () => {
+    expect(seedCommand({ ...COMPARED, QA_ANSWER_VISION: '1', QA_ANTHROPIC_API_KEY: 'k', QA_OPENAI_API_KEY: 'o' }, 'saas_e2e_8031').env.QA_SEED_VISION).toBe('1');
+    expect(SEED_PY).toContain('supports_vision=os.environ["QA_SEED_VISION"] == "1"');
   });
 
   it('leaves the fallback empty when none is asked, so a failing model is never answered for', () => {

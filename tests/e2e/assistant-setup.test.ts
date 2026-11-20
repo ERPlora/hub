@@ -11,8 +11,10 @@ import { describe, expect, it } from 'vitest';
 
 import type { Probe } from './assistant-probes';
 import {
+  hubShellCommand,
   isPreparation,
   madridToday,
+  mapStrings,
   missingFor,
   namesOf,
   parseSetup,
@@ -123,6 +125,23 @@ describe('isPreparation', () => {
     expect(isPreparation('tests/e2e/qa/probes/owner-es-preparation-sales-2026-11-09.json')).toBe(true);
     expect(isPreparation('/x/owner-es-preparation-2026-11-09.json')).toBe(true);
     expect(isPreparation('tests/e2e/qa/probes/owner-es-table-2026-11-08.json')).toBe(false);
+  });
+});
+
+describe('mapStrings', () => {
+  it('changes every text inside a value, at any depth, and leaves the rest as it is', () => {
+    const value = { a: 'x', b: ['x', 1, null], c: { d: 'x', e: true } };
+    expect(mapStrings(value, (text) => text.toUpperCase())).toEqual({ a: 'X', b: ['X', 1, null], c: { d: 'X', e: true } });
+  });
+});
+
+describe('hubShellCommand', () => {
+  it('runs a script in a with the environment it was given, unset variables left out, and its own on top', () => {
+    expect(hubShellCommand('print(1)', { PATH: '/bin', UNSET: undefined }, { QA_FILE: '/tmp/x.json' })).toEqual({
+      file: 'uv',
+      args: ['run', 'python', 'manage.py', 'shell', '--hub', 'a', '-c', 'print(1)'],
+      env: { PATH: '/bin', QA_FILE: '/tmp/x.json' },
+    });
   });
 });
 

@@ -5,7 +5,8 @@
 // `.artifacts/qa/<run>/bench.json`; assistant-bench-compare.ts reads several of them. Pure, so Vitest proves it.
 import { type Frame, observe, parseFrames } from './assistant-battery.ts';
 import { type Catalog, catalogKey, type Probe, type ProbeOutcome, probeVerdict } from './assistant-probes.ts';
-import type { AnswerChoice } from './assistant-seed.ts';
+import type { ScenarioRow } from './assistant-scenario-bench.ts';
+import { type AnswerChoice, answerChoice } from './assistant-seed.ts';
 
 export type BenchVerdict = 'pass' | 'fail' | 'n/a';
 
@@ -65,6 +66,8 @@ export interface BenchModel {
   priceIn: number | null;
   priceOut: number | null;
   fallback: string | null;
+  /** Whether it sees images (the seed writes it on its model). */
+  vision?: boolean;
 }
 
 export interface BenchMeta {
@@ -78,12 +81,16 @@ export interface BenchMeta {
   sample: { size: number; seed: number } | null;
   /** The setup a sampled run made before its first probe (assistant-setup.ts), and the steps of it that failed. */
   setup?: { file: string; failed: { step: number; tool: string; why: string }[] } | null;
+  /** A scenario run's simulated owner (assistant-owner.ts), the same model for every assistant compared. */
+  owner?: { model: string } | null;
 }
 
 export interface BenchReport {
   schema: 1;
   meta: BenchMeta;
   turns: BenchTurn[];
+  /** A scenario run's scenarios (assistant-scenario-bench.ts); its `turns` are empty. */
+  scenarios?: ScenarioRow[];
 }
 
 /** What the spec measured around one probe, besides what the verdict reads. */
@@ -109,8 +116,18 @@ export function benchModel(choice: AnswerChoice): BenchModel {
     priceIn: choice.priceIn,
     priceOut: choice.priceOut,
     fallback: choice.fallback,
+    vision: choice.vision,
   };
 }
+
+/** What every report of a Hub run starts with: its name, when it began, the model `env` chooses and the files asked. */
+export const hubRunMeta = (run: string, files: string[], env: Record<string, string | undefined>): Pick<BenchMeta, 'product' | 'run' | 'date' | 'model' | 'files'> => ({
+  product: 'hub',
+  run,
+  date: new Date().toISOString(),
+  model: benchModel(answerChoice(env)),
+  files,
+});
 
 /** A tool's name as the model calls it (`sale__sale__today`) and as the Hub runs it (`sale.sale.today`). */
 const operationName = (name: string): string => name.split('__').join('.');
@@ -261,12 +278,18 @@ export function parseOffered(output: string): Record<string, string[]> {
   return JSON.parse(output.trim().split('\n').at(-1) ?? '{}') as Record<string, string[]>;
 }
 
-/** The run's report with `turn` in it (a probe asked again replaces its turn), in the order of the run's probes. */
-export function withTurn(report: BenchReport | null, meta: BenchMeta, turn: BenchTurn, order: string[]): BenchReport {
+/** The report already written for `meta`'s run, or null when it starts; a run another model answered is refused. */
+export function keptReport(report: BenchReport | null, meta: BenchMeta): BenchReport | null {
   const kept = report && report.meta.run === meta.run ? report : null;
   if (kept && kept.meta.model.label !== meta.model.label) {
     throw new Error(`the run ${meta.run} was answered by ${kept.meta.model.label}, not ${meta.model.label}: ask it in a new run`);
   }
+  return kept;
+}
+
+/** The run's report with `turn` in it (a probe asked again replaces its turn), in the order of the run's probes. */
+export function withTurn(report: BenchReport | null, meta: BenchMeta, turn: BenchTurn, order: string[]): BenchReport {
+  const kept = keptReport(report, meta);
   const turns = [...(kept?.turns ?? []).filter((row) => row.probe !== turn.probe), turn];
   const place = (row: BenchTurn) => order.indexOf(row.probe);
   return { schema: 1, meta: kept?.meta ?? meta, turns: turns.sort((a, b) => place(a) - place(b)) };

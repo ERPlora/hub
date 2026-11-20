@@ -9,6 +9,7 @@ import { readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 
 import type { BenchReport, BenchTurn, BenchVerdict } from './assistant-bench.ts';
+import { renderScenarios } from './assistant-scenario-compare.ts';
 
 export interface Rate {
   passed: number;
@@ -210,13 +211,17 @@ function modelLines(summary: ModelSummary): string[] {
   ];
 }
 
-/** The comparison as text: one section per model, then the probes on which they disagree. */
+/** The comparison as text: one section per model, then the probes on which they disagree, then the scenarios of the
+ *  scenario runs (assistant-scenario-compare.ts). */
 export function renderComparison(reports: BenchReport[]): string {
-  const disagreeing = disagreements(reports);
+  const probes = reports.filter((report) => !report.scenarios);
+  const scenarios = renderScenarios(reports);
+  if (!probes.length) return scenarios;
+  const disagreeing = disagreements(probes);
   const lines = [
     '# Assistant models compared',
     '',
-    ...summarize(reports).flatMap(modelLines),
+    ...summarize(probes).flatMap(modelLines),
     `## Probes where the models disagree (${disagreeing.length})`,
     '',
     ...disagreeing.map((row) => {
@@ -224,7 +229,7 @@ export function renderComparison(reports: BenchReport[]): string {
       return `- ${row.probe} «${row.phrase.slice(0, 80)}»: ${verdicts}`;
     }),
   ];
-  return `${lines.join('\n')}\n`;
+  return `${lines.join('\n')}\n${scenarios ? `\n${scenarios}` : ''}`;
 }
 
 export interface CompareDeps {
