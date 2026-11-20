@@ -18,7 +18,6 @@ from pathlib import Path
 
 import pytest
 from django.conf import settings
-from live import assistant as shared
 from live.operations import AI, registry
 
 from apps.invoice.tests.conftest import (
@@ -74,14 +73,6 @@ PROBES = [
     for probe in json.loads(path.read_text(encoding="utf-8"))["probes"]
     if probe["app"] == "verifactu"
 ]
-#: The probe of going live: «la cuenta» (ERPlora's account) is read as a table's check, so every write of Sales that
-#: takes a check and «activa» turns on goes ahead of it; it is offered, past the first half.
-GO_LIVE = "qa20261108.owner.es.verifactu.config.go_live"
-#: Why that probe is marked: whoever brings the pointer of live with the fix its reason names sees it pass and takes
-#: it off.
-UNTIL_LIVE_TELLS_THE_ACCOUNT_FROM_A_CHECK = pytest.mark.xfail(
-    strict=True, raises=AssertionError, reason="ERPlora/live#76: «la cuenta» of ERPlora is read as a table's check"
-)
 #: What a person says in words of their own, neither an ask nor a probe of layer 2, one per tool of VeriFactu: each
 #: reaches its tool among the first ten by its asks and not without them, so asks that stop reading as people speak fail
 #: here, tool by tool. None says more than two content words of any one of its asks or of its probes, nor half of its
@@ -213,14 +204,7 @@ def test_sealing_the_record_of_an_issued_invoice_comes_before_creating_another_t
 
 
 @HUB_DB  # the catalogue is of the apps on in the business (base.activation) and of the person's role
-@pytest.mark.parametrize(
-    "probe",
-    [
-        pytest.param(probe, marks=UNTIL_LIVE_TELLS_THE_ACCOUNT_FROM_A_CHECK) if probe["id"] == GO_LIVE else probe
-        for probe in PROBES
-    ],
-    ids=[probe["id"] for probe in PROBES],
-)
+@pytest.mark.parametrize("probe", PROBES, ids=[probe["id"] for probe in PROBES])
 def test_every_probe_of_verifactu_offers_its_tool_to_whoever_may_run_it(catalog_of, probe):
     """The phrases of layer 2 of VeriFactu, the ones the model answered right too: a tool of VeriFactu that a new ask
     elsewhere pushes out of the first half of the ones a turn offers fails here before the real-model QA sees it. What
@@ -234,15 +218,6 @@ def test_every_probe_of_verifactu_offers_its_tool_to_whoever_may_run_it(catalog_
         assert probe["tool"] not in tools
         return
     assert_offered_with_room(tools, probe["tool"], probe["phrase"])
-
-
-@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
-def test_going_live_is_offered_although_the_account_is_read_as_a_check(catalog_of):
-    """Before VeriFactu said its asks, going live was not offered at all for the owner's request; now it is, behind the
-    writes of a check that «activa … la cuenta» brings (``GO_LIVE``)."""
-    probe = next(probe for probe in PROBES if probe["id"] == GO_LIVE)
-    tools = catalog_of(Membership.Role.OWNER, "es")
-    assert_offered_with_room(tools, probe["tool"], probe["phrase"], room=shared.MAX_TOOLS)
 
 
 test_a_request_in_the_persons_own_words_reaches_its_tool_by_its_asks = in_hubs(own_words_test(OWN_WORDS, "es"))
