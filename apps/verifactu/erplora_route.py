@@ -26,10 +26,21 @@ UNAVAILABLE = _("ERPlora does not file on behalf of businesses for now: file wit
 OWN_CERTIFICATE_REQUIRED = _(
     "To go live, upload your own certificate: ERPlora does not file on behalf of businesses for now."
 )
+#: The Home's step «Set up VeriFactu», with ERPlora's route open to the business and with it closed.
+STEP_AUTHORISATION_OR_CERTIFICATE = _(
+    "Sign the authorisation for ERPlora to send your invoices to the AEAT, or upload your business certificate."
+)
+STEP_CERTIFICATE = _("Upload your business certificate to send your invoices to the AEAT.")
 
 
 def available(scope: Scope | None) -> bool:
     return bool(settings.VERIFACTU_ERPLORA_ROUTE_ENABLED) or (scope is not None and platform.is_platform_hub(scope))
+
+
+def step_description() -> str:
+    """What the Home's step offers the business at work: the ways VeriFactu → Configuration offers it."""
+    offered = available(platform.current_business_scope())
+    return str(STEP_AUTHORISATION_OR_CERTIFICATE if offered else STEP_CERTIFICATE)
 
 
 def route_for(config: Config, environment: str, scope: Scope | None, has_certificate: bool) -> str:
