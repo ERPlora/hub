@@ -343,7 +343,7 @@ En la pantalla Archivos:
 | BASE-F15 | Abrir una app desde Apps | hecho |
 | BASE-F16 | Buscar una app en el catálogo | hecho |
 | BASE-F17 | Saber cuánto cuesta una app antes de tenerla | hecho |
-| BASE-F18 | Instalar una app | hecho |
+| BASE-F18 | Activar una app | hecho |
 | BASE-F19 | Saber qué más viene con una app | hecho |
 | BASE-F20 | Intentar usar una app que necesita suscripción | hecho |
 | BASE-F21 | Ver por qué no se ha podido activar una app y reintentarlo | hecho |
@@ -619,7 +619,7 @@ Entra: los paneles que esta persona puede poner.
 Sale: el tablero elegido, guardado en este navegador: lo comparten las personas que usan este dispositivo
 y no viaja a otro.
 Si falla: un panel guardado cuya app se apagó desaparece del tablero sin aviso. Sin ninguna app que
-ofrezca paneles: «Ninguna app instalada ofrece widgets todavía.».
+ofrezca paneles: «Ninguna app activa ofrece widgets todavía.».
 Implicados: ninguno
 
 ### BASE-F08 Mantener los paneles al día sin recargar
@@ -785,7 +785,7 @@ Pantalla: Apps
 Pasos:
   1. En Apps, pulsa «Añadir apps» (todas las apps de ERPlora) o «De pago» (solo las que se contratan aparte).
   2. Mientras llega: «Cargando el catálogo…». Después, una fila por app con «App», «Categoría», «Descripción»,
-     «Precio», «Viene con» y «Estado» («Instalada» o «Necesita suscripción»), con los nombres y las
+     «Precio», «Viene con» y «Estado» («Activa» o «Necesita suscripción»), con los nombres y las
      descripciones en el idioma de quien mira. Una app que el país del negocio exige lleva «Obligatoria en España» (o
      el país del negocio) junto a su estado, también desactivada: así se ve cuál falta por activar (hub#997).
   3. Busca en «Buscar apps para añadir…» (en «De pago», «Buscar apps de pago…») por nombre, descripción o
@@ -814,7 +814,7 @@ Sale: nada guardado. El hub no cobra ni enseña importes: el precio y la compra 
 Si falla: sin la lista, como en «Mis apps» (BASE-F14).
 Implicados: APPS-F01, APPS-F07
 
-### BASE-F18 Instalar una app
+### BASE-F18 Activar una app
 Estado: hecho
 Actor: administrador
 Pantalla: Apps
@@ -823,7 +823,7 @@ Pasos:
      recargar, en cuanto se contrata en erplora.com (BASE-F20).
   2. En «Añadir apps», quien administra busca una app que el negocio no usa, «Desactivada», y pulsa «Activar». Si
      necesita otras apps que están desactivadas, antes le pregunta nombrándolas (BASE-F19).
-  3. La app pasa a «Instalada» al momento y sale en «Mis apps» y, sin recargar, en el menú de todos los
+  3. La app pasa a «Activa» al momento y sale en «Mis apps» y, sin recargar, en el menú de todos los
      dispositivos del negocio. El contador de arriba suma las apps que se activan y una de las del plan: al activar
      Tareas, de «26 apps activadas · 16 de 20 de tu plan» a «27 apps activadas · 17 de 20 de tu plan»; las que
      llegan con ella suman a las activadas, no a las del plan.
@@ -866,7 +866,7 @@ Pasos:
      suscripción», y no está en «Mis apps» ni en el menú.
   2. Quien administra el negocio, en el navegador, ve a su lado «Mejorar plan», que abre la Tienda de
      erplora.com de este negocio en una pestaña nueva: allí ve el precio y la contrata.
-  3. En cuanto erplora.com se lo dice al hub, la app pasa a «Instalada» y aparece en «Mis apps» y en el menú, sin
+  3. En cuanto erplora.com se lo dice al hub, la app pasa a «Activa» y aparece en «Mis apps» y en el menú, sin
      recargar.
   4. Quien no administra el negocio, y cualquiera en la app instalada, ve «Se contrata en erplora.com, desde tu
      cuenta de ERPlora.» y ningún botón: el hub nunca vende.

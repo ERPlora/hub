@@ -129,7 +129,7 @@ describe('an app whose tables the business’s database is still getting', () =>
     expect(rowOf(m, 'flow').find('ion-spinner').exists()).toBe(true);
     expect(await appActionLabel(m, 'flow', 'open')).toBeUndefined();
     await m.result(m.call, 'base.app.list', listOf(TASK, { ...FLOW, state: 'on', chosen: true, path: '/flow/home' }), 3);
-    expect(state(m, 'flow').text()).toBe('Installed');
+    expect(state(m, 'flow').text()).toBe('Active');
     expect(switchState(m, 'flow')).toMatchObject({ checked: true, disabled: false });
   });
 
