@@ -197,10 +197,10 @@ def test_by_default_the_change_is_what_differs_from_where_head_left_origin_main(
     for variable in [key for key in os.environ if key.startswith("GIT_")]:
         monkeypatch.delenv(variable)
     subprocess.run(["git", "init", "-q"], check=True)
-    commit(tmp_path, {"kept.txt": "1\n", "gone.txt": "1\n"})
+    commit(tmp_path, {"kept.txt": "kept\n", "gone.txt": "gone\n"})
     left = helper.git("rev-parse", "HEAD").strip()
     subprocess.run(["git", "update-ref", "refs/remotes/origin/main", left], check=True)
-    commit(tmp_path, {"added.txt": "1\n"})
+    commit(tmp_path, {"added.txt": "added\n"})
     (tmp_path / "kept.txt").write_text("2\n", encoding="utf-8")
     (tmp_path / "gone.txt").unlink()
     (tmp_path / "untracked.txt").write_text("1\n", encoding="utf-8")
