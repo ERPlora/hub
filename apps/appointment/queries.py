@@ -73,7 +73,7 @@ from apps.customer.queries import card_in_business, cards_in_copy, find_customer
 from apps.schedule.queries import day_label, hours_for_range
 from apps.schedule.schemas import HoursRangeIn
 from apps.service.models import Assignment, Service
-from apps.service.queries import find_service, services_in_business, services_in_copy
+from apps.service.queries import catalog, recovery
 from apps.staff.models import Member
 from apps.staff.queries import member_availability, own_member, resolve_member
 from apps.staff.schemas import AvailabilityIn
@@ -574,7 +574,7 @@ def list_for_customer(ctx: OperationContext, params: ForCustomerIn) -> dict:
     },
 )
 def count_active_for_service(ctx: OperationContext, data: CountForServiceIn) -> dict:
-    service = find_service(data.service_id, data.service)
+    service = catalog.find_service(data.service_id, data.service)
     rows = (
         appointments()
         .filter(status__in=MOVABLE, start__gte=now(), lines__service=service)
@@ -750,12 +750,12 @@ def resolve_services(refs: list[ServiceRefIn]) -> list[Service]:
     services = []
     for ref in refs:
         try:
-            service = find_service(ref.service_id, ref.service)
+            service = catalog.find_service(ref.service_id, ref.service)
         except NotFound:
             if ref.service_id is not None:
                 raise
             # Named, it may be an archived one: say so, not «does not exist».
-            service = find_service(None, ref.service, archived=True)
+            service = catalog.find_service(None, ref.service, archived=True)
         if not (service.is_active and service.is_bookable):
             raise Conflict(
                 str(SERVICE_NOT_BOOKABLE) % {"name": service.name},
@@ -1462,7 +1462,7 @@ def appointments_in_copy(conn) -> list[dict]:
     services = _lines_in_copy(conn, AppointmentService, "appointment", [row["id"] for row in rows])
     cards = {card["id"]: card for card in cards_in_copy(conn)}
     # All of them, never the appointments' alone: Services matches by the whole copy (``services_in_business``).
-    copy_services = services_in_copy(conn) if rows else []
+    copy_services = recovery.services_in_copy(conn) if rows else []
     return [
         {
             "id": row["id"],
@@ -1545,7 +1545,7 @@ def appointments_not_in_business(appointments: list[dict]) -> list[dict]:
     refuses one not bookable any more, as it refuses a moment that does not fit the agenda now."""
     held = set(Appointment.objects.filter(pk__in=[one["id"] for one in appointments]).values_list("pk", flat=True))
     # The same list in each (``appointments_in_copy``): every service of the copy, matched once.
-    services = services_in_business(appointments[0]["services_in_copy"]) if appointments else {}
+    services = recovery.services_in_business(appointments[0]["services_in_copy"]) if appointments else {}
     lacking = []
     for one in appointments:
         if one["id"] in held:
@@ -1604,7 +1604,7 @@ def series_in_copy(conn) -> list[dict]:
         return []
     services = _lines_in_copy(conn, RecurringService, "recurring", [row["id"] for row in rows])
     cards = {card["id"]: card for card in cards_in_copy(conn)}
-    copy_services = services_in_copy(conn)
+    copy_services = recovery.services_in_copy(conn)
     return [
         {
             "id": row["id"],
@@ -1649,7 +1649,7 @@ def series_not_in_business(series: list[dict]) -> list[dict]:
     books the dates of its window that still fit, so none where an appointment came back before it."""
     held = set(Recurring.objects.filter(pk__in=[one["id"] for one in series]).values_list("pk", flat=True))
     # The same list in each (``series_in_copy``): every service of the copy, matched once.
-    services = services_in_business(series[0]["services_in_copy"]) if series else {}
+    services = recovery.services_in_business(series[0]["services_in_copy"]) if series else {}
     lacking = []
     for one in series:
         if one["id"] in held:

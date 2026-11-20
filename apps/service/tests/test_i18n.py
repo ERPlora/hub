@@ -119,7 +119,7 @@ def test_spanish_texts_of_the_workbook():
         )
         assert str(services.REDEEM_REFUSALS["expired"][1]) == "Este bono ha caducado."
         assert (
-            str(queries.SERVICE_NOT_FOUND) == "Ese servicio no existe en este negocio."
+            str(queries.catalog.SERVICE_NOT_FOUND) == "Ese servicio no existe en este negocio."
         )
         assert str(schemas.SAY_WHICH_CUSTOMER) == (
             "Elige el cliente al que pertenece el bono: un bono sin dueño no lo puede canjear nadie."
@@ -143,7 +143,7 @@ def test_spanish_texts_of_the_workbook():
             "Esa sesión del bono ya no se puede soltar: la venta está cobrada. Devolverla es una devolución."
         )
         assert (
-            str(queries.SESSION_NOT_FOUND)
+            str(queries.grants.SESSION_NOT_FOUND)
             == "Esa sesión del bono no existe en este negocio."
         )
         assert str(services.HOLD_LOST) % {"name": "Bono 5"} == (
@@ -164,7 +164,7 @@ def test_spanish_says_services_own_words_not_an_earlier_apps():
         "Redemption": Redemption._meta.verbose_name,
         "Redemption plural": Redemption._meta.verbose_name_plural,
         "SAY_WHICH_CATEGORY": schemas.SAY_WHICH_CATEGORY,
-        "CATEGORY_AMBIGUOUS": queries.CATEGORY_AMBIGUOUS,
+        "CATEGORY_AMBIGUOUS": queries.categories.CATEGORY_AMBIGUOUS,
     }
     with translation.override("es"):
         said = {name: str(text) for name, text in texts.items()}

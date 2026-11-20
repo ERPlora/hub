@@ -40,12 +40,12 @@ def failed_halfway(recoveries, every_app_on, monkeypatch):  # noqa: F811 - the f
     into it: the business, its services' ids and the copy."""
     hub, ids, color, copy = whole.TestServicesComeBack().a_full_category(recoveries, every_app_on)
     run_in(hub, "service.category.delete", id=color)
-    read_links = queries.service_links_not_in_business
+    read_links = queries.recovery.service_links_not_in_business
 
     def broken(categories):
         raise RuntimeError("the worker died")
 
-    monkeypatch.setattr(queries, "service_links_not_in_business", broken)
+    monkeypatch.setattr(queries.recovery, "service_links_not_in_business", broken)
     failed = recoveries.ask(copy, "service")
     assert run() == 1
     failed = fresh(failed)
@@ -53,7 +53,7 @@ def failed_halfway(recoveries, every_app_on, monkeypatch):  # noqa: F811 - the f
         "failed",
         [whole.CATEGORIES | {"created": 1}, whole.SERVICES, whole.SERVICE_LINKS],
     )
-    monkeypatch.setattr(queries, "service_links_not_in_business", read_links)
+    monkeypatch.setattr(queries.recovery, "service_links_not_in_business", read_links)
     return hub, ids, copy
 
 
