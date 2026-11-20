@@ -322,6 +322,10 @@ expect "a night whose taxonomy cannot be seeded ends red" 1 "$status"
 expect "no server starts" 0 "$(calls_re '^runserver ')"
 expect "the issue names the SaaS's seeding" 1 "$(grep -cF 'falló «la siembra del SaaS»' "$BODIES_LOG" || true)"
 
+night FAKE_SEED_EXIT=1
+expect "a night whose accounts cannot be seeded ends red" 1 "$status"
+expect "and starts no server either" 0 "$(calls_re '^runserver ')"
+
 night FAKE_CURL_EXIT=7 NIGHTLY_START_SECONDS=1
 expect "a night whose servers never answer ends red" 1 "$status"
 expect "no spec runs" 0 "$(calls_re '^e2e ')"
