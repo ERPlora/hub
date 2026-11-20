@@ -9,7 +9,8 @@ import { A, api, capture, login, shown } from './helpers';
 import { rowAction } from './service-helpers';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
 import { ensureIssuer, snapshotSeries } from './invoice-helpers';
-import { chargeByApi, cleanSales, drawerOff, numberRow, restoreDrawer, shots, stamp } from './sale-helpers';
+import { chargeByApi, cleanSales, drawerOff, restoreDrawer, shots, stamp } from './sale-helpers';
+import { numberRow } from './sale-receipt';
 
 const RUN = stamp();
 let product: Product;
