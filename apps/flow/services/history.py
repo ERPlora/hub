@@ -15,7 +15,8 @@ from apps.flow.models import Flow, FlowRun, Question
 from apps.flow.queries.reads import SYSTEM
 from apps.flow.queries.reasons import say
 from apps.flow.queries.runs import RESUME_DAYS, resume_problem
-from apps.flow.schemas import ChangedOut, CustomerErasedIn, DueIn, DueOut
+from apps.flow.schemas.fields import DueIn, DueOut
+from apps.flow.schemas.history import ChangedOut, CustomerErasedIn
 
 from .engine import _finish, _own, _remember_read
 

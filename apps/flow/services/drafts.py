@@ -11,7 +11,7 @@ from apps.flow import events
 from apps.flow.models import Draft, Flow
 from apps.flow.queries.drafts import DRAFT_NOT_FOUND, draft_row
 from apps.flow.queries.reads import MANAGE
-from apps.flow.schemas import DraftOut, DraftProposeIn, DraftRefIn
+from apps.flow.schemas.drafts import DraftOut, DraftProposeIn, DraftRefIn
 
 from .writes import _actor
 

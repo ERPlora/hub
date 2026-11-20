@@ -1341,7 +1341,7 @@ Los avisos llevan ids, nunca nombres ni contenidos.
   empates incluidos. Lo fija `test_ties_go_by_id_in_the_lists_own_direction`.
 - **Anatomía**: `apps.py`, `models.py`, `document.py` (el documento de una automatización: rutas de
   datos, plantillas `{{…}}`, condiciones, horarios y permisos que pide; puro, sin base de datos),
-  `schemas.py`, `queries/`, `services/` (con el motor), `events.py`, `live.py`, `api.py`, `admin.py`,
+  `schemas/`, `queries/`, `services/` (con el motor), `events.py`, `live.py`, `api.py`, `admin.py`,
   `locale/`, `frontend/` y un `tests/test_<fichero>.py` por fichero, más
   `tests/test_integration_apps.py` (Clientes, Ventas y Tareas de verdad) y `tests/test_concurrency.py`.
 - **Modelos**: `Flow` (nombre, encendida, disparador aplanado —`trigger_kind`, `trigger_event`,
