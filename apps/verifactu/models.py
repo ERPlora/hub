@@ -159,10 +159,13 @@ class OwnCertificate(UUIDModel):
     issuer_recognised = models.BooleanField(_("issued by a recognised authority"), null=True, editable=False)
     checked_list = models.PositiveIntegerField(_("trusted list checked against"), null=True, editable=False)
     aeat_proof = models.CharField(
-        _("AEAT test"), max_length=8, choices=Proof.choices, default=Proof.UNTESTED, editable=False
+        _("AEAT test"), max_length=8, choices=Proof.choices, default=Proof.UNTESTED, db_default=Proof.UNTESTED,
+        editable=False,
     )
     #: What the AEAT's test environment said when it refused it (empty when its door said nothing but «302»).
-    aeat_proof_detail = models.CharField(_("AEAT test answer"), max_length=500, blank=True, editable=False)
+    aeat_proof_detail = models.CharField(
+        _("AEAT test answer"), max_length=500, blank=True, default="", db_default="", editable=False
+    )
 
     class Meta:
         verbose_name = _("own certificate")

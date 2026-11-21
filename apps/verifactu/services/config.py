@@ -15,6 +15,7 @@ from apps.verifactu.queries.config import config_out
 from apps.verifactu.queries.country import refuse_outside_spain
 from apps.verifactu.queries.route import (
     effective_environment,
+    going_live_problem,
     issuer_configured,
     production_open,
     route_problem,
@@ -76,7 +77,7 @@ _ROUTE_REFUSALS = {
 
 
 def _route_refusal(config: Config, scope: Scope) -> Conflict | None:
-    problem = route_problem(config, Environment.PRODUCTION, scope)
+    problem = route_problem(config, Environment.PRODUCTION, scope) or going_live_problem(config, scope)
     if problem not in _ROUTE_REFUSALS:
         return None
     return Conflict(str(_ROUTE_REFUSALS[problem]), code=f"verifactu.{problem}")

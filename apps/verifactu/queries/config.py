@@ -15,9 +15,9 @@ from apps.verifactu.schemas.own_certificate import CertificateOut
 from .authorisation import representation_out
 from .reads import VIEW
 from .route import (
-    _route_sending_problem,
     blockers,
     config_row,
+    going_live_problem,
     issue_problem,
     issuer_identity,
     live_problems,
@@ -97,7 +97,7 @@ def config_out(config: Config, ctx: OperationContext) -> ConfigOut:
         representation=representation_out(config, nif),
         synced_at=config.synced_at,
         route_ready=not route_problem(config, config.environment, ctx.scope),
-        route_ready_for_production=not _route_sending_problem(config, Environment.PRODUCTION, ctx.scope),
+        route_ready_for_production=not going_live_problem(config, ctx.scope),
         reasons=[wait(code) for code in blockers(config, config.environment, ctx.scope)],
         issue_blocker=wait(refused) if refused else None,
         live_blockers=[wait(code) for code in live_problems(config, ctx.scope)],
