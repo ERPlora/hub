@@ -3,19 +3,20 @@
 // a line. The owner sells in cash with change and sees the ticket with its VAT row; sells by card to a
 // customer found in the till; a product without tax category is refused; on a phone the cart is the
 // drawer behind the FAB; the employee charges and sees «Void» and «Refund» (each asks a manager's approval:
-// sale-approval.spec.ts) but never reads the figures. A marked
+// sale-approval.spec.ts) but never reads the figures. While the cash tendered is missing or short, «Charge» is
+// greyed and its native button is announced unavailable. A marked
 // line is charged on its own (SALE-F22) with its ticket, and the rest closes the check; on full screen
 // the checkout sheet still opens and charges on top of the till. In Spanish its search boxes are named by
 // their hint, never Ionic's English «search text» (flow: sale-pos).
 // Screenshots of the till in the three viewports. What this file creates is deleted after it.
 import { expect, type Page, test } from '@playwright/test';
 
-import { A, EMPLOYEE, api, hostPage, login, psql, shot, shown } from './helpers';
+import { A, EMPLOYEE, api, capture, hostPage, login, psql, shot, shown } from './helpers';
 import { offersRowAction } from './service-helpers';
 import { cleanUp as cleanCustomers, createCard, e2eName, spanishMobile } from './customer-helpers';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
 import { snapshotSeries } from './invoice-helpers';
-import { cleanSales, drawerOff, expectTakes, newestSaleOf, openTillCart, restoreDrawer, shots, stamp } from './sale-helpers';
+import { cleanSales, drawerOff, expectTakes, newestSaleOf, openTillCart, restoreDrawer, shots, stamp, VIEWPORTS } from './sale-helpers';
 import { toastSaying } from './toast-helpers';
 
 const RUN = stamp();
@@ -24,6 +25,7 @@ let shirt: Product;
 let untaxed: Product;
 let juice: Product;
 let cake: Product;
+let coffee: Product;
 let customer: { id: string; name: string };
 let methods: Record<string, string>;
 
@@ -61,6 +63,7 @@ test.beforeAll(async ({ browser }) => {
   shirt = await createProduct(context, { name: `E2E Shirt ${RUN}`, sku: `E2E-POS-S-${RUN}`, price: 1210, tax_category_key: 'product.generic' });
   juice = await createProduct(context, { name: `E2E Juice ${RUN}`, sku: `E2E-POS-J-${RUN}`, price: 250, tax_category_key: 'restaurant.drink' });
   cake = await createProduct(context, { name: `E2E Cake ${RUN}`, sku: `E2E-POS-C-${RUN}`, price: 400, tax_category_key: 'restaurant.drink' });
+  coffee = await createProduct(context, { name: `E2E Coffee ${RUN}`, sku: `E2E-POS-K-${RUN}`, price: 150, tax_category_key: 'restaurant.drink' });
   untaxed = await createProduct(context, { name: `E2E Untaxed ${RUN}`, sku: `E2E-POS-U-${RUN}`, price: 500, tax_category_key: 'product.generic' });
   psql(`update inventory_product set tax_category_id = null where id = '${untaxed.id}'`);
   const card = await createCard(context, { name: e2eName('Ana'), phone: spanishMobile() });
@@ -123,6 +126,40 @@ test('SALE-F01: the owner sells two shirts in cash, gets the change and the tick
   });
   expect(sale.lines.map((line) => [line.tax_rate, line.line_total])).toEqual([['21.00', 2420]]);
   expect(sale.payments.map((p) => [p.method_type, p.tendered, p.change])).toEqual([['cash', 5000, 2580]]);
+});
+
+// The sheet opens with «Charge» disabled while the total loads; Ionic then takes the host's `aria-disabled` away and
+// copies a host's `aria-*` to its native button only when it loads. The grey and what a screen reader announces are
+// both read where they live: the dimming on the host, the state on its native button.
+test('SALE-F01: while the cash tendered is missing or short, «Charge» is greyed and announced unavailable', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await login(page, A, '/sale/pos');
+  await tillReady(page);
+  await addBySearch(page, coffee);
+  await expect(lineOf(page, coffee.name)).toBeVisible();
+  await shown(page).locator('[data-testid=pos-charge]').click();
+  const sheet = page.locator('[data-testid=sale-checkout-modal]');
+  const charge = sheet.locator('[data-testid=sale-checkout-confirm]');
+  const greyed = async (blocked: boolean) => {
+    await expectTakes(charge, !blocked);
+    await expect(charge).toHaveCSS('opacity', blocked ? '0.75' : '1');
+  };
+  const press = (key: string) => sheet.locator(`[data-testid=sale-checkout-keypad-${key}]`).click();
+  await expect(sheet.locator('[data-testid=sale-checkout-total]')).toContainText(/1[.,]50/);
+  await greyed(true);
+
+  for (const vp of VIEWPORTS) {
+    await page.setViewportSize({ width: vp.width, height: vp.height });
+    await press('clear');
+    await greyed(true);
+    await press('1');
+    await greyed(true);
+    await capture(page, `sale-checkout-charge-short-${vp.label}`);
+    await press('5');
+    await greyed(false);
+  }
+  await charge.click();
+  await expect(sheet).toBeHidden();
 });
 
 test('SALE-F05 and F13: a check with a customer found in the till and a quick note is charged by card @smoke', async ({ page, context }) => {
