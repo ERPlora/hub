@@ -84,6 +84,15 @@ describe('PrintersPage', () => {
     expect(words(s.find('printing-printers-state-p1').element)).toBe('Ready');
   });
 
+  it('says what a device’s error code means, not the code', async () => {
+    const s = await setup();
+    const switchedOff = printer('p4', { state: 'failing', last_failed_at: '2026-10-14T09:00:00Z', last_error: 'printer_unreachable' });
+    await s.result(LIST, { ...PAGE, rows: [switchedOff], total: 1 });
+    expect(words(s.find('printing-printers-state-p4').element)).toBe(
+      `With errors Last error: ${en.printing.deviceErrors.unreachable}`,
+    );
+  });
+
   it('the owner and the manager add, edit, test and deactivate; the employee only tests', async () => {
     const s = await setup();
     await s.result(LIST, PAGE);
