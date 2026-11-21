@@ -66,6 +66,7 @@ ROUTES = {
         "sale.order.set_line_discount_over_limit",
     ),
     ("POST", "/sale/orders/set_label", "sale.order.set_label"),
+    ("POST", "/sale/orders/set_staff", "sale.order.set_staff"),
     ("POST", "/sale/orders/set_appointment", "sale.order.set_appointment"),
     ("GET", "/sale/payment_methods", "sale.payment_method.list"),
     ("POST", "/sale/payment_methods", "sale.payment_method.create"),

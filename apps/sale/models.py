@@ -224,15 +224,14 @@ class Order(UUIDModel):
         COUNTER = "counter", _("Counter sale")
 
     status = models.CharField(_("status"), max_length=10, choices=Status.choices, default=Status.OPEN)
-    source = models.CharField(
-        _("source"), max_length=10, choices=Source.choices, default=Source.POS
-    )
+    source = models.CharField(_("source"), max_length=10, choices=Source.choices, default=Source.POS)
     label = models.CharField(_("title"), max_length=120, blank=True)
     notes = models.TextField(_("notes"), blank=True)
     appointment_id = models.UUIDField(_("appointment"), null=True, blank=True)
-    discount_percent = models.DecimalField(
-        _("discount (%)"), default=Decimal("0"), **PERCENT
-    )
+    # Who serves the check (a member of Staff, with the name it had when chosen); empty = whoever holds the session.
+    staff_id = models.UUIDField(_("served by"), null=True, blank=True)
+    staff_name = models.CharField(_("server's name"), max_length=201, blank=True)
+    discount_percent = models.DecimalField(_("discount (%)"), default=Decimal("0"), **PERCENT)
     # In whole minor units of the business's currency (not always the cent): its name never says the unit.
     discount_amount = models.PositiveBigIntegerField(_("fixed-amount discount"), default=0)
     discount_approved_by = _actor(_("discount approved by"))

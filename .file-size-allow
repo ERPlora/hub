@@ -79,7 +79,7 @@
 971 apps/sale/frontend/operations.d.ts ERPlora/erplora-next#74
 1060 apps/sale/frontend/pages/PosPage.test.ts ERPlora/erplora-next#74
 587 apps/sale/frontend/pages/SalesPage.test.ts ERPlora/erplora-next#74
-867 apps/sale/models.py ERPlora/erplora-next#74
+866 apps/sale/models.py ERPlora/erplora-next#74
 1560 apps/sale/tests/test_integration_service.py ERPlora/erplora-next#74
 562 apps/schedule/queries.py ERPlora/erplora-next#74
 668 apps/schedule/schemas.py ERPlora/erplora-next#74
