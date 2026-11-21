@@ -8,6 +8,7 @@ as a request, the live executor and the worker enter it), the deployment's when 
 use a zone that is not the deployment's; each app proves its own reading in its ``tests/test_business_zone.py``.
 """
 
+import datetime as dt
 from zoneinfo import ZoneInfo
 
 import pytest
@@ -104,3 +105,14 @@ def test_an_instant_of_a_notice_is_read_on_the_businesss_clock(hub_a):
         assert moment(INSTANT).hour == 9
     with in_hub("Europe/Madrid", hub_a):
         assert moment(INSTANT).hour == 10
+
+
+@HUB_DB
+def test_a_paper_writes_its_moment_on_the_businesss_clock_as_the_printer_prints_it(hub_a):
+    """The app of the device prints the date and time a document brings as they come: the server writes them on the
+    business's clock, never on the device's nor on the deployment's."""
+    instant = dt.datetime.fromisoformat(INSTANT)
+    with in_hub(CANARY, hub_a):
+        assert (business.paper_date(instant), business.paper_time(instant)) == ("02/11/2026 09:00", "09:00")
+    with in_hub("Europe/Madrid", hub_a):
+        assert (business.paper_date(instant), business.paper_time(instant)) == ("02/11/2026 10:00", "10:00")
