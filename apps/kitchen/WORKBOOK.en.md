@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:650a91dc442fce9936c3d2617cc9bc44519706af94793e17921bc579d1a6ebe4 -->
+<!-- generated from WORKBOOK.md sha256:869ea875151cc5882968479a9226cf1efdbafbce13876d875a4de8d60f0688ce -->
 
 ## What it is for and who it is for
 
@@ -220,7 +220,7 @@ With the window as it opened, Back closes it without asking (BASE-F05).
 | KITCHEN-F28 | Withdraw the rounds of a check deleted or merged into another | done |
 | KITCHEN-F29 | Void a dish already sent, with a notice to the kitchen | done |
 | KITCHEN-F31 | Give Cash register the tickets still under way | done |
-| KITCHEN-F32 | Highlight the customer's allergy on the card and on paper | partial |
+| KITCHEN-F32 | Highlight the customer's allergy on the card and on paper | done |
 
 ### KITCHEN-F01 Create a station
 Status: done
@@ -784,8 +784,7 @@ register.
 Involved: CASH_REGISTER-F08, CASH_REGISTER-F09, KITCHEN-F10, KITCHEN-F13
 
 ### KITCHEN-F32 Highlight the customer's allergy on the card and on paper
-Status: partial — the card and the detail already show the allergy and the matching allergens, and the paper prints
-the dish's lines; the device's app does not print `!! ALERGIA !!` in the sheet's header yet (ERPlora/app#63)
+Status: done
 Actor: employee
 Screen: Display, Tickets
 Steps:
