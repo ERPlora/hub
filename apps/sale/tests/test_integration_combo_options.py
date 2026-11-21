@@ -32,8 +32,7 @@ def option(group: str, name: str, **more) -> str:
     return str(setup("modifier.option.create", {"group": group, "name": name, **more}).id)
 
 
-@pytest.fixture
-def menu(product):
+def steak_menu(product):
     """«Menu of the day», 13,50 € eaten in: «Starters» (lentils) and «Mains» (hake, or the steak +2,00 €). The steak
     asks «Doneness» (one, required) and «Extras» (cheese +1,00 €, which has milk, and a soda +2,00 € at 21 %)."""
     product("Lentils", "LEN", 500, FOOD, initial_stock="10")
@@ -63,8 +62,7 @@ def menu(product):
     return dishes, options
 
 
-@pytest.fixture
-def takeaway(product):
+def sandwich_and_beer(product):
     """«Sandwich and beer» to take away, 6,00 €: a sandwich of 4,50 € (food) and a beer of 2,00 € (a restaurant's
     alcohol). The sandwich takes «Extras»: cheese +1,00 € (food, with the sandwich) or a glass of wine +1,50 € (a
     restaurant's alcohol: 21 % to take away, on a line of its own)."""
@@ -84,6 +82,16 @@ def takeaway(product):
     }
     setup("modifier.link.attach", {"group": "Extras", "product_id": str(sandwich.id)})
     return dishes, options
+
+
+@pytest.fixture
+def menu(product):
+    return steak_menu(product)
+
+
+@pytest.fixture
+def takeaway(product):
+    return sandwich_and_beer(product)
 
 
 def dish(option_id: str, *option_ids: str, quantity: int = 1) -> dict:

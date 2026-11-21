@@ -10,7 +10,7 @@ from django.utils import translation
 from apps.printing import documents
 from apps.sale import paper
 from apps.sale.tests.conftest import HUB_DB, A, run
-from apps.sale.tests.test_integration_combo_options import add_menu, charge, dish, menu, open_check, takeaway
+from apps.sale.tests.test_integration_combo_options import add_menu, charge, dish, open_check, sandwich_and_beer, steak_menu
 from base.models import Hub
 
 pytestmark = HUB_DB
@@ -167,9 +167,9 @@ def test_the_paper_says_when_the_sale_was_charged_and_when_the_bill_was_asked_on
     assert paper.bill(valued, label="Table 4", letterhead=LETTERHEAD, decimals=2)["date"] == "02/11/2026 23:30"
 
 
-def test_a_menu_in_one_line_prints_the_options_of_each_dish_with_it(menu):
+def test_a_menu_in_one_line_prints_the_options_of_each_dish_with_it(product):
     """SALE-F42: the steak of a menu eaten in, with its doneness and its cheese, under the menu as the screen shows it."""
-    dishes, options = menu
+    dishes, options = steak_menu(product)
     order_id = open_check()
     add_menu(order_id, dish(dishes["LEN"]), dish(dishes["STK"], options["rare"], options["cheese"]))
     sale = run("sale.sale.get", {"sale_id": str(charge(order_id, "paper-menu-opts-1").id)})
@@ -179,10 +179,10 @@ def test_a_menu_in_one_line_prints_the_options_of_each_dish_with_it(menu):
     ]
 
 
-def test_a_dish_of_a_split_menu_prints_its_options_once(takeaway):
+def test_a_dish_of_a_split_menu_prints_its_options_once(product):
     """SALE-F42: to take away, the sandwich names its cheese under it and its glass of wine goes on a line of its own;
     neither is named again as a dish of the menu."""
-    dishes, options = takeaway
+    dishes, options = sandwich_and_beer(product)
     order_id = open_check()
     add_menu(order_id, dish(dishes["SAN"], options["cheese"], options["wine"]), dish(dishes["BEE"]), combo="Sandwich and beer")
     sale = run("sale.sale.get", {"sale_id": str(charge(order_id, "paper-menu-opts-2").id)})
