@@ -716,8 +716,8 @@ Implicados: INVENTORY-F21
 ### SALE-F16 Atribuir la cuenta o una línea a quien atiende
 Estado: hecho
 Vertical: común
-Actor: empleado, responsable
-Pantalla: Vender
+Actor: empleado, responsable, asistente
+Pantalla: Vender; asistente
 Pasos:
 1. En la cabecera de la cuenta, el chip «Atiende yo» dice a quién se atribuye. Tócalo.
 2. En «Quién atiende esta cuenta», elige a la persona del equipo de Personal o «Yo (quien tenga la
@@ -728,13 +728,17 @@ Pasos:
    «El profesional de la cuenta».
 4. Cobra. Con el chip en «Yo», la venta se atribuye a tu ficha de Personal; una línea con su propio
    profesional (la de una cita, la que moviste) se queda con él. Después, el chip vuelve a «yo».
+5. Con el asistente: «la cuenta de la mesa 6 la atiende Lucía». Queda guardado en la cuenta hasta cobrarla,
+   también en la cuenta nueva si se divide: la comanda que se envíe lleva su nombre y la venta es
+   suya, la cobre quien la cobre; las líneas ya puestas se quedan con quien tenían.
 Entra: el equipo de Personal (fichas activas) y la ficha de quien tiene la sesión.
 Sale: la venta y cada línea atribuidas a esa persona, para el cierre por profesional y las comisiones de
 Personal (STAFF-F21). Con «Yo», la venta es de la ficha de quien cobra; sin ficha, no cuenta para nadie.
 La comanda de cocina que se envíe lleva su nombre (KITCHEN-F18); con «Yo», el de quien la envía.
 Si falla: «No se ha podido cargar el equipo. La venta se sigue atribuyendo a quien tenga la sesión.»;
 «No se ha podido mover la línea a otro profesional. Se queda con el que tenía.». Una línea enviada a
-cocina no se reasigna.
+cocina no se reasigna. Con el asistente, alguien que no está en el equipo: «Ese miembro del personal no
+existe en este negocio.»; sin Personal activo: «Personal no está activo en este negocio.».
 Implicados: STAFF-F21, KITCHEN-F18
 
 ### SALE-F17 Aparcar una cuenta y recuperarla
@@ -1539,6 +1543,7 @@ secciones, las notas rápidas y lo devolvible se pueden seguir en vivo.
 | Añade una línea a precio libre | precio libre | F09 | `sale.order.add_open_line` |
 | Cambia la cantidad, la invitación o la nota de una línea | montar la cuenta | F01, F10, F13, F15 | `sale.order.update_line` |
 | Cambia de quién es una línea | montar la cuenta | F16 | `sale.order.set_line_staff` |
+| Dice quién atiende una cuenta abierta (o «yo»): la comanda lleva su nombre y la venta es suya | montar la cuenta | F16 | `sale.order.set_staff` |
 | Marca o quita la alergia del cliente en una línea sin enviar | montar la cuenta | F41 | `sale.order.set_line_allergy` |
 | Separa una línea de N unidades en N líneas | montar la cuenta | F27 | `sale.order.split_line` |
 | Quita una línea sin enviar | montar la cuenta | F01 | `sale.order.remove_line` |
