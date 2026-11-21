@@ -69,21 +69,40 @@ const ZONE = Array.from({ length: 10 }, (_, index) =>
   tableRow({ id: `z${index}`, number: String(index + 1), position_x: 16 + (index % 5) * 88, position_y: 16 + Math.floor(index / 5) * 88 }),
 );
 const ROW = Array.from({ length: 6 }, (_, index) => tableRow({ id: `r${index}`, number: String(index + 1), position_x: 16 + index * 88, position_y: 16 }));
+/** A zone whose only table was placed at the bottom right of the plan, as on a terrace drawn beside the dining room. */
+const CORNER = tableRow({ id: 'c1', number: '1', position_x: 448, position_y: 254 });
 
 describe('FloorCanvas', () => {
-  it('lays every table at its box on a plan as large as the farthest one while the stage is unmeasured', async () => {
+  it('lays every table at its box, from the corner of the nearest one to the farthest, while the stage is unmeasured', async () => {
     const c = await canvas();
-    expect([c.tile('t2').style.left, c.tile('t2').style.top]).toEqual(['300px', '200px']);
-    expect([c.plane().style.width, c.plane().style.height]).toEqual([`${300 + 120 + 10}px`, `${200 + 72 + 10}px`]);
+    expect([c.tile('t2').style.left, c.tile('t2').style.top]).toEqual([`${300 - 16}px`, `${200 - 16}px`]);
+    expect([c.plane().style.width, c.plane().style.height]).toEqual([`${300 + 120 + 10 - 16}px`, `${200 + 72 + 10 - 16}px`]);
   });
 
   it('spreads the tables to fit a measured stage and grows each table less than the gaps between them', async () => {
     vi.stubGlobal('ResizeObserver', FakeObserver);
     const c = await canvas();
     await c.measure(1000, 700);
-    expect([c.plane().style.width, c.plane().style.height]).toEqual(['946px', '620.4px']);
-    expect([c.tile('t1').style.left, c.tile('t1').style.width]).toEqual(['67.6px', '93.6px']);
+    expect([c.plane().style.width, c.plane().style.height]).toEqual(['910.8px', '585.2px']);
+    expect([c.tile('t1').style.left, c.tile('t1').style.width]).toEqual(['32.4px', '93.6px']);
     expect(c.tile('t1').dataset.x).toBe('16');
+  });
+
+  it('in Service frames the zone’s tables, so a lone table at the bottom right shows on a landscape tablet unscrolled', async () => {
+    vi.stubGlobal('ResizeObserver', FakeObserver);
+    const c = await canvas({ tables: [CORNER] });
+    await c.measure(1240, 438);
+    expect([c.plane().style.width, c.plane().style.height]).toEqual(['180.4px', '180.4px']);
+    expect([c.tile('c1').style.left, c.tile('c1').style.top]).toEqual(['32.4px', '32.4px']);
+    expect([c.tile('c1').dataset.x, c.tile('c1').dataset.y]).toEqual(['448', '254']);
+  });
+
+  it('in Edit plan keeps the plan from its corner, so a table can still go to the empty part before the others', async () => {
+    vi.stubGlobal('ResizeObserver', FakeObserver);
+    const c = await canvas({ tables: [CORNER], editable: true });
+    await c.measure(1240, 438);
+    expect([c.plane().style.width, c.plane().style.height]).toEqual(['1050.6px', '720.8px']);
+    expect([c.tile('c1').style.left, c.tile('c1').style.top]).toEqual(['779.6px', '449.8px']);
   });
 
   it('paints each table in the app’s language, at its place on the plan and with the width its label may take', async () => {
@@ -137,6 +156,7 @@ describe('FloorCanvas', () => {
 
   it('in Service a tap or the keyboard picks a table once, and nothing is dragged', async () => {
     const c = await canvas();
+    const left = c.tile('t1').style.left;
     await c.pointer(c.tile('t1'), 'pointerdown', 20, 20);
     await c.pointer(c.tile('t1'), 'pointermove', 120, 120);
     await c.pointer(c.tile('t1'), 'pointerup', 120, 120);
@@ -148,7 +168,7 @@ describe('FloorCanvas', () => {
     await c.key(c.button('t2'), 'ArrowRight');
     expect(c.selected()).toEqual(['t1', 't2']);
     expect(c.moves()).toEqual([]);
-    expect(c.tile('t1').style.left).toBe('16px');
+    expect(c.tile('t1').style.left).toBe(left);
   });
 
   it('in Edit plan a table is dragged to its place, shows there at once and says so', async () => {

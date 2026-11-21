@@ -434,7 +434,7 @@ En la pantalla Archivos:
 | BASE-F106 | El asistente sin conexión, con el servicio caído o sin plan | hecho |
 | BASE-F107 | Pasar la QA maestra del Hub | hecho |
 | BASE-F108 | Reportar un problema a soporte | hecho |
-| BASE-F109 | Borrar un negocio eliminado pasados sus 90 días | parcial — un negocio con documentos los escribe en el archivo fiscal, pero aún guarda su base de datos (hub#738) |
+| BASE-F109 | Borrar un negocio eliminado pasados sus 90 días | hecho |
 | BASE-F110 | Abrir la web del negocio por su dominio propio | hecho |
 | BASE-F111 | Esperar a la base de datos cuando se corta un momento | hecho |
 | BASE-F112 | Guardar un archivo descargado dentro de la app | hecho |
@@ -2845,44 +2845,47 @@ para escribir directamente. En los dos casos lo escrito se queda y se puede volv
 Implicados: ACCOUNTS-F38, BASE-F40
 
 ### BASE-F109 Borrar un negocio eliminado pasados sus 90 días
-Estado: parcial — un negocio con documentos los escribe en el archivo fiscal, pero aún guarda su base de datos (hub#738)
+Estado: hecho
 Actor: nadie: lo hace el Hub solo, sin que nadie pulse nada
 Pantalla: Ninguna; la dirección del negocio sigue diciendo «Este hub ya no está disponible.»
 Pasos:
   1. Un negocio eliminado en erplora.com (HUBS-F18, HUBS-F20) cumple 90 días. Hasta ese momento su base de datos se
      queda intacta y se puede recuperar.
   2. El Hub mira si guarda documentos: ventas, facturas, registros de VeriFactu, cobros, movimientos de caja, pedidos
-     de la tienda o compras de un cliente, en cualquier estado y aunque la app esté apagada. Si guarda alguno, antes
+     de la tienda o compras de un cliente, en cualquier estado y aunque la app esté apagada. Si guarda alguno y aún no
+     se pueden archivar (no hay archivo fiscal, o un registro de VeriFactu espera la respuesta de la AEAT), se detiene:
+     el negocio sigue eliminado, con su base de datos, y lo vuelve a mirar al día siguiente.
+  3. Hace la copia final de sus datos, que se guarda 90 días en el almacén de copias; si ya tiene una de menos de un
+     día (un intento anterior que no llegó a borrar), no hace otra. Mientras se hace, el negocio aún se puede
+     recuperar y erplora.com sigue viendo sus copias.
+  4. Al terminar vuelve a mirar si guarda documentos, también los que entraran durante la copia, y si guarda alguno
      los escribe en el archivo fiscal, donde se guardan 6 años sin que nadie los pueda borrar: cada tabla de esos
      documentos tal como está guardada, sin rehacer nada; el PDF de cada factura tal como se entregó al cliente, en su
      idioma o en el del negocio y con el QR de VeriFactu si tiene su registro, uno por factura; y al final una
      lista que cuenta las filas y los PDF y lleva la huella de cada fichero, que solo se escribe cuando todos se han
-     vuelto a leer iguales. Lo hace una vez por baja, y si un registro de VeriFactu aún espera la respuesta de la AEAT,
-     espera a que llegue. Después se detiene: el negocio sigue eliminado, con su base de datos, y lo vuelve a mirar al
-     día siguiente.
-  3. Sin documentos, hace la copia final de sus datos, que se guarda 90 días en el almacén de copias. Mientras se
-     hace, el negocio aún se puede recuperar y erplora.com sigue viendo sus copias. Al terminar vuelve a mirar si
-     guarda documentos, por si entró alguno durante la copia.
-  4. Borra la base de datos de ese negocio, y solo esa. Desde aquí ya no vuelve.
-  5. Borra sus ficheros del almacén, los de Archivos y los que guardan sus apps, y solo los suyos.
-  6. Queda solo una marca, sin nombre ni datos, para que su dirección siga diciendo «Este hub ya no está disponible.»;
+     vuelto a leer iguales. Un archivo hecho antes de la copia final no vale: se vuelve a hacer después de ella.
+  5. Borra la base de datos de ese negocio, y solo esa. Desde aquí ya no vuelve.
+  6. Borra sus ficheros del almacén, los de Archivos y los que guardan sus apps, y solo los suyos.
+  7. Queda solo una marca, sin nombre ni datos, para que su dirección siga diciendo «Este hub ya no está disponible.»;
      sus personas y sus sesiones se van con ella.
 Entra: el negocio eliminado y sus 90 días cumplidos. Nunca una demo, que se borra a su manera al caducar, el negocio
 de la plataforma ni uno que se está moviendo de servidor.
-Sale: la copia final, y la base de datos y los ficheros borrados, con el evento `base.hub.purged`; desde ahí
-erplora.com ya no lista sus copias. O, con documentos, su archivo fiscal escrito (en la fila, `fiscal_archived_at` y
-el motivo `fiscal_archived: <apps>`) y la base de datos y los ficheros guardados; donde no hay archivo fiscal, el motivo
-es `fiscal_archive_missing: <apps>`, y mientras un registro espera a la AEAT, `fiscal_archive_waiting: verifactu`.
+Sale: la copia final y, con documentos, su archivo fiscal (en la fila, `fiscal_archived_at`); y la base de datos y los
+ficheros borrados, con el evento `base.hub.purged`; desde ahí erplora.com ya no lista sus copias. Si sus documentos no
+se pueden archivar, no se borra nada: la base de datos y los ficheros se guardan y la fila dice por qué,
+`fiscal_archive_missing: <apps>` donde no hay archivo fiscal, `fiscal_archive_waiting: verifactu` mientras un registro
+espera a la AEAT y `fiscal_archive_failed` si el archivo no se pudo escribir entero.
 Si falla: una copia que falla no borra nada, y sin almacén de copias tampoco; una copia o un borrado que falla se
-reintenta (1 min, 5 min, 15 min y luego cada hora) con el error anotado en la fila, sin hacer otra copia si ya la había.
-Si el almacén no borra sus ficheros, el negocio sigue borrándose, sin marca, con `files_purge_failed` en la fila, y se
-reintenta igual. Si una app no se puede leer, la base de datos se queda. Una fila que no nombra la base de datos propia
-del negocio no borra nada (`invalid_database_name`). Un negocio recuperado durante la copia sigue abierto con su base
-de datos; ya borrándose, erplora.com recibe `hub_purged`. Si el Hub se apaga a media copia, el siguiente la retoma.
-Si se apaga a medio archivo fiscal, el siguiente intento de esa baja aprovecha los PDF que ya subió y no los vuelve a
-hacer. Si el archivo fiscal no se puede escribir entero, o un fichero no se lee igual que se escribió, no se da por
-hecho: la fila dice `fiscal_archive_failed` con el motivo y se reintenta al día siguiente en otra carpeta del archivo
-(lo ya subido se queda, porque nadie lo puede borrar, y sin su lista final no cuenta).
+reintenta (1 min, 5 min, 15 min y luego cada hora) con el error anotado en la fila, sin hacer otra copia si ya la había
+de menos de un día. Si el almacén no borra sus ficheros, el negocio sigue borrándose, sin marca, con
+`files_purge_failed` en la fila, y se reintenta igual. Si una app no se puede leer, la base de datos se queda. Una fila
+que no nombra la base de datos propia del negocio no borra nada (`invalid_database_name`). Un negocio recuperado
+durante la copia sigue abierto con su base de datos; ya borrándose, erplora.com recibe `hub_purged`. Si el Hub se apaga
+a media copia, el siguiente la retoma. Si se apaga a medio archivo fiscal, el siguiente intento de esa baja aprovecha
+los PDF que ya subió y no los vuelve a hacer. Si el archivo fiscal no se puede escribir entero, o un fichero no se lee
+igual que se escribió, no se da por hecho y no se borra nada: la fila dice `fiscal_archive_failed` con el motivo y se
+reintenta al día siguiente en otra carpeta del archivo (lo ya subido se queda, porque nadie lo puede borrar, y sin su
+lista final no cuenta), con una copia final nueva si la que había tiene más de un día.
 Implicados: HUBS-F18, HUBS-F19, HUBS-F20, PUBLIC-F34 (el mismo borrado de ficheros, al retirar una demo), INVOICE-F18
 (el A4 de cada factura que va al archivo)
 
@@ -3816,10 +3819,10 @@ Implicados: BASE-F10, BASE-F11, BILLING-F16 (erplora.com), BILLING-F17 (erplora.
   conozca (`zone_of`); sin contexto, `HubContextMissing`, como un modelo de hub. La usan la tarjeta del asistente, los
   avisos del Inicio y los textos de las automatizaciones (`base.home.moment`), el CSV de autorizaciones y las apps; una
   lectura nueva del reloj del despliegue la para `tests/test_guardrails_zone.py`. En pantalla, `useBusinessZone`
-  (`base/frontend/lib/zone.ts`), que también siguen Fichajes, Tareas y la bandeja de WhatsApp (hub#779). Lo que aún lee
-  el reloj del despliegue es lo que llega a un registro fiscal, y cambia junto y con supervisión (hub#772): las fechas de
-  la factura y las horas de VeriFactu, el día y el número de una venta y el «hoy» de Impuestos; hasta entonces lo congela
-  `tests/test_guardrails_fiscal_clock.py`.
+  (`base/frontend/lib/zone.ts`), que también siguen Fichajes, Tareas y la bandeja de WhatsApp (hub#779). Las fechas de
+  la factura, el día y el número de una venta y el «hoy» de Impuestos van juntos en ese reloj, porque llegan a un
+  registro fiscal (lo congela `tests/test_guardrails_fiscal_clock.py`); lo que aún lee el reloj del despliegue son las
+  horas de VeriFactu (hub#772).
 - **Acceso (BASE-F52…F71).** Modelos de hub en `base/models.py`: `TrustedDevice` (el dispositivo:
   `token_digest` = SHA-256 del token de 256 bits de la cookie `hub_device`, httpOnly; nunca el token; `mode`
   `shared`/`personal` con quién y cuándo, `name`, `agent`, última persona y entrada, `ended_reason` `device_limit`),
@@ -4573,9 +4576,6 @@ Cada operación de la plataforma con los flujos que la usan; las que no usa ning
 
 - **Avisar por correo al dueño cuando debe ampliar (BASE-F40)**: el mercado lo da por supuesto, pero lo manda erplora.com
   (PLAN-SAAS §28) y lleva su flujo y su issue allí.
-- **El borrado de un negocio con documentos (BASE-F109)**, hub#738: sus documentos ya van al archivo fiscal, pero
-  guarda su base de datos y sus ficheros pasados los 90 días hasta que ese borrado se active.
-- **El PDF de cada factura en el archivo fiscal (BASE-F109)**, hub#1821: hoy van sus datos y el XML de VeriFactu.
 - **La fila de salud del Inicio en pantalla (BASE-F02)**, hub#573: su lectura ya existe (`base.health.list`, con la
   impresora de Impresión); falta pintarla en el Inicio y que la Bandeja de WhatsApp declare cómo está su número.
 - **La cola de PgBouncer de cada negocio en CloudWatch**, hub#572.

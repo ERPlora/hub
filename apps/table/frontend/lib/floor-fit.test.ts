@@ -43,9 +43,10 @@ describe('fitPlan', () => {
 
 describe('paintBox', () => {
   const fit = { spread: 2, box: 1.3, plane: { w: 900, h: 500 } };
+  const corner = { x: 0, y: 0 };
 
   it('scales positions by spread and centres the smaller table box', () => {
-    expect(paintBox(tableRow({ position_x: 100, position_y: 50, width: 72, height: 72 }), fit)).toEqual({
+    expect(paintBox(tableRow({ position_x: 100, position_y: 50, width: 72, height: 72 }), fit, corner)).toEqual({
       x: 225.2,
       y: 125.2,
       width: 93.6,
@@ -54,8 +55,14 @@ describe('paintBox', () => {
     });
   });
 
+  it('lays the table out from the corner of the frame it is painted in, not from the corner of the plan', () => {
+    const painted = paintBox(tableRow({ position_x: 448, position_y: 254 }), fit, { x: 448, y: 254 });
+    expect([painted.x, painted.y]).toEqual([25.2, 25.2]);
+    expect(paintBox(tableRow({ position_x: 500, position_y: 300 }), fit, { x: 448, y: 254 })).toMatchObject({ x: 129.2, y: 117.2 });
+  });
+
   it('paints a nearly square rectangle at 68 percent height, centred in its box', () => {
-    const painted = paintBox(tableRow({ shape: 'rectangle', position_x: 0, position_y: 0, width: 72, height: 72 }), fit);
+    const painted = paintBox(tableRow({ shape: 'rectangle', position_x: 0, position_y: 0, width: 72, height: 72 }), fit, corner);
     expect(painted.width).toBe(93.6);
     expect(painted.height).toBeCloseTo(63.648);
     expect(painted.x).toBe(25.2);
@@ -63,19 +70,19 @@ describe('paintBox', () => {
   });
 
   it('leaves a genuinely wide rectangle at its full height', () => {
-    const painted = paintBox(tableRow({ shape: 'rectangle', width: 144, height: 72 }), fit);
+    const painted = paintBox(tableRow({ shape: 'rectangle', width: 144, height: 72 }), fit, corner);
     expect(painted.height).toBe(93.6);
   });
 
   it('owns the width of its place on the plan, which its label never leaves', () => {
-    expect(paintBox(tableRow({ width: 144 }), fit).slot).toBe(288);
-    expect(paintBox(tableRow({ width: 72 }), { ...fit, spread: 1.7 }).slot).toBe(122.4);
+    expect(paintBox(tableRow({ width: 144 }), fit, corner).slot).toBe(288);
+    expect(paintBox(tableRow({ width: 72 }), { ...fit, spread: 1.7 }, corner).slot).toBe(122.4);
   });
 
   it('keeps the default ten-table grid clear of tables, seats and labels', () => {
     const fit = fitPlan(CONTENT, { w: 700, h: 500 });
     const boxes = Array.from({ length: 10 }, (_, index) =>
-      paintBox(tableRow({ position_x: 16 + (index % 5) * 88, position_y: 16 + Math.floor(index / 5) * 88 }), fit),
+      paintBox(tableRow({ position_x: 16 + (index % 5) * 88, position_y: 16 + Math.floor(index / 5) * 88 }), fit, corner),
     );
     const envelopes = boxes.map((box) => ({
       left: box.x - 14,

@@ -2,6 +2,7 @@
 
 import datetime as dt
 import json
+import socket
 
 import pytest
 from django.db import connection
@@ -386,3 +387,16 @@ def across_a_change_of_zone(monkeypatch):
         return made
 
     return across
+
+
+@pytest.fixture
+def nothing_leaves(monkeypatch):
+    """Any connection out of the machine fails the test: what it seals for the tax agency is never sent."""
+    real = socket.socket.connect
+
+    def connect(self, address):
+        if isinstance(address, tuple) and address[0] not in ("127.0.0.1", "::1", "localhost"):
+            raise AssertionError(f"tried to connect to {address}")
+        return real(self, address)
+
+    monkeypatch.setattr(socket.socket, "connect", connect)

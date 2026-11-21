@@ -1708,10 +1708,9 @@ es una línea.
   método) los retiene con `FOR KEY SHARE` (`held`, también por id) antes de escribir lo que los apunta: el borrado
   espera y responde «No se puede eliminar», o la escritura que llega después recibe lo mismo que con una sección
   (422 en su campo) o un método (409) que no existen (`tests/test_concurrency.py`).
-- **El día de una venta sigue en `TIME_ZONE`**, no en la zona del negocio: Facturación copia el día a la
-  `operation_date` del registro de VeriFactu y el número a su descripción, y la fecha de emisión y el tipo del cobro están
-  en ese mismo reloj. Cambian juntos, con supervisión (hub#772); hasta entonces lo congela
-  `tests/test_guardrails_fiscal_clock.py`.
+- **El día de una venta va en la zona del negocio** (`base.business.business_zone`): Facturación copia el día a la
+  `operation_date` del registro de VeriFactu y el número a su descripción, y la fecha de emisión y el tipo del cobro
+  van en ese mismo reloj; lo congela `tests/test_guardrails_fiscal_clock.py`.
 - **Numeración**: `SaleCounter` por el día de la venta con `UPDATE … RETURNING`
   (asignar `F("last") + 1` y guardar: Django devuelve el valor con `RETURNING`), en la transacción del
   cobro: un rechazo no gasta número y nunca hay huecos. `AAAAMMDD-NNNN`, cuatro cifras como mínimo
@@ -2015,7 +2014,7 @@ título, sus pasos y «Si falla»: ahí no van nombres de código, incidencias, 
   `requires` nuevo), igual que copia en la línea lo que vale la del cobro (`SaleLine.voucher_value`, hub#783). No la
   lee de Servicios al pedir las cifras: así la producción de un periodo no cambia si Servicios se apaga (como la del
   cobro, `test_a_session_keeps_counting_with_services_off`) y el informe no pide permisos de Servicios. El día es el
-  del cobro (`apps.tax.queries.business_today`), el mismo reloj que el de una venta, que hub#772 mueve entero. Una
+  del cobro (`apps.tax.queries.business_today`), el mismo reloj que el de una venta, el del negocio. Una
   sesión nunca está en las dos: la del cobro no pasa por `service.grant.redeem`.
 
 - **El código del tique para pedir la factura completa** (INVOICE-F04, hub#500): toda venta cobrada como tique

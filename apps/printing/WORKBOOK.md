@@ -397,7 +397,9 @@ Pantalla: Vender (de Ventas)
 Pasos:
 1. El empleado cobra en **Ventas → Vender**.
 2. Junto con el cobro, Ventas pide a Impresión el tique: el tique simplificado o la factura completa,
-   con el QR de VeriFactu.
+   con el QR de VeriFactu y el nombre de quien cobró («Cajero: Bea Ruiz»): el de «Mi perfil» en este
+   negocio o, si no lo ha puesto, el de su cuenta. Sin nombre que poner, el papel no lleva esa línea:
+   nunca su correo ni un identificador interno, porque el tique se lo lleva el cliente.
 3. Si «Imprimir tique al cobrar» está encendido, el tique entra en la cola de la función Recibo
    con las copias de los ajustes y, si «Abrir cajón al cobrar» está encendido y entró efectivo, con la
    orden de abrir el cajón (PRINTING-F13); el dispositivo lo saca (PRINTING-F18). Tras cobrar, Ventas dice
@@ -418,7 +420,8 @@ Actor: administrador, responsable, empleado
 Pantalla: Ventas, Facturas (de esas apps)
 Pasos:
 1. En la ficha de la venta o de la factura, pulsa «Imprimir» («Imprimir / PDF» en Facturas).
-2. Ventas pide a Impresión el tique (o la factura completa) marcado como copia («DUPLICADO»); Facturación
+2. Ventas pide a Impresión el tique (o la factura completa) marcado como copia («DUPLICADO»), con el
+   cajero de la venta, no el de quien reimprime; Facturación
    pide la página A4 de la factura, en el idioma de quien imprime y con su QR de VeriFactu, para la
    impresora del sistema. La pantalla dice a qué impresora fue.
 3. Sin Impresión encendida, sin una impresora que lo acepte (de tiques para el tique; del sistema para la

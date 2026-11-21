@@ -14,6 +14,7 @@ from live.operations import registry
 from apps.printing.models import PrintJob
 from apps.sale.models import Sale
 from apps.sale.tests.conftest import HUB_DB, ctx_for, run
+from base.models import Profile
 from apps.sale.tests.test_integration_invoice import ISSUER
 
 pytestmark = HUB_DB
@@ -54,6 +55,20 @@ def charge(key="sale-print-1", payments=None, ctx=None, **more):
 
 def jobs() -> list[PrintJob]:
     return list(PrintJob.objects.select_related("printer").order_by("created_at", "id"))
+
+
+@pytest.fixture
+def account(make_user):
+    """``account(username, **fields)``: a person with a session in the business, named as their account says."""
+
+    def make(username: str, **fields):
+        user = make_user(username)
+        for field, value in fields.items():
+            setattr(user, field, value)
+        user.save()
+        return ctx_for(actor=user)
+
+    return make
 
 
 def test_the_receipt_prints_at_checkout_inside_the_charge(bar, till):
@@ -231,3 +246,43 @@ def test_a_full_invoice_prints_both_parties(bar, till):
         "76543210S",
         "Calle Real 2",
     )
+
+
+def test_the_receipt_names_who_charged_never_their_internal_id(bar, till, account):
+    """hub#1985: the cashier line printed the account's internal id. It says who charged by the name the kitchen
+    gives a waiter, and a copy printed later by someone else still names who charged."""
+    bea = account("saas:01a13f83-5fd4-73c2-8d2c-44be64bc28a8", first_name="Bea", last_name="Ruiz")
+    out = charge("sale-print-cashier", ctx=bea)
+    run("sale.sale.print", {"sale_id": str(out.id)}, account("saas:02b24f94-0000-7000-8000-000000000002", first_name="Luis"))
+    assert [job.document["cashier"] for job in jobs()] == ["Bea Ruiz", "Bea Ruiz"]
+
+
+def test_a_full_invoice_names_who_charged_too(bar, till, account):
+    charge(
+        "sale-print-invoice-cashier",
+        ctx=account("saas:01a13f83-5fd4-73c2-8d2c-44be64bc28a8", first_name="Bea"),
+        document_type="invoice",
+        customer_name="Javier Gomez Ruiz",
+        customer_tax_id="76543210S",
+        customer_address="Calle Real 2",
+    )
+    (job,) = jobs()
+    assert (job.document_type, job.document["cashier"]) == ("invoice", "Bea")
+
+
+def test_the_name_of_my_profile_in_this_business_is_the_one_on_the_receipt(bar, till, account):
+    bea = account("saas:05e57fc7-0000-7000-8000-000000000005", first_name="Beatriz Ruiz Soler")
+    Profile.objects.create(username=bea.actor.get_username(), first_name="Bea")
+    charge("sale-print-profile", ctx=bea)
+    (job,) = jobs()
+    assert job.document["cashier"] == "Bea"
+
+
+def test_without_a_name_to_print_the_receipt_has_no_cashier_line(bar, till, account):
+    """The paper goes to the customer: with no name it has no cashier line, rather than an employee's e-mail (the
+    SaaS names an account without a name by its address) or an internal id (an account with nothing, an API key)."""
+    charge("sale-print-named-by-email", ctx=account("saas:03c35fa5-0000-7000-8000-000000000003", first_name="bea@example.com"))
+    charge("sale-print-email-only", ctx=account("saas:06f68fd8-0000-7000-8000-000000000006", email="bea@example.com"))
+    charge("sale-print-nameless", ctx=account("saas:04d46fb6-0000-7000-8000-000000000004"))
+    charge("sale-print-platform")
+    assert [("cashier" in job.document) for job in jobs()] == [False, False, False, False]
