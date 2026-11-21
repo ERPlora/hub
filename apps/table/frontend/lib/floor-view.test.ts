@@ -19,6 +19,7 @@ const words: Record<string, string> = {
   'table.reservedFor': 'Reserved for {name}',
   'table.erasedCustomer': 'Deleted customer',
   'table.floor.bill': 'Bill {amount}',
+  'table.floor.billRequested': 'Bill requested',
 };
 
 const EUR: Money = { currency: 'EUR', decimals: 2 };
@@ -110,6 +111,24 @@ describe('floorView', () => {
     const unknown = view(occupied(), NOW, null, null);
     expect(unknown.amount).toBeUndefined();
     expect(unknown.accessible).not.toContain('Bill');
+  });
+
+  it('marks an occupied table whose bill was asked for, and says so wherever it says its status', () => {
+    const model = view(occupied({ bill_requested: true }));
+    expect(model).toMatchObject({ status: 'occupied', billRequested: true, statusLabel: 'Bill requested', caption: 'Bill requested · 3/4 pax', short: '0:35', pax: '3/4 pax', amount: '€42.50' });
+    expect(model.accessible).toBe('Table 4 · Dining room · 4 pax · Bill requested · 3 guests · 35 min · Bill €42.50 · Served by Luis');
+    expect(view(occupied({ since: null, bill_requested: true })).short).toBe('Bill requested');
+  });
+
+  it('leaves an occupied table without its bill asked for, and every other table, as they were', () => {
+    const plain = view(occupied());
+    expect([plain.billRequested, plain.statusLabel, plain.caption]).toEqual([false, 'Occupied', 'Occupied · 3/4 pax']);
+    for (const status of ['available', 'reserved', 'blocked'] as const) {
+      const model = view(tableRow({ status, bill_requested: true }));
+      expect(model.billRequested, status).toBe(false);
+      expect(model.statusLabel, status).toBe(words[`table.status.${status}`]);
+      expect(model.accessible, status).not.toContain('Bill requested');
+    }
   });
 
   it('says whether a table may be picked only while a destination is picked', () => {

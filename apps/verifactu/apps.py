@@ -4,7 +4,7 @@ fingerprint, with their QR, validated against the AEAT's schemas and sent to the
 
 from django.utils.functional import lazy
 from django.utils.translation import gettext_lazy as _
-from live.meta import Category, LiveAppConfig, Nav, SetupCheck, SetupStep, Widget
+from live.meta import Category, Help, LiveAppConfig, Nav, SetupCheck, SetupStep, Widget
 
 from apps.verifactu import events as E
 
@@ -86,6 +86,7 @@ class VerifactuConfig(LiveAppConfig):
         Nav("config", _("Configuration"), "ion:key-outline", "/verifactu/config"),
         Nav("settings", _("Settings"), "ion:settings-outline", "/verifactu/settings"),
     ]
+    help = Help()
     # The Home's step is done once the chosen way could carry the records to the AEAT's production environment
     # (VERIFACTU-F08), whatever the plan. Its level is base's: functional in testing, which files without it while the
     # till sells; ⛔ legal where the hub files in production, which refuses every sale without it

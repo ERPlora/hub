@@ -4,7 +4,7 @@ from pathlib import Path
 
 from django.apps import apps
 from django.conf import settings
-from live.meta import Category, LiveAppConfig, Nav, module_configs, permissions_for_role
+from live.meta import Category, Help, LiveAppConfig, Nav, module_configs, permissions_for_role
 
 
 def modifier():
@@ -157,3 +157,7 @@ def test_the_pos_reads_are_open_to_api_keys():
     } <= exposed
     # The reactions to Inventory are the platform's only.
     assert not exposed & {"modifier.link.drop_product", "modifier.link.drop_category"}
+
+
+def test_its_help_window_is_ready_without_a_video_yet():
+    assert modifier().help == Help()

@@ -1,6 +1,13 @@
-<!-- generated from WORKBOOK.md sha256:8c41966378949ffe606c4398f0a84caed5148be522c05463edcdc4a068c04525 -->
+<!-- generated from WORKBOOK.md sha256:5b54099ccaba468379f00904ef2734075ce5594f311b5cf02f7c2c92528ba48f -->
 
 ## What it is for and who it is for
+
+Modifiers keeps the choices that go with a dish: the doneness of the meat, an extra of cheese, the size or "no onion".
+They are arranged in groups that say how many options must be chosen, and each option carries its supplement (more,
+less or free) and its allergens. A group applies to products or to whole categories: the till asks for it when selling,
+charges the supplement and sends it to the kitchen.
+
+### In detail
 
 Modifiers is the catalogue of the choices that go with a dish: the "doneness of the meat", the
 "extra cheese", the size, "no onion". It is arranged in **groups**:
@@ -69,6 +76,13 @@ Initial setup, step by step:
 ## Screens
 
 ### Modifiers
+Here are the modifier groups, each one with its choice rule (optional or required, how many options at most and
+whether one can be repeated), how many options it has and to how many products and categories it applies. With "New
+group" you create one and, on its row, you change or delete it. Tap a group to open its sheet: there you add its
+options, with their supplement and their allergens, and in "Applies to" you link it to the products or the categories
+that carry it. A group without options or that applies to nothing does not show at the till.
+
+#### Detail
 Menu **Modifiers** (a single entry). At the top, the title "Modifiers". Below, the table of groups
 with the "Search…" box (it searches by name and by kitchen ticket name): **Name** (sorted and
 filtered), **On the kitchen ticket** (the kitchen name; empty, the commercial one), **Choice** (sorted
@@ -80,7 +94,7 @@ an option can be repeated. By order and name; pages of 50.
 Whoever can manage sees **"New group"** and, on each row, **Edit** and **Delete**. Tapping a row opens
 the group's sheet, for everyone.
 
-### Group sheet
+#### Group sheet
 Title "Group — {name}" and its rule. Two sections:
 
 - **Options**: each one with its name, its kitchen ticket name (if different), its supplement in the
@@ -95,7 +109,7 @@ Title "Group — {name}" and its rule. Two sections:
 
 20 at a time, with "Load more".
 
-### Forms
+#### Forms
 - **Group** ("New group" / "Editing group — {name}"): Name, "Kitchen ticket name", "Minimum (1 or more
   = required)", "Maximum (0 = no ceiling)", "An option can be chosen more than once" and Order.
 - **Option** ("New option" / "Editing option — {name}"): Name, "Kitchen ticket name",
@@ -168,13 +182,13 @@ Steps:
    not 0, it cannot be below the minimum), whether an option can be repeated and the Order in which it
    shows at the till.
 5. Tap "Create": the form closes and the group shows in the table. It does not show at the till yet:
-   its options (F04) and where it applies (F05) are missing.
+   its options and where it applies are missing, and they are set in its sheet.
 In: what the person types.
 Out: the group (announces: group created). It creates no options or links.
 If it fails: an empty name or one of more than 255 characters, a minimum or maximum outside 0–50 or a
 maximum below the minimum show under their field; a name another group already has, "There is already
 a group with that name." under the Name. The reason of a field goes as soon as that field is corrected, even if
-another one says the same (hub#888). What was typed stays.
+another one says the same. What was typed stays.
 Involved: none
 
 ### MODIFIER-F03 Change or delete a group
@@ -194,8 +208,8 @@ If it fails: the same refusals as when creating; lowering the maximum below the 
 come by default, "This group has more options chosen by default than its maximum.". A group that does
 not exist, "This group does not exist.". Through the assistant, a name that fits several groups or none brings up
 no card, and if before the "yes" another group fits better what was said, nothing is changed or deleted and the new
-card comes up (BASE-F97).
-Involved: SALE-F11
+card comes up.
+Involved: SALE-F11, BASE-F97
 
 ### MODIFIER-F04 Add, change or remove the options of a group
 Status: done
@@ -204,8 +218,8 @@ Screen: Modifiers (group sheet)
 Steps:
 1. Open the group and, in Options, tap "Add option".
 2. Type the Name (unique within the group) and, if needed, the kitchen ticket name.
-3. Type the Supplement in the business's currency, its country's in Settings → Business, with its
-   decimals (the yen has none): positive charges more, negative is a discount, empty or 0 is free.
+3. Type the Supplement in the business's currency, its country's, with its decimals (the yen has none):
+   positive charges more, negative is a discount, empty or 0 is free.
 4. Only if the option is taxed differently from the dish, choose its own tax category; empty, it
    inherits the dish's.
 5. Tick "Chosen by default" if the till must bring it already ticked. In a group of maximum 1, ticking
@@ -219,18 +233,19 @@ catalogue: what was already ordered keeps its frozen copy, also on the kitchen t
 If it fails: "Create" and "Save" are grey while the name is missing and while the business has not yet
 said its currency, because the supplement is read in it (without it, "150" yen would be saved as 15,000); until
 then, leaving the supplement keeps it as typed, without inventing decimals for it or judging it: "¥150" or "-0,50 zł"
-are not marked red as "This is not an amount", and as soon as the currency arrives they are read in it (hub#945). If the currency cannot be read, the window says so ("The business's currency could not be read", with the
-reason) and offers "Retry", which asks for it again; as soon as it arrives, the button lights up (hub#938). An
+are not marked red as "This is not an amount", and as soon as the currency arrives they are read in it. If the
+currency cannot be read, the window says so ("The business's currency could not be read", with the reason) and offers
+"Retry", which asks for it again; as soon as it arrives, the button lights up. An
 empty name or one repeated in the group, a supplement that is not an amount, a tax
 category that does not exist in Taxes or more default options than the maximum show next to their
 field; the one of the name, the kitchen ticket name, the supplement, the tax category or the order goes as soon as
-that field is corrected, even if another one says the same (hub#888), and the one of "Chosen by default" as soon as
-that switch is changed, without saving again (hub#1437). An option with its own tax category is charged on a separate line, which cannot be worth zero or
+that field is corrected, even if another one says the same, and the one of "Chosen by default" as soon as
+that switch is changed, without saving again. An option with its own tax category is charged on a separate line, which cannot be worth zero or
 less: "An option with its own tax category is billed on a line of its own: its supplement must be more
 than zero.". A group holds up to 100 options. Through the assistant, when changing or removing an option, a group
 said by its name that fits several or none brings up no card, and if before the "yes" another group fits better what
-was said, nothing is touched and the new card comes up (BASE-F97).
-Involved: SALE-F11
+was said, nothing is touched and the new card comes up.
+Involved: SALE-F11, BASE-F97
 
 ### MODIFIER-F05 Link a group to products or categories, and unlink it
 Status: done
@@ -249,10 +264,10 @@ Out: the link (announces: link made or removed). At the till, the item asks for 
 If it fails: a product or a category that does not exist or is deleted, "This product does not exist in
 this hub." or "This category no longer exists."; a link that already exists, "This group already
 applies there.". Through the assistant, unlinking a group said by its name that fits several or none brings up no
-card, and if before the "yes" another group fits better what was said, nothing is unlinked and the new card comes up
-(BASE-F97). A link to a product or a category already deleted brings up no card either ("This group does not apply
-there."): MODIFIER-F09 removes it.
-Involved: INVENTORY-F01, INVENTORY-F06
+card, and if before the "yes" another group fits better what was said, nothing is unlinked and the new card comes up.
+A link to a product or a category already deleted brings up no card either ("This group does not apply there."): it is
+removed by itself a few seconds after the deletion.
+Involved: INVENTORY-F01, INVENTORY-F06, MODIFIER-F09, BASE-F97
 
 ### MODIFIER-F06 Choose the options when selling an item
 Status: done

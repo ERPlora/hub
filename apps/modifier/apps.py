@@ -2,7 +2,7 @@
 a price supplement, and the products or categories of Inventory each group is linked to (WORKBOOK.md)."""
 
 from django.utils.translation import gettext_lazy as _
-from live.meta import Category, LiveAppConfig, Nav
+from live.meta import Category, Help, LiveAppConfig, Nav
 
 from base.allergens import ALLERGENS
 
@@ -56,6 +56,7 @@ class ModifierConfig(LiveAppConfig):
     navigation = [
         Nav("groups", _("Modifiers"), "lucide:sliders-horizontal", "/modifier/groups")
     ]
+    help = Help()
 
     def recoverable_from_copy(self) -> list:
         """What a separate copy of the business gives back when ERPlora's staff recovers from it (BASE-F114): each group

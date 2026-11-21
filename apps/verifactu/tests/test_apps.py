@@ -10,6 +10,7 @@ from django.utils import translation
 from live.live_registry import live_registry
 from live.meta import (
     Category,
+    Help,
     LiveAppConfig,
     Nav,
     SetupCheck,
@@ -424,3 +425,7 @@ def test_the_hooks_icons_are_registered_in_the_shell():
 def test_verifactu_has_no_bell_counters():
     # The old module declared none (its module.json has no `bell`).
     assert verifactu().bell == []
+
+
+def test_its_help_window_is_ready_without_a_video_yet():
+    assert verifactu().help == Help()
