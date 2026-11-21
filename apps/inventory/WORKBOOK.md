@@ -109,10 +109,8 @@ Configuración inicial, paso a paso:
 
 ## Pantallas
 
-Inventario tiene cinco pestañas: **Panel**, **Productos**, **Movimientos**, **Categorías** y
-**Ajustes**. Las cuatro primeras son también las entradas del menú **Inventario**, con los mismos
-nombres; Ajustes solo sale en la barra de pestañas. El lanzador de apps y «Mis apps» abren el Panel.
-Todas se ven con solo poder ver productos, salvo Ajustes (abajo); lo que una persona no puede hacer no
+Inventario tiene cinco pestañas, en la barra de abajo: **Panel**, **Productos**, **Movimientos**,
+**Categorías** y **Ajustes**. El lanzador de apps y «Mis apps» abren el Panel. Todas se ven con solo poder ver productos, salvo Ajustes (abajo); lo que una persona no puede hacer no
 aparece en pantalla, y además la app lo rechaza aunque alguien lo intente por otra puerta (el asistente
 o la API).
 

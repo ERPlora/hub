@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:8e6ca199c6e7f733119a740623ce409782b0393bc0142a796d47a7b9c2ce2478 -->
+<!-- generated from WORKBOOK.md sha256:25c561d957e2aaed7fb6cdc6f8d0fa85e7817efbcbb0829b02ed7a98c0dfec8b -->
 
 ## What it is for and who it is for
 
@@ -100,9 +100,8 @@ Initial setup, step by step:
 
 ## Screens
 
-Inventory has five tabs: **Dashboard**, **Products**, **Movements**, **Categories** and **Settings**.
-The first four are also the entries of the **Inventory** menu, with the same names; Settings only shows
-in the tab bar. The apps launcher and "My apps" open the Dashboard. All of them can be seen by anyone who
+Inventory has five tabs, in the bar at the bottom: **Dashboard**, **Products**, **Movements**,
+**Categories** and **Settings**. The apps launcher and "My apps" open the Dashboard. All of them can be seen by anyone who
 can view products, except Settings (below); what a person cannot do does not appear on screen, and the
 app also refuses it even if someone tries it through another door (the assistant or the API).
 

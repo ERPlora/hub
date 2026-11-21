@@ -90,9 +90,9 @@ class InventoryConfig(LiveAppConfig):
             "inventory.view_stock",
         ],
     }
-    # The tab bar's screens (frontend/composables/useInventoryTabs.ts), so that the help window and the menu's highlight
-    # name the screen in view. The first keeps the cube: it is the launcher's and «My apps»' icon, and its screen is
-    # where «/inventory» lands.
+    # The tab bar's screens (frontend/composables/useInventoryTabs.ts), so that the help window and the assistant name
+    # the screen in view. The first keeps the cube: it is the launcher's and «My apps»' icon, and its screen is where
+    # «/inventory» lands.
     navigation = [
         Nav("dashboard", _("Dashboard"), "ion:cube-outline", "/inventory/dashboard"),
         Nav("products", _("Products"), "ion:cube-outline", "/inventory/products"),
