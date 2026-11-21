@@ -85,7 +85,7 @@
       "staffError": "No se han podido cargar los profesionales.",
       "keptOne": "{names} ya no admite citas nuevas: sus citas del día siguen en su fila para que puedas pasárselas a otra persona del equipo.",
       "keptMany": "{names} ya no admiten citas nuevas: sus citas del día siguen en su fila para que puedas pasárselas a otra persona del equipo.",
-      "unassignedWarning": "{n} citas no tienen profesional: asígnalas editándolas o arrastrándolas a una fila.",
+      "unassignedWarning": "{n} cita no tiene profesional: asígnala editándola o arrastrándola a una fila. | {n} citas no tienen profesional: asígnalas editándolas o arrastrándolas a una fila.",
       "notLinked": "Tu cuenta no está vinculada a ninguna ficha de Personal: no hay agenda tuya que enseñar.",
       "slot": "Reservar con {staff} a las {time}",
       "moved": "Cita movida.",
@@ -202,7 +202,7 @@
         "active": "Activa"
       },
       "noEnd": "Sin fin",
-      "endsAfter": "Tras {n} citas",
+      "endsAfter": "Tras {n} cita | Tras {n} citas",
       "noStaff": "Nadie: edítala",
       "actions": {
         "edit": "Editar serie",

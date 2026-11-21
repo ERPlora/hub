@@ -43,8 +43,8 @@ const outcome = (over: Partial<MaterializeOut>): MaterializeOut => ({
   ...over,
 });
 
-async function setup() {
-  const m = await mountAppointment(SeriesList, { props: { canAdd: true, canChange: true, businessToday: '2026-10-14' } });
+async function setup(locale: 'en' | 'es' = 'en') {
+  const m = await mountAppointment(SeriesList, { props: { canAdd: true, canChange: true, businessToday: '2026-10-14' }, locale });
   await m.live();
   const table = () => m.wrapper.findComponent(DataTable as unknown as Component);
   const cells = (i: number) => m.wrapper.findAll('[data-testid="appointment-series-row"]')[i].findAll('[role="cell"]').map((c) => c.text().trim());
@@ -59,6 +59,17 @@ describe('SeriesList', () => {
     expect(s.cells(0).slice(0, 6)).toEqual(['Lucía Pérez', 'Haircut', 'Ana López', 'Every week · Monday · 11:00 AM', 'Oct 19, 2026', 'No end']);
     expect(s.cells(1).slice(2, 6)).toEqual(['Nobody: edit it', 'Every month · 11:00 AM', 'Oct 19, 2026', 'After 6 appointments']);
     expect(s.cells(2)[5]).toBe('Mar 1, 2027');
+  });
+
+  it.each([
+    ['en', 1, 'After 1 appointment'],
+    ['en', 2, 'After 2 appointments'],
+    ['es', 1, 'Tras 1 cita'],
+    ['es', 2, 'Tras 2 citas'],
+  ] as const)('says how a series ends in the singular only for one (%s: %i)', async (locale, max, ends) => {
+    const s = await setup(locale);
+    await s.result(OP, page([series('r1', { max_occurrences: max })], 1, 100));
+    expect(s.cells(0)[5]).toBe(ends);
   });
 
   it('the Active switch pauses and reactivates a series', async () => {

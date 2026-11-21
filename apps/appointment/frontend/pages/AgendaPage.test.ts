@@ -63,8 +63,8 @@ const row = (id: string, over: Partial<AppointmentRow> = {}): AppointmentRow => 
   ...over,
 });
 
-async function setup(session = OWNER) {
-  const m = await mountAppointment(AgendaPage, { session, path: '/appointment/agenda' });
+async function setup(session = OWNER, locale: 'en' | 'es' = 'en') {
+  const m = await mountAppointment(AgendaPage, { session, path: '/appointment/agenda', locale });
   await m.live();
   await m.result('appointment.settings.get', SETTINGS);
   await m.reopen();
@@ -215,6 +215,16 @@ describe('AgendaPage', () => {
     const s = await setup();
     await s.result('appointment.agenda.lanes', { ...LANES, unassigned: 2 });
     expect(s.find('appointment-agenda-unassigned').text()).toContain('2 appointments have no professional');
+  });
+
+  it.each([
+    ['en', 1, '1 appointment has no professional: assign it by editing or dragging it to a row.'],
+    ['es', 1, '1 cita no tiene profesional: asígnala editándola o arrastrándola a una fila.'],
+    ['es', 2, '2 citas no tienen profesional: asígnalas editándolas o arrastrándolas a una fila.'],
+  ] as const)('says how many have no professional in the singular only for one (%s: %i)', async (locale, unassigned, said) => {
+    const s = await setup(OWNER, locale);
+    await s.result('appointment.agenda.lanes', { ...LANES, unassigned });
+    expect(s.find('appointment-agenda-unassigned').text()).toBe(said);
   });
 
   it('the Settings tab is only for who may change them', async () => {
