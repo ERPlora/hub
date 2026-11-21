@@ -16,7 +16,7 @@ from django.conf import settings
 from django.db.models import Count, Exists, F, OuterRef, Prefetch, Q, Sum, Window
 from django.db.models.functions import Coalesce, Lag
 from django.template.loader import render_to_string
-from django.utils import timezone, translation
+from django.utils import translation
 from django.utils.formats import date_format
 from django.utils.translation import gettext
 from django.utils.translation import gettext_lazy as _
@@ -71,7 +71,7 @@ from apps.invoice.schemas.platform import (
 )
 from apps.sale.models import Refund
 from apps.sale.queries.sales import find_sale
-from apps.tax.queries import business_tax_kind, resolve_tax
+from apps.tax.queries import business_tax_kind, business_today, resolve_tax
 from base.business import money_text
 
 INVOICE_NOT_FOUND = _("Invoice not found.")
@@ -763,7 +763,7 @@ def find_series(series_id, code: str | None, year: int | None) -> InvoiceSeries:
         series = InvoiceSeries.objects.filter(pk=series_id).first()
     else:
         series = InvoiceSeries.objects.filter(
-            code=(code or "").strip().upper(), year=year or timezone.localdate().year
+            code=(code or "").strip().upper(), year=year or business_today().year
         ).first()
     if series is None:
         raise NotFound(str(SERIES_NOT_FOUND), code="invoice.series_not_found")
@@ -1006,7 +1006,7 @@ def rectification_preview(
     ctx: OperationContext, params: RectificationPreviewIn
 ) -> dict:
     original = find_invoice(params.invoice_id, params.number)
-    today = timezone.localdate()
+    today = business_today()
     left_over = rectifiable(original, today)
     entries, lines, whole = rectification_figures(
         original, amount=left_over, line_description=params.reason
@@ -1075,7 +1075,7 @@ def rectification_preview(
     },
 )
 def numbering_status(ctx: OperationContext, params: NumberingStatusIn) -> dict:
-    year = timezone.localdate().year
+    year = business_today().year
     this_year = InvoiceSeries.objects.filter(year=year)
     ordinary = this_year.filter(invoice_type__in=("F1", "F2", "F3")).count()
     rectifying = this_year.filter(invoice_type__startswith="R").count()

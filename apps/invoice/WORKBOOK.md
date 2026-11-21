@@ -71,9 +71,11 @@ Aquí manda la especificación oficial sobre el mercado:
   la campana lleva el aviso «Todavía no puedes facturar» en cualquier pantalla, con «Configurar los datos del
   negocio». El emisor se escribe aquí, a mano: no llega de la cuenta de
   ERPlora.
-- **«Hoy» es la hora de Madrid** en la fase 1 (el Hub todavía no guarda la zona horaria del negocio):
-  decide la fecha de cada documento y, con ella, el año de su serie. Un cobro a las 00:30 del 1 de enero
-  numera en la serie del año nuevo.
+- **«Hoy» es el día del negocio**, en su zona horaria (la de «Ajustes»), no el de Madrid: decide la fecha de
+  cada documento y, con ella, el año de su serie. Un cobro a las 00:30 del 1 de enero numera en la serie del
+  año nuevo, y uno a las 23:30 del 31 de diciembre en Canarias, en la del año que acaba, aunque en Madrid ya
+  sea 1 de enero. Una devolución o una anulación llevan como fecha de la operación el día del negocio en que
+  se hicieron.
 - Las series se crean solas la primera vez que se usan en el año: «TICKET» (tiques, F2), «FACT»
   (facturas completas y sustitutivas, F1 y F3) y «RECT» (rectificativas, R1–R5), con el código como
   prefijo (`TICKET-2026-000001`). La de un año nuevo hereda el nombre, el prefijo y el formato de la del
@@ -1107,7 +1109,7 @@ sola (riesgo alto, como sustituir un tique en el mostrador).
   original menos sus rectificativas vivas) por resto mayor, base por proporción y cuota por diferencia;
   si se lleva todo lo que queda de una clave, copia sus cifras tal cual. Entera, niega cabecera,
   desglose y líneas de la original.
-- **Fechas**: `issue_date` es el día del negocio al emitir (Madrid en la fase 1); `operation_date`, el
+- **Fechas**: `issue_date` es el día del negocio al emitir, en su zona horaria; `operation_date`, el
   del cobro (`Sale.business_day`), el de la devolución o el de la anulación; la F3 conserva el del tique.
 - **El emisor** (`Issuer`, una fila) se copia en cada documento. `invoice.issuer.sync` lo guarda como sistema
   con `{legal_name, tax_id, address, postal_code, city, province, country, version}` (una `version` menor o igual

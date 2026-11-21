@@ -1,7 +1,7 @@
-"""A sale's day at night in a business of another zone (hub#771). A sale's day, and the «today» of Taxes that its
-figures and its preview read, are still on the deployment's clock: they reach the VeriFactu record, so they move
-together, under supervision (hub#772; ``tests/test_guardrails_fiscal_clock.py`` freezes the record). Until then the till
-stays on one clock, whole: it never says one day and charges on another."""
+"""A sale's day at night in a business of another zone is the business's: its number, its day, the «today» of Taxes
+that its figures and its preview read and the rate it charges are on the business's clock, the one the invoice it is
+issued with is dated on (``tests/test_guardrails_fiscal_clock.py`` freezes the record). The till stays on one clock,
+whole: it never says one day and charges on another."""
 
 import datetime as dt
 import uuid
@@ -9,20 +9,20 @@ import uuid
 import pytest
 
 from apps.sale.tests.conftest import HUB_DB, run
-from apps.tax.models import TaxCategory, TaxRule
+from apps.tax.models import TaxCategory
+from apps.tax.tests.conftest import turn_the_rate_at_midnight
 
 pytestmark = HUB_DB
 
-#: The day of a sale at night in another zone (``night_elsewhere``): the deployment's, until hub#772.
-SALE_DAY = dt.date(2026, 11, 3)
+#: The day of a sale at night in another zone (``night_elsewhere``): the business's, not the deployment's 3rd.
+SALE_DAY = dt.date(2026, 11, 2)
 
 
 @pytest.fixture
 def tapa(product, night_elsewhere):
     """A product of a category whose rate changes at the turn of the night: 10 % until the 2nd, 21 % from the 3rd."""
     category = TaxCategory.objects.create(key="test.turn", name="Turn of the night")
-    TaxRule.objects.create(category=category, country_code="ES", rate_pct="10", valid_to=dt.date(2026, 11, 2))
-    TaxRule.objects.create(category=category, country_code="ES", rate_pct="21", valid_from=SALE_DAY)
+    turn_the_rate_at_midnight(category)
     product("Tapa", "TAP", 1000, "test.turn")
     return category
 
@@ -39,7 +39,7 @@ def charge():
 
 def test_the_till_counts_a_sale_on_the_day_it_numbers_it(tapa):
     sale = charge()
-    assert sale.business_day == SALE_DAY
+    assert (sale.business_day, sale.number) == (SALE_DAY, "20261102-0001")
     assert run("sale.business_day.get").today == SALE_DAY
     today = run("sale.sale.today")
     assert (today.day, today.tickets, today.total) == (SALE_DAY, 1, sale.total)
@@ -47,7 +47,7 @@ def test_the_till_counts_a_sale_on_the_day_it_numbers_it(tapa):
 
 
 def test_a_session_done_outside_the_till_counts_on_the_day_the_till_charges(tapa):
-    # SALE-F28, SERVICE-F21: what a professional produced is on one clock, the till's, which hub#772 moves whole.
+    # SALE-F28, SERVICE-F21: what a professional produced is on one clock, the till's.
     sale = charge()
     ana = uuid.uuid7()
     done = run("sale.voucher_session.record", {"session_id": str(uuid.uuid7()), "staff_id": str(ana), "value": 3333})
@@ -67,10 +67,10 @@ def test_the_cash_limit_values_the_rest_of_a_check_on_the_day_it_would_be_charge
     order = run("sale.order.open", {"lines": LINES + LINES})
     first = order.lines[0]
     preview = run("sale.checkout.preview", {"order_id": str(order.id), "line_ids": [str(first.id)]})
-    # Both lines at 21 % (12.10 € each): at the other day's 10 %, the whole check would be 22 €.
-    assert (preview.total, preview.operation_total) == (1210, 2420)
+    # Both lines at 10 % (11 € each): at the other day's 21 %, the whole check would be 24.20 €.
+    assert (preview.total, preview.operation_total) == (1100, 2200)
 
 
 def test_a_section_says_the_rate_the_till_charges(tapa):
     run("sale.department.create", {"name": "Fruit", "tax_category_key": "test.turn"})
-    assert run("sale.department.list").rows[0].tax_rate_pct == 21
+    assert run("sale.department.list").rows[0].tax_rate_pct == 10
