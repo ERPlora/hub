@@ -840,7 +840,7 @@ def test_an_early_status_is_matched_by_the_key_and_never_lost(delivered):
     answering()
     from apps.whatsapp_inbox import services
 
-    services.deliver(A, out.id)
+    services.deliveries.deliver(A, out.id)
     message.refresh_from_db()
     assert (message.status, message.wa_message_id) == ("delivered", "wamid.OUT")
 

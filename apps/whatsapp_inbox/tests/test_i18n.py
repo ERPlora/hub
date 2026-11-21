@@ -92,7 +92,7 @@ def test_spanish_texts():
         assert str(Conversation.Status.PENDING.label) == "Pendiente"
         assert str(Message.Status.READ.label) == "Leído"
         assert str(Template.Status.DELETED.label) == "Borrada en WhatsApp Manager"
-        assert str(services.WINDOW_CLOSED) == (
+        assert str(services.sending.WINDOW_CLOSED) == (
             "Han pasado más de 24 horas desde el último mensaje del cliente: WhatsApp solo deja escribirle "
             "con una plantilla aprobada."
         )
