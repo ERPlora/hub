@@ -74,18 +74,20 @@ const options = (values: readonly string[], prefix: string) => values.map((value
 
 const columns = computed<DataTableColumn<TicketRowOut>[]>(() => [
   // The whole number (its end tells one ticket from another), never «20261021-00…».
-  { key: 'number', label: t('kitchen.tickets.columns.number'), sortable: true, priority: 'high', width: 'minmax(9.5rem, 1fr)' },
+  { key: 'number', label: t('kitchen.tickets.columns.number'), sortable: true, priority: 'high', width: 'minmax(9.5rem, 1fr)', cardIcon: 'ion:receipt-outline' },
   { key: 'label', label: t('kitchen.tickets.columns.label'), format: (_, r) => r.label || '—' },
   {
     key: 'order_type',
     label: t('kitchen.tickets.columns.type'),
     format: (_, r) => t(`kitchen.orderType.${r.order_type}`),
+    cardIcon: 'ion:storefront-outline',
     filter: { type: 'select', options: options(TYPES, 'kitchen.orderType') },
   },
   {
     key: 'priority',
     label: t('kitchen.tickets.columns.priority'),
     format: (_, r) => t(`kitchen.priority.${r.priority}`),
+    cardIcon: 'ion:speedometer-outline',
     filter: { type: 'select', options: options(PRIORITIES, 'kitchen.priority') },
   },
   {
@@ -95,14 +97,22 @@ const columns = computed<DataTableColumn<TicketRowOut>[]>(() => [
     format: (_, r) => t(`kitchen.status.${r.status}`),
     filter: { type: 'select', options: options(STATUSES, 'kitchen.status') },
   },
-  { key: 'items_count', label: t('kitchen.tickets.columns.items'), align: 'right' },
-  { key: 'total', label: t('kitchen.tickets.columns.total'), sortable: true, align: 'right', format: (_, r) => formatMoney(r.total, locale.value, money.value) },
+  { key: 'items_count', label: t('kitchen.tickets.columns.items'), align: 'right', format: (_, r) => t('kitchen.card.menuDishes', { n: r.items_count }), cardIcon: 'ion:list-outline' },
+  {
+    key: 'total',
+    label: t('kitchen.tickets.columns.total'),
+    sortable: true,
+    align: 'right',
+    format: (_, r) => formatMoney(r.total, locale.value, money.value),
+    cardIcon: 'ion:cash-outline',
+  },
   {
     key: 'received_at',
     label: t('kitchen.tickets.columns.received'),
     sortable: true,
     width: 'minmax(8.5rem,1fr)',
     format: (_, r) => formatDateTime(r.received_at, locale.value, timezone.value),
+    cardIcon: 'ion:time-outline',
   },
 ]);
 
@@ -240,6 +250,7 @@ async function confirmCancel(): Promise<void> {
       :sort-dir="table.dir.value"
       :views="['table', 'cards']"
       :card-title="(r: TicketRowOut) => `#${r.short_number} ${r.label}`.trim()"
+      card-title-column="label"
       :card-icon="() => 'ticket-outline'"
       :entity-label="{ one: $t('kitchen.tickets.entity.one'), many: $t('kitchen.tickets.entity.many') }"
       :loading="status === 'loading'"

@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:f5b1153fcdef59eec531be30d33318c3272c622409584cc199d3893e8e0588e1 -->
+<!-- generated from WORKBOOK.md sha256:cabd3624a9cd04cf8db9b89883c1aa0c4f9fbebc4aa4559f4b4d3795ef1027f2 -->
 
 ## What it is for and who it is for
 
@@ -214,7 +214,9 @@ to a free one.
 Menu **Tables → Sessions**: the checks of the room. Tabs "Open", "Closed" and "All". Table: Table ("No
 table (parked)" if it has none), Charged and Closed (they do not show in Open), Zone, Server, Guests,
 Opened, Time, Status (Open, Closed, Transferred, Merged, Parked); the time of an open check turns amber
-and red according to the Settings. Search box "Search table…", filters behind the funnel by zone, server
+and red according to the Settings. Table or card view: the card's title is the table ("Table 4"), the
+status goes in its tag and, below, every other datum has its column's icon in front, without repeating the
+table; the opening and the closing each have their own, so two equal times are not mixed up. Search box "Search table…", filters behind the funnel by zone, server
 and status. Per row "Details" (window with zone, server, status, guests, opening, closing, time, charged
 and notes), on the open ones "Close session" (with confirmation), on the parked ones "Seat again" (pick
 the free table) and, on the finished ones, "Delete" (the administrator only). The times are in the

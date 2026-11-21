@@ -7,6 +7,7 @@ import { ConfirmDialog, DataTable } from '@erplora/ui/components';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Component } from 'vue';
 
+import { cardIcons, switchToCards } from '../../../../base/frontend/__tests__/data-table-cards';
 import { EMPLOYEE, flush, type MountOptions, mountTable, page } from '../__tests__/mount-table';
 import { charged, NOW, sessionRow, SETTINGS, zoneRow } from '../__tests__/tables';
 import RestoreModal from '../components/RestoreModal.vue';
@@ -155,6 +156,35 @@ describe('SessionsPage', () => {
     const s = await setup({ session: EMPLOYEE });
     await s.show([OPEN]);
     expect(s.prop<Array<{ id: string }>>('actions').map((a) => a.id)).toEqual(['detail', 'close', 'restore']);
+  });
+});
+
+// The tablet shows the list as cards: under the title, each datum is told by the icon of its column, so the
+// opening and the closing hours are never two bare times, and the table the title already names is not
+// said twice (TABLE-F22).
+describe('SessionsPage in cards: every datum says what it is', () => {
+  async function card() {
+    const s = await setup();
+    await s.show([OPEN]);
+    await s.segment('closed');
+    await s.result(OP, page([CLOSED]));
+    switchToCards(s.wrapper, 'table-sessions');
+    await flush();
+    return s.wrapper.get('[data-testid="table-sessions-row"]');
+  }
+
+  it('heads the card with its table and marks every other datum with its icon', async () => {
+    const check = await card();
+    expect(check.get('.data-table__card-title').text()).toBe('Table 4');
+    expect(cardIcons(check)).toEqual({
+      paid_total: 'cash-outline',
+      closed_at: 'log-out-outline',
+      zone_name: 'layers-outline',
+      waiter_name: 'person-outline',
+      guests_count: 'people-outline',
+      opened_at: 'log-in-outline',
+      duration: 'time-outline',
+    });
   });
 });
 

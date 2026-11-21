@@ -7,6 +7,7 @@ import { ConfirmDialog, DataTable } from '@erplora/ui/components';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Component } from 'vue';
 
+import { cardIcons, switchToCards } from '../../../../base/frontend/__tests__/data-table-cards';
 import { business, NOW, POLISH, row, SETTINGS } from '../__tests__/kitchen';
 import { EMPLOYEE, flush, ionValue, type MountOptions, mountKitchen, page, settle } from '../__tests__/mount-kitchen';
 import TicketDetailModal from '../components/TicketDetailModal.vue';
@@ -206,6 +207,39 @@ describe('TicketsPage: the list fills the page', () => {
   it('AppPage `fill` and its DataTable `fill`, only stacks between them: from the topbar to the tabbar', async () => {
     const s = await setup();
     expect(listFillProblems(s.wrapper)).toEqual([]);
+  });
+});
+
+// The tablet shows the list as cards: under the title, each datum is told by the icon of its column, the
+// dishes say what they count, and the destination the title already names is not said twice (KITCHEN-F21).
+describe('TicketsPage in cards: every datum says what it is', () => {
+  async function card(locale: 'en' | 'es' = 'en') {
+    const s = await setup({ locale });
+    await s.show([READY]);
+    switchToCards(s.wrapper, 'kitchen-tickets');
+    await settle();
+    return s.wrapper.get('[data-testid="kitchen-tickets-row"]');
+  }
+
+  it('heads the card with its number and destination and marks every other datum with its icon', async () => {
+    const ticket = await card();
+    expect(ticket.get('.data-table__card-title').text()).toBe('#0013 Table 9');
+    expect(cardIcons(ticket)).toEqual({
+      number: 'receipt-outline',
+      order_type: 'storefront-outline',
+      priority: 'speedometer-outline',
+      items_count: 'list-outline',
+      total: 'cash-outline',
+      received_at: 'time-outline',
+    });
+  });
+
+  it.each([
+    ['en', '2 dishes'],
+    ['es', '2 platos'],
+  ] as const)('says the dishes in words, not as a bare number (%s)', async (locale, said) => {
+    const ticket = await card(locale);
+    expect(ticket.get('[data-column="items_count"] .data-table__card-meta-value').text()).toBe(said);
   });
 });
 
