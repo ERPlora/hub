@@ -1,10 +1,10 @@
 // The head of a kitchen card: at the left, the type of order as an icon in its box, the label (or the type) and
 // «Waiter: …»; at the right, the clock, the wait in words with its icon («On time», «Warning», «Late», from the
-// semaphore, never colour alone) and «#0012». Under it, the ticket's status, its Rush/VIP and its round as pills.
+// semaphore, never colour alone) and «#0012». Under it, the ticket's status, its Rush/VIP, any allergy and its round as pills.
 // A tap on it marks every dish on screen, when the card lets it.
 import { describe, expect, it } from 'vitest';
 
-import { NOW, SETTINGS, ticket } from '../__tests__/kitchen';
+import { item, NOW, SETTINGS, ticket } from '../__tests__/kitchen';
 import { click, mountKitchen } from '../__tests__/mount-kitchen';
 import type { TicketOut } from '../operations';
 import KdsTicketHeader from './KdsTicketHeader.vue';
@@ -54,6 +54,16 @@ describe('KdsTicketHeader', () => {
     expect((await pill({ priority: 'normal' }, 'priority')).exists()).toBe(false);
     expect((await pill({ round_no: 2 }, 'round')).text()).toBe('Round 2');
     expect((await pill({ round_no: 1 }, 'round')).exists()).toBe(false);
+  });
+
+  it('marks the ticket when any dish has an allergy, without relying on colour alone', async () => {
+    const allergic = await setup(ticket('t1', { items: [item('i1', { allergy: ['milk'], allergy_in_dish: [] })] }));
+    const mark = allergic.find('kitchen-card-t1-allergy');
+    expect(mark.text()).toBe('Allergy');
+    expect(mark.attributes('data-tone')).toBe('danger');
+
+    const plain = await setup(ticket('t2', { items: [item('i2')] }));
+    expect(plain.find('kitchen-card-t2-allergy').exists()).toBe(false);
   });
 
   it('says the type when there is no label, and names the type icon when a label hides it', async () => {

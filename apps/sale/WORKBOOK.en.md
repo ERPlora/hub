@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:2b1c76ca73a19b717e73a733ddfb6a753e51230451a8158000bd4dda774e9a8c -->
+<!-- generated from WORKBOOK.md sha256:e80aa728c398f8dcf2304af78e1ac441c65404ffdaa07b2c8d6ad907057f679f -->
 
 ## What it is for and who it is for
 
@@ -310,7 +310,7 @@ With the window as it opened, Back closes it without asking (BASE-F05).
 | SALE-F38 | Sell a service from Services | hair salon | done |
 | SALE-F39 | Charge with what another app adds (the tip) | common | not done |
 | SALE-F40 | See a dish's allergens when ordering it | common | done |
-| SALE-F41 | Mark the customer's allergy on a line | restaurant | partial |
+| SALE-F41 | Mark the customer's allergy on a line | restaurant | done |
 
 ### SALE-F01 Sell and charge in cash
 Status: done
@@ -1386,24 +1386,22 @@ no row is not taken for a dish without allergens.
 Involved: INVENTORY-F27, INVENTORY-F35, SALE-F11, SALE-F12, SALE-F41, KITCHEN-F32
 
 ### SALE-F41 Mark the customer's allergy on a line
-Status: partial — the till marks it in the note sheet and shows it on the line, with the dish's match; the order sent
-carries it, also through the assistant and the API, and Kitchen's paper prints it, but the card does not highlight it
-yet (KITCHEN-F32)
+Status: done
 Vertical: restaurant
 Actor: employee, manager
 Screen: Sell
 Steps:
 1. With Kitchen active, the customer mentions an allergy. On the line of their dish, tap "Note": the sheet has at the
    top the "Customer's allergy" block, with the fourteen allergens by their name and none marked, and below it the
-   quick notes and the usual box (SALE-F13).
+   quick notes and the usual box.
 2. Tap the customer's allergens, one or several, and tap "Save". The line says, under the name, highlighted and
    before the note, "Allergy: Gluten".
-3. If the dish has any of those allergens (SALE-F40), on saving the line says it highlighted: "The dish has Gluten".
+3. If the dish has any of those allergens, on saving the line says it highlighted: "The dish has Gluten".
    It does not stop the order, because the kitchen may prepare it without it: the waiter talks it over with the
    customer and, if needed, removes the line and orders another dish.
 4. On a menu, the allergy is marked on the menu's line and counts for each of its dishes; the warning of step 3
    names the dish that has the allergen ("The burger has Gluten").
-5. Send the round (SALE-F20): the allergy goes with each dish to its station, highlighted (KITCHEN-F32). Until it is
+5. Send the round: the allergy goes with each dish to its station, highlighted. Until it is
    sent, it is changed by going back to the sheet; unmarking them all removes it.
 In: the fourteen allergens; the line's frozen allergens (SALE-F40).
 Out: the line with the customer's allergy (announces: check changed); when the round is sent, it goes to Kitchen
@@ -1411,7 +1409,7 @@ with the line (announces: order sent) and stays frozen on the dish. It does not 
 on the printed bill for the table or on the customer record.
 If it fails: if it is not saved, "That change to the line could not be saved. The line is back as it was.", as with
 the note. A line already sent has no note button: if the customer mentions it afterwards, the kitchen is told out
-loud or the dish is voided with its reason (SALE-F20) and ordered again with the allergy. Without Kitchen active the
+loud or the dish is voided with its reason and ordered again with the allergy. Without Kitchen active the
 sheet has no block, because there is no kitchen order to carry it, and the note still works. An allergen that is
 not on the list is refused, also through the assistant or the API.
 Through the assistant: "the burger on table 4 is for someone allergic to gluten" marks the allergy on that line after

@@ -1,5 +1,5 @@
-// One dish on a card of the kitchen display: an Ionic item with the quantity large («2×»), the name, the options in
-// bold, the note in italics, «Voided» and its reason, the station with its colour and «Paper only»; at its end an
+// One dish on a card of the kitchen display: an Ionic item with the quantity large («2×»), the name, any allergy,
+// the options in bold, the note in italics, «Voided» and its reason, the station with its colour and «Paper only»; at its end an
 // icon that says the dish's state, named for a screen reader. The whole row is the target: it answers a tap only when
 // the card lets it, and then it is a button.
 import { describe, expect, it } from 'vitest';
@@ -25,6 +25,31 @@ describe('KdsTicketLine', () => {
     expect(s.row().find('.ep-order-ticket__dish-note').text()).toBe('Allergic to nuts');
     const text = said(s.row().element);
     expect(text.indexOf('+CHEESE')).toBeLessThan(text.indexOf('Allergic to nuts'));
+  });
+
+  it('shows the allergy before the options and only the allergens that match', async () => {
+    const s = await setup(item('i1', {
+      allergy: ['gluten', 'milk'],
+      allergy_in_dish: ['milk'],
+      modifiers: ['+CHEESE'],
+      notes: 'Well done',
+    }));
+    const notice = s.find('kitchen-line-i1-allergy');
+    expect(said(notice.element)).toContain('Allergy: Gluten, Milk');
+    expect(s.find('kitchen-line-i1-allergy-contains').text()).toBe('The dish contains Milk');
+    expect(notice.find('ion-icon').attributes('aria-hidden')).toBe('true');
+    const text = said(s.row().element);
+    expect(text.indexOf('Allergy: Gluten, Milk')).toBeLessThan(text.indexOf('+CHEESE'));
+    expect(text.indexOf('Allergy: Gluten, Milk')).toBeLessThan(text.indexOf('Well done'));
+  });
+
+  it('shows an allergy without a match but no «Contains» line, and nothing without an allergy', async () => {
+    const allergic = await setup(item('i1', { allergy: ['peanut'], allergy_in_dish: [] }));
+    expect(allergic.find('kitchen-line-i1-allergy').text()).toContain('Allergy: Peanut');
+    expect(allergic.find('kitchen-line-i1-allergy-contains').exists()).toBe(false);
+
+    const plain = await setup(item('i2'));
+    expect(plain.find('kitchen-line-i2-allergy').exists()).toBe(false);
   });
 
   it('says the state of the dish with an icon at its end, named for a screen reader', async () => {
@@ -90,9 +115,16 @@ describe('KdsTicketLine', () => {
   });
 
   it('speaks Spanish', async () => {
-    const s = await setup(item('i1', { status: 'ready', destination: 'printer' }), {}, 'es');
+    const s = await setup(item('i1', {
+      status: 'ready',
+      destination: 'printer',
+      allergy: ['milk'],
+      allergy_in_dish: ['milk'],
+    }), {}, 'es');
     expect(s.find('kitchen-line-i1-state').attributes('aria-label')).toBe('Listo');
     expect(s.row().attributes('title')).toBe('Toca para recuperar');
     expect(s.find('kitchen-line-i1-paper').text()).toBe('Solo papel');
+    expect(s.find('kitchen-line-i1-allergy').text()).toContain('Alergia: Leche');
+    expect(s.find('kitchen-line-i1-allergy-contains').text()).toBe('El plato lleva Leche');
   });
 });

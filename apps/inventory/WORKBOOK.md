@@ -1633,8 +1633,7 @@ Las hace cumplir la app por cualquier puerta (pantalla, asistente, API).
 - Las peticiones a `@erplora/ui` de `UI-REQUESTS.md` (iconos, `KpiCard`, `Combo` múltiple, importar y
   exportar CSV y panel lateral del `DataTable`, formateadores, `useI18n` y ayudas de test): ninguna rompe
   un flujo y cada una tiene su sustituto en uso.
-- **Los alérgenos del producto** (F35, `no hecho`): el servidor, con el catálogo y el CSV, va por hub#1735, y el
-  formulario y la ficha, por hub#1738. Los de un suplemento son de Suplementos (hub#1739).
+- **Los alérgenos de un suplemento**: son de Suplementos (hub#1739).
 
 ## Lo que NO hace, a propósito
 
