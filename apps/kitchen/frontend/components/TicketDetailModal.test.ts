@@ -72,6 +72,7 @@ describe('TicketDetailModal', () => {
     expect(m.inDoc('kitchen-ticket-detail-dish-i2-allergy')?.textContent).toContain('Allergy: Peanut');
     expect(m.inDoc('kitchen-ticket-detail-dish-i2-allergy-contains')).toBeNull();
     expect(m.inDoc('kitchen-ticket-detail-dish-i3-allergy')).toBeNull();
+    expect(m.inDoc('kitchen-ticket-detail-dish-i1-allergy')?.closest('.ep-order-ticket')).not.toBeNull();
   });
 
   it('says when it could not load', async () => {
