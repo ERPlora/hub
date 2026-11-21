@@ -1330,3 +1330,76 @@ msgstr ""
 #: erplora_route.py
 msgid "Upload your business certificate to send your invoices to the AEAT."
 msgstr "Sube el certificado del negocio para enviar tus facturas a la AEAT."
+
+#: models.py
+msgid "Not tested by the AEAT yet"
+msgstr "Sin probar todavía por la AEAT"
+
+#: models.py
+msgid "Accepted by the AEAT's test environment"
+msgstr "Aceptado por la AEAT de pruebas"
+
+#: models.py
+msgid "Refused by the AEAT's test environment"
+msgstr "Rechazado por la AEAT de pruebas"
+
+#: models.py
+msgid "AEAT test"
+msgstr "Prueba de la AEAT"
+
+#: models.py
+msgid "AEAT test answer"
+msgstr "Respuesta de la AEAT de pruebas"
+
+#: models.py
+msgid ""
+"the AEAT's test environment has not accepted your own certificate yet: it is tried with the next record that goes "
+"out in testing"
+msgstr ""
+"la AEAT de pruebas aún no ha aceptado tu certificado propio: se prueba con el próximo registro que salga en pruebas"
+
+#: models.py
+msgid "the AEAT's test environment refused your own certificate: upload another one"
+msgstr "la AEAT de pruebas ha rechazado tu certificado propio: sube otro"
+
+#: models.py
+msgid ""
+"The AEAT's test environment accepted the own certificate of %(holder)s (%(holder_tax_id)s): the business can go "
+"live with it."
+msgstr ""
+"La AEAT de pruebas ha aceptado el certificado propio de %(holder)s (%(holder_tax_id)s): el negocio ya puede pasar a "
+"producción con él."
+
+#: models.py
+msgid ""
+"The AEAT's test environment refused the own certificate of %(holder)s (%(holder_tax_id)s) (%(detail)s): upload "
+"another one."
+msgstr ""
+"La AEAT de pruebas ha rechazado el certificado propio de %(holder)s (%(holder_tax_id)s) (%(detail)s): sube otro."
+
+#: services/config.py
+msgid ""
+"The AEAT's test environment has not accepted your own certificate yet: it is tried with the next record that goes "
+"out in testing. Issue a sale or an invoice and go live once it is accepted."
+msgstr ""
+"La AEAT de pruebas aún no ha aceptado tu certificado propio: se prueba con el próximo registro que salga en pruebas. "
+"Haz una venta o una factura y pasa a producción cuando lo acepte."
+
+#: services/config.py
+msgid ""
+"The AEAT's test environment refused your own certificate: upload another one in VeriFactu → Configuration → My "
+"certificate."
+msgstr ""
+"La AEAT de pruebas ha rechazado tu certificado propio: sube otro en VeriFactu → Configuración → Mi certificado."
+
+#: queries/config.py
+msgid "The AEAT's test environment refused this certificate (%(detail)s): upload another one."
+msgstr "La AEAT de pruebas ha rechazado este certificado (%(detail)s): sube otro."
+
+#: queries/config.py
+msgid ""
+"The AEAT's test environment refused this certificate: it could not verify it (no authority it recognises issued "
+"it, it is not valid for this service or it has expired). Upload another one."
+msgstr ""
+"La AEAT de pruebas ha rechazado este certificado: no ha podido verificarlo (no lo ha emitido una entidad que "
+"reconozca, no vale para este servicio o ha caducado). Sube otro."

@@ -18,6 +18,7 @@ from apps.verifactu.tests.conftest import (
     ISSUER,
     A,
     B,
+    accepted_by_the_aeat_of_testing,
     aeat_holds,
     answering,
     b64,
@@ -64,6 +65,7 @@ def opened(certificates_kept, gateway_answers):
 
 def upload_certificate(scope=A) -> None:
     run("verifactu.certificate.upload", {"p12_base64": b64(make_p12()), "password": "secret"}, ctx_for(scope=scope))
+    accepted_by_the_aeat_of_testing()
 
 
 def approve(scope=A) -> None:

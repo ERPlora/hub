@@ -28,6 +28,7 @@ from apps.verifactu.tests.conftest import (
     HUB_DB,
     A,
     RECIPIENT,
+    accepted_by_the_aeat_of_testing,
     b64,
     ctx_for,
     make_p12,
@@ -626,6 +627,7 @@ def own_certificate(days=30):
         expires_at=timezone.now() + dt.timedelta(days=days),
         sealed_blob=certificates.seal(make_p12(), "secret"),
         uploaded_by="ana",
+        aeat_proof=OwnCertificate.Proof.ACCEPTED,
     )
 
 
@@ -706,6 +708,7 @@ def upload_own_certificate() -> None:
         "verifactu.certificate.upload",
         {"p12_base64": b64(make_p12()), "password": "secret"},
     )
+    accepted_by_the_aeat_of_testing()
 
 
 def test_the_own_route_is_ready_for_production_with_a_valid_certificate_this_server_opens(
