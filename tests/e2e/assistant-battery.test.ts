@@ -318,7 +318,7 @@ describe('redact', () => {
 });
 
 describe('cleanupCommand', () => {
-  it('takes the QA keys and accounts out of the stack’s SaaS, on its database, with the accounts in the environment', () => {
+  it('takes the QA accounts out of the stack’s SaaS, on its database, with the accounts in the environment', () => {
     const command = cleanupCommand({ PATH: '/bin' }, 'saas_e2e_8895', [QA_STAFF_EMAIL, 'qa-manager@example.com']);
     expect(command.file).toBe('uv');
     expect(command.args).toEqual(['run', 'python', 'manage.py', 'shell', '-c', CLEANUP_PY]);
@@ -330,13 +330,17 @@ describe('cleanupCommand', () => {
     expect(() => cleanupCommand({}, 'saas_dev', [QA_STAFF_EMAIL])).toThrow(/not an e2e database/);
   });
 
-  it('deletes only the keys labelled qa and the named accounts, in development only, and is Python', () => {
+  it('deletes only the named accounts, in development only, and is Python', () => {
     expect(CLEANUP_PY).toContain('if not settings.DEBUG');
-    expect(CLEANUP_PY).toContain('AIProviderCredential.objects.filter(label="qa").delete()');
     expect(CLEANUP_PY).toContain('email__in=');
     expect(CLEANUP_PY).toContain('os.environ["QA_CLEANUP_EMAILS"]');
     expect(CLEANUP_PY).not.toMatch(/cursor|raw\(/);
     const parsed = spawnSync('python3', ['-c', 'import ast, sys; ast.parse(sys.stdin.read())'], { input: CLEANUP_PY, encoding: 'utf8' });
     expect(parsed.status, parsed.stderr).toBe(0);
+  });
+
+  it('has no key to take out: the stack’s SaaS reads the keys from its environment, never from its database', () => {
+    expect(CLEANUP_PY).not.toMatch(/credential|Credential|api_key|label="qa"/);
+    expect(CLEANUP_PY).toContain('print(json.dumps({"accounts": named}))');
   });
 });

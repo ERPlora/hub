@@ -6,13 +6,13 @@ import { spawnSync } from 'node:child_process';
 import { describe, expect, it } from 'vitest';
 
 import { QA_STAFF_EMAIL } from './assistant-battery';
-import { answerChoice, QWEN_ADDRESS, SEED_PY, seedCommand } from './assistant-seed';
+import { answerChoice, QWEN_ADDRESS, SEED_PY, seedCommand, seedSecrets } from './assistant-seed';
 
-const KEYS = { QA_QWEN_API_KEY: 'sk-qwen-secret', QA_OPENAI_API_KEY: 'sk-openai-secret', PATH: '/bin' };
+const KEYS = { DASHSCOPE_API_KEY: 'sk-qwen-secret', OPENAI_API_KEY: 'sk-openai-secret', PATH: '/bin' };
 const COMPARED = {
   QA_ANSWER_KIND: 'anthropic',
   QA_ANSWER_MODEL: 'claude-test-model',
-  QA_ANSWER_KEY_ENV: 'QA_ANTHROPIC_API_KEY',
+  QA_ANSWER_KEY_ENV: 'ANTHROPIC_API_KEY',
   QA_ANSWER_PRICE_IN: '3',
   QA_ANSWER_PRICE_OUT: '15.5',
 };
@@ -24,7 +24,7 @@ describe('answerChoice', () => {
       name: 'Qwen',
       kind: 'openai',
       baseUrl: QWEN_ADDRESS,
-      keyEnv: 'QA_QWEN_API_KEY',
+      keyEnv: 'DASHSCOPE_API_KEY',
       model: 'qwen3.7-plus',
       priceIn: null,
       priceOut: null,
@@ -39,7 +39,7 @@ describe('answerChoice', () => {
       name: 'QA answer',
       kind: 'anthropic',
       baseUrl: 'https://models.example.com/v1',
-      keyEnv: 'QA_ANTHROPIC_API_KEY',
+      keyEnv: 'ANTHROPIC_API_KEY',
       model: 'claude-test-model',
       priceIn: 3,
       priceOut: 15.5,
@@ -92,7 +92,7 @@ describe('seedCommand', () => {
       QA_SEED_PROVIDER_NAME: 'Qwen',
       QA_SEED_KIND: 'openai',
       QA_SEED_BASE_URL: QWEN_ADDRESS,
-      QA_SEED_KEY_ENV: 'QA_QWEN_API_KEY',
+      QA_SEED_KEY_ENV: 'DASHSCOPE_API_KEY',
       QA_SEED_MODEL: 'qwen3.7-plus',
       QA_SEED_PRICE_IN: '',
       QA_SEED_PRICE_OUT: '',
@@ -102,13 +102,13 @@ describe('seedCommand', () => {
   });
 
   it('seeds the model under test with its prices and no fallback, its key read from the variable named', () => {
-    const env = { ...COMPARED, QA_ANTHROPIC_API_KEY: 'sk-ant-secret', QA_OPENAI_API_KEY: 'sk-openai-secret' };
+    const env = { ...COMPARED, ANTHROPIC_API_KEY: 'sk-ant-secret', OPENAI_API_KEY: 'sk-openai-secret' };
     const command = seedCommand(env, 'saas_e2e_8895');
     expect(command.env).toMatchObject({
       QA_SEED_PROVIDER: 'qa-answer',
       QA_SEED_KIND: 'anthropic',
       QA_SEED_BASE_URL: '',
-      QA_SEED_KEY_ENV: 'QA_ANTHROPIC_API_KEY',
+      QA_SEED_KEY_ENV: 'ANTHROPIC_API_KEY',
       QA_SEED_MODEL: 'claude-test-model',
       QA_SEED_PRICE_IN: '3',
       QA_SEED_PRICE_OUT: '15.5',
@@ -118,10 +118,10 @@ describe('seedCommand', () => {
     expect(command.args.join(' ')).not.toContain('sk-ant-secret');
   });
 
-  it('refuses without a key, naming the variable and never a value', () => {
-    expect(() => seedCommand({ QA_OPENAI_API_KEY: 'sk-openai-secret' }, 'saas_e2e_8895')).toThrow(/QA_QWEN_API_KEY/);
-    expect(() => seedCommand({ QA_QWEN_API_KEY: 'sk-qwen-secret' }, 'saas_e2e_8895')).toThrow(/QA_OPENAI_API_KEY/);
-    expect(() => seedCommand({ ...COMPARED, QA_OPENAI_API_KEY: 'sk-openai-secret' }, 'saas_e2e_8895')).toThrow(/QA_ANTHROPIC_API_KEY/);
+  it('refuses without a key the stack\'s SaaS reads, naming the variable and never a value', () => {
+    expect(() => seedCommand({ OPENAI_API_KEY: 'sk-openai-secret' }, 'saas_e2e_8895')).toThrow(/DASHSCOPE_API_KEY/);
+    expect(() => seedCommand({ DASHSCOPE_API_KEY: 'sk-qwen-secret' }, 'saas_e2e_8895')).toThrow(/OPENAI_API_KEY/);
+    expect(() => seedCommand({ ...COMPARED, OPENAI_API_KEY: 'sk-openai-secret' }, 'saas_e2e_8895')).toThrow(/ANTHROPIC_API_KEY/);
   });
 
   it('refuses the shared SaaS database and any database that is not an e2e one', () => {
@@ -130,26 +130,48 @@ describe('seedCommand', () => {
   });
 });
 
+describe('seedSecrets', () => {
+  it('gives the keys of the run to take out of what it writes: Qwen\'s, OpenAI\'s and a model under test\'s', () => {
+    expect(seedSecrets({ ...KEYS, ...COMPARED, ANTHROPIC_API_KEY: 'sk-ant-secret' })).toEqual(['sk-qwen-secret', 'sk-openai-secret', 'sk-ant-secret']);
+  });
+
+  it('leaves out what is not exported and never a variable that is no key', () => {
+    expect(seedSecrets({ OPENAI_API_KEY: ' sk-openai-secret ', PATH: '/bin' })).toEqual(['sk-openai-secret']);
+  });
+});
+
 describe('SEED_PY', () => {
-  it('sets the providers only through the SaaS operations, prints no key and is Python', () => {
-    for (const op of ['credential_import', 'credential_save', 'model_select', 'policy_update']) expect(SEED_PY).toContain(`services.${op}(`);
+  it('chooses the models through the SaaS operations of their own module, prints no key and is Python', () => {
+    expect(SEED_PY).toContain('from assistant.services.model_choice import model_select, policy_update');
+    for (const op of ['model_select', 'policy_update']) expect(SEED_PY).toContain(`${op}(ctx, `);
+    expect(SEED_PY).not.toMatch(/services\.\w+\(/);
     expect(SEED_PY).not.toMatch(/print\([^)]*(secret|key|KEY)/);
     expect(SEED_PY).not.toMatch(/cursor|raw\(/);
     const parsed = spawnSync('python3', ['-c', 'import ast, sys; ast.parse(sys.stdin.read())'], { input: SEED_PY, encoding: 'utf8' });
     expect(parsed.status, parsed.stderr).toBe(0);
   });
 
-  it('reads the answering model from the seed variables, validates its provider and keeps its key labelled qa', () => {
+  it('never writes nor reads a key: each provider names the variable of the SaaS\'s environment it reads', () => {
+    expect(SEED_PY).not.toMatch(/credential|Credential|api_key|label="qa"/);
+    expect(SEED_PY).not.toMatch(/os\.environ\[os\.environ/);
+    expect(SEED_PY).toContain('found.key_variable = ');
+    expect(SEED_PY).toContain('os.environ["QA_SEED_KEY_ENV"]');
+  });
+
+  it('adds OpenAI as the admin\'s form does, reading OPENAI_API_KEY: the documentation search and the fallback', () => {
+    expect(SEED_PY).toMatch(/provider\("openai", "OpenAI", "openai", "", "OPENAI_API_KEY"\)/);
+  });
+
+  it('reads the answering model from the seed variables and validates each provider as the admin\'s form does', () => {
     for (const name of ['PROVIDER', 'PROVIDER_NAME', 'KIND', 'BASE_URL', 'KEY_ENV', 'MODEL', 'PRICE_IN', 'PRICE_OUT', 'FALLBACK_MODEL']) {
       expect(SEED_PY).toContain(`os.environ["QA_SEED_${name}"]`);
     }
     expect(SEED_PY).toContain('full_clean()');
     expect(SEED_PY).toContain(`"${QA_STAFF_EMAIL}"`);
-    expect(SEED_PY.match(/label="qa"/g)?.length).toBeGreaterThanOrEqual(2);
   });
 
   it('writes on the answering model whether it sees images, both ways, so an earlier run never leaves it on', () => {
-    expect(seedCommand({ ...COMPARED, QA_ANSWER_VISION: '1', QA_ANTHROPIC_API_KEY: 'k', QA_OPENAI_API_KEY: 'o' }, 'saas_e2e_8031').env.QA_SEED_VISION).toBe('1');
+    expect(seedCommand({ ...COMPARED, QA_ANSWER_VISION: '1', ANTHROPIC_API_KEY: 'k', OPENAI_API_KEY: 'o' }, 'saas_e2e_8031').env.QA_SEED_VISION).toBe('1');
     expect(SEED_PY).toContain('supports_vision=os.environ["QA_SEED_VISION"] == "1"');
   });
 
