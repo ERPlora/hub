@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:a36e5e512308b790672864456d3cd22faf2fc6c8d8fbc8ace9aa2ac21e749f1e -->
+<!-- generated from WORKBOOK.md sha256:7b1a14960be8c34f046848020c3722a617d3468eb174506cf03cb76521b713cb -->
 
 ## What it is for and who it is for
 
@@ -88,6 +88,10 @@ Here the reference is not a competitor: it is the AEAT's rules.
   hub#997).
 - **The software producer's data** (ERPlora) go fixed in every record (its responsible declaration declares them),
   also "Serves several taxpayers", always "S".
+- **Hours and days are the business's**, in its time zone (the one in "Settings"), not Madrid's: the time each record
+  is generated at (with its offset), the time the AEAT asked to wait until, the current month the AEAT is asked about
+  and the day your certificate expires. A business in the Canary Islands sees its records generated at its own time
+  and, on New Year's Eve at 23:30, asks the AEAT about December, even though it is already January in Madrid.
 
 Initial setup, step by step:
 

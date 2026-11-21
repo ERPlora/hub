@@ -20,6 +20,7 @@ from apps.verifactu.schemas.chains import (
     RecoverManualIn,
     RecoveryOut,
 )
+from base.business import business_zone
 
 from .aeat_query import _query_aeat
 from .sealing import _fingerprint_of
@@ -235,7 +236,7 @@ def recover_from_aeat(ctx: OperationContext, data: RecoverFromAeatIn) -> Recover
     nif = data.issuer_nif or issuer_identity()[0]
     if _unsent(nif, config.environment).exists():
         raise Conflict(str(PENDING_IN_CHAIN), code="verifactu.pending_in_chain")
-    today = timezone.localdate()
+    today = timezone.localdate(timezone=business_zone())
     records = _query_aeat(ctx, config, nif, config.environment, today.year, today.month)
     latest = aeat.latest(records)
     if latest is None:

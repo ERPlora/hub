@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:085788e7b3c3738fc6b29e7cb4c0af75de25e9944ad5d8f7f11c060d60acceef -->
+<!-- generated from WORKBOOK.md sha256:a771401188dd598f1d91a14d3f2e7095d32c4433e6491b394a0360235404fb1e -->
 
 ## What it is for and who it is for
 
@@ -311,6 +311,7 @@ With the window as it opened, Back closes it without asking (BASE-F05).
 | SALE-F39 | Charge with what another app adds (the tip) | common | not done |
 | SALE-F40 | See a dish's allergens when ordering it | common | done |
 | SALE-F41 | Mark the customer's allergy on a line | restaurant | done |
+| SALE-F42 | Choose the modifiers of a dish in a menu | restaurant | not done |
 
 ### SALE-F01 Sell and charge in cash
 Status: done
@@ -635,7 +636,7 @@ is sold out."…). A half-made menu does not go into the check, not through the 
 reaches the kitchen without its dishes. A quantity with decimals: "The quantity does not fit the step of the
 product (1 ud).". If the menus cannot be read, above the grid "The menus could not be read. Try again." with
 "Retry", and the products sell just the same. Without Menus and combos active, the POS offers no menus.
-Involved: COMBO-F07, COMBO-F08, COMBO-F09, COMBO-F10, COMBO-F11, INVENTORY-F22
+Involved: COMBO-F07, COMBO-F08, COMBO-F09, COMBO-F10, COMBO-F11, INVENTORY-F22, SALE-F42
 
 ### SALE-F13 Put a note on a line
 Status: done
@@ -1423,6 +1424,46 @@ not on the list is refused, also through the assistant or the API.
 Through the assistant: "the burger on table 4 is for someone allergic to gluten" marks the allergy on that line after
 the confirmation card, which says the check, the dish and the allergens by their name.
 Involved: SALE-F13, SALE-F20, SALE-F40, INVENTORY-F35, KITCHEN-F32
+
+### SALE-F42 Choose the modifiers of a dish in a menu
+Status: not done — the menu sheet does not ask yet for the modifiers of each dish, Menus does not add them to the
+amount and the kitchen order does not carry them (hub#2019)
+Vertical: restaurant
+Actor: employee, manager
+Screen: Sell
+Steps:
+1. With Menus and combos and Modifiers active, open a menu in the POS (SALE-F12) and choose a dish that has modifier
+   groups, its own or its category's, the same ones it asks for when sold on its own (the entrecôte with "Meat
+   doneness"): its groups open right there, under the dish, with the rules, the extra charges with their sign, the
+   allergens and the default options of the sheet of an article on its own (SALE-F11). A dish without groups is
+   chosen as always.
+2. Choose the options. Removing the dish, or changing it for another in a single-choice course, removes its
+   options. A choice that is repeated (two coffees) carries the same options each time.
+3. While a required group of a chosen dish is not complete, the button says what is missing ("Choose 1 in «Meat
+   doneness»") and tapping it points to that group. With everything complete, "Add · <total>" adds to the set price
+   the menu's extra charges and those of the chosen options.
+4. Press it: the menu goes into the check with each dish and, under it, its options.
+5. Send to the kitchen: each dish carries its options under it, on the screen and on paper, like a dish on its own
+   (COMBO-F11, MODIFIER-F08). Charge as always: the ticket names the options under their dish and the menu charges
+   what it was worth when ordered, options included, even if they change or are deleted later.
+In: the groups and options of the product of each chosen dish, from Modifiers (MODIFIER-F06). Modifiers checks and
+prices the options of each dish (MODIFIER-F07) and Menus adds them to the menu's amount when the line is added and
+again when charging, with the amount ordered (COMBO-F08).
+Out: the menu line with the options of each dish, their kitchen text and their allergens, frozen when ordered
+(announces: check changed). "Eat in", the menu stays on one line at the menu's VAT, with the options inside (art.
+91.Uno.2.2º LIVA), an option with another tax category too. "Take away", each option takes part in the menu's
+split (COMBO-F09): one without a tax category of its own, or with its dish's, goes with it, and the dish's weight is
+its catalog price plus that of those options; one with another tax category goes to its own take-away category,
+weighs its catalog price and shows on its own line with its rate under its dish, as on a dish on its own
+(MODIFIER-F07). If with the options everything goes to the same category, the menu stays on one line. The options do
+not move stock (COMBO-F10).
+If it fails: Modifiers' reasons show inside the sheet, under the dish they refer to ("Choose at least 1 in «Meat
+doneness»."…), and a menu with a required group left unchosen does not go into the check, not through the assistant
+or the API either, so it never reaches the kitchen without the meat doneness. If a dish's groups cannot be read, the
+sheet says so under that dish with "Retry" and the menu cannot be added. Without Modifiers active, the dishes are
+chosen without options, as today.
+Involved: SALE-F11, SALE-F12, SALE-F40, COMBO-F07, COMBO-F08, COMBO-F09, COMBO-F10, COMBO-F11, MODIFIER-F06,
+MODIFIER-F07, MODIFIER-F08
 
 ## What the verticals share
 

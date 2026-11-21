@@ -14,6 +14,7 @@ from apps.verifactu import chain, envelope, events, producer, xsd
 from apps.verifactu.envelope import AltaData, AnulacionData, ChainLink, InvoiceRef
 from apps.verifactu.models import Config, Environment, Event, Record, wait_reason_text
 from apps.verifactu.queries.route import route_problem, system_for
+from base.business import business_zone
 
 from .writes import _actor, _event, _lock_chain
 
@@ -237,7 +238,7 @@ def _seal(ctx: OperationContext, config: Config, record: Record) -> Record:
     record.previous_issue_date = head.last_issue_date
     record.previous_fingerprint = head.last_fingerprint
     record.generated_on = now
-    record.generated_at = chain.format_timestamp(timezone.localtime(now))
+    record.generated_at = chain.format_timestamp(timezone.localtime(now, business_zone()))
     record.created_at = now
     record.next_attempt_at = now
     record.created_by = _actor(ctx)
