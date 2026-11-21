@@ -458,7 +458,7 @@ def _field_message(error: dict) -> str:
 def _import_row(
     row: ImportRowIn, ctx: OperationContext
 ) -> tuple[dict, dict[str, str], dict[str, str]]:
-    """A CSV row as the values of a new card, or the reason it is skipped, and what to review."""
+    """A CSV row as a new card's values, or why it is skipped, and what to review; a blank cell is a missing column."""
     raw = {
         field: value[1:] if value.startswith(EXPORT_GUARD) else value
         for field, value in row.model_dump().items()
@@ -471,7 +471,7 @@ def _import_row(
         warnings["country"] = str(COUNTRY_IMPORTED_EMPTY)
     stage = raw["lifecycle_stage"].strip().lower()
     candidate = {
-        **raw,
+        **{field: value for field, value in raw.items() if value.strip()},
         "country": country,
         # «customer» is how the product's older files called an active customer.
         "lifecycle_stage": "active" if stage in ("", "customer") else stage,
