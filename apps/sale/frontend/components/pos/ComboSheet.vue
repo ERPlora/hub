@@ -15,6 +15,7 @@ import { computed, shallowRef, watch } from 'vue';
 import type { SaleComboOut } from '../../../../combo/frontend/operations';
 import { useLocale, useT } from '../../composables/useT';
 import { useDishGroups } from '../../composables/pos/useDishGroups';
+import { useSheetChoice } from '../../composables/pos/useSheetChoice';
 import {
   comboChoices,
   comboShort,
@@ -30,7 +31,7 @@ import {
 } from '../../lib/comboChoice';
 import { formatMoney, useBusinessMoney } from '../../lib/format';
 import { refusal } from '../../lib/refusal';
-import { choose, type Choice, initialChoice, unchoose } from '../../lib/modifierChoice';
+import { choose, unchoose } from '../../lib/modifierChoice';
 import type { ComboChoiceIn } from '../../operations';
 import ChoiceGroupSection, { type SectionGroup } from './ChoiceGroupSection.vue';
 import ComboDishOptions from './ComboDishOptions.vue';
@@ -45,8 +46,7 @@ const locale = useLocale();
 const business = useBusinessMoney();
 
 const groups = computed(() => props.combo?.groups ?? []);
-const choice = shallowRef<Choice>(initialChoice([]));
-const attention = shallowRef<string | null>(null);
+const { choice, attention, start, tap, less } = useSheetChoice();
 const dishGroups = useDishGroups();
 const dishChoices = shallowRef<DishChoices>({});
 /** The dish the sheet points at, and its group short (`true`: the whole dish, its options unread). */
@@ -81,8 +81,7 @@ watch(
     dishAllergens.value = {};
     allergensStatus.value = 'idle';
     if (!isOpen) return;
-    choice.value = initialChoice([]);
-    attention.value = null;
+    start([]);
     dishChoices.value = {};
     dishAttention.value = null;
     dishGroups.reset();
@@ -125,16 +124,6 @@ const label = computed(() => {
   if (!missing) return t('sale.pos.options.add', { price: total.value });
   return t('sale.pos.menu.chooseIn', { n: missing.n, course: missing.group.name });
 });
-
-function tap(group: SectionGroup, optionId: string): void {
-  choice.value = choose(choice.value, group, optionId);
-  attention.value = choice.value.refused;
-}
-
-function less(optionId: string): void {
-  choice.value = unchoose(choice.value, optionId);
-  attention.value = null;
-}
 
 function tapOption(dish: PickedDish, group: SectionGroup, optionId: string): void {
   const next = choose(dishChoice(dish, dishOptions.value), group, optionId);

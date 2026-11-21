@@ -1,15 +1,17 @@
-// flow: SALE-F11, SALE-F12, SALE-F20, SALE-F28 — the till in Chrome with the real Modifiers, Menus, Kitchen,
+// flow: SALE-F11, SALE-F12, SALE-F20, SALE-F28, SALE-F42 — the till in Chrome with the real Modifiers, Menus, Kitchen,
 // Inventory and Taxes apps: a burger with its options sheet, a menu from «All» with its courses sheet charged by
 // card and printed with its dishes, «Current order» sending the round to the kitchen as a rush, and Sales'
-// «7 days» with each day's takings. Each screen in 390×844, 834×1112 and 1440×900. What a run creates — its
+// «7 days» with each day's takings; the steak of the menu asks its doneness and its extras in the menu's sheet, and
+// the check, the kitchen and the receipt carry them with the steak. Each screen in 390×844, 834×1112 and 1440×900.
+// What a run creates — its
 // products `E2E-SMO-<run>-…`, its options group «E2E SMO <run>», its menu «e2e Menu <run>», its checks, sales,
 // kitchen tickets and fiscal documents — is deleted after it.
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
-import { A, api, capture, login, psql, shown, untilStill } from './helpers';
+import { A, api, capture, login, psql, saveSessionForTheSweep, shown, untilStill } from './helpers';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
 import { chargeByCard } from './sale-charge-helpers';
-import { cleanSales, drawerOff, expectFirstTile, openTillCart, restoreDrawer, stamp } from './sale-helpers';
+import { cleanSales, drawerOff, expectFirstTile, openTillCart, restoreDrawer, sendRound, stamp } from './sale-helpers';
 import { toastSaying } from './toast-helpers';
 
 const RUN = stamp();
@@ -78,6 +80,15 @@ async function tillReady(page: Page): Promise<void> {
 }
 
 const lineOf = (page: Page, name: string) => shown(page).locator('[data-testid^=pos-line-]').filter({ hasText: name }).first();
+
+/** The choice of the run's menu that sells `product`, as the till offers it. */
+async function optionOf(context: BrowserContext, product: Product): Promise<string> {
+  type Offer = { rows: { id: string; groups: { options: { id: string; product_id: string }[] }[] }[] };
+  const offers = await api<Offer>(context, A, 'GET', '/combo/combos/for_sale?limit=50');
+  const offer = offers.data.rows.find((row) => row.id === comboId);
+  expect(offer, 'the menu is on sale').toBeTruthy();
+  return offer!.groups.flatMap((group) => group.options).find((option) => option.product_id === product.id)!.id;
+}
 
 /** The buttons on top of the check (park, table, customer, open checks, close), each with its box: none may sit on
  *  another, or a tap meant for one lands on the other. */
@@ -176,18 +187,9 @@ test('SALE-F12: a menu from «All» is composed course by course, charged by car
   await expect(add).toContainText('Choose 1 in «Starters»');
   await add.click();
   await expect(sheet.locator('.pos-options__group--missing')).toHaveCount(1);
-  const options = await api<{ rows: { id: string; groups: { name: string; options: { id: string; product_id: string }[] }[] }[] }>(
-    context,
-    A,
-    'GET',
-    '/combo/combos/for_sale?limit=50',
-  );
-  const offer = options.data.rows.find((row) => row.id === comboId);
-  expect(offer, 'the menu is on sale').toBeTruthy();
-  const optionOf = (product: Product) => offer!.groups.flatMap((group) => group.options).find((option) => option.product_id === product.id)!.id;
-  await sheet.locator(`[data-testid=pos-menu-dish-${optionOf(lentils)}]`).click();
+  await sheet.locator(`[data-testid=pos-menu-dish-${await optionOf(context, lentils)}]`).click();
   await expect(add).toContainText('Choose 1 in «Mains»');
-  await sheet.locator(`[data-testid=pos-menu-dish-${optionOf(hake)}]`).click();
+  await sheet.locator(`[data-testid=pos-menu-dish-${await optionOf(context, hake)}]`).click();
   await expect(add).toContainText(/13[.,]50/);
   await shots(page, 'SALE-F12', async () => {
     await expect(add).toBeVisible();
@@ -243,4 +245,67 @@ test('SALE-F28: «7 days» shows what was sold each of those days', async ({ pag
   await shots(page, 'SALE-F28', async () => {
     await expect(week).toBeVisible();
   });
+});
+
+/** The doneness the steak of SALE-F42 asks. */
+const DONENESS = `${GROUP} Doneness`;
+
+/** A steak among the menu's mains (+2,00 €) that asks its doneness (required) and the burger's extras (SALE-F42). */
+async function addSteak(context: BrowserContext): Promise<Product> {
+  const steak = await createProduct(context, { name: `E2E Steak ${RUN}`, sku: `${SKU}-STK`, price: 1800, tax_category_key: FOOD });
+  await post(context, '/combo/options', { combo: MENU, group: 'Mains', product: steak.sku, price_delta: 200 });
+  await post(context, '/modifier/groups', { name: DONENESS, min_choices: 1, max_choices: 1 });
+  await post(context, '/modifier/options', { group: DONENESS, name: 'Rare', kitchen_name: 'RARE' });
+  await post(context, '/modifier/options', { group: DONENESS, name: 'Well done' });
+  for (const group of [DONENESS, GROUP]) await post(context, '/modifier/links/attach', { group, product_id: steak.id });
+  return steak;
+}
+
+test('SALE-F42: the steak of a menu asks its doneness, goes to the kitchen with it and is charged with its cheese', async ({ page, context }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await login(page, A, '/sale/pos');
+  await saveSessionForTheSweep(context);
+  const steak = await addSteak(context);
+  await page.reload();
+  await tillReady(page);
+  await shown(page).locator(`[data-testid=pos-menu-${comboId}]`).click();
+  const sheet = page.locator('ion-modal[data-testid=pos-menu]');
+  const steakChoice = await optionOf(context, steak);
+  await sheet.locator(`[data-testid=pos-menu-dish-${await optionOf(context, lentils)}]`).click();
+  await sheet.locator(`[data-testid=pos-menu-dish-${steakChoice}]`).click();
+  const options = sheet.locator(`[data-testid=pos-menu-dish-options-${steakChoice}]`);
+  await expect(options).toContainText(DONENESS);
+  const add = sheet.locator('[data-testid=pos-menu-add]');
+  await expect(add).toContainText(`Choose 1 in «${DONENESS}»`);
+  await add.click();
+  await expect(options.locator('.pos-options__group--missing')).toContainText(DONENESS);
+  await options.getByRole('button', { name: 'Rare' }).click();
+  await options.getByRole('button', { name: /Cheese/ }).click();
+  // 13,50 + 2,00 (the steak) + 1,00 (its cheese).
+  await expect(add).toContainText(/16[.,]50/);
+  const sheetShown = async () => {
+    await options.scrollIntoViewIfNeeded();
+    await expect(add).toBeVisible();
+  };
+  await shots(page, 'SALE-F42-sheet', sheetShown);
+  await add.click();
+  await expect(sheet).toBeHidden();
+  const line = lineOf(page, MENU);
+  await expect(line).toContainText(`${steak.name} (Rare, Cheese)`);
+  const lineShown = async () => {
+    await openTillCart(page);
+    await expect(line).toBeVisible();
+  };
+  await shots(page, 'SALE-F42-check', lineShown);
+
+  await sendRound(page);
+  type Board = { cooking: { items: { name: string; modifiers: string[] }[] }[] };
+  const board = await api<Board>(context, A, 'GET', '/kitchen/board');
+  const cooked = board.data.cooking.flatMap((ticket) => ticket.items).find((item) => item.name === steak.name);
+  expect(cooked?.modifiers).toEqual(['RARE', 'Cheese']);
+
+  await shown(page).locator('[data-testid=pos-cart-tab-check]').click();
+  const receipt = await chargeByCard(page, card, /16[.,]50/);
+  await expect(receipt.locator('[data-testid=sale-receipt-dish]')).toHaveText([lentils.name, `${steak.name} (Rare, Cheese)`]);
+  await shots(page, 'SALE-F42-receipt', async () => expect(receipt).toBeVisible());
 });

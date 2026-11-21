@@ -5,27 +5,16 @@
 import { describe, expect, it } from 'vitest';
 
 import type { AllergenCode } from '@erplora/ui/components';
-import type { SaleComboOut } from '../../../../combo/frontend/operations';
 import { click, mountSale, settle } from '../../__tests__/mount-sale';
 import { plain } from '../../lib/format';
-import { product, refused } from './__tests__/fixtures';
+import { menuDish as dish, product, refused, saleMenu } from './__tests__/fixtures';
 import ComboSheet from './ComboSheet.vue';
 
-const dish = (id: string, name: string, price_delta = 0) => ({ id, product_id: `p-${id}`, product_name: name, sku: '', price_delta });
-
-const MENU: SaleComboOut = {
-  id: 'm1',
-  name: 'Menú del día',
-  kitchen_name: 'MENU',
-  price: 1350,
-  supply_kind: 'service',
-  sort_order: 0,
-  groups: [
-    { id: 'starters', name: 'Primeros', min_choices: 1, max_choices: 1, allow_repeat: false, options: [dish('lentils', 'Lentejas'), dish('salad', 'Ensalada')] },
-    { id: 'mains', name: 'Segundos', min_choices: 1, max_choices: 1, allow_repeat: false, options: [dish('hake', 'Merluza'), dish('steak', 'Entrecot', 200)] },
-    { id: 'coffee', name: 'Café', min_choices: 0, max_choices: 2, allow_repeat: false, options: [dish('espresso', 'Solo'), dish('latte', 'Con leche'), dish('cut', 'Cortado')] },
-  ],
-};
+const MENU = saleMenu([
+  { id: 'starters', name: 'Primeros', min_choices: 1, max_choices: 1, allow_repeat: false, options: [dish('lentils', 'Lentejas'), dish('salad', 'Ensalada')] },
+  { id: 'mains', name: 'Segundos', min_choices: 1, max_choices: 1, allow_repeat: false, options: [dish('hake', 'Merluza'), dish('steak', 'Entrecot', 200)] },
+  { id: 'coffee', name: 'Café', min_choices: 0, max_choices: 2, allow_repeat: false, options: [dish('espresso', 'Solo'), dish('latte', 'Con leche'), dish('cut', 'Cortado')] },
+]);
 
 const withAllergens = (call: { url: string }) => {
   const id = new URL(call.url, 'http://test').searchParams.get('id') ?? '';

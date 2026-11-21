@@ -5,27 +5,16 @@
 // Modifiers the dishes are picked as before.
 import { describe, expect, it } from 'vitest';
 
-import type { SaleComboOut } from '../../../../combo/frontend/operations';
 import type { TargetGroupOut } from '../../../../modifier/frontend/operations';
 import { click, mountSale, settle } from '../../__tests__/mount-sale';
 import { plain } from '../../lib/format';
-import { product, refused } from './__tests__/fixtures';
+import { menuDish as dish, product, refused, saleMenu } from './__tests__/fixtures';
 import ComboSheet from './ComboSheet.vue';
 
-const dish = (id: string, name: string, price_delta = 0) => ({ id, product_id: `p-${id}`, product_name: name, sku: '', price_delta });
-
-const MENU: SaleComboOut = {
-  id: 'm1',
-  name: 'Menú del día',
-  kitchen_name: 'MENU',
-  price: 1350,
-  supply_kind: 'service',
-  sort_order: 0,
-  groups: [
-    { id: 'mains', name: 'Segundos', min_choices: 1, max_choices: 1, allow_repeat: false, options: [dish('hake', 'Merluza'), dish('steak', 'Entrecot', 200)] },
-    { id: 'coffee', name: 'Café', min_choices: 0, max_choices: 2, allow_repeat: true, options: [dish('latte', 'Con leche')] },
-  ],
-};
+const MENU = saleMenu([
+  { id: 'mains', name: 'Segundos', min_choices: 1, max_choices: 1, allow_repeat: false, options: [dish('hake', 'Merluza'), dish('steak', 'Entrecot', 200)] },
+  { id: 'coffee', name: 'Café', min_choices: 0, max_choices: 2, allow_repeat: true, options: [dish('latte', 'Con leche')] },
+]);
 
 const option = (id: string, name: string, price_delta = 0) => ({ id, name, kitchen_name: '', price_delta, tax_category_key: null, is_default: false, allergens: [] });
 const DONENESS: TargetGroupOut = {
@@ -131,7 +120,7 @@ describe('ComboSheet: the options of a dish', () => {
     expect(within(s, 'steak', 'pos-menu-dish-options-error-steak')?.textContent).toContain('No se han podido leer los suplementos');
     await click(s.inDoc('pos-menu-add'));
     expect(s.wrapper.emitted('add')).toBeUndefined();
-    expect(s.inDoc('pos-menu-dish-options-steak')?.classList.contains('pos-menu-dish-options--missing')).toBe(true);
+    expect(s.inDoc('pos-menu-dish-options-steak')?.classList.contains('pos-sheet-nested--missing')).toBe(true);
     failing = false;
     await click(within(s, 'steak', 'pos-menu-dish-options-retry-steak'));
     await settle();

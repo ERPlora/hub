@@ -9,7 +9,7 @@ import { computed } from 'vue';
 import type { DishGroups } from '../../composables/pos/useDishGroups';
 import { useT } from '../../composables/useT';
 import type { Choice } from '../../lib/modifierChoice';
-import ChoiceGroupSection, { type SectionGroup } from './ChoiceGroupSection.vue';
+import ChoiceGroupSection, { modifierSections, type SectionGroup } from './ChoiceGroupSection.vue';
 
 const props = defineProps<{
   dish: { id: string; name: string };
@@ -22,22 +22,18 @@ const emit = defineEmits<{ tap: [group: SectionGroup, optionId: string]; less: [
 
 const t = useT();
 
-const sections = computed<SectionGroup[]>(() =>
-  props.groups.state === 'ready'
-    ? props.groups.groups.map((group) => ({ ...group, options: group.options.map((option) => ({ ...option, label: option.name })) }))
-    : [],
-);
+const sections = computed(() => (props.groups.state === 'ready' ? modifierSections(props.groups.groups) : []));
 </script>
 
 <template>
   <section
     v-if="groups.state !== 'ready' || sections.length"
-    class="pos-menu-dish-options"
-    :class="{ 'pos-menu-dish-options--missing': attention === true }"
+    class="pos-sheet-nested"
+    :class="{ 'pos-sheet-nested--missing': attention === true }"
     :aria-label="dish.name"
     :data-testid="`pos-menu-dish-options-${dish.id}`"
   >
-    <p class="pos-menu-dish-options__name">
+    <p class="pos-sheet-nested__name">
       {{ dish.name }}
     </p>
     <p
@@ -76,23 +72,3 @@ const sections = computed<SectionGroup[]>(() =>
     />
   </section>
 </template>
-
-<style scoped>
-.pos-menu-dish-options {
-  display: grid;
-  gap: 0.25rem;
-  margin: 0 0 0.5rem 0.75rem;
-  padding: 0.25rem 0 0.25rem 0.75rem;
-  border-left: 3px solid var(--ion-color-primary, #3880ff);
-  border-radius: 4px;
-}
-.pos-menu-dish-options--missing {
-  box-shadow: inset 0 0 0 2px var(--ion-color-warning, #f59e0b);
-}
-.pos-menu-dish-options__name {
-  margin: 0;
-  font-size: 0.875rem;
-  font-weight: 600;
-  overflow-wrap: break-word;
-}
-</style>

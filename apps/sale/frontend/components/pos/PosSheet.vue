@@ -152,6 +152,25 @@ ion-modal.pos-sheet .pos-sheet-hint {
   font-size: 0.86rem;
   color: var(--ion-color-medium, #8b897f);
 }
+/* A block that hangs from a choice of the sheet (the options of a dish picked in a menu), with its name on top; it
+   rings while the sheet waits for it. */
+ion-modal.pos-sheet .pos-sheet-nested {
+  display: grid;
+  gap: 0.25rem;
+  margin: 0 0 0.5rem 0.75rem;
+  padding: 0.25rem 0 0.25rem 0.75rem;
+  border-left: 3px solid var(--ion-color-primary, #3880ff);
+  border-radius: 4px;
+}
+ion-modal.pos-sheet .pos-sheet-nested--missing {
+  box-shadow: inset 0 0 0 2px var(--ion-color-warning, #f59e0b);
+}
+ion-modal.pos-sheet .pos-sheet-nested__name {
+  margin: 0;
+  font-size: 0.875rem;
+  font-weight: 600;
+  overflow-wrap: break-word;
+}
 ion-modal.pos-sheet .pos-sheet-foot {
   display: flex;
   flex: 1;
