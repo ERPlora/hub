@@ -109,6 +109,8 @@ test('SALE-F08: «Open a cash session» opens the session over the sheet, and th
     await expect(drawer.locator('[data-testid=cash-register-open-submit]')).toBeInViewport();
     await page.screenshot({ path: shot(`sale-cash-gate-window-${width}x${height}`) });
   }
+  // Opened and charged on the low phone, where the sheet's foot is the bottom of the screen: the «Session opened»
+  // notice sits above «Charge», never on it, and the next tap charges.
   await drawer.locator('[data-testid=cash-register-open-submit]').click();
   await expect(drawer.locator('[data-testid=cash-register-open-submit]')).toBeHidden();
 
@@ -118,7 +120,7 @@ test('SALE-F08: «Open a cash session» opens the session over the sheet, and th
 
   // The sheet is still there, as it was (cash, 5,00 tendered), without the notice: «Charge» charges the cash.
   await expect(sheet.locator('[data-testid=sale-checkout-error]')).toBeHidden();
-  await page.screenshot({ path: shot('sale-cash-gate-opened-1280') });
+  await page.screenshot({ path: shot('sale-cash-gate-opened-375x667') });
   await sheet.locator('[data-testid=sale-checkout-confirm]').click();
   await expect(sheet).toBeHidden();
   const sale = await newestSaleOf(context, coffee.sku);
