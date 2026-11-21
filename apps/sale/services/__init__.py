@@ -1,7 +1,8 @@
 """Write operations of the sale app: one operation = one transaction, with its events in the outbox.
 
-Every write on an open check locks the check's row first (``select_for_update``) and raises its
-``version``, so two devices are queued and a charge can tell the check moved under it. A charge locks
+Every write on an open check locks the check's row first (``select_for_update``), so two devices are
+queued, and every write that changes what it charges raises its ``version``, so a charge can tell the check
+moved under it (printing its bill only notes it, and leaves the version as it was). A charge locks
 the check it charges, numbers the sale with its day's counter (``UPDATE … RETURNING``, in the same
 transaction: a refusal never burns a number) and marks the lines it takes. A void and a refund lock the
 sale's row: whichever comes first wins.
