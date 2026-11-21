@@ -46,6 +46,15 @@ afterEach(() => {
   document.body.innerHTML = '';
 });
 
+/** Presses «Change» and lets the sign-out answer `response`. */
+async function confirmAnswered(response: Partial<Response>): Promise<void> {
+  inDoc('change-business-dialog-submit')!.click();
+  await flush();
+  answerSignOut(response as Response);
+  await flush();
+  await flush();
+}
+
 async function opened(locale: 'en' | 'es' = 'es') {
   await mountBase(ChangeBusinessDialog, { locale });
   await flush();
@@ -100,11 +109,7 @@ describe('ChangeBusinessDialog', () => {
 
   it('when the sign-out fails, says so in the dialog, forgets nothing and lets the person try again', async () => {
     await opened();
-    inDoc('change-business-dialog-submit')!.click();
-    await flush();
-    answerSignOut({ type: 'basic', status: 500, ok: false } as Response);
-    await flush();
-    await flush();
+    await confirmAnswered({ type: 'basic', status: 500, ok: false });
 
     expect(inDoc('change-business-dialog-error')?.textContent).toContain(
       'No se ha podido cerrar la sesión en este negocio. Comprueba la conexión e inténtalo de nuevo.',
@@ -116,11 +121,7 @@ describe('ChangeBusinessDialog', () => {
 
   it('asked again after a failure and a cancel, starts without the old failure', async () => {
     await opened();
-    inDoc('change-business-dialog-submit')!.click();
-    await flush();
-    answerSignOut({ type: 'basic', status: 500, ok: false } as Response);
-    await flush();
-    await flush();
+    await confirmAnswered({ type: 'basic', status: 500, ok: false });
     expect(inDoc('change-business-dialog-error')).not.toBeNull();
 
     inDoc('change-business-dialog-cancel')!.click();
@@ -134,11 +135,7 @@ describe('ChangeBusinessDialog', () => {
   it('when the app refuses to forget the hub, says so in the dialog', async () => {
     invoke.mockRejectedValueOnce('io error');
     await opened('en');
-    inDoc('change-business-dialog-submit')!.click();
-    await flush();
-    answerSignOut({ type: 'opaqueredirect', status: 0, ok: false } as Response);
-    await flush();
-    await flush();
+    await confirmAnswered({ type: 'opaqueredirect', status: 0, ok: false });
 
     expect(inDoc('change-business-dialog-error')?.textContent).toContain(
       'You are signed out, but the app could not leave this business. Close the app and open it again.',

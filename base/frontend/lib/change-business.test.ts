@@ -4,10 +4,11 @@
 // The same way out when the hub answers, while open, that it is gone (HUB_APP-F05), without forcing the list.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const shell = vi.hoisted(() => ({ stopNoticeListening: vi.fn(async () => {}) }));
-vi.mock('@erplora/ui/shell', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@erplora/ui/shell')>()),
-  stopNoticeListening: shell.stopNoticeListening,
+// What the sign-out does before the session ends (sign-out.test.ts runs it): here, whether it is done.
+const signOut = vi.hoisted(() => ({ beforeSignOut: vi.fn(async () => {}) }));
+vi.mock('./sign-out', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./sign-out')>()),
+  beforeSignOut: signOut.beforeSignOut,
 }));
 
 import { PRIMER_ANSWERED_KEY } from '@erplora/ui/shell';
@@ -72,6 +73,7 @@ beforeEach(() => {
 afterEach(() => {
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
+  signOut.beforeSignOut.mockClear();
   changeBusinessOpen.value = false;
   document.body.innerHTML = '';
 });
@@ -87,7 +89,7 @@ describe('changeBusiness', () => {
 
     expect(FORGET_HUB_COMMAND).toBe('forget_hub');
     expect(steps).toEqual(['POST /auth/logout', `forget_hub {"choose":true} ${AFTER_ERASING}`]);
-    expect(shell.stopNoticeListening).toHaveBeenCalledOnce();
+    expect(signOut.beforeSignOut).toHaveBeenCalledOnce();
   });
 
   it.each([
@@ -103,7 +105,7 @@ describe('changeBusiness', () => {
     expect(steps).toEqual(['POST /auth/logout']);
     expect(invoke).not.toHaveBeenCalled();
     expect({ local: kept(local), session: kept(session) }).toEqual(before);
-    expect(shell.stopNoticeListening).not.toHaveBeenCalled();
+    expect(signOut.beforeSignOut).not.toHaveBeenCalled();
   });
 
   it('goes on when the hub answers that it is gone: there was no session left to close', async () => {
