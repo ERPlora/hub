@@ -63,8 +63,8 @@ const row = (id: string, over: Partial<AppointmentRow> = {}): AppointmentRow => 
   ...over,
 });
 
-async function setup(session = OWNER, locale: 'en' | 'es' = 'en') {
-  const m = await mountAppointment(AgendaPage, { session, path: '/appointment/agenda', locale });
+async function setup(session = OWNER) {
+  const m = await mountAppointment(AgendaPage, { session, path: '/appointment/agenda' });
   await m.live();
   await m.result('appointment.settings.get', SETTINGS);
   await m.reopen();
@@ -222,7 +222,8 @@ describe('AgendaPage', () => {
     ['es', 1, '1 cita no tiene profesional: asígnala editándola o arrastrándola a una fila.'],
     ['es', 2, '2 citas no tienen profesional: asígnalas editándolas o arrastrándolas a una fila.'],
   ] as const)('says how many have no professional in the singular only for one (%s: %i)', async (locale, unassigned, said) => {
-    const s = await setup(OWNER, locale);
+    const s = await setup();
+    await s.setLocale(locale);
     await s.result('appointment.agenda.lanes', { ...LANES, unassigned });
     expect(s.find('appointment-agenda-unassigned').text()).toBe(said);
   });
