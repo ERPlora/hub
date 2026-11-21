@@ -27,7 +27,7 @@ from live.operations import UnknownOperation, atomic, get, operation
 from live.outbox import record_event
 
 from apps.inventory.models import Category, Product
-from apps.inventory.queries import held
+from apps.inventory.queries.reads import held
 from apps.kitchen import allergy, events
 from apps.kitchen.models import (
     ACTOR_MAX_LENGTH,

@@ -742,7 +742,7 @@ vende, y si Menús no está activo el TPV no ofrece menús.
   `not_found`) y deja fuera el que el negocio tiene, el que una recuperación rehízo y uno con su nombre en ese menú; los
   añade `combo.group.recover` (solo sistema): `combo.group.create`, que bloquea el menú. `queries.options_not_in_business`
   pone cada elección en el plato que hace del suyo y en el producto que hace del suyo
-  (`apps.inventory.queries.products_standing_for`, la misma pareja que Tarifas y Suplementos: el mismo mientras vive; si
+  (`apps.inventory.queries.recovery.products_standing_for`, la misma pareja que Tarifas y Suplementos: el mismo mientras vive; si
   no, el vivo con su SKU que hizo una recuperación, `base.recovery.brought_back`; uno hecho a mano con su SKU no recibe
   nada) y deja las que el negocio no tiene ni por id (una elección puede cambiar de producto, nunca de plato) ni por
   sitio (plato y producto, el índice único `combo_option_product_unique`); la plataforma las crea con

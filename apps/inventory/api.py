@@ -52,27 +52,27 @@ MAX_PHOTO_BODY = 2_900_000
 
 @bind(router, "inventory.product.list", "/inventory/products")
 async def product_list(request, params: Query[ProductListIn]):
-    return await run_operation(request, queries.list_products, params)
+    return await run_operation(request, queries.products.list_products, params)
 
 
 @bind(router, "inventory.product.get", "/inventory/products/detail")
 async def product_detail(request, params: Query[ProductRefIn]):
-    return await run_operation(request, queries.get_product, params)
+    return await run_operation(request, queries.products.get_product, params)
 
 
 @bind(router, "inventory.product.list_for_sale", "/inventory/products/for_sale")
 async def product_list_for_sale(request, params: Query[ForSaleListIn]):
-    return await run_operation(request, queries.list_for_sale, params)
+    return await run_operation(request, queries.products.list_for_sale, params)
 
 
 @bind(router, "inventory.product.list_low_stock", "/inventory/products/low_stock")
 async def product_list_low_stock(request, params: Query[LowStockListIn]):
-    return await run_operation(request, queries.list_low_stock, params)
+    return await run_operation(request, queries.products.list_low_stock, params)
 
 
 @bind(router, "inventory.product.export", "/inventory/products/export")
 async def product_export(request, params: Query[ProductFiltersIn]):
-    return await run_operation(request, queries.export_products, params)
+    return await run_operation(request, queries.exports.export_products, params)
 
 
 @bind(router, "inventory.product.create", "/inventory/products", status=201)
@@ -110,7 +110,7 @@ async def product_print_label(request, data: ProductRefIn):
 
 @bind(router, "inventory.product_category.list", "/inventory/product_categories")
 async def product_category_list(request, params: Query[ProductCategoryListIn]):
-    return await run_operation(request, queries.list_product_categories, params)
+    return await run_operation(request, queries.categories.list_product_categories, params)
 
 
 @bind(router, "inventory.product_category.add", "/inventory/product_categories/add")
@@ -128,12 +128,12 @@ async def product_category_remove(request, data: ProductCategoryIn):
 
 @bind(router, "inventory.category.list", "/inventory/categories")
 async def category_list(request, params: Query[CategoryListIn]):
-    return await run_operation(request, queries.list_categories, params)
+    return await run_operation(request, queries.categories.list_categories, params)
 
 
 @bind(router, "inventory.category.export", "/inventory/categories/export")
 async def category_export(request, params: Query[CategoryFiltersIn]):
-    return await run_operation(request, queries.export_categories, params)
+    return await run_operation(request, queries.exports.export_categories, params)
 
 
 @bind(router, "inventory.category.create", "/inventory/categories", status=201)
@@ -161,12 +161,12 @@ async def category_delete(request, data: CategoryRefIn):
 
 @bind(router, "inventory.movement.list", "/inventory/movements")
 async def movement_list(request, params: Query[MovementListIn]):
-    return await run_operation(request, queries.list_movements, params)
+    return await run_operation(request, queries.movements.list_movements, params)
 
 
 @bind(router, "inventory.stock.get_summary", "/inventory/stock/summary")
 async def stock_summary(request):
-    return await run_operation(request, queries.get_summary)
+    return await run_operation(request, queries.stock.get_summary)
 
 
 @bind(router, "inventory.stock.receive", "/inventory/stock/receive")
@@ -189,12 +189,12 @@ async def stock_write_off(request, data: WriteOffIn):
 
 @bind(router, "inventory.unit.list", "/inventory/units")
 async def unit_list(request, params: Query[UnitListIn]):
-    return await run_operation(request, queries.list_units, params)
+    return await run_operation(request, queries.units.list_units, params)
 
 
 @bind(router, "inventory.config.get", "/inventory/config")
 async def config_get(request):
-    return await run_operation(request, queries.get_config)
+    return await run_operation(request, queries.settings.get_config)
 
 
 @bind(router, "inventory.config.update", "/inventory/config")
@@ -218,4 +218,4 @@ async def product_image_upload(request, data: ProductImageUploadIn):
 
 @bind(router, "inventory.product.suggest_image", "/inventory/products/image/suggest")
 async def product_image_suggest(request, params: Query[ProductImageSuggestIn]):
-    return await run_operation(request, queries.suggest_image, params)
+    return await run_operation(request, queries.products.suggest_image, params)

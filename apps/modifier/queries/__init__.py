@@ -18,13 +18,8 @@ from live.operations import operation
 from psycopg import sql
 
 from apps.inventory.models import ProductCategory
-from apps.inventory.queries import (
-    categories_standing_for,
-    category_names_in_copy,
-    find_category,
-    find_product,
-    products_standing_for,
-)
+from apps.inventory.queries.reads import find_category, find_product
+from apps.inventory.queries.recovery import categories_standing_for, category_names_in_copy, products_standing_for
 from apps.modifier.models import ModifierGroup, ModifierLink, ModifierOption
 from apps.modifier.schemas import (
     CategoryRefIn,
