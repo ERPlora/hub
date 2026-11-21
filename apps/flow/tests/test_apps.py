@@ -1,5 +1,5 @@
 """The flow app declares its module metadata, its menu entry, its permissions, what each role gets, its
-scheduled tasks and the assistant's contract of every operation (``ai`` and described input fields)."""
+scheduled tasks, the assistant's contract of every operation (``ai`` and described input fields) and its help window."""
 
 from pathlib import Path
 
