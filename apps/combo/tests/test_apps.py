@@ -2,7 +2,7 @@
 the assistant's contract of every operation (``ai`` and described input fields)."""
 
 from django.apps import apps
-from live.meta import Category, LiveAppConfig, Nav, module_configs, permissions_for_role
+from live.meta import Category, Help, LiveAppConfig, Nav, module_configs, permissions_for_role
 from live.operations import INTERNAL, registry
 
 from apps.combo import queries, services  # noqa: F401  (importing them registers the operations)
@@ -214,3 +214,7 @@ def test_the_reaction_and_the_recovery_are_run_only_by_the_platform():
     # No role holds the system permission: no person and no API key reaches them.
     assert {name: registry[name].permission for name in SYSTEM_ONLY} == dict.fromkeys(SYSTEM_ONLY, "combo.system")
     assert "combo.system" not in combo_app().permissions
+
+
+def test_its_help_window_is_ready_without_a_video_yet():
+    assert combo_app().help == Help()

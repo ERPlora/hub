@@ -7,7 +7,7 @@ from django.apps import apps
 from django.conf import settings
 from django.utils import translation
 from live.live_registry import live_registry
-from live.meta import Category, LiveAppConfig, Nav, SetupCheck, SetupStep, module_configs, permissions_for_role
+from live.meta import Category, Help, LiveAppConfig, Nav, SetupCheck, SetupStep, module_configs, permissions_for_role
 from live.operations import INTERNAL, registry
 
 from apps.tax import events as E
@@ -223,3 +223,7 @@ def test_the_step_that_asks_to_turn_taxes_on_paints_an_icon_the_shell_has():
     registry = shell_icon_registry()
     assert step["icon"] == tax().navigation[0].icon
     assert f"'{step['icon'].removeprefix('ion:')}'" in registry
+
+
+def test_its_help_window_is_ready_without_a_video_yet():
+    assert tax().help == Help()
