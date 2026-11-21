@@ -2,8 +2,9 @@
 // the «+» and the pencil — a summary of the chosen zone, and its live plan underneath (on a phone in
 // «Service», its cards): every table of the room is read once, on the page's one stream, and the strip only
 // picks which zone the plan paints.
-// - Service: the zones and tables in service; a tap opens the table's window; Transfer and Merge pick
-//   their destination on the plan («Transfer 4 to…», «Pick a free table», «Cancel»).
+// - Service: the zones and tables in service; a tap on an occupied table opens its check in Sales (a split
+//   one asks which check first), a tap on any other table and a long press on any table open its window;
+//   Transfer and Merge pick their destination on the plan («Transfer 4 to…», «Pick a free table», «Cancel»).
 // - Edit plan: every zone and table (the inactive ones greyed out); a tap opens «Edit table», a drag saves
 //   the place at once (a refused one goes back and says so); «+» adds a zone or a table, the pencil edits
 //   the zone.
@@ -26,6 +27,13 @@ const FREE = tableRow({ id: 't1', number: '1' });
 const BUSY = occupied({ id: 't4', number: '4', position_x: 104 });
 const IDLE = tableRow({ id: 't9', number: '9', is_active: false, in_service: false, position_x: 192 });
 const TERRACE = tableRow({ id: 't7', number: '7', zone_id: 'z2', zone_name: 'Terrace' });
+
+/** Table 4 split in two checks; the second one's order is `o2`. */
+function splitTable(): TableOut {
+  const table = occupied({ id: 't4', number: '4' });
+  table.checks = [...table.checks, { ...table.checks[0], id: 's2', order_id: 'o2' }];
+  return table;
+}
 
 /** A screen of `width` px: `@erplora/ui`'s phone breakpoint answers as a browser would. */
 function screenOf(width: number): void {
@@ -74,7 +82,7 @@ describe('FloorPlanPage · service', () => {
     expect(s.net.streams.map((stream) => stream.aborted())).toEqual([false]);
     expect(s.zoneNames()).toEqual(['Dining room', 'Terrace']);
     expect(s.tiles()).toEqual(['t1', 't4']);
-    expect(s.el('hint').exists()).toBe(false);
+    expect(s.el('hint').text()).toBe('Tap a table to seat it or open its check · press and hold it (or right-click it) for transfer, merge and more.');
   });
 
   it('shows a skeleton of the plan while it loads, then each zone tab counts its occupied tables and the card sums up the zone', async () => {
@@ -115,13 +123,17 @@ describe('FloorPlanPage · service', () => {
     expect(s.tiles()).toEqual(['t1', 't4']);
     s.wrapper.findComponent(FloorCards).vm.$emit('select', 't4');
     await flush();
-    expect((s.wrapper.findComponent(TableSheet).props('table') as TableOut).id).toBe('t4');
+    expect(s.router.currentRoute.value.fullPath).toBe('/sale/pos?order=o1');
+    s.wrapper.findComponent(FloorCards).vm.$emit('actions', 't4');
+    await flush();
+    const sheet = s.wrapper.findComponent(TableSheet);
+    expect([sheet.props('open'), (sheet.props('table') as TableOut).id, sheet.props('intent')]).toEqual([true, 't4', 'actions']);
     await s.mode('edit');
     expect(s.el('cards').exists()).toBe(false);
     expect(s.el('canvas').exists()).toBe(true);
   });
 
-  it('on a phone a transfer picks its destination among the cards', async () => {
+  it('on a phone a transfer picks its destination among the cards, where a long press does nothing', async () => {
     screenOf(390);
     const s = await setup();
     await s.show();
@@ -130,6 +142,11 @@ describe('FloorPlanPage · service', () => {
     const card = (id: string) => s.wrapper.find(`[data-testid="table-floor-tile-${id}"]`).classes();
     expect(card('t4')).toContain('floor-card--dimmed');
     expect(card('t1')).toContain('floor-card--target');
+    s.wrapper.findComponent(FloorCards).vm.$emit('actions', 't1');
+    await flush();
+    expect(s.wrapper.findComponent(TableSheet).props('open')).toBe(false);
+    expect(s.el('pick').exists()).toBe(true);
+    expect(s.el('hint').exists()).toBe(false);
   });
 
   it('a tablet keeps the plan', async () => {
@@ -178,15 +195,52 @@ describe('FloorPlanPage · service', () => {
     expect(s.el('zones').classes()).not.toContain('floor-zone-tabs--more-left');
   });
 
-  it('a tap opens the table’s window, which follows the live table', async () => {
+  it('a tap on an occupied table opens its check in Sales, with no window on the way', async () => {
     const s = await setup();
     await s.show();
     s.canvas().vm.$emit('select', BUSY);
     await flush();
+    expect(s.router.currentRoute.value.fullPath).toBe('/sale/pos?order=o1');
+    expect(s.wrapper.findComponent(TableSheet).props('open')).toBe(false);
+  });
+
+  it('a long press opens the table’s window with its actions, which follows the live table', async () => {
+    const s = await setup();
+    await s.show();
+    s.canvas().vm.$emit('actions', BUSY);
+    await flush();
     const sheet = s.wrapper.findComponent(TableSheet);
-    expect([sheet.props('open'), (sheet.props('table') as TableOut).id]).toEqual([true, 't4']);
+    expect([sheet.props('open'), (sheet.props('table') as TableOut).id, sheet.props('intent')]).toEqual([true, 't4', 'actions']);
+    expect(s.router.currentRoute.value.fullPath).toBe('/table/floor-plan');
     await s.result(TABLES, page([FREE, { ...BUSY, guests: 5 }, IDLE, TERRACE], 4, 100));
     expect((s.wrapper.findComponent(TableSheet).props('table') as TableOut).guests).toBe(5);
+  });
+
+  it('a tap on a free table opens its window to seat it, as does one on a check that Sales has not got', async () => {
+    const orderless = occupied({ id: 't5', number: '5', position_x: 192 });
+    orderless.checks = [{ ...orderless.checks[0], order_id: null }];
+    const s = await setup();
+    await s.show(ZONES, [FREE, orderless]);
+    for (const table of [FREE, orderless]) {
+      s.canvas().vm.$emit('select', table);
+      await flush();
+      const sheet = s.wrapper.findComponent(TableSheet);
+      expect([sheet.props('open'), (sheet.props('table') as TableOut).id, sheet.props('intent')]).toEqual([true, table.id, 'actions']);
+    }
+    expect(s.router.currentRoute.value.fullPath).toBe('/table/floor-plan');
+  });
+
+  it('a tap on a split table asks which check first, and the one chosen opens in Sales', async () => {
+    const split = splitTable();
+    const s = await setup();
+    await s.show(ZONES, [split]);
+    s.canvas().vm.$emit('select', split);
+    await flush();
+    const sheet = s.wrapper.findComponent(TableSheet);
+    expect([sheet.props('open'), sheet.props('intent')]).toEqual([true, 'check']);
+    sheet.vm.$emit('check', 'o2');
+    await flush();
+    expect(s.router.currentRoute.value.fullPath).toBe('/sale/pos?order=o2');
   });
 
   it('Transfer picks a free table on the plan, then moves the check there', async () => {
@@ -206,8 +260,7 @@ describe('FloorPlanPage · service', () => {
   });
 
   it('Merge into the other check of a split table names that check; «Cancel» stops picking', async () => {
-    const split = occupied({ id: 't4', number: '4' });
-    split.checks = [...split.checks, { ...split.checks[0], id: 's2', order_id: 'o2' }];
+    const split = splitTable();
     const s = await setup();
     await s.show(ZONES, [split]);
     s.wrapper.findComponent(TableSheet).vm.$emit('pick', { mode: 'merge', table: split, check: split.checks[1] });
@@ -267,6 +320,7 @@ describe('FloorPlanPage · service', () => {
     const none = await setup({ session: EMPLOYEE });
     await none.show(ZONES, [IDLE]);
     expect(none.el('empty-tables').text()).toContain('No tables in service in this zone.');
+    expect(none.el('hint').exists()).toBe(false);
   });
 });
 
@@ -320,6 +374,7 @@ describe('FloorPlanPage · edit plan', () => {
     const s = await setup({ locale: 'es' });
     await s.show();
     expect(s.labels('table-floor-mode-')).toEqual(['Servicio', 'Editar plano']);
+    expect(s.el('hint').text()).toBe('Toca una mesa para sentarla o abrir su cuenta · mantenla pulsada (o haz clic derecho) para transferir, fusionar y más.');
     await s.mode('edit');
     expect(s.el('hint').text()).toBe('Arrastra para colocar · clic en una mesa para editarla o borrarla. Los cambios se guardan al momento.');
   });
