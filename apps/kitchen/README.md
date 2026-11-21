@@ -69,8 +69,7 @@ pnpm e2e tests/e2e/kitchen-*.spec.ts tests/e2e/printing-kitchen.spec.ts
 
 ## Qué queda fuera
 
-- Cursos con retener y lanzar (kitchen#71), vaciar de golpe lo cobrado antes de pasar a papel (kitchen#158) y, de la
-  alergia del cliente, la marca de la cabecera del papel, que pinta la app del dispositivo (ERPlora/app#63): «Lo que
+- Cursos con retener y lanzar (kitchen#71) y vaciar de golpe lo cobrado antes de pasar a papel (kitchen#158): «Lo que
   queda fuera» del WORKBOOK.
 - Lo que sigue pedido a Ventas: el aviso propio del cambio de título y dos índices parciales («Lo que pide a otras
   apps» del WORKBOOK).

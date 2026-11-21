@@ -229,7 +229,7 @@ cierra la ventana sin guardarlo. Con la ventana como se abrió, atrás la cierra
 | KITCHEN-F28 | Retirar las rondas de una cuenta eliminada o unida a otra | hecho |
 | KITCHEN-F29 | Anular un plato ya enviado con aviso a cocina | hecho |
 | KITCHEN-F31 | Dar a Caja las comandas que siguen en marcha | hecho |
-| KITCHEN-F32 | Resaltar la alergia del cliente en la tarjeta y en el papel | parcial |
+| KITCHEN-F32 | Resaltar la alergia del cliente en la tarjeta y en el papel | hecho |
 
 ### KITCHEN-F01 Crear una estación
 Estado: hecho
@@ -790,9 +790,7 @@ estar incompleta.»). Con Cocina apagada no hay comandas pendientes. Nunca impid
 Implicados: CASH_REGISTER-F08, CASH_REGISTER-F09, KITCHEN-F10, KITCHEN-F13
 
 ### KITCHEN-F32 Resaltar la alergia del cliente en la tarjeta y en el papel
-Estado: parcial — la tarjeta y el detalle ya enseñan la alergia y los alérgenos que coinciden, y el papel imprime
-los renglones del plato; falta que la app del dispositivo imprima `!! ALERGIA !!` en la cabecera de la hoja
-(ERPlora/app#63)
+Estado: hecho
 Actor: empleado
 Pantalla: Pantalla, Comandas
 Pasos:
@@ -928,9 +926,8 @@ avisos de Ventas (`sale.order.*`).
   lleva primero en `modifiers` sus renglones (`*** ALERGIA: … ***` y, si coincide, `*** LLEVA: … ***`), con los
   nombres en el idioma del negocio y en mayúsculas, y la hoja lleva `allergy` (`!! ALERGIA !!`, vacío si ningún
   plato de esa hoja la tiene) para la cabecera (KITCHEN-F32).
-- **A la app del dispositivo** (ERPlora/app): que la comanda pinte en su cabecera `priority`, `allergy` y la marca
-  de copia (`duplicate`), hoy sin pintar (ERPlora/app#63), y que las mayúsculas con tilde no salgan como «?»
-  (ERPlora/app#64).
+- **A la app del dispositivo** (ya hecho, ERPlora/app): la comanda pinta en su cabecera `priority`, `allergy` y la
+  marca de copia (`duplicate`), y las mayúsculas con tilde salen sin acento, nunca como «?».
 - **A Caja** (ya hecho): avisar al cerrar de las comandas sin servir con `kitchen.ticket.board`
   (CASH_REGISTER-F08, KITCHEN-F31).
 
@@ -1080,5 +1077,3 @@ que no tiene ningún papel: solo el sistema (`*`).
 - Cursos de verdad, retener y lanzar (kitchen#71): fuera del MVP («Referencia adoptada»).
 - Vaciar de golpe las comandas cobradas antes de pasar la cocina a papel (kitchen#158): hoy se sirven a
   mano (KITCHEN-F26, F27). Comportamiento nuevo, después del MVP.
-- La marca `!! ALERGIA !!` en la cabecera del papel (KITCHEN-F32, `parcial`), por la app del dispositivo
-  (ERPlora/app#63).
