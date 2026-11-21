@@ -271,7 +271,8 @@ test('an aborted help request shows the error and retry loads the same window', 
 
 test('a video stays local until its poster creates one sandboxed no-cookie frame', async () => {
   const videoId = 'dQw4w9WgXcQ';
-  const embedUrl = `https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&fs=0&rel=0&playsinline=1`;
+  const embedUrl =
+    `https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&rel=0&playsinline=1&cc_load_policy=1&cc_lang_pref=es&hl=es`;
   await page.goto(`${A}/table/floor-plan`);
   await page.route('**/api/help?app=table', async (route) => {
     const response = await route.fetch();
@@ -292,7 +293,12 @@ test('a video stays local until its poster creates one sandboxed no-cookie frame
   const frame = page.locator('iframe.youtube-embed__player');
   await expect(frame).toHaveCount(1);
   await expect(frame).toHaveAttribute('src', embedUrl);
-  await expect(frame).toHaveAttribute('sandbox', 'allow-scripts allow-same-origin allow-presentation');
+  await expect(frame).toHaveAttribute(
+    'sandbox',
+    'allow-scripts allow-same-origin allow-presentation allow-popups allow-popups-to-escape-sandbox',
+  );
+  await expect(frame).toHaveAttribute('allowfullscreen', '');
+  await expect(frame).toHaveAttribute('allow', 'autoplay; encrypted-media; picture-in-picture; fullscreen');
   await expect(frame).toHaveAttribute('referrerpolicy', 'strict-origin-when-cross-origin');
   expect(googleRequests.slice(before)).toEqual([embedUrl]);
   const csp = await page.evaluate(() => (window as unknown as { helpCsp?: string[] }).helpCsp ?? []);
