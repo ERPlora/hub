@@ -1,0 +1,54 @@
+{
+  "id": "s18-closed-monday-whole",
+  "title": "Closed only this coming Monday, for the local holiday, said whole: mark it in the opening hours",
+  "vertical": "restaurant",
+  "said": "whole",
+  "seed": "restaurant.en",
+  "language": "en",
+  "setup": [
+    {"tool": "schedule.week.set_day", "arguments": {"weekday": 0, "is_closed": false, "intervals": [{"open_time": "12:30", "close_time": "16:30"}, {"open_time": "19:30", "close_time": "23:30"}]}},
+    {"tool": "schedule.week.set_day", "arguments": {"weekday": 1, "is_closed": false, "intervals": [{"open_time": "12:30", "close_time": "16:30"}, {"open_time": "19:30", "close_time": "23:30"}]}},
+    {"tool": "schedule.week.set_day", "arguments": {"weekday": 2, "is_closed": false, "intervals": [{"open_time": "12:30", "close_time": "16:30"}, {"open_time": "19:30", "close_time": "23:30"}]}},
+    {"tool": "schedule.week.set_day", "arguments": {"weekday": 3, "is_closed": false, "intervals": [{"open_time": "12:30", "close_time": "16:30"}, {"open_time": "19:30", "close_time": "23:30"}]}},
+    {"tool": "schedule.week.set_day", "arguments": {"weekday": 4, "is_closed": false, "intervals": [{"open_time": "12:30", "close_time": "16:30"}, {"open_time": "19:30", "close_time": "23:30"}]}},
+    {"tool": "schedule.week.set_day", "arguments": {"weekday": 5, "is_closed": false, "intervals": [{"open_time": "12:30", "close_time": "16:30"}, {"open_time": "19:30", "close_time": "23:30"}]}},
+    {"tool": "schedule.week.set_day", "arguments": {"weekday": 6, "is_closed": false, "intervals": [{"open_time": "12:30", "close_time": "16:30"}]}}
+  ],
+  "owner": {
+    "persona": "James, the English owner of The Anchor, a restaurant in Nerja open every day of the week. He is closing up for the night and types quickly on the tablet.",
+    "goal": "That the opening hours show the restaurant closed this coming Monday, {monday}, for the local holiday, and open as usual every other Monday.",
+    "upFront": ["We're closed this coming Monday, the {monday}, for the local holiday: only that day, every other Monday we open as usual. It has to show as closed in the opening hours."],
+    "ifAsked": ["It's the town's local holiday."]
+  },
+  "attachments": [],
+  "opening": "We're closed this coming Monday for the local holiday, just that day: mark it as closed in the opening hours",
+  "writes": ["schedule.special_day.create", "schedule.special_day.bulk_create", "schedule.override.create", "reservation.blocked_date.create"],
+  "cards": [],
+  "expect": [
+    {
+      "says": "the restaurant is closed this coming Monday, once",
+      "sql": "select (select count(*) from schedule_specialday where date = '{monday}' and is_closed) + (select count(*) from schedule_override where start_date = '{monday}' and end_date = '{monday}' and is_closed)",
+      "equals": "1"
+    }
+  ],
+  "forbidden": [
+    {
+      "says": "the usual week does not change: every other Monday opens as before",
+      "sql": "select md5(string_agg(d.weekday || d.is_closed::text || i.open_time || i.close_time, ',' order by d.weekday, i.position)) from schedule_weekday d join schedule_weekdayinterval i on i.day_id = d.id",
+      "unchanged": true
+    },
+    {
+      "says": "no other day is closed or has other hours",
+      "sql": "select (select count(*) from schedule_specialday where date <> '{monday}') + (select count(*) from schedule_override where start_date <> '{monday}' or end_date <> '{monday}')",
+      "equals": "0"
+    }
+  ],
+  "mustAsk": [],
+  "maxTurns": 6,
+  "golden": [
+    {
+      "tool": "schedule.special_day.create",
+      "arguments": {"date": "{monday}", "name": "Local holiday", "is_closed": true}
+    }
+  ]
+}

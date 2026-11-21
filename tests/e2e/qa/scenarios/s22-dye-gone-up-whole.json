@@ -1,0 +1,46 @@
+{
+  "id": "s22-dye-gone-up-whole",
+  "title": "El tinte de raíz a 38 € porque el color ha subido, dicho entero: cambiar su precio",
+  "vertical": "hair_salon",
+  "said": "whole",
+  "seed": "hair_salon.es",
+  "language": "es",
+  "setup": [],
+  "owner": {
+    "persona": "Pilar, dueña de la peluquería Pilar Peluqueros, en Zaragoza. Le acaba de llegar la factura del distribuidor de color y escribe desde el móvil.",
+    "goal": "Que el tinte de raíz pase a cobrarse a 38 € en vez de 35 €, sin tocar ningún otro servicio.",
+    "upFront": ["El color ha subido: el tinte de raíz hay que cobrarlo a 38 € en vez de 35 €. Lo demás se queda como está."],
+    "ifAsked": ["Lo que me cobra el distribuidor no lo llevo apuntado aquí."]
+  },
+  "attachments": [],
+  "opening": "El color nos ha subido: pon el tinte de raíz a 38 €, lo demás se queda igual",
+  "writes": ["service.service.update"],
+  "cards": [],
+  "expect": [
+    {
+      "says": "el tinte de raíz pasa de 35 € a 38 €",
+      "sql": "select price from service_service where name = 'Tinte de raíz'",
+      "equals": "3800"
+    }
+  ],
+  "forbidden": [
+    {
+      "says": "el tinte de raíz solo cambia de precio",
+      "sql": "select cost || ' ' || duration_minutes || ' ' || is_active::text || ' ' || is_bookable::text from service_service where name = 'Tinte de raíz'",
+      "unchanged": true
+    },
+    {
+      "says": "ningún otro servicio cambia",
+      "sql": "select md5(string_agg(id::text || price || cost || duration_minutes || is_active::text, ',' order by id)) from service_service where name <> 'Tinte de raíz'",
+      "unchanged": true
+    }
+  ],
+  "mustAsk": [],
+  "maxTurns": 6,
+  "golden": [
+    {
+      "tool": "service.service.update",
+      "arguments": {"service": "Tinte de raíz", "price": 3800}
+    }
+  ]
+}

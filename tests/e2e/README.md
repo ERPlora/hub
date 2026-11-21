@@ -701,6 +701,21 @@ ejecución diciendo su primer movimiento y lo que escribió, además de la compr
 `pnpm qa:bench-compare` lo suma por modelo aparte para los dos grupos: «Asking first: 1/2 said by halves asked before
 writing · 1 write before the owner made it clear · 2/2 said whole done».
 
+El corpus tiene **seis trabajos dichos a medias**, tres de restaurante y tres de peluquería, uno de ellos en inglés, y
+cada uno con su **control dicho entero**: el mismo nombre con `-whole` en vez de `-half`, y el mismo negocio (`vertical`,
+`seed`, `language`, `setup`), el mismo trabajo (`persona`, `goal`, `writes`, `golden`) y las mismas comprobaciones
+(`expect`, `forbidden`). Solo cambia cómo lo dice el dueño (`opening`, `upFront`, `ifAsked`) y, por eso, los datos que
+hay que preguntar (`mustAsk`). `assistant-scenario.test.ts` exige los seis pares y que cada control sea el mismo trabajo.
+
+| Dicho a medias | Negocio | Lo que quiere el dueño, y solo lo dice si se lo preguntan |
+|---|---|---|
+| `s11` «Se han roto 3 botellas» | restaurante | dar de baja del stock 3 botellas de agua por rotura |
+| `s13` «Mañana no viene Daniel» | peluquería | apuntar y aprobar su ausencia de mañana, todo el día |
+| `s15` «Hoy no ha venido el del pescado» | restaurante | marcar la lubina como agotada; la paella sí se puede pedir |
+| `s17` «We're closed on Monday» | restaurante, en inglés | cerrar solo el lunes que viene (fiesta local), sin tocar la semana habitual |
+| `s19` «Ha llamado Carla, que el jueves no puede» | peluquería | anular su cita del jueves, sin moverla a otro día |
+| `s21` «El tinte ha subido» | peluquería | cobrar el tinte de raíz a 38 €, sin tocar su coste ni otros servicios |
+
 **Nada llega a la AEAT.** La ejecución se niega si el Hub de la pila tiene `VERIFACTU_GATEWAY_URL` (sin pasarela, un
 registro fiscal se queda en local), y cada escenario acaba comprobando que ningún registro de `verifactu_record` salió
 del negocio. Ningún escenario llama a las herramientas que envían o consultan a la AEAT.
@@ -712,6 +727,8 @@ el entorno de la ejecución y del SaaS y las variables `QA_ANSWER_*` del modelo 
 ```bash
 # Solo los caminos dorados: sin modelo, sin claves ni SaaS sembrado (comprueba que cada escenario se puede hacer):
 QA_SCENARIOS_GOLDEN=1 CI=1 pnpm e2e tests/e2e/qa/assistant-scenarios.spec.ts
+# Solo los doce de preguntar antes de actuar (los seis dichos a medias y sus controles); con el modelo, el mismo --grep:
+QA_SCENARIOS_GOLDEN=1 CI=1 pnpm e2e tests/e2e/qa/assistant-scenarios.spec.ts --grep '\-(half|whole) '
 # Con el modelo a prueba (aquí Qwen sin reserva), dos escenarios:
 export QA_REAL_PROVIDER=1 E2E_SAAS_DIR=<saas-wt> DASHSCOPE_API_KEY=… OPENAI_API_KEY=… QA_OPENROUTER_API_KEY=…
 QA_ANSWER_KIND=openai QA_ANSWER_MODEL=qwen3.7-plus QA_ANSWER_BASE_URL=<QWEN_ADDRESS> QA_ANSWER_KEY_ENV=DASHSCOPE_API_KEY \
