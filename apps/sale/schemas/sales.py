@@ -231,7 +231,7 @@ class SaleListIn(PageIn):
     )
     status: SaleStatus | None = Field(None, description="Only sales of this status.")
     payment_method_name: str | None = Field(
-        None, max_length=60, description="Only sales whose main tender is this method."
+        None, max_length=60, description="Only sales paid with this method, in full or in part."
     )
     customer_name: str | None = Field(
         None, max_length=200, description="Part of the customer's name."
@@ -269,7 +269,9 @@ class SaleRow(Schema):
     document_type: DocumentType = Field(description="ticket or invoice.")
     customer_id: UUID | None = Field(description="Customer's card.")
     customer_name: str = Field(description="Customer's name.")
-    payment_method_name: str = Field(description="Main tender's method.")
+    payment_method_name: str = Field(
+        description="The methods it was paid with, once each in the order they were tendered («Cash + Card»)."
+    )
     staff_id: UUID | None = Field(description="Who served it.")
     currency: str = Field(description="ISO 4217 currency it was charged in.")
     currency_decimals: int = Field(description="The decimals of its currency as the server counts them (0 in JPY).")

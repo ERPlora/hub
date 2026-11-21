@@ -3,14 +3,15 @@
 from decimal import Decimal
 from uuid import UUID
 
-from django.db.models import Count, Exists, OuterRef, Q, Sum
+from django.db.models import Count, Exists, OuterRef, Q, StringAgg, Subquery, Sum, TextField, Value
+from django.db.models.functions import Coalesce
 from django.utils import translation
 from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext
 from live.errors import NotFound
 from live.operations import AI, operation
 
-from apps.sale.models import FiscalStatus, Refund, RefundLine, Sale, SaleLine
+from apps.sale.models import FiscalStatus, Refund, RefundLine, Sale, SaleLine, SalePayment
 from apps.sale.queries.payment_methods import method_display_name
 from apps.sale.queries.receipt_codes import paper_code
 from apps.sale.schemas.sales import SaleByKeyIn, SaleByKeyOut, SaleListIn, SaleOut, SalePage, SaleRefIn
@@ -223,6 +224,31 @@ def sale_by_key(ctx: OperationContext, params: SaleByKeyIn) -> dict:
 
 
 _SALE_SORT = {"number": ("business_day", "sequence"), "created_at": ("created_at",)}
+_TENDER_SEPARATOR = " + "
+
+
+def tender_names(sale: Sale) -> str:
+    """The methods ``sale`` was paid with, once each and in the order they were tendered, as the reader reads them
+    («Cash + Card»); empty when nothing was tendered."""
+    names = dict.fromkeys(payment.method_name for payment in sale.payments.all())
+    return _TENDER_SEPARATOR.join(method_display_name(name) for name in names)
+
+
+def _tender_order() -> Coalesce:
+    """What sorting by payment compares: the stored names of a sale's tenders, joined in the order they were tendered."""
+    names = (
+        SalePayment.objects.filter(sale=OuterRef("pk"))
+        .order_by()
+        .values("sale")
+        .annotate(names=StringAgg("method_name", Value(_TENDER_SEPARATOR), order_by=("position", "id")))
+        .values("names")
+    )
+    return Coalesce(Subquery(names), Value(""), output_field=TextField())
+
+
+def _paid_with(method_name: str) -> Exists:
+    """A sale that took at least one tender of this method, the largest or not."""
+    return Exists(SalePayment.objects.filter(sale=OuterRef("pk"), method_name=method_name))
 
 
 def sale_row(sale: Sale) -> dict:
@@ -235,7 +261,7 @@ def sale_row(sale: Sale) -> dict:
         "document_type": sale.document_type,
         "customer_id": sale.customer_id,
         "customer_name": sale.customer_name,
-        "payment_method_name": method_display_name(sale.payment_method_name),
+        "payment_method_name": tender_names(sale),
         "staff_id": sale.staff_id,
         "currency": sale.currency,
         "currency_decimals": currency_decimals(sale.currency),
@@ -262,7 +288,7 @@ def sale_row(sale: Sale) -> dict:
     expose_api=True,
     ai=AI(
         description="List the sales, newest first: search by number or customer; filter by status (completed, voided, "
-        "refunded), main payment method, customer, professional, business days (inclusive) and total in cents.",
+        "refunded), payment method (any of its tenders), customer, professional, business days (inclusive) and total in cents.",
         asks={
             "en": (
                 "show me yesterday's sales",
@@ -295,9 +321,10 @@ def list_sales(ctx: OperationContext, params: SaleListIn) -> dict:
         sales = sales.filter(
             Q(number__icontains=text) | Q(customer_name__icontains=text)
         )
+    if params.payment_method_name is not None:
+        sales = sales.filter(_paid_with(params.payment_method_name))
     exact = {
         "status": params.status,
-        "payment_method_name": params.payment_method_name,
         "customer_id": params.customer_id,
         "staff_id": params.staff_id,
         "business_day__gte": params.date_from,
@@ -312,8 +339,12 @@ def list_sales(ctx: OperationContext, params: SaleListIn) -> dict:
         sales = sales.filter(customer_name__icontains=params.customer_name.strip())
     if params.number:
         sales = sales.filter(number__icontains=params.number.strip())
-    columns = _SALE_SORT.get(params.sort, (params.sort,))
-    page = sales.order_by(*list_order(*columns, descending=params.dir == "desc"))[
+    columns = (
+        (_tender_order(),)
+        if params.sort == "payment_method_name"
+        else _SALE_SORT.get(params.sort, (params.sort,))
+    )
+    page = sales.order_by(*list_order(*columns, descending=params.dir == "desc")).prefetch_related("payments")[
         params.offset : params.offset + params.limit
     ]
     with translation.override(ctx.language):

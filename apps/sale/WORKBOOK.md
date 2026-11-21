@@ -1026,8 +1026,10 @@ Pasos:
    territorio de **Impuestos → Ajustes**, y cambia al momento si se cambia el territorio. Con «7 días»,
    debajo de las cifras, lo vendido cada uno de esos días, de más antiguo a hoy («mié 14 · 120,50 €»).
 3. La tabla: Fecha, Número, Cliente, Pago, Estado (Completada, Anulada, Devuelta; con «Por devolver
-   5,00 €» si se devolvió una parte) y Total. Busca con «Buscar número o cliente…», filtra por
-   estado, pago, fecha o total, u ordena.
+   5,00 €» si se devolvió una parte) y Total. Una venta cobrada con varios medios (SALE-F03) dice en
+   «Pago» todos, una vez cada uno y en el orden en que se cobraron: «Efectivo + Tarjeta». Busca con
+   «Buscar número o cliente…», filtra por estado, pago, fecha o total, u ordena; el filtro de pago
+   encuentra una venta por cualquiera de sus medios.
 4. Toca una fila para ver su documento. La tabla se recarga sola cuando se cobra, anula o
    devuelve una venta.
 5. Las cifras de hoy también están en el **Inicio**, en el tablero: «Ventas
