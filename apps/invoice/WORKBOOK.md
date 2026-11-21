@@ -140,6 +140,19 @@ Ventana que abre «Factura completa» en la ficha de un tique. Título «Factura
 «Tipo de documento» (solo fuera de España), «NIF» y «Domicilio», todos obligatorios salvo el tipo.
 «Emitir factura completa» y «Cancelar». Al emitir, la ventana se cierra y la ficha abre la F3 nueva.
 
+### Pedir la factura del tique (página pública)
+La abre el cliente, sin cuenta, con el código de su tique (`/p/<negocio>/invoice/<código>`, INVOICE-F04). Título
+«Solicita tu factura». Arriba, «Tique {número}» con «Negocio», «Fecha» y «Total». Debajo, «Escribe tus
+datos fiscales para obtener la factura completa de este tique.», los mismos campos que en «Factura completa» sin el
+buscador de clientes, y «Solicitar factura completa», en gris hasta que están el nombre, el NIF y el domicilio. Al
+pedirla, «Tu factura está lista.» y «Factura {número}» con «Emisor», «Fecha de emisión», «Cliente» y «NIF
+cliente», las líneas y los totales como en la ficha, e «Imprimir / PDF», que saca la factura en A4 con su QR de
+VeriFactu; si ya la había pedido, al abrirla ve esa misma factura con «Ya pediste esta factura. Esta es la misma,
+con los datos que diste entonces.». Un rechazo de un campo sale bajo él, y el del servidor encima del botón.
+Cargando: «Cargando tu tique…». Error: el motivo del servidor (código que no abre nada, caducado, tique aún sin
+registrar o demasiados intentos), con «Reintentar» salvo cuando el código no abre nada o ha caducado; sin respuesta
+del servidor, «No se pudo cargar el tique. Inténtalo de nuevo.».
+
 ### Nueva factura manual
 Ventana con la «Serie» (las activas del año que emiten F1 o F2; de entrada, la predeterminada o FACT),
 el buscador de clientes de Clientes, «Cliente», «NIF cliente», «Dirección», «País», «Notas» y las
@@ -195,7 +208,7 @@ territorio no cuentan como cambio, ni una rectificativa ya emitida: atrás cierr
 | INVOICE-F01 | El tique (factura simplificada) que nace al cobrar | hecho — Ventas lo pide dentro del mismo cobro |
 | INVOICE-F02 | La factura completa al cobrar a un cliente con NIF | hecho — Ventas lo pide dentro del mismo cobro |
 | INVOICE-F03 | Emitir una factura a mano | hecho |
-| INVOICE-F04 | El cliente pide la factura completa de su tique | parcial — el servidor ya la emite con el código del tique; faltan el código en el papel y la página pública |
+| INVOICE-F04 | El cliente pide la factura completa de su tique | parcial — la página pública ya la pide con el código del tique; falta imprimir el código en el papel |
 | INVOICE-F05 | Pasar un tique a factura completa desde el mostrador | hecho |
 | INVOICE-F06 | Una venta cobrada que no se ha podido facturar | hecho |
 | INVOICE-F07 | Anular una venta cobrada que ya tiene su tique | hecho — Ventas la pide dentro de la misma anulación |
@@ -318,17 +331,17 @@ motivo) y ofrece «Reintentar», que la vuelve a pedir; en cuanto llega, «Emiti
 Implicados: TAX-F18, CUSTOMER-F17, TAX-F11
 
 ### INVOICE-F04 El cliente pide la factura completa de su tique
-Estado: parcial — Facturación ya la emite con el código del tique; faltan el código en el papel del tique (SALE-F29) y la página pública donde el cliente escribe sus datos (hub#500)
+Estado: parcial — la página pública ya la pide con el código del tique y la enseña; falta imprimir el código en el papel del tique (SALE-F29)
 Actor: cliente, sin cuenta
-Pantalla: la página pública del negocio `/p/<negocio>/invoice/<código>` (aún no se pinta)
+Pantalla: la página pública del negocio `/p/<negocio>/invoice/<código>`
 Pasos:
 1. El tique lleva su código para pedir la factura completa, que es también el final de la dirección que lo abre.
-2. El cliente la abre en su móvil, sin iniciar sesión, y ve el número, la fecha y el total de su tique; si ya la
-   pidió, ve su factura completa.
+2. El cliente la abre en su móvil, sin iniciar sesión, y ve el negocio, el número, la fecha y el total de su tique;
+   si ya la pidió, ve su factura completa sin volver a escribir sus datos.
 3. Escribe su nombre o razón social, su país, el tipo de documento (solo fuera de España), su NIF y su domicilio,
    y pide la factura.
 4. Facturación emite, como el sistema, la factura completa que sustituye al tique (F3), igual que en INVOICE-F05,
-   y el cliente la ve en A4, desde donde la imprime o la guarda en PDF (INVOICE-F18).
+   y el cliente la ve en pantalla, desde donde la imprime o la guarda en PDF en A4 (INVOICE-F18).
 Entra: el código del tique y los datos fiscales que escribe el cliente.
 Sale: la F3, una sola por tique, como en INVOICE-F05 (avisa `invoice.invoice.issued`). El código no se gasta:
 desde entonces abre esa misma F3, hasta que caduca a los cuatro años del cobro.
@@ -337,7 +350,8 @@ tique. Revísalo o pide la factura en el establecimiento.», sin datos de nadie;
 caducado: pide la factura en el establecimiento.»; un tique que aún no tiene su documento fiscal, «Tu tique aún
 se está registrando. Prueba otra vez en unos minutos.»; diez códigos que no abren nada en una hora desde la misma
 conexión, «Demasiadas peticiones. Inténtalo de nuevo en un momento.» hasta que pasa la hora (un código bueno no
-cuenta). Los datos del cliente se comprueban como en INVOICE-F05, y un tique anulado o devuelto se rechaza igual.
+cuenta). Los datos del cliente se comprueban como en INVOICE-F05, con cada rechazo bajo su campo, y un tique anulado
+o devuelto se rechaza igual.
 Si el tique ya tiene su F3, responde con ella sin emitir otra ni gastar número, aunque se escriban otros datos.
 Implicados: SALE-F29, INVOICE-F05, INVOICE-F18
 
@@ -1286,9 +1300,9 @@ sola (riesgo alto, como sustituir un tique en el mostrador).
 
 Lo que no entra tiene su issue abierta:
 
-- **hub#500** — El cliente no puede pedir él mismo la factura completa de su tique (INVOICE-F04): faltan el
-  código en el papel del tique de Ventas y la página pública que lo abre; Facturación ya da sus dos operaciones
-  por la puerta pública (`invoice.public.ticket` e `invoice.public.substitute`).
+- **hub#500** — El cliente no puede pedir él mismo la factura completa de su tique (INVOICE-F04): falta el
+  código en el papel del tique de Ventas; la página pública ya lo abre y pide la factura con las operaciones
+  `invoice.public.ticket` e `invoice.public.substitute`.
 - **hub#501** — El emisor de Facturación no se rellena con los datos fiscales de la cuenta de ERPlora:
   la foto del SaaS no lleva el bloque `issuer` y `base.hub.state_apply` no llama a
   `invoice.issuer.sync`, que ya existe; y el flujo choca con «Dos identidades» de PLAN-SAAS (los datos fiscales

@@ -28,6 +28,12 @@ const routes: RouteRecordRaw[] = [
     component: () => import('./pages/IssuerPage.vue'),
     meta: { auth: true },
   },
+  // The page a customer opens with the code on her ticket, without a session; base's public door serves its HTML.
+  {
+    path: '/p/:slug/invoice/:code',
+    component: () => import('./pages/PublicInvoicePage.vue'),
+    meta: { auth: false, chrome: false },
+  },
 ];
 
 export default routes;
