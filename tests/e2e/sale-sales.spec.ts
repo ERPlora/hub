@@ -51,14 +51,6 @@ const FILTER_VIEWPORTS = [
   { label: '834', width: 834, height: 1112 },
   { label: '1440', width: 1440, height: 900 },
 ];
-/** A desk, a tablet upright and a small phone (cards): where the split sale's methods are checked whole. */
-const ROW_VIEWPORTS = [
-  { label: '1440', width: 1440, height: 900 },
-  { label: '820', width: 820, height: 1180 },
-  { label: '375', width: 375, height: 667 },
-];
-/** Both methods of the split sale, as an English or a Spanish reader reads them. */
-const BOTH_METHODS = /Cash \+ Card|Efectivo \+ Tarjeta/;
 
 test.beforeAll(async ({ browser }) => {
   // Card charges issue tickets (F2) when the hub has an issuer: the cleanup gives their numbers back.
@@ -116,6 +108,15 @@ test('SALE-F28 and F29: the history lists the sales, finds one by number and sho
   await document.locator('[data-testid=sale-document-close]').click();
   await expect(receipt).toBeHidden();
 });
+
+/** A desk, a tablet upright and a small phone (cards): where the split sale's methods are checked whole. */
+const ROW_VIEWPORTS = [
+  { label: '1440', width: 1440, height: 900 },
+  { label: '820', width: 820, height: 1180 },
+  { label: '375', width: 375, height: 667 },
+];
+/** Both methods of the split sale, as an English or a Spanish reader reads them. */
+const BOTH_METHODS = /Cash \+ Card|Efectivo \+ Tarjeta/;
 
 test('SALE-F28 and F03: a sale paid in cash and by card says both under «Payment», and filtering by cash finds it', async ({ page, context }) => {
   await login(page, A, '/sale/sales');
