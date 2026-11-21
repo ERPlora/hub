@@ -122,7 +122,7 @@ max-statements = 50
 "base/tenancy/tests/test_concurrency.py" = ["F401"]
 "base/tests/test_activation.py" = ["B905"]
 "base/tests/test_database_cut.py" = ["B905"]
-"control/tests/test_admin.py" = ["F841"]
+"control/tests/test_admin_restore.py" = ["F841"]
 "tests/packaged_doors/apps/shop/queries/__init__.py" = ["F401"]
 "tests/packaged_doors/apps/shop/services/__init__.py" = ["F401"]
 
