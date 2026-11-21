@@ -17,7 +17,7 @@ Cocina recibe cada ronda que el camarero envía desde el TPV, antes de cobrar, y
 platos entre **estaciones** (plancha, barra, postres…), deja que cada estación los marque **listos** y
 que el pase los **entregue**, y guarda un **historial** de lo que se hizo.
 
-Quién la usa:
+### Quién la usa y qué hace cada uno
 
 - El **empleado** de cocina o de sala (cocinero, camarero): marca platos listos, los recupera, entrega,
   marca urgente una ronda y envía rondas desde el TPV. Solo cambia estados.
@@ -106,6 +106,12 @@ ERPlora no inventa flujos: adopta los que el mercado ya probó.
 ## Pantallas
 
 ### Pantalla
+El tablero de la cocina: una tarjeta por comanda que se cocina, con sus platos, la espera en color y quién la
+atiende. Arriba eliges la vista («Comandas», «Listas» o «Resumen») y, si hay platos de varias estaciones, la tuya,
+que la tableta recuerda. Toca un plato para marcarlo listo, «Listo» para la tarjeta entera y «Servida» cuando sale;
+en «⋮» están «Marcar urgente» y «Recuperar». Se pone al día sola, sin recargar.
+
+#### Detalle
 Menú **Cocina → Pantalla**. El tablero de cocina. Una sola barra arriba, fija al desplazar: las tres
 vistas en pestañas con su contador («Comandas» y «Listas»; «Resumen» sin contador), el botón «Pantalla completa»
 y, si en las comandas en marcha hay platos de más de una estación, los botones de estación («Todas»,
@@ -132,6 +138,12 @@ urgencia. Avisa a cocina de viva voz y revisa su impresora.» hasta que una impr
 bien. Se actualiza sola con cada cambio, sin recargar.
 
 ### Comandas
+Todas las comandas, la más nueva primero, con su número, su destino, su tipo, su prioridad, su estado, sus platos y
+su total. Búscalas por número o por destino y fíltralas por tipo, prioridad o estado. Desde cada fila la lanzas, la
+marcas lista, la recuperas, la sirves, la reimprimes o la cancelas; al tocarla ves su detalle. «Nueva comanda» crea
+una a mano, para lo que no pasa por el TPV.
+
+#### Detalle
 Menú **Cocina → Comandas**. Tabla de todas las comandas, la más nueva primero, 50 por página (otro
 tamaño se elige al pie):
 Comanda (número completo `AAAAMMDD-NNNN`), Destino (la etiqueta), Tipo, Prioridad, Estado, Platos y
@@ -147,6 +159,12 @@ tabla con reintento; un rechazo de una acción sale en su diálogo o encima de l
 dentro del panel.
 
 ### Estaciones
+Las estaciones de tu cocina (plancha, barra, postres…), cada una con su color, dónde sale lo suyo (en la pantalla,
+en papel o en las dos) y por qué impresora. Con «Añadir estación» creas una; en cada fila la cambias, la eliminas o
+le mandas productos. Debajo, el enrutado dice qué productos y categorías van a cada estación: lo que no tiene
+estación sale en «Sin estación».
+
+#### Detalle
 Menú **Cocina → Estaciones**. Tabla: Estación (con su color), Destino («Pantalla y papel», «Solo
 pantalla», «Solo papel»), Impresora (la función —«Cocina», «Barra»— y, si se eligió, la impresora
 concreta), En curso (platos por hacer de esa estación) y Activa («Sí»/«No»); buscador «Buscar
@@ -160,6 +178,11 @@ Error: el de la tabla con reintento; cada rechazo dentro de su formulario o de s
 acciones solo salen a quien puede gestionar estaciones (responsable, administrador, propietario).
 
 ### Historial
+Lo que ha pasado en la cocina, lo último primero: qué se hizo, en qué comanda y con qué plato, quién y cuándo.
+Busca por el número de la comanda o por palabras de sus notas, y filtra por acción («Recibida», «Lista»,
+«Cancelada»…).
+
+#### Detalle
 Menú **Cocina → Historial**, título «Historial de cocina». Tabla de lo que pasó en cocina, lo último
 primero, 50 por página (otro tamaño se elige al pie): Acción, Comanda (el número), Plato, Quién (el
 nombre de la persona o, si no tiene, su correo, o el de la API key; «Sistema» si no lo hizo una persona:
@@ -170,6 +193,11 @@ notas…» (un trozo del número o palabras de las notas); filtro de acción con
 el de la tabla con reintento.
 
 ### Ajustes
+Cómo trabaja la pantalla de cocina: el cronómetro, a los cuántos minutos una tarjeta pasa a ámbar y a rojo, el
+sonido al entrar una comanda (con su volumen y su tono), si sale el pase en papel al marcar lista, si la cocina
+trabaja con la pantalla y el tipo de comanda de entrada. Solo la ve quien puede guardar los ajustes.
+
+#### Detalle
 Pestaña **Cocina → Ajustes** (solo para quien puede guardarlos: responsable, administrador,
 propietario). «Mostrar cronómetro», «Aviso ámbar (minutos)», «Aviso rojo (minutos)», «Semáforo de
 color», «Sonar al entrar una comanda», «Volumen del sonido (0-100)», «Tono del sonido» («Campanilla»,
@@ -245,7 +273,7 @@ Pasos:
 Entra: lo que escribe quien la crea.
 Sale: la estación (avisa: estación creada).
 Si falla: el rechazo sale dentro del panel; el motivo de un campo, debajo de él, y se quita en cuanto se
-corrige ese campo, aunque otro diga lo mismo (hub#888). Un nombre que ya tiene otra estación viva se rechaza
+corrige ese campo, aunque otro diga lo mismo. Un nombre que ya tiene otra estación viva se rechaza
 («Ya hay una estación con ese nombre. Elige otro nombre.»); el de una eliminada vuelve a estar libre.
 Quien no puede gestionar estaciones no ve el botón.
 Implicados: KITCHEN-F02, KITCHEN-F03, KITCHEN-F04, KITCHEN-F08, PRINTING-F04
@@ -255,7 +283,7 @@ Estado: hecho
 Actor: responsable, administrador
 Pantalla: Estaciones
 Pasos:
-1. Toca la fila (o «Editar»): se abre «Editar estación · <nombre>».
+1. Toca la fila (o «Editar»): se abre «Editar estación · Plancha».
 2. Cambia el nombre, el color, el destino, la impresora o «Activa».
 3. Pulsa «Guardar»: la tabla se actualiza.
 Entra: la estación y lo que cambia.
@@ -263,7 +291,7 @@ Sale: la estación cambiada (avisa: estación cambiada). Desactivarla hace que l
 después busquen la estación de su categoría y, si no hay, salgan «Sin estación». Lo ya enviado no cambia
 de estación ni de destino; el nombre y el color que pinta la pantalla sí son los vivos.
 Si falla: dentro del formulario, cada motivo bajo su campo hasta que se corrige ese campo, aunque otro
-diga lo mismo (hub#888). Un nombre repetido se rechaza; guardar una estación que otro
+diga lo mismo. Un nombre repetido se rechaza; guardar una estación que otro
 dispositivo acaba de eliminar dice que ya no existe.
 Implicados: KITCHEN-F01, KITCHEN-F04, KITCHEN-F10, PRINTING-F04
 
@@ -272,7 +300,7 @@ Estado: hecho
 Actor: responsable, administrador
 Pantalla: Estaciones
 Pasos:
-1. En la fila, «Eliminar»: sale «¿Eliminar «<nombre>»?» con «La estación sale de la lista y deja de
+1. En la fila, «Eliminar»: sale «¿Eliminar «Plancha»?» con «La estación sale de la lista y deja de
    recibir comandas. Las comandas ya enviadas la conservan en su historial.».
 2. Pulsa «Eliminar estación».
 Entra: la estación.
@@ -333,23 +361,22 @@ Estado: hecho
 Actor: empleado
 Pantalla: Pantalla
 Pasos:
-1. En el TPV, añade un menú eligiendo un plato de cada tanda (SALE-F12) y pulsa «Enviar comanda»
-   (KITCHEN-F18).
+1. En el TPV, añade un menú eligiendo un plato de cada tanda y pulsa «Enviar comanda».
 2. En la tarjeta sale la cabecera del menú (su nombre de cocina o, si no tiene, su nombre) con cuántos
    platos lleva («2 platos»; «1 plato» si es uno) y, debajo, junto a una raya, cada plato elegido con la
    cantidad multiplicada por los menús pedidos.
-3. Cada plato va a la estación de su propio producto o, si no tiene, a la de su categoría (KITCHEN-F04),
+3. Cada plato va a la estación de su propio producto o, si no tiene, a la de su categoría,
    nunca a la del menú: cada estación ve solo sus platos, con la misma cabecera encima.
 4. Toca un plato para marcarlo listo, o toca la cabecera del menú para marcar listos de una vez sus
    platos que quedan en pantalla; el resto de la comanda no cambia.
-5. En el papel de cada estación sale la cabecera del menú y, sangrados debajo, sus platos (KITCHEN-F08).
+5. En el papel de cada estación sale la cabecera del menú y, sangrados debajo, sus platos.
 Entra: de Ventas, el menú tal como se pidió: sus platos elegidos (cada uno con su producto y su
 categoría), su nombre de cocina, cuántos menús y la nota del menú, que sale en cada uno de sus platos.
 Sale: un plato por cada plato del menú, cada uno en su estación, que se marca listo y se entrega por
 separado; el importe del menú cuenta una sola vez en el total de la comanda (avisa: comanda recibida).
 Si falla: un plato del menú que es un servicio no se cocina ni sale; un menú cuyos platos son todos
 servicios no abre comanda. El TPV no deja añadir un menú sin elegir nada ni al que le falta una tanda
-obligatoria, así que nunca llega vacío ni a medias. Anular el menú en el TPV tacha todos sus platos (KITCHEN-F29). Lo ya enviado no cambia aunque
+obligatoria, así que nunca llega vacío ni a medias. Anular el menú en el TPV tacha todos sus platos. Lo ya enviado no cambia aunque
 el menú cambie después.
 Implicados: SALE-F12, SALE-F20, COMBO-F11, KITCHEN-F04, KITCHEN-F08, KITCHEN-F29
 
@@ -358,18 +385,17 @@ Estado: hecho
 Actor: empleado
 Pantalla: Pantalla
 Pasos:
-1. En el TPV, elige los suplementos del plato («+QUESO», «sin cebolla», el punto) (SALE-F11) y, si hace
-   falta, escribe una nota en la línea (SALE-F13); después envía la ronda.
+1. En el TPV, elige los suplementos del plato («+QUESO», «sin cebolla», el punto) y, si hace
+   falta, escribe una nota en la línea; después envía la ronda.
 2. En la tarjeta, debajo del nombre del plato salen sus suplementos en negrita, separados por comas y en
    el orden en que se eligieron, y debajo la nota en cursiva.
-3. En el papel salen igual: cada suplemento en su renglón, sangrado bajo el plato, y después la nota
-   (KITCHEN-F08).
+3. En el papel salen igual: cada suplemento en su renglón, sangrado bajo el plato, y después la nota.
 Entra: de Ventas, los suplementos elegidos con su nombre de cocina (si no tiene, su nombre), la nota de
 la línea y, si la línea va invitada, el motivo.
 Sale: los suplementos y la nota congelados en el plato: cambiar el catálogo después no cambia esta
 comanda.
 Si falla: una alergia escrita solo en la nota sale como cualquier nota; la que el camarero marca en la línea
-sale aparte, antes de los suplementos (KITCHEN-F32). Un suplemento que se cobra en una línea aparte (otro IVA)
+sale aparte, antes de los suplementos. Un suplemento que se cobra en una línea aparte (otro IVA)
 sale igual bajo su plato.
 Implicados: SALE-F11, SALE-F13, SALE-F20, MODIFIER-F08, KITCHEN-F08
 
@@ -407,7 +433,7 @@ Pasos:
    papel sale como su primera hoja, sin «copia».
 Entra: la comanda.
 Sale: trabajos nuevos en la cola de Impresión (cada reimpresión es un trabajo distinto).
-Si falla: «No se pudo imprimir la comanda: <motivo>», con el motivo de Impresión; sin Impresión, o
+Si falla: «No se pudo imprimir la comanda:», seguido del motivo que da Impresión; sin Impresión, o
 sin ninguna impresora activa de la función de sus platos, «Ninguna impresora imprime esta comanda:
 activa Impresión y añade una impresora de cocina o de barra activa.» y no se manda nada a la cola.
 Implicados: KITCHEN-F08, KITCHEN-F21, PRINTING-F11
@@ -489,7 +515,7 @@ Pasos:
 1. En una tarjeta que se cocina, «⋮» → «Marcar urgente»: lleva «Urgente» y salta al principio del tablero
    en todas las pantallas, que suenan una vez.
 2. Las estaciones que imprimen y aún tienen platos de esa ronda por hacer reciben un aviso corto en
-   papel: la cabecera de la comanda con `!! URGENTE !!` y sin platos.
+   papel: la cabecera de la comanda con «!! URGENTE !!» y sin platos.
 3. «Quitar urgente» lo deshace y no imprime nada. Una ronda VIP no lo ofrece, y por el asistente
    o la API se rechaza («Esa comanda es VIP: marcarla urgente no cambia su prioridad.»).
 Entra: la comanda que se cocina.
@@ -630,7 +656,7 @@ Estado: hecho
 Actor: responsable
 Pantalla: Comandas (también el asistente)
 Pasos:
-1. En la fila, «⋮ → Cancelar»: sale «¿Cancelar la comanda <número>?» con «Sale de la pantalla de
+1. En la fila, «⋮ → Cancelar»: sale «¿Cancelar la comanda 20261014-0012?» con «Sale de la pantalla de
    cocina. La cuenta del TPV no cambia: los platos siguen en ella.» y un motivo opcional.
 2. Pulsa «Cancelar comanda»: la comanda y sus platos pasan a «Cancelada» (un plato anulado sigue
    «Anulado»).
@@ -658,8 +684,7 @@ Si falla: dentro del panel, y lo escrito se queda. Una comanda sin platos se rec
 plato.»). Lo que el servidor rechaza de un campo se marca bajo ese campo, con su motivo: una cantidad 0
 marca la cantidad de ese plato («Debe ser mayor que 0.»), aunque haya filas vacías encima, y la ventana
 trae el campo a la vista si la persona estaba más abajo. La marca se va al cambiar ese campo o al quitar
-el plato, y solo la de ese campo aunque otro diga lo mismo (también la del producto de un plato, al elegir otro;
-hub#888). Como no cuelga de ninguna cuenta, cobrar no la cierra.
+el plato, y solo la de ese campo aunque otro diga lo mismo (también la del producto de un plato, al elegir otro). Como no cuelga de ninguna cuenta, cobrar no la cierra.
 Implicados: KITCHEN-F04, KITCHEN-F10, KITCHEN-F21, KITCHEN-F24, KITCHEN-F27, INVENTORY-F27
 
 ### KITCHEN-F24 Borrar una comanda
@@ -709,7 +734,7 @@ Pasos:
    domicilio»).
 2. «Guardar» solo se puede pulsar cuando algo cambió: sale «Ajustes guardados.» y las pantallas
    abiertas los toman al momento.
-   Lo que se cambia mientras se está guardando no se pierde: se queda en pantalla, por guardar (hub#914).
+   Lo que se cambia mientras se está guardando no se pierde: se queda en pantalla, por guardar.
 Entra: los valores.
 Sale: los ajustes (avisa: ajustes cambiados). «La cocina trabaja con la pantalla» vale desde el
 siguiente cobro: lo cobrado antes se sirve a mano.
@@ -717,7 +742,7 @@ Si falla: minutos fuera de 1–120 o volumen fuera de 0–100 se rechazan; el á
 rojo, también («El aviso ámbar tiene que llegar antes que el rojo.»). El rechazo sale bajo el
 formulario, con el campo marcado, y lo escrito se queda. Como en las ventanas de formulario, el aviso se quita
 en cuanto se cambia algo y el motivo de un campo en cuanto se corrige ese campo; los dos vuelven si el
-siguiente intento también se rechaza. Un rechazo sin campo se queda hasta el siguiente intento (hub#854).
+siguiente intento también se rechaza. Un rechazo sin campo se queda hasta el siguiente intento.
 Implicados: KITCHEN-F10, KITCHEN-F16, KITCHEN-F17, KITCHEN-F23, KITCHEN-F27
 
 ### KITCHEN-F27 Cerrar las rondas al cobrar la cuenta entera
@@ -794,28 +819,27 @@ Estado: hecho
 Actor: empleado
 Pantalla: Pantalla, Comandas
 Pasos:
-1. En el TPV, el camarero marca la alergia del cliente en la línea de su plato (SALE-F41) y envía la ronda
-   (KITCHEN-F18).
+1. En el TPV, el camarero marca la alergia del cliente en la línea de su plato y envía la ronda.
 2. En la tarjeta, la cabecera lleva la marca «Alergia», en rojo, junto a «Urgente» y «VIP», si alguno de sus
    platos tiene una alergia marcada. Cada estación la ve solo si la tiene uno de sus platos.
 3. Debajo del nombre de ese plato, antes de sus suplementos y de su nota, sale un bloque propio en rojo: «Alergia:
-   Gluten». Si el plato lleva ese alérgeno según Inventario (SALE-F40), el bloque añade «El plato lleva Gluten». Un
+   Gluten». Si el plato lleva ese alérgeno según Inventario, el bloque añade «El plato lleva Gluten». Un
    plato sin alergia marcada no lleva bloque, aunque tenga alérgenos: la pantalla no repite los de cada plato.
 4. En un menú, el bloque sale en cada uno de sus platos, y «El plato lleva» nombra solo los alérgenos de ese plato.
-5. En el papel de la estación (KITCHEN-F08), la cabecera lleva `!! ALERGIA !!` (debajo de `!! URGENTE !!` si la
-   ronda va urgente) y, justo debajo del plato y antes de sus suplementos, `*** ALERGIA: GLUTEN ***` y, si lo
-   lleva, `*** LLEVA: GLUTEN ***`, cada uno en su renglón y en mayúsculas, para que se distinga sin color. La
-   reimpresión (KITCHEN-F09) sale igual.
-6. El cocinero sigue como siempre: marcar listo, recuperar y entregar no cambian (KITCHEN-F11 a KITCHEN-F13), y el
+5. En el papel de la estación, la cabecera lleva «!! ALERGIA !!» (debajo de «!! URGENTE !!» si la ronda va
+   urgente) y, justo debajo del plato y antes de sus suplementos, «*** ALERGIA: GLUTEN ***» y, si lo lleva,
+   «*** LLEVA: GLUTEN ***», cada uno en su renglón y en mayúsculas, para que se distinga sin color. La reimpresión
+   sale igual.
+6. El cocinero sigue como siempre: marcar listo, recuperar y entregar no cambian, y el
    bloque sigue a la vista mientras el plato está en la pantalla. En **Comandas**, el detalle de la comanda lo
    enseña también en su plato.
 Entra: de Ventas, por cada línea enviada, la alergia del cliente y los alérgenos congelados de su producto
 (SALE-F40, SALE-F41).
 Sale: la alergia y los alérgenos que coinciden, congelados en el plato como sus suplementos: cambiar la línea o el
 catálogo después no cambia esta comanda (avisa: comanda recibida).
-Si falla: si la hoja no se imprime, la alergia sigue en la pantalla y la comanda se reimprime como cualquier otra
-(KITCHEN-F09). Sin alergia marcada, el plato sale como hoy, con su nota tal cual. Una alergia que el cliente dice
-después de enviar no llega sola: se avisa de viva voz (SALE-F41). Una comanda hecha a mano (KITCHEN-F23) no lleva
+Si falla: si la hoja no se imprime, la alergia sigue en la pantalla y la comanda se reimprime como cualquier otra.
+Sin alergia marcada, el plato sale como hoy, con su nota tal cual. Una alergia que el cliente dice
+después de enviar no llega sola: se avisa de viva voz. Una comanda hecha a mano no lleva
 bloque de alergia: es para lo que no pasa por el TPV, y su nota sigue ahí.
 Implicados: SALE-F20, SALE-F40, SALE-F41, INVENTORY-F35, KITCHEN-F05, KITCHEN-F06, KITCHEN-F07, KITCHEN-F08, KITCHEN-F09
 
@@ -1062,6 +1086,24 @@ que no tiene ningún papel: solo el sistema (`*`).
   moneda de la venta (como Caja, hub#273).
 - Toda lista pagina (`limit` ≤ 100) con desempate por `id`; el tablero tiene un tope de 200 comandas en
   marcha (`truncated`).
+
+### Lo que la ventana de ayuda no enseña
+
+La ayuda del Hub publica el primer apartado hasta su primer `###`, el resumen de cada pestaña (lo que va antes de su
+primer `####`) y, de cada flujo hecho en una pestaña, su título, sus pasos y «Si falla», sin nombres de código,
+incidencias ni ids de flujo (`tests/test_help_workbooks.py`). Lo que esas partes dejaron de decir, y quien mantiene
+Cocina necesita:
+
+- Los mensajes llevan el nombre real de la estación y el número de la comanda («Editar estación · <nombre>»,
+  «¿Eliminar «<nombre>»?», «¿Cancelar la comanda <número>?», «No se pudo imprimir la comanda: <motivo>»); la ayuda
+  los enseña con un ejemplo (Plancha, 20261014-0012) o sin el hueco.
+- El aviso bajo un campo se quita al corregir ese campo, aunque otro diga lo mismo (hub#888: KITCHEN-F01, F02 y
+  F23); en los ajustes, lo que se cambia mientras se guarda se queda por guardar (hub#914) y un rechazo sin campo se
+  queda hasta el siguiente intento (hub#854), en KITCHEN-F26.
+- Las marcas del papel (`!! URGENTE !!`, `!! ALERGIA !!`, `*** ALERGIA: GLUTEN ***`, `*** LLEVA: GLUTEN ***`) salen
+  en la ayuda entre comillas; el envío de la ronda es KITCHEN-F18, el papel KITCHEN-F08 y la reimpresión
+  KITCHEN-F09, que KITCHEN-F06, F07 y F32 ya no citan en sus pasos; la alergia en la línea es SALE-F41 y los
+  alérgenos del producto, SALE-F40.
 
 ### Contradicciones (sin resolver; se señalan)
 
