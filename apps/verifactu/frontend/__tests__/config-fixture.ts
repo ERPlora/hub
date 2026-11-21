@@ -16,7 +16,7 @@ export const CONFIG: ConfigOut = {
   declaration_version: 'v1',
   declaration_url: 'https://erplora.com/legal/declaracion-responsable/v1/',
   account_url: 'https://erplora.com',
-  own_certificate: { loaded: false, holder: '', holder_tax_id: '', kind: '', uploaded_at: null, expires_at: null, expires_in_days: null, expires_soon: false },
+  own_certificate: { loaded: false, holder: '', holder_tax_id: '', kind: '', uploaded_at: null, expires_at: null, expires_in_days: null, expires_soon: false, aeat_proof: 'untested', aeat_proof_detail: '' },
   representation: { status: 'none', updated_at: null, reason: '', linked: true, company: true, submission: null, history: [] },
   synced_at: null,
   route_ready: true,
@@ -40,4 +40,6 @@ export const LOADED_CERTIFICATE: ConfigOut['own_certificate'] = {
   expires_at: '2027-10-01T10:00:00Z',
   expires_in_days: 351,
   expires_soon: false,
+  aeat_proof: 'accepted',
+  aeat_proof_detail: '',
 };

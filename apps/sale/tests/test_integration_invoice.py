@@ -356,15 +356,17 @@ def _live_through_erplora(settings):
 
 
 def _live_with_its_own_certificate(settings):
-    """The business files with its own certificate, uploaded by the owner, and goes live."""
+    """The business files with its own certificate, uploaded by the owner and accepted by the AEAT's test environment,
+    and goes live."""
     from apps.verifactu import certificates
-    from apps.verifactu.tests.conftest import b64, make_p12
+    from apps.verifactu.tests.conftest import accepted_by_the_aeat_of_testing, b64, make_p12
 
     settings.FISCAL_CERTIFICATE_KEY = certificates.generate_key()
     run(
         "verifactu.certificate.upload",
         {"p12_base64": b64(make_p12()), "password": "secret"},
     )
+    accepted_by_the_aeat_of_testing()
     run("verifactu.config.go_live")
 
 

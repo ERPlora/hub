@@ -28,6 +28,7 @@ from live.meta import all_live_app_configs, permissions_for_role
 from live.operations import get
 
 from apps.verifactu import gateway, trust
+from apps.verifactu.models import OwnCertificate
 from base import scheduler
 from base.tenancy.context import use_hub
 from base.tenancy.tests.business import (
@@ -477,3 +478,9 @@ def trusts_the_test_authority(monkeypatch):
 
 def b64(data: bytes) -> str:
     return base64.b64encode(data).decode()
+
+
+def accepted_by_the_aeat_of_testing() -> None:
+    """The own certificate as the AEAT's test environment leaves it once it accepts a submission presented with it
+    (``test_certificate_proof`` shows how): what going live with it needs."""
+    OwnCertificate.objects.update(aeat_proof=OwnCertificate.Proof.ACCEPTED)

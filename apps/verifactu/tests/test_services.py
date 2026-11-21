@@ -1489,11 +1489,9 @@ def test_the_test_invoice_is_only_for_the_test_environment(issuer):
 
 
 def own_certificate(days: float = 400) -> OwnCertificate:
-    """A certificate as an upload leaves it (its material aside: the route only reads its expiry)."""
+    """A certificate as an upload leaves it once the AEAT's test environment accepted it (the route reads its expiry)."""
     return OwnCertificate.objects.create(
-        holder="ACME SL",
-        holder_tax_id=ISSUER_NIF,
-        kind="representative",
+        holder="ACME SL", holder_tax_id=ISSUER_NIF, kind="representative", aeat_proof=OwnCertificate.Proof.ACCEPTED,
         expires_at=timezone.now() + dt.timedelta(days=days),
         sealed_blob=certificates.seal(make_p12(), "secret"),
         uploaded_by="ana",

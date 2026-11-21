@@ -288,6 +288,13 @@
       "expires": "Expires on",
       "expiresSoon": "Expires in {n} days: upload the renewed one here.",
       "expired": "The certificate has expired. Upload a valid one to send to the AEAT.",
+      "proof": {
+        "label": "AEAT test environment",
+        "untested": "Not tested yet",
+        "accepted": "Accepted",
+        "rejected": "Refused",
+        "untestedNote": "It is tried with the next record that goes out in testing: once the AEAT's test environment accepts it, you can go live."
+      },
       "testingNote": "You can test VeriFactu without a certificate. You only need one to go live.",
       "productionNote": "Upload a valid certificate to send your records to the AEAT.",
       "keysNote": "The certificate and its password are kept encrypted in this Hub and only travel to ERPlora's gateway when sending to the AEAT; they are never shown again.",

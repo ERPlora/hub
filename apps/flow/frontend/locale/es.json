@@ -2748,7 +2748,9 @@
       "erased": "Cliente borrado",
       "reserving": "Se ve reservada",
       "running": "En curso",
-      "issued": "Emitida ahora"
+      "issued": "Emitida ahora",
+      "aeat_proof": "AEAT de pruebas",
+      "aeat_proof_detail": "Por qué lo ha rechazado la AEAT de pruebas"
     },
     "catalogError": "No se ha podido leer lo que pueden usar aquí las automatizaciones.",
     "errors": {

@@ -25,6 +25,7 @@ from apps.verifactu.queries.route import (
 )
 from apps.verifactu.schemas.contingency import TransmitOut
 
+from .certificate_proof import note_answer
 from .sealing import INVALID_RECORD, _build_xml
 from .writes import _config, _event
 
@@ -323,6 +324,7 @@ def _send_chain(  # noqa: C901, PLR0912, PLR0913, PLR0915, PLR0917
         envelope=whole,
         certificate=certificate,
     )
+    note_answer(ctx, environment, reply, certificate)
     transmission = uuid.uuid7()
     digest = hashlib.sha256(whole.encode("utf-8")).hexdigest()
     for record in batch:
