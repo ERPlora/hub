@@ -39,6 +39,19 @@ describe('useStaffNames', () => {
     ]);
   });
 
+  it('names the professionals of a check already on screen when the till mounts', async () => {
+    let names!: ReturnType<typeof useStaffNames>;
+    const lines = [line({ staff_id: 's9' })];
+    await mountComposable(
+      () => {
+        names = useStaffNames(() => lines);
+      },
+      { answer: { status: 200, body: { id: 's9', full_name: 'Lucia Garcia' } } },
+    );
+    await settle();
+    expect(names.names.value).toEqual({ s9: 'Lucia Garcia' });
+  });
+
   it('a professional picked on this screen is named as picked, without asking', async () => {
     const s = await setup();
     s.names().remember('s1', 'Marta');
