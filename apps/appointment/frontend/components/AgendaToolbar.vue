@@ -163,9 +163,12 @@ function jump(value: unknown): void {
           <ion-label>{{ $t('appointment.views.week') }}</ion-label>
         </ion-segment-button>
       </ion-segment>
+      <!-- The bar changes with the view, so the view changes on the click and not as the finger lifts: the click
+           that follows a touch would land on whatever the new view puts under the finger. -->
       <ion-segment
         data-testid="appointment-toolbar-view"
         :value="view"
+        :swipe-gesture="false"
         :aria-label="$t('appointment.views.label')"
         @ion-change="view = ($event.detail.value as AgendaView) ?? 'list'"
       >
