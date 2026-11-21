@@ -1,45 +1,13 @@
 // The Home's figures are the library's figure card (StatCard): its first figures with a colour head the board in a row
 // in colour, one per colour, in the colour of their measure (sales 1, tickets 2, inventory 6); the rest stay soft. Seen
 // at the three sizes, in light and in dark.
-import { type Browser, expect, type Locator, type Page, test } from '@playwright/test';
+import { expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, horizontalOverflow, login, shot, shown, turnOffTurnedOn, turnOnMissing } from './helpers';
-import { boardWidget, HOME_BOARD, panelValue } from './home-helpers';
+import { horizontalOverflow, shot, shown, THREE_SIZES } from './helpers';
+import { boardWidget, panelValue, spanishOwnerWithPanels } from './home-helpers';
 
-const NEEDED = ['sale', 'inventory'] as const;
+/** Sales and Inventory, on in the seeded business: three figures with a colour (two of inventory), and a chart. */
 const BOARD = ['sale.today', 'sale.tickets_today', 'inventory.low_stock_count', 'inventory.value', 'sale.last_7_days'];
-const SIZES = [
-  { label: '375', width: 375, height: 667 },
-  { label: '820', width: 820, height: 1180 },
-  { label: '1440', width: 1440, height: 900 },
-] as const;
-
-const turnedOn: string[] = [];
-
-test.beforeAll(async ({ browser }) => {
-  const context = await browser.newContext({ baseURL: A });
-  const page = await context.newPage();
-  await login(page, A, '/');
-  await turnOnMissing(context, A, NEEDED, turnedOn).finally(() => context.close());
-});
-
-test.afterAll(async ({ browser }) => {
-  const context = await browser.newContext({ baseURL: A });
-  const page = await context.newPage();
-  await login(page, A, '/');
-  await turnOffTurnedOn(context, A, turnedOn).finally(() => context.close());
-});
-
-async function homeWithFigures(browser: Browser, size: (typeof SIZES)[number], scheme: 'light' | 'dark') {
-  const context = await browser.newContext({ baseURL: A, viewport: size, locale: 'es-ES', colorScheme: scheme });
-  await context.addInitScript(([key, keys]) => localStorage.setItem(key, keys), [HOME_BOARD, JSON.stringify(BOARD)]);
-  const page = await context.newPage();
-  await login(page, A, '/');
-  await context.addCookies([{ name: 'django_language', value: 'es', domain: new URL(A).hostname, path: '/' }]);
-  await page.goto(`${A}/`);
-  if (process.env.E2E_SAVE_STORAGE_STATE) await context.storageState({ path: process.env.E2E_SAVE_STORAGE_STATE });
-  return { context, page };
-}
 
 const lively = (page: Page): Locator => shown(page).locator('[data-testid="widgets-lively"]');
 
@@ -53,11 +21,12 @@ async function readFigure(page: Page, key: string, tone: string, variant: 'live'
   return card;
 }
 
-for (const size of SIZES) {
+for (const size of THREE_SIZES) {
   for (const scheme of ['light', 'dark'] as const) {
     test(`Inicio: the figures in figure cards, the main ones in a row in colour, at ${size.label} in ${scheme}`, async ({ browser }) => {
-      const { context, page } = await homeWithFigures(browser, size, scheme);
+      const { context, page } = await spanishOwnerWithPanels(browser, size, BOARD);
       try {
+        await page.emulateMedia({ colorScheme: scheme });
         const row = lively(page);
         await expect(row).toHaveClass(/ep-stat-grid/);
         await expect(row.locator('[data-testid="widget"]')).toHaveCount(3);

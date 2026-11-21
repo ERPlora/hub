@@ -6,10 +6,10 @@
 // who sees the team and the time off (STAFF-F20 is everyone's), reads the same panels. Captures of the board, of who
 // is away and of the figures and the roles. Everything this file creates is named «E2E-HOOKS …» and removed after it;
 // it parks nothing.
-import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
+import { type Browser, type BrowserContext, expect, type Page, test } from '@playwright/test';
 
 import { A, api, type Credentials, EMPLOYEE, horizontalOverflow, login, OWNER, shot, shown, untilStill } from './helpers';
-import { panelError, panelTitle, panelValue } from './home-helpers';
+import { boardValue as value, boardWidget as panel, panelsRead, panelTitle } from './home-helpers';
 import { staffCleanUp } from './staff-helpers';
 import { VIEWPORTS } from './inventory-helpers';
 import { stamp } from './sale-helpers';
@@ -116,9 +116,6 @@ async function spanish(
   return { context, page };
 }
 
-const panel = (page: Page, key: string): Locator =>
-  shown(page).locator(`[data-testid="widget-board"] [data-testid="widget"][data-key="${key}"]`);
-const value = (page: Page, key: string): Locator => panelValue(panel(page, key));
 
 async function stats(context: BrowserContext): Promise<Stats> {
   const res = await api<Stats>(context, A, 'GET', '/staff/members/stats');
@@ -207,10 +204,7 @@ test('STAFF-F20 STAFF-F23: «Ausencias pendientes» and «Empleados por rol» to
 test('STAFF-F20 STAFF-F23: the employee, who sees the team and the time off, reads the same five panels', async ({ browser }) => {
   const { context, page } = await spanish(browser, { width: 1440, height: 900 }, { board: ALL, who: EMPLOYEE });
   try {
-    for (const key of ALL) {
-      await expect(panel(page, key)).toHaveAttribute('aria-busy', 'false');
-      await expect(panelError(panel(page, key))).toHaveCount(0);
-    }
+    await panelsRead(page, ALL);
     const figures = await stats(context);
     await expect(value(page, HEADCOUNT)).toHaveText(count.format(figures.active));
     await expect(value(page, ON_LEAVE)).toHaveText(count.format(figures.absent_today));
@@ -226,10 +220,7 @@ for (const size of VIEWPORTS) {
     const { context, page } = await spanish(browser, { width: size.width, height: size.height }, { board: ALL });
     try {
       const overflow = () => horizontalOverflow(page);
-      for (const key of ALL) {
-        await expect(panel(page, key)).toHaveAttribute('aria-busy', 'false');
-        await expect(panelError(panel(page, key))).toHaveCount(0);
-      }
+      await panelsRead(page, ALL);
       const figures = await stats(context);
       await expect(value(page, HEADCOUNT)).toHaveText(count.format(figures.active));
       await expect(panel(page, BY_ROLE).locator('[data-testid="widget-bar"]')).toHaveCount((await byRole(context)).length);

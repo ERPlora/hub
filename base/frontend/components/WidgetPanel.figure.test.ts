@@ -2,32 +2,12 @@ import { StatCard } from '@erplora/ui/components';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { WidgetDef } from '../operations/home';
+import { openItemsPanel } from '../__tests__/home-fixtures';
 import { errorFrame, flush, mountBase, subId } from '../__tests__/mount-base';
 import WidgetPanel from './WidgetPanel.vue';
 
-function widget(fields: Partial<WidgetDef> = {}): WidgetDef {
-  return {
-    key: 'demo.open_items',
-    app: 'demo',
-    title: 'Open items',
-    icon: 'ion:flask-outline',
-    category: 'Demo',
-    size: 'sm',
-    default: true,
-    kind: 'kpi',
-    operation: 'demo.item.stats',
-    params: {},
-    map: { value: 'open' },
-    options: {},
-    component: null,
-    refresh_on: ['demo.item.created'],
-    live: true,
-    ...fields,
-  };
-}
-
 async function panel(fields: Partial<WidgetDef> = {}, props: { variant?: 'live' | 'soft' } = {}, locale: 'en' | 'es' = 'en') {
-  return mountBase(WidgetPanel, { props: { widget: widget(fields), ...props }, locale });
+  return mountBase(WidgetPanel, { props: { widget: openItemsPanel(fields), ...props }, locale });
 }
 
 const STATS = { total: 5, open: 3, done: 2, lines: 7 };
@@ -92,7 +72,7 @@ describe('WidgetPanel as a figure card', () => {
   it('a panel asked once asks again on «Retry»', async () => {
     let answers = 0;
     const m = await mountBase(WidgetPanel, {
-      props: { widget: widget({ live: false }) },
+      props: { widget: openItemsPanel({ live: false }) },
       onApi: () => (answers++ === 0 ? new Response('boom', { status: 500 }) : Response.json(STATS)),
     });
     await flush();

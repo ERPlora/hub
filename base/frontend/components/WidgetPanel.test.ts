@@ -2,32 +2,12 @@ import { HubIcon } from '@erplora/ui/shell';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { WidgetDef } from '../operations/home';
+import { openItemsPanel } from '../__tests__/home-fixtures';
 import { business, errorFrame, flush, mountBase, POLISH, subId } from '../__tests__/mount-base';
 import WidgetPanel from './WidgetPanel.vue';
 
-function widget(fields: Partial<WidgetDef> = {}): WidgetDef {
-  return {
-    key: 'demo.open_items',
-    app: 'demo',
-    title: 'Open items',
-    icon: 'ion:flask-outline',
-    category: 'Demo',
-    size: 'sm',
-    default: true,
-    kind: 'kpi',
-    operation: 'demo.item.stats',
-    params: {},
-    map: { value: 'open' },
-    options: {},
-    component: null,
-    refresh_on: ['demo.item.created'],
-    live: true,
-    ...fields,
-  };
-}
-
 async function panel(fields: Partial<WidgetDef> = {}, locale: 'en' | 'es' = 'en') {
-  return mountBase(WidgetPanel, { props: { widget: widget(fields) }, locale });
+  return mountBase(WidgetPanel, { props: { widget: openItemsPanel(fields) }, locale });
 }
 
 /** The figure of a figure panel (a kpi here): the library's figure card. */
@@ -55,7 +35,7 @@ describe('WidgetPanel', () => {
 
   it('asks once for an operation that is no live query', async () => {
     const m = await mountBase(WidgetPanel, {
-      props: { widget: widget({ live: false }) },
+      props: { widget: openItemsPanel({ live: false }) },
       onApi: () => Response.json({ total: 2, open: 1, done: 1, lines: 0 }),
     });
     await flush();
