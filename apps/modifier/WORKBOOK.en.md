@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:5b54099ccaba468379f00904ef2734075ce5594f311b5cf02f7c2c92528ba48f -->
+<!-- generated from WORKBOOK.md sha256:e1654930e3dac90479b37dd198811d475dd78f4f2b807b51ee8bc5c42a4f19c0 -->
 
 ## What it is for and who it is for
 
@@ -294,7 +294,7 @@ Out: the line with the chosen options; from the till only the options travel, ne
 If it fails: a group without options is not asked. A group linked to the product and to its category
 shows only once. If the groups cannot be read, "The options of this product could not be read. Try
 again." and nothing goes in.
-Involved: SALE-F11
+Involved: SALE-F11, SALE-F42
 
 ### MODIFIER-F07 Charge the supplement: price and VAT
 Status: done
