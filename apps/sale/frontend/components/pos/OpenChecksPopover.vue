@@ -241,12 +241,14 @@ const meta = (row: OrderRow) => {
 }
 .pos-checks__row {
   min-width: 0;
+  height: auto;
   margin: 0;
   font: inherit;
   text-align: left;
   text-transform: none;
   --color: var(--ion-text-color);
   --background: transparent;
+  --border-radius: 0;
   --padding-start: 0;
   --padding-end: 0;
 }
@@ -256,12 +258,13 @@ const meta = (row: OrderRow) => {
   padding: 0.3rem 0;
   text-align: left;
 }
-/* Full width, or ion-button centres it. */
+/* Full width, or ion-button centres it; a long title wraps with the spacing of text, not of a button label. */
 .pos-checks__text {
   display: flex;
   flex-direction: column;
   gap: 0.1rem;
   width: 100%;
+  line-height: 1.25;
 }
 .pos-checks__name {
   font-size: 0.9rem;
