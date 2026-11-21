@@ -46,7 +46,7 @@
 463 apps/invoice/frontend/operations.d.ts ERPlora/erplora-next#74
 1350 apps/invoice/queries/__init__.py ERPlora/erplora-next#74
 1031 apps/invoice/schemas/__init__.py ERPlora/erplora-next#74
-1755 apps/invoice/services/__init__.py ERPlora/erplora-next#74
+1754 apps/invoice/services/__init__.py ERPlora/erplora-next#74
 355 apps/kitchen/frontend/operations.d.ts ERPlora/erplora-next#74
 506 apps/kitchen/models.py ERPlora/erplora-next#74
 1609 apps/kitchen/queries.py ERPlora/erplora-next#74

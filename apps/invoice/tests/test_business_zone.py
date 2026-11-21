@@ -64,7 +64,7 @@ def test_the_day_of_a_document_is_the_business_s_at_its_midnight(at):
 def test_an_invoice_at_night_is_dated_on_the_business_s_day(issuer, at):
     at(BOGOTA_NIGHT)
     invoice = Invoice.objects.get(pk=manual().id)
-    assert (invoice.issue_date, invoice.operation_date) == (dt.date(2026, 11, 2), None)
+    assert (invoice.issue_date, invoice.operation_date) == (dt.date(2026, 11, 2), dt.date(2026, 11, 2))
 
 
 def test_an_invoice_on_new_year_s_eve_numbers_in_the_business_s_year(issuer, at):
