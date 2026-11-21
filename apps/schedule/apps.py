@@ -6,7 +6,7 @@ app knows nobody of the team and requires no other app (WORKBOOK «Referencia ad
 
 from django.utils.translation import gettext_lazy as _
 from django.utils.translation import pgettext_lazy
-from live.meta import Category, LiveAppConfig, Nav, SetupCheck, SetupStep
+from live.meta import Category, Help, LiveAppConfig, Nav, SetupCheck, SetupStep
 
 from apps.schedule.events import WEEK_UPDATED
 
@@ -82,3 +82,4 @@ class ScheduleConfig(LiveAppConfig):
             refresh_on=[WEEK_UPDATED],
         )
     ]
+    help = Help()

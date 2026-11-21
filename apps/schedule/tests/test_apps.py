@@ -5,7 +5,7 @@ the assistant's contract of every operation (``ai`` and described input fields) 
 from django.apps import apps
 from django.utils import translation
 from live.live_registry import live_registry
-from live.meta import Category, LiveAppConfig, Nav, SetupCheck, SetupStep, module_configs, permissions_for_role
+from live.meta import Category, Help, LiveAppConfig, Nav, SetupCheck, SetupStep, module_configs, permissions_for_role
 from live.operations import INTERNAL, registry
 
 from apps.schedule import events
@@ -264,3 +264,7 @@ def test_the_steps_icon_is_registered():
 
 def test_schedules_brings_no_panels_and_no_bell_rows_to_the_home():
     assert (schedule().widgets, schedule().bell) == ([], [])
+
+
+def test_its_help_window_is_ready_without_a_video_yet():
+    assert schedule().help == Help()

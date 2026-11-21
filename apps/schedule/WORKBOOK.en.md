@@ -1,6 +1,12 @@
-<!-- generated from WORKBOOK.md sha256:6af11c4d4142afa4185f1517ac078cbfc8f61bb1251edc32ffa9d1868f602811 -->
+<!-- generated from WORKBOOK.md sha256:8fd3db8795bac882d0d171ad2aaab43617a0ab50e86e6dfc3cdc976eed5eceb5 -->
 
 ## What it is for and who it is for
+
+Schedules says when your business is open: each weekday's hours, the holidays and the days with other hours, and a
+run of dates with other hours or closed, such as your holidays. Appointments and Reservations read it so as not to give
+a time or a table while the business is closed. These are the premises' hours; each professional's are kept in Staff.
+
+### In detail
 
 Schedules says **when the business is open**:
 
@@ -14,7 +20,7 @@ Schedules says **when the business is open**:
 These are the **business's** hours. They are not each professional's shift nor their time off (that is
 **Staff**'s), nor the hours that can be booked (that is decided by **Appointments**, crossing both).
 
-Who uses it:
+### Who uses it and what each one does
 
 - The **owner**, the **administrator** and the **manager** set the week, add, correct and delete special
   days and temporary changes, and change the settings.
@@ -90,6 +96,12 @@ Schedules opens from the **Schedules** menu and has three tabs: **Hours**, **Spe
 API or the assistant.
 
 ### Hours
+Here is your week: one row per day with its hours (for example "10:00–14:00 · 17:00–20:00", "Open 24 hours" or
+"Closed") and whether you open that day. Tap a day to change it: close it, open it 24 hours or give it one or more
+intervals, such as a split shift or an interval that runs past midnight. While the week is the one we set by default, a
+yellow notice asks you to check it and confirm it with "Yes, these are my hours".
+
+#### Detail
 A table of **seven fixed rows**, one per weekday, with the columns **Day**, **Hours** and **Status**; there
 is no add button: a day is edited. **Hours** says, for example, "10:00–14:00 · 17:00–20:00", "Open 24
 hours", "Closed" or "Not set"; **Status** says "Open", "Closed" or "—" (not set); above it, **Columns** and
@@ -104,6 +116,12 @@ they match your business — appointments outside them are refused." shows above
 notice). On a phone the table is painted as cards.
 
 ### Special days
+Here go the exceptions to your week. In "Special days" you note a single day, closed or with other hours, such as a
+holiday, which can repeat every year, like Christmas. In "Overrides" you note a run of dates with other hours or
+closed, such as your holidays or summer hours. A special day wins over an override, and both win over the week. Tap a
+row to correct it, or tap **Delete** on it to remove it.
+
+#### Detail
 Two tables, one under the other, each with its title.
 
 - **Special days**: columns **Date**, **Name**, **Status** ("Closed" or its hours, interval by interval)
@@ -121,6 +139,11 @@ Two tables, one under the other, each with its title.
   **Cancel** and **Delete**.
 
 ### Settings
+Here you choose whether the week starts on Monday or on Sunday, which only changes the order of the days in Hours. At
+the top you see the business's time zone, the Hub's, with which all the hours are read. Whoever cannot change the
+settings sees them without being able to save them.
+
+#### Detail
 At the top, read-only, **Business timezone** with its name (for example, Europe/Madrid) and the note "It
 is the Hub's, and the single clock the schedule is read with.". Below, **Week starts** (Monday or Sunday)
 and **Save**, which confirms with "Saved". Whoever cannot change the settings sees the value without being
@@ -169,7 +192,7 @@ Screen: Hours
 Steps:
 1. Open **Schedules**; the **Hours** tab shows the seven days.
 2. Read each day's intervals, "Open 24 hours", "Closed" or "Not set".
-3. If the week starts on Sunday (SCHEDULE-F08), the table opens on Sunday; only the order changes.
+3. If the week starts on Sunday (you choose it in **Settings**), the table opens on Sunday; only the order changes.
 In: the business's week and the "Week starts" setting.
 Out: nothing; read only.
 If it fails: the table says "The opening hours could not be loaded." with **Retry**; until both the week
@@ -182,8 +205,8 @@ Status: done (server and screen)
 Actor: owner, administrator, manager, assistant
 Screen: Hours
 Steps:
-1. In **Hours**, tap **Edit** on the day (or tap the row): "Edit hours — {day}" opens. The **Day**
-   selector changes the day without closing.
+1. In **Hours**, tap **Edit** on the day (or tap the row): "Edit hours — Monday" opens (with the day you
+   tapped). The **Day** selector changes the day without closing.
 2. Choose one of three things: **Closed**; **Open 24 hours**; or one line per interval with its opening
    and its closing (10:00–14:00 and 17:00–20:00 for a split shift; 22:00–02:00 runs past midnight).
 3. Tap **Save day**: the form closes and the row shows the new summary.
@@ -219,8 +242,8 @@ then on the week also governs table reservations (SCHEDULE-F12). Confirming twic
 announces nothing. "Confirm your opening hours" is "Done" on the Home without a reload; also if, instead
 of confirming, a day is saved (SCHEDULE-F02), even as closed. Changing "Week starts", a special day or
 a temporary change does not confirm the week.
-If it fails: above the table: "There are no weekly opening hours to confirm." (409 `schedule.no_week`) if
-no day is saved (it cannot be reached from the screen: the notice only shows when there is a week).
+If it fails: above the table: "There are no weekly opening hours to confirm." if no day is saved (it cannot be
+reached from the screen: the notice only shows when there is a week).
 Involved: BASE-F01
 
 ### SCHEDULE-F04 Add a special day
@@ -231,7 +254,7 @@ Steps:
 1. In **Special days**, tap **+** (New special day).
 2. Type the **Date** and the **Name** (both required).
 3. Leave **Closed** (what it comes with) or choose "Open (with hours)" and type one or more intervals, as
-   in SCHEDULE-F02.
+   when editing a day in **Hours**.
 4. Tick **Repeats every year** if it falls on the same day and month every year (Christmas); if you want,
    **Notes**.
 5. Tap **Add day**: the form closes and the day shows in the list.
@@ -240,10 +263,9 @@ In: date (a real one: 31 February is not valid), name (up to 200), closed or int
 Out: the special day (`schedule.special_day.created`). It beats everything else that day (SCHEDULE-F10,
 F11). A yearly day applies **every year**, also the ones before its date; the one on 29 February only
 exists in leap years.
-If it fails: "There is already a special day on that date." under the date (409
-`schedule.special_day_exists`, also if two people create it at the same time); the interval refusals of
-SCHEDULE-F02; an empty name or one of only spaces, under the name. A date that had a deleted special day
-can be used again.
+If it fails: "There is already a special day on that date." under the date (also if two people create it at
+the same time); intervals that are not valid, with the same reasons as when editing a day in **Hours**; an empty
+name or one of only spaces, under the name. A date that had a deleted special day can be used again.
 Involved: Appointments, Reservations
 
 ### SCHEDULE-F05 Add a temporary change
@@ -261,9 +283,9 @@ every day of the range with the same hours.
 Out: the temporary change (`schedule.override.created`). It beats the week, but loses against a special
 day on that date (there is no warning that it overrides it: precedence settles it).
 If it fails: "The end date cannot be before the start date." under To; "Those dates overlap the temporary
-change “{reason}” ({from} – {to})." under From (409 `schedule.override_overlaps`): two changes do not
-cover the same day, so that the answer does not depend on which one is read first; the interval refusals
-of SCHEDULE-F02.
+change “Holidays” (08/01/2026 – 08/15/2026)." under From: two changes do not cover the same day, so that the
+answer does not depend on which one is read first; intervals that are not valid, with the same reasons as when
+editing a day in **Hours**.
 Involved: Appointments, Reservations
 
 ### SCHEDULE-F06 Delete a special day or a temporary change
@@ -272,18 +294,17 @@ Actor: owner, administrator, manager, assistant
 Screen: Special days
 Steps:
 1. In the row, tap **Delete**.
-2. On "«{name}» will be deleted. This cannot be undone." tap **Delete** (or **Cancel**).
+2. On "«Christmas» will be deleted. This cannot be undone." (with its name) tap **Delete** (or **Cancel**).
 3. The row disappears; the week (or the temporary change) rules those dates again.
 In: the special day (by id, by its name or by its date; a yearly one answers for its day and month of any
 year) or the temporary change (by id, by its reason or by a date it covers). The assistant: "delete the
 Christmas holiday".
 Out: the row and its intervals deleted in the same operation (`schedule.special_day.deleted`,
 `schedule.override.deleted`). Its date becomes free.
-If it fails: "That special day does not exist in this business." or "That temporary change does not exist
-in this business." (404), without announcing anything; a name that fits several: "There are several with
-“{name}”: {matches}. Say which one." (409 `schedule.ambiguous_reference`); without saying which: "Say
-which special day: its id, its name or its date." or "Say which temporary change: its id, its reason or a
-date it covers." (422).
+If it fails: if someone else already deleted it, "That special day does not exist in this business." or "That
+temporary change does not exist in this business.", without deleting anything else. If you ask the assistant with a
+name that fits several, it tells you which ones and asks you to choose one; if you do not say which, it asks for its
+name or its date.
 Involved: Appointments, Reservations
 
 ### SCHEDULE-F07 Load several special days at once
@@ -315,7 +336,7 @@ In: the start day (the screen offers Monday or Sunday; the server accepts from 1
 and the table rotates with any of them).
 Out: the setting (`schedule.settings.updated`, only if it changes). It only moves the order of the rows:
 it changes no hour nor what SCHEDULE-F10 answers.
-If it fails: a value outside 1–7 shows under the field and nothing is saved.
+If it fails: if it cannot be saved, the reason shows under the field and nothing changes.
 Involved: none
 
 ### SCHEDULE-F09 See the time zone the schedule is read with
@@ -325,7 +346,8 @@ Screen: Settings
 Steps:
 1. Open **Settings**; at the top, "Business timezone" shows with its name (Europe/Madrid).
 2. Read the note "It is the Hub's, and the single clock the schedule is read with.": the week, the special
-   days, the temporary changes and what SCHEDULE-F10 answers are read with that clock.
+   days, the temporary changes and what the assistant answers when you ask whether the business is open are read
+   with that clock.
 In: the Hub's zone.
 Out: nothing; read only. Schedules keeps no zone of its own: the hours are wall-clock hours (10:00 is
 10:00 before and after the clocks change, without touching anything).
@@ -394,15 +416,17 @@ Status: done (server and screen)
 Actor: owner, administrator, manager, assistant
 Screen: Special days
 Steps:
-1. Tap the row (or **Edit**): "Edit · {name}" (or "Edit · {reason}") opens with what was saved.
+1. Tap the row (or **Edit**): "Edit · Christmas" opens (with its name, or an override's reason) with what was
+   saved.
 2. Change the date, the name or the reason, the status, the intervals, "Repeats every year" or the notes.
 3. Tap **Save**.
 In: the special day or the temporary change (by id or by name) and what is sent; what is not sent stays as
 it was, and if the intervals are sent they are **all replaced**.
 Out: the corrected day or change (`schedule.special_day.updated`, `schedule.override.updated`). Saving
 without changing anything announces nothing.
-If it fails: the same refusals as when creating it (another special day's date, another change's range)
-and, when naming it, those of SCHEDULE-F06.
+If it fails: the same refusals as when creating it (another special day's date, another change's range) and, if
+someone else deleted it meanwhile, "That special day does not exist in this business." or "That temporary change
+does not exist in this business.".
 Involved: Appointments, Reservations
 
 ## Services: what goes in and what comes out
