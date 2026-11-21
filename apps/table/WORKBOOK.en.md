@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:9b7054f619701ec8380fab82a09f53d4524502d8b979e83339d6a00c340af0b5 -->
+<!-- generated from WORKBOOK.md sha256:29fe0eae6fe856d07ebf4faa804475ea51fb29a525568e421d3e33a21aab5a83 -->
 
 ## What it is for and who it is for
 
@@ -489,14 +489,16 @@ Steps:
 2. Tap a shortcut from 1 to 8 (it seats in one tap) or adjust with "−" and "+" and tap "Seat N". More
    than the capacity warns "Above the table capacity (4)" and lets you seat. With the guests setting
    off, "Seat" seats with the capacity.
-3. If you want, before seating "Assign customer" puts the card on the check.
+3. If you want, before seating "Assign customer" puts the card on the check. On a Reserved one, if you
+   pick none, the check carries the booking's customer.
 4. The table turns Occupied and its open check is born in Sales with the title "Table N" (**Open
    checks** of the till sees it). Whoever seats is the server of the check.
 5. With the assistant: "seat 3 at table 4" (with its zone if the number repeats).
-In: the table and the guests; on a Reserved one, the booking's guests.
+In: the table and the guests; on a Reserved one, the booking's guests and customer.
 Out: the table check opened with its guests, the time and the server (announces:
-`table.session.opened`); its check in Sales (announces: `sale.order.opened`); the bookings held at that
-table that were already Reserved, spent (TABLE-F28; from Reservations, only that booking's).
+`table.session.opened`); its check in Sales (announces: `sale.order.opened`), with its customer if there
+is one (announces: `customer.order.linked`); the bookings held at that table that were already Reserved,
+spent (TABLE-F28; from Reservations, only that booking's).
 If it fails: if another device has just taken it, "Another device has just taken that table. The floor
 plan has been refreshed." and the table is not seated. **Two servers who seat the same table at the
 same time leave a single check**: the second one gets that same warning. A blocked, deactivated or
@@ -808,9 +810,10 @@ Screen: Floor plan (Service)
 Steps:
 1. The booking's party arrives: the table is Reserved. Tap it; the guests question comes with the
    booking's. Tap "Seat N", as when seating any party.
-2. The table turns Occupied and the booking counts as seated: the table no longer shows Reserved for
-   it. Transferring or splitting a check to that table, or seating a parked one there again, also
-   counts it as seated.
+2. The table turns Occupied, its check carries the booking's customer (or the one picked before with
+   "Assign customer"), as when seating it from Reservations, and the booking counts as seated: the
+   table no longer shows Reserved for it. Transferring or splitting a check to that table, or seating a
+   parked one there again, also counts it as seated.
 3. Seating another party at that table hours before the booking (the table still Available) does
    **not** count the evening's booking as seated.
 4. When seating from Reservations ("Seat" on the booking), only that booking counts: with Ana at 19:00
@@ -819,8 +822,9 @@ Steps:
    table does not show Reserved again for whoever already sat down. From the plan it is not known which
    booking the party belongs to, and all those that already had the table Reserved count as seated.
 In: the Reserved table (and, from Reservations, the booking that is seated, RESERVATION-F11).
-Out: the holds that painted it Reserved (from Reservations, only its own), spent and without a name; a
-hold that did not paint the table yet, released when seating from Reservations.
+Out: the check with the booking's customer; the holds that painted it Reserved (from Reservations, only
+its own), spent and without a name; a hold that did not paint the table yet, released when seating from
+Reservations.
 If it fails: the same notices as when seating a party at a free or reserved table.
 Involved: RESERVATION-F11, TABLE-F10, TABLE-F25
 
