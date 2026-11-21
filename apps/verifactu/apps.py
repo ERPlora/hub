@@ -158,19 +158,12 @@ class VerifactuConfig(LiveAppConfig):
         ),
     ]
     # The queue's send (VERIFACTU-F20): the phase-2 worker runs it on every hub as the system, every minute
-    # (cron in UTC); each chain waits the TiempoEsperaEnvio the AEAT answered. Every hour, the kept own certificate
-    # is checked against the trusted list it was not checked against yet (VERIFACTU-F02).
+    # (cron in UTC); each chain waits the TiempoEsperaEnvio the AEAT answered.
     scheduled_tasks = [
         {
             "name": "process_queue",
             "operation": "verifactu.contingency.process",
             "cron": "* * * * *",
-            "catch_up": "collapse",
-        },
-        {
-            "name": "recheck_certificate",
-            "operation": "verifactu.certificate.recheck",
-            "cron": "23 * * * *",
             "catch_up": "collapse",
         },
     ]

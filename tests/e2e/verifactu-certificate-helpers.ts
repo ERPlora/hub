@@ -1,8 +1,7 @@
 // The own certificates of VeriFactu's e2e (apps/verifactu/WORKBOOK.md, VERIFACTU-F02–F04), made here and never a
-// real one: a .p12 an authority of the test issued, the issuer's NIF as its organisation identifier, valid for a year.
-// The Hub refuses it on upload, as it refuses any certificate no authority of Spain's trusted list issued
-// (`makeP12`); the screen of a business whose certificate counts is reached by keeping one in `a`'s database as an
-// upload of a recognised one leaves it (`keepCertificate`), since no test can hold a recognised authority's key.
+// real one: a .p12 an authority made up by the test issued, the issuer's NIF as its organisation identifier, valid for
+// a year. It is uploaded on the screen (`makeP12`), or kept in `a`'s database as an upload leaves it when a flow only
+// needs one loaded (`keepCertificate`).
 import { execFileSync, spawnSync } from 'node:child_process';
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -47,18 +46,16 @@ export function makeP12(dir: string, path: string, nif: string, password: string
   execFileSync('uv', ['run', 'python', script, path, password, nif], { cwd: HUB_DIR, stdio: 'pipe' });
 }
 
-/** Keeps in `a`'s database a certificate of the test for `nif`, sealed with the server's key and marked as checked
- *  against the kept trusted list, as the upload of a recognised one leaves it. */
+/** Keeps in `a`'s database a certificate of the test for `nif`, sealed with the server's key, as an upload leaves it. */
 export function keepCertificate(nif: string, password: string): void {
   const code = `${P12_PY}
-from apps.verifactu import certificates, trust
+from apps.verifactu import certificates
 from apps.verifactu.models import OwnCertificate
 p12, cert = make(${JSON.stringify(nif)}, ${JSON.stringify(password)})
 OwnCertificate.objects.update_or_create(singleton=True, defaults={
     "holder": "${HOLDER}", "holder_tax_id": ${JSON.stringify(nif)}, "kind": "representative",
     "expires_at": cert.not_valid_after_utc, "uploaded_by": "e2e",
     "sealed_blob": certificates.seal(p12, ${JSON.stringify(password)}),
-    "issuer_recognised": True, "checked_list": trust.sequence(),
 })
 `;
   const out = spawnSync('uv', ['run', 'python', 'manage.py', 'shell', '--hub', 'a', '-c', code], {
