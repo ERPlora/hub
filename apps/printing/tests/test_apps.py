@@ -8,7 +8,16 @@ from django.conf import settings
 from django.core import checks
 from django.utils import translation
 from live.live_registry import live_registry
-from live.meta import BellCounter, Category, LiveAppConfig, SetupCheck, SetupStep, module_configs, permissions_for_role
+from live.meta import (
+    BellCounter,
+    Category,
+    Help,
+    LiveAppConfig,
+    SetupCheck,
+    SetupStep,
+    module_configs,
+    permissions_for_role,
+)
 from live.operations import registry
 
 from apps.printing import events as E
@@ -232,3 +241,7 @@ def test_its_card_of_system_is_your_printer_for_everybody_with_printing_and_base
     )
     assert home.system_card_errors([config()]) == []
     assert [message.id for message in checks.run_checks(tags=["base"]) if message.id == "base.E015"] == []
+
+
+def test_its_help_window_is_ready_without_a_video_yet():
+    assert config().help == Help()
