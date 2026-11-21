@@ -6,15 +6,9 @@
 // flow: BASE-F09
 import { expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, capture, exposeMovingInPage, horizontalOverflow, login, shot, shown, untilStill } from './helpers';
+import { A, capture, exposeMovingInPage, horizontalOverflow, login, shot, shown, THREE_SIZES, untilStill } from './helpers';
 import { cleanInventory, createProduct, pick, type Product } from './inventory-helpers';
 import { chargeByApi, cleanSales, drawerOff, restoreDrawer, stamp } from './sale-helpers';
-
-const VIEWPORTS = [
-  { label: '390', width: 390, height: 844 },
-  { label: '834', width: 834, height: 1112 },
-  { label: '1440', width: 1440, height: 900 },
-];
 
 const RUN = stamp();
 let coffee: Product;
@@ -195,7 +189,7 @@ test('BASE-F09 — a sale shows up live in «Activity», its date and time whole
   await expect(row).toContainText(sale.number);
   await expect(row).toContainText(/1[.,]50/);
 
-  for (const vp of [VIEWPORTS[1], VIEWPORTS[0], VIEWPORTS[2]]) {
+  for (const vp of [THREE_SIZES[1], THREE_SIZES[0], THREE_SIZES[2]]) {
     await page.setViewportSize({ width: vp.width, height: vp.height });
     await page.goto(`${A}/#actividad`);
     const seen = await rowOf(page, sale.id);
@@ -255,7 +249,7 @@ test('BASE-F09 — a sale paid in cash and by card is found under «Method» by 
 });
 
 /** The fleet's tablet (820) beside the old hub's reference sizes. */
-const TOOLBAR_VIEWPORTS = [...VIEWPORTS, { label: '820', width: 820, height: 1180 }];
+const TOOLBAR_VIEWPORTS = [...THREE_SIZES, { label: '820', width: 820, height: 1180 }];
 
 test('BASE-F09 — the toolbar of «Activity» is one row from 820 to 1440, as in the old hub, and spills nowhere', async ({ page }) => {
   await login(page, A, '/');

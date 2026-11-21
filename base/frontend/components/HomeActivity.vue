@@ -21,7 +21,7 @@ interface ActivitySale {
   customer_name: string;
   payment_method_name: string;
   /** Each method it was paid with, once and in the order they were charged (several when the payment was split). */
-  payment_methods: string[];
+  payment_methods?: string[];
   total: number;
   status: string;
 }
@@ -42,7 +42,7 @@ const sales = salesOn
 
 const rows = computed<ActivitySale[]>(() => sales?.data.value?.rows ?? []);
 /** The methods of the sales on screen, once each and sorted: what the method filter offers. */
-const methods = computed(() => [...new Set(rows.value.flatMap((row) => row.payment_methods))].sort());
+const methods = computed(() => [...new Set(rows.value.flatMap((row) => row.payment_methods ?? []))].sort());
 const loading = computed(() => !!sales && sales.data.value === undefined && sales.status.value !== 'error');
 const failed = computed(() => sales?.status.value === 'error');
 
