@@ -408,6 +408,16 @@ describe('OptionFormModal: the allergens the option adds to the dish', () => {
     expect(s.wrapper.emitted('update:open')?.at(-1)).not.toEqual([false]);
   });
 
+  it('marking another one after the refusal takes the refusal away', async () => {
+    const s = await setup();
+    s.answer(422, { error: { code: 'invalid_payload', message: 'Check the fields.', fields: { allergens: 'Not one of the fourteen.' } } });
+    await ionValue(s.field('name'), 'Cheese', 'ionInput');
+    await click(s.save());
+    expect(block(s).querySelector('.allergen-select__error')).not.toBeNull();
+    await mark(s, 'egg', true);
+    expect(block(s).querySelector('.allergen-select__error')).toBeNull();
+  });
+
   it('while it saves, the allergens cannot be changed; once saved the window closes', async () => {
     const s = await setup();
     let reply!: (response: Response) => void;

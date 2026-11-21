@@ -22,6 +22,7 @@ import { IonInput, IonToggle } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
 
 import BusinessMoneyError from '../../../../base/frontend/components/BusinessMoneyError.vue';
+import { useGroupChange } from '../../../../base/frontend/lib/group-change';
 import { useUnsavedFormOnOpen } from '../../../../base/frontend/lib/unsaved-changes';
 import { useLocale, useT } from '../composables/useT';
 import { useBusinessMoney } from '../lib/format';
@@ -60,8 +61,15 @@ const title = computed(() =>
 );
 const searchTax = computed(() => searchTaxCategories(client, t, locale.value));
 const form = ref<Form>({ name: '', kitchenName: '', price: '', tax: null, isDefault: false, allergens: [], order: '0' });
+/** The fourteen are refused as one group: each mark tells the window, which takes their refusal away. */
+const allergensChanged = useGroupChange('allergensGroup');
 /** A save was tried: a supplement that is not an amount says so even before leaving the field. */
 const tried = ref(false);
+
+function setAllergens(allergens: AllergenCode[]): void {
+  form.value = { ...form.value, allergens };
+  allergensChanged();
+}
 
 function fromOption(option: OptionOut | null): Form {
   if (!option) return { name: '', kitchenName: '', price: '', tax: null, isDefault: false, allergens: [], order: '0' };
@@ -247,13 +255,15 @@ const canDismiss = useUnsavedFormOnOpen(
           {{ fieldErrors.is_default }}
         </p>
         <AllergenSelect
+          ref="allergensGroup"
+          name="allergens"
           testid="modifier-option-form-allergens"
           :model-value="form.allergens"
           :label="$t('modifier.options.form.allergens')"
           :helper-text="$t('modifier.options.form.allergensHint')"
           :error-text="fieldErrors.allergens"
           :disabled="pending"
-          @update:model-value="form = { ...form, allergens: $event }"
+          @update:model-value="setAllergens"
         />
         <ion-input
           data-testid="modifier-option-form-sort_order"
