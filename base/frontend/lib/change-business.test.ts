@@ -145,6 +145,17 @@ describe('reloadOrForgetGone: the hub stopped serving the page', () => {
     expect(reload).toHaveBeenCalledOnce();
   });
 
+  it('inside the app, a session that ended elsewhere reloads and keeps the hub: the logout’s redirect is not a hub that is gone', async () => {
+    signOutAnswers(REDIRECTED);
+    const before = { local: kept(local), session: kept(session) };
+
+    await reloadOrForgetGone(appWindow());
+
+    expect(invoke).not.toHaveBeenCalled();
+    expect(reload).toHaveBeenCalledOnce();
+    expect({ local: kept(local), session: kept(session) }).toEqual(before);
+  });
+
   it('inside the app, reloads when the app refuses to forget the gone hub: its page has the way back', async () => {
     signOutAnswers(GONE);
     invoke.mockRejectedValueOnce('io error');
