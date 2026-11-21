@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:b9a796cdc50f3b6757f701c07f5be6d7809d77661faf51e41eaabb6157a6da57 -->
+<!-- generated from WORKBOOK.md sha256:265a75cdfec41cba4d81752977ad0dbb9afd3b71f491efb5c67eb01fe60f5d7c -->
 
 ## What it is for and who it is for
 
@@ -160,8 +160,9 @@ Menu **Reservations → Availability**. Three stacked sections:
 - **Occupancy**: a date (today by default) and, for each slot of that day, Slot, Reserved, Max, Guests
   and Available; the slot without room is seen dimmed with the "Full" mark, and the one that falls
   outside the business's opening hours, marked "Outside opening hours". Above, the business's opening
-  hours for that day and, if the day is blocked, its reason. It refreshes by itself when a reservation
-  comes in, changes or is cancelled. Empty: "No service that day (no time slots).".
+  hours for that day (a shift that runs past midnight belongs to the day it opens) and, if the day is
+  blocked, its reason. It refreshes by itself when a reservation comes in, changes or is cancelled.
+  Empty: "No service that day (no time slots).".
 - **Time slots**: Day, From, To, Max (of reservations), Max guests; "Add slot" (Day, From, To, Max,
   Max guests (optional) → "Create slot") and "Remove" per row. Empty: "No time slots.".
 - **Blocked dates**: Date, Reason, Hours (Whole day, or from–to); "Add blocked date" (Date, Reason,
@@ -292,7 +293,10 @@ Status: done
 Actor: employee, manager
 Screen: Availability (Occupancy); Reservations (day bar)
 Steps:
-1. Choose the date (today by default).
+1. Choose the date (today by default). Above it go the business's opening hours for that day in
+   Schedules. A shift that runs past midnight belongs to the day it opens: Friday from 13:00 to 01:00
+   shows on Friday, not on Saturday. A day without shifts of its own says "The business is closed this
+   day (Schedules).".
 2. Each slot says how many reservations it has, its maximum, the guests and how many are left; the full
    one shows dimmed with "Full" and the one that falls outside the business's opening hours, with
    "Outside opening hours".
