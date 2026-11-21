@@ -755,7 +755,7 @@ Entra: al retomar la cuenta, su cliente, de Clientes (CUSTOMER-F19).
 Sale: la cuenta sigue abierta con su título; aparcar nunca la anula.
 Si falla: «No se ha podido aparcar la cuenta. Sigue en pantalla.». Con «Permitir tiques aparcados»
 apagado no hay botón de aparcar en ningún sitio.
-Implicados: CUSTOMER-F19
+Implicados: CUSTOMER-F19, TABLE-F33
 
 ### SALE-F18 Eliminar una cuenta abierta
 Estado: hecho
@@ -808,7 +808,7 @@ Sale: nada propio; Mesas sienta (`table.session.open` con la cuenta, `.restore`)
 Si falla: el rechazo de Mesas dentro de la ventana, con sus palabras («Otro dispositivo acaba de ocupar
 esa mesa…», «Esa cuenta ya está en la mesa N.»…). Sin Mesas activa, o sin permiso de ver sus mesas y
 sentar, no hay botón ni se pregunta nada a Mesas.
-Implicados: TABLE-F10, TABLE-F12, TABLE-F13, TABLE-F24
+Implicados: TABLE-F10, TABLE-F12, TABLE-F13, TABLE-F24, TABLE-F33
 
 ### SALE-F20 Enviar la comanda a cocina y anular una línea enviada
 Estado: hecho
@@ -903,7 +903,7 @@ Si falla: los mismos rechazos que un cobro normal, también el de la cuenta que 
 cobraba: la hoja cobra lo que enseñaba al abrirse, nunca lo de después. Si con la hoja abierta otro
 dispositivo cierra la cuenta, la pantalla la suelta al cerrar la hoja y avisa; no se queda en pantalla
 una cuenta que ya no existe.
-Implicados: ninguno
+Implicados: TABLE-F33
 
 ### SALE-F23 Dividir la cuenta de una mesa
 Estado: hecho — el botón «Dividir cuenta» es del control de mesa de Mesas (TABLE-F17)

@@ -284,7 +284,7 @@ cierra la ventana sin guardarlo. Con la ventana como se abrió, atrás la cierra
 | TABLE-F30 | Retener o soltar una mesa a mano | hecho |
 | TABLE-F31 | Olvidar el nombre de un cliente cuyos datos se borran (RGPD) | hecho |
 | TABLE-F32 | Poner o quitar el cliente de una mesa | hecho |
-| TABLE-F33 | Ver cuánto lleva cada mesa | no hecho |
+| TABLE-F33 | Ver cuánto lleva cada mesa | hecho |
 
 ### TABLE-F01 Crear y ordenar las zonas del local
 Estado: hecho
@@ -864,13 +864,14 @@ Si falla: el motivo de Clientes; la mesa se sienta igual.
 Implicados: CUSTOMER-F17, CUSTOMER-F19, CUSTOMER-F33, TABLE-F10
 
 ### TABLE-F33 Ver cuánto lleva cada mesa
-Estado: no hecho — el plano todavía no recibe el importe de las cuentas de cada mesa
+Estado: hecho
 Actor: empleado, responsable
 Pantalla: Plano de sala (Servicio)
 Pasos:
-1. Abre **Mesas → Plano de sala**. Cada mesa Ocupada enseña en la etiqueta de debajo, junto a sus
-   comensales, el importe de su cuenta con la moneda del negocio («3/4 pax · 42,50 €»), y «0,00 €» mientras
-   no se ha pedido nada. Es el mismo importe que esa cuenta enseña en **Cuentas abiertas** de Ventas.
+1. Abre **Mesas → Plano de sala**. Cada mesa Ocupada enseña en la etiqueta de debajo, debajo de sus
+   comensales, el importe de su cuenta con la moneda del negocio (bajo «Ocupada · 3/4 pax», «42,50 €»), y
+   «0,00 €» mientras no se ha pedido nada. Es el mismo importe que esa cuenta enseña en **Cuentas abiertas**
+   de Ventas. El lector de pantalla lo dice con la mesa: «Cuenta 42,50 €».
 2. Con varias cuentas en la mesa (dividida), enseña la suma de todas.
 3. En el teléfono, la tarjeta de cada mesa ocupada lo enseña también, junto al tiempo.
 4. Cuando el camarero añade o quita una línea en Ventas, cobra una parte de la cuenta (entonces enseña
@@ -879,7 +880,7 @@ Pasos:
 5. Las mesas Disponibles, Reservadas y Bloqueadas no enseñan importe.
 Entra: el importe de cada cuenta abierta de la sala, de Ventas, leído de una vez para todo el plano.
 Sale: nada.
-Si falla: como el plano (TABLE-F09), un fallo al cargar sale con «Reintentar».
+Si falla: como el resto del plano, un fallo al cargar sale con «Reintentar».
 Implicados: TABLE-F09, TABLE-F15, TABLE-F16, TABLE-F17, SALE-F17, SALE-F19, SALE-F22
 
 ## Mesas: lo que entra y lo que sale
@@ -1149,9 +1150,7 @@ Ventas (`sale.add_sale`), que tienen los cuatro papeles.
 
 ### Lo que queda fuera
 
-- TABLE-F33, el importe de cada mesa ocupada en el plano, está `no hecho`: el plano todavía no recibe el
-  importe de sus cuentas. Los otros 32 están `hecho`. Lo que no entra a propósito está en «Lo que NO hace,
-  a propósito».
+- Los 33 flujos están `hecho`. Lo que no entra a propósito está en «Lo que NO hace, a propósito».
 - Los dos iconos de [`UI-REQUESTS.md`](UI-REQUESTS.md) (`ion:restaurant-outline` para la app y
   `ion:map-outline` para el Plano de sala) siguen sin registrarse en `@erplora/ui`; mientras, la app usa
   `ion:grid-outline` (también en el paso «Tus mesas» del Inicio) y el plano `ion:apps-outline`.

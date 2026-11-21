@@ -12,6 +12,7 @@ from django.db.models import (
     ExpressionWrapper,
     OuterRef,
     Q,
+    Subquery,
     Value,
     When,
 )
@@ -82,6 +83,11 @@ def tables_now(now: dt.datetime):
     )
 
 
+def _bill():
+    """What is left to charge on a check of Sales, the figure Open checks shows, read with the check itself."""
+    return Subquery(Order.objects.filter(pk=OuterRef("order_id")).values("provisional_total")[:1])
+
+
 def table_label(table: Table) -> str:
     return str(TABLE_LABEL) % {
         "number": table.number,
@@ -108,7 +114,8 @@ def table_rows(tables: list[Table], now: dt.datetime) -> list[dict]:
     """The rows of ``tables`` (annotated by ``tables_now``) with their live checks and their next hold."""
     ids = [table.pk for table in tables]
     checks = defaultdict(list)
-    for session in live_sessions().filter(table_id__in=ids).order_by("opened_at", "id"):
+    seated_now = live_sessions().filter(table_id__in=ids).annotate(bill=_bill())
+    for session in seated_now.order_by("opened_at", "id"):
         checks[session.table_id].append(session)
     customers = _customers([s.order_id for group in checks.values() for s in group])
     holds = {}
@@ -142,14 +149,24 @@ def table_rows(tables: list[Table], now: dt.datetime) -> list[dict]:
                 "position_y": table.position_y,
                 "width": table.width,
                 "height": table.height,
-                "guests": sum(s.guests_count for s in seated) if seated else None,
-                "since": seated[0].opened_at if seated else None,
-                "waiter_name": seated[0].waiter_name if seated else "",
-                "checks": [_check_row(s, customers) for s in seated],
+                **_seated_row(seated, customers),
                 "hold": _hold_row(hold, now) if hold else None,
             }
         )
     return out
+
+
+def _seated_row(seated: list[TableSession], customers: dict) -> dict:
+    """What a table's live checks paint: its guests, since when, who serves it, the checks and the bill."""
+    if not seated:
+        return {"guests": None, "since": None, "waiter_name": "", "checks": [], "amount": None}
+    return {
+        "guests": sum(s.guests_count for s in seated),
+        "since": seated[0].opened_at,
+        "waiter_name": seated[0].waiter_name,
+        "checks": [_check_row(s, customers) for s in seated],
+        "amount": sum(s.bill or 0 for s in seated),
+    }
 
 
 def _check_row(session: TableSession, customers: dict) -> dict:
