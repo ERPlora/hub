@@ -6,7 +6,7 @@ condition that ends it quietly when not met, and waits.
 """
 
 from django.utils.translation import gettext_lazy as _
-from live.meta import Category, LiveAppConfig, Nav
+from live.meta import Category, Help, LiveAppConfig, Nav
 
 #: The actor prefix of what a run does (``flow_run:<id>``): the outbox keeps it, the loop guard reads it.
 RUN_ACTOR = "flow_run:"
@@ -93,6 +93,7 @@ class FlowConfig(LiveAppConfig):
     navigation = [
         Nav("automations", _("Automations"), "ion:sync-outline", "/flow/automations")
     ]
+    help = Help()
     # FLOW-F22 and FLOW-F23: the worker runs them every minute as the system (cron in UTC), in each business it
     # serves, in its database and on its scope (base.hub_visits).
     scheduled_tasks = [

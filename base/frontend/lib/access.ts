@@ -4,6 +4,7 @@
 import { ApiError, parseErrorEnvelope, readCookie, readSpaConfig } from '@erplora/ui/sdk';
 
 import { readJsonBlock } from './home';
+import { sessionDoorFetch } from './sign-out';
 
 // ── Entering ─────────────────────────────────────────────────────────────────────────────────────────────────────
 
@@ -15,10 +16,7 @@ export async function enterWith(
   path: EntryPath,
   body: Record<string, string>,
   doc: Document = document,
-  // `/auth/pin` and `/auth/badge` open a session, which no operation does (Django's `login` needs the request, as the
-  // callback's): the SDK has no route to them. Same origin and the SDK's CSRF header, as its own calls.
-  // eslint-disable-next-line no-restricted-globals -- see above
-  fetcher: typeof fetch = (...args) => fetch(...args),
+  fetcher: typeof fetch = sessionDoorFetch,
 ): Promise<string> {
   const config = readSpaConfig(doc);
   const response = await fetcher(path, {

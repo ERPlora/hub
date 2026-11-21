@@ -1,0 +1,85 @@
+# Recorridos de QA del Hub
+
+La funcionalidad del Hub se describe en un solo sitio: el `WORKBOOK.md` de cada app (`base/WORKBOOK.md` y
+`apps/<app>/WORKBOOK.md`), con sus flujos `### <APP>-F<nn>`. La QA no la vuelve a describir: recorre **recorridos**,
+lo que hace una persona real en una sesión de trabajo mezclando apps (abrir la caja y servir las comidas, cerrar el
+día, preparar la carta, dar citas…), y cada paso de un recorrido solo **cita** los flujos que se hacen en él.
+
+## Qué hay aquí
+
+- `journeys/<recorrido>.md`: un recorrido por fichero. El nombre del fichero va en inglés y el contenido en español.
+- Este README, que es el contrato.
+
+## El formato de un recorrido
+
+```markdown
+---
+title: Apertura y servicio de comidas
+vertical: restaurant
+roles: responsable, empleado
+---
+
+Para qué: abrir el local, servir las mesas del mediodía y cobrar.
+
+## Punto de partida
+
+- Lo que deja `restaurant-menu-setup.md`: la carta con suplementos y un menú del día.
+- Una reserva confirmada para las 14:00 (`restaurant-reservations.md`).
+
+## Recorrido
+
+1. BASE-F55 — el responsable entra con su PIN en la tableta de la barra.
+2. CASH_REGISTER-F03 — fondo de 150,00 €.
+3. TABLE-F10, SALE-F19 — mesa 4, tres comensales.
+```
+
+- **Cabecera** entre dos líneas `---`, con tres claves `clave: valor` y ninguna vacía:
+  - `title`: lo que hace la persona, dicho como lo diría ella;
+  - `vertical`: el tipo de negocio que declaran las apps (`restaurant`, `hair_salon`) o `any` si vale para cualquiera;
+  - `roles`: quién actúa, separado por comas (`propietario`, `administrador`, `responsable`, `empleado`, `cliente
+    (sin sesión)`…).
+- **Una línea `Para qué: …`** antes de las secciones.
+- **Dos secciones, en este orden y ninguna más:**
+  - `## Punto de partida`: el estado del negocio que hace falta antes de empezar; puede apuntar a lo que deja otro
+    recorrido.
+  - `## Recorrido`: los pasos numerados desde 1, uno por línea, con la forma `<n>. <ID>[, <ID>…][ — <nota>]`.
+- **Un paso empieza siempre por el ID de uno o más flujos.** Varios IDs en un paso, separados por coma, se hacen en el
+  mismo gesto (cobrar en efectivo y que salga el tique y se abra el cajón).
+- **La nota es solo lo propio del recorrido:** el dato que se arrastra de un paso a otro («mesa 4», «la reserva de las
+  14:00»), quién actúa si no es el de siempre y por qué el paso va ahí. **Nunca copia los pasos, las pantallas ni los
+  textos del WORKBOOK**: lo que hay que hacer y lo que tiene que pasar se leen en el flujo citado.
+- Un recorrido solo cita flujos con `Estado: hecho`. Un mismo flujo puede salir en varios recorridos.
+
+## Qué juzga la QA en cada paso
+
+1. **Que funciona:** el flujo citado hace lo que dice su WORKBOOK, también su «Si falla».
+2. **Que se ve bien** en escritorio, tableta y móvil: nada cortado ni fuera de sitio, sin textos en el otro idioma.
+3. **Que tiene sentido para el usuario:** el paso se entiende sin ayuda y encaja con el anterior y el siguiente.
+
+Un defecto se abre como issue en el repo del Hub, con el ID del flujo y el paso del recorrido en el que salió.
+
+## La cobertura
+
+```bash
+uv run python manage.py qa_coverage
+uv run python manage.py qa_coverage --ledger ~/qa/walks.csv
+```
+
+- Sin opciones dice, por app, qué flujos hechos con pantalla están en algún recorrido, cuáles en ninguno y cuáles
+  quedan **fuera del alcance visual**: los que no están `hecho` y los de `Pantalla: ninguna…`, que hace el sistema
+  solo (su efecto se comprueba en el paso del recorrido que lo provoca).
+- Con `--ledger` cruza con el **registro de pasadas**, un CSV que vive fuera del repo con las columnas
+  `flow,date,device,app_version,result,issue` (una fila por flujo recorrido, la fecha como `AAAA-MM-DD`) y dice qué
+  flujos no se han recorrido nunca y cuándo fue la última vez de los demás, empezando por los más antiguos.
+
+## Cómo se mantiene
+
+**Quien añade, borra o cambia un flujo de un WORKBOOK actualiza los recorridos en el mismo cambio.** Lo exige
+`tests/test_qa_coverage.py`, que falla si:
+
+- un recorrido cita un ID que no existe en ningún WORKBOOK o que no está `hecho`;
+- un flujo `hecho` con pantalla no está en ningún recorrido;
+- un recorrido no sigue el formato de arriba.
+
+Un flujo nuevo entra en el recorrido en el que lo haría una persona, en su sitio dentro de la sesión; si ninguno
+encaja, se escribe un recorrido nuevo.

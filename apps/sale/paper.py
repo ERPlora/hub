@@ -134,6 +134,13 @@ def receipt(  # noqa: PLR0913
     return ("invoice" if full else "receipt"), document
 
 
+def claim(code: str, url: str) -> dict:
+    """The second QR of a ticket, after the payment: ``url``, where its customer asks for the full invoice, with a line
+    over it saying so and ``code`` under it, to type when a camera cannot read it. The fiscal QR stays: that one checks
+    the ticket at the AEAT, this one asks for the invoice."""
+    return {"claim_qr_data": url, "claim_note": gettext("Scan to ask for your full invoice"), "claim_locator": code}
+
+
 def bill(valued: PreviewOut, *, label: str, letterhead: dict, decimals: int) -> dict:
     """The bill of a check (``prebill``): what is owed, without a number, a QR or a payment. The app's bill prints no
     ``vat_number`` (``render_prebill``), so the tax ID travels as the last line of the address."""

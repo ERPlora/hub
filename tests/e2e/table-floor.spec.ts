@@ -214,6 +214,7 @@ test('Serve the room with the real till: seat, transfer, merge, charge and close
     await expect(tile(page, one.id)).toContainText('Occupied');
     await expect(tile(page, one.id)).toContainText('3/6 pax');
     await expect(tile(page, one.id)).toContainText('0:00');
+    await expect(tile(page, one.id)).toContainText('€0.00');
     const seated = await table('1');
     const orderId = seated.checks[0].order_id!;
     const check = await api<{ label: string; status: string }>(context, A, 'GET', `/sale/orders/detail?order_id=${orderId}`);
@@ -240,12 +241,26 @@ test('Serve the room with the real till: seat, transfer, merge, charge and close
       const added = await api(context, A, 'POST', '/sale/orders/add_line', { order_id: id, product_id: coffee.id, quantity: '1' });
       expect(added.status).toBe(200);
     }
+    // Each occupied table shows its bill under its guests, and it follows the lines without a reload.
+    await expect(tile(page, one.id)).toContainText('€1.50');
+    await expect(tile(page, two.id)).toContainText('€1.50');
+    await expect(tile(page, two.id).getByRole('button')).toHaveAccessibleName(/3 guests · \d+ min · Bill €1\.50/);
+    await shots(page, 'table-floor-bill', async () => {
+      await expect(tile(page, two.id)).toContainText('€1.50');
+    });
     await tile(page, one.id).click();
     await page.locator('[data-testid=table-sheet-action-merge]').click();
     await tile(page, two.id).click();
     await expect(tile(page, one.id)).toContainText('Available');
     const merged = await api<{ lines: unknown[] }>(context, A, 'GET', `/sale/orders/detail?order_id=${orderId}`);
     expect(merged.data.lines).toHaveLength(2);
+    await expect(tile(page, two.id)).toContainText('€3.00');
+    // A line taken off the check comes off the bill on the plan too.
+    const extra = await api<{ lines: { id: string }[] }>(context, A, 'POST', '/sale/orders/add_line', { order_id: orderId, product_id: coffee.id, quantity: '1' });
+    await expect(tile(page, two.id)).toContainText('€4.50');
+    const removed = await api(context, A, 'POST', '/sale/orders/remove_line', { order_id: orderId, line_id: extra.data.lines.at(-1)!.id });
+    expect(removed.status).toBe(200);
+    await expect(tile(page, two.id)).toContainText('€3.00');
 
     // «Charge» goes to the till with the table's check: waited for by what the till shows, not by its URL (the till
     // drops `?order=` as soon as it has loaded the check, sometimes before a URL check sees it). Charged whole there,

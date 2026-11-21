@@ -1,7 +1,8 @@
 // VeriFactu's Configuration and Settings in Chrome, in Spanish (apps/verifactu/WORKBOOK.md), against the real Hub:
-//   - VERIFACTU-F02, F03: «Mi certificado» refuses a .p12 made for the test (never a real certificate), which no
-//     recognised authority issued, and shows the holder, NIF and expiry of one kept as a recognised one, and removes
-//     it after asking (verifactu-certificate-helpers.ts);
+//   - VERIFACTU-F02, F03: «Mi certificado» refuses a .p12 made for the test (never a real certificate) with a wrong
+//     password, keeps it with its own, although an authority made up by the test issued it, and shows its holder,
+//     NIF and expiry, whether the AEAT's test environment accepted it, and removes it after asking
+//     (verifactu-certificate-helpers.ts);
 //   - VERIFACTU-F05: «Lo remite ERPlora» refuses a signed model that is no PDF (by its bytes, not its name) with the
 //     Spanish text, and takes four minimal PDFs on to ERPlora's account. The spec points VeriFactu at a hub id no
 //     SaaS registered (`unknownToTheSaas`), so the SaaS answers 404 and the Hub says «not linked yet»: the Hub's own
@@ -225,7 +226,7 @@ test.afterAll(() => {
   cleanInvoices();
 });
 
-test('Mi certificado: an unrecognised authority is refused; a kept one shows its holder and expiry, and is removed', async ({ browser }) => {
+test('Mi certificado: a wrong password is refused; any authority\'s is kept, shows its holder and expiry, and is removed', async ({ browser }) => {
   const p12 = join(DIR, 'negocio.p12');
   makeP12(DIR, p12, ISSUER_NIF, PASSWORD);
   const { context, page } = await spanishPage(browser, '/verifactu/config');
@@ -237,23 +238,24 @@ test('Mi certificado: an unrecognised authority is refused; a kept one shows its
 
   await own.locator('[data-testid=verifactu-config-cert-file]').setInputFiles(p12);
   await expect(own.locator('[data-testid=verifactu-config-cert-picked]')).toHaveText('negocio.p12');
-  await own.locator('[data-testid=verifactu-config-cert-password] input').fill(PASSWORD);
+  const password = own.locator('[data-testid=verifactu-config-cert-password] input');
+  await password.fill('not-its-password');
   await own.locator('[data-testid=verifactu-config-cert-upload]').click();
-  await expect(own.locator('[data-testid=verifactu-config-cert-error]')).toContainText('no lo ha emitido una entidad que reconozca la AEAT');
+  await expect(own.locator('[data-testid=verifactu-config-cert-error]')).toContainText('no es un certificado .p12/.pfx que abra esta contraseña');
   await expect(cert).toContainText('Sin cargar');
   expect(psql('select count(*) from verifactu_owncertificate')).toBe('0');
   await flowShots(page, 'F02-refused', async (p) => {
     await expect(shown(p).locator('[data-testid=verifactu-config-cert]')).toContainText('Sin cargar');
   });
 
-  keepCertificate(ISSUER_NIF, PASSWORD);
-  await page.reload();
-  await shown(page).locator('[data-testid=verifactu-config-tab-own]').click();
+  // The same file with its password: no authority is refused here, the AEAT's test environment tries it.
+  await password.fill(PASSWORD);
+  await own.locator('[data-testid=verifactu-config-cert-upload]').click();
   await expect(cert).toContainText('Cargado');
   await expect(cert).toContainText(HOLDER);
   await expect(cert).toContainText(ISSUER_NIF);
   await expect(cert.locator('dt', { hasText: 'Caduca el' })).toBeVisible();
-  await expect(cert.locator('dd').last()).toContainText(String(new Date().getFullYear() + 1));
+  await expect(cert.locator('dt:has-text("Caduca el") + dd')).toContainText(String(new Date().getFullYear() + 1));
   await expect(own.locator('[data-testid=verifactu-config-cert-error]')).toHaveCount(0);
   expect(psql('select holder_tax_id from verifactu_owncertificate')).toBe(ISSUER_NIF);
   for (const flow of ['F02', 'F34']) {
@@ -263,6 +265,19 @@ test('Mi certificado: an unrecognised authority is refused; a kept one shows its
     });
   }
   await expect(own.locator('[data-testid=verifactu-config-expiry]')).toHaveCount(0);
+  // F02: until the AEAT's test environment accepts it, it is not tested; refused, it says the AEAT's answer.
+  const proof = own.locator('[data-testid=verifactu-config-proof]');
+  await expect(cert.locator('[data-testid=verifactu-config-cert-proof]')).toHaveText('Sin probar todavía');
+  await expect(proof).toContainText('Se prueba con el próximo registro que salga en pruebas');
+  await flowShots(page, 'F02-untested', async (p) => expect(shown(p).locator('[data-testid=verifactu-config-proof]')).toBeVisible());
+  const aeatAnswer = 'Codigo[4112].El titular del certificado debe ser Obligado Emisión, Colaborador Social, Apoderado o Sucesor.';
+  psql(`update verifactu_owncertificate set aeat_proof = 'rejected', aeat_proof_detail = '${aeatAnswer}'`);
+  await page.reload();
+  await shown(page).locator('[data-testid=verifactu-config-tab-own]').click();
+  await expect(cert.locator('[data-testid=verifactu-config-cert-proof]')).toHaveText('Rechazado');
+  await expect(proof).toHaveText(`La AEAT de pruebas ha rechazado este certificado (${aeatAnswer}): sube otro.`);
+  await flowShots(page, 'F02-rejected', async (p) => expect(shown(p).locator('[data-testid=verifactu-config-proof]')).toBeVisible());
+  psql("update verifactu_owncertificate set aeat_proof = 'accepted', aeat_proof_detail = ''");
 
   // F34: within the server's notice period the screen warns; the server decides it, the screen paints it.
   psql("update verifactu_owncertificate set expires_at = now() + interval '20 days 1 hour'");
@@ -459,6 +474,8 @@ test('VERIFACTU-F04: Settings says who files, the own certificate once loaded an
   await expect(hint).toContainText('Envías tú directamente a Hacienda con el certificado de tu negocio');
   // Nothing to choose: the certificate is the route.
   await expect(shown(page).locator('[data-testid=verifactu-settings-own]')).toHaveCount(0);
+  // F08: going live with it waits for the AEAT's test environment to accept it.
+  await expect(shown(page).locator('[data-testid=verifactu-settings-live-blockers]')).toContainText('la AEAT de pruebas aún no ha aceptado tu certificado propio');
   await flowShots(page, 'F04', async (p) => {
     await expect(shown(p).locator('[data-testid=verifactu-settings-route-hint]')).toHaveAttribute('data-route', 'own');
   });

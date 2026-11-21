@@ -1,18 +1,18 @@
 """The tax app declares its module metadata, its menu entries, its permissions, what each role gets and its hook of
 the Home."""
 
-from pathlib import Path
 
 import pytest
 from django.apps import apps
 from django.conf import settings
 from django.utils import translation
 from live.live_registry import live_registry
-from live.meta import Category, LiveAppConfig, Nav, SetupCheck, SetupStep, module_configs, permissions_for_role
+from live.meta import Category, Help, LiveAppConfig, Nav, SetupCheck, SetupStep, module_configs, permissions_for_role
 from live.operations import INTERNAL, registry
 
 from apps.tax import events as E
 from base import activation, home
+from base.tests.shell_icons import shell_icon_registry
 
 
 def tax():
@@ -178,7 +178,7 @@ def test_the_step_is_refreshed_on_what_changes_the_rules_in_force_today():
 def test_the_steps_icon_is_registered():
     # The old module's `receipt`, the icon of the Rules tab.
     (step,) = tax().setup
-    icons = (Path(settings.BASE_DIR) / "packages/ui/src/shell/icons.ts").read_text()
+    icons = shell_icon_registry()
     assert f"'{step.icon.removeprefix('ion:')}'" in icons
 
 
@@ -220,6 +220,10 @@ def test_the_step_that_asks_to_turn_taxes_on_paints_an_icon_the_shell_has():
     """Its store icon (``calculator-outline``) is baked apart and the shell has not registered it: HubIcon would refuse
     it. The step paints Taxes as «My apps» does."""
     (step,) = home.mandatory_steps([tax()], on=frozenset(), hub_country="ES")
-    registry = Path(settings.BASE_DIR, "packages/ui/src/shell/icons.ts").read_text()
+    registry = shell_icon_registry()
     assert step["icon"] == tax().navigation[0].icon
     assert f"'{step['icon'].removeprefix('ion:')}'" in registry
+
+
+def test_its_help_window_is_ready_without_a_video_yet():
+    assert tax().help == Help()

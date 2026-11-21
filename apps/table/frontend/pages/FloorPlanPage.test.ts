@@ -139,6 +139,22 @@ describe('FloorPlanPage · service', () => {
     expect([s.el('canvas').exists(), s.el('cards').exists()]).toEqual([true, false]);
   });
 
+  it('tells apart, on the plan and on a phone, the occupied table that asked for its bill', async () => {
+    const asked = occupied({ id: 't5', number: '5', position_x: 192, bill_requested: true });
+    let s = await setup({ locale: 'es' });
+    const bill = (id: string) => s.wrapper.find(`[data-testid="table-floor-tile-${id}"]`).attributes('data-bill');
+    const status = (id: string) => s.wrapper.find(`[data-testid="table-floor-tile-${id}"] [data-part="status"]`).text();
+    await s.show(ZONES, [FREE, BUSY, asked]);
+    expect([bill('t5'), bill('t4'), bill('t1')]).toEqual(['requested', undefined, undefined]);
+    expect([status('t5'), status('t4')]).toEqual(['Cuenta pedida · 3/4 pax', 'Ocupada · 3/4 pax']);
+    expect(s.el('summary').find('[data-stat="occupied"]').text()).toBe('2Ocupadas');
+    screenOf(390);
+    s = await setup({ locale: 'es' });
+    await s.show(ZONES, [FREE, BUSY, asked]);
+    expect([bill('t5'), bill('t4'), bill('t1')]).toEqual(['requested', undefined, undefined]);
+    expect([status('t5'), status('t4')]).toEqual(['Cuenta pedida', 'Ocupada']);
+  });
+
   it('another zone of the strip shows its plan at once, without asking the server again', async () => {
     const s = await setup();
     await s.show();

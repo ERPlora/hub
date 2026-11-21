@@ -1,7 +1,7 @@
 """The inventory app: the catalog of what is sold with stock, its categories and the stock ledger."""
 
 from django.utils.translation import gettext_lazy as _
-from live.meta import Category, LiveAppConfig, Nav, SetupCheck, SetupStep, Widget
+from live.meta import Category, Help, LiveAppConfig, Nav, SetupCheck, SetupStep, Widget
 
 from apps.inventory.events import FIGURE_EVENTS, PRODUCT_EVENTS
 from base.allergens import ALLERGENS
@@ -90,14 +90,16 @@ class InventoryConfig(LiveAppConfig):
             "inventory.view_stock",
         ],
     }
+    # The tab bar's screens (frontend/composables/useInventoryTabs.ts): the help window names the screen in view by
+    # them and the assistant links each one by its name. The first keeps the cube: it is the launcher's and «My apps»'
+    # icon, and its screen is where «/inventory» lands.
     navigation = [
-        Nav(
-            id="inventory",
-            label=_("Inventory"),
-            icon="ion:cube-outline",
-            path="/inventory",
-        )
+        Nav("dashboard", _("Dashboard"), "ion:cube-outline", "/inventory/dashboard"),
+        Nav("products", _("Products"), "ion:cube-outline", "/inventory/products"),
+        Nav("movements", _("Movements"), "ion:swap-vertical-outline", "/inventory/movements"),
+        Nav("categories", _("Categories"), "ion:list-outline", "/inventory/categories"),
     ]
+    help = Help()
     # The Home's hooks, on the Panel's own queries. Registered icons only: `trending-down-outline` waits in
     # UI-REQUESTS.md.
     setup = [
@@ -116,7 +118,8 @@ class InventoryConfig(LiveAppConfig):
         )
     ]
     widgets = [
-        # A KPI says its name once, in its title; the money one is in the hub's currency.
+        # A KPI says its name once, in its title; the money one is in the hub's currency. Every figure is in the colour of
+        # data of inventory (6), the same on every screen.
         Widget(
             key="low_stock_count",
             title=_("Low-stock products"),
@@ -128,7 +131,7 @@ class InventoryConfig(LiveAppConfig):
             kind="kpi",
             operation="inventory.stock.get_summary",
             map={"value": "products_low_stock"},
-            options={"format": "number"},
+            options={"format": "number", "tone": 6},
         ),
         Widget(
             key="value",
@@ -141,7 +144,7 @@ class InventoryConfig(LiveAppConfig):
             kind="kpi",
             operation="inventory.stock.get_summary",
             map={"value": "stock_value"},
-            options={"format": "currency"},
+            options={"format": "currency", "tone": 6},
         ),
         Widget(
             key="in_stock",
@@ -153,7 +156,7 @@ class InventoryConfig(LiveAppConfig):
             kind="stat",
             operation="inventory.stock.get_summary",
             map={"value": "products_in_stock"},
-            options={"format": "number"},
+            options={"format": "number", "tone": 6},
         ),
         # The Panel's own page size: the five with less stock, the one with less first.
         Widget(
@@ -187,24 +190,24 @@ class InventoryConfig(LiveAppConfig):
             Recoverable(
                 label=_("Product categories"),
                 reads_since="0001_initial",
-                read=queries.categories_in_copy,
-                missing=queries.categories_not_in_business,
+                read=queries.recovery.categories_in_copy,
+                missing=queries.recovery.categories_not_in_business,
                 create="inventory.category.recover",
             ),
             Recoverable(
                 label=_("Products"),
                 reads_since="0005_product_image",
-                read=queries.products_in_copy,
-                missing=queries.products_not_in_business,
+                read=queries.recovery.products_in_copy,
+                missing=queries.recovery.products_not_in_business,
                 create="inventory.product.recover",
-                deleted=queries.products_deleted_in_business,
+                deleted=queries.recovery.products_deleted_in_business,
                 restore="inventory.product.restore",
             ),
             Recoverable(
                 label=_("Product links to categories"),
                 reads_since="0001_initial",
-                read=queries.product_links_in_copy,
-                missing=queries.product_links_not_in_business,
+                read=queries.recovery.product_links_in_copy,
+                missing=queries.recovery.product_links_not_in_business,
                 create="inventory.product_category.add",
             ),
         ]

@@ -1550,6 +1550,7 @@
       "base_price": "Precio base",
       "beneficiary_iban": "IBAN del beneficiario",
       "beneficiary_name": "Nombre del beneficiario",
+      "bill_requested": "Cuenta pedida",
       "billing_address": "Dirección de facturación",
       "bills": "Billetes",
       "bio": "Biografía",
@@ -2245,6 +2246,7 @@
       "ready_at": "Listo el",
       "ready_count": "Listos",
       "reasons": "Motivos",
+      "receipt_code": "Código del tique para pedir la factura",
       "receipt_copies": "Copias del tique",
       "receipt_footer": "Pie del tique",
       "receipt_footer_image": "Imagen del pie del tique",
@@ -2747,7 +2749,9 @@
       "erased": "Cliente borrado",
       "reserving": "Se ve reservada",
       "running": "En curso",
-      "issued": "Emitida ahora"
+      "issued": "Emitida ahora",
+      "aeat_proof": "AEAT de pruebas",
+      "aeat_proof_detail": "Por qué lo ha rechazado la AEAT de pruebas"
     },
     "catalogError": "No se ha podido leer lo que pueden usar aquí las automatizaciones.",
     "errors": {

@@ -17,7 +17,8 @@ from apps.flow.queries.catalog import grantable_operations
 from apps.flow.queries.flows import flow_row
 from apps.flow.queries.reads import MANAGE
 from apps.flow.queries.recipe_flows import recipe_flow
-from apps.flow.schemas import CreateIn, FlowOut, RecipeEnabledOut, RecipeRefIn
+from apps.flow.schemas.flows import CreateIn, FlowOut
+from apps.flow.schemas.recipe_flows import RecipeEnabledOut, RecipeRefIn
 
 from .flow_document import _apply_trigger, _next_fire, refresh_search_text
 from .flows import _switch

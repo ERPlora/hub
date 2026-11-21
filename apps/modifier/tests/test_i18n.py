@@ -7,6 +7,7 @@ from django.utils import translation
 
 from apps.modifier import queries, schemas, services
 from apps.modifier.models import ModifierGroup, ModifierLink, ModifierOption
+from apps.modifier.queries import selection
 from base.tests.po import (
     catalogue_key,
     compiled_differences,
@@ -55,25 +56,25 @@ def test_spanish_texts_of_the_workbook():
         assert str(config.navigation[0].label) == "Suplementos"
         assert str(queries.GROUP_NOT_FOUND) == "Este grupo no existe."
         assert (
-            str(queries.OPTION_NOT_OFFERED)
+            str(selection.OPTION_NOT_OFFERED)
             == "Esta opción no se ofrece con este producto."
         )
         assert (
-            str(queries.CHOICE_BELOW_MIN) % {"min": 1, "group": "Punto"}
+            str(selection.CHOICE_BELOW_MIN) % {"min": 1, "group": "Punto"}
             == "Elige al menos 1 en «Punto»."
         )
         assert (
-            str(queries.CHOICE_ABOVE_MAX) % {"max": 2, "group": "Salsas"}
+            str(selection.CHOICE_ABOVE_MAX) % {"max": 2, "group": "Salsas"}
             == "Elige como mucho 2 en «Salsas»."
         )
         assert (
-            str(queries.OPTION_REPEATED) % {"option": "Queso"}
+            str(selection.OPTION_REPEATED) % {"option": "Queso"}
             == "«Queso» no se puede repetir."
         )
-        assert str(queries.PRICE_BELOW_ZERO) % {"product": "Tostada"} == (
+        assert str(selection.PRICE_BELOW_ZERO) % {"product": "Tostada"} == (
             "Estas opciones dejan el precio de «Tostada» por debajo de cero."
         )
-        assert str(queries.PRICED_BY_MEASURE) % {"product": "Jamón"} == (
+        assert str(selection.PRICED_BY_MEASURE) % {"product": "Jamón"} == (
             "«Jamón» se vende a peso o por medida: no admite una opción con suplemento."
         )
         assert str(services.GROUP_NAME_TAKEN) == "Ya hay un grupo con ese nombre."

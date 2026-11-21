@@ -105,6 +105,14 @@
       "profile": "Perfil",
       "switchUser": "Cambiar de usuario"
     },
+    "changeBusiness": {
+      "label": "Cambiar de negocio",
+      "title": "¿Cambiar de negocio?",
+      "message": "Se cerrará tu sesión en este negocio y verás la lista de tus negocios para elegir otro.",
+      "confirm": "Cambiar",
+      "signOutFailed": "No se ha podido cerrar la sesión en este negocio. Comprueba la conexión e inténtalo de nuevo.",
+      "forgetRefused": "Se ha cerrado tu sesión, pero la aplicación no ha podido dejar este negocio. Ciérrala y vuelve a abrirla."
+    },
     "appsPage": {
       "title": "Apps",
       "tabs": {
@@ -288,6 +296,7 @@
         "language": "Idioma",
         "country": "País",
         "version": "Versión",
+        "versionValue": "Versión {version}",
         "brings": "Trae",
         "readError": "No se pudo leer el fichero: {reason}",
         "tooBig": "el fichero pasa de 20 MB."
@@ -461,6 +470,17 @@
         "auto": "Este hub se actualiza solo cuando publicamos una versión nueva, sin cortar el servicio: no tienes que instalar nada.",
         "releasedAt": "Actualizado el {date}.",
         "unknownDate": "No sabemos cuándo se publicó esta versión."
+      },
+      "releaseNotes": {
+        "heading": "Novedades",
+        "loading": "Consultando las novedades…",
+        "empty": "Todavía no hay novedades.",
+        "error": "No se pudieron cargar las novedades",
+        "kinds": {
+          "new": "Nuevo",
+          "improved": "Mejora",
+          "fixed": "Arreglo"
+        }
       },
       "failed": {
         "heading": "Eventos caídos",

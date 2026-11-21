@@ -18,6 +18,13 @@ msgstr ""
 msgid "Inventory"
 msgstr "Inventario"
 
+# The menu's entries, the tab bar's screens.
+msgid "Dashboard"
+msgstr "Panel"
+
+msgid "Movements"
+msgstr "Movimientos"
+
 msgid "Your catalog"
 msgstr "Tu catálogo"
 

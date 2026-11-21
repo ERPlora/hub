@@ -342,7 +342,7 @@ arranca en `E2E_AI_PROVIDER_PORT` (por defecto, el puerto del Hub + 2). Ningún 
 escribe una clave real. Responde en el idioma que pide el mensaje de sistema del Hub («Answer in English» o «Answer in
 Spanish»: el de la persona o, en una automatización, el de quien la guardó), como un modelo de verdad; sin él, en inglés.
 Cada texto suyo se exporta en los dos idiomas (`DONE.en` y `DONE.es`, `NOT_DONE`, `GREETING`…), así que una spec con
-la interfaz en inglés espera `NOT_DONE.en` tras «Cancelar» y una en español, `NOT_DONE.es` (hub#1025). Pide tres cosas
+la interfaz en inglés espera `NOT_DONE.en` tras «Cancelar» y una en español, `NOT_DONE.es` (hub#1025). Pide cuatro cosas
 al SaaS de la pila:
 
 - **La BD del SaaS sembrada con ese proveedor**, desde su worktree y antes de la primera ejecución:
@@ -351,13 +351,18 @@ al SaaS de la pila:
   cae con «not seeded with this provider».
 - **`ASSISTANT_SERVICE_PROVIDER=e2e-local`** en el `runserver` del SaaS (con el resto de variables de la receta de
   arriba, también `E2E_RELAX_LOGIN_RATE_LIMIT=True`): sin ella el dictado responde 503.
+- **Una clave inventada en `OPENAI_API_KEY`** en ese mismo `runserver`
+  (`OPENAI_API_KEY=sk-e2e-0000000000000000000000000000e2e1`): el SaaS no guarda claves en su BD y lee la de cada
+  proveedor de su entorno, y «E2E Local» lee la de OpenAI. Sin ella, el SaaS no tiene con qué contestar y cada turno cae
+  con `assistant.provider_not_configured`; con ella, ninguna clave de verdad del `.env` del SaaS llega al proveedor
+  falso.
 - **`E2E_SAAS_DB`** (la de la tabla de arriba), si la BD del SaaS no es `saas_e2e_<Hub+1>` (con el Hub en :8000, `saas`):
   cada spec fija en ella los mensajes del mes del negocio `a` antes de cada test, así que nunca gasta el cupo del plan.
 
 ```bash
 # El SaaS de la pila (8871), desde su worktree:
 env DB_NAME=saas_e2e_8871 VITE_DEV_PORT=6071 ASSISTANT_SERVICE_PROVIDER=e2e-local \
-  HUB_CALLBACK_TEMPLATE='http://{slug}.localhost:8870/auth/callback' \
+  OPENAI_API_KEY=sk-e2e-0000000000000000000000000000e2e1 HUB_CALLBACK_TEMPLATE='http://{slug}.localhost:8870/auth/callback' \
   HUB_ADMIN_CALLBACK_URL='http://hubs.localhost:8870/auth/callback' HUB_INTERNAL_URL=http://localhost:8870 \
   EMAIL_FILE_PATH="$PWD/.mail-8871" E2E_RELAX_LOGIN_RATE_LIMIT=True DEMO_SPAWN_RATELIMIT=100/h \
   uv run python manage.py runserver 127.0.0.1:8871
@@ -391,18 +396,21 @@ C35 a C37) con el **modelo de verdad** y el **índice de documentación de verda
 propia (arriba, «Varias ejecuciones a la vez») con el SaaS arrancado con `ASSISTANT_SERVICE_PROVIDER=openai` (las
 huellas de la búsqueda; sin `e2e-local`), y en el entorno de la ejecución:
 
-- `QA_QWEN_API_KEY` y `QA_OPENAI_API_KEY`: las claves, solo en el entorno. Nunca en el repo, en el informe ni en una
-  captura: el informe y su JSON pasan por `redact` antes de escribirse.
+- `DASHSCOPE_API_KEY` (Qwen, de Alibaba) y `OPENAI_API_KEY`: las claves, exportadas en la terminal desde la que se
+  arrancan el `runserver` del SaaS de la pila y la ejecución, porque el SaaS lee la de cada proveedor de su entorno y
+  nunca de su BD; sin la clave inventada de «El asistente» (arriba). Nunca en el repo, en el informe ni en una captura:
+  el informe y su JSON pasan por `redact` antes de escribirse, y la siembra se niega si falta alguna.
 - `E2E_SAAS_DIR`: el checkout del SaaS de la pila.
 
 En cada invocación, antes del primer punto: `register_apps` del Hub en el esquema `shared` de la BD del SaaS de la
-pila (la documentación de las apps), los proveedores reales por las operaciones del propio SaaS (`SEED_PY` de
-`assistant-seed.ts`: `qwen`, compatible con OpenAI, contesta con `qwen3.7-plus`; `openai`, de reserva con
-`gpt-5.4-mini` y de las huellas; con `QA_ANSWER_MODEL`, el modelo a prueba, abajo «Comparar modelos») e `index_docs`
+pila (la documentación de las apps), los proveedores reales como los da de alta el admin del SaaS y sus modelos por
+las operaciones del propio SaaS (`SEED_PY` de `assistant-seed.ts`: `qwen`, compatible con OpenAI y con la clave de
+`DASHSCOPE_API_KEY`, contesta con `qwen3.7-plus`; `openai`, con la de `OPENAI_API_KEY`, de reserva con `gpt-5.4-mini` y
+de las huellas; con `QA_ANSWER_MODEL`, el modelo a prueba, abajo «Comparar modelos») e `index_docs`
 (idempotente: solo calcula lo nuevo); una vez por ejecución, los mensajes
-del mes de `a` a cero. Al acabar, pase o falle, su `afterAll` saca del SaaS de la pila las claves (las de etiqueta `qa`) y
-la cuenta de personal con la que siembra (`CLEANUP_PY`): las claves nunca se quedan en la BD. Se niega a sembrar en la BD
-compartida `saas` o en una que no sea `…e2e…`. Cada punto pregunta en una conversación nueva, en `es` (C37 en `en`), guarda lo que pasó por
+del mes de `a` a cero. La siembra nunca lee ni escribe una clave: cada proveedor dice de qué variable la lee el SaaS.
+Al acabar, pase o falle, su `afterAll` saca del SaaS de la pila la cuenta de personal con la que siembra
+(`CLEANUP_PY`). Se niega a sembrar en la BD compartida `saas` o en una que no sea `…e2e…`. Cada punto pregunta en una conversación nueva, en `es` (C37 en `en`), guarda lo que pasó por
 `/api/assistant/turn` (herramientas, tarjeta, extractos de `base.docs.search`, errores), confirma la tarjeta de los
 «hazlo» escribiendo la palabra que pide (los demás la cancelan), comprueba el registro por la API del Hub y escribe
 `.artifacts/qa/<ejecución>/assistant-battery-B.md` (el informe, punto a punto) y `.artifacts/qa/<ejecución>/<punto>-<slug>.png`:
@@ -412,8 +420,8 @@ respuesta nunca se comprueba: la lee una persona en el informe. C35 pone el mes 
 (solo se pinta desde ahí, BASE-G122) y lo devuelve a lo gastado.
 
 ```bash
-# Con la pila en marcha (Hub 8894, SaaS 8895 en el ejemplo) y sus variables exportadas:
-export QA_REAL_PROVIDER=1 E2E_SAAS_DIR=<saas-wt> QA_QWEN_API_KEY=… QA_OPENAI_API_KEY=…
+# Con la pila en marcha (Hub 8894, SaaS 8895 en el ejemplo), su SaaS arrancado con las dos claves y sus variables exportadas:
+export QA_REAL_PROVIDER=1 E2E_SAAS_DIR=<saas-wt> DASHSCOPE_API_KEY=… OPENAI_API_KEY=…
 CI=1 pnpm e2e tests/e2e/qa/assistant-battery.spec.ts
 # Volver a preguntar algunos puntos en el informe de una ejecución anterior (su id, el de la cabecera del informe):
 QA_BATTERY_RUN=<id> CI=1 pnpm e2e tests/e2e/qa/assistant-battery.spec.ts --grep C35
@@ -452,12 +460,13 @@ rol no tiene y cada `lookups` es otra lectura que el rol tiene. Si no encaja, la
 arreglar la sonda, no el producto.
 
 La spec se salta sin `QA_REAL_PROVIDER=1` (gasta tokens de verdad; nunca en la CI) y pide lo mismo que la batería de
-arriba: pila propia, el SaaS con `ASSISTANT_SERVICE_PROVIDER=openai`, `E2E_SAAS_DIR` y las dos claves en el entorno.
+arriba: pila propia, el SaaS con `ASSISTANT_SERVICE_PROVIDER=openai`, `E2E_SAAS_DIR` y las dos claves en el entorno
+de la ejecución y del SaaS.
 Una vez por ejecución hace la siembra de la batería (proveedores reales, índice de documentación), da de alta en el
 SaaS de la pila un encargado y un administrador de `a` (`qa-manager@example.com` / `manager` y `qa-admin@example.com` /
 `admin`; el dueño y el empleado son los de `demo_seed`) y enciende todas las apps de `a`, como supone el catálogo. Al
-acabar, pase o falle, su `afterAll` saca del SaaS de la pila las claves (`qa`) y esas cuentas (`CLEANUP_PY`), igual que
-la batería; por eso cada invocación vuelve a sembrarlas. Tampoco escribe nunca en la BD compartida `saas` ni en una que no
+acabar, pase o falle, su `afterAll` saca del SaaS de la pila esas cuentas (`CLEANUP_PY`), igual que la batería; por eso
+cada invocación vuelve a sembrarlas. Tampoco escribe nunca en la BD compartida `saas` ni en una que no
 sea `…e2e…`: se niega antes de sembrar. Cada
 sonda entra con su rol, en una conversación nueva y con su idioma, vacía antes los mensajes del mes de `a` y escribe
 `.artifacts/qa/<ejecución>/assistant-probes.md` (el informe: PASS, FAIL y N/A, la herramienta que eligió el modelo y
@@ -469,7 +478,7 @@ El veredicto (`probeVerdict`) y la carga de los ficheros están en `assistant-pr
 
 ```bash
 # Con la pila en marcha y sus variables exportadas (como la batería):
-export QA_REAL_PROVIDER=1 E2E_SAAS_DIR=<saas-wt> QA_QWEN_API_KEY=… QA_OPENAI_API_KEY=…
+export QA_REAL_PROVIDER=1 E2E_SAAS_DIR=<saas-wt> DASHSCOPE_API_KEY=… OPENAI_API_KEY=…
 CI=1 pnpm e2e tests/e2e/qa/assistant-probes.spec.ts                       # todo qa/probes/
 QA_PROBES=tests/e2e/qa/probes/sale-customer-base.json CI=1 pnpm e2e tests/e2e/qa/assistant-probes.spec.ts
 # Repetir algunas sondas en el informe de una ejecución anterior:
@@ -510,17 +519,17 @@ deja un registro por turno que se puede comparar entre ejecuciones. Lo mismo val
 | `QA_ANSWER_MODEL` | el id del modelo en la API del proveedor; activa la comparación |
 | `QA_ANSWER_KIND` | la API que habla: `openai`, `anthropic`, `gemini` o `deepseek` (un servicio compatible con OpenAI es `openai` con su dirección) |
 | `QA_ANSWER_BASE_URL` | opcional: su dirección (https); sin ella, la de su API |
-| `QA_ANSWER_KEY_ENV` | el **nombre** de la variable que guarda la clave (`QA_QWEN_API_KEY`, `QA_ANTHROPIC_API_KEY`…), nunca la clave |
+| `QA_ANSWER_KEY_ENV` | el **nombre** de la variable del entorno del SaaS de la que su proveedor lee la clave, nunca la clave: una de las del SaaS (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`, `DEEPSEEK_API_KEY` o `DASHSCOPE_API_KEY`), exportada con la clave en la ejecución y en el SaaS |
 | `QA_ANSWER_PRICE_IN`, `QA_ANSWER_PRICE_OUT` | USD por millón de tokens de entrada y de salida; se escriben en el modelo como en el admin |
 | `QA_ANSWER_VISION` | opcional: `1` si el modelo ve imágenes (la siembra marca «imágenes» en su modelo; sin ella, o con `0`, no las ve y una foto le llega como una nota) |
 | `QA_PROBES_SAMPLE`, `QA_PROBES_SEED` | cuántas sondas del corpus y con qué semilla (1 por defecto) |
 
 Si con `QA_ANSWER_MODEL` falta alguna variable, la ejecución se niega diciendo cuáles; sin ella, cualquier otra
-`QA_ANSWER_*` también la para (nunca contesta Qwen en silencio). La clave se lee solo del entorno, la siembra la guarda con la etiqueta `qa` (el
-`afterAll` la borra) y se tapa en todo lo que se escribe. La búsqueda en la documentación sigue con `openai`
-(`QA_OPENAI_API_KEY`). Para medir Qwen en las mismas condiciones que los demás, sin reserva, se le nombra como modelo a
+`QA_ANSWER_*` también la para (nunca contesta Qwen en silencio). La clave vive solo en el entorno, el SaaS la lee de
+ahí (nunca llega a su BD) y se tapa en todo lo que se escribe. La búsqueda en la documentación sigue con `openai`
+(`OPENAI_API_KEY`). Para medir Qwen en las mismas condiciones que los demás, sin reserva, se le nombra como modelo a
 prueba: `QA_ANSWER_KIND=openai`, `QA_ANSWER_MODEL=qwen3.7-plus`, `QA_ANSWER_BASE_URL` con la dirección de Qwen
-(`QWEN_ADDRESS` de `assistant-seed.ts`) y `QA_ANSWER_KEY_ENV=QA_QWEN_API_KEY`.
+(`QWEN_ADDRESS` de `assistant-seed.ts`) y `QA_ANSWER_KEY_ENV=DASHSCOPE_API_KEY`.
 
 **La muestra** (`assistant-sample.ts`): `QA_PROBES_SAMPLE` sondas de los ficheros, primero una de cada app, rol, idioma
 y expectativa, y después cada una cerca de su parte del corpus. El mismo corpus y la misma semilla dan siempre las
@@ -572,8 +581,9 @@ las peticiones del turno (`rounds`), los tokens de entrada, salida y huellas, el
 ```bash
 # El modelo de producción, 150 sondas con la semilla 7:
 QA_PROBES_SAMPLE=150 QA_PROBES_SEED=7 CI=1 pnpm e2e tests/e2e/qa/assistant-probes.spec.ts
-# Otro modelo, las mismas 150 sondas, sin reserva (en una pila con su BD recién creada):
-QA_ANSWER_KIND=anthropic QA_ANSWER_MODEL=<id> QA_ANSWER_KEY_ENV=QA_ANTHROPIC_API_KEY QA_ANTHROPIC_API_KEY=… \
+# Otro modelo, las mismas 150 sondas, sin reserva (en una pila con su BD recién creada y su SaaS arrancado con
+# ANTHROPIC_API_KEY exportada):
+QA_ANSWER_KIND=anthropic QA_ANSWER_MODEL=<id> QA_ANSWER_KEY_ENV=ANTHROPIC_API_KEY ANTHROPIC_API_KEY=… \
   QA_ANSWER_PRICE_IN=<USD> QA_ANSWER_PRICE_OUT=<USD> QA_PROBES_SAMPLE=150 QA_PROBES_SEED=7 \
   CI=1 pnpm e2e tests/e2e/qa/assistant-probes.spec.ts
 # El resumen: por modelo, el acierto total, en lecturas y escrituras, por idioma y por app; los N/A; los fallos del
@@ -677,14 +687,15 @@ registro fiscal se queda en local), y cada escenario acaba comprobando que ning�
 del negocio. Ningún escenario llama a las herramientas que envían o consultan a la AEAT.
 
 Pide lo mismo que las sondas (pila propia, el SaaS con `ASSISTANT_SERVICE_PROVIDER=openai`, `E2E_SAAS_DIR`, las claves en
-el entorno y las variables `QA_ANSWER_*` del modelo a prueba), más la clave del dueño. Cada modelo, en una ejecución suya.
+el entorno de la ejecución y del SaaS y las variables `QA_ANSWER_*` del modelo a prueba), más la clave del dueño
+(`QA_OPENROUTER_API_KEY`, solo en la ejecución). Cada modelo, en una ejecución suya.
 
 ```bash
 # Solo los caminos dorados: sin modelo, sin claves ni SaaS sembrado (comprueba que cada escenario se puede hacer):
 QA_SCENARIOS_GOLDEN=1 CI=1 pnpm e2e tests/e2e/qa/assistant-scenarios.spec.ts
 # Con el modelo a prueba (aquí Qwen sin reserva), dos escenarios:
-export QA_REAL_PROVIDER=1 E2E_SAAS_DIR=<saas-wt> QA_QWEN_API_KEY=… QA_OPENAI_API_KEY=… QA_OPENROUTER_API_KEY=…
-QA_ANSWER_KIND=openai QA_ANSWER_MODEL=qwen3.7-plus QA_ANSWER_BASE_URL=<QWEN_ADDRESS> QA_ANSWER_KEY_ENV=QA_QWEN_API_KEY \
+export QA_REAL_PROVIDER=1 E2E_SAAS_DIR=<saas-wt> DASHSCOPE_API_KEY=… OPENAI_API_KEY=… QA_OPENROUTER_API_KEY=…
+QA_ANSWER_KIND=openai QA_ANSWER_MODEL=qwen3.7-plus QA_ANSWER_BASE_URL=<QWEN_ADDRESS> QA_ANSWER_KEY_ENV=DASHSCOPE_API_KEY \
   QA_ANSWER_PRICE_IN=0.276 QA_ANSWER_PRICE_OUT=1.101 CI=1 pnpm e2e tests/e2e/qa/assistant-scenarios.spec.ts --grep 's02|s05'
 # Otros ficheros de escenarios, o repetir escenarios en el informe de una ejecución anterior:
 QA_SCENARIOS=<a.json>,<b.json> QA_SCENARIOS_RUN=<id> CI=1 pnpm e2e tests/e2e/qa/assistant-scenarios.spec.ts
@@ -726,7 +737,7 @@ specs posteriores caían con 401 o con 402 `base.app_limit_reached` (hub#528).
 # El SaaS de la pila (8031, Hub en 8030), desde su worktree; <hub-wt> es el worktree del Hub de la pila:
 env $(node <hub-wt>/tests/e2e/whatsapp-graph.ts 8030 http://localhost:8031) \
   DB_NAME=saas_e2e_8031 VITE_DEV_PORT=5204 ASSISTANT_SERVICE_PROVIDER=e2e-local \
-  HUB_CALLBACK_TEMPLATE='http://{slug}.localhost:8030/auth/callback' \
+  OPENAI_API_KEY=sk-e2e-0000000000000000000000000000e2e1 HUB_CALLBACK_TEMPLATE='http://{slug}.localhost:8030/auth/callback' \
   HUB_ADMIN_CALLBACK_URL='http://hubs.localhost:8030/auth/callback' \
   EMAIL_FILE_PATH="$PWD/.mail-8031" E2E_RELAX_LOGIN_RATE_LIMIT=True DEMO_SPAWN_RATELIMIT=100/h \
   uv run python manage.py runserver 127.0.0.1:8031

@@ -11,6 +11,7 @@ import type { Page } from '@playwright/test';
 import { describe, expect, it, vi } from 'vitest';
 
 import {
+  countLiveOpens,
   liveStreamsPending,
   liveStreamsSettled,
   type LiveStream,
@@ -183,6 +184,45 @@ describe('watchLiveStreams', () => {
 
     expect(streams.map(({ ops }) => ops)).toEqual([[HOME], [TABLES]]);
     expect(streams[0].answered.size).toBe(0);
+  });
+});
+
+/** A page that only tells its listeners the requests a test makes it send or lose. */
+function fakePage() {
+  const listeners = new Map<string, ((request: never) => void)[]>();
+  const page = {
+    on(event: string, listener: (request: never) => void) {
+      listeners.set(event, [...(listeners.get(event) ?? []), listener]);
+    },
+  } as unknown as Page;
+  const emit = (event: string, url: string, errorText?: string) => {
+    const request = { url: () => url, failure: () => (errorText ? { errorText } : null) };
+    for (const listener of listeners.get(event) ?? []) listener(request as never);
+  };
+  return { page, send: (url: string) => emit('request', url), lose: (url: string, errorText: string) => emit('requestfailed', url, errorText) };
+}
+
+describe('countLiveOpens', () => {
+  it('notes every /api/live the page opens from then on, and no other request', () => {
+    const browser = fakePage();
+    const { opened } = countLiveOpens(browser.page);
+
+    browser.send(liveUrl([HOME]));
+    browser.send('http://a.localhost:8000/api/home/widgets');
+    browser.send('http://a.localhost:8000/static/spa/api/live.ts');
+    browser.send(liveUrl([HOME, TABLES]));
+
+    expect(opened).toEqual([liveUrl([HOME]), liveUrl([HOME, TABLES])]);
+  });
+
+  it('notes why each /api/live was cut, and no other request that failed', () => {
+    const browser = fakePage();
+    const { cut } = countLiveOpens(browser.page);
+
+    browser.lose('http://a.localhost:8000/api/home/widgets', 'net::ERR_FAILED');
+    browser.lose(liveUrl([HOME]), 'net::ERR_ABORTED');
+
+    expect(cut).toEqual(['net::ERR_ABORTED']);
   });
 });
 

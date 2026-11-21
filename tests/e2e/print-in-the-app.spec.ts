@@ -10,7 +10,8 @@ import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 import { A, api, capture, login, psql, shown } from './helpers';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
 import { cleanInvoices, ensureIssuer, issuedIds, snapshotSeries } from './invoice-helpers';
-import { chargeByApi, cleanSales, drawerOff, numberRow, restoreDrawer, stamp } from './sale-helpers';
+import { chargeByApi, cleanSales, drawerOff, restoreDrawer, stamp } from './sale-helpers';
+import { numberRow } from './sale-receipt';
 import { rowAction } from './service-helpers';
 import { toastSaying, toasts } from './toast-helpers';
 

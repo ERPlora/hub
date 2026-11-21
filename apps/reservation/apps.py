@@ -3,7 +3,7 @@ each reservation from pending to completed with its table held on the floor plan
 (WORKBOOK.md)."""
 
 from django.utils.translation import gettext_lazy as _
-from live.meta import Category, LiveAppConfig, Nav
+from live.meta import Category, Help, LiveAppConfig, Nav
 
 
 class ReservationConfig(LiveAppConfig):
@@ -105,3 +105,4 @@ class ReservationConfig(LiveAppConfig):
             "/reservation/availability",
         ),
     ]
+    help = Help()

@@ -1,7 +1,7 @@
 """The service app: the catalog of services a salon sells, who performs each one, and the vouchers."""
 
 from django.utils.translation import gettext_lazy as _
-from live.meta import Category, LiveAppConfig, Nav, SetupCheck, SetupStep
+from live.meta import Category, Help, LiveAppConfig, Nav, SetupCheck, SetupStep
 
 from apps.service.events import SERVICE_EVENTS
 
@@ -136,6 +136,7 @@ class ServiceConfig(LiveAppConfig):
         ),
         Nav("packages", _("Packages"), "ion:gift-outline", "/service/packages"),
     ]
+    help = Help()
 
     def recoverable_from_copy(self) -> list:
         """The platform asks (``base.tenancy.recovery``) what a separate copy of the business gives back when the staff

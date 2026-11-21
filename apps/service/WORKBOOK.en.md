@@ -1,6 +1,13 @@
-<!-- generated from WORKBOOK.md sha256:499b414228143071aa3588bdb5941d6ec6dec0ed0b42a0c5f4de2064ad535a7c -->
+<!-- generated from WORKBOOK.md sha256:e258284e191d64992b01416ae91ba13f0c8a6ebc1da34b40950298d7150de108 -->
 
 ## What it is for and who it is for
+
+Services is the catalogue of what your hair salon or your beauty centre sells: each service with its price, its
+duration and its category, and which professionals perform it. It also keeps the vouchers, packages of sessions that
+a customer buys once and spends over several visits. The agenda, the till and online booking read from this
+catalogue.
+
+### In detail
 
 Services is the **catalogue of what a hair salon or a beauty centre sells when what is sold is not an
 item**: each service with its name, its pricing, its price, its duration, its category and its tax
@@ -14,7 +21,7 @@ It also keeps the **vouchers**: a voucher is a package of sessions of specific s
 buys once and spends over several visits. A voucher pays for a whole service line, not an amount (it is
 not a gift card), and its owner is a single customer.
 
-Who uses it:
+### Who uses it and what each one does
 
 - The **employee** (front desk, till): sees the catalogue, the categories and the vouchers, adds
   services, sees the sold vouchers and their movements, grants a voucher to a customer and spends
@@ -79,6 +86,12 @@ Services opens from the **Services** menu and has three tabs: **Services**, **Ca
 the app refuses it even if they try through the API or the assistant.
 
 ### Services
+Here is your catalogue of services. The list shows each one with its photo, its category, its pricing, its price,
+its duration and whether it can be charged yet; search, filter and sort them. With **New service** you add one; tap
+a row to change it and say which professionals perform it, and **Archive** stops offering it without losing its
+history.
+
+#### Detail
 Table with the search box "Search service…", columns **Photo** (the thumbnail, or the initials over its
 colour), **Name, Category, Pricing** (Fixed price, Hourly,
 From, Variable, Free), **Price** (in the business's currency), **Duration (min)** and **Status**: **Active**, **Not configured** (with the
@@ -107,6 +120,11 @@ up to 2 MB". The "Image library" window is Inventory's, with "Hair" and "Beauty"
 uploads, the button says "Uploading photo…".
 
 ### Categories
+Categories group your services in the list, at the till and in online booking, for example "Haircut", "Colour" or
+"Beauty", and one can sit inside another. Here you create them, order them, rename them and delete them; when you
+delete one, its services are left without a category.
+
+#### Detail
 Table with the search box "Search category…" and columns **Name, Parent category, Order** and
 **Services** (how many services on offer it has). **New category** opens the form: **Name, Parent
 category** ("No parent (root)" or another) and **Order**, with **Create category** / **Save changes**.
@@ -115,6 +133,12 @@ disappears; the services in it are kept, without a category." and, if it has ser
 services will be left without a category." (with one, "1 service will be left without a category.").
 
 ### Packages
+Here you create the vouchers you sell: their name, the services they include with their sessions, their price or
+their discount, how many uses they give and how many days they last. For each voucher you see who has bought it and
+its movements, and from there you spend a session outside the checkout, give sessions as a gift or void one sold by
+mistake. At the top, **Vouchers with no customer** gathers the vouchers whose customer was deleted.
+
+#### Detail
 At the top, **Vouchers with no customer** (manager, owner and administrator only). Table with the search
 box "Search package…", columns **Name, Discount, Closed price, Lines** and **Status** (Active, Archived or
 Deleted). In **Filters**, the Status filter on **Deleted** switches to the view of the vouchers deleted
@@ -154,7 +178,12 @@ and **Load more** with "Showing {shown} of {total}" when there are more:
   deleted on {when}", "Expired" if it is and "Customer reference: <identifier>". Empty: "No voucher has
   lost its customer.".
 
-### Services settings
+### Settings
+Here you decide what a new service takes when you do not say it: its duration, its buffer time and its tax
+category; and whether online booking shows the prices and the duration and lets people book. Only whoever may
+change the settings sees it.
+
+#### Detail
 Only for whoever may change them. Fields: "Default duration (min)", "Default buffer time (min)",
 "Default tax category", "Show prices", "Show duration" and "Allow online booking"; **Save** button.
 While the business has never saved, the factory ones show (60 min, 0 min, no category, yes, yes, yes).
@@ -235,9 +264,9 @@ Steps:
    Settings comes chosen if there is one). Without it **Create service** cannot be tapped; nor while the
    business has not yet said its currency, because the price is read in it (without it, "1500" yen would be
    saved as 150,000); until then, leaving the price keeps it as typed, without inventing decimals for it or judging it: "¥1500" or "12,50 zł" are not marked red as "This is not an amount", and
-   as soon as the currency arrives they are read in it (hub#945).
+   as soon as the currency arrives they are read in it.
    If the currency cannot be read, the window says so ("The business's currency could not be read", with the
-   reason) and offers "Retry", which asks for it again; as soon as it arrives, **Create service** lights up (hub#938).
+   reason) and offers "Retry", which asks for it again; as soon as it arrives, **Create service** lights up.
 5. Tap **Create service**: the form closes and the service shows in the table as **Active**.
 In: the categories of Services and the active tax categories of Taxes.
 Out: the service on offer and bookable (`service.service.created`); from that moment the agenda and the
@@ -252,7 +281,7 @@ not an amount. Type a figure, for example 12.50.", also with another currency's 
 business in Poland), one that reads two ways or a negative one; a deleted
 category ("That category is not available: it does not exist in this business or it has been
 deleted."); a tax category that does not exist or is deactivated ("That tax category does not exist in
-Taxes or is deactivated."); with no tax category at all, the notice of Taxes. What was typed is kept. The reason of a field goes as soon as that field is corrected, even if another one says the same (hub#888).
+Taxes or is deactivated."); with no tax category at all, the notice of Taxes. What was typed is kept. The reason of a field goes as soon as that field is corrected, even if another one says the same.
 Involved: TAX-F01, BASE-F01, BASE-F114 (the ERPlora staff get back from a separate copy the services that were lost,
 each by this same creation)
 
@@ -261,15 +290,15 @@ Status: done
 Actor: manager, assistant
 Screen: Services
 Steps:
-1. Tap the service's row or its **Edit**: "Editing service — <name>" opens with its data.
+1. Tap the service's row or its **Edit**: "Editing service — Women's haircut" opens with its data.
 2. Change Name, Pricing, Price, Duration, Category or Tax category (this one cannot be emptied).
 3. Tap **Save changes**: the form closes and the table updates on its own.
 In: the whole service.
 Out: the changed service (`service.service.updated`); only what was touched changes. The appointments
 already booked keep the name, the price and the duration they had; the vouchers already sold do not
 change.
-If it fails: the reasons of SERVICE-F01; a service that no longer exists, "That service does not exist
-in this business.". A service whose category was deleted shows "No category" and saves without trouble.
+If it fails: the same reasons as when adding it, each under its field; a service that no longer exists,
+"That service does not exist in this business.". A service whose category was deleted shows "No category" and saves without trouble.
 Involved: SERVICE-F31
 
 ### SERVICE-F03 Give a service an open price
@@ -294,9 +323,9 @@ Actor: owner, administrator, assistant
 Screen: Services
 Steps:
 1. In the service's row tap **Archive**.
-2. Read "Archive service": "<name> — it will no longer be offered or bookable. Its history and the
+2. Read "Archive service": "Women's haircut — it will no longer be offered or bookable. Its history and the
    appointments already booked are kept." and, if Appointments is active and has upcoming appointments
-   with that service, "{count} upcoming appointments still use this service. They keep their booking,
+   with that service, how many: "3 upcoming appointments still use this service. They keep their booking,
    price and length; only new bookings stop." (with one, "1 upcoming appointment still uses this service. It
    keeps …").
 3. Tap **Archive** (or **Cancel**). The row disappears from the list.
@@ -349,7 +378,7 @@ Steps:
 1. In **Categories** tap **New category**.
 2. Type the Name and, if you want, choose the Parent category and an Order.
 3. Tap **Create category**. To change it, tap the row or its **Edit** ("Editing category —
-   <name>"), change what is needed and tap **Save changes**.
+   Colour"), change what is needed and tap **Save changes**.
 In: the live categories of the business.
 Out: the category (`service.category.created`, `service.category.updated`), which shows in the Category
 field of the service form and in the filter of the Category column. The lists and the till sort them by
@@ -358,7 +387,7 @@ If it fails: a name another live category already has (ignoring case and extra s
 field: "There is already a category with that name. Pick another name.". A category cannot be its own
 parent nor hang from one of its children: "A category cannot hang from itself or from one of its
 subcategories.". A deleted parent: "That parent category is not available: it does not exist in this
-business or it has been deleted.". The reason of a field goes as soon as that field is corrected, even if another one says the same (hub#888).
+business or it has been deleted.". The reason of a field goes as soon as that field is corrected, even if another one says the same.
 Involved: SERVICE-F01, SERVICE-F08, BASE-F114 (the ERPlora staff recover from a separate copy the categories the
 business no longer has, each by this same creation)
 
@@ -417,12 +446,12 @@ WHATSAPP_INBOX-F21
 ### SERVICE-F11 Change the Services settings
 Status: done
 Actor: owner, administrator
-Screen: Services settings
+Screen: Settings
 Steps:
 1. Open **Services → Settings**.
 2. Change the fields and tap **Save**.
 3. "Settings saved." shows.
-   What is changed while it is saving is not lost: it stays on screen, still to save (hub#914).
+   What is changed while it is saving is not lost: it stays on screen, still to save.
 In: the saved settings (or the factory ones).
 Out: the settings (`service.settings.updated`). The duration, the buffer (before and after), the online
 booking and the default tax category are taken by every new service that does not give them (form,
@@ -432,7 +461,7 @@ price or the duration of each service.
 If it fails: "The settings could not be saved." and the reason below the field (a duration of 0, a tax
 category that does not exist). As in the form windows, the notice goes as soon as something is changed and
 a field's reason as soon as that field is corrected; both come back if the next try is refused too. A
-refusal that names no field stays until the next try (hub#821).
+refusal that names no field stays until the next try.
 Involved: SERVICE-F01, SERVICE-F06, ONLINE_BOOKING-F01
 
 ### SERVICE-F12 Create a voucher
@@ -455,11 +484,11 @@ If it fails: with no service at all, "Add at least one service: a package with n
 redeemed."; a repeated service, an archived one or one that does not exist; an unreadable or negative
 amount, below its field; a name another live voucher already has, "There is already a package with that
 name. Pick another name.". The reason of a field goes as soon as that field is corrected, even if another one says
-the same, and the one of the lines as a whole (a repeated service), below them, as soon as a line is changed, added or removed (hub#888). "Create package" (and "Save changes" when editing it, SERVICE-F13) is grey while
+the same, and the one of the lines as a whole (a repeated service), below them, as soon as a line is changed, added or removed. "Create package" (and "Save changes" when editing it) is grey while
 the business has not yet said its currency, because the closed price and the discount are read in it
 (without it, "1500" yen would be saved as 150,000); until then, leaving the closed price or the discount keeps it as
-typed, without inventing decimals for it or judging it: "¥9500" or "7,50 zł" are not marked red as "This is not an amount", and as soon as the currency arrives they are read in it (hub#945). If the currency cannot be read, the window says so ("The business's currency could not be read", with the
-reason) and offers "Retry", which asks for it again; as soon as it arrives, the button lights up (hub#938).
+typed, without inventing decimals for it or judging it: "¥9500" or "7,50 zł" are not marked red as "This is not an amount", and as soon as the currency arrives they are read in it. If the currency cannot be read, the window says so ("The business's currency could not be read", with the
+reason) and offers "Retry", which asks for it again; as soon as it arrives, the button lights up.
 Involved: SERVICE-F14, SERVICE-F22
 
 ### SERVICE-F13 Edit or delete a voucher
@@ -467,7 +496,7 @@ Status: done
 Actor: manager (edit), owner and administrator (delete)
 Screen: Packages
 Steps:
-1. Tap the row or its **Edit** ("Editing package — <name>"): change Name, Discount, Closed price,
+1. Tap the row or its **Edit** ("Editing package — 5 haircuts voucher"): change Name, Discount, Closed price,
    Validity or Uses; the lines are not changed. Tap **Save changes**.
 2. To take it off the catalogue tap **Delete** and confirm.
 3. To see what was sold of a deleted voucher, in **Filters** choose **Deleted** in Status.
@@ -478,7 +507,7 @@ When deleting (`service.package.deleted`), the voucher leaves the catalogue and 
 the ones already sold are still spent, adjusted and voided the same. A deleted voucher nobody bought shows
 in no view.
 If it fails: when saving, inside the form, the reason ("That package does not exist in this business." if
-it was deleted in the meantime) or those of SERVICE-F12 below their field; when deleting, the reason in
+it was deleted in the meantime) or the same ones as when creating it, below their field; when deleting, the reason in
 the confirmation.
 Involved: SERVICE-F12, SERVICE-F16
 
@@ -529,7 +558,7 @@ Actor: employee, manager, assistant
 Screen: Packages
 Steps:
 1. In the voucher's row tap **Sold vouchers** (for a deleted one, with Status on **Deleted**).
-2. One row per purchase shows, the most recent first (see "Screens").
+2. One row per purchase shows, the most recent first.
 3. **Load more** brings the next page; **Close** goes back to the table.
 In: the purchases of that voucher and the name of each customer (Customers); for a deleted card, its
 identifier.
@@ -546,7 +575,7 @@ Screen: Packages
 Steps:
 1. In **Sold vouchers**, on the wrong purchase tap **Void** (it only shows if no session has been
    spent).
-2. Read "Void this voucher?": "The voucher of customer {customer} ({amount}) stops being usable and stays
+2. Read "Void this voucher?": "The voucher of customer Lucía Pérez (€45.00) stops being usable and stays
    in the list as voided. The money is not given back here: if it was paid, refund the sale from Sales
    with a return.".
 3. Type the Reason (required) and tap **Void**.
@@ -567,7 +596,8 @@ Steps:
 1. In **Sold vouchers** tap **Adjust** on a live purchase with a session limit or an expiry.
 2. Choose **Add sessions** or **Remove sessions** and how many (up to 100; removing, up to the ones it has
    left), and/or "Days to extend" (up to 366).
-3. Type the Reason and check "After the adjustment: {count} sessions left · expires {when}" ("1 session left").
+3. Type the Reason and check how it is left, for example "After the adjustment: 4 sessions left · expires
+   12/31/2026" ("1 session left").
 4. Tap **Adjust**.
 In: the purchase, the quantities and the reason.
 Out: a separate movement with who, when, how much and why (`service.grant.adjusted`), which shows in
@@ -576,7 +606,7 @@ used-up voucher. The sessions already delivered keep their value; the ones left 
 price (SERVICE-F24).
 If it fails: "Say why this voucher is being adjusted…", "Add or remove at least one session, or add at
 least one day.", "You cannot take away more sessions than the customer has left.", "That voucher has no
-session limit…", "That voucher never expires…" or "That voucher was already voided.". The reason of a field goes as soon as that field is corrected, even if another one says the same (hub#888).
+session limit…", "That voucher never expires…" or "That voucher was already voided.". The reason of a field goes as soon as that field is corrected, even if another one says the same.
 Involved: SERVICE-F16, SERVICE-F20
 
 ### SERVICE-F19 See a voucher's movements
@@ -585,9 +615,9 @@ Actor: employee, manager, assistant
 Screen: Packages
 Steps:
 1. In the voucher's row tap **Movements**.
-2. Each delivered session and each adjustment shows, the most recent first (see "Screens"); **Load
+2. Each delivered session and each adjustment shows, the most recent first; **Load
    more** brings the next ones, each movement only once even if several carry the same time.
-3. A session spent saying who did it (SERVICE-F21) names her beside the customer, "Professional: Ana
+3. A session spent saying who did it names her beside the customer, "Professional: Ana
    López"; if her name changes in Staff, the row says it at once.
 In: the sessions and the adjustments of that voucher; the name of each session's professional (Staff).
 Out: nothing; read only.
@@ -617,7 +647,7 @@ Screen: Packages, assistant
 Steps:
 1. In **Packages**, in the voucher's row tap **Sold vouchers** and, on the customer's purchase, **Spend a
    session**. The button shows on a voucher neither voided nor expired and with a session left (or with no limit):
-   on an expired or used-up one the row already says so, and **Adjust** (SERVICE-F18) gives it days or sessions back.
+   on an expired or used-up one the row already says so, and **Adjust** gives it days or sessions back.
 2. The dialog checks when it opens, and each time you change the service, whether it can be spent: if not, it says
    why ("This session cannot be spent" and the reason) and **Spend session** cannot be tapped; if so, it shows the
    balance, "3 sessions left · 2 after this one".
@@ -828,7 +858,7 @@ Actor: manager
 Screen: Packages
 Steps:
 1. Tap **Vouchers with no customer**.
-2. Each voucher whose card was deleted or anonymised shows, the most recent first (see "Screens"). There
+2. Each voucher whose card was deleted or anonymised shows, the most recent first. There
    is no name, email or phone.
 3. To give the money back, find the sale in **Sales** and make a refund; to void the voucher if it was not
    used, open it from **Sold vouchers** of that voucher, where it shows with its reference.
@@ -846,8 +876,8 @@ Steps:
 1. Open the service: in "Professionals who perform it" the list shows, or "Nobody assigned yet: the whole
    bookable team may perform it.".
 2. In "Add professional…" choose someone from Staff (the ones who do not have it yet show) and, if you
-   want, their own "Minutes (optional)" and their own price, "Price (<currency>, optional)" (in the business's
-   currency: "Price (EUR, optional)" in Spain; "Price (optional)" while the business has not answered).
+   want, their own "Minutes (optional)" and their own price, in the business's currency: "Price (EUR,
+   optional)" in Spain; "Price (optional)" while the business has not answered.
 3. Tap **Assign**.
 In: the service and the card of the professional (Staff).
 Out: the assignment, active and not main (`service.assignment.assigned`). Appointments reads it to filter
@@ -857,9 +887,9 @@ price; their main service only changes if it is said.
 If it fails: inside the section, "That staff member does not exist in this business.", a name that fits
 several (the list to choose from) or the amount unreadable or negative. **Assign** is off while the
 business has not yet said its currency: the own price is read in it, and without it "1500" yen would be
-saved as 150,000 (leaving the own price keeps it as typed, without inventing decimals for it or judging it: "¥1500" or "12,50 zł" are not marked red as "This is not an amount", and as soon as the currency arrives they are read in it (hub#945)); if it cannot be read, "Editing service" says so at the top ("The business's currency
-could not be read", with the reason) and offers "Retry"; as soon as it arrives, **Assign** lights up
-(hub#946). While the list arrives it shows
+saved as 150,000 (leaving the own price keeps it as typed, without inventing decimals for it or judging it: "¥1500" or "12,50 zł" are not marked red as "This is not an amount", and as soon as the currency arrives they are read in it); if it cannot be read, "Editing service" says so at the top ("The business's currency
+could not be read", with the reason) and offers "Retry"; as soon as it arrives, **Assign** lights up.
+While the list arrives it shows
 "Loading…"; if it cannot be read, "The professionals could not be loaded." with the reason and
 "Retry", never "Nobody assigned yet".
 Involved: STAFF-F01, SALE-F38, BASE-F114 (from a separate copy, a service brought back comes back assigned, by this
@@ -871,19 +901,19 @@ Status: done
 Actor: manager, assistant
 Screen: Services (Editing service)
 Steps:
-1. In "Professionals who perform it", change the "Minutes (optional)" or the "Price (<currency>, optional)" of
-   a person and tap **Save**.
+1. In "Professionals who perform it", change the "Minutes (optional)" or the own price ("Price (EUR,
+   optional)" in Spain) of a person and tap **Save**.
 2. Tap "Make it their main service": "Main service" shows (one per person, the previous one stops being
    it).
 3. Turn off "Performs it" so that they stop doing it without removing them, or tap "Remove".
 4. If a person leaves in Staff, they stop showing at once in "Professionals who perform it"
-   and in who can perform it (SERVICE-F33), and within a few seconds Services removes them on its own from
+   and in who can perform the service in the agenda, and within a few seconds Services removes them on its own from
    every service they performed.
 In: the assignment.
 Out: the change (`service.assignment.updated`, `service.assignment.removed`). A person leaving in Staff
 removes them from every service they performed.
 If it fails: "That assignment does not exist in this business.". **Save** waits, off, for the business's
-currency, like **Assign** (SERVICE-F31): the own price is read in it (hub#946).
+currency, like **Assign**: the own price is read in it.
 Involved: SERVICE-F31, SERVICE-F33, STAFF-F06
 
 ### SERVICE-F33 Know who can perform a service
@@ -905,9 +935,9 @@ Status: done
 Actor: manager, assistant
 Screen: Services
 Steps:
-1. In the service's form (**New service** or "Editing service — <name>"), under "Photo", tap "Choose from
-   the library": the "Image library" window opens with the search box "Search image…" already filled in
-   with the service's name; among the sector tabs (those of INVENTORY-F30), "Hair" and "Beauty" come
+1. In the service's form (**New service** or "Editing service — Women's haircut"), under "Photo", tap "Choose
+   from the library": the "Image library" window opens with the search box "Search image…" already filled in
+   with the service's name; among the sector tabs, the same as in Inventory, "Hair" and "Beauty" come
    first.
 2. Search in Spanish or in English ("highlights", "balayage", "manicure"): the search looks at each
    image's title and synonyms, never at its file name. Tap one: the window closes and the form shows it
@@ -954,9 +984,9 @@ items' photos (INVENTORY-F33). The upload is `service.service.upload_image`, als
 If it fails: next to "Photo", on choosing it, and nothing is uploaded: an image over 2 MB, "The photo
 weighs more than 2 MB. Choose a lighter one."; a file that is not an image, "That file is not a photo.
 Upload a JPG, PNG or WebP image.". If the service was saved and the photo was not, the form says so ("The
-service has been saved, but the photo has not: <reason>") with "Retry", which only uploads the photo
+service has been saved, but the photo has not:" and the reason) with "Retry", which only uploads the photo
 again, and the service keeps the photo it had; the reason is, with no space left in the plan, "There is
-no space left for that file: your plan includes <space>." and, if the store does not answer, "The photo
+no space left for that file: your plan includes…", with your plan's space, and, if the store does not answer, "The photo
 could not be saved. Try again.".
 Involved: SERVICE-F01, SERVICE-F02, SERVICE-F04, SERVICE-F05, SERVICE-F09, INVENTORY-F31, INVENTORY-F33, BASE-F35
 

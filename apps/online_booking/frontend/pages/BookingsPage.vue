@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// Online booking → Bookings (WORKBOOK «Reservas (bandeja)»; ONLINE_BOOKING-F02 to F06, F08): the live
+// Online booking → Bookings (WORKBOOK «Reservas»; ONLINE_BOOKING-F02 to F06, F08): the live
 // `online_booking.booking.list` (the diary's appointments booked online) in a server-side DataTable — No.,
 // Customer with her phone, Service, Professional, Date, Time, Status and Booked —, the newest first, search,
 // column filters, list or cards, 50 a page. Per row Confirm, Complete, No-show, Cancel (its dialog, with a

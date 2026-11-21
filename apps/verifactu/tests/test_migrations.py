@@ -65,6 +65,8 @@ def test_the_first_migration_depends_on_invoicing():
         "0004_multiple_taxpayers_always.py",
         "0005_config_hub_id.py",
         "0006_own_certificate_issuer_check.py",
+        "0007_own_certificate_aeat_proof.py",
+        "0008_own_certificate_without_trusted_list.py",
     ]
 
 

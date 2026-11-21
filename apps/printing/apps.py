@@ -4,7 +4,7 @@ apps fill by name and the device next to the printer drains (WORKBOOK.md)."""
 
 from django.utils.translation import gettext_lazy as _
 from django.utils.translation import ngettext_lazy
-from live.meta import BellCounter, Category, LiveAppConfig, Nav, SetupCheck, SetupStep
+from live.meta import BellCounter, Category, Help, LiveAppConfig, Nav, SetupCheck, SetupStep
 
 from apps.printing.events import COVERAGE_EVENTS, UNATTENDED_EVENTS
 
@@ -130,10 +130,11 @@ class PrintingConfig(LiveAppConfig):
         {"name": "prune", "operation": "printing.job.prune", "cron": "23 * * * *", "catch_up": "collapse"},
     ]
     # Positional (id, label, icon, path): scripts/app-icons.mjs reads every line starting with
-    # `icon =` as the module's own icon. Registered icons only (packages/ui/src/shell/icons.ts).
+    # `icon =` as the module's own icon. Registered icons only (packages/ui/src/shell/set-icons.ts).
     navigation = [
         Nav("printers", _("Printers"), "lucide:receipt", "/printing/printers"),
         Nav("devices", _("Devices"), "lucide:smartphone", "/printing/devices"),
         Nav("jobs", _("Queue"), "ion:list-outline", "/printing/jobs"),
         Nav("settings", _("Settings"), "ion:settings-outline", "/printing/settings"),
     ]
+    help = Help()

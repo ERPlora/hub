@@ -180,7 +180,7 @@ def preview(body: str, filename: str = "", caption: str = "") -> str:
     return (body or caption or filename or "").strip()[:160]
 
 
-# ── Lookups shared with services.py ─────────────────────────────────────────────────────────────
+# ── Lookups shared with services/ ───────────────────────────────────────────────────────────────
 
 
 def live_conversations() -> QuerySet:

@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:ecdf68afb57249853edbf2546e6368d966395004d439ca1547db1976de9b7d65 -->
+<!-- generated from WORKBOOK.md sha256:5c76a6e1d83cefbd6513501c5cad034e5602bb9d6b9e8942c73b4bd5ab306cf6 -->
 
 ## What it is for and who it is for
 
@@ -72,8 +72,9 @@ The table of the latest sales: "Date", "Sale", "Customer", "Method", "Amount" an
 also opens with the Home's link ending in `#actividad`.
 
 ### The bell
-At the top right, the last one in the bar, after "My apps" and the assistant's sparkles, on a phone too. It gathers
-what asks for an action and stays true until it is solved: "You cannot issue invoices yet", the failed events, the
+At the top right, the last one in the bar, after "My apps", the assistant's sparkles and, in the installed app,
+"Change business" (HUB_APP-F04 of ERPlora/app), on a phone too. It gathers what asks for an action and stays true
+until it is solved: "You cannot issue invoices yet", an unpaid invoice of the plan, the failed events, the
 plan's limits, the appointments to confirm, the WhatsApp customers waiting for an answer, a printer that does not
 print… No notice is dismissed: it goes by itself once it is solved.
 
@@ -436,7 +437,8 @@ On the Employees screens and the API documentation:
 | BASE-F113 | Keep warning with the screen off (Android app) | done |
 | BASE-F114 | Put a business back as it was at a past moment from the Hub admin | done |
 | BASE-F115 | See the help of a module's screen | done |
-| BASE-F116 | Read what is new in ERPlora | partial |
+| BASE-F116 | Read what is new in ERPlora | done |
+| BASE-F117 | See in the bell that the plan has an unpaid invoice | done |
 
 ### BASE-F01 See what the business still has to set up
 Status: done
@@ -577,9 +579,14 @@ Screen: Home · Summary
 Steps:
   1. Under the list is the board, with its panels from the moment the Home opens ("Loading widgets…" only while
      it is not known which ones are theirs).
-  2. Each panel is a card with its title and icon: a figure (with what it counts under it, if its app says
-     so), a list with bars, a timeline, a chart or a piece of its app's screen, with its texts in the language
-     of whoever is looking. In a list with bars, each bar measures how big its figure is against the biggest
+  2. Each panel is a card with its title and icon: a figure (with what it counts under its title, if its app
+     says so), a list with bars, a timeline, a chart or a piece of its app's screen, with its texts in the
+     language of whoever is looking. Each figure has the colour of its measure, the same on every screen: sales,
+     tickets and inventory, each its own. The board's first figures that have a colour head it in a row in
+     colour, one per colour and two to four; the others go in a light card with the colour on their icon, in
+     the order chosen. On a phone the figures go two by two. A figure with a state to watch (VeriFactu's
+     contingency queue when something waits or has already failed) says it in an orange or red tag with an
+     icon, without changing the figure's colour. In a list with bars, each bar measures how big its figure is against the biggest
      one of the list, whatever its sign; a negative figure, such as a cash discrepancy where money was missing
      or a product with stock below zero, shows in red and with its sign (-€0.40), and the others keep the
      panel's colour or, if its app gives each row a colour, their own row's. The red of a negative figure
@@ -596,8 +603,9 @@ Steps:
 In: the panels each app that is on declares; each one's data, asked for with the permissions of whoever
 is looking.
 Out: nothing saved in the hub.
-If it fails: a panel without data says "No data"; one whose data cannot be read, "Unavailable", never an
-old or made-up figure. A row of a list with bars (or a day of a chart) that has no figure, such as a cash
+If it fails: a panel without data says "No data" (a figure, with a dash in its place); a figure whose data
+cannot be read says "Couldn't load" with "Retry", which asks for it again, and any other panel,
+"Unavailable": never an old or made-up figure. A row of a list with bars (or a day of a chart) that has no figure, such as a cash
 session closed without a count, shows a dash (—) and no bar, never a zero; a real zero does show as zero
 (€0.00). If the board cannot be read: "Could not load the panels" with "Retry".
 Involved: none
@@ -630,8 +638,8 @@ Steps:
      Home is loaded again.
 In: the business notices each panel declares.
 Out: nothing saved.
-If it fails: if the new data does not come, the panel says "Unavailable", not the value it had; when the
-connection is back, it updates by itself.
+If it fails: if the new data does not come, the panel says "Unavailable" (a figure, "Couldn't load" with
+"Retry"), not the value it had; when the connection is back, it updates by itself.
 Involved: none
 
 ### BASE-F09 Look at the recent activity
@@ -1040,10 +1048,12 @@ Steps:
   1. Open "Settings" in the side menu; in "Data and backups", "Import" is what opens. It says "Load a
      template: it fills your apps with its data — a menu, services, tables — ready to use." and, below,
      "Choose what to load".
-  2. While they arrive, "Loading templates…". Then one card per template (or one row, in the list view):
-     its name, its description, its "Language" and its "Country" by name, its "Version" and what "It brings"
-     (how many categories, products, services, areas or tables). First those of the business's country and,
-     among them, those in the person's language.
+  2. While they arrive, "Loading templates…". Then one card per template: its name as the title, its
+     description and each datum on its own line with the icon that says what it is: the language and the
+     country by name, the version in words ("Version 1") and what it brings (how many categories, products,
+     services, areas or tables). In the list view, one row per template with those data in their columns
+     "Language", "Country", "Version" and "It brings". First those of the business's country and, among them,
+     those in the person's language.
   3. "Search templates" searches by the name, the description or the apps it brings.
   4. Tap "Use template" on the one that fits: the button spins while it is read and "Review what it brings"
      opens (BASE-F31).
@@ -1763,7 +1773,8 @@ Steps:
 In: the session.
 Out: the session closed in the business; erplora.com's, only if the person confirms it.
 If it fails: if the business does not answer, the session expires by itself.
-Involved: BASE-F113 (in the Android app, it stops listening before leaving)
+Involved: BASE-F113 (in the Android app, it stops listening before leaving); HUB_APP-F04 (ERPlora/app: inside the
+app, "Change business" in the bar signs out the same way and only then forgets the business)
 
 ### BASE-F62 Decide whether this device is shared or personal
 Status: done
@@ -2475,7 +2486,10 @@ Status: done
 Actor: owner, administrator, manager, employee
 Screen: Assistant confirmation card
 Steps:
-  1. The person asks it for something that changes data ("create the service Haircut at €15 for 30 minutes").
+  1. The person asks it for something that changes data ("create the service Haircut at €15 for 30 minutes"). What
+     the action needs and the person has not said, the assistant looks up with its tools; if none gives it, it asks
+     for it in one short question and never makes it up ("Which tax do you sell it with?"), and if the request fits
+     several records, it asks which one. It never asks in its text whether to go ahead: the card asks that.
   2. Before doing it, "Run this action?" shows over everything, with the action, the app and its first data in one line,
      for example "Create in Services: Haircut · €15.00 · 30". An amount, every datum its app declares as money, shows
      in the business's currency (never in cents), also inside a datum that groups others, and the assistant
@@ -3277,18 +3291,17 @@ translated into the person's language, or its translation fell behind, the help 
 Involved: BASE-F92, BASE-F93
 
 ### BASE-F116 Read what is new in ERPlora
-Status: partial — what is new can already be read through the assistant and the API, but System › Updates does not
-show it yet (hub#576)
+Status: done
 Actor: owner, administrator, manager, employee
 Screen: System · Updates
 Steps:
   1. In the "Updates" tab, below the version and its date (BASE-F41), comes "What's new": what has changed in ERPlora
      that the business notices, the most recent first. Whoever does not run the business sees it too: it says nothing
-     about the business.
-  2. Each item says its day, whether it is something new, an improvement or a fix, a short title and one or two
-     sentences on what can be done now. They are notes written for the business, never the list of changes to the
-     code.
-  3. The 20 most recent come first; "See more" brings the earlier ones.
+     about the business. While it loads: "Reading what's new…".
+  2. Each item says its day, whether it is something new, an improvement or a fix ("New", "Improved" or "Fixed"), a
+     short title and one or two sentences on what can be done now, just as they were written. They are notes written
+     for the business, never the list of changes to the code.
+  3. The 20 most recent are shown, with no pages.
   4. With none, it says "Nothing new yet.".
   5. Through the assistant, "what's new in ERPlora?" or "what changed in the latest update?" reads them the same way,
      in the person's language.
@@ -3296,3 +3309,30 @@ In: what is new in the version running: it travels with it, so it is always its 
 Out: nothing saved: what is new is only read.
 If it fails: "Could not load what's new" with "Retry"; the version and its date stay in view.
 Involved: BASE-F41
+
+### BASE-F117 See in the bell that the plan has an unpaid invoice
+Status: done
+Actor: owner, administrator
+Screen: The bell
+Steps:
+  1. erplora.com cannot charge the renewal of the business's plan and gives it its 7 days of grace (BILLING-F16): the
+     business keeps working with its whole plan.
+  2. The bell of whoever runs the business goes up without reloading with the urgent notice "Your ERPlora plan has an
+     unpaid invoice", which comes in as a card and settles in it. Its sentence says until when: "Pay it on
+     erplora.com: if it is not paid by Nov. 24, 2026, the business is suspended. Nothing is deleted.", with the
+     date on the business's clock, and the bell's ring empties over that last week.
+  3. "Pay on erplora.com" opens, in a new tab, this business's unpaid invoices on erplora.com, where it is paid
+     (BILLING-F17). Only in the browser: in the installed app the notice comes all the same, without the button, and
+     its sentence already says where to pay it.
+  4. If the deadline goes by and erplora.com has not suspended it yet, the notice says so at that moment, without
+     reloading: "Pay it on erplora.com: its deadline was Nov. 24, 2026 and the business may be suspended at any
+     moment. Nothing is deleted.", with the ring empty.
+  5. Once it is paid, the notice disappears as soon as erplora.com tells the business. If it is suspended, the business
+     stops opening until it is paid (BILLING-F16).
+In: the business's status and the moment it is suspended, as erplora.com sends them in its photo of the business
+(HUBS-F31). The Hub does not ask erplora.com nor count the 7 days on its own.
+Out: nothing saved in the Hub.
+If it fails: a manager or an employee does not see the notice. If the photo does not bring the deadline, the notice
+comes without a date: "Pay it on erplora.com: if it is not paid soon, the business is suspended. Nothing is deleted.".
+If the notices cannot be read, the bell keeps what it last knew, as in BASE-F10.
+Involved: BASE-F10, BASE-F11, BILLING-F16 (erplora.com), BILLING-F17 (erplora.com), HUBS-F31 (erplora.com)

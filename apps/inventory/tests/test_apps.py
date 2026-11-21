@@ -1,14 +1,15 @@
-"""The inventory app declares its module metadata, its menu entry, its permissions, what each role gets and its
-hooks of the Home."""
+"""The inventory app declares its module metadata, its menu entries, its permissions, what each role gets, its help
+and its hooks of the Home."""
 
+import re
 from pathlib import Path
 
 from django.apps import apps
-from django.conf import settings
 from django.utils import translation
 from live.live_registry import live_registry
 from live.meta import (
     Category,
+    Help,
     LiveAppConfig,
     Nav,
     SetupCheck,
@@ -21,6 +22,8 @@ from live.operations import AI, INTERNAL, registry
 
 from apps.inventory import events as E
 from base import home
+from base.queries import app_help
+from base.tests.shell_icons import shell_icon_registry
 
 PERMISSIONS = [
     "inventory.view_product",
@@ -92,11 +95,45 @@ def test_owner_admin_and_manager_may_do_everything_the_employee_only_reads():
     assert permissions_for_role([config], "hub_employee") == READ_ONLY
 
 
-def test_navigation_opens_the_inventory_with_an_iconify_icon():
-    [entry] = inventory().navigation
-    assert isinstance(entry, Nav)
-    assert (entry.id, str(entry.label), entry.path) == ("inventory", "Inventory", "/inventory")
-    assert entry.icon == "ion:cube-outline"
+FRONTEND = Path(apps.get_app_config("inventory").path) / "frontend"
+
+
+def tabbar() -> list[tuple[str, str]]:
+    """The id and route of each tab of the inventory's tab bar, Settings included, as the frontend declares them."""
+    source = (FRONTEND / "composables" / "useInventoryTabs.ts").read_text(encoding="utf-8")
+    return re.findall(r"\{ id: '(\w+)'.*? to: '([^']+)' \}", source)
+
+
+def test_the_menu_has_the_tab_bar_s_screens_with_the_launcher_s_icon_first():
+    # The help window names the screen in view by these entries and the assistant links each one, so they are the tab
+    # bar's sections. The first one keeps the cube: it is the icon of the launcher and of «My apps» (base.home.shell_icon).
+    entries = inventory().navigation
+    assert all(isinstance(entry, Nav) for entry in entries)
+    assert [(entry.id, str(entry.label), entry.path, entry.icon) for entry in entries] == [
+        ("dashboard", "Dashboard", "/inventory/dashboard", "ion:cube-outline"),
+        ("products", "Products", "/inventory/products", "ion:cube-outline"),
+        ("movements", "Movements", "/inventory/movements", "ion:swap-vertical-outline"),
+        ("categories", "Categories", "/inventory/categories", "ion:list-outline"),
+    ]
+    assert [(entry.id, entry.path) for entry in entries] == tabbar()[:-1]
+    assert home.shell_icon(inventory()) == "ion:cube-outline"
+    shell = shell_icon_registry()
+    for entry in entries:
+        assert f"'{entry.icon.removeprefix('ion:')}':" in shell, entry.icon
+
+
+def test_the_launcher_opens_where_the_inventory_s_root_lands():
+    # The launcher and «My apps» open the first entry; `/inventory` hands over to that same screen.
+    routes = (FRONTEND / "routes.ts").read_text(encoding="utf-8")
+    assert f"{{ path: '/inventory', redirect: '{inventory().navigation[0].path}'" in routes
+
+
+def test_the_help_window_s_tabs_are_the_tab_bar_s():
+    assert [(tab.id, tab.path) for tab in app_help.tabs_of(inventory())] == tabbar()
+
+
+def test_its_help_window_is_ready_without_a_video_yet():
+    assert inventory().help == Help()
 
 
 #: The reads that only name a record on the assistant's card: no tool, no route.
@@ -214,7 +251,7 @@ def test_the_homes_panels_are_the_old_modules_four():
             "inventory.view_product",
             {},
             {"value": "products_low_stock"},
-            {"format": "number"},
+            {"format": "number", "tone": 6},
         ),
         (
             "value",
@@ -226,7 +263,7 @@ def test_the_homes_panels_are_the_old_modules_four():
             "inventory.view_product",
             {},
             {"value": "stock_value"},
-            {"format": "currency"},
+            {"format": "currency", "tone": 6},
         ),
         (
             "in_stock",
@@ -238,7 +275,7 @@ def test_the_homes_panels_are_the_old_modules_four():
             "inventory.view_product",
             {},
             {"value": "products_in_stock"},
-            {"format": "number"},
+            {"format": "number", "tone": 6},
         ),
         (
             "low_stock_products",
@@ -320,9 +357,20 @@ def test_the_hooks_icons_are_registered_in_the_shell():
         "ion:cube-outline",
         "ion:arrow-down-outline",
     ]
-    shell = (Path(settings.BASE_DIR) / "packages/ui/src/shell/icons.ts").read_text()
+    shell = shell_icon_registry()
     for icon in icons:
         assert f"'{icon.removeprefix('ion:')}':" in shell, icon
+
+
+def test_its_figures_carry_the_colour_of_inventory():
+    # The same measure keeps the same colour of data on every screen: inventory is 6. The list of products is no figure.
+    panels = {panel.key: panel for panel in inventory().widgets}
+    assert {key: panel.options.get("tone") for key, panel in panels.items()} == {
+        "low_stock_count": 6,
+        "value": 6,
+        "in_stock": 6,
+        "low_stock_products": None,
+    }
 
 
 def test_inventory_has_no_bell_counters():

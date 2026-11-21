@@ -32,6 +32,7 @@ import MyRecordModal from '../components/MyRecordModal.vue';
 import TerminateDialog from '../components/TerminateDialog.vue';
 import MembersPage from './MembersPage.vue';
 import { listFillProblems } from '../../../../frontend/testing/list-fill';
+import { rowButtonNames } from '../../../../base/frontend/__tests__/mount-base';
 
 const OP = 'staff.member.list';
 
@@ -309,6 +310,15 @@ describe('MembersPage: who may do what', () => {
       ['terminate', 'person-remove-outline'],
     ]);
     expect((s.wrapper.findComponent(AppPage).props('tabs') ?? []).map((t: { id: string }) => t.id)).toEqual(['staff', 'roles', 'time_off', 'schedules', 'commissions', 'settings']);
+  });
+
+  it('each row action tells a screen reader which person it is for, its short words first', async () => {
+    const s = await setup();
+    await s.show(page(ROWS));
+    expect(['m1', 'm2'].map((id) => rowButtonNames(s.wrapper.element, `staff-members-row-${id}`))).toEqual([
+      { edit: 'Edit: Ana López', deactivate: 'Deactivate: Ana López' },
+      { edit: 'Edit: Bea Ruiz', deactivate: 'Deactivate: Bea Ruiz' },
+    ]);
   });
 
   it('a manager adds and edits, but neither deactivates nor terminates', async () => {

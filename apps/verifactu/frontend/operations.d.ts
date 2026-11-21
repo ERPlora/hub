@@ -281,10 +281,10 @@ export interface ConfigOut {
     holder: string;
     holder_tax_id: string;
     kind: CertificateKind | '';
-    uploaded_at: string | null;
-    expires_at: string | null;
-    expires_in_days: number | null;
-    expires_soon: boolean;
+    uploaded_at: string | null; expires_at: string | null;
+    expires_in_days: number | null; expires_soon: boolean;
+    /** What the AEAT's test environment made of it (going live needs it accepted) and, if it refused it, why. */
+    aeat_proof: 'untested' | 'accepted' | 'rejected'; aeat_proof_detail: string;
   };
   representation: RepresentationOut;
   synced_at: string | null;

@@ -11,7 +11,7 @@ import { expect, type Locator, type Page, test } from '@playwright/test';
 
 import { answers, box, cancel, card, panel, receipts, send } from './assistant-panel';
 import { DICTATION } from './assistant-provider';
-import { A, EMPLOYEE, login, shot, THREE_SIZES as VIEWPORTS, untilStill } from './helpers';
+import { A, capture, EMPLOYEE, login, shot, THREE_SIZES as VIEWPORTS, untilStill } from './helpers';
 import { chats, panelSpec } from './provider-helpers';
 import { toastSaying } from './toast-helpers';
 
@@ -24,6 +24,9 @@ test.use({
 });
 
 const key = (page: Page): Locator => page.locator('[data-testid="pos-speak"]');
+// The native button inside `ion-button`, the one a screen reader announces: Ionic moves the key's `aria-*` onto it when
+// it loads, so its state is read there and not on the host.
+const announced = (page: Page): Locator => key(page).locator('button');
 const asked = (): number => chats(provider()).length;
 const transcribed = (): number => provider().seen.filter((seen) => seen.path === '/v1/audio/transcriptions').length;
 
@@ -36,7 +39,7 @@ async function till(page: Page): Promise<void> {
 async function speak(page: Page): Promise<void> {
   await expect(key(page)).toHaveText('Speak');
   await key(page).click();
-  await expect(key(page)).toHaveAttribute('aria-pressed', 'true');
+  await expect(announced(page)).toHaveAttribute('aria-pressed', 'true');
   await expect(key(page)).toHaveText('Stop');
   await expect(page.locator('[data-testid="pos-speak-status"]')).toHaveText('Listening…');
   await page.waitForTimeout(1200);
@@ -98,16 +101,31 @@ test('SALE-F01 / BASE-F94 — offline, «Speak» stays greyed and a tap says why
   if (process.env.E2E_SAVE_STORAGE_STATE) await page.context().storageState({ path: process.env.E2E_SAVE_STORAGE_STATE });
   const dictations = transcribed();
   await page.context().setOffline(true);
-  await expect(key(page)).toHaveAttribute('aria-disabled', 'true');
+  await expect(announced(page)).toHaveAttribute('aria-disabled', 'true');
   // A person can tap a greyed key (it explains itself); Playwright does not tap what is `aria-disabled` unless forced.
   await key(page).click({ force: true });
   await expect(toastSaying(page, 'No connection: talking to the assistant needs the internet.')).toBeVisible();
-  await expect(key(page)).toHaveAttribute('aria-pressed', 'false');
+  await expect(announced(page)).toHaveAttribute('aria-pressed', 'false');
 
   await page.context().setOffline(false);
-  await expect(key(page)).toHaveAttribute('aria-disabled', 'false');
+  await expect(announced(page)).not.toHaveAttribute('aria-disabled', 'true');
   await speak(page);
   expect(transcribed()).toBe(dictations + 1);
+});
+
+// The till can be opened with the connection already gone (the installed app, or coming back to it from another page):
+// Ionic then takes the key's `aria-disabled` off the host as it loads, and the grey must not hang on it.
+test('SALE-F01 — opened with no connection, «Speak» is greyed for the eye and for a screen reader', async ({ page }) => {
+  await login(page, A, '/sale/pos', EMPLOYEE);
+  // The browser says there is no connection from the first script on, while the dev server still serves the page.
+  await page.addInitScript(() => Object.defineProperty(Navigator.prototype, 'onLine', { get: () => false }));
+  for (const vp of VIEWPORTS) {
+    await page.setViewportSize({ width: vp.width, height: vp.height });
+    await till(page);
+    await expect(announced(page)).toHaveAttribute('aria-disabled', 'true');
+    await expect(key(page)).toHaveCSS('opacity', '0.6');
+    await capture(page, `sale-speak-opened-offline-${vp.label}`);
+  }
 });
 
 // The dictation is base's (`useDictation`); the key keeps
@@ -129,16 +147,16 @@ test('SALE-F01 — a recording stopped once the connection is gone is thrown awa
 
     await page.context().setOffline(true);
     // A recording can always be stopped: the key is not greyed while it records.
-    await expect(key(page)).toHaveAttribute('aria-disabled', 'false');
+    await expect(announced(page)).not.toHaveAttribute('aria-disabled', 'true');
     await key(page).click();
     await expect(toastSaying(page, 'No connection: talking to the assistant needs the internet.')).toBeVisible();
     await expect(key(page)).toHaveText('Speak');
-    await expect(key(page)).toHaveAttribute('aria-disabled', 'true');
+    await expect(announced(page)).toHaveAttribute('aria-disabled', 'true');
     await expect(status).toBeHidden();
     await expect(panel(page)).toHaveAttribute('data-open', 'false');
     expect(transcribed()).toBe(dictations);
 
     await page.context().setOffline(false);
-    await expect(key(page)).toHaveAttribute('aria-disabled', 'false');
+    await expect(announced(page)).not.toHaveAttribute('aria-disabled', 'true');
   }
 });

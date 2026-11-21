@@ -196,6 +196,21 @@
       "done": "Factura completa {number} emitida",
       "failed": "No se pudo emitir la factura completa"
     },
+    "public": {
+      "title": "Solicita tu factura",
+      "loading": "Cargando tu tique…",
+      "business": "Negocio",
+      "intro": "Escribe tus datos fiscales para obtener la factura completa de este tique.",
+      "ticket": "Tique {number}",
+      "date": "Fecha",
+      "total": "Total",
+      "submit": "Solicitar factura completa",
+      "issuing": "Solicitando tu factura…",
+      "ready": "Tu factura está lista.",
+      "already": "Ya pediste esta factura. Esta es la misma, con los datos que diste entonces.",
+      "loadFailed": "No se pudo cargar el tique. Inténtalo de nuevo.",
+      "issueFailed": "No se pudo solicitar la factura. Inténtalo de nuevo."
+    },
     "recipient": {
       "name": "Nombre o razón social",
       "country": "País",

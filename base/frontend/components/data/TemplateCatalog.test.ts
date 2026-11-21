@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { errorFrame, flush, mountBase, subId } from '../../__tests__/mount-base';
+import { errorFrame, flush, mountBase, rowButtonNames, subId } from '../../__tests__/mount-base';
 import { template } from '../../__tests__/data-fixtures';
 import TemplateCatalog from './TemplateCatalog.vue';
 
@@ -24,6 +24,13 @@ async function catalog(props: Record<string, unknown> = {}, locale: 'en' | 'es' 
 }
 
 describe('TemplateCatalog', () => {
+  it('each template’s «Use template» tells a screen reader which template it is', async () => {
+    const m = await catalog();
+    await m.result(m.call, 'base.blueprint.list', { templates: [template('restaurant.es'), template('hair_salon.es')], empty: true });
+    const names = ['restaurant.es', 'hair_salon.es'].map((key) => rowButtonNames(m.wrapper.element, `templates-row-${key}`));
+    expect(names).toEqual([{ use: 'Use template: Restaurant' }, { use: 'Use template: Hair salon' }]);
+  });
+
   it('says it is loading until the catalogue arrives', async () => {
     const m = await catalog();
     expect(m.wrapper.get('[data-testid="templates-loading"]').text()).toContain('Loading templates…');
@@ -39,6 +46,35 @@ describe('TemplateCatalog', () => {
     expect(row.attributes('data-id')).toBe('restaurant.es');
     const text = row.text();
     for (const part of ['Restaurant', 'español', 'España', '1', 'Products · 12']) expect(text).toContain(part);
+  });
+
+  it('heads each card with the template’s name and marks every other datum with the icon that says what it is', async () => {
+    const m = await catalog({}, 'es');
+    await m.result(m.call, 'base.blueprint.list', { templates: [template('restaurant.es')], empty: true });
+    const card = m.wrapper.get('[data-testid="templates-row"]');
+    expect(card.get('.data-table__card-title').text()).toBe('Restaurant');
+    const icons = Object.fromEntries(
+      ['language_name', 'country_name', 'version', 'brings'].map((key) => [
+        key,
+        card.get(`[data-column="${key}"] .data-table__card-meta-icon`).attributes('name'),
+      ]),
+    );
+    expect(icons).toEqual({
+      language_name: 'language-outline',
+      country_name: 'globe-outline',
+      version: 'layers-outline',
+      brings: 'cube-outline',
+    });
+  });
+
+  it.each([
+    ['en', 'Version 1'],
+    ['es', 'Versión 1'],
+  ] as const)('says the version in words, not as a bare number (%s)', async (locale, said) => {
+    const m = await catalog({}, locale);
+    await m.result(m.call, 'base.blueprint.list', { templates: [template('restaurant.es')], empty: true });
+    const line = m.wrapper.get('[data-testid="templates-row"] [data-column="version"]');
+    expect(line.get('.data-table__card-meta-value').text()).toBe(said);
   });
 
   it('emits the template chosen with «Use template», and spins on it while it is read', async () => {

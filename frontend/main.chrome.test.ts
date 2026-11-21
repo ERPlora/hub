@@ -12,18 +12,8 @@ const chrome = vi.hoisted(() => {
   return { late, arrive: () => arrive() };
 });
 
-vi.mock('@erplora/ui/shell', () => ({
-  createShell: vi.fn(),
-  logout: vi.fn(),
-  toastSuccess: vi.fn(),
-  applyUserThemePreferences: vi.fn(),
-  resetUserThemePreferences: vi.fn(),
-}));
-vi.mock('@erplora/ui/sdk', async (importOriginal) => ({
-  ...((await importOriginal()) as object),
-  createLiveClient: vi.fn(() => ({ api: { call: vi.fn() } })),
-  provideLiveClient: vi.fn(),
-}));
+vi.mock('@erplora/ui/shell', async () => (await import('./__tests__/main-boot')).shellModule());
+vi.mock('@erplora/ui/sdk', async (importOriginal) => (await import('./__tests__/main-boot')).sdkModule(importOriginal));
 // Each piece a stub of its own (`__esModule`: Vue takes `default` from a module it recognises; Vitest's mock is not
 // tagged `Module`). The one beside the pane is held until the test lets it arrive; the menu's foot («Upgrade plan»,
 // «Manage on erplora.com») never loads (a chunk the network lost): the piece's own load reports it at render.

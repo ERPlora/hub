@@ -1,7 +1,7 @@
 """The online booking app declares its module metadata, its menu, its permissions and what each role gets."""
 
 from django.apps import apps
-from live.meta import Category, LiveAppConfig, Nav, module_configs
+from live.meta import Category, Help, LiveAppConfig, Nav, module_configs
 
 from base.tests.roles import grants_by_role
 
@@ -79,3 +79,7 @@ def test_navigation_is_the_old_modules_two_entries_with_registered_icons():
         ("bookings", "Bookings", "ion:calendar-outline", "/online_booking/bookings"),
         ("settings", "Settings", "ion:settings-outline", "/online_booking/settings"),
     ]
+
+
+def test_its_help_window_is_ready_without_a_video_yet():
+    assert online_booking().help == Help()

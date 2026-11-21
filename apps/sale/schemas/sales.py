@@ -168,6 +168,10 @@ class SaleOut(Schema):
         "empty while it has none. The paper prints it."
     )
     invoice_type: str = Field(description="F2 (ticket) or F1 (invoice); empty while it has none.")
+    receipt_code: str | None = Field(
+        description="The code its ticket prints under a QR of its own, for the customer to ask for the full invoice "
+        "on the business's public page; none for a full invoice or without Invoicing."
+    )
     void_invoice_status: FiscalStatus = Field(
         description="The rectifying invoice of its void, as Invoicing answered; empty if not voided."
     )

@@ -84,6 +84,9 @@ msgstr "categoría fiscal"
 msgid "chosen by default"
 msgstr "elegida por defecto"
 
+msgid "allergens"
+msgstr "alérgenos"
+
 msgid "option"
 msgstr "opción"
 

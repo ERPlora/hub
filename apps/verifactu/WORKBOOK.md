@@ -10,6 +10,13 @@ Estado de la app: completa (2026-10-27)
 
 ## Para qué sirve y para quién
 
+VeriFactu convierte cada factura y cada tique que emite Facturación en su registro para la Agencia Tributaria (AEAT):
+encadenado al anterior por su huella, con el QR que el cliente puede cotejar, y enviado a la AEAT en orden. Lo que no
+puede salir en el momento espera en la cola y sale solo después. Solo vale para negocios de España, y empieza en el
+entorno de pruebas de la AEAT hasta que pasas a producción.
+
+### En detalle
+
 VeriFactu es el final de la cadena fiscal: cada factura o tique que emite Facturación se convierte aquí en
 un **registro de facturación** encadenado (cada registro lleva la huella del anterior), con su **QR** de
 cotejo, que se envía a la Agencia Tributaria (AEAT). Si no puede salir en ese momento, se queda en la cola
@@ -103,6 +110,13 @@ Eventos, Recuperación, Configuración y Ajustes. Todas se ven con el permiso de
 la persona no puede usar no aparecen.
 
 ### Registros
+Cada factura y cada tique que emites tiene aquí su registro de VeriFactu, lo último arriba, con su estado ante la
+AEAT (Pendiente, Enviado, Aceptado, Aceptado con errores o Rechazado) y su entorno, pruebas o producción. Búscalos por
+factura, emisor o NIF y fíltralos por estado, tipo, fecha o total. Toca uno para abrir su ficha: la factura, la cadena
+de huellas, el QR, la respuesta de la AEAT y, si aún no ha llegado, por qué espera; desde ahí, según su estado y tu
+permiso, lo envías ya, lo subsanas o lo anulas.
+
+#### Detalle
 Menú **VeriFactu → Registros**. Título «Registros VeriFactu». Tabla de 50 en 50 (tabla o tarjetas; en el
 móvil, tarjetas con el número de factura como título) con «Seq», «Factura», «Fecha», «Tipo» (Alta /
 Anulación), «F.» (F1…R5), «Emisor», «Total», «Entorno» (Pruebas / Producción) y «Estado» (Pendiente,
@@ -118,7 +132,7 @@ cuando nace, sale o cambia un registro en cualquier dispositivo.
 Vacía: «Todavía no hay registros. Cada factura que emitas se sella y aparece aquí.»; con búsqueda o filtro,
 «Sin resultados». Cargando: «Cargando…». Error: el mensaje con «Reintentar».
 
-### Ficha de registro
+#### Ficha de registro
 Se abre desde una fila de **Registros** (`/verifactu/records/<id>`). Arriba, «Registro {número}» con su estado,
 su entorno y «← Volver». Si no está en la AEAT (Pendiente o Enviado), el aviso «Aún no está en la AEAT» con
 el porqué y el cuándo (VERIFACTU-F17). Si fue rechazado, el aviso «La AEAT lo ha rechazado» con qué hacer
@@ -138,6 +152,12 @@ está en la cola, «Subsanar» (VERIFACTU-F24) y «Anular registro» (VERIFACTU-
 Error al abrir: «Registro no encontrado» o el mensaje del fallo, con «← Volver».
 
 ### Contingencia
+La cola de los registros que aún no están en la AEAT, en el orden en que van a salir, con sus intentos, el próximo
+intento y el último error. El sistema los envía solo, en orden, y lo que vuelve a fallar espera un poco más antes del
+siguiente intento. «Procesar cola» hace la pasada en ese momento y «Reintentar» pone un registro a salir en la
+siguiente. Vacía, todo está en la AEAT.
+
+#### Detalle
 Menú **VeriFactu → Contingencia**. Título «Cola de contingencia» y botón «Procesar cola» («Procesando…»
 mientras trabaja). Tabla de los registros que aún no están en la AEAT: «Factura», «Entorno», «Intentos»,
 «Estado», «Próximo intento» y «Último error», en el orden en que salen (cada columna se ordena); buscador «Buscar
@@ -146,6 +166,11 @@ pone a salir en la siguiente pasada) y «Ver». Debajo de la tabla, el resultado
 Vacía: «Cola vacía: todo está en la AEAT.». Cargando: «Cargando…». Error: el mensaje encima de la tabla.
 
 ### Eventos
+Lo que ha pasado con tus registros y con la conexión a la AEAT, lo más reciente primero: cada registro creado, cada
+envío aceptado, aplazado o fallido, cada pasada de la cola, las comprobaciones de la cadena, las consultas a la AEAT y
+los cambios de configuración. Búscalos por tipo o por mensaje y fíltralos por tipo, severidad o fecha.
+
+#### Detalle
 Menú **VeriFactu → Eventos**. Título «Eventos de auditoría». Tabla, lo más reciente primero: «Cuándo»,
 «Severidad» (Depuración, Información, Aviso, Error, Crítico), «Tipo» (Registro creado, Envío aplazado, Envío
 aceptado, Aceptado con errores, Envío fallido, Cola procesada, Registro reprogramado, Cadena verificada, Cadena
@@ -156,6 +181,12 @@ anterior a la «desde» se dice bajo su campo y no filtra). Se pone al día sola
 Vacía: «Sin eventos.». Cargando: «Cargando…». Error: el mensaje con «Reintentar».
 
 ### Recuperación
+Aquí compruebas que la cadena de huellas de tus registros está íntegra y consultas los registros que la AEAT tiene de
+tu negocio este mes. Si hace falta, recuperas la cadena: desde la AEAT, después de restaurar una copia de la base de
+datos, o desde la última huella de la aplicación que usabas antes, al migrar. Las dos recuperaciones piden
+confirmación.
+
+#### Detalle
 Menú **VeriFactu → Recuperación**. Título «Recuperación de cadena». Campo «NIF del emisor» (rellenado con el
 del emisor de Facturación) y el entorno actual. Bloque «Integridad de la cadena» con el último veredicto
 («Cadena de huellas íntegra ✓», «Cadena de huellas ROTA ✗» con la secuencia, o «Sin validar todavía») y la
@@ -168,6 +199,12 @@ factura» y «Fecha» y «Continuar desde esta huella». Las dos recuperaciones 
 recuperación» / «Cancelar»). Al terminar: «Operación completada.».
 
 ### Configuración
+Aquí preparas cómo llegan tus registros a la AEAT. En «Mi certificado» subes el certificado electrónico de tu negocio
+(un fichero .p12 o .pfx) con su contraseña, ves su titular y cuándo caduca, y lo renuevas o lo quitas. Si ERPlora
+presenta por cuenta de los negocios, la pestaña «Lo remite ERPlora» te deja descargar el modelo de autorización y,
+una vez firmado, enviarlo a revisión, y dice en qué estado está. Solo quien configura VeriFactu sube o envía algo.
+
+#### Detalle
 Menú **VeriFactu → Configuración**. Título «Configuración de VeriFactu». Con la vía de ERPlora disponible, dos
 pestañas, las dos vías:
 - **«Lo remite ERPlora»** (abre por defecto): «Otorgamiento de
@@ -190,7 +227,9 @@ pestañas, las dos vías:
   dato.».
 - **«Mi certificado»**: «Certificado del negocio (.p12 / .pfx)» con «Cargado» / «Sin cargar», «Titular», «NIF
   del titular», «Tipo», «Subido el» y «Caduca el» (con el aviso «Caduca en {n} días: sube aquí el renovado.» a
-  30 días o menos y «El certificado ha caducado. Sube uno vigente para poder enviar a la AEAT.»). Quien configura
+  30 días o menos y «El certificado ha caducado. Sube uno vigente para poder enviar a la AEAT.») y, en pruebas,
+  «AEAT de pruebas»: «Sin probar todavía», «Aceptado» o «Rechazado», con el aviso de cómo se prueba o de por qué lo
+  ha rechazado (VERIFACTU-F02). Quien configura
   VeriFactu ve «Elegir el fichero .p12 / .pfx», «Contraseña del certificado», «Subir el certificado» y, con uno
   cargado, «Quitar» (pregunta antes, en una tarjeta que dice qué pasará: en pruebas, «Puedes seguir probando sin él:
   tus registros de pruebas siguen saliendo.»; en producción con tu certificado, «Los registros esperarán hasta
@@ -208,6 +247,12 @@ remite ERPlora», si está disponible, no enseña el otorgamiento ni el trámite
 sin subirlo ni quitarlo.
 
 ### Ajustes
+Aquí ves por qué vía salen tus registros (con tu certificado o por ERPlora) y en qué entorno de la AEAT estás, pruebas
+o producción. Pasas a producción cuando ya no falta nada (si falta algo, la pantalla dice qué), o vuelves a pruebas
+mientras no se haya sellado ningún registro en producción. También pruebas la conexión con la AEAT sin enviar nada,
+creas una factura de prueba mientras estás en pruebas y lees la declaración responsable del sistema.
+
+#### Detalle
 Menú **VeriFactu → Ajustes**. Título «Ajustes de VeriFactu». Tres bloques:
 - **«Envío»**: con la vía de ERPlora disponible, una frase con su icono dice por qué vía salen los registros y qué
   falta (VERIFACTU-F04), con «Abrir Configuración»: con tu certificado, «Envías tú directamente a Hacienda con el
@@ -259,7 +304,7 @@ Avisos de la pantalla: el resultado de cada acción en una franja arriba (verde 
 | VERIFACTU-F04 | Saber quién remite: mi certificado o ERPlora | hecho — la vía no se elige: la decide el certificado y queda fijada al pasar a producción |
 | VERIFACTU-F05 | Firmar y subir el otorgamiento de representación para que remita ERPlora | hecho — se sube en el Hub, lo revisa el staff en el SaaS (`fiscal/`) y el estado vuelve en la foto; con la vía de ERPlora cerrada en el servidor no se ofrece |
 | VERIFACTU-F06 | Volver a enviar el otorgamiento | hecho — en el Hub, como VERIFACTU-F05 |
-| VERIFACTU-F08 | Pasar a producción | hecho — producción = despliegue `prod` ∧ `VERIFACTU_PRODUCTION_ENABLED` ∧ (certificado propio válido \| vía ERPlora abierta en el servidor con otorgamiento aprobado) ∧ cuenta activa, en todos los planes (también en Gratis); el servidor lo tiene cerrado hasta que ERPlora lo abra (bajo supervisión de Ioan) |
+| VERIFACTU-F08 | Pasar a producción | hecho — producción = despliegue `prod` ∧ `VERIFACTU_PRODUCTION_ENABLED` ∧ (certificado propio vigente y aceptado por la AEAT de pruebas \| vía ERPlora abierta en el servidor con otorgamiento aprobado) ∧ cuenta activa, en todos los planes (también en Gratis); el servidor lo tiene cerrado hasta que ERPlora lo abra (bajo supervisión de Ioan) |
 | VERIFACTU-F09 | Volver a pruebas | hecho |
 | VERIFACTU-F10 | Probar la conexión con la AEAT | hecho — con la sonda de la pasarela del SaaS (`/internal/verifactu/probe`) |
 | VERIFACTU-F11 | Crear una factura de prueba | hecho |
@@ -317,43 +362,46 @@ Estado: hecho — en el Hub; cifrado en la BD del hub con `FISCAL_CERTIFICATE_KE
 Actor: propietario y administrador (configurar)
 Pantalla: Configuración
 Pasos:
-1. En **VeriFactu → Configuración**, pestaña «Mi certificado», pulsa «Elegir el fichero .p12 / .pfx» y elige el
-   certificado del negocio (como mucho 1 MB).
+1. En **Configuración**, pestaña «Mi certificado», pulsa «Elegir el fichero .p12 / .pfx» y elige el certificado
+   del negocio (como mucho 1 MB).
 2. Escribe su contraseña en «Contraseña del certificado» y pulsa «Subir el certificado».
-3. El Hub lo abre con la contraseña, comprueba que lo ha emitido una entidad reconocida (las autoridades de
-   certificados cualificados de firma o de sello de la lista de confianza de prestadores de España), lee titular,
-   NIF, tipo y caducidad y lo guarda cifrado (Fernet) junto con la contraseña en la base de datos del hub. Sale
-   «Certificado subido: {titular} ({NIF}).» y la pestaña pasa a «Cargado». Subir otro sustituye al anterior.
-4. Mientras el negocio está en pruebas, desde ese momento sus registros salen con él (VERIFACTU-F04), también los que
-   la pasarela había rechazado, y ya puede pasar a producción con él (VERIFACTU-F08).
-5. El certificado guardado se vuelve a comprobar solo, cada hora, si aún no se comprobó con la lista de confianza que
-   trae el Hub (uno subido antes de esta comprobación, o la lista renovada). Si no lo ha emitido una entidad
-   reconocida, deja de valer: la pestaña pasa a «Sin cargar» y pide subir uno válido, la vía pasa a ser la de sin
-   certificado (VERIFACTU-F04) y en los eventos queda «El certificado propio de {titular} ({NIF}) ya no vale: no lo ha
-   emitido una entidad que reconozca la AEAT. Sube uno válido.». Si el servidor no puede abrirlo, se queda sin
-   comprobar, como estaba.
-6. En un negocio de fuera de España no se ofrece: arriba dice «VeriFactu solo es para negocios de España.» y la pestaña solo enseña el estado del
+3. El Hub lo abre con la contraseña, lee titular, NIF, tipo y caducidad y lo guarda cifrado, junto con la
+   contraseña, en la base de datos del Hub. No mira qué entidad lo ha emitido: si vale, lo dice la AEAT de pruebas
+   (paso 4). Sale, por ejemplo, «Certificado subido: Bar Sol SL (B12345678).» y la pestaña pasa a «Cargado». Subir
+   otro sustituye al anterior.
+4. Mientras el negocio está en pruebas, desde ese momento sus registros salen con él, también los que
+   la pasarela había rechazado, y con ellos lo prueba la AEAT de pruebas. En la pestaña, la fila «AEAT de pruebas»
+   dice «Sin probar todavía» y debajo «Se prueba con el próximo registro que salga en pruebas: cuando la AEAT de
+   pruebas lo acepte, podrás pasar a producción.». Cuando la AEAT de pruebas contesta a un envío hecho con él con su
+   veredicto sobre los registros (aunque rechace alguno por su contenido), pasa a «Aceptado» y ya puede pasar a
+   producción con él. Si lo rechaza por el certificado, pasa a «Rechazado» y debajo sale por qué: la sede de la AEAT
+   contesta con su página de error («Se ha producido un error al verificar el certificado presentado»: no lo ha
+   emitido una entidad que reconozca, no vale para este servicio o ha caducado), o responde el
+   fallo 4112 («El titular del certificado debe ser Obligado Emisión, Colaborador Social, Apoderado o Sucesor»). Una
+   AEAT caída o que no responde, un fallo del contenido del envío o un fallo pasajero como el 103 «NIF no
+   identificado» (la AEAT de pruebas se lo ha dado a certificados buenos y al rato los identificaba) no lo cambian; si
+   después la AEAT de pruebas lo acepta, pasa a «Aceptado». Subir otro lo deja
+   otra vez «Sin probar todavía». En producción la fila no sale: la producción nunca prueba un certificado.
+5. En un negocio de fuera de España no se ofrece: arriba dice «VeriFactu solo es para negocios de España.» y la pestaña solo enseña el estado del
    certificado, sin subirlo ni quitarlo.
 Entra: el `.p12`/`.pfx` en base64 y su contraseña (`verifactu.certificate.upload`).
 Sale: el certificado guardado (`OwnCertificate`), un evento «Certificado propio de … subido» y el aviso
-`verifactu.config.changed`; el de uno guardado que deja de valer, el evento «El certificado propio de … ya no vale» y
-el mismo aviso (`verifactu.certificate.recheck`, la tarea programada). El fichero y la contraseña no se vuelven a mostrar: ni en la API, ni en el admin,
+`verifactu.config.changed`; cuando la AEAT de pruebas lo acepta o lo rechaza, el evento «La AEAT de pruebas ha aceptado el certificado propio de …: el negocio ya puede pasar a producción
+con él.» o «La AEAT de pruebas ha rechazado el certificado propio de … (motivo): sube otro.» y el mismo aviso. El fichero y la contraseña no se vuelven a mostrar: ni en la API, ni en el admin,
 ni en la foto, ni en los registros del servidor.
-Si falla: el certificado no se guarda (409):
-- sin clave de almacenamiento en el servidor, «Este servidor aún no puede guardar certificados: ERPlora tiene
-  que configurar su clave de almacenamiento.» (`verifactu.certificate_storage_unavailable`);
-- sin emisor, «Configura antes el emisor en Facturación → Emisor.» (`verifactu.issuer_missing`);
-- contraseña mala o fichero que no es un `.p12`, «El fichero no es un certificado .p12/.pfx que abra esta
+Si falla: el certificado no se guarda y la pantalla dice por qué:
+- si este servidor todavía no puede guardar certificados, «Este servidor aún no puede guardar certificados: ERPlora
+  tiene que configurar su clave de almacenamiento.»;
+- sin emisor, pide configurarlo antes en Facturación, pestaña Emisor;
+- con una contraseña mala o un fichero que no es un .p12, «El fichero no es un certificado .p12/.pfx que abra esta
   contraseña.»; autofirmado, «Este certificado no lo ha emitido ninguna entidad (es autofirmado), así que la AEAT
   no lo aceptará. Usa el certificado electrónico de tu negocio emitido por una entidad reconocida, por ejemplo la
-  FNMT.»; emitido por una entidad que no es de la lista de confianza, «Este certificado no lo ha emitido una entidad
-  que reconozca la AEAT, así que la AEAT no lo aceptará. Usa el certificado electrónico de tu negocio emitido por una
-  entidad reconocida, por ejemplo la FNMT.»; sin uso de autenticación de cliente, «El certificado no permite la autenticación de cliente,
-  así que no puede conectar con la AEAT.»; caducado, «El certificado caducó el {fecha}: sube uno vigente.»
-  (todos `verifactu.certificate_invalid`);
-- titular distinto del emisor de Facturación, «El certificado es de {NIF}, no del emisor de este negocio,
-  {NIF}.» (`verifactu.certificate_holder_mismatch`): por la vía propia se presentaría en nombre de otro.
-Implicados: VERIFACTU-F04, VERIFACTU-F34
+  FNMT.»; sin uso de autenticación de cliente, «El certificado no permite la autenticación de cliente,
+  así que no puede conectar con la AEAT.»; caducado, por ejemplo «El certificado caducó el 2025-12-31: sube uno
+  vigente.»;
+- con un titular distinto del emisor de Facturación, por ejemplo «El certificado es de B87654321, no del emisor de
+  este negocio, B12345678.»: por la vía propia se presentaría en nombre de otro.
+Implicados: VERIFACTU-F04, VERIFACTU-F08, VERIFACTU-F34
 
 ### VERIFACTU-F03 Quitar el certificado propio
 Estado: hecho — en el Hub
@@ -362,16 +410,16 @@ Pantalla: Configuración
 Pasos:
 1. En «Mi certificado», con uno cargado, pulsa «Quitar»; una tarjeta pregunta «¿Quitar el certificado?» y dice qué
    pasará (la pantalla Configuración).
-2. Al confirmar, el certificado se borra de la base de datos del hub, sale «Certificado quitado.» y la pestaña
+2. Al confirmar, el certificado se borra de la base de datos del Hub, sale «Certificado quitado.» y la pestaña
    pasa a «Sin cargar».
-3. En pruebas, los registros que aún no han salido pasan a salir con el sello de ERPlora (VERIFACTU-F04), también
-   los que la pasarela había rechazado. En producción con la vía del certificado fijada, dejan de poder salir hasta
-   subir otro: esperan en la cola con el motivo «tu certificado propio no está cargado o ha caducado» y las ventas
-   nuevas se rechazan (VERIFACTU-F08); nunca vuelven al sello. En producción con la vía de ERPlora fijada, no cambia
+3. En pruebas, los registros que aún no han salido pasan a salir con el sello de ERPlora, también los que la
+   pasarela había rechazado. En producción con la vía del certificado fijada, dejan de poder salir hasta subir otro:
+   esperan en la cola con el motivo «tu certificado propio no está cargado o ha caducado» y las ventas nuevas se
+   rechazan; nunca vuelven al sello. En producción con la vía de ERPlora fijada, no cambia
    nada.
 Entra: nada (`verifactu.certificate.remove`).
 Sale: el certificado borrado, un evento «Certificado propio de … quitado» y el aviso `verifactu.config.changed`.
-Si falla: sin permiso de configurar, 403.
+Si falla: sin permiso para configurar VeriFactu no sale «Quitar», y pedirlo por otra puerta se rechaza.
 Implicados: VERIFACTU-F04, VERIFACTU-F08
 
 ### VERIFACTU-F04 Saber quién remite: mi certificado o ERPlora
@@ -379,25 +427,25 @@ Estado: hecho — la vía no se elige: la decide el certificado y queda fijada a
 Actor: administrador
 Pantalla: Ajustes
 Pasos:
-1. La vía la decide el certificado. Con un certificado propio cargado, vigente y emitido por una entidad reconocida
-   (VERIFACTU-F02), los registros salen con él; sin él, en pruebas los remite ERPlora con su sello, también en un
-   negocio de demostración. Mientras el negocio está en pruebas, subir, quitar o dejar caducar el certificado, o que
-   deje de valer al volver a comprobarlo, cambia la vía de lo que aún no ha salido.
-2. En **VeriFactu → Ajustes**, «Envío» lo dice en una frase con su icono y lo que falta (la pantalla Ajustes).
-3. Al pasar a producción (VERIFACTU-F08), la vía de ese momento queda fijada: con un certificado válido, el
+1. La vía la decide el certificado. Con un certificado propio cargado y vigente, los registros salen
+   con él; sin él, en pruebas los remite ERPlora con su sello, también en un
+   negocio de demostración. Mientras el negocio está en pruebas, subir, quitar o dejar caducar el certificado cambia
+   la vía de lo que aún no ha salido.
+2. En **Ajustes**, «Envío» lo dice en una frase con su icono, con lo que falta.
+3. Al pasar a producción, la vía de ese momento queda fijada: con un certificado válido, el
    certificado, aunque también esté aprobada la autorización; sin él, la de ERPlora. Desde entonces, subir, quitar o
    dejar caducar el certificado no la cambia. Con la del certificado fijada y sin certificado válido, los registros
-   esperan y las ventas nuevas se rechazan (VERIFACTU-F08); nunca vuelven al sello. Con la de ERPlora fijada, sigue
-   enviando y anulando con el sello mientras su autorización siga aprobada.
-4. ERPlora puede cerrar su vía en el servidor (`VERIFACTU_ERPLORA_ROUTE_ENABLED` a falso; abierta por defecto):
-   entonces solo se pasa a producción con el certificado propio. Las pruebas sin certificado, también las de las
+   esperan y las ventas nuevas se rechazan; nunca vuelven al sello. Con la de ERPlora fijada, sigue enviando y
+   anulando con el sello mientras su autorización siga aprobada.
+4. ERPlora puede dejar de presentar por cuenta de los negocios en un servidor (de partida presenta): entonces solo se
+   pasa a producción con el certificado propio. Las pruebas sin certificado, también las de las
    demos, siguen saliendo con el sello, y quien ya está en producción por ella sigue enviando y anulando por ella. El
    negocio de la propia ERPlora no se ve afectado: remite siempre con el sello.
 5. En un negocio de fuera de España, arriba dice «VeriFactu solo es para negocios de España.».
 Entra: el certificado subido (VERIFACTU-F02, F03), el entorno y, de la cuenta, el estado de la autorización.
 Sale: la vía con la que sale cada registro, en `verifactu.config.get` (`route`); al pasar a producción, guardada.
 Si falla: no hay nada que elegir ni que rechazar. Lo que falta para enviar lo dice «Los registros están esperando:»,
-y lo que falta para pasar a producción, VERIFACTU-F08.
+y lo que falta para pasar a producción, la lista «Todavía no puede pasar a producción:», en la misma pantalla.
 Implicados: VERIFACTU-F02, VERIFACTU-F03, VERIFACTU-F05, VERIFACTU-F08
 
 ### VERIFACTU-F05 Firmar y subir el otorgamiento de representación para que remita ERPlora
@@ -405,18 +453,18 @@ Estado: hecho — se sube en el Hub, lo revisa el staff en el SaaS y el estado v
 Actor: administrador (permiso «configurar»)
 Pantalla: Configuración
 Pasos:
-1. En **VeriFactu → Configuración**, pestaña «Lo remite ERPlora», el estado dice «Sin firmar».
-2. «Descargar el modelo» baja el modelo oficial (Anexo I del Convenio 17, el del SaaS) con los datos del negocio ya
+1. En **Configuración**, pestaña «Lo remite ERPlora», el estado dice «Sin firmar».
+2. «Descargar el modelo» baja el modelo oficial (el Anexo I del Convenio 17, que da ERPlora) con los datos del negocio ya
    puestos: la razón social, el NIF y la dirección del emisor de Facturación (el municipio y la vía pública, con el
    número tal como figura en la dirección); sin emisor, baja en blanco. Se completa lo que falte y se firma fuera de
    la pantalla: a mano (y se escanea a PDF, con el sello si es una sociedad) o con AutoFirma. Debajo del botón sale
    «Modelo descargado. Fírmalo y súbelo aquí abajo.»; dentro de la app de ERPlora el modelo se guarda en Descargas y
-   sale también «Guardado en {ruta}» (BASE-F112).
+   sale también la carpeta donde ha quedado.
 3. Una sociedad escribe su representante legal (nombre y NIF/NIE); un autónomo firma él mismo.
 4. Se elige el documento de identidad (DNI o NIE) y se adjuntan los PDF: el modelo firmado, la copia del
    documento, con NIE una muestra de la firma y, con sociedad, el justificante de representación.
-5. «Enviar a revisión»: el Hub comprueba los documentos y los reenvía tal cual al SaaS; queda «En revisión».
-6. Una persona de ERPlora lo revisa en el SaaS; la cuenta manda al Hub el estado nuevo: «Aprobado», «Devuelto»
+5. «Enviar a revisión»: el Hub comprueba los documentos y los reenvía tal cual a ERPlora; queda «En revisión».
+6. Una persona de ERPlora lo revisa; tu cuenta de ERPlora manda al Hub el estado nuevo: «Aprobado», «Devuelto»
    (con el motivo) o «Revocado».
 7. En un negocio de fuera de España no se ofrece: arriba dice «VeriFactu solo es para negocios de España.» y la
    pestaña no enseña el otorgamiento ni el trámite.
@@ -427,19 +475,17 @@ Sale: `POST /internal/hubs/{id}/representation` al SaaS; «En revisión» (uno a
 hasta que se apruebe el nuevo), su huella en «Lo que has enviado» y en el registro de auditoría (número, fecha,
 tipo de documento y qué documentos; nunca su contenido) y el aviso `verifactu.config.changed`. El Hub no guarda
 ningún documento. Aprobado, abre la vía de ERPlora en producción (VERIFACTU-F08).
-Si falla: antes de llamar, con los códigos del SaaS (422): falta el modelo («Adjunta el modelo firmado.»), no es un
-PDF («El modelo firmado tiene que ser un PDF — escanéalo o fírmalo con AutoFirma.»), falta la copia del documento,
-con NIE la muestra de firma, con sociedad el representante o el justificante, un fichero de más de 5 MB («Cada
-fichero puede ocupar 5 MB como máximo.»); el rechazo del SaaS, con su código `fiscal.*` y sus campos tal cual; sin
-emisor, 409 `verifactu.issuer_missing`; sin la foto de la cuenta (el Hub aún no sabe su id en ERPlora) o un negocio
-que el SaaS no conoce, 409 `verifactu.hub_unregistered` («ERPlora todavía no ha vinculado este negocio.»); sin el
-SaaS, 503 `verifactu.saas_unreachable` («ERPlora no ha podido atenderlo ahora mismo. Inténtalo en unos minutos.»).
-Con la vía de ERPlora cerrada en el servidor, ni «Descargar el modelo» ni «Enviar a revisión» llegan al SaaS: 409
-`verifactu.erplora_route_unavailable`, «De momento ERPlora no presenta por cuenta de los negocios: presenta con tu
-propio certificado.». El negocio de la propia ERPlora no se ve afectado.
+Si falla: antes de enviar nada, la pantalla dice lo que falta: el modelo («Adjunta el modelo firmado.»), que sea un
+PDF («El modelo firmado tiene que ser un PDF — escanéalo o fírmalo con AutoFirma.»), la copia del documento, con NIE
+la muestra de firma, con sociedad el representante o el justificante, o un fichero de más de 5 MB («Cada fichero
+puede ocupar 5 MB como máximo.»). Si ERPlora lo rechaza al recibirlo, sale su motivo. Sin emisor en Facturación, pide
+configurarlo antes; si ERPlora todavía no ha vinculado el negocio, «ERPlora todavía no ha vinculado este negocio.»; si
+ERPlora no contesta, «ERPlora no ha podido atenderlo ahora mismo. Inténtalo en unos minutos.». Si ERPlora deja de
+presentar por cuenta de los negocios, la pestaña «Lo remite ERPlora» ya no sale, y pedirlo por otra puerta contesta
+«De momento ERPlora no presenta por cuenta de los negocios: presenta con tu propio certificado.».
 Al descargar el modelo, un dato del emisor que el modelo no puede escribir (una letra fuera de las suyas o un texto
 demasiado largo) baja en blanco para escribirlo a mano, con el resto ya puesto: nunca deja sin modelo. Dentro de la app,
-si no lo puede guardar, lo dice con su motivo (BASE-F112) y no sale «Modelo descargado».
+si no lo puede guardar, lo dice con su motivo y no sale «Modelo descargado».
 Implicados: VERIFACTU-F08, BASE-F112 (dentro de la app)
 
 ### VERIFACTU-F06 Volver a enviar el otorgamiento
@@ -452,70 +498,58 @@ Pasos:
    con uno aprobado, se sigue remitiendo con él mientras se revisa el nuevo. «Cancelar» lo cierra.
 Entra: como VERIFACTU-F05.
 Sale: como VERIFACTU-F05; el envío lleva el número siguiente.
-Si falla: como VERIFACTU-F05.
+Si falla: lo mismo que al enviarlo la primera vez.
 Implicados: VERIFACTU-F05
 
 ### VERIFACTU-F08 Pasar a producción
-Estado: hecho — producción = despliegue `prod` ∧ `VERIFACTU_PRODUCTION_ENABLED` ∧ (certificado propio válido | vía
-ERPlora abierta en el servidor con otorgamiento aprobado) ∧ cuenta activa (`status` de la foto), en todos los planes
+Estado: hecho — producción = despliegue `prod` ∧ `VERIFACTU_PRODUCTION_ENABLED` ∧ (certificado propio vigente y
+aceptado por la AEAT de pruebas | vía ERPlora abierta en el servidor con otorgamiento aprobado) ∧ cuenta activa (`status` de la foto), en todos los planes
 (también en Gratis, sin opción de pago); el servidor lo tiene cerrado hasta que ERPlora lo abra (bajo supervisión de Ioan). En `pre` nunca se abre: todo va a pruebas. Un
 hub demo nunca pasa a producción (`verifactu.go_live_forbidden`).
 Actor: administrador
 Pantalla: Ajustes
 Pasos:
-1. En **VeriFactu → Ajustes**, «Entorno AEAT» enseña «Pruebas (AEAT de pruebas)» y «Tus facturas van al entorno de
+1. En **Ajustes**, «Entorno AEAT» enseña «Pruebas (AEAT de pruebas)» y «Tus facturas van al entorno de
    pruebas de la AEAT. Cuando esté todo listo, pasa a producción.». Si falta algo, debajo sale «Todavía no puede
    pasar a producción:» con la lista (negocio de demostración, otorgamiento sin aprobar, vía de ERPlora cerrada en el
-   servidor, certificado propio que falta o ha caducado, cuenta con un pago pendiente o suspendida) y «Pasar a
+   servidor, certificado propio que falta o ha caducado, certificado propio que la AEAT de pruebas aún no ha aceptado
+   o ha rechazado, cuenta con un pago pendiente o suspendida) y «Pasar a
    producción» queda desactivado. Ningún plan falta en ella: VeriFactu en vivo es de todos los planes.
 2. Pulsa «Pasar a producción» y confirma en «¿Enviar tus facturas a la AEAT de verdad?» («A partir de ahora
    cada registro se remite a la AEAT real. En cuanto se selle el primero ya no podrás volver a pruebas.»).
 3. Sale «Tu negocio está en producción: los registros ya se remiten a la AEAT real.» y la pastilla pasa a
    «Producción».
-Entra: el emisor de Facturación; el certificado propio y su caducidad; de la foto de la cuenta
+Entra: el emisor de Facturación; el certificado propio, su caducidad y si la AEAT de pruebas lo ha aceptado
+(VERIFACTU-F02); de la foto de la cuenta
 (`verifactu.config.sync`), el otorgamiento y el estado del negocio (la foto de un SaaS anterior aún trae `live_paid`:
 se acepta y no se lee).
 Sale: el entorno en producción y la vía de ese momento fijada (VERIFACTU-F04: con certificado válido, el certificado;
 sin él, la de ERPlora), avisando `verifactu.config.changed`: los registros nuevos nacen en la cadena de producción, con
 el QR de la sede real; los que nacieron en pruebas siguen yendo a pruebas.
-Si falla: mientras ERPlora no lo abra en el servidor, «El paso a producción todavía no está abierto en este
-servidor: ERPlora lo abre cuando la remisión real esté lista.» (en Ajustes, en la lista de lo que falta: «ERPlora
-todavía no ha abierto la presentación real a la AEAT en este servidor», `production_closed`); sin la pasarela del
-SaaS en el servidor, «La pasarela de envío de ERPlora no está configurada en este servidor: nada podría llegar a la
-AEAT.» (`verifactu.gateway_unavailable`); con un certificado propio que este servidor no abre (la clave
-`FISCAL_CERTIFICATE_KEY` falta o se rotó), «Tu certificado propio no se puede abrir en este servidor: vuelve a
-subirlo en VeriFactu → Configuración → Mi certificado.» (`verifactu.own_certificate_unreadable`); en un hub demo, «Un negocio de demostración no
-puede pasar a producción: siempre presenta en el entorno de pruebas de la AEAT.» (`verifactu.go_live_forbidden`;
-quién es demo lo dice la plataforma, `base.operations.is_demo_hub`); sin emisor, «Configura antes el emisor en
-Facturación → Emisor.»; sin certificado válido y sin autorización aprobada, «Para que ERPlora remita en producción
-falta que apruebe tu autorización firmada.» (`verifactu.representation_not_approved`); sin certificado válido y con
-la vía de ERPlora cerrada en el servidor, apruebe o no la autorización, «Para pasar a producción, sube tu propio
-certificado: de momento ERPlora no presenta por cuenta de los negocios.» (`verifactu.own_certificate_required`; en la
-lista de lo que falta: «de momento ERPlora no presenta por cuenta de los negocios: usa tu propio certificado»,
-`own_certificate_required`); con la cuenta con un pago
-pendiente o suspendida, «Tu cuenta de ERPlora tiene un pago pendiente o está suspendida: regulariza el pago en tu
-cuenta de ERPlora para pasar a producción.» (`verifactu.hub_not_active`). Todos son 409 y el entorno sigue en pruebas.
-Ya en producción, no hace nada.
-En un negocio de fuera de España se niega como con la app apagada, «VeriFactu solo es para negocios de España.» (404
-`app_inactive`), y Ajustes lo dice arriba, «VeriFactu solo es para negocios de España.», como único motivo (sin la lista de lo que falta), con
-«Pasar a producción» deshabilitado.
-Si en producción se pierde la vía fijada (con la de ERPlora, la foto deja de traer el otorgamiento aprobado; con la del
-certificado, caduca o se quita), no se cambia de vía ni se vuelve a pruebas (ya hay registros de producción): **no se sella nada nuevo** —la venta o la factura se
-rechazan con 409 y el código de la ruta (`verifactu.representation_not_approved`,
-`verifactu.own_certificate_missing`) y «No se ha emitido nada: este negocio presenta en real a la AEAT y ahora no
-puede hacerle llegar sus registros:», el motivo y «Resuélvelo en VeriFactu → Ajustes y vuelve a intentarlo.»— y
-Ajustes lo dice bajo «Las ventas y facturas nuevas se rechazan hasta que se
-resuelva:» (`issue_blocker`). Lo ya sellado sin otorgamiento aprobado o sin certificado válido espera, porque la
-pasarela no podría presentarlo.
-Cerrar la vía de ERPlora en el servidor no saca de producción a quien ya está en ella ni le cambia la vía: sigue
-sellando, enviando y anulando con el sello de ERPlora, porque la AEAT solo acepta una anulación presentada con el mismo
-sello; subir después un certificado tampoco la cambia. El paso «Configura VeriFactu» del Inicio, con la vía cerrada,
-solo se da por hecho con el certificado propio y solo habla de él: «Sube el certificado del negocio para enviar tus
-facturas a la AEAT.» (con la vía abierta, «Firma la autorización para que ERPlora envíe tus facturas a la AEAT, o sube
-el certificado del negocio.»).
-Se comprueba en este orden y la primera causa da el 409 con su código: el servidor cerrado → un negocio de
-demostración → el emisor → la vía (con certificado válido, el certificado, que no pide otorgamiento; sin él, la de
-ERPlora, abierta en el servidor y con el otorgamiento aprobado) → la cuenta.
+Si falla: mientras falte algo, «Pasar a producción» se queda desactivado, el entorno sigue en pruebas y la lista
+«Todavía no puede pasar a producción:» dice qué falta:
+- que ERPlora todavía no haya abierto la presentación real a la AEAT en este servidor, o que falte su pasarela de
+  envío;
+- que sea un negocio de demostración, que siempre presenta en el entorno de pruebas de la AEAT;
+- con tu certificado, que este servidor no lo pueda abrir (hay que volver a subirlo en «Mi certificado»), que la AEAT
+  de pruebas aún no lo haya aceptado (se prueba con el próximo registro que salga en pruebas: haz una venta o una
+  factura y pasa a producción cuando lo acepte) o que lo haya rechazado (hay que subir otro);
+- sin certificado válido, que ERPlora no haya aprobado todavía tu autorización firmada o, si ERPlora no presenta por
+  cuenta de los negocios, que falte tu propio certificado;
+- que tu cuenta de ERPlora tenga un pago pendiente o esté suspendida: hay que regularizar el pago en tu cuenta.
+
+Sin emisor en Facturación, pide configurarlo antes. Ya en producción, no hace nada. En un negocio de fuera de España,
+Ajustes dice arriba «VeriFactu solo es para negocios de España.» como único motivo y «Pasar a producción» va
+deshabilitado.
+Si en producción se pierde la vía fijada (con la de ERPlora, se revoca tu autorización; con la del certificado, caduca
+o se quita), no se cambia de vía ni se vuelve a pruebas: no se sella nada nuevo. La venta o la factura se rechazan con
+«No se ha emitido nada: este negocio presenta en real a la AEAT y ahora no puede hacerle llegar sus registros:» y el
+motivo, y Ajustes lo dice bajo «Las ventas y facturas nuevas se rechazan hasta que se resuelva:». Lo ya sellado
+espera, porque no se podría presentar.
+Si ERPlora deja de presentar por cuenta de los negocios, quien ya está en producción por esa vía sigue sellando,
+enviando y anulando con el sello de ERPlora, porque la AEAT solo acepta una anulación presentada con el mismo sello;
+subir después un certificado tampoco la cambia. Quien ya está en producción con su certificado y sube otro sigue
+enviando con él sin que se pruebe: la producción nunca prueba un certificado.
 Implicados: VERIFACTU-F04, VERIFACTU-F05, VERIFACTU-F09
 
 ### VERIFACTU-F09 Volver a pruebas
@@ -538,7 +572,7 @@ Estado: hecho — con la sonda de la pasarela del SaaS (`/internal/verifactu/pro
 Actor: responsable, administrador
 Pantalla: Ajustes
 Pasos:
-1. En **VeriFactu → Ajustes**, «Prueba en vivo», pulsa «Probar la conexión» (los botones esperan mientras prueba).
+1. En **Ajustes**, «Prueba en vivo», pulsa «Probar la conexión» (los botones esperan mientras prueba).
 2. El Hub comprueba, sin presentar nada a la AEAT, todo lo que hace falta para enviar: el emisor, los datos del
    productor, la vía y su estado y, si la pasarela está configurada, le pregunta si puede presentar ahora.
 3. Debajo sale el resultado, línea a línea, y «Este negocio puede enviar.» o «Todavía no puede enviar:» con los
@@ -556,11 +590,11 @@ Estado: hecho
 Actor: administrador
 Pantalla: Ajustes
 Pasos:
-1. Con el negocio en pruebas, en **VeriFactu → Ajustes**, «Prueba en vivo», pulsa «Crear factura de prueba». En
-   producción el botón no aparece.
+1. Con el negocio en pruebas, en **Ajustes**, «Prueba en vivo», pulsa «Crear factura de prueba». En producción el
+   botón no aparece.
 2. VeriFactu pide a Facturación un tique (F2) de una línea «Prueba VeriFactu» de 1,00 € más el 21 % de IVA en
-   la serie TICKET, por la misma puerta que el alta manual (INVOICE-F03).
-3. Sale «Factura de prueba {número} creada: su registro está en Registros.».
+   la serie TICKET, como una factura hecha a mano.
+3. Sale, por ejemplo, «Factura de prueba TICKET-2026-000001 creada: su registro está en Registros.».
 4. En un negocio de fuera de España, arriba dice «VeriFactu solo es para negocios de España.» y «Crear factura de prueba» va deshabilitado.
 Entra: nada que escribir.
 Sale: una factura real de Facturación en pruebas y su registro, que sale como cualquier otro.
@@ -572,7 +606,7 @@ Estado: hecho
 Actor: empleado, responsable, administrador
 Pantalla: Ajustes
 Pasos:
-1. En **VeriFactu → Ajustes**, tarjeta «Declaración responsable», «Leer la declaración firmada» abre la
+1. En **Ajustes**, tarjeta «Declaración responsable», «Leer la declaración firmada» abre la
    publicada en erplora.com (en la app instalada, en el navegador del dispositivo); al lado, «Versión de la declaración».
 2. «Datos identificativos de este sistema» enseña los datos del productor, la versión instalada y el número de
    instalación (el identificador de este negocio en ERPlora).
@@ -660,7 +694,7 @@ Estado: hecho
 Actor: empleado, responsable, administrador
 Pantalla: Registros
 Pasos:
-1. Abre **VeriFactu → Registros**.
+1. Abre **Registros**.
 2. Busca por número de factura, secuencia, nombre o NIF del emisor, o filtra por estado, tipo, tipo de
    factura, entorno, fecha y total.
 3. Cada fila enseña su estado con color: verde «Aceptado», ámbar «Pendiente» / «Enviado» / «Aceptado con
@@ -668,7 +702,7 @@ Pasos:
 Entra: los registros.
 Sale: nada; es consulta.
 Si falla: el mensaje con «Reintentar». El total se lee como en cualquier campo de importe del Hub y como en las
-demás listas (hub#1247: «1.000,50», «1,000.50», «2 500» y «12,50 €» filtran); uno que no se puede leer lo dice
+demás listas («1.000,50», «1,000.50», «2 500» y «12,50 €» filtran); uno que no se puede leer lo dice
 bajo su campo con las palabras del campo de importe («Esto no es un importe. Escribe una cifra, por ejemplo
 12,50.», «Este importe no puede ser negativo.» o, con «1.000» en euros, «Este importe se puede leer de dos
 maneras…»), y una fecha final anterior a la inicial, «La fecha final no puede ser anterior a la inicial.»; ninguno
@@ -681,15 +715,16 @@ Actor: empleado, responsable, administrador
 Pantalla: Ficha de registro
 Pasos:
 1. En **Registros**, pulsa una fila.
-2. Se abre «Registro {número}» con la factura, la cadena, el QR, la respuesta de la AEAT y el XML.
+2. Se abre su ficha, por ejemplo «Registro TICKET-2026-000001», con la factura, la cadena, el QR, la respuesta de
+   la AEAT y el XML.
 3. Si no está en la AEAT, «Aún no está en la AEAT» dice por qué («la pasarela de envío de ERPlora no está
-   configurada en este servidor», «tu certificado propio no está cargado o ha caducado», «la AEAT pidió esperar
-   hasta las {hora}», «no se ha podido contactar con la pasarela o con la AEAT ({detalle})») y un solo cuándo: si
+   configurada en este servidor», «tu certificado propio no está cargado o ha caducado», que la AEAT pidió esperar
+   hasta cierta hora, que no se ha podido contactar con la pasarela o con la AEAT) y un solo cuándo: si
    todo lo que espera se resuelve solo (la AEAT pidió esperar, sin contacto, sin respuesta, un fallo de la AEAT),
    «Sale solo en la próxima pasada, en orden y declarado como envío tardío si ya falló antes. No tienes que hacer
    nada.»; si espera a que se resuelva algo (un rechazo de la pasarela, que no se reenvía solo; la autorización; la
-   vía; el servidor), «Sale solo, en orden y declarado como envío tardío, en cuanto se resuelva.» (hub#454). Debajo,
-   el «Próximo intento».
+   vía; el servidor), «Sale solo, en orden y declarado como envío tardío, en cuanto se resuelva.». Debajo, el
+   «Próximo intento».
 4. En un negocio de fuera de España dice solo «este negocio no está en España: VeriFactu solo es para negocios de
    España, así que no se envía nada a la AEAT», sin próximo intento ni botones para enviar, subsanar o anular:
    nunca sale.
@@ -734,16 +769,16 @@ Pantalla: Contingencia
 Pasos:
 1. Mientras se vende nada se para por esto: si la pasarela, la AEAT o la red están caídas, el cobro sigue y el
    registro espera.
-2. Cada minuto (tarea programada `process_queue`) el sistema hace la pasada de VERIFACTU-F15 en todas las
-   cadenas a las que les toca, cada una en su entorno; si se perdieron pasadas (servidor parado), al volver
+2. Cada minuto el sistema hace la pasada de envío en todas las cadenas a las que les toca, cada una en su
+   entorno, en orden y respetando la espera que pidió la AEAT; si se perdieron pasadas (servidor parado), al volver
    se hace una sola.
 3. Lo que vuelve a fallar espera más (5, 10, 20, 40 y 60 minutos), sin límite de intentos.
-4. Queda el evento «Cola procesada: {enviados} enviados, {aceptados} aceptados, {rechazados} rechazados, {en
-   espera} en espera».
+4. Queda el evento de la pasada en **Eventos**, por ejemplo «Cola procesada: 3 enviados, 3 aceptados, 0 rechazados, 0
+   en espera.».
 Entra: los registros pendientes.
 Sale: los envíos y sus respuestas (avisa `verifactu.contingency.processed`).
 Si falla: lo que no sale sigue en la cola con su motivo; en un negocio de fuera de España no sale nunca. La pasada
-presenta cada registro como el negocio al que pertenece, nunca como el hub de ERPlora (VERIFACTU-F15, hub#454).
+presenta cada registro como el negocio al que pertenece, nunca como el de ERPlora.
 Implicados: VERIFACTU-F15
 
 ### VERIFACTU-F21 Procesar la cola a mano
@@ -751,7 +786,7 @@ Estado: hecho
 Actor: responsable, administrador
 Pantalla: Contingencia
 Pasos:
-1. En **VeriFactu → Contingencia**, pulsa «Procesar cola» («Procesando…»).
+1. En **Contingencia**, pulsa «Procesar cola» («Procesando…»).
 2. Se hace en ese momento la misma pasada que la automática.
 3. Debajo de la tabla sale el resultado; la tabla se pone al día sola.
 Entra: la cola.
@@ -765,7 +800,7 @@ Estado: hecho
 Actor: responsable, administrador
 Pantalla: Contingencia
 Pasos:
-1. En **VeriFactu → Contingencia**, pulsa «Reintentar» en la fila.
+1. En **Contingencia**, pulsa «Reintentar» en la fila.
 2. El registro (y los anteriores de su cadena, que salen antes que él) pasan a salir en la siguiente pasada;
    los intentos se conservan.
 Entra: el registro elegido.
@@ -780,17 +815,15 @@ Actor: administrador
 Pantalla: Registros, Ficha de registro
 Pasos:
 1. El registro sale en rojo «Rechazado» en **Registros**, y a su lado «Pendiente de subsanar»; en **Eventos** queda
-   «Envío fallido» con el motivo. El filtro «Subsanación» → «Pendientes de subsanar» deja solo los que faltan.
+   «Envío fallido» con el motivo. El filtro «Subsanación», en «Pendientes de subsanar», deja solo los que faltan.
 2. En su ficha, «La AEAT lo ha rechazado» con el código y el mensaje literales de la AEAT y qué hacer: si el
    error está en los datos de la factura (un NIF de cliente que la AEAT no reconoce, un importe), se corrige
    **en Facturación** con una rectificativa; si no (un error de la cadena tras restaurar una copia, un fallo
    nuestro), «Subsanar».
 3. «Subsanar» (con confirmación) sella un registro **nuevo** de la misma factura, leída otra vez, marcado como
-   subsanación, que entra en la cola. El rechazado se queda tal cual. `RechazoPrevio` según la Descripción del
-   servicio web VERI*FACTU v1.0.3: `X` si la AEAT no tiene ningún registro de esa factura (se rechazó el alta
-   inicial; §9.1.3, «alta por rechazo»); `S` si la AEAT sí la tiene y lo rechazado fue una subsanación
-   posterior.
-4. Un «Aceptado con errores» también se puede subsanar (`Subsanacion = S`, `RechazoPrevio = N`; §9.1.2).
+   subsanación, que entra en la cola. El rechazado se queda tal cual. El registro nuevo le dice a la AEAT si ya tenía
+   esa factura o si se rechazó desde el primer envío.
+4. Un «Aceptado con errores» también se puede subsanar.
 5. Ya subsanado, en **Registros** el de antes dice «Subsanado», que abre el registro que lo subsana, y su ficha,
    «Ya está subsanado con un registro nuevo» con «Ver el registro que lo subsana». Si la AEAT rechaza también la
    subsanación, esa sale «Pendiente de subsanar» y se subsana a su vez; la de antes sigue «Subsanado».
@@ -809,13 +842,13 @@ Pasos:
 1. En la ficha de un registro pendiente o enviado sin respuesta, pulsa «Enviar ahora».
 2. Sale ya su cadena hasta él (los anteriores pendientes van delante, en orden), si la espera de la AEAT ya
    pasó.
-3. El registro queda con la respuesta de la AEAT, como en VERIFACTU-F15.
+3. El registro queda con la respuesta de la AEAT: «Aceptado», «Aceptado con errores» o «Rechazado».
 Entra: el registro elegido (por su id o por el número de su factura).
 Sale: el envío y su respuesta (avisa `verifactu.record.transmitted`).
 Si falla: sin pasarela, «No se puede enviar ahora: la pasarela de envío de ERPlora no está configurada en este
 servidor. Sigue en la cola y sale en cuanto se pueda.»; ya aceptado o rechazado, «Este registro no está en la cola:
 ya está en la AEAT, o la AEAT lo rechazó.»; con la espera
-de la AEAT en curso, «La AEAT pidió esperar: sale solo a las {hora}.». Nunca dice «aceptado» sin respuesta.
+de la AEAT en curso, por ejemplo «La AEAT pidió esperar: sale solo a las 12:05.». Nunca dice «aceptado» sin respuesta.
 Implicados: VERIFACTU-F15
 
 ### VERIFACTU-F26 Verificar la cadena de huellas
@@ -823,12 +856,12 @@ Estado: hecho
 Actor: empleado, responsable, administrador
 Pantalla: Recuperación
 Pasos:
-1. En **VeriFactu → Recuperación**, con el «NIF del emisor», pulsa «Validar cadena» («Trabajando…»).
+1. En **Recuperación**, con el «NIF del emisor», pulsa «Validar cadena» («Trabajando…»).
 2. El sistema recalcula la huella de cada registro de la cadena del entorno actual y comprueba que cada uno
    lleva la del anterior.
-3. Sale «Operación completada.» y el veredicto: «Cadena de huellas íntegra: {total} registros con su
-   encadenado SHA-256 verificado ({nif}).» (con uno, «1 registro»; nunca «registro(s)») o «Cadena de huellas ROTA
-   en la secuencia {seq} ({nif}).».
+3. Sale «Operación completada.» y el veredicto: por ejemplo, «Cadena de huellas íntegra: 120 registros con su
+   encadenado SHA-256 verificado (B12345678). No se re-auditan los importes.» o «Cadena de huellas ROTA en la
+   secuencia 57 (B12345678).».
 Entra: los registros de la cadena.
 Sale: el veredicto como evento (avisa `verifactu.chain.validated`). Solo lee: no repara nada ni re-audita los
 importes.
@@ -840,7 +873,7 @@ Estado: hecho — por la pasarela del SaaS (`/internal/verifactu/query`)
 Actor: responsable, administrador
 Pantalla: Recuperación
 Pasos:
-1. En **VeriFactu → Recuperación**, pulsa «Consultar AEAT» («Trabajando…»).
+1. En **Recuperación**, pulsa «Consultar AEAT» («Trabajando…»).
 2. El sistema pregunta a la AEAT, por la pasarela, por los registros de ese emisor del mes en curso.
 3. La tabla «Últimos registros en la AEAT» se llena y sale «Operación completada.».
 4. En la tabla, busca por factura, huella o CSV («Buscar factura, huella o CSV…»), ordena por cualquier columna y
@@ -858,7 +891,7 @@ Actor: administrador
 Pantalla: Recuperación
 Pasos:
 1. Tras restaurar una copia de la base de datos (la AEAT tiene registros que la copia no), deja de emitir y
-   abre **VeriFactu → Recuperación**.
+   abre **Recuperación**.
 2. Pulsa «Recuperar cadena desde la AEAT» y confirma («Se reconstruirá la continuidad local desde el último
    registro disponible en la AEAT. Verifica el NIF del emisor antes de continuar.»).
 3. El sistema consulta a la AEAT y ancla la cadena del entorno actual en el último registro (por su fecha de
@@ -875,7 +908,7 @@ Estado: hecho
 Actor: administrador
 Pantalla: Recuperación
 Pasos:
-1. En **VeriFactu → Recuperación**, bloque «Continuar cadena manualmente (migración)», escribe la «Última
+1. En **Recuperación**, bloque «Continuar cadena manualmente (migración)», escribe la «Última
    huella (64 hex)» de la aplicación anterior, el «Nº de factura» y la «Fecha» de ese último registro.
 2. Pulsa «Continuar desde esta huella» y confirma («La huella indicada será el antecedente del próximo
    registro fiscal. Usa esta opción únicamente durante una migración y con los datos del último registro de la
@@ -884,8 +917,8 @@ Pasos:
 Entra: la huella, el número y la fecha del último registro de la aplicación anterior.
 Sale: un ancla nueva (avisa `verifactu.chain.recovered`).
 Si falla: una huella que no tiene 64 caracteres hexadecimales, «La huella debe tener 64 caracteres
-hexadecimales»; sin número o fecha, que son parte del encadenado, el campo lo pide; con registros pendientes,
-como VERIFACTU-F28.
+hexadecimales»; sin número o fecha, que son parte del encadenado, el campo lo pide; con registros pendientes en
+la cadena, «Antes tienen que salir los registros pendientes de esta cadena.».
 Implicados: ninguno
 
 ### VERIFACTU-F30 Anular un registro enviado por error
@@ -894,7 +927,7 @@ Actor: administrador, asistente
 Pantalla: Ficha de registro
 Pasos:
 1. Solo para una factura que **nunca debió emitirse** (un duplicado, una prueba hecha en producción). Una
-   devolución o una corrección no se anula: es una rectificativa en Facturación (VERIFACTU-F14).
+   devolución o una corrección no se anula: es una rectificativa en Facturación.
 2. En la ficha del registro de alta, pulsa «Anular registro», escribe el motivo y confirma («Se declarará a la
    AEAT que esta factura se emitió por error. Una devolución o una corrección nunca es esto: es una rectificativa
    en Facturación. La factura sigue en Facturación.»).
@@ -903,8 +936,8 @@ Pasos:
 Entra: el registro de alta (o el número de su factura).
 Sale: el registro de anulación (avisa `verifactu.record.created`).
 Si falla: un alta rechazada no se anula (no está en la AEAT); una ya anulada, tampoco: «Este registro no se
-puede anular: solo se anula un alta que está (o estará) en la AEAT y no tiene anulación.». Si la AEAT rechazó la anulación, se puede volver a anular: la nueva lleva `RechazoPrevio = S`
-(§9.2.2, «anulación por rechazo»).
+puede anular: solo se anula un alta que está (o estará) en la AEAT y no tiene anulación.». Si la AEAT rechazó la
+anulación, se puede volver a anular: la nueva le dice a la AEAT que la anterior se rechazó.
 Implicados: INVOICE-F07
 
 ### VERIFACTU-F31 Vigilar los envíos desde las pantallas
@@ -955,9 +988,10 @@ Estado: hecho — en el Hub (subir el renovado sustituye al anterior)
 Actor: propietario y administrador (configurar)
 Pantalla: Configuración
 Pasos:
-1. «Mi certificado» enseña «Caduca el {fecha}» y, a 30 días o menos, «Caduca en {n} días: sube aquí el
-   renovado.».
-2. El certificado nuevo se sube como en VERIFACTU-F02 y sustituye al anterior; la cadena no cambia.
+1. «Mi certificado» enseña su fecha en «Caduca el» y, a 30 días o menos, por ejemplo «Caduca en 12 días: sube aquí
+   el renovado.».
+2. El certificado nuevo se sube como el primero, con «Elegir el fichero .p12 / .pfx», su contraseña y «Subir el
+   certificado», y sustituye al anterior; la cadena no cambia.
 Entra: el certificado renovado.
 Sale: el nuevo, en lugar del anterior.
 Si falla: caducado, en pruebas los registros salen con el sello de ERPlora hasta subir el renovado, y en producción
@@ -972,10 +1006,10 @@ Actor: responsable, administrador (enviar); el staff de ERPlora desde el admin
 Pantalla: Ficha de registro («Preguntar a la AEAT»); para el staff, el admin de Django (Registros → «Consultar a la
 AEAT (sale de la cola si ya lo tiene)»)
 Pasos:
-1. Un registro se quedó «enviado, sin respuesta» (o pendiente) y puede que la AEAT ya lo tenga: en su ficha, pulsa
+1. Un registro se quedó «Enviado» sin respuesta (o «Pendiente») y puede que la AEAT ya lo tenga: en su ficha, pulsa
    «Preguntar a la AEAT».
-2. Se consulta a la AEAT, por la pasarela de ERPlora, el emisor del registro en el mes de su fecha de expedición
-   (como VERIFACTU-F27, que renueva la última foto).
+2. Se consulta a la AEAT, por la pasarela de ERPlora, el emisor del registro en el mes de su fecha de expedición;
+   la tabla «Últimos registros en la AEAT» de Recuperación queda al día con esa consulta.
 3. Si la AEAT devuelve **ese mismo registro** (mismo emisor, número y huella), sale de la cola como «Aceptado» o
    «Aceptado con errores», según lo que diga la AEAT, sin perder sus intentos; queda un evento con quién lo hizo.
 4. Si no lo tiene (o tiene otro registro de la misma factura, p. ej. el original de una subsanación), no cambia
@@ -1341,13 +1375,10 @@ negocio, y una automatización sin nadie detrás, no ven esa línea. La marca de
   `FISCAL_CERTIFICATE_KEY` (variable de entorno; en AWS, Secrets Manager en `hub` y `worker`). Sin clave, la
   subida se rechaza a la vista; con la clave cambiada, el guardado no se abre y los registros por la vía propia
   esperan con `own_certificate_unreadable` sin llamar a la pasarela. Al subirlo se rechaza el autofirmado (emisor
-  igual al sujeto) y el que no ha firmado una autoridad de la lista de confianza (`trust.py`): las de certificados
-  cualificados (`CA/QC`) de firma o de sello de la TSL de España, también las retiradas para lo que emitieron antes de
-  su retirada. La lista va dentro de la app (`trusted_authorities.json`, sin red al comprobar) y se renueva con
-  `manage.py verifactu_trusted_list` (la descarga de `https://tsl.digital.gob.es/TSL.xml`, o `--file` con una copia
-  guardada; nunca vuelve a una lista más antigua), y el fichero nuevo entra en una PR. La fila guarda si su emisor
-  es reconocido y con qué lista (`issuer_recognised`, `checked_list`); la tarea `recheck_certificate` (cada hora,
-  `verifactu.certificate.recheck`) comprueba la que no lo está con la lista de ahora.
+  igual al sujeto); el emisor no se compara con ninguna lista de autoridades: si la AEAT lo admite lo dice la AEAT de
+  pruebas (`aeat.certificate_verdict`, `aeat_proof`). Las columnas `issuer_recognised` y `checked_list` de la tabla ya
+  no se usan: la migración `0008` las quitó solo del estado, porque el código anterior aún las lee durante el
+  despliegue, y las filas nuevas las dejan vacías.
 - **Producción**: además de lo de VERIFACTU-F08, el despliegue tiene que ser `prod` (`ERPLORA_ENVIRONMENT`; en
   `pre` nunca) y el servidor tener `VERIFACTU_PRODUCTION_ENABLED` a verdadero. Cerrado de nuevo, ningún registro de
   producción sale (esperan con `production_closed`, sin llamar a la pasarela) y no se emite nada nuevo en producción
@@ -1586,3 +1617,49 @@ Lo demás del bloque fiscal está en PLAN-HUB §8, «Bloque fiscal: lo que queda
 - No presenta nada a la AEAT por su cuenta: lo hace la pasarela del SaaS.
 - No lleva el registro de eventos de la modalidad NO VERI\*FACTU.
 - No tramita el cese de actividad.
+
+### Lo que la ventana de ayuda no enseña
+
+La ayuda del Hub publica el primer apartado hasta su primer `###`, el resumen de cada pestaña (lo que va antes de su
+primer `####`) y, de cada flujo hecho en una pestaña o en una de sus ventanas, su título, sus pasos y «Si falla», sin
+nombres de código, incidencias ni ids de flujo (`tests/test_help_workbooks.py`). Por eso la ficha de un registro es una
+ventana (`####`) de **Registros**: así VERIFACTU-F17, F24, F25, F30 y F35 se publican en esa pestaña. Lo que esas
+partes dejaron de decir, y quien mantiene VeriFactu necesita:
+
+- Los códigos de los rechazos que los flujos dicen por su frase:
+  - al subir el certificado (VERIFACTU-F02), todos 409: `verifactu.certificate_storage_unavailable`,
+    `verifactu.issuer_missing`, `verifactu.certificate_invalid` (contraseña o fichero, autofirmado, sin autenticación
+    de cliente o caducado) y `verifactu.certificate_holder_mismatch`; quitarlo sin permiso de configurar es 403 (F03);
+  - el otorgamiento (F05 y F06): la comprobación previa con los códigos del SaaS (422), el rechazo del SaaS con su
+    código `fiscal.*` y sus campos tal cual, 409 `verifactu.issuer_missing`, 409 `verifactu.hub_unregistered` (sin
+    `Config.hub_id` o un negocio que el SaaS no conoce), 503 `verifactu.saas_unreachable` y, con la vía de ERPlora
+    cerrada en el servidor, 409 `verifactu.erplora_route_unavailable` en «Descargar el modelo» y en «Enviar a
+    revisión», salvo en el negocio de la propia ERPlora. Guardar el modelo dentro de la app es BASE-F112;
+  - pasar a producción (F08) se comprueba en este orden y la primera causa da el 409 con su código: el servidor
+    cerrado (`verifactu.production_closed`; en la lista de Ajustes, `production_closed`) → un negocio de
+    demostración (`verifactu.go_live_forbidden`; quién es demo lo dice la plataforma, `base.operations.is_demo_hub`)
+    → el emisor (`verifactu.issuer_missing`) → la vía (con certificado válido, `verifactu.own_certificate_unreadable`,
+    `verifactu.own_certificate_untested` o `verifactu.own_certificate_rejected`; sin él,
+    `verifactu.representation_not_approved` o, con la vía de ERPlora cerrada, `verifactu.own_certificate_required`)
+    → la cuenta (`verifactu.hub_not_active`); sin pasarela, `verifactu.gateway_unavailable`. Fuera de España, 404
+    `app_inactive`. En producción sin la vía fijada, la venta o la factura se rechazan con 409 y el código de la ruta
+    (`verifactu.representation_not_approved`, `verifactu.own_certificate_missing`), y Ajustes lo dice en
+    `issue_blocker`.
+- La vía de ERPlora la abre o la cierra `VERIFACTU_ERPLORA_ROUTE_ENABLED` (abierta por defecto; F04, F05 y F08).
+- El certificado propio se guarda cifrado con Fernet y la clave `FISCAL_CERTIFICATE_KEY` (F02); la sede de la AEAT de
+  pruebas contesta a un certificado que no reconoce redirigiendo a su página de error 401.
+- El paso «Configura VeriFactu» del Inicio solo se da por hecho con el certificado propio cuando la AEAT de pruebas lo
+  ha aceptado y, con la vía de ERPlora cerrada, solo habla de él: «Sube el certificado del negocio para enviar tus
+  facturas a la AEAT.» (con la vía abierta, «Firma la autorización para que ERPlora envíe tus facturas a la AEAT, o
+  sube el certificado del negocio.»).
+- La pasada automática (F20) es la tarea programada `process_queue`, que corre la de VERIFACTU-F15; su evento es
+  «Cola procesada: {enviados} enviados, {aceptados} aceptados, {rechazados} rechazados, {en espera} en espera.». Cada
+  registro se presenta como su negocio, nunca como el hub de ERPlora (hub#454).
+- El total del filtro de Registros se lee como cualquier importe del Hub (hub#1247, F16).
+- La subsanación (F24) lleva `RechazoPrevio` según la Descripción del servicio web VERI\*FACTU v1.0.3: `X` si la AEAT
+  no tiene ningún registro de esa factura (se rechazó el alta inicial; §9.1.3, «alta por rechazo»); `S` si la AEAT sí
+  la tiene y lo rechazado fue una subsanación posterior. Un «Aceptado con errores» se subsana con `Subsanacion = S` y
+  `RechazoPrevio = N` (§9.1.2). Volver a anular tras una anulación rechazada lleva `RechazoPrevio = S` (§9.2.2, F30).
+- Los mensajes con hueco (`{titular}`, `{NIF}`, `{fecha}`, `{número}`, `{hora}`, `{total}`, `{seq}`, `{n}`,
+  `{ruta}`) la ayuda los enseña con un ejemplo o sin el hueco. La factura de prueba (F11) se pide a Facturación por la
+  misma puerta que el alta manual (INVOICE-F03).

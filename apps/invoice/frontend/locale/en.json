@@ -196,6 +196,21 @@
       "done": "Full invoice {number} issued",
       "failed": "Could not issue the full invoice"
     },
+    "public": {
+      "title": "Request your invoice",
+      "loading": "Loading your ticket…",
+      "business": "Business",
+      "intro": "Enter your tax details to get the full invoice for this ticket.",
+      "ticket": "Ticket {number}",
+      "date": "Date",
+      "total": "Total",
+      "submit": "Request full invoice",
+      "issuing": "Requesting your invoice…",
+      "ready": "Your invoice is ready.",
+      "already": "You already requested this invoice. This is the same invoice, with your original details.",
+      "loadFailed": "The ticket could not be loaded. Try again.",
+      "issueFailed": "The invoice could not be requested. Try again."
+    },
     "recipient": {
       "name": "Name or company name",
       "country": "Country",

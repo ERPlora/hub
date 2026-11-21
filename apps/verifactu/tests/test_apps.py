@@ -10,6 +10,7 @@ from django.utils import translation
 from live.live_registry import live_registry
 from live.meta import (
     Category,
+    Help,
     LiveAppConfig,
     Nav,
     SetupCheck,
@@ -22,6 +23,7 @@ from live.meta import (
 from apps.verifactu import erplora_route
 from apps.verifactu import events as E
 from base import home
+from base.tests.shell_icons import shell_icon_registry
 
 PERMISSIONS = [
     "verifactu.view_record",
@@ -110,19 +112,13 @@ def test_navigation_is_the_six_tabs_of_the_old_module_with_registered_icons():
     ]
 
 
-def test_the_worker_sends_the_queue_every_minute_and_checks_the_own_certificate_every_hour():
-    # Declared in the AppConfig for the phase-2 worker, which runs them as the system; collapsed on catch-up.
+def test_the_worker_sends_the_queue_every_minute():
+    # Declared in the AppConfig for the phase-2 worker, which runs it as the system; collapsed on catch-up.
     assert verifactu().scheduled_tasks == [
         {
             "name": "process_queue",
             "operation": "verifactu.contingency.process",
             "cron": "* * * * *",
-            "catch_up": "collapse",
-        },
-        {
-            "name": "recheck_certificate",
-            "operation": "verifactu.certificate.recheck",
-            "cron": "23 * * * *",
             "catch_up": "collapse",
         },
     ]
@@ -159,7 +155,6 @@ OPERATIONS = {
     "verifactu.config.back_to_testing",
     "verifactu.certificate.upload",
     "verifactu.certificate.remove",
-    "verifactu.certificate.recheck",
     "verifactu.config.sync",
     "verifactu.config.follow_deployment",
     "verifactu.representation.submit",
@@ -421,7 +416,7 @@ def test_the_hooks_icons_are_registered_in_the_shell():
         "ion:list-outline",
         "ion:time-outline",
     ]
-    shell = (Path(settings.BASE_DIR) / "packages/ui/src/shell/icons.ts").read_text()
+    shell = shell_icon_registry()
     for icon in icons:
         name = icon.removeprefix("ion:")
         assert f"'{name}'" in shell, icon
@@ -430,3 +425,7 @@ def test_the_hooks_icons_are_registered_in_the_shell():
 def test_verifactu_has_no_bell_counters():
     # The old module declared none (its module.json has no `bell`).
     assert verifactu().bell == []
+
+
+def test_its_help_window_is_ready_without_a_video_yet():
+    assert verifactu().help == Help()

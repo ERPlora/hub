@@ -65,6 +65,8 @@ export interface MountOptions {
   stubs?: Record<string, Component | boolean>;
   /** How every API call is answered from the start, the ones made while mounting included. */
   answer?: { status: number; body: unknown };
+  /** Mounted into this element of the document, where Ionic loads its elements and draws their native parts. */
+  attachTo?: HTMLElement;
 }
 
 export async function mountSale(component: Component, options: MountOptions = {}) {

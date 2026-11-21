@@ -1,13 +1,15 @@
 """The flow app declares its module metadata, its menu entry, its permissions, what each role gets, its
-scheduled tasks and the assistant's contract of every operation (``ai`` and described input fields)."""
+scheduled tasks, the assistant's contract of every operation (``ai`` and described input fields) and its help window."""
+
 
 import pytest
 from django.apps import apps
 from django.utils import translation
-from live.meta import Category, LiveAppConfig, Nav, module_configs, permissions_for_role
+from live.meta import Category, Help, LiveAppConfig, Nav, module_configs, permissions_for_role
 from live.operations import INTERNAL, registry
 
 from base import assistant
+from base.queries import app_help
 
 PERMISSIONS = ["flow.view", "flow.manage", "flow.answer", "flow.answer_manager"]
 QUERIES = {
@@ -273,3 +275,22 @@ def test_the_store_card_says_what_it_does_today():
         assert happens in description, description
         assert happens in summary, summary
         assert assistant in description, description
+
+
+def test_its_help_window_is_ready_without_a_video_yet():
+    assert flow_app().help == Help()
+
+
+@pytest.mark.parametrize("language", ["es", "en"])
+def test_its_help_teaches_every_task_done_on_its_screens_and_only_leaves_out_the_assistant_s_and_the_platform_s(
+    language,
+):
+    # The editor and the guide open from the Automations tab and are windows of it: what is done there is published in
+    # that tab. Only what the assistant, another app or the platform does on its own stays out of the window.
+    served, read = app_help.help_of(flow_app(), language)
+    assert served == language
+    assert {flow.screens for flow in read.flows} == {("automations",)}
+    assert {"FLOW-F08", "FLOW-F09", "FLOW-F16", "FLOW-F37"} <= {flow.id for flow in read.flows}
+    assert sorted(draft.id for draft in read.unpublished) == [
+        "FLOW-F17", "FLOW-F20", "FLOW-F21", "FLOW-F22", "FLOW-F23", "FLOW-F30", "FLOW-F38", "FLOW-F39"
+    ]

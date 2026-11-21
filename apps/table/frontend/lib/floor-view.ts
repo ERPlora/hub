@@ -4,7 +4,7 @@ import type { Translate } from '../composables/useT';
 import type { SettingsOut, TableOut } from '../operations';
 import { holdName } from './floor';
 import { paintedRatio } from './floor-fit';
-import { clock, durationTone, minutesSince } from './format';
+import { clock, durationTone, formatMoney, minutesSince, type Money } from './format';
 
 export interface FloorViewOptions {
   now: Date;
@@ -14,6 +14,8 @@ export interface FloorViewOptions {
   t: Translate;
   /** While a transfer or a merge picks its destination: which tables may be picked. */
   pick?: ((table: TableOut) => boolean) | null;
+  /** The business's currency; until it is known no table shows its bill. */
+  money?: Money;
 }
 
 type Timing = Pick<FloorTable, 'timed' | 'tone' | 'progress'> & { minutes: number | null };
@@ -36,16 +38,30 @@ function timing(table: TableOut, options: FloorViewOptions): Timing {
   };
 }
 
-function accessible(table: TableOut, view: { minutes: number | null; holder: string; holdTime: string }, t: Translate): string {
+function bill(table: TableOut, options: FloorViewOptions): string | undefined {
+  if (table.status !== 'occupied' || typeof table.amount !== 'number' || !options.money) return undefined;
+  return formatMoney(table.amount, options.locale, options.money);
+}
+
+interface Spoken {
+  statusLabel: string;
+  minutes: number | null;
+  amount: string | undefined;
+  holder: string;
+  holdTime: string;
+}
+
+function accessible(table: TableOut, view: Spoken, t: Translate): string {
   const occupied = table.status === 'occupied';
   return [
     t('table.tableLabel', { number: table.number }),
     table.zone_name ?? '',
     table.name,
     t('table.pax', { count: table.capacity }),
-    t(`table.status.${table.status}`),
+    view.statusLabel,
     occupied && table.guests !== null ? t('table.guestsCount', { count: table.guests }) : '',
     occupied && view.minutes !== null ? t('table.minutes', { minutes: view.minutes }) : '',
+    view.amount ? t('table.floor.bill', { amount: view.amount }) : '',
     occupied && table.waiter_name ? t('table.servedBy', { name: table.waiter_name }) : '',
     table.hold ? t('table.reservedFor', { name: view.holder }) : '',
     view.holdTime,
@@ -58,11 +74,13 @@ function accessible(table: TableOut, view: { minutes: number | null; holder: str
 export function floorView(table: TableOut, options: FloorViewOptions): FloorTable {
   const { t } = options;
   const { minutes, ...time } = timing(table, options);
-  const statusLabel = t(`table.status.${table.status}`);
+  const billRequested = table.status === 'occupied' && table.bill_requested;
+  const statusLabel = billRequested ? t('table.floor.billRequested') : t(`table.status.${table.status}`);
   const holdTime = clock(table.hold?.held_from, options.locale, options.timeZone);
   const holder = holdName(table.hold, t('table.erasedCustomer'));
   const pax = table.status === 'occupied' ? t('table.floor.paxOf', { guests: table.guests ?? 0, capacity: table.capacity }) : t('table.pax', { count: table.capacity });
   const short = time.timed ? elapsed(minutes) : table.status === 'reserved' && holdTime ? holdTime : statusLabel;
+  const amount = bill(table, options);
   return {
     id: table.id,
     number: table.number,
@@ -71,14 +89,16 @@ export function floorView(table: TableOut, options: FloorViewOptions): FloorTabl
     capacity: table.capacity,
     guests: table.guests,
     ratio: paintedRatio(table),
+    billRequested,
     ...time,
     short,
     statusLabel,
     caption: short === statusLabel ? pax : `${statusLabel} · ${pax}`,
     pax,
+    amount,
     holder,
     holdTime,
-    accessible: accessible(table, { minutes, holder, holdTime }, t),
+    accessible: accessible(table, { statusLabel, minutes, amount, holder, holdTime }, t),
     pickable: options.pick ? options.pick(table) : undefined,
     testid: `table-floor-tile-${table.id}`,
   };

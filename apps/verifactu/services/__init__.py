@@ -17,6 +17,7 @@ The clock is the Hub's time zone (Madrid): ``FechaHoraHusoGenRegistro`` carries 
 from . import (
     aeat_query as aeat_query,
     authorisation as authorisation,
+    certificate_proof as certificate_proof,
     chains as chains,
     config as config,
     contingency as contingency,

@@ -6,6 +6,7 @@ import { EMPLOYEE, flush, mountBase } from '../__tests__/mount-base';
 import FailedEvents from '../components/FailedEvents.vue';
 import SystemLog from '../components/SystemLog.vue';
 import SystemRelease from '../components/SystemRelease.vue';
+import SystemReleaseNotes from '../components/SystemReleaseNotes.vue';
 import SystemAppCards from '../components/SystemAppCards.vue';
 import SystemUsage from '../components/SystemUsage.vue';
 import SystemPage from './SystemPage.vue';
@@ -106,6 +107,17 @@ describe('SystemPage › its tabs', () => {
     const employee = await at('/system#updates', { session: EMPLOYEE });
     expect(employee.wrapper.text()).toContain('This hub updates itself when we publish a new version');
     expect(employee.wrapper.findComponent(SystemRelease).exists()).toBe(false);
+  });
+
+  it('Updates lists what is new below the version and its date, for anyone in the business', async () => {
+    const owner = await at('/system#updates');
+    const release = owner.wrapper.getComponent(SystemRelease).element;
+    const notes = owner.wrapper.getComponent(SystemReleaseNotes).element;
+    expect(release.compareDocumentPosition(notes) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(owner.find('system-updates').element.contains(notes)).toBe(true);
+    const employee = await at('/system#updates', { session: EMPLOYEE });
+    expect(employee.wrapper.findComponent(SystemReleaseNotes).exists()).toBe(true);
+    expect((await at('/system')).wrapper.findComponent(SystemReleaseNotes).exists()).toBe(false);
   });
 
   it('the old backups tab goes to Settings › Data', async () => {

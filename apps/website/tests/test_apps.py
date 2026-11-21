@@ -1,7 +1,7 @@
 """The website app declares its module metadata, its menu entry, its permissions and what each role gets."""
 
 from django.apps import apps
-from live.meta import Category, LiveAppConfig, Nav, module_configs, permissions_for_role
+from live.meta import Category, Help, LiveAppConfig, Nav, module_configs, permissions_for_role
 from live.operations import INTERNAL
 
 
@@ -150,3 +150,7 @@ def test_every_field_of_the_draft_is_described_for_the_assistant():
         if not str(field.get("description", "")).strip()
     ]
     assert undescribed == []
+
+
+def test_its_help_window_is_ready_without_a_video_yet():
+    assert website().help == Help()

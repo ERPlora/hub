@@ -54,6 +54,27 @@ describe('TicketDetailModal', () => {
     expect(m.inDoc('kitchen-ticket-detail-dish-i2-modifiers')).toBeNull();
   });
 
+  it('shows each dish’s allergy and only its matching allergens', async () => {
+    const m = await setup();
+    await m.result(
+      'kitchen.ticket.get',
+      ticket('t1', {
+        items: [
+          item('i1', { allergy: ['gluten', 'milk'], allergy_in_dish: ['milk'] }),
+          item('i2', { allergy: ['peanut'], allergy_in_dish: [] }),
+          item('i3'),
+        ],
+      }),
+    );
+    await flush();
+    expect(m.inDoc('kitchen-ticket-detail-dish-i1-allergy')?.textContent).toContain('Allergy: Gluten, Milk');
+    expect(m.inDoc('kitchen-ticket-detail-dish-i1-allergy-contains')?.textContent).toBe('The dish contains Milk');
+    expect(m.inDoc('kitchen-ticket-detail-dish-i2-allergy')?.textContent).toContain('Allergy: Peanut');
+    expect(m.inDoc('kitchen-ticket-detail-dish-i2-allergy-contains')).toBeNull();
+    expect(m.inDoc('kitchen-ticket-detail-dish-i3-allergy')).toBeNull();
+    expect(m.inDoc('kitchen-ticket-detail-dish-i1-allergy')?.closest('.ep-order-ticket')).not.toBeNull();
+  });
+
   it('says when it could not load', async () => {
     const m = await setup();
     m.net.lastStream().push(errorFrame(m.subId('kitchen.ticket.get'), 'not_found'));

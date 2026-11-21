@@ -1,5 +1,5 @@
-"""The business's own certificate (``verifactu.certificate.*``): uploaded, removed, and checked again against the
-trusted list of recognised authorities once it is kept."""
+"""The business's own certificate (``verifactu.certificate.*``): uploaded and removed. Whether the AEAT takes it is for
+the AEAT's test environment to say (``certificate_proof``)."""
 
 import base64
 import binascii
@@ -11,7 +11,7 @@ from live.errors import Conflict
 from live.operations import operation
 from live.outbox import record_event
 
-from apps.verifactu import certificates, events, trust
+from apps.verifactu import certificates, events
 from apps.verifactu.models import Environment, Event, OwnCertificate
 from apps.verifactu.queries.config import config_out
 from apps.verifactu.queries.route import config_row, issuer_configured, issuer_identity, own_certificate
@@ -29,11 +29,9 @@ CERTIFICATE_HOLDER_MISMATCH = _(
     "The certificate belongs to %(holder)s, not to this business's issuer %(issuer)s."
 )
 CERTIFICATE_EXPIRED = _("The certificate expired on %(date)s: upload a valid one.")
-#: Only the platform runs the check of the kept certificate (the scheduled task): no role is given this permission.
-SYSTEM = "verifactu.system"
 
 
-def _certificate_event(ctx, key: str, row: OwnCertificate, severity: str = "info") -> None:
+def _certificate_event(ctx, key: str, row: OwnCertificate) -> None:
     _event(
         ctx,
         Event.Kind.CONFIG_CHANGED,
@@ -43,7 +41,6 @@ def _certificate_event(ctx, key: str, row: OwnCertificate, severity: str = "info
             "holder_tax_id": row.holder_tax_id,
             "expires_on": timezone.localtime(row.expires_at).date().isoformat(),
         },
-        severity=severity,
         environment=config_row().environment,
     )
     record_event(ctx, events.CONFIG_CHANGED, {"fields": ["own_certificate"]})
@@ -105,8 +102,8 @@ def upload_certificate(ctx: OperationContext, data: CertificateUploadIn) -> Conf
             "uploaded_at": timezone.now(),
             "uploaded_by": _actor(ctx),
             "sealed_blob": certificates.seal(p12, password),
-            "issuer_recognised": True,
-            "checked_list": trust.sequence(),
+            "aeat_proof": OwnCertificate.Proof.UNTESTED,
+            "aeat_proof_detail": "",
         },
     )
     _back_in_the_queue()
@@ -145,50 +142,3 @@ def remove_certificate(ctx: OperationContext, data: NoInput) -> ConfigOut:
         _certificate_event(ctx, "certificate_removed", row)
     return config_out(config_row(), ctx)
 
-
-@operation(
-    "verifactu.certificate.recheck",
-    kind="command",
-    permission=SYSTEM,
-    input=NoInput,
-    output=ConfigOut,
-    ai={
-        "description": "Platform only: check the kept own certificate again against the trusted list of recognised "
-        "authorities, when it was never checked or was checked against an older list; one no recognised authority "
-        "issued stops counting.",
-        "risk": "normal",
-    },
-)
-def recheck_certificate(ctx: OperationContext, data: NoInput) -> ConfigOut:
-    # Locked: an upload meanwhile waits, so its certificate never takes this one's verdict.
-    row = (
-        OwnCertificate.objects.select_for_update()
-        .filter(singleton=True)
-        .exclude(checked_list=trust.sequence())
-        .first()
-    )
-    if row is not None:
-        _check(ctx, row)
-    return config_out(config_row(), ctx)
-
-
-def _check(ctx: OperationContext, row: OwnCertificate) -> None:
-    """Records whether ``row`` still presents: one this server cannot open is left unchecked, as it was (production
-    already waits on it with ``own_certificate_unreadable``)."""
-    try:
-        p12, password = certificates.open(row.sealed_blob)
-    except certificates.CertificateUnreadable:
-        return
-    try:
-        certificates.inspect(p12, password)
-    except certificates.CertificateInvalid:
-        recognised = False
-    else:
-        recognised = True
-    counted = row.issuer_recognised is not False
-    row.issuer_recognised, row.checked_list = recognised, trust.sequence()
-    row.save(update_fields=["issuer_recognised", "checked_list"])
-    if counted and not recognised:
-        # Like a removal: in testing, what the gateway refused goes out again by ERPlora's seal.
-        _back_in_the_queue(_unsent().filter(environment=Environment.TESTING))
-        _certificate_event(ctx, "certificate_refused", row, severity=Event.Severity.WARNING)

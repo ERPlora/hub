@@ -76,6 +76,13 @@ ERPlora no inventa flujos: adopta los que el mercado ya probó.
   [Toast — quitar una mesa del área de servicio](https://support.toasttab.com/article/Creating-Service-Areas-and-Table-Setup-1493049150430)
   y el estado Activa / Inactiva de los planos de [Poster](https://knowledge-base.joinposter.com/en/how-to-edit-a-table-layout-or-hide-the-floor-plan)
   y [MultiPOS](https://docs.devdiggers.com/multipos-point-of-sale-for-woocommerce/configuration/tables/).
+- **La mesa cuya cuenta se ha impreso se marca «Cuenta pedida» hasta que se cobra** (decisión de mercado):
+  al imprimir la cuenta para la mesa, la mesa cambia de color en el plano, como en
+  [Lightspeed K-Series](https://k-series-support.lightspeedhq.com/hc/en-us/articles/360050328494-Understanding-the-Floor-Plan-screen),
+  [SumUp POS Pro](https://help.sumup.com/en-GB/pos/articles/75000023480-table-plan-what-is-the-meaning-of-the-colours-associated-to-any-table-)
+  e [iMPOS](https://knowledge.impos.com.au/hc/en-us/articles/210213528-Table-and-Meal-Status), y vuelve a su
+  color al cobrarla, como en [Lightspeed L-Series](https://resto-support.lightspeedhq.com/hc/en-us/articles/226306187-Understanding-table-status).
+  Ninguno de los consultados dice que la marca se quite al añadir líneas o al volver a imprimir.
 
 ## Antes de empezar
 
@@ -284,6 +291,8 @@ cierra la ventana sin guardarlo. Con la ventana como se abrió, atrás la cierra
 | TABLE-F30 | Retener o soltar una mesa a mano | hecho |
 | TABLE-F31 | Olvidar el nombre de un cliente cuyos datos se borran (RGPD) | hecho |
 | TABLE-F32 | Poner o quitar el cliente de una mesa | hecho |
+| TABLE-F33 | Ver cuánto lleva cada mesa | hecho |
+| TABLE-F34 | Ver qué mesas han pedido la cuenta | hecho |
 
 ### TABLE-F01 Crear y ordenar las zonas del local
 Estado: hecho
@@ -460,7 +469,7 @@ Pasos:
 Entra: las mesas, sus cuentas abiertas, sus retenciones y el estado de sus cuentas en Ventas.
 Sale: nada.
 Si falla: un fallo al cargar sale con «Reintentar».
-Implicados: TABLE-F10, TABLE-F25, TABLE-F29, SALE-F19
+Implicados: TABLE-F10, TABLE-F25, TABLE-F29, TABLE-F33, TABLE-F34, SALE-F19
 
 ### TABLE-F10 Sentar a un grupo en una mesa libre o reservada
 Estado: hecho
@@ -862,6 +871,50 @@ Sale: el enlace cuenta ↔ cliente, que guarda Clientes (avisa: `customer.order.
 Si falla: el motivo de Clientes; la mesa se sienta igual.
 Implicados: CUSTOMER-F17, CUSTOMER-F19, CUSTOMER-F33, TABLE-F10
 
+### TABLE-F33 Ver cuánto lleva cada mesa
+Estado: hecho
+Actor: empleado, responsable
+Pantalla: Plano de sala (Servicio)
+Pasos:
+1. Abre **Mesas → Plano de sala**. Cada mesa Ocupada enseña en la etiqueta de debajo, debajo de sus
+   comensales, el importe de su cuenta con la moneda del negocio (bajo «Ocupada · 3/4 pax», «42,50 €»), y
+   «0,00 €» mientras no se ha pedido nada. Es el mismo importe que esa cuenta enseña en **Cuentas abiertas**
+   de Ventas. El lector de pantalla lo dice con la mesa: «Cuenta 42,50 €».
+2. Con varias cuentas en la mesa (dividida), enseña la suma de todas.
+3. En el teléfono, la tarjeta de cada mesa ocupada lo enseña también, junto al tiempo.
+4. Cuando el camarero añade o quita una línea en Ventas, cobra una parte de la cuenta (entonces enseña
+   lo que falta por cobrar) o la junta, la divide o la pasa a otra mesa, el importe cambia solo en todos
+   los dispositivos que tienen el plano abierto, sin salir y volver.
+5. Las mesas Disponibles, Reservadas y Bloqueadas no enseñan importe.
+Entra: el importe de cada cuenta abierta de la sala, de Ventas, leído de una vez para todo el plano.
+Sale: nada.
+Si falla: como el resto del plano, un fallo al cargar sale con «Reintentar».
+Implicados: TABLE-F09, TABLE-F15, TABLE-F16, TABLE-F17, TABLE-F34, SALE-F17, SALE-F19, SALE-F22
+
+### TABLE-F34 Ver qué mesas han pedido la cuenta
+Estado: hecho
+Actor: empleado, responsable, asistente
+Pantalla: Plano de sala (Servicio); asistente
+Pasos:
+1. En Ventas, con la cuenta de una mesa en pantalla, el camarero imprime la cuenta para llevarla a la mesa
+   («Imprimir cuenta»), por la impresora de tiques o por el diálogo de impresión del dispositivo, o se la pide
+   al asistente («imprime la cuenta de la mesa 4»).
+2. En **Mesas → Plano de sala**, esa mesa pasa a **Cuenta pedida**: su estado escrito, con su icono, dice
+   «Cuenta pedida» en lugar de «Ocupada», y la mesa se pinta de un color propio que no se confunde con los de
+   los otros estados ni con el ámbar y el rojo del aviso de tiempo. Sigue enseñando el tiempo, los comensales
+   y el importe, y en la tarjeta de la zona cuenta como ocupada. En el teléfono, su tarjeta lo dice igual.
+3. Con varias cuentas en la mesa (dividida), basta con que se haya impreso la de una.
+4. La marca es de la cuenta: si la cuenta pasa a otra mesa, va con ella. Volver a imprimirla, añadir líneas o
+   cobrar solo una parte no la quita; se quita cuando esa cuenta se cierra: se cobra entera o se elimina.
+5. El cambio sale solo en todos los dispositivos que tienen el plano abierto, sin salir y volver.
+6. Por el asistente o la API, cada mesa del plano dice si su cuenta está pedida («¿qué mesas han pedido la
+   cuenta?»).
+Entra: de Ventas, qué cuentas abiertas de la sala tienen la cuenta impresa, leído de una vez para todo el plano.
+Sale: nada en Mesas; Ventas apunta en la cuenta que se imprimió.
+Si falla: si la impresión no llega a Ventas (sin conexión), el papel sale igual por el dispositivo y la mesa no
+se marca hasta que se vuelva a imprimir; un fallo al cargar el plano sale con «Reintentar».
+Implicados: TABLE-F09, TABLE-F15, TABLE-F17, TABLE-F18, TABLE-F20, TABLE-F33, SALE-F21
+
 ## Mesas: lo que entra y lo que sale
 
 Todo se puede pedir por las pantallas, por el asistente (por voz o por texto, con la sesión de la
@@ -1014,7 +1067,7 @@ Ventas (`sale.add_sale`), que tienen los cuatro papeles.
 
 ## Para quien lo mantiene
 
-- Anatomía completa: `apps.py`, `models.py`, `migrations/`, `schemas.py`, `queries.py`,
+- Anatomía completa: `apps.py`, `models.py`, `migrations/`, `schemas/`, `queries/`,
   `services.py`, `events.py`, `live.py`, `api.py`, `admin.py`, `locale/`, `frontend/` y un
   `tests/test_<fichero>.py` por fichero, más `tests/test_integration_sale.py` (Ventas y Clientes reales),
   `tests/test_integration_relay.py` (Reservas, Clientes y Ventas reales, por el bucle del worker con el
@@ -1078,7 +1131,7 @@ Ventas (`sale.add_sale`), que tienen los cuatro papeles.
 - **Hora del negocio**: `base.business.business_zone` (la zona del hub); las retenciones de Reservas
   traen fecha y hora de pared y se guardan con esa zona. «Hoy» en el plano es el día del negocio.
 - **Asistente**: cada operación declara `ai` (descripción; `risk: "high"` en cerrar, trasladar,
-  fusionar, borrar zonas, mesas y cuentas) y cada campo de `schemas.py` su `description`. Ninguna
+  fusionar, borrar zonas, mesas y cuentas) y cada campo de `schemas/` su `description`. Ninguna
   descripción manda preguntar antes: la tarjeta es la confirmación, y el «Ask first.» que llevaban
   cerrar, pasar, juntar y borrar una cuenta hacía que el asistente preguntara en el chat sin sacarla
   (hub#1140; lo guarda `tests/test_guardrails_assistant.py` para todo el Hub).
@@ -1118,7 +1171,8 @@ Ventas (`sale.add_sale`), que tienen los cuatro papeles.
 
 ### Lo que NO hace, a propósito
 
-- No sabe qué se ha pedido: líneas, importes y cocina son de Ventas y Cocina.
+- No guarda lo que se ha pedido: líneas, importes y cocina son de Ventas y Cocina; el importe de cada
+  mesa del plano (TABLE-F33) lo lee de Ventas.
 - No impide sentar más comensales que el aforo: avisa.
 - No toma reservas: eso es Reservas; Mesas solo aparta la mesa en el plano.
 - No tiene asiento por comensal, cursos, estado «por limpiar» ni mesas físicas unidas con
@@ -1128,8 +1182,7 @@ Ventas (`sale.add_sale`), que tienen los cuatro papeles.
 
 ### Lo que queda fuera
 
-- Ningún flujo a medias: los 32 están `hecho`. Lo que no entra a propósito está en «Lo que NO hace, a
-  propósito».
+- Los 34 flujos están `hecho`. Lo que no entra a propósito está en «Lo que NO hace, a propósito».
 - Los dos iconos de [`UI-REQUESTS.md`](UI-REQUESTS.md) (`ion:restaurant-outline` para la app y
   `ion:map-outline` para el Plano de sala) siguen sin registrarse en `@erplora/ui`; mientras, la app usa
   `ion:grid-outline` (también en el paso «Tus mesas» del Inicio) y el plano `ion:apps-outline`.

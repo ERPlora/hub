@@ -150,7 +150,6 @@
       "lineNoteHint": "The kitchen reads this note on the ticket.",
       "lineNoteRemove": "Remove",
       "lineNoteSave": "Save",
-      "allergens": "Allergens: {names}",
       "allergensLoading": "Loading allergens…",
       "allergensLoadFailed": "The allergens could not be loaded.",
       "customerAllergy": "Customer allergy",
@@ -443,6 +442,10 @@
         "checkReceipt": "Scan it to check this receipt at the AEAT",
         "checkInvoice": "Scan it to check this invoice at the AEAT",
         "csv": "CSV: {csv}"
+      },
+      "claim": {
+        "note": "Scan to ask for your full invoice",
+        "alt": "QR code to ask for the full invoice"
       },
       "paperPending": "Fiscal document pending"
     },

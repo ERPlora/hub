@@ -1,6 +1,13 @@
-<!-- generated from WORKBOOK.md sha256:c17f63ce331a609e58955d32739ca1871a764ba77d70162e029ab545bd26b0d7 -->
+<!-- generated from WORKBOOK.md sha256:5b54099ccaba468379f00904ef2734075ce5594f311b5cf02f7c2c92528ba48f -->
 
 ## What it is for and who it is for
+
+Modifiers keeps the choices that go with a dish: the doneness of the meat, an extra of cheese, the size or "no onion".
+They are arranged in groups that say how many options must be chosen, and each option carries its supplement (more,
+less or free) and its allergens. A group applies to products or to whole categories: the till asks for it when selling,
+charges the supplement and sends it to the kitchen.
+
+### In detail
 
 Modifiers is the catalogue of the choices that go with a dish: the "doneness of the meat", the
 "extra cheese", the size, "no onion". It is arranged in **groups**:
@@ -69,6 +76,13 @@ Initial setup, step by step:
 ## Screens
 
 ### Modifiers
+Here are the modifier groups, each one with its choice rule (optional or required, how many options at most and
+whether one can be repeated), how many options it has and to how many products and categories it applies. With "New
+group" you create one and, on its row, you change or delete it. Tap a group to open its sheet: there you add its
+options, with their supplement and their allergens, and in "Applies to" you link it to the products or the categories
+that carry it. A group without options or that applies to nothing does not show at the till.
+
+#### Detail
 Menu **Modifiers** (a single entry). At the top, the title "Modifiers". Below, the table of groups
 with the "Search…" box (it searches by name and by kitchen ticket name): **Name** (sorted and
 filtered), **On the kitchen ticket** (the kitchen name; empty, the commercial one), **Choice** (sorted
@@ -80,13 +94,13 @@ an option can be repeated. By order and name; pages of 50.
 Whoever can manage sees **"New group"** and, on each row, **Edit** and **Delete**. Tapping a row opens
 the group's sheet, for everyone.
 
-### Group sheet
+#### Group sheet
 Title "Group — {name}" and its rule. Two sections:
 
 - **Options**: each one with its name, its kitchen ticket name (if different), its supplement in the
   business's currency ("+€1.00" or "-€0.50" in Spain, "+zł 1.00" in Poland; or "Free"), its own tax
-  category if it has one and the "By default" mark. Whoever manages
-  sees "Add option" and, on each one, Edit and Delete. Empty: "This group has no options yet.".
+  category if it has one, the "By default" mark and, under its name, its allergens if it has any ("Allergens: Milk").
+  Whoever manages sees "Add option" and, on each one, Edit and Delete. Empty: "This group has no options yet.".
   If it has fewer options than the minimum asks for (and they cannot repeat), a notice says so: the till
   could not complete it.
 - **Applies to**: each product ("Product · Burger (HAM-01)") or category ("Category · Meats") it is
@@ -95,12 +109,13 @@ Title "Group — {name}" and its rule. Two sections:
 
 20 at a time, with "Load more".
 
-### Forms
+#### Forms
 - **Group** ("New group" / "Editing group — {name}"): Name, "Kitchen ticket name", "Minimum (1 or more
   = required)", "Maximum (0 = no ceiling)", "An option can be chosen more than once" and Order.
 - **Option** ("New option" / "Editing option — {name}"): Name, "Kitchen ticket name",
   "Supplement (<currency>)" (the business's: "Supplement (PLN)" in Poland; negative is a discount; empty
-  or 0, free), "Own tax category" (searched; empty = the dish's), Order and "Chosen by default".
+  or 0, free), "Own tax category" (searched; empty = the dish's), Order, "Chosen by default" and, under it,
+  "Allergens" (the fourteen: the ones the option adds to the dish are marked).
 - **Link** ("Apply «{group}» to…"): Product or Category, and the search box of each one.
 - **Delete** group or option and **Stop applying**: they ask for confirmation saying what goes with it.
 
@@ -135,6 +150,8 @@ With the window as it opened, Back closes it without asking (BASE-F05); a supple
 | MODIFIER-F08 | Have the supplement show on the kitchen ticket | done |
 | MODIFIER-F09 | Unlink the groups of a product or a category that is deleted | done |
 | MODIFIER-F10 | Recover the modifier groups, and those of a product or of a category, from a separate copy | done |
+| MODIFIER-F11 | Declare an option's allergens | done |
+| MODIFIER-F12 | Add the options' allergens to the dish's | done |
 
 ### MODIFIER-F01 Look up and search the groups
 Status: done
@@ -165,13 +182,13 @@ Steps:
    not 0, it cannot be below the minimum), whether an option can be repeated and the Order in which it
    shows at the till.
 5. Tap "Create": the form closes and the group shows in the table. It does not show at the till yet:
-   its options (F04) and where it applies (F05) are missing.
+   its options and where it applies are missing, and they are set in its sheet.
 In: what the person types.
 Out: the group (announces: group created). It creates no options or links.
 If it fails: an empty name or one of more than 255 characters, a minimum or maximum outside 0–50 or a
 maximum below the minimum show under their field; a name another group already has, "There is already
 a group with that name." under the Name. The reason of a field goes as soon as that field is corrected, even if
-another one says the same (hub#888). What was typed stays.
+another one says the same. What was typed stays.
 Involved: none
 
 ### MODIFIER-F03 Change or delete a group
@@ -191,8 +208,8 @@ If it fails: the same refusals as when creating; lowering the maximum below the 
 come by default, "This group has more options chosen by default than its maximum.". A group that does
 not exist, "This group does not exist.". Through the assistant, a name that fits several groups or none brings up
 no card, and if before the "yes" another group fits better what was said, nothing is changed or deleted and the new
-card comes up (BASE-F97).
-Involved: SALE-F11
+card comes up.
+Involved: SALE-F11, BASE-F97
 
 ### MODIFIER-F04 Add, change or remove the options of a group
 Status: done
@@ -201,8 +218,8 @@ Screen: Modifiers (group sheet)
 Steps:
 1. Open the group and, in Options, tap "Add option".
 2. Type the Name (unique within the group) and, if needed, the kitchen ticket name.
-3. Type the Supplement in the business's currency, its country's in Settings → Business, with its
-   decimals (the yen has none): positive charges more, negative is a discount, empty or 0 is free.
+3. Type the Supplement in the business's currency, its country's, with its decimals (the yen has none):
+   positive charges more, negative is a discount, empty or 0 is free.
 4. Only if the option is taxed differently from the dish, choose its own tax category; empty, it
    inherits the dish's.
 5. Tick "Chosen by default" if the till must bring it already ticked. In a group of maximum 1, ticking
@@ -216,18 +233,19 @@ catalogue: what was already ordered keeps its frozen copy, also on the kitchen t
 If it fails: "Create" and "Save" are grey while the name is missing and while the business has not yet
 said its currency, because the supplement is read in it (without it, "150" yen would be saved as 15,000); until
 then, leaving the supplement keeps it as typed, without inventing decimals for it or judging it: "¥150" or "-0,50 zł"
-are not marked red as "This is not an amount", and as soon as the currency arrives they are read in it (hub#945). If the currency cannot be read, the window says so ("The business's currency could not be read", with the
-reason) and offers "Retry", which asks for it again; as soon as it arrives, the button lights up (hub#938). An
+are not marked red as "This is not an amount", and as soon as the currency arrives they are read in it. If the
+currency cannot be read, the window says so ("The business's currency could not be read", with the reason) and offers
+"Retry", which asks for it again; as soon as it arrives, the button lights up. An
 empty name or one repeated in the group, a supplement that is not an amount, a tax
 category that does not exist in Taxes or more default options than the maximum show next to their
 field; the one of the name, the kitchen ticket name, the supplement, the tax category or the order goes as soon as
-that field is corrected, even if another one says the same (hub#888), and the one of "Chosen by default" as soon as
-that switch is changed, without saving again (hub#1437). An option with its own tax category is charged on a separate line, which cannot be worth zero or
+that field is corrected, even if another one says the same, and the one of "Chosen by default" as soon as
+that switch is changed, without saving again. An option with its own tax category is charged on a separate line, which cannot be worth zero or
 less: "An option with its own tax category is billed on a line of its own: its supplement must be more
 than zero.". A group holds up to 100 options. Through the assistant, when changing or removing an option, a group
 said by its name that fits several or none brings up no card, and if before the "yes" another group fits better what
-was said, nothing is touched and the new card comes up (BASE-F97).
-Involved: SALE-F11
+was said, nothing is touched and the new card comes up.
+Involved: SALE-F11, BASE-F97
 
 ### MODIFIER-F05 Link a group to products or categories, and unlink it
 Status: done
@@ -246,10 +264,10 @@ Out: the link (announces: link made or removed). At the till, the item asks for 
 If it fails: a product or a category that does not exist or is deleted, "This product does not exist in
 this hub." or "This category no longer exists."; a link that already exists, "This group already
 applies there.". Through the assistant, unlinking a group said by its name that fits several or none brings up no
-card, and if before the "yes" another group fits better what was said, nothing is unlinked and the new card comes up
-(BASE-F97). A link to a product or a category already deleted brings up no card either ("This group does not apply
-there."): MODIFIER-F09 removes it.
-Involved: INVENTORY-F01, INVENTORY-F06
+card, and if before the "yes" another group fits better what was said, nothing is unlinked and the new card comes up.
+A link to a product or a category already deleted brings up no card either ("This group does not apply there."): it is
+removed by itself a few seconds after the deletion.
+Involved: INVENTORY-F01, INVENTORY-F06, MODIFIER-F09, BASE-F97
 
 ### MODIFIER-F06 Choose the options when selling an item
 Status: done
@@ -352,12 +370,12 @@ Steps:
    links with it, F03) is created again as the Modifiers screen creates it (F02), with its name, its kitchen ticket
    name, its minimum and its maximum, whether an option can be repeated and its order, and with its options as the
    group's sheet adds them (F04), each with its name, its kitchen ticket name, its supplement, its own tax category,
-   whether it comes chosen by default and its order. It comes back as a new group, with another identifier, and in the
+   whether it comes chosen by default, its order and its allergens (F11). It comes back as a new group, with another identifier, and in the
    next steps its links of the copy are made to that one: the one the recovery brought back with its name.
 3. Then, each option that in the copy had a group the business keeps (the same one, even renamed, or the one an
    earlier recovery brought back with its name) and that this group no longer has, because the business took it away
    (F04), is added again as the group's sheet adds it (F04), with its name, its kitchen ticket name, its supplement,
-   its own tax category and its order. If in the copy it came chosen by default, it comes back chosen only if the
+   its own tax category, its order and its allergens. If in the copy it came chosen by default, it comes back chosen only if the
    group has room for it: it never takes that from the ones the business chose. In a "choose one" group that already
    comes with another one by default, or in one that already comes with as many as its maximum, it comes back not
    chosen and its note says so.
@@ -405,6 +423,62 @@ Recoveries says why ("not_found: …"); the one a recovery brought back is known
 brought it back or an earlier one.
 Involved: BASE-F114, INVENTORY-F01, INVENTORY-F07, INVENTORY-F34, MODIFIER-F05, MODIFIER-F09
 
+### MODIFIER-F11 Declare an option's allergens
+Status: done
+Actor: owner, administrator, manager, assistant
+Screen: Modifiers (group sheet)
+Steps:
+1. Open the group and, in Options, tap "Add option" or **Edit** on one. Under "Chosen by default" comes the
+   "Allergens" block, with the note "Mark the ones this option adds to the dish." and the fourteen allergens that must
+   be declared, the same ones and in the same order as in a product's form: Gluten, Crustaceans, Egg, Fish, Peanut,
+   Soy, Milk, Tree nuts, Celery, Mustard, Sesame, Sulphites, Lupin and Molluscs. When creating, none comes marked.
+2. Tap the ones the option has: "+Cheese", Milk; "Mustard sauce", Mustard. Each tap marks or unmarks one. An option
+   that only takes something away ("No onion") or that adds no ingredient ("Rare") is left unmarked.
+3. Tap "Create" or "Save", like the rest of the option. An allergen marked and not saved asks before the window
+   closes, like any other field.
+4. In the group sheet, each option with allergens says them under its name: "Allergens: Milk", in the order of the
+   list. An option without allergens has no such row.
+In: the option; the list of the fourteen allergens.
+Out: the option with its allergens, in the same step as the rest of the form: either everything is saved or nothing
+(announces: option created or changed). The same is done through the assistant or the API, with the same
+permissions: "mark milk on the cheese of Extras" first asks for the confirmation card, which says the option with its
+group and the allergens by their name. A change counts for what is ordered from that moment on: a line already
+ordered keeps the allergens it had (F12). An option that comes back from a separate copy comes back with its
+allergens (F10).
+If it fails: an allergen that is not on the list is rejected, also through the assistant or the API, and nothing is
+saved ("That allergen is not one of the fourteen that must be declared."); in the window it shows next to its field,
+like the option's other rejections. Whoever can only view reads the allergens in the group sheet, but does not have
+the form.
+Involved: MODIFIER-F04, MODIFIER-F10, MODIFIER-F12, INVENTORY-F35
+
+### MODIFIER-F12 Add the options' allergens to the dish's
+Status: done
+Actor: employee, manager
+Screen: Sales: Sell
+Steps:
+1. On the till, tap an item that has groups. On its sheet, under the item's name come its allergens and,
+   under each option that has them, its own: "+Cheese" says "Allergens: Milk". An option without allergens does not
+   get that row.
+2. Choose the options and tap "Add". The line says, under the name, "Allergens: …" with the dish's and those of
+   each option chosen, together, without repeating and in the order of the list of the fourteen: a burger with Gluten
+   and "+Cheese" says "Allergens: Gluten, Milk". All the options chosen count, also those charged on a separate line.
+   A dish without allergens with an option that has them also gets the row.
+3. If the customer warned of an allergy marked on the line, the warning "The dish has …" also counts the options':
+   "+Cheese" on the dish of someone allergic to milk says "The dish has Milk".
+4. Send the round: Kitchen gets the line's allergens already added up and crosses them with the customer's allergy
+   as with any dish.
+In: the product's allergens (INVENTORY-F35) and those of the options chosen (F11), which the options' valuation gives
+(F07).
+Out: the line with the allergens added up and frozen when it is ordered, like the supplement: changing or deleting
+the option, or its allergens, afterwards does not change what that line says or what Kitchen reads. The allergens do
+not change the price or the charge, and they do not show on the ticket, on the invoice or on the printed bill for the
+table (SALE-F40).
+If it fails: if the options cannot be valued, the line does not go in, as with any supplement. An option never takes
+an allergen away from the dish: "No cheese" does not take the Milk away from a burger that declares it, because what
+the product declares is what its recipe has and what is taken away is an instruction for the kitchen; if the customer
+is allergic, their allergy is marked on the line.
+Involved: MODIFIER-F06, MODIFIER-F07, MODIFIER-F11, SALE-F11, SALE-F40, SALE-F41, KITCHEN-F32
+
 ## Services: what goes in and what comes out
 
 Everything can be asked for through the screens, the assistant (by voice or by text, with the person's
@@ -447,8 +521,8 @@ another category, the card does not show that name, which the action does not us
 | The links, of a group, of a product or of a category, with pages | view | F05 | `modifier.link.list` |
 | A link by its id, or by its group and its product or category, with its `label`: "Sauces · Burger" | view | F05 | `modifier.link.get` |
 | An Inventory category by its id or its name, as the list of links names it | view | F05 | `modifier.category.get` |
-| The groups with their options of a product (its own and those of all its categories, once each) | view | F06 | `modifier.group.for_target` |
-| The check and pricing of some chosen options for a product: price, names, tax category, total to add and kitchen text | view | F07, F08 | `modifier.selection.resolve` |
+| The groups with their options of a product (its own and those of all its categories, once each), each option with its allergens | view | F06, F11 | `modifier.group.for_target` |
+| The check and pricing of some chosen options for a product: price, names, tax category, allergens, total to add and kitchen text | view | F07, F08, F12 | `modifier.selection.resolve` |
 
 The groups, a group, the options, the links and the groups of a product can be followed live.
 
@@ -459,8 +533,8 @@ The groups, a group, the options, the links and the groups of a product can be f
 | Creates a group | manage | F02 | `modifier.group.create` |
 | Changes a group (what is not sent stays) | manage | F03 | `modifier.group.update` |
 | Deletes a group with its options and links | manage | F03 | `modifier.group.delete` |
-| Adds an option to a group | manage | F04 | `modifier.option.create` |
-| Changes an option (what is not sent stays) | manage | F04 | `modifier.option.update` |
+| Adds an option to a group, with its allergens | manage | F04, F11 | `modifier.option.create` |
+| Changes an option, its allergens too (what is not sent stays) | manage | F04, F11 | `modifier.option.update` |
 | Deletes an option | manage | F04 | `modifier.option.delete` |
 | Links a group to a product or a category | manage | F05, F10 | `modifier.link.attach` |
 | Unlinks a group from a product or a category | manage | F05 | `modifier.link.detach` |

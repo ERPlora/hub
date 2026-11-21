@@ -56,6 +56,26 @@ export async function watchLiveStreams(page: Page): Promise<LiveStream[]> {
   return streams;
 }
 
+/** Whether `url` opens the live stream. */
+export const isLiveStream = (url: string): boolean => new URL(url).pathname === '/api/live';
+
+/**
+ * Every `/api/live` the page opens from now on, and why the browser cut each one that failed. A stream dropped as the
+ * page leaves its document is not reported as cut. `hostPage` returns before its page has opened its stream, which can
+ * follow at any moment: a count of what one load opens starts once that stream is in, or once that page is left.
+ */
+export function countLiveOpens(page: Page): { opened: string[]; cut: string[] } {
+  const opened: string[] = [];
+  const cut: string[] = [];
+  page.on('request', (request) => {
+    if (isLiveStream(request.url())) opened.push(request.url());
+  });
+  page.on('requestfailed', (request) => {
+    if (isLiveStream(request.url())) cut.push(request.failure()?.errorText ?? 'failed');
+  });
+  return { opened, cut };
+}
+
 /**
  * The owner on `a` in Spanish, on the Home, with every `/api/live` the page opens from then on: what the sign-in opened
  * says nothing about the screen, so the count starts with a Home loaded again.

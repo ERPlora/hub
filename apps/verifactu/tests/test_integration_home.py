@@ -24,6 +24,7 @@ from apps.verifactu.tests.conftest import (
     HUB_DB_COMMITTED,
     A,
     B,
+    accepted_by_the_aeat_of_testing,
     b64,
     business_in,
     ctx_for,
@@ -103,8 +104,10 @@ def test_the_owner_has_the_step_pending_until_erplora_may_file_in_production(iss
 def test_the_own_certificate_also_completes_the_step(issuer):
     owner = ctx_for("hub_admin")
     assert steps(owner)[STEP]["state"] == "pending"
-    # Uploading it is all it takes: nothing else to choose.
+    # Uploading it and the AEAT's test environment accepting it is all it takes: nothing else to choose.
     run("verifactu.certificate.upload", {"p12_base64": b64(make_p12()), "password": "secret"})
+    assert steps(owner)[STEP]["state"] == "pending"
+    accepted_by_the_aeat_of_testing()
     assert steps(owner)[STEP]["state"] == "done"
     run("verifactu.certificate.remove")
     assert steps(owner)[STEP]["state"] == "pending"
@@ -191,6 +194,7 @@ def live_by_erplora():
 
 def live_by_own_certificate():
     run("verifactu.certificate.upload", {"p12_base64": b64(make_p12()), "password": "secret"})
+    accepted_by_the_aeat_of_testing()
     run("verifactu.config.go_live")
 
 

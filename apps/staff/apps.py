@@ -1,7 +1,7 @@
 """The staff app: who works and attends, their role, weekly schedule, time off and pay."""
 
 from django.utils.translation import gettext_lazy as _
-from live.meta import Category, LiveAppConfig, Nav, Widget
+from live.meta import Category, Help, LiveAppConfig, Nav, Widget
 
 from apps.staff.events import (
     MEMBER_ALL,
@@ -79,7 +79,8 @@ class StaffConfig(LiveAppConfig):
         ],
         "hub_employee": ["staff.view", "staff.view_time_off", "staff.request_time_off"],
     }
-    # The old module's four tabs.
+    # The sections of its tab bar (frontend/tabs.ts) but Settings, which the help window adds. Commissions opens to
+    # everyone, as every app's Settings does, and its page tells whoever does not see the pay that it is not theirs.
     navigation = [
         Nav(
             id="staff",
@@ -102,7 +103,14 @@ class StaffConfig(LiveAppConfig):
             icon="ion:time-outline",
             path="/staff/schedules",
         ),
+        Nav(
+            id="commissions",
+            label=_("Commissions"),
+            icon="ion:wallet-outline",
+            path="/staff/commissions",
+        ),
     ]
+    help = Help()
     # The Home's panels, on the queries Staff's own figures read (STAFF-F20, STAFF-F23), in every business. A KPI says
     # its name once, in its title. Registered icons only: the old airplane and hourglass are asked for in
     # UI-REQUESTS.md.

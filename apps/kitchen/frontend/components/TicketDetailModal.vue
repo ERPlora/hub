@@ -1,8 +1,8 @@
 <script setup lang="ts">
 // A ticket's detail (WORKBOOK «Pantallas · Comandas»): tapping a row opens it, live (`kitchen.ticket.get`):
 // destination, type, status, waiter and when it was sent, its notes, and its dishes with their quantity,
-// their menu and options (KITCHEN-F06, F07), station and state (a voided one with its reason). The page
-// mounts it only while it is open.
+// any allergy, their menu and options (KITCHEN-F06, F07), station and state (a voided one with its reason). The page
+// mounts it only while it is open. Its body carries the order ticket's class so a dish's allergy looks as on the card.
 import { FormModal, InlineFeedback } from '@erplora/ui/components';
 import { useLive } from '@erplora/ui/sdk';
 import { IonButton } from '@ionic/vue';
@@ -10,6 +10,7 @@ import { computed } from 'vue';
 
 import { useLocale, useT } from '../composables/useT';
 import { formatDateTime, formatQuantity } from '../lib/format';
+import KitchenAllergyNotice from './KitchenAllergyNotice.vue';
 
 const props = defineProps<{ ticketId: string; timezone: string }>();
 const open = defineModel<boolean>('open', { default: false });
@@ -52,6 +53,7 @@ const title = computed(() => t('kitchen.detail.title', { number: ticket.value?.n
     </InlineFeedback>
     <div
       v-else
+      class="ep-order-ticket"
       data-testid="kitchen-ticket-detail-body"
     >
       <dl class="kitchen-detail">
@@ -75,6 +77,11 @@ const title = computed(() => t('kitchen.detail.title', { number: ticket.value?.n
           :data-status="dish.status"
         >
           <strong>{{ formatQuantity(dish.quantity, locale) }}× {{ dish.name }}</strong>
+          <KitchenAllergyNotice
+            class="kitchen-detail__allergy"
+            :line="dish"
+            :testid="`kitchen-ticket-detail-dish-${dish.id}-allergy`"
+          />
           <span
             v-if="dish.menu_name"
             :data-testid="`kitchen-ticket-detail-dish-${dish.id}-menu`"
@@ -134,8 +141,11 @@ const title = computed(() => t('kitchen.detail.title', { number: ticket.value?.n
   padding: 0.4rem 0;
   border-bottom: 1px solid var(--ion-border-color, #e7e2d6);
 }
-.kitchen-detail__dishes li[data-status='voided'] strong,
-.kitchen-detail__dishes li[data-status='cancelled'] strong {
+.kitchen-detail__allergy {
+  flex-basis: 100%;
+}
+.kitchen-detail__dishes li[data-status='voided'] > strong,
+.kitchen-detail__dishes li[data-status='cancelled'] > strong {
   text-decoration: line-through;
 }
 </style>

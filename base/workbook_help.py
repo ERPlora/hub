@@ -139,7 +139,7 @@ def parse(markdown: str, tabs: Sequence[Tab], vocabulary: Words) -> Help:
     screen_lines = next((body for title, body in sections if _name(title) == screens_heading), [])
     screens, windows, unknown, repeated = _screens(screen_lines, tabs)
     places = {**windows, **{_place(tab.label): tab.id for tab in tabs}}
-    read = [flow for _title, body in sections for flow in _flows(body, vocabulary, places)]
+    read = [_flow(*flow, vocabulary, places) for flow in flow_fields(markdown, vocabulary)]
     flows = tuple(flow for flow in read if isinstance(flow, Flow))
     drafts = tuple(flow for flow in read if isinstance(flow, Draft))
     return Help(purpose, screens, flows, unknown, repeated, drafts)
@@ -169,20 +169,25 @@ def _screens(
     return screens, windows, tuple(unknown), tuple(repeated)
 
 
-def _flows(lines: list[str], vocabulary: Words, places: dict[str, str]) -> Iterator[Flow | Draft]:
-    """Each flow of a section: published when it is done on a tab (or one of its windows), else a draft."""
-    for title, body in _sections(lines, 3)[1:]:
-        heading = _FLOW.match(title)
-        if heading is None:
-            continue
-        fields = _fields(body, vocabulary)
-        status = " ".join(line.strip() for line in fields.get("status", [])).strip()
-        screens = _places(fields.get("screen", []), places)
-        if screens and _is_done(status, vocabulary):
-            steps, failure = (_capital(_markdown(fields.get(key, []))) for key in ("steps", "failure"))
-            yield Flow(heading.group(1), heading.group(2).strip(), screens, steps, failure)
-        else:
-            yield Draft(heading.group(1), status, screens)
+def flow_fields(markdown: str, vocabulary: Words) -> Iterator[tuple[str, str, dict[str, list[str]]]]:
+    """Each flow of a customer's part written with ``vocabulary``, in the file's order: its id, its title and the lines
+    of each of its keys."""
+    for _title, body in _sections(markdown.splitlines(), 2)[1:]:
+        for title, lines in _sections(body, 3)[1:]:
+            if heading := _FLOW.match(title):
+                yield heading.group(1), heading.group(2).strip(), _fields(lines, vocabulary)
+
+
+def _flow(
+    flow_id: str, title: str, fields: dict[str, list[str]], vocabulary: Words, places: dict[str, str]
+) -> Flow | Draft:
+    """A flow published when it is done on a tab (or one of its windows), else a draft."""
+    status = " ".join(line.strip() for line in fields.get("status", [])).strip()
+    screens = _places(fields.get("screen", []), places)
+    if screens and is_done(status, vocabulary):
+        steps, failure = (_capital(_markdown(fields.get(key, []))) for key in ("steps", "failure"))
+        return Flow(flow_id, title, screens, steps, failure)
+    return Draft(flow_id, status, screens)
 
 
 def _fields(lines: list[str], vocabulary: Words) -> dict[str, list[str]]:
@@ -201,7 +206,7 @@ def _fields(lines: list[str], vocabulary: Words) -> dict[str, list[str]]:
     return fields
 
 
-def _is_done(status: str, vocabulary: Words) -> bool:
+def is_done(status: str, vocabulary: Words) -> bool:
     """Whether ``status``, before the note it may carry, is the word of a flow that is done."""
     return _name(_STATUS_NOTE.split(status, maxsplit=1)[0]) == _name(vocabulary.done)
 

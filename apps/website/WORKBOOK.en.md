@@ -1,6 +1,13 @@
-<!-- generated from WORKBOOK.md sha256:30d95211d2fc273353cd8d902529094b1c23370940bfafa10b0c45d0265c77c6 -->
+<!-- generated from WORKBOOK.md sha256:d66376cd4ad28bd0b3a3c90570d7cc6ed7cfea5363758dee9109de207f683a52 -->
 
 ## What it is for and who it is for
+
+Website gives your business a simple page of its own at its ERPlora address (your-business.erplora.com). You pick one
+of four designs and its colours, fill in the sections you want (cover, about us, catalog, gallery, Google reviews,
+contact and location) and publish it. Your customers see it when they open that address, and your team signs in from
+its **Log in** button.
+
+### In detail
 
 Website gives each business a simple page of its own at its ERPlora address (your-business on erplora.com).
 The owner picks one of four designs, fills in its sections (name and logo, title and cover photo, a few words about
@@ -40,6 +47,13 @@ content and the design are kept apart.
 ## Screens
 
 ### Website
+Here you prepare and publish the business's website. At the top you see whether it is online and at what address,
+with **Save**, **Publish**, **Take offline** and **Share and QR**. Below, the editor (design, colours, background and
+each section) and the preview as your customers will see it; on a tablet or a phone, the **Edit / Preview** tab
+switches between the two. What you change is kept in a draft, and your customers do not see it until you tap
+**Publish**.
+
+#### Detail
 At the top, the status: «Your website is not online yet…» (never published), «Your website is offline…» (taken
 offline) or «Your website is online at …» (with the address), and «You have changes that are not published yet.»
 when the draft has changed since the last publication. Next to it, **Save**, **Publish**, **Take offline** (only when
@@ -90,13 +104,13 @@ switches between the two.
 - **Preview**: the page as customers will see it with the current design and draft, at a computer's or a phone's
   width, and **Reload**. It reloads by itself after each save.
 
-### Share and QR
+#### Share and QR
 The website's address with **Copy link**, its QR code and **Download PNG** (to print) and **Download SVG** (to scale up
 without losing quality). It warns that, on the device where you signed in, the address opens the app (to see the
 page: your phone or a private window) and, if the page is not online, that the address still leads to the team's
 sign-in.
 
-### The public page
+#### The public page
 The chosen template with what is published, at the business's address: a sticky see-through top bar with the
 logo, the name, the sections' menu (folded on a phone) and **Log in** (an outline pill); a header with the cover photo
 (or, without one, a soft gradient of the palette, never empty), the title in large type, the tagline and two pills:
@@ -184,8 +198,8 @@ Steps:
 1. In **Design**, tap one of the four cards: **Classic**, **Modern**, **Minimal** or **Bold**.
 2. In **Colours**, tap one of the eight palettes and, if you want, change **Main colour** and **Second colour**;
    **Reset colours** gives the palette's own back.
-3. In **Page background**, choose **Light**, **Dark** or **Auto**. It saves as in WEBSITE-F01 and the preview shows
-   it.
+3. In **Page background**, choose **Light**, **Dark** or **Auto**. It saves by itself, like the rest of the draft, and the preview
+   shows it.
 In: the template, the palette, the two own colours (or none: the palette's) and the background.
 Out: the same content in another design or other colours; nothing is lost on changing. Notice
 `website.site.updated`.
@@ -199,13 +213,13 @@ Actor: owner, administrator, assistant, API
 Screen: Website
 Steps:
 1. Unfold **About us**, **Catalog**, **Gallery**, **Google reviews**, **Contact** or **Location**.
-2. Turn its **Show** switch on or off (off, the list says «Hidden» under its name) and save as in WEBSITE-F01. The
+2. Turn its **Show** switch on or off (off, the list says «Hidden» under its name) and it saves by itself. The
    **Top bar**, the **Header** and the **Footer** have no switch: they are always there.
 In: which sections are shown.
 Out: what is hidden is not painted on the page nor given to visitors; it is kept to show it again. A section shown but
 with nothing in it (no text nor photo, no catalog, no photos in the gallery, no Google reviews, no contact details, no
 address nor map) is not painted either, nor its link in the menu. Notice `website.site.updated`.
-If it fails: as when saving (WEBSITE-F01); hiding never deletes what was written.
+If it fails: the same as when saving the draft; hiding never deletes what was written.
 Involved: WEBSITE-F01, WEBSITE-F10
 
 ### WEBSITE-F04 Upload an image
@@ -216,7 +230,7 @@ Steps:
 1. In the logo (**Top bar**), the cover photo (**Header**), the photo of **About us** or a photo of the **Gallery**,
    tap **Choose image** and pick the file.
 2. Its thumbnail shows with **Replace image** and **Remove**; **Remove** empties the field (in the gallery, it takes
-   the photo out of the list). It saves as in WEBSITE-F01.
+   the photo out of the list). It saves by itself, like the rest of the draft.
 In: a jpeg, png or webp file of up to 5 MB and 8000 pixels a side; its content is checked, not only its name.
 Out: the image kept in the business's file store under a name taken from its content (the same image twice is one
 file), served from the business's own address and kept a year by the browser; the name of the file it was first
@@ -224,7 +238,7 @@ uploaded with is kept too, which is how the assistant names it. Notice `website.
 If it fails: under the field: «The file did not arrive whole: choose it again.», «The file is empty.», «The image may
 weigh 5 MB at most.», «This file is not a PNG image.» (or JPEG, WEBP), «The image may be 8000 pixels a side at
 most.» or, if the image does not fit in your plan's space (the same one Files' files take), «There is no space left
-for that file: your plan includes {space}.», as in Files. An image uploaded before takes no more and is accepted
+for that file…» with the space your plan includes, as in Files. An image uploaded before takes no more and is accepted
 anyway.
 Involved: WEBSITE-F01, WEBSITE-F11
 
@@ -237,7 +251,7 @@ Steps:
 2. In **What to show**, choose **Products** (Inventory's on sale: active and not sold out) or **Services** (those
    offered); only those of the apps on in the business are offered.
 3. If you want, choose the **Categories** (none = **All categories**) and whether prices show with **Show prices**.
-   It saves as in WEBSITE-F01.
+   It saves by itself, like the rest of the draft.
 In: the source, the chosen categories and whether prices show.
 Out: on the preview and, once published, on the page: the catalog grouped by category in their order (what has no
 category, last), up to 200 items, with pills to jump between categories when there are two or more. Prices, in the
@@ -273,7 +287,7 @@ Actor: owner, administrator, assistant, API
 Screen: Website
 Steps:
 1. Tap **Publish**: anything unsaved is saved first.
-2. «Publish your website?» says «Whoever opens {url} will see this version, with your catalog as it is now.»; tap
+2. «Publish your website?» says «Whoever opens your-business.erplora.com will see this version, with your catalog as it is now.»; tap
    **Publish** (cancelled, nothing is published).
 3. On top it reads «Your website is online at …» with the address.
 In: the draft as it is now.
@@ -329,7 +343,7 @@ kept a minute by the browser; the tab shows the logo or the name's initial. The 
 main address: the business's own domain if it opens there (BASE-F110), also from this address, which does not redirect
 because it is still the team's way in; without an own domain, this one.
 If it fails: not published, taken offline or with the app off, the address leads to the team's sign-in; whoever
-makes more than 60 reads a minute from one connection waits a moment. On the business's own domain (BASE-F110) it is the
+makes more than 60 reads a minute from one connection waits a moment. On the business's own domain it is the
 same page: **Log in** leads to its address on erplora.com and, with no page to show, the domain says there is nothing there.
 Involved: WEBSITE-F07, WEBSITE-F08, WEBSITE-F05, WEBSITE-F11, WEBSITE-F12, BASE-F110, HUBS-F17
 
@@ -341,7 +355,7 @@ Steps:
 1. Unfold **Gallery** and tap **Add a photo** (one by one, up to 12; «3 of 12 photos» says how many there are).
 2. **Move up** or **Move down** change their order and **Remove** takes one out; with 12, «The gallery is full (12
    photos): remove one to add another.».
-3. It saves as in WEBSITE-F01 and shows once published.
+3. It saves by itself, like the rest of the draft, and shows once published.
 In: the uploaded photos (WEBSITE-F04), in their order.
 Out: on the page, a grid of square photos in that order (2, 3 or 4 a row by screen), served from the business's
 address and kept a year by the browser; each one opens whole in another tab. Without photos, or with the gallery
@@ -356,7 +370,7 @@ Actor: owner, administrator, assistant (the link), API
 Screen: Website
 Steps:
 1. On Google Maps, open the business's listing, tap **Share** and copy its link (or its Place ID).
-2. Unfold **Google reviews** and paste it in **Google Maps link or Place ID**; it saves as in WEBSITE-F01.
+2. Unfold **Google reviews** and paste it in **Google Maps link or Place ID**; it saves by itself.
 3. The note below says how they stand: «Google will be asked for this place once it is saved.» (not saved), «Your
    reviews will show here and on your page once Google answers for this place.» (no answer yet) or «Rating 4.7 out of
    5 · reviews on Google: 128» (ready).

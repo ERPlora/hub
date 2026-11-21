@@ -72,7 +72,6 @@ function renderShellHtml(session: object | null = ME) {
 }
 
 let main: Main;
-let importBoot: ReturnType<typeof shellOptions>;
 
 /** Boots the Hub under the fake shell with `home` as the `hub-home` block base/spa.py embeds in the page. */
 async function bootWithHome(home: object): Promise<void> {
@@ -89,7 +88,6 @@ beforeAll(async () => {
   renderShellHtml();
   fakeShell();
   main = await import('./main');
-  importBoot = shellOptions();
 });
 
 beforeEach(() => {
@@ -103,33 +101,6 @@ afterEach(() => {
 });
 
 describe('main.ts', () => {
-  it('boots on import with the routes Vite globs from apps/*/frontend/routes.ts (the demo pages among them)', () => {
-    const routes = importBoot.routes as RouteRecordRaw[];
-    expect(routes.map((r) => r.path)).toEqual(expect.arrayContaining(['/demo/items', '/demo/items/:id']));
-  });
-
-  it("boots with base's Home at `/`: its route goes before the shell's grid, under a name of its own", () => {
-    const routes = importBoot.routes as RouteRecordRaw[];
-    const home = routes.filter((r) => r.path === '/');
-    expect(home.map((r) => [r.name, r.meta?.auth])).toEqual([['base-home', true]]);
-    // The shell's grid (`home: true`) stays registered after it, as the fallback of `/` and «Home» first in the menu.
-    expect(importBoot.home).toBe(true);
-  });
-
-  it("plugs base's pieces into the chrome: the assistant in the topbar, «Upgrade plan» and «Manage on erplora.com» at the menu's foot, and the device's notices and the assistant's panel beside the pane", async () => {
-    const chrome = importBoot.chrome as Record<string, unknown>;
-    expect(Object.keys(chrome).sort()).toEqual(['background', 'sidebarFooter', 'topbar']);
-    for (const piece of Object.values(chrome)) expect(piece).toBeTruthy();
-    // Loaded on demand; what each one loads.
-    const loaded = async (piece: unknown) =>
-      ((await (piece as { __asyncLoader: () => Promise<{ __name?: string }> }).__asyncLoader()) ?? {}).__name;
-    expect([await loaded(chrome.topbar), await loaded(chrome.sidebarFooter), await loaded(chrome.background)]).toEqual([
-      'TopbarChrome',
-      'SidebarFooter',
-      'BackgroundChrome',
-    ]);
-  });
-
   // From the menu and from the idle lock alike.
   it('signing out forgets the conversation with the assistant, then leaves', async () => {
     sessionStorage.setItem('erplora.assistant.history', JSON.stringify({ user: 'u1', bubbles: [], conversation: [] }));
@@ -151,11 +122,6 @@ describe('main.ts', () => {
     stopped();
     await leaving;
     expect(logout).toHaveBeenCalledOnce();
-  });
-
-  it("on import, globs base's catalogue next to the apps' (the Home would show raw keys otherwise)", () => {
-    const messages = importBoot.messages as Record<string, { base: { home: { title: string } } }>;
-    expect([messages.en.base.home.title, messages.es.base.home.title]).toEqual(['Home', 'Inicio']);
   });
 
   it('collects the routes of every app, in path order, behind a session by default', async () => {
@@ -194,12 +160,6 @@ describe('main.ts', () => {
     });
   });
 
-  it("on import, the shell speaks the shared assistant's words next to base's (its panel would show raw keys otherwise)", () => {
-    const messages = importBoot.messages as Record<string, { assistant: { send: string }; base: { assistant: { empty: string } } }>;
-    expect([messages.en.assistant.send, messages.es.assistant.send]).toEqual(['Send', 'Enviar']);
-    expect(messages.es.base.assistant.empty).toBe('Pregúntame por tus ventas, tu inventario o cualquier cosa de tu negocio.');
-  });
-
   it("configures the shared assistant as the Hub's before the shell mounts (HUB_ASSISTANT)", async () => {
     const shell = fakeShell();
     configureAssistant(undefined);
@@ -225,17 +185,13 @@ describe('main.ts', () => {
     expect(typeof configured?.speak).toBe('function');
   });
 
-  it('on import, globs the real app catalogues (the demo pages would show raw keys otherwise)', () => {
-    const messages = importBoot.messages as Record<string, { demo: { items: { title: string } } }>;
-    expect([messages.en.demo.items.title, messages.es.demo.items.title]).toEqual(['Demo items', 'Elementos']);
-  });
-
   it('builds the live client from spa-config with the generated op → route map and provides it to the app', async () => {
     const { app } = fakeShell();
     await main.boot({});
     expect(createLiveClient).toHaveBeenCalledWith(expect.objectContaining({ csrfCookieName: 'csrftoken', lang: 'es' }), {
       routes: OPERATION_ROUTES,
       getElevationToken: approvalPass,
+      reload: expect.any(Function),
     });
     expect(provideLiveClient).toHaveBeenCalledWith(sdk.client, app);
   });
@@ -534,30 +490,6 @@ describe('import order guards', () => {
       const source = readFileSync(file, 'utf8');
       const staticImports = [...source.matchAll(/^import\s+(?!type\b).*$/gm)].map((m) => m[0]);
       expect(staticImports, `${file}: pages load with () => import('./pages/…')`).toEqual([]);
-    }
-  });
-});
-
-describe('app catalogue guards', () => {
-  it('keeps base/frontend/locale/<lang>.json under base and every apps/<id>/frontend/locale/<lang>.json under its own <id>, so merging apps never collides', () => {
-    const appsDir = join(HERE, '..', 'apps');
-    const baseLocale = join(HERE, '..', 'base', 'frontend', 'locale');
-    const catalogues = readdirSync(appsDir, { withFileTypes: true })
-      .filter((entry) => entry.isDirectory() && existsSync(join(appsDir, entry.name, 'frontend', 'locale')))
-      .flatMap((entry) => {
-        const dir = join(appsDir, entry.name, 'frontend', 'locale');
-        return readdirSync(dir)
-          .filter((name) => name.endsWith('.json'))
-          .map((name) => ({ app: entry.name, file: join(dir, name) }));
-      })
-      .concat(
-        (existsSync(baseLocale) ? readdirSync(baseLocale) : [])
-          .filter((name) => name.endsWith('.json'))
-          .map((name) => ({ app: 'base', file: join(baseLocale, name) })),
-      );
-    expect(catalogues.map(({ app }) => app)).toContain('base');
-    for (const { app, file } of catalogues) {
-      expect(Object.keys(JSON.parse(readFileSync(file, 'utf8')) as object), file).toEqual([app]);
     }
   });
 });

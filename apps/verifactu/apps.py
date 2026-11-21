@@ -4,7 +4,7 @@ fingerprint, with their QR, validated against the AEAT's schemas and sent to the
 
 from django.utils.functional import lazy
 from django.utils.translation import gettext_lazy as _
-from live.meta import Category, LiveAppConfig, Nav, SetupCheck, SetupStep, Widget
+from live.meta import Category, Help, LiveAppConfig, Nav, SetupCheck, SetupStep, Widget
 
 from apps.verifactu import events as E
 
@@ -86,6 +86,7 @@ class VerifactuConfig(LiveAppConfig):
         Nav("config", _("Configuration"), "ion:key-outline", "/verifactu/config"),
         Nav("settings", _("Settings"), "ion:settings-outline", "/verifactu/settings"),
     ]
+    help = Help()
     # The Home's step is done once the chosen way could carry the records to the AEAT's production environment
     # (VERIFACTU-F08), whatever the plan. Its level is base's: functional in testing, which files without it while the
     # till sells; ⛔ legal where the hub files in production, which refuses every sale without it
@@ -158,19 +159,12 @@ class VerifactuConfig(LiveAppConfig):
         ),
     ]
     # The queue's send (VERIFACTU-F20): the phase-2 worker runs it on every hub as the system, every minute
-    # (cron in UTC); each chain waits the TiempoEsperaEnvio the AEAT answered. Every hour, the kept own certificate
-    # is checked against the trusted list it was not checked against yet (VERIFACTU-F02).
+    # (cron in UTC); each chain waits the TiempoEsperaEnvio the AEAT answered.
     scheduled_tasks = [
         {
             "name": "process_queue",
             "operation": "verifactu.contingency.process",
             "cron": "* * * * *",
-            "catch_up": "collapse",
-        },
-        {
-            "name": "recheck_certificate",
-            "operation": "verifactu.certificate.recheck",
-            "cron": "23 * * * *",
             "catch_up": "collapse",
         },
     ]

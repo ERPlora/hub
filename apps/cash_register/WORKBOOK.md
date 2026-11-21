@@ -9,6 +9,12 @@ Estado de la app: completa (2026-10-21)
 
 ## Para qué sirve y para quién
 
+Caja lleva el efectivo del cajón por turnos. Abres el turno con el dinero que hay en el cajón, los cobros de Ventas se
+apuntan solos y, al cerrar, cuentas el cajón: Caja compara lo que debería haber con lo que has contado y guarda la
+diferencia.
+
+### En detalle
+
 Caja controla el **efectivo del cajón por turnos**. Se abre una sesión con el fondo que hay en el
 cajón; durante el turno, los cobros, las anulaciones y las devoluciones de Ventas aparecen solos, y
 las entradas y salidas de efectivo (cambio traído de la caja fuerte, un pago a un proveedor, una
@@ -16,12 +22,14 @@ retirada al banco) se apuntan a mano; se cuenta el cajón por billetes y monedas
 compara lo que debería haber (**esperado**) con lo que se ha contado: la **diferencia** queda guardada
 para siempre. Sirve igual a la peluquería y al restaurante.
 
-Quién la usa:
+### Quién la usa y qué hace cada uno
 
 - El **empleado** que hace de cajero: abre, apunta, cuenta y cierra.
 - El **responsable**: lo mismo y, además, ve el efectivo esperado aunque el arqueo sea ciego.
 - El **propietario** y el **administrador**: todo, y además configuran la caja y dan de alta los
   cajones.
+
+### Lo que no hace
 
 Caja no cobra (es de Ventas), no abre el cajón físico (lo hará Impresión) y no factura.
 
@@ -67,7 +75,18 @@ Configuración inicial, paso a paso:
 
 ## Pantallas
 
+El menú **Caja** tiene dos pestañas: **Caja** y **Ajustes**. Las dos salen a todos; los ajustes solo los cambia quien
+tiene permiso, y los demás los ven bloqueados. Los botones que el perfil no puede usar no salen.
+
 ### Caja
+Aquí abres y cierras los turnos de caja y repasas los anteriores. Arriba ves el efectivo que debería haber ahora en
+el cajón y los últimos descuadres; debajo, la lista de sesiones, de la más reciente a la más antigua. Pulsa **Abrir
+sesión** para empezar el turno con el dinero que hay en el cajón. En la fila de la sesión abierta apuntas un
+**Movimiento** (dinero que entra o sale a mano), haces el **Arqueo** contando billetes y monedas y la cierras con
+**Cerrar** al acabar el turno. Tocar una fila abre el detalle de la sesión, con sus movimientos, sus arqueos y el informe para
+imprimir.
+
+#### Detalle
 Menú **Caja**. Arriba, el título «Caja» y el botón «Abrir sesión» (apagado mientras haya una sesión
 abierta: «Ya hay una sesión de caja abierta. Ciérrala antes de abrir otra.»). Debajo, las cifras de la
 caja: «Sesión actual» y «Descuadres recientes» (CASH_REGISTER-F12; las mismas cifras salen también en
@@ -112,7 +131,7 @@ Encima de la tabla pueden salir dos avisos:
   (CASH_REGISTER-F10). Esa sesión ya no admite movimientos, arqueos ni cierre: en su fila solo queda
   «Detalle».
 
-### Detalle de la sesión
+#### Detalle de la sesión
 Desde **Caja**, «Detalle» o tocar una fila: se abre como página, con su flecha de volver. Título
 «Detalle de la sesión · S-…». Un resumen
 en dos columnas: Estado, Cajón, Abierta (cuándo y quién), Cerrada (cuándo y quién, o «Cerrada sola»),
@@ -128,7 +147,13 @@ movimientos en esta sesión.» y «Sin arqueos en esta sesión.». El botón «I
 papel: «Informe parcial (X)» si la sesión está abierta, «Cierre de caja (Z)» si está cerrada
 (CASH_REGISTER-F16).
 
-### Ajustes de Caja
+### Ajustes
+Aquí decides cómo funciona la caja en todo el negocio: si hace falta un turno abierto para cobrar en efectivo, si se
+exige el fondo al abrir y el recuento al cerrar, si la caja puede quedar en negativo, si quien cuenta ve lo que
+debería haber y si la caja se cierra sola cada día a una hora. Debajo das de alta los cajones, si tienes más de uno
+(por ejemplo, la barra y la terraza). Cambia lo que necesites y pulsa **Guardar**.
+
+#### Detalle
 Menú **Caja → Ajustes**. Una tarjeta «Caja» con «Activar caja», «Exigir fondo de apertura», «Exigir
 recuento al cierre», «Permitir saldo negativo», «Arqueo ciego», «Cierre automático diario» y «Hora del
 cierre automático» (de 00:00 a 23:00, en horas en punto), y «Guardar». Debajo, la tarjeta «Cajones»:
@@ -183,7 +208,7 @@ cierra la ventana sin guardarlo. Con la ventana como se abrió, atrás la cierra
 Estado: hecho
 Vertical: común
 Actor: administrador
-Pantalla: Inicio: Termina de configurar tu negocio; Ajustes de Caja
+Pantalla: Inicio: Termina de configurar tu negocio; Ajustes
 Pasos:
 1. Mientras los ajustes de caja no se han guardado nunca, en el **Inicio** la lista «Termina de
    configurar tu negocio» trae el paso «Tu caja» («Decide cómo se abre y se cierra la caja: el fondo
@@ -193,9 +218,9 @@ Pasos:
    saldo negativo», «Arqueo ciego» y «Cierre automático diario» con su hora.
 3. Pulsa «Guardar». Se guarda lo que cambiaste; lo demás queda como estaba. La primera vez se puede
    guardar sin cambiar nada: el negocio se queda con los de fábrica.
-4. Sale «Ajustes guardados.» y, desde ese momento, el servidor aplica el fondo obligatorio (F03), el
-   recuento obligatorio (F09), el saldo negativo (F05), el arqueo ciego (F07) y el cierre automático
-   (F10), venga la orden de la pantalla, del asistente o de la API. En el Inicio, «Tu caja» sale hecho
+4. Sale «Ajustes guardados.» y, desde ese momento, valen el fondo obligatorio al abrir, el recuento
+   obligatorio al cerrar, el saldo negativo, el arqueo ciego y el cierre automático, venga la orden de la
+   pantalla, del asistente o de la API. En el Inicio, «Tu caja» sale hecho
    sin recargar.
 Entra: las decisiones del administrador.
 Sale: los ajustes de caja del negocio, una sola fila (avisa: `cash_register.settings.updated`, también
@@ -211,7 +236,7 @@ Implicados: CASH_REGISTER-F03, F05, F07, F09, F10
 Estado: hecho
 Vertical: común
 Actor: administrador, asistente
-Pantalla: Ajustes de Caja
+Pantalla: Ajustes
 Pasos:
 1. En **Caja → Ajustes → Cajones**, pulsa «Añadir cajón», escribe su nombre («Barra») y pulsa
    «Guardar»; o pídeselo al asistente («crea un cajón llamado Barra»).
@@ -222,7 +247,7 @@ Sale: el cajón (avisa: `cash_register.register.created` o `cash_register.regist
 nunca se borra: las sesiones lo nombran.
 Si falla: sin nombre, «Escribe el nombre del cajón.»; con un nombre que ya tiene otro cajón (sin
 distinguir mayúsculas), «Ya hay un cajón con ese nombre.». Los dos salen debajo del nombre y se quitan en
-cuanto se escribe en él, sin volver a pulsar «Guardar» (hub#1470).
+cuanto se escribe en él, sin volver a pulsar «Guardar».
 Implicados: CASH_REGISTER-F03
 
 ### CASH_REGISTER-F03 Abrir el turno de caja con el fondo inicial
@@ -235,8 +260,9 @@ Pasos:
 2. Elige el «Cajón» si hay varios (con uno solo se elige solo), escribe el «Fondo de apertura» tal
    como se lee («150,50»; vacío es 0) y, si quieres, «Notas».
 3. Pulsa «Abrir sesión».
-4. Sale «Sesión abierta»; la sesión aparece arriba de la tabla como «Abierta», con su número
-   `S-AAMMDD-NNNN` (correlativo del día de negocio, lo pone el sistema) y «Abrir sesión» se apaga.
+4. Sale «Sesión abierta»; la sesión aparece arriba de la tabla como «Abierta», con su número (por
+   ejemplo, S-261014-0001: el día de negocio y un correlativo, que pone el sistema) y «Abrir sesión» se
+   apaga.
 Entra: cajón, fondo y notas; los ajustes del negocio.
 Sale: la sesión abierta, a nombre de quien la abre (avisa: `cash_register.session.opened`). El fondo
 cuenta para el esperado desde ese momento.
@@ -246,12 +272,12 @@ fondo obligatorio y el fondo vacío o a cero, «Este negocio exige fondo de aper
 con el que empieza la caja.» bajo el campo; un cajón desactivado o que no existe, «Ese cajón no está
 disponible.»; un importe ilegible («Esto no es un importe. Escribe una cifra, por ejemplo 12,50.»),
 negativo («Este importe no puede ser negativo.») o ambiguo («1.250») se dice debajo del campo al salir de él o al
-pulsar «Abrir sesión», y no se envía; «12,555» no es ambiguo: son 12.555,00 €, como en un precio (hub#1160). El aviso que el servidor pone debajo de
-un campo (el fondo obligatorio) se quita en cuanto se cambia ese campo, sin volver a pulsar «Abrir sesión»; el de
-otro campo se queda hasta que se cambia el suyo (hub#1470). «Abrir sesión» está en gris mientras el negocio no
+pulsar «Abrir sesión», y no se envía; «12,555» no es ambiguo: son 12.555,00 €, como en un precio. El aviso que el
+servidor pone debajo de un campo (el fondo obligatorio) se quita en cuanto se cambia ese campo, sin volver a pulsar
+«Abrir sesión»; el de otro campo se queda hasta que se cambia el suyo. «Abrir sesión» está en gris mientras el negocio no
 haya dicho todavía su moneda, porque el fondo se lee en ella (sin ella, «1500» yenes se guardaría como
 150 000). Si la moneda no se puede leer, la ventana lo dice («No se ha podido leer la moneda del negocio», con el
-motivo) y ofrece «Reintentar», que la vuelve a pedir; en cuanto llega, «Abrir sesión» se enciende (hub#938).
+motivo) y ofrece «Reintentar», que la vuelve a pedir; en cuanto llega, «Abrir sesión» se enciende.
 Implicados: CASH_REGISTER-F04, F09
 
 ### CASH_REGISTER-F04 Vender solo con la caja abierta
@@ -291,12 +317,12 @@ Sale: el movimiento, a nombre de quien lo apunta (avisa: `cash_register.movement
 pone el sistema según el tipo.
 Si falla: «Esta salida dejaría la caja en negativo y el saldo negativo no está permitido.» si los
 ajustes no lo permiten; un importe cero («Importe inválido»), ilegible, negativo o ambiguo se dice debajo del campo
-y no se envía (se lee como en F03); el aviso de un campo se quita en cuanto se cambia ese campo, sin volver a
-pulsar «Registrar», y el de otro campo se queda hasta que se cambia el suyo (hub#1470); la sesión
+y no se envía (se lee como el fondo al abrir la sesión); el aviso de un campo se quita en cuanto se cambia ese
+campo, sin volver a pulsar «Registrar», y el de otro campo se queda hasta que se cambia el suyo; la sesión
 cerrada en otro dispositivo: «Esa caja está cerrada: una caja cerrada no acepta movimientos nuevos.».
 «Registrar» está en gris mientras el negocio no haya dicho todavía su moneda, porque el importe se lee
 en ella (sin ella, «1500» yenes se guardaría como 150 000). Si la moneda no se puede leer, la ventana lo dice («No se ha podido leer la moneda del negocio», con el
-motivo) y ofrece «Reintentar», que la vuelve a pedir; en cuanto llega, «Registrar» se enciende (hub#938).
+motivo) y ofrece «Reintentar», que la vuelve a pedir; en cuanto llega, «Registrar» se enciende.
 Un movimiento equivocado no se edita ni se borra: se apunta el contrario con un concepto que diga por
 qué.
 Implicados: ninguno
@@ -313,7 +339,7 @@ Pasos:
    total.
 3. Pulsa «Registrar arqueo».
 4. Sale «Arqueo registrado · total contado …» y el arqueo aparece en el detalle. Si era de «Cierre»,
-   se abre directamente «Cerrar sesión» con «Efectivo contado» ya puesto (F09); el arqueo no cierra
+   se abre directamente «Cerrar sesión» con «Efectivo contado» ya puesto; el arqueo no cierra
    nada por sí solo.
 Entra: las cantidades por billete y moneda, o el total.
 Sale: el arqueo con su desglose (avisa: `cash_register.count.added`). El total lo suma el sistema con
@@ -322,7 +348,7 @@ prevalece sobre el desglose.
 Si falla: una sesión cerrada, «Esa caja está cerrada: una caja cerrada no acepta movimientos
 nuevos.»; un billete o moneda que no es de la moneda del negocio, bajo el desglose; sin desglose ni
 total, «Cuenta el cajón: indica los billetes y monedas o el total.»; un total escrito a mano que no es un importe lo
-dice debajo del campo al salir de él (se lee como en F03) y «Registrar arqueo» sigue en gris.
+dice debajo del campo al salir de él (se lee como el fondo al abrir la sesión) y «Registrar arqueo» sigue en gris.
 Implicados: CASH_REGISTER-F09
 
 ### CASH_REGISTER-F07 Contar a ciegas: quién ve el efectivo esperado
@@ -331,16 +357,15 @@ Vertical: común
 Actor: administrador, responsable, empleado
 Pantalla: Caja, Detalle de la sesión
 Pasos:
-1. El administrador enciende «Arqueo ciego» y guarda (F01).
+1. El administrador enciende «Arqueo ciego» en **Caja → Ajustes** y guarda.
 2. Durante el turno, en la sesión abierta, el empleado ve vacía la columna Esperado; en el detalle ve
    el fondo y «—» en Esperado, Ventas, Devoluciones, Entradas, Salidas e Invitaciones, y en la lista de
    movimientos solo las entradas y salidas apuntadas a mano: ni las ventas, ni las anulaciones, ni las
-   devoluciones, así que no hay con qué sumar el esperado (Square y Lightspeed ocultan igual el esperado
-   en el cierre ciego). El responsable, el propietario y el administrador lo ven todo: la tabla, el
+   devoluciones, así que no hay con qué sumar el esperado. El responsable, el propietario y el administrador lo ven todo: la tabla, el
    detalle, la lista y la ventana de cierre. El asistente tampoco se lo dice a quien no puede verlo: el
-   resumen del cierre (F09) y su confirmación le llegan sin esperado ni diferencia, y el asistente no los
+   resumen del cierre y su confirmación le llegan sin esperado ni diferencia, y el asistente no los
    conoce.
-3. El cajero cuenta (F06) y cierra (F09) sin ver el esperado.
+3. El cajero hace el arqueo y cierra la sesión sin ver el esperado.
 4. Al cerrar aparecen esperado, contado y diferencia para todos.
 Entra: el ajuste «Arqueo ciego» y el permiso de ver el esperado (responsable, propietario y
 administrador).
@@ -363,7 +388,7 @@ Pasos:
    nada.
 3. El primer «Cerrar sesión» no cierra: avisa «El turno se cerrará igualmente. Pulsa otra vez para
    confirmar.» y el botón pasa a «Cerrar de todos modos».
-4. El segundo clic cierra (F09).
+4. El segundo clic cierra la sesión.
 Entra: las cuentas abiertas de Ventas, las comandas en marcha de Cocina y la cola de Impresión. Si Cocina
 o Impresión no están encendidas en el negocio, no tienen nada pendiente.
 Sale: nada; avisa, nunca impide.
@@ -378,23 +403,23 @@ Vertical: común
 Actor: empleado, responsable, administrador, asistente
 Pantalla: Caja
 Pasos:
-1. En la fila de la sesión abierta, pulsa «Cerrar» (o llega desde un arqueo de «Cierre», F06); o
+1. En la fila de la sesión abierta, pulsa «Cerrar» (o llega desde un arqueo de «Cierre»); o
    pídeselo al asistente («cierra la caja con 250 € contados») y sigue en el paso 5.
 2. Escribe o revisa el «Efectivo contado» (viene del último arqueo de cierre de esa sesión; nunca de
    uno de apertura); si puedes ver el esperado, «Esperado en el cajón» y «Diferencia» se ven mientras
    escribes. Añade «Notas de cierre» si quieres.
-3. Pulsa «Cerrar sesión» (dos veces si la revisión del turno avisó, F08).
+3. Pulsa «Cerrar sesión» (dos veces si la revisión del turno avisó de algo pendiente).
 4. Sale «Sesión S-… cerrada · esperado … · contado … · diferencia …»; la fila pasa a «Cerrada» con los
    tres importes fijos para siempre y «Abrir sesión» vuelve a encenderse.
 5. Con el asistente, antes de cerrar nada te enseña el resumen del cierre: el número de la sesión, el
    efectivo contado y, si puedes ver el esperado, el esperado y la diferencia (con el arqueo ciego, a
-   quien no lo ve no se lo dice: el asistente tampoco lo conoce, F07), y lo que la revisión del turno
-   encuentre pendiente (F08).
+   quien no lo ve no se lo dice: el asistente tampoco lo conoce), y lo que la revisión del turno
+   encuentre pendiente.
 6. En esa misma respuesta, sin que tengas que volver a pedírselo, sale «¿Ejecutar esta acción?» con
    «Cerrar en Caja. Revisa cada dato antes de seguir.», la
    sesión por su número (nunca por su código interno) y el efectivo contado y, en «Lo que va a pasar», lo que da el cierre: la «Sesión», el «Cajón»
    (si la sesión tiene uno), el «Esperado en el cajón» y la «Diferencia», con la moneda del negocio (con
-   el arqueo ciego, a quien no ve el esperado no le salen esos dos, F07). Escribe «CONFIRMAR» y pulsa
+   el arqueo ciego, a quien no ve el esperado no le salen esos dos). Escribe «CONFIRMAR» y pulsa
    «Ejecutar». Se cierra esa misma sesión, a tu nombre y con los tres importes, igual que desde la
    pantalla.
 7. Si pulsas «Cancelar», no se cierra nada: la sesión sigue abierta y el asistente lo dice («No se hizo,
@@ -407,10 +432,10 @@ diferencia (contado − esperado: positiva sobra, negativa falta), a nombre de q
 pase después (una anulación de ayer) va al turno abierto, nunca a este.
 Si falla: «Escribe el efectivo contado para cerrar la sesión.» con el campo vacío (la pantalla siempre
 lo pide; el ajuste de recuento obligatorio lo hace cumplir también al asistente y a la API); uno ilegible, negativo
-o ambiguo se dice debajo del campo y no cierra nada (se lee como en F03). «Cerrar sesión» está en gris mientras el negocio no haya dicho todavía su moneda, y el último arqueo de cierre
+o ambiguo se dice debajo del campo y no cierra nada (se lee como el fondo al abrir la sesión). «Cerrar sesión» está en gris mientras el negocio no haya dicho todavía su moneda, y el último arqueo de cierre
 no se escribe en el campo hasta entonces: el contado se escribe y se lee en ella (sin ella, «1500» yenes
 se guardaría como 150 000 y el arqueo de 1500 yenes saldría como «15.00»). Si la moneda no se puede leer, la ventana lo dice («No se ha podido leer la moneda del negocio», con el
-motivo) y ofrece «Reintentar», que la vuelve a pedir; en cuanto llega, «Cerrar sesión» se enciende (hub#938). Si otro
+motivo) y ofrece «Reintentar», que la vuelve a pedir; en cuanto llega, «Cerrar sesión» se enciende. Si otro
 dispositivo la cerró antes, «Esa caja está cerrada: una caja cerrada no acepta movimientos nuevos.»
 (dos cierres a la vez: uno cierra, el otro recibe este aviso). Al asistente, si el recuento es
 obligatorio y no dices cuánto has contado, te lo pide con ese mismo aviso y no sale la confirmación; si
@@ -486,7 +511,7 @@ Entra: la sesión abierta, las sesiones cerradas y la moneda del negocio.
 Sale: nada.
 Si falla: «No se pudieron cargar las cifras de la caja.» con «Reintentar»; en el Inicio, un panel que no
 se puede leer dice «No disponible». Con el arqueo ciego, quien no puede ver el esperado lo ve «—» en
-**Caja** y no tiene el panel del esperado en el Inicio (F07). Sin sesiones cerradas, «Todavía no hay
+**Caja** y no tiene el panel del esperado en el Inicio. Sin sesiones cerradas, «Todavía no hay
 sesiones cerradas.» (en el Inicio, «Sin datos»).
 Implicados: CASH_REGISTER-F07, F09
 
@@ -508,7 +533,7 @@ invitaciones).
 Sale: la línea en la sesión abierta, al momento (la pantalla se refresca sola con el aviso
 `sale.sale.completed`). Una venta de total cero sin invitaciones no deja nada; una toda invitación
 deja una línea de importe cero con su coste.
-Si falla: sin sesión abierta, el cobro no se pierde: sale en F17.
+Si falla: sin sesión abierta, el cobro no se pierde: sale en «Cobros fuera de turno».
 Implicados: SALE-F01, SALE-F02, SALE-F03, SALE-F15
 
 ### CASH_REGISTER-F14 Compensar en la caja una venta anulada
@@ -524,8 +549,8 @@ Pasos:
    mueve. Anulada en el mismo turno, la venta y su anulación se compensan y no cuentan.
 Entra: la venta anulada y cuándo se anuló (`sale.sale.voided`).
 Sale: la línea de anulación. Cada anulación se anota una sola vez.
-Si falla: sin sesión abierta, la anulación sale en F17. Anular no corrige nada fiscal: el tique sigue
-emitido (SALE-F30).
+Si falla: sin sesión abierta, la anulación sale en «Cobros fuera de turno». Anular no corrige nada fiscal: el tique
+sigue emitido.
 Implicados: SALE-F30
 
 ### CASH_REGISTER-F15 Anotar en la caja una devolución
@@ -540,7 +565,7 @@ Pasos:
    el esperado; una en efectivo devuelta a la tarjeta no lo toca.
 Entra: la devolución con sus formas de pago e importes (`sale.sale.refunded`).
 Sale: la línea de devolución. Cada forma de pago de cada devolución se anota una sola vez.
-Si falla: sin sesión abierta, la devolución sale en F17.
+Si falla: sin sesión abierta, la devolución sale en «Cobros fuera de turno».
 Implicados: SALE-F31
 
 ### CASH_REGISTER-F16 Imprimir el informe de la sesión (X o Z)
@@ -580,7 +605,7 @@ Pasos:
 1. En Caja sale «Cobros fuera de turno: N líneas de venta no entraron en ninguna sesión · … en
    efectivo» cuando alguna línea de Ventas no cayó en ningún turno:
    - con la caja cerrada: lo cobrado, anulado o devuelto desde el último turno sin sesión abierta;
-   - con una sesión olvidada pasado su corte (F10): lo de después del corte;
+   - con una sesión olvidada pasado su cierre automático: lo de después de esa hora;
    - con una sesión abierta: las rezagadas del turno anterior, confirmadas mientras se cerraba (su Z
      ya no las recoge).
 2. Pulsa «Ver» para ver la lista (cuándo, tipo, importe, método y documento). Es solo de lectura: un
@@ -861,6 +886,24 @@ Los papeles llegan del SaaS con prefijo (`hub_owner`, `hub_admin`, `hub_manager`
   lectura no se puede hacer (recuento obligatorio sin contado: 409) no sale la tarjeta. Cada dato se
   nombra por el `title` de `ClosingSummaryOut` («Sesión», «Cajón», «Esperado en el cajón»; la diferencia,
   por el `verbose_name` del modelo) y los importes, que dicen «in cents», salen como dinero.
+
+### Lo que la ventana de ayuda no enseña
+
+La ayuda del Hub publica el primer apartado, el resumen de cada pantalla (lo que va antes de su primer `####`) y, de
+cada flujo hecho con pantalla, su título, sus pasos y «Si falla», sin nombres de código, incidencias ni ids de flujo
+(`tests/test_help_workbooks.py`). Lo que esas partes dejaron de decir, y quien mantiene Caja necesita:
+
+- El número de sesión es `S-AAMMDD-NNNN`: el día de negocio en la zona horaria del negocio y un correlativo de ese
+  día.
+- Los importes de la ventana (fondo, movimiento, total contado a mano y efectivo contado) se leen como un precio del
+  resto del Hub (hub#1160): CASH_REGISTER-F03 lo describe y F05, F06 y F09 lo reutilizan.
+- El aviso que el servidor pone bajo un campo se quita al cambiar ese campo, y el de otro campo se queda (hub#1470;
+  CASH_REGISTER-F02, F03 y F05).
+- Sin la moneda del negocio, los botones de abrir, apuntar y cerrar esperan en gris y la ventana ofrece «Reintentar»
+  (hub#938; CASH_REGISTER-F03, F05 y F09).
+- El arqueo ciego oculta el esperado como Square y Lightspeed en su cierre ciego (CASH_REGISTER-F07).
+- Lo que la ayuda llama «Cobros fuera de turno» es CASH_REGISTER-F17, y el tique que sigue emitido tras anular una
+  venta, SALE-F30.
 
 ### Lo que NO hace, a propósito
 

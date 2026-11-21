@@ -9,6 +9,14 @@ Estado de la app: completa (2026-10-21)
 
 ## Para qué sirve y para quién
 
+Tarifas guarda otros precios para tus productos y servicios, y los descuentos automáticos. Una tarifa es un precio
+distinto del de la ficha: para un grupo de clientes, entre unas fechas o a partir de una cantidad. Una regla de
+descuento baja el importe de una línea, como un 10 % o «compra 2 y llévate 1». Con ellas, Tarifas calcula el precio
+que toca: el más bajo, con el mejor descuento. Hoy se lo piden el asistente y la API; el TPV todavía cobra el precio
+de la ficha.
+
+### En detalle
+
 Tarifas guarda **otros precios** para tus artículos y servicios y los **descuentos automáticos**:
 
 - una **tarifa** (lista de precios) es un precio distinto del de la ficha para algunos artículos o
@@ -113,7 +121,12 @@ Tarifas se abre desde el menú **Tarifas** (icono de etiquetas). Lo que una pers
 aparece, y la app lo rechaza aunque lo intente por la API o por el asistente.
 
 ### Tarifas
-Dos tablas, una encima de otra.
+Dos tablas, una encima de otra. Arriba, las **Listas de precios**, con su código, nombre, divisa, grupo de clientes,
+vigencia, cuántos precios tienen y si están activas; debajo, las **Reglas de descuento**, con su tipo, su valor, a qué
+se aplican y su prioridad. Al abrir salen las activas, y el embudo de la barra enseña también las inactivas. **+**
+en cada tabla crea una tarifa o una regla, y pulsar una tarifa abre su detalle con sus precios.
+
+#### Listas de precios
 
 **Listas de precios**: buscador «Buscar código o nombre…», columnas **Código** (con la etiqueta
 **General** si es la tarifa general), **Nombre**, **Divisa**, **Grupo de clientes** («Todos» si es
@@ -132,6 +145,8 @@ texto que contienen), Grupo de clientes, Impuesto y Estado (al abrir, **Activas*
   **Desactivar** (en el menú «⋮»; pide confirmación; no en la general) o **Activar** (en las inactivas). El empleado solo ve
   **Abrir**.
 
+#### Reglas de descuento
+
 **Reglas de descuento**: buscador «Buscar código o nombre…», columnas **Código**, **Nombre**, **Tipo**
 (Porcentaje, Importe por unidad, Compra X, llévate Y, Por tramos), **Valor** («10 %», «0,50 € por
 unidad», «Compra 2, llévate 1», «3+: 10 % · 6+: 15 %»), **Se aplica a** («Todo», «Todos los
@@ -144,7 +159,7 @@ Código, Nombre, Tipo, Se aplica a y Estado (como en las tarifas: **Activas** al
 - Acciones de fila: **Editar** (también pulsando la fila), **Desactivar** (pide confirmación) o
   **Activar** (en las inactivas). El empleado no tiene acciones.
 
-### Tarifa (detalle)
+#### Tarifa (detalle)
 Se abre desde la fila y tiene **Volver**; su título es el nombre de la tarifa. Arriba, la tarifa:
 **Código** con la etiqueta **General**, **Grupo de clientes** («Todos» en la general), **Divisa**,
 **Impuesto**, **Vigencia** y **Estado**, y en la barra **Editar**, **Hacer general** y **Desactivar /
@@ -231,7 +246,7 @@ de serlo en la misma operación: nunca hay dos.
 Si falla: debajo de su campo y sin crear nada: «Ya existe una tarifa con ese código. Elige otro.»
 (también si la que lo tiene está desactivada), una divisa que no existe o que no tiene dos decimales,
 «Hasta» antes que «Desde», un grupo que no existe, «La tarifa general vale para todos: quítale el
-grupo.» o «La tarifa general va en la divisa del negocio ({divisa}), la que cobra la caja.» (el interruptor
+grupo.» o «La tarifa general va en la divisa del negocio (EUR), la que cobra la caja.» (el interruptor
 se apaga solo con un grupo o con otra divisa).
 Implicados: Clientes
 
@@ -240,7 +255,7 @@ Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, responsable, asistente
 Pantalla: Tarifas, Tarifa (detalle)
 Pasos:
-1. **Editar** en la fila o en el detalle: **Editar tarifa — {nombre}** con lo que tiene.
+1. **Editar** en la fila o en el detalle: **Editar tarifa — Socios VIP** con lo que tiene.
 2. Cambia lo que quieras (código, nombre, divisa, impuesto, grupo, fechas) y pulsa **Guardar**.
 Entra: solo lo cambiado. Quitar el grupo deja la tarifa sin grupo.
 Sale: la tarifa y `pricing.price_list.updated` (sin cambios, nada).
@@ -255,15 +270,15 @@ Actor: propietario, administrador, responsable, asistente
 Pantalla: Tarifas, Tarifa (detalle)
 Pasos:
 1. **Hacer general** en una tarifa activa, sin grupo y en la divisa del negocio (en otra no se ofrece).
-2. Confirma «{nombre} pasa a ser la tarifa general: valdrá para todos los clientes y la actual dejará de
+2. Confirma «Socios VIP pasa a ser la tarifa general: valdrá para todos los clientes y la actual dejará de
    serlo.».
 Entra: la tarifa. Por el asistente o la API también se puede **quitar** la marca (ninguna general).
 Sale: la tarifa general nueva y `pricing.price_list.default_changed` (con la anterior). Si dos personas
 eligen a la vez, queda una sola: la última.
 Si falla: «Una tarifa desactivada no puede ser la general.», «La tarifa general vale para todos: quítale
-el grupo.», «La tarifa general va en la divisa del negocio ({divisa})…» y, si otras elecciones ganan la carrera
+el grupo.», «La tarifa general va en la divisa del negocio (EUR)…» y, si otras elecciones ganan la carrera
 tres veces seguidas, «Otra persona está cambiando la tarifa general en este momento. Vuelve a intentarlo
-en un instante.» (409 `pricing.default_busy`, nunca un error del servidor).
+en un instante.», nunca un error del servidor.
 Implicados: ninguno
 
 ### PRICING-F05 Desactivar o reactivar una tarifa
@@ -271,7 +286,7 @@ Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, responsable, asistente
 Pantalla: Tarifas, Tarifa (detalle)
 Pasos:
-1. **Desactivar** y confirma «{nombre} dejará de aplicarse a las ventas nuevas. Sus precios se
+1. **Desactivar** y confirma «Socios VIP dejará de aplicarse a las ventas nuevas. Sus precios se
    guardan.».
 2. Para volver a usarla, filtra por **Inactivas** y pulsa **Activar**.
 Entra: la tarifa.
@@ -324,7 +339,7 @@ Actor: propietario, administrador, responsable, asistente
 Pantalla: Tarifa (detalle)
 Pasos:
 1. **Editar** en la fila: cambia **Precio** o **Desde la cantidad** y **Guardar**.
-2. **Quitar** en la fila y confirma «Se quitará el precio de {artículo} desde {cantidad}. Se cobrará el de
+2. **Quitar** en la fila y confirma «Se quitará el precio de Café molido desde 1 kg. Se cobrará el de
    otra tarifa o el de la ficha.».
 Entra: el precio, por su fila; el asistente, por la tarifa, el artículo y la cantidad mínima (1 si no la
 dice).
@@ -371,13 +386,13 @@ Sale: la regla activa y `pricing.rule.created`.
 Si falla: debajo de su campo: «Ya existe una regla con ese código. Elige otro.», un valor que falta o
 fuera de rango para su tipo, tramos repetidos o desordenados, una categoría, un producto o un servicio
 que no existe, «Hasta» antes que «Desde». El de los tramos, que sale debajo de todos ellos, se quita en
-cuanto se cambia cualquier tramo (se escribe en él, se añade o se quita uno), sin volver a guardar
-(hub#1448). **Crear** (y **Guardar** al editarla, PRICING-F11) está en gris
+cuanto se cambia cualquier tramo (se escribe en él, se añade o se quita uno), sin volver a guardar.
+**Crear** (y **Guardar** al editarla) está en gris
 mientras el negocio no haya dicho todavía su moneda, porque el importe por unidad se lee en ella (sin
 ella, «1500» yenes se guardaría como 150 000); hasta entonces, salir del importe lo deja como se
 escribió, sin inventarle decimales ni juzgarlo: «¥1500» o «12,50 zł» no salen en rojo como «Esto no es un
-importe», y en cuanto llega la moneda se leen en ella (hub#945). Si la moneda no se puede leer, la ventana lo dice («No se ha podido leer la moneda del negocio», con el
-motivo) y ofrece «Reintentar», que la vuelve a pedir; en cuanto llega, **Crear** (o **Guardar**) se enciende (hub#938).
+importe», y en cuanto llega la moneda se leen en ella. Si la moneda no se puede leer, la ventana lo dice («No se ha podido leer la moneda del negocio», con el
+motivo) y ofrece «Reintentar», que la vuelve a pedir; en cuanto llega, **Crear** (o **Guardar**) se enciende.
 Implicados: Inventario, Servicios, Clientes
 
 ### PRICING-F11 Editar una regla
@@ -385,7 +400,7 @@ Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, responsable, asistente
 Pantalla: Tarifas
 Pasos:
-1. **Editar** en la fila: **Editar regla — {nombre}**.
+1. **Editar** en la fila: **Editar regla — Happy hour**.
 2. Cambia lo que quieras y **Guardar**.
 Entra: solo lo cambiado; el asistente nombra la regla por su código o su nombre.
 Sale: la regla y `pricing.rule.updated` (sin cambios, nada).
@@ -397,13 +412,13 @@ Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, responsable, asistente
 Pantalla: Tarifas
 Pasos:
-1. **Desactivar** y confirma «{nombre} dejará de aplicarse a las ventas nuevas.».
+1. **Desactivar** y confirma «Happy hour dejará de aplicarse a las ventas nuevas.».
 2. Para volver a usarla, filtra por **Inactivas** y pulsa **Activar**.
 Entra: la regla.
 Sale: `pricing.rule.deactivated` o `pricing.rule.activated`. Las ventas ya hechas no cambian.
 Si falla: «Esa regla de descuento ya está desactivada.», «Esa regla de descuento ya está activa.» y, si
 Clientes borró su grupo, «El grupo de clientes de esta regla ya no existe: elige otro grupo o quítaselo
-antes de activarla.» (409 `pricing.rule_group_deleted`): sin grupo valdría para todos.
+antes de activarla.»: sin grupo valdría para todos.
 Implicados: Clientes
 
 ### PRICING-F13 Consultar el precio de una línea
@@ -712,7 +727,7 @@ Ventas **no** requiere Tarifas y Tarifas no toca Ventas. Lo que se pide a Ventas
   servicio o de un producto no borrado, como `live_items`) y `queries.prices_not_in_business` deja los que el negocio no
   tiene ni por id ni por sitio (tarifa, producto o servicio y `min_quantity`, el índice único); la plataforma los crea
   con `pricing.price_item.add` como la recuperación (`copy_recovery:<id>`). Cada precio va al artículo que hace del de
-  la copia: el producto por `inventory.queries.products_standing_for` (su SKU) y el servicio por
+  la copia: el producto por `inventory.queries.recovery.products_standing_for` (su SKU) y el servicio por
   `service.service.standing_for`, la operación de Servicios (no es requisito), preguntada como la plataforma en el
   negocio en curso (`base.operations.current_business_scope`); con Servicios apagada o ausente, el de la copia, que el
   alta rechaza con su motivo (hub#1459). Las reglas no van por la copia: el borrado

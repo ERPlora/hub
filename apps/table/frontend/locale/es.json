@@ -65,6 +65,8 @@
       },
       "zones": "Zonas",
       "paxOf": "{guests}/{capacity} pax",
+      "bill": "Cuenta {amount}",
+      "billRequested": "Cuenta pedida",
       "planLabel": "Plano de mesas. Usa las flechas para desplazarlo.",
       "add": "Añadir zona o mesa",
       "editZone": "Editar zona",

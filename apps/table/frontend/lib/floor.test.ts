@@ -29,6 +29,8 @@ function table(overrides: Partial<TableOut> = {}): TableOut {
     waiter_name: '',
     checks: [],
     hold: null,
+    amount: null,
+    bill_requested: false,
     ...overrides,
   };
 }

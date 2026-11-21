@@ -344,7 +344,7 @@ def _complete(ctx: OperationContext, data: CompleteIn, *, over_limit: bool) -> d
     with translation.override(ctx.language):
         detail = sale_detail(sale)
     # Its receipt (and the drawer's order) to the printing queue, inside this very charge (PRINTING-F07, F13).
-    printed = _print_sale(ctx, sale, SaleOut.model_validate(detail), duplicate=False, key=f"sale-{sale.id}-receipt", at_checkout=True)
+    printed = _print_sale(ctx, SaleOut.model_validate(detail), duplicate=False, key=f"sale-{sale.id}-receipt", at_checkout=True)
     return {**detail, "printed": printed}
 
 

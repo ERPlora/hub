@@ -10,8 +10,15 @@ Lo que no entra todavía: ver «Lo que queda fuera».
 
 ## Para qué sirve y para quién
 
-Inventario es el catálogo de lo que se vende con existencias: cada producto con su nombre, su SKU,
-su precio, su coste, su categoría fiscal, su unidad de medida y cuántas unidades quedan.
+Inventario es el catálogo de lo que vendes con existencias: cada producto con su precio, su coste, su
+categoría fiscal, su unidad de medida y cuántas unidades quedan. En el restaurante es la carta que
+enseña el TPV; en la peluquería, los productos de venta. El stock baja solo al cobrar en Ventas, y cada
+entrada o salida deja un movimiento que no se edita ni se borra.
+
+### En detalle
+
+Cada producto lleva su nombre, su SKU, su precio, su coste, su categoría fiscal, su unidad de medida y
+cuántas unidades quedan.
 
 - En el **restaurante** es **la carta**: los platos y las bebidas que el TPV enseña agrupados por
   categoría y que Cocina envía a su estación.
@@ -102,12 +109,18 @@ Configuración inicial, paso a paso:
 
 ## Pantallas
 
-Inventario se abre desde el menú **Inventario** y tiene cinco pestañas: **Panel**, **Productos**,
-**Movimientos**, **Categorías** y **Ajustes**. Todas se ven con solo poder ver productos, salvo
-Ajustes (abajo); lo que una persona no puede hacer no aparece en pantalla, y además la app lo
-rechaza aunque alguien lo intente por otra puerta (el asistente o la API).
+Inventario tiene cinco pestañas, en la barra de abajo: **Panel**, **Productos**, **Movimientos**,
+**Categorías** y **Ajustes**. El lanzador de apps y «Mis apps» abren el Panel. Todas se ven con solo poder ver productos, salvo Ajustes (abajo); lo que una persona no puede hacer no
+aparece en pantalla, y además la app lo rechaza aunque alguien lo intente por otra puerta (el asistente
+o la API).
 
 ### Panel
+Las cifras del stock de un vistazo: «Productos seguidos» (los que llevan control de stock), «En stock»,
+«Agotados», «Stock bajo» y «Valor de existencias», a coste. Toca una de las cuatro primeras para ir a
+Productos. Debajo, la tabla «Productos con stock bajo», del que menos tiene al que más, con el umbral de
+cada uno. Se pone al día sola con cada venta y cada movimiento.
+
+#### Detalle
 Cifras de arriba: «Productos seguidos», «En stock», «Agotados», «Stock bajo» y «Valor de
 existencias» («a coste»). Las cuatro primeras llevan a Productos. Si hay artículos con control de
 stock sin coste, la nota «N producto(s) sin coste registrado: el valor mostrado es parcial».
@@ -116,6 +129,13 @@ Vacía: «Sin productos en stock bajo.». Cargando: «Cargando…». Error: «No
 métricas del inventario.» y el aviso de la tabla con «Reintentar».
 
 ### Productos
+Tu catálogo: cada producto con su foto, su nombre, su SKU, su precio, su stock y si está a la venta.
+Búscalo por nombre o SKU y fíltralo por precio, stock o estado. Con **+** das de alta un producto y con
+«Editar» lo cambias; desde cada fila recibes mercancía, cuentas el stock, das de baja lo que se rompe o
+se pierde, lo marcas agotado o lo eliminas. Tocar la fila abre su ficha, con el código de barras para
+imprimir su etiqueta. Los botones de la tabla importan y exportan el catálogo en un fichero CSV.
+
+#### Detalle
 Tabla con Nombre, SKU, Precio, Stock («—» en un artículo sin control de stock) y Estado: un
 interruptor activo/inactivo, «Sí»/«No» para quien no puede cambiar productos, o la marca «Sin
 configurar · Falta la categoría fiscal», entera mientras la fila tiene sitio (también a 1280 px con el
@@ -153,29 +173,29 @@ otra palabra o sube una foto.» si no encuentra nada y «No se pudo cargar la li
 Vacía: «Sin productos». Cargando: «Cargando…». Error: el aviso de la tabla con «Reintentar». Un
 rechazo del formulario sale dentro del panel; el de una acción de fila, encima de la tabla.
 
-### Ficha del producto
+#### Ficha del producto
 Ventana con el nombre del producto: SKU, Precio, Stock y Estado («Sí · Agotado» si está agotado); el
 código de barras del SKU en una placa blanca con el SKU debajo; «Imprimir código de barras» y, con
 permiso de stock y en un producto físico, «Recibir stock» y «Contar stock», y «Dar de baja stock» si
 el artículo controla su stock; con permiso para cambiar productos, «Marcar agotado» o «Volver a poner
 a la venta». Un fallo al imprimir o al marcar sale dentro de la ventana.
 
-### Recepción
+#### Recepción
 Ventana «Recepción — <producto>»: «Stock actual», «Cantidad recibida», «Coste unitario (<moneda>)» y
 «Registrar recepción». Un rechazo sale dentro de la ventana.
 
-### Recuento
+#### Recuento
 Ventana «Recuento — <producto>»: «Stock actual», «Diferencia» (en cuanto hay cifra), «Stock
 contado», «Motivo (obligatorio)» y «Aplicar recuento», con la nota de lo que falta («Escribe el
 stock contado para continuar.» / «Hace falta un motivo para aplicar el recuento.»). Un rechazo
 sale dentro de la ventana.
 
-### Baja
+#### Baja
 Ventana «Baja — <producto>»: «Stock actual», «Cantidad que se da de baja», «Motivo: merma, rotura,
 consumo propio… (obligatorio)» y «Dar de baja», con la nota de lo que falta. Un rechazo sale dentro
 de la ventana.
 
-### Importar productos
+#### Importar productos
 Tres ventanas seguidas:
 
 1. «Revisa la importación»: un desplegable por columna del fichero («No importar» o el campo;
@@ -190,6 +210,12 @@ Tres ventanas seguidas:
    línea por fila fallida («Línea N · SKU — motivo») y «Copiar informe».
 
 ### Movimientos
+El historial de cada entrada y salida de stock, la más reciente primero: la fecha, el producto, el tipo
+(una recepción, una venta, un recuento, una baja…), la cantidad con su signo, el saldo que quedó, el
+motivo y la referencia, que en una venta es el número de su tique o de su factura. Es solo de lectura:
+un movimiento no se edita ni se borra. Busca por producto, SKU o número de tique y filtra por tipo.
+
+#### Detalle
 Tabla de solo lectura: Fecha, Nombre, SKU, Tipo («Inicial», «Recepción», «Venta», «Anulación»,
 «Recuento», «Descuento», «Devolución»), Cantidad (con signo), Saldo, Motivo y Referencia (en una venta, el número
 de su tique, su factura o la propia venta). Buscador por producto, SKU, referencia o número de
@@ -201,6 +227,12 @@ filtros. Una venta se encuentra por el número de su tique, factura o venta.». 
 tabla con «Reintentar».
 
 ### Categorías
+Las categorías que agrupan los productos en el TPV, cada una con cuántos productos activos tiene (los
+agotados también cuentan). Con **+** creas una, tocando la fila la editas y «Eliminar» la borra sin
+borrar sus productos: solo dejan de estar en ella. Los botones de la tabla importan y exportan las
+categorías en un fichero CSV.
+
+#### Detalle
 Tabla con Nombre, Slug y Productos (cuántos activos tiene, agotados incluidos: la misma cifra que la
 tira de categorías del TPV, que también los enseña); buscador «Buscar categoría…»; 25 por página; importar y
 exportar CSV. El **+** y la fila (o «Editar») abren el panel: Nombre, «Slug
@@ -209,6 +241,12 @@ edición» y «Guardar» / «Guardar cambios». «Eliminar» abre «Eliminar cat
 pasar y «Eliminar y desvincular» / «Cancelar». Vacía: «Sin categorías.». Cargando: «Cargando…».
 
 ### Ajustes
+Cómo lleva el stock tu negocio: «Controlar stock», si los artículos llevan su stock salvo los que decidan
+otra cosa; «Permitir vender sin stock», si una venta puede dejar el stock en negativo; y el «Umbral de
+stock bajo» que toma un producto creado sin el suyo. Solo la ve quien puede gestionar los ajustes del
+inventario: de fábrica, el administrador y el responsable.
+
+#### Detalle
 Cabecera «Inventario» con «Permitir vender sin stock», «Umbral de stock bajo» (con su explicación)
 y «Controlar stock», y «Guardar». La ve y la guarda quien puede gestionar los ajustes del
 inventario: de fábrica, el administrador y el responsable. Al empleado y al cajero no se les enseña
@@ -291,13 +329,13 @@ Pasos:
    se abre ya has entrado en otro campo, el cursor se queda donde estás y lo que escribes va ahí.
 2. Escribe Nombre, SKU y Precio. El precio admite «2,20», «1.234,56» o lo que se pegue de la
    pantalla; al salir del campo se reescribe en el formato del negocio. Son opcionales «Coste
-   (<moneda>)» (la del negocio: «Coste (PLN)» en Polonia), «Stock inicial», «Umbral stock bajo» (vacío = 10), «EAN-13» y «Descripción».
+   (EUR)» (en la moneda del negocio: «Coste (PLN)» en Polonia), «Stock inicial», «Umbral stock bajo» (vacío = 10), «EAN-13» y «Descripción».
 3. Elige «Tipo» («Físico» o «Servicio»), la «Unidad de medida» («Unidad (ud)» de entrada) y la
    «Categoría fiscal». Cada categoría fiscal dice su tipo («Producto — general · 21 %», «… ·
    exento») y no hay ninguna elegida de antemano.
 4. En un producto físico, la casilla «Controlar stock de este artículo» sale marcada o no según el
    ajuste del negocio, con la nota «Sigue el ajuste del hub». Tocarla fija la decisión para este
-   artículo (INVENTORY-F20).
+   artículo.
 5. Si hay categorías, busca en «Categorías» las que agrupan el producto en el TPV y elígelas una a
    una: cada una sale debajo del campo, con su botón para quitarla.
 6. Pulsa «Guardar» («Guardando…»). El panel se cierra y el producto sale en la tabla con Estado
@@ -306,8 +344,7 @@ Pasos:
    tocar fuera del panel, ni en la aplicación de Android el botón atrás del móvil, lo cierran: preguntan
    «¿Descartar los cambios?» («Lo que has escrito en esta ventana no se ha guardado.»). «Seguir editando»,
    o atrás otra vez, deja el panel con lo escrito; «Descartar cambios» lo cierra sin guardar nada y sin
-   volver a preguntar. Con el panel como se abrió, cualquiera de ellos lo cierra sin preguntar (hub#1015,
-   hub#1023).
+   volver a preguntar. Con el panel como se abrió, cualquiera de ellos lo cierra sin preguntar.
 Entra: las categorías fiscales y su tipo, de Impuestos; las unidades de medida y las categorías de
 producto, de Inventario.
 Sale: el producto, activo y enlazado a las categorías marcadas, en un solo paso: o se guarda
@@ -318,8 +355,8 @@ se puede dar de alta ya desactivado, fuera del TPV hasta que se active (INVENTOR
 que estaba desactivado al recuperarse desde una copia aparte (BASE-F114).
 Si falla: «Guardar» está apagado mientras falten Nombre, SKU o categoría fiscal, y mientras el negocio no
 haya dicho todavía su moneda: el precio y el coste se leen en ella, y sin ella «1500» yenes se guardaría
-como 150 000; hasta entonces, salir del precio o del coste lo deja como se escribió, sin inventarle decimales ni juzgarlo: «¥1500» o «12,50 zł» no salen en rojo como «Esto no es un importe», y en cuanto llega la moneda se leen en ella (hub#945). Si la moneda no se puede leer, la ventana lo dice («No se ha podido leer la moneda del negocio», con el
-motivo) y ofrece «Reintentar», que la vuelve a pedir; en cuanto llega, «Guardar» se enciende (hub#938). Sin categorías
+como 150 000; hasta entonces, salir del precio o del coste lo deja como se escribió, sin inventarle decimales ni juzgarlo: «¥1500» o «12,50 zł» no salen en rojo como «Esto no es un importe», y en cuanto llega la moneda se leen en ella. Si la moneda no se puede leer, la ventana lo dice («No se ha podido leer la moneda del negocio», con el
+motivo) y ofrece «Reintentar», que la vuelve a pedir; en cuanto llega, «Guardar» se enciende. Sin categorías
 fiscales sale «Todavía no hay categorías fiscales. Créalas en Impuestos: un producto no se puede
 vender sin saber cómo tributa.». Un importe ilegible: «Esto no es un importe. Escribe una cifra,
 por ejemplo 12,50.» o «Este importe se puede leer de dos maneras…»; uno negativo: «Este importe no puede ser
@@ -338,12 +375,12 @@ Actor: administrador, responsable
 Pantalla: Productos
 Pasos:
 1. En **Productos**, pulsa «Editar» en la fila (o toca la marca «Sin configurar»): se abre el panel
-   «Editando producto — <nombre>» con los datos actuales.
+   «Editando producto — Café con leche» con los datos actuales.
 2. Cambia lo que haga falta. El SKU está bloqueado («El SKU es la identidad del producto: no se
-   edita»). El stock no se edita aquí: se recibe (INVENTORY-F13) o se cuenta (INVENTORY-F14). El
-   «Tipo» y el «Stock inicial» no salen.
+   edita»). El stock no se edita aquí: se recibe con «Recibir stock» o se cuenta con «Contar stock».
+   El «Tipo» y el «Stock inicial» no salen.
 3. Pulsa «Guardar cambios». Con un cambio sin guardar, «Cancelar edición», la «×», Escape, tocar fuera del panel
-   y, en la aplicación de Android, el botón atrás preguntan antes, como en el alta (INVENTORY-F01, paso 7), y
+   y, en la aplicación de Android, el botón atrás preguntan antes, como en el alta, y
    «Descartar cambios» lo deja como estaba; sin cambios, cierran el panel.
 4. La fila enseña los datos nuevos.
 Entra: el producto tal como está guardado; las categorías fiscales, de Impuestos; las unidades y
@@ -351,7 +388,7 @@ las categorías de producto.
 Sale: el producto cambiado, con sus categorías, en un solo paso. Inventario avisa del cambio y de
 cada categoría añadida o quitada. El precio nuevo vale para lo que se añada a una cuenta desde
 ahora: una cuenta abierta conserva el precio de cuando se pidió (lo decide Ventas).
-Si falla: los mismos rechazos que el alta (INVENTORY-F01), dentro del panel, y no se guarda nada.
+Si falla: los mismos rechazos que el alta, dentro del panel, y no se guarda nada.
 La categoría fiscal no se puede vaciar: el campo no tiene opción vacía. La unidad de un producto con stock no se cambia: «No se puede cambiar la unidad de
 un producto con stock. Cuenta su stock a cero y cámbiala después.».
 Implicados: SALE-F01, TAX-F01, TAX-F19, BASE-F05
@@ -363,7 +400,7 @@ Pantalla: Productos
 Pasos:
 1. En **Productos**, toca el interruptor de la columna Estado de la fila.
 2. Apagado, el producto pasa a «No»; encendido, a «Sí». Un producto «Sin configurar» no tiene
-   interruptor hasta que tenga categoría fiscal (INVENTORY-F05).
+   interruptor hasta que tenga categoría fiscal.
 Entra: el producto.
 Sale: el producto activo o inactivo; Inventario avisa del cambio. Inactivo, deja de salir en el TPV
 y en el catálogo de venta, en las cifras del Panel, en la lista de stock bajo y en el número de
@@ -378,8 +415,8 @@ Actor: administrador, responsable
 Pantalla: Productos
 Pasos:
 1. En **Productos**, pulsa «Eliminar» en la fila.
-2. La ventana «Eliminar producto» dice «<nombre> (<SKU>) — se eliminará del catálogo (borrado
-   lógico; sus movimientos de stock se conservan)».
+2. La ventana «Eliminar producto» dice, por ejemplo, «Café con leche (CAF-01) — se eliminará del
+   catálogo (borrado lógico; sus movimientos de stock se conservan)».
 3. Pulsa «Eliminar» (o «Cancelar»). La fila desaparece.
 Entra: el producto elegido.
 Sale: el producto queda eliminado e inactivo, fuera de todas las listas y del TPV. Su SKU y su
@@ -395,9 +432,9 @@ Estado: hecho
 Actor: administrador, responsable
 Pantalla: Productos
 Pasos:
-1. En el TPV, el aviso «N artículos no se pueden vender: les falta configurar el IVA.» trae
+1. En el TPV, el aviso «3 artículos no se pueden vender: les falta configurar el IVA.» trae
    «Revisar el catálogo» (solo para quien puede cambiar productos): abre **Productos** filtrado
-   por «Sin configurar». También se llega filtrando Estado → «Sin configurar».
+   por «Sin configurar». También se llega filtrando Estado por «Sin configurar».
 2. Cada fila lleva la marca «Sin configurar · Falta la categoría fiscal»: tocarla abre el
    formulario de edición. Se lee al menos hasta «Sin configurar» también en la tableta, junto a un
    nombre largo: mientras alguna fila lleva la marca, su columna no baja de su suelo y las acciones
@@ -406,7 +443,7 @@ Pasos:
 Entra: los productos cuya categoría fiscal ya no está en Impuestos. No se les inventa ninguna.
 Sale: el producto con su categoría fiscal; Inventario avisa del cambio y el TPV deja de marcarlo
 «Falta el IVA».
-Si falla: los rechazos del formulario (INVENTORY-F02).
+Si falla: los rechazos del formulario de edición del producto.
 Implicados: SALE-F01, TAX-F01
 
 ### INVENTORY-F06 Crear y editar una categoría
@@ -415,7 +452,7 @@ Actor: administrador, responsable
 Pantalla: Categorías
 Pasos:
 1. En **Categorías**, pulsa **+** (o toca una fila para editarla: «Editando categoría —
-   <nombre>»).
+   Bebidas»).
 2. Escribe el Nombre. Si dejas vacío «Slug (opcional)», se rellena solo con el nombre en
    minúsculas y con guiones. Al editar, dejarlo vacío conserva el que tenía; por el asistente o la
    API, un slug vacío se rehace con el nombre (nunca queda una categoría sin slug). Elige, si
@@ -436,9 +473,9 @@ Actor: administrador, responsable
 Pantalla: Categorías
 Pasos:
 1. En **Categorías**, pulsa «Eliminar» en la fila.
-2. La ventana «Eliminar categoría» dice «<nombre> — N productos quedarán sin esta categoría (se
-   desvinculan; los productos no se borran)»; con uno, «<nombre> — 1 producto quedará sin esta
-   categoría (se desvincula; el producto no se borra)». N cuenta los productos activos.
+2. La ventana «Eliminar categoría» dice, por ejemplo, «Bebidas — 12 productos quedarán sin esta
+   categoría (se desvinculan; los productos no se borran)»; con uno, «Postres — 1 producto quedará sin
+   esta categoría (se desvincula; el producto no se borra)». La cifra cuenta los productos activos.
 3. Pulsa «Eliminar y desvincular» (o «Cancelar»).
 Entra: la categoría elegida.
 Sale: la categoría queda eliminada y todos sus productos, activos o no, desvinculados en el mismo
@@ -463,7 +500,7 @@ Estado: hecho
 Actor: administrador, responsable
 Pantalla: Productos
 Pasos:
-1. Crea antes la categoría (INVENTORY-F06).
+1. Crea antes la categoría en **Categorías**.
 2. En el formulario del producto (alta o edición), busca en «Categorías» y elige una o varias: cada
    una sale debajo del campo, con su botón para quitarla, y ya no se ofrece de nuevo. El campo solo
    sale si hay alguna categoría.
@@ -490,15 +527,15 @@ Pasos:
    inglés y con o sin tildes («Nombre», «Código», «Precio», «IVA»…). Cámbialo o pon «No importar».
    Se pueden importar Nombre, SKU, Precio, Coste, Stock, Umbral, EAN-13, Descripción, Alérgenos,
    Unidad y Categoría fiscal; Nombre y SKU son obligatorias.
-3. Mira las «Primeras {n} filas de {total}» y el ensayo de todo el fichero: «{ready} filas listas
-   · {failed} con problemas» («1 fila lista» con una), con la línea y el motivo de las diez primeras.
-4. Pulsa «Importar {n} productos» («Importar 1 producto» con uno; o «Cancelar», que no deja rastro).
+3. Mira las primeras filas («Primeras 5 filas de 120») y el ensayo de todo el fichero: «118 filas
+   listas · 2 con problemas» («1 fila lista» con una), con la línea y el motivo de las diez primeras.
+4. Pulsa «Importar 118 productos» («Importar 1 producto» con uno; o «Cancelar», que no deja rastro).
 5. Si algún texto fiscal no se reconoce, o hay filas sin columna fiscal («Filas sin categoría
    fiscal»), sale «Categorías fiscales del CSV». Para cada uno: «Elegir» una categoría, «Crear» una
    (Clave y Nombre) u «Omitir». Pulsa «Confirmar e importar». Lo que se elige para un texto se guarda
    en Impuestos y la próxima importación ya lo reconoce; lo de «Filas sin categoría fiscal» no se
    guarda y se pregunta cada vez.
-6. Mientras crea, encima de la tabla se lee «Importando {done}/{total}…» con «Parar».
+6. Mientras crea, encima de la tabla se lee cuántos lleva («Importando 40/118…») con «Parar».
 7. Al acabar, «Resultado de la importación»: «Filas», «Creadas», «Omitidas (ya existían)»,
    «Fallidas», una línea por fallo y «Copiar informe».
 Entra: el fichero; las categorías fiscales, sus nombres (también los traducidos) y los textos
@@ -536,19 +573,19 @@ Entra: el fichero; las categorías fiscales y los textos aprendidos, de Impuesto
 Sale: las categorías creadas. Una fila con el nombre de una categoría que ya existe se omite, así
 que repetir el fichero no duplica nada.
 Si falla: cada fila que no entra sale en el informe con su motivo: «Falta el nombre» o «Categoría
-fiscal no reconocida: <texto>».
+fiscal no reconocida:» seguido del texto del fichero.
 Implicados: TAX-F15
 
 ### INVENTORY-F11 Exportar el catálogo a CSV
 Estado: hecho
 Actor: administrador, responsable
-Pantalla: Productos
+Pantalla: Productos, Categorías
 Pasos:
 1. En **Productos** (con la búsqueda y los filtros que quieras), pulsa el botón de exportar CSV de
    la tabla.
-2. Se descarga `inventario-productos.csv` con **todos** los productos que cumplen la búsqueda y los
+2. Se descarga «inventario-productos.csv» con **todos** los productos que cumplen la búsqueda y los
    filtros, no solo la página que se ve.
-3. En **Categorías**, el mismo botón descarga `inventario-categorias.csv` (Nombre, Slug y número de
+3. En **Categorías**, el mismo botón descarga «inventario-categorias.csv» (Nombre, Slug y número de
    productos).
 Entra: los productos o las categorías que cumplen la búsqueda y los filtros.
 Sale: el fichero, con las mismas cabeceras que reconoce la importación (Nombre, SKU, Precio, Coste,
@@ -597,8 +634,8 @@ Actor: administrador, responsable
 Pantalla: Recepción
 Pasos:
 1. En **Productos**, pulsa «Recibir stock» en la fila o en la ficha del producto.
-2. En «Recepción — <producto>» se ve el «Stock actual». Escribe la «Cantidad recibida» y, si
-   quieres, el «Coste unitario (<moneda>)».
+2. En la ventana de la recepción («Recepción — Agua mineral») se ve el «Stock actual». Escribe la
+   «Cantidad recibida» y, si quieres, el «Coste unitario (EUR)», en la moneda del negocio.
 3. Pulsa «Registrar recepción». La ventana se cierra y la fila enseña el stock nuevo.
 4. En **Movimientos** sale una línea «Recepción» con la cantidad en positivo y el saldo.
 Entra: el producto y el escalón de su unidad. Por el asistente o la API, una recepción puede llevar
@@ -609,9 +646,9 @@ lleve control de stock. Si un artículo con control sube por encima de su umbral
 (INVENTORY-F18). Inventario avisa de que el stock cambió.
 Si falla: «Registrar recepción» está apagado sin cantidad, y mientras el negocio no haya dicho todavía su
 moneda: el coste se lee en ella, y sin ella «1500» yenes se guardaría como 150 000; hasta entonces, salir del
-coste lo deja como se escribió, sin inventarle decimales ni juzgarlo: «¥1500» o «12,50 zł» no salen en rojo como «Esto no es un importe», y en cuanto llega la moneda se leen en ella (hub#945). Si la moneda no se
+coste lo deja como se escribió, sin inventarle decimales ni juzgarlo: «¥1500» o «12,50 zł» no salen en rojo como «Esto no es un importe», y en cuanto llega la moneda se leen en ella. Si la moneda no se
 puede leer, la ventana lo dice («No se ha podido leer la moneda del negocio», con el motivo) y ofrece
-«Reintentar», que la vuelve a pedir; en cuanto llega, «Registrar recepción» se enciende (hub#946). El
+«Reintentar», que la vuelve a pedir; en cuanto llega, «Registrar recepción» se enciende. El
 recuento y la baja no leen importes: no la esperan. «La cantidad no respeta el incremento
 permitido para esta unidad», un coste ilegible («Esto no es un importe…») o el motivo de
 cualquier otro rechazo salen dentro de la ventana. Un servicio no se recibe: no tiene el botón, y por el
@@ -626,8 +663,8 @@ Actor: administrador, responsable
 Pantalla: Recuento
 Pasos:
 1. En **Productos**, pulsa «Contar stock» en la fila o en la ficha.
-2. En «Recuento — <producto>», escribe en «Stock contado» lo que hay de verdad (el total, no la
-   diferencia): si el sistema dice 5 y cuentas 7, escribe 7. Aparece «Diferencia» (+2).
+2. En la ventana del recuento («Recuento — Agua mineral»), escribe en «Stock contado» lo que hay de
+   verdad (el total, no la diferencia): si el sistema dice 5 y cuentas 7, escribe 7. Aparece «Diferencia» (+2).
 3. Escribe el «Motivo (obligatorio)».
 4. Pulsa «Aplicar recuento». La fila enseña el saldo contado; en **Movimientos** sale «Recuento» con
    la diferencia y el motivo.
@@ -647,11 +684,11 @@ Implicados: ninguno
 ### INVENTORY-F15 Dar de baja stock sin venta (merma, rotura, consumo propio)
 Estado: hecho
 Actor: administrador, responsable (pantalla); asistente
-Pantalla: ficha y tabla de Productos (ventana «Baja»); asistente
+Pantalla: Productos (ventana «Baja», desde la fila o la ficha); asistente
 Pasos:
 1. En **Productos**, pulsa «Dar de baja stock» en la fila (menú ⋮) o en la ficha del producto: solo
    sale en productos físicos con control de stock y con permiso de mover stock.
-2. En «Baja — <producto>» escribe la cantidad y el motivo (merma, rotura, consumo propio…) y pulsa
+2. En la ventana de la baja («Baja — Vino tinto») escribe la cantidad y el motivo (merma, rotura, consumo propio…) y pulsa
    «Dar de baja». Por el asistente: «da de baja 2 botellas de vino tinto por rotura»; enseña la
    tarjeta de confirmación con el producto, la cantidad y el motivo.
 3. En **Movimientos** sale «Descuento» con la cantidad en negativo y el motivo.
@@ -663,8 +700,8 @@ Si falla: si no hay bastante y «Permitir vender sin stock» está apagado, «No
 para completar la operación.». Un producto que no existe: «Este producto no existe en este hub.».
 Una cantidad fuera del escalón: «La cantidad no respeta el incremento permitido para esta
 unidad: usa múltiplos de …» (no se redondea). Un servicio se rechaza con «Un servicio no lleva stock.», y un artículo sin control de
-stock con «Este artículo no controla su stock: no hay nada que dar de baja.» (409
-`inventory.stock_not_tracked`): ni éxito en silencio ni movimiento. Todo sale dentro de la ventana.
+stock con «Este artículo no controla su stock: no hay nada que dar de baja.»: ni éxito en silencio ni
+movimiento. Todo sale dentro de la ventana.
 Implicados: ninguno
 
 ### INVENTORY-F16 Consultar el historial de movimientos
@@ -672,7 +709,7 @@ Estado: hecho
 Actor: administrador, responsable, empleado, cajero
 Pantalla: Movimientos
 Pasos:
-1. Abre **Inventario → Movimientos**: los más recientes primero.
+1. Abre la pestaña **Movimientos** de Inventario: los más recientes primero.
 2. Busca por producto, SKU o referencia, o escribe el número de un tique, una factura o una venta:
    salen esa venta y, si se anuló, su anulación.
 3. Filtra por Tipo o por Referencia; ordena por Fecha, Cantidad o Saldo.
@@ -693,7 +730,7 @@ Estado: hecho
 Actor: administrador, responsable, empleado, cajero
 Pantalla: Panel
 Pasos:
-1. Abre **Inventario → Panel**: «Productos seguidos», «En stock», «Agotados» (saldo 0 o menos),
+1. Abre la pestaña **Panel** de Inventario: «Productos seguidos», «En stock», «Agotados» (saldo 0 o menos),
    «Stock bajo» (saldo igual o menor que su umbral) y «Valor de existencias» a coste. Tocar una de
    las cuatro primeras lleva a **Productos**.
 2. Debajo, «Productos con stock bajo», del que menos tiene al que más, con su umbral.
@@ -739,10 +776,10 @@ Estado: hecho
 Actor: administrador, responsable
 Pantalla: Ajustes
 Pasos:
-1. Abre **Inventario → Ajustes**. La ven y la guardan el administrador y el responsable, igual
+1. Abre la pestaña **Ajustes** de Inventario. La ven y la guardan el administrador y el responsable, igual
    desde la pestaña que por el asistente.
 2. «Controlar stock» (de fábrica, encendido): es lo que hacen los artículos que no han decidido por
-   sí mismos (INVENTORY-F20).
+   sí mismos en su ficha.
 3. «Permitir vender sin stock» (de fábrica, apagado): encendido, una venta baja el stock aunque
    quede en negativo; apagado, si una venta pide más de lo que queda, ese artículo no baja nada (la
    venta se cobra igual) y una baja sin venta se rechaza.
@@ -751,7 +788,7 @@ Pasos:
    mandan uno). Cambiarlo no toca los productos que ya existen.
 5. Pulsa «Guardar» (apagado hasta que cambias algo): se envía solo lo que cambiaste y sale «Ajustes
    guardados.» encima del botón.
-   Lo que se cambia mientras se está guardando no se pierde: se queda en pantalla, por guardar (hub#914).
+   Lo que se cambia mientras se está guardando no se pierde: se queda en pantalla, por guardar.
 Entra: los ajustes guardados del negocio (uno por negocio); si nunca se guardaron, valen los de
 fábrica.
 Sale: los ajustes, que se aplican desde el siguiente movimiento. Solo avisan a las pantallas abiertas
@@ -759,8 +796,8 @@ Sale: los ajustes, que se aplican desde el siguiente movimiento. Solo avisan a l
 Si falla: «No se pudieron guardar los ajustes.» y el motivo debajo del campo (un umbral vacío o con
 decimales: «Introduce un número entero.»). Como en las ventanas de formulario, el aviso se quita en
 cuanto se cambia algo y el motivo de un campo en cuanto se corrige ese campo; los dos vuelven si el
-siguiente intento también se rechaza. Un rechazo sin campo se queda hasta el siguiente intento
-(hub#871). Si con la pestaña abierta entra otra persona sin
+siguiente intento también se rechaza. Un rechazo sin campo se queda hasta el siguiente intento.
+Si con la pestaña abierta entra otra persona sin
 el permiso (relevo de turno), los campos se bloquean, desaparece «Guardar» y sale «No tienes
 permiso para cambiar estos ajustes. Pídeselo a un administrador si lo necesitas.».
 Implicados: SALE-F01
@@ -780,7 +817,7 @@ Sale: la decisión del artículo; Inventario avisa del cambio. Vale la del artí
 del negocio; si el negocio nunca guardó ajustes, sí. Un servicio nunca lleva control. Sin control,
 la venta no lo mueve, no sale en stock bajo ni en las cifras del Panel y no cruza su mínimo; recibir
 y contar sí lo mueven.
-Si falla: los rechazos del formulario (INVENTORY-F01). Una vez decidido, el artículo no vuelve a
+Si falla: los rechazos del formulario del producto. Una vez decidido, el artículo no vuelve a
 «Sigue el ajuste del hub».
 Implicados: SALE-F01
 
@@ -874,12 +911,12 @@ Estado: hecho
 Actor: administrador, responsable, empleado, cajero
 Pantalla: Ficha del producto
 Pasos:
-1. Abre la ficha del producto (toca la fila o «⋮» → «Detalles»): se ve el código de barras de su SKU
+1. Abre la ficha del producto (toca la fila o, en su «⋮», «Detalles»): se ve el código de barras de su SKU
    en una placa blanca, con el SKU debajo, que se lee también con el tema oscuro.
 2. Pulsa «Imprimir código de barras».
 3. La etiqueta (nombre, código de barras y precio) va a la cola de Impresión, a la impresora con la
-   función «Etiqueta», y la ficha dice «La etiqueta ha ido a la impresora «<nombre>».». La saca el
-   equipo que recoge los trabajos de esa impresora (PRINTING-F12). Cada pulsación saca una etiqueta.
+   función «Etiqueta», y la ficha dice a cuál ha ido («La etiqueta ha ido a la impresora «Mostrador».»).
+   La saca el equipo que recoge los trabajos de esa impresora. Cada pulsación saca una etiqueta.
 4. Si ninguna impresora tiene la función «Etiqueta», la etiqueta espera en la cola y la ficha lo
    dice: «La etiqueta espera en la cola de impresión: ninguna impresora tiene la función «Etiqueta».
    Asígnasela a una en Impresión.».
@@ -893,7 +930,7 @@ Si la app no lo abre, la ficha dice por qué: «No se pudo imprimir la etiqueta 
 versión de la app de ERPlora no puede imprimir; actualízala» (o el motivo que toque). Un SKU con letras que
 un código de barras no lleva (tildes, eñes) no se dibuja ni se imprime: «Este SKU no se puede pasar a
 código de barras: usa letras sin tilde, números y signos.». Cualquier otro rechazo sale dentro de la
-ficha: «No se pudo imprimir la etiqueta del código de barras: <motivo>».
+ficha: «No se pudo imprimir la etiqueta del código de barras:» seguido del motivo.
 Implicados: PRINTING-F04, PRINTING-F12
 
 ### INVENTORY-F26 Vender al peso o por medida: unidades y escalón
@@ -908,7 +945,7 @@ Pasos:
 3. El stock inicial, el umbral, la recepción, el recuento y la baja solo admiten cantidades de ese
    escalón.
 4. En el TPV el artículo se vende tecleando la cantidad (0,532 kg) y la venta baja esa cantidad
-   exacta, sin redondear (SALE-F10).
+   exacta, sin redondear.
 Entra: las unidades del negocio, que llegan al activar Inventario.
 Sale: el producto con su unidad. Ventas la lee para la línea; el precio es por 1 de la unidad.
 Por el asistente o la API, el precio se puede referir a otra cantidad (por 100 g, o por kilo con
@@ -916,7 +953,7 @@ el stock en gramos).
 Si falla: «La cantidad no respeta el incremento permitido para esta unidad» en pantalla; «La
 cantidad no respeta el incremento permitido para esta unidad: usa múltiplos de …» por el asistente o la
 API. La unidad de un producto
-con stock no se cambia (INVENTORY-F02).
+con stock no se cambia.
 Implicados: SALE-F10
 
 ### INVENTORY-F27 Entregar el catálogo al TPV, a Cocina y a Menús
@@ -967,7 +1004,7 @@ Estado: hecho
 Actor: administrador, responsable
 Pantalla: Productos; Ficha del producto
 Pasos:
-1. Se acaba un plato o un artículo a media jornada: en **Inventario → Productos**, búscalo y, en el
+1. Se acaba un plato o un artículo a media jornada: en la pestaña **Productos**, búscalo y, en el
    menú «⋮» de su fila, toca «Marcar agotado». También desde su ficha, con «Marcar agotado», o
    diciéndoselo al asistente («las croquetas se han acabado»).
 2. La fila enseña la insignia «Agotado» junto a su interruptor, que sigue encendido: el artículo no
@@ -1004,8 +1041,7 @@ Pasos:
 3. Toca una imagen: la ventana se cierra y el formulario la enseña en «Foto», con «Cambiar» y «Quitar
    foto».
 4. Pulsa «Guardar» o «Guardar cambios»: la foto queda en el artículo. «Cancelar edición» o cerrar el
-   panel pregunta antes «¿Descartar los cambios?» y, con «Descartar cambios», la descarta (INVENTORY-F01,
-   paso 7).
+   panel pregunta antes «¿Descartar los cambios?» y, con «Descartar cambios», la descarta.
 5. Por el asistente: «ponle foto al café con leche». El asistente busca por el nombre del artículo,
    enseña hasta cinco imágenes candidatas por su título y pregunta cuál; nunca pone una por su cuenta.
    Al elegir una, pide la tarjeta de confirmación de un clic y la pone.
@@ -1050,9 +1086,9 @@ por la API.
 Si falla: junto a «Foto», al elegirla, y no se sube nada: una imagen de más de 2 MB, «La foto pesa más
 de 2 MB. Elige una más ligera.»; un archivo que no es una imagen, «Ese archivo no es una foto. Sube una
 imagen JPG, PNG o WebP.». Si el artículo se guardó y la foto no, el panel lo dice («El producto se ha
-guardado, pero la foto no: <motivo>») con «Reintentar», que solo vuelve a subir la foto, y el artículo se
-queda con la foto que tenía; el motivo es, sin espacio en el plan, «No queda espacio para ese archivo: tu
-plan incluye <espacio>.» y, si el almacén no contesta, «No se pudo guardar la foto. Inténtalo de nuevo.».
+guardado, pero la foto no:» seguido del motivo) con «Reintentar», que solo vuelve a subir la foto, y el
+artículo se queda con la foto que tenía; el motivo es, sin espacio en el plan, «No queda espacio para ese
+archivo: tu plan incluye 1 GB.» (el espacio de tu plan) y, si el almacén no contesta, «No se pudo guardar la foto. Inténtalo de nuevo.».
 Implicados: INVENTORY-F01, INVENTORY-F02, INVENTORY-F04, INVENTORY-F32, BASE-F40
 
 ### INVENTORY-F32 La foto en la ficha del TPV
@@ -1067,7 +1103,7 @@ Pasos:
    ahora: nunca un hueco ni una imagen rota.
 3. Las baldosas de los menús (Menús) siguen la misma regla: su foto si la tienen y, si no, sus
    iniciales.
-4. En **Inventario → Productos**, cada fila lleva delante del nombre, en la columna «Foto», la miniatura
+4. En la pestaña **Productos** de Inventario, cada fila lleva delante del nombre, en la columna «Foto», la miniatura
    de la foto (o las iniciales), y cada tarjeta su línea «Foto»; la ficha del producto la enseña arriba,
    más grande.
 Entra: la foto de cada artículo, de la librería o propia.
@@ -1147,13 +1183,13 @@ Pasos:
    Altramuces y Moluscos. En el alta no sale ninguno marcado.
 2. Toca los que lleva el producto: cada toque marca o desmarca uno. No hay otros: es la lista del reglamento
    europeo y no se amplía.
-3. Pulsa «Guardar» o «Guardar cambios», como en el alta y en la edición (INVENTORY-F01, INVENTORY-F02). Un
+3. Pulsa «Guardar» o «Guardar cambios», como en el alta y en la edición. Un
    alérgeno marcado sin guardar pregunta antes de cerrar el panel, como cualquier otro campo.
 4. La **ficha del producto** dice «Alérgenos: Gluten, Leche», en el orden de la lista, o «Sin alérgenos
    declarados» si no tiene ninguno marcado.
-5. Para tener la carta entera por escrito, exporta el catálogo (INVENTORY-F11): el fichero lleva la columna
+5. Para tener la carta entera por escrito, exporta el catálogo con el botón de exportar CSV: el fichero lleva la columna
    «Alérgenos», con sus nombres separados por comas («Gluten, Leche») y vacía si no tiene ninguno. La
-   importación (INVENTORY-F09) reconoce esa columna en los productos que crea, con los nombres en español o en
+   importación de un CSV reconoce esa columna en los productos que crea, con los nombres en español o en
    inglés, con o sin tildes y en mayúsculas o minúsculas; un SKU que ya existe se omite como siempre y sus
    alérgenos no cambian.
 Entra: el producto; la lista de los catorce alérgenos.
@@ -1164,7 +1200,7 @@ y leche en la hamburguesa» pide antes la tarjeta de confirmación). Un cambio v
 momento: una línea ya pedida conserva los alérgenos que tenía al pedirla (SALE-F40).
 Si falla: un alérgeno que no es de la lista se rechaza, también por el asistente o la API, y no se guarda nada
 («Ese alérgeno no es uno de los catorce de declaración obligatoria.»). En la importación, una celda con un nombre
-que no se reconoce deja la fila como fallida con el motivo «Alérgeno no reconocido: <texto>». Quien solo puede ver
+que no se reconoce deja la fila como fallida con el motivo «Alérgeno no reconocido:» seguido del nombre que trae el fichero. Quien solo puede ver
 productos lee la línea de la ficha, pero no tiene el formulario. Todo rechazo sale dentro del panel, como los del
 resto del formulario.
 Implicados: INVENTORY-F01, INVENTORY-F02, INVENTORY-F09, INVENTORY-F11, INVENTORY-F27, INVENTORY-F34, SALE-F40, SALE-F41,
@@ -1340,17 +1376,17 @@ Lo que sigue es para quien cambia la app; quien la usa puede parar aquí.
 - **Recuperar desde una copia aparte** (BASE-F114): `apps.py` responde a la plataforma (`recoverable_from_copy`,
   `base.recovery.Recoverable`) con tres declaraciones, por este orden, leídas de la copia por SQL sobre los nombres de los
   modelos (la copia no es un negocio y no tiene alias). Primero las categorías vivas de la copia
-  (`queries.categories_in_copy`, con sus productos vivos en `product_ids`): cada una que el negocio no tiene
-  (`queries.categories_not_in_business`) se crea por `inventory.category.recover` (permiso `inventory.system`, sin
+  (`queries.recovery.categories_in_copy`, con sus productos vivos en `product_ids`): cada una que el negocio no tiene
+  (`queries.recovery.categories_not_in_business`) se crea por `inventory.category.recover` (permiso `inventory.system`, sin
   ruta; el alta de la pantalla más, en el mismo paso, el enlace de los productos de la copia que el negocio guarda
   eliminados y se pueden restaurar, para que vuelvan dentro). Una categoría
   de la copia es la del negocio por su id mientras siga viva (aunque se renombrara); si no, una viva con su nombre
   (`_same_name`) que no sea ninguna de la copia, cada una por una sola, la más antigua por la más antigua
-  (`_categories_held`). Después los productos vivos de la copia (`queries.products_in_copy`, con todas las categorías
+  (`_categories_held`). Después los productos vivos de la copia (`queries.recovery.products_in_copy`, con todas las categorías
   vivas de la copia en `copy_categories`, la misma en cada uno): los que el negocio aún guarda eliminados vuelven
-  primero, los mismos, por `inventory.product.restore` (`queries.products_deleted_in_business` y `_restorable`: nunca
+  primero, los mismos, por `inventory.product.restore` (`queries.recovery.products_deleted_in_business` y `_restorable`: nunca
   uno cuyo SKU o EAN-13 tiene ya otro vivo; INVENTORY-F34, avisa `inventory.product.restored`, que está en
-  `events.PRODUCT_EVENTS`); y los que ya no tiene en absoluto (`queries.products_not_in_business`: ni guardado, vivo o
+  `events.PRODUCT_EVENTS`); y los que ya no tiene en absoluto (`queries.recovery.products_not_in_business`: ni guardado, vivo o
   eliminado, ni otro vivo con su SKU o su EAN-13) se crean, cada uno por `inventory.product.create` con la clave de su
   categoría fiscal y sus categorías aquí por la misma regla (`_categories_held`: la misma, o la que acaba de volver o
   el negocio volvió a crear con su nombre), activo o no como estaba (`ProductIn.is_active`), sin stock (el saldo de la
@@ -1363,9 +1399,9 @@ Lo que sigue es para quien cambia la app; quien la usa puede parar aquí.
   al que se eliminó antes de eso, sin ninguna, `inventory.product.restore` le devuelve la de la copia en el mismo paso
   y con la misma regla (`ProductRestoreIn`: el `id` y la `image` del registro leído, que es lo que la plataforma le
   da de la copia, `base.tenancy.recovery._restore_input`). Uno que el negocio tiene vivo no cambia.
-  Al final, los enlaces vivos de la copia (`queries.product_links_in_copy`:
+  Al final, los enlaces vivos de la copia (`queries.recovery.product_links_in_copy`:
   producto y categoría vivos allí, con el id del enlace y `copy_categories`): cada uno que le falta a una categoría que
-  trajo una recuperación (`queries.product_links_not_in_business`: la de la copia ya no está viva aquí y la que ocupa su
+  trajo una recuperación (`queries.recovery.product_links_not_in_business`: la de la copia ya no está viva aquí y la que ocupa su
   sitio por `_categories_held` la creó una recuperación, `created_by` según `base.recovery.brought_back`; el producto
   sigue vivo aquí y fuera de ella) se crea por la operación de la pantalla, `inventory.product_category.add`, que añade
   sin quitar ninguna otra categoría. Va aparte, con su propia cuenta, porque toca lo que el negocio tiene. Una categoría
@@ -1378,13 +1414,13 @@ Lo que sigue es para quien cambia la app; quien la usa puede parar aquí.
   `copy_columns`. Tests: `tests/test_recovery.py`, de punta a punta incluido, `tests/test_copy_columns.py` y el
   contrato de `base/tenancy/tests/test_recovery.py`.
   Las apps cuyos registros de la copia cuelgan de un producto (Tarifas, Suplementos, Menús) no emparejan a su manera:
-  piden a `queries.products_standing_for` (`{id allí: SKU allí}`) el producto del negocio que hace de cada uno que ya
+  piden a `queries.recovery.products_standing_for` (`{id allí: SKU allí}`) el producto del negocio que hace de cada uno que ya
   no está vivo aquí: el vivo con su SKU que hizo una recuperación (`base.recovery.brought_back`), la de esta pasada u
   otra anterior. Uno vivo es él mismo y no sale; uno hecho a mano con su SKU es del negocio y no hace de ninguno.
 
 ## El servidor
 
-- **Anatomía**: `apps.py`, `models.py`, `migrations/`, `schemas.py`, `queries.py`, `services.py`,
+- **Anatomía**: `apps.py`, `models.py`, `migrations/`, `schemas.py`, `queries/`, `services.py`,
   `events.py`, `live.py`, `api.py`, `admin.py`, `locale/` y un `tests/test_<fichero>.py` por fichero.
   Las páginas (`frontend/`): Panel, Productos, Movimientos, Categorías y Ajustes.
 - **31 operaciones** (12 consultas y 19 acciones), todas con `ai` (descripción y, en las acciones,
@@ -1458,7 +1494,7 @@ Lo que sigue es para quien cambia la app; quien la usa puede parar aquí.
   la importación acepta su código y su símbolo alrededor de la cifra («PLN12.50», «12,50 zł»), no los de otra.
 - **Agotado (INVENTORY-F29, 2026-10-21)**: `Product.is_sold_out` con `db_default=False` (la 0003 solo
   añade la columna: un proceso con el código anterior sigue insertando). «A la venta» = activo y no
-  agotado (`queries.ON_SALE`): es lo que da el filtro `is_active` de `inventory.product.list` (`false` da
+  agotado (`queries.products.ON_SALE`): es lo que da el filtro `is_active` de `inventory.product.list` (`false` da
   el resto, inactivos o agotados) y `list_for_sale`; la cifra de cada categoría cuenta los activos,
   agotados incluidos (lo que enseña el TPV); `include_sold_out=true`
   hace que `is_active` sea solo el interruptor (la rejilla, el buscador y el «Todos» del TPV, que enseñan
@@ -1633,8 +1669,7 @@ Las hace cumplir la app por cualquier puerta (pantalla, asistente, API).
 - Las peticiones a `@erplora/ui` de `UI-REQUESTS.md` (iconos, `KpiCard`, `Combo` múltiple, importar y
   exportar CSV y panel lateral del `DataTable`, formateadores, `useI18n` y ayudas de test): ninguna rompe
   un flujo y cada una tiene su sustituto en uso.
-- **Los alérgenos del producto** (F35, `no hecho`): el servidor, con el catálogo y el CSV, va por hub#1735, y el
-  formulario y la ficha, por hub#1738. Los de un suplemento son de Suplementos (hub#1739).
+- **Los alérgenos de un suplemento**: son de Suplementos (hub#1739).
 
 ## Lo que NO hace, a propósito
 

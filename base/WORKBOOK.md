@@ -87,8 +87,9 @@ La tabla de las últimas ventas: «Fecha», «Venta», «Cliente», «Método»,
 Se abre también con el enlace del Inicio terminado en `#actividad`.
 
 ### La campana
-Arriba a la derecha, la última de la barra, después de «Mis apps» y de los destellos del asistente, también en el
-móvil. Reúne lo que pide una acción y sigue siendo verdad hasta que se resuelve: «Todavía no puedes facturar», los
+Arriba a la derecha, la última de la barra, después de «Mis apps», de los destellos del asistente y, en la aplicación
+instalada, de «Cambiar de negocio» (HUB_APP-F04 de ERPlora/app), también en el móvil. Reúne lo que pide una acción
+y sigue siendo verdad hasta que se resuelve: «Todavía no puedes facturar», una factura del plan sin pagar, los
 eventos caídos, los límites del plan, las citas por confirmar, los clientes de WhatsApp esperando respuesta, una
 impresora que no imprime… Ningún aviso se descarta: se va solo cuando se resuelve.
 
@@ -440,7 +441,8 @@ En la pantalla Archivos:
 | BASE-F113 | Seguir avisando con la pantalla apagada (app de Android) | hecho |
 | BASE-F114 | Devolver un negocio a un momento pasado desde el admin de Hubs | hecho |
 | BASE-F115 | Ver la ayuda de la pantalla de un módulo | hecho |
-| BASE-F116 | Leer las novedades de ERPlora | parcial |
+| BASE-F116 | Leer las novedades de ERPlora | hecho |
+| BASE-F117 | Ver en la campana que el plan tiene una factura sin pagar | hecho |
 
 ### BASE-F01 Ver lo que le falta por configurar al negocio
 Estado: hecho
@@ -580,9 +582,14 @@ Pantalla: Inicio · Resumen
 Pasos:
   1. Bajo la lista está el tablero, con sus paneles desde que se abre el Inicio («Cargando widgets…» solo mientras
      no se sabe cuáles le tocan).
-  2. Cada panel es una tarjeta con su título e icono: una cifra (con debajo lo que cuenta, si su app lo dice),
-     una lista con barras, una cronología, un gráfico o un trozo de la pantalla de su app, con sus textos en el
-     idioma de quien mira. En una lista con barras, cada barra mide lo grande que es su cifra frente a la mayor
+  2. Cada panel es una tarjeta con su título e icono: una cifra (con lo que cuenta bajo el título, si su app lo
+     dice), una lista con barras, una cronología, un gráfico o un trozo de la pantalla de su app, con sus textos en
+     el idioma de quien mira. Cada cifra lleva el color de su medida, el mismo en todas las pantallas: ventas,
+     tickets e inventario, cada una el suyo. Las primeras cifras del tablero que tienen color lo encabezan en una
+     fila de color, una por color y de dos a cuatro; las demás van en una tarjeta clara con el color en su icono,
+     en el orden elegido. En el teléfono las cifras van de dos en dos. Una cifra con un estado que vigilar (la cola
+     de contingencia de VeriFactu cuando algo espera o ya ha fallado) lo dice en una etiqueta naranja o roja con
+     icono, sin cambiar el color de la cifra. En una lista con barras, cada barra mide lo grande que es su cifra frente a la mayor
      de la lista, sea del signo que sea; una cifra negativa, como un descuadre de caja en el que faltó dinero o
      un producto con existencias por debajo de cero, sale en rojo y con su signo (-0,40 €), y las demás
      conservan el color del panel o, si su app da un color a cada fila, el de la suya. El rojo de una cifra
@@ -599,8 +606,9 @@ Pasos:
 Entra: los paneles que declara cada app encendida; los datos de cada uno, pedidos con los permisos de
 quien mira.
 Sale: nada guardado en el hub.
-Si falla: un panel sin datos dice «Sin datos»; uno cuyos datos no se pueden leer, «No disponible», nunca
-una cifra vieja o inventada. Una fila de una lista con barras (o un día de un gráfico) que no tiene cifra,
+Si falla: un panel sin datos dice «Sin datos» (una cifra, con una raya en su sitio); una cifra cuyos datos no se
+pueden leer dice «No se pudo cargar» con «Reintentar», que la vuelve a pedir, y cualquier otro panel, «No
+disponible»: nunca una cifra vieja o inventada. Una fila de una lista con barras (o un día de un gráfico) que no tiene cifra,
 como una sesión de caja cerrada sin recuento, sale con una raya (—) y sin barra, nunca como un cero; un cero
 de verdad sí sale como cero (0,00 €). Si no se puede leer el tablero: «No se han podido cargar los paneles»
 con «Reintentar».
@@ -634,8 +642,8 @@ Pasos:
      cargar el Inicio.
 Entra: los avisos del negocio que declara cada panel.
 Sale: nada guardado.
-Si falla: si los datos nuevos no llegan, el panel dice «No disponible», no el valor de antes; cuando
-vuelve la conexión, se pone al día solo.
+Si falla: si los datos nuevos no llegan, el panel dice «No disponible» (una cifra, «No se pudo cargar» con
+«Reintentar»), no el valor de antes; cuando vuelve la conexión, se pone al día solo.
 Implicados: ninguno
 
 ### BASE-F09 Consultar la actividad reciente
@@ -1040,10 +1048,11 @@ Pasos:
   1. Abre «Ajustes» en el menú lateral; en «Datos y copias», «Importar» es lo que se abre. Dice «Carga una
      plantilla: llena tus apps con sus datos —una carta, servicios, mesas— listos para usar.» y, debajo,
      «Elige qué cargar».
-  2. Mientras llegan, «Cargando plantillas…». Después, una tarjeta por plantilla (o una fila, con la vista de
-     lista): su nombre, su descripción, su «Idioma» y su «País» por su nombre, su «Versión» y lo que «Trae»
-     (cuántas categorías, productos, servicios, zonas o mesas). Primero las del país del negocio y, dentro,
-     las del idioma de la persona.
+  2. Mientras llegan, «Cargando plantillas…». Después, una tarjeta por plantilla: su nombre de título, su
+     descripción y cada dato en su línea con el icono que dice qué es: el idioma y el país por su nombre, la
+     versión en palabras («Versión 1») y lo que trae (cuántas categorías, productos, servicios, zonas o mesas).
+     Con la vista de lista, una fila por plantilla con esos datos en sus columnas «Idioma», «País», «Versión» y
+     «Trae». Primero las del país del negocio y, dentro, las del idioma de la persona.
   3. «Buscar plantillas» busca por el nombre, la descripción o las apps que trae.
   4. Pulsa «Usar plantilla» en la que le sirva: el botón gira mientras se lee y se abre «Revisa lo que
      trae» (BASE-F31).
@@ -1767,7 +1776,8 @@ Pasos:
 Entra: la sesión.
 Sale: la sesión cerrada en el negocio; la de erplora.com, solo si la persona lo confirma.
 Si falla: si el negocio no contesta, la sesión caduca sola.
-Implicados: BASE-F113 (en la app de Android, antes de salir deja de estar a la escucha)
+Implicados: BASE-F113 (en la app de Android, antes de salir deja de estar a la escucha); HUB_APP-F04 (ERPlora/app: dentro
+de la aplicación, «Cambiar de negocio» de la barra cierra la sesión igual y solo después olvida el negocio)
 
 ### BASE-F62 Decidir si este dispositivo es compartido o personal
 Estado: hecho
@@ -2493,7 +2503,10 @@ Estado: hecho
 Actor: propietario, administrador, responsable, empleado
 Pantalla: Tarjeta de confirmación del asistente
 Pasos:
-  1. La persona le pide algo que cambia datos («crea el servicio Corte a 15 € de 30 minutos»).
+  1. La persona le pide algo que cambia datos («crea el servicio Corte a 15 € de 30 minutos»). Lo que la acción
+     necesita y la persona no ha dicho, el asistente lo busca con sus herramientas; si ninguna lo da, se lo pregunta
+     en una sola pregunta corta y nunca se lo inventa («¿Con qué impuesto lo vendes?»), y si la petición vale para
+     varios registros, le pregunta cuál. Nunca pregunta en su texto si sigue adelante: eso lo pregunta la tarjeta.
   2. Antes de hacerlo sale, encima de todo, «¿Ejecutar esta acción?» con la acción, la app y sus primeros datos en una
      línea, por ejemplo «Crear en Servicios: Corte · 15,00 € · 30». Un importe, todo dato que su app declara como
      dinero, sale en la moneda del negocio (nunca en céntimos), también dentro de un dato que agrupa otros, y el
@@ -3289,17 +3302,17 @@ español.
 Implicados: BASE-F92, BASE-F93
 
 ### BASE-F116 Leer las novedades de ERPlora
-Estado: parcial — las novedades ya se leen por el asistente y por la API, pero Sistema › Actualizaciones todavía no las
-enseña (hub#576)
+Estado: hecho
 Actor: propietario, administrador, responsable, empleado
 Pantalla: Sistema · Actualizaciones
 Pasos:
   1. En la pestaña «Actualizaciones», debajo de la versión y su fecha (BASE-F41), sale «Novedades»: lo que ha cambiado
      en ERPlora que el negocio nota, lo más reciente primero. Quien no administra el negocio también las ve: no dicen
-     nada de él.
-  2. Cada novedad dice su día, si es algo nuevo, una mejora o un arreglo, un título corto y una o dos frases de lo que
-     se puede hacer ahora. Son notas escritas para el negocio, nunca la lista de cambios del código.
-  3. Salen las 20 más recientes; «Ver más» trae las anteriores.
+     nada de él. Mientras carga: «Consultando las novedades…».
+  2. Cada novedad dice su día, si es algo nuevo, una mejora o un arreglo («Nuevo», «Mejora» o «Arreglo»), un título
+     corto y una o dos frases de lo que se puede hacer ahora, tal cual se escribieron. Son notas escritas para el
+     negocio, nunca la lista de cambios del código.
+  3. Salen las 20 más recientes, sin páginas.
   4. Sin ninguna, dice «Todavía no hay novedades.».
   5. Por el asistente, «¿qué hay de nuevo en ERPlora?» o «¿qué ha cambiado en la última actualización?» las lee igual,
      en el idioma de la persona.
@@ -3307,6 +3320,33 @@ Entra: las novedades de la versión que corre: viajan con ella, así que siempre
 Sale: nada guardado: las novedades solo se leen.
 Si falla: «No se pudieron cargar las novedades» con «Reintentar»; la versión y su fecha siguen a la vista.
 Implicados: BASE-F41
+
+### BASE-F117 Ver en la campana que el plan tiene una factura sin pagar
+Estado: hecho
+Actor: propietario, administrador
+Pantalla: La campana
+Pasos:
+  1. erplora.com no consigue cobrar la renovación del plan del negocio y le da sus 7 días de margen (BILLING-F16): el
+     negocio sigue funcionando con todo su plan.
+  2. La campana de quien administra el negocio sube sin recargar con el aviso urgente «Tu plan de ERPlora tiene una
+     factura sin pagar», que llega como tarjeta y se recoge en ella. Su frase dice hasta cuándo: «Págala en
+     erplora.com: si no se paga antes del 24 de noviembre de 2026, el negocio se suspende. No se borra nada.», con la
+     fecha en el reloj del negocio, y el anillo de la campana se va vaciando en esa última semana.
+  3. «Pagar en erplora.com» abre en una pestaña nueva las facturas pendientes de este negocio en erplora.com, donde se
+     paga (BILLING-F17). Solo en el navegador: en la app instalada el aviso sale igual, sin el botón, y su frase ya
+     dice dónde pagarla.
+  4. Si se pasa el plazo y erplora.com todavía no lo ha suspendido, el aviso lo dice en el momento, sin recargar:
+     «Págala en erplora.com: su plazo terminó el 24 de noviembre de 2026 y el negocio se puede suspender en cualquier
+     momento. No se borra nada.», con el anillo vacío.
+  5. Al pagarla, el aviso desaparece en cuanto erplora.com se lo dice al negocio. Si se suspende, el negocio deja de
+     abrirse hasta que se pague (BILLING-F16).
+Entra: el estado del negocio y el momento en que se suspende, tal como los manda erplora.com en su foto del negocio
+(HUBS-F31). El Hub no le pregunta a erplora.com ni cuenta los 7 días por su cuenta.
+Sale: nada guardado en el Hub.
+Si falla: un responsable o un empleado no ve el aviso. Si la foto no trae el plazo, el aviso sale sin fecha: «Págala en
+erplora.com: si no se paga pronto, el negocio se suspende. No se borra nada.». Si no se pueden leer los avisos, la
+campana se queda con lo último que supo, como en BASE-F10.
+Implicados: BASE-F10, BASE-F11, BILLING-F16 (erplora.com), BILLING-F17 (erplora.com), HUBS-F31 (erplora.com)
 
 ## Para quien lo mantiene
 
@@ -3374,7 +3414,8 @@ Implicados: BASE-F41
   solo le da su fuente, `useHubActionNotices` (`base/frontend/lib/action-notices.ts`), en `actionNotices` de
   `createShell`. Cada contador de `base.bell.counters` por encima de cero es un aviso con lo que dice el servidor
   (`id` = su `key`, su icono, su gravedad, su `title` como fila y titular, su `body`, su número, su plazo `due` y una
-  acción con su `action_label` a su `route`, sin acción si el Hub no tiene esa pantalla), y `base.setup.status` da
+  acción con su `action_label` a su `route`, sin acción si el Hub no tiene esa pantalla; una `route` que es una
+  dirección de otro sitio, `http(s)://…`, es un enlace fuera del Hub y solo sale en el navegador), y `base.setup.status` da
   `base.blocking`, urgente, mientras queda un ⛔ pendiente (`blockingItems` de `lib/home.ts`): «Configurar» a los dos
   primeros pasos que la persona puede hacer, o «Esto lo tiene que configurar un administrador.» si no puede ninguno.
   La pantalla no pone palabras a un contador. La hoja
@@ -3394,6 +3435,15 @@ Implicados: BASE-F41
   contador de los módulos dice sus palabras en inglés y en español y que los tipos siguen al esquema),
   `test_queries_home_bell.py` y los de cada app (`test_integration_home.py` de Citas e Impresión, `test_home_hooks.py`
   de WhatsApp).
+- Factura del plan sin pagar (BASE-F117): `base/unpaid_plan.py` da a quien administra el negocio la fila
+  `base.payment_pending` de `base.bell.counters` mientras la foto de erplora.com guardada en `Hub.state` dice
+  `status: past_due`; su plazo es `suspends_on` de la misma foto, tal cual (el Hub no cuenta los 7 días), y uno que no
+  es un instante con zona se queda sin fecha y se anota en el log como `base.unpaid_plan_bad_deadline`. La frase,
+  con la fecha en la zona del negocio, cambia cuando el plazo pasa: `refresh_every` pide leer otra vez la campana en
+  ese momento (entre 30 s y un día, o antes si una app lo pide). Su `route` son las facturas pendientes del negocio
+  en erplora.com (`/dashboard/billing/invoices?business=<id>&status=open`). La foto aplicada
+  (`base.hub.state_applied`) ya vuelve a calcular la campana: el aviso llega y se va sin recargar. Tests:
+  `test_unpaid_plan.py` y `action-notices.test.ts`.
 - Presencia del dispositivo que imprime (misma tarea): la app que
   lleva los dispositivos declara en su `LiveAppConfig` `print_presence`, el nombre de una orden suya cuya entrada lleva
   `device`; `/ws/print` (`base/ws_print.py`) la ejecuta con el contexto del dispositivo en su `hello` y en cada `beat`
@@ -3683,7 +3733,9 @@ Implicados: BASE-F41
   caracteres) y `body` (hasta 400), en texto llano. `base/release_notes.py` las lee una vez por proceso (con `DEBUG`, en
   cada llamada) y rechaza la que no lo cumple; `base/tests/test_release_notes.py` lee todas las del repositorio, así
   que una nota rota no llega a la imagen. Se escribe una por cambio que nota un negocio (algo nuevo, una mejora o un
-  arreglo que se ve), en su lenguaje: nunca el título del commit ni los cambios internos.
+  arreglo que se ve), en su lenguaje: nunca el título del commit ni los cambios internos. La pantalla
+  (`base/frontend/components/SystemReleaseNotes.vue`) la pide una vez con la página por defecto, y otra vez si la
+  persona cambia de idioma, porque el Hub contesta en el suyo.
 - Comandos (`base/services/`, `base.administer_hub`, `ai=` con `risk`), con el id en el cuerpo:
   `base.failed_event.retry` (`POST /api/system/failed-events/retry`: `pending`, `attempts` 0, solo a su `app_label`;
   409 `base.failed_event_app_off` si la app no está activa), `base.failed_event.retry_all` (`POST
@@ -4327,7 +4379,7 @@ Implicados: BASE-F41
   clúster destino y lo protege de borrarse. «Cancelar el traslado» la quita mientras no ha empezado
   (`control.hub.scheduled_move_cancelled`), sin cerrar nada. Tests: `control/tests/test_services.py::TestTheNight` y
   `::TestMoveAtNight`, `base/tenancy/tests/test_move.py::TestAMoveAskedForTheNight` (dos BD reales y el arriendo) y
-  `control/tests/test_admin.py::TestMoveToCluster` y `::TestCancelTheMove`. El aviso al negocio de que esa noche se
+  `control/tests/test_admin_move.py::TestMoveToCluster` y `::TestCancelTheMove`. El aviso al negocio de que esa noche se
   le traslada no existe todavía (hub#1510).
 - **Un negocio de cualquier tamaño se traslada** (hub#1509): la copia pasa por el bucket de volcados
   (`HUB_DUMPS_BUCKET`), nunca por el disco del worker, así que `control.hub.move` no rechaza por tamaño (solo
@@ -4345,13 +4397,13 @@ Implicados: BASE-F41
   Tests: `base/tenancy/tests/test_dumps.py` (los `stream`),
   `base/tenancy/tests/test_move.py::TestTheCopyGoesThroughTheBucket` y `::TestFeedingAProgram` (dos BD reales y el S3
   de moto), `control/tests/test_services.py::TestMove` y
-  `control/tests/test_admin.py::test_its_confirmation_page_promises_no_refusal_by_size`.
+  `control/tests/test_admin_move.py::test_its_confirmation_page_promises_no_refusal_by_size`.
 - **«Restaurar desde una copia…»** (BASE-F114, hub#1198) es `control.admin.HubAdmin.restore_from_a_copy`: su página de
   confirmación (`RestoreFromACopyForm`, la plantilla `action_confirmation.html` que comparte con «Mover a otro
   clúster…») y, por cada hub, `control.hub.restore` con el actor del personal; el admin no comprueba nada que la
   operación compruebe. Restaura el worker (`base.tenancy.restore`), y su negativa fiscal (`restore_fiscal_records`, con
   el gancho `fiscal_record_states` de cada app que presenta a Hacienda) queda en `Hub.last_error`, que la ficha enseña
-  tal cual. Tests: `control/tests/test_admin.py::TestRestoreFromACopy` y, de punta a punta con el worker y dos BD
+  tal cual. Tests: `control/tests/test_admin_restore.py::TestRestoreFromACopy` y, de punta a punta con el worker y dos BD
   reales, `base/tenancy/tests/test_restore.py::TestAskedInTheHubAdmin`.
 - **Cuánto puede estar cerrado el negocio** (hub#1527): las páginas de «Mover a otro clúster…» y «Restaurar desde una
   copia…» dicen debajo de cada hub el tamaño de su base (el que mide la lista, `control.cluster.sizes`, una vez por
@@ -4387,7 +4439,7 @@ Implicados: BASE-F41
   `move.MOVED_COPY_DAYS` (`restore.drop_old_aside_copies`); mientras se hace cuenta en `control.freeze.get`. Su esquema
   es el del momento. Tests: `base/tenancy/tests/test_restore_aside.py` (dos BD reales, la guarda de red y
   `TestSendingToTheTaxAuthorityIsOffInTheCopy`, que nunca puede caer), `control/tests/test_services.py::TestRestoreAside`
-  y `control/tests/test_admin.py::TestRestoreToASeparateCopy`.
+  y `control/tests/test_admin_restore.py::TestRestoreToASeparateCopy`.
 - **«Recuperar en el negocio…»** (BASE-F114, hub#1257, capa 2a) es `control.admin.RestoredCopyAdmin.recover_into_the_business`:
   su página (`RecoverForm`, la misma `action_confirmation.html` de las acciones de Hubs, con `AsksFirst`) y, por cada
   copia, `control.copy.recover`, que escribe una fila `control.CopyRecovery` con las apps pedidas y el idioma del personal.
@@ -4415,7 +4467,7 @@ Implicados: BASE-F41
   `customer.customer.recover`, que rehace la ficha con sus grupos, etiquetas y campos (hub#1285). Ninguna app cuyos
   registros llegan a Hacienda responde (contrato en `test_recovery.py`). Tests: `base/tenancy/tests/test_recovery.py`
   (dos BD reales: la copia y el negocio), `apps/customer/tests/test_recovery.py`, `control/tests/test_services.py::TestRecover`,
-  `control/tests/test_admin.py::TestRecoverIntoTheBusiness` y `tests/e2e/base-recover-from-copy.spec.ts`.
+  `control/tests/test_admin_restore.py::TestRecoverIntoTheBusiness` y `tests/e2e/base-recover-from-copy.spec.ts`.
 
 ## Lo que queda fuera
 
@@ -4426,8 +4478,6 @@ Implicados: BASE-F41
 - **El PDF de cada factura en el archivo fiscal (BASE-F109)**, hub#1821: hoy van sus datos y el XML de VeriFactu.
 - **La fila de salud del Inicio en pantalla (BASE-F02)**, hub#573: su lectura ya existe (`base.health.list`, con la
   impresora de Impresión); falta pintarla en el Inicio y que la Bandeja de WhatsApp declare cómo está su número.
-- **Las novedades en Sistema › Actualizaciones (BASE-F116)**: ya se leen por el asistente y por la API; falta
-  enseñarlas en la pantalla, hub#576.
 - **La cola de PgBouncer de cada negocio en CloudWatch**, hub#572.
 - **Peticiones a `@erplora/ui`** que siguen abiertas: [`UI-REQUESTS.md`](UI-REQUESTS.md) (los iconos de documento de
   Archivos, los del cuadro del asistente y `useI18n` en el shell).

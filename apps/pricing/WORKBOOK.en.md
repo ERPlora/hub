@@ -1,6 +1,14 @@
-<!-- generated from WORKBOOK.md sha256:17bf902b8178a3c60642f308d3b74a2cdeb9bafa3eb2e84039d5f4a5f42352c1 -->
+<!-- generated from WORKBOOK.md sha256:f1627fc5a0053639edea55fd7eee403ddc6883d10fd6b34724872886b308efa1 -->
 
 ## What it is for and who it is for
+
+Price Lists keeps other prices for your products and services, and the automatic discounts. A price list is a price
+other than the catalog's: for a customer group, between some dates or from a quantity on. A discount rule lowers
+the amount of a line, such as 10% or "buy 2, get 1 free". With them, Price Lists works out the price that applies:
+the lowest, with the best discount. Today the assistant and the API ask for it; the till still charges the catalog
+price.
+
+### In detail
 
 Price Lists keeps **other prices** for your products and services and the **automatic discounts**:
 
@@ -106,7 +114,13 @@ Price Lists opens from the **Price Lists** menu (tags icon). What a person canno
 show, and the app refuses it even if they try through the API or the assistant.
 
 ### Price Lists
-Two tables, one above the other.
+Two tables, one above the other. At the top, the **Price lists**, with their code, name, currency, customer group,
+validity, how many prices they have and whether they are active; below, the **Discount rules**, with their type,
+their value, what they apply to and their priority. On opening the active ones show, and the toolbar's funnel also
+shows the inactive ones. **+** in each table creates a price list or a rule, and tapping a price list opens its
+detail with its prices.
+
+#### Price lists
 
 **Price lists**: search box "Search code or name…", columns **Code** (with the tag
 **General** if it is the general price list), **Name**, **Currency**, **Customer group** ("Everybody" if it is
@@ -125,6 +139,8 @@ text they contain), Customer group, Tax and Status (on opening, **Active** alrea
   confirmation), **Deactivate** (in the "⋮" menu; asks for confirmation; not on the general one) or **Activate** (on the inactive ones). The employee only sees
   **Open**.
 
+#### Discount rules
+
 **Discount rules**: search box "Search code or name…", columns **Code**, **Name**, **Type**
 (Percentage, Amount per unit, Buy X, get Y, Tiered), **Value** ("10%", "€0.50 per
 unit", "Buy 2, get 1", "3+: 10% · 6+: 15%"), **Applies to** ("Everything", "All
@@ -137,7 +153,7 @@ Code, Name, Type, Applies to and Status (as in the price lists: **Active** on op
 - Row actions: **Edit** (also by tapping the row), **Deactivate** (asks for confirmation) or
   **Activate** (on the inactive ones). The employee has no actions.
 
-### Price list (detail)
+#### Price list (detail)
 It opens from the row and has **Back**; its title is the price list's name. At the top, the price list:
 **Code** with the tag **General**, **Customer group** ("Everybody" on the general one), **Currency**,
 **Tax**, **Validity** and **Status**, and in the bar **Edit**, **Make general** and **Deactivate /
@@ -224,7 +240,7 @@ stops being so in the same operation: there are never two.
 If it fails: under its field and without creating anything: "A price list with that code already exists. Pick a different code."
 (also if the one that has it is deactivated), a currency that does not exist or does not have two decimals,
 "Until" before "From", a group that does not exist, "The general list is for everybody: take its customer
-group off." or "The general list goes in the business's currency ({currency}), the one the till sells in." (the
+group off." or "The general list goes in the business's currency (EUR), the one the till sells in." (the
 toggle turns off by itself with a group or with another currency).
 Involved: Customers
 
@@ -233,7 +249,7 @@ Status: done (server and screen)
 Actor: owner, administrator, manager, assistant
 Screen: Price Lists, Price list (detail)
 Steps:
-1. **Edit** on the row or in the detail: **Editing price list — {name}** with what it has.
+1. **Edit** on the row or in the detail: **Editing price list — VIP members** with what it has.
 2. Change whatever you want (code, name, currency, tax, group, dates) and tap **Save**.
 In: only what changed. Removing the group leaves the price list without a group.
 Out: the price list and `pricing.price_list.updated` (without changes, nothing).
@@ -249,15 +265,15 @@ Screen: Price Lists, Price list (detail)
 Steps:
 1. **Make general** on an active price list, without a group and in the business's currency (on any other it
    is not offered).
-2. Confirm "{name} becomes the general price list: it will apply to every customer, and the current one will
+2. Confirm "VIP members becomes the general price list: it will apply to every customer, and the current one will
    stop being general.".
 In: the price list. Through the assistant or the API the mark can also be **taken off** (no general list).
 Out: the new general price list and `pricing.price_list.default_changed` (with the previous one). If two people
 choose at the same time, a single one remains: the last one.
 If it fails: "A deactivated price list cannot be the general one.", "The general list is for everybody: take
-its customer group off.", "The general list goes in the business's currency ({currency})…" and, if other choices win the race
+its customer group off.", "The general list goes in the business's currency (EUR)…" and, if other choices win the race
 three times in a row, "Someone else is changing the general price list right now. Try again
-in a moment." (409 `pricing.default_busy`, never a server error).
+in a moment.", never a server error.
 Involved: none
 
 ### PRICING-F05 Deactivate or reactivate a price list
@@ -265,7 +281,7 @@ Status: done (server and screen)
 Actor: owner, administrator, manager, assistant
 Screen: Price Lists, Price list (detail)
 Steps:
-1. **Deactivate** and confirm "{name} will stop applying to new sales. Its prices are
+1. **Deactivate** and confirm "VIP members will stop applying to new sales. Its prices are
    kept.".
 2. To use it again, filter by **Inactive** and tap **Activate**.
 In: the price list.
@@ -318,7 +334,7 @@ Actor: owner, administrator, manager, assistant
 Screen: Price list (detail)
 Steps:
 1. **Edit** on the row: change **Price** or **From quantity** and **Save**.
-2. **Remove** on the row and confirm "The price of {item} from {quantity} will be removed. It will be charged at
+2. **Remove** on the row and confirm "The price of Ground coffee from 1 kg will be removed. It will be charged at
    another list's price or the catalog's.".
 In: the price, by its row; the assistant, by the price list, the item and the minimum quantity (1 if it does not
 say).
@@ -365,12 +381,12 @@ Out: the active rule and `pricing.rule.created`.
 If it fails: under its field: "A discount rule with that code already exists. Pick a different code.", a value that is missing or
 out of range for its type, repeated or unordered tiers, a category, a product or a service
 that does not exist, "Until" before "From". The tiers' one, shown under all of them, goes away as soon as
-any tier changes (typed in, one added or one removed), without saving again (hub#1448). **Create** (and **Save** when editing it, PRICING-F11) is grey
+any tier changes (typed in, one added or one removed), without saving again. **Create** (and **Save** when editing it) is grey
 while the business has not yet said its currency, because the amount per unit is read in it (without it,
 "1500" yen would be saved as 150,000); until then, leaving the amount keeps it as typed, without inventing
 decimals for it or judging it: "¥1500" or "12,50 zł" are not marked red as "This is not an amount", and as soon as
-the currency arrives they are read in it (hub#945). If the currency cannot be read, the window says so ("The business's currency could not be read", with the
-reason) and offers "Retry", which asks for it again; as soon as it arrives, **Create** (or **Save**) lights up (hub#938).
+the currency arrives they are read in it. If the currency cannot be read, the window says so ("The business's currency could not be read", with the
+reason) and offers "Retry", which asks for it again; as soon as it arrives, **Create** (or **Save**) lights up.
 Involved: Inventory, Services, Customers
 
 ### PRICING-F11 Edit a rule
@@ -378,7 +394,7 @@ Status: done (server and screen)
 Actor: owner, administrator, manager, assistant
 Screen: Price Lists
 Steps:
-1. **Edit** on the row: **Editing rule — {name}**.
+1. **Edit** on the row: **Editing rule — Happy hour**.
 2. Change whatever you want and **Save**.
 In: only what changed; the assistant names the rule by its code or its name.
 Out: the rule and `pricing.rule.updated` (without changes, nothing).
@@ -390,13 +406,13 @@ Status: done (server and screen)
 Actor: owner, administrator, manager, assistant
 Screen: Price Lists
 Steps:
-1. **Deactivate** and confirm "{name} will stop applying to new sales.".
+1. **Deactivate** and confirm "Happy hour will stop applying to new sales.".
 2. To use it again, filter by **Inactive** and tap **Activate**.
 In: the rule.
 Out: `pricing.rule.deactivated` or `pricing.rule.activated`. Sales already made do not change.
 If it fails: "That discount rule is already deactivated.", "That discount rule is already active." and, if
 Customers deleted its group, "This rule's customer group no longer exists: choose another group or take it off
-before activating it." (409 `pricing.rule_group_deleted`): without a group it would apply to everybody.
+before activating it.": without a group it would apply to everybody.
 Involved: Customers
 
 ### PRICING-F13 Look up the price of a line

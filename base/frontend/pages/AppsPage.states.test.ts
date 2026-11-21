@@ -28,7 +28,7 @@ describe('what an app refuses is said beforehand (hub#618, hub#694)', () => {
     expect(noteOf(m, 'verifactu').text()).toBe(NEVER_OFF);
     expect(state(m, 'verifactu').text()).toBe('Active');
     // «Open» is still there: only turning it off is refused.
-    expect(await appActionLabel(m, 'verifactu', 'open')).toBe('Open');
+    expect(await appActionLabel(m, 'verifactu', 'open')).toBe('Open: VeriFactu');
     // The app next to it goes on as ever.
     expect(switchState(m, 'tax').disabled).toBe(false);
     expect(noteOf(m, 'tax').exists()).toBe(false);

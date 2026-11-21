@@ -42,7 +42,7 @@ from apps.combo.schemas import (
     SaleComboPage,
 )
 from apps.inventory.models import Product, ProductCategory, Unit
-from apps.inventory.queries import products_standing_for
+from apps.inventory.queries.recovery import products_standing_for
 from apps.tax.models import TaxCategory
 from base import images
 from base.queries.catalog_images import business_language, image_library

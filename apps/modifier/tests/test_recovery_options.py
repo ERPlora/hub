@@ -67,11 +67,11 @@ def test_the_copy_gives_each_option_with_its_group_and_what_its_create_takes():
     named = {sauces.id: "Sauces", extras.id: "Extras"}
     assert read == [
         {"id": ketchup.id, "group_id": sauces.id, "name": "Ketchup", "kitchen_name": "", "price_delta": 0,
-         "is_default": True, "sort_order": 0, "tax_category_id": None, "copy_groups": named},
+         "is_default": True, "sort_order": 0, "allergens": [], "tax_category_id": None, "copy_groups": named},
         {"id": cheese.id, "group_id": extras.id, "name": "Cheese", "kitchen_name": "+CH", "price_delta": 100,
-         "is_default": False, "sort_order": 2, "tax_category_id": generic, "copy_groups": named},
+         "is_default": False, "sort_order": 2, "allergens": [], "tax_category_id": generic, "copy_groups": named},
         {"id": bbq.id, "group_id": sauces.id, "name": "BBQ", "kitchen_name": "", "price_delta": 0,
-         "is_default": False, "sort_order": 1, "tax_category_id": None, "copy_groups": named},
+         "is_default": False, "sort_order": 1, "allergens": [], "tax_category_id": None, "copy_groups": named},
     ]
 
 

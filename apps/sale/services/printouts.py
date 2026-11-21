@@ -1,22 +1,24 @@
 """The sale's paper through Printing (PRINTING-F07, F08, F09, F13; SALE-F21, F29): a sale's ticket and an open
-check's bill."""
+check's bill, which the check notes as asked for (TABLE-F34)."""
 
 import logging
 import uuid
 
 from babel.numbers import get_currency_precision
 from django.db import DatabaseError
-from django.utils import translation
+from django.utils import timezone, translation
 from live.context import OperationContext
 from live.errors import AppInactive, OperationError
 from live.operations import AI, UnknownOperation, atomic, get, operation
+from live.outbox import record_event
 
-from apps.sale import paper
-from apps.sale.models import FiscalStatus, Sale
+from apps.sale import events, paper
+from apps.sale.models import FiscalStatus, Order
 from apps.sale.queries.business import business_currency
 from apps.sale.queries.checkout import preview
 from apps.sale.queries.letterhead import business_letterhead
 from apps.sale.queries.orders import find_order
+from apps.sale.queries.receipt_codes import receipt_url
 from apps.sale.queries.sales import find_sale, sale_detail
 from apps.sale.queries.settings import current_settings
 from apps.sale.schemas.checkout import PreviewIn
@@ -79,18 +81,19 @@ def _fiscal_record(ctx: OperationContext, sale: SaleOut) -> dict | None:
     return found.record.model_dump() if found.record else None
 
 
-def _print_sale(ctx: OperationContext, sale: Sale, detail: SaleOut, *, duplicate: bool, key: str, at_checkout: bool = False) -> dict:  # noqa: PLR0913
-    """The receipt (or the full invoice) of ``sale`` to the receipt printer's queue. ``at_checkout``: the print by
-    itself of the charge — it follows the printing settings, and the drawer opens only when cash came in. A
-    fiscal document still pending never prints as if issued: the screen's paper says it is pending."""
-    if sale.invoice_status == FiscalStatus.PENDING:
+def _print_sale(ctx: OperationContext, detail: SaleOut, *, duplicate: bool, key: str, at_checkout: bool = False) -> dict:
+    """The receipt (or the full invoice) of the sale ``detail`` to the receipt printer's queue, a ticket with the code
+    its customer asks for the full invoice with. ``at_checkout``: the print by itself of the charge — it follows the
+    printing settings, and the drawer opens only when cash came in. A fiscal document still pending never prints as if
+    issued: the screen's paper says it is pending."""
+    if detail.invoice_status == FiscalStatus.PENDING:
         return dict(NOT_QUEUED)
     try:
         record = _fiscal_record(ctx, detail)
     except _Unprintable:
         return dict(NOT_QUEUED)
     settings = current_settings()
-    currency = sale.currency
+    currency = detail.currency
     with translation.override(ctx.language):
         kind, document = paper.receipt(
             detail,
@@ -100,6 +103,8 @@ def _print_sale(ctx: OperationContext, sale: Sale, detail: SaleOut, *, duplicate
             duplicate=duplicate,
             record=record,
         )
+        if detail.receipt_code:
+            document.update(paper.claim(detail.receipt_code, receipt_url(ctx, detail.receipt_code)))
     request = {
         "job_key": key,
         "document_type": kind,
@@ -111,6 +116,16 @@ def _print_sale(ctx: OperationContext, sale: Sale, detail: SaleOut, *, duplicate
     if at_checkout:
         request.update(automatic=True, open_drawer=any(payment.method_type == "cash" for payment in detail.payments))
     return _queue_paper(ctx, request)
+
+
+def _note_bill_requested(ctx: OperationContext, order: Order) -> None:
+    """The check keeps its bill's first print, with its own event. Printing it again changes nothing, and never its
+    version: the screen still charges the check with the version it showed."""
+    if order.bill_printed_at is not None:
+        return
+    order.bill_printed_at = timezone.now()
+    order.save(update_fields=["bill_printed_at", "updated_at"])
+    record_event(ctx, events.ORDER_CHANGED, {"order_id": str(order.id)})
 
 
 @operation(
@@ -143,7 +158,7 @@ def print_sale(ctx: OperationContext, data: SalePrintIn) -> dict:
     sale = find_sale(data.sale_id, data.sale)
     with translation.override(ctx.language):
         detail = SaleOut.model_validate(sale_detail(sale))
-    return _print_sale(ctx, sale, detail, duplicate=data.duplicate, key=f"sale-{sale.id}-print-{uuid.uuid7()}")
+    return _print_sale(ctx, detail, duplicate=data.duplicate, key=f"sale-{sale.id}-print-{uuid.uuid7()}")
 
 
 @operation(
@@ -157,7 +172,7 @@ def print_sale(ctx: OperationContext, data: SalePrintIn) -> dict:
     ai=AI(
         description="Print the bill of an open check for the table (not an invoice: no number, no payment) on the "
         "receipt printer. Each call prints one. Not queued (Printing off, no receipt printer): say so; the screen "
-        "prints it.",
+        "prints it. Either way its table shows «Bill requested» on the floor plan until the check is charged in full.",
         risk="normal",
         asks={
             "en": (
@@ -173,13 +188,14 @@ def print_sale(ctx: OperationContext, data: SalePrintIn) -> dict:
     ),
 )
 def print_bill(ctx: OperationContext, data: OrderRefIn) -> dict:
-    order = find_order(data.order_id)
+    order = find_order(data.order_id, lock=True)
     valued = preview(ctx, PreviewIn(order_id=data.order_id))
     currency = business_currency(ctx)
     with translation.override(ctx.language):
         document = paper.bill(
             valued, label=order.label, letterhead=business_letterhead(ctx), decimals=get_currency_precision(currency)
         )
+    _note_bill_requested(ctx, order)
     return _queue_paper(
         ctx,
         {

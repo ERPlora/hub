@@ -83,7 +83,8 @@ test('the waiter sees dish allergens and the customer allergy on lines and sheet
     products[key] = await createProduct(context, { name: `E2E ${name} ${RUN}`, sku: `${SKU}-${key}`, price: 800, tax_category_key: FOOD, allergens });
   }
   const group = await post<{ id: string }>(context, '/modifier/groups', { name: GROUP, max_choices: 1 });
-  await post(context, '/modifier/options', { group_id: group.id, name: 'Extra' });
+  const cheese = await post<{ id: string }>(context, '/modifier/options', { group_id: group.id, name: 'Cheese', allergens: ['milk'] });
+  const extra = await post<{ id: string }>(context, '/modifier/options', { group_id: group.id, name: 'Extra' });
   await post(context, '/modifier/links/attach', { group_id: group.id, product_id: products.plate.id });
   menuId = (await post<{ id: string }>(context, '/combo/combos', { name: MENU, price: 1400, tax_category_key: FOOD })).id;
   for (const course of ['Main', 'Dessert']) await post(context, '/combo/groups', { combo: MENU, name: course, min_choices: 1, max_choices: 1 });
@@ -96,6 +97,10 @@ test('the waiter sees dish allergens and the customer allergy on lines and sheet
   const modifiers = page.locator('[data-testid=pos-options]');
   await expect(modifiers).toBeVisible();
   await expect(modifiers.locator('[data-testid=pos-options-allergens]')).toHaveText('Allergens: Gluten, Milk');
+  await expect(modifiers.locator(`[data-testid=pos-option-allergens-${cheese.id}]`)).toHaveText('Allergens: Milk');
+  await expect(modifiers.locator(`[data-testid=pos-option-allergens-${extra.id}]`)).toHaveCount(0);
+  const tileHeight = async (id: string) => (await modifiers.locator(`[data-testid=pos-option-${id}]`).boundingBox())?.height;
+  expect(await tileHeight(extra.id), 'a choice without allergens stands as tall as the one beside it that says them').toBe(await tileHeight(cheese.id));
   await snap(page, 'modifiers');
   await modifiers.locator('[data-testid=pos-options-add]').click();
   await expect(modifiers).toBeHidden();

@@ -1,21 +1,29 @@
-<!-- generated from WORKBOOK.md sha256:c4ce5b68e9e70d9cb30ff78a1b87f33bc1cef0d70cfec0560986f7a01572d447 -->
+<!-- generated from WORKBOOK.md sha256:3a38883c70673128aa4f9d9b203e923be9ec479517702c805196f9ce6d117080 -->
 
 ## What it is for and who it is for
 
-Cart & Checkout is an **internal notebook of carts and orders**. It keeps **carts** — of a person
-(their email and their name) or of an anonymous visit, told apart by a **session code** — with their
-lines (product, quantity and price), and turns them into **orders** with a number, addresses, a shipping
-and a payment method and a status: **Initiated**, **Paid** or **Failed**, and **Completed**.
+Cart & Checkout is an **internal notebook of carts and orders**: it keeps the carts of a customer or of
+an anonymous visit and turns them into orders with their number and their status. **It is not the till
+and it charges nothing**: a person marks "Paid" after charging some other way, and nothing it does is
+fiscal. To charge at the counter there is **Sales**.
 
-The most important thing: **it is not the till and nothing it does is fiscal**. An order paid and
-completed here does **not** create a sale, an invoice, a VeriFactu record, a cash movement or a stock
-movement, and nothing charged here reaches the AEAT. "Paid" is a status that **a person marks** after
-charging some other way: the app charges nothing, talks to no payment gateway and asks for no amount or
-receipt. To charge at the counter there is **Sales**.
+### What it keeps
+
+It keeps **carts** — of a person (their email and their name) or of an anonymous visit, told apart by a
+**session code** — with their lines (product, quantity and price), and turns them into **orders** with a
+number, addresses, a shipping and a payment method and a status: **Initiated**, **Paid** or **Failed**,
+and **Completed**.
+
+### What it does not do
+
+An order paid and completed here does **not** create a sale, an invoice, a VeriFactu record, a cash
+movement or a stock movement, and nothing charged here reaches the AEAT. "Paid" is a status that **a
+person marks** after charging some other way: the app charges nothing, talks to no payment gateway and
+asks for no amount or receipt.
 
 It has no shop and no public page: only staff with a session in the Hub use it.
 
-Who uses it:
+### Who uses it
 
 - The **employee**: only looks at the carts and the orders.
 - The **manager**, the **administrator** and the **owner**: they also create, abandon and delete
@@ -46,12 +54,18 @@ refuses it even if they try it through the API or the assistant.
 
 ### Carts
 
-A table with the columns **Session**, **Email**, **Status** (Active, Abandoned, Converted,
-Expired), **Items** and **Total**. A search box "Search session or email…" (it searches the session
-code, the email and the name), filters per column behind the funnel of the bar, which opens "Filters" —
-session and email by a piece of the text, the status from a list, the items and the total "from / to" —,
-sorting per column, a list or card view and 50 rows
-per page. It is sorted by creation date, the most recent on top. The total shows in the cart's currency
+A table with the carts, the most recent on top: **Session**, **Email**, **Status** (Active, Abandoned,
+Converted, Expired), **Items** and **Total**, in each cart's currency. The search box searches the
+session, the email and the name, and the funnel of the bar opens "Filters", with a box per column.
+**New cart** creates one; each row offers **Abandon** (only an active cart) and **Delete**. The lines of
+a cart are not seen nor added on this screen: the assistant does that.
+
+#### The table of carts
+
+A search box "Search session or email…" (it searches the session code, the email and the name), filters
+per column behind the funnel of the bar, which opens "Filters" — session and email by a piece of the
+text, the status from a list, the items and the total "from / to" —, sorting per column, a list or card
+view and 50 rows per page. It is sorted by creation date, the most recent on top. The total shows in the cart's currency
 (one created in euros stays in euros even if the business changes country); the Total filter is typed in
 the business's currency ("12" is zł 12.00 in a business in Poland and ¥12 in one in Japan, where there are
 no cents) and compares the amount as it is, without converting currencies. It is read as in any amount
@@ -64,12 +78,22 @@ a negative one, "This amount cannot be negative.". While the business has not an
 with two decimals and nothing is warned; when it answers, the filter is read again in its currency from the
 first page.
 
+#### New cart
+
 The **New cart** button opens the "New cart" form: **Session** (required; "Save" is not enabled
 without it), **Email** and **Name**. Each row offers **Abandon** (only an active cart) and
 **Delete** (asks for confirmation). **There is no screen for the lines** of a cart nor for adding them:
 the assistant or the API does that.
 
 ### Orders
+
+A table with the orders, the most recent on top: **Order** (its number), **Email**, **Status**
+(Initiated, Paid, Failed, Completed), **Payment** (the payment method, as text) and **Total**, in the
+order's currency. A failed order shows its reason under the status. Each row offers the action that
+fits it: **Mark paid** (Initiated, after charging some other way), **Complete** (Paid) and **Fail**
+(Initiated or Paid). Orders are not created here: they are started from a cart with the assistant.
+
+#### The table of orders
 
 A table with **Order** (its number, always whole), **Email**, **Status** (Initiated, Paid, Failed,
 Completed), **Payment** (the payment method, as text) and **Total**, in the order's currency. A search box
@@ -79,7 +103,7 @@ and Total), sorting per column, a list or card view and 50 rows per page, the mo
 Each row offers the action that fits it: **Mark paid** (Initiated), **Complete** (Paid) and
 **Fail** (Initiated or Paid), which opens a form asking for the **reason**. While a row action is
 working, its button spins and a second tap does nothing. There is no button to create an order: they are
-born from the flow CART_CHECKOUT-F08.
+born from the flow CART_CHECKOUT-F08, from a cart, with the assistant or the API.
 
 ## States of each screen
 
@@ -135,8 +159,9 @@ may also give the currency (an ISO 4217 code) and the expiry date.
 Out: an active cart in the currency given or, if none is given, the business's
 (`cart_checkout.cart.created`).
 If it fails: inside the form, under its field: an empty session; a session another cart not deleted
-already uses ("There is already a cart with that session."); an email that is not an email; a currency
-that does not exist; an expiry that has already passed. What was typed is kept. Without permission, it is refused.
+already uses ("There is already a cart with that session."); an email that is not an email; through the
+assistant or the API, a currency that does not exist or an expiry that has already passed. What was typed
+is kept. Without permission, it is refused.
 Involved: none
 
 ### CART_CHECKOUT-F02 Add a line to a cart
@@ -216,7 +241,7 @@ Actor: manager, administrator, owner, assistant
 Screen: Carts
 Steps:
 1. In **Carts**, on the row, tap **Delete**.
-2. Confirm "Delete the cart …?" with **Delete**; **Cancel** leaves it as it was.
+2. Confirm "Delete the cart sess_a1b2c3?" with **Delete**; **Cancel** leaves it as it was.
 3. The cart disappears from the list. The assistant asks for a stronger confirmation (a dangerous action)
    and says the cart by its session.
 In: the cart.
@@ -230,8 +255,8 @@ Status: done
 Actor: system (scheduled task), administrator, assistant
 Screen: Carts (the status)
 Steps:
-1. An active cart whose expiry date has already passed **reads as Expired** in the list, in its
-   detail and in the status filter, and no longer takes changes or orders.
+1. An active cart whose expiry date has already passed **reads as Expired** in the list, in the
+   status filter and in what the assistant answers, and no longer takes changes or orders.
 2. Every fifteen minutes, the app's task stores it as Expired. The assistant or the API can also be asked
    to "expire the overdue carts".
 In: nothing; the Hub sets the time.

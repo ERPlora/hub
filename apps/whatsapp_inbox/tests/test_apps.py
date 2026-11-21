@@ -1,6 +1,5 @@
 """The WhatsApp inbox declares its module metadata, its menu, its permissions and what each role gets."""
 
-from pathlib import Path
 
 from django.apps import apps
 from django.conf import settings
@@ -11,6 +10,7 @@ from live.meta import (
     BellCounter,
     Category,
     DeviceNotice,
+    Help,
     LiveAppConfig,
     Nav,
     module_configs,
@@ -18,6 +18,7 @@ from live.meta import (
 )
 
 from apps.whatsapp_inbox import events
+from base.tests.shell_icons import shell_icon_registry
 
 
 def inbox():
@@ -228,7 +229,7 @@ def test_the_counters_events_re_run_its_query_and_its_icon_is_registered():
     assert live_registry.is_subscribable(counter.operation)
     assert set(counter.refresh_on) <= set(live_registry.subscribable[counter.operation])
     assert set(counter.refresh_on) <= set(events.ALL)
-    icons = (Path(settings.BASE_DIR) / "packages/ui/src/shell/icons.ts").read_text()
+    icons = shell_icon_registry()
     assert f"'{counter.icon.removeprefix('ion:')}'" in icons
 
 
@@ -263,3 +264,7 @@ def test_the_notice_falls_back_to_the_old_words_in_spanish():
 
 def test_the_inbox_has_no_setup_steps_nor_panels():
     assert (inbox().setup, inbox().widgets) == ([], [])
+
+
+def test_its_help_window_is_ready_without_a_video_yet():
+    assert inbox().help == Help()

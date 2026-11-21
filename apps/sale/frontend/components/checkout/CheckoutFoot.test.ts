@@ -106,6 +106,26 @@ describe('CheckoutFoot: why it cannot charge', () => {
   });
 });
 
+describe('CheckoutFoot: what a screen reader hears', () => {
+  // Ionic copies the button's aria-* to its native button only when it loads, and takes the host's own aria-disabled
+  // away when its `disabled` goes off. The sheet opens with «Charge» disabled while the total loads, so what blocks it
+  // afterwards has to reach the native button, the one a screen reader announces.
+  it('the native button is announced unavailable while the amount tendered is missing or short, and available once it covers', async () => {
+    const s = await setup({ total: undefined, ready: false });
+    s.confirm().shadowRoot!.innerHTML = '<button type="button"></button>';
+    const heard = () => [s.confirm().getAttribute('data-aria-disabled'), s.confirm().shadowRoot!.querySelector('button')!.getAttribute('aria-disabled')];
+
+    await s.wrapper.setProps({ total: 4250, ready: true, block: { kind: 'tenderedMissing' } });
+    expect(heard()).toEqual(['true', 'true']);
+    await s.wrapper.setProps({ block: { kind: 'tenderedShort' } });
+    expect(heard()).toEqual(['true', 'true']);
+    await s.wrapper.setProps({ block: null });
+    expect(heard()).toEqual(['false', null]);
+    await s.wrapper.setProps({ block: { kind: 'tenderedMissing' } });
+    expect(heard()).toEqual(['true', 'true']);
+  });
+});
+
 describe('CheckoutFoot: what happened', () => {
   it('a refusal in the server’s words', async () => {
     const s = await setup({ failure: { kind: 'refused', code: 'sale.order_changed', message: 'The check changed while it was being charged.' } });

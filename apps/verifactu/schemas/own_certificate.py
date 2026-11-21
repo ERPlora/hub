@@ -27,6 +27,13 @@ class CertificateOut(Schema):
     expires_at: dt.datetime | None = Field(description="When it expires.")
     expires_in_days: int | None = Field(description="Days left (negative: expired).")
     expires_soon: bool = Field(description="It expires within the notice period and has not expired: the screen warns.")
+    aeat_proof: Literal[*OwnCertificate.Proof.values] = Field(
+        description="untested, accepted or rejected: what the AEAT's test environment made of it (untested without "
+        "one). Going live with it needs it accepted; uploading another one leaves it untested."
+    )
+    aeat_proof_detail: str = Field(
+        description="Why the AEAT's test environment refused it, in the reader's language; empty unless rejected."
+    )
 
 
 class CertificateUploadIn(Schema):

@@ -1,6 +1,13 @@
-<!-- generated from WORKBOOK.md sha256:190cc6f01cc5281aa034580c3ff95bc2afaf7b30c62765cb56e0454466eaa7eb -->
+<!-- generated from WORKBOOK.md sha256:7b513c9fc907adfb274775eed9f9cbde067f0d63cd3d06eb35582ac4b1567c16 -->
 
 ## What it is for and who it is for
+
+Staff is your team: who works, with which role, on which schedule each week, when they are away and how much they earn
+per hour and in commission. The manager adds the records, approves time off and sees in Commissions what each
+professional has earned; each employee sees their own record and asks for their time off. Appointments, Services, Time
+clock, Tasks and the till read from here who works and who serves.
+
+### In detail
 
 Staff is the **business's team as a working resource**: who works, which catalogue role they have
 ("stylist", "waiter"), which schedule they work each week, when they are away, how much they earn per hour
@@ -61,12 +68,18 @@ ticket). At the end of the day, **Commissions** gives what each professional has
 
 ## Screens
 
-Staff opens from the **Staff** menu and has four tabs: **Staff**, **Roles**, **Time Off** and
-**Schedules**, plus **Commissions** (for whoever sees the pay) and **Settings** (for whoever can save
-them). What a person cannot do does not show, and the app refuses it even if they try through the API or
+Staff has five tabs: **Staff**, **Roles**, **Time Off**, **Schedules** and **Commissions** (this one,
+only for whoever sees the pay), plus **Settings** (for whoever can save them). What a person cannot do does not show, and the app refuses it even if they try through the API or
 the assistant.
 
 ### Staff
+Here is your team: one row per person with their name, their role, their email and their status (**Active**,
+**Inactive** or **On leave**) and, for whoever sees the pay, their hourly rate. Above it, three figures: **Active
+staff**, **On leave today** and **Pending time off**. **+** adds a person and a row opens their record to edit it; the
+owner and the administrator also deactivate or terminate them from the row. Whoever has their account linked to a
+record sees it in **My record**.
+
+#### Detail
 Above the table, three figures: **Active staff**, **On leave today** and **Pending time off**
 (STAFF-F23). Below, the table with the search "Search member…" (first name, last name, email, phone,
 employee ID or role), columns **Name, Role, Email, Status** and, only for whoever can see the pay,
@@ -84,6 +97,18 @@ country's in Settings → Business (euros in Spain, złoty in Poland), with its 
 its symbol at the end of the field; while the business has not answered, an amount is "—", never euros or guessed
 decimals.
 
+#### Home panels
+The Hub's **Home** shows the five panels of Staff, grouped as "Staff" in **Customize panel**. By default
+"Active staff" (how many people are **Active**), "On leave today" (different people with approved time off
+that covers today) and "Today’s time off" (who is away today, full days first and then by name, with the
+type of time off under each name) show; "Pending time off" (how many requests are waiting for an answer) and
+"Staff by role" (a bar per role with its **Active** people, the role with the most first and ten at most;
+each bar has its role's colour, and the one of a role without a colour, the panel's) are added from
+**Customize panel**. Whoever does not see the time off does not get the three time-off ones,
+and whoever does not see the team, neither "Active staff" nor "Staff by role". They change by themselves,
+without reloading. The same figures stay inside Staff: the three above the Staff table, "Today’s time off"
+above the Time Off one and the "Members" column of Roles (STAFF-F20 and STAFF-F23).
+
 ### Roles
 Table with the search "Search role…" and columns **Role, Description, Members** (how many **Active**
 people hold it). **+** opens **New** (**Role name, Description, Color**); a row opens **Edit**, where the
@@ -91,7 +116,7 @@ role is also **retired** (it stops being offered) or turned active again.
 
 ### Time Off
 Above the table, **Today’s time off**: who is away today, with the type and, if it is only part of the
-day, its hours (STAFF-F20). Below, the table with a search by name and columns **Member, Type, From, To,
+day, its hours. Below, the table with a search by name and columns **Member, Type, From, To,
 Status**, with filters by member, type, status and dates. Row actions: **Approve**, **Reject** and
 **Cancel**, where they apply. **+** opens the form: **Member** (only for whoever manages time off; the
 employee asks for it for themselves), **Type** (Vacation, Sick leave, Personal, Training or Other),
@@ -106,6 +131,13 @@ Default** and one row per weekday with **Start, End, Break start, Break end** (o
 working day of **Settings** already in place.
 
 ### Commissions
+Here you see what each professional has sold in a period and what is due to them in commission: "Today" on entering,
+or "Yesterday", "This week", "This month" or "Custom", with its "From" and "To" dates. At the top, the total of
+**Production** and of **Commissions**; below, one row per person with their role, what they have sold, their
+"Commission %" and their "Commission", in the business's currency. Only whoever can see the pay sees it, and it updates
+by itself when a sale is charged, voided or refunded.
+
+#### Detail
 At the top, the period: "Today" (on entering), "Yesterday", "This week" (since Monday), "This month"
 (since the 1st) or "Custom", which opens "From" and "To" with the days that were on screen; next to it,
 the days it counts. On a phone, the period is chosen in the "Period" drop-down, with the same options.
@@ -117,22 +149,10 @@ period even if they are no longer here ("No longer works here" or "Inactive" nex
 name, role, production or commission. On a phone, one card per person. It updates by itself when a sale is
 charged, voided or refunded and when a record changes.
 
-### Staff settings
+### Settings
 "Default working day", with "A new schedule proposes this working day from Monday to Friday, with the
 break in the middle of the day.": "Working day starts (HH:MM)", "Working day ends (HH:MM)", "Break
 duration (minutes)" and **Save**. While the business has never saved, the proposed values show.
-
-### Home panels
-The Hub's **Home** shows the five panels of Staff, grouped as "Staff" in **Customize panel**. By default
-"Active staff" (how many people are **Active**), "On leave today" (different people with approved time off
-that covers today) and "Today’s time off" (who is away today, full days first and then by name, with the
-type of time off under each name) show; "Pending time off" (how many requests are waiting for an answer) and
-"Staff by role" (a bar per role with its **Active** people, the role with the most first and ten at most;
-each bar has its role's colour, and the one of a role without a colour, the panel's) are added from
-**Customize panel**. Whoever does not see the time off does not get the three time-off ones,
-and whoever does not see the team, neither "Active staff" nor "Staff by role". They change by themselves,
-without reloading. The same figures stay inside Staff: the three above the Staff table, "Today’s time off"
-above the Time Off one and the "Members" column of Roles (STAFF-F20 and STAFF-F23).
 
 ## States of each screen
 
@@ -186,7 +206,7 @@ Screen: Staff
 Steps:
 1. In **Staff**, tap **+**: **New** opens (without Status: the person is born **Active**).
 2. Write First name and Last name (required, up to 100 characters). If you want, Email, Phone, Employee
-   ID, Role, Hub user (STAFF-F03), Hire date, Color (#RRGGBB), Specialties, Bio, Buffer between
+   ID, Role, Hub user, Hire date, Color (#RRGGBB), Specialties, Bio, Buffer between
    appointments and, with the pay permission, Hourly rate and Commission (%). **Bookable** comes on.
 3. Tap Save: the person shows in the table as **Active**.
 In: the form; the active roles (STAFF-F04), by id or by their name. The rate is typed in the business's
@@ -197,13 +217,13 @@ Out: the record; Staff announces there is a new record (`staff.member.created`).
 If it fails: under each field and without saving anything: first name or last name empty, an email that
 is not one, a color that is not #RRGGBB, a negative rate, a commission outside 0–100, "That role is not
 available: it does not exist in this business, or it has been deleted or retired.", "That Hub user has no
-access to this business." or the account already linked to another record (STAFF-F03). Whoever cannot see
-the pay cannot send it: "Permission “{permission}” is required.". Two records with the same name, email or
+access to this business." or the account already linked to another record. Whoever cannot see
+the pay cannot send it: the notice says which permission they lack. Two records with the same name, email or
 employee ID are accepted. From the assistant, a role the business does not have (or that has been retired)
 is checked before the confirmation card: no card shows, the assistant says that role is not available and
-which ones there are, and nothing is created. Save (also when editing, STAFF-F02) is grey while the business has not yet said its
+which ones there are, and nothing is created. Save (also when editing) is grey while the business has not yet said its
 currency, because the hourly rate is read in it (without it, "1500" yen would be saved as 150,000). If the currency cannot be read, the window says so ("The business's currency could not be read", with the
-reason) and offers "Retry", which asks for it again; as soon as it arrives, Save lights up (hub#938).
+reason) and offers "Retry", which asks for it again; as soon as it arrives, Save lights up.
 Involved: BASE-F97
 
 ### STAFF-F02 Edit a professional's record
@@ -211,11 +231,11 @@ Status: done (server and screen)
 Actor: owner, administrator, manager, assistant
 Screen: Staff
 Steps:
-1. Tap the row: **Edit · {name}** opens (the assistant names it by its name) with what the row already
+1. Tap the row: **Edit · Ana García** opens (the assistant names it by its name) with what the row already
    says, and "Loading…" while the whole record arrives; Save waits in grey until then.
 2. Change what is needed, also before the record arrives: what was typed or chosen stays, and the record,
-   when it arrives, fills only what has not been touched (hub#1347). **Status** offers Active, Inactive and
-   On leave (the final termination is STAFF-F06). "No role" removes the role, "No Hub access" unlinks the
+   when it arrives, fills only what has not been touched. **Status** offers Active, Inactive and
+   On leave (the final termination is done with **Terminate**, in the row). "No role" removes the role, "No Hub access" unlinks the
    account, and the Hire date can be **cleared**.
 3. Save: only what was sent changes.
 In: the record (and, with the permission, its rate, commission and notes).
@@ -240,8 +260,8 @@ In: the active accounts with access to this business, only their identifier and 
 Out: the link. With it, the person sees their own record (STAFF-F08) and asks for their time off
 (STAFF-F24). It changes no permission nor the commission: a sale counts for whoever was chosen when it was
 charged (STAFF-F21). Terminating the record frees the account.
-If it fails: "That Hub user is already linked to {name}. A Hub user can belong to only one staff member:
-unlink it there first, or pick another user." (`staff.user_already_linked`), also if two people link it
+If it fails: "That Hub user is already linked to Ana García. A Hub user can belong to only one staff member:
+unlink it there first, or pick another user.", also if two people link it
 at the same time; "That Hub user has no access to this business.".
 Involved: ATTENDANCE-F01, TASK-F03
 
@@ -258,7 +278,7 @@ In: what was typed.
 Out: the role (`staff.role.created` or `staff.role.updated`). A retired role stops being offered in the
 records; the ones that already carry it keep it. "Members" counts only **Active** people. A role grants
 no permissions.
-If it fails: "A role with that name already exists." (case-insensitive, `staff.role_name_taken`); "That
+If it fails: "A role with that name already exists." (case-insensitive); "That
 role does not exist in this business.".
 Involved: none
 
@@ -267,14 +287,14 @@ Status: done (server and screen)
 Actor: owner, administrator, assistant
 Screen: Staff
 Steps:
-1. In the row, tap **Deactivate** and confirm "Take {name} off the floor? They stop being bookable;
+1. In the row, tap **Deactivate** and confirm "Take Ana García off the floor? They stop being bookable;
    nothing is deleted.".
 2. The row turns **Inactive** and stops being bookable.
 In: the record and its pending or approved time off that has not ended (with the business's "today").
 Out: status Inactive and Bookable off (`staff.member.deactivated`). It does not touch schedules, time off,
 account or appointments. To come back: STAFF-F02.
 If it fails: "That staff member has pending or approved time off that has not ended yet. Resolve it
-first." (`staff.active_time_off`; it is rejected or cancelled in STAFF-F18 and STAFF-F19); "That staff
+first." (it is rejected or cancelled in **Time Off**); "That staff
 member is already inactive."; "That staff member does not exist in this business.".
 Involved: none
 
@@ -317,9 +337,9 @@ Involved: none
 ### STAFF-F08 See my own record and my time off
 Status: done (server and screen)
 Actor: employee (and any person with a linked record), assistant
-Screen: Staff (own view) and Time Off
+Screen: Staff (own view), Time Off
 Steps:
-1. A person with their account linked to their record (STAFF-F03) opens what is theirs.
+1. A person with their account linked to their record taps **My record** in **Staff**, or opens **Time Off**.
 2. They see their record with **their own** rate and commission (without the HR notes), and their time
    off with its reason and its notes.
 3. The record is read-only: a single button, **Close**.
@@ -349,7 +369,7 @@ Actor: owner, administrator, manager, assistant
 Screen: Schedules
 Steps:
 1. Choose the person and tap **+**: **New** opens with a proposed week: from Monday to Friday, the default
-   working day of **Settings** (STAFF-F22), with the break in the middle of the day and its start on the
+   working day of **Settings**, with the break in the middle of the day and its start on the
    previous quarter of an hour; with the settings untouched, from 09:00 to 18:00 with a break from 13:00 to
    14:00. A day off proposes the same hours if it is ticked.
 2. Set the name (empty, "Regular schedule"), the validity if it only applies on some dates, "Default" if it
@@ -365,9 +385,9 @@ must be before the end time.", "The break needs a start and an end, or neither."
 inside the working hours.", "Each weekday can appear only once.", "The schedule's validity ends before it
 starts."; "That staff member does not exist in this business.". A shift that crosses midnight is not
 accepted. "A schedule needs at least one working day with hours." shows on top of the week and goes away
-as soon as any day changes (ticked, unticked, or an hour typed), without saving again (hub#1448). A day's
+as soon as any day changes (ticked, unticked, or an hour typed), without saving again. A day's
 reason shows under that day and goes away as soon as that day changes (ticked, unticked, or one of its hours
-typed), without saving again; the other days' reasons stay until those days change (hub#1460).
+typed), without saving again; the other days' reasons stay until those days change.
 Involved: none
 
 ### STAFF-F14 Edit a schedule
@@ -375,7 +395,7 @@ Status: done (server and screen)
 Actor: owner, administrator, manager
 Screen: Schedules
 Steps:
-1. Tap the schedule's row: **Edit · {name}** opens with its week.
+1. Tap the schedule's row: **Edit · Regular schedule** opens with its week.
 2. Change the name, the validity, "Default" or the days; a day you untick becomes "Off". Save: **the whole
    week is replaced**; the rest you do not send stays as it was and an empty date removes that validity.
 In: the schedule and its whole week.
@@ -391,7 +411,7 @@ Actor: owner, administrator, manager
 Screen: Schedules
 Steps:
 1. **Activate / deactivate** changes at once: an inactive schedule rules no day.
-2. **Delete** asks to confirm "Delete the schedule "{name}"? Its hours stop counting for availability." and
+2. **Delete** asks to confirm "Delete the schedule "Regular schedule"? Its hours stop counting for availability." and
    deletes it with its hours.
 In: the schedule.
 Out: `staff.schedule.updated` or `staff.schedule.deleted`. Deleting the "Default" one does not make
@@ -430,7 +450,7 @@ Out: the Pending time off (`staff.time_off.created`; the notice does not carry t
 change the agenda yet: it only counts when it is approved (STAFF-F18). It does not notify the person.
 If it fails: under each field: "The end date cannot be before the start date.", "A half-day absence needs
 a start and an end time.", "The start time must be before the end time."; "That staff member already has
-pending or approved time off in those dates." (`staff.overlapping_time_off`): they overlap if they share
+pending or approved time off in those dates.": they overlap if they share
 any day and, when both are by hours, also any hour (a morning one and an afternoon one on the same day do
 **not** clash); rejected and cancelled ones do not count. "That staff member does not exist in this
 business.".
@@ -449,7 +469,7 @@ Out: the new status and, when approving, who approved and when (`staff.time_off.
 "On leave today"; Rejected changes nothing. It does not notify the person nor look at their appointments.
 Whoever manages time off can also approve their own.
 If it fails: "That staff member already has approved time off in those dates." (when approving); "That
-time-off request cannot change to that status from its current one." (`staff.invalid_transition`); "That
+time-off request cannot change to that status from its current one."; "That
 time-off request does not exist in this business.".
 Involved: none
 
@@ -470,7 +490,7 @@ Involved: none
 ### STAFF-F20 See who is away today
 Status: done (server and screen)
 Actor: everyone
-Screen: Time Off, Staff and Home
+Screen: Time Off, Staff, Home
 Steps:
 1. Open **Time Off**: above the table, "Today’s time off" lists whoever has **approved** time off that
    covers today (in the business's day), full days first and then by name, with the type and, if it is only
@@ -488,15 +508,15 @@ Involved: none
 ### STAFF-F21 Give each professional's rate and commission
 Status: done (server and screen)
 Actor: owner, administrator, manager
-Screen: Staff (Rate/h column and form) and Commissions
+Screen: Staff (Rate/h column and form), Commissions
 Steps:
 1. Whoever can see the pay sees the rate, the commission and the HR notes of each record.
-2. The **commission sheet** gives, for each person who can earn a commission (Active or On leave; not the
-   Inactive nor the terminated ones), their record, their account (empty if they have none), name, role
-   and commission, also those with commission 0.
-3. To know what each professional has earned, open **Staff → Commissions**. "Today" shows: what each person
+2. **Commissions** shows each person who can earn a commission (Active or On leave) with their name, their
+   role and their commission, also without sales or with commission 0, and whoever sold in the period even
+   if they are no longer here ("No longer works here" or "Inactive" next to the name).
+3. To know what each professional has earned, open the **Commissions** tab. "Today" shows: what each person
    has sold in the business's day, with what was refunded already taken off, without the vouchers they sold
-   and with what the voucher sessions they did are worth added (SALE-F28), their commission and what is
+   and with what the voucher sessions they did are worth added, their commission and what is
    due to them (sold × commission ÷ 100, rounded to the smallest unit of the business's currency, the cent
    in euros, only once per person; half a unit rounds up). At the top, the total sold and the total of
    commissions.
@@ -518,14 +538,14 @@ Involved: SALE-F16, SALE-F27, SALE-F28
 ### STAFF-F22 Change the Staff settings
 Status: done (server and screen)
 Actor: owner, administrator, manager
-Screen: Staff settings
+Screen: Settings
 Steps:
 1. Open **Settings**: the saved default working day shows or, if it was never saved, the proposed one (from
    09:00 to 18:00 with a 60-minute break).
 2. Change the start and the end in HH:MM (the end, after the start: a schedule's day does not cross
    midnight) and the break, from 0 (no break) to 480 minutes and shorter than the working day.
 3. Tap **Save**.
-   What is changed while it is saving is not lost: it stays on screen, still to save (hub#914).
+   What is changed while it is saving is not lost: it stays on screen, still to save.
 In: what was sent; the rest stays as it was.
 Out: the business's settings (`staff.settings.updated`), with the hours always in HH:MM. From that moment,
 a new schedule proposes that working day from Monday to Friday, with the break in the middle of the day
@@ -536,14 +556,14 @@ before it starts says "The start time must be before the end time." under "Worki
 working day, "The break must fall inside the working hours." under the break; nothing is saved. As in the form
 windows, the notice goes as soon as something is changed and a field's reason as soon as that field is
 corrected; both come back if the next try is refused too. A refusal that names no field stays until the next
-try (hub#854). If the settings cannot be read, "The settings could not be loaded" with "Retry", without a
+try. If the settings cannot be read, "The settings could not be loaded" with "Retry", without a
 form: values that are not the business's are never offered to be saved.
 Involved: none
 
 ### STAFF-F23 See the figures of the staff and by role
 Status: done (server and screen)
 Actor: everyone
-Screen: Staff, Roles and Home
+Screen: Staff, Roles, Home
 Steps:
 1. Open **Staff**: above the table three figures show: "Active staff" (how many people are **Active**), "On
    leave today" (different people with approved time off that covers today) and "Pending time off" (how
@@ -569,12 +589,12 @@ Screen: Time Off
 Steps:
 1. In **Time Off**, tap **+**: the form does not ask for the Member, the time off is yours.
 2. Choose the Type, the dates, "Full day" (or its hours) and, if you want, the Reason, and save.
-3. It shows as **Pending** until a manager approves or rejects it (STAFF-F18); while it is pending you can
-   withdraw it (STAFF-F19).
+3. It shows as **Pending** until a manager approves or rejects it; while it is pending you can
+   withdraw it with **Cancel**.
 In: your record, through your linked account (STAFF-F03).
 Out: the Pending time off, with the same notice as STAFF-F17 (`staff.time_off.created`).
-If it fails: the same refusals as STAFF-F17; without a linked record: "Your user is not linked to any staff
-member: ask a manager to link it." (`staff.no_member_record`).
+If it fails: the same refusals as when registering time off; without a linked record: "Your user is not linked to
+any staff member: ask a manager to link it.".
 Involved: none
 
 ## Services: what goes in and what comes out

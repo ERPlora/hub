@@ -14,11 +14,10 @@ import {
   type ShellSidebar,
   type ShellUserMenu,
   type ShellUserMenuItem,
-  stopNoticeListening,
   type ThemePalette,
   toastSuccess,
 } from '@erplora/ui/shell';
-import { assistantMessages, configureAssistant, forgetAssistant } from '@erplora/ui/components';
+import { assistantMessages, configureAssistant } from '@erplora/ui/components';
 import { createLiveClient, type LiveClient, provideLiveClient, readSpaConfig } from '@erplora/ui/sdk';
 import { defineAsyncComponent, ref, watch } from 'vue';
 import { isNavigationFailure, type RouteRecordRaw } from 'vue-router';
@@ -29,9 +28,11 @@ import { APP_BLOCKED_ROUTE, appOfRouteFile, createAppGate } from '../base/fronte
 import { installErrorReport } from '../base/frontend/lib/error-report';
 import { approvalPass } from '../base/frontend/lib/approval';
 import { hubAssistant } from '../base/frontend/lib/assistant-hub';
+import { reloadOrForgetGone } from '../base/frontend/lib/change-business';
 import { type HubHome, readJsonBlock } from '../base/frontend/lib/home';
 import { openReportProblem } from '../base/frontend/lib/report-problem';
 import { allowedTo, useApiDocsShown } from '../base/frontend/lib/sidebar';
+import { beforeSignOut } from '../base/frontend/lib/sign-out';
 import { OPERATION_ROUTES } from './generated/operation-routes';
 
 /**
@@ -112,9 +113,14 @@ export function chromeLoaded(pieces: object = CHROME): Promise<unknown> {
  * linked hub and the app refuses its orders; then the shell's.
  */
 export async function signOut(doc: Document = document): Promise<void> {
-  forgetAssistant();
-  await stopNoticeListening();
+  await beforeSignOut();
   logout(doc);
+}
+
+/** The live client's reload once the hub stopped serving the page: inside the installed app, a hub that is gone is
+ *  forgotten instead of reloaded (HUB_APP-F05). */
+function reloadThePage(): void {
+  void reloadOrForgetGone();
 }
 
 /** An app's `frontend/routes.ts` default-exports its routes → pages, and nothing else. */
@@ -135,7 +141,7 @@ export function appRoutes(routeFiles: Record<string, AppRoutes>): RouteRecordRaw
     });
 }
 
-/** An app's `frontend/locale/<lang>.json`, all under the app id (guard: main.test.ts). */
+/** An app's `frontend/locale/<lang>.json`, all under the app id (guard: main.on-import.test.ts). */
 export type AppCatalogue = Record<string, unknown>;
 
 /** Every app catalogue, by the language in its file name, over the shared assistant's words (`assistant`, its panel's);
@@ -213,7 +219,7 @@ export async function boot(
   // The shared assistant's panel as the Hub's: its routes, base's operations and words, who uses it.
   configureAssistant(hubAssistant(doc));
   // A manager's approval: the pass of the command being repeated travels in `X-Elevation-Token`.
-  const client = createLiveClient(config, { routes: OPERATION_ROUTES, getElevationToken: approvalPass });
+  const client = createLiveClient(config, { routes: OPERATION_ROUTES, getElevationToken: approvalPass, reload: reloadThePage });
   const { reload, ...session } = loadSession(client, doc);
   const chrome = chromeLoaded();
   const { app, router } = await createShell({

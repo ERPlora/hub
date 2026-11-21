@@ -1,12 +1,15 @@
 <script setup lang="ts">
 // A declarative panel paints its operation's result by `kind` (lib/home.ts `widgetView`), followed live when the
-// operation is a live query and asked once when it is not. A failed read says «Unavailable», never the figure it had.
+// operation is a live query and asked once when it is not. A figure is the library's figure card (lib/home-figures.ts),
+// in the colour its app declares, soft unless the board puts it in its row in colour; a failed read offers «Retry».
+// Any other panel that fails says «Unavailable». Neither ever shows the figure it had.
 // A panel with its own `component` mounts that component of its app (`apps/<app>/frontend/components/<component>.vue`).
 // A timeline says when each entry happened in the device's time, because the browser does not know the business's
 // zone; it is read again each minute so a Home left open past midnight moves today's entries to yesterday.
 // A row without its value (a cash session closed without a count) says «—» with no bar, never a 0. A bar is as long as
 // the size of its value; only one below zero is red, because a drawer 0,40 € short beside one 5,50 € over is a
 // discrepancy too. Every other bar keeps the panel's colour, or its row's when the panel maps one (`map.color`).
+import { StatCard, type StatCardVariant } from '@erplora/ui/components';
 import { type OpName, useLive, useLiveClient } from '@erplora/ui/sdk';
 import { HubIcon } from '@erplora/ui/shell';
 import { IonSkeletonText } from '@ionic/vue';
@@ -15,10 +18,11 @@ import { computed, defineAsyncComponent, onMounted, onUnmounted, ref, type Ref, 
 import type { WidgetDef } from '../operations/home';
 import { appComponent } from '../lib/app-components';
 import { widgetView } from '../lib/home';
+import { figureCard, figureTone, isFigure } from '../lib/home-figures';
 import { useBaseI18n } from '../lib/i18n';
 import { useBusinessMoney } from '../lib/money';
 
-const props = defineProps<{ widget: WidgetDef }>();
+const props = withDefaults(defineProps<{ widget: WidgetDef; variant?: StatCardVariant }>(), { variant: 'soft' });
 
 const { locale } = useBaseI18n();
 const client = useLiveClient();
@@ -27,6 +31,7 @@ interface Source {
   data: Readonly<Ref<unknown>>;
   failed: Readonly<Ref<boolean>>;
   loading: Readonly<Ref<boolean>>;
+  retry: () => void;
 }
 
 function followed(op: OpName): Source {
@@ -35,6 +40,7 @@ function followed(op: OpName): Source {
     data: live.data,
     failed: computed(() => live.status.value === 'error'),
     loading: computed(() => live.data.value === undefined && live.status.value !== 'error'),
+    retry: live.refresh,
   };
 }
 
@@ -42,7 +48,9 @@ function askedOnce(op: OpName): Source {
   const data = shallowRef<unknown>(undefined);
   const failed = ref(false);
   const loading = ref(true);
-  onMounted(async () => {
+  async function load(): Promise<void> {
+    loading.value = true;
+    failed.value = false;
     try {
       data.value = await client.api.call(op, props.widget.params as never);
     } catch (error) {
@@ -51,8 +59,9 @@ function askedOnce(op: OpName): Source {
     } finally {
       loading.value = false;
     }
-  });
-  return { data, failed, loading };
+  }
+  onMounted(load);
+  return { data, failed, loading, retry: () => void load() };
 }
 
 const componentFailed = ref(false);
@@ -89,18 +98,8 @@ if (props.widget.kind === 'timeline') {
 const view = computed(() =>
   source ? widgetView(props.widget, source.data.value, locale.value, { now: now.value, money: money?.value }) : { kind: 'empty' as const },
 );
-
-/** The sparkline's points in a 100×40 box, lowest value at the bottom. */
-const points = computed(() => {
-  const current = view.value;
-  if (current.kind !== 'sparkline') return '';
-  const { series } = current;
-  const min = Math.min(...series);
-  const span = Math.max(...series) - min;
-  const y = (v: number) => (span > 0 ? Math.round((40 - ((v - min) / span) * 40) * 100) / 100 : 20);
-  if (series.length === 1) return `0,${y(series[0])} 100,${y(series[0])}`;
-  return series.map((v, i) => `${Math.round((i / (series.length - 1)) * 10000) / 100},${y(v)}`).join(' ');
-});
+const figure = isFigure(props.widget);
+const card = computed(() => figureCard(view.value));
 
 const percent = (share: number) => `${Math.round(share * 1000) / 10}%`;
 
@@ -115,7 +114,27 @@ const chosenBar = computed(() => {
 </script>
 
 <template>
+  <StatCard
+    v-if="figure"
+    :class="`widget--${widget.size}`"
+    :data-key="widget.key"
+    testid="widget"
+    :aria-busy="loading"
+    :label="widget.title"
+    :icon="widget.icon"
+    :tone="figureTone(widget)"
+    :variant="variant"
+    :value="card.value"
+    :note="card.note"
+    :sparkline="card.sparkline"
+    :status="card.status"
+    :loading="loading"
+    :error="unavailable"
+    :empty-label="$t('base.widgets.noData')"
+    @retry="source?.retry()"
+  />
   <article
+    v-else
     class="widget ep-surface"
     :class="`widget--${widget.size}`"
     :data-key="widget.key"
@@ -160,58 +179,6 @@ const chosenBar = computed(() => {
     >
       {{ $t('base.widgets.noData') }}
     </p>
-    <p
-      v-else-if="view.kind === 'kpi'"
-      class="widget-value"
-      data-testid="widget-value"
-    >
-      {{ view.value }}
-    </p>
-    <div
-      v-else-if="view.kind === 'stat'"
-      class="widget-stat"
-      :data-severity="view.severity"
-    >
-      <p
-        class="widget-value"
-        data-testid="widget-value"
-      >
-        {{ view.value }}
-      </p>
-      <p
-        v-if="view.label"
-        class="widget-muted"
-        data-testid="widget-label"
-      >
-        {{ view.label }}
-      </p>
-    </div>
-    <div
-      v-else-if="view.kind === 'sparkline'"
-      class="widget-sparkline"
-      data-testid="widget-sparkline"
-    >
-      <p
-        v-if="view.value !== undefined"
-        class="widget-value"
-        data-testid="widget-value"
-      >
-        {{ view.value }}
-      </p>
-      <svg
-        viewBox="-2 -2 104 44"
-        preserveAspectRatio="none"
-        aria-hidden="true"
-      >
-        <polyline
-          :points="points"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-          vector-effect="non-scaling-stroke"
-        />
-      </svg>
-    </div>
     <ul
       v-else-if="view.kind === 'bar-list'"
       class="widget-bars"
@@ -330,40 +297,14 @@ const chosenBar = computed(() => {
   font-weight: 600;
 }
 
-.widget-value {
-  margin: 0;
-  font-size: 1.75rem;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-  line-height: 1.1;
-}
-
 .widget-muted {
   margin: 0;
   font-size: 0.875rem;
   color: var(--ion-color-medium);
 }
 
-.widget-stat[data-severity='danger'] .widget-value {
-  color: var(--ion-color-danger);
-}
-
-.widget-stat[data-severity='warning'] .widget-value {
-  color: var(--ion-color-warning-shade);
-}
-
-.widget-stat[data-severity='success'] .widget-value {
-  color: var(--ion-color-success);
-}
-
 .widget-skeleton {
   height: 32px;
-}
-
-.widget-sparkline svg {
-  width: 100%;
-  height: 48px;
-  color: var(--ion-color-primary);
 }
 
 .widget-bars,

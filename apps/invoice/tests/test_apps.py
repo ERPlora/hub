@@ -1,12 +1,14 @@
 """The invoice app declares its module metadata, its menu entries, its permissions, what each role gets and its
 hooks of the Home."""
 
+import pytest
 from django.apps import apps
 from django.conf import settings
 from django.utils import translation
 from live.live_registry import live_registry
 from live.meta import (
     Category,
+    Help,
     LiveAppConfig,
     Nav,
     SetupCheck,
@@ -18,6 +20,7 @@ from live.operations import INTERNAL, registry
 
 from apps.invoice import events as E
 from base import home
+from base.queries import app_help
 
 PERMISSIONS = [
     "invoice.view_invoice",
@@ -328,3 +331,15 @@ def test_each_step_is_refreshed_by_the_events_that_change_its_query():
 def test_the_app_brings_no_panels_nor_counters_to_the_home():
     # The old module had neither `widgets` nor `bell`.
     assert (list(invoice().widgets), list(invoice().bell)) == ([], [])
+
+
+def test_its_help_window_is_ready_without_a_video_yet():
+    assert invoice().help == Help()
+
+
+@pytest.mark.parametrize("language", ["es", "en"])
+def test_the_help_of_invoices_explains_how_the_customer_asks_for_the_full_invoice_of_their_ticket(language):
+    # The public page where the customer asks for it is a window of Invoices: its flow is published in that tab.
+    served, read = app_help.help_of(invoice(), language)
+    assert served == language
+    assert {flow.id: flow.screens for flow in read.flows}.get("INVOICE-F04") == ("invoices",)

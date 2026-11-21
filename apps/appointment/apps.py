@@ -2,7 +2,7 @@
 
 from django.utils.translation import gettext_lazy as _
 from django.utils.translation import ngettext_lazy
-from live.meta import BellCounter, Category, DeviceNotice, LiveAppConfig, Nav, SetupCheck
+from live.meta import BellCounter, Category, DeviceNotice, Help, LiveAppConfig, Nav, SetupCheck
 
 from apps.appointment.events import TO_CONFIRM_EVENTS
 
@@ -94,14 +94,16 @@ class AppointmentConfig(LiveAppConfig):
     }
     # Positional (id, label, icon, path): scripts/app-icons.mjs reads every line starting with `icon =`
     # as the module's own icon.
+    # The entry's label is the tab bar's: the help window and the assistant name the screen by it.
     navigation = [
         Nav(
             "appointments",
-            _("Appointments"),
+            _("Agenda"),
             "ion:calendar-outline",
             "/appointment/agenda",
         ),
     ]
+    help = Help()
     # The bell counts the customers' own bookings waiting for confirmation, on the query the agenda's «N to
     # confirm» reads (whoever sees an agenda counts her own, or everybody's when she sees them all).
     bell = [

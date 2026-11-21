@@ -4,18 +4,8 @@
 // hangs from the first import of main.ts, which boots on import (main.chrome.test.ts holds one that arrives).
 import { afterAll, describe, expect, it, vi } from 'vitest';
 
-vi.mock('@erplora/ui/shell', () => ({
-  createShell: vi.fn(),
-  logout: vi.fn(),
-  toastSuccess: vi.fn(),
-  applyUserThemePreferences: vi.fn(),
-  resetUserThemePreferences: vi.fn(),
-}));
-vi.mock('@erplora/ui/sdk', async (importOriginal) => ({
-  ...((await importOriginal()) as object),
-  createLiveClient: vi.fn(() => ({ api: { call: vi.fn() } })),
-  provideLiveClient: vi.fn(),
-}));
+vi.mock('@erplora/ui/shell', async () => (await import('./__tests__/main-boot')).shellModule());
+vi.mock('@erplora/ui/sdk', async (importOriginal) => (await import('./__tests__/main-boot')).sdkModule(importOriginal));
 // Each piece a stub of its own (`__esModule`: Vue takes `default` from a module it recognises); the one beside the pane
 // never settles.
 vi.mock('../base/frontend/components/TopbarChrome.vue', () => ({ __esModule: true, default: { render: () => null } }));

@@ -10,28 +10,13 @@ from live.ninja import bind, run_operation
 from ninja import Query, Router
 
 from apps.flow import queries, services
-from apps.flow.schemas import (
-    AnswerIn,
-    CreateIn,
-    DraftListIn,
-    DraftProposeIn,
-    DraftRefIn,
-    EnabledIn,
-    FlowListIn,
-    FlowRefIn,
-    GrantIn,
-    QuestionRefIn,
-    RecipeRefIn,
-    RunIn,
-    RunListIn,
-    RunRefIn,
-    SampleIn,
-    SecretRefIn,
-    SecretSetIn,
-    StatusIn,
-    TestIn,
-    UpdateIn,
-)
+from apps.flow.schemas.drafts import DraftListIn, DraftProposeIn, DraftRefIn
+from apps.flow.schemas.dry_run import SampleIn, TestIn
+from apps.flow.schemas.flows import CreateIn, EnabledIn, FlowListIn, FlowRefIn, GrantIn, StatusIn, UpdateIn
+from apps.flow.schemas.questions import AnswerIn, QuestionRefIn
+from apps.flow.schemas.recipe_flows import RecipeRefIn
+from apps.flow.schemas.runs import RunIn, RunListIn, RunRefIn
+from apps.flow.schemas.stored_secrets import SecretRefIn, SecretSetIn
 
 router = Router(tags=["flow"])
 

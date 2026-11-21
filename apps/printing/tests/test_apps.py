@@ -8,12 +8,22 @@ from django.conf import settings
 from django.core import checks
 from django.utils import translation
 from live.live_registry import live_registry
-from live.meta import BellCounter, Category, LiveAppConfig, SetupCheck, SetupStep, module_configs, permissions_for_role
+from live.meta import (
+    BellCounter,
+    Category,
+    Help,
+    LiveAppConfig,
+    SetupCheck,
+    SetupStep,
+    module_configs,
+    permissions_for_role,
+)
 from live.operations import registry
 
 from apps.printing import events as E
 from base import home
 from base.ws_print import presence_operation
+from base.tests.shell_icons import shell_icon_registry
 
 PERMISSIONS = [
     "printing.view_settings",
@@ -45,7 +55,7 @@ def test_it_is_a_free_module_of_the_organization_group_with_a_registered_icon():
     assert config().premium is False
     # `ion:print-outline` is not registered in the shell yet (UI-REQUESTS.md): lucide's receipt stands in.
     assert config().icon == "lucide:receipt"
-    icons = (Path(settings.BASE_DIR) / "packages/ui/src/shell/icons.ts").read_text()
+    icons = shell_icon_registry()
     for icon in [config().icon, *(entry.icon for entry in config().navigation)]:
         name = icon.removeprefix("ion:")
         assert f"'{name}'" in icons, icon
@@ -210,7 +220,7 @@ def test_the_hooks_query_is_re_run_on_their_events_and_their_icon_is_registered(
     (step,) = config().setup
     assert live_registry.is_subscribable("printing.device.coverage")
     assert set(UNATTENDED) <= set(live_registry.subscribable["printing.device.coverage"])
-    icons = (Path(settings.BASE_DIR) / "packages/ui/src/shell/icons.ts").read_text()
+    icons = shell_icon_registry()
     assert all(f"'{icon.removeprefix('ion:')}'" in icons for icon in {step.icon, *(counter.icon for counter in config().bell)})
 
 
@@ -231,3 +241,7 @@ def test_its_card_of_system_is_your_printer_for_everybody_with_printing_and_base
     )
     assert home.system_card_errors([config()]) == []
     assert [message.id for message in checks.run_checks(tags=["base"]) if message.id == "base.E015"] == []
+
+
+def test_its_help_window_is_ready_without_a_video_yet():
+    assert config().help == Help()

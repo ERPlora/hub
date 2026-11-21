@@ -65,6 +65,8 @@
       },
       "zones": "Zones",
       "paxOf": "{guests}/{capacity} pax",
+      "bill": "Bill {amount}",
+      "billRequested": "Bill requested",
       "planLabel": "Floor plan. Use the arrow keys to scroll it.",
       "add": "Add zone or table",
       "editZone": "Edit zone",

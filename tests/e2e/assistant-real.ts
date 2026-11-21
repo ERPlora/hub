@@ -9,19 +9,15 @@ import { expect, type Page, type Response } from '@playwright/test';
 
 import { cleanupCommand, type Meta, observe, redact } from './assistant-battery';
 import { answers, box, card, panel, send } from './assistant-panel';
-import { seedCommand } from './assistant-seed';
+import { seedCommand, seedSecrets } from './assistant-seed';
 import { HUB_DIR, REPO_DIR } from './helpers';
 import { STACK } from './stack';
 
 /** The checkout of the stack's SaaS (`E2E_SAAS_DIR`). */
 export const SAAS_DIR = process.env.E2E_SAAS_DIR ?? '';
-/** The keys of the real providers, a model under test's too: taken out of every output, report and state written. */
-export const SECRETS = [
-  process.env.QA_QWEN_API_KEY ?? '',
-  process.env.QA_OPENAI_API_KEY ?? '',
-  process.env[process.env.QA_ANSWER_KEY_ENV ?? ''] ?? '',
-  process.env.QA_OPENROUTER_API_KEY ?? '',
-];
+/** The keys of the real providers, a model under test's and the simulated owner's too: taken out of every output,
+ *  report and state written. */
+export const SECRETS = [...seedSecrets(process.env), process.env.QA_OPENROUTER_API_KEY ?? ''];
 /** A real model may think for a while: one turn, card included. */
 export const TURN_MS = 240_000;
 
@@ -77,7 +73,7 @@ export function seedRealProviders(): Omit<Meta, 'run'> {
 }
 
 /**
- * Takes out of the stack's SaaS what a run left there: the real keys (labelled `qa`) and the accounts `emails`. Each
+ * Takes out of the stack's SaaS what a run left there: the accounts `emails` (no key is ever in its database). Each
  * spec calls it in its `afterAll`, so it runs whether the run passed or failed; without `E2E_SAAS_DIR` nothing could
  * have been seeded. It refuses the shared SaaS database, as the seed does.
  */

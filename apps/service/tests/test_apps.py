@@ -1,18 +1,17 @@
 """The service app declares its module metadata, its menu, its permissions, what each role gets and its hook of the
 Home."""
 
-from pathlib import Path
 
 from django.apps import apps
-from django.conf import settings
 from django.utils import translation
 from live.live_registry import live_registry
-from live.meta import Category, LiveAppConfig, Nav, SetupCheck, SetupStep, module_configs
+from live.meta import Category, Help, LiveAppConfig, Nav, SetupCheck, SetupStep, module_configs
 from live.operations import registry
 
 from apps.service import events as E
 from base import home
 from base.tests.roles import grants_by_role
+from base.tests.shell_icons import shell_icon_registry
 
 PERMISSIONS = [
     "service.view_service",
@@ -260,10 +259,14 @@ def test_the_step_is_refreshed_on_what_changes_the_services_on_offer():
 def test_the_steps_icon_is_registered():
     # The app's own icon, the old module's `briefcase`.
     (step,) = service().setup
-    icons = (Path(settings.BASE_DIR) / "packages/ui/src/shell/icons.ts").read_text()
+    icons = shell_icon_registry()
     assert f"'{step.icon.removeprefix('ion:')}'" in icons
 
 
 def test_services_brings_no_panels_and_no_bell_rows_to_the_home():
     # The old module declared neither (its module.json has `widgets` and `bell` null).
     assert (service().widgets, service().bell) == ([], [])
+
+
+def test_its_help_window_is_ready_without_a_video_yet():
+    assert service().help == Help()

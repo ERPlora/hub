@@ -1,6 +1,12 @@
-<!-- generated from WORKBOOK.md sha256:2dbdb17735489391bec4f9f704c553b5a6b450c18467d00b952a44f3ee0603f2 -->
+<!-- generated from WORKBOOK.md sha256:52fcb273e4421f79e3854900d89e8132d6a3a4d37a7526a16e2bb961b46761e4 -->
 
 ## What it is for and who it is for
+
+Printing is where you add the business's printers, say what comes out of each one (receipts, kitchen and bar
+orders, labels) and see whether the paper is coming out. The paper is taken out by the ERPlora app on the device next
+to the printer; if something does not come out, the queue says so and lets you retry or cancel it.
+
+### In detail
 
 Printing is where the business **adds its printers, says what comes out of each one and sees whether the
 paper is coming out**. Each printer has a name ("Till", "Kitchen"), its connection (network, USB,
@@ -11,7 +17,7 @@ the device with the ERPlora app installed next to the printer turns them into pa
 confirms. Only **devices set up** with their printers print: a session on any other
 device does not take anybody's paper. If something does not come out, the queue says so and lets you retry or cancel it.
 
-Who uses it:
+### Who uses it and what each one does
 
 - The **owner** and the **administrator**: everything; they also retry and cancel stuck jobs.
 - The **manager**: adds and changes printers, the devices that print and the settings, and asks for
@@ -75,6 +81,12 @@ Initial setup, step by step:
 Four tabs at the bottom, the same as the menu: **Printers**, **Devices**, **Queue** and **Settings**.
 
 ### Printers
+Here you see at a glance whether the paper comes out. At the top, one card per role (Receipt, Kitchen, Bar, Label)
+says whether it has a printer and a device, how much is waiting in the queue and which printer it comes out of. Below
+are your printers, with their connection, their paper and their state. With "Add printer" you add one by its address,
+or with "Search printers" you find it on the network; on each row, "Test" prints a test page.
+
+#### Detail
 Menu **Printing → Printers**. Title "Printing" and the sentence "Add the business's printers, say what each one
 prints and check that paper comes out.". Two areas, in this order:
 
@@ -114,6 +126,11 @@ Whoever cannot change printers does not see "Search printers", "Add printer", "E
 "Deactivate"; whoever cannot print does not see "Test".
 
 ### Devices
+Here you set up the devices that take the paper out: the one next to the printers, with the ERPlora app open. Only
+the devices on this list print, with anybody's session. From that device, "Print from this device" sets it up with
+the printers it reaches; the list says when each one was last seen, and on each row you can change it or retire it.
+
+#### Detail
 Menu **Printing → Devices**. Title "Devices that print" and the sentence "Only the devices set up here
 print the queue, with anybody’s session: set up the one next to the printers from that
 device.". Underneath, a note about the device it is being looked at on: "This device prints for: Till,
@@ -137,6 +154,11 @@ with "It will print nothing more, and the jobs it has go back to the queue. To p
 up again from it.", "Yes, retire" and "Back".
 
 ### Queue
+The queue is every print job that has been asked for, from the most recent to the oldest, with its document, its
+printer and its status: Pending, Sent, Printed, Failed or Cancelled. Filter it by status, role or printer, or search
+by document number. A stuck job is sent again with "Retry" or withdrawn with "Cancel".
+
+#### Detail
 Menu **Printing → Queue**. Title "Print queue". The table of jobs, from the most recent to the
 oldest, 50 per page: Document ("Receipt T-000123", or "Receipt · 14/10/26 23:05" if it carries no number),
 Role, Printer, Status ("Pending", "Sent", "Printed", "Failed", "Cancelled"), Attempts, Asked on
@@ -147,6 +169,11 @@ without an answer once its time is up; "Cancel" opens a window with "Reason (opt
 "Back". Empty: "No print jobs.". Error when loading: the message with "Retry".
 
 ### Settings
+Here you decide how the business prints: whether the receipt comes out on its own on checkout, whether the drawer
+opens with it, how many copies come out and, if you have several printers with the same role, which one prints each
+thing. The receipt's header and footer are written in the Sales settings: this screen's note takes you there.
+
+#### Detail
 Menu **Printing → Settings**. A card "Ticket settings" with "Print receipt on checkout", "Open drawer on
 checkout" and "Receipt copies" (1, 2 or 3); another "Printer of each role" with a dropdown per
 role ("Receipt", "Kitchen", "Bar", "Label"): "The first active one of this role" or one of its
@@ -208,7 +235,7 @@ Steps:
 1. On **Home**, while no device set up reaches an active receipt printer,
    "Finish setting up your business" brings "Set up your printer" ("Register the device that
    prints your customers' receipts, so the first sale comes out on paper."), "Recommended", to
-   whoever manages the printers. "Set up" leads to **Printing → Devices** (PRINTING-F18); the
+   whoever manages the printers. "Set up" leads to **Printing → Devices**; the
    step is "Done" as soon as that device is set up, switched on or not.
 2. If a role has jobs that have been waiting a minute or more and no switched-on device can take
    them out (none set up reaches its printer, or they wait for a printer and none reaches one of its role,
@@ -224,9 +251,8 @@ Steps:
    prints it, how many are waiting and since when.
 4. Open **Printing → Queue** to see each job with its status, its attempts and its last
    error.
-5. If a role shows "Waiting, no printer" or there is an orange warning, the paper is not coming
-   out: go on with PRINTING-F04 (give the role to a printer) or PRINTING-F14 (get the job
-   unstuck).
+5. If a role shows "Waiting, no printer" or there is an orange warning, the paper is not coming out: give that
+   role to a printer in **Printing → Printers** or get the job unstuck in **Printing → Queue**.
 In: the business's queue, printers and devices.
 Out: nothing saved. What depends on the clock (how long it has been waiting, the orange warning, "Waiting",
 "Device off" on the role's card and a sent job that did not answer in time) is recalculated on its own every
@@ -289,7 +315,7 @@ network name (for example 192.168.1.100).", "The port goes from 1 to 65535.", "T
 as AA:BB:CC:DD:EE:FF.", "Type the print queue's name as the system gives it (no
 spaces, slashes or #).", "The system printer prints A4 pages: give it the Receipt role.". Without
 a name, "Give the printer a name.". Each notice shows under its field and goes as soon as that field changes,
-without tapping "Save" again; another field's stays until its own changes (hub#1470).
+without tapping "Save" again; another field's stays until its own changes.
 Involved: PRINTING-F04, PRINTING-F05
 
 ### PRINTING-F04 Assign what comes out of each printer
@@ -308,7 +334,7 @@ In: each printer's role and, if there are several, the chosen one.
 Out: each document comes out of the printer of its role. A printer is not deleted: the queue names it.
 If it fails: if no active printer has the role, the job **waits** in the queue without a
 printer ("Waiting, no printer") and comes out as soon as one has it; not Kitchen's order, because Kitchen
-then does not send it (PRINTING-F10). In settings, a printer of another
+then does not send it. In settings, a printer of another
 role or an inactive one is refused: "That printer does not have this role.", "That printer is inactive.".
 Involved: PRINTING-F01, PRINTING-F06, INVENTORY-F25
 
@@ -319,15 +345,15 @@ Screen: Printers
 Steps:
 1. Press "Test" on the printer's row.
 2. "Test page sent to the queue of Till." shows and "Test page" appears in the queue.
-3. The device that prints for that printer, with the ERPlora app open, takes it out right away
-   (PRINTING-F18): the business's name (the one Invoicing has; without Invoicing or without permission to read it,
+3. The device that prints for that printer, with the ERPlora app open, takes it out right away:
+   the business's name (the one Invoicing has; without Invoicing or without permission to read it,
    "ERPlora"), "Printer OK", the date and the printer's address. A system printer prints the page in
    A4 with the same. In the queue, the page ends up "Printed".
 In: the printer.
 Out: a "Test page" job for that printer (announces: `printing.job.queued`).
 If it fails: an inactive printer is not tested: "That printer is inactive: activate it to test it.".
-If the paper does not come out, the page goes back to the queue with the device's error and, after 5 attempts, ends up "Failed"
-(PRINTING-F14).
+If the paper does not come out, the page goes back to the queue with the device's error and, after 5 attempts, ends up "Failed": in
+**Printing → Queue** it is retried or cancelled.
 Involved: PRINTING-F18
 
 ### PRINTING-F06 Choose how the business prints
@@ -340,7 +366,7 @@ Steps:
    copies" and, if you want, the printer of each role.
 3. Press "Save settings" (off until you change something). What you changed is saved; the rest stays
    as it was, and "Settings saved." shows above the button.
-   What is changed while it is saving is not lost: it stays on screen, still to save (hub#914).
+   What is changed while it is saving is not lost: it stays on screen, still to save.
 In: the business's decisions.
 Out: the print settings, a single row (announces: `printing.settings.updated`). Without saving,
 the factory ones always hold: receipt on checkout on, drawer off, one copy, no printer chosen.
@@ -348,7 +374,7 @@ If it fails: "Could not save the settings." with the reason; if it names a role'
 deleted or moved to another role while it was being chosen), the reason also shows below that role. As
 in the form windows, the notice goes as soon as something is changed and a role's reason as soon as
 another printer is chosen for it; both come back if the next try is refused too. A refusal that names no
-field stays until the next try (hub#871). If the read fails, the screen does not
+field stays until the next try. If the read fails, the screen does not
 show values and offers "Retry". Without permission, locked and without "Save settings".
 Involved: PRINTING-F07, PRINTING-F13
 
@@ -442,13 +468,12 @@ Involved: KITCHEN-F09, PRINTING-F10
 ### PRINTING-F12 Print a barcode label
 Status: done
 Actor: administrator, manager, employee
-Screen: Product card (from Inventory) and Printers
+Screen: Product card (from Inventory), Printers
 Steps:
-1. In **Inventory → Products**, open the product's card and press "Print barcode"
-   (INVENTORY-F25).
+1. In **Inventory → Products**, open the product's card and press "Print barcode".
 2. Inventory asks Printing for the label: it goes into the queue of the printer with the "Label" role,
    with the product's name, its SKU as the barcode and its price. The printer draws the code
-   and the device that picks up that printer's jobs takes it out (PRINTING-F18).
+   and the device that picks up that printer's jobs takes it out.
 3. In **Printing → Printers**, the "Label" card of "Print queue" says how many are waiting and which
    printer they come out of.
 In: the product's name, its SKU (the barcode) and its price in the business's currency.
@@ -551,7 +576,7 @@ Involved: CASH_REGISTER-F16
 Status: done
 Actor: the owner, the administrator or the manager (they set up the device) and the device's app
 (it picks up)
-Screen: Printing → Devices
+Screen: Devices
 Steps:
 1. On the device next to the printers, whoever manages the printers opens **Printing →
    Devices**, presses "Print from this device", gives it a name ("Counter till") and ticks the
@@ -580,7 +605,7 @@ Steps:
 6. While the ERPlora app on the device is connected to print, it says it is there when it connects and in
    each heartbeat (every 30 s), with the session of whoever uses it, an employee's too; setting it up from it and
    asking for a job also count. The list shows it in "Last seen". If 90 s pass without signs, it
-   counts as switched off: its jobs make the bell ring once the minute has passed (PRINTING-F01).
+   counts as switched off: its jobs make the bell ring once the minute has passed.
 7. From any device, whoever manages the printers changes in the list the name or the printers of
    a device ("Edit") or retires it ("Retire", after confirming it): the app on that device notices it
    at once, prints for its new printers or stops printing, and the jobs it had go back to the queue when
@@ -603,7 +628,7 @@ copies goes past the 90 s and the job had already gone back to the queue) is acc
 again. A confirmation or a failure from another device, or from a hand-out that is not its own, is refused and changes
 nothing. Setting up without a name or without active printers warns in its field, and the notice goes as soon as
 that field changes (the name is typed, a printer is ticked), without tapping "Save" again; the other's stays until
-its own changes (hub#1470). It is only set up from the device itself. The queue and the list name each device by its name, never by its identifier: with it
+its own changes. It is only set up from the device itself. The queue and the list name each device by its name, never by its identifier: with it
 anybody could pretend to be the till.
 Involved: PRINTING-F05, PRINTING-F07, PRINTING-F14
 

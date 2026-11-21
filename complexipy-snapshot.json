@@ -78,8 +78,8 @@
     ]
   },
   {
-    "path": "apps/flow/schemas.py",
-    "file_name": "schemas.py",
+    "path": "apps/flow/schemas/steps.py",
+    "file_name": "steps.py",
     "functions": [
       {
         "name": "document_problems",
@@ -116,8 +116,8 @@
     ]
   },
   {
-    "path": "apps/inventory/queries.py",
-    "file_name": "queries.py",
+    "path": "apps/inventory/queries/products.py",
+    "file_name": "products.py",
     "functions": [
       {
         "name": "filter_products",
@@ -180,16 +180,6 @@
       {
         "name": "create_ticket",
         "complexity": 25
-      }
-    ]
-  },
-  {
-    "path": "apps/modifier/queries.py",
-    "file_name": "queries.py",
-    "functions": [
-      {
-        "name": "resolve_selection",
-        "complexity": 29
       }
     ]
   },
@@ -398,24 +388,22 @@
     ]
   },
   {
-    "path": "apps/whatsapp_inbox/services.py",
-    "file_name": "services.py",
+    "path": "apps/whatsapp_inbox/services/deliveries.py",
+    "file_name": "deliveries.py",
     "functions": [
-      {
-        "name": "notify",
-        "complexity": 16
-      },
-      {
-        "name": "_tapped",
-        "complexity": 17
-      },
       {
         "name": "record_delivery",
         "complexity": 17
-      },
+      }
+    ]
+  },
+  {
+    "path": "apps/whatsapp_inbox/services/received.py",
+    "file_name": "received.py",
+    "functions": [
       {
-        "name": "send_message",
-        "complexity": 19
+        "name": "_tapped",
+        "complexity": 17
       },
       {
         "name": "update_status",
@@ -424,6 +412,20 @@
       {
         "name": "receive_message",
         "complexity": 32
+      }
+    ]
+  },
+  {
+    "path": "apps/whatsapp_inbox/services/sending.py",
+    "file_name": "sending.py",
+    "functions": [
+      {
+        "name": "notify",
+        "complexity": 16
+      },
+      {
+        "name": "send_message",
+        "complexity": 19
       }
     ]
   },

@@ -10,6 +10,12 @@ Lo que no entra todavía: ver «Lo que queda fuera».
 
 ## Para qué sirve y para quién
 
+Horarios dice cuándo está abierto tu negocio: el horario de cada día de la semana, los festivos y los días con otro
+horario, y unas fechas seguidas con otro horario o cerradas, como las vacaciones. Citas y Reservas lo leen para no dar
+hora ni mesa con el negocio cerrado. Es el horario del local; el de cada profesional se lleva en Personal.
+
+### En detalle
+
 Horarios dice **cuándo está abierto el negocio**:
 
 - la **semana habitual**: por cada día, cerrado, abierto 24 horas o uno o varios tramos (turno partido,
@@ -22,7 +28,7 @@ Horarios dice **cuándo está abierto el negocio**:
 Es el horario **del negocio**. No es el turno de cada profesional ni sus ausencias (eso es de
 **Personal**), ni las horas que se pueden reservar (eso lo decide **Citas** cruzando las dos cosas).
 
-Quién la usa:
+### Quién la usa y qué hace cada uno
 
 - El **propietario**, el **administrador** y el **responsable** fijan la semana, añaden, corrigen y borran
   días especiales y cambios temporales, y cambian los ajustes.
@@ -98,6 +104,12 @@ Horarios se abre desde el menú **Horarios** y tiene tres pestañas: **Horario**
 API o por el asistente.
 
 ### Horario
+Aquí está tu semana: una fila por día con su horario (por ejemplo «10:00–14:00 · 17:00–20:00», «Abierto 24 horas» o
+«Cerrado») y si ese día abres. Toca un día para cambiarlo: ciérralo, ábrelo las 24 horas o ponle uno o varios tramos,
+como un turno partido o un tramo que pasa de medianoche. Mientras la semana sea la que pusimos por defecto, un aviso
+amarillo te pide que la compruebes y la confirmes con «Sí, este es mi horario».
+
+#### Detalle
 Tabla de **siete filas fijas**, una por día de la semana, con las columnas **Día**, **Horario** y
 **Estado**; no hay botón de añadir: un día se edita. **Horario** dice, por ejemplo, «10:00–14:00 ·
 17:00–20:00», «Abierto 24 horas», «Cerrado» o «Sin definir»; **Estado** dice «Abierto», «Cerrado» o «—»
@@ -113,6 +125,12 @@ este es mi horario** (el botón, solo para quien puede cambiar el horario; el em
 móvil la tabla se pinta como tarjetas.
 
 ### Días especiales
+Aquí van las excepciones a tu semana. En «Días especiales» apuntas un día suelto, cerrado o con otro horario, como un
+festivo, que puede repetirse cada año, como Navidad. En «Cambios temporales» apuntas unas fechas seguidas con otro
+horario o cerradas, como las vacaciones o el horario de verano. Un día especial manda sobre un cambio temporal, y los
+dos sobre la semana. Toca una fila para corregirla, o pulsa **Eliminar** en ella para borrarla.
+
+#### Detalle
 Dos tablas, una debajo de otra, cada una con su título.
 
 - **Días especiales**: columnas **Fecha**, **Nombre**, **Estado** («Cerrado» o sus horas, tramo a tramo)
@@ -131,6 +149,11 @@ Dos tablas, una debajo de otra, cada una con su título.
   **Cancelar** y **Eliminar**.
 
 ### Ajustes
+Aquí eliges si la semana empieza en lunes o en domingo, que solo cambia el orden de los días en Horario. Arriba ves la
+zona horaria del negocio, la del Hub, con la que se lee todo el horario. Quien no puede cambiar los ajustes los ve sin
+poder guardarlos.
+
+#### Detalle
 Arriba, solo lectura, **Zona horaria del negocio** con su nombre (por ejemplo, Europe/Madrid) y la nota
 «Es la del Hub y el único reloj con el que se lee el horario.». Debajo, **Semana empieza** (Lunes o
 Domingo) y **Guardar**, que confirma con «Guardado». Quien no puede cambiar los ajustes ve el valor sin
@@ -179,7 +202,7 @@ Pantalla: Horario
 Pasos:
 1. Abre **Horarios**; la pestaña **Horario** muestra los siete días.
 2. Lee de cada día sus tramos, «Abierto 24 horas», «Cerrado» o «Sin definir».
-3. Si la semana empieza en domingo (SCHEDULE-F08), la tabla abre por el domingo; solo cambia el orden.
+3. Si la semana empieza en domingo (lo eliges en **Ajustes**), la tabla abre por el domingo; solo cambia el orden.
 Entra: la semana del negocio y el ajuste «Semana empieza».
 Sale: nada; solo lectura.
 Si falla: la tabla dice «No se ha podido cargar el horario.» con **Reintentar**; hasta tener la semana y
@@ -192,8 +215,8 @@ Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, responsable, asistente
 Pantalla: Horario
 Pasos:
-1. En **Horario**, pulsa **Editar** en el día (o toca la fila): se abre «Editar horario — {día}». El
-   selector **Día** cambia de día sin cerrar.
+1. En **Horario**, pulsa **Editar** en el día (o toca la fila): se abre «Editar horario — Lunes» (con el día que
+   tocaste). El selector **Día** cambia de día sin cerrar.
 2. Elige una de tres cosas: **Cerrado**; **Abierto 24 horas**; o una línea por tramo con su apertura y
    su cierre (10:00–14:00 y 17:00–20:00 para un turno partido; 22:00–02:00 pasa de medianoche).
 3. Pulsa **Guardar día**: el formulario se cierra y la fila enseña el resumen nuevo.
@@ -230,8 +253,8 @@ entonces la semana rige también las reservas de mesa (SCHEDULE-F12). Confirmar 
 avisa. «Confirma tu horario» queda «Hecho» en el Inicio sin recargar; también si en vez de confirmar se
 guarda un día (SCHEDULE-F02), aunque sea como cerrado. Cambiar «Semana empieza», un día especial o un
 cambio temporal no confirma la semana.
-Si falla: arriba de la tabla: «No hay horario semanal que confirmar.» (409 `schedule.no_week`) si no hay
-ningún día guardado (no se llega desde la pantalla: el aviso solo sale cuando hay semana).
+Si falla: arriba de la tabla: «No hay horario semanal que confirmar.» si no hay ningún día guardado (no se llega
+desde la pantalla: el aviso solo sale cuando hay semana).
 Implicados: BASE-F01
 
 ### SCHEDULE-F04 Añadir un día especial
@@ -242,7 +265,7 @@ Pasos:
 1. En **Días especiales**, pulsa **+** (Nuevo día especial).
 2. Escribe la **Fecha** y el **Nombre** (los dos obligatorios).
 3. Deja **Cerrado** (lo que viene) o elige «Abierto (con horario)» y escribe uno o más tramos, igual que
-   en SCHEDULE-F02.
+   al editar un día en **Horario**.
 4. Marca **Se repite cada año** si cae el mismo día y mes todos los años (Navidad); si quieres, **Notas**.
 5. Pulsa **Añadir día**: el formulario se cierra y el día aparece en la lista.
 Entra: fecha (real: el 31 de febrero no vale), nombre (hasta 200), cerrado o tramos, anual y notas (hasta
@@ -250,9 +273,9 @@ Entra: fecha (real: el 31 de febrero no vale), nombre (hasta 200), cerrado o tra
 Sale: el día especial (`schedule.special_day.created`). Gana a todo lo demás ese día (SCHEDULE-F10,
 F11). Un día anual vale **todos los años**, también los anteriores a su fecha; el del 29 de febrero solo
 existe los años bisiestos.
-Si falla: «Ya existe un día especial en esa fecha.» bajo la fecha (409 `schedule.special_day_exists`,
-también si dos personas la crean a la vez); los rechazos de tramos de SCHEDULE-F02; un nombre vacío o de
-solo espacios, bajo el nombre. Una fecha que tuvo un día especial borrado se puede volver a usar.
+Si falla: «Ya existe un día especial en esa fecha.» bajo la fecha (también si dos personas la crean a la vez);
+unos tramos que no valen, con los mismos motivos que al editar un día en **Horario**; un nombre vacío o de solo
+espacios, bajo el nombre. Una fecha que tuvo un día especial borrado se puede volver a usar.
 Implicados: Citas, Reservas
 
 ### SCHEDULE-F05 Añadir un cambio temporal
@@ -270,9 +293,9 @@ los días del rango con las mismas horas.
 Sale: el cambio temporal (`schedule.override.created`). Gana a la semana, pero pierde contra un día
 especial de esa fecha (no se avisa de que lo pisa: la precedencia lo resuelve).
 Si falla: «La fecha de fin no puede ser anterior a la de inicio.» bajo Hasta; «Esas fechas se solapan con
-el cambio temporal «{motivo}» ({desde} – {hasta}).» bajo Desde (409 `schedule.override_overlaps`): dos
-cambios no cubren el mismo día, para que la respuesta no dependa de cuál se lea primero; los rechazos de
-tramos de SCHEDULE-F02.
+el cambio temporal «Vacaciones» (01/08/2026 – 15/08/2026).» bajo Desde: dos cambios no cubren el mismo día,
+para que la respuesta no dependa de cuál se lea primero; unos tramos que no valen, con los mismos motivos que
+al editar un día en **Horario**.
 Implicados: Citas, Reservas
 
 ### SCHEDULE-F06 Borrar un día especial o un cambio temporal
@@ -281,17 +304,16 @@ Actor: propietario, administrador, responsable, asistente
 Pantalla: Días especiales
 Pasos:
 1. En la fila, pulsa **Eliminar**.
-2. En «Se eliminará «{nombre}». No se puede deshacer.» pulsa **Eliminar** (o **Cancelar**).
+2. En «Se eliminará «Navidad». No se puede deshacer.» (con su nombre) pulsa **Eliminar** (o **Cancelar**).
 3. La fila desaparece; vuelve a regir la semana (o el cambio temporal) en esas fechas.
 Entra: el día especial (por id, por su nombre o por su fecha; uno anual responde por su día y mes de
 cualquier año) o el cambio temporal (por id, por su motivo o por una fecha que cubra). El asistente: «borra
 el festivo de Navidad».
 Sale: la fila y sus tramos borrados en la misma operación (`schedule.special_day.deleted`,
 `schedule.override.deleted`). Su fecha queda libre.
-Si falla: «Ese día especial no existe en este negocio.» o «Ese cambio temporal no existe en este
-negocio.» (404), sin avisar de nada; un nombre que vale para varios: «Hay varios con «{nombre}»:
-{candidatos}. Elige uno.» (409 `schedule.ambiguous_reference`); sin decir cuál: «Di qué día especial: su
-id, su nombre o su fecha.» o «Di qué cambio temporal: su id, su motivo o una fecha que cubra.» (422).
+Si falla: si otra persona ya lo borró, «Ese día especial no existe en este negocio.» o «Ese cambio temporal no
+existe en este negocio.», sin borrar nada más. Si se lo pides al asistente con un nombre que vale para varios, te
+dice cuáles son y te pide que elijas uno; si no dices cuál, te pregunta su nombre o su fecha.
 Implicados: Citas, Reservas
 
 ### SCHEDULE-F07 Cargar varios días especiales de golpe
@@ -323,7 +345,7 @@ Entra: el día de inicio (la pantalla ofrece lunes o domingo; el servidor acepta
 domingo, y la tabla gira con cualquiera).
 Sale: el ajuste (`schedule.settings.updated`, solo si cambia). Solo mueve el orden de las filas: no
 cambia ninguna hora ni lo que contesta SCHEDULE-F10.
-Si falla: un valor fuera de 1–7 sale debajo del campo y no se guarda nada.
+Si falla: si no se puede guardar, el motivo sale debajo del campo y no cambia nada.
 Implicados: ninguno
 
 ### SCHEDULE-F09 Ver la zona horaria con la que se lee el horario
@@ -333,7 +355,8 @@ Pantalla: Ajustes
 Pasos:
 1. Abre **Ajustes**; arriba aparece «Zona horaria del negocio» con su nombre (Europe/Madrid).
 2. Lee la nota «Es la del Hub y el único reloj con el que se lee el horario.»: con ese reloj se leen la
-   semana, los días especiales, los cambios temporales y lo que contesta SCHEDULE-F10.
+   semana, los días especiales, los cambios temporales y lo que contesta el asistente si le preguntas si el
+   negocio está abierto.
 Entra: la zona del Hub.
 Sale: nada; solo lectura. Horarios no guarda zona propia: las horas son de pared (las 10:00 son las 10:00
 antes y después del cambio de hora, sin tocar nada).
@@ -402,15 +425,17 @@ Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, responsable, asistente
 Pantalla: Días especiales
 Pasos:
-1. Pulsa la fila (o **Editar**): se abre «Editar · {nombre}» (o «Editar · {motivo}») con lo guardado.
+1. Pulsa la fila (o **Editar**): se abre «Editar · Navidad» (con su nombre, o el motivo de un cambio temporal)
+   con lo guardado.
 2. Cambia la fecha, el nombre o el motivo, el estado, los tramos, «Se repite cada año» o las notas.
 3. Pulsa **Guardar**.
 Entra: el día especial o el cambio temporal (por id o por nombre) y lo enviado; lo que no se envía se
 queda como estaba, y si se envían los tramos se **sustituyen** todos.
 Sale: el día o el cambio corregido (`schedule.special_day.updated`, `schedule.override.updated`).
 Guardar sin cambiar nada no avisa.
-Si falla: los mismos rechazos que al crearlo (la fecha de otro día especial, el rango de otro cambio) y,
-al nombrarlo, los de SCHEDULE-F06.
+Si falla: los mismos rechazos que al crearlo (la fecha de otro día especial, el rango de otro cambio) y, si
+otra persona lo borró mientras tanto, «Ese día especial no existe en este negocio.» o «Ese cambio temporal no
+existe en este negocio.».
 Implicados: Citas, Reservas
 
 ## Servicios: lo que entra y lo que sale

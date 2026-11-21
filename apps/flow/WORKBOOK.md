@@ -10,11 +10,12 @@ Estado de la app: completa (2026-11-01)
 
 ## Para qué sirve y para quién
 
-Automatizaciones es donde el negocio deja escritas reglas que se cumplen solas: «cuando se cobre una
-venta grande, apunta una nota en la ficha del cliente», «cada mañana a las 9, déjame la tarea de
-repasar la agenda», «cuando alguien no venga a su cita, déjame la tarea de llamarle». Desde aquí se
-elige una automatización hecha de la galería o se monta una desde cero, se le conceden los permisos
-que necesita, se prueba sin efectos, se enciende, se ejecuta a mano si hace falta y se lee lo que hizo.
+Automatizaciones es donde el negocio deja escritas reglas que se cumplen solas: «cuando alguien no
+venga a su cita, déjame la tarea de llamarle», «cada mañana a las 9, déjame la tarea de repasar la
+agenda». Se elige una hecha de la galería o se monta desde cero, se le conceden los permisos que
+necesita, se prueba sin efectos, se enciende y se lee lo que hizo cada vez.
+
+### Cómo es una automatización
 
 Una automatización es **una columna**: arriba, **cuándo arranca** (algo que pasa en el negocio, un
 horario, una fecha o solo a mano); debajo, sus **pasos**, que se hacen en orden: **Hacer algo** (una
@@ -23,8 +24,14 @@ acción de otra app, por ejemplo crear una tarea), **Consultar algo** (leer un d
 **Esperar** (minutos, horas o días). Arrancan solas cuando pasa lo que esperan en el negocio, a su hora o
 en su fecha (FLOW-F21, F22), y también con **Ejecutar ahora**.
 
-Solo la usan el **propietario** y el **administrador**: una automatización actúa en nombre del negocio
-sin nadie delante. El responsable y el empleado no la ven.
+### Quién la usa
+
+Solo el **propietario** y el **administrador** ven, montan y cambian las automatizaciones: una
+automatización actúa en nombre del negocio sin nadie delante. El **responsable** y el **empleado** solo
+contestan lo que una automatización les pregunta, en **Esperan tu respuesta** (FLOW-F29): es lo único que
+ven de la app.
+
+### Con el asistente
 
 Con el asistente del Hub se usa por voz o por texto, con la sesión de quien habla: «crea un flujo que al
 completar una venta de más de 100 € me cree una tarea» (lo deja como **borrador**, apagado, para que lo revises,
@@ -89,6 +96,13 @@ Configuración inicial, paso a paso:
 ## Pantallas
 
 ### Automatizaciones
+Una sola pantalla, de arriba abajo: **Esperan tu respuesta**, con lo que te pregunta una automatización
+(un responsable o un empleado solo ven esto); **Propuestas por el asistente**, con los borradores que
+te escribió; **Tus automatizaciones**, con su buscador, sus filtros y el interruptor de cada una; y **la
+galería**, con automatizaciones hechas para empezar y las que traen otras apps. **Nueva automatización**
+y cada fila abren el editor, y **¿Cómo funciona esto?** abre la guía.
+
+#### Lo que enseña, de arriba abajo
 Menú **Automatizaciones**, una sola entrada. De arriba abajo:
 
 - El botón **Nueva automatización**, arriba a la derecha; en el móvil es solo su **+**, para que el título
@@ -116,7 +130,7 @@ Menú **Automatizaciones**, una sola entrada. De arriba abajo:
   fábrica** (FLOW-F33 a F35); al final, la línea de lo que falta («Hay automatizaciones ocultas: necesitan
   Tareas.») (FLOW-F04).
 
-### Editor de automatización
+#### Editor de automatización
 Se abre al tocar una fila, al pulsar **Nueva automatización**, al usar una tarjeta o al revisar un
 borrador. Cabecera: ← (vuelve a la lista; si hay cambios sin guardar, pregunta antes), el nombre
 (vacío: «Automatización sin nombre»), la etiqueta «Activa»/«En pausa», el interruptor, **Probar**,
@@ -136,7 +150,7 @@ borrador. Cabecera: ← (vuelve a la lista; si hay cambios sin guardar, pregunta
 - **Historial**: las ejecuciones, las más recientes primero y las paradas por error arriba (FLOW-F16);
   una parada por un error en un paso lleva **Reanudar desde el paso que falló** (FLOW-F24).
 
-### Guía
+#### Guía
 Botón **¿Cómo funciona esto?** de la galería. «Cómo funcionan las automatizaciones», con cinco
 apartados: «Qué es una automatización», «Tu primera automatización, paso a paso», «Los permisos: por
 qué hay que decir que sí», «Cómo saber si funcionó» y «Lo que todavía no puede hacer». **Volver a las
@@ -209,8 +223,8 @@ Pasos:
 Entra: la sesión.
 Sale: nada guardado.
 Si falla: sin permiso, «No tienes permiso»; con la app apagada, «Esta app no está activa en este
-negocio»; cualquier otro fallo, en rojo con **Reintentar**. Lo ven el propietario y el administrador; el
-resto del equipo no tiene la entrada en el menú.
+negocio»; cualquier otro fallo, en rojo con **Reintentar**. Un responsable o un empleado solo ven
+**Esperan tu respuesta**, con lo que una automatización les pregunta.
 Implicados: FLOW-F02, FLOW-F04, FLOW-F18
 
 ### FLOW-F02 Ver, buscar y ordenar las automatizaciones
@@ -261,8 +275,8 @@ Pasos:
 2. Si ya hay una automatización encendida que arranca con el mismo aviso, avisa: «Ojo: «…» ya se
    dispara con lo mismo.»
 3. Pulsa **Usar esta** («Se crea en pausa. No pasa nada hasta que la enciendas.»).
-4. Se abre el editor de la nueva, en pausa, en la pestaña **Permisos**. Sigue por FLOW-F12, FLOW-F13 y
-   FLOW-F14.
+4. Se abre el editor de la nueva, en pausa, en la pestaña **Permisos**. Después, concede sus permisos,
+   pruébala y enciéndela.
 5. Si el negocio ya la tiene, la tarjeta lleva «Activa», «En pausa» o «Sin terminar» (sin permisos) y
    el primer botón es **Verla**; **Usar esta** sigue disponible y crea una segunda. Una tarjeta de
    horario se reconoce por su horario y lo que hace, aunque se le haya cambiado el nombre.
@@ -301,7 +315,8 @@ Pasos:
 3. Un atajo a una tarjeta que no existe o está escondida enseña la galería sin abrir nada.
 Entra: la tarjeta que nombra el atajo.
 Sale: nada guardado.
-Si falla: lo mismo que FLOW-F01; una tarjeta que no se puede usar aquí no se abre.
+Si falla: sin permiso, «No tienes permiso»; con la app apagada, «Esta app no está activa en este
+negocio»; una tarjeta que no se puede usar aquí no se abre.
 Implicados: FLOW-F04, FLOW-F20
 
 ### FLOW-F06 Hacer una copia
@@ -357,15 +372,15 @@ Pasos:
 1. En **Automatizaciones** pulsa **Nueva automatización**.
 2. Se abre el editor vacío: «Automatización sin nombre», «En pausa», el disparador «Solo cuando pulses
    Ejecutar» y «Todavía no hay pasos…».
-3. Escribe el nombre, elige cuándo arranca (FLOW-F10) y añade los pasos (FLOW-F11).
+3. Escribe el nombre, elige cuándo arranca y añade los pasos.
 4. Pulsa **Guardar**: sale «Guardada.» y el editor sigue abierto sobre ella; ya se le pueden conceder
-   permisos (FLOW-F12).
+   permisos.
 Entra: lo que escribe en el editor y lo que pueden usar las automatizaciones del negocio (avisos y
 acciones de sus apps activas).
 Sale: una automatización nueva, en pausa salvo que se haya encendido el interruptor antes de guardar, y
 sin permisos (`flow.flow.created`). Sin nombre se guarda como «Automatización sin nombre».
 Si falla: lo que no encaja, en rojo y junto al paso que lo tiene («Elige qué tiene que hacer este
-paso.», «Este aviso no existe en tu negocio.», «Esa fecha y hora ya ha pasado.»…); no se guarda nada.
+paso.», «Eso no pasa en este negocio: «…».», «Esa fecha y hora ya ha pasado.»…); no se guarda nada.
 Implicados: FLOW-F10, FLOW-F11, FLOW-F12, FLOW-F14
 
 ### FLOW-F10 Elegir cuándo arranca
@@ -378,12 +393,12 @@ Pasos:
      («se cobra una venta», «se crea una ficha de cliente», «una cita se marca como no vino»…), con la
      palabra de la app que los tiene («se crea un cambio temporal», como en Horarios) y con
      buscador. Debajo, **Solo cuando…**: condiciones sobre los datos del aviso («el total es mayor que
-     10000»); sin ellas arranca con cada aviso, sola (FLOW-F21).
+     10000»); sin ellas arranca sola con cada aviso.
    - **Según un horario**: «Cada cuánto» (todos los días, todas las semanas, todos los meses), el día de
      la semana o del mes si toca, y la hora, en la hora del negocio. Un día del mes que no existe (el 31
      en abril) se salta ese mes.
    - **Una vez, en una fecha y hora**.
-   - **Solo a mano**: no arranca sola (FLOW-F15).
+   - **Solo a mano**: no arranca sola; se ejecuta con **Ejecutar ahora**.
 2. La tarjeta resume lo elegido («Cuando se cobra una venta», «Todos los viernes a las 18:00»…).
 Entra: los avisos de las apps activas.
 Sale: el disparador, al **Guardar**.
@@ -405,7 +420,7 @@ Pasos:
    lo quita.
 2. Rellena su formulario:
    - **Hacer algo**: «Qué hacer» (una acción de las apps activas, elegida de una lista con buscador:
-     «Crear una tarea», «Añadir una nota a un cliente»…) y «Con esta información»: un campo por cada
+     «Crear una tarea», «Apuntar una nota en un cliente»…) y «Con esta información»: un campo por cada
      dato que la acción pide (los obligatorios marcados) y **Añadir información** para los opcionales.
    - **Consultar algo**: «Qué consultar» (una consulta de las apps activas), sus datos y «Qué guardar»
      («La primera fila que encuentre, campo a campo» o «Solo cuántas hay»). Si no encuentra nada, la
@@ -424,7 +439,7 @@ Pasos:
    algo a un carrito › Elemento › Precio unitario», «… › Carrito › Importe total», el número y el total de la
    factura de una venta), nunca los que van dentro de una lista; se elige, no se escribe. Un dato elegido se ve como una
    pastilla; el resto del valor es texto. En lo que lee una
-   persona —la pregunta de «Preguntar antes a alguien» (FLOW-F28) y el mensaje a un cliente (FLOW-F31)— cada
+   persona —la pregunta de «Preguntar antes a alguien» y el mensaje a un cliente— cada
    dato sale en palabras, en el idioma de quien guardó la automatización: un sí o un no como «Sí» o «No», una
    fecha y una hora como se escriben en ese idioma y a la hora del negocio («2 nov 2026, 10:00»), y un importe
    que deja un paso anterior (el de un pago que acaba de registrar, el total de una venta o de una factura, el
@@ -461,7 +476,7 @@ una acción o consulta cuya app se apagó después de guardar la automatización
 esa acción ya no está disponible; la automatización y lo que hicieron los pasos anteriores se conservan.
 Mientras esté apagada, el editor lo dice junto al paso («Su app, Tareas, está apagada en este negocio:
 enciéndela en Apps o elige otra acción.») y guardar desde él lo rechaza con ese mismo motivo. Tras volver a
-encender la app, **Reanudar desde el paso que falló** la continúa desde ahí (FLOW-F24).
+encender la app, **Reanudar desde el paso que falló** la continúa desde ahí.
 Implicados: FLOW-F12, FLOW-F13, FLOW-F16, FLOW-F24
 
 ### FLOW-F12 Conceder y retirar los permisos
@@ -481,7 +496,7 @@ guardado no hay nada que autorizar: la pestaña lo dice y pide guardar.
 Si falla: si la lista nombra algo que no existe en el negocio, o algo que necesita a una persona delante
 (anular, devolver, borrar datos, enviar a Hacienda, sentar a un grupo que llega…), se rechaza entera y se
 dice qué. Las únicas excepciones son «Anular una reserva» y «Anular una cita»: se autorizan cuando un paso **Pedírselo
-al asistente** con «Que me lo pregunte» las usa (FLOW-F37), y solo así. Nadie concede lo
+al asistente** con «Que me lo pregunte» las usa, y solo así. Nadie concede lo
 que no puede hacer él mismo: «No puedes permitir lo que tú no puedes hacer: «…».» (tampoco una
 integración con su clave). Cada paso actúa solo con el permiso que se le concedió, nunca con todos los
 de quien la montó. Reservar con solo el nombre y el teléfono de quien reserva busca o crea su ficha de
@@ -505,8 +520,8 @@ Pasos:
    que la pararía («Se pararía aquí, y eso es la automatización funcionando»), lo que no se puede saber
    porque sale de un paso que no ha corrido, una espera y un paso sin permiso («Todavía no le has
    permitido …»).
-4. En un paso **Pedírselo al asistente**, debajo de «Se lo pediría al asistente: …», cada dato fijo (FLOW-F37)
-   con el valor que tendría, dicho como lo dice la tarjeta de «Esperan tu respuesta» (FLOW-F29), leído como
+4. En un paso **Pedírselo al asistente**, debajo de «Se lo pediría al asistente: …», cada dato fijo del paso
+   con el valor que tendría, dicho como lo dice la tarjeta de «Esperan tu respuesta», leído como
    quien prueba: una ficha por su nombre («Anular una reserva › En nombre del cliente» · «Lucía Pérez»), un día
    como lo escribe su idioma, un importe en la moneda del negocio, un sí o un no; nunca un id. Una ficha que no
    puede ver (sin permiso, o que ya no está) se queda fuera, como en la tarjeta. Si uno saldría vacío, la
@@ -523,8 +538,9 @@ Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador
 Pantalla: Editor de automatización
 Pasos:
-1. Mueve el interruptor de la cabecera: la etiqueta pasa a «Activa». Si le faltan permisos avisa como en
-   FLOW-F03; si no se ha abierto **Probar**, «Todavía no la has probado…». No impide encenderla.
+1. Mueve el interruptor de la cabecera: la etiqueta pasa a «Activa». Si le faltan permisos avisa de que no
+   hará nada hasta que se los concedas en la pestaña Permisos; si no se ha abierto **Probar**, «Todavía no
+   la has probado…». No impide encenderla.
 2. Pulsa **Guardar** («Guardando…» y después «Guardada.»): se guarda el documento y, si el interruptor
    cambió, después se enciende o se pausa.
 Entra: lo que hay en el editor y sus cambios sin guardar.
@@ -562,8 +578,8 @@ Pantalla: Editor de automatización
 Pasos:
 1. Abre la pestaña **Historial**: las ejecuciones, las más recientes primero, de 20 en 20 con **Ver
    más**; se actualiza sola.
-2. Si alguna se paró por un error, arriba sale «Necesita a alguien» con «N ejecuciones se pararon por
-   un problema».
+2. Si alguna se paró por un error, arriba sale «Necesita a alguien» con cuántas, por ejemplo «2
+   ejecuciones se pararon por un problema».
 3. Cada ejecución: su estado («Terminó bien», «Terminó: no se cumplía la condición», «Se paró por un
    error», «Esperando», «Cancelada»), el día y la hora, **Copiar la referencia** y ▾ para ver sus
    pasos en palabras («Hizo: Crear una tarea», «Encontró 3», «No encontró nada, y siguió», «Esperó 1
@@ -616,7 +632,7 @@ Pasos:
    que todavía no existe, con el recuadro «Esto es un borrador que escribió el asistente. Está apagado,
    no tiene permisos y no pasa nada hasta que lo actives tú.» y «Lo que el asistente no ha podido
    decidir».
-2. Corrige y completa los pasos (FLOW-F10, FLOW-F11).
+2. Corrige y completa cuándo arranca y los pasos.
 3. Pulsa **Guardar**: se crea la automatización (en pausa si no se ha tocado el interruptor) y el
    borrador sale de la bandeja como usado, **en la misma operación**: no se puede crear dos veces.
 Entra: el borrador pendiente, tal como lo dejó el asistente, con sus notas. Si se lo pides al asistente, su
@@ -744,10 +760,10 @@ ningún paso (una cadena, un «Solo cuando…» ilegible), en algo que necesita 
 llamada a una dirección privada o mal escrita (los mismos pasos volverían a fallar), «Esta ejecución no se
 puede reanudar…: ejecútala de nuevo entera»; pasados 7 días, «…ya no se puede reanudar…»;
 una ya reanudada, «Solo se puede reanudar una ejecución que se paró por un error…»: nunca se reanuda dos
-veces. Ninguna se reanuda sola. Si se borran los datos personales del cliente del que guarda algo (CUSTOMER-F16),
+veces. Ninguna se reanuda sola. Si se borran los datos personales del cliente del que guarda algo,
 la que aún se podía reanudar se cancela («Cancelada: se borraron los datos personales del cliente.»), olvida lo
 que leyeron sus pasos y ya no se reanuda; en sus pasos sigue el que había fallado. Una que ya no se podía reanudar
-solo olvida lo que leyeron sus pasos. Las dos olvidan los textos libres de su historial (FLOW-F16).
+solo olvida lo que leyeron sus pasos. Las dos olvidan los textos libres de su historial.
 Implicados: FLOW-F12, FLOW-F15, FLOW-F16, CUSTOMER-F16
 
 ### FLOW-F25 «Solo si…» y «Si falla, sigue» en cada paso
@@ -793,11 +809,12 @@ valor dicho en una conversación ya habría salido al historial.
 Sale: el secreto sellado con la clave del servidor (`flow.secret.saved`, `flow.secret.deleted`). Su valor
 solo se abre en el momento de llamar y nunca sale: ni en la lista, ni en **Probar** (que enseña «••••»), ni
 en el historial, ni en un fallo; lo que el otro sistema responda con el secreto dentro también sale tapado.
-Si falla: un nombre con minúsculas al principio, cifras primero o símbolos: «Usa mayúsculas, cifras y _,
-empezando por una letra (STRIPE_KEY).», y lo escrito se queda; sin la clave de cifrado del servidor, la caja
+Si falla: un nombre con minúsculas al principio, cifras primero o símbolos no se guarda, y debajo pide
+mayúsculas, cifras y guiones bajos, empezando por una letra, como STRIPE_KEY; lo escrito se queda; sin la clave de cifrado del servidor, la caja
 dice «Este servidor todavía no puede guardar secretos: le falta su clave de cifrado.» en cuanto se abre, en
 lugar de los campos, y no deja guardar.
-Guardar un paso que nombra un secreto que no existe: «No hay ningún secreto llamado «X».» junto al campo.
+Guardar un paso que nombra un secreto que no existe: «No hay ningún secreto llamado «STRIPE_KEY».» junto al
+campo.
 Una ejecución cuyo secreto se borró o ya no se puede abrir se para antes de llamar, con el motivo y qué hacer.
 Un secreto solo se puede insertar en **Llamar a otro sistema**: en cualquier otro paso no se guarda.
 Implicados: FLOW-F11, FLOW-F13, FLOW-F16, FLOW-F27
@@ -812,8 +829,8 @@ Pasos:
    «Este paso te pedirá permiso para llamar a» y ese nombre. Después del nombre se pueden insertar datos.
 3. Añade las **Cabeceras** que pida el otro sistema (**Añadir una cabecera**: **Nombre** y **Valor**) y **Qué
    envía**. En cualquier valor, **Insertar un dato** ofrece lo que trajo el aviso, lo que dejaron los pasos
-   anteriores, los **Secretos** (FLOW-F26) y la «Clave de no repetición» de esta llamada.
-4. Ajusta los **Segundos de espera** (de 1 a 30) y, si quieres, **Más opciones** (FLOW-F25).
+   anteriores, los **Secretos** y la «Clave de no repetición» de esta llamada.
+4. Ajusta los **Segundos de espera** (de 1 a 30) y, si quieres, **Más opciones**.
 5. **Guardar** y, en **Permisos**, concede «Llamar a» ese servidor.
 Entra: el método, la dirección, las cabeceras, el texto que envía y la espera.
 Sale: **Ejecutar ahora** responde al momento, sin esperar al otro sistema: la ejecución queda en «Llamando
@@ -828,9 +845,9 @@ antes del nombre, no se guarda («Escribe la dirección a mano…»); tampoco la
 ejecución con el motivo y el nombre de la cabecera, sin llamar; una dirección de una red privada, del propio servidor o de los datos
 internos de la nube no se llama («…está dentro de una red privada, así que no se llamó.»); sin permiso, «…no
 le has dejado hacer…»; si responde un error, no contesta a tiempo o no se puede llegar, la ejecución se para
-con el motivo y qué hacer, y se puede reanudar (FLOW-F24) o seguir con «Si falla, sigue»; una dirección
+con el motivo y qué hacer, y se puede reanudar o seguir con «Si falla, sigue»; una dirección
 privada no se reanuda: hay que cambiar el paso y ejecutarla de nuevo. Mientras el servidor no pueda guardar
-secretos (FLOW-F26), una llamada que no usa ninguno se guarda, se prueba y sale igual; la que usa uno se
+secretos, una llamada que no usa ninguno se guarda, se prueba y sale igual; la que usa uno se
 para antes de llamar («Este servidor no puede usar secretos…»). No sigue
 redirecciones. Una ejecución cuya automatización se borra mientras llama se cancela.
 Implicados: FLOW-F12, FLOW-F13, FLOW-F16, FLOW-F24, FLOW-F25, FLOW-F26
@@ -869,20 +886,20 @@ Actor: propietario, administrador, responsable, empleado
 Pantalla: Automatizaciones
 Pasos:
 1. En **Automatizaciones**, **Esperan tu respuesta** enseña cada pregunta que puedes contestar, la que caduca
-   antes primero: de qué automatización viene, la pregunta y sus detalles (con sus datos en palabras, FLOW-F28),
+   antes primero: de qué automatización viene, la pregunta y sus detalles (con sus datos en palabras),
    «Preguntado a los responsables.
    Quien lleva el negocio también puede contestar.», qué pasa si nadie contesta («Si nadie contesta antes
-   del …, cuenta como un no.») y qué hace un no. Si es un cambio que quiere hacer el asistente (FLOW-F38), la
+   del …, cuenta como un no.») y qué hace un no. Si es un cambio que quiere hacer el asistente, la
    tarjeta dice primero qué quiere hacer: justo debajo de la pregunta («El asistente quiere cambiar algo en
    «Reservas»»), la acción con el nombre que le da el historial («Anular una reserva», «Reservar una cita»),
    las dos en tu idioma aunque la automatización esté escrita en otro, también en una pregunta que ya esperaba.
    Sus detalles son lo que dijo y, debajo, cada dato que mandaría, uno por línea, como lo dice su tarjeta en el
-   chat (BASE-F97): una fecha y una hora en tu idioma y a la hora del negocio («Empieza a las: 2 nov 2026,
+   chat: una fecha y una hora en tu idioma y a la hora del negocio («Empieza a las: 2 nov 2026,
    10:00»), un valor de una lista cerrada con el nombre que le da su app («Reservada por: Mostrador»), un
    importe en la moneda del negocio, un sí o un no como «Sí» o «No», una lista por sus elementos en palabras,
    como los servicios de una cita («Servicios: Corte de pelo, Tinte»), o, si no se pueden decir (las líneas de
    una venta, una lista de códigos), por cuántos elementos lleva, y un registro por su nombre solo si tú puedes
-   verlo; si no, no sale, y nunca por su código. Los datos fijos del paso (FLOW-F37) salen ya puestos, como los
+   verlo; si no, no sale, y nunca por su código. Los datos fijos del paso salen ya puestos, como los
    mandará («En nombre del
    cliente: Lucía Pérez»), aunque el asistente pidiera otro. Un dato vacío no sale. Se lee al abrir la bandeja,
    con lo que cada persona puede ver.
@@ -934,26 +951,26 @@ Pasos:
    está en formato internacional): solo lo recibe la conversación de WhatsApp de justo ese número
    internacional, nunca una nueva. Un número escrito a mano incompleto no le llega a nadie.
 3. Escribe el «Mensaje», con datos insertados: sale tal cual si el cliente te escribió en las últimas 24 horas,
-   con cada dato en palabras (FLOW-F11: un sí o un no, una fecha y una hora, un importe del aviso o de un paso anterior),
+   con cada dato en palabras (un sí o un no, una fecha y una hora, un importe del aviso o de un paso anterior),
    también en los huecos de la plantilla.
 4. Elige la «Plantilla» entre tus plantillas aprobadas por Meta (debajo se ve su texto) y rellena un dato por
    cada hueco: pasadas las 24 horas, WhatsApp solo deja pasar una plantilla aprobada. Sin plantillas
    aprobadas lo dice: «Todavía no tienes plantillas aprobadas: crea una en WhatsApp › Ajustes.». Si la que
-   eliges lleva arriba una foto, un vídeo o un documento, se manda con su archivo (FLOW-F32).
-5. **Guardar** y, en **Permisos**, autoriza «Enviar un WhatsApp a un cliente» (FLOW-F12).
+   eliges lleva arriba una foto, un vídeo o un documento, se manda con su archivo.
+5. **Guardar** y, en **Permisos**, autoriza «Enviar un WhatsApp a un cliente».
 Entra: el teléfono del cliente (de un aviso o de un paso anterior), las plantillas aprobadas de la Bandeja de
 WhatsApp y la conversación de ese número.
 Sale: al ejecutarse, el WhatsApp queda en la conversación del cliente en la bandeja, como uno enviado desde
 ella, y sale por el número del negocio (`whatsapp_inbox.message.sent`); el mismo aviso nunca lo manda dos
 veces.
-Si falla: no sale nada y el motivo queda en el historial de la automatización (FLOW-F16): un número que no
+Si falla: no sale nada y el motivo queda en el historial de la automatización: un número que no
 está en formato internacional, con «+» y el prefijo del país (no se envía nada, para que nunca le llegue a
 otra persona), un número sin conversación en este negocio («No hay ninguna
 conversación de WhatsApp con el … en este negocio: no se ha enviado nada.»), más de 24 horas sin plantilla,
 el número de WhatsApp sin conectar o los mensajes del plan de este mes gastados. Una plantilla de publicidad
 solo le llega a un cliente que lo haya aceptado en Clientes. Lo que Meta rechace después se ve en la
 conversación de la bandeja («No entregado»). Sin la Bandeja de WhatsApp el botón no aparece; por correo
-todavía no se puede (ver «Qué queda fuera»).
+todavía no se puede.
 Implicados: FLOW-F11, FLOW-F12, FLOW-F16, FLOW-F32, WHATSAPP_INBOX-F23, WHATSAPP_INBOX-F33
 
 ### FLOW-F32 Poner una foto, un vídeo o un PDF en la cabecera de un WhatsApp
@@ -961,7 +978,7 @@ Estado: hecho
 Actor: propietario, administrador
 Pantalla: Editor de automatización
 Pasos:
-1. En un paso **Enviar un mensaje** (FLOW-F31), elige en «Plantilla» una que lleve arriba una foto, un vídeo o un
+1. En un paso **Enviar un mensaje**, elige en «Plantilla» una que lleve arriba una foto, un vídeo o un
    documento: debajo sale el archivo que se manda con ella y lo que acepta WhatsApp («JPEG o PNG, hasta 5 MB.»,
    «MP4, hasta 16 MB.» o «PDF, hasta 25 MB.»).
 2. Si la plantilla ya tiene su archivo (la hiciste en WhatsApp › Ajustes), sale su nombre y su tamaño («Foto:
@@ -979,7 +996,7 @@ foto JPEG o PNG.», «Este archivo pesa más de 5 MB: elige uno más ligero.»);
 subir el archivo. Inténtalo de nuevo.». Si el archivo que eligió el paso ya no está guardado, lo dice («El archivo
 que había elegido este paso ya no está guardado: elígelo de nuevo.»); si no se puede leer ahora, «No se ha podido
 leer el archivo de este paso.» con **Reintentar**. Sin archivo, al ejecutarse no sale nada y el motivo queda en el
-historial de la automatización (FLOW-F16); un archivo de otro negocio nunca se manda.
+historial de la automatización; un archivo de otro negocio nunca se manda.
 Implicados: FLOW-F11, FLOW-F16, FLOW-F31, WHATSAPP_INBOX-F29, WHATSAPP_INBOX-F33
 
 ### FLOW-F33 Encender una automatización que trae otra app
@@ -1053,18 +1070,18 @@ Pantalla: Automatizaciones
 Pasos:
 1. No tienes que hacer nada: lo que su app corrigió después de que la montaras llega solo a tu automatización,
    aunque la hayas retocado, y sin ningún aviso encima de **Tus automatizaciones**. La tarjeta de **Viene con …**
-   sigue diciendo «Versión nueva», como con cualquier otro cambio de su app (FLOW-F35).
+   sigue diciendo «Versión nueva», como con cualquier otro cambio de su app.
 2. Si su app estrechó cuándo arranca, ya no arranca en los casos que su app dejó fuera: la respuesta por WhatsApp
    montada antes de que su app dejara fuera los mensajes antiguos que trae la bandeja ya no contesta a ninguno. Al
    abrirla, su «Solo cuando…» ya lo dice.
-3. Si su app fijó un dato de su paso **Pedírselo al asistente** (FLOW-F37), ese paso ya lo lleva: al abrirla sale en
-   sus **Datos fijos**, y el asistente no lo ve ni puede cambiarlo (FLOW-F38). Así, la respuesta por WhatsApp
+3. Si su app fijó un dato de su paso **Pedírselo al asistente**, ese paso ya lo lleva: al abrirla sale en
+   sus **Datos fijos**, y el asistente no lo ve ni puede cambiarlo. Así, la respuesta por WhatsApp
    montada antes de que su app fijara la ficha de quien escribe tampoco anula ni cambia la reserva de otra persona,
    ni siquiera tras el **Aprobar**.
 4. Lo que su app pone no se quita desde tu automatización: en el editor, esa condición del «Solo cuando…» y ese dato
    fijo dicen «Lo fija …: puedes cambiarlo, pero no quitarlo.», sin × y sin poder elegir otro dato. Tus salidas: darle
    otro valor (vale el tuyo), quitar esa consulta o acción de **Qué puede usar**, hacer que arranque con otro aviso, o
-   hacer una copia (FLOW-F06), que es tuya entera.
+   hacer una copia, que es tuya entera.
 Entra: las automatizaciones montadas desde una tarjeta de **Viene con …**, cuando se montaran, cuyo «Solo cuando…»
 no tiene lo que su app le pone hoy mientras arrancan con el mismo aviso, o que dejan al asistente un dato que su
 app fija hoy en ese paso.
@@ -1100,15 +1117,14 @@ Pasos:
    elige con **Fijar un dato** cuál («En nombre del cliente», de «Anular una reserva») y rellénalo, con
    **Insertar un dato** si quieres (la «Ficha» que leyó un paso anterior). Sale como «Anular una reserva › En
    nombre del cliente»; × lo quita, y quitar algo de **Qué puede usar** quita también sus datos fijos. Uno que fija la
-   app de la receta desde la que la montaste no tiene ×: dice «Lo fija …: puedes cambiarlo, pero no quitarlo.»
-   (FLOW-F36). Sin
-   ninguno: «Ninguno: el asistente rellena todos los datos.». La tarjeta lo explica: «El asistente no los ve ni
+   app de la receta desde la que la montaste no tiene ×: dice «Lo fija …: puedes cambiarlo, pero no quitarlo.».
+   Sin ninguno: «Ninguno: el asistente rellena todos los datos.». La tarjeta lo explica: «El asistente no los ve ni
    puede cambiarlos: se rellenan al pedírselo, y una herramienta con un dato fijo vacío no se usa.».
 5. En **Cambios**, elige «Que me lo pregunte» (de fábrica) o «Que lo haga por su cuenta». La tarjeta lo explica:
    «Lo que quiera cambiar espera un sí en Automatizaciones, en «Esperan tu respuesta». Lo que solo consulta nunca
    espera.» o «Hace los cambios por su cuenta, como esta automatización, con los permisos que le has dado.».
-6. Ajusta **Vueltas como mucho** (de 1 a 10; de fábrica, 6) y, si quieres, **Más opciones** (FLOW-F25).
-7. Pulsa **Guardar** y, en **Permisos**, concede cada consulta o acción que puede usar (FLOW-F12).
+6. Ajusta **Vueltas como mucho** (de 1 a 10; de fábrica, 6) y, si quieres, **Más opciones**.
+7. Pulsa **Guardar** y, en **Permisos**, concede cada consulta o acción que puede usar.
 Entra: el encargo, lo que puede usar, sus datos fijos, cómo hace los cambios y las vueltas.
 Sale: el paso. Los pasos de después pueden insertar «Texto», lo que ha contestado, y, si un cambio esperó tu
 respuesta, «Aprobada», «Nota» y «Contestada por». **Probar** dice «Se lo pediría al asistente: …» con el encargo
@@ -1122,7 +1138,7 @@ cuenta», tampoco:
 dato fijo de algo que no puede usar (««…» tiene datos fijos, pero el asistente no puede usarla: añádela a lo que
 puede usar o quita sus datos fijos.»), uno que esa consulta o acción no tiene (««…» no es un dato de «…».»), uno
 sin valor («Dale un valor a «…» de «…», o quítalo.»), ni uno que lee un secreto o un paso de después, como el
-encargo. Uno que fija su app, sin valor o quitado, tampoco (FLOW-F36).
+encargo. Uno que fija su app, sin valor o quitado, tampoco.
 Implicados: FLOW-F11, FLOW-F12, FLOW-F13, FLOW-F17, FLOW-F25, FLOW-F29, FLOW-F38, FLOW-F39
 
 ### FLOW-F38 El asistente hace el paso que le toca dentro de una automatización
@@ -1341,7 +1357,7 @@ Los avisos llevan ids, nunca nombres ni contenidos.
   empates incluidos. Lo fija `test_ties_go_by_id_in_the_lists_own_direction`.
 - **Anatomía**: `apps.py`, `models.py`, `document.py` (el documento de una automatización: rutas de
   datos, plantillas `{{…}}`, condiciones, horarios y permisos que pide; puro, sin base de datos),
-  `schemas.py`, `queries/`, `services/` (con el motor), `events.py`, `live.py`, `api.py`, `admin.py`,
+  `schemas/`, `queries/`, `services/` (con el motor), `events.py`, `live.py`, `api.py`, `admin.py`,
   `locale/`, `frontend/` y un `tests/test_<fichero>.py` por fichero, más
   `tests/test_integration_apps.py` (Clientes, Ventas y Tareas de verdad) y `tests/test_concurrency.py`.
 - **Modelos**: `Flow` (nombre, encendida, disparador aplanado —`trigger_kind`, `trigger_event`,

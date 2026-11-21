@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// Services → Settings (WORKBOOK «Pantallas · Ajustes de Servicios»; SERVICE-F11): the old settings tab,
+// Services → Settings (WORKBOOK «Pantallas · Ajustes»; SERVICE-F11): the old settings tab,
 // only for whoever may save them. The values come live (`service.settings.get`: the factory ones until
 // the business saves). The form is every settings page's (`useSettingsForm`, hub#867): a change saved
 // elsewhere repaints every field the person has not touched, «Save» sends only the fields touched and

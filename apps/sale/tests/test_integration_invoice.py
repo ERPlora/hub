@@ -356,15 +356,17 @@ def _live_through_erplora(settings):
 
 
 def _live_with_its_own_certificate(settings):
-    """The business files with its own certificate, uploaded by the owner, and goes live."""
+    """The business files with its own certificate, uploaded by the owner and accepted by the AEAT's test environment,
+    and goes live."""
     from apps.verifactu import certificates
-    from apps.verifactu.tests.conftest import b64, make_p12
+    from apps.verifactu.tests.conftest import accepted_by_the_aeat_of_testing, b64, make_p12
 
     settings.FISCAL_CERTIFICATE_KEY = certificates.generate_key()
     run(
         "verifactu.certificate.upload",
         {"p12_base64": b64(make_p12()), "password": "secret"},
     )
+    accepted_by_the_aeat_of_testing()
     run("verifactu.config.go_live")
 
 
@@ -411,16 +413,12 @@ WAYS_LOST = {
 
 @pytest.mark.parametrize("lost", sorted(WAYS_LOST))
 def test_in_production_without_a_way_to_the_aeat_the_charge_is_refused(
-    issuer, bar, settings, monkeypatch, lost
+    issuer, bar, settings, lost
 ):
     # A business that files for real never charges a sale whose ticket could never reach the AEAT, whether the route
     # lost it (the authorisation, the own certificate) or the server (the key that opens the certificate, ERPlora's
     # gateway, real filing). The refusal is not a document that waits: it reaches the cashier as it is and nothing is
-    # charged, numbered or sealed. The charge never stays «pending». The own certificate is the test's, its authority
-    # recognised here as a real one is by the trusted list.
-    from apps.verifactu.tests.conftest import recognise_test_authority
-
-    recognise_test_authority(monkeypatch)
+    # charged, numbered or sealed. The charge never stays «pending».
     settings.ERPLORA_ENVIRONMENT = "prod"
     settings.VERIFACTU_PRODUCTION_ENABLED = True
     settings.VERIFACTU_GATEWAY_URL = "http://saas.internal:8001"

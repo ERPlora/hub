@@ -22,7 +22,8 @@ from apps.flow.queries.questions import (
 )
 from apps.flow.queries.reads import ANSWER, SYSTEM, TURN
 from apps.flow.queries.reasons import action_label
-from apps.flow.schemas import AnsweredOut, AnswerIn, DueIn, DueOut
+from apps.flow.schemas.fields import DueIn, DueOut
+from apps.flow.schemas.questions import AnsweredOut, AnswerIn
 
 from .assistant_steps import _make_proposal, _step_of
 from .engine import _finish, _go_on, _log, _own
