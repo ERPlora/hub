@@ -224,15 +224,16 @@ def _check_drawer(ctx: OperationContext, legs: list[dict]) -> None:
 CURRENT_MEMBER = "staff.member.current"
 
 
-def _served_by(ctx: OperationContext, named: UUID | None) -> UUID | None:
-    """Who the sale is attributed to (SALE-F16): whoever the charge names (an integration's) or who serves the
-    check (the person chosen on the chip) or, left on «Me», the Staff record of whoever holds the session, asked by name (Staff is
-    no requirement of Sales; its operation needs no Staff permission, so a cashier who does not see the team
-    still sells as herself). Nobody without a record, without a user behind the session (the platform, an API
-    key) or without Staff (absent or off): the sale counts for nobody, as the till warns. It is the sale's
-    professional, for the lines of the check: a line with its own (an appointment's service) keeps it."""
-    if named is not None:
-        return named
+def _served_by(ctx: OperationContext, named: UUID | None, serving: UUID | None = None) -> UUID | None:
+    """Who the sale is attributed to (SALE-F16): whoever the charge names (an integration's), else who serves the
+    check (``serving``, the person chosen on the chip) or, left on «Me», the Staff record of whoever holds the
+    session, asked by name (Staff is no requirement of Sales; its operation needs no Staff permission, so a cashier
+    who does not see the team still sells as herself). Nobody without a record, without a user behind the session
+    (the platform, an API key) or without Staff (absent or off): the sale counts for nobody, as the till warns. It
+    is the sale's professional, for the lines of the check: a line with its own (an appointment's service) keeps it."""
+    chosen = named or serving
+    if chosen is not None:
+        return chosen
     try:
         op = get(CURRENT_MEMBER)
         current = op(ctx, op.input.model_validate({}))
