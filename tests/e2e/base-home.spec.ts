@@ -4,13 +4,17 @@ import { type Browser, type BrowserContext, expect, type Locator, type Page, tes
 
 import { bellSays, bellTotal, featureNotice, noticeButton } from './action-center';
 import { A, api, clearItems, horizontalOverflow, hostPage, login, psql, shot, shown, uniqueName, untilStill } from './helpers';
-import { panelAdded, panelTitle, panelValue, spanishContext, spanishHome } from './home-helpers';
+import { boardValue, panelAdded, panelTitle, panelValue, spanishContext, spanishHome } from './home-helpers';
+import { countLiveOpens, isLiveStream } from './live-streams';
 
 const VIEWPORTS = {
   390: { width: 390, height: 844 },
   834: { width: 834, height: 1112 },
   1440: { width: 1440, height: 900 },
 } as const;
+
+/** The demo's panel «Open items», whose figure only comes through a stream that carries the panel. */
+const OPEN_ITEMS = 'demo.open_items';
 
 /** The side menu is pinned from 992 px; below it is a drawer behind the bar's menu button. */
 const PINNED_MIN = 992;
@@ -162,15 +166,9 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
 for (const [label, viewport] of Object.entries(VIEWPORTS)) {
   test(`BASE-F06 BASE-F08 — the Home opens one live stream, with its panels' data in it, at ${label}`, async ({ browser }) => {
     const { context, page } = await hostPage(browser, A, { viewport, next: '/' });
-    const isLive = (url: string) => new URL(url).pathname === '/api/live';
-    const opened: string[] = [];
-    const cut: string[] = [];
-    page.on('request', (request) => {
-      if (isLive(request.url())) opened.push(request.url());
-    });
-    page.on('requestfailed', (request) => {
-      if (isLive(request.url())) cut.push(request.failure()?.errorText ?? 'failed');
-    });
+    // The page the login left opens its own stream only once it mounts: the count starts when its panel's figure is in.
+    await expect(boardValue(page, OPEN_ITEMS)).toHaveText(/\d/);
+    const { opened, cut } = countLiveOpens(page);
     await page.reload();
     // The panel's figure only comes through a stream that carries the panel: by then any reopening has happened.
     await panelOnOneStream(page, cut, opened);
@@ -203,8 +201,7 @@ async function recentPanelInSpanish(
 
 /** The panel's figure came, over the one `/api/live` the page opened, which was never cut. */
 async function panelOnOneStream(page: Page, cut: string[], opened: unknown[]): Promise<void> {
-  const panel = testid(page, 'widget-board').locator('[data-testid="widget"][data-key="demo.open_items"]');
-  await expect(panelValue(panel)).toHaveText(/\d/);
+  await expect(boardValue(page, OPEN_ITEMS)).toHaveText(/\d/);
   expect(cut).toEqual([]);
   expect(opened).toHaveLength(1);
 }
@@ -233,18 +230,10 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
         await route.continue();
       },
     );
-    const isLive = (url: string) => new URL(url).pathname === '/api/live';
-    const opened: string[] = [];
-    const cut: string[] = [];
-    page.on('request', (request) => {
-      if (isLive(request.url())) opened.push(request.url());
-    });
-    page.on('requestfailed', (request) => {
-      if (isLive(request.url())) cut.push(request.failure()?.errorText ?? 'failed');
-    });
+    const { opened, cut } = countLiveOpens(page);
     // The chrome's queries only come in a stream opened once its pieces mounted: by then any reopening has happened.
     const withChrome = page.waitForRequest((request) => {
-      if (!isLive(request.url())) return false;
+      if (!isLiveStream(request.url())) return false;
       const ops = liveOps(request.url());
       return ops.includes('base.bell.counters') && ops.includes('base.app.list');
     });

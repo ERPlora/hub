@@ -1,12 +1,11 @@
 <script setup lang="ts">
-import { formatAllergens, InlineFeedback } from '@erplora/ui/components';
+import { AllergenRow, formatAllergens, InlineFeedback } from '@erplora/ui/components';
 import { HubIcon } from '@erplora/ui/shell';
 import { computed } from 'vue';
 
 import type { OrderLineOut } from '../../operations';
 import { useLocale, useT } from '../../composables/useT';
 import { dishLabel } from '../../lib/comboChoice';
-import AllergenRow from './AllergenRow.vue';
 
 const props = defineProps<{ line: OrderLineOut }>();
 const t = useT();

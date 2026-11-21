@@ -21,6 +21,7 @@ const option = (id: string, price_delta = 0, is_default = false) => ({
   price_delta,
   tax_category_key: null,
   is_default,
+  allergens: [],
 });
 
 const group = (id: string, min: number, max: number, ids: string[], more: Partial<TargetGroupOut> = {}): TargetGroupOut => ({

@@ -104,6 +104,8 @@
         "taxHint": "Only if it taxes differently from the dish; empty = the dish's.",
         "noTax": "The dish's",
         "default": "Chosen by default",
+        "allergens": "Allergens",
+        "allergensHint": "Mark the ones this option adds to the dish.",
         "order": "Order",
         "create": "Create",
         "save": "Save"

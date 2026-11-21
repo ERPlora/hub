@@ -150,7 +150,6 @@
       "lineNoteHint": "Cocina lee esta nota en la comanda.",
       "lineNoteRemove": "Quitar",
       "lineNoteSave": "Guardar",
-      "allergens": "Alérgenos: {names}",
       "allergensLoading": "Cargando alérgenos…",
       "allergensLoadFailed": "No se han podido cargar los alérgenos.",
       "customerAllergy": "Alergia del cliente",
