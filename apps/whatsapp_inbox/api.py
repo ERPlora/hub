@@ -100,14 +100,14 @@ async def conversation_notices(request, params: Query[NoticesIn]):
     "/whatsapp_inbox/conversations/mark_read",
 )
 async def conversation_mark_read(request, data: ConversationRefIn):
-    return await run_operation(request, services.mark_read, data)
+    return await run_operation(request, services.conversations.mark_read, data)
 
 
 @bind(
     router, "whatsapp_inbox.conversation.assign", "/whatsapp_inbox/conversations/assign"
 )
 async def conversation_assign(request, data: AssignIn):
-    return await run_operation(request, services.assign, data)
+    return await run_operation(request, services.conversations.assign, data)
 
 
 @bind(
@@ -116,7 +116,7 @@ async def conversation_assign(request, data: AssignIn):
     "/whatsapp_inbox/conversations/set_status",
 )
 async def conversation_set_status(request, data: SetStatusIn):
-    return await run_operation(request, services.set_status, data)
+    return await run_operation(request, services.conversations.set_status, data)
 
 
 @bind(
@@ -125,19 +125,19 @@ async def conversation_set_status(request, data: SetStatusIn):
     "/whatsapp_inbox/conversations/link_customer",
 )
 async def conversation_link_customer(request, data: LinkCustomerIn):
-    return await run_operation(request, services.link_customer, data)
+    return await run_operation(request, services.conversations.link_customer, data)
 
 
 @bind(
     router, "whatsapp_inbox.conversation.erase", "/whatsapp_inbox/conversations/erase"
 )
 async def conversation_erase(request, data: ConversationRefIn):
-    return await run_operation(request, services.erase, data)
+    return await run_operation(request, services.erasing.erase, data)
 
 
 @bind(router, "whatsapp_inbox.conversation.flag", "/whatsapp_inbox/conversations/flag")
 async def conversation_flag(request, data: ConversationRefIn):
-    return await run_operation(request, services.flag, data)
+    return await run_operation(request, services.conversations.flag, data)
 
 
 # Messages
@@ -157,19 +157,19 @@ async def message_get(request, params: Query[MessageRefIn]):
     router, "whatsapp_inbox.message.send", "/whatsapp_inbox/messages/send", status=201
 )
 async def message_send(request, data: SendIn):
-    return await run_operation(request, services.send_message, data)
+    return await run_operation(request, services.sending.send_message, data)
 
 
 @bind(
     router, "whatsapp_inbox.message.notify", "/whatsapp_inbox/messages/notify", status=201
 )
 async def message_notify(request, data: NotifyIn):
-    return await run_operation(request, services.notify, data)
+    return await run_operation(request, services.sending.notify, data)
 
 
 @bind(router, "whatsapp_inbox.message.retry", "/whatsapp_inbox/messages/retry")
 async def message_retry(request, data: MessageRefIn):
-    return await run_operation(request, services.retry_message, data)
+    return await run_operation(request, services.sending.retry_message, data)
 
 
 # Notes
@@ -182,12 +182,12 @@ async def note_list(request, params: Query[NoteListIn]):
 
 @bind(router, "whatsapp_inbox.note.add", "/whatsapp_inbox/notes", status=201)
 async def note_add(request, data: NoteAddIn):
-    return await run_operation(request, services.add_note, data)
+    return await run_operation(request, services.notes.add_note, data)
 
 
 @bind(router, "whatsapp_inbox.note.delete", "/whatsapp_inbox/notes/delete")
 async def note_delete(request, data: NoteRefIn):
-    return await run_operation(request, services.delete_note, data)
+    return await run_operation(request, services.notes.delete_note, data)
 
 
 # Templates, channel and team
@@ -205,17 +205,17 @@ async def channel_get(request):
 
 @bind(router, "whatsapp_inbox.channel.prepare", "/whatsapp_inbox/channel/prepare")
 async def channel_prepare(request):
-    return await run_operation(request, services.prepare_connect)
+    return await run_operation(request, services.channel.prepare_connect)
 
 
 @bind(router, "whatsapp_inbox.channel.connect", "/whatsapp_inbox/channel/connect")
 async def channel_connect(request, data: ChannelConnectIn):
-    return await run_operation(request, services.connect_number, data)
+    return await run_operation(request, services.channel.connect_number, data)
 
 
 @bind(router, "whatsapp_inbox.channel.disconnect", "/whatsapp_inbox/channel/disconnect")
 async def channel_disconnect(request):
-    return await run_operation(request, services.disconnect_number)
+    return await run_operation(request, services.channel.disconnect_number)
 
 
 @bind(router, "whatsapp_inbox.agent.list", "/whatsapp_inbox/agents")
@@ -225,13 +225,13 @@ async def agent_list(request, params: Query[AgentListIn]):
 
 @bind(router, "whatsapp_inbox.template.create", "/whatsapp_inbox/templates", status=201)
 async def template_create(request, data: TemplateCreateIn):
-    return await run_operation(request, services.create_template, data)
+    return await run_operation(request, services.templates.create_template, data)
 
 
 @bind(router, "whatsapp_inbox.template_sample.upload", "/whatsapp_inbox/templates/samples", status=201)
 @decorate_view(accept_body_up_to(MAX_SAMPLE_BODY))
 async def template_upload_sample(request, data: TemplateSampleUploadIn):
-    return await run_operation(request, services.upload_sample, data)
+    return await run_operation(request, services.template_samples.upload_sample, data)
 
 
 @bind(router, "whatsapp_inbox.template_sample.detail", "/whatsapp_inbox/templates/samples/detail")
@@ -241,14 +241,14 @@ async def template_sample_detail(request, params: Query[TemplateSampleRefIn]):
 
 @bind(router, "whatsapp_inbox.template.update", "/whatsapp_inbox/templates/update")
 async def template_update(request, data: TemplateUpdateIn):
-    return await run_operation(request, services.update_template, data)
+    return await run_operation(request, services.templates.update_template, data)
 
 
 @bind(router, "whatsapp_inbox.template.retry", "/whatsapp_inbox/templates/retry")
 async def template_retry(request, data: TemplateRefIn):
-    return await run_operation(request, services.retry_template, data)
+    return await run_operation(request, services.templates.retry_template, data)
 
 
 @bind(router, "whatsapp_inbox.template.delete", "/whatsapp_inbox/templates/delete")
 async def template_delete(request, data: TemplateRefIn):
-    return await run_operation(request, services.delete_template, data)
+    return await run_operation(request, services.templates.delete_template, data)

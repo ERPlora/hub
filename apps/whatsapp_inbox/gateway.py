@@ -4,7 +4,7 @@ The WhatsApp Business account and Meta's token live in the SaaS: the Hub asks it
 a number, and keeps what it answers. JSON, signed like every ``/internal`` call (``X-Erplora-Timestamp``
 and ``X-Erplora-Signature``, HMAC-SHA256 of ``f"{timestamp}.{body}"`` with ``INTERNAL_SHARED_SECRET``;
 ``base.auth.sign``). Both are called OUTSIDE any transaction, after the COMMIT that queued the work
-(services.py): a slow erplora.com never holds a lock of the hub.
+(``services``): a slow erplora.com never holds a lock of the hub.
 
 ``send`` → ``POST {SAAS_INTERNAL_URL}/internal/whatsapp/send`` with an ``Idempotency-Key``: erplora.com
 never sends the same key twice, so a retry is safe. ``httpx`` (maintained since 2019, 100+
@@ -23,7 +23,7 @@ its messages (WHATSAPP_INBOX-F10, F11); only ``200 {"erased": true}`` confirms i
 ``submit_template`` → ``POST {SAAS_INTERNAL_URL}/internal/whatsapp/templates`` (door 8, WHATSAPP_INBOX-F29,
 F30) with an ``Idempotency-Key``: erplora.com registers (or edits) the template at Meta once per key (a header with a
 file carries it in ``header_sample``, which erplora.com uploads to Meta first: waited for 90 s, still within
-``services.STUCK_AFTER``) and
+``services.deliveries.STUCK_AFTER``) and
 answers ``200 {"meta_id", "status"}`` (``accepted``: Meta took it for review); a 409 carries its code and
 Meta's reason (``refused``); the rest reads as for ``send``. ``delete_template`` → ``POST …/templates/delete``
 (door 9, F31): ``200 {"deleted": true}`` or its 404 ``whatsapp.template_not_found`` (Meta no longer has
