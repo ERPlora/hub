@@ -17,7 +17,8 @@ with what preproduction taught it:
   number alone could be an earlier record of the same invoice.
 - What a submission's answer says of the certificate it was presented with (``certificate_verdict``): the AEAT's
   door answers one it cannot verify with a redirect to its «401» page (``302``, empty body), and refuses its holder
-  with the faults 103 (not identified) and 4112 (may not file for the taxpayer); a verdict on the records proves it.
+  for the taxpayer with the fault 4112; a verdict on the records proves it. The fault 103 «NIF no identificado» is
+  no verdict: the test door gave it to good certificates and identified them a while later.
 - A query answers at most 10,000 records (the AEAT's web service description, section 6.4.3):
   ``IndicadorPaginacion`` S says more follow, after the record its ``ClavePaginacion`` names.
 """
@@ -35,7 +36,7 @@ ACCEPTED_WITH_ERRORS = "accepted_with_errors"
 REJECTED = "rejected"
 DUPLICATE = "3000"
 PERMANENT_FAULTS = frozenset({"4102", "4104", "4116"})
-CERTIFICATE_FAULTS = frozenset({"103", "4112"})
+CERTIFICATE_FAULTS = frozenset({"4112"})
 CERTIFICATE_REDIRECT = 302
 _FAULT_CODE = re.compile(r"Codigo\[(\d+)\]")
 

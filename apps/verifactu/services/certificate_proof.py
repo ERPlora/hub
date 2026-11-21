@@ -3,7 +3,6 @@ presented with it in testing may accept it or reject it (``aeat.certificate_verd
 Only testing proves it: an answer of production never changes it, nor one presented with ERPlora's seal (no
 certificate of the business travelled with it)."""
 
-from django.utils import timezone
 from live.context import OperationContext
 from live.outbox import record_event
 
@@ -46,7 +45,6 @@ def _told(ctx: OperationContext, row: OwnCertificate) -> None:
     params = {
         "holder": row.holder,
         "holder_tax_id": row.holder_tax_id,
-        "expires_on": timezone.localtime(row.expires_at).date().isoformat(),
         # The door that cannot verify a certificate answers nothing but its status.
         "detail": row.aeat_proof_detail or f"HTTP {aeat.CERTIFICATE_REDIRECT}",
     }

@@ -4,10 +4,11 @@ business goes live with it only once it is accepted; uploading another one leave
 
 How the AEAT's test door refuses a certificate was measured on ``prewww1.aeat.es``: one it cannot verify (no
 recognised authority issued it, it is not valid for the service, or it has expired) is redirected, ``302`` with an
-empty body, to its page «401 No autorizado. Se ha producido un error al verificar el certificado presentado»; one
-whose holder it does not identify gets a SOAP fault ``Codigo[103].NIF no identificado: <NIF>/<name>`` (the answer
-kept in ``fixtures/``, its holder rewritten to the test's). Its list of errors names ``4112``: «El titular del
-certificado debe ser Obligado Emisión, Colaborador Social, Apoderado o Sucesor».
+empty body, to its page «401 No autorizado. Se ha producido un error al verificar el certificado presentado». Its list
+of errors names ``4112``: «El titular del certificado debe ser Obligado Emisión, Colaborador Social, Apoderado o
+Sucesor». The SOAP fault ``Codigo[103].NIF no identificado: <NIF>/<name>`` (the answer kept in ``fixtures/``, its
+holder rewritten to the test's) is no verdict: the same door gave it to two good certificates and, a while later,
+identified both, so it says nothing of the certificate.
 
 The gateway is the only stand-in (``gateway_answers``): nothing here opens a connection."""
 
@@ -23,7 +24,7 @@ from apps.verifactu.tests.conftest import FIXTURES, HUB_DB, answering, b64, code
 pytestmark = HUB_DB
 
 CERTIFICATE_REFUSED = gateway.Reply(kind=gateway.ANSWERED, aeat_status=302, aeat_body="")
-HOLDER_UNKNOWN = gateway.Reply(
+HOLDER_NOT_IDENTIFIED_FOR_NOW = gateway.Reply(
     kind=gateway.ANSWERED,
     aeat_status=403,
     aeat_body=FIXTURES.joinpath("certificado_103_nif_no_identificado_2026-11-21.xml").read_text(encoding="utf-8"),
@@ -31,7 +32,7 @@ HOLDER_UNKNOWN = gateway.Reply(
 
 
 def fault(code: str, text: str, kind: str = "Client", status: int = 500) -> gateway.Reply:
-    """A SOAP fault in the AEAT's own form (``Codigo[<code>].<text>``, as its door answered the 103)."""
+    """A SOAP fault in the AEAT's own form (``Codigo[<code>].<text>``, as its door answers in ``fixtures/``)."""
     body = (
         '<?xml version="1.0" encoding="UTF-8"?><env:Envelope xmlns:env="http://schemas.xmlsoap.org/soap/envelope/">'
         f"<env:Body><env:Fault><faultcode>env:{kind}</faultcode><faultstring>Codigo[{code}].{text}</faultstring>"
@@ -96,10 +97,9 @@ def test_an_answer_with_the_aeats_verdict_on_the_records_accepts_the_certificate
     ("reply", "detail"),
     [
         (CERTIFICATE_REFUSED, ""),
-        (HOLDER_UNKNOWN, "Codigo[103].NIF no identificado: 12345678Z/ACME  SL"),
         (HOLDER_MAY_NOT_FILE, "Codigo[4112].El titular del certificado debe ser Obligado Emisión"),
     ],
-    ids=["302_cannot_verify", "103_holder_unknown", "4112_holder_may_not_file"],
+    ids=["302_cannot_verify", "4112_holder_may_not_file"],
 )
 def test_the_aeats_refusals_of_the_certificate_reject_it(reply, detail):
     verdict = aeat.certificate_verdict(reply.aeat_status, reply.aeat_body)
@@ -115,8 +115,9 @@ def test_the_aeats_refusals_of_the_certificate_reject_it(reply, detail):
         fault("4108", "Error técnico al obtener el certificado."),
         gateway.Reply(kind=gateway.ANSWERED, aeat_status=503, aeat_body="<html>maintenance</html>"),
         gateway.Reply(kind=gateway.ANSWERED, aeat_status=200, aeat_body=""),
+        HOLDER_NOT_IDENTIFIED_FOR_NOW,
     ],
-    ids=["aeat_unavailable", "content_of_the_header", "technical", "maintenance_page", "empty"],
+    ids=["aeat_unavailable", "content_of_the_header", "technical", "maintenance_page", "empty", "103_for_now"],
 )
 def test_an_aeat_down_or_a_fault_of_the_content_says_nothing_of_the_certificate(reply):
     assert aeat.certificate_verdict(reply.aeat_status, reply.aeat_body) is None
@@ -154,12 +155,13 @@ def test_a_record_the_aeat_rejects_for_its_content_still_proves_the_certificate(
     [
         (CERTIFICATE_REFUSED, "", "it could not verify it (no authority it recognises issued it"),
         (
-            HOLDER_UNKNOWN,
-            "Codigo[103].NIF no identificado: 12345678Z/ACME  SL",
-            "refused this certificate (Codigo[103].NIF no identificado: 12345678Z/ACME  SL): upload another one.",
+            HOLDER_MAY_NOT_FILE,
+            "Codigo[4112].El titular del certificado debe ser Obligado Emisión, Colaborador Social, Apoderado o Sucesor.",
+            "refused this certificate (Codigo[4112].El titular del certificado debe ser Obligado Emisión, Colaborador "
+            "Social, Apoderado o Sucesor.): upload another one.",
         ),
     ],
-    ids=["302_cannot_verify", "103_holder_unknown"],
+    ids=["302_cannot_verify", "4112_holder_may_not_file"],
 )
 def test_the_aeat_of_testing_refusing_the_certificate_rejects_it(issuer, gateway_answers, reply, detail, said):
     upload()
@@ -181,8 +183,9 @@ def test_the_aeat_of_testing_refusing_the_certificate_rejects_it(issuer, gateway
         gateway.Reply(kind=gateway.REFUSED, code="certificate_invalid", message="It does not open."),
         fault("2000", "Servicio no disponible", kind="Server"),
         fault("4104", "Error en la cabecera: el valor del campo NIF del bloque ObligadoEmision no está identificado."),
+        HOLDER_NOT_IDENTIFIED_FOR_NOW,
     ],
-    ids=["unreachable", "no_answer", "gateway_refusal", "aeat_unavailable", "content_fault"],
+    ids=["unreachable", "no_answer", "gateway_refusal", "aeat_unavailable", "content_fault", "103_for_now"],
 )
 def test_an_aeat_down_without_an_answer_or_a_content_error_leaves_it_untested(issuer, gateway_answers, reply):
     upload()
@@ -200,7 +203,7 @@ def test_an_aeat_down_after_it_was_accepted_keeps_it_accepted(issuer, gateway_an
 
 def test_a_rejected_certificate_the_aeat_accepts_later_is_accepted(issuer, gateway_answers):
     upload()
-    send_a_ticket(gateway_answers, HOLDER_UNKNOWN)
+    send_a_ticket(gateway_answers, HOLDER_MAY_NOT_FILE)
     send_a_ticket(gateway_answers, answering())
     assert proof() == ("accepted", "")
 

@@ -268,11 +268,12 @@ test('Mi certificado: an unrecognised authority is refused; a kept one shows its
   await expect(cert.locator('[data-testid=verifactu-config-cert-proof]')).toHaveText('Sin probar todavía');
   await expect(proof).toContainText('Se prueba con el próximo registro que salga en pruebas');
   await flowShots(page, 'F02-untested', async (p) => expect(shown(p).locator('[data-testid=verifactu-config-proof]')).toBeVisible());
-  psql("update verifactu_owncertificate set aeat_proof = 'rejected', aeat_proof_detail = 'Codigo[103].NIF no identificado: 12345678Z/E2E'");
+  const aeatAnswer = 'Codigo[4112].El titular del certificado debe ser Obligado Emisión, Colaborador Social, Apoderado o Sucesor.';
+  psql(`update verifactu_owncertificate set aeat_proof = 'rejected', aeat_proof_detail = '${aeatAnswer}'`);
   await page.reload();
   await shown(page).locator('[data-testid=verifactu-config-tab-own]').click();
   await expect(cert.locator('[data-testid=verifactu-config-cert-proof]')).toHaveText('Rechazado');
-  await expect(proof).toHaveText('La AEAT de pruebas ha rechazado este certificado (Codigo[103].NIF no identificado: 12345678Z/E2E): sube otro.');
+  await expect(proof).toHaveText(`La AEAT de pruebas ha rechazado este certificado (${aeatAnswer}): sube otro.`);
   await flowShots(page, 'F02-rejected', async (p) => expect(shown(p).locator('[data-testid=verifactu-config-proof]')).toBeVisible());
   psql("update verifactu_owncertificate set aeat_proof = 'accepted', aeat_proof_detail = ''");
 

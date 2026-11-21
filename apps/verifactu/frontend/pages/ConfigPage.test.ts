@@ -100,7 +100,7 @@ describe('ConfigPage', () => {
     expect(untested.find('verifactu-config-proof').text()).toBe(
       "It is tried with the next record that goes out in testing: once the AEAT's test environment accepts it, you can go live.",
     );
-    const why = "The AEAT's test environment refused this certificate (Codigo[103].NIF no identificado): upload another one.";
+    const why = "The AEAT's test environment refused this certificate (Codigo[4112].El titular del certificado debe ser Obligado Emisión, Colaborador Social, Apoderado o Sucesor.): upload another one.";
     const rejected = await ownTab({ own_certificate: { ...LOADED, aeat_proof: 'rejected', aeat_proof_detail: why } });
     expect(rejected.find('verifactu-config-cert-proof').text()).toBe('Refused');
     expect(rejected.find('verifactu-config-proof').text()).toBe(why);

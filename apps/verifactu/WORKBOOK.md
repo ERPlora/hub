@@ -334,9 +334,10 @@ Pasos:
    producción con él (VERIFACTU-F08). Si lo rechaza por el certificado, pasa a «Rechazado» y debajo sale por qué:
    su puerta redirige a la página de error 401 de la sede («Se ha producido un error al verificar el certificado
    presentado»: no lo ha emitido una entidad que reconozca, no vale para este servicio o ha caducado), o responde el
-   fallo 103 «NIF no identificado» (no identifica a su titular) o el 4112 («El titular del certificado debe ser
-   Obligado Emisión, Colaborador Social, Apoderado o Sucesor»). Una AEAT caída o que no responde, o un fallo del
-   contenido del envío, no lo cambian; si después la AEAT de pruebas lo acepta, pasa a «Aceptado». Subir otro lo deja
+   fallo 4112 («El titular del certificado debe ser Obligado Emisión, Colaborador Social, Apoderado o Sucesor»). Una
+   AEAT caída o que no responde, un fallo del contenido del envío o un fallo pasajero como el 103 «NIF no
+   identificado» (la AEAT de pruebas se lo ha dado a certificados buenos y al rato los identificaba) no lo cambian; si
+   después la AEAT de pruebas lo acepta, pasa a «Aceptado». Subir otro lo deja
    otra vez «Sin probar todavía». En producción la fila no sale: la producción nunca prueba un certificado.
 5. El certificado guardado se vuelve a comprobar solo, cada hora, si aún no se comprobó con la lista de confianza que
    trae el Hub (uno subido antes de esta comprobación, o la lista renovada). Si no lo ha emitido una entidad

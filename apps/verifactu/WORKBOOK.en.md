@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:4533053a4e211b13fc93e57918d71039d567a3b374b52d670076aa54e4b430e9 -->
+<!-- generated from WORKBOOK.md sha256:299e999e02b9e733fb712f329e7969644e9716c3343bc67d3fd19f5327c3a34e -->
 
 ## What it is for and who it is for
 
@@ -326,9 +326,10 @@ Steps:
    go live with it (VERIFACTU-F08). If it refuses it because of the certificate, it turns "Refused" and below it says
    why: its door redirects to the site's error page 401 ("Se ha producido un error al verificar el certificado
    presentado": no authority it recognises issued it, it is not valid for this service or it has expired), or it
-   answers the fault 103 "NIF no identificado" (it does not identify its holder) or 4112 ("El titular del
-   certificado debe ser Obligado Emisión, Colaborador Social, Apoderado o Sucesor"). An AEAT that is down or does not
-   answer, or a fault of the submission's content, does not change it; if the AEAT's test environment accepts it
+   answers the fault 4112 ("El titular del certificado debe ser Obligado Emisión, Colaborador Social, Apoderado o
+   Sucesor"). An AEAT that is down or does not answer, a fault of the submission's content or a passing fault such as
+   103 "NIF no identificado" (the AEAT's test environment gave it to good certificates and identified them a while
+   later) does not change it; if the AEAT's test environment accepts it
    later, it turns "Accepted". Uploading another one leaves it "Not tested yet" again. In production the row does
    not show: production never tries a certificate.
 5. The kept certificate is checked again by itself, every hour, if it was not checked yet against the trusted list
