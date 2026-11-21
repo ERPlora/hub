@@ -10,6 +10,13 @@ Lo que no entra todavía: ver «Lo que queda fuera».
 
 ## Para qué sirve y para quién
 
+La Bandeja de WhatsApp pone dentro del Hub el WhatsApp del negocio: cada cliente que escribe a tu número tiene una
+conversación, y tu equipo la lee y contesta desde aquí, sin coger el móvil. La une a su ficha de Clientes, deja
+asignarla a alguien, marcarla abierta, pendiente o cerrada y dejar notas internas. Pasadas 24 horas desde el último
+mensaje del cliente, solo se le puede escribir con una plantilla aprobada por Meta.
+
+### En detalle
+
 La Bandeja de WhatsApp pone dentro del Hub el WhatsApp del negocio: cada cliente que escribe al
 número del negocio tiene **una conversación**, con todos sus mensajes, y el equipo la lee y **contesta
 desde el Hub**, sin coger el móvil. Reconoce a la persona por su número y une la conversación a su
@@ -71,6 +78,13 @@ WhatsApp Manager a crear las plantillas saca al dueño de la app para lo que hac
 ## Pantallas
 
 ### Bandeja de entrada
+Aquí están las conversaciones con tus clientes, primero la de actividad más reciente, con su estado, a quién está
+asignada y cuántos mensajes quedan sin leer. Busca por contacto o teléfono, o filtra por estado, asignación o sin
+leer. Al abrir una, su hilo sale en un panel encima de la lista: desde ahí contestas, envías una plantilla, la
+asignas, cambias su estado o dejas una nota interna. Encima de la lista, los avisos del número y de los mensajes del
+plan.
+
+#### Detalle
 Menú **Bandeja de WhatsApp → Bandeja de entrada** (título «Bandeja de WhatsApp»). La ven todos los
 roles. Tabla con **Contacto** (el nombre de la ficha, o el de WhatsApp, o el número), **Teléfono**,
 **Estado** (Abierta, Pendiente, Cerrada), **Asignada a**, **Sin leer** y **Último mensaje** (hora si es
@@ -108,6 +122,12 @@ motivo que da el Hub o «No se pudo cargar la conversación»; una foto o una no
 podido cargar la imagen.» o «No se ha podido cargar la nota de voz.», con **Abrir el adjunto**.
 
 ### Ajustes
+Solo para el propietario y el administrador. En **Tu número** conectas, vuelves a conectar o desconectas el
+WhatsApp del negocio; en **Este mes** ves los mensajes enviados frente a los de tu plan; en **¿Para qué lo usas?**
+(con Citas o Reservas) enciendes las respuestas automáticas que reservan citas o mesas; y en **Plantillas de Meta**
+creas, editas y borras las plantillas y ves qué dice Meta de cada una.
+
+#### Detalle
 Menú **Bandeja de WhatsApp → Ajustes** (título «Ajustes del canal»), solo propietario y
 administrador. Tres bloques: **Tu número** («Conectado» con el número y el nombre del negocio, «Sin
 conectar» o «Hay que reconectar»; sin conectar o por reconectar, «Comprobando con erplora.com…» y luego
@@ -126,7 +146,7 @@ Meta») y **Texto**, con buscador «Buscar plantilla…», el motivo de Meta en 
 «Crea una con «Añadir plantilla»: Meta la revisa. Las que se hacen en WhatsApp Manager también salen
 aquí.».
 
-### Plantilla (hoja)
+#### Plantilla (hoja)
 Se abre con **Añadir plantilla** («Nueva plantilla») o **Editar** («Editar plantilla — nombre»), encima
 de Ajustes. Campos: **Nombre** («Minúsculas, números y guiones bajos. No se puede cambiar después.»),
 **Idioma** y **Categoría** (Utilidad o Marketing), **Tipo de cabecera** (Texto, Foto, Vídeo o Documento) con
@@ -231,7 +251,7 @@ Pantalla: Ajustes, Bandeja de entrada
 Pasos:
 1. Si WhatsApp retiró el permiso, **Tu número** dice «Hay que reconectar» y la bandeja avisa de que no se
    puede enviar, con **Ir a Ajustes** para quien puede configurar.
-2. **Volver a conectar** abre la ventana de Meta, como al conectar (F01).
+2. **Volver a conectar** abre la ventana de Meta, como al conectar.
 3. **Desconectar** pregunta antes («¿Desconectar el número de WhatsApp?»: deja de recibir y enviar hasta que
    se vuelva a conectar; las conversaciones guardadas no se tocan). Al confirmar, **Tu número** dice «Sin
    conectar» y «WhatsApp desconectado.».
@@ -333,14 +353,14 @@ Estado: hecho
 Actor: empleado (a sí mismo), responsable, administrador, propietario
 Pantalla: Bandeja de entrada
 Pasos:
-1. Abrir la conversación (F05).
+1. Abrir la conversación.
 2. Pulsar **Asignármela**, o elegir a alguien del equipo en **Asignada a** (solo responsable,
    administrador y propietario), o **Quitar asignación**.
 3. La lista y el panel enseñan la asignación, en todas las pantallas abiertas.
 Entra: a quién: a mí, a una persona del equipo o a nadie.
 Sale: la conversación queda asignada; aviso `whatsapp_inbox.conversation.assigned`.
 Si falla: quien no puede asignar a otros (el empleado) nunca quita una conversación a otra persona:
-«Esta conversación ya la lleva {nombre}.», también si se la asignaron un instante antes; tampoco puede
+«Esta conversación ya la lleva Ana.», también si se la asignaron un instante antes; tampoco puede
 asignarla a otro («Solo puedes asignarte conversaciones a ti»). El responsable sí reasigna, y su
 **Asignármela** tampoco pisa a nadie.
 Implicados: el equipo del negocio (las personas con acceso a la bandeja)
@@ -365,11 +385,11 @@ Pantalla: Bandeja de entrada
 Pasos:
 1. En **Filtros**, elegir **Estado: Abierta** y **Sin leer** y pulsar **Aplicar**: quedan las
    conversaciones cuyo último mensaje es del cliente.
-2. La campana del Hub cuenta **Clientes de WhatsApp esperando respuesta** («N clientes de WhatsApp esperando
+2. La campana del Hub cuenta **Clientes de WhatsApp esperando respuesta** («3 clientes de WhatsApp esperando
    respuesta», con «Contesta antes de 24 horas desde su último mensaje: después, WhatsApp solo deja mandar una
    plantilla aprobada.») y lleva con «Contestar a los clientes» a la **Bandeja de entrada**;
    cuenta también las conversaciones que una respuesta automática no pudo contestar, marcadas «Necesita atención»
-   junto al nombre (F20). Baja sola en cuanto alguien contesta (desde el Hub o desde el móvil), la deja pendiente o
+   junto al nombre. Baja sola en cuanto alguien contesta (desde el Hub o desde el móvil), la deja pendiente o
    la cierra, y no sale cuando no espera nadie.
 3. En la app instalada, cada mensaje de un cliente que se queda sin contestar avisa con una notificación del
    sistema, con su nombre y lo que escribió; al tocarla se abre esa conversación en la **Bandeja de entrada**.
@@ -439,12 +459,12 @@ Pasos:
    mes.».
 2. Desde el 80 % de los mensajes del mes, la bandeja lo avisa encima de la lista, por ejemplo, «Te quedan 30 de 150
    mensajes de WhatsApp de tu plan este mes.»; quien puede configurar ve, en el navegador, **Mejorar el plan**, que
-   abre los planes de erplora.com ya dentro con su cuenta (BASE-F11). Por debajo del 80 %, nada. La cuenta se mueve
+   abre los planes de erplora.com ya dentro con su cuenta. Por debajo del 80 %, nada. La cuenta se mueve
    sola, sin recargar.
 3. En el tope (con un plan que no incluye ninguno, desde el primer mensaje), la bandeja lo avisa encima de
    la lista y **Enviar** lo explica en vez de enviar («Tu plan no incluye mensajes de WhatsApp: no se puede
    enviar nada.» cuando el plan no incluye ninguno); quien puede configurar ve, en el navegador, **Mejorar el
-   plan**, que abre los planes de erplora.com ya dentro con su cuenta (BASE-F11).
+   plan**, que abre los planes de erplora.com ya dentro con su cuenta.
 4. Lo que escriben los clientes se sigue guardando.
 5. Al cambiar de mes (el de erplora.com, que cuenta los mensajes en UTC: en España, a la 1:00 o las 2:00 del día 1) el
    aviso se va aunque erplora.com aún no haya hablado; si el plan no incluye mensajes, sigue.
@@ -472,10 +492,10 @@ Pasos:
 3. Pulsa **Activar**: primero se apagan «Reservar mesa» y su aviso de reserva confirmada si estaban encendidos, y
    después la tarjeta pasa a «Activa» con **Desactivar** y dice «Listo. Escríbete desde otro móvil: “quiero cita
    mañana”.».
-4. Aparece el interruptor de confirmación (F16).
+4. Aparece debajo el interruptor que decide si las citas se confirman solas.
 5. Si las dos llegan a estar encendidas desde Automatizaciones, cada tarjeta encendida avisa: «“Reservar mesa” también
    está encendida: cada mensaje recibe dos respuestas automáticas. Desactiva la que no uses.» (o nombrando «Reservar
-   citas»); desactivar una (F17) quita el aviso.
+   citas»); desactivar una quita el aviso.
 Entra: que Citas, Clientes y Automatizaciones estén activas en el negocio; el asistente lo pone erplora.com.
 Sale: las automatizaciones «WhatsApp → cita reservada» y «Avisar por WhatsApp a la clienta cuando se confirma su cita»
 encendidas (la primera vez, con exactamente los permisos que piden) y, si estaba encendida, «WhatsApp → mesa reservada»
@@ -504,8 +524,9 @@ Pasos:
 3. Pulsa **Activar**: primero se apagan «Reservar citas» y su aviso de cita confirmada si estaban encendidos, y después
    la tarjeta pasa a «Activa» con **Desactivar** y dice «Listo. Escríbete desde otro móvil: “quiero mesa para dos
    mañana”.».
-4. Aparece el interruptor de confirmación (F16).
-5. Con las dos encendidas desde Automatizaciones, el mismo aviso que en F14, nombrando «Reservar citas».
+4. Aparece debajo el interruptor que decide si las reservas se confirman solas.
+5. Si las dos llegan a estar encendidas desde Automatizaciones, cada tarjeta encendida avisa de que cada mensaje
+   recibe dos respuestas automáticas; desactivar una quita el aviso.
 Entra: que Reservas, Clientes y Automatizaciones estén activas en el negocio; el asistente lo pone erplora.com.
 Sale: las automatizaciones «WhatsApp → mesa reservada» y «Avisar por WhatsApp al cliente cuando se confirma su
 reserva» encendidas (la primera vez, con exactamente los permisos que piden) y, si estaba encendida, «WhatsApp → cita
@@ -602,10 +623,10 @@ Pasos:
 1. Si el asistente falla o no dice nada, el cliente recibe un texto fijo: «Perdona, ahora mismo no puedo mirar
    las reservas. Alguien del equipo te contestará por aquí en cuanto pueda.».
 2. Su conversación queda marcada «Necesita atención», que se ve junto a su nombre en la bandeja, y la campana la
-   cuenta entre los clientes que esperan respuesta (F09).
+   cuenta entre los clientes que esperan respuesta.
 3. No se le manda nada más en ese turno.
 4. La marca se pone solo en ese caso y cuando la respuesta automática no contesta porque se gastaron los
-   mensajes del plan del mes o el número no está conectado (F13); cuando es el propio asistente quien contesta que
+   mensajes del plan del mes o el número no está conectado; cuando es el propio asistente quien contesta que
    alguien del negocio le responderá, la conversación no se marca.
 5. La marca se quita en cuanto alguien del negocio le contesta (desde la bandeja o desde el móvil) o la deja
    pendiente o cerrada.
@@ -805,7 +826,7 @@ Pasos:
    aquí: se gestiona en WhatsApp Manager.», pero no se ofrecen para enviar ni se editan aquí; sí se pueden
    borrar.
 4. Las que llevan una foto, un vídeo o un documento en la cabecera se envían desde la bandeja eligiendo el
-   archivo (F33), pero se editan allí: dicen «Se edita en WhatsApp Manager.».
+   archivo, pero se editan allí: dicen «Se edita en WhatsApp Manager.».
 Entra: la lista de plantillas que erplora.com trae de Meta.
 Sale: cada plantilla guardada como la tiene Meta.
 Si falla: nunca pisa una plantilla del Hub que todavía va hacia Meta ni trae de vuelta una borrada aquí.
@@ -817,8 +838,8 @@ Actor: propietario, administrador
 Pantalla: Ajustes, Plantilla (hoja)
 Pasos:
 1. En **Ajustes → Plantillas de Meta**, pulsar **Añadir plantilla**.
-2. Escribir el nombre, elegir idioma y categoría (Utilidad o Marketing) y escribir el texto con `{{1}}`,
-   `{{2}}`… donde van las variables, con un ejemplo de cada una; si se quiere, cabecera, pie y botones
+2. Escribir el nombre, elegir idioma y categoría (Utilidad o Marketing) y escribir el texto con el número
+   de cada variable entre dobles llaves donde va, empezando por el 1, con un ejemplo de cada una; si se quiere, cabecera, pie y botones
    (respuestas rápidas juntas, hasta dos enlaces y una llamada; diez como mucho).
 3. Para una cabecera con foto, vídeo o documento, elegir «Foto», «Vídeo» o «Documento» en **Tipo de
    cabecera** y pulsar **Elegir archivo** (una foto JPEG o PNG hasta 5 MB, un vídeo MP4 hasta 16 MB o un
@@ -828,7 +849,7 @@ Pasos:
 4. Pulsar **Enviar a revisión de Meta**: la plantilla sale en la lista «Sin enviar a Meta» con
    «Enviándose a Meta…» y pasa a «En revisión» en cuanto Meta la recibe. La de una cabecera con archivo
    nombra el suyo («Foto: …»).
-5. Cuando Meta decide, pasa sola a «Aprobada» (ya se puede enviar, F33) o a «Rechazada» con su motivo.
+5. Cuando Meta decide, pasa sola a «Aprobada» (ya se puede enviar desde la bandeja) o a «Rechazada» con su motivo.
 Entra: nombre, idioma, categoría, cabecera (un texto, o una foto, un vídeo o un documento), texto,
 ejemplos, pie, botones y una clave del guardado (la misma al reintentar).
 Sale: el archivo de la cabecera guardado en los archivos del negocio al elegirlo (aviso
@@ -841,7 +862,7 @@ mismo idioma: «Ya hay una plantilla «…» en ese idioma.». Un archivo que no
 debajo y no se guarda («Elige una foto JPEG o PNG.», «Elige un vídeo MP4.», «Elige un documento PDF.»), y
 uno que pesa de más también («Este archivo pesa más de 5 MB: elige uno más ligero.»); uno que no cabe en el
 espacio para archivos del plan (lo cuentan juntos los archivos del negocio y los de las cabeceras), como
-en Archivos: «No queda espacio para ese archivo: tu plan incluye {space}.»; si no se pudo subir: «No se pudo
+en Archivos: «No queda espacio para ese archivo…» con el espacio que incluye tu plan; si no se pudo subir: «No se pudo
 subir el archivo. Inténtalo de nuevo.». Si la foto o el vídeo no se pueden enseñar, la hoja lo dice bajo
 su nombre («No se ha podido mostrar la foto.», «No se ha podido mostrar el vídeo.») y se sigue pudiendo
 enviar. Si al entregarla el archivo ya no está en los
@@ -875,7 +896,7 @@ un momento.»); la que tiene algo que el Hub no sabe escribir, o está desactiva
 Manager, se cambia allí («Esta plantilla se cambia en WhatsApp Manager: el Hub no puede cambiarla.»);
 la categoría de una aprobada: «Meta solo deja cambiar la categoría de una plantilla que ha rechazado.».
 Si el cambio no llega a Meta, la fila dice «Cambios sin enviar: …» con **Volver a enviar a Meta**; lo
-demás, como en F29.
+demás, como al crearla.
 Implicados: erplora.com, Meta
 
 ### WHATSAPP_INBOX-F31 Borrar una plantilla
@@ -902,7 +923,7 @@ Estado: hecho
 Actor: empleado, responsable, administrador, propietario
 Pantalla: Bandeja de entrada
 Pasos:
-1. Abrir la conversación (F05), pestaña **Responder**.
+1. Abrir la conversación, pestaña **Responder**.
 2. Escribir y pulsar **Enviar** (o Ctrl+Intro).
 3. El mensaje aparece en el hilo, a la derecha, «Enviando…»; **Sin leer** queda a cero. En cuanto
    erplora.com lo acepta pasa a «Enviado».
@@ -928,18 +949,18 @@ Pantalla: Bandeja de entrada
 Pasos:
 1. En **Responder**, pulsar **Plantilla**: se abre «Enviar una plantilla» con las plantillas
    **aprobadas** que el Hub sabe rellenar (nombre, idioma, categoría y texto).
-2. Elegir una y rellenar sus variables (`{{1}}`, `{{2}}`…); la vista previa enseña el texto final.
+2. Elegir una y rellenar sus variables (la 1, la 2…); la vista previa enseña el texto final.
 3. Si su cabecera lleva una foto, un vídeo o un documento, la hecha aquí trae ya el suyo (su miniatura, su
    nombre y su peso, con **Cambiar archivo**) y la hecha en WhatsApp Manager pide **Elegir archivo** («Ningún
    archivo elegido»): se guarda al momento en los archivos del negocio y se ve su miniatura, con lo que admite
    («JPEG o PNG, hasta 5 MB.») y «El cliente recibe la plantilla con este archivo.»; la foto o el vídeo que
-   no se pueden enseñar lo dicen como en F29.
-4. Pulsar **Enviar**: el mensaje aparece en el hilo como en F32; el de una cabecera con archivo lo nombra
+   no se pueden enseñar lo dicen bajo su nombre, como al crear la plantilla.
+4. Pulsar **Enviar**: el mensaje aparece en el hilo como una respuesta; el de una cabecera con archivo lo nombra
    («Foto · carta.jpg»).
 También por el asistente o la API a un número que aún no ha escrito («envía la plantilla de
 recordatorio a este número»): se crea su conversación. Una automatización no usa este envío sino uno más
-estrecho, que nunca crea una conversación: solo escribe a la que ya existe con el número internacional exacto
-(FLOW-F31, F23). Un número escrito a mano es del país del negocio
+estrecho, que nunca crea una conversación: solo escribe a la que ya existe con el número internacional exacto.
+Un número escrito a mano es del país del negocio
 salvo que lleve su prefijo.
 Entra: la plantilla (nombre e idioma), sus variables, el archivo de su cabecera (si lleva foto, vídeo o
 documento: el suyo o el elegido), una clave del mensaje y la conversación o el número. Una automatización
@@ -952,12 +973,12 @@ publicidad por WhatsApp.»); una plantilla no aprobada, borrada o que el Hub no 
 puede elegir; faltan variables: «Rellena todas las variables de la plantilla.»; un número incompleto:
 «Esto no es un número de teléfono.» y no se guarda nada; sin el archivo de su cabecera: «Elige el archivo de
 la cabecera: la plantilla se envía con él.»; un archivo que no es del tipo o pesa de más se dice debajo
-(«Elige una foto JPEG o PNG.») y no se guarda, igual que uno que no cabe en el espacio del plan (F29). Si al
+(«Elige una foto JPEG o PNG.») y no se guarda, igual que uno que no cabe en el espacio del plan. Si al
 entregarlo el archivo ya no está en los archivos del
 negocio, el mensaje dice «El archivo de la cabecera ya no está en los archivos del negocio: vuelve a enviar
 la plantilla eligiendo su archivo.»; si Meta no toma el archivo o no contesta, «Meta no ha contestado.
 Inténtalo de nuevo en unos minutos.» y se vuelve a entregar con la misma clave (nunca culpa a ERPlora); el
-resto, como en F32.
+resto, como al contestar desde la bandeja.
 Implicados: Clientes (el consentimiento de marketing), erplora.com, Meta
 
 ### WHATSAPP_INBOX-F34 Saber si un mensaje llegó y se leyó
