@@ -105,6 +105,14 @@
       "profile": "Profile",
       "switchUser": "Switch user"
     },
+    "changeBusiness": {
+      "label": "Change business",
+      "title": "Change business?",
+      "message": "You will be signed out of this business and see the list of your businesses to choose another.",
+      "confirm": "Change",
+      "signOutFailed": "Could not sign out of this business. Check the connection and try again.",
+      "forgetRefused": "You are signed out, but the app could not leave this business. Close the app and open it again."
+    },
     "appsPage": {
       "title": "Apps",
       "tabs": {
