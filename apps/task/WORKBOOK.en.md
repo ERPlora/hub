@@ -1,6 +1,12 @@
-<!-- generated from WORKBOOK.md sha256:115c14845c5c400ffe737093b318da0650f643d226170575238f5ca9009fe184 -->
+<!-- generated from WORKBOOK.md sha256:32249bdb55e598bd6afd790e78105aea77b9b0a50fa70e808740a8d3d6ddbf02 -->
 
 ## What it is for and who it is for
+
+Tasks is the team's to-do list, such as "clean the storeroom" or "order blonde dye". Each task has a person who takes
+care of it, a priority and, if you want, a due date; they are grouped in projects, split into subtasks and carry
+comments. Each employee sees their own and the manager sees them all.
+
+### In detail
 
 Tasks is the **team's to-do list**: "clean the storeroom", "order blonde dye", "check the cold room".
 Each task has a title, a priority, a due date and a team member who takes care of it; they are grouped
@@ -9,7 +15,7 @@ of **comments**.
 
 It is for the staff, not for the customers: a customer's complaint is not a task.
 
-Who uses it:
+### Who uses it and what each one does
 
 - The **owner**, the **administrator** and the **manager** see and change **every** task, assign them,
   delete them and run the projects.
@@ -65,6 +71,12 @@ Tasks opens from the **Tasks** menu and has two tabs: **Tasks** and **Projects**
 do does not show, and the app refuses it even if they try through the API or the assistant.
 
 ### Tasks
+Here is the team's task list. In **All**, the table with each task's number, title, status, priority, due date and
+assignee, which you can search and filter; in **My tasks**, the open ones assigned to you, those due soonest first.
+With **+** you create a task; from its row you start it or complete it, and tapping it opens it with its subtasks and
+its comments, where you also assign it, edit it or delete it. If you are an employee, you only see your own.
+
+#### Detail
 At the top, the **All / My tasks** selector ("My tasks" only shows to whoever has a linked record).
 
 **All**: table with the search box "Search no. or title…" (number, title, description, assignee or
@@ -90,7 +102,7 @@ at the top) and then the ones without, the newest first. Starting, assigning or 
 card. The one I complete from its card stays in its place, as done and without actions, until I
 change tab.
 
-### Task (sheet)
+#### Task (sheet)
 It opens over the list with: **TSK-YYYYMMDD-NNNN — Title**, its status and its priority; the description;
 **Due**, **Completed**, **Assigned to** ("Unassigned"), **Project**, **Created** and **Created by**.
 
@@ -105,6 +117,12 @@ It opens over the list with: **TSK-YYYYMMDD-NNNN — Title**, its status and its
   text stays next to the reason.
 
 ### Projects
+Here are the projects that group the tasks, such as "Opening the shop", with their code, their name, their colour and
+whether they are active. With **+** you create one; tapping it opens it with its tasks, where you change its name or
+its colour, deactivate it or delete it (its tasks stay, without a project). Creating, changing and deleting them is the
+manager's; the employee sees the list.
+
+#### Detail
 Table with the search box "Search code or name…", columns **Code, Name, Color** and **Active** (Yes /
 No, list filter; Code, Name and Color filter by "contains"; the filters, behind the funnel of the
 bar); sort by any column, 50 per page. A project's task counters count only the ones whoever is looking can see. **+** opens **New project**:
@@ -112,7 +130,7 @@ bar); sort by any column, 50 per page. A project's task counters count only the 
 #RRGGBB). Row action **Open**; tapping the row does the same. Creating, editing and deleting is for the
 manager; the employee sees the list.
 
-### Project (sheet)
+#### Project (sheet)
 **Name** with its colour, **Active / Inactive** and the **Code**; **Name** and **Color** editable with
 **Save** (the code does not change: it is the project's key); **Deactivate / Activate** (does not send what was
 typed without saving); **Delete** with confirmation; **Tasks in this project ({n})**, the 50 most
@@ -166,8 +184,8 @@ Steps:
    Priority (Low, Medium, High, Urgent; Medium by default), Due (a day), Assigned to (an
    active team member), Project (the selector offers the active ones) and Tags (up to 20, of
    up to 50 characters, separated by commas).
-3. Tap **Create task**: the task shows in the list as **To Do**, without a completion date and with its number
-   `TSK-YYYYMMDD-NNNN` (the business's day and a counter of the day that leaves no gaps).
+3. Tap **Create task**: the task shows in the list as **To Do**, without a completion date and with its number,
+   such as TSK-20260901-0001 (the business's day and a counter of the day that leaves no gaps).
 In: the form. The assistant names the project by its code or its name, the parent task by its
 number or its title and the assignee by their name. A date with a time is taken as its day in the business's
 time zone. Creator: whoever creates it, always from the session.
@@ -181,7 +199,7 @@ Involved: Staff (the assignee's record)
 ### TASK-F02 See and search the tasks
 Status: done (server and screen)
 Actor: everyone; the employee sees only their own
-Screen: Tasks → All
+Screen: Tasks (All)
 Steps:
 1. Open **Tasks**: the table shows with the newest first.
 2. Search, sort by any column or tap the funnel, choose the filters and tap **Apply**.
@@ -190,13 +208,13 @@ code or name), assignee (id or name), unassigned, parent task, only the top-leve
 tag, and ranges of due date, of completion and of creation. Up to 100 per page.
 Out: the tasks with their project, their parent, their assignee, their creator, how many subtasks and
 comments they have and whether whoever is looking can change them.
-If it fails: a filter that does not exist, "422".
+If it fails: "The tasks could not be loaded." with **Retry**; through the API, a filter that does not exist is refused.
 Involved: Staff (the assignee's name)
 
 ### TASK-F03 See my tasks
 Status: done (server and screen)
 Actor: whoever has a record linked to their account, assistant
-Screen: Tasks → My tasks
+Screen: Tasks (My tasks)
 Steps:
 1. Tap **My tasks**.
 2. My **open** tasks show (to do, in progress and blocked): with a date first, the nearest
@@ -246,7 +264,7 @@ Steps:
 In: the task.
 Out: the task (`task.task.status_changed` and `task.task.completed`).
 If it fails: if it was already done or cancelled, "That task is already closed, so it was left as it
-was." (409 `task.task_already_closed`): a cancelled one is not "finished" by mistake; to reopen it,
+was.": a cancelled one is not "finished" by mistake; to reopen it,
 the status is changed.
 Involved: none
 
@@ -269,7 +287,7 @@ Involved: Staff
 ### TASK-F08 Edit a task
 Status: done (server and screen)
 Actor: whoever can change it
-Screen: Task → **Edit**
+Screen: Task (**Edit**)
 Steps:
 1. Open the task and tap **Edit**: "Editing task — TSK-…" opens with its details.
 2. Change the title, the description, the priority, the due date, the project or the tags and
@@ -308,7 +326,7 @@ Involved: none
 ### TASK-F11 Delete a task
 Status: done (server and screen)
 Actor: owner, administrator, manager, assistant (with reinforced confirmation)
-Screen: Task → **Delete**
+Screen: Task (**Delete**)
 Steps:
 1. Open the task and tap **Delete**: confirmation is asked for.
 2. Tap **Delete** in the notice: the task disappears **with its subtasks and its comments**.
@@ -316,7 +334,7 @@ In: the task.
 Out: `task.task.deleted`.
 If it fails: "That task does not exist in this business.". Through the assistant, a name that fits several tasks or
 none brings up no card, and if before the "yes" another task fits better what was said, nothing is deleted and the new
-card comes up (BASE-F97).
+card comes up.
 Involved: none
 
 ### TASK-F12 Create a project
@@ -351,7 +369,7 @@ Involved: none
 ### TASK-F14 Delete a project
 Status: done (server and screen)
 Actor: owner, administrator, manager, assistant (with reinforced confirmation)
-Screen: Project → **Delete**
+Screen: Project (**Delete**)
 Steps:
 1. Open the project and tap **Delete**: confirmation is asked for.
 2. Tap **Delete** in the notice: the project disappears; **its tasks stay**, without a project.
@@ -359,7 +377,7 @@ In: the project.
 Out: `task.project.deleted`.
 If it fails: "That project does not exist in this business.". Through the assistant, a name that fits several
 projects or none brings up no card, and if before the "yes" another project fits better what was said, nothing is
-deleted and the new card comes up (BASE-F97).
+deleted and the new card comes up.
 Involved: none
 
 ### TASK-F15 When someone leaves the team
