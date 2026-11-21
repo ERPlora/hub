@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:c3c499064091d51c68a43c95322a96f61b68c87d553b4a41ee36dc60093d5cf9 -->
+<!-- generated from WORKBOOK.md sha256:d0dff6f71b8e6977ec47d719a3c1ac7779218475a206532a383a34ba5bb48fc8 -->
 
 ## What it is for and who it is for
 
@@ -818,9 +818,9 @@ Steps:
 2. On the card, the header carries the "Allergy" mark, in red, next to "Rush" and "VIP", if any of its dishes has an
    allergy marked. Each station sees it only if one of its dishes has it.
 3. Under the name of that dish, before its modifiers and its note, comes a block of its own in red: "Allergy:
-   Gluten". If the dish has that allergen according to Inventory, the block adds "The dish contains
-   Gluten". A dish without an allergy marked has no block, even if it has allergens: the display does not repeat each
-   dish's.
+   Gluten". If the dish has that allergen, from its product or from a modifier chosen, the block adds "The dish
+   contains Gluten". A dish without an allergy marked has no block, even if it has allergens: the display does not
+   repeat each dish's.
 4. On a menu, the block shows on each of its dishes, and "The dish contains" names only that dish's allergens.
 5. On the station's paper, the header carries "!! ALLERGY !!" (under "!! URGENT !!" if the round is rush) and,
    right under the dish and before its modifiers, "ALLERGY: GLUTEN" and, if it has it, "CONTAINS: GLUTEN", each on its
@@ -829,8 +829,8 @@ Steps:
 6. The cook carries on as always: marking ready, recalling and serving do not change,
    and the block stays in view while the dish is on the display. In **Tickets**, the ticket's detail shows it on its
    dish too.
-In: from Sales, for each line sent, the customer's allergy and its product's frozen allergens (SALE-F40,
-SALE-F41).
+In: from Sales, for each line sent, the customer's allergy and the line's frozen allergens, its product's with its
+modifiers' (SALE-F40, SALE-F41, MODIFIER-F12).
 Out: the allergy and the matching allergens, frozen on the dish like its modifiers: changing the line or the
 catalogue afterwards does not change this ticket (announces: ticket received).
 If it fails: if the sheet does not print, the allergy stays on the display and the ticket is reprinted like any
