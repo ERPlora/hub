@@ -719,7 +719,7 @@ Pasos:
    la AEAT y el XML.
 3. Si no está en la AEAT, «Aún no está en la AEAT» dice por qué («la pasarela de envío de ERPlora no está
    configurada en este servidor», «tu certificado propio no está cargado o ha caducado», que la AEAT pidió esperar
-   hasta una hora, que no se ha podido contactar con la pasarela o con la AEAT) y un solo cuándo: si
+   hasta cierta hora, que no se ha podido contactar con la pasarela o con la AEAT) y un solo cuándo: si
    todo lo que espera se resuelve solo (la AEAT pidió esperar, sin contacto, sin respuesta, un fallo de la AEAT),
    «Sale solo en la próxima pasada, en orden y declarado como envío tardío si ya falló antes. No tienes que hacer
    nada.»; si espera a que se resuelva algo (un rechazo de la pasarela, que no se reenvía solo; la autorización; la
