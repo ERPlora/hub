@@ -12,6 +12,7 @@
 import { expect, type Page, test } from '@playwright/test';
 
 import { A, EMPLOYEE, api, capture, hostPage, login, psql, shot, shown } from './helpers';
+import { capturedFitting } from './screen';
 import { offersRowAction } from './service-helpers';
 import { cleanUp as cleanCustomers, createCard, e2eName, spanishMobile } from './customer-helpers';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
@@ -203,15 +204,23 @@ test('SALE-F05 and F13: a check with a customer found in the till and a quick no
   expect(sale.payments.map((p) => p.method_type)).toEqual(['card']);
 });
 
-test('SALE-F22: a marked line is charged on its own with its ticket, and the rest closes the check', async ({ page, context }) => {
-  await page.setViewportSize({ width: 1280, height: 860 });
-  await login(page, A, '/sale/pos');
+/** On the till already open, a check of the juice and the cake (6.50): what SALE-F22 charges a part of. */
+async function juiceAndCake(page: Page): Promise<void> {
   await tillReady(page);
   await addBySearch(page, juice);
   await expect(lineOf(page, juice.name)).toBeVisible();
   await addBySearch(page, cake);
   await expect(lineOf(page, cake.name)).toBeVisible();
-  await lineOf(page, juice.name).locator('[data-testid$=-mark]').click();
+}
+
+/** Taps the line of `product` itself, never its buttons: it is marked, or unmarked, for a part charge. */
+const toggleMark = (page: Page, product: Product) => lineOf(page, product.name).locator('[data-testid$=-mark]').click();
+
+test('SALE-F22: a marked line is charged on its own with its ticket, and the rest closes the check', async ({ page, context }) => {
+  await page.setViewportSize({ width: 1280, height: 860 });
+  await login(page, A, '/sale/pos');
+  await juiceAndCake(page);
+  await toggleMark(page, juice);
 
   await shown(page).locator('[data-testid=pos-charge]').click();
   const sheet = page.locator('[data-testid=sale-checkout-modal]');
@@ -246,6 +255,43 @@ test('SALE-F22: a marked line is charged on its own with its ticket, and the res
   await expect(shown(page).locator('[data-testid=pos-cart-empty]')).toBeVisible();
   const rest = await newestSaleOf(context, cake.sku);
   expect([rest.total, rest.lines.map((line) => line.sku)]).toEqual([400, [cake.sku]]);
+});
+
+const FLEET_SIZES = [
+  { width: 1440, height: 900 },
+  { width: 820, height: 1180 },
+  { width: 375, height: 667 },
+] as const;
+
+test('SALE-F22: with a line marked, «Charge» says what it will charge and «Total» stays the whole check', async ({ page, context }) => {
+  await page.setViewportSize(FLEET_SIZES[0]);
+  await login(page, A, '/sale/pos');
+  await context.addCookies([{ name: 'django_language', value: 'es', domain: new URL(A).hostname, path: '/' }]);
+  await page.goto(`${A}/sale/pos`);
+  await juiceAndCake(page);
+  const charge = shown(page).locator('[data-testid=pos-charge]');
+  await expect(charge).toContainText(/Cobrar · 6,50\s€/);
+
+  await toggleMark(page, juice);
+  await expect(charge).toContainText(/Cobrar 1 línea · 2,50\s€/);
+  await expect(shown(page).locator('[data-testid=pos-total]')).toContainText(/6,50/);
+  for (const size of FLEET_SIZES) {
+    await page.setViewportSize(size);
+    await openTillCart(page);
+    await expect(charge).toBeInViewport({ ratio: 1 });
+    const clipped = await charge.evaluate((el) => {
+      const native = el.shadowRoot?.querySelector('.button-native');
+      return native ? native.scrollWidth - native.clientWidth : -1;
+    });
+    expect(clipped, `«Charge» fits its text at ${size.width}x${size.height}`).toBe(0);
+    await capturedFitting(page, `sale-pos-marked-charge-${size.width}x${size.height}`, `${size.width}x${size.height}`);
+  }
+
+  await toggleMark(page, cake);
+  await expect(charge).toContainText(/Cobrar 2 líneas · 6,50\s€/);
+  await toggleMark(page, juice);
+  await toggleMark(page, cake);
+  await expect(charge).toContainText(/Cobrar · 6,50\s€/);
 });
 
 test('full screen: the whole page goes full screen and the checkout sheet opens and charges on top', async ({ page, context }) => {
