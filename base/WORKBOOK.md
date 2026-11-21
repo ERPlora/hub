@@ -350,7 +350,7 @@ En la pantalla Archivos:
 | BASE-F21 | Ver por qué no se ha podido activar una app y reintentarlo | hecho |
 | BASE-F22 | Seguir la activación de una app mientras se navega | hecho |
 | BASE-F23 | Desactivar una app | hecho |
-| BASE-F24 | Activar una app | hecho |
+| BASE-F24 | Volver a activar una app | hecho |
 | BASE-F25 | Ver que una app se niega a desactivarse | hecho |
 | BASE-F26 | Entender por qué una app no se abre | hecho |
 | BASE-F27 | Ver una app de pago bloqueada | hecho |
@@ -447,7 +447,7 @@ En la pantalla Archivos:
 ### BASE-F01 Ver lo que le falta por configurar al negocio
 Estado: hecho
 Actor: propietario, administrador, responsable, empleado
-Pantalla: Inicio · Resumen
+Pantalla: Inicio · Resumen, El aviso «Todavía no puedes facturar»
 Pasos:
   1. Entra en el Inicio. En «Termina de configurar tu negocio» ve cuántos pasos lleva hechos y una barra.
   2. Debajo, los pasos que faltan: primero los que impiden facturar («Necesario para facturar», en rojo) y
@@ -469,7 +469,7 @@ Pasos:
      (hub#682). Un paso cuya comprobación falla tampoco sale: nunca se da por hecho ni por pendiente lo que no se
      pudo comprobar.
   6. Mientras falta un paso «Necesario para facturar», la campana lleva el aviso «Todavía no puedes facturar», con
-     «Configurar» a ese paso, en cualquier pantalla.
+     el botón de ese paso («Configurar los datos del negocio»), en cualquier pantalla.
   7. Cuando otra persona completa un paso en otro dispositivo, o activa una app, la lista se pone al día sola.
 Entra: los pasos que declara cada app encendida, con su comprobación, su país, su permiso y su pantalla; y los
 países donde cada app dice que es obligatoria.
@@ -526,7 +526,7 @@ Implicados: BASE-F38
 ### BASE-F04 Ver qué pasos de la lista tiene que configurar un administrador
 Estado: hecho
 Actor: responsable, empleado
-Pantalla: Inicio · Resumen
+Pantalla: Inicio · Resumen, El aviso «Todavía no puedes facturar»
 Pasos:
   1. Un paso que impide facturar y que esta persona no puede hacer sigue en su lista, con su etiqueta
      «Necesario para facturar», y en el aviso «Todavía no puedes facturar» de la campana.
@@ -688,7 +688,7 @@ Implicados: BASE-F40
 ### BASE-F11 Ir a erplora.com a gestionar o mejorar el plan
 Estado: hecho
 Actor: propietario, administrador, responsable, empleado
-Pantalla: Menú lateral
+Pantalla: El menú lateral, «Mejorar plan», «Gestionar en erplora.com»
 Pasos:
   1. Al pie del menú lateral, bajo el código QR y alineado con él, está «Mejorar plan». Lo ve cualquier
      perfil; lo que se puede hacer al llegar lo decide erplora.com según quién entre. Con el menú plegado a
@@ -949,7 +949,7 @@ Si falla: si otra app en marcha la necesita, no cambia nada; si no se puede desa
 (BASE-F25). Con «Cancelar», tampoco cambia nada. Desde el asistente, un nombre que vale para varias apps no saca tarjeta: pregunta cuál (BASE-F24).
 Implicados: VERIFACTU-F32
 
-### BASE-F24 Activar una app
+### BASE-F24 Volver a activar una app
 Estado: hecho
 Actor: administrador
 Pantalla: Apps
@@ -1517,7 +1517,7 @@ Implicados: ninguno
 ### BASE-F48 Abrir Ajustes y moverse por sus pestañas
 Estado: hecho
 Actor: propietario, administrador, responsable, empleado
-Pantalla: Ajustes
+Pantalla: Ajustes, Ajustes · Impresión
 Pasos:
   1. Pulsa «Ajustes» en el menú lateral, o llega desde un enlace de otra pantalla.
   2. Abajo, las pestañas «General», «Negocio», «Impresión» y «Datos y copias»; se abre

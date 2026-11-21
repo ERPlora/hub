@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:baa590dae9df52bc2a004a179ce4d78edb2dac55dfc2df9406bf0e41389f5c6a -->
+<!-- generated from WORKBOOK.md sha256:46fac7ab34632c7280755acf47fa7ee55ddbbb0de30721b5aeb03ffb47f89d77 -->
 
 ## What it is for and who it is for
 
@@ -829,7 +829,7 @@ name, their phone or their email (as in Customers) and a series by its code.
 | Whether the year's numbering is ready | view | F14 | `invoice.numbering.status` |
 | The gaps of the numbering | view | F15 | `invoice.numbering.gaps` |
 | The book of numbers given | view | F15 | `invoice.numbering.allocations` |
-| The issuer | view | F21, F22 | `invoice.issuer.get` |
+| The issuer | view | F21 | `invoice.issuer.get` |
 | How an ERPlora invoice is going (by the SaaS's `id`) | only the system | F23 | `invoice.invoice.platform_status` |
 | The A4 of an ERPlora invoice, in its language | only the system | F23 | `invoice.invoice.platform_document` |
 | Whether the platform hub can issue now (in production, only with real filing with the AEAT open) | only the system | F23 | `invoice.invoice.platform_health` |
@@ -852,7 +852,7 @@ All of them can be followed live.
 | Changes a series | keep the series | F13 | `invoice.series.update` |
 | Saves the issuer | set up the issuer | F21 | `invoice.issuer.update` |
 | Sends the A4 page of an invoice to the Printing queue (or says it was not queued: the device prints it) | view | F18 | `invoice.invoice.print` |
-| Saves the issuer the ERPlora account sends | only the system | F22 | `invoice.issuer.sync` |
+| Saves the issuer as the system; nothing calls it today | only the system | — | `invoice.issuer.sync` |
 | Issues an ERPlora invoice with its VeriFactu record | only the system | F23 | `invoice.invoice.issue_platform` |
 
 ### What it announces

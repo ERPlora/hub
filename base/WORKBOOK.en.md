@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:5c76a6e1d83cefbd6513501c5cad034e5602bb9d6b9e8942c73b4bd5ab306cf6 -->
+<!-- generated from WORKBOOK.md sha256:ba4f7e0b9900434472860a1862e3eda9e34b43a06dbf211117744c0a3c3f8cb1 -->
 
 ## What it is for and who it is for
 
@@ -346,7 +346,7 @@ On the Employees screens and the API documentation:
 | BASE-F21 | See why an app could not be turned on and try again | done |
 | BASE-F22 | Follow an app being turned on while moving around | done |
 | BASE-F23 | Turn an app off | done |
-| BASE-F24 | Turn an app on | done |
+| BASE-F24 | Turn an app back on | done |
 | BASE-F25 | See an app refuse to be turned off | done |
 | BASE-F26 | Understand why an app does not open | done |
 | BASE-F27 | See a paid app blocked | done |
@@ -443,7 +443,7 @@ On the Employees screens and the API documentation:
 ### BASE-F01 See what the business still has to set up
 Status: done
 Actor: owner, administrator, manager, employee
-Screen: Home · Summary
+Screen: Home · Summary, The "You cannot issue invoices yet" notice
 Steps:
   1. They come into the Home. In "Finish setting up your business" they see how many steps are done and a
      bar.
@@ -467,7 +467,7 @@ Steps:
      of another country (hub#682). A step whose check fails does not show either: what could not be checked is
      never taken as done nor as pending.
   6. While a "Needed to invoice" step is missing, the bell carries the "You cannot issue invoices yet" notice,
-     with "Set up" to that step, on any screen.
+     with that step's button ("Set up your business details"), on any screen.
   7. When someone else completes a step on another device, or turns an app on, the list updates by itself.
 In: the steps each app that is on declares, with their check, their country, their permission and their
 screen; and the countries where each app says it is mandatory.
@@ -524,7 +524,7 @@ Involved: BASE-F38
 ### BASE-F04 See which steps of the list an administrator has to set up
 Status: done
 Actor: manager, employee
-Screen: Home · Summary
+Screen: Home · Summary, The "You cannot issue invoices yet" notice
 Steps:
   1. A step that stops invoicing and that this person cannot do stays on their list, with its "Needed to
      invoice" label, and in the bell's "You cannot issue invoices yet" notice.
@@ -684,7 +684,7 @@ Involved: BASE-F40
 ### BASE-F11 Go to erplora.com to manage or upgrade the plan
 Status: done
 Actor: owner, administrator, manager, employee
-Screen: Side menu
+Screen: The side menu, "Upgrade plan", "Manage on erplora.com"
 Steps:
   1. At the foot of the side menu, under the QR code and lined up with it, is "Upgrade plan". Any profile
      sees it; what can be done on arriving is decided by erplora.com according to who comes in. With the
@@ -950,7 +950,7 @@ If it fails: if another running app needs it, nothing changes; if it cannot be t
 (BASE-F24).
 Involved: VERIFACTU-F32
 
-### BASE-F24 Turn an app on
+### BASE-F24 Turn an app back on
 Status: done
 Actor: administrator
 Screen: Apps
@@ -1512,7 +1512,7 @@ Involved: none
 ### BASE-F48 Open Settings and move through its tabs
 Status: done
 Actor: owner, administrator, manager, employee
-Screen: Settings
+Screen: Settings, Settings · Printing
 Steps:
   1. Tap "Settings" in the side menu, or arrive from a link on another screen.
   2. At the bottom, the tabs "General", "Business", "Printing" and "Data and backups";

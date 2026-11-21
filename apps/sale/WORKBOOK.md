@@ -941,7 +941,7 @@ Si falla: si una de las dos ya no está abierta, se rechaza sin mover nada.
 Implicados: TABLE-F16, KITCHEN-F28
 
 ### SALE-F25 Pasar la cuenta a otra mesa
-Estado: hecho en Mesas (TABLE-F15): la cuenta no cambia
+Estado: hecho — en Mesas (TABLE-F15): la cuenta no cambia
 Vertical: restaurante
 Actor: empleado, responsable
 Pantalla: ninguna
@@ -1464,7 +1464,6 @@ diciendo cuáles (409 `*_ambiguous`).
 | Lo vendido cada uno de los últimos 7 días | informes | F28 | `sale.sale.last_7_days` |
 | Lo vendido por cada profesional en un periodo: bruto, base, impuesto, lo devuelto de sus líneas, lo que queda, lo que pagó bonos que vendió, lo que valen las sesiones de bono que hizo y su producción (sobre la que va la comisión) | informes | F16, F28 | `sale.sale.by_staff` |
 | Lo que cobraría una cuenta, o unas líneas, sin cobrar nada (total, base, IVA, descuentos, desglose y líneas) | ver ventas | F01, F21, F22 | `sale.checkout.preview` |
-| Los pasos que las apps activas añaden al cobro (hoy, la propina de Propinas), sin saber cuáles son | ver ventas | F39 | `sale.checkout.steps` |
 | Las cuentas abiertas (o de otro estado), con búsqueda por título y páginas | ver ventas | F17 | `sale.order.list` |
 | Una cuenta con sus líneas sin cobrar | ver ventas | F17, F19 | `sale.order.get` |
 | Los medios de pago activos, con los que permite hoy el negocio | ver medios de pago | F02, F03 | `sale.payment_method.list` |
@@ -1489,10 +1488,12 @@ secciones, las notas rápidas y lo devolvible se pueden seguir en vivo.
 | El mismo cobro, con un descuento por encima del máximo | descuento sin tope | F14 | `sale.sale.complete_over_limit` |
 | Anula una venta cobrada con motivo (y devuelve sus sesiones de bono); con su rectificativa en la misma anulación (y antes su tique, si estaba pendiente) | anular | F30, F32 | `sale.sale.void` |
 | Emite ahora los documentos fiscales de una venta que esperan («Emitir ahora»): su tique o factura y las rectificativas de su anulación y de sus devoluciones | cobrar (y el permiso de Facturación de cada documento) | F29 | `sale.sale.issue_documents` |
+| Vuelve a imprimir el tique o la factura de una venta, con «DUPLICADO», por la impresora de tiques; si no se puede encolar, lo dice y lo imprime el dispositivo | ver ventas | F29 | `sale.sale.print` |
 | Devuelve dinero de una venta por cobro, y las líneas que vuelven (las pagadas con bono devuelven su sesión); con su rectificativa en la misma devolución | devolver | F31, F32 | `sale.sale.refund` |
 | Abre una cuenta, con o sin líneas (artículos, servicios —a su precio reservado o al de la profesional— o precio libre); la de una cita que ya tiene una abierta devuelve esa (`already`) | montar la cuenta | F01, F17, F26, F38 | `sale.order.open` |
 | Añade un artículo del catálogo a una cuenta | montar la cuenta | F01, F10 | `sale.order.add_line` |
 | Añade un servicio de Servicios a una cuenta | montar la cuenta | F38 | `sale.order.add_service_line` |
+| Añade un menú de Menús y combos a una cuenta, con lo elegido en cada plato; Menús comprueba la elección y pone el precio | montar la cuenta | F12 | `sale.order.add_combo_line` |
 | Paga una línea de servicio con un bono de la clienta (reserva la sesión) | montar la cuenta y gastar sesiones | F27 | `sale.order.apply_voucher` |
 | Deshace el bono de una línea (suelta la sesión) | montar la cuenta y gastar sesiones | F27 | `sale.order.remove_voucher` |
 | Añade una línea a precio libre | precio libre | F09 | `sale.order.add_open_line` |
@@ -1511,6 +1512,7 @@ secciones, las notas rápidas y lo devolvible se pueden seguir en vivo.
 | Pone el descuento de una línea (y su versión por encima del máximo) | montar la cuenta / descuento sin tope | F14 | `sale.order.set_line_discount`, `sale.order.set_line_discount_over_limit` |
 | Pone el título de una cuenta (aparcar) | montar la cuenta | F17 | `sale.order.set_label` |
 | Enlaza una cuenta a su cita | montar la cuenta | F26 | `sale.order.set_appointment` |
+| Imprime la cuenta de una mesa (no es factura: sin número ni cobro) por la impresora de tiques, o dice que no se encoló y la imprime el dispositivo; la mesa queda «Cuenta pedida» hasta cobrarla entera | ver ventas | F21 | `sale.order.print_bill` |
 | Crea un medio de pago | crear medios de pago | F37 | `sale.payment_method.create` |
 | Guarda los ajustes del TPV | ajustes | F34 | `sale.settings.update` |
 | Crea, cambia y elimina secciones | ajustes | F35 | `sale.department.create`, `.update`, `.delete` |
@@ -2074,7 +2076,8 @@ título, sus pasos y «Si falla»: ahí no van nombres de código, incidencias, 
   (se abre desde el plano, TABLE-F11, o desde **Cuentas abiertas**); y el icono relleno `grid` del botón
   con mesa (no está registrado en `packages/ui`: se pinta `grid-outline` en color).
 - **Cobrar con propina**: es la app Propinas (`tip`, su `WORKBOOK.md`), con el paso del cobro que pinta Ventas
-  (SALE-F39), las dos `no hecho`; el código va por las issues hijas de hub#562. Mientras, la propina en efectivo se
+  (SALE-F39, que leerá los pasos de las apps activas con una consulta `sale.checkout.steps` que aún no existe), las
+  dos `no hecho`; el código va por las issues hijas de hub#562. Mientras, la propina en efectivo se
   anota en Caja como «Entrada» (CASH_REGISTER-F05).
 - **Los alérgenos de un suplemento**: la línea y las hojas del TPV ya enseñan los alérgenos del plato y la alergia
   del cliente (F40 y F41 hechos), y la tarjeta de Cocina resalta la alergia (KITCHEN-F32). La línea ya suma los de sus
