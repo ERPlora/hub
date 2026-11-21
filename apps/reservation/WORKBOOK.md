@@ -165,8 +165,9 @@ Menú **Reservas → Disponibilidad**. Tres secciones apiladas:
 - **Ocupación**: una fecha (hoy por defecto) y, por cada franja de ese día, Franja, Reservadas, Máx,
   Comensales y Disponibles; la franja sin hueco se ve atenuada con la marca «Lleno», y la que cae
   fuera del horario del negocio, marcada «Fuera de horario». Encima, el horario del negocio de ese día
-  y, si el día está bloqueado, su motivo. Se refresca sola cuando entra, cambia o se cancela una
-  reserva. Vacía: «Sin servicio ese día (sin franjas).».
+  (un turno que pasa de la medianoche es del día en que abre) y, si el día está bloqueado, su motivo. Se
+  refresca sola cuando entra, cambia o se cancela una reserva. Vacía: «Sin servicio ese día (sin
+  franjas).».
 - **Franjas horarias**: Día, Desde, Hasta, Máx (de reservas), Máx comensales; «Añadir franja» (Día,
   Desde, Hasta, Máx, Máx comensales (opcional) → «Crear franja») y «Quitar» por fila. Vacía: «Sin
   franjas horarias.».
@@ -299,7 +300,9 @@ Estado: hecho
 Actor: empleado, responsable
 Pantalla: Disponibilidad (Ocupación); Reservas (barra del día)
 Pasos:
-1. Elige la fecha (hoy por defecto).
+1. Elige la fecha (hoy por defecto). Encima sale el horario del negocio de ese día en Horarios. Un turno
+   que pasa de la medianoche es del día en que abre: el viernes de 13:00 a 01:00 sale el viernes, no el
+   sábado. Un día sin turnos propios dice «El negocio cierra este día (Horarios).».
 2. Cada franja dice cuántas reservas lleva, su máximo, los comensales y las que quedan; la llena sale
    atenuada con «Lleno» y la que cae fuera del horario del negocio, con «Fuera de horario».
 3. Se actualiza sola mientras entran, cambian o se cancelan reservas.

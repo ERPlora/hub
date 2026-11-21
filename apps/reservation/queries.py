@@ -706,11 +706,8 @@ def day_availability(ctx: OperationContext, params: DayIn) -> dict:
         "closed": any(block.is_full_day for block in blocks),
         "blocks": [blocked_out(block) for block in blocks],
         "hours_restricted": hours.restricted,
-        "spans": [
-            {"start": start, "end": end}
-            for start, end in hours.spans
-            if end > dt.datetime.combine(day, dt.time.min) and start.date() <= day
-        ],
+        # A night past midnight belongs to the day it opens: the eve's tail still counts for booking.
+        "spans": [{"start": start, "end": end} for start, end in hours.spans if start.date() == day],
         "slots": [
             {
                 "id": slot.id,
