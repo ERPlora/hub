@@ -12,7 +12,7 @@ from django.contrib.auth import get_user_model, login
 from django.contrib.sessions.backends.db import SessionStore
 from django.test import RequestFactory
 
-from base.middleware import PLATFORM_SESSION_HOST, SESSION_HOST_KEY
+from base.session_host import PLATFORM_SESSION_HOST, SESSION_HOST_KEY
 from base.models import Membership
 from base.tests.test_auth_views import A, B, ON_HUB_A
 
