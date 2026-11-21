@@ -61,6 +61,23 @@ describe('QtyStepper', () => {
     expect(m.wrapper.emitted('change')).toEqual([['2500']]);
   });
 
+  // hub#2010: a weight finer than its step («1,2505» kg) is no typo to drop in silence; the line's step judges it on
+  // the server, whose refusal says which step it is.
+  it('a typed quantity goes as typed, whatever its decimals: the step of the line judges it', async () => {
+    const m = await setup({ quantity: '0.532', unit: 'kg' }, 'es');
+    await type(m.field(), '1,2505');
+    expect(m.wrapper.emitted('change')).toEqual([['1.2505']]);
+  });
+
+  it('once a write settles, the field shows the quantity the server keeps (a refused one goes back)', async () => {
+    const m = await setup({ quantity: '0.532', unit: 'kg' }, 'es');
+    await type(m.field(), '1,25');
+    expect(m.wrapper.emitted('change')).toEqual([['1.25']]);
+    await m.wrapper.setProps({ disabled: true });
+    await m.wrapper.setProps({ disabled: false });
+    expect(m.field().value).toBe('0,532');
+  });
+
   it('something that is not a quantity puts the field back and asks nothing', async () => {
     const m = await setup();
     await type(m.field(), 'abc');

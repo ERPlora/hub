@@ -83,12 +83,11 @@ test('SALE-F20 (hub#1017): a table seated on the plan offers «Send order (1)» 
   await view.locator('[data-testid=table-floor-mode-service]').click();
   await view.locator(`[data-testid=table-floor-zone-tab-${zoneId}]`).click();
 
-  // Tables → the free table → seat two → its window → «Charge»: the till on the table's check.
+  // Tables → the free table → seat two → a tap on the occupied table: the till on the table's check.
   await view.locator(`[data-testid=table-floor-tile-${tableId}]`).click();
   await page.locator('[data-testid=table-guests-quick-2]').click();
   await expect(view.locator(`[data-testid=table-floor-tile-${tableId}]`)).toContainText('Occupied');
   await view.locator(`[data-testid=table-floor-tile-${tableId}]`).click();
-  await page.locator('ion-modal[data-testid=table-sheet] [data-testid=table-sheet-action-charge]').click();
   await expect(shown(page).locator('[data-testid=pos-check-title]')).toHaveValue(`Table ${RUN}`);
 
   // A dish: the check stays on «Check», the tab it opened on, and «Send order (1)» is there.

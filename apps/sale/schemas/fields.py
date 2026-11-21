@@ -93,6 +93,9 @@ Reason = _text(500, 1)
 Cents = Annotated[int, Field(ge=0, le=MAX_CENTS, json_schema_extra={"money": True})]
 PositiveCents = Annotated[int, Field(ge=1, le=MAX_CENTS, json_schema_extra={"money": True})]
 Quantity = Annotated[Decimal, Field(gt=0, max_digits=15, decimal_places=3)]
+#: A quantity typed for a line, with as many decimals as typed: the step of the line's unit judges it and says
+#: which step it is; no step is finer than three decimals, so what is kept still fits ``Quantity``.
+TypedQuantity = Annotated[Decimal, Field(gt=0, lt=Decimal(10) ** 12)]
 Percent = Annotated[Decimal, Field(ge=0, le=100, max_digits=5, decimal_places=2)]
 AttemptKey = Annotated[
     str,

@@ -29,7 +29,7 @@ from apps.sale.schemas.fields import (
     Page,
     PageIn,
     Percent,
-    Quantity,
+    TypedQuantity,
     _text,
 )
 from apps.sale.schemas.lines import (
@@ -110,7 +110,7 @@ class OrderApplyVoucherIn(OrderLineRefIn):
 
 
 class OrderUpdateLineIn(OrderLineRefIn):
-    quantity: Quantity | None = Field(None, description="New quantity; empty keeps it.")
+    quantity: TypedQuantity | None = Field(None, description="New quantity; empty keeps it.")
     is_gift: bool | None = Field(
         None, description="True: a comp; false: charged again; empty keeps it."
     )

@@ -4,6 +4,7 @@ import { type ApiError, useCommand, useLive } from '@erplora/ui/sdk';
 import { AppPage, HubIcon, useSession } from '@erplora/ui/shell';
 import { IonButton, IonLabel, IonSegment, IonSegmentButton } from '@ionic/vue';
 import { computed, ref, useTemplateRef, watch } from 'vue';
+import { useRouter } from 'vue-router';
 
 import AddModal from '../components/AddModal.vue';
 import FloorCanvas from '../components/FloorCanvas.vue';
@@ -37,6 +38,7 @@ const FACTORY: SettingsOut = {
 };
 
 const session = useSession();
+const router = useRouter();
 const t = useT();
 const now = useNow();
 const canDraw = computed(() => session.can('table.change_table') || session.can('table.add_table') || session.can('table.add_zone'));
@@ -101,6 +103,10 @@ const pickable = computed(() => {
   return current ? (table: TableOut) => targetable(current.mode, current.table, table) : null;
 });
 const tabs = computed(() => zoneTabs(zones.value, painted.value, t));
+const hint = computed(() => {
+  if (editing.value) return t('table.floor.hint');
+  return tables.value.length && !pick.value ? t('table.floor.serviceHint') : '';
+});
 const summary = computed(() => zoneSummary(activeZone.value, inService.value, t));
 const cards = useFloorViews(
   () => (asCards.value ? tables.value : []),
@@ -110,6 +116,7 @@ const cards = useFloorViews(
 // Dialogs
 const sheetId = ref<string | null>(null);
 const sheetOpen = ref(false);
+const sheetIntent = ref<'check' | 'actions'>('actions');
 const sheetTable = computed(() => painted.value.find((table) => table.id === sheetId.value) ?? null);
 const formTable = ref<TableOut | null>(null);
 const formOpen = ref(false);
@@ -156,11 +163,22 @@ async function finishPick(target: TableOut): Promise<void> {
   pick.value = null;
 }
 
-function onCard(id: string): void {
+function onCard(id: string, handle: (table: TableOut) => void): void {
   const table = tables.value.find((row) => row.id === id);
-  if (table) onSelect(table);
+  if (table) handle(table);
 }
 
+function openSheet(table: TableOut, intent: 'check' | 'actions'): void {
+  sheetId.value = table.id;
+  sheetIntent.value = intent;
+  sheetOpen.value = true;
+}
+
+function openCheck(orderId: string): void {
+  void router.push({ path: '/sale/pos', query: { order: orderId } });
+}
+
+// A tap on an occupied table goes to its check in Sales, as restaurant tills do; a split one asks which check.
 function onSelect(table: TableOut): void {
   if (pick.value) {
     void finishPick(table);
@@ -172,8 +190,15 @@ function onSelect(table: TableOut): void {
     formOpen.value = true;
     return;
   }
-  sheetId.value = table.id;
-  sheetOpen.value = true;
+  const [only, ...others] = table.checks;
+  if (only?.order_id && !others.length) openCheck(only.order_id);
+  else openSheet(table, others.length ? 'check' : 'actions');
+}
+
+function onActions(table: TableOut): void {
+  if (pick.value) return;
+  failure.value = '';
+  openSheet(table, 'actions');
 }
 
 async function onMove({ table, x, y }: { table: TableOut; x: number; y: number }): Promise<void> {
@@ -348,7 +373,8 @@ function onZoneSaved(zone: ZoneOut): void {
             data-testid="table-floor-cards"
             :tables="cards"
             :label="$t('table.floor.cardsLabel')"
-            @select="onCard"
+            @select="(id: string) => onCard(id, onSelect)"
+            @actions="(id: string) => onCard(id, onActions)"
           />
           <EmptyState
             v-else
@@ -367,6 +393,7 @@ function onZoneSaved(zone: ZoneOut): void {
           :editable="editing && !pick"
           :pick="pickable"
           @select="onSelect"
+          @actions="onActions"
           @move="onMove"
         >
           <EmptyState
@@ -378,11 +405,11 @@ function onZoneSaved(zone: ZoneOut): void {
           />
         </FloorCanvas>
         <p
-          v-if="editing"
+          v-if="hint"
           class="table-floor__hint"
           data-testid="table-floor-hint"
         >
-          {{ $t('table.floor.hint') }}
+          {{ hint }}
         </p>
       </template>
     </div>
@@ -392,7 +419,9 @@ function onZoneSaved(zone: ZoneOut): void {
       :table="sheetTable"
       :settings="settings"
       :now="now"
+      :intent="sheetIntent"
       @pick="onPick"
+      @check="openCheck"
     />
     <TableFormModal
       v-model:open="formOpen"
