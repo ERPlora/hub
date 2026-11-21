@@ -46,6 +46,16 @@ async function seen(page: Page, tableId: string): Promise<Seen> {
     });
 }
 
+/** Shows the plan at `size`, captures it and says where the table is against what shows it. */
+async function at(page: Page, tableId: string, { label, width, height }: (typeof SIZES)[number]): Promise<Seen> {
+  await page.setViewportSize({ width, height });
+  await expect(shown(page).locator(`[data-testid="table-floor-tile-${tableId}"]`)).toBeVisible();
+  await settled(page);
+  const where = await seen(page, tableId);
+  await capture(page, `table-floor-frame-${label}`);
+  return where;
+}
+
 test('A zone whose only table is at the bottom right of the plan shows it in Service without scrolling, at every size', async ({ browser }) => {
   const { context, page } = await ownerPage(browser, '/table/floor-plan', { width: SIZES[0].width, height: SIZES[0].height });
   try {
@@ -54,11 +64,7 @@ test('A zone whose only table is at the bottom right of the plan shows it in Ser
     await page.reload();
     await shown(page).locator(`[data-testid=table-floor-zone-tab-${zone.id}]`).click();
     for (const size of SIZES) {
-      await page.setViewportSize({ width: size.width, height: size.height });
-      await expect(shown(page).locator(`[data-testid="table-floor-tile-${table.id}"]`)).toBeVisible();
-      await settled(page);
-      expect(await seen(page, table.id), `the table whole on the screen, unscrolled, at ${size.label}`).toEqual({ outside: 0, scroll: [0, 0] });
-      await capture(page, `table-floor-frame-${size.label}`);
+      expect(await at(page, table.id, size), `the table whole on the screen, unscrolled, at ${size.label}`).toEqual({ outside: 0, scroll: [0, 0] });
     }
   } finally {
     await context.close();
