@@ -93,6 +93,7 @@ def test_the_screens_of_a_routes_file_are_those_with_a_session_that_ship():
 
 
 def test_a_screen_under_no_entry_is_caught():
-    """The settings without an entry, and a path that only shares the entry's letters, are strays."""
+    """The settings without an entry, and a path that only starts with the entry's letters, are strays."""
     assert strays(MADE_UP, ["/stock/items"]) == ["/stock/settings", "/stock-guide"]
+    assert strays(MADE_UP, ["/stock"]) == ["/stock-guide"]
     assert strays(MADE_UP, ["/stock/items", "/stock/settings", "/stock-guide"]) == []
