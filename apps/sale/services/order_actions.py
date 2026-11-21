@@ -394,11 +394,11 @@ def set_label(ctx: OperationContext, data: OrderSetLabelIn) -> dict:
         asks={
             "en": (
                 "Lucia is serving table 6",
-                "put Marco in charge of the terrace check",
+                "put Sergio in charge of the terrace check",
             ),
             "es": (
                 "la cuenta de la mesa 6 la atiende Lucía",
-                "que la cuenta de la terraza la lleve Marco",
+                "que la cuenta de la terraza la lleve Sergio",
             ),
         },
     ),
