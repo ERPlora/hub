@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:051c7e5ea19d24afc4580ff7ec21a57f77e04faadd0836bb94afe6a2fcff3b74 -->
+<!-- generated from WORKBOOK.md sha256:cbdd837073045f27b598a7a421ec67f07042111fe122ec2cadddeb58e5c17840 -->
 
 ## What it is for and who it is for
 
@@ -279,6 +279,7 @@ With the window as it opened, Back closes it without asking (BASE-F05).
 | TABLE-F30 | Hold or release a table by hand | done |
 | TABLE-F31 | Forget the name of a customer whose data are erased (GDPR) | done |
 | TABLE-F32 | Put or remove the customer of a table | done |
+| TABLE-F33 | See how much each table has run up | not done |
 
 ### TABLE-F01 Create and order the zones of the room
 Status: done
@@ -460,7 +461,7 @@ Steps:
 In: the tables, their open checks, their holds and the status of their checks in Sales.
 Out: nothing.
 If it fails: a failure on loading shows with "Retry".
-Involved: TABLE-F10, TABLE-F25, TABLE-F29, SALE-F19
+Involved: TABLE-F10, TABLE-F25, TABLE-F29, TABLE-F33, SALE-F19
 
 ### TABLE-F10 Seat a party at a free or reserved table
 Status: done
@@ -865,6 +866,25 @@ In: the card, from Customers.
 Out: the check ↔ customer link, which Customers keeps (announces: `customer.order.linked`).
 If it fails: the reason of Customers; the table is seated anyway.
 Involved: CUSTOMER-F17, CUSTOMER-F19, CUSTOMER-F33, TABLE-F10
+
+### TABLE-F33 See how much each table has run up
+Status: not done — the plan does not receive the amount of each table's checks yet
+Actor: employee, manager
+Screen: Floor plan (Service)
+Steps:
+1. Open **Tables → Floor plan**. Each Occupied table shows in the label under it, next to its guests, the
+   amount of its check in the business's currency ("3/4 pax · €42.50"), and "€0.00" while nothing has been
+   ordered. It is the same amount that check shows in **Open checks** in Sales.
+2. With several checks at the table (split), it shows the sum of them all.
+3. On the phone, each occupied table's card shows it too, next to the time.
+4. When the waiter adds or removes a line in Sales, charges part of the check (it then shows what is
+   still to be charged), or joins, splits or moves it to another table, the amount changes by itself on
+   every device that has the plan open, without leaving and coming back.
+5. Available, Reserved and Blocked tables show no amount.
+In: the amount of each open check of the room, from Sales, read at once for the whole plan.
+Out: nothing.
+If it fails: as the plan (TABLE-F09), a failure on loading shows with "Retry".
+Involved: TABLE-F09, TABLE-F15, TABLE-F16, TABLE-F17, SALE-F17, SALE-F19, SALE-F22
 
 ## Tables: what goes in and what comes out
 

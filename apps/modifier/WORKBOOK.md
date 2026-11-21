@@ -142,6 +142,8 @@ cierra la ventana sin guardarlo. Con la ventana como se abrió, atrás la cierra
 | MODIFIER-F08 | Que el suplemento salga en la comanda de cocina | hecho |
 | MODIFIER-F09 | Soltar los grupos de un producto o una categoría que se borra | hecho |
 | MODIFIER-F10 | Recuperar los grupos de suplementos, y los de un producto o de una categoría, desde una copia aparte | hecho |
+| MODIFIER-F11 | Declarar los alérgenos de una opción | no hecho |
+| MODIFIER-F12 | Sumar los alérgenos de las opciones a los del plato | no hecho |
 
 ### MODIFIER-F01 Consultar y buscar los grupos
 Estado: hecho
@@ -402,6 +404,63 @@ tiene. Con las categorías es igual: una que sigue eliminada (no se recuperó Pr
 crear a mano con su nombre, que se queda con los grupos que él le enganchó, no recibe ninguno y Recuperaciones dice por
 qué («not_found: …»); la que trajo una recuperación se reconoce por su nombre, la trajera esta u otra anterior.
 Implicados: BASE-F114, INVENTORY-F01, INVENTORY-F07, INVENTORY-F34, MODIFIER-F05, MODIFIER-F09
+
+### MODIFIER-F11 Declarar los alérgenos de una opción
+Estado: no hecho — la opción todavía no guarda alérgenos: faltan el dato, el bloque del formulario y la fila de la
+hoja del grupo
+Actor: propietario, administrador, responsable, asistente
+Pantalla: Suplementos (hoja del grupo)
+Pasos:
+1. Abre el grupo y, en Opciones, pulsa «Añadir opción» o **Editar** en una. Debajo de «Elegida por defecto»
+   sale el bloque «Alérgenos», con la nota «Marca los que añade esta opción al plato.» y los catorce alérgenos de
+   declaración obligatoria, los mismos y en el mismo orden que en el formulario de un producto: Gluten, Crustáceos,
+   Huevo, Pescado, Cacahuete, Soja, Leche, Frutos de cáscara, Apio, Mostaza, Sésamo, Sulfitos, Altramuces y
+   Moluscos. En el alta no sale ninguno marcado.
+2. Toca los que lleva la opción: «+Queso», Leche; «Salsa de mostaza», Mostaza. Cada toque marca o desmarca uno.
+   Una opción que solo quita algo («Sin cebolla») o que no añade ningún ingrediente («Poco hecha») se deja sin
+   marcar.
+3. Pulsa «Crear» o «Guardar», como el resto de la opción. Un alérgeno marcado sin guardar pregunta antes de cerrar
+   la ventana, como cualquier otro campo.
+4. En la hoja del grupo, cada opción con alérgenos los dice debajo de su nombre: «Alérgenos: Leche», en el orden de
+   la lista. Una opción sin alérgenos no lleva esa fila.
+Entra: la opción; la lista de los catorce alérgenos.
+Sale: la opción con sus alérgenos, en el mismo paso que el resto del formulario: o se guarda todo o nada (avisa:
+opción creada o cambiada). Lo mismo se hace por el asistente o la API, con los mismos permisos: «marca leche en el
+queso de Extras» pide antes la tarjeta de confirmación, que dice la opción con su grupo y los alérgenos por su
+nombre. Un cambio vale para lo que se pida desde ese momento: una línea ya pedida conserva los alérgenos que tenía
+(F12). Una opción que vuelve desde una copia aparte vuelve con sus alérgenos (F10).
+Si falla: un alérgeno que no es de la lista se rechaza, también por el asistente o la API, y no se guarda nada
+(«Ese alérgeno no es uno de los catorce de declaración obligatoria.»); en la ventana sale junto a su campo, como los
+demás rechazos de la opción. Quien solo puede ver lee los alérgenos en la hoja del grupo, pero no tiene el
+formulario.
+Implicados: MODIFIER-F04, MODIFIER-F10, MODIFIER-F12, INVENTORY-F35
+
+### MODIFIER-F12 Sumar los alérgenos de las opciones a los del plato
+Estado: no hecho — la valoración de las opciones todavía no da sus alérgenos y la línea solo lleva los de su
+producto
+Actor: empleado, responsable
+Pantalla: Ventas: Vender
+Pasos:
+1. En el TPV, toca un artículo que tiene grupos. En su hoja, debajo del nombre del artículo salen sus alérgenos
+   y, debajo de cada opción que los tiene, los suyos: «Leche».
+2. Elige las opciones y pulsa «Añadir». La línea dice, debajo del nombre, «Alérgenos: …» con los del plato y
+   los de cada opción elegida, juntos, sin repetir y en el orden de la lista de los catorce: una hamburguesa con
+   Gluten y «+Queso» dice «Alérgenos: Gluten, Leche». Cuentan todas las opciones elegidas, también las que se cobran
+   en una línea aparte. Un plato sin alérgenos con una opción que los tiene también lleva la fila.
+3. Si el cliente avisó de una alergia marcada en la línea, el aviso «El plato lleva …» cuenta también los de las
+   opciones: «+Queso» en el plato de un alérgico a la leche dice «El plato lleva Leche».
+4. Envía la ronda: Cocina recibe los alérgenos de la línea ya sumados y los cruza con la alergia del cliente como
+   con cualquier plato.
+Entra: los alérgenos del producto (INVENTORY-F35) y los de las opciones elegidas (F11), que da la valoración de las
+opciones (F07).
+Sale: la línea con los alérgenos sumados y congelados al pedirla, como el suplemento: cambiar o borrar la opción, o
+sus alérgenos, después no cambia lo que dice esa línea ni lo que lee Cocina. Los alérgenos no cambian el precio ni
+el cobro, y no salen en el tique, en la factura ni en la cuenta impresa para la mesa (SALE-F40).
+Si falla: si no se pueden valorar las opciones, la línea no entra, como con cualquier suplemento. Una opción nunca
+quita un alérgeno al plato: «Sin queso» no quita la Leche de una hamburguesa que la declara, porque lo que declara el
+producto es lo que lleva su receta y lo que se quita es una indicación para cocina; si el cliente es alérgico, se
+marca su alergia en la línea.
+Implicados: MODIFIER-F06, MODIFIER-F07, MODIFIER-F11, SALE-F11, SALE-F40, SALE-F41, KITCHEN-F32
 
 ## Servicios: lo que entra y lo que sale
 
@@ -726,8 +785,19 @@ comanda y la pinta debajo del nombre: en la pantalla separada por «, » y en el
 (hub#1156, hub#1138). Renombrar o borrar la opción, o su grupo, después de pedirla no cambia lo que lee
 cocina (`tests/test_integration_kitchen.py`).
 
+### Los alérgenos de una opción
+
+F11 y F12 están `no hecho`. La lista es la de la plataforma (`base.allergens`), la misma que declara un producto de
+Inventario (INVENTORY-F35) y que leen Ventas y Cocina. Se hacen por partes y en este orden: el dato de la opción, su
+migración y las operaciones, con la recuperación desde una copia aparte y lo que devuelven `modifier.group.for_target`
+y `modifier.selection.resolve` (hub#1932); el formulario de la opción y la fila de la hoja del grupo (hub#1933); y la
+suma en la línea del TPV, con la hoja de suplementos de Ventas y el cambio de SALE-F40 (hub#1934).
+
 ### Lo que NO hace, a propósito
 
+- No guarda más alérgenos que los catorce de declaración obligatoria ni «puede contener trazas» en una opción (F11),
+  igual que un producto; y una opción no quita alérgenos al plato (F12): lo que se quita es una indicación para
+  cocina, y la alergia del cliente se marca en la línea.
 - No tiene variantes de producto ni stock ni coste por opción (descontar ingredientes es otra cosa).
 - No hace menús a precio cerrado: eso es Menús.
 - No cobra ni factura por sí misma: Ventas pone el dinero.

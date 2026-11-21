@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:c17f63ce331a609e58955d32739ca1871a764ba77d70162e029ab545bd26b0d7 -->
+<!-- generated from WORKBOOK.md sha256:5f86df2100b344e4323f9ae0f76e0846f97f239f7ee576f7e3de2b61766c763a -->
 
 ## What it is for and who it is for
 
@@ -135,6 +135,8 @@ With the window as it opened, Back closes it without asking (BASE-F05); a supple
 | MODIFIER-F08 | Have the supplement show on the kitchen ticket | done |
 | MODIFIER-F09 | Unlink the groups of a product or a category that is deleted | done |
 | MODIFIER-F10 | Recover the modifier groups, and those of a product or of a category, from a separate copy | done |
+| MODIFIER-F11 | Declare an option's allergens | not done |
+| MODIFIER-F12 | Add the options' allergens to the dish's | not done |
 
 ### MODIFIER-F01 Look up and search the groups
 Status: done
@@ -404,6 +406,62 @@ that the business already made again by hand with its name, which keeps the grou
 Recoveries says why ("not_found: …"); the one a recovery brought back is known by its name, whether this recovery
 brought it back or an earlier one.
 Involved: BASE-F114, INVENTORY-F01, INVENTORY-F07, INVENTORY-F34, MODIFIER-F05, MODIFIER-F09
+
+### MODIFIER-F11 Declare an option's allergens
+Status: not done — the option does not keep allergens yet: the data, the form's block and the group sheet's row are
+missing
+Actor: owner, administrator, manager, assistant
+Screen: Modifiers (group sheet)
+Steps:
+1. Open the group and, in Options, tap "Add option" or **Edit** on one. Under "Chosen by default" comes the
+   "Allergens" block, with the note "Mark the ones this option adds to the dish." and the fourteen allergens that must
+   be declared, the same ones and in the same order as in a product's form: Gluten, Crustaceans, Egg, Fish, Peanut,
+   Soy, Milk, Tree nuts, Celery, Mustard, Sesame, Sulphites, Lupin and Molluscs. When creating, none comes marked.
+2. Tap the ones the option has: "+Cheese", Milk; "Mustard sauce", Mustard. Each tap marks or unmarks one. An option
+   that only takes something away ("No onion") or that adds no ingredient ("Rare") is left unmarked.
+3. Tap "Create" or "Save", like the rest of the option. An allergen marked and not saved asks before the window
+   closes, like any other field.
+4. In the group sheet, each option with allergens says them under its name: "Allergens: Milk", in the order of the
+   list. An option without allergens has no such row.
+In: the option; the list of the fourteen allergens.
+Out: the option with its allergens, in the same step as the rest of the form: either everything is saved or nothing
+(announces: option created or changed). The same is done through the assistant or the API, with the same
+permissions: "mark milk on the cheese of Extras" first asks for the confirmation card, which says the option with its
+group and the allergens by their name. A change counts for what is ordered from that moment on: a line already
+ordered keeps the allergens it had (F12). An option that comes back from a separate copy comes back with its
+allergens (F10).
+If it fails: an allergen that is not on the list is rejected, also through the assistant or the API, and nothing is
+saved ("That allergen is not one of the fourteen that must be declared."); in the window it shows next to its field,
+like the option's other rejections. Whoever can only view reads the allergens in the group sheet, but does not have
+the form.
+Involved: MODIFIER-F04, MODIFIER-F10, MODIFIER-F12, INVENTORY-F35
+
+### MODIFIER-F12 Add the options' allergens to the dish's
+Status: not done — the options' valuation does not give their allergens yet and the line only carries its product's
+Actor: employee, manager
+Screen: Sales: Sell
+Steps:
+1. On the till, tap an item that has groups. On its sheet, under the item's name come its allergens and,
+   under each option that has them, its own: "Milk".
+2. Choose the options and tap "Add". The line says, under the name, "Allergens: …" with the dish's and those of
+   each option chosen, together, without repeating and in the order of the list of the fourteen: a burger with Gluten
+   and "+Cheese" says "Allergens: Gluten, Milk". All the options chosen count, also those charged on a separate line.
+   A dish without allergens with an option that has them also gets the row.
+3. If the customer warned of an allergy marked on the line, the warning "The dish has …" also counts the options':
+   "+Cheese" on the dish of someone allergic to milk says "The dish has Milk".
+4. Send the round: Kitchen gets the line's allergens already added up and crosses them with the customer's allergy
+   as with any dish.
+In: the product's allergens (INVENTORY-F35) and those of the options chosen (F11), which the options' valuation gives
+(F07).
+Out: the line with the allergens added up and frozen when it is ordered, like the supplement: changing or deleting
+the option, or its allergens, afterwards does not change what that line says or what Kitchen reads. The allergens do
+not change the price or the charge, and they do not show on the ticket, on the invoice or on the printed bill for the
+table (SALE-F40).
+If it fails: if the options cannot be valued, the line does not go in, as with any supplement. An option never takes
+an allergen away from the dish: "No cheese" does not take the Milk away from a burger that declares it, because what
+the product declares is what its recipe has and what is taken away is an instruction for the kitchen; if the customer
+is allergic, their allergy is marked on the line.
+Involved: MODIFIER-F06, MODIFIER-F07, MODIFIER-F11, SALE-F11, SALE-F40, SALE-F41, KITCHEN-F32
 
 ## Services: what goes in and what comes out
 
