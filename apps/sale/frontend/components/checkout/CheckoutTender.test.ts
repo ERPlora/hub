@@ -48,6 +48,11 @@ describe('CheckoutTender: one method', () => {
     expect(s.find('sale-checkout-exact').exists()).toBe(false);
   });
 
+  it('cash still asks for what was handed over: nothing typed shows nothing', async () => {
+    const s = await setup({ block: { kind: 'tenderedMissing' } });
+    expect(s.parts('sale-checkout-tendered')).toEqual(['Tendered', '€0.00']);
+  });
+
   it('cash: the change, big', async () => {
     const s = await setup({ typed: 5000, change: 750 });
     expect(s.parts('sale-checkout-change')).toEqual(['Change', '€7.50']);
@@ -117,6 +122,13 @@ describe('CheckoutTender: split', () => {
     expect(s.text('sale-checkout-add-leg')).toBe('Add this payment');
     await click(s.find('sale-checkout-add-leg').element);
     expect(s.wrapper.emitted('add')).toEqual([[]]);
+  });
+
+  it('hub#2017: with nothing typed it shows all that is left, which is what «Add this payment» takes', async () => {
+    const card = await setup({ splitting: true, method: CARD, legs: LEGS, remaining: 2250 });
+    expect(card.parts('sale-checkout-tendered')).toEqual(['Amount for this payment', '€22.50']);
+    const cash = await setup({ splitting: true, legs: LEGS, remaining: 2250 });
+    expect(cash.parts('sale-checkout-tendered')).toEqual(['Tendered', '€22.50']);
   });
 
   it('cash types what was handed over', async () => {

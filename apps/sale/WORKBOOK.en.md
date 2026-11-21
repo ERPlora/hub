@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:0892edf2da61fdc9a900ce7e5452015f6dba8f85cc834773129ee1b171e93ee9 -->
+<!-- generated from WORKBOOK.md sha256:545079fcd065fed81220b847e4e747e92dca9cb5ccf7cfd317589bb3949bc0c2 -->
 
 ## What it is for and who it is for
 
@@ -387,8 +387,9 @@ Actor: employee, manager
 Screen: Charge
 Steps:
 1. In the **Charge** sheet, press "Split the payment". "Remaining" appears at the top.
-2. Choose a method, enter the "Amount for this payment" (in cash, what is tendered) and press "Add this
-   payment". With no amount entered, the payment covers all that is left.
+2. Choose a method: the "Amount for this payment" (in cash, "Tendered") already shows all that is left.
+   To charge only part of it, or if more cash is handed over, type another amount, which replaces the one
+   shown. Press "Add this payment".
 3. The payments taken show in "Payments taken"; the ✕ removes one.
 4. When the remainder reaches 0, press "Charge €18.50".
 In: the payment methods and what the customer hands over.
@@ -1079,7 +1080,8 @@ Steps:
    name and the rest the address. On an invoice, under "Customer", its tax ID and its address. Then, the number Invoicing gave it when charging ("Invoice FACT-2026-000012", "Receipt TICKET-2026-000031"; without
    Invoicing, or while its document is pending, the sale's number), date, lines, one VAT row per tax key
    (an exempt one says its cause: "Exempt (E1)"), total, payment method (charged with several methods,
-   all of them: "Cash + Card"), tendered and change, and the footer. With **VeriFactu**, before the footer goes the fiscal QR: "Tax QR:" above, "VERI*FACTU" below
+   all of them: "Cash + Card"), tendered and change, and the footer. With **VeriFactu**, before the
+   footer goes the fiscal QR: "Tax QR:" above, "VERI*FACTU" below
    and "Scan it to check this receipt at the AEAT" ("…this invoice…" if it is an invoice); once the AEAT
    has answered, its code ("CSV: …") instead of that sentence. While VeriFactu has no record of that
    document, the paper comes out without a QR. A receipt with its fiscal document (issued or pending)

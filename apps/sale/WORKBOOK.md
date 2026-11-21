@@ -398,8 +398,9 @@ Actor: empleado, responsable
 Pantalla: Cobro
 Pasos:
 1. En la hoja **Cobro**, pulsa «Repartir el cobro». Arriba aparece «Restante».
-2. Elige un medio, marca el «Importe de este cobro» (en efectivo, lo entregado) y pulsa «Añadir este
-   cobro». Sin importe marcado, el cobro cubre todo lo que falta.
+2. Elige un medio: el «Importe de este cobro» (en efectivo, «Entregado») sale ya con todo lo que falta.
+   Para cobrar solo una parte, o si en efectivo entrega más, teclea otro importe, que sustituye al que
+   sale. Pulsa «Añadir este cobro».
 3. Los cobros tomados salen en «Cobros tomados»; la ✕ quita uno.
 4. Cuando el restante llega a 0, pulsa «Cobrar 18,50 €».
 Entra: los medios de pago y lo que entrega el cliente.
@@ -1084,7 +1085,8 @@ Pasos:
    dio Facturación en el cobro («Factura FACT-2026-000012», «Tique TICKET-2026-000031»; sin
    Facturación, o mientras su documento está pendiente, el número de la venta), fecha, líneas, una fila
    de IVA por clave fiscal (un exento dice su causa: «Exento (E1)»), total, forma de pago (cobrada con
-   varios medios, todos: «Efectivo + Tarjeta»), entregado y cambio, y el pie. Con **VeriFactu**, antes del pie va el QR fiscal: «QR tributario:» encima,
+   varios medios, todos: «Efectivo + Tarjeta»), entregado y cambio, y el pie. Con **VeriFactu**, antes
+   del pie va el QR fiscal: «QR tributario:» encima,
    «VERI*FACTU» debajo y «Escanéalo para cotejar este tique en la AEAT» («…esta factura…» si es una
    factura); cuando la AEAT ya respondió, su código («CSV: …») en lugar de esa frase. Mientras VeriFactu
    no tiene registro de ese documento, el papel sale sin QR. Un tique con su documento fiscal (emitido o
