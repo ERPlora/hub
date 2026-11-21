@@ -3,7 +3,7 @@ and the orders made from them, with their number of the day and a payment status
 (WORKBOOK.md). It is not the till and nothing it does is fiscal: the till is the sale app."""
 
 from django.utils.translation import gettext_lazy as _
-from live.meta import Category, LiveAppConfig, Nav
+from live.meta import Category, Help, LiveAppConfig, Nav
 
 
 class CartCheckoutConfig(LiveAppConfig):
@@ -68,6 +68,7 @@ class CartCheckoutConfig(LiveAppConfig):
         Nav("carts", _("Carts"), "lucide:shopping-bag", "/cart_checkout/carts"),
         Nav("orders", _("Orders"), "ion:receipt-outline", "/cart_checkout/orders"),
     ]
+    help = Help()
 
     fiscal_archive_models = ("Cart", "CartItem", "Order")
 

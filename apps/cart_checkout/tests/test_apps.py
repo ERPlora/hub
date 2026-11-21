@@ -2,7 +2,7 @@
 its scheduled task and what the assistant sees of each operation."""
 
 from django.apps import apps
-from live.meta import Category, LiveAppConfig, Nav, module_configs, permissions_for_role
+from live.meta import Category, Help, LiveAppConfig, Nav, module_configs, permissions_for_role
 
 PERMISSIONS = [
     "cart_checkout.view_cart",
@@ -179,3 +179,7 @@ def test_every_input_field_says_what_it_is():
     for name, op in operations().items():
         for field, info in op.input.model_fields.items():
             assert info.description, f"{name}: {field}"
+
+
+def test_its_help_window_is_ready_without_a_video_yet():
+    assert cart_checkout().help == Help()
