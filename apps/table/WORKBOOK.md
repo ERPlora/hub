@@ -178,7 +178,7 @@ sienta, cobra, mueve o edita una mesa. Tiene dos modos:
   (Número, Aforo, Ancho, Alto, Nombre (opcional), Forma, Estado (Disponible o Bloqueada), Zona, Activa;
   pie con «Borrar» y «Guardar»); el «+» abre **Añadir** (campo Zona y «Añadir zona»; campo «Número de
   mesa», que si se deja vacío «Se numera sola», y «Añadir mesa»); el lápiz abre **Editar zona** (Nombre, Descripción
-  (opcional); «Borrar zona» y «Guardar»). Debajo, la ayuda «Arrastra para colocar · clic en una mesa
+  (opcional); «Borrar zona» y «Guardar»). Debajo, la ayuda «Arrastra para colocar · toca una mesa
   para editarla o borrarla. Los cambios se guardan al momento.». En «Editar plano» se ven también las
   mesas y zonas desactivadas, en gris.
 

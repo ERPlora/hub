@@ -24,7 +24,7 @@ const zone = useBusinessZone();
         v-if="data"
         class="attendance-presence__count"
         data-testid="attendance-presence-count"
-      >{{ $t('attendance.presence.count', { n: data.total }) }}</span>
+      >{{ $t('attendance.presence.count', { n: data.total }, data.total) }}</span>
     </header>
     <p
       v-if="status === 'error' && !data"

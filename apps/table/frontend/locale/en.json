@@ -70,7 +70,7 @@
       "planLabel": "Floor plan. Use the arrow keys to scroll it.",
       "add": "Add zone or table",
       "editZone": "Edit zone",
-      "hint": "Drag to position · click a table to edit or delete it. Changes are saved instantly.",
+      "hint": "Drag to position · tap a table to edit or delete it. Changes are saved instantly.",
       "emptyZones": "Create a zone to start placing tables.",
       "emptyTables": "No tables in this zone. Tap “Add table”.",
       "emptyService": "No tables in service in this zone.",

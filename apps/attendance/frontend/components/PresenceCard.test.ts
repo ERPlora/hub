@@ -64,4 +64,14 @@ describe('PresenceCard (ATTENDANCE-F11)', () => {
     expect(s.find('attendance-presence').text()).toContain('Fichados ahora');
     expect(s.find('attendance-presence-row').text().replace(/\s+/g, ' ')).toBe('Bea Ruiz desde las 09:00 En pausa');
   });
+
+  it('agrees the count with its number in Spanish (hub#2045)', async () => {
+    const s = await setup('es');
+    await s.result('attendance.presence.list', page([BEA]));
+    expect(s.find('attendance-presence-count').text()).toBe('1 fichado');
+    await s.result('attendance.presence.list', page([ANA, BEA]), {}, 2);
+    expect(s.find('attendance-presence-count').text()).toBe('2 fichados');
+    await s.result('attendance.presence.list', page([]), {}, 3);
+    expect(s.find('attendance-presence-count').text()).toBe('0 fichados');
+  });
 });
