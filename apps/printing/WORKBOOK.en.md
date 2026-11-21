@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:ac9333d83849a4313d048a82ee104aabc79499d75f12e85ed0eb659d7c52b5ea -->
+<!-- generated from WORKBOOK.md sha256:fc16cadeb68b206ab4f6a8313aca97133dc818326478a488150b23cc28439bec -->
 
 ## What it is for and who it is for
 
@@ -226,6 +226,7 @@ the window without saving. With the window as it opened, Back closes it without 
 | PRINTING-F19 | See the state of a printer | common | done |
 | PRINTING-F20 | How long the hub keeps the print jobs | common | done |
 | PRINTING-F21 | See in System who prints and where to get the ERPlora app | common | partial — the card does not say yet whether the printer answers right now (hub#573) |
+| PRINTING-F22 | Print the receipt and open the drawer at the till that charges | common | not done |
 
 ### PRINTING-F01 See how printing is going
 Status: done
@@ -336,7 +337,7 @@ If it fails: if no active printer has the role, the job **waits** in the queue w
 printer ("Waiting, no printer") and comes out as soon as one has it; not Kitchen's order, because Kitchen
 then does not send it. In settings, a printer of another
 role or an inactive one is refused: "That printer does not have this role.", "That printer is inactive.".
-Involved: PRINTING-F01, PRINTING-F06, INVENTORY-F25
+Involved: PRINTING-F01, PRINTING-F06, INVENTORY-F25, PRINTING-F22
 
 ### PRINTING-F05 Do a test print
 Status: done
@@ -376,7 +377,7 @@ in the form windows, the notice goes as soon as something is changed and a role'
 another printer is chosen for it; both come back if the next try is refused too. A refusal that names no
 field stays until the next try. If the read fails, the screen does not
 show values and offers "Retry". Without permission, locked and without "Save settings".
-Involved: PRINTING-F07, PRINTING-F13
+Involved: PRINTING-F07, PRINTING-F13, PRINTING-F22
 
 ### PRINTING-F07 Print the receipt when charging
 Status: done
@@ -400,7 +401,7 @@ Out: a job in the queue, or nothing if the business does not print when charging
 If it fails: a sale **never fails** because of printing: if Printing is not switched on, refuses the receipt or
 fails, Sales charges anyway and the receipt comes out through the device's dialog. A job that does not come out stays in
 the queue (PRINTING-F14).
-Involved: SALE-F08, PRINTING-F13, PRINTING-F18
+Involved: SALE-F08, PRINTING-F13, PRINTING-F18, PRINTING-F22
 
 ### PRINTING-F08 Reprint a receipt or an invoice
 Status: done
@@ -419,7 +420,7 @@ In: the document marked as a copy.
 Out: a job in the Receipt queue; an A4 invoice goes to the system printer. Each press, one
 paper.
 If it fails: as in F07.
-Involved: SALE-F31
+Involved: SALE-F31, PRINTING-F22
 
 ### PRINTING-F09 Print the table's bill
 Status: done
@@ -433,7 +434,7 @@ Steps:
 In: the bill with its lines.
 Out: a job in the Receipt queue. Each press prints one bill.
 If it fails: "A bill has lines to charge for: this one has none.".
-Involved: SALE-F15
+Involved: SALE-F15, PRINTING-F22
 
 ### PRINTING-F10 Print the order in the kitchen and at the bar
 Status: done
@@ -507,7 +508,7 @@ drawer does not answer (the printer was switched off, or the drawer is not conne
 "The cash drawer did not open: check that “Till” is on and connected.", and the receipt, which already came out, is not
 printed again; the drawer is opened by hand. A drawer-only job that does not open warns the same way and goes back to the queue with
 the device's error.
-Involved: PRINTING-F06, PRINTING-F07
+Involved: PRINTING-F06, PRINTING-F07, PRINTING-F22
 
 ### PRINTING-F14 Get a print job unstuck
 Status: done
@@ -573,7 +574,7 @@ Steps:
 In: the report (session, cashier, float, closing and movements).
 Out: a job in the Receipt queue; each press, one paper.
 If it fails: as in F07.
-Involved: CASH_REGISTER-F16
+Involved: CASH_REGISTER-F16, PRINTING-F22
 
 ### PRINTING-F18 Take the paper out: the device picks up and confirms the jobs
 Status: done
@@ -633,7 +634,7 @@ nothing. Setting up without a name or without active printers warns in its field
 that field changes (the name is typed, a printer is ticked), without tapping "Save" again; the other's stays until
 its own changes. It is only set up from the device itself. The queue and the list name each device by its name, never by its identifier: with it
 anybody could pretend to be the till.
-Involved: PRINTING-F05, PRINTING-F07, PRINTING-F14
+Involved: PRINTING-F05, PRINTING-F07, PRINTING-F14, PRINTING-F22
 
 ### PRINTING-F19 See the state of a printer
 Status: done
@@ -692,6 +693,43 @@ If it fails: if which cards apply cannot be read, none shows (never that of an a
 tab says its own; without erplora.com's addresses the download buttons do not show (never a button that leads
 nowhere).
 Involved: BASE-F02, BASE-F39, PRINTING-F18
+
+### PRINTING-F22 Print the receipt and open the drawer at the till that charges
+Status: not done — the receipt printer is still a single one for the whole business: with two tills, the second
+one's receipt and drawer come out of the first one's printer (hub#2035)
+Actor: employee (charges and prints); the manager sets up each till with its printers (PRINTING-F18)
+Screen: Sell and Sales (from Sales), Session detail (from Cash register), Printers, Settings
+Steps:
+1. Each till is a device set up with the printers it reaches (PRINTING-F18): the bar's with "Receipt 1" and
+   "Kitchen", the terrace's with "Receipt 2" and "Kitchen".
+2. When charging, reprinting a receipt, printing the table's bill or the shift report from a device, the paper comes
+   out of that device's receipt printer, and the drawer that opens is its own (PRINTING-F07, PRINTING-F08,
+   PRINTING-F09, PRINTING-F13 and PRINTING-F17): charging on the terrace prints the receipt on "Receipt 2" and
+   opens its drawer, and "Receipt 1" prints nothing. As in Square, Toast, Odoo, Lightspeed and Shopify: the receipt
+   printer, with its drawer, belongs to each till, and the kitchen ones are shared.
+3. If the device reaches several active receipt printers, it comes out of the one chosen in **Settings → Printer of
+   each role** if it is one of them and, if not, of the first one by name.
+4. A device that reaches no active receipt printer, or that is not set up (the office laptop), uses the business's,
+   as until now: the one chosen in Settings or, if none, the first active one with that role (PRINTING-F04). In
+   Settings, below the "Receipt" dropdown, it says so: "From a device with its own receipt printer, the receipt
+   comes out of its own.".
+5. Kitchen and bar orders, labels and an invoice's A4 page do not change: they come out of the printer of their
+   role in the business (PRINTING-F04, PRINTING-F10, PRINTING-F12). What names its printer ("print it on
+   Kitchen", the test page) comes out of that one.
+6. After charging, Sales says which printer the receipt went to, and in **Printing → Printers** the "Receipt" card
+   says which one it comes out of from the device it is looked at on: "Prints on: Receipt 2.".
+In: the device it is asked from (the ERPlora app and the browser say so on every request), the printers it is set
+up with and the settings.
+Out: the job in the queue of that device's receipt printer, with the order to open the drawer when it applies
+(announces: `printing.job.queued`).
+If it fails: if the device's receipt printer is off or out of paper, the job waits for it in the queue and is
+retried or cancelled there (PRINTING-F14): it never jumps to another till's printer, which would open a drawer that
+is not its own. If its printer is deactivated or the device is retired, what it asks for from then on comes out of
+the business's, and what the deactivated printer had in the queue goes to the business's, as when deactivating any
+printer (PRINTING-F04). With no active receipt printer, as until now: nothing is queued and the paper comes out
+through the device's dialog (PRINTING-F07).
+Involved: PRINTING-F04, PRINTING-F06, PRINTING-F07, PRINTING-F08, PRINTING-F09, PRINTING-F13, PRINTING-F17,
+PRINTING-F18
 
 ## Services: what goes in and what comes out
 
