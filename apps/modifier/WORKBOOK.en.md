@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:5f86df2100b344e4323f9ae0f76e0846f97f239f7ee576f7e3de2b61766c763a -->
+<!-- generated from WORKBOOK.md sha256:50c5ec01778f9017c51ed7d64b4fef6acb1d8a11476e56b0869c5e586bcdc663 -->
 
 ## What it is for and who it is for
 
@@ -135,7 +135,7 @@ With the window as it opened, Back closes it without asking (BASE-F05); a supple
 | MODIFIER-F08 | Have the supplement show on the kitchen ticket | done |
 | MODIFIER-F09 | Unlink the groups of a product or a category that is deleted | done |
 | MODIFIER-F10 | Recover the modifier groups, and those of a product or of a category, from a separate copy | done |
-| MODIFIER-F11 | Declare an option's allergens | not done |
+| MODIFIER-F11 | Declare an option's allergens | partial — the option keeps its allergens through the assistant and the API; the form's block and the row of the group's sheet are missing |
 | MODIFIER-F12 | Add the options' allergens to the dish's | not done |
 
 ### MODIFIER-F01 Look up and search the groups
@@ -354,12 +354,12 @@ Steps:
    links with it, F03) is created again as the Modifiers screen creates it (F02), with its name, its kitchen ticket
    name, its minimum and its maximum, whether an option can be repeated and its order, and with its options as the
    group's sheet adds them (F04), each with its name, its kitchen ticket name, its supplement, its own tax category,
-   whether it comes chosen by default and its order. It comes back as a new group, with another identifier, and in the
+   whether it comes chosen by default, its order and its allergens (F11). It comes back as a new group, with another identifier, and in the
    next steps its links of the copy are made to that one: the one the recovery brought back with its name.
 3. Then, each option that in the copy had a group the business keeps (the same one, even renamed, or the one an
    earlier recovery brought back with its name) and that this group no longer has, because the business took it away
    (F04), is added again as the group's sheet adds it (F04), with its name, its kitchen ticket name, its supplement,
-   its own tax category and its order. If in the copy it came chosen by default, it comes back chosen only if the
+   its own tax category, its order and its allergens. If in the copy it came chosen by default, it comes back chosen only if the
    group has room for it: it never takes that from the ones the business chose. In a "choose one" group that already
    comes with another one by default, or in one that already comes with as many as its maximum, it comes back not
    chosen and its note says so.
@@ -408,8 +408,8 @@ brought it back or an earlier one.
 Involved: BASE-F114, INVENTORY-F01, INVENTORY-F07, INVENTORY-F34, MODIFIER-F05, MODIFIER-F09
 
 ### MODIFIER-F11 Declare an option's allergens
-Status: not done — the option does not keep allergens yet: the data, the form's block and the group sheet's row are
-missing
+Status: partial — the option keeps its allergens through the assistant and the API, and the reads of the group's
+sheet and of the till give them already; the form's block and the row of the group's sheet are missing
 Actor: owner, administrator, manager, assistant
 Screen: Modifiers (group sheet)
 Steps:
@@ -437,7 +437,8 @@ the form.
 Involved: MODIFIER-F04, MODIFIER-F10, MODIFIER-F12, INVENTORY-F35
 
 ### MODIFIER-F12 Add the options' allergens to the dish's
-Status: not done — the options' valuation does not give their allergens yet and the line only carries its product's
+Status: not done — the options' valuation gives each one's allergens already, but the line still only carries its
+product's
 Actor: employee, manager
 Screen: Sales: Sell
 Steps:
@@ -505,8 +506,8 @@ another category, the card does not show that name, which the action does not us
 | The links, of a group, of a product or of a category, with pages | view | F05 | `modifier.link.list` |
 | A link by its id, or by its group and its product or category, with its `label`: "Sauces · Burger" | view | F05 | `modifier.link.get` |
 | An Inventory category by its id or its name, as the list of links names it | view | F05 | `modifier.category.get` |
-| The groups with their options of a product (its own and those of all its categories, once each) | view | F06 | `modifier.group.for_target` |
-| The check and pricing of some chosen options for a product: price, names, tax category, total to add and kitchen text | view | F07, F08 | `modifier.selection.resolve` |
+| The groups with their options of a product (its own and those of all its categories, once each), each option with its allergens | view | F06, F11 | `modifier.group.for_target` |
+| The check and pricing of some chosen options for a product: price, names, tax category, allergens, total to add and kitchen text | view | F07, F08, F12 | `modifier.selection.resolve` |
 
 The groups, a group, the options, the links and the groups of a product can be followed live.
 
@@ -517,8 +518,8 @@ The groups, a group, the options, the links and the groups of a product can be f
 | Creates a group | manage | F02 | `modifier.group.create` |
 | Changes a group (what is not sent stays) | manage | F03 | `modifier.group.update` |
 | Deletes a group with its options and links | manage | F03 | `modifier.group.delete` |
-| Adds an option to a group | manage | F04 | `modifier.option.create` |
-| Changes an option (what is not sent stays) | manage | F04 | `modifier.option.update` |
+| Adds an option to a group, with its allergens | manage | F04, F11 | `modifier.option.create` |
+| Changes an option, its allergens too (what is not sent stays) | manage | F04, F11 | `modifier.option.update` |
 | Deletes an option | manage | F04 | `modifier.option.delete` |
 | Links a group to a product or a category | manage | F05, F10 | `modifier.link.attach` |
 | Unlinks a group from a product or a category | manage | F05 | `modifier.link.detach` |

@@ -69,6 +69,18 @@ def brought_back(actor: str) -> bool:
     return actor.startswith(ACTOR)
 
 
+def held_in_copy(conn: psycopg.Connection, table: str, fields: Iterable[str]) -> tuple[str, ...]:
+    """Those of ``fields``, columns newer than the migration a read declares it reads since, that the copy's ``table``
+    holds, through ``conn``, its direct connection: a copy made before one of them still gives its records back,
+    without it."""
+    found = conn.execute(
+        "SELECT attname FROM pg_attribute WHERE attrelid = to_regclass(%s) AND attnum > 0 AND NOT attisdropped",
+        [table],
+    )
+    held = {name for (name,) in found}
+    return tuple(field for field in fields if field in held)
+
+
 @dataclass(frozen=True)
 class Recoverable:
     """What an app gives back from a separate copy of its business (``recoverable_from_copy`` on its config).
