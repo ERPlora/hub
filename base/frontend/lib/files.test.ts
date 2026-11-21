@@ -137,6 +137,7 @@ describe('reading a file', () => {
     expect(delimiterOf('a\tb\tc\n1,5\t2\t3')).toBe('\t');
     expect(delimiterOf('"Harina; Aceite; Sal",importe\n1;2,3')).toBe(',');
     expect(delimiterOf('importe\n18,50')).toBe(',');
+    expect(delimiterOf('importe;iva\n18,50;21,00\n27,90;10,00')).toBe(';');
   });
 
   it('paints each kind with an icon the shell has', () => {
