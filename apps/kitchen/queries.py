@@ -1459,12 +1459,12 @@ def get_station(ctx: OperationContext, params: StationRefIn) -> dict:
     ai={
         "asks": {
             "en": (
-                "where do the drinks go?",
-                "which station gets the desserts?",
+                "where do the drinks go?", "which station gets the desserts?",
+                "which products and categories go to each station?",
             ),
             "es": (
-                "¿a qué estación van las bebidas?",
-                "enséñame el enrutado de los postres",
+                "¿a qué estación van las bebidas?", "enséñame el enrutado de los postres",
+                "¿qué productos y categorías van a cada estación?",
             ),
         },
         "description": "Which products and categories go to which station («where do the drinks go»), for every "
