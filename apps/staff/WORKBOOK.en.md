@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:dd960c22ea1ada425aabde3d0ed4c36f9673903beccfe30b72fb85cd8192075c -->
+<!-- generated from WORKBOOK.md sha256:7b513c9fc907adfb274775eed9f9cbde067f0d63cd3d06eb35582ac4b1567c16 -->
 
 ## What it is for and who it is for
 
@@ -511,8 +511,9 @@ Actor: owner, administrator, manager
 Screen: Staff (Rate/h column and form), Commissions
 Steps:
 1. Whoever can see the pay sees the rate, the commission and the HR notes of each record.
-2. **Commissions** shows each person who can earn a commission (Active or On leave; not the Inactive nor
-   the terminated ones) with their name, their role and their commission, also those with commission 0.
+2. **Commissions** shows each person who can earn a commission (Active or On leave) with their name, their
+   role and their commission, also without sales or with commission 0, and whoever sold in the period even
+   if they are no longer here ("No longer works here" or "Inactive" next to the name).
 3. To know what each professional has earned, open the **Commissions** tab. "Today" shows: what each person
    has sold in the business's day, with what was refunded already taken off, without the vouchers they sold
    and with what the voucher sessions they did are worth added, their commission and what is
