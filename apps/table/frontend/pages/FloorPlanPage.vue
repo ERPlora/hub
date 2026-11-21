@@ -230,6 +230,7 @@ function onZoneSaved(zone: ZoneOut): void {
           v-if="canDraw"
           class="table-floor__mode"
           data-testid="table-floor-mode"
+          scrollable
           :value="mode"
           :aria-label="$t('table.floor.mode.label')"
           @ion-change="onModeChange"
@@ -432,8 +433,7 @@ function onZoneSaved(zone: ZoneOut): void {
   flex: 1;
 }
 .table-floor__mode {
-  flex: 0 0 210px;
-  width: 210px;
+  flex: none;
 }
 .table-floor__action {
   width: var(--ep-touch-min);
