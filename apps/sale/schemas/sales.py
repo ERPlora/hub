@@ -274,6 +274,9 @@ class SaleRow(Schema):
     payment_method_name: str = Field(
         description="The methods it was paid with, once each in the order they were tendered («Cash + Card»)."
     )
+    payment_methods: list[str] = Field(
+        description="The same methods one by one, to find the sale by any of them («Cash», «Card»)."
+    )
     staff_id: UUID | None = Field(description="Who served it.")
     currency: str = Field(description="ISO 4217 currency it was charged in.")
     currency_decimals: int = Field(description="The decimals of its currency as the server counts them (0 in JPY).")

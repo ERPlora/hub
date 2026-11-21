@@ -35,7 +35,7 @@ def listed(**params) -> list:
 def test_a_sale_paid_with_two_methods_says_both_in_the_order_they_were_taken(menu):
     split = charge("tenders-key-0001", SPLIT)
     (row,) = listed()
-    assert (row.id, row.payment_method_name) == (split.id, "Cash + Card")
+    assert (row.id, row.payment_method_name, row.payment_methods) == (split.id, "Cash + Card", ["Cash", "Card"])
 
 
 def test_the_methods_of_a_split_sale_read_in_the_readers_language(menu):

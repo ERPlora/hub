@@ -6,9 +6,9 @@
 // flow: BASE-F09
 import { expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, exposeMovingInPage, horizontalOverflow, login, shot, shown, untilStill } from './helpers';
-import { cleanInventory, createProduct, type Product } from './inventory-helpers';
-import { chargeByApi, cleanSales, stamp } from './sale-helpers';
+import { A, capture, exposeMovingInPage, horizontalOverflow, login, shot, shown, untilStill } from './helpers';
+import { cleanInventory, createProduct, pick, type Product } from './inventory-helpers';
+import { chargeByApi, cleanSales, drawerOff, restoreDrawer, stamp } from './sale-helpers';
 
 const VIEWPORTS = [
   { label: '390', width: 390, height: 844 },
@@ -30,6 +30,7 @@ test.beforeAll(async ({ browser }) => {
 test.afterAll(() => {
   cleanSales();
   cleanInventory();
+  restoreDrawer();
 });
 
 /** What cuts `el`'s text: the boxes that clip it, up to its table cell (or card field). Empty = whole. */
@@ -217,6 +218,39 @@ test('BASE-F09 — a sale shows up live in «Activity», its date and time whole
     // The list/cards switch slides its indicator when the width changes the view: capture it settled.
     await untilStill(page);
     await page.screenshot({ path: shot(`APP-BASE-1-BASE-F09-sale-${vp.label}`) });
+  }
+});
+
+/** A desk, a tablet upright and a small phone (cards): where the method filter is checked. */
+const METHOD_VIEWPORTS = [
+  { label: '1440x900', width: 1440, height: 900 },
+  { label: '820x1180', width: 820, height: 1180 },
+  { label: '375x667', width: 375, height: 667 },
+];
+
+test('BASE-F09 — a sale paid in cash and by card is found under «Method» by either of them', async ({ page, context }) => {
+  await login(page, A, '/');
+  // Cash without a cash session: the drawer's lock is sale-cash-gate.spec.ts's.
+  await drawerOff(context);
+  const split = await chargeByApi(context, {
+    lines: [{ product: coffee.sku }],
+    payments: [
+      { method: 'card', amount: 100 },
+      { method: 'cash', amount: 50, tendered: 50 },
+    ],
+  });
+  const cardOnly = await chargeByApi(context, { lines: [{ product: coffee.sku }], payments: [{ method: 'card' }] });
+  for (const vp of METHOD_VIEWPORTS) {
+    await page.setViewportSize({ width: vp.width, height: vp.height });
+    await page.goto(`${A}/#actividad`);
+    await expect(await rowOf(page, split.id)).toContainText(/Card \+ Cash|Tarjeta \+ Efectivo/);
+    await shown(page).locator('[data-testid=home-activity-filters-toggle]').click();
+    const panel = shown(page).locator('[data-testid=home-activity-filters-panel]');
+    await pick(page, panel.locator('[data-testid=home-activity-filter-payment_methods]'), /^(Cash|Efectivo)$/);
+    await panel.locator('[data-testid=home-activity-filters-apply]').click();
+    await expect(shown(page).locator(`[data-testid=home-activity-row][data-id="${cardOnly.id}"]`)).toHaveCount(0);
+    await (await rowOf(page, split.id)).scrollIntoViewIfNeeded();
+    await capture(page, `BASE-F09-split-sale-by-cash-${vp.label}`);
   }
 });
 

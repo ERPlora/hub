@@ -101,11 +101,16 @@ def documents_pending(sale: Sale) -> bool:
 _TENDER_SEPARATOR = " + "
 
 
-def tender_names(sale: Sale) -> str:
-    """The methods ``sale`` was paid with, once each and in the order they were tendered, as the reader reads them
-    («Cash + Card»); empty when nothing was tendered."""
+def tender_methods(sale: Sale) -> list[str]:
+    """The methods ``sale`` was paid with, once each and in the order they were tendered, as the reader reads them;
+    none when nothing was tendered."""
     names = dict.fromkeys(payment.method_name for payment in sale.payments.all())
-    return _TENDER_SEPARATOR.join(method_display_name(name) for name in names)
+    return [method_display_name(name) for name in names]
+
+
+def tender_names(sale: Sale) -> str:
+    """``tender_methods`` said in one line: «Cash + Card»."""
+    return _TENDER_SEPARATOR.join(tender_methods(sale))
 
 
 def sale_detail(sale: Sale, *, already: bool = False) -> dict:
@@ -264,6 +269,7 @@ def sale_row(sale: Sale) -> dict:
         "customer_id": sale.customer_id,
         "customer_name": sale.customer_name,
         "payment_method_name": tender_names(sale),
+        "payment_methods": tender_methods(sale),
         "staff_id": sale.staff_id,
         "currency": sale.currency,
         "currency_decimals": currency_decimals(sale.currency),
