@@ -6,6 +6,7 @@ WORKBOOKs and journeys below show each check catching what it guards, and the co
 """
 
 import io
+import re
 from pathlib import Path
 
 import pytest
@@ -110,6 +111,7 @@ Para qué: comprobar el recorrido de ejemplo.
 """
 
 LEDGER_HEADER = "flow,date,device,app_version,result,issue\n"
+COUNTS = re.compile(r"^(\w+): (\d+) in a journey, (\d+) in none, (\d+) out of visual scope$")
 
 
 @pytest.fixture
@@ -305,12 +307,13 @@ class TestTheLedger:
 
 
 class TestTheCommand:
-    def test_it_reports_each_app_and_the_totals(self):
+    def test_it_reports_each_app_and_totals_that_add_them_up(self, repo_flows):
         out = io.StringIO()
         call_command("qa_coverage", stdout=out)
         lines = out.getvalue().splitlines()
-        assert any(line.startswith("sale: ") and "in a journey" in line for line in lines)
-        assert any(line.startswith("tip: 0 in a journey, 0 in none, ") for line in lines)
+        counts = {match[1]: tuple(map(int, match.groups()[1:])) for line in lines if (match := COUNTS.match(line))}
+        assert set(counts) == {flow.app for flow in repo_flows.values()} | {"total"}
+        assert counts.pop("total") == tuple(map(sum, zip(*counts.values(), strict=True)))
         assert lines[-1].startswith("total: ")
 
     def test_with_a_ledger_it_says_when_each_walkable_flow_was_last_walked(self, tmp_path):
