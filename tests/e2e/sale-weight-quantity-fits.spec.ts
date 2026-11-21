@@ -2,7 +2,8 @@
 // hub#2009: a product sold by weight takes a typed quantity with up to three decimals, and its line's quantity field
 // shows it whole next to its unit («0,532 kg»). The field was a fixed 2.3rem and cut the last digit («0,53» with half
 // a «2» under «kg»), the only place the line shows the weight. In Spanish, on a desktop, a tablet standing up and a
-// phone; what a run creates, its product `E2E-WEIGHT-<run>` and its check, is deleted after it.
+// phone; a one-figure quantity keeps the old 2.3rem, the field's tap target. What a run creates, its product
+// `E2E-WEIGHT-<run>` and its check, is deleted after it.
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
 import { A, capture, login, saveSessionForTheSweep, shown } from './helpers';
@@ -98,6 +99,15 @@ async function quantityReadsWhole(weight: (typeof WEIGHTS)[number], where: strin
   expect(fit.stepperRight, `the selector inside its line at ${where}`).toBeLessThanOrEqual(fit.lineRight + 0.5);
   expect(fit.labelWidth, `the product's name keeps its room at ${where}`).toBeGreaterThan(40);
 }
+
+test('SALE-F10: a one-figure quantity keeps the field as wide as it always was', async () => {
+  const field = line().locator('.pos-qty__field');
+  await expect(field).toHaveValue('1');
+  const rem = await field.evaluate(
+    (el) => el.getBoundingClientRect().width / Number.parseFloat(getComputedStyle(document.documentElement).fontSize),
+  );
+  expect(rem, 'the width of the field holding «1», in rem').toBeCloseTo(2.3, 1);
+});
 
 for (const weight of WEIGHTS) {
   test(`SALE-F10: «${weight.typed} kg» reads whole in its line on a desktop, a tablet and a phone`, async () => {
