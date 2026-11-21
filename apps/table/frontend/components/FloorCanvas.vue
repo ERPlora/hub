@@ -25,6 +25,7 @@ const props = withDefaults(
 
 const emit = defineEmits<{
   select: [table: TableOut];
+  actions: [table: TableOut];
   move: [move: { table: TableOut; x: number; y: number }];
 }>();
 
@@ -122,6 +123,13 @@ function onClick(table: TableOut, event: MouseEvent): void {
   // In «Edit plan» a pointer's tap was answered on its release; a click with no pointer is Enter or Space.
   if (props.editable && event.detail !== 0) return;
   emit('select', table);
+}
+
+// In Service a long press on a touch screen, a right click or the menu key asks for the table's actions.
+function onContextMenu(table: TableOut, event: MouseEvent): void {
+  if (props.editable) return;
+  event.preventDefault();
+  if (!props.pick) emit('actions', table);
 }
 
 function onTileDown(table: TableOut, event: PointerEvent): void {
@@ -224,6 +232,7 @@ const edgeClasses = computed(() => Object.fromEntries(EDGES.map((edge) => [`tabl
           :data-x="tile.table.position_x"
           :data-y="tile.table.position_y"
           @click="onClick(tile.table, $event)"
+          @contextmenu="onContextMenu(tile.table, $event)"
           @pointerdown="onTileDown(tile.table, $event)"
           @keydown="onKeydown(tile.table, $event)"
         />

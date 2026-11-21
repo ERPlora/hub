@@ -1,10 +1,11 @@
-<!-- generated from WORKBOOK.md sha256:cabd3624a9cd04cf8db9b89883c1aa0c4f9fbebc4aa4559f4b4d3795ef1027f2 -->
+<!-- generated from WORKBOOK.md sha256:c4895e779799dd867d4f0d94d4bb67aedd1ddead29190aec8553beeab22c3558 -->
 
 ## What it is for and who it is for
 
 Tables is the floor plan of your place and its zones, such as the dining room, the terrace or the bar.
 At a glance you see which table is free, occupied or reserved and how long each group has been seated.
-You tap a table to seat a group, move its check to another table or take it to the till.
+You tap a free table to seat a group and an occupied one to open its check, order more or charge it;
+pressing and holding it, you move its check to another table, merge it with another one or split it.
 
 ### In detail
 
@@ -104,9 +105,10 @@ buttons the profile cannot use do not show.
 
 ### Floor plan
 Here you see at a glance how the room is doing: each table in its place, with its colour and, when it is
-occupied, how long the party has been seated. In **Service** you tap a table to seat a party, charge,
-move the check to another table or merge it with another one; in **Edit plan** you drag the tables into
-place and add zones and tables.
+occupied, how long the party has been seated. In **Service** you tap a free table to seat a party and an
+occupied one to open its check, order more or charge it; pressing and holding a table, you move the check
+to another table, merge it with another one or split it. In **Edit plan** you drag the tables into place
+and add zones and tables.
 
 The colour of each table says how it is:
 
@@ -153,15 +155,18 @@ the table does not change colour. Status and zone changes are animated gently, u
 it loads, the outline of the plan shows. The plan **is live**: it changes by itself when somebody seats,
 charges, moves or edits a table. It has two modes:
 
-- **Service** (at first): nothing is dragged. Tapping a table opens its **Table N** window:
+- **Service** (at first): nothing is dragged. Tapping an occupied table opens its check in **Sales →
+  Sell**, ready to add dishes or charge it; with two checks at the table, which one is chosen first
+  ("Check 1", "Check 2"). Tapping a free, reserved or blocked table, or pressing and holding any table (on
+  a computer, right click), opens its **Table N** window. Below, the hint "Tap a table to seat it or open
+  its check · press and hold it for transfer, merge and more.".
   - free or reserved: the guests question ("Guests at table N · 4 pax", "−" and "+", shortcuts from 1
     to 8 that seat in one tap, the warning "Above the table capacity (4)" and "Seat N"), and the
     optional customer ("Assign customer"). With the guests setting off, "Seat" seats with the capacity
     (or the booking's guests).
   - occupied: guests, since when, who serves, the check's customer (assign or remove) and the actions
-    **Charge** (takes you to the till with the check), **Transfer**, **Merge**, **Split check**,
-    **Guests**, **Remove table** and **Close table**. With two checks at the table, which one is chosen
-    first ("Check 1", "Check 2").
+    **Transfer**, **Merge**, **Split check**, **Guests**, **Remove table** and **Close table**. With two
+    checks at the table, which one is chosen first ("Check 1", "Check 2").
   - blocked: "Table out of service: it cannot be seated until it is unblocked.".
   - Transfer and Merge put the plan in destination mode: "Transfer N to…" / "Pick a free table" (or
     "Merge N with…" / "Pick an occupied table") and "Cancel"; only the tables that are valid can be
@@ -267,7 +272,7 @@ With the window as it opened, Back closes it without asking (BASE-F05).
 | TABLE-F08 | Set up the room: guests when seating and time warnings | done |
 | TABLE-F09 | See how the room is | done |
 | TABLE-F10 | Seat a party at a free or reserved table | done |
-| TABLE-F11 | Go back to an occupied table and charge it | done |
+| TABLE-F11 | Go back to an occupied table to order more or charge it | done |
 | TABLE-F12 | Take a check that is already open to a table | done |
 | TABLE-F13 | Take the table away from a check (park it) | done |
 | TABLE-F14 | Correct the guests of an occupied table | done |
@@ -499,21 +504,24 @@ deleted table is not seated. Seating is done on the floor, with the party in fro
 cannot do it.
 Involved: TABLE-F08, TABLE-F28, TABLE-F32, SALE-F19, FLOW-F12
 
-### TABLE-F11 Go back to an occupied table and charge it
+### TABLE-F11 Go back to an occupied table to order more or charge it
 Status: done
 Actor: employee, manager
 Screen: Floor plan (Service)
 Steps:
-1. In **Floor plan → Service**, tap an Occupied table: its window opens with guests ("1 guest", "3
-   guests"), since when, server and customer.
-2. **Charge** takes you to **Sales → Sell** with that check on screen; there rounds are added and it
-   is charged.
-3. With two checks at the table (split), the check is chosen first ("Check 1", "Check 2").
+1. In **Floor plan → Service**, tap an Occupied table: its check opens in **Sales → Sell**, with no window
+   on the way; there rounds are added and it is charged.
+2. With two checks at the table (split), the check is chosen first ("Check 1", "Check 2") and that one
+   opens.
+3. The table's details (guests, since when, server and customer) and its actions (transfer, merge, split,
+   correct the guests, remove the table and close it) are in its window, which opens by pressing and
+   holding the table (on a computer, with a right click).
 In: the tapped table and its open check.
 Out: nothing in Tables.
 If it fails: if the check was already charged or voided from somewhere else, Sales warns on arrival
 "That check is not open any more (charged, voided or gone): the till carries on as it was.".
-Involved: TABLE-F18, SALE-F19
+Involved: TABLE-F13, TABLE-F14, TABLE-F15, TABLE-F16, TABLE-F17, TABLE-F18, TABLE-F21, TABLE-F32,
+SALE-F19
 
 ### TABLE-F12 Take a check that is already open to a table
 Status: done
@@ -545,7 +553,7 @@ Status: done
 Actor: employee, manager
 Screen: Floor plan (Service); also in Sales → Sell, "Choose table" → "Remove from table" (SALE-F19)
 Steps:
-1. In the window of the occupied table tap "Remove table".
+1. On the plan, press and hold the occupied table and, in its window, tap "Remove table".
 2. The table stays Available for others; the table check turns "Parked", without a table, keeping
    guests, server and time; the check stays open in Sales (**Open checks**).
 3. To carry on with it at a table, **Sessions → Seat again**.
@@ -561,7 +569,7 @@ Status: done
 Actor: employee, manager, assistant
 Screen: Floor plan (Service); assistant
 Steps:
-1. In the window of the occupied table tap "Guests".
+1. On the plan, press and hold the occupied table and, in its window, tap "Guests".
 2. The question comes with the current guests; change them with a shortcut or with "−" / "+" and "Save".
 3. The table shows the new guests. On a split table the chosen check is corrected.
 4. With the assistant: "one more joined table 4, make it five"; on a split table, say which of its checks.
@@ -576,7 +584,7 @@ Status: done
 Actor: employee, manager, assistant
 Screen: Floor plan (Service); assistant
 Steps:
-1. In the window of the occupied table tap "Transfer".
+1. On the plan, press and hold the occupied table and, in its window, tap "Transfer".
 2. The plan says "Transfer N to…" and "Pick a free table": only the Available and Reserved ones can be
    tapped. "Cancel" undoes it.
 3. Tap the destination table.
@@ -596,7 +604,7 @@ Status: done
 Actor: employee, manager
 Screen: Floor plan (Service)
 Steps:
-1. In the window of the table that is going to be joined tap "Merge".
+1. On the plan, press and hold the table that is going to be joined and, in its window, tap "Merge".
 2. The plan says "Merge N with…" and "Pick an occupied table": only the Occupied ones can be tapped (the
    table itself only if it has another check: that is how a split is undone).
 3. Tap the table that stays.
@@ -618,7 +626,7 @@ Status: done
 Actor: employee, manager, assistant
 Screen: Floor plan (Service); assistant
 Steps:
-1. In the window of the occupied table tap "Split check".
+1. On the plan, press and hold the occupied table and, in its window, tap "Split check".
 2. Mark the lines that go to the new check (those of its check in Sales, each with its amount in the
    business's currency) and tap "Split". With nothing marked, the new one is born empty.
 3. Tables opens a second check at the same table (1 guest) and Sales moves the marked lines to it, in
@@ -681,7 +689,8 @@ Status: done
 Actor: employee, manager
 Screen: Sessions, Floor plan (Service)
 Steps:
-1. In **Tables → Sessions → Open**, "Close session" (or "Close table" in the table's window).
+1. In **Tables → Sessions → Open**, "Close session" (or "Close table" in the table's window, which opens
+   by pressing and holding it on the plan).
 2. Confirm in "Close the session?": "Table N · N guests. The table is freed and the session moves to
    the history. If its bill is still open in Sales, first charge it, move it to another table or delete
    it from the till." (with just one, "1 guest").
@@ -866,8 +875,9 @@ Status: done
 Actor: employee, manager
 Screen: Floor plan (Service)
 Steps:
-1. When seating, or in the window of an occupied table, tap "Assign customer" and search the card by
-   name or phone (the search box of Customers, the same one as the till's).
+1. When seating, or in the window of an occupied table (press and hold it on the plan), tap "Assign
+   customer" and search the card by name or phone (the search box of Customers, the same one as the
+   till's).
 2. The check of the table stays with that card: Sales gets it back when charging. "Remove customer" lets
    it go.
 3. The assistant can also seat with a customer: "seat Ana García at table 4, there are 3 of us".
