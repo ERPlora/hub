@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:a1dcd8ac78f63c5b8ef0834680d9b943c43cdcd770916f6b5b15f1f5adab8669 -->
+<!-- generated from WORKBOOK.md sha256:f0257e9cc90541fc8ba69266c2007fccf52c568b615c83bdeed104b6438497ea -->
 
 ## What it is for and who it is for
 
@@ -132,6 +132,20 @@ customer search of Customers (it fills in the details) and "Name or company name
 type" (only outside Spain), "Tax ID" and "Address", all mandatory except the type. "Issue full invoice"
 and "Cancel". On issuing, the window closes and the detail opens the new F3.
 
+### Ask for the ticket's invoice (public page)
+The customer opens it, without an account, with their ticket's code (`/p/<business>/invoice/<code>`, INVOICE-F04).
+Title "Request your invoice". At the top, "Ticket {number}" with "Business", "Date" and "Total". Below,
+"Enter your tax details to get the full invoice for this ticket.", the same fields as in "Full invoice" without the
+customer search, and "Request full invoice", grey until the name, the tax ID and the address are there. On asking,
+"Your invoice is ready." and "Invoice {number}" with "Issuer", "Issue date", "Customer" and "Customer tax ID", the
+lines and the totals as in the detail, and "Print / PDF", which prints the invoice in A4 with its VeriFactu QR; if
+they had already asked for it, opening it shows that same invoice with "You already requested this invoice. This is
+the same invoice, with your original details.". A refusal of a field shows under it, and the server's above the
+button.
+Loading: "Loading your ticket…". Error: the server's reason (a code that opens nothing, expired, a ticket not yet
+registered or too many attempts), with "Retry" except when the code opens nothing or has expired; with no answer
+from the server, "The ticket could not be loaded. Try again.".
+
 ### New manual invoice
 Window with the "Series" (the active ones of the year that issue F1 or F2; at first, the default one or
 FACT), the customer search of Customers, "Customer", "Customer tax ID", "Address", "Country", "Notes" and
@@ -188,7 +202,7 @@ rectifying invoice already issued: Back closes its result (BASE-F05).
 | INVOICE-F01 | The ticket (simplified invoice) born when charging | done — Sales asks for it within the same charge |
 | INVOICE-F02 | The full invoice when charging a customer with a tax ID | done — Sales asks for it within the same charge |
 | INVOICE-F03 | Issue an invoice by hand | done |
-| INVOICE-F04 | The customer asks for the full invoice of their ticket | partial — the server already issues it with the ticket's code; the code on the paper and the public page are missing |
+| INVOICE-F04 | The customer asks for the full invoice of their ticket | partial — the public page already asks for it with the ticket's code; printing the code on the paper is missing |
 | INVOICE-F05 | Turn a ticket into a full invoice at the counter | done |
 | INVOICE-F06 | A charged sale that could not be invoiced | done |
 | INVOICE-F07 | Void a charged sale that already has its ticket | done — Sales asks for it within the same void |
@@ -310,17 +324,17 @@ reason) and offers "Retry", which asks for it again; as soon as it arrives, "Iss
 Involved: TAX-F18, CUSTOMER-F17, TAX-F11
 
 ### INVOICE-F04 The customer asks for the full invoice of their ticket
-Status: partial — Invoicing already issues it with the ticket's code; the code on the ticket's paper (SALE-F29) and the public page where the customer types their details are missing (hub#500)
+Status: partial — the public page already asks for it with the ticket's code and shows it; printing the code on the ticket's paper (SALE-F29) is missing
 Actor: customer, without an account
-Screen: the business's public page `/p/<business>/invoice/<code>` (not painted yet)
+Screen: the business's public page `/p/<business>/invoice/<code>`
 Steps:
 1. The ticket carries its code to ask for the full invoice, which is also the end of the address that opens it.
-2. The customer opens it on their phone, without signing in, and sees their ticket's number, date and total; if
-   they already asked for it, they see their full invoice.
+2. The customer opens it on their phone, without signing in, and sees the business, their ticket's number, date and
+   total; if they already asked for it, they see their full invoice without typing their details again.
 3. They type their name or company name, their country, the kind of document (only outside Spain), their tax ID
    and their address, and ask for the invoice.
 4. Invoicing issues, as the system, the full invoice that replaces the ticket (F3), as in INVOICE-F05, and the
-   customer sees it in A4, from where they print it or save it as a PDF (INVOICE-F18).
+   customer sees it on screen, from where they print it or save it as a PDF in A4 (INVOICE-F18).
 In: the ticket's code and the tax details the customer types.
 Out: the F3, one per ticket, as in INVOICE-F05 (notifies `invoice.invoice.issued`). The code is not spent: from
 then on it opens that same F3, until it expires four years after the charge.
@@ -329,7 +343,8 @@ Check it or ask for the invoice at the business.», with nobody's data; an expir
 ask for the invoice at the business.»; a ticket that does not have its fiscal document yet, «Your ticket is still
 being registered. Try again in a few minutes.»; ten codes that open nothing within an hour from the same
 connection, «Too many requests. Try again in a moment.» until the hour is over (a right code does not count). The
-customer's details are checked as in INVOICE-F05, and a voided or refunded ticket is refused the same way. If the
+customer's details are checked as in INVOICE-F05, with each refusal under its field, and a voided or refunded ticket
+is refused the same way. If the
 ticket already has its F3, it answers with it without issuing another or spending a number, even if other
 details are typed.
 Involved: SALE-F29, INVOICE-F05, INVOICE-F18
