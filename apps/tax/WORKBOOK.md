@@ -10,6 +10,13 @@ Lo que no entra todavía: ver «Lo que queda fuera».
 
 ## Para qué sirve y para quién
 
+Impuestos dice cuánto IVA lleva cada cosa que vendes: las categorías fiscales de tus productos y servicios, el tipo de
+cada una en tu país y desde qué día, y los textos que el importador de productos reconoce como una categoría. Viene
+lista con los tipos de España: se revisa al montar el negocio y se toca cuando cambia un tipo. El TPV y las facturas
+cobran con lo que dice aquí.
+
+### En detalle
+
 Impuestos guarda lo que dice cuánto IVA lleva cada cosa que se vende:
 
 - las **categorías fiscales** («Restauración — comida», «Servicio — general»…), a las que apuntan los
@@ -98,6 +105,12 @@ en Reglas, las acciones de fila. La app exige el permiso en cada acción aunque 
 botón.
 
 ### Categorías
+Aquí están las categorías fiscales a las que apuntan tus productos, tus servicios y tus menús: su clave, que no cambia
+nunca, su nombre y el tipo que se cobra hoy en tu país («21,00 %», «Exenta»…). Las de origen «Sistema» vienen de
+fábrica; las «Propia» las creas tú con **+**. Busca por clave o por nombre, o filtra por columna. Mientras tu país no
+tenga ningún tipo vigente, arriba sale el aviso «Tus impuestos» para quien puede gestionarlos.
+
+#### Detalle
 Tabla con Clave, Nombre, Descripción, Origen («Sistema» o «Propia»), Activa y el tipo vigente en el
 país del negocio («21,00 %», «Exenta»…). Buscador «Buscar clave o nombre…» (clave, nombre y descripción,
 guardados o traducidos), filtros por columna (Clave, Nombre, Descripción y Origen) y orden por cualquier
@@ -106,6 +119,13 @@ de la persona; las propias, con el texto que se tecleó. Botón **+** que abre e
 Nombre, Descripción, «Añadir»). Sin acciones de fila.
 
 ### Reglas
+Aquí está el tipo de cada categoría en cada país o región y desde qué día se aplica, con su calificación: sujeta,
+exenta, no sujeta o con inversión del sujeto pasivo. Un recargo de equivalencia sale justo debajo de su regla. Con **+**
+creas una regla. Una regla no se edita: para cambiar un tipo, en su fila pulsa «Poner fecha de fin» y crea la nueva
+desde el día siguiente; «Desactivar» la deja de aplicar. De entrada salen las activas, y el filtro Estado enseña las
+desactivadas.
+
+#### Detalle
 Tabla con Categoría, País, Región, %, Tipo, Calificación (con la causa de exención si la hay), Vigente
 desde, Vigente hasta y Activa. Un componente (el recargo) sale justo debajo de su regla raíz, como
 «↳ etiqueta». Buscador «Buscar categoría o país…» y filtros de País, Región, Categoría, Tipo,
@@ -116,11 +136,22 @@ Régimen, Vigente desde, Vigente hasta, «Regla raíz (componente de)», «Etiqu
 «Añadir»). Acciones de fila: «Poner fecha de fin» y «Desactivar»; en una desactivada, «Reactivar».
 
 ### Alias
+Aquí están los textos de fuera, como «comida», «beer» o «IVA 10», que el importador de productos entiende como una
+categoría fiscal. Los «De fábrica» vienen con la app; los «Aprendido» se guardan cuando, al importar, dices qué
+categoría es un texto, o los añades tú con **+**.
+
+#### Detalle
 Tabla con Alias, Categoría, Origen («De fábrica» o «Aprendido») y Activo. Buscador «Buscar alias o
 categoría…», filtros de Alias, Categoría y Origen y orden por cualquier columna. Botón **+** con el
 panel de alta (Alias, Categoría, Origen —«Aprendido» de entrada—, «Añadir»).
 
 ### Ajustes
+Aquí eliges el territorio fiscal del negocio: todo el país, con IVA, o, en España, Canarias (IGIC), Ceuta (IPSI) o
+Melilla (IPSI). El país es el de tu cuenta de ERPlora y no se cambia aquí. En Canarias, Ceuta y Melilla solo se cobra
+con las reglas de su territorio, nunca con el IVA nacional. Quien solo consulta impuestos ve el territorio sin poder
+cambiarlo.
+
+#### Detalle
 «Territorio fiscal del negocio»: el «País» del negocio, solo de lectura («Es el país de tu cuenta de
 ERPlora.»), y el desplegable «Territorio fiscal» con «Todo el país (IVA)», «Canarias (IGIC)», «Ceuta
 (IPSI)» y «Melilla (IPSI)», con su explicación debajo, y «Guardar» («Territorio fiscal guardado.»). Los
@@ -175,7 +206,7 @@ Estado: hecho
 Actor: propietario, administrador, responsable, empleado
 Pantalla: Categorías
 Pasos:
-1. Abre **Impuestos → Categorías**.
+1. Abre **Impuestos**, en la pestaña **Categorías**.
 2. Busca por clave o nombre, o filtra por Origen («Sistema» o «Propia»).
 3. Lee la Clave: es lo que guardan los productos y los servicios y no cambia nunca; el Nombre es solo
    una etiqueta. La columna del tipo dice qué se cobra hoy en el país del negocio.
@@ -193,7 +224,7 @@ Pantalla: Categorías
 Pasos:
 1. En Categorías pulsa **+**.
 2. Escribe la Clave (minúsculas; empieza por letra; letras, dígitos, puntos y guiones bajos; hasta 80;
-   por ejemplo `product.books`) y el Nombre; la Descripción es opcional.
+   por ejemplo «product.books») y el Nombre; la Descripción es opcional.
 3. Pulsa «Añadir». El panel se cierra y la categoría sale en la tabla como «Propia».
 Entra: clave, nombre y descripción que escribe la persona.
 Sale: la categoría, única por clave en el negocio; Impuestos avisa de que hay una categoría nueva
@@ -201,7 +232,7 @@ Sale: la categoría, única por clave en el negocio; Impuestos avisa de que hay 
 categoría se rechaza. Inventario también la crea cuando alguien elige «Crear» al importar un fichero
 (TAX-F15).
 Si falla: una clave con otra forma o un nombre vacío salen debajo de su campo; una clave que ya existe,
-«Ya hay una categoría fiscal con esa clave.» debajo de la Clave. El motivo de un campo se quita en cuanto se corrige ese campo, aunque otro diga lo mismo (hub#888). No se guarda nada.
+«Ya hay una categoría fiscal con esa clave.» debajo de la Clave. El motivo de un campo se quita en cuanto se corrige ese campo, aunque otro diga lo mismo. No se guarda nada.
 Implicados: INVENTORY-F09
 
 ### TAX-F03 Ver y filtrar las reglas
@@ -209,10 +240,9 @@ Estado: hecho
 Actor: propietario, administrador, responsable, empleado
 Pantalla: Reglas
 Pasos:
-1. Abre **Impuestos → Reglas**: salen las activas.
+1. Abre **Impuestos**, en la pestaña **Reglas**: salen las activas.
 2. Busca por categoría o país, o filtra por País, Región, Categoría, Tipo o Calificación.
-3. Elige Estado «Desactivadas» (o «Todas») para ver las desactivadas; su fila ofrece «Reactivar»
-   (TAX-F08).
+3. Elige Estado «Desactivadas» (o «Todas») para ver las desactivadas; su fila ofrece «Reactivar».
 4. Reconoce un componente (recargo) porque sale justo debajo de su regla raíz.
 Entra: nada; lee las reglas del negocio.
 Sale: nada (solo lectura).
@@ -241,11 +271,11 @@ salvo en Canarias, Ceuta y Melilla, donde solo vale la de su territorio (el IVA 
 allí); una regla de otra región nunca se usa. Las ventas ya hechas no cambian (TAX-F07).
 Si falla: dos reglas activas de la misma categoría, país y región no pueden estar vigentes el mismo
 día: el rechazo sale en «Vigente desde» con «Se solapa con otra regla activa de este país, región y
-categoría…» (se resuelve con TAX-F07 o TAX-F08). Un país que no existe, una región de otro país, un %
+categoría…» (se resuelve poniendo fecha de fin a la otra regla o desactivándola). Un país que no existe, una región de otro país, un %
 fuera de 0–100, un «Vigente hasta» anterior a «Vigente desde» o una categoría que no existe salen
 debajo de su campo. Una regla del mismo país, región y categoría que empieza el mismo día que otra ya
 guardada, aunque esté desactivada: «Ya hay una regla de este país, región y categoría desde ese día,
-quizá desactivada: reactívala o empieza esta otro día.», en «Vigente desde». El motivo de un campo se quita en cuanto se corrige ese campo, aunque otro diga lo mismo (hub#888). No se guarda nada.
+quizá desactivada: reactívala o empieza esta otro día.», en «Vigente desde». El motivo de un campo se quita en cuanto se corrige ese campo, aunque otro diga lo mismo. No se guarda nada.
 Implicados: INVOICE-F01, SALE-F01
 
 ### TAX-F05 Declarar una operación exenta, no sujeta o con inversión del sujeto pasivo
@@ -253,7 +283,7 @@ Estado: hecho
 Actor: propietario, administrador, responsable
 Pantalla: Reglas
 Pasos:
-1. En Reglas pulsa **+** y rellena país, categoría y tipo como en TAX-F04.
+1. En Reglas pulsa **+** y rellena el país, la categoría y el tipo como en cualquier regla.
 2. En Calificación elige «Exenta», «No sujeta», «No sujeta (reglas de localización)» o «Inversión del
    sujeto pasivo». El % se pone en 0 y se bloquea, con la nota «Esta operación no lleva impuesto, así
    que su tipo es 0 %.».
@@ -273,7 +303,7 @@ Estado: hecho
 Actor: propietario, administrador, responsable
 Pantalla: Reglas
 Pasos:
-1. Crea antes la regla principal de la categoría (TAX-F04): es la raíz.
+1. Crea antes la regla principal de la categoría: es la raíz.
 2. En Reglas pulsa **+**, elige el mismo País, Región y Categoría y escribe el % del recargo (por
    ejemplo 5,2).
 3. Elige el Tipo «Recargo»; en «Regla raíz (componente de)» elige la raíz y escribe la «Etiqueta
@@ -296,7 +326,7 @@ Pasos:
 1. En la fila de la regla vigente pulsa «Poner fecha de fin».
 2. Escribe el último día que se aplica (el día antes de que empiece el tipo nuevo) y pulsa «Guardar
    fecha de fin».
-3. Crea la regla nueva (TAX-F04) con «Vigente desde» el día siguiente.
+3. Crea la regla nueva con **+** y «Vigente desde» el día siguiente.
 4. La tabla enseña las dos con sus fechas; desde el día del cambio las ventas nuevas usan la nueva.
 Entra: la fecha de fin (incluida) y los datos de la regla nueva.
 Sale: la regla con su fecha de fin (`tax.rule.ended`). Una venta ya hecha conserva su tipo: la línea de
@@ -330,14 +360,14 @@ Implicados: SALE-F01
 ### TAX-F11 Montar un negocio de Canarias, Ceuta o Melilla
 Estado: hecho
 Actor: propietario, administrador, responsable
-Pantalla: Ajustes y Reglas
+Pantalla: Ajustes, Reglas
 Pasos:
-1. En **Impuestos → Ajustes** elige el «Territorio fiscal» del negocio: «Canarias (IGIC)», «Ceuta
+1. En **Impuestos**, en la pestaña **Ajustes**, elige el «Territorio fiscal» del negocio: «Canarias (IGIC)», «Ceuta
    (IPSI)» o «Melilla (IPSI)», y pulsa «Guardar»: sale «Territorio fiscal guardado.». El «País» es el
    de la cuenta de ERPlora del negocio.
 2. En Reglas crea una regla por cada categoría que vendes: País «España», la Región (ES-CN Canarias,
    ES-CE Ceuta o ES-ML Melilla), el % del territorio y el Tipo «IGIC (Canarias)» o «IPSI
-   (Ceuta/Melilla)» (TAX-F04).
+   (Ceuta/Melilla)».
 3. Crea una regla del territorio por cada categoría que vendas: en Canarias, Ceuta y Melilla el IVA
    nacional no se aplica nunca, así que una categoría sin regla de su territorio no se puede cobrar hasta
    que la tenga. Las reglas del IVA no hace falta borrarlas: vuelven a usarse con «Todo el país (IVA)».
@@ -383,7 +413,7 @@ Estado: hecho
 Actor: propietario, administrador, responsable, empleado
 Pantalla: Alias
 Pasos:
-1. Abre **Impuestos → Alias**.
+1. Abre **Impuestos**, en la pestaña **Alias**.
 2. Busca por alias o categoría, o filtra por Categoría u Origen.
 Entra: nada; lee los alias del negocio.
 Sale: nada (solo lectura).
@@ -396,14 +426,14 @@ Actor: propietario, administrador, responsable
 Pantalla: Alias
 Pasos:
 1. En Alias pulsa **+**.
-2. Escribe el Alias (el texto que llega de fuera, por ejemplo `comida`), escribe parte del nombre de
+2. Escribe el Alias (el texto que llega de fuera, por ejemplo «comida»), escribe parte del nombre de
    la Categoría y elígela de la lista, y elige el Origen («Aprendido» de entrada).
 3. Pulsa «Añadir».
 Entra: el texto externo, la categoría y el origen que elige la persona.
 Sale: el alias, guardado en minúsculas y sin espacios de sobra, único en el negocio
 (`tax.alias.created`). La próxima importación de Inventario lo entiende, se escriba como se escriba.
 Si falla: un alias que ya existe: «Ese alias ya existe.» debajo del Alias; una categoría que no existe,
-debajo de la Categoría. El motivo de un campo se quita en cuanto se corrige ese campo, aunque otro diga lo mismo (hub#888). No se guarda nada.
+debajo de la Categoría. El motivo de un campo se quita en cuanto se corrige ese campo, aunque otro diga lo mismo. No se guarda nada.
 Implicados: INVENTORY-F09
 
 ### TAX-F15 Decir al importador de Inventario qué categoría es un texto
@@ -448,7 +478,7 @@ Implicados: ninguno
 ### TAX-F17 Avisar de que faltan tipos para el país del negocio
 Estado: hecho
 Actor: propietario, administrador, responsable
-Pantalla: Inicio, Categorías, Reglas y Alias
+Pantalla: Inicio, Categorías, Reglas, Alias
 Pasos:
 1. En el **Inicio**, mientras ninguna regla raíz activa del país del negocio esté vigente hoy, «Termina de
    configurar tu negocio» trae «Tus impuestos» («Configura los tipos de IVA del país en el que vendes para que el TPV pueda calcular
@@ -459,7 +489,7 @@ Pasos:
    fábrica (todos menos España) dice, en su lugar, «Portugal no trae sus tipos de impuesto de fábrica: crea en
    Reglas el tipo de cada categoría que vendes para que el TPV pueda calcular el precio de una venta.», con el
    nombre de su país.
-3. Pulsa «Configurar»: lleva a la pestaña Reglas, donde se crea la que falta con **+** (TAX-F04). En
+3. Pulsa «Configurar»: lleva a la pestaña Reglas, donde se crea la que falta con **+**. En
    Reglas el aviso no lleva botón.
 4. En cuanto una regla raíz activa del país del negocio está vigente hoy, el aviso desaparece solo y el paso
    del Inicio queda «Hecho» sin recargar.
@@ -471,7 +501,7 @@ solo, y al reactivarla (TAX-F08) o crear otra (TAX-F04, TAX-F12) vuelve a «Hech
 fiscal (TAX-F11) no lo mueve.
 Si falla: basta una sola regla del país del negocio, de cualquier categoría, para darlo por hecho. Cuenta
 las de cualquier territorio del país: un negocio de Canarias sin ninguna regla de IGIC no ve el aviso,
-aunque el TPV le explica el motivo al cobrar y la ayuda de Ajustes lo dice (TAX-F11). Una regla exenta o
+aunque el TPV le explica el motivo al cobrar y la ayuda de Ajustes lo dice. Una regla exenta o
 de IGIC también cuenta: un negocio que solo vende servicios exentos está bien configurado.
 Implicados: BASE-F01
 
