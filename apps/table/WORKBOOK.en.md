@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:75ccd24f381cdd7c8cf147929f027019f30abdaaa42a3df592125416cff33a83 -->
+<!-- generated from WORKBOOK.md sha256:c0f811c86ad44821eb50f109f91c84230fa302105a960b15e4099c4d8aeef341 -->
 
 ## What it is for and who it is for
 
@@ -884,7 +884,7 @@ Steps:
 5. Available, Reserved and Blocked tables show no amount.
 In: the amount of each open check of the room, from Sales, read at once for the whole plan.
 Out: nothing.
-If it fails: as the plan (TABLE-F09), a failure on loading shows with "Retry".
+If it fails: as the rest of the plan, a failure on loading shows with "Retry".
 Involved: TABLE-F09, TABLE-F15, TABLE-F16, TABLE-F17, SALE-F17, SALE-F19, SALE-F22
 
 ## Tables: what goes in and what comes out

@@ -880,7 +880,7 @@ Pasos:
 5. Las mesas Disponibles, Reservadas y Bloqueadas no enseñan importe.
 Entra: el importe de cada cuenta abierta de la sala, de Ventas, leído de una vez para todo el plano.
 Sale: nada.
-Si falla: como el plano (TABLE-F09), un fallo al cargar sale con «Reintentar».
+Si falla: como el resto del plano, un fallo al cargar sale con «Reintentar».
 Implicados: TABLE-F09, TABLE-F15, TABLE-F16, TABLE-F17, SALE-F17, SALE-F19, SALE-F22
 
 ## Mesas: lo que entra y lo que sale
