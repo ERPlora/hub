@@ -56,6 +56,20 @@ def jobs() -> list[PrintJob]:
     return list(PrintJob.objects.select_related("printer").order_by("created_at", "id"))
 
 
+@pytest.fixture
+def account(make_user):
+    """``account(username, **fields)``: a person with a session in the business, named as their account says."""
+
+    def make(username: str, **fields):
+        user = make_user(username)
+        for field, value in fields.items():
+            setattr(user, field, value)
+        user.save()
+        return ctx_for(actor=user)
+
+    return make
+
+
 def test_the_receipt_prints_at_checkout_inside_the_charge(bar, till):
     out = charge()
     (job,) = jobs()
@@ -231,3 +245,39 @@ def test_a_full_invoice_prints_both_parties(bar, till):
         "76543210S",
         "Calle Real 2",
     )
+
+
+def test_the_receipt_names_who_charged_never_their_internal_id(bar, till, account):
+    """hub#1985: the cashier line printed the account's internal id. It says who charged by the name the kitchen
+    gives a waiter, and a copy printed later by someone else still names who charged."""
+    bea = account("saas:01a13f83-5fd4-73c2-8d2c-44be64bc28a8", first_name="Bea", last_name="Ruiz")
+    out = charge("sale-print-cashier", ctx=bea)
+    run("sale.sale.print", {"sale_id": str(out.id)}, account("saas:02b24f94-0000-7000-8000-000000000002", first_name="Luis"))
+    assert [job.document["cashier"] for job in jobs()] == ["Bea Ruiz", "Bea Ruiz"]
+
+
+def test_a_full_invoice_names_who_charged_too(bar, till, account):
+    charge(
+        "sale-print-invoice-cashier",
+        ctx=account("saas:01a13f83-5fd4-73c2-8d2c-44be64bc28a8", first_name="Bea"),
+        document_type="invoice",
+        customer_name="Javier Gomez Ruiz",
+        customer_tax_id="76543210S",
+        customer_address="Calle Real 2",
+    )
+    (job,) = jobs()
+    assert (job.document_type, job.document["cashier"]) == ("invoice", "Bea")
+
+
+def test_an_account_without_a_name_is_named_by_its_email_as_in_the_kitchen(bar, till, account):
+    charge("sale-print-email", ctx=account("saas:03c35fa5-0000-7000-8000-000000000003", email="bea@example.com"))
+    (job,) = jobs()
+    assert job.document["cashier"] == "bea@example.com"
+
+
+def test_without_a_name_to_print_the_receipt_has_no_cashier_line(bar, till, account):
+    """Neither a name nor an email (only the internal id), or no person at all (an API key, the platform):
+    the line is left out rather than printing an id."""
+    charge("sale-print-nameless", ctx=account("saas:04d46fb6-0000-7000-8000-000000000004"))
+    charge("sale-print-platform")
+    assert [("cashier" in job.document) for job in jobs()] == [False, False]

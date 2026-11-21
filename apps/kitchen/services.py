@@ -65,7 +65,6 @@ from apps.kitchen.queries import (
     in_progress_by_station,
     in_scope,
     pending_rounds,
-    person_label,
     product_routes,
     round_view,
     routing,
@@ -100,6 +99,7 @@ from apps.kitchen.schemas import (
     TicketSyncIn,
 )
 from apps.sale.models import OrderLine
+from apps.sale.queries.people import person_label
 from base.queries.catalog_images import business_language
 
 logger = logging.getLogger(__name__)

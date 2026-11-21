@@ -16,6 +16,7 @@ from apps.sale import events
 from apps.sale.models import Order, OrderLine
 from apps.sale.queries.business import actor
 from apps.sale.queries.orders import ORDER_CHANGED, ORDER_NOT_FOUND, dish_allergens, find_order, order_detail
+from apps.sale.queries.people import person_label
 from apps.sale.schemas.orders import (
     OrderFireIn,
     OrderFireOut,
@@ -42,19 +43,6 @@ NOTHING_TO_FIRE = _("There is nothing new to send to the kitchen.")
 APPOINTMENT_CHECK_OPEN = _(
     "That appointment already has an open check: charge that one (Open checks)."
 )
-
-
-def person_label(ctx: OperationContext) -> str:
-    """Who acts, as a person reads it (the waiter the kitchen prints): their name, else their e-mail; their
-    username (the id of the session) only as the last resort; the system, its own label."""
-    who = ctx.actor
-    if who is None:
-        return ""
-    if hasattr(who, "get_username"):
-        label = who.get_full_name() or getattr(who, "email", "") or who.get_username()
-    else:
-        label = str(who)
-    return label[:128]
 
 
 @operation(
@@ -107,7 +95,7 @@ def fire(ctx: OperationContext, data: OrderFireIn) -> dict:
             "priority": data.priority,
             "round_no": round_no,
             # Who attends the check («Atiende» of the till), else who sends the round.
-            "waiter": data.waiter or person_label(ctx),
+            "waiter": data.waiter or person_label(ctx.actor)[:128],
             "items": [
                 {
                     "order_item_id": str(line.id),

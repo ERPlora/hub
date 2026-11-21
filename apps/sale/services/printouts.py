@@ -18,6 +18,7 @@ from apps.sale.queries.business import business_currency
 from apps.sale.queries.checkout import preview
 from apps.sale.queries.letterhead import business_letterhead
 from apps.sale.queries.orders import find_order
+from apps.sale.queries.people import person_names
 from apps.sale.queries.receipt_codes import receipt_url
 from apps.sale.queries.sales import find_sale, sale_detail
 from apps.sale.queries.settings import current_settings
@@ -99,10 +100,10 @@ def _print_sale(ctx: OperationContext, detail: SaleOut, *, duplicate: bool, key:
             detail,
             letterhead=business_letterhead(ctx, detail.invoice_id),
             footer=settings.receipt_footer,
-            decimals=get_currency_precision(currency),
             duplicate=duplicate,
             record=record,
         )
+        document.update(paper.cashier(person_names([detail.created_by]).get(detail.created_by, "")))
         if detail.receipt_code:
             document.update(paper.claim(detail.receipt_code, receipt_url(ctx, detail.receipt_code)))
     request = {
