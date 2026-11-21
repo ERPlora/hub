@@ -35,8 +35,10 @@ for (const size of THREE_SIZES) {
         const sales = await readFigure(page, 'sale.today', '1', 'live');
         const tickets = await readFigure(page, 'sale.tickets_today', '2', 'live');
         await readFigure(page, 'inventory.low_stock_count', '6', 'live');
-        // Inventory's colour already shows in the row: its stock value stays soft, after the row.
-        await readFigure(page, 'inventory.value', '6', 'soft');
+        // Inventory's colour already shows in the row: its stock value stays soft, after the row, and two by two with
+        // the other figures on a phone too: never the whole width.
+        const soft = await readFigure(page, 'inventory.value', '6', 'soft');
+        expect((await soft.boundingBox())?.width ?? size.width).toBeLessThan(size.width * 0.6);
         await expect(row.locator('[data-key="inventory.value"]')).toHaveCount(0);
 
         // Two by two on a phone and on a tablet, side by side on a desk: sales and tickets share their line.
