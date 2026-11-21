@@ -1,7 +1,7 @@
 """The inventory app: the catalog of what is sold with stock, its categories and the stock ledger."""
 
 from django.utils.translation import gettext_lazy as _
-from live.meta import Category, LiveAppConfig, Nav, SetupCheck, SetupStep, Widget
+from live.meta import Category, Help, LiveAppConfig, Nav, SetupCheck, SetupStep, Widget
 
 from apps.inventory.events import FIGURE_EVENTS, PRODUCT_EVENTS
 from base.allergens import ALLERGENS
@@ -90,14 +90,16 @@ class InventoryConfig(LiveAppConfig):
             "inventory.view_stock",
         ],
     }
+    # The tab bar's screens (frontend/composables/useInventoryTabs.ts), so that the help window and the menu's highlight
+    # name the screen in view. The first keeps the cube: it is the launcher's and «My apps»' icon, and its screen is
+    # where «/inventory» lands.
     navigation = [
-        Nav(
-            id="inventory",
-            label=_("Inventory"),
-            icon="ion:cube-outline",
-            path="/inventory",
-        )
+        Nav("dashboard", _("Dashboard"), "ion:cube-outline", "/inventory/dashboard"),
+        Nav("products", _("Products"), "ion:cube-outline", "/inventory/products"),
+        Nav("movements", _("Movements"), "ion:swap-vertical-outline", "/inventory/movements"),
+        Nav("categories", _("Categories"), "ion:list-outline", "/inventory/categories"),
     ]
+    help = Help()
     # The Home's hooks, on the Panel's own queries. Registered icons only: `trending-down-outline` waits in
     # UI-REQUESTS.md.
     setup = [

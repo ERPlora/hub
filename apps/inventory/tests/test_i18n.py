@@ -4,6 +4,7 @@ import json
 import uuid
 from pathlib import Path
 
+import pytest
 from django.apps import apps
 from django.utils import translation
 
@@ -58,6 +59,12 @@ def test_the_compiled_catalog_is_current():
 def test_spanish_texts_of_the_workbook():
     with translation.override("es"):
         assert str(apps.get_app_config("inventory").verbose_name) == "Inventario"
+        assert [str(nav.label) for nav in apps.get_app_config("inventory").navigation] == [
+            "Panel",
+            "Productos",
+            "Movimientos",
+            "Categorías",
+        ]
         assert str(queries.PRODUCT_NOT_FOUND) == "Este producto no existe en este hub."
         assert str(services.SKU_TAKEN) == "Ese SKU ya existe en el catálogo"
         assert str(services.EAN13_TAKEN) == "Ese EAN-13 ya lo tiene otro producto del catálogo"
@@ -72,6 +79,14 @@ def test_spanish_texts_of_the_workbook():
         assert [str(label) for label in StockMovement.Type.labels] == ["Inicial", "Recepción", "Venta", "Anulación", "Recuento", "Descuento", "Devolución"]
         assert str(Unit.HOUR.label) == "Hora (h)"
         assert str(AppCategory.CATALOG.label)  # the apps page's group comes from live, not from here
+
+
+@pytest.mark.parametrize("language", ["en", "es"])
+def test_the_menu_and_the_tab_bar_name_each_screen_alike(language):
+    tabs = json.loads((LOCALE.parents[2] / "frontend" / "locale" / f"{language}.json").read_text(encoding="utf-8"))
+    with translation.override(language):
+        menu = {nav.id: str(nav.label) for nav in apps.get_app_config("inventory").navigation}
+    assert menu == {screen: tabs["inventory"]["tabs"][screen] for screen in ("dashboard", "products", "movements", "categories")}
 
 
 @HUB_DB

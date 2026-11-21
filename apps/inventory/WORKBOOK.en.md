@@ -1,9 +1,16 @@
-<!-- generated from WORKBOOK.md sha256:3264337be3a77f0dfd8e927ee792d15feeebf99a072a61436f8de2fb1144db43 -->
+<!-- generated from WORKBOOK.md sha256:8e6ca199c6e7f733119a740623ce409782b0393bc0142a796d47a7b9c2ce2478 -->
 
 ## What it is for and who it is for
 
-Inventory is the catalog of what is sold with stock: each product with its name, its SKU, its price,
-its cost, its tax category, its unit of measure and how many units are left.
+Inventory is the catalog of what you sell with stock: each product with its price, its cost, its tax
+category, its unit of measure and how many units are left. In the restaurant it is the menu the till
+shows; in the hair salon, the products for sale. The stock goes down on its own when Sales takes the
+payment, and every receipt or removal leaves a movement that is never edited or deleted.
+
+### In detail
+
+Each product carries its name, its SKU, its price, its cost, its tax category, its unit of measure and
+how many units are left.
 
 - In the **restaurant** it is **the menu**: the dishes and drinks the till shows grouped by category
   and that Kitchen sends to their station.
@@ -93,12 +100,19 @@ Initial setup, step by step:
 
 ## Screens
 
-Inventory opens from the **Inventory** menu and has five tabs: **Dashboard**, **Products**,
-**Movements**, **Categories** and **Settings**. All of them can be seen by anyone who can view
-products, except Settings (below); what a person cannot do does not appear on screen, and the app
-also refuses it even if someone tries it through another door (the assistant or the API).
+Inventory has five tabs: **Dashboard**, **Products**, **Movements**, **Categories** and **Settings**.
+The first four are also the entries of the **Inventory** menu, with the same names; Settings only shows
+in the tab bar. The apps launcher and "My apps" open the Dashboard. All of them can be seen by anyone who
+can view products, except Settings (below); what a person cannot do does not appear on screen, and the
+app also refuses it even if someone tries it through another door (the assistant or the API).
 
 ### Dashboard
+The stock's figures at a glance: "Tracked products" (those with stock control), "In stock", "Out of
+stock", "Low stock" and "Inventory value", at cost. Tap one of the first four to go to Products. Below,
+the "Low stock products" table, from the one with the least to the one with the most, with each one's
+threshold. It updates on its own with every sale and every movement.
+
+#### Detail
 Figures at the top: "Tracked products", "In stock", "Out of stock", "Low stock" and "Inventory
 value" ("at cost"). The first four lead to Products. If there are items with stock control and no
 cost, the note "N product(s) without recorded cost: the value shown is partial". Below, the "Low
@@ -107,6 +121,13 @@ stock.". Loading: "Loading…". Error: "Inventory metrics could not be loaded." 
 with "Retry".
 
 ### Products
+Your catalog: each product with its photo, its name, its SKU, its price, its stock and whether it is on
+sale. Search it by name or SKU and filter it by price, stock or status. With **+** you add a product and
+with "Edit" you change it; from each row you receive goods, count the stock, write off what breaks or is
+lost, mark it sold out or delete it. Tapping the row opens its card, with the barcode to print its label.
+The table's buttons import and export the catalog as a CSV file.
+
+#### Detail
 Table with Name, SKU, Price, Stock ("—" for an item without stock control) and Status: an
 active/inactive switch, "Yes"/"No" for whoever cannot change products, or the mark "Not configured ·
 Missing tax category", whole while the row has room (also at 1280 px with the side menu open and the
@@ -144,29 +165,29 @@ photo…".
 Empty: "No products". Loading: "Loading…". Error: the table's notice with "Retry". A refusal of the
 form shows inside the panel; that of a row action, above the table.
 
-### Product card
+#### Product card
 Window with the product's name: SKU, Price, Stock and Status ("Yes · Sold out" if it is sold out); the
 SKU's barcode on a white plate with the SKU below; "Print barcode" and, with stock permission and on a
 physical product, "Receive stock" and "Count stock", and "Write off stock" if the item tracks its
 stock; with permission to change products, "Mark sold out" or "Put back on sale". A failure when
 printing or when marking shows inside the window.
 
-### Goods receipt
+#### Goods receipt
 Window "Goods receipt — <product>": "Current stock", "Quantity received", "Unit cost (<currency>)" and
 "Record receipt". A refusal shows inside the window.
 
-### Stock count
+#### Stock count
 Window "Stock count — <product>": "Current stock", "Difference" (as soon as there is a figure),
 "Counted stock", "Reason (required)" and "Apply count", with the note of what is missing ("Enter the
 counted stock to continue." / "A reason is required to apply the count."). A refusal shows inside the
 window.
 
-### Write-off
+#### Write-off
 Window "Write-off — <product>": "Current stock", "Quantity written off", "Reason: waste, breakage, own
 consumption… (required)" and "Write off", with the note of what is missing. A refusal shows inside the
 window.
 
-### Import products
+#### Import products
 Three windows in a row:
 
 1. "Check the import": a drop-down per column of the file ("Do not import" or the field; Name and
@@ -180,6 +201,12 @@ Three windows in a row:
    · SKU — reason") and "Copy report".
 
 ### Movements
+The history of every stock receipt and removal, the most recent first: the date, the product, the type
+(a goods receipt, a sale, a count, a write-off…), the quantity with its sign, the balance left, the
+reason and the reference, which in a sale is the number of its ticket or its invoice. It is read-only: a
+movement is never edited or deleted. Search by product, SKU or ticket number and filter by type.
+
+#### Detail
 Read-only table: Date, Name, SKU, Type ("Initial", "Reception", "Sale", "Void", "Count", "Decrease",
 "Refund"), Quantity (with its sign), Balance, Reason and Reference (in a sale, the number of its
 ticket, its invoice or the sale itself). Search box by product, SKU, reference or ticket number;
@@ -190,6 +217,12 @@ Products, and with every sale.". No matches: "No movement matches the search or 
 found by the number of its ticket, invoice or sale.". Error: the table's notice with "Retry".
 
 ### Categories
+The categories that group the products on the till, each one with how many active products it has
+(sold-out ones count too). With **+** you create one, tapping the row edits it and "Delete" removes it
+without deleting its products: they just stop being in it. The table's buttons import and export the
+categories as a CSV file.
+
+#### Detail
 Table with Name, Slug and Products (how many active ones it has, sold-out ones included: the same
 figure as the till's category strip, which shows them too); search box "Search category…"; 25 per page;
 import and export CSV. The **+** and the row (or "Edit") open the panel: Name, "Slug (optional)",
@@ -198,6 +231,12 @@ opens "Delete category" with what is going to happen and "Delete and unlink" / "
 categories.". Loading: "Loading…".
 
 ### Settings
+How your business keeps its stock: "Track stock", whether the items keep their stock except those that
+decide otherwise; "Allow selling without stock", whether a sale may leave the stock below zero; and the
+"Low stock threshold" a product created without its own takes. Only whoever can manage the inventory
+settings sees it: out of the box, the administrator and the manager.
+
+#### Detail
 Heading "Inventory" with "Allow selling without stock", "Low stock threshold" (with its explanation)
 and "Track stock", and "Save". It is seen and saved by whoever can manage the inventory settings: out
 of the box, the administrator and the manager. The employee and the cashier are not shown the tab; if
@@ -279,14 +318,14 @@ Steps:
    another field while it opens, the cursor stays where you are and what you type goes there.
 2. Type Name, SKU and Price. The price takes "2.20", "1,234.56" or whatever is pasted from the
    screen; on leaving the field it is rewritten in the business's format. Optional are "Cost
-   (<currency>)" (the business's: "Cost (PLN)" in Poland), "Initial stock", "Low stock threshold"
+   (EUR)" (in the business's currency: "Cost (PLN)" in Poland), "Initial stock", "Low stock threshold"
    (empty = 10), "EAN-13" and "Description".
 3. Choose "Type" ("Physical" or "Service"), the "Unit of measure" ("Unit (ud)" to begin with) and the
    "Tax category". Each tax category says its type ("Product — generic · 21 %", "… · exempt") and
    none is chosen beforehand.
 4. On a physical product, the "Track stock for this item" box comes ticked or not according to the
    business's setting, with the note "Following the hub setting". Tapping it fixes the decision for
-   this item (INVENTORY-F20).
+   this item.
 5. If there are categories, search in "Categories" for the ones that group the product on the till
    and pick them one by one: each one shows below the field, with its button to remove it.
 6. Tap "Save" ("Saving…"). The panel closes and the product shows in the table with Status "Yes".
@@ -294,7 +333,7 @@ Steps:
    Escape, nor tapping outside the panel, nor the phone's back button in the Android app close it: they ask
    "Discard changes?" ("What you typed in this window has not been saved."). "Keep editing", or back again,
    leaves the panel with what was typed; "Discard changes" closes it without saving anything and without
-   asking again. With the panel as it opened, any of them closes it without asking (hub#1015, hub#1023).
+   asking again. With the panel as it opened, any of them closes it without asking.
 In: the tax categories and their type, from Taxes; the units of measure and the product categories,
 from Inventory.
 Out: the product, active and linked to the ticked categories, in a single step: either it is saved
@@ -305,8 +344,8 @@ already inactive, out of the till until it is activated (INVENTORY-F03), as one 
 back when it is recovered from a separate copy (BASE-F114).
 If it fails: "Save" is off while Name, SKU or tax category are missing, and while the business has not
 yet said its currency: the price and the cost are read in it, and without it "1500" yen would be saved
-as 150,000; until then, leaving the price or the cost keeps it as typed, without inventing decimals for it or judging it: "¥1500" or "12,50 zł" are not marked red as "This is not an amount", and as soon as the currency arrives they are read in it (hub#945). If the currency cannot be read, the window says so ("The business's currency could not be read", with the
-reason) and offers "Retry", which asks for it again; as soon as it arrives, "Save" lights up (hub#938). With no tax categories it says
+as 150,000; until then, leaving the price or the cost keeps it as typed, without inventing decimals for it or judging it: "¥1500" or "12,50 zł" are not marked red as "This is not an amount", and as soon as the currency arrives they are read in it. If the currency cannot be read, the window says so ("The business's currency could not be read", with the
+reason) and offers "Retry", which asks for it again; as soon as it arrives, "Save" lights up. With no tax categories it says
 "There are no tax categories yet. Create them in Taxes: a product cannot be sold until it is known how
 it is taxed.". An unreadable amount: "This is not an amount. Type a figure, for example 12.50." or
 "This amount can be read in two ways…"; a negative one: "This amount cannot be negative.". A quantity that does not fit the unit: "The quantity does not
@@ -324,12 +363,12 @@ Actor: administrator, manager
 Screen: Products
 Steps:
 1. In **Products**, tap "Edit" on the row (or tap the "Not configured" mark): the panel "Editing
-   product — <name>" opens with the current data.
+   product — White coffee" opens with the current data.
 2. Change what is needed. The SKU is locked ("The SKU is the product's identity: it is not edited").
-   The stock is not edited here: it is received (INVENTORY-F13) or counted (INVENTORY-F14). The "Type"
-   and the "Initial stock" do not show.
+   The stock is not edited here: it is received with "Receive stock" or counted with "Count stock". The
+   "Type" and the "Initial stock" do not show.
 3. Tap "Save changes". With a change not saved, "Cancel editing", the "×", Escape, tapping outside the
-   panel and, in the Android app, the back button ask first, as when creating (INVENTORY-F01, step 7), and
+   panel and, in the Android app, the back button ask first, as when creating, and
    "Discard changes" leaves it as it was; with no change, they close the panel.
 4. The row shows the new data.
 In: the product as it is saved; the tax categories, from Taxes; the units and the product
@@ -337,7 +376,7 @@ categories.
 Out: the product changed, with its categories, in a single step. Inventory tells of the change and of
 each category added or removed. The new price is for what is added to a bill from now on: an open
 bill keeps the price from when it was ordered (Sales decides it).
-If it fails: the same refusals as creating (INVENTORY-F01), inside the panel, and nothing is saved.
+If it fails: the same refusals as creating, inside the panel, and nothing is saved.
 The tax category cannot be emptied: the field has no empty option. The unit of a product with stock
 is not changed: "The unit of a product with stock cannot be changed. Count its stock to zero and change
 it afterwards.".
@@ -350,7 +389,7 @@ Screen: Products
 Steps:
 1. In **Products**, tap the switch in the row's Status column.
 2. Off, the product goes to "No"; on, to "Yes". A "Not configured" product has no switch until it has
-   a tax category (INVENTORY-F05).
+   a tax category.
 In: the product.
 Out: the product active or inactive; Inventory tells of the change. Inactive, it stops showing on the
 till and in the sales catalog, in the Dashboard's figures, in the low-stock list and in the number of
@@ -365,8 +404,8 @@ Actor: administrator, manager
 Screen: Products
 Steps:
 1. In **Products**, tap "Delete" on the row.
-2. The "Delete product" window says "<name> (<SKU>) — will be removed from the catalog (soft delete;
-   its stock movements are kept)".
+2. The "Delete product" window says, for example, "White coffee (CAF-01) — will be removed from the
+   catalog (soft delete; its stock movements are kept)".
 3. Tap "Delete" (or "Cancel"). The row disappears.
 In: the chosen product.
 Out: the product is deleted and inactive, out of every list and of the till. Its SKU and its EAN-13
@@ -382,9 +421,9 @@ Status: done
 Actor: administrator, manager
 Screen: Products
 Steps:
-1. On the till, the notice "N items cannot be sold: their VAT is not set up." brings "Review the
+1. On the till, the notice "3 items cannot be sold: their VAT is not set up." brings "Review the
    catalogue" (only for whoever can change products): it opens **Products** filtered by "Not
-   configured". It can also be reached by filtering Status → "Not configured".
+   configured". It can also be reached by filtering Status by "Not configured".
 2. Each row carries the mark "Not configured · Missing tax category": tapping it opens the edit
    form. It reads at least as far as "Not configured" on a tablet too, beside a long name: while any
    row carries the mark, its column does not go below its floor and the row's actions fold into the
@@ -393,7 +432,7 @@ Steps:
 In: the products whose tax category is no longer in Taxes. None is made up for them.
 Out: the product with its tax category; Inventory tells of the change and the till stops marking it
 "VAT missing".
-If it fails: the form's refusals (INVENTORY-F02).
+If it fails: the refusals of the product's edit form.
 Involved: SALE-F01, TAX-F01
 
 ### INVENTORY-F06 Create and edit a category
@@ -401,7 +440,7 @@ Status: done
 Actor: administrator, manager
 Screen: Categories
 Steps:
-1. In **Categories**, tap **+** (or tap a row to edit it: "Editing category — <name>").
+1. In **Categories**, tap **+** (or tap a row to edit it: "Editing category — Drinks").
 2. Type the Name. If you leave "Slug (optional)" empty, it fills itself with the name in lower case
    and with hyphens. When editing, leaving it empty keeps the one it had; through the assistant or the
    API, an empty slug is remade from the name (a category is never left without a slug). Choose, if you
@@ -421,9 +460,9 @@ Actor: administrator, manager
 Screen: Categories
 Steps:
 1. In **Categories**, tap "Delete" on the row.
-2. The "Delete category" window says "<name> — N products will lose this category (unlinked;
-   products are kept)"; with one, "<name> — 1 product will lose this category (unlinked; the product
-   is kept)". N counts the active products.
+2. The "Delete category" window says, for example, "Drinks — 12 products will lose this category
+   (unlinked; products are kept)"; with one, "Desserts — 1 product will lose this category (unlinked;
+   the product is kept)". The figure counts the active products.
 3. Tap "Delete and unlink" (or "Cancel").
 In: the chosen category.
 Out: the category is deleted and all its products, active or not, unlinked in the same step; the
@@ -448,7 +487,7 @@ Status: done
 Actor: administrator, manager
 Screen: Products
 Steps:
-1. Create the category first (INVENTORY-F06).
+1. Create the category first in **Categories**.
 2. In the product's form (new or edit), search in "Categories" and pick one or several: each one shows
    below the field, with its button to remove it, and it is not offered again. The field only shows if
    there is some category.
@@ -474,15 +513,15 @@ Steps:
    English and with or without accents ("Name", "Code", "Price", "VAT"…). Change it or set "Do not
    import". Name, SKU, Price, Cost, Stock, Threshold, EAN-13, Description, Allergens, Unit and Tax category
    can be imported; Name and SKU are required.
-3. Look at the "First {n} rows of {total}" and at the rehearsal of the whole file: "{ready} rows ready
-   · {failed} with problems" ("1 row ready" with one), with the line and the reason of the first ten.
-4. Tap "Import {n} products" ("Import 1 product" with one; or "Cancel", which leaves no trace).
+3. Look at the first rows ("First 5 rows of 120") and at the rehearsal of the whole file: "118 rows
+   ready · 2 with problems" ("1 row ready" with one), with the line and the reason of the first ten.
+4. Tap "Import 118 products" ("Import 1 product" with one; or "Cancel", which leaves no trace).
 5. If some tax text is not recognised, or there are rows with no tax column ("Rows with no tax
    category"), "CSV tax categories" shows. For each one: "Pick" a category, "Create" one (Key and Name)
    or "Skip". Tap "Confirm & import". What is chosen for a text is saved in Taxes and the next import
    already recognises it; what is chosen for "Rows with no tax category" is not saved and is asked each
    time.
-6. While it creates, above the table it reads "Importing {done}/{total}…" with "Stop".
+6. While it creates, above the table it reads how many it has done ("Importing 40/118…") with "Stop".
 7. When it ends, "Import result": "Rows", "Created", "Skipped (already existed)", "Failed", a line per
    failure and "Copy report".
 In: the file; the tax categories, their names (the translated ones too) and the learnt texts, from
@@ -519,18 +558,18 @@ In: the file; the tax categories and the learnt texts, from Taxes.
 Out: the categories created. A row with the name of a category that already exists is skipped, so
 repeating the file duplicates nothing.
 If it fails: each row that does not go in shows in the report with its reason: "The name is missing" or
-"Tax category not recognized: <text>".
+"Tax category not recognized:" followed by the file's text.
 Involved: TAX-F15
 
 ### INVENTORY-F11 Export the catalog to CSV
 Status: done
 Actor: administrator, manager
-Screen: Products
+Screen: Products, Categories
 Steps:
 1. In **Products** (with the search and the filters you want), tap the table's export CSV button.
-2. `inventory-products.csv` downloads with **all** the products that match the search and the
+2. "inventory-products.csv" downloads with **all** the products that match the search and the
    filters, not only the page shown.
-3. In **Categories**, the same button downloads `inventory-categories.csv` (Name, Slug and number of
+3. In **Categories**, the same button downloads "inventory-categories.csv" (Name, Slug and number of
    products).
 In: the products or the categories that match the search and the filters.
 Out: the file, with the same headers the import recognises (Name, SKU, Price, Cost, Stock, Threshold,
@@ -580,8 +619,8 @@ Actor: administrator, manager
 Screen: Goods receipt
 Steps:
 1. In **Products**, tap "Receive stock" on the row or on the product's card.
-2. In "Goods receipt — <product>" the "Current stock" shows. Type the "Quantity received" and, if you
-   want, the "Unit cost (<currency>)".
+2. In the receipt's window ("Goods receipt — Still water") the "Current stock" shows. Type the
+   "Quantity received" and, if you want, the "Unit cost (EUR)", in the business's currency.
 3. Tap "Record receipt". The window closes and the row shows the new stock.
 4. In **Movements** a "Reception" line shows with the quantity in positive and the balance.
 In: the product and its unit's step. Through the assistant or the API, a goods receipt can carry several
@@ -592,9 +631,9 @@ has no stock control. If an item with control goes above its threshold, it tells
 (INVENTORY-F18). Inventory tells that the stock changed.
 If it fails: "Record receipt" is off without a quantity, and while the business has not yet said its
 currency: the cost is read in it, and without it "1500" yen would be saved as 150,000; until then, leaving the
-cost keeps it as typed, without inventing decimals for it or judging it: "¥1500" or "12,50 zł" are not marked red as "This is not an amount", and as soon as the currency arrives they are read in it (hub#945). If the currency
+cost keeps it as typed, without inventing decimals for it or judging it: "¥1500" or "12,50 zł" are not marked red as "This is not an amount", and as soon as the currency arrives they are read in it. If the currency
 cannot be read, the window says so ("The business's currency could not be read", with the reason) and
-offers "Retry", which asks for it again; as soon as it arrives, "Record receipt" lights up (hub#946). The
+offers "Retry", which asks for it again; as soon as it arrives, "Record receipt" lights up. The
 count and the write-off read no amounts: they do not wait for it. "The quantity does not respect the step allowed
 for this unit", an unreadable cost ("This is not an amount…") or the reason of any other refusal show
 inside the window. A service is not received: it has no button, and through the assistant or the API it
@@ -608,8 +647,8 @@ Actor: administrator, manager
 Screen: Stock count
 Steps:
 1. In **Products**, tap "Count stock" on the row or on the product's card.
-2. In "Stock count — <product>", type in "Counted stock" what there really is (the total, not the
-   difference): if the system says 5 and you count 7, type 7. "Difference" shows (+2).
+2. In the count's window ("Stock count — Still water"), type in "Counted stock" what there really is
+   (the total, not the difference): if the system says 5 and you count 7, type 7. "Difference" shows (+2).
 3. Type the "Reason (required)".
 4. Tap "Apply count". The row shows the counted balance; in **Movements** "Count" shows with the
    difference and the reason.
@@ -629,11 +668,11 @@ Involved: none
 ### INVENTORY-F15 Write off stock without a sale (waste, breakage, own consumption)
 Status: done
 Actor: administrator, manager (screen); assistant
-Screen: Products' card and table ("Write-off" window); assistant
+Screen: Products ("Write-off" window, from the row or the card); assistant
 Steps:
 1. In **Products**, tap "Write off stock" on the row (⋮ menu) or on the product's card: it only shows on
    physical products with stock control and with permission to move stock.
-2. In "Write-off — <product>" type the quantity and the reason (waste, breakage, own consumption…) and
+2. In the write-off's window ("Write-off — Red wine") type the quantity and the reason (waste, breakage, own consumption…) and
    tap "Write off". Through the assistant: "write off 2 bottles of red wine for breakage"; it shows the
    confirmation card with the product, the quantity and the reason.
 3. In **Movements** "Decrease" shows with the quantity in negative and the reason.
@@ -646,9 +685,8 @@ If it fails: if there is not enough and "Allow selling without stock" is off, "T
 to complete the operation.". A product that does not exist: "This product does not exist in this hub.".
 A quantity off the step: "The quantity does not respect the step allowed for this unit: use multiples
 of …" (it is not rounded). A service is refused with "A service has no stock.", and an item without
-stock control with "This article does not track its stock: there is nothing to write off." (409
-`inventory.stock_not_tracked`): neither a silent success nor a movement. Everything shows inside the
-window.
+stock control with "This article does not track its stock: there is nothing to write off.": neither a
+silent success nor a movement. Everything shows inside the window.
 Involved: none
 
 ### INVENTORY-F16 Look up the history of movements
@@ -656,7 +694,7 @@ Status: done
 Actor: administrator, manager, employee, cashier
 Screen: Movements
 Steps:
-1. Open **Inventory → Movements**: the most recent first.
+1. Open Inventory's **Movements** tab: the most recent first.
 2. Search by product, SKU or reference, or type the number of a ticket, an invoice or a sale: that sale
    shows and, if it was voided, its void.
 3. Filter by Type or by Reference; sort by Date, Quantity or Balance.
@@ -677,7 +715,7 @@ Status: done
 Actor: administrator, manager, employee, cashier
 Screen: Dashboard
 Steps:
-1. Open **Inventory → Dashboard**: "Tracked products", "In stock", "Out of stock" (balance 0 or less),
+1. Open Inventory's **Dashboard** tab: "Tracked products", "In stock", "Out of stock" (balance 0 or less),
    "Low stock" (balance equal to or below its threshold) and "Inventory value" at cost. Tapping one of
    the first four leads to **Products**.
 2. Below, "Low stock products", from the one with least to the one with most, with its threshold.
@@ -720,10 +758,10 @@ Status: done
 Actor: administrator, manager
 Screen: Settings
 Steps:
-1. Open **Inventory → Settings**. The administrator and the manager see and save it, the same from the
+1. Open Inventory's **Settings** tab. The administrator and the manager see and save it, the same from the
    tab as through the assistant.
-2. "Track stock" (out of the box, on): it is what the items that have not decided for themselves do
-   (INVENTORY-F20).
+2. "Track stock" (out of the box, on): it is what the items that have not decided for themselves on
+   their card do.
 3. "Allow selling without stock" (out of the box, off): on, a sale lowers the stock even if it goes
    negative; off, if a sale asks for more than what is left, that item lowers nothing (the sale is
    charged all the same) and a write-off without a sale is refused.
@@ -732,14 +770,14 @@ Steps:
    send one). Changing it does not touch the products that already exist.
 5. Tap "Save" (off until you change something): only what you changed is sent and "Settings saved."
    shows above the button.
-   What is changed while it is saving is not lost: it stays on screen, still to save (hub#914).
+   What is changed while it is saving is not lost: it stays on screen, still to save.
 In: the business's saved settings (one per business); if they were never saved, the factory ones apply.
 Out: the settings, which apply from the next movement. They only tell the open screens (the Dashboard and
 the lists refresh); no other app reacts.
 If it fails: "The settings could not be saved." and the reason below the field (an empty threshold or one
 with decimals: "Enter a whole number."). As in the form windows, the notice goes as soon as something is
 changed and a field's reason as soon as that field is corrected; both come back if the next try is
-refused too. A refusal that names no field stays until the next try (hub#871). If, with the tab open, another person without the
+refused too. A refusal that names no field stays until the next try. If, with the tab open, another person without the
 permission comes in (shift change), the fields lock, "Save" disappears and "You do not have permission
 to change these settings. Ask an administrator if you need it." shows.
 Involved: SALE-F01
@@ -759,7 +797,7 @@ Out: the item's decision; Inventory tells of the change. The item's applies; if 
 business's; if the business never saved settings, yes. A service never has control. Without control,
 the sale does not move it, it does not show in low stock nor in the Dashboard's figures and it does not
 cross its minimum; receiving and counting do move it.
-If it fails: the form's refusals (INVENTORY-F01). Once decided, the item does not go back to "Following
+If it fails: the refusals of the product's form. Once decided, the item does not go back to "Following
 the hub setting".
 Involved: SALE-F01
 
@@ -852,14 +890,14 @@ Status: done
 Actor: administrator, manager, employee, cashier
 Screen: Product card
 Steps:
-1. Open the product's card (tap the row or "⋮" → "Details"): the barcode of its SKU shows on a white plate,
+1. Open the product's card (tap the row or, in its "⋮", "Details"): the barcode of its SKU shows on a white plate,
    with the SKU below, which also reads with the dark theme.
 2. Tap "Print barcode".
 3. The label (name, barcode and price) goes to Printing's queue, to the printer with the "Label"
-   function, and the card says "The label went to the printer "<name>".". The device that collects that
-   printer's jobs prints it (PRINTING-F12). Each tap prints one label.
+   function, and the card says which one it went to ("The label went to the printer «Counter».").
+   The device that collects that printer's jobs prints it. Each tap prints one label.
 4. If no printer has the "Label" function, the label waits in the queue and the card says so: "The
-   label is waiting in the print queue: no printer has the "Label" function. Give it to one in
+   label is waiting in the print queue: no printer has the «Label» function. Give it to one in
    Printing.".
 In: the product's SKU, name and price; the printer with the "Label" function, from Printing. It can also
 be asked for through the assistant ("print the shampoo's label") or through the API.
@@ -871,7 +909,7 @@ open it, the card says why: "Could not print the barcode label: this version of 
 print; update it" (or the reason that applies). A SKU with letters a
 barcode does not carry (accents, ñ) is neither drawn nor printed: "This SKU cannot be turned into a
 barcode: use letters without accents, digits and signs.". Any other refusal shows inside the card:
-"Could not print the barcode label: <reason>".
+"Could not print the barcode label:" followed by the reason.
 Involved: PRINTING-F04, PRINTING-F12
 
 ### INVENTORY-F26 Sell by weight or by measure: units and step
@@ -886,14 +924,14 @@ Steps:
 3. The initial stock, the threshold, the goods receipt, the count and the write-off only take quantities
    of that step.
 4. On the till the item is sold by typing the quantity (0.532 kg) and the sale lowers that exact
-   quantity, without rounding (SALE-F10).
+   quantity, without rounding.
 In: the business's units, which arrive when Inventory is turned on.
 Out: the product with its unit. Sales reads it for the line; the price is per 1 of the unit. Through the
 assistant or the API, the price can refer to another quantity (per 100 g, or per kilo with the stock in
 grams).
 If it fails: "The quantity does not respect the step allowed for this unit" on screen; "The quantity
 does not respect the step allowed for this unit: use multiples of …" through the assistant or the API.
-The unit of a product with stock is not changed (INVENTORY-F02).
+The unit of a product with stock is not changed.
 Involved: SALE-F10
 
 ### INVENTORY-F27 Hand the catalog to the till, to Kitchen and to Menus
@@ -945,7 +983,7 @@ Status: done
 Actor: administrator, manager
 Screen: Products; Product card
 Steps:
-1. A dish or an item runs out halfway through the day: in **Inventory → Products**, find it and, in its
+1. A dish or an item runs out halfway through the day: in the **Products** tab, find it and, in its
    row's "⋮" menu, tap "Mark sold out". Also from its card, with "Mark sold out", or by telling the
    assistant ("the croquettes have run out").
 2. The row shows the "Sold out" badge next to its switch, which stays on: the item is not turned off nor
@@ -980,7 +1018,7 @@ Steps:
    "Fitness" and "Spa and wellness" narrow by sector; they come 60 at a time with "Load more".
 3. Tap an image: the window closes and the form shows it in "Photo", with "Change" and "Remove photo".
 4. Tap "Save" or "Save changes": the photo stays on the item. "Cancel editing" or closing the panel asks
-   "Discard changes?" first and, with "Discard changes", discards it (INVENTORY-F01, step 7).
+   "Discard changes?" first and, with "Discard changes", discards it.
 5. Through the assistant: "put a photo on the white coffee". The assistant searches by the item's name,
    shows up to five candidate images by their title and asks which one; it never sets one on its own.
    When one is chosen, it asks for the one-tap confirmation card and sets it.
@@ -1024,9 +1062,9 @@ previous one from the folder; deleting the item (INVENTORY-F04), too. The upload
 If it fails: next to "Photo", when choosing it, and nothing is uploaded: an image of more than 2 MB, "The
 photo weighs more than 2 MB. Choose a lighter one."; a file that is not an image, "That file is not a
 photo. Upload a JPG, PNG or WebP image.". If the item was saved and the photo was not, the panel says so
-("The product has been saved, but the photo has not: <reason>") with "Retry", which only uploads the
-photo again, and the item keeps the photo it had; the reason is, with no space in the plan, "There is no
-space left for that file: your plan includes <space>." and, if the storage does not answer, "The photo
+("The product has been saved, but the photo has not:" followed by the reason) with "Retry", which only
+uploads the photo again, and the item keeps the photo it had; the reason is, with no space in the plan,
+"There is no space left for that file: your plan includes 1 GB." (your plan's space) and, if the storage does not answer, "The photo
 could not be saved. Try again.".
 Involved: INVENTORY-F01, INVENTORY-F02, INVENTORY-F04, INVENTORY-F32, BASE-F40
 
@@ -1041,7 +1079,7 @@ Steps:
    never a gap or a broken image.
 3. The menus' tiles (Menus) follow the same rule: their photo if they have one and, if not, their
    initials.
-4. In **Inventory → Products**, each row carries before the name, in the "Photo" column, the photo's
+4. In Inventory's **Products** tab, each row carries before the name, in the "Photo" column, the photo's
    thumbnail (or the initials), and each card its "Photo" line; the product's card shows it at the top,
    larger.
 In: each item's photo, from the library or its own.
@@ -1123,13 +1161,13 @@ Steps:
    nuts, Celery, Mustard, Sesame, Sulphites, Lupin and Molluscs. When creating, none comes marked.
 2. Tap the ones the product has: each tap marks or unmarks one. There are no others: it is the list of the European
    regulation and it is not extended.
-3. Tap "Save" or "Save changes", as when creating and editing (INVENTORY-F01, INVENTORY-F02). An allergen marked and
+3. Tap "Save" or "Save changes", as when creating and editing. An allergen marked and
    not saved asks before the panel closes, like any other field.
 4. The **product card** says "Allergens: Gluten, Milk", in the order of the list, or "No allergens declared" if it
    has none marked.
-5. To have the whole menu in writing, export the catalogue (INVENTORY-F11): the file carries the "Allergens" column,
-   with their names separated by commas ("Gluten, Milk") and empty if it has none. The import (INVENTORY-F09)
-   recognises that column in the products it creates, with the names in Spanish or in English, with or without
+5. To have the whole menu in writing, export the catalogue with the export CSV button: the file carries the
+   "Allergens" column, with their names separated by commas ("Gluten, Milk") and empty if it has none. The import
+   of a CSV recognises that column in the products it creates, with the names in Spanish or in English, with or without
    accents and in upper or lower case; a SKU that already exists is skipped as always and its allergens do not
    change.
 In: the product; the list of the fourteen allergens.
@@ -1140,7 +1178,8 @@ permissions ("mark gluten and milk on the burger" asks for the confirmation card
 is ordered from that moment on: a line already ordered keeps the allergens it had when it was ordered (SALE-F40).
 If it fails: an allergen that is not on the list is refused, also through the assistant or the API, and nothing is
 saved ("That allergen is not one of the fourteen that must be declared."). In the import, a cell with a name that
-is not recognised leaves the row as failed with the reason "Allergen not recognised: <text>". Whoever can only see
+is not recognised leaves the row as failed with the reason "Allergen not recognized:" followed by the name the file
+brings. Whoever can only see
 products reads the line of the card, but has no form. Every refusal shows inside the panel, like those of the rest
 of the form.
 Involved: INVENTORY-F01, INVENTORY-F02, INVENTORY-F09, INVENTORY-F11, INVENTORY-F27, INVENTORY-F34, SALE-F40, SALE-F41,
