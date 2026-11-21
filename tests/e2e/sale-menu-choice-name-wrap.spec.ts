@@ -6,7 +6,7 @@
 // What a run makes — products `E2E-SMW-<run>-…` and its menu «e2e Wrap Menu …» — goes.
 import { expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, capture, horizontalOverflow, hostPage, login, psql, shown } from './helpers';
+import { A, capture, horizontalOverflow, hostPage, login, psql, saveSessionForTheSweep, shown } from './helpers';
 import { cleanInventory, createProduct } from './inventory-helpers';
 import { drawerOff, restoreDrawer, stamp } from './sale-helpers';
 import { post } from './service-helpers';
@@ -100,6 +100,7 @@ test.afterAll(() => {
 async function openMenu(page: Page): Promise<Locator> {
   await page.setViewportSize({ width: 1280, height: 720 });
   await login(page, A, '/sale/pos');
+  await saveSessionForTheSweep(page.context());
   await shown(page).locator(`[data-testid=pos-menu-${menuId}]`).click();
   const sheet = page.locator('ion-modal[data-testid=pos-menu]');
   await expect(sheet).toBeVisible();
