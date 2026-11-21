@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:46fac7ab34632c7280755acf47fa7ee55ddbbb0de30721b5aeb03ffb47f89d77 -->
+<!-- generated from WORKBOOK.md sha256:e9d5432543507d86dc90f51fa18933a1bf275f4a12c6f4fbe18fb71ed861720a -->
 
 ## What it is for and who it is for
 
@@ -65,9 +65,11 @@ Here the official specification prevails over the market:
   notice "You cannot issue invoices yet" on any screen, with "Set up your business details". The issuer is typed
   here, by hand: it does not come from the
   ERPlora account.
-- **"Today" is Madrid time** in phase 1 (the Hub does not keep the business's time zone yet): it decides
-  the date of each document and, with it, the year of its series. A charge at 00:30 on 1 January numbers
-  in the new year's series.
+- **"Today" is the business's day**, in its time zone (the one in "Settings"), not Madrid's: it decides the
+  date of each document and, with it, the year of its series. A charge at 00:30 on 1 January numbers in the
+  new year's series, and one at 23:30 on 31 December in the Canary Islands in the series of the year that ends,
+  even if it is already 1 January in Madrid. A refund or a void carries as its operation date the business's
+  day they were made on.
 - The series are created by themselves the first time they are used in the year: "TICKET" (tickets, F2),
   "FACT" (full and replacing invoices, F1 and F3) and "RECT" (rectifying invoices, R1–R5), with the code
   as prefix (`TICKET-2026-000001`). The one of a new year inherits the name, the prefix and the format of

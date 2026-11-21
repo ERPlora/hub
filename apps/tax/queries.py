@@ -58,7 +58,7 @@ from apps.tax.schemas import (
     normalize_text,
 )
 from base import operations as platform
-from base.business import babel_locale, country_name, country_or_market
+from base.business import babel_locale, business_zone, country_name, country_or_market
 from base.ordering import list_order
 
 CATEGORY_NOT_FOUND = _("This tax category does not exist.")
@@ -137,8 +137,8 @@ class Resolution:
 
 
 def business_today() -> dt.date:
-    """The business's today (the Hub's time zone), not UTC: the till sells on the local date."""
-    return timezone.localdate()
+    """The business's today, on its clock (``business_zone``), not UTC: the till sells on the local date."""
+    return timezone.localdate(timezone=business_zone())
 
 
 def _in_force(rules: QuerySet, on: dt.date) -> QuerySet:

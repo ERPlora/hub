@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:5a826c5b81e20b884f726c02aee85033e8dbee76a936a2e4a25483c6be937a63 -->
+<!-- generated from WORKBOOK.md sha256:becf7f63b3ac82cbb358902aea4f8abf0afe215e95498b99ede7900d8266deea -->
 
 ## What it is for and who it is for
 
@@ -74,9 +74,8 @@ country.
   it: until it creates its own in Rules (TAX-F04, TAX-F12), the till and the invoices charge nothing it
   sells, and the "Your taxes" notice and the step of the Home (TAX-F17) tell it that its country brings no
   factory rates.
-- **"Today" is Madrid time** in phase 1: Taxes does not use the business's time zone yet. The day a rate
-  changes (TAX-F07) starts at midnight in Madrid; in the Canary Islands (TAX-F11), one hour before their
-  midnight. When it uses the business's, "today" will be its own.
+- **"Today" is the business's day**, in its time zone (the one in "Settings"): the day a rate changes
+  (TAX-F07) starts at its midnight, also in the Canary Islands (TAX-F11), not at Madrid's.
 
 Initial setup, step by step:
 
@@ -502,7 +501,7 @@ Steps:
 2. The base, the tax amount, the total, the combined rate, the qualification, the applied rule and the
    breakdown by component are obtained.
 In: amount in cents, category, country (at first, the business's with its tax region, TAX-F11: the one
-chosen when it was signed up on erplora.com, Spain without a country), region and date (at first, today; in phase 1, today in Madrid). If a country is given, it calculates in that country
+chosen when it was signed up on erplora.com, Spain without a country), region and date (at first, today in the business's time zone). If a country is given, it calculates in that country
 and in the region given, without the business's region.
 Out: only the answer; it saves nothing and announces nothing. Without the tax included, each component's
 tax is base × rate rounded to the cent, half up. With the tax included, the base is the amount ÷ (1 +

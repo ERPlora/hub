@@ -6,9 +6,7 @@ documents of a series queue and a refused one leaves no gap) and the document, i
 ``invoice.invoice.issued`` are written together. A document is never edited: only ``status`` and
 ``paid_at`` move (paid, cancelled when rectified whole). The operations that act on a sale or on a
 document lock its row first, so a repeated or simultaneous request waits and answers what the first one
-did, without spending a number.
-
-The clock is ``_now()``: the business's day is its date in the Hub's time zone (Madrid).
+did, without spending a number. The clock is ``_now()``, and a day is its date on the business's (``business_zone``).
 """
 
 import datetime as dt
@@ -92,6 +90,7 @@ from apps.tax.queries import (
     tax_kind_of,
 )
 from base import operations as base_operations
+from base.business import business_zone
 
 logger = logging.getLogger(__name__)
 
@@ -193,7 +192,7 @@ def _now() -> dt.datetime:
 
 
 def _today() -> dt.date:
-    return timezone.localdate(_now())
+    return timezone.localdate(_now(), business_zone())
 
 
 def actor(ctx: OperationContext) -> str:
@@ -399,7 +398,7 @@ def _issue(  # noqa: PLR0913
         year=series.year,
         sequence=sequence,
         number=number,
-        issue_date=issue_date or timezone.localdate(now),
+        issue_date=issue_date or timezone.localdate(now, business_zone()),
         operation_date=operation_date,
         issued_at=now,
         base_amount=base,
@@ -1262,7 +1261,7 @@ def rectify_from_refund(ctx: OperationContext, data: FromRefundIn) -> dict:
         reason=refund.reason,
         invoice_type=rectifying_type(original),
         source_type=Invoice.Source.REFUND,
-        operation_date=timezone.localdate(refund.created_at),
+        operation_date=timezone.localdate(refund.created_at, business_zone()),
         line_description=_refund_concept(refund),
         source_refund=refund,
         returned=None if closes else _returned_by_key(refund),
@@ -1318,7 +1317,7 @@ def rectify_from_void(ctx: OperationContext, data: FromVoidIn) -> dict:
         reason=sale.void_reason,
         invoice_type=rectifying_type(original),
         source_type=Invoice.Source.VOID,
-        operation_date=timezone.localdate(sale.voided_at or _now()),
+        operation_date=timezone.localdate(sale.voided_at or _now(), business_zone()),
         line_description=sale.void_reason,
     )
     _tell_sales(ctx, rectification, sale.void_invoice_status)

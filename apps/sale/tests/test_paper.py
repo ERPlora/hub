@@ -39,7 +39,7 @@ def charged(key="paper-sale-1", lines=None, payments=None, **more):
 
 def test_a_ticket_says_what_the_screen_paper_says(bar):
     sale = charged()
-    kind, document = paper.receipt(sale, letterhead=LETTERHEAD, footer="Thank you!", decimals=2, duplicate=False)
+    kind, document = paper.receipt(sale, letterhead=LETTERHEAD, footer="Thank you!", duplicate=False)
     assert kind == "receipt"
     assert documents.problems(kind, document) is None
     # A simplified invoice names its issuer and its tax ID (RD 1619/2012, art. 7; hub#458).
@@ -58,14 +58,17 @@ def test_a_ticket_says_what_the_screen_paper_says(bar):
     assert (document["total"], document["paid"], document["change"]) == (7.5, 10.0, 2.5)
     assert round(document["subtotal"] + document["tax_amount"], 2) == document["total"]
     assert document["payment_method"] == sale.payment_method_name
-    assert (document["cashier"], document["duplicate"], document["receipt_footer"]) == (sale.created_by, False, "Thank you!")
+    assert (document["duplicate"], document["receipt_footer"]) == (False, "Thank you!")
+    # Who charged it is added by whoever prints it, by name (hub#1985): never the account's internal id.
+    assert "cashier" not in document
+    assert paper.cashier("Bea Ruiz") == {"cashier": "Bea Ruiz"} and paper.cashier("") == {}
     assert "qr_data" not in document
 
 
 def test_a_reprint_says_duplicate_and_a_business_without_issuer_prints_no_tax_id(bar):
     sale = charged()
     bare = {"name": "Bar Ana", "tax_id": "", "lines": []}
-    _, document = paper.receipt(sale, letterhead=bare, footer="", decimals=2, duplicate=True)
+    _, document = paper.receipt(sale, letterhead=bare, footer="", duplicate=True)
     assert (document["duplicate"], document["business_name"]) == (True, "Bar Ana")
     assert not {"vat_number", "business_address", "receipt_footer"} & set(document)
 
@@ -77,7 +80,7 @@ def test_a_gift_a_voucher_line_and_the_discount_say_so_as_on_screen(bar):
         discount_percent="10",
     )
     with translation.override("es"):
-        _, document = paper.receipt(sale, letterhead=LETTERHEAD, footer="Gracias", decimals=2, duplicate=False)
+        _, document = paper.receipt(sale, letterhead=LETTERHEAD, footer="Gracias", duplicate=False)
     assert document["items"][0]["name"] == "Coffee (Invitación)"
     # The discount is already inside the amounts: it is said under them, never subtracted again.
     assert "discount" not in document
@@ -88,7 +91,7 @@ def test_a_gift_a_voucher_line_and_the_discount_say_so_as_on_screen(bar):
 def test_the_fiscal_qr_opens_the_paper_with_its_legal_texts(bar):
     sale = charged()
     record = {"qr_url": "https://prewww2.aeat.es/wlpl/TIKE-CONT/ValidarQR?nif=B12345674&numserie=T-1", "csv": ""}
-    _, document = paper.receipt(sale, letterhead=LETTERHEAD, footer="", decimals=2, duplicate=False, record=record)
+    _, document = paper.receipt(sale, letterhead=LETTERHEAD, footer="", duplicate=False, record=record)
     assert (document["qr_data"], document["qr_heading"], document["qr_legend"]) == (
         record["qr_url"],
         "QR tributario:",
@@ -104,7 +107,7 @@ def test_a_full_invoice_carries_both_parties_and_its_breakdown(bar):
         customer_address="Calle Real 2",
         payments=[{"method": "card"}],
     )
-    kind, document = paper.receipt(sale, letterhead=LETTERHEAD, footer="", decimals=2, duplicate=False)
+    kind, document = paper.receipt(sale, letterhead=LETTERHEAD, footer="", duplicate=False)
     assert kind == "invoice"
     assert documents.problems(kind, document) is None
     assert (
@@ -146,5 +149,5 @@ def test_a_discount_in_a_currency_written_in_letters_keeps_the_code_off_the_figu
     sale = charged(payments=[{"method": "card"}], discount_percent="10")
     assert sale.currency == "PLN"
     with translation.override("en"):
-        _, document = paper.receipt(sale, letterhead=LETTERHEAD, footer="", decimals=2, duplicate=False)
+        _, document = paper.receipt(sale, letterhead=LETTERHEAD, footer="", duplicate=False)
     assert document["receipt_footer"] == "Discount of PLN\xa00.75, already applied to the amounts above."

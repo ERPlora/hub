@@ -535,8 +535,7 @@ horario» de «Termina de configurar tu negocio» (SCHEDULE-F03).
   especial repetido lo para la restricción única, traducida al mismo 409.
 - **Zona horaria**: `base.business.business_zone()`, el único sitio que la lee (hub#687): la zona del hub en el que se
   trabaja (`base.Hub.timezone`, en la BD de control, la manda el SaaS), o la del despliegue si no tiene una que Python
-  conozca. Las horas son de pared; un instante con zona se convierte con `zoneinfo` (cambio de hora incluido). «Hoy» en
-  Impuestos aún es el de `TIME_ZONE` (hub#772).
+  conozca. Las horas son de pared; un instante con zona se convierte con `zoneinfo` (cambio de hora incluido).
 - **Librerías**: ninguna nueva. La zona y el cambio de hora son `zoneinfo` y `datetime` de la biblioteca
   estándar (Python 3.14 lee RFC 3339 con `datetime.fromisoformat`). No hay calendario de festivos
   precargado, así que `holidays` no hace falta.

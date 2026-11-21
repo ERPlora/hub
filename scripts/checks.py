@@ -8,7 +8,8 @@ commit, in a temporary worktree.
    - ESLint on its TypeScript, JavaScript and Vue files, the typecheck when it touches any, and the Vitest tests related
      to them.
    - pytest on its test files and on each touched module's ``test_<module>.py``, on the Postgres of compose.yaml, in a
-     test database of this checkout's own unless TEST_DB_NAME names one.
+     test database of this checkout's own unless TEST_DB_NAME names one. A touched WORKBOOK runs its module's
+     ``test_workbook.py`` and the tests that read every WORKBOOK.
 
 Every check runs, and any red one fails the command. The whole suite is the CI's (.github/workflows/test.yml).
 
@@ -23,6 +24,7 @@ import argparse
 import hashlib
 import io
 import os
+import re
 import subprocess
 import sys
 import tarfile
@@ -34,6 +36,15 @@ GUARDRAILS = (
     "tests/test_guardrails_ruff.py",
     "tests/test_guardrails_complexity.py",
     "tests/test_guardrails_imports.py",
+)
+WORKBOOK = re.compile(r"WORKBOOK(?:\.[a-z]{2})?\.md")
+#: The tests that read every WORKBOOK of the repository, run when any of them changes.
+EVERY_WORKBOOK_TESTS = (
+    "base/tests/test_workbooks_scheduled_tasks.py",
+    "tests/test_help_workbooks.py",
+    "tests/test_qa_coverage.py",
+    "tests/test_workbook_only_useful.py",
+    "tests/test_workbook_translations.py",
 )
 FRONTEND = (".ts", ".vue", ".js", ".mjs")
 UI = Path("packages/ui")
@@ -68,12 +79,16 @@ def touched(point: str) -> list[str]:
 
 def tests_of(path: Path) -> list[Path]:
     """The test file itself, or the module's ``test_<module>.py`` (``test_<package>_<module>.py`` too, for a module of a
-    package such as services/) in the tests folder of the nearest package that has one."""
+    package such as services/) in the tests folder of the nearest package that has one. A WORKBOOK in either language
+    is the module's ``test_workbook.py`` and the tests that read every WORKBOOK."""
     if path.name.startswith("test_") and path.suffix == ".py":
         return [path]
+    workbook = WORKBOOK.fullmatch(path.name) is not None
+    stem = "workbook" if workbook else path.stem
     home = next((parent for parent in path.parents if (parent / "tests").is_dir()), Path())
-    names = {f"test_{path.stem}.py", f"test_{path.parent.name}_{path.stem}.py"}
-    return sorted(home / "tests" / name for name in names if (home / "tests" / name).is_file())
+    names = {f"test_{stem}.py", f"test_{path.parent.name}_{stem}.py"}
+    own = [home / "tests" / name for name in names if (home / "tests" / name).is_file()]
+    return sorted([*own, *map(Path, EVERY_WORKBOOK_TESTS)] if workbook else own)
 
 
 def unpack(clone: Path, into: Path) -> None:

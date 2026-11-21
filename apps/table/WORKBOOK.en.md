@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:970d65bf3d85d994224b3fcba3f1759268e6fcce128945fe790e6db17c62f965 -->
+<!-- generated from WORKBOOK.md sha256:f5b1153fcdef59eec531be30d33318c3272c622409584cc199d3893e8e0588e1 -->
 
 ## What it is for and who it is for
 
@@ -122,9 +122,10 @@ the plan) and, in "Edit plan", a "+" ("Add zone or table") and a pencil ("Edit z
 in its zone's colour and the number of occupied tables over those in service ("7/12"). Below, a card
 summarises the chosen zone: available, occupied, reserved tables and guests.
 
-On tablet and desktop, the plan adjusts the place and size of the tables by itself to show the whole zone
-while they can still be read. If it still does not fit, it scrolls within its frame, sideways and up and
-down, with a fade at every edge that has tables behind it; the background can be dragged with the mouse
+On tablet and desktop, the plan frames the zone's tables, from the first to the last even when they are far
+from the corner of the plan, and adjusts their place and size by itself to show them all while they can
+still be read; "Edit plan" shows it from its corner, so a table can be placed anywhere. If it still does
+not fit, it scrolls within its frame, sideways and up and down, with a fade at every edge that has tables behind it; the background can be dragged with the mouse
 and, with the plan selected, the keyboard's arrows scroll it. There are no zoom buttons. The grid only
 shows in "Edit plan". On a phone, "Service" shows the tables as two-column cards, each with the drawing of
 the table and its seats, the number, the status and the time; "Edit plan" is still the plan.
@@ -456,9 +457,9 @@ Steps:
 1. Open **Tables → Floor plan** and choose the zone: its content shows at once, without waiting to load.
    The tab says how many tables are occupied and the card summarises available, occupied, reserved tables
    and guests.
-2. On tablet and desktop the plan fits every table to the space; on the phone, "Service" shows them in
-   two-column cards. Each table says its status in writing, with an icon, shape, seats and colour:
-   Available, Occupied, Reserved or Blocked.
+2. On tablet and desktop the plan frames the zone's tables, from the first to the last, and fits them to
+   the space; on the phone, "Service" shows them in two-column cards. Each table says its status in
+   writing, with an icon, shape, seats and colour: Available, Occupied, Reserved or Blocked.
 3. An occupied table shows the time ("0:35") and guests ("3/4 pax"); the time moves forward by itself and
    past the warnings in Settings only the time and its arc change colour. A table with a booking today says
    its name and time. Who serves it is seen in its window.

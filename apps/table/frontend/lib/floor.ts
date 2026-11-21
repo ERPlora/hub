@@ -37,6 +37,21 @@ export function planeSize(tables: readonly Box[], floor?: Size): Size {
   return { w: Math.ceil(w), h: Math.ceil(h) };
 }
 
+/** A part of the plan: its top left corner and its size. */
+export interface Frame extends Size {
+  x: number;
+  y: number;
+}
+
+/** The part of the plan the tables take, from the nearest edges of any table to the far edges of the farthest. */
+export function tablesFrame(tables: readonly Box[]): Frame {
+  if (tables.length === 0) return { x: 0, y: 0, w: 0, h: 0 };
+  const x = Math.min(...tables.map((table) => table.position_x));
+  const y = Math.min(...tables.map((table) => table.position_y));
+  const far = planeSize(tables);
+  return { x, y, w: far.w - x, h: far.h - y };
+}
+
 /** A position inside `plane` for a table of `box`: it never leaves the plan, painted whole. */
 export function clampPosition(x: number, y: number, box: Size, plane: Size): { x: number; y: number } {
   const maxX = Math.max(0, plane.w - box.w - TILE_CHROME);
