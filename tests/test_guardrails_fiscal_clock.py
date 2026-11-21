@@ -3,7 +3,8 @@
 The issue date of an invoice, the day of a sale and Taxes' «today» are on the business's clock, and they move together:
 the rate a «today» proposes or charges has to be the one in force on the date the record says, or the TipoImpositivo
 and the Huella of a record change on the day a rate changes (the form proposes 10 % and the invoice goes out dated the
-day of the 21 %). The hour a record is generated at is still the deployment's (Madrid). The records are sealed, never
+day of the 21 %). The hour a record is generated at is on the same clock, with its offset: east of Madrid, a record
+issued after its midnight is generated on the day it is issued, not the day before. The records are sealed, never
 sent: nothing here leaves the machine. The business is ``hub_a``, in its own database.
 """
 
@@ -66,22 +67,22 @@ INVOICE_OF_THE_2ND = ("02-11-2026", "Course", "10.00", "1.00", "11.00")
 SALES = [
     pytest.param(
         BOGOTA,
-        Sent(*SALE_OF_THE_2ND, "2026-11-03T05:30:00+01:00", "4C8E8FB32085E9F6D963CC06A05579C986D8DA20A6A688B2C0422AB8D2856A7B"),
+        Sent(*SALE_OF_THE_2ND, "2026-11-02T23:30:00-05:00", "B439D6BE7E6DF76A8D1006F8777F20AF8EAF2B375A3353AC2D4EB3CE450AE624"),
         id="bogota-2330",
     ),
     pytest.param(
         CANARY,
-        Sent(*SALE_OF_THE_2ND, "2026-11-03T00:30:00+01:00", "5C33597617223FCD7D67528A27A331357410224922165D283516E12C3CEBD205"),
+        Sent(*SALE_OF_THE_2ND, "2026-11-02T23:30:00+00:00", "F01C6B125FFB554DC1E0C26EF4209F46A11BDEB8F9D3F1B8351FF0D9A9ED5237"),
         id="canary-2330",
     ),
     pytest.param(
         TOKYO_NIGHT,
-        Sent(*SALE_OF_THE_2ND, "2026-11-02T15:30:00+01:00", "B1EC9B4B856B3E37A6CA6B5A7660F74591EC742058E74C540C50E0A249F81739"),
+        Sent(*SALE_OF_THE_2ND, "2026-11-02T23:30:00+09:00", "D6A7DBBBA787E4E3CF10436902F7CF9908F4939932557536E5D90F03F61BE4C3"),
         id="tokyo-2330",
     ),
     pytest.param(
         TOKYO_MORNING,
-        Sent(*SALE_OF_THE_3RD, "2026-11-02T16:30:00+01:00", "26D3C9A99D7D55946CBB1D75C442F00317C2EBE66664347C80B39D07DA98E28F"),
+        Sent(*SALE_OF_THE_3RD, "2026-11-03T00:30:00+09:00", "E21D1397DEBFB2B2D8AC0A89A8487AE6ABF0311467578AF715D743D2F5AA1841"),
         id="tokyo-0030",
     ),
     pytest.param(
@@ -93,22 +94,22 @@ SALES = [
 INVOICES = [
     pytest.param(
         BOGOTA,
-        Sent(*INVOICE_OF_THE_2ND, "2026-11-03T05:30:00+01:00", "15EC87FB5B392C5CE2E956B4A43D59DC53ED797ABB49960960005F94BEA26C8E"),
+        Sent(*INVOICE_OF_THE_2ND, "2026-11-02T23:30:00-05:00", "7B8D362969E96DA7986D357DF065BBDA604127A6E1F636B1AC1140640B4A47F9"),
         id="bogota-2330",
     ),
     pytest.param(
         CANARY,
-        Sent(*INVOICE_OF_THE_2ND, "2026-11-03T00:30:00+01:00", "3BB8494A045563D73010970C45E381F88F717029175285FF67564FE68F6B3361"),
+        Sent(*INVOICE_OF_THE_2ND, "2026-11-02T23:30:00+00:00", "87D122C8FC0FAE310A789D0F0904DEA9E1E22D43D1E15F1C7FB94229758F4ABB"),
         id="canary-2330",
     ),
     pytest.param(
         TOKYO_NIGHT,
-        Sent(*INVOICE_OF_THE_2ND, "2026-11-02T15:30:00+01:00", "1FBC16CB19052777AFC320549648E1DCD9A032A80B6B18EDAADFE6476FFA76E9"),
+        Sent(*INVOICE_OF_THE_2ND, "2026-11-02T23:30:00+09:00", "5B88CAC55D95ADCDCA2C6DEBF7818FAE6B0DBCBF15306A955A64CAF50AD462F0"),
         id="tokyo-2330",
     ),
     pytest.param(
         TOKYO_MORNING,
-        Sent(*INVOICE_OF_THE_3RD, "2026-11-02T16:30:00+01:00", "D0DBB34903547E965D900481593077EA5CC35B0F2070A51B08F79403D7DC418D"),
+        Sent(*INVOICE_OF_THE_3RD, "2026-11-03T00:30:00+09:00", "7DC8AC473F66F7990CFF5DBCAF84557F206FE4897DCD32F7F440AB2C7B3D2583"),
         id="tokyo-0030",
     ),
     pytest.param(

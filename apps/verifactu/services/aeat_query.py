@@ -15,6 +15,7 @@ from apps.verifactu.queries.aeat_records import aeat_row
 from apps.verifactu.queries.country import refuse_outside_spain
 from apps.verifactu.queries.route import config_row, issuer_identity, own_certificate_material, presenter, sending_route
 from apps.verifactu.schemas.aeat_records import AeatQueryIn, AeatQueryOut
+from base.business import business_zone
 
 from .sending import CANNOT_SEND, _outlast_the_gateway
 from .writes import TRANSMIT, _event
@@ -182,7 +183,7 @@ def _query_aeat(  # noqa: PLR0913, PLR0917
 def query_aeat(ctx: OperationContext, data: AeatQueryIn) -> AeatQueryOut:
     refuse_outside_spain(ctx)
     config = config_row()
-    today = timezone.localdate()
+    today = timezone.localdate(timezone=business_zone())
     nif = data.issuer_nif or issuer_identity()[0]
     records = _query_aeat(
         ctx,

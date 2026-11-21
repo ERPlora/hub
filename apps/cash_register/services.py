@@ -76,7 +76,7 @@ from apps.cash_register.schemas import (
     SettingsOut,
     SettingsPatchIn,
 )
-from base.business import business_zone
+from base.business import business_zone, paper_date
 
 SESSION_ALREADY_OPEN = _(
     "There is already an open cash session. Close it before opening another one."
@@ -664,8 +664,8 @@ def _units(cents: int, scale: Decimal, sign: int = 1) -> float:
 
 
 def _report(ctx: OperationContext, session: Session, report: str) -> dict:
-    """The ``cash_session_report`` the receipt printer paints: the session, who, the float and the expected
-    cash at the close (or now), and the detail's figures as its lines, in the language of who prints."""
+    """The ``cash_session_report`` the receipt printer paints: the session, its close (or now), who, the float and
+    the expected cash then, and the detail's figures as its lines, in the language of who prints."""
     scale = Decimal(10) ** currency_decimals(business_currency(ctx))
     with translation.override(ctx.language):
         figures = session_detail(ctx, session)["summary"]
@@ -684,6 +684,7 @@ def _report(ctx: OperationContext, session: Session, report: str) -> dict:
             cashier = str(CLOSED_BY_ITSELF) if session.auto_closed else session.closed_by
     return {
         "receipt_id": f"{session.number} ({report.upper()})",
+        "date": paper_date(session.closed_at or timezone.now()),
         "cashier": cashier,
         "opening_balance": _units(session.opening_balance, scale),
         "closing_balance": _units(figures["expected_cash"], scale),
@@ -746,7 +747,6 @@ def print_session(ctx: OperationContext, data: SessionGetIn) -> dict:
         queued = create(ctx, create.input.model_validate(request))
     except AppInactive:
         return nothing
-    job = queued.job
-    if job is None:
+    if (job := queued.job) is None:
         return nothing
     return {"report": report, "queued": True, "job_id": job.id, "printer": job.printer_name}
