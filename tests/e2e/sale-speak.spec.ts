@@ -113,6 +113,22 @@ test('SALE-F01 / BASE-F94 — offline, «Speak» stays greyed and a tap says why
   expect(transcribed()).toBe(dictations + 1);
 });
 
+// The till can be opened with the connection already gone (the installed app, or coming back to it from another page):
+// Ionic then takes the key's `aria-disabled` off the host as it loads, and the grey must not hang on it.
+test('SALE-F01 — opened with no connection, «Speak» is greyed for the eye and for a screen reader', async ({ page }) => {
+  await login(page, A, '/sale/pos', EMPLOYEE);
+  // The browser says there is no connection from the first script on, while the dev server still serves the page.
+  await page.addInitScript(() => Object.defineProperty(Navigator.prototype, 'onLine', { get: () => false }));
+  for (const vp of VIEWPORTS) {
+    await page.setViewportSize({ width: vp.width, height: vp.height });
+    await till(page);
+    await expect(announced(page)).toHaveAttribute('aria-disabled', 'true');
+    await expect(key(page)).toHaveCSS('opacity', '0.6');
+    await untilStill(page);
+    await page.screenshot({ path: shot(`sale-speak-opened-offline-${vp.label}`) });
+  }
+});
+
 // The dictation is base's (`useDictation`); the key keeps
 // its own offline guard, and a recording stopped once the connection is gone goes through base's `cancel`.
 test('SALE-F01 — a recording stopped once the connection is gone is thrown away untranscribed, and a toast says why', async ({ page }) => {
