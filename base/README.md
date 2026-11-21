@@ -6,8 +6,8 @@ documentación de la API, y por debajo lo que comparten todas las apps: el regis
 de datos por negocio), las operaciones, el outbox y su relevo, las tareas programadas y el contrato con erplora.com
 por `/internal`.
 
-- **Estado**: completa (2026-11-01): 113 de sus 115 flujos (`BASE-F01` … `F116`, sin `F28`) están `hecho`;
-  `BASE-F02` (hub#573) y `BASE-F109` (hub#738) están `parcial`.
+- **Estado**: completa (2026-11-01): 114 de sus 115 flujos (`BASE-F01` … `F116`, sin `F28`) están `hecho`;
+  `BASE-F02` (hub#573) está `parcial`.
 - **Especificación**: [`WORKBOOK.md`](WORKBOOK.md) (en inglés, [`WORKBOOK.en.md`](WORKBOOK.en.md), hasta «Para quien
   lo mantiene»). Lo que se cambie de la plataforma se cambia antes allí; lo que no entra, en su «Lo que queda fuera».
 - **Peticiones** a `@erplora/ui` que siguen abiertas: [`UI-REQUESTS.md`](UI-REQUESTS.md).
@@ -40,15 +40,14 @@ por `/internal`.
   por plan y se le informa de una respuesta mala.
 - **La QA maestra del Hub y el reporte a soporte** (F107, F108).
 - **El borrado de un negocio eliminado** (F109): pasados sus 90 días, su copia final y su base de datos borrada; con
-  documentos, la guarda hasta que exista el archivo fiscal (hub#738).
+  documentos, los escribe antes en el archivo fiscal y, si no puede, no borra nada.
 - **La web por su dominio propio, el corte de la base de datos y las descargas en la app** (F110–F112): abrir la web
   del negocio por su dominio, esperar a la base de datos cuando se corta un momento y guardar un archivo descargado
   dentro de la app.
 
 ## Lo que queda fuera
 
-El detalle está en «Lo que queda fuera» del [`WORKBOOK.md`](WORKBOOK.md): el archivo fiscal antes de borrar un negocio
-con documentos (hub#738), la fila de salud del Inicio en pantalla (hub#573) y la cola de PgBouncer de cada negocio en
-CloudWatch (hub#572). Ya no están fuera, cerradas después del cierre de la app: las cifras de uso y el aviso de ampliar
+El detalle está en «Lo que queda fuera» del [`WORKBOOK.md`](WORKBOOK.md): la fila de salud del Inicio en pantalla
+(hub#573) y la cola de PgBouncer de cada negocio en CloudWatch (hub#572). Ya no están fuera, cerradas después del cierre de la app: las cifras de uso y el aviso de ampliar
 (hub#603), el pase a erplora.com (saas#190), la vista previa de .xlsx y .docx (hub#578), los roles que trae una app,
 que son siempre los cuatro de erplora.com (hub#579), y las novedades en la pantalla de Actualizaciones (hub#576).

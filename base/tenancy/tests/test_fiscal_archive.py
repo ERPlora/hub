@@ -1,8 +1,7 @@
 """The fiscal archive of a business that left with fiscal documents, written before anything of it is dropped.
 
-Its database stays (the drop of such a business is not turned on yet); what changes is that, with
-``FISCAL_ARCHIVE_BUCKET`` named, the worker writes every fiscal document there first, whole and verifiable, and notes
-it on the row. Real databases and a real S3 (moto's) with Object Lock, as aws's bucket.
+With ``FISCAL_ARCHIVE_BUCKET`` named, the worker writes every fiscal document there, whole and verifiable, and notes it
+on the row before the database goes. Real databases and a real S3 (moto's) with Object Lock, as aws's bucket.
 """
 
 import base64
@@ -17,8 +16,8 @@ from botocore.exceptions import ClientError
 from django.utils import timezone
 from live.meta import all_live_app_configs
 
-from base import pdf, worker_data
-from base.tenancy import fiscal_archive, offboarding
+from base import pdf, services, worker_data
+from base.tenancy import dumps, fiscal_archive, offboarding, provision
 from base.tenancy.context import use_hub
 from base.tenancy.tests import s3
 from base.tenancy.tests import test_offboarding as leaving
@@ -77,7 +76,27 @@ def database_rows(hub, labels: list[str]) -> set[tuple[str, str]]:
     return found
 
 
-def test_a_business_with_documents_is_archived_whole_before_anything_goes_and_keeps_its_database(
+def copied(hub) -> None:
+    """The final copy of ``hub``, already made: the pass goes straight to its archive, and what it renews is the
+    archive's."""
+    dumps.dump_hub(hub, kind=HubDump.Kind.OFFBOARDING)
+
+
+def a_drop_step_that_fails_once(monkeypatch) -> None:
+    """The step into ``dropping`` fails once, as if the worker went away right after the archive: the business stays
+    ``archiving`` and is tried again at its next attempt."""
+    real, calls = services.offboarding.offboarding_dropping, []
+
+    def once(*args, **kwargs):
+        calls.append(args)
+        if len(calls) == 1:
+            raise RuntimeError("the worker went away")
+        return real(*args, **kwargs)
+
+    monkeypatch.setattr(services.offboarding, "offboarding_dropping", once)
+
+
+def test_a_business_with_documents_is_archived_whole_before_its_database_goes(
     business, dumps_bucket, fiscal_archive_bucket, moto_s3
 ):
     hub = business(left_days_ago=91)
@@ -85,21 +104,19 @@ def test_a_business_with_documents_is_archived_whole_before_anything_goes_and_ke
         one_sale()
         one_record()
         one_cash_movement()
-    now = timezone.now()
+    apps = ["cash_register", "invoice", "sale", "verifactu"]
+    stored = database_rows(hub, apps)
 
-    run_pass(now)
+    run_pass()
 
     hub = fresh(hub)
-    assert (hub.status, hub.purged_at) == ("cancelled", None)
-    assert hub.db_name in databases()
-    assert hub.last_error == "fiscal_archived: cash_register, invoice, sale, verifactu"
+    assert hub.status == "purged"
+    assert hub.db_name not in databases()
     assert hub.fiscal_archived_at is not None
-    assert hub.next_attempt_at == now + dt.timedelta(days=1)
-    assert not HubDump.objects.filter(hub=hub).exists()
 
     manifest_key, manifest = manifest_of(moto_s3, fiscal_archive_bucket, hub)
     assert manifest["business"]["id"] == str(hub.id)
-    assert manifest["apps"] == ["cash_register", "invoice", "sale", "verifactu"]
+    assert manifest["apps"] == apps
     kept = objects(moto_s3, fiscal_archive_bucket)
     listed = manifest["files"] + manifest["documents"]
     assert set(kept) == {entry["key"] for entry in listed} | {manifest_key}
@@ -110,7 +127,7 @@ def test_a_business_with_documents_is_archived_whole_before_anything_goes_and_ke
     for entry in manifest["files"]:
         assert entry["rows"] == len(body(moto_s3, fiscal_archive_bucket, entry["key"]).splitlines())
     rows = archived_rows(moto_s3, fiscal_archive_bucket, manifest)
-    assert {(row["model"], row["pk"]) for row in rows} == database_rows(hub, manifest["apps"])
+    assert {(row["model"], row["pk"]) for row in rows} == stored
     assert sum(manifest["models"].values()) == len(rows) == manifest["total"]["rows"]
     assert [entry["app"] for entry in manifest["documents"]] == ["invoice"]
     assert (manifest["total"]["files"], manifest["total"]["documents"]) == (len(listed), 1)
@@ -233,6 +250,7 @@ def test_a_large_table_goes_in_parts_read_a_page_at_a_time_and_none_is_lost(
     # Two rows fill a part, so the last of the 7 goes alone; read 3 at a time, a page ends inside a part.
     monkeypatch.setattr(fiscal_archive, "PART_BYTES", 2 * longest - 1)
     monkeypatch.setattr(reads, "PAGE_ROWS", 3)
+    stored = database_rows(hub, ["sale"])
 
     run_pass()
 
@@ -242,7 +260,7 @@ def test_a_large_table_goes_in_parts_read_a_page_at_a_time_and_none_is_lost(
     assert len({entry["key"] for entry in manifest["files"]}) == len(manifest["files"])
     assert manifest["models"]["sale.sale"] == 7
     rows = archived_rows(moto_s3, fiscal_archive_bucket, manifest)
-    assert {(row["model"], row["pk"]) for row in rows} == database_rows(hub, ["sale"])
+    assert {(row["model"], row["pk"]) for row in rows} == stored
 
 
 def test_the_archive_of_one_business_holds_nothing_of_another(business, dumps_bucket, fiscal_archive_bucket, moto_s3):
@@ -255,29 +273,35 @@ def test_the_archive_of_one_business_holds_nothing_of_another(business, dumps_bu
         sale(3)
         invoice(1)
         invoice(2)
+    stored = database_rows(leaving, ["invoice", "sale"])
 
     run_pass()
 
     _, manifest = manifest_of(moto_s3, fiscal_archive_bucket, leaving)
     rows = archived_rows(moto_s3, fiscal_archive_bucket, manifest)
-    assert {(row["model"], row["pk"]) for row in rows} == database_rows(leaving, ["invoice", "sale"])
+    assert {(row["model"], row["pk"]) for row in rows} == stored
     assert [entry["key"].rsplit("/", 1)[-1] for entry in manifest["documents"]] == [f"{own.id}.pdf"]
     assert all(key.startswith(f"{leaving.id.hex}/") for key in objects(moto_s3, fiscal_archive_bucket))
 
 
-def test_an_archived_business_is_not_archived_again(business, dumps_bucket, fiscal_archive_bucket, moto_s3):
+def test_an_archive_made_after_the_final_copy_is_not_made_again_when_the_drop_is_tried_again(
+    business, dumps_bucket, fiscal_archive_bucket, moto_s3, monkeypatch
+):
     hub = business(left_days_ago=91)
     with use_hub(hub):
         one_sale()
-    now = timezone.now()
-    run_pass(now)
-    archived, written = fresh(hub).fiscal_archived_at, objects(moto_s3, fiscal_archive_bucket)
+    a_drop_step_that_fails_once(monkeypatch)
+    run_pass()
+    failed = fresh(hub)
+    archived, written = failed.fiscal_archived_at, objects(moto_s3, fiscal_archive_bucket)
+    assert (failed.status, archived is not None) == ("archiving", True)
 
-    run_pass(now + dt.timedelta(days=1, minutes=1))
+    run_pass(failed.next_attempt_at + dt.timedelta(seconds=1))
 
     hub = fresh(hub)
-    assert (hub.status, hub.fiscal_archived_at, hub.last_error) == ("cancelled", archived, "fiscal_archived: sale")
+    assert (hub.status, hub.fiscal_archived_at) == ("purged", archived)
     assert objects(moto_s3, fiscal_archive_bucket) == written
+    assert HubDump.objects.filter(hub=hub).count() == 1
 
 
 def test_an_archive_made_in_the_very_second_the_90_days_end_is_not_made_again(
@@ -291,16 +315,18 @@ def test_an_archive_made_in_the_very_second_the_90_days_end_is_not_made_again(
     ends = timezone.now().replace(microsecond=900_000)
     type(hub).objects.filter(pk=hub.pk).update(cancelled_at=ends - dt.timedelta(days=90))
     now = ends + dt.timedelta(milliseconds=50)
+    a_drop_step_that_fails_once(monkeypatch)
     with monkeypatch.context() as clock:
         clock.setattr(timezone, "now", lambda: now)
         run_pass(now)
-    archived, written = fresh(hub).fiscal_archived_at, objects(moto_s3, fiscal_archive_bucket)
+    failed = fresh(hub)
+    archived, written = failed.fiscal_archived_at, objects(moto_s3, fiscal_archive_bucket)
     assert archived is not None
 
-    run_pass(now + dt.timedelta(days=1, minutes=1))
+    run_pass(failed.next_attempt_at + dt.timedelta(seconds=1))
 
     hub = fresh(hub)
-    assert (hub.fiscal_archived_at, hub.last_error) == (archived, "fiscal_archived: sale")
+    assert (hub.status, hub.fiscal_archived_at) == ("purged", archived)
     assert objects(moto_s3, fiscal_archive_bucket) == written
 
 
@@ -395,8 +421,6 @@ def test_a_document_that_does_not_read_back_as_written_marks_nothing(
 
 def renewals(monkeypatch) -> list:
     """Each renewal of the worker's lease from now on, by the business it renews."""
-    from base import services
-
     renewed, renew = [], services.reset.renew_lease
     monkeypatch.setattr(services.reset, "renew_lease", lambda hub_id, lease: renewed.append(hub_id) or renew(hub_id, lease))
     return renewed
@@ -409,6 +433,7 @@ def test_the_lease_is_renewed_after_each_file_of_the_archive(
     with use_hub(hub):
         one_sale()
         invoice(1)
+    copied(hub)
     renewed = renewals(monkeypatch)
     s3, read = client(moto_s3), []
     s3.meta.events.register("provide-client-params.s3.HeadObject", lambda params, **kwargs: read.append(len(renewed)))
@@ -432,6 +457,7 @@ def test_the_lease_is_renewed_after_each_page_of_the_pdfs_already_up(
         invoice(1)
     monkeypatch.setattr(pdf, "render_pdf", lambda html: b"%PDF-")
     monkeypatch.setattr(fiscal_archive, "LISTED_AT_ONCE", 1)
+    copied(hub)
     renewed = renewals(monkeypatch)
 
     run_pass()
@@ -487,7 +513,7 @@ def test_a_stopped_archive_takes_up_the_pdfs_already_up_and_prints_none_twice(
     assert manifest["documents"][0]["key"] == first
     for entry in manifest["documents"]:
         assert entry["sha256"] == hashlib.sha256(body(moto_s3, fiscal_archive_bucket, entry["key"])).hexdigest()
-    assert fresh(hub).last_error == "fiscal_archived: invoice"
+    assert fresh(hub).status == "purged"
 
 
 def test_a_pdf_of_an_earlier_attempt_kept_without_its_checksum_marks_nothing(
@@ -527,7 +553,7 @@ def test_a_failed_archive_is_written_whole_the_next_day(business, dumps_bucket, 
     run_pass(now + dt.timedelta(days=1, minutes=1))
 
     hub = fresh(hub)
-    assert (hub.last_error, hub.fiscal_archived_at is not None) == ("fiscal_archived: sale", True)
+    assert (hub.status, hub.fiscal_archived_at is not None) == ("purged", True)
     manifest_of(moto_s3, fiscal_archive_bucket, hub)
 
 
@@ -551,12 +577,16 @@ def test_a_worker_that_stops_during_the_archive_marks_nothing(business, dumps_bu
     hub = business(left_days_ago=91)
     with use_hub(hub):
         one_sale()
+    copied(hub)
+    now = timezone.now()
+    assert services.offboarding.claim_next_data_hub(now, provision.LEASE) == hub.pk
 
     with pytest.raises(fiscal_archive.ArchiveStopped):
-        offboarding.retire(hub.pk, timezone.now(), cancelled=lambda: True)
+        offboarding.retire(hub.pk, now, cancelled=lambda: True)
 
     hub = fresh(hub)
-    assert (hub.status, hub.fiscal_archived_at, hub.attempts) == ("cancelled", None, 0)
+    assert (hub.status, hub.fiscal_archived_at, hub.attempts) == ("archiving", None, 0)
+    assert hub.db_name in databases()
     assert not [key for key in objects(moto_s3, fiscal_archive_bucket) if key.endswith("/manifest.json")]
 
 
