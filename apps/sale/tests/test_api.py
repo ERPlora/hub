@@ -14,7 +14,7 @@ from live.operations import get as get_operation
 
 from apps.sale.api import router
 from apps.sale.tests.conftest import HOST, HUB_DB, A, run
-from base.tests.routes import bound_routes, spa_route_map
+from base.tests.routes import bound_routes, published_routes, spa_route_map
 from config.api import api
 
 ROUTES = {
@@ -115,8 +115,19 @@ def test_every_route_is_bound_to_its_operation():
     assert bound_routes(router) == ROUTES
 
 
-def test_the_spas_route_map_names_every_sale_route():
-    assert spa_route_map("sale.") == {(method, f"/api{path}", op) for method, path, op in ROUTES}
+#: Routes no page calls yet: who serves a check is said by the assistant and the API until the till's chip says it too.
+#: The SPA's map names a route once a page calls it.
+NOT_CALLED_BY_A_PAGE = {("POST", "/sale/orders/set_staff", "sale.order.set_staff")}
+
+
+def test_the_spas_route_map_names_every_sale_route_a_page_calls():
+    called = ROUTES - NOT_CALLED_BY_A_PAGE
+    assert spa_route_map("sale.") == {(method, f"/api{path}", op) for method, path, op in called}
+
+
+@HUB_DB  # the host gate reads the business's row
+def test_the_api_publishes_the_routes_no_page_calls_yet(client):
+    assert NOT_CALLED_BY_A_PAGE <= published_routes(client, "sale.", HOST)
 
 
 def test_no_sale_operation_republishes_the_tax_of_the_territory():

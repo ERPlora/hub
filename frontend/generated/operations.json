@@ -851,10 +851,6 @@
     "method": "post",
     "path": "/api/sale/orders/set_line_discount_over_limit"
   },
-  "sale.order.set_staff": {
-    "method": "post",
-    "path": "/api/sale/orders/set_staff"
-  },
   "sale.order.set_label": {
     "method": "post",
     "path": "/api/sale/orders/set_label"
