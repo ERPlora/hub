@@ -7,6 +7,7 @@ it; a refusal of Printing never spoils the charge.
 """
 
 import dataclasses
+import datetime as dt
 
 import pytest
 from live.operations import registry
@@ -14,6 +15,7 @@ from live.operations import registry
 from apps.printing.models import PrintJob
 from apps.sale.models import Sale
 from apps.sale.tests.conftest import HUB_DB, ctx_for, run
+from base.business import paper_date
 from base.models import Profile
 from apps.sale.tests.test_integration_invoice import ISSUER
 
@@ -175,6 +177,18 @@ def test_a_reprint_is_a_copy_with_its_own_key_each_time(bar, till):
     assert len({job.job_key for job in jobs()}) == 3
     assert all(job.reference == out.invoice_number for job in jobs())
 
+
+
+def test_a_reprint_says_when_the_sale_was_charged_not_the_hour_it_prints(bar, till, monkeypatch, in_business_a):
+    """ERPlora/app#77: a coffee charged at 15:41 and reprinted at 16:20 said «16:20», the device's hour, on the paper
+    and not the sale's, the one on its invoice and its QR. The paper brings it, on the business's clock."""
+    monkeypatch.setattr(in_business_a, "timezone", "Europe/Madrid")
+    out = charge("sale-print-date")
+    Sale.objects.filter(pk=out.id).update(created_at=dt.datetime(2026, 11, 21, 14, 41, tzinfo=dt.UTC))
+    run("sale.sale.print", {"sale_id": str(out.id)})
+    original, copy = jobs()
+    assert original.document["date"] == paper_date(out.created_at)
+    assert copy.document["date"] == "21/11/2026 15:41"
 
 def test_the_first_paper_after_charging_can_be_the_original(bar, till):
     """With «print at checkout» off, the till's own «Print» right after charging is the original."""
