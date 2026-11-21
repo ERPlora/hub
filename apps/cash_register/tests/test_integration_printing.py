@@ -18,6 +18,7 @@ from apps.cash_register.tests.conftest import (
     ctx_for,
     open_session,
     run,
+    void,
 )
 from apps.printing.models import PrintJob
 
@@ -112,6 +113,12 @@ def test_other_payment_methods_are_a_line_only_when_there_were_some(shift):
     charge(payments=[{"method": "Bizum"}])
     labels = [label for label, _ in lines(PrintJob.objects.get(pk=print_report(shift).job_id))]
     assert "Sales with other payment methods" in labels
+
+
+def test_a_sale_voided_in_the_same_shift_is_on_the_paper_neither_as_a_sale_nor_as_a_refund(shift):
+    void(charge(payments=[{"method": "card"}]))
+    printed = dict(lines(PrintJob.objects.get(pk=print_report(shift).job_id)))
+    assert [printed[label] for label in ("Sales", "Card sales", "Refunds", "Expected")] == [1.5, 0.0, 0.0, 101.0]
 
 
 def test_every_print_is_a_paper_of_its_own(shift):
