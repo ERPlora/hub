@@ -1,4 +1,4 @@
-"""What every read of the inventory app shares, and services.py too inside the command's own transaction: how a
+"""What every read of the inventory app shares, and services/ too inside the command's own transaction: how a
 person names a product or a category (assistant, voice), the rows a write holds and how a list pages."""
 
 from uuid import UUID

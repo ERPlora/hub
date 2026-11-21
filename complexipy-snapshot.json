@@ -126,8 +126,8 @@
     ]
   },
   {
-    "path": "apps/inventory/services.py",
-    "file_name": "services.py",
+    "path": "apps/inventory/services/imports.py",
+    "file_name": "imports.py",
     "functions": [
       {
         "name": "_check_product_row",
