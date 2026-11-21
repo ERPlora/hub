@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:c7df979e041128785d994394926feeb422b9e346f3e3f0c3af5d220e61e47445 -->
+<!-- generated from WORKBOOK.md sha256:9a0306e9f7f9fc9dc3c6034dbc72c3bcbe452d2e1cffc795ad11f06db6c7f7d2 -->
 
 ## What it is for and who it is for
 
@@ -1375,19 +1375,20 @@ Steps:
 3. If the customer asks, the waiter reads them on the line; if the dish does not suit them, they remove the line
    like any other before sending it.
 4. Send to the kitchen and charge as always: the allergens do not change the price or the payment.
-In: from Inventory, each product's allergens, with the till's catalogue (INVENTORY-F27).
-Out: the line with its product's allergens frozen when it is ordered, like its modifiers: if Inventory changes them
-afterwards, the line keeps the ones it had (announces: check changed). They travel to Kitchen with the line when the
-round is sent, where they are crossed with the customer's allergy (SALE-F41, KITCHEN-F32). They do not show on the
-ticket, on the invoice or on the printed bill for the table.
+In: from Inventory, each product's allergens, with the till's catalogue (INVENTORY-F27), and from Modifiers, those
+of each option chosen (MODIFIER-F07).
+Out: the line with its product's allergens and those of its modifiers (MODIFIER-F12) frozen when it is ordered, like
+its modifiers: if Inventory or Modifiers change them afterwards, the line keeps the ones it had (announces: check
+changed). They travel to Kitchen with the line when the round is sent, where they are crossed with the customer's
+allergy (SALE-F41, KITCHEN-F32). They do not show on the ticket, on the invoice or on the printed bill for the table.
 If it fails: without Inventory active there are no allergens, and open-price lines and services do not carry them.
 An item with no allergens marked says nothing, because the till does not tell "has none" from "none declared": that
-is why Inventory's card says "No allergens declared". A modifier has no allergens of its own: "+Cheese" does not add
-Milk to the line; if the customer has an allergy, it is marked on the line as the customer's allergy and Kitchen
-sees it all the same.
+is why Inventory's card says "No allergens declared". A modifier adds its allergens to the dish's: "+Cheese" adds
+Milk to the line; one that takes something out ("No cheese") takes none away, and if the customer has an allergy, it
+is marked on the line as the customer's allergy and Kitchen sees it all the same.
 If a menu's sheet cannot read the allergens of its dishes, it says so and offers "Retry": that way a dish with
 no row is not taken for a dish without allergens.
-Involved: INVENTORY-F27, INVENTORY-F35, SALE-F11, SALE-F12, SALE-F41, KITCHEN-F32
+Involved: INVENTORY-F27, INVENTORY-F35, SALE-F11, SALE-F12, SALE-F41, KITCHEN-F32, MODIFIER-F12
 
 ### SALE-F41 Mark the customer's allergy on a line
 Status: done
@@ -1520,7 +1521,7 @@ the quick notes and what is refundable can be followed live.
 | Sale with its document | A document that could not be issued in the charge, the void or the refund is issued later (the charge's retry, "Issue now" or Invoicing's reaction) | The sale, the document, its number, the refund (`refund_id`) or whether it is the void's (`void`); one per document | `sale.sale.invoiced` |
 | Check opened | Open or split | The check | `sale.order.opened` |
 | Check changed | Any change of lines, discounts or title | The check | `sale.order.changed` |
-| Order sent | Send to the kitchen | The check, its title, the channel, the round, who serves and the lines with their notes, their product's allergens (in a menu, each dish's) and the customer's allergy | `sale.order.fired` |
+| Order sent | Send to the kitchen | The check, its title, the channel, the round, who serves and the lines with their notes, their product's and their modifiers' allergens (in a menu, each dish's) and the customer's allergy | `sale.order.fired` |
 | Check closed | Charge the last of a check | The check | `sale.order.completed` |
 | Check voided | Void an open check | The check | `sale.order.voided` |
 | Checks merged | Merge | The absorbed one and the one that stays | `sale.order.merged` |

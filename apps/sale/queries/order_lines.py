@@ -15,6 +15,7 @@ from apps.sale.queries.departments import _department_refused, find_department, 
 from apps.sale.queries.line_parts import GRID_FALLBACK, WHOLE, check_grid, provisional_total
 from apps.sale.queries.other_apps import call_app
 from apps.sale.schemas.lines import ComboLineFields, LineFields, OpenLineFields, ProductLineIn
+from base.allergens import in_order
 
 PRODUCT_NOT_AVAILABLE = _(
     "A product of the ticket is no longer in the catalog. Remove the line and add it again."
@@ -154,6 +155,13 @@ def _options(ctx: OperationContext, product, option_ids: list[UUID]) -> dict | N
         raise
 
 
+def _dish_allergens(product, chosen) -> list[str]:
+    """The product's allergens and those of every option chosen, also one charged on a line of its own, once each and
+    in the order of the list. An option adds allergens to the dish and never takes one away."""
+    picked = [code for pick in chosen.picks for code in pick.allergens] if chosen else []
+    return in_order([*product.allergens, *picked])
+
+
 def freeze_product_line(
     ctx: OperationContext, data: ProductLineIn, units: dict | None = None
 ) -> OrderLine:
@@ -203,7 +211,7 @@ def freeze_product_line(
         modifiers=picks,
         modifier_lines=[own.model_dump(mode="json") for own in chosen.own_lines] if chosen else [],
         kitchen_text=chosen.kitchen_text[:500] if chosen else "",
-        allergens=product.allergens,
+        allergens=_dish_allergens(product, chosen),
     )
 
 

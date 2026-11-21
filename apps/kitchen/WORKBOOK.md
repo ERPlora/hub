@@ -823,8 +823,9 @@ Pasos:
 2. En la tarjeta, la cabecera lleva la marca «Alergia», en rojo, junto a «Urgente» y «VIP», si alguno de sus
    platos tiene una alergia marcada. Cada estación la ve solo si la tiene uno de sus platos.
 3. Debajo del nombre de ese plato, antes de sus suplementos y de su nota, sale un bloque propio en rojo: «Alergia:
-   Gluten». Si el plato lleva ese alérgeno según Inventario, el bloque añade «El plato lleva Gluten». Un
-   plato sin alergia marcada no lleva bloque, aunque tenga alérgenos: la pantalla no repite los de cada plato.
+   Gluten». Si el plato lleva ese alérgeno, por su producto o por un suplemento elegido, el bloque añade «El plato
+   lleva Gluten». Un plato sin alergia marcada no lleva bloque, aunque tenga alérgenos: la pantalla no repite los de
+   cada plato.
 4. En un menú, el bloque sale en cada uno de sus platos, y «El plato lleva» nombra solo los alérgenos de ese plato.
 5. En el papel de la estación, la cabecera lleva «!! ALERGIA !!» (debajo de «!! URGENTE !!» si la ronda va
    urgente) y, justo debajo del plato y antes de sus suplementos, «ALERGIA: GLUTEN» y, si lo lleva, «LLEVA: GLUTEN»,
@@ -833,8 +834,8 @@ Pasos:
 6. El cocinero sigue como siempre: marcar listo, recuperar y entregar no cambian, y el
    bloque sigue a la vista mientras el plato está en la pantalla. En **Comandas**, el detalle de la comanda lo
    enseña también en su plato.
-Entra: de Ventas, por cada línea enviada, la alergia del cliente y los alérgenos congelados de su producto
-(SALE-F40, SALE-F41).
+Entra: de Ventas, por cada línea enviada, la alergia del cliente y los alérgenos congelados de la línea, los de su
+producto con los de sus suplementos (SALE-F40, SALE-F41, MODIFIER-F12).
 Sale: la alergia y los alérgenos que coinciden, congelados en el plato como sus suplementos: cambiar la línea o el
 catálogo después no cambia esta comanda (avisa: comanda recibida).
 Si falla: si la hoja no se imprime, la alergia sigue en la pantalla y la comanda se reimprime como cualquier otra.
@@ -917,9 +918,9 @@ avisos de Ventas (`sale.order.*`).
 - **Ventas** (requisito): sus cuentas y sus líneas enviadas (`Order`, `OrderLine`: ronda, hora de
   envío, producto, nombre, cantidad, nota, categoría, anulación y su motivo, estado y hora de cierre de
   la cuenta, y lo que la línea congeló al pedirse: los suplementos con su nombre de cocina, `modifiers`,
-  y el menú con su `kitchen_name` y sus platos, `combo.components`; los alérgenos del producto, `allergens`, y en
-  un menú los de cada plato, `combo.components[].allergens`, y la alergia del cliente, `allergy`), leídas con sus
-  modelos; el envío,
+  y el menú con su `kitchen_name` y sus platos, `combo.components`; los alérgenos del producto con los de sus
+  suplementos, `allergens`, y en un menú los de cada plato, `combo.components[].allergens`, y la alergia del
+  cliente, `allergy`), leídas con sus modelos; el envío,
   por su operación `sale.order.fire`. Un plato de un menú guarda la línea del menú y su número dentro de
   él (`menu_dish`); su id sale del de la línea (`queries.dish_id`), así que la comanda por recibir y la
   guardada comparten los ids de sus platos.

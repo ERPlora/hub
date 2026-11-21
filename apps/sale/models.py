@@ -364,8 +364,8 @@ class OrderLine(UUIDModel):
     combo = models.JSONField(
         _("menu as ordered"), default=dict, blank=True, db_default={}, encoder=DjangoJSONEncoder
     )
-    # The allergens of its product (``base.allergens`` codes, in the order of the list), frozen when it is ordered as its
-    # options are; a menu has none of its own: each dish of ``combo`` keeps its product's.
+    # The allergens of its product and of its options (``base.allergens`` codes, in the order of the list), frozen when
+    # it is ordered as its options are; a menu has none of its own: each dish of ``combo`` keeps its product's.
     allergens = _json_list(_("allergens"))
     # The customer's allergy the waiter marks before the line is sent (SALE-F41), ``base.allergens`` codes.
     allergy = _json_list(_("customer's allergy"))
