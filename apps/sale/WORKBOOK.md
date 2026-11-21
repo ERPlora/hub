@@ -398,8 +398,9 @@ Actor: empleado, responsable
 Pantalla: Cobro
 Pasos:
 1. En la hoja **Cobro**, pulsa «Repartir el cobro». Arriba aparece «Restante».
-2. Elige un medio, marca el «Importe de este cobro» (en efectivo, lo entregado) y pulsa «Añadir este
-   cobro». Sin importe marcado, el cobro cubre todo lo que falta.
+2. Elige un medio: el «Importe de este cobro» (en efectivo, «Entregado») sale ya con todo lo que falta.
+   Para cobrar solo una parte, o si en efectivo entrega más, teclea otro importe, que sustituye al que
+   sale. Pulsa «Añadir este cobro».
 3. Los cobros tomados salen en «Cobros tomados»; la ✕ quita uno.
 4. Cuando el restante llega a 0, pulsa «Cobrar 18,50 €».
 Entra: los medios de pago y lo que entrega el cliente.

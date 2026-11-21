@@ -238,6 +238,7 @@ cierra sin preguntar (BASE-F05).
 | PRINTING-F19 | Ver el estado de una impresora | común | hecho |
 | PRINTING-F20 | Cuánto tiempo guarda el hub los trabajos de impresión | común | hecho |
 | PRINTING-F21 | Ver en Sistema quién imprime y dónde bajar la app de ERPlora | común | parcial — la tarjeta aún no dice si la impresora responde ahora (hub#573) |
+| PRINTING-F22 | Sacar el tique y abrir el cajón en la caja que cobra | común | no hecho |
 
 ### PRINTING-F01 Ver cómo va la impresión
 Estado: hecho
@@ -348,7 +349,7 @@ Si falla: si ninguna impresora activa tiene la función, el trabajo **espera** e
 impresora («En cola, sin impresora») y sale en cuanto una la tenga; la comanda de Cocina no, porque
 Cocina entonces no la manda. En ajustes, una impresora de otra
 función o inactiva se rechaza: «Esa impresora no tiene esta función.», «Esa impresora está inactiva.».
-Implicados: PRINTING-F01, PRINTING-F06, INVENTORY-F25
+Implicados: PRINTING-F01, PRINTING-F06, INVENTORY-F25, PRINTING-F22
 
 ### PRINTING-F05 Hacer una prueba de impresión
 Estado: hecho
@@ -388,7 +389,7 @@ función. Como en las ventanas de formulario, el aviso se quita en cuanto se cam
 una función en cuanto se elige otra impresora para ella; los dos vuelven si el siguiente intento también
 se rechaza. Un rechazo sin campo se queda hasta el siguiente intento. Si la lectura falla, la
 pantalla no enseña valores y ofrece «Reintentar». Sin permiso, bloqueados y sin «Guardar ajustes».
-Implicados: PRINTING-F07, PRINTING-F13
+Implicados: PRINTING-F07, PRINTING-F13, PRINTING-F22
 
 ### PRINTING-F07 Imprimir el tique al cobrar
 Estado: hecho
@@ -412,7 +413,7 @@ Sale: un trabajo en la cola, o nada si el negocio no imprime al cobrar.
 Si falla: una venta **nunca se cae** por la impresión: si Impresión no está encendida, rechaza el tique o
 falla, Ventas cobra igual y el tique sale por el diálogo del dispositivo. Un trabajo que no sale queda en
 la cola (PRINTING-F14).
-Implicados: SALE-F08, PRINTING-F13, PRINTING-F18
+Implicados: SALE-F08, PRINTING-F13, PRINTING-F18, PRINTING-F22
 
 ### PRINTING-F08 Reimprimir un tique o una factura
 Estado: hecho
@@ -431,7 +432,7 @@ Entra: el documento marcado como copia.
 Sale: un trabajo en la cola de Recibo; una factura A4 va a la impresora del sistema. Cada pulsación, un
 papel.
 Si falla: como F07.
-Implicados: SALE-F31
+Implicados: SALE-F31, PRINTING-F22
 
 ### PRINTING-F09 Imprimir la cuenta de la mesa
 Estado: hecho
@@ -445,7 +446,7 @@ Pasos:
 Entra: la cuenta con sus líneas.
 Sale: un trabajo en la cola de Recibo. Cada pulsación saca una cuenta.
 Si falla: «Una cuenta lleva líneas que cobrar: esta no tiene ninguna.».
-Implicados: SALE-F15
+Implicados: SALE-F15, PRINTING-F22
 
 ### PRINTING-F10 Imprimir la comanda en cocina y barra
 Estado: hecho
@@ -519,7 +520,7 @@ cajón no responde (la impresora se apagó, o el cajón no está conectado a ell
 «El cajón no se ha abierto: comprueba que «Caja» está encendida y conectada.», y el tique, que ya salió, no se
 imprime otra vez; el cajón se abre a mano. Un trabajo solo de cajón que no se abre avisa igual y vuelve a la cola con
 el error del dispositivo.
-Implicados: PRINTING-F06, PRINTING-F07
+Implicados: PRINTING-F06, PRINTING-F07, PRINTING-F22
 
 ### PRINTING-F14 Sacar del atasco un trabajo de impresión
 Estado: hecho
@@ -585,7 +586,7 @@ Pasos:
 Entra: el informe (sesión, cajero, fondo, cierre y movimientos).
 Sale: un trabajo en la cola de Recibo; cada pulsación, un papel.
 Si falla: como F07.
-Implicados: CASH_REGISTER-F16
+Implicados: CASH_REGISTER-F16, PRINTING-F22
 
 ### PRINTING-F18 Sacar el papel: el dispositivo recoge y confirma los trabajos
 Estado: hecho
@@ -645,7 +646,7 @@ nada. Dar de alta sin nombre o sin impresoras activas avisa en su campo, y el av
 ese campo (se escribe el nombre, se marca una impresora), sin volver a pulsar «Guardar»; el del otro se queda hasta
 que se cambia el suyo. Solo se da de alta desde el propio dispositivo. La cola y la lista nombran cada dispositivo por su nombre, nunca por su identificador: con él
 cualquiera se haría pasar por la caja.
-Implicados: PRINTING-F05, PRINTING-F07, PRINTING-F14
+Implicados: PRINTING-F05, PRINTING-F07, PRINTING-F14, PRINTING-F22
 
 ### PRINTING-F19 Ver el estado de una impresora
 Estado: hecho
@@ -704,6 +705,43 @@ Si falla: si no se puede leer qué tarjetas tocan, no sale ninguna (nunca la de 
 pestaña dice lo suyo; sin las direcciones de erplora.com no salen los botones de descarga (nunca un botón que no
 lleva a ningún sitio).
 Implicados: BASE-F02, BASE-F39, PRINTING-F18
+
+### PRINTING-F22 Sacar el tique y abrir el cajón en la caja que cobra
+Estado: no hecho — la impresora de tiques es todavía una sola para todo el negocio: con dos cajas, el tique y el
+cajón de la segunda salen por la impresora de la primera (hub#2035)
+Actor: empleado (cobra e imprime); el responsable da de alta cada caja con sus impresoras (PRINTING-F18)
+Pantalla: Vender y Ventas (de Ventas), Detalle de la sesión (de Caja), Impresoras, Ajustes
+Pasos:
+1. Cada caja es un dispositivo dado de alta con las impresoras a las que llega (PRINTING-F18): la de la barra con
+   «Tique 1» y «Cocina», la de la terraza con «Tique 2» y «Cocina».
+2. Al cobrar, reimprimir un tique, imprimir la cuenta de la mesa o el informe del turno desde un dispositivo, el papel
+   sale por la impresora de tiques de ese dispositivo, y el cajón que se abre es el suyo (PRINTING-F07, PRINTING-F08,
+   PRINTING-F09, PRINTING-F13 y PRINTING-F17): cobrar en la terraza saca el tique por «Tique 2» y abre su cajón, y
+   «Tique 1» no imprime nada. Como en Square, Toast, Odoo, Lightspeed y Shopify: la impresora de tiques, con su
+   cajón, es de cada caja, y las de cocina se comparten.
+3. Si el dispositivo llega a varias impresoras de tiques activas, sale por la elegida en **Ajustes → Impresora de
+   cada función** si es una de ellas y, si no, por la primera por nombre.
+4. Un dispositivo que no llega a ninguna impresora de tiques activa, o que no está dado de alta (el portátil de la
+   oficina), usa la del negocio, como hasta ahora: la elegida en Ajustes o, si no, la primera activa con esa función
+   (PRINTING-F04). En Ajustes, debajo del desplegable «Recibo», lo dice: «Desde un dispositivo con su propia impresora
+   de tiques, el tique sale por la suya.».
+5. Las comandas de cocina y barra, las etiquetas y la página A4 de una factura no cambian: salen por la impresora de
+   su función en el negocio (PRINTING-F04, PRINTING-F10, PRINTING-F12). Lo que nombra su impresora («imprímelo en
+   Cocina», la hoja de prueba) sale por esa.
+6. Tras cobrar, Ventas dice a qué impresora fue el tique, y en **Impresión → Impresoras** la tarjeta «Recibo» dice
+   por cuál sale desde el dispositivo en el que se mira: «Imprime en: Tique 2.».
+Entra: el dispositivo desde el que se pide (la app de ERPlora y el navegador lo dicen en cada petición), las
+impresoras de su alta y los ajustes.
+Sale: el trabajo en la cola de la impresora de tiques de ese dispositivo, con la orden de abrir el cajón cuando toca
+(avisa: `printing.job.queued`).
+Si falla: si la impresora de tiques del dispositivo está apagada o sin papel, el trabajo la espera en la cola y se
+reintenta o se cancela allí (PRINTING-F14): nunca salta a la impresora de otra caja, que abriría un cajón que no es
+el suyo. Si su impresora se desactiva o el dispositivo se retira, lo que pida desde entonces sale por la del negocio,
+y lo que la impresora desactivada tenía en cola pasa a la del negocio, como al desactivar cualquier impresora
+(PRINTING-F04). Sin ninguna impresora de tiques activa, como hasta ahora: no se encola nada y el papel sale por el
+diálogo del dispositivo (PRINTING-F07).
+Implicados: PRINTING-F04, PRINTING-F06, PRINTING-F07, PRINTING-F08, PRINTING-F09, PRINTING-F13, PRINTING-F17,
+PRINTING-F18
 
 ## Servicios: lo que entra y lo que sale
 

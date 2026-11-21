@@ -6,6 +6,7 @@ import { describe, expect, it } from 'vitest';
 import {
   centsToTyped,
   changeDue,
+  keypadAmount,
   type Leg,
   needsTendered,
   paymentsIn,
@@ -85,6 +86,13 @@ describe('the legs of a split payment', () => {
 
   it('cash handed over beyond what is left pays what is left and gives change', () => {
     expect(planLeg(CASH, 5000, 3000)).toEqual({ amount: 3000, tendered: 5000 });
+  });
+
+  it('the keypad shows what was typed; in a split with nothing typed, all that is left', () => {
+    expect(keypadAmount(0, 3000, true)).toBe(3000);
+    expect(keypadAmount(1000, 3000, true)).toBe(1000);
+    expect(keypadAmount(0, 3000, false)).toBe(0);
+    expect(keypadAmount(5000, 3000, false)).toBe(5000);
   });
 
   it('nothing to take without a method or with nothing left', () => {
