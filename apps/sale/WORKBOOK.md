@@ -525,16 +525,21 @@ Pasos:
 1. Con «Activar caja» encendido en Caja y sin sesión de caja abierta, cobra en efectivo (también un
    cobro repartido con una parte en efectivo).
 2. La hoja **Cobro** no cobra nada y dice «La caja está cerrada: abre una sesión de caja para cobrar en
-   efectivo.»; a quien puede abrirla le ofrece «Abrir sesión de caja», que lleva a **Caja**. La
-   pantalla **Vender** no cambia: la cuenta sigue ahí.
-3. Abierta la sesión, vuelve a **Vender** y cobra. Con tarjeta, Bizum o transferencia se cobra siempre,
-   con la caja abierta o cerrada.
+   efectivo.»; a quien puede abrirla le ofrece «Abrir sesión de caja», que abre encima del cobro la
+   ventana de apertura de **Caja**, con «Cajón», «Fondo de apertura» y «Notas». La pantalla **Vender**
+   no cambia: la cuenta sigue ahí.
+3. Pulsa «Abrir sesión»: la ventana se cierra, sale «Sesión abierta» y el cobro sigue como estaba, ya
+   sin el aviso; «Cobrar» cobra en efectivo. Con tarjeta, Bizum o transferencia se cobra siempre, con la
+   caja abierta o cerrada.
 Entra: si la caja está activada y si hay sesión abierta, que Ventas pregunta a Caja
 (`cash_register.session.current`) con la sesión de quien cobra, solo cuando hay efectivo.
 Sale: nada propio; el cobro rechazado no gasta número.
 Si falla: si Caja no está activa en el negocio o no contesta, se cobra igual, para no parar las
-ventas, y Caja enseña ese cobro entre los de fuera de turno.
-Implicados: CASH_REGISTER-F04, CASH_REGISTER-F17
+ventas, y Caja enseña ese cobro entre los de fuera de turno. La ventana de apertura avisa como en Caja:
+fondo obligatorio, una sesión ya abierta en otro dispositivo, un importe ilegible; «Cancelar» la cierra
+y el cobro sigue con su aviso. Si la ventana no llega a cargarse, «Abrir sesión de caja» lleva a
+**Caja** para abrirla allí, y la cuenta sigue en **Vender**.
+Implicados: CASH_REGISTER-F03, CASH_REGISTER-F04, CASH_REGISTER-F17
 
 ### SALE-F09 Vender a precio libre por sección
 Estado: hecho

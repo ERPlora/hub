@@ -6,7 +6,7 @@
 // card, split, the legal limits, invoice and its recipient abroad, part of a check, a refusal, a lost
 // answer, a read that fails.
 import { toastWarning } from '@erplora/ui/shell';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import type { CustomerSnapshot } from '../../../../customer/frontend/components/CustomerSearch.vue';
 import {
@@ -354,7 +354,7 @@ describe('CheckoutPanel: cash with the drawer closed (SALE-F08)', () => {
       { status: 409 },
     );
 
-  it('the refusal stays in the sheet; «Open a cash session» goes to the cash register and closes the sheet', async () => {
+  it('the refusal stays in the sheet; «Open a cash session» opens Cash register’s window over it, without leaving the sale', async () => {
     const s = await setup({ session: DRAWER });
     s.replies({ '/api/sale/sales': [closed()] });
     await click(s.find('sale-checkout-method-m-card').element);
@@ -362,8 +362,8 @@ describe('CheckoutPanel: cash with the drawer closed (SALE-F08)', () => {
     expect(s.text('sale-checkout-error')).toBe('The cash register is closed: open a cash session to charge in cash.');
     expect(s.wrapper.emitted('charged')).toBeUndefined();
     await click(s.find('sale-checkout-open-drawer').element);
-    expect(s.router.currentRoute.value.path).toBe('/cash_register/sessions');
-    expect(s.wrapper.emitted('close')).toEqual([[]]);
+    await vi.waitFor(() => expect(s.inDoc('cash-register-open')).not.toBeNull());
+    expect([!!s.inDoc('cash-register-open'), s.router.currentRoute.value.path, s.wrapper.emitted('close')]).toEqual([true, '/sale/pos', undefined]);
   });
 
   it('without the right to open a session, or without Cash register on, only the reason', async () => {
