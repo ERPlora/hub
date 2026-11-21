@@ -4469,6 +4469,103 @@ Implicados: BASE-F10, BASE-F11, BILLING-F16 (erplora.com), BILLING-F17 (erplora.
   (dos BD reales: la copia y el negocio), `apps/customer/tests/test_recovery.py`, `control/tests/test_services.py::TestRecover`,
   `control/tests/test_admin_restore.py::TestRecoverIntoTheBusiness` y `tests/e2e/base-recover-from-copy.spec.ts`.
 
+### Operaciones y sus flujos
+
+Cada operación de la plataforma con los flujos que la usan; las que no usa ningún flujo del Hub dicen quién las llama.
+
+| Servicios | Flujos |
+|---|---|
+| `base.setup.status` | F01, F03, F04, F12, F103 |
+| `base.health.list` | F02 |
+| `base.widget.list` | F06, F07, F08 |
+| `base.bell.counters` | F10, F40, F117 |
+| `base.notice.list` | F113, KITCHEN-F16, APPOINTMENT-F28, WHATSAPP_INBOX-F09 |
+| `base.session.me` | F05, F13 |
+| `base.saas_pass.create` | F11 |
+| `base.hub.state_apply` | F13, F20, F40, F117 |
+| `base.session.revoke` | F13 |
+| `base.app.list` | F14–F17, F22, F26, F27 |
+| `base.app.get` | F18, F21, F23, F24, F97 |
+| `base.app.enable` | F18, F24, F31 |
+| `base.app.retry` | F21 |
+| `base.app.activation_settle` | F22 |
+| `base.app.disable` | F23, F25 |
+| `base.blueprint.list` | F29, F38 |
+| `base.blueprint.inspect` | F30, F31 |
+| `base.blueprint.import` | F31, F33, F38 |
+| `base.import.list` | F32, F33, F34, F38 |
+| `base.import.detail` | F33, F34, F97 |
+| `base.import.undo` | F34 |
+| `base.blueprint.export` | F35, F36 |
+| `base.dataset.list` | F36 |
+| `base.hub.reset`, `base.hub.reset_apply`, `base.hub.dumps`, `base.hub.dump_link` | F37 |
+| `base.system.cards` | F39 |
+| `base.plan.usage` | F40, F77 |
+| `base.assistant.usage` | F40, F104 |
+| `base.system.status` | F41 |
+| `base.event.list` | F42 |
+| `base.failed_event.list` | F43 |
+| `base.failed_event.retry` | F44 |
+| `base.failed_event.retry_all` | F45 |
+| `base.failed_event.discard` | F46 |
+| `base.failed_event.detail` | F44, F46, F97 |
+| `base.business.get` | F49, F50, F51 |
+| `base.access.door` | F52, F55, F56 |
+| `base.hub_user.sync` | F13, F52 |
+| `base.pin.set` | F54, F65 |
+| `base.access.faces` | F60 |
+| `base.device.current`, `base.device.mode_set` | F62 |
+| `base.hub.register` | F63 |
+| `base.profile.get` | F54, F64, F65 |
+| `base.profile.update`, `base.profile.preferences_set`, `base.profile.avatar_set`, `base.profile.avatar_remove` | F64 |
+| `base.access.settings`, `base.access.settings_update` | F66, F67 |
+| `base.device.list` | F68 |
+| `base.device.rename` | F69 |
+| `base.device.remove` | F70 |
+| `base.device.detail` | F69, F70, F97 |
+| `base.device.prune` | F71 |
+| `base.file.list` | F72 |
+| `base.file.upload`, `base.file.create_folder` | F73 |
+| `base.file.read` | F74 |
+| `base.file.move`, `base.file.rename` | F75 |
+| `base.file.delete` | F76 |
+| `base.person.list` | F77, F80, F81 |
+| `base.person.detail` | F78, F79 |
+| `base.person.pin_remove` | F78 |
+| `base.person.badge_set`, `base.person.badge_remove` | F79 |
+| `base.role.list` | F82, F83 |
+| `base.approval.approvers`, `base.approval.approve`, `base.approval.spend` | F84 |
+| `base.approval.list`, `base.approval.export` | F85 |
+| `base.api_key.create` | F86 |
+| `base.api_key.rotate` | F87 |
+| `base.api_key.revoke` | F88 |
+| `base.api_key.detail` | F87, F88, F97 |
+| `base.api_key.list` | F89 |
+| `base.api_doc.get` | F90 |
+| `base.api_doc.settings` | F90, F91 |
+| `base.api_doc.settings_update` | F91 |
+| `base.assistant.turn` | F93, F97, F101 |
+| `base.assistant.find_tools`, `base.assistant.speak`, `base.docs.search` | F93 |
+| `base.assistant.transcribe` | F94 |
+| `base.assistant.report` | F105 |
+| `base.support.report` | F108 |
+| `base.hub.cancel` | F109, HUBS-F18, HUBS-F20 |
+| `base.hub.purge` | F109 |
+| `base.help.get` | F115 |
+| `base.release_note.list` | F116 |
+| `base.hub.restore` | HUBS-F19 |
+| `base.hub.dump_list` | HUBS-F18 |
+| `base.hub.get` | HUBS-F21 |
+| `base.usage.list` | HUBS-F22 |
+| `base.demo.create`, `base.demo.code_create` | PUBLIC-F28 |
+| `base.demo.expire` | PUBLIC-F33 |
+| `base.demo.get`, `base.demo.purge` | PUBLIC-F34 |
+| `base.catalog_image.search`, `base.catalog_image.get` | INVENTORY-F30, SERVICE-F34, COMBO-F14 |
+| `base.hub_user.get` | F97, en las tarjetas de Personal y de la Bandeja de WhatsApp |
+| `base.location.list` | ninguno: solo el asistente y la API |
+| `base.hub.cut_finish` | ninguno: `manage.py cut_shared_hubs` y el migrador, al dar a un negocio su propia base de datos |
+| `base.hub.by_slugs`, `base.hub.seed_local` | ninguno: `manage.py seed_local_hubs`, solo en desarrollo |
+
 ## Lo que queda fuera
 
 - **Avisar por correo al dueño cuando debe ampliar (BASE-F40)**: el mercado lo da por supuesto, pero lo manda erplora.com
