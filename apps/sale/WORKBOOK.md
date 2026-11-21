@@ -1457,9 +1457,11 @@ comprueba y valora las opciones de cada plato (MODIFIER-F07) y Menús las suma a
 y otra vez al cobrar, con el importe pedido (COMBO-F08).
 Sale: la línea del menú con las opciones de cada plato, su texto de cocina y sus alérgenos, congelados al pedirla
 (avisa: cuenta cambiada). «En el local», el menú sigue en una línea al IVA del menú, con las opciones dentro (art.
-91.Uno.2.2º LIVA). «Para llevar» partido por plato, las opciones de un plato van con él: su peso en el reparto es su
-precio de catálogo más el de sus opciones, y una opción con otra categoría fiscal sale en línea propia con su tipo,
-como en un plato suelto (COMBO-F09, MODIFIER-F07). Las opciones no mueven stock (COMBO-F10).
+91.Uno.2.2º LIVA), también una opción de otra categoría fiscal. «Para llevar», cada opción entra en el reparto del
+menú (COMBO-F09): una sin categoría fiscal propia, o con la de su plato, va con él, y el peso del plato es su precio de
+catálogo más el de esas opciones; una con otra categoría fiscal va a la suya de para llevar, pesa su precio de
+catálogo y sale en línea propia con su tipo bajo su plato, como en un plato suelto (MODIFIER-F07). Si con las
+opciones todo va a la misma categoría, el menú sigue en una línea. Las opciones no mueven stock (COMBO-F10).
 Si falla: los motivos de Suplementos salen dentro de la hoja, bajo el plato al que se refieren («Elige al menos 1 en
 «Punto de la carne».»…), y un menú con un grupo obligatorio sin elegir no entra en la cuenta, tampoco pedido por el
 asistente o la API, así que nunca llega a cocina sin el punto de la carne. Si no se pueden leer los grupos de un

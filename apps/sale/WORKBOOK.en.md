@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:a8dedea3dc62497143faca4730c324874a83013df0a6ab1231afa81683be0c66 -->
+<!-- generated from WORKBOOK.md sha256:68b43ae2a2eca638f9dd6243bdd7a280a8073f94c5c99946277cef53a8e323ac -->
 
 ## What it is for and who it is for
 
@@ -1450,9 +1450,12 @@ prices the options of each dish (MODIFIER-F07) and Menus adds them to the menu's
 again when charging, with the amount ordered (COMBO-F08).
 Out: the menu line with the options of each dish, their kitchen text and their allergens, frozen when ordered
 (announces: check changed). "Eat in", the menu stays on one line at the menu's VAT, with the options inside (art.
-91.Uno.2.2º LIVA). "Take away" split per dish, a dish's options go with it: its weight in the split is its catalog
-price plus that of its options, and an option with another tax category shows on its own line with its rate, as on
-a dish on its own (COMBO-F09, MODIFIER-F07). The options do not move stock (COMBO-F10).
+91.Uno.2.2º LIVA), an option with another tax category too. "Take away", each option takes part in the menu's
+split (COMBO-F09): one without a tax category of its own, or with its dish's, goes with it, and the dish's weight is
+its catalog price plus that of those options; one with another tax category goes to its own take-away category,
+weighs its catalog price and shows on its own line with its rate under its dish, as on a dish on its own
+(MODIFIER-F07). If with the options everything goes to the same category, the menu stays on one line. The options do
+not move stock (COMBO-F10).
 If it fails: Modifiers' reasons show inside the sheet, under the dish they refer to ("Choose at least 1 in «Meat
 doneness»."…), and a menu with a required group left unchosen does not go into the check, not through the assistant
 or the API either, so it never reaches the kitchen without the meat doneness. If a dish's groups cannot be read, the
