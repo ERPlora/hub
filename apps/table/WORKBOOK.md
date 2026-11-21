@@ -1150,9 +1150,7 @@ Ventas (`sale.add_sale`), que tienen los cuatro papeles.
 
 ### Lo que queda fuera
 
-- TABLE-F33, el importe de cada mesa ocupada en el plano, está `no hecho`: el plano todavía no recibe el
-  importe de sus cuentas. Los otros 32 están `hecho`. Lo que no entra a propósito está en «Lo que NO hace,
-  a propósito».
+- Los 33 flujos están `hecho`. Lo que no entra a propósito está en «Lo que NO hace, a propósito».
 - Los dos iconos de [`UI-REQUESTS.md`](UI-REQUESTS.md) (`ion:restaurant-outline` para la app y
   `ion:map-outline` para el Plano de sala) siguen sin registrarse en `@erplora/ui`; mientras, la app usa
   `ion:grid-outline` (también en el paso «Tus mesas» del Inicio) y el plano `ion:apps-outline`.
