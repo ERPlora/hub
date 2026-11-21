@@ -47,6 +47,12 @@ describe('firstMove', () => {
     expect(firstMove([refused])).toBe('writes');
   });
 
+  it('writes when the opening turn showed a card that never ran, because the turn was cut while it waited', () => {
+    const cut = turn('Se han roto 3 botellas', { calls: [call(LIST), call(WRITE_OFF, { product: 'BEB-01', qty: '3' })], cards: [card(WRITE_OFF)], executed: [ran(LIST, 'query')], errors: ['assistant.cut'] });
+    expect(firstMove([cut])).toBe('writes');
+    expect(writesBeforeClear([cut])).toEqual([WRITE_OFF]);
+  });
+
   it('asks when the opening turn only read and its answer asks the owner something', () => {
     expect(firstMove([askedFirst, clarified])).toBe('asks');
     expect(firstMove([turn('Book me a table', { assistant: 'What time would you like?' })])).toBe('asks');

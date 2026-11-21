@@ -96,7 +96,7 @@ describe('summarizeScenarios, asking before acting', () => {
   const rows = [
     row('s11', { ask: ask('half', 'writes', false, ['inventory.stock.write_off']) }),
     row('s13', { done: false, fraction: 0, ask: ask('half', 'asks', true) }),
-    row('s12', { ask: ask('whole', 'writes', true) }),
+    row('s12', { ask: ask('whole', 'writes', true, ['inventory.stock.write_off']) }),
     row('s14', { done: false, fraction: 0, ask: ask('whole', 'asks', false) }),
     row('s01'),
     row('s15', { status: 'excluded', why: 'golden path: step 1 failed', done: false, fraction: 0, ask: { said: null, firstMove: null, writesBeforeClear: [], right: null } }),
@@ -110,6 +110,14 @@ describe('summarizeScenarios, asking before acting', () => {
   it('writes the line of asking first, and leaves it out when no scenario says how the job is said', () => {
     expect(renderScenarios([report('m1', rows)])).toContain('- Asking first: 1/2 said by halves asked before writing · 1 write before the owner made it clear · 1/2 said whole done');
     expect(renderScenarios([report('m1', [row('s01')])])).not.toContain('Asking first');
+  });
+
+  it('counts a row of a report kept from before the measure, which has no ask, in neither group', () => {
+    const kept: Partial<ScenarioRow> = row('s01');
+    delete kept.ask;
+    const [summary] = summarizeScenarios([report('m1', [kept as ScenarioRow, ...rows])]);
+    expect(summary.ask).toEqual({ half: 2, askedFirst: 1, writesBeforeClear: 1, whole: 2, wholeDone: 1 });
+    expect(renderScenarios([report('m1', [kept as ScenarioRow])])).not.toContain('Asking first');
   });
 });
 
