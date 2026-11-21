@@ -14,7 +14,8 @@ from apps.inventory import events
 from live.assistant.running import invalid_arguments
 
 from apps.inventory.models import Product
-from apps.inventory.schemas import ForSaleListIn, ProductFiltersIn, ProductIn, ProductListIn, ProductPatchIn, ProductRefIn
+from apps.inventory.schemas.fields import ProductRefIn
+from apps.inventory.schemas.products import ForSaleListIn, ProductFiltersIn, ProductIn, ProductListIn, ProductPatchIn
 from apps.inventory.tests.test_assistant_card_records import fields_of
 from apps.inventory.tests.test_queries import read_csv
 from apps.inventory.tests.test_services import (

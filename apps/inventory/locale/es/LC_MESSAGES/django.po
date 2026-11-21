@@ -478,6 +478,6 @@ msgstr "Líneas devueltas"
 msgid "image"
 msgstr "imagen"
 
-#: schemas.py
+#: schemas/product_images.py
 msgid "Image"
 msgstr "Imagen"

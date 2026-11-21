@@ -19,31 +19,22 @@ from apps.inventory.models import (
     Settings,
     StockMovement,
 )
-from apps.inventory.schemas import (
-    CategoryFiltersIn,
-    CategoryListIn,
-    CategoryPage,
-    ConfigGetIn,
-    ConfigOut,
-    ExportOut,
+from apps.inventory.schemas.categories import CategoryFiltersIn, CategoryListIn, CategoryPage
+from apps.inventory.schemas.exports import ExportOut
+from apps.inventory.schemas.fields import ProductRefIn
+from apps.inventory.schemas.movements import MovementListIn, MovementPage
+from apps.inventory.schemas.product_categories import ProductCategoryListIn, ProductCategoryPage
+from apps.inventory.schemas.products import (
     ForSaleListIn,
-    LowStockListIn,
-    LowStockPage,
-    MovementListIn,
-    MovementPage,
-    ProductCategoryListIn,
-    ProductCategoryPage,
     ProductFiltersIn,
     ProductListIn,
     ProductOut,
     ProductPage,
-    ProductRefIn,
     SaleProductPage,
-    SummaryIn,
-    SummaryOut,
-    UnitListIn,
-    UnitPage,
 )
+from apps.inventory.schemas.settings import ConfigGetIn, ConfigOut
+from apps.inventory.schemas.stock import LowStockListIn, LowStockPage, SummaryIn, SummaryOut
+from apps.inventory.schemas.units import UnitListIn, UnitPage
 from base.tests.ordering import assert_reads_backwards, listed_with
 from apps.tax.models import TaxCategory
 

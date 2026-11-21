@@ -38,6 +38,28 @@ describe('CartFooter', () => {
     expect(m.find('pos-ticket-discount-row').exists()).toBe(false);
   });
 
+  it('with lines marked, Charge says how many and what it charges; Total stays the whole check (SALE-F22)', async () => {
+    const one = await setup({ total: 750, markedLines: 1, markedTotal: 180 }, 'es');
+    expect(plain(one.find('pos-charge').text())).toBe('Cobrar 1 línea · 1,80 €');
+    expect(plain(one.find('pos-total').text())).toBe('7,50 €');
+    const two = await setup({ total: 750, markedLines: 2, markedTotal: 360 }, 'es');
+    expect(plain(two.find('pos-charge').text())).toBe('Cobrar 2 líneas · 3,60 €');
+    const en = await setup({ total: 750, markedLines: 1, markedTotal: 180 });
+    expect(plain(en.find('pos-charge').text())).toBe('Charge 1 line · €1.80');
+    const enMany = await setup({ total: 750, markedLines: 3, markedTotal: 540 });
+    expect(plain(enMany.find('pos-charge').text())).toBe('Charge 3 lines · €5.40');
+  });
+
+  it('with nothing marked, Charge says the whole check', async () => {
+    const m = await setup({ total: 750, markedLines: 0, markedTotal: undefined }, 'es');
+    expect(plain(m.find('pos-charge').text())).toBe('Cobrar · 7,50 €');
+  });
+
+  it('while what the marked lines come to is on its way, Charge shows a dash, never the whole check', async () => {
+    const m = await setup({ total: 750, markedLines: 1, markedTotal: undefined });
+    expect(plain(m.find('pos-charge').text())).toBe('Charge 1 line · —');
+  });
+
   it('while the total is still on its way it shows a dash, never a number of its own', async () => {
     const m = await setup({ total: undefined });
     expect(m.find('pos-total').text()).toBe('—');

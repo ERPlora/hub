@@ -115,7 +115,8 @@ di qué sale por cada una y comprueba que el papel sale.». Dos zonas, en este o
   impresión.» con «Reintentar».
 - **Impresoras**: la tabla (o tarjetas en el móvil) con Nombre, Función, Conexión, Dirección, Papel,
   Estado y Activa. El estado es «Lista», «Esperando» (tiene trabajos que no salen desde hace más de un
-  minuto), «Con errores» (el último intento falló: debajo, «Último error: …») o «Inactiva». Por fila:
+  minuto), «Con errores» (el último intento falló: debajo, «Último error: …», dicho como en PRINTING-F19) o
+  «Inactiva». Por fila:
   «Editar», «Probar» y «Desactivar»/«Activar». Arriba, «Buscar impresoras» (PRINTING-F02) y «Añadir
   impresora». Vacía: «Todavía no hay
   impresoras. Añade la de tu caja con su dirección.». Una nota recuerda que el papel lo saca la app de
@@ -365,8 +366,8 @@ Pasos:
 Entra: la impresora.
 Sale: un trabajo «Hoja de prueba» para esa impresora (avisa: `printing.job.queued`).
 Si falla: una impresora inactiva no se prueba: «Esa impresora está inactiva: actívala para probarla.».
-Si el papel no sale, la hoja vuelve a la cola con el error del dispositivo y, tras 5 intentos, queda «Fallido»: en
-**Impresión → Cola** se reintenta o se cancela.
+Si el papel no sale, la hoja vuelve a la cola con el error del dispositivo (con la impresora apagada: «La impresora
+no contesta. Comprueba que está encendida y conectada.») y, tras 5 intentos, queda «Fallido»: en **Impresión → Cola** se reintenta o se cancela.
 Implicados: PRINTING-F18
 
 ### PRINTING-F06 Elegir cómo imprime el negocio
@@ -654,7 +655,12 @@ Actor: administrador, responsable, empleado
 Pantalla: Impresoras
 Pasos:
 1. La columna «Estado» de cada impresora dice «Lista», «Esperando», «Con errores» o «Inactiva», con
-   su último error.
+   su último error. La app de ERPlora dice qué pasó con un código y la pantalla lo cuenta en el idioma de
+   quien mira, con qué hacer: la impresora no contesta (apagada, fuera de la red o del alcance del
+   Bluetooth: «La impresora no contesta. Comprueba que está encendida y conectada.»), la app no tiene permiso para usar el Bluetooth, la dirección de la impresora no
+   es válida, o el dispositivo no ha podido preparar el documento (hay que actualizar la app). El detalle
+   del sistema queda en el registro del dispositivo. Una app anterior a los códigos lo dice con sus
+   palabras, que salen tal cual hasta que se actualiza.
 2. El asistente lo contesta por el nombre de la impresora.
 Entra: la impresora.
 Sale: su estado, cuántos trabajos esperan y desde cuándo, cuándo imprimió por última vez y su último
@@ -913,7 +919,10 @@ canal llama a sus operaciones con el contexto de la sesión del dispositivo:
    `usb:<cola>` o `system`.
 3. `done` → `printing.job.complete` con `device` y `attempt` (`{"confirmed": true}` → `ack`); se acepta
    también si el trabajo ya volvió a la cola, siempre que sea del mismo dispositivo (el de su alta, no retirado).
-   `failed` → `printing.job.fail` con el error, `device` y `attempt`; solo vale para la entrega en curso. Otro
+   `failed` → `printing.job.fail` con el error, `device` y `attempt`; solo vale para la entrega en curso. El
+   error es el código de la app (`printer_unreachable`, `io_error`, `bluetooth_permission_denied`,
+   `invalid_printer_address`, `unknown_document_type`, `invalid_payload`), que `deviceError` de
+   `frontend/lib/format.ts` convierte en la frase; cualquier otro texto se enseña tal cual. Otro
    dispositivo, uno sin alta u otra entrega → 409 `printing.job_not_yours`.
 4. `wake`: tras el COMMIT de un trabajo nuevo llega el aviso `printing.job.queued` por la BD de control
    (el mismo NOTIFY que `/api/live`); el canal despierta a los dispositivos de esa impresora o función.
