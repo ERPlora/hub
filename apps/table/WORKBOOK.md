@@ -292,7 +292,7 @@ cierra la ventana sin guardarlo. Con la ventana como se abrió, atrás la cierra
 | TABLE-F31 | Olvidar el nombre de un cliente cuyos datos se borran (RGPD) | hecho |
 | TABLE-F32 | Poner o quitar el cliente de una mesa | hecho |
 | TABLE-F33 | Ver cuánto lleva cada mesa | hecho |
-| TABLE-F34 | Ver qué mesas han pedido la cuenta | parcial |
+| TABLE-F34 | Ver qué mesas han pedido la cuenta | hecho |
 
 ### TABLE-F01 Crear y ordenar las zonas del local
 Estado: hecho
@@ -892,8 +892,7 @@ Si falla: como el resto del plano, un fallo al cargar sale con «Reintentar».
 Implicados: TABLE-F09, TABLE-F15, TABLE-F16, TABLE-F17, TABLE-F34, SALE-F17, SALE-F19, SALE-F22
 
 ### TABLE-F34 Ver qué mesas han pedido la cuenta
-Estado: parcial — Ventas ya apunta en la cuenta que se imprimió y el plano lo recibe al día, por la API y el
-asistente; la pantalla del plano todavía no pinta la mesa «Cuenta pedida» (pasos 2 y 5)
+Estado: hecho
 Actor: empleado, responsable, asistente
 Pantalla: Plano de sala (Servicio); asistente
 Pasos:
@@ -1183,10 +1182,7 @@ Ventas (`sale.add_sale`), que tienen los cuatro papeles.
 
 ### Lo que queda fuera
 
-- TABLE-F34, ver qué mesas han pedido la cuenta, está `parcial`: Ventas ya apunta en la cuenta que se imprimió
-  y el plano lo recibe al día por la API y el asistente, pero la pantalla del plano todavía no pinta la mesa
-  «Cuenta pedida». Los otros 33 están `hecho`. Lo que no entra a propósito está en «Lo
-  que NO hace, a propósito».
+- Los 34 flujos están `hecho`. Lo que no entra a propósito está en «Lo que NO hace, a propósito».
 - Los dos iconos de [`UI-REQUESTS.md`](UI-REQUESTS.md) (`ion:restaurant-outline` para la app y
   `ion:map-outline` para el Plano de sala) siguen sin registrarse en `@erplora/ui`; mientras, la app usa
   `ion:grid-outline` (también en el paso «Tus mesas» del Inicio) y el plano `ion:apps-outline`.
