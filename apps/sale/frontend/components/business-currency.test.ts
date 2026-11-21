@@ -98,7 +98,7 @@ const GROUP: TargetGroupOut = {
   max_choices: 1,
   allow_repeat: false,
   is_required: false,
-  options: [{ id: 'cheese', name: 'Cheese', kitchen_name: '', price_delta: 500, tax_category_key: null, is_default: false }],
+  options: [{ id: 'cheese', name: 'Cheese', kitchen_name: '', price_delta: 500, tax_category_key: null, is_default: false, allergens: [] }],
 };
 const dish = (id: string, name: string, price_delta = 0) => ({ id, product_id: `p-${id}`, product_name: name, sku: '', price_delta });
 const MENU = {

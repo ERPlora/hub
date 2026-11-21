@@ -15,12 +15,12 @@ export interface SectionGroup extends ChoiceGroup {
 // it is full. A group whose choices repeat lays them one per line, the counter and the minus to the right of the
 // name (as Square and Toast do): in a tile they left the name a few pixels and it broke letter by letter. The
 // taps go up; the rules live in `modifierChoice`.
+import { AllergenRow } from '@erplora/ui/components';
 import { computed } from 'vue';
 
 import { useLocale, useT } from '../../composables/useT';
 import { signedMoney, useBusinessMoney } from '../../lib/format';
 import { type Choice, countOf, ruleOf } from '../../lib/modifierChoice';
-import AllergenRow from './AllergenRow.vue';
 
 const props = defineProps<{ kind: 'options' | 'menu'; group: SectionGroup; choice: Choice; attention: string | null }>();
 const emit = defineEmits<{ tap: [optionId: string]; less: [optionId: string] }>();

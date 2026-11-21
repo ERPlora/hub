@@ -1,13 +1,22 @@
 <script setup lang="ts">
-// MODIFIER-F04 «Añadir, cambiar o quitar las opciones de un grupo»: «Add option» asks for Name, «Kitchen
-// ticket name», «Supplement (PLN)» (in the business's currency, its country's, with its decimals; just
-// «Supplement» until the business answers; signed: negative is a discount; empty or 0, free), «Own tax category»
-// (searched in Taxes; empty = the dish's), «Chosen by default» and Order; Edit opens «Editing option —
-// {name}» and sends only what changed with `modifier.option.update` (an emptied tax category sends
-// `''`, the dish's again). «Create» / «Save» wait in grey until the business has answered its money (the supplement
-// is read in it; hub#918). A supplement that is not an amount is never sent; the server's refusals (a
-// taken name, too many defaults, an own line worth nothing) stay under their field.
-import { Combo, type ComboOption, FormModal, MoneyInput, moneyFieldText, parseMoney } from '@erplora/ui/components';
+// MODIFIER-F04 «Add, change or remove the options of a group»: «Add option» asks for Name, «Kitchen ticket name»,
+// «Supplement (PLN)» (in the business's currency, its country's, with its decimals; just «Supplement» until the
+// business answers; signed: negative is a discount; empty or 0, free), «Own tax category» (searched in Taxes; empty =
+// the dish's), «Chosen by default», the allergens it adds to the dish (MODIFIER-F11) and Order; Edit opens «Editing
+// option — {name}» and sends only what changed with `modifier.option.update` (an emptied tax category sends `''`, the
+// dish's again). «Create» / «Save» wait in grey until the business has answered its money (the supplement is read in
+// it; hub#918). A supplement that is not an amount is never sent; the server's refusals (a taken name, too many
+// defaults, an own line worth nothing, an allergen off the list) stay under their field.
+import {
+  AllergenSelect,
+  type AllergenCode,
+  Combo,
+  type ComboOption,
+  FormModal,
+  MoneyInput,
+  moneyFieldText,
+  parseMoney,
+} from '@erplora/ui/components';
 import { useCommand, useLiveClient } from '@erplora/ui/sdk';
 import { IonInput, IonToggle } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
@@ -34,6 +43,7 @@ interface Form {
   price: string;
   tax: ComboOption | null;
   isDefault: boolean;
+  allergens: AllergenCode[];
   order: string;
 }
 
@@ -49,18 +59,19 @@ const title = computed(() =>
   props.option ? t('modifier.options.form.titleEdit', { name: props.option.name }) : t('modifier.options.form.titleNew'),
 );
 const searchTax = computed(() => searchTaxCategories(client, t, locale.value));
-const form = ref<Form>({ name: '', kitchenName: '', price: '', tax: null, isDefault: false, order: '0' });
+const form = ref<Form>({ name: '', kitchenName: '', price: '', tax: null, isDefault: false, allergens: [], order: '0' });
 /** A save was tried: a supplement that is not an amount says so even before leaving the field. */
 const tried = ref(false);
 
 function fromOption(option: OptionOut | null): Form {
-  if (!option) return { name: '', kitchenName: '', price: '', tax: null, isDefault: false, order: '0' };
+  if (!option) return { name: '', kitchenName: '', price: '', tax: null, isDefault: false, allergens: [], order: '0' };
   return {
     name: option.name,
     kitchenName: option.kitchen_name,
     price: moneyFieldText(option.price_delta, locale.value, money.value),
     tax: option.tax_category_key ? { id: option.tax_category_key, label: option.tax_category_name ?? option.tax_category_key } : null,
     isDefault: option.is_default,
+    allergens: [...option.allergens],
     order: String(option.sort_order),
   };
 }
@@ -87,6 +98,8 @@ watch(money, (now, before) => {
   form.value = { ...form.value, price: props.option ? moneyFieldText(props.option.price_delta, locale.value, now) : '' };
 });
 
+/** Two values of a field are the same; two lists of allergens, when they hold the same codes in the same order. */
+const same = (a: unknown, b: unknown): boolean => (Array.isArray(a) && Array.isArray(b) ? a.join() === b.join() : a === b);
 const text = (value: unknown): string => (value === null || value === undefined ? '' : String(value));
 const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'ion-touched': !!message });
 /** A whole number as the server takes it; anything else as typed, for the server to refuse. */
@@ -101,6 +114,7 @@ function fields(cents: number): Required<Omit<OptionIn, 'group' | 'group_id'>> {
     tax_category_key: f.tax?.id ?? '',
     is_default: f.isDefault,
     sort_order: whole(f.order || '0'),
+    allergens: f.allergens,
   };
 }
 
@@ -114,9 +128,10 @@ function patch(option: OptionOut, cents: number): OptionPatchIn {
     tax_category_key: option.tax_category_key ?? '',
     is_default: option.is_default,
     sort_order: option.sort_order,
+    allergens: option.allergens,
   };
   for (const key of Object.keys(now) as Array<keyof typeof now>) {
-    if (now[key] !== before[key]) (out as Record<string, unknown>)[key] = now[key];
+    if (!same(now[key], before[key])) (out as Record<string, unknown>)[key] = now[key];
   }
   return out;
 }
@@ -230,6 +245,15 @@ const canDismiss = useUnsavedFormOnOpen(
         >
           {{ fieldErrors.is_default }}
         </p>
+        <AllergenSelect
+          testid="modifier-option-form-allergens"
+          :model-value="form.allergens"
+          :label="$t('modifier.options.form.allergens')"
+          :helper-text="$t('modifier.options.form.allergensHint')"
+          :error-text="fieldErrors.allergens"
+          :disabled="pending"
+          @update:model-value="form = { ...form, allergens: $event }"
+        />
         <ion-input
           data-testid="modifier-option-form-sort_order"
           name="sort_order"

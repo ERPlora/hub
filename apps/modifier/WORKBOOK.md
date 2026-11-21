@@ -92,8 +92,8 @@ Título «Grupo — {nombre}» y su regla. Dos apartados:
 
 - **Opciones**: cada una con su nombre, su nombre de comanda (si es otro), su suplemento en la moneda
   del negocio («+1,00 €» o «−0,50 €» en España, «+1,00 zł» en Polonia; o «Gratis»), su categoría fiscal
-  propia si la tiene y la marca «Por defecto». Quien gestiona
-  ve «Añadir opción» y, en cada una, Editar y Borrar. Vacío: «Este grupo todavía no tiene opciones.».
+  propia si la tiene, la marca «Por defecto» y, debajo de su nombre, sus alérgenos si tiene («Alérgenos: Leche»).
+  Quien gestiona ve «Añadir opción» y, en cada una, Editar y Borrar. Vacío: «Este grupo todavía no tiene opciones.».
   Si tiene menos opciones de las que pide el mínimo (y no se repiten), un aviso lo dice: el TPV no
   podría completarlo.
 - **Se aplica a**: cada producto («Producto · Hamburguesa (HAM-01)») o categoría («Categoría ·
@@ -107,7 +107,8 @@ De 20 en 20, con «Cargar más».
   más = obligatorio)», «Máximo (0 = sin techo)», «Se puede repetir una opción» y Orden.
 - **Opción** («Nueva opción» / «Editando opción — {nombre}»): Nombre, «Nombre en la comanda»,
   «Suplemento (<moneda>)» (la del negocio: «Suplemento (PLN)» en Polonia; negativo descuenta; vacío o 0,
-  gratis), «Categoría fiscal propia» (se busca; vacía = la del plato), Orden y «Elegida por defecto».
+  gratis), «Categoría fiscal propia» (se busca; vacía = la del plato), Orden, «Elegida por defecto» y, debajo,
+  «Alérgenos» (los catorce: se marcan los que la opción añade al plato).
 - **Enganchar** («Aplicar «{grupo}» a…»): Producto o Categoría, y el buscador de cada uno.
 - **Borrar** grupo u opción y **Dejar de aplicar**: piden confirmación diciendo qué se va con ello.
 
@@ -142,7 +143,7 @@ cierra la ventana sin guardarlo. Con la ventana como se abrió, atrás la cierra
 | MODIFIER-F08 | Que el suplemento salga en la comanda de cocina | hecho |
 | MODIFIER-F09 | Soltar los grupos de un producto o una categoría que se borra | hecho |
 | MODIFIER-F10 | Recuperar los grupos de suplementos, y los de un producto o de una categoría, desde una copia aparte | hecho |
-| MODIFIER-F11 | Declarar los alérgenos de una opción | parcial — la opción guarda sus alérgenos por el asistente y la API; faltan el bloque del formulario y la fila de la hoja del grupo |
+| MODIFIER-F11 | Declarar los alérgenos de una opción | hecho |
 | MODIFIER-F12 | Sumar los alérgenos de las opciones a los del plato | no hecho |
 
 ### MODIFIER-F01 Consultar y buscar los grupos
@@ -406,8 +407,7 @@ qué («not_found: …»); la que trajo una recuperación se reconoce por su nom
 Implicados: BASE-F114, INVENTORY-F01, INVENTORY-F07, INVENTORY-F34, MODIFIER-F05, MODIFIER-F09
 
 ### MODIFIER-F11 Declarar los alérgenos de una opción
-Estado: parcial — la opción guarda sus alérgenos por el asistente y la API, y las lecturas de la hoja del grupo y
-del TPV ya los devuelven; faltan el bloque del formulario y la fila de la hoja del grupo
+Estado: hecho
 Actor: propietario, administrador, responsable, asistente
 Pantalla: Suplementos (hoja del grupo)
 Pasos:
@@ -791,14 +791,14 @@ cocina (`tests/test_integration_kitchen.py`).
 
 ### Los alérgenos de una opción
 
-F11 está `parcial` y F12 `no hecho`. La lista es la de la plataforma (`base.allergens`: su tipo, su comprobación y sus
+F11 está `hecho` y F12 `no hecho`. La lista es la de la plataforma (`base.allergens`: su tipo, su comprobación y sus
 esquemas `AllergensIn`, `AllergensPatchIn` y `AllergensOut`), la misma que declara un producto de Inventario
 (INVENTORY-F35) y que leen Ventas y Cocina; `apps.py` declara sus nombres (`choices`) para la tarjeta del asistente.
 `ModifierOption.allergens` (migración `0002_option_allergens`, con `db_default` para el código de antes) la guardan el
 alta y la edición de la opción, y la devuelven `modifier.option.get` y `.list`, `modifier.group.for_target` y cada
-elección de `modifier.selection.resolve`; la recuperación desde una copia aparte la trae. Quedan, en este orden, el
-formulario de la opción y la fila de la hoja del grupo (hub#1933) y la suma en la línea del TPV, con la hoja de
-suplementos de Ventas y el cambio de SALE-F40 (hub#1934).
+elección de `modifier.selection.resolve`; la recuperación desde una copia aparte la trae. El formulario de la opción
+la marca con `AllergenSelect` y la hoja del grupo la dice con `AllergenRow`, los dos de `@erplora/ui`, como Inventario y
+Ventas. Queda la suma en la línea del TPV, con la hoja de suplementos de Ventas y el cambio de SALE-F40 (hub#1934).
 
 ### Lo que NO hace, a propósito
 

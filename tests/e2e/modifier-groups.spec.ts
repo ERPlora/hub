@@ -1,10 +1,10 @@
-// flow: MODIFIER-F01, MODIFIER-F02, MODIFIER-F03, MODIFIER-F04, MODIFIER-F05 — Modifiers in Chrome
+// flow: MODIFIER-F01, MODIFIER-F02, MODIFIER-F03, MODIFIER-F04, MODIFIER-F05, MODIFIER-F11 — Modifiers in Chrome
 // (apps/modifier/WORKBOOK.md) on hub `a` with the real Inventory and Taxes apps (no doubles), one test per flow:
 // the owner finds the groups by their rule (F01; the employee reads them and their sheet with nothing that changes
 // them), creates one from «New group» (F02; a taken name is refused under Name), edits it (F03; a maximum below its
 // defaults is refused under Maximum) and deletes it after a confirmation that says what goes with it, adds, edits and
 // deletes the options of its sheet (F04: a supplement, a discount with the ± key, a soft drink with its own tax
-// category; one default too many is refused under «Chosen by default» until it is switched off), and applies it to a product found by its SKU and to a category, then stops applying it (F05). Each screen
+// category; one default too many is refused under «Chosen by default» until it is switched off), applies it to a product found by its SKU and to a category, then stops applying it (F05), and marks the allergens an option adds to the dish, which the sheet says under its name (F11). Each screen
 // in 390×844, 834×1112 and 1440×900. Its data are named `E2E Mod …` / `E2E-MOD-…`
 // and `afterAll` deletes exactly them.
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
@@ -333,6 +333,45 @@ test('MODIFIER-F04: the sheet adds, edits and deletes the options with their sup
   await page.locator('[data-testid=modifier-sheet-option-delete-submit]').click();
   await expect(optionRows).toHaveCount(2);
   await expect(optionRows.filter({ hasText: 'Soda' })).toHaveCount(0);
+});
+
+test('MODIFIER-F11: an option is saved with the allergens it adds, and the sheet says them under its name', async ({ page, context }) => {
+  await login(page, A, '/modifier/groups');
+  const group = await makeGroup(context, { name: named('Extras') }, [{ name: 'No onion' }]);
+  await openGroups(page);
+  await groupRow(page, group.id).locator('[role=cell]').first().click();
+  await expect(sheet(page)).toBeVisible();
+  const optionForm = dialog(page, 'modifier-option-form');
+  const allergens = optionForm.locator('[data-testid=modifier-option-form-allergens]');
+  const cheeseRow = sheet(page).locator('[data-testid^=modifier-sheet-options-row-]').filter({ hasText: 'Cheese' });
+  const onionRow = sheet(page).locator('[data-testid^=modifier-sheet-options-row-]').filter({ hasText: 'No onion' });
+
+  // «+Cheese» adds milk: none comes marked, one tap marks it.
+  await sheet(page).locator('[data-testid=modifier-sheet-options-add]').click();
+  await expect(optionForm).toBeVisible();
+  await fill(optionForm, 'modifier-option-form-name', 'Cheese');
+  await expect(allergens.locator('ion-checkbox.checkbox-checked')).toHaveCount(0);
+  await allergens.locator('[data-testid=modifier-option-form-allergens-milk] ion-checkbox').click();
+  await shoot(page, 'MODIFIER-F11-form', () => expect(allergens).toBeVisible());
+  await optionForm.locator('[data-testid=modifier-option-form-submit]').click();
+  await expect(optionForm).toBeHidden();
+  await expect(cheeseRow.locator('[data-testid^=modifier-sheet-options-allergens-]')).toHaveText('Allergens: Milk');
+  await expect(onionRow.locator('[data-testid^=modifier-sheet-options-allergens-]')).toHaveCount(0);
+
+  // Editing opens with milk marked; gluten joins it, said in the list's order.
+  await cheeseRow.locator('[data-testid^=modifier-sheet-options-edit-]').click();
+  await expect(optionForm).toBeVisible();
+  await expect(allergens.locator('[data-testid=modifier-option-form-allergens-milk] ion-checkbox')).toHaveJSProperty('checked', true);
+  await allergens.locator('[data-testid=modifier-option-form-allergens-gluten] ion-checkbox').click();
+  await optionForm.locator('[data-testid=modifier-option-form-submit]').click();
+  await expect(optionForm).toBeHidden();
+  await expect(cheeseRow.locator('[data-testid^=modifier-sheet-options-allergens-]')).toHaveText('Allergens: Gluten, Milk');
+  const saved = await api<{ rows: { name: string; allergens: string[] }[] }>(context, A, 'GET', `/modifier/options?group_id=${group.id}`);
+  expect(saved.data.rows.map((row) => [row.name, row.allergens]).sort()).toEqual([
+    ['Cheese', ['gluten', 'milk']],
+    ['No onion', []],
+  ]);
+  await shoot(page, 'MODIFIER-F11', () => expect(cheeseRow).toContainText('Allergens: Gluten, Milk'));
 });
 
 test('MODIFIER-F04: one default too many is refused under «Chosen by default», and switching it off takes the refusal away', async ({ page, context }) => {
