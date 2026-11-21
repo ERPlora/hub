@@ -383,7 +383,7 @@ export function redact(text: string, secrets: string[]): string {
 export const QA_STAFF_EMAIL = 'qa-assistant-staff@example.com';
 
 /**
- * Only a stack's own SaaS database (`saas_e2e_<port>`) gets the real keys and the QA accounts: never the shared one
+ * Only a stack's own SaaS database (`saas_e2e_<port>`) gets the real providers and the QA accounts: never the shared one
  * (`saas`, the stack on :8000) nor any other.
  */
 export function guardSaasDatabase(name: string): void {
@@ -402,23 +402,21 @@ type Env = Record<string, string | undefined>;
 
 /**
  * What a run leaves behind on the stack's SaaS, taken out again once it ends, failed or not (`manage.py shell -c`,
- * DEBUG only): every provider key labelled `qa` (the real keys the seed wrote) and the accounts it made, named in
- * `QA_CLEANUP_EMAILS` (their memberships go with them). It prints how many of each, never a key.
+ * DEBUG only): the accounts it made, named in `QA_CLEANUP_EMAILS` (their memberships go with them). No key is ever in
+ * the SaaS's database: its providers read theirs from its environment. It prints how many accounts.
  */
 export const CLEANUP_PY = `
 import json, os
 from django.conf import settings
 from django.contrib.auth import get_user_model
-from assistant.models import AIProviderCredential
 
 if not settings.DEBUG:
     raise SystemExit("the real-provider cleanup only runs with DEBUG=True")
 emails = [email.strip() for email in os.environ["QA_CLEANUP_EMAILS"].split(",") if email.strip()]
-keys = AIProviderCredential.objects.filter(label="qa").delete()[0]
 accounts = get_user_model().objects.filter(email__in=emails)
 named = accounts.count()
 accounts.delete()
-print(json.dumps({"keys": keys, "accounts": named}))
+print(json.dumps({"accounts": named}))
 `;
 
 /** How the cleanup runs from the stack's SaaS checkout, on `saasDatabase`, for the accounts `emails`. */

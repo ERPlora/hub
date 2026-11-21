@@ -4,9 +4,9 @@
 // in a new conversation of the real chat and checks what went over the wire: the read ran, the write's card showed
 // (cancelled by default: nothing changes; confirmed only when the probe says so), the role was refused what it lacks
 // (checked first against the exported catalogue) or the documentation was searched and cited. Skipped unless
-// QA_REAL_PROVIDER=1: it spends real tokens and never runs in CI. Needs the keys in the environment (QA_QWEN_API_KEY,
-// QA_OPENAI_API_KEY; never in the repo, the report or a screenshot) and the stack's SaaS (E2E_SAAS_DIR) running with
-// ASSISTANT_SERVICE_PROVIDER=openai (README «Las sondas del asistente»). A probe that does not fit the catalogue (empty
+// QA_REAL_PROVIDER=1: it spends real tokens and never runs in CI. Needs the keys in the environment of the run and of
+// the stack's SaaS (DASHSCOPE_API_KEY, OPENAI_API_KEY; never in the repo, the report or a screenshot) and the stack's
+// SaaS (E2E_SAAS_DIR) running with ASSISTANT_SERVICE_PROVIDER=openai (README «Las sondas del asistente»). A probe that does not fit the catalogue (empty
 // phrase, a copy of an ask, a tool the role holds or lacks) is n.a.: no turn is asked. The QA_ANSWER_* variables
 // choose the model that answers (assistant-seed.ts) and QA_PROBES_SAMPLE a sample of the files (assistant-sample.ts);
 // a sampled run first makes the records its probes name (qa/setup.json, assistant-setup.ts) and leaves out of the score
