@@ -440,7 +440,7 @@ En la pantalla Archivos:
 | BASE-F113 | Seguir avisando con la pantalla apagada (app de Android) | hecho |
 | BASE-F114 | Devolver un negocio a un momento pasado desde el admin de Hubs | hecho |
 | BASE-F115 | Ver la ayuda de la pantalla de un módulo | hecho |
-| BASE-F116 | Leer las novedades de ERPlora | parcial |
+| BASE-F116 | Leer las novedades de ERPlora | hecho |
 
 ### BASE-F01 Ver lo que le falta por configurar al negocio
 Estado: hecho
@@ -3289,17 +3289,17 @@ español.
 Implicados: BASE-F92, BASE-F93
 
 ### BASE-F116 Leer las novedades de ERPlora
-Estado: parcial — las novedades ya se leen por el asistente y por la API, pero Sistema › Actualizaciones todavía no las
-enseña (hub#576)
+Estado: hecho
 Actor: propietario, administrador, responsable, empleado
 Pantalla: Sistema · Actualizaciones
 Pasos:
   1. En la pestaña «Actualizaciones», debajo de la versión y su fecha (BASE-F41), sale «Novedades»: lo que ha cambiado
      en ERPlora que el negocio nota, lo más reciente primero. Quien no administra el negocio también las ve: no dicen
-     nada de él.
-  2. Cada novedad dice su día, si es algo nuevo, una mejora o un arreglo, un título corto y una o dos frases de lo que
-     se puede hacer ahora. Son notas escritas para el negocio, nunca la lista de cambios del código.
-  3. Salen las 20 más recientes; «Ver más» trae las anteriores.
+     nada de él. Mientras carga: «Consultando las novedades…».
+  2. Cada novedad dice su día, si es algo nuevo, una mejora o un arreglo («Nuevo», «Mejora» o «Arreglo»), un título
+     corto y una o dos frases de lo que se puede hacer ahora, tal cual se escribieron. Son notas escritas para el
+     negocio, nunca la lista de cambios del código.
+  3. Salen las 20 más recientes, sin páginas.
   4. Sin ninguna, dice «Todavía no hay novedades.».
   5. Por el asistente, «¿qué hay de nuevo en ERPlora?» o «¿qué ha cambiado en la última actualización?» las lee igual,
      en el idioma de la persona.
@@ -3683,7 +3683,9 @@ Implicados: BASE-F41
   caracteres) y `body` (hasta 400), en texto llano. `base/release_notes.py` las lee una vez por proceso (con `DEBUG`, en
   cada llamada) y rechaza la que no lo cumple; `base/tests/test_release_notes.py` lee todas las del repositorio, así
   que una nota rota no llega a la imagen. Se escribe una por cambio que nota un negocio (algo nuevo, una mejora o un
-  arreglo que se ve), en su lenguaje: nunca el título del commit ni los cambios internos.
+  arreglo que se ve), en su lenguaje: nunca el título del commit ni los cambios internos. La pantalla
+  (`base/frontend/components/SystemReleaseNotes.vue`) la pide una vez con la página por defecto, y otra vez si la
+  persona cambia de idioma, porque el Hub contesta en el suyo.
 - Comandos (`base/services/`, `base.administer_hub`, `ai=` con `risk`), con el id en el cuerpo:
   `base.failed_event.retry` (`POST /api/system/failed-events/retry`: `pending`, `attempts` 0, solo a su `app_label`;
   409 `base.failed_event_app_off` si la app no está activa), `base.failed_event.retry_all` (`POST
@@ -4426,8 +4428,6 @@ Implicados: BASE-F41
 - **El PDF de cada factura en el archivo fiscal (BASE-F109)**, hub#1821: hoy van sus datos y el XML de VeriFactu.
 - **La fila de salud del Inicio en pantalla (BASE-F02)**, hub#573: su lectura ya existe (`base.health.list`, con la
   impresora de Impresión); falta pintarla en el Inicio y que la Bandeja de WhatsApp declare cómo está su número.
-- **Las novedades en Sistema › Actualizaciones (BASE-F116)**: ya se leen por el asistente y por la API; falta
-  enseñarlas en la pantalla, hub#576.
 - **La cola de PgBouncer de cada negocio en CloudWatch**, hub#572.
 - **Peticiones a `@erplora/ui`** que siguen abiertas: [`UI-REQUESTS.md`](UI-REQUESTS.md) (los iconos de documento de
   Archivos, los del cuadro del asistente y `useI18n` en el shell).
