@@ -169,8 +169,9 @@ function supplement(cents: number): string {
   min-width: 0;
   min-height: 2.75rem;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.25rem 0.5rem;
   padding: 0.5rem 0.75rem;
   border: 1px solid var(--ep-border, rgba(0, 0, 0, 0.15));
   border-radius: 10px;
@@ -184,10 +185,12 @@ function supplement(cents: number): string {
   border-color: var(--ion-color-primary, #3880ff);
   background: rgba(var(--ion-color-primary-rgb, 56, 128, 255), 0.1);
 }
+/* The name keeps its longest word whole (that is its narrowest width), so a supplement that does not fit beside it
+   moves under it; only a word longer than the whole choice is split. */
 .pos-options__label {
   flex: 1;
-  min-width: 0;
-  overflow-wrap: anywhere;
+  max-width: 100%;
+  overflow-wrap: break-word;
 }
 .pos-options__delta,
 .pos-options__count {
