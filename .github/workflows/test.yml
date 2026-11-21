@@ -143,8 +143,10 @@ jobs:
       - name: The SaaS beside the Hub
         env:
           GH_TOKEN: ${{ github.token }}
+        run: bash .github/scripts/clone-repo.sh ERPlora/saas ../saas
+      # Without the token: these run the SaaS's own setup.
+      - name: The SaaS's dependencies
         run: |
-          bash .github/scripts/clone-repo.sh ERPlora/saas ../saas
           git -C ../saas submodule update --init --depth 1 packages/live
           cp ../saas/.env.example ../saas/.env
           uv sync --locked --directory ../saas

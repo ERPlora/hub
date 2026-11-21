@@ -5,6 +5,7 @@ import { spawnSync } from 'node:child_process';
 
 import { describe, expect, it } from 'vitest';
 
+import { NO_CLOCK } from '../../vitest.load';
 import { QA_STAFF_EMAIL } from './assistant-battery';
 import { answerChoice, QWEN_ADDRESS, SEED_PY, seedCommand, seedSecrets } from './assistant-seed';
 import { checkInSaas, saasCheckout } from './saas-names';
@@ -144,11 +145,11 @@ describe('seedSecrets', () => {
 const SAAS = saasCheckout(process.env);
 
 describe.skipIf(!SAAS)('SEED_PY in the SaaS beside the Hub', () => {
-  it('takes from the SaaS only names it has, called with arguments it accepts, among them the operations it seeds with', () => {
-    const checked = checkInSaas(SEED_PY, SAAS ?? '');
+  it('takes from the SaaS only names it has, called with arguments it accepts, among them the operations it seeds with', async () => {
+    const checked = await checkInSaas(SEED_PY, SAAS ?? '');
     expect(checked.status, checked.problems).toBe(0);
     expect(checked.names).toEqual(expect.arrayContaining(['model_select', 'policy_update', 'ModelSelectIn', 'PolicyIn', 'AIModel', 'AIProvider']));
-  }, 120_000);
+  }, NO_CLOCK);
 });
 
 describe('SEED_PY', () => {

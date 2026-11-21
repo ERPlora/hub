@@ -1,7 +1,7 @@
 // Whether a script the Hub's e2e runs inside the SaaS (`manage.py shell -c`, as SEED_PY of assistant-seed.ts) still
 // fits the SaaS checked out beside the Hub. Run in that SaaS, so a SaaS that moves or renames what the script uses
 // fails the Hub's Vitest instead of a run's preparation.
-import { spawnSync } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 
@@ -74,14 +74,28 @@ if problems:
 print(json.dumps(sorted(name for name in imported if name != "__builtins__")))
 `;
 
+export interface SaasCheck {
+  status: number | null;
+  names: string[];
+  problems: string;
+}
+
 /** The script's names resolved in the SaaS at `saasDir`: `names`, what it imports, when everything resolves; otherwise
- *  `problems` names, line by line, what the SaaS lacks. */
-export function checkInSaas(script: string, saasDir: string): { status: number | null; names: string[]; problems: string } {
-  const checked = spawnSync('uv', ['run', 'python', 'manage.py', 'shell', '--no-imports', '-c', NAMES_PY], {
-    cwd: saasDir,
-    input: script,
-    encoding: 'utf8',
+ *  `problems` names, line by line, what the SaaS lacks. The process runs off the Vitest worker's thread: a test waits
+ *  for it with NO_CLOCK (vitest.load.ts), as long as starting Django cold takes. */
+export function checkInSaas(script: string, saasDir: string): Promise<SaasCheck> {
+  return new Promise((settle) => {
+    const child = spawn('uv', ['run', 'python', 'manage.py', 'shell', '--no-imports', '-c', NAMES_PY], { cwd: saasDir });
+    let stdout = '';
+    let stderr = '';
+    child.stdout.setEncoding('utf8').on('data', (chunk: string) => (stdout += chunk));
+    child.stderr.setEncoding('utf8').on('data', (chunk: string) => (stderr += chunk));
+    child.stdin.on('error', (error) => (stderr += `${error.message}\n`));
+    child.once('error', (error) => settle({ status: null, names: [], problems: `${stderr}${error.message}` }));
+    child.once('close', (status) => {
+      const names = status === 0 ? (JSON.parse(stdout.trim().split('\n').at(-1) ?? '[]') as string[]) : [];
+      settle({ status, names, problems: `${stderr}${stdout}` });
+    });
+    child.stdin.end(script);
   });
-  const names = checked.status === 0 ? (JSON.parse(checked.stdout.trim().split('\n').at(-1) ?? '[]') as string[]) : [];
-  return { status: checked.status, names, problems: `${checked.stderr}${checked.stdout}` };
 }

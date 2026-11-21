@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 
 import { describe, expect, it } from 'vitest';
 
+import { NO_CLOCK } from '../../vitest.load';
 import { checkInSaas, saasCheckout } from './saas-names';
 
 const SAAS = saasCheckout(process.env);
@@ -15,9 +16,10 @@ print("the script ran")
 from assistant import services
 from assistant.services import model_select
 from assistant.schemas import PolicyIn
-
+from django.conf import settings
 services.credential_import(None)
 PolicyIn(answer_model=None)
+service = settings.ASSISTANT_STORED_KEYS
 `;
 
 describe('saasCheckout', () => {
@@ -33,12 +35,13 @@ describe('saasCheckout', () => {
 });
 
 describe.skipIf(!SAAS)('checkInSaas', () => {
-  it('names each name the SaaS lacks, an attribute, an import and an argument, without running the script', () => {
-    const checked = checkInSaas(STALE, SAAS ?? '');
+  it('names each name the SaaS lacks, an attribute called or read, an import and an argument, without running the script', async () => {
+    const checked = await checkInSaas(STALE, SAAS ?? '');
     expect(checked.status).not.toBe(0);
     expect(checked.problems).toMatch(/line 7: .*module 'assistant\.services' has no attribute 'credential_import'/);
     expect(checked.problems).toMatch(/line 4: .*cannot import name 'model_select' from 'assistant\.services'/);
     expect(checked.problems).toMatch(/line 8: .*answer_model/);
+    expect(checked.problems).toMatch(/line 9: .*has no attribute 'ASSISTANT_STORED_KEYS'/);
     expect(checked.problems).not.toContain('the script ran');
-  }, 120_000);
+  }, NO_CLOCK);
 });
