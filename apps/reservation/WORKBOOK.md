@@ -10,12 +10,18 @@ Lo que no entra todavía: ver «Lo que queda fuera».
 
 ## Para qué sirve y para quién
 
+Reservas es el libro de reservas de tu restaurante o tu bar: cuándo y para cuántos aceptas reservas, cada reserva con
+su cliente y su mesa, desde que llama hasta que se va, y una lista de espera para quien no cabe. La mesa de cada
+reserva confirmada queda apartada en el plano de Mesas.
+
+### En detalle
+
 Reservas es el **libro de reservas del restaurante o del bar**: decide cuándo y para cuántos se acepta
 reservar (franjas horarias con un máximo de reservas y, si se quiere, de comensales, dentro del horario
 del negocio; y días bloqueados), apunta cada reserva con su cliente y su mesa, la lleva de Pendiente a
 Completada y guarda en una **lista de espera** a quien no cabe.
 
-Quién la usa:
+### Quién la usa y qué hace cada uno
 
 - El **empleado** que coge el teléfono o atiende la puerta (el anfitrión o el camarero) apunta,
   confirma, sienta, cambia y cancela reservas y lleva la lista de espera.
@@ -103,6 +109,13 @@ las pestañas de las tres más **Ajustes** (esta, solo a quien puede cambiarlos)
 perfil no puede usar no salen.
 
 ### Reservas
+Aquí está el libro del día: arriba, la fecha con sus flechas y tres cifras (cubiertos, reservas y cuánto queda en la
+próxima franja); debajo, las reservas del día por hora, con su cliente, sus comensales, su mesa y su estado. Con
+«Nueva reserva» apuntas una que llega por teléfono o en el local; en cada fila la confirmas, la sientas cuando llega
+el grupo, la completas cuando se va o la cancelas. El buscador encuentra una reserva en todo el libro por nombre,
+teléfono o correo.
+
+#### Detalle
 Menú **Reservas → Reservas**. Arriba, la **barra del día**: «Día anterior», la fecha, «Día siguiente» y
 «Hoy» cuando se está en otro día; el día en letra; y tres cifras: **cubiertos** (personas que vienen,
 sin canceladas ni no presentadas), **reservas** y **próxima franja** (la primera que no ha terminado,
@@ -129,6 +142,11 @@ Origen (Teléfono, En el local), Notas del cliente y Notas internas. Una reserva
 cancelada o no presentada solo cambia sus notas, y lo dice arriba; la cancelada, además, con su motivo entero.
 
 ### Lista de espera
+Aquí apuntas a quien quiere mesa y no cabe, en el orden en que llega, con el día y la hora que prefiere y sus
+comensales. Cuando le llamas, lo marcas «Contactado»; si queda sitio, «Convertir» le hace la reserva con sus datos, y
+«Quitar» lo saca de la lista.
+
+#### Detalle
 Menú **Reservas → Lista de espera**. Tabla, en el orden en que se apuntaron (por día y hora preferida):
 Fecha, Hora pref., Cliente, Teléfono (como en Clientes), Pax, Contactado, Estado (En espera, Convertida);
 buscador y filtros (fecha, contactado, convertida). Acción principal **«Añadir cliente»** (Cliente,
@@ -137,6 +155,12 @@ Nombre, Teléfono, Fecha, Hora, Pax, Notas → «Añadir a la lista de espera»)
 de la tabla con «Reintentar».
 
 ### Disponibilidad
+Aquí decides cuándo y para cuántos se acepta reservar. «Ocupación» enseña, para un día, cuánto queda libre en cada
+franja. En «Franjas horarias» creas los turnos de cada día de la semana con su máximo de reservas y, si quieres, de
+comensales: sin franjas, ese día no se puede reservar. En «Fechas bloqueadas» cierras un día entero o unas horas, por
+ejemplo un festivo o un evento privado.
+
+#### Detalle
 Menú **Reservas → Disponibilidad**. Tres secciones apiladas:
 - **Ocupación**: una fecha (hoy por defecto) y, por cada franja de ese día, Franja, Reservadas, Máx,
   Comensales y Disponibles; la franja sin hueco se ve atenuada con la marca «Lleno», y la que cae
@@ -152,6 +176,12 @@ Menú **Reservas → Disponibilidad**. Tres secciones apiladas:
 Cada sección pinta su propio «Cargando…» y su error con reintento.
 
 ### Ajustes
+Aquí cambias las reglas de las reservas: cuántos comensales, con cuánta antelación y hasta cuántos días vista se
+reserva por internet o por WhatsApp, cuánto dura una reserva, si las nuevas se confirman solas, si el teléfono o el
+correo son obligatorios y cuántos minutos después de su hora se libera una pendiente que nadie confirmó. Solo la ve
+quien puede cambiarlas.
+
+#### Detalle
 Pestaña **Ajustes** (solo quien puede cambiarlos). Comensales mínimos y máximos, antelación mínima
 (horas, para internet y WhatsApp), días máximos de antelación, duración por defecto, confirmar solas
 las reservas nuevas, teléfono obligatorio, correo obligatorio y minutos tras la hora para liberar una
@@ -206,7 +236,7 @@ cierra la ventana sin guardarlo. Con la ventana como se abrió, atrás la cierra
 ### RESERVATION-F01 Crear y quitar franjas horarias
 Estado: hecho
 Actor: responsable
-Pantalla: Disponibilidad → Franjas horarias
+Pantalla: Disponibilidad (Franjas horarias)
 Pasos:
 1. Pulsa «Añadir franja», elige el día de la semana, desde y hasta, el máximo de reservas y, si
    quieres, el máximo de comensales. «Crear franja».
@@ -215,13 +245,13 @@ Entra: día, desde, hasta, máximo de reservas, máximo de comensales (opcional)
 Sale: la franja (avisa: `reservation.time_slot.created`, `reservation.time_slot.deleted`).
 Si falla: «Hasta» antes o igual que «Desde»: «La franja tiene que terminar después de empezar.»; una
 franja que se pisa con otra del mismo día: «Esa franja se pisa con otra del mismo día (13:00–16:00).». El
-motivo de un campo se quita en cuanto se corrige ese campo, aunque otro diga lo mismo (hub#888).
+motivo de un campo se quita en cuanto se corrige ese campo, aunque otro diga lo mismo.
 Implicados: RESERVATION-F05, RESERVATION-F06
 
 ### RESERVATION-F02 Bloquear un día o unas horas
 Estado: hecho
 Actor: responsable, asistente
-Pantalla: Disponibilidad → Fechas bloqueadas
+Pantalla: Disponibilidad (Fechas bloqueadas)
 Pasos:
 1. Pulsa «Añadir fecha bloqueada», escribe la fecha y el motivo (festivo, cierre, evento privado).
 2. Deja «Todo el día» marcado o, para unas horas, quítalo y pon desde y hasta.
@@ -231,7 +261,7 @@ Entra: fecha, motivo, todo el día o desde–hasta.
 Sale: el bloqueo (avisa: `reservation.blocked_date.created`, `reservation.blocked_date.deleted`).
 Si falla: sin horas cuando no es todo el día, o «hasta» antes que «desde»: lo dice el campo; ese día
 ya bloqueado a esa hora: «Esa fecha ya está bloqueada a esa hora.». El motivo de un campo se quita en
-cuanto se corrige ese campo, aunque otro diga lo mismo (hub#888).
+cuanto se corrige ese campo, aunque otro diga lo mismo.
 Implicados: RESERVATION-F05, RESERVATION-F06
 
 ### RESERVATION-F03 Ajustar las reglas de reserva
@@ -241,13 +271,13 @@ Pantalla: Ajustes
 Pasos:
 1. Cambia comensales mínimos y máximos, antelación, duración por defecto, teléfono o correo
    obligatorios y los minutos para liberar una pendiente. «Guardar».
-   Lo que se cambia mientras se está guardando no se pierde: se queda en pantalla, por guardar (hub#914).
+   Lo que se cambia mientras se está guardando no se pierde: se queda en pantalla, por guardar.
 2. Las reglas valen para las reservas nuevas y para los cambios; las ya hechas no se tocan.
 Entra: las reglas.
 Sale: las reglas guardadas (avisa: `reservation.settings.updated`).
 Si falla: mínimo de comensales mayor que el máximo: lo dice el campo. Como en las ventanas de formulario, el
 aviso se quita en cuanto se cambia algo y el motivo de un campo en cuanto se corrige ese campo; los dos vuelven
-si el siguiente intento también se rechaza. Un rechazo sin campo se queda hasta el siguiente intento (hub#873).
+si el siguiente intento también se rechaza. Un rechazo sin campo se queda hasta el siguiente intento.
 Implicados: RESERVATION-F06, RESERVATION-F13, RESERVATION-F17
 
 ### RESERVATION-F04 Elegir si las reservas se confirman solas
@@ -267,7 +297,7 @@ Implicados: RESERVATION-F07, TABLE-F25
 ### RESERVATION-F05 Consultar cuánto queda libre en un día
 Estado: hecho
 Actor: empleado, responsable
-Pantalla: Disponibilidad → Ocupación; Reservas (barra del día)
+Pantalla: Disponibilidad (Ocupación); Reservas (barra del día)
 Pasos:
 1. Elige la fecha (hoy por defecto).
 2. Cada franja dice cuántas reservas lleva, su máximo, los comensales y las que quedan; la llena sale
@@ -282,12 +312,12 @@ Implicados: RESERVATION-F01, RESERVATION-F02, SCHEDULE-F02
 ### RESERVATION-F06 Tomar una reserva a mano (teléfono o mostrador)
 Estado: hecho
 Actor: empleado, responsable, asistente
-Pantalla: Reservas → «Nueva reserva»
+Pantalla: Reservas («Nueva reserva»)
 Pasos:
 1. Busca al cliente por nombre o teléfono; si no está, escribe su nombre y su teléfono (se crea su
    ficha en Clientes, o se usa la que ya tiene ese teléfono).
-2. Pon la fecha, la hora, los comensales y, si quieres, la mesa (RESERVATION-F23), la duración, el
-   origen y las notas. «Reservar».
+2. Pon la fecha, la hora, los comensales y, si quieres, la mesa (te ofrece las libres a esa hora), la
+   duración, el origen y las notas. «Reservar».
 3. La reserva nace Pendiente (o Confirmada, si se confirman solas: entonces retiene su mesa).
 4. Por voz: «reserva para 4 mañana a las 21 a nombre de Ana, en la mesa 5». Antes de apuntarla, la
    tarjeta del asistente dice para quién, por el nombre de su ficha, el día y la hora («Crear en Reservas:
@@ -316,7 +346,7 @@ fuera de servicio.»; mesa ya reservada a esa hora: «La mesa 5 ya tiene una res
 Dos reservas a la vez sobre el último hueco o sobre la misma mesa y hora: entra una y la otra recibe su
 motivo (en la franja llena, el personal puede después reservar igualmente; en la mesa, nunca). En la
 ventana, el motivo de un campo (la Mesa incluida) sale debajo de él y se quita en cuanto se corrige ese
-campo, aunque otro diga lo mismo (hub#888).
+campo, aunque otro diga lo mismo.
 Implicados: CUSTOMER-F10, CUSTOMER-F11, SCHEDULE-F02, RESERVATION-F23, TABLE-F25
 
 ### RESERVATION-F07 Confirmar una reserva
@@ -326,7 +356,7 @@ Pantalla: Reservas (fila → «Confirmar»)
 Pasos:
 1. «Confirmar» en una reserva Pendiente.
 2. Pasa a Confirmada y, si tiene mesa, Mesas la retiene: desde una hora antes la mesa sale Reservada
-   en el plano con el nombre y la hora (TABLE-F25).
+   en el plano con el nombre y la hora.
 Entra: la reserva.
 Sale: la reserva confirmada (avisa: `reservation.reservation.status_changed`).
 Si falla: desde otro estado: «Esta reserva está confirmada: no se puede confirmar.»; con su mesa fuera
@@ -344,7 +374,7 @@ Pasos:
 2. El cambio pasa la misma puerta que el alta del personal (sin contar la propia reserva), aunque la
    reserva naciera por internet o por WhatsApp: el personal cambia cualquier grupo y llena una franja
    llena con «Reservar igualmente». Si estaba confirmada, Mesas mueve su retención a la mesa y la hora
-   nuevas, o la suelta si se queda sin mesa (TABLE-F26).
+   nuevas, o la suelta si se queda sin mesa.
 3. Una reserva sentada, completada, cancelada o no presentada solo cambia sus notas.
 4. Por voz: «pasa la reserva de Ana a la 7 de la terraza». Antes de cambiarla, la tarjeta del asistente
    dice la reserva por su cliente, su día y su hora y la mesa nueva con su zona, como la nombra Mesas
@@ -352,7 +382,7 @@ Pasos:
 Entra: los campos cambiados. El teléfono nuevo se guarda en formato internacional, como en el alta; el
 mismo número escrito de otra forma (con espacios o sin el prefijo) no es un cambio.
 Sale: la reserva cambiada (avisa: `reservation.reservation.updated`).
-Si falla: los motivos de RESERVATION-F06, y el primero, un teléfono que no es de su país: «No es un
+Si falla: los mismos motivos que al tomar una reserva a mano, y el primero, un teléfono que no es de su país: «No es un
 teléfono válido de su país: revisa las cifras o escríbelo con su prefijo internacional (+44…).», en el
 campo Teléfono, y no cambia nada; en otro estado: «Esta reserva ya no se puede cambiar: solo sus
 notas.».
@@ -364,7 +394,7 @@ Actor: empleado, responsable, asistente
 Pantalla: Reservas (fila → «Cancelar»)
 Pasos:
 1. «Cancelar» en una reserva Pendiente o Confirmada; escribe el motivo si quieres y confirma.
-2. Pasa a Cancelada, deja su hueco libre y Mesas suelta su mesa (TABLE-F27).
+2. Pasa a Cancelada, deja su hueco libre y Mesas suelta su mesa.
 3. Junto a «Cancelada», la fila, la tarjeta del móvil y el formulario de la reserva dicen «Motivo: …» con lo
    que se escribió, tal cual (uno largo, acortado con «…» en la fila y entero en el formulario); sin motivo,
    solo «Cancelada».
@@ -392,7 +422,7 @@ Pantalla: Reservas (fila → «Sentar»)
 Pasos:
 1. Llega el grupo: «Sentar» en su reserva Pendiente o Confirmada.
 2. Pasa a Sentada. Si tiene mesa, se sienta en Mesas con sus comensales y su cliente: se abre la
-   cuenta de la mesa en Ventas y se gasta la retención de esta reserva, solo la suya (TABLE-F28): con
+   cuenta de la mesa en Ventas y se gasta la retención de esta reserva, solo la suya: con
    Ana a las 19:00 y Bea a las 21:00 en la mesa 5, sentar a Ana a las 20:10 deja la mesa reservada para
    Bea, que vuelve a salir Reservada cuando Ana se va.
 3. Si el grupo ya se sentó en esa mesa desde el plano (gastando la retención de esta reserva), solo se
@@ -442,7 +472,7 @@ Implicados: RESERVATION-F03
 ### RESERVATION-F14 Apuntar en la lista de espera
 Estado: hecho
 Actor: empleado, responsable, asistente
-Pantalla: Lista de espera → «Añadir cliente»
+Pantalla: Lista de espera («Añadir cliente»)
 Pasos:
 1. Busca al cliente o escribe su nombre y, si quieres, su teléfono (con teléfono se liga a su ficha como
    una reserva), la fecha, la hora que prefiere, los comensales y las notas.
@@ -453,7 +483,7 @@ Sale: la entrada (avisa: `reservation.waitlist.created`).
 Si falla: sin nombre ni cliente: lo dice el formulario; un teléfono que no es de su país: el motivo de
 Clientes, «No es un teléfono válido de su país: revisa las cifras o escríbelo con su prefijo
 internacional (+44…).», en el campo Teléfono, y no se apunta a nadie ni se crea la ficha. El motivo de
-un campo se quita en cuanto se corrige ese campo, aunque otro diga lo mismo (hub#888).
+un campo se quita en cuanto se corrige ese campo, aunque otro diga lo mismo.
 Implicados: RESERVATION-F16, CUSTOMER-F10
 
 ### RESERVATION-F15 Marcar contactado o quitar de la lista de espera
@@ -493,12 +523,11 @@ Estado: hecho
 Actor: cliente, propietario, asistente
 Pantalla: Reservas; se activa en Bandeja de WhatsApp → Ajustes y se aprueba en Automatizaciones
 Pasos:
-1. En **Bandeja de WhatsApp → Ajustes → ¿Para qué lo usas?**, el dueño activa **Reservar mesa**
-   (WHATSAPP_INBOX-F15) y elige si las reservas se confirman solas o las revisa él antes
-   (RESERVATION-F04, WHATSAPP_INBOX-F16).
+1. En **Bandeja de WhatsApp → Ajustes → ¿Para qué lo usas?**, el dueño activa **Reservar mesa** y elige si
+   las reservas se confirman solas o las revisa él antes.
 2. El cliente escribe al WhatsApp del restaurante («mesa para 4 el sábado a las 21»). El asistente mira
    cuánto queda libre ese día y propone la reserva; el día, la hora y los comensales los dice el
-   cliente, nunca el asistente (WHATSAPP_INBOX-F24).
+   cliente, nunca el asistente.
 3. La reserva espera en **Automatizaciones**, en «Esperan tu respuesta», con el teléfono de quien la
    pide. Con «Aprobar» entra en Reservas con las reglas del cliente que reserva solo (comensales,
    antelación, días máximos; una franja llena, nunca), ligada a la ficha que ya tiene ese teléfono o a
@@ -509,7 +538,9 @@ Pasos:
    recibe por WhatsApp lo que se ha reservado.
 Entra: el mensaje, el teléfono y la ficha del cliente.
 Sale: la reserva, de origen WhatsApp (avisa: `reservation.reservation.created`).
-Si falla: los motivos de RESERVATION-F06 que atan al cliente: se le cuentan y se le ofrecen otras horas
+Si falla: los motivos por los que no se acepta una reserva que hace el propio cliente (una hora ya pasada, los
+comensales, la antelación o los días vista fuera de las reglas, el día bloqueado, el negocio cerrado, ninguna franja a
+esa hora o la franja llena): se le cuentan y se le ofrecen otras horas
 o la lista de espera. Con «No» en «Esperan tu respuesta», o si nadie contesta en 72 horas, no se
 reserva nada.
 Implicados: CUSTOMER-F10, RESERVATION-F04, RESERVATION-F19, WHATSAPP_INBOX-F15, WHATSAPP_INBOX-F16,
@@ -520,11 +551,11 @@ Estado: hecho
 Actor: cliente, propietario, asistente
 Pantalla: Reservas; se aprueba en Automatizaciones
 Pasos:
-1. Con **Reservar mesa** activa (RESERVATION-F17), el cliente escribe «no vamos a poder ir» o
+1. Con **Reservar mesa** activa en la Bandeja de WhatsApp, el cliente escribe «no vamos a poder ir» o
    «¿podemos ir a las nueve?».
 2. Se busca su última reserva por el número desde el que escribe. El cambio o la anulación de esa misma
    reserva espera en **Automatizaciones**, en «Esperan tu respuesta», nombrada por su cliente, su día y
-   su hora; una anulación solo la aprueba quien puede cancelar reservas (WHATSAPP_INBOX-F25).
+   su hora; una anulación solo la aprueba quien puede cancelar reservas.
 3. Con «Aprobar», se comprueba que la reserva es de quien escribe (su ficha); si no, se rechaza sin
    contar nada de ella, ni siquiera si existe. Se cambia con las reglas del cliente que reserva solo; la
    mesa, las notas internas y reservar igualmente siguen siendo cosa del restaurante.
@@ -535,7 +566,7 @@ Sale: la reserva anulada o cambiada (avisa: `reservation.reservation.status_chan
 `reservation.reservation.updated`).
 Si falla: «Esa reserva es de otro comensal, así que no se puede gestionar en su nombre.»; «La mesa y
 las notas internas las pone el restaurante: no se pueden cambiar desde la reserva del propio
-cliente.»; o el motivo de la puerta (RESERVATION-F06): se le explica por WhatsApp y la reserva sigue
+cliente.»; o el motivo por el que no se acepta la reserva: se le explica por WhatsApp y la reserva sigue
 como estaba. Con «No» en «Esperan tu respuesta», o si nadie contesta en 72 horas, no cambia nada.
 Implicados: RESERVATION-F08, RESERVATION-F09, RESERVATION-F17, WHATSAPP_INBOX-F25
 
@@ -545,11 +576,11 @@ Actor: responsable, cliente
 Pantalla: Reservas
 Pasos:
 1. Con la automatización «Avisar por WhatsApp al cliente cuando se confirma su reserva» encendida en
-   Automatizaciones (WHATSAPP_INBOX-F26), el personal pulsa «Confirmar» en una reserva Pendiente, o la reserva
+   Automatizaciones, el personal pulsa «Confirmar» en una reserva Pendiente, o la reserva
    nace ya confirmada porque «Confirmar solas las reservas nuevas» está encendido.
 2. La reserva da su día y su hora listos para decírselos al cliente («martes, 5 de marzo de 2030»,
    «21:30»), en su idioma y en el reloj del negocio, y sus comensales.
-3. Si el teléfono de la reserva (el de su conversación, si llegó por WhatsApp; RESERVATION-F17) tiene
+3. Si el teléfono de la reserva (el de su conversación, si llegó por WhatsApp) tiene
    conversación de WhatsApp con el negocio, el cliente recibe por ese mismo WhatsApp que su mesa está
    confirmada, con el día, la hora y los comensales.
 Entra: la confirmación de la reserva y su teléfono.
@@ -597,8 +628,8 @@ Pasos:
    cancelación, y sus entradas de espera sin nombre, teléfono, correo ni notas (también las quitadas).
    La pantalla dice «Cliente borrado».
 3. Se conservan el día, la hora, los comensales, la mesa, el estado y el enlace a la ficha. El nombre
-   también se borra de los avisos que sus reservas dejaron en el registro de avisos (`status_changed` y
-   `updated` lo llevan). Mesas olvida el nombre de sus retenciones por su cuenta (TABLE-F31).
+   también se borra de los avisos que sus reservas dejaron en el registro de avisos. Mesas olvida el nombre de
+   sus retenciones por su cuenta.
 Entra: el aviso `customer.customer.erased` (`id` de la ficha).
 Sale: reservas y entradas sin datos personales (avisa: `reservation.customer.erased`, solo si cambió
 alguna). Repetirlo no cambia nada.
@@ -608,7 +639,7 @@ Implicados: CUSTOMER-F16, TABLE-F31
 ### RESERVATION-F23 Elegir una mesa libre para la reserva
 Estado: hecho
 Actor: empleado, responsable, asistente
-Pantalla: formulario de reserva → Mesa
+Pantalla: Reservas (campo Mesa del formulario de reserva)
 Pasos:
 1. Con la fecha, la hora y los comensales puestos, el campo Mesa ofrece las mesas en servicio que
    están libres a esa hora (sin otra reserva viva que se pise), primero las que caben al grupo, con su
@@ -617,7 +648,7 @@ Pasos:
 Entra: fecha, hora, duración, comensales.
 Sale: nada (consulta).
 Si falla: sin mesas libres a esa hora, el campo no ofrece ninguna y la reserva se puede tomar sin mesa;
-una mesa que se ocupa mientras tanto la rechaza la puerta (RESERVATION-F06).
+una mesa que se ocupa mientras tanto se rechaza al guardar la reserva, con su motivo.
 Implicados: RESERVATION-F06, TABLE-F25
 
 ## Reservas: lo que entra y lo que sale
