@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:f5c1c1dd0ec05010ce990b2b6e3d4372a17d77fb76a7c82bf1184ccf0ef5e777 -->
+<!-- generated from WORKBOOK.md sha256:6d752d35d3c3e61516cbca4daa4ffa3a59a79446ba754506445c1a38be7cc21e -->
 
 ## What it is for and who it is for
 
@@ -72,10 +72,11 @@ The table of the latest sales: "Date", "Sale", "Customer", "Method", "Amount" an
 also opens with the Home's link ending in `#actividad`.
 
 ### The bell
-At the top right, the last one in the bar, after "My apps" and the assistant's sparkles, on a phone too. It gathers
-what asks for an action and stays true until it is solved: "You cannot issue invoices yet", an unpaid invoice of the
-plan, the failed events, the plan's limits, the appointments to confirm, the WhatsApp customers waiting for an answer, a
-printer that does not print… No notice is dismissed: it goes by itself once it is solved.
+At the top right, the last one in the bar, after "My apps", the assistant's sparkles and, in the installed app,
+"Change business" (HUB_APP-F04 of ERPlora/app), on a phone too. It gathers what asks for an action and stays true
+until it is solved: "You cannot issue invoices yet", an unpaid invoice of the plan, the failed events, the
+plan's limits, the appointments to confirm, the WhatsApp customers waiting for an answer, a printer that does not
+print… No notice is dismissed: it goes by itself once it is solved.
 
 - **The bell.** With nothing pending, just the bell. With something, it becomes a pill with the bell and the number,
   in the colour and with the icon of the gravest notice (urgent, attention or information). If a notice has a
@@ -1766,7 +1767,8 @@ Steps:
 In: the session.
 Out: the session closed in the business; erplora.com's, only if the person confirms it.
 If it fails: if the business does not answer, the session expires by itself.
-Involved: BASE-F113 (in the Android app, it stops listening before leaving)
+Involved: BASE-F113 (in the Android app, it stops listening before leaving); HUB_APP-F04 (ERPlora/app: inside the
+app, "Change business" in the bar signs out the same way and only then forgets the business)
 
 ### BASE-F62 Decide whether this device is shared or personal
 Status: done

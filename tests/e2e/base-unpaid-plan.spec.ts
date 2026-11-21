@@ -18,7 +18,7 @@ import {
   noticeButton,
   serverCounter,
 } from './action-center';
-import { EMPLOYEE, horizontalOverflow, internalPut, psql, saveSessionForTheSweep, shot, untilStill } from './helpers';
+import { capture, EMPLOYEE, horizontalOverflow, internalPut, psql, saveSessionForTheSweep } from './helpers';
 import { spanishContext, spanishHome } from './home-helpers';
 import { STACK } from './stack';
 
@@ -71,9 +71,8 @@ async function spanishPerson(browser: Browser, size: (typeof SIZES)[number], who
 }
 
 async function snap(page: Page, name: string, width: number): Promise<void> {
-  await untilStill(page);
   expect(await horizontalOverflow(page), `${name} at ${width}: no sideways scroll`).toBeLessThanOrEqual(0);
-  await page.screenshot({ path: shot(`BASE-F117-${name}-${width}`) });
+  await capture(page, `BASE-F117-${name}-${width}`);
 }
 
 for (const size of SIZES) {

@@ -191,6 +191,7 @@ describe('main.ts', () => {
     expect(createLiveClient).toHaveBeenCalledWith(expect.objectContaining({ csrfCookieName: 'csrftoken', lang: 'es' }), {
       routes: OPERATION_ROUTES,
       getElevationToken: approvalPass,
+      reload: expect.any(Function),
     });
     expect(provideLiveClient).toHaveBeenCalledWith(sdk.client, app);
   });

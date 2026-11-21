@@ -2,12 +2,13 @@
 // base's pieces beside the pane (`createShell({ chrome: { background } })`, mounted once per signed-in person): the
 // device's notices, the assistant's panel (the shared one of @erplora/ui, configured as
 // the Hub's in main.ts, with base's empty conversation and its setup shortcuts), the business's apps followed live, so the
-// menu follows an app turned on or off on any device, the user menu's «Report a problem» and
-// the installed app's Back button, and the help entry that paints into the visible page's topbar.
+// menu follows an app turned on or off on any device, the user menu's «Report a problem», the installed app's
+// «Change business?» and its Back button, and the help entry that paints into the visible page's topbar.
 import { AssistantPanel } from '@erplora/ui/components';
 
 import AppsFollower from './AppsFollower.vue';
 import AssistantSetupEmpty from './AssistantSetupEmpty.vue';
+import ChangeBusinessDialog from './ChangeBusinessDialog.vue';
 import DeviceNotices from './DeviceNotices.vue';
 import HelpEntry from './HelpEntry.vue';
 import ReportProblemDialog from './ReportProblemDialog.vue';
@@ -26,6 +27,7 @@ import SystemBackButton from './SystemBackButton.vue';
   </AssistantPanel>
   <AppsFollower />
   <ReportProblemDialog />
+  <ChangeBusinessDialog />
   <SystemBackButton />
   <HelpEntry />
 </template>

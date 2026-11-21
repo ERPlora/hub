@@ -87,10 +87,11 @@ La tabla de las últimas ventas: «Fecha», «Venta», «Cliente», «Método»,
 Se abre también con el enlace del Inicio terminado en `#actividad`.
 
 ### La campana
-Arriba a la derecha, la última de la barra, después de «Mis apps» y de los destellos del asistente, también en el
-móvil. Reúne lo que pide una acción y sigue siendo verdad hasta que se resuelve: «Todavía no puedes facturar», una
-factura del plan sin pagar, los eventos caídos, los límites del plan, las citas por confirmar, los clientes de WhatsApp
-esperando respuesta, una impresora que no imprime… Ningún aviso se descarta: se va solo cuando se resuelve.
+Arriba a la derecha, la última de la barra, después de «Mis apps», de los destellos del asistente y, en la aplicación
+instalada, de «Cambiar de negocio» (HUB_APP-F04 de ERPlora/app), también en el móvil. Reúne lo que pide una acción
+y sigue siendo verdad hasta que se resuelve: «Todavía no puedes facturar», una factura del plan sin pagar, los
+eventos caídos, los límites del plan, las citas por confirmar, los clientes de WhatsApp esperando respuesta, una
+impresora que no imprime… Ningún aviso se descarta: se va solo cuando se resuelve.
 
 - **La campana.** Sin nada pendiente, solo la campana. Con algo, pasa a una píldora con la campana y el número, en el
   color y con el icono del aviso más grave (urgente, atención o información). Si un aviso tiene plazo, como la hora de
@@ -1769,7 +1770,8 @@ Pasos:
 Entra: la sesión.
 Sale: la sesión cerrada en el negocio; la de erplora.com, solo si la persona lo confirma.
 Si falla: si el negocio no contesta, la sesión caduca sola.
-Implicados: BASE-F113 (en la app de Android, antes de salir deja de estar a la escucha)
+Implicados: BASE-F113 (en la app de Android, antes de salir deja de estar a la escucha); HUB_APP-F04 (ERPlora/app: dentro
+de la aplicación, «Cambiar de negocio» de la barra cierra la sesión igual y solo después olvida el negocio)
 
 ### BASE-F62 Decidir si este dispositivo es compartido o personal
 Estado: hecho
