@@ -14,7 +14,7 @@ from apps.sale import pricing
 from apps.sale.models import Order, OrderLine, Sale
 from apps.sale.queries.business import CASH_LIMIT, LIMITS_CURRENCY, TICKET_LIMIT, business_country
 from apps.sale.queries.departments import hold_departments
-from apps.sale.queries.line_parts import charge_parts, combo_name, dishes_of, folded_names, is_child, ratio_of
+from apps.sale.queries.line_parts import charge_parts, combo_name, dish_name, dishes_of, folded_names, is_child, ratio_of
 from apps.sale.queries.order_lines import (
     freeze_combo_line,
     freeze_open_line,
@@ -233,9 +233,7 @@ def preview(ctx: OperationContext, params: PreviewIn) -> dict:
                 "modifiers": [] if is_child(line) else folded_names(line),
                 "is_child": is_child(line),
                 "combo_name": combo_name(line),
-                "components": [
-                    dish["product_name"] for dish in dishes_of(line) if getattr(line, "dish", None) is None
-                ],
+                "components": [dish_name(dish) for dish in dishes_of(line) if getattr(line, "dish", None) is None],
             }
             for line, out in zip(parts, valuation.lines, strict=True)
         ],

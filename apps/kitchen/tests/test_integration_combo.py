@@ -268,3 +268,30 @@ def test_a_menu_of_services_only_is_not_cooked(menu):
         run("kitchen.ticket.send", {"order_id": str(order.id)}, ctx_for(actor="luis"))
     assert refused.value.code == "kitchen.nothing_to_cook"
     assert Ticket.objects.count() == 0
+
+
+@HUB_DB_COMMITTED
+def test_a_dish_of_a_menu_carries_its_options_on_the_board_and_on_paper(relay, menu, printers):
+    """The steak of a menu with its doneness and its cheese (SALE-F42): the cook reads them under the steak, by their
+    kitchen names, as under a steak sold on its own; the menu's other dishes carry none."""
+    options, products, _ = menu
+    setup("modifier.group.create", {"name": "Doneness", "min_choices": 1, "max_choices": 1})
+    setup("modifier.group.create", {"name": "Extras", "max_choices": 2})
+    rare = setup("modifier.option.create", {"group": "Doneness", "name": "Rare", "kitchen_name": "RARE"})
+    cheese = setup("modifier.option.create", {"group": "Extras", "name": "Cheese", "kitchen_name": "+CHEESE"})
+    for group in ("Doneness", "Extras"):
+        setup("modifier.link.attach", {"group": group, "product_id": str(products["STK"].id)})
+    order = open_check("Table 4")
+    choices = [{"option_id": options["SAL"]}, {"option_id": options["STK"], "option_ids": [str(rare.id), str(cheese.id)]}]
+    run("sale.order.add_combo_line", {"order_id": str(order.id), "combo": "Menu of the day", "choices": choices})
+    fire(order.id)
+
+    relay()
+
+    (ticket,) = board().cooking
+    assert [(item.name, item.modifiers) for item in ticket.items] == [("Salad", []), ("Steak", ["RARE", "+CHEESE"])]
+    (sheet,) = kitchen_sheets()
+    assert [(item["name"], item.get("modifiers", [])) for item in sheet.document["items"]] == [
+        ("Salad", []),
+        ("Steak", ["RARE", "+CHEESE"]),
+    ]

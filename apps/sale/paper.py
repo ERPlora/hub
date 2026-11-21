@@ -74,9 +74,12 @@ def _item(line, decimals: int) -> dict:
 
 
 def _dish(dish) -> str:
+    """A dish of a menu charged in one line, as the receipt prints it under the menu: «2× Coffee», with the options
+    charged inside it («Steak (Rare, Cheese)»); the bill's preview already names it so."""
     if isinstance(dish, str):
         return dish
-    return f"{dish.quantity}× {dish.product_name}" if dish.quantity > 1 else dish.product_name
+    name = f"{dish.quantity}× {dish.product_name}" if dish.quantity > 1 else dish.product_name
+    return f"{name} ({', '.join(dish.modifiers)})" if dish.modifiers else name
 
 
 def receipt(

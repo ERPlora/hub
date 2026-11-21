@@ -54,13 +54,14 @@ def charge_parts(lines: Iterable[OrderLine]) -> list[OrderLine]:
     per option of another tax category (SALE-F11, MODIFIER-F07) — unsaved, at the option's frozen price, with
     the dish's discount and comp, and its count per dish by the dish's quantity. A menu Menus splits (SALE-F12,
     COMBO-F09) is not a part itself: each of its dishes is, at its share of the amount and its own tax
-    category, with no parent line carrying money. Each part keeps the check's line it comes from in
-    ``origin`` (itself for the line)."""
+    category, with no parent line carrying money, and right after it each option of the dish Menus gave a part of
+    its own (SALE-F42). Each part keeps the check's line it comes from in ``origin`` (itself for the line)."""
     parts: list[OrderLine] = []
     for line in lines:
         line.origin = line
         if line.combo_id is not None and line.combo.get("split"):
-            parts += [_dish_part(line, dish) for dish in line.combo["components"]]
+            for dish in line.combo["components"]:
+                parts += _dish_parts(line, dish)
             continue
         parts.append(line)
         for own in line.modifier_lines:
@@ -83,9 +84,37 @@ def charge_parts(lines: Iterable[OrderLine]) -> list[OrderLine]:
     return parts
 
 
-def _dish_part(line: OrderLine, dish: dict) -> OrderLine:
-    """A dish of a split menu as a part of the charge: one per menu of the line, at its share of one menu's
+def _dish_parts(line: OrderLine, dish: dict) -> list[OrderLine]:
+    """A dish of a split menu as a part of the charge, with the options inside it, and after it a part per option of a
+    line of its own, under the dish's (``parent_part``): one each per menu of the line, at its share of one menu's
     amount and its tax category, with the menu's discount and comp."""
+    part = _dish_part(line, dish)
+    parts = [part]
+    for option in dish.get("options", []):
+        if option["amount"] is None:
+            continue
+        own = OrderLine(
+            order_id=line.order_id,
+            position=line.position,
+            name=option["name"],
+            unit="ud",
+            increment=WHOLE,
+            quantity=line.quantity,
+            unit_price=option["amount"],
+            tax_category_key=option["line_tax_category_key"],
+            discount_percent=line.discount_percent,
+            discount_approved_by=line.discount_approved_by,
+            is_gift=line.is_gift,
+            gift_reason=line.gift_reason,
+            staff_id=line.staff_id,
+        )
+        own.origin = line
+        own.parent_part = part
+        parts.append(own)
+    return parts
+
+
+def _dish_part(line: OrderLine, dish: dict) -> OrderLine:
     part = OrderLine(
         order_id=line.order_id,
         position=line.position,
@@ -106,6 +135,7 @@ def _dish_part(line: OrderLine, dish: dict) -> OrderLine:
         gift_reason=line.gift_reason,
         notes=line.notes,
         staff_id=line.staff_id,
+        modifiers=inside(dish),
     )
     part.origin = line
     part.dish = dish
@@ -139,9 +169,22 @@ def dishes_of(part: OrderLine) -> list[dict]:
             "quantity": dish["quantity"],
             "is_service": dish["is_service"],
             "category_id": dish["category_id"],
+            "modifiers": [option["name"] for option in inside(dish)],
         }
         for dish in dishes
     ]
+
+
+def inside(dish: dict) -> list[dict]:
+    """The options of a dish of a menu charged inside the dish's line (SALE-F42): all of them unless Menus gave one a
+    part of its own; none on a dish ordered without."""
+    return [option for option in dish.get("options", []) if option.get("amount") is None]
+
+
+def dish_name(dish: dict) -> str:
+    """A dish of a menu as the bill names it: «Steak (Rare, Cheese)» with the options charged inside it."""
+    names = dish.get("modifiers", [])
+    return f"{dish['product_name']} ({', '.join(names)})" if names else dish["product_name"]
 
 
 def folded_names(line: OrderLine) -> list[str]:

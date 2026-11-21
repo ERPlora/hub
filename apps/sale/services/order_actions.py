@@ -125,6 +125,7 @@ def fire(ctx: OperationContext, data: OrderFireIn) -> dict:
                             "category_id": dish["category_id"],
                             "quantity": f"{dish['quantity'] * line.quantity:.3f}",
                             "allergens": dish_allergens(dish),
+                            "modifiers": [option["kitchen_name"] for option in dish.get("options", [])],
                         }
                         for dish in (line.combo.get("components", []) if line.combo_id else [])
                     ],

@@ -520,7 +520,7 @@ def dishes_of_menu(
                 quantity=Decimal(dish["quantity"]) * line.quantity,
                 unit="ud",
                 total=line.line_total if number == 1 else 0,
-                modifiers=[],
+                modifiers=[option["kitchen_name"] for option in dish.get("options", [])],
                 **frozen(line.allergy, dish.get("allergens", [])),
                 menu_name=header,
                 menu_dish=number,
