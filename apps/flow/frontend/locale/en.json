@@ -2245,6 +2245,7 @@
       "ready_at": "Ready at",
       "ready_count": "Ready count",
       "reasons": "Reasons",
+      "receipt_code": "Ticket code to ask for the invoice",
       "receipt_copies": "Receipt copies",
       "receipt_footer": "Receipt footer",
       "receipt_footer_image": "Receipt footer image",

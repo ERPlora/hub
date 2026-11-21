@@ -37,6 +37,9 @@ importers:
       pdfjs-dist:
         specifier: 6.4.299
         version: 6.4.299
+      qrcode:
+        specifier: 1.5.4
+        version: 1.5.4
       read-excel-file:
         specifier: 9.3.14
         version: 9.3.14

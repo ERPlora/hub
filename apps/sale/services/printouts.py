@@ -12,11 +12,12 @@ from live.errors import AppInactive, OperationError
 from live.operations import AI, UnknownOperation, atomic, get, operation
 
 from apps.sale import paper
-from apps.sale.models import FiscalStatus, Sale
+from apps.sale.models import FiscalStatus
 from apps.sale.queries.business import business_currency
 from apps.sale.queries.checkout import preview
 from apps.sale.queries.letterhead import business_letterhead
 from apps.sale.queries.orders import find_order
+from apps.sale.queries.receipt_codes import receipt_url
 from apps.sale.queries.sales import find_sale, sale_detail
 from apps.sale.queries.settings import current_settings
 from apps.sale.schemas.checkout import PreviewIn
@@ -79,18 +80,19 @@ def _fiscal_record(ctx: OperationContext, sale: SaleOut) -> dict | None:
     return found.record.model_dump() if found.record else None
 
 
-def _print_sale(ctx: OperationContext, sale: Sale, detail: SaleOut, *, duplicate: bool, key: str, at_checkout: bool = False) -> dict:  # noqa: PLR0913
-    """The receipt (or the full invoice) of ``sale`` to the receipt printer's queue. ``at_checkout``: the print by
-    itself of the charge — it follows the printing settings, and the drawer opens only when cash came in. A
-    fiscal document still pending never prints as if issued: the screen's paper says it is pending."""
-    if sale.invoice_status == FiscalStatus.PENDING:
+def _print_sale(ctx: OperationContext, detail: SaleOut, *, duplicate: bool, key: str, at_checkout: bool = False) -> dict:
+    """The receipt (or the full invoice) of the sale ``detail`` to the receipt printer's queue, a ticket with the code
+    its customer asks for the full invoice with. ``at_checkout``: the print by itself of the charge — it follows the
+    printing settings, and the drawer opens only when cash came in. A fiscal document still pending never prints as if
+    issued: the screen's paper says it is pending."""
+    if detail.invoice_status == FiscalStatus.PENDING:
         return dict(NOT_QUEUED)
     try:
         record = _fiscal_record(ctx, detail)
     except _Unprintable:
         return dict(NOT_QUEUED)
     settings = current_settings()
-    currency = sale.currency
+    currency = detail.currency
     with translation.override(ctx.language):
         kind, document = paper.receipt(
             detail,
@@ -100,6 +102,8 @@ def _print_sale(ctx: OperationContext, sale: Sale, detail: SaleOut, *, duplicate
             duplicate=duplicate,
             record=record,
         )
+        if detail.receipt_code:
+            document.update(paper.claim(detail.receipt_code, receipt_url(ctx, detail.receipt_code)))
     request = {
         "job_key": key,
         "document_type": kind,
@@ -143,7 +147,7 @@ def print_sale(ctx: OperationContext, data: SalePrintIn) -> dict:
     sale = find_sale(data.sale_id, data.sale)
     with translation.override(ctx.language):
         detail = SaleOut.model_validate(sale_detail(sale))
-    return _print_sale(ctx, sale, detail, duplicate=data.duplicate, key=f"sale-{sale.id}-print-{uuid.uuid7()}")
+    return _print_sale(ctx, detail, duplicate=data.duplicate, key=f"sale-{sale.id}-print-{uuid.uuid7()}")
 
 
 @operation(

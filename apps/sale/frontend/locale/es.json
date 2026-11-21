@@ -444,6 +444,10 @@
         "checkInvoice": "Escanéalo para cotejar esta factura en la AEAT",
         "csv": "CSV: {csv}"
       },
+      "claim": {
+        "note": "Escanea para pedir tu factura completa",
+        "alt": "Código QR para pedir la factura completa"
+      },
       "paperPending": "Documento fiscal pendiente"
     },
     "sales": {
