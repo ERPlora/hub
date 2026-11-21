@@ -11,19 +11,17 @@ from live.operations import operation
 from apps.inventory.models import Product, ProductCategory, Settings
 from apps.inventory.queries.reads import _bounds, _page, find_product
 from apps.inventory.queries.settings import current_settings
-from apps.inventory.schemas import (
+from apps.inventory.schemas.fields import ProductRefIn
+from apps.inventory.schemas.product_images import ProductImageSuggestIn, ProductImageSuggestOut
+from apps.inventory.schemas.products import (
     ForSaleListIn,
-    LowStockListIn,
-    LowStockPage,
     ProductFiltersIn,
-    ProductImageSuggestIn,
-    ProductImageSuggestOut,
     ProductListIn,
     ProductOut,
     ProductPage,
-    ProductRefIn,
     SaleProductPage,
 )
+from apps.inventory.schemas.stock import LowStockListIn, LowStockPage
 from base import images
 from base.queries.catalog_images import business_language, image_library
 from base.ordering import list_order_for

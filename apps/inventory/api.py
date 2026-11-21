@@ -11,34 +11,23 @@ from ninja import Query, Router
 from ninja.decorators import decorate_view
 
 from apps.inventory import queries, services
-from apps.inventory.schemas import (
-    CategoryFiltersIn,
-    CategoryImportIn,
-    CategoryIn,
-    CategoryListIn,
-    CategoryPatchIn,
-    CategoryRefIn,
-    ConfigPatchIn,
-    CountIn,
+from apps.inventory.schemas.categories import CategoryFiltersIn, CategoryIn, CategoryListIn, CategoryPatchIn
+from apps.inventory.schemas.fields import CategoryRefIn, ProductRefIn
+from apps.inventory.schemas.imports import CategoryImportIn, ProductImportIn
+from apps.inventory.schemas.movements import MovementListIn
+from apps.inventory.schemas.product_categories import ProductCategoryIn, ProductCategoryListIn
+from apps.inventory.schemas.product_images import ProductImageIn, ProductImageSuggestIn, ProductImageUploadIn
+from apps.inventory.schemas.products import (
     ForSaleListIn,
-    LowStockListIn,
-    MovementListIn,
-    ProductCategoryIn,
-    ProductCategoryListIn,
     ProductFiltersIn,
-    ProductImageIn,
-    ProductImageSuggestIn,
-    ProductImageUploadIn,
-    ProductImportIn,
     ProductIn,
     ProductListIn,
     ProductPatchIn,
-    ProductRefIn,
     ProductSoldOutIn,
-    ReceiveIn,
-    UnitListIn,
-    WriteOffIn,
 )
+from apps.inventory.schemas.settings import ConfigPatchIn
+from apps.inventory.schemas.stock import CountIn, LowStockListIn, ReceiveIn, WriteOffIn
+from apps.inventory.schemas.units import UnitListIn
 from base.request_body import accept_body_up_to
 
 router = Router(tags=["inventory"])

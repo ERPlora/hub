@@ -896,15 +896,20 @@ Pantalla: Vender
 Pasos:
 1. Con dos o más líneas, toca las líneas que paga esta persona (la línea, no sus botones): se marcan
    con un círculo.
-2. Pulsa «Cobrar»: la hoja dice «Cobrando 2 líneas de 12,00 €» y cobra solo esas.
-3. Tras cobrar se abre el **Documento de venta** de ese cobro y, detrás, la cuenta sigue abierta con
+2. Con líneas marcadas, el botón del pie dice lo que va a cobrar: «Cobrar 1 línea · 1,80 €» o
+   «Cobrar 2 líneas · 7,00 €», con lo que el servidor calcula para esas líneas, el mismo importe que
+   cobrará la hoja; mientras llega, una raya. La fila «Total» sigue siendo el de toda la cuenta. Sin
+   nada marcado, el botón vuelve a «Cobrar · 12,00 €».
+3. Pulsa «Cobrar»: la hoja dice «Cobrando 2 líneas de 12,00 €» y cobra solo esas.
+4. Tras cobrar se abre el **Documento de venta** de ese cobro y, detrás, la cuenta sigue abierta con
    lo que falta; lo cobrado ya no vuelve a salir. Cobrar la última línea pendiente cierra la cuenta.
    Se cobran las líneas que estaban marcadas al abrir la hoja, aunque después se marque otra.
 Entra: las líneas marcadas.
 Sale: una venta con esas líneas (avisa: venta cobrada); las líneas quedan atadas a su venta. El
 descuento en % de la cuenta se aplica a cada cobro; el de importe fijo, solo al que la cierra.
-Si falla: los mismos rechazos que un cobro normal, también el de la cuenta que cambió mientras se
-cobraba: la hoja cobra lo que enseñaba al abrirse, nunca lo de después. Si con la hoja abierta otro
+Si falla: si el servidor no puede calcular lo marcado, el pie lo dice con sus palabras y el botón enseña
+una raya, nunca el total de la cuenta. Al cobrar, los mismos rechazos que un cobro normal, también el de
+la cuenta que cambió mientras se cobraba: la hoja cobra lo que enseñaba al abrirse, nunca lo de después. Si con la hoja abierta otro
 dispositivo cierra la cuenta, la pantalla la suelta al cerrar la hoja y avisa; no se queda en pantalla
 una cuenta que ya no existe.
 Implicados: TABLE-F33
@@ -1988,7 +1993,9 @@ título, sus pasos y «Si falla»: ahí no van nombres de código, incidencias, 
   Facturación tenga hoy; la «Cabecera del recibo» se añade sin repetir lo que el emisor ya dice, y sin emisor ni
   cabecera sale el nombre con el que se dio de alta el negocio.
 - **SALE-F22**: si un cobro es parcial o total lo dicen las líneas fijadas al abrir la hoja, no lo marcado al
-  terminar.
+  terminar. La cifra del botón con líneas marcadas es `sale.checkout.preview` de esas líneas, la misma petición
+  que hace la hoja, nunca una suma de la pantalla: el descuento en % de la cuenta ya va dentro y el fijo solo
+  cuando lo marcado cierra la cuenta.
 - **SALE-F26**: «Cobrar» de la agenda lleva a `/sale/pos?order=<id>`. Enlazar una cita a una cuenta que ya no está
   abierta se rechaza, y a otra cuenta cuando ya tiene una abierta, con «Esa cita ya tiene una cuenta abierta: cobra
   esa (Cuentas abiertas).».

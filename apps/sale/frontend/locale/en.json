@@ -105,6 +105,8 @@
       "printPrebill": "Print bill",
       "charge": "Charge",
       "chargeAmount": "Charge · {amount}",
+      "chargeLinesOne": "Charge 1 line · {amount}",
+      "chargeLines": "Charge {n} lines · {amount}",
       "openCart": "Open cart",
       "openCartWithItemsOne": "Open cart, 1 item, total {total}",
       "openCartWithItems": "Open cart, {count} items, total {total}",

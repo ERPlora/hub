@@ -105,6 +105,8 @@
       "printPrebill": "Imprimir cuenta",
       "charge": "Cobrar",
       "chargeAmount": "Cobrar · {amount}",
+      "chargeLinesOne": "Cobrar 1 línea · {amount}",
+      "chargeLines": "Cobrar {n} líneas · {amount}",
       "openCart": "Abrir carrito",
       "openCartWithItemsOne": "Abrir carrito, 1 artículo, total {total}",
       "openCartWithItems": "Abrir carrito, {count} artículos, total {total}",

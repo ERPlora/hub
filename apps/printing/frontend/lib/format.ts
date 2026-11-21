@@ -43,6 +43,24 @@ export function printerState(printer: PrinterOut, now: Date): PrinterState {
   return 'ready';
 }
 
+/** The app's error codes (its `PeripheralError::code`) and the sentence that says each one. A refused connection and a
+ * silent printer ask the same of the person (switch it on, connect it), so they share one. */
+const DEVICE_ERRORS: ReadonlyMap<string, string> = new Map([
+  ['printer_unreachable', 'unreachable'],
+  ['io_error', 'unreachable'],
+  ['bluetooth_permission_denied', 'bluetoothPermission'],
+  ['invalid_printer_address', 'invalidAddress'],
+  ['unknown_document_type', 'updateApp'],
+  ['invalid_payload', 'updateApp'],
+]);
+
+/** A device's last error in the reader's language when it is one of the app's codes; any other text, as it came (an
+ * app older than the codes says it in its own words). */
+export function deviceError(error: string, t: Translate): string {
+  const sentence = DEVICE_ERRORS.get(error);
+  return sentence ? t(`printing.deviceErrors.${sentence}`) : error;
+}
+
 /** Why a job is where it is: who cancelled it and why, who sent it again, no answer, its last error. */
 export function jobDetail(job: JobOut, t: Translate, now: Date): string {
   const parts: string[] = [];
@@ -53,7 +71,7 @@ export function jobDetail(job: JobOut, t: Translate, now: Date): string {
   }
   if (job.retried_by) parts.push(t('printing.jobs.retriedBy', { who: job.retried_by }));
   if (jobFlags(job, now).stale) parts.push(t('printing.jobs.stale'));
-  else if (job.last_error) parts.push(t('printing.jobs.lastError', { error: job.last_error }));
+  else if (job.last_error) parts.push(t('printing.jobs.lastError', { error: deviceError(job.last_error, t) }));
   return parts.join(' · ');
 }
 

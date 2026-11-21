@@ -17,13 +17,12 @@ from apps.inventory.models import Category, Product, ProductCategory, StockMovem
 from apps.inventory.queries.products import load_product
 from apps.inventory.queries.reads import find_product, held
 from apps.inventory.queries.settings import current_settings
-from apps.inventory.schemas import (
-    DeletedOut,
+from apps.inventory.schemas.fields import DeletedOut, ProductRefIn
+from apps.inventory.schemas.products import (
     ProductIn,
     ProductOut,
     ProductPatchIn,
     ProductRecoverIn,
-    ProductRefIn,
     ProductRestoreIn,
     ProductSoldOutIn,
 )
