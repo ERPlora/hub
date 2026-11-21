@@ -11,7 +11,8 @@ from django.utils import translation
 from live.operations import get
 
 from apps.inventory.models import Product
-from apps.inventory.schemas import ProductFiltersIn, ProductImportIn
+from apps.inventory.schemas.imports import ProductImportIn
+from apps.inventory.schemas.products import ProductFiltersIn
 from apps.printing.models import PrintJob
 from apps.tax.models import TaxCategory
 from base import operations as base_operations

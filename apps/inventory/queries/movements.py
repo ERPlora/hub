@@ -8,7 +8,7 @@ from live.operations import operation
 
 from apps.inventory.models import SaleStock, StockMovement
 from apps.inventory.queries.reads import _bounds, _page
-from apps.inventory.schemas import MovementListIn, MovementPage
+from apps.inventory.schemas.movements import MovementListIn, MovementPage
 from base.ordering import list_order_for
 
 

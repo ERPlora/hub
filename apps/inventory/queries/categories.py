@@ -10,15 +10,9 @@ from live.operations import INTERNAL, operation
 
 from apps.inventory.models import Category, ProductCategory
 from apps.inventory.queries.reads import CATEGORY_NOT_FOUND, _bounds, _page, find_category
-from apps.inventory.schemas import (
-    CategoryFiltersIn,
-    CategoryListIn,
-    CategoryOut,
-    CategoryPage,
-    CategoryRefIn,
-    ProductCategoryListIn,
-    ProductCategoryPage,
-)
+from apps.inventory.schemas.categories import CategoryFiltersIn, CategoryListIn, CategoryOut, CategoryPage
+from apps.inventory.schemas.fields import CategoryRefIn
+from apps.inventory.schemas.product_categories import ProductCategoryListIn, ProductCategoryPage
 from base.ordering import list_order_for
 
 

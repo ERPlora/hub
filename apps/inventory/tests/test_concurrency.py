@@ -24,17 +24,11 @@ from live.errors import NotFound, OperationError
 from live.operations import atomic, get
 
 from apps.inventory.models import Category, Product, ProductCategory
-from apps.inventory.schemas import (
-    CategoryImportIn,
-    CategoryIn,
-    CategoryPatchIn,
-    CategoryRefIn,
-    ProductCategoryIn,
-    ProductImportIn,
-    ProductIn,
-    ProductPatchIn,
-    ProductRefIn,
-)
+from apps.inventory.schemas.categories import CategoryIn, CategoryPatchIn
+from apps.inventory.schemas.fields import CategoryRefIn, ProductRefIn
+from apps.inventory.schemas.imports import CategoryImportIn, ProductImportIn
+from apps.inventory.schemas.product_categories import ProductCategoryIn
+from apps.inventory.schemas.products import ProductIn, ProductPatchIn
 from apps.tax.models import TaxCategory
 from base.tenancy.context import current_alias
 from base.tenancy.tests.concurrency import at_once, in_a_thread

@@ -1422,7 +1422,7 @@ Lo que sigue es para quien cambia la app; quien la usa puede parar aquí.
 
 ## El servidor
 
-- **Anatomía**: `apps.py`, `models.py`, `migrations/`, `schemas.py`, `queries/`, `services/`,
+- **Anatomía**: `apps.py`, `models.py`, `migrations/`, `schemas/`, `queries/`, `services/`,
   `events.py`, `live.py`, `api.py`, `admin.py`, `locale/` y un `tests/test_<fichero>.py` por fichero.
   Las páginas (`frontend/`): Panel, Productos, Movimientos, Categorías y Ajustes.
 - **31 operaciones** (12 consultas y 19 acciones), todas con `ai` (descripción y, en las acciones,
@@ -1431,7 +1431,7 @@ Lo que sigue es para quien cambia la app; quien la usa puede parar aquí.
   foto (F30, F31) y `inventory.category.get`, lectura interna (`ai=INTERNAL`, sin API): solo nombra la categoría en
   la tarjeta del asistente; el modelo encuentra las categorías en su lista.
 - **Tarjeta de confirmación del asistente** (BASE-F97, hub#526): nombra el registro que una escritura señala por su
-  id con las marcas `refers` de `schemas.py`, leídas como quien pregunta: el producto por su `name` con
+  id con las marcas `refers` de `schemas/fields.py`, leídas como quien pregunta: el producto por su `name` con
   `inventory.product.get` (`A_PRODUCT`: el `id` de `ProductRefIn` y el `product_id` de `_ProductLineRef`, también en
   cada línea de una recepción) y la categoría por su `name` con `inventory.category.get` (`A_CATEGORY`: el `id` de
   `CategoryRefIn`, el `category_id` de `ProductCategoryIn` y cada elemento de `category_ids`). El `id` lleva el título
