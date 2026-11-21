@@ -1390,7 +1390,7 @@ X-Erplora-Signature: 5f0c…e91a   # hex(HMAC_SHA256(secret, "1760518800." + cue
 ```
 
 **Cuatro puertas que monta `base`** (erplora.com → Hub; cada una ejecuta una operación de sistema). Están
-montadas en `base/internal.py`, probadas en `base/tests/test_internal_whatsapp.py` y, por HTTP firmado con la
+montadas en `base/internal_whatsapp.py`, probadas en `base/tests/test_internal_whatsapp.py` y, por HTTP firmado con la
 bandeja abierta, en `tests/e2e/whatsapp-internal.spec.ts`; erplora.com las llama, probado de punta a punta con su
 número de pruebas en `tests/e2e/whatsapp-inbox-erplora.spec.ts`:
 
@@ -1592,7 +1592,7 @@ abierta sin su SDK; si no la manda, la puerta 11 tendría que sacar la cuenta de
 ### Contrato con `base`
 
 - Monta las puertas 1–3 en `/internal/whatsapp/` (no publicadas en el ALB;
-  `base/internal.py`): comprueba la firma y la marca de tiempo, resuelve el negocio por `hub` (su slug: entra en su
+  `base/internal_whatsapp.py`): comprueba la firma y la marca de tiempo, resuelve el negocio por `hub` (su slug: entra en su
   BD con `use_hub` y corre como `Scope("host", hub)`), comprueba que la app está activa (si no, 404 `app_inactive`) y
   ejecuta la operación con `system_context(scope)`, devolviendo su salida o el sobre de errores con su
   estado HTTP (422 para un cuerpo que no vale).
