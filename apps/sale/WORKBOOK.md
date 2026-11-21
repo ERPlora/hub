@@ -144,8 +144,8 @@ cierra tocando fuera, con Esc o con el botón atrás del móvil. Dos zonas:
   su número, y «Cerrar» en el móvil; el título editable («Cuenta nueva») y los chips de cliente,
   «Atiende …» y «Falta el cliente». Cada línea: nombre, precio por unidad, marca de descuento o
   «Invitación», nota y profesional debajo; botones de descuento, nota, invitación y el selector de
-  cantidad (una línea enviada a cocina solo enseña su cantidad, «Comanda N» y el botón ⊗ «Anular
-  este artículo»; una pagada con bono, «Ya pagado · <bono>», 0,00 € y solo el botón de quitarla). Pie:
+  cantidad (una línea enviada a cocina solo enseña su cantidad, «Comanda N», el regalo y el botón ⊗
+  «Anular este artículo»; una pagada con bono, «Ya pagado · <bono>», 0,00 € y solo el botón de quitarla). Pie:
   la fila «Descuento del tique» si lo hay, «Total», el botón de descuento, la impresora («Imprimir
   cuenta») y «Cobrar · <importe>». En el cajón del móvil, la barra de arriba y el pie con «Cobrar» se
   quedan siempre a la vista, encima de la barra de pestañas, y lo de en medio (título, chips, pestañas y
@@ -703,13 +703,14 @@ Vertical: común
 Actor: empleado, responsable
 Pantalla: Vender
 Pasos:
-1. En la línea, toca el regalo («Invitar / quitar invitación»).
-2. La línea queda a 0 con la marca «Invitación»; tocarlo otra vez la vuelve a cobrar.
+1. En la línea, toca el regalo («Invitar / quitar invitación»). También en una línea ya enviada a cocina,
+   porque lo que se invita suele ser lo ya servido: el postre de la casa o el plato que salió mal.
+2. La línea queda a 0 con la marca «Invitación»; tocarlo otra vez la vuelve a cobrar. Una línea enviada
+   sigue en la cuenta con su comanda, y a cocina no le llega nada nuevo.
 Entra: nada de otras apps.
 Sale: la línea invitada: no suma dinero ni IVA, pero el aviso de venta la lleva para que Inventario
 baje el stock; la venta guarda el coste de lo invitado.
-Si falla: «No se ha podido guardar ese cambio de la línea. La línea vuelve a estar como estaba.». Una
-línea ya enviada a cocina no se puede invitar.
+Si falla: «No se ha podido guardar ese cambio de la línea. La línea vuelve a estar como estaba.».
 Implicados: INVENTORY-F21
 
 ### SALE-F16 Atribuir la cuenta o una línea a quien atiende
@@ -829,7 +830,8 @@ Pasos:
 3. Al pulsar «Cobrar» con algo pendiente, se envía primero a cocina y después se abre el cobro: nadie paga
    un plato que no se va a preparar. El aviso de la comanda también sale arriba, para poder tocar el teclado
    del cobro desde el primer momento. Si el envío falla, no se abre el cobro y se dice por qué.
-4. Una línea enviada queda bloqueada: ni cantidad, ni nota, ni descuento, ni invitación.
+4. Una línea enviada queda bloqueada: ni cantidad, ni nota, ni descuento. Sí se puede invitar con su
+   regalo: se queda en la cuenta a 0 y a cocina no le llega nada nuevo.
 5. Para quitar un plato ya enviado, pulsa ⊗ «Anular este artículo» en su línea: se abre «Anular
    «Croquetas»» con «Ya se envió a cocina. Sale de la cuenta y se guarda el motivo. Tiene que
    autorizarlo un responsable.», los motivos de un toque («Error al pedir», «El cliente lo cambia»,
