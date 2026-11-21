@@ -3,8 +3,8 @@
 While a database upgrade runs with Blue/Green nothing may change a schema (logical replication copies no DDL): ERPlora's
 staff freezes the platform with ``control.freeze.set`` (the Hub admin, ``hubs.erplora.com/admin``) and lifts it the same
 way. While it is on, the worker makes, drops and moves no database and sets up no app's tables, and ``migrate_hubs``
-refuses to start (``base/tests/test_worker.py``, ``base/tests/test_migrate_hubs.py``); the relay, the tasks and the
-sends to the AEAT go on. ``control.freeze.get`` says how it stands (who, since when, why) and how many hubs the worker
+refuses to start (``base/tests/test_worker_freeze.py``, ``base/tests/test_migrate_hubs.py``); the relay, the tasks and
+the sends to the AEAT go on. ``control.freeze.get`` says how it stands (who, since when, why) and how many hubs the worker
 is still working on (their ``hub_due`` lease held): what the staff waits to see at 0 before creating the Blue/Green.
 
 Only the platform's admins (staff and superuser) or the platform itself set it; support reads it; a customer neither.
