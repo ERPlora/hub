@@ -107,6 +107,8 @@ def upload_certificate(ctx: OperationContext, data: CertificateUploadIn) -> Conf
             "sealed_blob": certificates.seal(p12, password),
             "issuer_recognised": True,
             "checked_list": trust.sequence(),
+            "aeat_proof": OwnCertificate.Proof.UNTESTED,
+            "aeat_proof_detail": "",
         },
     )
     _back_in_the_queue()

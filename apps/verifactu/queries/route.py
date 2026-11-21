@@ -164,6 +164,21 @@ def presenter(scope: Scope) -> str:
     return scope.key
 
 
+def going_live_problem(config: Config, scope: Scope) -> str:
+    """What the route of this moment lacks to take the business live (VERIFACTU-F08): to carry a record to production
+    and, by the own certificate, the AEAT's test environment having accepted it. Not a route's problem: a business
+    already live keeps filing with a certificate uploaded after (production never proves one)."""
+    problem = _route_sending_problem(config, Environment.PRODUCTION, scope)
+    if problem or config.environment == Environment.PRODUCTION:
+        return problem
+    if sending_route(config, Environment.PRODUCTION, scope) != Config.Route.OWN:
+        return ""
+    proof = own_certificate().aeat_proof
+    if proof == OwnCertificate.Proof.ACCEPTED:
+        return ""
+    return "own_certificate_rejected" if proof == OwnCertificate.Proof.REJECTED else "own_certificate_untested"
+
+
 def route_problem(config: Config, environment: str, scope: Scope | None) -> str:
     """Why nothing can be carried to the AEAT of ``environment`` now (a wait code), or ``""`` (VERIFACTU-F04, F08):
     the route's own lack first, then the server's in production (no gateway, closed). It keeps the queue waiting
@@ -191,7 +206,7 @@ def live_problems(config: Config, scope: Scope) -> list[str]:
         found.append("gateway_unavailable")
     if platform.is_demo_hub(scope):
         found.append("go_live_forbidden")
-    if problem := _route_sending_problem(config, Environment.PRODUCTION, scope):
+    if problem := going_live_problem(config, scope):
         found.append(problem)
     if config.hub_status != Config.HubStatus.ACTIVE:
         found.append("hub_not_active")

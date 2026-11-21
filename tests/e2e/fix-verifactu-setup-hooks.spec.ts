@@ -10,7 +10,7 @@
 import { expect, type Page, test } from '@playwright/test';
 
 import { A, api, horizontalOverflow, psql, shot, untilStill } from './helpers';
-import { boardWidget, setupCard, setupStep, spanishOwnerWithPanels as spanishOwner } from './home-helpers';
+import { boardWidget, panelError, panelTitle, panelValue, setupCard, setupStep, spanishOwnerWithPanels as spanishOwner } from './home-helpers';
 import { keepVerifactu, pushPhoto, putVerifactuBack } from './verifactu-helpers';
 
 const KEY = 'FIX-VERIFACTU-SETUP-HOOKS';
@@ -60,10 +60,10 @@ test('HUB_HOME verifactu hooks: «Configura VeriFactu» pending until the author
 
     // «Pendientes VeriFactu» on the board by default, with what the server counts.
     const pending = boardWidget(page, 'verifactu.pending');
-    await expect(pending.locator('[data-testid="widget-title"]')).toHaveText('Pendientes VeriFactu');
+    await expect(panelTitle(pending)).toHaveText('Pendientes VeriFactu');
     const summary = await api<{ pending_count: number }>(context, A, 'GET', '/verifactu/stats/compliance_summary');
     expect(summary.status).toBe(200);
-    await expect(pending.locator('[data-testid="widget-value"]')).toHaveText(new Intl.NumberFormat('es-ES').format(summary.data.pending_count));
+    await expect(panelValue(pending)).toHaveText(new Intl.NumberFormat('es-ES').format(summary.data.pending_count));
     for (const key of PANELS.slice(1)) await expect(boardWidget(page, key)).toHaveCount(0);
 
     // «Configurar» leads to VeriFactu's Configuration.
@@ -89,8 +89,8 @@ for (const size of SIZES) {
       await expect(row(page).locator('[data-testid="setup-pill"]')).toHaveText('Importante');
       const titles = ['Pendientes VeriFactu', 'Cola de contingencia', 'Registros por estado', 'Eventos AEAT recientes'];
       for (const [index, key] of PANELS.entries()) {
-        await expect(boardWidget(page, key).locator('[data-testid="widget-title"]')).toHaveText(titles[index]);
-        await expect(boardWidget(page, key).locator('[data-testid="widget-error"]')).toHaveCount(0);
+        await expect(panelTitle(boardWidget(page, key))).toHaveText(titles[index]);
+        await expect(panelError(boardWidget(page, key))).toHaveCount(0);
         await expect(boardWidget(page, key)).toHaveAttribute('aria-busy', 'false');
       }
       // The photo just received is the newest event: its type in Spanish, never its code.

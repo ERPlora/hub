@@ -25,6 +25,17 @@ export function widget(key: string, fields: Partial<WidgetDef> = {}): WidgetDef 
   };
 }
 
+/** The demo's «Open items» as a small panel of the board on by default, a kpi followed live; `fields` change it. */
+export const openItemsPanel = (fields: Partial<WidgetDef> = {}): WidgetDef =>
+  widget('demo.open_items', {
+    title: 'Open items',
+    icon: 'ion:flask-outline',
+    size: 'sm',
+    default: true,
+    refresh_on: ['demo.item.created'],
+    ...fields,
+  });
+
 /** A pending, functional step of the checklist that the person may do, its app taken from `key`'s prefix and titled by
  *  it; `fields` change it. */
 export function setupItem(key: string, fields: Partial<SetupItem> = {}): SetupItem {

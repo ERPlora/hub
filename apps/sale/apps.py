@@ -121,8 +121,9 @@ class SaleConfig(LiveAppConfig):
     ]
     help = Help()
     # The Home's panels, on the queries Sales' own screen reads, each refreshed by the events live.py re-runs its query
-    # on. Registered icons only: the old `trending-up-outline` and `bar-chart-outline` wait in UI-REQUESTS.md. No steps
-    # of «Finish setting up your business» nor counters of the bell: the old module had none.
+    # on; each figure in the colour of data of its measure, the same on every screen (sales 1, tickets 2). Registered
+    # icons only: the old `trending-up-outline` and `bar-chart-outline` wait in UI-REQUESTS.md. No steps of «Finish
+    # setting up your business» nor counters of the bell: the old module had none.
     widgets = [
         Widget(
             key="today",
@@ -135,7 +136,7 @@ class SaleConfig(LiveAppConfig):
             kind="kpi",
             operation="sale.sale.today",
             map={"value": "total"},
-            options={"format": "currency"},
+            options={"format": "currency", "tone": 1},
         ),
         Widget(
             key="tickets_today",
@@ -148,7 +149,7 @@ class SaleConfig(LiveAppConfig):
             kind="kpi",
             operation="sale.sale.today",
             map={"value": "tickets"},
-            options={"format": "number"},
+            options={"format": "number", "tone": 2},
         ),
         Widget(
             key="last_7_days",

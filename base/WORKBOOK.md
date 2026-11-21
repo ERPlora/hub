@@ -582,9 +582,14 @@ Pantalla: Inicio · Resumen
 Pasos:
   1. Bajo la lista está el tablero, con sus paneles desde que se abre el Inicio («Cargando widgets…» solo mientras
      no se sabe cuáles le tocan).
-  2. Cada panel es una tarjeta con su título e icono: una cifra (con debajo lo que cuenta, si su app lo dice),
-     una lista con barras, una cronología, un gráfico o un trozo de la pantalla de su app, con sus textos en el
-     idioma de quien mira. En una lista con barras, cada barra mide lo grande que es su cifra frente a la mayor
+  2. Cada panel es una tarjeta con su título e icono: una cifra (con lo que cuenta bajo el título, si su app lo
+     dice), una lista con barras, una cronología, un gráfico o un trozo de la pantalla de su app, con sus textos en
+     el idioma de quien mira. Cada cifra lleva el color de su medida, el mismo en todas las pantallas: ventas,
+     tickets e inventario, cada una el suyo. Las primeras cifras del tablero que tienen color lo encabezan en una
+     fila de color, una por color y de dos a cuatro; las demás van en una tarjeta clara con el color en su icono,
+     en el orden elegido. En el teléfono las cifras van de dos en dos. Una cifra con un estado que vigilar (la cola
+     de contingencia de VeriFactu cuando algo espera o ya ha fallado) lo dice en una etiqueta naranja o roja con
+     icono, sin cambiar el color de la cifra. En una lista con barras, cada barra mide lo grande que es su cifra frente a la mayor
      de la lista, sea del signo que sea; una cifra negativa, como un descuadre de caja en el que faltó dinero o
      un producto con existencias por debajo de cero, sale en rojo y con su signo (-0,40 €), y las demás
      conservan el color del panel o, si su app da un color a cada fila, el de la suya. El rojo de una cifra
@@ -601,8 +606,9 @@ Pasos:
 Entra: los paneles que declara cada app encendida; los datos de cada uno, pedidos con los permisos de
 quien mira.
 Sale: nada guardado en el hub.
-Si falla: un panel sin datos dice «Sin datos»; uno cuyos datos no se pueden leer, «No disponible», nunca
-una cifra vieja o inventada. Una fila de una lista con barras (o un día de un gráfico) que no tiene cifra,
+Si falla: un panel sin datos dice «Sin datos» (una cifra, con una raya en su sitio); una cifra cuyos datos no se
+pueden leer dice «No se pudo cargar» con «Reintentar», que la vuelve a pedir, y cualquier otro panel, «No
+disponible»: nunca una cifra vieja o inventada. Una fila de una lista con barras (o un día de un gráfico) que no tiene cifra,
 como una sesión de caja cerrada sin recuento, sale con una raya (—) y sin barra, nunca como un cero; un cero
 de verdad sí sale como cero (0,00 €). Si no se puede leer el tablero: «No se han podido cargar los paneles»
 con «Reintentar».
@@ -636,8 +642,8 @@ Pasos:
      cargar el Inicio.
 Entra: los avisos del negocio que declara cada panel.
 Sale: nada guardado.
-Si falla: si los datos nuevos no llegan, el panel dice «No disponible», no el valor de antes; cuando
-vuelve la conexión, se pone al día solo.
+Si falla: si los datos nuevos no llegan, el panel dice «No disponible» (una cifra, «No se pudo cargar» con
+«Reintentar»), no el valor de antes; cuando vuelve la conexión, se pone al día solo.
 Implicados: ninguno
 
 ### BASE-F09 Consultar la actividad reciente
@@ -4370,7 +4376,7 @@ Implicados: BASE-F10, BASE-F11, BILLING-F16 (erplora.com), BILLING-F17 (erplora.
   clúster destino y lo protege de borrarse. «Cancelar el traslado» la quita mientras no ha empezado
   (`control.hub.scheduled_move_cancelled`), sin cerrar nada. Tests: `control/tests/test_services.py::TestTheNight` y
   `::TestMoveAtNight`, `base/tenancy/tests/test_move.py::TestAMoveAskedForTheNight` (dos BD reales y el arriendo) y
-  `control/tests/test_admin.py::TestMoveToCluster` y `::TestCancelTheMove`. El aviso al negocio de que esa noche se
+  `control/tests/test_admin_move.py::TestMoveToCluster` y `::TestCancelTheMove`. El aviso al negocio de que esa noche se
   le traslada no existe todavía (hub#1510).
 - **Un negocio de cualquier tamaño se traslada** (hub#1509): la copia pasa por el bucket de volcados
   (`HUB_DUMPS_BUCKET`), nunca por el disco del worker, así que `control.hub.move` no rechaza por tamaño (solo
@@ -4388,13 +4394,13 @@ Implicados: BASE-F10, BASE-F11, BILLING-F16 (erplora.com), BILLING-F17 (erplora.
   Tests: `base/tenancy/tests/test_dumps.py` (los `stream`),
   `base/tenancy/tests/test_move.py::TestTheCopyGoesThroughTheBucket` y `::TestFeedingAProgram` (dos BD reales y el S3
   de moto), `control/tests/test_services.py::TestMove` y
-  `control/tests/test_admin.py::test_its_confirmation_page_promises_no_refusal_by_size`.
+  `control/tests/test_admin_move.py::test_its_confirmation_page_promises_no_refusal_by_size`.
 - **«Restaurar desde una copia…»** (BASE-F114, hub#1198) es `control.admin.HubAdmin.restore_from_a_copy`: su página de
   confirmación (`RestoreFromACopyForm`, la plantilla `action_confirmation.html` que comparte con «Mover a otro
   clúster…») y, por cada hub, `control.hub.restore` con el actor del personal; el admin no comprueba nada que la
   operación compruebe. Restaura el worker (`base.tenancy.restore`), y su negativa fiscal (`restore_fiscal_records`, con
   el gancho `fiscal_record_states` de cada app que presenta a Hacienda) queda en `Hub.last_error`, que la ficha enseña
-  tal cual. Tests: `control/tests/test_admin.py::TestRestoreFromACopy` y, de punta a punta con el worker y dos BD
+  tal cual. Tests: `control/tests/test_admin_restore.py::TestRestoreFromACopy` y, de punta a punta con el worker y dos BD
   reales, `base/tenancy/tests/test_restore.py::TestAskedInTheHubAdmin`.
 - **Cuánto puede estar cerrado el negocio** (hub#1527): las páginas de «Mover a otro clúster…» y «Restaurar desde una
   copia…» dicen debajo de cada hub el tamaño de su base (el que mide la lista, `control.cluster.sizes`, una vez por
@@ -4430,7 +4436,7 @@ Implicados: BASE-F10, BASE-F11, BILLING-F16 (erplora.com), BILLING-F17 (erplora.
   `move.MOVED_COPY_DAYS` (`restore.drop_old_aside_copies`); mientras se hace cuenta en `control.freeze.get`. Su esquema
   es el del momento. Tests: `base/tenancy/tests/test_restore_aside.py` (dos BD reales, la guarda de red y
   `TestSendingToTheTaxAuthorityIsOffInTheCopy`, que nunca puede caer), `control/tests/test_services.py::TestRestoreAside`
-  y `control/tests/test_admin.py::TestRestoreToASeparateCopy`.
+  y `control/tests/test_admin_restore.py::TestRestoreToASeparateCopy`.
 - **«Recuperar en el negocio…»** (BASE-F114, hub#1257, capa 2a) es `control.admin.RestoredCopyAdmin.recover_into_the_business`:
   su página (`RecoverForm`, la misma `action_confirmation.html` de las acciones de Hubs, con `AsksFirst`) y, por cada
   copia, `control.copy.recover`, que escribe una fila `control.CopyRecovery` con las apps pedidas y el idioma del personal.
@@ -4458,7 +4464,7 @@ Implicados: BASE-F10, BASE-F11, BILLING-F16 (erplora.com), BILLING-F17 (erplora.
   `customer.customer.recover`, que rehace la ficha con sus grupos, etiquetas y campos (hub#1285). Ninguna app cuyos
   registros llegan a Hacienda responde (contrato en `test_recovery.py`). Tests: `base/tenancy/tests/test_recovery.py`
   (dos BD reales: la copia y el negocio), `apps/customer/tests/test_recovery.py`, `control/tests/test_services.py::TestRecover`,
-  `control/tests/test_admin.py::TestRecoverIntoTheBusiness` y `tests/e2e/base-recover-from-copy.spec.ts`.
+  `control/tests/test_admin_restore.py::TestRecoverIntoTheBusiness` y `tests/e2e/base-recover-from-copy.spec.ts`.
 
 ## Lo que queda fuera
 

@@ -15,6 +15,10 @@ with what preproduction taught it:
   the latest record is the one generated last, never the first or the last of the list.
 - A record of the queue is in the AEAT when its query returns it with the same fingerprint (``held_as``): the
   number alone could be an earlier record of the same invoice.
+- What a submission's answer says of the certificate it was presented with (``certificate_verdict``): the AEAT's
+  door answers one it cannot verify with a redirect to its «401» page (``302``, empty body), and refuses its holder
+  for the taxpayer with the fault 4112; a verdict on the records proves it. The fault 103 «NIF no identificado» is
+  no verdict: the test door gave it to good certificates and identified them a while later.
 - A query answers at most 10,000 records (the AEAT's web service description, section 6.4.3):
   ``IndicadorPaginacion`` S says more follow, after the record its ``ClavePaginacion`` names.
 """
@@ -32,6 +36,8 @@ ACCEPTED_WITH_ERRORS = "accepted_with_errors"
 REJECTED = "rejected"
 DUPLICATE = "3000"
 PERMANENT_FAULTS = frozenset({"4102", "4104", "4116"})
+CERTIFICATE_FAULTS = frozenset({"4112"})
+CERTIFICATE_REDIRECT = 302
 _FAULT_CODE = re.compile(r"Codigo\[(\d+)\]")
 
 
@@ -181,6 +187,28 @@ def parse_submission(body: str) -> SubmissionAnswer:
         wait_seconds=int(wait) if wait.isdigit() else None,
         lines=[_line(node) for node in answer if _local(node.tag) == "RespuestaLinea"],
     )
+
+
+@dataclass(frozen=True)
+class CertificateVerdict:
+    accepted: bool
+    detail: str = ""
+
+
+def certificate_verdict(status: int | None, body: str) -> CertificateVerdict | None:
+    """What the answer to a submission says of the certificate it was presented with; ``None`` when it says nothing
+    of it: no answer of the AEAT (down, a maintenance page) or a fault of the submission's content."""
+    if status == CERTIFICATE_REDIRECT:
+        return CertificateVerdict(accepted=False)
+    try:
+        answer = parse_submission(body)
+    except UnreadableAnswer:
+        return None
+    if answer.fault_code in CERTIFICATE_FAULTS:
+        return CertificateVerdict(accepted=False, detail=answer.fault_message)
+    if not answer.fault_code and answer.lines:
+        return CertificateVerdict(accepted=True)
+    return None
 
 
 def _timestamp(text: str) -> dt.datetime | None:

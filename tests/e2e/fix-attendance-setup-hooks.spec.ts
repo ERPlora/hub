@@ -3,9 +3,10 @@
 // the board by default with the server's count, which follows a clock-in and a clock-out made elsewhere (by the API, as
 // the assistant would) without a reload; the employee, who does not see the whole team, never gets it. A capture per
 // width. Everything this file creates is named «E2E-PRESENCE …» and removed after it.
-import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
+import { type Browser, type BrowserContext, expect, type Page, test } from '@playwright/test';
 
 import { A, api, type Credentials, EMPLOYEE, horizontalOverflow, login, OWNER, psql, shot, shown, untilStill } from './helpers';
+import { boardValue as value, boardWidget as panel, panelError, panelTitle } from './home-helpers';
 import { VIEWPORTS } from './inventory-helpers';
 import { stamp } from './sale-helpers';
 
@@ -91,14 +92,11 @@ async function spanish(
   return { context, page };
 }
 
-const panel = (page: Page, key: string): Locator =>
-  shown(page).locator(`[data-testid="widget-board"] [data-testid="widget"][data-key="${key}"]`);
-const value = (page: Page, key: string): Locator => panel(page, key).locator('[data-testid="widget-value"]');
 
 test('ATTENDANCE-F11: «Fichados ahora» on the owner\'s Home by default with the server\'s count, live', async ({ browser }) => {
   const { context, page } = await spanish(browser, { width: 1440, height: 900 });
   try {
-    await expect(panel(page, CLOCKED_IN_NOW).locator('[data-testid="widget-title"]')).toHaveText('Fichados ahora');
+    await expect(panelTitle(panel(page, CLOCKED_IN_NOW))).toHaveText('Fichados ahora');
     // A KPI says its name once: the title, no second label inside.
     await expect(panel(page, CLOCKED_IN_NOW).getByText('Fichados ahora')).toHaveCount(1);
     const before = await presence(context);
@@ -136,7 +134,7 @@ for (const size of VIEWPORTS) {
     try {
       const overflow = () => horizontalOverflow(page);
       await expect(panel(page, CLOCKED_IN_NOW)).toHaveAttribute('aria-busy', 'false');
-      await expect(panel(page, CLOCKED_IN_NOW).locator('[data-testid="widget-error"]')).toHaveCount(0);
+      await expect(panelError(panel(page, CLOCKED_IN_NOW))).toHaveCount(0);
       await expect(value(page, CLOCKED_IN_NOW)).toHaveText(count.format(await presence(context)));
       await panel(page, CLOCKED_IN_NOW).evaluate((element) => element.scrollIntoView({ block: 'center' }));
       await untilStill(page);

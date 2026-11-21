@@ -116,7 +116,8 @@ class InventoryConfig(LiveAppConfig):
         )
     ]
     widgets = [
-        # A KPI says its name once, in its title; the money one is in the hub's currency.
+        # A KPI says its name once, in its title; the money one is in the hub's currency. Every figure is in the colour of
+        # data of inventory (6), the same on every screen.
         Widget(
             key="low_stock_count",
             title=_("Low-stock products"),
@@ -128,7 +129,7 @@ class InventoryConfig(LiveAppConfig):
             kind="kpi",
             operation="inventory.stock.get_summary",
             map={"value": "products_low_stock"},
-            options={"format": "number"},
+            options={"format": "number", "tone": 6},
         ),
         Widget(
             key="value",
@@ -141,7 +142,7 @@ class InventoryConfig(LiveAppConfig):
             kind="kpi",
             operation="inventory.stock.get_summary",
             map={"value": "stock_value"},
-            options={"format": "currency"},
+            options={"format": "currency", "tone": 6},
         ),
         Widget(
             key="in_stock",
@@ -153,7 +154,7 @@ class InventoryConfig(LiveAppConfig):
             kind="stat",
             operation="inventory.stock.get_summary",
             map={"value": "products_in_stock"},
-            options={"format": "number"},
+            options={"format": "number", "tone": 6},
         ),
         # The Panel's own page size: the five with less stock, the one with less first.
         Widget(
