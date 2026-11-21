@@ -972,7 +972,7 @@ sola (riesgo alto, como sustituir un tique en el mostrador).
   los millares desde cuatro cifras («1.234,56 €», hub#1090) en la lista, la ficha y el aviso del tope del tique.
 - **Hub de plataforma** (INVOICE-F23; PLAN-SAAS §4): el hub propio de
   ERPlora, el slug `PLATFORM_HUB_SLUG` (`erplora`, reservado en `live.slugs`: ningún negocio lo puede
-  coger y el alta normal del SaaS no lo crea). Las cuatro puertas viven en `base/internal.py`
+  coger y el alta normal del SaaS no lo crea). Las cuatro puertas viven en `base/internal_platform.py`
   (`/internal/platform/invoices`, `/health`, `/{id}`, `/{id}/pdf`) y llaman como sistema a
   `invoice.invoice.issue_platform`, `platform_status`, `platform_document` y `platform_health` (permiso
   `invoice.issue_platform`, sin rol ni ruta ninja). Contrato: `POST /internal/platform/invoices` con el

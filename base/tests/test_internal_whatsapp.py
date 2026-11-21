@@ -23,7 +23,7 @@ from live.models import OutboxEvent
 from live.operations import get as get_operation
 
 from apps.whatsapp_inbox.models import Channel, Message
-from base import activation, apps_on, internal
+from base import activation, apps_on, internal, internal_whatsapp
 from base.models import AppActivation, Hub
 from base.services import photo as photo_service
 from base.tenancy import context
@@ -280,7 +280,7 @@ def test_a_business_that_does_not_open_answers_as_its_host(client, acme, path, c
 def test_the_app_off_in_the_business_is_404_app_inactive(client, acme, path, monkeypatch):
     with use_hub(acme):
         every = apps_on.active_apps(ACME)
-    monkeypatch.setattr(internal.apps_on, "active_apps", lambda scope: every - {"whatsapp_inbox"})
+    monkeypatch.setattr(internal_whatsapp.apps_on, "active_apps", lambda scope: every - {"whatsapp_inbox"})
 
     answer = post(client, path, door_body(path))
 
@@ -297,7 +297,7 @@ def test_the_app_is_asked_about_the_business_of_the_body(client, acme, other, mo
         asked.append(scope)
         return every if scope == ACME else every - {"whatsapp_inbox"}
 
-    monkeypatch.setattr(internal.apps_on, "active_apps", active)
+    monkeypatch.setattr(internal_whatsapp.apps_on, "active_apps", active)
 
     assert post(client, INBOUND, message(hub=OTHER.key)).status_code == 404
     assert post(client, INBOUND, message(hub=ACME.key)).status_code == 200
@@ -384,7 +384,7 @@ def test_each_business_answers_from_its_own_database(hub_a, hub_b, production, m
         reached.append((name, context.current_hub().slug, ctx.scope.key))
         return None, internal.refuse(418, "probe", "reached")
 
-    monkeypatch.setattr(internal, "_operation_call", operation)
+    monkeypatch.setattr(internal_whatsapp, "_operation_call", operation)
     door = production()
     cold(hub_a.slug, hub_b.slug)
 
@@ -414,7 +414,7 @@ def test_a_database_that_fails_asking_for_the_apps_is_503_and_logged(
     def failing(scope):
         raise failure
 
-    monkeypatch.setattr(internal.apps_on, "active_apps", failing)
+    monkeypatch.setattr(internal_whatsapp.apps_on, "active_apps", failing)
     door = production()
 
     answer = post(door, path, door_body(path, hub=hub_a.slug), host=PRIVATE_NAME)
