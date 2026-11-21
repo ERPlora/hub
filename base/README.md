@@ -16,10 +16,10 @@ por `/internal`.
 
 ## Qué hace hoy
 
-- **El Inicio** (F01–F12, F38): el saludo, «Mis apps», «Termina de configurar tu negocio» con los pasos que declara
-  cada app (el que impide facturar, primero y en rojo), el tablero de paneles de las apps, que se ponen al día solos,
-  la actividad, la campana con los avisos de las apps y los eventos que no se entregaron, y las plantillas de un
-  negocio como el suyo.
+- **El Inicio** (F01–F12, F38, F117): el saludo, «Mis apps», «Termina de configurar tu negocio» con los pasos que
+  declara cada app (el que impide facturar, primero y en rojo), el tablero de paneles de las apps, que se ponen al día
+  solos, la actividad, la campana con los avisos de las apps, los eventos que no se entregaron y la factura del plan sin
+  pagar, y las plantillas de un negocio como el suyo.
 - **Apps** (F14–F27): las apps del negocio y el catálogo, su precio, lo que traen consigo, activar y desactivar (al
   momento y en todos los dispositivos), por qué una no se abre y la de pago bloqueada.
 - **Sistema** (F39–F47, F116): Uso y plan, con lo que usa el negocio y si tiene que ampliar, Actualizaciones
