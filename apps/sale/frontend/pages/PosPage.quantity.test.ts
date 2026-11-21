@@ -3,11 +3,10 @@
 import { toastError } from '@erplora/ui/shell';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { MANAGER, mountSale, settle } from '../__tests__/mount-sale';
-import PosCatalog from '../components/pos/PosCatalog.vue';
+import { settle } from '../__tests__/mount-sale';
+import { posWithCheck } from '../__tests__/pos-with-check';
 import QtyStepper from '../components/pos/QtyStepper.vue';
-import { line, memoryStorage, order, product, refused, settings } from '../components/pos/__tests__/fixtures';
-import PosPage from './PosPage.vue';
+import { line, memoryStorage, order, refused } from '../components/pos/__tests__/fixtures';
 
 beforeEach(() => vi.stubGlobal('localStorage', memoryStorage()));
 
@@ -16,13 +15,7 @@ const CHECK = order({ id: 'o1', lines: [PRAWNS] });
 const OFF_GRID = 'La cantidad no encaja con el escalón del producto (0,001 kg).';
 
 async function sellingPrawns() {
-  const m = await mountSale(PosPage, { session: MANAGER, locale: 'es' });
-  await m.live();
-  await m.result('sale.pos_settings.get', settings());
-  m.net.onApi(() => Response.json(CHECK));
-  m.wrapper.findComponent(PosCatalog).vm.$emit('add', product({ id: 'p1' }));
-  await settle();
-  await m.reopen();
+  const m = await posWithCheck(CHECK, { locale: 'es' });
   const field = () => m.wrapper.findComponent(QtyStepper).find('input').element as HTMLInputElement;
   const lineWrites = () =>
     m
