@@ -2156,6 +2156,7 @@
       "payment_id": "Payment",
       "payment_method": "Payment method",
       "payment_method_name": "Payment method name",
+      "payment_methods": "Payment methods",
       "payments": "Payments",
       "pending": "Pending",
       "pending_count": "Pending count",
