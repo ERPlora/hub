@@ -5,6 +5,7 @@
 // same check (one per appointment). Everything is named «E2E Apt Charge …» and removed before and after.
 import { expect, test } from '@playwright/test';
 
+import { pickDay } from './date-time-fields';
 import { A, psql, shot, shown } from './helpers';
 import { ownerPage, post, rowAction } from './service-helpers';
 
@@ -78,9 +79,7 @@ test('«Charge» ends on the till with the appointment’s check, at the price b
     });
     expect(booked.total).toBe(3000);
 
-    const calendar = shown(page).locator('[data-testid=appointment-toolbar-calendar] input');
-    await calendar.fill(DAY);
-    await calendar.press('Tab');
+    await pickDay(page, shown(page).locator('[data-testid=appointment-toolbar-calendar]'), DAY);
     await rowAction(page, 'appointment-list', booked.id, 'charge');
     await page.waitForURL(/\/sale\/pos\?order=/);
     const orderId = new URL(page.url()).searchParams.get('order');
@@ -93,8 +92,7 @@ test('«Charge» ends on the till with the appointment’s check, at the price b
 
     // Back on the agenda: «Go to the check» returns to the same one.
     await page.goto(`${A}/appointment/agenda`);
-    await calendar.fill(DAY);
-    await calendar.press('Tab');
+    await pickDay(page, shown(page).locator('[data-testid=appointment-toolbar-calendar]'), DAY);
     await expect(shown(page).locator(`[data-testid=appointment-list-row-${booked.id}-charge]`)).toContainText('Go to the check');
     await rowAction(page, 'appointment-list', booked.id, 'charge');
     await page.waitForURL(new RegExp(`/sale/pos\\?order=${orderId}`));

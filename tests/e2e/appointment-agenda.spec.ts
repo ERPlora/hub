@@ -11,6 +11,7 @@
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
 import { aMonday } from './appointment-helpers';
+import { dayAsShown, pickDay, pickTime } from './date-time-fields';
 import { A, api, psql, shot, shown } from './helpers';
 import { ownerPage, pick, post, rowAction, VIEWPORTS } from './service-helpers';
 import { discardChanges } from './unsaved-back-helpers';
@@ -116,9 +117,7 @@ async function offer(context: BrowserContext, day: string, service = 'Haircut', 
 }
 
 async function goToDay(page: Page, day = DAY): Promise<void> {
-  const calendar = shown(page).locator('[data-testid=appointment-toolbar-calendar] input');
-  await calendar.fill(day);
-  await calendar.press('Tab');
+  await pickDay(page, shown(page).locator('[data-testid=appointment-toolbar-calendar]'), day);
   await expect(shown(page).locator('[data-testid=appointment-toolbar-date]')).not.toBeEmpty();
 }
 
@@ -136,9 +135,7 @@ async function fillBooking(page: Page, who: Cast): Promise<void> {
 async function chooseServiceStaffAndDay(page: Page, what: Offer, day: string): Promise<void> {
   await pick(page, 'appointment-form-service-add', what.service.name.split(' ')[2], what.service.name);
   await pick(page, 'appointment-form-staff', what.member.full_name.split(' ')[2], what.member.full_name);
-  const input = page.locator('ion-modal[data-testid=appointment-form] [data-testid=appointment-form-day] input');
-  await input.fill(day);
-  await input.press('Tab');
+  await pickDay(page, page.locator('ion-modal[data-testid=appointment-form] [data-testid=appointment-form-day]'), day);
 }
 
 test('Agenda: book with a free time, an overlap refused, the grid and the week, drag, cancel, charge, series and the card @smoke', async ({ browser }) => {
@@ -177,7 +174,7 @@ test('Agenda: book with a free time, an overlap refused, the grid and the week, 
     expect([clash.status, clash.data.error.code]).toEqual([409, 'appointment.slot_taken']);
     await view.locator('[data-testid=appointment-list-add]').click();
     await fillBooking(page, who);
-    await page.locator('[data-testid=appointment-form-time] input').fill('10:15');
+    await pickTime(page, page.locator('ion-modal[data-testid=appointment-form] [data-testid=appointment-form-time]'), '10:15');
     await page.locator('[data-testid=appointment-form-submit]').click();
     await expect(page.locator('[data-testid=appointment-form-error]')).toContainText('already has an appointment at that time');
     await page.screenshot({ path: shot('appointment-overlap-refused') });
@@ -304,7 +301,7 @@ test('CUSTOMER-F25: a new customer from «New appointment» without leaving the 
     const form = page.locator('ion-modal[data-testid=appointment-form]');
     await form.locator('[data-testid=appointment-slots-time]', { hasText: /^10:00\s?AM$/ }).click();
     const time = form.locator('[data-testid=appointment-form-time] input');
-    await expect(time).toHaveValue('10:00');
+    await expect(time).toHaveValue(/^10:00\sAM$/);
 
     // «Customer»: the name is on no card, so the search offers «+ New customer «…»».
     const name = named('Marta');
@@ -335,8 +332,8 @@ test('CUSTOMER-F25: a new customer from «New appointment» without leaving the 
     await expect(form.locator('[data-testid=customer-search-trigger]')).toHaveText(name);
     await expect(form.locator('[data-testid=appointment-form-services] ion-chip')).toHaveText([what.service.name]);
     await expect(form.locator('[data-testid=appointment-form-staff] input')).toHaveValue(what.member.full_name);
-    await expect(form.locator('[data-testid=appointment-form-day] input')).toHaveValue(NEXT_DAY);
-    await expect(time).toHaveValue('10:00');
+    await expect(form.locator('[data-testid=appointment-form-day] input')).toHaveValue(dayAsShown(NEXT_DAY));
+    await expect(time).toHaveValue(/^10:00\sAM$/);
 
     // «Add appointment» books it with her; her card is a walk-in («En el local») with the phone.
     await form.locator('[data-testid=appointment-form-submit]').click();

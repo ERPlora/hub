@@ -5,6 +5,7 @@
 // control: he sees both. Everything is named «E2E Apt …» and removed before and after.
 import { type Browser, expect, test } from '@playwright/test';
 
+import { pickDay } from './date-time-fields';
 import { A, api, type Credentials, EMPLOYEE, login, psql, shot, shown } from './helpers';
 import { pick, post } from './service-helpers';
 
@@ -52,9 +53,7 @@ async function signedIn(browser: Browser, credentials?: Credentials) {
 }
 
 async function goToDay(page: import('@playwright/test').Page): Promise<void> {
-  const calendar = shown(page).locator('[data-testid=appointment-toolbar-calendar] input');
-  await calendar.fill(DAY);
-  await calendar.press('Tab');
+  await pickDay(page, shown(page).locator('[data-testid=appointment-toolbar-calendar]'), DAY);
 }
 
 test('an employee sees and books her own agenda only, and the API agrees', async ({ browser }) => {
@@ -122,9 +121,7 @@ test('an employee sees and books her own agenda only, and the API agrees', async
     await search.locator('[data-testid=customer-picker-search] input').fill(customer.name);
     await search.locator(`[data-testid=customer-picker-result-${customer.id}]`).click();
     await pick(employee.page, 'appointment-form-service-add', service.name.split(' ')[2], service.name);
-    const day = form.locator('[data-testid=appointment-form-day] input');
-    await day.fill(DAY);
-    await day.press('Tab');
+    await pickDay(employee.page, form.locator('[data-testid=appointment-form-day]'), DAY);
     await employee.page.locator('[data-testid=appointment-slots-time]', { hasText: /^11:00\s?AM$/ }).click();
     await employee.page.locator('[data-testid=appointment-form-submit]').click();
     await expect(view.locator('[data-testid=appointment-list-row]', { hasText: customer.name })).toHaveCount(2);
