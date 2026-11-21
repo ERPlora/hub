@@ -116,8 +116,8 @@
     ]
   },
   {
-    "path": "apps/inventory/queries.py",
-    "file_name": "queries.py",
+    "path": "apps/inventory/queries/products.py",
+    "file_name": "products.py",
     "functions": [
       {
         "name": "filter_products",

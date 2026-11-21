@@ -655,14 +655,14 @@ Los papeles llegan del SaaS con prefijo (`hub_owner`, `hub_admin`, `hub_manager`
   (`queries.groups_standing_for`: el mismo mientras el negocio lo tiene; si no, el de su nombre que trajo una
   recuperación, `base.recovery.brought_back`, y que no es ninguno de la copia; uno hecho a mano no hace de ninguno).
   `queries.category_links_in_copy` lee los `ModifierLink` de la copia que cuelgan de una categoría no borrada allí, con
-  las categorías vivas de la copia por su nombre (`apps.inventory.queries.category_names_in_copy`), y
+  las categorías vivas de la copia por su nombre (`apps.inventory.queries.recovery.category_names_in_copy`), y
   `queries.category_links_not_in_business` pone cada uno en la categoría que hace de ella en el negocio
-  (`apps.inventory.queries.categories_standing_for`, la misma pareja que los enlaces de productos a categorías de
+  (`apps.inventory.queries.recovery.categories_standing_for`, la misma pareja que los enlaces de productos a categorías de
   Inventario: la misma mientras vive; si no, la viva con su nombre que trajo una recuperación; una hecha a mano no
   recibe nada). `queries.links_in_copy` lee con su propio SQL los `ModifierLink` de la copia que cuelgan de un
   producto no borrado allí, con el SKU del producto allí, y
   `queries.links_not_in_business` pone cada uno en el producto que hace de él en el negocio
-  (`apps.inventory.queries.products_standing_for`, la misma pareja que Tarifas: el mismo mientras vive; si no, el vivo
+  (`apps.inventory.queries.recovery.products_standing_for`, la misma pareja que Tarifas: el mismo mientras vive; si no, el vivo
   con su SKU que hizo una recuperación, `base.recovery.brought_back`; uno hecho a mano con su SKU no recibe nada) y deja
   los que el negocio no tiene en su sitio (grupo y producto, el índice único `modifier_link_product_unique`; grupo y
   categoría, `modifier_link_category_unique`; un enganche nunca cambia de grupo ni de destino, así que el mismo enganche

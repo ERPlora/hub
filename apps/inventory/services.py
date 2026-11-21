@@ -44,18 +44,11 @@ from apps.inventory.models import (
     Unit,
     UNIT_SPECS,
 )
-from apps.inventory.queries import (
-    FORMULA_STARTS,
-    config_row,
-    current_settings,
-    find_category,
-    find_product,
-    held,
-    load_category,
-    load_product,
-    quantity_text,
-    tracks_stock,
-)
+from apps.inventory.queries.categories import load_category
+from apps.inventory.queries.exports import FORMULA_STARTS, quantity_text
+from apps.inventory.queries.products import load_product, tracks_stock
+from apps.inventory.queries.reads import find_category, find_product, held
+from apps.inventory.queries.settings import config_row, current_settings
 from apps.inventory.schemas import (
     CategoryImportIn,
     CategoryIn,
@@ -131,7 +124,7 @@ SYSTEM = "inventory.system"
 THOUSANDTHS = Decimal("0.001")
 #: A quantity holds at most 12 whole digits (DecimalField 15, 3).
 MAX_QUANTITY = Decimal(10) ** (QUANTITY["max_digits"] - QUANTITY["decimal_places"])
-#: What the export put in front of a cell a spreadsheet would run (queries.FORMULA_STARTS).
+#: What the export put in front of a cell a spreadsheet would run (queries.exports.FORMULA_STARTS).
 EXPORT_GUARD = tuple(f"'{start}" for start in FORMULA_STARTS)
 # A cell of a CSV: digits with decimals (at most the currency's for money, three for quantities), after normalizing.
 _AMOUNT_RE = re.compile(r"^\d+(\.\d+)?$")
