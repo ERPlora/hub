@@ -333,16 +333,16 @@ Pasos:
    busca por nombre o SKU.
 2. Toca el artículo: entra como línea de la cuenta. Tocarlo otra vez (mismo profesional, sin nota ni
    descuento) sube la cantidad; el selector de la línea la sube o la baja, y a 0 la línea se quita.
-3. Pulsa «Cobrar · <total>» al pie de la cuenta (en el móvil, abre antes la cuenta con el botón
+3. Pulsa «Cobrar · 18,50 €» al pie de la cuenta (en el móvil, abre antes la cuenta con el botón
    flotante, que enseña el total). Con el móvil tumbado, la cuenta ocupa toda la pantalla: su barra y
    su pie se quedan fijos, con «Cobrar» a la vista, y las líneas se desplazan entre ellos.
 4. En la hoja **Cobro**, con efectivo elegido, marca en el teclado el importe entregado; el cambio
    sale en grande encima del teclado, en la fila que hasta entonces pide el importe. En un móvil bajo,
    el teclado entero queda a la vista en cuanto se abre la hoja.
-5. Pulsa «Cobrar <total>».
+5. Pulsa «Cobrar 18,50 €».
 6. La hoja se cierra, la cuenta queda vacía y se abre el **Documento de venta** con el tique. Con
    **Impresión**, el tique sale solo por la impresora de tiques, según sus ajustes (y, si entró
-   efectivo, se abre el cajón): se lee «Enviado a <impresora>.» y el papel en pantalla es ya una copia.
+   efectivo, se abre el cajón): se lee «Enviado a Barra.» y el papel en pantalla es ya una copia.
    Sin Impresión encendida, sin impresora de tiques o con el documento fiscal pendiente, el tique se
    imprime desde el Documento de venta. Un fallo de la impresora nunca deshace el cobro.
 Entra: los artículos y precios de Inventario; los tipos de IVA de Impuestos; los ajustes del TPV.
@@ -375,12 +375,12 @@ Vertical: común
 Actor: empleado, responsable
 Pantalla: Cobro
 Pasos:
-1. Con la cuenta lista, pulsa «Cobrar · <total>».
+1. Con la cuenta lista, pulsa «Cobrar · 18,50 €».
 2. En la hoja **Cobro**, toca **Tarjeta** (o el medio que sea; salen los medios activos que permiten
    los ajustes).
-3. Se lee «Importe exacto» y «Cobra <importe> en el datáfono y confirma.»: cobra en el datáfono
+3. Se lee «Importe exacto» y «Cobra 18,50 € en el datáfono y confirma.»: cobra en el datáfono
    aparte.
-4. Pulsa «Cobrar <importe> con tarjeta». El resultado es el mismo que al cobrar en efectivo: la cuenta
+4. Pulsa «Cobrar 18,50 € con tarjeta». El resultado es el mismo que al cobrar en efectivo: la cuenta
    queda vacía y se abre el tique.
 Entra: los medios de pago del negocio.
 Sale: la venta con un pago por el importe exacto y sin cambio; el aviso de venta cobrada lleva el
@@ -400,10 +400,10 @@ Pasos:
 2. Elige un medio, marca el «Importe de este cobro» (en efectivo, lo entregado) y pulsa «Añadir este
    cobro». Sin importe marcado, el cobro cubre todo lo que falta.
 3. Los cobros tomados salen en «Cobros tomados»; la ✕ quita uno.
-4. Cuando el restante llega a 0, pulsa «Cobrar <total>».
+4. Cuando el restante llega a 0, pulsa «Cobrar 18,50 €».
 Entra: los medios de pago y lo que entrega el cliente.
 Sale: una venta con una fila por medio; el cambio sale siempre del efectivo y nunca se reparte.
-Si falla: mientras falte dinero, el botón dice «Faltan <importe>»; si los cobros no suman el total, no
+Si falla: mientras falte dinero, el botón dice «Faltan 5,00 €»; si los cobros no suman el total, no
 se cobra: «Los cobros no suman el total de la venta.». En un negocio de España, una venta de 1.000 € o
 más no admite **ningún** cobro en efectivo, tampoco repartido: el efectivo sale desactivado con su
 motivo («La ley no permite cobrar en efectivo ventas de 1.000,00 € o más. Cóbrala con tarjeta o
@@ -543,9 +543,9 @@ Pasos:
 1. Toca la baldosa «Precio libre», al final de la rejilla.
 2. Marca el importe en el teclado y elige la sección en «Sección (IVA)»; cada botón enseña su
    tipo de IVA.
-3. Pulsa «Añadir <importe>»: entra una línea con el nombre de la sección y ese importe. Nunca se
+3. Pulsa «Añadir 12,50 €»: entra una línea con el nombre de la sección y ese importe. Nunca se
    suma a otra línea.
-4. Si no tienes el permiso de precio libre, al pulsar «Añadir <importe>» sale encima «Hace falta una
+4. Si no tienes el permiso de precio libre, al pulsar «Añadir 12,50 €» sale encima «Hace falta una
    aprobación» con lo que se aprueba y el importe marcado («Se aprueba: Vender a precio libre por
    12,50 €»): un responsable la aprueba con su PIN (o su placa) en ese mismo dispositivo y la línea
    entra. Si aún no había cuenta, se abre vacía y la línea espera a la aprobación.
@@ -591,7 +591,7 @@ Pasos:
 3. Toca las opciones: en un grupo de una sola, tocar otra la cambia y tocar la misma la quita; en uno con
    techo, al llegar a él el siguiente toque dice ««Extras» está completo: quita una para elegir otra.»; una
    opción que se puede repetir lleva su contador («× 2») y su «−».
-4. Pulsa «Añadir · <precio>»: la línea entra con sus suplementos debajo del nombre y su precio ya sumado.
+4. Pulsa «Añadir · 9,50 €»: la línea entra con sus suplementos debajo del nombre y su precio ya sumado.
    Mientras un grupo obligatorio no esté completo, el botón dice «Elige una opción para continuar» y
    tocarlo señala ese grupo.
 5. Cobra como siempre: la línea cobra lo que valía al pedirla aunque el suplemento cambie o se
@@ -621,7 +621,7 @@ Pasos:
    siguiente toque dice ««Café» está completo: quita una para elegir otra.»; una elección que se puede repetir
    lleva su contador y su «−».
 4. Mientras falte algo, el botón dice qué («Elige 1 en «Segundos»») y tocarlo señala ese plato; cuando cada
-   plato obligatorio está completo, dice «Añadir · <total>» con el precio cerrado más los suplementos.
+   plato obligatorio está completo, dice «Añadir · 14,00 €» con el precio cerrado más los suplementos.
    Púlsalo: el menú entra en la cuenta como una línea, con sus platos debajo del nombre. Cada menú es una
    línea propia; su cantidad se cambia por unidades enteras.
 5. Cobra como siempre: el menú cobra el importe que tenía al pedirlo aunque después suba de precio,
@@ -672,7 +672,7 @@ Pasos:
    de etiqueta del pie («Descuento del tique»).
 2. Marca el porcentaje; en la cuenta puedes cambiar a importe fijo con el botón de la moneda del negocio
    («€», «zł»…).
-3. Pulsa «Aplicar −N %» (o «Aplicar −<importe>»). «Quitar» lo borra. La línea enseña «−N %» y el pie
+3. Pulsa «Aplicar −N %» (o «Aplicar −2,00 €»). «Quitar» lo borra. La línea enseña «−N %» y el pie
    la fila «Descuento del tique −N %» con lo que el descuento de la cuenta quita, sea porcentaje o
    importe fijo: un 10 % sobre 8,50 € dice «−0,85 €», nunca «−0,00 €». El de la cuenta se calcula sobre
    las líneas ya con su propio descuento.
@@ -831,7 +831,7 @@ Pasos:
    del cobro desde el primer momento. Si el envío falla, no se abre el cobro y se dice por qué.
 4. Una línea enviada queda bloqueada: ni cantidad, ni nota, ni descuento, ni invitación.
 5. Para quitar un plato ya enviado, pulsa ⊗ «Anular este artículo» en su línea: se abre «Anular
-   «<artículo>»» con «Ya se envió a cocina. Sale de la cuenta y se guarda el motivo. Tiene que
+   «Croquetas»» con «Ya se envió a cocina. Sale de la cuenta y se guarda el motivo. Tiene que
    autorizarlo un responsable.», los motivos de un toque («Error al pedir», «El cliente lo cambia»,
    «Agotado», «Pedido dos veces») y «O escribe el motivo…». «Anular artículo» no se puede pulsar sin
    motivo.
@@ -871,7 +871,7 @@ Pasos:
    fiscal se entrega al cobrar.». Con descuento en la cuenta, la fila «Descuento» dice lo que quita (el
    mismo importe que el pie de la cuenta): con precios con IVA, las líneas menos el descuento dan el total.
 3. Pulsa la impresora de arriba: con **Impresión** y una impresora de tiques activa, la cuenta sale por
-   ella y se lee «Enviado a <impresora>.»; si no, sale por el diálogo de impresión del
+   ella y se lee «Enviado a Barra.»; si no, sale por el diálogo de impresión del
    dispositivo con la cuenta sola: el del navegador o, en la app instalada, su pantalla de impresión (el
    diálogo del sistema, con la impresora o «Guardar como PDF»).
 Entra: la cuenta abierta y su total calculado por el servidor.
@@ -894,7 +894,7 @@ Pantalla: Vender
 Pasos:
 1. Con dos o más líneas, toca las líneas que paga esta persona (la línea, no sus botones): se marcan
    con un círculo.
-2. Pulsa «Cobrar»: la hoja dice «Cobrando N líneas de <total>» y cobra solo esas.
+2. Pulsa «Cobrar»: la hoja dice «Cobrando 2 líneas de 12,00 €» y cobra solo esas.
 3. Tras cobrar se abre el **Documento de venta** de ese cobro y, detrás, la cuenta sigue abierta con
    lo que falta; lo cobrado ya no vuelve a salir. Cobrar la última línea pendiente cierra la cuenta.
    Se cobran las líneas que estaban marcadas al abrir la hoja, aunque después se marque otra.
@@ -983,10 +983,10 @@ Pasos:
 2. Si la línea es de más de una unidad («Corte × 2»), pulsa «Separar en N líneas»: un bono paga una
    línea entera de una unidad, y cada una tiene su hueco.
 3. Elige el bono (viene elegido el que se gasta primero) y pulsa «Gastar una sesión»: la línea pasa a
-   0,00 € con «Ya pagado · <bono>», el importe del cobro baja y el hueco dice «<bono>: sesión gastada.
-   Quedan N.» con «Deshacer». Lo que no paga el bono se cobra con su medio; si el bono paga todo, se
+   0,00 € con «Ya pagado · Bono 5 cortes», el importe del cobro baja y el hueco dice «Bono 5 cortes: sesión gastada.
+   Quedan 3.» con «Deshacer». Lo que no paga el bono se cobra con su medio; si el bono paga todo, se
    cobra 0,00 € sin medio de pago.
-4. Cobra: la línea sale en el tique a 0,00 € con «Ya pagado · <bono>» y la sesión queda gastada.
+4. Cobra: la línea sale en el tique a 0,00 € con «Ya pagado · Bono 5 cortes» y la sesión queda gastada.
 5. Cerrar la hoja, aparcar la cuenta, recargar o cobrarla en otro dispositivo no cambia nada: la
    línea de la cuenta guarda el bono que la paga.
 Entra: los bonos de la clienta y su saldo, de Servicios.
@@ -1025,7 +1025,7 @@ Pasos:
    territorio de **Impuestos → Ajustes**, y cambia al momento si se cambia el territorio. Con «7 días»,
    debajo de las cifras, lo vendido cada uno de esos días, de más antiguo a hoy («mié 14 · 120,50 €»).
 3. La tabla: Fecha, Número, Cliente, Pago, Estado (Completada, Anulada, Devuelta; con «Por devolver
-   <importe>» si se devolvió una parte) y Total. Busca con «Buscar número o cliente…», filtra por
+   5,00 €» si se devolvió una parte) y Total. Busca con «Buscar número o cliente…», filtra por
    estado, pago, fecha o total, u ordena.
 4. Toca una fila para ver su documento. La tabla se recarga sola cuando se cobra, anula o
    devuelve una venta.
@@ -1094,7 +1094,7 @@ Pasos:
    «Documento fiscal pendiente — Facturación no pudo emitirlo al cobrar (falta el emisor, o un permiso).
    Cuando esté resuelto, emítelo ahora.» con «Emitir ahora».
 3. Pulsa la impresora del pie para imprimirlo, o «Reimprimir» en la fila. Con **Impresión** y una
-   impresora de tiques activa, el papel sale por ella y se lee «Enviado a <impresora>.»; si
+   impresora de tiques activa, el papel sale por ella y se lee «Enviado a Barra.»; si
    no (o con su documento fiscal pendiente), sale por el diálogo de impresión del dispositivo con el papel
    solo: el del navegador o, en la app instalada, su pantalla de impresión (el diálogo del sistema, con la
    impresora o «Guardar como PDF»). Toda
@@ -1124,7 +1124,7 @@ Actor: responsable; cajero, con la aprobación de un responsable
 Pantalla: Ventas, Anular venta, Hace falta una aprobación
 Pasos:
 1. En **Ventas**, en una venta Completada sin devoluciones, pulsa «Anular».
-2. Se abre «Anular la venta <número>». Escribe el «Motivo (obligatorio)» y pulsa «Anular», o
+2. Se abre «Anular la venta 20261121-0007». Escribe el «Motivo (obligatorio)» y pulsa «Anular», o
    «Cancelar».
 3. Si no tienes el permiso de anular, sale encima «Hace falta una aprobación» con «Se aprueba: Anular
    una venta»: un responsable toca su cara y teclea su PIN (o pasa su placa) en ese mismo dispositivo.
@@ -1153,28 +1153,28 @@ Actor: responsable; cajero, con la aprobación de un responsable
 Pantalla: Devolver, Hace falta una aprobación
 Pasos:
 1. En **Ventas**, en una venta Completada (también con factura), pulsa «Devolver».
-2. «Devolver la venta <número>» enseña una tarjeta por cada forma en que se pagó: «Cobrado», «Ya
+2. «Devolver la venta 20261121-0007» enseña una tarjeta por cada forma en que se pagó: «Cobrado», «Ya
    devuelto» y «Devolvible», con una propuesta de devolución total ya repartida («Devolver todo» la
    repone).
 3. Si el cliente devuelve artículos, márcalos en «Qué se devuelve»: el importe se propone solo (la
    parte de cada línea marcada, sin pasar de lo que queda). Con dos o más unidades por devolver, sale
-   «Unidades que vuelven» para elegir cuántas. Una línea de la que ya volvió una parte dice «<n> de
-   <m> ya devueltas»; la que ya volvió entera sale como «Ya devuelta». Sin marcar nada solo se
+   «Unidades que vuelven» para elegir cuántas. Una línea de la que ya volvió una parte dice «1 de
+   2 ya devueltas»; la que ya volvió entera sale como «Ya devuelta». Sin marcar nada solo se
    devuelve dinero.
 4. Cambia el «Importe a devolver» de cada forma si solo vuelve una parte. Si el medio original ya no
    está disponible, elige otro en «Devolver por».
-5. Escribe el «Motivo» y pulsa «Devolver <importe>». Si no tienes el permiso de devolver, sale encima
+5. Escribe el «Motivo» y pulsa «Devolver 12,00 €». Si no tienes el permiso de devolver, sale encima
    «Hace falta una aprobación» con «Se aprueba: Devolver una venta»: un responsable la aprueba con su PIN
    (o su placa) en ese mismo dispositivo. Quien tiene el permiso no ve esta pregunta.
 6. Sale «Devolución registrada.»; si ya no queda nada por devolver, la venta pasa a Devuelta; si
-   queda, la fila dice «Por devolver <importe>».
+   queda, la fila dice «Por devolver 6,00 €».
 Entra: lo cobrado y lo ya devuelto por cada forma de pago; las líneas de la venta y las que ya
 volvieron.
 Sale: el documento de devolución con una fila por forma de pago, las líneas que vuelven con sus
 unidades, su motivo y quién la hizo (avisa: venta devuelta, con las líneas devueltas y si queda
 devuelta del todo) y, con Facturación, su rectificativa en la misma devolución (R5 de un tique, R1 de
 una factura; por diferencias, o lo que queda si cierra la venta: INVOICE-F09, F10).
-Si falla: «<medio>: <importe> es más que los <importe> que quedan por devolver.», «<medio>: elige por
+Si falla: «Tarjeta: 20,00 € es más que los 12,00 € que quedan por devolver.», «Tarjeta: elige por
 dónde vuelve este dinero.», «Una devolución necesita un motivo.», «No queda dinero por devolver en
 esta venta.». Si otra devolución se lleva a la vez lo último de una línea marcada: «Una de las líneas
 marcadas ya se devolvió en otra devolución. Vuelve a abrir la devolución para ver lo que queda.». Si
@@ -1194,9 +1194,9 @@ Pantalla: Devolver, Anular venta
 Pasos:
 1. En **Ventas**, pulsa «Devolver» en una venta con líneas pagadas con bono (sale también en una
    pagada entera con bono, a 0,00 €, mientras le quede una sesión por devolver).
-2. En «Qué se devuelve», la línea pagada con bono dice «Ya pagado · <bono>». Márcala: «La sesión
-   vuelve a <bono>.».
-3. Escribe el «Motivo» y pulsa el botón: con dinero, «Devolver <importe>»; solo la sesión, «Devolver
+2. En «Qué se devuelve», la línea pagada con bono dice «Ya pagado · Bono 5 cortes». Márcala: «La sesión
+   vuelve a Bono 5 cortes.».
+3. Escribe el «Motivo» y pulsa el botón: con dinero, «Devolver 15,00 €»; solo la sesión, «Devolver
    la sesión».
 4. Anular la venta devuelve también todas sus sesiones.
 Entra: las líneas de la venta pagadas con bono y lo que ya volvió de cada una.
@@ -1311,8 +1311,8 @@ Pasos:
 1. Con Servicios activa y «Mostrar servicios en el TPV» encendido, toca «Servicios» en la tira de
    categorías (o búscalo con la lupa).
 2. Toca el servicio: entra como línea con su precio. Si no es de precio fijo («Desde», «Por hora»,
-   «Variable», «Gratis»), se abre «Importe de <servicio>» con su precio como sugerencia: marca el
-   importe y pulsa «Añadir <importe>».
+   «Variable», «Gratis»), se abre «Importe de Mechas» con su precio como sugerencia: marca el
+   importe y pulsa «Añadir 45,00 €».
 3. Cobra como siempre; la línea lleva a la profesional como cualquier otra.
 4. **Precio de la profesional**: un servicio de precio fijo hecho por una profesional que tiene su
    propio precio en Servicios entra a ese precio; sin precio propio, al del servicio. El precio se fija
@@ -1326,16 +1326,16 @@ reservó, de Citas (`appointment.appointment.get`); el servicio rechazado, mient
 vista (`service.service.get`).
 Sale: una línea de servicio con el servicio, su precio congelado y la categoría fiscal del servicio;
 no mueve stock.
-Si falla: en «Importe de <servicio>», «Añadir <importe>» y «Usar <precio>» esperan en gris mientras el
+Si falla: en «Importe de Mechas», los botones de añadir y de usar el precio esperan en gris mientras el
 negocio no haya dicho todavía su moneda, y el precio no sale todavía: «Usar —», y en la baldosa «—» o
 «Desde —». Si la moneda no se puede leer, la hoja lo dice («No se ha podido leer la moneda del negocio», con
-el motivo) y ofrece «Reintentar»; en cuanto llega, «Añadir <importe>» y «Usar <precio>» se encienden. Un
+el motivo) y ofrece «Reintentar»; en cuanto llega, esos dos botones se encienden. Un
 servicio sin categoría fiscal sale «Falta el IVA» y no entra («No se puede vender: sin categoría fiscal.
 Falta configurar el IVA.»); ese aviso se va solo en cuanto el servicio tiene categoría, sin tocar nada más,
 y también al salir de **Vender**. Uno cuya categoría no tiene regla de IVA en el país del negocio entra, pero
 la cuenta no se cobra: el pie dice el motivo, con el nombre de la categoría y dónde se crea su regla. Uno
 archivado, «Ese servicio ya no se ofrece…»; un importe fuera del mínimo y el máximo del servicio, «Ese
-importe está fuera de lo que admite el servicio (<mínimo> – <máximo>).». Un precio reservado que no casa con
+importe está fuera de lo que admite el servicio (30,00 € – 80,00 €).». Un precio reservado que no casa con
 la cita: «Ese no es el precio que reservó la cita para este servicio: está cancelada, es de otra clienta, no
 reservó este servicio o lo reservó más barato.». Sin Servicios activa, «Servicios» no sale en la tira.
 Implicados: SERVICE-F09, SERVICE-F03, SERVICE-F31, APPOINTMENT-F17

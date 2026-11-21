@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:3b738a213f6aa582bbbba2b48a5adad0fa56c9886b02b65c24b476cee8c35b75 -->
+<!-- generated from WORKBOOK.md sha256:8e09f424cea8054dccf969e515415f2c9e3cfa00d1cecf559325b6c429d02284 -->
 
 ## What it is for and who it is for
 
@@ -322,16 +322,16 @@ Steps:
    search by name or SKU.
 2. Tap the article: it goes in as a line of the check. Tapping it again (same professional, no note or
    discount) raises the quantity; the line's selector raises or lowers it, and at 0 the line goes.
-3. Press "Charge · <total>" at the foot of the check (on a phone, first open the check with the floating
+3. Press "Charge · €18.50" at the foot of the check (on a phone, first open the check with the floating
    button, which shows the total). On a phone on its side, the check takes the whole screen: its bar and
    its foot stay put, with "Charge" in view, and the lines scroll between them.
 4. In the **Charge** sheet, with cash chosen, enter the amount tendered on the keypad; the change shows
    large above the keypad, in the row that until then asks for the amount. On a low phone, the whole
    keypad is in view as soon as the sheet opens.
-5. Press "Charge <total>".
+5. Press "Charge €18.50".
 6. The sheet closes, the check is left empty and the **Sale document** opens with the ticket. With
    **Printing**, the ticket comes out by itself on the ticket printer, according to its settings (and, if
-   cash came in, the drawer opens): "Sent to <printer>." is read and the paper on screen is already a
+   cash came in, the drawer opens): "Sent to Bar." is read and the paper on screen is already a
    copy. Without Printing turned on, without a ticket printer or with the fiscal document pending, the
    ticket is printed from the Sale document. A printer failure never undoes the charge.
 In: Inventory's articles and prices; Taxes' VAT rates; the POS settings.
@@ -364,12 +364,12 @@ Vertical: common
 Actor: employee, manager
 Screen: Charge
 Steps:
-1. With the check ready, press "Charge · <total>".
+1. With the check ready, press "Charge · €18.50".
 2. In the **Charge** sheet, tap **Card** (or whatever the method is; the active methods the settings
    allow are shown).
-3. "Exact amount" and "Charge <amount> on the card terminal, then confirm." are read: charge on the
+3. "Exact amount" and "Charge €18.50 on the card terminal, then confirm." are read: charge on the
    card terminal separately.
-4. Press "Charge <amount> by card". The result is the same as charging in cash: the check is left
+4. Press "Charge €18.50 by card". The result is the same as charging in cash: the check is left
    empty and the ticket opens.
 In: the business's payment methods.
 Out: the sale with one payment for the exact amount and no change; the charged-sale notice carries
@@ -389,10 +389,10 @@ Steps:
 2. Choose a method, enter the "Amount for this payment" (in cash, what is tendered) and press "Add this
    payment". With no amount entered, the payment covers all that is left.
 3. The payments taken show in "Payments taken"; the ✕ removes one.
-4. When the remainder reaches 0, press "Charge <total>".
+4. When the remainder reaches 0, press "Charge €18.50".
 In: the payment methods and what the customer hands over.
 Out: one sale with one row per method; the change always comes out of the cash and is never split.
-If it fails: while money is missing, the button says "<amount> still to cover"; if the payments do not
+If it fails: while money is missing, the button says "€5.00 still to cover"; if the payments do not
 add up to the total, nothing is charged: "The payments do not add up to the total of the sale.". In a
 business in Spain, a sale of €1,000 or more admits **no** cash payment, not even split: cash shows
 disabled with its reason ("The law does not allow cash for sales of €1,000.00 or more. Charge it by card
@@ -533,9 +533,9 @@ Steps:
 1. Tap the "Open price" tile, at the end of the grid.
 2. Enter the amount on the keypad and choose the section in "Section (VAT)"; each button shows its VAT
    rate.
-3. Press "Add <amount>": a line goes in with the section's name and that amount. It is never added to
+3. Press "Add €12.50": a line goes in with the section's name and that amount. It is never added to
    another line.
-4. If you do not have the open-price permission, pressing "Add <amount>" opens "An approval is needed" on
+4. If you do not have the open-price permission, pressing "Add €12.50" opens "An approval is needed" on
    top with what is being approved and the amount entered ("Approving: Sell at an open price of
    €12.50"): a manager approves it with their PIN (or their badge) on that same device and the line goes
    in. If there was no check yet, it opens empty and the line waits for the approval.
@@ -581,7 +581,7 @@ Steps:
 3. Tap the options: in a single-choice group, tapping another changes it and tapping the same one
    removes it; in one with a ceiling, on reaching it the next tap says "«Extras» is full: take one out to
    choose another."; an option that can be repeated carries its counter ("× 2") and its "−".
-4. Press "Add · <price>": the line goes in with its modifiers under the name and its price already added
+4. Press "Add · €9.50": the line goes in with its modifiers under the name and its price already added
    up. While a required group is not complete, the button says "Choose an option to continue" and tapping
    it points to that group.
 5. Charge as always: the line charges what it was worth when ordered even if the modifier
@@ -613,7 +613,7 @@ Steps:
    the next tap says "«Coffee» is full: take one out to choose another."; a choice that can be repeated
    carries its counter and its "−".
 4. While something is missing, the button says what ("Choose 1 in «Mains»") and tapping it points to that
-   course; when each required course is complete, it says "Add · <total>" with the set price plus the
+   course; when each required course is complete, it says "Add · €14.00" with the set price plus the
    extra charges. Press it: the menu goes into the check as one line, with its courses under the name.
    Each menu is a line of its own; its quantity changes by whole units.
 5. Charge as always: the menu charges the amount it had when ordered even if its price goes
@@ -664,7 +664,7 @@ Steps:
    ("Ticket discount").
 2. Enter the percentage; on the check you can switch to a fixed amount with the button of the business's
    currency ("€", "zł"…).
-3. Press "Apply −N %" (or "Apply −<amount>"). "Remove" deletes it. The line shows "−N %" and the footer
+3. Press "Apply −N %" (or "Apply −€2.00"). "Remove" deletes it. The line shows "−N %" and the footer
    the row "Ticket discount −N %" with what the check's discount takes off, be it a percentage or a fixed
    amount: 10 % on €8.50 says "−€0.85", never "−€0.00". The check's discount is worked out on the lines
    already with their own discount.
@@ -823,7 +823,7 @@ Steps:
    too, so the charge keypad can be tapped from the first moment. If the send fails, the
    charge does not open and it says why.
 4. A sent line is locked: no quantity, no note, no discount, no comp.
-5. To take off a dish already sent, press ⊗ "Void this item" on its line: "Void «<article>»" opens with
+5. To take off a dish already sent, press ⊗ "Void this item" on its line: "Void «Croquettes»" opens with
    "It was already sent to the kitchen. It comes off the check and the reason is kept. A manager has to
    approve it.", the one-tap reasons ("Ordered by mistake", "Customer changed their mind", "Sold out",
    "Entered twice") and "Or write the reason…". "Void item" cannot be pressed without a reason.
@@ -866,7 +866,7 @@ Steps:
    says what it takes off (the same amount as the check's footer): with prices including VAT, the lines
    minus the discount give the total.
 3. Press the printer at the top: with **Printing** and an active ticket printer, the bill comes out on
-   it and "Sent to <printer>." is read; if not, it goes through the device's print
+   it and "Sent to Bar." is read; if not, it goes through the device's print
    dialog with the bill alone: the browser's or, in the installed app, its print screen (the system's
    dialog, with the printer or "Save as PDF").
 In: the open check and its total worked out by the server.
@@ -889,7 +889,7 @@ Screen: Sell
 Steps:
 1. With two or more lines, tap the lines this person pays for (the line, not its buttons): they are
    marked with a circle.
-2. Press "Charge": the sheet says "Paying N lines of <total>" and charges only those.
+2. Press "Charge": the sheet says "Paying 2 lines of €12.00" and charges only those.
 3. After charging, the **Sale document** of that charge opens and, behind it, the check stays open with
    what is left; what was charged does not show again. Charging the last pending line closes the check.
    The lines charged are those marked when the sheet opened, even if another one is marked later.
@@ -978,10 +978,10 @@ Steps:
 2. If the line is of more than one unit ("Haircut × 2"), press "Split into N lines": a voucher pays a
    whole line of one unit, and each one has its slot.
 3. Choose the voucher (the one spent first comes chosen) and press "Spend one session": the line goes to
-   0.00 € with "Already paid · <voucher>", the charge's amount goes down and the slot says "<voucher>:
-   session spent. N left." with "Undo". What the voucher does not pay is charged with its method; if the
+   0.00 € with "Already paid · 5 haircuts voucher", the charge's amount goes down and the slot says "5 haircuts voucher:
+   session spent. 3 left." with "Undo". What the voucher does not pay is charged with its method; if the
    voucher pays everything, 0.00 € is charged with no payment method.
-4. Charge: the line shows on the ticket at 0.00 € with "Already paid · <voucher>" and the session is left
+4. Charge: the line shows on the ticket at 0.00 € with "Already paid · 5 haircuts voucher" and the session is left
    spent.
 5. Closing the sheet, parking the check, reloading or charging it on another device changes nothing: the
    check's line keeps the voucher that pays it.
@@ -1021,7 +1021,7 @@ Steps:
    of the territory in **Taxes → Settings**, and changes at once if the territory is changed. With "7
    days", under the figures, what was sold on each of those days, from oldest to today ("Wed 14 ·
    €120.50").
-3. The table: Date, Number, Customer, Payment, Status (Completed, Voided, Refunded; with "<amount> left to
+3. The table: Date, Number, Customer, Payment, Status (Completed, Voided, Refunded; with "€5.00 left to
    refund" if part was refunded) and Total. Search with "Search number or customer…", filter by status,
    payment, date or total, or sort.
 4. Tap a row to see its document. The table reloads by itself when a sale is charged, voided
@@ -1089,7 +1089,7 @@ Steps:
    "Fiscal document pending — Invoicing could not issue it when charging (the issuer is missing, or a
    permission). Once that is fixed, issue it now." with "Issue now".
 3. Press the footer's printer to print it, or "Reprint" on the row. With **Printing** and an active
-   ticket printer, the paper comes out on it and "Sent to <printer>." is read; if not (or
+   ticket printer, the paper comes out on it and "Sent to Bar." is read; if not (or
    with its fiscal document pending), it goes through the device's print dialog with the paper alone: the
    browser's or, in the installed app, its print screen (the system's dialog, with the printer or "Save
    as PDF"). Every print from
@@ -1120,7 +1120,7 @@ Actor: manager; cashier, with a manager's approval
 Screen: Sales, Void sale, An approval is needed
 Steps:
 1. In **Sales**, on a Completed sale with no refunds, press "Void".
-2. "Void sale <number>" opens. Write the "Reason (required)" and press "Void", or "Cancel".
+2. "Void sale 20261121-0007" opens. Write the "Reason (required)" and press "Void", or "Cancel".
 3. If you do not have the permission to void, "An approval is needed" opens on top with "Approving: Void
    a sale": a manager taps their face and types their PIN (or swipes their badge) on that same device.
    Whoever has the permission does not see this question.
@@ -1148,27 +1148,27 @@ Actor: manager; cashier, with a manager's approval
 Screen: Refund, An approval is needed
 Steps:
 1. In **Sales**, on a Completed sale (also with an invoice), press "Refund".
-2. "Refund sale <number>" shows one card for each way it was paid: "Charged", "Already refunded" and
+2. "Refund sale 20261121-0007" shows one card for each way it was paid: "Charged", "Already refunded" and
    "Refundable", with a proposal for a full refund already shared out ("Refund everything" puts it back).
 3. If the customer returns articles, mark them in "What goes back": the amount is proposed by itself (the
    share of each marked line, without going over what is left). With two or more units to refund, "Units
-   that go back" shows to choose how many. A line part of which already came back says "<n> of <m>
+   that go back" shows to choose how many. A line part of which already came back says "1 of 2
    already returned"; one that came back whole shows as "Already returned". Without marking anything only
    money is refunded.
 4. Change the "Refund amount" of each method if only part goes back. If the original method is no longer
    available, choose another in "Give it back through".
-5. Write the "Reason" and press "Refund <amount>". If you do not have the permission to refund, "An
+5. Write the "Reason" and press "Refund €12.00". If you do not have the permission to refund, "An
    approval is needed" opens on top with "Approving: Refund a sale": a manager approves it with their PIN
    (or their badge) on that same device. Whoever has the permission does not see this question.
 6. "Refund recorded." shows; if nothing is left to refund, the sale changes to Refunded; if something is
-   left, the row says "<amount> left to refund".
+   left, the row says "€6.00 left to refund".
 In: what was charged and what was already refunded for each payment method; the sale's lines and the ones
 that already came back.
 Out: the refund document with one row per payment method, the lines that go back with their units, its
 reason and who made it (announces: sale refunded, with the refunded lines and whether it is left fully
 refunded) and, with Invoicing, its corrective invoice in the same refund (R5 for a ticket, R1 for an
 invoice; by differences, or what is left if it closes the sale: INVOICE-F09, F10).
-If it fails: "<method>: <amount> is more than the <amount> still refundable.", "<method>: choose where
+If it fails: "Card: €20.00 is more than the €12.00 still refundable.", "Card: choose where
 this money goes back.", "A refund needs a reason.", "There is no money left to refund on this sale.". If
 another refund takes the last of a marked line at the same time: "One of the lines marked already came
 back with another refund. Open the refund again to see what is left.". If the Hub does not answer,
@@ -1188,9 +1188,9 @@ Screen: Refund, Void sale
 Steps:
 1. In **Sales**, press "Refund" on a sale with lines paid with a voucher (it also shows on one paid
    entirely with a voucher, at 0.00 €, while it has a session left to give back).
-2. In "What goes back", the line paid with a voucher says "Already paid · <voucher>". Mark it: "The
-   session goes back to <voucher>.".
-3. Write the "Reason" and press the button: with money, "Refund <amount>"; only the session, "Give the
+2. In "What goes back", the line paid with a voucher says "Already paid · 5 haircuts voucher". Mark it: "The
+   session goes back to 5 haircuts voucher.".
+3. Write the "Reason" and press the button: with money, "Refund €15.00"; only the session, "Give the
    session back".
 4. Voiding the sale also gives back all its sessions.
 In: the sale's lines paid with a voucher and what already came back of each one.
@@ -1303,8 +1303,8 @@ Steps:
 1. With Services active and "Show services in the till" on, tap "Services" in the category strip (or
    search for it with the magnifier).
 2. Tap the service: it goes in as a line with its price. If it is not a fixed price ("From", "Hourly",
-   "Variable", "Free"), "Amount of <service>" opens with its price as a suggestion: enter the amount and
-   press "Add <amount>".
+   "Variable", "Free"), "Amount of Highlights" opens with its price as a suggestion: enter the amount and
+   press "Add €45.00".
 3. Charge as always; the line carries the professional like any other.
 4. **The professional's price**: a fixed-price service done by a professional who has their own price in
    Services goes in at that price; without their own price, at the service's. The price is set when the
@@ -1318,16 +1318,16 @@ booked, from Appointments (`appointment.appointment.get`); the refused service, 
 showing (`service.service.get`).
 Out: a service line with the service, its frozen price and the service's tax category; it moves no
 stock.
-If it fails: in "Amount of <service>", "Add <amount>" and "Use <price>" wait in grey while the business
+If it fails: in "Amount of Highlights", the buttons to add and to use the price wait in grey while the business
 has not yet said its currency, and the price does not show yet: "Use —", and on the tile "—" or "From —".
 If the currency cannot be read, the sheet says so ("The business's currency could not be read", with the
-reason) and offers "Retry"; as soon as it arrives, "Add <amount>" and "Use <price>" light up. A service
+reason) and offers "Retry"; as soon as it arrives, those two buttons light up. A service
 without a tax category shows "VAT missing" and does not go in ("Cannot be sold: no tax category. VAT needs to
 be set up."); that notice goes away on its own as soon as the service has a category, without touching
 anything else, and also on leaving **Sell**. One whose category has no VAT rule in the business's country
 goes in, but the check is not charged: the foot says why, with the category's name and where its rule is
 made. An archived one, "That service is no longer offered…"; an amount outside the service's minimum and
-maximum, "That amount is outside what the service allows (<minimum> – <maximum>).". A booked price that
+maximum, "That amount is outside what the service allows (€30.00 – €80.00).". A booked price that
 does not match the appointment: "That is not the price the appointment booked for this service: it is
 cancelled, it is another customer's, it did not book this service or it booked it cheaper.". Without
 Services active, "Services" does not show in the strip.
