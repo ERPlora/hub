@@ -37,7 +37,7 @@ const emit = defineEmits<{
   /** A tap on the blocked button, with what to say. */
   blocked: [block: ChargeBlock, message: string];
   checkSales: [];
-  /** «Open a cash session»: the cash register's sessions, to open one. */
+  /** «Open a cash session»: Cash register's window, to open one over the sheet. */
   openDrawer: [];
 }>();
 

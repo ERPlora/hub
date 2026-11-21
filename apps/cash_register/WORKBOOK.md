@@ -256,7 +256,8 @@ Vertical: común
 Actor: empleado, responsable, administrador, asistente
 Pantalla: Caja
 Pasos:
-1. En **Caja**, pulsa «Abrir sesión».
+1. En **Caja**, pulsa «Abrir sesión». La misma ventana se abre en Ventas, encima del cobro, al pulsar
+   «Abrir sesión de caja» cuando se cobra en efectivo con la caja cerrada.
 2. Elige el «Cajón» si hay varios (con uno solo se elige solo), escribe el «Fondo de apertura» tal
    como se lee («150,50»; vacío es 0) y, si quieres, «Notas».
 3. Pulsa «Abrir sesión».
@@ -278,7 +279,7 @@ servidor pone debajo de un campo (el fondo obligatorio) se quita en cuanto se ca
 haya dicho todavía su moneda, porque el fondo se lee en ella (sin ella, «1500» yenes se guardaría como
 150 000). Si la moneda no se puede leer, la ventana lo dice («No se ha podido leer la moneda del negocio», con el
 motivo) y ofrece «Reintentar», que la vuelve a pedir; en cuanto llega, «Abrir sesión» se enciende.
-Implicados: CASH_REGISTER-F04, F09
+Implicados: CASH_REGISTER-F04, F09, SALE-F08
 
 ### CASH_REGISTER-F04 Vender solo con la caja abierta
 Estado: hecho — lo aplica Ventas al cobrar (SALE-F08): pregunta a Caja si la caja está abierta (ver
@@ -729,8 +730,9 @@ efectivo con la caja cerrada lo hace Ventas así (hecho; probado contra esta app
    efectivo.»). Solo el efectivo: tarjeta, transferencia y otros cobran siempre.
 3. Si Caja está apagada en el Hub o la llamada falla, Ventas cobra igual (el bloqueo cede antes que
    parar las ventas).
-4. La pantalla Vender no se sustituye: el rechazo se lee en el cobro, con un botón que lleva a **Caja**
-   a abrir la sesión.
+4. La pantalla Vender no se sustituye: el rechazo se lee en el cobro, con un botón que abre encima la
+   ventana de apertura de Caja (CASH_REGISTER-F03). Ventas la monta por su nombre, `OpenSessionModal`,
+   sin importar Caja; si no llega a cargarse, el botón lleva a **Caja** a abrir la sesión allí.
 
 Lo que dice Ventas de esto está en su WORKBOOK (SALE-F08). Lo que se cobra en efectivo sin turno porque
 Caja estaba apagada o no respondió se ve en CASH_REGISTER-F17.

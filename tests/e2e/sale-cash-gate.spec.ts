@@ -1,13 +1,13 @@
 // Cash only with the drawer open, in Chrome (SALE-F08, CASH_REGISTER-F04; apps/sale/WORKBOOK.md): with Cash
 // register on and no session open, the till charges a card as ever, but refuses cash INSIDE the charge sheet
-// — «The cash register is closed…» — with «Open a cash session», which goes to Cash register; the check
-// stays on the till. With a session open (set up through Cash register's API) the same cash charges.
+// — «The cash register is closed…» — with «Open a cash session», which opens Cash register's opening window
+// (CASH_REGISTER-F03) over the sheet; once the session is open there, the same sheet charges the same cash.
 // What this file creates (its sales, its products, the session it opened) is deleted after it, and the
 // cash register's setting goes back as it was.
 import { expect, type Page, test } from '@playwright/test';
 
 import { A, api, login, psql, shot, shown } from './helpers';
-import { cleanInventory, createProduct, type Product } from './inventory-helpers';
+import { cleanInventory, createProduct, dialog, fill, type Product } from './inventory-helpers';
 import { snapshotSeries } from './invoice-helpers';
 import { cleanSales, newestSaleOf, stamp } from './sale-helpers';
 
@@ -75,7 +75,7 @@ async function chargeInCash(page: Page) {
   return sheet;
 }
 
-test('SALE-F08: with the drawer closed, cash is refused in the sheet and «Open a cash session» goes to Cash register @smoke', async ({ page, context }) => {
+test('SALE-F08: with the drawer closed, cash is refused in the sheet, which offers «Open a cash session» @smoke', async ({ page, context }) => {
   await page.setViewportSize({ width: 1280, height: 860 });
   await tillWithCoffee(page);
   const sheet = await chargeInCash(page);
@@ -94,23 +94,33 @@ test('SALE-F08: with the drawer closed, cash is refused in the sheet and «Open 
   expect((await newestSaleOf(context, coffee.sku)).payments.map((p) => p.method_type)).toEqual(['card']);
 });
 
-test('SALE-F08: «Open a cash session» leads to Cash register; with a session open, the same cash charges', async ({ page, context }) => {
+test('SALE-F08: «Open a cash session» opens the session over the sheet, and the same sheet then charges the cash', async ({ page, context }) => {
   await page.setViewportSize({ width: 1280, height: 860 });
   await tillWithCoffee(page);
   const sheet = await chargeInCash(page);
   await sheet.locator('[data-testid=sale-checkout-open-drawer]').click();
+  const drawer = dialog(page, 'cash-register-open');
+  await expect(drawer.locator('[data-testid=cash-register-open-submit]')).toBeVisible();
+  await expect(page).toHaveURL(/\/sale\/pos/);
+  await fill(drawer, 'cash-register-open-balance', '100');
+  // The window over the sheet at the three sizes a business uses: desktop, tablet and a low phone.
+  for (const [width, height] of [[1440, 900], [820, 1180], [375, 667]]) {
+    await page.setViewportSize({ width, height });
+    await expect(drawer.locator('[data-testid=cash-register-open-submit]')).toBeInViewport();
+    await page.screenshot({ path: shot(`sale-cash-gate-window-${width}x${height}`) });
+  }
+  await drawer.locator('[data-testid=cash-register-open-submit]').click();
+  await expect(drawer.locator('[data-testid=cash-register-open-submit]')).toBeHidden();
+
+  const current = await api<Current>(context, A, 'GET', '/cash_register/sessions/current');
+  expect(current.data.session, 'the window opened the session').not.toBeNull();
+  sessions.push(current.data.session!.id);
+
+  // The sheet is still there, as it was (cash, 5,00 tendered), without the notice: «Charge» charges the cash.
+  await expect(sheet.locator('[data-testid=sale-checkout-error]')).toBeHidden();
+  await page.screenshot({ path: shot('sale-cash-gate-opened-1280') });
+  await sheet.locator('[data-testid=sale-checkout-confirm]').click();
   await expect(sheet).toBeHidden();
-  await expect(page).toHaveURL(/\/cash_register\/sessions$/);
-
-  const opened = await api<{ id: string }>(context, A, 'POST', '/cash_register/sessions/open', { opening_balance: 10000 });
-  expect(opened.status).toBe(201);
-  sessions.push(opened.data.id);
-
-  // Back on the till, the check is still there, as it was, and cash charges now.
-  await login(page, A, '/sale/pos');
-  await expect(coffeeLine(page)).toBeVisible();
-  const again = await chargeInCash(page);
-  await expect(again).toBeHidden();
   const sale = await newestSaleOf(context, coffee.sku);
   expect(sale.payments.map((p) => [p.method_type, p.amount, p.tendered, p.change])).toEqual([['cash', 150, 500, 350]]);
 });
