@@ -14,17 +14,13 @@ that contains it; several → 409 ``*_ambiguous`` naming them.
 """
 
 import datetime as dt
-from collections import defaultdict
 from uuid import UUID
 
 from django.db.models import (
-    BooleanField,
     Case,
     CharField,
     Count,
     DateTimeField,
-    Exists,
-    ExpressionWrapper,
     F,
     Func,
     IntegerField,
@@ -43,9 +39,17 @@ from live.context import OperationContext
 from live.errors import Conflict, NotFound
 from live.operations import operation
 
-from apps.customer.models import OrderLink
 from apps.sale.models import Order, OrderLine, Sale
 from apps.table.models import Hold, Table, TableSession, TableSettings, Zone
+from .floor import (
+    ENDED,
+    RESERVED_LEAD,
+    _customers,
+    live_sessions,
+    table_label,
+    table_rows,
+    tables_now,
+)
 from apps.table.schemas import (
     ByOrderIn,
     FloorStatusOut,
@@ -61,8 +65,6 @@ from apps.table.schemas import (
     SessionsOut,
     SettingsOut,
     TableListIn,
-    TableOut,
-    TablePage,
     TableRefIn,
     WaiterListIn,
     WaiterPage,
@@ -71,11 +73,10 @@ from apps.table.schemas import (
     ZonePage,
     ZoneRefIn,
 )
+from apps.table.schemas.floor import TableOut, TablePage
 from base.business import business_zone, currency_decimals, zone_name
 from base.ordering import list_order_for
 
-#: A reservation paints its table Reserved this long before it starts (WORKBOOK «Referencia adoptada»).
-RESERVED_LEAD = dt.timedelta(minutes=60)
 #: How many names an ambiguous reference lists.
 MAX_CANDIDATES = 5
 #: Width every run of digits of a table number is padded to, to sort numbers as numbers.
@@ -93,8 +94,6 @@ SESSION_NOT_ACTIVE = _(
     "transferred, merged or parked."
 )
 SESSION_AMBIGUOUS = _("Table %(number)s has %(count)s open checks: say which one.")
-TABLE_LABEL = _("%(number)s (%(zone)s)")
-NO_ZONE = _("no zone")
 HOLD_NOT_FOUND = _(
     "That hold is not there any more: it was released, it expired, or that booking never held a table."
 )
@@ -124,19 +123,8 @@ SESSION_ORDER = {
     "paid_total": ("paid_total",),
     "status": ("status_now",),
 }
-ENDED = [Order.Status.COMPLETED, Order.Status.VOIDED]
 #: The checks still alive (seated or parked): Sales ending their check ends them.
 LIVE_STATUSES = [TableSession.Status.OPEN, TableSession.Status.PARKED]
-
-
-# --- The business's clock ------------------------------------------------------------------------
-
-
-def end_of_today(now: dt.datetime) -> dt.datetime:
-    """Midnight at the end of the business's today."""
-    local = timezone.localtime(now, business_zone())
-    tomorrow = local.date() + dt.timedelta(days=1)
-    return dt.datetime.combine(tomorrow, dt.time.min, tzinfo=business_zone())
 
 
 # --- Shared with services.py, inside the command's own transaction --------------------------------
@@ -145,25 +133,6 @@ def end_of_today(now: dt.datetime) -> dt.datetime:
 def current_settings() -> TableSettings:
     """The room settings; the factory ones (unsaved) if they were never saved."""
     return TableSettings.objects.first() or TableSettings()
-
-
-def ended_orders():
-    """The checks of Sales that are no longer open (charged in full, or voided)."""
-    return Order.objects.filter(status__in=ENDED).values("pk")
-
-
-def live_sessions():
-    """The checks seated right now: open, not deleted, and whose check of Sales (if any) is still open."""
-    return TableSession.objects.filter(
-        status=TableSession.Status.OPEN, is_deleted=False
-    ).exclude(order_id__in=ended_orders())
-
-
-def reserving_holds(now: dt.datetime):
-    """The live holds already within their window: they paint their table Reserved."""
-    return Hold.objects.filter(
-        status=Hold.Status.HELD, held_until__gt=now, held_from__lte=now + RESERVED_LEAD
-    )
 
 
 def natural_key(expression) -> Func:
@@ -185,25 +154,6 @@ def natural_key(expression) -> Func:
         Value("g"),
         function="regexp_replace",
         output_field=CharField(),
-    )
-
-
-def tables_now(now: dt.datetime):
-    """The tables in use or not (never the deleted ones), each with its status right now."""
-    return Table.objects.filter(is_deleted=False).annotate(
-        occupied=Exists(live_sessions().filter(table=OuterRef("pk"))),
-        reserving=Exists(reserving_holds(now).filter(table=OuterRef("pk"))),
-        status_now=Case(
-            When(occupied=True, then=Value("occupied")),
-            When(blocked=True, then=Value("blocked")),
-            When(reserving=True, then=Value("reserved")),
-            default=Value("available"),
-            output_field=CharField(),
-        ),
-        serving=ExpressionWrapper(
-            Q(is_active=True) & (Q(zone__isnull=True) | Q(zone__is_active=True)),
-            output_field=BooleanField(),
-        ),
     )
 
 
@@ -252,13 +202,6 @@ def find_zone(
     if zone is None:
         raise NotFound(str(ZONE_NOT_FOUND), code="table.zone_not_found")
     return zone
-
-
-def table_label(table: Table) -> str:
-    return str(TABLE_LABEL) % {
-        "number": table.number,
-        "zone": table.zone.name if table.zone_id else NO_ZONE,
-    }
 
 
 def check_label(session: TableSession) -> str:
@@ -347,17 +290,6 @@ def order_is_open(order_id: UUID | None) -> bool:
     )
 
 
-def _customers(order_ids) -> dict:
-    """``order_id`` → ``(customer_id, name)`` of the live cards linked to those checks of Sales."""
-    links = OrderLink.objects.filter(
-        order_id__in=[o for o in order_ids if o], customer__deleted_at__isnull=True
-    )
-    return {
-        link.order_id: (link.customer_id, link.customer.name)
-        for link in links.select_related("customer")
-    }
-
-
 # --- Rows ----------------------------------------------------------------------------------------
 
 
@@ -401,86 +333,6 @@ def zones_now(now: dt.datetime):
         table_count=Coalesce(Subquery(count, output_field=IntegerField()), 0),
         available_count=Coalesce(Subquery(free, output_field=IntegerField()), 0),
     )
-
-
-def table_rows(tables: list[Table], now: dt.datetime) -> list[dict]:
-    """The rows of ``tables`` (annotated by ``tables_now``) with their live checks and their next hold."""
-    ids = [table.pk for table in tables]
-    checks = defaultdict(list)
-    for session in live_sessions().filter(table_id__in=ids).order_by("opened_at", "id"):
-        checks[session.table_id].append(session)
-    customers = _customers([s.order_id for group in checks.values() for s in group])
-    holds = {}
-    shown = Hold.objects.filter(
-        table_id__in=ids,
-        status=Hold.Status.HELD,
-        held_until__gt=now,
-        held_from__lt=end_of_today(now),
-    )
-    for hold in shown.order_by("held_from", "id"):
-        holds.setdefault(hold.table_id, hold)
-    out = []
-    for table in tables:
-        seated = checks.get(table.pk, [])
-        hold = holds.get(table.pk)
-        out.append(
-            {
-                "id": table.pk,
-                "number": table.number,
-                "label": table_label(table),
-                "name": table.name,
-                "capacity": table.capacity,
-                "shape": table.shape,
-                "status": table.status_now,
-                "blocked": table.blocked,
-                "is_active": table.is_active,
-                "zone_id": table.zone_id,
-                "zone_name": table.zone.name if table.zone_id else None,
-                "in_service": table.serving,
-                "position_x": table.position_x,
-                "position_y": table.position_y,
-                "width": table.width,
-                "height": table.height,
-                "guests": sum(s.guests_count for s in seated) if seated else None,
-                "since": seated[0].opened_at if seated else None,
-                "waiter_name": seated[0].waiter_name if seated else "",
-                "checks": [_check_row(s, customers) for s in seated],
-                "hold": _hold_row(hold, now) if hold else None,
-            }
-        )
-    return out
-
-
-def _check_row(session: TableSession, customers: dict) -> dict:
-    customer_id, customer_name = customers.get(session.order_id, (None, None))
-    return {
-        "id": session.pk,
-        "order_id": session.order_id,
-        "guests_count": session.guests_count,
-        "opened_at": session.opened_at,
-        "waiter_name": session.waiter_name,
-        "customer_id": customer_id,
-        "customer_name": customer_name,
-        "split_from_id": session.split_from_id,
-    }
-
-
-def _hold_row(hold: Hold, now: dt.datetime) -> dict:
-    return {
-        "label": hold.label,
-        "erased": not hold.label and hold.customer_id is not None,
-        "held_from": hold.held_from,
-        "held_until": hold.held_until,
-        "party_size": hold.party_size,
-        "reserving": hold.held_from - RESERVED_LEAD <= now,
-    }
-
-
-def table_out(table: Table) -> dict:
-    """One table as ``table.table.list`` paints it, read again now (also after a write)."""
-    now = timezone.now()
-    row = tables_now(now).select_related("zone").get(pk=table.pk)
-    return table_rows([row], now)[0]
 
 
 def sessions_now():

@@ -1,5 +1,5 @@
 // The times of the reservations of table-flows.spec.ts, chosen from the clock of the run (table-clock.test.ts): both
-// on the business's today, as the plan paints only today's (`table_rows` in apps/table/queries.py); one within
+// on the business's today, as the plan paints only today's (`table_rows` in apps/table/queries/floor.py); one within
 // `RESERVED_LEAD`, so its table is Reserved, and one of the afternoon, whose hour reads differently in 12 h; never a
 // time gone, which the book refuses. In the last minutes of the day no such time is left, and the test waits for
 // midnight (`untilMidnight`), the days it books on being open beforehand (`bookingDays`).
@@ -21,7 +21,7 @@ export interface BookingTimes {
   evening: WallTime;
 }
 
-/** How long before its start a reservation paints its table Reserved (`RESERVED_LEAD` of apps/table/queries.py). */
+/** How long before its start a reservation paints its table Reserved (`RESERVED_LEAD` of apps/table/queries/floor.py). */
 export const RESERVED_LEAD_MINUTES = 60;
 /** The room between choosing the times and booking the last reservation of the test: the book refuses a time gone. */
 export const MARGIN_MINUTES = 5;
