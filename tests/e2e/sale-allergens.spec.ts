@@ -99,6 +99,8 @@ test('the waiter sees dish allergens and the customer allergy on lines and sheet
   await expect(modifiers.locator('[data-testid=pos-options-allergens]')).toHaveText('Allergens: Gluten, Milk');
   await expect(modifiers.locator(`[data-testid=pos-option-allergens-${cheese.id}]`)).toHaveText('Allergens: Milk');
   await expect(modifiers.locator(`[data-testid=pos-option-allergens-${extra.id}]`)).toHaveCount(0);
+  const tileHeight = async (id: string) => (await modifiers.locator(`[data-testid=pos-option-${id}]`).boundingBox())?.height;
+  expect(await tileHeight(extra.id), 'a choice without allergens stands as tall as the one beside it that says them').toBe(await tileHeight(cheese.id));
   await snap(page, 'modifiers');
   await modifiers.locator('[data-testid=pos-options-add]').click();
   await expect(modifiers).toBeHidden();
