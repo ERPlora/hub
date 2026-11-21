@@ -8,8 +8,15 @@ import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('@erplora/ui/shell', async () => (await import('./__tests__/main-boot')).shellModule());
 vi.mock('@erplora/ui/sdk', async (importOriginal) => (await import('./__tests__/main-boot')).sdkModule(importOriginal));
+// The reload of a hub that stopped serving the page (base/frontend/lib/change-business.test.ts runs it).
+const gone = vi.hoisted(() => ({ reloadOrForgetGone: vi.fn(async () => {}) }));
+vi.mock('../base/frontend/lib/change-business', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../base/frontend/lib/change-business')>()),
+  reloadOrForgetGone: gone.reloadOrForgetGone,
+}));
 
 import { createShell } from '@erplora/ui/shell';
+import { createLiveClient } from '@erplora/ui/sdk';
 
 import { embedPage, shellFakes } from './__tests__/main-boot';
 
@@ -48,6 +55,15 @@ describe('main.ts', () => {
       'SidebarFooter',
       'BackgroundChrome',
     ]);
+  });
+
+  it('boots with a live client that, when the hub stops serving the page, first checks whether it is gone (HUB_APP-F05)', () => {
+    const overrides = vi.mocked(createLiveClient).mock.calls[0][1]!;
+    expect(gone.reloadOrForgetGone).not.toHaveBeenCalled();
+
+    overrides.reload!();
+
+    expect(gone.reloadOrForgetGone).toHaveBeenCalledOnce();
   });
 
   it("on import, globs base's catalogue next to the apps' (the Home would show raw keys otherwise)", () => {

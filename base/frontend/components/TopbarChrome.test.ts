@@ -9,7 +9,9 @@ import { defineComponent, h, shallowRef, watch } from 'vue';
 import { createAssistant, installAssistant, useAssistant } from '@erplora/ui/components';
 
 import TopbarMore from '../../../packages/ui/src/shell/TopbarMore.vue';
+import { outOfTheApp } from '../__tests__/app-download';
 import { flush, memoryStorage, mountBase, OWNER } from '../__tests__/mount-base';
+import { changeBusinessOpen } from '../lib/change-business';
 import TopbarChrome from './TopbarChrome.vue';
 
 /** The popovers on their way out: each one ends when the test says so, then says `didDismiss`. */
@@ -63,6 +65,8 @@ beforeEach(() => {
 
 afterEach(() => {
   leaving.length = 0;
+  outOfTheApp();
+  changeBusinessOpen.value = false;
   vi.unstubAllGlobals();
   installAssistant(undefined);
   document.body.innerHTML = '';
@@ -93,5 +97,35 @@ describe('base’s piece of the topbar on a phone (under 768 px)', () => {
   it('puts nothing on the bar for who may not use the assistant', async () => {
     const m = await mountBase(TopbarChrome, { session: { ...OWNER, permissions: [] } });
     expect(m.wrapper.findAll('ion-button')).toHaveLength(0);
+  });
+});
+
+describe('base’s piece of the topbar inside the installed app', () => {
+  const insideTheApp = () => {
+    (window as { __TAURI__?: unknown }).__TAURI__ = { core: { invoke: vi.fn(async () => undefined) } };
+  };
+
+  it('is the assistant’s sparkles and then «Change business» (ERPlora/app HUB_APP-F04)', async () => {
+    insideTheApp();
+    const m = await mountBase(TopbarChrome);
+    expect(m.wrapper.findAll('ion-button').map((button) => button.attributes('data-testid'))).toEqual([
+      'assistant-button',
+      'change-business-button',
+    ]);
+  });
+
+  it('listed in the shell’s «⋮», «Cambiar de negocio» is a row that asks once the menu has gone', async () => {
+    insideTheApp();
+    const m = await mountBase(InTheShellMenu, { locale: 'es' });
+    await m.wrapper.get('[data-testid="topbar-more"]').trigger('click');
+    await flush();
+    expect(inTheMenu('change-business-button')?.textContent?.trim()).toBe('Cambiar de negocio');
+
+    inTheMenu('change-business-button')!.click();
+    await flush();
+    expect(changeBusinessOpen.value).toBe(false);
+    await finishLeaving();
+    expect(inTheMenu('change-business-button')).toBeNull();
+    expect(changeBusinessOpen.value).toBe(true);
   });
 });
