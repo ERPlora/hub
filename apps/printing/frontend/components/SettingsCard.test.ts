@@ -121,6 +121,16 @@ describe('SettingsCard', () => {
     expect(off.find('printing-settings-receipt-link').exists()).toBe(false);
   });
 
+  it('under «Receipt» it says that a device with its own receipt printer prints there; the other roles say nothing', async () => {
+    const s = await setup();
+    await s.result(OP, FACTORY);
+    expect(prop(s.field('receipt_printer'), 'helperText')).toBe('From a device with its own receipt printer, the receipt comes out of its own.');
+    expect(prop(s.field('kitchen_printer'), 'helperText')).toBeUndefined();
+    const es = await setup(true, 'es');
+    await es.result(OP, FACTORY);
+    expect(prop(es.field('receipt_printer'), 'helperText')).toBe('Desde un dispositivo con su propia impresora de tiques, el tique sale por la suya.');
+  });
+
   it('a failed read shows no values and offers to retry', async () => {
     const s = await setup();
     s.net.lastStream().push(errorFrame(s.subId(OP), 'internal_error'));

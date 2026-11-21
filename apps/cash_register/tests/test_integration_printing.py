@@ -4,9 +4,11 @@ session's figures as the paper shows them. Without Printing in the business, or 
 printer in it (the paper would wait for ever), nothing is queued and the screen prints through the browser;
 a blind count does not print an open session's figures to whoever may not see the expected cash."""
 
+import dataclasses
 import datetime as dt
 
 import pytest
+from django.test import RequestFactory
 from django.utils import timezone
 from live.errors import Conflict, NotFound, PermissionDenied
 from live.operations import registry
@@ -142,6 +144,19 @@ def test_without_an_active_receipt_printer_nothing_is_queued_and_the_screen_prin
 def test_the_receipt_printer_named_is_said(shift):
     run("printing.settings.update", {"receipt_printer": "Till"})
     assert print_report(shift).printer == "Till"
+
+
+def test_with_two_tills_the_report_comes_out_at_the_till_that_prints_it(shift, till):
+    """PRINTING-F22: the terrace's till prints its shift report on its own receipt printer, not the business's."""
+    terrace = run(
+        "printing.printer.create",
+        {"name": "Till 2", "kind": "network", "address": "192.168.1.51", "usage": "receipt"},
+    )
+    at_the_terrace = dataclasses.replace(ctx_for("hub_manager"), request=RequestFactory().post("/", HTTP_X_DEVICE_ID="terrace"))
+    run("printing.device.register", {"name": "Terrace", "printers": [str(terrace.id)]}, at_the_terrace)
+    out = print_report(shift, at_the_terrace)
+    assert (out.queued, out.printer) == (True, "Till 2")
+    assert PrintJob.objects.get(pk=out.job_id).printer_id == terrace.id
 
 
 def test_without_printing_in_the_business_nothing_is_queued_and_the_screen_prints(shift, monkeypatch):

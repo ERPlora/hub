@@ -1,7 +1,7 @@
 // A line of the check (WORKBOOK «Vender»): name, price per unit, discount mark or «Gift», note and
 // professional underneath; the discount, note and gift buttons and the quantity selector. A line sent
-// to the kitchen only shows its quantity, «Order N» and ⊗ «Void this item». Tapping the line (not its
-// buttons) marks it for a partial charge (SALE-F22). The amount is the server's `line_total`.
+// to the kitchen only shows its quantity, «Order N», the gift button and ⊗ «Void this item». Tapping the
+// line (not its buttons) marks it for a partial charge (SALE-F22). The amount is the server's `line_total`.
 import { describe, expect, it } from 'vitest';
 
 import type { AllergenCode } from '@erplora/ui/components';
@@ -208,18 +208,39 @@ describe('CartLine: actions', () => {
 });
 
 describe('CartLine: sent to the kitchen', () => {
-  it('only shows «Order N», ×quantity and ⊗ «Void this item»; nothing else can change', async () => {
-    const m = await setup({ fired_at: '2026-10-14T10:00:00Z', round_no: 2, quantity: '3.000', staff_id: 's1' }, {}, 'es');
+  const sent = { fired_at: '2026-10-14T10:00:00Z', round_no: 2, quantity: '3.000', staff_id: 's1' };
+
+  it('shows «Order N», ×quantity, the gift and ⊗ «Void this item»; quantity, note and discount stay', async () => {
+    const m = await setup(sent, {}, 'es');
     const row = m.find('pos-line-l1');
     expect(row.find('.pos-line__round').text()).toBe('Comanda 2');
     expect(row.find('.pos-line__qty').text()).toBe('×3');
     expect(m.wrapper.findComponent(QtyStepper).exists()).toBe(false);
-    for (const id of ['discount', 'note', 'gift']) expect(m.find(`pos-line-l1-${id}`).exists()).toBe(false);
+    for (const id of ['discount', 'note']) expect(m.find(`pos-line-l1-${id}`).exists()).toBe(false);
     expect((m.find('pos-line-l1-staff').element as HTMLElement & { disabled?: boolean }).disabled).toBe(true);
     const voiding = m.find('pos-line-l1-void');
     expect(voiding.attributes('aria-label')).toBe('Anular este artículo');
     await click(voiding.element);
     expect(m.wrapper.emitted('void')).toHaveLength(1);
+  });
+
+  it('comps it with the gift, as a line still to send, and says when it is comped (SALE-F15)', async () => {
+    const m = await setup(sent, {}, 'es');
+    const gift = m.find('pos-line-l1-gift');
+    expect(gift.attributes('aria-label')).toBe('Invitar / quitar invitación');
+    expect(gift.attributes('aria-pressed')).toBe('false');
+    await click(gift.element);
+    expect(m.wrapper.emitted('gift')).toHaveLength(1);
+    expect(m.wrapper.emitted('void')).toBeUndefined();
+    const comped = await setup({ ...sent, is_gift: true, line_total: 0 }, {}, 'es');
+    expect(comped.find('pos-line-l1-gift').attributes('aria-pressed')).toBe('true');
+    expect(comped.find('pos-line-l1').find('.pos-line__gift').text()).toBe('Invitación');
+  });
+
+  it('a sent line a voucher pays offers no gift: the voucher is undone first', async () => {
+    const m = await setup({ ...sent, service_id: 's1', paid_by_voucher: true, voucher_session_id: 'r1', voucher_name: 'Bono' });
+    expect(m.find('pos-line-l1-gift').exists()).toBe(false);
+    expect(m.find('pos-line-l1-void').exists()).toBe(true);
   });
 });
 

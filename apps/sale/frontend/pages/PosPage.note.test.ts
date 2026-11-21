@@ -1,11 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { MANAGER, mountSale, settle } from '../__tests__/mount-sale';
+import { MANAGER, settle } from '../__tests__/mount-sale';
+import { posWithCheck } from '../__tests__/pos-with-check';
 import LineNoteSheet from '../components/pos/LineNoteSheet.vue';
 import PosCart from '../components/pos/PosCart.vue';
-import PosCatalog from '../components/pos/PosCatalog.vue';
-import { line, memoryStorage, order, product, settings } from '../components/pos/__tests__/fixtures';
-import PosPage from './PosPage.vue';
+import { line, memoryStorage, order } from '../components/pos/__tests__/fixtures';
 
 beforeEach(() => vi.stubGlobal('localStorage', memoryStorage()));
 
@@ -14,13 +13,7 @@ const ALLERGIC = line({ id: 'l1', notes: 'No salt', allergy: ['gluten'] });
 const CHECK = order({ id: 'o1', lines: [ALLERGIC] });
 
 async function noteSheetOf(session: typeof MANAGER) {
-  const m = await mountSale(PosPage, { session });
-  await m.live();
-  await m.result('sale.pos_settings.get', settings());
-  m.net.onApi(() => Response.json(CHECK));
-  m.wrapper.findComponent(PosCatalog).vm.$emit('add', product({ id: 'p1' }));
-  await settle();
-  await m.reopen();
+  const m = await posWithCheck(CHECK, { session });
   m.wrapper.findComponent(PosCart).vm.$emit('note', ALLERGIC);
   await settle();
   const sheet = m.wrapper.findComponent(LineNoteSheet);

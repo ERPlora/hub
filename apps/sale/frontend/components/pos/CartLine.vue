@@ -3,10 +3,10 @@
 // more). Middle: «Order N» if the kitchen has it, the name and «Gift»; the price per unit with its unit,
 // the gift's reason and the «−N %» of a line discount; the note; the professional (only when the line
 // has one; a tap re-assigns it). Right: the server's amount for the line and either the discount, note
-// and gift buttons with the quantity selector, or — sent to the kitchen — ×quantity and ⊗ «Void this
-// item». A line a voucher pays (SALE-F27) says «Already paid · <voucher>» at 0 and offers only its note
-// and ⊗ to take it off (which gives the session back). Tapping the line itself (never its buttons) marks
-// it. Nothing here works money out.
+// and gift buttons with the quantity selector, or — sent to the kitchen — the gift, ⊗ «Void this item»
+// and ×quantity: what is comped is usually what was already served. A line a voucher pays (SALE-F27) says
+// «Already paid · <voucher>» at 0 and offers only its note (until it is sent) and ⊗ to take it off (which
+// gives the session back). Tapping the line itself (never its buttons) marks it. Nothing here works money out.
 import { HubIcon } from '@erplora/ui/shell';
 import { IonButton } from '@ionic/vue';
 import { computed } from 'vue';
@@ -44,6 +44,8 @@ const business = useBusinessMoney();
 const fired = computed(() => !!props.line.fired_at);
 const covered = computed(() => props.line.paid_by_voucher);
 const discounted = computed(() => Number(props.line.discount_percent) > 0);
+/** Neither in the kitchen nor paid with a voucher: quantity, discount and note can still change. */
+const editable = computed(() => !fired.value && !covered.value);
 
 /** «1,50 €», or «12,00 € / kg» (and «/ 100 g») when it is not priced by the unit. */
 const price = computed(() => {
@@ -130,92 +132,79 @@ function onRow(): void {
         class="pos-line__amount"
         :class="{ 'pos-line__amount--gift': line.is_gift }"
       >{{ formatMoney(line.line_total, locale, business) }}</span>
-      <template v-if="fired">
-        <span class="pos-line__actions">
-          <ion-button
-            fill="clear"
-            class="pos-line__icon pos-line__icon--danger"
-            :data-testid="`pos-line-${line.id}-void`"
-            :title="$t('sale.pos.voidLine')"
-            :aria-label="$t('sale.pos.voidLine')"
-            @click.stop="emit('void')"
-          >
-            <HubIcon name="ion:close-circle-outline" />
-          </ion-button>
-          <span class="pos-line__qty">×{{ quantity }}</span>
-        </span>
-      </template>
-      <template v-else-if="covered">
-        <span class="pos-line__actions">
-          <ion-button
-            fill="clear"
-            class="pos-line__icon"
-            :class="{ 'pos-line__icon--primary': !!line.notes }"
-            :data-testid="`pos-line-${line.id}-note`"
-            :title="$t('sale.pos.lineNote')"
-            :aria-label="$t('sale.pos.lineNote')"
-            @click.stop="emit('note')"
-          >
-            <HubIcon name="ion:chatbubbles-outline" />
-          </ion-button>
-          <ion-button
-            fill="clear"
-            class="pos-line__icon pos-line__icon--danger"
-            :data-testid="`pos-line-${line.id}-remove`"
-            :title="$t('sale.pos.removeLine')"
-            :aria-label="$t('sale.pos.removeLine')"
-            :disabled="busy"
-            @click.stop="emit('quantity', '0')"
-          >
-            <HubIcon name="ion:close-circle-outline" />
-          </ion-button>
-        </span>
-      </template>
-      <template v-else>
-        <span class="pos-line__actions">
-          <ion-button
-            v-if="allowDiscounts"
-            fill="clear"
-            class="pos-line__icon"
-            :class="{ 'pos-line__icon--warning': discounted }"
-            :data-testid="`pos-line-${line.id}-discount`"
-            :title="$t('sale.pos.discountLine')"
-            :aria-label="$t('sale.pos.discountLine')"
-            @click.stop="emit('discount')"
-          >
-            <HubIcon :name="discounted ? 'ion:pricetag' : 'ion:pricetag-outline'" />
-          </ion-button>
-          <ion-button
-            fill="clear"
-            class="pos-line__icon"
-            :class="{ 'pos-line__icon--primary': !!line.notes }"
-            :data-testid="`pos-line-${line.id}-note`"
-            :title="$t('sale.pos.lineNote')"
-            :aria-label="$t('sale.pos.lineNote')"
-            @click.stop="emit('note')"
-          >
-            <HubIcon name="ion:chatbubbles-outline" />
-          </ion-button>
-          <ion-button
-            fill="clear"
-            class="pos-line__icon"
-            :class="{ 'pos-line__icon--success': line.is_gift }"
-            :data-testid="`pos-line-${line.id}-gift`"
-            :title="$t('sale.pos.giftAction')"
-            :aria-label="$t('sale.pos.giftAction')"
-            :aria-pressed="line.is_gift ? 'true' : 'false'"
-            @click.stop="emit('gift')"
-          >
-            <HubIcon :name="line.is_gift ? 'ion:gift' : 'ion:gift-outline'" />
-          </ion-button>
-        </span>
-        <QtyStepper
-          :quantity="line.quantity"
-          :unit="line.unit"
+      <span class="pos-line__actions">
+        <ion-button
+          v-if="editable && allowDiscounts"
+          fill="clear"
+          class="pos-line__icon"
+          :class="{ 'pos-line__icon--warning': discounted }"
+          :data-testid="`pos-line-${line.id}-discount`"
+          :title="$t('sale.pos.discountLine')"
+          :aria-label="$t('sale.pos.discountLine')"
+          @click.stop="emit('discount')"
+        >
+          <HubIcon :name="discounted ? 'ion:pricetag' : 'ion:pricetag-outline'" />
+        </ion-button>
+        <ion-button
+          v-if="!fired"
+          fill="clear"
+          class="pos-line__icon"
+          :class="{ 'pos-line__icon--primary': !!line.notes }"
+          :data-testid="`pos-line-${line.id}-note`"
+          :title="$t('sale.pos.lineNote')"
+          :aria-label="$t('sale.pos.lineNote')"
+          @click.stop="emit('note')"
+        >
+          <HubIcon name="ion:chatbubbles-outline" />
+        </ion-button>
+        <ion-button
+          v-if="!covered"
+          fill="clear"
+          class="pos-line__icon"
+          :class="{ 'pos-line__icon--success': line.is_gift }"
+          :data-testid="`pos-line-${line.id}-gift`"
+          :title="$t('sale.pos.giftAction')"
+          :aria-label="$t('sale.pos.giftAction')"
+          :aria-pressed="line.is_gift ? 'true' : 'false'"
+          @click.stop="emit('gift')"
+        >
+          <HubIcon :name="line.is_gift ? 'ion:gift' : 'ion:gift-outline'" />
+        </ion-button>
+        <ion-button
+          v-if="fired"
+          fill="clear"
+          class="pos-line__icon pos-line__icon--danger"
+          :data-testid="`pos-line-${line.id}-void`"
+          :title="$t('sale.pos.voidLine')"
+          :aria-label="$t('sale.pos.voidLine')"
+          @click.stop="emit('void')"
+        >
+          <HubIcon name="ion:close-circle-outline" />
+        </ion-button>
+        <ion-button
+          v-else-if="covered"
+          fill="clear"
+          class="pos-line__icon pos-line__icon--danger"
+          :data-testid="`pos-line-${line.id}-remove`"
+          :title="$t('sale.pos.removeLine')"
+          :aria-label="$t('sale.pos.removeLine')"
           :disabled="busy"
-          @change="emit('quantity', $event)"
-        />
-      </template>
+          @click.stop="emit('quantity', '0')"
+        >
+          <HubIcon name="ion:close-circle-outline" />
+        </ion-button>
+        <span
+          v-if="fired"
+          class="pos-line__qty"
+        >×{{ quantity }}</span>
+      </span>
+      <QtyStepper
+        v-if="editable"
+        :quantity="line.quantity"
+        :unit="line.unit"
+        :disabled="busy"
+        @change="emit('quantity', $event)"
+      />
     </div>
   </div>
 </template>
