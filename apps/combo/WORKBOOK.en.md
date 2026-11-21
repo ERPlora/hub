@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:c335ff83dfbda5b3187b04289d5301807a61c9f7c486d2ecae1a4b635faf8e2d -->
+<!-- generated from WORKBOOK.md sha256:784ca09bf77278ba18df2564d2e7b2b289f3166131f9a6c00205a965d7de19a1 -->
 
 ## What it is for and who it is for
 
@@ -339,7 +339,7 @@ without available choices is not either. If Menus refuses the line, the sheet sa
 (COMBO-F08). If the menus cannot be read, above the grid "The menus could not be read. Try again."
 with "Retry", and the products are sold just the same. With the employee profile they are
 also seen and sold.
-Involved: SALE-F12, MODIFIER-F06
+Involved: SALE-F12, SALE-F42, MODIFIER-F06
 
 ### COMBO-F08 Charge the menu: closed price and supplements
 Status: done
