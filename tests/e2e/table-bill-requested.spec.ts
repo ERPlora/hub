@@ -6,7 +6,7 @@
 // removes all of it, sales included.
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
-import { A, api, shot, shown } from './helpers';
+import { A, api, capture, shown } from './helpers';
 import { cleanInventory, createProduct } from './inventory-helpers';
 import { chargeByCard } from './sale-charge-helpers';
 import { cleanRoom, cleanSales } from './sale-helpers';
@@ -81,7 +81,7 @@ test('A table whose bill is printed shows «Bill requested» on the plan until i
       await page.setViewportSize({ width: viewport.width, height: viewport.height });
       await expect(tile(page, asked.table)).toHaveAttribute('data-bill', 'requested');
       await expect(tile(page, asked.table)).toContainText('Bill requested');
-      await page.screenshot({ path: shot(`table-floor-bill-requested-${viewport.label}`), fullPage: true });
+      await capture(page, `table-floor-bill-requested-${viewport.label}`, { fullPage: true });
     }
     await page.setViewportSize({ width: 1280, height: 860 });
 
