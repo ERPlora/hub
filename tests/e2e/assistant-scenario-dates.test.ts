@@ -16,7 +16,6 @@ const parsed = (changes: Record<string, unknown>): Scenario =>
       language: 'es',
       owner: { persona: 'Ana', goal: 'Reservar', upFront: ['Para el viernes'], ifAsked: [] },
       opening: 'Reserva',
-      offered: [],
       writes: [],
       expect: [{ says: 'x', sql: 'select 1', equals: '1' }],
       maxTurns: 2,

@@ -17,7 +17,6 @@
   },
   "attachments": [],
   "opening": "Añade la tarta de zanahoria a 5,50",
-  "offered": ["inventory.product.create"],
   "writes": ["inventory.product.create", "inventory.product.update", "inventory.product_category.add"],
   "cards": [{ "tool": "inventory.product.create", "match": { "name": "zanahoria" }, "expect": { "price": 550 } }],
   "expect": [

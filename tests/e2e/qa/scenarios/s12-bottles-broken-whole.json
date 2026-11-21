@@ -14,7 +14,6 @@
   },
   "attachments": [],
   "opening": "Se han roto 3 botellas de agua mineral, quítalas del stock como rotura",
-  "offered": ["inventory.stock.write_off"],
   "writes": ["inventory.stock.write_off"],
   "cards": [],
   "expect": [

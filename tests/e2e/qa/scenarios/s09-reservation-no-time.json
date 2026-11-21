@@ -126,7 +126,6 @@
   },
   "attachments": [],
   "opening": "Book me a table for 6 on Friday",
-  "offered": ["reservation.reservation.create"],
   "writes": ["reservation.reservation.create", "reservation.reservation.update", "customer.customer.create"],
   "cards": [{"tool": "reservation.reservation.create", "match": {"guest_name": "ortega"}, "expect": {"party_size": 6}}],
   "expect": [

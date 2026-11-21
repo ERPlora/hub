@@ -220,7 +220,9 @@ quedó abierta o, con **Volver a sentar**, llevas a una mesa libre una cuenta qu
 Menú **Mesas → Sesiones**: las cuentas de la sala. Pestañas «Abiertas», «Cerradas» y «Todas». Tabla:
 Mesa («Sin mesa (aparcada)» si no tiene), Cobrado y Cierre (no salen en Abiertas), Zona, Camarero,
 Comensales, Apertura, Tiempo, Estado (Abierta, Cerrada, Trasladada, Fusionada, Aparcada); el tiempo de
-una cuenta abierta se pone ámbar y rojo según los Ajustes. Buscador «Buscar mesa…», filtros tras el
+una cuenta abierta se pone ámbar y rojo según los Ajustes. Vista tabla o tarjetas: la tarjeta lleva de título la
+mesa («Mesa 4»), el estado en su etiqueta y, debajo, cada otro dato con el icono de su columna delante, sin
+repetir la mesa; la apertura y el cierre llevan cada uno el suyo, así que dos horas iguales no se confunden. Buscador «Buscar mesa…», filtros tras el
 embudo por zona, camarero y estado. Por fila «Detalle» (ventana con zona, camarero, estado, comensales, apertura,
 cierre, tiempo, cobrado y notas), en las abiertas «Cerrar sesión» (con confirmación), en las aparcadas
 «Volver a sentar» (elige la mesa libre) y, en las terminadas, «Borrar» (solo el administrador). Las

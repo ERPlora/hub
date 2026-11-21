@@ -146,10 +146,11 @@ una a mano, para lo que no pasa por el TPV.
 #### Detalle
 Menú **Cocina → Comandas**. Tabla de todas las comandas, la más nueva primero, 50 por página (otro
 tamaño se elige al pie):
-Comanda (número completo `AAAAMMDD-NNNN`), Destino (la etiqueta), Tipo, Prioridad, Estado, Platos y
-Total (en la moneda del negocio, la de su país); buscador «Buscar comanda o destino…» (por número y etiqueta), filtros por Tipo, Prioridad y
+Comanda (número completo `AAAAMMDD-NNNN`), Destino (la etiqueta), Tipo, Prioridad, Estado, Platos (en palabras:
+«2 platos»), Total (en la moneda del negocio, la de su país) y Enviada; buscador «Buscar comanda o destino…» (por número y etiqueta), filtros por Tipo, Prioridad y
 Estado (cada uno, una lista con sus palabras: «En sala», «Urgente», «Por preparar»…), y vista tabla o
-tarjetas. Acciones por fila, solo icono: «Lanzar», «Lista», «Servida»,
+tarjetas. La tarjeta lleva de título el número corto y el destino («#0013 Mesa 9»), el estado en su etiqueta y,
+debajo, cada otro dato con el icono de su columna delante, sin repetir el destino. Acciones por fila, solo icono: «Lanzar», «Lista», «Servida»,
 «Recuperar» y «Cancelar» (en el menú «⋮», con confirmación y motivo opcional); solo salen las que el
 perfil puede hacer y se esconden las que el estado no admite. Tocar una fila abre su detalle: los
 platos con la alergia del cliente, su menú, sus suplementos, su estación y su estado. «Nueva comanda» abre el panel
