@@ -7,6 +7,10 @@
 export const VERTICALS = ['restaurant', 'hair_salon'] as const;
 export type Vertical = (typeof VERTICALS)[number];
 
+/** How the owner says the job: by halves, so the assistant must ask what to do before writing, or whole. */
+export const SAID = ['half', 'whole'] as const;
+export type Said = (typeof SAID)[number];
+
 /** A tool call the Hub runs as the owner: a setup step or a step of the golden path. An argument may be
  *  `{"$ref": "<step id>", "where": {...}, "take": "id"}`: a value of an earlier step's result (assistant-golden.ts). */
 export interface ToolStep {
@@ -70,6 +74,8 @@ export interface Scenario {
   id: string;
   title: string;
   vertical: Vertical;
+  /** Absent: the scenario is not scored on asking before acting. */
+  said?: Said;
   /** The seed of the vertical loaded into the business (`base.blueprint.import`): `restaurant.es`. */
   seed: string;
   language: 'es' | 'en';
@@ -240,6 +246,7 @@ export function parseScenario(text: string, source: string): Scenario {
     id,
     title: fields.text('title'),
     vertical: fields.oneOf('vertical', VERTICALS),
+    ...((raw as Raw).said === undefined ? {} : { said: fields.oneOf('said', SAID) }),
     seed,
     language: fields.oneOf('language', ['es', 'en'] as const),
     setup: each(fields, 'setup', step, source),

@@ -1,0 +1,82 @@
+{
+  "id": "s14-staff-off-tomorrow-whole",
+  "title": "La ausencia de Daniel de mañana, todo el día, dicho entero: apuntarla y aprobarla",
+  "vertical": "hair_salon",
+  "said": "whole",
+  "seed": "hair_salon.es",
+  "language": "es",
+  "setup": [
+    {
+      "tool": "staff.role.create",
+      "arguments": {"name": "Estilista"}
+    },
+    {
+      "tool": "staff.member.create",
+      "arguments": {"first_name": "Lucía", "last_name": "Romero", "role": "Estilista"}
+    },
+    {
+      "tool": "staff.member.create",
+      "arguments": {"first_name": "Daniel", "last_name": "Pérez", "role": "Estilista"}
+    }
+  ],
+  "owner": {
+    "persona": "Elena, dueña de la peluquería Elena Estilistas, en Granada. Trabajan con ella Lucía Romero y Daniel Pérez.",
+    "goal": "Que la ausencia de Daniel de mañana, el día entero, quede apuntada y aprobada, para que nadie le dé citas.",
+    "upFront": ["Mañana Daniel no viene: hay que apuntarle y aprobarle la ausencia de todo el día, para que no le den citas."],
+    "ifAsked": ["Es por un asunto personal.", "Mañana no tiene ninguna cita."]
+  },
+  "attachments": [],
+  "opening": "Mañana Daniel no viene, apúntale la ausencia de todo el día y apruébala, que no le den citas",
+  "offered": ["staff.time_off.create", "staff.time_off.approve"],
+  "writes": ["staff.time_off.create", "staff.time_off.approve"],
+  "cards": [],
+  "expect": [
+    {
+      "says": "Daniel tiene aprobada una ausencia de día completo que cubre mañana",
+      "sql": "select count(*) from staff_timeoff t join staff_member m on m.id = t.member_id where m.first_name = 'Daniel' and t.status = 'approved' and t.is_full_day and t.start_date <= '{today+1}' and t.end_date >= '{today+1}'",
+      "equals": "1"
+    }
+  ],
+  "forbidden": [
+    {
+      "says": "la ausencia es solo de mañana: ninguna pendiente o aprobada de otros días",
+      "sql": "select count(*) from staff_timeoff where status in ('pending', 'approved') and (start_date <> '{today+1}' or end_date <> '{today+1}')",
+      "equals": "0"
+    },
+    {
+      "says": "Lucía no tiene ninguna ausencia",
+      "sql": "select count(*) from staff_timeoff t join staff_member m on m.id = t.member_id where m.first_name = 'Lucía'",
+      "equals": "0"
+    },
+    {
+      "says": "Daniel sigue de alta y se le pueden dar citas otros días",
+      "sql": "select status || ' ' || is_bookable::text from staff_member where first_name = 'Daniel'",
+      "unchanged": true
+    },
+    {
+      "says": "no se crean citas ni bloqueos en la agenda",
+      "sql": "select (select count(*) from appointment_appointment) + (select count(*) from appointment_blockedtime)",
+      "equals": "0"
+    }
+  ],
+  "mustAsk": [],
+  "maxTurns": 6,
+  "golden": [
+    {
+      "id": "absence",
+      "tool": "staff.time_off.create",
+      "arguments": {
+        "member": "Daniel Pérez",
+        "leave_type": "personal",
+        "start_date": "{today+1}",
+        "end_date": "{today+1}",
+        "is_full_day": true,
+        "reason": "Asunto personal"
+      }
+    },
+    {
+      "tool": "staff.time_off.approve",
+      "arguments": {"id": {"$ref": "absence", "take": "id"}}
+    }
+  ]
+}
