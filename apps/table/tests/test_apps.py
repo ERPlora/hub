@@ -1,10 +1,8 @@
 """The table app declares its module metadata, its menu, its permissions, what each role gets and its hook of the
 Home."""
 
-from pathlib import Path
 
 from django.apps import apps
-from django.conf import settings
 from django.utils import translation
 from live.live_registry import live_registry
 from live.meta import Category, Help, LiveAppConfig, Nav, SetupCheck, SetupStep, module_configs
@@ -13,6 +11,7 @@ from live.operations import registry
 from apps.table import events as E
 from base import home
 from base.tests.roles import grants_by_role
+from base.tests.shell_icons import shell_icon_registry
 
 PERMISSIONS = [
     "table.view_zone",
@@ -275,7 +274,7 @@ def test_the_step_is_refreshed_on_what_changes_the_tables_in_use():
 def test_the_steps_icon_is_registered():
     # `map-outline` waits in UI-REQUESTS.md, as the menu's.
     (step,) = table().setup
-    icons = (Path(settings.BASE_DIR) / "packages/ui/src/shell/icons.ts").read_text()
+    icons = shell_icon_registry()
     assert f"'{step.icon.removeprefix('ion:')}'" in icons
 
 

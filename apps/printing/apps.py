@@ -130,7 +130,7 @@ class PrintingConfig(LiveAppConfig):
         {"name": "prune", "operation": "printing.job.prune", "cron": "23 * * * *", "catch_up": "collapse"},
     ]
     # Positional (id, label, icon, path): scripts/app-icons.mjs reads every line starting with
-    # `icon =` as the module's own icon. Registered icons only (packages/ui/src/shell/icons.ts).
+    # `icon =` as the module's own icon. Registered icons only (packages/ui/src/shell/set-icons.ts).
     navigation = [
         Nav("printers", _("Printers"), "lucide:receipt", "/printing/printers"),
         Nav("devices", _("Devices"), "lucide:smartphone", "/printing/devices"),

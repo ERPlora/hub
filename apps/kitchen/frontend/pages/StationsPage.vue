@@ -147,6 +147,7 @@ async function onRouteAction({ row }: { actionId: string; row: RouteOut }): Prom
       v-if="!blocked"
       v-model:search="table.search.value"
       testid="kitchen-stations"
+      card-title-column="name"
       fill
       server-side
       searchable
@@ -217,6 +218,7 @@ async function onRouteAction({ row }: { actionId: string; row: RouteOut }): Prom
       <DataTable
         v-model:search="routes.search.value"
         testid="kitchen-routing"
+        card-title-column="target_name"
         server-side
         searchable
         :rows="routing?.rows ?? []"

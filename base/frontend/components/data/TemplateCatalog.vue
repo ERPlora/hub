@@ -96,6 +96,7 @@ function onAction(event: DataTableActionEvent<Row>): void {
     default-view="cards"
     :page-size-chooser="false"
     testid="templates"
+    card-title-column="name"
     @action="onAction"
     @retry="refresh"
   />

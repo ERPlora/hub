@@ -1,12 +1,12 @@
 """The sale app declares its module metadata, its menu entries, its permissions, what each role gets and its panels
 of the Home."""
 
-from pathlib import Path
 
 from django.apps import apps
 from django.conf import settings
 from django.utils import translation
 from live.live_registry import live_registry
+from base.tests.shell_icons import shell_icon_registry
 from live.meta import (
     Category,
     Help,
@@ -284,7 +284,7 @@ def test_the_panels_icons_are_registered_in_the_shell():
         "ion:calendar-outline",
         "ion:time-outline",
     ]
-    icons = (Path(settings.BASE_DIR) / "packages/ui/src/shell/icons.ts").read_text()
+    icons = shell_icon_registry()
     for panel in sale().widgets:
         assert f"'{panel.icon.removeprefix('ion:')}'" in icons, panel.icon
 

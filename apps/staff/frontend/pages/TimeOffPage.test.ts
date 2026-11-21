@@ -14,6 +14,7 @@ import { EMPLOYEE, errorFrame, flush, type MountOptions, mountStaff, page, settl
 import TimeOffFormModal from '../components/TimeOffFormModal.vue';
 import TimeOffPage from './TimeOffPage.vue';
 import { listFillProblems } from '../../../../frontend/testing/list-fill';
+import { rowButtonNames } from '../../../../base/frontend/__tests__/mount-base';
 
 const OP = 'staff.time_off.list';
 const off = (id: string, over: Partial<TimeOffOut> = {}): TimeOffOut => ({
@@ -55,6 +56,17 @@ async function setup(options: MountOptions = {}) {
   }
   return { ...m, table, prop, rows, cells, shownActions, action, list: () => m.params(OP), show: (data: unknown) => m.result(OP, data) };
 }
+
+describe('TimeOffPage: who it is for', () => {
+  it('each row action tells a screen reader whose time off it is, its short words first', async () => {
+    const s = await setup();
+    await s.show(page(ROWS));
+    expect(['t1', 't2'].map((id) => rowButtonNames(s.wrapper.element, `staff-time-off-row-${id}`))).toEqual([
+      { approve: 'Approve: Ana López', reject: 'Reject: Ana López' },
+      { cancel: 'Cancel: Bea Ruiz' },
+    ]);
+  });
+});
 
 describe('TimeOffPage: the live list', () => {
   it('follows the requests, newest first, 50 from the first', async () => {

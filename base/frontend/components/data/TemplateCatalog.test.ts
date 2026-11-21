@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { errorFrame, flush, mountBase, subId } from '../../__tests__/mount-base';
+import { errorFrame, flush, mountBase, rowButtonNames, subId } from '../../__tests__/mount-base';
 import { template } from '../../__tests__/data-fixtures';
 import TemplateCatalog from './TemplateCatalog.vue';
 
@@ -24,6 +24,13 @@ async function catalog(props: Record<string, unknown> = {}, locale: 'en' | 'es' 
 }
 
 describe('TemplateCatalog', () => {
+  it('each template’s «Use template» tells a screen reader which template it is', async () => {
+    const m = await catalog();
+    await m.result(m.call, 'base.blueprint.list', { templates: [template('restaurant.es'), template('hair_salon.es')], empty: true });
+    const names = ['restaurant.es', 'hair_salon.es'].map((key) => rowButtonNames(m.wrapper.element, `templates-row-${key}`));
+    expect(names).toEqual([{ use: 'Use template: Restaurant' }, { use: 'Use template: Hair salon' }]);
+  });
+
   it('says it is loading until the catalogue arrives', async () => {
     const m = await catalog();
     expect(m.wrapper.get('[data-testid="templates-loading"]').text()).toContain('Loading templates…');

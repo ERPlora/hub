@@ -1,10 +1,8 @@
 """The schedule app declares its module metadata, its menu entries, its permissions, what each role gets,
 the assistant's contract of every operation (``ai`` and described input fields) and its hook of the Home."""
 
-from pathlib import Path
 
 from django.apps import apps
-from django.conf import settings
 from django.utils import translation
 from live.live_registry import live_registry
 from live.meta import Category, LiveAppConfig, Nav, SetupCheck, SetupStep, module_configs, permissions_for_role
@@ -13,6 +11,7 @@ from live.operations import INTERNAL, registry
 from apps.schedule import events
 from apps.schedule import queries, services  # noqa: F401  (importing them registers the operations)
 from base import home
+from base.tests.shell_icons import shell_icon_registry
 
 PERMISSIONS = [
     "schedule.view",
@@ -259,7 +258,7 @@ def test_the_step_is_refreshed_on_what_confirms_the_week():
 def test_the_steps_icon_is_registered():
     # The app's own icon, `time-outline`.
     (step,) = schedule().setup
-    icons = (Path(settings.BASE_DIR) / "packages/ui/src/shell/icons.ts").read_text()
+    icons = shell_icon_registry()
     assert f"'{step.icon.removeprefix('ion:')}'" in icons
 
 

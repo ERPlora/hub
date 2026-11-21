@@ -82,6 +82,7 @@ function onAction({ actionId, row }: { actionId: string; row: RegisterOut }): vo
     </h2>
     <DataTable
       testid="cash-register-registers"
+      card-title-column="name"
       :rows="rows"
       :page-size="100"
       :page-size-options="[]"
