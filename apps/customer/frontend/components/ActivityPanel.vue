@@ -1,8 +1,8 @@
 <script setup lang="ts">
 // «Add note» and «Activity» of a card (CUSTOMER-F05, F03), the product's chatter: the note goes in
 // with «Add» and comes back at the top of the activity by itself (`customer.activity.list` is live
-// and re-runs on `customer.note.added`). The activity keeps keys, never sentences: the titles of the
-// app's own kinds are translated here; another app's entry shows its own title. An amount is in the currency its
+// and re-runs on `customer.note.added`). The activity keeps keys, never sentences: a kind with a text
+// in the app's catalogue is shown with it; another app's entry shows its own title. An amount is in the currency its
 // entry carries, one without, in the business's (customer-business-currency).
 import { formatDateTime, formatMoney } from '@erplora/ui/components';
 import { useCommand } from '@erplora/ui/sdk';
@@ -20,18 +20,8 @@ import type { ActivityRow } from '../operations';
 const props = defineProps<{ customerId: string; canAddNote: boolean }>();
 
 const STEP = 50;
-const OWN_KINDS = new Set([
-  'note_added',
-  'purchase_recorded',
-  'purchase_voided',
-  'purchase_refunded',
-  'consent_granted',
-  'consent_withdrawn',
-  'merged',
-  'erased',
-]);
 
-const { t, locale } = useCustomerI18n();
+const { t, te, locale } = useCustomerI18n();
 const money = useBusinessMoney();
 
 // «Show more» grows what is shown by 50; the server is asked in windows of ≤ 100 (`useLiveList`).
@@ -47,7 +37,8 @@ const more = computed(() => (data.value ? data.value.total > data.value.rows.len
 
 function title(row: ActivityRow): string {
   if (row.title) return row.title;
-  return OWN_KINDS.has(row.kind) ? t(`customer.activity.kinds.${row.kind}`) : row.kind;
+  const key = `customer.activity.kinds.${row.kind}`;
+  return te(key) ? t(key) : row.kind;
 }
 
 function detail(row: ActivityRow): string {
