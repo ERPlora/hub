@@ -2,7 +2,7 @@
 discount rules of a line, and the price a line takes (WORKBOOK.md)."""
 
 from django.utils.translation import gettext_lazy as _
-from live.meta import Category, LiveAppConfig, Nav
+from live.meta import Category, Help, LiveAppConfig, Nav
 
 
 class PricingConfig(LiveAppConfig):
@@ -44,6 +44,7 @@ class PricingConfig(LiveAppConfig):
     navigation = [
         Nav("lists", _("Price Lists"), "ion:pricetag", "/pricing/lists"),
     ]
+    help = Help()
 
     def recoverable_from_copy(self) -> list:
         """What a separate copy of the business gives back when ERPlora's staff recovers from it (BASE-F114): each price

@@ -9,6 +9,13 @@ Estado de la app: completa (2026-10-23); sus avisos arrancan las automatizacione
 
 ## Para qué sirve y para quién
 
+Pagos apunta el dinero que sale del negocio: lo que se paga a un proveedor, una transferencia o un reembolso que no
+es de una venta. Cada pago lleva su referencia y pasa de borrador a aprobado, enviado y completado, o se cancela con
+su motivo, y guarda quién hizo cada paso. No mueve dinero ni habla con el banco: cada paso lo marcas tú cuando ya ha
+pasado.
+
+### En detalle
+
 Pagos registra el **dinero que sale** del negocio: lo que se paga a un proveedor, una transferencia,
 un reembolso que no es de una venta. Cada pago lleva su referencia propia (`PAY-AAAAMMDD-NNNN`) y
 pasa por una escalera de estados — **Borrador**, **Aprobado**, **Enviado**, **Completado** — o se
@@ -71,7 +78,15 @@ asistente.
 
 ### Pagos
 
-Título «Pagos salientes». Una tabla con las columnas **Referencia**, **Fecha**, **Beneficiario**,
+Título «Pagos salientes». La tabla de los pagos, con su referencia, fecha, beneficiario, importe y estado, el más
+reciente arriba; se busca por la referencia, el beneficiario o la factura del proveedor, y el embudo de la barra
+filtra por fecha, importe y estado. Cada fila ofrece el paso que le toca: **Aprobar**, **Marcar como enviado** o
+**Marcar como completado**, y **Cancelar pago** mientras no esté terminado. **Nuevo pago** abre el formulario para
+registrar uno.
+
+#### Tabla de pagos
+
+Una tabla con las columnas **Referencia**, **Fecha**, **Beneficiario**,
 **Importe** y **Estado** (y **Método**, que se puede mostrar con el selector de columnas). Buscador
 «Buscar referencia o beneficiario…» (busca también en la referencia de la factura del proveedor),
 filtros por columna tras el embudo de la barra — referencia y beneficiario por un trozo del texto, la fecha
@@ -85,11 +100,19 @@ cancelado enseña su motivo debajo del estado; uno aprobado (y después enviado 
 aprobó («Aprobado por …»). Mientras una acción de fila trabaja, su botón gira y un segundo toque no
 hace nada.
 
+#### Nuevo pago
+
 El botón **Nuevo pago** abre el formulario «Nuevo pago»: **Método**, **Fecha** (viene la de hoy),
 **Importe** (dice la moneda del negocio: «Importe (EUR)», «Importe (PLN)»), **Beneficiario**,
 **Concepto** y, si se quieren, **IBAN del beneficiario** y **Factura del proveedor** (su número).
 
 ### Métodos
+
+Los métodos son desde dónde paga el negocio: su cuenta del banco, su tarjeta de empresa o el efectivo del cajón.
+Una tabla con su nombre, su tipo, la cuenta (tapada salvo los últimos cuatro caracteres) y si está activo.
+**Nuevo método** crea uno, una fila abre su ficha para cambiarlo y cada fila ofrece **Desactivar** o **Activar**.
+
+#### Tabla de métodos
 
 Una tabla con **Nombre**, **Tipo** (Efectivo, Transferencia, Tarjeta, SEPA, Cheque u Otro),
 **Cuenta** (la referencia de la cuenta bancaria, tapada salvo los últimos cuatro caracteres: un IBAN
@@ -136,7 +159,7 @@ Estado: hecho
 Actor: responsable, administrador, propietario, asistente
 Pantalla: Métodos
 Pasos:
-1. En **Pagos → Métodos** pulsa **Nuevo método**.
+1. En **Métodos** pulsa **Nuevo método**.
 2. Escribe el **Nombre**, elige el **Tipo** (viene **Transferencia**) y, si quiere, la **Cuenta** (la
    referencia de la cuenta del banco, por ejemplo los últimos dígitos del IBAN).
 3. Pulsa **Crear método**: el formulario se cierra y el método sale en la tabla como **Activo**.
@@ -280,7 +303,7 @@ Estado: hecho
 Actor: responsable, administrador, propietario, asistente
 Pantalla: Métodos
 Pasos:
-1. En **Pagos → Métodos** pulsa una fila (o su **Editar**): se abre «Editando método — {nombre}» con lo
+1. En **Métodos** pulsa una fila (o su **Editar**): se abre «Editando método — Cuenta BBVA» con lo
    que ya dice la fila; la **Cuenta** y **Guardar** esperan en gris mientras llega la ficha completa
    (la lista enmascara la cuenta).
 2. Cambia el nombre, el tipo o la cuenta y pulsa **Guardar**. El nombre y el tipo se pueden cambiar

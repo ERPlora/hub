@@ -1,6 +1,13 @@
-<!-- generated from WORKBOOK.md sha256:5bbd916c4e33acabf5253e3713cc972f403033e29912af5de23c55ed1f4dc0e7 -->
+<!-- generated from WORKBOOK.md sha256:aa404957d52634011c31b8cf8f89cce0502350c5562d8e534b324c7c397532db -->
 
 ## What it is for and who it is for
+
+Payments keeps the money that goes out of the business: what is paid to a supplier, a transfer or a refund that is
+not a sale's. Each payment carries its reference and moves from draft to approved, sent and completed, or is
+cancelled with its reason, and keeps who did each step. It moves no money and talks to no bank: you mark each step
+once it has happened.
+
+### In detail
 
 Payments records the **money that goes out** of the business: what is paid to a supplier, a transfer,
 a refund that is not a sale's. Each payment carries its own reference (`PAY-YYYYMMDD-NNNN`) and goes
@@ -64,7 +71,15 @@ cannot do does not show, and the app refuses it even if they try through the API
 
 ### Payments
 
-Title "Outgoing payments". A table with the columns **Reference**, **Date**, **Beneficiary**,
+Title "Outgoing payments". The table of the payments, with their reference, date, beneficiary, amount and status,
+the most recent on top; you search by the reference, the beneficiary or the supplier invoice, and the toolbar's
+funnel filters by date, amount and status. Each row offers the step that is due: **Approve**, **Mark as sent** or
+**Mark as completed**, and **Cancel payment** while it is not finished. **New payment** opens the form to record
+one.
+
+#### Payments table
+
+A table with the columns **Reference**, **Date**, **Beneficiary**,
 **Amount** and **Status** (and **Method**, which can be shown with the column picker). Search box
 "Search reference or beneficiary…" (it also searches the supplier invoice reference), column filters
 behind the toolbar's funnel — reference and beneficiary by a piece of the text, the date "from / to", the
@@ -78,11 +93,19 @@ cancelled. A completed or cancelled payment offers none. A cancelled payment sho
 status; an approved one (and later sent or completed), who approved it ("Approved by …"). While a row
 action is working, its button spins and a second tap does nothing.
 
+#### New payment
+
 The **New payment** button opens the "New payment" form: **Method**, **Date** (today's comes filled
 in), **Amount** (it says the business's currency: "Amount (EUR)", "Amount (PLN)"), **Beneficiary**,
 **Concept** and, if wanted, **Beneficiary IBAN** and **Supplier invoice** (its number).
 
 ### Methods
+
+The methods are where the business pays from: its bank account, its company card or the cash in the drawer. A table
+with their name, their type, the account (covered except for its last four characters) and whether it is active.
+**New method** creates one, a row opens it to change it and each row offers **Deactivate** or **Activate**.
+
+#### Methods table
 
 A table with **Name**, **Type** (Cash, Bank transfer, Card, SEPA, Cheque or Other), **Account** (the
 reference of the bank account, covered except for its last four characters: an IBAN shows as
@@ -129,7 +152,7 @@ Status: done
 Actor: manager, administrator, owner, assistant
 Screen: Methods
 Steps:
-1. In **Payments → Methods** tap **New method**.
+1. In **Methods** tap **New method**.
 2. Type the **Name**, pick the **Type** (**Bank transfer** comes selected) and, if wanted, the
    **Account** (the reference of the bank account, for example the last digits of the IBAN).
 3. Tap **Create method**: the form closes and the method shows in the table as **Active**.
@@ -274,7 +297,7 @@ Status: done
 Actor: manager, administrator, owner, assistant
 Screen: Methods
 Steps:
-1. In **Payments → Methods** tap a row (or its **Edit**): "Editing method — {name}" opens with what the
+1. In **Methods** tap a row (or its **Edit**): "Editing method — BBVA account" opens with what the
    row already says; **Account** and **Save** wait in grey while the whole method arrives (the list
    masks the account).
 2. Change the name, the type or the account and tap **Save**. The name and the type can be changed
