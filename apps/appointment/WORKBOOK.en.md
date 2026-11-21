@@ -1,6 +1,13 @@
-<!-- generated from WORKBOOK.md sha256:28f86a33368d8b1648f86920b6dbb413c6c388c03dbedf90a32e0e623d9ded7f -->
+<!-- generated from WORKBOOK.md sha256:7b175b8b09612833587e5e04817aed256391d499d3ec6e0c70df93a3690f4d82 -->
 
 ## What it is for and who it is for
+
+Appointments is the agenda of a business that works by appointment, such as a hair salon, a beauty salon or a barber
+shop. Each appointment joins a customer, the services they have done and the professional who attends them at a time,
+without stepping over the business's opening hours or the team's time off, and keeps what happens to it until it is
+attended and charged.
+
+### In detail
 
 Appointments is **the agenda of a business that works by appointment** (hair salon, beauty salon, barber
 shop). Each appointment joins a customer from **Customers**, one or more services from **Services** (cut +
@@ -8,7 +15,7 @@ colour) and a professional from **Staff** at a time, without stepping over the b
 (**Schedules**), the professional's shift or time off, or another appointment of theirs, and it keeps
 everything that happens to it from the moment it is booked until it is attended, charged or called off.
 
-Who uses it:
+### Who uses it and what each one does
 
 - The **employee** sees **their own agenda**: books appointments for themselves, confirms them, starts
   them, finishes them, moves them, cancels them and charges them. They do not see their colleagues'
@@ -67,9 +74,22 @@ Who uses it:
 
 Appointments opens from the **Appointments** menu and has two tabs: **Agenda** and **Settings** (the latter
 only for whoever can change them). What a person cannot do is greyed out or does not appear, and the app
-refuses it even if they try through the API or through the assistant.
+refuses it even if they try through the API or through the assistant. The help calls the agenda's tab
+**Appointments**, like its menu entry.
 
-### Agenda
+Besides, Appointments puts the **Visit history** block at the end of a customer's card in **Customers**: their last
+10 appointments, the most recent first, with services, professional, state and notes (the internal one first).
+
+### Appointments
+Here is the business's agenda, always on its clock. Change the day with the arrows or with **Today** and choose how
+to see it: as a **List**, **By professional** (one row per professional, by day or by week) or the **Repeating**
+appointments. With **Add appointment** you pick the customer, the services, the professional and one of the free
+times; on the grid, tapping a slot books at that time with that professional. Tap an appointment to see its card
+and, from its row, confirm it, start it, complete it, charge it at the till, move it or cancel it; you can also drag
+it to another time or another professional. The **N to confirm** notice takes you to the appointments customers have
+booked that are waiting for your confirmation.
+
+#### Agenda
 A bar with the day (‹ date › and **Today**, and the calendar button to jump to a date), **Filter by
 status**, the **N to confirm** notice when there are pending bookings made by customers, and the
 **List · By professional · Repeating** switch (on a phone, icons only). In **List** and in **By
@@ -110,7 +130,7 @@ professional**, also **Day · Week**.
   appointment** (**This appointment only** / **This and all following appointments**), **Cancel the
   appointment** (optional reason) and **Delete the appointment** (confirmation).
 
-### Repeating
+#### Repeating
 Third segment of the Agenda. Table: Customer, Service, Professional, Repeats (for example "Every
 week · Monday · 11:00"), Starts, Ends ("No end", "After {n} appointments" or the date) and **Active**
 (switch). On each row: **Edit series**, **Book appointments** and **Delete** (asks for confirmation). The
@@ -123,23 +143,25 @@ they were all there already, "Nothing new to book: its {n} appointments were alr
 are left, "The dates from {date} on are not booked yet: tap «Book appointments» on the series to book
 them.".
 
-### Appointment card
+#### Appointment card
 When you tap an appointment: number, state, customer, services with their price, professional, time,
 notes, whether it is charged and its **History**: each change with its time on the business clock, who
 made it ("Requested by the customer" when it was them) and what changed.
 
-### Appointment settings
+### Settings
+Here you decide the agenda's rules for the whole business: the default length of an appointment, how far ahead
+customers can book and how many days ahead at most, whether overlapping appointments are allowed, whether the
+customer can cancel on their own and with how many hours' notice, what time the calendar starts and ends, how many
+minutes apart the slots are and whether the appointments customers book are confirmed by themselves. Change what you
+need and tap **Save**.
+
+#### Detail
 **Settings** tab (only for whoever can change them): "Default duration (minutes)", "Minimum booking notice
 (minutes)" (only for the bookings made by the customer), "Book at most this far ahead (days; 0 = no
 limit)", "Allow overlapping appointments (the front desk is warned first)",
 "Let customers cancel their appointment", "Minimum cancellation notice (hours)", "Calendar starts at
 (hour)", "Calendar ends at (hour)", "Slot interval (minutes)" and "Confirm bookings made by the customer
 automatically"; **Save** button.
-
-### Visit history (on the Customers card)
-Block at the end of a customer's card in **Customers**, contributed by Appointments: their last 10
-appointments, the most recent first, with services, professional, state and notes (the internal one
-first).
 
 ## States of each screen
 
@@ -218,7 +240,7 @@ Steps:
 3. Type the day and tap one of the **Free times** (or type another time).
 4. Tap **Add appointment**. If the business allows overlaps and that time clashes with another appointment
    of the professional, answer "Overlapping appointment".
-5. The appointment shows as **Confirmed** with its number `APT-YYYYMMDD-NNNN`.
+5. The appointment shows as **Confirmed** with its number (for example, APT-20261116-0001).
 In: the customer's card (Customers), the services with their price and duration (Services), the
 professional and who does what (Staff and Services), the business's opening hours (Schedules) and the
 professional's shift and time off (Staff).
@@ -228,9 +250,9 @@ the history and the appointment-created event (`appointment.appointment.created`
 appointment, one of a batch and one of a series.
 If it fails: the reason shows inside the panel, without losing what was typed: outside the business's
 opening hours, the professional does not work at that time, blocked slot, the professional already has an
-appointment (`appointment.slot_taken`), too far ahead, the customer, the service or the professional do
+appointment, too far ahead, the customer, the service or the professional do
 not exist or cannot be booked. The customer's one, shown under her search, goes away as soon as another
-customer is chosen, without saving again (hub#1448). From the front desk neither the minimum notice nor a time already past
+customer is chosen, without saving again. From the front desk neither the minimum notice nor a time already past
 refuses (the past time only warns before saving); an automation does not have those exceptions. An employee
 only books for themselves; an automation allowed to book, with any professional. Two people
 who book the same slot of the same professional at once: one gets in and the other gets the refusal.
@@ -289,8 +311,8 @@ Screen: Agenda
 Steps:
 1. Tap **Edit** (or tap the appointment in "By professional"): "Edit appointment" opens.
 2. Change Day, Time, Min., Services or Professional and tap **Save changes**. If the appointment belongs
-   to a series, choose **This appointment only** or **This and all following appointments**
-   (APPOINTMENT-F14). From the front desk it can be taken to a time already past (to note down what
+   to a series, choose **This appointment only** or **This and all following appointments**.
+   From the front desk it can be taken to a time already past (to note down what
    already happened).
 3. Shortcut: in "By professional" drag it to another time, another day or another row. Dragging does not
    take it to a time already past (that, from the panel).
@@ -320,7 +342,7 @@ In: a pending, confirmed or no-show appointment, without its check open at the t
 Out: the `appointment.appointment.cancelled` event.
 If it fails: "This appointment can no longer be cancelled in its current state." (in progress, completed
 or already cancelled); with its check open at the till, "This appointment has a check open in the till:
-charge it or void it there first." (`appointment.check_open`).
+charge it or void it there first.".
 Involved: none
 
 ### APPOINTMENT-F06 The customer cancels or moves their own appointment
@@ -366,7 +388,7 @@ Actor: employee (their own), manager
 Screen: Agenda
 Steps:
 1. When finished, tap **Complete** on the appointment in progress (or confirmed).
-2. The appointment becomes **Completed**. Charging it also completes it (APPOINTMENT-F17).
+2. The appointment becomes **Completed**. Charging it at the till also completes it.
 In: an appointment in progress or confirmed.
 Out: the `appointment.appointment.completed` event.
 If it fails: "This appointment cannot be completed in its current state."
@@ -383,7 +405,7 @@ In: a pending or confirmed appointment whose time has already passed.
 Out: the `appointment.appointment.marked_no_show` event.
 If it fails: before its time, "It is not the appointment's time yet: it cannot be marked as a no-show.";
 in another state, "This appointment cannot be marked as a no-show in its current state.";
-with its check open at the till, `appointment.check_open`.
+with its check open at the till, "This appointment has a check open in the till: charge it or void it there first."
 Involved: none
 
 ### APPOINTMENT-F10 See an appointment's history
@@ -396,7 +418,7 @@ Steps:
    them; "Done by the platform" if no person did: the system, an automation or a recovery from a separate copy;
    an API key, by its name) and what changed (from which professional or service to which, and the new time). A
    deleted appointment that ERPlora's staff brought back from a separate copy keeps its lines and adds "Deleted"
-   and "Restored" (APPOINTMENT-F11).
+   and "Restored".
 3. It is read-only: a single button, **Close**.
 In: an appointment in any state.
 Out: nothing (it only reads).
@@ -414,15 +436,15 @@ Steps:
 In: a pending, confirmed, cancelled or no-show appointment that is not charged.
 Out: the `appointment.appointment.deleted` event.
 If it fails: "This appointment cannot be deleted: it is in progress, completed or charged."; with its check
-open at the till, `appointment.check_open`. An appointment deleted by mistake that has not come yet is recovered by
-ERPlora's staff from a separate copy of the business (BASE-F114): THE SAME one comes back to the agenda, as it was when
+open at the till, "This appointment has a check open in the till: charge it or void it there first." An appointment deleted by mistake that has not come yet is recovered by
+ERPlora's staff from a separate copy of the business: THE SAME one comes back to the agenda, as it was when
 it was deleted, with its number, its customer, its services, its professional, its time, its notes, its series and its
-history, which adds the line "Restored", and with the `appointment.appointment.restored` event. It never comes back for
-a customer the business no longer has. If it was still booked, it only comes back if it fits as a booking of
-APPOINTMENT-F01: if its time is no longer free or no longer fits the opening hours, or one of its services or its
+history, which adds the line "Restored". It never comes back for
+a customer the business no longer has. If it was still booked, it only comes back if it fits as a new booking from
+the agenda: if its time is no longer free or no longer fits the opening hours, or one of its services or its
 professional can no longer be booked, it does not come back and Recoveries says why; a cancelled one comes back
 cancelled. One the business booked again (the same customer at the same time, or its series on that date) stays as it
-is. Only one the business no longer has comes back as a new appointment, booked as in APPOINTMENT-F01 (another number and
+is. Only one the business no longer has comes back as a new appointment, booked like any other (another number and
 without its history; one of its services the business made again, with its name in its category, counts as the same),
 under the same conditions.
 Involved: APPOINTMENT-F10, BASE-F114
@@ -436,8 +458,8 @@ Steps:
 2. Pick the customer, the services, the professional (only those who perform them), the repetition (every
    day, every week, every two weeks or every month), the day of the week if it applies, the start day, the
    time, the minutes and, if you want, "Ends on (optional)" or "Number of appointments (optional)".
-3. Tap **Create repeating appointment**: the series is created and the appointments of its window are
-   booked (APPOINTMENT-F13).
+3. Tap **Create repeating appointment**: the series is created and its appointments are booked up to the
+   maximum booking notice of the settings.
 In: the customer, the services and the professional (Customers, Services and Staff) and the Appointments
 settings.
 Out: the active series, its appointments and the `appointment.recurring.created` event.
@@ -466,8 +488,8 @@ Steps:
    it gets closer.".
 In: an active series and the maximum advance booking of the settings.
 Out: the booked appointments, each with its `appointment.appointment.created` event.
-If it fails: a paused series asks to reactivate it (`appointment.recurring_inactive`); one without dates,
-"This repeating appointment has no dates left to book." (`appointment.recurring_ended`).
+If it fails: a paused series asks to reactivate it ("That repeating appointment is paused: reactivate it to book
+its appointments."); one without dates, "This repeating appointment has no dates left to book.".
 Involved: SCHEDULE-F11, STAFF-F16
 
 ### APPOINTMENT-F14 Edit a series from this appointment on
@@ -509,15 +531,14 @@ Steps:
 In: a series.
 Out: `appointment.recurring.updated` or `appointment.recurring.deleted`.
 If it fails: "The repeating appointment's status could not be changed." and the series stays as it was. A series
-deleted by mistake is recovered by ERPlora's staff from a separate copy of the business (BASE-F114) if in the copy it
+deleted by mistake is recovered by ERPlora's staff from a separate copy of the business if in the copy it
 was still booking (active, with its professional and not ended): THE SAME one comes back to **Repeating**, active, with
-its customer, its services, its professional, its repetition and the appointments it had already booked, with the
-`appointment.recurring.restored` event. It books nothing by itself: its next dates are booked with **Book
-appointments** (APPOINTMENT-F13), which skips those that already have an appointment. It only comes back if it could be
-created today (APPOINTMENT-F12): if its customer is no longer in the business, or its professional or one of its
+its customer, its services, its professional, its repetition and the appointments it had already booked. It books
+nothing by itself: its next dates are booked with **Book appointments**, which skips those that already have an
+appointment. It only comes back if it could be created today: if its customer is no longer in the business, or its professional or one of its
 services can no longer be booked, it does not come back and Recoveries says why. One the business created again (the
 same customer, repeating the same way on the same day at the same time) stays as it is. One the business no longer has
-is created again as in APPOINTMENT-F12.
+is created again as a new series.
 Involved: BASE-F114
 
 ### APPOINTMENT-F16 Block time in the agenda
@@ -532,8 +553,8 @@ Steps:
 3. The "By professional" grid paints it striped on its row (or on all of them, if it is the business's).
 In: the professional (Staff), if the block is theirs.
 Out: `appointment.blocked_time.created` / `appointment.blocked_time.deleted`.
-If it fails: "The end cannot be before the start."; removing one that is no longer there,
-`appointment.blocked_time_not_found`.
+If it fails: "The end cannot be before the start."; removing one that is no longer there, "That blocked period
+does not exist in this business.".
 Involved: none
 
 ### APPOINTMENT-F17 Charge the appointment at the till
@@ -544,11 +565,11 @@ Steps:
 1. Tap **Charge** on the appointment's row.
 2. Appointments opens at the till a check linked to the appointment, titled "{customer} · {appointment
    no.}", with a **service** line for each service of the appointment (as if it were tapped in "Services"
-   of the till, SALE-F38), with the professional who performed it and **at the price it was booked at**
+   of the till), with the professional who performed it and **at the price it was booked at**
    (the professional's own included), even if the catalogue has changed since then, and takes you to
    **Sales** with that check on screen.
 3. At the till products or discounts are added, a service
-   can be paid with a **voucher** of the customer (SALE-F27) and it is charged like any sale.
+   can be paid with a **voucher** of the customer and it is charged like any sale.
 4. An appointment has **a single check**: while it is still open, the button is called **Go to the check**
    and goes back to it (it never opens another one, even if it is tapped at the same time on two devices);
    if the check is voided at the till, **Charge** opens a new one. With the check open, the appointment is
@@ -561,12 +582,11 @@ In: a pending, confirmed, in progress or completed appointment that is not charg
 Out: the check open in Sales (`sale.order.opened`) and here `appointment.appointment.check_opened`; on
 charging, the Sales event `sale.sale.created_from_appointment` and here `appointment.appointment.charged`;
 on voiding the check, `sale.order.voided` and here `appointment.appointment.check_closed`.
-If it fails: a cancelled or no-show appointment is not charged (`appointment.cannot_charge`); already
-charged, also if the till has just charged it and the event has not arrived yet
-(`appointment.already_charged`); a service without a tax category (`appointment.service_needs_tax_setup`);
-Sales turned off (`appointment.sale_unavailable`); a service that is no longer offered or a price that is
-not the appointment's, the Sales sentence (`sale.service_not_available`, `sale.booked_price_mismatch`);
-without the right to sell, the Sales one.
+If it fails: "A cancelled or no-show appointment is not charged."; already charged, also if the till has just
+charged it and the event has not arrived yet, "This appointment is already charged."; a service without a tax
+category, the notice that it needs one in Services before charging; with Sales turned off, "The till (Sales) is not
+active in this business: the appointment cannot be charged there."; a service that is no longer offered or a price
+that is not the appointment's, the Sales sentence; without the right to sell, the Sales notice.
 Involved: SALE-F26, SALE-F27, SALE-F30, SALE-F38
 
 ### APPOINTMENT-F18 Appointment booked by the customer
@@ -599,14 +619,14 @@ Screen: Settings
 Steps:
 1. Open the Appointments **Settings** tab.
 2. Change the settings and tap **Save**: "Settings saved." Only what changes is saved.
-   What is changed while it is saving is not lost: it stays on screen, still to save (hub#914).
+   What is changed while it is saving is not lost: it stays on screen, still to save.
 In: the current Appointments settings.
 Out: `appointment.settings.updated`.
 If it fails: "The settings could not be saved." with each reason under its field, without losing what was
 written; a calendar that ends before it starts, "The calendar has to end after it starts.". As in the form
 windows, the notice goes as soon as something is changed and a field's reason as soon as that field is
 corrected; both come back if the next try is refused too. A refusal that names no field stays until the next
-try (hub#854).
+try.
 Involved: none
 
 ### APPOINTMENT-F20 See a customer's appointments on their card
@@ -638,17 +658,18 @@ Involved: none
 ### APPOINTMENT-F22 Change the notes or the contact details of an appointment
 Status: done
 Actor: employee (their own), manager, assistant
-Screen: Agenda (Edit) and assistant
+Screen: Agenda (Edit), assistant
 Steps:
 1. In "Edit appointment" change the notes, or ask the assistant to correct the phone or the email. **Edit** is
    only on a pending or confirmed appointment that is not charged; the notes of any other one are changed
    through the assistant.
 2. Only what is sent changes. The phone is saved in international format, with the country prefix;
-   one that is not a valid number is refused (`appointment.phone_invalid`) and nothing is saved.
+   one that is not a valid number is refused and nothing is saved.
 In: an appointment.
 Out: `appointment.appointment.updated` (without a history line if only notes or contact details change).
-If it fails: the invalid phone is refused without saving anything; an appointment that does not exist,
-`appointment.appointment_not_found`.
+If it fails: the invalid phone is refused without saving anything ("That phone is not a valid number for the
+business's country. Check it, or type it with its international prefix (for example +44…)."); an appointment that
+does not exist, "That appointment does not exist in this business.".
 Involved: CUSTOMER-F11
 
 ### APPOINTMENT-F23 Merge the appointments when two customer cards are merged
@@ -729,7 +750,7 @@ Involved: none
 ### APPOINTMENT-F28 Get the system notice of a new or cancelled appointment
 Status: done
 Actor: employee (those of their agenda), manager
-Screen: System notice and Agenda
+Screen: System notice, Agenda
 Steps:
 1. A customer books or cancels by themselves (WhatsApp, online booking).
 2. At once, the device with the ERPlora application installed warns about it with a system notice, even

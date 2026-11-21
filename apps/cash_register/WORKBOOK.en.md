@@ -1,6 +1,12 @@
-<!-- generated from WORKBOOK.md sha256:f8aef28d4bb338bbb100567a09e4e120902a75527410830c1a89072198404d6a -->
+<!-- generated from WORKBOOK.md sha256:ee02a00135bd8fe8354d5039b4cb59cf5d6858a0fe26ebd5f5a2908e1c917dcc -->
 
 ## What it is for and who it is for
+
+Cash register keeps track of the drawer's cash by shifts. You open the shift with the money in the drawer, the
+charges from Sales are recorded by themselves and, at closing, you count the drawer: Cash register compares what
+there should be with what you counted and keeps the difference.
+
+### In detail
 
 Cash register keeps track of the **drawer's cash by shifts**. A session is opened with the float that is
 in the drawer; during the shift, the charges, voids and refunds from Sales show up by themselves, and the
@@ -9,12 +15,14 @@ is recorded by hand; the drawer is counted by notes and coins, and at closing wh
 (**expected**) is compared with what has been counted: the **difference** is kept for good. It works the
 same for the hair salon and for the restaurant.
 
-Who uses it:
+### Who uses it and what each one does
 
 - The **employee** acting as cashier: opens, records, counts and closes.
 - The **manager**: the same and, besides, sees the expected cash even when the count is blind.
 - The **owner** and the **administrator**: everything, and they also set up the cash register and add
   the drawers.
+
+### What it does not do
 
 Cash register does not charge (that is Sales), does not open the physical drawer (Printing will) and does
 not invoice.
@@ -61,7 +69,19 @@ Initial setup, step by step:
 
 ## Screens
 
+The **Cash register** menu has two tabs: **Cash register** and **Settings**. Both show for everyone; only whoever
+has permission changes the settings, and the others see them locked. The buttons the profile cannot use do not
+show.
+
 ### Cash register
+Here you open and close the cash shifts and look back at the earlier ones. At the top you see the cash there should
+be in the drawer now and the latest discrepancies; below, the list of sessions, from the most recent to the oldest.
+Tap **Open session** to start the shift with the money in the drawer. In the row of the open session you record a
+**Movement** (money that comes in or goes out by hand), do the **Count** of notes and coins and close it with
+**Close** at the end of the shift. Tapping a row opens the session's detail, with its movements, its counts and the
+report to print.
+
+#### Detail
 Menu **Cash register**. At the top, the title "Cash register" and the "Open session" button (off while a
 session is open: "There is already an open cash session. Close it before opening another one."). Below,
 the cash figures: "Current session" and "Recent discrepancies" (CASH_REGISTER-F12; the same figures also show
@@ -105,7 +125,7 @@ Two notices may show above the table:
   (CASH_REGISTER-F10). That session no longer takes movements, counts or a close: only "Detail" is left
   in its row.
 
-### Session detail
+#### Session detail
 From **Cash register**, "Detail" or tapping a row: it opens as a page, with its back arrow. Title
 "Session detail · S-…". A summary
 in two columns: Status, Drawer, Opened (when and by whom), Closed (when and by whom, or "Closed by
@@ -119,7 +139,14 @@ Count type, Total counted, Notes). Empty: "No movements in this session." and "N
 session.". The "Print" button prints the report on paper: "Partial report (X)" if the session is open,
 "Cash closing (Z)" if it is closed (CASH_REGISTER-F16).
 
-### Cash register settings
+### Settings
+Here you decide how the cash register works for the whole business: whether charging in cash needs an open shift,
+whether the float is required to open and the count to close, whether the cash register may go negative, whether
+whoever counts sees what there should be and whether the cash register closes by itself every day at a time. Below
+you add the drawers, if you have more than one (for example, the bar and the terrace). Change what you need and tap
+**Save**.
+
+#### Detail
 Menu **Cash register → Settings**. A "Cash register" card with "Turn on the cash register", "Require an
 opening float", "Require a count to close", "Allow a negative balance", "Blind count", "Daily auto-close"
 and "Auto-close time" (from 00:00 to 23:00, on the hour), and "Save". Below, the "Drawers" card: the list
@@ -174,7 +201,7 @@ With the window as it opened, Back closes it without asking (BASE-F05); the draw
 Status: done
 Vertical: common
 Actor: administrator
-Screen: Home: Finish setting up your business; Cash register settings
+Screen: Home: Finish setting up your business; Settings
 Steps:
 1. While the cash register settings have never been saved, on the **Home** the "Finish setting up your
    business" list brings the step "Your cash drawer" ("Decide how the till opens and closes: the opening
@@ -184,9 +211,9 @@ Steps:
    "Allow a negative balance", "Blind count" and "Daily auto-close" with its time.
 3. Tap "Save". What you changed is saved; the rest stays as it was. The first time it can be saved
    without changing anything: the business keeps the default ones.
-4. "Settings saved." shows and, from that moment, the server applies the required float (F03), the
-   required count (F09), the negative balance (F05), the blind count (F07) and the auto-close (F10),
-   whether the order comes from the screen, the assistant or the API. On the Home, "Your cash drawer"
+4. "Settings saved." shows and, from that moment, the required float to open, the required count to close, the
+   negative balance, the blind count and the auto-close apply, whether the order comes from the screen, the
+   assistant or the API. On the Home, "Your cash drawer"
    shows done without reloading.
 In: the administrator's decisions.
 Out: the business's cash register settings, a single row (announces: `cash_register.settings.updated`, also
@@ -202,7 +229,7 @@ Involved: CASH_REGISTER-F03, F05, F07, F09, F10
 Status: done
 Vertical: common
 Actor: administrator, assistant
-Screen: Cash register settings
+Screen: Settings
 Steps:
 1. In **Cash register → Settings → Drawers**, tap "Add drawer", type its name ("Bar") and tap "Save"; or
    ask the assistant ("create a drawer called Bar").
@@ -213,7 +240,7 @@ Out: the drawer (announces: `cash_register.register.created` or `cash_register.r
 drawer is never deleted: the sessions name it.
 If it fails: without a name, "Type the drawer's name."; with a name another drawer already has (whatever
 the case), "There is already a drawer with that name.". Both show under the name and go as soon as
-something is typed in it, without tapping "Save" again (hub#1470).
+something is typed in it, without tapping "Save" again.
 Involved: CASH_REGISTER-F03
 
 ### CASH_REGISTER-F03 Open the cash shift with the starting float
@@ -226,8 +253,9 @@ Steps:
 2. Choose the "Drawer" if there are several (with only one it is chosen by itself), type the "Opening
    float" as it reads ("150.50"; empty is 0) and, if you want, "Notes".
 3. Tap "Open session".
-4. "Session opened" shows; the session appears at the top of the table as "Open", with its number
-   `S-AAMMDD-NNNN` (sequential within the business day, set by the system) and "Open session" turns off.
+4. "Session opened" shows; the session appears at the top of the table as "Open", with its number (for
+   example, S-261014-0001: the business day and a sequence number, set by the system) and "Open session"
+   turns off.
 In: drawer, float and notes; the business's settings.
 Out: the open session, in the name of whoever opens it (announces: `cash_register.session.opened`). The
 float counts towards the expected cash from that moment.
@@ -238,12 +266,12 @@ give the cash the drawer starts with." under the field; a deactivated drawer or 
 "That drawer is not available."; an unreadable amount ("This is not an amount. Type a figure, for example
 12.50."), a negative ("This amount cannot be negative.") or an ambiguous one ("1,250") is said under the field on
 leaving it or on tapping "Open session", and nothing is sent; "12.555" is not ambiguous: it is €12,555.00, as in a
-price (hub#1160). The notice the server puts under a field (the required float) goes as soon as that field
-changes, without tapping "Open session" again; another field's stays until its own changes (hub#1470).
+price. The notice the server puts under a field (the required float) goes as soon as that field changes, without
+tapping "Open session" again; another field's stays until its own changes.
 "Open session" is grey while
 the business has not yet said its currency, because the float is read in it (without it, "1500" yen would
 be saved as 150,000). If the currency cannot be read, the window says so ("The business's currency could not be read", with the
-reason) and offers "Retry", which asks for it again; as soon as it arrives, "Open session" lights up (hub#938).
+reason) and offers "Retry", which asks for it again; as soon as it arrives, "Open session" lights up.
 Involved: CASH_REGISTER-F04, F09
 
 ### CASH_REGISTER-F04 Sell only with the cash register open
@@ -283,12 +311,12 @@ Out: the movement, in the name of whoever records it (announces: `cash_register.
 sign is set by the system according to the type.
 If it fails: "This cash-out would leave the drawer below zero and a negative balance is not allowed." if
 the settings do not allow it; a zero ("Invalid amount"), unreadable, negative or ambiguous amount is said under the
-field and nothing is sent (it is read as in F03); a field's notice goes as soon as that field changes,
-without tapping "Register" again, and another field's stays until its own changes (hub#1470); the
+field and nothing is sent (it is read as the float when opening the session); a field's notice goes as soon as
+that field changes, without tapping "Register" again, and another field's stays until its own changes; the
 session closed on another device: "That cash session is closed: a closed session takes no new
 movements.". "Register" is grey while the business has not yet said its currency, because the amount is
 read in it (without it, "1500" yen would be saved as 150,000). If the currency cannot be read, the window says so ("The business's currency could not be read", with the
-reason) and offers "Retry", which asks for it again; as soon as it arrives, "Register" lights up (hub#938).
+reason) and offers "Retry", which asks for it again; as soon as it arrives, "Register" lights up.
 A wrong movement is neither edited nor deleted: the opposite one is recorded with a concept
 that says why.
 Involved: none
@@ -305,7 +333,7 @@ Steps:
    type the total.
 3. Tap "Register count".
 4. "Count recorded · total counted …" shows and the count appears in the detail. If it was a "Closing"
-   one, "Close session" opens straight away with "Counted cash" already filled in (F09); the count closes
+   one, "Close session" opens straight away with "Counted cash" already filled in; the count closes
    nothing by itself.
 In: the quantities per note and coin, or the total.
 Out: the count with its breakdown (announces: `cash_register.count.added`). The total is added up by the
@@ -314,7 +342,8 @@ and prevails over the breakdown.
 If it fails: a closed session, "That cash session is closed: a closed session takes no new movements."; a
 note or coin that is not of the business's currency, under the breakdown; with neither breakdown nor
 total, "Count the drawer: give its notes and coins or its total."; a total typed by hand that is not an amount says
-so under the field on leaving it (it is read as in F03) and "Register count" stays grey.
+so under the field on leaving it (it is read as the float when opening the session) and "Register count" stays
+grey.
 Involved: CASH_REGISTER-F09
 
 ### CASH_REGISTER-F07 Blind count: who sees the expected cash
@@ -323,16 +352,16 @@ Vertical: common
 Actor: administrator, manager, employee
 Screen: Cash register, Session detail
 Steps:
-1. The administrator turns on "Blind count" and saves (F01).
+1. The administrator turns on "Blind count" in **Cash register → Settings** and saves.
 2. During the shift, in the open session, the employee sees the Expected column empty; in the detail they
    see the float and "—" in Expected, Sales, Refunds, Cash in, Cash out and Comps, and in the list of
    movements only the cash in and out recorded by hand: neither the sales, nor the voids, nor the refunds,
    so there is nothing to add up the expected cash with (Square and Lightspeed hide the expected cash the
    same way in the blind close). The manager, the owner and the administrator see everything: the table,
    the detail, the list and the close window. Nor does the assistant tell it to whoever may not see it:
-   the close's summary (F09) and its confirmation reach them without expected nor difference, and the
+   the close's summary and its confirmation reach them without expected nor difference, and the
    assistant does not know them.
-3. The cashier counts (F06) and closes (F09) without seeing the expected cash.
+3. The cashier counts the drawer and closes the session without seeing the expected cash.
 4. On closing, expected, counted and difference appear for everyone.
 In: the "Blind count" setting and the permission to see the expected cash (manager, owner and
 administrator).
@@ -354,7 +383,7 @@ Steps:
    "Labels"; Printing: what waits in the queue and what failed). With nothing pending nothing shows.
 3. The first "Close session" does not close: it warns "The shift will be closed anyway. Press again to
    confirm." and the button becomes "Close anyway".
-4. The second click closes (F09).
+4. The second click closes the session.
 In: the open checks from Sales, the kitchen tickets in progress from Kitchen and the queue of Printing. If
 Kitchen or Printing are not on in the business, they have nothing pending.
 Out: nothing; it warns, it never prevents.
@@ -369,23 +398,23 @@ Vertical: common
 Actor: employee, manager, administrator, assistant
 Screen: Cash register
 Steps:
-1. In the row of the open session, tap "Close" (or arrive from a "Closing" count, F06); or ask the
+1. In the row of the open session, tap "Close" (or arrive from a "Closing" count); or ask the
    assistant ("close the drawer with 250 € counted") and go on at step 5.
 2. Type or check the "Counted cash" (it comes from the last closing count of that session; never from an
    opening one); if you may see the expected cash, "Expected in the drawer" and "Difference" show while
    you type. Add "Closing notes" if you want.
-3. Tap "Close session" (twice if the shift review warned, F08).
+3. Tap "Close session" (twice if the shift review warned of something still pending).
 4. "Session S-… closed · expected … · counted … · difference …" shows; the row becomes "Closed" with the
    three amounts fixed for good and "Open session" turns on again.
 5. With the assistant, before closing anything it shows you the close's summary: the session's number,
    the counted cash and, if you may see the expected cash, the expected cash and the difference (with the
    blind count it does not tell them to whoever may not see them: the assistant does not know them
-   either, F07), and whatever the shift review finds still open (F08).
+   either), and whatever the shift review finds still open.
 6. In that same answer, without you having to ask again, "Run this action?" shows with "Close in Cash
    register. Check each datum before going on.", the
    session by its number (never by its internal code) and the counted cash and, in "What will happen", what closing gives: the "Session", the
    "Drawer" (if the session has one), the "Expected in the drawer" and the "Difference", in the business's
-   currency (with the blind count, whoever may not see the expected cash does not get those two, F07).
+   currency (with the blind count, whoever may not see the expected cash does not get those two).
    Type "CONFIRM" and tap "Run it". That very session closes, in your name and with the three amounts,
    just as from the screen.
 7. If you tap "Cancel", nothing closes: the session stays open and the assistant says so ("Not done,
@@ -398,11 +427,11 @@ cash; what is charged or recorded by card, transfer or other does not count), co
 happens afterwards (a void of a sale from yesterday) goes to the open shift, never to this one.
 If it fails: "Type the counted cash to close the session." with the field empty (the screen always asks
 for it; the required count setting enforces it on the assistant and the API too); an unreadable, negative or
-ambiguous one is said under the field and closes nothing (it is read as in F03). "Close session" is grey
+ambiguous one is said under the field and closes nothing (it is read as the float when opening the session). "Close session" is grey
 while the business has not yet said its currency, and the last closing count is not written in the field
 until then: the counted cash is written and read in it (without it, "1500" yen would be saved as 150,000
 and a count of 1500 yen would show as "15.00"). If the currency cannot be read, the window says so ("The business's currency could not be read", with the
-reason) and offers "Retry", which asks for it again; as soon as it arrives, "Close session" lights up (hub#938). If another device
+reason) and offers "Retry", which asks for it again; as soon as it arrives, "Close session" lights up. If another device
 closed it before, "That cash session is closed: a closed session takes no new movements." (two closes at
 once: one closes, the other gets this notice). To the assistant, if the count is required and you do not
 say how much you counted, it asks for it with that same notice and no confirmation shows; if the
@@ -478,7 +507,7 @@ In: the open session, the closed sessions and the business's currency.
 Out: nothing.
 If it fails: "The cash figures could not be loaded." with "Retry"; on the Home, a panel that cannot be
 read says "Unavailable". With the blind count, whoever cannot see the expected cash sees "—" in **Cash
-register** and has no expected cash panel on the Home (F07). With no closed sessions, "No closed sessions
+register** and has no expected cash panel on the Home. With no closed sessions, "No closed sessions
 yet." (on the Home, "No data").
 Involved: CASH_REGISTER-F07, F09
 
@@ -501,7 +530,7 @@ comps).
 Out: the line in the open session, at once (the screen refreshes by itself with the notice
 `sale.sale.completed`). A zero-total sale with no comps leaves nothing; an all-comp one leaves a
 zero-amount line with its cost.
-If it fails: with no open session, the charge is not lost: it shows in F17.
+If it fails: with no open session, the charge is not lost: it shows in "Sale lines in no shift".
 Involved: SALE-F01, SALE-F02, SALE-F03, SALE-F15
 
 ### CASH_REGISTER-F14 Offset a voided sale in the cash register
@@ -518,8 +547,8 @@ Steps:
    count.
 In: the voided sale and when it was voided (`sale.sale.voided`).
 Out: the void line. Each void is recorded only once.
-If it fails: with no open session, the void shows in F17. Voiding corrects nothing fiscal: the ticket
-stays issued (SALE-F30).
+If it fails: with no open session, the void shows in "Sale lines in no shift". Voiding corrects nothing fiscal: the
+ticket stays issued.
 Involved: SALE-F30
 
 ### CASH_REGISTER-F15 Record a refund in the cash register
@@ -534,7 +563,7 @@ Steps:
    the expected cash; a cash one refunded to the card does not touch it.
 In: the refund with its payment methods and amounts (`sale.sale.refunded`).
 Out: the refund line. Each payment method of each refund is recorded only once.
-If it fails: with no open session, the refund shows in F17.
+If it fails: with no open session, the refund shows in "Sale lines in no shift".
 Involved: SALE-F31
 
 ### CASH_REGISTER-F16 Print the session report (X or Z)
@@ -575,7 +604,7 @@ Steps:
    line from Sales fell in no shift:
    - with the cash register closed: what was charged, voided or refunded since the last shift, with no
      open session;
-   - with a session forgotten past its cut-off (F10): what came after the cut-off;
+   - with a session forgotten past its auto-close: what came after that time;
    - with a session open: the stragglers of the previous shift, confirmed while it was being closed (its Z
      no longer picks them up).
 2. Tap "View" to see the list (when, type, amount, method and document). It is read-only: a single

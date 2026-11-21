@@ -3,7 +3,7 @@ out recorded by hand, the counts by notes and coins, and the close that compares
 the counted one (WORKBOOK.md). The sale lines of a shift are read from sale, its requirement."""
 
 from django.utils.translation import gettext_lazy as _
-from live.meta import Category, LiveAppConfig, Nav, SetupCheck, SetupStep, Widget
+from live.meta import Category, Help, LiveAppConfig, Nav, SetupCheck, SetupStep, Widget
 
 from apps.cash_register.events import SESSION_EVENTS, SETTINGS_UPDATED
 
@@ -113,6 +113,7 @@ class CashRegisterConfig(LiveAppConfig):
             "settings", _("Settings"), "ion:settings-outline", "/cash_register/settings"
         ),
     ]
+    help = Help()
     # The Home's step and panels, on the queries the drawer's own screens read. The factory values apply from the
     # start, so «Your cash drawer» waits for the business's own save (CASH_REGISTER-F01), even of the values as they
     # came.

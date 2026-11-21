@@ -8,6 +8,7 @@ from django.utils import translation
 from live.live_registry import live_registry
 from live.meta import (
     Category,
+    Help,
     LiveAppConfig,
     Nav,
     SetupCheck,
@@ -353,3 +354,7 @@ def test_the_hooks_icons_are_registered_in_the_shell():
 
 def test_cash_register_has_no_bell_counters():
     assert config().bell == []
+
+
+def test_its_help_window_is_ready_without_a_video_yet():
+    assert config().help == Help()
