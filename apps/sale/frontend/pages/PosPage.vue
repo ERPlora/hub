@@ -43,6 +43,7 @@ import TableFollower from '../components/pos/TableFollower.vue';
 import TablePicker from '../components/pos/TablePicker.vue';
 import { shortTime } from '../components/pos/till';
 import VoidLineSheet from '../components/pos/VoidLineSheet.vue';
+import { useAppOn } from '../composables/pos/useAppOn';
 import { useDrawerFocus } from '../composables/pos/useDrawerFocus';
 import { useSystemBack } from '../composables/pos/useSystemBack';
 import { type OpenLine, useTill, type WriteResult } from '../composables/pos/useTill';
@@ -222,9 +223,7 @@ const addOpenLine = (line: OpenLine) =>
 
 // ── The options of Modifiers (SALE-F11; Modifiers' operations only) ──────────────────────────────
 /** A product may carry options: Modifiers on in this business and the right to read it. */
-const modifiersOn = computed(
-  () => !!session.me.value?.apps.some((app) => app.label === 'modifier' && app.state === 'on') && session.can('modifier.view'),
-);
+const modifiersOn = useAppOn('modifier', 'modifier.view');
 const groupsOf = useCommand('modifier.group.for_target');
 const optioning = shallowRef<{ product: ProductOut; groups: TargetGroupOut[] } | null>(null);
 const optionsOpen = computed({
@@ -760,7 +759,6 @@ onBeforeUnmount(() => {
       <ComboSheet
         v-model:open="menuOpen"
         :combo="composing"
-        :options="modifiersOn"
         :pending="sheetPending"
         :error="sheetError"
         @add="addCombo"

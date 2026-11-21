@@ -10,6 +10,7 @@ import type { DishGroups } from '../../composables/pos/useDishGroups';
 import { useT } from '../../composables/useT';
 import type { Choice } from '../../lib/modifierChoice';
 import ChoiceGroupSection, { modifierSections, type SectionGroup } from './ChoiceGroupSection.vue';
+import './ComboDishOptions.css';
 
 const props = defineProps<{
   dish: { id: string; name: string };
@@ -28,12 +29,12 @@ const sections = computed(() => (props.groups.state === 'ready' ? modifierSectio
 <template>
   <section
     v-if="groups.state !== 'ready' || sections.length"
-    class="pos-sheet-nested"
-    :class="{ 'pos-sheet-nested--missing': attention === true }"
+    class="pos-menu-dish-options"
+    :class="{ 'pos-menu-dish-options--missing': attention === true }"
     :aria-label="dish.name"
     :data-testid="`pos-menu-dish-options-${dish.id}`"
   >
-    <p class="pos-sheet-nested__name">
+    <p class="pos-menu-dish-options__name">
       {{ dish.name }}
     </p>
     <p

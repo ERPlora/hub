@@ -6,7 +6,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { TargetGroupOut } from '../../../../modifier/frontend/operations';
-import { click, mountSale, settle } from '../../__tests__/mount-sale';
+import { click, MANAGER, mountSale, settle } from '../../__tests__/mount-sale';
 import { plain } from '../../lib/format';
 import { menuDish as dish, product, refused, saleMenu } from './__tests__/fixtures';
 import ComboSheet from './ComboSheet.vue';
@@ -27,15 +27,27 @@ const DONENESS: TargetGroupOut = {
   is_required: true,
   options: [option('rare', 'Poco hecho'), option('done', 'Hecho')],
 };
-const EXTRAS: TargetGroupOut = { ...DONENESS, id: 'extras', name: 'Extras', min_choices: 0, max_choices: 2, is_required: false, options: [option('cheese', 'Queso', 100)] };
+const EXTRAS: TargetGroupOut = {
+  ...DONENESS,
+  id: 'extras',
+  name: 'Extras',
+  min_choices: 0,
+  max_choices: 2,
+  is_required: false,
+  options: [option('cheese', 'Queso', 100), option('bacon', 'Beicon'), option('egg', 'Huevo')],
+};
 const MILK: TargetGroupOut = { ...EXTRAS, id: 'milk', name: 'Leche', options: [option('oat', 'De avena', 20)] };
 const GROUPS: Record<string, TargetGroupOut[]> = { 'p-steak': [DONENESS, EXTRAS], 'p-latte': [MILK] };
 
 type Answer = (productId: string) => Response | Promise<Response>;
 const groupsOf: Answer = (id) => Response.json({ product_id: id, product_name: id, groups: GROUPS[id] ?? [] });
 
-async function setup(props: Record<string, unknown> = {}, groups: Answer = groupsOf) {
-  const m = await mountSale(ComboSheet, { props: { open: false, combo: MENU, pending: false, error: null, options: true, ...props }, locale: 'es' });
+/** Modifiers on in the business and readable by the manager, as the till asks the options of a dish. */
+const WITH_MODIFIERS = { ...MANAGER, permissions: [...MANAGER.permissions, 'modifier.view'], apps: [{ label: 'modifier', state: 'on' as const }] };
+
+async function setup(props: Record<string, unknown> = {}, groups: Answer = groupsOf, modifiers = true) {
+  const session = modifiers ? WITH_MODIFIERS : MANAGER;
+  const m = await mountSale(ComboSheet, { props: { open: false, combo: MENU, pending: false, error: null, ...props }, locale: 'es', session });
   m.net.onApi((call) => {
     const url = new URL(call.url, 'http://test');
     if (url.pathname === '/api/modifier/groups/for_target') return groups(url.searchParams.get('product_id') ?? '');
@@ -73,6 +85,29 @@ describe('ComboSheet: the options of a dish', () => {
     await click(s.inDoc('pos-menu-add'));
     expect(s.wrapper.emitted('add')).toBeUndefined();
     expect(within(s, 'steak', 'pos-options-group-doneness')?.classList.contains('pos-options__group--missing')).toBe(true);
+  });
+
+  it('waits, marked as waiting, while a group of a dish is short, and stops waiting once it is complete', async () => {
+    const s = await setup();
+    await click(s.inDoc('pos-menu-dish-steak'));
+    await settle();
+    const add = () => s.inDoc('pos-menu-add');
+    expect(add()?.getAttribute('aria-disabled')).toBe('true');
+    expect(add()?.classList.contains('pos-menu__add--waiting')).toBe(true);
+    await click(within(s, 'steak', 'pos-option-rare'));
+    expect(add()?.hasAttribute('aria-disabled')).toBe(false);
+    expect(add()?.classList.contains('pos-menu__add--waiting')).toBe(false);
+  });
+
+  it('a tap a full group of a dish refuses points at that group and says it is full', async () => {
+    const s = await setup();
+    await click(s.inDoc('pos-menu-dish-steak'));
+    await settle();
+    for (const id of ['cheese', 'bacon', 'egg']) await click(within(s, 'steak', `pos-option-${id}`));
+    expect(within(s, 'steak', 'pos-option-egg')?.getAttribute('aria-pressed')).toBe('false');
+    const extras = within(s, 'steak', 'pos-options-group-extras');
+    expect(extras?.classList.contains('pos-options__group--missing')).toBe(true);
+    expect(extras?.textContent).toContain('«Extras» está completo');
   });
 
   it('adds the options to the total and hands the dish up with them', async () => {
@@ -120,7 +155,7 @@ describe('ComboSheet: the options of a dish', () => {
     expect(within(s, 'steak', 'pos-menu-dish-options-error-steak')?.textContent).toContain('No se han podido leer los suplementos');
     await click(s.inDoc('pos-menu-add'));
     expect(s.wrapper.emitted('add')).toBeUndefined();
-    expect(s.inDoc('pos-menu-dish-options-steak')?.classList.contains('pos-sheet-nested--missing')).toBe(true);
+    expect(s.inDoc('pos-menu-dish-options-steak')?.classList.contains('pos-menu-dish-options--missing')).toBe(true);
     failing = false;
     await click(within(s, 'steak', 'pos-menu-dish-options-retry-steak'));
     await settle();
@@ -139,7 +174,7 @@ describe('ComboSheet: the options of a dish', () => {
   });
 
   it('without Modifiers the dishes are picked as before, with nothing to read', async () => {
-    const s = await setup({ options: false });
+    const s = await setup({}, groupsOf, false);
     await click(s.inDoc('pos-menu-dish-steak'));
     await settle();
     expect(s.inDoc('pos-menu-dish-options-steak')).toBeNull();

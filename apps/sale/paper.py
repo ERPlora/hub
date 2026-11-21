@@ -63,7 +63,8 @@ def _item(line, decimals: int) -> dict:
     item = {"name": f"+ {name}" if child else name, "quantity": float(line.quantity), "total": units(line.line_total, decimals)}
     if line.modifiers:
         item["modifiers"] = list(line.modifiers)
-    if line.components:
+    # A dish of a split menu is a line of its own (it has its product), its options already under it.
+    if line.components and getattr(line, "product_id", None) is None:
         item["components"] = [_dish(dish) for dish in line.components]
     notes = [(line.notes or "").strip()] if hasattr(line, "notes") else []
     if line.paid_by_voucher:

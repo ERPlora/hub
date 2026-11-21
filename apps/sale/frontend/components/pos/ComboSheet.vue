@@ -5,8 +5,8 @@
 // instead of adding (never the native `disabled`: a touchscreen would swallow the tap and nobody would learn why);
 // once each one is complete it says «Add · <total>», the closed price plus the supplements (a preview: Menus prices
 // the line on the server). The dishes go up, each once with how many times; the server's refusal is read over the
-// button. With Modifiers (`options`), a dish picked asks its groups right under its course (SALE-F42): the button names
-// a group still short as it names a course, the total adds the options, and each dish goes up with their ids.
+// button. With Modifiers on and readable, a dish picked asks its groups right under its course (SALE-F42): the button
+// names a group still short as it names a course, the total adds the options, and each dish goes up with their ids.
 import { type AllergenCode, InlineFeedback } from '@erplora/ui/components';
 import { useCommand } from '@erplora/ui/sdk';
 import { IonButton, IonSpinner } from '@ionic/vue';
@@ -14,6 +14,7 @@ import { computed, shallowRef, watch } from 'vue';
 
 import type { SaleComboOut } from '../../../../combo/frontend/operations';
 import { useLocale, useT } from '../../composables/useT';
+import { useAppOn } from '../../composables/pos/useAppOn';
 import { useDishGroups } from '../../composables/pos/useDishGroups';
 import { useSheetChoice } from '../../composables/pos/useSheetChoice';
 import {
@@ -37,7 +38,7 @@ import ChoiceGroupSection, { type SectionGroup } from './ChoiceGroupSection.vue'
 import ComboDishOptions from './ComboDishOptions.vue';
 import PosSheet from './PosSheet.vue';
 
-const props = defineProps<{ combo: SaleComboOut | null; pending: boolean; error: string | null; options?: boolean }>();
+const props = defineProps<{ combo: SaleComboOut | null; pending: boolean; error: string | null }>();
 const open = defineModel<boolean>('open', { default: false });
 const emit = defineEmits<{ add: [choices: ComboChoiceIn[]] }>();
 
@@ -96,7 +97,8 @@ const sections = computed<SectionGroup[]>(() =>
     options: group.options.map((option) => ({ ...option, label: option.product_name, allergens: dishAllergens.value[option.product_id] ?? [] })),
   })),
 );
-const dishes = computed(() => (props.options ? pickedDishes(groups.value, choice.value) : []));
+const modifiersOn = useAppOn('modifier', 'modifier.view');
+const dishes = computed(() => (modifiersOn.value ? pickedDishes(groups.value, choice.value) : []));
 const groupsOf = (productId: string) => {
   const read = dishGroups.of(productId);
   return read?.state === 'ready' ? read.groups : null;

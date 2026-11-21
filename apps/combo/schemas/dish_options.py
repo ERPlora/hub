@@ -18,7 +18,12 @@ class DishOptionIn(Schema):
     option_id: UUID = Field(description="The option of Modifiers.")
     name: str = Field(max_length=200, description="Its name, as the ticket prints it.")
     kitchen_name: str = Field(max_length=200, description="Its name for the kitchen.")
-    price_delta: int = Field(ge=-10_000_000, le=10_000_000, description="Its price in cents, per pick of the dish.")
+    price_delta: int = Field(
+        ge=-10_000_000,
+        le=10_000_000,
+        description="Its price in cents, per pick of the dish.",
+        json_schema_extra={"money": True},
+    )
     tax_category_key: str | None = Field(None, max_length=80, description="Its own tax category, if it has one.")
     own_line: bool = Field(False, description="True: it taxes apart from its dish (another tax category).")
     allergens: list[str] = Field(default_factory=list, max_length=20, description="The allergens it adds to the dish.")
