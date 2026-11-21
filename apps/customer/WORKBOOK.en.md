@@ -1,6 +1,13 @@
-<!-- generated from WORKBOOK.md sha256:46a072ac4c989b32b9e61da2a2ff57e10e02c1ab73579f949e9d8d3ed4f8144d -->
+<!-- generated from WORKBOOK.md sha256:50630418f4461c283c70acd93bdfb4284da9d1278dfe2e7fdee8075e01b0fe75 -->
 
 ## What it is for and who it is for
+
+Customers is the file of the people and companies of your business: each one's card with their contact and tax
+details, their groups and tags, your notes, their permission to receive advertising through each channel and what
+they have bought from you. In the hair salon it is the client of the agenda; in the restaurant, the guest who books
+or asks for an invoice.
+
+### In detail
 
 Customers is the business's **file of people and companies** and the owner of their personal data: the
 card with the contact and tax details, its groups, tags and own fields, its notes and its activity, its
@@ -15,7 +22,7 @@ It is the app the others depend on most: the till asks it for the sale's custome
 Appointments and Reservations look them up by name or phone, WhatsApp recognises them by their number and
 all of them learn when two cards are merged or a person's data is erased. Customers needs no other app.
 
-Who uses it:
+### Who uses it and what each one does
 
 - The **owner** and the **administrator**: everything, also deleting cards and erasing personal data.
 - The **manager**: edits cards, merges duplicates, creates and changes groups, tags and fields (and
@@ -73,16 +80,24 @@ has its own database: its cards are seen by that business alone.
 ## Screens
 
 Customers opens from the **Customers** menu and has four tabs: **Customers**, **Groups**, **Tags** and
-**Fields**. It has no settings tab.
+**Fields**. It has no settings tab. The till's customer search is not a tab of Customers: it lives in
+**Sales & POS → Sell**, behind the "Assign customer" button.
 
 ### Customers
+Here is the file of your customers. At the top you see four figures: how many there are, how many are active, how
+many are VIP and how much they have spent. Below, the list: look them up by name, phone, email, tax ID or company,
+filter them and sort them. With **Add** you create a card, with **Import CSV** you bring in the customers you
+already had and with **Export CSV** you take them to a spreadsheet. Tap a row to open their card: their details,
+your notes, their advertising permission, their allergies and their purchases.
+
+#### Detail
 At the top, four figures: "Customers", "Active", "VIP" and "Revenue" (what the live cards have spent).
 Below, the table: "Name", "Email", "Phone", "Stage" and "Spent"; search "Search name, phone or email…"
 (it also searches tax ID and company); filters by stage, source, active and spent ("From / To", in the
 business's currency); sort by any column; 50 per page. In the bar, **Add** and **Import CSV** for whoever
 may manage cards, and **Export CSV** for whoever may export. Tapping a row opens the card.
 
-### Customer card
+#### Customer card
 The name and the buttons the profile allows: **Edit**, **Delete**, **Merge with…** and **Erase personal
 data** (the employee sees **Merge with…**, which they do with a manager's PIN). Blocks: the details (Email, Phone, Tax ID, Company, Address, Stage, Source, Preferred channel,
 Purchases, Spent, Last purchase, Active, internal notes, birthday, anniversary and custom fields);
@@ -91,47 +106,30 @@ was decided"; "Add note"; "Activity"; "Purchases" (each sale with its amount and
 end the blocks of other apps (today, the "Visit history" of Appointments).
 
 ### Groups
+Groups sort your customers, for example "Members" or "Companies". Here you create them, change their name or
+color, deactivate them and delete them; then, on each customer's card, you tick which groups they belong to.
+
+#### Detail
 Table "Name", "Description", "Customers" (how many live cards it has), "Order" and "Active"; search
 "Search group…" and an active filter; **Add** and **Edit** for whoever may configure and for the
 employee (with a manager's PIN), **Delete** for the owner and the administrator.
 
 ### Tags
+Tags are colored marks you put on a card to recognise the customer at a glance, for example "Regular" or "Prefers
+mornings". Here you create, change and delete them; on each customer's card you tick the ones they carry.
+
+#### Detail
 Table "Name", "Color", "Customers" and "Active"; search "Search tag…"; same actions as Groups.
 
 ### Fields
+Own fields are the details your business wants to keep about each customer and that the card does not bring, such
+as their size or their hair type. Here you create them with their type (text, number, date, yes or no, a list of
+options or a long text) and decide whether they are required; they show on the card of all your customers.
+
+#### Detail
 Table "Name", "Type", "Required" (Yes/No), "Order" and "Active"; search "Search field…"; filters by
 type, required and active; **Add**, **Edit** and **Delete** for whoever may configure and for the
 employee (with a manager's PIN).
-
-### Till customer search
-It lives inside the sale screen of **Sales & POS**: an "Assign customer" button (or the name of the
-customer already chosen) opens a search by name, phone or email, with "+ New customer «…»" (name and
-phone) and **Remove customer**. Customers paints it; Sales & POS keeps the slot.
-
-### Till customer search · API
-The Customers component `CustomerSearch` (Sales & POS imports it by its path, from the Customers
-components).
-
-```vue
-<CustomerSearch v-model="venta.cliente" v-model:open="eligiendo" />
-```
-
-- `v-model` (`CustomerSnapshot | null`): the assigned customer, as a COPY of their tax card at that
-  moment: `customer_id`, `customer_name`, `customer_tax_id`, `customer_address` ("street, postal code
-  city, country", in the page's language) and `customer_country` (two-letter ISO code, or empty). `null` =
-  no customer.
-- `v-model:open` (optional): opens and closes the search; Sales & POS sets it to `true` when it requires
-  a customer and there is none.
-- The button says "Assign customer" or the customer's name. The search (an `ion-modal`) looks by name,
-  phone or email among the first 20 cards, live, and tells apart "searching", "no results", "down" (with
-  "Retry") and "no permission". On choosing it reads the whole card (`customer.customer.detail`); if it
-  cannot be read, it does not assign and says so. "+ New customer «…»" (whoever manages cards) creates
-  with name and phone; if live cards already have that phone, it shows them and asks "use or create a new
-  one" (it never assigns without choosing; F12, F18). "Remove customer" returns `null`.
-- It does not link the order: that belongs to Sales & POS, with `customer.order.link` and
-  `customer.order.customer` (F19).
-- While Sales & POS does not exist, it is seen and tested at `/customer/preview/customer-search` (only
-  on the development server; never in the production build).
 
 ## States of each screen
 
@@ -196,8 +194,7 @@ Status: done
 Actor: owner, administrator, manager, employee
 Screen: Customers
 Steps:
-1. In **Customers** tap **Add**: the "New customer" dialog opens (the product's side panel, asked of
-   `@erplora/ui` in `UI-REQUESTS.md`).
+1. In **Customers** tap **Add**: the "New customer" dialog opens.
 2. In sight: "Name", "Phone", "Email", "Tax ID" and "Company". Behind "More details": "Address", "City",
    "Postal code", "Country", "Photo" (its address), "Birthday", "Anniversary", "Source" ("Walk-in" to
    begin with), "Stage" ("Lead" to begin with), "Preferred channel" ("None" to begin with) and "Internal
@@ -224,16 +221,16 @@ Screen: Customers
 Steps:
 1. Type in the search. It searches at once in name, email, phone, tax ID and company, ignoring case and
    accents ("garcia" finds "García"). A term made only of digits and phone signs (with spaces, dashes or
-   brackets, with `+` or `00` in front) is searched by its digits, without the `00` or the national zero,
+   brackets, with the + or the 00 in front) is searched by its digits, without the 00 or the national zero,
    so the card is found however it is written.
 2. With the filters: stage, source, active and spent by range ("From / To", in the business's currency,
    the one of its country in Settings → Business, with its decimals: the yen has none; with or without its
-   symbol, "12,50 zł"). The amount is typed as in any amount field of the Hub and as in the other lists
-   (hub#1196): with or without thousands separators ("1.000,50", "1,000.50", "2 500"); in euros "1.000"
+   symbol, "12,50 zł"). The amount is typed as in any amount field of the Hub and as in the other lists:
+   with or without thousands separators ("1.000,50", "1,000.50", "2 500"); in euros "1.000"
    could be a thousand euros or one euro, and it asks for the decimals.
 3. Sort by name, email, phone, stage, spent, last purchase or date added. To begin with, by name from A
    to Z, 50 per page (at most 100).
-4. Tap a row to open its card (CUSTOMER-F03).
+4. Tap a row to open its card.
 In: the text, the filters and the sort.
 Out: nothing; read only. Cards that are deleted, merged into another or with their data erased do not
 show; those marked as not active do.
@@ -268,7 +265,7 @@ Actor: everyone who manages cards (owner, administrator, manager, employee)
 Screen: Customer card
 Steps:
 1. On the card tap **Edit**: the details become the add form, plus the business's "Custom fields" (each
-   with its shape: text, number, date, yes/no, select or long text; the required ones carry `*`) and the
+   with its shape: text, number, date, yes/no, select or long text; the required ones carry an asterisk) and the
    "Active" checkbox.
 2. Change what is needed. Emptying a field is also a change.
 3. Tap **Save**. "Customer updated" shows.
@@ -330,9 +327,9 @@ Actor: owner, administrator
 Screen: Customer card
 Steps:
 1. On the card tap **Delete**.
-2. A dialog asks "Delete customer" — "Delete {name}? They no longer show in the list, at the till or in
+2. A dialog asks "Delete customer" — "Delete Ana García? They no longer show in the list, at the till or in
    the search by phone. Their sales are kept." with **Cancel** and **Delete**.
-3. On confirming, "Customer {name} deleted" shows and the card disappears from the list, the till and
+3. On confirming, "Customer Ana García deleted" shows and the card disappears from the list, the till and
    the search by phone.
 In: the card.
 Out: the card marked as deleted KEEPING its details, its activity, its consents, its purchases and its
@@ -350,17 +347,19 @@ Actor: everyone who manages cards
 Screen: Customers
 Steps:
 1. Tap **Import CSV** and choose the file.
-2. Headers it understands: `name`/"Nombre", `email`/"Email"/"correo", `phone`/"Teléfono"/"tel",
-   `tax_id`/"NIF"/"CIF", `company_name`/"Empresa", `address`/"Dirección", `city`/"Ciudad",
-   `postal_code`/"CP"/"Código postal", `country`/"País", `lifecycle_stage`/"Etapa" and `notes`/"Notas"
-   (the same columns the export gives, CUSTOMER-F09), and also `source`, `preferred_channel`,
-   `birthday`, `anniversary` and `avatar`.
-3. While it works, "Importing…" shows. When it ends, a summary "Import: {total} rows — {created}
-   created, {skipped} skipped." with each skipped row and its reason, which begins with the column it
+2. The first row of the file names the columns, with the export's names (name, email, phone, tax_id,
+   company_name, address, city, postal_code, country, lifecycle_stage and notes) or with their Spanish names,
+   such as "Nombre" or "Teléfono". A file exported from Customers can be imported again as it is.
+3. While it works, "Importing…" shows. When it ends, a summary such as "Import: 120 rows — 118
+   created, 2 skipped." with each skipped row and its reason, which begins with the column it
    speaks of ("Name: This field is required."; the same with an email or a phone that are not valid), and
    those with something to review ("Country not recognised: imported without country, check it on the
    card.").
-In: the file, which the screen sends in blocks of 50 rows.
+In: the file, which the screen sends in blocks of 50 rows. Headers it understands: `name`/"Nombre",
+`email`/"Email"/"correo", `phone`/"Teléfono"/"tel", `tax_id`/"NIF"/"CIF", `company_name`/"Empresa",
+`address`/"Dirección", `city`/"Ciudad", `postal_code`/"CP"/"Código postal", `country`/"País",
+`lifecycle_stage`/"Etapa" and `notes`/"Notas" (the same columns the export gives, CUSTOMER-F09), and also
+`source`, `preferred_channel`, `birthday`, `anniversary` and `avatar`.
 Out: the cards created, with source "Import", the phone in the international format and without consent
 (even if the file brings a consent column), and a card-created notice for each one, so WhatsApp joins
 their conversations as with adding by hand. A row without stage comes in as "Active" (it is a customer
@@ -370,7 +369,7 @@ If it fails: a bad row is skipped with its reason and the others are created. A 
 phone and email as a card already there (because it was already imported or because the file repeats it)
 is skipped with "There is already a card with this name, phone and email: it is not created again."; so,
 importing the same file again after a cut halfway only creates what was missing. It is enough for one of
-the three to change for it to be created (a mother and her daughter share a phone, CUSTOMER-F12).
+the three to change for it to be created (a mother and her daughter may share a phone).
 Involved: WHATSAPP_INBOX-F04
 
 ### CUSTOMER-F09 Export the cards to CSV
@@ -379,7 +378,7 @@ Actor: owner, administrator, manager
 Screen: Customers
 Steps:
 1. With the search and the filters wanted, tap **Export CSV**.
-2. The browser downloads `customers.csv` with ALL the cards that match the search, not only the page
+2. The browser downloads the file "customers.csv" with ALL the cards that match the search, not only the page
    that is seen.
 In: the table's search and filters.
 Out: a file with the columns `name`, `email`, `phone`, `tax_id`, `company_name`, `address`, `city`,
@@ -420,19 +419,19 @@ Actor: whoever adds or edits
 Screen: Customer card
 Steps:
 1. When adding, editing, importing or creating at the till or through WhatsApp, the phone is written as
-   one has it (with spaces or dashes, with `0034` or `+34` in front, or with another country's prefix and
+   one has it (with spaces or dashes, with 0034 or +34 in front, or with another country's prefix and
    the national zero in brackets).
-2. On saving, libphonenumber's rules are read: with the prefix it carries or, if it carries none, in the
+2. On saving, the number is read with the prefix it carries or, if it carries none, as a number of the
    business's country (Spain if it has none, see "Before you start"); out go spaces, dashes, dots, slashes,
    brackets and the national zero (also in brackets after the prefix). Italy and the other countries that
-   keep the `0` after the prefix keep it. The number has to be a valid number of its country (its
-   numbering, not only its length). It is stored with its prefix and the digits together (`+34` and the
+   keep the 0 after the prefix keep it. The number has to be a valid number of its country (its
+   numbering, not only its length). It is stored with its prefix and the digits together (+34 and the
    nine digits, for a Spanish number).
 3. Emptying the phone is allowed: only the name is required.
 In: the typed phone.
 Out: the phone in E.164 on the card. Whoever copies it (Appointments in the appointment) copies it
 already normalised.
-If it fails: a number that is not valid in its country (`600111` in Spain, a range not in use), with
+If it fails: a number that is not valid in its country (600111 in Spain, a range not in use), with
 letters (an extension) or with two numbers in the same field is rejected with "This is not a valid phone
 number of its country: check the digits or write it with its international prefix (+44…)." and nothing
 is saved.
@@ -441,14 +440,15 @@ Involved: APPOINTMENT-F01, WHATSAPP_INBOX-F04
 ### CUSTOMER-F12 Avoid duplicate cards of the same person
 Status: done
 Actor: everyone who manages cards
-Screen: Customers and Till customer search
+Screen: Customers, Till customer search
 Steps:
-1. Before creating, search by name, phone, email or tax ID (CUSTOMER-F02).
-2. In the till's quick add, if the phone is that of one or more live cards (CUSTOMER-F10), they are shown
-   and it asks: use one of them or create another (it may be another person with the same phone). It
-   never assigns without choosing (CUSTOMER-F18).
+1. Before creating, search by name, phone, email or tax ID in the search of **Customers**.
+2. In the till's quick add, if the phone is that of one or more cards, they are shown and it asks: use
+   one of them or create another (it may be another person with the same phone). It never assigns without
+   choosing.
 3. On WhatsApp, the appointment answer only creates a card if the search by number finds nobody.
-4. If there are already two cards of the same person, they are joined with CUSTOMER-F13.
+4. If there are already two cards of the same person, they are joined with **Merge with…** from the card
+   that stays.
 In: what is typed.
 Out: nothing of its own. On purpose, no rule prevents two cards with the same phone, email or tax ID: a
 mother and her daughter share a phone, and a company gives the same email to several people.
@@ -462,12 +462,12 @@ Screen: Customer card
 Steps:
 1. Open the card that is going to STAY and tap **Merge with…**.
 2. Look for the duplicate (name, email, phone, tax ID or company) and tap it.
-3. Read the warning: "{absorbed} will be merged into {surviving}: its appointments, sales, bookings,
-   conversations, prepaid packages, notes and consents move to {surviving}, empty fields are filled from
-   it, and {absorbed} disappears from the list. This cannot be undone.".
-4. Tap **Merge**. "{name} was merged into this customer." shows.
+3. Read the warning, which names both cards: "Ana G. will be merged into Ana García: its appointments,
+   sales, bookings, conversations, prepaid packages, notes and consents move to Ana García, empty fields are
+   filled from it, and Ana G. disappears from the list. This cannot be undone.".
+4. Tap **Merge**. "Ana G. was merged into this customer." shows.
 5. If an employee taps it, "An approval is needed" opens on top first with "Approving: Merge two customer
-   cards", and a manager approves it with their PIN (or their badge) on that same device (BASE-F84); then
+   cards", and a manager approves it with their PIN (or their badge) on that same device; then
    they are merged.
 In: the two cards, live and different.
 Out: the one that stays keeps its details and only fills its EMPTY fields with the other's (also the
@@ -521,7 +521,8 @@ In: the channel and, if wished, a reason.
 Out: a new fact (the earlier "Given" is kept: it proves the time when writing was allowed), "Consent
 withdrawn" in the activity and the `customer.consent.withdrawn` notice. Giving it again later is another
 fact.
-If it fails: like CUSTOMER-F14.
+If it fails: "This customer is no longer available." if the card is no longer there. Whoever does not
+manage cards sees the status without buttons.
 Involved: none
 
 ### CUSTOMER-F16 Erase a customer's personal data (GDPR)
@@ -530,7 +531,7 @@ Actor: owner, administrator
 Screen: Customer card
 Steps:
 1. On the card tap **Erase personal data**.
-2. "Erase personal data (GDPR)" shows with the text "This erases {name}'s personal data, their notes,
+2. "Erase personal data (GDPR)" shows with the text "This erases Ana García's personal data, their notes,
    their activity, their health data and their custom fields, and cannot be undone. Sales and invoices
    keep their reference. An audit entry records who, when and why." and the field "Reason (kept in the
    audit)".
@@ -675,7 +676,7 @@ Status: done
 Actor: everyone
 Screen: Customer card
 Steps:
-1. Open the card (CUSTOMER-F03).
+1. Open the customer's card from **Customers**.
 2. In "Purchases" each sale shows with its date, its amount (in the currency it was charged in) and its
    status ("Paid" or "Voided"), and each refund on its own line ("Refund", amount negative), the newest
    first, 50 per page; it can be filtered by status.
@@ -747,14 +748,14 @@ Screen: Groups
 Steps:
 1. In **Groups** tap **Add** ("New group"): "Name" (required), "Description", "Color" and "Order".
    **Save** → "Group created".
-2. To change it, tap the row ("Edit · {name}"), which adds the "Active" checkbox. **Save** → "Group
+2. To change it, tap the row ("Edit · Members"), which adds the "Active" checkbox. **Save** → "Group
    updated". A deactivated group stops being offered on the cards (those that have it keep it) and stays
    in the list with the inactive filter, from where it is activated again.
-3. To remove it, **Delete**: "Delete {name}? The customers who have it lose it." → "Group {name}
+3. To remove it, **Delete**: "Delete Members? The customers who have it lose it." → "Group Members
    deleted".
 4. If an employee taps **Save**, "An approval is needed" opens on top first with "Approving: Create a
    customer group" (or "Change a customer group"), and a manager approves it with their PIN (or their
-   badge) on that same device (BASE-F84). Deleting is never asked for: the employee does not see it.
+   badge) on that same device. Deleting is never asked for: the employee does not see it.
 In: the group's details.
 Out: the group, which is assigned from each card (CUSTOMER-F06), and its notice
 (`customer.group.created`, `.updated`, `.deleted`). Deleting a group really removes it from all its
@@ -773,10 +774,10 @@ owner and administrator)
 Screen: Tags
 Steps:
 1. In **Tags** tap **Add** ("New tag"): "Name" and "Color". **Save** → "Tag created".
-2. When editing ("Edit · {name}") "Active" appears, as in the groups. **Save** → "Tag updated".
-3. **Delete**: "Delete {name}? The customers who have it lose it." → "Tag {name} deleted".
+2. When editing ("Edit · Regular") "Active" appears, as in the groups. **Save** → "Tag updated".
+3. **Delete**: "Delete Regular? The customers who have it lose it." → "Tag Regular deleted".
 4. As with the groups, the employee saves with a manager's PIN: "Approving: Create a customer tag" (or
-   "Change a customer tag") (BASE-F84). Deleting is not offered to them.
+   "Change a customer tag"). Deleting is not offered to them.
 In: name and color.
 Out: the tag, which is assigned from each card (CUSTOMER-F06), and its notice (`customer.tag.created`,
 `.updated`, `.deleted`). Deleting it removes it from all its cards.
@@ -791,14 +792,14 @@ Screen: Fields
 Steps:
 1. In **Fields** tap **Add** ("New custom field"): "Name", "Type" ("Text", "Number", "Date", "Yes/No",
    "Select" or "Long text"), the "Options" if it is a select, "Order" and, if needed, "Required".
-2. **Save** → "Field created". The field appears on the card of ALL the customers (CUSTOMER-F03, F04),
-   with its shape.
-3. When editing ("Edit · {name}") "Active" appears: an inactive field does not show on the cards and is
+2. **Save** → "Field created". The field appears on the card of ALL the customers, when viewing and
+   editing it, with its shape.
+3. When editing ("Edit · Size") "Active" appears: an inactive field does not show on the cards and is
    not demanded, and its values stay. Everything can be changed except the type, if there are already
-   cards with a value. **Delete** → "Delete {name}? The values saved on the cards are deleted too." →
-   "Field {name} deleted".
+   cards with a value. **Delete** → "Delete Size? The values saved on the cards are deleted too." →
+   "Field Size deleted".
 4. If an employee saves or deletes, a manager approves it first with their PIN (or their badge) on that
-   same device (BASE-F84): "Approving: Create a custom field" ("Change…", "Delete a custom field").
+   same device: "Approving: Create a custom field" ("Change…", "Delete a custom field").
 In: the field's definition.
 Out: the field and its notice (`customer.field.created`, `.updated`, `.deleted`). "Required" is only
 demanded when saving the full card (CUSTOMER-F04), never when adding it (Customers, till, import or
@@ -876,8 +877,8 @@ the health data in the same step.
 If it fails: without the permission in force nothing is saved: "Record their permission first to keep
 health data.". A test with a future date: "This date is in the future."; a result without a date: "Enter
 the date of the test.", each under its field: it goes as soon as that field is corrected and comes back if
-the next try is refused too; what is not of a field shows in the block and stays until the next try
-(hub#854). "This customer is no longer available." if the card is no longer there. Whoever
+the next try is refused too; what is not of a field shows in the block and stays until the next try.
+"This customer is no longer available." if the card is no longer there. Whoever
 does not manage cards sees the block without buttons.
 Involved: CUSTOMER-F13, CUSTOMER-F16
 
