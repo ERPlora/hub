@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:6fcbe83deb2363de0e6333d787757ea977ff8b6e3a697b5b14674f900bf0270d -->
+<!-- generated from WORKBOOK.md sha256:03d1d1ed1b783425da2bb8aeeff7ad3c872bf06eedaa3b2135c263d5f56ad7b0 -->
 
 ## What it is for and who it is for
 
@@ -72,8 +72,9 @@ The table of the latest sales: "Date", "Sale", "Customer", "Method", "Amount" an
 also opens with the Home's link ending in `#actividad`.
 
 ### The bell
-At the top right, the last one in the bar, after "My apps" and the assistant's sparkles, on a phone too. It gathers
-what asks for an action and stays true until it is solved: "You cannot issue invoices yet", the failed events, the
+At the top right, the last one in the bar, after "My apps", the assistant's sparkles and, in the installed app,
+"Change business" (HUB_APP-F04 of ERPlora/app), on a phone too. It gathers what asks for an action and stays true
+until it is solved: "You cannot issue invoices yet", the failed events, the
 plan's limits, the appointments to confirm, the WhatsApp customers waiting for an answer, a printer that does not
 print… No notice is dismissed: it goes by itself once it is solved.
 
@@ -1765,7 +1766,8 @@ Steps:
 In: the session.
 Out: the session closed in the business; erplora.com's, only if the person confirms it.
 If it fails: if the business does not answer, the session expires by itself.
-Involved: BASE-F113 (in the Android app, it stops listening before leaving)
+Involved: BASE-F113 (in the Android app, it stops listening before leaving); HUB_APP-F04 (ERPlora/app: inside the
+app, "Change business" in the bar signs out the same way and only then forgets the business)
 
 ### BASE-F62 Decide whether this device is shared or personal
 Status: done
