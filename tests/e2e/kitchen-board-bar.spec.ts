@@ -1,7 +1,7 @@
 // flow: KITCHEN-F10 — Kitchen → Display with more tickets than fit, in Chrome: while the board scrolls, its bar of views
 // stays whole at the very top of the content and no ticket shows above it nor through it, on a phone, a tablet upright and
 // lying down and a desktop, and alone on the screen («Full screen»). The scrolled board is captured in 375×667,
-// 820×1180 and 1440×900 (`APP-KITCHEN-F10-scrolled-<size>`). What a run creates — the tickets «e2e kbb <run> <n>» — is
+// 820×1180 and 1440×900 (`kitchen-display-scrolled-<size>`). What a run creates — the tickets «e2e kbb <run> <n>» — is
 // deleted after it.
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
@@ -115,7 +115,7 @@ test('KITCHEN-F10: no ticket shows above the bar of views nor through it while t
     for (const size of SIZES) {
       await page.setViewportSize({ width: size.width, height: size.height });
       wrong.push(...(await overBar(page, size.label)));
-      if (CAPTURED.has(size.label)) await capture(page, `APP-KITCHEN-F10-scrolled-${size.label}`);
+      if (CAPTURED.has(size.label)) await capture(page, `kitchen-display-scrolled-${size.label}`);
     }
 
     await page.setViewportSize({ width: 1440, height: 900 });
