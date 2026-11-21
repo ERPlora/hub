@@ -88,9 +88,9 @@ Se abre también con el enlace del Inicio terminado en `#actividad`.
 
 ### La campana
 Arriba a la derecha, la última de la barra, después de «Mis apps» y de los destellos del asistente, también en el
-móvil. Reúne lo que pide una acción y sigue siendo verdad hasta que se resuelve: «Todavía no puedes facturar», los
-eventos caídos, los límites del plan, las citas por confirmar, los clientes de WhatsApp esperando respuesta, una
-impresora que no imprime… Ningún aviso se descarta: se va solo cuando se resuelve.
+móvil. Reúne lo que pide una acción y sigue siendo verdad hasta que se resuelve: «Todavía no puedes facturar», una
+factura del plan sin pagar, los eventos caídos, los límites del plan, las citas por confirmar, los clientes de WhatsApp
+esperando respuesta, una impresora que no imprime… Ningún aviso se descarta: se va solo cuando se resuelve.
 
 - **La campana.** Sin nada pendiente, solo la campana. Con algo, pasa a una píldora con la campana y el número, en el
   color y con el icono del aviso más grave (urgente, atención o información). Si un aviso tiene plazo, como la hora de
@@ -441,6 +441,7 @@ En la pantalla Archivos:
 | BASE-F114 | Devolver un negocio a un momento pasado desde el admin de Hubs | hecho |
 | BASE-F115 | Ver la ayuda de la pantalla de un módulo | hecho |
 | BASE-F116 | Leer las novedades de ERPlora | hecho |
+| BASE-F117 | Ver en la campana que el plan tiene una factura sin pagar | hecho |
 
 ### BASE-F01 Ver lo que le falta por configurar al negocio
 Estado: hecho
@@ -3309,6 +3310,33 @@ Sale: nada guardado: las novedades solo se leen.
 Si falla: «No se pudieron cargar las novedades» con «Reintentar»; la versión y su fecha siguen a la vista.
 Implicados: BASE-F41
 
+### BASE-F117 Ver en la campana que el plan tiene una factura sin pagar
+Estado: hecho
+Actor: propietario, administrador
+Pantalla: La campana
+Pasos:
+  1. erplora.com no consigue cobrar la renovación del plan del negocio y le da sus 7 días de margen (BILLING-F16): el
+     negocio sigue funcionando con todo su plan.
+  2. La campana de quien administra el negocio sube sin recargar con el aviso urgente «Tu plan de ERPlora tiene una
+     factura sin pagar», que llega como tarjeta y se recoge en ella. Su frase dice hasta cuándo: «Págala en
+     erplora.com: si no se paga antes del 24 de noviembre de 2026, el negocio se suspende. No se borra nada.», con la
+     fecha en el reloj del negocio, y el anillo de la campana se va vaciando en esa última semana.
+  3. «Pagar en erplora.com» abre en una pestaña nueva las facturas pendientes de este negocio en erplora.com, donde se
+     paga (BILLING-F17). Solo en el navegador: en la app instalada el aviso sale igual, sin el botón, y su frase ya
+     dice dónde pagarla.
+  4. Si se pasa el plazo y erplora.com todavía no lo ha suspendido, el aviso lo dice en el momento, sin recargar:
+     «Págala en erplora.com: su plazo terminó el 24 de noviembre de 2026 y el negocio se puede suspender en cualquier
+     momento. No se borra nada.», con el anillo vacío.
+  5. Al pagarla, el aviso desaparece en cuanto erplora.com se lo dice al negocio. Si se suspende, el negocio deja de
+     abrirse hasta que se pague (BILLING-F16).
+Entra: el estado del negocio y el momento en que se suspende, tal como los manda erplora.com en su foto del negocio
+(HUBS-F31). El Hub no le pregunta a erplora.com ni cuenta los 7 días por su cuenta.
+Sale: nada guardado en el Hub.
+Si falla: un responsable o un empleado no ve el aviso. Si la foto no trae el plazo, el aviso sale sin fecha: «Págala en
+erplora.com: si no se paga pronto, el negocio se suspende. No se borra nada.». Si no se pueden leer los avisos, la
+campana se queda con lo último que supo, como en BASE-F10.
+Implicados: BASE-F10, BASE-F11, BILLING-F16 (erplora.com), BILLING-F17 (erplora.com), HUBS-F31 (erplora.com)
+
 ## Para quien lo mantiene
 
 - **Dominio propio de un negocio** (BASE-F110, HUBS-F17, PLAN-SAAS §37 punto 2; `base/custom_domains.py`,
@@ -3375,7 +3403,8 @@ Implicados: BASE-F41
   solo le da su fuente, `useHubActionNotices` (`base/frontend/lib/action-notices.ts`), en `actionNotices` de
   `createShell`. Cada contador de `base.bell.counters` por encima de cero es un aviso con lo que dice el servidor
   (`id` = su `key`, su icono, su gravedad, su `title` como fila y titular, su `body`, su número, su plazo `due` y una
-  acción con su `action_label` a su `route`, sin acción si el Hub no tiene esa pantalla), y `base.setup.status` da
+  acción con su `action_label` a su `route`, sin acción si el Hub no tiene esa pantalla; una `route` que es una
+  dirección de otro sitio, `http(s)://…`, es un enlace fuera del Hub y solo sale en el navegador), y `base.setup.status` da
   `base.blocking`, urgente, mientras queda un ⛔ pendiente (`blockingItems` de `lib/home.ts`): «Configurar» a los dos
   primeros pasos que la persona puede hacer, o «Esto lo tiene que configurar un administrador.» si no puede ninguno.
   La pantalla no pone palabras a un contador. La hoja
@@ -3395,6 +3424,15 @@ Implicados: BASE-F41
   contador de los módulos dice sus palabras en inglés y en español y que los tipos siguen al esquema),
   `test_queries_home_bell.py` y los de cada app (`test_integration_home.py` de Citas e Impresión, `test_home_hooks.py`
   de WhatsApp).
+- Factura del plan sin pagar (BASE-F117): `base/unpaid_plan.py` da a quien administra el negocio la fila
+  `base.payment_pending` de `base.bell.counters` mientras la foto de erplora.com guardada en `Hub.state` dice
+  `status: past_due`; su plazo es `suspends_on` de la misma foto, tal cual (el Hub no cuenta los 7 días), y uno que no
+  es un instante con zona se queda sin fecha y se anota en el log como `base.unpaid_plan_bad_deadline`. La frase,
+  con la fecha en la zona del negocio, cambia cuando el plazo pasa: `refresh_every` pide leer otra vez la campana en
+  ese momento (entre 30 s y un día, o antes si una app lo pide). Su `route` son las facturas pendientes del negocio
+  en erplora.com (`/dashboard/billing/invoices?business=<id>&status=open`). La foto aplicada
+  (`base.hub.state_applied`) ya vuelve a calcular la campana: el aviso llega y se va sin recargar. Tests:
+  `test_unpaid_plan.py` y `action-notices.test.ts`.
 - Presencia del dispositivo que imprime (misma tarea): la app que
   lleva los dispositivos declara en su `LiveAppConfig` `print_presence`, el nombre de una orden suya cuya entrada lleva
   `device`; `/ws/print` (`base/ws_print.py`) la ejecuta con el contexto del dispositivo en su `hello` y en cada `beat`
