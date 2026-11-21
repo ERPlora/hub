@@ -1,25 +1,24 @@
 """The own certificate as the AEAT's test environment proves it (VERIFACTU-F02, F08): each answer to a submission
 presented with it in testing may accept it or reject it (``aeat.certificate_verdict``); going live needs it accepted.
-Only testing proves it: an answer of production never changes it, nor one presenting with ERPlora's seal."""
+Only testing proves it: an answer of production never changes it, nor one presented with ERPlora's seal (no
+certificate of the business travelled with it)."""
 
 from django.utils import timezone
 from live.context import OperationContext
 from live.outbox import record_event
 
 from apps.verifactu import aeat, certificates, events, gateway
-from apps.verifactu.models import Config, Environment, Event, OwnCertificate
+from apps.verifactu.models import Environment, Event, OwnCertificate
 
 from .writes import _event
 
 
 def note_answer(
-    ctx: OperationContext, route: str, environment: str, reply: gateway.Reply, presented: gateway.Certificate | None
+    ctx: OperationContext, environment: str, reply: gateway.Reply, presented: gateway.Certificate | None
 ) -> None:
-    """Keeps what ``reply`` says of the certificate ``presented`` on ``route`` in ``environment``, while it is still the
-    one kept: an answer for a certificate replaced on its way says nothing of the new one."""
-    if environment != Environment.TESTING or route != Config.Route.OWN or presented is None:
-        return
-    if reply.kind != gateway.ANSWERED:
+    """Keeps what ``reply`` says of the certificate ``presented`` in ``environment``, while it is still the one kept: an
+    answer for a certificate replaced on its way says nothing of the new one."""
+    if environment != Environment.TESTING or presented is None:
         return
     verdict = aeat.certificate_verdict(reply.aeat_status, reply.aeat_body)
     if verdict is None:

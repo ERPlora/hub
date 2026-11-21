@@ -150,18 +150,26 @@ def test_a_record_the_aeat_rejects_for_its_content_still_proves_the_certificate(
 
 
 @pytest.mark.parametrize(
-    ("reply", "detail"),
-    [(CERTIFICATE_REFUSED, ""), (HOLDER_UNKNOWN, "Codigo[103].NIF no identificado: 12345678Z/ACME  SL")],
+    ("reply", "detail", "said"),
+    [
+        (CERTIFICATE_REFUSED, "", "it could not verify it (no authority it recognises issued it"),
+        (
+            HOLDER_UNKNOWN,
+            "Codigo[103].NIF no identificado: 12345678Z/ACME  SL",
+            "refused this certificate (Codigo[103].NIF no identificado: 12345678Z/ACME  SL): upload another one.",
+        ),
+    ],
     ids=["302_cannot_verify", "103_holder_unknown"],
 )
-def test_the_aeat_of_testing_refusing_the_certificate_rejects_it(issuer, gateway_answers, reply, detail):
+def test_the_aeat_of_testing_refusing_the_certificate_rejects_it(issuer, gateway_answers, reply, detail, said):
     upload()
     send_a_ticket(gateway_answers, reply)
 
     assert proof() == ("rejected", detail)
     out = shown()
     assert out.aeat_proof == "rejected"
-    assert "test environment refused" in out.aeat_proof_detail
+    assert out.aeat_proof_detail.startswith("The AEAT's test environment refused this certificate")
+    assert said in out.aeat_proof_detail
     assert Event.objects.filter(message_key="certificate_rejected_by_aeat", severity="warning").count() == 1
 
 
@@ -285,4 +293,6 @@ def test_a_business_already_live_keeps_filing_with_a_new_untested_certificate(is
 
     config = run("verifactu.config.get")
     assert config.issue_blocker is None
-    assert not codes(config.reasons) & {"own_certificate_untested", "own_certificate_rejected"}
+    assert config.route_ready_for_production is True
+    not_proven = {"own_certificate_untested", "own_certificate_rejected"}
+    assert not (codes(config.reasons) | codes(config.live_blockers)) & not_proven
