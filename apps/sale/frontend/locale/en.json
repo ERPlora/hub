@@ -444,6 +444,10 @@
         "checkInvoice": "Scan it to check this invoice at the AEAT",
         "csv": "CSV: {csv}"
       },
+      "claim": {
+        "note": "Scan to ask for your full invoice",
+        "alt": "QR code to ask for the full invoice"
+      },
       "paperPending": "Fiscal document pending"
     },
     "sales": {

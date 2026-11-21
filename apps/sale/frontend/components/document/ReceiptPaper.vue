@@ -11,12 +11,15 @@
 // exempt key names its cause), «TOTAL», the payment rows and «Change», the discount already applied and
 // the fiscal QR and the footer. Every figure is the server's; this only lays them out. The fiscal QR is
 // VeriFactu's (VERIFACTU-F19): «Tax QR:» over it, «VERI*FACTU» under it and how to check the ticket or
-// the invoice at the AEAT — its CSV once the AEAT answered. `printPaper` prints a copy of this very element.
+// the invoice at the AEAT — its CSV once the AEAT answered. A ticket that carries its code adds a second QR after
+// it, the page where its customer asks for the full invoice (INVOICE-F04), with the code under it to type.
+// `printPaper` prints a copy of this very element.
 import { formatDateTime } from '@erplora/ui/components';
 import { computed } from 'vue';
 
 import { useLocale, useT } from '../../composables/useT';
 import { taxRow } from '../../lib/breakdown';
+import type { ReceiptClaim } from '../../composables/useReceiptClaim';
 import { dishLabel } from '../../lib/comboChoice';
 import { formatMoney, moneyOf, quantityWithUnit } from '../../lib/format';
 import type { LetterheadOut, SaleOut, SettingsOut } from '../../operations';
@@ -33,8 +36,10 @@ const props = withDefaults(
     duplicate?: boolean;
     /** VeriFactu's record of its fiscal document; none = no fiscal QR. */
     record?: Pick<FiscalRecord, 'qr_svg' | 'qr_url' | 'csv'> | null;
+    /** The QR to ask for the full invoice, drawn; none = no second QR. */
+    claim?: ReceiptClaim | null;
   }>(),
-  { settings: null, duplicate: false, record: null },
+  { settings: null, duplicate: false, record: null, claim: null },
 );
 
 const t = useT();
@@ -102,6 +107,17 @@ const qrHint = computed(() => {
   if (props.record.csv) return t('sale.document.qr.csv', { csv: props.record.csv });
   return isInvoice.value ? t('sale.document.qr.checkInvoice') : t('sale.document.qr.checkReceipt');
 });
+
+/** The QRs of the paper, in order: VeriFactu's, to check the document at the AEAT, and the one to ask for the full
+ *  invoice, whose address goes under it as text when it could not be drawn. */
+const qrs = computed(() => [
+  ...(props.record
+    ? [{ id: 'sale-receipt-qr', heading: t('sale.document.qr.label'), image: props.record.qr_svg, alt: t('sale.document.qr.alt'), mark: 'VERI*FACTU', hint: qrHint.value, code: false }]
+    : []),
+  ...(props.claim
+    ? [{ id: 'sale-receipt-claim', heading: t('sale.document.claim.note'), image: props.claim.image, alt: t('sale.document.claim.alt'), mark: '', hint: props.claim.image ? props.claim.code : props.claim.url, code: true }]
+    : []),
+]);
 
 const footer = computed(() =>
   [
@@ -316,28 +332,35 @@ const footer = computed(() =>
         </tr>
       </tbody>
     </table>
-    <template v-if="record">
+    <template
+      v-for="qr in qrs"
+      :key="qr.id"
+    >
       <hr class="sale-receipt__rule">
       <div
         class="sale-receipt__qr"
-        data-testid="sale-receipt-qr"
+        :data-testid="qr.id"
       >
         <div class="sale-receipt__center">
-          {{ $t('sale.document.qr.label') }}
+          {{ qr.heading }}
         </div>
         <img
+          v-if="qr.image"
           class="sale-receipt__qr-image"
-          :src="record.qr_svg"
-          :alt="$t('sale.document.qr.alt')"
+          :src="qr.image"
+          :alt="qr.alt"
         >
-        <div class="sale-receipt__center sale-receipt__qr-mark">
-          VERI*FACTU
+        <div
+          v-if="qr.mark"
+          class="sale-receipt__center sale-receipt__qr-mark"
+        >
+          {{ qr.mark }}
         </div>
         <div
-          class="sale-receipt__center sale-receipt__qr-hint"
-          data-testid="sale-receipt-qr-hint"
+          :class="['sale-receipt__center', qr.code ? 'sale-receipt__qr-code' : 'sale-receipt__qr-hint']"
+          :data-testid="`${qr.id}-hint`"
         >
-          {{ qrHint }}
+          {{ qr.hint }}
         </div>
       </div>
     </template>
@@ -481,6 +504,11 @@ const footer = computed(() =>
 }
 .sale-receipt__qr-hint {
   font-size: 0.85em;
+}
+/* The code to type when the camera cannot read the QR: bold, and an address that does not fit breaks anywhere. */
+.sale-receipt__qr-code {
+  font-weight: 700;
+  overflow-wrap: anywhere;
 }
 .sale-receipt__footer {
   font-size: 10px;
