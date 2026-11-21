@@ -19,6 +19,8 @@ SALE = [
     "sale.sale.completed",
     "sale.sale.voided",
 ]
+#: Adding, changing, removing or voiding a line changes what an occupied table has run up (TABLE-F33).
+BILL = ["sale.order.changed", "sale.order.line_removed"]
 CUSTOMER = [
     "customer.order.linked",
     "customer.order.unlinked",
@@ -34,6 +36,7 @@ FLOOR = [
     *events.HOLD_EVENTS,
     *events.SESSION_EVENTS,
     *SALE,
+    *BILL,
     *CUSTOMER,
 ]
 CHECKS = [
@@ -93,6 +96,13 @@ def test_every_live_query_is_a_read_with_a_permission():
 def test_charging_a_tables_check_in_sales_re_runs_the_floor_and_the_checks():
     affected = live_registry.affected(["sale.order.completed"])
     assert {"table.table.list", "table.zone.list", "table.session.list"} <= affected
+
+
+def test_a_line_added_or_taken_off_a_check_re_runs_the_floor_but_not_the_zones_nor_the_checks():
+    for event in BILL:
+        affected = live_registry.affected([event])
+        assert {"table.table.list", "table.table.get"} <= affected, event
+        assert not {"table.zone.list", "table.session.list"} & affected, event
 
 
 def test_a_hold_re_runs_the_floor_but_not_the_checks():

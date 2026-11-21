@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:cbdd837073045f27b598a7a421ec67f07042111fe122ec2cadddeb58e5c17840 -->
+<!-- generated from WORKBOOK.md sha256:75ccd24f381cdd7c8cf147929f027019f30abdaaa42a3df592125416cff33a83 -->
 
 ## What it is for and who it is for
 
@@ -279,7 +279,7 @@ With the window as it opened, Back closes it without asking (BASE-F05).
 | TABLE-F30 | Hold or release a table by hand | done |
 | TABLE-F31 | Forget the name of a customer whose data are erased (GDPR) | done |
 | TABLE-F32 | Put or remove the customer of a table | done |
-| TABLE-F33 | See how much each table has run up | not done |
+| TABLE-F33 | See how much each table has run up | done |
 
 ### TABLE-F01 Create and order the zones of the room
 Status: done
@@ -868,13 +868,14 @@ If it fails: the reason of Customers; the table is seated anyway.
 Involved: CUSTOMER-F17, CUSTOMER-F19, CUSTOMER-F33, TABLE-F10
 
 ### TABLE-F33 See how much each table has run up
-Status: not done — the plan does not receive the amount of each table's checks yet
+Status: done
 Actor: employee, manager
 Screen: Floor plan (Service)
 Steps:
-1. Open **Tables → Floor plan**. Each Occupied table shows in the label under it, next to its guests, the
-   amount of its check in the business's currency ("3/4 pax · €42.50"), and "€0.00" while nothing has been
-   ordered. It is the same amount that check shows in **Open checks** in Sales.
+1. Open **Tables → Floor plan**. Each Occupied table shows in the label under it, below its guests, the
+   amount of its check in the business's currency (under "Occupied · 3/4 pax", "€42.50"), and "€0.00" while
+   nothing has been ordered. It is the same amount that check shows in **Open checks** in Sales. The screen
+   reader says it with the table: "Bill €42.50".
 2. With several checks at the table (split), it shows the sum of them all.
 3. On the phone, each occupied table's card shows it too, next to the time.
 4. When the waiter adds or removes a line in Sales, charges part of the check (it then shows what is

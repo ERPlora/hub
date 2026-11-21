@@ -2,13 +2,14 @@
 
 The floor is live (TABLE-F09): a table's status is computed when read from its checks, its block and
 its holds, so everything that changes one of them re-runs the plan — this app's own writes, Sales
-charging or voiding a table's check (the read itself sees what Sales did, before the relay delivers it) and
-Customers putting a card on a check or erasing it.
+charging or voiding a table's check (the read itself sees what Sales did, before the relay delivers it), a line
+that changes what an occupied table has run up (TABLE-F33) and Customers putting a card on a check or erasing it.
 """
 
 from live.live_registry import live
 
 from apps.table.events import (
+    BILL_EVENTS,
     CUSTOMER_EVENTS,
     HOLD_EVENTS,
     SALE_EVENTS,
@@ -20,13 +21,14 @@ from apps.table.events import (
     ZONE_EVENTS,
 )
 
-#: Every table of the plan: its box, its zone, its status (checks, block, holds), its customer.
+#: Every table of the plan: its box, its zone, its status (checks, block, holds), its bill, its customer.
 FLOOR = [
     *TABLE_EVENTS,
     *ZONE_EVENTS,
     *HOLD_EVENTS,
     *SESSION_EVENTS,
     *SALE_EVENTS,
+    *BILL_EVENTS,
     *CUSTOMER_EVENTS,
 ]
 #: The checks of the room: their table and zone, their status and what Sales charged, their customer.

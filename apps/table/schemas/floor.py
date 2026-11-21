@@ -70,6 +70,10 @@ class TableOut(Schema):
     hold: HoldShownOut | None = Field(
         description="Its earliest reservation of today, if any."
     )
+    amount: int | None = Field(
+        description="What is left to charge on all its open checks of Sales, in cents of the business's currency, "
+        "when occupied (0 while nothing is ordered); null otherwise."
+    )
 
 
 TablePage = Page[TableOut]

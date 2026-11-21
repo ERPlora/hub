@@ -284,7 +284,7 @@ cierra la ventana sin guardarlo. Con la ventana como se abrió, atrás la cierra
 | TABLE-F30 | Retener o soltar una mesa a mano | hecho |
 | TABLE-F31 | Olvidar el nombre de un cliente cuyos datos se borran (RGPD) | hecho |
 | TABLE-F32 | Poner o quitar el cliente de una mesa | hecho |
-| TABLE-F33 | Ver cuánto lleva cada mesa | no hecho |
+| TABLE-F33 | Ver cuánto lleva cada mesa | hecho |
 
 ### TABLE-F01 Crear y ordenar las zonas del local
 Estado: hecho
@@ -864,13 +864,14 @@ Si falla: el motivo de Clientes; la mesa se sienta igual.
 Implicados: CUSTOMER-F17, CUSTOMER-F19, CUSTOMER-F33, TABLE-F10
 
 ### TABLE-F33 Ver cuánto lleva cada mesa
-Estado: no hecho — el plano todavía no recibe el importe de las cuentas de cada mesa
+Estado: hecho
 Actor: empleado, responsable
 Pantalla: Plano de sala (Servicio)
 Pasos:
-1. Abre **Mesas → Plano de sala**. Cada mesa Ocupada enseña en la etiqueta de debajo, junto a sus
-   comensales, el importe de su cuenta con la moneda del negocio («3/4 pax · 42,50 €»), y «0,00 €» mientras
-   no se ha pedido nada. Es el mismo importe que esa cuenta enseña en **Cuentas abiertas** de Ventas.
+1. Abre **Mesas → Plano de sala**. Cada mesa Ocupada enseña en la etiqueta de debajo, debajo de sus
+   comensales, el importe de su cuenta con la moneda del negocio (bajo «Ocupada · 3/4 pax», «42,50 €»), y
+   «0,00 €» mientras no se ha pedido nada. Es el mismo importe que esa cuenta enseña en **Cuentas abiertas**
+   de Ventas. El lector de pantalla lo dice con la mesa: «Cuenta 42,50 €».
 2. Con varias cuentas en la mesa (dividida), enseña la suma de todas.
 3. En el teléfono, la tarjeta de cada mesa ocupada lo enseña también, junto al tiempo.
 4. Cuando el camarero añade o quita una línea en Ventas, cobra una parte de la cuenta (entonces enseña
