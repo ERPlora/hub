@@ -871,11 +871,11 @@ Pasos:
 1. Abre **Mesas → Plano de sala**. Cada mesa Ocupada enseña en la etiqueta de debajo, junto a sus
    comensales, el importe de su cuenta con la moneda del negocio («3/4 pax · 42,50 €»), y «0,00 €» mientras
    no se ha pedido nada. Es el mismo importe que esa cuenta enseña en **Cuentas abiertas** de Ventas.
-2. Con dos cuentas en la mesa (dividida), enseña la suma de las dos.
+2. Con varias cuentas en la mesa (dividida), enseña la suma de todas.
 3. En el teléfono, la tarjeta de cada mesa ocupada lo enseña también, junto al tiempo.
-4. Cuando el camarero añade o quita una línea en Ventas, cobra una parte de la cuenta o la junta, la
-   divide o la pasa a otra mesa, el importe cambia solo en todos los dispositivos que tienen el plano
-   abierto, sin salir y volver.
+4. Cuando el camarero añade o quita una línea en Ventas, cobra una parte de la cuenta (entonces enseña
+   lo que falta por cobrar) o la junta, la divide o la pasa a otra mesa, el importe cambia solo en todos
+   los dispositivos que tienen el plano abierto, sin salir y volver.
 5. Las mesas Disponibles, Reservadas y Bloqueadas no enseñan importe.
 Entra: el importe de cada cuenta abierta de la sala, de Ventas, leído de una vez para todo el plano.
 Sale: nada.
@@ -1138,7 +1138,8 @@ Ventas (`sale.add_sale`), que tienen los cuatro papeles.
 
 ### Lo que NO hace, a propósito
 
-- No sabe qué se ha pedido: líneas, importes y cocina son de Ventas y Cocina.
+- No guarda lo que se ha pedido: líneas, importes y cocina son de Ventas y Cocina; el importe de cada
+  mesa del plano (TABLE-F33) lo lee de Ventas.
 - No impide sentar más comensales que el aforo: avisa.
 - No toma reservas: eso es Reservas; Mesas solo aparta la mesa en el plano.
 - No tiene asiento por comensal, cursos, estado «por limpiar» ni mesas físicas unidas con

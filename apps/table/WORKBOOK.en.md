@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:9b1e18965529c62a46ab79795edf0f8227df0207bd1ed013c7220e9c820a00cb -->
+<!-- generated from WORKBOOK.md sha256:cbdd837073045f27b598a7a421ec67f07042111fe122ec2cadddeb58e5c17840 -->
 
 ## What it is for and who it is for
 
@@ -875,11 +875,11 @@ Steps:
 1. Open **Tables → Floor plan**. Each Occupied table shows in the label under it, next to its guests, the
    amount of its check in the business's currency ("3/4 pax · €42.50"), and "€0.00" while nothing has been
    ordered. It is the same amount that check shows in **Open checks** in Sales.
-2. With two checks at the table (split), it shows the sum of both.
+2. With several checks at the table (split), it shows the sum of them all.
 3. On the phone, each occupied table's card shows it too, next to the time.
-4. When the waiter adds or removes a line in Sales, charges part of the check, or joins, splits or moves
-   it to another table, the amount changes by itself on every device that has the plan open, without
-   leaving and coming back.
+4. When the waiter adds or removes a line in Sales, charges part of the check (it then shows what is
+   still to be charged), or joins, splits or moves it to another table, the amount changes by itself on
+   every device that has the plan open, without leaving and coming back.
 5. Available, Reserved and Blocked tables show no amount.
 In: the amount of each open check of the room, from Sales, read at once for the whole plan.
 Out: nothing.
