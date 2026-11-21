@@ -94,6 +94,27 @@ describe('ConfigPage', () => {
     expect(notYet.find('verifactu-config-expiry').exists()).toBe(false);
   });
 
+  it('says whether the AEAT test environment accepted it, and why it refused it', async () => {
+    const untested = await ownTab({ own_certificate: { ...LOADED, aeat_proof: 'untested' } });
+    expect(untested.find('verifactu-config-cert-proof').text()).toBe('Not tested yet');
+    expect(untested.find('verifactu-config-proof').text()).toBe(
+      "It is tried with the next record that goes out in testing: once the AEAT's test environment accepts it, you can go live.",
+    );
+    const why = "The AEAT's test environment refused this certificate (Codigo[103].NIF no identificado): upload another one.";
+    const rejected = await ownTab({ own_certificate: { ...LOADED, aeat_proof: 'rejected', aeat_proof_detail: why } });
+    expect(rejected.find('verifactu-config-cert-proof').text()).toBe('Refused');
+    expect(rejected.find('verifactu-config-proof').text()).toBe(why);
+    const accepted = await ownTab({ own_certificate: { ...LOADED, aeat_proof: 'accepted' } });
+    expect(accepted.find('verifactu-config-cert-proof').text()).toBe('Accepted');
+    expect(accepted.find('verifactu-config-proof').exists()).toBe(false);
+  });
+
+  it('live, the AEAT test environment is no longer asked about the certificate', async () => {
+    const s = await ownTab({ environment: 'production', own_certificate: { ...LOADED, aeat_proof: 'untested' } });
+    expect(s.find('verifactu-config-cert-proof').exists()).toBe(false);
+    expect(s.find('verifactu-config-proof').exists()).toBe(false);
+  });
+
   it('an expired certificate says so', async () => {
     const s = await ownTab({ own_certificate: { ...LOADED, expires_at: '2026-10-01T10:00:00Z', expires_in_days: -13 } });
     expect(s.find('verifactu-config-expiry').text()).toBe('The certificate has expired. Upload a valid one to send to the AEAT.');
