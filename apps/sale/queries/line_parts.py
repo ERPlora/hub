@@ -27,7 +27,9 @@ WHOLE = Decimal("1")
 
 
 def check_grid(quantity: Decimal, increment: Decimal, unit: str) -> None:
-    if increment and quantity % increment != 0:
+    # Compared with what the column keeps: a remainder alone rounds a quantity below the decimal context to zero.
+    kept = quantity.quantize(GRID_FALLBACK)
+    if increment and (kept != quantity or kept % increment != 0):
         message = str(QUANTITY_OFF_GRID) % {
             "step": _step_text(increment),
             "unit": unit,

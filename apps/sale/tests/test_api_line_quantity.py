@@ -72,3 +72,21 @@ def test_a_quantity_too_big_to_keep_is_refused_before_the_line(cashier, prawns_l
     assert (huge.status_code, huge.json()["error"]["code"]) == (422, "invalid_payload")
     check = get(cashier, "/sale/orders/detail", order_id=order_id).json()
     assert check["lines"][0]["quantity"] == "0.532"
+
+
+@pytest.mark.parametrize("typed", ["1E-1000030", "0.0005", "1E-30"])
+def test_a_quantity_smaller_than_any_step_is_refused_and_the_line_stays(
+    cashier, prawns_line, typed
+):
+    order_id, line_id = prawns_line
+    tiny = post(
+        cashier,
+        "/sale/orders/update_line",
+        {"order_id": order_id, "line_id": line_id, "quantity": typed},
+    )
+    assert (tiny.status_code, tiny.json()["error"]["code"]) == (
+        409,
+        "sale.quantity_off_grid",
+    )
+    check = get(cashier, "/sale/orders/detail", order_id=order_id).json()
+    assert check["lines"][0]["quantity"] == "0.532"
