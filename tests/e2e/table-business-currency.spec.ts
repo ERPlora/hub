@@ -99,7 +99,7 @@ async function splitLine(page: Page): Promise<Locator> {
   await page.goto(`${A}/table/floor-plan`);
   await shown(page).locator('[data-testid=table-floor-mode-service]').click();
   await shown(page).locator(`[data-testid=table-floor-zone-tab-${zoneId}]`).click();
-  await shown(page).locator(`[data-testid=table-floor-tile-${run.openTable}]`).click();
+  await shown(page).locator(`[data-testid=table-floor-tile-${run.openTable}]`).click({ button: 'right' });
   const sheet = page.locator('ion-modal[data-testid=table-sheet]');
   await expect(sheet).toBeVisible();
   await settled(page);
