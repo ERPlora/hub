@@ -78,24 +78,18 @@ def _dish(dish) -> str:
     return f"{dish.quantity}× {dish.product_name}" if dish.quantity > 1 else dish.product_name
 
 
-def receipt(  # noqa: PLR0913
-    sale: SaleOut,
-    *,
-    letterhead: dict,
-    footer: str,
-    decimals: int,
-    duplicate: bool,
-    record: dict | None = None,
+def receipt(
+    sale: SaleOut, *, letterhead: dict, footer: str, duplicate: bool, record: dict | None = None
 ) -> tuple[str, dict]:
     """The document type and the document of ``sale``'s receipt: ``receipt`` for a ticket, ``invoice`` for a
     sale charged as a full invoice (both parties and its breakdown). ``record``: VeriFactu's record of its
-    document (``qr_url``), whose QR opens the paper."""
+    document (``qr_url``), whose QR opens the paper. Who charged it is the caller's to add (``cashier``)."""
     full = sale.document_type == "invoice"
+    decimals = sale.currency_decimals
     document = {
         **_business(letterhead["name"], letterhead["lines"]),
         "receipt_id": sale.invoice_number or sale.number,
         "duplicate": duplicate,
-        "cashier": sale.created_by,
         "items": [_item(line, decimals) for line in sale.lines],
         "subtotal": units(sale.subtotal, decimals),
         "tax_amount": units(sale.tax_total, decimals),
@@ -132,6 +126,11 @@ def receipt(  # noqa: PLR0913
     if record and record.get("qr_url"):
         document.update(qr_data=record["qr_url"], qr_heading=QR_HEADING, qr_legend=QR_LEGEND)
     return ("invoice" if full else "receipt"), document
+
+
+def cashier(name: str) -> dict:
+    """The cashier line of a receipt, only with a name to print: without one the paper has no such line."""
+    return {"cashier": name} if name else {}
 
 
 def claim(code: str, url: str) -> dict:
