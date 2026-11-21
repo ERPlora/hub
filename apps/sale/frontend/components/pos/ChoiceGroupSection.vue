@@ -3,7 +3,7 @@ import type { ChoiceGroup } from '../../lib/modifierChoice';
 
 export interface SectionGroup extends ChoiceGroup {
   readonly name: string;
-  readonly options: readonly { readonly id: string; readonly label: string; readonly price_delta: number; readonly allergens?: readonly string[] }[];
+  readonly options: readonly { readonly id: string; readonly label: string; readonly price_delta: number; readonly allergens: readonly string[] }[];
 }
 </script>
 
@@ -87,7 +87,7 @@ function supplement(cents: number): string {
           <span class="pos-options__label">
             <span :data-testid="`${hook.name}-${option.id}`">{{ option.label }}</span>
             <AllergenRow
-              :codes="option.allergens ?? []"
+              :codes="option.allergens"
               :testid="`${hook.choice}-allergens-${option.id}`"
             />
           </span>

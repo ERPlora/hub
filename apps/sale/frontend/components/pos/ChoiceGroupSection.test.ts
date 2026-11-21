@@ -17,9 +17,9 @@ const COFFEE: SectionGroup = {
   max_choices: 2,
   allow_repeat: true,
   options: [
-    { id: 'espresso', label: 'Solo', price_delta: 0 },
-    { id: 'latte', label: 'Con leche', price_delta: 50 },
-    { id: 'decaf', label: 'Descafeinado', price_delta: -20 },
+    { id: 'espresso', label: 'Solo', price_delta: 0, allergens: [] },
+    { id: 'latte', label: 'Con leche', price_delta: 50, allergens: [] },
+    { id: 'decaf', label: 'Descafeinado', price_delta: -20, allergens: [] },
   ],
 };
 
