@@ -70,7 +70,10 @@ async function setup(session?: MountOptions['session']) {
     await flush();
   }
   const keys = () => m.sent().filter((c) => c.method === 'POST').map((c) => (c.body as CompleteIn).idempotency_key);
-  return { ...m, modal, panel, subscribed, open, openReady, keys };
+  const confirm = () => click(m.find('sale-checkout-confirm').element);
+  /** What the till was handed and the sheet's last word on being open. */
+  const outcome = () => [m.wrapper.emitted('charged'), m.wrapper.emitted('update:open')?.at(-1)];
+  return { ...m, modal, panel, subscribed, open, openReady, keys, confirm, outcome };
 }
 
 describe('CheckoutSheet', () => {
@@ -91,9 +94,8 @@ describe('CheckoutSheet', () => {
     const s = await setup();
     await s.openReady();
     s.answer(200, SALE);
-    await click(s.find('sale-checkout-confirm').element);
-    expect(s.wrapper.emitted('charged')).toEqual([[SALE, []]]);
-    expect(s.wrapper.emitted('update:open')?.at(-1)).toEqual([false]);
+    await s.confirm();
+    expect(s.outcome()).toEqual([[[SALE, []]], [false]]);
     expect(s.panel().exists()).toBe(false);
     await s.clock.advance(2000);
     expect(s.subscribed()).toEqual([]);
@@ -174,7 +176,7 @@ describe('CheckoutSheet: cash with the drawer closed (SALE-F08, CASH_REGISTER-F0
     s.net.onApi(({ url }) =>
       new URL(url, 'http://a.localhost').pathname === '/api/sale/sales' ? sales.shift()! : Response.json({ id: 'cs1' }, { status: 201 }),
     );
-    await click(s.find('sale-checkout-confirm').element);
+    await s.confirm();
     expect(s.find('sale-checkout-error').text()).toBe(CLOSED.error.message);
 
     await click(s.find('sale-checkout-open-drawer').element);
@@ -187,9 +189,8 @@ describe('CheckoutSheet: cash with the drawer closed (SALE-F08, CASH_REGISTER-F0
     expect(s.sent().at(-1)).toMatchObject({ method: 'POST', path: '/api/cash_register/sessions/open', body: { opening_balance: 10000 } });
     expect([s.find('sale-checkout-error').exists(), s.wrapper.emitted('update:open')]).toEqual([false, undefined]);
 
-    await click(s.find('sale-checkout-confirm').element);
-    expect(s.wrapper.emitted('charged')).toEqual([[SALE, []]]);
-    expect(s.wrapper.emitted('update:open')?.at(-1)).toEqual([false]);
+    await s.confirm();
+    expect(s.outcome()).toEqual([[[SALE, []]], [false]]);
   });
 
   it('when Cash register’s window cannot load, it goes to Cash register instead and the sheet closes', async () => {

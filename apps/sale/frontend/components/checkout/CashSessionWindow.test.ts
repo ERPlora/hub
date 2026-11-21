@@ -30,7 +30,14 @@ function setup(loader: ComponentLoader | undefined) {
     props: { open: false, 'onUpdate:open': (open: boolean) => void wrapper.setProps({ open }) },
   });
   const window = () => wrapper.find('[data-testid="cash-window"]');
-  return { wrapper, window };
+  /** The sheet asks for the window. */
+  async function ask(): Promise<void> {
+    await wrapper.setProps({ open: true });
+    await flushPromises();
+  }
+  /** What it said of being unavailable, and whether it is still asked for. */
+  const gaveUp = () => [wrapper.emitted('unavailable'), wrapper.props('open')];
+  return { wrapper, window, ask, gaveUp };
 }
 
 afterEach(() => vi.mocked(appComponent).mockReset());
@@ -44,40 +51,33 @@ describe('CashSessionWindow', () => {
     expect(loader).not.toHaveBeenCalled();
     expect(s.window().exists()).toBe(false);
 
-    await s.wrapper.setProps({ open: true });
-    await flushPromises();
+    await s.ask();
     expect(loader).toHaveBeenCalledOnce();
     expect(s.window().attributes('data-open')).toBe('true');
   });
 
   it('a session opened in it closes it and says so to the sheet', async () => {
     const s = setup(() => Promise.resolve({ default: OpenSessionWindow }));
-    await s.wrapper.setProps({ open: true });
-    await flushPromises();
+    await s.ask();
     await s.window().trigger('click');
     expect(s.wrapper.emitted('opened')).toEqual([[]]);
-    expect(s.wrapper.props('open')).toBe(false);
+    expect(s.gaveUp()).toEqual([undefined, false]);
     expect(s.window().attributes('data-open')).toBe('false');
-    expect(s.wrapper.emitted('unavailable')).toBeUndefined();
   });
 
   it('its code does not arrive: unavailable, and nothing stays asked for', async () => {
     vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     const s = setup(() => Promise.reject(new Error('the chunk did not arrive')));
-    await s.wrapper.setProps({ open: true });
-    await flushPromises();
-    expect(s.wrapper.emitted('unavailable')).toEqual([[]]);
-    expect(s.wrapper.props('open')).toBe(false);
+    await s.ask();
+    expect(s.gaveUp()).toEqual([[[]], false]);
     expect(s.window().exists()).toBe(false);
   });
 
   it('Cash register has no such window: unavailable as soon as it is asked for', async () => {
     const s = setup(undefined);
     expect(s.wrapper.emitted('unavailable')).toBeUndefined();
-    await s.wrapper.setProps({ open: true });
-    await flushPromises();
-    expect(s.wrapper.emitted('unavailable')).toEqual([[]]);
-    expect(s.wrapper.props('open')).toBe(false);
+    await s.ask();
+    expect(s.gaveUp()).toEqual([[[]], false]);
   });
 
   it('Cash register does ship the window by that name', async () => {
