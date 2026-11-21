@@ -99,5 +99,10 @@ export function useCheckout(options: UseCheckoutOptions) {
     }
   }
 
-  return { key: readonly(key), busy: readonly(busy), failure: readonly(failure), charge };
+  /** Forgets the last refusal once its cause is gone (the cash session it asked for is open now). */
+  function clearFailure(): void {
+    failure.value = null;
+  }
+
+  return { key: readonly(key), busy: readonly(busy), failure: readonly(failure), charge, clearFailure };
 }

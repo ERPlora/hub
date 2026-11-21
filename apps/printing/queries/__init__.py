@@ -9,7 +9,7 @@ puts it back in the queue (services.py).
 import datetime as dt
 import uuid
 
-from django.db.models import Case, Count, IntegerField, Min, Prefetch, Q, QuerySet, Value, When
+from django.db.models import Count, Min, Prefetch, Q, QuerySet
 from django.db.models.functions import Lower
 from django.utils import timezone, translation
 from django.utils.translation import gettext_lazy as _
@@ -42,6 +42,7 @@ from apps.printing.schemas import (
 from base.ordering import list_order
 
 from .health import SEEN_WITHIN
+from .job_printer import active_printers, prints_on
 
 #: Hand-outs a job gets before it fails (the old hub's ``MAX_ATTEMPTS``).
 MAX_ATTEMPTS = 5
@@ -62,8 +63,6 @@ NO_JOB = _("There is no print job with that id or number.")
 NO_DEVICE = _("There is no device set up to print with that id.")
 
 PENDING = Q(status=PrintJob.Status.PENDING)
-#: Receipt paper before the computer's printer, the order a job of a function finds its printer in.
-_SYSTEM_LAST = Case(When(kind=Printer.Kind.SYSTEM, then=Value(1)), default=Value(0), output_field=IntegerField())
 
 
 def actor(ctx: OperationContext) -> str:
@@ -565,24 +564,21 @@ def job_summary(ctx: OperationContext, data: EmptyIn) -> dict:
             failed=Count("id", filter=Q(status=PrintJob.Status.FAILED)),
         )
     }
-    active: dict[str, list[Printer]] = {}
-    # Receipt paper first, then the computer's printer; by name within each, as a job is sent (services.py).
-    for printer in Printer.objects.filter(is_active=True).order_by(_SYSTEM_LAST, Lower("name"), "id"):
-        active.setdefault(printer.usage, []).append(printer)
-    settings = current_settings()
+    # The receipt goes to the printer of the till that looks, when it has one of its own (PRINTING-F22).
+    active, settings, device = active_printers(), current_settings(), this_device_key(ctx)
     reach, stuck = coverage(USAGES), stalled(USAGES)
     usages = []
     for usage in USAGES:
         row = counts.get(usage, {})
         chosen = getattr(settings, DEFAULT_FIELDS[usage])
         mine = active.get(usage, [])
-        prints_on = chosen if chosen is not None and chosen.is_active else (mine[0] if mine else None)
+        printing_on = prints_on(usage, chosen, mine, device)
         usages.append(
             {
                 "usage": usage,
                 "printers": len(mine),
                 "default_printer": chosen.name if chosen else None,
-                "prints_on": prints_on.name if prints_on else None,
+                "prints_on": printing_on.name if printing_on else None,
                 "pending": row.get("pending", 0),
                 "oldest_pending_at": row.get("oldest"),
                 "sent": row.get("sent", 0),
