@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:25c561d957e2aaed7fb6cdc6f8d0fa85e7817efbcbb0829b02ed7a98c0dfec8b -->
+<!-- generated from WORKBOOK.md sha256:fb32cda5fb67fec3555fac16f4cd929546f4e8fb7c1709ac807deb7ccef86683 -->
 
 ## What it is for and who it is for
 
@@ -673,7 +673,10 @@ Steps:
    physical products with stock control and with permission to move stock.
 2. In the write-off's window ("Write-off — Red wine") type the quantity and the reason (waste, breakage, own consumption…) and
    tap "Write off". Through the assistant: "write off 2 bottles of red wine for breakage"; it shows the
-   confirmation card with the product, the quantity and the reason.
+   confirmation card with the product, the quantity and the reason. Told in the same message as a count
+   ("three bottles of water got broken, and I just counted the soft drinks, there are 40 left"), the
+   breakage is written off all the same and the count is only of what was counted: a count
+   never records a breakage.
 3. In **Movements** "Decrease" shows with the quantity in negative and the reason.
 In: the product, the quantity (in its unit's step) and the reason. It can also be asked for through the
 API.
