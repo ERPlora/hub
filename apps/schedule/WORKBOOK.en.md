@@ -2,8 +2,8 @@
 
 ## What it is for and who it is for
 
-Schedules says when your business is open: each weekday's hours, the holidays and the days with other hours, and a
-run of dates with other hours or closed, such as your holidays. Appointments and Reservations read it so as not to give
+Schedules says when your business is open: each weekday's hours, the public holidays and the days with other hours,
+and a run of dates with other hours or closed, such as your vacation. Appointments and Reservations read it so as not to give
 a time or a table while the business is closed. These are the premises' hours; each professional's are kept in Staff.
 
 ### In detail
@@ -118,7 +118,7 @@ notice). On a phone the table is painted as cards.
 ### Special days
 Here go the exceptions to your week. In "Special days" you note a single day, closed or with other hours, such as a
 holiday, which can repeat every year, like Christmas. In "Overrides" you note a run of dates with other hours or
-closed, such as your holidays or summer hours. A special day wins over an override, and both win over the week. Tap a
+closed, such as your vacation or summer hours. A special day wins over an override, and both win over the week. Tap a
 row to correct it, or tap **Delete** on it to remove it.
 
 #### Detail
@@ -283,7 +283,7 @@ every day of the range with the same hours.
 Out: the temporary change (`schedule.override.created`). It beats the week, but loses against a special
 day on that date (there is no warning that it overrides it: precedence settles it).
 If it fails: "The end date cannot be before the start date." under To; "Those dates overlap the temporary
-change “Holidays” (08/01/2026 – 08/15/2026)." under From: two changes do not cover the same day, so that the
+change “Vacation” (08/01/2026 – 08/15/2026)." under From: two changes do not cover the same day, so that the
 answer does not depend on which one is read first; intervals that are not valid, with the same reasons as when
 editing a day in **Hours**.
 Involved: Appointments, Reservations
