@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:164fe1b9733c2aac9558e3387924c1fd54e6545d6e0dec5912db69ec659a0c38 -->
+<!-- generated from WORKBOOK.md sha256:8c41966378949ffe606c4398f0a84caed5148be522c05463edcdc4a068c04525 -->
 
 ## What it is for and who it is for
 
@@ -137,7 +137,7 @@ With the window as it opened, Back closes it without asking (BASE-F05); a supple
 | MODIFIER-F09 | Unlink the groups of a product or a category that is deleted | done |
 | MODIFIER-F10 | Recover the modifier groups, and those of a product or of a category, from a separate copy | done |
 | MODIFIER-F11 | Declare an option's allergens | done |
-| MODIFIER-F12 | Add the options' allergens to the dish's | not done |
+| MODIFIER-F12 | Add the options' allergens to the dish's | done |
 
 ### MODIFIER-F01 Look up and search the groups
 Status: done
@@ -437,13 +437,13 @@ the form.
 Involved: MODIFIER-F04, MODIFIER-F10, MODIFIER-F12, INVENTORY-F35
 
 ### MODIFIER-F12 Add the options' allergens to the dish's
-Status: not done — the line adds and freezes its options' allergens already, but the till's modifier sheet does not
-show each option's yet
+Status: done
 Actor: employee, manager
 Screen: Sales: Sell
 Steps:
 1. On the till, tap an item that has groups. On its sheet, under the item's name come its allergens and,
-   under each option that has them, its own: "Milk".
+   under each option that has them, its own: "+Cheese" says "Allergens: Milk". An option without allergens does not
+   get that row.
 2. Choose the options and tap "Add". The line says, under the name, "Allergens: …" with the dish's and those of
    each option chosen, together, without repeating and in the order of the list of the fourteen: a burger with Gluten
    and "+Cheese" says "Allergens: Gluten, Milk". All the options chosen count, also those charged on a separate line.
