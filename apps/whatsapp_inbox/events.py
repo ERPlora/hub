@@ -1,6 +1,6 @@
 """Events of the WhatsApp inbox (``whatsapp_inbox.<entity>.<fact>``) and its reactions to Customers.
 
-services.py records them in the outbox, in the command's transaction; live.py names the ones that
+``services`` records them in the outbox, in the command's transaction; live.py names the ones that
 re-run each live query. They carry ids only, never a number or a text.
 
 Reactions (WORKBOOK «A qué reacciona»): a card created, corrected or recovered from the separate copy claims the
