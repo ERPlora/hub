@@ -9,20 +9,28 @@ Estado de la app: completa (2026-10-21)
 
 ## Para qué sirve y para quién
 
-Carrito y pago es una **libreta interna de carritos y pedidos**. Guarda **carritos** — de una persona
-(su email y su nombre) o de una visita anónima, que se distingue por un **código de sesión** — con sus
-líneas (producto, cantidad y precio), y los convierte en **pedidos** con número, direcciones, método de
-envío y de pago y un estado: **Iniciado**, **Pagado** o **Fallido**, y **Completado**.
+Carrito y pago es una **libreta interna de carritos y pedidos**: guarda los carritos de un cliente o de
+una visita anónima y los convierte en pedidos con su número y su estado. **No es el TPV y no cobra**:
+«Pagado» lo marca una persona después de cobrar por otra vía, y nada de lo que hace es fiscal. Para
+cobrar en el mostrador está **Ventas**.
 
-Lo más importante: **no es el TPV y nada de lo que hace es fiscal**. Un pedido pagado y completado aquí
-**no** genera venta, ni factura, ni registro VeriFactu, ni movimiento de caja, ni movimiento de stock, y
-nada de lo cobrado aquí llega a la AEAT. «Pagado» es un estado que **una persona marca** después de
-cobrar por otra vía: la app no cobra, no habla con ninguna pasarela y no pide importe ni justificante.
-Para cobrar en el mostrador está **Ventas**.
+### Qué guarda
+
+Guarda **carritos** — de una persona (su email y su nombre) o de una visita anónima, que se distingue
+por un **código de sesión** — con sus líneas (producto, cantidad y precio), y los convierte en
+**pedidos** con número, direcciones, método de envío y de pago y un estado: **Iniciado**, **Pagado** o
+**Fallido**, y **Completado**.
+
+### Lo que no hace
+
+Un pedido pagado y completado aquí **no** genera venta, ni factura, ni registro VeriFactu, ni
+movimiento de caja, ni movimiento de stock, y nada de lo cobrado aquí llega a la AEAT. «Pagado» es un
+estado que **una persona marca** después de cobrar por otra vía: la app no cobra, no habla con ninguna
+pasarela y no pide importe ni justificante.
 
 No tiene tienda ni página pública: solo la usa personal con sesión en el Hub.
 
-Quién la usa:
+### Quién la usa
 
 - El **empleado**: solo mira los carritos y los pedidos.
 - El **responsable**, el **administrador** y el **propietario**: además crean, abandonan y borran
@@ -53,11 +61,19 @@ aparece, y la app lo rechaza aunque lo intente por la API o por el asistente.
 
 ### Carritos
 
-Una tabla con las columnas **Sesión**, **Email**, **Estado** (Activo, Abandonado, Convertido,
-Expirado), **Ítems** y **Total**. Buscador «Buscar sesión o email…» (busca en el código de sesión, el
-email y el nombre), filtros por columna tras el embudo de la barra, que abre «Filtros» — sesión y email
-por un trozo del texto, el estado por lista, los ítems y el total «desde / hasta» —, orden por columna, vista de lista o de tarjetas y 50 filas por
-página. Va ordenada por fecha de alta, el más reciente arriba. El total sale en la moneda del carrito
+Una tabla con los carritos, el más reciente arriba: **Sesión**, **Email**, **Estado** (Activo,
+Abandonado, Convertido, Expirado), **Ítems** y **Total**, en la moneda de cada carrito. El buscador
+busca en la sesión, el email y el nombre, y el embudo de la barra abre «Filtros», con una caja por
+columna. **Nuevo carrito** crea uno; cada fila ofrece **Abandonar** (solo un carrito activo) y
+**Borrar**. Las líneas de un carrito no se ven ni se añaden en esta pantalla: eso lo hace el
+asistente.
+
+#### La tabla de carritos
+
+Buscador «Buscar sesión o email…» (busca en el código de sesión, el email y el nombre), filtros por
+columna tras el embudo de la barra, que abre «Filtros» — sesión y email por un trozo del texto, el
+estado por lista, los ítems y el total «desde / hasta» —, orden por columna, vista de lista o de
+tarjetas y 50 filas por página. Va ordenada por fecha de alta, el más reciente arriba. El total sale en la moneda del carrito
 (uno creado en euros sigue en euros aunque el negocio cambie de país); el filtro de Total se escribe en
 la moneda del negocio («12» son 12,00 zł en un negocio de Polonia y 12 ¥ en uno de Japón, donde no hay
 céntimos) y compara el importe tal cual, sin convertir monedas. Se lee como en cualquier campo de importe
@@ -70,12 +86,23 @@ negativo, «Este importe no puede ser negativo.». Mientras el negocio no ha con
 con dos decimales y no se avisa de nada; cuando contesta, el filtro se vuelve a leer en su moneda desde la
 primera página.
 
+#### Nuevo carrito
+
 El botón **Nuevo carrito** abre el formulario «Nuevo carrito»: **Sesión** (obligatoria; «Guardar» no se
 activa sin ella), **Email** y **Nombre**. Cada fila ofrece **Abandonar** (solo un carrito activo) y
 **Borrar** (pide confirmación). **No hay pantalla de las líneas** de un carrito ni para añadirlas: eso
 lo hace el asistente o la API.
 
 ### Pedidos
+
+Una tabla con los pedidos, el más reciente arriba: **Pedido** (su número), **Email**, **Estado**
+(Iniciado, Pagado, Fallido, Completado), **Pago** (el método de pago, como texto) y **Total**, en la
+moneda del pedido. Un pedido fallido enseña su motivo debajo del estado. Cada fila ofrece la acción
+que le toca: **Marcar pagado** (Iniciado, después de cobrar por otra vía), **Completar** (Pagado) y
+**Fallar** (Iniciado o Pagado). Aquí no se crean pedidos: se inician desde un carrito con el
+asistente.
+
+#### La tabla de pedidos
 
 Una tabla con **Pedido** (su número, siempre entero), **Email**, **Estado** (Iniciado, Pagado, Fallido,
 Completado), **Pago** (el método de pago, texto) y **Total**, en la moneda del pedido. Buscador «Buscar
@@ -85,7 +112,7 @@ orden por columna, vista de lista o de tarjetas y 50 filas por página, el más 
 Cada fila ofrece la acción que le toca: **Marcar pagado** (Iniciado), **Completar** (Pagado) y
 **Fallar** (Iniciado o Pagado), que abre un formulario que pide el **motivo**. Mientras una acción de
 fila trabaja, su botón gira y un segundo toque no hace nada. No hay botón para crear un pedido: nacen
-del flujo CART_CHECKOUT-F08.
+del flujo CART_CHECKOUT-F08, desde un carrito, con el asistente o la API.
 
 ## Estados de cada pantalla
 
@@ -141,8 +168,9 @@ pueden dar además la moneda (código ISO 4217) y la fecha de caducidad.
 Sale: un carrito activo en la moneda dicha o, si no se dice, la del negocio
 (`cart_checkout.cart.created`).
 Si falla: dentro del formulario, debajo de su campo: una sesión vacía; una sesión que ya usa otro
-carrito no borrado («Ya hay un carrito con esa sesión.»); un email que no es un email; una moneda que no
-existe; una caducidad que ya pasó. Lo tecleado se conserva. Sin permiso, se rechaza.
+carrito no borrado («Ya hay un carrito con esa sesión.»); un email que no es un email; por el asistente
+o la API, una moneda que no existe o una caducidad que ya pasó. Lo tecleado se conserva. Sin permiso, se
+rechaza.
 Implicados: ninguno
 
 ### CART_CHECKOUT-F02 Añadir una línea a un carrito
@@ -222,7 +250,7 @@ Actor: responsable, administrador, propietario, asistente
 Pantalla: Carritos
 Pasos:
 1. En **Carritos**, en la fila, pulsa **Borrar**.
-2. Confirma «¿Borrar el carrito …?» con **Borrar**; **Cancelar** lo deja como estaba.
+2. Confirma «¿Borrar el carrito sess_a1b2c3?» con **Borrar**; **Cancelar** lo deja como estaba.
 3. El carrito desaparece de la lista. El asistente pide confirmación reforzada (acción peligrosa)
    y dice el carrito por su sesión.
 Entra: el carrito.
@@ -236,8 +264,8 @@ Estado: hecho
 Actor: sistema (tarea programada), administrador, asistente
 Pantalla: Carritos (el estado)
 Pasos:
-1. Un carrito activo cuya fecha de caducidad ya pasó **se lee como Expirado** en la lista, en su
-   detalle y en el filtro por estado, y ya no admite cambios ni pedidos.
+1. Un carrito activo cuya fecha de caducidad ya pasó **se lee como Expirado** en la lista, en el
+   filtro por estado y en lo que contesta el asistente, y ya no admite cambios ni pedidos.
 2. Cada quince minutos, la tarea de la app lo deja guardado como Expirado. También se puede pedir al
    asistente o a la API «caducar los carritos vencidos».
 Entra: nada; la hora la pone el Hub.

@@ -1,12 +1,13 @@
-<!-- generated from WORKBOOK.md sha256:feb021abf28fbcfd82adcd1c04e5c2b4e2ae7673884472c0798f68ab08a8e632 -->
+<!-- generated from WORKBOOK.md sha256:549247479897769d92979cb6b3dd1ec34bc4588ccc2f1b457d3c4390a09eff95 -->
 
 ## What it is for and who it is for
 
-Automations is where the business writes down rules that carry themselves out: "when a big sale is
-charged, add a note to the customer's card", "every morning at 9, leave me the task of going over the
-diary", "when someone does not turn up to their appointment, leave me the task of calling them". From here
-you pick a ready-made automation from the gallery or build one from scratch, grant it the permissions it
-needs, try it without effects, turn it on, run it by hand if needed and read what it did.
+Automations is where the business writes down rules that carry themselves out: "when someone does not
+turn up to their appointment, leave me the task of calling them", "every morning at 9, leave me the task
+of going over the diary". You pick a ready-made one from the gallery or build one from scratch, grant it
+the permissions it needs, try it without effects, turn it on and read what it did each time.
+
+### What an automation is like
 
 An automation is **one column**: at the top, **when it starts** (something that happens in the business, a
 schedule, a date or only by hand); below, its **steps**, done in order: **Do something** (an action of
@@ -15,8 +16,13 @@ app), **Only continue if…** (a condition: if it is not met, the automation end
 **Wait** (minutes, hours or days). They start on their own when what they wait for happens in the business,
 at their time or on their date (FLOW-F21, F22), and also with **Run now**.
 
-Only the **owner** and the **administrator** use it: an automation acts on behalf of the business with
-nobody in front of it. The manager and the employee do not see it.
+### Who uses it
+
+Only the **owner** and the **administrator** see, build and change the automations: an automation acts
+on behalf of the business with nobody in front of it. The **manager** and the **employee** only answer
+what an automation asks them, in **Waiting for your answer** (FLOW-F29): it is all they see of the app.
+
+### With the assistant
 
 With the Hub's assistant it is used by voice or by text, with the session of whoever speaks: "create a flow
 that creates a task for me when a sale over €100 is completed" (it leaves it as a **draft**, off, for you to
@@ -81,6 +87,13 @@ Initial setup, step by step:
 ## Screens
 
 ### Automations
+A single screen, from top to bottom: **Waiting for your answer**, with what an automation asks you (a
+manager or an employee only see this); **Proposed by the assistant**, with the drafts it wrote for you;
+**Your automations**, with their search box, their filters and the switch of each one; and **the
+gallery**, with ready-made automations to start from and the ones other apps bring. **New automation**
+and each row open the editor, and **How does this work?** opens the guide.
+
+#### What it shows, from top to bottom
 Menu **Automations**, a single entry. From top to bottom:
 
 - The **New automation** button, top right; on a phone it is only its **+**, so that the title can be read
@@ -108,7 +121,7 @@ Menu **Automations**, a single entry. From top to bottom:
   one** (FLOW-F33 to F35); at the end, the line of what is missing ("Some automations are hidden: they need
   Tasks.") (FLOW-F04).
 
-### Automation editor
+#### Automation editor
 It opens when you tap a row, press **New automation**, use a card or review a draft. Header: ← (back to
 the list; if there are unsaved changes, it asks first), the name (empty: "Untitled automation"), the
 "Active"/"Paused" label, the switch, **Try it**, **Run now** and **Save** ("Saving…"). Four tabs:
@@ -127,7 +140,7 @@ the list; if there are unsaved changes, it asks first), the name (empty: "Untitl
 - **History**: the runs, the most recent first and those stopped by an error at the top (FLOW-F16); one
   stopped by an error in a step carries **Resume from the step that failed** (FLOW-F24).
 
-### Guide
+#### Guide
 The gallery's **How does this work?** button. "How automations work", with five sections: "What an
 automation is", "Your first automation, step by step", "Permissions: why you have to say yes", "How to
 know whether it worked" and "What it cannot do yet". **Back to the automations** goes back (FLOW-F08).
@@ -199,8 +212,8 @@ Steps:
 In: the session.
 Out: nothing saved.
 If it fails: without permission, "You do not have permission"; with the app off, "This app is not active in
-this business"; any other failure, in red with **Retry**. The owner and the administrator see it; the rest
-of the team does not have the entry in the menu.
+this business"; any other failure, in red with **Retry**. A manager or an employee only see **Waiting for
+your answer**, with what an automation asks them.
 Involved: FLOW-F02, FLOW-F04, FLOW-F18
 
 ### FLOW-F02 See, search and sort the automations
@@ -250,8 +263,8 @@ Steps:
 2. If there is already an automation turned on that starts with the same notice, it warns: "Careful: "…"
    already starts with the same thing."
 3. Press **Use this one** ("It is created paused. Nothing happens until you turn it on.").
-4. The editor of the new one opens, paused, on the **Permissions** tab. Carry on with FLOW-F12, FLOW-F13 and
-   FLOW-F14.
+4. The editor of the new one opens, paused, on the **Permissions** tab. Then grant its permissions, try it
+   and turn it on.
 5. If the business already has it, the card carries "Active", "Paused" or "Unfinished" (without permissions)
    and the first button is **See it**; **Use this one** is still available and creates a second one. A
    schedule card is recognised by its schedule and what it does, even if it was renamed.
@@ -288,7 +301,8 @@ Steps:
 3. A shortcut to a card that does not exist or is hidden shows the gallery without opening anything.
 In: the card the shortcut names.
 Out: nothing saved.
-If it fails: the same as FLOW-F01; a card that cannot be used here does not open.
+If it fails: without permission, "You do not have permission"; with the app off, "This app is not active in
+this business"; a card that cannot be used here does not open.
 Involved: FLOW-F04, FLOW-F20
 
 ### FLOW-F06 Make a copy
@@ -343,15 +357,15 @@ Steps:
 1. In **Automations** press **New automation**.
 2. The empty editor opens: "Untitled automation", "Paused", the trigger "Only when you press Run" and "No
    steps yet…".
-3. Write the name, choose when it starts (FLOW-F10) and add the steps (FLOW-F11).
-4. Press **Save**: "Saved." appears and the editor stays open on it; permissions can now be granted to it
-   (FLOW-F12).
+3. Write the name, choose when it starts and add the steps.
+4. Press **Save**: "Saved." appears and the editor stays open on it; permissions can now be granted to
+   it.
 In: what is written in the editor and what the business's automations can use (notices and actions of its
 active apps).
 Out: a new automation, paused unless the switch was turned on before saving, and without permissions
 (`flow.flow.created`). Without a name it is saved as "Untitled automation".
 If it fails: what does not fit, in red and next to the step that has it ("Choose what this step does.",
-"This notice does not exist in your business.", "That date and time has already passed."…); nothing is
+"That does not happen in this business: «…».", "That date and time has already passed."…); nothing is
 saved.
 Involved: FLOW-F10, FLOW-F11, FLOW-F12, FLOW-F14
 
@@ -365,12 +379,12 @@ Steps:
      words ("a sale is charged", "a customer card is created", "an appointment is marked as a no-show"…), with
      the word of the app they belong to ("an opening hours override is created", as in Schedule) and with a
      search box. Below, **Only when…**: conditions on the notice's data ("the total is greater than
-     10000"); without them it starts with every notice, on its own (FLOW-F21).
+     10000"); without them it starts on its own with every notice.
    - **On a schedule**: "How often" (every day, every week, every month), the day of the week or of the
      month when it applies, and the time, in the business's time. A day of the month that does not exist
      (the 31st in April) is skipped that month.
    - **Once, at a date and time**.
-   - **Only by hand**: it does not start on its own (FLOW-F15).
+   - **Only by hand**: it does not start on its own; it runs with **Run now**.
 2. The card sums up what was chosen ("When a sale is charged", "Every Friday at 18:00"…).
 In: the notices of the active apps.
 Out: the trigger, on **Save**.
@@ -392,7 +406,7 @@ Steps:
    it.
 2. Fill in its form:
    - **Do something**: "What to do" (an action of the active apps, chosen from a list with a search box:
-     "Create a task", "Add a note to a customer"…) and "With this information": a field for each piece of
+     "Create a task", "Write a note on a customer"…) and "With this information": a field for each piece of
      data the action asks for (the required ones marked) and **Add information** for the optional ones.
    - **Look something up**: "What to look up" (a query of the active apps), its data and "What to keep"
      ("The first row it finds, field by field" or "Only how many there are"). If it finds nothing, the
@@ -411,10 +425,10 @@ Steps:
    name in front ("1. Add something to a cart › Item › Unit price", "… › Cart › Total amount", the number and
    the total of a sale's invoice), never those inside a list; it is chosen, not typed. A chosen piece of data shows as a pill; the
    rest of the value is text. In what a person reads
-   —the question of "Ask someone first" (FLOW-F28) and the message to a customer (FLOW-F31)— each piece of
+   —the question of "Ask someone first" and the message to a customer— each piece of
    data comes out in words, in the language of whoever saved the automation: a yes or a no as "Yes" or
-   "No", a date and a time as they are written in that language and at the business's time ("2 Nov 2026,
-   10:00"), and an amount a previous step leaves (that of a payment it has just recorded, the total of a sale
+   "No", a date and a time as they are written in that language and at the business's time ("Nov 2, 2026,
+   10:00 AM"), and an amount a previous step leaves (that of a payment it has just recorded, the total of a sale
    or of an invoice, the price of a service or of a combo, the provisional total of a check, the amount of a
    voucher, a cash movement, the price and the total of a cart's line, a price of a price list, the fixed
    discount of a price-list rule), also one the step leaves inside another piece of data (the price and the
@@ -447,7 +461,7 @@ with a step before it. If they cannot be read, it says so inside, in red, with *
 an action or query whose app was turned off after the automation was saved, it stops and History says that
 the action is no longer available; the automation and what the previous steps did are kept. While it is off,
 the editor says so next to the step ("Its app, Tasks, is off in this business: turn it on in Apps, or choose
-another action.") and saving from it is refused with that same reason. After turning the app on again, **Resume from the step that failed** carries it on from there (FLOW-F24).
+another action.") and saving from it is refused with that same reason. After turning the app on again, **Resume from the step that failed** carries it on from there.
 Involved: FLOW-F12, FLOW-F13, FLOW-F16, FLOW-F24
 
 ### FLOW-F12 Grant and withdraw the permissions
@@ -467,7 +481,7 @@ nothing to allow: the tab says so and asks to save.
 If it fails: if the list names something that does not exist in the business, or something that needs a
 person in front (cancelling, refunding, erasing data, sending to the tax agency, seating a group that
 arrives…), it is refused whole and it says what. The only exceptions are "Cancel a reservation" and "Cancel an
-appointment": they are allowed when an **Ask the assistant** step with "Ask me first" uses them (FLOW-F37), and only
+appointment": they are allowed when an **Ask the assistant** step with "Ask me first" uses them, and only
 then. Nobody grants what
 they cannot do themselves: "You cannot allow what you may not do yourself: "…"." (nor an integration with
 its key). Each step acts only with the permission it was granted, never with all those of whoever set it
@@ -492,8 +506,8 @@ Steps:
    it: …"), a condition that would stop it ("It would stop here, and that is the automation working"), what
    cannot be known because it comes from a step that has not run, a wait and a step without permission
    ("They would refuse it: you have not allowed it "…" yet").
-4. In an **Ask the assistant** step, below "Would ask the assistant: …", each fixed piece of data (FLOW-F37)
-   with the value it would have, said as the "Waiting for your answer" card says it (FLOW-F29), read as
+4. In an **Ask the assistant** step, below "Would ask the assistant: …", each fixed piece of data of the step
+   with the value it would have, said as the "Waiting for your answer" card says it, read as
    whoever is trying it: a card by its name ("Cancel a reservation › On behalf of the customer" · "Lucía
    Pérez"), a day as its language writes it, an amount in the business's currency, a yes or a no; never an
    id. A card that person cannot see (without permission, or that is gone) is left out, as on the card. If
@@ -511,9 +525,9 @@ Status: done (server and screen)
 Actor: owner, administrator
 Screen: Automation editor
 Steps:
-1. Move the header's switch: the label changes to "Active". If it lacks permissions it warns as in
-   FLOW-F03; if **Try it** has not been opened, "You have not tried it yet…". It does not prevent turning it
-   on.
+1. Move the header's switch: the label changes to "Active". If it lacks permissions it warns that it will
+   do nothing until you grant them on the Permissions tab; if **Try it** has not been opened, "You have not
+   tried it yet…". It does not prevent turning it on.
 2. Press **Save** ("Saving…" and then "Saved."): the document is saved and, if the switch changed, it is
    then turned on or paused.
 In: what is in the editor and its unsaved changes.
@@ -549,7 +563,8 @@ Screen: Automation editor
 Steps:
 1. Open the **History** tab: the runs, the most recent first, 20 at a time with **See more**; it updates
    itself.
-2. If any stopped by an error, "Needs somebody" shows at the top with "N runs stopped by a problem".
+2. If any stopped by an error, "Needs somebody" shows at the top with how many, for example "2 runs
+   stopped by a problem".
 3. Each run: its state ("Finished well", "Finished: a condition did not hold", "Stopped by an error",
    "Waiting", "Cancelled"), the day and the time, **Copy the reference** and ▾ to see its steps in words
    ("Did: Create a task", "Found 3", "Found nothing, and carried on", "Waited 1 hour", "It stopped here
@@ -600,7 +615,7 @@ Steps:
 1. In **Proposed by the assistant**, press **Review**: it opens in the editor as an automation that does not
    exist yet, with the box "This is a draft the assistant wrote. It is off, has no permissions and nothing
    happens until you turn it on." and "What the assistant could not decide".
-2. Correct and complete the steps (FLOW-F10, FLOW-F11).
+2. Correct and complete when it starts and the steps.
 3. Press **Save**: the automation is created (paused if the switch was not touched) and the draft leaves the
    tray as used, **in the same operation**: it cannot be created twice.
 In: the pending draft, as the assistant left it, with its notes. If you ask the assistant for it, its card
@@ -724,10 +739,10 @@ unreadable "Only when…"), at something that needs a person in front or at a ca
 written address (the same steps would fail again), "This run cannot be resumed…: run it again whole"; after
 7 days, "…can no longer be resumed…"; one already resumed, "Only a run that stopped by an error at one of its
 steps can be resumed…": it is never resumed twice. None resumes by itself. If the personal data of a customer it
-keeps something of are erased (CUSTOMER-F16), one that could still be resumed is cancelled ("Cancelled: the
+keeps something of are erased, one that could still be resumed is cancelled ("Cancelled: the
 customer's personal data were erased."), forgets what its steps read and is no longer resumed; its steps still
 show the one that had failed. One that could no longer be resumed only forgets what its steps read. Both forget
-the free texts of their history (FLOW-F16).
+the free texts of their history.
 Involved: FLOW-F12, FLOW-F15, FLOW-F16, CUSTOMER-F16
 
 ### FLOW-F25 "Only if…" and "If it fails, it carries on" on each step
@@ -775,11 +790,12 @@ Out: the secret sealed with the server's key (`flow.secret.saved`, `flow.secret.
 only opened at the moment of calling and never comes out: not in the list, nor in **Try it** (which shows
 "••••"), nor in the history, nor in a failure; whatever the other system answers with the secret inside
 also comes out hidden.
-If it fails: a name with lower case at the start, digits first or symbols: "Use capitals, digits and _,
-starting with a letter (STRIPE_KEY).", and what was written stays; without the server's encryption key, the
+If it fails: a name with lower case at the start, digits first or symbols is not saved, and below it asks
+for capitals, digits and underscores, starting with a letter, like STRIPE_KEY; what was written stays; without the server's encryption key, the
 box says "This server cannot keep secrets yet: its encryption key is missing." as soon as it opens, instead
 of the fields, and does not let anything be saved.
-Saving a step that names a secret that does not exist: "There is no secret called "X"." next to the field.
+Saving a step that names a secret that does not exist: "There is no secret called "STRIPE_KEY"." next to the
+field.
 A run whose secret was deleted or can no longer be opened stops before calling, with the reason and what to
 do. A secret can only be inserted in **Call another system**: in any other step it is not saved.
 Involved: FLOW-F11, FLOW-F13, FLOW-F16, FLOW-F27
@@ -794,8 +810,8 @@ Steps:
    "This step will ask your permission to call" and that name. After the name, data can be inserted.
 3. Add the **Headers** the other system asks for (**Add a header**: **Name** and **Value**) and **What it
    sends**. In any value, **Insert data** offers what the notice brought, what the previous steps left, the
-   **Secrets** (FLOW-F26) and the "No-repeat key" of this call.
-4. Adjust the **Seconds to wait** (from 1 to 30) and, if you want, **More options** (FLOW-F25).
+   **Secrets** and the "No-repeat key" of this call.
+4. Adjust the **Seconds to wait** (from 1 to 30) and, if you want, **More options**.
 5. **Save** and, in **Permissions**, grant "Call" that server.
 In: the method, the address, the headers, the text it sends and the wait.
 Out: **Run now** answers at once, without waiting for the other system: the run stays at "Calling …" with
@@ -810,9 +826,9 @@ data before the name, is not saved ("Write the address by hand…"); nor are the
 run with the reason and the header's name, without calling; an address of a private network, of the server
 itself or of the cloud's internal data is not called ("…is inside a private network, so it was not
 called."); without permission, "…you have not let it do…"; if it answers an error, does not answer in time
-or cannot be reached, the run stops with the reason and what to do, and can be resumed (FLOW-F24) or carry
+or cannot be reached, the run stops with the reason and what to do, and can be resumed or carry
 on with "If it fails, it carries on"; a private address is not resumed: the step has to be changed and the
-run started again. While the server cannot keep secrets (FLOW-F26), a call that uses none is saved, tried
+run started again. While the server cannot keep secrets, a call that uses none is saved, tried
 and goes out the same; one that uses one stops before calling ("This server cannot use secrets…"). It does
 not follow redirects. A run whose automation is deleted while it calls is cancelled.
 Involved: FLOW-F12, FLOW-F13, FLOW-F16, FLOW-F24, FLOW-F25, FLOW-F26
@@ -826,8 +842,8 @@ Steps:
 2. Write **The question** and, if you want, **Details (optional)**, with inserted data: they are filled in at
    the moment of asking.
 3. In **Who has to answer** choose "Whoever runs the business" (by default), "A manager" or "An employee":
-   "Managers answer it in Automations, under "Waiting for your answer"; whoever runs the business can
-   too.".
+   "The managers answer it in Automations, under "Waiting for your answer"; whoever runs the business
+   can too.".
 4. Adjust **How long to wait for the answer** (from 1 to 720 hours; by default, 72).
 5. In **If they say no**, "Stop the automation here" or "Carry on with the next steps"; in **If nobody answers
    in time**, "Count it as a no", "Stop the automation here" or "Carry on with the next steps". With "Carry
@@ -835,7 +851,7 @@ Steps:
 6. Press **Save**. This step does not ask for permission.
 In: the question, its details, to whom, how long to wait and what to do with a no and with silence.
 Out: the step. When it runs, the question waits in "Waiting for your answer" (FLOW-F29) with its text already
-filled in, each inserted piece of data in words (FLOW-F11: "Yes", "2 Nov 2026, 10:00"), and the run stops
+filled in, each inserted piece of data in words (FLOW-F11: "Yes", "Nov 2, 2026, 10:00 AM"), and the run stops
 there (`flow.question.asked`); the history says "Asked managers; waiting for an answer until the …".
 Changing the automation afterwards does not change a question already asked. **Try it** says "Would ask …
 and wait up to … hours" with the question filled in as it will go out, without asking. A yes to this question
@@ -852,20 +868,20 @@ Actor: owner, administrator, manager, employee
 Screen: Automations
 Steps:
 1. In **Automations**, **Waiting for your answer** shows each question you can answer, the one that expires
-   first at the top: which automation it comes from, the question and its details (with its data in words,
-   FLOW-F28), "Asked of managers. Whoever runs the business can answer too.", what happens if nobody answers
+   first at the top: which automation it comes from, the question and its details (with its data in
+   words), "Asked of the managers. Whoever runs the business can answer too.", what happens if nobody answers
    ("If nobody answers before …, it counts as a no.") and what a no does. If it is a change the assistant
-   wants to make (FLOW-F38), the card first says what it wants to do: right below the question ("The
+   wants to make, the card first says what it wants to do: right below the question ("The
    assistant wants to change something in "Reservations""), the action with the name the history gives it
    ("Cancel a reservation", "Book an appointment"), both in your language even if the automation is written
    in another, also in a question that was already waiting. Its details are what it said and, below, each
-   piece of data it would send, one per line, as its card in the chat says it (BASE-F97): a date and a time in
-   your language and at the business's time ("Starts at: 2 Nov 2026, 10:00"), a value from a closed list with
-   the name its app gives it ("Booked by: Counter"), an amount in the business's currency, a yes or a no as
+   piece of data it would send, one per line, as its card in the chat says it: a date and a time in
+   your language and at the business's time ("Starts at: Nov 2, 2026, 10:00 AM"), a value from a closed list with
+   the name its app gives it ("Booked through: Front desk"), an amount in the business's currency, a yes or a no as
    "Yes" or "No", a list by its items in words, such as the services of an appointment ("Services: Haircut,
    Colour"), or, when they cannot be said (the lines of a sale, a list of codes), by how many items it carries,
    and a record by its name only if
-   you can see it; if not, it does not show, and never by its code. The step's fixed data (FLOW-F37) come out
+   you can see it; if not, it does not show, and never by its code. The step's fixed data come out
    already set, as it will send them ("On behalf of the customer: Lucía Pérez"), even if the assistant asked
    for another. An empty piece of data does not show. It is read when the tray opens, with what each person
    can see.
@@ -917,26 +933,25 @@ Steps:
    already in international format): only the WhatsApp conversation of exactly that international number
    gets it, never a new one. An incomplete number typed by hand reaches nobody.
 3. Write the "Message", with inserted data: it goes as it is if the customer wrote to you in the last 24
-   hours, with each piece of data in words (FLOW-F11: a yes or a no, a date and a time, an amount of the
+   hours, with each piece of data in words (a yes or a no, a date and a time, an amount of the
    notice or of a previous step), also in the template's blanks.
 4. Choose the "Template" among your templates approved by Meta (its text shows below) and fill in a piece of
    data for each blank: after 24 hours, WhatsApp only lets an approved template through. With no approved
    templates it says so: "You have no approved templates yet: create one in WhatsApp › Settings.". If the one
-   you choose carries a photo, a video or a document at the top, it goes with its file (FLOW-F32).
-5. **Save** and, in **Permissions**, allow "Send a WhatsApp to a customer" (FLOW-F12).
+   you choose carries a photo, a video or a document at the top, it goes with its file.
+5. **Save** and, in **Permissions**, allow "Send a WhatsApp to a customer".
 In: the customer's phone (from a notice or from a previous step), the approved templates of the WhatsApp
 inbox and the conversation of that number.
 Out: when it runs, the WhatsApp stays in the customer's conversation in the inbox, as one sent from it, and
 goes out through the business's number (`whatsapp_inbox.message.sent`); the same notice never sends it
 twice.
-If it fails: nothing goes out and the reason stays in the automation's history (FLOW-F16): a number that is
+If it fails: nothing goes out and the reason stays in the automation's history: a number that is
 not in international format, with "+" and the country prefix (nothing is sent, so that it never reaches
 another person), a number with no conversation in this business ("There is no WhatsApp conversation with …
 in this business: nothing was sent."), more than 24 hours without a template, the WhatsApp number not
 connected or the plan's messages of this month used up. A marketing template only reaches a customer who
 has accepted it in Customers. What Meta refuses afterwards is seen in the inbox's conversation ("Not
-delivered"). Without the WhatsApp inbox the button does not appear; by email it cannot be done yet (see "Qué
-queda fuera").
+delivered"). Without the WhatsApp inbox the button does not appear; by email it cannot be done yet.
 Involved: FLOW-F11, FLOW-F12, FLOW-F16, FLOW-F32, WHATSAPP_INBOX-F23, WHATSAPP_INBOX-F33
 
 ### FLOW-F32 Put a photo, a video or a PDF at the top of a WhatsApp
@@ -944,7 +959,7 @@ Status: done
 Actor: owner, administrator
 Screen: Automation editor
 Steps:
-1. In a **Send a message** step (FLOW-F31), choose in "Template" one that carries a photo, a video or a
+1. In a **Send a message** step, choose in "Template" one that carries a photo, a video or a
    document at the top: below it shows the file that goes with it and what WhatsApp takes ("JPEG or PNG, up
    to 5 MB.", "MP4, up to 16 MB." or "PDF, up to 25 MB.").
 2. If the template already has its file (you made it in WhatsApp › Settings), its name and size show
@@ -963,7 +978,7 @@ JPEG or PNG photo.", "This file weighs more than 5 MB: choose a lighter one."); 
 file could not be uploaded. Try again.". If the file the step chose is no longer kept, it says so ("The file
 this step had chosen is no longer kept: choose it again."); if it cannot be read right now, "The file of this
 step could not be read." with **Retry**. Without a file, nothing goes out when it runs and the reason stays
-in the automation's history (FLOW-F16); a file of another business is never sent.
+in the automation's history; a file of another business is never sent.
 Involved: FLOW-F11, FLOW-F16, FLOW-F31, WHATSAPP_INBOX-F29, WHATSAPP_INBOX-F33
 
 ### FLOW-F33 Turn on an automation another app brings
@@ -1038,18 +1053,18 @@ Screen: Automations
 Steps:
 1. You do not have to do anything: what its app fixed after you set it up reaches your automation by itself,
    even if you tweaked it, and without any notice above **Your automations**. The card in **Comes with …**
-   still says "New version", as with any other change by its app (FLOW-F35).
+   still says "New version", as with any other change by its app.
 2. If its app narrowed when it starts, it no longer starts in the cases its app left out: the WhatsApp reply
    set up before its app left out the old messages the inbox brings no longer answers any of them. When it is
    opened, its "Only when…" already says so.
-3. If its app fixed a piece of data of its **Ask the assistant** step (FLOW-F37), that step already carries
-   it: when opened it shows in its **Fixed data**, and the assistant does not see it nor can change it
-   (FLOW-F38). That way, the WhatsApp reply set up before its app fixed the card of whoever writes does not
+3. If its app fixed a piece of data of its **Ask the assistant** step, that step already carries
+   it: when opened it shows in its **Fixed data**, and the assistant does not see it nor can change it.
+   That way, the WhatsApp reply set up before its app fixed the card of whoever writes does not
    cancel or change another person's reservation either, not even after **Approve**.
 4. What its app sets is not removed from your automation: in the editor, that condition of the "Only when…"
    and that fixed piece of data say "Set by …: you can change it, not take it off.", with no × and no way to
    choose another piece of data. Your ways out: give it another value (yours counts), remove that query or
-   action from **What it may use**, make it start with another notice, or make a copy (FLOW-F06), which is
+   action from **What it may use**, make it start with another notice, or make a copy, which is
    entirely yours.
 In: the automations set up from a **Comes with …** card, whenever they were set up, whose "Only when…" lacks
 what its app sets on it today while they start with the same notice, or that leave to the assistant a piece
@@ -1088,14 +1103,14 @@ Steps:
    reservation") and fill it in, with **Insert data** if you want (the "Card" a previous step read). It shows
    as "Cancel a reservation › On behalf of the customer"; × removes it, and removing something from **What it
    may use** also removes its fixed data. One fixed by the app of the recipe you set it up from has no ×: it
-   says "Set by …: you can change it, not take it off." (FLOW-F36). With none: "None: the assistant fills in
+   says "Set by …: you can change it, not take it off.". With none: "None: the assistant fills in
    every datum itself.". The card explains it: "The assistant never sees them nor can change them: they are
    filled in when it is asked, and a tool whose fixed datum is empty is not used.".
 5. In **Changes**, choose "Ask me first" (by default) or "On its own". The card explains it: "A change it
    wants waits for a yes in Automations, under "Waiting for your answer". What it only looks up never waits."
    or "It makes the changes on its own, as this automation, with the permissions you gave it.".
-6. Adjust **Most turns** (from 1 to 10; by default, 6) and, if you want, **More options** (FLOW-F25).
-7. Press **Save** and, in **Permissions**, grant each query or action it may use (FLOW-F12).
+6. Adjust **Most turns** (from 1 to 10; by default, 6) and, if you want, **More options**.
+7. Press **Save** and, in **Permissions**, grant each query or action it may use.
 In: the request, what it may use, its fixed data, how it makes changes and the turns.
 Out: the step. The steps after it can insert "Text", what it answered, and, if a change waited for your
 answer, "Approved", "Note" and "Answered by". **Try it** says "Would ask the assistant: …" with the request
@@ -1109,7 +1124,7 @@ own", neither:
 something it cannot use is not saved (""…" has fixed data but the assistant may not use it: add it to what it
 may use or remove its fixed data."), nor one that query or action does not have (""…" is no datum of "…"."),
 nor one without a value ("Give "…" of "…" a value, or remove it."), nor one that reads a secret or a later
-step, like the request. Nor one its app fixes, left without a value or removed (FLOW-F36).
+step, like the request. Nor one its app fixes, left without a value or removed.
 Involved: FLOW-F11, FLOW-F12, FLOW-F13, FLOW-F17, FLOW-F25, FLOW-F29, FLOW-F38, FLOW-F39
 
 ### FLOW-F38 The assistant does its step inside an automation

@@ -92,9 +92,8 @@ def _read(config: LiveAppConfig, language: str) -> dict:
     """The help of ``config`` for ``language`` (``_READ``), with the name of the module in the language served."""
     key = (config.label, language)
     if key not in _READ or settings.DEBUG:
-        served, markdown = workbook_help.workbook(Path(config.path), language)
+        served, read = help_of(config, language)
         with translation.override(served):
-            read = workbook_help.parse(markdown, tabs_of(config), workbook_help.words())
             name = str(config.verbose_name)
         _READ[key] = {
             "app": config.label,
@@ -105,6 +104,13 @@ def _read(config: LiveAppConfig, language: str) -> dict:
             "flows": [asdict(flow) for flow in read.flows],
         }
     return _READ[key]
+
+
+def help_of(config: LiveAppConfig, language: str) -> tuple[str, workbook_help.Help]:
+    """The language ``config``'s help is served in for ``language`` and what its window reads there."""
+    served, markdown = workbook_help.workbook(Path(config.path), language)
+    with translation.override(served):
+        return served, workbook_help.parse(markdown, tabs_of(config), workbook_help.words())
 
 
 def _video(videos: Mapping[str, str], language: str) -> str | None:
