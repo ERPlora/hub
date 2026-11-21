@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import type { RouteComponent, RouteRecordRaw } from 'vue-router';
 import { describe, expect, it, vi } from 'vitest';
 
+import { appMenu } from '../../../base/frontend/__tests__/app-menu';
 import routes from './routes';
 
 // The pages, stubbed: this file checks which page each route loads and that it loads it on demand, not
@@ -47,9 +48,7 @@ describe('reservation routes.ts', () => {
     expect([...source.matchAll(/^import\s+(?!type\b).*$/gm)]).toEqual([]);
   });
 
-  it('serves every menu entry of apps.py, plus Settings (a tab of the pages)', () => {
-    const appsPy = readFileSync(join(HERE, '..', 'apps.py'), 'utf8');
-    const paths = [...appsPy.matchAll(/"(\/reservation\/[a-z]+)"/g)].map((m) => m[1]);
-    expect(paths).toEqual(routes.map((r) => r.path).filter((path) => path !== '/reservation/settings'));
+  it('serves every menu entry of apps.py, Settings among them, entry for entry', () => {
+    expect(appMenu('reservation').map((entry) => entry.path)).toEqual(routes.map((r) => r.path));
   });
 });

@@ -59,6 +59,6 @@ describe('kitchen routes.ts', () => {
     const appsPy = readFileSync(join(HERE, '..', 'apps.py'), 'utf8');
     const paths = new Set([...appsPy.matchAll(/"(\/kitchen\/[a-z-]+)"/g)].map((m) => m[1]));
     expect([...paths].every((path) => routes.some((r) => r.path === path))).toBe(true);
-    expect(paths).toHaveLength(4);
+    expect(paths).toHaveLength(5);
   });
 });

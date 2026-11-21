@@ -58,7 +58,7 @@ describe('table routes.ts', () => {
     expect(routes.map((r) => r.path)).toEqual(TABLE_TABS.map((tab) => tab.to));
     const appsPy = readFileSync(join(HERE, '..', 'apps.py'), 'utf8');
     const paths = [...new Set([...appsPy.matchAll(/"(\/table\/[a-z-]+)"/g)].map((m) => m[1]))];
-    expect(paths.sort()).toEqual(['/table/floor-plan', '/table/sessions', '/table/tables', '/table/zones']);
+    expect(paths.sort()).toEqual(['/table/floor-plan', '/table/sessions', '/table/settings', '/table/tables', '/table/zones']);
     for (const path of paths) expect(routes.some((r) => r.path === path), path).toBe(true);
   });
 });

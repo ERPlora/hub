@@ -51,6 +51,10 @@ def test_an_employee_s_menu_has_only_the_screens_of_its_work(make_user):
     assert menu["reservation"] == ["/reservation/reservations", "/reservation/waitlist"]
     assert menu["staff"] == ["/staff/members", "/staff/time-off", "/staff/schedules"]
     assert menu["flow"] == ["/flow/automations"]
+    assert menu["online_booking"] == ["/online_booking/bookings"]
+    assert menu["whatsapp_inbox"] == ["/whatsapp_inbox/inbox"]
+    assert menu["task"] == ["/task/tasks", "/task/projects"]
+    assert menu["cart_checkout"] == ["/cart_checkout/carts", "/cart_checkout/orders"]
 
 
 def test_the_apps_an_employee_does_not_open_stay_on_for_the_screens_that_read_them(make_user):

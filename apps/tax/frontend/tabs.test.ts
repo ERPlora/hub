@@ -1,13 +1,11 @@
 // The three sections of Taxes (the WORKBOOK's screens; the old manifest's `navigation`): Categories,
 // Rules and Aliases, as the footer tabbar of every tax page. Each tab follows its route, has its icon
 // (a registered one: an unregistered icon paints nothing) and its label in the reader's language.
-import { readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
 
 import { createShellI18n } from '@erplora/ui/shell';
 import { describe, expect, it } from 'vitest';
 
+import { appMenu } from '../../../base/frontend/__tests__/app-menu';
 import { ION_ICONS } from '../../../packages/ui/src/shell/icons';
 import en from './locale/en.json';
 import es from './locale/es.json';
@@ -43,8 +41,7 @@ describe('the tax tabbar', () => {
   });
 
   it('wears the same icons and paths as the menu entries of apps.py (one icon per section everywhere)', () => {
-    const appsPy = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '..', 'apps.py'), 'utf8');
-    const menu = [...appsPy.matchAll(/Nav\("([a-z]+)", _\("[^"]+"\), "([^"]+)", "([^"]+)"\)/g)].map((m) => [m[1], m[2], m[3]]);
+    const menu = appMenu('tax').map((entry) => [entry.id, entry.icon, entry.path]);
     expect(menu).toEqual(TAX_TABS.map((tab) => [tab.id, tab.icon, tab.to]));
   });
 });

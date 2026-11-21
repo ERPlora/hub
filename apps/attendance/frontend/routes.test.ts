@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import type { RouteComponent, RouteRecordRaw } from 'vue-router';
 import { describe, expect, it, vi } from 'vitest';
 
+import { appMenu } from '../../../base/frontend/__tests__/app-menu';
 import { OPERATION_ROUTES } from '../../../frontend/generated/operation-routes';
 import routes from './routes';
 
@@ -46,10 +47,8 @@ describe('attendance routes.ts', () => {
     expect([...source.matchAll(/^import\s+(?!type\b).*$/gm)]).toEqual([]);
   });
 
-  it('matches the navigation of apps.py (and the settings tab)', () => {
-    const appsPy = readFileSync(join(HERE, '..', 'apps.py'), 'utf8');
-    const paths = [...appsPy.matchAll(/"(\/attendance\/[a-z]+)"/g)].map((m) => m[1]);
-    expect([...paths, '/attendance/settings']).toEqual(routes.map((r) => r.path));
+  it('matches the navigation of apps.py, entry for entry', () => {
+    expect(appMenu('attendance').map((entry) => entry.path)).toEqual(routes.map((r) => r.path));
   });
 
   it('binds the sixteen routed operations to apps/attendance/api.py: queries by GET, commands by POST', () => {

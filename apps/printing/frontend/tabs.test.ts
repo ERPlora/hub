@@ -1,13 +1,11 @@
 // The four sections of Printing (the old single «Printers» screen split as the platform's apps do), as
 // the footer tabbar of every page: each tab follows its route, has a registered icon and its label in the
 // reader's language, and wears the same icon and path as its menu entry in apps.py.
-import { readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
 
 import { createShellI18n } from '@erplora/ui/shell';
 import { describe, expect, it } from 'vitest';
 
+import { appMenu } from '../../../base/frontend/__tests__/app-menu';
 import { resolveIcon } from '../../../packages/ui/src/shell/icons';
 import en from './locale/en.json';
 import es from './locale/es.json';
@@ -34,8 +32,7 @@ describe('the printing tabbar', () => {
 
   it('gives every tab a registered icon, the same as its menu entry in apps.py', () => {
     for (const tab of PRINTING_TABS) expect(resolveIcon(tab.icon), tab.icon).toBeTruthy();
-    const appsPy = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '..', 'apps.py'), 'utf8').replace(/\s+/g, ' ');
-    const menu = [...appsPy.matchAll(/Nav\( ?"([a-z_]+)", _\("[^"]+"\), "([^"]+)", "([^"]+)",? ?\)/g)].map((m) => [m[1], m[2], m[3]]);
+    const menu = appMenu('printing').map((entry) => [entry.id, entry.icon, entry.path]);
     expect(menu).toEqual(PRINTING_TABS.map((tab) => [tab.id, tab.icon, tab.to]));
   });
 });

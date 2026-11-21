@@ -2,13 +2,11 @@
 // Stations and History, as the footer tabbar of every kitchen page, plus «Settings» — the tab the old shell
 // generated from the module's settings block, shown only to whoever may save them. Each tab follows its
 // route and wears a registered icon, the same as the menu's.
-import { readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
 
 import { createShellI18n } from '@erplora/ui/shell';
 import { describe, expect, it } from 'vitest';
 
+import { appMenu } from '../../../base/frontend/__tests__/app-menu';
 import { ION_ICONS } from '../../../packages/ui/src/shell/icons';
 import en from './locale/en.json';
 import es from './locale/es.json';
@@ -43,8 +41,9 @@ describe('the kitchen tabbar', () => {
   });
 
   it('wears the same icons and paths as the menu entries of apps.py (one icon per section everywhere)', () => {
-    const appsPy = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '..', 'apps.py'), 'utf8');
-    const menu = [...appsPy.matchAll(/Nav\(\s*"([a-z_]+)",\s*(?:_|pgettext_lazy)\([^)]*\),\s*"([^"]+)",\s*"([^"]+)",?\s*\)/g)].map((m) => [m[1], m[2], m[3]]);
-    expect(menu).toEqual(KITCHEN_TABS.filter((tab) => tab.id !== 'settings').map((tab) => [tab.id, tab.icon, tab.to]));
+    const menu = appMenu('kitchen');
+    expect(menu.map((entry) => [entry.id, entry.icon, entry.path])).toEqual(KITCHEN_TABS.map((tab) => [tab.id, tab.icon, tab.to]));
+    // «Settings» opens with the permission its pages show the tab with.
+    expect(menu.find((entry) => entry.id === 'settings')?.permission).toBe('kitchen.change_settings');
   });
 });

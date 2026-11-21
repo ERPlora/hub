@@ -48,8 +48,8 @@ describe('appointment routes.ts', () => {
   it('has a page for every tab, and every path apps.py names (its menu entry, its bell counter) is one of them', () => {
     expect(routes.map((r) => r.path)).toEqual(APPOINTMENT_TABS.map((tab) => tab.to));
     const appsPy = readFileSync(join(HERE, '..', 'apps.py'), 'utf8');
-    // Distinct paths: the menu entry and the bell's «Appointments to confirm» both lead to the Agenda.
+    // Distinct paths: the two menu entries, and the bell's «Appointments to confirm», which leads to the Agenda.
     const paths = new Set([...appsPy.matchAll(/"(\/appointment\/[a-z-]+)"/g)].map((m) => m[1]));
-    expect([...paths]).toEqual(['/appointment/agenda']);
+    expect([...paths]).toEqual(['/appointment/agenda', '/appointment/settings']);
   });
 });

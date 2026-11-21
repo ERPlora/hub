@@ -2,13 +2,11 @@
 // tabbar of every sale page. «Sections», not «Departments»: that word is wider than a fifth of a phone's strip, so the
 // five tabs would not fit whole. Each tab follows its route, has a registered icon and its label in the reader's
 // language, and wears the same icon and path as its menu entry in apps.py.
-import { readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
 
 import { createShellI18n } from '@erplora/ui/shell';
 import { describe, expect, it } from 'vitest';
 
+import { appMenu } from '../../../base/frontend/__tests__/app-menu';
 import { ION_ICONS } from '../../../packages/ui/src/shell/icons';
 import en from './locale/en.json';
 import es from './locale/es.json';
@@ -39,8 +37,7 @@ describe('the sale tabbar', () => {
   });
 
   it('wears the same icons and paths as the menu entries of apps.py', () => {
-    const appsPy = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '..', 'apps.py'), 'utf8');
-    const menu = [...appsPy.matchAll(/Nav\(\s*"([a-z_]+)",\s*_\("[^"]+"\),\s*"([^"]+)",\s*"([^"]+)",?\s*\)/g)].map((m) => [m[1], m[2], m[3]]);
+    const menu = appMenu('sale').map((entry) => [entry.id, entry.icon, entry.path]);
     expect(menu).toEqual(SALE_TABS.map((tab) => [tab.id, tab.icon, tab.to]));
   });
 });

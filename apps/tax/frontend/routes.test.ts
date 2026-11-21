@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import type { RouteComponent, RouteRecordRaw } from 'vue-router';
 import { describe, expect, it, vi } from 'vitest';
 
+import { appMenu } from '../../../base/frontend/__tests__/app-menu';
 import routes from './routes';
 
 // The pages, stubbed: this file checks which page each route loads and that it loads it on demand, not
@@ -48,9 +49,7 @@ describe('tax routes.ts', () => {
   });
 
   it('matches the navigation of apps.py, entry for entry', () => {
-    const appsPy = readFileSync(join(HERE, '..', 'apps.py'), 'utf8');
-    const paths = [...appsPy.matchAll(/Nav\(.*"(\/tax\/[a-z]+)"\)/g)].map((m) => m[1]);
-    expect(paths).toEqual(routes.map((r) => r.path));
+    expect(appMenu('tax').map((entry) => entry.path)).toEqual(routes.map((r) => r.path));
   });
 
   it('has a page where the Home sends its step «Your taxes» (the `route` of apps.py)', () => {

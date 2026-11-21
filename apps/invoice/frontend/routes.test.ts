@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import type { RouteComponent, RouteRecordRaw } from 'vue-router';
 import { describe, expect, it, vi } from 'vitest';
 
+import { appMenu } from '../../../base/frontend/__tests__/app-menu';
 import routes from './routes';
 
 // The pages, stubbed: this file checks which page each route loads and that it loads it on demand, not
@@ -52,8 +53,7 @@ describe('invoice routes.ts', () => {
   });
 
   it('has a page for every entry of the navigation of apps.py', () => {
-    const appsPy = readFileSync(join(HERE, '..', 'apps.py'), 'utf8');
-    const paths = [...appsPy.matchAll(/Nav\(.*"(\/invoice\/[a-z]+)"\)/g)].map((m) => m[1]);
+    const paths = appMenu('invoice').map((entry) => entry.path);
     expect(paths).toEqual(['/invoice/invoices', '/invoice/series', '/invoice/issuer']);
     for (const path of paths) expect(routes.some((r) => r.path === path), path).toBe(true);
   });

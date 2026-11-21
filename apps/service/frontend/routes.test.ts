@@ -55,7 +55,7 @@ describe('service routes.ts', () => {
     expect(routes.map((r) => r.path)).toEqual(SERVICE_TABS.map((tab) => tab.to));
     const appsPy = readFileSync(join(HERE, '..', 'apps.py'), 'utf8');
     const paths = [...new Set([...appsPy.matchAll(/"(\/service\/[a-z-]+)"/g)].map((m) => m[1]))];
-    expect(paths.sort()).toEqual(['/service/categories', '/service/packages', '/service/services']);
+    expect(paths.sort()).toEqual(['/service/categories', '/service/packages', '/service/services', '/service/settings']);
     for (const path of paths) expect(routes.some((r) => r.path === path), path).toBe(true);
   });
 });
