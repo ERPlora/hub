@@ -144,8 +144,8 @@ cierra tocando fuera, con Esc o con el botón atrás del móvil. Dos zonas:
   su número, y «Cerrar» en el móvil; el título editable («Cuenta nueva») y los chips de cliente,
   «Atiende …» y «Falta el cliente». Cada línea: nombre, precio por unidad, marca de descuento o
   «Invitación», nota y profesional debajo; botones de descuento, nota, invitación y el selector de
-  cantidad (una línea enviada a cocina solo enseña su cantidad, «Comanda N» y el botón ⊗ «Anular
-  este artículo»; una pagada con bono, «Ya pagado · <bono>», 0,00 € y solo el botón de quitarla). Pie:
+  cantidad (una línea enviada a cocina solo enseña su cantidad, «Comanda N», el regalo y el botón ⊗
+  «Anular este artículo»; una pagada con bono, «Ya pagado · <bono>», 0,00 € y solo el botón de quitarla). Pie:
   la fila «Descuento del tique» si lo hay, «Total», el botón de descuento, la impresora («Imprimir
   cuenta») y «Cobrar · <importe>». En el cajón del móvil, la barra de arriba y el pie con «Cobrar» se
   quedan siempre a la vista, encima de la barra de pestañas, y lo de en medio (título, chips, pestañas y
@@ -525,16 +525,21 @@ Pasos:
 1. Con «Activar caja» encendido en Caja y sin sesión de caja abierta, cobra en efectivo (también un
    cobro repartido con una parte en efectivo).
 2. La hoja **Cobro** no cobra nada y dice «La caja está cerrada: abre una sesión de caja para cobrar en
-   efectivo.»; a quien puede abrirla le ofrece «Abrir sesión de caja», que lleva a **Caja**. La
-   pantalla **Vender** no cambia: la cuenta sigue ahí.
-3. Abierta la sesión, vuelve a **Vender** y cobra. Con tarjeta, Bizum o transferencia se cobra siempre,
-   con la caja abierta o cerrada.
+   efectivo.»; a quien puede abrirla le ofrece «Abrir sesión de caja», que abre encima del cobro la
+   ventana de apertura de **Caja**, con «Cajón», «Fondo de apertura» y «Notas». La pantalla **Vender**
+   no cambia: la cuenta sigue ahí.
+3. Pulsa «Abrir sesión»: la ventana se cierra, sale «Sesión abierta» y el cobro sigue como estaba, ya
+   sin el aviso; «Cobrar» cobra en efectivo. Con tarjeta, Bizum o transferencia se cobra siempre, con la
+   caja abierta o cerrada.
 Entra: si la caja está activada y si hay sesión abierta, que Ventas pregunta a Caja
 (`cash_register.session.current`) con la sesión de quien cobra, solo cuando hay efectivo.
 Sale: nada propio; el cobro rechazado no gasta número.
 Si falla: si Caja no está activa en el negocio o no contesta, se cobra igual, para no parar las
-ventas, y Caja enseña ese cobro entre los de fuera de turno.
-Implicados: CASH_REGISTER-F04, CASH_REGISTER-F17
+ventas, y Caja enseña ese cobro entre los de fuera de turno. La ventana de apertura avisa como en Caja:
+fondo obligatorio, una sesión ya abierta en otro dispositivo, un importe ilegible; «Cancelar» la cierra
+y el cobro sigue con su aviso. Si la ventana no llega a cargarse, «Abrir sesión de caja» lleva a
+**Caja** para abrirla allí, y la cuenta sigue en **Vender**.
+Implicados: CASH_REGISTER-F03, CASH_REGISTER-F04, CASH_REGISTER-F17
 
 ### SALE-F09 Vender a precio libre por sección
 Estado: hecho
@@ -705,13 +710,14 @@ Vertical: común
 Actor: empleado, responsable
 Pantalla: Vender
 Pasos:
-1. En la línea, toca el regalo («Invitar / quitar invitación»).
-2. La línea queda a 0 con la marca «Invitación»; tocarlo otra vez la vuelve a cobrar.
+1. En la línea, toca el regalo («Invitar / quitar invitación»). También en una línea ya enviada a cocina,
+   porque lo que se invita suele ser lo ya servido: el postre de la casa o el plato que salió mal.
+2. La línea queda a 0 con la marca «Invitación»; tocarlo otra vez la vuelve a cobrar. Una línea enviada
+   sigue en la cuenta con su comanda, y a cocina no le llega nada nuevo.
 Entra: nada de otras apps.
 Sale: la línea invitada: no suma dinero ni IVA, pero el aviso de venta la lleva para que Inventario
 baje el stock; la venta guarda el coste de lo invitado.
-Si falla: «No se ha podido guardar ese cambio de la línea. La línea vuelve a estar como estaba.». Una
-línea ya enviada a cocina no se puede invitar.
+Si falla: «No se ha podido guardar ese cambio de la línea. La línea vuelve a estar como estaba.».
 Implicados: INVENTORY-F21
 
 ### SALE-F16 Atribuir la cuenta o una línea a quien atiende
@@ -831,7 +837,8 @@ Pasos:
 3. Al pulsar «Cobrar» con algo pendiente, se envía primero a cocina y después se abre el cobro: nadie paga
    un plato que no se va a preparar. El aviso de la comanda también sale arriba, para poder tocar el teclado
    del cobro desde el primer momento. Si el envío falla, no se abre el cobro y se dice por qué.
-4. Una línea enviada queda bloqueada: ni cantidad, ni nota, ni descuento, ni invitación.
+4. Una línea enviada queda bloqueada: ni cantidad, ni nota, ni descuento. Sí se puede invitar con su
+   regalo: se queda en la cuenta a 0 y a cocina no le llega nada nuevo.
 5. Para quitar un plato ya enviado, pulsa ⊗ «Anular este artículo» en su línea: se abre «Anular
    «Croquetas»» con «Ya se envió a cocina. Sale de la cuenta y se guarda el motivo. Tiene que
    autorizarlo un responsable.», los motivos de un toque («Error al pedir», «El cliente lo cambia»,
@@ -1979,7 +1986,7 @@ título, sus pasos y «Si falla»: ahí no van nombres de código, incidencias, 
 - **SALE-F19**: sentar es TABLE-F12, abrir la cuenta de la mesa TABLE-F10, volver a sentar TABLE-F24 y soltar
   TABLE-F13.
 - **SALE-F20**: «Enviar comanda (N)» se queda fija también en «Cuenta», la pestaña con la que se abre una cuenta (al
-  pulsar «Cobrar» en una mesa de Mesas, al cambiar de cuenta o al volver a abrir la app), en horizontal y en vertical
+  tocar una mesa ocupada en Mesas, al cambiar de cuenta o al volver a abrir la app), en horizontal y en vertical
   (hub#1017). En el cajón del móvil, «Enviar comanda» y la llama se quedan fijos sobre el pie mientras dejan sitio a
   las pestañas y a una línea; en un móvil más bajo se desplazan con las líneas y «Cobrar» sigue a la vista, y lo
   mismo en la columna lateral de una pantalla igual de baja (hub#787). En la columna lateral, si la cabecera, las

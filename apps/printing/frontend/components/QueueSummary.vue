@@ -3,8 +3,8 @@
 // its state — «Ready», «Waiting, no printer», «No device» (jobs no device set up here can print: where the bell's
 // «Nothing is printing “…”» leads, it says why), «Device off» (jobs that waited a minute while the device set up for
 // them gave no news for 90 s: the bell's too), «With errors» —, «Waiting: N · the oldest has waited 3 min» or «Nothing
-// waiting», the failed ones and the printer it prints on now (the chosen one, else the first active one: named, never
-// counted). A role with jobs waiting for over a minute and no active printer raises the orange alert with its cause.
+// waiting», the failed ones and the printer it prints on now from this device (named, never counted; the server picks
+// it). A role with jobs waiting for over a minute and no active printer raises the orange alert with its cause.
 // Nothing waiting, sent unconfirmed or failed: «All clear». Live: every job that changes re-runs it; the ages and the
 // alert move on by themselves every 30 s (`useNow`). «Device off» moves with the clock on the server (a job reaching
 // its minute, a device quiet for 90 s) with no event: while something waits and the page is in sight, the summary is

@@ -9,7 +9,7 @@ from live.operations import operation
 from apps.inventory.models import Product
 from apps.inventory.queries.products import tracks_stock_expression
 from apps.inventory.queries.settings import current_settings
-from apps.inventory.schemas import SummaryIn, SummaryOut
+from apps.inventory.schemas.stock import SummaryIn, SummaryOut
 
 
 @operation(

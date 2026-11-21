@@ -2,13 +2,15 @@
 // hub#2009: a product sold by weight takes a typed quantity with up to three decimals, and its line's quantity field
 // shows it whole next to its unit («0,532 kg»). The field was a fixed 2.3rem and cut the last digit («0,53» with half
 // a «2» under «kg»), the only place the line shows the weight. In Spanish, on a desktop, a tablet standing up and a
-// phone; a one-figure quantity keeps the old 2.3rem, the field's tap target. What a run creates, its product
-// `E2E-WEIGHT-<run>` and its check, is deleted after it.
+// phone; a one-figure quantity keeps the old 2.3rem, the field's tap target. hub#2010: a weight finer than the step of
+// its unit («1,2505», where the kilo steps by the gram) was dropped in silence; the till says why, in the server's words,
+// and the line keeps its weight. What a run creates, its product `E2E-WEIGHT-<run>` and its check, is deleted after it.
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
 import { A, capture, login, saveSessionForTheSweep, shown } from './helpers';
 import { createProduct, type Product } from './inventory-helpers';
 import { cleanTill, drawerOff, openTillCart, stamp, tillIn, tillIsPhone } from './sale-helpers';
+import { dismissToasts, toastSaying } from './toast-helpers';
 
 const KEY = 'FIX-HUB-2009-WEIGHT-QTY';
 const RUN = stamp();
@@ -22,6 +24,7 @@ const WEIGHTS = [
   { typed: '0,532', shown: '0,532', amount: /12,77\s€/ },
   { typed: '12,345', shown: '12,345', amount: /296,28\s€/ },
 ] as const;
+const OFF_STEP = 'La cantidad no encaja con el escalón del producto (0,001 kg).';
 
 let product: Product;
 let context: BrowserContext;
@@ -58,14 +61,20 @@ test.afterAll(async () => {
 
 const line = (): Locator => shown(page).locator('[data-testid^=pos-line-]').filter({ hasText: product.name }).first();
 
-/** The quantity typed into the line's field and confirmed, once the server has valued it and the check's total too
- *  (a dash while its preview is on its way). On a phone the line scrolls under «Send order»: brought into view. */
-async function weigh(weight: (typeof WEIGHTS)[number]): Promise<void> {
+/** `typed` into the line's field and confirmed. On a phone the line scrolls under «Send order»: brought into view. */
+async function confirm(typed: string): Promise<Locator> {
   await openTillCart(page);
   const field = line().locator('.pos-qty__field');
   await field.scrollIntoViewIfNeeded();
-  await field.fill(weight.typed);
+  await field.fill(typed);
   await field.press('Enter');
+  return field;
+}
+
+/** The quantity typed and confirmed, once the server has valued it and the check's total too (a dash while its
+ *  preview is on its way). */
+async function weigh(weight: (typeof WEIGHTS)[number]): Promise<void> {
+  const field = await confirm(weight.typed);
   await expect(line()).toContainText(weight.amount);
   await expect(field).toHaveValue(weight.shown);
   await expect(shown(page).locator('[data-testid=pos-total]')).toHaveText(weight.amount);
@@ -118,10 +127,32 @@ for (const weight of WEIGHTS) {
       await weigh(weight);
       await quantityReadsWhole(weight, where);
       await capture(page, `${KEY}-${weight.shown.replace(',', '_')}-${size.label}`);
-      if (await tillIsPhone(page)) {
-        await shown(page).locator('[data-testid=pos-cart-close]').click();
-        await expect(shown(page).locator('[data-testid=pos-cart-drawer]')).toBeHidden();
-      }
+      await closeCartOnPhone();
     }
   });
+}
+
+test('SALE-F10: «1,2505 kg» says why and the line keeps its weight, on a desktop, a tablet and a phone', async () => {
+  const [kept] = WEIGHTS;
+  for (const size of SIZES) {
+    await page.setViewportSize({ width: size.width, height: size.height });
+    await tillIsPhone(page);
+    await weigh(kept);
+    const field = await confirm('1,2505');
+    await expect(toastSaying(page, OFF_STEP)).toBeVisible();
+    await expect(field).toHaveValue(kept.shown);
+    await expect(line()).toContainText(kept.amount);
+    await expect(shown(page).locator('[data-testid=pos-total]')).toHaveText(kept.amount);
+    await field.evaluate((el) => el.scrollIntoView({ block: 'center' }));
+    await capture(page, `FIX-HUB-2010-WEIGHT-OFF-STEP-${size.label}`);
+    await dismissToasts(page);
+    await closeCartOnPhone();
+  }
+});
+
+/** On a phone the check is a drawer over the catalogue: closed, so the next size starts from the catalogue. */
+async function closeCartOnPhone(): Promise<void> {
+  if (!(await tillIsPhone(page))) return;
+  await shown(page).locator('[data-testid=pos-cart-close]').click();
+  await expect(shown(page).locator('[data-testid=pos-cart-drawer]')).toBeHidden();
 }

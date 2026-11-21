@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:428c2a333f570741d262e64ab53ee940c0cc8017a3bc7d68d2713bc2ca5b49e4 -->
+<!-- generated from WORKBOOK.md sha256:6a225d87ec7ba8209ed108b54041b882f0546b69b674860d093b1e5bc74fa416 -->
 
 ## What it is for and who it is for
 
@@ -134,13 +134,13 @@ or with the phone's back button. Two areas:
   number, and "Close" on a phone; the editable title ("New check") and the chips for the customer,
   "Served by …" and "Customer required". Each line: name, unit price, discount mark or "Comp", note and
   professional underneath; buttons for discount, note, comp and the quantity selector (a line sent to the
-  kitchen only shows its quantity, "Order N" and the ⊗ button "Void this item"; one paid with a voucher,
-  "Already paid · <voucher>", 0.00 € and only the button to remove it). Footer: the "Ticket discount" row
-  if there is one, "Total", the discount button, the printer ("Print bill") and "Charge · <amount>". In
-  the phone's drawer, the top bar and the footer with "Charge" always stay in view, above the tab bar,
-  and what is in between (title, chips, tabs and lines) scrolls. The customer button's name takes two
-  lines at most (a longer one ends in "…"); on a very narrow phone, the button keeps only its icon and
-  the customer chip in the heading already names them.
+  kitchen only shows its quantity, "Order N", the gift and the ⊗ button "Void this item"; one paid with a
+  voucher, "Already paid · <voucher>", 0.00 € and only the button to remove it). Footer: the "Ticket
+  discount" row if there is one, "Total", the discount button, the printer ("Print bill") and "Charge ·
+  <amount>". In the phone's drawer, the top bar and the footer with "Charge" always stay in view, above
+  the tab bar, and what is in between (title, chips, tabs and lines) scrolls. The customer button's name
+  takes two lines at most (a longer one ends in "…"); on a very narrow phone, the button keeps only its
+  icon and the customer chip in the heading already names them.
 
 **Speak** (the strip's microphone key; only for whoever may use the assistant and on a device that can
 record): press it and speak. While it records it turns red, is called "Stop" and "Listening…" shows
@@ -515,16 +515,22 @@ Steps:
 1. With "Turn on the cash register" on in Cash register and no open cash session, charge in cash (also
    a split payment with a part in cash).
 2. The **Charge** sheet charges nothing and says "The cash register is closed: open a cash session to
-   charge in cash."; to whoever can open it, it offers "Open a cash session", which leads to **Cash
-   register**. The **Sell** screen does not change: the check is still there.
-3. With the session open, go back to **Sell** and charge. By card, Bizum or bank transfer it always
-   charges, with the cash register open or closed.
+   charge in cash."; to whoever can open it, it offers "Open a cash session", which opens **Cash
+   register**'s opening window over the charge, with "Drawer", "Opening float" and "Notes".
+   The **Sell** screen does not change: the check is still there.
+3. Tap "Open session": the window closes, "Session opened" shows and the charge goes on as it was, now
+   without the notice; "Charge" charges in cash. By card, Bizum or bank transfer it always charges, with
+   the cash register open or closed.
 In: whether the cash register is turned on and whether there is an open session, which Sales asks Cash
 register (`cash_register.session.current`) with the session of whoever charges, only when there is cash.
 Out: nothing of its own; the refused charge does not use up a number.
 If it fails: if Cash register is not active in the business or does not answer, the sale is charged just
-the same, so as not to stop the sales, and Cash register shows that charge among the ones in no shift.
-Involved: CASH_REGISTER-F04, CASH_REGISTER-F17
+the same, so as not to stop the sales, and Cash register shows that charge among the ones in no shift. The
+opening window gives the same notices as in Cash register: a required float, a session already open on
+another device, an unreadable amount; "Cancel" closes it and the charge keeps its notice.
+If the window cannot load, "Open a cash session" takes you to **Cash register** to open it there, and the
+check stays in **Sell**.
+Involved: CASH_REGISTER-F03, CASH_REGISTER-F04, CASH_REGISTER-F17
 
 ### SALE-F09 Sell at an open price by section
 Status: done
@@ -697,13 +703,15 @@ Vertical: common
 Actor: employee, manager
 Screen: Sell
 Steps:
-1. On the line, tap the gift ("Comp / un-comp line").
-2. The line goes to 0 with the "Comp" mark; tapping it again charges it again.
+1. On the line, tap the gift ("Comp / un-comp line"). Also on a line already sent to the kitchen,
+   because what is comped is usually what was already served: the dessert on the house or the dish
+   that came out wrong.
+2. The line goes to 0 with the "Comp" mark; tapping it again charges it again. A sent line stays on the
+   check with its order, and the kitchen gets nothing new.
 In: nothing from other apps.
 Out: the comped line: it adds no money or VAT, but the sale notice carries it so that Inventory lowers
 the stock; the sale keeps the cost of what was comped.
-If it fails: "That change to the line could not be saved. The line is back as it was.". A line already
-sent to the kitchen cannot be comped.
+If it fails: "That change to the line could not be saved. The line is back as it was.".
 Involved: INVENTORY-F21
 
 ### SALE-F16 Attribute the check or a line to whoever serves
@@ -824,7 +832,8 @@ Steps:
    opens: nobody pays for a dish that is not going to be made. The order's notice shows at the top here
    too, so the charge keypad can be tapped from the first moment. If the send fails, the
    charge does not open and it says why.
-4. A sent line is locked: no quantity, no note, no discount, no comp.
+4. A sent line is locked: no quantity, no note, no discount. It can still be comped with its gift: it
+   stays on the check at 0 and the kitchen gets nothing new.
 5. To take off a dish already sent, press ⊗ "Void this item" on its line: "Void «Croquettes»" opens with
    "It was already sent to the kitchen. It comes off the check and the reason is kept. A manager has to
    approve it.", the one-tap reasons ("Ordered by mistake", "Customer changed their mind", "Sold out",

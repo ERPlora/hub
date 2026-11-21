@@ -247,6 +247,37 @@ def test_the_printer_a_receipt_goes_to_by_itself_deleted_while_it_is_queued_wait
     assert Printer.objects.filter(pk=till.id).exists()
 
 
+def lock_as_a_claim(device: str) -> bool:
+    """What a claim of ``device`` takes first (``printing.job.claim``): the device's row, locked to update it, giving up
+    at once when another session holds it; whether it took it."""
+    with atomic():
+        PrintDevice.objects.select_for_update(nowait=True).get(key=PrintDevice.key_of(device))
+    return True
+
+
+def test_a_receipt_queued_at_a_till_holds_its_printer_and_never_the_till_itself():
+    """PRINTING-F22: the till's own receipt printer is held until the receipt is saved (a deletion waits for it), but
+    its device's row is not: the till claiming its jobs never waits for a checkout."""
+    printer("Till")
+    own = printer("Till 2", address="10.0.0.2")
+    set_up("terrace", own)
+    at_the_terrace = dataclasses.replace(ctx_for("hub_employee"), request=RequestFactory().post("/", HTTP_X_DEVICE_ID="terrace"))
+    meanwhile: list = []
+
+    def wrapper(execute, sql, params, many, context):
+        result = execute(sql, params, many, context)
+        if not meanwhile and sql.rstrip().endswith("FOR KEY SHARE") and 'FROM "printing_printer"' in sql:
+            meanwhile.extend(at_once(lambda: delete_as_the_admin(own.id), lambda: lock_as_a_claim("terrace")))
+        return result
+
+    with connections[current_alias()].execute_wrapper(wrapper):
+        queued = run("printing.job.create", {"document_type": "receipt", "document": RECEIPT}, ctx=at_the_terrace)
+    deletion, claim = meanwhile
+    assert isinstance(deletion, Exception) and held([deletion]), deleted([deletion])
+    assert claim is True, claim
+    assert (queued.job.printer_id, queued.job.status) == (own.id, "pending")
+
+
 # Two writes that name printers at once must never wait for each other in a circle (a deadlock is a 500). A
 # write that names a printer holds it with a key-share lock, which the admin's deletion waits for but another
 # write that names it does not: two rounds of paper on the same printers in any order, a round of paper while

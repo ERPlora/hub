@@ -27,34 +27,15 @@ from apps.inventory.models import (
     Settings,
     StockMovement,
 )
-from apps.inventory.schemas import (
-    CategoryImportIn,
-    CategoryIn,
-    CategoryOut,
-    CategoryPatchIn,
-    CategoryRecoverIn,
-    CategoryRefIn,
-    ConfigOut,
-    ConfigPatchIn,
-    CountIn,
-    DeletedOut,
-    ImportReportOut,
-    ProductCategoryIn,
-    ProductCategoryLinkOut,
-    ProductImageIn,
-    ProductImportIn,
-    ProductIn,
-    ProductOut,
-    ProductPatchIn,
-    ProductRefIn,
-    ProductSoldOutIn,
-    ProductsOut,
-    ReceiveIn,
-    SaleCompletedIn,
-    SaleStockOut,
-    SaleVoidedIn,
-    WriteOffIn,
-)
+from apps.inventory.schemas.categories import CategoryIn, CategoryOut, CategoryPatchIn, CategoryRecoverIn
+from apps.inventory.schemas.fields import CategoryRefIn, DeletedOut, ProductRefIn
+from apps.inventory.schemas.imports import CategoryImportIn, ImportReportOut, ProductImportIn
+from apps.inventory.schemas.product_categories import ProductCategoryIn, ProductCategoryLinkOut
+from apps.inventory.schemas.product_images import ProductImageIn
+from apps.inventory.schemas.products import ProductIn, ProductOut, ProductPatchIn, ProductSoldOutIn, ProductsOut
+from apps.inventory.schemas.sale_reactions import SaleCompletedIn, SaleStockOut, SaleVoidedIn
+from apps.inventory.schemas.settings import ConfigOut, ConfigPatchIn
+from apps.inventory.schemas.stock import CountIn, ReceiveIn, WriteOffIn
 from apps.tax.models import TaxCategory
 from base.tenancy.context import use_hub
 from base.tenancy.tests.concurrency import in_a_thread
@@ -2293,7 +2274,7 @@ def exported_rows():
     import csv
     import io
 
-    from apps.inventory.schemas import ProductFiltersIn
+    from apps.inventory.schemas.products import ProductFiltersIn
 
     content = run("inventory.product.export", ProductFiltersIn()).content.lstrip("﻿")
     return [

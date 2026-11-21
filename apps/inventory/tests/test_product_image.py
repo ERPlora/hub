@@ -27,17 +27,14 @@ from PIL import Image as PILImage
 
 from apps.inventory import events
 from apps.inventory.models import Product
-from apps.inventory.schemas import (
-    ForSaleListIn,
+from apps.inventory.schemas.fields import ProductRefIn
+from apps.inventory.schemas.product_images import (
     ProductImageIn,
     ProductImageSuggestIn,
     ProductImageSuggestOut,
     ProductImageUploadIn,
-    ProductIn,
-    ProductListIn,
-    ProductOut,
-    ProductRefIn,
 )
+from apps.inventory.schemas.products import ForSaleListIn, ProductIn, ProductListIn, ProductOut
 from apps.tax.models import TaxCategory
 from base.models import Hub
 from base.storage import hub_prefix
