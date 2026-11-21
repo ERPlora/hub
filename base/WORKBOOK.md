@@ -2503,7 +2503,10 @@ Estado: hecho
 Actor: propietario, administrador, responsable, empleado
 Pantalla: Tarjeta de confirmación del asistente
 Pasos:
-  1. La persona le pide algo que cambia datos («crea el servicio Corte a 15 € de 30 minutos»).
+  1. La persona le pide algo que cambia datos («crea el servicio Corte a 15 € de 30 minutos»). Lo que la acción
+     necesita y la persona no ha dicho, el asistente lo busca con sus herramientas; si ninguna lo da, se lo pregunta
+     en una sola pregunta corta y nunca se lo inventa («¿Con qué impuesto lo vendes?»), y si la petición vale para
+     varios registros, le pregunta cuál. Nunca pregunta en su texto si sigue adelante: eso lo pregunta la tarjeta.
   2. Antes de hacerlo sale, encima de todo, «¿Ejecutar esta acción?» con la acción, la app y sus primeros datos en una
      línea, por ejemplo «Crear en Servicios: Corte · 15,00 € · 30». Un importe, todo dato que su app declara como
      dinero, sale en la moneda del negocio (nunca en céntimos), también dentro de un dato que agrupa otros, y el

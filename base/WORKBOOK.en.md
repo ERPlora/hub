@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:4bb8ea4bd0c377c916b03c814642ab8f01fdbba93811c130220d8ddd5f05a6be -->
+<!-- generated from WORKBOOK.md sha256:5c76a6e1d83cefbd6513501c5cad034e5602bb9d6b9e8942c73b4bd5ab306cf6 -->
 
 ## What it is for and who it is for
 
@@ -2486,7 +2486,10 @@ Status: done
 Actor: owner, administrator, manager, employee
 Screen: Assistant confirmation card
 Steps:
-  1. The person asks it for something that changes data ("create the service Haircut at €15 for 30 minutes").
+  1. The person asks it for something that changes data ("create the service Haircut at €15 for 30 minutes"). What
+     the action needs and the person has not said, the assistant looks up with its tools; if none gives it, it asks
+     for it in one short question and never makes it up ("Which tax do you sell it with?"), and if the request fits
+     several records, it asks which one. It never asks in its text whether to go ahead: the card asks that.
   2. Before doing it, "Run this action?" shows over everything, with the action, the app and its first data in one line,
      for example "Create in Services: Haircut · €15.00 · 30". An amount, every datum its app declares as money, shows
      in the business's currency (never in cents), also inside a datum that groups others, and the assistant
