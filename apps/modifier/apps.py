@@ -54,7 +54,7 @@ class ModifierConfig(LiveAppConfig):
     # Positional (id, label, icon, path): scripts/app-icons.mjs reads every line starting with
     # `icon =` as the module's own icon, and a keyword split over lines would look like one.
     navigation = [
-        Nav("groups", _("Modifiers"), "lucide:sliders-horizontal", "/modifier/groups")
+        Nav("groups", _("Modifiers"), "lucide:sliders-horizontal", "/modifier/groups", permission="modifier.manage")
     ]
     help = Help()
 

@@ -106,6 +106,7 @@ def test_spanish_texts_of_the_workbook():
             "Comandas",
             "Estaciones",
             "Historial",
+            "Ajustes",
         ]
         assert str(services.INVALID_TRANSITION) == (
             "Esa comanda ya no está en el estado que requiere esta acción. Actualiza e inténtalo de nuevo."

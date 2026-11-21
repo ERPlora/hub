@@ -64,6 +64,7 @@ def test_spanish_texts_of_the_workbook():
             "Productos",
             "Movimientos",
             "Categorías",
+            "Ajustes",
         ]
         assert str(queries.reads.PRODUCT_NOT_FOUND) == "Este producto no existe en este hub."
         assert str(services.products.SKU_TAKEN) == "Ese SKU ya existe en el catálogo"
@@ -86,7 +87,8 @@ def test_the_menu_and_the_tab_bar_name_each_screen_alike(language):
     tabs = json.loads((LOCALE.parents[2] / "frontend" / "locale" / f"{language}.json").read_text(encoding="utf-8"))
     with translation.override(language):
         menu = {nav.id: str(nav.label) for nav in apps.get_app_config("inventory").navigation}
-    assert menu == {screen: tabs["inventory"]["tabs"][screen] for screen in ("dashboard", "products", "movements", "categories")}
+    screens = ("dashboard", "products", "movements", "categories", "settings")
+    assert menu == {screen: tabs["inventory"]["tabs"][screen] for screen in screens}
 
 
 @HUB_DB

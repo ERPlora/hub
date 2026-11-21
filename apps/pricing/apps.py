@@ -42,7 +42,7 @@ class PricingConfig(LiveAppConfig):
     # Positional (id, label, icon, path): scripts/app-icons.mjs reads every line starting with
     # `icon =` as the module's own icon. One entry: lists and rules on one screen.
     navigation = [
-        Nav("lists", _("Price Lists"), "ion:pricetag", "/pricing/lists"),
+        Nav("lists", _("Price Lists"), "ion:pricetag", "/pricing/lists", permission="pricing.manage"),
     ]
     help = Help()
 

@@ -108,16 +108,17 @@ class SaleConfig(LiveAppConfig):
     # `chatbubble-ellipses-outline` wait in UI-REQUESTS.md. The departments of the open price read
     # «Sections»: the old «Departments» was one word wider than a fifth of a phone's tabbar.
     navigation = [
-        Nav("pos", _("Sell"), "ion:storefront-outline", "/sale/pos"),
-        Nav("sales", _("Sales"), "ion:cart-outline", "/sale/sales"),
+        Nav("pos", _("Sell"), "ion:storefront-outline", "/sale/pos", permission="sale.add_sale"),
+        Nav("sales", _("Sales"), "ion:cart-outline", "/sale/sales", permission="sale.view_sale"),
         Nav(
             "quick_notes",
             _("Quick notes"),
             "ion:chatbubbles-outline",
             "/sale/quick-notes",
+            permission="sale.manage_settings",
         ),
-        Nav("departments", _("Sections"), "ion:grid-outline", "/sale/departments"),
-        Nav("settings", _("Settings"), "ion:settings-outline", "/sale/settings"),
+        Nav("departments", _("Sections"), "ion:grid-outline", "/sale/departments", permission="sale.manage_settings"),
+        Nav("settings", _("Settings"), "ion:settings-outline", "/sale/settings", permission="sale.manage_settings"),
     ]
     help = Help()
     # The Home's panels, on the queries Sales' own screen reads, each refreshed by the events live.py re-runs its query

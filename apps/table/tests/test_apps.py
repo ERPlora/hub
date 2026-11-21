@@ -107,17 +107,16 @@ def test_what_each_role_gets():
     }
 
 
-def test_navigation_is_four_sections_with_registered_icons():
-    # Settings is a tab of the pages (frontend/tabs.ts), shown only to whoever may save them.
+def test_navigation_is_four_sections_and_the_settings_with_registered_icons():
+    # Settings opens only to whoever may save them, as its tab of the pages (frontend/tabs.ts).
     entries = table().navigation
     assert all(isinstance(entry, Nav) for entry in entries)
-    assert [
-        (entry.id, str(entry.label), entry.icon, entry.path) for entry in entries
-    ] == [
-        ("floor_plan", "Floor plan", "ion:apps-outline", "/table/floor-plan"),
-        ("zones", "Zones", "ion:layers-outline", "/table/zones"),
-        ("tables", "Tables", "ion:grid-outline", "/table/tables"),
-        ("sessions", "Sessions", "ion:time-outline", "/table/sessions"),
+    assert [(entry.id, str(entry.label), entry.icon, entry.path, entry.permission) for entry in entries] == [
+        ("floor_plan", "Floor plan", "ion:apps-outline", "/table/floor-plan", "table.view_table"),
+        ("zones", "Zones", "ion:layers-outline", "/table/zones", "table.change_zone"),
+        ("tables", "Tables", "ion:grid-outline", "/table/tables", "table.change_table"),
+        ("sessions", "Sessions", "ion:time-outline", "/table/sessions", "table.view_session"),
+        ("settings", "Settings", "ion:settings-outline", "/table/settings", "table.manage_settings"),
     ]
 
 

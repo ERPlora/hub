@@ -109,16 +109,18 @@ def tabbar() -> list[tuple[str, str]]:
 
 def test_the_menu_has_the_tab_bar_s_screens_with_the_launcher_s_icon_first():
     # The help window names the screen in view by these entries and the assistant links each one, so they are the tab
-    # bar's sections. The first one keeps the cube: it is the icon of the launcher and of «My apps» (base.home.shell_icon).
+    # bar's sections, each with the permission that opens it. The first one keeps the cube: it is the icon of the
+    # launcher and of «My apps» (base.home.shell_icon).
     entries = inventory().navigation
     assert all(isinstance(entry, Nav) for entry in entries)
-    assert [(entry.id, str(entry.label), entry.path, entry.icon) for entry in entries] == [
-        ("dashboard", "Dashboard", "/inventory/dashboard", "ion:cube-outline"),
-        ("products", "Products", "/inventory/products", "ion:cube-outline"),
-        ("movements", "Movements", "/inventory/movements", "ion:swap-vertical-outline"),
-        ("categories", "Categories", "/inventory/categories", "ion:list-outline"),
+    assert [(entry.id, str(entry.label), entry.path, entry.icon, entry.permission) for entry in entries] == [
+        ("dashboard", "Dashboard", "/inventory/dashboard", "ion:cube-outline", "inventory.view_stock"),
+        ("products", "Products", "/inventory/products", "ion:cube-outline", "inventory.view_product"),
+        ("movements", "Movements", "/inventory/movements", "ion:swap-vertical-outline", "inventory.view_stock"),
+        ("categories", "Categories", "/inventory/categories", "ion:list-outline", "inventory.view_category"),
+        ("settings", "Settings", "/inventory/settings", "ion:settings-outline", "inventory.manage_settings"),
     ]
-    assert [(entry.id, entry.path) for entry in entries] == tabbar()[:-1]
+    assert [(entry.id, entry.path) for entry in entries] == tabbar()
     assert home.shell_icon(inventory()) == "ion:cube-outline"
     shell = shell_icon_registry()
     for entry in entries:

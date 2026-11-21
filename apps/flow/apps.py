@@ -91,7 +91,7 @@ class FlowConfig(LiveAppConfig):
     # Positional (id, label, icon, path): scripts/app-icons.mjs reads every line starting with `icon =`
     # as the module's own icon.
     navigation = [
-        Nav("automations", _("Automations"), "ion:sync-outline", "/flow/automations")
+        Nav("automations", _("Automations"), "ion:sync-outline", "/flow/automations", permission="flow.answer")
     ]
     help = Help()
     # FLOW-F22 and FLOW-F23: the worker runs them every minute as the system (cron in UTC), in each business it

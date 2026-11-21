@@ -92,7 +92,7 @@ describe('AutomationsPage', () => {
     expect(m.wrapper.findComponent(FlowGallery).props('openCard')).toBe('noShow');
     m.wrapper.findComponent(FlowGallery).vm.$emit('guide');
     await settle();
-    expect(m.router.currentRoute.value.path).toBe('/flow/guide');
+    expect(m.router.currentRoute.value.path).toBe('/flow/automations/guide');
   });
 
   it('the app off replaces it all with its notice', async () => {

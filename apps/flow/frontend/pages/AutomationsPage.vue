@@ -148,7 +148,7 @@ function openFlow(flow: FlowOut, tab?: string): void {
         :open-card="openCard"
         @created="openFlow($event, 'permissions')"
         @open-flow="openFlow($event, $event.missing_grants.length ? 'permissions' : undefined)"
-        @guide="router.push('/flow/guide')"
+        @guide="router.push('/flow/automations/guide')"
       />
     </div>
   </AppPage>

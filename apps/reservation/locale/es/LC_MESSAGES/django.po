@@ -440,3 +440,7 @@ msgstr "En nombre del cliente"
 
 msgid "Duplicate customer"
 msgstr "Ficha duplicada"
+
+#: apps.py:113
+msgid "Settings"
+msgstr "Ajustes"

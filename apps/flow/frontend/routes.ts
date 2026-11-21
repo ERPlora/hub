@@ -22,7 +22,7 @@ const routes: RouteRecordRaw[] = [
     meta: { auth: true },
   },
   {
-    path: '/flow/guide',
+    path: '/flow/automations/guide',
     component: () => import('./pages/GuidePage.vue'),
     meta: { auth: true },
   },

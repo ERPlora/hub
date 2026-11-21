@@ -40,7 +40,7 @@ class DemoConfig(LiveAppConfig):
         "hub_manager": ["demo.*"],
         "hub_employee": ["demo.view"],
     }
-    navigation = [Nav(id="demo", label=_("Demo"), icon="ion:flask-outline", path="/demo/items")]
+    navigation = [Nav(id="demo", label=_("Demo"), icon="ion:flask-outline", path="/demo/items", permission="demo.view")]
     # What a manager approves on the spot with their PIN or badge (BASE-F84, base.approvals), the example every module
     # copies: the employee, who only views, adds a line with a manager's approval, which says what it approves with the
     # figures of that very line (``approval_figures``: holes {field}, {field, percent} or {field, money} of the

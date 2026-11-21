@@ -51,14 +51,21 @@ class ScheduleConfig(LiveAppConfig):
     # as the module's own icon. `star-outline` for «Special days» is not registered in the shell
     # (UI-REQUESTS.md): `calendar-outline` stands in.
     navigation = [
-        Nav("hours", pgettext_lazy("schedule section", "Hours"), "ion:time-outline", "/schedule/hours"),
+        Nav(
+            "hours", pgettext_lazy("schedule section", "Hours"), "ion:time-outline", "/schedule/hours",
+            permission="schedule.change",
+        ),
         Nav(
             "special_days",
             _("Special days"),
             "ion:calendar-outline",
             "/schedule/special-days",
+            permission="schedule.change",
         ),
-        Nav("settings", pgettext_lazy("schedule section", "Settings"), "ion:settings-outline", "/schedule/settings"),
+        Nav(
+            "settings", pgettext_lazy("schedule section", "Settings"), "ion:settings-outline", "/schedule/settings",
+            permission="schedule.manage_settings",
+        ),
     ]
     # The Home's step «Confirm your opening hours», order 101 and recommended, done once a person confirmed the
     # default week or saved a day of it (the settings' ``hours_confirmed``), for whoever changes the hours, leading to

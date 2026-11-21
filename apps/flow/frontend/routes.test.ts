@@ -30,7 +30,7 @@ describe('flow routes.ts', () => {
       ['/flow/automations', true],
       ['/flow/automations/new', true],
       ['/flow/automations/:id', true],
-      ['/flow/guide', true],
+      ['/flow/automations/guide', true],
     ]);
   });
 

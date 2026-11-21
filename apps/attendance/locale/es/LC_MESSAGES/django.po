@@ -287,3 +287,7 @@ msgstr "corregida por (nombre)"
 #, python-format
 msgid "This working day has been open more than %(hours)s hours and is waiting for review: a manager corrects it. Clock in to start a new day."
 msgstr "Esta jornada lleva abierta más de %(hours)s horas y está por revisar: la corrige un responsable. Ficha la entrada para empezar una jornada nueva."
+
+#: apps.py:74
+msgid "Settings"
+msgstr "Ajustes"
