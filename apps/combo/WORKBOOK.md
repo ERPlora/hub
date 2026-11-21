@@ -343,7 +343,7 @@ sin elecciones disponibles tampoco. Si Menús rechaza la línea, la hoja dice po
 (COMBO-F08). Si no se pueden leer los menús, encima de la rejilla «No se han podido leer los menús.
 Inténtalo de nuevo.» con «Reintentar», y los productos se venden igual. Con el perfil de empleado
 también se ven y se venden.
-Implicados: SALE-F12, MODIFIER-F06
+Implicados: SALE-F12, SALE-F42, MODIFIER-F06
 
 ### COMBO-F08 Cobrar el menú: precio cerrado y suplementos
 Estado: hecho
@@ -877,8 +877,8 @@ vende, y si Menús no está activo el TPV no ofrece menús.
 - **No cobra, no factura ni calcula cuotas**: lo hace Ventas con lo que lee de aquí.
 - **No tiene stock propio**: el menú no se cuenta; se cuentan sus productos.
 - **No tiene horario** (menú solo a mediodía): se pone y se quita de la venta a mano.
-- **No tiene elección por defecto** ni modificadores dentro de un plato (eso es Suplementos, desde el
-  TPV).
+- **No tiene elección por defecto** ni suplementos propios dentro de un plato: los de cada plato son los de su
+  producto en Suplementos (SALE-F42).
 - **No admite servicios de la app Servicios** como elección: los packs de peluquería son los bonos y
   paquetes de Servicios (SERVICE-F12).
 - **No manda nada a cocina** por sí mismo.

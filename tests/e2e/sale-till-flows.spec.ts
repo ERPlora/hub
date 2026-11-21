@@ -5,7 +5,7 @@
 // back from «Open checks», and another deleted there. Each screen in 390×844, 834×1194 and 1440×900. What a run
 // creates — its products `E2E-TILL-<run>-…`, its section «e2e Fruit <run>», its team member «E2E Till <run>», its
 // checks and sales — is deleted after it.
-import { type BrowserContext, expect, type Page, test } from '@playwright/test';
+import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
 import { A, api, login, psql, shown, untilStill } from './helpers';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
@@ -100,6 +100,24 @@ async function methodIds(context: BrowserContext): Promise<Record<string, string
 async function checkOf(context: BrowserContext, label: string): Promise<{ id: string; status: string } | undefined> {
   const res = await api<{ rows: { id: string; label: string; status: string }[] }>(context, A, 'GET', '/sale/orders?status=open&limit=100');
   return res.data.rows.find((row) => row.label === label);
+}
+
+/** How a check of «Open checks» reads: its row's width and bottom, how many lines its title and its «time · amount»
+ *  take, by how many pixels their text runs past the row (0 when it fits) and how far in from the row's left edge
+ *  the text starts. */
+async function reading(row: Locator): Promise<{ width: number; bottom: number; lines: number[]; spill: number; indent: number }> {
+  return row.evaluate((button) => {
+    const box = button.getBoundingClientRect();
+    const texts = ['.pos-checks__name', '.pos-checks__meta'].map((part) => {
+      const range = document.createRange();
+      range.selectNodeContents(button.querySelector(part)!);
+      return range;
+    });
+    const lines = texts.map((text) => new Set([...text.getClientRects()].map((line) => Math.round(line.top))).size);
+    const spill = Math.max(0, ...texts.map((text) => text.getBoundingClientRect()).flatMap((text) => [box.left - text.left, text.right - box.right]));
+    const indent = Math.min(...texts.map((text) => text.getBoundingClientRect().left)) - box.left;
+    return { width: box.width, bottom: box.bottom, lines, spill: Math.round(spill), indent: Math.round(indent) };
+  });
 }
 
 // The till goes through 390 twice, and the first time its drawer was opened. The second time the open
@@ -351,6 +369,30 @@ test('SALE-F17, F18: a check parked and taken back from «Open checks», another
     },
     { width: 1440, height: 900 },
   );
+  if (!(await list.isVisible())) await shown(page).locator('[data-testid=pos-open-checks]').click();
+  // Armed, the check still reads whole beside its hint: as wide as before, its title and its «time · amount» each on
+  // one line inside it from its left edge, and the hint on a line of its own underneath. Also on the landscape
+  // tablet, 1280×800.
+  const row = list.locator(`[data-testid=pos-parked-${droppedCheck?.id}]`);
+  for (const size of [...VIEWPORTS, { label: '1280', width: 1280, height: 800 }]) {
+    await page.setViewportSize(size);
+    await cartReady(page);
+    if (!(await list.isVisible())) await shown(page).locator('[data-testid=pos-open-checks]').click();
+    await armed.waitFor({ state: 'hidden' });
+    await untilStill(page);
+    const disarmed = await reading(row);
+    await bin.click();
+    await expect(armed).toHaveText(ARMED);
+    const read = await reading(row);
+    const hint = (await armed.boundingBox())!;
+    expect(Math.abs(read.width - disarmed.width), `${size.label}: the armed check narrowed`).toBeLessThan(1);
+    expect(read.lines, `${size.label}: lines of the title and of «time · amount»`).toEqual([1, 1]);
+    expect(read.spill, `${size.label}: px of the check's text past its row`).toBe(0);
+    expect(hint.y, `${size.label}: the hint sits under the check`).toBeGreaterThanOrEqual(read.bottom - 1);
+    expect(read.indent, `${size.label}: px between the row's left edge and its text, aligned with the hint`).toBe(0);
+  }
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await cartReady(page);
   if (!(await list.isVisible())) await shown(page).locator('[data-testid=pos-open-checks]').click();
   await armed.waitFor({ state: 'hidden' });
   const disarmedAt = await bin.boundingBox();

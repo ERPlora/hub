@@ -402,10 +402,11 @@ def make_p12(
     password: bytes = b"secret",
     eseal: bool = False,
     self_signed: bool = False,
+    expires_at: dt.datetime | None = None,
 ) -> bytes:
     """A .p12 made for the test (never a real certificate) whose subject and usages are the ones asked: ``None``
     leaves an attribute (or the Extended Key Usage) out. ``TEST_AUTHORITY``, an authority made up by the test, issues
-    it, or its own key signs it."""
+    it, or its own key signs it. It expires ``days`` from now, or at ``expires_at`` to the second."""
     key, authority_key = _keys()
     attributes = [x509.NameAttribute(NameOID.COMMON_NAME, "ACME SL")]
     if org_id:
@@ -413,7 +414,7 @@ def make_p12(
     if serial:
         attributes.append(x509.NameAttribute(NameOID.SERIAL_NUMBER, serial))
     name = x509.Name(attributes)
-    now = dt.datetime.now(dt.UTC)
+    now = expires_at - dt.timedelta(days=days) if expires_at else dt.datetime.now(dt.UTC)
     builder = (
         x509.CertificateBuilder()
         .subject_name(name)
