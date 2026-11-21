@@ -9,7 +9,7 @@ import uuid
 
 import pytest
 from live.context import system_context
-from live.errors import AppInactive, Conflict, NotFound
+from live.errors import AppInactive, Conflict, NotFound, PermissionDenied
 from live.models import OutboxEvent
 from live.operations import registry
 
@@ -108,6 +108,16 @@ def test_somebody_who_is_not_on_the_team_is_refused_and_the_check_stays_as_it_wa
         run("sale.order.open", {"staff_id": str(uuid.uuid4()), "lines": [{"product": "WAT"}]})
     assert served(order) == (None, "")
     assert run("sale.order.list", {}).total == 1
+
+
+def test_someone_who_may_not_sell_cannot_say_who_serves_a_check(catalog):
+    lucia = member("Lucia", "Garcia")
+    order = run("sale.order.open", {"lines": [{"product": "COF"}]})
+    ctx = ctx_for()
+    no_selling = dataclasses.replace(ctx, permissions=frozenset(ctx.permissions) - {"sale.add_sale"})
+    with pytest.raises(PermissionDenied):
+        set_staff(order, lucia.id, no_selling)
+    assert served(order) == (None, "")
 
 
 @pytest.fixture(params=["absent", "off"])

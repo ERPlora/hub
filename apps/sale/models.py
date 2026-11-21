@@ -230,7 +230,7 @@ class Order(UUIDModel):
     appointment_id = models.UUIDField(_("appointment"), null=True, blank=True)
     # Who serves the check (a member of Staff, with the name it had when chosen); empty = whoever holds the session.
     staff_id = models.UUIDField(_("served by"), null=True, blank=True)
-    staff_name = models.CharField(_("server's name"), max_length=201, blank=True)
+    staff_name = models.CharField(_("server's name"), max_length=201, blank=True, default="", db_default="")
     discount_percent = models.DecimalField(_("discount (%)"), default=Decimal("0"), **PERCENT)
     # In whole minor units of the business's currency (not always the cent): its name never says the unit.
     discount_amount = models.PositiveBigIntegerField(_("fixed-amount discount"), default=0)

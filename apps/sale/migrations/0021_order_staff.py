@@ -18,6 +18,6 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='order',
             name='staff_name',
-            field=models.CharField(blank=True, max_length=201, verbose_name="server's name"),
+            field=models.CharField(blank=True, db_default='', default='', max_length=201, verbose_name="server's name"),
         ),
     ]
