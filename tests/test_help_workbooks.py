@@ -16,6 +16,7 @@ them, so a word of the vocabulary that is missing or wrong in it cannot empty th
 an empty set; the made-up WORKBOOKs below, clean and then broken once per rule, show the check catching what it guards.
 """
 
+import itertools
 import re
 from collections.abc import Iterator
 from pathlib import Path
@@ -107,23 +108,27 @@ def placements(read: workbook_help.Help) -> set[tuple[str, str]]:
     return {(flow.id, tab) for flow in read.flows for tab in flow.screens}
 
 
-def with_commas(markdown: str, screen_key: str, joining_words: bool) -> str:
+def with_commas(markdown: str, screen_key: str, joining_words: bool, module: str | None) -> str:
     """``markdown`` with each flow's screen cut where a person reads two places: at an arrow (what follows it is left
-    out) and, with ``joining_words``, at a joining word, both written as the comma the help reads."""
+    out, or, with ``module``, the module's own name before it) and, with ``joining_words``, at a joining word, both
+    written as the comma the help reads."""
+    own_name = re.compile(rf"(^|[,;])\s*{re.escape(module)}\s*(?:→|->|›)", re.IGNORECASE) if module else None
 
     def rewrite(line: re.Match) -> str:
-        screen = JOINING_WORD.sub(", ", line.group(2)) if joining_words else line.group(2)
+        screen = own_name.sub(r"\1", line.group(2)) if own_name else line.group(2)
+        screen = JOINING_WORD.sub(", ", screen) if joining_words else screen
         return line.group(1) + ARROW.sub("", screen)
 
     return re.sub(rf"^({re.escape(screen_key)}:)(.*)$", rewrite, markdown, flags=re.MULTILINE)
 
 
-def placement_problems(read: workbook_help.Help, markdown: str, tabs, vocabulary: workbook_help.Words) -> list[str]:
+def placement_problems(read: workbook_help.Help, markdown: str, tabs, vocabulary: workbook_help.Words, module: str):
     """The tabs a done flow is left out of because its screen names them with an arrow or a joining word: both are cut
-    as a comma, once keeping the joining words (a tab's name may hold one) and once without them."""
+    as a comma, keeping and not keeping the joining words (a tab's name may hold one), and reading what goes before an
+    arrow both as a tab and as the module's own name («Impresión → Dispositivos»)."""
     readable: set[tuple[str, str]] = set()
-    for joining_words in (False, True):
-        rewritten = with_commas(markdown, vocabulary.keys["screen"], joining_words)
+    for joining_words, own_name in itertools.product((False, True), (None, module)):
+        rewritten = with_commas(markdown, vocabulary.keys["screen"], joining_words, own_name)
         readable |= placements(workbook_help.parse(rewritten, tabs, vocabulary))
     labels = {tab.id: tab.label for tab in tabs}
     return [
@@ -150,9 +155,10 @@ def reference_problems(read: workbook_help.Help, markdown: str, tabs) -> list[st
     ]
 
 
-def problems(markdown: str, tabs, menu: set[str], vocabulary: workbook_help.Words) -> list[str]:
-    """What breaks the rules in the help read from ``markdown`` with ``vocabulary``, for a module whose tabs are
-    ``tabs`` and whose menu has the ids ``menu`` (its implicit settings tab is a tab only when the WORKBOOK writes it)."""
+def problems(markdown: str, tabs, menu: set[str], vocabulary: workbook_help.Words, module: str) -> list[str]:
+    """What breaks the rules in the help read from ``markdown`` with ``vocabulary``, for the module named ``module``,
+    whose tabs are ``tabs`` and whose menu has the ids ``menu`` (its implicit settings tab is a tab only when the
+    WORKBOOK writes it)."""
     read = workbook_help.parse(markdown, tabs, vocabulary)
     documented = {screen.id for screen in read.screens}
     found = [f"the tab «{tab.label}» has no ### under the screens heading" for tab in tabs if tab.id in menu - documented]
@@ -161,7 +167,7 @@ def problems(markdown: str, tabs, menu: set[str], vocabulary: workbook_help.Word
     found += purpose_problems(read) + summary_problems(read)
     names = {config.label for config in all_live_app_configs()}
     found += [problem for where, text in published(read) for problem in text_problems(where, text, names)]
-    found += reference_problems(read, markdown, tabs) + placement_problems(read, markdown, tabs, vocabulary)
+    found += reference_problems(read, markdown, tabs) + placement_problems(read, markdown, tabs, vocabulary, module)
     found += [f"{flow.id} is published without steps" for flow in read.flows if not flow.steps.strip()]
     return found + [
         f"{draft.id} is done on a tab, but its status «{draft.status}» is not read as done: it is left out"
@@ -175,16 +181,17 @@ def shape(read: workbook_help.Help) -> tuple[list[str], list[tuple[str, bool, bo
     return [screen.id for screen in read.screens], [(flow.id, bool(flow.steps), bool(flow.failure)) for flow in read.flows]
 
 
-def served(config, language: str) -> tuple[str, str, list, workbook_help.Words]:
+def served(config, language: str) -> tuple[str, str, list, workbook_help.Words, str]:
     """The language ``base.help.get`` serves ``config`` in for ``language``, the customer's part it reads there, the
-    module's tabs and the words of that language."""
+    module's tabs, the words of that language and the module's name in it."""
     language_served, markdown = workbook_help.workbook(Path(config.path), language)
     with translation.override(language_served):
-        return language_served, markdown, app_help.tabs_of(config), workbook_help.words()
+        tabs, vocabulary = app_help.tabs_of(config), workbook_help.words()
+        return language_served, markdown, tabs, vocabulary, str(config.verbose_name)
 
 
 def read_served(config, language: str) -> tuple[str, workbook_help.Help]:
-    language_served, markdown, tabs, vocabulary = served(config, language)
+    language_served, markdown, tabs, vocabulary, _module = served(config, language)
     return language_served, workbook_help.parse(markdown, tabs, vocabulary)
 
 
@@ -192,8 +199,8 @@ def read_served(config, language: str) -> tuple[str, workbook_help.Help]:
 @pytest.mark.parametrize("label", READY)
 def test_a_ready_module_publishes_only_what_a_customer_reads_and_all_of_it(label, language):
     config = apps.get_app_config(label)
-    _language_served, markdown, tabs, vocabulary = served(config, language)
-    assert problems(markdown, tabs, {nav.id for nav in config.navigation}, vocabulary) == []
+    _language_served, markdown, tabs, vocabulary, module = served(config, language)
+    assert problems(markdown, tabs, {nav.id for nav in config.navigation}, vocabulary, module) == []
 
 
 @pytest.mark.parametrize("language", [code for code in LANGUAGES if code != workbook_help.SOURCE_LANGUAGE])
@@ -248,7 +255,7 @@ MENU = {"floor_plan", "zones", "tables"}
 
 
 def made_up(markdown: str) -> list[str]:
-    return problems(markdown, ES_TABS, MENU, ES_WORDS)
+    return problems(markdown, ES_TABS, MENU, ES_WORDS, "Mesas")
 
 
 def test_the_clean_module_passes_with_code_and_ids_where_nothing_is_published():
@@ -347,6 +354,12 @@ def test_what_reads_like_a_broken_rule_but_is_not_passes(before, after):
     assert made_up(CLEAN.replace(before, after, 1)) == []
 
 
+def test_a_screen_with_the_module_s_own_name_before_the_arrow_is_caught_on_the_tab_after_it():
+    assert "Pantalla: Zonas\n" in CLEAN
+    found = made_up(CLEAN.replace("Pantalla: Zonas\n", "Pantalla: Mesas → Zonas\n", 1))
+    assert any("TABLE-F01 is left out of «Zonas»" in problem for problem in found), found
+
+
 CLEAN_EN = """\
 ## What it is for and who it is for
 
@@ -375,7 +388,7 @@ If it fails: without a name, the button stays off.
 
 
 def made_up_en(markdown: str) -> list[str]:
-    return problems(markdown, EN_TABS, MENU, EN_WORDS)
+    return problems(markdown, EN_TABS, MENU, EN_WORDS, "Tables")
 
 
 def test_the_clean_english_module_passes_with_what_you_see_in_quotes():

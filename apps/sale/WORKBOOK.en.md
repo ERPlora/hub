@@ -1168,7 +1168,7 @@ Out: the refund document with one row per payment method, the lines that go back
 reason and who made it (announces: sale refunded, with the refunded lines and whether it is left fully
 refunded) and, with Invoicing, its corrective invoice in the same refund (R5 for a ticket, R1 for an
 invoice; by differences, or what is left if it closes the sale: INVOICE-F09, F10).
-If it fails: "Card: €20.00 is more than the €12.00 left to refund.", "Card: choose how
+If it fails: "Card: €20.00 is more than the €12.00 still refundable.", "Card: choose where
 this money goes back.", "A refund needs a reason.", "There is no money left to refund on this sale.". If
 another refund takes the last of a marked line at the same time: "One of the lines marked already came
 back with another refund. Open the refund again to see what is left.". If the Hub does not answer,
