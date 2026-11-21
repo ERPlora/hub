@@ -181,3 +181,11 @@ def test_a_business_kept_after_its_final_copy_makes_a_new_one_before_it_goes(
     new = HubDump.objects.filter(hub=hub).exclude(pk=old.pk).get()
     assert new.created_at > timezone.now() - services.offboarding.FINAL_COPY_FRESH
     assert hub.fiscal_archived_at >= new.created_at.replace(microsecond=0)
+
+
+def test_an_archive_made_before_the_90_days_end_is_not_one_of_this_leaving():
+    left = timezone.now() - dt.timedelta(days=120)
+    ends = left + services.offboarding.OFFBOARDING_RETENTION
+
+    assert not services.offboarding.fiscal_archive_kept(Hub(cancelled_at=left, fiscal_archived_at=ends - dt.timedelta(days=1)))
+    assert services.offboarding.fiscal_archive_kept(Hub(cancelled_at=left, fiscal_archived_at=ends + dt.timedelta(days=1)))
