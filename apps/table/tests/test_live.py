@@ -19,8 +19,9 @@ SALE = [
     "sale.sale.completed",
     "sale.sale.voided",
 ]
-#: Adding, changing, removing or voiding a line changes what an occupied table has run up (TABLE-F33).
-BILL = ["sale.order.changed", "sale.order.line_removed"]
+#: Adding, changing, removing or voiding a line changes what an occupied table has run up (TABLE-F33): Sales records
+#: this one event with every one of them.
+BILL = ["sale.order.changed"]
 CUSTOMER = [
     "customer.order.linked",
     "customer.order.unlinked",
@@ -103,6 +104,12 @@ def test_a_line_added_or_taken_off_a_check_re_runs_the_floor_but_not_the_zones_n
         affected = live_registry.affected([event])
         assert {"table.table.list", "table.table.get"} <= affected, event
         assert not {"table.zone.list", "table.session.list"} & affected, event
+
+
+def test_a_line_taken_off_re_runs_the_floor_once_with_the_check_that_changed():
+    """Removing or voiding a line records ``sale.order.changed`` in the same transaction, so the plan needs no event
+    of its own for it."""
+    assert not {"table.table.list", "table.table.get"} & live_registry.affected(["sale.order.line_removed"])
 
 
 def test_a_hold_re_runs_the_floor_but_not_the_checks():

@@ -72,7 +72,8 @@ class TableOut(Schema):
     )
     amount: int | None = Field(
         description="What is left to charge on all its open checks of Sales, in cents of the business's currency, "
-        "when occupied (0 while nothing is ordered); null otherwise."
+        "when occupied (0 while nothing is ordered); null otherwise.",
+        json_schema_extra={"money": True},
     )
 
 
