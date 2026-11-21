@@ -6,7 +6,7 @@ come in through ``/internal`` and go out through it (WORKBOOK «Contrato con el 
 
 from django.utils.translation import gettext_lazy as _
 from django.utils.translation import ngettext_lazy, pgettext_lazy
-from live.meta import BellCounter, Category, DeviceNotice, LiveAppConfig, Nav
+from live.meta import BellCounter, Category, DeviceNotice, Help, LiveAppConfig, Nav
 
 from apps.whatsapp_inbox.events import AWAITING_REPLY_EVENTS, NOTICE_EVENTS
 
@@ -128,3 +128,4 @@ class WhatsappInboxConfig(LiveAppConfig):
             refresh_on=NOTICE_EVENTS,
         )
     ]
+    help = Help()

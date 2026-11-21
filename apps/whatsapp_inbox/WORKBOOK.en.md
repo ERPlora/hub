@@ -1,6 +1,13 @@
-<!-- generated from WORKBOOK.md sha256:02e44b0a80ffe235ab16f8d5e469a9143e2e036ee730250f0c5b473926e4c671 -->
+<!-- generated from WORKBOOK.md sha256:8b41adc356d0b7b5d7767bf81855ccc2c96d4c0d0867b1c4c072786e4365681e -->
 
 ## What it is for and who it is for
+
+The WhatsApp inbox puts the business's WhatsApp inside the Hub: each customer who writes to your number has a
+conversation, and your team reads it and answers from here, without picking up the phone. It links it to their
+Customers card and lets you assign it to someone, mark it open, pending or closed and leave internal notes. Once 24
+hours have passed since the customer's last message, you can only write to them with a template approved by Meta.
+
+### In detail
 
 The WhatsApp inbox puts the business's WhatsApp inside the Hub: each customer who writes to the business's number
 has **one conversation**, with all their messages, and the team reads it and **answers from the Hub**, without
@@ -63,6 +70,13 @@ create the templates takes them out of the app for something they do every day.
 ## Screens
 
 ### Inbox
+Here are the conversations with your customers, the most recent activity first, with their status, who they are
+assigned to and how many messages are unread. Search by contact or phone, or filter by status, assignment or unread.
+When you open one, its thread shows in a panel on top of the list: from there you answer, send a template, assign
+it, change its status or leave an internal note. Above the list, the warnings about the number and the plan's
+messages.
+
+#### Detail
 Menu **WhatsApp inbox → Inbox** (title "WhatsApp inbox"). Every role sees it. Table with **Contact** (the card's
 name, or the WhatsApp one, or the number), **Phone**, **Status** (Open, Pending, Closed), **Assigned to**,
 **Unread** and **Last message** (the time if it is from today, "Yesterday", or the date, on the business's clock);
@@ -97,6 +111,12 @@ the conversation"; a photo or a voice note that does not load: "The image could 
 could not be loaded.", with **Open the attachment**.
 
 ### Settings
+For the owner and the administrator only. In **Your number** you connect, reconnect or disconnect the business's
+WhatsApp; in **This month** you see the messages sent against your plan's; in **What do you use it for?** (with
+Appointments or Reservations) you turn on the automatic answers that book appointments or tables; and in **Meta
+templates** you create, edit and delete the templates and see what Meta says about each one.
+
+#### Detail
 Menu **WhatsApp inbox → Settings** (title "Channel settings"), owner and administrator only. Three blocks: **Your
 number** ("Connected" with the number and the business's name, "Not connected" or "Needs reconnecting"; not
 connected or to be reconnected, "Checking with erplora.com…" and then **Connect WhatsApp** or **Reconnect**, or the
@@ -113,7 +133,7 @@ with search box "Search template…", Meta's reason on the rejected ones and the
 there or was not accepted) and **Delete**. Empty: "No templates." with "Create one with «Add template»: Meta reviews
 it. The ones made in WhatsApp Manager appear here too.".
 
-### Template (sheet)
+#### Template (sheet)
 It opens with **Add template** ("New template") or **Edit** ("Edit template — name"), on top of Settings. Fields:
 **Name** ("Lowercase letters, numbers and underscores. It cannot be changed later."), **Language** and **Category**
 (Utility or Marketing), **Header type** (Text, Photo, Video or Document) with **Header (optional)** if it is text or,
@@ -216,7 +236,7 @@ Screen: Settings, Inbox
 Steps:
 1. If WhatsApp withdrew the permission, **Your number** says "Needs reconnecting" and the inbox warns that
    nothing can be sent, with **Go to Settings** for whoever can configure.
-2. **Reconnect** opens Meta's window, as when connecting (F01).
+2. **Reconnect** opens Meta's window, as when connecting.
 3. **Disconnect** asks first ("Disconnect the WhatsApp number?": it stops receiving and sending until it is
    connected again; the saved conversations are not touched). On confirming, **Your number** says "Not
    connected" and "WhatsApp disconnected.".
@@ -317,14 +337,14 @@ Status: done
 Actor: employee (to themselves), manager, administrator, owner
 Screen: Inbox
 Steps:
-1. Open the conversation (F05).
+1. Open the conversation.
 2. Press **Assign to me**, or choose someone on the team in **Assigned to** (manager, administrator and owner
    only), or **Remove assignment**.
 3. The list and the panel show the assignment, on every open screen.
 In: to whom: to me, to a person on the team or to nobody.
 Out: the conversation is assigned; notice `whatsapp_inbox.conversation.assigned`.
 If it fails: whoever cannot assign to others (the employee) never takes a conversation away from someone else: "This
-conversation is already with {name}.", also if it was assigned to them an instant before; nor can they assign it to
+conversation is already with Ana.", also if it was assigned to them an instant before; nor can they assign it to
 someone else ("You may only assign conversations to yourself."). The manager does reassign, and their **Assign to
 me** does not override anyone either.
 Involved: the business's team (the people with access to the inbox)
@@ -349,10 +369,10 @@ Screen: Inbox
 Steps:
 1. In **Filters**, choose **Status: Open** and **Unread** and press **Apply**: the conversations whose last message
    is the customer's are left.
-2. The Hub's bell counts **WhatsApp customers waiting for an answer** ("N WhatsApp customers waiting for an answer",
+2. The Hub's bell counts **WhatsApp customers waiting for an answer** ("3 WhatsApp customers waiting for an answer",
    with "Answer within 24 hours of their last message: after that, WhatsApp only lets you send an approved
    template.") and leads with "Answer the customers" to the **Inbox**; it also counts the
-   conversations an automatic answer could not answer, marked "Needs attention" next to the name (F20). It goes down
+   conversations an automatic answer could not answer, marked "Needs attention" next to the name. It goes down
    by itself as soon as someone answers (from the Hub or from the phone), leaves it pending or closes it, and it does
    not show when nobody is waiting.
 3. In the installed app, each message from a customer that is left unanswered alerts with a system notification,
@@ -422,12 +442,12 @@ Steps:
    reported this month’s messages yet.".
 2. From 80 % of the month's messages, the inbox warns above the list, for example, "You have 30 of 150 WhatsApp
    messages of your plan left this month."; whoever can configure sees, in the browser, **Upgrade plan**, which opens
-   erplora.com's plans, already signed in with their account (BASE-F11). Below 80 %, nothing. The count moves by itself,
+   erplora.com's plans, already signed in with their account. Below 80 %, nothing. The count moves by itself,
    without reloading.
 3. At the cap (with a plan that includes none, from the first message), the inbox warns above the list and **Send**
    explains it instead of sending ("Your plan does not include WhatsApp messages: nothing can be sent." when the plan
    includes none); whoever can configure sees, in the browser, **Upgrade plan**, which opens erplora.com's plans,
-   already signed in with their account (BASE-F11).
+   already signed in with their account.
 4. What the customers write is still saved.
 5. When the month changes (erplora.com's, which counts the messages in UTC: in Spain, at 1:00 or 2:00 on the 1st) the
    notice goes away even if erplora.com has not spoken yet; if
@@ -457,9 +477,9 @@ Steps:
 3. Press **Turn on**: first "Book a table" and its confirmed-reservation notice turn off if they were on, and then the
    card turns "On" with **Turn off** and says "Done. Write to yourself from another phone: “I want an appointment
    tomorrow”.".
-4. The confirmation switch appears (F16).
+4. The switch that decides whether appointments confirm themselves appears underneath.
 5. If both end up on from Automations, each card that is on warns: "“Book a table” is on too: each message gets two
-   automatic answers. Turn off the one you do not use." (or naming "Book appointments"); turning one off (F17) removes
+   automatic answers. Turn off the one you do not use." (or naming "Book appointments"); turning one off removes
    the warning.
 In: that Appointments, Customers and Automations are active in the business; the assistant is provided by
 erplora.com.
@@ -490,8 +510,9 @@ Steps:
 3. Press **Turn on**: first "Book appointments" and its confirmed-appointment notice turn off if they were on, and then
    the card turns "On" with **Turn off** and says "Done. Write to yourself from another phone: “I want a table for two
    tomorrow”.".
-4. The confirmation switch appears (F16).
-5. With both on from Automations, the same warning as in F14, naming "Book appointments".
+4. The switch that decides whether reservations confirm themselves appears underneath.
+5. If both end up on from Automations, each card that is on warns that each message gets two automatic answers;
+   turning one off removes the warning.
 In: that Reservations, Customers and Automations are active in the business; the assistant is provided by
 erplora.com.
 Out: the automations "WhatsApp → table booked" and "Tell the customer by WhatsApp when their reservation is
@@ -590,10 +611,10 @@ Steps:
 1. If the assistant fails or says nothing, the customer gets a fixed text: "Sorry, I cannot check the reservations
    right now. Someone from the team will answer you here as soon as they can.".
 2. Their conversation is marked "Needs attention", which shows next to their name in the inbox, and the bell counts
-   it among the customers waiting for an answer (F09).
+   it among the customers waiting for an answer.
 3. Nothing else is sent to them in that turn.
 4. The mark is only set in that case and when the automatic answer does not answer because the plan's messages for
-   the month were spent or the number is not connected (F13); when it is the assistant itself that answers that
+   the month were spent or the number is not connected; when it is the assistant itself that answers that
    someone from the business will reply, the conversation is not marked.
 5. The mark is removed as soon as someone from the business answers them (from the inbox or from the phone) or
    leaves it pending or closed.
@@ -792,7 +813,7 @@ Steps:
 3. The ones the Hub cannot fill in when sending (a header with a location or with a variable; variables with a name
    instead of a number; verification codes) show with their status and "Can't be sent or edited here: it is managed in
    WhatsApp Manager.", but are not offered for sending nor edited here; they can be deleted.
-4. The ones with a photo, a video or a document in the header are sent from the inbox choosing the file (F33), but
+4. The ones with a photo, a video or a document in the header are sent from the inbox choosing the file, but
    are edited there: they say "Edited in WhatsApp Manager.".
 In: the list of templates erplora.com brings from Meta.
 Out: each template saved as Meta has it.
@@ -805,8 +826,8 @@ Actor: owner, administrator
 Screen: Settings, Template (sheet)
 Steps:
 1. In **Settings → Meta templates**, press **Add template**.
-2. Write the name, choose language and category (Utility or Marketing) and write the text with `{{1}}`, `{{2}}`…
-   where the variables go, with an example of each one; if you want, header, footer and buttons (quick replies
+2. Write the name, choose language and category (Utility or Marketing) and write the text with the number of each
+   variable between double braces where it goes, starting with 1, with an example of each one; if you want, header, footer and buttons (quick replies
    together, up to two links and one call; ten at most).
 3. For a header with a photo, a video or a document, choose "Photo", "Video" or "Document" in **Header type** and
    press **Choose file** (a JPEG or PNG photo up to 5 MB, an MP4 video up to 16 MB or a PDF up to 25 MB): it is saved
@@ -815,7 +836,7 @@ Steps:
    it, it cannot be sent for review.
 4. Press **Send to Meta for review**: the template shows in the list as "Not sent to Meta" with "Sending to Meta…"
    and turns "In review" as soon as Meta receives it. One with a file in its header names its file ("Photo: …").
-5. When Meta decides, it turns by itself to "Approved" (it can be sent now, F33) or to "Rejected" with its reason.
+5. When Meta decides, it turns by itself to "Approved" (it can be sent from the inbox now) or to "Rejected" with its reason.
 In: name, language, category, header (a text, or a photo, a video or a document), text, examples, footer, buttons and
 a saving key (the same one when retrying).
 Out: the header's file saved in the business's files when it is chosen (notice
@@ -827,8 +848,8 @@ numbered in order or with a name, a variable without an example, a variable in t
 already a template “…” in that language.". A file that is not of the chosen type is said underneath and not saved
 ("Choose a JPEG or PNG photo.", "Choose an MP4 video.", "Choose a PDF document."), and one that weighs too much too
 ("This file weighs more than 5 MB: choose a lighter one."); one that does not fit in the plan's space for files (the
-business's files and the headers' count together), as in Files: "No space is left for that file: your plan includes
-{space}."; if it could not be uploaded: "The file could not be uploaded. Try again.". If the photo or the video cannot
+business's files and the headers' count together), as in Files: "There is no space left for that file…" with the
+space your plan includes; if it could not be uploaded: "The file could not be uploaded. Try again.". If the photo or the video cannot
 be shown, the sheet says so under its name ("The photo could not be shown.", "The video could not be shown.") and it
 can still be sent. If, when it is handed over, the file is no longer in the business's files, the list says "Not
 accepted: The header's file is no longer in the business's files: choose it again with Edit.". If Meta does not
@@ -858,7 +879,7 @@ it."), nor one on its way ("This template is on its way to Meta: wait a moment."
 cannot write, or disabled or deleted in WhatsApp Manager, is changed there ("This template is changed in WhatsApp
 Manager: the Hub cannot change it."); the category of an approved one: "Meta only lets you change the category of a
 template it rejected.". If the change does not reach Meta, the row says "Changes not sent: …" with **Send to Meta
-again**; the rest, as in F29.
+again**; the rest, as when creating it.
 Involved: erplora.com, Meta
 
 ### WHATSAPP_INBOX-F31 Delete a template
@@ -884,7 +905,7 @@ Status: done
 Actor: employee, manager, administrator, owner
 Screen: Inbox
 Steps:
-1. Open the conversation (F05), tab **Reply**.
+1. Open the conversation, tab **Reply**.
 2. Write and press **Send** (or Ctrl+Enter).
 3. The message shows in the thread, on the right, "Sending…"; **Unread** stays at zero. As soon as erplora.com
    accepts it, it turns "Sent".
@@ -909,18 +930,18 @@ Screen: Inbox
 Steps:
 1. In **Reply**, press **Template**: "Send a template" opens with the **approved** templates the Hub can fill in
    (name, language, category and text).
-2. Choose one and fill in its variables (`{{1}}`, `{{2}}`…); the preview shows the final text.
+2. Choose one and fill in its variables (1, 2…); the preview shows the final text.
 3. If its header carries a photo, a video or a document, the one made here already brings its own (its thumbnail,
    its name and its size, with **Change file**) and the one made in WhatsApp Manager asks for **Choose file** ("No
    file chosen"): it is saved at once in the business's files and its thumbnail shows, with what it accepts ("JPEG or
    PNG, up to 5 MB.") and "The customer receives the template with this file."; a photo or a video that cannot be
-   shown says so as in F29.
-4. Press **Send**: the message shows in the thread as in F32; the one with a file in its header names it ("Photo ·
+   shown says so under its name, as when creating the template.
+4. Press **Send**: the message shows in the thread like an answer; the one with a file in its header names it ("Photo ·
    carta.jpg").
 Also through the assistant or the API to a number that has not written yet ("send the reminder template to this
 number"): its conversation is created. An automation does not use this send but a narrower one, which never
-creates a conversation: it only writes to the one that already exists with the exact international number (FLOW-F31,
-F23). A number written by hand belongs to the business's country unless it carries its prefix.
+creates a conversation: it only writes to the one that already exists with the exact international number.
+A number written by hand belongs to the business's country unless it carries its prefix.
 In: the template (name and language), its variables, its header's file (if it carries a photo, a video or a document:
 its own or the chosen one), a message key and the conversation or the number. An automation sends the same ones the
 inbox knows how to fill in: one with a file in the header goes with the one its step **Send a message** chose
@@ -931,11 +952,11 @@ WhatsApp given in Customers ("This customer has not agreed to receive marketing 
 approved, deleted or that the Hub cannot fill in cannot be chosen; missing variables: "Fill in every variable of the
 template."; an incomplete number: "This is not a phone number." and nothing is saved; without its header's file:
 "Choose the header's file: the template is sent with it."; a file of the wrong type or that weighs too much is said
-underneath ("Choose a JPEG or PNG photo.") and not saved, just like one that does not fit in the plan's space (F29).
+underneath ("Choose a JPEG or PNG photo.") and not saved, just like one that does not fit in the plan's space.
 If, when it is handed over, the file is no longer in the business's files, the message says "The header's file is no
 longer in the business's files: send the template again choosing its file."; if Meta does not take the file or does
 not answer, "Meta did not answer. Try again in a few minutes." and it is handed over again with the same key (it
-never blames ERPlora); the rest, as in F32.
+never blames ERPlora); the rest, as when answering from the inbox.
 Involved: Customers (the marketing consent), erplora.com, Meta
 
 ### WHATSAPP_INBOX-F34 Know whether a message got there and was read
