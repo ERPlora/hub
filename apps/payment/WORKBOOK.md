@@ -11,8 +11,8 @@ Estado de la app: completa (2026-10-23); sus avisos arrancan las automatizacione
 
 Pagos apunta el dinero que sale del negocio: lo que se paga a un proveedor, una transferencia o un reembolso que no
 es de una venta. Cada pago lleva su referencia y pasa de borrador a aprobado, enviado y completado, o se cancela con
-su motivo, y guarda quién hizo cada paso. No mueve dinero ni habla con el banco: cada paso lo marcas tú cuando ya ha
-pasado.
+su motivo, y guarda quién lo apuntó, quién lo aprobó y cuándo pasó cada paso. No mueve dinero ni habla con el banco:
+cada paso lo marcas tú cuando ya ha pasado.
 
 ### En detalle
 

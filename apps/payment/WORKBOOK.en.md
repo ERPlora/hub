@@ -1,11 +1,11 @@
-<!-- generated from WORKBOOK.md sha256:aa404957d52634011c31b8cf8f89cce0502350c5562d8e534b324c7c397532db -->
+<!-- generated from WORKBOOK.md sha256:f78dd4409b31dddb4be21846853ece8d2ca0c65d77db64e036580bd57a974ade -->
 
 ## What it is for and who it is for
 
 Payments keeps the money that goes out of the business: what is paid to a supplier, a transfer or a refund that is
 not a sale's. Each payment carries its reference and moves from draft to approved, sent and completed, or is
-cancelled with its reason, and keeps who did each step. It moves no money and talks to no bank: you mark each step
-once it has happened.
+cancelled with its reason, and keeps who recorded it, who approved it and when each step happened. It moves no money
+and talks to no bank: you mark each step once it has happened.
 
 ### In detail
 
