@@ -367,7 +367,8 @@ test('SALE-F17, F18: a check parked and taken back from «Open checks», another
 
   await shown(page).locator('[data-testid=pos-open-checks]').click();
   const list = shown(page).locator('[data-testid=pos-checks]');
-  await expect(list.locator(`[data-testid=pos-parked-${keptCheck?.id}]`)).toContainText(kept);
+  const keptRow = list.locator(`[data-testid=pos-parked-${keptCheck?.id}]`);
+  await expect(keptRow).toContainText(kept);
   await shots(
     page,
     'APP-SALE-SALE-F17-F18',
@@ -406,14 +407,13 @@ test('SALE-F17, F18: a check parked and taken back from «Open checks», another
   // one line inside it from its left edge, and the hint on a line of its own underneath. A long title takes the lines
   // it needs, and the row grows with it without cutting a letter. Also on the landscape tablet, 1280×800.
   const row = list.locator(`[data-testid=pos-parked-${droppedCheck?.id}]`);
-  const longRow = list.locator(`[data-testid=pos-parked-${keptCheck?.id}]`);
   for (const size of [...VIEWPORTS, { label: '1280', width: 1280, height: 800 }]) {
     await page.setViewportSize(size);
     await cartReady(page);
     if (!(await list.isVisible())) await shown(page).locator('[data-testid=pos-open-checks]').click();
     await armed.waitFor({ state: 'hidden' });
     await untilStill(page);
-    const long = await reading(longRow);
+    const long = await reading(keptRow);
     expect(long.lines[0], `${size.label}: lines of the long title`).toBeGreaterThan(1);
     expect(long.cut, `${size.label}: lines of the long check cut by its row`).toBe(0);
     expect(long.spacing, `${size.label}: the long title's lines, in times its font size apart`).toBeGreaterThanOrEqual(1.2);
@@ -448,7 +448,7 @@ test('SALE-F17, F18: a check parked and taken back from «Open checks», another
   expect(await checkOf(context, dropped)).toBeUndefined();
 
   // F17: back on screen with its line.
-  await list.locator(`[data-testid=pos-parked-${keptCheck?.id}]`).click();
+  await keptRow.click();
   await expect(lineOf(page, coffee.name)).toBeVisible();
   await expect(shown(page).locator('[data-testid=pos-check-title]')).toHaveValue(kept);
 });
