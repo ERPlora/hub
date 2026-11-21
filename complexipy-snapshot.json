@@ -184,7 +184,7 @@
     ]
   },
   {
-    "path": "apps/modifier/queries.py",
+    "path": "apps/modifier/queries/__init__.py",
     "file_name": "queries.py",
     "functions": [
       {
