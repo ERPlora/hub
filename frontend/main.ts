@@ -135,7 +135,7 @@ export function appRoutes(routeFiles: Record<string, AppRoutes>): RouteRecordRaw
     });
 }
 
-/** An app's `frontend/locale/<lang>.json`, all under the app id (guard: main.test.ts). */
+/** An app's `frontend/locale/<lang>.json`, all under the app id (guard: main.on-import.test.ts). */
 export type AppCatalogue = Record<string, unknown>;
 
 /** Every app catalogue, by the language in its file name, over the shared assistant's words (`assistant`, its panel's);
