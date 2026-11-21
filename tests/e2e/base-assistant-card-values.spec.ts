@@ -2,10 +2,10 @@
 // label, an object by its values, no attempt key, a file by its name and an amount in its currency.
 import { expect, type Locator, type Page, test } from '@playwright/test';
 
-import { sentCard } from './assistant-card-helpers';
-import { ask, askForACard, cancelAtComputerSize, captureConfirmation, captureStill, card, decide, lastAnswer, leave, openPanelAtTheDesk, openPanelInSpanish, panel, panelSpec, signedInWith } from './assistant-panel';
+import { ask, askForACard, askForAPriceInDollars, cancelAtComputerSize, captureConfirmation, captureStill, card, decide, lastAnswer, leave, openPanelAtTheDesk, openPanelInSpanish, panel, sentCard, signedInWith } from './assistant-panel';
 import { A, api, login, THREE_SIZES as VIEWPORTS } from './helpers';
 import { cleanPricing, CODE as PRICING_CODE, createProduct, post, TAG as PRICING_TAG } from './pricing-helpers';
+import { panelSpec } from './provider-helpers';
 
 panelSpec();
 
@@ -200,13 +200,7 @@ test('base-assistant-money-mark — in Spanish a price set on a list in another 
   }
   await openPanelInSpanish(page);
   const price = { product, price_list: `${PRICING_CODE}USD`, price: 1500 };
-  const sent = sentCard(page);
-  await askForACard(page, `E2E-ASK pricing__price_item__add ${JSON.stringify(price)}`);
-  expect((await sent).fields.find((field) => field.name === 'price')).toMatchObject({
-    kind: 'money',
-    value: 1500,
-    money: { currency: 'USD', decimals: 2 },
-  });
+  await askForAPriceInDollars(page, 'pricing__price_item__add', price);
   for (const vp of VIEWPORTS) {
     await page.setViewportSize({ width: vp.width, height: vp.height });
     await expect(card(page)).toContainText(new RegExp(`${PRICING_CODE}USD · 15,00\\s\\$`));

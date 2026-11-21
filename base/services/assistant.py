@@ -2,6 +2,7 @@
 """
 
 import base64
+import contextlib
 import dataclasses
 import json
 
@@ -13,6 +14,7 @@ from live.context import OperationContext
 from live.errors import OperationError, Unauthorized
 from live.operations import get as get_operation
 from live.operations import operation
+from pydantic import ValidationError
 
 from base import approvals as approval_rules
 from base import assistant, queries
@@ -34,6 +36,11 @@ NOT_CONFIRMED = "Not confirmed by the person: nothing was done."
 STOPPED = "The person stopped this request: nothing more was done."
 NOT_AVAILABLE = "This tool is not available to this person here: nothing was done."
 NOT_FROM_THE_CHAT = "This cannot be done from the chat (it names no record): nothing was done. Say where it is done."
+#: What the model hears on the last round of a request, the one that offers it no tool.
+LAST_ROUND = (
+    "This request has used all its steps: no more tools. Answer the person now: say what was done and what is left, "
+    "for them to ask for it in another message."
+)
 
 
 def _assistant_screens(ctx: OperationContext) -> dict[str, str]:
@@ -64,6 +71,79 @@ def _assistant_read(ctx: OperationContext, name: str) -> dict | None:
         return op(ctx, op.input()).model_dump(mode="json")
     except OperationError:
         return None
+
+
+def _assistant_words(content) -> str:
+    """The words of a person's message, to choose its tools: a message that brings files comes as a list of parts,
+    and only its text parts are words."""
+    if isinstance(content, str):
+        return content
+    parts = content if isinstance(content, list) else []
+    texts = (part.get("text", "") for part in parts if isinstance(part, dict) and part.get("type") == "text")
+    return "\n".join(str(text) for text in texts)
+
+
+def _assistant_asked(still_open: list[dict]) -> list[str]:
+    """What the person wrote in the request still open (``_assistant_opened``), message by message. A file alone says
+    nothing: the words written before it still count."""
+    return [
+        words
+        for message in still_open
+        if message.get("role") == "user" and (words := _assistant_words(message.get("content")))
+    ]
+
+
+def _assistant_opened(messages: list[dict], tools: dict) -> int:
+    """Where the request still open starts: after the model last asked for a write, which closes what it was asked for,
+    and never after the person's second-to-last message. The answers to the assistant's questions about a request name
+    none of its tools («no tiene código, ponle tú uno»), so its first words must still count."""
+    closed = max((at for at, message in enumerate(messages) if _asks_for_a_write(message, tools)), default=-1)
+    said = [
+        at
+        for at, message in enumerate(messages)
+        if message.get("role") == "user" and _assistant_words(message.get("content"))
+    ]
+    return min(closed + 1, said[-2]) if len(said) >= 2 else 0
+
+
+def _asks_for_a_write(message: dict, tools: dict) -> bool:
+    """Whether ``message`` is the model's asking for a write among ``tools``."""
+    names = (function.get("name") for function in _functions(message))
+    return any((op := shared.operation_of(str(name), tools)) is not None and op.kind == "command" for name in names)
+
+
+def _functions(message: dict) -> list[dict]:
+    """The tools the model asked for in ``message``, as the gateway wrote each: its ``name`` and ``arguments``."""
+    calls = message.get("tool_calls") if message.get("role") == "assistant" else None
+    asked = (call.get("function") for call in calls if isinstance(call, dict)) if isinstance(calls, list) else ()
+    return [function for function in asked if isinstance(function, dict)]
+
+
+def _assistant_searched(still_open: list[dict]) -> list[str]:
+    """The tasks the model searched the person's tools for (``base.assistant.find_tools``) in the request still open
+    (``_assistant_opened``), in order; a search its operation refuses searched nothing."""
+    search = get_operation(assistant.relevance.FIND_TOOLS)
+    queries = []
+    for function in (function for message in still_open for function in _functions(message)):
+        if function.get("name") != shared.tool_name(search.name):
+            continue
+        with contextlib.suppress(ValidationError):
+            queries.append(search.input.model_validate_json(str(function.get("arguments") or "{}")).query)
+    return queries
+
+
+def _assistant_ran(ctx: OperationContext, tools: dict, call, outcome: "shared.ToolOutcome") -> dict:
+    """What ran, or was refused, by its name: a write this person was not offered is named too. Named as its card
+    names it: an app by its name, the platform by its screen."""
+    op = shared.operation_of(call.name, tools) or shared.named(call.name)
+    if op is None:
+        named = {"name": call.name, "app": "", "app_name": "", "screen": "", "kind": ""}
+    else:
+        with translation.override(ctx.language):
+            app_name = assistant.cards.app_name(op)
+        screen = assistant.cards.screen(op)
+        named = {"name": op.name, "app": op.app_label, "app_name": app_name, "screen": screen, "kind": op.kind}
+    return {"call_id": call.call_id, **named, "outcome": outcome.outcome, "code": outcome.code}
 
 
 def _assistant_refusal(outcome: str, code: str, message: str) -> "shared.ToolOutcome":
@@ -150,10 +230,13 @@ def assistant_turn(ctx: OperationContext, data: AssistantTurnIn) -> dict:
     only on what that card showed (hub#1208: the call it waits on goes back with its ``shown``); a tool this person
     was not offered never runs. Then what goes to the gateway: the tools of what was asked, by relevance,
     and the instructions (with the person's role and the writes a manager must approve, hub#585; with the checklist,
-    read again, in ``setup``). Past ``shared.MAX_ROUNDS`` rounds of tools it goes no further (``stop``)."""
+    read again, in ``setup``). The round that reaches ``shared.MAX_ROUNDS`` offers no tool, so the model answers with
+    what was done and what is left; past it, the turn goes no further (``stop``)."""
     if ctx.actor is None:
         raise Unauthorized(gettext("Sign in to talk to the assistant."))
     tools = assistant.tools.catalog(ctx)
+    # The assistant's own search of the person's tools runs as one of them, but never ranks among them.
+    runs = {**tools, assistant.relevance.FIND_TOOLS: get_operation(assistant.relevance.FIND_TOOLS)}
     pending = list(data.pending)
     decision = data.decision
     stopped = False
@@ -162,7 +245,7 @@ def assistant_turn(ctx: OperationContext, data: AssistantTurnIn) -> dict:
     card = None
     while pending:
         call = pending[0]
-        outcome, card, shown = _assistant_answer(ctx, tools, call, decision, stopped=stopped)
+        outcome, card, shown = _assistant_answer(ctx, runs, call, decision, stopped=stopped)
         if outcome is None:
             # The call its card waits on goes back with what the card showed: the yes comes with it (hub#1208).
             pending[0] = call.model_copy(update={"shown": shown})
@@ -170,48 +253,23 @@ def assistant_turn(ctx: OperationContext, data: AssistantTurnIn) -> dict:
         if decision is not None and decision.call_id == call.call_id:
             stopped = decision.stop
             decision = None
-        # What ran, or was refused, by its name: a write this person was not offered is named too.
-        op = shared.operation_of(call.name, tools) or shared.named(call.name)
         append.append({"role": "tool", "tool_call_id": call.call_id, "content": outcome.content})
-        with translation.override(ctx.language):
-            # Named as its card names it: an app by its name, the platform by its screen.
-            app_name = assistant.cards.app_name(op) if op else ""
-        executed.append(
-            {
-                "call_id": call.call_id,
-                "name": op.name if op else call.name,
-                "app": op.app_label if op else "",
-                "app_name": app_name,
-                "screen": assistant.cards.screen(op) if op else "",
-                "kind": op.kind if op else "",
-                "outcome": outcome.outcome,
-                "code": outcome.code,
-            }
-        )
+        executed.append(_assistant_ran(ctx, runs, call, outcome))
         pending.pop(0)
     messages = [*data.messages, *append]
-    asked = [str(m.get("content")) for m in data.messages if m.get("role") == "user" and isinstance(m.get("content"), str)]
+    still_open = data.messages[_assistant_opened(data.messages, tools) :]
     business = _assistant_read(ctx, "base.business.get") or {}
     if card is not None:
         # The card paints an amount (its schema's ``money`` mark) in the business's currency, with its decimals.
         currency = business.get("currency") or "EUR"
         card["money"] = {"currency": currency, "decimals": business.get("currency_decimals", 2)}
-    offered = assistant.relevance.relevant(tools, asked[-2:], ctx.language)
-    text = assistant.prompt.instructions(
-        language=ctx.language,
-        currency=business.get("currency") or "EUR",
-        decimals=business.get("currency_decimals", 2),
-        business=business.get("name") or "",
-        screens=_assistant_screens(ctx),
-        role=_assistant_role(ctx),
-        # What is offered without its permission is a write a manager may approve (``assistant.tools.catalog``).
-        approvable=[op.name for op in offered if not ctx.has(op.permission)],
+    rounds = _assistant_rounds(messages, card, stopped)
+    last = rounds == shared.MAX_ROUNDS
+    offered = [] if last else assistant.relevance.relevant(
+        tools, _assistant_asked(still_open), ctx.language, searched=_assistant_searched(still_open)
     )
-    if data.setup:
-        text += "\n\n" + assistant.prompt.setup_block(_assistant_read(ctx, "base.setup.status"))
-    stop = ""
-    if card is None and not stopped and shared.rounds(messages) >= shared.MAX_ROUNDS:
-        stop = "assistant.too_many_steps"
+    text = _assistant_instructions(ctx, business, offered, setup=data.setup, last=last)
+    stop = "assistant.too_many_steps" if rounds > shared.MAX_ROUNDS else ""
     return {
         "messages": messages,
         "append": append,
@@ -223,6 +281,32 @@ def assistant_turn(ctx: OperationContext, data: AssistantTurnIn) -> dict:
         "continuation": data.continuation,
         "stop": stop,
     }
+
+
+def _assistant_rounds(messages: list[dict], card: dict | None, stopped: bool) -> int:
+    """The rounds of tools of the request that count against ``shared.MAX_ROUNDS``: none while a write's card waits
+    for its answer, nor once the person stopped the request, which the model still has to hear."""
+    return 0 if card is not None or stopped else shared.rounds(messages)
+
+
+def _assistant_instructions(ctx: OperationContext, business: dict, offered: list, *, setup: bool, last: bool) -> str:
+    """The model's instructions for this round: with the checklist, read again, in ``setup``, and with ``LAST_ROUND``
+    on the last round of the request."""
+    text = assistant.prompt.instructions(
+        language=ctx.language,
+        currency=business.get("currency") or "EUR",
+        decimals=business.get("currency_decimals", 2),
+        business=business.get("name") or "",
+        screens=_assistant_screens(ctx),
+        role=_assistant_role(ctx),
+        # What is offered without its permission is a write a manager may approve (``assistant.tools.catalog``).
+        approvable=[op.name for op in offered if not ctx.has(op.permission)],
+    )
+    if setup:
+        text += "\n\n" + assistant.prompt.setup_block(_assistant_read(ctx, "base.setup.status"))
+    if last:
+        text += "\n\n" + LAST_ROUND
+    return text
 
 
 def _assistant_role(ctx: OperationContext) -> str:

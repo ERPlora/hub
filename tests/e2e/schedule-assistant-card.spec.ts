@@ -8,8 +8,8 @@
 // flow: SCHEDULE-F06 SCHEDULE-F13 BASE-F97
 import { type BrowserContext, expect, test } from '@playwright/test';
 
-import { AN_ID, cancel, cardSpec, datumOf, ownerIn, VIEWPORTS } from './assistant-card-helpers';
-import { card, openPanel } from './assistant-real';
+import { AN_ID, cardSpec, datumOf, VIEWPORTS } from './assistant-card-helpers';
+import { cancel, card, openPanelAtTheDesk, ownerIn } from './assistant-panel';
 import { A, api, capture, untilStill } from './helpers';
 import { post } from './pricing-helpers';
 import { cleanupExceptions, TAG } from './schedule-helpers';
@@ -49,8 +49,7 @@ for (const language of ['es', 'en'] as const) {
   test(`schedule-assistant-card — in ${language}, a write of Schedules says which special day or temporary change, never by its id`, async ({ browser }) => {
     const [context, page] = await ownerIn(browser, language);
     const { christmas, summer } = await aCalendar(context);
-    await page.setViewportSize({ width: 1440, height: 900 });
-    await openPanel(page);
+    await openPanelAtTheDesk(page);
 
     // «Borra el festivo de Navidad», a dangerous write: the special day by its name, titled as its screen titles it, in
     // every size.

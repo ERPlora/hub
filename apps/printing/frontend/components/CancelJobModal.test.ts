@@ -1,21 +1,11 @@
 // «Cancel Receipt T-000123?» (PRINTING-F14): it will not be printed and stays in the queue; an optional
 // reason; «Yes, cancel» cancels it and says so; «Back» leaves it; a refusal is said in the server's words.
 import { toastSuccess } from '@erplora/ui/shell';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import { click, ionValue, mountPrinting, words } from '../__tests__/mount-printing';
 import type { JobOut } from '../operations';
 import CancelJobModal from './CancelJobModal.vue';
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
-vi.mock('@erplora/ui/shell', async (importOriginal) => ({
-  ...((await importOriginal()) as object),
-  toastSuccess: vi.fn(),
-}));
-beforeEach(() => vi.mocked(toastSuccess).mockClear());
 
 const JOB = { id: 'j1', kind: 'document', document_type: 'receipt', reference: 'T-000123', status: 'failed' } as JobOut;
 

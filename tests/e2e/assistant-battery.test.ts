@@ -1,7 +1,7 @@
 // @vitest-environment node
 // The pure parts of the assistant's QA battery with the real model (qa/assistant-battery.spec.ts): reading the
-// streamed turns of `/api/assistant/turn`, the automatic verdict of each item, the report and the seed of the real
-// providers on the stack's SaaS. The spec itself only runs with QA_REAL_PROVIDER=1, never in CI.
+// streamed turns of `/api/assistant/turn`, the automatic verdict of each item, the report and the cleanup of the
+// stack's SaaS. The spec itself only runs with QA_REAL_PROVIDER=1, never in CI.
 import { spawnSync } from 'node:child_process';
 
 import { describe, expect, it } from 'vitest';
@@ -15,11 +15,9 @@ import {
   parseFrames,
   redact,
   renderReport,
-  SEED_PY,
   CLEANUP_PY,
   cleanupCommand,
   QA_STAFF_EMAIL,
-  seedCommand,
   verdictOf,
 } from './assistant-battery';
 
@@ -319,38 +317,8 @@ describe('redact', () => {
   });
 });
 
-describe('seedCommand', () => {
-  const env = { QA_QWEN_API_KEY: 'sk-qwen-secret', QA_OPENAI_API_KEY: 'sk-openai-secret', PATH: '/bin' };
-
-  it('runs the seed in the SaaS on its database with the keys in the environment, never in the arguments', () => {
-    const command = seedCommand(env, 'saas_e2e_8895');
-    expect(command.file).toBe('uv');
-    expect(command.args.slice(0, 5)).toEqual(['run', 'python', 'manage.py', 'shell', '-c']);
-    expect(command.args.join(' ')).not.toMatch(/sk-qwen-secret|sk-openai-secret/);
-    expect(command.env).toMatchObject({ DB_NAME: 'saas_e2e_8895', ASSISTANT_SERVICE_PROVIDER: 'openai', ...env });
-  });
-
-  it('refuses without a key, naming the variable and never a value', () => {
-    expect(() => seedCommand({ QA_OPENAI_API_KEY: 'sk-openai-secret' }, 'saas_e2e_8895')).toThrow(/QA_QWEN_API_KEY/);
-    expect(() => seedCommand({ QA_QWEN_API_KEY: 'sk-qwen-secret' }, 'saas_e2e_8895')).toThrow(/QA_OPENAI_API_KEY/);
-  });
-
-  it('refuses the shared SaaS database and any database that is not an e2e one', () => {
-    expect(() => seedCommand(env, 'saas')).toThrow(/shared SaaS database «saas»/);
-    expect(() => seedCommand(env, 'saas_dev')).toThrow(/not an e2e database/);
-  });
-
-  it('sets the providers only through the SaaS operations and prints no key', () => {
-    for (const op of ['credential_import', 'credential_save', 'model_select', 'policy_update']) expect(SEED_PY).toContain(`services.${op}(`);
-    expect(SEED_PY).not.toMatch(/print\([^)]*(key|KEY)/);
-    expect(SEED_PY).not.toMatch(/cursor|raw\(/);
-    const parsed = spawnSync('python3', ['-c', 'import ast, sys; ast.parse(sys.stdin.read())'], { input: SEED_PY, encoding: 'utf8' });
-    expect(parsed.status, parsed.stderr).toBe(0);
-  });
-});
-
 describe('cleanupCommand', () => {
-  it('takes the QA keys and accounts out of the stack’s SaaS, on its database, with the accounts in the environment', () => {
+  it('takes the QA accounts out of the stack’s SaaS, on its database, with the accounts in the environment', () => {
     const command = cleanupCommand({ PATH: '/bin' }, 'saas_e2e_8895', [QA_STAFF_EMAIL, 'qa-manager@example.com']);
     expect(command.file).toBe('uv');
     expect(command.args).toEqual(['run', 'python', 'manage.py', 'shell', '-c', CLEANUP_PY]);
@@ -362,15 +330,17 @@ describe('cleanupCommand', () => {
     expect(() => cleanupCommand({}, 'saas_dev', [QA_STAFF_EMAIL])).toThrow(/not an e2e database/);
   });
 
-  it('deletes only the keys labelled qa and the named accounts, in development only, and is Python', () => {
-    expect(SEED_PY).toContain(`"${QA_STAFF_EMAIL}"`);
-    expect(SEED_PY.match(/label="qa"/g)?.length).toBeGreaterThanOrEqual(2);
+  it('deletes only the named accounts, in development only, and is Python', () => {
     expect(CLEANUP_PY).toContain('if not settings.DEBUG');
-    expect(CLEANUP_PY).toContain('AIProviderCredential.objects.filter(label="qa").delete()');
     expect(CLEANUP_PY).toContain('email__in=');
     expect(CLEANUP_PY).toContain('os.environ["QA_CLEANUP_EMAILS"]');
     expect(CLEANUP_PY).not.toMatch(/cursor|raw\(/);
     const parsed = spawnSync('python3', ['-c', 'import ast, sys; ast.parse(sys.stdin.read())'], { input: CLEANUP_PY, encoding: 'utf8' });
     expect(parsed.status, parsed.stderr).toBe(0);
+  });
+
+  it('has no key to take out: the stack’s SaaS reads the keys from its environment, never from its database', () => {
+    expect(CLEANUP_PY).not.toMatch(/credential|Credential|api_key|label="qa"/);
+    expect(CLEANUP_PY).toContain('print(json.dumps({"accounts": named}))');
   });
 });

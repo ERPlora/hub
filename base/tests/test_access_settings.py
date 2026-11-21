@@ -18,7 +18,7 @@ from django.utils import timezone
 from live.models import OutboxEvent
 
 from base import access
-from base.models import AccessSettings, Credential, Membership, TrustedDevice
+from base.models import AccessSettings, Credential, TrustedDevice
 from base.tenancy.context import use_hub
 from base.tenancy.tests import hubs
 from base.tests.test_access_devices import employee, owner  # noqa: F401 (fixtures)

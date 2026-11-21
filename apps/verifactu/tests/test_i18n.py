@@ -40,8 +40,9 @@ def visible_texts() -> set[str]:
     config = apps.get_app_config("verifactu")
     lazies = [
         *config_texts(config),
-        # The Home's step of «Finish setting up your business» and its panels.
-        *(text for step in config.setup for text in (step.title, step.description)),
+        # The Home's step of «Finish setting up your business» and its panels. The step's description depends on the
+        # business reading it: its texts are erplora_route's, among the module texts below.
+        *(step.title for step in config.setup),
         *(panel.title for panel in config.widgets),
         # The texts among a panel's literal props, as the one under the queue's figure.
         *(

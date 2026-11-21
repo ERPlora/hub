@@ -17,8 +17,10 @@ withDefaults(
   defineProps<{
     /** What the server refused, by field of the command (`customer_tax_id`…). */
     fieldErrors?: Readonly<Record<string, string>>;
+    /** The search of Customers' cards; off on the public page, whose visitor has no session to read them. */
+    allowSearch?: boolean;
   }>(),
-  { fieldErrors: () => ({}) },
+  { fieldErrors: () => ({}), allowSearch: true },
 );
 
 const model = defineModel<Recipient>({ required: true });
@@ -85,6 +87,7 @@ const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'i
     data-testid="invoice-recipient"
   >
     <CustomerSearch
+      v-if="allowSearch"
       v-model="card"
       v-model:open="choosing"
     />

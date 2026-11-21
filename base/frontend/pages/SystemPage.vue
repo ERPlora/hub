@@ -11,6 +11,7 @@ import FailedEvents from '../components/FailedEvents.vue';
 import SystemAppCards from '../components/SystemAppCards.vue';
 import SystemLog from '../components/SystemLog.vue';
 import SystemRelease from '../components/SystemRelease.vue';
+import SystemReleaseNotes from '../components/SystemReleaseNotes.vue';
 import SystemUsage from '../components/SystemUsage.vue';
 import { useBaseI18n } from '../lib/i18n';
 import { BACKUPS_HASH, BACKUPS_TARGET, type SystemTab, TAB_HASH, tabOf, tabsFor } from '../lib/system';
@@ -80,6 +81,7 @@ watchEffect(() => {
       <p class="system-updates-hint">
         {{ t('base.system.updates.auto') }}
       </p>
+      <SystemReleaseNotes />
     </section>
     <div
       v-else-if="tab === 'events'"

@@ -9,7 +9,7 @@
 // it opens, and saves only what changed. The server judges: a 422 goes under its field, a 409 (the
 // Hub user already linked to someone else) on top, and the dialog stays open with what was typed.
 import { Combo, type ComboOption } from '@erplora/ui/components';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import { expectSaveWaitsForMoney, expectWindowSaysMoneyUnreadable } from '../../../../base/frontend/__tests__/save-waits-for-money';
 import { itTellsTheCorrectedFieldApart } from '../../../../base/frontend/__tests__/same-words-refusal';
@@ -30,11 +30,6 @@ import {
   settle,
 } from '../__tests__/mount-staff';
 import MemberFormModal from './MemberFormModal.vue';
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
 
 type Control = HTMLElement & { label?: string; value?: unknown; checked?: boolean; errorText?: string; type?: string; disabled?: boolean };
 

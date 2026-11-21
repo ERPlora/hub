@@ -1,7 +1,6 @@
 // Routes → pages of the staff app, and nothing else: menu, permissions and active apps come from the
-// server (`base.session.me`). The four sections of the old module (Staff, Roles, Time Off, Schedules)
-// on the paths of the menu in apps.py, plus Commissions (STAFF-F21) and Settings (the old shell's
-// settings tab). Types only:
+// server (`base.session.me`). The sections of the menu in apps.py (Staff, Roles, Time Off, Schedules,
+// Commissions) on its paths, plus Settings (the old shell's settings tab). Types only:
 // `main.ts` globs this file eagerly and Vite hoists that glob above the shell's boot hooks. Each page
 // is its own chunk (`import()`).
 import type { RouteRecordRaw } from 'vue-router';

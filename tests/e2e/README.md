@@ -259,7 +259,8 @@ mismo con su pasada.
 - **Monta la pila de la receta de arriba, sola**: worktrees sueltos de `origin/main` del Hub (o del commit que diga
   `NIGHTLY_HUB_REF`, aunque no esté subido) y del SaaS en
   `~/.erplora/hub-nightly-e2e/` (de los checkouts compartidos solo hace `fetch`), con su `.env`; sus BD `hub_e2e_9770` y
-  `saas_e2e_9771`; la siembra (cuentas de demo con los ids de `a` y `b`, y el proveedor falso del asistente); los dos
+  `saas_e2e_9771`; la siembra (cuentas de demo con los ids de `a` y `b`, el proveedor falso del asistente y la taxonomía
+  del SaaS, que siembra también cada despliegue y pide la QA maestra, abajo); los dos
   `runserver` con las variables de la receta, del asistente y de WhatsApp; y `CI=1 pnpm e2e` con el tope global de Playwright
   (`NIGHTLY_MAX_MINUTES`, 360); con `NIGHTLY_GREP`, solo los tests cuyo título casa con ese patrón (`--grep` de
   Playwright). Las specs que gastan tokens de verdad (`QA_REAL_PROVIDER`) se quedan fuera. El humo de navegador
@@ -333,15 +334,15 @@ tope de demos vivas (`MAX_CONCURRENT_DEMOS`).
 
 Prueban el asistente del Hub (BASE-F92…F106) en cuatro specs, por tema: el panel (`base-assistant.spec.ts`), la tarjeta
 de una escritura (`base-assistant-card.spec.ts`), cómo dice cada dato (`base-assistant-card-values.spec.ts`) y cómo
-nombra los registros (`base-assistant-card-records.spec.ts`). Lo que comparten, los ganchos de cada spec (`panelSpec`) y
-cómo se maneja el panel y su tarjeta, está en `assistant-panel.ts`. Corren con sus dependencias de verdad: el Hub de la
+nombra los registros (`base-assistant-card-records.spec.ts`). Sus ganchos (`panelSpec`) están en `provider-helpers.ts`, y
+cómo se maneja el panel y su tarjeta, en `assistant-panel.ts`, del que lo importan todas las specs del asistente. Corren con sus dependencias de verdad: el Hub de la
 pila, la pasarela del SaaS de la pila (`/internal/assistant/*` y `/internal/speech/transcribe`) y, detrás, el proveedor
 falso `tests/e2e/assistant-provider.ts`, un servidor HTTP en 127.0.0.1 que habla la API de OpenAI y que cada spec
 arranca en `E2E_AI_PROVIDER_PORT` (por defecto, el puerto del Hub + 2). Ningún test llega a un proveedor real ni
 escribe una clave real. Responde en el idioma que pide el mensaje de sistema del Hub («Answer in English» o «Answer in
 Spanish»: el de la persona o, en una automatización, el de quien la guardó), como un modelo de verdad; sin él, en inglés.
 Cada texto suyo se exporta en los dos idiomas (`DONE.en` y `DONE.es`, `NOT_DONE`, `GREETING`…), así que una spec con
-la interfaz en inglés espera `NOT_DONE.en` tras «Cancelar» y una en español, `NOT_DONE.es` (hub#1025). Pide tres cosas
+la interfaz en inglés espera `NOT_DONE.en` tras «Cancelar» y una en español, `NOT_DONE.es` (hub#1025). Pide cuatro cosas
 al SaaS de la pila:
 
 - **La BD del SaaS sembrada con ese proveedor**, desde su worktree y antes de la primera ejecución:
@@ -350,13 +351,18 @@ al SaaS de la pila:
   cae con «not seeded with this provider».
 - **`ASSISTANT_SERVICE_PROVIDER=e2e-local`** en el `runserver` del SaaS (con el resto de variables de la receta de
   arriba, también `E2E_RELAX_LOGIN_RATE_LIMIT=True`): sin ella el dictado responde 503.
+- **Una clave inventada en `OPENAI_API_KEY`** en ese mismo `runserver`
+  (`OPENAI_API_KEY=sk-e2e-0000000000000000000000000000e2e1`): el SaaS no guarda claves en su BD y lee la de cada
+  proveedor de su entorno, y «E2E Local» lee la de OpenAI. Sin ella, el SaaS no tiene con qué contestar y cada turno cae
+  con `assistant.provider_not_configured`; con ella, ninguna clave de verdad del `.env` del SaaS llega al proveedor
+  falso.
 - **`E2E_SAAS_DB`** (la de la tabla de arriba), si la BD del SaaS no es `saas_e2e_<Hub+1>` (con el Hub en :8000, `saas`):
   cada spec fija en ella los mensajes del mes del negocio `a` antes de cada test, así que nunca gasta el cupo del plan.
 
 ```bash
 # El SaaS de la pila (8871), desde su worktree:
 env DB_NAME=saas_e2e_8871 VITE_DEV_PORT=6071 ASSISTANT_SERVICE_PROVIDER=e2e-local \
-  HUB_CALLBACK_TEMPLATE='http://{slug}.localhost:8870/auth/callback' \
+  OPENAI_API_KEY=sk-e2e-0000000000000000000000000000e2e1 HUB_CALLBACK_TEMPLATE='http://{slug}.localhost:8870/auth/callback' \
   HUB_ADMIN_CALLBACK_URL='http://hubs.localhost:8870/auth/callback' HUB_INTERNAL_URL=http://localhost:8870 \
   EMAIL_FILE_PATH="$PWD/.mail-8871" E2E_RELAX_LOGIN_RATE_LIMIT=True DEMO_SPAWN_RATELIMIT=100/h \
   uv run python manage.py runserver 127.0.0.1:8871
@@ -390,17 +396,21 @@ C35 a C37) con el **modelo de verdad** y el **índice de documentación de verda
 propia (arriba, «Varias ejecuciones a la vez») con el SaaS arrancado con `ASSISTANT_SERVICE_PROVIDER=openai` (las
 huellas de la búsqueda; sin `e2e-local`), y en el entorno de la ejecución:
 
-- `QA_QWEN_API_KEY` y `QA_OPENAI_API_KEY`: las claves, solo en el entorno. Nunca en el repo, en el informe ni en una
-  captura: el informe y su JSON pasan por `redact` antes de escribirse.
+- `DASHSCOPE_API_KEY` (Qwen, de Alibaba) y `OPENAI_API_KEY`: las claves, exportadas en la terminal desde la que se
+  arrancan el `runserver` del SaaS de la pila y la ejecución, porque el SaaS lee la de cada proveedor de su entorno y
+  nunca de su BD; sin la clave inventada de «El asistente» (arriba). Nunca en el repo, en el informe ni en una captura:
+  el informe y su JSON pasan por `redact` antes de escribirse, y la siembra se niega si falta alguna.
 - `E2E_SAAS_DIR`: el checkout del SaaS de la pila.
 
 En cada invocación, antes del primer punto: `register_apps` del Hub en el esquema `shared` de la BD del SaaS de la
-pila (la documentación de las apps), los proveedores reales por las operaciones del propio SaaS (`SEED_PY` de
-`assistant-battery.ts`: `qwen`, compatible con OpenAI, contesta con `qwen3.7-plus`; `openai`, de reserva con
-`gpt-5.4-mini` y de las huellas) e `index_docs` (idempotente: solo calcula lo nuevo); una vez por ejecución, los mensajes
-del mes de `a` a cero. Al acabar, pase o falle, su `afterAll` saca del SaaS de la pila las claves (las de etiqueta `qa`) y
-la cuenta de personal con la que siembra (`CLEANUP_PY`): las claves nunca se quedan en la BD. Se niega a sembrar en la BD
-compartida `saas` o en una que no sea `…e2e…`. Cada punto pregunta en una conversación nueva, en `es` (C37 en `en`), guarda lo que pasó por
+pila (la documentación de las apps), los proveedores reales como los da de alta el admin del SaaS y sus modelos por
+las operaciones del propio SaaS (`SEED_PY` de `assistant-seed.ts`: `qwen`, compatible con OpenAI y con la clave de
+`DASHSCOPE_API_KEY`, contesta con `qwen3.7-plus`; `openai`, con la de `OPENAI_API_KEY`, de reserva con `gpt-5.4-mini` y
+de las huellas; con `QA_ANSWER_MODEL`, el modelo a prueba, abajo «Comparar modelos») e `index_docs`
+(idempotente: solo calcula lo nuevo); una vez por ejecución, los mensajes
+del mes de `a` a cero. La siembra nunca lee ni escribe una clave: cada proveedor dice de qué variable la lee el SaaS.
+Al acabar, pase o falle, su `afterAll` saca del SaaS de la pila la cuenta de personal con la que siembra
+(`CLEANUP_PY`). Se niega a sembrar en la BD compartida `saas` o en una que no sea `…e2e…`. Cada punto pregunta en una conversación nueva, en `es` (C37 en `en`), guarda lo que pasó por
 `/api/assistant/turn` (herramientas, tarjeta, extractos de `base.docs.search`, errores), confirma la tarjeta de los
 «hazlo» escribiendo la palabra que pide (los demás la cancelan), comprueba el registro por la API del Hub y escribe
 `.artifacts/qa/<ejecución>/assistant-battery-B.md` (el informe, punto a punto) y `.artifacts/qa/<ejecución>/<punto>-<slug>.png`:
@@ -410,8 +420,8 @@ respuesta nunca se comprueba: la lee una persona en el informe. C35 pone el mes 
 (solo se pinta desde ahí, BASE-G122) y lo devuelve a lo gastado.
 
 ```bash
-# Con la pila en marcha (Hub 8894, SaaS 8895 en el ejemplo) y sus variables exportadas:
-export QA_REAL_PROVIDER=1 E2E_SAAS_DIR=<saas-wt> QA_QWEN_API_KEY=… QA_OPENAI_API_KEY=…
+# Con la pila en marcha (Hub 8894, SaaS 8895 en el ejemplo), su SaaS arrancado con las dos claves y sus variables exportadas:
+export QA_REAL_PROVIDER=1 E2E_SAAS_DIR=<saas-wt> DASHSCOPE_API_KEY=… OPENAI_API_KEY=…
 CI=1 pnpm e2e tests/e2e/qa/assistant-battery.spec.ts
 # Volver a preguntar algunos puntos en el informe de una ejecución anterior (su id, el de la cabecera del informe):
 QA_BATTERY_RUN=<id> CI=1 pnpm e2e tests/e2e/qa/assistant-battery.spec.ts --grep C35
@@ -450,22 +460,25 @@ rol no tiene y cada `lookups` es otra lectura que el rol tiene. Si no encaja, la
 arreglar la sonda, no el producto.
 
 La spec se salta sin `QA_REAL_PROVIDER=1` (gasta tokens de verdad; nunca en la CI) y pide lo mismo que la batería de
-arriba: pila propia, el SaaS con `ASSISTANT_SERVICE_PROVIDER=openai`, `E2E_SAAS_DIR` y las dos claves en el entorno.
+arriba: pila propia, el SaaS con `ASSISTANT_SERVICE_PROVIDER=openai`, `E2E_SAAS_DIR` y las dos claves en el entorno
+de la ejecución y del SaaS.
 Una vez por ejecución hace la siembra de la batería (proveedores reales, índice de documentación), da de alta en el
 SaaS de la pila un encargado y un administrador de `a` (`qa-manager@example.com` / `manager` y `qa-admin@example.com` /
 `admin`; el dueño y el empleado son los de `demo_seed`) y enciende todas las apps de `a`, como supone el catálogo. Al
-acabar, pase o falle, su `afterAll` saca del SaaS de la pila las claves (`qa`) y esas cuentas (`CLEANUP_PY`), igual que
-la batería; por eso cada invocación vuelve a sembrarlas. Tampoco escribe nunca en la BD compartida `saas` ni en una que no
+acabar, pase o falle, su `afterAll` saca del SaaS de la pila esas cuentas (`CLEANUP_PY`), igual que la batería; por eso
+cada invocación vuelve a sembrarlas. Tampoco escribe nunca en la BD compartida `saas` ni en una que no
 sea `…e2e…`: se niega antes de sembrar. Cada
 sonda entra con su rol, en una conversación nueva y con su idioma, vacía antes los mensajes del mes de `a` y escribe
 `.artifacts/qa/<ejecución>/assistant-probes.md` (el informe: PASS, FAIL y N/A, la herramienta que eligió el modelo y
-los 300 primeros caracteres de la respuesta), su JSON y `.artifacts/qa/<ejecución>/<sonda>.png`; nada de eso se sube.
+los 300 primeros caracteres de la respuesta), su JSON, `.artifacts/qa/<ejecución>/<sonda>.png` y
+`.artifacts/qa/<ejecución>/bench.json` (el registro de cada turno con el que se comparan modelos, abajo); nada de eso se
+sube.
 El veredicto (`probeVerdict`) y la carga de los ficheros están en `assistant-probes.ts`, probados con Vitest en
 `assistant-probes.test.ts`.
 
 ```bash
 # Con la pila en marcha y sus variables exportadas (como la batería):
-export QA_REAL_PROVIDER=1 E2E_SAAS_DIR=<saas-wt> QA_QWEN_API_KEY=… QA_OPENAI_API_KEY=…
+export QA_REAL_PROVIDER=1 E2E_SAAS_DIR=<saas-wt> DASHSCOPE_API_KEY=… OPENAI_API_KEY=…
 CI=1 pnpm e2e tests/e2e/qa/assistant-probes.spec.ts                       # todo qa/probes/
 QA_PROBES=tests/e2e/qa/probes/sale-customer-base.json CI=1 pnpm e2e tests/e2e/qa/assistant-probes.spec.ts
 # Repetir algunas sondas en el informe de una ejecución anterior:
@@ -488,6 +501,206 @@ pnpm -s qa:probes --role owner --language en --all --out probes-owner-en.json
 la vuelta entera: pila propia sobre `origin/main`, catálogo y esqueleto por rol e idioma, escribe las frases (nuevas,
 ambiguas, como las diría esa persona; nunca las `asks`), corre la spec, abre una issue por fallo del producto (no de la
 sonda) y sube las sondas nuevas en una PR. Por defecto, 2 herramientas por app y rol; «completa» = `--all`.
+
+## Comparar modelos (`QA_ANSWER_*`, `QA_PROBES_SAMPLE`, `pnpm qa:bench-compare`)
+
+El asistente llama a operaciones que mueven dinero y documentos fiscales, así que un modelo se elige por su acierto
+primero y por su precio después. El examen son las sondas de arriba: la misma spec las pregunta al modelo que se elija y
+deja un registro por turno que se puede comparar entre ejecuciones. Lo mismo vale para el panel del SaaS (su
+`tests/e2e/README.md`, «Sondas del asistente»): sus informes tienen el mismo formato y este mismo comando los compara.
+
+**Qué modelo contesta.** Sin ninguna variable `QA_ANSWER_*`, el de producción: Qwen (`qwen3.7-plus`) con
+`gpt-5.4-mini` de reserva. Con `QA_ANSWER_MODEL`, el modelo a prueba, en un proveedor propio del SaaS de la pila
+(`qa-answer`) y **sin reserva**: un turno en el que falla cuenta como fallo suyo, nunca como respuesta de otro modelo
+(`assistant-seed.ts`, probado en `assistant-seed.test.ts`).
+
+| Variable | Qué dice |
+|---|---|
+| `QA_ANSWER_MODEL` | el id del modelo en la API del proveedor; activa la comparación |
+| `QA_ANSWER_KIND` | la API que habla: `openai`, `anthropic`, `gemini` o `deepseek` (un servicio compatible con OpenAI es `openai` con su dirección) |
+| `QA_ANSWER_BASE_URL` | opcional: su dirección (https); sin ella, la de su API |
+| `QA_ANSWER_KEY_ENV` | el **nombre** de la variable del entorno del SaaS de la que su proveedor lee la clave, nunca la clave: una de las del SaaS (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`, `DEEPSEEK_API_KEY` o `DASHSCOPE_API_KEY`), exportada con la clave en la ejecución y en el SaaS |
+| `QA_ANSWER_PRICE_IN`, `QA_ANSWER_PRICE_OUT` | USD por millón de tokens de entrada y de salida; se escriben en el modelo como en el admin |
+| `QA_ANSWER_VISION` | opcional: `1` si el modelo ve imágenes (la siembra marca «imágenes» en su modelo; sin ella, o con `0`, no las ve y una foto le llega como una nota) |
+| `QA_PROBES_SAMPLE`, `QA_PROBES_SEED` | cuántas sondas del corpus y con qué semilla (1 por defecto) |
+
+Si con `QA_ANSWER_MODEL` falta alguna variable, la ejecución se niega diciendo cuáles; sin ella, cualquier otra
+`QA_ANSWER_*` también la para (nunca contesta Qwen en silencio). La clave vive solo en el entorno, el SaaS la lee de
+ahí (nunca llega a su BD) y se tapa en todo lo que se escribe. La búsqueda en la documentación sigue con `openai`
+(`OPENAI_API_KEY`). Para medir Qwen en las mismas condiciones que los demás, sin reserva, se le nombra como modelo a
+prueba: `QA_ANSWER_KIND=openai`, `QA_ANSWER_MODEL=qwen3.7-plus`, `QA_ANSWER_BASE_URL` con la dirección de Qwen
+(`QWEN_ADDRESS` de `assistant-seed.ts`) y `QA_ANSWER_KEY_ENV=DASHSCOPE_API_KEY`.
+
+**La muestra** (`assistant-sample.ts`): `QA_PROBES_SAMPLE` sondas de los ficheros, primero una de cada app, rol, idioma
+y expectativa, y después cada una cerca de su parte del corpus. El mismo corpus y la misma semilla dan siempre las
+mismas sondas, así que todos los modelos contestan las mismas frases: se comparan ejecuciones sobre el mismo commit del
+corpus. Una sonda `decide: confirm` escribe en `a`; para comparar en igualdad, cada modelo en una pila con su BD recién
+creada.
+
+**La preparación de una muestra** (`qa/setup.json`, `assistant-setup.ts`). Muchas sondas nombran registros de `a`
+(«Comedor QA», «Fichaje QA», el carrito «QA-WEB-1») que en una pila recién creada solo harían antes otras sondas
+confirmadas o una ejecución anterior; sin ellos, una muestra falla casi siempre con «no lo encuentro», sea cual sea el
+modelo. Por eso una ejecución con `QA_PROBES_SAMPLE`, una sola vez y antes de la primera sonda (tras encender las apps),
+hace esos registros con las herramientas del propio Hub y datos fijos, como la dueña de `a` y sin ningún modelo: cada
+paso es una llamada confirmada de una herramienta (`live.assistant.run_tool`), con su validación y sus permisos. Las
+fechas se escriben como `{today}`, `{today+N}` o `{year}` y salen del día de la ejecución en Madrid. Un nombre cuenta
+como hecho solo si su paso salió bien y su resultado lo nombra; lo que falló queda en `setup-run.json` de la ejecución y
+en los datos de `bench.json`. Después, una regla igual para todos los modelos deja fuera de la nota (N/A, con el motivo)
+las sondas que no pueden aprobar en esa pila:
+
+- las de los ficheros de preparación del corpus (`*-preparation-*.json`): la preparación hace lo mismo que ellas;
+- las que nombran un registro que la preparación no hizo: un nombre que acaba en «QA» (fuera de «…», que es un valor
+  nuevo), un código `QA-…`, un número con fecha (`OS-20261109-0001`, `20261109-0001`) o `product.qa`; así salen, por
+  ejemplo, las de conversaciones de WhatsApp (solo llegan de fuera), las de un dispositivo de impresión (se da de alta
+  desde el propio dispositivo) y las que citan un número de un día ya pasado;
+- y las que crean (`create`, `bulk_create`, `place`, `register`, `open`, `add`, `issue`) algo que la preparación ya hizo
+  con el mismo tipo de registro, porque saldrían duplicadas. Una sonda que crea un registro nuevo sí cuenta: lo que
+  nombra puede ser el registro que crea.
+
+Una sonda que no nombra nada así cuenta siempre, aunque pida datos que la pila no tiene («la factura de prueba»): esos
+fallos se ven en los motivos y son iguales para todos los modelos. Sin muestra no hay preparación y no cambia nada.
+
+**El registro** (`bench.json`, `assistant-bench.ts`): los datos de la ejecución (modelo, tipo de API, dirección, precios,
+reserva, fecha, ficheros, tamaño del corpus y muestra con su semilla) y una fila por sonda: id, frase, rol, idioma,
+superficie (`hub`), expectativa, si la herramienta lee o escribe, la herramienta y sus `lookups`, las herramientas que
+llamó el modelo **en orden y con sus argumentos** y cómo acabó cada una, si salió tarjeta, el veredicto y sus motivos,
+las peticiones del turno (`rounds`), los tokens de entrada, salida y huellas, el coste, la latencia y el error si lo hubo.
+
+- **Tokens y coste por turno**: la fila de uso del mes de `a` en el SaaS de la pila, que la spec vacía antes de cada
+  sonda; lo que hay después es lo de ese turno. `costUsd` suma la respuesta (con los precios del modelo) y las huellas
+  de la búsqueda (`tokensEmbedding`). Si el proveedor no devuelve el uso, la pasarela apunta 0: el resumen lo cuenta como
+  «Turns with no tokens recorded». Sin precios, el coste sale `n/a`, no cero.
+- **Si la herramienta se ofreció** (`offered`): la spec ordena la frase en el Hub como la primera ronda del turno
+  (`base.assistant.relevance`, con el catálogo del rol y todas las apps encendidas). Un fallo con `offered: false` es del
+  ranking (el modelo no tuvo la herramienta) y es igual para todos los modelos; en una `refused` no aplica.
+- **Latencia**: del envío de la frase a la última respuesta del turno, tarjeta incluida.
+- **Lo que no se ve desde el navegador**: las herramientas que corre erplora.com (fecha, tipo de cambio, búsqueda web) no
+  salen en `calls`, y `rounds` cuenta las peticiones del navegador, no las vueltas al modelo dentro del SaaS.
+- Una ejecución es de un modelo: volver a preguntar sondas (`QA_PROBES_RUN`) con otro modelo se niega.
+
+```bash
+# El modelo de producción, 150 sondas con la semilla 7:
+QA_PROBES_SAMPLE=150 QA_PROBES_SEED=7 CI=1 pnpm e2e tests/e2e/qa/assistant-probes.spec.ts
+# Otro modelo, las mismas 150 sondas, sin reserva (en una pila con su BD recién creada y su SaaS arrancado con
+# ANTHROPIC_API_KEY exportada):
+QA_ANSWER_KIND=anthropic QA_ANSWER_MODEL=<id> QA_ANSWER_KEY_ENV=ANTHROPIC_API_KEY ANTHROPIC_API_KEY=… \
+  QA_ANSWER_PRICE_IN=<USD> QA_ANSWER_PRICE_OUT=<USD> QA_PROBES_SAMPLE=150 QA_PROBES_SEED=7 \
+  CI=1 pnpm e2e tests/e2e/qa/assistant-probes.spec.ts
+# El resumen: por modelo, el acierto total, en lecturas y escrituras, por idioma y por app; los N/A; los fallos del
+# ranking aparte de los del modelo y estos por motivo; el gasto total, por turno, por 1.000 mensajes y por respuesta
+# correcta; los tokens medios; los segundos por turno (media, p50, p95 y máximo, en total y en lecturas y escrituras)
+# y las rondas medias; y las sondas en las que los modelos no coinciden
+pnpm -s qa:bench-compare tests/e2e/.artifacts/qa/<ejecución 1>/bench.json tests/e2e/.artifacts/qa/<ejecución 2>/bench.json
+```
+
+## Los escenarios del asistente: el trabajo entero (`qa/assistant-scenarios.spec.ts`)
+
+Las sondas miden qué herramienta elige el modelo para una frase; un **escenario** mide si el trabajo acaba bien hecho,
+como en el uso real: una conversación entera en el chat de verdad, con varios mensajes de un dueño que habla de su
+negocio y no sabe nada de herramientas, a veces con un archivo adjunto por el botón del chat y a veces dejándose un dato
+que el asistente tiene que **preguntar** en vez de inventar. Lo que cuenta es el estado final de la base de datos del
+negocio, no la redacción de las respuestas.
+
+**El formato** (`qa/scenarios/*.json`, uno por escenario; lo lee `assistant-scenario.ts`, probado en
+`assistant-scenario.test.ts`):
+
+- `id` (`s<NN>-<palabras>`), `title`, `vertical` (`restaurant` o `hair_salon`), `seed` (la plantilla de la vertical que
+  se carga en el negocio con `base.blueprint.import`: `restaurant.es`, `restaurant.en`, `hair_salon.es`) y `language`
+  (`es` o `en`: el del dueño y el de la interfaz);
+- `setup`: lo que el trabajo necesita y la plantilla no trae (el emisor de las facturas, el personal y sus horarios, el
+  horario del negocio, los turnos de reservas…), como llamadas a las herramientas del Hub, sin modelo;
+- `owner`: quién es (`persona`), qué quiere en palabras llanas (`goal`), lo que dice de entrada (`upFront`) y lo que solo
+  dice si se lo preguntan (`ifAsked`);
+- `attachments`: los archivos que adjunta, hechos por los fixtures de `assistant-fixtures.ts` en cada ejecución y nunca
+  guardados en el repo: un `.xlsx` de verdad (`xlsx`, con sus filas), o un albarán (`note`) impreso por el navegador como
+  PDF de texto (`pdf`) o como una foto de móvil del papel sobre el mostrador (`photo`, `.jpg` o `.png`);
+- `opening`: el primer mensaje, igual para todos los modelos; `maxTurns`: los mensajes del dueño como mucho;
+- `expect`: el estado final, como comprobaciones SQL sobre la base del negocio (`sql` da un solo valor; `equals` es el
+  valor esperado, o `unchanged: true` pide el mismo valor que antes del trabajo). Sin comillas dobles, `$` ni acentos
+  graves en el SQL: viaja por la shell hasta `psql()`;
+- `forbidden`: lo que no puede pasar, con la misma forma (otros productos que cambian, un borrado, otra reserva…);
+- `writes`: las herramientas que el trabajo puede usar para escribir; cualquier otra escritura que se ejecute cuenta como
+  no deseada. `cards`: tarjetas cuyos valores se comparan (`match` elige la tarjeta por sus argumentos, `expect` dice lo
+  que tiene que llevar);
+- `mustAsk`: los datos que hay que preguntar: cómo los revela el dueño (`reveals`), las llamadas que los usarían
+  (`uses`: herramienta, ruta en sus argumentos como `rows[name~pulpo].price`, y `where` si es de un solo registro) y las
+  lecturas que pueden encontrarlos sin preguntar (`resolvers`). Un dato que el dueño dice de entrada no puede estar aquí:
+  el formato lo rechaza;
+- `offered`: las herramientas que el turno tiene que ofrecer al mensaje de apertura (con sus archivos, si los lleva)
+  para que el trabajo se pueda empezar; vacío cuando lo correcto es preguntar antes de hacer nada;
+- `golden`: el camino dorado, las llamadas que haría un asistente perfecto. Un paso puede tomar un valor del resultado de
+  otro anterior: `{"$ref": "<id del paso>", "where": {"name": "Bebidas"}, "take": "id"}` (`assistant-golden.ts`).
+
+Las fechas se escriben `{today}`, `{today+N}` o con el día de la semana (`{friday}`: el siguiente, nunca hoy) y salen del
+día de la ejecución en Madrid.
+
+**El negocio de partida.** Cada escenario empieza del mismo negocio: en el `beforeAll` la dueña entra una vez en `a` y se
+copia la base de `a` a `<base de a>_qa` (`assistant-snapshot.ts`); antes de cada escenario se vuelve a poner esa copia,
+se carga su plantilla y se hace su `setup` (por el ejecutor de herramientas del asistente, `live.assistant.run_tool`). Así
+lo que hizo o rompió un modelo en un escenario nunca cambia el siguiente. El `afterAll` deja `a` como lo encontró y
+borra la copia; si una ejecución se corta antes, la copia se queda y la siguiente vuelve a ella en vez de copiar un negocio
+a medias. Sin copia nunca se borra la base de `a`. Copiar y reponer cierra las conexiones a esa base: la pila es solo de
+esta ejecución.
+
+**Un nombre por ejecución.** Las instrucciones del asistente empiezan por el nombre del negocio, y la caché de prompts de
+algunos proveedores cobra a una fracción (y a veces contesta antes) lo que ya vio igual. Si todas las ejecuciones usan el
+mismo `a` con el mismo nombre, una repetición sale más barata que la primera conversación de un negocio de verdad. Por eso
+el `beforeAll` pone al negocio su nombre seguido del id de la ejecución («La Esquina · <ejecución>», o solo el id si no
+tiene nombre; `assistant-run-name.ts`) y el `afterAll` le devuelve el suyo. Dentro de una conversación la caché sigue
+funcionando como en producción. La caché solo cambia coste y tiempo, nunca la respuesta.
+
+**El camino dorado va primero, siempre.** Antes de preguntar al modelo, cada escenario corre su camino dorado en el negocio
+recién preparado, **por el propio turno del asistente** (`base.assistant.turn`: una lectura se ejecuta; una escritura
+saca su tarjeta y se ejecuta con el sí, escribiendo la palabra si la pide, como en el chat) y sus `expect` y `forbidden`
+tienen que cumplirse. Si no, el escenario sale **excluido** con el motivo, igual para todos los modelos: ningún modelo
+podría aprobarlo en esa pila. Si el motivo es un defecto de una herramienta, va a su issue. Después se vuelve a poner la
+copia y se pregunta al modelo.
+
+**No ejecutable** (`assistant-precheck.ts`): antes de preguntar se pide al turno del asistente, como la dueña y sin
+modelo, qué herramientas ofrece al mensaje de apertura tal como lo manda el chat (texto y archivos). Si falta alguna de
+`offered`, el escenario sale «not runnable: tools not offered on the attached message» (o «… on the opening message»,
+sin archivos), aparte de los fallos del modelo: las herramientas se eligen por las palabras de la persona, así que ningún
+modelo podría hacer el trabajo. Un escenario con foto tampoco se pregunta a un modelo que no ve imágenes
+(`QA_ANSWER_VISION`).
+
+**El dueño simulado** (`assistant-owner.ts`): un modelo fijo, el mismo para todos los modelos que se comparan,
+`QA_OWNER_MODEL` (por defecto `anthropic/claude-sonnet-5.5`) por OpenRouter, con temperatura 0 y el mínimo de razonamiento
+(en ese modelo no se puede apagar); si una vez no dice nada, se le pregunta otra. Solo conoce su persona y
+sus datos; escribe como un dueño con prisa, nunca nombra herramientas, campos ni ids, contesta una pregunta solo con lo
+que sabe (si no, dice que no lo sabe) y acaba con `[DONE]` cuando el trabajo parece hecho o `[GIVE UP]` si se rinde. Las
+tarjetas las confirma siempre (como un usuario distraído), escribiendo la palabra en las de riesgo alto, y la
+conversación le dice qué confirmó. Su gasto se apunta aparte del del asistente. La clave es `QA_OPENROUTER_API_KEY`, del
+`.env` de la raíz de erplora-next: se exporta en el mismo comando que lanza la spec y nunca se imprime.
+
+**La nota de cada escenario** (`assistant-scenario-score.ts`): si el trabajo quedó hecho (todo `expect` y ningún
+`forbidden`) y qué parte (`fraction`); las escrituras malas (lo prohibido que pasó, las no deseadas y las tarjetas con un
+valor equivocado); para cada dato de `mustAsk`, si el asistente lo preguntó antes de usarlo (`asked`), lo encontró con una
+lectura (`resolved`), lo inventó (`invented`) o no lo usó (`unused`); los mensajes del dueño, el tiempo, los tokens y el
+coste del asistente (la fila de uso de `a`, vaciada al empezar; los mensajes del mes se ponen a cero antes de cada
+mensaje del dueño, así que el cupo nunca corta una conversación) y los errores. Todo, con la conversación, cada llamada
+con sus argumentos y cada tarjeta, va a `.artifacts/qa/<ejecución>/bench.json` (`scenarios`, `assistant-scenario-bench.ts`),
+y `pnpm qa:bench-compare` lo pone por modelo: trabajos hechos, parte media del trabajo, datos inventados, escrituras
+malas, coste por trabajo terminado y tiempo por trabajo (`assistant-scenario-compare.ts`).
+
+**Nada llega a la AEAT.** La ejecución se niega si el Hub de la pila tiene `VERIFACTU_GATEWAY_URL` (sin pasarela, un
+registro fiscal se queda en local), y cada escenario acaba comprobando que ningún registro de `verifactu_record` salió
+del negocio. Ningún escenario llama a las herramientas que envían o consultan a la AEAT.
+
+Pide lo mismo que las sondas (pila propia, el SaaS con `ASSISTANT_SERVICE_PROVIDER=openai`, `E2E_SAAS_DIR`, las claves en
+el entorno de la ejecución y del SaaS y las variables `QA_ANSWER_*` del modelo a prueba), más la clave del dueño
+(`QA_OPENROUTER_API_KEY`, solo en la ejecución). Cada modelo, en una ejecución suya.
+
+```bash
+# Solo los caminos dorados: sin modelo, sin claves ni SaaS sembrado (comprueba que cada escenario se puede hacer):
+QA_SCENARIOS_GOLDEN=1 CI=1 pnpm e2e tests/e2e/qa/assistant-scenarios.spec.ts
+# Con el modelo a prueba (aquí Qwen sin reserva), dos escenarios:
+export QA_REAL_PROVIDER=1 E2E_SAAS_DIR=<saas-wt> DASHSCOPE_API_KEY=… OPENAI_API_KEY=… QA_OPENROUTER_API_KEY=…
+QA_ANSWER_KIND=openai QA_ANSWER_MODEL=qwen3.7-plus QA_ANSWER_BASE_URL=<QWEN_ADDRESS> QA_ANSWER_KEY_ENV=DASHSCOPE_API_KEY \
+  QA_ANSWER_PRICE_IN=0.276 QA_ANSWER_PRICE_OUT=1.101 CI=1 pnpm e2e tests/e2e/qa/assistant-scenarios.spec.ts --grep 's02|s05'
+# Otros ficheros de escenarios, o repetir escenarios en el informe de una ejecución anterior:
+QA_SCENARIOS=<a.json>,<b.json> QA_SCENARIOS_RUN=<id> CI=1 pnpm e2e tests/e2e/qa/assistant-scenarios.spec.ts
+pnpm -s qa:bench-compare tests/e2e/.artifacts/qa/<ejecución 1>/bench.json tests/e2e/.artifacts/qa/<ejecución 2>/bench.json
+```
 
 ## WhatsApp (`whatsapp-*.spec.ts`)
 
@@ -524,7 +737,7 @@ specs posteriores caían con 401 o con 402 `base.app_limit_reached` (hub#528).
 # El SaaS de la pila (8031, Hub en 8030), desde su worktree; <hub-wt> es el worktree del Hub de la pila:
 env $(node <hub-wt>/tests/e2e/whatsapp-graph.ts 8030 http://localhost:8031) \
   DB_NAME=saas_e2e_8031 VITE_DEV_PORT=5204 ASSISTANT_SERVICE_PROVIDER=e2e-local \
-  HUB_CALLBACK_TEMPLATE='http://{slug}.localhost:8030/auth/callback' \
+  OPENAI_API_KEY=sk-e2e-0000000000000000000000000000e2e1 HUB_CALLBACK_TEMPLATE='http://{slug}.localhost:8030/auth/callback' \
   HUB_ADMIN_CALLBACK_URL='http://hubs.localhost:8030/auth/callback' \
   EMAIL_FILE_PATH="$PWD/.mail-8031" E2E_RELAX_LOGIN_RATE_LIMIT=True DEMO_SPAWN_RATELIMIT=100/h \
   uv run python manage.py runserver 127.0.0.1:8031
@@ -550,7 +763,8 @@ y, además, **su taxonomía**, que en cada despliegue siembra `saas-migrate`:
 env DB_NAME=saas_e2e_8871 uv run python manage.py seed_taxonomy
 ```
 
-Sin ella la spec cae al empezar con «no business type of the restaurant vertical». Da de alta una cuenta por ejecución:
+Sin ella la spec cae al empezar con «no business type of the restaurant vertical». La pila de la pasada nocturna (y la
+del humo) ya la siembra en su paso «la siembra del SaaS»: con `nightly-e2e.sh` no hace falta a mano. Da de alta una cuenta por ejecución:
 con `E2E_RELAX_LOGIN_RATE_LIMIT=True` en el SaaS (la receta) las altas no tienen tope práctico; sin la marca, el SaaS deja
 10 por hora y dirección, y tras varias ejecuciones seguidas hay que reiniciar su `runserver` (la caché local es de
 memoria). Deja `APP-BASE-10-BASE-G152-<idioma>-<pantalla>-<ancho>.png` en `.artifacts/`.

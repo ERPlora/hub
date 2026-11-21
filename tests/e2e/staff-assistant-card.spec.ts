@@ -7,8 +7,8 @@
 // flow: STAFF-F02 STAFF-F04 STAFF-F05 STAFF-F07 STAFF-F15 STAFF-F18 STAFF-F19 BASE-F97
 import { type BrowserContext, expect, test } from '@playwright/test';
 
-import { AN_ID, cancel, cardSpec, datumOf, ownerIn, VIEWPORTS } from './assistant-card-helpers';
-import { card, openPanel } from './assistant-real';
+import { AN_ID, cardSpec, datumOf, VIEWPORTS } from './assistant-card-helpers';
+import { cancel, card, openPanelAtTheDesk, ownerIn } from './assistant-panel';
 import { A, api, capture, psql, untilStill } from './helpers';
 import { post, stamp } from './pricing-helpers';
 
@@ -71,8 +71,7 @@ for (const language of ['es', 'en'] as const) {
   test(`staff-assistant-card — in ${language}, a write of Staff says which person, role, schedule or time off, never by its id`, async ({ browser }) => {
     const [context, page] = await ownerIn(browser, language);
     const team = await aTeam(context, `${RUN}${language}`);
-    await page.setViewportSize({ width: 1440, height: 900 });
-    await openPanel(page);
+    await openPanelAtTheDesk(page);
 
     // «Borra ese horario», a dangerous write: its title and whose it is, in every size.
     const scheduleName = `${team.member.full_name} · ${team.schedule.name}`;

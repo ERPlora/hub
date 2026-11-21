@@ -4,7 +4,7 @@
 // «Editing package — {name}» changes everything but the lines (they cannot change once created) and
 // sends only what changed; empty validity, uses or closed price remove them.
 import { Combo, InlineFeedback } from '@erplora/ui/components';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import {
   expectAmountLeftWaitsForMoney,
@@ -15,11 +15,6 @@ import { itTellsTheCorrectedFieldApart } from '../../../../base/frontend/__tests
 import { business, click, ionValue, JAPANESE, type MountOptions, mountService, POLISH, settle } from '../__tests__/mount-service';
 import { PACKAGE, pkg } from '../__tests__/package';
 import PackageFormModal from './PackageFormModal.vue';
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
 
 type Control = HTMLElement & { label?: string; value?: unknown; errorText?: string; disabled?: boolean; helperText?: string };
 

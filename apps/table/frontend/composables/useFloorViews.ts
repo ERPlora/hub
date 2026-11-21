@@ -2,6 +2,7 @@ import type { FloorTable } from '@erplora/ui/components';
 import { computed, type ComputedRef } from 'vue';
 
 import { floorView } from '../lib/floor-view';
+import { useBusinessMoney } from '../lib/format';
 import type { SettingsOut, TableOut } from '../operations';
 import { useLocale, useT } from './useT';
 
@@ -15,8 +16,9 @@ export interface FloorViewSource {
 export function useFloorViews(tables: () => readonly TableOut[], source: () => FloorViewSource): ComputedRef<FloorTable[]> {
   const t = useT();
   const locale = useLocale();
+  const money = useBusinessMoney();
   return computed(() => {
-    const options = { ...source(), locale: locale.value, t };
+    const options = { ...source(), locale: locale.value, t, money: money.value };
     return tables().map((table) => floorView(table, options));
   });
 }

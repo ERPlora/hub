@@ -6,7 +6,7 @@
 // Empty counted cash is asked for; with open checks the first press warns and the second closes («Close
 // anyway»). Success says «Session S-… closed · expected … · counted … · difference …».
 import { toastSuccess } from '@erplora/ui/shell';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { business, click, errorFrame, flush, ionValue, JAPANESE, mountCash } from '../__tests__/mount-cash-register';
 import { itReadsAmountsAsTheHub, itReadsWhatWasLeftOnceTheMoneyArrives } from '../__tests__/money-field';
@@ -14,12 +14,6 @@ import { expectWindowSaysMoneyUnreadable } from '../../../../base/frontend/__tes
 import { plain } from '../lib/money';
 import type { Business } from '../../../../base/frontend/operations/business';
 import CloseSessionForm from './CloseSessionForm.vue';
-
-vi.mock('@erplora/ui/shell', async (importOriginal) => ({
-  ...((await importOriginal()) as object),
-  toastSuccess: vi.fn(),
-}));
-beforeEach(() => vi.mocked(toastSuccess).mockClear());
 
 const prop = (el: Element | null, name: string): unknown => (el as unknown as Record<string, unknown>)[name];
 const SESSION = { id: 's1', number: 'S-261014-0001' };

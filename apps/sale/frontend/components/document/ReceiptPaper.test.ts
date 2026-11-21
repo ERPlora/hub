@@ -301,6 +301,49 @@ describe('ReceiptPaper', () => {
     });
   });
 
+  describe('the QR to ask for the full invoice (INVOICE-F04)', () => {
+    const CLAIM = {
+      code: '20261014-0007-K7Q2M9XD3FPA',
+      url: 'https://bar-pepe.erplora.com/p/bar-pepe/invoice/20261014-0007-K7Q2M9XD3FPA',
+      image: 'data:image/png;base64,iVBORw0KGgo=',
+    };
+    const RECORD = { qr_svg: 'data:image/svg+xml;base64,PHN2Zy8+', qr_url: 'https://prewww2.aeat.es/x', csv: '' };
+
+    it('a second QR after the fiscal one: what it is for over it and the code under it, before the footer', async () => {
+      const s = await paper({ sale: saleOut({ discount_amount: 0 }), settings: SETTINGS, record: RECORD, claim: CLAIM });
+      const claim = s.find('sale-receipt-claim');
+      expect(words(claim.element)).toBe(`Escanea para pedir tu factura completa ${CLAIM.code}`);
+      expect(s.text('sale-receipt-claim-hint')).toBe(CLAIM.code);
+      const image = claim.find('img');
+      expect(image.attributes('src')).toBe(CLAIM.image);
+      expect(image.attributes('alt')).toBe('Código QR para pedir la factura completa');
+      const fiscal = s.find('sale-receipt-qr').element;
+      expect(fiscal.compareDocumentPosition(claim.element) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      const footer = s.find('sale-receipt-footer').element;
+      expect(claim.element.compareDocumentPosition(footer) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    });
+
+    it('a QR that could not be drawn leaves the address to type under it, never a blank square', async () => {
+      const s = await paper({ sale: saleOut(), claim: { ...CLAIM, image: '' } });
+      expect(s.find('sale-receipt-claim').find('img').exists()).toBe(false);
+      expect(s.text('sale-receipt-claim-hint')).toBe(CLAIM.url);
+    });
+
+    it('without a code, no second QR; without VeriFactu, the code still prints', async () => {
+      const none = await paper({ sale: saleOut(), settings: SETTINGS, record: RECORD });
+      expect(none.find('sale-receipt-claim').exists()).toBe(false);
+      const alone = await paper({ sale: saleOut(), claim: CLAIM });
+      expect(alone.find('sale-receipt-qr').exists()).toBe(false);
+      expect(alone.text('sale-receipt-claim-hint')).toBe(CLAIM.code);
+    });
+
+    it('speaks English', async () => {
+      const s = await paper({ sale: saleOut(), claim: CLAIM }, 'en');
+      expect(words(s.find('sale-receipt-claim').element)).toBe(`Scan to ask for your full invoice ${CLAIM.code}`);
+      expect(s.find('sale-receipt-claim').find('img').attributes('alt')).toBe('QR code to ask for the full invoice');
+    });
+  });
+
   it('speaks English', async () => {
     const s = await paper({ sale: saleOut({ customer_name: 'Lucía' }), settings: SETTINGS, duplicate: true }, 'en');
     expect(s.text('sale-receipt-number')).toBe('Receipt: 20261014-0007');

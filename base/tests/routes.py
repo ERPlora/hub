@@ -31,10 +31,12 @@ def published_routes(client, prefix: str, host: str) -> set[tuple[str, str, str]
 
 
 def assert_bound(method: str, path: str, operation: str) -> None:
-    """``base/api.py`` binds ``path`` to ``operation`` alone and by ``method`` alone, and it resolves under ``/api``."""
-    from base.api import router
+    """One of the routers of ``base/api/`` binds ``path`` to ``operation`` alone and by ``method`` alone, and it
+    resolves under ``/api``."""
+    from base.api import ROUTERS
 
-    [route] = router.path_operations[path].operations
+    [view] = [router.path_operations[path] for router in ROUTERS if path in router.path_operations]
+    [route] = view.operations
     assert (route.methods, route.operation_id) == ([method], operation)
     assert resolve(f"/api{path}").url_name
 

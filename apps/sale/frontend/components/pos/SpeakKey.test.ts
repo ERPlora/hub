@@ -22,12 +22,6 @@ import { computed, ref, toRaw, toValue } from 'vue';
 import { EMPLOYEE, mountSale, settle } from '../../__tests__/mount-sale';
 import SpeakKey from './SpeakKey.vue';
 
-vi.mock('@erplora/ui/shell', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@erplora/ui/shell')>()),
-  toast: vi.fn(),
-  toastWarning: vi.fn(),
-}));
-
 // The shared assistant's dictation, the real one unless a test swaps it for one it drives (`fakeDictation`).
 vi.mock('@erplora/ui/components', async (importOriginal) => {
   const real = await importOriginal<typeof import('@erplora/ui/components')>();
@@ -69,8 +63,6 @@ beforeEach(() => {
 
 afterEach(() => {
   installAssistant(undefined);
-  vi.mocked(toast).mockClear();
-  vi.mocked(toastWarning).mockClear();
   // Back to the real dictation, also when a swapped one was never taken.
   vi.mocked(useDictation).mockReset();
   vi.restoreAllMocks();
@@ -122,6 +114,15 @@ function microphone() {
   };
 }
 
+/** The button a screen reader meets: the native one `ion-button` draws in its shadow root once it has loaded. */
+function nativeOf(el: Element): Promise<HTMLButtonElement> {
+  return vi.waitFor(() => {
+    const native = el.shadowRoot?.querySelector('button');
+    if (!native) throw new Error('the key drew no native button');
+    return native;
+  });
+}
+
 /** The icon a key paints: `ion-icon`'s `src` is a property, not an attribute. */
 const iconOf = (el: Element): string | undefined => (el.querySelector('ion-icon') as (HTMLElement & { src?: string }) | null)?.src;
 
@@ -130,6 +131,8 @@ interface Options {
   session?: SessionMe;
   locale?: 'en' | 'es';
   answer?: { status: number; body: unknown };
+  /** In the document, so Ionic loads the key and draws its native button. */
+  attachTo?: HTMLElement;
 }
 
 async function key(options: Options = {}) {
@@ -139,6 +142,7 @@ async function key(options: Options = {}) {
     session: options.session ?? CASHIER,
     locale: options.locale ?? 'es',
     answer: options.answer ?? { status: 200, body: { text: 'cobra la mesa 4', language: 'es' } },
+    attachTo: options.attachTo,
   });
   const button = () => m.find('pos-speak');
   const press = async () => {
@@ -326,6 +330,43 @@ describe('SpeakKey: without connection', () => {
     await k.press();
     expect(voice.getUserMedia).toHaveBeenCalled();
     await k.press();
+  });
+
+  // Ionic copies the key's `aria-*` to its native button only when it loads: what changes afterwards is the key's to
+  // bring along, or a screen reader keeps announcing the state it had when the till opened.
+  it('a screen reader hears it greyed while offline and pressed while it records, as the connection comes and goes', async () => {
+    const online = vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true);
+    const k = await key({ attachTo: document.body });
+    const native = await nativeOf(k.button().element);
+    const greyed = () => native.getAttribute('aria-disabled') === 'true';
+    const connection = async (up: boolean) => {
+      online.mockReturnValue(up);
+      window.dispatchEvent(new Event(up ? 'online' : 'offline'));
+      await settle();
+    };
+    expect([greyed(), native.getAttribute('aria-pressed')]).toEqual([false, 'false']);
+
+    await connection(false);
+    expect(greyed()).toBe(true);
+    await connection(true);
+    expect(greyed()).toBe(false);
+
+    await k.press();
+    expect(native.getAttribute('aria-pressed')).toBe('true');
+    // A recording can always be stopped: offline it is not greyed until it stops.
+    await connection(false);
+    expect(greyed()).toBe(false);
+    await k.press();
+    expect([greyed(), native.getAttribute('aria-pressed')]).toEqual([true, 'false']);
+  });
+
+  // Ionic takes the host's `aria-disabled` away when it loads, so the grey hangs on `data-aria-disabled`, which stays.
+  it('opened offline, the key is greyed for the eye as well as for a screen reader', async () => {
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
+    const k = await key({ attachTo: document.body });
+    const native = await nativeOf(k.button().element);
+    expect(native.getAttribute('aria-disabled')).toBe('true');
+    expect(k.button().attributes('data-aria-disabled')).toBe('true');
   });
 
   it('a recording stopped once the connection is gone is thrown away untranscribed, and a toast says why', async () => {

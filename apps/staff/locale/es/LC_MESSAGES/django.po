@@ -33,6 +33,9 @@ msgstr "Ausencias"
 msgid "Schedules"
 msgstr "Horarios"
 
+msgid "Commissions"
+msgstr "Comisiones"
+
 msgid "Active staff"
 msgstr "Plantilla activa"
 

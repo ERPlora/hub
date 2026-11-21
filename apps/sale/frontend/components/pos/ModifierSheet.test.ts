@@ -2,18 +2,13 @@
 // and its options with their supplement, the defaults already chosen, a counter where an option repeats, and
 // «Add · <price>», which waits (and says so) while a required group is short. It hands the ids up, in the
 // order chosen; the server values them.
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import type { TargetGroupOut } from '../../../../modifier/frontend/operations';
 import { click, mountSale, settle } from '../../__tests__/mount-sale';
 import { plain } from '../../lib/format';
 import { product } from './__tests__/fixtures';
 import ModifierSheet from './ModifierSheet.vue';
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
 
 const option = (id: string, name: string, price_delta = 0, is_default = false) => ({
   id,
@@ -22,6 +17,7 @@ const option = (id: string, name: string, price_delta = 0, is_default = false) =
   price_delta,
   tax_category_key: null,
   is_default,
+  allergens: [],
 });
 
 const GROUPS: TargetGroupOut[] = [
@@ -47,10 +43,10 @@ const GROUPS: TargetGroupOut[] = [
   },
 ];
 
-async function setup(props: Record<string, unknown> = {}) {
+async function setup(props: Record<string, unknown> = {}, locale: 'en' | 'es' = 'es') {
   const m = await mountSale(ModifierSheet, {
     props: { open: true, product: product({ id: 'p1', name: 'Hamburguesa', price: 800 }), groups: GROUPS, pending: false, error: null, ...props },
-    locale: 'es',
+    locale,
   });
   await m.live();
   await settle();
@@ -73,6 +69,15 @@ describe('ModifierSheet', () => {
     expect(s.inDoc('pos-options-allergens')?.textContent).toBe('Alérgenos: Gluten, Leche');
     const plainProduct = await setup();
     expect(plainProduct.inDoc('pos-options-allergens')).toBeNull();
+  });
+
+  it('says under each option the allergens it adds, in the business’s language; an option without them says nothing', async () => {
+    const groups: TargetGroupOut[] = [{ ...GROUPS[0], options: [{ ...option('cheese', 'Queso', 100), allergens: ['milk'] }, option('onion', 'Sin cebolla')] }];
+    const s = await setup({ groups });
+    expect(s.inDoc('pos-option-allergens-cheese')?.textContent).toBe('Alérgenos: Leche');
+    expect(s.inDoc('pos-option-allergens-onion')).toBeNull();
+    const english = await setup({ groups }, 'en');
+    expect(english.inDoc('pos-option-allergens-cheese')?.textContent).toBe('Allergens: Milk');
   });
 
   it('opens with the defaults chosen and «Add» waiting for the required group, saying so on a tap', async () => {

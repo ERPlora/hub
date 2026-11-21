@@ -5,7 +5,7 @@
 // another person changes shows without reloading; a card gone says «no longer available».
 import { InlineFeedback } from '@erplora/ui/components';
 import { AppPage, toastSuccess } from '@erplora/ui/shell';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 
 import { DETAIL } from '../__tests__/fixtures';
 import {
@@ -37,15 +37,6 @@ import PurchaseHistory from '../components/PurchaseHistory.vue';
 import CustomerDetailPage from './CustomerDetailPage.vue';
 import source from './CustomerDetailPage.vue?raw';
 
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
-vi.mock('@erplora/ui/shell', async (importOriginal) => ({
-  ...((await importOriginal()) as object),
-  toastSuccess: vi.fn(),
-}));
-beforeEach(() => vi.mocked(toastSuccess).mockClear());
 afterEach(() => {
   document.body.innerHTML = '';
 });

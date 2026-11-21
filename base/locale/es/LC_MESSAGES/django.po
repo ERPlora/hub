@@ -2277,6 +2277,36 @@ msgstr "Tu negocio está llegando a lo que incluye su plan: algunas cosas pueden
 msgid "See the plan’s usage"
 msgstr "Ver el uso del plan"
 
+#: unpaid_plan.py
+msgid "Unpaid invoice"
+msgstr "Factura sin pagar"
+
+#: unpaid_plan.py
+msgid "Your ERPlora plan has an unpaid invoice"
+msgstr "Tu plan de ERPlora tiene una factura sin pagar"
+
+#: unpaid_plan.py
+msgid "Pay on erplora.com"
+msgstr "Pagar en erplora.com"
+
+#: unpaid_plan.py
+msgid "Pay it on erplora.com: if it is not paid soon, the business is suspended. Nothing is deleted."
+msgstr "Págala en erplora.com: si no se paga pronto, el negocio se suspende. No se borra nada."
+
+#: unpaid_plan.py
+#, python-format
+msgid ""
+"Pay it on erplora.com: its deadline was %(until)s and the business may be suspended at any moment. Nothing is "
+"deleted."
+msgstr ""
+"Págala en erplora.com: su plazo terminó el %(until)s y el negocio se puede suspender en cualquier momento. No se "
+"borra nada."
+
+#: unpaid_plan.py
+#, python-format
+msgid "Pay it on erplora.com: if it is not paid by %(until)s, the business is suspended. Nothing is deleted."
+msgstr "Págala en erplora.com: si no se paga antes del %(until)s, el negocio se suspende. No se borra nada."
+
 #: workbook_help.py
 msgctxt "workbook"
 msgid "Screens"

@@ -8,7 +8,7 @@
 import { DataTable } from '@erplora/ui/components';
 import { offeredRowActions, pressRowAction } from '@erplora/ui/testing/data-table';
 import { AppPage } from '@erplora/ui/shell';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import type { Component } from 'vue';
 
 import { business, EMPLOYEE, errorFrame, flush, type MountOptions, mountCash, words } from '../__tests__/mount-cash-register';
@@ -22,11 +22,6 @@ import UnassignedModal from '../components/UnassignedModal.vue';
 import type { SessionRow } from '../operations';
 import SessionsPage from './SessionsPage.vue';
 import { listFillProblems } from '../../../../frontend/testing/list-fill';
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
 
 const LIST = 'cash_register.session.list';
 const CURRENT = 'cash_register.session.current';

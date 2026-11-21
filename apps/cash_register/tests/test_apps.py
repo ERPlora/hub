@@ -1,7 +1,6 @@
 """The cash register app declares its module metadata, its menu, its permissions, what each role gets,
 its scheduled task (the daily auto-close the worker runs) and its hooks of the Home."""
 
-from pathlib import Path
 
 from django.apps import apps
 from django.conf import settings
@@ -9,6 +8,7 @@ from django.utils import translation
 from live.live_registry import live_registry
 from live.meta import (
     Category,
+    Help,
     LiveAppConfig,
     Nav,
     SetupCheck,
@@ -21,6 +21,7 @@ from live.operations import registry
 
 from apps.cash_register import events as E
 from base import home
+from base.tests.shell_icons import shell_icon_registry
 
 PERMISSIONS = [
     "cash_register.view_session",
@@ -67,7 +68,7 @@ def test_it_is_a_free_module_of_the_sales_group_with_a_registered_icon():
     assert config().premium is False
     assert config().icon == "ion:cash-outline"
     # Registered in the shell (ION_ICONS): an unregistered icon paints nothing.
-    icons = (Path(settings.BASE_DIR) / "packages/ui/src/shell/icons.ts").read_text()
+    icons = shell_icon_registry()
     for icon in [config().icon, *(entry.icon for entry in config().navigation)]:
         assert f"'{icon.removeprefix('ion:')}'" in icons, icon
 
@@ -214,14 +215,30 @@ def test_the_step_speaks_the_language_of_whoever_reads_it():
         spanish = (str(step.title), str(step.description))
     assert english == (
         "Your cash drawer",
-        "Decide how the till opens and closes: the opening float, the closing count and the POS screen that stays "
-        "locked until the drawer is open.",
+        "Decide how the till opens and closes: the opening float, the closing count and whether charging in cash "
+        "needs an open session.",
     )
     assert spanish == (
         "Tu caja",
-        "Decide cómo se abre y se cierra la caja: el fondo inicial, el arqueo de cierre y la pantalla del TPV que "
-        "queda bloqueada hasta abrirla.",
+        "Decide cómo se abre y se cierra la caja: el fondo inicial, el arqueo de cierre y si cobrar en efectivo "
+        "exige una sesión abierta.",
     )
+
+
+def test_the_step_promises_no_locked_till_only_the_cash_refusal():
+    """With the cash register on and no session open, Sales still sells and charges by card or any other way:
+    it only refuses the charges with a cash part (CASH_REGISTER-F04). No screen of the till is locked, so the
+    step must not promise one."""
+    (step,) = config().setup
+    for language, locked, cash, session in (
+        ("en", "locked", "in cash", "session"),
+        ("es", "bloquead", "en efectivo", "sesión"),
+    ):
+        with translation.override(language):
+            description = str(step.description)
+        assert locked not in description.lower(), (language, description)
+        assert cash in description, (language, description)
+        assert session in description, (language, description)
 
 
 def test_the_step_is_refreshed_when_the_settings_are_saved():
@@ -330,10 +347,14 @@ def test_the_hooks_icons_are_registered_in_the_shell():
     (step,) = config().setup
     icons = [step.icon, *(panel.icon for panel in config().widgets)]
     assert icons == ["ion:cash-outline", "ion:cash-outline", "ion:swap-vertical-outline"]
-    shell = (Path(settings.BASE_DIR) / "packages/ui/src/shell/icons.ts").read_text()
+    shell = shell_icon_registry()
     for icon in icons:
         assert f"'{icon.removeprefix('ion:')}':" in shell, icon
 
 
 def test_cash_register_has_no_bell_counters():
     assert config().bell == []
+
+
+def test_its_help_window_is_ready_without_a_video_yet():
+    assert config().help == Help()

@@ -1,16 +1,11 @@
 // «Void «<item>»» (SALE-F20): a line already sent to the kitchen leaves the check with a reason — one
 // tap («Ordered by mistake», «Customer changed their mind», «Sold out», «Entered twice») or typed —
 // and «Void item» cannot be pressed without one. A refusal is read in the sheet.
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { h, ref } from 'vue';
 
 import { click, mountSale, settle } from '../../__tests__/mount-sale';
 import VoidLineSheet from './VoidLineSheet.vue';
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
 
 async function setup(props: Record<string, unknown> = {}, locale: 'en' | 'es' = 'en') {
   const open = ref(true);

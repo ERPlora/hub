@@ -15,12 +15,14 @@ from apps.verifactu.queries.config import config_out
 from apps.verifactu.queries.country import refuse_outside_spain
 from apps.verifactu.queries.route import (
     effective_environment,
+    going_live_problem,
     issuer_configured,
     production_open,
     route_problem,
     sending_route,
 )
-from apps.verifactu.schemas import ConfigOut, ConfigSyncIn, ConfigSyncOut, NoInput
+from apps.verifactu.schemas.config import ConfigOut, ConfigSyncIn, ConfigSyncOut
+from apps.verifactu.schemas.fields import NoInput
 
 from .authorisation import _representation_step
 from .sending import _back_in_the_queue
@@ -42,6 +44,14 @@ OWN_CERTIFICATE_UNREADABLE = _(
     "Your own certificate cannot be opened on this server: upload it again in VeriFactu → Configuration → My "
     "certificate."
 )
+OWN_CERTIFICATE_UNTESTED = _(
+    "The AEAT's test environment has not accepted your own certificate yet: it is tried with the next record that "
+    "goes out in testing. Issue a sale or an invoice and go live once it is accepted."
+)
+OWN_CERTIFICATE_REJECTED = _(
+    "The AEAT's test environment refused your own certificate: upload another one in VeriFactu → Configuration → My "
+    "certificate."
+)
 GATEWAY_UNAVAILABLE = _(
     "ERPlora's sending gateway is not configured on this server: nothing could reach the AEAT."
 )
@@ -58,6 +68,8 @@ PLATFORM_ONLY = _("Only ERPlora's own business follows the environment of its se
 #: (VERIFACTU-F04, F08). A closed server is not the route's: ``go_live`` refuses it first.
 _ROUTE_REFUSALS = {
     "own_certificate_unreadable": OWN_CERTIFICATE_UNREADABLE,
+    "own_certificate_untested": OWN_CERTIFICATE_UNTESTED,
+    "own_certificate_rejected": OWN_CERTIFICATE_REJECTED,
     "gateway_unavailable": GATEWAY_UNAVAILABLE,
     "representation_not_approved": REPRESENTATION_NOT_APPROVED,
     erplora_route.CLOSED: erplora_route.OWN_CERTIFICATE_REQUIRED,
@@ -65,7 +77,7 @@ _ROUTE_REFUSALS = {
 
 
 def _route_refusal(config: Config, scope: Scope) -> Conflict | None:
-    problem = route_problem(config, Environment.PRODUCTION, scope)
+    problem = route_problem(config, Environment.PRODUCTION, scope) or going_live_problem(config, scope)
     if problem not in _ROUTE_REFUSALS:
         return None
     return Conflict(str(_ROUTE_REFUSALS[problem]), code=f"verifactu.{problem}")

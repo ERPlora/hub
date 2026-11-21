@@ -5,17 +5,17 @@
 // Sales' screens give it, read as the person, never by its id, and the order type by Kitchen's word. Cancelled: nothing
 // is sent nor deleted. What this file creates is deleted after it.
 // flow: SALE-F20 SALE-F35 BASE-F97
-import { execSync } from 'node:child_process';
 
-import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
+import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
-import { sentCard, type SentCard } from './assistant-card-helpers';
-import { type Provider, startProvider } from './assistant-provider';
-import { A, api, capture, login, psql, REPO_DIR, untilStill } from './helpers';
+import { AN_ID } from './assistant-card-helpers';
+import { askForACard, cancelAtComputerSize, cancelInSpanish, card, openPanel, sentCard, type SentCard } from './assistant-panel';
+import { type Provider } from './assistant-provider';
+import { emptyMonth } from './assistant-real';
+import { A, api, capture, login, psql, untilStill } from './helpers';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
+import { seededProvider } from './provider-helpers';
 import { cleanSales, stamp } from './sale-helpers';
-import { STACK } from './stack';
-import { openAssistant as openPanel } from './topbar';
 
 const KEY = 'FIX-HUB-SALE-ASSISTANT-CARD-LEAVES-OUT-ITS-RECORDS';
 const RUN = stamp();
@@ -24,31 +24,12 @@ const VIEWPORTS = [
   { label: '820', width: 820, height: 1180 },
   { label: '1440', width: 1440, height: 900 },
 ];
-const PROVIDER_PORT = Number(process.env.E2E_AI_PROVIDER_PORT ?? STACK.hubPort + 2);
-/** The SaaS's database of this stack (README «Varias ejecuciones a la vez»: `saas_e2e_<Hub port + 1>`). */
-const SAAS_DB = process.env.E2E_SAAS_DB ?? (STACK.hubPort === 8000 ? 'saas' : `saas_e2e_${STACK.hubPort + 1}`);
-/** An id as a schema's `format: uuid` takes it: never on a card. */
-const AN_ID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
 
 let provider: Provider;
 let product: Product;
 
-function saasSql(sql: string): string {
-  return execSync(`docker compose exec -T postgres psql -U hub -d ${SAAS_DB} -At -c "${sql}"`, {
-    cwd: REPO_DIR,
-    encoding: 'utf8',
-  }).trim();
-}
-
-/** The month's assistant messages of the business `a` back to none: a run never spends the plan's allowance. */
-function unspend(): void {
-  saasSql("delete from assistant_assistantusage where hub_id = (select id from hubs_hub where slug = 'a')");
-}
-
 test.beforeAll(async ({ browser }) => {
-  provider = await startProvider(PROVIDER_PORT);
-  const seeded = saasSql("select base_url from assistant_aiprovider where slug = 'e2e-local'");
-  expect(seeded, `the SaaS ${SAAS_DB} is not seeded with this provider: README «El asistente»`).toBe(provider.url);
+  provider = await seededProvider();
   const context = await browser.newContext({ baseURL: A });
   const page = await context.newPage();
   await login(page, A, '/sale/pos');
@@ -68,43 +49,20 @@ test.afterAll(async () => {
     cleanInventory();
     psql("delete from sale_department where name like 'e2e %'");
   } finally {
-    unspend();
+    emptyMonth();
   }
 });
 
 test.beforeEach(() => {
-  unspend();
+  emptyMonth();
 });
-
-// ── The assistant's panel (as assistant-panel.ts drives it) ──
-
-const panel = (page: Page): Locator => page.locator('[data-testid="assistant-panel"]');
-const box = (page: Page): Locator => panel(page).locator('[data-testid="assistant-input"] textarea');
-const answers = (page: Page): Locator => panel(page).locator('[data-testid="assistant-answer"]');
-const lastAnswer = (page: Page): Locator => panel(page).locator('[data-testid="assistant-bubble-assistant"]').last();
-const card = (page: Page): Locator => page.locator('ion-modal[data-testid="assistant-confirm"]');
-/** Writes `text` and sends it with Enter, without waiting for the turn to end (a card stops it half-way). */
-async function ask(page: Page, text: string): Promise<void> {
-  await expect(panel(page).locator('[data-testid="assistant-send"]')).toBeVisible({ timeout: 30_000 });
-  const before = await answers(page).count();
-  await box(page).fill(text);
-  await box(page).press('Enter');
-  await expect(answers(page)).toHaveCount(before + 1);
-}
-
-async function cancelCard(page: Page): Promise<void> {
-  await card(page).locator('[data-testid="assistant-confirm-cancel"]').click();
-  await expect(card(page)).toBeHidden();
-  await expect(lastAnswer(page)).toContainText('No lo he hecho.');
-}
 
 const saidBy = (sent: SentCard) => Object.fromEntries(sent.fields.map((field) => [field.name, [field.label, field.value]]));
 
 /** The assistant asks for `tool` with `data`: what the card says, as sent and with its id nowhere. */
 async function asked(page: Page, tool: string, data: Record<string, unknown>): Promise<Record<string, unknown[]>> {
   const sent = sentCard(page);
-  await ask(page, `E2E-ASK ${tool} ${JSON.stringify(data)}`);
-  await expect(card(page)).toBeVisible({ timeout: 30_000 });
+  await askForACard(page, `E2E-ASK ${tool} ${JSON.stringify(data)}`, { timeout: 30_000 });
   const fields = await sent;
   expect(JSON.stringify(fields)).not.toMatch(AN_ID);
   await expect(card(page)).not.toContainText(AN_ID);
@@ -143,8 +101,7 @@ test('SALE-F20 — in Spanish sending a round names the check and the order type
       await untilStill(page);
       await capture(page, `${KEY}-fire-${vp.label}`);
     }
-    await page.setViewportSize({ width: 1440, height: 900 });
-    await cancelCard(page);
+    await cancelAtComputerSize(page);
 
     expect(await asked(page, 'sale__order__remove_line', { order_id: check.id, line_id: check.lines[0].id })).toMatchObject({
       order_id: ['Cuenta abierta', label],
@@ -153,7 +110,7 @@ test('SALE-F20 — in Spanish sending a round names the check and the order type
     await expect(card(page)).toContainText(product.name);
     await untilStill(page);
     await capture(page, `${KEY}-remove-line-1440`);
-    await cancelCard(page);
+    await cancelInSpanish(page);
 
     // Cancelled: the line stays on the check and nothing went to the kitchen.
     const after = await api<{ lines: { id: string }[] }>(context, A, 'GET', `/sale/orders/detail?order_id=${check.id}`);
@@ -179,7 +136,7 @@ test('SALE-F35 — in Spanish deleting a section names it, as the Sections scree
     await expect(card(page)).toContainText(name);
     await untilStill(page);
     await capture(page, `${KEY}-section-1440`);
-    await cancelCard(page);
+    await cancelInSpanish(page);
 
     // Cancelled: the section is still there.
     expect(psql(`select count(*) from sale_department where id = '${section.data.id}' and not is_deleted`)).toBe('1');

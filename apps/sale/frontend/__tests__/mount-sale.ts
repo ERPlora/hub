@@ -1,8 +1,6 @@
 // Test helper of the sale app's pages and components: `mountInShell` with its catalogues over base's and Taxes' (whose
 // `useTaxName` names the territory's tax on every sale screen), the till, its people and the hub's business; the shared
 // assistant configured as the Hub boots it (main.ts), for the till's «Speak», which dictates to it.
-// Dialogs: a test that opens one mocks `@ionic/vue`'s IonModal with FormModal's `ionModalStub` (imported
-// from its own file in the mock factory: this helper loads @ionic/vue, the factory must not).
 import { configureAssistant } from '@erplora/ui/components';
 import type { SessionMe } from '@erplora/ui/shell';
 import type { Component } from 'vue';
@@ -67,6 +65,8 @@ export interface MountOptions {
   stubs?: Record<string, Component | boolean>;
   /** How every API call is answered from the start, the ones made while mounting included. */
   answer?: { status: number; body: unknown };
+  /** Mounted into this element of the document, where Ionic loads its elements and draws their native parts. */
+  attachTo?: HTMLElement;
 }
 
 export async function mountSale(component: Component, options: MountOptions = {}) {

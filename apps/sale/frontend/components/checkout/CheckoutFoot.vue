@@ -8,10 +8,11 @@
 // drawer closed (SALE-F08) offers «Open a cash session» to whoever may open one.
 import { HubIcon } from '@erplora/ui/shell';
 import { IonButton, IonSpinner } from '@ionic/vue';
-import { computed } from 'vue';
+import { computed, useTemplateRef } from 'vue';
 
 import type { CheckoutFailure } from '../../composables/checkout/useCheckout';
 import { useLocale, useT } from '../../composables/useT';
+import { useNativeAriaDisabled } from '../../lib/ariaDisabled';
 import { type ChargeBlock, tenderReason } from '../../lib/checkout/blocks';
 import { needsTendered, type TenderMethod } from '../../lib/checkout/tender';
 import { formatMoney, useBusinessMoney } from '../../lib/format';
@@ -44,6 +45,12 @@ const emit = defineEmits<{
 const drawerClosed = computed(
   () => props.canOpenDrawer && props.failure?.kind === 'refused' && props.failure.code === 'sale.cash_register_closed',
 );
+
+// Ionic hands the button's aria-disabled to its native button only when it loads, and takes it off the host when its
+// `disabled` goes off (the sheet opens disabled while the total loads): a block that comes or goes afterwards has to
+// reach the native button, the one a screen reader announces.
+const chargeButton = useTemplateRef<{ $el: HTMLElement }>('chargeButton');
+useNativeAriaDisabled(() => chargeButton.value?.$el);
 
 const t = useT();
 const locale = useLocale();
@@ -147,12 +154,13 @@ function press(): void {
       {{ written }}
     </p>
     <ion-button
+      ref="chargeButton"
       class="charge"
       expand="block"
       data-testid="sale-checkout-confirm"
       :disabled="busy || !ready"
       :aria-disabled="block ? 'true' : undefined"
-      :data-blocked="block ? 'true' : undefined"
+      :data-aria-disabled="String(block !== null)"
       @click="press"
     >
       <ion-spinner
@@ -194,7 +202,7 @@ function press(): void {
 
 /* A full-colour button that is not going to charge is a promise the screen does not keep: dimmed, and
    still live to the tap. */
-.charge[data-blocked] {
+.charge[data-aria-disabled='true'] {
   --background: var(--ion-color-medium, #92949c);
   --background-activated: var(--ion-color-medium-shade, #808289);
   --background-focused: var(--ion-color-medium-shade, #808289);

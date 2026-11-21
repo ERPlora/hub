@@ -196,6 +196,30 @@ def test_on_a_business_that_is_no_demo_there_is_no_demo(request, business):
         assert get("base.session.me")(ctx, SessionMeIn()).demo is None
 
 
+def test_a_demo_elsewhere_shows_nothing_of_a_demo_on_a_customers_hub(make_user, settings, hub_a, hub_b):
+    """Only the demo's own hub says when the demo ends and lists the reference app; a customer's hub never does,
+    even while another business is a demo."""
+    settings.SHOW_UNLISTED_MODULES = False
+    demo = a_demo(hub_b)
+    person = make_user()
+    seen = {}
+    for hub in (hub_a, demo):
+        ctx = OperationContext(
+            scope=Scope("host", hub.slug), actor=person, permissions=frozenset({"demo.view"}), language="en"
+        )
+        with use_hub(hub):
+            me = get("base.session.me")(ctx, SessionMeIn()).model_dump(mode="json")
+        seen[hub.slug] = {
+            "banner": me["demo"] is not None,
+            "menu": DEMO_MENU in me["menu"],
+            "apps": "demo" in [app["label"] for app in me["apps"]],
+        }
+    assert seen == {
+        hub_a.slug: {"banner": False, "menu": False, "apps": False},
+        demo.slug: {"banner": True, "menu": True, "apps": True},
+    }
+
+
 def test_a_business_whose_row_is_gone_has_no_demo(hub_a):
     from base.models import Hub
 

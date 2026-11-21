@@ -6,7 +6,7 @@
 import { formatDateTime } from '@erplora/ui/components';
 import { toastSuccess } from '@erplora/ui/shell';
 import { IonTextarea } from '@ionic/vue';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import { pageOf } from '../__tests__/fixtures';
 import {
@@ -23,12 +23,6 @@ import {
 } from '../__tests__/mount-customer';
 import type { ActivityRow } from '../operations';
 import ActivityPanel from './ActivityPanel.vue';
-
-vi.mock('@erplora/ui/shell', async (importOriginal) => ({
-  ...((await importOriginal()) as object),
-  toastSuccess: vi.fn(),
-}));
-beforeEach(() => vi.mocked(toastSuccess).mockClear());
 
 const entry = (id: string, kind: string, extra: Partial<ActivityRow> = {}): ActivityRow => ({
   id,

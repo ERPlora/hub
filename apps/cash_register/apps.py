@@ -3,9 +3,21 @@ out recorded by hand, the counts by notes and coins, and the close that compares
 the counted one (WORKBOOK.md). The sale lines of a shift are read from sale, its requirement."""
 
 from django.utils.translation import gettext_lazy as _
-from live.meta import Category, LiveAppConfig, Nav, SetupCheck, SetupStep, Widget
+from live.meta import Category, Help, LiveAppConfig, Nav, SetupCheck, SetupStep, Widget
 
 from apps.cash_register.events import SESSION_EVENTS, SETTINGS_UPDATED
+
+#: Several movements said by how many come before their amount: «dos entradas de» 20 €, «3 salidas de» 10 €, «two
+#: entries of» 20 €. Only before «de» or «of»: «dos entradas para el concierto» and «two entries to the waitlist» are
+#: no movement.
+COUNTED_MOVEMENTS = (
+    *(
+        f"{count} {kind} de"
+        for count in ("dos", "tres", "cuatro", "cinco", "2", "3", "4", "5")
+        for kind in ("entradas", "salidas", "movimientos")
+    ),
+    *(f"{count} entries of" for count in ("two", "three", "four", "five", "2", "3", "4", "5")),
+)
 
 
 class CashRegisterConfig(LiveAppConfig):
@@ -33,14 +45,23 @@ class CashRegisterConfig(LiveAppConfig):
     default_auto_field = "django.db.models.BigAutoField"
     # What these words mean to the Hub's assistant (base.assistant.relevance.synonyms). An «arqueo», a «recuento» or a «conteo» of
     # the drawer is a count (cash_register.count), the «moneda» or «divisa» of the business is its currency
-    # (cash_register.currency), and «una entrada», «una salida» or «un movimiento» is a movement
-    # (cash_register.movement). Those go as phrases: a bare «entrada» shares its stem with «entre» and «entra», and a
-    # bare «salida» is also a clock-out or a dish that left the pass. «Las cajas de la» barra or tienda are the tills
-    # (cash_register.register), which Inventory's «cajas de» goods would otherwise hide.
+    # (cash_register.currency), and «una entrada», «una salida» or «un movimiento», or several of them by their count,
+    # is a movement (cash_register.movement). Those go as phrases: a bare «entrada» shares its stem with «entre» and
+    # «entra», and a bare «salida» is also a clock-out or a dish that left the pass. «Las cajas de la» barra or tienda
+    # are the tills (cash_register.register), which Inventory's «cajas de» goods would otherwise hide.
     assistant_synonyms = (
         ("arqueo", "recuento", "conteo", "count"),
         ("divisa", "moneda", "currency"),
-        ("movement", "un movimiento", "una entrada", "una salida", "otro movimiento", "otra entrada", "otra salida"),
+        (
+            "movement",
+            "un movimiento",
+            "una entrada",
+            "una salida",
+            "otro movimiento",
+            "otra entrada",
+            "otra salida",
+            *COUNTED_MOVEMENTS,
+        ),
         ("register", "cajas de la"),
     )
     permissions = [
@@ -92,6 +113,7 @@ class CashRegisterConfig(LiveAppConfig):
             "settings", _("Settings"), "ion:settings-outline", "/cash_register/settings"
         ),
     ]
+    help = Help()
     # The Home's step and panels, on the queries the drawer's own screens read. The factory values apply from the
     # start, so «Your cash drawer» waits for the business's own save (CASH_REGISTER-F01), even of the values as they
     # came.
@@ -102,8 +124,8 @@ class CashRegisterConfig(LiveAppConfig):
             configured_when=[SetupCheck(field="updated_at", truthy=True)],
             title=_("Your cash drawer"),
             description=_(
-                "Decide how the till opens and closes: the opening float, the closing count and the POS screen that "
-                "stays locked until the drawer is open."
+                "Decide how the till opens and closes: the opening float, the closing count and whether charging in "
+                "cash needs an open session."
             ),
             icon="ion:cash-outline",
             route="/cash_register/settings",

@@ -1,16 +1,11 @@
 // ONLINE_BOOKING-F05 «Cancelar una reserva»: a confirmation (the market: Fresha, Timely, Phorest) naming
 // whose booking and when, with an optional reason that stays in its history; «Cancel the booking» cancels it
 // (or declines a pending one), «Keep it» leaves it. A refusal stays in the dialog.
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import type { BookingRow } from '../operations';
 import { click, ionValue, mountOnlineBooking, settle } from '../__tests__/mount-online-booking';
 import CancelDialog from './CancelDialog.vue';
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
 
 const ROW = { id: 'a1', number: 'APT-1', customer_name: 'Lucía Pérez', start: '2030-03-05T10:00:00+01:00' } as BookingRow;
 

@@ -43,7 +43,7 @@ from live.meta import LiveAppConfig, module_configs
 
 from apps.flow import document, queries
 from apps.flow.models import Flow
-from apps.flow.schemas import CreateIn
+from apps.flow.schemas.flows import CreateIn
 
 logger = logging.getLogger(__name__)
 

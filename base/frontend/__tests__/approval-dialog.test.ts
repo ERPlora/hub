@@ -6,17 +6,38 @@ import { ApiError } from '@erplora/ui/sdk';
 import { modalController } from '@ionic/vue';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import { IonModalStub } from '../../../packages/ui/src/components/FormModal/__tests__/ionModalStub';
 import { withApproval } from '../lib/approval';
-import { asksApproval } from './approval-dialog';
+import { APPROVED_BY_MANAGER, approvalDialog, asksApproval, ionicWithApprovalDialog } from './approval-dialog';
 
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { modalControllerStub } = await import('./approval-dialog');
-  const ionic = await importOriginal<typeof import('@ionic/vue')>();
-  return { ...ionic, modalController: modalControllerStub(ionic.modalController) };
-});
+vi.mock('@ionic/vue', async (importOriginal) => (await import('./approval-dialog')).ionicWithApprovalDialog(importOriginal));
 
 afterEach(() => {
   vi.restoreAllMocks();
+  approvalDialog.reset();
+});
+
+/** A stand-in for Ionic Vue: only what the factory reads or keeps. */
+function fakeIonic() {
+  const dismiss = vi.fn();
+  const ionic = { IonModal: { name: 'IonModal' }, IonButton: { name: 'IonButton' }, modalController: { create: vi.fn(), dismiss } };
+  return { ionic, importOriginal: async () => ionic as unknown as typeof import('@ionic/vue'), dismiss };
+}
+
+describe('ionicWithApprovalDialog', () => {
+  it('ends the approval dialog as the test says, with the inline IonModal as the test double and the rest of Ionic Vue', async () => {
+    const { ionic, importOriginal, dismiss } = fakeIonic();
+    const question = { operation: 'sale.order.void', label: 'Void the sale', fingerprint: 'f'.repeat(64) };
+
+    const mocked = await ionicWithApprovalDialog(importOriginal);
+    const dialog = await mocked.modalController.create({ component: 'approval-dialog', componentProps: { question } });
+
+    expect(await dialog.onDidDismiss()).toEqual(APPROVED_BY_MANAGER);
+    expect(approvalDialog.questions).toEqual([question]);
+    expect(mocked.modalController.dismiss).toBe(dismiss);
+    expect(mocked.IonModal).toBe(IonModalStub);
+    expect(mocked.IonButton).toBe(ionic.IonButton);
+  });
 });
 
 describe('approval-dialog', () => {

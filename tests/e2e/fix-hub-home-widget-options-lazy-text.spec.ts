@@ -5,6 +5,7 @@
 import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
 import { A, api, horizontalOverflow, login, shot, shown, untilStill } from './helpers';
+import { figureNote, panelError, panelTitle, panelValue } from './home-helpers';
 
 const KEY = 'FIX-HUB-HOME-WIDGET-OPTIONS-LAZY-TEXT';
 const PANEL = 'verifactu.contingency';
@@ -52,17 +53,17 @@ for (const language of LANGUAGES) {
       try {
         const queue = panel(page);
         await expect(queue).toHaveAttribute('aria-busy', 'false');
-        await expect(queue.locator('[data-testid="widget-error"]')).toHaveCount(0);
-        await expect(queue.locator('[data-testid="widget-title"]')).toHaveText(language.title);
+        await expect(panelError(queue)).toHaveCount(0);
+        await expect(panelTitle(queue)).toHaveText(language.title);
 
         // The server's figure, and under it what it counts in the reader's language.
         const summary = await api<{ queued_count: number }>(context, A, 'GET', '/verifactu/stats/contingency_summary');
         expect(summary.status).toBe(200);
-        await expect(queue.locator('[data-testid="widget-value"]')).toHaveText(
+        await expect(panelValue(queue)).toHaveText(
           new Intl.NumberFormat(language.locale).format(summary.data.queued_count),
         );
-        await expect(queue.locator('[data-testid="widget-label"]')).toHaveText(language.label);
-        await expect(queue.locator('[data-testid="widget-label"]')).toBeVisible();
+        await expect(figureNote(queue)).toHaveText(language.label);
+        await expect(figureNote(queue)).toBeVisible();
 
         // The board in sight, with no sideways scroll.
         await queue.evaluate((element) => element.scrollIntoView({ block: 'center' }));

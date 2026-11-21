@@ -2,18 +2,13 @@
 // Colour (Blue, Cyan, Purple, Green, Amber, Red, Grey) and Order, «Add zone»; editing adds «Active» and
 // «Save changes». From the plan's pencil, «Edit zone» with Name and Description, «Delete zone» and «Save».
 // A zone with tables cannot be deleted: «Delete zone» is off and says why.
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import { itTellsTheCorrectedFieldApart } from '../../../../base/frontend/__tests__/same-words-refusal';
 import { click, ionChecked, ionValue, mountTable, settle } from '../__tests__/mount-table';
 import { zoneRow } from '../__tests__/tables';
 import type { ZoneOut } from '../operations';
 import ZoneFormModal from './ZoneFormModal.vue';
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
 
 type Control = HTMLElement & { label?: string; value?: unknown; checked?: boolean; disabled?: boolean };
 

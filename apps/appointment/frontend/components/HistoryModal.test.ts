@@ -1,16 +1,11 @@
 // APPOINTMENT-F10: «History» of a row opens «Appointment history» with its number and its lines.
 import { FormModal } from '@erplora/ui/components';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import type { AppointmentRow } from '../operations';
 import { click, mountAppointment, settle } from '../__tests__/mount-appointment';
 import AppointmentHistory from './AppointmentHistory.vue';
 import HistoryModal from './HistoryModal.vue';
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
 
 describe('HistoryModal', () => {
   it('shows the history of the appointment and closes', async () => {

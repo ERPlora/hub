@@ -1,13 +1,19 @@
-<!-- generated from WORKBOOK.md sha256:8385341398e44c45b13a72a246e1027b74800e488556576ab0dabf2838b8ec9e -->
+<!-- generated from WORKBOOK.md sha256:b9a796cdc50f3b6757f701c07f5be6d7809d77661faf51e41eaabb6157a6da57 -->
 
 ## What it is for and who it is for
+
+Reservations is the reservation book of your restaurant or bar: when and for how many people you take reservations,
+each reservation with its customer and its table, from the call until they leave, and a waitlist for whoever does not
+fit. The table of each confirmed reservation is set aside on the floor plan of Tables.
+
+### In detail
 
 Reservations is the **reservation book of the restaurant or bar**: it decides when and for how many
 people reservations are taken (time slots with a maximum of reservations and, if wanted, of guests,
 inside the business's opening hours; and blocked days), notes down each reservation with its customer and
 its table, takes it from Pending to Completed and keeps on a **waitlist** whoever does not fit.
 
-Who uses it:
+### Who uses it and what each one does
 
 - The **employee** who picks up the phone or attends the door (the host or the server) notes down,
   confirms, seats, changes and cancels reservations and keeps the waitlist.
@@ -98,6 +104,13 @@ the tabs of the three plus **Settings** (this one, only for whoever can change t
 profile cannot use do not show.
 
 ### Reservations
+Here is the day's book: at the top, the date with its arrows and three figures (covers, reservations and how much is
+left in the next slot); below, the day's reservations by time, with their customer, their guests, their table and
+their status. With "New reservation" you note down one that comes by phone or at the door; on each row you confirm
+it, seat it when the party arrives, complete it when they leave or cancel it. The search finds a reservation in the
+whole book by name, phone or email.
+
+#### Detail
 Menu **Reservations → Reservations**. At the top, the **day bar**: "Previous day", the date, "Next day"
 and "Today" when on another day; the day in words; and three figures: **covers** (people coming, without
 the cancelled ones nor the no-shows), **bookings** and **next slot** (the first one that has not ended,
@@ -125,6 +138,11 @@ completed, cancelled or not shown only changes its notes, and says so on top; a 
 whole reason.
 
 ### Waitlist
+Here you note down whoever wants a table and does not fit, in the order they arrive, with the day and the time they
+prefer and their guests. When you call them, you mark them "Contacted"; if there is room, "Convert" makes their
+reservation with their details, and "Remove" takes them off the list.
+
+#### Detail
 Menu **Reservations → Waitlist**. Table, in the order in which they were added (by day and preferred
 time): Date, Pref. time, Guest, Phone (as in Customers), Party, Contacted, Status (Waiting, Converted);
 search box and filters (date, contacted, converted). Main action **"Add guest"** (Customer, Guest, Phone,
@@ -132,6 +150,12 @@ Date, Time, Party, Notes → "Add to waitlist"); per row "Contacted", "Convert" 
 "Waitlist is empty.". Loading: "Loading…". Error: the table's message with "Retry".
 
 ### Availability
+Here you decide when and for how many people reservations are taken. "Occupancy" shows, for one day, how much is
+left free in each slot. In "Time slots" you create the services of each day of the week with their maximum of
+reservations and, if you want, of guests: without slots, that day cannot be booked. In "Blocked dates" you close a
+whole day or some hours, for example a bank holiday or a private event.
+
+#### Detail
 Menu **Reservations → Availability**. Three stacked sections:
 - **Occupancy**: a date (today by default) and, for each slot of that day, Slot, Reserved, Max, Guests
   and Available; the slot without room is seen dimmed with the "Full" mark, and the one that falls
@@ -145,6 +169,12 @@ Menu **Reservations → Availability**. Three stacked sections:
 Each section paints its own "Loading…" and its error with retry.
 
 ### Settings
+Here you change the rules of reservations: how many guests, how much notice and how many days ahead people book
+online or through WhatsApp, how long a reservation lasts, whether new ones confirm themselves, whether the phone or
+the email are required and how many minutes after its time a pending one that nobody confirmed is released. Only
+whoever can change them sees it.
+
+#### Detail
 Tab **Settings** (only for whoever can change them). Minimum and maximum guests, minimum notice (hours,
 for online and WhatsApp), maximum days ahead, default duration, confirm new reservations automatically,
 phone required, email required and the minutes after the time to release a pending one. "Save". On a phone it
@@ -199,7 +229,7 @@ With the window as it opened, Back closes it without asking (BASE-F05).
 ### RESERVATION-F01 Create and remove time slots
 Status: done
 Actor: manager
-Screen: Availability → Time slots
+Screen: Availability (Time slots)
 Steps:
 1. Tap "Add slot", choose the weekday, from and to, the maximum of reservations and, if you want, the
    maximum of guests. "Create slot".
@@ -208,13 +238,13 @@ In: day, from, to, maximum of reservations, maximum of guests (optional).
 Out: the slot (announces: `reservation.time_slot.created`, `reservation.time_slot.deleted`).
 If it fails: "To" before or equal to "From": "A slot has to end after it starts."; a slot that overlaps
 another one of the same day: "That slot overlaps another one of the same day (13:00–16:00).". The reason
-of a field goes away as soon as that field is corrected, even if another one says the same (hub#888).
+of a field goes away as soon as that field is corrected, even if another one says the same.
 Involved: RESERVATION-F05, RESERVATION-F06
 
 ### RESERVATION-F02 Block a day or some hours
 Status: done
 Actor: manager, assistant
-Screen: Availability → Blocked dates
+Screen: Availability (Blocked dates)
 Steps:
 1. Tap "Add blocked date", type the date and the reason (holiday, closure, private event).
 2. Leave "Whole day" ticked or, for some hours, untick it and set from and until.
@@ -224,7 +254,7 @@ In: date, reason, whole day or from–until.
 Out: the block (announces: `reservation.blocked_date.created`, `reservation.blocked_date.deleted`).
 If it fails: without hours when it is not the whole day, or "Until" before "From": the field says so;
 that day already blocked at that time: "That date is already blocked at that time.". The reason of a
-field goes away as soon as that field is corrected, even if another one says the same (hub#888).
+field goes away as soon as that field is corrected, even if another one says the same.
 Involved: RESERVATION-F05, RESERVATION-F06
 
 ### RESERVATION-F03 Adjust the booking rules
@@ -234,13 +264,13 @@ Screen: Settings
 Steps:
 1. Change the minimum and maximum guests, the notice, the default duration, the required phone or email
    and the minutes to release a pending one. "Save".
-   What is changed while it is saving is not lost: it stays on screen, still to save (hub#914).
+   What is changed while it is saving is not lost: it stays on screen, still to save.
 2. The rules apply to new reservations and to changes; the ones already made are not touched.
 In: the rules.
 Out: the saved rules (announces: `reservation.settings.updated`).
 If it fails: minimum guests greater than the maximum: the field says so. As in the form windows, the notice
 goes as soon as something is changed and a field's reason as soon as that field is corrected; both come back if
-the next try is refused too. A refusal that names no field stays until the next try (hub#873).
+the next try is refused too. A refusal that names no field stays until the next try.
 Involved: RESERVATION-F06, RESERVATION-F13, RESERVATION-F17
 
 ### RESERVATION-F04 Choose whether reservations confirm themselves
@@ -260,7 +290,7 @@ Involved: RESERVATION-F07, TABLE-F25
 ### RESERVATION-F05 Check how much is left free on a day
 Status: done
 Actor: employee, manager
-Screen: Availability → Occupancy; Reservations (day bar)
+Screen: Availability (Occupancy); Reservations (day bar)
 Steps:
 1. Choose the date (today by default).
 2. Each slot says how many reservations it has, its maximum, the guests and how many are left; the full
@@ -276,12 +306,12 @@ Involved: RESERVATION-F01, RESERVATION-F02, SCHEDULE-F02
 ### RESERVATION-F06 Take a reservation by hand (phone or counter)
 Status: done
 Actor: employee, manager, assistant
-Screen: Reservations → "New reservation"
+Screen: Reservations ("New reservation")
 Steps:
 1. Look up the customer by name or phone; if they are not there, type their name and their phone (their
    card is created in Customers, or the one that already has that phone is used).
-2. Set the date, the time, the guests and, if you want, the table (RESERVATION-F23), the duration, where
-   it was booked through and the notes. "Reserve".
+2. Set the date, the time, the guests and, if you want, the table (it offers the free ones at that time), the
+   duration, where it was booked through and the notes. "Reserve".
 3. The reservation is born Pending (or Confirmed, if they confirm themselves: then it holds its table).
 4. By voice: "book for 4 tomorrow at 9 pm under the name Ana, at table 5". Before noting it down, the
    assistant's card says who it is for, by the name of their card, the day and the time ("Create in
@@ -310,7 +340,7 @@ reserved at that time: "Table 5 already has a reservation from 21:00 to 23:00.".
 on the last place or on the same table and time: one goes in and the other gets its reason (in the full
 slot, the staff can then book anyway; on the table, never). In the window, the reason of a field (the
 Table included) shows under it and goes away as soon as that field is corrected, even if another one says
-the same (hub#888).
+the same.
 Involved: CUSTOMER-F10, CUSTOMER-F11, SCHEDULE-F02, RESERVATION-F23, TABLE-F25
 
 ### RESERVATION-F07 Confirm a reservation
@@ -320,7 +350,7 @@ Screen: Reservations (row → "Confirm")
 Steps:
 1. "Confirm" on a Pending reservation.
 2. It becomes Confirmed and, if it has a table, Tables holds it: from one hour before, the table shows
-   Reserved on the floor plan with the name and the time (TABLE-F25).
+   Reserved on the floor plan with the name and the time.
 In: the reservation.
 Out: the confirmed reservation (announces: `reservation.reservation.status_changed`).
 If it fails: from another status: "This reservation is confirmed: it cannot be confirmed."; with its
@@ -338,7 +368,7 @@ Steps:
 2. The change goes through the same door as a new reservation taken by the staff (without counting the
    reservation itself), even if the reservation was born online or through WhatsApp: the staff changes any
    party and fills a full slot with "Book anyway". If it was confirmed, Tables moves its hold to the new
-   table and time, or releases it if it is left without a table (TABLE-F26).
+   table and time, or releases it if it is left without a table.
 3. A seated, completed, cancelled or no-show reservation only changes its notes.
 4. By voice: "move Ana's reservation to table 7 on the terrace". Before changing it, the assistant's card
    says the reservation by its customer, its day and its time and the new table with its zone, as Tables
@@ -346,7 +376,7 @@ Steps:
 In: the changed fields. The new phone is saved in international format, as on a new reservation; the
 same number written another way (with spaces or without the prefix) is not a change.
 Out: the changed reservation (announces: `reservation.reservation.updated`).
-If it fails: the reasons of RESERVATION-F06, and the first one, a phone that is not of its country:
+If it fails: the same reasons as when taking a reservation by hand, and the first one, a phone that is not of its country:
 "This is not a valid phone number of its country: check the digits or write it with its international
 prefix (+44…).", in the Phone field, and nothing changes; in another status: "This reservation can no
 longer change: only its notes.".
@@ -358,7 +388,7 @@ Actor: employee, manager, assistant
 Screen: Reservations (row → "Cancel")
 Steps:
 1. "Cancel" on a Pending or Confirmed reservation; type the reason if you want and confirm.
-2. It becomes Cancelled, frees its place and Tables releases its table (TABLE-F27).
+2. It becomes Cancelled, frees its place and Tables releases its table.
 3. Next to "Cancelled", the row, the phone's card and the reservation form say "Reason: …" with what was
    typed, as typed (a long one, shortened with "…" in the row and whole in the form); without a reason,
    only "Cancelled".
@@ -386,7 +416,7 @@ Screen: Reservations (row → "Seat")
 Steps:
 1. The party arrives: "Seat" on their Pending or Confirmed reservation.
 2. It becomes Seated. If it has a table, it is seated in Tables with its guests and its customer: the
-   table's check opens in Sales and this reservation's hold is spent, only its own (TABLE-F28): with
+   table's check opens in Sales and this reservation's hold is spent, only its own: with
    Ana at 19:00 and Bea at 21:00 at table 5, seating Ana at 20:10 leaves the table reserved for Bea,
    which shows Reserved again when Ana leaves.
 3. If the party already sat at that table from the floor plan (spending this reservation's hold), only
@@ -441,7 +471,7 @@ Involved: RESERVATION-F03
 ### RESERVATION-F14 Put someone on the waitlist
 Status: done
 Actor: employee, manager, assistant
-Screen: Waitlist → "Add guest"
+Screen: Waitlist ("Add guest")
 Steps:
 1. Look up the customer or type their name and, if you want, their phone (with a phone it is linked to
    their card like a reservation), the date, the time they prefer, the guests and the notes.
@@ -452,8 +482,7 @@ Out: the entry (announces: `reservation.waitlist.created`).
 If it fails: without a name nor a customer: the form says so; a phone that is not of its country:
 Customers' reason, "This is not a valid phone number of its country: check the digits or write it with
 its international prefix (+44…).", in the Phone field, and nobody is added nor is the card created. The
-reason of a field goes away as soon as that field is corrected, even if another one says the same
-(hub#888).
+reason of a field goes away as soon as that field is corrected, even if another one says the same.
 Involved: RESERVATION-F16, CUSTOMER-F10
 
 ### RESERVATION-F15 Mark as contacted or remove from the waitlist
@@ -492,12 +521,11 @@ Status: done
 Actor: customer, owner, assistant
 Screen: Reservations; it is turned on in WhatsApp inbox → Settings and approved in Automations
 Steps:
-1. In **WhatsApp inbox → Settings → What do you use it for?**, the owner turns on **Book a table**
-   (WHATSAPP_INBOX-F15) and chooses whether reservations confirm themselves or they review them first
-   (RESERVATION-F04, WHATSAPP_INBOX-F16).
+1. In **WhatsApp inbox → Settings → What do you use it for?**, the owner turns on **Book a table** and
+   chooses whether reservations confirm themselves or they review them first.
 2. The customer writes to the restaurant's WhatsApp ("table for 4 on Saturday at 9 pm"). The assistant
    looks at how much is left free that day and proposes the reservation; the day, the time and the guests
-   are said by the customer, never by the assistant (WHATSAPP_INBOX-F24).
+   are said by the customer, never by the assistant.
 3. The reservation waits in **Automations**, in "Waiting for your answer", with the phone of whoever asks
    for it. With "Approve" it goes into Reservations with the rules of the customer who books by themselves
    (guests, notice, maximum days; a full slot, never), linked to the card that already has that phone or
@@ -508,7 +536,9 @@ Steps:
    customer receives through WhatsApp what has been booked.
 In: the message, the phone and the customer's card.
 Out: the reservation, booked through WhatsApp (announces: `reservation.reservation.created`).
-If it fails: the reasons of RESERVATION-F06 that bind the customer: they are told them and offered other
+If it fails: the reasons why a reservation made by the customer themselves is not accepted (a time already past,
+the guests, the notice or the days ahead outside the rules, the blocked day, the business closed, no slot at that
+time or the full slot): they are told them and offered other
 times or the waitlist. With "No" in "Waiting for your answer", or if nobody answers in 72 hours, nothing
 is booked.
 Involved: CUSTOMER-F10, RESERVATION-F04, RESERVATION-F19, WHATSAPP_INBOX-F15, WHATSAPP_INBOX-F16,
@@ -519,12 +549,11 @@ Status: done
 Actor: customer, owner, assistant
 Screen: Reservations; it is approved in Automations
 Steps:
-1. With **Book a table** on (RESERVATION-F17), the customer writes "we won't be able to make it" or "can
+1. With **Book a table** on in the WhatsApp inbox, the customer writes "we won't be able to make it" or "can
    we come at nine?".
 2. Their latest reservation is looked up by the number they write from. The change or the cancellation of
    that same reservation waits in **Automations**, in "Waiting for your answer", named by its customer,
-   its day and its time; a cancellation is only approved by whoever can cancel reservations
-   (WHATSAPP_INBOX-F25).
+   its day and its time; a cancellation is only approved by whoever can cancel reservations.
 3. With "Approve", it is checked that the reservation belongs to whoever writes (their card); if not, it
    is refused without telling anything about it, not even whether it exists. It is changed with the rules
    of the customer who books by themselves; the table, the internal notes and booking anyway are still
@@ -537,7 +566,7 @@ Out: the cancelled or changed reservation (announces: `reservation.reservation.s
 `reservation.reservation.updated`).
 If it fails: "That reservation belongs to a different guest, so it cannot be managed on their behalf.";
 "The table and the restaurant's internal notes are set by the restaurant: they cannot be changed from
-the guest's own booking."; or the reason of the door (RESERVATION-F06): it is explained to them through
+the guest's own booking."; or the reason why the reservation is not accepted: it is explained to them through
 WhatsApp and the reservation stays as it was. With "No" in "Waiting for your answer", or if nobody
 answers in 72 hours, nothing changes.
 Involved: RESERVATION-F08, RESERVATION-F09, RESERVATION-F17, WHATSAPP_INBOX-F25
@@ -548,12 +577,11 @@ Actor: manager, customer
 Screen: Reservations
 Steps:
 1. With the automation "Tell the customer by WhatsApp when their reservation is confirmed" turned on in
-   Automations (WHATSAPP_INBOX-F26), the staff taps "Confirm" on a Pending reservation, or the reservation
+   Automations, the staff taps "Confirm" on a Pending reservation, or the reservation
    is born already confirmed because "Confirm new reservations automatically" is on.
 2. The reservation gives its day and its time ready to tell the customer ("Tuesday, March 5, 2030",
    "21:30"), in their language and on the business's clock, and its guests.
-3. If the reservation's phone (the one of its conversation, if it came through WhatsApp;
-   RESERVATION-F17) has a WhatsApp conversation with the business, the customer receives through that
+3. If the reservation's phone (the one of its conversation, if it came through WhatsApp) has a WhatsApp conversation with the business, the customer receives through that
    same WhatsApp that their table is confirmed, with the day, the time and the guests.
 In: the confirmation of the reservation and its phone.
 Out: the notice of the confirmation (`reservation.reservation.status_changed`) and the message to the
@@ -600,8 +628,8 @@ Steps:
    and their waitlist entries without name, phone, email or notes (also the removed ones). The screen
    says "Deleted customer".
 3. The day, the time, the guests, the table, the status and the link to the card are kept. The name is
-   also erased from the notices their reservations left in the notice log (`status_changed` and
-   `updated` carry it). Tables forgets the name of its holds on its own (TABLE-F31).
+   also erased from the notices their reservations left in the notice log. Tables forgets the name of its
+   holds on its own.
 In: the notice `customer.customer.erased` (`id` of the card).
 Out: reservations and entries without personal data (announces: `reservation.customer.erased`, only if
 it changed any). Repeating it changes nothing.
@@ -611,7 +639,7 @@ Involved: CUSTOMER-F16, TABLE-F31
 ### RESERVATION-F23 Pick a free table for the reservation
 Status: done
 Actor: employee, manager, assistant
-Screen: reservation form → Table
+Screen: Reservations (Table field of the reservation form)
 Steps:
 1. With the date, the time and the guests set, the Table field offers the tables in service that are
    free at that time (without another live reservation that overlaps), first the ones that fit the party,
@@ -621,7 +649,8 @@ Steps:
 In: date, time, duration, guests.
 Out: nothing (query).
 If it fails: without free tables at that time, the field offers none and the reservation can be taken
-without a table; a table that becomes taken in the meantime is refused by the door (RESERVATION-F06).
+without a table; a table that becomes taken in the meantime is refused when the reservation is saved, with its
+reason.
 Involved: RESERVATION-F06, TABLE-F25
 
 ## Reservations: what goes in and what comes out

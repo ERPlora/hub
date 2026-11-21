@@ -11,9 +11,10 @@
 import { ASSISTANT_ICONS, browserVoice, type DictationProblem, useDictation, type VoiceEnv } from '@erplora/ui/components';
 import { toast, toastWarning, useSession } from '@erplora/ui/shell';
 import { IonButton, IonIcon, IonSpinner } from '@ionic/vue';
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, useTemplateRef } from 'vue';
 
 import { useT } from '../../composables/useT';
+import { useNativeAriaDisabled } from '../../lib/ariaDisabled';
 
 const props = withDefaults(defineProps<{ voice?: VoiceEnv }>(), { voice: () => browserVoice() });
 
@@ -31,6 +32,10 @@ const shown = computed(() => session.can('base.view_home') && available.value);
 const offline = ref(globalThis.navigator?.onLine === false);
 /** Greyed: offline and not recording (a recording can always be stopped). */
 const unavailable = computed(() => offline.value && !recording.value);
+// Ionic hands the key's aria-disabled to its native button only when it loads: losing or getting back the connection
+// afterwards has to reach that button too, the one a screen reader announces.
+const keyButton = useTemplateRef<{ $el: HTMLElement }>('keyButton');
+useNativeAriaDisabled(() => keyButton.value?.$el);
 
 const onConnection = () => {
   offline.value = globalThis.navigator?.onLine === false;
@@ -59,12 +64,14 @@ onBeforeUnmount(() => {
     class="pos-speak"
   >
     <ion-button
+      ref="keyButton"
       fill="outline"
       class="pos-speak__key"
       :class="{ 'pos-speak__key--on': recording }"
       data-testid="pos-speak"
       :aria-pressed="recording ? 'true' : 'false'"
       :aria-disabled="unavailable ? 'true' : 'false'"
+      :data-aria-disabled="String(unavailable)"
       :disabled="transcribing"
       :title="unavailable ? t('sale.pos.speak.offline') : undefined"
       @click="press"
@@ -135,7 +142,7 @@ onBeforeUnmount(() => {
   --background: var(--ion-color-danger);
   --border-color: var(--ion-color-danger);
 }
-.pos-speak__key[aria-disabled='true'] {
+.pos-speak__key[data-aria-disabled='true'] {
   --color: var(--ion-color-medium);
   cursor: not-allowed;
   opacity: 0.6;

@@ -16,7 +16,8 @@ from live.errors import OperationError
 from base.tenancy import move
 from control import queries
 from control.models import Hub
-from control.tests.test_admin import AT_MOMENT, HUBS, MOMENT, PLATFORM, a_cluster, nothing_kept, root  # noqa: F401
+from control.tests.test_admin import HUBS, PLATFORM, a_cluster, nothing_kept, root  # noqa: F401
+from control.tests.test_admin_restore import AT_MOMENT, MOMENT
 
 pytestmark = pytest.mark.django_db
 MB = 1000 * 1000

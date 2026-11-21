@@ -5,33 +5,37 @@ waits for a person's yes."""
 import datetime as dt
 import json
 import uuid
-from typing import Any
 
 from django.utils import timezone, translation
 from live import assistant as shared
 from live.context import OperationContext, Scope, system_context
 from live.errors import OperationError
 from live.operations import Operation, get, operation
-from live.outbox import record_event
 
-from apps.flow import document, events, gateway, recipes
+from apps.flow import document, gateway, recipes
 from apps.flow.models import Flow, FlowRun, Question
 from apps.flow.queries.catalog import ask_first_catalog, catalog_operations
 from apps.flow.queries.pinned import pinned_values
 from apps.flow.queries.questions import ASSISTANT_WANTS
 from apps.flow.queries.reads import SYSTEM, TURN
 from apps.flow.queries.reasons import ASSISTANT_GONE_KEY
-from apps.flow.schemas import (
-    AssistantRoundIn,
-    AssistantRoundOut,
-    ClaimAssistantOut,
-    DueOut,
-    RecordAssistantIn,
-    RunRefIn,
-)
+from apps.flow.schemas.assistant_steps import AssistantRoundIn, AssistantRoundOut, ClaimAssistantOut, RecordAssistantIn
+from apps.flow.schemas.fields import DueOut
+from apps.flow.schemas.runs import RunRefIn
 from base import assistant as hub_assistant, outbound
 
-from .engine import _back_to_assistant, _call_failed, _end_turn, _fail, _finish, _go_on, _log, _own, _step_context
+from .engine import (
+    _back_to_assistant,
+    _call_failed,
+    _end_turn,
+    _fail,
+    _finish,
+    _go_on,
+    _log,
+    _own,
+    _park_on_question,
+    _step_context,
+)
 from .writes import CALL_LEASE_MINUTES
 
 #: What the step's instructions add to the assistant's own: nobody is in front, and what a change does.
@@ -209,28 +213,16 @@ def claim_assistant(ctx: OperationContext, data: RunRefIn) -> dict:
     }
 
 
-def _propose(  # noqa: PLR0913, PLR0917
-    ctx: OperationContext,
-    run: FlowRun,
-    flow: Flow,
-    step: dict,
-    op: Operation,
-    call: Any,
-    arguments: str,
-    later: list[str],
-    turn: dict,
-    said: str,
-    now: dt.datetime,
-) -> None:
-    """«Ask me first»: the change waits in «Waiting for your answer» with what the assistant said, and the run on it;
-    its title, its action and what it would send are said there for whoever reads it, as they read it
-    (``queries.questions.question_row``). A yes makes it (``answer_question``), a no or silence cancels the run, as a question
-    that stops on a no. One change waits at a time: ``later``, the calls of the same answer behind it, are not made,
-    and the assistant hears so with the change's result. Each change it asks for is a question of its own
-    (``<step>:<n>``), so a late yes to one never approves the next."""
+def _propose(run: FlowRun, step: dict, op: Operation, said: str, now: dt.datetime) -> Question:
+    """«Ask me first»: the change the run holds in its turn (its ``proposal``) waits in «Waiting for your answer» with
+    what the assistant said; its title, its action and what it would send are said there for whoever reads it, as they
+    read it (``queries.questions.question_row``). A yes makes it (``answer_question``), a no or silence cancels the run,
+    as a question that stops on a no. One change waits at a time: the calls of the same answer behind it (the
+    proposal's ``later``) are not made, and the assistant hears so with the change's result. Each change it asks for is
+    a question of its own (``<step>:<n>``), so a late yes to one never approves the next."""
     question = Question.objects.create(
         run=run,
-        flow=flow,
+        flow=run.flow,
         step_id=f"{step['id']}:{Question.objects.filter(run=run).count() + 1}",
         title=(str(ASSISTANT_WANTS) % {"app": hub_assistant.cards.app_name(op)})[:300],
         details=said[:2000],
@@ -240,16 +232,8 @@ def _propose(  # noqa: PLR0913, PLR0917
         expires_at=now + dt.timedelta(hours=72),
         created_at=now,
     )
-    proposal = {"call_id": call.call_id, "operation": op.name, "arguments": arguments, "later": later}
-    run.outputs = {**run.outputs, TURN: {**turn, "proposal": proposal}}
     _log(run, step, "assistant_proposed", now, operation=op.name, until=question.expires_at.isoformat())
-    run.status = FlowRun.Status.ASKING
-    run.resume_at = question.expires_at
-    run.save()
-    record_event(ctx, events.QUESTION_ASKED, {"id": str(question.id), "run_id": str(run.id), "flow_id": str(flow.id)})
-    record_event(
-        ctx, events.RUN_PARKED, {"id": str(run.id), "flow_id": str(flow.id), "resume_at": question.expires_at.isoformat()}
-    )
+    return question
 
 
 @operation(
@@ -289,9 +273,11 @@ def assistant_round(ctx: OperationContext, data: AssistantRoundIn) -> dict:
                 _log(run, step, "assistant_pinned_empty", now, operation=op.name, fields=empty)
             elif op.kind == "command" and step.get("mode", "ask") == "ask":
                 later = [behind.call_id for behind in data.calls[index + 1 :]]
-                asked_turn = {**turn, "messages": messages, "continuation": data.continuation}
                 arguments = _with_pinned(call.arguments, fixed)
-                _propose(ctx, run, flow, step, op, call, arguments, later, asked_turn, data.text, now)
+                proposal = {"call_id": call.call_id, "operation": op.name, "arguments": arguments, "later": later}
+                asked_turn = {**turn, "messages": messages, "continuation": data.continuation, "proposal": proposal}
+                run.outputs = {**run.outputs, TURN: asked_turn}
+                _park_on_question(ctx, run, flow, _propose(run, step, op, data.text, now))
                 return {"go_on": False}
             else:
                 outcome = shared.run_tool(_step_context(ctx, run, flow, op), op, _with_pinned(call.arguments, fixed))

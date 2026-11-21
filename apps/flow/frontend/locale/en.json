@@ -1550,6 +1550,7 @@
       "base_price": "Base price",
       "beneficiary_iban": "Beneficiary IBAN",
       "beneficiary_name": "Beneficiary name",
+      "bill_requested": "Bill requested",
       "billing_address": "Billing address",
       "bills": "Bills",
       "bio": "Bio",
@@ -2245,6 +2246,7 @@
       "ready_at": "Ready at",
       "ready_count": "Ready count",
       "reasons": "Reasons",
+      "receipt_code": "Ticket code to ask for the invoice",
       "receipt_copies": "Receipt copies",
       "receipt_footer": "Receipt footer",
       "receipt_footer_image": "Receipt footer image",
@@ -2747,7 +2749,9 @@
       "erased": "Deleted customer",
       "reserving": "Shown as reserved",
       "running": "In progress",
-      "issued": "Issued now"
+      "issued": "Issued now",
+      "aeat_proof": "AEAT test environment",
+      "aeat_proof_detail": "Why the AEAT test environment refused it"
     },
     "catalogError": "What automations can use here could not be read.",
     "errors": {

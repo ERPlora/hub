@@ -28,6 +28,7 @@ from live.operations import get as get_operation
 
 from apps.invoice import fiscal
 from apps.invoice.document_issuer import document_issuer, issuer_vat_number
+from . import fiscal_archive as fiscal_archive
 from . import public as public
 from apps.invoice.models import (
     FACTORY_SERIES_NAMES,
@@ -1267,7 +1268,7 @@ def _ask_verifactu(ctx: OperationContext, name: str, data: dict):
         return None
 
 
-def _record_of(ctx: OperationContext, invoice: Invoice):
+def record_of(ctx: OperationContext, invoice: Invoice):
     answer = _ask_verifactu(ctx, VERIFACTU_BY_INVOICE, {"invoice_id": str(invoice.id)})
     return answer.record if answer is not None else None
 
@@ -1275,7 +1276,7 @@ def _record_of(ctx: OperationContext, invoice: Invoice):
 def platform_answer(ctx: OperationContext, invoice: Invoice, *, already: bool = False) -> dict:
     """What the SaaS hears of one of its invoices: ``issuing`` without a record yet, ``issued`` while its record is
     on its way to the AEAT, else the AEAT's answer (with its code and message when it found a flaw); its QR link."""
-    record = _record_of(ctx, invoice)
+    record = record_of(ctx, invoice)
     if record is None:
         return {"status": "issuing", "qr": "", "error": None, "already": already}
     status = "issued" if record.status in ON_ITS_WAY else record.status
@@ -1314,7 +1315,7 @@ def platform_status(ctx: OperationContext, data: PlatformRefIn) -> dict:
 )
 def platform_document(ctx: OperationContext, data: PlatformRefIn) -> dict:
     invoice = _platform_invoice(data.id)
-    record = _record_of(ctx, invoice)
+    record = record_of(ctx, invoice)
     qr = (
         {"url": record.qr_url, "svg": record.qr_svg}
         if record is not None and record.status in IN_THE_AEAT
@@ -1347,9 +1348,3 @@ def platform_health(ctx: OperationContext, data: PlatformHealthIn) -> dict:
     if settings.ERPLORA_ENVIRONMENT == "prod" and not verifactu.production_open:
         return {"ready": False, "detail": str(PLATFORM_REAL_FILING_CLOSED)}
     return {"ready": True, "detail": ""}
-
-
-def keeps_fiscal_documents() -> bool:
-    """Whether this database holds its invoices (``fiscal_documents_kept`` on this app's config), of any status: a draft counts
-    too, for what it asks is whether a database can go, and that cannot be undone."""
-    return Invoice.objects.exists()

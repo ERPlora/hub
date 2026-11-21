@@ -18,6 +18,7 @@ import { computed, shallowRef, useTemplateRef } from 'vue';
 
 import PageNotices from '../components/PageNotices.vue';
 import RepresentationGrant from '../components/RepresentationGrant.vue';
+import OwnCertificateProof from '../components/OwnCertificateProof.vue';
 import OwnCertificateStatus from '../components/OwnCertificateStatus.vue';
 import { useLocale, useT } from '../composables/useT';
 import { fileToBase64 } from '../lib/files';
@@ -53,6 +54,15 @@ const expiry = computed(() => {
   if (cert.expires_in_days < 0) return { tone: 'danger' as const, text: t('verifactu.config.expired') };
   if (cert.expires_soon) return { tone: 'warning' as const, text: t('verifactu.config.expiresSoon', { n: cert.expires_in_days }) };
   return null;
+});
+
+/** Whether the AEAT's test environment accepted the certificate matters while going live is ahead: in testing. */
+const proofShown = computed(() => config.value?.environment === 'testing' && config.value.own_certificate.loaded);
+const proofNotice = computed(() => {
+  const cert = config.value?.own_certificate;
+  if (!proofShown.value || !cert || cert.aeat_proof === 'accepted') return null;
+  if (cert.aeat_proof === 'rejected') return { tone: 'danger' as const, text: cert.aeat_proof_detail };
+  return { tone: 'info' as const, text: t('verifactu.config.proof.untestedNote') };
 });
 
 function onPick(): void {
@@ -227,8 +237,24 @@ async function removeCertificate(): Promise<void> {
             <dd>{{ date(config.own_certificate.uploaded_at) }}</dd>
             <dt>{{ $t('verifactu.config.expires') }}</dt>
             <dd>{{ date(config.own_certificate.expires_at) }}</dd>
+            <template v-if="proofShown">
+              <dt>{{ $t('verifactu.config.proof.label') }}</dt>
+              <dd>
+                <OwnCertificateProof
+                  testid="verifactu-config-cert-proof"
+                  :certificate="config.own_certificate"
+                />
+              </dd>
+            </template>
           </dl>
         </div>
+        <InlineFeedback
+          v-if="proofNotice"
+          :tone="proofNotice.tone"
+          data-testid="verifactu-config-proof"
+        >
+          {{ proofNotice.text }}
+        </InlineFeedback>
         <InlineFeedback
           v-if="expiry"
           :tone="expiry.tone"

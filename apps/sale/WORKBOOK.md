@@ -3,8 +3,7 @@ Prefijo: SALE
 Alcance MVP: núcleo
 Estado de la app: completa (2026-10-31)
 Lo que no entra todavía: ver «Lo que queda fuera». La propina (SALE-G06) es de la app Propinas (`tip`), que añade
-su paso al cobro (SALE-F39, no hecho). La alergia del cliente en la línea (SALE-F41) sigue parcial: el TPV la marca
-y la enseña, y la comanda la lleva, pero la tarjeta de Cocina todavía no la resalta.
+su paso al cobro (SALE-F39, no hecho).
 
 > Manual de usuario y especificación de la app `sale`. Se escribe **antes** que el código: no se
 > programa nada que no esté aquí, y cada flujo pasa a `Estado: hecho` cuando sus tests están en verde
@@ -322,7 +321,7 @@ cierra la ventana sin guardarlo. Con la ventana como se abrió, atrás la cierra
 | SALE-F38 | Vender un servicio de Servicios | peluquería | hecho |
 | SALE-F39 | Cobrar con lo que añade otra app (la propina) | común | no hecho |
 | SALE-F40 | Ver los alérgenos de un plato al pedirlo | común | hecho |
-| SALE-F41 | Marcar la alergia del cliente en una línea | restaurante | parcial |
+| SALE-F41 | Marcar la alergia del cliente en una línea | restaurante | hecho |
 
 ### SALE-F01 Vender y cobrar en efectivo
 Estado: hecho
@@ -756,7 +755,7 @@ Entra: al retomar la cuenta, su cliente, de Clientes (CUSTOMER-F19).
 Sale: la cuenta sigue abierta con su título; aparcar nunca la anula.
 Si falla: «No se ha podido aparcar la cuenta. Sigue en pantalla.». Con «Permitir tiques aparcados»
 apagado no hay botón de aparcar en ningún sitio.
-Implicados: CUSTOMER-F19
+Implicados: CUSTOMER-F19, TABLE-F33
 
 ### SALE-F18 Eliminar una cuenta abierta
 Estado: hecho
@@ -809,7 +808,7 @@ Sale: nada propio; Mesas sienta (`table.session.open` con la cuenta, `.restore`)
 Si falla: el rechazo de Mesas dentro de la ventana, con sus palabras («Otro dispositivo acaba de ocupar
 esa mesa…», «Esa cuenta ya está en la mesa N.»…). Sin Mesas activa, o sin permiso de ver sus mesas y
 sentar, no hay botón ni se pregunta nada a Mesas.
-Implicados: TABLE-F10, TABLE-F12, TABLE-F13, TABLE-F24
+Implicados: TABLE-F10, TABLE-F12, TABLE-F13, TABLE-F24, TABLE-F33
 
 ### SALE-F20 Enviar la comanda a cocina y anular una línea enviada
 Estado: hecho
@@ -876,14 +875,16 @@ Pasos:
    dispositivo con la cuenta sola: el del navegador o, en la app instalada, su pantalla de impresión (el
    diálogo del sistema, con la impresora o «Guardar como PDF»).
 Entra: la cuenta abierta y su total calculado por el servidor.
-Sale: un papel sin número fiscal; no consume numeración ni crea venta. Cada pulsación, una cuenta.
+Sale: un papel sin número fiscal; no consume numeración ni crea venta. Cada pulsación, una cuenta. Imprimirla
+deja la cuenta marcada como pedida, salga por la impresora de tiques o por el diálogo del dispositivo, hasta que
+se cobra entera o se elimina; volver a imprimirla, añadir líneas o cobrar una parte no la quita.
 Si falla: mientras el negocio no haya dicho todavía su moneda, «Cuenta» sigue cargando y la impresora en gris: el
 papel nunca sale con una cifra supuesta; si la moneda no se puede leer, lo dice con «Reintentar», como si falla
 el cálculo de la cuenta. Si no se imprime, «No se pudo imprimir la cuenta»; si la app instalada no abre su
 pantalla de impresión, el aviso dice por qué tras dos puntos: «…: esta versión de la app de ERPlora no puede imprimir; actualízala», «…: el
 servicio de impresión del dispositivo no se abrió», «…: el documento está vacío o es demasiado grande para
 imprimirlo» o «…: esta app está vinculada a otro negocio».
-Implicados: PRINTING-F09
+Implicados: PRINTING-F09, TABLE-F34
 
 ### SALE-F22 Cobrar solo una parte de la cuenta
 Estado: hecho
@@ -904,7 +905,7 @@ Si falla: los mismos rechazos que un cobro normal, también el de la cuenta que 
 cobraba: la hoja cobra lo que enseñaba al abrirse, nunca lo de después. Si con la hoja abierta otro
 dispositivo cierra la cuenta, la pantalla la suelta al cerrar la hoja y avisa; no se queda en pantalla
 una cuenta que ya no existe.
-Implicados: ninguno
+Implicados: TABLE-F33
 
 ### SALE-F23 Dividir la cuenta de una mesa
 Estado: hecho — el botón «Dividir cuenta» es del control de mesa de Mesas (TABLE-F17)
@@ -1083,7 +1084,11 @@ Pasos:
    cambio, y el pie. Con **VeriFactu**, antes del pie va el QR fiscal: «QR tributario:» encima,
    «VERI*FACTU» debajo y «Escanéalo para cotejar este tique en la AEAT» («…esta factura…» si es una
    factura); cuando la AEAT ya respondió, su código («CSV: …») en lugar de esa frase. Mientras VeriFactu
-   no tiene registro de ese documento, el papel sale sin QR. Si su documento fiscal no se pudo emitir
+   no tiene registro de ese documento, el papel sale sin QR. Un tique con su documento fiscal (emitido o
+   pendiente) lleva después un segundo QR, el de la página donde el cliente pide la factura completa:
+   «Escanea para pedir tu factura completa» encima y el código del tique debajo, para
+   escribirlo si la cámara no lo lee; si no se pudo dibujar, debajo va la dirección entera. Una factura, o
+   una venta sin Facturación, no lo lleva. Si su documento fiscal no se pudo emitir
    al cobrar, el papel lo dice bajo el número («Documento fiscal pendiente») y, encima del papel (fuera
    de lo que se imprime), el aviso
    «Documento fiscal pendiente — Facturación no pudo emitirlo al cobrar (falta el emisor, o un permiso).
@@ -1093,7 +1098,7 @@ Pasos:
    no (o con su documento fiscal pendiente), sale por el diálogo de impresión del dispositivo con el papel
    solo: el del navegador o, en la app instalada, su pantalla de impresión (el diálogo del sistema, con la
    impresora o «Guardar como PDF»). Toda
-   impresión desde **Ventas** sale con «DUPLICADO», también con su QR fiscal; solo el primer papel justo
+   impresión desde **Ventas** sale con «DUPLICADO», también con sus QR; solo el primer papel justo
    tras cobrar es el original (y es copia si ya salió por la impresora al cobrar).
 4. **Documento pendiente**: en la lista, una venta con algún documento fiscal pendiente (el suyo, la
    rectificativa de su anulación o la de una devolución) lleva la pastilla «Documento pendiente» bajo
@@ -1110,7 +1115,7 @@ fiscal: el papel nunca sale sin él). Si no se imprime, «No se pudo imprimir»;
 abre su pantalla de impresión, con el motivo tras dos puntos, como al imprimir la cuenta para la mesa.
 «Emitir ahora» rechazado dice el motivo de Facturación («Configura el emisor…») y no cambia nada; sin
 motivo, «No se han podido emitir los documentos. Inténtalo de nuevo.».
-Implicados: INVOICE-F01, INVOICE-F02, INVOICE-F06, INVOICE-F18, PRINTING-F08, VERIFACTU-F19, SALE-F21, SALE-F34
+Implicados: INVOICE-F01, INVOICE-F02, INVOICE-F04, INVOICE-F06, INVOICE-F18, PRINTING-F08, VERIFACTU-F19, SALE-F21, SALE-F34
 
 ### SALE-F30 Anular una venta cobrada
 Estado: hecho
@@ -1379,38 +1384,38 @@ Pasos:
 3. Si el cliente pregunta, el camarero los lee en la línea; si el plato no le vale, quita la línea como cualquier
    otra antes de enviarla.
 4. Envía a cocina y cobra como siempre: los alérgenos no cambian el precio ni el cobro.
-Entra: de Inventario, los alérgenos de cada producto, con el catálogo del TPV (INVENTORY-F27).
-Sale: la línea con los alérgenos de su producto congelados al pedirla, como sus suplementos: si Inventario los
-cambia después, la línea conserva los que tenía (avisa: cuenta cambiada). Viajan a Cocina con la línea al enviar
-la ronda, donde se cruzan con la alergia del cliente (SALE-F41, KITCHEN-F32). No salen en el tique, en la factura
-ni en la cuenta impresa para la mesa.
+Entra: de Inventario, los alérgenos de cada producto, con el catálogo del TPV (INVENTORY-F27), y de Suplementos, los
+de cada opción elegida (MODIFIER-F07).
+Sale: la línea con los alérgenos de su producto y los de sus suplementos (MODIFIER-F12) congelados al pedirla, como
+sus suplementos: si Inventario o Suplementos los cambian después, la línea conserva los que tenía (avisa: cuenta
+cambiada). Viajan a Cocina con la línea al enviar la ronda, donde se cruzan con la alergia del cliente (SALE-F41,
+KITCHEN-F32). No salen en el tique, en la factura ni en la cuenta impresa para la mesa.
 Si falla: sin Inventario activo no hay alérgenos, y el precio libre y los servicios no los llevan. Un artículo sin
 alérgenos marcados no dice nada, porque el TPV no distingue «no lleva ninguno» de «no se han declarado»: por eso la
-ficha de Inventario dice «Sin alérgenos declarados». Un suplemento no tiene alérgenos propios: «+Queso» no añade
-Leche a la línea; si el cliente tiene una alergia, se marca en la línea como alergia del cliente y Cocina la ve igual.
+ficha de Inventario dice «Sin alérgenos declarados». Un suplemento suma sus alérgenos a los del plato: «+Queso» añade
+Leche a la línea; uno que quita algo («Sin queso») no le quita ninguno, y si el cliente tiene una alergia, se marca en
+la línea como alergia del cliente y Cocina la ve igual.
 Si la hoja de un menú no puede leer los alérgenos de sus platos, lo dice y ofrece «Reintentar»: así un plato sin
 fila no se toma por un plato sin alérgenos.
-Implicados: INVENTORY-F27, INVENTORY-F35, SALE-F11, SALE-F12, SALE-F41, KITCHEN-F32
+Implicados: INVENTORY-F27, INVENTORY-F35, SALE-F11, SALE-F12, SALE-F41, KITCHEN-F32, MODIFIER-F12
 
 ### SALE-F41 Marcar la alergia del cliente en una línea
-Estado: parcial — el TPV la marca en la hoja de nota y la enseña en la línea, con la coincidencia del plato; la
-comanda enviada la lleva, también por el asistente y la API, y en Cocina la imprime el papel, pero la tarjeta
-todavía no la resalta (KITCHEN-F32)
+Estado: hecho
 Vertical: restaurante
 Actor: empleado, responsable
 Pantalla: Vender
 Pasos:
 1. Con Cocina activa, el cliente avisa de una alergia. En la línea de su plato, toca «Nota»: la hoja lleva arriba
    el bloque «Alergia del cliente», con los catorce alérgenos por su nombre y ninguno marcado, y debajo las notas
-   rápidas y el cuadro de siempre (SALE-F13).
+   rápidas y el cuadro de siempre.
 2. Toca los alérgenos del cliente, uno o varios, y pulsa «Guardar». La línea dice, debajo del nombre, resaltado
    y antes de la nota, «Alergia: Gluten».
-3. Si el plato lleva alguno de esos alérgenos (SALE-F40), al guardar la línea lo dice resaltado: «El plato lleva
+3. Si el plato lleva alguno de esos alérgenos, al guardar la línea lo dice resaltado: «El plato lleva
    Gluten». No impide pedirlo, porque la cocina puede prepararlo sin él: el camarero lo habla con el cliente y, si
    hace falta, quita la línea y pide otro plato.
 4. En un menú, la alergia se marca en la línea del menú y vale para cada uno de sus platos; el aviso del paso 3
    nombra el plato que lleva el alérgeno («La hamburguesa lleva Gluten»).
-5. Envía la ronda (SALE-F20): la alergia va con cada plato a su estación, resaltada (KITCHEN-F32). Hasta enviarla,
+5. Envía la ronda: la alergia va con cada plato a su estación, resaltada. Hasta enviarla,
    se cambia volviendo a la hoja; desmarcarlos todos la quita.
 Entra: los catorce alérgenos; los alérgenos congelados de la línea (SALE-F40).
 Sale: la línea con la alergia del cliente (avisa: cuenta cambiada); al enviar la ronda, va a Cocina con la línea
@@ -1418,7 +1423,7 @@ Sale: la línea con la alergia del cliente (avisa: cuenta cambiada); al enviar l
 para la mesa ni en la ficha del cliente.
 Si falla: si no se guarda, «No se ha podido guardar ese cambio de la línea. La línea vuelve a estar como estaba.»,
 como la nota. Una línea ya enviada no tiene botón de nota: si el cliente avisa después, se dice a cocina de viva voz
-o se anula el plato con su motivo (SALE-F20) y se pide otra vez con la alergia. Sin Cocina activa la hoja no lleva
+o se anula el plato con su motivo y se pide otra vez con la alergia. Sin Cocina activa la hoja no lleva
 el bloque, porque no hay comanda que lo lleve, y la nota sigue sirviendo. Un alérgeno que no es de la lista se
 rechaza, también por el asistente o la API.
 Por el asistente: «la hamburguesa de la mesa 4 es para un alérgico al gluten» marca la alergia en esa línea tras la
@@ -1524,8 +1529,8 @@ secciones, las notas rápidas y lo devolvible se pueden seguir en vivo.
 | Una sesión de bono hecha fuera del cobro | Servicios gasta una sesión diciendo quién la hizo | La sesión y la profesional | `sale.voucher_session.recorded` |
 | Venta con su documento | Un documento que no se pudo emitir en el cobro, la anulación o la devolución se emite después (reintento del cobro, «Emitir ahora» o la reacción de Facturación) | La venta, el documento, su número, la devolución (`refund_id`) o si es el de la anulación (`void`); uno por documento | `sale.sale.invoiced` |
 | Cuenta abierta | Abrir o dividir | La cuenta | `sale.order.opened` |
-| Cuenta cambiada | Cualquier cambio de líneas, descuentos o título | La cuenta | `sale.order.changed` |
-| Comanda enviada | Enviar a cocina | La cuenta, su título, el canal, la ronda, quién atiende y las líneas con sus notas, los alérgenos de su producto (en un menú, los de cada plato) y la alergia del cliente | `sale.order.fired` |
+| Cuenta cambiada | Cualquier cambio de líneas, descuentos o título, y su primera precuenta impresa | La cuenta | `sale.order.changed` |
+| Comanda enviada | Enviar a cocina | La cuenta, su título, el canal, la ronda, quién atiende y las líneas con sus notas, los alérgenos de su producto y de sus suplementos (en un menú, los de cada plato) y la alergia del cliente | `sale.order.fired` |
 | Cuenta cerrada | Cobrar lo último de una cuenta | La cuenta | `sale.order.completed` |
 | Cuenta anulada | Anular una cuenta abierta | La cuenta | `sale.order.voided` |
 | Cuentas juntadas | Juntar | La absorbida y la que queda | `sale.order.merged` |
@@ -2016,8 +2021,14 @@ título, sus pasos y «Si falla»: ahí no van nombres de código, incidencias, 
   `sale_of_code`): la firma, doce caracteres en base32 de Crockford, es el HMAC-SHA256 del id de la venta con la
   clave secreta del servidor (y sus `SECRET_KEY_FALLBACKS` al leerlo). No se guarda: cada reimpresión da el mismo,
   también para las ventas de antes, y el cobro no escribe nada más. Vale cuatro años desde el cobro. Lo lee
-  Facturación, que requiere Ventas, en su página pública (`invoice.public.*`); el papel del tique (SALE-F29) aún no
-  lo imprime (hub#500). La decisión, con el mercado, en el WORKBOOK de Facturación («Decisiones», 22).
+  Facturación, que requiere Ventas, en su página pública (`invoice.public.*`). El papel del tique (SALE-F29) lo
+  imprime solo si Facturación emitió su documento o lo va a emitir (`paper_code`, `receipt_code` de `SaleOut`): sin
+  Facturación no hay página que abrir. La pantalla dibuja el QR de `<origen>/p/<primera etiqueta del host>/invoice/<código>`
+  con `qrcode` (`composables/useReceiptClaim.ts`) y el papel espera a tenerlo antes de imprimirse; la impresora de
+  tiques recibe la misma dirección del servidor (`receipt_url`: el host de la petición o, sin ella,
+  `<negocio>.<HUB_BASE_DOMAIN>`) en `claim_qr_data`, con `claim_note` encima y el código en `claim_locator`, que la
+  app del dispositivo ya pinta tras el pago. La decisión, con el mercado, en el WORKBOOK de Facturación
+  («Decisiones», 22).
 
 ### Lo que NO hace, a propósito
 
@@ -2065,6 +2076,7 @@ título, sus pasos y «Si falla»: ahí no van nombres de código, incidencias, 
 - **Cobrar con propina**: es la app Propinas (`tip`, su `WORKBOOK.md`), con el paso del cobro que pinta Ventas
   (SALE-F39), las dos `no hecho`; el código va por las issues hijas de hub#562. Mientras, la propina en efectivo se
   anota en Caja como «Entrada» (CASH_REGISTER-F05).
-- **La tarjeta de Cocina y los alérgenos de un suplemento**: la línea y las hojas del TPV ya enseñan los alérgenos
-  del plato y la alergia del cliente (F40 hecho; F41 parcial solo porque la tarjeta de Cocina aún no resalta la
-  alergia, hub#1738). Los alérgenos de un suplemento («+Queso» lleva leche) no entran: hub#1739.
+- **Los alérgenos de un suplemento**: la línea y las hojas del TPV ya enseñan los alérgenos del plato y la alergia
+  del cliente (F40 y F41 hechos), y la tarjeta de Cocina resalta la alergia (KITCHEN-F32). La línea ya suma los de sus
+  suplementos («+Queso» lleva leche) y los congela al pedirla; MODIFIER-F12 pasa a hecho con la hoja de suplementos
+  del TPV, que enseña los de cada opción antes de añadirla: hub#1934.

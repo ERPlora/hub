@@ -4,17 +4,12 @@
 import { InlineFeedback } from '@erplora/ui/components';
 import { AppPage, toastError } from '@erplora/ui/shell';
 import { IonInput, IonTextarea } from '@ionic/vue';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import { AlertStub, BYE, EMPLOYEE, errorFrame, flush, type MountOptions, mountDemo, subId } from '../__tests__/mount-demo';
 import ItemLines, { type ShownLine } from '../components/ItemLines.vue';
 import ItemDetailPage from './ItemDetailPage.vue';
 import source from './ItemDetailPage.vue?raw';
-
-vi.mock('@erplora/ui/shell', async (importOriginal) => ({
-  ...((await importOriginal()) as object),
-  toastError: vi.fn(),
-}));
 
 const LINE = { id: 'l1', text: 'Water', qty: '2.000', position: 1, client_line_id: 'c0' };
 const ITEM = {
@@ -57,8 +52,6 @@ async function setup(options: MountOptions & { withList?: boolean } = {}) {
   };
   return { ...m, call, show, listSub, testid, note, input, lines, banner, body, disabled, click };
 }
-
-beforeEach(() => vi.mocked(toastError).mockClear());
 
 describe('ItemDetailPage: the item, live', () => {
   it('follows demo.item.detail of its id, with a spinner until the first result', async () => {

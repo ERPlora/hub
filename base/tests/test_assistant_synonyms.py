@@ -27,10 +27,11 @@ from base.tests.test_assistant_asks import (
 
 __all__ = ["in_business_a"]
 
-#: The words of an item («elemento»), a word only Demo says (``demo.item``), in requests of other apps' tools.
+#: The words of an item («elemento»), a word only Demo says (``demo.item``), in requests of other apps' tools that name
+#: no product otherwise (Inventory reads «la carta» as its products).
 ELEMENT_REQUESTS = [
     ("inventory.product.delete", "borra el elemento «Tarta de queso» del inventario"),
-    ("inventory.product.create", "añade un elemento nuevo a la carta: tarta de queso a 5 euros"),
+    ("inventory.product.create", "añade un elemento nuevo: tarta de queso a 5 euros"),
 ]
 
 
@@ -142,7 +143,8 @@ def test_a_turn_ranks_with_the_words_that_count_for_its_tools():
     tools = tools_of("inventory", "cart_checkout", "pricing")
     name, phrase = ELEMENT_REQUESTS[0]
     turn = [op.name for op in assistant.relevance.relevant(tools, [phrase], "es")]
-    assert turn == [op.name for op in shared.relevant(tools, [phrase], "es", **assistant.relevance.ranking(tools))]
+    ranked = [op.name for op in shared.relevant(tools, [phrase], "es", **assistant.relevance.ranking(tools))]
+    assert turn == [*ranked[: shared.MAX_TOOLS - 1], assistant.relevance.FIND_TOOLS]
     every = {**assistant.relevance.ranking(tools), "synonyms": assistant.relevance.synonyms()}
     assert turn != [op.name for op in shared.relevant(tools, [phrase], "es", **every)]  # positive control
 

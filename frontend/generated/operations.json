@@ -119,6 +119,10 @@
     "method": "get",
     "path": "/api/system/events"
   },
+  "base.release_note.list": {
+    "method": "get",
+    "path": "/api/system/release-notes"
+  },
   "base.failed_event.list": {
     "method": "get",
     "path": "/api/system/failed-events"

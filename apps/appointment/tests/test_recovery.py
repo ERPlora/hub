@@ -27,18 +27,8 @@ from apps.service import queries as service_queries
 from apps.service.models import Service
 from apps.tax.models import TaxCategory
 from base.tenancy.context import current_alias, use_hub
-from base.tenancy.tests.test_recovery import (
-    ANA,
-    APPOINTMENTS,
-    SERIES,
-    Recoveries,
-    Salon,
-    a_monday_at,
-    booked_events,
-    fresh,
-    run,
-    run_in,
-)
+from base.tenancy.tests.test_recovery import ANA, Recoveries, fresh, run, run_in
+from base.tenancy.tests.test_recovery_appointments import APPOINTMENTS, SERIES, Salon, a_monday_at, booked_events
 
 from .conftest import HUB_DB
 
@@ -84,7 +74,7 @@ def test_the_copy_gives_each_appointment_still_to_come_and_booked_with_what_its_
 
     # Every service of the copy (Services' own read), each appointment's or not: what Services matches the
     # business's by, never a part of them (``services_in_business``).
-    services = service_queries.services_in_copy(direct())
+    services = service_queries.recovery.services_in_copy(direct())
     assert {one["id"] for one in services} == {cut.pk, colour.pk}
     assert all(one.pop("services_in_copy") == services for one in read)
     assert read == [
@@ -153,7 +143,7 @@ def an_appointment_of_the_copy(
         "notes": "",
         "internal_notes": "",
         "source": "counter",
-        "services_in_copy": services_in_copy if services_in_copy is not None else service_queries.services_in_copy(
+        "services_in_copy": services_in_copy if services_in_copy is not None else service_queries.recovery.services_in_copy(
             direct()
         ),
     }
@@ -302,7 +292,7 @@ def test_a_lacking_ones_service_made_again_since_is_the_one_it_is_booked_with(sa
     """hub#1341: a service gone from the business and made again (the same name in the same category, by hand or
     brought back by Services first) is the one the appointment comes back with, as Services says
     (``services_in_business``)."""
-    copy = service_queries.services_in_copy(direct())
+    copy = service_queries.recovery.services_in_copy(direct())
     lost(salon.cut)
     again = make_service("  haircut ", tax=salon.tax)
 
@@ -312,7 +302,7 @@ def test_a_lacking_ones_service_made_again_since_is_the_one_it_is_booked_with(sa
 def test_a_lacking_ones_service_the_business_no_longer_has_stays_the_copys_for_its_create_to_refuse(salon):
     """Without one made again (another name, here), the copy's service stays: the create refuses it with why, and an
     appointment never comes back with a service the business does not have."""
-    copy = service_queries.services_in_copy(direct())
+    copy = service_queries.recovery.services_in_copy(direct())
     lost(salon.cut)
     make_service("Haircut and beard", tax=salon.tax)
 
@@ -320,7 +310,7 @@ def test_a_lacking_ones_service_the_business_no_longer_has_stays_the_copys_for_i
 
 
 def test_with_two_made_again_the_oldest_is_the_one_it_is_booked_with(salon):
-    copy = service_queries.services_in_copy(direct())
+    copy = service_queries.recovery.services_in_copy(direct())
     lost(salon.cut)
     older = make_service("Haircut", tax=salon.tax)
     make_service("Haircut", tax=salon.tax)
@@ -332,7 +322,7 @@ def test_a_service_the_copy_had_too_is_never_taken_for_the_lost_one_of_the_same_
     """Service names are not unique: a cut the copy had too and the business kept is that one, never the lost one made
     again; so the match is by all of the copy's services, never by the appointment's alone."""
     kept = make_service("Haircut", tax=salon.tax)
-    copy = service_queries.services_in_copy(direct())
+    copy = service_queries.recovery.services_in_copy(direct())
     lost(salon.cut)
 
     assert comes_back_with(salon, copy) == [{"service_id": salon.cut.pk}]
@@ -395,7 +385,7 @@ def test_the_copy_gives_each_series_still_booking_with_what_its_create_takes(sal
 
     read = queries.series_in_copy(direct())
 
-    services = service_queries.services_in_copy(direct())
+    services = service_queries.recovery.services_in_copy(direct())
     assert all(one.pop("services_in_copy") == services for one in read)
     assert read == [
         {
@@ -461,7 +451,7 @@ def a_series_of_the_copy(customer_card: dict, salon, series_id=None, **rule) -> 
         "start_date": MONDAY,
         "end_date": None,
         "max_occurrences": None,
-        "services_in_copy": service_queries.services_in_copy(direct()),
+        "services_in_copy": service_queries.recovery.services_in_copy(direct()),
     } | rule
 
 
@@ -513,7 +503,7 @@ def test_each_lacking_series_names_the_businesss_card_and_services_and_is_what_i
     # Deleted since the copy and made again (by hand, or brought back by Customers first): another id here.
     old = make_customer("Marta Ruiz", phone="+34600555666", email="marta@example.com", deleted_at=now)
     marta = make_customer("Marta Ruiz", phone="+34600555666", email="marta@example.com")
-    copy = service_queries.services_in_copy(direct())
+    copy = service_queries.recovery.services_in_copy(direct())
     lost(salon.cut)
     cut_again = make_service("Haircut", tax=salon.tax)
     record = a_series_of_the_copy(

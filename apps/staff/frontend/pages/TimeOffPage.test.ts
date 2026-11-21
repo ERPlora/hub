@@ -6,7 +6,7 @@
 // only their own pending request. «+» registers anyone's (managers) or asks for one's own (employee).
 // Whoever has a linked record switches to «My time off» (`staff.time_off.mine`, with the reason).
 import { ConfirmDialog, DataTable, EmptyState, StatusPill } from '@erplora/ui/components';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import type { Component } from 'vue';
 
 import type { TimeOffDetailOut, TimeOffOut } from '../operations';
@@ -14,11 +14,7 @@ import { EMPLOYEE, errorFrame, flush, type MountOptions, mountStaff, page, settl
 import TimeOffFormModal from '../components/TimeOffFormModal.vue';
 import TimeOffPage from './TimeOffPage.vue';
 import { listFillProblems } from '../../../../frontend/testing/list-fill';
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
+import { rowButtonNames } from '../../../../base/frontend/__tests__/mount-base';
 
 const OP = 'staff.time_off.list';
 const off = (id: string, over: Partial<TimeOffOut> = {}): TimeOffOut => ({
@@ -60,6 +56,17 @@ async function setup(options: MountOptions = {}) {
   }
   return { ...m, table, prop, rows, cells, shownActions, action, list: () => m.params(OP), show: (data: unknown) => m.result(OP, data) };
 }
+
+describe('TimeOffPage: who it is for', () => {
+  it('each row action tells a screen reader whose time off it is, its short words first', async () => {
+    const s = await setup();
+    await s.show(page(ROWS));
+    expect(['t1', 't2'].map((id) => rowButtonNames(s.wrapper.element, `staff-time-off-row-${id}`))).toEqual([
+      { approve: 'Approve: Ana López', reject: 'Reject: Ana López' },
+      { cancel: 'Cancel: Bea Ruiz' },
+    ]);
+  });
+});
 
 describe('TimeOffPage: the live list', () => {
   it('follows the requests, newest first, 50 from the first', async () => {

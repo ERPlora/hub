@@ -2,18 +2,13 @@
 // Destination (screen and paper, screen only, paper only), Printer function (Kitchen, Bar), Printer
 // (optional) and Active; «Create station» or, editing, «Save» with only what changed. A refusal (a name
 // taken) shows in the dialog.
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import { itTellsTheCorrectedFieldApart } from '../../../../base/frontend/__tests__/same-words-refusal';
 import { station } from '../__tests__/kitchen';
 import { click, ionChecked, ionValue, mountKitchen, settle } from '../__tests__/mount-kitchen';
 import type { StationOut } from '../operations';
 import StationFormModal from './StationFormModal.vue';
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
 
 type Control = HTMLElement & { label?: string; value?: unknown; checked?: boolean; disabled?: boolean; placeholder?: string };
 

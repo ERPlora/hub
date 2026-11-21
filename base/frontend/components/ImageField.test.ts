@@ -9,11 +9,6 @@ import type { ImageDraft } from '../lib/item-image';
 import { flush, mountBase } from '../__tests__/mount-base';
 import ImageField from './ImageField.vue';
 
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
-
 afterEach(() => {
   document.body.innerHTML = '';
 });

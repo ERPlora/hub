@@ -13,7 +13,7 @@
 import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
 import { A, api, type Credentials, EMPLOYEE, horizontalOverflow, login, psql, shot, shown, untilStill } from './helpers';
-import { boardShown, boardWidget, setupRow, spanishOnTheHome, unfoldedTo } from './home-helpers';
+import { boardShown, boardWidget, panelError, panelTitle, panelValue, setupRow, spanishOnTheHome, unfoldedTo } from './home-helpers';
 import { VIEWPORTS } from './inventory-helpers';
 import { stamp } from './sale-helpers';
 
@@ -147,7 +147,7 @@ test('CASH_REGISTER-F01: «Tu caja» pending on the factory values, done when th
     await unfolded(page);
     await expect(row(page).locator('.setup-row-title')).toHaveText('Tu caja');
     await expect(row(page).locator('.setup-row-desc')).toHaveText(
-      'Decide cómo se abre y se cierra la caja: el fondo inicial, el arqueo de cierre y la pantalla del TPV que queda bloqueada hasta abrirla.',
+      'Decide cómo se abre y se cierra la caja: el fondo inicial, el arqueo de cierre y si cobrar en efectivo exige una sesión abierta.',
     );
     await expect(row(page).locator('[data-testid="setup-pill"]')).toHaveText('Recomendado');
 
@@ -184,8 +184,8 @@ test('CASH_REGISTER-F12: «Caja (sesión actual)» by default with the server\'s
   try {
     const format = await money(context);
     const expected = boardWidget(page, EXPECTED);
-    await expect(expected.locator('[data-testid="widget-title"]')).toHaveText('Caja (sesión actual)');
-    await expect(expected.locator('[data-testid="widget-value"]')).toHaveText(format.format((await expectedNow(context)) / 100));
+    await expect(panelTitle(expected)).toHaveText('Caja (sesión actual)');
+    await expect(panelValue(expected)).toHaveText(format.format((await expectedNow(context)) / 100));
     await expect(boardWidget(page, RECENT)).toHaveCount(0);
 
     // 5.00 € out for a supplier: the panel follows without a reload.
@@ -193,7 +193,7 @@ test('CASH_REGISTER-F12: «Caja (sesión actual)» by default with the server\'s
     const out = await api(context, A, 'POST', '/cash_register/movements', { type: 'out', amount: 500, description: `E2E ${RUN}` });
     expect(out.status).toBe(201);
     expect(await expectedNow(context)).toBe(before - 500);
-    await expect(expected.locator('[data-testid="widget-value"]')).toHaveText(format.format((before - 500) / 100));
+    await expect(panelValue(expected)).toHaveText(format.format((before - 500) / 100));
 
     // «Personalizar panel» offers «Descuadres recientes», grouped under «Caja».
     await shown(page).locator('[data-testid="widgets-customize"]').click();
@@ -202,7 +202,7 @@ test('CASH_REGISTER-F12: «Caja (sesión actual)» by default with the server\'s
     await picker.locator(`[data-testid="widgets-add-${RECENT}"]`).click();
     await picker.locator('[data-testid="widgets-close"]').click();
     const recent = boardWidget(page, RECENT);
-    await expect(recent.locator('[data-testid="widget-title"]')).toHaveText('Descuadres recientes');
+    await expect(panelTitle(recent)).toHaveText('Descuadres recientes');
     const closed = await closedSessions(context);
     expect(closed.length).toBeGreaterThanOrEqual(2);
     const bars = recent.locator('[data-testid="widget-bar"]');
@@ -220,7 +220,7 @@ test('CASH_REGISTER-F12: «Caja (sesión actual)» by default with the server\'s
 test('CASH_REGISTER-F12: an employee counts blind and never gets the expected cash panel, but reads the discrepancies', async ({ browser }) => {
   const { context, page } = await spanish(browser, { width: 1440, height: 900 }, { board: [EXPECTED, RECENT], who: EMPLOYEE });
   try {
-    await expect(boardWidget(page, RECENT).locator('[data-testid="widget-title"]')).toHaveText('Descuadres recientes');
+    await expect(panelTitle(boardWidget(page, RECENT))).toHaveText('Descuadres recientes');
     await expect(boardWidget(page, RECENT)).toHaveAttribute('aria-busy', 'false');
     await expect(boardWidget(page, EXPECTED)).toHaveCount(0);
     await shown(page).locator('[data-testid="widgets-customize"]').click();
@@ -247,9 +247,9 @@ for (const size of VIEWPORTS) {
       const format = await money(context);
       for (const key of [EXPECTED, RECENT]) {
         await expect(boardWidget(page, key)).toHaveAttribute('aria-busy', 'false');
-        await expect(boardWidget(page, key).locator('[data-testid="widget-error"]')).toHaveCount(0);
+        await expect(panelError(boardWidget(page, key))).toHaveCount(0);
       }
-      await expect(boardWidget(page, EXPECTED).locator('[data-testid="widget-value"]')).toHaveText(format.format((await expectedNow(context)) / 100));
+      await expect(panelValue(boardWidget(page, EXPECTED))).toHaveText(format.format((await expectedNow(context)) / 100));
       await expect(boardWidget(page, RECENT).locator('[data-testid="widget-bar"]')).toHaveCount((await closedSessions(context)).length);
       await boardWidget(page, EXPECTED).evaluate((element) => element.scrollIntoView({ block: 'start' }));
       await untilStill(page);

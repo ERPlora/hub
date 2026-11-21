@@ -8,24 +8,23 @@
 // The SaaS of the stack needs its taxonomy (`seed_taxonomy`, as every deploy runs it) and the assistant's provider
 // (README of this folder, «El asistente» and «La QA maestra»); the spec says which is missing.
 // flow: BASE-F05
-import { execSync } from 'node:child_process';
-
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
 import { closeActionCenter, openActionCenter } from './action-center';
-import { GREETING, type Provider, startProvider } from './assistant-provider';
+import { box, lastAnswer, panel, send } from './assistant-panel';
+import { GREETING, type Provider } from './assistant-provider';
 import {
   api,
   horizontalOverflow,
   HUB_DIR,
   login,
   psql,
-  REPO_DIR,
   SAAS,
   shot,
   shown,
   untilStill,
 } from './helpers';
+import { seededProvider } from './provider-helpers';
 import { type SaasOwner, saasPost, signUpOnSaas } from './saas-owner';
 import { STACK } from './stack';
 import { openApps, openAssistant } from './topbar';
@@ -48,10 +47,6 @@ const PINNED_MIN = 992;
 /** The vertical of the QA's restaurant chain: the business is created as one. */
 const VERTICAL = 'restaurant';
 
-const PROVIDER_PORT = Number(process.env.E2E_AI_PROVIDER_PORT ?? STACK.hubPort + 2);
-/** The SaaS's database of this stack (README «Varias ejecuciones a la vez»: `saas_e2e_<Hub port + 1>`). */
-const SAAS_DB = process.env.E2E_SAAS_DB ?? (STACK.hubPort === 8000 ? 'saas' : `saas_e2e_${STACK.hubPort + 1}`);
-
 /** The hub's catalogues, `en` and `es`: what a text on screen is checked against. */
 const CATALOG = loadCatalog(HUB_DIR);
 
@@ -62,13 +57,6 @@ let owner: Owner;
 let origin = '';
 /** What the business holds as data, not as interface (its name, the template's name and description): never judged. */
 const data = new Set<string>();
-
-function saasSql(sql: string): string {
-  return execSync(`docker compose exec -T postgres psql -U hub -d ${SAAS_DB} -At -c "${sql}"`, {
-    cwd: REPO_DIR,
-    encoding: 'utf8',
-  }).trim();
-}
 
 /** A business type of `vertical` from erplora.com's catalogue (its taxonomy, which every deploy seeds). */
 async function businessTypeOf(context: BrowserContext, vertical: string): Promise<string> {
@@ -184,9 +172,7 @@ async function tab(page: Page, id: string): Promise<void> {
 
 test.beforeAll(async ({ browser }) => {
   test.setTimeout(180_000);
-  provider = await startProvider(PROVIDER_PORT);
-  const seeded = saasSql("select base_url from assistant_aiprovider where slug = 'e2e-local'");
-  expect(seeded, `the SaaS ${SAAS_DB} is not seeded with this provider: README «El asistente»`).toBe(provider.url);
+  provider = await seededProvider();
   owner = await signUpOnSaas(browser, 'qa-master');
 });
 
@@ -338,19 +324,18 @@ for (const language of LANGUAGES) {
       await expect(page).toHaveURL(`${origin}/`);
 
       // The assistant opens and answers (the e2e's provider, behind erplora.com's gateway).
-      const panel = await openAssistant(page);
-      const box = panel.locator('[data-testid="assistant-input"] textarea');
-      await expect(box).toBeVisible();
-      await box.fill(language === 'es' ? 'Hola' : 'Hello');
+      await openAssistant(page);
+      await expect(box(page)).toBeVisible();
+      await box(page).fill(language === 'es' ? 'Hola' : 'Hello');
       // «Send», as on a phone, where Enter breaks the line.
-      await panel.locator('[data-testid="assistant-send"]').click();
-      await expect(panel.locator('[data-testid="assistant-bubble-assistant"]').last()).toContainText(GREETING[language], { timeout: SAAS_STEP });
-      await expect(panel.locator('[data-testid="assistant-send"]')).toBeVisible({ timeout: SAAS_STEP });
+      await send(page).click();
+      await expect(lastAnswer(page)).toContainText(GREETING[language], { timeout: SAAS_STEP });
+      await expect(send(page)).toBeVisible({ timeout: SAAS_STEP });
       data.add(GREETING[language]);
       data.add(language === 'es' ? 'Hola' : 'Hello');
       await check('assistant');
-      await panel.locator('[data-testid="assistant-close"]').click();
-      await expect(panel).not.toHaveAttribute('data-open', 'true');
+      await panel(page).locator('[data-testid="assistant-close"]').click();
+      await expect(panel(page)).not.toHaveAttribute('data-open', 'true');
 
       clean(seen, `the platform in ${language} at ${size.label}`);
     });

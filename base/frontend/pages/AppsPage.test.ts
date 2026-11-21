@@ -9,7 +9,6 @@ import type { AppList, AppRow } from '../operations/apps';
 const ids = (wrapper: Mounted['wrapper']) => idsOf({ wrapper } as Mounted);
 
 vi.mock('@erplora/ui/components', async (importOriginal) => (await import('../__tests__/apps-page-spies')).componentsWithConfirmSpy(importOriginal));
-vi.mock('@erplora/ui/shell', async (importOriginal) => (await import('../__tests__/toast-spies')).shellWithToastSpies(importOriginal));
 vi.mock('../lib/access', async (importOriginal) => (await import('../__tests__/apps-page-spies')).accessWithSessionSpy(importOriginal));
 
 freshEachTest();
@@ -61,8 +60,25 @@ describe('AppsPage', () => {
     expect(invoice.text()).toContain('What invoice does.');
     expect(invoice.text()).toContain('Free');
     expect(invoice.text()).toContain('Taxes');
-    expect(invoice.text()).toContain('Installed');
+    expect(invoice.find('[data-testid="apps-state"]').text()).toBe('Active');
     expect(m.wrapper.find('[data-testid="apps-row"][data-id="stock"]').text()).toContain('Needs a subscription');
+  });
+
+  it.each([
+    ['en', 'Active'],
+    ['es', 'Activa'],
+  ] as const)('an app that is on reads the same in both lists and in the state filter (%s)', async (locale, active) => {
+    const stateOf = (m: Mounted) => m.wrapper.find('[data-testid="apps-row"][data-id="invoice"] [data-testid="apps-state"]').text();
+    const mine = await open('/apps', { locale });
+    await mine.result(mine.call, 'base.app.list', LIST);
+    expect(stateOf(mine)).toBe(active);
+    const all = await open('/apps#all', { locale });
+    await all.result(all.call, 'base.app.list', LIST);
+    expect(stateOf(all)).toBe(active);
+    await all.wrapper.find('[data-testid="apps-filters-toggle"]').trigger('click');
+    await flush();
+    const filter = all.wrapper.findAll('[data-testid="apps-filter-state"] ion-select-option').map((option) => option.text());
+    expect(filter).toContain(active);
   });
 
   it('shows the plan under the app name, and «Open» as a named icon button in the list', async () => {
@@ -73,8 +89,8 @@ describe('AppsPage', () => {
     expect(invoice.find('[data-testid="apps-plan"]').text()).toBe('Free');
     expect(invoice.find('.data-table__identity-icon').classes()).toContain('ep-icon-tile');
     const opener = m.wrapper.find('[data-testid="apps-row-tax-open"]');
-    // Its name is the title of the host and, inside, the `aria-label` Ionic moves onto its native button.
-    expect([opener.text(), opener.attributes('title')]).toEqual(['', 'Open']);
+    // Its name, with the app it opens, is the title of the host and, inside, the `aria-label` Ionic moves onto its native button.
+    expect([opener.text(), opener.attributes('title')]).toEqual(['', 'Open: Taxes']);
   });
 
   it('«Paid» (#paid) lists only what is bought apart; never a free app', async () => {
@@ -107,7 +123,7 @@ describe('AppsPage', () => {
   it('a paid app without its right offers «Upgrade plan» to whoever runs the business, and only it', async () => {
     const m = await open('/apps#all');
     await m.result(m.call, 'base.app.list', LIST);
-    expect(await appActionLabel(m, 'stock', 'plans')).toBe('Upgrade plan');
+    expect(await appActionLabel(m, 'stock', 'plans')).toBe('Upgrade plan: Stock');
     expect(await appActionLabel(m, 'tax', 'plans')).toBeUndefined();
   });
 

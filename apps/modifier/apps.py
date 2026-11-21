@@ -4,6 +4,8 @@ a price supplement, and the products or categories of Inventory each group is li
 from django.utils.translation import gettext_lazy as _
 from live.meta import Category, LiveAppConfig, Nav
 
+from base.allergens import ALLERGENS
+
 
 class ModifierConfig(LiveAppConfig):
     name = "apps.modifier"
@@ -30,6 +32,9 @@ class ModifierConfig(LiveAppConfig):
     # A link points at a product or a category of Inventory; an option at a tax category of Taxes.
     requires = ["inventory", "tax"]
     default_auto_field = "django.db.models.BigAutoField"
+    # An option's allergens by their names: no field of the models labels them, so the assistant's card would say their
+    # codes.
+    choices = {"allergens": ALLERGENS}
     # What these words mean to the Hub's assistant (base.assistant.relevance.synonyms). The «predeterminada» option is the one a
     # group brings chosen, its default (is_default), as the descriptions say it in English. Never «por defecto»: it is
     # also the default of a shift, a working day or a threshold (Staff's and Inventory's settings), whose asks would

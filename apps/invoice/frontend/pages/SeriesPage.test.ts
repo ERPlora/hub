@@ -5,7 +5,7 @@
 // whoever keeps the series; anyone else only looks. Every state of the screen.
 import { DataTable, EmptyState } from '@erplora/ui/components';
 import { AppPage } from '@erplora/ui/shell';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import type { Component } from 'vue';
 
 import { answerIssuer, EMPLOYEE, errorFrame, flush, type MountOptions, mountInvoice } from '../__tests__/mount-invoice';
@@ -14,11 +14,6 @@ import SeriesFormModal from '../components/SeriesFormModal.vue';
 import type { SeriesOut } from '../operations';
 import SeriesPage from './SeriesPage.vue';
 import { listFillProblems } from '../../../../frontend/testing/list-fill';
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
 
 const OP = 'invoice.series.list';
 
@@ -130,10 +125,12 @@ describe('SeriesPage', () => {
     expectAnAdministratorToSetUpTheIssuer(s);
   });
 
-  it('empty, it says so; an error says it with Retry', async () => {
+  it('empty, it says the series are born with the first sale; an error says it with Retry', async () => {
     const s = await setup();
     await s.show({ rows: [], total: 0, limit: 50, offset: 0 });
-    expect(s.wrapper.findComponent(EmptyState).props('heading')).toBe('No series yet. Create the first one to number your invoices.');
+    expect(s.wrapper.findComponent(EmptyState).props('heading')).toBe(
+      'No series yet. They are created on their own with your first sale; create one only to change the prefix or continue another system’s numbering.',
+    );
     const failing = await setup();
     failing.call.push(errorFrame(failing.subId(OP), 'invoice.boom'));
     await flush();

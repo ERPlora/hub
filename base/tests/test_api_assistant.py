@@ -106,27 +106,42 @@ def test_the_yes_runs_it_and_the_turn_goes_on_with_its_result(client, make_user,
     assert sent["messages"][-1]["tool_call_id"] == "c1"
 
 
-def test_after_too_many_rounds_it_stops_and_says_why(client, make_user, gateway):
-    client.force_login(make_user("ana", host=A.key, role="hub_employee"))
+def _rounds_of_reads(count: int) -> dict:
+    """A turn whose request has used ``count`` rounds of tools: the last one's read still to run."""
     messages = [ASK]
-    for n in range(6):
+    for n in range(count):
         messages.append({"role": "assistant", "content": "", "tool_calls": [
             {"id": f"r{n}", "type": "function", "function": {"name": "demo__item__list", "arguments": "{}"}}
         ]})
-        if n < 5:
+        if n < count - 1:
             messages.append({"role": "tool", "tool_call_id": f"r{n}", "content": "{}"})
-    body = {"messages": messages, "pending": [{"call_id": "r5", "name": "demo__item__list", "arguments": "{}"}]}
-    got = frames(post(client, "/assistant/turn", body))
+    return {"messages": messages, "pending": [{"call_id": f"r{count - 1}", "name": "demo__item__list", "arguments": "{}"}]}
+
+
+def test_on_the_last_round_the_model_answers_without_tools(client, make_user, gateway):
+    client.force_login(make_user("ana", host=A.key, role="hub_employee"))
+    gateway.turn({"type": "text_delta", "text": "Hecho."}, {"type": "response", "output": [], "usage": {}, "continuation": None})
+    got = frames(post(client, "/assistant/turn", _rounds_of_reads(6)))
+    assert [frame["type"] for frame in got] == ["executed", "text", "done"]
+    result, answer = got[-1]["append"]
+    assert result["tool_call_id"] == "r5"
+    assert answer == {"role": "assistant", "content": "Hecho."}
+    assert gateway.sent("/internal/assistant/chat/stream")[0].body["tools"] == []
+
+
+def test_past_the_last_round_it_stops_and_says_why(client, make_user, gateway):
+    client.force_login(make_user("ana", host=A.key, role="hub_employee"))
+    got = frames(post(client, "/assistant/turn", _rounds_of_reads(7)))
     assert [frame["type"] for frame in got] == ["executed", "error", "done"]
     assert got[1]["code"] == "assistant.too_many_steps"
-    assert got[-1]["append"][0]["tool_call_id"] == "r5"
+    assert got[-1]["append"][0]["tool_call_id"] == "r6"
     assert got[-1]["web"] is False  # no pages: it never reached the gateway (hub#870)
     assert gateway.requests == []
 
 
 def test_a_turn_too_heavy_is_refused_before_it_is_read(client, make_user):
     client.force_login(make_user("ana", host=A.key, role="hub_employee"))
-    from base.api import MAX_ASSISTANT_TURN_BODY
+    from base.api.assistant import MAX_ASSISTANT_TURN_BODY
 
     response = client.post(
         "/api/assistant/turn", b"x", content_type="application/json", CONTENT_LENGTH=MAX_ASSISTANT_TURN_BODY + 1, **HOST

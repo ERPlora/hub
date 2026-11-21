@@ -4,11 +4,13 @@
 // its host the paper is ready to print (or that it failed). With VeriFactu on and readable, a sale with a
 // fiscal document waits for that document's record too: the paper carries its QR, also when reprinted.
 import { InlineFeedback } from '@erplora/ui/components';
+import QRCode from 'qrcode';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { SessionMe } from '@erplora/ui/shell';
 
 import { errorFrame, flush, MANAGER, mountSale } from '../../__tests__/mount-sale';
+import { RECEIPT_QR_OPTIONS, receiptClaimUrl } from '../../composables/useReceiptClaim';
 import { LETTERHEAD, saleOut, SETTINGS } from './__tests__/fixtures';
 import PendingDocuments from './PendingDocuments.vue';
 import ReceiptPaper from './ReceiptPaper.vue';
@@ -206,6 +208,35 @@ describe('SaleDocument', () => {
       expect(s.find('sale-document-error').exists()).toBe(true);
       expect(s.wrapper.emitted('failed')).toEqual([['msg internal_error']]);
       expect(s.wrapper.emitted('ready')).toBeUndefined();
+    });
+  });
+
+  describe('the QR to ask for the full invoice (INVOICE-F04)', () => {
+    const CODE = '20261014-0007-K7Q2M9XD3FPA';
+
+    it('a ticket that carries its code waits for its QR, drawn for this hub’s page, and only then is ready to print', async () => {
+      let drawn!: (image: string) => void;
+      const drawing = vi.spyOn(QRCode, 'toDataURL').mockReturnValue(new Promise<string>((resolve) => (drawn = resolve)));
+      const s = await setup();
+      await s.showSale(saleOut({ receipt_code: CODE }));
+      await s.showSettings();
+      const url = receiptClaimUrl(window.location, CODE);
+      expect(drawing).toHaveBeenCalledWith(url, RECEIPT_QR_OPTIONS);
+      expect(s.find('sale-document-loading').exists()).toBe(true);
+      expect(s.wrapper.emitted('ready')).toBeUndefined();
+      drawn('data:image/png;base64,UVI=');
+      await flush();
+      expect(s.wrapper.findComponent(ReceiptPaper).props('claim')).toEqual({ code: CODE, url, image: 'data:image/png;base64,UVI=' });
+      expect(s.wrapper.emitted('ready')).toHaveLength(1);
+      drawing.mockRestore();
+    });
+
+    it('a sale without a code prints no second QR and does not wait for one', async () => {
+      const s = await setup();
+      await s.showSale(saleOut({ receipt_code: null }));
+      await s.showSettings();
+      expect(s.wrapper.findComponent(ReceiptPaper).props('claim')).toBeNull();
+      expect(s.wrapper.emitted('ready')).toHaveLength(1);
     });
   });
 

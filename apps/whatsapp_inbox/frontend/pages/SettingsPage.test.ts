@@ -5,17 +5,12 @@
 // one, «No templates.» with where they are made. Whoever may not configure reads «You do not have permission».
 import { DataTable, EmptyState, UsageMeter } from '@erplora/ui/components';
 import { AppPage, applySurface } from '@erplora/ui/shell';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import type { Component } from 'vue';
 
 import { ADMIN, errorFrame, flush, followUpgrade, MANAGER, type MountOptions, mountInbox, SIGNED } from '../__tests__/mount-inbox';
 import type { ChannelOut, TemplateOut } from '../operations';
 import SettingsPage from './SettingsPage.vue';
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
 
 const CHANNEL = 'whatsapp_inbox.channel.get';
 const TEMPLATES = 'whatsapp_inbox.template.list';

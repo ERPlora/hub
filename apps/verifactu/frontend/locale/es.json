@@ -288,6 +288,13 @@
       "expires": "Caduca el",
       "expiresSoon": "Caduca en {n} días: sube aquí el renovado.",
       "expired": "El certificado ha caducado. Sube uno vigente para poder enviar a la AEAT.",
+      "proof": {
+        "label": "AEAT de pruebas",
+        "untested": "Sin probar todavía",
+        "accepted": "Aceptado",
+        "rejected": "Rechazado",
+        "untestedNote": "Se prueba con el próximo registro que salga en pruebas: cuando la AEAT de pruebas lo acepte, podrás pasar a producción."
+      },
       "testingNote": "Puedes probar VeriFactu sin certificado. Solo lo necesitas para pasar a producción.",
       "productionNote": "Sube un certificado válido para enviar tus registros a la AEAT.",
       "keysNote": "El certificado y su contraseña se guardan cifrados en este Hub y solo viajan a la pasarela de ERPlora al enviar a la AEAT; no se vuelven a mostrar.",

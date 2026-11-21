@@ -3,17 +3,12 @@
 // «Save», and sends only what changed. The dialog closes once the server saved it (the live list paints
 // it). A refusal keeps it open with what was typed: a 422 under its field, a note another device deleted
 // with the server's words on top, a failure without words as «The quick note could not be saved.».
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import { itTellsTheCorrectedFieldApart } from '../../../../../base/frontend/__tests__/same-words-refusal';
 import { click, ionValue, mountSale, settle } from '../../__tests__/mount-sale';
 import type { QuickNoteOut } from '../../operations';
 import QuickNoteFormModal from './QuickNoteFormModal.vue';
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
 
 type Control = HTMLElement & {
   label?: string;

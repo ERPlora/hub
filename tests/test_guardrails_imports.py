@@ -37,6 +37,7 @@ BASE_CONTRACT = "base-imports-no-app"
 CYCLES_CONTRACT = "no-sibling-cycles"
 CYCLE_ANCESTORS = {
     "base",
+    "base.api",
     "base.tenancy",
     "base.services",
     "base.queries",

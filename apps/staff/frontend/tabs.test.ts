@@ -1,8 +1,7 @@
-// The sections of Staff (WORKBOOK «Pantallas»; the old manifest's `navigation`): Staff, Roles, Time Off
-// and Schedules, as the footer tabbar of every staff page, plus «Commissions» (STAFF-F21), shown only to
-// whoever sees the pay, and «Settings» — the tab the old shell generated from the module's settings
-// block, shown only to whoever may save them. Each tab follows its route and
-// wears a registered icon, the same as the menu's.
+// The sections of Staff (WORKBOOK «Pantallas», the menu of apps.py): Staff, Roles, Time Off, Schedules
+// and Commissions, as the footer tabbar of every staff page, Commissions shown only to whoever sees the
+// pay, plus «Settings» — the tab the old shell generated from the module's settings block, shown only to
+// whoever may save them. Each tab follows its route and wears a registered icon, the same as the menu's.
 import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -75,7 +74,7 @@ describe('the staff tabbar', () => {
       m[2],
       m[3],
     ]);
-    // Commissions and Settings depend on a permission: the menu (apps.py) cannot say so, the tabbar does.
-    expect(menu).toEqual(STAFF_TABS.filter((tab) => !['commissions', 'settings'].includes(tab.id)).map((tab) => [tab.id, tab.icon, tab.to]));
+    // Settings is the help's own last tab (base.queries.app_help), not a menu entry.
+    expect(menu).toEqual(STAFF_TABS.filter((tab) => tab.id !== 'settings').map((tab) => [tab.id, tab.icon, tab.to]));
   });
 });

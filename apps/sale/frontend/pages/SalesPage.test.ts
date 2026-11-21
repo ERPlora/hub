@@ -25,17 +25,6 @@ import SalesPage from './SalesPage.vue';
 import source from './SalesPage.vue?raw';
 import { listFillProblems } from '../../../../frontend/testing/list-fill';
 
-vi.mock('@erplora/ui/shell', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@erplora/ui/shell')>()),
-  toastError: vi.fn(),
-  toastSuccess: vi.fn(),
-}));
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
-
 const OP = 'sale.sale.list';
 
 /** What a person reads in `el`: its texts in order, one space apart. */
@@ -91,8 +80,6 @@ beforeEach(() => {
 afterEach(() => {
   vi.useRealTimers();
   vi.unstubAllGlobals();
-  vi.mocked(toastError).mockClear();
-  vi.mocked(toastSuccess).mockClear();
 });
 
 async function setup(options: MountOptions = {}) {

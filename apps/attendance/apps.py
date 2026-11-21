@@ -3,7 +3,7 @@ breaks, corrections with a mandatory reason and their trail, and the month in CS
 
 from django.utils.translation import gettext_lazy as _
 from django.utils.translation import pgettext_lazy
-from live.meta import Category, LiveAppConfig, Nav, Widget
+from live.meta import Category, Help, LiveAppConfig, Nav, Widget
 
 from apps.attendance.events import WHO_IS_IN
 
@@ -96,3 +96,4 @@ class AttendanceConfig(LiveAppConfig):
             "catch_up": "collapse",
         }
     ]
+    help = Help()

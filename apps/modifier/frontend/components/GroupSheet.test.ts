@@ -6,7 +6,7 @@
 // with «Load more»; loading, empty and error states per section; a warning when the group asks for more
 // options than it has.
 import { ConfirmDialog } from '@erplora/ui/components';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import type { GroupOut, LinkOut, OptionOut } from '../operations';
 import type { Business } from '../../../../base/frontend/operations/business';
@@ -14,11 +14,6 @@ import { business, click, EMPLOYEE, errorFrame, flush, mountModifier, page, POLI
 import GroupSheet from './GroupSheet.vue';
 import LinkFormModal from './LinkFormModal.vue';
 import OptionFormModal from './OptionFormModal.vue';
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
 
 const SAUCES: GroupOut = {
   id: 'g1',
@@ -46,6 +41,7 @@ const option = (id: string, over: Partial<OptionOut> = {}): OptionOut => ({
   tax_category_name: null,
   is_default: false,
   sort_order: 0,
+  allergens: [],
   created_at: '2026-10-15T10:00:00Z',
   updated_at: '2026-10-15T10:00:00Z',
   ...over,
@@ -82,11 +78,12 @@ async function setup(options: { locale?: 'en' | 'es'; session?: typeof EMPLOYEE;
   return { ...m, text };
 }
 
-async function filled(options: Parameters<typeof setup>[0] & { owner?: Business | null } = {}) {
+async function filled(options: Parameters<typeof setup>[0] & { owner?: Business | null; rows?: OptionOut[] } = {}) {
   const s = await setup(options);
   if (options.owner !== null) await s.result('base.business.get', options.owner ?? business());
   await s.result('modifier.group.get', options.group ?? SAUCES);
-  await s.result('modifier.option.list', page(OPTIONS, 3, 20));
+  const rows = options.rows ?? OPTIONS;
+  await s.result('modifier.option.list', page(rows, rows.length, 20));
   await s.result('modifier.link.list', page(LINKS, 2, 20));
   await settle();
   return s;
@@ -297,5 +294,30 @@ describe('GroupSheet', () => {
     expect(s.text('modifier-sheet-rule')).toBe('Obligatorio (mín. 1) · máx. 2');
     expect(s.text('modifier-sheet-options-row-o1')).toContain('Gratis');
     expect(s.text('modifier-sheet-links-row-l2')).toContain('Categoría · Mains');
+  });
+});
+
+// MODIFIER-F11: each option with allergens says them under its name, «Allergens: Milk», in the order of the list; one
+// without them has no such row. Whoever can only view reads them too.
+describe('GroupSheet: the allergens of each option', () => {
+  const ROWS = [option('o1'), option('o2', { name: 'Cheese', kitchen_name: '+CHEESE', allergens: ['milk', 'gluten'] })];
+
+  it('says them under the option’s name, in the list’s order; an option without them has no such row', async () => {
+    const s = await filled({ rows: ROWS });
+    expect(s.text('modifier-sheet-options-allergens-o2')).toBe('Allergens: Gluten, Milk');
+    const name = s.inDoc('modifier-sheet-options-row-o2')!.querySelector('strong')!;
+    expect(name.compareDocumentPosition(s.inDoc('modifier-sheet-options-allergens-o2')!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(s.inDoc('modifier-sheet-options-allergens-o1')).toBeNull();
+    expect(s.text('modifier-sheet-options-row-o1')).not.toContain('Allergens');
+  });
+
+  it('an employee reads them too', async () => {
+    const s = await filled({ session: EMPLOYEE, rows: ROWS });
+    expect(s.text('modifier-sheet-options-allergens-o2')).toBe('Allergens: Gluten, Milk');
+  });
+
+  it('speaks Spanish', async () => {
+    const s = await filled({ locale: 'es', rows: ROWS });
+    expect(s.text('modifier-sheet-options-allergens-o2')).toBe('Alérgenos: Gluten, Leche');
   });
 });

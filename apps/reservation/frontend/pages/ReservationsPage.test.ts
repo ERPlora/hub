@@ -17,11 +17,7 @@ import en from '../locale/en.json';
 import ReservationFormModal from '../components/ReservationFormModal.vue';
 import StepDialog from '../components/StepDialog.vue';
 import ReservationsPage from './ReservationsPage.vue';
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
+import { rowButtonNames } from '../../../../base/frontend/__tests__/mount-base';
 
 const OP = 'reservation.reservation.list';
 /** Thursday 15 October 2026, 12:00 in Madrid. */
@@ -51,6 +47,17 @@ async function setup(options: MountOptions = {}) {
       .map((a) => a.id);
   return { ...m, table, prop, rows, cells, show, action, visible, list: () => m.params(OP) };
 }
+
+describe('ReservationsPage: whom an action is for', () => {
+  it('each row action tells a screen reader whose reservation it is, its short words first', async () => {
+    const s = await setup();
+    await s.show([PENDING, SEATED]);
+    expect(['r1', 'r2'].map((id) => rowButtonNames(s.wrapper.element, `reservation-list-row-${id}`))).toEqual([
+      { confirm: 'Confirm: Ana García', seat: 'Seat: Ana García' },
+      { complete: 'Complete: Deleted customer', edit: 'Edit: Deleted customer' },
+    ]);
+  });
+});
 
 describe('ReservationsPage', () => {
   beforeEach(() => {

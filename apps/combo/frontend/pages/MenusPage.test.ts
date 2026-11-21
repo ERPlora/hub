@@ -3,7 +3,7 @@
 // sale, by order then name, 50 a page. With the right to manage: «+», and per row «Edit details» and
 // «Withdraw» (after its confirmation). Tapping a row opens the menu's builder.
 import { ConfirmDialog, DataTable, EmptyState } from '@erplora/ui/components';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import type { Component } from 'vue';
 
 import { business, EMPLOYEE, errorFrame, flush, JAPANESE, type MountOptions, mountCombo, page, POLISH } from '../__tests__/mount-combo';
@@ -11,11 +11,6 @@ import MenuFormModal from '../components/MenuFormModal.vue';
 import type { ComboOut } from '../operations';
 import MenusPage from './MenusPage.vue';
 import { listFillProblems } from '../../../../frontend/testing/list-fill';
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
 
 const OP = 'combo.combo.list';
 

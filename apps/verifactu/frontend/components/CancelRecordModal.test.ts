@@ -2,20 +2,10 @@
 // by error (a refund is a rectifying invoice), «Reason» (required) and «Cancel the record». Without a reason
 // nothing is sent; with one it runs `verifactu.record.cancel` and says so; a refusal is read inside the window.
 import { toastSuccess } from '@erplora/ui/shell';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import { click, ionValue, mountVerifactu } from '../__tests__/mount-verifactu';
 import CancelRecordModal from './CancelRecordModal.vue';
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
-vi.mock('@erplora/ui/shell', async (importOriginal) => ({
-  ...((await importOriginal()) as object),
-  toastSuccess: vi.fn(),
-}));
-beforeEach(() => vi.mocked(toastSuccess).mockClear());
 
 const RECORD = { id: 'r1', invoice_number: 'TICKET-2026-000001' };
 

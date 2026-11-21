@@ -6,8 +6,8 @@ documentación de la API, y por debajo lo que comparten todas las apps: el regis
 de datos por negocio), las operaciones, el outbox y su relevo, las tareas programadas y el contrato con erplora.com
 por `/internal`.
 
-- **Estado**: completa (2026-11-01): 112 de sus 115 flujos (`BASE-F01` … `F116`, sin `F28`) están `hecho`;
-  `BASE-F02` (hub#573), `BASE-F109` (hub#738) y `BASE-F116` (hub#576) están `parcial`.
+- **Estado**: completa (2026-11-01): 113 de sus 115 flujos (`BASE-F01` … `F116`, sin `F28`) están `hecho`;
+  `BASE-F02` (hub#573) y `BASE-F109` (hub#738) están `parcial`.
 - **Especificación**: [`WORKBOOK.md`](WORKBOOK.md) (en inglés, [`WORKBOOK.en.md`](WORKBOOK.en.md), hasta «Para quien
   lo mantiene»). Lo que se cambie de la plataforma se cambia antes allí; lo que no entra, en su «Lo que queda fuera».
 - **Peticiones** a `@erplora/ui` que siguen abiertas: [`UI-REQUESTS.md`](UI-REQUESTS.md).
@@ -16,10 +16,10 @@ por `/internal`.
 
 ## Qué hace hoy
 
-- **El Inicio** (F01–F12, F38): el saludo, «Mis apps», «Termina de configurar tu negocio» con los pasos que declara
-  cada app (el que impide facturar, primero y en rojo), el tablero de paneles de las apps, que se ponen al día solos,
-  la actividad, la campana con los avisos de las apps y los eventos que no se entregaron, y las plantillas de un
-  negocio como el suyo.
+- **El Inicio** (F01–F12, F38, F117): el saludo, «Mis apps», «Termina de configurar tu negocio» con los pasos que
+  declara cada app (el que impide facturar, primero y en rojo), el tablero de paneles de las apps, que se ponen al día
+  solos, la actividad, la campana con los avisos de las apps, los eventos que no se entregaron y la factura del plan sin
+  pagar, y las plantillas de un negocio como el suyo.
 - **Apps** (F14–F27): las apps del negocio y el catálogo, su precio, lo que traen consigo, activar y desactivar (al
   momento y en todos los dispositivos), por qué una no se abre y la de pago bloqueada.
 - **Sistema** (F39–F47, F116): Uso y plan, con lo que usa el negocio y si tiene que ampliar, Actualizaciones
@@ -48,8 +48,7 @@ por `/internal`.
 ## Lo que queda fuera
 
 El detalle está en «Lo que queda fuera» del [`WORKBOOK.md`](WORKBOOK.md): el archivo fiscal antes de borrar un negocio
-con documentos (hub#738), la fila de salud del Inicio en pantalla (hub#573), las novedades en la pantalla de
-Actualizaciones (hub#576) y la cola de PgBouncer de cada negocio en CloudWatch (hub#572). Ya no están fuera, cerradas
-después del cierre de la app: las cifras de uso y el aviso de ampliar (hub#603), el pase a erplora.com (saas#190), la
-vista previa de .xlsx y .docx (hub#578) y los roles que trae una app, que son siempre los cuatro de erplora.com
-(hub#579).
+con documentos (hub#738), la fila de salud del Inicio en pantalla (hub#573) y la cola de PgBouncer de cada negocio en
+CloudWatch (hub#572). Ya no están fuera, cerradas después del cierre de la app: las cifras de uso y el aviso de ampliar
+(hub#603), el pase a erplora.com (saas#190), la vista previa de .xlsx y .docx (hub#578), los roles que trae una app,
+que son siempre los cuatro de erplora.com (hub#579), y las novedades en la pantalla de Actualizaciones (hub#576).

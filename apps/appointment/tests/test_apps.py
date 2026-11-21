@@ -1,14 +1,13 @@
 """The appointment app declares its module metadata, its menu, its permissions and what each role gets."""
 
-from pathlib import Path
 
 from django.apps import apps
-from django.conf import settings
 from django.utils import translation
 from live.live_registry import live_registry
-from live.meta import BellCounter, Category, LiveAppConfig, Nav, module_configs
+from live.meta import BellCounter, Category, Help, LiveAppConfig, Nav, module_configs
 
 from base.tests.roles import grants_by_role
+from base.tests.shell_icons import shell_icon_registry
 
 PERMISSIONS = [
     "appointment.view_appointment",
@@ -96,7 +95,7 @@ def test_navigation_is_a_single_entry_with_a_registered_icon():
     assert [
         (entry.id, str(entry.label), entry.icon, entry.path) for entry in entries
     ] == [
-        ("appointments", "Appointments", "ion:calendar-outline", "/appointment/agenda"),
+        ("appointments", "Agenda", "ion:calendar-outline", "/appointment/agenda"),
     ]
 
 
@@ -216,9 +215,13 @@ def test_the_counters_events_re_run_its_query_and_its_icon_is_registered():
     counter = appointment().bell[0]
     assert live_registry.is_subscribable(counter.operation)
     assert set(counter.refresh_on) <= set(live_registry.subscribable[counter.operation])
-    icons = (Path(settings.BASE_DIR) / "packages/ui/src/shell/icons.ts").read_text()
+    icons = shell_icon_registry()
     assert f"'{counter.icon.removeprefix('ion:')}'" in icons
 
 
 def test_citas_has_no_setup_steps_nor_panels():
     assert (appointment().setup, appointment().widgets) == ([], [])
+
+
+def test_its_help_window_is_ready_without_a_video_yet():
+    assert appointment().help == Help()

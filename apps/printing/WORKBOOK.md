@@ -11,6 +11,12 @@ Lo que no entra todavía: ver «Lo que queda fuera».
 
 ## Para qué sirve y para quién
 
+Impresión es donde das de alta las impresoras del negocio, dices qué sale por cada una (tiques, comandas de cocina y
+barra, etiquetas) y ves si el papel está saliendo. El papel lo saca la app de ERPlora del dispositivo que está junto a
+la impresora; si algo no sale, la cola lo dice y te deja reintentarlo o cancelarlo.
+
+### En detalle
+
 Impresión es donde el negocio **da de alta sus impresoras, dice qué sale por cada una y ve si el
 papel está saliendo**. Cada impresora tiene un nombre («Caja», «Cocina»), su conexión (red, USB,
 Bluetooth o la impresora del sistema), su ancho de papel (58 u 80 mm) y su **función**: tiques,
@@ -20,7 +26,7 @@ negocio; el dispositivo con la app de ERPlora instalada junto a la impresora las
 confirma. Solo imprimen los **dispositivos dados de alta** con sus impresoras: una sesión de cualquier otro
 dispositivo no se lleva el papel de nadie. Si algo no sale, la cola lo dice y deja reintentarlo o cancelarlo.
 
-Quién la usa:
+### Quién la usa y qué hace cada uno
 
 - El **propietario** y el **administrador**: todo; además reintentan y cancelan trabajos atascados.
 - El **responsable**: da de alta y cambia impresoras, los dispositivos que imprimen y los ajustes, y pide
@@ -84,6 +90,12 @@ Configuración inicial, paso a paso:
 Cuatro pestañas abajo, las mismas que el menú: **Impresoras**, **Dispositivos**, **Cola** y **Ajustes**.
 
 ### Impresoras
+Aquí ves de un vistazo si el papel sale. Arriba, una tarjeta por función (Recibo, Cocina, Barra, Etiqueta) dice si
+tiene impresora y dispositivo, cuánto espera en cola y por qué impresora sale. Debajo están tus impresoras, con su
+conexión, su papel y su estado. Con «Añadir impresora» das de alta una por su dirección, o con «Buscar impresoras» la
+encuentras en la red; en cada fila, «Probar» saca una hoja de prueba.
+
+#### Detalle
 Menú **Impresión → Impresoras**. Título «Impresión» y la frase «Da de alta las impresoras del negocio,
 di qué sale por cada una y comprueba que el papel sale.». Dos zonas, en este orden:
 
@@ -124,6 +136,12 @@ Quien no puede cambiar impresoras no ve «Buscar impresoras», «Añadir impreso
 «Desactivar»; quien no puede imprimir no ve «Probar».
 
 ### Dispositivos
+Aquí das de alta los dispositivos que sacan el papel: el que está junto a las impresoras, con la app de ERPlora
+abierta. Solo imprimen los dispositivos de esta lista, con la sesión de cualquiera. Desde ese dispositivo, «Imprimir
+desde este dispositivo» lo da de alta con las impresoras a las que llega; la lista dice cuándo se vio cada uno por
+última vez, y en cada fila puedes cambiarlo o retirarlo.
+
+#### Detalle
 Menú **Impresión → Dispositivos**. Título «Dispositivos que imprimen» y la frase «Solo los dispositivos dados de
 alta aquí imprimen la cola, con la sesión de cualquiera: da de alta el que está junto a las impresoras desde ese
 dispositivo.». Debajo, una nota sobre el dispositivo en el que se mira: «Este dispositivo imprime para: Caja,
@@ -147,6 +165,11 @@ con «No imprimirá nada más, y los trabajos que tenga vuelven a la cola. Para 
 alta de nuevo desde él.», «Sí, retirar» y «Volver».
 
 ### Cola
+La cola es cada trabajo de impresión que se ha pedido, del más reciente al más antiguo, con su documento, su
+impresora y su estado: Pendiente, Enviado, Impreso, Fallido o Cancelado. Fíltrala por estado, función o impresora, o
+busca por número de documento. Un trabajo atascado se vuelve a mandar con «Reintentar» o se retira con «Cancelar».
+
+#### Detalle
 Menú **Impresión → Cola**. Título «Cola de impresión». La tabla de trabajos, del más reciente al más
 antiguo, 50 por página: Documento («Recibo T-000123», o «Recibo · 14/10/26 23:05» si no trae número),
 Función, Impresora, Estado («Pendiente», «Enviado», «Impreso», «Fallido», «Cancelado»), Intentos, Pedido el
@@ -157,6 +180,11 @@ sin respuesta pasado su plazo; «Cancelar» abre una ventana con «Motivo (opcio
 «Volver». Vacía: «No hay trabajos de impresión.». Error al cargar: el mensaje con «Reintentar».
 
 ### Ajustes
+Aquí decides cómo imprime el negocio: si el tique sale solo al cobrar, si se abre el cajón con él, cuántas copias
+salen y, si tienes varias impresoras con la misma función, por cuál sale cada cosa. El encabezado y el pie del tique
+se escriben en los ajustes de Ventas: la nota de esta pantalla te lleva allí.
+
+#### Detalle
 Menú **Impresión → Ajustes**. Una tarjeta «Ajustes del tique» con «Imprimir tique al cobrar», «Abrir cajón al
 cobrar» y «Copias del tique» (1, 2 o 3); otra «Impresora de cada función» con un desplegable por
 función («Recibo», «Cocina», «Barra», «Etiqueta»): «La primera activa con esa función» o una de sus
@@ -219,7 +247,7 @@ Pasos:
 1. En el **Inicio**, mientras ningún dispositivo dado de alta llega a una impresora de recibos activa,
    «Termina de configurar tu negocio» trae «Configura la impresora» («Da de alta el dispositivo que
    imprime los tiques de tus clientes, para que la primera venta salga en papel.»), «Recomendado», a
-   quien gestiona las impresoras. «Configurar» lleva a **Impresión → Dispositivos** (PRINTING-F18); el
+   quien gestiona las impresoras. «Configurar» lleva a **Impresión → Dispositivos**; el
    paso queda «Hecho» en cuanto ese dispositivo está dado de alta, encendido o no.
 2. Si una función tiene trabajos que llevan un minuto o más en cola y ningún dispositivo encendido puede
    sacarlos (ninguno dado de alta llega a su impresora, o esperan impresora y ninguno llega a una de su función,
@@ -235,9 +263,8 @@ Pasos:
 3. Abre **Impresión → Impresoras**: las tarjetas de función dicen si cada una tiene impresora y cuál
    la imprime, cuánto espera y desde cuándo.
 4. Abre **Impresión → Cola** para ver cada trabajo con su estado, sus intentos y su último error.
-5. Si una función sale «En cola, sin impresora» o hay un aviso naranja, el papel no está saliendo:
-   sigue por PRINTING-F04 (dar la función a una impresora) o PRINTING-F14 (sacar el trabajo del
-   atasco).
+5. Si una función sale «En cola, sin impresora» o hay un aviso naranja, el papel no está saliendo: dale esa
+   función a una impresora en **Impresión → Impresoras** o saca el trabajo del atasco en **Impresión → Cola**.
 Entra: la cola, las impresoras y los dispositivos del negocio.
 Sale: nada guardado. Lo que depende del reloj (cuánto lleva esperando, el aviso naranja, «Esperando»,
 «Dispositivo apagado» en la tarjeta de la función y un enviado que no contestó a tiempo) se recalcula solo cada
@@ -300,7 +327,7 @@ nombre de red válidos (por ejemplo 192.168.1.100).», «El puerto va de 1 a 655
 como AA:BB:CC:DD:EE:FF.», «Escribe el nombre de la cola de impresión tal como lo da el sistema (sin
 espacios, barras ni #).», «La impresora del sistema imprime páginas A4: dale la función Recibo.». Sin
 nombre, «Ponle un nombre a la impresora.». Cada aviso sale debajo de su campo y se quita en cuanto se cambia ese
-campo, sin volver a pulsar «Guardar»; el de otro campo se queda hasta que se cambia el suyo (hub#1470).
+campo, sin volver a pulsar «Guardar»; el de otro campo se queda hasta que se cambia el suyo.
 Implicados: PRINTING-F04, PRINTING-F05
 
 ### PRINTING-F04 Asignar qué sale por cada impresora
@@ -319,7 +346,7 @@ Entra: la función de cada impresora y, si hay varias, la elegida.
 Sale: cada documento sale por la impresora de su función. Una impresora no se borra: la cola la nombra.
 Si falla: si ninguna impresora activa tiene la función, el trabajo **espera** en la cola sin
 impresora («En cola, sin impresora») y sale en cuanto una la tenga; la comanda de Cocina no, porque
-Cocina entonces no la manda (PRINTING-F10). En ajustes, una impresora de otra
+Cocina entonces no la manda. En ajustes, una impresora de otra
 función o inactiva se rechaza: «Esa impresora no tiene esta función.», «Esa impresora está inactiva.».
 Implicados: PRINTING-F01, PRINTING-F06, INVENTORY-F25
 
@@ -330,15 +357,15 @@ Pantalla: Impresoras
 Pasos:
 1. Pulsa «Probar» en la fila de la impresora.
 2. Sale «Hoja de prueba enviada a la cola de Caja.» y en la cola aparece «Hoja de prueba».
-3. El dispositivo que imprime para esa impresora, con la app de ERPlora abierta, la saca enseguida
-   (PRINTING-F18): el nombre del negocio (el que tiene Facturación; sin Facturación o sin permiso para leerlo,
+3. El dispositivo que imprime para esa impresora, con la app de ERPlora abierta, la saca enseguida:
+   el nombre del negocio (el que tiene Facturación; sin Facturación o sin permiso para leerlo,
    «ERPlora»), «Impresora OK», la fecha y la dirección de la impresora. Una impresora del sistema saca la hoja en
    A4 con lo mismo. En la cola, la hoja queda «Impreso».
 Entra: la impresora.
 Sale: un trabajo «Hoja de prueba» para esa impresora (avisa: `printing.job.queued`).
 Si falla: una impresora inactiva no se prueba: «Esa impresora está inactiva: actívala para probarla.».
-Si el papel no sale, la hoja vuelve a la cola con el error del dispositivo y, tras 5 intentos, queda «Fallido»
-(PRINTING-F14).
+Si el papel no sale, la hoja vuelve a la cola con el error del dispositivo y, tras 5 intentos, queda «Fallido»: en
+**Impresión → Cola** se reintenta o se cancela.
 Implicados: PRINTING-F18
 
 ### PRINTING-F06 Elegir cómo imprime el negocio
@@ -351,7 +378,7 @@ Pasos:
    tique» y, si quieres, la impresora de cada función.
 3. Pulsa «Guardar ajustes» (apagado hasta que cambias algo). Se guarda lo que cambiaste; lo demás
    queda como estaba, y sale «Ajustes guardados.» encima del botón.
-   Lo que se cambia mientras se está guardando no se pierde: se queda en pantalla, por guardar (hub#914).
+   Lo que se cambia mientras se está guardando no se pierde: se queda en pantalla, por guardar.
 Entra: las decisiones del negocio.
 Sale: los ajustes de impresión, una sola fila (avisa: `printing.settings.updated`). Sin guardar
 nunca valen los de fábrica: tique al cobrar encendido, cajón apagado, una copia, sin impresora elegida.
@@ -359,7 +386,7 @@ Si falla: «No se pudieron guardar los ajustes.» con el motivo; si nombra la im
 (desactivada, borrada o pasada a otra función mientras se elegía), el motivo sale también debajo de esa
 función. Como en las ventanas de formulario, el aviso se quita en cuanto se cambia algo y el motivo de
 una función en cuanto se elige otra impresora para ella; los dos vuelven si el siguiente intento también
-se rechaza. Un rechazo sin campo se queda hasta el siguiente intento (hub#871). Si la lectura falla, la
+se rechaza. Un rechazo sin campo se queda hasta el siguiente intento. Si la lectura falla, la
 pantalla no enseña valores y ofrece «Reintentar». Sin permiso, bloqueados y sin «Guardar ajustes».
 Implicados: PRINTING-F07, PRINTING-F13
 
@@ -453,13 +480,12 @@ Implicados: KITCHEN-F09, PRINTING-F10
 ### PRINTING-F12 Imprimir la etiqueta de un código de barras
 Estado: hecho
 Actor: administrador, responsable, empleado
-Pantalla: Ficha del producto (de Inventario) e Impresoras
+Pantalla: Ficha del producto (de Inventario), Impresoras
 Pasos:
-1. En **Inventario → Productos**, abre la ficha del producto y pulsa «Imprimir código de barras»
-   (INVENTORY-F25).
+1. En **Inventario → Productos**, abre la ficha del producto y pulsa «Imprimir código de barras».
 2. Inventario pide la etiqueta a Impresión: entra en la cola de la impresora con la función «Etiqueta»,
    con el nombre del producto, su SKU como código de barras y su precio. El código lo dibuja la impresora
-   y la saca el dispositivo que recoge los trabajos de esa impresora (PRINTING-F18).
+   y la saca el dispositivo que recoge los trabajos de esa impresora.
 3. En **Impresión → Impresoras**, la tarjeta «Etiqueta» de «Cola de impresión» dice cuántas esperan y por
    qué impresora salen.
 Entra: el nombre del producto, su SKU (el código de barras) y su precio en la moneda del negocio.
@@ -562,7 +588,7 @@ Implicados: CASH_REGISTER-F16
 Estado: hecho
 Actor: el propietario, el administrador o el responsable (dan de alta el dispositivo) y la app del dispositivo
 (recoge)
-Pantalla: Impresión → Dispositivos
+Pantalla: Dispositivos
 Pasos:
 1. En el dispositivo que está junto a las impresoras, quien gestiona las impresoras abre **Impresión →
    Dispositivos**, pulsa «Imprimir desde este dispositivo», le pone nombre («Caja del mostrador») y marca las
@@ -591,7 +617,7 @@ Pasos:
 6. Mientras la app de ERPlora del dispositivo está conectada para imprimir, dice que está ahí al conectarse y en
    cada latido (cada 30 s), con la sesión de quien la usa, también la de un empleado; darlo de alta desde él y
    pedir un trabajo también cuentan. La lista lo enseña en «Visto por última vez». Si pasa 90 s sin dar señales,
-   cuenta como apagado: sus trabajos hacen sonar la campana pasado el minuto (PRINTING-F01).
+   cuenta como apagado: sus trabajos hacen sonar la campana pasado el minuto.
 7. Desde cualquier dispositivo, quien gestiona las impresoras cambia en la lista el nombre o las impresoras de
    un dispositivo («Editar») o lo retira («Retirar», tras confirmarlo): la app de ese dispositivo lo nota al
    momento, imprime para sus impresoras nuevas o deja de imprimir, y los trabajos que tenía vuelven a la cola cuando
@@ -614,7 +640,7 @@ copias pasa de los 90 s y el trabajo ya había vuelto a la cola) se acepta: el p
 vez. Una confirmación o un fallo de otro dispositivo, o de una entrega que no es la suya, se rechaza y no cambia
 nada. Dar de alta sin nombre o sin impresoras activas avisa en su campo, y el aviso se quita en cuanto se cambia
 ese campo (se escribe el nombre, se marca una impresora), sin volver a pulsar «Guardar»; el del otro se queda hasta
-que se cambia el suyo (hub#1470). Solo se da de alta desde el propio dispositivo. La cola y la lista nombran cada dispositivo por su nombre, nunca por su identificador: con él
+que se cambia el suyo. Solo se da de alta desde el propio dispositivo. La cola y la lista nombran cada dispositivo por su nombre, nunca por su identificador: con él
 cualquiera se haría pasar por la caja.
 Implicados: PRINTING-F05, PRINTING-F07, PRINTING-F14
 

@@ -39,32 +39,23 @@ from apps.service.models import (
     ServiceSettings,
     parent_problem,
 )
-from apps.service.queries import (
-    ASSIGNMENT_NOT_FOUND,
-    PACKAGE_NOT_FOUND,
+from apps.service.queries.assignments import ASSIGNMENT_NOT_FOUND, load_assignment
+from apps.service.queries.catalog import find_service, load_service
+from apps.service.queries.categories import find_category, load_category
+from apps.service.queries.grant_checks import redeem_refusal, void_refusal
+from apps.service.queries.grants import (
     SESSION_NOT_FOUND,
-    SYSTEM,
     balance,
-    current_settings,
-    find_category,
     find_grant,
-    find_package,
-    find_service,
-    grants,
     session_rows,
-    held_rows,
-    load_assignment,
-    load_category,
     load_grant,
-    load_package,
-    load_service,
-    left_by_deleting,
     lock_grant,
-    redeem_refusal,
     session_value,
-    settings_row,
-    void_refusal,
 )
+from apps.service.queries.packages import PACKAGE_NOT_FOUND, find_package, load_package
+from apps.service.queries.reads import SYSTEM, held_rows
+from apps.service.queries.recovery import left_by_deleting
+from apps.service.queries.settings import current_settings, settings_row
 from apps.service.schemas import (
     PRICE_RANGE_UPSIDE_DOWN,
     SERVICE_REPEATED,
@@ -166,7 +157,7 @@ SUBCATEGORY_CHANGED_LEFT = _("came back without the subcategory %(category)s: ch
 CATEGORY_BROUGHT_EARLIER = _(
     "the category %(category)s came back in an earlier recovery: what goes in it is the business's to decide"
 )
-#: Why a session cannot be spent (queries.redeem_refusal) → its code and its message.
+#: Why a session cannot be spent (queries.grant_checks.redeem_refusal) → its code and its message.
 REDEEM_REFUSALS = {
     "voided": (
         "service.grant_voided",
@@ -1164,7 +1155,7 @@ def recover_service(ctx: OperationContext, data: ServiceRecoverIn) -> dict:
     (the business's choice stays), and it comes back switched off, by ``service.assignment.update``, if it was. Its
     image of the library comes back as ``service.service.set_image`` sets it (SERVICE-F34); a photo of its own does not
     (``base.images.from_copy``). It keeps which of the copy's it is made again for (``stands_for``), for the apps whose
-    records hang from that one (``queries.services_standing_for``)."""
+    records hang from that one (``queries.recovery.services_standing_for``)."""
     made = create_service(ctx, ServiceIn.model_validate(data.model_dump(include=set(ServiceIn.model_fields))))
     Service.objects.filter(pk=made.id).update(stands_for=data.stands_for)
     if image := images.from_copy(ctx, data.image):

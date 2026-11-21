@@ -3,16 +3,10 @@
 // «Personal data erased.». A refusal stays in the panel.
 import { toastSuccess } from '@erplora/ui/shell';
 import { IonInput } from '@ionic/vue';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import { flush, json, type MountOptions, mountCustomer, refusal, sent } from '../__tests__/mount-customer';
 import ErasePanel from './ErasePanel.vue';
-
-vi.mock('@erplora/ui/shell', async (importOriginal) => ({
-  ...((await importOriginal()) as object),
-  toastSuccess: vi.fn(),
-}));
-beforeEach(() => vi.mocked(toastSuccess).mockClear());
 
 async function setup(options: MountOptions = {}) {
   const m = await mountCustomer(ErasePanel, { props: { customer: { id: 'c1', name: 'Ana García' } }, ...options });

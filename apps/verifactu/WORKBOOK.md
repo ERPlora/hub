@@ -190,7 +190,9 @@ pestañas, las dos vías:
   dato.».
 - **«Mi certificado»**: «Certificado del negocio (.p12 / .pfx)» con «Cargado» / «Sin cargar», «Titular», «NIF
   del titular», «Tipo», «Subido el» y «Caduca el» (con el aviso «Caduca en {n} días: sube aquí el renovado.» a
-  30 días o menos y «El certificado ha caducado. Sube uno vigente para poder enviar a la AEAT.»). Quien configura
+  30 días o menos y «El certificado ha caducado. Sube uno vigente para poder enviar a la AEAT.») y, en pruebas,
+  «AEAT de pruebas»: «Sin probar todavía», «Aceptado» o «Rechazado», con el aviso de cómo se prueba o de por qué lo
+  ha rechazado (VERIFACTU-F02). Quien configura
   VeriFactu ve «Elegir el fichero .p12 / .pfx», «Contraseña del certificado», «Subir el certificado» y, con uno
   cargado, «Quitar» (pregunta antes, en una tarjeta que dice qué pasará: en pruebas, «Puedes seguir probando sin él:
   tus registros de pruebas siguen saliendo.»; en producción con tu certificado, «Los registros esperarán hasta
@@ -259,7 +261,7 @@ Avisos de la pantalla: el resultado de cada acción en una franja arriba (verde 
 | VERIFACTU-F04 | Saber quién remite: mi certificado o ERPlora | hecho — la vía no se elige: la decide el certificado y queda fijada al pasar a producción |
 | VERIFACTU-F05 | Firmar y subir el otorgamiento de representación para que remita ERPlora | hecho — se sube en el Hub, lo revisa el staff en el SaaS (`fiscal/`) y el estado vuelve en la foto; con la vía de ERPlora cerrada en el servidor no se ofrece |
 | VERIFACTU-F06 | Volver a enviar el otorgamiento | hecho — en el Hub, como VERIFACTU-F05 |
-| VERIFACTU-F08 | Pasar a producción | hecho — producción = despliegue `prod` ∧ `VERIFACTU_PRODUCTION_ENABLED` ∧ (certificado propio válido \| vía ERPlora abierta en el servidor con otorgamiento aprobado) ∧ cuenta activa, en todos los planes (también en Gratis); el servidor lo tiene cerrado hasta que ERPlora lo abra (bajo supervisión de Ioan) |
+| VERIFACTU-F08 | Pasar a producción | hecho — producción = despliegue `prod` ∧ `VERIFACTU_PRODUCTION_ENABLED` ∧ (certificado propio vigente y aceptado por la AEAT de pruebas \| vía ERPlora abierta en el servidor con otorgamiento aprobado) ∧ cuenta activa, en todos los planes (también en Gratis); el servidor lo tiene cerrado hasta que ERPlora lo abra (bajo supervisión de Ioan) |
 | VERIFACTU-F09 | Volver a pruebas | hecho |
 | VERIFACTU-F10 | Probar la conexión con la AEAT | hecho — con la sonda de la pasarela del SaaS (`/internal/verifactu/probe`) |
 | VERIFACTU-F11 | Crear una factura de prueba | hecho |
@@ -320,24 +322,29 @@ Pasos:
 1. En **VeriFactu → Configuración**, pestaña «Mi certificado», pulsa «Elegir el fichero .p12 / .pfx» y elige el
    certificado del negocio (como mucho 1 MB).
 2. Escribe su contraseña en «Contraseña del certificado» y pulsa «Subir el certificado».
-3. El Hub lo abre con la contraseña, comprueba que lo ha emitido una entidad reconocida (las autoridades de
-   certificados cualificados de firma o de sello de la lista de confianza de prestadores de España), lee titular,
-   NIF, tipo y caducidad y lo guarda cifrado (Fernet) junto con la contraseña en la base de datos del hub. Sale
-   «Certificado subido: {titular} ({NIF}).» y la pestaña pasa a «Cargado». Subir otro sustituye al anterior.
+3. El Hub lo abre con la contraseña, lee titular, NIF, tipo y caducidad y lo guarda cifrado (Fernet) junto con la
+   contraseña en la base de datos del hub. No mira qué entidad lo ha emitido: si vale, lo dice la AEAT de pruebas
+   (paso 4). Sale «Certificado subido: {titular} ({NIF}).» y la pestaña pasa a «Cargado». Subir otro sustituye al
+   anterior.
 4. Mientras el negocio está en pruebas, desde ese momento sus registros salen con él (VERIFACTU-F04), también los que
-   la pasarela había rechazado, y ya puede pasar a producción con él (VERIFACTU-F08).
-5. El certificado guardado se vuelve a comprobar solo, cada hora, si aún no se comprobó con la lista de confianza que
-   trae el Hub (uno subido antes de esta comprobación, o la lista renovada). Si no lo ha emitido una entidad
-   reconocida, deja de valer: la pestaña pasa a «Sin cargar» y pide subir uno válido, la vía pasa a ser la de sin
-   certificado (VERIFACTU-F04) y en los eventos queda «El certificado propio de {titular} ({NIF}) ya no vale: no lo ha
-   emitido una entidad que reconozca la AEAT. Sube uno válido.». Si el servidor no puede abrirlo, se queda sin
-   comprobar, como estaba.
-6. En un negocio de fuera de España no se ofrece: arriba dice «VeriFactu solo es para negocios de España.» y la pestaña solo enseña el estado del
+   la pasarela había rechazado, y con ellos lo prueba la AEAT de pruebas. En la pestaña, la fila «AEAT de pruebas»
+   dice «Sin probar todavía» y debajo «Se prueba con el próximo registro que salga en pruebas: cuando la AEAT de
+   pruebas lo acepte, podrás pasar a producción.». Cuando la AEAT de pruebas contesta a un envío hecho con él con su
+   veredicto sobre los registros (aunque rechace alguno por su contenido), pasa a «Aceptado» y ya puede pasar a
+   producción con él (VERIFACTU-F08). Si lo rechaza por el certificado, pasa a «Rechazado» y debajo sale por qué:
+   su puerta redirige a la página de error 401 de la sede («Se ha producido un error al verificar el certificado
+   presentado»: no lo ha emitido una entidad que reconozca, no vale para este servicio o ha caducado), o responde el
+   fallo 4112 («El titular del certificado debe ser Obligado Emisión, Colaborador Social, Apoderado o Sucesor»). Una
+   AEAT caída o que no responde, un fallo del contenido del envío o un fallo pasajero como el 103 «NIF no
+   identificado» (la AEAT de pruebas se lo ha dado a certificados buenos y al rato los identificaba) no lo cambian; si
+   después la AEAT de pruebas lo acepta, pasa a «Aceptado». Subir otro lo deja
+   otra vez «Sin probar todavía». En producción la fila no sale: la producción nunca prueba un certificado.
+5. En un negocio de fuera de España no se ofrece: arriba dice «VeriFactu solo es para negocios de España.» y la pestaña solo enseña el estado del
    certificado, sin subirlo ni quitarlo.
 Entra: el `.p12`/`.pfx` en base64 y su contraseña (`verifactu.certificate.upload`).
 Sale: el certificado guardado (`OwnCertificate`), un evento «Certificado propio de … subido» y el aviso
-`verifactu.config.changed`; el de uno guardado que deja de valer, el evento «El certificado propio de … ya no vale» y
-el mismo aviso (`verifactu.certificate.recheck`, la tarea programada). El fichero y la contraseña no se vuelven a mostrar: ni en la API, ni en el admin,
+`verifactu.config.changed`; cuando la AEAT de pruebas lo acepta o lo rechaza, el evento «La AEAT de pruebas ha aceptado el certificado propio de …: el negocio ya puede pasar a producción
+con él.» o «La AEAT de pruebas ha rechazado el certificado propio de … (motivo): sube otro.» y el mismo aviso. El fichero y la contraseña no se vuelven a mostrar: ni en la API, ni en el admin,
 ni en la foto, ni en los registros del servidor.
 Si falla: el certificado no se guarda (409):
 - sin clave de almacenamiento en el servidor, «Este servidor aún no puede guardar certificados: ERPlora tiene
@@ -346,14 +353,12 @@ Si falla: el certificado no se guarda (409):
 - contraseña mala o fichero que no es un `.p12`, «El fichero no es un certificado .p12/.pfx que abra esta
   contraseña.»; autofirmado, «Este certificado no lo ha emitido ninguna entidad (es autofirmado), así que la AEAT
   no lo aceptará. Usa el certificado electrónico de tu negocio emitido por una entidad reconocida, por ejemplo la
-  FNMT.»; emitido por una entidad que no es de la lista de confianza, «Este certificado no lo ha emitido una entidad
-  que reconozca la AEAT, así que la AEAT no lo aceptará. Usa el certificado electrónico de tu negocio emitido por una
-  entidad reconocida, por ejemplo la FNMT.»; sin uso de autenticación de cliente, «El certificado no permite la autenticación de cliente,
+  FNMT.»; sin uso de autenticación de cliente, «El certificado no permite la autenticación de cliente,
   así que no puede conectar con la AEAT.»; caducado, «El certificado caducó el {fecha}: sube uno vigente.»
   (todos `verifactu.certificate_invalid`);
 - titular distinto del emisor de Facturación, «El certificado es de {NIF}, no del emisor de este negocio,
   {NIF}.» (`verifactu.certificate_holder_mismatch`): por la vía propia se presentaría en nombre de otro.
-Implicados: VERIFACTU-F04, VERIFACTU-F34
+Implicados: VERIFACTU-F04, VERIFACTU-F08, VERIFACTU-F34
 
 ### VERIFACTU-F03 Quitar el certificado propio
 Estado: hecho — en el Hub
@@ -379,10 +384,10 @@ Estado: hecho — la vía no se elige: la decide el certificado y queda fijada a
 Actor: administrador
 Pantalla: Ajustes
 Pasos:
-1. La vía la decide el certificado. Con un certificado propio cargado, vigente y emitido por una entidad reconocida
-   (VERIFACTU-F02), los registros salen con él; sin él, en pruebas los remite ERPlora con su sello, también en un
-   negocio de demostración. Mientras el negocio está en pruebas, subir, quitar o dejar caducar el certificado, o que
-   deje de valer al volver a comprobarlo, cambia la vía de lo que aún no ha salido.
+1. La vía la decide el certificado. Con un certificado propio cargado y vigente (VERIFACTU-F02), los registros salen
+   con él; sin él, en pruebas los remite ERPlora con su sello, también en un
+   negocio de demostración. Mientras el negocio está en pruebas, subir, quitar o dejar caducar el certificado cambia
+   la vía de lo que aún no ha salido.
 2. En **VeriFactu → Ajustes**, «Envío» lo dice en una frase con su icono y lo que falta (la pantalla Ajustes).
 3. Al pasar a producción (VERIFACTU-F08), la vía de ese momento queda fijada: con un certificado válido, el
    certificado, aunque también esté aprobada la autorización; sin él, la de ERPlora. Desde entonces, subir, quitar o
@@ -456,8 +461,8 @@ Si falla: como VERIFACTU-F05.
 Implicados: VERIFACTU-F05
 
 ### VERIFACTU-F08 Pasar a producción
-Estado: hecho — producción = despliegue `prod` ∧ `VERIFACTU_PRODUCTION_ENABLED` ∧ (certificado propio válido | vía
-ERPlora abierta en el servidor con otorgamiento aprobado) ∧ cuenta activa (`status` de la foto), en todos los planes
+Estado: hecho — producción = despliegue `prod` ∧ `VERIFACTU_PRODUCTION_ENABLED` ∧ (certificado propio vigente y
+aceptado por la AEAT de pruebas | vía ERPlora abierta en el servidor con otorgamiento aprobado) ∧ cuenta activa (`status` de la foto), en todos los planes
 (también en Gratis, sin opción de pago); el servidor lo tiene cerrado hasta que ERPlora lo abra (bajo supervisión de Ioan). En `pre` nunca se abre: todo va a pruebas. Un
 hub demo nunca pasa a producción (`verifactu.go_live_forbidden`).
 Actor: administrador
@@ -466,13 +471,15 @@ Pasos:
 1. En **VeriFactu → Ajustes**, «Entorno AEAT» enseña «Pruebas (AEAT de pruebas)» y «Tus facturas van al entorno de
    pruebas de la AEAT. Cuando esté todo listo, pasa a producción.». Si falta algo, debajo sale «Todavía no puede
    pasar a producción:» con la lista (negocio de demostración, otorgamiento sin aprobar, vía de ERPlora cerrada en el
-   servidor, certificado propio que falta o ha caducado, cuenta con un pago pendiente o suspendida) y «Pasar a
+   servidor, certificado propio que falta o ha caducado, certificado propio que la AEAT de pruebas aún no ha aceptado
+   o ha rechazado, cuenta con un pago pendiente o suspendida) y «Pasar a
    producción» queda desactivado. Ningún plan falta en ella: VeriFactu en vivo es de todos los planes.
 2. Pulsa «Pasar a producción» y confirma en «¿Enviar tus facturas a la AEAT de verdad?» («A partir de ahora
    cada registro se remite a la AEAT real. En cuanto se selle el primero ya no podrás volver a pruebas.»).
 3. Sale «Tu negocio está en producción: los registros ya se remiten a la AEAT real.» y la pastilla pasa a
    «Producción».
-Entra: el emisor de Facturación; el certificado propio y su caducidad; de la foto de la cuenta
+Entra: el emisor de Facturación; el certificado propio, su caducidad y si la AEAT de pruebas lo ha aceptado
+(VERIFACTU-F02); de la foto de la cuenta
 (`verifactu.config.sync`), el otorgamiento y el estado del negocio (la foto de un SaaS anterior aún trae `live_paid`:
 se acepta y no se lee).
 Sale: el entorno en producción y la vía de ese momento fijada (VERIFACTU-F04: con certificado válido, el certificado;
@@ -484,7 +491,14 @@ todavía no ha abierto la presentación real a la AEAT en este servidor», `prod
 SaaS en el servidor, «La pasarela de envío de ERPlora no está configurada en este servidor: nada podría llegar a la
 AEAT.» (`verifactu.gateway_unavailable`); con un certificado propio que este servidor no abre (la clave
 `FISCAL_CERTIFICATE_KEY` falta o se rotó), «Tu certificado propio no se puede abrir en este servidor: vuelve a
-subirlo en VeriFactu → Configuración → Mi certificado.» (`verifactu.own_certificate_unreadable`); en un hub demo, «Un negocio de demostración no
+subirlo en VeriFactu → Configuración → Mi certificado.» (`verifactu.own_certificate_unreadable`); con un certificado
+propio que la AEAT de pruebas aún no ha aceptado, «La AEAT de pruebas aún no ha aceptado tu certificado propio: se
+prueba con el próximo registro que salga en pruebas. Haz una venta o una factura y pasa a producción cuando lo
+acepte.» (`verifactu.own_certificate_untested`; en la lista de lo que falta: «la AEAT de pruebas aún no ha aceptado
+tu certificado propio: se prueba con el próximo registro que salga en pruebas», `own_certificate_untested`); con uno
+que ha rechazado, «La AEAT de pruebas ha rechazado tu certificado propio: sube otro en VeriFactu → Configuración → Mi
+certificado.» (`verifactu.own_certificate_rejected`; en la lista: «la AEAT de pruebas ha rechazado tu certificado
+propio: sube otro», `own_certificate_rejected`); en un hub demo, «Un negocio de demostración no
 puede pasar a producción: siempre presenta en el entorno de pruebas de la AEAT.» (`verifactu.go_live_forbidden`;
 quién es demo lo dice la plataforma, `base.operations.is_demo_hub`); sin emisor, «Configura antes el emisor en
 Facturación → Emisor.»; sin certificado válido y sin autorización aprobada, «Para que ERPlora remita en producción
@@ -509,11 +523,15 @@ resuelva:» (`issue_blocker`). Lo ya sellado sin otorgamiento aprobado o sin cer
 pasarela no podría presentarlo.
 Cerrar la vía de ERPlora en el servidor no saca de producción a quien ya está en ella ni le cambia la vía: sigue
 sellando, enviando y anulando con el sello de ERPlora, porque la AEAT solo acepta una anulación presentada con el mismo
-sello; subir después un certificado tampoco la cambia. El paso «Configura VeriFactu» del Inicio, con la vía cerrada,
-solo se da por hecho con el certificado propio.
+sello; subir después un certificado tampoco la cambia. Quien ya está en producción por el certificado y sube otro
+sigue enviando con él sin que se pruebe: la producción nunca prueba un certificado. El paso «Configura VeriFactu» del
+Inicio solo se da por hecho con el certificado propio cuando la AEAT de pruebas lo ha aceptado y, con la vía cerrada,
+solo habla de él: «Sube el certificado del negocio para enviar tus
+facturas a la AEAT.» (con la vía abierta, «Firma la autorización para que ERPlora envíe tus facturas a la AEAT, o sube
+el certificado del negocio.»).
 Se comprueba en este orden y la primera causa da el 409 con su código: el servidor cerrado → un negocio de
-demostración → el emisor → la vía (con certificado válido, el certificado, que no pide otorgamiento; sin él, la de
-ERPlora, abierta en el servidor y con el otorgamiento aprobado) → la cuenta.
+demostración → el emisor → la vía (con certificado válido, el certificado, que no pide otorgamiento pero sí que la AEAT
+de pruebas lo haya aceptado; sin él, la de ERPlora, abierta en el servidor y con el otorgamiento aprobado) → la cuenta.
 Implicados: VERIFACTU-F04, VERIFACTU-F05, VERIFACTU-F09
 
 ### VERIFACTU-F09 Volver a pruebas
@@ -1110,7 +1128,7 @@ que manda la cuenta (`verifactu.sync_config`) no es de ningún papel: solo del s
 
 `apps.py`, `models.py` (`Config`, `OwnCertificate`, `Chain`, `SendControl`, `Record`, `Event`, `AeatRecord`),
 `migrations/`,
-`schemas.py`, `services/`, `queries/`, `api.py`, `live.py`, `events.py`, `admin.py`, `locale/`,
+`schemas/`, `services/`, `queries/`, `api.py`, `live.py`, `events.py`, `admin.py`, `locale/`,
 `frontend/` y, puros y sin ORM: `chain.py` (formatos, huella, QR), `envelope.py` (el XML: `RegistroAlta`,
 `RegistroAnulacion`, el sobre y la consulta), `xsd.py` (validación con los esquemas de `xsd/`), `aeat.py`
 (lectura de las respuestas de la AEAT y de la consulta), `gateway.py` (cliente de la pasarela del SaaS),
@@ -1131,6 +1149,8 @@ production, scope)` sobre la vía que tendría en producción, `queries.route.se
 este servidor abre o, sin él, la vía ERPlora abierta en el servidor (`erplora_route.closed`) con el otorgamiento
 aprobado; ya en producción, la vía fijada, sin mirar el interruptor; la exención del hub de ERPlora incluida; lo que le
 falte al servidor no cuenta, no es tarea del negocio),
+descripción según la vía de ERPlora para el negocio que lee el Inicio (`erplora_route.step_description`, perezosa: la
+misma `erplora_route.available` que da `erplora_route_available` a Configuración; con ella cerrada, solo el certificado),
 permiso `verifactu.configure`, ruta `/verifactu/config`, `refresh_on` `verifactu.config.changed`, `countries`
 `(SPAIN,)` (`apps.py`; hub#682: un negocio de otro país no lo ve, ni su muro en producción; uno sin país cuenta como
 España por `base.business.country_or_market`, que también lee `queries.country.outside_spain`: una sola regla). **Paneles** (permiso
@@ -1159,10 +1179,11 @@ WhatsApp) o «waiting» (la de «waiter»). Hasta ERPlora/live#71 el asistente l
 `tests/test_assistant_asks.py` mide con las frases reales de la QA de la capa 2
 (`tests/e2e/qa/probes/*-es-verifactu-*.json`), nunca con los propios asks, y con una frase propia por herramienta que
 solo la trae con sus asks; el empleado no recibe las escrituras que no puede hacer, y ningún test sale de la máquina
-(ni la AEAT de pruebas ni la de producción). Límite medido: la sonda de pasar a producción («activa el envío real…
-comprobando antes que la cuenta y la autorización estén listas») se ofrece pasado el 30.º puesto de 40, porque «la
-cuenta» (la de ERPlora) se lee como la cuenta de una mesa y van delante las escrituras de Ventas que la toman (`xfail`
-estricto en el test hasta ERPlora/live#76; sin «la cuenta y», la misma frase la trae la 6.ª).
+(ni la AEAT de pruebas ni la de producción). Hasta ERPlora/live#76, la sonda de pasar a producción («activa el envío
+real… comprobando antes que la cuenta y la autorización estén listas») se ofrecía la 34.ª de 40: «la cuenta» (la de
+ERPlora) se leía como la cuenta de una mesa y pasaban delante las escrituras de Ventas que la toman. Lo que se nombra de
+pasada, en la parte de la frase que abre con un gerundio («comprobando…»), ya no cuenta como lo que «activa» enciende, y
+la sonda trae la herramienta la 8.ª.
 
 La tarjeta de confirmación de una escritura (BASE-F97) dice qué registro toca por el número de su factura, como la
 lista de registros y la ficha: reintentar, reenviar, preguntar a la AEAT, subsanar o anular el registro de una factura
@@ -1336,13 +1357,10 @@ negocio, y una automatización sin nadie detrás, no ven esa línea. La marca de
   `FISCAL_CERTIFICATE_KEY` (variable de entorno; en AWS, Secrets Manager en `hub` y `worker`). Sin clave, la
   subida se rechaza a la vista; con la clave cambiada, el guardado no se abre y los registros por la vía propia
   esperan con `own_certificate_unreadable` sin llamar a la pasarela. Al subirlo se rechaza el autofirmado (emisor
-  igual al sujeto) y el que no ha firmado una autoridad de la lista de confianza (`trust.py`): las de certificados
-  cualificados (`CA/QC`) de firma o de sello de la TSL de España, también las retiradas para lo que emitieron antes de
-  su retirada. La lista va dentro de la app (`trusted_authorities.json`, sin red al comprobar) y se renueva con
-  `manage.py verifactu_trusted_list` (la descarga de `https://tsl.digital.gob.es/TSL.xml`, o `--file` con una copia
-  guardada; nunca vuelve a una lista más antigua), y el fichero nuevo entra en una PR. La fila guarda si su emisor
-  es reconocido y con qué lista (`issuer_recognised`, `checked_list`); la tarea `recheck_certificate` (cada hora,
-  `verifactu.certificate.recheck`) comprueba la que no lo está con la lista de ahora.
+  igual al sujeto); el emisor no se compara con ninguna lista de autoridades: si la AEAT lo admite lo dice la AEAT de
+  pruebas (`aeat.certificate_verdict`, `aeat_proof`). Las columnas `issuer_recognised` y `checked_list` de la tabla ya
+  no se usan: la migración `0008` las quitó solo del estado, porque el código anterior aún las lee durante el
+  despliegue, y las filas nuevas las dejan vacías.
 - **Producción**: además de lo de VERIFACTU-F08, el despliegue tiene que ser `prod` (`ERPLORA_ENVIRONMENT`; en
   `pre` nunca) y el servidor tener `VERIFACTU_PRODUCTION_ENABLED` a verdadero. Cerrado de nuevo, ningún registro de
   producción sale (esperan con `production_closed`, sin llamar a la pasarela) y no se emite nada nuevo en producción

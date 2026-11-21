@@ -4,7 +4,7 @@
 // by permission. «Test» queues the test page and says so; a refusal is said in the server's words.
 import { DataTable, type DataTableAction, type DataTableColumn } from '@erplora/ui/components';
 import { AppPage, applySurface, toastError, toastSuccess } from '@erplora/ui/shell';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Component } from 'vue';
 
 import { EMPLOYEE, flush, MANAGER, type MountOptions, mountPrinting, words } from '../__tests__/mount-printing';
@@ -15,20 +15,6 @@ import type { PrinterOut } from '../operations';
 import PrintersPage from './PrintersPage.vue';
 import en from '../locale/en.json';
 import { listFillProblems } from '../../../../frontend/testing/list-fill';
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
-vi.mock('@erplora/ui/shell', async (importOriginal) => ({
-  ...((await importOriginal()) as object),
-  toastSuccess: vi.fn(),
-  toastError: vi.fn(),
-}));
-beforeEach(() => {
-  vi.mocked(toastSuccess).mockClear();
-  vi.mocked(toastError).mockClear();
-});
 
 const LIST = 'printing.printer.list';
 const printer = (id: string, more: Partial<PrinterOut> = {}): PrinterOut => ({

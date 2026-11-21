@@ -1,13 +1,13 @@
 <script setup lang="ts">
 // The group's sheet (WORKBOOK «Hoja del grupo»; MODIFIER-F04, F05): «Group — {name}» with its rule, the
 // group followed live (`modifier.group.get`; gone, the sheet closes), and two sections, 20 rows at a time
-// with «Load more»: «Options», each with its supplement, its kitchen name, its own tax category and «By
-// default»; «Applies to», each product or category. Whoever may manage adds, edits and deletes options
+// with «Load more»: «Options», each with its supplement, «By default», «Allergens: …» under its name (MODIFIER-F11),
+// its kitchen name and its own tax category; «Applies to», each product or category. Whoever may manage adds, edits and deletes options
 // (the option form, a confirmation) and applies or stops applying the group (the link form, a
 // confirmation); an employee only reads. A group that asks for more options than it has, and cannot
 // repeat them, says the till could not complete it. It says `closed` once Ionic dismissed it: unmounting a
 // presented modal leaves its overlay on screen.
-import { ConfirmDialog, InlineFeedback, StatusPill } from '@erplora/ui/components';
+import { AllergenRow, ConfirmDialog, InlineFeedback, StatusPill } from '@erplora/ui/components';
 import { useCommand, useLive } from '@erplora/ui/sdk';
 import { useSession } from '@erplora/ui/shell';
 import { IonButton, IonButtons, IonContent, IonHeader, IonModal, IonTitle, IonToolbar } from '@ionic/vue';
@@ -207,6 +207,10 @@ watch(
                 :label="t('modifier.sheet.default')"
               />
             </div>
+            <AllergenRow
+              :codes="option.allergens"
+              :testid="`modifier-sheet-options-allergens-${option.id}`"
+            />
             <div
               v-if="option.kitchen_name || option.tax_category_name"
               class="modifier-sheet__line"

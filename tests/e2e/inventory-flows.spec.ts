@@ -78,8 +78,8 @@ test('INVENTORY-F02: «Edit» opens the product with its SKU locked and the row 
   await searchProducts(page, sku);
   await expect(productRow(page, sku)).toBeVisible();
   // The row's stock actions are buttons with their names, not bare icons.
-  await expect(productRow(page, sku).getByRole('button', { name: /^(Receive stock|Recibir stock)$/ })).toBeVisible();
-  await expect(productRow(page, sku).getByRole('button', { name: /^(Count stock|Contar stock)$/ })).toBeVisible();
+  await expect(productRow(page, sku).getByRole('button', { name: /^(Receive stock|Recibir stock): / })).toBeVisible();
+  await expect(productRow(page, sku).getByRole('button', { name: /^(Count stock|Contar stock): / })).toBeVisible();
 
   await rowAction(page, 'inventory-products', tea.id, 'edit');
   const form = dialog(page, 'inventory-product-form');

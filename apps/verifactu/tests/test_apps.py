@@ -1,6 +1,7 @@
 """The verifactu app declares its module metadata, its menu, its permissions, what each role gets, its scheduled
 task, its hooks of the Home and, for the assistant, every operation and every input field."""
 
+from itertools import product
 from pathlib import Path
 
 from django.apps import apps
@@ -18,8 +19,10 @@ from live.meta import (
     permissions_for_role,
 )
 
+from apps.verifactu import erplora_route
 from apps.verifactu import events as E
 from base import home
+from base.tests.shell_icons import shell_icon_registry
 
 PERMISSIONS = [
     "verifactu.view_record",
@@ -28,6 +31,10 @@ PERMISSIONS = [
     "verifactu.correct_record",
     "verifactu.configure",
 ]
+
+
+#: What the Home's step may say, with ERPlora's route open to the business and with it closed.
+DESCRIPTIONS = (erplora_route.STEP_AUTHORISATION_OR_CERTIFICATE, erplora_route.STEP_CERTIFICATE)
 
 
 def verifactu():
@@ -104,19 +111,13 @@ def test_navigation_is_the_six_tabs_of_the_old_module_with_registered_icons():
     ]
 
 
-def test_the_worker_sends_the_queue_every_minute_and_checks_the_own_certificate_every_hour():
-    # Declared in the AppConfig for the phase-2 worker, which runs them as the system; collapsed on catch-up.
+def test_the_worker_sends_the_queue_every_minute():
+    # Declared in the AppConfig for the phase-2 worker, which runs it as the system; collapsed on catch-up.
     assert verifactu().scheduled_tasks == [
         {
             "name": "process_queue",
             "operation": "verifactu.contingency.process",
             "cron": "* * * * *",
-            "catch_up": "collapse",
-        },
-        {
-            "name": "recheck_certificate",
-            "operation": "verifactu.certificate.recheck",
-            "cron": "23 * * * *",
             "catch_up": "collapse",
         },
     ]
@@ -153,7 +154,6 @@ OPERATIONS = {
     "verifactu.config.back_to_testing",
     "verifactu.certificate.upload",
     "verifactu.certificate.remove",
-    "verifactu.certificate.recheck",
     "verifactu.config.sync",
     "verifactu.config.follow_deployment",
     "verifactu.representation.submit",
@@ -254,36 +254,31 @@ def registry_output(name: str) -> set[str]:
 def test_the_step_is_important_in_testing_and_its_text_never_says_it_stops_the_sale():
     """The step never says «Necesario para vender» while the till sells without it. Testing files without the step,
     so there it is functional («Important»); base's legal level («Needed to invoice») is only where the hub files in
-    production, which refuses the sale without it. Its text names what it is for, not a wall, in both."""
+    production, which refuses the sale without it. Its text names what it is for, not a wall, in both, with ERPlora's
+    route open or closed."""
     (step,) = verifactu().setup
     key = f"verifactu.{step.key}"
     assert step.required is True
     assert home.level_of(key, step.required, {"environment": "testing"}) == home.LEVEL_FUNCTIONAL
     assert home.level_of(key, step.required, {"environment": "production"}) == home.LEVEL_LEGAL
-    for language in ("en", "es"):
+    for language, description in product(("en", "es"), DESCRIPTIONS):
         with translation.override(language):
-            text = f"{step.title} {step.description}".lower()
+            text = f"{step.title} {description}".lower()
         for wall in ("sell", "vender", "invoice", "facturar"):
             assert f"to {wall}" not in text and f"para {wall}" not in text, (language, wall)
 
 
 def test_the_step_speaks_the_language_of_whoever_reads_it():
     """The step is in the reader's language: the Spanish reader keeps the title they already knew («Configura
-    VeriFactu»), and the description says the ways of today."""
+    VeriFactu»), and each description it may say has its Spanish. Which one a business reads, and its words, is
+    ``test_integration_home``'s: it depends on whether ERPlora's route is open to that business."""
     (step,) = verifactu().setup
     with translation.override("en"):
-        english = (str(step.title), str(step.description))
+        english = [str(text) for text in (step.title, *DESCRIPTIONS)]
     with translation.override("es"):
-        spanish = (str(step.title), str(step.description))
-    assert english == (
-        "Set up VeriFactu",
-        "Sign the authorisation for ERPlora to send your invoices to the AEAT, or upload your business "
-        "certificate.",
-    )
-    assert spanish == (
-        "Configura VeriFactu",
-        "Firma la autorización para que ERPlora envíe tus facturas a la AEAT, o sube el certificado del negocio.",
-    )
+        spanish = [str(text) for text in (step.title, *DESCRIPTIONS)]
+    assert (english[0], spanish[0]) == ("Set up VeriFactu", "Configura VeriFactu")
+    assert all(theirs != ours for theirs, ours in zip(english[1:], spanish[1:], strict=True))
 
 
 def test_the_step_is_refreshed_when_the_configuration_changes():
@@ -420,7 +415,7 @@ def test_the_hooks_icons_are_registered_in_the_shell():
         "ion:list-outline",
         "ion:time-outline",
     ]
-    shell = (Path(settings.BASE_DIR) / "packages/ui/src/shell/icons.ts").read_text()
+    shell = shell_icon_registry()
     for icon in icons:
         name = icon.removeprefix("ion:")
         assert f"'{name}'" in shell, icon

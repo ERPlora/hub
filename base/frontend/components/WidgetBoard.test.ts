@@ -5,11 +5,6 @@ import { accessibleName, errorFrame, flush, memoryStorage, mountBase, subId } fr
 import { widget as homeWidget } from '../__tests__/home-fixtures';
 import WidgetBoard from './WidgetBoard.vue';
 
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
-
 /** A panel titled «Panel <key>», small. */
 function widget(key: string, fields: Partial<WidgetDef> = {}): WidgetDef {
   return homeWidget(key, { title: `Panel ${key}`, size: 'sm', ...fields });
@@ -18,7 +13,10 @@ function widget(key: string, fields: Partial<WidgetDef> = {}): WidgetDef {
 const CATALOGUE = [widget('a.one', { default: true }), widget('a.two'), widget('b.three', { default: true })];
 
 /** WidgetPanel has its own tests: here only which panels, in which order. */
-const PanelStub = { props: ['widget'], template: '<article data-testid="widget" :data-key="widget.key" />' };
+const PanelStub = {
+  props: ['widget', 'variant'],
+  template: '<article data-testid="widget" :data-key="widget.key" :data-variant="variant ?? \'soft\'" />',
+};
 
 async function setup(locale: 'en' | 'es' = 'en') {
   const m = await mountBase(WidgetBoard, { locale, stubs: { WidgetPanel: PanelStub } });
@@ -84,6 +82,34 @@ describe('WidgetBoard', () => {
     expect(s.panels()).toEqual(['b.three', 'a.two']);
   });
 
+  it('heads the board with a row of its first figures in colour, one per colour, the rest after them in order', async () => {
+    const tone = (key: string, value: number) => widget(key, { options: { tone: value } });
+    const board = [widget('cash.balance'), tone('inventory.low', 6), widget('sale.chart', { kind: 'chart' }), tone('sale.today', 1)];
+    localStorage.setItem('dashboard-hub', JSON.stringify([...board.map((panel) => panel.key), 'inventory.value']));
+    const s = await setup();
+    await s.show([...board, tone('inventory.value', 6)]);
+    const row = s.wrapper.get('[data-testid="widgets-lively"]');
+    expect(row.classes()).toContain('ep-stat-grid');
+    const keys = (within: { findAll: (q: string) => { attributes: (n: string) => string | undefined }[] }) =>
+      within.findAll('[data-testid="widget"]').map((panel) => [panel.attributes('data-key'), panel.attributes('data-variant')]);
+    expect(keys(row)).toEqual([
+      ['inventory.low', 'live'],
+      ['sale.today', 'live'],
+    ]);
+    expect(keys(s.wrapper.get('.widget-board-grid'))).toEqual([
+      ['cash.balance', 'soft'],
+      ['sale.chart', 'soft'],
+      ['inventory.value', 'soft'],
+    ]);
+  });
+
+  it('has no row in colour with fewer than two figures that declare one', async () => {
+    const s = await setup();
+    await s.show([widget('a.one', { default: true, options: { tone: 1 } }), widget('b.three', { default: true })]);
+    expect(s.wrapper.find('[data-testid="widgets-lively"]').exists()).toBe(false);
+    expect(s.panels()).toEqual(['a.one', 'b.three']);
+  });
+
   it('«Customize panel» lists the active ones and the available ones; adding one keeps it in this browser', async () => {
     const s = await setup('es');
     await s.show(CATALOGUE);
@@ -141,11 +167,14 @@ describe('WidgetBoard', () => {
     expect(s.inDoc('widgets-active')).toBeNull();
   });
 
-  it('with no app offering panels the picker says so', async () => {
-    const s = await setup('es');
+  it.each([
+    ['en', 'No active app offers widgets yet.'],
+    ['es', 'Ninguna app activa ofrece widgets todavía.'],
+  ] as const)('with no app offering panels the picker says so (%s)', async (locale, said) => {
+    const s = await setup(locale);
     await s.show([]);
     await s.customize();
-    expect(s.inDoc('widgets-none')!.textContent?.trim()).toBe('Ninguna app instalada ofrece widgets todavía.');
+    expect(s.inDoc('widgets-none')!.textContent?.trim()).toBe(said);
   });
 
   it('a failed read says so, with «Retry»', async () => {

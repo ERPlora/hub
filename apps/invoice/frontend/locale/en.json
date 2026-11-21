@@ -196,6 +196,21 @@
       "done": "Full invoice {number} issued",
       "failed": "Could not issue the full invoice"
     },
+    "public": {
+      "title": "Request your invoice",
+      "loading": "Loading your ticket…",
+      "business": "Business",
+      "intro": "Enter your tax details to get the full invoice for this ticket.",
+      "ticket": "Ticket {number}",
+      "date": "Date",
+      "total": "Total",
+      "submit": "Request full invoice",
+      "issuing": "Requesting your invoice…",
+      "ready": "Your invoice is ready.",
+      "already": "You already requested this invoice. This is the same invoice, with your original details.",
+      "loadFailed": "The ticket could not be loaded. Try again.",
+      "issueFailed": "The invoice could not be requested. Try again."
+    },
     "recipient": {
       "name": "Name or company name",
       "country": "Country",
@@ -251,7 +266,7 @@
         "one": "series",
         "many": "series"
       },
-      "empty": "No series yet. Create the first one to number your invoices.",
+      "empty": "No series yet. They are created on their own with your first sale; create one only to change the prefix or continue another system’s numbering.",
       "noResults": "No results",
       "loading": "Loading series…",
       "loadError": "Could not load the series",

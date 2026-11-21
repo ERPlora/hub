@@ -1,10 +1,8 @@
 """The inventory app declares its module metadata, its menu entry, its permissions, what each role gets and its
 hooks of the Home."""
 
-from pathlib import Path
 
 from django.apps import apps
-from django.conf import settings
 from django.utils import translation
 from live.live_registry import live_registry
 from live.meta import (
@@ -21,6 +19,7 @@ from live.operations import AI, INTERNAL, registry
 
 from apps.inventory import events as E
 from base import home
+from base.tests.shell_icons import shell_icon_registry
 
 PERMISSIONS = [
     "inventory.view_product",
@@ -214,7 +213,7 @@ def test_the_homes_panels_are_the_old_modules_four():
             "inventory.view_product",
             {},
             {"value": "products_low_stock"},
-            {"format": "number"},
+            {"format": "number", "tone": 6},
         ),
         (
             "value",
@@ -226,7 +225,7 @@ def test_the_homes_panels_are_the_old_modules_four():
             "inventory.view_product",
             {},
             {"value": "stock_value"},
-            {"format": "currency"},
+            {"format": "currency", "tone": 6},
         ),
         (
             "in_stock",
@@ -238,7 +237,7 @@ def test_the_homes_panels_are_the_old_modules_four():
             "inventory.view_product",
             {},
             {"value": "products_in_stock"},
-            {"format": "number"},
+            {"format": "number", "tone": 6},
         ),
         (
             "low_stock_products",
@@ -320,9 +319,20 @@ def test_the_hooks_icons_are_registered_in_the_shell():
         "ion:cube-outline",
         "ion:arrow-down-outline",
     ]
-    shell = (Path(settings.BASE_DIR) / "packages/ui/src/shell/icons.ts").read_text()
+    shell = shell_icon_registry()
     for icon in icons:
         assert f"'{icon.removeprefix('ion:')}':" in shell, icon
+
+
+def test_its_figures_carry_the_colour_of_inventory():
+    # The same measure keeps the same colour of data on every screen: inventory is 6. The list of products is no figure.
+    panels = {panel.key: panel for panel in inventory().widgets}
+    assert {key: panel.options.get("tone") for key, panel in panels.items()} == {
+        "low_stock_count": 6,
+        "value": 6,
+        "in_stock": 6,
+        "low_stock_products": None,
+    }
 
 
 def test_inventory_has_no_bell_counters():

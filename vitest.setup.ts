@@ -8,7 +8,10 @@
 // naming where it was armed. It watches the real timers, not Vitest's fake clock: a file with fake timers of its
 // own works as before, and a timer put on a fake clock dies with that clock — it cannot outlive the page.
 // A page mounted alone paints the icons the running app paints (`createShell` registers them when the app starts), and
-// Ionic's elements attach as in a browser (`fillHappyDomGaps`, as packages/ui's own setup does).
+// Ionic's elements attach as in a browser (`fillHappyDomGaps`, as packages/ui's own setup does), and an inline modal
+// that is open presents its content as in a browser (the test double of @erplora/ui). The shell's toasts are spies
+// that each test starts with unused (a real toast would leave its timer armed). A file that mocks `@ionic/vue` or
+// `@erplora/ui/shell` itself replaces that mock.
 // A `vi.waitFor` waits as long as the machine's load says, as each test and hook does (vitest.load.ts, hub#765).
 import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -18,12 +21,16 @@ import { enableAutoUnmount } from '@vue/test-utils';
 import { afterEach, beforeEach, inject, vi } from 'vitest';
 import { render, toRaw } from 'vue';
 
+import { clearToastSpies } from './base/frontend/__tests__/toast-spies';
 // The hub does not depend on ionicons itself: its registry is global (`window.Ionicons`), so the copy @erplora/ui
 // installs registers the shell's icons, as apps/inventory's and apps/customer's harnesses did; the shell's registry
 // itself, as its barrel would boot the whole shell.
 import { addIcons } from './packages/ui/node_modules/ionicons';
 import { ION_ICONS } from './packages/ui/src/shell/icons';
 import { scaleWaitFor } from './vitest.load';
+
+vi.mock('@ionic/vue', async (importOriginal) => (await import('./base/frontend/__tests__/modal')).mockIonicModal(importOriginal));
+vi.mock('@erplora/ui/shell', async (importOriginal) => (await import('./base/frontend/__tests__/toast-spies')).shellWithToastSpies(importOriginal));
 
 type Timer = ReturnType<typeof setTimeout>;
 type Handler = (...args: unknown[]) => void;
@@ -97,6 +104,7 @@ fillHappyDomGaps();
 beforeEach(() => {
   // What the file armed before its tests (this setup, its imports, a `beforeAll`) is not the test's.
   armed.clear();
+  clearToastSpies();
 });
 
 afterEach(async () => {

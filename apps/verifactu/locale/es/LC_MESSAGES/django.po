@@ -849,15 +849,15 @@ msgstr "Registro no encontrado."
 msgid "Invoice not found."
 msgstr "Factura no encontrada."
 
-#: schemas.py:28
+#: apps/verifactu/schemas/fields.py
 msgid "Say which record: its id or the number of its invoice."
 msgstr "Di qué registro: su id o el número de su factura."
 
-#: schemas.py:29
+#: apps/verifactu/schemas/records.py
 msgid "Say which invoice: its id or its number."
 msgstr "Di qué factura: su id o su número."
 
-#: schemas.py:30
+#: apps/verifactu/schemas/chains.py
 msgid "The fingerprint must be 64 hexadecimal characters."
 msgstr "La huella debe tener 64 caracteres hexadecimales."
 
@@ -990,14 +990,6 @@ msgid "sealed certificate"
 msgstr "certificado cifrado"
 
 #: models.py
-msgid "issued by a recognised authority"
-msgstr "emitido por una entidad reconocida"
-
-#: models.py
-msgid "trusted list checked against"
-msgstr "lista de confianza con la que se comprobó"
-
-#: models.py
 msgid "own certificate"
 msgstr "certificado propio"
 
@@ -1047,14 +1039,6 @@ msgid ""
 "electronic certificate issued by a recognised authority, for example the FNMT."
 msgstr ""
 "Este certificado no lo ha emitido ninguna entidad (es autofirmado), así que la AEAT no lo aceptará. Usa el "
-"certificado electrónico de tu negocio emitido por una entidad reconocida, por ejemplo la FNMT."
-
-#: certificates.py
-msgid ""
-"No authority the AEAT recognises issued this certificate, so the AEAT will not accept it. Use your business's "
-"electronic certificate issued by a recognised authority, for example the FNMT."
-msgstr ""
-"Este certificado no lo ha emitido una entidad que reconozca la AEAT, así que la AEAT no lo aceptará. Usa el "
 "certificado electrónico de tu negocio emitido por una entidad reconocida, por ejemplo la FNMT."
 
 #: certificates.py
@@ -1194,7 +1178,7 @@ msgstr "ERPlora no ha admitido el otorgamiento tal como está."
 msgid "ERPlora has not linked this business yet. Try again in a few minutes."
 msgstr "ERPlora todavía no ha vinculado este negocio. Inténtalo en unos minutos."
 
-#: apps/verifactu/schemas.py
+#: apps/verifactu/schemas/own_certificate.py
 msgid "The certificate file has to be 1 MB at most."
 msgstr "El fichero del certificado tiene que ocupar 1 MB como máximo."
 
@@ -1221,14 +1205,6 @@ msgstr ""
 #: apps/verifactu/apps.py
 msgid "Set up VeriFactu"
 msgstr "Configura VeriFactu"
-
-#: apps/verifactu/apps.py
-msgid ""
-"Sign the authorisation for ERPlora to send your invoices to the AEAT, or "
-"upload your business certificate."
-msgstr ""
-"Firma la autorización para que ERPlora envíe tus facturas a la AEAT, o sube "
-"el certificado del negocio."
 
 #: apps/verifactu/apps.py
 msgid "VeriFactu pending"
@@ -1270,51 +1246,51 @@ msgstr ""
 "este negocio no está en España: VeriFactu solo es para negocios de España, "
 "así que no se envía nada a la AEAT"
 
-#: apps/verifactu/schemas.py
+#: apps/verifactu/schemas/aeat_records.py
 msgid "Year"
 msgstr "Año"
 
-#: apps/verifactu/schemas.py
+#: apps/verifactu/schemas/aeat_records.py
 msgid "Month"
 msgstr "Mes"
 
-#: apps/verifactu/schemas.py
+#: apps/verifactu/schemas/own_certificate.py
 msgid "Business certificate (.p12 / .pfx)"
 msgstr "Certificado del negocio (.p12 / .pfx)"
 
-#: apps/verifactu/schemas.py
+#: apps/verifactu/schemas/authorisation.py
 msgid "ID number of the person signing"
 msgstr "NIF/NIE de quien firma"
 
-#: apps/verifactu/schemas.py
+#: apps/verifactu/schemas/authorisation.py
 msgid "Full name of the person signing"
 msgstr "Nombre y apellidos de quien firma"
 
-#: apps/verifactu/schemas.py
+#: apps/verifactu/schemas/authorisation.py
 msgid "Identity document"
 msgstr "Documento de identidad"
 
-#: apps/verifactu/schemas.py
+#: apps/verifactu/schemas/authorisation.py
 msgid "Signed model"
 msgstr "Modelo firmado"
 
-#: apps/verifactu/schemas.py
+#: apps/verifactu/schemas/authorisation.py
 msgid "Copy of the identity document"
 msgstr "Copia del documento de identidad"
 
-#: apps/verifactu/schemas.py
+#: apps/verifactu/schemas/authorisation.py
 msgid "Signature sample"
 msgstr "Muestra de firma"
 
-#: apps/verifactu/schemas.py
+#: apps/verifactu/schemas/authorisation.py
 msgid "Proof of representation"
 msgstr "Justificante de representación"
 
-#: apps/verifactu/schemas.py
+#: apps/verifactu/schemas/own_certificate.py
 msgid "Certificate password"
 msgstr "Contraseña del certificado"
 
-#: apps/verifactu/schemas.py
+#: apps/verifactu/schemas/records.py
 msgid "Invoice number"
 msgstr "Número de factura"
 
@@ -1326,3 +1302,88 @@ msgstr "De momento ERPlora no presenta por cuenta de los negocios: presenta con 
 msgid "To go live, upload your own certificate: ERPlora does not file on behalf of businesses for now."
 msgstr ""
 "Para pasar a producción, sube tu propio certificado: de momento ERPlora no presenta por cuenta de los negocios."
+
+#: erplora_route.py
+msgid ""
+"Sign the authorisation for ERPlora to send your invoices to the AEAT, or "
+"upload your business certificate."
+msgstr ""
+"Firma la autorización para que ERPlora envíe tus facturas a la AEAT, o sube "
+"el certificado del negocio."
+
+#: erplora_route.py
+msgid "Upload your business certificate to send your invoices to the AEAT."
+msgstr "Sube el certificado del negocio para enviar tus facturas a la AEAT."
+
+#: models.py
+msgid "Not tested by the AEAT yet"
+msgstr "Sin probar todavía por la AEAT"
+
+#: models.py
+msgid "Accepted by the AEAT's test environment"
+msgstr "Aceptado por la AEAT de pruebas"
+
+#: models.py
+msgid "Refused by the AEAT's test environment"
+msgstr "Rechazado por la AEAT de pruebas"
+
+#: models.py
+msgid "AEAT test"
+msgstr "Prueba de la AEAT"
+
+#: models.py
+msgid "AEAT test answer"
+msgstr "Respuesta de la AEAT de pruebas"
+
+#: models.py
+msgid ""
+"the AEAT's test environment has not accepted your own certificate yet: it is tried with the next record that goes "
+"out in testing"
+msgstr ""
+"la AEAT de pruebas aún no ha aceptado tu certificado propio: se prueba con el próximo registro que salga en pruebas"
+
+#: models.py
+msgid "the AEAT's test environment refused your own certificate: upload another one"
+msgstr "la AEAT de pruebas ha rechazado tu certificado propio: sube otro"
+
+#: models.py
+msgid ""
+"The AEAT's test environment accepted the own certificate of %(holder)s (%(holder_tax_id)s): the business can go "
+"live with it."
+msgstr ""
+"La AEAT de pruebas ha aceptado el certificado propio de %(holder)s (%(holder_tax_id)s): el negocio ya puede pasar a "
+"producción con él."
+
+#: models.py
+msgid ""
+"The AEAT's test environment refused the own certificate of %(holder)s (%(holder_tax_id)s) (%(detail)s): upload "
+"another one."
+msgstr ""
+"La AEAT de pruebas ha rechazado el certificado propio de %(holder)s (%(holder_tax_id)s) (%(detail)s): sube otro."
+
+#: services/config.py
+msgid ""
+"The AEAT's test environment has not accepted your own certificate yet: it is tried with the next record that goes "
+"out in testing. Issue a sale or an invoice and go live once it is accepted."
+msgstr ""
+"La AEAT de pruebas aún no ha aceptado tu certificado propio: se prueba con el próximo registro que salga en pruebas. "
+"Haz una venta o una factura y pasa a producción cuando lo acepte."
+
+#: services/config.py
+msgid ""
+"The AEAT's test environment refused your own certificate: upload another one in VeriFactu → Configuration → My "
+"certificate."
+msgstr ""
+"La AEAT de pruebas ha rechazado tu certificado propio: sube otro en VeriFactu → Configuración → Mi certificado."
+
+#: queries/config.py
+msgid "The AEAT's test environment refused this certificate (%(detail)s): upload another one."
+msgstr "La AEAT de pruebas ha rechazado este certificado (%(detail)s): sube otro."
+
+#: queries/config.py
+msgid ""
+"The AEAT's test environment refused this certificate: it could not verify it (no authority it recognises issued "
+"it, it is not valid for this service or it has expired). Upload another one."
+msgstr ""
+"La AEAT de pruebas ha rechazado este certificado: no ha podido verificarlo (no lo ha emitido una entidad que "
+"reconozca, no vale para este servicio o ha caducado). Sube otro."

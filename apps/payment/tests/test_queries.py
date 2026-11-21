@@ -35,7 +35,7 @@ from .conftest import HUB_DB, ctx_for, make_method, make_payment
 
 pytestmark = HUB_DB
 
-OPERATIONS_TS = Path(__file__).resolve().parents[1] / "frontend" / "operations.d.ts"
+OPERATIONS_TS = Path(__file__).resolve().parents[1] / "frontend" / "operations.ts"
 
 
 def run(name, data=None, role="hub_admin", **ctx):
@@ -291,12 +291,12 @@ def test_nobody_without_the_view_permission(ledger):
 
 
 def ts_fields(interface: str) -> set[str]:
-    """The fields of ``interface`` in the pages' typed operations (``frontend/operations.d.ts``)."""
+    """The fields of ``interface`` in the pages' typed operations (``frontend/operations.ts``)."""
     source = OPERATIONS_TS.read_text()
     found = re.search(
         rf"export interface {interface}(?: extends (\w+))? \{{(.*?)\n\}}", source, re.S
     )
-    assert found, f"{interface} is not in operations.d.ts"
+    assert found, f"{interface} is not in operations.ts"
     fields = set(re.findall(r"^\s+(\w+)\??:", found.group(2), re.M))
     return fields | (ts_fields(found.group(1)) if found.group(1) else set())
 

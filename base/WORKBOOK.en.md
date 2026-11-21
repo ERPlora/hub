@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:c5d01663e40f695952832ecb8d72d6faebfc82eb9c4dafb8660a7c23fd887d52 -->
+<!-- generated from WORKBOOK.md sha256:5c76a6e1d83cefbd6513501c5cad034e5602bb9d6b9e8942c73b4bd5ab306cf6 -->
 
 ## What it is for and who it is for
 
@@ -72,8 +72,9 @@ The table of the latest sales: "Date", "Sale", "Customer", "Method", "Amount" an
 also opens with the Home's link ending in `#actividad`.
 
 ### The bell
-At the top right, the last one in the bar, after "My apps" and the assistant's sparkles, on a phone too. It gathers
-what asks for an action and stays true until it is solved: "You cannot issue invoices yet", the failed events, the
+At the top right, the last one in the bar, after "My apps", the assistant's sparkles and, in the installed app,
+"Change business" (HUB_APP-F04 of ERPlora/app), on a phone too. It gathers what asks for an action and stays true
+until it is solved: "You cannot issue invoices yet", an unpaid invoice of the plan, the failed events, the
 plan's limits, the appointments to confirm, the WhatsApp customers waiting for an answer, a printer that does not
 print… No notice is dismissed: it goes by itself once it is solved.
 
@@ -339,7 +340,7 @@ On the Employees screens and the API documentation:
 | BASE-F15 | Open an app from Apps | done |
 | BASE-F16 | Look for an app in the catalogue | done |
 | BASE-F17 | Know how much an app costs before having it | done |
-| BASE-F18 | Install an app | done |
+| BASE-F18 | Turn on an app | done |
 | BASE-F19 | Know what else comes with an app | done |
 | BASE-F20 | Try to use an app that needs a subscription | done |
 | BASE-F21 | See why an app could not be turned on and try again | done |
@@ -436,7 +437,8 @@ On the Employees screens and the API documentation:
 | BASE-F113 | Keep warning with the screen off (Android app) | done |
 | BASE-F114 | Put a business back as it was at a past moment from the Hub admin | done |
 | BASE-F115 | See the help of a module's screen | done |
-| BASE-F116 | Read what is new in ERPlora | partial |
+| BASE-F116 | Read what is new in ERPlora | done |
+| BASE-F117 | See in the bell that the plan has an unpaid invoice | done |
 
 ### BASE-F01 See what the business still has to set up
 Status: done
@@ -577,9 +579,14 @@ Screen: Home · Summary
 Steps:
   1. Under the list is the board, with its panels from the moment the Home opens ("Loading widgets…" only while
      it is not known which ones are theirs).
-  2. Each panel is a card with its title and icon: a figure (with what it counts under it, if its app says
-     so), a list with bars, a timeline, a chart or a piece of its app's screen, with its texts in the language
-     of whoever is looking. In a list with bars, each bar measures how big its figure is against the biggest
+  2. Each panel is a card with its title and icon: a figure (with what it counts under its title, if its app
+     says so), a list with bars, a timeline, a chart or a piece of its app's screen, with its texts in the
+     language of whoever is looking. Each figure has the colour of its measure, the same on every screen: sales,
+     tickets and inventory, each its own. The board's first figures that have a colour head it in a row in
+     colour, one per colour and two to four; the others go in a light card with the colour on their icon, in
+     the order chosen. On a phone the figures go two by two. A figure with a state to watch (VeriFactu's
+     contingency queue when something waits or has already failed) says it in an orange or red tag with an
+     icon, without changing the figure's colour. In a list with bars, each bar measures how big its figure is against the biggest
      one of the list, whatever its sign; a negative figure, such as a cash discrepancy where money was missing
      or a product with stock below zero, shows in red and with its sign (-€0.40), and the others keep the
      panel's colour or, if its app gives each row a colour, their own row's. The red of a negative figure
@@ -596,8 +603,9 @@ Steps:
 In: the panels each app that is on declares; each one's data, asked for with the permissions of whoever
 is looking.
 Out: nothing saved in the hub.
-If it fails: a panel without data says "No data"; one whose data cannot be read, "Unavailable", never an
-old or made-up figure. A row of a list with bars (or a day of a chart) that has no figure, such as a cash
+If it fails: a panel without data says "No data" (a figure, with a dash in its place); a figure whose data
+cannot be read says "Couldn't load" with "Retry", which asks for it again, and any other panel,
+"Unavailable": never an old or made-up figure. A row of a list with bars (or a day of a chart) that has no figure, such as a cash
 session closed without a count, shows a dash (—) and no bar, never a zero; a real zero does show as zero
 (€0.00). If the board cannot be read: "Could not load the panels" with "Retry".
 Involved: none
@@ -615,7 +623,7 @@ In: the panels this person may put.
 Out: the chosen board, kept in this browser: the people who use this device share it and it does not
 travel to another one.
 If it fails: a kept panel whose app was turned off disappears from the board without notice. Without any
-app offering panels: "No installed app offers widgets yet.".
+app offering panels: "No active app offers widgets yet.".
 Involved: none
 
 ### BASE-F08 Keep the panels up to date without reloading
@@ -630,8 +638,8 @@ Steps:
      Home is loaded again.
 In: the business notices each panel declares.
 Out: nothing saved.
-If it fails: if the new data does not come, the panel says "Unavailable", not the value it had; when the
-connection is back, it updates by itself.
+If it fails: if the new data does not come, the panel says "Unavailable" (a figure, "Couldn't load" with
+"Retry"), not the value it had; when the connection is back, it updates by itself.
 Involved: none
 
 ### BASE-F09 Look at the recent activity
@@ -784,7 +792,7 @@ Screen: Apps
 Steps:
   1. In Apps, they tap "Add apps" (every ERPlora app) or "Paid" (only the ones subscribed to separately).
   2. While it arrives: "Loading the catalogue…". Then one row per app with "App", "Category", "Description",
-     "Price", "Comes with" and "Status" ("Installed" or "Needs a subscription"), with the names and the
+     "Price", "Comes with" and "Status" ("Active" or "Needs a subscription"), with the names and the
      descriptions in the language of whoever looks. An app the business's country requires shows "Mandatory in
      Spain" (or the business's country) next to its status, off too: that way it shows which one is still to be
      turned on (hub#997).
@@ -813,7 +821,7 @@ Out: nothing saved. The hub neither charges nor shows amounts: the price and the
 If it fails: without the list, as in "My apps" (BASE-F14).
 Involved: APPS-F01, APPS-F07
 
-### BASE-F18 Install an app
+### BASE-F18 Turn on an app
 Status: done
 Actor: administrator
 Screen: Apps
@@ -822,7 +830,7 @@ Steps:
      without reloading, as soon as it is subscribed to on erplora.com (BASE-F20).
   2. In "Add apps", whoever runs the business looks for an app the business does not use, "Off", and presses "Turn
      on". If it needs other apps that are off, it asks first, naming them (BASE-F19).
-  3. The app becomes "Installed" at once and shows in "My apps" and, without reloading, in the menu of every device
+  3. The app becomes "Active" at once and shows in "My apps" and, without reloading, in the menu of every device
      of the business. The counter at the top adds the apps turned on and one of the plan's: turning Tasks on, from
      "26 apps turned on · 16 of 20 in your plan" to "27 apps turned on · 17 of 20 in your plan"; the ones that come
      along with it add to the apps turned on, not to the plan's.
@@ -865,7 +873,7 @@ Steps:
      subscription", and is neither in "My apps" nor in the menu.
   2. Whoever runs the business, in the browser, sees "Upgrade plan" next to it, which opens this
      business's Store on erplora.com in a new tab: there they see the price and subscribe.
-  3. As soon as erplora.com tells the hub, the app becomes "Installed" and shows in "My apps" and in the menu,
+  3. As soon as erplora.com tells the hub, the app becomes "Active" and shows in "My apps" and in the menu,
      without reloading.
   4. Whoever does not run the business, and anyone in the installed app, sees "Subscribed to on erplora.com,
      from your ERPlora account." and no button: the hub never sells.
@@ -1040,10 +1048,12 @@ Steps:
   1. Open "Settings" in the side menu; in "Data and backups", "Import" is what opens. It says "Load a
      template: it fills your apps with its data — a menu, services, tables — ready to use." and, below,
      "Choose what to load".
-  2. While they arrive, "Loading templates…". Then one card per template (or one row, in the list view):
-     its name, its description, its "Language" and its "Country" by name, its "Version" and what "It brings"
-     (how many categories, products, services, areas or tables). First those of the business's country and,
-     among them, those in the person's language.
+  2. While they arrive, "Loading templates…". Then one card per template: its name as the title, its
+     description and each datum on its own line with the icon that says what it is: the language and the
+     country by name, the version in words ("Version 1") and what it brings (how many categories, products,
+     services, areas or tables). In the list view, one row per template with those data in their columns
+     "Language", "Country", "Version" and "It brings". First those of the business's country and, among them,
+     those in the person's language.
   3. "Search templates" searches by the name, the description or the apps it brings.
   4. Tap "Use template" on the one that fits: the button spins while it is read and "Review what it brings"
      opens (BASE-F31).
@@ -1763,7 +1773,8 @@ Steps:
 In: the session.
 Out: the session closed in the business; erplora.com's, only if the person confirms it.
 If it fails: if the business does not answer, the session expires by itself.
-Involved: BASE-F113 (in the Android app, it stops listening before leaving)
+Involved: BASE-F113 (in the Android app, it stops listening before leaving); HUB_APP-F04 (ERPlora/app: inside the
+app, "Change business" in the bar signs out the same way and only then forgets the business)
 
 ### BASE-F62 Decide whether this device is shared or personal
 Status: done
@@ -2393,6 +2404,11 @@ Steps:
      stops it. If ERPlora has its own voices turned on (not today), the panel's header lets the person choose between
      the two for the screen's language (the first one, until another is chosen; the device remembers the choice) and
      the "Device voice".
+  9. If they ask for something done with the business's data ("raise the drinks by 5 %", "add the tonic water at
+     €2.50"), the assistant does it with the same actions that person has on the screens of their apps, and what
+     changes something with the confirmation of BASE-F97. If the one it needs is not among those it has at hand for
+     that message, it searches all of that person's for it and uses it in the next step; only when there is none does
+     it say on which screen it is done.
 In: what the person writes; the whole conversation travels with each question (BASE-F102).
 Out: the question to erplora.com, which answers it and counts it in the month's messages (BASE-F104).
 If it fails: without a connection, with the service down, without a plan or without messages: BASE-F106 and BASE-F104.
@@ -2644,8 +2660,9 @@ Steps:
      does not accept the next ones. If more wait behind it, the card carries "Cancel all", which cancels this one and
      those left.
   4. If they cancel one, the assistant knows and decides how to go on. What was already done stays done.
-  5. A request allows six rounds at most: it is a brake against loops, not an allowance. Past them, "I stopped: this
-     needed too many steps. Ask for it in parts.".
+  5. A request allows six rounds at most: it is a brake against loops, not an allowance. On the sixth the assistant
+     can do nothing more and answers with what it has done and what is left, to ask for it in another message. If it
+     still tries to go on, "I stopped: this needed too many steps. Ask for it in parts.".
 In: the request; the result of each action, which goes back to the assistant.
 Out: as many actions as cards accepted, each in its app and with its receipt.
 If it fails: if an action fails half way, the assistant gets it and tells it; the earlier ones are not undone. With
@@ -2825,10 +2842,12 @@ Steps:
   2. The Hub checks whether it keeps documents: sales, invoices, VeriFactu records, payments, cash movements, shop
      orders or a customer's purchases, in any status and even with the app turned off. If it keeps any, it first
      writes them to the fiscal archive, where they are kept for 6 years and nobody can delete them: each table of
-     those documents as it is stored, with nothing rebuilt, and last a list that counts the rows and carries the
-     fingerprint of each file, written only once every file has been read back the same. It does so once per
-     deletion, and if a VeriFactu record still awaits the AEAT's answer, it waits for it. Then it stops: the business
-     stays deleted, with its database, and is checked again the next day.
+     those documents as it is stored, with nothing rebuilt; the PDF of each invoice as it was handed to the customer,
+     in its own language or the business's and with the VeriFactu QR if it has its record, one per
+     invoice; and last a list that counts the rows and the PDFs and carries the fingerprint of each file, written only
+     once every file has been read back the same. It does so once per deletion, and if a VeriFactu record still awaits
+     the AEAT's answer, it waits for it. Then it stops: the business stays deleted, with its database, and is checked
+     again the next day.
   3. Without documents, it makes the final copy of its data, kept for 90 days in the copies store. Meanwhile the
      business can still be restored and erplora.com still sees its copies. When it ends it checks again for
      documents, in case one came in during the copy.
@@ -2848,11 +2867,13 @@ already was one. If the store does not delete its files, the business stays bein
 `files_purge_failed` on the row, and it is tried again the same way. If an app cannot be read, the database stays. A row
 that does not name the business's own database drops nothing (`invalid_database_name`). A business restored during the
 copy stays open with its database; once it is being dropped, erplora.com gets `hub_purged`. If the Hub shuts down
-mid-copy, the next one takes it up. If the fiscal archive cannot be written whole, or a file does not read back as it
-was written, it is not taken as done: the row says `fiscal_archive_failed` with the reason and it is tried again the
-next day in another folder of the archive (what was already up stays, since nobody can delete it, and without its final
-list it does not count).
-Involved: HUBS-F18, HUBS-F19, HUBS-F20, PUBLIC-F34 (the same deletion of files, when a demo is retired)
+mid-copy, the next one takes it up. If it shuts down mid-way through the fiscal archive, the next attempt for that
+deletion uses the PDFs already uploaded and does not make them again. If the fiscal archive cannot be written whole, or
+a file does not read back as it was written, it is not taken as done: the row says `fiscal_archive_failed` with the
+reason and it is tried again the next day in another folder of the archive (what was already up stays, since nobody can
+delete it, and without its final list it does not count).
+Involved: HUBS-F18, HUBS-F19, HUBS-F20, PUBLIC-F34 (the same deletion of files, when a demo is retired), INVOICE-F18
+(each invoice's A4 that goes to the archive)
 
 ### BASE-F110 Open the business's website on its own domain
 Status: done (the address and what it serves; connecting the domain is erplora.com's HUBS-F17, which shows it on the panel)
@@ -3270,18 +3291,17 @@ translated into the person's language, or its translation fell behind, the help 
 Involved: BASE-F92, BASE-F93
 
 ### BASE-F116 Read what is new in ERPlora
-Status: partial — what is new can already be read through the assistant and the API, but System › Updates does not
-show it yet (hub#576)
+Status: done
 Actor: owner, administrator, manager, employee
 Screen: System · Updates
 Steps:
   1. In the "Updates" tab, below the version and its date (BASE-F41), comes "What's new": what has changed in ERPlora
      that the business notices, the most recent first. Whoever does not run the business sees it too: it says nothing
-     about the business.
-  2. Each item says its day, whether it is something new, an improvement or a fix, a short title and one or two
-     sentences on what can be done now. They are notes written for the business, never the list of changes to the
-     code.
-  3. The 20 most recent come first; "See more" brings the earlier ones.
+     about the business. While it loads: "Reading what's new…".
+  2. Each item says its day, whether it is something new, an improvement or a fix ("New", "Improved" or "Fixed"), a
+     short title and one or two sentences on what can be done now, just as they were written. They are notes written
+     for the business, never the list of changes to the code.
+  3. The 20 most recent are shown, with no pages.
   4. With none, it says "Nothing new yet.".
   5. Through the assistant, "what's new in ERPlora?" or "what changed in the latest update?" reads them the same way,
      in the person's language.
@@ -3289,3 +3309,30 @@ In: what is new in the version running: it travels with it, so it is always its 
 Out: nothing saved: what is new is only read.
 If it fails: "Could not load what's new" with "Retry"; the version and its date stay in view.
 Involved: BASE-F41
+
+### BASE-F117 See in the bell that the plan has an unpaid invoice
+Status: done
+Actor: owner, administrator
+Screen: The bell
+Steps:
+  1. erplora.com cannot charge the renewal of the business's plan and gives it its 7 days of grace (BILLING-F16): the
+     business keeps working with its whole plan.
+  2. The bell of whoever runs the business goes up without reloading with the urgent notice "Your ERPlora plan has an
+     unpaid invoice", which comes in as a card and settles in it. Its sentence says until when: "Pay it on
+     erplora.com: if it is not paid by Nov. 24, 2026, the business is suspended. Nothing is deleted.", with the
+     date on the business's clock, and the bell's ring empties over that last week.
+  3. "Pay on erplora.com" opens, in a new tab, this business's unpaid invoices on erplora.com, where it is paid
+     (BILLING-F17). Only in the browser: in the installed app the notice comes all the same, without the button, and
+     its sentence already says where to pay it.
+  4. If the deadline goes by and erplora.com has not suspended it yet, the notice says so at that moment, without
+     reloading: "Pay it on erplora.com: its deadline was Nov. 24, 2026 and the business may be suspended at any
+     moment. Nothing is deleted.", with the ring empty.
+  5. Once it is paid, the notice disappears as soon as erplora.com tells the business. If it is suspended, the business
+     stops opening until it is paid (BILLING-F16).
+In: the business's status and the moment it is suspended, as erplora.com sends them in its photo of the business
+(HUBS-F31). The Hub does not ask erplora.com nor count the 7 days on its own.
+Out: nothing saved in the Hub.
+If it fails: a manager or an employee does not see the notice. If the photo does not bring the deadline, the notice
+comes without a date: "Pay it on erplora.com: if it is not paid soon, the business is suspended. Nothing is deleted.".
+If the notices cannot be read, the bell keeps what it last knew, as in BASE-F10.
+Involved: BASE-F10, BASE-F11, BILLING-F16 (erplora.com), BILLING-F17 (erplora.com), HUBS-F31 (erplora.com)

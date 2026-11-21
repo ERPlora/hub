@@ -1,6 +1,6 @@
 <script setup lang="ts">
-// One dish of a kitchen card. The row is the dish's only target, so its state is said by the icon at its end and
-// never by a second button.
+// One dish of a kitchen card, with any allergy before its options. The row is the dish's only target, so its state
+// is said by the icon at its end and never by a second button.
 import { HubIcon } from '@erplora/ui/shell';
 import { IonItem, IonLabel, IonText } from '@ionic/vue';
 import { computed } from 'vue';
@@ -9,6 +9,7 @@ import { useLocale, useT } from '../composables/useT';
 import { ITEM_STATUS_ICONS } from '../lib/card';
 import { formatQuantity } from '../lib/format';
 import type { ItemOut } from '../operations';
+import KitchenAllergyNotice from './KitchenAllergyNotice.vue';
 
 const props = defineProps<{
   line: ItemOut;
@@ -53,6 +54,10 @@ function tap(): void {
     </ion-text>
     <ion-label class="ep-order-ticket__dish-body">
       <span class="ep-order-ticket__name">{{ line.name }}</span>
+      <KitchenAllergyNotice
+        :line="line"
+        :testid="`kitchen-line-${line.id}-allergy`"
+      />
       <span
         v-if="line.modifiers.length"
         class="ep-order-ticket__modifiers"

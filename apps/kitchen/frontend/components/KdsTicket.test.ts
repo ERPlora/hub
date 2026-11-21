@@ -179,6 +179,32 @@ describe('KdsTicket', () => {
     expect(s.find('kitchen-line-i4').attributes('data-menu')).toBeUndefined();
   });
 
+  it('keeps the allergy on every dish of a menu with only that dish’s matches', async () => {
+    const t = ticket('t1', {
+      items: [
+        item('i1', {
+          name: 'Lentils',
+          menu_name: 'MENU',
+          menu_line_id: 'm1',
+          allergy: ['milk'],
+          allergy_in_dish: [],
+        }),
+        item('i2', {
+          name: 'Flan',
+          menu_name: 'MENU',
+          menu_line_id: 'm1',
+          allergy: ['milk'],
+          allergy_in_dish: ['milk'],
+        }),
+      ],
+    });
+    const s = await setup(t);
+    expect(s.find('kitchen-line-i1-allergy').text()).toContain('Allergy: Milk');
+    expect(s.find('kitchen-line-i1-allergy-contains').exists()).toBe(false);
+    expect(s.find('kitchen-line-i2-allergy').text()).toContain('Allergy: Milk');
+    expect(s.find('kitchen-line-i2-allergy-contains').text()).toBe('The dish contains Milk');
+  });
+
   it('a tap on the menu header marks ready the dishes of that menu still to do, and nothing else', async () => {
     const t = ticket('t1', {
       status: 'preparing',

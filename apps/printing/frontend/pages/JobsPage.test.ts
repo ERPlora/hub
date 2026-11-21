@@ -4,7 +4,7 @@
 // failed (or unanswered) job and cancels a queued, failed or unanswered one; nobody else sees those buttons.
 import { DataTable, type DataTableAction, type DataTableColumn } from '@erplora/ui/components';
 import { AppPage, toastError, toastSuccess } from '@erplora/ui/shell';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Component } from 'vue';
 
 import { EMPLOYEE, flush, MANAGER, type MountOptions, mountPrinting, words } from '../__tests__/mount-printing';
@@ -12,20 +12,6 @@ import CancelJobModal from '../components/CancelJobModal.vue';
 import type { JobOut } from '../operations';
 import JobsPage from './JobsPage.vue';
 import { listFillProblems } from '../../../../frontend/testing/list-fill';
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
-vi.mock('@erplora/ui/shell', async (importOriginal) => ({
-  ...((await importOriginal()) as object),
-  toastSuccess: vi.fn(),
-  toastError: vi.fn(),
-}));
-beforeEach(() => {
-  vi.mocked(toastSuccess).mockClear();
-  vi.mocked(toastError).mockClear();
-});
 
 const LIST = 'printing.job.list';
 const PRINTERS = 'printing.printer.list';

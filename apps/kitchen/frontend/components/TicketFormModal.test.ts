@@ -2,7 +2,7 @@
 // Destination and Notes (optional) and its dishes — a product of the catalogue, or the dish written by
 // hand, its quantity and a note — with «Add dish» and «Remove dish»; «Create ticket» only with a dish.
 import { Combo } from '@erplora/ui/components';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import type { Component } from 'vue';
 
 import { itTellsTheCorrectedFieldApart } from '../../../../base/frontend/__tests__/same-words-refusal';
@@ -12,11 +12,6 @@ import TicketFormModal from './TicketFormModal.vue';
 
 /** A prop of a mounted component, whatever its type (a generic component's props read as `never`). */
 const prop = (wrapper: { props: () => unknown }, name: string): unknown => (wrapper.props() as Record<string, unknown>)[name];
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
 
 type Control = HTMLElement & { value?: unknown; disabled?: boolean; label?: string };
 

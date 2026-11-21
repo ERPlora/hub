@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:13238ea706585db546ecf6243347bc5df8b78f34193322289bdef9c6759acdc3 -->
+<!-- generated from WORKBOOK.md sha256:d0dff6f71b8e6977ec47d719a3c1ac7779218475a206532a383a34ba5bb48fc8 -->
 
 ## What it is for and who it is for
 
@@ -7,7 +7,7 @@ Kitchen receives every round the waiter sends from the till, before charging, an
 dishes out among **stations** (grill, bar, desserts…), lets each station mark them **ready** and the
 pass **serve** them, and keeps a **history** of what was done.
 
-Who uses it:
+### Who uses it and what each one does
 
 - The kitchen or floor **employee** (cook, waiter): marks dishes ready, recalls them, serves, marks a
   round rush and sends rounds from the till. Only changes states.
@@ -98,6 +98,12 @@ ERPlora does not invent flows: it adopts the ones the market has already proven.
 ## Screens
 
 ### Display
+The kitchen board: one card per ticket being cooked, with its dishes, the wait in colour and who is serving it. At
+the top you choose the view ("Tickets", "Ready" or "All-Day") and, if there are dishes from several stations, yours,
+which the tablet remembers. Tap a dish to mark it ready, "Ready" for the whole card and "Served" when it goes out; in
+"⋮" you have "Mark rush" and "Recall". It updates by itself, without reloading.
+
+#### Detail
 Menu **Kitchen → Display**. The kitchen board. A single bar at the top, fixed while scrolling: the three
 views as tabs with their counter ("Tickets" and "Ready"; "All-Day" without a counter), the "Full screen"
 button and, if the tickets on the line have dishes from more than one station, the station buttons
@@ -106,10 +112,10 @@ on that device. Below, a grid of cards in equal columns, as many as fit (a singl
 sideways scroll). Each card: on the left, the type as an icon, the label ("Table 4"; without a label, the
 type) and "Waiter: <name>"; on the right, the clock, the wait in words with its icon ("On time", "Warning"
 or "Late") and the short number "#0012"; below, the status ("To prepare", "Preparing" or "Ready") and the
-marks "Rush", "VIP" and "Round N" (from the second one). The dishes with the quantity in large type
-("2×"), the name, their modifiers in bold, the note in italics, in "All" the station with its colour,
-"Paper only" if the station is paper only and, on the right, an icon with their state (to prepare,
-preparing, ready or voided); the dishes of a menu, next to a line under the menu header, which says how
+marks "Rush", "VIP", "Allergy" and "Round N" (from the second one). The dishes with the quantity in large type
+("2×"), the name, the customer's allergy in a red block, their modifiers in bold, the note in italics, in "All" the
+station with its colour, "Paper only" if the station is paper only and, on the right, an icon with their state (to
+prepare, preparing, ready or voided); the dishes of a menu, next to a line under the menu header, which says how
 many dishes it has ("2 dishes") and, when tapped, marks its dishes ready. A dish that is ready shows
 struck through and dimmed. A dish voided at the till shows struck through, with "Voided" and the reason in
 red, and does not respond to a tap. At the bottom, depending on the permission and the state, the main
@@ -125,6 +131,12 @@ its printer." until a later print comes out fine. It updates by itself with ever
 reloading.
 
 ### Tickets
+All the tickets, newest first, with their number, destination, type, priority, status, dishes and total. Search them
+by number or destination and filter them by type, priority or status. From each row you fire it, mark it ready,
+recall it, serve it, reprint it or cancel it; tapping it shows its detail. "New ticket" creates one by hand, for what
+does not go through the till.
+
+#### Detail
 Menu **Kitchen → Tickets**. Table of all the tickets, newest first, 50 per page (another size is chosen
 at the bottom):
 Ticket (full number `YYYYMMDD-NNNN`), Destination (the label), Type, Priority, Status, Dishes and Total
@@ -132,13 +144,19 @@ Ticket (full number `YYYYMMDD-NNNN`), Destination (the label), Type, Priority, S
 (each one a list with its words: "Dine in", "Rush", "To prepare"…), and table or card view. Actions per
 row, icon only: "Fire", "Ready", "Served", "Recall" and "Cancel" (in the "⋮" menu, with confirmation and an
 optional reason); only the ones the profile can do show up, and the ones the state does not allow are
-hidden. Tapping a row opens its detail: the dishes with their menu, their modifiers, their station and
-their state. "New ticket" opens the panel (full screen on the phone) with Type, Destination, Notes and
+hidden. Tapping a row opens its detail: the dishes with the customer's allergy, their menu, their modifiers, their
+station and their state. "New ticket" opens the panel (full screen on the phone) with Type, Destination, Notes and
 its dishes (product of the catalogue, quantity and note; "Add dish"), and "Create ticket". Empty: "No
 tickets.". Loading: the table skeleton. Load error: the table's, with retry; a rejection of an action
 shows in its dialog or above the table, and one of the creation, inside the panel.
 
 ### Stations
+Your kitchen's stations (grill, bar, desserts…), each with its colour, where its dishes come out (on the display, on
+paper or both) and through which printer. "Add station" creates one; in each row you change it, delete it or send
+products to it. Below, the routing says which products and categories go to each station: whatever has no station
+shows under "No station".
+
+#### Detail
 Menu **Kitchen → Stations**. Table: Station (with its colour), Destination ("Screen and paper", "Screen
 only", "Paper only"), Printer (the function —"Kitchen", "Bar"— and, if one was chosen, the specific
 printer), In progress (dishes to cook at that station) and Active ("Yes"/"No"); search box "Search
@@ -152,6 +170,10 @@ to «No station».". Loading: the skeleton. Error: the table's, with retry; each
 its dialog. The actions only show to whoever can manage stations (manager, administrator, owner).
 
 ### History
+What has happened in the kitchen, latest first: what was done, on which ticket and with which dish, who and when.
+Search by the ticket's number or by words of its notes, and filter by action ("Received", "Ready", "Cancelled"…).
+
+#### Detail
 Menu **Kitchen → History**, title "Kitchen history". Table of what happened in the kitchen, latest first,
 50 per page (another size is chosen at the bottom): Action, Ticket (the number), Dish, Who (the person's
 name or, if they have none, their e-mail, or the API key's; "System" if no person did it: Kitchen by
@@ -162,6 +184,11 @@ action filter with the same words as the column ("Received", "Created", "Fired",
 "Deleted"). Empty: "No recent kitchen activity.". Loading: the skeleton. Error: the table's, with retry.
 
 ### Settings
+How the kitchen display works: the timer, after how many minutes a card turns amber and red, the sound when a ticket
+comes in (with its volume and tone), whether the pass prints on paper when marked ready, whether the kitchen works
+with the display and the ticket type to start with. Only whoever can save the settings sees it.
+
+#### Detail
 Tab **Kitchen → Settings** (only for whoever can save them: manager, administrator, owner). "Show timer",
 "Amber warning (minutes)", "Red alert (minutes)", "Colour semaphore", "Sound on a new ticket", "Sound
 volume (0-100)", "Sound tone" ("Chime", "Bell", "Buzzer"), "Print the pass when marked ready", "The
@@ -220,7 +247,7 @@ With the window as it opened, Back closes it without asking (BASE-F05).
 | KITCHEN-F28 | Withdraw the rounds of a check deleted or merged into another | done |
 | KITCHEN-F29 | Void a dish already sent, with a notice to the kitchen | done |
 | KITCHEN-F31 | Give Cash register the tickets still under way | done |
-| KITCHEN-F32 | Highlight the customer's allergy on the card and on paper | partial |
+| KITCHEN-F32 | Highlight the customer's allergy on the card and on paper | done |
 
 ### KITCHEN-F01 Create a station
 Status: done
@@ -236,7 +263,7 @@ Steps:
 In: what whoever creates it writes.
 Out: the station (announces: station created).
 If it fails: the rejection shows inside the panel; the reason of a field, under it, and it goes away as soon
-as that field is corrected, even if another one says the same (hub#888). A name that another live station
+as that field is corrected, even if another one says the same. A name that another live station
 already has is rejected
 ("There is already a station with that name. Choose a different name."); the name of a deleted one is free
 again. Whoever cannot manage stations does not see the button.
@@ -247,7 +274,7 @@ Status: done
 Actor: manager, administrator
 Screen: Stations
 Steps:
-1. Tap the row (or "Edit"): "Edit station · <name>" opens.
+1. Tap the row (or "Edit"): "Edit station · Grill" opens.
 2. Change the name, the colour, the destination, the printer or "Active".
 3. Press "Save": the table updates.
 In: the station and what changes.
@@ -256,7 +283,7 @@ look for the station of their category and, if there is none, come out under "No
 already sent does not change station or destination; the name and colour the display paints are the live
 ones.
 If it fails: inside the form, each reason under its field until that field is corrected, even if another
-one says the same (hub#888). A repeated name is rejected; saving a station that another device has just
+one says the same. A repeated name is rejected; saving a station that another device has just
 deleted says it no longer exists.
 Involved: KITCHEN-F01, KITCHEN-F04, KITCHEN-F10, PRINTING-F04
 
@@ -265,7 +292,7 @@ Status: done
 Actor: manager, administrator
 Screen: Stations
 Steps:
-1. In the row, "Delete": "Delete «<name>»?" shows with "The station leaves the list and stops receiving
+1. In the row, "Delete": "Delete «Grill»?" shows with "The station leaves the list and stops receiving
    tickets. Tickets already sent keep it in their history.".
 2. Press "Delete station".
 In: the station.
@@ -325,16 +352,15 @@ Status: done
 Actor: employee
 Screen: Display
 Steps:
-1. At the till, add a menu choosing a dish from each course (SALE-F12) and press "Send order"
-   (KITCHEN-F18).
+1. At the till, add a menu choosing a dish from each course and press "Send order".
 2. On the card the menu header shows (its kitchen name or, if it has none, its name) with how many dishes
    it has ("2 dishes"; "1 dish" if it is one) and, below, next to a line, each dish chosen with the
    quantity multiplied by the menus ordered.
-3. Each dish goes to the station of its own product or, if it has none, to the one of its category
-   (KITCHEN-F04), never to the menu's: each station sees only its dishes, with the same header above.
+3. Each dish goes to the station of its own product or, if it has none, to the one of its category,
+   never to the menu's: each station sees only its dishes, with the same header above.
 4. Tap a dish to mark it ready, or tap the menu header to mark ready at once its dishes still on screen;
    the rest of the ticket does not change.
-5. On each station's paper the menu header comes out and, indented below, its dishes (KITCHEN-F08).
+5. On each station's paper the menu header comes out and, indented below, its dishes.
 In: from Sales, the menu as it was ordered: its dishes chosen (each one with its product and its
 category), its kitchen name, how many menus and the menu's note, which shows on each of its dishes.
 Out: one dish for each dish of the menu, each at its station, marked ready and served separately; the
@@ -342,7 +368,7 @@ menu's amount counts only once in the ticket's total (announces: ticket received
 If it fails: a dish of the menu that is a service is not cooked and does not come out; a menu whose dishes are
 all services does not open a ticket. The till does not let you add a menu without choosing anything or one
 that is missing a mandatory course, so it never arrives empty or half-done. Voiding the menu at the till
-strikes through all its dishes (KITCHEN-F29). What was already sent does not change even if the menu
+strikes through all its dishes. What was already sent does not change even if the menu
 changes afterwards.
 Involved: SALE-F12, SALE-F20, COMBO-F11, KITCHEN-F04, KITCHEN-F08, KITCHEN-F29
 
@@ -351,18 +377,18 @@ Status: done
 Actor: employee
 Screen: Display
 Steps:
-1. At the till, choose the dish's modifiers ("+CHEESE", "no onion", how it is cooked) (SALE-F11) and, if
-   needed, write a note on the line (SALE-F13); then send the round.
+1. At the till, choose the dish's modifiers ("+CHEESE", "no onion", how it is cooked) and, if
+   needed, write a note on the line; then send the round.
 2. On the card, under the dish's name come its modifiers in bold, separated by commas and in the order
    they were chosen, and below that the note in italics.
 3. On paper they come out the same way: each modifier on its own line, indented under the dish, and then
-   the note (KITCHEN-F08).
+   the note.
 In: from Sales, the modifiers chosen with their kitchen name (if they have none, their name), the
 line's note and, if the line is on the house, the reason.
 Out: the modifiers and the note frozen on the dish: changing the catalogue afterwards does not change this
 ticket.
 If it fails: an allergy written only in the note comes out like any note; the one the waiter marks on the line
-comes out on its own, before the modifiers (KITCHEN-F32). A modifier charged on a separate line (another VAT)
+comes out on its own, before the modifiers. A modifier charged on a separate line (another VAT)
 comes out the same under its dish.
 Involved: SALE-F11, SALE-F13, SALE-F20, MODIFIER-F08, KITCHEN-F08
 
@@ -379,7 +405,7 @@ Steps:
    when it reaches Kitchen.
 2. The sheet carries the label, the number, the round, the waiter and each dish with its quantity, its
    modifiers (one per line) and its note, and the dishes of a menu indented under their header
-   (KITCHEN-F06, F07); if the round is rush, `!! URGENTE !!`.
+   (KITCHEN-F06, F07); if the round is rush, `!! URGENT !!`.
 In: the dishes with the destination and the printer frozen on receiving.
 Out: one job per printer in Printing's queue, only once even if it is asked for twice: the round Kitchen
 sent is not printed again when the notice from Sales reaches it.
@@ -400,7 +426,7 @@ Steps:
    on paper comes out as its first sheet, without "copy".
 In: the ticket.
 Out: new jobs in Printing's queue (each reprint is a different job).
-If it fails: "The ticket could not be printed: <reason>", with Printing's reason; without Printing, or
+If it fails: "The ticket could not be printed:", followed by the reason Printing gives; without Printing, or
 without any active printer of its dishes' function, "No printer prints this ticket: turn on Printing and add
 an active kitchen or bar printer." and nothing is sent to the queue.
 Involved: KITCHEN-F08, KITCHEN-F21, PRINTING-F11
@@ -482,7 +508,7 @@ Steps:
 1. On a card being cooked, "⋮" → "Mark rush": it carries "Rush" and jumps to the start of the board on every
    display, which ring once.
 2. The stations that print and still have dishes of that round to cook receive a short notice on paper:
-   the ticket's header with `!! URGENTE !!` and no dishes.
+   the ticket's header with "!! URGENT !!" and no dishes.
 3. "Remove rush" undoes it and prints nothing. A VIP round does not offer it, and through the
    assistant or the API it is rejected ("That ticket is VIP: a rush does not change its priority.").
 In: the ticket being cooked.
@@ -623,7 +649,7 @@ Status: done
 Actor: manager
 Screen: Tickets (also the assistant)
 Steps:
-1. In the row, "⋮ → Cancel": "Cancel ticket <number>?" shows with "It leaves the kitchen display. The check
+1. In the row, "⋮ → Cancel": "Cancel ticket 20261014-0012?" shows with "It leaves the kitchen display. The check
    in the till does not change: its dishes stay on it." and an optional reason.
 2. Press "Cancel ticket": the ticket and its dishes move to "Cancelled" (a voided dish stays "Voided").
 In: the ticket To prepare, Preparing or Ready.
@@ -651,7 +677,7 @@ one dish."). What the server refuses of a field is marked under that field, with
 marks the quantity of that dish ("Ensure this value is greater than 0."), even with empty rows above it, and
 the window brings the field into view if the person was further down. The mark goes when that field changes
 or the dish is removed, and only that field's even if another one says the same (a dish's product too, when
-another one is chosen; hub#888). As it hangs from no check, charging does not close it.
+another one is chosen). As it hangs from no check, charging does not close it.
 Involved: KITCHEN-F04, KITCHEN-F10, KITCHEN-F21, KITCHEN-F24, KITCHEN-F27, INVENTORY-F27
 
 ### KITCHEN-F24 Delete a ticket
@@ -700,7 +726,7 @@ Steps:
    "Takeaway", "Delivery").
 2. "Save" can only be pressed when something changed: "Settings saved." shows and the open displays take
    them at once.
-   What is changed while it is saving is not lost: it stays on screen, still to save (hub#914).
+   What is changed while it is saving is not lost: it stays on screen, still to save.
 In: the values.
 Out: the settings (announces: settings changed). "The kitchen works from the screen" applies from the next
 charge: what was charged before is served by hand.
@@ -708,7 +734,7 @@ If it fails: minutes outside 1–120 or a volume outside 0–100 are rejected; t
 the red, too ("The amber warning has to come before the red one."). The rejection shows under the form,
 with the field marked, and what was written stays. As in the form windows, the notice goes as soon as
 something is changed and a field's reason as soon as that field is corrected; both come back if the next try
-is refused too. A refusal that names no field stays until the next try (hub#854).
+is refused too. A refusal that names no field stays until the next try.
 Involved: KITCHEN-F10, KITCHEN-F16, KITCHEN-F17, KITCHEN-F23, KITCHEN-F27
 
 ### KITCHEN-F27 Close the rounds when the whole check is charged
@@ -784,33 +810,31 @@ register.
 Involved: CASH_REGISTER-F08, CASH_REGISTER-F09, KITCHEN-F10, KITCHEN-F13
 
 ### KITCHEN-F32 Highlight the customer's allergy on the card and on paper
-Status: partial — the ticket already receives and keeps the allergy and the matching allergens, the display and the
-detail receive them and the paper prints the dish's lines; the card does not paint the mark and the block yet
-(hub#1738) and the device's app does not print `!! ALERGIA !!` in the sheet's header yet (ERPlora/app#63)
+Status: done
 Actor: employee
 Screen: Display, Tickets
 Steps:
-1. At the till, the waiter marks the customer's allergy on the line of their dish (SALE-F41) and sends the round
-   (KITCHEN-F18).
+1. At the till, the waiter marks the customer's allergy on the line of their dish and sends the round.
 2. On the card, the header carries the "Allergy" mark, in red, next to "Rush" and "VIP", if any of its dishes has an
    allergy marked. Each station sees it only if one of its dishes has it.
 3. Under the name of that dish, before its modifiers and its note, comes a block of its own in red: "Allergy:
-   Gluten". If the dish has that allergen according to Inventory (SALE-F40), the block adds "The dish has Gluten". A
-   dish without an allergy marked has no block, even if it has allergens: the display does not repeat each dish's.
-4. On a menu, the block shows on each of its dishes, and "The dish has" names only that dish's allergens.
-5. On the station's paper (KITCHEN-F08), the header carries `!! ALERGIA !!` (under `!! URGENTE !!` if the round is
-   rush) and, right under the dish and before its modifiers, `*** ALERGIA: GLUTEN ***` and, if it has it,
-   `*** LLEVA: GLUTEN ***`, each on its own line and in capitals, so that it stands out without colour. The reprint
-   (KITCHEN-F09) comes out the same.
-6. The cook carries on as always: marking ready, recalling and serving do not change (KITCHEN-F11 to KITCHEN-F13),
+   Gluten". If the dish has that allergen, from its product or from a modifier chosen, the block adds "The dish
+   contains Gluten". A dish without an allergy marked has no block, even if it has allergens: the display does not
+   repeat each dish's.
+4. On a menu, the block shows on each of its dishes, and "The dish contains" names only that dish's allergens.
+5. On the station's paper, the header carries "!! ALLERGY !!" (under "!! URGENT !!" if the round is rush) and,
+   right under the dish and before its modifiers, "ALLERGY: GLUTEN" and, if it has it, "CONTAINS: GLUTEN", each on its
+   own line, in capitals and between asterisks, so that it stands out without colour. The reprint
+   comes out the same.
+6. The cook carries on as always: marking ready, recalling and serving do not change,
    and the block stays in view while the dish is on the display. In **Tickets**, the ticket's detail shows it on its
    dish too.
-In: from Sales, for each line sent, the customer's allergy and its product's frozen allergens (SALE-F40,
-SALE-F41).
+In: from Sales, for each line sent, the customer's allergy and the line's frozen allergens, its product's with its
+modifiers' (SALE-F40, SALE-F41, MODIFIER-F12).
 Out: the allergy and the matching allergens, frozen on the dish like its modifiers: changing the line or the
 catalogue afterwards does not change this ticket (announces: ticket received).
 If it fails: if the sheet does not print, the allergy stays on the display and the ticket is reprinted like any
-other (KITCHEN-F09). Without an allergy marked, the dish comes out as today, with its note as it is. An allergy the
-customer mentions after sending does not arrive by itself: the kitchen is told out loud (SALE-F41). A ticket made by
-hand (KITCHEN-F23) has no allergy block: it is for what does not go through the till, and its note is still there.
+other. Without an allergy marked, the dish comes out as today, with its note as it is. An allergy the
+customer mentions after sending does not arrive by itself: the kitchen is told out loud. A ticket made by
+hand has no allergy block: it is for what does not go through the till, and its note is still there.
 Involved: SALE-F20, SALE-F40, SALE-F41, INVENTORY-F35, KITCHEN-F05, KITCHEN-F06, KITCHEN-F07, KITCHEN-F08, KITCHEN-F09

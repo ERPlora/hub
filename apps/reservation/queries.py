@@ -58,7 +58,7 @@ from apps.reservation.schemas import (
 from apps.schedule.queries import day_label, get_week, hours_for_range
 from apps.schedule.schemas import HoursRangeIn, NoParamsIn
 from apps.table.models import Table
-from apps.table.queries import natural_key, table_label
+from apps.table.queries import floor, natural_key
 from base.business import babel_locale, business_zone, zone_name
 from base.ordering import list_order_for
 
@@ -181,7 +181,7 @@ def reservation_out(ctx: OperationContext, reservation: Reservation) -> dict:
         "duration_minutes": reservation.duration_minutes,
         "party_size": reservation.party_size,
         "table_id": reservation.table_id,
-        "table_label": table_label(table) if table is not None else "",
+        "table_label": floor.table_label(table) if table is not None else "",
         "table_capacity": table.capacity if table is not None else None,
         "status": reservation.status,
         "source": reservation.source,
@@ -560,7 +560,7 @@ def table_facts(
     table: Table, window: engine.Window, exclude: tuple = ()
 ) -> engine.TableFacts:
     return engine.TableFacts(
-        label=table_label(table),
+        label=floor.table_label(table),
         in_service=in_service(table),
         booked=tuple(theirs for _, theirs in booked_windows(table.pk, window, exclude)),
     )
@@ -779,7 +779,7 @@ def free_tables(ctx: OperationContext, params: TablesIn) -> dict:
             {
                 "id": table.pk,
                 "number": table.number,
-                "label": table_label(table),
+                "label": floor.table_label(table),
                 "zone_name": table.zone.name if table.zone_id else "",
                 "capacity": table.capacity,
                 "fits": fits,

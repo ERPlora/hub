@@ -91,7 +91,7 @@ OWN_WORDS = [
         "appointment.appointment.count_active_for_service",
         "¿alguien lleva todavía el alisado de keratina en lo que tiene por delante?",
     ),
-    ("appointment.appointment.count_to_confirm", "¿cuántas quedan pendientes de mi confirmación?"),
+    ("appointment.appointment.count_to_confirm", "¿cuántas quedan pendientes de que las acepte?"),
     ("appointment.appointment.create", "Lola quiere venir el lunes a las 12:00 a hacerse un tinte con Inés"),
     ("appointment.appointment.delete", "fuera del todo la de prueba del viernes"),
     ("appointment.appointment.get", "¿de quién es la APT-0042 y qué teléfono dejó?"),

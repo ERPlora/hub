@@ -4,17 +4,12 @@
 // ready · {failed} with problems» with up to ten reasons), and «Import {n} products» / «Cancel»; one
 // row or product is said in the singular (hub#1124).
 // Without Name and SKU mapped it says so and cannot import.
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 
 import { flush, mountInventory } from '../__tests__/mount-inventory';
 import { parseCsv } from '../lib/csv';
 import { emptyReport } from '../lib/import-report';
 import ImportPreviewModal from './ImportPreviewModal.vue';
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
 
 afterEach(() => {
   document.body.innerHTML = '';

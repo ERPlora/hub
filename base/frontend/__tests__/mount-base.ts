@@ -122,6 +122,12 @@ export function accessibleName(element: Element): string | null | undefined {
   return element.shadowRoot?.querySelector('button, a')?.getAttribute('aria-label') ?? element.getAttribute('aria-label');
 }
 
+/** What a screen reader hears for each button of a DataTable row (`<hook>-<action id>`, its «⋮» left out). */
+export function rowButtonNames(root: Element, hook: string): Record<string, string | null | undefined> {
+  const buttons = [...root.querySelectorAll(`[data-testid^="${hook}-"]`)].filter((el) => !el.getAttribute('data-testid')!.endsWith('-menu'));
+  return Object.fromEntries(buttons.map((el) => [el.getAttribute('data-testid')!.slice(hook.length + 1), accessibleName(el)]));
+}
+
 export function memoryStorage(): Storage {
   const store = new Map<string, string>();
   return {

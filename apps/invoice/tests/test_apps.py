@@ -7,6 +7,7 @@ from django.utils import translation
 from live.live_registry import live_registry
 from live.meta import (
     Category,
+    Help,
     LiveAppConfig,
     Nav,
     SetupCheck,
@@ -328,3 +329,7 @@ def test_each_step_is_refreshed_by_the_events_that_change_its_query():
 def test_the_app_brings_no_panels_nor_counters_to_the_home():
     # The old module had neither `widgets` nor `bell`.
     assert (list(invoice().widgets), list(invoice().bell)) == ([], [])
+
+
+def test_its_help_window_is_ready_without_a_video_yet():
+    assert invoice().help == Help()

@@ -1,15 +1,10 @@
 // TASK-F12: «New project» asks for Code (unique: «Code (q3-audit)»), Name and Color (optional, #RRGGBB),
 // with «Create project», which cannot be pressed without code and name. A repeated code is said under
 // the field, and what was typed stays.
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import { click, ionValue, mountTask, settle } from '../__tests__/mount-task';
 import ProjectFormModal from './ProjectFormModal.vue';
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
 
 type Control = HTMLElement & { label?: string; value?: unknown; errorText?: string; disabled?: boolean; placeholder?: string };
 

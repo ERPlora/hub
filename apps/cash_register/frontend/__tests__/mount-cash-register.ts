@@ -1,7 +1,5 @@
 // Test helper of the cash register app's pages and components: `mountInShell` with its catalogues over base's, the
 // sessions, its people and the hub's business.
-// Dialogs: a test that opens one mocks `@ionic/vue`'s IonModal with FormModal's `ionModalStub` (imported
-// from its own file in the mock factory: this helper loads @ionic/vue, the factory must not).
 import type { SessionMe } from '@erplora/ui/shell';
 import type { Component } from 'vue';
 

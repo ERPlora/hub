@@ -10,6 +10,13 @@ Lo que no entra todavía: ver «Qué queda fuera».
 
 ## Para qué sirve y para quién
 
+Facturación convierte cada venta cobrada en un documento fiscal numerado y lo guarda para siempre: el tique de cada
+cobro, la factura completa cuando el cliente da su NIF y la rectificativa cuando se devuelve dinero o un documento
+estaba mal. Aquí buscas y ves tus facturas, emites una a mano, llevas tus series de numeración y escribes los datos
+fiscales de tu negocio.
+
+### En detalle
+
 Facturación convierte cada venta cobrada en un **documento fiscal numerado** y lo guarda para siempre:
 el **tique** (factura simplificada, F2) de cada cobro, la **factura completa** (F1) cuando el cliente da
 su NIF, la **factura completa que sustituye a un tique** (F3) que ya se llevó el cliente, y la
@@ -18,7 +25,7 @@ el eslabón entre Ventas y VeriFactu en la cadena fiscal española (venta → fa
 → AEAT): aquí nace el número de serie que luego viaja a Hacienda. Sirve igual al restaurante y a la
 peluquería: no hay nada propio de un vertical.
 
-Quién la usa:
+### Quién la usa y qué hace cada uno
 
 - El **empleado** consulta las facturas, las imprime, emite una factura a mano, pasa un tique a
   factura completa y marca pagada una factura.
@@ -87,6 +94,12 @@ Configuración inicial, paso a paso:
 ## Pantallas
 
 ### Facturas
+Todas las facturas del negocio: los tiques de cada cobro, las facturas completas y las rectificativas, lo último
+emitido arriba. Búscalas por número, cliente o NIF, fíltralas por estado, tipo, serie, fecha o total, y ábrelas para
+verlas, imprimirlas o guardarlas en PDF. Desde cada una la marcas pagada, la rectificas o pasas un tique a factura
+completa; con **+** emites una factura a mano.
+
+#### Detalle
 Menú **Facturación → Facturas**. Tabla paginada de 50 en 50 (vista de tabla o de tarjetas; en el móvil,
 tarjetas con el número como título) con «Número», «Cliente», «Total», «Estado», «Fecha» y «Tipo»; cada
 columna se ordena. Buscador «Buscar facturas…» (número, nombre o NIF del cliente) y filtros de «Estado»,
@@ -102,7 +115,7 @@ rectifica o se paga una factura en cualquier dispositivo.
 Vacía: «Aún no hay facturas.». Cargando: «Cargando…». Error: el mensaje con «Reintentar». Un rechazo de
 una acción de fila sale como aviso encima de la tabla.
 
-### Ficha de factura
+#### Ficha de factura
 Se abre desde una fila de **Facturas** (`/invoice/invoices/<id>`). Arriba, «Factura {número}» con la
 etiqueta de estado y los botones «Imprimir / PDF» y «← Volver». Si es una factura completa o una
 rectificativa de una factura completa sin NIF del cliente, el aviso «Esta factura no tiene el NIF del
@@ -124,7 +137,7 @@ pruebas)» si es del entorno de pruebas), el «CSV» cuando la AEAT ya contestó
 Tributaria ↗». Sin VeriFactu, sin registro todavía o sin permiso, no sale la tarjeta.
 Error al abrir: «Factura no encontrada» o el mensaje del fallo, con «← Volver».
 
-### Rectificar
+#### Rectificar
 Ventana que abre «Rectificar», desde la fila o desde la ficha. Título «Rectificar {número}», la nota
 «Se emitirá una rectificativa (serie RECT) con los importes negados y la factura original quedará
 cancelada. Esta operación no se puede deshacer.», el «Tipo de rectificativa» (R1 a R4; en un tique,
@@ -134,13 +147,26 @@ que no se puede rectificar («Una rectificativa no se puede rectificar.», «La 
 cancelada.») y el resultado «Rectificativa {número} emitida. {original} queda cancelada.», cada uno con
 «Cerrar».
 
-### Factura completa (sustituir un tique)
+#### Factura completa (sustituir un tique)
 Ventana que abre «Factura completa» en la ficha de un tique. Título «Factura completa del tique
 {número}», el buscador de clientes de Clientes (rellena los datos) y «Nombre o razón social», «País»,
 «Tipo de documento» (solo fuera de España), «NIF» y «Domicilio», todos obligatorios salvo el tipo.
 «Emitir factura completa» y «Cancelar». Al emitir, la ventana se cierra y la ficha abre la F3 nueva.
 
-### Nueva factura manual
+#### Pedir la factura del tique (página pública)
+La abre el cliente, sin cuenta, con el código de su tique (`/p/<negocio>/invoice/<código>`, INVOICE-F04). Título
+«Solicita tu factura». Arriba, «Tique {número}» con «Negocio», «Fecha» y «Total». Debajo, «Escribe tus
+datos fiscales para obtener la factura completa de este tique.», los mismos campos que en «Factura completa» sin el
+buscador de clientes, y «Solicitar factura completa», en gris hasta que están el nombre, el NIF y el domicilio. Al
+pedirla, «Tu factura está lista.» y «Factura {número}» con «Emisor», «Fecha de emisión», «Cliente» y «NIF
+cliente», las líneas y los totales como en la ficha, e «Imprimir / PDF», que saca la factura en A4 con su QR de
+VeriFactu; si ya la había pedido, al abrirla ve esa misma factura con «Ya pediste esta factura. Esta es la misma,
+con los datos que diste entonces.». Un rechazo de un campo sale bajo él, y el del servidor encima del botón.
+Cargando: «Cargando tu tique…». Error: el motivo del servidor (código que no abre nada, caducado, tique aún sin
+registrar o demasiados intentos), con «Reintentar» salvo cuando el código no abre nada o ha caducado; sin respuesta
+del servidor, «No se pudo cargar el tique. Inténtalo de nuevo.».
+
+#### Nueva factura manual
 Ventana con la «Serie» (las activas del año que emiten F1 o F2; de entrada, la predeterminada o FACT),
 el buscador de clientes de Clientes, «Cliente», «NIF cliente», «Dirección», «País», «Notas» y las
 líneas: «Descripción», «Cant.» (1 de entrada; admite decimales), «Precio» (sin impuesto, en la moneda del negocio y con sus decimales; su símbolo o su código alrededor de la
@@ -152,6 +178,11 @@ factura» (con una rueda que gira mientras va) está en gris hasta que el negoci
 descripción, cantidad, precio y tipo. Un rechazo sale encima de los botones, por campo cuando es de un campo.
 
 ### Series
+Las series con las que se numeran tus documentos, cada una con su código, su tipo, su año, su prefijo y el número
+por el que va. Se crean solas con tu primera venta: crea o cambia una solo si quieres otro prefijo u otro formato, o
+seguir la numeración que traías de otro sistema. Solo la ve quien lleva las series.
+
+#### Detalle
 Menú **Facturación → Series** (solo con permiso de llevar las series). La entrada «Cada serie define
 el prefijo, el formato y el contador de la numeración de un tipo de factura y un año…» y una tabla con
 «Código», «Nombre», «Tipo», «Año», «Prefijo», «Formato» (vacío se lee `PREFIX-YYYY-NNNNNN`), «Nº
@@ -159,10 +190,16 @@ actual», «Activa» y «Predet.»; buscador «Buscar código, nombre…». Por 
 tarjetas. **+** abre «Nueva serie de numeración»; «Editar» (o pulsar la fila) abre «Editar serie
 {código}» (INVOICE-F12, INVOICE-F13). Sin emisor, lo dice el mismo aviso «Todavía no puedes facturar» de la
 campana que en **Facturas**, una sola vez, y ninguno en la pantalla.
-Vacía: «Aún no hay series. Crea la primera para numerar tus facturas.». Cargando: «Cargando series…».
+Vacía: «Aún no hay series. Se crean solas con tu primera venta; crea una solo para cambiar el prefijo o seguir
+la numeración de otro sistema.». Cargando: «Cargando series…».
 Error: «No se pudieron cargar las series» con «Reintentar».
 
 ### Emisor
+Los datos fiscales de tu negocio que salen en cada factura: razón social, NIF y domicilio completo. Sin ellos no se
+emite ningún tique ni factura. Solo los cambian el propietario y el administrador; los demás los ven sin poder
+editarlos.
+
+#### Detalle
 Menú **Facturación → Emisor**. «Razón social», «NIF», «Domicilio», «Código postal», «Ciudad»,
 «Provincia» y «País», y «Guardar». Arriba, si aún no está completo, «Sin el emisor no se puede emitir
 ninguna factura.»; si lo mandó la cuenta de ERPlora, «Datos recibidos de tu cuenta de ERPlora el
@@ -194,7 +231,7 @@ territorio no cuentan como cambio, ni una rectificativa ya emitida: atrás cierr
 | INVOICE-F01 | El tique (factura simplificada) que nace al cobrar | hecho — Ventas lo pide dentro del mismo cobro |
 | INVOICE-F02 | La factura completa al cobrar a un cliente con NIF | hecho — Ventas lo pide dentro del mismo cobro |
 | INVOICE-F03 | Emitir una factura a mano | hecho |
-| INVOICE-F04 | El cliente pide la factura completa de su tique | parcial — el servidor ya la emite con el código del tique; faltan el código en el papel y la página pública |
+| INVOICE-F04 | El cliente pide la factura completa de su tique | hecho |
 | INVOICE-F05 | Pasar un tique a factura completa desde el mostrador | hecho |
 | INVOICE-F06 | Una venta cobrada que no se ha podido facturar | hecho |
 | INVOICE-F07 | Anular una venta cobrada que ya tiene su tique | hecho — Ventas la pide dentro de la misma anulación |
@@ -300,34 +337,35 @@ precio, cerrado una vez por tipo y repartido entre las líneas por resto mayor (
 total impreso), y como descripción de la operación sus conceptos («Curso de corte, Kit de tinte», hasta
 500 caracteres); avisa `invoice.invoice.issued`.
 Si falla: dentro de la ventana, encima de los botones: «Una factura completa necesita el nombre, el NIF y
-la dirección del cliente.», «Ese NIF no es válido.» (bajo el campo), «Línea {n}: el precio no es un
+la dirección del cliente.», «Ese NIF no es válido.» (bajo el campo), «Línea 2: el precio no es un
 importe…», una línea con precio que sale a 0,00, una serie inactiva, que no emite facturas o de otro año
 («Esa serie numera otro año…»), un tique por encima del límite de Ventas («Por encima de 3.000,00 € no se
 puede emitir un tique…», RD 1619/2012 art. 4), o la falta de emisor. Una línea con categoría fiscal (por la API o
 el asistente) sin regla vigente en el territorio del negocio se rechaza en el campo de esa línea, con la
-categoría por el nombre que le da Impuestos en el idioma de quien mira (p. ej. «Producto — general», nunca su clave `product.generic`) y
-«Crea su regla en Impuestos › Reglas.» (hub#1149). No se emite nada ni se gasta número,
+categoría por el nombre que le da Impuestos en el idioma de quien mira (p. ej. «Producto — general») y
+«Crea su regla en Impuestos › Reglas.». No se emite nada ni se gasta número,
 y lo escrito se conserva. El mensaje de un campo se va en cuanto se corrige ese campo (también si lo
 rellena la tarjeta de un cliente, y el del NIF si cambia el país o el tipo de documento), el aviso que
 solo señala campos en cuanto se cambia algo, y los dos vuelven si el siguiente intento también se
 rechaza. Si no se puede leer el territorio fiscal, el tipo se llama «Imp. %», sale vacío y avisa «No se
 pudo leer el territorio fiscal del negocio: escribe el tipo de cada línea.»; la factura se emite igual,
 con el impuesto del territorio. Si la moneda no se puede leer, la ventana lo dice («No se ha podido leer la moneda del negocio», con el
-motivo) y ofrece «Reintentar», que la vuelve a pedir; en cuanto llega, «Emitir factura» se enciende (hub#938).
+motivo) y ofrece «Reintentar», que la vuelve a pedir; en cuanto llega, «Emitir factura» se enciende.
 Implicados: TAX-F18, CUSTOMER-F17, TAX-F11
 
 ### INVOICE-F04 El cliente pide la factura completa de su tique
-Estado: parcial — Facturación ya la emite con el código del tique; faltan el código en el papel del tique (SALE-F29) y la página pública donde el cliente escribe sus datos (hub#500)
+Estado: hecho
 Actor: cliente, sin cuenta
-Pantalla: la página pública del negocio `/p/<negocio>/invoice/<código>` (aún no se pinta)
+Pantalla: la página pública del negocio `/p/<negocio>/invoice/<código>`
 Pasos:
-1. El tique lleva su código para pedir la factura completa, que es también el final de la dirección que lo abre.
-2. El cliente la abre en su móvil, sin iniciar sesión, y ve el número, la fecha y el total de su tique; si ya la
-   pidió, ve su factura completa.
+1. El tique, en pantalla y en la impresora de tiques, lleva tras el QR fiscal un segundo QR que abre esta página,
+   con «Escanea para pedir tu factura completa» encima y su código debajo, que es también el final de la dirección.
+2. El cliente la abre en su móvil, sin iniciar sesión, y ve el negocio, el número, la fecha y el total de su tique;
+   si ya la pidió, ve su factura completa sin volver a escribir sus datos.
 3. Escribe su nombre o razón social, su país, el tipo de documento (solo fuera de España), su NIF y su domicilio,
    y pide la factura.
 4. Facturación emite, como el sistema, la factura completa que sustituye al tique (F3), igual que en INVOICE-F05,
-   y el cliente la ve en A4, desde donde la imprime o la guarda en PDF (INVOICE-F18).
+   y el cliente la ve en pantalla, desde donde la imprime o la guarda en PDF en A4 (INVOICE-F18).
 Entra: el código del tique y los datos fiscales que escribe el cliente.
 Sale: la F3, una sola por tique, como en INVOICE-F05 (avisa `invoice.invoice.issued`). El código no se gasta:
 desde entonces abre esa misma F3, hasta que caduca a los cuatro años del cobro.
@@ -336,7 +374,8 @@ tique. Revísalo o pide la factura en el establecimiento.», sin datos de nadie;
 caducado: pide la factura en el establecimiento.»; un tique que aún no tiene su documento fiscal, «Tu tique aún
 se está registrando. Prueba otra vez en unos minutos.»; diez códigos que no abren nada en una hora desde la misma
 conexión, «Demasiadas peticiones. Inténtalo de nuevo en un momento.» hasta que pasa la hora (un código bueno no
-cuenta). Los datos del cliente se comprueban como en INVOICE-F05, y un tique anulado o devuelto se rechaza igual.
+cuenta). Los datos del cliente se comprueban como en INVOICE-F05, con cada rechazo bajo su campo, y un tique anulado
+o devuelto se rechaza igual.
 Si el tique ya tiene su F3, responde con ella sin emitir otra ni gastar número, aunque se escriban otros datos.
 Implicados: SALE-F29, INVOICE-F05, INVOICE-F18
 
@@ -423,9 +462,10 @@ Pasos:
 2. Elige el «Tipo de rectificativa» (R1 de entrada: error fundado en derecho y art. 80 Uno, Dos y Seis
    LIVA; R2 concurso; R3 deudas incobrables; R4 resto; un tique siempre R5), escribe el «Motivo» y pulsa
    «Emitir rectificativa» (un segundo clic no emite otra).
-3. La ventana dice «Rectificativa {número} emitida. {original} queda cancelada.». Al cerrarla, la
-   original sale «Cancelada» y la lista tiene una «Rectificativa» nueva fechada hoy, con los importes y
-   las líneas de la original en negativo y la nota «Rectifica la factura {número}. Motivo: {motivo}».
+3. La ventana dice, por ejemplo, «Rectificativa RECT-2026-000001 emitida. FACT-2026-000003 queda cancelada.». Al
+   cerrarla, la original sale «Cancelada» y la lista tiene una «Rectificativa» nueva fechada hoy, con los importes
+   y las líneas de la original en negativo y la nota «Rectifica la factura FACT-2026-000003. Motivo: el precio
+   estaba mal».
 4. Con el asistente, antes de emitir nada te enseña la rectificativa que va a nacer: la factura que
    rectifica (número, fecha y cliente), el tipo (R1 de entrada, R5 si es un tique), el motivo, el
    siguiente número de la serie «RECT» del año (no queda reservado: lo toma al emitirse), la fecha de
@@ -454,7 +494,7 @@ de la misma factura: la segunda espera a la primera y se rechaza sin gastar núm
 aparece la acción. Al asistente, sobre una rectificativa, una cancelada o un tique sustituido te dice
 por qué con esos mismos avisos y no sale la confirmación; si otra rectificativa se emite entre la vista
 previa y tu confirmación, la tuya no se emite: sale otra vez la confirmación con el número siguiente, y
-se emite con él cuando la confirmes (BASE-F97); si otro dispositivo rectifica esa factura antes de que
+se emite con él cuando la confirmes; si otro dispositivo rectifica esa factura antes de que
 confirmes, no se emite otra: sale «La factura ya está cancelada.».
 Implicados: SALE-F31
 
@@ -530,8 +570,8 @@ Pasos:
 1. En **Facturación → Series**, pulsa **+**: se abre «Nueva serie de numeración».
 2. Escribe «Código» (mayúsculas, dígitos, guion o guion bajo), «Nombre», «Tipo de factura» (de F1 a R5),
    «Año» (de entrada, el del negocio), «Prefijo» (vacío = el código), si quieres «Formato del número»
-   (marcadores `{prefix}`, `{code}`, `{year}`, `{seq}` y `{seq:01d}`…`{seq:09d}`; vacío es
-   `PREFIX-YYYY-NNNNNN`) y «Siguiente número» (1 de entrada; otro para continuar la numeración de otro
+   (los marcadores que admite salen debajo del campo; vacío, el número sale como «FACT-2026-000001») y
+   «Siguiente número» (1 de entrada; otro para continuar la numeración de otro
    sistema). Elige «Activa» y «Serie predeterminada».
 3. Pulsa «Crear serie». La ventana se cierra y la serie aparece con «Nº actual» uno menos que el
    siguiente número.
@@ -541,9 +581,9 @@ ventas y las devoluciones, el código tiene que ser TICKET, FACT o RECT; con otr
 alta manual (si su tipo es F1 o F2).
 Si falla: un código vacío o con otra forma, un formato sin el año o sin marcador de secuencia, con un
 salto de línea, o un prefijo o formato con tildes o símbolos como º o ª, salen bajo su campo (el número
-es el `NumSerieFactura` de VeriFactu: solo ASCII imprimible); el código con otra forma (`E2E-?`) dice qué
-admite, «Usa solo letras sin tilde, números, guiones (-) y guiones bajos (_), empezando por una letra o un
-número.», también al asistente, que no saca tarjeta (hub#872); unos números que con la secuencia más ancha
+viaja a VeriFactu, que solo admite letras sin tilde, cifras y signos sencillos); el código con otra forma («E2E-?»)
+dice qué admite, «Usa solo letras sin tilde, números, guiones (-) y guiones bajos (_), empezando por una letra o un
+número.», también al asistente, que no saca tarjeta; unos números que con la secuencia más ancha
 pasarían de 60 caracteres, «Los números de esta serie no cabrían en 60 caracteres…» bajo el prefijo o el
 formato; un código que ya existe ese año, «Ya hay una serie con ese código ese año.». Cada campo
 rechazado, también el tipo de factura, se marca en rojo con su mensaje debajo y arriba sale «Revisa los
@@ -556,7 +596,7 @@ Estado: hecho
 Actor: responsable, administrador
 Pantalla: Series
 Pasos:
-1. En **Series**, pulsa «Editar» en la fila (o la fila entera): se abre «Editar serie {código}».
+1. En **Series**, pulsa «Editar» en la fila (o la fila entera): se abre «Editar serie FACT».
 2. Cambia «Nombre», «Activa», «Serie predeterminada» y, mientras la serie no haya emitido nada,
    «Prefijo», «Formato del número» y «Siguiente número». «Código», «Tipo de factura» y «Año» están
    bloqueados.
@@ -581,7 +621,7 @@ Pasos:
    prefijo con el que saldrán tus números de factura. Si vienes de otro sistema, continúa su numeración en
    vez de empezar otra vez por el 1.». Solo lo ve quien lleva las series.
 2. «Configurar» abre **Facturación → Series**. Si quieres otro prefijo, otro formato o seguir la numeración de
-   otro sistema, crea allí las series del año (INVOICE-F12); si no, no hace falta hacer nada: las series se
+   otro sistema, crea allí las series del año; si no, no hace falta hacer nada: las series se
    crean solas con el primer documento.
 3. En cuanto el negocio tiene su primera serie, creada a mano o nacida con el primer documento, el paso queda
    «Hecho» sin recargar, y sigue hecho los años siguientes (la serie de un año nuevo hereda la del anterior).
@@ -618,11 +658,11 @@ Pasos:
 2. Escribe en «Buscar facturas…» un número, un nombre de cliente o un NIF; o filtra (estado, tipo,
    serie, origen, fecha, total); o pulsa una columna para ordenar.
 3. La tabla enseña las que casan, de 50 en 50; lo último emitido, arriba.
-4. Pulsa «Ver», o la fila, para abrirla (INVOICE-F17).
+4. Pulsa «Ver», o la fila, para abrirla.
 Entra: las facturas del hub.
 Sale: nada; solo se lee.
 Si falla: sin resultados, «Sin resultados»; con un error, el mensaje y «Reintentar». El total se lee como
-en cualquier campo de importe del Hub y como en las demás listas (hub#1196: «1.000,50», «1,000.50», «2 500» y
+en cualquier campo de importe del Hub y como en las demás listas («1.000,50», «1,000.50», «2 500» y
 «12,50 €» filtran); uno que no se puede leer lo dice bajo su campo con las palabras del campo de importe
 («Esto no es un importe. Escribe una cifra, por ejemplo 12,50.», «Este importe no puede ser negativo.» o, con
 «1.000» en euros, «Este importe se puede leer de dos maneras…»), y una fecha final anterior a la inicial,
@@ -639,7 +679,7 @@ Pasos:
    columna «Dto.» con el descuento sin IVA), el desglose y los totales.
 3. Con **VeriFactu**, lee debajo el «Justificante VeriFactu»: el estado del registro en la AEAT, su «CSV»
    cuando la AEAT ya contestó y el QR, que se puede escanear o abrir con «Validar en la Agencia Tributaria ↗» (en la
-   app instalada, en el navegador del dispositivo: VERIFACTU-F18).
+   app instalada, en el navegador del dispositivo).
 4. «Rectifica a», «Sustituye a», «Sustituida por» y las rectificativas abren el documento enlazado.
 5. «← Volver» regresa a la lista.
 Entra: la factura y sus líneas y, con VeriFactu, su registro.
@@ -657,12 +697,12 @@ Pantalla: Ficha de factura
 Pasos:
 1. En la ficha, pulsa «Imprimir / PDF».
 2. Con **Impresión** y una impresora del sistema activa con la función Recibo, la factura en A4 va a esa
-   impresora, con el QR de VeriFactu si tiene su registro, y se lee «Enviado a <impresora>.»
-   (PRINTING-F08).
+   impresora, con el QR de VeriFactu si tiene su registro, y se lee, por ejemplo, «Enviado a
+   Oficina.».
 3. Si no (sin Impresión encendida, sin impresora del sistema, o si no se pudo leer su registro de VeriFactu
    para esa impresora), se abre el diálogo de impresión del dispositivo (el del navegador o, en la app
    instalada, su pantalla de impresión: el diálogo del sistema, con la impresora o «Guardar como PDF», y el
-   trabajo llamado «Factura <número>») con la factura en A4 (con VeriFactu, arriba el QR del registro con
+   trabajo llamado, por ejemplo, «Factura FACT-2026-000003») con la factura en A4 (con VeriFactu, arriba el QR del registro con
    «QR tributario:» y
    «VERI*FACTU»; emisor, «Facturar a», líneas, desglose por tipo, totales y la nota de lo que rectifica),
    desde donde se puede guardar como PDF. Mientras llega el registro, «Imprimir / PDF» espera: el papel
@@ -675,7 +715,7 @@ Si falla: «No se pudo imprimir la factura», también si no se puede leer el re
 factura que lo tiene (no se imprime sin su QR). Si la app instalada no abre su pantalla de impresión, el
 aviso dice por qué tras dos puntos («…: esta versión de la app de ERPlora no puede imprimir; actualízala»,
 «…: el servicio de impresión del dispositivo no se abrió»…).
-Implicados: PRINTING-F08, VERIFACTU-F19
+Implicados: PRINTING-F08, VERIFACTU-F19, BASE-F109 (el archivo fiscal de una baja guarda este A4 en PDF)
 
 ### INVOICE-F19 Marcar una factura como pagada
 Estado: hecho
@@ -685,7 +725,7 @@ Pasos:
 1. En **Facturas** (fila) o en la ficha, pulsa «Marcar pagada» en una factura «Emitida»; o pídeselo al
    asistente («marca como cobrada la FACT-2026-000001», «la factura de Carpintería Lema ya está pagada»)
    y sigue en el paso 4.
-2. Confirma en «¿Marcar {número} como pagada?» («El cobro se registra con la fecha y la hora de
+2. Confirma en «¿Marcar FACT-2026-000001 como pagada?» («El cobro se registra con la fecha y la hora de
    ahora.») con «Marcar pagada», o vuelve con «Cancelar».
 3. La factura pasa a «Pagada» y la ficha enseña «Pagada el» con la fecha y la hora.
 4. Con el asistente sale «¿Ejecutar esta acción?» con la factura por su número; pulsa «Ejecutar» y pasa a
@@ -732,8 +772,7 @@ Sale: el emisor, que se copia en cada documento que se emita desde ahora (los ya
 avisa `invoice.issuer.updated`.
 Si falla: sin razón social, NIF o domicilio, bajo su campo; un NIF español que no es válido, «Ese NIF no
 es válido.». El motivo de un campo se quita en cuanto se corrige ese campo y vuelve si el siguiente intento
-también se rechaza; un rechazo sin campo sale encima del formulario y se queda hasta el siguiente intento
-(hub#854).
+también se rechaza; un rechazo sin campo sale encima del formulario y se queda hasta el siguiente intento.
 Implicados: ninguno
 
 ### INVOICE-F23 Emitir las facturas de ERPlora (hub de plataforma)
@@ -971,7 +1010,7 @@ sola (riesgo alto, como sustituir un tique en el mostrador).
   los millares desde cuatro cifras («1.234,56 €», hub#1090) en la lista, la ficha y el aviso del tope del tique.
 - **Hub de plataforma** (INVOICE-F23; PLAN-SAAS §4): el hub propio de
   ERPlora, el slug `PLATFORM_HUB_SLUG` (`erplora`, reservado en `live.slugs`: ningún negocio lo puede
-  coger y el alta normal del SaaS no lo crea). Las cuatro puertas viven en `base/internal.py`
+  coger y el alta normal del SaaS no lo crea). Las cuatro puertas viven en `base/internal_platform.py`
   (`/internal/platform/invoices`, `/health`, `/{id}`, `/{id}/pdf`) y llaman como sistema a
   `invoice.invoice.issue_platform`, `platform_status`, `platform_document` y `platform_health` (permiso
   `invoice.issue_platform`, sin rol ni ruta ninja). Contrato: `POST /internal/platform/invoices` con el
@@ -1186,6 +1225,28 @@ sola (riesgo alto, como sustituir un tique en el mostrador).
   importes» sale 5.ª: live no lee como pedido el «cambiar» detrás de «ni» cuando
   hay un «sin» antes.
 
+### Lo que la ventana de ayuda no enseña
+
+La ayuda del Hub publica el primer apartado hasta su primer `###`, el resumen de cada pestaña (lo que va antes de su
+primer `####`) y, de cada flujo hecho en una pestaña o en una de sus ventanas, su título, sus pasos y «Si falla», sin
+nombres de código, incidencias ni ids de flujo (`tests/test_help_workbooks.py`). Por eso la ficha, «Rectificar»,
+«Factura completa», la página pública y «Nueva factura manual» son ventanas (`####`) de **Facturas**: así sus flujos
+se publican en esa pestaña. Lo que esas partes dejaron de decir, y quien mantiene Facturación necesita:
+
+- Los mensajes llevan el número real («Rectificativa {número} emitida. {original} queda cancelada.», «Rectifica la
+  factura {número}. Motivo: {motivo}», «¿Marcar {número} como pagada?», «Editar serie {código}», «Línea {n}: …»,
+  «Enviado a <impresora>.», el trabajo «Factura <número>»); la ayuda los enseña con un ejemplo (FACT-2026-000003,
+  RECT-2026-000001, FACT, Oficina) o sin el hueco.
+- Los marcadores del formato de una serie (`{prefix}`, `{code}`, `{year}`, `{seq}` y `{seq:01d}`…`{seq:09d}`; vacío,
+  `PREFIX-YYYY-NNNNNN`) los enseña la ventana bajo el campo; el número es el `NumSerieFactura` de VeriFactu, solo
+  ASCII imprimible, y el código rechazado sin tarjeta del asistente es hub#872 (INVOICE-F12).
+- En INVOICE-F03, la categoría fiscal se nombra por su nombre y nunca por su clave (`product.generic`, hub#1149) y el
+  botón se enciende al llegar la moneda (hub#938); el filtro de total lee el importe como el resto del Hub
+  (hub#1196, INVOICE-F16); un rechazo sin campo del emisor se queda hasta el siguiente intento (hub#854,
+  INVOICE-F21); la confirmación que se repite con el número siguiente es la del asistente (BASE-F97, INVOICE-F08).
+- Abrir la ficha es INVOICE-F17, crear una serie INVOICE-F12, la impresión A4 PRINTING-F08 y abrir la página de
+  la AEAT en la app instalada VERIFACTU-F18, que INVOICE-F14, F16, F17 y F18 ya no citan en sus pasos.
+
 ### Decisiones (resueltas con el mercado)
 
 1. **La factura de una venta nace «Pagada»** (Square, Lightspeed, Toast, Odoo TPV): el dinero ya se
@@ -1249,6 +1310,10 @@ sola (riesgo alto, como sustituir un tique en el mostrador).
       otros datos: corregirlos es rectificar en el mostrador (INVOICE-F08).
     - **Intentos**: diez códigos que no abren nada por conexión y hora (`base.throttle.AttemptLimit`, la del
       inicio de sesión); un código bueno, caducado o no, no cuenta.
+    - **En el papel**: un segundo QR tras el del VeriFactu, que no lo sustituye (aquel es para cotejar el tique en la
+      AEAT y este para pedir la factura), con una línea encima que dice para qué es y el código debajo, para
+      teclearlo cuando la cámara no enfoca o el tique es una fotocopia (Ágora imprime «CREAR FACTURA»; Cuiner, el
+      localizador y su QR). Solo en un tique con su documento fiscal emitido o por emitir.
     - **Mercado**: gana el QR del tique que abre una página sin cuenta, donde el cliente escribe sus datos y
       recibe la factura, con un enlace que no caduca a los pocos días y que, la segunda vez, lleva a la factura
       ya emitida (Odoo, Qamarero). Los portales de México cierran el plazo al mes porque allí lo no facturado
@@ -1285,9 +1350,6 @@ sola (riesgo alto, como sustituir un tique en el mostrador).
 
 Lo que no entra tiene su issue abierta:
 
-- **hub#500** — El cliente no puede pedir él mismo la factura completa de su tique (INVOICE-F04): faltan el
-  código en el papel del tique de Ventas y la página pública que lo abre; Facturación ya da sus dos operaciones
-  por la puerta pública (`invoice.public.ticket` e `invoice.public.substitute`).
 - **hub#501** — El emisor de Facturación no se rellena con los datos fiscales de la cuenta de ERPlora:
   la foto del SaaS no lleva el bloque `issuer` y `base.hub.state_apply` no llama a
   `invoice.issuer.sync`, que ya existe; y el flujo choca con «Dos identidades» de PLAN-SAAS (los datos fiscales

@@ -26,7 +26,8 @@ from apps.verifactu.queries.route import (
     sending_route,
     wait,
 )
-from apps.verifactu.schemas import DiagnosticOut, NoInput, TestInvoiceOut
+from apps.verifactu.schemas.diagnostics import DiagnosticOut, TestInvoiceOut
+from apps.verifactu.schemas.fields import NoInput
 
 from .sealing import _seal_alta
 from .sending import _outlast_the_gateway

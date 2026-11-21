@@ -1,16 +1,11 @@
 // RESERVATION-F01: «Add slot» — the Day of the week, From, To, Max reservations and, optionally, Max
 // guests; «Create slot». An overlap with another slot of the day goes on top and under «From».
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import { itTellsTheCorrectedFieldApart } from '../../../../base/frontend/__tests__/same-words-refusal';
 import { click, ionValue, mountReservation, settle } from '../__tests__/mount-reservation';
 import { slotRow } from '../__tests__/rows';
 import SlotFormModal from './SlotFormModal.vue';
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
 
 type Control = HTMLElement & { label?: string; value?: unknown; errorText?: string };
 

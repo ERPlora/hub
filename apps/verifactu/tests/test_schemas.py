@@ -22,42 +22,42 @@ def refused(schema, data: dict) -> dict:
 
 def test_a_record_is_named_by_its_id_or_by_its_invoices_number():
     assert (
-        schemas.RecordRefIn.model_validate(
+        schemas.fields.RecordRefIn.model_validate(
             {"invoice_number": " TICKET-2026-000001 "}
         ).invoice_number
         == "TICKET-2026-000001"
     )
     record_id = uuid.uuid7()
     assert (
-        schemas.RecordRefIn.model_validate({"record_id": str(record_id)}).record_id
+        schemas.fields.RecordRefIn.model_validate({"record_id": str(record_id)}).record_id
         == record_id
     )
     assert "Say which record" in next(
-        iter(refused(schemas.RecordRefIn, {"invoice_number": "  "}).values())
+        iter(refused(schemas.fields.RecordRefIn, {"invoice_number": "  "}).values())
     )
 
 
 def test_a_record_is_created_from_an_invoice_by_its_id_or_its_number():
     assert (
-        schemas.RecordCreateIn.model_validate({"number": "FACT-2026-000001"}).number
+        schemas.records.RecordCreateIn.model_validate({"number": "FACT-2026-000001"}).number
         == "FACT-2026-000001"
     )
-    assert refused(schemas.RecordCreateIn, {})
+    assert refused(schemas.records.RecordCreateIn, {})
 
 
 def test_the_create_input_takes_the_invoices_notice_as_it_comes():
     # invoice.invoice.issued carries more keys than an invoice's id: the reaction ignores them.
-    data = schemas.RecordCreateIn.model_validate(
+    data = schemas.records.RecordCreateIn.model_validate(
         {"invoice_id": str(uuid.uuid7()), "number": "T-1", "total": 100}
     )
     assert data.invoice_id is not None
 
 
 def test_a_cancellation_says_why():
-    errors = refused(schemas.RecordCancelIn, {"invoice_number": "T-1", "reason": ""})
+    errors = refused(schemas.records.RecordCancelIn, {"invoice_number": "T-1", "reason": ""})
     assert "reason" in errors
     assert (
-        schemas.RecordCancelIn.model_validate(
+        schemas.records.RecordCancelIn.model_validate(
             {"invoice_number": "T-1", "reason": "Duplicate"}
         ).reason
         == "Duplicate"
@@ -65,13 +65,13 @@ def test_a_cancellation_says_why():
 
 
 def test_lists_page_at_most_a_hundred():
-    assert schemas.RecordListIn.model_validate({}).limit == 50
-    assert "limit" in refused(schemas.RecordListIn, {"limit": 101})
-    assert "limit" in refused(schemas.EventListIn, {"limit": 0})
+    assert schemas.records.RecordListIn.model_validate({}).limit == 50
+    assert "limit" in refused(schemas.records.RecordListIn, {"limit": 101})
+    assert "limit" in refused(schemas.events.EventListIn, {"limit": 0})
 
 
 def test_the_record_list_filters_and_sorts_by_what_it_shows():
-    data = schemas.RecordListIn.model_validate(
+    data = schemas.records.RecordListIn.model_validate(
         {
             "status": "rejected",
             "environment": "production",
@@ -86,25 +86,25 @@ def test_the_record_list_filters_and_sorts_by_what_it_shows():
         "production",
         "sequence",
     )
-    assert "status" in refused(schemas.RecordListIn, {"status": "error"})
-    assert "sort" in refused(schemas.RecordListIn, {"sort": "xml"})
+    assert "status" in refused(schemas.records.RecordListIn, {"status": "error"})
+    assert "sort" in refused(schemas.records.RecordListIn, {"sort": "xml"})
 
 
 def test_the_record_list_filters_the_rejections_by_their_correction():
     for value in ("pending", "corrected"):
         assert (
-            schemas.RecordListIn.model_validate({"correction_status": value}).correction_status
+            schemas.records.RecordListIn.model_validate({"correction_status": value}).correction_status
             == value
         )
-    assert schemas.RecordListIn.model_validate({}).correction_status is None
+    assert schemas.records.RecordListIn.model_validate({}).correction_status is None
     # «Nothing to correct» is every other record: not a filter.
     assert "correction_status" in refused(
-        schemas.RecordListIn, {"correction_status": "not_applicable"}
+        schemas.records.RecordListIn, {"correction_status": "not_applicable"}
     )
 
 
 def test_a_manual_anchor_is_a_64_hexadecimal_fingerprint_with_its_invoice():
-    data = schemas.RecoverManualIn.model_validate(
+    data = schemas.chains.RecoverManualIn.model_validate(
         {
             "fingerprint": " " + "ab" * 32 + " ",
             "invoice_number": "OLD-1",
@@ -114,20 +114,20 @@ def test_a_manual_anchor_is_a_64_hexadecimal_fingerprint_with_its_invoice():
     assert data.fingerprint == "AB" * 32
     assert data.issue_date == dt.date(2026, 10, 1)
     errors = refused(
-        schemas.RecoverManualIn,
+        schemas.chains.RecoverManualIn,
         {"fingerprint": "XYZ", "invoice_number": "OLD-1", "issue_date": "2026-10-01"},
     )
     assert errors["fingerprint"].endswith(
         "The fingerprint must be 64 hexadecimal characters."
     )
-    errors = refused(schemas.RecoverManualIn, {"fingerprint": "A" * 64})
+    errors = refused(schemas.chains.RecoverManualIn, {"fingerprint": "A" * 64})
     assert set(errors) == {"invoice_number", "issue_date"}
 
 
 def test_the_photo_no_longer_carries_the_certificate():
     """The certificate is uploaded in the Hub: an older photo that still names it is read without it."""
-    assert "own_certificate" not in schemas.ConfigSyncIn.model_fields
-    data = schemas.ConfigSyncIn.model_validate(
+    assert "own_certificate" not in schemas.config.ConfigSyncIn.model_fields
+    data = schemas.config.ConfigSyncIn.model_validate(
         {"version": 1, "own_certificate": {"loaded": True, "holder": "ANA"}}
     )
     assert "own_certificate" not in data.model_dump()
@@ -136,13 +136,13 @@ def test_the_photo_no_longer_carries_the_certificate():
 def test_the_photo_no_longer_carries_the_multiple_taxpayers_indicator():
     """IndicadorMultiplesOT is always «S» (ERPlora serves many taxpayers, T2b): an older photo that still names
     it is read without it."""
-    assert "multiple_taxpayers" not in schemas.ConfigSyncIn.model_fields
-    data = schemas.ConfigSyncIn.model_validate({"version": 1, "multiple_taxpayers": "N"})
+    assert "multiple_taxpayers" not in schemas.config.ConfigSyncIn.model_fields
+    data = schemas.config.ConfigSyncIn.model_validate({"version": 1, "multiple_taxpayers": "N"})
     assert "multiple_taxpayers" not in data.model_dump()
 
 
 def test_the_accounts_photo():
-    data = schemas.ConfigSyncIn.model_validate(
+    data = schemas.config.ConfigSyncIn.model_validate(
         {
             "version": 7,
             "representation": {
@@ -154,19 +154,19 @@ def test_the_accounts_photo():
     )
     assert data.version == 7
     assert data.representation.status == "approved"
-    assert "version" in refused(schemas.ConfigSyncIn, {})
+    assert "version" in refused(schemas.config.ConfigSyncIn, {})
 
 
 def test_the_photo_s_retired_live_option_is_neither_read_nor_refused():
     # ``live_paid`` is no condition any more. The SaaS sends it until the Hub's retirement is out (expand/contract):
     # refusing it would stop every photo; reading it, keep a plan gate.
-    data = schemas.ConfigSyncIn.model_validate({"version": 1, "live_paid": "maybe"})
+    data = schemas.config.ConfigSyncIn.model_validate({"version": 1, "live_paid": "maybe"})
     assert "live_paid" not in data.model_dump()
 
 
 def test_an_aeat_query_month_is_one_to_twelve():
-    assert "month" in refused(schemas.AeatQueryIn, {"month": 13})
-    assert schemas.AeatQueryIn.model_validate({"year": 2026, "month": 8}).month == 8
+    assert "month" in refused(schemas.aeat_records.AeatQueryIn, {"month": 13})
+    assert schemas.aeat_records.AeatQueryIn.model_validate({"year": 2026, "month": 8}).month == 8
 
 
 def test_a_certificate_file_is_one_mb_at_most():
@@ -174,7 +174,7 @@ def test_a_certificate_file_is_one_mb_at_most():
     one_mb = base64.b64encode(b"\0" * (1024 * 1024)).decode()
     larger = base64.b64encode(b"\0" * (1024 * 1024 + 1)).decode()
 
-    assert schemas.CertificateUploadIn.model_validate({"p12_base64": one_mb})
-    errors = refused(schemas.CertificateUploadIn, {"p12_base64": larger})
+    assert schemas.own_certificate.CertificateUploadIn.model_validate({"p12_base64": one_mb})
+    errors = refused(schemas.own_certificate.CertificateUploadIn, {"p12_base64": larger})
     assert list(errors) == ["p12_base64"]
     assert "1 MB" in errors["p12_base64"]

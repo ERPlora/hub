@@ -7,11 +7,6 @@ import { flush, mountInventory } from '../__tests__/mount-inventory';
 import { emptyReport, type ImportReport } from '../lib/import-report';
 import ImportReportModal from './ImportReportModal.vue';
 
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
-
 afterEach(() => {
   document.body.innerHTML = '';
 });

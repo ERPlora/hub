@@ -7,7 +7,7 @@ from live.operations import operation
 
 from apps.flow import document, recipes
 from apps.flow.models import Flow
-from apps.flow.schemas import RecipeListIn, RecipeListOut
+from apps.flow.schemas.recipe_flows import RecipeListIn, RecipeListOut
 
 from .flows import live_flows
 from .reads import VIEW

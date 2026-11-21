@@ -204,6 +204,23 @@ def test_an_event_whose_key_is_unknown_still_reads():
     assert event.message() == "nope"
 
 
+def test_an_event_of_a_certificate_that_stopped_counting_still_reads():
+    # Nothing writes this event any more, but the trail keeps the ones written while the Hub checked the issuer.
+    event = Event(
+        kind=Event.Kind.CONFIG_CHANGED,
+        severity=Event.Severity.WARNING,
+        message_key="certificate_refused",
+        params={"holder": "ACME SL", "holder_tax_id": "B12345674", "expires_on": "2027-01-01"},
+    )
+    from django.utils import translation
+
+    with translation.override("es"):
+        assert event.message() == (
+            "El certificado propio de ACME SL (B12345674) ya no vale: no lo ha emitido una entidad que reconozca la "
+            "AEAT. Sube uno válido."
+        )
+
+
 NIF = {"issuer_nif": "B12345674"}
 WHY = {"reason": "unreachable", "detail": "", "at": ""}
 ACCEPTED = {"environment": "testing", "csv": "A-86MZ448LPLEBV7"}

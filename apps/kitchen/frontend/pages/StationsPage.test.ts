@@ -3,7 +3,7 @@
 // a tap on the row) and Delete (asks first; a refusal shows in the dialog). Under it, the routing: what goes
 // to each station, «Route» and «Remove». The actions only for whoever runs the stations.
 import { ConfirmDialog, DataTable } from '@erplora/ui/components';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import type { Component } from 'vue';
 
 import { route, station } from '../__tests__/kitchen';
@@ -13,14 +13,10 @@ import StationFormModal from '../components/StationFormModal.vue';
 import type { RouteOut, StationOut } from '../operations';
 import StationsPage from './StationsPage.vue';
 import { listFillProblems } from '../../../../frontend/testing/list-fill';
+import { rowButtonNames } from '../../../../base/frontend/__tests__/mount-base';
 
 /** A prop of a mounted component, whatever its type (a generic component's props read as `never`). */
 const prop = (wrapper: { props: () => unknown }, name: string): unknown => (wrapper.props() as Record<string, unknown>)[name];
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
 
 const GRILL = station('st-grill', { name: 'Grill', in_progress: 3, routes: 1 });
 const BAR = station('st-bar', { name: 'Bar', destination: 'printer', printer_usage: 'bar', printer_name: 'Bar printer', is_active: false });
@@ -45,6 +41,17 @@ async function setup(options: MountOptions = {}) {
 }
 
 describe('StationsPage', () => {
+  it('each row action tells a screen reader which station or which routed item it is for', async () => {
+    const s = await setup();
+    await s.show([GRILL, BAR], [BURGER, route('c1', { kind: 'category', target_name: 'Drinks' })]);
+    const names = (hook: string, ids: string[]) => ids.map((id) => rowButtonNames(s.wrapper.element, `${hook}-row-${id}`));
+    expect(names('kitchen-stations', ['st-grill', 'st-bar'])).toEqual([
+      { edit: 'Edit: Grill', route: 'Route: Grill' },
+      { edit: 'Edit: Bar', route: 'Route: Bar' },
+    ]);
+    expect(names('kitchen-routing', ['product-p1', 'category-c1'])).toEqual([{ remove: 'Remove: Burger' }, { remove: 'Remove: Drinks' }]);
+  });
+
   it('lists the stations with the old columns and the routing under them', async () => {
     const s = await setup();
     await s.show([GRILL, BAR], [BURGER]);

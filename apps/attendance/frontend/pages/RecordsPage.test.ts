@@ -17,10 +17,6 @@ import { listFillProblems } from '../../../../frontend/testing/list-fill';
 
 const download = vi.hoisted(() => ({ saveCsv: vi.fn() }));
 vi.mock('../lib/download', () => ({ saveCsv: download.saveCsv }));
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
 
 const OP = 'attendance.record.list';
 const NOW = '2026-10-06T08:30:00Z';

@@ -48,6 +48,7 @@ export function saleOut(over: Partial<SaleOut> = {}): SaleOut {
     invoice_id: null,
     invoice_number: '',
     invoice_type: '',
+    receipt_code: null,
     void_invoice_status: '',
     void_invoice_number: '',
     documents_pending: false,

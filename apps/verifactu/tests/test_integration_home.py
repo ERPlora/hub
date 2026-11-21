@@ -24,6 +24,7 @@ from apps.verifactu.tests.conftest import (
     HUB_DB_COMMITTED,
     A,
     B,
+    accepted_by_the_aeat_of_testing,
     b64,
     business_in,
     ctx_for,
@@ -103,8 +104,10 @@ def test_the_owner_has_the_step_pending_until_erplora_may_file_in_production(iss
 def test_the_own_certificate_also_completes_the_step(issuer):
     owner = ctx_for("hub_admin")
     assert steps(owner)[STEP]["state"] == "pending"
-    # Uploading it is all it takes: nothing else to choose.
+    # Uploading it and the AEAT's test environment accepting it is all it takes: nothing else to choose.
     run("verifactu.certificate.upload", {"p12_base64": b64(make_p12()), "password": "secret"})
+    assert steps(owner)[STEP]["state"] == "pending"
+    accepted_by_the_aeat_of_testing()
     assert steps(owner)[STEP]["state"] == "done"
     run("verifactu.certificate.remove")
     assert steps(owner)[STEP]["state"] == "pending"
@@ -116,6 +119,39 @@ def test_the_step_is_in_spanish_for_a_spanish_reader(issuer):
     assert (step["title"], step["description"]) == (
         "Configura VeriFactu",
         "Firma la autorización para que ERPlora envíe tus facturas a la AEAT, o sube el certificado del negocio.",
+    )
+
+
+@HUB_DB
+def test_with_erploras_route_closed_the_step_only_asks_for_the_business_certificate(issuer, settings):
+    """Where ERPlora does not file on behalf of businesses, VeriFactu → Configuration only offers the business's own
+    certificate, and the step says the same, in the reader's language."""
+    settings.VERIFACTU_ERPLORA_ROUTE_ENABLED = False
+    assert run("verifactu.config.get").erplora_route_available is False
+
+    english = steps(ctx_for("hub_owner"))[STEP]["description"]
+    spanish = steps(ctx_for("hub_owner", language="es"))[STEP]["description"]
+
+    assert (english, spanish) == (
+        "Upload your business certificate to send your invoices to the AEAT.",
+        "Sube el certificado del negocio para enviar tus facturas a la AEAT.",
+    )
+
+
+@HUB_DB
+@pytest.mark.parametrize(
+    ("switch", "platform_hub"), [(True, None), (False, A.key)], ids=["route open", "ERPlora's own hub"]
+)
+def test_where_configuration_offers_erploras_route_the_step_still_offers_the_authorisation(
+    issuer, settings, switch, platform_hub
+):
+    settings.VERIFACTU_ERPLORA_ROUTE_ENABLED = switch
+    if platform_hub:
+        settings.PLATFORM_HUB_SLUG = platform_hub
+    assert run("verifactu.config.get").erplora_route_available is True
+
+    assert steps(ctx_for("hub_owner"))[STEP]["description"] == (
+        "Sign the authorisation for ERPlora to send your invoices to the AEAT, or upload your business certificate."
     )
 
 
@@ -158,6 +194,7 @@ def live_by_erplora():
 
 def live_by_own_certificate():
     run("verifactu.certificate.upload", {"p12_base64": b64(make_p12()), "password": "secret"})
+    accepted_by_the_aeat_of_testing()
     run("verifactu.config.go_live")
 
 

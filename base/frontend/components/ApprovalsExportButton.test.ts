@@ -9,14 +9,9 @@ import ApprovalsExportButton from './ApprovalsExportButton.vue';
 
 const mocks = vi.hoisted(() => ({ saveFile: vi.fn(async () => true) }));
 vi.mock('../lib/download', () => ({ saveFile: mocks.saveFile }));
-vi.mock('@erplora/ui/shell', async (importOriginal) => ({
-  ...((await importOriginal()) as object),
-  toastError: vi.fn(),
-}));
 
 beforeEach(() => {
   mocks.saveFile.mockClear();
-  vi.mocked(toastError).mockClear();
 });
 
 const FILE = { filename: 'approvals.csv', content_type: 'text/csv', rows: 1, csv: 'Cuándo,Acción\r\n2026-10-24 11:30,Anular\r\n' };

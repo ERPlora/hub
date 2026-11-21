@@ -1,12 +1,13 @@
 // Test helper of a manager's approval in the apps (BASE-F84): `withApproval` opens «An approval is needed» with
-// `@ionic/vue`'s modalController; a test that reaches it mocks `@ionic/vue` with `modalControllerStub` (imported from
-// this file in the mock factory, as FormModal's `ionModalStub` is) and says here how the dialog ends: a manager approves
+// `@ionic/vue`'s modalController; a test that reaches it mocks `@ionic/vue` with `ionicWithApprovalDialog` (imported
+// from this file in the mock factory) and says here how the dialog ends: a manager approves
 // (`approvalDialog.answer = APPROVED_BY_MANAGER`, the default) or somebody presses «Cancel». The questions it was opened
 // with are kept, in order. The dialog is imported when first needed: `approvalSettled()` waits for it. Not an app's mount
 // helper: those load `@ionic/vue`, which the mock factory that imports this file is building.
 import { vi } from 'vitest';
 
 import { flush } from '../../../packages/ui/src/sdk/__tests__/live-harness';
+import { mockIonicModal } from './modal';
 
 // The stub below ends the dialog without painting it, so importing the real one only made Vite transform its whole graph
 // inside the budget of whichever test reached the approval first, past Vitest's 5 s on a loaded machine (hub#558).
@@ -44,6 +45,13 @@ export function modalControllerStub<T extends object>(real: T): T {
       return { present: async () => undefined, onDidDismiss: async () => approvalDialog.answer };
     },
   };
+}
+
+/** The factory of `vi.mock('@ionic/vue', …)`: Ionic Vue as the hub setup leaves it (`mockIonicModal`), with
+ *  `modalControllerStub`. */
+export async function ionicWithApprovalDialog(importOriginal: () => Promise<typeof import('@ionic/vue')>) {
+  const ionic = await mockIonicModal(importOriginal);
+  return { ...ionic, modalController: modalControllerStub(ionic.modalController) };
 }
 
 /** Lets the dialog's lazy import land, the approval end and the repeated command answer. */

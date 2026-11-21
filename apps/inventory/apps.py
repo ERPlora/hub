@@ -12,6 +12,9 @@ QUANTITIES_OF_GOODS = (
     "kilos de", "kg de", "gramos de", "litros de", "cajas de", "sacos de",
     "kilos of", "kg of", "grams of", "litres of", "liters of", "boxes of",
 )
+#: Goods noted down as arrived («apunta que han llegado…» is read «apunta que llegan…»), never «llegan» alone: people
+#: arrive too («han llegado dos más para la mesa 7»).
+GOODS_NOTED_AS_ARRIVED = ("apunta que llegan", "apuntame que llegan", "anota que llegan", "registra que llegan")
 
 
 class InventoryConfig(LiveAppConfig):
@@ -45,15 +48,20 @@ class InventoryConfig(LiveAppConfig):
     choices = {"allergens": ALLERGENS}
     # What these words mean to the Hub's assistant (base.assistant.relevance.synonyms). The «unidades» are the units of measure
     # (inventory.unit), and a «albarán», the «mercancía» or what «entran» (never «entrada»: its stem is that of «entre»)
-    # is the goods inventory.stock.receive records. So are «20 kilos de» or «5 cajas de» a product, which are also its
-    # stock (inventory.stock); not the bottles, cans or units a sale line or a cart counts too.
+    # is the goods inventory.stock.receive records. So are «20 kilos de» or «5 cajas de» a product, and what is noted
+    # down as arrived, which are also its stock (inventory.stock); not the bottles, cans or units a sale line or a cart
+    # counts too. A restaurant's «carta» is its products, in the very group live says for them (with fewer words it would
+    # be a second concept, and «los productos de la carta» would count the products twice). What broke is the breakage
+    # a write-off records, «roto» or «broken» (never «break» nor «breakage»: their stem is a staff member's break).
     assistant_synonyms = (
         ("unidad", "unidades", "unit", "units"),
         (
             "albaran", "mercancia", "entran", "recibir", "recibe", "recibido", "receive", "received", "goods",
-            "delivery note", *QUANTITIES_OF_GOODS,
+            "delivery note", *QUANTITIES_OF_GOODS, *GOODS_NOTED_AS_ARRIVED,
         ),
-        ("stock", *QUANTITIES_OF_GOODS),
+        ("stock", *QUANTITIES_OF_GOODS, *GOODS_NOTED_AS_ARRIVED),
+        ("carta", "producto", "articulo", "product"),
+        ("roto", "rota", "rotos", "rotas", "rotura", "broke", "broken"),
     )
     permissions = [
         "inventory.view_product",
@@ -108,7 +116,8 @@ class InventoryConfig(LiveAppConfig):
         )
     ]
     widgets = [
-        # A KPI says its name once, in its title; the money one is in the hub's currency.
+        # A KPI says its name once, in its title; the money one is in the hub's currency. Every figure is in the colour of
+        # data of inventory (6), the same on every screen.
         Widget(
             key="low_stock_count",
             title=_("Low-stock products"),
@@ -120,7 +129,7 @@ class InventoryConfig(LiveAppConfig):
             kind="kpi",
             operation="inventory.stock.get_summary",
             map={"value": "products_low_stock"},
-            options={"format": "number"},
+            options={"format": "number", "tone": 6},
         ),
         Widget(
             key="value",
@@ -133,7 +142,7 @@ class InventoryConfig(LiveAppConfig):
             kind="kpi",
             operation="inventory.stock.get_summary",
             map={"value": "stock_value"},
-            options={"format": "currency"},
+            options={"format": "currency", "tone": 6},
         ),
         Widget(
             key="in_stock",
@@ -145,7 +154,7 @@ class InventoryConfig(LiveAppConfig):
             kind="stat",
             operation="inventory.stock.get_summary",
             map={"value": "products_in_stock"},
-            options={"format": "number"},
+            options={"format": "number", "tone": 6},
         ),
         # The Panel's own page size: the five with less stock, the one with less first.
         Widget(

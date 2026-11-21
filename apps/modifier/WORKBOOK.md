@@ -92,8 +92,8 @@ Título «Grupo — {nombre}» y su regla. Dos apartados:
 
 - **Opciones**: cada una con su nombre, su nombre de comanda (si es otro), su suplemento en la moneda
   del negocio («+1,00 €» o «−0,50 €» en España, «+1,00 zł» en Polonia; o «Gratis»), su categoría fiscal
-  propia si la tiene y la marca «Por defecto». Quien gestiona
-  ve «Añadir opción» y, en cada una, Editar y Borrar. Vacío: «Este grupo todavía no tiene opciones.».
+  propia si la tiene, la marca «Por defecto» y, debajo de su nombre, sus alérgenos si tiene («Alérgenos: Leche»).
+  Quien gestiona ve «Añadir opción» y, en cada una, Editar y Borrar. Vacío: «Este grupo todavía no tiene opciones.».
   Si tiene menos opciones de las que pide el mínimo (y no se repiten), un aviso lo dice: el TPV no
   podría completarlo.
 - **Se aplica a**: cada producto («Producto · Hamburguesa (HAM-01)») o categoría («Categoría ·
@@ -107,7 +107,8 @@ De 20 en 20, con «Cargar más».
   más = obligatorio)», «Máximo (0 = sin techo)», «Se puede repetir una opción» y Orden.
 - **Opción** («Nueva opción» / «Editando opción — {nombre}»): Nombre, «Nombre en la comanda»,
   «Suplemento (<moneda>)» (la del negocio: «Suplemento (PLN)» en Polonia; negativo descuenta; vacío o 0,
-  gratis), «Categoría fiscal propia» (se busca; vacía = la del plato), Orden y «Elegida por defecto».
+  gratis), «Categoría fiscal propia» (se busca; vacía = la del plato), Orden, «Elegida por defecto» y, debajo,
+  «Alérgenos» (los catorce: se marcan los que la opción añade al plato).
 - **Enganchar** («Aplicar «{grupo}» a…»): Producto o Categoría, y el buscador de cada uno.
 - **Borrar** grupo u opción y **Dejar de aplicar**: piden confirmación diciendo qué se va con ello.
 
@@ -142,6 +143,8 @@ cierra la ventana sin guardarlo. Con la ventana como se abrió, atrás la cierra
 | MODIFIER-F08 | Que el suplemento salga en la comanda de cocina | hecho |
 | MODIFIER-F09 | Soltar los grupos de un producto o una categoría que se borra | hecho |
 | MODIFIER-F10 | Recuperar los grupos de suplementos, y los de un producto o de una categoría, desde una copia aparte | hecho |
+| MODIFIER-F11 | Declarar los alérgenos de una opción | hecho |
+| MODIFIER-F12 | Sumar los alérgenos de las opciones a los del plato | hecho |
 
 ### MODIFIER-F01 Consultar y buscar los grupos
 Estado: hecho
@@ -351,12 +354,12 @@ Pasos:
    enganches, F03) se vuelve a crear como lo crea la pantalla de Suplementos (F02), con su nombre, su nombre en la
    comanda, su mínimo y su máximo, si una opción se puede repetir y su orden, y con sus opciones como las añade la hoja
    del grupo (F04), cada una con su nombre, su nombre en la comanda, su suplemento, su categoría fiscal propia, si sale
-   elegida por defecto y su orden. Vuelve como un grupo nuevo, con otro identificador, y en los pasos siguientes sus
+   elegida por defecto, su orden y sus alérgenos (F11). Vuelve como un grupo nuevo, con otro identificador, y en los pasos siguientes sus
    enganches de la copia se le hacen a ese: el que la recuperación trajo con su nombre.
 3. Después, cada opción que en la copia tenía un grupo que el negocio conserva (el mismo, aunque lo renombrara, o el
    que trajo una recuperación anterior con su nombre) y que ese grupo ya no tiene, porque el negocio se la quitó (F04),
    se vuelve a añadir como la añade la hoja del grupo (F04), con su nombre, su nombre en la comanda, su suplemento, su
-   categoría fiscal propia y su orden. Si en la copia salía elegida por defecto, vuelve elegida solo si el grupo tiene
+   categoría fiscal propia, su orden y sus alérgenos. Si en la copia salía elegida por defecto, vuelve elegida solo si el grupo tiene
    hueco: nunca se la quita a las que el negocio eligió. En un grupo de «elige una» que ya trae otra por defecto, o en
    uno que ya trae tantas como su máximo, vuelve sin elegir y su nota lo dice.
 4. Cada grupo que en la copia colgaba de un producto vivo en ella y que el negocio ya no tiene enganchado a ese producto
@@ -403,6 +406,62 @@ crear a mano con su nombre, que se queda con los grupos que él le enganchó, no
 qué («not_found: …»); la que trajo una recuperación se reconoce por su nombre, la trajera esta u otra anterior.
 Implicados: BASE-F114, INVENTORY-F01, INVENTORY-F07, INVENTORY-F34, MODIFIER-F05, MODIFIER-F09
 
+### MODIFIER-F11 Declarar los alérgenos de una opción
+Estado: hecho
+Actor: propietario, administrador, responsable, asistente
+Pantalla: Suplementos (hoja del grupo)
+Pasos:
+1. Abre el grupo y, en Opciones, pulsa «Añadir opción» o **Editar** en una. Debajo de «Elegida por defecto»
+   sale el bloque «Alérgenos», con la nota «Marca los que añade esta opción al plato.» y los catorce alérgenos de
+   declaración obligatoria, los mismos y en el mismo orden que en el formulario de un producto: Gluten, Crustáceos,
+   Huevo, Pescado, Cacahuete, Soja, Leche, Frutos de cáscara, Apio, Mostaza, Sésamo, Sulfitos, Altramuces y
+   Moluscos. En el alta no sale ninguno marcado.
+2. Toca los que lleva la opción: «+Queso», Leche; «Salsa de mostaza», Mostaza. Cada toque marca o desmarca uno.
+   Una opción que solo quita algo («Sin cebolla») o que no añade ningún ingrediente («Poco hecha») se deja sin
+   marcar.
+3. Pulsa «Crear» o «Guardar», como el resto de la opción. Un alérgeno marcado sin guardar pregunta antes de cerrar
+   la ventana, como cualquier otro campo.
+4. En la hoja del grupo, cada opción con alérgenos los dice debajo de su nombre: «Alérgenos: Leche», en el orden de
+   la lista. Una opción sin alérgenos no lleva esa fila.
+Entra: la opción; la lista de los catorce alérgenos.
+Sale: la opción con sus alérgenos, en el mismo paso que el resto del formulario: o se guarda todo o nada (avisa:
+opción creada o cambiada). Lo mismo se hace por el asistente o la API, con los mismos permisos: «marca leche en el
+queso de Extras» pide antes la tarjeta de confirmación, que dice la opción con su grupo y los alérgenos por su
+nombre. Un cambio vale para lo que se pida desde ese momento: una línea ya pedida conserva los alérgenos que tenía
+(F12). Una opción que vuelve desde una copia aparte vuelve con sus alérgenos (F10).
+Si falla: un alérgeno que no es de la lista se rechaza, también por el asistente o la API, y no se guarda nada
+(«Ese alérgeno no es uno de los catorce de declaración obligatoria.»); en la ventana sale junto a su campo, como los
+demás rechazos de la opción. Quien solo puede ver lee los alérgenos en la hoja del grupo, pero no tiene el
+formulario.
+Implicados: MODIFIER-F04, MODIFIER-F10, MODIFIER-F12, INVENTORY-F35
+
+### MODIFIER-F12 Sumar los alérgenos de las opciones a los del plato
+Estado: hecho
+Actor: empleado, responsable
+Pantalla: Ventas: Vender
+Pasos:
+1. En el TPV, toca un artículo que tiene grupos. En su hoja, debajo del nombre del artículo salen sus alérgenos
+   y, debajo de cada opción que los tiene, los suyos: «+Queso» dice «Alérgenos: Leche». Una opción sin alérgenos no
+   lleva esa fila.
+2. Elige las opciones y pulsa «Añadir». La línea dice, debajo del nombre, «Alérgenos: …» con los del plato y
+   los de cada opción elegida, juntos, sin repetir y en el orden de la lista de los catorce: una hamburguesa con
+   Gluten y «+Queso» dice «Alérgenos: Gluten, Leche». Cuentan todas las opciones elegidas, también las que se cobran
+   en una línea aparte. Un plato sin alérgenos con una opción que los tiene también lleva la fila.
+3. Si el cliente avisó de una alergia marcada en la línea, el aviso «El plato lleva …» cuenta también los de las
+   opciones: «+Queso» en el plato de un alérgico a la leche dice «El plato lleva Leche».
+4. Envía la ronda: Cocina recibe los alérgenos de la línea ya sumados y los cruza con la alergia del cliente como
+   con cualquier plato.
+Entra: los alérgenos del producto (INVENTORY-F35) y los de las opciones elegidas (F11), que da la valoración de las
+opciones (F07).
+Sale: la línea con los alérgenos sumados y congelados al pedirla, como el suplemento: cambiar o borrar la opción, o
+sus alérgenos, después no cambia lo que dice esa línea ni lo que lee Cocina. Los alérgenos no cambian el precio ni
+el cobro, y no salen en el tique, en la factura ni en la cuenta impresa para la mesa (SALE-F40).
+Si falla: si no se pueden valorar las opciones, la línea no entra, como con cualquier suplemento. Una opción nunca
+quita un alérgeno al plato: «Sin queso» no quita la Leche de una hamburguesa que la declara, porque lo que declara el
+producto es lo que lleva su receta y lo que se quita es una indicación para cocina; si el cliente es alérgico, se
+marca su alergia en la línea.
+Implicados: MODIFIER-F06, MODIFIER-F07, MODIFIER-F11, SALE-F11, SALE-F40, SALE-F41, KITCHEN-F32
+
 ## Servicios: lo que entra y lo que sale
 
 Todo se puede pedir por las pantallas, el asistente (por voz o por texto, con la sesión de la propia
@@ -444,8 +503,8 @@ nombre, que la acción no usa: dice el del identificador (hub#1291).
 | Los enganches, de un grupo, de un producto o de una categoría, con páginas | ver | F05 | `modifier.link.list` |
 | Un enganche por su id, o por su grupo y su producto o categoría, con su `label`: «Salsas · Hamburguesa» | ver | F05 | `modifier.link.get` |
 | Una categoría de Inventario por su id o su nombre, como la nombra la lista de enganches | ver | F05 | `modifier.category.get` |
-| Los grupos con sus opciones de un producto (los suyos y los de todas sus categorías, una vez cada uno) | ver | F06 | `modifier.group.for_target` |
-| La comprobación y valoración de unas opciones elegidas para un producto: precio, nombres, categoría fiscal, total a sumar y texto de cocina | ver | F07, F08 | `modifier.selection.resolve` |
+| Los grupos con sus opciones de un producto (los suyos y los de todas sus categorías, una vez cada uno), cada opción con sus alérgenos | ver | F06, F11 | `modifier.group.for_target` |
+| La comprobación y valoración de unas opciones elegidas para un producto: precio, nombres, categoría fiscal, alérgenos, total a sumar y texto de cocina | ver | F07, F08, F12 | `modifier.selection.resolve` |
 
 Los grupos, un grupo, las opciones, los enganches y los grupos de un producto se pueden seguir en vivo.
 
@@ -456,8 +515,8 @@ Los grupos, un grupo, las opciones, los enganches y los grupos de un producto se
 | Crea un grupo | gestionar | F02 | `modifier.group.create` |
 | Cambia un grupo (lo que no se manda se queda) | gestionar | F03 | `modifier.group.update` |
 | Borra un grupo con sus opciones y enganches | gestionar | F03 | `modifier.group.delete` |
-| Añade una opción a un grupo | gestionar | F04 | `modifier.option.create` |
-| Cambia una opción (lo que no se manda se queda) | gestionar | F04 | `modifier.option.update` |
+| Añade una opción a un grupo, con sus alérgenos | gestionar | F04, F11 | `modifier.option.create` |
+| Cambia una opción, también sus alérgenos (lo que no se manda se queda) | gestionar | F04, F11 | `modifier.option.update` |
 | Borra una opción | gestionar | F04 | `modifier.option.delete` |
 | Engancha un grupo a un producto o una categoría | gestionar | F05, F10 | `modifier.link.attach` |
 | Suelta un grupo de un producto o una categoría | gestionar | F05 | `modifier.link.detach` |
@@ -504,7 +563,8 @@ Los papeles llegan del SaaS con prefijo (`hub_owner`, `hub_admin`, `hub_manager`
 ## Para quien lo mantiene
 
 - Anatomía completa: `apps.py`, `models.py` (`ModifierGroup`, `ModifierOption`, `ModifierLink`),
-  `migrations/`, `schemas.py`, `queries.py`, `services.py`, `events.py`, `live.py`, `api.py`,
+  `migrations/`, `schemas/`, `queries/` (con `selection.py`, la valoración, y `copy_columns.py`), `services/`,
+  `events.py`, `live.py`, `api.py`,
   `admin.py`, `locale/`, `frontend/` y un `tests/test_<fichero>.py` por fichero, más
   `tests/test_integration_inventory.py`, `tests/test_integration_tax.py`, `tests/test_integration_sale.py`
   (F06 y F07 contra Ventas: descuento, repetido, a peso e IVA al céntimo) y
@@ -527,13 +587,14 @@ Los papeles llegan del SaaS con prefijo (`hub_owner`, `hub_admin`, `hub_manager`
   una desmarca la otra (en la misma transacción, con la fila del grupo bloqueada); con otro máximo, no
   más que el máximo (409 `modifier.too_many_defaults`). Bajar el máximo por debajo de las que ya hay
   por defecto, el mismo 409.
-- **Valoración (`modifier.selection.resolve`)**: la única puerta del precio. Para un producto vivo,
-  sus grupos son los suyos y los de todas sus categorías vivas, sin repetir; un grupo sin opciones no
+- **Valoración (`modifier.selection.resolve`, sus pasos en `queries/selection.py`)**: la única puerta del precio.
+  Para un producto vivo, sus grupos son los suyos y los de todas sus categorías vivas, sin repetir; un grupo sin opciones no
   se pregunta ni se exige. Comprueba pertenencia (409 `modifier.option_not_offered`), mínimo
   (`modifier.choice_below_min`), máximo (`modifier.choice_above_max`) y repetición
   (`modifier.option_repeated`), con el campo `option_ids`. `own_line` = la opción tiene categoría fiscal
   y no es la del producto; `folded_delta` = la suma de las que no van en línea propia; `own_lines` = una
-  por opción en línea propia, con su cantidad por unidad del plato. Rechaza también un plato que quedaría
+  por opción en línea propia, con su cantidad por unidad del plato; cada elección lleva sus `allergens` (F12).
+  Rechaza también un plato que quedaría
   por debajo de cero (`modifier.price_below_zero`) y cualquier suplemento en un artículo que no se vende
   por unidad (`modifier.priced_by_measure`). Hasta 100 elecciones por llamada.
 - **`modifier.group.for_target` no pagina** a propósito: es la respuesta de un solo artículo, en una
@@ -566,7 +627,9 @@ Los papeles llegan del SaaS con prefijo (`hub_owner`, `hub_admin`, `hub_manager`
   vuelve desde la copia aparte (F10); `live.py` solo repinta con él.
 - **Desde una copia aparte** (BASE-F114, F10): `recoverable_from_copy` de `apps.py` declara tres cosas, «Modifier
   groups», «Modifier groups of categories» y después «Modifier groups of products», cada una contada aparte.
-  `queries.groups_in_copy` lee con su propio SQL cada grupo de la copia con sus opciones, y
+  `queries.groups_in_copy` lee con su propio SQL cada grupo de la copia con sus opciones, y los alérgenos de cada
+  opción solo si la copia tiene la columna (`queries/copy_columns.py`, `LATER_OPTION_FIELDS`, igual que
+  `queries.options_in_copy`): una copia anterior devuelve sus opciones sin ellos y `reads_since` no sube; y
   `queries.groups_not_in_business` deja los que el negocio no tiene ni por id ni con su nombre (sin mirar mayúsculas: el
   nombre es único, `modifier_group_name_unique`), cada opción con la clave de su categoría fiscal propia (Impuestos nunca
   borra una). Los crea `modifier.group.recover` (permiso `modifier.system`, sin ruta ni herramienta del asistente):
@@ -592,7 +655,7 @@ Los papeles llegan del SaaS con prefijo (`hub_owner`, `hub_admin`, `hub_manager`
   con `modifier.link.attach` como la recuperación (`copy_recovery:<id>`), y lo que `attach` rechaza sale «sin crear»
   con su motivo. Pruebas: `tests/test_recovery.py`.
 - **Asistente**: cada operación declara `ai` (descripción; en las escrituras, `risk`: `high` al borrar
-  un grupo o una opción) y cada campo de `schemas.py` su `description`. Los datos que ningún modelo
+  un grupo o una opción) y cada campo de `schemas/` su `description`. Los datos que ningún modelo
   nombra llevan además un `title` en inglés con su `es` en el catálogo de la app (`option` «Opción»,
   `tax_category_key` «Categoría fiscal propia», el nombre del formulario de opción): así los nombra la
   tarjeta de confirmación del asistente, nunca por el título que pydantic inventa del campo
@@ -610,7 +673,7 @@ Los papeles llegan del SaaS con prefijo (`hub_owner`, `hub_admin`, `hub_manager`
   (`tests/test_assistant_asks.py`), también la de borrar un grupo «sin cambiar los pedidos antiguos», desde que live
   deja de leer «sin cambiar» como una orden de cambiar (ERPlora/live#60).
 - **La tarjeta de confirmación del asistente** (BASE-F97) nombra cada registro que una escritura señala por su id con
-  las marcas `refers` de `schemas.py` (`A_GROUP`, `AN_OPTION`, `A_LINK`, `A_PRODUCT`, `A_CATEGORY`), leídas como quien
+  las marcas `refers` de `schemas/__init__.py` (`A_GROUP`, `AN_OPTION`, `A_LINK`, `A_PRODUCT`, `A_CATEGORY`), leídas como quien
   pregunta: el grupo, el producto y la categoría por su nombre, la opción por su nombre y su grupo, porque dos grupos
   pueden tener una opción con el mismo nombre, y el enganche por su grupo y lo que engancha. El id lleva su título
   («Grupo», «Opción», «Se aplica a»), nunca «Registro». Sin persona detrás, sin permiso, con un id de otro negocio o
@@ -726,8 +789,23 @@ comanda y la pinta debajo del nombre: en la pantalla separada por «, » y en el
 (hub#1156, hub#1138). Renombrar o borrar la opción, o su grupo, después de pedirla no cambia lo que lee
 cocina (`tests/test_integration_kitchen.py`).
 
+### Los alérgenos de una opción
+
+F11 y F12 están `hecho`. La lista es la de la plataforma (`base.allergens`: su tipo, su comprobación y sus
+esquemas `AllergensIn`, `AllergensPatchIn` y `AllergensOut`), la misma que declara un producto de Inventario
+(INVENTORY-F35) y que leen Ventas y Cocina; `apps.py` declara sus nombres (`choices`) para la tarjeta del asistente.
+`ModifierOption.allergens` (migración `0002_option_allergens`, con `db_default` para el código de antes) la guardan el
+alta y la edición de la opción, y la devuelven `modifier.option.get` y `.list`, `modifier.group.for_target` y cada
+elección de `modifier.selection.resolve`; la recuperación desde una copia aparte la trae. El formulario de la opción
+la marca con `AllergenSelect` y la hoja del grupo la dice con `AllergenRow`, los dos de `@erplora/ui`, como Inventario y
+Ventas. La hoja de suplementos del TPV, que es de Ventas, dice los de cada opción con la misma `AllergenRow`, y Ventas
+suma a la línea los de las opciones elegidas al pedirla y los congela con el resto de la copia del suplemento (SALE-F40).
+
 ### Lo que NO hace, a propósito
 
+- No guarda más alérgenos que los catorce de declaración obligatoria ni «puede contener trazas» en una opción (F11),
+  igual que un producto; y una opción no quita alérgenos al plato (F12): lo que se quita es una indicación para
+  cocina, y la alergia del cliente se marca en la línea.
 - No tiene variantes de producto ni stock ni coste por opción (descontar ingredientes es otra cosa).
 - No hace menús a precio cerrado: eso es Menús.
 - No cobra ni factura por sí misma: Ventas pone el dinero.

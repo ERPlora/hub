@@ -179,3 +179,30 @@ def test_a_how_to_question_ranks_the_documentation_first_by_being_one(owner, lan
     tools = assistant.tools.catalog(owner(language))
     ranking = {**assistant.relevance.ranking(tools), "always": ()}
     assert [op.name for op in shared.relevant(tools, [asked], language, **ranking)][0] == assistant.relevance.DOCS_SEARCH
+
+
+#: «ventas» names the Sales app and also what a product's sold out takes: each request with the tool it asks for and
+#: the one that came before it. Sales named alone as what is turned off or on is the app; said with the product it is
+#: of, it is that product's sold out.
+SALES_OFF_OR_SOLD_OUT = [
+    ("es", "desactiva las ventas", "base.app.disable", "inventory.product.set_sold_out"),
+    ("es", "apaga las ventas", "base.app.disable", "inventory.product.set_sold_out"),
+    ("en", "turn off the sales", "base.app.disable", "inventory.product.set_sold_out"),
+    ("es", "activa las ventas", "base.app.enable", "inventory.product.set_sold_out"),
+    ("es", "desactiva la venta del café", "inventory.product.set_sold_out", "base.app.disable"),
+    ("en", "turn off sales of the coffee", "inventory.product.set_sold_out", "base.app.disable"),
+]
+
+
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
+@pytest.mark.parametrize(("language", "asked", "expected", "after"), SALES_OFF_OR_SOLD_OUT)
+def test_turning_sales_off_is_the_app_and_stopping_the_sale_of_a_product_is_its_sold_out(
+    owner, language, asked, expected, after
+):
+    """«desactiva las ventas» offered marking a product as sold out before turning the Sales app off. A pointer of
+    ``packages/live`` back to before live told the two apart fails here."""
+    ctx = owner(language)
+    assert {expected, after} <= set(assistant.tools.catalog(ctx))  # the owner holds both: only the order can fail
+    got = offered(ctx, asked)
+    assert got.index(expected) == len(assistant.relevance.ALWAYS)  # first after what is always at hand
+    assert got.index(expected) < got.index(after)

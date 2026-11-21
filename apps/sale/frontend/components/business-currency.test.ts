@@ -2,7 +2,7 @@
 // business (`base.business.get`, its country's, with the decimals the server counts), and what was charged is shown
 // with the sale's own currency, never the euro by default nor rewritten when the business's changes. Until the
 // business answers, the till paints no figure: a dash where the amount goes (hub#936: never 15.00 for 1,500 yen).
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import type { Component } from 'vue';
 
 import type { TargetGroupOut } from '../../../modifier/frontend/operations';
@@ -26,11 +26,6 @@ import ProductTile from './pos/ProductTile.vue';
 import ServicePriceSheet from './pos/ServicePriceSheet.vue';
 import ServiceSearchResults from './pos/ServiceSearchResults.vue';
 import ServiceTile from './pos/ServiceTile.vue';
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
 
 const FOOT = { hasLines: true, total: 1250, discountPercent: '0.00', discountAmount: 0, ticketDiscount: 0, allowDiscounts: true, blockedReason: null };
 
@@ -103,7 +98,7 @@ const GROUP: TargetGroupOut = {
   max_choices: 1,
   allow_repeat: false,
   is_required: false,
-  options: [{ id: 'cheese', name: 'Cheese', kitchen_name: '', price_delta: 500, tax_category_key: null, is_default: false }],
+  options: [{ id: 'cheese', name: 'Cheese', kitchen_name: '', price_delta: 500, tax_category_key: null, is_default: false, allergens: [] }],
 };
 const dish = (id: string, name: string, price_delta = 0) => ({ id, product_id: `p-${id}`, product_name: name, sku: '', price_delta });
 const MENU = {

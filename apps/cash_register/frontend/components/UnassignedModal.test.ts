@@ -1,16 +1,11 @@
 // «Sale lines in no shift» (CASH_REGISTER-F17): the window with the sale lines that
 // fell in no session; it only reads them while open. «Close» closes it.
 import { FormModal } from '@erplora/ui/components';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import { click, mountCash } from '../__tests__/mount-cash-register';
 import SessionLines from './SessionLines.vue';
 import UnassignedModal from './UnassignedModal.vue';
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
 
 describe('UnassignedModal', () => {
   it('lists the unassigned lines while open, and «Close» closes it', async () => {

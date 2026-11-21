@@ -6,11 +6,11 @@ what it is for (what the first section says before its first ``###``, the only p
 empty and has at most ``PURPOSE_MAX`` characters; every screen has a summary (what goes before its first ``####``, the
 only part of it that is published) of at most ``SUMMARY_MAX`` characters; what is published (what it is for, each
 screen's summary, and each flow's title, steps and what happens if it fails) holds no code (backticks), no issue
-reference, no size in pixels, no flow id and no operation or event name, while the detail under a ``###`` of the first
-section or a ``####`` of a screen may hold any of them; every published flow has
-its steps; and no flow that reads as done on a tab is left out. A translation publishes the same tabs and flows as its
-source, each with its steps and what happens if it fails when the source has them, so a word of the vocabulary that is
-missing or wrong in it cannot empty the help in that language. While no module declares its help, the real cases are
+reference, no size in pixels, no flow id (also a short one, «F09»), no placeholder of a message («{n}») and no
+operation or event name, while the detail under a ``###`` of the first section or a ``####`` of a screen may hold any
+of them; every published flow has its steps; and no flow that reads as done on a tab is left out. A translation
+publishes the same tabs and flows as its source, each with its steps and what happens if it fails when the source has
+them, so a word of the vocabulary that is missing or wrong in it cannot empty the help in that language. While no module declares its help, the real cases are
 an empty set; the made-up WORKBOOKs below, clean and then broken once per rule, show the check catching what it guards.
 """
 
@@ -33,7 +33,8 @@ FORBIDDEN = {
     "code": re.compile(r"`"),
     "an issue reference": re.compile(r"\w+#\d+"),
     "a size in pixels": re.compile(r"\d+ ?px\b"),
-    "a flow id": re.compile(r"[A-Z_]+-F\d+"),
+    "a flow id": re.compile(r"[A-Z_]+-F\d+|\bF\d{2,}\b"),
+    "a placeholder": re.compile(r"\{[^{}]*\}"),
 }
 #: ``<app>.<entity>.<action>`` (or ``<fact>``): an operation's or an event's name, when its first part is an app.
 DOTTED = re.compile(r"(?<![\w.])([a-z][a-z0-9_]*)\.[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*(?!\w|\.\w)")
@@ -200,6 +201,8 @@ def test_the_clean_module_passes_with_code_and_ids_where_nothing_is_published():
         ("Una tabla de zonas.", "Una tabla de zonas (hub#888).", "the screen «Zonas» has an issue reference"),
         ("1. Pulsa «+».", "1. Pulsa «+» y arrastra 8 px.", "the steps of TABLE-F01 has a size in pixels"),
         ("se activa.\n", "se activa (TABLE-F02).\n", "what happens if TABLE-F01 fails has a flow id"),
+        ("se activa.\n", "se activa (F02).\n", "what happens if TABLE-F01 fails has a flow id"),
+        ("Una tabla de zonas.", "Sale «{n} zonas».", "the screen «Zonas» has a placeholder"),
         ("Una tabla de mesas.", "Una tabla de mesas que lee table.table.list.", "names 'table.table.list'"),
         ("Pasos:\n1. Pulsa «+».\n", "", "TABLE-F01 is published without steps"),
         ("Estado: hecho\n", "Estado: hecho, también por la API\n", "TABLE-F01 is done on a tab, but its status"),
@@ -216,6 +219,8 @@ def test_the_clean_module_passes_with_code_and_ids_where_nothing_is_published():
         "issue",
         "pixels",
         "flow-id",
+        "short-flow-id",
+        "placeholder",
         "operation",
         "no-steps",
         "dropped",

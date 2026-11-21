@@ -17,6 +17,7 @@ vi.mock('./pages/InvoicesPage.vue', () => ({ default: { name: 'InvoicesPage' } }
 vi.mock('./pages/InvoiceDetailPage.vue', () => ({ default: { name: 'InvoiceDetailPage' } }));
 vi.mock('./pages/SeriesPage.vue', () => ({ default: { name: 'SeriesPage' } }));
 vi.mock('./pages/IssuerPage.vue', () => ({ default: { name: 'IssuerPage' } }));
+vi.mock('./pages/PublicInvoicePage.vue', () => ({ default: { name: 'PublicInvoicePage' } }));
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
@@ -26,12 +27,13 @@ async function load(r: RouteRecordRaw): Promise<RouteComponent> {
 }
 
 describe('invoice routes.ts', () => {
-  it('maps Invoices, the detail of one, Series and Issuer, all behind a session', () => {
-    expect(routes.map((r) => [r.path, r.meta?.auth, r.props ?? false])).toEqual([
-      ['/invoice/invoices', true, false],
-      ['/invoice/invoices/:id', true, true],
-      ['/invoice/series', true, false],
-      ['/invoice/issuer', true, false],
+  it('maps the invoice pages and the public ticket page without a session or shell chrome', () => {
+    expect(routes.map((r) => [r.path, r.meta?.auth, r.meta?.chrome ?? true, r.props ?? false])).toEqual([
+      ['/invoice/invoices', true, true, false],
+      ['/invoice/invoices/:id', true, true, true],
+      ['/invoice/series', true, true, false],
+      ['/invoice/issuer', true, true, false],
+      ['/p/:slug/invoice/:code', false, false, false],
     ]);
   });
 
@@ -41,6 +43,7 @@ describe('invoice routes.ts', () => {
     expect(await load(routes[1])).toEqual({ name: 'InvoiceDetailPage' });
     expect(await load(routes[2])).toEqual({ name: 'SeriesPage' });
     expect(await load(routes[3])).toEqual({ name: 'IssuerPage' });
+    expect(await load(routes[4])).toEqual({ name: 'PublicInvoicePage' });
   });
 
   it('imports types only: Vite hoists the eager glob of main.ts above the shell boot hooks', () => {

@@ -15,13 +15,16 @@ import json
 
 import pytest
 from django.conf import settings as deployed
+from django.db import OperationalError
 
 from apps.invoice.models import Invoice
 from apps.invoice.tests.test_platform import BODY, free_month
 from apps.invoice.tests.test_platform_invoices import PLATFORM, PLATFORM_ISSUER, system
 from apps.invoice.tests.conftest import run
 from apps.verifactu.models import Record
+from base.tenancy import identity
 from base.tenancy.context import use_hub
+from base.tenancy.identity import HubIdentityMismatch
 from base.tenancy.tests.business import HUB_DB
 from base.tests.test_internal import code, signed
 from control.models import Hub
@@ -120,6 +123,31 @@ def test_the_platform_hub_issues_in_its_own_database_and_nowhere_else(client, hu
     assert answer.status_code == 201
     with use_hub(hub_a):
         assert Invoice.objects.count() == 1
+
+
+@pytest.mark.parametrize(
+    ("failure", "level"),
+    [
+        # Unreachable now: it passes, a warning.
+        (OperationalError("connection refused"), "WARNING"),
+        # A database that says it is another hub: an alarm, as on a hub's host (base.middleware).
+        (HubIdentityMismatch("another hub's database"), "CRITICAL"),
+    ],
+)
+def test_a_platform_hub_database_that_fails_is_503_and_logged_as_every_internal_door(
+    client, platform_row, monkeypatch, caplog, failure, level
+):
+    def failing(alias, hub_id):
+        raise failure
+
+    monkeypatch.setattr(identity, "_verified", set())
+    monkeypatch.setattr(identity, "verify", failing)
+
+    answer = post(client, BODY)
+
+    assert answer.status_code == 503 and code(answer) == "base.hub_unavailable"
+    [logged] = [record for record in caplog.records if record.name == "base.internal"]
+    assert logged.levelname == level and f"hub={platform_row.slug}" in logged.getMessage()
 
 
 def test_health_unsigned_is_401(client, platform_hub):
@@ -266,3 +294,16 @@ def test_the_pdf_of_an_invoice_that_never_arrived_is_404(client, platform_hub):
     answer = get(client, f"{ROOT}/{BODY['id']}/pdf")
 
     assert (answer.status_code, code(answer)) == (404, "invoice.platform_unknown")
+
+
+def test_without_weasyprint_s_libraries_the_pdf_is_503(client, platform_hub, monkeypatch):
+    post(client, BODY)
+
+    def missing():
+        raise OSError("cannot load library 'libpango-1.0-0'")
+
+    monkeypatch.setattr("base.pdf._weasyprint", missing)
+
+    answer = get(client, f"{ROOT}/{BODY['id']}/pdf")
+
+    assert (answer.status_code, code(answer)) == (503, "internal.pdf_unavailable")

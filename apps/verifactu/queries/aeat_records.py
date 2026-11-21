@@ -5,7 +5,8 @@ from live.context import OperationContext
 from live.operations import operation
 
 from apps.verifactu.models import AeatRecord
-from apps.verifactu.schemas import AeatRecordListIn, AeatRecordOut, Page
+from apps.verifactu.schemas.aeat_records import AeatRecordListIn, AeatRecordOut
+from apps.verifactu.schemas.fields import Page
 
 from .reads import VIEW, page
 

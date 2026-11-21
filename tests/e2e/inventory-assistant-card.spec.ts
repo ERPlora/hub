@@ -8,8 +8,8 @@
 // flow: INVENTORY-F04 INVENTORY-F07 INVENTORY-F08 INVENTORY-F13 BASE-F97
 import { type BrowserContext, expect, test } from '@playwright/test';
 
-import { cancel, cardSpec, datumOf, fieldsOf, ownerIn, VIEWPORTS } from './assistant-card-helpers';
-import { card, openPanel } from './assistant-real';
+import { cardSpec, datumOf, fieldsOf, VIEWPORTS } from './assistant-card-helpers';
+import { cancel, card, openPanelAtTheDesk, ownerIn } from './assistant-panel';
 import { A, api, capture, untilStill } from './helpers';
 import { cleanInventory, createProduct, stamp } from './inventory-helpers';
 
@@ -50,8 +50,7 @@ for (const language of ['es', 'en'] as const) {
   test(`inventory-assistant-card — in ${language}, a write of Inventory says which product or category, never by its id`, async ({ browser }) => {
     const [context, page] = await ownerIn(browser, language);
     const { category, product } = await aCatalog(context);
-    await page.setViewportSize({ width: 1440, height: 900 });
-    await openPanel(page);
+    await openPanelAtTheDesk(page);
 
     // «Borra el producto vino tinto», a dangerous write: the product by its name, titled as the screens call one, in
     // every size.

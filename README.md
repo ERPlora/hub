@@ -31,15 +31,28 @@ git config core.hooksPath .githooks   # una vez por clon, cuando su HEAD ya trae
 scripts/checks.sh fast                # lo mismo que corre el gancho, a mano, sobre el árbol de trabajo
 ```
 
-`scripts/checks.sh fast` pasa en unos segundos, sin red ni base de datos, los tests de guardarraíles del tamaño de
-cada fichero, de ruff, de los contratos de import-linter y de la complejidad cognitiva, con sus listas de excepciones,
-que solo encogen (`.file-size-allow`, las de `pyproject.toml` y `complexipy-snapshot.json`). Su salida dice qué
-fichero incumple y por qué.
+`scripts/checks.sh fast` pasa primero, en unos segundos y sin red ni base de datos, los tests de guardarraíles del
+tamaño de cada fichero, de ruff, de los contratos de import-linter y de la complejidad cognitiva, con sus listas de
+excepciones, que solo encogen (`.file-size-allow`, las de `pyproject.toml` y `complexipy-snapshot.json`). Después
+comprueba lo que toca el cambio: lo que difiere de donde la rama salió de `origin/main` (en `origin/main`, del commit
+anterior) o del commit que se le pase (`scripts/checks.sh fast <commit>`), con lo no commiteado y los ficheros nuevos.
+
+- ESLint sobre sus ficheros TypeScript, JavaScript y Vue y, si toca alguno, la comprobación de tipos (`pnpm typecheck`)
+  y las pruebas de Vitest relacionadas (`vitest related`).
+- pytest sobre sus ficheros de prueba y sobre el `test_<módulo>.py` de cada módulo tocado (también
+  `test_<paquete>_<módulo>.py`, para un módulo de un paquete como `services/`) en la carpeta `tests/` más cercana,
+  contra el Postgres de `compose.yaml` y en una base de pruebas propia de cada checkout (`TEST_DB_NAME` la cambia).
+
+Corren todas, y cualquier rojo hace fallar el comando; su salida dice qué fichero incumple y por qué. La pasada completa
+(la suite entera, el build y el humo de navegador) la hace la CI.
 
 El gancho `.githooks/pre-push` corre primero el `pre-push` global de la máquina, con los mismos argumentos y la misma
 entrada, y después `scripts/checks.sh fast` sobre cada commit que se sube, sacado en un worktree temporal con el
-entorno de Python de este checkout (`.venv`, o el de `UV_PROJECT_ENVIRONMENT`): se comprueba lo que se sube, nunca el
-árbol de trabajo. Un rojo para el push, y no hay variable para saltárselo; sin el entorno (`uv sync`) también se para.
+entorno de Python de este checkout (`.venv`, o el de `UV_PROJECT_ENVIRONMENT`), que además le presta su `node_modules`
+y `packages/ui` (en el commit que registra lo que se sube): se comprueba lo que se sube, nunca el árbol de trabajo. Un
+rojo para el push, y no hay variable para saltárselo; sin el entorno (`uv sync`) también se para, y si a ESLint, a los
+tipos o a Vitest les falta `node_modules` o `packages/ui`, el comando lo dice (`pnpm install`, `git submodule update
+--init`) y falla.
 `commit-msg`, `pre-commit` y `applypatch-msg` pasan el turno a los ganchos globales del mismo nombre, que
 `core.hooksPath` dejaría de correr. La suite de la CI vuelve a pasar estos tests al fusionar, así que un clon sin el
 gancho no se salta nada. Sus tests: `tests/test_githooks.py` y `tests/test_checks.py`.
@@ -57,9 +70,9 @@ bash .github/scripts/smoke-e2e.sh --spec tests/e2e/login-and-shell.spec.ts   # s
 
 Recorre en el navegador lo que no se puede romper: entrar, las sesiones y los permisos, la separación entre negocios, la
 suspensión por impago, cobrar y la caja, la impresión, el ticket con QR, la factura, VeriFactu, la cocina y las mesas, las
-citas, los servicios y los bonos, el alta de un negocio y la demo. Usa la misma pila que la pasada nocturna
-(`tests/e2e/README.md`, «La pasada nocturna»): sus worktrees, sus BD, los dos `runserver` y, pase lo que pase, la
-limpieza.
+citas, los servicios y los bonos, el alta de un negocio, activar y desactivar apps, la demo y la actualización en vivo
+entre pestañas. Usa la misma pila que la pasada nocturna (`tests/e2e/README.md`, «La pasada nocturna»): sus worktrees,
+sus BD, los dos `runserver` y, pase lo que pase, la limpieza.
 
 - **Qué tests**: los que llevan `@smoke` al final de su título; se marca el test concreto, nunca la spec entera.
   `pnpm e2e --list --grep @smoke` los lista.
@@ -67,6 +80,7 @@ limpieza.
   El SaaS va en su `origin/main`.
 - **El tope**: 20 minutos para los tests (el tope global de Playwright), fijado con las pasadas medidas en el Mac
   cargado. Al llegar, Playwright corta y el humo sale en rojo. Subirlo es una decisión, no el arreglo de una pasada lenta.
+  En el job de GitHub, con todos los grupos dentro, los tests tardan de 11,9 a 14,2 minutos.
 - **Dónde**: `~/.erplora/hub-smoke-e2e/` y el puerto `9780` (el SaaS en el `9781`, como en la noche), aparte de la
   pasada nocturna, así que ninguna espera a la otra. Un worker lo lleva a su carpeta y a sus puertos con `NIGHTLY_DIR` y
   `NIGHTLY_HUB_PORT`. Nunca escribe en GitHub; lo que deja está en `runs/<pasada>/` de esa carpeta (`night.log`, los
@@ -82,15 +96,19 @@ limpieza.
   Los grupos entran de uno en uno, tras tres pasadas seguidas en verde del job, y el job los nombra con `--spec`: hoy,
   entrar, las sesiones, los permisos de un empleado, la separación entre negocios y la suspensión por impago; cobrar
   en el TPV, la caja y la impresión del ticket; el ticket con su QR, la factura y VeriFactu; la cocina y las mesas
-  (mandar la ronda a cocina desde el TPV, seguirla y meterle prisa, y sentar la cuenta del TPV en una mesa y
-  quitársela); y las citas, los servicios y los bonos (reservar en la agenda, cobrar la cita en el TPV al precio del
+  (mandar la ronda a cocina desde el TPV, seguirla y meterle prisa, sentar la cuenta del TPV en una mesa y
+  quitársela, y servir una mesa desde el plano hasta cobrar su cuenta en el TPV y verla libre); las citas, los servicios y los bonos (reservar en la agenda, cobrar la cita en el TPV al precio del
   profesional, dar de alta un servicio con quien lo hace, crear un bono, venderlo y ajustarlo, y pagar con él un corte
-  en el TPV). Nada del grupo fiscal llega a la AEAT: el runner no tiene pasarela de envío ni certificados, y sus
+  en el TPV); y el alta, las apps, la demo y lo vivo (dar de alta en erplora.com un negocio de España, que nace con
+  Impuestos y sin VeriFactu; desactivar Reservas, que se lleva Mesas, y volver a activarlas; entrar en la demo desde
+  la puerta del SaaS hasta que termina, y ver en otra pestaña, sin recargar, un elemento recién creado).
+  Nada del grupo fiscal llega a la AEAT: el runner no tiene pasarela de envío ni certificados, y sus
   tests caen si un registro va al entorno de producción de la AEAT. Tampoco pide un PDF al servidor (la factura se
   imprime desde el navegador), así que el job no instala WeasyPrint. `.github/scripts/workflows.test.sh` lleva la
-  lista de los grupos que ya están dentro y cae si el job pierde o añade una spec por su cuenta. Con todos dentro, el
-  job correrá todos los `@smoke`, como en el Mac. El job tiene un tope de 31 minutos, el doble de lo que tarda su
-  pasada medida más lenta con la pila incluida; un grupo que entra lo vuelve a medir. Lo que hace la pila sale en el
+  lista de los grupos que ya están dentro y cae si el job pierde o añade una spec por su cuenta. Con este último grupo
+  están todos dentro: el job corre los mismos tests `@smoke` que este comando sin `--spec`, y una spec que se marque
+  después entra como un grupo, con sus tres pasadas. El job tiene un tope de 34 minutos, el doble de lo que tarda su
+  pasada medida más lenta con la pila incluida; una spec que entra lo vuelve a medir. Lo que hace la pila sale en el
   registro del job y, si falla, el artefacto `smoke` guarda además los registros de los dos `runserver` y las trazas
   de Playwright.
 
@@ -321,7 +339,7 @@ PLAN-DB, ronda 2026-10-30: decisión 2 y propuestas (a), (f), (j), (k), (l), (m)
 
 - **Restablecer el negocio** (`base.hub.reset`, Ajustes › Datos): sin `dry_run` ya no vacía en la petición; anota lo
   pedido en el registro (`Hub.reset_requested_at`, `Hub.reset_sections`), lo deja debido en `hub_due` y responde
-  `status: "copying"`. El worker (`base/worker.py`, pase `_data`, bajo el arriendo del hub) copia la BD del negocio
+  `status: "copying"`. El worker (`base/worker_data.py`, pase `_data`, bajo el arriendo del hub) copia la BD del negocio
   (`base/tenancy/dumps.py`) y, solo si la copia quedó guardada, vacía las secciones en su BD con
   `base.hub.reset_apply` (una transacción: todo o nada) y anota `base.hub.data_reset`; si la copia falla no vacía
   nada y deja `failed` con su motivo (`dumps_unavailable`, `dump_failed`, `emptying_failed`, `hub_not_ready`), y la

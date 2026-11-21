@@ -1,17 +1,20 @@
 """The staff app declares its module metadata, its menu entries, its permissions, what each role gets,
-the assistant's contract of every operation (``ai`` and described input fields) and its panels of the Home."""
+the assistant's contract of every operation (``ai`` and described input fields), its help and its panels of the Home."""
 
+import re
 from pathlib import Path
 
 from django.apps import apps
-from django.conf import settings
 from django.utils import translation
 from live.live_registry import live_registry
-from live.meta import Category, LiveAppConfig, Nav, Widget, module_configs, permissions_for_role
+from live.meta import Category, Help, LiveAppConfig, Nav, Widget, module_configs, permissions_for_role
 from live.operations import INTERNAL, registry
 
 from apps.staff import events as E
 from apps.staff import queries, services  # noqa: F401  (importing them registers the operations)
+from base import home
+from base.queries import app_help
+from base.tests.shell_icons import shell_icon_registry
 
 # The old module's permissions, one by one (module.json), plus asking for one's own time off.
 PERMISSIONS = [
@@ -151,17 +154,37 @@ def test_every_granted_permission_is_declared():
             )
 
 
-def test_navigation_is_the_four_tabs_of_the_old_module():
+def tabbar() -> list[tuple[str, str]]:
+    """The id and route of each tab of the staff tab bar, Settings included, as the frontend declares them."""
+    source = (Path(staff().path) / "frontend" / "tabs.ts").read_text(encoding="utf-8")
+    return re.findall(r"\{ id: '(\w+)'.*? to: '([^']+)' \}", source)
+
+
+def test_the_menu_has_the_tab_bar_s_screens_with_the_launcher_s_icon_first():
+    # The help window and the menu's highlight follow these entries, so they are the tab bar's sections but Settings,
+    # which the help adds. The first one is the app's entry and its people icon the launcher's (base.home.shell_icon).
     entries = staff().navigation
     assert all(isinstance(entry, Nav) for entry in entries)
-    assert [
-        (entry.id, str(entry.label), entry.path, entry.icon) for entry in entries
-    ] == [
+    assert [(entry.id, str(entry.label), entry.path, entry.icon) for entry in entries] == [
         ("staff", "Staff", "/staff/members", "ion:people-outline"),
         ("roles", "Roles", "/staff/roles", "ion:shield-outline"),
         ("time_off", "Time Off", "/staff/time-off", "ion:calendar-outline"),
         ("schedules", "Schedules", "/staff/schedules", "ion:time-outline"),
+        ("commissions", "Commissions", "/staff/commissions", "ion:wallet-outline"),
     ]
+    assert [(entry.id, entry.path) for entry in entries] == tabbar()[:-1]
+    assert home.shell_icon(staff()) == "ion:people-outline"
+    shell = shell_icon_registry()
+    for entry in entries:
+        assert f"'{entry.icon.removeprefix('ion:')}':" in shell, entry.icon
+
+
+def test_the_help_window_s_tabs_are_the_tab_bar_s():
+    assert [(tab.id, tab.path) for tab in app_help.tabs_of(staff())] == tabbar()
+
+
+def test_its_help_window_is_ready_without_a_video_yet():
+    assert staff().help == Help()
 
 
 # The operations and the assistant's contract
@@ -341,7 +364,7 @@ def test_the_panels_icons_are_registered_in_the_shell():
     # The old airplane and hourglass are not registered: UI-REQUESTS.md asks for them.
     icons = [panel.icon for panel in staff().widgets]
     assert icons == ["ion:people-outline", "ion:log-out-outline", "ion:time-outline", "ion:calendar-outline", "ion:shield-outline"]
-    shell = (Path(settings.BASE_DIR) / "packages/ui/src/shell/icons.ts").read_text()
+    shell = shell_icon_registry()
     for icon in icons:
         assert f"'{icon.removeprefix('ion:')}':" in shell, icon
 

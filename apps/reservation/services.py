@@ -96,7 +96,7 @@ from apps.reservation.schemas import (
     WaitlistRefIn,
 )
 from apps.table.models import Hold, Table
-from apps.table.queries import find_table, live_sessions, seatable, table_label
+from apps.table.queries import find_table, floor, seatable
 
 S = Reservation.Status
 #: The platform's own writes (reactions): the system has «*»; no role is given this one.
@@ -673,7 +673,7 @@ def held_table(reservation: Reservation) -> None:
         return
     table = Table.objects.select_related("zone").get(pk=reservation.table_id)
     if not in_service(table):
-        raise refuse(engine.Refusal("table_unavailable", {"table": table_label(table)}))
+        raise refuse(engine.Refusal("table_unavailable", {"table": floor.table_label(table)}))
 
 
 def _named(data: ReservationRefIn) -> Reservation:
@@ -786,10 +786,10 @@ def seat_at_table(ctx: OperationContext, reservation: Reservation):
     now = timezone.now()
     table = Table.objects.select_related("zone").get(pk=reservation.table_id)
     if not in_service(table):
-        raise refuse(engine.Refusal("table_unavailable", {"table": table_label(table)}))
+        raise refuse(engine.Refusal("table_unavailable", {"table": floor.table_label(table)}))
     holds = Hold.objects.filter(source=Hold.Source.RESERVATION, source_ref=str(reservation.pk))
     if not seatable(table, now):
-        sitting = live_sessions().filter(table=table).order_by("opened_at", "id").first()
+        sitting = floor.live_sessions().filter(table=table).order_by("opened_at", "id").first()
         owned = (
             sitting is not None
             and Reservation.objects.filter(table_session_id=sitting.pk, is_deleted=False)
@@ -798,7 +798,7 @@ def seat_at_table(ctx: OperationContext, reservation: Reservation):
         )
         if sitting is not None and not owned and holds.filter(status=Hold.Status.CONSUMED).exists():
             return sitting.pk
-        text = str(TABLE_NOT_FREE) % {"table": table_label(table)}
+        text = str(TABLE_NOT_FREE) % {"table": floor.table_label(table)}
         raise Conflict(text, code="reservation.table_not_free")
     seat = {
         "table_id": str(table.pk),
@@ -1380,7 +1380,7 @@ def delete_entry(ctx: OperationContext, data: WaitlistRefIn) -> dict:
         "asks": {
             "en": (
                 "change the reservation settings to take bookings 30 days ahead",
-                "confirm the reservations automatically",
+                "enable automatic confirmation for reservations",
             ),
             "es": (
                 "deja reservar con hasta 30 días de antelación",

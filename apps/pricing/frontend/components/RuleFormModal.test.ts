@@ -4,7 +4,7 @@
 // Priority. A row's Edit opens «Editing rule — {name}» and sends only what changed. Refusals stay in the
 // dialog, under their field.
 import { Combo } from '@erplora/ui/components';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import { itTellsTheCorrectedFieldApart } from '../../../../base/frontend/__tests__/same-words-refusal';
 import { expectSaveWaitsForMoney, expectWindowSaysMoneyUnreadable } from '../../../../base/frontend/__tests__/save-waits-for-money';
@@ -12,11 +12,6 @@ import type { Business } from '../../../../base/frontend/operations/business';
 import { business, JAPANESE, KUWAITI, POLISH, rule } from '../__tests__/fixtures';
 import { click, ionValue, mountPricing, settle } from '../__tests__/mount-pricing';
 import RuleFormModal from './RuleFormModal.vue';
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
 
 type Control = HTMLElement & { label?: string; value?: unknown; errorText?: string; disabled?: boolean };
 

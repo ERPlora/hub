@@ -12,6 +12,7 @@ from live.operations import AI, operation
 
 from apps.sale.models import FiscalStatus, Refund, RefundLine, Sale, SaleLine
 from apps.sale.queries.payment_methods import method_display_name
+from apps.sale.queries.receipt_codes import paper_code
 from apps.sale.schemas.sales import SaleByKeyIn, SaleByKeyOut, SaleListIn, SaleOut, SalePage, SaleRefIn
 from base.business import currency_decimals
 from base.ordering import list_order
@@ -137,6 +138,7 @@ def sale_detail(sale: Sale, *, already: bool = False) -> dict:
         "invoice_id": sale.invoice_id,
         "invoice_number": sale.invoice_number,
         "invoice_type": sale.invoice_type,
+        "receipt_code": paper_code(sale),
         "void_invoice_status": sale.void_invoice_status,
         "void_invoice_number": sale.void_invoice_number,
         "documents_pending": documents_pending(sale),

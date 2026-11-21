@@ -1,11 +1,11 @@
-"""Schemas of the assistant (``base.assistant.*``, ``base.docs.search``), and the marks an app's schemas give the
-data its card names (``names``, ``unless_given``, ``in_currency_of``) and the names it reads (``exactly_one``,
-``RecordNameOut``)."""
+"""Schemas of the assistant (``base.assistant.*``, ``base.docs.search``), and the marks an app's
+schemas give the data its card names (``names``, ``unless_given``, ``in_currency_of``) and the names it reads
+(``exactly_one``, ``RecordNameOut``)."""
 
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
 from ninja import Schema
-from pydantic import Field, field_validator
+from pydantic import Field, StringConstraints, field_validator
 
 
 def names(  # noqa: PLR0913
@@ -174,8 +174,8 @@ class AssistantCardOut(Schema):
 class AssistantTurnOut(Schema):
     """The turn made ready (the route streams it, ``text/event-stream``): the tools' results to keep (``append``),
     what ran (``executed``), the card of the write that waits (``confirm``) with what still waits (``pending``), and
-    what goes to the gateway (``messages``, ``tools``, ``instructions``, ``continuation``); ``stop``, why it goes no
-    further (``assistant.too_many_steps``)."""
+    what goes to the gateway (``messages``, ``tools``, ``instructions``, ``continuation``; no tool on the last round of
+    the request); ``stop``, why it goes no further (``assistant.too_many_steps``)."""
 
     messages: list[dict[str, Any]]
     append: list[dict[str, Any]]
@@ -247,6 +247,21 @@ class DocsExcerptOut(Schema):
 
 class DocsSearchOut(Schema):
     results: list[DocsExcerptOut]
+
+
+class FindToolsIn(Schema):
+    query: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=300)] = Field(
+        description="The task, in a few words: «list the products of a category», «create a product»."
+    )
+
+
+class FoundToolOut(Schema):
+    name: str = Field(description="The tool's name, to call it.")
+    description: str = Field(description="What the tool does.")
+
+
+class FindToolsOut(Schema):
+    tools: list[FoundToolOut] = Field(description="The tools found, best first.")
 
 
 class AssistantReportIn(Schema):

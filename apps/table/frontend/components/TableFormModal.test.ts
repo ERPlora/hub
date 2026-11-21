@@ -3,18 +3,13 @@
 // the others are the room's, not a person's), Zone and In use; «Save» sends only what changed, a new size
 // as a move of the box where it is; «Delete» (whoever may) asks first. A new table asks Number (empty = the
 // first free one), Capacity, Width and Height (empty = the standard box) and Zone. Refusals stay in the dialog.
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import { itTellsTheCorrectedFieldApart } from '../../../../base/frontend/__tests__/same-words-refusal';
 import { click, ionChecked, ionValue, mountTable, settle } from '../__tests__/mount-table';
 import { tableRow, zoneRow } from '../__tests__/tables';
 import type { TableOut } from '../operations';
 import TableFormModal from './TableFormModal.vue';
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
 
 type Control = HTMLElement & { label?: string; value?: unknown; checked?: boolean; disabled?: boolean };
 

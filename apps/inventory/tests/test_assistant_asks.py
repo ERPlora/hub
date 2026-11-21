@@ -13,6 +13,7 @@ from live.operations import AI, registry
 
 from base import assistant
 from base.models import Membership
+from base.tests.assistant_context import offered, owner_of_a
 from base.tests.test_assistant_asks import assert_its_words_name
 from base.tests.test_assistant_asks import (
     TOP,
@@ -110,19 +111,79 @@ QUANTITY_IN = [
 ]
 
 
+def assert_its_words_bring_the_reception(tools, language: str, phrase: str, words: str) -> None:
+    """That ``phrase`` brings ``inventory.stock.receive`` among the first ten, and that without ``words`` among the
+    Hub's words it does not: they are what names the goods."""
+    assert comparable(phrase) not in probe_phrases()
+    assert_offered_with_room(tools, "inventory.stock.receive", phrase, language, room=TOP)
+    counted = assistant.relevance.ranking(tools)["synonyms"]
+    without = tuple(tuple(word for word in group if word != words) for group in counted)
+    assert without != counted  # positive control: the words are some of the Hub's
+    assert "inventory.stock.receive" not in offered_to(tools, phrase, language, synonyms=without)[:TOP]
+
+
 @HUB_DB
 @pytest.mark.parametrize("role", [Membership.Role.OWNER, Membership.Role.MANAGER])
 @pytest.mark.parametrize(("language", "phrase", "unit"), QUANTITY_IN)
 def test_goods_said_as_a_quantity_in_a_unit_bring_the_reception_among_the_first_ten(
     catalog_of, role, language, phrase, unit
 ):
-    tools = catalog_of(role, language)
-    assert comparable(phrase) not in probe_phrases()
-    assert_offered_with_room(tools, "inventory.stock.receive", phrase, language, room=TOP)
-    counted = assistant.relevance.ranking(tools)["synonyms"]
-    without = tuple(tuple(word for word in group if word != unit) for group in counted)
-    assert without != counted  # positive control: the unit is one of the Hub's words
-    assert "inventory.stock.receive" not in offered_to(tools, phrase, language, synonyms=without)[:TOP]
+    assert_its_words_bring_the_reception(catalog_of(role, language), language, phrase, unit)
+
+
+#: Goods noted down as arrived: «llegar» named nothing, so «apunta que han llegado 12 unidades de tarta» left the
+#: reception 149th for the owner, behind a cart's items («apunta que llegan…» 159th, «registra que han llegado…» 88th).
+#: Each case says the words that name the goods.
+GOODS_ARRIVED = [
+    ("apunta que han llegado 12 unidades de tarta", "apunta que llegan"),
+    ("apunta que llegan 12 unidades de tarta", "apunta que llegan"),
+    ("apúntame que han llegado 24 latas de cerveza", "apuntame que llegan"),
+    ("anota que han llegado 12 unidades de tarta", "anota que llegan"),
+    ("registra que han llegado 12 unidades de tarta", "registra que llegan"),
+    ("registra que han llegado 6 botellas de vino", "registra que llegan"),
+]
+
+
+@HUB_DB
+@pytest.mark.parametrize("role", [Membership.Role.OWNER, Membership.Role.MANAGER])
+@pytest.mark.parametrize(("phrase", "words"), GOODS_ARRIVED)
+def test_goods_noted_as_arrived_bring_the_reception_among_the_first_ten(catalog_of, role, phrase, words):
+    assert_its_words_bring_the_reception(catalog_of(role, "es"), "es", phrase, words)
+
+
+#: What arrives and is not goods, in Spanish and in English: people (a booking, more diners for a table, the customer of
+#: an appointment, staff) and the tickets or invoices that reach somewhere.
+NOT_GOODS_ARRIVING = [
+    "han llegado los de la reserva de Luis, siéntalos",
+    "ya llegan los de la reserva de las nueve, pásalos a su mesa",
+    "han llegado dos más para la mesa 7",
+    "ha llegado la clienta de la cita de las 10, empieza el servicio",
+    "han llegado Pedro y Ana, fíchalos",
+    "enséñame las comandas que llegan a cocina",
+    "¿han llegado las facturas a Hacienda?",
+    "Luis's party has arrived, seat them",
+    "two more have arrived for table 7",
+    "the 10 o'clock client has arrived, start her service",
+    "Pedro and Ana have arrived, clock them in",
+    "show me the tickets that arrive in the kitchen",
+    "have the invoices arrived at the tax agency?",
+]
+
+
+def test_the_hub_reads_goods_noted_as_arrived_as_goods_and_nothing_else_that_arrives():
+    """Inventory's own words: what someone notes down as arrived («apunta que han llegado…», read «apunta que
+    llegan…») is goods received and their stock, and without the Hub's groups it is neither (positive control); the
+    people who arrive, and what reaches the kitchen or the tax agency, are neither."""
+    stock, receive = shared.stem("stock"), shared.stem("receive")
+    said = [phrase for phrase, _ in GOODS_ARRIVED]
+    assert_its_words_name("inventory", [(phrase, wanted) for phrase in said for wanted in (stock, receive)])
+    own = apps.get_app_config("inventory").assistant_synonyms
+    named = [
+        phrase
+        for phrase in NOT_GOODS_ARRIVING
+        if any(stock in concept or receive in concept for concept in shared.asked([phrase], own).concepts)
+    ]
+    assert named == []
 
 
 #: A quantity in a unit written off: the goods it names are also the stock a write-off acts on, so the reception the
@@ -184,3 +245,40 @@ def test_the_hub_reads_a_quantity_in_a_unit_as_the_stock_of_goods_and_an_amount_
         if any(stock in concept or receive in concept for concept in shared.asked([phrase], own).concepts)
     ]
     assert named == []
+
+
+def offered_by_a_turn(make_user, language: str, text: str) -> list[str]:
+    """The tools a turn of the assistant offers the owner of business A for ``text``, said alone."""
+    return offered(owner_of_a(make_user, language), {"role": "user", "content": text})
+
+
+@HUB_DB
+def test_taking_one_product_off_the_menu_and_repricing_another_brings_both_writes(make_user):
+    tools = offered_by_a_turn(make_user, "es", "Quita el flan casero de la carta y pon el café con leche a 1,90 €")
+
+    assert {"inventory__product__delete", "inventory__product__update"} <= set(tools)
+
+
+@HUB_DB
+def test_putting_a_product_with_the_other_desserts_of_the_menu_brings_a_way_to_its_category(make_user):
+    tools = offered_by_a_turn(make_user, "es", "Sí, ponla con los otros postres de la carta, como un postre más.")
+
+    assert {"inventory__category__list", "inventory__product_category__add"} & set(tools)
+
+
+@HUB_DB
+def test_bottles_that_got_broken_bring_the_write_off(make_user):
+    assert "inventory__stock__write_off" in offered_by_a_turn(make_user, "en", "Three bottles of water got broken")
+
+
+def test_the_hub_reads_the_menu_as_the_products_and_what_broke_as_breakage():
+    """Inventory's own words: a restaurant's «carta» is its products, and «roto» and «broken» are one word, the
+    breakage a write-off records; neither the platform's words nor live alone say so (positive control)."""
+    assert_its_words_name(
+        "inventory",
+        [
+            ("quita el flan casero de la carta", shared.stem("product")),
+            ("se han roto tres botellas de agua", shared.stem("broke")),
+            ("three bottles of water got broken", shared.stem("roto")),
+        ],
+    )

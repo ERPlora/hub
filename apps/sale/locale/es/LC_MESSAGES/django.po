@@ -234,6 +234,9 @@ msgstr "clave del intento"
 msgid "closed at"
 msgstr "cerrada el"
 
+msgid "bill printed at"
+msgstr "cuenta impresa el"
+
 msgid "voided by"
 msgstr "anulada por"
 
@@ -878,6 +881,9 @@ msgstr "Ya pagado · %(name)s"
 #, python-format
 msgid "Discount of %(amount)s, already applied to the amounts above."
 msgstr "Descuento de %(amount)s, ya aplicado en los importes de arriba."
+
+msgid "Scan to ask for your full invoice"
+msgstr "Escanea para pedir tu factura completa"
 
 msgid "Void a sale"
 msgstr "Anular una venta"

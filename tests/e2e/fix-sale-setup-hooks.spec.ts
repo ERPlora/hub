@@ -9,6 +9,7 @@
 import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
 import { A, api, horizontalOverflow, login, shot, shown, untilStill } from './helpers';
+import { panelError, panelTitle, panelValue } from './home-helpers';
 import { cleanInventory, createProduct } from './inventory-helpers';
 import { chargeByApi, cleanSales, drawerOff, restoreDrawer, stamp } from './sale-helpers';
 
@@ -86,8 +87,8 @@ async function charge(context: BrowserContext): Promise<string> {
 
 /** The two default panels say the day's money and tickets the server counts. */
 async function figuresAre(page: Page, figures: Today): Promise<void> {
-  await expect(panel(page, 'sale.today').locator('[data-testid="widget-value"]')).toHaveText(money.format(figures.total / 100));
-  await expect(panel(page, 'sale.tickets_today').locator('[data-testid="widget-value"]')).toHaveText(count.format(figures.tickets));
+  await expect(panelValue(panel(page, 'sale.today'))).toHaveText(money.format(figures.total / 100));
+  await expect(panelValue(panel(page, 'sale.tickets_today'))).toHaveText(count.format(figures.tickets));
 }
 
 test('paneles de Ventas en el Inicio (hooks de LiveAppConfig): today\'s figures by default, live, and the other two from «Customize panel»', async ({ browser }) => {
@@ -98,7 +99,7 @@ test('paneles de Ventas en el Inicio (hooks de LiveAppConfig): today\'s figures 
 
     // The defaults: «Ventas hoy» and «Tiques hoy», with what the server counts today.
     for (const [key, title] of [['sale.today', 'Ventas hoy'], ['sale.tickets_today', 'Tiques hoy']]) {
-      await expect(panel(page, key).locator('[data-testid="widget-title"]')).toHaveText(title);
+      await expect(panelTitle(panel(page, key))).toHaveText(title);
     }
     await expect(panel(page, 'sale.last_7_days')).toHaveCount(0);
     await expect(panel(page, 'sale.recent_activity')).toHaveCount(0);
@@ -121,12 +122,12 @@ test('paneles de Ventas en el Inicio (hooks de LiveAppConfig): today\'s figures 
 
     // «Ventas últimos 7 días»: seven days, oldest first, today with what was sold.
     const chart = panel(page, 'sale.last_7_days');
-    await expect(chart.locator('[data-testid="widget-title"]')).toHaveText('Ventas últimos 7 días');
+    await expect(panelTitle(chart)).toHaveText('Ventas últimos 7 días');
     await expect(chart.locator('.widget-chart-col')).toHaveCount(7);
     await expect(chart.locator('[data-testid="widget-chart-amount"]')).toHaveText(money.format((before.total + PRICE) / 100));
     // «Actividad reciente»: the last sales, newest first.
     const activity = panel(page, 'sale.recent_activity');
-    await expect(activity.locator('[data-testid="widget-title"]')).toHaveText('Actividad reciente');
+    await expect(panelTitle(activity)).toHaveText('Actividad reciente');
     await expect(activity.locator('[data-testid="widget-entry"] strong').first()).toHaveText(second);
     await expect(activity.locator('[data-testid="widget-entry"] strong').nth(1)).toHaveText(first);
 
@@ -143,7 +144,7 @@ for (const size of SIZES) {
     const { context, page } = await spanishOwner(browser, { width: size.width, height: size.height }, ALL);
     try {
       for (const key of ALL) {
-        await expect(panel(page, key).locator('[data-testid="widget-error"]')).toHaveCount(0);
+        await expect(panelError(panel(page, key))).toHaveCount(0);
         await expect(panel(page, key)).toHaveAttribute('aria-busy', 'false');
       }
       // The board at the top of the screen, as far as the page scrolls.

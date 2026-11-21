@@ -1,0 +1,183 @@
+{
+  "id": "s07-day-at-the-till",
+  "title": "Un día en la caja: abrir, cobrar con factura, devolver una línea y cerrar",
+  "vertical": "restaurant",
+  "seed": "restaurant.es",
+  "language": "es",
+  "setup": [
+    {
+      "tool": "invoice.issuer.update",
+      "arguments": {
+        "legal_name": "La Esquina de Triana S.L.",
+        "tax_id": "B12345674",
+        "address": "Calle Betis 21",
+        "postal_code": "41010",
+        "city": "Sevilla",
+        "province": "Sevilla",
+        "country": "ES"
+      }
+    }
+  ],
+  "owner": {
+    "persona": "Manuel, dueño del bar La Esquina de Triana, en Sevilla. Hoy lleva él solo la barra y la caja.",
+    "goal": "Abrir la caja, cobrar en efectivo la mesa del cliente con su factura, devolverle una caña que salió mal y cerrar la caja al final con lo contado.",
+    "upFront": [
+      "Abre la caja con 150 € de cambio.",
+      "Cóbrame en efectivo: dos cañas de cerveza, unas croquetas caseras y un entrecot a la brasa.",
+      "El cliente quiere factura a nombre de Talleres Giralda S.L.",
+      "Una de las cañas salió mal tirada: devuélvesela en efectivo.",
+      "Al final del día cierra la caja: he contado 182,70 € en el cajón."
+    ],
+    "ifAsked": [
+      "El CIF de Talleres Giralda es B90123456.",
+      "Su dirección: Polígono Calonge, calle A, 7, 41007 Sevilla.",
+      "No ha habido más ventas hoy."
+    ]
+  },
+  "attachments": [],
+  "opening": "Buenos días, abre la caja con 150 € de cambio",
+  "offered": ["cash_register.session.open"],
+  "writes": [
+    "cash_register.session.open",
+    "cash_register.session.close",
+    "sale.sale.complete",
+    "sale.order.open",
+    "sale.order.add_line",
+    "sale.sale.refund",
+    "customer.customer.create",
+    "customer.customer.update",
+    "invoice.invoice.substitute",
+    "sale.sale.issue_documents"
+  ],
+  "cards": [
+    {
+      "tool": "cash_register.session.open",
+      "match": {},
+      "expect": {"opening_balance": 15000}
+    },
+    {
+      "tool": "cash_register.session.close",
+      "match": {},
+      "expect": {"closing_balance": 18270}
+    }
+  ],
+  "expect": [
+    {
+      "says": "la caja se abrió con 150 € y se cerró con los 182,70 € contados",
+      "sql": "select string_agg(opening_balance || '/' || closing_balance || '/' || status, ',') from cash_register_session",
+      "equals": "15000/18270/closed"
+    },
+    {
+      "says": "la caja cuadra al cerrar",
+      "sql": "select string_agg(difference::text, ',') from cash_register_session",
+      "equals": "0"
+    },
+    {
+      "says": "una sola venta, de 34,90 €",
+      "sql": "select string_agg(total::text, ',') from sale_sale where status <> 'voided'",
+      "equals": "3490"
+    },
+    {
+      "says": "la venta lleva dos cañas, las croquetas y el entrecot",
+      "sql": "select string_agg(sku || 'x' || quantity::int, ',' order by sku) from sale_saleline",
+      "equals": "ENT-01x1,PRI-01x1,VIN-01x2"
+    },
+    {
+      "says": "la factura está a nombre de Talleres Giralda con su CIF",
+      "sql": "select count(*) from invoice_invoice where customer_tax_id = 'B90123456' and invoice_type in ('F1', 'F3') and customer_name ilike '%giralda%'",
+      "equals": "1"
+    },
+    {
+      "says": "una sola devolución: una caña, 2,20 €",
+      "sql": "select string_agg(r.total || ':' || l.quantity::int, ',') from sale_refund r join sale_refundline l on l.refund_id = r.id",
+      "equals": "220:1"
+    },
+    {
+      "says": "la devolución es de la caña",
+      "sql": "select string_agg(s.sku, ',') from sale_refundline l join sale_saleline s on s.id = l.sale_line_id",
+      "equals": "VIN-01"
+    }
+  ],
+  "forbidden": [
+    {
+      "says": "ningún registro fiscal sale del negocio",
+      "sql": "select count(*) from verifactu_record where transmitted_at is not null or coalesce(csv, '') <> ''",
+      "equals": "0"
+    },
+    {
+      "says": "no se anula ninguna venta",
+      "sql": "select count(*) from sale_sale where status = 'voided'",
+      "equals": "0"
+    },
+    {
+      "says": "el catálogo no cambia",
+      "sql": "select md5(string_agg(id::text || price || is_deleted::text, ',' order by id)) from inventory_product",
+      "unchanged": true
+    }
+  ],
+  "mustAsk": [
+    {
+      "id": "tax-id",
+      "fact": "el CIF del cliente",
+      "reveals": ["B90123456"],
+      "uses": [
+        {"tool": "sale.sale.complete", "path": "customer_tax_id"},
+        {"tool": "customer.customer.create", "path": "tax_id"},
+        {"tool": "customer.customer.update", "path": "tax_id"},
+        {"tool": "invoice.invoice.substitute", "path": "customer_tax_id"}
+      ]
+    },
+    {
+      "id": "address",
+      "fact": "la dirección del cliente",
+      "reveals": ["calonge"],
+      "uses": [
+        {"tool": "sale.sale.complete", "path": "customer_address"},
+        {"tool": "customer.customer.create", "path": "address"},
+        {"tool": "customer.customer.update", "path": "address"},
+        {"tool": "invoice.invoice.substitute", "path": "customer_address"}
+      ]
+    }
+  ],
+  "maxTurns": 14,
+  "golden": [
+    {
+      "tool": "cash_register.session.open",
+      "arguments": {"opening_balance": 15000}
+    },
+    {
+      "id": "sale",
+      "tool": "sale.sale.complete",
+      "arguments": {
+        "lines": [
+          {"product": "VIN-01", "quantity": "2"},
+          {"product": "ENT-01", "quantity": "1"},
+          {"product": "PRI-01", "quantity": "1"}
+        ],
+        "payments": [{"method": "cash"}],
+        "document_type": "invoice",
+        "customer_name": "Talleres Giralda S.L.",
+        "customer_tax_id": "B90123456",
+        "customer_address": "Polígono Calonge, calle A, 7, 41007 Sevilla",
+        "idempotency_key": "golden-s07-sale"
+      }
+    },
+    {
+      "tool": "sale.sale.refund",
+      "arguments": {
+        "sale_id": {"$ref": "sale", "take": "id"},
+        "reason": "Caña mal tirada",
+        "lines": [{"line_id": {"$ref": "sale", "where": {"sku": "VIN-01"}, "take": "id"}, "quantity": "1"}],
+        "allocations": [{"payment_id": {"$ref": "sale", "where": {"method_type": "cash"}, "take": "id"}, "amount": 220}]
+      }
+    },
+    {
+      "tool": "cash_register.session.closing_summary",
+      "arguments": {"closing_balance": 18270}
+    },
+    {
+      "tool": "cash_register.session.close",
+      "arguments": {"closing_balance": 18270}
+    }
+  ]
+}

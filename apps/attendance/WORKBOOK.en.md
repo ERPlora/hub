@@ -1,6 +1,13 @@
-<!-- generated from WORKBOOK.md sha256:46bd0aecd4813b9d240d10ee86f5e4cdfade2a8f77731cf7ed672f2667f881f6 -->
+<!-- generated from WORKBOOK.md sha256:9ef66bfc75213a28ec45dc938fea060000e88cd2e4328c166e461893ebc7c362 -->
 
 ## What it is for and who it is for
+
+Time clock is your business's working-day record: each person on the team clocks in on arrival, takes their breaks
+and clocks out on leaving, with one tap. The manager sees everyone's working days, corrects the wrong ones with a
+reason that stays in their history and exports the month in CSV for the accountant or the Labour Inspectorate. No
+working day is ever deleted.
+
+### In detail
 
 It is the business's **working-day record**. Each person on the team clocks in on arrival and clocks out
 on leaving, with their breaks in between, with one tap and without choosing anything: whoever clocks is
@@ -16,7 +23,7 @@ for four years and make it available to the worker, their representatives and th
   which leaves a new row in its history that is never deleted or edited either.
 - **The worker sees their own working days** and who corrected them, when and why.
 
-Who uses it:
+### Who uses it and what each one does
 
 - The **employee** clocks in, clocks out and takes their breaks, sees their working days, their
   correction history and the settings (without being able to change them), and exports their working
@@ -51,7 +58,13 @@ Who uses it:
 ## Screens
 
 ### Clock in
-Reached from the app's menu, "Clock in". At the top, "Hello, <name>" and "It is <time>"; in the middle,
+Here you clock yourself. The big button changes with the moment: "Clock in" and, once in, "Start break" or "End
+break" and "Clock out". At the top you see whether you are in or on a break, since what time and how long you have
+been in, which runs by itself; beside it, what you worked today and your recent days. Whoever has the session open is
+the one who clocks, through their Staff record.
+
+#### Detail
+Reached from the app's menu, "Clock in". At the top, "Hello, Ana" and "It is 09:00"; in the middle,
 the state ("You are clocked out", "Clocked in since 09:00", "On break since 13:00"), the time since the
 clock-in, which runs by itself, and the big button of the moment: "Clock in", or "Start break" / "End
 break" and "Clock out". On the right (below on a phone), "Today" (Worked and Breaks, which run by
@@ -59,6 +72,12 @@ themselves) and "Recent days" (the last ten, with their status: "Open", "Closed"
 Records). Anyone on the team can open it.
 
 ### Records
+Here are the month's working days, with their clock-in, their clock-out, their breaks, the time worked and their
+status: "Open", "Closed" or "Needs review" if nobody clocked out. Each person sees their own; the manager sees the
+whole team's and who is clocked in now, and corrects a wrongly clocked day with its reason. "History" shows who
+changed a working day and why, and "Export CSV" downloads the month.
+
+#### Detail
 Reached from the app's menu, "Records". A table of the working days of the chosen month: Date, Person,
 Clock-in, Clock-out, Breaks (min), Worked, Status and Location, with the actions "Correct" and "History"
 on each row; on a phone, cards. An employee sees only their own (without the Person column, with
@@ -68,12 +87,17 @@ and who, since what time and whether they are on a break. At the top, "Export CS
 "Location" and "Breaks (min)" give way first (they stay in the cards and in "Columns"); each person's
 name and their status read in full.
 
-### Home panel
+#### Home panel
 The Hub's **Home** shows the "Clocked in now" panel by default, grouped as "Time clock" in **Customize
 panel**: the number of people who have their working day open right now, the same one "Clocked in now"
 says above Records. Only whoever sees the working days of the whole team has it; an employee does not.
 
 ### Settings
+Here a manager decides whether whoever clocks in from their own phone is asked for their location, how far from the
+workplace they may clock in and where the workplace is. They also choose after how many hours a working day nobody
+closed becomes "Needs review". Everyone else sees the settings without being able to change them.
+
+#### Detail
 The app's "Settings" tab. "Require location when clocking in from a personal device" (below it, where a
 device is marked as personal), "Allowed radius", "Workplace location" (Latitude, Longitude and "Use my
 current location") and "Flag for review after (hours)". Only a manager or an administrator can save;
@@ -122,7 +146,7 @@ Status: done (server and screen)
 Actor: owner, administrator, manager, employee
 Screen: Clock in
 Steps:
-1. Open Time clock → "Clock in". You see "You are clocked out" and the "Clock in" button.
+1. Open Time clock, on the "Clock in" tab. You see "You are clocked out" and the "Clock in" button.
 2. Tap "Clock in". You see "Clocked in at 09:00.", "Clocked in since 09:00" and the time since the
    clock-in, which runs by itself.
 3. When you finish, tap "Clock out". You see "Clocked out at 17:00." and the "Clock in" button comes
@@ -156,8 +180,8 @@ In: the person's open working day (ATTENDANCE-F01).
 Out: each break saved inside its working day; the break started and ended notices.
 If it fails: without an open working day, "There is no open working day: clock in first."; with a break
 already running, "A break is already running."; ending a break that does not exist, "There is no running
-break to end."; on a forgotten working day (ATTENDANCE-F05), "This working day has been open more than 12
-hours and is waiting for review…".
+break to end."; on a forgotten working day, open more hours than set in Settings, "This working day has been open
+more than 12 hours and is waiting for review…".
 Involved: ATTENDANCE-F01, ATTENDANCE-F05
 
 ### ATTENDANCE-F03 Clock in from a phone when the business asks for the location
@@ -165,10 +189,10 @@ Status: done (server and screen)
 Actor: owner, administrator, manager, employee
 Screen: Clock in
 Steps:
-1. The business has "Require location when clocking in from a personal device" turned on
-   (ATTENDANCE-F04) and the person uses their own phone or laptop, on which an administrator chose
-   "Personal — a device only you use" from that same device, in Settings › This device (BASE-F62). If
-   they change it with Clock in open, the screen follows it without reloading.
+1. The business has turned on, on the "Settings" tab, "Require location when clocking in from a personal
+   device" and the person uses their own phone or laptop, on which an administrator chose "Personal — a device
+   only you use" from that same device, in Settings › This device. If they change it with Clock in open, the
+   screen follows it without reloading.
 2. Under the button you see "Your location is checked when you clock in from this device.". Tap "Clock
    in". You see "Getting your location…"; the first time, the phone asks for permission.
 3. Inside the radius, you clock in as always and the working day keeps the position, the accuracy and the
@@ -198,16 +222,16 @@ Status: done (server and screen)
 Actor: owner, administrator, manager, assistant
 Screen: Settings
 Steps:
-1. Open Time clock → "Settings".
+1. Open Time clock, on the "Settings" tab.
 2. Turn on "Require location when clocking in from a personal device" and choose the "Allowed radius":
    50, 100, 250, 500 or 1000 m. Below it you read "Only a device marked as personal is asked for its
    location; the counter POS never is. Each device is marked shared or personal on the device itself, in
-   Settings › This device." (ATTENDANCE-F03).
+   Settings › This device.".
 3. From the workplace itself, tap "Use my current location": the latitude and the longitude are filled
    in and you see the accuracy read. You can also type them by hand.
 4. In "Flag for review after (hours)" put from 1 to 24 hours (12 if you leave it).
 5. Tap "Save" and you see "Settings saved.". Only what changed is sent.
-   What is changed while it is saving is not lost: it stays on screen, still to save (hub#914).
+   What is changed while it is saving is not lost: it stays on screen, still to save.
 In: nothing from other apps; without saved settings, the default values show.
 Out: the settings that Clock in (ATTENDANCE-F03) and the working-day review (ATTENDANCE-F05) read; the
 settings changed notice.
@@ -221,9 +245,8 @@ your device settings to read the workplace position, or type the coordinates.");
 manager sees the settings read-only. As in the form windows, the notice goes as soon as something is changed
 and a field's reason as soon as that field is corrected (the coordinates, as the pair they are: correcting one
 takes both reasons away); both come back if the next try is refused too. A refusal that names no field stays
-until the next try (hub#854). Tapping "Save" with nothing to send is a try too: it says "Settings saved." and
-takes away the red notice and the fields' reasons of the last refusal, which do not come back until the next
-refusal (hub#894).
+until the next try. Tapping "Save" with nothing to send is a try too: it says "Settings saved." and takes away the
+red notice and the fields' reasons of the last refusal, which do not come back until the next refusal.
 Involved: ATTENDANCE-F03, ATTENDANCE-F05
 
 ### ATTENDANCE-F05 Flag for review a working day nobody closed
@@ -251,7 +274,7 @@ Status: done (server and screen)
 Actor: employee (and anyone, for their own)
 Screen: Records
 Steps:
-1. Open Time clock → "Records": you see your working days of the current month, without choosing a
+1. Open Time clock, on the "Records" tab: you see your working days of the current month, without choosing a
    person.
 2. In "Month" you can choose any of the last four years.
 3. The open working day shows "Open", with the time worked so far marked "In progress"; the one still to
@@ -268,7 +291,7 @@ Status: done (server and screen)
 Actor: owner, administrator, manager
 Screen: Records
 Steps:
-1. Open Time clock → "Records": you see the month's working days of the whole team, with each person's
+1. Open Time clock, on the "Records" tab: you see the month's working days of the whole team, with each person's
    full name (also of whoever was already terminated: their working days are kept four years).
 2. Filter by "Person" (search by name), "Month" and "Status" ("Open", "Closed", "Needs review"), and sort
    by date, clock-in, clock-out, person or status.
@@ -300,8 +323,8 @@ previous one ended); "That person already has another open working day: this one
 a future time, "The time cannot be in the future."; without a reason, "Write a reason of at least 3
 characters.". If the business's time zone cannot be read, "The business's time zone could not be read, so this
 correction cannot be saved yet. Reload the page to try again.", with the button off. Each reason of a field
-shows under it and goes away as soon as that field is corrected, even if another one says the same
-(hub#888). A refused correction changes nothing and leaves no trace. "Correct" only shows to whoever can correct.
+shows under it and goes away as soon as that field is corrected, even if another one says the same.
+A refused correction changes nothing and leaves no trace. "Correct" only shows to whoever can correct.
 Involved: ATTENDANCE-F05, ATTENDANCE-F09, ATTENDANCE-F11
 
 ### ATTENDANCE-F09 See who changed a working day, when and why
@@ -311,7 +334,7 @@ Screen: Records
 Steps:
 1. In "Records", on a working day, tap "History".
 2. In "Correction history" you see each change, from the most recent to the oldest: who (or "System"),
-   when, "Before" → "After" and the "Reason".
+   when, what was "Before", what is "After" and the "Reason".
 3. If nobody has corrected it, you see "This working day has never been corrected.".
 In: the corrections of ATTENDANCE-F08 and ATTENDANCE-F13.
 Out: nothing; the history cannot be edited or deleted.
@@ -325,7 +348,7 @@ Screen: Records
 Steps:
 1. In "Records", choose the month (and, as a manager, the person and the status).
 2. Tap "Export CSV"; meanwhile you see "Exporting…".
-3. `attendance-2026-10.csv` downloads with one line per working day of the filter, all of them, not only
+3. "attendance-2026-10.csv" downloads with one line per working day of the filter, all of them, not only
    those that fit on the screen: date, person, clock-in, clock-out, break minutes, minutes worked, status
    and whether the clock-in and the clock-out were inside the radius.
 4. The file opens with the accents right in a spreadsheet.
@@ -339,7 +362,7 @@ Involved: ATTENDANCE-F06, ATTENDANCE-F07, BASE-F112 (inside the app)
 ### ATTENDANCE-F11 See who is clocked in now
 Status: done (server, screen and Home panel)
 Actor: owner, administrator, manager
-Screen: Records ("Clocked in now") and Home
+Screen: Records ("Clocked in now"), Home
 Steps:
 1. Open "Records". Above the table, "Clocked in now" says how many people have their working day open
    and who, since what time and whether they are on a break.
@@ -347,8 +370,8 @@ Steps:
 3. Both change by themselves as soon as someone clocks in or out, starts or ends a break, or a working
    day is corrected.
 4. A "Needs review" working day (or an already forgotten one) does not count: nobody knows whether that
-   person is still in. A terminated record does not either (its open working day closes by itself,
-   ATTENDANCE-F13). Whoever is on a break does count.
+   person is still in. A terminated record does not either (its open working day closes by itself). Whoever
+   is on a break does count.
 In: the open working days (ATTENDANCE-F01, ATTENDANCE-F08).
 Out: nothing; it only reads.
 If it fails: the error notice in its place, without covering the table; on the **Home**, the panel says

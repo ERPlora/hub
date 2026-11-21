@@ -1,6 +1,6 @@
 """A business that left, once its 90 days are over.
 
-The worker's data pass (``base.worker._data``), under the row's lease, takes the business from ``cancelled`` through
+The worker's data pass (``base.worker_data._data``), under the row's lease, takes the business from ``cancelled`` through
 
 1. ``archiving``: its final copy (``base.tenancy.dumps``, ``offboarding``); it can still come back (``base.hub.restore``);
 2. ``dropping``: ``DROP DATABASE … WITH (FORCE)``, that database only (``base.tenancy.ops``), outside any transaction;

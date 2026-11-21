@@ -12,7 +12,7 @@ from live.errors import NotFound
 from live.operations import operation
 
 from apps.flow.models import FlowRun
-from apps.flow.schemas import RunDetailOut, RunListIn, RunPageOut, RunRefIn
+from apps.flow.schemas.runs import RunDetailOut, RunListIn, RunPageOut, RunRefIn
 
 from .problems import HIGH_RISK_CODE
 from .reads import VIEW

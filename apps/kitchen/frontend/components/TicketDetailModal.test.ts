@@ -1,16 +1,11 @@
 // A ticket's detail (WORKBOOK «Pantallas · Comandas»): tapping a row opens it, live
 // (`kitchen.ticket.get`): its destination, type, status, waiter and when it was sent, its notes and its
 // dishes with their quantity, station and state (a voided one with its reason).
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import { item, SETTINGS, ticket } from '../__tests__/kitchen';
 import { errorFrame, flush, mountKitchen, settle } from '../__tests__/mount-kitchen';
 import TicketDetailModal from './TicketDetailModal.vue';
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
 
 async function setup(locale: 'en' | 'es' = 'en') {
   const m = await mountKitchen(TicketDetailModal, { props: { open: true, ticketId: 't1', timezone: SETTINGS.timezone }, locale });
@@ -57,6 +52,27 @@ describe('TicketDetailModal', () => {
     expect(m.inDoc('kitchen-ticket-detail-dish-i1-modifiers')?.textContent).toBe('Rare');
     expect(m.inDoc('kitchen-ticket-detail-dish-i2-menu')).toBeNull();
     expect(m.inDoc('kitchen-ticket-detail-dish-i2-modifiers')).toBeNull();
+  });
+
+  it('shows each dish’s allergy and only its matching allergens', async () => {
+    const m = await setup();
+    await m.result(
+      'kitchen.ticket.get',
+      ticket('t1', {
+        items: [
+          item('i1', { allergy: ['gluten', 'milk'], allergy_in_dish: ['milk'] }),
+          item('i2', { allergy: ['peanut'], allergy_in_dish: [] }),
+          item('i3'),
+        ],
+      }),
+    );
+    await flush();
+    expect(m.inDoc('kitchen-ticket-detail-dish-i1-allergy')?.textContent).toContain('Allergy: Gluten, Milk');
+    expect(m.inDoc('kitchen-ticket-detail-dish-i1-allergy-contains')?.textContent).toBe('The dish contains Milk');
+    expect(m.inDoc('kitchen-ticket-detail-dish-i2-allergy')?.textContent).toContain('Allergy: Peanut');
+    expect(m.inDoc('kitchen-ticket-detail-dish-i2-allergy-contains')).toBeNull();
+    expect(m.inDoc('kitchen-ticket-detail-dish-i3-allergy')).toBeNull();
+    expect(m.inDoc('kitchen-ticket-detail-dish-i1-allergy')?.closest('.ep-order-ticket')).not.toBeNull();
   });
 
   it('says when it could not load', async () => {

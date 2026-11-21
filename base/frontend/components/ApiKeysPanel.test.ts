@@ -1,18 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { errorFrame, flush, mountBase, subId } from '../__tests__/mount-base';
+import { accessibleName, errorFrame, flush, mountBase, subId } from '../__tests__/mount-base';
 import type { ApiKeyList, ApiKeyRow } from '../operations/api_keys';
 import ApiKeysPanel from './ApiKeysPanel.vue';
-
-vi.mock('@erplora/ui/shell', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@erplora/ui/shell')>()),
-  toastSuccess: vi.fn(),
-  toastError: vi.fn(),
-}));
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
 
 // Shaped like a real token (`erpk_live_` + URL-safe base64) without looking like a leaked one to the secrets hook.
 const TOKEN = 'erpk_live_test-token-shown-once_0123456789-abcdefghij';
@@ -99,6 +89,13 @@ describe('ApiKeysPanel', () => {
     expect(rows[0].text()).toContain('60/min');
     expect(rows[1].find('[data-testid="api-keys-scopes"]').text()).toBe('Online shop L/E');
     expect(rows[2].text()).toContain('Revocada');
+  });
+
+  it('each key’s buttons tell a screen reader which key they are for, their short words first', async () => {
+    const m = await open();
+    await m.result(m.call, 'base.api_key.list', LIST);
+    const named = (n: string, action: string) => accessibleName(m.wrapper.get(`[data-testid="api-keys-row-0199aaaa-0000-7000-8000-00000000000${n}-${action}"]`).element);
+    expect([named('1', 'rotate'), named('1', 'revoke'), named('2', 'revoke')]).toEqual(['Rotate: Gestoría', 'Revoke: Gestoría', 'Revoke: Tienda']);
   });
 
   it('a revoked key is neither rotated nor revoked again', async () => {

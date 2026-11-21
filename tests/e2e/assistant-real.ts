@@ -1,21 +1,23 @@
 // The browser and stack side of the assistant's QA with the REAL model, shared by qa/assistant-battery.spec.ts (the
 // battery of the QA plan) and qa/assistant-probes.spec.ts (layer 2: the probes): the commands of the stack's Hub and
-// SaaS (keys never in their output), the once-per-run seed of the real providers and the documentation index, and the
-// assistant's panel as a person uses it (open it, ask, decide the card, read the answer). What can be proved without a
-// browser lives in assistant-battery.ts and assistant-probes.ts, with their Vitest tests.
+// SaaS (keys never in their output), the once-per-run seed of the real providers and the documentation index, and a
+// whole conversation in the panel (assistant-panel.ts) as a real model leads it: ask, decide the card, read the answer.
+// What can be proved without a browser lives in assistant-battery.ts and assistant-probes.ts, with their Vitest tests.
 import { execFileSync } from 'node:child_process';
 
-import { expect, type Locator, type Page, type Response } from '@playwright/test';
+import { expect, type Page, type Response } from '@playwright/test';
 
-import { cleanupCommand, type Meta, observe, redact, seedCommand } from './assistant-battery';
-import { A, HUB_DIR, REPO_DIR } from './helpers';
+import { cleanupCommand, type Meta, observe, redact } from './assistant-battery';
+import { answers, box, card, panel, send } from './assistant-panel';
+import { seedCommand, seedSecrets } from './assistant-seed';
+import { HUB_DIR, REPO_DIR } from './helpers';
 import { STACK } from './stack';
-import { openAssistant } from './topbar';
 
 /** The checkout of the stack's SaaS (`E2E_SAAS_DIR`). */
 export const SAAS_DIR = process.env.E2E_SAAS_DIR ?? '';
-/** The keys of the real providers: taken out of every output, report and state written. */
-export const SECRETS = [process.env.QA_QWEN_API_KEY ?? '', process.env.QA_OPENAI_API_KEY ?? ''];
+/** The keys of the real providers, a model under test's and the simulated owner's too: taken out of every output,
+ *  report and state written. */
+export const SECRETS = [...seedSecrets(process.env), process.env.QA_OPENROUTER_API_KEY ?? ''];
 /** A real model may think for a while: one turn, card included. */
 export const TURN_MS = 240_000;
 
@@ -44,7 +46,7 @@ export function emptyMonth(): void {
 
 /**
  * Once per run: the Hub's apps registered in the SaaS (`register_apps`: their documentation), the real providers set
- * through the SaaS's own operations (`SEED_PY`), the documentation indexed (`index_docs`, idempotent) and the chunks
+ * through the SaaS's own operations (`SEED_PY` of assistant-seed.ts), the documentation indexed (`index_docs`, idempotent) and the chunks
  * counted per source. Returns what the report says of them.
  */
 export function seedRealProviders(): Omit<Meta, 'run'> {
@@ -71,7 +73,7 @@ export function seedRealProviders(): Omit<Meta, 'run'> {
 }
 
 /**
- * Takes out of the stack's SaaS what a run left there: the real keys (labelled `qa`) and the accounts `emails`. Each
+ * Takes out of the stack's SaaS what a run left there: the accounts `emails` (no key is ever in its database). Each
  * spec calls it in its `afterAll`, so it runs whether the run passed or failed; without `E2E_SAAS_DIR` nothing could
  * have been seeded. It refuses the shared SaaS database, as the seed does.
  */
@@ -81,25 +83,10 @@ export function cleanUpRealProviders(emails: string[]): void {
   run(command.file, command.args, SAAS_DIR, command.env);
 }
 
-// ── The panel (as assistant-panel.ts reads it) ──
-
-export const panel = (page: Page): Locator => page.locator('[data-testid="assistant-panel"]');
-export const box = (page: Page): Locator => panel(page).locator('[data-testid="assistant-input"] textarea');
-export const answers = (page: Page): Locator => panel(page).locator('[data-testid="assistant-answer"]');
-export const card = (page: Page): Locator => page.locator('ion-modal[data-testid="assistant-confirm"]');
-export const send = (page: Page): Locator => panel(page).locator('[data-testid="assistant-send"]');
-export const foot = (page: Page): Locator => panel(page).locator('[data-testid="assistant-usage"]');
-
-/** The Hub's home with the assistant's panel open and its box ready. */
-export async function openPanel(page: Page): Promise<void> {
-  await page.goto(`${A}/`);
-  await openAssistant(page);
-  await expect(box(page)).toBeVisible();
-}
-
 /**
  * Asks `question` and follows the turn to its end: a card is confirmed (typing its word when it asks one) or cancelled
- * as `decide` says; returns every streamed answer of `/api/assistant/turn` and what was decided. `label` names the
+ * as `decide` says; returns every streamed answer of `/api/assistant/turn` (also kept in `bodies`, so a turn that
+ * never ends still shows what it streamed), what was decided and when the last answer had come. `label` names the
  * question in a timeout.
  */
 export async function converse(
@@ -107,12 +94,21 @@ export async function converse(
   question: string,
   decide: 'confirm' | 'cancel',
   label: string,
-): Promise<{ bodies: string[]; decided: 'confirmed' | 'cancelled' | 'none' }> {
-  const bodies: string[] = [];
+  bodies: string[] = [],
+): Promise<{ bodies: string[]; decided: 'confirmed' | 'cancelled' | 'none'; endedAt: number }> {
   const reading: Promise<void>[] = [];
+  let endedAt = Date.now();
   const heard = (response: Response) => {
     if (!response.url().endsWith('/api/assistant/turn')) return;
-    reading.push(response.text().then((text) => void bodies.push(text), () => undefined));
+    reading.push(
+      response.text().then(
+        (text) => {
+          bodies.push(text);
+          endedAt = Date.now();
+        },
+        () => undefined,
+      ),
+    );
   };
   page.on('response', heard);
   let decided: 'confirmed' | 'cancelled' | 'none' = 'none';
@@ -149,7 +145,7 @@ export async function converse(
   } finally {
     page.off('response', heard);
   }
-  return { bodies, decided };
+  return { bodies, decided, endedAt };
 }
 
 /** Every answer of the assistant in the panel, as a person reads it. */

@@ -35,7 +35,7 @@ from apps.schedule.schemas import (
 from apps.staff.tests.test_services import _race
 from base.tenancy.context import use_hub
 
-from .conftest import HUB_DB, HUB_DB_COMMITTED, A, B, ctx_for, make_day, make_override, make_special_day
+from .conftest import HUB_DB, HUB_DB_COMMITTED, A, B, ctx_for, make_override, make_special_day
 
 pytestmark = HUB_DB
 

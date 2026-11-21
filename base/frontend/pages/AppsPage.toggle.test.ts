@@ -26,7 +26,6 @@ import { EMPLOYEE, flush, followPass, passRefused, placedUpgrade, SIGNED } from 
 import type { AppList } from '../operations/apps';
 
 vi.mock('@erplora/ui/components', async (importOriginal) => (await import('../__tests__/apps-page-spies')).componentsWithConfirmSpy(importOriginal));
-vi.mock('@erplora/ui/shell', async (importOriginal) => (await import('../__tests__/toast-spies')).shellWithToastSpies(importOriginal));
 vi.mock('../lib/access', async (importOriginal) => (await import('../__tests__/apps-page-spies')).accessWithSessionSpy(importOriginal));
 
 freshEachTest();
@@ -264,7 +263,7 @@ describe('a paid app without its right', () => {
     const m = await open('/apps#all');
     await m.result(m.call, 'base.app.list', APPS);
     expect(switchState(m, 'stock')).toMatchObject({ checked: false, disabled: true });
-    expect(await appActionLabel(m, 'stock', 'plans')).toBe('Upgrade plan');
+    expect(await appActionLabel(m, 'stock', 'plans')).toBe('Upgrade plan: Stock');
     expect(rowOf(m, 'stock').find('[data-testid="apps-row-stock-plans"]').text()).toBe('Upgrade plan');
     await pressAppAction(m, 'stock', 'plans');
     // Clicked as its link would be, so the installed app hands it to the system browser (`openExternalLink`).

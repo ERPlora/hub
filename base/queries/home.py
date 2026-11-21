@@ -1,12 +1,12 @@
 """The Home's live queries (``base.setup.status``, ``base.widget.list``, ``base.bell.counters``), the device's notices
 and System's cards; their rules are ``base.home``'s."""
 
-from django.utils import translation
+from django.utils import timezone, translation
 from django.utils.translation import gettext_lazy
 from live.context import OperationContext
 from live.operations import AI, INTERNAL, operation
 
-from base import activation, bell, home
+from base import activation, bell, home, unpaid_plan
 from base.apps_on import active_apps
 from base.models import EventDelivery, Hub, Membership
 from base.permissions import ADMINISTER_HUB, VIEW_HOME
@@ -152,13 +152,17 @@ def system_cards(ctx: OperationContext, data: SystemCardsIn) -> dict:
     ai=INTERNAL,
 )
 def bell_counters(ctx: OperationContext, data: BellCountersIn) -> dict:
-    """The bell: the counters above zero of the apps on, and for who runs the hub the events the relay gave up on and
-    the reasons to upgrade its plan (BASE-F40)."""
+    """The bell: the counters above zero of the apps on, and for who runs the hub the events the relay gave up on, the
+    reasons to upgrade its plan (BASE-F40) and its plan's unpaid invoice (BASE-F117)."""
     with translation.override(ctx.language):
         hub = Hub.objects.filter(slug=ctx.scope.key).first()
         modules = home.home_modules(active_apps(ctx.scope), demo_hub=bool(hub and hub.is_demo))
         counters = home.bell_counters(ctx, modules)
+        refresh = home.bell_refresh_every(ctx, modules)
         if ctx.has(ADMINISTER_HUB):
+            now = timezone.now()
+            unpaid = unpaid_plan.notice(hub, now)
+            refresh = min(filter(None, [refresh, unpaid_plan.refresh_every(unpaid, now)]), default=None)
             failed = EventDelivery.objects.filter(
                 status=EventDelivery.Status.DEAD,
                 event__scope_kind=ctx.scope.kind,
@@ -169,7 +173,9 @@ def bell_counters(ctx: OperationContext, data: BellCountersIn) -> dict:
                 counters.insert(0, bell.notice("base.plan_limits", bell.PLAN_LIMITS, {"count": motives}))
             if failed:
                 counters.insert(0, bell.notice("base.failed_events", bell.FAILED_EVENTS, {"count": failed}))
-        return {"counters": counters, "refresh_every": home.bell_refresh_every(ctx, modules)}
+            if unpaid:
+                counters.insert(0, unpaid)
+        return {"counters": counters, "refresh_every": refresh}
 
 
 # Not an assistant tool: the device's notices, which the device itself shows.

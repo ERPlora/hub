@@ -17,6 +17,7 @@ from ninja import Schema
 
 from base import assistant
 from base.models import Hub, Membership
+from base.services.assistant import LAST_ROUND
 from base.tenancy import context
 from base.tenancy.tests.business import HUB_DB, HUB_DB_COMMITTED, A, in_business_a
 from base.tests.fake_gateway import gateway
@@ -459,15 +460,53 @@ def test_a_write_the_assistant_runs_for_one_business_never_lands_in_another(hub_
 # ── A loop is cut ────────────────────────────────────────────────────────────────────────────────────────────────
 
 
-def test_after_too_many_rounds_the_turn_stops_and_says_why():
-    rounds = [asked(call("demo.item.list", {}, f"r{n}")) for n in range(shared.MAX_ROUNDS)]
+def answered_rounds(count):
+    """The person's request and ``count`` rounds of tools, each already answered."""
     messages = [ASK]
-    for n, message in enumerate(rounds[:-1]):
-        messages += [message, {"role": "tool", "tool_call_id": f"r{n}", "content": "{}"}]
-    last = call("demo.item.list", {}, f"r{shared.MAX_ROUNDS - 1}")
-    plan = run("base.assistant.turn", messages=[*messages, asked(last)], pending=[last])
-    assert plan["stop"] == "assistant.too_many_steps"
+    for at in range(count):
+        read = call("demo.item.list", {}, f"r{at}")
+        messages += [asked(read), {"role": "tool", "tool_call_id": f"r{at}", "content": "{}"}]
+    return messages
+
+
+def test_before_its_last_round_the_model_still_has_its_tools():
+    plan = run("base.assistant.turn", messages=answered_rounds(shared.MAX_ROUNDS - 1))
+    assert plan["tools"]
+    assert LAST_ROUND not in plan["instructions"]
+
+
+def test_on_its_last_round_the_model_answers_without_tools():
+    plan = run("base.assistant.turn", messages=answered_rounds(shared.MAX_ROUNDS))
+    assert (plan["stop"], plan["tools"]) == ("", [])
+    assert LAST_ROUND in plan["instructions"]
+
+
+def test_the_reads_of_the_last_round_run_before_the_model_answers_without_tools():
+    last = call("demo.item.list", {}, "last")
+    messages = [*answered_rounds(shared.MAX_ROUNDS - 1), asked(last)]
+    plan = run("base.assistant.turn", messages=messages, pending=[last])
     assert plan["executed"][0]["outcome"] == "ok"
+    assert (plan["stop"], plan["tools"]) == ("", [])
+
+
+def test_past_its_last_round_the_turn_stops_and_says_why():
+    plan = run("base.assistant.turn", messages=answered_rounds(shared.MAX_ROUNDS + 1))
+    assert plan["stop"] == "assistant.too_many_steps"
+
+
+def test_past_its_last_round_a_write_still_waits_for_the_answer_to_its_card():
+    write = call("demo.item.create", {"name": "Mesa 4"})
+    plan = turn(write, messages=[*answered_rounds(shared.MAX_ROUNDS), asked(write)])
+    assert plan["confirm"] is not None
+    assert plan["stop"] == ""
+
+
+def test_past_its_last_round_the_model_still_hears_that_the_person_stopped():
+    write = call("demo.item.create", {"name": "Mesa 4"})
+    stop = {"call_id": "c1", "accepted": False, "stop": True}
+    plan = turn(write, messages=[*answered_rounds(shared.MAX_ROUNDS), asked(write)], decision=stop)
+    assert plan["executed"][0]["outcome"] == "cancelled"
+    assert plan["stop"] == ""
 
 
 # ── The setup ────────────────────────────────────────────────────────────────────────────────────────────────────

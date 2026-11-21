@@ -16,23 +16,14 @@ from base.auth_views import auth_badge, auth_callback, auth_login, auth_logout, 
 from base.error_report import error_report
 from base.health import readyz
 from base.image_catalog import catalog_image
-from base.internal import (
-    demo_codes,
-    demos,
-    hub,
-    hub_dumps,
-    hub_restore,
-    hub_state,
+from base.internal import demo_codes, demos, hub, hub_dumps, hub_restore, hub_state, sessions_revoke, usage
+from base.internal_platform import (
     platform_invoice_create,
     platform_invoice_get,
     platform_invoice_pdf,
     platform_invoices_health,
-    sessions_revoke,
-    usage,
-    whatsapp_channel,
-    whatsapp_inbound,
-    whatsapp_status,
 )
+from base.internal_whatsapp import whatsapp_channel, whatsapp_inbound, whatsapp_status
 from base.media import media
 from base.public_door import call, open_page
 from base.spa import spa, spa_route

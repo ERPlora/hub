@@ -1,17 +1,12 @@
 // Schedules → Special days (WORKBOOK «Pantallas · Días especiales»): two tables one under the other,
 // each with its title — «Special days» and «Overrides» —, under «Schedules» with the three tabs.
 import { AppPage } from '@erplora/ui/shell';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import { mountSchedule } from '../__tests__/mount-schedule';
 import OverridesList from '../components/OverridesList.vue';
 import SpecialDaysList from '../components/SpecialDaysList.vue';
 import SpecialDaysPage from './SpecialDaysPage.vue';
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
 
 describe('SpecialDaysPage', () => {
   it('holds the special days, then the overrides, under «Schedules» with its tabs', async () => {

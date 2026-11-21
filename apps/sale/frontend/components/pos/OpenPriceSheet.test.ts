@@ -2,7 +2,7 @@
 // <amount>», which cannot be pressed without an amount and a department. It hands the line up in cents
 // with its department (or, without departments, its tax category): the server names the line after it.
 // A refusal is read in the sheet.
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { h, ref } from 'vue';
 
 import { click, expectWaitsForTheYen, mountSale, settle, taxSettings } from '../../__tests__/mount-sale';
@@ -10,11 +10,6 @@ import { expectWindowSaysMoneyUnreadable } from '../../../../../base/frontend/__
 import { plain } from '../../lib/format';
 import { page } from './__tests__/fixtures';
 import OpenPriceSheet from './OpenPriceSheet.vue';
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
 
 const department = { id: 'd1', name: 'Fruta', tax_category_key: 'food', tax_category_name: 'Food', tax_rate_pct: '4.00', sort_order: 0 };
 

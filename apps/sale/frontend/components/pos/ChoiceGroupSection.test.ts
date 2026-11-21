@@ -17,9 +17,9 @@ const COFFEE: SectionGroup = {
   max_choices: 2,
   allow_repeat: true,
   options: [
-    { id: 'espresso', label: 'Solo', price_delta: 0 },
-    { id: 'latte', label: 'Con leche', price_delta: 50 },
-    { id: 'decaf', label: 'Descafeinado', price_delta: -20 },
+    { id: 'espresso', label: 'Solo', price_delta: 0, allergens: [] },
+    { id: 'latte', label: 'Con leche', price_delta: 50, allergens: [] },
+    { id: 'decaf', label: 'Descafeinado', price_delta: -20, allergens: [] },
   ],
 };
 
@@ -74,6 +74,10 @@ describe('ChoiceGroupSection', () => {
     expect(s.inDoc('pos-menu-dish-count-latte')).not.toBeNull();
     expect(s.inDoc('pos-menu-dish-less-latte')).not.toBeNull();
     expect(source.replace(/\s+/g, ' ')).toMatch(/\.pos-options__list--rows \{[^}]*grid-template-columns: 1fr;/);
+  });
+
+  it('stretches each tile to its row, so a choice that says its allergens stands as tall as one beside it that does not', () => {
+    expect(source.replace(/\s+/g, ' ')).toMatch(/\.pos-options__option \{[^}]*align-self: stretch;/);
   });
 
   it('keeps the tiles where a choice cannot repeat', async () => {

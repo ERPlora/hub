@@ -242,7 +242,7 @@ def test_a_hubs_operation_never_runs_inside_another_hub(hub_a, hub_b):
 
 @HUB_DB
 def test_internal_calls_for_a_business_enter_it(monkeypatch, hub_b):
-    from base import internal
+    from base import internal, internal_whatsapp
     from base.services import photo
 
     seen = []
@@ -251,30 +251,30 @@ def test_internal_calls_for_a_business_enter_it(monkeypatch, hub_b):
         seen.append((context.current_hub().slug, context.current_alias()))
         return None, internal.refuse(418, "probe", "seen")
 
-    monkeypatch.setattr(internal, "_operation_call", call)
-    monkeypatch.setattr(internal.apps_on, "active_apps", lambda scope: frozenset({photo.WHATSAPP_APP}))
+    monkeypatch.setattr(internal_whatsapp, "_operation_call", call)
+    monkeypatch.setattr(internal_whatsapp.apps_on, "active_apps", lambda scope: frozenset({photo.WHATSAPP_APP}))
     request = type("Request", (), {"body": json.dumps({"hub": hub_b.slug}).encode()})()
 
-    internal._whatsapp_call(request, "whatsapp_inbox.message.receive")
+    internal_whatsapp._whatsapp_call(request, "whatsapp_inbox.message.receive")
 
     assert seen == [(hub_b.slug, hubs.HUB_B_ALIAS)]
 
 
 @pytest.mark.django_db
 def test_internal_calls_for_a_business_without_its_own_database_answer_503_and_enter_nothing(monkeypatch):
-    from base import internal
+    from base import internal_whatsapp
 
-    monkeypatch.setattr(internal, "_operation_call", lambda *args: pytest.fail("it ran"))
+    monkeypatch.setattr(internal_whatsapp, "_operation_call", lambda *args: pytest.fail("it ran"))
     request = type("Request", (), {"body": json.dumps({"hub": "b"}).encode()})()
 
-    answer = internal._whatsapp_call(request, "whatsapp_inbox.message.receive")
+    answer = internal_whatsapp._whatsapp_call(request, "whatsapp_inbox.message.receive")
 
     assert (answer.status_code, json.loads(answer.content)["error"]["code"]) == (503, "base.hub_maintenance")
 
 
 @HUB_DB
 def test_internal_calls_for_the_platform_hub_run_in_its_own_database(monkeypatch, settings, hub_a):
-    from base import internal
+    from base import internal, internal_platform
 
     settings.PLATFORM_HUB_SLUG = hub_a.slug
     seen = []
@@ -283,9 +283,9 @@ def test_internal_calls_for_the_platform_hub_run_in_its_own_database(monkeypatch
         seen.append((context.current().kind, context.current_alias()))
         return None, internal.refuse(418, "probe", "seen")
 
-    monkeypatch.setattr(internal, "_operation_call", call)
+    monkeypatch.setattr(internal_platform, "_operation_call", call)
 
-    internal._platform_call("invoice.invoice.platform_health", {})
+    internal_platform._platform_call("invoice.invoice.platform_health", {})
 
     assert seen == [(context.HUB, hubs.HUB_A_ALIAS)]
 

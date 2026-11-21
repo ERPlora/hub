@@ -9,7 +9,6 @@ import { EMPLOYEE } from '../__tests__/mount-base';
 import type { AppList, AppRow } from '../operations/apps';
 
 vi.mock('@erplora/ui/components', async (importOriginal) => (await import('../__tests__/apps-page-spies')).componentsWithConfirmSpy(importOriginal));
-vi.mock('@erplora/ui/shell', async (importOriginal) => (await import('../__tests__/toast-spies')).shellWithToastSpies(importOriginal));
 vi.mock('../lib/access', async (importOriginal) => (await import('../__tests__/apps-page-spies')).accessWithSessionSpy(importOriginal));
 
 freshEachTest();
@@ -29,7 +28,7 @@ describe('what an app refuses is said beforehand (hub#618, hub#694)', () => {
     expect(noteOf(m, 'verifactu').text()).toBe(NEVER_OFF);
     expect(state(m, 'verifactu').text()).toBe('Active');
     // «Open» is still there: only turning it off is refused.
-    expect(await appActionLabel(m, 'verifactu', 'open')).toBe('Open');
+    expect(await appActionLabel(m, 'verifactu', 'open')).toBe('Open: VeriFactu');
     // The app next to it goes on as ever.
     expect(switchState(m, 'tax').disabled).toBe(false);
     expect(noteOf(m, 'tax').exists()).toBe(false);
@@ -130,7 +129,7 @@ describe('an app whose tables the business’s database is still getting', () =>
     expect(rowOf(m, 'flow').find('ion-spinner').exists()).toBe(true);
     expect(await appActionLabel(m, 'flow', 'open')).toBeUndefined();
     await m.result(m.call, 'base.app.list', listOf(TASK, { ...FLOW, state: 'on', chosen: true, path: '/flow/home' }), 3);
-    expect(state(m, 'flow').text()).toBe('Installed');
+    expect(state(m, 'flow').text()).toBe('Active');
     expect(switchState(m, 'flow')).toMatchObject({ checked: true, disabled: false });
   });
 

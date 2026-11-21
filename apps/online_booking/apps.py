@@ -3,7 +3,7 @@ confirms what she booked. The booking is an appointment of the diary (source «o
 
 from django.utils.translation import gettext_lazy as _
 from django.utils.translation import pgettext_lazy
-from live.meta import Category, LiveAppConfig, Nav
+from live.meta import Category, Help, LiveAppConfig, Nav
 
 
 class OnlineBookingConfig(LiveAppConfig):
@@ -73,3 +73,4 @@ class OnlineBookingConfig(LiveAppConfig):
             "/online_booking/settings",
         ),
     ]
+    help = Help()

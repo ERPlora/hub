@@ -27,6 +27,7 @@ from apps.inventory.tests.test_recovery import (
     PRODUCTS,
     a_tax_key,
     brought_back,
+    direct,
     gone_altogether,
     made_by_a_recovery,
 )
@@ -40,12 +41,6 @@ from base.tenancy.tests.test_recovery import Recoveries, fields_held_since, fres
 
 from .conftest import GENERIC, HUB_DB, ctx_for, ctx_with, make_category, make_product
 from .conftest import run as run_here
-
-
-def direct():
-    """The raw connection of business A's database, as the platform's direct one reads the copy."""
-    (business := connections[current_alias()]).ensure_connection()
-    return business.connection
 
 
 def a_group(name: str):
@@ -311,9 +306,9 @@ def test_the_copy_gives_each_group_with_its_options_as_its_recover_takes_them():
             "id": sauces.id, "name": "Sauces", "kitchen_name": "SAU", "min_choices": 1, "max_choices": 2,
             "allow_repeat": True, "sort_order": 3, "options": [
                 {"name": "Ketchup", "kitchen_name": "", "price_delta": 0, "tax_category_id": None, "is_default": True,
-                 "sort_order": 0},
+                 "sort_order": 0, "allergens": []},
                 {"name": "BBQ", "kitchen_name": "+BBQ", "price_delta": 50, "tax_category_id": generic,
-                 "is_default": False, "sort_order": 4},
+                 "is_default": False, "sort_order": 4, "allergens": []},
             ],
         },
         {

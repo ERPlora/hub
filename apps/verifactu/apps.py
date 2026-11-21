@@ -2,6 +2,7 @@
 fingerprint, with their QR, validated against the AEAT's schemas and sent to the AEAT through ERPlora's gateway
 (WORKBOOK.md)."""
 
+from django.utils.functional import lazy
 from django.utils.translation import gettext_lazy as _
 from live.meta import Category, LiveAppConfig, Nav, SetupCheck, SetupStep, Widget
 
@@ -11,6 +12,13 @@ VIEW = "verifactu.view_record"
 #: VeriFactu binds the taxpayers of Spain alone (RD 1007/2023, Orden HAC/1177/2024); the Canary Islands, Ceuta and
 #: Melilla are regions of ES, not other countries.
 SPAIN = "ES"
+
+
+def sending_route_description() -> str:
+    """The Home's step text, read in the business at work when the Home asks for it (``erplora_route``)."""
+    from apps.verifactu import erplora_route  # the models are not loaded yet when this module is
+
+    return erplora_route.step_description()
 
 
 class VerifactuConfig(LiveAppConfig):
@@ -92,10 +100,7 @@ class VerifactuConfig(LiveAppConfig):
             operation="verifactu.config.get",
             configured_when=[SetupCheck(field="route_ready_for_production", truthy=True)],
             title=_("Set up VeriFactu"),
-            description=_(
-                "Sign the authorisation for ERPlora to send your invoices to the AEAT, or upload your business "
-                "certificate."
-            ),
+            description=lazy(sending_route_description, str)(),
             icon="ion:shield-checkmark-outline",
             route="/verifactu/config",
             permission="verifactu.configure",
@@ -153,19 +158,12 @@ class VerifactuConfig(LiveAppConfig):
         ),
     ]
     # The queue's send (VERIFACTU-F20): the phase-2 worker runs it on every hub as the system, every minute
-    # (cron in UTC); each chain waits the TiempoEsperaEnvio the AEAT answered. Every hour, the kept own certificate
-    # is checked against the trusted list it was not checked against yet (VERIFACTU-F02).
+    # (cron in UTC); each chain waits the TiempoEsperaEnvio the AEAT answered.
     scheduled_tasks = [
         {
             "name": "process_queue",
             "operation": "verifactu.contingency.process",
             "cron": "* * * * *",
-            "catch_up": "collapse",
-        },
-        {
-            "name": "recheck_certificate",
-            "operation": "verifactu.certificate.recheck",
-            "cron": "23 * * * *",
             "catch_up": "collapse",
         },
     ]

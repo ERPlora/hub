@@ -516,11 +516,12 @@ def not_cut(client):
 
 def _asked_at_its_door(client, hub, name: str, payload: dict):
     """``name`` asked through its route on ``hub``'s host, as its screen asks it; ``(response, sent)``."""
-    from base.api import router
+    from base.api import ROUTERS
     from base.tenancy.tests import hubs
     from base.tests.routes import bound_routes
 
-    [(method, path)] = [(method, path) for method, path, operation in bound_routes(router) if operation == name]
+    routes = {route for router in ROUTERS for route in bound_routes(router)}
+    [(method, path)] = [(method, path) for method, path, operation in routes if operation == name]
     host = f"{hub.slug}.localhost"
     with hubs.watched() as sent:
         if method == "GET":

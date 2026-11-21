@@ -78,8 +78,8 @@
     ]
   },
   {
-    "path": "apps/flow/schemas.py",
-    "file_name": "schemas.py",
+    "path": "apps/flow/schemas/steps.py",
+    "file_name": "steps.py",
     "functions": [
       {
         "name": "document_problems",
@@ -180,16 +180,6 @@
       {
         "name": "create_ticket",
         "complexity": 25
-      }
-    ]
-  },
-  {
-    "path": "apps/modifier/queries.py",
-    "file_name": "queries.py",
-    "functions": [
-      {
-        "name": "resolve_selection",
-        "complexity": 29
       }
     ]
   },
@@ -824,10 +814,6 @@
       {
         "name": "_assistant_answer",
         "complexity": 19
-      },
-      {
-        "name": "assistant_turn",
-        "complexity": 27
       }
     ]
   },
@@ -878,16 +864,6 @@
       {
         "name": "answer_question",
         "complexity": 21
-      }
-    ]
-  },
-  {
-    "path": "apps/flow/services/runs.py",
-    "file_name": "runs.py",
-    "functions": [
-      {
-        "name": "react",
-        "complexity": 16
       }
     ]
   },

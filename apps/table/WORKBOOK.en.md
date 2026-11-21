@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:051c7e5ea19d24afc4580ff7ec21a57f77e04faadd0836bb94afe6a2fcff3b74 -->
+<!-- generated from WORKBOOK.md sha256:54f1aef5ec3228c021a014ffe7d0312af95002985c87cd40bf53434fbbe5930e -->
 
 ## What it is for and who it is for
 
@@ -70,6 +70,13 @@ ERPlora does not invent flows: it adopts the ones the market has already proven.
   [Toast — removing a table from the service area](https://support.toasttab.com/article/Creating-Service-Areas-and-Table-Setup-1493049150430)
   and the Active / Inactive status of the floor plans of [Poster](https://knowledge-base.joinposter.com/en/how-to-edit-a-table-layout-or-hide-the-floor-plan)
   and [MultiPOS](https://docs.devdiggers.com/multipos-point-of-sale-for-woocommerce/configuration/tables/).
+- **The table whose bill has been printed is marked "Bill requested" until it is charged** (market
+  decision): printing the bill for the table changes its colour on the plan, as in
+  [Lightspeed K-Series](https://k-series-support.lightspeedhq.com/hc/en-us/articles/360050328494-Understanding-the-Floor-Plan-screen),
+  [SumUp POS Pro](https://help.sumup.com/en-GB/pos/articles/75000023480-table-plan-what-is-the-meaning-of-the-colours-associated-to-any-table-)
+  and [iMPOS](https://knowledge.impos.com.au/hc/en-us/articles/210213528-Table-and-Meal-Status), and it goes
+  back to its colour once charged, as in [Lightspeed L-Series](https://resto-support.lightspeedhq.com/hc/en-us/articles/226306187-Understanding-table-status).
+  None of the ones consulted says the mark goes away when lines are added or the bill is printed again.
 
 ## Before you start
 
@@ -279,6 +286,8 @@ With the window as it opened, Back closes it without asking (BASE-F05).
 | TABLE-F30 | Hold or release a table by hand | done |
 | TABLE-F31 | Forget the name of a customer whose data are erased (GDPR) | done |
 | TABLE-F32 | Put or remove the customer of a table | done |
+| TABLE-F33 | See how much each table has run up | done |
+| TABLE-F34 | See which tables have asked for the bill | partial |
 
 ### TABLE-F01 Create and order the zones of the room
 Status: done
@@ -460,7 +469,7 @@ Steps:
 In: the tables, their open checks, their holds and the status of their checks in Sales.
 Out: nothing.
 If it fails: a failure on loading shows with "Retry".
-Involved: TABLE-F10, TABLE-F25, TABLE-F29, SALE-F19
+Involved: TABLE-F10, TABLE-F25, TABLE-F29, TABLE-F33, TABLE-F34, SALE-F19
 
 ### TABLE-F10 Seat a party at a free or reserved table
 Status: done
@@ -865,6 +874,53 @@ In: the card, from Customers.
 Out: the check ↔ customer link, which Customers keeps (announces: `customer.order.linked`).
 If it fails: the reason of Customers; the table is seated anyway.
 Involved: CUSTOMER-F17, CUSTOMER-F19, CUSTOMER-F33, TABLE-F10
+
+### TABLE-F33 See how much each table has run up
+Status: done
+Actor: employee, manager
+Screen: Floor plan (Service)
+Steps:
+1. Open **Tables → Floor plan**. Each Occupied table shows in the label under it, below its guests, the
+   amount of its check in the business's currency (under "Occupied · 3/4 pax", "€42.50"), and "€0.00" while
+   nothing has been ordered. It is the same amount that check shows in **Open checks** in Sales. The screen
+   reader says it with the table: "Bill €42.50".
+2. With several checks at the table (split), it shows the sum of them all.
+3. On the phone, each occupied table's card shows it too, next to the time.
+4. When the waiter adds or removes a line in Sales, charges part of the check (it then shows what is
+   still to be charged), or joins, splits or moves it to another table, the amount changes by itself on
+   every device that has the plan open, without leaving and coming back.
+5. Available, Reserved and Blocked tables show no amount.
+In: the amount of each open check of the room, from Sales, read at once for the whole plan.
+Out: nothing.
+If it fails: as the rest of the plan, a failure on loading shows with "Retry".
+Involved: TABLE-F09, TABLE-F15, TABLE-F16, TABLE-F17, TABLE-F34, SALE-F17, SALE-F19, SALE-F22
+
+### TABLE-F34 See which tables have asked for the bill
+Status: partial — Sales already notes on the check that its bill was printed and the plan receives it up to date,
+through the API and the assistant; the plan screen does not yet paint the table "Bill requested" (steps 2 and 5)
+Actor: employee, manager, assistant
+Screen: Floor plan (Service); assistant
+Steps:
+1. In Sales, with a table's check on screen, the waiter prints the bill to take it to the table ("Print
+   bill"), on the receipt printer or through the device's print dialog, or asks the assistant for it ("print
+   the bill for table 4").
+2. In **Tables → Floor plan**, that table turns **Bill requested**: its written status, with its icon, says
+   "Bill requested" instead of "Occupied", and the table is painted in a colour of its own that cannot be
+   mistaken for those of the other statuses nor for the amber and red of the time warning. It still shows the
+   time, the guests and the amount, and in the zone's card it counts as occupied. On the phone, its card says
+   the same.
+3. With several checks at the table (split), it is enough that the bill of one of them has been printed.
+4. The mark belongs to the check: if the check moves to another table, it goes with it. Printing it again,
+   adding lines or charging only part of it does not remove it; it goes away when that check is closed: it is
+   charged in full or deleted.
+5. The change shows by itself on every device that has the plan open, without leaving and coming back.
+6. Through the assistant or the API, each table of the plan says whether its bill has been requested ("which
+   tables have asked for the bill?").
+In: from Sales, which open checks of the room have their bill printed, read at once for the whole plan.
+Out: nothing in Tables; Sales notes on the check that its bill was printed.
+If it fails: if the print does not reach Sales (no connection), the paper still comes out on the device and the
+table is not marked until it is printed again; a failure on loading the plan shows with "Retry".
+Involved: TABLE-F09, TABLE-F15, TABLE-F17, TABLE-F18, TABLE-F20, TABLE-F33, SALE-F21
 
 ## Tables: what goes in and what comes out
 

@@ -133,8 +133,13 @@ class Config(UUIDModel):
 
 
 class OwnCertificate(UUIDModel):
-    """The business's own certificate (VERIFACTU-F02): one at most, its material sealed (``certificates.seal``). It
-    counts unless the check against the trusted list (``checked_list``, its number) found no recognised issuer."""
+    """The business's own certificate (VERIFACTU-F02): one at most, its material sealed (``certificates.seal``). Going
+    live with it needs the AEAT's test environment to have accepted it (``aeat_proof``, VERIFACTU-F08)."""
+
+    class Proof(models.TextChoices):
+        UNTESTED = "untested", _("Not tested by the AEAT yet")
+        ACCEPTED = "accepted", _("Accepted by the AEAT's test environment")
+        REJECTED = "rejected", _("Refused by the AEAT's test environment")
 
     class Kind(models.TextChoices):
         SEAL = "seal", _("Electronic seal")
@@ -148,12 +153,16 @@ class OwnCertificate(UUIDModel):
     kind = models.CharField(_("kind"), max_length=14, choices=Kind.choices)
     expires_at = models.DateTimeField(_("expires at"))
     uploaded_at = models.DateTimeField(_("uploaded at"), default=timezone.now)
-    uploaded_by = models.CharField(
-        _("uploaded by"), max_length=ACTOR_MAX_LENGTH, blank=True
-    )
+    uploaded_by = models.CharField(_("uploaded by"), max_length=ACTOR_MAX_LENGTH, blank=True)
     sealed_blob = models.BinaryField(_("sealed certificate"), editable=False)
-    issuer_recognised = models.BooleanField(_("issued by a recognised authority"), null=True, editable=False)
-    checked_list = models.PositiveIntegerField(_("trusted list checked against"), null=True, editable=False)
+    aeat_proof = models.CharField(
+        _("AEAT test"), max_length=8, choices=Proof.choices, default=Proof.UNTESTED, db_default=Proof.UNTESTED,
+        editable=False,
+    )
+    #: What the AEAT's test environment said when it refused it (empty when its door said nothing but «302»).
+    aeat_proof_detail = models.CharField(
+        _("AEAT test answer"), max_length=500, blank=True, default="", db_default="", editable=False
+    )
 
     class Meta:
         verbose_name = _("own certificate")
@@ -468,50 +477,37 @@ class Record(UUIDModel):
 #: code; ``%(detail)s`` and ``%(at)s`` where they apply.
 WAIT_REASONS = {
     "gateway_unavailable": _("ERPlora's sending gateway is not configured on this server"),
-    "production_closed": _(
-        "ERPlora has not opened real filing with the AEAT on this server yet"
-    ),
+    "production_closed": _("ERPlora has not opened real filing with the AEAT on this server yet"),
     "own_certificate_missing": _("your own certificate is not loaded or has expired"),
-    "own_certificate_unreadable": _(
-        "your own certificate cannot be opened on this server: upload it again"
+    "own_certificate_unreadable": _("your own certificate cannot be opened on this server: upload it again"),
+    "own_certificate_untested": _(
+        "the AEAT's test environment has not accepted your own certificate yet: it is tried with the next record "
+        "that goes out in testing"
     ),
-    "representation_not_approved": _(
-        "ERPlora still has to approve your signed authorisation to file for you"
-    ),
+    "own_certificate_rejected": _("the AEAT's test environment refused your own certificate: upload another one"),
+    "representation_not_approved": _("ERPlora still has to approve your signed authorisation to file for you"),
     "own_certificate_required": _("ERPlora does not file on behalf of businesses for now: use your own certificate"),
-    "go_live_forbidden": _(
-        "this is a demo business: it always files in the AEAT's test environment"
-    ),
+    "go_live_forbidden": _("this is a demo business: it always files in the AEAT's test environment"),
     "outside_spain": _(
         "this business is not in Spain: VeriFactu is only for businesses in Spain, so nothing is sent to the AEAT"
     ),
-    "hub_not_active": _(
-        "your ERPlora account has a pending payment or is suspended"
-    ),
-    "hub_unregistered": _(
-        "ERPlora has not linked this business to its account on this server yet"
-    ),
+    "hub_not_active": _("your ERPlora account has a pending payment or is suspended"),
+    "hub_unregistered": _("ERPlora has not linked this business to its account on this server yet"),
     "aeat_wait": _("the AEAT asked to wait until %(at)s"),
     "unreachable": _("the gateway or the AEAT could not be reached (%(detail)s)"),
     "refused": _(
         "ERPlora's gateway could not present it (%(detail)s); it is not sent again by itself until the "
         "configuration changes or it is sent by hand"
     ),
-    "unknown": _(
-        "the submission left and no answer came back; it is sent again, declared as late"
-    ),
-    "aeat_fault": _(
-        "the AEAT refused the whole submission and it is tried again (%(detail)s)"
-    ),
+    "unknown": _("the submission left and no answer came back; it is sent again, declared as late"),
+    "aeat_fault": _("the AEAT refused the whole submission and it is tried again (%(detail)s)"),
     "xml_invalid": _("its XML does not pass the AEAT's schema (%(detail)s)"),
 }
 
 
 #: What a refusal of the gateway means, by its code, shown in place of the SaaS's own English message.
 GATEWAY_REFUSALS = {
-    "hub_unknown": _(
-        "ERPlora does not recognise this business: contact ERPlora's support"
-    ),
+    "hub_unknown": _("ERPlora does not recognise this business: contact ERPlora's support"),
     "representation_not_approved": WAIT_REASONS["representation_not_approved"],
 }
 
@@ -690,31 +686,30 @@ EVENT_MESSAGES = {
         "Own certificate of %(holder)s (%(holder_tax_id)s) uploaded; it expires on %(expires_on)s."
     ),
     "certificate_removed": _("Own certificate of %(holder)s (%(holder_tax_id)s) removed."),
+    # No longer written: the events already in the trail still read with it.
     "certificate_refused": _(
         "Own certificate of %(holder)s (%(holder_tax_id)s) no longer counts: no authority the AEAT recognises "
         "issued it. Upload a valid one."
+    ),
+    "certificate_accepted_by_aeat": _(
+        "The AEAT's test environment accepted the own certificate of %(holder)s (%(holder_tax_id)s): the business "
+        "can go live with it."
+    ),
+    "certificate_rejected_by_aeat": _(
+        "The AEAT's test environment refused the own certificate of %(holder)s (%(holder_tax_id)s) (%(detail)s): "
+        "upload another one."
     ),
     "route_own": _("From now on you send with your own certificate."),
     "route_erplora": _("From now on ERPlora files on your behalf."),
     "went_live": _("The business went live: records go to the real AEAT."),
     "back_to_testing": _("The business went back to the AEAT's test environment."),
     "account_synced": _("Data received from your ERPlora account (version %(version)s)."),
-    "representation_submitted": _(
-        "Representation authorisation no. %(version)s sent to ERPlora for review."
-    ),
-    "representation_under_review": _(
-        "ERPlora is reviewing the representation authorisation."
-    ),
-    "representation_approved": _(
-        "ERPlora approved the representation authorisation: it can file on your behalf."
-    ),
-    "representation_returned": _(
-        "ERPlora returned the representation authorisation: %(note)s"
-    ),
+    "representation_submitted": _("Representation authorisation no. %(version)s sent to ERPlora for review."),
+    "representation_under_review": _("ERPlora is reviewing the representation authorisation."),
+    "representation_approved": _("ERPlora approved the representation authorisation: it can file on your behalf."),
+    "representation_returned": _("ERPlora returned the representation authorisation: %(note)s"),
     "representation_revoked": _("The representation authorisation was revoked."),
-    "representation_none": _(
-        "ERPlora holds no signed representation authorisation for this business."
-    ),
+    "representation_none": _("ERPlora holds no signed representation authorisation for this business."),
     "xml_invalid": _(
         "Invoice %(invoice_number)s cannot be sent: its XML does not pass the AEAT's schema (%(detail)s)."
     ),

@@ -1,7 +1,8 @@
 <script setup lang="ts">
 // The Home's panels from the apps that are on and this person may see; the catalogue's defaults show until this
 // browser chooses. The choice lives in this browser (`dashboard-hub`): every person of this device shares it, and it
-// does not travel to another one.
+// does not travel to another one. Its first figures with a colour head it in a row in colour (lib/home-figures.ts); the
+// rest follow in the order chosen.
 import { InlineFeedback } from '@erplora/ui/components';
 import { useLive } from '@erplora/ui/sdk';
 import { HubIcon } from '@erplora/ui/shell';
@@ -25,6 +26,7 @@ import { computed, ref } from 'vue';
 
 import type { WidgetDef } from '../operations/home';
 import { activeWidgetKeys, BOARD_STORAGE_KEY, readJsonBlock } from '../lib/home';
+import { livelyRow } from '../lib/home-figures';
 import { useBaseI18n } from '../lib/i18n';
 import WidgetPanel from './WidgetPanel.vue';
 
@@ -51,6 +53,8 @@ const byKey = computed(() => new Map(catalogue.value.map((widget) => [widget.key
 const active = computed(() =>
   activeWidgetKeys(choice.value, catalogue.value).map((key) => byKey.value.get(key) as WidgetDef),
 );
+const lively = computed(() => livelyRow(active.value));
+const rest = computed(() => active.value.filter((widget) => !lively.value.includes(widget)));
 const available = computed(() => catalogue.value.filter((widget) => !active.value.includes(widget)));
 const loading = computed(() => data.value === undefined && embedded === null && status.value !== 'error');
 const failed = computed(() => data.value === undefined && embedded === null && status.value === 'error');
@@ -148,16 +152,27 @@ function onReorder(event: CustomEvent<{ from: number; to: number; complete: (dat
       {{ $t('base.widgets.empty') }}
     </p>
 
-    <div
-      v-else
-      class="widget-board-grid"
-    >
-      <WidgetPanel
-        v-for="widget in active"
-        :key="widget.key"
-        :widget="widget"
-      />
-    </div>
+    <template v-else>
+      <div
+        v-if="lively.length"
+        class="ep-stat-grid widget-board-lively"
+        data-testid="widgets-lively"
+      >
+        <WidgetPanel
+          v-for="widget in lively"
+          :key="widget.key"
+          :widget="widget"
+          variant="live"
+        />
+      </div>
+      <div class="widget-board-grid">
+        <WidgetPanel
+          v-for="widget in rest"
+          :key="widget.key"
+          :widget="widget"
+        />
+      </div>
+    </template>
 
     <ion-modal
       :is-open="picking"
@@ -297,7 +312,13 @@ function onReorder(event: CustomEvent<{ from: number; to: number; complete: (dat
   text-align: center;
 }
 
-/* Four columns on a desk (a small panel takes one, a medium two, a large the row), two on a tablet, one on a phone. */
+/* The row in colour is the library's row of figure cards (`ep-stat-grid`), above the rest of the board. */
+.widget-board-lively {
+  margin-bottom: 12px;
+}
+
+/* Four columns on a desk (a small panel takes one, a medium two, a large the row) and two on a tablet. On a phone the
+   figure cards keep going two by two, as in the row in colour, and every other panel takes the whole row. */
 .widget-board-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -324,8 +345,8 @@ function onReorder(event: CustomEvent<{ from: number; to: number; complete: (dat
 }
 
 @media (max-width: 575px) {
-  .widget-board-grid {
-    grid-template-columns: minmax(0, 1fr);
+  .widget-board-grid > :deep(.widget) {
+    grid-column: 1 / -1;
   }
 }
 </style>

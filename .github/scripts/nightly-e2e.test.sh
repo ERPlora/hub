@@ -55,7 +55,8 @@ clone_head="$(git -C "$hub_clone" rev-parse HEAD)"
 
 # --- the fakes ---------------------------------------------------------------------------------
 # uv: `sync`; `run python manage.py runserver <addr>` logs its environment and sleeps like a server (its pid in
-# $FAKE_PIDS); `run python tests/e2e/panel/<seed>.py <args>` logs and exits with FAKE_SEED_EXIT.
+# $FAKE_PIDS); `run python tests/e2e/panel/<seed>.py <args>` logs and exits with FAKE_SEED_EXIT; any other
+# `run python manage.py <command>` logs and exits with FAKE_MANAGE_EXIT.
 cat > "$root/bin/uv" <<'EOF'
 #!/usr/bin/env bash
 where="$(basename "$PWD")"
@@ -66,7 +67,7 @@ case "$*" in
       "HUB_INTERNAL_URL=${HUB_INTERNAL_URL:-} EMAIL_FILE_PATH=${EMAIL_FILE_PATH:-}" \
       "ASSISTANT_SERVICE_PROVIDER=${ASSISTANT_SERVICE_PROVIDER:-} E2E_RELAX_LOGIN_RATE_LIMIT=${E2E_RELAX_LOGIN_RATE_LIMIT:-}" \
       "DEMO_SPAWN_RATELIMIT=${DEMO_SPAWN_RATELIMIT:-} HUB_CALLBACK_TEMPLATE=${HUB_CALLBACK_TEMPLATE:-}" \
-      "HUB_ADMIN_CALLBACK_URL=${HUB_ADMIN_CALLBACK_URL:-} HTTPS_PROXY=${HTTPS_PROXY:-} CATALOG_DIR=${CATALOG_DIR:-}" \
+      "HUB_ADMIN_CALLBACK_URL=${HUB_ADMIN_CALLBACK_URL:-} HTTPS_PROXY=${HTTPS_PROXY:-} OPENAI_API_KEY=${OPENAI_API_KEY:-} CATALOG_DIR=${CATALOG_DIR:-}" \
       >> "$FAKE_CALLS"
     echo "$$" >> "$FAKE_PIDS"
     exec sleep 120 ;;
@@ -74,6 +75,10 @@ case "$*" in
     shift 2
     echo "seed $where $* DB_NAME=${DB_NAME:-} HUB_INTERNAL_URL=${HUB_INTERNAL_URL:-}" >> "$FAKE_CALLS"
     exit "${FAKE_SEED_EXIT:-0}" ;;
+  "run python manage.py "*)
+    shift 3
+    echo "manage $where $* DB_NAME=${DB_NAME:-}" >> "$FAKE_CALLS"
+    exit "${FAKE_MANAGE_EXIT:-0}" ;;
 esac
 echo "uv unexpected $where $*" >> "$FAKE_CALLS"
 exit 2
@@ -256,8 +261,13 @@ expect "the SaaS is seeded with the ids of a and b" 1 \
 expect "those ids come from the Hub's database" 1 "$(calls_re '^docker .* -d hub_e2e_9770 .*select id from base_hub')"
 expect "and with the fake assistant provider" 1 \
   "$(calls 'seed saas tests/e2e/panel/assistant_seed.py gateway http://127.0.0.1:9772/v1 DB_NAME=saas_e2e_9771')"
+expect "and with its taxonomy, which every deploy seeds after migrating" 1 \
+  "$(calls 'manage saas seed_taxonomy DB_NAME=saas_e2e_9771')"
+expect "the taxonomy goes into the migrated database, before the servers start" 1 \
+  "$([ "$(line_of 'database saas')" -lt "$(line_of 'manage saas seed_taxonomy')" ] &&
+    [ "$(line_of 'manage saas seed_taxonomy')" -lt "$(line_of 'runserver')" ] && echo 1 || echo 0)"
 expect "the SaaS runs as the e2e README says" 1 \
-  "$(calls "runserver saas 127.0.0.1:9771 DB_NAME=saas_e2e_9771 VITE_DEV_PORT=9776 SAAS_URL= HUB_INTERNAL_URL=http://localhost:9770 EMAIL_FILE_PATH=$nightly/saas/.mail-9771 ASSISTANT_SERVICE_PROVIDER=e2e-local E2E_RELAX_LOGIN_RATE_LIMIT=True DEMO_SPAWN_RATELIMIT=100/h HUB_CALLBACK_TEMPLATE=http://{slug}.localhost:9770/auth/callback HUB_ADMIN_CALLBACK_URL=http://hubs.localhost:9770/auth/callback HTTPS_PROXY=http://127.0.0.1:9779")"
+  "$(calls "runserver saas 127.0.0.1:9771 DB_NAME=saas_e2e_9771 VITE_DEV_PORT=9776 SAAS_URL= HUB_INTERNAL_URL=http://localhost:9770 EMAIL_FILE_PATH=$nightly/saas/.mail-9771 ASSISTANT_SERVICE_PROVIDER=e2e-local E2E_RELAX_LOGIN_RATE_LIMIT=True DEMO_SPAWN_RATELIMIT=100/h HUB_CALLBACK_TEMPLATE=http://{slug}.localhost:9770/auth/callback HUB_ADMIN_CALLBACK_URL=http://hubs.localhost:9770/auth/callback HTTPS_PROXY=http://127.0.0.1:9779 OPENAI_API_KEY=sk-e2e-0000000000000000000000000000e2e1")"
 expect "the Hub runs on its port and database" 1 \
   "$(calls "runserver hub 127.0.0.1:9770 DB_NAME=hub_e2e_9770 VITE_DEV_PORT=9775 SAAS_URL=http://localhost:9771")"
 expect "the Hub's runserver sees the blueprints" 1 "$(calls_re "^runserver hub .*CATALOG_DIR=$root/erplora/blueprints/img\$")"
@@ -306,6 +316,15 @@ expect "it opens the issue naming the step" 1 "$(grep -cF 'La pasada no llegó a
 expect "the Hub's database is still dropped after the failure" 1 \
   "$([ "$(last_line_of 'drop hub')" -gt "$(line_of 'database saas')" ] && echo 1 || echo 0)"
 expect "and the worktrees removed" "1 1" "$(worktrees "$hub_clone") $(worktrees "$root/erplora/saas")"
+
+night FAKE_MANAGE_EXIT=1
+expect "a night whose taxonomy cannot be seeded ends red" 1 "$status"
+expect "no server starts" 0 "$(calls_re '^runserver ')"
+expect "the issue names the SaaS's seeding" 1 "$(grep -cF 'falló «la siembra del SaaS»' "$BODIES_LOG" || true)"
+
+night FAKE_SEED_EXIT=1
+expect "a night whose accounts cannot be seeded ends red" 1 "$status"
+expect "and starts no server either" 0 "$(calls_re '^runserver ')"
 
 night FAKE_CURL_EXIT=7 NIGHTLY_START_SECONDS=1
 expect "a night whose servers never answer ends red" 1 "$status"

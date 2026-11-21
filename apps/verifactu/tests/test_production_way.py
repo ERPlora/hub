@@ -18,6 +18,7 @@ from apps.verifactu.models import Chain, Config, Environment, Record
 from apps.verifactu.tests.conftest import (
     HUB_DB,
     A,
+    accepted_by_the_aeat_of_testing,
     answering,
     b64,
     ctx_for,
@@ -67,6 +68,7 @@ def by_own_certificate(*, live: bool = False):
         "verifactu.certificate.upload",
         {"p12_base64": b64(make_p12()), "password": "secret"},
     )
+    accepted_by_the_aeat_of_testing()
     if live:
         run("verifactu.config.go_live")
 

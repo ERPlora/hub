@@ -65,10 +65,8 @@ def app_list(ctx: OperationContext, data: AppListIn) -> dict:
     plans of this business.
 
     Read again when an app's state changes (its live notice, in every process with the list open: AppsFollower on every
-    screen). It first forgets what the cache keeps of the business's apps (``base.activation.forget``), so the session
-    read right after it (the menu) sees rows written outside an operation too, as the e2e write them by hand. A change
-    of an operation or of the worker forgets at its COMMIT, in a cache every process shares (``base.cache``)."""
-    activation.forget(ctx.scope.key)
+    screen). It reads the rows and leaves the cache as it is: every change of the apps forgets it at its COMMIT, in a
+    cache every process shares (``base.cache``)."""
     hub = Hub.objects.filter(slug=ctx.scope.key).first()
     demo = bool(hub and hub.is_demo)
     configs = home.shown_modules(demo_hub=demo)
