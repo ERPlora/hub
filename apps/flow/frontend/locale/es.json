@@ -2245,6 +2245,7 @@
       "ready_at": "Listo el",
       "ready_count": "Listos",
       "reasons": "Motivos",
+      "receipt_code": "Código del tique para pedir la factura",
       "receipt_copies": "Copias del tique",
       "receipt_footer": "Pie del tique",
       "receipt_footer_image": "Imagen del pie del tique",

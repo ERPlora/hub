@@ -59,6 +59,21 @@ describe('useReceiptClaim', () => {
     await vi.waitFor(() => expect(claim()).toBeNull());
   });
 
+  it('a drawing that ends after another code was asked for does not replace that code’s QR', async () => {
+    const OTHER = '20261014-0008-AAAABBBBCCCC';
+    const finish: Array<(image: string) => void> = [];
+    vi.spyOn(QRCode, 'toDataURL').mockImplementation(() => new Promise<string>((resolve) => finish.push(resolve)));
+    const code = ref<string | null | undefined>(CODE);
+    const claim = host(code);
+    code.value = OTHER;
+    await vi.waitFor(() => expect(finish).toHaveLength(2));
+    finish[1]('data:image/png;base64,T1RIRVI=');
+    await vi.waitFor(() => expect(claim()?.code).toBe(OTHER));
+    finish[0]('data:image/png;base64,RklSU1Q=');
+    await new Promise((resolve) => setTimeout(resolve));
+    expect(claim()).toEqual({ code: OTHER, url: receiptClaimUrl(BAR, OTHER), image: 'data:image/png;base64,T1RIRVI=' });
+  });
+
   it('a QR that cannot be drawn leaves the address to type, never a blank square', async () => {
     const failure = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     vi.spyOn(QRCode, 'toDataURL').mockRejectedValue(new Error('no canvas'));
