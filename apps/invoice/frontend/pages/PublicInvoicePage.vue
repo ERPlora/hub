@@ -187,7 +187,7 @@ onMounted(load);
         :money="moneyOf(invoice)"
       />
       <InvoiceTotals :invoice="invoice" />
-      <p class="ion-text-center">
+      <p class="ion-text-center ion-margin-top">
         <ion-button
           data-testid="invoice-public-print"
           :disabled="printing"

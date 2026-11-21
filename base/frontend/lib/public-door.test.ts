@@ -1,48 +1,14 @@
 // A public page's way to base's public door (`base/public_door.py`): each operation the page names posted to
 // `/p/<slug>/api/<operation>` with its input as the JSON body (never the query string: a personal link's token travels
 // in it), the page's CSRF token sent back, and the business's money read from the page's own HTML.
-import { ApiError, type SpaConfig } from '@erplora/ui/sdk';
-import { describe, expect, it, vi } from 'vitest';
+import { ApiError } from '@erplora/ui/sdk';
+import { describe, expect, it } from 'vitest';
 
-import { type DoorDeps, doorRoutes, openPublicDoor } from './public-door';
-
-const CONFIG = {
-  csrfCookieName: 'hub_csrftoken',
-  csrfHeader: 'X-CSRFToken',
-  liveUrl: '/api/live',
-  apiBase: '/api',
-  lang: 'en',
-  deviceIdStorageKey: 'hub.device',
-} satisfies SpaConfig;
+import { DOOR_CONFIG as CONFIG, doorDeps as deps, doorDocument as doc, jsonAnswer as json } from '../__tests__/public-door-deps';
+import { doorRoutes, openPublicDoor } from './public-door';
 
 const OPERATIONS = ['invoice.public.ticket', 'invoice.public.substitute'] as const;
 const PAGE = { slug: 'salon-lucia', operations: OPERATIONS };
-
-function doc(block?: string): Document {
-  const page = document.implementation.createHTMLDocument('public page');
-  if (block !== undefined) {
-    const script = page.createElement('script');
-    script.id = 'public-door';
-    script.type = 'application/json';
-    script.textContent = block;
-    page.body.append(script);
-  }
-  return page;
-}
-
-function deps(answer: Response, page = doc()): DoorDeps & { fetchImpl: ReturnType<typeof vi.fn> } {
-  const store = new Map<string, string>();
-  return {
-    fetchImpl: vi.fn(async () => answer),
-    storage: { getItem: (key) => store.get(key) ?? null, setItem: (key, value) => void store.set(key, value) },
-    cookies: () => 'hub_csrftoken=tok',
-    randomUUID: () => '00000000-0000-4000-8000-000000000000',
-    doc: page,
-  };
-}
-
-const json = (status: number, body: unknown) =>
-  new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
 
 describe('the public door of a page without a session', () => {
   it('posts each operation the page names to its address under the business’s slug, and nothing else', () => {

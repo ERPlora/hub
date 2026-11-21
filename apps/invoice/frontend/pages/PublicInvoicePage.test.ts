@@ -152,12 +152,13 @@ describe('PublicInvoicePage', () => {
   });
 
   it.each([
-    [404, 'invoice.code_not_found', 'This code opens no ticket.'],
-    [410, 'invoice.code_expired', 'This code has expired.'],
-    [409, 'invoice.ticket_pending', 'Your ticket is still being registered.'],
-  ])('says plainly why a ticket cannot open (%i %s)', async (status, code, message) => {
+    [404, 'invoice.code_not_found', 'This code opens no ticket.', false],
+    [410, 'invoice.code_expired', 'This code has expired.', false],
+    [409, 'invoice.ticket_pending', 'Your ticket is still being registered.', true],
+  ])('says plainly why a ticket cannot open, with «Retry» only where it can change it (%i %s)', async (status, code, message, retry) => {
     const s = await open({ 'invoice.public.ticket': [status, { error: { code, message } }] });
     expect(s.el('error')?.textContent).toContain(message);
+    expect(s.el('retry') !== null).toBe(retry);
     expect(s.el('form')).toBeNull();
   });
 
