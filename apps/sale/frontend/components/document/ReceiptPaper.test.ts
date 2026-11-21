@@ -167,6 +167,15 @@ describe('ReceiptPaper', () => {
     expect(s.all('sale-receipt-dish')).toEqual(['Lentejas', '2× Café']);
   });
 
+  it('names the options of a dish of a menu with the dish (SALE-F42)', async () => {
+    const sale = saleOut();
+    const steak = { product_id: 'p-steak', product_name: 'Entrecot', quantity: 1, modifiers: ['Poco hecho', 'Queso'] };
+    const lentils = { product_id: 'p-lentils', product_name: 'Lentejas', quantity: 1, modifiers: [] };
+    const menu = { ...sale.lines[0], id: 'm1', product_id: null, name: 'Menú del día', combo_id: 'c1', combo_name: 'Menú del día', components: [lentils, steak] };
+    const s = await paper({ sale: { ...sale, lines: [menu] }, settings: SETTINGS });
+    expect(s.all('sale-receipt-dish')).toEqual(['Lentejas', 'Entrecot (Poco hecho, Queso)']);
+  });
+
   it('a menu split per dish prints its name once as a head and each dish at its own VAT under it (SALE-F12)', async () => {
     const sale = saleOut();
     const part = (id: string, name: string, line_total: number) => ({

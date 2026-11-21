@@ -33,6 +33,7 @@ const menuDish = (id: string, allergens: AllergenCode[], allergy_in_dish: Allerg
   price_delta: 0,
   tax_category_key: null,
   amount: null,
+  modifiers: [],
   allergens,
   allergy_in_dish,
 });
@@ -52,6 +53,7 @@ describe('CartLine: what it shows', () => {
       price_delta: 0,
       tax_category_key: null,
       amount: null,
+      modifiers: [],
       allergens: [],
       allergy_in_dish: [],
     });

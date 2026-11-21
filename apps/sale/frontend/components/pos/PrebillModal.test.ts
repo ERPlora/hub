@@ -98,7 +98,7 @@ describe('PrebillModal', () => {
   });
 
   it('names the dishes of a menu under it, as the ticket will (SALE-F12)', async () => {
-    const dish = (product_name: string) => ({ option_id: product_name, group_name: 'Mains', product_id: product_name, product_name, category_id: null, is_service: false, quantity: 1, price_delta: 0, tax_category_key: null, amount: null, allergens: [], allergy_in_dish: [] });
+    const dish = (product_name: string) => ({ option_id: product_name, group_name: 'Mains', product_id: product_name, product_name, category_id: null, is_service: false, quantity: 1, price_delta: 0, tax_category_key: null, amount: null, modifiers: [], allergens: [], allergy_in_dish: [] });
     const combo = { combo_id: 'm1', kitchen_name: 'MENU', supply_kind: 'service' as const, split: false, components: [dish('Lentils'), dish('Hake')] };
     const menu = line({ id: 'l3', name: 'Menu of the day', product_id: null, unit_price: 1350, line_total: 1350, combo });
     const m = await setup({ order: { ...CHECK, lines: [menu] } }, 'es');
