@@ -63,9 +63,9 @@
 699 apps/pricing/schemas.py ERPlora/erplora-next#74
 1024 apps/pricing/services.py ERPlora/erplora-next#74
 331 apps/printing/frontend/operations.d.ts ERPlora/erplora-next#74
-752 apps/printing/queries/__init__.py ERPlora/erplora-next#74
+748 apps/printing/queries/__init__.py ERPlora/erplora-next#74
 578 apps/printing/schemas/__init__.py ERPlora/erplora-next#74
-1121 apps/printing/services.py ERPlora/erplora-next#74
+1111 apps/printing/services.py ERPlora/erplora-next#74
 1115 apps/printing/tests/test_services.py ERPlora/erplora-next#74
 390 apps/reservation/frontend/operations.d.ts ERPlora/erplora-next#74
 1031 apps/reservation/queries.py ERPlora/erplora-next#74

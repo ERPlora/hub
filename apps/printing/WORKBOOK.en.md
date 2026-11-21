@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:fc16cadeb68b206ab4f6a8313aca97133dc818326478a488150b23cc28439bec -->
+<!-- generated from WORKBOOK.md sha256:4101912b24a88686a4515654a446f000daf7d30724ab1ecc58648ffde1978784 -->
 
 ## What it is for and who it is for
 
@@ -226,7 +226,7 @@ the window without saving. With the window as it opened, Back closes it without 
 | PRINTING-F19 | See the state of a printer | common | done |
 | PRINTING-F20 | How long the hub keeps the print jobs | common | done |
 | PRINTING-F21 | See in System who prints and where to get the ERPlora app | common | partial — the card does not say yet whether the printer answers right now (hub#573) |
-| PRINTING-F22 | Print the receipt and open the drawer at the till that charges | common | not done |
+| PRINTING-F22 | Print the receipt and open the drawer at the till that charges | common | done |
 
 ### PRINTING-F01 See how printing is going
 Status: done
@@ -695,27 +695,23 @@ nowhere).
 Involved: BASE-F02, BASE-F39, PRINTING-F18
 
 ### PRINTING-F22 Print the receipt and open the drawer at the till that charges
-Status: not done — the receipt printer is still a single one for the whole business: with two tills, the second
-one's receipt and drawer come out of the first one's printer (hub#2035)
+Status: done
 Actor: employee (charges and prints); the manager sets up each till with its printers (PRINTING-F18)
 Screen: Sell and Sales (from Sales), Session detail (from Cash register), Printers, Settings
 Steps:
-1. Each till is a device set up with the printers it reaches (PRINTING-F18): the bar's with "Receipt 1" and
-   "Kitchen", the terrace's with "Receipt 2" and "Kitchen".
+1. Each till is a device set up in **Printing → Devices** with the printers it reaches: the bar's with "Receipt 1"
+   and "Kitchen", the terrace's with "Receipt 2" and "Kitchen".
 2. When charging, reprinting a receipt, printing the table's bill or the shift report from a device, the paper comes
-   out of that device's receipt printer, and the drawer that opens is its own (PRINTING-F07, PRINTING-F08,
-   PRINTING-F09, PRINTING-F13 and PRINTING-F17): charging on the terrace prints the receipt on "Receipt 2" and
-   opens its drawer, and "Receipt 1" prints nothing. As in Square, Toast, Odoo, Lightspeed and Shopify: the receipt
+   out of that device's receipt printer, and the drawer that opens is its own: charging on the terrace prints the
+   receipt on "Receipt 2" and opens its drawer, and "Receipt 1" prints nothing. As in Square, Toast, Odoo, Lightspeed and Shopify: the receipt
    printer, with its drawer, belongs to each till, and the kitchen ones are shared.
 3. If the device reaches several active receipt printers, it comes out of the one chosen in **Settings → Printer of
    each role** if it is one of them and, if not, of the first one by name.
 4. A device that reaches no active receipt printer, or that is not set up (the office laptop), uses the business's,
-   as until now: the one chosen in Settings or, if none, the first active one with that role (PRINTING-F04). In
-   Settings, below the "Receipt" dropdown, it says so: "From a device with its own receipt printer, the receipt
-   comes out of its own.".
+   as until now: the one chosen in Settings or, if none, the first active one with that role. In Settings, below the
+   "Receipt" dropdown, it says so: "From a device with its own receipt printer, the receipt comes out of its own.".
 5. Kitchen and bar orders, labels and an invoice's A4 page do not change: they come out of the printer of their
-   role in the business (PRINTING-F04, PRINTING-F10, PRINTING-F12). What names its printer ("print it on
-   Kitchen", the test page) comes out of that one.
+   role in the business. What names its printer ("print it on Kitchen", the test page) comes out of that one.
 6. After charging, Sales says which printer the receipt went to, and in **Printing → Printers** the "Receipt" card
    says which one it comes out of from the device it is looked at on: "Prints on: Receipt 2.".
 In: the device it is asked from (the ERPlora app and the browser say so on every request), the printers it is set
@@ -723,11 +719,11 @@ up with and the settings.
 Out: the job in the queue of that device's receipt printer, with the order to open the drawer when it applies
 (announces: `printing.job.queued`).
 If it fails: if the device's receipt printer is off or out of paper, the job waits for it in the queue and is
-retried or cancelled there (PRINTING-F14): it never jumps to another till's printer, which would open a drawer that
-is not its own. If its printer is deactivated or the device is retired, what it asks for from then on comes out of
-the business's, and what the deactivated printer had in the queue goes to the business's, as when deactivating any
-printer (PRINTING-F04). With no active receipt printer, as until now: nothing is queued and the paper comes out
-through the device's dialog (PRINTING-F07).
+retried or cancelled in **Printing → Queue**: it never jumps to another till's printer, which would open a drawer
+that is not its own. If its printer is deactivated or the device is retired, what it asks for from then on comes out
+of the business's, and what the deactivated printer had in the queue goes to the business's, as when deactivating any
+printer. With no active receipt printer, as until now: nothing is queued and the paper comes out through the
+device's dialog.
 Involved: PRINTING-F04, PRINTING-F06, PRINTING-F07, PRINTING-F08, PRINTING-F09, PRINTING-F13, PRINTING-F17,
 PRINTING-F18
 

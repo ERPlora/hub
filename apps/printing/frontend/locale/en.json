@@ -259,6 +259,7 @@
         "receipt_copies": "Receipt copies"
       },
       "automatic": "The first active one of this role",
+      "receiptPerDevice": "From a device with its own receipt printer, the receipt comes out of its own.",
       "receiptText": "The receipt header and footer are part of your till settings, where the ticket is printed from.",
       "receiptLink": "Open the receipt settings",
       "save": "Save settings",

@@ -259,6 +259,7 @@
         "receipt_copies": "Copias del tique"
       },
       "automatic": "La primera activa con esa función",
+      "receiptPerDevice": "Desde un dispositivo con su propia impresora de tiques, el tique sale por la suya.",
       "receiptText": "El encabezado y el pie del tique forman parte de los ajustes de Ventas, que es de donde sale el tique.",
       "receiptLink": "Abrir los ajustes del tique",
       "save": "Guardar ajustes",
