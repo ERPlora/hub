@@ -94,6 +94,10 @@ Aquí la referencia no es un competidor: es la norma de la AEAT.
   ata al negocio con la AEAT hasta el fin del año natural, así que la activa el dueño (BASE-F01, hub#997).
 - **Los datos del productor del software** (ERPlora) van fijos en cada registro (los declara su declaración
   responsable), también «Da servicio a varios obligados», siempre «S».
+- **Las horas y los días son los del negocio**, en su zona horaria (la de «Ajustes»), no los de Madrid: la hora a la
+  que se genera cada registro (con su huso), la hora hasta la que la AEAT pidió esperar, el mes en curso que se
+  pregunta a la AEAT y el día en que caduca tu certificado. Un negocio en Canarias ve sus registros generados a su
+  hora y, la Nochevieja a las 23:30, pregunta a la AEAT por diciembre, aunque en Madrid ya sea enero.
 
 Configuración inicial, paso a paso:
 
@@ -1218,9 +1222,11 @@ negocio, y una automatización sin nadie detrás, no ven esa línea. La marca de
   para el alta, y
   `IDEmisorFacturaAnulada=…&NumSerieFacturaAnulada=…&FechaExpedicionFacturaAnulada=…&Huella=…&FechaHoraHusoGenRegistro=…`
   para la anulación. Importes en euros con dos decimales y punto (los céntimos se dividen en el límite), fecha
-  `DD-MM-AAAA`, marca de tiempo con segundos enteros y huso (`2026-09-22T19:58:55+02:00`), a la hora de Madrid del
-  despliegue (`settings.TIME_ZONE`), no a la de la zona del negocio (hub#772). Vectores: los tres casos oficiales de
-  la AEAT (un alta, la siguiente y una anulación encadenadas) y
+  `DD-MM-AAAA`, marca de tiempo con segundos enteros y huso (`2026-09-22T19:58:55+02:00`), a la hora del negocio en
+  su zona horaria (`base.business.business_zone`; Canarias, `+00:00` o `+01:00`), la misma que fecha la factura: al
+  este de Madrid, un registro emitido pasada su medianoche se genera el día en que se expide, no la víspera. Un
+  registro sellado nunca cambia la suya, así que la huella de los ya sellados cuadra igual. Vectores: los tres
+  casos oficiales de la AEAT (un alta, la siguiente y una anulación encadenadas) y
   las huellas de los 19 envíos reales aceptados por la preproducción (`tests/fixtures/*_sent_*.xml`).
 - **Cadena** por `(NIF del emisor, entorno)`: la fila `Chain` guarda la secuencia, la huella, el número, la
   fecha y el NIF del último registro. Sellar bloquea esa fila (`select_for_update`) en la transacción del
