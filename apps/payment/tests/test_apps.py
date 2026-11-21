@@ -1,7 +1,7 @@
 """The payment app declares its module metadata, its menu, its permissions and what each role gets."""
 
 from django.apps import apps
-from live.meta import Category, LiveAppConfig, Nav, module_configs, permissions_for_role
+from live.meta import Category, Help, LiveAppConfig, Nav, module_configs, permissions_for_role
 
 PERMISSIONS = [
     "payment.view_payment",
@@ -134,3 +134,7 @@ def test_every_input_field_says_what_it_is():
             continue
         for field, info in op.input.model_fields.items():
             assert info.description, f"{name}: {field}"
+
+
+def test_its_help_window_is_ready_without_a_video_yet():
+    assert payment().help == Help()
