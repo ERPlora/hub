@@ -10,14 +10,8 @@ from apps.inventory import events
 from apps.inventory.models import Category, Product, ProductCategory
 from apps.inventory.queries.categories import load_category
 from apps.inventory.queries.reads import find_category, held
-from apps.inventory.schemas import (
-    CategoryIn,
-    CategoryOut,
-    CategoryPatchIn,
-    CategoryRecoverIn,
-    CategoryRefIn,
-    DeletedOut,
-)
+from apps.inventory.schemas.categories import CategoryIn, CategoryOut, CategoryPatchIn, CategoryRecoverIn
+from apps.inventory.schemas.fields import CategoryRefIn, DeletedOut
 from apps.inventory.services.writes import SYSTEM, _actor, _record_link, _tax_category
 
 

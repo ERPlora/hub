@@ -9,7 +9,8 @@ from live.errors import AppInactive, Conflict, PermissionDenied
 from live.operations import UnknownOperation, get, operation
 
 from apps.inventory.queries.reads import find_product
-from apps.inventory.schemas import ProductRefIn, PrintLabelOut
+from apps.inventory.schemas.fields import ProductRefIn
+from apps.inventory.schemas.labels import PrintLabelOut
 from base import operations as platform
 
 LABEL_QUEUE_UNAVAILABLE = _("The print queue is not available here: print the label from the browser.")
