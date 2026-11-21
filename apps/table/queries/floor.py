@@ -88,6 +88,11 @@ def _bill():
     return Subquery(Order.objects.filter(pk=OuterRef("order_id")).values("provisional_total")[:1])
 
 
+def _bill_requested():
+    """Whether the bill of a check of Sales was printed for the table, read with the check itself."""
+    return Exists(Order.objects.filter(pk=OuterRef("order_id"), bill_printed_at__isnull=False))
+
+
 def table_label(table: Table) -> str:
     return str(TABLE_LABEL) % {
         "number": table.number,
@@ -114,7 +119,7 @@ def table_rows(tables: list[Table], now: dt.datetime) -> list[dict]:
     """The rows of ``tables`` (annotated by ``tables_now``) with their live checks and their next hold."""
     ids = [table.pk for table in tables]
     checks = defaultdict(list)
-    seated_now = live_sessions().filter(table_id__in=ids).annotate(bill=_bill())
+    seated_now = live_sessions().filter(table_id__in=ids).annotate(bill=_bill(), bill_requested=_bill_requested())
     for session in seated_now.order_by("opened_at", "id"):
         checks[session.table_id].append(session)
     customers = _customers([s.order_id for group in checks.values() for s in group])
@@ -157,15 +162,17 @@ def table_rows(tables: list[Table], now: dt.datetime) -> list[dict]:
 
 
 def _seated_row(seated: list[TableSession], customers: dict) -> dict:
-    """What a table's live checks paint: its guests, since when, who serves it, the checks and the bill."""
+    """What a table's live checks paint: its guests, since when, who serves it, the checks, the bill and whether it
+    was asked for."""
     if not seated:
-        return {"guests": None, "since": None, "waiter_name": "", "checks": [], "amount": None}
+        return {"guests": None, "since": None, "waiter_name": "", "checks": [], "amount": None, "bill_requested": False}
     return {
         "guests": sum(s.guests_count for s in seated),
         "since": seated[0].opened_at,
         "waiter_name": seated[0].waiter_name,
         "checks": [_check_row(s, customers) for s in seated],
         "amount": sum(s.bill or 0 for s in seated),
+        "bill_requested": any(s.bill_requested for s in seated),
     }
 
 
