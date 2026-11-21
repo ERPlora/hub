@@ -1,19 +1,12 @@
 // Inventory's help plays its own video from YouTube, so unlike base-help.spec.ts this spec reaches the real player.
-import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
-
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
 import { A, capture, horizontalOverflow, settled, signedInSpanish, turnOffTurnedOn, turnOnMissing } from './helpers';
+import { THREE_SIZES_TALL_TABLET } from './screen';
 
 const VIDEO = 'dIppfjMEKWo';
 const SRC =
   `https://www.youtube-nocookie.com/embed/${VIDEO}?autoplay=1&rel=0&playsinline=1&cc_load_policy=1&cc_lang_pref=es&hl=es`;
-const SIZES = [
-  { label: '390', width: 390, height: 844 },
-  { label: '834', width: 834, height: 1194 },
-  { label: '1440', width: 1440, height: 900 },
-] as const;
-const SHOTS = '/tmp/help-video-shots';
 
 let context: BrowserContext;
 let page: Page;
@@ -33,8 +26,6 @@ async function playInventoryVideo(): Promise<void> {
 test.describe.configure({ mode: 'serial' });
 
 test.beforeAll(async ({ browser }) => {
-  rmSync(SHOTS, { recursive: true, force: true });
-  mkdirSync(SHOTS, { recursive: true });
   ({ context, page } = await signedInSpanish(browser, { width: 1440, height: 900 }, '/inventory/products'));
   await turnOnMissing(context, A, ['inventory'], turnedOn);
 });
@@ -46,7 +37,7 @@ test.afterAll(async () => {
   }
 });
 
-for (const size of SIZES) {
+for (const size of THREE_SIZES_TALL_TABLET) {
   test(`at ${size.label} px the Spanish video plays in YouTube's full player, 16:9 across the help window`, async () => {
     await page.setViewportSize({ width: size.width, height: size.height });
     await playInventoryVideo();
@@ -64,7 +55,7 @@ for (const size of SIZES) {
     const { x, y, width, height } = (await frame().boundingBox())!;
     await page.mouse.move(x + width / 2, y + height / 2);
     await settled(page);
-    writeFileSync(`${SHOTS}/help-video-${size.label}.png`, await capture(page, `help-video-${size.label}`));
+    await capture(page, `help-video-${size.label}`);
     await page.getByTestId('help-close').click();
   });
 }
