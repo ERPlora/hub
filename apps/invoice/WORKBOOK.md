@@ -1109,7 +1109,7 @@ sola (riesgo alto, como sustituir un tique en el mostrador).
   original menos sus rectificativas vivas) por resto mayor, base por proporción y cuota por diferencia;
   si se lleva todo lo que queda de una clave, copia sus cifras tal cual. Entera, niega cabecera,
   desglose y líneas de la original.
-- **Fechas**: `issue_date` es el día del negocio al emitir (Madrid en la fase 1); `operation_date`, el
+- **Fechas**: `issue_date` es el día del negocio al emitir, en su zona horaria; `operation_date`, el
   del cobro (`Sale.business_day`), el de la devolución o el de la anulación; la F3 conserva el del tique.
 - **El emisor** (`Issuer`, una fila) se copia en cada documento. `invoice.issuer.sync` lo guarda como sistema
   con `{legal_name, tax_id, address, postal_code, city, province, country, version}` (una `version` menor o igual
