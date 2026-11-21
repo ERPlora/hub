@@ -3,7 +3,7 @@
 // at the three sizes, in light and in dark.
 import { expect, type Locator, type Page, test } from '@playwright/test';
 
-import { horizontalOverflow, shot, shown, THREE_SIZES } from './helpers';
+import { capture, horizontalOverflow, shown, THREE_SIZES } from './helpers';
 import { boardWidget, panelValue, spanishOwnerWithPanels } from './home-helpers';
 
 /** Sales and Inventory, on in the seeded business: three figures with a colour (two of inventory), and a chart. */
@@ -47,7 +47,7 @@ for (const size of THREE_SIZES) {
         expect(await horizontalOverflow(page)).toBe(0);
 
         await row.evaluate((element) => element.scrollIntoView({ block: 'start' }));
-        await page.screenshot({ path: shot(`base-home-figures-${size.label}-${scheme}`) });
+        await capture(page, `base-home-figures-${size.label}-${scheme}`);
       } finally {
         await context.close();
       }
