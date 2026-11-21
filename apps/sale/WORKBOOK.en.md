@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:428c2a333f570741d262e64ab53ee940c0cc8017a3bc7d68d2713bc2ca5b49e4 -->
+<!-- generated from WORKBOOK.md sha256:7bcbd2c0321cd6d6aaf488e96baff22c3330b6305c2c2f762367cc6e5bd9b135 -->
 
 ## What it is for and who it is for
 
@@ -718,16 +718,20 @@ Steps:
    Staff: left on «Me», this sale counts for nobody."
 3. The lines added from then on are stamped with that person. To correct a line already in, tap the
    name shown under it ("Whose line is this") and choose another person or "The check's professional".
+   A line that arrives with its professional (an appointment's, one of a check built on another device or
+   before a reload) also shows their name, the one Staff gives.
 4. Charge. With the chip on "Me", the sale is attributed to your Staff record; a line with its own
    professional (an appointment's, the one you moved) keeps them. Afterwards, the chip goes back to "me".
-In: the Staff team (active records) and the record of whoever is signed in.
+In: the Staff team (active records), the record of whoever is signed in and the name of each line's
+person.
 Out: the sale and each line attributed to that person, for the close by professional and Staff's
 commissions (STAFF-F21). With "Me", the sale belongs to the record of whoever charges; without a record,
 it counts for nobody. The kitchen order sent carries their name (KITCHEN-F18); with "Me", that of whoever
 sends it.
 If it fails: "The team could not be loaded. The sale is still attributed to whoever is signed in.";
 "The line could not be moved to another professional. It stays with the one it had.". A line sent to
-the kitchen is not reassigned.
+the kitchen is not reassigned. If Staff cannot say whose a line is (off, no permission or a record that
+is gone), the line says "the assigned professional".
 Involved: STAFF-F21, KITCHEN-F18
 
 ### SALE-F17 Park a check and retrieve it
@@ -1595,8 +1599,9 @@ the quick notes and what is refundable can be followed live.
   check with its customer is kept by Customers (`customer.order.link`).
 - **Inventory** (optional): the sale catalog, the price, the unit and the tax category of each article,
   read with its own queries when the line is added.
-- **Staff** (optional): the team for the "Served by" chip and the record of whoever is signed in
-  (`staff.member.current`, without Staff's permission), to which the charge attributes "Me".
+- **Staff** (optional): the team for the "Served by" chip, the record of whoever is signed in
+  (`staff.member.current`, without Staff's permission), to which the charge attributes "Me", and the name
+  of the person of a line not chosen on that screen (`staff.member.detail`).
 - **Services** (optional): its services on offer (`service.service.list_for_sale`, and
   `service.service.get` when the line is added and while the notice of a refused one lasts), the client's
   vouchers for a service
