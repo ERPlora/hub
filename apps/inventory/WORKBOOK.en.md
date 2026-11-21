@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:c29490c2e8c84a8cb0ec3180d0e96e2225906aa04a33e1608963f03db5b717b7 -->
+<!-- generated from WORKBOOK.md sha256:fb32cda5fb67fec3555fac16f4cd929546f4e8fb7c1709ac807deb7ccef86683 -->
 
 ## What it is for and who it is for
 
@@ -675,7 +675,7 @@ Steps:
    tap "Write off". Through the assistant: "write off 2 bottles of red wine for breakage"; it shows the
    confirmation card with the product, the quantity and the reason. Told in the same message as a count
    ("three bottles of water got broken, and I just counted the soft drinks, there are 40 left"), the
-   breakage is written off all the same and the count (INVENTORY-F14) is only of what was counted: a count
+   breakage is written off all the same and the count is only of what was counted: a count
    never records a breakage.
 3. In **Movements** "Decrease" shows with the quantity in negative and the reason.
 In: the product, the quantity (in its unit's step) and the reason. It can also be asked for through the

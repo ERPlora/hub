@@ -692,7 +692,7 @@ Pasos:
    «Dar de baja». Por el asistente: «da de baja 2 botellas de vino tinto por rotura»; enseña la
    tarjeta de confirmación con el producto, la cantidad y el motivo. Contada en el mismo mensaje que un
    recuento («se han roto tres botellas de agua y he contado los refrescos: quedan 40»), la rotura se da
-   de baja igual y el recuento (INVENTORY-F14) es solo de lo contado: un recuento nunca apunta una rotura.
+   de baja igual y el recuento es solo de lo contado: un recuento nunca apunta una rotura.
 3. En **Movimientos** sale «Descuento» con la cantidad en negativo y el motivo.
 Entra: el producto, la cantidad (en el escalón de su unidad) y el motivo. También se puede pedir
 por la API.
