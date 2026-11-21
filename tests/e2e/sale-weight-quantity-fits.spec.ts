@@ -5,7 +5,7 @@
 // phone; what a run creates, its product `E2E-WEIGHT-<run>` and its check, is deleted after it.
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, capture, login, shown } from './helpers';
+import { A, capture, login, saveSessionForTheSweep, shown } from './helpers';
 import { createProduct, type Product } from './inventory-helpers';
 import { cleanTill, drawerOff, openTillCart, stamp, tillIn, tillIsPhone } from './sale-helpers';
 
@@ -45,6 +45,7 @@ test.beforeAll(async ({ browser }) => {
   context = await browser.newContext({ baseURL: A, locale: 'es-ES', viewport: SIZES[0] });
   page = await context.newPage();
   await tillIn(page, context, 'es');
+  await saveSessionForTheSweep(context);
   await shown(page).locator(`[data-testid=pos-product-${product.id}]`).click();
   await expect(line()).toBeAttached();
 });
@@ -56,14 +57,18 @@ test.afterAll(async () => {
 
 const line = (): Locator => shown(page).locator('[data-testid^=pos-line-]').filter({ hasText: product.name }).first();
 
-/** The quantity typed into the line's field and confirmed, once the server has valued it. */
+/** The quantity typed into the line's field and confirmed, once the server has valued it and the check's total too
+ *  (a dash while its preview is on its way). On a phone the line scrolls under «Send order»: brought into view. */
 async function weigh(weight: (typeof WEIGHTS)[number]): Promise<void> {
   await openTillCart(page);
   const field = line().locator('.pos-qty__field');
+  await field.scrollIntoViewIfNeeded();
   await field.fill(weight.typed);
   await field.press('Enter');
   await expect(line()).toContainText(weight.amount);
   await expect(field).toHaveValue(weight.shown);
+  await expect(shown(page).locator('[data-testid=pos-total]')).toHaveText(weight.amount);
+  await field.evaluate((el) => el.scrollIntoView({ block: 'center' }));
 }
 
 /** The field's figure whole inside it, the unit after it, and the selector inside its line. */
