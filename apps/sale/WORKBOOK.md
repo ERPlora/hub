@@ -1083,8 +1083,8 @@ Pasos:
    resto el domicilio. En una factura, bajo «Cliente», su NIF y su domicilio. Luego, el número que le
    dio Facturación en el cobro («Factura FACT-2026-000012», «Tique TICKET-2026-000031»; sin
    Facturación, o mientras su documento está pendiente, el número de la venta), fecha, líneas, una fila
-   de IVA por clave fiscal (un exento dice su causa: «Exento (E1)»), total, forma de pago, entregado y
-   cambio, y el pie. Con **VeriFactu**, antes del pie va el QR fiscal: «QR tributario:» encima,
+   de IVA por clave fiscal (un exento dice su causa: «Exento (E1)»), total, forma de pago (cobrada con
+   varios medios, todos: «Efectivo + Tarjeta»), entregado y cambio, y el pie. Con **VeriFactu**, antes del pie va el QR fiscal: «QR tributario:» encima,
    «VERI*FACTU» debajo y «Escanéalo para cotejar este tique en la AEAT» («…esta factura…» si es una
    factura); cuando la AEAT ya respondió, su código («CSV: …») en lugar de esa frase. Mientras VeriFactu
    no tiene registro de ese documento, el papel sale sin QR. Un tique con su documento fiscal (emitido o

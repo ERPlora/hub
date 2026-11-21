@@ -98,6 +98,16 @@ def documents_pending(sale: Sale) -> bool:
     )
 
 
+_TENDER_SEPARATOR = " + "
+
+
+def tender_names(sale: Sale) -> str:
+    """The methods ``sale`` was paid with, once each and in the order they were tendered, as the reader reads them
+    («Cash + Card»); empty when nothing was tendered."""
+    names = dict.fromkeys(payment.method_name for payment in sale.payments.all())
+    return _TENDER_SEPARATOR.join(method_display_name(name) for name in names)
+
+
 def sale_detail(sale: Sale, *, already: bool = False) -> dict:
     returned = returned_by_line(sale)
     return {
@@ -129,7 +139,7 @@ def sale_detail(sale: Sale, *, already: bool = False) -> dict:
         "sessions_to_return": sessions_to_return(sale)
         if sale.status == Sale.Status.COMPLETED
         else 0,
-        "payment_method_name": method_display_name(sale.payment_method_name),
+        "payment_method_name": tender_names(sale),
         "breakdown": sale.tax_breakdown,
         "notes": sale.notes,
         "voided_at": sale.voided_at,
@@ -224,14 +234,6 @@ def sale_by_key(ctx: OperationContext, params: SaleByKeyIn) -> dict:
 
 
 _SALE_SORT = {"number": ("business_day", "sequence"), "created_at": ("created_at",)}
-_TENDER_SEPARATOR = " + "
-
-
-def tender_names(sale: Sale) -> str:
-    """The methods ``sale`` was paid with, once each and in the order they were tendered, as the reader reads them
-    («Cash + Card»); empty when nothing was tendered."""
-    names = dict.fromkeys(payment.method_name for payment in sale.payments.all())
-    return _TENDER_SEPARATOR.join(method_display_name(name) for name in names)
 
 
 def _tender_order() -> Coalesce:

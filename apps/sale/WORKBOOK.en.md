@@ -1078,8 +1078,8 @@ Steps:
    later), with the "Receipt header" under them. Without an issuer set up, the header's first line is the
    name and the rest the address. On an invoice, under "Customer", its tax ID and its address. Then, the number Invoicing gave it when charging ("Invoice FACT-2026-000012", "Receipt TICKET-2026-000031"; without
    Invoicing, or while its document is pending, the sale's number), date, lines, one VAT row per tax key
-   (an exempt one says its cause: "Exempt (E1)"), total, payment method, tendered and change, and the
-   footer. With **VeriFactu**, before the footer goes the fiscal QR: "Tax QR:" above, "VERI*FACTU" below
+   (an exempt one says its cause: "Exempt (E1)"), total, payment method (charged with several methods,
+   all of them: "Cash + Card"), tendered and change, and the footer. With **VeriFactu**, before the footer goes the fiscal QR: "Tax QR:" above, "VERI*FACTU" below
    and "Scan it to check this receipt at the AEAT" ("…this invoice…" if it is an invoice); once the AEAT
    has answered, its code ("CSV: …") instead of that sentence. While VeriFactu has no record of that
    document, the paper comes out without a QR. A receipt with its fiscal document (issued or pending)

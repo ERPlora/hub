@@ -250,7 +250,7 @@ def test_a_split_payment_takes_the_change_out_of_the_cash(catalog):
         ("card", 800, 800, 0),
     ]
     assert (sale.payment_method_name, sale.tendered_total, sale.change_total) == (
-        "Cash",
+        "Cash + Card",
         2800,
         1000,
     )

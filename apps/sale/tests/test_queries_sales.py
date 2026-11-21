@@ -1,8 +1,10 @@
-"""The sales list reads every tender of a sale, not only the largest one (SALE-F28, SALE-F03)."""
+"""The sales list, a sale read alone and its ticket name every tender of a sale, not only the largest one
+(SALE-F28, SALE-F29, SALE-F03)."""
 
 import pytest
 from django.utils import translation
 
+from apps.sale import paper
 from apps.sale.tests.conftest import HUB_DB, ctx_for, run
 
 pytestmark = HUB_DB
@@ -75,3 +77,10 @@ def test_sorting_by_payment_follows_what_the_column_says(menu):
     card = charge("tenders-key-0003", [{"method": "card"}])
     rows = listed(sort="payment_method_name", dir="asc")
     assert [row.id for row in rows] == [card.id, cash.id, split.id]
+
+
+def test_a_split_sale_read_alone_says_both_methods_too_and_so_does_its_ticket(menu):
+    split = charge("tenders-key-0001", SPLIT)
+    sale = run("sale.sale.get", {"sale_id": str(split.id)})
+    _, ticket = paper.receipt(sale, letterhead={"name": "Bar", "tax_id": "", "lines": []}, footer="", duplicate=False)
+    assert (sale.payment_method_name, ticket["payment_method"]) == ("Cash + Card", "Cash + Card")

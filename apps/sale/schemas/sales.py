@@ -147,7 +147,9 @@ class SaleOut(Schema):
     sessions_to_return: int = Field(
         description="Lines paid with a voucher whose session has not come back yet."
     )
-    payment_method_name: str = Field(description="The main tender's method.")
+    payment_method_name: str = Field(
+        description="The methods it was paid with, once each in the order they were tendered («Cash + Card»)."
+    )
     breakdown: list[BreakdownOut] = Field(description="Base and tax by fiscal key.")
     notes: str = Field(description="Notes.")
     voided_at: datetime | None = Field(description="When it was voided.")
