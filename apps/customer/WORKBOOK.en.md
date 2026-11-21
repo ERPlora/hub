@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:50630418f4461c283c70acd93bdfb4284da9d1278dfe2e7fdee8075e01b0fe75 -->
+<!-- generated from WORKBOOK.md sha256:8024241cd608fd8bc2447f7222629f1c63a1bf53b8a4972a96e8170458108fdd -->
 
 ## What it is for and who it is for
 
@@ -422,7 +422,7 @@ Steps:
    one has it (with spaces or dashes, with 0034 or +34 in front, or with another country's prefix and
    the national zero in brackets).
 2. On saving, the number is read with the prefix it carries or, if it carries none, as a number of the
-   business's country (Spain if it has none, see "Before you start"); out go spaces, dashes, dots, slashes,
+   business's country (the one in Settings → Business; Spain if it has none); out go spaces, dashes, dots, slashes,
    brackets and the national zero (also in brackets after the prefix). Italy and the other countries that
    keep the 0 after the prefix keep it. The number has to be a valid number of its country (its
    numbering, not only its length). It is stored with its prefix and the digits together (+34 and the

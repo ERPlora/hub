@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:0ebc1755864906c2a24e5d1164bc23d90cab6ab8379d613b8bea9798f4ed5053 -->
+<!-- generated from WORKBOOK.md sha256:e258284e191d64992b01416ae91ba13f0c8a6ebc1da34b40950298d7150de108 -->
 
 ## What it is for and who it is for
 
@@ -558,7 +558,7 @@ Actor: employee, manager, assistant
 Screen: Packages
 Steps:
 1. In the voucher's row tap **Sold vouchers** (for a deleted one, with Status on **Deleted**).
-2. One row per purchase shows, the most recent first (see "Screens").
+2. One row per purchase shows, the most recent first.
 3. **Load more** brings the next page; **Close** goes back to the table.
 In: the purchases of that voucher and the name of each customer (Customers); for a deleted card, its
 identifier.
@@ -615,7 +615,7 @@ Actor: employee, manager, assistant
 Screen: Packages
 Steps:
 1. In the voucher's row tap **Movements**.
-2. Each delivered session and each adjustment shows, the most recent first (see "Screens"); **Load
+2. Each delivered session and each adjustment shows, the most recent first; **Load
    more** brings the next ones, each movement only once even if several carry the same time.
 3. A session spent saying who did it names her beside the customer, "Professional: Ana
    López"; if her name changes in Staff, the row says it at once.
@@ -858,7 +858,7 @@ Actor: manager
 Screen: Packages
 Steps:
 1. Tap **Vouchers with no customer**.
-2. Each voucher whose card was deleted or anonymised shows, the most recent first (see "Screens"). There
+2. Each voucher whose card was deleted or anonymised shows, the most recent first. There
    is no name, email or phone.
 3. To give the money back, find the sale in **Sales** and make a refund; to void the voucher if it was not
    used, open it from **Sold vouchers** of that voucher, where it shows with its reference.

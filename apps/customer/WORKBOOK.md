@@ -437,7 +437,7 @@ Pasos:
    tenga (con espacios o guiones, con 0034 o +34 delante, o con el prefijo de otro país y el cero
    nacional entre paréntesis).
 2. Al guardar, el número se lee con el prefijo que lleve o, si no lleva, como un número del país del
-   negocio (España si no tiene ninguno, ver «Antes de empezar»); fuera espacios, guiones, puntos, barras,
+   negocio (el de Ajustes → Negocio; España si no tiene ninguno); fuera espacios, guiones, puntos, barras,
    paréntesis y el cero nacional (también entre paréntesis tras el prefijo). Italia y los demás
    países que conservan el 0 tras el prefijo lo conservan. El número tiene que ser un número
    válido de su país (su numeración, no solo su longitud). Se guarda con su prefijo y las cifras

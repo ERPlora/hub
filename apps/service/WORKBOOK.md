@@ -559,7 +559,7 @@ Actor: empleado, responsable, asistente
 Pantalla: Bonos y paquetes
 Pasos:
 1. En la fila del bono pulsa **Bonos vendidos** (de uno eliminado, con Estado en **Eliminado**).
-2. Sale una fila por compra, la más reciente primero (ver «Pantallas»).
+2. Sale una fila por compra, la más reciente primero.
 3. **Cargar más** trae la siguiente página; **Cerrar** vuelve a la tabla.
 Entra: las compras de ese bono y el nombre de cada clienta (Clientes); de una ficha eliminada, su
 identificador.
@@ -616,7 +616,7 @@ Actor: empleado, responsable, asistente
 Pantalla: Bonos y paquetes
 Pasos:
 1. En la fila del bono pulsa **Movimientos**.
-2. Sale cada sesión entregada y cada ajuste, el más reciente primero (ver «Pantallas»); **Cargar
+2. Sale cada sesión entregada y cada ajuste, el más reciente primero; **Cargar
    más** trae los siguientes, cada movimiento una sola vez aunque varios lleven la misma hora.
 3. Una sesión gastada diciendo quién la hizo la nombra junto a la clienta, «Profesional: Ana
    López»; si cambia su nombre en Personal, la fila lo dice al momento.
@@ -853,7 +853,7 @@ Actor: responsable
 Pantalla: Bonos y paquetes
 Pasos:
 1. Pulsa **Bonos sin cliente**.
-2. Sale cada bono cuya ficha se eliminó o se anonimizó, el más reciente primero (ver «Pantallas»). No
+2. Sale cada bono cuya ficha se eliminó o se anonimizó, el más reciente primero. No
    hay nombre, correo ni teléfono.
 3. Para devolver el dinero, busca la venta en **Ventas** y haz una devolución; para anular el bono si
    no se usó, ábrelo desde **Bonos vendidos** de ese bono, donde sale con su referencia.
