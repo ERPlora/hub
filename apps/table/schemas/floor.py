@@ -75,6 +75,10 @@ class TableOut(Schema):
         "when occupied (0 while nothing is ordered); null otherwise.",
         json_schema_extra={"money": True},
     )
+    bill_requested: bool = Field(
+        description="Whether it has asked for the bill: the bill of one of its open checks was printed for the table in "
+        "Sales. It stays until that check is charged in full or deleted; false when nobody sits at it."
+    )
 
 
 TablePage = Page[TableOut]

@@ -1,4 +1,4 @@
-// Online booking → Bookings (WORKBOOK «Reservas (bandeja)»; ONLINE_BOOKING-F02 to F06, F08): the live
+// Online booking → Bookings (WORKBOOK «Reservas»; ONLINE_BOOKING-F02 to F06, F08): the live
 // `online_booking.booking.list` in a server-side DataTable — No., Customer (with her phone), Service,
 // Professional, Date, Time, Status and Booked —, the newest first, «Search no., customer, phone, service…»,
 // column filters, list or cards, 50 a page. Per row Confirm, Complete, No-show, Cancel (with its dialog and

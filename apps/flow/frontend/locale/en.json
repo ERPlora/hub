@@ -1550,6 +1550,7 @@
       "base_price": "Base price",
       "beneficiary_iban": "Beneficiary IBAN",
       "beneficiary_name": "Beneficiary name",
+      "bill_requested": "Bill requested",
       "billing_address": "Billing address",
       "bills": "Bills",
       "bio": "Bio",

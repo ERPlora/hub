@@ -413,16 +413,12 @@ WAYS_LOST = {
 
 @pytest.mark.parametrize("lost", sorted(WAYS_LOST))
 def test_in_production_without_a_way_to_the_aeat_the_charge_is_refused(
-    issuer, bar, settings, monkeypatch, lost
+    issuer, bar, settings, lost
 ):
     # A business that files for real never charges a sale whose ticket could never reach the AEAT, whether the route
     # lost it (the authorisation, the own certificate) or the server (the key that opens the certificate, ERPlora's
     # gateway, real filing). The refusal is not a document that waits: it reaches the cashier as it is and nothing is
-    # charged, numbered or sealed. The charge never stays «pending». The own certificate is the test's, its authority
-    # recognised here as a real one is by the trusted list.
-    from apps.verifactu.tests.conftest import recognise_test_authority
-
-    recognise_test_authority(monkeypatch)
+    # charged, numbered or sealed. The charge never stays «pending».
     settings.ERPLORA_ENVIRONMENT = "prod"
     settings.VERIFACTU_PRODUCTION_ENABLED = True
     settings.VERIFACTU_GATEWAY_URL = "http://saas.internal:8001"

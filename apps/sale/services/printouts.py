@@ -1,18 +1,19 @@
 """The sale's paper through Printing (PRINTING-F07, F08, F09, F13; SALE-F21, F29): a sale's ticket and an open
-check's bill."""
+check's bill, which the check notes as asked for (TABLE-F34)."""
 
 import logging
 import uuid
 
 from babel.numbers import get_currency_precision
 from django.db import DatabaseError
-from django.utils import translation
+from django.utils import timezone, translation
 from live.context import OperationContext
 from live.errors import AppInactive, OperationError
 from live.operations import AI, UnknownOperation, atomic, get, operation
+from live.outbox import record_event
 
-from apps.sale import paper
-from apps.sale.models import FiscalStatus
+from apps.sale import events, paper
+from apps.sale.models import FiscalStatus, Order
 from apps.sale.queries.business import business_currency
 from apps.sale.queries.checkout import preview
 from apps.sale.queries.letterhead import business_letterhead
@@ -117,6 +118,16 @@ def _print_sale(ctx: OperationContext, detail: SaleOut, *, duplicate: bool, key:
     return _queue_paper(ctx, request)
 
 
+def _note_bill_requested(ctx: OperationContext, order: Order) -> None:
+    """The check keeps its bill's first print, with its own event. Printing it again changes nothing, and never its
+    version: the screen still charges the check with the version it showed."""
+    if order.bill_printed_at is not None:
+        return
+    order.bill_printed_at = timezone.now()
+    order.save(update_fields=["bill_printed_at", "updated_at"])
+    record_event(ctx, events.ORDER_CHANGED, {"order_id": str(order.id)})
+
+
 @operation(
     "sale.sale.print",
     kind="command",
@@ -161,7 +172,7 @@ def print_sale(ctx: OperationContext, data: SalePrintIn) -> dict:
     ai=AI(
         description="Print the bill of an open check for the table (not an invoice: no number, no payment) on the "
         "receipt printer. Each call prints one. Not queued (Printing off, no receipt printer): say so; the screen "
-        "prints it.",
+        "prints it. Either way its table shows «Bill requested» on the floor plan until the check is charged in full.",
         risk="normal",
         asks={
             "en": (
@@ -177,13 +188,14 @@ def print_sale(ctx: OperationContext, data: SalePrintIn) -> dict:
     ),
 )
 def print_bill(ctx: OperationContext, data: OrderRefIn) -> dict:
-    order = find_order(data.order_id)
+    order = find_order(data.order_id, lock=True)
     valued = preview(ctx, PreviewIn(order_id=data.order_id))
     currency = business_currency(ctx)
     with translation.override(ctx.language):
         document = paper.bill(
             valued, label=order.label, letterhead=business_letterhead(ctx), decimals=get_currency_precision(currency)
         )
+    _note_bill_requested(ctx, order)
     return _queue_paper(
         ctx,
         {

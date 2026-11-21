@@ -516,8 +516,8 @@ def get_zone(ctx: OperationContext, params: ZoneRefIn) -> dict:
     expose_api=True,
     ai={
         "description": "List the tables of the room in natural order (2 before 10), each with its status right now "
-        "(available, occupied, reserved, blocked), its guests and since when, who serves it, its customer and its next "
-        "reservation of today. Filter by zone, status or number.",
+        "(available, occupied, reserved, blocked), its guests and since when, who serves it, its customer, what it has "
+        "run up, whether it asked for the bill and its next reservation of today. Filter by zone, status or number.",
         "asks": {
             "en": (
                 "which tables are free right now?",

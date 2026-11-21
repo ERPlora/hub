@@ -1,7 +1,7 @@
 """The task app: the team's to-do list, with projects, subtasks and comments (WORKBOOK.md)."""
 
 from django.utils.translation import gettext_lazy as _
-from live.meta import Category, LiveAppConfig, Nav
+from live.meta import Category, Help, LiveAppConfig, Nav
 
 
 class TaskConfig(LiveAppConfig):
@@ -62,3 +62,4 @@ class TaskConfig(LiveAppConfig):
         Nav("tasks", _("Tasks"), "ion:checkbox-outline", "/task/tasks"),
         Nav("projects", _("Projects"), "ion:folder-outline", "/task/projects"),
     ]
+    help = Help()

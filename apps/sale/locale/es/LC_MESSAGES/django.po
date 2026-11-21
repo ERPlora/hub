@@ -234,6 +234,9 @@ msgstr "clave del intento"
 msgid "closed at"
 msgstr "cerrada el"
 
+msgid "bill printed at"
+msgstr "cuenta impresa el"
+
 msgid "voided by"
 msgstr "anulada por"
 

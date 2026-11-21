@@ -258,5 +258,26 @@ def test_many_tables_are_made_at_once_over_http_or_none_with_the_taken_numbers(a
     assert refused.status_code == 403
 
 
+@HUB_DB
+def test_a_table_has_asked_for_the_bill_once_printed_until_it_is_paid_over_http(admin_client, product):
+    product("Coffee", "COF", 150, "restaurant.drink")
+    check = post(admin_client, "/sale/orders", {"label": "Table 4", "lines": [{"product": "COF"}]})
+    assert check.status_code == 201
+    table = make_table("4")
+    post(admin_client, "/table/sessions/open", {"table_id": str(table.id), "order_id": check.json()["id"]})
+    assert get(admin_client, "/table/tables/detail", id=str(table.id)).json()["bill_requested"] is False
+    assert post(admin_client, "/sale/orders/print_bill", {"order_id": check.json()["id"]}).status_code == 200
+    [row] = get(admin_client, "/table/tables").json()["rows"]
+    assert (row["status"], row["bill_requested"]) == ("occupied", True)
+    paid = post(
+        admin_client,
+        "/sale/sales",
+        {"idempotency_key": "table-api-bill", "order_id": check.json()["id"], "payments": [{"method": "card"}]},
+    )
+    assert paid.status_code == 201
+    after = get(admin_client, "/table/tables/detail", id=str(table.id)).json()
+    assert (after["status"], after["bill_requested"]) == ("available", False)
+
+
 def test_the_spas_route_map_names_every_table_route():
     assert spa_routes("table.") == ROUTES

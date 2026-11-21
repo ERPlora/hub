@@ -133,8 +133,7 @@ class Config(UUIDModel):
 
 
 class OwnCertificate(UUIDModel):
-    """The business's own certificate (VERIFACTU-F02): one at most, its material sealed (``certificates.seal``). It
-    counts unless the check against the trusted list (``checked_list``, its number) found no recognised issuer. Going
+    """The business's own certificate (VERIFACTU-F02): one at most, its material sealed (``certificates.seal``). Going
     live with it needs the AEAT's test environment to have accepted it (``aeat_proof``, VERIFACTU-F08)."""
 
     class Proof(models.TextChoices):
@@ -156,8 +155,6 @@ class OwnCertificate(UUIDModel):
     uploaded_at = models.DateTimeField(_("uploaded at"), default=timezone.now)
     uploaded_by = models.CharField(_("uploaded by"), max_length=ACTOR_MAX_LENGTH, blank=True)
     sealed_blob = models.BinaryField(_("sealed certificate"), editable=False)
-    issuer_recognised = models.BooleanField(_("issued by a recognised authority"), null=True, editable=False)
-    checked_list = models.PositiveIntegerField(_("trusted list checked against"), null=True, editable=False)
     aeat_proof = models.CharField(
         _("AEAT test"), max_length=8, choices=Proof.choices, default=Proof.UNTESTED, db_default=Proof.UNTESTED,
         editable=False,
@@ -689,6 +686,7 @@ EVENT_MESSAGES = {
         "Own certificate of %(holder)s (%(holder_tax_id)s) uploaded; it expires on %(expires_on)s."
     ),
     "certificate_removed": _("Own certificate of %(holder)s (%(holder_tax_id)s) removed."),
+    # No longer written: the events already in the trail still read with it.
     "certificate_refused": _(
         "Own certificate of %(holder)s (%(holder_tax_id)s) no longer counts: no authority the AEAT recognises "
         "issued it. Upload a valid one."
