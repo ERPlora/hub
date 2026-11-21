@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:be347a5d668f548e35615691da26f31a881c430a102b259a48436b47ad12cc4a -->
+<!-- generated from WORKBOOK.md sha256:6fcbe83deb2363de0e6333d787757ea977ff8b6e3a697b5b14674f900bf0270d -->
 
 ## What it is for and who it is for
 
@@ -436,7 +436,7 @@ On the Employees screens and the API documentation:
 | BASE-F113 | Keep warning with the screen off (Android app) | done |
 | BASE-F114 | Put a business back as it was at a past moment from the Hub admin | done |
 | BASE-F115 | See the help of a module's screen | done |
-| BASE-F116 | Read what is new in ERPlora | partial |
+| BASE-F116 | Read what is new in ERPlora | done |
 
 ### BASE-F01 See what the business still has to set up
 Status: done
@@ -3279,18 +3279,17 @@ translated into the person's language, or its translation fell behind, the help 
 Involved: BASE-F92, BASE-F93
 
 ### BASE-F116 Read what is new in ERPlora
-Status: partial — what is new can already be read through the assistant and the API, but System › Updates does not
-show it yet (hub#576)
+Status: done
 Actor: owner, administrator, manager, employee
 Screen: System · Updates
 Steps:
   1. In the "Updates" tab, below the version and its date (BASE-F41), comes "What's new": what has changed in ERPlora
      that the business notices, the most recent first. Whoever does not run the business sees it too: it says nothing
-     about the business.
-  2. Each item says its day, whether it is something new, an improvement or a fix, a short title and one or two
-     sentences on what can be done now. They are notes written for the business, never the list of changes to the
-     code.
-  3. The 20 most recent come first; "See more" brings the earlier ones.
+     about the business. While it loads: "Reading what's new…".
+  2. Each item says its day, whether it is something new, an improvement or a fix ("New", "Improved" or "Fixed"), a
+     short title and one or two sentences on what can be done now, just as they were written. They are notes written
+     for the business, never the list of changes to the code.
+  3. The 20 most recent are shown, with no pages.
   4. With none, it says "Nothing new yet.".
   5. Through the assistant, "what's new in ERPlora?" or "what changed in the latest update?" reads them the same way,
      in the person's language.

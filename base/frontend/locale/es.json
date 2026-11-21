@@ -463,6 +463,17 @@
         "releasedAt": "Actualizado el {date}.",
         "unknownDate": "No sabemos cuándo se publicó esta versión."
       },
+      "releaseNotes": {
+        "heading": "Novedades",
+        "loading": "Consultando las novedades…",
+        "empty": "Todavía no hay novedades.",
+        "error": "No se pudieron cargar las novedades",
+        "kinds": {
+          "new": "Nuevo",
+          "improved": "Mejora",
+          "fixed": "Arreglo"
+        }
+      },
       "failed": {
         "heading": "Eventos caídos",
         "hint": "Arregla la causa (un permiso, una app parada…) y reenvía. El evento no se edita: si la causa sigue, vuelve a caer aquí.",

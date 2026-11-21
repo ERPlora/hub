@@ -463,6 +463,17 @@
         "releasedAt": "Updated on {date}.",
         "unknownDate": "We do not know when this version was published."
       },
+      "releaseNotes": {
+        "heading": "What's new",
+        "loading": "Reading what's new…",
+        "empty": "Nothing new yet.",
+        "error": "Could not load what's new",
+        "kinds": {
+          "new": "New",
+          "improved": "Improved",
+          "fixed": "Fixed"
+        }
+      },
       "failed": {
         "heading": "Failed events",
         "hint": "Fix the cause (a permission, an app that is off…) and resend. The event is never edited: if the cause is still there, it fails again and comes back here.",
