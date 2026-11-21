@@ -322,6 +322,25 @@ def test_a_day_brings_the_business_hours_and_marks_the_slots_that_start_closed()
     assert in_hours == {lunch.id: True, dinner.id: False}
 
 
+def test_a_closed_day_after_a_night_past_midnight_says_closed_not_the_eve_hours():
+    # Friday 13:00–01:00 belongs to Friday, as every hours listing shows it: Saturday, closed in
+    # Schedules, has no hours of its own, the same as its slots and the booking judge it.
+    set_week_hours([("13:00", "01:00")], days=[4])
+    set_week_hours([], days=[5])
+    make_slot(5, "16:00", "23:00")
+    day = run("reservation.availability.day", {"date": "2026-10-17"})
+    assert (day.hours_restricted, day.spans, day.slots[0].in_hours) == (True, [], False)
+
+
+def test_a_day_after_a_night_past_midnight_shows_only_its_own_hours():
+    set_week_hours([("13:00", "01:00")], days=[4])
+    set_week_hours([("13:00", "23:30")], days=[5])
+    day = run("reservation.availability.day", {"date": "2026-10-17"})
+    assert [(span.start, span.end) for span in day.spans] == [
+        (dt.datetime(2026, 10, 17, 13, 0), dt.datetime(2026, 10, 17, 23, 30))
+    ]
+
+
 def test_the_default_week_nobody_confirmed_does_not_restrict():
     # Schedules ships Monday to Friday 09:00–18:00 until the business saves or confirms its week: a
     # restaurant that never opened Schedules must still book its dinners.

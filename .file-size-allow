@@ -69,7 +69,7 @@
 1121 apps/printing/services.py ERPlora/erplora-next#74
 1115 apps/printing/tests/test_services.py ERPlora/erplora-next#74
 390 apps/reservation/frontend/operations.d.ts ERPlora/erplora-next#74
-1034 apps/reservation/queries.py ERPlora/erplora-next#74
+1031 apps/reservation/queries.py ERPlora/erplora-next#74
 891 apps/reservation/schemas.py ERPlora/erplora-next#74
 1521 apps/reservation/services.py ERPlora/erplora-next#74
 1035 apps/reservation/tests/test_services.py ERPlora/erplora-next#74
