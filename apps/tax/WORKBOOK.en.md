@@ -1,6 +1,13 @@
-<!-- generated from WORKBOOK.md sha256:037989c4bfacce5b6f4ce89721e7453638f02196c0543feef22d6788a9669b96 -->
+<!-- generated from WORKBOOK.md sha256:5a826c5b81e20b884f726c02aee85033e8dbee76a936a2e4a25483c6be937a63 -->
 
 ## What it is for and who it is for
+
+Taxes says how much VAT each thing you sell carries: the tax categories of your products and services, the rate of
+each one in your country and from which day, and the texts the product importer recognises as a category. It comes
+ready with Spain's rates: you check it when setting up the business and touch it when a rate changes. The till and
+the invoices charge with what it says here.
+
+### In detail
 
 Taxes keeps what says how much VAT each thing that is sold carries:
 
@@ -92,6 +99,12 @@ in Rules, so do the row actions. The app requires the permission on every action
 the button.
 
 ### Categories
+Here are the tax categories your products, your services and your menus point to: their key, which never changes,
+their name and the rate charged today in your country ("21.00%", "Exempt"…). The ones of origin "System" come from
+the factory; the "Custom" ones you create with **+**. Search by key or by name, or filter by column. While your
+country has no rate in force, the "Your taxes" notice shows at the top for whoever can manage them.
+
+#### Detail
 Table with Key, Name, Description, Origin ("System" or "Custom"), Active and the rate in force in the
 business's country ("21.00%", "Exempt"…). Search "Search key or name…" (key, name and description, stored
 or translated), column filters (Key, Name, Description and Origin) and sorting by any column; 50 per page,
@@ -100,6 +113,13 @@ with the text that was typed. A **+** button that opens the creation panel (Key,
 No row actions.
 
 ### Rules
+Here is the rate of each category in each country or region and from which day it applies, with its qualification:
+subject, exempt, not subject or reverse charge. An equivalence surcharge shows right under its rule. With **+** you
+create a rule. A rule is not edited: to change a rate, tap "Set end date" on its row and create the new one from the
+next day; "Deactivate" stops applying it. At first the active ones show, and the Status filter shows the deactivated
+ones.
+
+#### Detail
 Table with Category, Country, Region, %, Type, Qualification (with the exemption reason if there is one),
 Valid from, Valid to and Active. A component (the surcharge) shows right under its root rule, as
 "↳ label". Search "Search category or country…" and filters for Country, Region, Category, Type,
@@ -110,11 +130,22 @@ Exemption reason —only if it is exempt—, Regime, Valid from, Valid to, "Root
 "Restore".
 
 ### Aliases
+Here are the outside texts, such as "food", "beer" or "IVA 10", that the product importer understands as a tax
+category. The "Shipped" ones come with the app; the "Learned" ones are saved when, while importing, you say which
+category a text is, or you add them with **+**.
+
+#### Detail
 Table with Alias, Category, Source ("Shipped" or "Learned") and Active. Search "Search alias or category…",
 filters for Alias, Category and Source and sorting by any column. A **+** button with the creation panel
 (Alias, Category, Source —"Learned" at first—, "Add").
 
 ### Settings
+Here you choose the business's tax region: the whole country, with VAT, or, in Spain, the Canary Islands (IGIC), Ceuta
+(IPSI) or Melilla (IPSI). The country is the one of your ERPlora account and is not changed here. In the Canary
+Islands, Ceuta and Melilla only the rules of their region are charged, never the national VAT. Whoever only views
+taxes sees the region without being able to change it.
+
+#### Detail
 "Your business's tax region": the business's "Country", read only ("It is the country of your ERPlora
 account."), and the "Tax region" dropdown with "Whole country (VAT)", "Canary Islands (IGIC)", "Ceuta
 (IPSI)" and "Melilla (IPSI)", with its explanation below, and "Save" ("Tax region saved."). The regions are
@@ -168,7 +199,7 @@ Status: done
 Actor: owner, administrator, manager, employee
 Screen: Categories
 Steps:
-1. Open **Taxes → Categories**.
+1. Open **Taxes**, on the **Categories** tab.
 2. Search by key or name, or filter by Origin ("System" or "Custom").
 3. Read the Key: it is what products and services keep and it never changes; the Name is only a label. The
    rate column says what is charged today in the business's country.
@@ -186,14 +217,14 @@ Screen: Categories
 Steps:
 1. In Categories tap **+**.
 2. Type the Key (lower case; starts with a letter; letters, digits, dots and underscores; up to 80; for
-   example `product.books`) and the Name; the Description is optional.
+   example "product.books") and the Name; the Description is optional.
 3. Tap "Add". The panel closes and the category shows in the table as "Custom".
 In: key, name and description that the person types.
 Out: the category, unique by key in the business; Taxes announces that there is a new category
 (`tax.category.created`). It brings no rule: until one is created (TAX-F04), a sale of that category is
 refused. Inventory also creates it when somebody chooses "Create" when importing a file (TAX-F15).
 If it fails: a key with another shape or an empty name show below their field; a key that already exists,
-"There is already a tax category with that key." below the Key. The reason of a field goes as soon as that field is corrected, even if another one says the same (hub#888). Nothing is saved.
+"There is already a tax category with that key." below the Key. The reason of a field goes as soon as that field is corrected, even if another one says the same. Nothing is saved.
 Involved: INVENTORY-F09
 
 ### TAX-F03 View and filter the rules
@@ -201,10 +232,9 @@ Status: done
 Actor: owner, administrator, manager, employee
 Screen: Rules
 Steps:
-1. Open **Taxes → Rules**: the active ones show.
+1. Open **Taxes**, on the **Rules** tab: the active ones show.
 2. Search by category or country, or filter by Country, Region, Category, Type or Qualification.
-3. Choose Status "Deactivated" (or "All") to see the deactivated ones; their row offers "Restore"
-   (TAX-F08).
+3. Choose Status "Deactivated" (or "All") to see the deactivated ones; their row offers "Restore".
 4. Recognise a component (surcharge) because it shows right under its root rule.
 In: nothing; it reads the business's rules.
 Out: nothing (read only).
@@ -233,11 +263,11 @@ the Canary Islands, Ceuta and Melilla, where only their region's applies (the na
 there); a rule of another region is never used. Sales already made do not change (TAX-F07).
 If it fails: two active rules of the same category, country and region cannot be in force on the same day:
 the refusal shows in "Valid from" with "It overlaps another active rule of this country, region and
-category…" (it is solved with TAX-F07 or TAX-F08). A country that does not exist, a region of another
+category…" (it is solved by setting an end date on the other rule or deactivating it). A country that does not exist, a region of another
 country, a % outside 0–100, a "Valid to" before "Valid from" or a category that does not exist show below
 their field. A rule of the same country, region and category that starts the same day as another one
 already saved, even a deactivated one: "There is already a rule of this country, region and category from
-that day, perhaps deactivated: reactivate it or start this one another day.", in "Valid from". The reason of a field goes as soon as that field is corrected, even if another one says the same (hub#888).
+that day, perhaps deactivated: reactivate it or start this one another day.", in "Valid from". The reason of a field goes as soon as that field is corrected, even if another one says the same.
 Nothing is saved.
 Involved: INVOICE-F01, SALE-F01
 
@@ -246,7 +276,7 @@ Status: done
 Actor: owner, administrator, manager
 Screen: Rules
 Steps:
-1. In Rules tap **+** and fill in country, category and type as in TAX-F04.
+1. In Rules tap **+** and fill in the country, the category and the type as in any rule.
 2. In Qualification choose "Exempt", "Not subject", "Not subject (place of supply)" or "Reverse charge". The
    % is set to 0 and locked, with the note "This operation carries no tax, so its rate is 0 %.".
 3. If it is "Exempt", type the Exemption reason (up to 10 characters, for example E1); the Regime is
@@ -265,7 +295,7 @@ Status: done
 Actor: owner, administrator, manager
 Screen: Rules
 Steps:
-1. Create the category's main rule first (TAX-F04): it is the root.
+1. Create the category's main rule first: it is the root.
 2. In Rules tap **+**, choose the same Country, Region and Category and type the surcharge's % (for example
    5.2).
 3. Choose the Type "Surcharge"; in "Root rule (component of)" choose the root and type the "Component label"
@@ -286,7 +316,7 @@ Screen: Rules
 Steps:
 1. In the row of the rule in force tap "Set end date".
 2. Type the last day it applies (the day before the new rate starts) and tap "Save end date".
-3. Create the new rule (TAX-F04) with "Valid from" the next day.
+3. Create the new rule with **+** and "Valid from" the next day.
 4. The table shows both with their dates; from the day of the change new sales use the new one.
 In: the end date (included) and the data of the new rule.
 Out: the rule with its end date (`tax.rule.ended`). A sale already made keeps its rate: the sale line keeps
@@ -319,14 +349,14 @@ Involved: SALE-F01
 ### TAX-F11 Set up a business in the Canary Islands, Ceuta or Melilla
 Status: done
 Actor: owner, administrator, manager
-Screen: Settings and Rules
+Screen: Settings, Rules
 Steps:
-1. In **Taxes → Settings** choose the business's "Tax region": "Canary Islands (IGIC)", "Ceuta (IPSI)" or
+1. In **Taxes**, on the **Settings** tab, choose the business's "Tax region": "Canary Islands (IGIC)", "Ceuta (IPSI)" or
    "Melilla (IPSI)", and tap "Save": "Tax region saved." shows. The "Country" is the one of the business's
    ERPlora account.
 2. In Rules create one rule for each category you sell: Country "Spain", the Region (ES-CN Canary Islands,
    ES-CE Ceuta or ES-ML Melilla), the region's % and the Type "IGIC (Canary Islands)" or "IPSI
-   (Ceuta/Melilla)" (TAX-F04).
+   (Ceuta/Melilla)".
 3. Create a rule of the region for each category you sell: in the Canary Islands, Ceuta and Melilla the
    national VAT never applies, so a category without a rule of its region cannot be charged until it has
    one. The VAT rules do not need to be deleted: they are used again with "Whole country (VAT)".
@@ -371,7 +401,7 @@ Status: done
 Actor: owner, administrator, manager, employee
 Screen: Aliases
 Steps:
-1. Open **Taxes → Aliases**.
+1. Open **Taxes**, on the **Aliases** tab.
 2. Search by alias or category, or filter by Category or Source.
 In: nothing; it reads the business's aliases.
 Out: nothing (read only).
@@ -384,14 +414,14 @@ Actor: owner, administrator, manager
 Screen: Aliases
 Steps:
 1. In Aliases tap **+**.
-2. Type the Alias (the text that comes from outside, for example `comida`), type part of the Category's
+2. Type the Alias (the text that comes from outside, for example "comida"), type part of the Category's
    name and choose it from the list, and choose the Source ("Learned" at first).
 3. Tap "Add".
 In: the outside text, the category and the source that the person chooses.
 Out: the alias, kept in lower case and without extra spaces, unique in the business (`tax.alias.created`).
 The next Inventory import understands it, however it is written.
 If it fails: an alias that already exists: "That alias already exists." below the Alias; a category that
-does not exist, below the Category. The reason of a field goes as soon as that field is corrected, even if another one says the same (hub#888). Nothing is saved.
+does not exist, below the Category. The reason of a field goes as soon as that field is corrected, even if another one says the same. Nothing is saved.
 Involved: INVENTORY-F09
 
 ### TAX-F15 Tell the Inventory importer which category a text is
@@ -435,7 +465,7 @@ Involved: none
 ### TAX-F17 Warn that rates are missing for the business's country
 Status: done
 Actor: owner, administrator, manager
-Screen: Home, Categories, Rules and Aliases
+Screen: Home, Categories, Rules, Aliases
 Steps:
 1. On the **Home**, while no active root rule of the business's country is in force today, "Finish setting
    up your business" brings "Your taxes" ("Set up the VAT rates of the country you sell in so the till can price a sale."),
@@ -444,7 +474,7 @@ Steps:
    shows, only for whoever can manage taxes. In a country Taxes brings no factory rules for (all but Spain)
    it says instead "Portugal does not come with its tax rates ready: create in Rules the rate of each
    category you sell so the till can price a sale.", with the name of its country.
-3. Tap "Set up": it takes you to the Rules tab, where the missing one is created with **+** (TAX-F04). In
+3. Tap "Set up": it takes you to the Rules tab, where the missing one is created with **+**. In
    Rules the notice carries no button.
 4. As soon as an active root rule of the business's country is in force today, the notice disappears by
    itself and the step of the Home is "Done" without a reload.
@@ -458,7 +488,7 @@ Changing the tax region (TAX-F11) does not move it.
 If it fails: a single rule of the business's country, of any category, is enough to consider it done. It
 counts those of any region of the country: a Canary Islands business without any IGIC rule does not see the
 notice,
-although the till explains the reason when charging and the help of Settings says so (TAX-F11). An exempt or
+although the till explains the reason when charging and the help of Settings says so. An exempt or
 IGIC rule also counts: a business that only sells exempt services is properly set up.
 Involved: BASE-F01
 

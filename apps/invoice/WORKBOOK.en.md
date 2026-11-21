@@ -1,6 +1,13 @@
-<!-- generated from WORKBOOK.md sha256:da1749d76f3638ed5598e5ba06a7210514b58459a91c76e3bb876b5ad78eb59b -->
+<!-- generated from WORKBOOK.md sha256:d872ddac1df8bcfb201d44666a3a8998d67daa44c6d70d229f808edb21c62ea7 -->
 
 ## What it is for and who it is for
+
+Invoicing turns every charged sale into a numbered fiscal document and keeps it forever: the ticket of every charge,
+the full invoice when the customer gives their tax ID and the rectifying invoice when money is refunded or a document
+was wrong. Here you search and view your invoices, issue one by hand, keep your numbering series and write your
+business's fiscal details.
+
+### In detail
 
 Invoicing turns every charged sale into a **numbered fiscal document** and keeps it forever: the
 **ticket** (simplified invoice, F2) of every charge, the **full invoice** (F1) when the customer gives
@@ -10,7 +17,7 @@ the link between Sales and VeriFactu in the Spanish fiscal chain (sale → invoi
 → AEAT): this is where the series number that later travels to the tax agency is born. It serves the
 restaurant and the hair salon alike: nothing in it belongs to one vertical.
 
-Who uses it:
+### Who uses it and what each one does
 
 - The **employee** looks at the invoices, prints them, issues an invoice by hand, turns a ticket into a
   full invoice and marks an invoice as paid.
@@ -81,6 +88,12 @@ Initial setup, step by step:
 ## Screens
 
 ### Invoices
+All the business's invoices: the tickets of every charge, the full invoices and the rectifying ones, the latest
+issued on top. Search them by number, customer or tax ID, filter them by status, type, series, date or total, and
+open them to view, print or save them as a PDF. From each one you mark it paid, rectify it or turn a ticket into a
+full invoice; **+** issues an invoice by hand.
+
+#### Detail
 Menu **Invoicing → Invoices**. Table paginated 50 at a time (table or card view; on the phone, cards
 with the number as title) with "Number", "Customer", "Total", "Status", "Date" and "Type"; every column
 sorts. Search box "Search invoices…" (number, name or tax ID of the customer) and filters for "Status",
@@ -96,7 +109,7 @@ rectified or paid on any device.
 Empty: "No invoices yet.". Loading: "Loading…". Error: the message with "Retry". A refusal of a row
 action shows as a notice above the table.
 
-### Invoice detail
+#### Invoice detail
 Opens from a row of **Invoices** (`/invoice/invoices/<id>`). On top, "Invoice {number}" with the status
 tag and the buttons "Print / PDF" and "← Back". If it is a full invoice, or a rectifying invoice of a full
 invoice, without the customer's tax ID, the notice "This invoice has no customer tax ID: the ticket
@@ -117,7 +130,7 @@ the test environment), the "CSV" once the AEAT has answered, the QR and "Check a
 Without VeriFactu, without a record yet or without permission, the card does not show.
 Error when opening: "Invoice not found" or the message of the failure, with "← Back".
 
-### Rectify
+#### Rectify
 Window opened by "Rectify", from the row or from the detail. Title "Rectify {number}", the note "A
 rectifying invoice (RECT series) will be issued with the amounts negated and the original invoice will be
 cancelled. This cannot be undone.", the "Type of rectifying invoice" (R1 to R4; on a ticket, always R5,
@@ -126,13 +139,13 @@ goes) and "Cancel". Three endings inside the same window: the translated refusal
 cannot be rectified ("A rectifying invoice cannot be rectified.", "The invoice is already cancelled.")
 and the result "Rectifying invoice {number} issued. {original} is cancelled.", each with "Close".
 
-### Full invoice (replace a ticket)
+#### Full invoice (replace a ticket)
 Window opened by "Full invoice" on the detail of a ticket. Title "Full invoice of ticket {number}", the
 customer search of Customers (it fills in the details) and "Name or company name", "Country", "Document
 type" (only outside Spain), "Tax ID" and "Address", all mandatory except the type. "Issue full invoice"
 and "Cancel". On issuing, the window closes and the detail opens the new F3.
 
-### Ask for the ticket's invoice (public page)
+#### Ask for the ticket's invoice (public page)
 The customer opens it, without an account, with their ticket's code (`/p/<business>/invoice/<code>`, INVOICE-F04).
 Title "Request your invoice". At the top, "Ticket {number}" with "Business", "Date" and "Total". Below,
 "Enter your tax details to get the full invoice for this ticket.", the same fields as in "Full invoice" without the
@@ -146,7 +159,7 @@ Loading: "Loading your ticket…". Error: the server's reason (a code that opens
 registered or too many attempts), with "Retry" except when the code opens nothing or has expired; with no answer
 from the server, "The ticket could not be loaded. Try again.".
 
-### New manual invoice
+#### New manual invoice
 Window with the "Series" (the active ones of the year that issue F1 or F2; at first, the default one or
 FACT), the customer search of Customers, "Customer", "Customer tax ID", "Address", "Country", "Notes" and
 the lines: "Description", "Qty" (1 at first; it takes decimals), "Price" (without tax, in the business's
@@ -159,6 +172,11 @@ currency and every line has a description, quantity, price and rate. A refusal s
 field.
 
 ### Series
+The series your documents are numbered with, each with its code, type, year, prefix and the number it has reached.
+They are created by themselves with your first sale: create or change one only if you want another prefix or
+another format, or to continue the numbering you brought from another system. Only whoever keeps the series sees it.
+
+#### Detail
 Menu **Invoicing → Series** (only with permission to keep the series). The intro "Each series sets the
 prefix, the format and the counter of the numbering of one invoice type and one year…" and a table with
 "Code", "Name", "Type", "Year", "Prefix", "Format" (empty reads `PREFIX-YYYY-NNNNNN`), "Current no.",
@@ -171,6 +189,11 @@ continue another system’s numbering.". Loading: "Loading series…".
 Error: "Could not load the series" with "Retry".
 
 ### Issuer
+Your business's fiscal details that appear on every invoice: legal name, tax ID and full address. Without them no
+ticket or invoice is issued. Only the owner and the administrator change them; the others see them without being
+able to edit them.
+
+#### Detail
 Menu **Invoicing → Issuer**. "Legal name", "Tax ID", "Address", "Postal code", "City", "Province" and
 "Country", and "Save". On top, if it is not complete yet, "Without the issuer no invoice can be issued.";
 if the ERPlora account sent it, "Received from your ERPlora account on {date}.". Only the owner and the
@@ -307,20 +330,20 @@ price, closed once per rate and spread over the lines by largest remainder (the 
 printed total), and as the description of the operation its items ("Curso de corte, Kit de tinte", up to
 500 characters); announces `invoice.invoice.issued`.
 If it fails: inside the window, above the buttons: "A full invoice needs the customer's name, tax ID and
-address.", "That tax ID is not valid." (under the field), "Line {n}: the price is not an amount…", a line
+address.", "That tax ID is not valid." (under the field), "Line 2: the price is not an amount…", a line
 with a price that comes to 0.00, a series that is inactive, does not issue invoices or belongs to another
 year ("That series numbers another year…"), a ticket above the Sales limit ("Above €3,000.00 a ticket
 cannot be issued…", RD 1619/2012 art. 4), or the missing issuer. A line with a tax category (through the API
 or the assistant) that has no rule in force in the business's territory is refused on that line's field, naming the category as Taxes names
-it in the reader's language (e.g. "Product — generic", never its key `product.generic`) and with "Create its
-rule in Taxes › Rules." (hub#1149). Nothing is issued, no number is used,
+it in the reader's language (e.g. "Product — generic") and with "Create its
+rule in Taxes › Rules.". Nothing is issued, no number is used,
 and what was typed is kept. A field's message goes as soon as that field is corrected (also when a
 customer's card fills it, and the tax ID's when the country or the document type changes), the notice
 that only points at fields as soon as anything is changed, and both come back if the next try is refused
 too. If the tax territory cannot be read, the rate is called "Tax %", comes empty and warns "Could not
 read the business’s tax territory: type the rate of each line."; the invoice is issued anyway, with the
 territory's tax. If the currency cannot be read, the window says so ("The business's currency could not be read", with the
-reason) and offers "Retry", which asks for it again; as soon as it arrives, "Issue invoice" lights up (hub#938).
+reason) and offers "Retry", which asks for it again; as soon as it arrives, "Issue invoice" lights up.
 Involved: TAX-F18, CUSTOMER-F17, TAX-F11
 
 ### INVOICE-F04 The customer asks for the full invoice of their ticket
@@ -428,14 +451,14 @@ Actor: manager, administrator, assistant
 Screen: Rectify
 Steps:
 1. In **Invoices** (row) or on the detail, tap "Rectify" on an invoice that is not a rectifying invoice
-   and is neither cancelled nor replaced; or ask the assistant ("rectifica la factura FACT-2026-000003
-   porque el precio estaba mal") and go on at step 4.
+   and is neither cancelled nor replaced; or ask the assistant ("rectify invoice FACT-2026-000003 because
+   the price was wrong") and go on at step 4.
 2. Choose the "Type of rectifying invoice" (R1 at first: error founded in law and art. 80 One, Two and Six
    LIVA; R2 insolvency proceedings; R3 bad debts; R4 others; a ticket always R5), type the "Reason" and
    tap "Issue rectifying invoice" (a second click issues no other).
-3. The window says "Rectifying invoice {number} issued. {original} is cancelled.". On closing it, the
-   original shows "Cancelled" and the list has a new "Rectifying" dated today, with the original's
-   amounts and lines negated and the note "Rectifies invoice {number}. Reason: {reason}".
+3. The window says, for example, "Rectifying invoice RECT-2026-000001 issued. FACT-2026-000003 is cancelled.". On
+   closing it, the original shows "Cancelled" and the list has a new "Rectifying" dated today, with the original's
+   amounts and lines negated and the note "Rectifies invoice FACT-2026-000003. Reason: the price was wrong".
 4. With the assistant, before issuing anything it shows you the rectifying invoice about to be born: the
    invoice it rectifies (number, date and customer), the type (R1 at first, R5 if it is a ticket), the
    reason, the next number of the year's "RECT" series (it is not reserved: it takes it when issued),
@@ -466,7 +489,7 @@ first and is refused without using a number. Without permission the action does 
 assistant, on a rectifying invoice, a cancelled one or a replaced ticket, it tells you why with those
 same notices and the confirmation does not come; if another rectifying invoice is issued between the
 preview and your confirmation, yours is not issued: the confirmation comes again with the next number,
-and it is issued with it once you confirm (BASE-F97); if another device rectifies that invoice before
+and it is issued with it once you confirm; if another device rectifies that invoice before
 you confirm, no other is issued: "The invoice is already cancelled." comes.
 Involved: SALE-F31
 
@@ -541,9 +564,9 @@ Screen: Series
 Steps:
 1. In **Invoicing → Series**, tap **+**: "New numbering series" opens.
 2. Type "Code" (capitals, digits, hyphen or underscore), "Name", "Invoice type" (from F1 to R5), "Year"
-   (at first, the business's), "Prefix" (empty = the code), if you want "Number format" (placeholders
-   `{prefix}`, `{code}`, `{year}`, `{seq}` and `{seq:01d}`…`{seq:09d}`; empty is `PREFIX-YYYY-NNNNNN`)
-   and "Next number" (1 at first; another to continue the numbering of another system). Choose "Active"
+   (at first, the business's), "Prefix" (empty = the code), if you want "Number format" (the
+   placeholders it takes show under the field; empty, the number comes out like "FACT-2026-000001") and
+   "Next number" (1 at first; another to continue the numbering of another system). Choose "Active"
    and "Default series".
 3. Tap "Create series". The window closes and the series appears with "Current no." one less than the
    next number.
@@ -553,9 +576,9 @@ and refunds to use it, the code has to be TICKET, FACT or RECT; with another cod
 entry (if its type is F1 or F2).
 If it fails: an empty code or one with another shape, a format without the year or without a sequence
 placeholder, with a line break, or a prefix or format with accents or symbols such as º or ª, show under
-their field (the number is VeriFactu's `NumSerieFactura`: printable ASCII only); a code of another shape
-(`E2E-?`) says what it takes, "Use only letters without accents, digits, hyphens (-) and underscores (_),
-starting with a letter or a digit.", to the assistant too, which shows no card (hub#872); numbers that with
+their field (the number travels to VeriFactu, which only takes letters without accents, digits and plain signs);
+a code of another shape ("E2E-?") says what it takes, "Use only letters without accents, digits, hyphens (-) and underscores (_),
+starting with a letter or a digit.", to the assistant too, which shows no card; numbers that with
 the widest sequence would go over 60 characters, "The numbers of this series would not fit in 60 characters…"
 under the prefix or the format; a code that already exists that year, "There is already a series with
 that code that year.". Each refused field, the invoice type too, is marked red with its message under it
@@ -569,7 +592,7 @@ Status: done
 Actor: manager, administrator
 Screen: Series
 Steps:
-1. In **Series**, tap "Edit" on the row (or the whole row): "Edit series {code}" opens.
+1. In **Series**, tap "Edit" on the row (or the whole row): "Edit series FACT" opens.
 2. Change "Name", "Active", "Default series" and, while the series has issued nothing, "Prefix", "Number
    format" and "Next number". "Code", "Invoice type" and "Year" are locked.
 3. Look at "Next number": it is exactly the number the next document will carry, computed by the server
@@ -593,7 +616,7 @@ Steps:
    numbers will carry. If you are coming from another system, continue its numbering instead of starting
    again at 1.". Only whoever keeps the series sees it.
 2. "Set up" opens **Invoicing → Series**. If you want another prefix, another format or to continue the
-   numbering of another system, create the year's series there (INVOICE-F12); if not, there is nothing to
+   numbering of another system, create the year's series there; if not, there is nothing to
    do: the series are created by themselves with the first document.
 3. As soon as the business has its first series, created by hand or born with the first document, the step
    becomes "Done" without reloading, and stays done in the following years (a new year's series inherits
@@ -633,11 +656,11 @@ Steps:
 2. Type in "Search invoices…" a number, a customer's name or a tax ID; or filter (status, type, series,
    source, date, total); or tap a column to sort.
 3. The table shows the matching ones, 50 at a time; the latest issued, on top.
-4. Tap "View", or the row, to open it (INVOICE-F17).
+4. Tap "View", or the row, to open it.
 In: the hub's invoices.
 Out: nothing; it only reads.
 If it fails: without results, "No results"; with an error, the message and "Retry". The total is read as in
-any amount field of the Hub and as in the other lists (hub#1196: "1.000,50", "1,000.50", "2 500" and
+any amount field of the Hub and as in the other lists ("1.000,50", "1,000.50", "2 500" and
 "12,50 €" filter); one it cannot read says so under its field in the words of the amount field ("This is not
 an amount. Type a figure, for example 12.50.", "This amount cannot be negative." or, with "1.000" in euros,
 "This amount can be read in two ways…"), and an end date before the start date, "The end date cannot be
@@ -654,7 +677,7 @@ Steps:
    "Disc." column with the discount without VAT), the breakdown and the totals.
 3. With **VeriFactu**, read below the "VeriFactu receipt": the status of the record at the AEAT, its
    "CSV" once the AEAT has answered and the QR, which can be scanned or opened with "Check at the tax
-   agency ↗" (in the installed app, in the device's browser: VERIFACTU-F18).
+   agency ↗" (in the installed app, in the device's browser).
 4. "Rectifies", "Replaces", "Replaced by" and the rectifying invoices open the linked document.
 5. "← Back" goes back to the list.
 In: the invoice and its lines and, with VeriFactu, its record.
@@ -672,11 +695,11 @@ Screen: Invoice detail
 Steps:
 1. On the detail, tap "Print / PDF".
 2. With **Printing** and an active system printer with the Receipt function, the A4 invoice goes to that
-   printer, with the VeriFactu QR if it has its record, and "Sent to <printer>." reads (PRINTING-F08).
+   printer, with the VeriFactu QR if it has its record, and, for example, "Sent to Office." reads.
 3. If not (without Printing turned on, without a system printer, or if its VeriFactu record could not be
    read for that printer), the device's print dialog opens (the browser's or, in the installed app, its
-   print screen: the system's dialog, with the printer or "Save as PDF", and the job named "Invoice
-   <number>") with the A4 invoice (with VeriFactu, on top
+   print screen: the system's dialog, with the printer or "Save as PDF", and the job named, for example,
+   "Invoice FACT-2026-000003") with the A4 invoice (with VeriFactu, on top
    the record's QR with "QR tributario:" and "VERI*FACTU", fixed in Spanish by the AEAT; issuer, "Bill
    to", lines, breakdown per rate, totals and the note of what it rectifies), from where it can be saved
    as PDF. While the record arrives, "Print / PDF" waits: the paper never goes out without its QR.
@@ -697,7 +720,7 @@ Screen: Invoices, Invoice detail
 Steps:
 1. In **Invoices** (row) or on the detail, tap "Mark as paid" on an "Issued" invoice; or ask the assistant
    ("mark invoice FACT-2026-000001 as paid", "Carpintería Lema has paid their invoice") and go on at step 4.
-2. Confirm in "Mark {number} as paid?" ("The payment is recorded with the current date and time.") with
+2. Confirm in "Mark FACT-2026-000001 as paid?" ("The payment is recorded with the current date and time.") with
    "Mark as paid", or go back with "Cancel".
 3. The invoice becomes "Paid" and the detail shows "Paid on" with the date and the time.
 4. With the assistant, "Run this action?" comes with the invoice by its number; tap "Run" and it becomes
@@ -744,8 +767,7 @@ Out: the issuer, which is copied into every document issued from now on (those a
 change); announces `invoice.issuer.updated`.
 If it fails: without legal name, tax ID or address, under its field; a Spanish tax ID that is not valid,
 "That tax ID is not valid.". A field's reason goes as soon as that field is corrected and comes back if the
-next try is refused too; a refusal that names no field shows above the form and stays until the next try
-(hub#854).
+next try is refused too; a refusal that names no field shows above the form and stays until the next try.
 Involved: none
 
 ### INVOICE-F23 Issue ERPlora's invoices (platform hub)

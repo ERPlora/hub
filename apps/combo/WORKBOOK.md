@@ -9,6 +9,12 @@ Estado de la app: completa (2026-10-21)
 
 ## Para qué sirve y para quién
 
+Menús y combos vende a un precio cerrado el menú del día, el menú infantil o el bocadillo con bebida para llevar. Cada
+menú tiene sus platos (Primero, Segundo, Bebida…) y cada plato, las elecciones entre tus productos, con un suplemento
+si una cuesta más. El TPV lo cobra con el IVA que toca y cocina recibe cada plato en su estación.
+
+### En detalle
+
 Menús y combos guarda los artículos compuestos que se venden a **precio cerrado**: el menú del día
 («primero + segundo + postre + bebida por 13,50 €»), el menú infantil o el «bocadillo + bebida» para
 llevar. Cada menú tiene **platos** (Primero, Segundo, Bebida…), cada uno con cuántas elecciones pide
@@ -74,6 +80,12 @@ Configuración inicial, paso a paso:
 ## Pantallas
 
 ### Menús
+Aquí están tus menús, con su foto, su precio cerrado, si se toman en el local o se venden para llevar y si están a la
+venta. Con **+** creas uno; en su fila, «Editar datos» lo cambia y «Retirar» lo quita de la venta con sus platos. Toca
+un menú para abrir su constructor: ahí añades sus platos, en cada plato las elecciones con su suplemento, y marcas lo
+que hoy está agotado. Arriba del constructor, un aviso dice si el menú ya sale en el TPV o qué le falta.
+
+#### Detalle
 Menú **Menús**. Tabla de menús con el buscador «Buscar un menú…» (busca por nombre y por nombre de
 cocina), vista de tabla o de tarjetas y columnas: «Foto» (la miniatura, o las iniciales sobre su color),
 Nombre (se ordena y se filtra), «Precio cerrado» (en la
@@ -90,7 +102,7 @@ elija.»), «¿Cómo se vende?» («Se consume en el local
 siempre a la vista y la elegida resaltada), «Tipo de IVA» (solo si es «en el local»), «Orden en la
 lista de menús» y la casilla «A la venta» (marcada de partida), con «Guardar» y «Cancelar».
 
-### Constructor del menú
+#### Constructor del menú
 Se abre al tocar un menú (`/combo/menus/<id>`). La flecha atrás de la barra de arriba vuelve a Menús.
 Arriba de la página, el nombre y el precio del menú (en la moneda del negocio), y un aviso con lo que hará ese menú en el tique: «Este menú se factura como un
 único servicio: una sola línea a su tipo de IVA, tributen como tributen sus componentes.» o «Este menú
@@ -175,29 +187,28 @@ Pantalla: Menús
 Pasos:
 1. En Menús, pulsa **+**.
 2. Escribe el Nombre; si la comanda debe decir otra cosa, el «Nombre de cocina».
-3. Escribe el «Precio cerrado (<moneda>)»: lo que paga el cliente por el menú entero, en la moneda del
+3. Escribe el «Precio cerrado» (en España, «Precio cerrado (EUR)»): lo que paga el cliente por el menú entero, en la moneda del
    negocio y con sus decimales (el yen no tiene). Vacío es 0.
 4. Elige «¿Cómo se vende?»: «Se consume en el local» factura UNA línea al tipo del menú, la bebida
    incluida (el menú del día); «Se vende como producto / para llevar»: si todas las elecciones tributan
-   igual, UNA línea a ese tipo; si no, UNA línea por plato, cada una a su tipo, con el precio repartido
-   (COMBO-F09).
+   igual, UNA línea a ese tipo; si no, UNA línea por plato, cada una a su tipo, con el precio repartido.
 5. Si es «en el local», elige el «Tipo de IVA» del menú entero (en un restaurante, «Restauración —
    comida», al 10 %).
 6. Deja marcada «A la venta» si ya se puede vender y pulsa «Guardar».
 7. El formulario se cierra y el menú aparece en la lista. Todavía no sale en el TPV: le faltan los
-   platos y las elecciones (COMBO-F05, F06).
+   platos y las elecciones, que se añaden tocando el menú para abrir su constructor.
 Entra: nombre, nombre de cocina, precio, forma de venta, tipo de IVA, orden y «A la venta»; las
 categorías de IVA las lee de Impuestos.
 Sale: el menú (avisa: menú nuevo).
 Si falla: «Guardar» está en gris mientras falte el nombre y mientras el negocio no haya dicho todavía su
 moneda, porque el precio se lee en ella (sin ella, «1500» yenes se guardaría como 150 000); hasta entonces, salir del precio
-lo deja como se escribió, sin inventarle decimales ni juzgarlo: «¥1500» o «12,50 zł» no salen en rojo como «Esto no es un importe», y en cuanto llega la moneda se leen en ella (hub#945). Si la moneda no se puede leer, la ventana lo dice («No se ha podido leer la moneda del negocio», con el
-motivo) y ofrece «Reintentar», que la vuelve a pedir; en cuanto llega, «Guardar» se enciende (hub#938). Junto al
+lo deja como se escribió, sin inventarle decimales ni juzgarlo: «¥1500» o «12,50 zł» no salen en rojo como «Esto no es un importe», y en cuanto llega la moneda se leen en ella. Si la moneda no se puede leer, la ventana lo dice («No se ha podido leer la moneda del negocio», con el
+motivo) y ofrece «Reintentar», que la vuelve a pedir; en cuanto llega, «Guardar» se enciende. Junto al
 campo: «El menú necesita un nombre.», «Un menú que se consume en el local
 necesita su propio tipo de IVA: sin él no se puede facturar.», «Este importe no puede ser
-negativo.» (para abaratar una opción, se le pone un suplemento negativo: COMBO-F06), «Esto no es un importe. Escribe
+negativo.» (para abaratar una opción, se le pone un suplemento negativo en el constructor), «Esto no es un importe. Escribe
 una cifra, por ejemplo 12,50.» (también con el símbolo de otra moneda: «13,50 €» en un negocio de
-Polonia) y el de las dos lecturas posibles de un importe («1.250»), que cita lo escrito. Un tipo de IVA que no existe en Impuestos: «Ese tipo de IVA no existe en Impuestos.». El motivo de un campo se quita en cuanto se corrige ese campo, aunque otro diga lo mismo (hub#888). Sin
+Polonia) y el de las dos lecturas posibles de un importe («1.250»), que cita lo escrito. Un tipo de IVA que no existe en Impuestos: «Ese tipo de IVA no existe en Impuestos.». El motivo de un campo se quita en cuanto se corrige ese campo, aunque otro diga lo mismo. Sin
 permiso de gestión no hay botón +.
 Implicados: TAX-F01
 
@@ -224,7 +235,7 @@ Actor: propietario, administrador, responsable, asistente
 Pantalla: Menús
 Pasos:
 1. En la fila del menú, pulsa «Retirar».
-2. Confirma en «¿Retirar este menú?» («{nombre}» deja de estar a la venta, junto con sus platos y sus
+2. Confirma en «¿Retirar este menú?» («Menú del día» deja de estar a la venta, junto con sus platos y sus
    elecciones. Los tiques ya emitidos se siguen leyendo.).
 3. El menú desaparece de la lista, con sus platos y sus elecciones, y el TPV deja de ofrecerlo. Quien
    lo tenga abierto en su constructor ve «Este menú ya no existe».
@@ -232,9 +243,9 @@ Entra: el menú elegido (por id o por nombre).
 Sale: el menú, sus platos y sus elecciones borrados en una sola operación (avisa: menú retirado, con
 su nombre). Los tiques emitidos llevan su copia y se siguen leyendo.
 Si falla: el diálogo dice por qué y sigue abierto; un menú que ya no existe, «Ese menú no existe en
-este negocio.». Una cuenta abierta que ya lo llevaba lo cobra como se pidió (COMBO-F08). Por el asistente, un nombre
+este negocio.». Una cuenta abierta que ya lo llevaba lo cobra como se pidió. Por el asistente, un nombre
 que vale para varios menús o para ninguno no saca tarjeta, y si antes del «sí» otro menú encaja mejor con lo dicho no
-se retira nada y sale la tarjeta nueva (BASE-F97).
+se retira nada y sale la tarjeta nueva.
 Implicados: SALE-F12, COMBO-F15
 
 ### COMBO-F05 Montar los platos de un menú
@@ -254,13 +265,13 @@ Pasos:
    sus elecciones, tras confirmarlo.
 Entra: nombre, mínimo, máximo y repetición.
 Sale: el plato (avisa: plato nuevo, cambiado, reordenado o retirado).
-Si falla: junto al campo: «El plato necesita un nombre.», «El máximo ({max}) queda por debajo del
-mínimo ({min}): nadie podría satisfacer nunca este plato.» y «Ese menú ya tiene un plato «{nombre}».».
+Si falla: junto al campo: «El plato necesita un nombre.», «El máximo (1) queda por debajo del
+mínimo (2): nadie podría satisfacer nunca este plato.» y «Ese menú ya tiene un plato «Primeros».».
 Un mínimo o un máximo por encima de 50 se rechaza, igual que más de 20 platos en un menú («Un menú
 admite como mucho 20 platos.»). Si el servidor rechaza, el formulario lo dice y no pierde lo escrito. Por el
 asistente, al cambiar o retirar un plato dicho por su nombre, un nombre que vale para varios platos o para ninguno no
 saca tarjeta, y si antes del «sí» otro plato u otro menú encaja mejor con lo dicho no se toca nada y sale la tarjeta
-nueva (BASE-F97). Al añadir u ordenar platos de un menú dicho por su nombre, el «sí» vale solo para el menú que enseñó
+nueva. Al añadir u ordenar platos de un menú dicho por su nombre, el «sí» vale solo para el menú que enseñó
 la tarjeta.
 Implicados: COMBO-F15
 
@@ -271,38 +282,38 @@ Pantalla: Constructor del menú
 Pasos:
 1. En la tarjeta del plato, escribe en «Busca un producto…» y elige el producto del catálogo de
    Inventario (busca por nombre y por SKU).
-2. Escribe el «Suplemento (<moneda>)», en la moneda del negocio, si sustituir cuesta más (o menos, con
+2. Escribe el «Suplemento» (en España, «Suplemento (EUR)»), en la moneda del negocio, si sustituir cuesta más (o menos, con
    signo negativo: «-» o el botón «±» al final del campo, porque el teclado decimal de un móvil no tiene
    signo menos) que el precio cerrado; vacío es sin suplemento.
 3. Pulsa «Añadir elección»: entra la última. Para varios de golpe, «Añadir varios»: marca las casillas
-   y pulsa «Añadir N seleccionados» («Añadir 1 seleccionado» con uno; todos entran sin suplemento y en
+   y pulsa «Añadir 3 seleccionados» («Añadir 1 seleccionado» con uno; todos entran sin suplemento y en
    el orden en que se marcaron). Para
    una categoría entera, elígela en «Categoría»: la lista enseña sus productos y «Marcar todos los de
-   «{categoría}» (N)» marca los que el plato aún no ofrece.
+   «Postres» (6)» marca los que el plato aún no ofrece.
 4. Para cambiar el producto o el suplemento de una elección, pulsa su lápiz: el formulario dice
-   «Editando «{producto}». Conserva su posición en el plato.». Con el asa, subir o bajar se reordena;
+   «Editando «Flan». Conserva su posición en el plato.». Con el asa, subir o bajar se reordena;
    la papelera la quita, tras confirmarlo.
 Entra: los productos de Inventario (los activos, que se venden por unidades; también los agotados hoy,
 que se pueden poner en un menú aunque el TPV no los ofrezca hasta que vuelvan).
 Sale: la elección (avisa: elección nueva, cambiada, reordenada o quitada). El suplemento se suma al
 precio cerrado, nunca al precio del producto.
 Si falla: «Elige antes un producto del catálogo.», «Este plato ya ofrece ese producto. Para que se
-pueda elegir dos veces, activa «se puede elegir la misma opción más de una vez».», ««{producto}» está
+pueda elegir dos veces, activa «se puede elegir la misma opción más de una vez».», ««Flan» está
 desactivado en Inventario: actívalo antes de ponerlo en un menú.», «Solo un producto que se vende y se
-cobra por unidades puede ser una elección de menú; «{producto}» se vende por {unidad}.», «Un plato admite
+cobra por unidades puede ser una elección de menú; «Queso curado» se vende por kg.», «Un plato admite
 como mucho 40 elecciones.» y los avisos de
 importe («Esto no es un importe. Escribe una cifra, por ejemplo 1,50, o -0,50 para descontar.» y el de las dos
 lecturas de «1.250»). «Añadir elección» (y «Guardar» al editar) está apagado mientras el negocio no haya dicho todavía
 su moneda: el suplemento se lee en ella, y sin ella «1500» yenes se guardaría como 150 000; hasta entonces, salir
-del suplemento lo deja como se escribió, sin inventarle decimales ni juzgarlo: «¥150» o «-0,50 zł» no salen en rojo como «Esto no es un importe», y en cuanto llega la moneda se leen en ella (hub#945). Si la moneda no
+del suplemento lo deja como se escribió, sin inventarle decimales ni juzgarlo: «¥150» o «-0,50 zł» no salen en rojo como «Esto no es un importe», y en cuanto llega la moneda se leen en ella. Si la moneda no
 se puede leer, el constructor lo dice una vez, encima de los platos («No se ha podido leer la moneda del
 negocio», con el motivo), y ofrece «Reintentar», que la vuelve a pedir; en cuanto llega, el botón se
-enciende (hub#946). «Añadir varios» sin nada marcado: «Marca al menos un producto.»; una búsqueda o una categoría
+enciende. «Añadir varios» sin nada marcado: «Marca al menos un producto.»; una búsqueda o una categoría
 sin productos: «Ningún producto coincide.». Si el catálogo no carga, el buscador lo dice con
 «Reintentar». Un producto que aún no existe se crea antes en Inventario: el buscador lo encuentra en
 cuanto se guarda. Por el asistente, al cambiar o quitar una elección dicha por su producto, un nombre que vale para
 varias elecciones o para ninguna no saca tarjeta, y si antes del «sí» otra elección u otro menú encaja mejor con lo
-dicho no se toca nada y sale la tarjeta nueva (BASE-F97). Al añadir u ordenar elecciones, el «sí» vale solo para el
+dicho no se toca nada y sale la tarjeta nueva. Al añadir u ordenar elecciones, el «sí» vale solo para el
 menú, el plato y el producto que enseñó la tarjeta.
 Implicados: INVENTORY-F27
 
@@ -443,14 +454,13 @@ Pasos:
 1. En la fila de la elección, pulsa «Agotado» (o di «hoy no hay flan en el menú del día»).
 2. La fila se marca «Agotado» y el TPV deja de ofrecerla; el resto del menú se sigue vendiendo.
 3. Cuando vuelva a haber, pulsa «Disponible».
-4. Si el producto se marca agotado en Inventario (INVENTORY-F29), todas sus elecciones, en todos los
+4. Si el producto se marca agotado en Inventario, todas sus elecciones, en todos los
    menús, salen «Agotado en Inventario» y el TPV deja de ofrecerlas al momento, sin tocar el menú;
    vuelven solas cuando Inventario lo pone otra vez a la venta.
 Entra: la elección, o el producto agotado en Inventario.
 Sale: la elección cambiada (avisa: elección cambiada).
 Si falla: si al agotarla un plato obligatorio se queda sin bastantes elecciones, el menú deja de salir
-en el TPV y el aviso del constructor lo dice. Una cuenta abierta con un plato ya pedido se cobra igual
-(COMBO-F08).
+en el TPV y el aviso del constructor lo dice. Una cuenta abierta con un plato ya pedido se cobra igual.
 Implicados: COMBO-F07, INVENTORY-F29
 
 ### COMBO-F13 Cuando un producto deja el catálogo
@@ -464,9 +474,9 @@ Pasos:
    menús que lo ofrecían, y el constructor abierto lo enseña al momento. Mientras tanto salen marcadas
    «Ya no está en el catálogo» y el TPV no las ofrece ni se pueden cobrar (desde sus pantallas un producto
    eliminado no vuelve; si el personal de ERPlora lo recupera desde una copia aparte, sus elecciones vuelven
-   con él, COMBO-F15).
+   con él).
 3. Mira el aviso de arriba del constructor: si un plato obligatorio se ha quedado sin bastantes
-   elecciones, dice por qué el menú ya no sale en el TPV; añade otra elección a ese plato (COMBO-F06).
+   elecciones, dice por qué el menú ya no sale en el TPV; añade otra elección a ese plato.
 Entra: el producto desactivado o eliminado en Inventario.
 Sale: las elecciones del producto eliminado, fuera de todos los menús (avisa: elección quitada, con el
 motivo «producto eliminado»). Si el aviso de Inventario llega dos veces, la segunda no cambia nada; lo
@@ -482,8 +492,8 @@ Actor: propietario, administrador, responsable, asistente
 Pantalla: Menús
 Pasos:
 1. En «Editar datos» del menú, en «Foto», pulsa «Elegir de la librería» (se abre la librería de
-   imágenes con el nombre del menú ya buscado, como en INVENTORY-F30) o «Subir foto» (un JPG, PNG o WebP
-   de hasta 2 MB, como en INVENTORY-F31).
+   imágenes con el nombre del menú ya buscado) o «Subir foto» (un JPG, PNG o WebP
+   de hasta 2 MB).
 2. Pulsa «Guardar»: el menú queda con su foto. «Quitar foto» lo deja con sus iniciales.
 3. Por el asistente: «ponle foto al menú del día». El asistente propone hasta cinco imágenes de la
    librería por su título y pregunta cuál; nunca pone una por su cuenta.
@@ -492,12 +502,11 @@ Sale: el menú con su foto (avisa: menú cambiado); el TPV la enseña en su bald
 (INVENTORY-F32), y la lista de menús, en su fila. La foto propia se guarda en la carpeta del negocio,
 la ven solo las personas del negocio y cuenta en el espacio de su plan; subir otra, elegir una de la
 librería, «Quitar foto» o retirar el menú (COMBO-F04) la borra.
-Si falla: los mismos avisos que la foto del artículo. Junto a «Foto», al elegirla, y no se sube nada: «La
+Si falla: junto a «Foto», al elegirla, y no se sube nada: «La
 foto pesa más de 2 MB. Elige una más ligera.» y «Ese archivo no es una foto. Sube una imagen JPG, PNG o
-WebP.». Si el menú se guardó y la foto no, la ventana lo dice («El menú se ha guardado, pero la foto no:
-<motivo>») con «Reintentar», que solo vuelve a mandar la foto, y el menú se queda con la foto que tenía;
+WebP.». Si el menú se guardó y la foto no, la ventana lo dice («El menú se ha guardado, pero la foto no:», seguido del motivo) con «Reintentar», que solo vuelve a mandar la foto, y el menú se queda con la foto que tenía;
 el motivo es «Esa imagen ya no está en la librería. Elige otra.», «No queda espacio para ese archivo: tu
-plan incluye <espacio>.» o «No se pudo guardar la foto. Inténtalo de nuevo.». Un menú sin foto, o cuya
+plan incluye 1 GB.» (con el espacio de tu plan) o «No se pudo guardar la foto. Inténtalo de nuevo.». Un menú sin foto, o cuya
 foto no carga, enseña sus iniciales.
 Implicados: COMBO-F03, COMBO-F04, COMBO-F07, INVENTORY-F30, INVENTORY-F31, INVENTORY-F32
 
