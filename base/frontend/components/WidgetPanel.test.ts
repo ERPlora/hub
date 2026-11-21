@@ -2,40 +2,21 @@ import { HubIcon } from '@erplora/ui/shell';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { WidgetDef } from '../operations/home';
+import { openItemsPanel } from '../__tests__/home-fixtures';
 import { business, errorFrame, flush, mountBase, POLISH, subId } from '../__tests__/mount-base';
 import WidgetPanel from './WidgetPanel.vue';
 
-function widget(fields: Partial<WidgetDef> = {}): WidgetDef {
-  return {
-    key: 'demo.open_items',
-    app: 'demo',
-    title: 'Open items',
-    icon: 'ion:flask-outline',
-    category: 'Demo',
-    size: 'sm',
-    default: true,
-    kind: 'kpi',
-    operation: 'demo.item.stats',
-    params: {},
-    map: { value: 'open' },
-    options: {},
-    component: null,
-    refresh_on: ['demo.item.created'],
-    live: true,
-    ...fields,
-  };
-}
-
 async function panel(fields: Partial<WidgetDef> = {}, locale: 'en' | 'es' = 'en') {
-  return mountBase(WidgetPanel, { props: { widget: widget(fields) }, locale });
+  return mountBase(WidgetPanel, { props: { widget: openItemsPanel(fields) }, locale });
 }
 
+/** The figure of a figure panel (a kpi here): the library's figure card. */
 const value = (wrapper: { find: (s: string) => { exists: () => boolean; text: () => string } }) =>
-  wrapper.find('[data-testid="widget-value"]');
+  wrapper.find('.ep-stat-card__value');
 
 describe('WidgetPanel', () => {
-  it('heads the panel with its title and its icon', async () => {
-    const m = await panel();
+  it('heads a panel that is no figure with its title and its icon', async () => {
+    const m = await panel({ kind: 'timeline', map: { title: 'who' } });
     expect(m.wrapper.get('[data-testid="widget-title"]').text()).toBe('Open items');
     expect(m.wrapper.getComponent(HubIcon).props('name')).toBe('ion:flask-outline');
     expect(m.wrapper.get('.widget').classes()).toContain('ep-surface');
@@ -54,7 +35,7 @@ describe('WidgetPanel', () => {
 
   it('asks once for an operation that is no live query', async () => {
     const m = await mountBase(WidgetPanel, {
-      props: { widget: widget({ live: false }) },
+      props: { widget: openItemsPanel({ live: false }) },
       onApi: () => Response.json({ total: 2, open: 1, done: 1, lines: 0 }),
     });
     await flush();
@@ -64,46 +45,30 @@ describe('WidgetPanel', () => {
     expect(value(m.wrapper).text()).toBe('1');
   });
 
-  it('a failed read is «Unavailable», not the figure it had', async () => {
-    const m = await panel();
+  it('a failed read of a panel that is no figure is «Unavailable», not the rows it had', async () => {
+    const m = await panel({ kind: 'timeline', map: { title: 'who' } });
     const call = await m.live();
-    await m.result(call, 'demo.item.stats', { total: 5, open: 3, done: 2, lines: 7 });
+    await m.result(call, 'demo.item.stats', [{ who: 'Ana' }]);
     call.push(errorFrame(subId(m.client, 'demo.item.stats'), 'internal'));
     await flush();
-    expect(value(m.wrapper).exists()).toBe(false);
+    expect(m.wrapper.find('[data-testid="widget-entry"]').exists()).toBe(false);
     expect(m.wrapper.get('[data-testid="widget-error"]').text()).toBe('Unavailable');
   });
 
-  it('without the mapped value: «No data»', async () => {
-    const m = await panel({ map: { value: 'missing' } }, 'es');
+  it('a panel that is no figure without rows: «No data»', async () => {
+    const m = await panel({ kind: 'timeline', map: { title: 'who' } }, 'es');
     const call = await m.live();
-    await m.result(call, 'demo.item.stats', { total: 5 });
+    await m.result(call, 'demo.item.stats', []);
     expect(m.wrapper.get('[data-testid="widget-empty"]').text()).toBe('Sin datos');
   });
 
-  // `options.label` arrives already in the reader's language: base translates it.
-  it('says under the figure of a stat what it counts, in its severity', async () => {
-    const stat = { kind: 'stat', map: { value: 'open', severity: 'tone' }, options: { format: 'number', label: 'En cola de contingencia' } } as const;
-    const m = await panel(stat, 'es');
-    const call = await m.live();
-    await m.result(call, 'demo.item.stats', { total: 5, open: 3, done: 2, lines: 7, tone: 'warning' });
-    expect(value(m.wrapper).text()).toBe('3');
-    expect(m.wrapper.get('[data-testid="widget-label"]').text()).toBe('En cola de contingencia');
-    expect(m.wrapper.get('.widget-stat').attributes('data-severity')).toBe('warning');
-
-    const bare = await panel({ kind: 'stat', map: { value: 'open' } }, 'es');
-    const again = await bare.live();
-    await bare.result(again, 'demo.item.stats', { total: 5, open: 3, done: 2, lines: 7 });
-    expect(value(bare.wrapper).text()).toBe('3');
-    expect(bare.wrapper.find('[data-testid="widget-label"]').exists()).toBe(false);
-  });
 
   it('a kpi paints only its figure under its title, never its `options.label`', async () => {
     const m = await panel({ options: { format: 'number', label: 'Records pending submission to the AEAT' } });
     const call = await m.live();
     await m.result(call, 'demo.item.stats', { total: 5, open: 3, done: 2, lines: 7 });
     expect(value(m.wrapper).text()).toBe('3');
-    expect(m.wrapper.find('[data-testid="widget-label"]').exists()).toBe(false);
+    expect(m.wrapper.find('.ep-stat-card__note').exists()).toBe(false);
     expect(m.wrapper.text()).not.toContain('Records pending submission to the AEAT');
   });
 
@@ -181,13 +146,6 @@ describe('WidgetPanel', () => {
     const call = await m.live();
     await m.result(call, 'demo.item.stats', [{ who: 'Ana', at: '10:00' }]);
     expect(m.wrapper.get('[data-testid="widget-entry"]').text()).toContain('Ana');
-  });
-
-  it('paints a sparkline as a line over its series', async () => {
-    const m = await panel({ kind: 'sparkline', map: { series: 'n' } });
-    const call = await m.live();
-    await m.result(call, 'demo.item.stats', [{ n: 1 }, { n: 3 }]);
-    expect(m.wrapper.get('[data-testid="widget-sparkline"] polyline').attributes('points')).toBe('0,40 100,0');
   });
 
   // A panel's amounts are in the business's currency (`base.business.get`, one subscription for every panel of the

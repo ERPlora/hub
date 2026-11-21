@@ -15,6 +15,24 @@ export const setupRow = (page: Page, key: string): Locator => setupCard(page).lo
 export const boardWidget = (page: Page, key: string): Locator =>
   shown(page).locator(`[data-testid="widget-board"] [data-testid="widget"][data-key="${key}"]`);
 
+/** The title, the figure and the error of a panel of the board, a figure card (the library's StatCard) or any other. */
+export const panelTitle = (panel: Locator): Locator => panel.locator('[data-testid="widget-title"], .ep-stat-card__label');
+export const panelValue = (panel: Locator): Locator => panel.locator('[data-testid="widget-value"], .ep-stat-card__value');
+export const panelError = (panel: Locator): Locator => panel.locator('[data-testid="widget-error"], .ep-stat-card__error');
+/** What a figure counts: under its title, or in its status when it flags a state. */
+export const figureNote = (panel: Locator): Locator => panel.locator('.ep-stat-card__note, .ep-stat-card__status');
+
+/** The figure of the panel `key` of the Home's board. */
+export const boardValue = (page: Page, key: string): Locator => panelValue(boardWidget(page, key));
+
+/** Each panel of `keys` on the Home's board has read its data, with no error. */
+export async function panelsRead(page: Page, keys: readonly string[]): Promise<void> {
+  for (const key of keys) {
+    await expect(boardWidget(page, key)).toHaveAttribute('aria-busy', 'false');
+    await expect(panelError(boardWidget(page, key))).toHaveCount(0);
+  }
+}
+
 /** The localStorage key of the Home's widget board: the panels on it. */
 export const HOME_BOARD = 'dashboard-hub';
 

@@ -582,9 +582,14 @@ Pantalla: Inicio · Resumen
 Pasos:
   1. Bajo la lista está el tablero, con sus paneles desde que se abre el Inicio («Cargando widgets…» solo mientras
      no se sabe cuáles le tocan).
-  2. Cada panel es una tarjeta con su título e icono: una cifra (con debajo lo que cuenta, si su app lo dice),
-     una lista con barras, una cronología, un gráfico o un trozo de la pantalla de su app, con sus textos en el
-     idioma de quien mira. En una lista con barras, cada barra mide lo grande que es su cifra frente a la mayor
+  2. Cada panel es una tarjeta con su título e icono: una cifra (con lo que cuenta bajo el título, si su app lo
+     dice), una lista con barras, una cronología, un gráfico o un trozo de la pantalla de su app, con sus textos en
+     el idioma de quien mira. Cada cifra lleva el color de su medida, el mismo en todas las pantallas: ventas,
+     tickets e inventario, cada una el suyo. Las primeras cifras del tablero que tienen color lo encabezan en una
+     fila de color, una por color y de dos a cuatro; las demás van en una tarjeta clara con el color en su icono,
+     en el orden elegido. En el teléfono las cifras van de dos en dos. Una cifra con un estado que vigilar (la cola
+     de contingencia de VeriFactu cuando algo espera o ya ha fallado) lo dice en una etiqueta naranja o roja con
+     icono, sin cambiar el color de la cifra. En una lista con barras, cada barra mide lo grande que es su cifra frente a la mayor
      de la lista, sea del signo que sea; una cifra negativa, como un descuadre de caja en el que faltó dinero o
      un producto con existencias por debajo de cero, sale en rojo y con su signo (-0,40 €), y las demás
      conservan el color del panel o, si su app da un color a cada fila, el de la suya. El rojo de una cifra
@@ -601,8 +606,9 @@ Pasos:
 Entra: los paneles que declara cada app encendida; los datos de cada uno, pedidos con los permisos de
 quien mira.
 Sale: nada guardado en el hub.
-Si falla: un panel sin datos dice «Sin datos»; uno cuyos datos no se pueden leer, «No disponible», nunca
-una cifra vieja o inventada. Una fila de una lista con barras (o un día de un gráfico) que no tiene cifra,
+Si falla: un panel sin datos dice «Sin datos» (una cifra, con una raya en su sitio); una cifra cuyos datos no se
+pueden leer dice «No se pudo cargar» con «Reintentar», que la vuelve a pedir, y cualquier otro panel, «No
+disponible»: nunca una cifra vieja o inventada. Una fila de una lista con barras (o un día de un gráfico) que no tiene cifra,
 como una sesión de caja cerrada sin recuento, sale con una raya (—) y sin barra, nunca como un cero; un cero
 de verdad sí sale como cero (0,00 €). Si no se puede leer el tablero: «No se han podido cargar los paneles»
 con «Reintentar».
@@ -636,8 +642,8 @@ Pasos:
      cargar el Inicio.
 Entra: los avisos del negocio que declara cada panel.
 Sale: nada guardado.
-Si falla: si los datos nuevos no llegan, el panel dice «No disponible», no el valor de antes; cuando
-vuelve la conexión, se pone al día solo.
+Si falla: si los datos nuevos no llegan, el panel dice «No disponible» (una cifra, «No se pudo cargar» con
+«Reintentar»), no el valor de antes; cuando vuelve la conexión, se pone al día solo.
 Implicados: ninguno
 
 ### BASE-F09 Consultar la actividad reciente

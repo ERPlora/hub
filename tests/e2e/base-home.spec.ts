@@ -4,7 +4,7 @@ import { type Browser, type BrowserContext, expect, type Locator, type Page, tes
 
 import { bellSays, bellTotal, featureNotice, noticeButton } from './action-center';
 import { A, api, clearItems, horizontalOverflow, hostPage, login, psql, shot, shown, uniqueName, untilStill } from './helpers';
-import { panelAdded, spanishContext, spanishHome } from './home-helpers';
+import { panelAdded, panelTitle, panelValue, spanishContext, spanishHome } from './home-helpers';
 
 const VIEWPORTS = {
   390: { width: 390, height: 844 },
@@ -80,7 +80,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
 
     // BASE-F06 / BASE-F08 — the demo's panel «Open items», and a new open item moves it without a reload.
     const panel = testid(page, 'widget-board').locator('[data-testid="widget"][data-key="demo.open_items"]');
-    const value = panel.locator('[data-testid="widget-value"]');
+    const value = panelValue(panel);
     await expect(value).toHaveText('0');
     await api(context, A, 'POST', '/demo/items', { name: uniqueName('Home') });
     await expect(value).toHaveText('1');
@@ -190,7 +190,7 @@ async function recentPanelInSpanish(
     const page = await context.newPage();
     await spanishHome(page);
     const panel = await panelAdded(page, key);
-    await expect(panel.locator('[data-testid="widget-title"]')).toHaveText('Descuadres recientes');
+    await expect(panelTitle(panel)).toHaveText('Descuadres recientes');
     await expect(panel).toHaveAttribute('aria-busy', 'false');
     const bar = (number: string) =>
       panel.locator('[data-testid="widget-bar"]').filter({ has: page.locator('.widget-bar-label').getByText(number, { exact: true }) });
@@ -204,7 +204,7 @@ async function recentPanelInSpanish(
 /** The panel's figure came, over the one `/api/live` the page opened, which was never cut. */
 async function panelOnOneStream(page: Page, cut: string[], opened: unknown[]): Promise<void> {
   const panel = testid(page, 'widget-board').locator('[data-testid="widget"][data-key="demo.open_items"]');
-  await expect(panel.locator('[data-testid="widget-value"]')).toHaveText(/\d/);
+  await expect(panelValue(panel)).toHaveText(/\d/);
   expect(cut).toEqual([]);
   expect(opened).toHaveLength(1);
 }
@@ -580,7 +580,7 @@ test.describe('BASE-F06 — a bar-list with the colour of its row', () => {
         await spanishHome(page);
 
         const panel = testid(page, 'widget-board').locator(`[data-testid="widget"][data-key="${BY_ROLE}"]`);
-        await expect(panel.locator('[data-testid="widget-title"]')).toHaveText('Empleados por rol');
+        await expect(panelTitle(panel)).toHaveText('Empleados por rol');
         await expect(panel).toHaveAttribute('aria-busy', 'false');
         const bar = (name: string) =>
           panel.locator('[data-testid="widget-bar"]').filter({ has: page.locator('.widget-bar-label').getByText(name, { exact: true }) });
