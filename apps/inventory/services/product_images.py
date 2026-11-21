@@ -9,7 +9,8 @@ from apps.inventory import events
 from apps.inventory.models import Product
 from apps.inventory.queries.products import load_product
 from apps.inventory.queries.reads import find_product
-from apps.inventory.schemas import ProductImageIn, ProductImageUploadIn, ProductOut
+from apps.inventory.schemas.product_images import ProductImageIn, ProductImageUploadIn
+from apps.inventory.schemas.products import ProductOut
 from apps.inventory.services.writes import _actor, _product_payload
 from base import images
 

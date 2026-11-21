@@ -4,7 +4,7 @@ from live.context import OperationContext
 from live.operations import operation
 
 from apps.inventory.models import Settings
-from apps.inventory.schemas import ConfigGetIn, ConfigOut
+from apps.inventory.schemas.settings import ConfigGetIn, ConfigOut
 
 
 def current_settings() -> Settings:
