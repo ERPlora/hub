@@ -1,7 +1,6 @@
 """The flow app declares its module metadata, its menu entry, its permissions, what each role gets, its
 scheduled tasks, the assistant's contract of every operation (``ai`` and described input fields) and its help window."""
 
-from pathlib import Path
 
 import pytest
 from django.apps import apps
@@ -9,7 +8,7 @@ from django.utils import translation
 from live.meta import Category, Help, LiveAppConfig, Nav, module_configs, permissions_for_role
 from live.operations import INTERNAL, registry
 
-from base import assistant, workbook_help
+from base import assistant
 from base.queries import app_help
 
 PERMISSIONS = ["flow.view", "flow.manage", "flow.answer", "flow.answer_manager"]
@@ -288,10 +287,7 @@ def test_its_help_teaches_every_task_done_on_its_screens_and_only_leaves_out_the
 ):
     # The editor and the guide open from the Automations tab and are windows of it: what is done there is published in
     # that tab. Only what the assistant, another app or the platform does on its own stays out of the window.
-    config = flow_app()
-    served, markdown = workbook_help.workbook(Path(config.path), language)
-    with translation.override(served):
-        read = workbook_help.parse(markdown, app_help.tabs_of(config), workbook_help.words())
+    served, read = app_help.help_of(flow_app(), language)
     assert served == language
     assert {flow.screens for flow in read.flows} == {("automations",)}
     assert {"FLOW-F08", "FLOW-F09", "FLOW-F16", "FLOW-F37"} <= {flow.id for flow in read.flows}

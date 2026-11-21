@@ -119,6 +119,24 @@ class TestTheAnswer:
         assert ask(language="eo")["language"] == "eo"
 
 
+class TestWhatTheWindowReads:
+    """What a module's window reads in a language, with the flows it leaves out: an app's own tests check theirs."""
+
+    def test_it_says_the_language_served_and_reads_with_the_tabs_in_that_language(self, table):
+        served, read = app_help.help_of(table, "en")
+        assert served == "en"
+        assert [screen.title for screen in read.screens] == ["Floor plan", "Zones", "Settings"]
+
+    def test_it_keeps_the_flows_the_window_leaves_out(self, table):
+        _served, read = app_help.help_of(table, "es")
+        assert [draft.id for draft in read.unpublished] == ["TABLE-F04", "TABLE-F05"]
+
+    def test_without_a_current_file_it_reads_the_source(self, table, tmp_path):
+        (tmp_path / "WORKBOOK.en.md").unlink()
+        served, read = app_help.help_of(table, "en")
+        assert (served, read.screens[0].title) == ("es", "Plano de sala")
+
+
 class TestTheVideo:
     def test_the_person_s_language_has_the_source_s_while_it_has_none_of_its_own(self, table):
         assert ask(language="en")["video"] == VIDEO_ES

@@ -1,14 +1,10 @@
 """The cart_checkout app declares its module metadata, its menu, its permissions, what each role gets,
 its scheduled task, what the assistant sees of each operation and its help window."""
 
-from pathlib import Path
-
 import pytest
 from django.apps import apps
-from django.utils import translation
 from live.meta import Category, Help, LiveAppConfig, Nav, module_configs, permissions_for_role
 
-from base import workbook_help
 from base.queries import app_help
 
 PERMISSIONS = [
@@ -196,10 +192,7 @@ def test_its_help_window_is_ready_without_a_video_yet():
 def test_its_help_teaches_every_task_done_on_its_tabs_and_only_leaves_out_the_assistant_s_and_the_platform_s(language):
     # Adding lines, emptying a cart, starting an order and erasing a customer's data are done with the assistant, and
     # telling other apps is the platform's: everything else is published in the tab where it is done.
-    config = cart_checkout()
-    served, markdown = workbook_help.workbook(Path(config.path), language)
-    with translation.override(served):
-        read = workbook_help.parse(markdown, app_help.tabs_of(config), workbook_help.words())
+    served, read = app_help.help_of(cart_checkout(), language)
     assert served == language
     assert {flow.id: flow.screens for flow in read.flows}["CART_CHECKOUT-F12"] == ("carts", "orders")
     assert sorted(draft.id for draft in read.unpublished) == [
