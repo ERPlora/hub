@@ -30,7 +30,9 @@ from apps.inventory.models import (
     ProductCategory,
     StockMovement,
 )
-from apps.inventory.schemas import CategoryRecoverIn, ProductCategoryIn, ProductIn
+from apps.inventory.schemas.categories import CategoryRecoverIn
+from apps.inventory.schemas.product_categories import ProductCategoryIn
+from apps.inventory.schemas.products import ProductIn
 from apps.tax.models import TaxCategory
 from base.recovery import actor_of
 from base.tenancy.context import current_alias, use_hub

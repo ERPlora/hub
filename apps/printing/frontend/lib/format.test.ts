@@ -7,7 +7,7 @@ import { describe, expect, it } from 'vitest';
 import en from '../locale/en.json';
 import es from '../locale/es.json';
 import type { JobOut, PrinterOut } from '../operations';
-import { JOB_TONE, jobDetail, jobFlags, jobTitle, printerAddress, printerPaper, printerState, STATE_TONE, waited } from './format';
+import { deviceError, JOB_TONE, jobDetail, jobFlags, jobTitle, printerAddress, printerPaper, printerState, STATE_TONE, waited } from './format';
 
 const i18n = createShellI18n({ locale: 'en', messages: { en, es } });
 const t = (key: string, named?: Record<string, unknown>) => (named ? i18n.global.t(key, named) : i18n.global.t(key));
@@ -81,6 +81,49 @@ describe('jobDetail', () => {
     expect(jobDetail(job({ status: 'cancelled', cancelled_by: 'Ana', cancel_reason: 'left' }), t, NOW)).toBe('Cancelled by Ana · Reason: left');
     expect(jobDetail(job({ status: 'cancelled', cancelled_by: 'Ana' }), t, NOW)).toBe('Cancelled by Ana');
     expect(jobDetail(job({ status: 'pending', retried_by: 'Ana', last_error: 'jam' }), t, NOW)).toBe('Sent again by Ana · Last error: jam');
+  });
+});
+
+describe('deviceError', () => {
+  // The app says what went wrong with a stable code (its `PeripheralError::code`); the system's words stay in the
+  // device's log.
+  const CODES = ['printer_unreachable', 'io_error', 'bluetooth_permission_denied', 'invalid_printer_address', 'unknown_document_type', 'invalid_payload'];
+  const inSpanish = (key: string, named?: Record<string, unknown>) => i18n.global.t(key, named ?? {}, { locale: 'es' });
+
+  it('says each code the app sends as a sentence in the reader’s language', () => {
+    for (const code of CODES) {
+      const english = deviceError(code, t);
+      const spanish = deviceError(code, inSpanish);
+      expect(english, code).not.toContain(code);
+      expect(english, code).toMatch(/^[A-Z].*\.$/);
+      expect(spanish, code).toMatch(/^[A-ZÁÉÍÓÚ].*\.$/);
+      expect(spanish, code).not.toBe(english);
+    }
+  });
+
+  it('a printer that does not answer is one sentence, whether it refused the connection or stayed silent', () => {
+    expect(deviceError('printer_unreachable', t)).toBe(t('printing.deviceErrors.unreachable'));
+    expect(deviceError('io_error', t)).toBe(t('printing.deviceErrors.unreachable'));
+  });
+
+  it('tells the person what to do for each other failure', () => {
+    expect(deviceError('bluetooth_permission_denied', t)).toBe(t('printing.deviceErrors.bluetoothPermission'));
+    expect(deviceError('invalid_printer_address', t)).toBe(t('printing.deviceErrors.invalidAddress'));
+    expect(deviceError('unknown_document_type', t)).toBe(t('printing.deviceErrors.updateApp'));
+    expect(deviceError('invalid_payload', t)).toBe(t('printing.deviceErrors.updateApp'));
+  });
+
+  it('keeps any other text as the device said it', () => {
+    const olderApp = 'impresora inalcanzable: Connection refused (os error 111)';
+    expect(deviceError(olderApp, t)).toBe(olderApp);
+    expect(deviceError('out of paper', t)).toBe('out of paper');
+    expect(deviceError('constructor', t)).toBe('constructor');
+  });
+
+  it('is what a job’s last error says', () => {
+    expect(jobDetail(job({ status: 'pending', last_error: 'printer_unreachable' }), t, NOW)).toBe(
+      t('printing.jobs.lastError', { error: t('printing.deviceErrors.unreachable') }),
+    );
   });
 });
 

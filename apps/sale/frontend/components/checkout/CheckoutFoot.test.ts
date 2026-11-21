@@ -40,6 +40,10 @@ describe('CheckoutFoot: the button', () => {
     expect((await setup({ method: BIZUM })).label()).toBe('Charge €42.50 with Bizum');
   });
 
+  it('is the sheet’s footer, the bar a notice at the bottom sits above instead of covering «Charge»', async () => {
+    expect((await setup()).wrapper.element.tagName).toBe('ION-FOOTER');
+  });
+
   it('is the sheet’s full-width primary button and charges on tap', async () => {
     const s = await setup();
     expect([s.confirm().expand, s.confirm().disabled, s.confirm().getAttribute('aria-disabled')]).toEqual(['block', false, null]);

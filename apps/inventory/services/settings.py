@@ -8,7 +8,7 @@ from live.outbox import record_event
 from apps.inventory import events
 from apps.inventory.models import Settings
 from apps.inventory.queries.settings import config_row
-from apps.inventory.schemas import ConfigOut, ConfigPatchIn
+from apps.inventory.schemas.settings import ConfigOut, ConfigPatchIn
 from apps.inventory.services.writes import _actor
 
 

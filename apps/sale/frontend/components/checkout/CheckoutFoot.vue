@@ -5,9 +5,10 @@
 // `disabled`: that would swallow the tap) and answers with the reason (`blocked`); only «Charging…» and
 // a total still loading use the native `disabled`. A refusal is the server's own words; a lost answer is
 // said as such, and when nobody knows whether it charged, «Check in Sales» goes and looks. Cash with the
-// drawer closed (SALE-F08) offers «Open a cash session» to whoever may open one.
+// drawer closed (SALE-F08) offers «Open a cash session» to whoever may open one. It is the sheet's `ion-footer`: the
+// shell sets the notices at the bottom of the screen above a dialog's footer, so none covers «Charge».
 import { HubIcon } from '@erplora/ui/shell';
-import { IonButton, IonSpinner } from '@ionic/vue';
+import { IonButton, IonFooter, IonSpinner } from '@ionic/vue';
 import { computed, useTemplateRef } from 'vue';
 
 import type { CheckoutFailure } from '../../composables/checkout/useCheckout';
@@ -37,7 +38,7 @@ const emit = defineEmits<{
   /** A tap on the blocked button, with what to say. */
   blocked: [block: ChargeBlock, message: string];
   checkSales: [];
-  /** «Open a cash session»: the cash register's sessions, to open one. */
+  /** «Open a cash session»: Cash register's window, to open one over the sheet. */
   openDrawer: [];
 }>();
 
@@ -106,7 +107,7 @@ function press(): void {
 </script>
 
 <template>
-  <div class="sheet-foot">
+  <ion-footer class="sheet-foot">
     <template v-if="failure">
       <p
         class="pay-err"
@@ -171,7 +172,7 @@ function press(): void {
       />
       {{ label }}
     </ion-button>
-  </div>
+  </ion-footer>
 </template>
 
 <style scoped>

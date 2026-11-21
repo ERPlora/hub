@@ -10,15 +10,9 @@ from live.operations import INTERNAL, operation
 
 from apps.inventory.models import Category, ProductCategory
 from apps.inventory.queries.reads import CATEGORY_NOT_FOUND, _bounds, _page, find_category
-from apps.inventory.schemas import (
-    CategoryFiltersIn,
-    CategoryListIn,
-    CategoryOut,
-    CategoryPage,
-    CategoryRefIn,
-    ProductCategoryListIn,
-    ProductCategoryPage,
-)
+from apps.inventory.schemas.categories import CategoryFiltersIn, CategoryListIn, CategoryOut, CategoryPage
+from apps.inventory.schemas.fields import CategoryRefIn
+from apps.inventory.schemas.product_categories import ProductCategoryListIn, ProductCategoryPage
 from base.ordering import list_order_for
 
 
@@ -99,8 +93,8 @@ def list_categories(ctx: OperationContext, params: CategoryListIn) -> dict:
     return _page(_filter_categories(categories, params), params, _category_row)
 
 
-# Not an assistant tool: what names a category on the card of a write (``schemas.A_CATEGORY``), as the screens show it;
-# the model finds a category in its list.
+# Not an assistant tool: what names a category on the card of a write (``schemas.fields.A_CATEGORY``), as the screens
+# show it; the model finds a category in its list.
 @operation(
     "inventory.category.get",
     kind="query",
