@@ -3,7 +3,7 @@ pass, and the kitchen's history (WORKBOOK.md)."""
 
 from django.utils.translation import gettext_lazy as _
 from django.utils.translation import pgettext_lazy
-from live.meta import Category, DeviceNotice, LiveAppConfig, Nav
+from live.meta import Category, DeviceNotice, Help, LiveAppConfig, Nav
 
 #: A round is told as soon as Sales fires it; saving it or creating one by hand refreshes the same row.
 NOTICE_EVENTS = ["kitchen.ticket.received", "kitchen.ticket.created", "sale.order.fired"]
@@ -107,3 +107,4 @@ class KitchenConfig(LiveAppConfig):
             refresh_on=NOTICE_EVENTS,
         )
     ]
+    help = Help()

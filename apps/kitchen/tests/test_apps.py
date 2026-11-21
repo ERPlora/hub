@@ -2,7 +2,7 @@
 (WORKBOOK «Quién puede qué»)."""
 
 from django.apps import apps
-from live.meta import Category, LiveAppConfig, Nav, module_configs, permissions_for_role
+from live.meta import Category, Help, LiveAppConfig, Nav, module_configs, permissions_for_role
 
 PERMISSIONS = [
     "kitchen.view_ticket",
@@ -169,3 +169,7 @@ def test_the_reaction_to_sales_is_the_systems_only():
 
     assert get("kitchen.ticket.sync").permission == "kitchen.system"
     assert "kitchen.system" not in kitchen().permissions
+
+
+def test_its_help_window_is_ready_without_a_video_yet():
+    assert kitchen().help == Help()
