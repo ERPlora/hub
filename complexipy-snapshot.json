@@ -48,8 +48,8 @@
     ]
   },
   {
-    "path": "apps/combo/queries.py",
-    "file_name": "queries.py",
+    "path": "apps/combo/queries/__init__.py",
+    "file_name": "__init__.py",
     "functions": [
       {
         "name": "resolve_line",

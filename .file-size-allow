@@ -24,8 +24,8 @@
 626 apps/cash_register/schemas.py ERPlora/erplora-next#74
 752 apps/cash_register/services.py ERPlora/erplora-next#74
 301 apps/combo/frontend/operations.d.ts ERPlora/erplora-next#74
-1061 apps/combo/queries.py ERPlora/erplora-next#74
-740 apps/combo/schemas.py ERPlora/erplora-next#74
+1061 apps/combo/queries/__init__.py ERPlora/erplora-next#74
+740 apps/combo/schemas/__init__.py ERPlora/erplora-next#74
 923 apps/combo/services.py ERPlora/erplora-next#74
 543 apps/customer/frontend/operations.d.ts ERPlora/erplora-next#74
 533 apps/customer/frontend/pages/CustomerListPage.test.ts ERPlora/erplora-next#74
