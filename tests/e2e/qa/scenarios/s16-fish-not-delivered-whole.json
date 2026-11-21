@@ -1,0 +1,46 @@
+{
+  "id": "s16-fish-not-delivered-whole",
+  "title": "La lubina agotada por hoy porque no ha llegado el pescado, dicho entero: marcarla",
+  "vertical": "restaurant",
+  "said": "whole",
+  "seed": "restaurant.es",
+  "language": "es",
+  "setup": [],
+  "owner": {
+    "persona": "Rosa, dueña del restaurante El Puerto, en Alicante. Está preparando el servicio de mediodía y escribe desde la tablet de la barra.",
+    "goal": "Que hoy no se pueda pedir la lubina a la plancha, porque no ha llegado el pescado, sin quitarla de la carta.",
+    "upFront": ["Hoy no ha venido el del pescado: hay que marcar la lubina a la plancha como agotada, sin quitarla de la carta. La paella de marisco sí se puede pedir."],
+    "ifAsked": ["Mañana vuelve a traer pescado."]
+  },
+  "attachments": [],
+  "opening": "Hoy no ha venido el del pescado: marca la lubina a la plancha como agotada, que no la pidan. La paella sí hay",
+  "writes": ["inventory.product.set_sold_out"],
+  "cards": [],
+  "expect": [
+    {
+      "says": "la lubina a la plancha sale como agotada",
+      "sql": "select is_sold_out from inventory_product where sku = 'PRI-02'",
+      "equals": "t"
+    }
+  ],
+  "forbidden": [
+    {
+      "says": "la lubina sigue en la carta, con su precio",
+      "sql": "select is_active::text || ' ' || is_deleted::text || ' ' || price from inventory_product where sku = 'PRI-02'",
+      "unchanged": true
+    },
+    {
+      "says": "ningún otro producto se agota ni cambia",
+      "sql": "select md5(string_agg(id::text || is_sold_out::text || is_active::text || is_deleted::text || price, ',' order by id)) from inventory_product where sku <> 'PRI-02'",
+      "unchanged": true
+    }
+  ],
+  "mustAsk": [],
+  "maxTurns": 6,
+  "golden": [
+    {
+      "tool": "inventory.product.set_sold_out",
+      "arguments": {"product": "PRI-02", "sold_out": true}
+    }
+  ]
+}
