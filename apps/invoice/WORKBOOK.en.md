@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:d872ddac1df8bcfb201d44666a3a8998d67daa44c6d70d229f808edb21c62ea7 -->
+<!-- generated from WORKBOOK.md sha256:baa590dae9df52bc2a004a179ce4d78edb2dac55dfc2df9406bf0e41389f5c6a -->
 
 ## What it is for and who it is for
 
@@ -349,28 +349,30 @@ Involved: TAX-F18, CUSTOMER-F17, TAX-F11
 ### INVOICE-F04 The customer asks for the full invoice of their ticket
 Status: done
 Actor: customer, without an account
-Screen: the business's public page `/p/<business>/invoice/<code>`
+Screen: Ask for the ticket's invoice (the business's public page, `/p/<business>/invoice/<code>`)
 Steps:
-1. The ticket, on screen and on the receipt printer, carries after the fiscal QR a second QR that opens this page,
-   with "Scan to ask for your full invoice" above it and its code below, which is also the end of the address.
-2. The customer opens it on their phone, without signing in, and sees the business, their ticket's number, date and
-   total; if they already asked for it, they see their full invoice without typing their details again.
+1. The ticket, on screen and on the receipt printer, carries after the fiscal QR a second QR, with "Scan to ask for
+   your full invoice" above it and its code below, which is also the end of the address.
+2. The customer scans it with their phone and, without signing in, opens "Request your invoice": they see the
+   business, their ticket's number, date and total. If they already asked for it, they see their full invoice
+   without typing their details again.
 3. They type their name or company name, their country, the kind of document (only outside Spain), their tax ID
-   and their address, and ask for the invoice.
-4. Invoicing issues, as the system, the full invoice that replaces the ticket (F3), as in INVOICE-F05, and the
-   customer sees it on screen, from where they print it or save it as a PDF in A4 (INVOICE-F18).
+   and their address, and tap "Request full invoice".
+4. Invoicing issues the full invoice that replaces the ticket, as when it is asked for at the counter, and the
+   customer sees it on screen with "Your invoice is ready."; with "Print / PDF" they print it or save it as a PDF
+   in A4.
 In: the ticket's code and the tax details the customer types.
-Out: the F3, one per ticket, as in INVOICE-F05 (notifies `invoice.invoice.issued`). The code is not spent: from
-then on it opens that same F3, until it expires four years after the charge.
-If it fails: a code that does not exist, is mistyped or belongs to another business, «This code opens no ticket.
-Check it or ask for the invoice at the business.», with nobody's data; an expired one, «This code has expired:
-ask for the invoice at the business.»; a ticket that does not have its fiscal document yet, «Your ticket is still
-being registered. Try again in a few minutes.»; ten codes that open nothing within an hour from the same
-connection, «Too many requests. Try again in a moment.» until the hour is over (a right code does not count). The
-customer's details are checked as in INVOICE-F05, with each refusal under its field, and a voided or refunded ticket
-is refused the same way. If the
-ticket already has its F3, it answers with it without issuing another or spending a number, even if other
-details are typed.
+Out: the F3, issued as the system and one per ticket, as in INVOICE-F05 (notifies `invoice.invoice.issued`). The
+code is not spent: from then on it opens that same F3, until it expires four years after the charge.
+If it fails: a code that does not exist, is mistyped or belongs to another business, "This code opens no ticket.
+Check it or ask for the invoice at the business.", with nobody's data; an expired one, "This code has expired:
+ask for the invoice at the business."; a ticket that does not have its fiscal document yet, "Your ticket is still
+being registered. Try again in a few minutes."; ten codes that open nothing within an hour from the same
+connection, "Too many requests. Try again in a moment." until the hour is over (a right code does not count). The
+customer's details are checked as at the counter, with each refusal under its field (a Spanish tax ID that is not
+valid, "That tax ID is not valid."), and a voided or refunded ticket is refused the same way.
+If the ticket already has its full invoice, the page shows that same one, without issuing another or spending a
+number, even if other details are typed.
 Involved: SALE-F29, INVOICE-F05, INVOICE-F18
 
 ### INVOICE-F05 Turn a ticket into a full invoice at the counter

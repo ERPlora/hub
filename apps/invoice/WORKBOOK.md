@@ -356,27 +356,28 @@ Implicados: TAX-F18, CUSTOMER-F17, TAX-F11
 ### INVOICE-F04 El cliente pide la factura completa de su tique
 Estado: hecho
 Actor: cliente, sin cuenta
-Pantalla: la página pública del negocio `/p/<negocio>/invoice/<código>`
+Pantalla: Pedir la factura del tique (la página pública del negocio, `/p/<negocio>/invoice/<código>`)
 Pasos:
-1. El tique, en pantalla y en la impresora de tiques, lleva tras el QR fiscal un segundo QR que abre esta página,
-   con «Escanea para pedir tu factura completa» encima y su código debajo, que es también el final de la dirección.
-2. El cliente la abre en su móvil, sin iniciar sesión, y ve el negocio, el número, la fecha y el total de su tique;
-   si ya la pidió, ve su factura completa sin volver a escribir sus datos.
+1. El tique, en pantalla y en la impresora de tiques, lleva tras el QR fiscal un segundo QR, con «Escanea para pedir
+   tu factura completa» encima y su código debajo, que es también el final de la dirección.
+2. El cliente lo escanea con su móvil y, sin iniciar sesión, abre «Solicita tu factura»: ve el negocio, el número,
+   la fecha y el total de su tique. Si ya la pidió, ve su factura completa sin volver a escribir sus datos.
 3. Escribe su nombre o razón social, su país, el tipo de documento (solo fuera de España), su NIF y su domicilio,
-   y pide la factura.
-4. Facturación emite, como el sistema, la factura completa que sustituye al tique (F3), igual que en INVOICE-F05,
-   y el cliente la ve en pantalla, desde donde la imprime o la guarda en PDF en A4 (INVOICE-F18).
+   y pulsa «Solicitar factura completa».
+4. Facturación emite la factura completa que sustituye al tique, igual que cuando se pide en el mostrador, y el
+   cliente la ve en pantalla con «Tu factura está lista.»; con «Imprimir / PDF» la imprime o la guarda en PDF en A4.
 Entra: el código del tique y los datos fiscales que escribe el cliente.
-Sale: la F3, una sola por tique, como en INVOICE-F05 (avisa `invoice.invoice.issued`). El código no se gasta:
-desde entonces abre esa misma F3, hasta que caduca a los cuatro años del cobro.
+Sale: la F3, emitida como el sistema y una sola por tique, como en INVOICE-F05 (avisa `invoice.invoice.issued`). El
+código no se gasta: desde entonces abre esa misma F3, hasta que caduca a los cuatro años del cobro.
 Si falla: un código que no existe, que está mal escrito o que es de otro negocio, «Este código no abre ningún
 tique. Revísalo o pide la factura en el establecimiento.», sin datos de nadie; uno caducado, «Este código ha
 caducado: pide la factura en el establecimiento.»; un tique que aún no tiene su documento fiscal, «Tu tique aún
 se está registrando. Prueba otra vez en unos minutos.»; diez códigos que no abren nada en una hora desde la misma
 conexión, «Demasiadas peticiones. Inténtalo de nuevo en un momento.» hasta que pasa la hora (un código bueno no
-cuenta). Los datos del cliente se comprueban como en INVOICE-F05, con cada rechazo bajo su campo, y un tique anulado
-o devuelto se rechaza igual.
-Si el tique ya tiene su F3, responde con ella sin emitir otra ni gastar número, aunque se escriban otros datos.
+cuenta). Los datos del cliente se comprueban igual que en el mostrador, con cada rechazo bajo su campo (un NIF
+español que no es válido, «Ese NIF no es válido.»), y un tique anulado o devuelto se rechaza igual.
+Si el tique ya tiene su factura completa, la página enseña esa misma, sin emitir otra ni gastar número, aunque se
+escriban otros datos.
 Implicados: SALE-F29, INVOICE-F05, INVOICE-F18
 
 ### INVOICE-F05 Pasar un tique a factura completa desde el mostrador
@@ -1246,6 +1247,9 @@ se publican en esa pestaña. Lo que esas partes dejaron de decir, y quien mantie
   INVOICE-F21); la confirmación que se repite con el número siguiente es la del asistente (BASE-F97, INVOICE-F08).
 - Abrir la ficha es INVOICE-F17, crear una serie INVOICE-F12, la impresión A4 PRINTING-F08 y abrir la página de
   la AEAT en la app instalada VERIFACTU-F18, que INVOICE-F14, F16, F17 y F18 ya no citan en sus pasos.
+- La factura que pide el cliente es la F3 de INVOICE-F05 («igual que cuando se pide en el mostrador») y su
+  impresión, INVOICE-F18; INVOICE-F04 ya no los cita en sus pasos ni en «Si falla», y su «Pantalla:» empieza por el
+  título de la ventana de la página pública para que se publique en **Facturas**.
 
 ### Decisiones (resueltas con el mercado)
 
