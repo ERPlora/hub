@@ -408,6 +408,20 @@ describe('OptionFormModal: the allergens the option adds to the dish', () => {
     expect(s.wrapper.emitted('update:open')?.at(-1)).not.toEqual([false]);
   });
 
+  it('while it saves, the allergens cannot be changed; once saved the window closes', async () => {
+    const s = await setup();
+    let reply!: (response: Response) => void;
+    s.answerBy({ '/api/modifier/options': () => new Promise<Response>((resolve) => (reply = resolve)) });
+    await ionValue(s.field('name'), 'Cheese', 'ionInput');
+    await mark(s, 'milk', true);
+    void click(s.save());
+    await settle();
+    expect(checkboxes(s).every((checkbox) => (checkbox as HTMLElement & { disabled?: boolean }).disabled === true)).toBe(true);
+    reply(new Response(JSON.stringify({ ...SODA, allergens: ['milk'] }), { status: 201, headers: { 'Content-Type': 'application/json' } }));
+    await settle();
+    expect(s.wrapper.emitted('update:open')?.at(-1)).toEqual([false]);
+  });
+
   it('an allergen marked and not saved asks before the window closes', async () => {
     const s = await setup({ ...SODA, allergens: ['milk'] });
     const { expectUnsavedFormAsksBeforeClosing } = await import('../../../../base/frontend/__tests__/unsaved-form');
