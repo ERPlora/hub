@@ -262,7 +262,7 @@ def recover_group(ctx: OperationContext, data: GroupRecoverIn) -> dict:
     ai={
         "description": "Add an option to a modifier group (named by its id or name) with its supplement in cents "
         "(negative is a discount, 0 is free); a tax category of its own only when it taxes differently from the "
-        "dish; optionally chosen by default.",
+        "dish; optionally chosen by default, and the allergens it adds to the dish.",
         "risk": "normal",
         "asks": {
             "en": (
@@ -334,8 +334,8 @@ def recover_option(ctx: OperationContext, data: OptionIn) -> dict:
     output=OptionOut,
     ai={
         "description": "Change an option, named by its id or its name (and its group when two have one so named): "
-        "its name, its supplement, its own tax category or whether it comes chosen by default; what is not sent is "
-        "kept, and an empty tax category gives it back the dish's.",
+        "its name, its supplement, its own tax category, whether it comes chosen by default or the allergens it adds "
+        "to the dish; what is not sent is kept, and an empty tax category gives it back the dish's.",
         "risk": "normal",
         "check": "modifier.option.get",
         "asks": {

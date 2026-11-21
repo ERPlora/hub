@@ -9,6 +9,13 @@ Estado de la app: completa (2026-10-31)
 
 ## Para qué sirve y para quién
 
+Control horario es el registro de jornada de tu negocio: cada persona del equipo ficha con un toque la entrada al
+llegar, sus pausas y la salida al irse. El responsable ve las jornadas de todos, corrige las que están mal con un
+motivo que queda en su historial y saca el mes en CSV para la gestoría o la Inspección de Trabajo. Ninguna jornada se
+borra.
+
+### En detalle
+
 Es el **registro de jornada** del negocio. Cada persona del equipo ficha la entrada al llegar y la
 salida al irse, con sus pausas en medio, con un toque y sin elegir nada: quien ficha es la persona de
 la sesión, por la ficha de Personal vinculada a su cuenta. El responsable ve las jornadas de todo el
@@ -23,7 +30,7 @@ Inspección (art. 34.9 del Estatuto de los Trabajadores, Real Decreto-ley 8/2019
   una fila nueva en su historial que tampoco se borra ni se edita.
 - **El trabajador ve sus propias jornadas** y quién las corrigió, cuándo y por qué.
 
-Quién la usa:
+### Quién la usa y qué hace cada uno
 
 - El **empleado** ficha la entrada, la salida y sus pausas, ve sus jornadas, su historial de
   correcciones y los ajustes (sin poder cambiarlos), y exporta sus jornadas en CSV.
@@ -57,7 +64,13 @@ Quién la usa:
 ## Pantallas
 
 ### Fichar
-Se llega desde el menú de la app, «Fichar». Arriba, «Hola, <nombre>» y «Son las <hora>»; en el centro,
+Aquí fichas tú. El botón grande cambia según el momento: «Fichar entrada» y, ya dentro, «Empezar pausa» o «Terminar
+pausa» y «Fichar salida». Arriba ves si estás dentro o en pausa, desde qué hora y el tiempo que llevas, que corre solo;
+al lado, lo trabajado hoy y tus últimas jornadas. Ficha siempre la persona que tiene la sesión abierta, por su ficha de
+Personal.
+
+#### Detalle
+Se llega desde el menú de la app, «Fichar». Arriba, «Hola, Ana» y «Son las 09:00»; en el centro,
 el estado («No has fichado la entrada», «Dentro desde las 09:00», «En pausa desde las 13:00»), el
 tiempo que lleva desde la entrada, que corre solo, y el botón grande del momento: «Fichar entrada», o
 «Empezar pausa» / «Terminar pausa» y «Fichar salida». A la derecha (debajo en el móvil), «Hoy»
@@ -65,6 +78,12 @@ tiempo que lleva desde la entrada, que corre solo, y el botón grande del moment
 «Cerrada» o «Por revisar», igual que en Registros). La puede abrir cualquier persona del equipo.
 
 ### Registros
+Aquí están las jornadas del mes, con su entrada, su salida, sus pausas, lo trabajado y su estado: «Abierta», «Cerrada»
+o «Por revisar» si nadie fichó la salida. Cada persona ve las suyas; el responsable ve las de todo el equipo y quién
+está fichado ahora, y corrige una jornada mal fichada con su motivo. «Historial» enseña quién cambió una jornada y por
+qué, y «Exportar CSV» descarga el mes.
+
+#### Detalle
 Se llega desde el menú de la app, «Registros». Una tabla de las jornadas del mes elegido: Fecha,
 Persona, Entrada, Salida, Pausas (min), Trabajado, Estado y Ubicación, con las acciones «Corregir» e
 «Historial» en cada fila; en el móvil, tarjetas. Un empleado ve solo las suyas (sin columna Persona,
@@ -74,12 +93,17 @@ quiénes, desde qué hora y si están en pausa. Arriba, «Exportar CSV». En una
 «Ubicación» y «Pausas (min)» ceden su sitio primero (siguen en las tarjetas y en «Columnas»); el nombre
 de cada persona y su estado se leen enteros.
 
-### Panel del Inicio
+#### Panel del Inicio
 El **Inicio** del Hub enseña el panel «Fichados ahora» de serie, agrupado como «Control horario» en
 **Personalizar panel**: el número de personas que tienen ahora la jornada abierta, el mismo que dice «Fichados
 ahora» encima de Registros. Solo lo tiene quien ve las jornadas de todo el equipo; un empleado no.
 
 ### Ajustes
+Aquí un responsable decide si se pide la ubicación a quien ficha desde su propio móvil, a qué distancia del local se
+puede fichar y dónde está el local. También elige tras cuántas horas una jornada que nadie cerró pasa a «Por
+revisar». Los demás ven los ajustes sin poder cambiarlos.
+
+#### Detalle
 La pestaña «Ajustes» de la app. «Pedir la ubicación al fichar desde un dispositivo personal» (debajo,
 dónde se marca un dispositivo como personal), «Radio permitido», «Ubicación del lugar de trabajo»
 (Latitud, Longitud y «Usar mi ubicación actual») y «Marcar a revisar tras (horas)». Solo un responsable o un administrador puede guardar; los demás la ven
@@ -127,7 +151,7 @@ Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, responsable, empleado
 Pantalla: Fichar
 Pasos:
-1. Abre Control horario → «Fichar». Ve «No has fichado la entrada» y el botón «Fichar entrada».
+1. Abre Control horario, en la pestaña «Fichar». Ve «No has fichado la entrada» y el botón «Fichar entrada».
 2. Pulsa «Fichar entrada». Ve «Entrada fichada a las 09:00.», «Dentro desde las 09:00» y el tiempo que
    lleva desde la entrada, que corre solo.
 3. Al acabar, pulsa «Fichar salida». Ve «Salida fichada a las 17:00.» y vuelve el botón «Fichar
@@ -162,8 +186,8 @@ Entra: la jornada abierta de la persona (ATTENDANCE-F01).
 Sale: cada pausa guardada dentro de su jornada; los avisos de pausa empezada y terminada.
 Si falla: sin jornada abierta, «No hay ninguna jornada abierta: ficha la entrada primero.»; con una
 pausa ya en curso, «Ya hay una pausa en curso.»; terminar una pausa que no existe, «No hay ninguna
-pausa en curso que terminar.»; en una jornada olvidada (ATTENDANCE-F05), «Esta jornada lleva abierta más
-de 12 horas y está por revisar…».
+pausa en curso que terminar.»; en una jornada olvidada, abierta más horas de las fijadas en Ajustes, «Esta
+jornada lleva abierta más de 12 horas y está por revisar…».
 Implicados: ATTENDANCE-F01, ATTENDANCE-F05
 
 ### ATTENDANCE-F03 Fichar desde el móvil cuando el negocio pide la ubicación
@@ -171,10 +195,10 @@ Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, responsable, empleado
 Pantalla: Fichar
 Pasos:
-1. El negocio tiene activado «Pedir la ubicación al fichar desde un dispositivo personal»
-   (ATTENDANCE-F04) y la persona usa su propio móvil o portátil, en el que un administrador eligió
-   «Personal — un dispositivo que solo usas tú» desde ese mismo dispositivo, en Ajustes › Este
-   dispositivo (BASE-F62). Si lo cambia con Fichar abierto, la pantalla lo sigue sin recargar.
+1. El negocio tiene activado, en la pestaña «Ajustes», «Pedir la ubicación al fichar desde un dispositivo
+   personal» y la persona usa su propio móvil o portátil, en el que un administrador eligió «Personal — un
+   dispositivo que solo usas tú» desde ese mismo dispositivo, en Ajustes › Este dispositivo. Si lo cambia con
+   Fichar abierto, la pantalla lo sigue sin recargar.
 2. Bajo el botón ve «Al fichar la entrada desde este dispositivo se comprueba tu ubicación.». Pulsa
    «Fichar entrada». Ve «Obteniendo tu ubicación…»; la primera vez el móvil pide permiso.
 3. Dentro del radio, ficha como siempre y la jornada guarda la posición, la precisión y la distancia
@@ -205,16 +229,16 @@ Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, responsable, asistente
 Pantalla: Ajustes
 Pasos:
-1. Abre Control horario → «Ajustes».
+1. Abre Control horario, en la pestaña «Ajustes».
 2. Activa «Pedir la ubicación al fichar desde un dispositivo personal» y elige el «Radio permitido»: 50,
    100, 250, 500 o 1000 m. Debajo lee «Solo se pide la ubicación a un dispositivo marcado como personal;
    al TPV del mostrador, nunca. Cada dispositivo se marca como compartido o personal desde él mismo, en
-   Ajustes › Este dispositivo.» (ATTENDANCE-F03).
+   Ajustes › Este dispositivo.».
 3. Desde el propio local, pulsa «Usar mi ubicación actual»: se rellenan la latitud y la longitud y ve
    la precisión leída. También puede escribirlas a mano.
 4. En «Marcar a revisar tras (horas)» pone de 1 a 24 horas (12 si no lo toca).
 5. Pulsa «Guardar» y ve «Ajustes guardados.». Solo se envía lo que cambió.
-   Lo que se cambia mientras se está guardando no se pierde: se queda en pantalla, por guardar (hub#914).
+   Lo que se cambia mientras se está guardando no se pierde: se queda en pantalla, por guardar.
 Entra: nada de otras apps; sin ajustes guardados se ven los valores por defecto.
 Sale: los ajustes que leen Fichar (ATTENDANCE-F03) y la revisión de jornadas (ATTENDANCE-F05); el
 aviso de ajustes cambiados.
@@ -228,9 +252,9 @@ ubicación está denegado. Permite la ubicación en los ajustes del dispositivo 
 lugar de trabajo o escribe las coordenadas.»); quien no es responsable ve los ajustes en solo lectura. Como en
 las ventanas de formulario, el aviso se quita en cuanto se cambia algo y el motivo de un campo en cuanto se
 corrige ese campo (las coordenadas, como el par que son: corregir una quita el motivo de las dos); los dos
-vuelven si el siguiente intento también se rechaza. Un rechazo sin campo se queda hasta el siguiente intento
-(hub#854). Pulsar «Guardar» sin nada que enviar también es un intento: dice «Ajustes guardados.» y quita el
-aviso rojo y los motivos de los campos del rechazo anterior, que no vuelven hasta el siguiente rechazo (hub#894).
+vuelven si el siguiente intento también se rechaza. Un rechazo sin campo se queda hasta el siguiente intento.
+Pulsar «Guardar» sin nada que enviar también es un intento: dice «Ajustes guardados.» y quita el aviso rojo y
+los motivos de los campos del rechazo anterior, que no vuelven hasta el siguiente rechazo.
 Implicados: ATTENDANCE-F03, ATTENDANCE-F05
 
 ### ATTENDANCE-F05 Marcar para revisar una jornada que nadie cerró
@@ -259,7 +283,7 @@ Estado: hecho (servidor y pantalla)
 Actor: empleado (y cualquiera, para las suyas)
 Pantalla: Registros
 Pasos:
-1. Abre Control horario → «Registros»: ve sus jornadas del mes en curso, sin elegir persona.
+1. Abre Control horario, en la pestaña «Registros»: ve sus jornadas del mes en curso, sin elegir persona.
 2. En «Mes» puede elegir cualquiera de los últimos cuatro años.
 3. La jornada abierta sale «Abierta», con el tiempo trabajado hasta ahora marcado «En curso»; la que
    falta por cerrar, «Por revisar».
@@ -275,7 +299,7 @@ Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, responsable
 Pantalla: Registros
 Pasos:
-1. Abre Control horario → «Registros»: ve las jornadas del mes de todo el equipo, con el nombre entero
+1. Abre Control horario, en la pestaña «Registros»: ve las jornadas del mes de todo el equipo, con el nombre entero
    de cada persona (también de quien ya se dio de baja: sus jornadas se guardan cuatro años).
 2. Filtra por «Persona» (busca por nombre), «Mes» y «Estado» («Abierta», «Cerrada», «Por revisar»),
    y ordena por fecha, entrada, salida, persona o estado.
@@ -307,8 +331,8 @@ que acabó la anterior); «Esa persona ya tiene otra jornada abierta: no se pued
 hora futura, «La hora no puede ser futura.»; sin motivo, «Escribe un motivo de al menos 3 caracteres.». Si no se
 puede leer la zona horaria del negocio, «No se ha podido leer la zona horaria del negocio y esta corrección aún no
 se puede guardar. Recarga la página para volver a intentarlo.», con el botón desactivado.
-Cada motivo de un campo sale bajo él y se quita en cuanto se corrige ese campo, aunque otro diga lo mismo
-(hub#888). Una corrección rechazada no cambia nada ni deja rastro. «Corregir» solo aparece a quien puede
+Cada motivo de un campo sale bajo él y se quita en cuanto se corrige ese campo, aunque otro diga lo mismo.
+Una corrección rechazada no cambia nada ni deja rastro. «Corregir» solo aparece a quien puede
 corregir.
 Implicados: ATTENDANCE-F05, ATTENDANCE-F09, ATTENDANCE-F11
 
@@ -319,7 +343,7 @@ Pantalla: Registros
 Pasos:
 1. En «Registros», en una jornada, pulsa «Historial».
 2. En «Historial de correcciones» ve cada cambio, del más reciente al más antiguo: quién (o «Sistema»),
-   cuándo, «Antes» → «Después» y el «Motivo».
+   cuándo, lo de «Antes», lo de «Después» y el «Motivo».
 3. Si nadie la ha corregido, ve «Esta jornada no se ha corregido nunca.».
 Entra: las correcciones de ATTENDANCE-F08 y ATTENDANCE-F13.
 Sale: nada; el historial no se puede editar ni borrar.
@@ -333,7 +357,7 @@ Pantalla: Registros
 Pasos:
 1. En «Registros», elige el mes (y, si es responsable, la persona y el estado).
 2. Pulsa «Exportar CSV»; mientras tanto ve «Exportando…».
-3. Se descarga `attendance-2026-10.csv` con una línea por jornada del filtro, todas, no solo las que
+3. Se descarga «attendance-2026-10.csv» con una línea por jornada del filtro, todas, no solo las que
    caben en la pantalla: fecha, persona, entrada, salida, minutos de pausa, minutos trabajados, estado y
    si la entrada y la salida fueron dentro del radio.
 4. El fichero se abre con los acentos bien en una hoja de cálculo.
@@ -347,7 +371,7 @@ Implicados: ATTENDANCE-F06, ATTENDANCE-F07, BASE-F112 (dentro de la app)
 ### ATTENDANCE-F11 Ver quién está fichado ahora
 Estado: hecho (servidor, pantalla y panel del Inicio)
 Actor: propietario, administrador, responsable
-Pantalla: Registros («Fichados ahora») e Inicio
+Pantalla: Registros («Fichados ahora»), Inicio
 Pasos:
 1. Abre «Registros». Encima de la tabla, «Fichados ahora» dice cuántas personas tienen la jornada
    abierta y quiénes, desde qué hora y si están en pausa.
@@ -355,8 +379,7 @@ Pasos:
 3. Los dos cambian solos en cuanto alguien ficha la entrada o la salida, empieza o termina una pausa, o
    se corrige una jornada.
 4. Una jornada «Por revisar» (o ya olvidada) no cuenta: nadie sabe si esa persona sigue dentro. Una
-   ficha dada de baja tampoco (su jornada abierta se cierra sola, ATTENDANCE-F13). Quien está en pausa
-   sí cuenta.
+   ficha dada de baja tampoco (su jornada abierta se cierra sola). Quien está en pausa sí cuenta.
 Entra: las jornadas abiertas (ATTENDANCE-F01, ATTENDANCE-F08).
 Sale: nada; solo lee.
 Si falla: el aviso de error en su lugar, sin tapar la tabla; en el **Inicio**, el panel dice «No

@@ -23,6 +23,7 @@ from pydantic import (
 )
 
 from apps.modifier.models import MAX_CHOICES, MAX_DELTA, MAX_OPTIONS, NAME_MAX_LENGTH
+from base.allergens import AllergensIn, AllergensOut, AllergensPatchIn
 from base.recovery import RecoveredOut
 from base.schemas.assistant import names, unless_given
 
@@ -328,12 +329,12 @@ class _OptionFields(_Input):
     )
 
 
-# Bases in this order keep the group's fields first in the schema, as they have always come.
-class OptionIn(_OptionFields, _OwningGroup):
+# Bases in this order keep the group's fields first in the schema, as they have always come, and the allergens last.
+class OptionIn(AllergensIn, _OptionFields, _OwningGroup):
     pass
 
 
-class OptionOfCopyIn(_OptionFields):
+class OptionOfCopyIn(AllergensIn, _OptionFields):
     """An option of a group of a separate copy, as ``modifier.option.create`` takes it but its group."""
 
 
@@ -346,7 +347,7 @@ class GroupRecoverIn(GroupIn):
     )
 
 
-class OptionPatchIn(OptionRefIn):
+class OptionPatchIn(AllergensPatchIn, OptionRefIn):
     """Only the fields sent are changed; ``null`` leaves one as it is; ``tax_category_key: ""`` clears it."""
 
     name: Name | None = Field(None, description="New name.")
@@ -490,7 +491,9 @@ class DropIn(Schema):
 # Outputs
 
 
-class GroupOut(Schema):
+class _GroupFields(Schema):
+    """What a group is, on the screen's list and on the till's sheet alike."""
+
     id: UUID = Field(description="The group's id.")
     name: str = Field(description="Name.")
     kitchen_name: str = Field(
@@ -504,6 +507,9 @@ class GroupOut(Schema):
         description="The same option may be chosen more than once."
     )
     is_required: bool = Field(description="True when the minimum is 1 or more.")
+
+
+class GroupOut(_GroupFields):
     sort_order: int = Field(description="Order in the till.")
     option_count: int = Field(description="How many options it has.")
     default_count: int = Field(description="How many of them come chosen by default.")
@@ -518,7 +524,7 @@ class GroupRecoveredOut(GroupOut, RecoveredOut):
     """A group made again from a separate copy, and the options it came back without."""
 
 
-class OptionOut(Schema):
+class OptionOut(AllergensOut):
     id: UUID = Field(description="The option's id.")
     group_id: UUID = Field(description="Its group.")
     group_name: str = Field(description="Its group's name.")
@@ -574,7 +580,7 @@ class CategoryRefOut(Schema):
     name: str = Field(description="Its name, as Inventory shows it.")
 
 
-class TargetOptionOut(Schema):
+class TargetOptionOut(AllergensOut):
     id: UUID = Field(
         description="The option's id: what the till sends back when it is chosen."
     )
@@ -591,20 +597,7 @@ class TargetOptionOut(Schema):
     is_default: bool = Field(description="Comes chosen when the sheet opens.")
 
 
-class TargetGroupOut(Schema):
-    id: UUID = Field(description="The group's id.")
-    name: str = Field(description="Name.")
-    kitchen_name: str = Field(
-        description="Name on the kitchen ticket; empty = the name."
-    )
-    min_choices: int = Field(
-        description="Options to choose at least; 1 or more = required."
-    )
-    max_choices: int = Field(description="Options to choose at most; 0 = no ceiling.")
-    allow_repeat: bool = Field(
-        description="The same option may be chosen more than once."
-    )
-    is_required: bool = Field(description="True when the minimum is 1 or more.")
+class TargetGroupOut(_GroupFields):
     options: list[TargetOptionOut] = Field(description="Its options, in their order.")
 
 
@@ -617,7 +610,7 @@ class TargetOut(Schema):
     )
 
 
-class PickOut(Schema):
+class PickOut(AllergensOut):
     option_id: UUID = Field(description="The option chosen.")
     group_id: UUID = Field(description="Its group.")
     group_name: str = Field(description="Its group's name.")

@@ -7,7 +7,6 @@ price. A link to a product or a category Inventory deleted is left out of every 
 deletes logically, and until its event is delivered (F09) the link is still in the table.
 """
 
-from collections import Counter
 from uuid import UUID
 
 from django.db.models import Count, Prefetch, Q
@@ -18,7 +17,7 @@ from live.errors import Conflict, NotFound
 from live.operations import operation
 from psycopg import sql
 
-from apps.inventory.models import ProductCategory, Unit
+from apps.inventory.models import ProductCategory
 from apps.inventory.queries import (
     categories_standing_for,
     category_names_in_copy,
@@ -51,6 +50,9 @@ from apps.tax.models import TaxCategory
 from base.ordering import list_order, list_order_for
 from base.recovery import at_work, brought_back
 
+from . import selection
+from .copy_columns import LATER_OPTION_FIELDS, later_option_fields
+
 GROUP_NOT_FOUND = _("This group does not exist.")
 GROUP_AMBIGUOUS = _("«%(said)s» names several groups: %(names)s. Say which one.")
 OPTION_NOT_FOUND = _("This option does not exist.")
@@ -58,12 +60,6 @@ LINK_NOT_FOUND = _("This group does not apply there.")
 OPTION_AMBIGUOUS = _(
     "«%(said)s» names several options: %(names)s. Say which one, or its group."
 )
-OPTION_NOT_OFFERED = _("This option is not offered with this product.")
-CHOICE_BELOW_MIN = _("Choose at least %(min)s in «%(group)s».")
-CHOICE_ABOVE_MAX = _("Choose at most %(max)s in «%(group)s».")
-OPTION_REPEATED = _("«%(option)s» cannot be chosen more than once.")
-PRICE_BELOW_ZERO = _("These options take the price of «%(product)s» below zero.")
-PRICED_BY_MEASURE = _("«%(product)s» is sold by weight or measure: an option with a supplement cannot go with it.")
 
 #: A link whose product or category is still alive in Inventory.
 LIVE_LINK = Q(product__isnull=False, product__is_deleted=False) | Q(
@@ -204,6 +200,7 @@ def option_row(option: ModifierOption) -> dict:
         "tax_category_key": tax.key if tax else None,
         "tax_category_name": tax.display_name if tax else None,
         "is_default": option.is_default,
+        "allergens": option.allergens,
         "sort_order": option.sort_order,
         "created_at": option.created_at,
         "updated_at": option.updated_at,
@@ -527,6 +524,7 @@ def _target_option(option: ModifierOption) -> dict:
         "price_delta": option.price_delta,
         "tax_category_key": option.tax_category.key if option.tax_category else None,
         "is_default": option.is_default,
+        "allergens": option.allergens,
     }
 
 
@@ -570,15 +568,6 @@ def for_target(ctx: OperationContext, data: TargetIn) -> dict:
     return {"product_id": product.id, "product_name": product.name, "groups": groups}
 
 
-def _sold_by_unit(product) -> bool:
-    """Its price is for one unit: what a supplement per unit of the dish can be added to."""
-    return product.unit == Unit.UNIT and product.pricing_unit == Unit.UNIT and product.price_quantity == 1
-
-
-def _refuse(code: str, message: str) -> Conflict:
-    return Conflict(message, code=code, fields={"option_ids": message})
-
-
 @operation(
     "modifier.selection.resolve",
     kind="query",
@@ -602,76 +591,15 @@ def _refuse(code: str, message: str) -> Conflict:
         },
     },
 )
-def resolve_selection(ctx: OperationContext, data: ResolveIn) -> dict:  # noqa: C901, PLR0912
+def resolve_selection(ctx: OperationContext, data: ResolveIn) -> dict:
     product = find_product(data.product_id, data.product)
-    groups = groups_for_product(product)
-    offered = {
-        option.id: (option, group) for group in groups for option in group.options.all()
-    }
-    for option_id in data.option_ids:
-        if option_id not in offered:
-            raise _refuse("modifier.option_not_offered", str(OPTION_NOT_OFFERED))
-    chosen = Counter(data.option_ids)
-    for group in groups:
-        picked = {
-            option.id: chosen[option.id]
-            for option in group.options.all()
-            if chosen[option.id]
-        }
-        if not group.allow_repeat:
-            for option in group.options.all():
-                if picked.get(option.id, 0) > 1:
-                    raise _refuse(
-                        "modifier.option_repeated",
-                        str(OPTION_REPEATED) % {"option": option.name},
-                    )
-        count = sum(picked.values())
-        if group.max_choices and count > group.max_choices:
-            raise _refuse(
-                "modifier.choice_above_max",
-                str(CHOICE_ABOVE_MAX) % {"max": group.max_choices, "group": group.name},
-            )
-        if count < group.min_choices:
-            raise _refuse(
-                "modifier.choice_below_min",
-                str(CHOICE_BELOW_MIN) % {"min": group.min_choices, "group": group.name},
-            )
-    picks = []
-    for option_id in data.option_ids:
-        option, group = offered[option_id]
-        own_line = option.tax_category_id is not None and option.tax_category_id != product.tax_category_id
-        picks.append(
-            {
-                "option_id": option.id,
-                "group_id": group.id,
-                "group_name": group.name,
-                "name": option.name,
-                "kitchen_name": option.kitchen_name or option.name,
-                "price_delta": option.price_delta,
-                "tax_category_key": option.tax_category.key if option.tax_category else None,
-                "own_line": own_line,
-            }
-        )
-    if any(pick["price_delta"] for pick in picks) and not _sold_by_unit(product):
-        # Sales prices such a line by its quantity (0.350 kg): a supplement would be scaled with it.
-        raise _refuse("modifier.priced_by_measure", str(PRICED_BY_MEASURE) % {"product": product.name})
-    folded_delta = sum(pick["price_delta"] for pick in picks if not pick["own_line"])
-    if product.price + folded_delta < 0:
-        raise _refuse("modifier.price_below_zero", str(PRICE_BELOW_ZERO) % {"product": product.name})
-    own_lines: dict = {}
-    for pick in picks:
-        if pick["own_line"]:
-            line = own_lines.setdefault(
-                pick["option_id"],
-                {key: pick[key] for key in ("option_id", "group_id", "name", "kitchen_name", "tax_category_key", "price_delta")}
-                | {"quantity": 0},
-            )
-            line["quantity"] += 1
+    offered = selection.offered(groups_for_product(product), data.option_ids)
+    picks = [selection.pick(*offered[option_id], product) for option_id in data.option_ids]
     return {
         "product_id": product.id,
         "picks": picks,
-        "folded_delta": folded_delta,
-        "own_lines": list(own_lines.values()),
+        "folded_delta": selection.folded_delta(product, picks),
+        "own_lines": selection.own_lines(picks),
         "kitchen_text": ", ".join(pick["kitchen_name"] for pick in picks),
     }
 
@@ -697,9 +625,9 @@ CATEGORY_LINK_FIELDS = ("id", "group_id", "category_id")
 
 def groups_in_copy(conn) -> list[dict]:
     """Each group of a separate copy of the business, by id, with what ``GROUP_COPY_FIELDS`` names and its options there
-    (``options``) in the order they were added, each with what ``OPTION_COPY_FIELDS`` names and the id of its own tax
-    category (``tax_category_id``); nothing where the app's table is not there. ``conn`` is the copy's direct, read-only
-    connection: it is read by its own SQL over the models' names, never the ORM."""
+    (``options``) in the order they were added, each with what ``OPTION_COPY_FIELDS`` names, the later fields the copy
+    holds (``copy_columns``) and the id of its own tax category (``tax_category_id``); nothing where the app's table is
+    not there. ``conn`` is the copy's direct, read-only connection: read by its own SQL over the models' names."""
     group, option = ModifierGroup._meta, ModifierOption._meta
     if conn.execute("SELECT to_regclass(%s)", [group.db_table]).fetchone()[0] is None:
         return []
@@ -707,9 +635,9 @@ def groups_in_copy(conn) -> list[dict]:
         dict(zip(("id", *GROUP_COPY_FIELDS), row, strict=True)) | {"options": []}
         for row in conn.execute(_by_id(group, ("id", *GROUP_COPY_FIELDS)))
     ]
-    by_id = {one["id"]: one for one in groups}
-    for group_id, *row in conn.execute(_by_id(option, ("group", *OPTION_COPY_FIELDS, "tax_category"))):
-        by_id[group_id]["options"].append(dict(zip((*OPTION_COPY_FIELDS, "tax_category_id"), row, strict=True)))
+    by_id, read = {one["id"]: one for one in groups}, (*OPTION_COPY_FIELDS, *later_option_fields(conn))
+    for group_id, *row in conn.execute(_by_id(option, ("group", *read, "tax_category"))):
+        by_id[group_id]["options"].append(dict(zip((*read, "tax_category_id"), row, strict=True)))
     return groups
 
 
@@ -745,7 +673,7 @@ def groups_not_in_business(groups: list[dict]) -> list[dict]:
         {field: one[field] for field in ("id", *GROUP_COPY_FIELDS)}
         | {
             "options": [
-                {field: option[field] for field in OPTION_COPY_FIELDS}
+                {field: option[field] for field in (*OPTION_COPY_FIELDS, *LATER_OPTION_FIELDS) if field in option}
                 | {"tax_category_key": keys.get(option["tax_category_id"], "")}
                 for option in one["options"]
             ]
@@ -756,17 +684,18 @@ def groups_not_in_business(groups: list[dict]) -> list[dict]:
 
 def options_in_copy(conn) -> list[dict]:
     """Each option of a separate copy of the business, by id, with its group there (``group_id``), what
-    ``OPTION_COPY_FIELDS`` names, the id of its own tax category (``tax_category_id``) and the copy's groups by name
-    (``copy_groups``, to pair a group the business deleted with the one brought back); nothing where the app's table is
-    not there. ``conn`` is the copy's direct, read-only connection."""
+    ``OPTION_COPY_FIELDS`` names, the later fields the copy holds (``copy_columns``), the id of its own tax category
+    (``tax_category_id``) and the copy's groups by name (``copy_groups``, to pair a group the business deleted with the
+    one brought back); nothing where the app's table is not there. ``conn`` is the copy's direct read-only connection."""
     option = ModifierOption._meta
     if conn.execute("SELECT to_regclass(%s)", [option.db_table]).fetchone()[0] is None:
         return []
-    rows = conn.execute(_by_id(option, ("id", "group", *OPTION_COPY_FIELDS, "tax_category"))).fetchall()
+    read = (*OPTION_COPY_FIELDS, *later_option_fields(conn))
+    rows = conn.execute(_by_id(option, ("id", "group", *read, "tax_category"))).fetchall()
     if not rows:
         return []
     groups = group_names_in_copy(conn)
-    keys = ("id", "group_id", *OPTION_COPY_FIELDS, "tax_category_id")
+    keys = ("id", "group_id", *read, "tax_category_id")
     return [dict(zip(keys, row, strict=True)) | {"copy_groups": groups} for row in rows]
 
 
@@ -794,7 +723,7 @@ def options_not_in_business(options: list[dict]) -> list[dict]:
     taxed = {one["tax_category_id"] for one, _group in lacking}
     keys = dict(TaxCategory.objects.filter(pk__in=taxed).values_list("pk", "key"))
     return [
-        {field: one[field] for field in ("id", *OPTION_COPY_FIELDS)}
+        {field: one[field] for field in ("id", *OPTION_COPY_FIELDS, *LATER_OPTION_FIELDS) if field in one}
         | {"group_id": group, "tax_category_key": keys.get(one["tax_category_id"], "")}
         for one, group in lacking
     ]

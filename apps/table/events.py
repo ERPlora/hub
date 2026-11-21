@@ -91,6 +91,9 @@ SALE_EVENTS = [
     "sale.sale.completed",
     "sale.sale.voided",
 ]
+#: A line added, changed, removed or voided changes what an occupied table has run up, which only the plan paints;
+#: Sales records this one event with every one of them.
+BILL_EVENTS = ["sale.order.changed"]
 CUSTOMER_ERASED = "customer.customer.erased"
 #: A check paints its customer's name (a card deleted, merged or erased no longer shows; one recovered from the
 #: separate copy, CUSTOMER-F33, shows again).

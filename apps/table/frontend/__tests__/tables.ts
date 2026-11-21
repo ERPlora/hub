@@ -25,17 +25,19 @@ export function tableRow(overrides: Partial<TableOut> = {}): TableOut {
     waiter_name: '',
     checks: [],
     hold: null,
+    amount: null,
     ...overrides,
   };
 }
 
-/** An occupied table: one check of 3 guests seated at 19:05 UTC by Luis, with its check of Sales. */
+/** An occupied table: one check of 3 guests seated at 19:05 UTC by Luis, with its check of Sales at 42.50. */
 export function occupied(overrides: Partial<TableOut> = {}): TableOut {
   return tableRow({
     status: 'occupied',
     guests: 3,
     since: '2026-10-14T19:05:00Z',
     waiter_name: 'Luis',
+    amount: 4250,
     checks: [
       {
         id: 's1',

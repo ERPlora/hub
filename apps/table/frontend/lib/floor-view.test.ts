@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { NOW, occupied, SETTINGS, tableRow } from '../__tests__/tables';
+import type { Money } from '../lib/format';
 import type { TableOut } from '../operations';
 import { elapsed, floorView } from './floor-view';
 
@@ -17,7 +18,10 @@ const words: Record<string, string> = {
   'table.servedBy': 'Served by {name}',
   'table.reservedFor': 'Reserved for {name}',
   'table.erasedCustomer': 'Deleted customer',
+  'table.floor.bill': 'Bill {amount}',
 };
+
+const EUR: Money = { currency: 'EUR', decimals: 2 };
 
 function t(key: string, named: Record<string, unknown> = {}): string {
   let text = words[key] ?? key;
@@ -25,8 +29,9 @@ function t(key: string, named: Record<string, unknown> = {}): string {
   return Object.entries(named).reduce((result, [name, value]) => result.replace(`{${name}}`, String(value)), text);
 }
 
-function view(table = tableRow(), now = NOW, pick: ((table: TableOut) => boolean) | null = null) {
-  return floorView(table, { now, settings: SETTINGS, locale: 'en', timeZone: 'Europe/Madrid', t, pick });
+/** `money` null: the business has not answered yet. */
+function view(table = tableRow(), now = NOW, pick: ((table: TableOut) => boolean) | null = null, money: Money | null = EUR) {
+  return floorView(table, { now, settings: SETTINGS, locale: 'en', timeZone: 'Europe/Madrid', t, pick, money: money ?? undefined });
 }
 
 describe('elapsed', () => {
@@ -55,7 +60,7 @@ describe('floorView', () => {
     const model = view(occupied());
     expect(model).toMatchObject({ timed: true, tone: 'normal', short: '0:35', statusLabel: 'Occupied', pax: '3/4 pax', caption: 'Occupied · 3/4 pax' });
     expect(model.progress).toBeCloseTo((35 / 90) * 100);
-    expect(model.accessible).toContain('3 guests · 35 min · Served by Luis');
+    expect(model.accessible).toContain('3 guests · 35 min · Bill €42.50 · Served by Luis');
   });
 
   it('uses the configured warning and critical thresholds only for an occupied timer', () => {
@@ -86,6 +91,25 @@ describe('floorView', () => {
     expect(view(occupied({ guests: 8 })).caption).toBe('Occupied · 8/4 pax');
     const erased = tableRow({ hold: { label: '', erased: true, held_from: '2026-10-14T18:00:00Z', held_until: '2026-10-14T20:00:00Z', party_size: 2, reserving: false } });
     expect([view(erased).holder, view(erased).holdTime]).toEqual(['Deleted customer', '8:00 PM']);
+  });
+
+  it('writes the bill of an occupied table in the business money, also for the screen reader', () => {
+    const model = view(occupied());
+    expect(model.amount).toBe('€42.50');
+    expect(model.accessible).toBe('Table 4 · Dining room · 4 pax · Occupied · 3 guests · 35 min · Bill €42.50 · Served by Luis');
+    expect(view(occupied({ amount: 0 })).amount).toBe('€0.00');
+    expect(view(occupied({ amount: 125000 }), NOW, null, { currency: 'JPY', decimals: 0 }).amount).toBe('¥125,000');
+  });
+
+  it('gives no bill to a table nobody sits at, nor before the business money is known', () => {
+    for (const status of ['available', 'reserved', 'blocked'] as const) {
+      const model = view(tableRow({ status, amount: 4250 }));
+      expect(model.amount, status).toBeUndefined();
+      expect(model.accessible, status).not.toContain('Bill');
+    }
+    const unknown = view(occupied(), NOW, null, null);
+    expect(unknown.amount).toBeUndefined();
+    expect(unknown.accessible).not.toContain('Bill');
   });
 
   it('says whether a table may be picked only while a destination is picked', () => {
