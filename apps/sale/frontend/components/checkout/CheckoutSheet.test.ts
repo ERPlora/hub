@@ -7,9 +7,10 @@ import { type ActionNotice, connectActionCenter, useActionCenter } from '@erplor
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ref } from 'vue';
 
-import { business, click, flush, mountSale, resultFrame } from '../../__tests__/mount-sale';
+import { business, click, flush, ionValue, MANAGER, type MountOptions, mountSale, resultFrame } from '../../__tests__/mount-sale';
 import type { CompleteIn, PaymentMethodOut, PreviewOut, SaleOut } from '../../operations';
 import { ionModalStubOf } from '../../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub';
+import CashSessionWindow from './CashSessionWindow.vue';
 import CheckoutPanel from './CheckoutPanel.vue';
 import CheckoutSheet from './CheckoutSheet.vue';
 
@@ -38,9 +39,10 @@ const CARD: PaymentMethodOut = { id: 'm-card', name: 'card', display_name: 'Card
 const SALE = { id: 's1', number: '20261014-0001', total: 1000, already: false } as SaleOut;
 const OPS = ['sale.checkout.preview', 'sale.payment_method.list', 'sale.pos_settings.get'] as const;
 
-async function setup() {
+async function setup(session?: MountOptions['session']) {
   const m = await mountSale(CheckoutSheet, {
     props: { open: false, orderId: 'o1', lineIds: [], orderVersion: 3, customer: null, staffId: null },
+    session,
   });
   await m.wrapper.setProps({ 'onUpdate:open': (open: boolean) => m.wrapper.setProps({ open }) });
   const modal = () => m.find('sale-checkout-modal');
@@ -68,7 +70,10 @@ async function setup() {
     await flush();
   }
   const keys = () => m.sent().filter((c) => c.method === 'POST').map((c) => (c.body as CompleteIn).idempotency_key);
-  return { ...m, modal, panel, subscribed, open, openReady, keys };
+  const confirm = () => click(m.find('sale-checkout-confirm').element);
+  /** What the till was handed and the sheet's last word on being open. */
+  const outcome = () => [m.wrapper.emitted('charged'), m.wrapper.emitted('update:open')?.at(-1)];
+  return { ...m, modal, panel, subscribed, open, openReady, keys, confirm, outcome };
 }
 
 describe('CheckoutSheet', () => {
@@ -89,9 +94,8 @@ describe('CheckoutSheet', () => {
     const s = await setup();
     await s.openReady();
     s.answer(200, SALE);
-    await click(s.find('sale-checkout-confirm').element);
-    expect(s.wrapper.emitted('charged')).toEqual([[SALE, []]]);
-    expect(s.wrapper.emitted('update:open')?.at(-1)).toEqual([false]);
+    await s.confirm();
+    expect(s.outcome()).toEqual([[[SALE, []]], [false]]);
     expect(s.panel().exists()).toBe(false);
     await s.clock.advance(2000);
     expect(s.subscribed()).toEqual([]);
@@ -158,5 +162,43 @@ describe('CheckoutSheet keeps the screen clear during a charge', () => {
     } finally {
       disconnect();
     }
+  });
+});
+
+describe('CheckoutSheet: cash with the drawer closed (SALE-F08, CASH_REGISTER-F03)', () => {
+  const DRAWER = { ...MANAGER, permissions: [...MANAGER.permissions, 'cash_register.add_session'], apps: [{ label: 'cash_register', state: 'on' as const }] };
+  const CLOSED = { error: { code: 'sale.cash_register_closed', message: 'The cash register is closed: open a cash session to charge in cash.' } };
+
+  it('«Open a cash session» opens Cash register’s window over the sheet; with the session open, the same sheet charges', async () => {
+    const s = await setup(DRAWER);
+    await s.openReady();
+    const sales = [Response.json(CLOSED, { status: 409 }), Response.json(SALE)];
+    s.net.onApi(({ url }) =>
+      new URL(url, 'http://a.localhost').pathname === '/api/sale/sales' ? sales.shift()! : Response.json({ id: 'cs1' }, { status: 201 }),
+    );
+    await s.confirm();
+    expect(s.find('sale-checkout-error').text()).toBe(CLOSED.error.message);
+
+    await click(s.find('sale-checkout-open-drawer').element);
+    await vi.waitFor(() => expect(s.inDoc('cash-register-open')).not.toBeNull());
+    expect([s.router.currentRoute.value.path, s.wrapper.emitted('update:open')]).toEqual(['/sale/pos', undefined]);
+
+    await ionValue(s.inDoc('cash-register-open-balance'), '100', 'ionInput');
+    await click(s.inDoc('cash-register-open-submit'));
+    await flush();
+    expect(s.sent().at(-1)).toMatchObject({ method: 'POST', path: '/api/cash_register/sessions/open', body: { opening_balance: 10000 } });
+    expect([s.find('sale-checkout-error').exists(), s.wrapper.emitted('update:open')]).toEqual([false, undefined]);
+
+    await s.confirm();
+    expect(s.outcome()).toEqual([[[SALE, []]], [false]]);
+  });
+
+  it('when Cash register’s window cannot load, it goes to Cash register instead and the sheet closes', async () => {
+    const s = await setup(DRAWER);
+    await s.openReady();
+    s.wrapper.findComponent(CashSessionWindow).vm.$emit('unavailable');
+    await flush();
+    expect(s.router.currentRoute.value.path).toBe('/cash_register/sessions');
+    expect(s.wrapper.emitted('update:open')?.at(-1)).toEqual([false]);
   });
 });
