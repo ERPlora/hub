@@ -2,11 +2,12 @@
 
 from django.conf import settings
 from django.utils import timezone
+from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext
 from live.operations import operation
 
 from apps.verifactu import erplora_route, gateway, producer
-from apps.verifactu.models import Config, Environment, Record
+from apps.verifactu.models import Config, Environment, OwnCertificate, Record
 from apps.verifactu.schemas.config import ConfigOut
 from apps.verifactu.schemas.fields import NoInput
 from apps.verifactu.schemas.own_certificate import CertificateOut
@@ -29,6 +30,20 @@ from .route import (
 
 #: Days before its expiry from which the own certificate is announced as expiring soon (VERIFACTU-F34).
 EXPIRY_WARNING_DAYS = 30
+REFUSED_BY_THE_AEAT = _("The AEAT's test environment refused this certificate (%(detail)s): upload another one.")
+#: The AEAT's door answers a certificate it cannot verify with a redirect to its «401» page, which says these causes.
+NOT_VERIFIED_BY_THE_AEAT = _(
+    "The AEAT's test environment refused this certificate: it could not verify it (no authority it recognises issued "
+    "it, it is not valid for this service or it has expired). Upload another one."
+)
+
+
+def _proof_detail(certificate: OwnCertificate | None) -> str:
+    if certificate is None or certificate.aeat_proof != OwnCertificate.Proof.REJECTED:
+        return ""
+    if not certificate.aeat_proof_detail:
+        return str(NOT_VERIFIED_BY_THE_AEAT)
+    return str(REFUSED_BY_THE_AEAT) % {"detail": certificate.aeat_proof_detail}
 
 
 def certificate_out() -> CertificateOut:
@@ -44,6 +59,8 @@ def certificate_out() -> CertificateOut:
         expires_at=expires,
         expires_in_days=days,
         expires_soon=days is not None and 0 <= days <= EXPIRY_WARNING_DAYS,
+        aeat_proof=certificate.aeat_proof if certificate else OwnCertificate.Proof.UNTESTED,
+        aeat_proof_detail=_proof_detail(certificate),
     )
 
 

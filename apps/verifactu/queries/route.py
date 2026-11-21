@@ -117,6 +117,14 @@ def certificate_valid(now: dt.datetime | None = None) -> bool:
     return _counted_certificate().filter(expires_at__gt=now).exists()
 
 
+def certificate_proof_problem() -> str:
+    """What the own certificate still lacks to go live with it: the AEAT's test environment accepting it."""
+    proof = own_certificate().aeat_proof
+    if proof == OwnCertificate.Proof.ACCEPTED:
+        return ""
+    return "own_certificate_rejected" if proof == OwnCertificate.Proof.REJECTED else "own_certificate_untested"
+
+
 def sending_route(config: Config, environment: str, scope: Scope | None) -> str:
     """The route the records of ``environment`` go by (``erplora_route.route_for``)."""
     return erplora_route.route_for(config, environment, scope, certificate_valid())
@@ -132,7 +140,10 @@ def _route_sending_problem(config: Config, environment: str, scope: Scope | None
     if route == Config.Route.OWN:
         if not certificate_valid():
             return "own_certificate_missing"
-        return "own_certificate_unreadable" if production and not own_certificate_readable(route) else ""
+        if production and not own_certificate_readable(route):
+            return "own_certificate_unreadable"
+        # Going live needs the AEAT's test environment to have accepted it; a business already live keeps filing.
+        return certificate_proof_problem() if production and config.environment != Environment.PRODUCTION else ""
     if not production or (
         scope is not None
         and platform.is_platform_hub(scope)
