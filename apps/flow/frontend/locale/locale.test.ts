@@ -59,6 +59,11 @@ describe('flow catalogues (en source + es)', () => {
     expect(EN.get('flow.events.payment__payment__cancelled')).toBe('a payment is cancelled');
   });
 
+  it('name the list’s default order by what it does: the last touched come first', () => {
+    // FlowList sorts this option by `-updated_at`, so the one changed most recently is at the top.
+    expectWords(CATALOGUES, [['flow.list.sortUpdated', 'Last touched', 'Últimas tocadas primero']]);
+  });
+
   it('keep the old screens’ words: list, editor, tabs, steps, permissions, gallery', () => {
     expectWords(CATALOGUES, [
       ['flow.title', 'Automations', 'Automatizaciones'],
