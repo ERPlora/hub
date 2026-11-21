@@ -4,11 +4,15 @@ grid of its quantity and its provisional total."""
 from collections.abc import Iterable
 from decimal import Decimal
 
+from babel.numbers import format_decimal
+from django.conf import settings
+from django.utils import translation
 from django.utils.translation import gettext_lazy as _
 from live.errors import Conflict
 
 from apps.sale import pricing
 from apps.sale.models import OrderLine
+from base.business import babel_locale
 
 GRID_FALLBACK = Decimal("0.001")
 
@@ -25,12 +29,23 @@ WHOLE = Decimal("1")
 def check_grid(quantity: Decimal, increment: Decimal, unit: str) -> None:
     if increment and quantity % increment != 0:
         message = str(QUANTITY_OFF_GRID) % {
-            "step": f"{increment.normalize():f}",
+            "step": _step_text(increment),
             "unit": unit,
         }
         raise Conflict(
             message, code="sale.quantity_off_grid", fields={"quantity": message}
         )
+
+
+def _step_text(step: Decimal) -> str:
+    """The step as the reader writes a quantity: «0,001» in Spanish, «0.001» in English."""
+    language = translation.get_language() or settings.LANGUAGE_CODE
+    return format_decimal(
+        step.normalize(),
+        locale=babel_locale(language),
+        group_separator=False,
+        decimal_quantization=False,
+    )
 
 
 def provisional_total(line: OrderLine) -> int:
