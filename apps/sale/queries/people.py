@@ -5,6 +5,8 @@ from collections.abc import Iterable
 
 from django.contrib.auth import get_user_model
 
+from base.queries.people import person_label as profile_name
+
 
 def person_label(who) -> str:
     """A person as a person reads them: their name, else their e-mail; their username (the id of the session) only
@@ -17,11 +19,22 @@ def person_label(who) -> str:
 
 
 def person_names(usernames: Iterable[str]) -> dict[str, str]:
-    """The people the apps keep by their username, by the name a person reads. Whoever is not found, or has
-    neither a name nor an e-mail, is left out: their username is an internal id, never a name."""
+    """The people the apps keep by their username, by the name a person reads."""
     wanted = {name for name in usernames if name}
     if not wanted:
         return {}
     users = get_user_model()
     found = users.objects.filter(**{f"{users.USERNAME_FIELD}__in": wanted})
-    return {user.get_username(): label for user in found if (label := person_label(user)) != user.get_username()}
+    return {user.get_username(): person_label(user) for user in found}
+
+
+def cashier_name(username: str) -> str:
+    """Who charged, for the paper the customer takes: their name in this business («My profile», else their
+    account's). Empty without one: an account without a name is named by its e-mail, and neither that nor the
+    username goes on a customer's paper."""
+    users = get_user_model()
+    user = users.objects.filter(**{users.USERNAME_FIELD: username}).first() if username else None
+    if user is None:
+        return ""
+    name = profile_name(user)
+    return "" if "@" in name or name == user.get_username() else name

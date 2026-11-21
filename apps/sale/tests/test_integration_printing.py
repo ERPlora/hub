@@ -14,6 +14,7 @@ from live.operations import registry
 from apps.printing.models import PrintJob
 from apps.sale.models import Sale
 from apps.sale.tests.conftest import HUB_DB, ctx_for, run
+from base.models import Profile
 from apps.sale.tests.test_integration_invoice import ISSUER
 
 pytestmark = HUB_DB
@@ -269,15 +270,19 @@ def test_a_full_invoice_names_who_charged_too(bar, till, account):
     assert (job.document_type, job.document["cashier"]) == ("invoice", "Bea")
 
 
-def test_an_account_without_a_name_is_named_by_its_email_as_in_the_kitchen(bar, till, account):
-    charge("sale-print-email", ctx=account("saas:03c35fa5-0000-7000-8000-000000000003", email="bea@example.com"))
+def test_the_name_of_my_profile_in_this_business_is_the_one_on_the_receipt(bar, till, account):
+    bea = account("saas:05e57fc7-0000-7000-8000-000000000005", first_name="Beatriz Ruiz Soler")
+    Profile.objects.create(username=bea.actor.get_username(), first_name="Bea")
+    charge("sale-print-profile", ctx=bea)
     (job,) = jobs()
-    assert job.document["cashier"] == "bea@example.com"
+    assert job.document["cashier"] == "Bea"
 
 
 def test_without_a_name_to_print_the_receipt_has_no_cashier_line(bar, till, account):
-    """Neither a name nor an email (only the internal id), or no person at all (an API key, the platform):
-    the line is left out rather than printing an id."""
+    """The paper goes to the customer: with no name it has no cashier line, rather than an employee's e-mail (the
+    SaaS names an account without a name by its address) or an internal id (an account with nothing, an API key)."""
+    charge("sale-print-named-by-email", ctx=account("saas:03c35fa5-0000-7000-8000-000000000003", first_name="bea@example.com"))
+    charge("sale-print-email-only", ctx=account("saas:06f68fd8-0000-7000-8000-000000000006", email="bea@example.com"))
     charge("sale-print-nameless", ctx=account("saas:04d46fb6-0000-7000-8000-000000000004"))
     charge("sale-print-platform")
-    assert [("cashier" in job.document) for job in jobs()] == [False, False]
+    assert [("cashier" in job.document) for job in jobs()] == [False, False, False, False]

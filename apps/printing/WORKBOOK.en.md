@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:ac226b8a4bef74cf1b8e8203985ab3f9d228cbf8706c25d087a7dad5c3443149 -->
+<!-- generated from WORKBOOK.md sha256:ac9333d83849a4313d048a82ee104aabc79499d75f12e85ed0eb659d7c52b5ea -->
 
 ## What it is for and who it is for
 
@@ -385,9 +385,9 @@ Screen: Sell (from Sales)
 Steps:
 1. The employee charges in **Sales → Sell**.
 2. Together with the charge, Sales asks Printing for the receipt: the simplified receipt or the full invoice,
-   with the VeriFactu QR and the name of whoever charged it ("Cashier: Bea Ruiz"), the same one Kitchen names
-   the waiter by (their account's name or, without a name, their email). With no name to print, the paper has
-   no such line: never an internal id.
+   with the VeriFactu QR and the name of whoever charged it ("Cashier: Bea Ruiz"): the one in "My profile" in
+   this business or, if they have not set one, their account's. With no name to print, the paper has no such
+   line: never their email nor an internal id, because the customer takes the receipt away.
 3. If "Print receipt on checkout" is on, the receipt goes into the queue of the Receipt role
    with the copies from the settings and, if "Open drawer on checkout" is on and cash came in, with the
    order to open the drawer (PRINTING-F13); the device takes it out (PRINTING-F18). After charging, Sales says
