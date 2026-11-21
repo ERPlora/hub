@@ -27,18 +27,8 @@ from apps.service import queries as service_queries
 from apps.service.models import Service
 from apps.tax.models import TaxCategory
 from base.tenancy.context import current_alias, use_hub
-from base.tenancy.tests.test_recovery import (
-    ANA,
-    APPOINTMENTS,
-    SERIES,
-    Recoveries,
-    Salon,
-    a_monday_at,
-    booked_events,
-    fresh,
-    run,
-    run_in,
-)
+from base.tenancy.tests.test_recovery import ANA, Recoveries, fresh, run, run_in
+from base.tenancy.tests.test_recovery_appointments import APPOINTMENTS, SERIES, Salon, a_monday_at, booked_events
 
 from .conftest import HUB_DB
 

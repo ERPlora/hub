@@ -140,7 +140,6 @@
 777 base/tenancy/move.py ERPlora/erplora-next#74
 1419 base/tenancy/tests/test_move.py ERPlora/erplora-next#74
 1180 base/tenancy/tests/test_provision.py ERPlora/erplora-next#74
-1201 base/tenancy/tests/test_recovery.py ERPlora/erplora-next#74
 1452 base/tests/test_app_activation.py ERPlora/erplora-next#74
 1030 base/tests/test_queries_home.py ERPlora/erplora-next#74
 1194 base/tests/test_ws_print.py ERPlora/erplora-next#74
