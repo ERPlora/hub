@@ -11,7 +11,7 @@
 // Screenshots of the till in the three viewports. What this file creates is deleted after it.
 import { expect, type Page, test } from '@playwright/test';
 
-import { A, EMPLOYEE, api, hostPage, login, psql, shot, shown, untilStill } from './helpers';
+import { A, EMPLOYEE, api, capture, hostPage, login, psql, shot, shown } from './helpers';
 import { offersRowAction } from './service-helpers';
 import { cleanUp as cleanCustomers, createCard, e2eName, spanishMobile } from './customer-helpers';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
@@ -154,8 +154,7 @@ test('SALE-F01: while the cash tendered is missing or short, «Charge» is greye
     await greyed(true);
     await press('1');
     await greyed(true);
-    await untilStill(page);
-    await page.screenshot({ path: shot(`sale-checkout-charge-short-${vp.label}`) });
+    await capture(page, `sale-checkout-charge-short-${vp.label}`);
     await press('5');
     await greyed(false);
   }
