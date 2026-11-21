@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:784c28356048827bdb69a1056c7bfd7315728c1e58411e38984a35f2f98fd8e3 -->
+<!-- generated from WORKBOOK.md sha256:da1749d76f3638ed5598e5ba06a7210514b58459a91c76e3bb876b5ad78eb59b -->
 
 ## What it is for and who it is for
 
@@ -329,8 +329,7 @@ Actor: customer, without an account
 Screen: the business's public page `/p/<business>/invoice/<code>`
 Steps:
 1. The ticket, on screen and on the receipt printer, carries after the fiscal QR a second QR that opens this page,
-   with "Scan to ask for your full invoice" above it and its code below, which is also the end of the address
-   (SALE-F29).
+   with "Scan to ask for your full invoice" above it and its code below, which is also the end of the address.
 2. The customer opens it on their phone, without signing in, and sees the business, their ticket's number, date and
    total; if they already asked for it, they see their full invoice without typing their details again.
 3. They type their name or company name, their country, the kind of document (only outside Spain), their tax ID

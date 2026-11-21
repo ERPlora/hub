@@ -1083,8 +1083,8 @@ Pasos:
    «VERI*FACTU» debajo y «Escanéalo para cotejar este tique en la AEAT» («…esta factura…» si es una
    factura); cuando la AEAT ya respondió, su código («CSV: …») en lugar de esa frase. Mientras VeriFactu
    no tiene registro de ese documento, el papel sale sin QR. Un tique con su documento fiscal (emitido o
-   pendiente) lleva después un segundo QR, el de la página donde el cliente pide la factura completa
-   (INVOICE-F04): «Escanea para pedir tu factura completa» encima y el código del tique debajo, para
+   pendiente) lleva después un segundo QR, el de la página donde el cliente pide la factura completa:
+   «Escanea para pedir tu factura completa» encima y el código del tique debajo, para
    escribirlo si la cámara no lo lee; si no se pudo dibujar, debajo va la dirección entera. Una factura, o
    una venta sin Facturación, no lo lleva. Si su documento fiscal no se pudo emitir
    al cobrar, el papel lo dice bajo el número («Documento fiscal pendiente») y, encima del papel (fuera

@@ -8,7 +8,7 @@ import { A, api, capture, login, psql, saveSessionForTheSweep, shown } from './h
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
 import { cleanInvoices, deliver, ensureIssuer, snapshotSeries } from './invoice-helpers';
 import { chargeByApi, cleanSales, type SaleOut, stamp } from './sale-helpers';
-import { noHorizontalScroll } from './service-helpers';
+import { noHorizontalScroll, ownerPage } from './service-helpers';
 
 const RUN = stamp();
 const TILL = `e2e Claim till ${RUN}`;
@@ -21,9 +21,7 @@ const SIZES = [
 let coffee: Product;
 
 test.beforeAll(async ({ browser }) => {
-  const context = await browser.newContext({ baseURL: A });
-  const page = await context.newPage();
-  await login(page, A, '/sale/sales');
+  const { context } = await ownerPage(browser, '/sale/sales');
   snapshotSeries();
   await ensureIssuer(context);
   coffee = await createProduct(context, { name: `E2E Claim coffee ${RUN}`, sku: `E2E-CLAIM-${RUN}`, price: 150, tax_category_key: 'restaurant.drink' });

@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:414ddacd73ccf6c7163ff89aa800fdb26256ce89907f30a48cd7e8033c633eab -->
+<!-- generated from WORKBOOK.md sha256:a5a0244cafc610dfd3e5308cbbd3aade601b10bdd146658456078e25ac9d65ee -->
 
 ## What it is for and who it is for
 
@@ -1078,8 +1078,8 @@ Steps:
    and "Scan it to check this receipt at the AEAT" ("…this invoice…" if it is an invoice); once the AEAT
    has answered, its code ("CSV: …") instead of that sentence. While VeriFactu has no record of that
    document, the paper comes out without a QR. A receipt with its fiscal document (issued or pending)
-   carries a second QR after it, the one of the page where the customer asks for the full invoice
-   (INVOICE-F04): "Scan to ask for your full invoice" above and the receipt's code below, to type it if the
+   carries a second QR after it, the one of the page where the customer asks for the full invoice:
+   "Scan to ask for your full invoice" above and the receipt's code below, to type it if the
    camera cannot read it; if it could not be drawn, the whole address goes below instead. An invoice, or a
    sale without Invoicing, carries none. If its fiscal document could not be issued when charging,
    the paper says so under the number ("Fiscal document pending") and, above the paper (outside what is

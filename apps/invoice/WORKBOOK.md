@@ -336,8 +336,7 @@ Actor: cliente, sin cuenta
 Pantalla: la página pública del negocio `/p/<negocio>/invoice/<código>`
 Pasos:
 1. El tique, en pantalla y en la impresora de tiques, lleva tras el QR fiscal un segundo QR que abre esta página,
-   con «Escanea para pedir tu factura completa» encima y su código debajo, que es también el final de la dirección
-   (SALE-F29).
+   con «Escanea para pedir tu factura completa» encima y su código debajo, que es también el final de la dirección.
 2. El cliente la abre en su móvil, sin iniciar sesión, y ve el negocio, el número, la fecha y el total de su tique;
    si ya la pidió, ve su factura completa sin volver a escribir sus datos.
 3. Escribe su nombre o razón social, su país, el tipo de documento (solo fuera de España), su NIF y su domicilio,
