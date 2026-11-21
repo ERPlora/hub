@@ -10,6 +10,12 @@ Lo que no entra todavía: nada.
 
 ## Para qué sirve y para quién
 
+Clientes es el fichero de las personas y empresas de tu negocio: la ficha de cada una con su contacto y sus datos
+fiscales, sus grupos y etiquetas, tus notas, su permiso para recibir publicidad por cada canal y lo que te ha
+comprado. En la peluquería es la clienta de la agenda; en el restaurante, el comensal que reserva o pide factura.
+
+### En detalle
+
 Clientes es el **fichero de personas y empresas** del negocio y el dueño de su dato personal: la
 ficha con el contacto y los datos fiscales, sus grupos, etiquetas y campos propios, sus notas y su
 actividad, su consentimiento para recibir publicidad por cada canal y lo que ha comprado.
@@ -24,7 +30,7 @@ Citas y Reservas lo buscan por nombre o teléfono, WhatsApp lo reconoce por su n
 enteran cuando se unen dos fichas o se borran los datos de una persona. Clientes no necesita ninguna
 otra app.
 
-Quién la usa:
+### Quién la usa y qué hace cada uno
 
 - El **propietario** y el **administrador**: todo, también eliminar fichas y borrar datos personales.
 - El **responsable**: edita fichas, une duplicados, crea y cambia grupos, etiquetas y campos (y
@@ -82,9 +88,17 @@ tiene su propia base de datos: sus fichas solo las ve ese negocio.
 ## Pantallas
 
 Clientes se abre desde el menú **Clientes** y tiene cuatro pestañas: **Clientes**, **Grupos**,
-**Etiquetas** y **Campos**. No tiene pestaña de ajustes.
+**Etiquetas** y **Campos**. No tiene pestaña de ajustes. El buscador de cliente del TPV no es una pestaña de
+Clientes: vive en **Ventas → Vender**, con el botón «Asignar cliente».
 
 ### Clientes
+Aquí está el fichero de tus clientes. Arriba ves cuatro cifras: cuántos hay, cuántos están activos, cuántos son VIP
+y cuánto han gastado. Debajo, la lista: búscalos por nombre, teléfono, email, NIF o empresa, fíltralos y ordénalos.
+Con **Añadir** das de alta una ficha, con **Importar CSV** traes los clientes que ya tenías y con **Exportar CSV**
+te los llevas a una hoja de cálculo. Toca una fila para abrir su ficha: sus datos, sus notas, su permiso de
+publicidad, sus alergias y sus compras.
+
+#### Detalle
 Arriba, cuatro cifras: «Clientes», «Activos», «VIP» e «Ingresos» (lo gastado por las fichas vivas).
 Debajo, la tabla: «Nombre», «Email», «Teléfono», «Etapa» y «Gastado»; buscador «Buscar nombre,
 teléfono o email…» (busca también NIF y empresa); filtros por etapa, origen, activo y gastado
@@ -92,7 +106,7 @@ teléfono o email…» (busca también NIF y empresa); filtros por etapa, origen
 **Importar CSV** a quien puede gestionar fichas, y **Exportar CSV** a quien puede exportar. Tocar
 una fila abre la ficha.
 
-### Ficha de cliente
+#### Ficha de cliente
 El nombre y los botones que permite el perfil: **Editar**, **Eliminar**, **Fusionar con…** y
 **Borrar datos personales** (el empleado ve **Fusionar con…**, que hace con el PIN de un responsable).
 Bloques: los datos (Email, Teléfono, NIF/CIF, Empresa, Dirección,
@@ -103,44 +117,32 @@ marketing» con una línea por canal y «Todo lo que se decidió»; «Añadir no
 «Historial de visitas» de Citas).
 
 ### Grupos
+Los grupos ordenan a tus clientes, por ejemplo «Socios» o «Empresas». Aquí los creas, les cambias el nombre o el
+color, los desactivas y los eliminas; después, en la ficha de cada cliente, marcas a qué grupos pertenece.
+
+#### Detalle
 Tabla «Nombre», «Descripción», «Clientes» (cuántas fichas vivas tiene), «Orden» y «Activo»; buscador
 «Buscar grupo…» y filtro de activos; **Añadir** y **Editar** a quien puede configurar y al empleado (con
 el PIN de un responsable), **Eliminar** al propietario y al administrador.
 
 ### Etiquetas
+Las etiquetas son marcas de color que pones a una ficha para reconocer al cliente de un vistazo, por ejemplo
+«Habitual» o «Prefiere mañanas». Aquí las creas, las cambias y las eliminas; en la ficha de cada cliente marcas las
+que lleva.
+
+#### Detalle
 Tabla «Nombre», «Color», «Clientes» y «Activa»; buscador «Buscar etiqueta…»; mismas acciones que
 Grupos.
 
 ### Campos
+Los campos propios son los datos que tu negocio quiere guardar de cada cliente y que la ficha no trae, como la talla
+o el tipo de cabello. Aquí los creas con su tipo (texto, número, fecha, sí o no, una lista de opciones o un texto
+largo) y decides si son obligatorios; salen en la ficha de todos tus clientes.
+
+#### Detalle
 Tabla «Nombre», «Tipo», «Obligatorio» (Sí/No), «Orden» y «Activo»; buscador «Buscar campo…»; filtros
 por tipo, obligatorio y activo; **Añadir**, **Editar** y **Eliminar** a quien puede configurar y al
 empleado (con el PIN de un responsable).
-
-### Buscador de cliente del TPV
-Vive dentro de la pantalla de venta de **Venta**: un botón «Asignar cliente» (o el nombre del cliente
-ya elegido) abre un buscador por nombre, teléfono o email, con «+ Nuevo cliente «…»» (nombre y
-teléfono) y **Quitar cliente**. Lo pinta Clientes; el hueco lo reserva Venta.
-
-### Buscador de cliente del TPV · API
-El componente `CustomerSearch` de Clientes (Venta lo importa por su ruta, de los componentes de Clientes).
-
-```vue
-<CustomerSearch v-model="venta.cliente" v-model:open="eligiendo" />
-```
-
-- `v-model` (`CustomerSnapshot | null`): el cliente asignado, como COPIA de su ficha fiscal en el momento:
-  `customer_id`, `customer_name`, `customer_tax_id`, `customer_address` («calle, CP ciudad, país», en el
-  idioma de la página) y `customer_country` (código ISO de dos letras, o vacío). `null` = sin cliente.
-- `v-model:open` (opcional): abre y cierra el buscador; Venta lo pone a `true` cuando exige cliente y no hay.
-- El botón dice «Asignar cliente» o el nombre del cliente. El buscador (un `ion-modal`) busca por nombre,
-  teléfono o email entre las 20 primeras fichas, en vivo, y distingue «buscando», «sin resultados»,
-  «caído» (con «Reintentar») y «sin permiso». Al elegir lee la ficha entera (`customer.customer.detail`);
-  si no se puede leer, no asigna y lo dice. «+ Nuevo cliente «…»» (quien gestiona fichas) crea con nombre
-  y teléfono; si fichas vivas ya tienen ese teléfono, las enseña y pregunta «usar o crear una nueva»
-  (nunca asigna sin elegir; F12, F18). «Quitar cliente» devuelve `null`.
-- No enlaza el pedido: eso es de Venta, con `customer.order.link` y `customer.order.customer` (F19).
-- Mientras Venta no existe, se ve y se prueba en `/customer/preview/customer-search` (solo en el servidor
-  de desarrollo; nunca en el build de producción).
 
 ## Estados de cada pantalla
 
@@ -205,8 +207,7 @@ Estado: hecho
 Actor: propietario, administrador, responsable, empleado
 Pantalla: Clientes
 Pasos:
-1. En **Clientes** pulsa **Añadir**: se abre el diálogo «Nuevo cliente» (el panel lateral del producto,
-   pedido a `@erplora/ui` en `UI-REQUESTS.md`).
+1. En **Clientes** pulsa **Añadir**: se abre el diálogo «Nuevo cliente».
 2. A la vista: «Nombre», «Teléfono», «Email», «NIF/CIF» y «Empresa». Detrás de «Más datos»:
    «Dirección», «Ciudad», «Código postal», «País», «Foto» (su dirección), «Cumpleaños»,
    «Aniversario», «Origen» («En el local» de entrada), «Etapa» («Contacto» de entrada), «Canal
@@ -233,16 +234,16 @@ Pantalla: Clientes
 Pasos:
 1. Escribe en el buscador. Busca a la vez en nombre, email, teléfono, NIF y empresa, sin distinguir
    mayúsculas ni acentos («garcia» encuentra «García»). Un término hecho solo de cifras y signos de
-   teléfono (con espacios, guiones o paréntesis, con `+` o `00` delante) se busca por sus cifras, sin
-   el `00` ni el cero nacional, así que la ficha se encuentra se escriba como se escriba.
+   teléfono (con espacios, guiones o paréntesis, con el + o el 00 delante) se busca por sus cifras, sin
+   el 00 ni el cero nacional, así que la ficha se encuentra se escriba como se escriba.
 2. Con los filtros: etapa, origen, activo y gastado por rango («Desde / Hasta», en la moneda del negocio,
    la de su país en Ajustes → Negocio, con sus decimales: el yen no tiene; con o sin su símbolo, «12,50 zł»).
-   El importe se escribe como en cualquier campo de importe del Hub y como en las demás listas (hub#1196): con
+   El importe se escribe como en cualquier campo de importe del Hub y como en las demás listas: con
    o sin puntos de miles («1.000,50», «1,000.50», «2 500»); «1.000» en euros puede ser mil euros o un euro, y
    pide escribir los decimales.
 3. Ordena por nombre, email, teléfono, etapa, gastado, última compra o fecha de alta. De entrada, por
    nombre de la A a la Z, 50 por página (como mucho 100).
-4. Toca una fila para abrir su ficha (CUSTOMER-F03).
+4. Toca una fila para abrir su ficha.
 Entra: el texto, los filtros y el orden.
 Sale: nada; solo lectura. Las fichas eliminadas, unidas a otra o con los datos borrados no salen;
 las marcadas como no activas, sí.
@@ -278,7 +279,7 @@ Pantalla: Ficha de cliente
 Pasos:
 1. En la ficha pulsa **Editar**: los datos pasan a ser el formulario del alta, más los «Campos
    personalizados» del negocio (cada uno con su forma: texto, número, fecha, sí/no, lista o texto
-   largo; los obligatorios llevan `*`) y la casilla «Activo».
+   largo; los obligatorios llevan un asterisco) y la casilla «Activo».
 2. Cambia lo que haga falta. Vaciar un campo también es un cambio.
 3. Pulsa **Guardar**. Sale «Cliente actualizado».
 Entra: los datos cambiados y el valor de cada campo personalizado. El teléfono se guarda en formato
@@ -340,9 +341,9 @@ Actor: propietario, administrador
 Pantalla: Ficha de cliente
 Pasos:
 1. En la ficha pulsa **Eliminar**.
-2. Un diálogo pregunta «Eliminar cliente» — «¿Eliminar {nombre}? Deja de salir en la lista, en el
+2. Un diálogo pregunta «Eliminar cliente» — «¿Eliminar Ana García? Deja de salir en la lista, en el
    TPV y en la búsqueda por teléfono. Sus ventas se conservan.» con **Cancelar** y **Eliminar**.
-3. Al confirmar sale «Cliente {nombre} eliminado» y la ficha desaparece de la lista, del TPV y de la
+3. Al confirmar sale «Cliente Ana García eliminado» y la ficha desaparece de la lista, del TPV y de la
    búsqueda por teléfono.
 Entra: la ficha.
 Sale: la ficha marcada como eliminada CONSERVANDO sus datos, su actividad, sus consentimientos, sus
@@ -361,17 +362,19 @@ Actor: todos los que gestionan fichas
 Pantalla: Clientes
 Pasos:
 1. Pulsa **Importar CSV** y elige el fichero.
-2. Cabeceras que entiende: `name`/«Nombre», `email`/«Email»/«correo», `phone`/«Teléfono»/«tel»,
-   `tax_id`/«NIF»/«CIF», `company_name`/«Empresa», `address`/«Dirección», `city`/«Ciudad»,
-   `postal_code`/«CP»/«Código postal», `country`/«País», `lifecycle_stage`/«Etapa» y
-   `notes`/«Notas» (las mismas columnas que da la exportación, CUSTOMER-F09), y además `source`,
-   `preferred_channel`, `birthday`, `anniversary` y `avatar`.
-3. Mientras trabaja sale «Importando…». Al acabar, un resumen «Importación: {total} filas —
-   {creadas} creadas, {omitidas} omitidas.» con cada fila omitida y su motivo, que empieza por la
+2. La primera fila del fichero nombra las columnas, en español o con los nombres de la exportación: «Nombre»,
+   «Email» o «correo», «Teléfono» o «tel», «NIF» o «CIF», «Empresa», «Dirección», «Ciudad», «CP» o «Código
+   postal», «País», «Etapa» y «Notas». Un fichero exportado de Clientes se puede volver a importar tal cual.
+3. Mientras trabaja sale «Importando…». Al acabar, un resumen como «Importación: 120 filas —
+   118 creadas, 2 omitidas.» con cada fila omitida y su motivo, que empieza por la
    columna de la que habla («Nombre: Este campo es obligatorio.»; igual con un email o un teléfono
    que no son válidos), y las que tienen algo que revisar («País no reconocido: importado sin país,
    revísalo en la ficha.»).
-Entra: el fichero, que la pantalla envía en bloques de 50 filas.
+Entra: el fichero, que la pantalla envía en bloques de 50 filas. Cabeceras que entiende: `name`/«Nombre»,
+`email`/«Email»/«correo», `phone`/«Teléfono»/«tel», `tax_id`/«NIF»/«CIF», `company_name`/«Empresa»,
+`address`/«Dirección», `city`/«Ciudad», `postal_code`/«CP»/«Código postal», `country`/«País»,
+`lifecycle_stage`/«Etapa» y `notes`/«Notas» (las mismas columnas que da la exportación, CUSTOMER-F09), y además
+`source`, `preferred_channel`, `birthday`, `anniversary` y `avatar`.
 Sale: las fichas creadas, con origen «Importación», el teléfono en formato internacional y sin
 consentimiento (aunque el fichero traiga una columna de consentimiento), y un aviso de ficha creada
 por cada una, así WhatsApp une sus conversaciones como en el alta a mano. Una fila sin etapa entra
@@ -381,7 +384,7 @@ Si falla: una fila mala se omite con su motivo y las demás se crean. Una fila c
 teléfono y email que una ficha que ya está (porque ya se importó o porque el fichero la repite) se
 omite con «Ya hay una ficha con este nombre, teléfono y email: no se vuelve a crear.»; así, volver a
 importar el mismo fichero tras un corte a mitad solo crea lo que faltaba. Basta que cambie uno de los
-tres para que se cree (una madre y su hija comparten teléfono, CUSTOMER-F12).
+tres para que se cree (una madre y su hija pueden compartir teléfono).
 Implicados: WHATSAPP_INBOX-F04
 
 ### CUSTOMER-F09 Exportar las fichas a CSV
@@ -390,7 +393,7 @@ Actor: propietario, administrador, responsable
 Pantalla: Clientes
 Pasos:
 1. Con la búsqueda y los filtros que se quieran, pulsa **Exportar CSV**.
-2. El navegador descarga `customers.csv` con TODAS las fichas que cumplen la búsqueda, no solo la
+2. El navegador descarga el fichero «customers.csv» con TODAS las fichas que cumplen la búsqueda, no solo la
    página que se ve.
 Entra: la búsqueda y los filtros de la tabla.
 Sale: un fichero con las columnas `name`, `email`, `phone`, `tax_id`, `company_name`, `address`,
@@ -431,18 +434,18 @@ Actor: quien da de alta o edita
 Pantalla: Ficha de cliente
 Pasos:
 1. Al dar de alta, editar, importar o crear en el TPV o por WhatsApp, se escribe el teléfono como se
-   tenga (con espacios o guiones, con `0034` o `+34` delante, o con el prefijo de otro país y el cero
+   tenga (con espacios o guiones, con 0034 o +34 delante, o con el prefijo de otro país y el cero
    nacional entre paréntesis).
-2. Al guardar se leen las reglas de libphonenumber: con el prefijo que lleve o, si no lleva, en el
-   país del negocio (España si no tiene ninguno, ver «Antes de empezar»); fuera espacios, guiones, puntos, barras,
+2. Al guardar, el número se lee con el prefijo que lleve o, si no lleva, como un número del país del
+   negocio (el de Ajustes → Negocio; España si no tiene ninguno); fuera espacios, guiones, puntos, barras,
    paréntesis y el cero nacional (también entre paréntesis tras el prefijo). Italia y los demás
-   países que conservan el `0` tras el prefijo lo conservan. El número tiene que ser un número
+   países que conservan el 0 tras el prefijo lo conservan. El número tiene que ser un número
    válido de su país (su numeración, no solo su longitud). Se guarda con su prefijo y las cifras
-   seguidas (`+34` y las nueve cifras, para un número español).
+   seguidas (+34 y las nueve cifras, para un número español).
 3. Vaciar el teléfono está permitido: solo el nombre es obligatorio.
 Entra: el teléfono tecleado.
 Sale: el teléfono en E.164 en la ficha. Quien lo copia (Citas en la cita) lo copia ya normalizado.
-Si falla: un número que no es válido en su país (`600111` en España, un rango que no se usa), con
+Si falla: un número que no es válido en su país (600111 en España, un rango que no se usa), con
 letras (una extensión) o con dos números en el mismo campo se rechaza con «No es un teléfono válido de su país: revisa las
 cifras o escríbelo con su prefijo internacional (+44…).» y no se guarda nada.
 Implicados: APPOINTMENT-F01, WHATSAPP_INBOX-F04
@@ -450,14 +453,13 @@ Implicados: APPOINTMENT-F01, WHATSAPP_INBOX-F04
 ### CUSTOMER-F12 Evitar fichas duplicadas de la misma persona
 Estado: hecho
 Actor: todos los que gestionan fichas
-Pantalla: Clientes y Buscador de cliente del TPV
+Pantalla: Clientes, Buscador de cliente del TPV
 Pasos:
-1. Antes de crear, se busca por nombre, teléfono, email o NIF (CUSTOMER-F02).
-2. En el alta rápida del TPV, si el teléfono es el de una o más fichas vivas (CUSTOMER-F10), se
-   enseñan y se pregunta: usar una de ellas o crear otra (puede ser otra persona con el mismo
-   teléfono). Nunca se asigna sin elegir (CUSTOMER-F18).
+1. Antes de crear, se busca por nombre, teléfono, email o NIF en el buscador de **Clientes**.
+2. En el alta rápida del TPV, si el teléfono es el de una o más fichas, se enseñan y se pregunta: usar
+   una de ellas o crear otra (puede ser otra persona con el mismo teléfono). Nunca se asigna sin elegir.
 3. Por WhatsApp, la respuesta de citas solo crea ficha si la búsqueda por número no encuentra a nadie.
-4. Si ya hay dos fichas de la misma persona, se juntan con CUSTOMER-F13.
+4. Si ya hay dos fichas de la misma persona, se juntan con **Fusionar con…** desde la ficha que se queda.
 Entra: lo que se teclea.
 Sale: nada propio. A propósito, ninguna regla impide dos fichas con el mismo teléfono, email o NIF:
 una madre y su hija comparten teléfono, y una empresa da el mismo email a varias personas.
@@ -471,13 +473,13 @@ Pantalla: Ficha de cliente
 Pasos:
 1. Abre la ficha que se va a QUEDAR y pulsa **Fusionar con…**.
 2. Busca la duplicada (nombre, email, teléfono, NIF o empresa) y tócala.
-3. Lee el aviso: «{absorbida} se fusionará en {superviviente}: sus citas, ventas, reservas,
-   conversaciones, bonos, notas y consentimientos pasan a {superviviente}, los datos que falten se
-   completan con los suyos y {absorbida} desaparece de la lista. No se puede deshacer.».
-4. Pulsa **Fusionar**. Sale «{nombre} se ha fusionado en esta ficha.».
+3. Lee el aviso, que nombra las dos fichas: «Ana G. se fusionará en Ana García: sus citas, ventas, reservas,
+   conversaciones, bonos, notas y consentimientos pasan a Ana García, los datos que falten se
+   completan con los suyos y Ana G. desaparece de la lista. No se puede deshacer.».
+4. Pulsa **Fusionar**. Sale «Ana G. se ha fusionado en esta ficha.».
 5. Si quien pulsa es un empleado, antes se abre encima «Hace falta una aprobación» con «Se aprueba:
    Fusionar dos fichas de cliente», y un responsable lo aprueba con su PIN (o su placa) en ese mismo
-   dispositivo (BASE-F84); entonces se fusionan.
+   dispositivo; entonces se fusionan.
 Entra: las dos fichas, vivas y distintas.
 Sale: la que se queda conserva sus datos y solo rellena sus campos VACÍOS con los de la otra (también
 el canal preferido si era «Ninguno»); las notas internas se juntan una detrás de otra; compras y
@@ -530,7 +532,8 @@ Entra: el canal y, si se quiere, un motivo.
 Sale: un hecho nuevo (el «Dado» anterior se conserva: prueba el tiempo en que sí se podía escribir),
 «Consentimiento retirado» en la actividad y el aviso `customer.consent.withdrawn`. Volver a darlo
 después es otro hecho.
-Si falla: como CUSTOMER-F14.
+Si falla: «Este cliente ya no está disponible.» si la ficha ya no está. Quien no gestiona fichas ve el
+estado sin botones.
 Implicados: ninguno
 
 ### CUSTOMER-F16 Borrar los datos personales de un cliente (RGPD)
@@ -539,7 +542,7 @@ Actor: propietario, administrador
 Pantalla: Ficha de cliente
 Pasos:
 1. En la ficha pulsa **Borrar datos personales**.
-2. Sale «Borrar datos personales (RGPD)» con el texto «Borra los datos personales de {nombre}, sus
+2. Sale «Borrar datos personales (RGPD)» con el texto «Borra los datos personales de Ana García, sus
    notas, su actividad, sus datos de salud y sus campos personalizados, y no se puede deshacer. Las ventas y facturas
    conservan su referencia. Queda una entrada de auditoría con quién, cuándo y por qué.» y el campo
    «Motivo (queda en la auditoría)».
@@ -681,7 +684,7 @@ Estado: hecho
 Actor: todos
 Pantalla: Ficha de cliente
 Pasos:
-1. Abre la ficha (CUSTOMER-F03).
+1. Abre la ficha del cliente desde **Clientes**.
 2. En «Compras» sale cada venta con su fecha, su importe (en la moneda en que se cobró) y su estado
    («Cobrada» o «Anulada»), y cada
    devolución en su propia línea («Devolución», importe en negativo), la más reciente primero, 50 por
@@ -752,14 +755,14 @@ Pantalla: Grupos
 Pasos:
 1. En **Grupos** pulsa **Añadir** («Nuevo grupo»): «Nombre» (obligatorio), «Descripción», «Color» y
    «Orden». **Guardar** → «Grupo creado».
-2. Para cambiarlo, toca la fila («Editar · {nombre}»), que añade la casilla «Activo». **Guardar** →
+2. Para cambiarlo, toca la fila («Editar · Socios»), que añade la casilla «Activo». **Guardar** →
    «Grupo actualizado». Un grupo desactivado deja de ofrecerse en las fichas (las que lo tienen lo
    conservan) y sigue en la lista con el filtro de inactivos, desde donde se vuelve a activar.
-3. Para quitarlo, **Eliminar**: «¿Eliminar {nombre}? Las fichas que lo tienen lo pierden.» → «Grupo
-   {nombre} eliminado».
+3. Para quitarlo, **Eliminar**: «¿Eliminar Socios? Las fichas que lo tienen lo pierden.» → «Grupo
+   Socios eliminado».
 4. Si un empleado pulsa **Guardar**, antes se abre encima «Hace falta una aprobación» con «Se aprueba:
    Crear un grupo de clientes» (o «Cambiar un grupo de clientes»), y un responsable lo aprueba con su
-   PIN (o su placa) en ese mismo dispositivo (BASE-F84). Eliminar nunca se pide: el empleado no lo ve.
+   PIN (o su placa) en ese mismo dispositivo. Eliminar nunca se pide: el empleado no lo ve.
 Entra: los datos del grupo.
 Sale: el grupo, que se asigna desde cada ficha (CUSTOMER-F06), y su aviso
 (`customer.group.created`, `.updated`, `.deleted`). Eliminar un grupo lo quita de todas sus fichas
@@ -779,12 +782,12 @@ Pantalla: Etiquetas
 Pasos:
 1. En **Etiquetas** pulsa **Añadir** («Nueva etiqueta»): «Nombre» y «Color». **Guardar** →
    «Etiqueta creada».
-2. Al editar («Editar · {nombre}») aparece «Activa», como en los grupos. **Guardar** → «Etiqueta
+2. Al editar («Editar · Habitual») aparece «Activa», como en los grupos. **Guardar** → «Etiqueta
    actualizada».
-3. **Eliminar**: «¿Eliminar {nombre}? Las fichas que la tienen la pierden.» → «Etiqueta {nombre}
+3. **Eliminar**: «¿Eliminar Habitual? Las fichas que la tienen la pierden.» → «Etiqueta Habitual
    eliminada».
 4. Como en los grupos, el empleado guarda con el PIN de un responsable: «Se aprueba: Crear una etiqueta
-   de clientes» (o «Cambiar una etiqueta de clientes») (BASE-F84). Eliminar no se le ofrece.
+   de clientes» (o «Cambiar una etiqueta de clientes»). Eliminar no se le ofrece.
 Entra: nombre y color.
 Sale: la etiqueta, que se asigna desde cada ficha (CUSTOMER-F06), y su aviso
 (`customer.tag.created`, `.updated`, `.deleted`). Eliminarla la quita de todas sus fichas.
@@ -800,14 +803,14 @@ Pasos:
 1. En **Campos** pulsa **Añadir** («Nuevo campo personalizado»): «Nombre», «Tipo» («Texto»,
    «Número», «Fecha», «Sí/No», «Selección» o «Texto largo»), las «Opciones» si es de selección,
    «Orden» y, si hace falta, «Obligatorio».
-2. **Guardar** → «Campo creado». El campo aparece en la ficha de TODOS los clientes (CUSTOMER-F03,
-   F04), con su forma.
-3. Al editar («Editar · {nombre}») aparece «Activo»: un campo inactivo no sale en las fichas ni se
+2. **Guardar** → «Campo creado». El campo aparece en la ficha de TODOS los clientes, al verla y al
+   editarla, con su forma.
+3. Al editar («Editar · Talla») aparece «Activo»: un campo inactivo no sale en las fichas ni se
    exige, y sus valores se quedan. Se cambia todo menos el tipo, si ya hay fichas con un valor.
-   **Eliminar** → «¿Eliminar {nombre}? Se borran también los valores guardados en las fichas.» →
-   «Campo {nombre} eliminado».
+   **Eliminar** → «¿Eliminar Talla? Se borran también los valores guardados en las fichas.» →
+   «Campo Talla eliminado».
 4. Si quien guarda o elimina es un empleado, un responsable lo aprueba antes con su PIN (o su placa) en
-   ese mismo dispositivo (BASE-F84): «Se aprueba: Crear un campo personalizado» («Cambiar…»,
+   ese mismo dispositivo: «Se aprueba: Crear un campo personalizado» («Cambiar…»,
    «Eliminar un campo personalizado»).
 Entra: la definición del campo.
 Sale: el campo y su aviso (`customer.field.created`, `.updated`, `.deleted`). «Obligatorio» solo se
@@ -886,7 +889,7 @@ Si falla: sin el permiso en vigor no se guarda nada: «Registra antes su permiso
 salud.». Una prueba con fecha futura: «Esta fecha está en el futuro.»; un resultado sin fecha: «Pon la
 fecha de la prueba.», cada uno debajo de su campo: se quita en cuanto se corrige ese campo y vuelve si el
 siguiente intento también se rechaza; lo que no es de un campo sale en el bloque y se queda hasta el siguiente
-intento (hub#854). «Este cliente ya no está disponible.» si la ficha ya no está. Quien no gestiona
+intento. «Este cliente ya no está disponible.» si la ficha ya no está. Quien no gestiona
 fichas ve el bloque sin botones.
 Implicados: CUSTOMER-F13, CUSTOMER-F16
 
@@ -1225,6 +1228,56 @@ asistente.
   enlace de pedido), así no se cuela en una ficha que se está eliminando o uniendo. El orden de los
   bloqueos es siempre la ficha y después lo que cuelga de ella (compras, enlaces), el mismo que el de
   la fusión: anular una venta bloquea primero la ficha y luego su compra.
+
+### Lo que la ventana de ayuda no enseña
+
+La ayuda del Hub publica el primer apartado, el resumen de cada pestaña (lo que va antes de su primer `####`) y, de
+cada flujo hecho con pantalla, su título, sus pasos y «Si falla», sin nombres de código, incidencias ni ids de flujo
+(`tests/test_help_workbooks.py`). La ficha de cliente es una ventana de la pestaña Clientes, así que sus flujos salen
+en la ayuda de esa pestaña. Lo que esas partes dejaron de decir, y quien mantiene Clientes necesita:
+
+- Los mensajes llevan el nombre real de la ficha, del grupo, de la etiqueta o del campo («¿Eliminar {nombre}?»,
+  «{absorbida} se fusionará en {superviviente}…», «Importación: {total} filas — {creadas} creadas, {omitidas}
+  omitidas.»); la ayuda los enseña con un ejemplo (Ana García, Socios, Habitual, Talla).
+- El diálogo «Nuevo cliente» es el panel lateral del producto, pedido a `@erplora/ui` en `UI-REQUESTS.md`
+  (CUSTOMER-F01).
+- El gastado de los filtros se lee como cualquier campo de importe del Hub y de las demás listas (hub#1196,
+  CUSTOMER-F02).
+- Las columnas exactas que entiende la importación están en el «Entra» de CUSTOMER-F08.
+- CUSTOMER-F12 se apoya en la búsqueda de CUSTOMER-F02, la lectura por teléfono de CUSTOMER-F10, el alta rápida
+  del TPV de CUSTOMER-F18 y la fusión de CUSTOMER-F13.
+- El empleado que crea o cambia grupos, etiquetas y campos, o que fusiona fichas, lo hace con la aprobación de un
+  responsable de BASE-F84 (CUSTOMER-F13, F27, F28 y F29).
+- El aviso bajo un campo de «Salud y alergias» se quita al corregir ese campo y lo que no es de un campo se queda en
+  el bloque hasta el siguiente intento (hub#854, CUSTOMER-F32).
+- El buscador de cliente del TPV (CUSTOMER-F17 y F18) no es una pestaña de Clientes: sus flujos no salen en esta
+  ayuda, que es de las pestañas de la app.
+
+### Buscador de cliente del TPV
+Vive dentro de la pantalla de venta de **Venta**: un botón «Asignar cliente» (o el nombre del cliente
+ya elegido) abre un buscador por nombre, teléfono o email, con «+ Nuevo cliente «…»» (nombre y
+teléfono) y **Quitar cliente**. Lo pinta Clientes; el hueco lo reserva Venta.
+
+### Buscador de cliente del TPV · API
+El componente `CustomerSearch` de Clientes (Venta lo importa por su ruta, de los componentes de Clientes).
+
+```vue
+<CustomerSearch v-model="venta.cliente" v-model:open="eligiendo" />
+```
+
+- `v-model` (`CustomerSnapshot | null`): el cliente asignado, como COPIA de su ficha fiscal en el momento:
+  `customer_id`, `customer_name`, `customer_tax_id`, `customer_address` («calle, CP ciudad, país», en el
+  idioma de la página) y `customer_country` (código ISO de dos letras, o vacío). `null` = sin cliente.
+- `v-model:open` (opcional): abre y cierra el buscador; Venta lo pone a `true` cuando exige cliente y no hay.
+- El botón dice «Asignar cliente» o el nombre del cliente. El buscador (un `ion-modal`) busca por nombre,
+  teléfono o email entre las 20 primeras fichas, en vivo, y distingue «buscando», «sin resultados»,
+  «caído» (con «Reintentar») y «sin permiso». Al elegir lee la ficha entera (`customer.customer.detail`);
+  si no se puede leer, no asigna y lo dice. «+ Nuevo cliente «…»» (quien gestiona fichas) crea con nombre
+  y teléfono; si fichas vivas ya tienen ese teléfono, las enseña y pregunta «usar o crear una nueva»
+  (nunca asigna sin elegir; F12, F18). «Quitar cliente» devuelve `null`.
+- No enlaza el pedido: eso es de Venta, con `customer.order.link` y `customer.order.customer` (F19).
+- Mientras Venta no existe, se ve y se prueba en `/customer/preview/customer-search` (solo en el servidor
+  de desarrollo; nunca en el build de producción).
 
 ## Datos: de quién es cada dato
 
