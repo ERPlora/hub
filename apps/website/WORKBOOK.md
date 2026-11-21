@@ -9,6 +9,13 @@ Lo que no entra todavía: ver «Lo que queda fuera» y «Lo que NO hace, a prop�
 
 ## Para qué sirve y para quién
 
+Página web le da a tu negocio una página sencilla en su propia dirección de ERPlora (tu-negocio.erplora.com). Eliges
+uno de cuatro diseños y sus colores, rellenas las secciones que quieras (portada, sobre nosotros, catálogo, galería,
+reseñas de Google, contacto y ubicación) y la publicas. Tus clientes la ven al abrir esa dirección y tu equipo entra
+desde su botón **Entrar**.
+
+### En detalle
+
 Página web le da a cada negocio una página sencilla en su propia dirección de ERPlora (tu-negocio.erplora.com). El
 propietario elige uno de cuatro diseños, rellena sus secciones (nombre y logotipo, título y foto de portada, unas
 palabras sobre el negocio, su catálogo, una galería de fotos, sus reseñas de Google, cómo contactar, dónde está) y sus
@@ -48,6 +55,12 @@ el contenido y el diseño se guardan por separado.
 ## Pantallas
 
 ### Página web
+Aquí preparas y publicas la página web del negocio. Arriba ves si está en línea y en qué dirección, con **Guardar**,
+**Publicar**, **Desconectar** y **Compartir y QR**. Debajo, el editor (diseño, colores, fondo y cada sección) y la
+vista previa tal y como la verán tus clientes; en una tableta o un móvil, la pestaña **Editar / Vista previa** cambia
+entre los dos. Lo que cambias se guarda en un borrador, y tus clientes no lo ven hasta que pulsas **Publicar**.
+
+#### Detalle
 Arriba, el estado: «Tu página web aún no está en línea. Publícala para que tus clientes puedan verla.» (nunca
 publicada), «Tu página web está fuera de línea. Publícala para volver a ponerla en línea.» (desconectada) o «Tu página
 web está en línea en …» (con la dirección), y «Tienes cambios que aún no están publicados.» cuando el borrador ha
@@ -100,13 +113,13 @@ Debajo, el editor y la vista previa. En un ordenador, uno al lado del otro; en u
 - **Vista previa**: la página tal y como la verán los clientes con el diseño y el borrador de ahora, a ancho de
   **Ordenador** o de **Móvil**, y **Recargar la vista previa**. Se recarga sola tras cada guardado.
 
-### Compartir y QR
+#### Compartir y QR
 La dirección de la página web con **Copiar enlace**, su código QR y **Descargar PNG** (para imprimir) y
 **Descargar SVG** (para ampliar sin perder calidad). Avisa de que, en el dispositivo donde se ha entrado, la
 dirección abre la app (para ver la página: el móvil o una ventana privada) y, si la página no está en línea, de que
 la dirección aún lleva al acceso del equipo.
 
-### La página pública
+#### La página pública
 La plantilla elegida con lo publicado, en la dirección del negocio: barra superior
 fija y translúcida con el logotipo, el nombre, el menú de secciones (plegado en un móvil) y **Entrar** (botón de
 contorno redondeado); cabecera con la foto de portada (o, sin foto, un degradado suave de la paleta, nunca vacía), el
@@ -195,8 +208,8 @@ Pasos:
 1. En **Diseño**, pulsa una de las cuatro tarjetas: **Clásica**, **Moderna**, **Minimalista** o **Llamativa**.
 2. En **Colores**, pulsa una de las ocho paletas y, si quieres, cambia **Color principal** y **Color secundario**;
    **Restablecer colores** vuelve a los de la paleta.
-3. En **Fondo de la página**, elige **Claro**, **Oscuro** o **Automático**. Se guarda como en WEBSITE-F01 y la vista
-   previa lo enseña.
+3. En **Fondo de la página**, elige **Claro**, **Oscuro** o **Automático**. Se guarda solo, como el resto del borrador, y la vista previa lo
+   enseña.
 Entra: la plantilla, la paleta, los dos colores propios (o ninguno: los de la paleta) y el fondo.
 Sale: el mismo contenido con otro diseño o con otros colores; nada se pierde al cambiar. Aviso
 `website.site.updated`.
@@ -210,14 +223,14 @@ Actor: propietario, administrador, asistente, API
 Pantalla: Página web
 Pasos:
 1. Despliega **Sobre nosotros**, **Catálogo**, **Galería**, **Reseñas de Google**, **Contacto** o **Ubicación**.
-2. Enciende o apaga su interruptor **Mostrar** (apagada, la lista dice «Oculta» bajo su nombre) y guarda como en
-   WEBSITE-F01. La **Barra superior**, la **Cabecera** y el **Pie de página** no tienen interruptor: siempre están.
+2. Enciende o apaga su interruptor **Mostrar** (apagada, la lista dice «Oculta» bajo su nombre) y se guarda
+   solo. La **Barra superior**, la **Cabecera** y el **Pie de página** no tienen interruptor: siempre están.
 Entra: qué secciones se muestran.
 Sale: lo oculto no se pinta en la página ni sale para los visitantes; se conserva para volver a mostrarlo. Una sección
 que se muestra pero no tiene nada (sin texto ni foto, sin catálogo, sin fotos en la galería, sin reseñas de Google,
 sin datos de contacto, sin dirección ni mapa) tampoco se pinta, ni su enlace en el menú. Aviso
 `website.site.updated`.
-Si falla: como al guardar (WEBSITE-F01); ocultar nunca borra lo escrito.
+Si falla: lo mismo que al guardar el borrador; ocultar nunca borra lo escrito.
 Implicados: WEBSITE-F01, WEBSITE-F10
 
 ### WEBSITE-F04 Subir una imagen
@@ -228,7 +241,7 @@ Pasos:
 1. En el logotipo (**Barra superior**), la foto de portada (**Cabecera**), la foto de **Sobre nosotros** o una foto
    de la **Galería**, pulsa **Elegir imagen** y escoge el archivo.
 2. Aparece su miniatura con **Cambiar imagen** y **Quitar**; **Quitar** deja el campo vacío (en la galería, saca la
-   foto de la lista). Se guarda como en WEBSITE-F01.
+   foto de la lista). Se guarda solo, como el resto del borrador.
 Entra: un archivo jpeg, png o webp de hasta 5 MB y 8000 píxeles por lado; se comprueba su contenido, no solo su
 nombre.
 Sale: la imagen guardada en el almacén de ficheros del negocio bajo un nombre sacado de su contenido (la misma imagen
@@ -238,7 +251,7 @@ guarda también el nombre del archivo con el que se subió la primera vez, que e
 Si falla: bajo el campo: «El archivo no llegó entero: vuelve a elegirlo.», «El archivo está vacío.», «La imagen puede
 pesar 5 MB como mucho.», «Este archivo no es una imagen PNG.» (o JPEG, WEBP), «La imagen puede medir 8000 píxeles
 por lado como mucho.» o, si la imagen no cabe en el espacio de tu plan (el mismo que gastan los archivos de
-Archivos), «No queda espacio para ese archivo: tu plan incluye {space}.», como en Archivos. Una imagen que ya se subió
+Archivos), «No queda espacio para ese archivo…» con el espacio que incluye tu plan, como en Archivos. Una imagen que ya se subió
 antes no ocupa más y se acepta igual.
 Implicados: WEBSITE-F01, WEBSITE-F11
 
@@ -251,7 +264,7 @@ Pasos:
 2. En **Qué mostrar**, elige **Productos** (los de Inventario a la venta: activos y no agotados) o **Servicios** (los
    ofrecidos); solo salen los de las apps activas en el negocio.
 3. Si quieres, elige las **Categorías** (ninguna = **Todas las categorías**) y si se ven los precios con **Mostrar
-   precios**. Se guarda como en WEBSITE-F01.
+   precios**. Se guarda solo, como el resto del borrador.
 Entra: la fuente, las categorías elegidas y si se ven los precios.
 Sale: en la vista previa y, al publicar, en la página: el catálogo agrupado por categoría en su orden (lo que no tiene
 categoría, al final), hasta 200 elementos, con píldoras para saltar de categoría si hay dos o más. Precios, en la
@@ -287,7 +300,7 @@ Actor: propietario, administrador, asistente, API
 Pantalla: Página web
 Pasos:
 1. Pulsa **Publicar**: si había algo sin guardar, se guarda antes.
-2. «¿Publicar tu página web?» dice «Quien abra {url} verá esta versión, con tu catálogo tal y como está ahora.»; pulsa
+2. «¿Publicar tu página web?» dice «Quien abra tu-negocio.erplora.com verá esta versión, con tu catálogo tal y como está ahora.»; pulsa
    **Publicar** (si cancelas, no se publica nada).
 3. Arriba se lee «Tu página web está en línea en …» con la dirección.
 Entra: el borrador de ahora.
@@ -344,7 +357,7 @@ página), sin cookies y guardada un minuto en el navegador; la pestaña lleva el
 página le dice al buscador cuál es su dirección principal: el dominio propio del negocio si se abre en él (BASE-F110),
 también desde esta dirección, que no redirige porque sigue siendo la entrada del equipo; sin dominio propio, esta.
 Si falla: sin publicar, desconectada o con la app apagada, la dirección lleva al acceso del equipo; quien hace más de
-60 lecturas por minuto desde una misma conexión espera un momento. Por el dominio propio del negocio (BASE-F110) es la
+60 lecturas por minuto desde una misma conexión espera un momento. Por el dominio propio del negocio es la
 misma página: **Entrar** lleva a su dirección de erplora.com y, sin página que enseñar, el dominio dice que no hay nada ahí.
 Implicados: WEBSITE-F07, WEBSITE-F08, WEBSITE-F05, WEBSITE-F11, WEBSITE-F12, BASE-F110, HUBS-F17
 
@@ -356,7 +369,7 @@ Pasos:
 1. Despliega **Galería** y pulsa **Añadir una foto** (una a una, hasta 12; «3 de 12 fotos» dice cuántas lleva).
 2. **Subir** o **Bajar** cambian su orden y **Quitar** la saca; con 12, «La galería está completa (12 fotos): quita
    una para añadir otra.».
-3. Se guarda como en WEBSITE-F01 y se ve al publicar.
+3. Se guarda solo, como el resto del borrador, y se ve al publicar.
 Entra: las fotos subidas (WEBSITE-F04), en su orden.
 Sale: en la página, una rejilla de fotos cuadradas en ese orden (2, 3 o 4 por fila según la pantalla), servidas desde
 la dirección del negocio y guardadas un año en el navegador; cada una se abre entera en otra pestaña. Sin fotos, o con
@@ -371,7 +384,7 @@ Actor: propietario, administrador, asistente (el enlace), API
 Pantalla: Página web
 Pasos:
 1. En Google Maps, abre la ficha del negocio, pulsa **Compartir** y copia su enlace (o su Place ID).
-2. Despliega **Reseñas de Google** y pégalo en **Enlace de Google Maps o Place ID**; se guarda como en WEBSITE-F01.
+2. Despliega **Reseñas de Google** y pégalo en **Enlace de Google Maps o Place ID**; se guarda solo.
 3. La nota de debajo dice cómo están: «Se preguntará a Google por este sitio en cuanto se guarde.» (sin guardar),
    «Tus reseñas aparecerán aquí y en tu página en cuanto Google responda por este sitio.» (aún sin respuesta) o
    «Valoración 4,7 de 5 · reseñas en Google: 128» (listas).

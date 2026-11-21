@@ -10,6 +10,7 @@ from live.meta import (
     BellCounter,
     Category,
     DeviceNotice,
+    Help,
     LiveAppConfig,
     Nav,
     module_configs,
@@ -263,3 +264,7 @@ def test_the_notice_falls_back_to_the_old_words_in_spanish():
 
 def test_the_inbox_has_no_setup_steps_nor_panels():
     assert (inbox().setup, inbox().widgets) == ([], [])
+
+
+def test_its_help_window_is_ready_without_a_video_yet():
+    assert inbox().help == Help()
