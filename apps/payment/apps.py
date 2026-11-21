@@ -3,7 +3,7 @@ is not a sale's), each payment with its reference of the day and its approval la
 it is paid from (WORKBOOK.md). It is not the till's tenders: those are the sale app's."""
 
 from django.utils.translation import gettext_lazy as _
-from live.meta import Category, LiveAppConfig, Nav
+from live.meta import Category, Help, LiveAppConfig, Nav
 
 
 class PaymentConfig(LiveAppConfig):
@@ -58,6 +58,7 @@ class PaymentConfig(LiveAppConfig):
         Nav("payments", _("Payments"), "lucide:send", "/payment/payments"),
         Nav("methods", _("Methods"), "ion:wallet-outline", "/payment/methods"),
     ]
+    help = Help()
 
     fiscal_archive_models = ("PaymentMethod", "Payment")
 
