@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:ecdf68afb57249853edbf2546e6368d966395004d439ca1547db1976de9b7d65 -->
+<!-- generated from WORKBOOK.md sha256:be347a5d668f548e35615691da26f31a881c430a102b259a48436b47ad12cc4a -->
 
 ## What it is for and who it is for
 
@@ -1040,10 +1040,12 @@ Steps:
   1. Open "Settings" in the side menu; in "Data and backups", "Import" is what opens. It says "Load a
      template: it fills your apps with its data — a menu, services, tables — ready to use." and, below,
      "Choose what to load".
-  2. While they arrive, "Loading templates…". Then one card per template (or one row, in the list view):
-     its name, its description, its "Language" and its "Country" by name, its "Version" and what "It brings"
-     (how many categories, products, services, areas or tables). First those of the business's country and,
-     among them, those in the person's language.
+  2. While they arrive, "Loading templates…". Then one card per template: its name as the title, its
+     description and each datum on its own line with the icon that says what it is: the language and the
+     country by name, the version in words ("Version 1") and what it brings (how many categories, products,
+     services, areas or tables). In the list view, one row per template with those data in their columns
+     "Language", "Country", "Version" and "It brings". First those of the business's country and, among them,
+     those in the person's language.
   3. "Search templates" searches by the name, the description or the apps it brings.
   4. Tap "Use template" on the one that fits: the button spins while it is read and "Review what it brings"
      opens (BASE-F31).

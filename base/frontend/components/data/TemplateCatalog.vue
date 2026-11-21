@@ -41,10 +41,16 @@ const rows = computed<Row[]>(() =>
 const columns = computed<DataTableColumn<Row>[]>(() => [
   { key: 'name', label: t('base.data.review.name') },
   { key: 'description', label: '', priority: 'low' },
-  { key: 'language_name', label: t('base.data.import.language') },
-  { key: 'country_name', label: t('base.data.import.country') },
-  { key: 'version', label: t('base.data.import.version'), priority: 'low' },
-  { key: 'brings', label: t('base.data.import.brings') },
+  { key: 'language_name', label: t('base.data.import.language'), cardIcon: 'ion:language-outline' },
+  { key: 'country_name', label: t('base.data.import.country'), cardIcon: 'ion:globe-outline' },
+  {
+    key: 'version',
+    label: t('base.data.import.version'),
+    priority: 'low',
+    cardIcon: 'ion:layers-outline',
+    format: (value) => t('base.data.import.versionValue', { version: String(value) }),
+  },
+  { key: 'brings', label: t('base.data.import.brings'), cardIcon: 'ion:cube-outline' },
 ]);
 
 const actions = computed<DataTableAction<Row>[]>(() => [
