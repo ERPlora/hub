@@ -879,6 +879,9 @@ msgstr "Ya pagado · %(name)s"
 msgid "Discount of %(amount)s, already applied to the amounts above."
 msgstr "Descuento de %(amount)s, ya aplicado en los importes de arriba."
 
+msgid "Scan to ask for your full invoice"
+msgstr "Escanea para pedir tu factura completa"
+
 msgid "Void a sale"
 msgstr "Anular una venta"
 
