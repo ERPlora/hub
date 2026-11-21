@@ -827,8 +827,8 @@ Pasos:
    plato sin alergia marcada no lleva bloque, aunque tenga alérgenos: la pantalla no repite los de cada plato.
 4. En un menú, el bloque sale en cada uno de sus platos, y «El plato lleva» nombra solo los alérgenos de ese plato.
 5. En el papel de la estación, la cabecera lleva «!! ALERGIA !!» (debajo de «!! URGENTE !!» si la ronda va
-   urgente) y, justo debajo del plato y antes de sus suplementos, «*** ALERGIA: GLUTEN ***» y, si lo lleva,
-   «*** LLEVA: GLUTEN ***», cada uno en su renglón y en mayúsculas, para que se distinga sin color. La reimpresión
+   urgente) y, justo debajo del plato y antes de sus suplementos, «ALERGIA: GLUTEN» y, si lo lleva, «LLEVA: GLUTEN»,
+   cada uno en su renglón, en mayúsculas y entre asteriscos, para que se distinga sin color. La reimpresión
    sale igual.
 6. El cocinero sigue como siempre: marcar listo, recuperar y entregar no cambian, y el
    bloque sigue a la vista mientras el plato está en la pantalla. En **Comandas**, el detalle de la comanda lo
@@ -1101,7 +1101,8 @@ Cocina necesita:
   F23); en los ajustes, lo que se cambia mientras se guarda se queda por guardar (hub#914) y un rechazo sin campo se
   queda hasta el siguiente intento (hub#854), en KITCHEN-F26.
 - Las marcas del papel (`!! URGENTE !!`, `!! ALERGIA !!`, `*** ALERGIA: GLUTEN ***`, `*** LLEVA: GLUTEN ***`) salen
-  en la ayuda entre comillas; el envío de la ronda es KITCHEN-F18, el papel KITCHEN-F08 y la reimpresión
+  en la ayuda entre comillas, y las de asteriscos dichas con palabras, porque la ventana leería los asteriscos como
+  negrita; el envío de la ronda es KITCHEN-F18, el papel KITCHEN-F08 y la reimpresión
   KITCHEN-F09, que KITCHEN-F06, F07 y F32 ya no citan en sus pasos; la alergia en la línea es SALE-F41 y los
   alérgenos del producto, SALE-F40.
 

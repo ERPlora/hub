@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:0c700bb007b304d5bcc225cd71cb0c1a083c7e2d9d62166ecb0dcbdd3789229c -->
+<!-- generated from WORKBOOK.md sha256:c3c499064091d51c68a43c95322a96f61b68c87d553b4a41ee36dc60093d5cf9 -->
 
 ## What it is for and who it is for
 
@@ -823,8 +823,8 @@ Steps:
    dish's.
 4. On a menu, the block shows on each of its dishes, and "The dish contains" names only that dish's allergens.
 5. On the station's paper, the header carries «!! ALERGIA !!» (under «!! URGENTE !!» if the round is rush) and,
-   right under the dish and before its modifiers, «*** ALERGIA: GLUTEN ***» and, if it has it,
-   «*** LLEVA: GLUTEN ***», each on its own line and in capitals, so that it stands out without colour. The reprint
+   right under the dish and before its modifiers, «ALERGIA: GLUTEN» and, if it has it, «LLEVA: GLUTEN», each on its
+   own line, in capitals and between asterisks, so that it stands out without colour. The reprint
    comes out the same.
 6. The cook carries on as always: marking ready, recalling and serving do not change,
    and the block stays in view while the dish is on the display. In **Tickets**, the ticket's detail shows it on its
