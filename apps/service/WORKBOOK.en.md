@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:e258284e191d64992b01416ae91ba13f0c8a6ebc1da34b40950298d7150de108 -->
+<!-- generated from WORKBOOK.md sha256:76718ae758c98740cb38a37187a62d9095b6e8ef8e2b5c44cb47616fd408733a -->
 
 ## What it is for and who it is for
 
@@ -225,7 +225,7 @@ With the window as it opened, Back closes it without asking (BASE-F05).
 | SERVICE-F11 | Change the Services settings | done |
 | SERVICE-F12 | Create a voucher | done |
 | SERVICE-F13 | Edit or delete a voucher | done |
-| SERVICE-F14 | Sell a voucher to a customer | done for the grant (assistant and API); not the sale at the till (see "What is left out") |
+| SERVICE-F14 | Sell a voucher to a customer | done — the grant, through the assistant and the API; not the sale at the till (see "What is left out") |
 | SERVICE-F15 | Look up a customer's vouchers | done (assistant and API) |
 | SERVICE-F16 | See who has bought a voucher | done |
 | SERVICE-F17 | Void a voucher sold by mistake | done |
@@ -512,7 +512,7 @@ the confirmation.
 Involved: SERVICE-F12, SERVICE-F16
 
 ### SERVICE-F14 Sell a voucher to a customer
-Status: done for the grant (assistant and API); not the sale at the till (see "What is left out")
+Status: done — the grant, through the assistant and the API; not the sale at the till (see "What is left out")
 Actor: employee, manager, assistant
 Screen: assistant
 Steps:

@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:8b41adc356d0b7b5d7767bf81855ccc2c96d4c0d0867b1c4c072786e4365681e -->
+<!-- generated from WORKBOOK.md sha256:2670599e5f254bac1b4ca5aa49ac66577bcd5828a00998406cfd901c3ee35af4 -->
 
 ## What it is for and who it is for
 
@@ -1037,57 +1037,62 @@ Involved: erplora.com; Appointments and Reservations, when they notify by WhatsA
 
 ### What it offers: reads (they read, they change nothing)
 
-| Operation | What it returns |
-|---|---|
-| `whatsapp_inbox.conversation.list` | Conversations, with search by contact or phone and filters by status, assignment, unread and card |
-| `whatsapp_inbox.conversation.detail` | A conversation (by id, number or name) with its card, its assignment and whether the 24 h window is open |
-| `whatsapp_inbox.conversation.by_phone` | The conversation of an exact number (international format), or none: to notify from another app |
-| `whatsapp_inbox.conversation.summary` | Open, unread and waiting for an answer, and whether the month's cap is spent |
-| `whatsapp_inbox.conversation.count_awaiting_reply` | How many customers are waiting for an answer (open with the customer's last message or marked "Needs attention"): the bell counts it |
-| `whatsapp_inbox.conversation.notices` | The customers waiting for an answer, from the newest to the oldest, with who, what they last wrote and when: the device's notifications |
-| `whatsapp_inbox.message.list` | A conversation's messages, from the newest to the oldest |
-| `whatsapp_inbox.message.get` | A message by its id (the one that started an automation): what it says, who and when, the exact international number of its conversation, what to call the customer, whether they can be written to now and the last thing the business wrote them from the Hub in the 24 hours before (the list they may be answering, F19) |
-| `whatsapp_inbox.note.list` | A conversation's internal notes |
-| `whatsapp_inbox.template.list` | The templates (filters by status, category, language, name and whether they can be sent), with their way to Meta |
-| `whatsapp_inbox.template_sample.detail` | A header's file by its id, as it was returned when saved (name, photo, video or document and size); only the asking business's |
-| `whatsapp_inbox.note.get` | An internal note by its id, with its text: what the assistant's card reads to name it (BASE-F97); no tool of the assistant and no route in the API |
-| `whatsapp_inbox.template.get` | A template of the business by its id with its name and its language ("recordatorio (es)"), also one deleted here that Meta still has: what the assistant's card reads to name it (BASE-F97); no tool of the assistant and no route in the API |
-| `whatsapp_inbox.channel.get` | The number's status and the month's usage |
-| `whatsapp_inbox.agent.list` | The business's people a conversation can be assigned to |
+| Operation | What it returns | Flows |
+|---|---|---|
+| `whatsapp_inbox.conversation.list` | Conversations, with search by contact or phone and filters by status, assignment, unread and card | F05, F09 |
+| `whatsapp_inbox.conversation.detail` | A conversation (by id, number or name) with its card, its assignment and whether the 24 h window is open | F05 |
+| `whatsapp_inbox.conversation.by_phone` | The conversation of an exact number (international format), or none: to notify from another app | F23, F26 |
+| `whatsapp_inbox.conversation.summary` | Open, unread and waiting for an answer, and whether the month's cap is spent | F09, F13 |
+| `whatsapp_inbox.conversation.count_awaiting_reply` | How many customers are waiting for an answer (open with the customer's last message or marked "Needs attention"): the bell counts it | F09 |
+| `whatsapp_inbox.conversation.notices` | The customers waiting for an answer, from the newest to the oldest, with who, what they last wrote and when: the device's notifications | F09 |
+| `whatsapp_inbox.message.list` | A conversation's messages, from the newest to the oldest | F05, F06 |
+| `whatsapp_inbox.message.get` | A message by its id (the one that started an automation): what it says, who and when, the exact international number of its conversation, what to call the customer, whether they can be written to now and the last thing the business wrote them from the Hub in the 24 hours before (the list they may be answering, F19) | F19–F22, F24, F25 |
+| `whatsapp_inbox.note.list` | A conversation's internal notes | F36 |
+| `whatsapp_inbox.template.list` | The templates (filters by status, category, language, name and whether they can be sent), with their way to Meta | F27, F28, F33 |
+| `whatsapp_inbox.template_sample.detail` | A header's file by its id, as it was returned when saved (name, photo, video or document and size); only the asking business's | F29, F30 |
+| `whatsapp_inbox.note.get` | An internal note by its id, with its text: what the assistant's card reads to name it (BASE-F97); no tool of the assistant and no route in the API | F36 |
+| `whatsapp_inbox.template.get` | A template of the business by its id with its name and its language ("recordatorio (es)"), also one deleted here that Meta still has: what the assistant's card reads to name it (BASE-F97); no tool of the assistant and no route in the API | F30, F31 |
+| `whatsapp_inbox.channel.get` | The number's status and the month's usage | F01, F02, F13 |
+| `whatsapp_inbox.agent.list` | The business's people a conversation can be assigned to | F07 |
 
 ### What it offers: actions (they change data)
 
-| Operation | What it does |
-|---|---|
-| `whatsapp_inbox.message.send` | Saves and hands over a text (within 24 h) or an approved template, to a conversation or to a number; asks for a key per message |
-| `whatsapp_inbox.message.retry` | Hands over again a message that did not go out, with the same key |
-| `whatsapp_inbox.message.notify` | The send an automation can have (FLOW-F31): only to the live conversation of the exact international number, never a new one; text within 24 h and the approved template outside them; same way out as `message.send` |
-| `whatsapp_inbox.conversation.mark_read` | Leaves **Unread** at zero |
-| `whatsapp_inbox.conversation.assign` | Assigns or unassigns; "Assign to me" does not override someone else |
-| `whatsapp_inbox.conversation.set_status` | Open, pending or closed |
-| `whatsapp_inbox.conversation.link_customer` | Links to a card, creates the card or unlinks |
-| `whatsapp_inbox.conversation.erase` | Erases a number's data (irreversible) |
-| `whatsapp_inbox.conversation.flag` | Marks an open conversation "Needs attention" (the automatic answer could not answer, F20); it goes away by itself when answering, leaving it pending or closing it |
-| `whatsapp_inbox.note.add` / `whatsapp_inbox.note.delete` | Internal notes |
-| `whatsapp_inbox.template_sample.upload` | Saves the file of a header with a photo, a video or a document in the business's files and returns its id |
-| `whatsapp_inbox.template.create` | Creates a template and hands it to erplora.com for Meta; asks for a key per save |
-| `whatsapp_inbox.template.update` | Changes a template; the approved one keeps being sent until Meta receives the change |
-| `whatsapp_inbox.template.retry` | Hands over again the template (or its deletion) that did not reach Meta; a rejection goes with a new key |
-| `whatsapp_inbox.template.delete` | Deletes a template here and in Meta (irreversible) |
-| `whatsapp_inbox.channel.prepare` | Asks erplora.com what to open Meta's window with and says whether it can be opened yet (it saves nothing; it is an action because it waits for erplora.com outside any transaction) |
-| `whatsapp_inbox.channel.connect` | Connects the number Meta's window chose, with its one-time code just as it arrived |
-| `whatsapp_inbox.channel.disconnect` | Disconnects the business's number; the conversations stay |
+| Operation | What it does | Flows |
+|---|---|---|
+| `whatsapp_inbox.message.send` | Saves and hands over a text (within 24 h) or an approved template, to a conversation or to a number; asks for a key per message | F32, F33 |
+| `whatsapp_inbox.message.retry` | Hands over again a message that did not go out, with the same key | F32, F33 |
+| `whatsapp_inbox.message.notify` | The send an automation can have (FLOW-F31): only to the live conversation of the exact international number, never a new one; text within 24 h and the approved template outside them; same way out as `message.send` | F19–F26 |
+| `whatsapp_inbox.conversation.mark_read` | Leaves **Unread** at zero | F05 |
+| `whatsapp_inbox.conversation.assign` | Assigns or unassigns; "Assign to me" does not override someone else | F07 |
+| `whatsapp_inbox.conversation.set_status` | Open, pending or closed | F35 |
+| `whatsapp_inbox.conversation.link_customer` | Links to a card, creates the card or unlinks | F37 |
+| `whatsapp_inbox.conversation.erase` | Erases a number's data (irreversible) | F10 |
+| `whatsapp_inbox.conversation.flag` | Marks an open conversation "Needs attention" (the automatic answer could not answer, F20); it goes away by itself when answering, leaving it pending or closing it | F20 |
+| `whatsapp_inbox.note.add` / `whatsapp_inbox.note.delete` | Internal notes | F36 |
+| `whatsapp_inbox.template_sample.upload` | Saves the file of a header with a photo, a video or a document in the business's files and returns its id | F29, F30 |
+| `whatsapp_inbox.template.create` | Creates a template and hands it to erplora.com for Meta; asks for a key per save | F29 |
+| `whatsapp_inbox.template.update` | Changes a template; the approved one keeps being sent until Meta receives the change | F30 |
+| `whatsapp_inbox.template.retry` | Hands over again the template (or its deletion) that did not reach Meta; a rejection goes with a new key | F29, F30, F31 |
+| `whatsapp_inbox.template.delete` | Deletes a template here and in Meta (irreversible) | F31 |
+| `whatsapp_inbox.channel.prepare` | Asks erplora.com what to open Meta's window with and says whether it can be opened yet (it saves nothing; it is an action because it waits for erplora.com outside any transaction) | F01 |
+| `whatsapp_inbox.channel.connect` | Connects the number Meta's window chose, with its one-time code just as it arrived | F01, F02 |
+| `whatsapp_inbox.channel.disconnect` | Disconnects the business's number; the conversations stay | F02 |
 
-The system's (with no public route; only erplora.com through `/internal`, the deliveries, the worker and the
-reactions): `whatsapp_inbox.message.receive`, `whatsapp_inbox.message.update_status`,
-`whatsapp_inbox.channel.sync`; the deliveries (`whatsapp_inbox.message.claim_delivery`,
-`whatsapp_inbox.message.record_delivery`, `whatsapp_inbox.conversation.claim_erasure`,
-`whatsapp_inbox.conversation.record_erasure`, `whatsapp_inbox.template.claim_submit`,
-`whatsapp_inbox.template.record_submit`, `whatsapp_inbox.template.claim_delete`,
-`whatsapp_inbox.template.record_delete`); the worker's task `whatsapp_inbox.delivery.resume`; and
-the reactions to Customers (`whatsapp_inbox.conversation.claim_for_customer`,
-`whatsapp_inbox.conversation.move_customer`, `whatsapp_inbox.conversation.release_customer`,
-`whatsapp_inbox.conversation.erase_for_customer`).
+The system's (with no public route):
+
+| Operation | Who calls it | Flows |
+|---|---|---|
+| `whatsapp_inbox.message.receive` | erplora.com, through `/internal` | F03, F04, F08, F38 |
+| `whatsapp_inbox.message.update_status` | erplora.com, through `/internal` | F34 |
+| `whatsapp_inbox.channel.sync` | erplora.com, through `/internal` | F01, F02, F13, F27, F28 |
+| `whatsapp_inbox.message.claim_delivery`, `whatsapp_inbox.message.record_delivery` | the deliveries | F32, F33 |
+| `whatsapp_inbox.conversation.claim_erasure`, `whatsapp_inbox.conversation.record_erasure` | the deliveries | F10, F11 |
+| `whatsapp_inbox.template.claim_submit`, `whatsapp_inbox.template.record_submit` | the deliveries | F29, F30 |
+| `whatsapp_inbox.template.claim_delete`, `whatsapp_inbox.template.record_delete` | the deliveries | F31 |
+| `whatsapp_inbox.delivery.resume` | the worker's task | F10, F11, F29–F33 |
+| `whatsapp_inbox.conversation.claim_for_customer`, `whatsapp_inbox.conversation.release_customer` | the reactions to Customers | F04 |
+| `whatsapp_inbox.conversation.move_customer` | the reactions to Customers | F12 |
+| `whatsapp_inbox.conversation.erase_for_customer` | the reactions to Customers | F11 |
 
 ### What it announces
 

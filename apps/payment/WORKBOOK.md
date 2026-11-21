@@ -322,25 +322,25 @@ Implicados: FLOW-F11, FLOW-F21
 
 ### Lo que ofrece: consultas (leen, no cambian nada)
 
-| Operación | Qué da | Permiso |
-|---|---|---|
-| `payment.payment.list` | Los pagos, paginados (≤ 100), con búsqueda, filtros (referencia, beneficiario, concepto por trozo; método por id o nombre, estado, moneda, IBAN y factura exactos; fecha e importe por rango) y orden | `payment.view_payment` |
-| `payment.payment.get` | Un pago entero, por su id o su referencia, con su IBAN completo | `payment.view_payment` |
-| `payment.method.list` | Los métodos, paginados, con búsqueda (nombre o cuenta), tipo, estado y orden | `payment.view_payment` |
-| `payment.method.get` | Un método, por su id o su nombre, con su cuenta completa | `payment.view_payment` |
+| Operación | Qué da | Permiso | Flujos |
+|---|---|---|---|
+| `payment.payment.list` | Los pagos, paginados (≤ 100), con búsqueda, filtros (referencia, beneficiario, concepto por trozo; método por id o nombre, estado, moneda, IBAN y factura exactos; fecha e importe por rango) y orden | `payment.view_payment` | F06 |
+| `payment.payment.get` | Un pago entero, por su id o su referencia, con su IBAN completo | `payment.view_payment` | F06 |
+| `payment.method.list` | Los métodos, paginados, con búsqueda (nombre o cuenta), tipo, estado y orden | `payment.view_payment` | F01, F02, F08 |
+| `payment.method.get` | Un método, por su id o su nombre, con su cuenta completa | `payment.view_payment` | F08 |
 
 ### Lo que ofrece: acciones (cambian datos)
 
-| Operación | Qué hace | Permiso |
-|---|---|---|
-| `payment.method.create` | Crea un método activo | `payment.add_payment` |
-| `payment.method.update` | Cambia nombre, tipo o cuenta (solo lo que se envía) | `payment.add_payment` |
-| `payment.method.deactivate` / `.activate` | Lo saca de «Nuevo pago» / lo devuelve | `payment.add_payment` |
-| `payment.payment.create` | Registra un pago en borrador con su referencia | `payment.add_payment` |
-| `payment.payment.approve` | Borrador → Aprobado | `payment.approve_payment` |
-| `payment.payment.mark_sent` | Aprobado → Enviado | `payment.add_payment` |
-| `payment.payment.mark_completed` | Enviado → Completado | `payment.add_payment` |
-| `payment.payment.cancel` | Cualquiera no terminado → Cancelado, con motivo | `payment.approve_payment` |
+| Operación | Qué hace | Permiso | Flujos |
+|---|---|---|---|
+| `payment.method.create` | Crea un método activo | `payment.add_payment` | F01 |
+| `payment.method.update` | Cambia nombre, tipo o cuenta (solo lo que se envía) | `payment.add_payment` | F08 |
+| `payment.method.deactivate` / `.activate` | Lo saca de «Nuevo pago» / lo devuelve | `payment.add_payment` | F08 |
+| `payment.payment.create` | Registra un pago en borrador con su referencia | `payment.add_payment` | F02 |
+| `payment.payment.approve` | Borrador → Aprobado | `payment.approve_payment` | F03 |
+| `payment.payment.mark_sent` | Aprobado → Enviado | `payment.add_payment` | F04 |
+| `payment.payment.mark_completed` | Enviado → Completado | `payment.add_payment` | F04, F07 |
+| `payment.payment.cancel` | Cualquiera no terminado → Cancelado, con motivo | `payment.approve_payment` | F05 |
 
 ### Lo que avisa
 

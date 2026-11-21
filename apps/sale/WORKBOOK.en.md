@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:8e09f424cea8054dccf969e515415f2c9e3cfa00d1cecf559325b6c429d02284 -->
+<!-- generated from WORKBOOK.md sha256:875650a9b6582bed1f73c8fdd0f896e41d98a9ea8dba7cd59204cf51058142c2 -->
 
 ## What it is for and who it is for
 
@@ -936,7 +936,7 @@ If it fails: if one of the two is no longer open, it is refused without moving a
 Involved: TABLE-F16, KITCHEN-F28
 
 ### SALE-F25 Move the check to another table
-Status: done in Tables (TABLE-F15): the check does not change
+Status: done — in Tables (TABLE-F15): the check does not change
 Vertical: restaurant
 Actor: employee, manager
 Screen: none
@@ -1457,7 +1457,6 @@ id, its name or its type ("cash", "card"). If a name matches several, it is refu
 | What was sold on each of the last 7 days | reports | F28 | `sale.sale.last_7_days` |
 | What each professional sold in a period: gross, base, tax, what was refunded of their lines, what is left, what paid for vouchers they sold, what the voucher sessions they did are worth and their production (what the commission goes on) | reports | F16, F28 | `sale.sale.by_staff` |
 | What a check, or some lines, would charge, without charging anything (total, base, VAT, discounts, breakdown and lines) | see sales | F01, F21, F22 | `sale.checkout.preview` |
-| The steps the active apps add to the charge (today, the tip from Tips), without knowing which they are | see sales | F39 | `sale.checkout.steps` |
 | The open checks (or of another state), with search by title and pages | see sales | F17 | `sale.order.list` |
 | A check with its uncharged lines | see sales | F17, F19 | `sale.order.get` |
 | The active payment methods, with the ones the business allows today | see payment methods | F02, F03 | `sale.payment_method.list` |
@@ -1482,10 +1481,12 @@ the quick notes and what is refundable can be followed live.
 | The same charge, with a discount above the maximum | uncapped discount | F14 | `sale.sale.complete_over_limit` |
 | Voids a charged sale with a reason (and gives back its voucher sessions); with its corrective invoice in the same void (and its ticket first, if it was pending) | void | F30, F32 | `sale.sale.void` |
 | Issues now a sale's fiscal documents that are waiting ("Issue now"): its ticket or invoice and the corrective invoices of its void and its refunds | charge (and Invoicing's permission for each document) | F29 | `sale.sale.issue_documents` |
+| Prints a sale's ticket or invoice again, marked "DUPLICATE", on the receipt printer; if it cannot be queued, it says so and the device prints it | see sales | F29 | `sale.sale.print` |
 | Refunds money from a sale per payment, and the lines that go back (the ones paid with a voucher give back their session); with its corrective invoice in the same refund | refund | F31, F32 | `sale.sale.refund` |
 | Opens a check, with or without lines (articles, services —at their booked price or at the professional's— or open price); that of an appointment that already has an open one returns that one (`already`) | build the check | F01, F17, F26, F38 | `sale.order.open` |
 | Adds a catalog article to a check | build the check | F01, F10 | `sale.order.add_line` |
 | Adds a service from Services to a check | build the check | F38 | `sale.order.add_service_line` |
+| Adds a menu from Menus and combos to a check, with what was picked in each course; Menus checks the choice and sets the price | build the check | F12 | `sale.order.add_combo_line` |
 | Pays a service line with one of the client's vouchers (holds the session) | build the check and spend sessions | F27 | `sale.order.apply_voucher` |
 | Undoes a line's voucher (releases the session) | build the check and spend sessions | F27 | `sale.order.remove_voucher` |
 | Adds an open-price line | open price | F09 | `sale.order.add_open_line` |
@@ -1504,6 +1505,7 @@ the quick notes and what is refundable can be followed live.
 | Sets a line's discount (and its version above the maximum) | build the check / uncapped discount | F14 | `sale.order.set_line_discount`, `sale.order.set_line_discount_over_limit` |
 | Sets a check's title (parking) | build the check | F17 | `sale.order.set_label` |
 | Links a check to its appointment | build the check | F26 | `sale.order.set_appointment` |
+| Prints the bill of a table (not an invoice: no number, no payment) on the receipt printer, or says it was not queued and the device prints it; the table shows "Bill requested" until it is charged in full | see sales | F21 | `sale.order.print_bill` |
 | Creates a payment method | create payment methods | F37 | `sale.payment_method.create` |
 | Saves the POS settings | settings | F34 | `sale.settings.update` |
 | Creates, changes and deletes sections | settings | F35 | `sale.department.create`, `.update`, `.delete` |
