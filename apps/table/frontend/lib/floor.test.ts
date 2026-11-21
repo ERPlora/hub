@@ -52,7 +52,13 @@ describe('tablesFrame', () => {
   });
 
   it('goes from the nearest edges of any table to the far edges of the farthest one', () => {
-    const tables = [table({ position_x: 600, position_y: 120 }), table({ id: 't2', position_x: 200, position_y: 400, height: 144 })];
+    // The nearest edge across and the nearest one down belong to two tables in the middle of the list.
+    const tables = [
+      table({ position_x: 600, position_y: 300 }),
+      table({ id: 't2', position_x: 200, position_y: 400, height: 144 }),
+      table({ id: 't3', position_x: 400, position_y: 120 }),
+      table({ id: 't4', position_x: 500, position_y: 250 }),
+    ];
     expect(tablesFrame(tables)).toEqual({ x: 200, y: 120, w: 600 + BOX + 10 - 200, h: 400 + 144 + 10 - 120 });
   });
 
