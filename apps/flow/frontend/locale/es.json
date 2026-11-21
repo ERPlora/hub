@@ -1181,6 +1181,7 @@
       "sale__order__set_label": "Poner nombre a una cuenta",
       "sale__order__set_line_allergy": "Marcar la alergia del cliente en una línea de una cuenta",
       "sale__order__set_line_staff": "Elegir quién hizo una línea de una cuenta",
+      "sale__order__set_staff": "Elegir quién atiende una cuenta",
       "sale__order__split": "Dividir una cuenta",
       "sale__order__split_line": "Dividir una línea de una cuenta",
       "sale__order__update_line": "Cambiar una línea de una cuenta",
