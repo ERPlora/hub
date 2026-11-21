@@ -18,6 +18,7 @@ from apps.cash_register.tests.conftest import (
     ctx_for,
     open_session,
     run,
+    void,
 )
 from apps.printing.models import PrintJob
 
@@ -114,6 +115,12 @@ def test_other_payment_methods_are_a_line_only_when_there_were_some(shift):
     assert "Sales with other payment methods" in labels
 
 
+def test_a_sale_voided_in_the_same_shift_is_on_the_paper_neither_as_a_sale_nor_as_a_refund(shift):
+    void(charge(payments=[{"method": "card"}]))
+    printed = dict(lines(PrintJob.objects.get(pk=print_report(shift).job_id)))
+    assert [printed[label] for label in ("Sales", "Card sales", "Refunds", "Expected")] == [1.5, 0.0, 0.0, 101.0]
+
+
 def test_every_print_is_a_paper_of_its_own(shift):
     first, second = print_report(shift), print_report(shift)
     assert first.job_id != second.job_id
@@ -191,3 +198,16 @@ def test_the_paper_speaks_the_language_of_whoever_prints(shift):
         "Ventas en efectivo",
         "Ventas con tarjeta",
     ]
+
+
+def test_the_z_says_when_the_session_closed_and_the_x_when_it_is_printed(shift, monkeypatch, in_business_a):
+    """The device printed its own hour on the report: the paper brings the hour of what it reports, on the
+    business's clock. At 23:30 of the 2nd in Bogotá it is already the 3rd in Madrid."""
+    monkeypatch.setattr(in_business_a, "timezone", "America/Bogota")
+    night = dt.datetime(2026, 11, 3, 4, 30, tzinfo=dt.UTC)
+    with monkeypatch.context() as clock:
+        clock.setattr(timezone, "now", lambda: night)
+        assert PrintJob.objects.get(pk=print_report(shift).job_id).document["date"] == "02/11/2026 23:30"
+    run("cash_register.session.close", {"session_id": str(shift.id), "closing_balance": 10090})
+    Session.objects.filter(pk=shift.id).update(closed_at=night)
+    assert PrintJob.objects.get(pk=print_report(shift).job_id).document["date"] == "02/11/2026 23:30"

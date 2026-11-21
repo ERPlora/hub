@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:82d19ca42ec8bafab4fcbce18bcc5d79f1413297d91b83eb30661e29171fd25a -->
+<!-- generated from WORKBOOK.md sha256:eda1800b2c7dcafc56867b02f6d9857aa1e52ebd04cf105c63c2ecfe9b7c22dc -->
 
 ## What it is for and who it is for
 
@@ -387,8 +387,9 @@ Actor: employee, manager
 Screen: Charge
 Steps:
 1. In the **Charge** sheet, press "Split the payment". "Remaining" appears at the top.
-2. Choose a method, enter the "Amount for this payment" (in cash, what is tendered) and press "Add this
-   payment". With no amount entered, the payment covers all that is left.
+2. Choose a method: the "Amount for this payment" (in cash, "Tendered") already shows all that is left.
+   To charge only part of it, or if more cash is handed over, type another amount, which replaces the one
+   shown. Press "Add this payment".
 3. The payments taken show in "Payments taken"; the ✕ removes one.
 4. When the remainder reaches 0, press "Charge €18.50".
 In: the payment methods and what the customer hands over.

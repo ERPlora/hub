@@ -8,11 +8,12 @@ the payment and, with VeriFactu, the fiscal QR. Every figure is the server's; th
 
 from decimal import Decimal
 
+from django.utils import timezone
 from django.utils.translation import gettext
 
 from apps.sale.schemas.checkout import PreviewOut
 from apps.sale.schemas.sales import SaleOut
-from base.business import money_text
+from base.business import money_text, paper_date
 
 #: The legal texts of the fiscal QR (Orden HAC/1177/2024 art. 20.1.b and 21.1; RD 1619/2012 art. 6.5.b): the
 #: AEAT fixes them in Spanish, whatever the paper's language.
@@ -81,14 +82,16 @@ def _dish(dish) -> str:
 def receipt(
     sale: SaleOut, *, letterhead: dict, footer: str, duplicate: bool, record: dict | None = None
 ) -> tuple[str, dict]:
-    """The document type and the document of ``sale``'s receipt: ``receipt`` for a ticket, ``invoice`` for a
-    sale charged as a full invoice (both parties and its breakdown). ``record``: VeriFactu's record of its
-    document (``qr_url``), whose QR opens the paper. Who charged it is the caller's to add (``cashier``)."""
+    """The document type and the document of ``sale``'s receipt, dated when it was charged, whenever it prints:
+    ``receipt`` for a ticket, ``invoice`` for a sale charged as a full invoice (both parties and its breakdown).
+    ``record``: VeriFactu's record of its document (``qr_url``), whose QR opens the paper. Who charged it is the
+    caller's to add (``cashier``)."""
     full = sale.document_type == "invoice"
     decimals = sale.currency_decimals
     document = {
         **_business(letterhead["name"], letterhead["lines"]),
         "receipt_id": sale.invoice_number or sale.number,
+        "date": paper_date(sale.created_at),
         "duplicate": duplicate,
         "items": [_item(line, decimals) for line in sale.lines],
         "subtotal": units(sale.subtotal, decimals),
@@ -141,11 +144,12 @@ def claim(code: str, url: str) -> dict:
 
 
 def bill(valued: PreviewOut, *, label: str, letterhead: dict, decimals: int) -> dict:
-    """The bill of a check (``prebill``): what is owed, without a number, a QR or a payment. The app's bill prints no
-    ``vat_number`` (``render_prebill``), so the tax ID travels as the last line of the address."""
+    """The bill of a check (``prebill``): what is owed now, without a number, a QR or a payment. The app's bill prints
+    no ``vat_number`` (``render_prebill``), so the tax ID travels as the last line of the address."""
     tax_id = [gettext("Tax ID: %(tax_id)s") % {"tax_id": letterhead["tax_id"]}] if letterhead["tax_id"] else []
     document = {
         **_business(letterhead["name"], [*letterhead["lines"], *tax_id]),
+        "date": paper_date(timezone.now()),
         "items": [_item(line, decimals) for line in valued.lines],
         "subtotal": units(valued.subtotal, decimals),
         "tax_amount": units(valued.tax_total, decimals),

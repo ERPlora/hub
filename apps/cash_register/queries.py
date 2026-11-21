@@ -665,7 +665,11 @@ def figures(session: Session, lines: list[Line], *, hidden: bool) -> dict:
 
     Hidden (a blind count, an open session, a reader without `view_expected_totals`): no total that adds
     up to the expected — only the float, and the lines written by hand counted."""
-    sales = [line for line in lines if line.type == "sale"]
+    # A tender charged and voided in this session cancels out (both stay listed); a void of an earlier one is a refund.
+    voids = {line.sale_payment_id for line in lines if line.type == "void"}
+    voided_here = voids & {line.sale_payment_id for line in lines if line.type == "sale"}
+    counted = [line for line in lines if line.sale_payment_id not in voided_here]
+    sales = [line for line in counted if line.type == "sale"]
 
     def total(of: list[Line]) -> int:
         return sum(line.amount for line in of)
@@ -702,12 +706,8 @@ def figures(session: Session, lines: list[Line], *, hidden: bool) -> dict:
         "total_sales": total(sales),
         "cash_sales": total([line for line in sales if line.method_type == CASH]),
         "card_sales": total([line for line in sales if line.method_type == "card"]),
-        "other_sales": total(
-            [line for line in sales if line.method_type in ("transfer", "other")]
-        ),
-        "total_refunds": total(
-            [line for line in lines if line.type in ("refund", "void")]
-        ),
+        "other_sales": total([line for line in sales if line.method_type in ("transfer", "other")]),
+        "total_refunds": total([line for line in counted if line.type in ("refund", "void")]),
         "total_cash_in": total([line for line in lines if line.type == "in"]),
         "total_cash_out": total([line for line in lines if line.type == "out"]),
         "total_gifts": sum(line.gift_total for line in sales),
