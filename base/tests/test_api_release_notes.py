@@ -5,11 +5,12 @@ import pytest
 
 from base import api_release_notes, release_notes
 from base.tenancy.tests.business import HOST, HUB_DB, A, in_business_a
-from base.tests.routes import bound_routes, published_routes
+from base.tests.routes import bound_routes, published_routes, spa_routes
 from base.tests.test_queries_release_notes import NOTES
 
 __all__ = ["in_business_a"]
 
+#: base/tests/test_api.py's map of the SPA's routes takes these too.
 RELEASE_NOTE_ROUTES = {("GET", "/system/release-notes", "base.release_note.list")}
 
 
@@ -18,8 +19,9 @@ def shipped(monkeypatch):
     monkeypatch.setattr(release_notes, "shipped", lambda: NOTES)
 
 
-def test_its_one_route_calls_the_operation():
+def test_its_one_route_calls_the_operation_and_the_spa_knows_it():
     assert bound_routes(api_release_notes.router) == RELEASE_NOTE_ROUTES
+    assert spa_routes("base.release_note.") == RELEASE_NOTE_ROUTES
 
 
 @HUB_DB
