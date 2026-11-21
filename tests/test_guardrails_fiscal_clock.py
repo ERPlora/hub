@@ -9,20 +9,20 @@ sent: nothing here leaves the machine. The business is ``hub_a``, in its own dat
 
 import datetime as dt
 import re
-import socket
 from typing import NamedTuple
 
 import pytest
 from django.utils import timezone
 
 from apps.invoice.models import Invoice
-from apps.tax.models import TaxCategory, TaxRule
+from apps.tax.models import TaxCategory
+from apps.tax.tests.conftest import turn_the_rate_at_midnight
 from apps.verifactu.models import Record
 from apps.verifactu.tests.conftest import HUB_DB, run
 from base.tenancy.context import use_hub
 from control.models import Hub
 
-pytestmark = [HUB_DB]
+pytestmark = [HUB_DB, pytest.mark.usefixtures("nothing_leaves")]
 
 ISSUER = {
     "legal_name": "Peluquería Ana SL",
@@ -128,18 +128,6 @@ def sent(invoice: Invoice) -> Sent:
 
 
 @pytest.fixture(autouse=True)
-def nothing_leaves(monkeypatch):
-    real = socket.socket.connect
-
-    def connect(self, address):
-        if isinstance(address, tuple) and address[0] not in ("127.0.0.1", "::1", "localhost"):
-            raise AssertionError(f"tried to connect to {address}")
-        return real(self, address)
-
-    monkeypatch.setattr(socket.socket, "connect", connect)
-
-
-@pytest.fixture(autouse=True)
 def business(hub_a):
     """The business ``A`` (``hub_a``), entered for the whole test."""
     with use_hub(hub_a):
@@ -156,10 +144,7 @@ def in_zone(business, zone: str):
 def rate_turns_at_midnight(business):
     """The issuer, and a general rate that changes at the turn of the night: 10 % until the 2nd, 21 % from the 3rd."""
     run("invoice.issuer.update", ISSUER)
-    category = TaxCategory.objects.get(key="product.generic")
-    TaxRule.objects.filter(category=category).delete()
-    TaxRule.objects.create(category=category, country_code="ES", rate_pct="10", valid_to=dt.date(2026, 11, 2))
-    TaxRule.objects.create(category=category, country_code="ES", rate_pct="21", valid_from=dt.date(2026, 11, 3))
+    turn_the_rate_at_midnight(TaxCategory.objects.get(key="product.generic"))
 
 
 @pytest.mark.parametrize(("moment", "expected"), SALES)

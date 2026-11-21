@@ -5,6 +5,8 @@ Every test with the database runs as production does: inside business A's own da
 own factory catalogue; a test of B asks for ``hub_b`` and enters it.
 """
 
+import datetime as dt
+
 import pytest
 from django.contrib.auth import get_user_model
 from django.db import connections
@@ -77,6 +79,15 @@ def empty_tax_tables():
     TaxRule.objects.filter(parent__isnull=False).delete()
     TaxRule.objects.all().delete()
     TaxCategory.objects.all().delete()
+
+
+def turn_the_rate_at_midnight(category) -> None:
+    """``category``'s rate in Spain changes at the turn of the night: 10 % until 2 November 2026, 21 % from the 3rd."""
+    from apps.tax.models import TaxRule
+
+    TaxRule.objects.filter(category=category).delete()
+    TaxRule.objects.create(category=category, country_code="ES", rate_pct="10", valid_to=dt.date(2026, 11, 2))
+    TaxRule.objects.create(category=category, country_code="ES", rate_pct="21", valid_from=dt.date(2026, 11, 3))
 
 
 @pytest.fixture

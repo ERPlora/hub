@@ -9,7 +9,8 @@ import uuid
 import pytest
 
 from apps.sale.tests.conftest import HUB_DB, run
-from apps.tax.models import TaxCategory, TaxRule
+from apps.tax.models import TaxCategory
+from apps.tax.tests.conftest import turn_the_rate_at_midnight
 
 pytestmark = HUB_DB
 
@@ -21,8 +22,7 @@ SALE_DAY = dt.date(2026, 11, 2)
 def tapa(product, night_elsewhere):
     """A product of a category whose rate changes at the turn of the night: 10 % until the 2nd, 21 % from the 3rd."""
     category = TaxCategory.objects.create(key="test.turn", name="Turn of the night")
-    TaxRule.objects.create(category=category, country_code="ES", rate_pct="10", valid_to=SALE_DAY)
-    TaxRule.objects.create(category=category, country_code="ES", rate_pct="21", valid_from=dt.date(2026, 11, 3))
+    turn_the_rate_at_midnight(category)
     product("Tapa", "TAP", 1000, "test.turn")
     return category
 

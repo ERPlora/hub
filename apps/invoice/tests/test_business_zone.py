@@ -3,7 +3,6 @@ its series and the «today» of numbering are the business's, not the deployment
 VeriFactu's testing environment and never sent: nothing here leaves the machine."""
 
 import datetime as dt
-import socket
 
 import pytest
 from django.utils import timezone
@@ -12,9 +11,8 @@ from apps.invoice import services
 from apps.invoice.models import Invoice
 from apps.invoice.tests.conftest import HUB_DB, ISSUER, deliver, run
 from apps.sale.models import Refund, Sale
-from apps.tax.models import TaxCategory, TaxRule
 
-pytestmark = HUB_DB
+pytestmark = [HUB_DB, pytest.mark.usefixtures("nothing_leaves")]
 
 #: 23:30 of 2 November in Bogotá; 05:30 of the 3rd in Madrid.
 BOGOTA_NIGHT = ("America/Bogota", dt.datetime(2026, 11, 3, 4, 30, tzinfo=dt.UTC))
@@ -25,18 +23,6 @@ RECIPIENT = {
     "customer_tax_id": "B12345674",
     "customer_address": "Calle Luna 3, Madrid",
 }
-
-
-@pytest.fixture(autouse=True)
-def nothing_leaves(monkeypatch):
-    real = socket.socket.connect
-
-    def connect(self, address):
-        if isinstance(address, tuple) and address[0] not in ("127.0.0.1", "::1", "localhost"):
-            raise AssertionError(f"tried to connect to {address}")
-        return real(self, address)
-
-    monkeypatch.setattr(socket.socket, "connect", connect)
 
 
 @pytest.fixture
@@ -96,15 +82,6 @@ def test_a_void_at_night_is_rectified_on_the_business_s_day(issuer, product, cha
     run("sale.sale.void", {"sale_id": str(sale.id), "reason": "Wrong table"})
     rectification = Invoice.objects.get(pk=deliver("sale.sale.voided").invoice.id)
     assert (rectification.issue_date, rectification.operation_date) == (dt.date(2026, 11, 2), dt.date(2026, 11, 2))
-
-
-def test_the_form_proposes_the_rate_of_the_day_the_invoice_is_dated(issuer, at):
-    category = TaxCategory.objects.get(key="product.generic")
-    TaxRule.objects.filter(category=category).delete()
-    TaxRule.objects.create(category=category, country_code="ES", rate_pct="10", valid_to=dt.date(2026, 11, 2))
-    TaxRule.objects.create(category=category, country_code="ES", rate_pct="21", valid_from=dt.date(2026, 11, 3))
-    at(BOGOTA_NIGHT)
-    assert run("invoice.invoice.line_defaults").tax_rate == 10
 
 
 def test_on_new_year_s_eve_numbering_speaks_of_the_business_s_year(issuer, at):
