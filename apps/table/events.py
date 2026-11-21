@@ -16,7 +16,7 @@ a party already seated), so they are not listened to.
 
 The outbox relay (``base.relay``, run by the worker on every tick) hands each event to ``react``; every
 reaction is idempotent, so a repeated delivery changes nothing. What Sales did is also read on every read and
-settled on every write (queries.py, services.py).
+settled on every write (queries/, services.py).
 """
 
 from typing import Any

@@ -100,9 +100,9 @@
 1307 apps/staff/tests/test_queries.py ERPlora/erplora-next#74
 1500 apps/staff/tests/test_services.py ERPlora/erplora-next#74
 409 apps/table/frontend/operations.d.ts ERPlora/erplora-next#74
-1041 apps/table/queries.py ERPlora/erplora-next#74
-895 apps/table/schemas.py ERPlora/erplora-next#74
-1685 apps/table/services.py ERPlora/erplora-next#74
+893 apps/table/queries/__init__.py ERPlora/erplora-next#74
+825 apps/table/schemas/__init__.py ERPlora/erplora-next#74
+1681 apps/table/services.py ERPlora/erplora-next#74
 612 apps/task/queries.py ERPlora/erplora-next#74
 645 apps/task/services.py ERPlora/erplora-next#74
 311 apps/tax/frontend/operations.d.ts ERPlora/erplora-next#74

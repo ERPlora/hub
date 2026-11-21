@@ -1014,7 +1014,7 @@ Ventas (`sale.add_sale`), que tienen los cuatro papeles.
 
 ## Para quien lo mantiene
 
-- Anatomía completa: `apps.py`, `models.py`, `migrations/`, `schemas.py`, `queries.py`,
+- Anatomía completa: `apps.py`, `models.py`, `migrations/`, `schemas/`, `queries/`,
   `services.py`, `events.py`, `live.py`, `api.py`, `admin.py`, `locale/`, `frontend/` y un
   `tests/test_<fichero>.py` por fichero, más `tests/test_integration_sale.py` (Ventas y Clientes reales),
   `tests/test_integration_relay.py` (Reservas, Clientes y Ventas reales, por el bucle del worker con el
@@ -1078,7 +1078,7 @@ Ventas (`sale.add_sale`), que tienen los cuatro papeles.
 - **Hora del negocio**: `base.business.business_zone` (la zona del hub); las retenciones de Reservas
   traen fecha y hora de pared y se guardan con esa zona. «Hoy» en el plano es el día del negocio.
 - **Asistente**: cada operación declara `ai` (descripción; `risk: "high"` en cerrar, trasladar,
-  fusionar, borrar zonas, mesas y cuentas) y cada campo de `schemas.py` su `description`. Ninguna
+  fusionar, borrar zonas, mesas y cuentas) y cada campo de `schemas/` su `description`. Ninguna
   descripción manda preguntar antes: la tarjeta es la confirmación, y el «Ask first.» que llevaban
   cerrar, pasar, juntar y borrar una cuenta hacía que el asistente preguntara en el chat sin sacarla
   (hub#1140; lo guarda `tests/test_guardrails_assistant.py` para todo el Hub).
