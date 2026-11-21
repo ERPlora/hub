@@ -25,6 +25,7 @@ import { recipientComplete, recipientFrom, recipientPayload } from '../../lib/ch
 import { recipientIssue } from '../../lib/checkout/taxId';
 import { formatMoney, useBusinessMoney } from '../../lib/format';
 import type { DocumentType, PaymentMethodOut, PreviewIn, SaleOut } from '../../operations';
+import CashSessionWindow from './CashSessionWindow.vue';
 import CheckoutFoot from './CheckoutFoot.vue';
 import CheckoutSide from './CheckoutSide.vue';
 import CheckoutTender from './CheckoutTender.vue';
@@ -54,7 +55,7 @@ const openedVersion = props.orderVersion;
 /** Methods are a handful; one page holds them all. */
 const METHODS_PAGE = 100;
 const SALES_PATH = '/sale/sales';
-/** Where a cash session is opened (CASH_REGISTER-F03). */
+/** Where a cash session is opened when its window cannot load here (CASH_REGISTER-F03). */
 const DRAWER_PATH = '/cash_register/sessions';
 
 const t = useT();
@@ -218,8 +219,11 @@ const canOpenDrawer = computed(
   () => !!session.me.value?.apps.some((app) => app.label === 'cash_register' && app.state === 'on') && session.can('cash_register.add_session'),
 );
 
-/** Cash refused with the drawer closed (SALE-F08): to the cash register; the check stays on the till. */
-function openDrawer(): void {
+/** Cash refused with the drawer closed (SALE-F08): Cash register's window opens the session over this sheet. */
+const drawerOpen = shallowRef(false);
+
+/** That window could not load: to Cash register to open it there; the check stays on the till. */
+function goToDrawer(): void {
   void router.push(DRAWER_PATH);
   emit('close');
 }
@@ -387,7 +391,13 @@ function openDrawer(): void {
       @confirm="confirm"
       @blocked="onBlocked"
       @check-sales="checkSales"
-      @open-drawer="openDrawer"
+      @open-drawer="drawerOpen = true"
+    />
+    <CashSessionWindow
+      v-if="canOpenDrawer"
+      v-model:open="drawerOpen"
+      @opened="checkout.clearFailure"
+      @unavailable="goToDrawer"
     />
   </div>
 </template>
