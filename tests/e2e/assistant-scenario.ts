@@ -83,8 +83,6 @@ export interface Scenario {
   owner: Owner;
   attachments: Attachment[];
   opening: string;
-  /** The tools the opening message (with its files) must be offered; without them it is not runnable. */
-  offered: string[];
   /** The tools whose writes the job wants; any other write is unwanted. */
   writes: string[];
   cards: CardCheck[];
@@ -240,8 +238,7 @@ export function parseScenario(text: string, source: string): Scenario {
   const maxTurns = (raw as Raw).maxTurns;
   if (!Number.isInteger(maxTurns) || (maxTurns as number) < 1 || (maxTurns as number) > 30) fields.fail('maxTurns', 'is 1 to 30');
   const writes = fields.texts('writes');
-  const offered = fields.texts('offered');
-  for (const [field, tools] of [['writes', writes], ['offered', offered]] as const) if (!tools.every((tool) => TOOL.test(tool))) fields.fail(field, 'is a list of tools');
+  if (!writes.every((tool) => TOOL.test(tool))) fields.fail('writes', 'is a list of tools');
   const scenario: Scenario = {
     id,
     title: fields.text('title'),
@@ -253,7 +250,6 @@ export function parseScenario(text: string, source: string): Scenario {
     owner: owner((raw as Raw).owner, source),
     attachments: each(fields, 'attachments', attachment, source),
     opening: fields.text('opening'),
-    offered,
     writes,
     cards: each(fields, 'cards', cardCheck, source),
     expect: each(fields, 'expect', check, source),

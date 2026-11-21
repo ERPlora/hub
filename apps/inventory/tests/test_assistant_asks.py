@@ -288,8 +288,7 @@ def test_the_hub_reads_the_menu_as_the_products_and_what_broke_as_breakage():
     )
 
 
-#: The QA's whole conversation of a breakage told together with a count: the exam asks it only when its opening is
-#: offered the tools its ``offered`` names, both writes.
+#: The QA's whole conversation of a breakage told together with a count: its opening is offered both writes of the job.
 BREAKAGE_AND_COUNT = Path(settings.BASE_DIR) / "tests" / "e2e" / "qa" / "scenarios" / "s06-breakage-and-count.json"
 
 
@@ -298,11 +297,11 @@ def test_a_breakage_told_with_a_count_is_offered_the_write_off_and_the_count(mak
     """The count's words came first and left the write-off out of the tools a turn offers (91st), so the model counted
     the broken bottles as stock instead of writing them off."""
     scenario = json.loads(BREAKAGE_AND_COUNT.read_text(encoding="utf-8"))
-    assert {"inventory.stock.write_off", "inventory.stock.count"} <= set(scenario["offered"])
+    assert {"inventory.stock.write_off", "inventory.stock.count"} <= set(scenario["writes"])
 
     tools = offered_by_a_turn(make_user, scenario["language"], scenario["opening"])
 
-    assert {shared.tool_name(name) for name in scenario["offered"]} <= set(tools)
+    assert {shared.tool_name(name) for name in scenario["writes"]} <= set(tools)
 
 
 #: The same breakage and count, said the other way round and in Spanish.

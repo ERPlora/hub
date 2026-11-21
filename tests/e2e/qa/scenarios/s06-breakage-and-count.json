@@ -13,7 +13,6 @@
   },
   "attachments": [],
   "opening": "Three bottles of water got broken, and I just counted the soft drinks, there are 40 left",
-  "offered": ["inventory.stock.write_off", "inventory.stock.count"],
   "writes": ["inventory.stock.write_off", "inventory.stock.count"],
   "cards": [{"tool": "inventory.stock.count", "match": {"product": "soft"}, "expect": {"stock": 40}}],
   "expect": [

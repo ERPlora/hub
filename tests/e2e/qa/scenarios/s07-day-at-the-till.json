@@ -36,7 +36,6 @@
   },
   "attachments": [],
   "opening": "Buenos días, abre la caja con 150 € de cambio",
-  "offered": ["cash_register.session.open"],
   "writes": [
     "cash_register.session.open",
     "cash_register.session.close",
