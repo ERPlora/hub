@@ -11,6 +11,7 @@ from live.context import OperationContext, Scope
 
 from apps.invoice.models import Issuer
 from base import operations as platform
+from base.business import business_zone
 from apps.verifactu import certificates, erplora_route, gateway, producer
 from apps.verifactu.models import Config, Environment, OwnCertificate, Record, SendControl, wait_reason_text
 
@@ -241,7 +242,7 @@ def wait(code: str, detail: str = "", at: str = "") -> dict:
 
 
 def _local_time(moment: dt.datetime) -> str:
-    return timezone.localtime(moment).strftime("%H:%M:%S")
+    return timezone.localtime(moment, business_zone()).strftime("%H:%M:%S")
 
 
 def waiting_of(record: Record, config: Config, scope: Scope | None) -> list[dict]:
