@@ -207,6 +207,11 @@ check("the python job checks out the whole history, origin/main included (fetch-
       (python_checkout.get("with") or {}).get("fetch-depth") == 0)
 check("frontend runs lint, typecheck, Vitest and the build",
       all(f"pnpm {task}" in frontend_runs for task in ("lint", "typecheck", "test", "build")))
+# Vitest checks the scripts the e2e runs inside the SaaS against the SaaS of main (tests/e2e/saas-names.ts), so the SaaS
+# is beside the Hub, with its live submodule and its dependencies, before Vitest.
+frontend_job = tjobs.get("frontend", {})
+for setup in ("clone-repo.sh ERPlora/saas ../saas", "submodule update --init", "uv sync --locked --directory ../saas"):
+    check(f"frontend runs {setup} before Vitest", before(frontend_job, setup, "pnpm test"))
 check("scripts runs actionlint, shellcheck and the script tests",
       all(needle in scripts_runs for needle in ("actionlint", "shellcheck", ".test.sh")))
 # A passing error of GitHub (a 5xx, a cut connection) while the CI fetches a tool is retried instead of turning a PR

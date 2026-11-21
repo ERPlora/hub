@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:4aca80dd64500058619799b3ce91d262130ccfad5ffbaa984afe8f7df9886687 -->
+<!-- generated from WORKBOOK.md sha256:2fe4ae15458b30f9b270d86f4d298056ba8558dd47896bd40c6b10ecbd06ffb8 -->
 
 ## What it is for and who it is for
 
@@ -42,13 +42,13 @@ Odoo's "record that no longer exists".
 
 Demo opens from **"My apps"**, at the top right, and has two screens and two forms.
 
-### Items (list)
-A table with Name, Status ("Open" / "Done"), Lines (how many it has) and Updated. A "Search…" box by
-name (not case-sensitive); the funnel opens "Filters", with the status one ("All", "Open", "Done"); 50
-per page (it can be changed), from the most recently changed to the oldest, as a table or as cards; on
-a phone, "Load more" up to 100 items and, with more, page by page ("Previous page", "Next page" and
-"1 / 3"). A **"New item"** button only for those who can manage. Tapping a row opens the
-item page. Above it, the figures "Open", "Done" and "Lines", only for those who can manage.
+### Demo
+The tab opens the "Items" list: a table with Name, Status ("Open" / "Done"), Lines (how many it has) and
+Updated. A "Search…" box by name (not case-sensitive); the funnel opens "Filters", with the status one
+("All", "Open", "Done"); 50 per page (it can be changed), from the most recently changed to the oldest,
+as a table or as cards; on a phone, "Load more" up to 100 items and, with more, page by page ("Previous
+page", "Next page" and "1 / 3"). A **"New item"** button only for those who can manage. Tapping a row
+opens the item page. Above it, the figures "Open", "Done" and "Lines", only for those who can manage.
 
 ![The list of items on a phone, with the figures, the search box, the filters funnel and "New item"](docs/img/items-list.png)
 
@@ -90,7 +90,7 @@ instead of the form.
 ### DEMO-F01 Create an item
 Status: done
 Actor: administrator, manager
-Screen: Items
+Screen: Demo
 Steps:
 1. In **Items**, tap "New item": the "New item" form opens.
 2. Type the Name; Status ("Open" to begin with) and Note are optional.
@@ -157,7 +157,7 @@ Involved: none
 ### DEMO-F05 See the change on another tablet in under a second
 Status: done
 Actor: anyone with permission to view
-Screen: Items and Item page
+Screen: Demo, Item page
 Steps:
 1. Open the list (or the same item page) on two tablets of the same business.
 2. On one, create, change, delete or add a line.
@@ -173,7 +173,7 @@ Involved: none
 ### DEMO-F06 Try it without permission
 Status: done
 Actor: employee
-Screen: Items and Item page
+Screen: Demo, Item page
 Steps:
 1. An employee opens **Demo**: they see the list and the item page, without "New item", "Edit",
    "Mark done", "Delete", "Save note", "Add line" or figures; the note is read-only.

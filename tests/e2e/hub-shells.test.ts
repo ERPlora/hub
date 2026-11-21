@@ -26,6 +26,7 @@ const WITHOUT_A_HUB: Record<string, { calls: number; on: string }> = {
     calls: 1,
     on: "control's registry and the platform's passes a spec plays in its open shell (a business's own, by use_hub)",
   },
+  'saas-names.ts': { calls: 1, on: "no data: the names a script takes from the SaaS, imported there without a database" },
   'whatsapp-inbox-offered-options.spec.ts': { calls: 1, on: "the SaaS's WhatsApp number" },
   'whatsapp-inbox-plan-cap.spec.ts': { calls: 1, on: "the SaaS's plan of the business" },
 };

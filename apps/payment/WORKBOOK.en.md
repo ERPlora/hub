@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:f78dd4409b31dddb4be21846853ece8d2ca0c65d77db64e036580bd57a974ade -->
+<!-- generated from WORKBOOK.md sha256:96ccf7d7bdd732390b817a6511fa70dbc86088cbfe7d004a2cec65e4bd2b678d -->
 
 ## What it is for and who it is for
 
@@ -316,25 +316,25 @@ Involved: FLOW-F11, FLOW-F21
 
 ### What it offers: queries (they read, they change nothing)
 
-| Operation | What it gives | Permission |
-|---|---|---|
-| `payment.payment.list` | The payments, paginated (≤ 100), with search, filters (reference, beneficiary, concept by a piece; method by id or name, status, currency, IBAN and invoice exact; date and amount by range) and sorting | `payment.view_payment` |
-| `payment.payment.get` | A whole payment, by its id or its reference, with its full IBAN | `payment.view_payment` |
-| `payment.method.list` | The methods, paginated, with search (name or account), type, status and sorting | `payment.view_payment` |
-| `payment.method.get` | A method, by its id or its name, with its full account | `payment.view_payment` |
+| Operation | What it gives | Permission | Flows |
+|---|---|---|---|
+| `payment.payment.list` | The payments, paginated (≤ 100), with search, filters (reference, beneficiary, concept by a piece; method by id or name, status, currency, IBAN and invoice exact; date and amount by range) and sorting | `payment.view_payment` | F06 |
+| `payment.payment.get` | A whole payment, by its id or its reference, with its full IBAN | `payment.view_payment` | F06 |
+| `payment.method.list` | The methods, paginated, with search (name or account), type, status and sorting | `payment.view_payment` | F01, F02, F08 |
+| `payment.method.get` | A method, by its id or its name, with its full account | `payment.view_payment` | F08 |
 
 ### What it offers: actions (they change data)
 
-| Operation | What it does | Permission |
-|---|---|---|
-| `payment.method.create` | Creates an active method | `payment.add_payment` |
-| `payment.method.update` | Changes name, type or account (only what is sent) | `payment.add_payment` |
-| `payment.method.deactivate` / `.activate` | Takes it out of "New payment" / brings it back | `payment.add_payment` |
-| `payment.payment.create` | Records a draft payment with its reference | `payment.add_payment` |
-| `payment.payment.approve` | Draft → Approved | `payment.approve_payment` |
-| `payment.payment.mark_sent` | Approved → Sent | `payment.add_payment` |
-| `payment.payment.mark_completed` | Sent → Completed | `payment.add_payment` |
-| `payment.payment.cancel` | Any unfinished one → Cancelled, with a reason | `payment.approve_payment` |
+| Operation | What it does | Permission | Flows |
+|---|---|---|---|
+| `payment.method.create` | Creates an active method | `payment.add_payment` | F01 |
+| `payment.method.update` | Changes name, type or account (only what is sent) | `payment.add_payment` | F08 |
+| `payment.method.deactivate` / `.activate` | Takes it out of "New payment" / brings it back | `payment.add_payment` | F08 |
+| `payment.payment.create` | Records a draft payment with its reference | `payment.add_payment` | F02 |
+| `payment.payment.approve` | Draft → Approved | `payment.approve_payment` | F03 |
+| `payment.payment.mark_sent` | Approved → Sent | `payment.add_payment` | F04 |
+| `payment.payment.mark_completed` | Sent → Completed | `payment.add_payment` | F04, F07 |
+| `payment.payment.cancel` | Any unfinished one → Cancelled, with a reason | `payment.approve_payment` | F05 |
 
 ### What it announces
 

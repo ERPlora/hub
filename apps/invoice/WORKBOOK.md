@@ -832,7 +832,7 @@ cliente por su nombre, su teléfono o su correo (como en Clientes) y una serie p
 | Si la numeración del año está preparada | ver | F14 | `invoice.numbering.status` |
 | Los huecos de la numeración | ver | F15 | `invoice.numbering.gaps` |
 | El libro de números entregados | ver | F15 | `invoice.numbering.allocations` |
-| El emisor | ver | F21, F22 | `invoice.issuer.get` |
+| El emisor | ver | F21 | `invoice.issuer.get` |
 | Cómo va una factura de ERPlora (por el `id` del SaaS) | solo el sistema | F23 | `invoice.invoice.platform_status` |
 | El A4 de una factura de ERPlora, en su idioma | solo el sistema | F23 | `invoice.invoice.platform_document` |
 | Si el hub de plataforma puede emitir ahora (en producción, solo con el envío real a la AEAT abierto) | solo el sistema | F23 | `invoice.invoice.platform_health` |
@@ -855,7 +855,7 @@ Todas se pueden seguir en vivo.
 | Cambia una serie | llevar las series | F13 | `invoice.series.update` |
 | Guarda el emisor | configurar el emisor | F21 | `invoice.issuer.update` |
 | Manda la página A4 de una factura a la cola de Impresión (o dice que no se encoló: la imprime el dispositivo) | ver | F18 | `invoice.invoice.print` |
-| Guarda el emisor que manda la cuenta de ERPlora | solo el sistema | F22 | `invoice.issuer.sync` |
+| Guarda el emisor como el sistema; hoy no la llama nadie | solo el sistema | — | `invoice.issuer.sync` |
 | Emite una factura de ERPlora con su registro de VeriFactu | solo el sistema | F23 | `invoice.invoice.issue_platform` |
 
 ### Lo que avisa
@@ -1112,10 +1112,9 @@ sola (riesgo alto, como sustituir un tique en el mostrador).
 - **El emisor** (`Issuer`, una fila) se copia en cada documento. `invoice.issuer.sync` lo guarda como sistema
   con `{legal_name, tax_id, address, postal_code, city, province, country, version}` (una `version` menor o igual
   que la guardada se ignora), pero nadie lo llama: la foto del SaaS (`PUT /internal/hubs/{id}/state`) no lleva un
-  bloque `issuer` y la plataforma no lo entrega (hub#501). ⚠️ **Contradicción señalada, sin elegir** (hub#501):
-  PLAN-SAAS §3.1 punto 2, «Dos identidades» (decisión del 2026-10-11), dice que los datos fiscales del negocio
-  viven y se editan en el Hub y que el SaaS solo guarda al pagador (`BillingProfile`); recibir el emisor del SaaS
-  pide la dirección contraria. El emisor se escribe en el Hub (INVOICE-F21).
+  bloque `issuer` y la plataforma no lo entrega (hub#501, cerrada sin planificar): según «Dos identidades» de
+  PLAN-SAAS §3.1 punto 2, los datos fiscales del negocio viven y se editan en el Hub y el SaaS solo guarda al
+  pagador (`BillingProfile`). El emisor se escribe en el Hub (INVOICE-F21).
 - **El NIF que imprime el papel** (`document_issuer.py`): `InvoiceOut` lleva, junto a `issuer_tax_id` (el NIF tal
   como se guarda, el que va a `IDEmisorFactura` y al `nif=` del QR, siempre sin prefijo: con «ES» la AEAT lo
   rechaza), `issuer_vat_number`, el que imprimen el A4 y la pantalla. Un emisor inscrito en el ROI imprime su
@@ -1354,8 +1353,4 @@ se publican en esa pestaña. Lo que esas partes dejaron de decir, y quien mantie
 
 Lo que no entra tiene su issue abierta:
 
-- **hub#501** — El emisor de Facturación no se rellena con los datos fiscales de la cuenta de ERPlora:
-  la foto del SaaS no lleva el bloque `issuer` y `base.hub.state_apply` no llama a
-  `invoice.issuer.sync`, que ya existe; y el flujo choca con «Dos identidades» de PLAN-SAAS (los datos fiscales
-  del negocio viven en el Hub): primero hay que decidir la dirección.
 - Las piezas compartidas que la app pide a `@erplora/ui` y aún no han llegado: [`UI-REQUESTS.md`](UI-REQUESTS.md).

@@ -232,7 +232,7 @@ cierra la ventana sin guardarlo. Con la ventana como se abrió, atrás la cierra
 | SERVICE-F11 | Cambiar los ajustes de Servicios | hecho |
 | SERVICE-F12 | Crear un bono | hecho |
 | SERVICE-F13 | Editar o eliminar un bono | hecho |
-| SERVICE-F14 | Vender un bono a una clienta | hecho la concesión (asistente y API); la venta en el TPV, no (ver «Lo que queda fuera») |
+| SERVICE-F14 | Vender un bono a una clienta | hecho — la concesión, por el asistente y la API; la venta en el TPV, no (ver «Lo que queda fuera») |
 | SERVICE-F15 | Consultar los bonos de una clienta | hecho (asistente y API) |
 | SERVICE-F16 | Ver quién ha comprado un bono | hecho |
 | SERVICE-F17 | Anular un bono vendido por error | hecho |
@@ -514,7 +514,7 @@ eliminó entretanto) o los mismos que al crearlo, debajo de su campo; al elimina
 Implicados: SERVICE-F12, SERVICE-F16
 
 ### SERVICE-F14 Vender un bono a una clienta
-Estado: hecho la concesión (asistente y API); la venta en el TPV, no (ver «Lo que queda fuera»)
+Estado: hecho — la concesión, por el asistente y la API; la venta en el TPV, no (ver «Lo que queda fuera»)
 Actor: empleado, responsable, asistente
 Pantalla: asistente
 Pasos:

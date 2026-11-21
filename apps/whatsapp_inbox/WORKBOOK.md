@@ -1062,57 +1062,62 @@ Implicados: erplora.com; Citas y Reservas, cuando avisen por WhatsApp
 
 ### Lo que ofrece: consultas (leen, no cambian nada)
 
-| Operación | Qué devuelve |
-|---|---|
-| `whatsapp_inbox.conversation.list` | Conversaciones, con búsqueda por contacto o teléfono y filtros de estado, asignación, sin leer y ficha |
-| `whatsapp_inbox.conversation.detail` | Una conversación (por id, número o nombre) con su ficha, su asignación y si la ventana de 24 h está abierta |
-| `whatsapp_inbox.conversation.by_phone` | La conversación de un número exacto (formato internacional), o ninguna: para avisar desde otra app |
-| `whatsapp_inbox.conversation.summary` | Abiertas, sin leer y esperando respuesta, y si el tope del mes está gastado |
-| `whatsapp_inbox.conversation.count_awaiting_reply` | Cuántos clientes esperan respuesta (abiertas con el último mensaje del cliente o marcadas «Necesita atención»): lo cuenta la campana |
-| `whatsapp_inbox.conversation.notices` | Los clientes que esperan respuesta, del más reciente al más antiguo, con quién, lo último que escribió y cuándo: los avisos del dispositivo |
-| `whatsapp_inbox.message.list` | Los mensajes de una conversación, del más reciente al más antiguo |
-| `whatsapp_inbox.message.get` | Un mensaje por su id (el que puso en marcha una automatización): qué dice, quién y cuándo, el número internacional exacto de su conversación, cómo llamar al cliente, si ahora se le puede escribir y lo último que el negocio le escribió desde el Hub en las 24 horas anteriores (la lista que puede estar contestando, F19) |
-| `whatsapp_inbox.note.list` | Las notas internas de una conversación |
-| `whatsapp_inbox.template.list` | Las plantillas (filtros de estado, categoría, idioma, nombre y si se pueden enviar), con su camino a Meta |
-| `whatsapp_inbox.template_sample.detail` | El archivo de una cabecera por su id, como lo devolvió al guardarlo (nombre, foto, vídeo o documento y tamaño); solo el del negocio que pregunta |
-| `whatsapp_inbox.note.get` | Una nota interna por su id, con su texto: lo que lee la tarjeta del asistente para nombrarla (BASE-F97); no es herramienta del asistente ni tiene ruta en la API |
-| `whatsapp_inbox.template.get` | Una plantilla del negocio por su id con su nombre y su idioma («recordatorio (es)»), también una borrada aquí que Meta aún tiene: lo que lee la tarjeta del asistente para nombrarla (BASE-F97); no es herramienta del asistente ni tiene ruta en la API |
-| `whatsapp_inbox.channel.get` | El estado del número y el consumo del mes |
-| `whatsapp_inbox.agent.list` | Las personas del negocio a las que se puede asignar una conversación |
+| Operación | Qué devuelve | Flujos |
+|---|---|---|
+| `whatsapp_inbox.conversation.list` | Conversaciones, con búsqueda por contacto o teléfono y filtros de estado, asignación, sin leer y ficha | F05, F09 |
+| `whatsapp_inbox.conversation.detail` | Una conversación (por id, número o nombre) con su ficha, su asignación y si la ventana de 24 h está abierta | F05 |
+| `whatsapp_inbox.conversation.by_phone` | La conversación de un número exacto (formato internacional), o ninguna: para avisar desde otra app | F23, F26 |
+| `whatsapp_inbox.conversation.summary` | Abiertas, sin leer y esperando respuesta, y si el tope del mes está gastado | F09, F13 |
+| `whatsapp_inbox.conversation.count_awaiting_reply` | Cuántos clientes esperan respuesta (abiertas con el último mensaje del cliente o marcadas «Necesita atención»): lo cuenta la campana | F09 |
+| `whatsapp_inbox.conversation.notices` | Los clientes que esperan respuesta, del más reciente al más antiguo, con quién, lo último que escribió y cuándo: los avisos del dispositivo | F09 |
+| `whatsapp_inbox.message.list` | Los mensajes de una conversación, del más reciente al más antiguo | F05, F06 |
+| `whatsapp_inbox.message.get` | Un mensaje por su id (el que puso en marcha una automatización): qué dice, quién y cuándo, el número internacional exacto de su conversación, cómo llamar al cliente, si ahora se le puede escribir y lo último que el negocio le escribió desde el Hub en las 24 horas anteriores (la lista que puede estar contestando, F19) | F19–F22, F24, F25 |
+| `whatsapp_inbox.note.list` | Las notas internas de una conversación | F36 |
+| `whatsapp_inbox.template.list` | Las plantillas (filtros de estado, categoría, idioma, nombre y si se pueden enviar), con su camino a Meta | F27, F28, F33 |
+| `whatsapp_inbox.template_sample.detail` | El archivo de una cabecera por su id, como lo devolvió al guardarlo (nombre, foto, vídeo o documento y tamaño); solo el del negocio que pregunta | F29, F30 |
+| `whatsapp_inbox.note.get` | Una nota interna por su id, con su texto: lo que lee la tarjeta del asistente para nombrarla (BASE-F97); no es herramienta del asistente ni tiene ruta en la API | F36 |
+| `whatsapp_inbox.template.get` | Una plantilla del negocio por su id con su nombre y su idioma («recordatorio (es)»), también una borrada aquí que Meta aún tiene: lo que lee la tarjeta del asistente para nombrarla (BASE-F97); no es herramienta del asistente ni tiene ruta en la API | F30, F31 |
+| `whatsapp_inbox.channel.get` | El estado del número y el consumo del mes | F01, F02, F13 |
+| `whatsapp_inbox.agent.list` | Las personas del negocio a las que se puede asignar una conversación | F07 |
 
 ### Lo que ofrece: acciones (cambian datos)
 
-| Operación | Qué hace |
-|---|---|
-| `whatsapp_inbox.message.send` | Guarda y entrega un texto (dentro de 24 h) o una plantilla aprobada, a una conversación o a un número; pide una clave por mensaje |
-| `whatsapp_inbox.message.retry` | Vuelve a entregar un mensaje que no salió, con la misma clave |
-| `whatsapp_inbox.message.notify` | El envío que puede tener una automatización (FLOW-F31): solo a la conversación viva del número internacional exacto, nunca una nueva; texto dentro de 24 h y la plantilla aprobada fuera; mismo camino de salida que `message.send` |
-| `whatsapp_inbox.conversation.mark_read` | Deja **Sin leer** a cero |
-| `whatsapp_inbox.conversation.assign` | Asigna o desasigna; «Asignármela» no pisa a otro |
-| `whatsapp_inbox.conversation.set_status` | Abierta, pendiente o cerrada |
-| `whatsapp_inbox.conversation.link_customer` | Une a una ficha, crea la ficha o desune |
-| `whatsapp_inbox.conversation.erase` | Borra los datos de un número (irreversible) |
-| `whatsapp_inbox.conversation.flag` | Marca una conversación abierta «Necesita atención» (la respuesta automática no pudo contestar, F20); se quita sola al contestar, dejarla pendiente o cerrarla |
-| `whatsapp_inbox.note.add` / `whatsapp_inbox.note.delete` | Notas internas |
-| `whatsapp_inbox.template_sample.upload` | Guarda el archivo de una cabecera con foto, vídeo o documento en los archivos del negocio y devuelve su id |
-| `whatsapp_inbox.template.create` | Crea una plantilla y la entrega a erplora.com para Meta; pide una clave por guardado |
-| `whatsapp_inbox.template.update` | Cambia una plantilla; la aprobada sigue enviándose hasta que Meta recibe el cambio |
-| `whatsapp_inbox.template.retry` | Vuelve a entregar la plantilla (o su borrado) que no llegó a Meta; un rechazo va con clave nueva |
-| `whatsapp_inbox.template.delete` | Borra una plantilla aquí y en Meta (irreversible) |
-| `whatsapp_inbox.channel.prepare` | Pregunta a erplora.com con qué abrir la ventana de Meta y dice si se puede abrir ya (no guarda nada; es acción porque espera a erplora.com fuera de toda transacción) |
-| `whatsapp_inbox.channel.connect` | Conecta el número que eligió la ventana de Meta, con su código de un solo uso tal cual llegó |
-| `whatsapp_inbox.channel.disconnect` | Desconecta el número del negocio; las conversaciones se quedan |
+| Operación | Qué hace | Flujos |
+|---|---|---|
+| `whatsapp_inbox.message.send` | Guarda y entrega un texto (dentro de 24 h) o una plantilla aprobada, a una conversación o a un número; pide una clave por mensaje | F32, F33 |
+| `whatsapp_inbox.message.retry` | Vuelve a entregar un mensaje que no salió, con la misma clave | F32, F33 |
+| `whatsapp_inbox.message.notify` | El envío que puede tener una automatización (FLOW-F31): solo a la conversación viva del número internacional exacto, nunca una nueva; texto dentro de 24 h y la plantilla aprobada fuera; mismo camino de salida que `message.send` | F19–F26 |
+| `whatsapp_inbox.conversation.mark_read` | Deja **Sin leer** a cero | F05 |
+| `whatsapp_inbox.conversation.assign` | Asigna o desasigna; «Asignármela» no pisa a otro | F07 |
+| `whatsapp_inbox.conversation.set_status` | Abierta, pendiente o cerrada | F35 |
+| `whatsapp_inbox.conversation.link_customer` | Une a una ficha, crea la ficha o desune | F37 |
+| `whatsapp_inbox.conversation.erase` | Borra los datos de un número (irreversible) | F10 |
+| `whatsapp_inbox.conversation.flag` | Marca una conversación abierta «Necesita atención» (la respuesta automática no pudo contestar, F20); se quita sola al contestar, dejarla pendiente o cerrarla | F20 |
+| `whatsapp_inbox.note.add` / `whatsapp_inbox.note.delete` | Notas internas | F36 |
+| `whatsapp_inbox.template_sample.upload` | Guarda el archivo de una cabecera con foto, vídeo o documento en los archivos del negocio y devuelve su id | F29, F30 |
+| `whatsapp_inbox.template.create` | Crea una plantilla y la entrega a erplora.com para Meta; pide una clave por guardado | F29 |
+| `whatsapp_inbox.template.update` | Cambia una plantilla; la aprobada sigue enviándose hasta que Meta recibe el cambio | F30 |
+| `whatsapp_inbox.template.retry` | Vuelve a entregar la plantilla (o su borrado) que no llegó a Meta; un rechazo va con clave nueva | F29, F30, F31 |
+| `whatsapp_inbox.template.delete` | Borra una plantilla aquí y en Meta (irreversible) | F31 |
+| `whatsapp_inbox.channel.prepare` | Pregunta a erplora.com con qué abrir la ventana de Meta y dice si se puede abrir ya (no guarda nada; es acción porque espera a erplora.com fuera de toda transacción) | F01 |
+| `whatsapp_inbox.channel.connect` | Conecta el número que eligió la ventana de Meta, con su código de un solo uso tal cual llegó | F01, F02 |
+| `whatsapp_inbox.channel.disconnect` | Desconecta el número del negocio; las conversaciones se quedan | F02 |
 
-Del sistema (sin ruta pública; solo erplora.com por `/internal`, las entregas, el worker y las
-reacciones): `whatsapp_inbox.message.receive`, `whatsapp_inbox.message.update_status`,
-`whatsapp_inbox.channel.sync`; las entregas (`whatsapp_inbox.message.claim_delivery`,
-`whatsapp_inbox.message.record_delivery`, `whatsapp_inbox.conversation.claim_erasure`,
-`whatsapp_inbox.conversation.record_erasure`, `whatsapp_inbox.template.claim_submit`,
-`whatsapp_inbox.template.record_submit`, `whatsapp_inbox.template.claim_delete`,
-`whatsapp_inbox.template.record_delete`); la tarea del worker `whatsapp_inbox.delivery.resume`; y
-las reacciones a Clientes (`whatsapp_inbox.conversation.claim_for_customer`,
-`whatsapp_inbox.conversation.move_customer`, `whatsapp_inbox.conversation.release_customer`,
-`whatsapp_inbox.conversation.erase_for_customer`).
+Del sistema (sin ruta pública):
+
+| Operación | Quién la llama | Flujos |
+|---|---|---|
+| `whatsapp_inbox.message.receive` | erplora.com, por `/internal` | F03, F04, F08, F38 |
+| `whatsapp_inbox.message.update_status` | erplora.com, por `/internal` | F34 |
+| `whatsapp_inbox.channel.sync` | erplora.com, por `/internal` | F01, F02, F13, F27, F28 |
+| `whatsapp_inbox.message.claim_delivery`, `whatsapp_inbox.message.record_delivery` | las entregas | F32, F33 |
+| `whatsapp_inbox.conversation.claim_erasure`, `whatsapp_inbox.conversation.record_erasure` | las entregas | F10, F11 |
+| `whatsapp_inbox.template.claim_submit`, `whatsapp_inbox.template.record_submit` | las entregas | F29, F30 |
+| `whatsapp_inbox.template.claim_delete`, `whatsapp_inbox.template.record_delete` | las entregas | F31 |
+| `whatsapp_inbox.delivery.resume` | la tarea del worker | F10, F11, F29–F33 |
+| `whatsapp_inbox.conversation.claim_for_customer`, `whatsapp_inbox.conversation.release_customer` | las reacciones a Clientes | F04 |
+| `whatsapp_inbox.conversation.move_customer` | las reacciones a Clientes | F12 |
+| `whatsapp_inbox.conversation.erase_for_customer` | las reacciones a Clientes | F11 |
 
 ### Lo que avisa
 

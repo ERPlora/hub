@@ -48,14 +48,14 @@ el «registro que ya no existe» de Odoo.
 
 Demo se abre desde **«Mis apps»**, arriba a la derecha, y tiene dos pantallas y dos formularios.
 
-### Elementos (lista)
-Tabla con Nombre, Estado («Abierto» / «Hecho»), Líneas (cuántas tiene) y Actualizado. Buscador
-«Buscar…» por nombre (sin distinguir mayúsculas); el embudo abre «Filtros», con el de estado («Todos»,
-«Abierto», «Hecho»); 50 por página (se puede cambiar), del cambiado más recientemente al más antiguo,
-como tabla o como tarjetas; en el móvil, «Cargar más» hasta 100 elementos y, con más, de página en página
-(«Página anterior», «Página siguiente» y «1 / 3»). Botón **«Nuevo elemento»** solo para quien
-puede gestionar. Tocar una fila abre la ficha. Encima, las cifras «Abiertos», «Hechos» y «Líneas»,
-solo para quien puede gestionar.
+### Demo
+La pestaña abre la lista «Elementos»: una tabla con Nombre, Estado («Abierto» / «Hecho»), Líneas (cuántas
+tiene) y Actualizado. Buscador «Buscar…» por nombre (sin distinguir mayúsculas); el embudo abre
+«Filtros», con el de estado («Todos», «Abierto», «Hecho»); 50 por página (se puede cambiar), del cambiado
+más recientemente al más antiguo, como tabla o como tarjetas; en el móvil, «Cargar más» hasta 100
+elementos y, con más, de página en página («Página anterior», «Página siguiente» y «1 / 3»). Botón
+**«Nuevo elemento»** solo para quien puede gestionar. Tocar una fila abre la ficha. Encima, las cifras
+«Abiertos», «Hechos» y «Líneas», solo para quien puede gestionar.
 
 ![La lista de elementos en el móvil, con las cifras, el buscador, el embudo de filtros y «Nuevo elemento»](docs/img/items-list.png)
 
@@ -98,7 +98,7 @@ del formulario.
 ### DEMO-F01 Crear un elemento
 Estado: hecho
 Actor: administrador, responsable
-Pantalla: Elementos
+Pantalla: Demo
 Pasos:
 1. En **Elementos**, pulsa «Nuevo elemento»: se abre el formulario «Nuevo elemento».
 2. Escribe el Nombre; Estado («Abierto» de entrada) y Nota son opcionales.
@@ -166,7 +166,7 @@ Implicados: ninguno
 ### DEMO-F05 Ver el cambio en otra tableta en menos de un segundo
 Estado: hecho
 Actor: cualquiera con permiso de ver
-Pantalla: Elementos y Ficha del elemento
+Pantalla: Demo, Ficha del elemento
 Pasos:
 1. Abre la lista (o la misma ficha) en dos tabletas del mismo negocio.
 2. En una, crea, cambia, borra o añade una línea.
@@ -181,7 +181,7 @@ Implicados: ninguno
 ### DEMO-F06 Intentarlo sin permiso
 Estado: hecho
 Actor: empleado
-Pantalla: Elementos y Ficha del elemento
+Pantalla: Demo, Ficha del elemento
 Pasos:
 1. Un empleado abre **Demo**: ve la lista y la ficha, sin «Nuevo elemento», «Editar», «Marcar como
    hecho», «Eliminar», «Guardar nota», «Añadir línea» ni cifras; la nota solo se lee.
