@@ -9,6 +9,13 @@ Estado de la app: completa (2026-10-21)
 
 ## Para qué sirve y para quién
 
+Suplementos guarda las elecciones que acompañan a un plato: el punto de la carne, un extra de queso, el tamaño o «sin
+cebolla». Se ordenan en grupos que dicen cuántas opciones hay que elegir, y cada opción lleva su suplemento (más, menos
+o gratis) y sus alérgenos. Un grupo se aplica a productos o a categorías enteras: el TPV lo pregunta al vender, cobra el
+suplemento y lo manda a cocina.
+
+### En detalle
+
 Suplementos es el catálogo de las elecciones que acompañan a un plato: el «punto de la carne», el
 «extra de queso», el tamaño, «sin cebolla». Se ordena en **grupos**:
 
@@ -76,6 +83,13 @@ Configuración inicial, paso a paso:
 ## Pantallas
 
 ### Suplementos
+Aquí están los grupos de suplementos, cada uno con su regla de elección (opcional u obligatorio, cuántas opciones como
+mucho y si una se puede repetir), cuántas opciones tiene y a cuántos productos y categorías se aplica. Con «Nuevo grupo»
+creas uno y, en su fila, lo cambias o lo borras. Toca un grupo para abrir su hoja: ahí añades sus opciones, con su
+suplemento y sus alérgenos, y en «Se aplica a» lo enganchas a los productos o a las categorías que lo llevan. Un grupo
+sin opciones o que no se aplica a nada no sale en el TPV.
+
+#### Detalle
 Menú **Suplementos** (una sola entrada). Arriba, el título «Suplementos». Debajo, la tabla de grupos
 con el buscador «Buscar…» (busca por nombre y por nombre de comanda): **Nombre** (se ordena y se
 filtra), **En la comanda** (el nombre de cocina; vacío, el comercial), **Elección** (se ordena por el
@@ -87,7 +101,7 @@ una opción puede repetirse. Por orden y nombre; páginas de 50.
 Quien puede gestionar ve **«Nuevo grupo»** y, en cada fila, **Editar** y **Borrar**. Tocar una fila abre
 la hoja del grupo, a todos.
 
-### Hoja del grupo
+#### Hoja del grupo
 Título «Grupo — {nombre}» y su regla. Dos apartados:
 
 - **Opciones**: cada una con su nombre, su nombre de comanda (si es otro), su suplemento en la moneda
@@ -102,7 +116,7 @@ Título «Grupo — {nombre}» y su regla. Dos apartados:
 
 De 20 en 20, con «Cargar más».
 
-### Formularios
+#### Formularios
 - **Grupo** («Nuevo grupo» / «Editando grupo — {nombre}»): Nombre, «Nombre en la comanda», «Mínimo (1 o
   más = obligatorio)», «Máximo (0 = sin techo)», «Se puede repetir una opción» y Orden.
 - **Opción** («Nueva opción» / «Editando opción — {nombre}»): Nombre, «Nombre en la comanda»,
@@ -173,13 +187,13 @@ Pasos:
 4. Pon el Mínimo (1 o más lo hace obligatorio; 0, opcional), el Máximo (0 es sin techo; si no es 0, no
    puede ser menor que el mínimo), si una opción se puede repetir y el Orden en que sale en el TPV.
 5. Pulsa «Crear»: el formulario se cierra y el grupo sale en la tabla. Todavía no sale en el TPV:
-   faltan sus opciones (F04) y dónde se aplica (F05).
+   faltan sus opciones y dónde se aplica, que se ponen en su hoja.
 Entra: lo que escribe la persona.
 Sale: el grupo (avisa: grupo creado). No crea opciones ni enganches.
 Si falla: un nombre vacío o de más de 255 caracteres, un mínimo o máximo fuera de 0–50 o un máximo por
 debajo del mínimo salen debajo de su campo; un nombre que ya tiene otro grupo, «Ya hay un grupo con ese
 nombre.» debajo del Nombre. El motivo de un campo se quita en cuanto se corrige ese campo, aunque otro diga lo
-mismo (hub#888). Lo escrito se queda.
+mismo. Lo escrito se queda.
 Implicados: ninguno
 
 ### MODIFIER-F03 Cambiar o borrar un grupo
@@ -198,8 +212,8 @@ línea.
 Si falla: los mismos rechazos que al crear; bajar el máximo por debajo de las opciones que ya salen por
 defecto, «Este grupo tiene más opciones por defecto que su máximo.». Un grupo que no existe, «Este
 grupo no existe.». Por el asistente, un nombre que vale para varios grupos o para ninguno no saca tarjeta, y si
-antes del «sí» otro grupo encaja mejor con lo dicho no se cambia ni se borra nada y sale la tarjeta nueva (BASE-F97).
-Implicados: SALE-F11
+antes del «sí» otro grupo encaja mejor con lo dicho no se cambia ni se borra nada y sale la tarjeta nueva.
+Implicados: SALE-F11, BASE-F97
 
 ### MODIFIER-F04 Añadir, cambiar o quitar las opciones de un grupo
 Estado: hecho
@@ -208,8 +222,8 @@ Pantalla: Suplementos (hoja del grupo)
 Pasos:
 1. Abre el grupo y, en Opciones, pulsa «Añadir opción».
 2. Escribe el Nombre (único dentro del grupo) y, si hace falta, el nombre de comanda.
-3. Escribe el Suplemento en la moneda del negocio, la de su país en Ajustes → Negocio, con sus decimales
-   (el yen no tiene): positivo cobra de más, negativo descuenta, vacío o 0 es gratis.
+3. Escribe el Suplemento en la moneda del negocio, la de su país, con sus decimales (el yen no tiene):
+   positivo cobra de más, negativo descuenta, vacío o 0 es gratis.
 4. Solo si la opción tributa distinto del plato, elige su categoría fiscal propia; vacía, hereda la del
    plato.
 5. Marca «Elegida por defecto» si el TPV debe traerla ya marcada. En un grupo de máximo 1, marcar otra
@@ -222,19 +236,19 @@ pedido conserva su copia congelada, también en la comanda.
 Si falla: «Crear» y «Guardar» están en gris mientras falte el nombre y mientras el negocio no haya dicho
 todavía su moneda, porque el suplemento se lee en ella (sin ella, «150» yenes se guardaría como 15 000); hasta
 entonces, salir del suplemento lo deja como se escribió, sin inventarle decimales ni juzgarlo: «¥150» o «-0,50 zł» no
-salen en rojo como «Esto no es un importe», y en cuanto llega la moneda se leen en ella (hub#945). Si la moneda no se puede leer, la ventana lo dice («No se ha podido leer la moneda del negocio», con el
-motivo) y ofrece «Reintentar», que la vuelve a pedir; en cuanto llega, el botón se enciende (hub#938). Un
+salen en rojo como «Esto no es un importe», y en cuanto llega la moneda se leen en ella. Si la moneda no se puede
+leer, la ventana lo dice («No se ha podido leer la moneda del negocio», con el motivo) y ofrece «Reintentar», que la
+vuelve a pedir; en cuanto llega, el botón se enciende. Un
 nombre vacío o repetido en el grupo, un suplemento que no es un importe, una categoría
 fiscal que no existe en Impuestos o más opciones por defecto que el máximo salen junto a su campo; el del nombre,
 el nombre de comanda, el suplemento, la categoría fiscal o el orden se quita en cuanto se corrige ese campo, aunque
-otro diga lo mismo (hub#888), y el de «Elegida por defecto», en cuanto se cambia ese interruptor, sin volver a
-guardar (hub#1437). Una
+otro diga lo mismo, y el de «Elegida por defecto», en cuanto se cambia ese interruptor, sin volver a guardar. Una
 opción con categoría fiscal propia se cobra en una línea aparte, que no puede valer cero ni menos: «Una
 opción con su propia categoría fiscal se cobra en una línea aparte: su suplemento tiene que ser mayor
 que cero.». Un grupo admite hasta 100 opciones. Por el asistente, al cambiar o quitar una opción, un grupo dicho por
 su nombre que vale para varios o para ninguno no saca tarjeta, y si antes del «sí» otro grupo encaja mejor con lo dicho
-no se toca nada y sale la tarjeta nueva (BASE-F97).
-Implicados: SALE-F11
+no se toca nada y sale la tarjeta nueva.
+Implicados: SALE-F11, BASE-F97
 
 ### MODIFIER-F05 Enganchar un grupo a productos o categorías, y soltarlo
 Estado: hecho
@@ -253,9 +267,10 @@ de **todas** sus categorías, cada grupo una sola vez.
 Si falla: un producto o una categoría que no existe o está borrado, «Este producto no existe en este
 hub.» o «Esta categoría ya no existe.»; un enganche que ya existe, «Este grupo ya se aplica ahí.». Por el
 asistente, al soltar un grupo dicho por su nombre que vale para varios o para ninguno no sale tarjeta, y si antes del
-«sí» otro grupo encaja mejor con lo dicho no se suelta nada y sale la tarjeta nueva (BASE-F97). Un enganche a un
-producto o una categoría ya borrados tampoco saca tarjeta («Este grupo no se aplica ahí.»): lo suelta MODIFIER-F09.
-Implicados: INVENTORY-F01, INVENTORY-F06
+«sí» otro grupo encaja mejor con lo dicho no se suelta nada y sale la tarjeta nueva. Un enganche a un producto o una
+categoría ya borrados tampoco saca tarjeta («Este grupo no se aplica ahí.»): se suelta solo a los pocos segundos de
+borrarse.
+Implicados: INVENTORY-F01, INVENTORY-F06, MODIFIER-F09, BASE-F97
 
 ### MODIFIER-F06 Elegir las opciones al vender un artículo
 Estado: hecho
@@ -818,3 +833,19 @@ suma a la línea los de las opciones elegidas al pedirla y los congela con el re
 - **«Agotado» por opción y activar o desactivar un grupo sin borrarlo** (Square): hoy se retira
   borrando la opción o soltando el enganche.
 - **Precio de la opción distinto por producto** (Toast «size-based pricing»).
+
+### Lo que la ventana de ayuda no enseña
+
+La ayuda del Hub publica el primer apartado hasta su primer `###`, el resumen de cada pestaña (lo que va antes de su
+primer `####`) y, de cada flujo hecho en una pestaña o en una de sus ventanas, su título, sus pasos y «Si falla», sin
+nombres de código, incidencias ni ids de flujo (`tests/test_help_workbooks.py`). Por eso la hoja del grupo y los
+formularios son ventanas (`####`) de **Suplementos**: MODIFIER-F04, F05 y F11 se publican en esa pestaña. MODIFIER-F06
+y F12 se hacen en el TPV de Ventas, y F07 a F10 los hace el sistema o el personal de ERPlora: ninguno sale en esta
+ayuda. Lo que esas partes dejaron de decir, y quien mantiene Suplementos necesita:
+
+- El aviso bajo un campo se quita al corregir ese campo, aunque otro diga lo mismo (hub#888: MODIFIER-F02 y F04), y el
+  de «Elegida por defecto», al cambiar ese interruptor (hub#1437, F04).
+- Sin la moneda del negocio, el suplemento se deja como se escribió hasta que llega (hub#945) y la ventana ofrece
+  «Reintentar» si no se puede leer (hub#938), en F04.
+- Lo que se cambia, se borra o se suelta por el asistente sigue la tarjeta de confirmación de BASE-F97 (F03, F04 y
+  F05), y un enganche a algo ya borrado lo suelta MODIFIER-F09.
