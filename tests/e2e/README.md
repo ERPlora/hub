@@ -632,8 +632,6 @@ negocio, no la redacción de las respuestas.
   (`uses`: herramienta, ruta en sus argumentos como `rows[name~pulpo].price`, y `where` si es de un solo registro) y las
   lecturas que pueden encontrarlos sin preguntar (`resolvers`). Un dato que el dueño dice de entrada no puede estar aquí:
   el formato lo rechaza;
-- `offered`: las herramientas que el turno tiene que ofrecer al mensaje de apertura (con sus archivos, si los lleva)
-  para que el trabajo se pueda empezar; vacío cuando lo correcto es preguntar antes de hacer nada;
 - `said` (opcional): cómo dice el dueño el trabajo. `half`, **a medias** («se han roto 3 botellas», «mañana no viene
   Daniel»): no deja claro qué quiere y lo correcto es preguntar antes de escribir nada; `whole`, **entero**, el mismo
   trabajo dicho con todo lo que hace falta, como control: lo correcto es hacerlo (o pedir solo el dato que falta). Sin
@@ -666,12 +664,11 @@ tienen que cumplirse. Si no, el escenario sale **excluido** con el motivo, igual
 podría aprobarlo en esa pila. Si el motivo es un defecto de una herramienta, va a su issue. Después se vuelve a poner la
 copia y se pregunta al modelo.
 
-**No ejecutable** (`assistant-precheck.ts`): antes de preguntar se pide al turno del asistente, como la dueña y sin
-modelo, qué herramientas ofrece al mensaje de apertura tal como lo manda el chat (texto y archivos). Si falta alguna de
-`offered`, el escenario sale «not runnable: tools not offered on the attached message» (o «… on the opening message»,
-sin archivos), aparte de los fallos del modelo: las herramientas se eligen por las palabras de la persona, así que ningún
-modelo podría hacer el trabajo. Un escenario con foto tampoco se pregunta a un modelo que no ve imágenes
-(`QA_ANSWER_VISION`).
+**No ejecutable** (`assistant-precheck.ts`): un escenario con foto no se pregunta a un modelo que no ve imágenes
+(`QA_ANSWER_VISION`); sale «not runnable: the model does not see images», aparte de los fallos del modelo. Las
+herramientas que el turno ofrece al mensaje de apertura nunca dejan fuera un escenario: cada turno ofrece también la
+búsqueda de las demás (`base.assistant.find_tools`), así que encontrar la que falta es trabajo del modelo y se puntúa
+como lo demás.
 
 **El dueño simulado** (`assistant-owner.ts`): un modelo fijo, el mismo para todos los modelos que se comparan,
 `QA_OWNER_MODEL` (por defecto `anthropic/claude-sonnet-5.5`) por OpenRouter, con temperatura 0 y el mínimo de razonamiento

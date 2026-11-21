@@ -27,7 +27,6 @@
   },
   "attachments": [],
   "opening": "Mañana Daniel no viene, apúntale la ausencia de todo el día y apruébala, que no le den citas",
-  "offered": ["staff.time_off.create", "staff.time_off.approve"],
   "writes": ["staff.time_off.create", "staff.time_off.approve"],
   "cards": [],
   "expect": [

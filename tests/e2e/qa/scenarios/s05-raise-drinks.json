@@ -16,7 +16,6 @@
   },
   "attachments": [],
   "opening": "Sube un 5 % las bebidas",
-  "offered": ["inventory.product.list", "inventory.product.update"],
   "writes": ["inventory.product.update"],
   "cards": [
     {

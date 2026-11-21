@@ -18,7 +18,6 @@
   },
   "attachments": [],
   "opening": "Se han roto 3 botellas",
-  "offered": [],
   "writes": ["inventory.stock.write_off"],
   "cards": [],
   "expect": [

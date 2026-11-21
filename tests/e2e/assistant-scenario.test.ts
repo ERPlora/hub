@@ -20,7 +20,6 @@ const minimal = (): Record<string, unknown> => ({
   owner: { persona: 'Ana, dueña de un bar', goal: 'Añadir un producto', upFront: ['Se llama Tarta'], ifAsked: ['Cuesta 5,50 €'] },
   attachments: [],
   opening: 'Añade la tarta',
-  offered: [],
   writes: ['inventory.product.create'],
   cards: [],
   expect: [{ says: 'the cake exists', sql: "select count(*) from inventory_product where name = 'Tarta'", equals: '1' }],
@@ -86,11 +85,6 @@ describe('parseScenario', () => {
     expect(() => parsed({ attachments: [{ kind: 'docx', name: 'x.docx' }] })).toThrow(/attachments 1: kind/);
     expect(() => parsed({ attachments: [{ kind: 'pdf', name: 'a.pdf', note: { ...note, lines: [] } }] })).toThrow(/attachments 1: note/);
     expect(() => parsed({ attachments: [{ kind: 'xlsx', name: 'a.xlsx', sheet: 'S', rows: [[{}]] }] })).toThrow(/attachments 1: rows/);
-  });
-
-  it('reads the tools the opening must be offered, with or without files, as tools', () => {
-    expect(parsed({ offered: ['inventory.product.create'] }).offered).toEqual(['inventory.product.create']);
-    expect(() => parsed({ offered: ['create'] })).toThrow(/offered/);
   });
 
   it('reads whether the owner says the job by halves or whole, and leaves it unsaid when the scenario does not say', () => {

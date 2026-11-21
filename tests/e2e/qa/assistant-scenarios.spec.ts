@@ -24,7 +24,7 @@ import { goldenCommand, parseStepResults, runSteps, type StepsRun } from '../ass
 import { ownName, renameSql, runBusinessName } from '../assistant-run-name';
 import { askOwner, type Exchange, ownerChoice, type OwnerDeps } from '../assistant-owner';
 import { openPanelAtHome } from '../assistant-panel';
-import { notRunnable, offeredTurnCommand, openingContent, parseOfferedTurn, SENT_SQL } from '../assistant-precheck';
+import { notRunnable, SENT_SQL } from '../assistant-precheck';
 import { cleanUpRealProviders, converse, emptyMonth, run, saasSql, SECRETS, seedRealProviders, TURN_MS } from '../assistant-real';
 import { type Check, loadedScenarios, type Scenario, type ToolStep } from '../assistant-scenario';
 import { datedScenario } from '../assistant-scenario-dates';
@@ -135,16 +135,6 @@ async function filesOf(browser: Browser, scenario: Scenario): Promise<AttachedFi
   } finally {
     await printer.close();
   }
-}
-
-/** The tools the assistant's turn offers the opening message with its files, as the owner of `a`; null when the
- *  scenario names none its opening needs. */
-function offeredFor(scenario: Scenario, files: AttachedFile[]): string[] | null {
-  if (!scenario.offered.length) return null;
-  const file = join(QA_DIR, `opening-${scenario.id}.json`);
-  writeFileSync(file, JSON.stringify(openingContent(scenario.opening, files)));
-  const command = offeredTurnCommand({ file, language: scenario.language }, process.env);
-  return parseOfferedTurn(run(command.file, command.args, HUB_DIR, command.env));
 }
 
 /** The month's messages of `a` back to none, its tokens and cost kept: a long conversation never runs out of them. */
@@ -260,7 +250,7 @@ for (const scenario of SCENARIOS) {
       test.skip(true, `excluded: ${problem}`);
     }
     const files = await filesOf(browser, dated);
-    const why = notRunnable(dated, offeredFor(dated, files), answerChoice(process.env).vision);
+    const why = notRunnable(dated, answerChoice(process.env).vision);
     if (why) {
       bench(dated, { status: 'not_runnable', why });
       test.skip(true, why);
