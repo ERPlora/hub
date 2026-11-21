@@ -7,7 +7,7 @@ from django.apps import apps
 from django.conf import settings
 from django.utils import translation
 from live.live_registry import live_registry
-from live.meta import Category, LiveAppConfig, Nav, Widget, module_configs, permissions_for_role
+from live.meta import Category, Help, LiveAppConfig, Nav, Widget, module_configs, permissions_for_role
 from live.operations import registry
 
 from apps.attendance import events as E
@@ -229,3 +229,7 @@ def test_the_panels_icon_is_registered_in_the_shell():
 def test_attendance_has_no_setup_steps_nor_bell_counters():
     assert attendance().setup == []
     assert attendance().bell == []
+
+
+def test_its_help_window_is_ready_without_a_video_yet():
+    assert attendance().help == Help()
