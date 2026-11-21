@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:e80aa728c398f8dcf2304af78e1ac441c65404ffdaa07b2c8d6ad907057f679f -->
+<!-- generated from WORKBOOK.md sha256:414ddacd73ccf6c7163ff89aa800fdb26256ce89907f30a48cd7e8033c633eab -->
 
 ## What it is for and who it is for
 
@@ -1077,7 +1077,11 @@ Steps:
    footer. With **VeriFactu**, before the footer goes the fiscal QR: "Tax QR:" above, "VERI*FACTU" below
    and "Scan it to check this receipt at the AEAT" ("…this invoice…" if it is an invoice); once the AEAT
    has answered, its code ("CSV: …") instead of that sentence. While VeriFactu has no record of that
-   document, the paper comes out without a QR. If its fiscal document could not be issued when charging,
+   document, the paper comes out without a QR. A receipt with its fiscal document (issued or pending)
+   carries a second QR after it, the one of the page where the customer asks for the full invoice
+   (INVOICE-F04): "Scan to ask for your full invoice" above and the receipt's code below, to type it if the
+   camera cannot read it; if it could not be drawn, the whole address goes below instead. An invoice, or a
+   sale without Invoicing, carries none. If its fiscal document could not be issued when charging,
    the paper says so under the number ("Fiscal document pending") and, above the paper (outside what is
    printed), the notice
    "Fiscal document pending — Invoicing could not issue it when charging (the issuer is missing, or a
@@ -1087,7 +1091,7 @@ Steps:
    with its fiscal document pending), it goes through the device's print dialog with the paper alone: the
    browser's or, in the installed app, its print screen (the system's dialog, with the printer or "Save
    as PDF"). Every print from
-   **Sales** comes out with "DUPLICATE", also with its fiscal QR; only the first paper right after
+   **Sales** comes out with "DUPLICATE", also with its QRs; only the first paper right after
    charging is the original (and it is a copy if it already came out on the printer when charging).
 4. **Document pending**: in the list, a sale with some fiscal document pending (its own, the corrective
    invoice of its void or that of a refund) carries the "Document pending" pill under its status and the
@@ -1105,7 +1109,7 @@ the paper never comes out without it). If it does not print, "Could not print"; 
 not open its print screen, with the reason after a colon, as when printing the bill for the table. A
 refused "Issue now" says Invoicing's reason ("Set up the issuer…") and changes nothing; with no reason,
 "The documents could not be issued. Try again.".
-Involved: INVOICE-F01, INVOICE-F02, INVOICE-F06, INVOICE-F18, PRINTING-F08, VERIFACTU-F19, SALE-F21, SALE-F34
+Involved: INVOICE-F01, INVOICE-F02, INVOICE-F04, INVOICE-F06, INVOICE-F18, PRINTING-F08, VERIFACTU-F19, SALE-F21, SALE-F34
 
 ### SALE-F30 Void a charged sale
 Status: done

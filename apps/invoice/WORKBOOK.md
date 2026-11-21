@@ -208,7 +208,7 @@ territorio no cuentan como cambio, ni una rectificativa ya emitida: atrás cierr
 | INVOICE-F01 | El tique (factura simplificada) que nace al cobrar | hecho — Ventas lo pide dentro del mismo cobro |
 | INVOICE-F02 | La factura completa al cobrar a un cliente con NIF | hecho — Ventas lo pide dentro del mismo cobro |
 | INVOICE-F03 | Emitir una factura a mano | hecho |
-| INVOICE-F04 | El cliente pide la factura completa de su tique | parcial — la página pública ya la pide con el código del tique; falta imprimir el código en el papel |
+| INVOICE-F04 | El cliente pide la factura completa de su tique | hecho |
 | INVOICE-F05 | Pasar un tique a factura completa desde el mostrador | hecho |
 | INVOICE-F06 | Una venta cobrada que no se ha podido facturar | hecho |
 | INVOICE-F07 | Anular una venta cobrada que ya tiene su tique | hecho — Ventas la pide dentro de la misma anulación |
@@ -331,11 +331,13 @@ motivo) y ofrece «Reintentar», que la vuelve a pedir; en cuanto llega, «Emiti
 Implicados: TAX-F18, CUSTOMER-F17, TAX-F11
 
 ### INVOICE-F04 El cliente pide la factura completa de su tique
-Estado: parcial — la página pública ya la pide con el código del tique y la enseña; falta imprimir el código en el papel del tique (SALE-F29)
+Estado: hecho
 Actor: cliente, sin cuenta
 Pantalla: la página pública del negocio `/p/<negocio>/invoice/<código>`
 Pasos:
-1. El tique lleva su código para pedir la factura completa, que es también el final de la dirección que lo abre.
+1. El tique, en pantalla y en la impresora de tiques, lleva tras el QR fiscal un segundo QR que abre esta página,
+   con «Escanea para pedir tu factura completa» encima y su código debajo, que es también el final de la dirección
+   (SALE-F29).
 2. El cliente la abre en su móvil, sin iniciar sesión, y ve el negocio, el número, la fecha y el total de su tique;
    si ya la pidió, ve su factura completa sin volver a escribir sus datos.
 3. Escribe su nombre o razón social, su país, el tipo de documento (solo fuera de España), su NIF y su domicilio,
@@ -1264,6 +1266,10 @@ sola (riesgo alto, como sustituir un tique en el mostrador).
       otros datos: corregirlos es rectificar en el mostrador (INVOICE-F08).
     - **Intentos**: diez códigos que no abren nada por conexión y hora (`base.throttle.AttemptLimit`, la del
       inicio de sesión); un código bueno, caducado o no, no cuenta.
+    - **En el papel**: un segundo QR tras el del VeriFactu, que no lo sustituye (aquel es para cotejar el tique en la
+      AEAT y este para pedir la factura), con una línea encima que dice para qué es y el código debajo, para
+      teclearlo cuando la cámara no enfoca o el tique es una fotocopia (Ágora imprime «CREAR FACTURA»; Cuiner, el
+      localizador y su QR). Solo en un tique con su documento fiscal emitido o por emitir.
     - **Mercado**: gana el QR del tique que abre una página sin cuenta, donde el cliente escribe sus datos y
       recibe la factura, con un enlace que no caduca a los pocos días y que, la segunda vez, lleva a la factura
       ya emitida (Odoo, Qamarero). Los portales de México cierran el plazo al mes porque allí lo no facturado
@@ -1300,9 +1306,6 @@ sola (riesgo alto, como sustituir un tique en el mostrador).
 
 Lo que no entra tiene su issue abierta:
 
-- **hub#500** — El cliente no puede pedir él mismo la factura completa de su tique (INVOICE-F04): falta el
-  código en el papel del tique de Ventas; la página pública ya lo abre y pide la factura con las operaciones
-  `invoice.public.ticket` e `invoice.public.substitute`.
 - **hub#501** — El emisor de Facturación no se rellena con los datos fiscales de la cuenta de ERPlora:
   la foto del SaaS no lleva el bloque `issuer` y `base.hub.state_apply` no llama a
   `invoice.issuer.sync`, que ya existe; y el flujo choca con «Dos identidades» de PLAN-SAAS (los datos fiscales
