@@ -20,7 +20,8 @@ const meta: BenchMeta = {
   sample: null,
   owner: { model: 'anthropic/claude-sonnet-5.5' },
 };
-const score: ScenarioScore = { done: true, fraction: 1, forbidden: [], unwanted: [], wrongCards: [], wrongWrites: 0, mustAsk: [{ id: 'tax', outcome: 'resolved' }], invented: 0 };
+const ask: ScenarioScore['ask'] = { said: 'half', firstMove: 'writes', writesBeforeClear: ['inventory.product.create'], right: false };
+const score: ScenarioScore = { done: true, fraction: 1, forbidden: [], unwanted: [], wrongCards: [], wrongWrites: 0, mustAsk: [{ id: 'tax', outcome: 'resolved' }], invented: 0, ask };
 const turns: ScenarioTurn[] = [
   {
     owner: 'Añade la tarta de zanahoria a 5,50',
@@ -56,6 +57,7 @@ describe('scenarioRow', () => {
       costUsd: 0.0028,
       owner: { tokensIn: 1200, tokensOut: 20, costUsd: 0.0025 },
       errors: ['assistant.cut'],
+      ask,
     });
     expect(row.calls.map((call) => call.name)).toEqual(['inventory.product.create']);
     expect(row.transcript).toEqual([
@@ -67,6 +69,7 @@ describe('scenarioRow', () => {
   it('records a scenario that was not asked, with why and nothing spent', () => {
     const row = scenarioRow(scenario, { status: 'not_runnable', why: 'not runnable: tools not offered on the attached message (x.y.z)' });
     expect(row).toMatchObject({ status: 'not_runnable', done: false, fraction: 0, costUsd: null, wallMs: null, ownerMessages: 0, transcript: [] });
+    expect(row.ask).toEqual({ said: null, firstMove: null, writesBeforeClear: [], right: null });
   });
 });
 

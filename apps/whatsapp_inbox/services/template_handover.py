@@ -12,13 +12,13 @@ from live.outbox import record_event
 
 from apps.whatsapp_inbox import clock, events, gateway, samples
 from apps.whatsapp_inbox.models import Template, TemplateSample
-from apps.whatsapp_inbox.queries import (
+from apps.whatsapp_inbox.queries.reasons import (
     HEADER_SAMPLE_MISSING_CODE,
     SAAS_UNREACHABLE_CODE,
     SEND_UNKNOWN_CODE,
     TEMPLATE_REFUSED_CODE,
-    templates_of,
 )
+from apps.whatsapp_inbox.queries.templates import templates_of
 from apps.whatsapp_inbox.schemas import (
     ClaimTemplateDeletionOut,
     ClaimTemplateOut,
@@ -173,8 +173,8 @@ def claim_submit(ctx: OperationContext, data: TemplateRefIn) -> dict:
 
 
 def _template_failure(kind: str, code: str, message: str) -> tuple[str, str]:
-    """The Hub's code of a hand-over or deletion that did not end well and, for a refusal of Meta's it has no name
-    for, Meta's reason as it came; the Hub's own words are said when the row is read (queries.template_reason)."""
+    """The Hub's code of a hand-over or deletion that did not end well and, for a refusal of Meta's it has no name for,
+    Meta's reason as it came; the Hub's own words are said when the row is read (queries.reasons.template_reason)."""
     if kind == gateway.REFUSED:
         known = _TEMPLATE_REFUSALS.get(code)
         if known:

@@ -2,7 +2,8 @@
 // whole job a business owner asks for in plain words, in one conversation of the real chat, sometimes with a file
 // attached through the real composer. A simulated owner (assistant-owner.ts) answers the assistant from its facts only;
 // it always confirms the cards, typing the word on a high-risk one. The job is scored from the business's database at
-// the end and from what went over the wire (assistant-scenario-score.ts).
+// the end and from what went over the wire (assistant-scenario-score.ts); a job the owner says by halves also fails when
+// the assistant's first move is not to ask (assistant-scenario-ask.ts).
 // Every scenario starts from the same business: a copy of `a`'s database taken in `beforeAll` and put back before each
 // scenario (assistant-snapshot.ts), then its seed and setup made by the Hub's tools with no model. First its golden path
 // runs there (the calls a perfect assistant would make, through the assistant's own turn) and its checks must hold: if
@@ -268,6 +269,11 @@ for (const scenario of SCENARIOS) {
     bench(dated, measured);
     expect(psql(SENT_SQL), 'no fiscal record ever leaves the business').toBe('0');
     const { score } = measured;
+    if (score?.ask.said === 'half') {
+      const writes = score.ask.writesBeforeClear;
+      const wrote = writes.length ? `, writing ${writes.join(', ')} before the owner made the job clear` : '';
+      expect.soft(score.ask.right, `${scenario.id}: said by halves, its first move was «${score.ask.firstMove}»${wrote}`).toBe(true);
+    }
     expect(score?.done, `${scenario.id}: ${failedOf(measured.checks ?? { expect: [], forbidden: [] }).join('; ')}`).toBe(true);
   });
 }

@@ -119,4 +119,10 @@ describe('scoreScenario', () => {
     ]);
     expect(score.invented).toBe(2);
   });
+
+  it('scores asking before acting: a write on the opening of a job said by halves is wrong', () => {
+    const turns = [turn('Añade la tarta', [call('inventory.product.create', {})], { executed: [{ name: 'inventory.product.create', kind: 'command', outcome: 'ok', code: '' }] })];
+    const score = scoreScenario({ ...scenario, said: 'half' }, { expect: [ok('a')], forbidden: [] }, turns);
+    expect(score.ask).toEqual({ said: 'half', firstMove: 'writes', writesBeforeClear: ['inventory.product.create'], right: false });
+  });
 });

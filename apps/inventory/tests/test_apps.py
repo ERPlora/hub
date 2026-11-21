@@ -6,6 +6,7 @@ from pathlib import Path
 
 from django.apps import apps
 from django.utils import translation
+from live.context import OperationContext
 from live.live_registry import live_registry
 from live.meta import (
     Category,
@@ -18,11 +19,13 @@ from live.meta import (
     module_configs,
     permissions_for_role,
 )
-from live.operations import AI, INTERNAL, registry
+from live.operations import AI, INTERNAL, get, registry
 
 from apps.inventory import events as E
 from base import home
 from base.queries import app_help
+from base.schemas.app_help import AppHelpIn
+from base.tenancy.tests.business import HUB_DB, A
 from base.tests.shell_icons import shell_icon_registry
 
 PERMISSIONS = [
@@ -132,8 +135,17 @@ def test_the_help_window_s_tabs_are_the_tab_bar_s():
     assert [(tab.id, tab.path) for tab in app_help.tabs_of(inventory())] == tabbar()
 
 
-def test_its_help_window_is_ready_without_a_video_yet():
-    assert inventory().help == Help()
+def test_its_help_window_plays_how_inventory_works_in_spanish_and_in_english():
+    assert inventory().help == Help(videos={"es": "dIppfjMEKWo", "en": "Pet7Q2ayo_Y"})
+
+
+@HUB_DB
+def test_the_help_window_gets_the_video_in_the_person_s_language():
+    def video(language: str) -> str | None:
+        ctx = OperationContext(scope=A, actor="ana", permissions=frozenset({"base.view_home"}), language=language)
+        return get("base.help.get")(ctx, AppHelpIn(app="inventory")).video
+
+    assert (video("es"), video("en"), video("en-gb")) == ("dIppfjMEKWo", "Pet7Q2ayo_Y", "Pet7Q2ayo_Y")
 
 
 #: The reads that only name a record on the assistant's card: no tool, no route.

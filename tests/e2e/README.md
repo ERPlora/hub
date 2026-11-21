@@ -409,6 +409,12 @@ las operaciones del propio SaaS (`SEED_PY` de `assistant-seed.ts`: `qwen`, compa
 de las huellas; con `QA_ANSWER_MODEL`, el modelo a prueba, abajo «Comparar modelos») e `index_docs`
 (idempotente: solo calcula lo nuevo); una vez por ejecución, los mensajes
 del mes de `a` a cero. La siembra nunca lee ni escribe una clave: cada proveedor dice de qué variable la lee el SaaS.
+Que `SEED_PY` sigue encajando con el SaaS lo comprueba Vitest sin pila (`assistant-seed.test.ts`, con `saas-names.ts`):
+en el SaaS de al lado (`../saas` o `E2E_SAAS_DIR`) importa cada nombre que el script toma del SaaS, resuelve cada
+atributo que lee de ellos y comprueba los argumentos de cada llamada, sin ejecutar el script. Si el SaaS mueve o
+renombra una operación, un esquema o un ajuste, cae el Vitest del Hub con la línea y el nombre que falta, no la
+preparación de una ejecución. En la CI el job `frontend` clona el SaaS de `main` al lado del Hub; un checkout del Hub
+sin el SaaS al lado se salta esa prueba y lo dice.
 Al acabar, pase o falle, su `afterAll` saca del SaaS de la pila la cuenta de personal con la que siembra
 (`CLEANUP_PY`). Se niega a sembrar en la BD compartida `saas` o en una que no sea `…e2e…`. Cada punto pregunta en una conversación nueva, en `es` (C37 en `en`), guarda lo que pasó por
 `/api/assistant/turn` (herramientas, tarjeta, extractos de `base.docs.search`, errores), confirma la tarjeta de los
@@ -628,6 +634,10 @@ negocio, no la redacción de las respuestas.
   el formato lo rechaza;
 - `offered`: las herramientas que el turno tiene que ofrecer al mensaje de apertura (con sus archivos, si los lleva)
   para que el trabajo se pueda empezar; vacío cuando lo correcto es preguntar antes de hacer nada;
+- `said` (opcional): cómo dice el dueño el trabajo. `half`, **a medias** («se han roto 3 botellas», «mañana no viene
+  Daniel»): no deja claro qué quiere y lo correcto es preguntar antes de escribir nada; `whole`, **entero**, el mismo
+  trabajo dicho con todo lo que hace falta, como control: lo correcto es hacerlo (o pedir solo el dato que falta). Sin
+  `said`, el escenario no se puntúa en preguntar antes de actuar;
 - `golden`: el camino dorado, las llamadas que haría un asistente perfecto. Un paso puede tomar un valor del resultado de
   otro anterior: `{"$ref": "<id del paso>", "where": {"name": "Bebidas"}, "take": "id"}` (`assistant-golden.ts`).
 
@@ -681,6 +691,18 @@ mensaje del dueño, así que el cupo nunca corta una conversación) y los errore
 con sus argumentos y cada tarjeta, va a `.artifacts/qa/<ejecución>/bench.json` (`scenarios`, `assistant-scenario-bench.ts`),
 y `pnpm qa:bench-compare` lo pone por modelo: trabajos hechos, parte media del trabajo, datos inventados, escrituras
 malas, coste por trabajo terminado y tiempo por trabajo (`assistant-scenario-compare.ts`).
+
+**Preguntar antes de actuar** (`assistant-scenario-ask.ts`): de cada escenario se guarda en `ask` el **primer
+movimiento** del asistente tras el mensaje de apertura, leído del turno de ese mensaje: `writes` si sacó una tarjeta o
+intentó una escritura (también una rechazada antes de su tarjeta), `asks` si no escribió y su respuesta pregunta algo
+(lleva `?`), y `neither` si no hizo ninguna de las dos cosas. También las **escrituras antes de aclarar**
+(`writesBeforeClear`): las que sacó antes del segundo mensaje del dueño, porque hasta que el dueño vuelve a escribir no
+ha aclarado nada de lo que dejó a medias. La nota (`right`): en uno dicho a medias, acierta solo si el primer movimiento
+es preguntar, y cualquier escritura antes de que el dueño lo aclare es un error, aunque el trabajo acabe bien; en uno
+dicho entero, acierta si el trabajo queda hecho. Un escenario dicho a medias que no pregunta primero falla en la
+ejecución diciendo su primer movimiento y lo que escribió, además de la comprobación del trabajo hecho.
+`pnpm qa:bench-compare` lo suma por modelo aparte para los dos grupos: «Asking first: 1/2 said by halves asked before
+writing · 1 write before the owner made it clear · 2/2 said whole done».
 
 **Nada llega a la AEAT.** La ejecución se niega si el Hub de la pila tiene `VERIFACTU_GATEWAY_URL` (sin pasarela, un
 registro fiscal se queda en local), y cada escenario acaba comprobando que ningún registro de `verifactu_record` salió

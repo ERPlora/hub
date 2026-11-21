@@ -1,0 +1,63 @@
+{
+  "id": "s11-bottles-broken-half",
+  "title": "«Se han roto 3 botellas», sin decir de qué ni qué hacer: preguntar antes de tocar el stock",
+  "vertical": "restaurant",
+  "said": "half",
+  "seed": "restaurant.es",
+  "language": "es",
+  "setup": [],
+  "owner": {
+    "persona": "Marta, dueña del bar La Esquina, en Valencia. Está recogiendo el almacén al cerrar y escribe deprisa desde la tablet.",
+    "goal": "Que el stock refleje las tres botellas de agua mineral que se han roto.",
+    "upFront": ["Se han roto 3 botellas."],
+    "ifAsked": [
+      "Son botellas de agua mineral.",
+      "Quiero que se descuenten del stock como rotura.",
+      "Se cayó una caja al colocar el pedido."
+    ]
+  },
+  "attachments": [],
+  "opening": "Se han roto 3 botellas",
+  "offered": [],
+  "writes": ["inventory.stock.write_off"],
+  "cards": [],
+  "expect": [
+    {
+      "says": "el agua mineral baja a 45",
+      "sql": "select stock::int from inventory_product where sku = 'BEB-01'",
+      "equals": "45"
+    },
+    {
+      "says": "las tres botellas salen como baja por rotura, una sola vez",
+      "sql": "select string_agg(m.qty::int::text, ',') from inventory_stockmovement m join inventory_product p on p.id = m.product_id where p.sku = 'BEB-01' and m.movement_type = 'write_off'",
+      "equals": "-3"
+    }
+  ],
+  "forbidden": [
+    {
+      "says": "ningún otro producto cambia",
+      "sql": "select md5(string_agg(id::text || stock || price || cost, ',' order by id)) from inventory_product where sku <> 'BEB-01'",
+      "unchanged": true
+    },
+    {
+      "says": "no se recibe, cuenta ni vende nada",
+      "sql": "select count(*) from inventory_stockmovement where movement_type <> 'write_off'",
+      "unchanged": true
+    }
+  ],
+  "mustAsk": [
+    {
+      "id": "which-bottles",
+      "fact": "de qué producto son las botellas",
+      "reveals": ["agua"],
+      "uses": [{"tool": "inventory.stock.write_off", "path": "product"}]
+    }
+  ],
+  "maxTurns": 6,
+  "golden": [
+    {
+      "tool": "inventory.stock.write_off",
+      "arguments": {"product": "BEB-01", "qty": "3", "reason": "Rotura: se cayó una caja al colocar el pedido"}
+    }
+  ]
+}

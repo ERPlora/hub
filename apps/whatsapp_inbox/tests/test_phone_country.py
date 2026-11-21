@@ -5,7 +5,7 @@ and the card Customers saved by those digits, never a Spanish number."""
 import pytest
 
 from apps.whatsapp_inbox.models import Conversation
-from apps.whatsapp_inbox.queries import e164
+from apps.whatsapp_inbox.queries.reads import e164
 from base.models import Hub
 from base.tenancy.context import use_hub
 
