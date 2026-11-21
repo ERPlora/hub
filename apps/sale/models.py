@@ -223,9 +223,7 @@ class Order(UUIDModel):
         POS = "pos", _("Till")
         COUNTER = "counter", _("Counter sale")
 
-    status = models.CharField(
-        _("status"), max_length=10, choices=Status.choices, default=Status.OPEN
-    )
+    status = models.CharField(_("status"), max_length=10, choices=Status.choices, default=Status.OPEN)
     source = models.CharField(
         _("source"), max_length=10, choices=Source.choices, default=Source.POS
     )
@@ -250,6 +248,8 @@ class Order(UUIDModel):
     updated_at = models.DateTimeField(_("updated at"), auto_now=True)
     created_by = _actor(_("created by"))
     closed_at = models.DateTimeField(_("closed at"), null=True, blank=True)
+    # Its bill's first print for the table: while the check is open, Tables paints its table «Bill requested».
+    bill_printed_at = models.DateTimeField(_("bill printed at"), null=True, blank=True)
     voided_by = _actor(_("voided by"))
     # A check joined with another (SALE-F24) ends voided and names the one that stays: a till that had it on
     # screen follows that one instead of saying it was closed on another device.

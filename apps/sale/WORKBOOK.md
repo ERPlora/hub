@@ -875,7 +875,9 @@ Pasos:
    dispositivo con la cuenta sola: el del navegador o, en la app instalada, su pantalla de impresión (el
    diálogo del sistema, con la impresora o «Guardar como PDF»).
 Entra: la cuenta abierta y su total calculado por el servidor.
-Sale: un papel sin número fiscal; no consume numeración ni crea venta. Cada pulsación, una cuenta.
+Sale: un papel sin número fiscal; no consume numeración ni crea venta. Cada pulsación, una cuenta. Imprimirla
+deja la cuenta marcada como pedida, salga por la impresora de tiques o por el diálogo del dispositivo, hasta que
+se cobra entera o se elimina; volver a imprimirla, añadir líneas o cobrar una parte no la quita.
 Si falla: mientras el negocio no haya dicho todavía su moneda, «Cuenta» sigue cargando y la impresora en gris: el
 papel nunca sale con una cifra supuesta; si la moneda no se puede leer, lo dice con «Reintentar», como si falla
 el cálculo de la cuenta. Si no se imprime, «No se pudo imprimir la cuenta»; si la app instalada no abre su
@@ -1527,7 +1529,7 @@ secciones, las notas rápidas y lo devolvible se pueden seguir en vivo.
 | Una sesión de bono hecha fuera del cobro | Servicios gasta una sesión diciendo quién la hizo | La sesión y la profesional | `sale.voucher_session.recorded` |
 | Venta con su documento | Un documento que no se pudo emitir en el cobro, la anulación o la devolución se emite después (reintento del cobro, «Emitir ahora» o la reacción de Facturación) | La venta, el documento, su número, la devolución (`refund_id`) o si es el de la anulación (`void`); uno por documento | `sale.sale.invoiced` |
 | Cuenta abierta | Abrir o dividir | La cuenta | `sale.order.opened` |
-| Cuenta cambiada | Cualquier cambio de líneas, descuentos o título | La cuenta | `sale.order.changed` |
+| Cuenta cambiada | Cualquier cambio de líneas, descuentos o título, y su primera precuenta impresa | La cuenta | `sale.order.changed` |
 | Comanda enviada | Enviar a cocina | La cuenta, su título, el canal, la ronda, quién atiende y las líneas con sus notas, los alérgenos de su producto y de sus suplementos (en un menú, los de cada plato) y la alergia del cliente | `sale.order.fired` |
 | Cuenta cerrada | Cobrar lo último de una cuenta | La cuenta | `sale.order.completed` |
 | Cuenta anulada | Anular una cuenta abierta | La cuenta | `sale.order.voided` |
