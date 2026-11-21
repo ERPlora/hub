@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:52fcb273e4421f79e3854900d89e8132d6a3a4d37a7526a16e2bb961b46761e4 -->
+<!-- generated from WORKBOOK.md sha256:ac226b8a4bef74cf1b8e8203985ab3f9d228cbf8706c25d087a7dad5c3443149 -->
 
 ## What it is for and who it is for
 
@@ -385,7 +385,9 @@ Screen: Sell (from Sales)
 Steps:
 1. The employee charges in **Sales → Sell**.
 2. Together with the charge, Sales asks Printing for the receipt: the simplified receipt or the full invoice,
-   with the VeriFactu QR.
+   with the VeriFactu QR and the name of whoever charged it ("Cashier: Bea Ruiz"), the same one Kitchen names
+   the waiter by (their account's name or, without a name, their email). With no name to print, the paper has
+   no such line: never an internal id.
 3. If "Print receipt on checkout" is on, the receipt goes into the queue of the Receipt role
    with the copies from the settings and, if "Open drawer on checkout" is on and cash came in, with the
    order to open the drawer (PRINTING-F13); the device takes it out (PRINTING-F18). After charging, Sales says
@@ -406,7 +408,8 @@ Actor: administrator, manager, employee
 Screen: Sales, Invoices (from those apps)
 Steps:
 1. On the sale's or the invoice's card, press "Print" ("Print / PDF" in Invoices).
-2. Sales asks Printing for the receipt (or the full invoice) marked as a copy ("DUPLICATE"); Invoicing
+2. Sales asks Printing for the receipt (or the full invoice) marked as a copy ("DUPLICATE"), with the
+   sale's cashier, not whoever reprints it; Invoicing
    asks for the invoice's A4 page, in the language of whoever prints and with its VeriFactu QR, for the
    system printer. The screen says which printer it went to.
 3. With Printing not switched on, without a printer that accepts it (a receipt one for the receipt; a system one for the
