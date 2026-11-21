@@ -134,6 +134,13 @@ async function openGroups(page: Page): Promise<void> {
   await shown(page).locator('[data-testid=modifier-groups-search] input').fill(STAMP);
 }
 
+/** The groups found, then the sheet of `group`, opened from its row. */
+async function openSheet(page: Page, group: Group): Promise<void> {
+  await openGroups(page);
+  await groupRow(page, group.id).locator('[role=cell]').first().click();
+  await expect(sheet(page)).toBeVisible();
+}
+
 test('MODIFIER-F01: the groups are found by name and say their rule, their options and where they apply', async ({ page, context }) => {
   await login(page, A, '/modifier/groups');
   const doneness = await makeGroup(context, { name: named('Doneness'), kitchen_name: 'POINT', min_choices: 1, max_choices: 1, sort_order: 1 }, [
@@ -271,9 +278,7 @@ test('MODIFIER-F03: Edit changes only what is touched, a maximum below the defau
 test('MODIFIER-F04: the sheet adds, edits and deletes the options with their supplement and their own tax', async ({ page, context }) => {
   await login(page, A, '/modifier/groups');
   const group = await makeGroup(context, { name: named('Toppings'), max_choices: 2 });
-  await openGroups(page);
-  await groupRow(page, group.id).locator('[role=cell]').first().click();
-  await expect(sheet(page)).toBeVisible();
+  await openSheet(page, group);
   await expect(sheet(page).locator('[data-testid=modifier-sheet-title]')).toContainText(named('Toppings'));
   await expect(sheet(page).locator('[data-testid=modifier-sheet-options-empty]')).toBeVisible();
   const optionForm = dialog(page, 'modifier-option-form');
@@ -338,9 +343,7 @@ test('MODIFIER-F04: the sheet adds, edits and deletes the options with their sup
 test('MODIFIER-F11: an option is saved with the allergens it adds, and the sheet says them under its name', async ({ page, context }) => {
   await login(page, A, '/modifier/groups');
   const group = await makeGroup(context, { name: named('Extras') }, [{ name: 'No onion' }]);
-  await openGroups(page);
-  await groupRow(page, group.id).locator('[role=cell]').first().click();
-  await expect(sheet(page)).toBeVisible();
+  await openSheet(page, group);
   const optionForm = dialog(page, 'modifier-option-form');
   const allergens = optionForm.locator('[data-testid=modifier-option-form-allergens]');
   const cheeseRow = sheet(page).locator('[data-testid^=modifier-sheet-options-row-]').filter({ hasText: 'Cheese' });
@@ -380,9 +383,7 @@ test('MODIFIER-F04: one default too many is refused under «Chosen by default»,
     { name: 'Ketchup', is_default: true },
     { name: 'Mayo', is_default: true },
   ]);
-  await openGroups(page);
-  await groupRow(page, group.id).locator('[role=cell]').first().click();
-  await expect(sheet(page)).toBeVisible();
+  await openSheet(page, group);
   const optionForm = dialog(page, 'modifier-option-form');
   const isDefault = optionForm.locator('[data-testid=modifier-option-form-is_default]');
   const refused = optionForm.locator('[data-testid=modifier-option-form-is_default-error]');
@@ -412,9 +413,7 @@ test('MODIFIER-F04: one default too many is refused under «Chosen by default»,
 test('MODIFIER-F05: the group is applied to a product by its SKU and to a category, and stops applying', async ({ page, context }) => {
   await login(page, A, '/modifier/groups');
   const group = await makeGroup(context, { name: named('Sides') }, [{ name: 'Fries' }]);
-  await openGroups(page);
-  await groupRow(page, group.id).locator('[role=cell]').first().click();
-  await expect(sheet(page)).toBeVisible();
+  await openSheet(page, group);
   await expect(sheet(page).locator('[data-testid=modifier-sheet-links-empty]')).toBeVisible();
   const linkForm = dialog(page, 'modifier-link-form');
   const linkRows = sheet(page).locator('[data-testid^=modifier-sheet-links-row-]');

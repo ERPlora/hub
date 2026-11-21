@@ -98,8 +98,6 @@ watch(money, (now, before) => {
   form.value = { ...form.value, price: props.option ? moneyFieldText(props.option.price_delta, locale.value, now) : '' };
 });
 
-/** Two values of a field are the same; two lists of allergens, when they hold the same codes in the same order. */
-const same = (a: unknown, b: unknown): boolean => (Array.isArray(a) && Array.isArray(b) ? a.join() === b.join() : a === b);
 const text = (value: unknown): string => (value === null || value === undefined ? '' : String(value));
 const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'ion-touched': !!message });
 /** A whole number as the server takes it; anything else as typed, for the server to refuse. */
@@ -117,6 +115,9 @@ function fields(cents: number): Required<Omit<OptionIn, 'group' | 'group_id'>> {
     allergens: f.allergens,
   };
 }
+
+/** Two values of a field are the same; two lists of allergens, when they hold the same codes in the same order. */
+const same = (a: unknown, b: unknown): boolean => (Array.isArray(a) && Array.isArray(b) ? a.join() === b.join() : a === b);
 
 function patch(option: OptionOut, cents: number): OptionPatchIn {
   const out: OptionPatchIn = { id: option.id };
