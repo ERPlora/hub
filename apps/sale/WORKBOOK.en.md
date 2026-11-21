@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:eda1800b2c7dcafc56867b02f6d9857aa1e52ebd04cf105c63c2ecfe9b7c22dc -->
+<!-- generated from WORKBOOK.md sha256:4ebe79e3f6d1108a188f5d60e07c7261ee86990e12f9328d17bc139debacb302 -->
 
 ## What it is for and who it is for
 
@@ -894,15 +894,21 @@ Screen: Sell
 Steps:
 1. With two or more lines, tap the lines this person pays for (the line, not its buttons): they are
    marked with a circle.
-2. Press "Charge": the sheet says "Paying 2 lines of €12.00" and charges only those.
-3. After charging, the **Sale document** of that charge opens and, behind it, the check stays open with
+2. With lines marked, the button at the foot says what it will charge: "Charge 1 line · €1.80" or
+   "Charge 2 lines · €7.00", with what the server works out for those lines, the same amount the sheet
+   will charge; while it arrives, a dash. The "Total" row stays the whole check's. With nothing marked,
+   the button goes back to "Charge · €12.00".
+3. Press "Charge": the sheet says "Paying 2 lines of €12.00" and charges only those.
+4. After charging, the **Sale document** of that charge opens and, behind it, the check stays open with
    what is left; what was charged does not show again. Charging the last pending line closes the check.
    The lines charged are those marked when the sheet opened, even if another one is marked later.
 In: the marked lines.
 Out: a sale with those lines (announces: sale charged); the lines are left tied to their sale. The
 check's % discount applies to each charge; the fixed-amount one, only to the one that closes it.
-If it fails: the same refusals as a normal charge, also that of the check that changed while it was
-being charged: the sheet charges what it showed when it opened, never what came later. If, with the sheet
+If it fails: if the server cannot work out what is marked, the foot says so in its words and the button
+shows a dash, never the whole check's total. When charging, the same refusals as a normal charge, also
+that of the check that changed while it was being charged: the sheet charges what it showed when it
+opened, never what came later. If, with the sheet
 open, another device closes the check, the screen lets it go on closing the sheet and warns; a check that
 no longer exists does not stay on screen.
 Involved: TABLE-F33

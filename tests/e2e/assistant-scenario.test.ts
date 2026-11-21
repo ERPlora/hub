@@ -108,13 +108,43 @@ describe('loadedScenarios', () => {
   });
 
   it('reads every scenario of the corpus', () => {
-    const folder = join(dirname(fileURLToPath(import.meta.url)), 'qa', 'scenarios');
-    const files = readdirSync(folder).filter((name) => name.endsWith('.json'));
-    const scenarios = loadedScenarios(files.map((name) => ({ source: name, text: readFileSync(join(folder, name), 'utf8') })));
-    expect(scenarios.length).toBe(14);
-    expect(scenarios.filter((scenario) => scenario.said === 'half').map((scenario) => scenario.vertical).sort()).toEqual(['hair_salon', 'restaurant']);
-    expect(scenarios.filter((scenario) => scenario.said === 'whole').map((scenario) => scenario.vertical).sort()).toEqual(['hair_salon', 'restaurant']);
+    const scenarios = corpus();
+    expect(scenarios.length).toBe(22);
     expect(new Set(scenarios.map((scenario) => scenario.vertical))).toEqual(new Set(['restaurant', 'hair_salon']));
     expect(scenarios.some((scenario) => scenario.language === 'en')).toBe(true);
+  });
+});
+
+function corpus(): Scenario[] {
+  const folder = join(dirname(fileURLToPath(import.meta.url)), 'qa', 'scenarios');
+  const files = readdirSync(folder).filter((name) => name.endsWith('.json'));
+  return loadedScenarios(files.map((name) => ({ source: name, text: readFileSync(join(folder, name), 'utf8') })));
+}
+
+/** What makes two scenarios the same job: the business it starts from, what the owner wants and how it is checked. */
+const job = (scenario: Scenario) => {
+  const { vertical, seed, language, setup, writes, expect: checks, forbidden, golden, owner } = scenario;
+  return { vertical, seed, language, setup, writes, checks, forbidden, golden, persona: owner.persona, goal: owner.goal };
+};
+
+describe('the jobs the owner says by halves', () => {
+  const scenarios = corpus();
+  const half = scenarios.filter((scenario) => scenario.said === 'half');
+  const whole = scenarios.filter((scenario) => scenario.said === 'whole');
+
+  it('are six, three of a restaurant and three of a hair salon, one of them in English', () => {
+    expect(half.map((scenario) => scenario.vertical).sort()).toEqual(['hair_salon', 'hair_salon', 'hair_salon', 'restaurant', 'restaurant', 'restaurant']);
+    expect(half.filter((scenario) => scenario.language === 'en')).toHaveLength(1);
+  });
+
+  it('each have their control said whole: the same job, with the same checks and golden path, under the same name', () => {
+    expect(whole).toHaveLength(half.length);
+    for (const scenario of half) {
+      const name = scenario.id.replace(/^s\d+-/, '').replace(/-half$/, '');
+      const control = whole.find((other) => other.id.replace(/^s\d+-/, '') === `${name}-whole`);
+      expect(control, `${scenario.id} has no control said whole`).toBeDefined();
+      expect(job(control as Scenario), `${control?.id} is not the job of ${scenario.id}`).toEqual(job(scenario));
+      expect(control?.opening, `${control?.id} says the job in other words than ${scenario.id}`).not.toBe(scenario.opening);
+    }
   });
 });
