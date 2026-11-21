@@ -3,7 +3,7 @@ substitutes a ticket F3 and the rectifying invoices R1–R5), their numbering se
 on each one (WORKBOOK.md)."""
 
 from django.utils.translation import gettext_lazy as _
-from live.meta import Category, LiveAppConfig, Nav, SetupCheck, SetupStep
+from live.meta import Category, Help, LiveAppConfig, Nav, SetupCheck, SetupStep
 
 from apps.invoice.events import ISSUER_UPDATED, SERIES_EVENTS
 
@@ -74,6 +74,7 @@ class InvoiceConfig(LiveAppConfig):
         Nav("series", _("Series"), "ion:layers-outline", "/invoice/series"),
         Nav("issuer", _("Issuer"), "ion:storefront-outline", "/invoice/issuer"),
     ]
+    help = Help()
     # The Home's steps: ⛔ «Your business details» (the issuer is Invoicing's, so its level is base's ``LEGAL_STEPS``)
     # and «Your invoice numbering», on the queries the Issuer and Series screens read. The first is done with what
     # issuing refuses to go without (``Issuer.configured``). The year's series are born with the first document, so the
