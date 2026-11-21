@@ -28,7 +28,8 @@ function reset(): void {
 }
 watch(shown, reset);
 
-const QUANTITY = /^\d+(?:\.\d{1,3})?$/;
+/** Any decimals: the step of the line's unit is the server's to judge, and its refusal says which step it is. */
+const QUANTITY = /^\d+(?:\.\d+)?$/;
 
 function ask(next: number): void {
   emit('change', String(Math.round(next * 1000) / 1000));
@@ -40,7 +41,7 @@ function onChange(): void {
     reset();
     return;
   }
-  ask(Number(typed));
+  emit('change', typed);
 }
 
 const step = (by: number) => ask(Math.max(0, Number(props.quantity) + by));

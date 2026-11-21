@@ -391,8 +391,8 @@ class UsageSummary(Schema):
     printers: int = Field(description="Its active printers.")
     default_printer: str | None = Field(description="The printer chosen for it in the settings, if any.")
     prints_on: str | None = Field(
-        description="The printer its next job goes to now: the chosen one if active, else its first active roll-paper "
-        "printer by name, else its computer's printer; none when no active printer has the function."
+        description="Where its next job goes from the device that asks: a receipt to that device's own receipt printer if "
+        "any; else the chosen one if active, else its first active one by name; none if no active printer has the function."
     )
     pending: int = Field(description="Its jobs waiting.")
     oldest_pending_at: datetime | None = Field(description="When the oldest of them was queued.")

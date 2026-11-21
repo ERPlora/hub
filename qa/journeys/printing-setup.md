@@ -11,6 +11,7 @@ Para qué: que tiques, cuentas, comandas y etiquetas salgan por la impresora que
 - Un negocio con Ventas, Caja e Impresión; en un restaurante, también Cocina.
 - Dos impresoras en la red del local, una en la barra y otra en la cocina, y la app de ERPlora instalada en la
   tableta de la barra.
+- Para la segunda caja, otra impresora de tiques y otra tableta con la app de ERPlora en la terraza.
 
 ## Recorrido
 
@@ -25,3 +26,4 @@ Para qué: que tiques, cuentas, comandas y etiquetas salgan por la impresora que
 9. INVENTORY-F25, PRINTING-F12 — la etiqueta del código de barras de un producto.
 10. PRINTING-F16 — que el asistente reimprima el último tique.
 11. PRINTING-F14 — con la impresora apagada, un trabajo atascado.
+12. PRINTING-F22 — la tableta de la terraza cobra: su tique sale por su impresora y abre su cajón, no el de la barra.

@@ -48,13 +48,13 @@ from apps.printing.queries import (
     find_device,
     find_job,
     find_printer,
-    first_held,
     job_row,
     printer_row,
     retryable,
     settings_row,
     this_device_key,
 )
+from apps.printing.queries.job_printer import job_printer
 from apps.printing.schemas import (
     DeviceOut,
     DeviceRefIn,
@@ -318,7 +318,7 @@ def _release_queue(ctx: OperationContext, printer: Printer, *, usage_changed: bo
         keeps = printer.is_active and printer.format == job.format and not (usage_changed and printer.usage != job.usage)
         if keeps:
             continue
-        job.printer = _resolve_printer(job.usage, job.format, settings)
+        job.printer = job_printer(job.usage, job.format, settings)
         job.save(update_fields=["printer"])
         _queued(ctx, job)
 
@@ -403,16 +403,6 @@ def update_settings(ctx: OperationContext, data: SettingsPatchIn) -> dict:
 
 
 # ── The queue ─────────────────────────────────────────────────────────────────────────────────────
-
-
-def _resolve_printer(usage: str, paper: str, settings: Settings) -> Printer | None:
-    """The printer of ``usage`` for ``paper``: the settings' choice, else the first active one by name. It is
-    held until the job that names it is saved: a deletion waits for it, and one deleted before is passed over."""
-    printers = Printer.objects.filter(is_active=True)
-    printers = printers.filter(kind=Printer.Kind.SYSTEM) if paper == PrintJob.Format.A4 else printers.exclude(kind=Printer.Kind.SYSTEM)
-    chosen_id = getattr(settings, f"{DEFAULT_FIELDS[usage]}_id")
-    chosen = first_held(printers.filter(pk=chosen_id)) if chosen_id else None
-    return chosen or first_held(printers.filter(usage=usage).order_by(Lower("name"), "id"))
 
 
 def _queued(ctx: OperationContext, job: PrintJob) -> None:
@@ -521,7 +511,7 @@ def create_job(ctx: OperationContext, data: JobCreateIn) -> dict:
     if data.printer is not None:
         printer = _given_printer(data.printer, data.format)
     else:
-        printer = _resolve_printer(usage, data.format, settings)
+        printer = job_printer(usage, data.format, settings, this_device_key(ctx))
     reference = (data.source_ref or documents.reference(data.document))[:64]
     document = _stamped(ctx, data)
     common = {
@@ -1045,7 +1035,7 @@ def retry_job(ctx: OperationContext, data: JobRefIn) -> dict:
     if not retryable(job, now):
         raise Conflict(str(NOT_RETRYABLE) % {"status": _status_label(job)}, code="printing.job_not_retryable")
     if job.printer_id is None or not Printer.objects.filter(pk=job.printer_id, is_active=True).exists():
-        job.printer = _resolve_printer(job.usage, job.format, current_settings())
+        job.printer = job_printer(job.usage, job.format, current_settings())
     job.status, job.attempts, job.leased_until = PrintJob.Status.PENDING, 0, None
     job.retried_at, job.retried_by = now, actor(ctx)
     job.save(update_fields=["status", "attempts", "leased_until", "retried_at", "retried_by", "printer"])
