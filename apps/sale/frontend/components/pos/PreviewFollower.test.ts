@@ -20,6 +20,12 @@ describe('PreviewFollower', () => {
     expect(m.wrapper.emitted('preview')?.at(-1)).toEqual([undefined]);
   });
 
+  it('given lines, values only those, as the checkout sheet does for a part charge', async () => {
+    const m = await mountSale(PreviewFollower, { props: { orderId: 'o1', lineIds: ['l2'] } });
+    await m.live();
+    expect(m.params('sale.checkout.preview')).toEqual([{ order_id: 'o1', line_ids: ['l2'] }]);
+  });
+
   it('says the preview is gone when it is let go', async () => {
     const m = await mountSale(PreviewFollower, { props: { orderId: 'o1' } });
     m.wrapper.unmount();
