@@ -105,6 +105,14 @@
       "profile": "Perfil",
       "switchUser": "Cambiar de usuario"
     },
+    "changeBusiness": {
+      "label": "Cambiar de negocio",
+      "title": "¿Cambiar de negocio?",
+      "message": "Se cerrará tu sesión en este negocio y verás la lista de tus negocios para elegir otro.",
+      "confirm": "Cambiar",
+      "signOutFailed": "No se ha podido cerrar la sesión en este negocio. Comprueba la conexión e inténtalo de nuevo.",
+      "forgetRefused": "Se ha cerrado tu sesión, pero la aplicación no ha podido dejar este negocio. Ciérrala y vuelve a abrirla."
+    },
     "appsPage": {
       "title": "Apps",
       "tabs": {
