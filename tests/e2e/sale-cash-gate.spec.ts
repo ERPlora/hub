@@ -6,7 +6,7 @@
 // cash register's setting goes back as it was.
 import { expect, type Page, test } from '@playwright/test';
 
-import { A, api, login, psql, shot, shown } from './helpers';
+import { A, api, capture, login, psql, shot, shown } from './helpers';
 import { cleanInventory, createProduct, dialog, fill, type Product } from './inventory-helpers';
 import { snapshotSeries } from './invoice-helpers';
 import { cleanSales, newestSaleOf, stamp } from './sale-helpers';
@@ -107,7 +107,7 @@ test('SALE-F08: «Open a cash session» opens the session over the sheet, and th
   for (const [width, height] of [[1440, 900], [820, 1180], [375, 667]]) {
     await page.setViewportSize({ width, height });
     await expect(drawer.locator('[data-testid=cash-register-open-submit]')).toBeInViewport();
-    await page.screenshot({ path: shot(`sale-cash-gate-window-${width}x${height}`) });
+    await capture(page, `sale-cash-gate-window-${width}x${height}`);
   }
   // Opened and charged on the low phone, where the sheet's foot is the bottom of the screen: the «Session opened»
   // notice sits above «Charge», never on it, and the next tap charges.
@@ -120,7 +120,7 @@ test('SALE-F08: «Open a cash session» opens the session over the sheet, and th
 
   // The sheet is still there, as it was (cash, 5,00 tendered), without the notice: «Charge» charges the cash.
   await expect(sheet.locator('[data-testid=sale-checkout-error]')).toBeHidden();
-  await page.screenshot({ path: shot('sale-cash-gate-opened-375x667') });
+  await capture(page, 'sale-cash-gate-opened-375x667');
   await sheet.locator('[data-testid=sale-checkout-confirm]').click();
   await expect(sheet).toBeHidden();
   const sale = await newestSaleOf(context, coffee.sku);
