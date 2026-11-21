@@ -128,8 +128,10 @@ el plano) y, en «Editar plano», un «+» («Añadir zona o mesa») y un lápiz
 lleva un punto del color de su zona y el número de mesas ocupadas sobre las que están en servicio
 («7/12»). Debajo, una tarjeta resume la zona elegida: libres, ocupadas, reservadas y comensales.
 
-En tableta y ordenador, el plano ajusta solo el sitio y el tamaño de las mesas para enseñar toda la zona
-sin que dejen de leerse. Si aun así no cabe, se desplaza dentro de su recuadro, de lado y de arriba abajo,
+En tableta y ordenador, el plano encuadra las mesas de la zona, de la primera a la última aunque estén lejos
+de la esquina del plano, y ajusta solo su sitio y su tamaño para enseñarlas todas sin que dejen de leerse;
+«Editar plano» lo enseña desde su esquina, para poder colocar una mesa en cualquier sitio. Si aun así no
+cabe, se desplaza dentro de su recuadro, de lado y de arriba abajo,
 con un fundido en cada borde que tenga mesas detrás; el fondo se arrastra con el ratón y, con el plano
 seleccionado, las flechas del teclado lo desplazan. No hay botones de zoom. La cuadrícula solo sale en
 «Editar plano». En el teléfono, «Servicio» enseña las mesas en tarjetas a dos columnas, cada una con el
@@ -456,9 +458,9 @@ Pasos:
 1. Abre **Mesas → Plano de sala** y elige la zona: su contenido sale al momento, sin esperar a cargar.
    La pestaña indica cuántas mesas están ocupadas y la tarjeta resume libres, ocupadas, reservadas y
    comensales.
-2. En tableta y ordenador el plano ajusta todas las mesas al espacio; en el teléfono, «Servicio» las
-   muestra en tarjetas a dos columnas. Cada mesa dice su estado escrito, con icono, forma, sillas y color:
-   Disponible, Ocupada, Reservada o Bloqueada.
+2. En tableta y ordenador el plano encuadra las mesas de la zona, de la primera a la última, y las ajusta
+   al espacio; en el teléfono, «Servicio» las muestra en tarjetas a dos columnas. Cada mesa dice su estado
+   escrito, con icono, forma, sillas y color: Disponible, Ocupada, Reservada o Bloqueada.
 3. Una mesa ocupada enseña el tiempo («0:35») y los comensales («3/4 pax»); el tiempo avanza solo y, al
    pasar los avisos de los Ajustes, solo cambian de color el tiempo y su arco. Una mesa con reserva hoy dice
    el nombre y la hora. Quién la atiende se ve en su ventana.
