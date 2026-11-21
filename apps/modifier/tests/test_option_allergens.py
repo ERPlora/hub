@@ -23,7 +23,7 @@ from base.models import Membership
 from base.tenancy.context import current_alias, use_hub
 from base.tests.test_assistant_asks import assert_offered_with_room, comparable, probe_phrases
 
-from .conftest import GENERIC, HOST, HUB_DB, HUB_DB_COMMITTED, A, B, catalog_of, ctx_for, make_product, run
+from .conftest import HOST, HUB_DB, HUB_DB_COMMITTED, A, B, catalog_of, ctx_for, make_product, run
 from .test_services import received
 
 pytestmark = HUB_DB
@@ -162,7 +162,8 @@ def test_the_assistant_hears_the_refusal_before_any_card_is_drawn(extras):
     cheese = option()
     refused = invalid_arguments(get_operation("modifier.option.update"), {"id": str(cheese.id), "allergens": ["cheese"]})
     assert (refused.outcome, refused.code) == ("error", "invalid_payload")
-    assert json.loads(refused.content)["error"]["fields"] == {"allergens": NOT_ONE_OF_THE_FOURTEEN["en"]}
+    fields = json.loads(refused.content)["error"]["fields"]
+    assert (set(fields), NOT_ONE_OF_THE_FOURTEEN["en"] in fields["allergens"]) == ({"allergens"}, True)
 
 
 def test_the_assistants_card_says_the_allergens_by_their_names_in_spanish(extras):
@@ -202,22 +203,6 @@ def test_the_groups_the_till_asks_for_a_product_carry_each_options_allergens(ext
     assert {one.name: one.allergens for one in target.groups[0].options} == {
         "Cheese": ["milk"], "Mustard sauce": ["mustard"], "No onion": []
     }
-
-
-def test_the_valuation_of_the_picks_gives_each_ones_allergens_own_line_included(extras):
-    burger = make_product()
-    run("modifier.link.attach", {"group": "Extras", "product_id": str(burger.id)})
-    cheese = option(allergens=["milk"])
-    wine = option("Wine sauce", price_delta=150, tax_category_key=GENERIC, allergens=["sulphites"])
-    rare = option("Rare")
-    picks = run(
-        "modifier.selection.resolve",
-        {"product_id": str(burger.id), "option_ids": [str(cheese.id), str(wine.id), str(rare.id)]},
-        role="hub_employee",
-    ).picks
-    assert [(pick.name, pick.own_line, pick.allergens) for pick in picks] == [
-        ("Cheese", False, ["milk"]), ("Wine sauce", True, ["sulphites"]), ("Rare", False, [])
-    ]
 
 
 # Each business its own

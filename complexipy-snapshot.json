@@ -184,16 +184,6 @@
     ]
   },
   {
-    "path": "apps/modifier/queries/__init__.py",
-    "file_name": "queries.py",
-    "functions": [
-      {
-        "name": "resolve_selection",
-        "complexity": 29
-      }
-    ]
-  },
-  {
     "path": "apps/pricing/schemas.py",
     "file_name": "schemas.py",
     "functions": [

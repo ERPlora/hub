@@ -96,6 +96,9 @@ class ModifierOption(UUIDModel):
     )
     # Comes chosen when the till opens the group's sheet.
     is_default = models.BooleanField(_("chosen by default"), default=False)
+    # The codes of the fourteen that must be declared (base.allergens) the option adds to the dish, in the order of the
+    # list. ``db_default``: a process still on the previous code inserts options without it (expand/contract).
+    allergens = models.JSONField(_("allergens"), blank=True, default=list, db_default=[])
     sort_order = models.PositiveIntegerField(_("order"), default=0)
     created_at = models.DateTimeField(_("created at"), auto_now_add=True)
     updated_at = models.DateTimeField(_("updated at"), auto_now=True)

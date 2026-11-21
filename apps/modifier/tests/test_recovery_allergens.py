@@ -31,6 +31,8 @@ def as_before_allergens() -> None:
     """Business A's database read as a copy made before options had allergens: without the column, undone with the
     test's transaction."""
     with connections[current_alias()].cursor() as cursor:
+        # The options were just written: their deferred checks run first, or Postgres refuses to alter the table.
+        cursor.execute("SET CONSTRAINTS ALL IMMEDIATE")
         cursor.execute("ALTER TABLE modifier_modifieroption DROP COLUMN allergens")
 
 
