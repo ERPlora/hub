@@ -403,32 +403,32 @@ Implicados: ninguno
 
 ### Lo que ofrece: consultas (leen, no cambian nada)
 
-| Operación | Qué da |
-|---|---|
-| `cart_checkout.cart.list` | Carritos, con búsqueda, filtros, orden y páginas de hasta 100. |
-| `cart_checkout.cart.get` | Un carrito con sus líneas, por id, sesión o cliente (email o nombre). |
-| `cart_checkout.item.list` | Las líneas de un carrito, con búsqueda, filtros y páginas. |
-| `cart_checkout.item.get` | Una línea por su id. |
-| `cart_checkout.order.list` | Pedidos, con búsqueda, filtros, orden y páginas de hasta 100. |
-| `cart_checkout.order.get` | Un pedido con todo (direcciones, métodos, fechas, notas), por id o número. |
+| Operación | Qué da | Flujos |
+|---|---|---|
+| `cart_checkout.cart.list` | Carritos, con búsqueda, filtros, orden y páginas de hasta 100. | F12 |
+| `cart_checkout.cart.get` | Un carrito con sus líneas, por id, sesión o cliente (email o nombre). | F12 |
+| `cart_checkout.item.list` | Las líneas de un carrito, con búsqueda, filtros y páginas. | F12 |
+| `cart_checkout.item.get` | Una línea por su id. | F12 |
+| `cart_checkout.order.list` | Pedidos, con búsqueda, filtros, orden y páginas de hasta 100. | F12 |
+| `cart_checkout.order.get` | Un pedido con todo (direcciones, métodos, fechas, notas), por id o número. | F12 |
 
 ### Lo que ofrece: acciones (cambian datos)
 
-| Operación | Qué hace | Permiso |
-|---|---|---|
-| `cart_checkout.cart.create` | Crea un carrito | gestionar carritos |
-| `cart_checkout.cart.mark_abandoned` | Abandona un carrito activo | gestionar carritos |
-| `cart_checkout.cart.delete` | Borra un carrito (peligrosa) | gestionar carritos |
-| `cart_checkout.cart.clear` | Vacía un carrito activo | gestionar carritos |
-| `cart_checkout.cart.cleanup_expired` | Caduca los carritos vencidos (también la tarea) | gestionar carritos |
-| `cart_checkout.item.add` | Añade una línea | gestionar carritos |
-| `cart_checkout.item.update` | Cambia la cantidad (0 la quita) | gestionar carritos |
-| `cart_checkout.item.remove` | Quita una línea | gestionar carritos |
-| `cart_checkout.checkout.initiate` | Inicia un pedido desde un carrito | cobrar |
-| `cart_checkout.order.mark_paid` | Marca un pedido pagado (peligrosa) | cobrar |
-| `cart_checkout.order.fail` | Marca un pedido fallido con su motivo (peligrosa) | cobrar |
-| `cart_checkout.order.complete` | Completa un pedido pagado y convierte su carrito | cobrar |
-| `cart_checkout.customer.erase` | Borra los datos personales de un cliente por su email (peligrosa) | gestionar carritos |
+| Operación | Qué hace | Permiso | Flujos |
+|---|---|---|---|
+| `cart_checkout.cart.create` | Crea un carrito | gestionar carritos | F01 |
+| `cart_checkout.cart.mark_abandoned` | Abandona un carrito activo | gestionar carritos | F05 |
+| `cart_checkout.cart.delete` | Borra un carrito (peligrosa) | gestionar carritos | F06 |
+| `cart_checkout.cart.clear` | Vacía un carrito activo | gestionar carritos | F04 |
+| `cart_checkout.cart.cleanup_expired` | Caduca los carritos vencidos (también la tarea) | gestionar carritos | F07 |
+| `cart_checkout.item.add` | Añade una línea | gestionar carritos | F02 |
+| `cart_checkout.item.update` | Cambia la cantidad (0 la quita) | gestionar carritos | F03 |
+| `cart_checkout.item.remove` | Quita una línea | gestionar carritos | F03 |
+| `cart_checkout.checkout.initiate` | Inicia un pedido desde un carrito | cobrar | F08 |
+| `cart_checkout.order.mark_paid` | Marca un pedido pagado (peligrosa) | cobrar | F09 |
+| `cart_checkout.order.fail` | Marca un pedido fallido con su motivo (peligrosa) | cobrar | F10 |
+| `cart_checkout.order.complete` | Completa un pedido pagado y convierte su carrito | cobrar | F11 |
+| `cart_checkout.customer.erase` | Borra los datos personales de un cliente por su email (peligrosa) | gestionar carritos | F14 |
 
 ### Lo que avisa
 

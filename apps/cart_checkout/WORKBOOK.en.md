@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:3a38883c70673128aa4f9d9b203e923be9ec479517702c805196f9ce6d117080 -->
+<!-- generated from WORKBOOK.md sha256:914c0562992de81c25dd09227c3977aa4fce7dcea175e1dfea99defb07611748 -->
 
 ## What it is for and who it is for
 
@@ -394,32 +394,32 @@ Involved: none
 
 ### What it offers: queries (they read and change nothing)
 
-| Operation | What it gives |
-|---|---|
-| `cart_checkout.cart.list` | Carts, with search, filters, sorting and pages of up to 100. |
-| `cart_checkout.cart.get` | A cart with its lines, by id, session or customer (email or name). |
-| `cart_checkout.item.list` | The lines of a cart, with search, filters and pages. |
-| `cart_checkout.item.get` | A line by its id. |
-| `cart_checkout.order.list` | Orders, with search, filters, sorting and pages of up to 100. |
-| `cart_checkout.order.get` | An order with everything (addresses, methods, dates, notes), by id or number. |
+| Operation | What it gives | Flows |
+|---|---|---|
+| `cart_checkout.cart.list` | Carts, with search, filters, sorting and pages of up to 100. | F12 |
+| `cart_checkout.cart.get` | A cart with its lines, by id, session or customer (email or name). | F12 |
+| `cart_checkout.item.list` | The lines of a cart, with search, filters and pages. | F12 |
+| `cart_checkout.item.get` | A line by its id. | F12 |
+| `cart_checkout.order.list` | Orders, with search, filters, sorting and pages of up to 100. | F12 |
+| `cart_checkout.order.get` | An order with everything (addresses, methods, dates, notes), by id or number. | F12 |
 
 ### What it offers: actions (they change data)
 
-| Operation | What it does | Permission |
-|---|---|---|
-| `cart_checkout.cart.create` | Creates a cart | manage carts |
-| `cart_checkout.cart.mark_abandoned` | Abandons an active cart | manage carts |
-| `cart_checkout.cart.delete` | Deletes a cart (dangerous) | manage carts |
-| `cart_checkout.cart.clear` | Empties an active cart | manage carts |
-| `cart_checkout.cart.cleanup_expired` | Expires the overdue carts (also the task) | manage carts |
-| `cart_checkout.item.add` | Adds a line | manage carts |
-| `cart_checkout.item.update` | Changes the quantity (0 removes it) | manage carts |
-| `cart_checkout.item.remove` | Removes a line | manage carts |
-| `cart_checkout.checkout.initiate` | Starts an order from a cart | check out |
-| `cart_checkout.order.mark_paid` | Marks an order paid (dangerous) | check out |
-| `cart_checkout.order.fail` | Marks an order failed with its reason (dangerous) | check out |
-| `cart_checkout.order.complete` | Completes a paid order and converts its cart | check out |
-| `cart_checkout.customer.erase` | Erases a customer's personal data by their email (dangerous) | manage carts |
+| Operation | What it does | Permission | Flows |
+|---|---|---|---|
+| `cart_checkout.cart.create` | Creates a cart | manage carts | F01 |
+| `cart_checkout.cart.mark_abandoned` | Abandons an active cart | manage carts | F05 |
+| `cart_checkout.cart.delete` | Deletes a cart (dangerous) | manage carts | F06 |
+| `cart_checkout.cart.clear` | Empties an active cart | manage carts | F04 |
+| `cart_checkout.cart.cleanup_expired` | Expires the overdue carts (also the task) | manage carts | F07 |
+| `cart_checkout.item.add` | Adds a line | manage carts | F02 |
+| `cart_checkout.item.update` | Changes the quantity (0 removes it) | manage carts | F03 |
+| `cart_checkout.item.remove` | Removes a line | manage carts | F03 |
+| `cart_checkout.checkout.initiate` | Starts an order from a cart | check out | F08 |
+| `cart_checkout.order.mark_paid` | Marks an order paid (dangerous) | check out | F09 |
+| `cart_checkout.order.fail` | Marks an order failed with its reason (dangerous) | check out | F10 |
+| `cart_checkout.order.complete` | Completes a paid order and converts its cart | check out | F11 |
+| `cart_checkout.customer.erase` | Erases a customer's personal data by their email (dangerous) | manage carts | F14 |
 
 ### What it announces
 
