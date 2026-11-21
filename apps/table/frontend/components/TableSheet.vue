@@ -6,16 +6,17 @@
 //   took says so and the window stays open to pick another.
 // - Blocked: why it cannot be seated.
 // - Occupied: with two checks (split), which one first; then its guests, since when, who serves and its
-//   customer, and Charge (to the till with its check), Transfer and Merge (the page picks the destination
-//   on the plan), Split check (the lines of its check in Sales, marked), Guests, Remove table (parks it)
-//   and Close table (asks first; Sales refuses a check with something ordered and the reason shows here).
+//   customer, Transfer and Merge (the page picks the destination on the plan), Split check (the lines of its
+//   check in Sales, marked), Guests, Remove table (parks it) and Close table (asks first; Sales refuses a
+//   check with something ordered and the reason shows here).
+// Opened to open a check (`intent: 'check'`, a tap on a split table), it only lists the checks and hands the
+// order of the one chosen to the page, which takes it to the till.
 // The buttons a person may not use are not shown.
 import { FormModal, InlineFeedback } from '@erplora/ui/components';
 import { type ApiError, useCommand } from '@erplora/ui/sdk';
 import { useSession } from '@erplora/ui/shell';
 import { IonButton } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
-import { useRouter } from 'vue-router';
 
 import CustomerSearch, { type CustomerSnapshot } from '../../../customer/frontend/components/CustomerSearch.vue';
 import { useLocale, useT } from '../composables/useT';
@@ -25,21 +26,27 @@ import type { SettingsOut, TableCheckOut, TableOut } from '../operations';
 import GuestsPrompt from './GuestsPrompt.vue';
 import SplitLines from './SplitLines.vue';
 
-const props = defineProps<{
-  table: TableOut | null;
-  settings: SettingsOut;
-  now: Date;
-}>();
+const props = withDefaults(
+  defineProps<{
+    table: TableOut | null;
+    settings: SettingsOut;
+    now: Date;
+    intent?: 'check' | 'actions';
+  }>(),
+  { intent: 'actions' },
+);
 
 const open = defineModel<boolean>('open', { default: false });
-const emit = defineEmits<{ pick: [pick: { mode: PickMode; table: TableOut; check: TableCheckOut }] }>();
+const emit = defineEmits<{
+  pick: [pick: { mode: PickMode; table: TableOut; check: TableCheckOut }];
+  check: [orderId: string];
+}>();
 
 type Step = 'main' | 'guests' | 'split' | 'close';
 
 const t = useT();
 const locale = useLocale();
 const session = useSession();
-const router = useRouter();
 
 const step = ref<Step>('main');
 const checkId = ref<string | null>(null);
@@ -158,11 +165,13 @@ async function onCheckCustomer(next: CustomerSnapshot | null): Promise<void> {
   await attempt(() => link.run({ order_id: orderId, customer_id: next?.customer_id ?? null }), false);
 }
 
-function charge(): void {
-  const orderId = check.value?.order_id;
-  if (!orderId) return;
-  open.value = false;
-  void router.push({ path: '/sale/pos', query: { order: orderId } });
+function choose(row: TableCheckOut): void {
+  if (props.intent === 'check' && row.order_id) {
+    open.value = false;
+    emit('check', row.order_id);
+    return;
+  }
+  checkId.value = row.id;
 }
 
 function pick(mode: PickMode): void {
@@ -282,7 +291,7 @@ function splitCheck(): void {
             expand="block"
             fill="outline"
             :data-testid="`table-sheet-check-${row.id}`"
-            @click="checkId = row.id"
+            @click="choose(row)"
           >
             {{ $t('table.sheet.check', { n: index + 1 }) }} · {{ $t('table.pax', { count: row.guests_count }) }}{{ row.customer_name ? ` · ${row.customer_name}` : '' }}
           </ion-button>
@@ -313,13 +322,6 @@ function splitCheck(): void {
             role="group"
             :aria-label="$t('table.sheet.actions.label')"
           >
-            <ion-button
-              v-if="check.order_id"
-              data-testid="table-sheet-action-charge"
-              @click="charge"
-            >
-              {{ $t('table.sheet.actions.charge') }}
-            </ion-button>
             <ion-button
               v-if="canMove"
               fill="outline"

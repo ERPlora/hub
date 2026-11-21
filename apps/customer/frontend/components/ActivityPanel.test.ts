@@ -21,6 +21,8 @@ import {
   sent,
   subId,
 } from '../__tests__/mount-customer';
+import en from '../locale/en.json';
+import es from '../locale/es.json';
 import type { ActivityRow } from '../operations';
 import ActivityPanel from './ActivityPanel.vue';
 
@@ -112,6 +114,41 @@ describe('ActivityPanel: the activity', () => {
     expect(read(4).get('.customer-activity__title').text()).toBe('Visit: haircut');
     expect(read(5).get('.customer-activity__title').text()).toBe('From the flow');
     expect(read(5).get('.customer-activity__when').text()).toContain('by Bot');
+  });
+
+  it('names the health steps in the page language, never by their key (hub#2049)', async () => {
+    const rows = pageOf([
+      entry('a1', 'health_consent_granted'),
+      entry('a2', 'health_updated'),
+      entry('a3', 'health_consent_withdrawn'),
+    ]);
+    const titles = (s: Awaited<ReturnType<typeof setup>>) => s.items().map((i) => i.get('.customer-activity__title').text());
+
+    const es = await setup({}, { locale: 'es' });
+    await es.result(es.call, ACTIVITY, rows);
+    expect(titles(es)).toEqual([
+      'Permiso para guardar datos de salud dado',
+      'Datos de salud actualizados',
+      'Permiso para guardar datos de salud retirado: datos de salud borrados',
+    ]);
+
+    const en = await setup();
+    await en.result(en.call, ACTIVITY, rows);
+    expect(titles(en)).toEqual([
+      'Permission to keep health data given',
+      'Health data updated',
+      'Permission to keep health data withdrawn: health data erased',
+    ]);
+  });
+
+  it('every kind the app has a text for is shown with that text, in both languages; another app\'s kind without a title keeps its key', async () => {
+    for (const [locale, catalog] of [['en', en], ['es', es]] as const) {
+      const kinds = catalog.customer.activity.kinds as Record<string, string>;
+      const s = await setup({}, { locale });
+      const own = Object.keys(kinds).map((kind, i) => entry(`a${i}`, kind));
+      await s.result(s.call, ACTIVITY, pageOf([...own, entry('x1', 'appointment.visit')]));
+      expect(s.items().map((i) => i.get('.customer-activity__title').text())).toEqual([...Object.values(kinds), 'appointment.visit']);
+    }
   });
 
   it('what the platform did says so instead of its own mark; a person, an API key and a named author keep their name (hub#1445)', async () => {

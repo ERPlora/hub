@@ -52,6 +52,11 @@ describe('AgendaToolbar', () => {
     expect(s.last('update:status')).toEqual(['pending']);
   });
 
+  it('the view switch changes on the click, not as a finger lifts, so the click lands on the tapped view', async () => {
+    const s = await setup();
+    expect((s.find('appointment-toolbar-view').element as HTMLIonSegmentElement).swipeGesture).toBe(false);
+  });
+
   it('the repeating view has no day, and a device on another zone is told', async () => {
     const s = await setup({ view: 'series', zone: 'Pacific/Kiritimati' });
     expect(s.find('appointment-toolbar-date').exists()).toBe(false);

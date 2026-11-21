@@ -180,7 +180,7 @@ test('TABLE-F16, SALE-F24: merging the table of the till check from Tables says 
   const floor = shown(page);
   await floor.locator('[data-testid=table-floor-mode-service]').click();
   await floor.locator(`[data-testid=table-floor-zone-tab-${zoneId}]`).click();
-  await floor.locator(`[data-testid=table-floor-tile-${tableId}]`).click();
+  await floor.locator(`[data-testid=table-floor-tile-${tableId}]`).click({ button: 'right' });
   await page.locator('ion-modal[data-testid=table-sheet] [data-testid=table-sheet-action-merge]').click();
   await expect(floor.locator('[data-testid=table-floor-pick]')).toContainText(`Merge ${NUMBER} with…`);
   await floor.locator(`[data-testid=table-floor-tile-${table.data.id}]`).click();

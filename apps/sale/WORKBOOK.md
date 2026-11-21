@@ -1987,7 +1987,7 @@ título, sus pasos y «Si falla»: ahí no van nombres de código, incidencias, 
 - **SALE-F19**: sentar es TABLE-F12, abrir la cuenta de la mesa TABLE-F10, volver a sentar TABLE-F24 y soltar
   TABLE-F13.
 - **SALE-F20**: «Enviar comanda (N)» se queda fija también en «Cuenta», la pestaña con la que se abre una cuenta (al
-  pulsar «Cobrar» en una mesa de Mesas, al cambiar de cuenta o al volver a abrir la app), en horizontal y en vertical
+  tocar una mesa ocupada en Mesas, al cambiar de cuenta o al volver a abrir la app), en horizontal y en vertical
   (hub#1017). En el cajón del móvil, «Enviar comanda» y la llama se quedan fijos sobre el pie mientras dejan sitio a
   las pestañas y a una línea; en un móvil más bajo se desplazan con las líneas y «Cobrar» sigue a la vista, y lo
   mismo en la columna lateral de una pantalla igual de baja (hub#787). En la columna lateral, si la cabecera, las
