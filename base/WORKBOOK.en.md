@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:6d752d35d3c3e61516cbca4daa4ffa3a59a79446ba754506445c1a38be7cc21e -->
+<!-- generated from WORKBOOK.md sha256:d14f6ba7e36e177c677729d423dca12d3461367ce540dc247571c653d453a694 -->
 
 ## What it is for and who it is for
 
@@ -579,9 +579,13 @@ Screen: Home · Summary
 Steps:
   1. Under the list is the board, with its panels from the moment the Home opens ("Loading widgets…" only while
      it is not known which ones are theirs).
-  2. Each panel is a card with its title and icon: a figure (with what it counts under it, if its app says
-     so), a list with bars, a timeline, a chart or a piece of its app's screen, with its texts in the language
-     of whoever is looking. In a list with bars, each bar measures how big its figure is against the biggest
+  2. Each panel is a card with its title and icon: a figure (with what it counts under its title, if its app
+     says so), a list with bars, a timeline, a chart or a piece of its app's screen, with its texts in the
+     language of whoever is looking. Each figure has the colour of its measure, the same on every screen: sales,
+     tickets and inventory, each its own. The board's first figures that have a colour head it in a row in
+     colour, one per colour and two to four; the others go in a light card with the colour on their icon, in
+     the order chosen. On a phone the figures go two by two. A figure that paints its state (VeriFactu's
+     contingency queue, in orange or red) stays on its usual panel. In a list with bars, each bar measures how big its figure is against the biggest
      one of the list, whatever its sign; a negative figure, such as a cash discrepancy where money was missing
      or a product with stock below zero, shows in red and with its sign (-€0.40), and the others keep the
      panel's colour or, if its app gives each row a colour, their own row's. The red of a negative figure
@@ -598,8 +602,9 @@ Steps:
 In: the panels each app that is on declares; each one's data, asked for with the permissions of whoever
 is looking.
 Out: nothing saved in the hub.
-If it fails: a panel without data says "No data"; one whose data cannot be read, "Unavailable", never an
-old or made-up figure. A row of a list with bars (or a day of a chart) that has no figure, such as a cash
+If it fails: a panel without data says "No data" (a figure, with a dash in its place); a figure whose data
+cannot be read says "Couldn't load" with "Retry", which asks for it again, and any other panel,
+"Unavailable": never an old or made-up figure. A row of a list with bars (or a day of a chart) that has no figure, such as a cash
 session closed without a count, shows a dash (—) and no bar, never a zero; a real zero does show as zero
 (€0.00). If the board cannot be read: "Could not load the panels" with "Retry".
 Involved: none
@@ -632,8 +637,8 @@ Steps:
      Home is loaded again.
 In: the business notices each panel declares.
 Out: nothing saved.
-If it fails: if the new data does not come, the panel says "Unavailable", not the value it had; when the
-connection is back, it updates by itself.
+If it fails: if the new data does not come, the panel says "Unavailable" (a figure, "Couldn't load" with
+"Retry"), not the value it had; when the connection is back, it updates by itself.
 Involved: none
 
 ### BASE-F09 Look at the recent activity

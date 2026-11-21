@@ -199,7 +199,7 @@ def test_the_homes_panels_are_the_old_sales_dashboards_four():
             "sale.view_reports",
             {},
             {"value": "total"},
-            {"format": "currency"},
+            {"format": "currency", "tone": 1},
         ),
         (
             "tickets_today",
@@ -210,7 +210,7 @@ def test_the_homes_panels_are_the_old_sales_dashboards_four():
             "sale.view_reports",
             {},
             {"value": "tickets"},
-            {"format": "number"},
+            {"format": "number", "tone": 2},
         ),
         (
             "last_7_days",
@@ -287,6 +287,18 @@ def test_the_panels_icons_are_registered_in_the_shell():
     icons = shell_icon_registry()
     for panel in sale().widgets:
         assert f"'{panel.icon.removeprefix('ion:')}'" in icons, panel.icon
+
+
+def test_its_figures_carry_the_colour_of_their_measure():
+    # The same measure keeps the same colour of data on every screen: sales are 1 and tickets 2. The chart and the
+    # activity are no figures.
+    panels = {panel.key: panel for panel in sale().widgets}
+    assert {key: panel.options.get("tone") for key, panel in panels.items()} == {
+        "today": 1,
+        "tickets_today": 2,
+        "last_7_days": None,
+        "recent_activity": None,
+    }
 
 
 def test_sales_has_no_setup_steps_nor_bell_counters():
