@@ -5,7 +5,7 @@ from decimal import Decimal
 
 from django.utils import translation
 
-from apps.inventory.schemas import ProductFiltersIn
+from apps.inventory.schemas.products import ProductFiltersIn
 from apps.inventory.tests.test_queries import general, product, read_csv, run
 
 from .conftest import HUB_DB
