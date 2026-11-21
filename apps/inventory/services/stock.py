@@ -9,7 +9,8 @@ from apps.inventory.models import Product, StockMovement
 from apps.inventory.queries.products import load_product, tracks_stock
 from apps.inventory.queries.reads import find_product
 from apps.inventory.queries.settings import current_settings
-from apps.inventory.schemas import CountIn, ProductOut, ProductsOut, ReceiveIn, WriteOffIn
+from apps.inventory.schemas.products import ProductOut, ProductsOut
+from apps.inventory.schemas.stock import CountIn, ReceiveIn, WriteOffIn
 from apps.inventory.services.movements import _crossing, _locked, _move
 from apps.inventory.services.writes import _check_grid, _service_has_no_stock
 

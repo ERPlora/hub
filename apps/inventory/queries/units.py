@@ -4,7 +4,7 @@ from live.context import OperationContext
 from live.operations import operation
 
 from apps.inventory.models import UNIT_SPECS, Unit
-from apps.inventory.schemas import UnitListIn, UnitPage
+from apps.inventory.schemas.units import UnitListIn, UnitPage
 
 
 @operation(

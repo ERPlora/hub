@@ -21,7 +21,7 @@ from apps.inventory.models import (
     fits_unit,
     increment_of,
 )
-from apps.inventory.schemas import UnitCode
+from apps.inventory.schemas.fields import UnitCode
 from base.tenancy.context import current_alias
 
 from .conftest import HUB_DB
