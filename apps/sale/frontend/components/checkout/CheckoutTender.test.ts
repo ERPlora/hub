@@ -119,6 +119,18 @@ describe('CheckoutTender: split', () => {
     expect(s.wrapper.emitted('add')).toEqual([[]]);
   });
 
+  it('hub#2017: with nothing typed it shows all that is left, which is what «Add this payment» takes', async () => {
+    const card = await setup({ splitting: true, method: CARD, legs: LEGS, remaining: 2250 });
+    expect(card.parts('sale-checkout-tendered')).toEqual(['Amount for this payment', '€22.50']);
+    const cash = await setup({ splitting: true, legs: LEGS, remaining: 2250 });
+    expect(cash.parts('sale-checkout-tendered')).toEqual(['Tendered', '€22.50']);
+  });
+
+  it('one method in cash still asks for what was handed over: nothing typed shows nothing', async () => {
+    const s = await setup({ block: { kind: 'tenderedMissing' } });
+    expect(s.parts('sale-checkout-tendered')).toEqual(['Tendered', '€0.00']);
+  });
+
   it('cash types what was handed over', async () => {
     const s = await setup({ splitting: true, typed: 3000, change: 750, legs: LEGS, remaining: 2250 });
     expect(s.parts('sale-checkout-tendered')).toEqual(['Tendered', '€30.00']);
