@@ -12,6 +12,7 @@ from live.errors import Conflict
 from live.outbox import record_event
 
 from base import operations as platform
+from base.business import business_zone
 from apps.verifactu import aeat, certificates, envelope, events, gateway, producer, xsd
 from apps.verifactu.models import Config, Event, Record, SendControl, backoff, wait_reason_text
 from apps.verifactu.queries.country import OUTSIDE_SPAIN
@@ -249,7 +250,7 @@ def _send_chain(  # noqa: C901, PLR0912, PLR0913, PLR0915, PLR0917
         return
     if control.next_send_at and control.next_send_at > now:
         if strict:
-            at = timezone.localtime(control.next_send_at).strftime("%H:%M:%S")
+            at = timezone.localtime(control.next_send_at, business_zone()).strftime("%H:%M:%S")
             raise Conflict(str(AEAT_WAIT) % {"at": at}, code="verifactu.aeat_wait")
         tally.waiting += _unsent(issuer_nif, environment).count()
         return
