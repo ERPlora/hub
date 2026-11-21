@@ -254,6 +254,8 @@ def test_a_split_payment_takes_the_change_out_of_the_cash(catalog):
         2800,
         1000,
     )
+    # The sale keeps its largest tender as its main method: the completed event carries it.
+    assert dict(events())["sale.sale.completed"]["payment_method_name"] == "Cash"
 
 
 def test_payments_must_add_up_to_the_total(catalog):
