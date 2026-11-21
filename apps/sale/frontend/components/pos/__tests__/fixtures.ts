@@ -233,6 +233,8 @@ export const kitchenItem = (over: Partial<ItemOut> = {}): ItemOut => ({
   status: 'pending',
   void_reason: '',
   ready_at: null,
+  allergy: [],
+  allergy_in_dish: [],
   ...over,
 });
 

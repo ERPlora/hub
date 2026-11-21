@@ -114,11 +114,12 @@ dispositivo. Debajo, una rejilla de tarjetas de columnas iguales, tantas como qu
 desplazamiento lateral). Cada tarjeta: a la izquierda, el tipo en un icono, la etiqueta («Mesa 4»; sin etiqueta, el
 tipo) y «Camarero: <nombre>»; a la derecha, el reloj, la espera en palabras con su icono («En tiempo», «Aviso» o
 «Retraso») y el número corto «#0012»; debajo, el estado («Por preparar», «En preparación» o «Lista») y las marcas
-«Urgente», «VIP» y «Ronda N» (desde la segunda). Los platos con la cantidad grande («2×»), el nombre, sus suplementos
-en negrita, la nota en cursiva, en «Todas» la estación con su color, «Solo papel» si la estación es solo de papel y, a
-la derecha, un icono con su estado (por preparar, en preparación, listo o anulado); los platos de un menú, junto a una
-raya bajo la cabecera del menú, que dice cuántos platos lleva («2 platos») y al tocarla marca listos sus platos. Un
-plato listo sale tachado y atenuado. Un plato anulado en el TPV sale tachado, con «Anulado» y el motivo en rojo, y no
+«Urgente», «VIP», «Alergia» y «Ronda N» (desde la segunda). Los platos con la cantidad grande («2×»), el nombre, la
+alergia del cliente en un bloque rojo, sus suplementos en negrita, la nota en cursiva, en «Todas» la estación con su
+color, «Solo papel» si la estación es solo de papel y, a la derecha, un icono con su estado (por preparar, en
+preparación, listo o anulado); los platos de un menú, junto a una raya bajo la cabecera del menú, que dice cuántos
+platos lleva («2 platos») y al tocarla marca listos sus platos. Un plato listo sale tachado y atenuado. Un plato
+anulado en el TPV sale tachado, con «Anulado» y el motivo en rojo, y no
 responde al toque. Al pie, según el permiso y el estado, la acción principal a todo el ancho («Listo» mientras se
 cocina con platos por hacer, «Servida» cuando está lista) y, a su derecha, «⋮», que abre las demás: «Marcar urgente» /
 «Quitar urgente» y «Recuperar»; sin ninguna de ellas no hay «⋮». Todo se pulsa bien con el dedo en una tableta. La
@@ -139,9 +140,9 @@ Estado (cada uno, una lista con sus palabras: «En sala», «Urgente», «Por pr
 tarjetas. Acciones por fila, solo icono: «Lanzar», «Lista», «Servida»,
 «Recuperar» y «Cancelar» (en el menú «⋮», con confirmación y motivo opcional); solo salen las que el
 perfil puede hacer y se esconden las que el estado no admite. Tocar una fila abre su detalle: los
-platos con su menú, sus suplementos, su estación y su estado. «Nueva comanda» abre el panel (a pantalla completa en el móvil)
-con Tipo, Destino, Notas y sus platos (producto del catálogo, cantidad y nota; «Añadir plato»), y
-«Crear comanda». Vacía: «Sin comandas.». Cargando: el esqueleto de la tabla. Error de carga: el de la
+platos con la alergia del cliente, su menú, sus suplementos, su estación y su estado. «Nueva comanda» abre el panel
+(a pantalla completa en el móvil) con Tipo, Destino, Notas y sus platos (producto del catálogo, cantidad y nota;
+«Añadir plato»), y «Crear comanda». Vacía: «Sin comandas.». Cargando: el esqueleto de la tabla. Error de carga: el de la
 tabla con reintento; un rechazo de una acción sale en su diálogo o encima de la tabla, y uno del alta,
 dentro del panel.
 
@@ -789,9 +790,9 @@ estar incompleta.»). Con Cocina apagada no hay comandas pendientes. Nunca impid
 Implicados: CASH_REGISTER-F08, CASH_REGISTER-F09, KITCHEN-F10, KITCHEN-F13
 
 ### KITCHEN-F32 Resaltar la alergia del cliente en la tarjeta y en el papel
-Estado: parcial — la comanda ya recibe y guarda la alergia y los alérgenos que coinciden, la pantalla y el detalle
-los reciben y el papel imprime los renglones del plato; falta que la tarjeta pinte la marca y el bloque (hub#1738)
-y que la app del dispositivo imprima `!! ALERGIA !!` en la cabecera de la hoja (ERPlora/app#63)
+Estado: parcial — la tarjeta y el detalle ya enseñan la alergia y los alérgenos que coinciden, y el papel imprime
+los renglones del plato; falta que la app del dispositivo imprima `!! ALERGIA !!` en la cabecera de la hoja
+(ERPlora/app#63)
 Actor: empleado
 Pantalla: Pantalla, Comandas
 Pasos:
@@ -1079,5 +1080,5 @@ que no tiene ningún papel: solo el sistema (`*`).
 - Cursos de verdad, retener y lanzar (kitchen#71): fuera del MVP («Referencia adoptada»).
 - Vaciar de golpe las comandas cobradas antes de pasar la cocina a papel (kitchen#158): hoy se sirven a
   mano (KITCHEN-F26, F27). Comportamiento nuevo, después del MVP.
-- La alergia del cliente en la tarjeta (KITCHEN-F32, `parcial`): la marca de la cabecera y el bloque del plato, por
-  hub#1738; y `!! ALERGIA !!` en la cabecera del papel, por la app del dispositivo (ERPlora/app#63).
+- La marca `!! ALERGIA !!` en la cabecera del papel (KITCHEN-F32, `parcial`), por la app del dispositivo
+  (ERPlora/app#63).

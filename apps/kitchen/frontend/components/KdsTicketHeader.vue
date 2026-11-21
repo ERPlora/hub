@@ -28,6 +28,7 @@ const typeName = computed(() => t(`kitchen.orderType.${props.ticket.order_type}`
 const label = computed(() => props.ticket.label || typeName.value);
 const wait = computed(() => waitOf(props.sem));
 const priority = computed(() => (props.ticket.priority === 'normal' ? null : props.ticket.priority));
+const hasAllergy = computed(() => props.ticket.items.some((line) => line.allergy.length > 0));
 
 function bumpAll(): void {
   if (props.tappable) emit('bumpAll');
@@ -99,6 +100,13 @@ function bumpAll(): void {
         :data-testid="`kitchen-card-${id}-priority`"
         :tone="PRIORITY_TONES[priority]"
         :label="t(`kitchen.priority.${priority}`)"
+      />
+      <StatusPill
+        v-if="hasAllergy"
+        class="ep-order-ticket__pill"
+        :data-testid="`kitchen-card-${id}-allergy`"
+        tone="danger"
+        :label="t('kitchen.card.allergy')"
       />
       <StatusPill
         v-if="ticket.round_no > 1"

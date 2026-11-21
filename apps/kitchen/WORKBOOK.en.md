@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:13238ea706585db546ecf6243347bc5df8b78f34193322289bdef9c6759acdc3 -->
+<!-- generated from WORKBOOK.md sha256:650a91dc442fce9936c3d2617cc9bc44519706af94793e17921bc579d1a6ebe4 -->
 
 ## What it is for and who it is for
 
@@ -106,10 +106,10 @@ on that device. Below, a grid of cards in equal columns, as many as fit (a singl
 sideways scroll). Each card: on the left, the type as an icon, the label ("Table 4"; without a label, the
 type) and "Waiter: <name>"; on the right, the clock, the wait in words with its icon ("On time", "Warning"
 or "Late") and the short number "#0012"; below, the status ("To prepare", "Preparing" or "Ready") and the
-marks "Rush", "VIP" and "Round N" (from the second one). The dishes with the quantity in large type
-("2×"), the name, their modifiers in bold, the note in italics, in "All" the station with its colour,
-"Paper only" if the station is paper only and, on the right, an icon with their state (to prepare,
-preparing, ready or voided); the dishes of a menu, next to a line under the menu header, which says how
+marks "Rush", "VIP", "Allergy" and "Round N" (from the second one). The dishes with the quantity in large type
+("2×"), the name, the customer's allergy in a red block, their modifiers in bold, the note in italics, in "All" the
+station with its colour, "Paper only" if the station is paper only and, on the right, an icon with their state (to
+prepare, preparing, ready or voided); the dishes of a menu, next to a line under the menu header, which says how
 many dishes it has ("2 dishes") and, when tapped, marks its dishes ready. A dish that is ready shows
 struck through and dimmed. A dish voided at the till shows struck through, with "Voided" and the reason in
 red, and does not respond to a tap. At the bottom, depending on the permission and the state, the main
@@ -132,8 +132,8 @@ Ticket (full number `YYYYMMDD-NNNN`), Destination (the label), Type, Priority, S
 (each one a list with its words: "Dine in", "Rush", "To prepare"…), and table or card view. Actions per
 row, icon only: "Fire", "Ready", "Served", "Recall" and "Cancel" (in the "⋮" menu, with confirmation and an
 optional reason); only the ones the profile can do show up, and the ones the state does not allow are
-hidden. Tapping a row opens its detail: the dishes with their menu, their modifiers, their station and
-their state. "New ticket" opens the panel (full screen on the phone) with Type, Destination, Notes and
+hidden. Tapping a row opens its detail: the dishes with the customer's allergy, their menu, their modifiers, their
+station and their state. "New ticket" opens the panel (full screen on the phone) with Type, Destination, Notes and
 its dishes (product of the catalogue, quantity and note; "Add dish"), and "Create ticket". Empty: "No
 tickets.". Loading: the table skeleton. Load error: the table's, with retry; a rejection of an action
 shows in its dialog or above the table, and one of the creation, inside the panel.
@@ -784,9 +784,8 @@ register.
 Involved: CASH_REGISTER-F08, CASH_REGISTER-F09, KITCHEN-F10, KITCHEN-F13
 
 ### KITCHEN-F32 Highlight the customer's allergy on the card and on paper
-Status: partial — the ticket already receives and keeps the allergy and the matching allergens, the display and the
-detail receive them and the paper prints the dish's lines; the card does not paint the mark and the block yet
-(hub#1738) and the device's app does not print `!! ALERGIA !!` in the sheet's header yet (ERPlora/app#63)
+Status: partial — the card and the detail already show the allergy and the matching allergens, and the paper prints
+the dish's lines; the device's app does not print `!! ALERGIA !!` in the sheet's header yet (ERPlora/app#63)
 Actor: employee
 Screen: Display, Tickets
 Steps:
@@ -795,9 +794,10 @@ Steps:
 2. On the card, the header carries the "Allergy" mark, in red, next to "Rush" and "VIP", if any of its dishes has an
    allergy marked. Each station sees it only if one of its dishes has it.
 3. Under the name of that dish, before its modifiers and its note, comes a block of its own in red: "Allergy:
-   Gluten". If the dish has that allergen according to Inventory (SALE-F40), the block adds "The dish has Gluten". A
-   dish without an allergy marked has no block, even if it has allergens: the display does not repeat each dish's.
-4. On a menu, the block shows on each of its dishes, and "The dish has" names only that dish's allergens.
+   Gluten". If the dish has that allergen according to Inventory (SALE-F40), the block adds "The dish contains
+   Gluten". A dish without an allergy marked has no block, even if it has allergens: the display does not repeat each
+   dish's.
+4. On a menu, the block shows on each of its dishes, and "The dish contains" names only that dish's allergens.
 5. On the station's paper (KITCHEN-F08), the header carries `!! ALERGIA !!` (under `!! URGENTE !!` if the round is
    rush) and, right under the dish and before its modifiers, `*** ALERGIA: GLUTEN ***` and, if it has it,
    `*** LLEVA: GLUTEN ***`, each on its own line and in capitals, so that it stands out without colour. The reprint
