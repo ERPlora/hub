@@ -12,6 +12,7 @@ import {
   afterMove,
   cellText,
   childrenOf,
+  delimiterOf,
   type FolderNode,
   flatFolders,
   formatSize,
@@ -129,6 +130,13 @@ describe('reading a file', () => {
       ['a', 'b'],
       ['1', '2'],
     ]);
+  });
+
+  it('takes the separator the header line holds most of, outside quotes, a comma when it holds none', () => {
+    expect(delimiterOf('proveedor;concepto;importe\nQA;Harina, 25 kg;18,50')).toBe(';');
+    expect(delimiterOf('a\tb\tc\n1,5\t2\t3')).toBe('\t');
+    expect(delimiterOf('"Harina; Aceite; Sal",importe\n1;2,3')).toBe(',');
+    expect(delimiterOf('importe\n18,50')).toBe(',');
   });
 
   it('paints each kind with an icon the shell has', () => {
