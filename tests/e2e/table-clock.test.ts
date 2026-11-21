@@ -11,7 +11,7 @@ import { describe, expect, it } from 'vitest';
 
 import { bookingDays, bookingTimes, MARGIN_MINUTES, RESERVED_LEAD_MINUTES, untilMidnight } from './table-clock';
 
-const QUERIES = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', 'apps', 'table', 'queries.py');
+const QUERIES = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', 'apps', 'table', 'queries', 'floor.py');
 const DAY = '2026-10-28';
 const WEDNESDAY = 2;
 const MINUTE = 60_000;

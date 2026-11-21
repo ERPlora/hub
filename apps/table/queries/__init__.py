@@ -41,7 +41,7 @@ from live.operations import operation
 
 from apps.sale.models import Order, OrderLine, Sale
 from apps.table.models import Hold, Table, TableSession, TableSettings, Zone
-from apps.table.queries.floor import (
+from .floor import (
     ENDED,
     RESERVED_LEAD,
     _customers,
