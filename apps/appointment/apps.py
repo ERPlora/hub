@@ -94,10 +94,11 @@ class AppointmentConfig(LiveAppConfig):
     }
     # Positional (id, label, icon, path): scripts/app-icons.mjs reads every line starting with `icon =`
     # as the module's own icon.
+    # The entry's label is the tab bar's: the help window and the assistant name the screen by it.
     navigation = [
         Nav(
             "appointments",
-            _("Appointments"),
+            _("Agenda"),
             "ion:calendar-outline",
             "/appointment/agenda",
         ),

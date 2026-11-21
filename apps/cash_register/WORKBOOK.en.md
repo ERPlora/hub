@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:ee02a00135bd8fe8354d5039b4cb59cf5d6858a0fe26ebd5f5a2908e1c917dcc -->
+<!-- generated from WORKBOOK.md sha256:43670fccfbc4fb891c273a5f5231bdce3c6a13a4c667bad4c6249f2a600535c0 -->
 
 ## What it is for and who it is for
 
@@ -356,8 +356,7 @@ Steps:
 2. During the shift, in the open session, the employee sees the Expected column empty; in the detail they
    see the float and "—" in Expected, Sales, Refunds, Cash in, Cash out and Comps, and in the list of
    movements only the cash in and out recorded by hand: neither the sales, nor the voids, nor the refunds,
-   so there is nothing to add up the expected cash with (Square and Lightspeed hide the expected cash the
-   same way in the blind close). The manager, the owner and the administrator see everything: the table,
+   so there is nothing to add up the expected cash with. The manager, the owner and the administrator see everything: the table,
    the detail, the list and the close window. Nor does the assistant tell it to whoever may not see it:
    the close's summary and its confirmation reach them without expected nor difference, and the
    assistant does not know them.

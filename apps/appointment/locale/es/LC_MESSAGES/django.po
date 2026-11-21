@@ -18,6 +18,9 @@ msgstr ""
 msgid "Appointments"
 msgstr "Citas"
 
+msgid "Agenda"
+msgstr "Agenda"
+
 #, python-brace-format
 msgid "{start_date_label} at {start_time_label}"
 msgstr "{start_date_label} a las {start_time_label}"

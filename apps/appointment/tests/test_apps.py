@@ -95,7 +95,7 @@ def test_navigation_is_a_single_entry_with_a_registered_icon():
     assert [
         (entry.id, str(entry.label), entry.icon, entry.path) for entry in entries
     ] == [
-        ("appointments", "Appointments", "ion:calendar-outline", "/appointment/agenda"),
+        ("appointments", "Agenda", "ion:calendar-outline", "/appointment/agenda"),
     ]
 
 

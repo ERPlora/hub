@@ -80,13 +80,12 @@ hasta que se atiende, se cobra o se anula.
 
 Citas se abre desde el menú **Citas** y tiene dos pestañas: **Agenda** y **Ajustes** (esta solo para
 quien puede cambiarlos). Lo que una persona no puede hacer sale en gris o no aparece, y la app lo
-rechaza aunque lo intente por la API o por el asistente. La ayuda llama **Citas** a la pestaña de la agenda,
-como su entrada del menú.
+rechaza aunque lo intente por la API o por el asistente.
 
 Además, Citas pone el bloque **Historial de visitas** al final de la ficha de una clienta en **Clientes**: sus 10
 últimas citas, la más reciente primero, con servicios, profesional, estado y notas (la interna primero).
 
-### Citas
+### Agenda
 Aquí está la agenda del negocio, siempre en su reloj. Cambia de día con las flechas o con **Hoy** y elige cómo
 verla: en **Lista**, **Por profesional** (una fila por profesional, por día o por semana) o las citas
 **Periódicas**. Con **Añadir cita** eliges la clienta, los servicios, el profesional y una de las horas libres; en
@@ -95,7 +94,7 @@ fila, confírmala, empiézala, complétala, cóbrala en el TPV, muévela o canc�
 hora o a otro profesional. El aviso **N por confirmar** te lleva a las citas que han reservado las clientas y
 esperan tu confirmación.
 
-#### Agenda
+#### Detalle
 Una barra con el día (‹ fecha › y **Hoy**, y el botón del calendario para saltar a una fecha),
 **Filtrar por estado**, el aviso **N por confirmar** cuando hay reservas de clientas pendientes, y el
 conmutador **Lista · Por profesional · Periódicas** (en el móvil, solo iconos). En **Lista** y en **Por
@@ -474,12 +473,12 @@ Pasos:
 3. Una fecha que no cabe (cerrado, el profesional no trabaja, bloqueo, otra cita, pasado, demasiado
    pronto) se salta y se lista con su motivo; las demás se reservan. Una fecha que se canceló a mano no
    se vuelve a reservar.
-4. El aviso dice solo lo que ha pasado: «{n} citas reservadas» y, si alguna no cupo, «{n} no se han
-   podido reservar» con cada fecha y su motivo. Si ya estaban todas: «Nada nuevo que reservar: sus {n}
-   citas ya estaban reservadas».
-5. Si la serie aún no tiene ninguna fecha en la ventana: «Aún no hay nada que reservar: la próxima fecha
-   de esta serie, el {fecha}, queda más lejos que la antelación máxima. Pulsa «Reservar citas» en la serie
-   cuando se acerque.».
+4. El aviso dice solo lo que ha pasado: cuántas citas se han reservado («8 citas reservadas») y, si alguna
+   no cupo, cuántas no se han podido reservar, con cada fecha y su motivo. Si ya estaban todas: «Nada nuevo
+   que reservar: sus 8 citas ya estaban reservadas».
+5. Si la serie aún no tiene ninguna fecha en la ventana, el aviso dice que todavía no hay nada que reservar
+   porque su próxima fecha queda más lejos que la antelación máxima, y que pulses «Reservar citas» en la
+   serie cuando se acerque.
 Entra: una serie activa y la antelación máxima de los ajustes.
 Sale: las citas reservadas, cada una con su aviso `appointment.appointment.created`.
 Si falla: una serie pausada pide reactivarla («Esa cita periódica está pausada: reactívala para reservar sus
@@ -519,7 +518,7 @@ Actor: empleado (las suyas), responsable, asistente
 Pantalla: Periódicas
 Pasos:
 1. Apaga el interruptor **Activa** para que deje de reservar; enciéndelo para reactivarla.
-2. **Borrar** pide confirmar «¿Borrar las citas periódicas de {nombre}?»; las citas ya reservadas se
+2. **Borrar** pide confirmar que se borran las citas periódicas de esa clienta; las citas ya reservadas se
    conservan.
 Entra: una serie.
 Sale: `appointment.recurring.updated` o `appointment.recurring.deleted`.
@@ -556,7 +555,7 @@ Actor: responsable, empleado (sus propias citas), con permiso de vender en Venta
 Pantalla: Agenda
 Pasos:
 1. Pulsa **Cobrar** en la fila de la cita.
-2. Citas abre en el TPV una cuenta enlazada a la cita, titulada «{clienta} · {nº de cita}», con una
+2. Citas abre en el TPV una cuenta enlazada a la cita, titulada con la clienta y el número de la cita («Lucía · APT-20261116-0001»), con una
    línea **de servicio** por cada servicio de la cita (como si se tocara en «Servicios» del TPV),
    con el profesional que lo hizo y **al precio con que se reservó** (el propio de la
    profesional incluido), aunque el catálogo haya cambiado desde entonces, y lleva a **Venta** con esa
@@ -566,7 +565,7 @@ Pasos:
 4. Una cita tiene **una sola cuenta**: mientras sigue abierta, el botón se llama **Ir a la cuenta** y
    vuelve a ella (nunca abre otra, aunque se pulse a la vez en dos dispositivos); si se anula la cuenta
    en el TPV, **Cobrar** abre una nueva. Con la cuenta abierta, la cita no se cancela, ni se marca como
-   no presentada, ni se borra: primero se cobra o se anula la cuenta (decisión de mercado).
+   no presentada, ni se borra: primero se cobra o se anula la cuenta.
 5. Al cobrarla, la cita queda **cobrada** y, si no lo estaba, **Completada**; **Cobrar** sale en gris.
    Si la venta se anula, la cita deja de estar cobrada y **Cobrar** vuelve a estar activo.
 Entra: una cita pendiente, confirmada, en curso o completada que no esté cobrada.
@@ -1011,9 +1010,7 @@ agenda tuya que enseñar.».
 
 La ayuda del Hub publica el primer apartado, el resumen de cada pantalla (lo que va antes de su primer `####`) y, de
 cada flujo hecho con pantalla, su título, sus pasos y «Si falla», sin nombres de código, incidencias ni ids de flujo
-(`tests/test_help_workbooks.py`). La pestaña de la agenda se llama en la ayuda como su entrada del menú, **Citas**,
-y sus vistas (Agenda, Periódicas y la ficha) son ventanas de esa pestaña. Lo que esas partes dejaron de decir, y
-quien mantiene Citas necesita:
+(`tests/test_help_workbooks.py`). Lo que esas partes dejaron de decir, y quien mantiene Citas necesita:
 
 - El número de cita es `APT-AAAAMMDD-NNNN`.
 - Los códigos de los rechazos que los flujos citan por su frase: `appointment.slot_taken` (APPOINTMENT-F01),
@@ -1028,6 +1025,10 @@ quien mantiene Citas necesita:
   `appointment.recurring.restored`, si encaja como una reserva de APPOINTMENT-F01 o una serie de APPOINTMENT-F12.
 - Mover una cita de una serie con «Esta y todas las siguientes» es APPOINTMENT-F14; reservar las citas de una serie,
   APPOINTMENT-F13; cobrar en el TPV, APPOINTMENT-F17 con SALE-F38 (la línea de servicio) y SALE-F27 (el bono).
+- Que una cuenta abierta en el TPV frene cancelar, marcar como no presentada y borrar la cita (APPOINTMENT-F17) es como
+  lo hace el mercado. Los avisos de una serie llevan sus datos («{n} citas reservadas», «el {fecha}», «¿Borrar las
+  citas periódicas de {nombre}?») y la cuenta del TPV se titula «{clienta} · {nº de cita}»: la ayuda los cuenta con
+  un ejemplo o con palabras.
 
 ## Cómo son las páginas (para quien lo mantiene)
 

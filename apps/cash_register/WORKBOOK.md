@@ -361,8 +361,7 @@ Pasos:
 2. Durante el turno, en la sesión abierta, el empleado ve vacía la columna Esperado; en el detalle ve
    el fondo y «—» en Esperado, Ventas, Devoluciones, Entradas, Salidas e Invitaciones, y en la lista de
    movimientos solo las entradas y salidas apuntadas a mano: ni las ventas, ni las anulaciones, ni las
-   devoluciones, así que no hay con qué sumar el esperado (Square y Lightspeed ocultan igual el esperado
-   en el cierre ciego). El responsable, el propietario y el administrador lo ven todo: la tabla, el
+   devoluciones, así que no hay con qué sumar el esperado. El responsable, el propietario y el administrador lo ven todo: la tabla, el
    detalle, la lista y la ventana de cierre. El asistente tampoco se lo dice a quien no puede verlo: el
    resumen del cierre y su confirmación le llegan sin esperado ni diferencia, y el asistente no los
    conoce.
@@ -902,6 +901,7 @@ cada flujo hecho con pantalla, su título, sus pasos y «Si falla», sin nombres
   CASH_REGISTER-F02, F03 y F05).
 - Sin la moneda del negocio, los botones de abrir, apuntar y cerrar esperan en gris y la ventana ofrece «Reintentar»
   (hub#938; CASH_REGISTER-F03, F05 y F09).
+- El arqueo ciego oculta el esperado como Square y Lightspeed en su cierre ciego (CASH_REGISTER-F07).
 - Lo que la ayuda llama «Cobros fuera de turno» es CASH_REGISTER-F17, y el tique que sigue emitido tras anular una
   venta, SALE-F30.
 

@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:7b175b8b09612833587e5e04817aed256391d499d3ec6e0c70df93a3690f4d82 -->
+<!-- generated from WORKBOOK.md sha256:96232821bb31987c98748aabd3a14ab74daf968aa5f7031a8a50112b5008ffcd -->
 
 ## What it is for and who it is for
 
@@ -74,13 +74,12 @@ everything that happens to it from the moment it is booked until it is attended,
 
 Appointments opens from the **Appointments** menu and has two tabs: **Agenda** and **Settings** (the latter
 only for whoever can change them). What a person cannot do is greyed out or does not appear, and the app
-refuses it even if they try through the API or through the assistant. The help calls the agenda's tab
-**Appointments**, like its menu entry.
+refuses it even if they try through the API or through the assistant.
 
 Besides, Appointments puts the **Visit history** block at the end of a customer's card in **Customers**: their last
 10 appointments, the most recent first, with services, professional, state and notes (the internal one first).
 
-### Appointments
+### Agenda
 Here is the business's agenda, always on its clock. Change the day with the arrows or with **Today** and choose how
 to see it: as a **List**, **By professional** (one row per professional, by day or by week) or the **Repeating**
 appointments. With **Add appointment** you pick the customer, the services, the professional and one of the free
@@ -89,7 +88,7 @@ and, from its row, confirm it, start it, complete it, charge it at the till, mov
 it to another time or another professional. The **N to confirm** notice takes you to the appointments customers have
 booked that are waiting for your confirmation.
 
-#### Agenda
+#### Detail
 A bar with the day (‹ date › and **Today**, and the calendar button to jump to a date), **Filter by
 status**, the **N to confirm** notice when there are pending bookings made by customers, and the
 **List · By professional · Repeating** switch (on a phone, icons only). In **List** and in **By
@@ -480,12 +479,12 @@ Steps:
 3. A date that does not fit (closed, the professional does not work, block, another appointment, past,
    too soon) is skipped and listed with its reason; the others are booked. A date that was cancelled by
    hand is not booked again.
-4. The notice says only what happened: "{n} appointments booked" and, if any did not fit, "{n} could not
-   be booked" with each date and its reason. If they were all there already: "Nothing new to book: its {n}
-   appointments were already booked".
-5. If the series still has no date in the window: "Nothing to book yet: the next date of this series,
-   {date}, is further ahead than the maximum advance booking. Tap «Book appointments» on the series when
-   it gets closer.".
+4. The notice says only what happened: how many appointments were booked ("8 appointments booked") and, if
+   any did not fit, how many could not be booked, with each date and its reason. If they were all there
+   already: "Nothing new to book: its 8 appointments were already booked".
+5. If the series still has no date in the window, the notice says there is nothing to book yet because its
+   next date is further ahead than the maximum advance booking, and that you tap «Book appointments» on the
+   series when it gets closer.
 In: an active series and the maximum advance booking of the settings.
 Out: the booked appointments, each with its `appointment.appointment.created` event.
 If it fails: a paused series asks to reactivate it ("That repeating appointment is paused: reactivate it to book
@@ -526,8 +525,8 @@ Actor: employee (their own), manager, assistant
 Screen: Repeating
 Steps:
 1. Turn off the **Active** switch so that it stops booking; turn it on to reactivate it.
-2. **Delete** asks to confirm "Delete {name}'s repeating appointments?"; the appointments already booked
-   are kept.
+2. **Delete** asks to confirm that the customer's repeating appointments are deleted; the appointments
+   already booked are kept.
 In: a series.
 Out: `appointment.recurring.updated` or `appointment.recurring.deleted`.
 If it fails: "The repeating appointment's status could not be changed." and the series stays as it was. A series
@@ -563,8 +562,8 @@ Actor: manager, employee (their own appointments), with the right to sell in Sal
 Screen: Agenda
 Steps:
 1. Tap **Charge** on the appointment's row.
-2. Appointments opens at the till a check linked to the appointment, titled "{customer} · {appointment
-   no.}", with a **service** line for each service of the appointment (as if it were tapped in "Services"
+2. Appointments opens at the till a check linked to the appointment, titled with the customer and the
+   appointment's number ("Lucía · APT-20261116-0001"), with a **service** line for each service of the appointment (as if it were tapped in "Services"
    of the till), with the professional who performed it and **at the price it was booked at**
    (the professional's own included), even if the catalogue has changed since then, and takes you to
    **Sales** with that check on screen.
@@ -573,8 +572,7 @@ Steps:
 4. An appointment has **a single check**: while it is still open, the button is called **Go to the check**
    and goes back to it (it never opens another one, even if it is tapped at the same time on two devices);
    if the check is voided at the till, **Charge** opens a new one. With the check open, the appointment is
-   not cancelled, nor marked as no-show, nor deleted: first the check is charged or voided (market
-   decision).
+   not cancelled, nor marked as no-show, nor deleted: first the check is charged or voided.
 5. When it is charged, the appointment is **charged** and, if it was not already, **Completed**; **Charge**
    is greyed out. If the sale is voided, the appointment stops being charged and **Charge** is active
    again.
