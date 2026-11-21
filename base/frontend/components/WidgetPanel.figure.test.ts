@@ -85,11 +85,15 @@ describe('WidgetPanel as a figure card', () => {
     expect(m.wrapper.get('.ep-stat-card__value').text()).toBe('3');
   });
 
-  it('keeps a stat coloured by its severity on its own panel', async () => {
-    const m = await panel({ kind: 'stat', map: { value: 'open', severity: 'tone' } });
+  // `options.label` arrives already in the reader's language: base translates it.
+  it("says a stat's state in its status, in words, and keeps the colour of its measure", async () => {
+    const stat = { kind: 'stat', map: { value: 'open', severity: 'tone' }, options: { label: 'En cola de contingencia', tone: 3 } } as const;
+    const m = await panel(stat, {}, 'es');
     const call = await m.live();
     await m.result(call, 'demo.item.stats', { ...STATS, tone: 'warning' });
-    expect(m.wrapper.findComponent(StatCard).exists()).toBe(false);
-    expect(m.wrapper.get('.widget-stat').attributes('data-severity')).toBe('warning');
+    const card = m.wrapper.getComponent(StatCard);
+    expect(card.props()).toMatchObject({ value: '3', tone: 3, status: { tone: 'warning', label: 'En cola de contingencia' } });
+    expect(card.props('note')).toBeUndefined();
+    expect(m.wrapper.get('.ep-stat-card__status').text()).toContain('En cola de contingencia');
   });
 });

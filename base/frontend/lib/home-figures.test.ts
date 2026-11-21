@@ -23,8 +23,8 @@ describe('isFigure', () => {
     expect(isFigure(widget('a.x', { kind: null, operation: null, component: 'Own' }))).toBe(false);
   });
 
-  it('keeps a stat that colours its figure by a severity on its own panel', () => {
-    expect(isFigure(widget('a.x', { kind: 'stat', map: { value: 'n', severity: 'severity' } }))).toBe(false);
+  it('is also a stat that says its state by a severity', () => {
+    expect(isFigure(widget('a.x', { kind: 'stat', map: { value: 'n', severity: 'severity' } }))).toBe(true);
   });
 });
 
@@ -86,6 +86,22 @@ describe('figureCard', () => {
       sparkline: [1, 4, 2],
     });
     expect(figureCard({ kind: 'sparkline', series: [1], value: undefined })).toEqual({ value: null, sparkline: [1] });
+  });
+
+  it("says a stat's state apart, in words, by its severity: never by the figure's colour", () => {
+    expect(figureCard({ kind: 'stat', value: '4', label: 'In the queue', severity: 'warning' })).toEqual({
+      value: '4',
+      status: { tone: 'warning', label: 'In the queue' },
+    });
+    expect(figureCard({ kind: 'stat', value: '1', label: 'In the queue', severity: 'danger' })).toEqual({
+      value: '1',
+      status: { tone: 'danger', label: 'In the queue' },
+    });
+    // Nothing to flag (VeriFactu says «ok» with an empty queue): what it counts stays a note.
+    expect(figureCard({ kind: 'stat', value: '0', label: 'In the queue', severity: 'ok' })).toEqual({
+      value: '0',
+      note: 'In the queue',
+    });
   });
 
   it('is no figure when there is no data', () => {

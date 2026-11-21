@@ -127,6 +127,7 @@ const chosenBar = computed(() => {
     :value="card.value"
     :note="card.note"
     :sparkline="card.sparkline"
+    :status="card.status"
     :loading="loading"
     :error="unavailable"
     :empty-label="$t('base.widgets.noData')"
@@ -178,25 +179,6 @@ const chosenBar = computed(() => {
     >
       {{ $t('base.widgets.noData') }}
     </p>
-    <div
-      v-else-if="view.kind === 'stat'"
-      class="widget-stat"
-      :data-severity="view.severity"
-    >
-      <p
-        class="widget-value"
-        data-testid="widget-value"
-      >
-        {{ view.value }}
-      </p>
-      <p
-        v-if="view.label"
-        class="widget-muted"
-        data-testid="widget-label"
-      >
-        {{ view.label }}
-      </p>
-    </div>
     <ul
       v-else-if="view.kind === 'bar-list'"
       class="widget-bars"
@@ -315,30 +297,10 @@ const chosenBar = computed(() => {
   font-weight: 600;
 }
 
-.widget-value {
-  margin: 0;
-  font-size: 1.75rem;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-  line-height: 1.1;
-}
-
 .widget-muted {
   margin: 0;
   font-size: 0.875rem;
   color: var(--ion-color-medium);
-}
-
-.widget-stat[data-severity='danger'] .widget-value {
-  color: var(--ion-color-danger);
-}
-
-.widget-stat[data-severity='warning'] .widget-value {
-  color: var(--ion-color-warning-shade);
-}
-
-.widget-stat[data-severity='success'] .widget-value {
-  color: var(--ion-color-success);
 }
 
 .widget-skeleton {

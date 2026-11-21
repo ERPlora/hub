@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:d14f6ba7e36e177c677729d423dca12d3461367ce540dc247571c653d453a694 -->
+<!-- generated from WORKBOOK.md sha256:4bb8ea4bd0c377c916b03c814642ab8f01fdbba93811c130220d8ddd5f05a6be -->
 
 ## What it is for and who it is for
 
@@ -584,8 +584,9 @@ Steps:
      language of whoever is looking. Each figure has the colour of its measure, the same on every screen: sales,
      tickets and inventory, each its own. The board's first figures that have a colour head it in a row in
      colour, one per colour and two to four; the others go in a light card with the colour on their icon, in
-     the order chosen. On a phone the figures go two by two. A figure that paints its state (VeriFactu's
-     contingency queue, in orange or red) stays on its usual panel. In a list with bars, each bar measures how big its figure is against the biggest
+     the order chosen. On a phone the figures go two by two. A figure with a state to watch (VeriFactu's
+     contingency queue when something waits or has already failed) says it in an orange or red tag with an
+     icon, without changing the figure's colour. In a list with bars, each bar measures how big its figure is against the biggest
      one of the list, whatever its sign; a negative figure, such as a cash discrepancy where money was missing
      or a product with stock below zero, shows in red and with its sign (-€0.40), and the others keep the
      panel's colour or, if its app gives each row a colour, their own row's. The red of a negative figure

@@ -587,8 +587,9 @@ Pasos:
      el idioma de quien mira. Cada cifra lleva el color de su medida, el mismo en todas las pantallas: ventas,
      tickets e inventario, cada una el suyo. Las primeras cifras del tablero que tienen color lo encabezan en una
      fila de color, una por color y de dos a cuatro; las demás van en una tarjeta clara con el color en su icono,
-     en el orden elegido. En el teléfono las cifras van de dos en dos. Una cifra que pinta su estado (la cola de
-     contingencia de VeriFactu, en naranja o rojo) sigue en su panel de siempre. En una lista con barras, cada barra mide lo grande que es su cifra frente a la mayor
+     en el orden elegido. En el teléfono las cifras van de dos en dos. Una cifra con un estado que vigilar (la cola
+     de contingencia de VeriFactu cuando algo espera o ya ha fallado) lo dice en una etiqueta naranja o roja con
+     icono, sin cambiar el color de la cifra. En una lista con barras, cada barra mide lo grande que es su cifra frente a la mayor
      de la lista, sea del signo que sea; una cifra negativa, como un descuadre de caja en el que faltó dinero o
      un producto con existencias por debajo de cero, sale en rojo y con su signo (-0,40 €), y las demás
      conservan el color del panel o, si su app da un color a cada fila, el de la suya. El rojo de una cifra

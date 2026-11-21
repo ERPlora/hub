@@ -62,16 +62,6 @@ describe('WidgetPanel', () => {
     expect(m.wrapper.get('[data-testid="widget-empty"]').text()).toBe('Sin datos');
   });
 
-  // `options.label` arrives already in the reader's language: base translates it.
-  it('says under the figure of a stat coloured by its severity what it counts, in its severity', async () => {
-    const stat = { kind: 'stat', map: { value: 'open', severity: 'tone' }, options: { format: 'number', label: 'En cola de contingencia' } } as const;
-    const m = await panel(stat, 'es');
-    const call = await m.live();
-    await m.result(call, 'demo.item.stats', { total: 5, open: 3, done: 2, lines: 7, tone: 'warning' });
-    expect(m.wrapper.get('[data-testid="widget-value"]').text()).toBe('3');
-    expect(m.wrapper.get('[data-testid="widget-label"]').text()).toBe('En cola de contingencia');
-    expect(m.wrapper.get('.widget-stat').attributes('data-severity')).toBe('warning');
-  });
 
   it('a kpi paints only its figure under its title, never its `options.label`', async () => {
     const m = await panel({ options: { format: 'number', label: 'Records pending submission to the AEAT' } });
