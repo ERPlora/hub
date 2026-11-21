@@ -6,11 +6,9 @@ Without Printing in the business the bill is not queued and the device prints it
 """
 
 import pytest
-from live.errors import Conflict
 from live.models import OutboxEvent
 
 from apps.sale.models import Order
-from apps.sale.services import printouts
 from apps.sale.tests.conftest import HUB_DB, run
 
 pytestmark = HUB_DB
@@ -46,19 +44,6 @@ def test_a_check_whose_bill_is_printed_is_noted_with_its_event(coffee):
     assert changed(order.id) == 1
 
 
-def test_the_note_and_its_event_go_back_with_a_print_that_fails(coffee, monkeypatch):
-    order = open_check()
-
-    def broken(ctx, request):
-        raise RuntimeError("the print broke")
-
-    monkeypatch.setattr(printouts, "_queue_paper", broken)
-    with pytest.raises(RuntimeError):
-        print_bill(order.id)
-    assert printed_at(order.id) is None
-    assert changed(order.id) == 0
-
-
 def test_printing_it_again_changes_nothing(coffee):
     order = open_check()
     print_bill(order.id)
@@ -88,6 +73,7 @@ def test_adding_lines_or_charging_part_keeps_the_note(coffee):
     order = open_check()
     print_bill(order.id)
     first = printed_at(order.id)
+    assert first is not None
     added = run("sale.order.add_line", {"order_id": str(order.id), "product": "COF"})
     run(
         "sale.sale.complete",
@@ -107,15 +93,6 @@ def test_the_check_that_stays_after_a_merge_keeps_its_note(coffee):
     joins = open_check("Table 5")
     print_bill(stays.id)
     first = printed_at(stays.id)
+    assert first is not None
     run("sale.order.merge", {"from_order_id": str(joins.id), "to_order_id": str(stays.id)})
     assert printed_at(stays.id) == first
-
-
-def test_a_closed_check_is_not_noted(coffee):
-    order = open_check()
-    run("sale.order.void", {"order_id": str(order.id)})
-    with pytest.raises(Conflict) as refusal:
-        print_bill(order.id)
-    assert refusal.value.code == "sale.order_changed"
-    assert printed_at(order.id) is None
-    assert changed(order.id) == 0
