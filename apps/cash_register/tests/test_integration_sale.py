@@ -146,7 +146,13 @@ def test_the_shift_follows_the_business_day_of_sale(coffee):
 # ── F14: voids ─────────────────────────────────────────────────────────────────────────────────
 
 
+def sold_and_refunded(session) -> tuple[int, int, int, int]:
+    figures = summary(session)
+    return figures.total_sales, figures.cash_sales, figures.card_sales, figures.total_refunds
+
+
 def test_a_sale_voided_in_the_same_shift_does_not_count(coffee):
+    # The sale and its void cancel out: the movements list both, the summary counts neither.
     session = open_session(10000)
     sale = charge("2")
     void(sale)
@@ -154,12 +160,49 @@ def test_a_sale_voided_in_the_same_shift_does_not_count(coffee):
         ("sale", 300),
         ("void", -300),
     ]
-    figures = summary(session)
-    assert (figures.expected_cash, figures.total_sales, figures.total_refunds) == (
-        10000,
-        300,
-        300,
+    assert sold_and_refunded(session) == (0, 0, 0, 0)
+    assert summary(session).expected_cash == 10000
+
+
+def test_a_card_sale_voided_in_the_same_shift_is_neither_a_card_sale_nor_a_refund(coffee):
+    # A 1.50 € espresso by card voided a minute later read «Sales 1.50», «Card sales 1.50» and «Refunds 1.50».
+    session = open_session(15000)
+    void(charge("1", payments=[{"method": "card"}]))
+    assert sold_and_refunded(session) == (0, 0, 0, 0)
+    assert summary(session).expected_cash == 15000
+
+
+def test_only_the_voided_sale_drops_out_of_a_shift_with_other_sales_and_a_refund(coffee):
+    session = open_session(10000)
+    kept = charge("3")
+    refund(kept, 150)
+    void(charge("2", payments=[{"method": "card"}]))
+    assert sold_and_refunded(session) == (450, 450, 0, 150)
+    assert summary(session).movement_count == 4
+
+
+def test_the_comps_of_a_sale_voided_in_the_same_shift_do_not_count_either(shirt):
+    session = open_session(0)
+    sale = run(
+        "sale.sale.complete",
+        {
+            "idempotency_key": "voided-with-comps-01",
+            "lines": [{"product": "SHIRT"}, {"product": "SHIRT", "is_gift": True, "gift_reason": "birthday"}],
+            "payments": [{"method": "card"}],
+        },
     )
+    assert summary(session).total_gifts == 4000
+    void(sale)
+    assert summary(session).total_gifts == 0
+
+
+def test_a_closed_shift_still_counts_neither_a_sale_voided_in_it_nor_its_void(coffee):
+    session = open_session(10000)
+    charge("1")
+    void(charge("2", payments=[{"method": "card"}]))
+    close(10150)
+    assert [line.type for line in lines(session)] == ["sale", "sale", "void"]
+    assert sold_and_refunded(session) == (150, 150, 0, 0)
 
 
 def test_a_card_sale_voided_moves_no_cash(coffee):
@@ -232,6 +275,8 @@ def test_a_sale_voided_after_its_shift_closed_takes_the_cash_out_of_the_open_shi
         ("void", 300, sale.number)
     ]
     assert summary(second).expected_cash == 10000
+    # Each shift has only half of the pair, so nothing cancels out: a sale in one, a refund in the other.
+    assert (sold_and_refunded(first), sold_and_refunded(second)) == ((300, 300, 0, 0), (0, 0, 0, 300))
 
 
 # ── F15: refunds ───────────────────────────────────────────────────────────────────────────────

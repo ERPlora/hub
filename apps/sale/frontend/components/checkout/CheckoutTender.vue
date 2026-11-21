@@ -4,14 +4,14 @@
 // types on the keypad; any other method charges the exact amount on the card terminal. Over the keypad, in
 // cash, one row of a fixed height says what the keys are missing and then, big, the change: the sheet is as
 // tall as its content, so a row that came and went would move the keys under the finger (hub#456). «Split the payment» opens the split (secondary: most charges are one method); «Add this
-// payment» takes each leg (with nothing typed, all that is left). It paints the sheet's tender state
-// (useTender) and sends what is tapped.
+// payment» takes each leg (with nothing typed, all that is left, and the row says so). It paints the sheet's
+// tender state (useTender) and sends what is tapped.
 import { HubIcon } from '@erplora/ui/shell';
 import { computed } from 'vue';
 
 import { useLocale } from '../../composables/useT';
 import { type ChargeBlock, tenderReason } from '../../lib/checkout/blocks';
-import { type Leg, needsTendered, type TenderMethod } from '../../lib/checkout/tender';
+import { keypadAmount, type Leg, needsTendered, type TenderMethod } from '../../lib/checkout/tender';
 import { formatMoney, moneyDecimals, useBusinessMoney } from '../../lib/format';
 import type { PaymentMethodOut } from '../../operations';
 import MethodPicker from './MethodPicker.vue';
@@ -49,6 +49,7 @@ const money = (cents: number): string => formatMoney(cents, locale.value, busine
 
 const cash = computed(() => needsTendered(props.method));
 const typing = computed(() => cash.value || props.splitting);
+const shown = computed(() => keypadAmount(props.typed, props.remaining, props.splitting));
 const amountLabel = computed(() => (props.splitting && !cash.value ? 'sale.checkout.legAmount' : 'sale.checkout.tendered'));
 const reason = computed(() => tenderReason(props.block));
 </script>
@@ -74,7 +75,7 @@ const reason = computed(() => tenderReason(props.block));
         data-testid="sale-checkout-tendered"
       >
         <span>{{ $t(amountLabel) }}</span>
-        <span class="amt__value">{{ money(typed) }}</span>
+        <span class="amt__value">{{ money(shown) }}</span>
       </div>
       <div
         v-if="cash || change > 0"

@@ -546,7 +546,10 @@ Pasos:
 2. La sesión abierta en ese momento recibe una «Anulación de …» por cada forma de pago de la venta; la
    de efectivo baja el esperado. La línea de la venta no se toca.
 3. Va siempre al turno abierto al anular, aunque la venta sea de un turno ya cerrado: el cerrado no se
-   mueve. Anulada en el mismo turno, la venta y su anulación se compensan y no cuentan.
+   mueve y, en el abierto, la anulación cuenta en «Devoluciones».
+4. Anulada en el mismo turno, la venta y su anulación se compensan: no cuentan en «Ventas», en las ventas
+   de su forma de pago, en «Devoluciones» ni en «Invitaciones», ni en el detalle ni en el informe impreso.
+   «Movimientos» enseña las dos.
 Entra: la venta anulada y cuándo se anuló (`sale.sale.voided`).
 Sale: la línea de anulación. Cada anulación se anota una sola vez.
 Si falla: sin sesión abierta, la anulación sale en «Cobros fuera de turno». Anular no corrige nada fiscal: el tique
