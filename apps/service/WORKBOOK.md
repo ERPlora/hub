@@ -10,6 +10,12 @@ Lo que no entra todavía: ver «Lo que queda fuera».
 
 ## Para qué sirve y para quién
 
+Servicios es el catálogo de lo que vende tu peluquería o tu centro de estética: cada servicio con su precio, su
+duración y su categoría, y qué profesionales lo hacen. También guarda los bonos, paquetes de sesiones que una clienta
+compra una vez y gasta en varias visitas. De este catálogo leen la agenda, el TPV y la reserva online.
+
+### En detalle
+
 Servicios es el **catálogo de lo que vende una peluquería o un centro de estética cuando lo que se
 vende no es un artículo**: cada servicio con su nombre, su tarifa, su precio, su duración, su
 categoría y su categoría fiscal (el IVA con el que se cobra), y **qué profesionales lo hacen**, con su
@@ -22,7 +28,7 @@ También guarda los **bonos**: un bono es un paquete de sesiones de servicios co
 clienta compra una vez y gasta en varias visitas. Un bono paga una línea de servicio entera, no un
 importe (no es una tarjeta regalo), y la titular es una sola clienta.
 
-Quién la usa:
+### Quién la usa y qué hace cada uno
 
 - El **empleado** (recepción, caja): ve el catálogo, las categorías y los bonos, da de alta servicios,
   ve los bonos vendidos y sus movimientos, concede un bono a una clienta y gasta sesiones.
@@ -86,6 +92,11 @@ Servicios se abre desde el menú **Servicios** y tiene tres pestañas: **Servici
 no aparece, y la app lo rechaza aunque lo intente por la API o por el asistente.
 
 ### Servicios
+Aquí está tu catálogo de servicios. La lista enseña cada uno con su foto, su categoría, su tarifa, su precio, su
+duración y si ya se puede cobrar; búscalos, fíltralos y ordénalos. Con **Nuevo servicio** das de alta uno; toca una
+fila para cambiarlo y decir qué profesionales lo hacen, y **Archivar** deja de ofrecerlo sin perder su historia.
+
+#### Detalle
 Tabla con buscador «Buscar servicio…», columnas **Foto** (la miniatura, o las iniciales sobre su color),
 **Nombre, Categoría, Tarifa** (Precio fijo, Por hora,
 Desde, Variable, Gratis), **Precio** (en la moneda del negocio), **Duración (min)** y **Estado**: **Activo**, **Sin configurar** (con
@@ -114,6 +125,11 @@ ventana «Librería de imágenes» es la de Inventario, con «Peluquería» y «
 la foto, el botón dice «Subiendo foto…».
 
 ### Categorías
+Las categorías agrupan tus servicios en la lista, en el TPV y en la reserva online, por ejemplo «Corte», «Color» o
+«Estética», y una puede ir dentro de otra. Aquí las creas, las ordenas, les cambias el nombre y las eliminas; al
+eliminar una, sus servicios se quedan sin categoría.
+
+#### Detalle
 Tabla con buscador «Buscar categoría…» y columnas **Nombre, Categoría padre, Orden** y **Servicios**
 (cuántos servicios en oferta tiene). **Nueva categoría** abre el formulario: **Nombre, Categoría
 padre** («Sin padre (raíz)» u otra) y **Orden**, con **Crear categoría** / **Guardar cambios**. Por
@@ -122,6 +138,12 @@ categoría desaparece; los servicios que contiene se conservan, sin categoría.�
 «{count} servicios se quedarán sin categoría.» (con uno, «1 servicio se quedará sin categoría.»).
 
 ### Bonos y paquetes
+Aquí creas los bonos que vendes: su nombre, los servicios que incluye con sus sesiones, su precio o su descuento,
+cuántos usos da y cuántos días vale. De cada bono ves quién lo ha comprado y sus movimientos, y desde ahí gastas una
+sesión fuera del cobro, regalas sesiones o anulas uno vendido por error. Arriba, **Bonos sin cliente** reúne los
+bonos cuya clienta se eliminó.
+
+#### Detalle
 Arriba, **Bonos sin cliente** (solo responsable, propietario y administrador). Tabla con buscador
 «Buscar paquete…», columnas **Nombre, Descuento, Precio cerrado, Líneas** y **Estado** (Activo,
 Archivado o Eliminado). En **Filtros**, el filtro de Estado en **Eliminado** cambia a la vista de los bonos
@@ -163,7 +185,12 @@ Hojas que se abren encima, todas con **Cerrar**, «Cargando…» mientras llegan
   «Caducado» si lo está y «Referencia del cliente: <identificador>». Vacía: «Ningún bono se ha quedado
   sin cliente.».
 
-### Ajustes de Servicios
+### Ajustes
+Aquí decides lo que toma un servicio nuevo cuando no lo dices: su duración, su tiempo de margen y su categoría
+fiscal; y si la reserva online enseña los precios y la duración y deja reservar. Solo la ve quien puede cambiar los
+ajustes.
+
+#### Detalle
 Solo para quien puede cambiarlos. Campos: «Duración por defecto (min)», «Tiempo de margen por
 defecto (min)», «Categoría fiscal por defecto», «Mostrar precios», «Mostrar duración» y «Permitir
 reserva online»; botón **Guardar**. Mientras el negocio no ha guardado nunca, salen los de fábrica
@@ -244,9 +271,9 @@ Pasos:
    si hay una). Sin ella **Crear servicio** no se puede pulsar; tampoco mientras el negocio no haya dicho
    todavía su moneda, porque el precio se lee en ella (sin ella, «1500» yenes se guardaría como 150 000);
    hasta entonces, salir del precio lo deja como se escribió, sin inventarle decimales ni juzgarlo: «¥1500» o «12,50 zł» no salen en rojo como «Esto no es un importe», y en
-   cuanto llega la moneda se leen en ella (hub#945).
+   cuanto llega la moneda se leen en ella.
    Si la moneda no se puede leer, la ventana lo dice («No se ha podido leer la moneda del negocio», con el
-   motivo) y ofrece «Reintentar», que la vuelve a pedir; en cuanto llega, **Crear servicio** se enciende (hub#938).
+   motivo) y ofrece «Reintentar», que la vuelve a pedir; en cuanto llega, **Crear servicio** se enciende.
 5. Pulsa **Crear servicio**: el formulario se cierra y el servicio sale en la tabla como **Activo**.
 Entra: las categorías de Servicios y las categorías fiscales activas de Impuestos.
 Sale: el servicio en oferta y reservable (`service.service.created`); desde ese momento lo ven la
@@ -260,7 +287,7 @@ Si falla: dentro del formulario, cada motivo debajo de su campo: un importe que 
 «22,50 €» en un negocio de Polonia), uno que se lee de dos maneras o uno negativo; una categoría eliminada («Esa categoría no está disponible: no existe en este negocio o se
 ha eliminado.»); una categoría fiscal que no existe o está desactivada («Esa categoría fiscal no
 existe en Impuestos o está desactivada.»); sin ninguna categoría fiscal, el aviso de Impuestos. Lo
-tecleado se conserva. El motivo de un campo se quita en cuanto se corrige ese campo, aunque otro diga lo mismo (hub#888).
+tecleado se conserva. El motivo de un campo se quita en cuanto se corrige ese campo, aunque otro diga lo mismo.
 Implicados: TAX-F01, BASE-F01, BASE-F114 (el personal de ERPlora recupera desde una copia aparte los servicios que se
 perdieron, cada uno por esta misma alta)
 
@@ -269,14 +296,14 @@ Estado: hecho
 Actor: responsable, asistente
 Pantalla: Servicios
 Pasos:
-1. Toca la fila del servicio o su **Editar**: se abre «Editando servicio — <nombre>» con sus datos.
+1. Toca la fila del servicio o su **Editar**: se abre «Editando servicio — Corte de mujer» con sus datos.
 2. Cambia Nombre, Tarifa, Precio, Duración, Categoría o Categoría fiscal (esta no se puede vaciar).
 3. Pulsa **Guardar cambios**: el formulario se cierra y la tabla se pone al día sola.
 Entra: el servicio completo.
 Sale: el servicio cambiado (`service.service.updated`); se cambia solo lo que se tocó. Las citas ya
 reservadas conservan el nombre, el precio y la duración que tenían; los bonos ya vendidos no cambian.
-Si falla: los motivos de SERVICE-F01; un servicio que ya no existe, «Ese servicio no existe en este
-negocio.». Un servicio cuya categoría se eliminó sale «Sin categoría» y se guarda sin problema.
+Si falla: los mismos motivos que al darlo de alta, cada uno debajo de su campo; un servicio que ya no existe,
+«Ese servicio no existe en este negocio.». Un servicio cuya categoría se eliminó sale «Sin categoría» y se guarda sin problema.
 Implicados: SERVICE-F31
 
 ### SERVICE-F03 Poner un servicio a precio abierto
@@ -300,9 +327,9 @@ Actor: propietario, administrador, asistente
 Pantalla: Servicios
 Pasos:
 1. En la fila del servicio pulsa **Archivar**.
-2. Lee «Archivar servicio»: «<nombre> — dejará de ofrecerse y de poder reservarse. Se conservan su
+2. Lee «Archivar servicio»: «Corte de mujer — dejará de ofrecerse y de poder reservarse. Se conservan su
    histórico y las citas ya reservadas.» y, si Citas está activa y tiene citas próximas con ese
-   servicio, «{count} citas próximas siguen usando este servicio. Conservan su reserva, precio y
+   servicio, cuántas son: «3 citas próximas siguen usando este servicio. Conservan su reserva, precio y
    duración; solo dejan de admitirse reservas nuevas.» (con una, «1 cita próxima sigue usando este servicio.
    Conserva …»).
 3. Pulsa **Archivar** (o **Cancelar**). La fila desaparece de la lista.
@@ -355,7 +382,7 @@ Pasos:
 1. En **Categorías** pulsa **Nueva categoría**.
 2. Escribe el Nombre y, si quieres, elige la Categoría padre y un Orden.
 3. Pulsa **Crear categoría**. Para cambiarla, toca la fila o su **Editar** («Editando categoría —
-   <nombre>»), cambia lo que haga falta y pulsa **Guardar cambios**.
+   Color»), cambia lo que haga falta y pulsa **Guardar cambios**.
 Entra: las categorías vivas del negocio.
 Sale: la categoría (`service.category.created`, `service.category.updated`), que aparece en el campo
 Categoría del formulario de servicio y en el filtro de la columna Categoría. Las listas y el TPV las
@@ -364,7 +391,7 @@ Si falla: un nombre que ya tiene otra categoría viva (sin distinguir mayúscula
 sale debajo del campo: «Ya hay una categoría con ese nombre. Elige otro nombre.». Una categoría no
 puede ser su propio padre ni colgar de una de sus hijas: «Una categoría no puede colgar de sí misma
 ni de una de sus subcategorías.». Un padre eliminado: «Esa categoría padre no está disponible: no
-existe en este negocio o se ha eliminado.». El motivo de un campo se quita en cuanto se corrige ese campo, aunque otro diga lo mismo (hub#888).
+existe en este negocio o se ha eliminado.». El motivo de un campo se quita en cuanto se corrige ese campo, aunque otro diga lo mismo.
 Implicados: SERVICE-F01, SERVICE-F08, BASE-F114 (el personal de ERPlora recupera desde una copia aparte las categorías
 que el negocio ya no tiene, cada una por esta misma alta)
 
@@ -422,12 +449,12 @@ WHATSAPP_INBOX-F21
 ### SERVICE-F11 Cambiar los ajustes de Servicios
 Estado: hecho
 Actor: propietario, administrador
-Pantalla: Ajustes de Servicios
+Pantalla: Ajustes
 Pasos:
 1. Abre **Servicios → Ajustes**.
 2. Cambia los campos y pulsa **Guardar**.
 3. Sale «Ajustes guardados.».
-   Lo que se cambia mientras se está guardando no se pierde: se queda en pantalla, por guardar (hub#914).
+   Lo que se cambia mientras se está guardando no se pierde: se queda en pantalla, por guardar.
 Entra: los ajustes guardados (o los de fábrica).
 Sale: los ajustes (`service.settings.updated`). La duración, el margen (antes y después), la reserva
 online y la categoría fiscal por defecto los toma todo servicio nuevo que no los diga (formulario,
@@ -437,7 +464,7 @@ precio o la duración de cada servicio.
 Si falla: «No se pudieron guardar los ajustes.» y el motivo debajo del campo (una duración de 0, una
 categoría fiscal que no existe). Como en las ventanas de formulario, el aviso se quita en cuanto se cambia
 algo y el motivo de un campo en cuanto se corrige ese campo; los dos vuelven si el siguiente intento
-también se rechaza. Un rechazo sin campo se queda hasta el siguiente intento (hub#821).
+también se rechaza. Un rechazo sin campo se queda hasta el siguiente intento.
 Implicados: SERVICE-F01, SERVICE-F06, ONLINE_BOOKING-F01
 
 ### SERVICE-F12 Crear un bono
@@ -460,11 +487,11 @@ Si falla: sin ningún servicio, «Añade al menos un servicio: un paquete sin l�
 canjear.»; un servicio repetido, archivado o que no existe; un importe ilegible o negativo, debajo de
 su campo; un nombre que ya tiene otro bono vivo, «Ya hay un paquete con ese nombre. Elige otro
 nombre.». El motivo de un campo se quita en cuanto se corrige ese campo, aunque otro diga lo mismo, y el
-de las líneas en conjunto (un servicio repetido), debajo de ellas, en cuanto se cambia, se añade o se quita una línea (hub#888). «Crear paquete» (y «Guardar cambios» al editarlo, SERVICE-F13) está en gris mientras el negocio
+de las líneas en conjunto (un servicio repetido), debajo de ellas, en cuanto se cambia, se añade o se quita una línea. «Crear paquete» (y «Guardar cambios» al editarlo) está en gris mientras el negocio
 no haya dicho todavía su moneda, porque el precio cerrado y el descuento se leen en ella (sin ella,
 «1500» yenes se guardaría como 150 000); hasta entonces, salir del precio cerrado o del descuento lo deja como se
-escribió, sin inventarle decimales ni juzgarlo: «¥9500» o «7,50 zł» no salen en rojo como «Esto no es un importe», y en cuanto llega la moneda se leen en ella (hub#945). Si la moneda no se puede leer, la ventana lo dice («No se ha podido leer la moneda del negocio», con el
-motivo) y ofrece «Reintentar», que la vuelve a pedir; en cuanto llega, el botón se enciende (hub#938).
+escribió, sin inventarle decimales ni juzgarlo: «¥9500» o «7,50 zł» no salen en rojo como «Esto no es un importe», y en cuanto llega la moneda se leen en ella. Si la moneda no se puede leer, la ventana lo dice («No se ha podido leer la moneda del negocio», con el
+motivo) y ofrece «Reintentar», que la vuelve a pedir; en cuanto llega, el botón se enciende.
 Implicados: SERVICE-F14, SERVICE-F22
 
 ### SERVICE-F13 Editar o eliminar un bono
@@ -472,7 +499,7 @@ Estado: hecho
 Actor: responsable (editar), propietario y administrador (eliminar)
 Pantalla: Bonos y paquetes
 Pasos:
-1. Toca la fila o su **Editar** («Editando paquete — <nombre>»): cambia Nombre, Descuento, Precio
+1. Toca la fila o su **Editar** («Editando paquete — Bono 5 cortes»): cambia Nombre, Descuento, Precio
    cerrado, Vigencia o Usos; las líneas no se cambian. Pulsa **Guardar cambios**.
 2. Para quitarlo del catálogo pulsa **Eliminar** y confirma.
 3. Para ver lo vendido de un bono eliminado, en **Filtros** elige **Eliminado** en Estado.
@@ -483,7 +510,7 @@ Al eliminar (`service.package.deleted`), el bono sale del catálogo y ya no se p
 vendidos se siguen gastando, ajustando y anulando igual. Un bono eliminado que nadie compró no sale
 en ninguna vista.
 Si falla: al guardar, dentro del formulario, el motivo («Ese paquete no existe en este negocio.» si se
-eliminó entretanto) o los de SERVICE-F12 debajo de su campo; al eliminar, el motivo en la confirmación.
+eliminó entretanto) o los mismos que al crearlo, debajo de su campo; al eliminar, el motivo en la confirmación.
 Implicados: SERVICE-F12, SERVICE-F16
 
 ### SERVICE-F14 Vender un bono a una clienta
@@ -549,7 +576,7 @@ Pantalla: Bonos y paquetes
 Pasos:
 1. En **Bonos vendidos**, en la compra equivocada pulsa **Anular** (solo sale si no se ha gastado
    ninguna sesión).
-2. Lee «¿Anular este bono?»: «El bono del cliente {customer} ({amount}) deja de poder usarse y queda
+2. Lee «¿Anular este bono?»: «El bono del cliente Lucía Pérez (45,00 €) deja de poder usarse y queda
    en la lista como anulado. El dinero no se devuelve aquí: si se cobró, devuelve la venta desde
    Ventas con una devolución.».
 3. Escribe el Motivo (obligatorio) y pulsa **Anular**.
@@ -570,7 +597,8 @@ Pasos:
 1. En **Bonos vendidos** pulsa **Ajustar** en una compra viva con límite de sesiones o caducidad.
 2. Elige **Añadir sesiones** o **Quitar sesiones** y cuántas (hasta 100; quitar, hasta las que le
    quedan), y/o «Días que se alarga» (hasta 366).
-3. Escribe el Motivo y revisa «Tras el ajuste: quedan {count} sesiones · caduca el {when}» («queda 1 sesión»).
+3. Escribe el Motivo y revisa cómo queda, por ejemplo «Tras el ajuste: quedan 4 sesiones · caduca el 31/12/2026»
+   («queda 1 sesión»).
 4. Pulsa **Ajustar**.
 Entra: la compra, las cantidades y el motivo.
 Sale: un movimiento aparte con quién, cuándo, cuánto y por qué (`service.grant.adjusted`), que sale en
@@ -579,7 +607,7 @@ o agotado. Las sesiones ya entregadas conservan su valor; las que quedan se repa
 precio (SERVICE-F24).
 Si falla: «Indica por qué se ajusta este bono…», «Añade o quita al menos una sesión, o añade al menos
 un día.», «No puedes quitar más sesiones de las que le quedan al cliente.», «Ese bono no tiene límite
-de sesiones…», «Ese bono no caduca…» o «Ese bono ya estaba anulado.». El motivo de un campo se quita en cuanto se corrige ese campo, aunque otro diga lo mismo (hub#888).
+de sesiones…», «Ese bono no caduca…» o «Ese bono ya estaba anulado.». El motivo de un campo se quita en cuanto se corrige ese campo, aunque otro diga lo mismo.
 Implicados: SERVICE-F16, SERVICE-F20
 
 ### SERVICE-F19 Ver los movimientos de un bono
@@ -590,7 +618,7 @@ Pasos:
 1. En la fila del bono pulsa **Movimientos**.
 2. Sale cada sesión entregada y cada ajuste, el más reciente primero (ver «Pantallas»); **Cargar
    más** trae los siguientes, cada movimiento una sola vez aunque varios lleven la misma hora.
-3. Una sesión gastada diciendo quién la hizo (SERVICE-F21) la nombra junto a la clienta, «Profesional: Ana
+3. Una sesión gastada diciendo quién la hizo la nombra junto a la clienta, «Profesional: Ana
    López»; si cambia su nombre en Personal, la fila lo dice al momento.
 Entra: las sesiones y los ajustes de ese bono; el nombre de la profesional de cada sesión (Personal).
 Sale: nada; solo lectura.
@@ -619,7 +647,7 @@ Pantalla: Bonos y paquetes, asistente
 Pasos:
 1. En **Bonos y paquetes**, en la fila del bono pulsa **Bonos vendidos** y, en la compra de la clienta, **Gastar una
    sesión**. El botón sale en un bono sin anular ni caducar y al que le queda alguna sesión (o sin límite): en uno
-   caducado o agotado la fila ya lo dice, y **Ajustar** (SERVICE-F18) le devuelve días o sesiones.
+   caducado o agotado la fila ya lo dice, y **Ajustar** le devuelve días o sesiones.
 2. La ventana comprueba al abrirse, y cada vez que cambias de servicio, si se puede gastar: si no, dice por qué
    («No se puede gastar esta sesión» y el motivo) y **Gastar sesión** no se puede pulsar; si sí, enseña el saldo,
    «Quedan 3 sesiones · 2 después de esta».
@@ -843,8 +871,8 @@ Pasos:
 1. Abre el servicio: en «Profesionales que lo hacen» sale la lista o «Nadie asignado todavía: lo
    puede hacer todo el equipo reservable.».
 2. En «Añadir profesional…» elige a alguien de Personal (salen los que aún no lo tienen) y, si
-   quieres, sus «Minutos (opcional)» y su precio propio, «Precio (<moneda>, opcional)» (en la moneda del
-   negocio: «Precio (EUR, opcional)» en España; «Precio (opcional)» mientras el negocio no contesta).
+   quieres, sus «Minutos (opcional)» y su precio propio, en la moneda del negocio: «Precio (EUR, opcional)»
+   en España; «Precio (opcional)» mientras el negocio no contesta.
 3. Pulsa **Asignar**.
 Entra: el servicio y la ficha del profesional (Personal).
 Sale: la asignación, activa y no principal (`service.assignment.assigned`). Citas la lee para filtrar
@@ -854,9 +882,9 @@ su servicio principal solo cambia si se dice.
 Si falla: dentro de la sección, «Ese miembro del personal no existe en este negocio.», un nombre que
 vale para varios (la lista para elegir) o el importe ilegible o negativo. **Asignar** está apagado
 mientras el negocio no haya dicho todavía su moneda: el precio propio se lee en ella, y sin ella «1500»
-yenes se guardaría como 150 000 (salir del precio propio lo deja como se escribió, sin inventarle decimales ni juzgarlo: «¥1500» o «12,50 zł» no salen en rojo como «Esto no es un importe», y en cuanto llega la moneda se leen en ella (hub#945)); si no se puede leer, «Editando servicio» lo dice arriba («No se ha podido
+yenes se guardaría como 150 000 (salir del precio propio lo deja como se escribió, sin inventarle decimales ni juzgarlo: «¥1500» o «12,50 zł» no salen en rojo como «Esto no es un importe», y en cuanto llega la moneda se leen en ella); si no se puede leer, «Editando servicio» lo dice arriba («No se ha podido
 leer la moneda del negocio», con el motivo) y ofrece «Reintentar»; en cuanto llega, **Asignar** se
-enciende (hub#946). Mientras llega la lista sale
+enciende. Mientras llega la lista sale
 «Cargando…»; si no se puede leer, «No se han podido cargar los profesionales.» con el motivo y
 «Reintentar», nunca «Nadie asignado todavía».
 Implicados: STAFF-F01, SALE-F38, BASE-F114 (desde una copia aparte, un servicio recuperado vuelve asignado, por esta
@@ -868,19 +896,19 @@ Estado: hecho
 Actor: responsable, asistente
 Pantalla: Servicios (Editando servicio)
 Pasos:
-1. En «Profesionales que lo hacen», cambia los «Minutos (opcional)» o el «Precio (<moneda>, opcional)» de
-   una persona y pulsa **Guardar**.
+1. En «Profesionales que lo hacen», cambia los «Minutos (opcional)» o el precio propio («Precio (EUR,
+   opcional)» en España) de una persona y pulsa **Guardar**.
 2. Pulsa «Hacerlo su servicio principal»: sale «Servicio principal» (uno por persona, el anterior deja
    de serlo).
 3. Apaga «Lo hace» para que deje de hacerlo sin quitarla, o pulsa «Quitar».
 4. Si en Personal se da de baja a una persona, deja de salir al momento en «Profesionales que lo hacen»
-   y en quién puede hacerlo (SERVICE-F33), y en unos segundos Servicios la quita sola de todos los
+   y en quién puede hacer el servicio en la agenda, y en unos segundos Servicios la quita sola de todos los
    servicios que hacía.
 Entra: la asignación.
 Sale: el cambio (`service.assignment.updated`, `service.assignment.removed`). Dar de baja a una
 persona en Personal la quita de todos los servicios que hacía.
 Si falla: «Esa asignación no existe en este negocio.». **Guardar** espera apagado a la moneda del
-negocio, como **Asignar** (SERVICE-F31): el precio propio se lee en ella (hub#946).
+negocio, como **Asignar**: el precio propio se lee en ella.
 Implicados: SERVICE-F31, SERVICE-F33, STAFF-F06
 
 ### SERVICE-F33 Saber quién puede hacer un servicio
@@ -903,10 +931,10 @@ Estado: hecho
 Actor: responsable, asistente
 Pantalla: Servicios
 Pasos:
-1. En el formulario del servicio (**Nuevo servicio** o «Editando servicio — <nombre>»), en «Foto», pulsa
+1. En el formulario del servicio (**Nuevo servicio** o «Editando servicio — Corte de mujer»), en «Foto», pulsa
    «Elegir de la librería»: se abre la ventana «Librería de imágenes» con el buscador «Buscar imagen…» ya
-   escrito con el nombre del servicio; entre las pestañas de sector (las de INVENTORY-F30), «Peluquería» y
-   «Estética» van primero.
+   escrito con el nombre del servicio; entre las pestañas de sector, las mismas que en Inventario, «Peluquería»
+   y «Estética» van primero.
 2. Busca en español o en inglés («mechas», «balayage», «manicura»): el buscador mira el título y los
    sinónimos de cada imagen, nunca el nombre de su archivo. Toca una: la ventana se cierra y el
    formulario la enseña en «Foto», con «Cambiar» y «Quitar foto».
@@ -952,9 +980,9 @@ archivo y se copia al negocio que lo importa, como las de los artículos (INVENT
 Si falla: junto a «Foto», al elegirla, y no se sube nada: una imagen de más de 2 MB, «La foto pesa más de
 2 MB. Elige una más ligera.»; un archivo que no es una imagen, «Ese archivo no es una foto. Sube una
 imagen JPG, PNG o WebP.». Si el servicio se guardó y la foto no, el formulario lo dice («El servicio se ha
-guardado, pero la foto no: <motivo>») con «Reintentar», que solo vuelve a subir la foto, y el servicio se
+guardado, pero la foto no:» y el motivo) con «Reintentar», que solo vuelve a subir la foto, y el servicio se
 queda con la foto que tenía; el motivo es, sin espacio en el plan, «No queda espacio para ese archivo: tu
-plan incluye <espacio>.» y, si el almacén no contesta, «No se pudo guardar la foto. Inténtalo de nuevo.».
+plan incluye…», con el espacio de tu plan, y, si el almacén no contesta, «No se pudo guardar la foto. Inténtalo de nuevo.».
 Implicados: SERVICE-F01, SERVICE-F02, SERVICE-F04, SERVICE-F05, SERVICE-F09, INVENTORY-F31, INVENTORY-F33, BASE-F35
 
 ### SERVICE-F36 Decir después qué venta cobró un bono
@@ -1385,6 +1413,27 @@ Los papeles llegan del SaaS con prefijo (`hub_owner`, `hub_admin`, `hub_manager`
   fiscal, servicio, profesional) son `Combo` que buscan en el servidor.
 - Las hojas de un bono (Movimientos, Bonos vendidos, Bonos sin cliente) siguen su consulta en vivo y
   crecen de 20 en 20 con **Cargar más**.
+
+### Lo que la ventana de ayuda no enseña
+
+La ayuda del Hub publica el primer apartado, el resumen de cada pestaña (lo que va antes de su primer `####`) y, de
+cada flujo hecho con pantalla, su título, sus pasos y «Si falla», sin nombres de código, incidencias ni ids de flujo
+(`tests/test_help_workbooks.py`). La pestaña de ajustes se llama «Ajustes», como en la barra de pestañas. Lo que esas
+partes dejaron de decir, y quien mantiene Servicios necesita:
+
+- Los mensajes llevan el nombre real del servicio, la categoría, el bono o la clienta, el importe y las cifras
+  («Editando servicio — <nombre>», «{count} citas próximas…», «El bono del cliente {customer} ({amount})…», «Tras
+  el ajuste: quedan {count} sesiones · caduca el {when}», «Precio (<moneda>, opcional)», «tu plan incluye
+  <espacio>»); la ayuda los enseña con un ejemplo (Corte de mujer, Color, Bono 5 cortes, Lucía Pérez) o sin el hueco.
+- Hasta que el negocio dice su moneda, un importe se deja como se escribió y se lee en ella cuando llega (hub#945);
+  si no se puede leer, la ventana ofrece «Reintentar» y el botón se enciende al llegar (hub#938, hub#946). Lo
+  cuentan SERVICE-F01, F12, F31 y F32.
+- El aviso bajo un campo se quita al corregir ese campo, aunque otro diga lo mismo (hub#888: SERVICE-F01, F07, F12 y
+  F18); en los ajustes, lo que se cambia mientras se guarda se queda por guardar (hub#914) y un rechazo sin campo se
+  queda hasta el siguiente intento (hub#821), en SERVICE-F11.
+- Los motivos de SERVICE-F02 son los de SERVICE-F01, y los de SERVICE-F13, los de SERVICE-F12.
+- Gastar una sesión diciendo quién la hizo es SERVICE-F21, y **Ajustar**, SERVICE-F18; quién puede hacer un
+  servicio en la agenda es SERVICE-F33, y las pestañas de sector de la librería son las de INVENTORY-F30.
 
 ## Lo que queda fuera
 

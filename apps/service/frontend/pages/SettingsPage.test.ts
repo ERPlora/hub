@@ -1,4 +1,4 @@
-// Services → Settings (WORKBOOK «Pantallas · Ajustes de Servicios»; SERVICE-F11): only for whoever may
+// Services → Settings (WORKBOOK «Pantallas · Ajustes»; SERVICE-F11): only for whoever may
 // save them. The values come live (the factory ones until the business saves); «Save» sends only the
 // fields the person touched and changed, says «Settings saved.», and a refusal goes under its field.
 import { Combo, InlineFeedback } from '@erplora/ui/components';
