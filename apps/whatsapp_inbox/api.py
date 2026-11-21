@@ -48,14 +48,14 @@ MAX_SAMPLE_BODY = MAX_SAMPLE_BASE64 + 4096
 
 @bind(router, "whatsapp_inbox.conversation.list", "/whatsapp_inbox/conversations")
 async def conversation_list(request, params: Query[ConversationListIn]):
-    return await run_operation(request, queries.list_conversations, params)
+    return await run_operation(request, queries.conversations.list_conversations, params)
 
 
 @bind(
     router, "whatsapp_inbox.conversation.detail", "/whatsapp_inbox/conversations/detail"
 )
 async def conversation_detail(request, params: Query[ConversationRefIn]):
-    return await run_operation(request, queries.conversation_get, params)
+    return await run_operation(request, queries.conversations.conversation_get, params)
 
 
 @bind(
@@ -64,7 +64,7 @@ async def conversation_detail(request, params: Query[ConversationRefIn]):
     "/whatsapp_inbox/conversations/by_phone",
 )
 async def conversation_by_phone(request, params: Query[ByPhoneIn]):
-    return await run_operation(request, queries.conversation_by_phone, params)
+    return await run_operation(request, queries.conversations.conversation_by_phone, params)
 
 
 @bind(
@@ -73,7 +73,7 @@ async def conversation_by_phone(request, params: Query[ByPhoneIn]):
     "/whatsapp_inbox/conversations/summary",
 )
 async def conversation_summary(request):
-    return await run_operation(request, queries.conversation_summary)
+    return await run_operation(request, queries.conversations.conversation_summary)
 
 
 @bind(
@@ -82,7 +82,7 @@ async def conversation_summary(request):
     "/whatsapp_inbox/conversations/count_awaiting_reply",
 )
 async def conversation_count_awaiting_reply(request):
-    return await run_operation(request, queries.count_awaiting_reply)
+    return await run_operation(request, queries.conversations.count_awaiting_reply)
 
 
 @bind(
@@ -91,7 +91,7 @@ async def conversation_count_awaiting_reply(request):
     "/whatsapp_inbox/conversations/notices",
 )
 async def conversation_notices(request, params: Query[NoticesIn]):
-    return await run_operation(request, queries.notices, params)
+    return await run_operation(request, queries.conversations.notices, params)
 
 
 @bind(
@@ -145,12 +145,12 @@ async def conversation_flag(request, data: ConversationRefIn):
 
 @bind(router, "whatsapp_inbox.message.list", "/whatsapp_inbox/messages")
 async def message_list(request, params: Query[MessageListIn]):
-    return await run_operation(request, queries.list_messages, params)
+    return await run_operation(request, queries.messages.list_messages, params)
 
 
 @bind(router, "whatsapp_inbox.message.get", "/whatsapp_inbox/messages/detail")
 async def message_get(request, params: Query[MessageRefIn]):
-    return await run_operation(request, queries.get_message, params)
+    return await run_operation(request, queries.messages.get_message, params)
 
 
 @bind(
@@ -177,7 +177,7 @@ async def message_retry(request, data: MessageRefIn):
 
 @bind(router, "whatsapp_inbox.note.list", "/whatsapp_inbox/notes")
 async def note_list(request, params: Query[NoteListIn]):
-    return await run_operation(request, queries.list_notes, params)
+    return await run_operation(request, queries.notes.list_notes, params)
 
 
 @bind(router, "whatsapp_inbox.note.add", "/whatsapp_inbox/notes", status=201)
@@ -195,12 +195,12 @@ async def note_delete(request, data: NoteRefIn):
 
 @bind(router, "whatsapp_inbox.template.list", "/whatsapp_inbox/templates")
 async def template_list(request, params: Query[TemplateListIn]):
-    return await run_operation(request, queries.list_templates, params)
+    return await run_operation(request, queries.templates.list_templates, params)
 
 
 @bind(router, "whatsapp_inbox.channel.get", "/whatsapp_inbox/channel")
 async def channel_get(request):
-    return await run_operation(request, queries.channel_get)
+    return await run_operation(request, queries.channel.channel_get)
 
 
 @bind(router, "whatsapp_inbox.channel.prepare", "/whatsapp_inbox/channel/prepare")
@@ -220,7 +220,7 @@ async def channel_disconnect(request):
 
 @bind(router, "whatsapp_inbox.agent.list", "/whatsapp_inbox/agents")
 async def agent_list(request, params: Query[AgentListIn]):
-    return await run_operation(request, queries.list_agents, params)
+    return await run_operation(request, queries.agents.list_agents, params)
 
 
 @bind(router, "whatsapp_inbox.template.create", "/whatsapp_inbox/templates", status=201)
@@ -236,7 +236,7 @@ async def template_upload_sample(request, data: TemplateSampleUploadIn):
 
 @bind(router, "whatsapp_inbox.template_sample.detail", "/whatsapp_inbox/templates/samples/detail")
 async def template_sample_detail(request, params: Query[TemplateSampleRefIn]):
-    return await run_operation(request, queries.template_sample_detail, params)
+    return await run_operation(request, queries.template_samples.template_sample_detail, params)
 
 
 @bind(router, "whatsapp_inbox.template.update", "/whatsapp_inbox/templates/update")

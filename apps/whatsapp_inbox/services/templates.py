@@ -12,7 +12,8 @@ from live.outbox import record_event
 
 from apps.whatsapp_inbox import clock, events, samples
 from apps.whatsapp_inbox.models import Template, TemplateSample, hub_writes
-from apps.whatsapp_inbox.queries import TEMPLATE_GONE, channel, live_templates, send_blocked, template_out, templates_of
+from apps.whatsapp_inbox.queries.channel import channel, send_blocked
+from apps.whatsapp_inbox.queries.templates import TEMPLATE_GONE, live_templates, template_out, templates_of
 from apps.whatsapp_inbox.schemas import TemplateCreateIn, TemplateOut, TemplateRefIn, TemplateUpdateIn, TemplateWriteIn
 
 from .sending import _blocked_error
