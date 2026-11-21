@@ -528,9 +528,8 @@ Actor: propietario, administrador, responsable
 Pantalla: Personal (columna Tarifa/h y formulario), Comisiones
 Pasos:
 1. Quien puede ver la compensación ve la tarifa, la comisión y las notas de RRHH de cada ficha.
-2. La **hoja de comisiones** da, por cada persona que puede cobrar comisión (Activa o De baja; no las
-   Inactivas ni las dadas de baja), su ficha, su cuenta (vacía si no tiene), nombre, rol y comisión,
-   también las de comisión 0.
+2. En **Comisiones** sale cada persona que puede cobrar comisión (Activa o De baja; no las Inactivas ni
+   las dadas de baja) con su nombre, su rol y su comisión, también las de comisión 0.
 3. Para saber lo que ha ganado cada profesional, abre la pestaña **Comisiones**. Sale «Hoy»: lo que ha
    vendido cada persona en el día del negocio, con lo devuelto ya restado, sin los bonos que vendió y
    sumado lo que valen las sesiones de bono que hizo, su comisión y lo que le
