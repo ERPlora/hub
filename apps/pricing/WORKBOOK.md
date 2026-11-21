@@ -727,7 +727,7 @@ Ventas **no** requiere Tarifas y Tarifas no toca Ventas. Lo que se pide a Ventas
   servicio o de un producto no borrado, como `live_items`) y `queries.prices_not_in_business` deja los que el negocio no
   tiene ni por id ni por sitio (tarifa, producto o servicio y `min_quantity`, el índice único); la plataforma los crea
   con `pricing.price_item.add` como la recuperación (`copy_recovery:<id>`). Cada precio va al artículo que hace del de
-  la copia: el producto por `inventory.queries.products_standing_for` (su SKU) y el servicio por
+  la copia: el producto por `inventory.queries.recovery.products_standing_for` (su SKU) y el servicio por
   `service.service.standing_for`, la operación de Servicios (no es requisito), preguntada como la plataforma en el
   negocio en curso (`base.operations.current_business_scope`); con Servicios apagada o ausente, el de la copia, que el
   alta rechaza con su motivo (hub#1459). Las reglas no van por la copia: el borrado

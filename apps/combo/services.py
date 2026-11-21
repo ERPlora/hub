@@ -61,7 +61,7 @@ from apps.combo.schemas import (
 )
 from apps.inventory import queries as inventory
 from apps.inventory.models import Product, Unit
-from apps.inventory.queries import find_product, held
+from apps.inventory.queries.reads import find_product, held
 from apps.tax.models import TaxCategory
 from base import images
 
@@ -159,7 +159,7 @@ def _sellable_product(product_id: UUID | None, said: str | None, field: str) -> 
     product = next(iter(held(live[:1])), None)
     if product is None:
         # Deleted between the two reads: Inventory's own refusal, as for one deleted before.
-        raise _field_refusal(NotFound(str(inventory.PRODUCT_NOT_FOUND)), field)
+        raise _field_refusal(NotFound(str(inventory.reads.PRODUCT_NOT_FOUND)), field)
     if not product.is_active:
         message = str(PRODUCT_INACTIVE) % {"product": product.name}
         raise Conflict(message, code="combo.product_inactive", fields={field: message})

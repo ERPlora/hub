@@ -65,7 +65,7 @@ def test_spanish_texts_of_the_workbook():
             "Movimientos",
             "Categorías",
         ]
-        assert str(queries.PRODUCT_NOT_FOUND) == "Este producto no existe en este hub."
+        assert str(queries.reads.PRODUCT_NOT_FOUND) == "Este producto no existe en este hub."
         assert str(services.SKU_TAKEN) == "Ese SKU ya existe en el catálogo"
         assert str(services.EAN13_TAKEN) == "Ese EAN-13 ya lo tiene otro producto del catálogo"
         assert str(services.INSUFFICIENT_STOCK) == "No hay stock suficiente para completar la operación."

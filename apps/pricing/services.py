@@ -26,7 +26,7 @@ from apps.customer.models import CustomerGroup
 from apps.customer.queries import find_group
 from apps.inventory import queries as inventory_queries
 from apps.inventory.models import Product, fits_unit, increment_of
-from apps.inventory.queries import find_category, find_product, held
+from apps.inventory.queries.reads import find_category, find_product, held
 from apps.pricing import events
 from apps.pricing.models import ACTOR_MAX_LENGTH, DiscountRule, PriceItem, PriceList
 from apps.pricing.queries import (
@@ -127,7 +127,7 @@ def _held_product(product_id: UUID | None, said: str | None) -> Product:
     """The live product named by its id, or by its SKU or name (Inventory's lookup), held until this write ends."""
     product = find_product(product_id, said)
     # Inventory's own refusal (its text, in its catalog), as for one deleted before.
-    return _held_one(Product.objects.filter(pk=product.pk, is_deleted=False), inventory_queries.PRODUCT_NOT_FOUND)
+    return _held_one(Product.objects.filter(pk=product.pk, is_deleted=False), inventory_queries.reads.PRODUCT_NOT_FOUND)
 
 
 def _group_id(group_id: UUID | None, said: str | None) -> UUID | None:

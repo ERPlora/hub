@@ -31,8 +31,8 @@ from live.operations import UnknownOperation, get, operation
 
 from apps.customer.models import CustomerGroup
 from apps.customer.queries import find_customer, find_group
+from apps.inventory import queries as inventory_queries
 from apps.inventory.models import UNIT_SPECS, Product, ProductCategory
-from apps.inventory.queries import find_category, find_product, products_standing_for
 from apps.pricing.models import DiscountRule, PriceItem, PriceList
 from apps.pricing.schemas import (
     CatalogRecordOut,
@@ -574,7 +574,7 @@ def get_catalog_record(ctx: OperationContext, data: CatalogRefIn) -> dict:
     if data.service_id is not None:
         record = call_service(ctx, data.service_id, None)
     elif data.category_id is not None:
-        record = find_category(data.category_id, None)
+        record = inventory_queries.reads.find_category(data.category_id, None)
     else:
         record = find_group(data.customer_group_id, None)
     return {"id": record.id, "name": record.name}
@@ -613,7 +613,7 @@ class Article:
 def article_of(ctx: OperationContext, data) -> Article:
     """The product (``product_id``/``product``) or the service (``service_id``/``service``) of ``data``."""
     if data.product_id is not None or data.product is not None:
-        product = find_product(data.product_id, data.product)
+        product = inventory_queries.reads.find_product(data.product_id, data.product)
         categories = ProductCategory.objects.filter(product=product, category__is_deleted=False)
         return Article(
             kind="product",
@@ -866,7 +866,7 @@ def prices_not_in_business(prices: list[dict]) -> list[dict]:
             "price_list_id", "product_id", "service_id", "min_quantity"
         )
     )
-    here = products_standing_for({one["product_id"]: one["sku"] for one in prices if one["product_id"]})
+    here = inventory_queries.recovery.products_standing_for({one["product_id"]: one["sku"] for one in prices if one["product_id"]})
     serving = services_standing_for({one["service_id"] for one in prices if one["service_id"]})
     lacking = []
     for one in prices:

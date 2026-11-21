@@ -1376,17 +1376,17 @@ Lo que sigue es para quien cambia la app; quien la usa puede parar aquí.
 - **Recuperar desde una copia aparte** (BASE-F114): `apps.py` responde a la plataforma (`recoverable_from_copy`,
   `base.recovery.Recoverable`) con tres declaraciones, por este orden, leídas de la copia por SQL sobre los nombres de los
   modelos (la copia no es un negocio y no tiene alias). Primero las categorías vivas de la copia
-  (`queries.categories_in_copy`, con sus productos vivos en `product_ids`): cada una que el negocio no tiene
-  (`queries.categories_not_in_business`) se crea por `inventory.category.recover` (permiso `inventory.system`, sin
+  (`queries.recovery.categories_in_copy`, con sus productos vivos en `product_ids`): cada una que el negocio no tiene
+  (`queries.recovery.categories_not_in_business`) se crea por `inventory.category.recover` (permiso `inventory.system`, sin
   ruta; el alta de la pantalla más, en el mismo paso, el enlace de los productos de la copia que el negocio guarda
   eliminados y se pueden restaurar, para que vuelvan dentro). Una categoría
   de la copia es la del negocio por su id mientras siga viva (aunque se renombrara); si no, una viva con su nombre
   (`_same_name`) que no sea ninguna de la copia, cada una por una sola, la más antigua por la más antigua
-  (`_categories_held`). Después los productos vivos de la copia (`queries.products_in_copy`, con todas las categorías
+  (`_categories_held`). Después los productos vivos de la copia (`queries.recovery.products_in_copy`, con todas las categorías
   vivas de la copia en `copy_categories`, la misma en cada uno): los que el negocio aún guarda eliminados vuelven
-  primero, los mismos, por `inventory.product.restore` (`queries.products_deleted_in_business` y `_restorable`: nunca
+  primero, los mismos, por `inventory.product.restore` (`queries.recovery.products_deleted_in_business` y `_restorable`: nunca
   uno cuyo SKU o EAN-13 tiene ya otro vivo; INVENTORY-F34, avisa `inventory.product.restored`, que está en
-  `events.PRODUCT_EVENTS`); y los que ya no tiene en absoluto (`queries.products_not_in_business`: ni guardado, vivo o
+  `events.PRODUCT_EVENTS`); y los que ya no tiene en absoluto (`queries.recovery.products_not_in_business`: ni guardado, vivo o
   eliminado, ni otro vivo con su SKU o su EAN-13) se crean, cada uno por `inventory.product.create` con la clave de su
   categoría fiscal y sus categorías aquí por la misma regla (`_categories_held`: la misma, o la que acaba de volver o
   el negocio volvió a crear con su nombre), activo o no como estaba (`ProductIn.is_active`), sin stock (el saldo de la
@@ -1399,9 +1399,9 @@ Lo que sigue es para quien cambia la app; quien la usa puede parar aquí.
   al que se eliminó antes de eso, sin ninguna, `inventory.product.restore` le devuelve la de la copia en el mismo paso
   y con la misma regla (`ProductRestoreIn`: el `id` y la `image` del registro leído, que es lo que la plataforma le
   da de la copia, `base.tenancy.recovery._restore_input`). Uno que el negocio tiene vivo no cambia.
-  Al final, los enlaces vivos de la copia (`queries.product_links_in_copy`:
+  Al final, los enlaces vivos de la copia (`queries.recovery.product_links_in_copy`:
   producto y categoría vivos allí, con el id del enlace y `copy_categories`): cada uno que le falta a una categoría que
-  trajo una recuperación (`queries.product_links_not_in_business`: la de la copia ya no está viva aquí y la que ocupa su
+  trajo una recuperación (`queries.recovery.product_links_not_in_business`: la de la copia ya no está viva aquí y la que ocupa su
   sitio por `_categories_held` la creó una recuperación, `created_by` según `base.recovery.brought_back`; el producto
   sigue vivo aquí y fuera de ella) se crea por la operación de la pantalla, `inventory.product_category.add`, que añade
   sin quitar ninguna otra categoría. Va aparte, con su propia cuenta, porque toca lo que el negocio tiene. Una categoría
@@ -1414,13 +1414,13 @@ Lo que sigue es para quien cambia la app; quien la usa puede parar aquí.
   `copy_columns`. Tests: `tests/test_recovery.py`, de punta a punta incluido, `tests/test_copy_columns.py` y el
   contrato de `base/tenancy/tests/test_recovery.py`.
   Las apps cuyos registros de la copia cuelgan de un producto (Tarifas, Suplementos, Menús) no emparejan a su manera:
-  piden a `queries.products_standing_for` (`{id allí: SKU allí}`) el producto del negocio que hace de cada uno que ya
+  piden a `queries.recovery.products_standing_for` (`{id allí: SKU allí}`) el producto del negocio que hace de cada uno que ya
   no está vivo aquí: el vivo con su SKU que hizo una recuperación (`base.recovery.brought_back`), la de esta pasada u
   otra anterior. Uno vivo es él mismo y no sale; uno hecho a mano con su SKU es del negocio y no hace de ninguno.
 
 ## El servidor
 
-- **Anatomía**: `apps.py`, `models.py`, `migrations/`, `schemas.py`, `queries.py`, `services.py`,
+- **Anatomía**: `apps.py`, `models.py`, `migrations/`, `schemas.py`, `queries/`, `services.py`,
   `events.py`, `live.py`, `api.py`, `admin.py`, `locale/` y un `tests/test_<fichero>.py` por fichero.
   Las páginas (`frontend/`): Panel, Productos, Movimientos, Categorías y Ajustes.
 - **31 operaciones** (12 consultas y 19 acciones), todas con `ai` (descripción y, en las acciones,
@@ -1494,7 +1494,7 @@ Lo que sigue es para quien cambia la app; quien la usa puede parar aquí.
   la importación acepta su código y su símbolo alrededor de la cifra («PLN12.50», «12,50 zł»), no los de otra.
 - **Agotado (INVENTORY-F29, 2026-10-21)**: `Product.is_sold_out` con `db_default=False` (la 0003 solo
   añade la columna: un proceso con el código anterior sigue insertando). «A la venta» = activo y no
-  agotado (`queries.ON_SALE`): es lo que da el filtro `is_active` de `inventory.product.list` (`false` da
+  agotado (`queries.products.ON_SALE`): es lo que da el filtro `is_active` de `inventory.product.list` (`false` da
   el resto, inactivos o agotados) y `list_for_sale`; la cifra de cada categoría cuenta los activos,
   agotados incluidos (lo que enseña el TPV); `include_sold_out=true`
   hace que `is_active` sea solo el interruptor (la rejilla, el buscador y el «Todos» del TPV, que enseñan

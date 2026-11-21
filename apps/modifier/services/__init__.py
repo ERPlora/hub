@@ -18,7 +18,7 @@ from live.outbox import record_event
 
 from apps.inventory import queries as inventory_queries
 from apps.inventory.models import Product
-from apps.inventory.queries import find_category, find_product, held
+from apps.inventory.queries.reads import find_category, find_product, held
 from apps.modifier import events
 from apps.modifier.models import (
     ACTOR_MAX_LENGTH,
@@ -651,7 +651,7 @@ def _held_product(product: Product) -> Product:
     live = held(Product.objects.filter(pk=product.pk, is_deleted=False)[:1])
     if not live:
         # Inventory's own text (and its translation), as for a product deleted before.
-        raise NotFound(str(inventory_queries.PRODUCT_NOT_FOUND))
+        raise NotFound(str(inventory_queries.reads.PRODUCT_NOT_FOUND))
     return live[0]
 
 
