@@ -22,7 +22,7 @@ from base.tests.help_workbooks import (
     header_of,
     write_workbooks,
 )
-from base.workbook_help import SOURCE_LANGUAGE, Draft, Flow, Screen, parse, workbook, words
+from base.workbook_help import SOURCE_LANGUAGE, Draft, Flow, Screen, flow_fields, is_done, parse, workbook, words
 
 
 def spanish():
@@ -199,6 +199,34 @@ class TestFlows:
         published = repr(spanish().flows)
         for internal in ("table.zone.created", "el nombre y el color", "responsable", "restaurante", "cobra la mesa 4"):
             assert internal not in published
+
+
+class TestEveryFlow:
+    """What another reader takes from every flow of a customer's part, published or not: the QA's coverage does."""
+
+    def test_each_flow_comes_with_its_title_and_the_lines_of_each_key_in_the_files_order(self):
+        read = list(flow_fields(user_part(ES), ES_WORDS))
+        assert [(flow_id, title) for flow_id, title, _fields in read] == [
+            ("TABLE-F01", "Crear una zona"),
+            ("TABLE-F02", "Cobrar una mesa desde el plano"),
+            ("TABLE-F03", "Cobrar desde la ventana de cobro"),
+            ("TABLE-F04", "Juntar dos zonas"),
+            ("TABLE-F05", "Olvidar a un cliente borrado"),
+        ]
+        fields = dict((flow_id, keys) for flow_id, _title, keys in read)
+        assert fields["TABLE-F04"]["status"] == ["no hecho — falta la pantalla"]
+        assert fields["TABLE-F05"]["screen"] == ["ninguna (se ve en el Plano de sala)"]
+
+    def test_a_translation_is_read_with_its_own_words(self):
+        assert [flow_id for flow_id, _title, _fields in flow_fields(EN, EN_WORDS)][:3] == [
+            "TABLE-F01",
+            "TABLE-F02",
+            "TABLE-F03",
+        ]
+
+    @pytest.mark.parametrize(("status", "done"), [("hecho: también por la API", True), ("parcial — sin ventana", False)])
+    def test_whether_a_status_is_done_is_read_as_the_help_reads_it(self, status, done):
+        assert is_done(status, ES_WORDS) is done
 
 
 @pytest.mark.parametrize(
