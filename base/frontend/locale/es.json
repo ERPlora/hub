@@ -288,6 +288,7 @@
         "language": "Idioma",
         "country": "País",
         "version": "Versión",
+        "versionValue": "Versión {version}",
         "brings": "Trae",
         "readError": "No se pudo leer el fichero: {reason}",
         "tooBig": "el fichero pasa de 20 MB."

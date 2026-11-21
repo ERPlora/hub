@@ -53,6 +53,12 @@ describe('RecipientFields', () => {
     expect(prop(abroad.field('id-type'), 'value')).toBe('02');
   });
 
+  it('can ask the fiscal fields without the customer search on a public page', async () => {
+    const s = await setup(BLANK, { allowSearch: false });
+    expect(s.find('customer-search-stub').exists()).toBe(false);
+    expect(s.find('invoice-recipient-name').exists()).toBe(true);
+  });
+
   it('what is typed travels as a new value; a new country resets the document type', async () => {
     const s = await setup();
     await ionValue(s.field('name'), 'Jean Dupont', 'ionInput');
