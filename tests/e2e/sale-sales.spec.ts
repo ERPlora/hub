@@ -3,11 +3,13 @@
 // filtered by status; the document shows the ticket with its VAT row and total; the owner voids one with
 // its reason and refunds another in full, and the server says so. Screenshots of the list and the
 // document in the three viewports. The list filters behind the table's funnel (total in euros, payment
-// searched on the server), with its count, at every width; a «to» day before its «from» is said under it.
+// searched on the server), with its count, at every width; a «to» day before its «from» is said under it. A sale
+// paid partly in cash and partly by card (SALE-F03) says both methods under «Payment», in English and in Spanish,
+// and filtering by cash finds it.
 // What this file creates is deleted after it (`afterAll`).
 import { expect, type Page, test } from '@playwright/test';
 
-import { A, api, capture, login, shot, shown, untilStill } from './helpers';
+import { A, api, capture, login, saveSessionForTheSweep, shot, shown, signedInSpanish, untilStill } from './helpers';
 import { rowAction } from './service-helpers';
 import { cleanInventory, createProduct, pick } from './inventory-helpers';
 import { snapshotSeries } from './invoice-helpers';
@@ -17,6 +19,7 @@ const SKU = `E2E-SAL-${stamp()}`;
 let cash: SaleOut;
 let card: SaleOut;
 let toVoid: SaleOut;
+let split: SaleOut;
 
 test.afterAll(() => {
   cleanSales();
@@ -48,6 +51,14 @@ const FILTER_VIEWPORTS = [
   { label: '834', width: 834, height: 1112 },
   { label: '1440', width: 1440, height: 900 },
 ];
+/** A desk, a tablet upright and a small phone (cards): where the split sale's methods are checked whole. */
+const ROW_VIEWPORTS = [
+  { label: '1440', width: 1440, height: 900 },
+  { label: '820', width: 820, height: 1180 },
+  { label: '375', width: 375, height: 667 },
+];
+/** Both methods of the split sale, as an English or a Spanish reader reads them. */
+const BOTH_METHODS = /Cash \+ Card|Efectivo \+ Tarjeta/;
 
 test.beforeAll(async ({ browser }) => {
   // Card charges issue tickets (F2) when the hub has an issuer: the cleanup gives their numbers back.
@@ -61,6 +72,13 @@ test.beforeAll(async ({ browser }) => {
   cash = await chargeByApi(context, { lines: [{ product: SKU, quantity: '2' }], payments: [{ method: 'cash', tendered: 5000 }] });
   card = await chargeByApi(context, { lines: [{ product: SKU }], payments: [{ method: 'card' }] });
   toVoid = await chargeByApi(context, { lines: [{ product: SKU }], payments: [{ method: 'card' }] });
+  split = await chargeByApi(context, {
+    lines: [{ product: SKU }],
+    payments: [
+      { method: 'cash', amount: 500, tendered: 500 },
+      { method: 'card', amount: 710 },
+    ],
+  });
   await context.close();
 });
 
@@ -97,6 +115,39 @@ test('SALE-F28 and F29: the history lists the sales, finds one by number and sho
   });
   await document.locator('[data-testid=sale-document-close]').click();
   await expect(receipt).toBeHidden();
+});
+
+test('SALE-F28 and F03: a sale paid in cash and by card says both under «Payment», and filtering by cash finds it', async ({ page, context }) => {
+  await login(page, A, '/sale/sales');
+  for (const vp of ROW_VIEWPORTS) {
+    await page.setViewportSize({ width: vp.width, height: vp.height });
+    await page.goto(`${A}/sale/sales`);
+    await tableReady(page);
+    await expect(row(page, split)).toContainText(BOTH_METHODS);
+    await expect(row(page, cash)).not.toContainText(BOTH_METHODS);
+    await row(page, split).scrollIntoViewIfNeeded();
+    await capture(page, `SALE-F28-split-payment-row-${vp.label}`);
+  }
+
+  const methods = await api<{ rows: { type: string; name: string }[] }>(context, A, 'GET', '/sale/payment_methods');
+  const cashName = methods.data.rows.find((method) => method.type === 'cash')!.name;
+  const { toggle, panel } = funnel(page);
+  await toggle.click();
+  const payment = panel.locator('[data-testid=sales-table-filter-payment_method_name]');
+  await payment.locator('[data-testid=sales-table-filter-payment_method_name-search]').click();
+  await payment.locator(`[data-testid=sales-table-filter-payment_method_name-option][data-value="${cashName}"]`).click();
+  await panel.locator('[data-testid=sales-table-filters-apply]').click();
+  await expect(row(page, card)).toHaveCount(0);
+  await expect(row(page, split)).toContainText(BOTH_METHODS);
+  await expect(row(page, cash)).toBeVisible();
+});
+
+test('SALE-F28: in Spanish the split sale reads «Efectivo + Tarjeta»', async ({ browser }) => {
+  const { context, page } = await signedInSpanish(browser, { width: 1440, height: 900 }, '/sale/sales');
+  await tableReady(page);
+  await expect(row(page, split)).toContainText('Efectivo + Tarjeta');
+  await saveSessionForTheSweep(context);
+  await context.close();
 });
 
 test('SALE-F30: the owner voids a sale with its reason', async ({ page, context }) => {
