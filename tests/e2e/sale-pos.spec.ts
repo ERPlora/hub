@@ -204,15 +204,23 @@ test('SALE-F05 and F13: a check with a customer found in the till and a quick no
   expect(sale.payments.map((p) => p.method_type)).toEqual(['card']);
 });
 
-test('SALE-F22: a marked line is charged on its own with its ticket, and the rest closes the check', async ({ page, context }) => {
-  await page.setViewportSize({ width: 1280, height: 860 });
-  await login(page, A, '/sale/pos');
+/** On the till already open, a check of the juice and the cake (6.50): what SALE-F22 charges a part of. */
+async function juiceAndCake(page: Page): Promise<void> {
   await tillReady(page);
   await addBySearch(page, juice);
   await expect(lineOf(page, juice.name)).toBeVisible();
   await addBySearch(page, cake);
   await expect(lineOf(page, cake.name)).toBeVisible();
-  await lineOf(page, juice.name).locator('[data-testid$=-mark]').click();
+}
+
+/** Taps the line of `product` itself, never its buttons: it is marked, or unmarked, for a part charge. */
+const toggleMark = (page: Page, product: Product) => lineOf(page, product.name).locator('[data-testid$=-mark]').click();
+
+test('SALE-F22: a marked line is charged on its own with its ticket, and the rest closes the check', async ({ page, context }) => {
+  await page.setViewportSize({ width: 1280, height: 860 });
+  await login(page, A, '/sale/pos');
+  await juiceAndCake(page);
+  await toggleMark(page, juice);
 
   await shown(page).locator('[data-testid=pos-charge]').click();
   const sheet = page.locator('[data-testid=sale-checkout-modal]');
@@ -260,15 +268,11 @@ test('SALE-F22: with a line marked, «Charge» says what it will charge and «To
   await login(page, A, '/sale/pos');
   await context.addCookies([{ name: 'django_language', value: 'es', domain: new URL(A).hostname, path: '/' }]);
   await page.goto(`${A}/sale/pos`);
-  await tillReady(page);
-  await addBySearch(page, juice);
-  await expect(lineOf(page, juice.name)).toBeVisible();
-  await addBySearch(page, cake);
-  await expect(lineOf(page, cake.name)).toBeVisible();
+  await juiceAndCake(page);
   const charge = shown(page).locator('[data-testid=pos-charge]');
   await expect(charge).toContainText(/Cobrar · 6,50\s€/);
 
-  await lineOf(page, juice.name).locator('[data-testid$=-mark]').click();
+  await toggleMark(page, juice);
   await expect(charge).toContainText(/Cobrar 1 línea · 2,50\s€/);
   await expect(shown(page).locator('[data-testid=pos-total]')).toContainText(/6,50/);
   for (const size of FLEET_SIZES) {
@@ -283,10 +287,10 @@ test('SALE-F22: with a line marked, «Charge» says what it will charge and «To
     await capturedFitting(page, `sale-pos-marked-charge-${size.width}x${size.height}`, `${size.width}x${size.height}`);
   }
 
-  await lineOf(page, cake.name).locator('[data-testid$=-mark]').click();
+  await toggleMark(page, cake);
   await expect(charge).toContainText(/Cobrar 2 líneas · 6,50\s€/);
-  await lineOf(page, juice.name).locator('[data-testid$=-mark]').click();
-  await lineOf(page, cake.name).locator('[data-testid$=-mark]').click();
+  await toggleMark(page, juice);
+  await toggleMark(page, cake);
   await expect(charge).toContainText(/Cobrar · 6,50\s€/);
 });
 
