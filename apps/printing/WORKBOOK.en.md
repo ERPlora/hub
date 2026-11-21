@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:fc16cadeb68b206ab4f6a8313aca97133dc818326478a488150b23cc28439bec -->
+<!-- generated from WORKBOOK.md sha256:1c2c6d979384040e900f4f0eeaa2b7e63c8d40c8a1c9d36efeeb159cedd3782e -->
 
 ## What it is for and who it is for
 
@@ -163,7 +163,8 @@ Menu **Printing → Queue**. Title "Print queue". The table of jobs, from the mo
 oldest, 50 per page: Document ("Receipt T-000123", or "Receipt · 14/10/26 23:05" if it carries no number),
 Role, Printer, Status ("Pending", "Sent", "Printed", "Failed", "Cancelled"), Attempts, Asked on
 and Detail ("Last error: …", "No answer from the device", "Cancelled by Ana · Reason: …", "Sent again
-by Ana"). Filters by status, role and printer, and a search by document number. Whoever may
+by Ana"); as cards, each value carries its name before it ("Role Receipt", "Attempts 1"). Filters by status,
+role and printer, and a search by document number. Whoever may
 manage the queue sees on each row "Try again" and "Cancel" on a job that is waiting, failed, or sent and
 without an answer once its time is up; "Cancel" opens a window with "Reason (optional)", "Yes, cancel" and
 "Back". Empty: "No print jobs.". Error when loading: the message with "Retry".

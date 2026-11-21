@@ -174,7 +174,8 @@ Menú **Impresión → Cola**. Título «Cola de impresión». La tabla de traba
 antiguo, 50 por página: Documento («Recibo T-000123», o «Recibo · 14/10/26 23:05» si no trae número),
 Función, Impresora, Estado («Pendiente», «Enviado», «Impreso», «Fallido», «Cancelado»), Intentos, Pedido el
 y Detalle («Último error: …», «El dispositivo no contestó», «Cancelado por Ana · Motivo: …», «Reenviado
-por Ana»). Filtros por estado, función e impresora, y buscador por número de documento. Quien puede
+por Ana»); en tarjetas, cada dato lleva su nombre delante («Función Recibo», «Intentos 1»). Filtros por estado,
+función e impresora, y buscador por número de documento. Quien puede
 gestionar la cola ve en cada fila «Reintentar» y «Cancelar» en un trabajo en cola, fallido, o enviado y
 sin respuesta pasado su plazo; «Cancelar» abre una ventana con «Motivo (opcional)», «Sí, cancelar» y
 «Volver». Vacía: «No hay trabajos de impresión.». Error al cargar: el mensaje con «Reintentar».

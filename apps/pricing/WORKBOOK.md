@@ -135,7 +135,8 @@ incluido»), **Vigencia** («Siempre», «Desde 1 jul 2026», «Hasta…» o las
 (cuántos tiene) y **Estado** (Activa o Inactiva). Se ordena por Código, Nombre, Divisa, Grupo e Impuesto
 (por defecto, por nombre) y se filtra, con el embudo de la barra, por Código, Nombre y Divisa (por el
 texto que contienen), Grupo de clientes, Impuesto y Estado (al abrir, **Activas** ya elegido;
-**Inactivas**, o **Todos** para las dos); 50 por página, en lista o en tarjetas.
+**Inactivas**, o **Todos** para las dos); 50 por página, en lista o en tarjetas. En la tarjeta, cada dato lleva su
+nombre delante («Código QA-TERRAZA», «Divisa EUR», «Precios 1»).
 
 - **+** abre **Nueva tarifa**: **Código** y **Nombre** (obligatorios), **Divisa** (la del negocio),
   **Impuesto** (Según el negocio por defecto), **Grupo de clientes** (buscador; vacío = ninguno), **Desde** y
