@@ -24,6 +24,7 @@ const row = (scenario: string, changes: Partial<ScenarioRow> = {}): ScenarioRow 
   wrongWrites: 0,
   mustAsk: [],
   invented: 0,
+  ask: { said: null, firstMove: 'writes', writesBeforeClear: [], right: null },
   ownerMessages: 3,
   endedBy: 'done',
   wallMs: 60_000,
@@ -87,6 +88,28 @@ describe('summarizeScenarios', () => {
     expect(unpriced.totalCostUsd).toBeNull();
     const [none] = summarizeScenarios([report('m3', [row('s01', { done: false, fraction: 0.2 })])]);
     expect(none.costPerDoneUsd).toBeNull();
+  });
+});
+
+describe('summarizeScenarios, asking before acting', () => {
+  const ask = (said: 'half' | 'whole', firstMove: 'asks' | 'writes', right: boolean, writes: string[] = []): ScenarioRow['ask'] => ({ said, firstMove, writesBeforeClear: writes, right });
+  const rows = [
+    row('s11', { ask: ask('half', 'writes', false, ['inventory.stock.write_off']) }),
+    row('s13', { done: false, fraction: 0, ask: ask('half', 'asks', true) }),
+    row('s12', { ask: ask('whole', 'writes', true) }),
+    row('s14', { done: false, fraction: 0, ask: ask('whole', 'asks', false) }),
+    row('s01'),
+    row('s15', { status: 'excluded', why: 'golden path: step 1 failed', done: false, fraction: 0, ask: { said: null, firstMove: null, writesBeforeClear: [], right: null } }),
+  ];
+
+  it('counts apart the jobs said by halves that asked before writing, their writes before the owner made it clear, and the jobs said whole that were done', () => {
+    const [summary] = summarizeScenarios([report('m1', rows)]);
+    expect(summary.ask).toEqual({ half: 2, askedFirst: 1, writesBeforeClear: 1, whole: 2, wholeDone: 1 });
+  });
+
+  it('writes the line of asking first, and leaves it out when no scenario says how the job is said', () => {
+    expect(renderScenarios([report('m1', rows)])).toContain('- Asking first: 1/2 said by halves asked before writing · 1 write before the owner made it clear · 1/2 said whole done');
+    expect(renderScenarios([report('m1', [row('s01')])])).not.toContain('Asking first');
   });
 });
 

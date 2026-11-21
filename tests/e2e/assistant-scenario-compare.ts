@@ -1,8 +1,9 @@
 // The scenarios of several scenario runs (`bench.json` with `scenarios`, assistant-scenario-bench.ts) side by side, per
 // model: the jobs done, the mean share of each job, the facts to ask that were asked, found or invented, the wrong
 // writes, the assistant's money in total and per finished job, the time per job and the owner's messages, the simulated
-// owner's money apart, and the scenarios not asked (a precheck, or a golden path that failed) counted apart; then a table
-// of each scenario per model. assistant-bench-compare.ts prints it after the probes. Pure, so Vitest proves it.
+// owner's money apart, the jobs said by halves that asked before writing and the jobs said whole that were done, and the
+// scenarios not asked (a precheck, or a golden path that failed) counted apart; then a table of each scenario per model.
+// assistant-bench-compare.ts prints it after the probes. Pure, so Vitest proves it.
 import type { BenchReport } from './assistant-bench.ts';
 import type { ScenarioRow } from './assistant-scenario-bench.ts';
 
@@ -24,12 +25,27 @@ export interface ScenarioSummary {
   meanSeconds: number | null;
   meanOwnerMessages: number | null;
   ownerCostUsd: number | null;
+  /** Asking before acting, over the scored jobs said by halves (`half`) and said whole (`whole`). */
+  ask: { half: number; askedFirst: number; writesBeforeClear: number; whole: number; wholeDone: number };
 }
 
 const money = (value: number): number => Math.round(value * 1e6) / 1e6;
 const mean = (values: number[]): number | null => (values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : null);
 const sum = (values: number[]): number => values.reduce((total, value) => total + value, 0);
 const facts = (rows: ScenarioRow[], outcome: string): number => rows.flatMap((row) => row.mustAsk).filter((fact) => fact.outcome === outcome).length;
+
+/** A report kept from before the measure has no `ask`: its rows count in neither group. */
+function askOf(scored: ScenarioRow[]): ScenarioSummary['ask'] {
+  const half = scored.filter((row) => row.ask?.said === 'half');
+  const whole = scored.filter((row) => row.ask?.said === 'whole');
+  return {
+    half: half.length,
+    askedFirst: half.filter((row) => row.ask.right).length,
+    writesBeforeClear: sum(half.map((row) => row.ask.writesBeforeClear.length)),
+    whole: whole.length,
+    wholeDone: whole.filter((row) => row.ask.right).length,
+  };
+}
 
 function grouped(reports: BenchReport[]): Map<string, BenchReport[]> {
   const groups = new Map<string, BenchReport[]>();
@@ -61,6 +77,7 @@ function summaryOf(label: string, group: BenchReport[]): ScenarioSummary {
     meanSeconds: mean(scored.map((row) => (row.wallMs ?? 0) / 1000)),
     meanOwnerMessages: mean(scored.map((row) => row.ownerMessages)),
     ownerCostUsd: owners.some((cost) => cost === null) ? null : money(sum(owners as number[])),
+    ask: askOf(scored),
   };
 }
 
@@ -73,6 +90,12 @@ const usd = (value: number | null): string => (value === null ? 'n/a' : `${value
 const share = (part: number, whole: number): string => `${((100 * part) / Math.max(whole, 1)).toFixed(1)} %`;
 const fixed = (value: number | null, digits: number, unit = ''): string => (value === null ? 'n/a' : `${value.toFixed(digits)}${unit}`);
 
+function askLines({ ask }: ScenarioSummary): string[] {
+  if (!ask.half && !ask.whole) return [];
+  const writes = `${ask.writesBeforeClear} write${ask.writesBeforeClear === 1 ? '' : 's'} before the owner made it clear`;
+  return [`- Asking first: ${ask.askedFirst}/${ask.half} said by halves asked before writing · ${writes} · ${ask.wholeDone}/${ask.whole} said whole done`];
+}
+
 function modelLines(summary: ScenarioSummary): string[] {
   return [
     `## ${summary.label}`,
@@ -81,6 +104,7 @@ function modelLines(summary: ScenarioSummary): string[] {
     `- Jobs done: ${summary.done}/${summary.scored} scored (${share(summary.done, summary.scored)}) · mean share of the job ${fixed(summary.meanFraction === null ? null : 100 * summary.meanFraction, 1, ' %')}`,
     `- Facts to ask: ${summary.asked} asked · ${summary.resolved} found with a read · ${summary.invented} invented`,
     `- Wrong writes: ${summary.wrongWrites}`,
+    ...askLines(summary),
     `- Not asked: ${summary.notRunnable} not runnable (the same for every model) · ${summary.excluded} excluded (setup or golden path failed)`,
     `- Money: ${usd(summary.totalCostUsd)} in total · ${usd(summary.costPerDoneUsd)} per finished job · simulated owner ${usd(summary.ownerCostUsd)} apart`,
     `- Time per job: ${fixed(summary.meanSeconds, 1, ' s')} · owner messages ${fixed(summary.meanOwnerMessages, 1)}`,
