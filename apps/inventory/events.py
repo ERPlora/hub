@@ -1,6 +1,6 @@
 """Events of the inventory app (``inventory.<entity>.<fact>``) and its reactions to the Sales app's events.
 
-services.py records them in the outbox, in the command's transaction; live.py names the ones that
+services/ records them in the outbox, in the command's transaction; live.py names the ones that
 re-run each live query. Each event carries only what the WORKBOOK's «Lo que avisa» lists.
 
 Reactions: a paid sale lowers the stock, a voided one restores it and a refund puts its returned units back, each

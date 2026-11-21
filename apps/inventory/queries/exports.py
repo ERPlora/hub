@@ -44,7 +44,7 @@ CSV_CONTENT_TYPE = "text/csv"
 # Excel reads a CSV as UTF-8 only with it.
 BOM = "\ufeff"
 #: What a spreadsheet runs as a formula at the start of a cell (=HYPERLINK, @SUM…): a text cell that
-#: starts so gets an apostrophe in front, which the import takes back (services.EXPORT_GUARD).
+#: starts so gets an apostrophe in front, which the import takes back (services.imports.EXPORT_GUARD).
 FORMULA_STARTS = ("=", "+", "-", "@", "\t", "\r")
 
 
