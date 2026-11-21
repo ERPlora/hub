@@ -366,8 +366,7 @@ Entra: la impresora.
 Sale: un trabajo «Hoja de prueba» para esa impresora (avisa: `printing.job.queued`).
 Si falla: una impresora inactiva no se prueba: «Esa impresora está inactiva: actívala para probarla.».
 Si el papel no sale, la hoja vuelve a la cola con el error del dispositivo (con la impresora apagada: «La impresora
-no contesta. Comprueba que está encendida y conectada a la red o al Bluetooth de este dispositivo.») y, tras 5
-intentos, queda «Fallido»: en **Impresión → Cola** se reintenta o se cancela.
+no contesta. Comprueba que está encendida y conectada.») y, tras 5 intentos, queda «Fallido»: en **Impresión → Cola** se reintenta o se cancela.
 Implicados: PRINTING-F18
 
 ### PRINTING-F06 Elegir cómo imprime el negocio
@@ -657,8 +656,7 @@ Pasos:
 1. La columna «Estado» de cada impresora dice «Lista», «Esperando», «Con errores» o «Inactiva», con
    su último error. La app de ERPlora dice qué pasó con un código y la pantalla lo cuenta en el idioma de
    quien mira, con qué hacer: la impresora no contesta (apagada, fuera de la red o del alcance del
-   Bluetooth: «La impresora no contesta. Comprueba que está encendida y conectada a la red o al Bluetooth
-   de este dispositivo.»), la app no tiene permiso para usar el Bluetooth, la dirección de la impresora no
+   Bluetooth: «La impresora no contesta. Comprueba que está encendida y conectada.»), la app no tiene permiso para usar el Bluetooth, la dirección de la impresora no
    es válida, o el dispositivo no ha podido preparar el documento (hay que actualizar la app). El detalle
    del sistema queda en el registro del dispositivo. Una app anterior a los códigos lo dice con sus
    palabras, que salen tal cual hasta que se actualiza.

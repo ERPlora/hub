@@ -270,10 +270,10 @@
       "noPermission": "No tienes permiso para cambiar estos ajustes."
     },
     "deviceErrors": {
-      "unreachable": "La impresora no contesta. Comprueba que está encendida y conectada a la red o al Bluetooth de este dispositivo.",
-      "bluetoothPermission": "ERPlora no tiene permiso para usar el Bluetooth en este dispositivo. Permite «Dispositivos cercanos» a ERPlora en los ajustes del dispositivo.",
+      "unreachable": "La impresora no contesta. Comprueba que está encendida y conectada.",
+      "bluetoothPermission": "ERPlora no tiene permiso para usar el Bluetooth. Permite «Dispositivos cercanos» en los ajustes del dispositivo.",
       "invalidAddress": "La dirección de la impresora no es válida. Corrígela editando la impresora.",
-      "updateApp": "Este dispositivo no ha podido preparar el documento. Actualiza en él la aplicación ERPlora."
+      "updateApp": "Este dispositivo no ha podido preparar el documento. Actualiza la app de ERPlora."
     },
     "host": {
       "drawerFailed": "El cajón no se ha abierto: comprueba que «{printer}» está encendida y conectada.",

@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:e49d957c6ccaa2b6da757be1c33c26d710d3604c6dac6c87c4bdda6ed69b0d45 -->
+<!-- generated from WORKBOOK.md sha256:48519d0db04aada45ff576a0853f5ea172226ba38ea6797bc3b14c33a008f02c -->
 
 ## What it is for and who it is for
 
@@ -354,8 +354,7 @@ In: the printer.
 Out: a "Test page" job for that printer (announces: `printing.job.queued`).
 If it fails: an inactive printer is not tested: "That printer is inactive: activate it to test it.".
 If the paper does not come out, the page goes back to the queue with the device's error (with the printer switched
-off: "The printer does not answer. Check that it is on and connected to this device's network or Bluetooth.") and,
-after 5 attempts, ends up "Failed": in **Printing → Queue** it is retried or cancelled.
+off: "The printer does not answer. Check that it is on and connected.") and, after 5 attempts, ends up "Failed": in **Printing → Queue** it is retried or cancelled.
 Involved: PRINTING-F18
 
 ### PRINTING-F06 Choose how the business prints
@@ -645,8 +644,7 @@ Steps:
 1. The "Status" column of each printer says "Ready", "Waiting", "With errors" or "Inactive", with
    its last error. The ERPlora app says what happened with a code and the screen tells it in the
    reader's language, with what to do: the printer does not answer (switched off, off the network or out
-   of Bluetooth range: "The printer does not answer. Check that it is on and connected to this device's
-   network or Bluetooth."), the app may not use Bluetooth, the printer's address is not valid, or the
+   of Bluetooth range: "The printer does not answer. Check that it is on and connected."), the app may not use Bluetooth, the printer's address is not valid, or the
    device could not prepare the document (the app needs updating). The system's detail stays in the
    device's log. An app older than the codes says it in its own words, shown as they are until it is
    updated.
