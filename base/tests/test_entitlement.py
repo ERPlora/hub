@@ -278,7 +278,7 @@ def test_a_paid_app_blocked_when_its_right_ends_comes_back_with_its_data_when_bo
     """BILLING-F34 of the SaaS, step 3: nothing is deleted, and bought again the business has the app as it was. The
     block only reads the photo, so what the business wrote with the app waits; the newer photo that names it again,
     open-ended, opens it on those same rows. The twin, for a right, of ``test_turning_one_off_and_on_again_keeps_its_data``
-    (``test_app_activation.py``)."""
+    (``test_app_activation_refusals.py``)."""
     from apps.task.models import Project
 
     monkeypatch.setattr(django_apps.get_app_config("task"), "premium", True)
