@@ -4,8 +4,8 @@
 // «Open checks — Tap a check to resume it.»; a row per open check of the business but the one on
 // screen, newest first, 20 at a time (title or amount, time and amount), that resumes it; and, for
 // whoever builds checks, its bin: a first tap arms it for 3 seconds and says so on screen, in a line
-// under the check («Tap again to delete — this voids the check»; hub#463), a second voids it. An empty check is whoever builds checks' (a party that left without
-// ordering needs no manager); one with something on it is a manager's, so whoever may not void asks a
+// under the check («Tap again to delete — this voids the check»), a second voids it. An empty check is whoever
+// builds checks' (a party that left without ordering needs no manager); one with something on it is a manager's, so whoever may not void asks a
 // manager, who approves it with their PIN on this very device (BASE-F84). A voided check leaves the list
 // with the next live result.
 import { useCommand, useLiveClient } from '@erplora/ui/sdk';
@@ -128,39 +128,40 @@ const meta = (row: OrderRow) => {
       class="pos-checks__item"
       lines="none"
     >
-      <ion-button
-        fill="clear"
-        class="pos-checks__row"
-        :data-testid="`pos-parked-${row.id}`"
-        @click="emit('resume', row)"
-      >
-        <span class="pos-checks__text">
-          <span class="pos-checks__name">{{ row.label || formatMoney(row.provisional_total, locale, business) }}</span>
-          <span class="pos-checks__meta">{{ meta(row) }}</span>
-        </span>
-      </ion-button>
-      <ion-button
-        v-if="canDelete"
-        slot="end"
-        fill="clear"
-        class="pos-checks__delete"
-        :data-testid="`pos-parked-${row.id}-delete`"
-        :title="armed === row.id ? $t('sale.pos.deleteCheckConfirm') : $t('sale.pos.deleteCheck')"
-        :aria-label="armed === row.id ? $t('sale.pos.deleteCheckConfirm') : $t('sale.pos.deleteCheck')"
-        @click="remove(row)"
-      >
-        <HubIcon
-          slot="icon-only"
-          :name="armed === row.id ? 'ion:alert-circle-outline' : 'ion:trash-outline'"
-        />
-      </ion-button>
-      <p
-        v-if="armed === row.id"
-        class="pos-checks__confirm"
-        :data-testid="`pos-parked-${row.id}-confirm`"
-      >
-        {{ $t('sale.pos.deleteCheckConfirm') }}
-      </p>
+      <div class="pos-checks__entry">
+        <ion-button
+          fill="clear"
+          class="pos-checks__row"
+          :data-testid="`pos-parked-${row.id}`"
+          @click="emit('resume', row)"
+        >
+          <span class="pos-checks__text">
+            <span class="pos-checks__name">{{ row.label || formatMoney(row.provisional_total, locale, business) }}</span>
+            <span class="pos-checks__meta">{{ meta(row) }}</span>
+          </span>
+        </ion-button>
+        <ion-button
+          v-if="canDelete"
+          fill="clear"
+          class="pos-checks__delete"
+          :data-testid="`pos-parked-${row.id}-delete`"
+          :title="armed === row.id ? $t('sale.pos.deleteCheckConfirm') : $t('sale.pos.deleteCheck')"
+          :aria-label="armed === row.id ? $t('sale.pos.deleteCheckConfirm') : $t('sale.pos.deleteCheck')"
+          @click="remove(row)"
+        >
+          <HubIcon
+            slot="icon-only"
+            :name="armed === row.id ? 'ion:alert-circle-outline' : 'ion:trash-outline'"
+          />
+        </ion-button>
+        <p
+          v-if="armed === row.id"
+          class="pos-checks__confirm"
+          :data-testid="`pos-parked-${row.id}-confirm`"
+        >
+          {{ $t('sale.pos.deleteCheckConfirm') }}
+        </p>
+      </div>
     </ion-item>
     <p
       v-if="checks.status.value !== 'loading' && !rows.length"
@@ -223,18 +224,23 @@ const meta = (row: OrderRow) => {
   text-align: center;
 }
 .pos-checks__item {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.3rem;
   margin-bottom: 0.35rem;
   padding: 0.2rem 0.3rem 0.2rem 0.6rem;
   border: 1px solid var(--ion-border-color, #e6e3db);
   border-radius: 10px;
 }
-.pos-checks__row {
+/* ion-item keeps its content on one line in its shadow root, so the armed hint gets its own row here. The check and
+   its bin fill the item's height on the first, so the hint grows the item without moving the bin. */
+.pos-checks__entry {
+  display: grid;
   flex: 1;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-rows: minmax(var(--min-height, 0), auto);
+  align-items: center;
+  column-gap: 0.3rem;
+}
+.pos-checks__row {
+  min-width: 0;
   margin: 0;
   font: inherit;
   text-align: left;
@@ -250,10 +256,12 @@ const meta = (row: OrderRow) => {
   padding: 0.3rem 0;
   text-align: left;
 }
+/* Full width, or ion-button centres it. */
 .pos-checks__text {
   display: flex;
   flex-direction: column;
   gap: 0.1rem;
+  width: 100%;
 }
 .pos-checks__name {
   font-size: 0.9rem;
@@ -267,9 +275,8 @@ const meta = (row: OrderRow) => {
   margin: 0;
   --color: var(--ion-color-danger, #c5000f);
 }
-/* Its own line under the check, so the armed bin stays where the first tap was. */
 .pos-checks__confirm {
-  flex-basis: 100%;
+  grid-column: 1 / -1;
   margin: 0 0 0.3rem;
   font-size: 0.8rem;
   font-weight: 600;

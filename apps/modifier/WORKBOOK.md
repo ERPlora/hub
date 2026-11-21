@@ -294,7 +294,7 @@ Sale: la línea con las opciones elegidas; del TPV solo viajan las opciones, nun
 Si falla: un grupo sin opciones no se pregunta. Un grupo enganchado al producto y a su categoría sale
 una sola vez. Si no se pueden leer los grupos, «No se han podido leer los suplementos de este producto.
 Inténtalo de nuevo.» y no entra nada.
-Implicados: SALE-F11
+Implicados: SALE-F11, SALE-F42
 
 ### MODIFIER-F07 Cobrar el suplemento: precio y IVA
 Estado: hecho
