@@ -3278,7 +3278,9 @@ Pasos:
   2. Al pulsarlo se abre la ventana «Ayuda · <módulo>», con el icono del módulo, centrada en una tableta o un ordenador
      y desde abajo en un móvil. Nunca se abre sola, y se cierra al pasar a otro módulo.
   3. Arriba, el vídeo del módulo, si tiene uno, en el idioma de la persona o, si no lo hay, en español. No se pide
-     nada a YouTube hasta que se pulsa, y se ve dentro de la ventana.
+     nada a YouTube hasta que se pulsa, y se ve dentro de la ventana, a todo su ancho, con el reproductor de YouTube
+     completo: pantalla completa, subtítulos encendidos en el idioma de la ayuda y su logotipo, que abre el vídeo en
+     YouTube en otra pestaña.
   4. Debajo, «Para qué sirve», con un texto corto, de dos o tres frases, de lo que se hace en el módulo, y «En esta
      pantalla · <pestaña>», marcado «Estás aquí», con el resumen de lo que enseña la pestaña en la que se está: corto
      y entero, sin «Ver más».
@@ -4146,7 +4148,8 @@ Implicados: BASE-F10, BASE-F11, BILLING-F16 (erplora.com), BILLING-F17 (erplora.
   `live.E023`), y el JSON `hub-home` de `base/spa.py` nombra esos módulos en `help_apps`. Con ellos, `HelpEntry.vue`
   pinta el «?» en la barra de la página visible y abre `HelpWindow.vue` (con `HelpContent.vue` y `HelpFlowList.vue`, en
   `base/frontend/components/`); `base/frontend/lib/help.ts` guarda lo leído por módulo e idioma hasta que se recarga la
-  página, y `tests/e2e/base-help.spec.ts` la recorre en tres tamaños. El idioma es `ctx.language`:
+  página, y `tests/e2e/base-help.spec.ts` la recorre en tres tamaños (`tests/e2e/base-help-video.spec.ts`, con el
+  vídeo de Inventario en el reproductor de YouTube de verdad). El idioma es `ctx.language`:
   el original, `SOURCE_LANGUAGE` (`es`), se lee de `WORKBOOK.md`, y cualquier otro de `WORKBOOK.<idioma>.md` solo si su
   primera línea es `catalog.en_header` del hash de la parte española; si no, el de su idioma base (`en` para `en-gb`),
   y si tampoco, el español; `language` dice cuál salió. El vídeo, igual. Lo leído se guarda en memoria por módulo e

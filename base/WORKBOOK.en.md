@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:ba4f7e0b9900434472860a1862e3eda9e34b43a06dbf211117744c0a3c3f8cb1 -->
+<!-- generated from WORKBOOK.md sha256:ca337e58c80e814b1fe16fa294412ee7de71b3bc1272ec7521dd528cb32d2b98 -->
 
 ## What it is for and who it is for
 
@@ -3268,7 +3268,9 @@ Steps:
   2. Tapping it opens the "Help · <module>" window, with the module's icon, centred on a tablet or a computer and from
      the bottom on a phone. It never opens by itself, and it closes when the person moves to another module.
   3. At the top, the module's video, if it has one, in the person's language or, if there is none, in Spanish. Nothing
-     is asked of YouTube until it is tapped, and it plays inside the window.
+     is asked of YouTube until it is tapped, and it plays inside the window, across its whole width, in YouTube's full
+     player: fullscreen, captions on in the help's language and its logo, which opens the video on YouTube in another
+     tab.
   4. Below, "What it is for", with a short text, two or three sentences, of what is done in the module, and "On this
      screen · <tab>", marked "You are here", with the summary of what the tab the person is on shows: short and whole,
      with no "See more".

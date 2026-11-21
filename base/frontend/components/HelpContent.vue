@@ -30,6 +30,7 @@ const otherScreens = computed(() => props.help.screens.filter((screen) => screen
         :video-id="help.video"
         :title="t('base.help.videoTitle', { app: help.name })"
         :icon="icon"
+        :language="help.language"
       />
     </section>
     <section
