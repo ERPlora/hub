@@ -882,7 +882,7 @@ el cálculo de la cuenta. Si no se imprime, «No se pudo imprimir la cuenta»; s
 pantalla de impresión, el aviso dice por qué tras dos puntos: «…: esta versión de la app de ERPlora no puede imprimir; actualízala», «…: el
 servicio de impresión del dispositivo no se abrió», «…: el documento está vacío o es demasiado grande para
 imprimirlo» o «…: esta app está vinculada a otro negocio».
-Implicados: PRINTING-F09
+Implicados: PRINTING-F09, TABLE-F34
 
 ### SALE-F22 Cobrar solo una parte de la cuenta
 Estado: hecho

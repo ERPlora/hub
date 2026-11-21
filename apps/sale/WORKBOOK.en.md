@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:ff3feb727a2869e36a4e71dab229af38aa882574359bda43831db760f29bf885 -->
+<!-- generated from WORKBOOK.md sha256:c7df979e041128785d994394926feeb422b9e346f3e3f0c3af5d220e61e47445 -->
 
 ## What it is for and who it is for
 
@@ -877,7 +877,7 @@ when the bill cannot be worked out. If it does not print, "Bill could not be pri
 not open its print screen, the notice says why after a colon: "…: this version of the ERPlora app cannot print; update it", "…: the device's print
 service did not open", "…: the document is empty or too large to print" or "…: this app is linked to
 another business".
-Involved: PRINTING-F09
+Involved: PRINTING-F09, TABLE-F34
 
 ### SALE-F22 Charge only part of the check
 Status: done

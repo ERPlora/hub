@@ -76,6 +76,13 @@ ERPlora no inventa flujos: adopta los que el mercado ya probó.
   [Toast — quitar una mesa del área de servicio](https://support.toasttab.com/article/Creating-Service-Areas-and-Table-Setup-1493049150430)
   y el estado Activa / Inactiva de los planos de [Poster](https://knowledge-base.joinposter.com/en/how-to-edit-a-table-layout-or-hide-the-floor-plan)
   y [MultiPOS](https://docs.devdiggers.com/multipos-point-of-sale-for-woocommerce/configuration/tables/).
+- **La mesa cuya cuenta se ha impreso se marca «Cuenta pedida» hasta que se cobra** (decisión de mercado):
+  al imprimir la cuenta para la mesa, la mesa cambia de color en el plano, como en
+  [Lightspeed K-Series](https://k-series-support.lightspeedhq.com/hc/en-us/articles/360050328494-Understanding-the-Floor-Plan-screen),
+  [SumUp POS Pro](https://help.sumup.com/en-GB/pos/articles/75000023480-table-plan-what-is-the-meaning-of-the-colours-associated-to-any-table-)
+  e [iMPOS](https://knowledge.impos.com.au/hc/en-us/articles/210213528-Table-and-Meal-Status), y vuelve a su
+  color al cobrarla, como en [Lightspeed L-Series](https://resto-support.lightspeedhq.com/hc/en-us/articles/226306187-Understanding-table-status).
+  Ninguno de los consultados dice que la marca se quite al añadir líneas o al volver a imprimir.
 
 ## Antes de empezar
 
@@ -285,6 +292,7 @@ cierra la ventana sin guardarlo. Con la ventana como se abrió, atrás la cierra
 | TABLE-F31 | Olvidar el nombre de un cliente cuyos datos se borran (RGPD) | hecho |
 | TABLE-F32 | Poner o quitar el cliente de una mesa | hecho |
 | TABLE-F33 | Ver cuánto lleva cada mesa | hecho |
+| TABLE-F34 | Ver qué mesas han pedido la cuenta | no hecho |
 
 ### TABLE-F01 Crear y ordenar las zonas del local
 Estado: hecho
@@ -461,7 +469,7 @@ Pasos:
 Entra: las mesas, sus cuentas abiertas, sus retenciones y el estado de sus cuentas en Ventas.
 Sale: nada.
 Si falla: un fallo al cargar sale con «Reintentar».
-Implicados: TABLE-F10, TABLE-F25, TABLE-F29, TABLE-F33, SALE-F19
+Implicados: TABLE-F10, TABLE-F25, TABLE-F29, TABLE-F33, TABLE-F34, SALE-F19
 
 ### TABLE-F10 Sentar a un grupo en una mesa libre o reservada
 Estado: hecho
@@ -881,7 +889,31 @@ Pasos:
 Entra: el importe de cada cuenta abierta de la sala, de Ventas, leído de una vez para todo el plano.
 Sale: nada.
 Si falla: como el resto del plano, un fallo al cargar sale con «Reintentar».
-Implicados: TABLE-F09, TABLE-F15, TABLE-F16, TABLE-F17, SALE-F17, SALE-F19, SALE-F22
+Implicados: TABLE-F09, TABLE-F15, TABLE-F16, TABLE-F17, TABLE-F34, SALE-F17, SALE-F19, SALE-F22
+
+### TABLE-F34 Ver qué mesas han pedido la cuenta
+Estado: no hecho — Ventas todavía no apunta en la cuenta que se imprimió para la mesa y el plano no lo recibe
+Actor: empleado, responsable, asistente
+Pantalla: Plano de sala (Servicio); asistente
+Pasos:
+1. En Ventas, con la cuenta de una mesa en pantalla, el camarero imprime la cuenta para llevarla a la mesa
+   («Imprimir cuenta»), por la impresora de tiques o por el diálogo de impresión del dispositivo, o se la pide
+   al asistente («imprime la cuenta de la mesa 4»).
+2. En **Mesas → Plano de sala**, esa mesa pasa a **Cuenta pedida**: su estado escrito, con su icono, dice
+   «Cuenta pedida» en lugar de «Ocupada», y la mesa se pinta de un color propio que no se confunde con los de
+   los otros estados ni con el ámbar y el rojo del aviso de tiempo. Sigue enseñando el tiempo, los comensales
+   y el importe, y en la tarjeta de la zona cuenta como ocupada. En el teléfono, su tarjeta lo dice igual.
+3. Con varias cuentas en la mesa (dividida), basta con que se haya impreso la de una.
+4. La marca es de la cuenta: si la cuenta pasa a otra mesa, va con ella. Volver a imprimirla, añadir líneas o
+   cobrar solo una parte no la quita; se quita cuando esa cuenta se cierra: se cobra entera o se elimina.
+5. El cambio sale solo en todos los dispositivos que tienen el plano abierto, sin salir y volver.
+6. Por el asistente o la API, cada mesa del plano dice si su cuenta está pedida («¿qué mesas han pedido la
+   cuenta?»).
+Entra: de Ventas, qué cuentas abiertas de la sala tienen la cuenta impresa, leído de una vez para todo el plano.
+Sale: nada en Mesas; Ventas apunta en la cuenta que se imprimió.
+Si falla: si la impresión no llega a Ventas (sin conexión), el papel sale igual por el dispositivo y la mesa no
+se marca hasta que se vuelva a imprimir; un fallo al cargar el plano sale con «Reintentar».
+Implicados: TABLE-F09, TABLE-F15, TABLE-F17, TABLE-F18, TABLE-F20, TABLE-F33, SALE-F21
 
 ## Mesas: lo que entra y lo que sale
 
@@ -1150,7 +1182,9 @@ Ventas (`sale.add_sale`), que tienen los cuatro papeles.
 
 ### Lo que queda fuera
 
-- Los 33 flujos están `hecho`. Lo que no entra a propósito está en «Lo que NO hace, a propósito».
+- TABLE-F34, ver qué mesas han pedido la cuenta, está `no hecho`: Ventas todavía no apunta en la cuenta que
+  se imprimió y el plano no lo recibe. Los otros 33 están `hecho`. Lo que no entra a propósito está en «Lo
+  que NO hace, a propósito».
 - Los dos iconos de [`UI-REQUESTS.md`](UI-REQUESTS.md) (`ion:restaurant-outline` para la app y
   `ion:map-outline` para el Plano de sala) siguen sin registrarse en `@erplora/ui`; mientras, la app usa
   `ion:grid-outline` (también en el paso «Tus mesas» del Inicio) y el plano `ion:apps-outline`.
