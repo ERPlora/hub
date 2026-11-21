@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:624e6640d25a3627741377171c14522e8c75bf36e0481f9a261d4ec4476c8770 -->
+<!-- generated from WORKBOOK.md sha256:54e9f4ec089306facc4c5c0e0a6661c17f4d3ac3921f5d5a5bf32ad523dea3ac -->
 
 ## What it is for and who it is for
 
@@ -134,13 +134,13 @@ or with the phone's back button. Two areas:
   number, and "Close" on a phone; the editable title ("New check") and the chips for the customer,
   "Served by …" and "Customer required". Each line: name, unit price, discount mark or "Comp", note and
   professional underneath; buttons for discount, note, comp and the quantity selector (a line sent to the
-  kitchen only shows its quantity, "Order N" and the ⊗ button "Void this item"; one paid with a voucher,
-  "Already paid · <voucher>", 0.00 € and only the button to remove it). Footer: the "Ticket discount" row
-  if there is one, "Total", the discount button, the printer ("Print bill") and "Charge · <amount>". In
-  the phone's drawer, the top bar and the footer with "Charge" always stay in view, above the tab bar,
-  and what is in between (title, chips, tabs and lines) scrolls. The customer button's name takes two
-  lines at most (a longer one ends in "…"); on a very narrow phone, the button keeps only its icon and
-  the customer chip in the heading already names them.
+  kitchen only shows its quantity, "Order N", the gift and the ⊗ button "Void this item"; one paid with a
+  voucher, "Already paid · <voucher>", 0.00 € and only the button to remove it). Footer: the "Ticket
+  discount" row if there is one, "Total", the discount button, the printer ("Print bill") and "Charge ·
+  <amount>". In the phone's drawer, the top bar and the footer with "Charge" always stay in view, above
+  the tab bar, and what is in between (title, chips, tabs and lines) scrolls. The customer button's name
+  takes two lines at most (a longer one ends in "…"); on a very narrow phone, the button keeps only its
+  icon and the customer chip in the heading already names them.
 
 **Speak** (the strip's microphone key; only for whoever may use the assistant and on a device that can
 record): press it and speak. While it records it turns red, is called "Stop" and "Listening…" shows
@@ -703,13 +703,15 @@ Vertical: common
 Actor: employee, manager
 Screen: Sell
 Steps:
-1. On the line, tap the gift ("Comp / un-comp line").
-2. The line goes to 0 with the "Comp" mark; tapping it again charges it again.
+1. On the line, tap the gift ("Comp / un-comp line"). Also on a line already sent to the kitchen,
+   because what is comped is usually what was already served: the dessert on the house or the dish
+   that came out wrong.
+2. The line goes to 0 with the "Comp" mark; tapping it again charges it again. A sent line stays on the
+   check with its order, and the kitchen gets nothing new.
 In: nothing from other apps.
 Out: the comped line: it adds no money or VAT, but the sale notice carries it so that Inventory lowers
 the stock; the sale keeps the cost of what was comped.
-If it fails: "That change to the line could not be saved. The line is back as it was.". A line already
-sent to the kitchen cannot be comped.
+If it fails: "That change to the line could not be saved. The line is back as it was.".
 Involved: INVENTORY-F21
 
 ### SALE-F16 Attribute the check or a line to whoever serves
@@ -830,7 +832,8 @@ Steps:
    opens: nobody pays for a dish that is not going to be made. The order's notice shows at the top here
    too, so the charge keypad can be tapped from the first moment. If the send fails, the
    charge does not open and it says why.
-4. A sent line is locked: no quantity, no note, no discount, no comp.
+4. A sent line is locked: no quantity, no note, no discount. It can still be comped with its gift: it
+   stays on the check at 0 and the kitchen gets nothing new.
 5. To take off a dish already sent, press ⊗ "Void this item" on its line: "Void «Croquettes»" opens with
    "It was already sent to the kitchen. It comes off the check and the reason is kept. A manager has to
    approve it.", the one-tap reasons ("Ordered by mistake", "Customer changed their mind", "Sold out",
