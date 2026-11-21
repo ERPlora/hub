@@ -76,6 +76,10 @@ describe('ChoiceGroupSection', () => {
     expect(source.replace(/\s+/g, ' ')).toMatch(/\.pos-options__list--rows \{[^}]*grid-template-columns: 1fr;/);
   });
 
+  it('stretches each tile to its row, so a choice that says its allergens stands as tall as one beside it that does not', () => {
+    expect(source.replace(/\s+/g, ' ')).toMatch(/\.pos-options__option \{[^}]*align-self: stretch;/);
+  });
+
   it('keeps the tiles where a choice cannot repeat', async () => {
     const s = await setup('options', { picks: ['latte'], refused: null }, null, { ...COFFEE, allow_repeat: false });
     const list = s.inDoc('pos-options-group-coffee')?.querySelector('.pos-options__list');

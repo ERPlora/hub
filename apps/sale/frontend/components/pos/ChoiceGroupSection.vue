@@ -165,6 +165,7 @@ function supplement(cents: number): string {
 }
 .pos-options__option {
   flex: 1;
+  align-self: stretch;
   min-width: 0;
   min-height: 2.75rem;
   display: flex;
