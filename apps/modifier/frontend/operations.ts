@@ -1,8 +1,10 @@
-// Types of the modifier app's operations for the SDK (`useLive`, `useCommand`, `client.api.call`), from
-// apps/modifier/schemas.py. Written by hand, as the other apps' are: nothing generates them from `/api/openapi.json`.
-// Keep it in step with schemas.py and `frontend/generated/operations.json`. One input per operation (ninja's parity):
+// Types of the modifier app's operations for the SDK (`useLive`, `useCommand`, `client.api.call`), from the
+// apps/modifier/schemas/ package. Written by hand, as the other apps' are: nothing generates them from `/api/openapi.json`.
+// Keep it in step with schemas/ and `frontend/generated/operations.json`. One input per operation (ninja's parity):
 // no path parameters, an id travels in the input. On the wire: supplements in whole cents (negative = a discount),
 // moments ISO 8601.
+import type { AllergenCode } from '@erplora/ui/components';
+
 import type { Page } from '../../../frontend/sdk-types';
 
 export type GroupSort =
@@ -100,6 +102,8 @@ export interface OptionIn {
   tax_category_key?: string;
   is_default?: boolean;
   sort_order?: number;
+  /** The allergens it adds to the dish; none if absent. */
+  allergens?: AllergenCode[];
 }
 
 /** Only what is sent changes; `tax_category_key: ''` gives it back the dish's. */
@@ -110,6 +114,8 @@ export interface OptionPatchIn extends OptionRefIn {
   tax_category_key?: string;
   is_default?: boolean;
   sort_order?: number;
+  /** All of its allergens: they replace the ones it had; `[]` leaves it with none. */
+  allergens?: AllergenCode[];
 }
 
 export interface OptionOut {
@@ -123,6 +129,8 @@ export interface OptionOut {
   tax_category_name: string | null;
   is_default: boolean;
   sort_order: number;
+  /** In the order of the list. */
+  allergens: AllergenCode[];
   created_at: string;
   updated_at: string;
 }
@@ -179,6 +187,7 @@ export interface TargetOptionOut {
   price_delta: number;
   tax_category_key: string | null;
   is_default: boolean;
+  allergens: AllergenCode[];
 }
 
 export interface TargetGroupOut {
@@ -212,6 +221,7 @@ export interface PickOut {
   price_delta: number;
   tax_category_key: string | null;
   own_line: boolean;
+  allergens: AllergenCode[];
 }
 
 /** A child line of the dish line: an option that taxes differently, with its quantity per unit of the dish. */

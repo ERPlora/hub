@@ -27,6 +27,7 @@ const SODA: OptionOut = {
   tax_category_name: 'Product — generic',
   is_default: false,
   sort_order: 1,
+  allergens: [],
   created_at: '2026-10-15T10:00:00Z',
   updated_at: '2026-10-15T10:00:00Z',
 };
@@ -91,7 +92,7 @@ describe('OptionFormModal: New option', () => {
         method: 'POST',
         path: '/api/modifier/options',
         query: {},
-        body: { group_id: 'g1', name: 'No bread', kitchen_name: '', price_delta: -50, tax_category_key: '', is_default: true, sort_order: 0 },
+        body: { group_id: 'g1', name: 'No bread', kitchen_name: '', price_delta: -50, tax_category_key: '', is_default: true, sort_order: 0, allergens: [] },
       },
     ]);
     expect(s.wrapper.emitted('update:open')?.at(-1)).toEqual([false]);
@@ -346,4 +347,105 @@ describe('OptionFormModal: fields refused with the same words (hub#888)', () => 
     s.answer(422, refusal);
     return { field: s.field, send: () => click(s.save()), settle };
   }, 'tax_category_key');
+});
+
+// MODIFIER-F11: under «Chosen by default», the «Allergens» block with the fourteen, saved with the rest of the option.
+describe('OptionFormModal: the allergens the option adds to the dish', () => {
+  type Form = Awaited<ReturnType<typeof setup>>;
+  const block = (s: Form) => s.inDoc('modifier-option-form-allergens')!;
+  const checkboxes = (s: Form) => [...block(s).querySelectorAll<HTMLElement & { checked: boolean }>('ion-checkbox')];
+  const marked = (s: Form) => checkboxes(s).filter((checkbox) => checkbox.checked).map((checkbox) => checkbox.textContent?.trim());
+  const mark = (s: Form, code: string, checked: boolean) =>
+    ionChecked(s.inDoc(`modifier-option-form-allergens-${code}`)?.querySelector('ion-checkbox') ?? null, checked);
+
+  it('comes under «Chosen by default», with its note and the fourteen in the list’s order, none marked on adding', async () => {
+    const s = await setup();
+    expect(s.field('is_default').compareDocumentPosition(block(s)) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(block(s).compareDocumentPosition(s.field('sort_order')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(block(s).querySelector('legend')?.textContent?.trim()).toBe('Allergens');
+    expect(block(s).querySelector('.allergen-select__helper')?.textContent?.trim()).toBe('Mark the ones this option adds to the dish.');
+    expect(checkboxes(s)).toHaveLength(14);
+    expect(checkboxes(s)[0].textContent?.trim()).toBe('Gluten');
+    expect(checkboxes(s)[13].textContent?.trim()).toBe('Molluscs');
+    expect(marked(s)).toEqual([]);
+  });
+
+  it('creates the option with the ones marked, in the list’s order', async () => {
+    const s = await setup();
+    s.answer(201, { ...SODA, allergens: ['gluten', 'milk'] });
+    await ionValue(s.field('name'), 'Cheese', 'ionInput');
+    await mark(s, 'milk', true);
+    await mark(s, 'gluten', true);
+    await click(s.save());
+    expect((s.sent()[0].body as Record<string, unknown>).allergens).toEqual(['gluten', 'milk']);
+  });
+
+  it('opens an edit with the option’s allergens marked and sends only them when they are what changed', async () => {
+    const s = await setup({ ...SODA, allergens: ['milk'] });
+    expect(marked(s)).toEqual(['Milk']);
+    s.answer(200, { ...SODA, allergens: ['egg', 'milk'] });
+    await mark(s, 'egg', true);
+    await click(s.save());
+    expect(s.sent()).toEqual([{ method: 'POST', path: '/api/modifier/options/update', query: {}, body: { id: 'o1', allergens: ['egg', 'milk'] } }]);
+  });
+
+  it('unmarking the last one sends an empty list, which leaves the option with none', async () => {
+    const s = await setup({ ...SODA, allergens: ['mustard'] });
+    s.answer(200, SODA);
+    await mark(s, 'mustard', false);
+    await click(s.save());
+    expect(s.sent()).toEqual([{ method: 'POST', path: '/api/modifier/options/update', query: {}, body: { id: 'o1', allergens: [] } }]);
+  });
+
+  it('the server’s refusal of an allergen shows inside the block, and nothing closes', async () => {
+    const s = await setup();
+    const refused = 'That allergen is not one of the fourteen that must be declared.';
+    s.answer(422, { error: { code: 'invalid_payload', message: 'Check the fields.', fields: { allergens: refused } } });
+    await ionValue(s.field('name'), 'Cheese', 'ionInput');
+    await mark(s, 'milk', true);
+    await click(s.save());
+    expect(block(s).querySelector('.allergen-select__error')?.textContent?.trim()).toBe(refused);
+    expect(s.wrapper.emitted('update:open')?.at(-1)).not.toEqual([false]);
+  });
+
+  it('marking another one after the refusal takes the refusal away', async () => {
+    const s = await setup();
+    s.answer(422, { error: { code: 'invalid_payload', message: 'Check the fields.', fields: { allergens: 'Not one of the fourteen.' } } });
+    await ionValue(s.field('name'), 'Cheese', 'ionInput');
+    await click(s.save());
+    expect(block(s).querySelector('.allergen-select__error')).not.toBeNull();
+    await mark(s, 'egg', true);
+    expect(block(s).querySelector('.allergen-select__error')).toBeNull();
+  });
+
+  it('while it saves, the allergens cannot be changed; once saved the window closes', async () => {
+    const s = await setup();
+    let reply!: (response: Response) => void;
+    s.answerBy({ '/api/modifier/options': () => new Promise<Response>((resolve) => (reply = resolve)) });
+    await ionValue(s.field('name'), 'Cheese', 'ionInput');
+    await mark(s, 'milk', true);
+    void click(s.save());
+    await settle();
+    expect(checkboxes(s).every((checkbox) => (checkbox as HTMLElement & { disabled?: boolean }).disabled === true)).toBe(true);
+    reply(new Response(JSON.stringify({ ...SODA, allergens: ['milk'] }), { status: 201, headers: { 'Content-Type': 'application/json' } }));
+    await settle();
+    expect(s.wrapper.emitted('update:open')?.at(-1)).toEqual([false]);
+  });
+
+  it('an allergen marked and not saved asks before the window closes', async () => {
+    const s = await setup({ ...SODA, allergens: ['milk'] });
+    const { expectUnsavedFormAsksBeforeClosing } = await import('../../../../base/frontend/__tests__/unsaved-form');
+    await expectUnsavedFormAsksBeforeClosing({
+      overlay: () => s.inDoc('modifier-option-form'),
+      change: () => mark(s, 'egg', true),
+      restore: () => mark(s, 'egg', false),
+    });
+  });
+
+  it('speaks Spanish', async () => {
+    const s = await setup(null, 'es');
+    expect(block(s).querySelector('legend')?.textContent?.trim()).toBe('Alérgenos');
+    expect(block(s).querySelector('.allergen-select__helper')?.textContent?.trim()).toBe('Marca los que añade esta opción al plato.');
+    expect(checkboxes(s)[6].textContent?.trim()).toBe('Leche');
+  });
 });
