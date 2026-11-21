@@ -81,9 +81,8 @@ No decide el precio, no emite facturas ni habla con la AEAT, y no guarda el paí
   aplican: hasta que crea las suyas en Reglas (TAX-F04, TAX-F12), el TPV y las facturas no cobran nada de lo
   que vende, y el aviso «Tus impuestos» y el paso del Inicio (TAX-F17) le dicen que su país no trae tipos de
   fábrica.
-- **«Hoy» es la hora de Madrid** en la fase 1: Impuestos todavía no usa la zona horaria del negocio.
-  El día en que cambia un tipo (TAX-F07) empieza a medianoche de Madrid; en Canarias (TAX-F11), una
-  hora antes de su medianoche. Cuando use la del negocio, «hoy» será el suyo.
+- **«Hoy» es el día del negocio**, en su zona horaria (la de «Ajustes»): el día en que cambia un tipo
+  (TAX-F07) empieza a su medianoche, también en Canarias (TAX-F11), y no a la de Madrid.
 
 Configuración inicial, paso a paso:
 
@@ -515,7 +514,7 @@ Pasos:
 2. Se obtiene la base, la cuota, el total, el tipo combinado, la calificación, la regla aplicada y el
    desglose por componente.
 Entra: importe en céntimos, categoría, país (de entrada, el del negocio con su territorio fiscal,
-TAX-F11: el que se eligió al darlo de alta en erplora.com, España sin país), región y fecha (de entrada, hoy; en la fase 1, hoy en Madrid). Si se dice un país, se
+TAX-F11: el que se eligió al darlo de alta en erplora.com, España sin país), región y fecha (de entrada, hoy en la zona horaria del negocio). Si se dice un país, se
 calcula en ese país y en la región que se diga, sin el territorio del negocio.
 Sale: solo la respuesta; no guarda nada ni avisa. Sin el impuesto incluido, la cuota de cada componente
 es base × tipo redondeada al céntimo, la mitad hacia arriba. Con el impuesto incluido, la base es el
@@ -788,12 +787,10 @@ Los papeles llegan del SaaS con prefijo (`hub_owner`, `hub_admin`, `hub_manager`
   negocio, pero de cualquier territorio; un negocio de Canarias, Ceuta o Melilla con solo las reglas de fábrica
   (IVA) no ve el aviso, aunque el TPV no le deja cobrar esas categorías y le dice por qué. Es comportamiento
   nuevo, todavía sin hacer.
-- **«Hoy» en la zona del negocio**: en la fase 1 es el de Madrid (`settings.TIME_ZONE`), también en
-  Canarias, donde un cambio de tipo empieza una hora antes de su medianoche (la zona horaria del negocio en
-  dos fuentes es una contradicción señalada en `PLAN-HUB.md`). No se mueve sola: la vista
-  previa de Ventas y `invoice.invoice.line_defaults` toman de él el tipo, que tiene que ser el del día del registro, y
-  ese tipo llega al `TipoImpositivo` y a la `Huella` de VeriFactu. Cambia con las fechas de la factura, con supervisión
-  (hub#772); hasta entonces lo congela `tests/test_guardrails_fiscal_clock.py`.
+- **«Hoy» en la zona del negocio**: `business_today()` lee el reloj del negocio (`base.business.business_zone`). La
+  vista previa de Ventas y `invoice.invoice.line_defaults` toman de él el tipo, que tiene que ser el del día del
+  registro, y ese tipo llega al `TipoImpositivo` y a la `Huella` de VeriFactu: por eso va en el mismo reloj que la
+  fecha de la factura y el día de una venta, y lo congela `tests/test_guardrails_fiscal_clock.py`.
 - **Tipos de fábrica de IGIC, IPSI, recargo de equivalencia o de otros países**: no se siembran, a propósito
   (un tipo inventado se declararía); los crea el negocio (TAX-F04, TAX-F06, TAX-F11).
 - **`useServerTable`/`useLiveList` y `formatPercent`/`formatDate` en `@erplora/ui`**: siguen en
