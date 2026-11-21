@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:2c17f71f853869c3e19c4dbc0429a65f3b5b84e97f0f5670ff43888ea2cc3ba5 -->
+<!-- generated from WORKBOOK.md sha256:b98a1619ae73a998f2f42944141d5b5b34cbac4a059859e8c3ebd280e446a455 -->
 
 ## What it is for and who it is for
 
@@ -543,8 +543,10 @@ Steps:
 2. The session open at that moment gets a "Void of …" for each payment method of the sale; the cash one
    lowers the expected cash. The line of the sale is not touched.
 3. It always goes to the shift open when voiding, even if the sale is from a shift already closed: the
-   closed one does not move. Voided in the same shift, the sale and its void offset each other and do not
-   count.
+   closed one does not move and, in the open one, the void counts in "Refunds".
+4. Voided in the same shift, the sale and its void offset each other: they count neither in "Sales", nor in
+   the sales of its payment method, nor in "Refunds", nor in "Comps", neither in the detail nor in the
+   printed report. "Movements" shows both.
 In: the voided sale and when it was voided (`sale.sale.voided`).
 Out: the void line. Each void is recorded only once.
 If it fails: with no open session, the void shows in "Sale lines in no shift". Voiding corrects nothing fiscal: the

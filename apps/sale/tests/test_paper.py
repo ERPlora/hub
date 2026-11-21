@@ -151,3 +151,16 @@ def test_a_discount_in_a_currency_written_in_letters_keeps_the_code_off_the_figu
     with translation.override("en"):
         _, document = paper.receipt(sale, letterhead=LETTERHEAD, footer="", duplicate=False)
     assert document["receipt_footer"] == "Discount of PLN\xa00.75, already applied to the amounts above."
+
+
+def test_the_paper_says_when_the_sale_was_charged_and_when_the_bill_was_asked_on_the_businesss_clock(
+    bar, night_elsewhere
+):
+    # The device printed its own hour: the paper brings the hour of what it says, written as the
+    # app prints it. At 23:30 of the 2nd in Bogotá it is already the 3rd in Madrid.
+    sale = charged()
+    _, document = paper.receipt(sale, letterhead=LETTERHEAD, footer="", duplicate=True)
+    assert document["date"] == "02/11/2026 23:30"
+    order = run("sale.order.open", {"lines": [{"product": "COF", "quantity": "1"}], "label": "Table 4"})
+    valued = run("sale.checkout.preview", {"order_id": str(order.id)})
+    assert paper.bill(valued, label="Table 4", letterhead=LETTERHEAD, decimals=2)["date"] == "02/11/2026 23:30"

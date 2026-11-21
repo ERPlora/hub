@@ -1,5 +1,5 @@
 // Quantities of the inventory screens: what a person types into the exact decimal the API takes,
-// with the server's rules (services.parse_quantity): at most three decimals (a gram in a kilo),
+// with the server's rules (services.imports.parse_quantity): at most three decimals (a gram in a kilo),
 // never negative, and with both marks the rightmost one is the decimal one. Whether a quantity fits
 // its unit's step is the server's to say. Arithmetic is exact, in thousandths (BigInt), never floats.
 
