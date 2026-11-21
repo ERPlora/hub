@@ -105,8 +105,8 @@ def tabbar() -> list[tuple[str, str]]:
 
 
 def test_the_menu_has_the_tab_bar_s_screens_with_the_launcher_s_icon_first():
-    # The help window and the assistant name the screen in view by these entries, so they are the tab bar's sections.
-    # The first one keeps the cube: it is the icon of the launcher and of «My apps» (base.home.shell_icon).
+    # The help window names the screen in view by these entries and the assistant links each one, so they are the tab
+    # bar's sections. The first one keeps the cube: it is the icon of the launcher and of «My apps» (base.home.shell_icon).
     entries = inventory().navigation
     assert all(isinstance(entry, Nav) for entry in entries)
     assert [(entry.id, str(entry.label), entry.path, entry.icon) for entry in entries] == [
