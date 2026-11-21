@@ -22,8 +22,8 @@ async function confirm(): Promise<void> {
   if (outcome !== 'left') error.value = { message: t(`base.changeBusiness.${outcome}`) };
 }
 
+/** Cancelled (the dialog closes itself): asked again, it starts without the failure of before. */
 function cancel(): void {
-  changeBusinessOpen.value = false;
   error.value = null;
 }
 </script>

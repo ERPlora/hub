@@ -114,6 +114,23 @@ describe('ChangeBusinessDialog', () => {
     expect(inDoc('change-business-dialog-submit')?.hasAttribute('disabled')).toBe(false);
   });
 
+  it('asked again after a failure and a cancel, starts without the old failure', async () => {
+    await opened();
+    inDoc('change-business-dialog-submit')!.click();
+    await flush();
+    answerSignOut({ type: 'basic', status: 500, ok: false } as Response);
+    await flush();
+    await flush();
+    expect(inDoc('change-business-dialog-error')).not.toBeNull();
+
+    inDoc('change-business-dialog-cancel')!.click();
+    await flush();
+    askChangeBusiness();
+    await flush();
+    expect(inDoc('change-business-dialog-submit')).not.toBeNull();
+    expect(inDoc('change-business-dialog-error')).toBeNull();
+  });
+
   it('when the app refuses to forget the hub, says so in the dialog', async () => {
     invoke.mockRejectedValueOnce('io error');
     await opened('en');
