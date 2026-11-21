@@ -109,6 +109,17 @@ def test_a_received_dish_keeps_the_customers_allergy_and_what_of_it_the_dish_con
     ]
 
 
+def test_an_allergen_only_an_option_brings_counts_as_the_dishs(kitchen):
+    """A salad declares none, but «+Cheese» brings milk: the cook reads that the dish contains it."""
+    setup("modifier.group.create", {"name": "Extras"})
+    cheese = setup("modifier.option.create", {"group": "Extras", "name": "Cheese", "allergens": ["milk"]})
+    setup("modifier.link.attach", {"group": "Extras", "product_id": str(kitchen["salad"].id)})
+    order = open_check("Table 4")
+    line = add_line(order.id, kitchen["salad"], option_ids=[str(cheese.id)]).lines[-1]
+    mark(order.id, line.id, ["milk"])
+    assert frozen(receive(order)) == [("Salad", ["milk"], ["milk"])]
+
+
 def test_what_a_dish_keeps_does_not_change_when_the_catalogue_does(kitchen):
     order = check_with(kitchen, ("burger", ["milk"]))
     (dish,) = receive(order)

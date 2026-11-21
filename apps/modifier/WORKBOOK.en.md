@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:6214da6f9bf53d1025f91ca456b9636c4d0fbc823f081c7a19f0e01a9797cd0c -->
+<!-- generated from WORKBOOK.md sha256:164fe1b9733c2aac9558e3387924c1fd54e6545d6e0dec5912db69ec659a0c38 -->
 
 ## What it is for and who it is for
 
@@ -437,8 +437,8 @@ the form.
 Involved: MODIFIER-F04, MODIFIER-F10, MODIFIER-F12, INVENTORY-F35
 
 ### MODIFIER-F12 Add the options' allergens to the dish's
-Status: not done — the options' valuation gives each one's allergens already, but the line still only carries its
-product's
+Status: not done — the line adds and freezes its options' allergens already, but the till's modifier sheet does not
+show each option's yet
 Actor: employee, manager
 Screen: Sales: Sell
 Steps:

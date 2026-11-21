@@ -1384,18 +1384,20 @@ Pasos:
 3. Si el cliente pregunta, el camarero los lee en la línea; si el plato no le vale, quita la línea como cualquier
    otra antes de enviarla.
 4. Envía a cocina y cobra como siempre: los alérgenos no cambian el precio ni el cobro.
-Entra: de Inventario, los alérgenos de cada producto, con el catálogo del TPV (INVENTORY-F27).
-Sale: la línea con los alérgenos de su producto congelados al pedirla, como sus suplementos: si Inventario los
-cambia después, la línea conserva los que tenía (avisa: cuenta cambiada). Viajan a Cocina con la línea al enviar
-la ronda, donde se cruzan con la alergia del cliente (SALE-F41, KITCHEN-F32). No salen en el tique, en la factura
-ni en la cuenta impresa para la mesa.
+Entra: de Inventario, los alérgenos de cada producto, con el catálogo del TPV (INVENTORY-F27), y de Suplementos, los
+de cada opción elegida (MODIFIER-F07).
+Sale: la línea con los alérgenos de su producto y los de sus suplementos (MODIFIER-F12) congelados al pedirla, como
+sus suplementos: si Inventario o Suplementos los cambian después, la línea conserva los que tenía (avisa: cuenta
+cambiada). Viajan a Cocina con la línea al enviar la ronda, donde se cruzan con la alergia del cliente (SALE-F41,
+KITCHEN-F32). No salen en el tique, en la factura ni en la cuenta impresa para la mesa.
 Si falla: sin Inventario activo no hay alérgenos, y el precio libre y los servicios no los llevan. Un artículo sin
 alérgenos marcados no dice nada, porque el TPV no distingue «no lleva ninguno» de «no se han declarado»: por eso la
-ficha de Inventario dice «Sin alérgenos declarados». Un suplemento no tiene alérgenos propios: «+Queso» no añade
-Leche a la línea; si el cliente tiene una alergia, se marca en la línea como alergia del cliente y Cocina la ve igual.
+ficha de Inventario dice «Sin alérgenos declarados». Un suplemento suma sus alérgenos a los del plato: «+Queso» añade
+Leche a la línea; uno que quita algo («Sin queso») no le quita ninguno, y si el cliente tiene una alergia, se marca en
+la línea como alergia del cliente y Cocina la ve igual.
 Si la hoja de un menú no puede leer los alérgenos de sus platos, lo dice y ofrece «Reintentar»: así un plato sin
 fila no se toma por un plato sin alérgenos.
-Implicados: INVENTORY-F27, INVENTORY-F35, SALE-F11, SALE-F12, SALE-F41, KITCHEN-F32
+Implicados: INVENTORY-F27, INVENTORY-F35, SALE-F11, SALE-F12, SALE-F41, KITCHEN-F32, MODIFIER-F12
 
 ### SALE-F41 Marcar la alergia del cliente en una línea
 Estado: hecho
@@ -1528,7 +1530,7 @@ secciones, las notas rápidas y lo devolvible se pueden seguir en vivo.
 | Venta con su documento | Un documento que no se pudo emitir en el cobro, la anulación o la devolución se emite después (reintento del cobro, «Emitir ahora» o la reacción de Facturación) | La venta, el documento, su número, la devolución (`refund_id`) o si es el de la anulación (`void`); uno por documento | `sale.sale.invoiced` |
 | Cuenta abierta | Abrir o dividir | La cuenta | `sale.order.opened` |
 | Cuenta cambiada | Cualquier cambio de líneas, descuentos o título, y su primera precuenta impresa | La cuenta | `sale.order.changed` |
-| Comanda enviada | Enviar a cocina | La cuenta, su título, el canal, la ronda, quién atiende y las líneas con sus notas, los alérgenos de su producto (en un menú, los de cada plato) y la alergia del cliente | `sale.order.fired` |
+| Comanda enviada | Enviar a cocina | La cuenta, su título, el canal, la ronda, quién atiende y las líneas con sus notas, los alérgenos de su producto y de sus suplementos (en un menú, los de cada plato) y la alergia del cliente | `sale.order.fired` |
 | Cuenta cerrada | Cobrar lo último de una cuenta | La cuenta | `sale.order.completed` |
 | Cuenta anulada | Anular una cuenta abierta | La cuenta | `sale.order.voided` |
 | Cuentas juntadas | Juntar | La absorbida y la que queda | `sale.order.merged` |
@@ -2075,5 +2077,6 @@ título, sus pasos y «Si falla»: ahí no van nombres de código, incidencias, 
   (SALE-F39), las dos `no hecho`; el código va por las issues hijas de hub#562. Mientras, la propina en efectivo se
   anota en Caja como «Entrada» (CASH_REGISTER-F05).
 - **Los alérgenos de un suplemento**: la línea y las hojas del TPV ya enseñan los alérgenos del plato y la alergia
-  del cliente (F40 y F41 hechos), y la tarjeta de Cocina resalta la alergia (KITCHEN-F32). Los alérgenos de un
-  suplemento («+Queso» lleva leche) no entran: hub#1739.
+  del cliente (F40 y F41 hechos), y la tarjeta de Cocina resalta la alergia (KITCHEN-F32). La línea ya suma los de sus
+  suplementos («+Queso» lleva leche) y los congela al pedirla; MODIFIER-F12 pasa a hecho con la hoja de suplementos
+  del TPV, que enseña los de cada opción antes de añadirla: hub#1934.

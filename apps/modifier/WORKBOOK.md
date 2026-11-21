@@ -436,8 +436,8 @@ formulario.
 Implicados: MODIFIER-F04, MODIFIER-F10, MODIFIER-F12, INVENTORY-F35
 
 ### MODIFIER-F12 Sumar los alérgenos de las opciones a los del plato
-Estado: no hecho — la valoración de las opciones ya da los alérgenos de cada una, pero la línea todavía solo lleva
-los de su producto
+Estado: no hecho — la línea ya suma y congela los alérgenos de sus opciones, pero la hoja de suplementos del TPV
+todavía no enseña los de cada opción
 Actor: empleado, responsable
 Pantalla: Ventas: Vender
 Pasos:
