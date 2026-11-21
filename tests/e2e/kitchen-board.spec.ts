@@ -16,6 +16,7 @@ import { cleanInventory, createProduct, type Product } from './inventory-helpers
 import { capture, ionicLabelStylesLast } from './kitchen-helpers';
 import { cleanSales, stamp } from './sale-helpers';
 import { ownerPage } from './service-helpers';
+import { splitWords } from './words';
 
 const RUN = stamp();
 const STATION = `E2E KBD ${RUN} Grill`;
@@ -114,24 +115,6 @@ function labelCut(target: Locator): Promise<boolean> {
     const text = range.getBoundingClientRect();
     const own = el.getBoundingClientRect();
     return text.width === 0 || text.left < own.left - 1 || text.right > own.right + 1;
-  });
-}
-
-function splitWords(target: Locator): Promise<string[]> {
-  return target.evaluate((el) => {
-    const broken: string[] = [];
-    for (const node of el.childNodes) {
-      if (node.nodeType !== Node.TEXT_NODE) continue;
-      const text = node as Text;
-      for (const match of text.data.matchAll(/\S+/g)) {
-        const start = match.index ?? 0;
-        const range = document.createRange();
-        range.setStart(text, start);
-        range.setEnd(text, start + match[0].length);
-        if (range.getClientRects().length > 1) broken.push(match[0]);
-      }
-    }
-    return broken;
   });
 }
 
