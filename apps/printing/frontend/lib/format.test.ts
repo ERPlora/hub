@@ -106,6 +106,13 @@ describe('deviceError', () => {
     expect(deviceError('io_error', t)).toBe(t('printing.deviceErrors.unreachable'));
   });
 
+  it('tells the person what to do for each other failure', () => {
+    expect(deviceError('bluetooth_permission_denied', t)).toBe(t('printing.deviceErrors.bluetoothPermission'));
+    expect(deviceError('invalid_printer_address', t)).toBe(t('printing.deviceErrors.invalidAddress'));
+    expect(deviceError('unknown_document_type', t)).toBe(t('printing.deviceErrors.updateApp'));
+    expect(deviceError('invalid_payload', t)).toBe(t('printing.deviceErrors.updateApp'));
+  });
+
   it('keeps any other text as the device said it', () => {
     const olderApp = 'impresora inalcanzable: Connection refused (os error 111)';
     expect(deviceError(olderApp, t)).toBe(olderApp);
