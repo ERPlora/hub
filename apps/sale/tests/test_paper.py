@@ -156,7 +156,7 @@ def test_a_discount_in_a_currency_written_in_letters_keeps_the_code_off_the_figu
 def test_the_paper_says_when_the_sale_was_charged_and_when_the_bill_was_asked_on_the_businesss_clock(
     bar, night_elsewhere
 ):
-    # The device printed its own hour (ERPlora/app#77): the paper brings the hour of what it says, written as the
+    # The device printed its own hour: the paper brings the hour of what it says, written as the
     # app prints it. At 23:30 of the 2nd in Bogotá it is already the 3rd in Madrid.
     sale = charged()
     _, document = paper.receipt(sale, letterhead=LETTERHEAD, footer="", duplicate=True)

@@ -194,8 +194,8 @@ def test_the_paper_speaks_the_language_of_whoever_prints(shift):
 
 
 def test_the_z_says_when_the_session_closed_and_the_x_when_it_is_printed(shift, monkeypatch, in_business_a):
-    """The device printed its own hour on the report (ERPlora/app#77): the paper brings the hour of what it reports,
-    on the business's clock. At 23:30 of the 2nd in Bogotá it is already the 3rd in Madrid."""
+    """The device printed its own hour on the report: the paper brings the hour of what it reports, on the
+    business's clock. At 23:30 of the 2nd in Bogotá it is already the 3rd in Madrid."""
     monkeypatch.setattr(in_business_a, "timezone", "America/Bogota")
     night = dt.datetime(2026, 11, 3, 4, 30, tzinfo=dt.UTC)
     with monkeypatch.context() as clock:

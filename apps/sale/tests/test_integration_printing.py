@@ -180,7 +180,7 @@ def test_a_reprint_is_a_copy_with_its_own_key_each_time(bar, till):
 
 
 def test_a_reprint_says_when_the_sale_was_charged_not_the_hour_it_prints(bar, till, monkeypatch, in_business_a):
-    """ERPlora/app#77: a coffee charged at 15:41 and reprinted at 16:20 said «16:20», the device's hour, on the paper
+    """A coffee charged at 15:41 and reprinted at 16:20 said «16:20», the device's hour, on the paper
     and not the sale's, the one on its invoice and its QR. The paper brings it, on the business's clock."""
     monkeypatch.setattr(in_business_a, "timezone", "Europe/Madrid")
     out = charge("sale-print-date")

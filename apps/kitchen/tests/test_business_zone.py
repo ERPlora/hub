@@ -23,7 +23,7 @@ def test_the_settings_and_the_day_are_on_the_businesss_clock(monkeypatch, in_bus
 def test_a_sheet_says_when_its_round_was_sent_and_a_void_slip_when_it_was_voided(
     monkeypatch, in_business_a, clock, product, printers
 ):
-    """The device printed its own hour (ERPlora/app#77): a copy printed a minute later said that minute, and in the
+    """The device printed its own hour: a copy printed a minute later said that minute, and in the
     kitchen that hour tells how long the round has been waiting. The sheet brings it, on the business's clock."""
     monkeypatch.setattr(in_business_a, "timezone", CANARY)
     order = open_check("Table 4")
