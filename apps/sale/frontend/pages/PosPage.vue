@@ -760,6 +760,7 @@ onBeforeUnmount(() => {
       <ComboSheet
         v-model:open="menuOpen"
         :combo="composing"
+        :options="modifiersOn"
         :pending="sheetPending"
         :error="sheetError"
         @add="addCombo"

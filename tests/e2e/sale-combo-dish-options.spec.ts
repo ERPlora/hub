@@ -8,10 +8,10 @@
 // kitchen tickets — goes.
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
-import { A, api, capture, horizontalOverflow, login, psql, shown, untilStill } from './helpers';
+import { A, api, capture, horizontalOverflow, login, psql, saveSessionForTheSweep, shown, untilStill } from './helpers';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
 import { chargeByCard } from './sale-charge-helpers';
-import { cleanSales, drawerOff, restoreDrawer, stamp } from './sale-helpers';
+import { cleanSales, drawerOff, openTillCart, restoreDrawer, stamp } from './sale-helpers';
 import { toastSaying } from './toast-helpers';
 
 const RUN = stamp();
@@ -21,9 +21,9 @@ const DONENESS = `e2e DishOpt Doneness ${RUN}`;
 const EXTRAS = `e2e DishOpt Extras ${RUN}`;
 const FOOD = 'restaurant.food';
 const SIZES = [
-  { label: '375', width: 375, height: 667 },
-  { label: '820', width: 820, height: 1180 },
-  { label: '1440', width: 1440, height: 900 },
+  { label: '375x667', width: 375, height: 667 },
+  { label: '820x1180', width: 820, height: 1180 },
+  { label: '1440x900', width: 1440, height: 900 },
 ];
 
 const products: Record<string, Product> = {};
@@ -120,6 +120,7 @@ test.afterAll(() => {
 test('SALE-F42: the steak of a menu asks its doneness, goes to the kitchen with it and is charged with its cheese', async ({ page, context }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await login(page, A, '/sale/pos');
+  await saveSessionForTheSweep(context);
   await shown(page).locator(`[data-testid=pos-menu-${menuId}]`).waitFor({ state: 'visible' });
   const picks = await offer(context);
   await shown(page).locator(`[data-testid=pos-menu-${menuId}]`).click();
@@ -147,6 +148,7 @@ test('SALE-F42: the steak of a menu asks its doneness, goes to the kitchen with 
   await expect(line).toContainText(`${products.STK.name} (Rare, Cheese)`);
   await expect(line).toContainText(/16[.,]50/);
   await shots(page, 'CHECK', async () => {
+    await openTillCart(page);
     await expect(line).toBeVisible();
   });
 

@@ -26,7 +26,7 @@ from live.operations import INTERNAL, operation
 from psycopg import sql
 
 from apps.combo.models import ChoiceGroup, ChoiceOption, Combo
-from apps.combo.queries.dish_options import TAKEAWAY_CATEGORY, Dish, categories, options_amount, priced, takeaway_key, weights
+from .dish_options import TAKEAWAY_CATEGORY, Dish, categories, options_amount, priced, takeaway_key, weights
 from apps.combo.schemas import (
     ComboDetailOut,
     ComboListIn,

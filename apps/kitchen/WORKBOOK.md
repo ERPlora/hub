@@ -371,15 +371,16 @@ Pasos:
 4. Toca un plato para marcarlo listo, o toca la cabecera del menú para marcar listos de una vez sus
    platos que quedan en pantalla; el resto de la comanda no cambia.
 5. En el papel de cada estación sale la cabecera del menú y, sangrados debajo, sus platos.
-Entra: de Ventas, el menú tal como se pidió: sus platos elegidos (cada uno con su producto y su
-categoría), su nombre de cocina, cuántos menús y la nota del menú, que sale en cada uno de sus platos.
+Entra: de Ventas, el menú tal como se pidió: sus platos elegidos (cada uno con su producto, su
+categoría y sus suplementos, que salen debajo del plato como en KITCHEN-F07: SALE-F42), su nombre de cocina,
+cuántos menús y la nota del menú, que sale en cada uno de sus platos.
 Sale: un plato por cada plato del menú, cada uno en su estación, que se marca listo y se entrega por
 separado; el importe del menú cuenta una sola vez en el total de la comanda (avisa: comanda recibida).
 Si falla: un plato del menú que es un servicio no se cocina ni sale; un menú cuyos platos son todos
 servicios no abre comanda. El TPV no deja añadir un menú sin elegir nada ni al que le falta una tanda
 obligatoria, así que nunca llega vacío ni a medias. Anular el menú en el TPV tacha todos sus platos. Lo ya enviado no cambia aunque
 el menú cambie después.
-Implicados: SALE-F12, SALE-F20, COMBO-F11, KITCHEN-F04, KITCHEN-F08, KITCHEN-F29
+Implicados: SALE-F12, SALE-F20, SALE-F42, COMBO-F11, KITCHEN-F04, KITCHEN-F08, KITCHEN-F29
 
 ### KITCHEN-F07 Notas de cada plato
 Estado: hecho
