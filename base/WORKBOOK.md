@@ -1040,10 +1040,11 @@ Pasos:
   1. Abre «Ajustes» en el menú lateral; en «Datos y copias», «Importar» es lo que se abre. Dice «Carga una
      plantilla: llena tus apps con sus datos —una carta, servicios, mesas— listos para usar.» y, debajo,
      «Elige qué cargar».
-  2. Mientras llegan, «Cargando plantillas…». Después, una tarjeta por plantilla (o una fila, con la vista de
-     lista): su nombre, su descripción, su «Idioma» y su «País» por su nombre, su «Versión» y lo que «Trae»
-     (cuántas categorías, productos, servicios, zonas o mesas). Primero las del país del negocio y, dentro,
-     las del idioma de la persona.
+  2. Mientras llegan, «Cargando plantillas…». Después, una tarjeta por plantilla: su nombre de título, su
+     descripción y cada dato en su línea con el icono que dice qué es: el idioma y el país por su nombre, la
+     versión en palabras («Versión 1») y lo que trae (cuántas categorías, productos, servicios, zonas o mesas).
+     Con la vista de lista, una fila por plantilla con esos datos en sus columnas «Idioma», «País», «Versión» y
+     «Trae». Primero las del país del negocio y, dentro, las del idioma de la persona.
   3. «Buscar plantillas» busca por el nombre, la descripción o las apps que trae.
   4. Pulsa «Usar plantilla» en la que le sirva: el botón gira mientras se lee y se abre «Revisa lo que
      trae» (BASE-F31).
