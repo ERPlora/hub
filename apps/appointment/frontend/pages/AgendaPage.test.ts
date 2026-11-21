@@ -221,6 +221,8 @@ describe('AgendaPage', () => {
     await es.live();
     await es.result('appointment.agenda.lanes', { ...LANES, unassigned: 1 });
     expect(es.find('appointment-agenda-unassigned').text()).toContain('1 cita no tiene profesional: asígnala editándola');
+    await es.result('appointment.agenda.lanes', { ...LANES, unassigned: 2 });
+    expect(es.find('appointment-agenda-unassigned').text()).toContain('2 citas no tienen profesional: asígnalas editándolas');
   });
 
   it('the Settings tab is only for who may change them', async () => {

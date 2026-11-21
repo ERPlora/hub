@@ -170,16 +170,26 @@ describe('with the app catalogues, one appointment reads in the singular', () =>
       '2 citas movidas · 2 fechas nuevas reservadas · 2 canceladas porque ya no caen en la repetición · ' +
         '2 sin tocar porque ya están cobradas · 2 no se han podido mover y se quedan a su hora:',
     );
+    expect(describeUpdate(edited(2), {}, translator('en'), 'en').summary).toBe(
+      '2 appointments moved · 2 new dates booked · 2 cancelled because they no longer fit the pattern · ' +
+        '2 left alone because they are already charged · 2 could not be moved and keep their time:',
+    );
   });
 
   it('handing a series to someone else or changing its services', () => {
     const moved = (count: number): RecurringUpdatedOut => ({ ...edited(0), moved: count });
     const [staff, services] = [{ staff_id: 'm2' }, { services: [{ service_id: 's2' }] }];
-    expect(describeUpdate(moved(1), staff, translator('es'), 'es').summary).toBe('1 cita pasa a Bea Ruiz');
-    expect(describeUpdate(moved(1), services, translator('es'), 'es').summary).toBe('1 cita cambia a Colour');
-    expect(describeUpdate(moved(4), { ...staff, ...services }, translator('es'), 'es').summary).toBe('4 citas pasan a Bea Ruiz con Colour');
-    expect(describeUpdate(moved(1), { ...staff, ...services }, translator('en'), 'en').summary).toBe(
-      '1 appointment now with Bea Ruiz for Colour',
-    );
+    type Change = Parameters<typeof describeUpdate>[1];
+    const said = (count: number, change: Change, locale: 'en' | 'es') =>
+      describeUpdate(moved(count), change, translator(locale), locale).summary;
+    const cases: [Change, 'en' | 'es', string, string][] = [
+      [staff, 'es', '1 cita pasa a Bea Ruiz', '4 citas pasan a Bea Ruiz'],
+      [staff, 'en', '1 appointment now with Bea Ruiz', '4 appointments now with Bea Ruiz'],
+      [services, 'es', '1 cita cambia a Colour', '4 citas cambian a Colour'],
+      [services, 'en', '1 appointment now for Colour', '4 appointments now for Colour'],
+      [{ ...staff, ...services }, 'es', '1 cita pasa a Bea Ruiz con Colour', '4 citas pasan a Bea Ruiz con Colour'],
+      [{ ...staff, ...services }, 'en', '1 appointment now with Bea Ruiz for Colour', '4 appointments now with Bea Ruiz for Colour'],
+    ];
+    for (const [change, locale, one, four] of cases) expect([said(1, change, locale), said(4, change, locale)]).toEqual([one, four]);
   });
 });

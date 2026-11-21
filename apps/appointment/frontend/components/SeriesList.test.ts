@@ -71,6 +71,8 @@ describe('SeriesList', () => {
     await es.result(OP, page([series('r1', { max_occurrences: 1 })], 1, 100));
     expect(es.wrapper.find('[data-testid="appointment-series-row"]').text()).toContain('Tras 1 cita');
     expect(es.wrapper.find('[data-testid="appointment-series-row"]').text()).not.toContain('Tras 1 citas');
+    await es.result(OP, page([series('r1', { max_occurrences: 3 })], 1, 100));
+    expect(es.wrapper.find('[data-testid="appointment-series-row"]').text()).toContain('Tras 3 citas');
   });
 
   it('the Active switch pauses and reactivates a series', async () => {
