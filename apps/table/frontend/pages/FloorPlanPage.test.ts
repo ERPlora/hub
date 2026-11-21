@@ -82,7 +82,7 @@ describe('FloorPlanPage · service', () => {
     expect(s.net.streams.map((stream) => stream.aborted())).toEqual([false]);
     expect(s.zoneNames()).toEqual(['Dining room', 'Terrace']);
     expect(s.tiles()).toEqual(['t1', 't4']);
-    expect(s.el('hint').text()).toBe('Tap a table to seat it or open its check · press and hold it for transfer, merge and more.');
+    expect(s.el('hint').text()).toBe('Tap a table to seat it or open its check · press and hold it (or right-click it) for transfer, merge and more.');
   });
 
   it('shows a skeleton of the plan while it loads, then each zone tab counts its occupied tables and the card sums up the zone', async () => {
@@ -374,7 +374,7 @@ describe('FloorPlanPage · edit plan', () => {
     const s = await setup({ locale: 'es' });
     await s.show();
     expect(s.labels('table-floor-mode-')).toEqual(['Servicio', 'Editar plano']);
-    expect(s.el('hint').text()).toBe('Toca una mesa para sentarla o abrir su cuenta · mantenla pulsada para transferir, fusionar y más.');
+    expect(s.el('hint').text()).toBe('Toca una mesa para sentarla o abrir su cuenta · mantenla pulsada (o haz clic derecho) para transferir, fusionar y más.');
     await s.mode('edit');
     expect(s.el('hint').text()).toBe('Arrastra para colocar · clic en una mesa para editarla o borrarla. Los cambios se guardan al momento.');
   });

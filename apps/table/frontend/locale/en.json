@@ -71,7 +71,7 @@
       "add": "Add zone or table",
       "editZone": "Edit zone",
       "hint": "Drag to position · click a table to edit or delete it. Changes are saved instantly.",
-      "serviceHint": "Tap a table to seat it or open its check · press and hold it for transfer, merge and more.",
+      "serviceHint": "Tap a table to seat it or open its check · press and hold it (or right-click it) for transfer, merge and more.",
       "emptyZones": "Create a zone to start placing tables.",
       "emptyTables": "No tables in this zone. Tap “Add table”.",
       "emptyService": "No tables in service in this zone.",

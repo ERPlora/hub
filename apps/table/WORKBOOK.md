@@ -166,7 +166,7 @@ sienta, cobra, mueve o edita una mesa. Tiene dos modos:
   lista para añadir platos o cobrarla; con dos cuentas en la mesa, se elige primero cuál («Cuenta 1»,
   «Cuenta 2»). Tocar una mesa libre, reservada o bloqueada, o mantener pulsada cualquier mesa (en el
   ordenador, clic derecho), abre su ventana **Mesa N**. Debajo, la ayuda «Toca una mesa para sentarla o
-  abrir su cuenta · mantenla pulsada para transferir, fusionar y más.».
+  abrir su cuenta · mantenla pulsada (o haz clic derecho) para transferir, fusionar y más.».
   - libre o reservada: la pregunta de comensales («Comensales en la mesa N · 4 pax», «−» y «+», atajos
     del 1 al 8 que sientan de un toque, el aviso «Supera el aforo de la mesa (4)» y «Sentar N»), y el
     cliente opcional («Asignar cliente»). Con el ajuste de comensales apagado, «Sentar» sienta con el

@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:c4895e779799dd867d4f0d94d4bb67aedd1ddead29190aec8553beeab22c3558 -->
+<!-- generated from WORKBOOK.md sha256:9b7054f619701ec8380fab82a09f53d4524502d8b979e83339d6a00c340af0b5 -->
 
 ## What it is for and who it is for
 
@@ -159,7 +159,7 @@ charges, moves or edits a table. It has two modes:
   Sell**, ready to add dishes or charge it; with two checks at the table, which one is chosen first
   ("Check 1", "Check 2"). Tapping a free, reserved or blocked table, or pressing and holding any table (on
   a computer, right click), opens its **Table N** window. Below, the hint "Tap a table to seat it or open
-  its check · press and hold it for transfer, merge and more.".
+  its check · press and hold it (or right-click it) for transfer, merge and more.".
   - free or reserved: the guests question ("Guests at table N · 4 pax", "−" and "+", shortcuts from 1
     to 8 that seat in one tap, the warning "Above the table capacity (4)" and "Seat N"), and the
     optional customer ("Assign customer"). With the guests setting off, "Seat" seats with the capacity
