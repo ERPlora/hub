@@ -52,6 +52,13 @@ describe('HelpContent', () => {
     expect(video.props('duration')).toBeUndefined();
   });
 
+  it('plays the video in the language the help came in, so its captions and controls match the text', async () => {
+    const spanish = await setup({ ...help, video: 'dQw4w9WgXcQ' });
+    expect(spanish.wrapper.getComponent(YouTubeEmbed).props('language')).toBe('es');
+    const english = await setup({ ...help, language: 'en', video: 'dQw4w9WgXcQ' });
+    expect(english.wrapper.getComponent(YouTubeEmbed).props('language')).toBe('en');
+  });
+
   it('keeps other screens collapsed until their button is pressed', async () => {
     const m = await setup();
     const button = m.wrapper.get('[data-testid="help-other-screen-settings"]');

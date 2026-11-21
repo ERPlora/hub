@@ -12,7 +12,9 @@ from apps.customer.models import Customer
 from apps.customer.queries import find_customer
 from apps.whatsapp_inbox import events
 from apps.whatsapp_inbox.models import Conversation
-from apps.whatsapp_inbox.queries import actor_id, conversation_out, find_conversation, person_name, team
+from apps.whatsapp_inbox.queries.agents import team
+from apps.whatsapp_inbox.queries.conversations import conversation_out, find_conversation
+from apps.whatsapp_inbox.queries.reads import actor_id, person_name
 from apps.whatsapp_inbox.schemas import (
     AssignIn,
     ConversationOut,

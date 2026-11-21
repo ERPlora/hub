@@ -93,6 +93,13 @@ describe('parseScenario', () => {
     expect(() => parsed({ offered: ['create'] })).toThrow(/offered/);
   });
 
+  it('reads whether the owner says the job by halves or whole, and leaves it unsaid when the scenario does not say', () => {
+    expect(parsed({ said: 'half' }).said).toBe('half');
+    expect(parsed({ said: 'whole' }).said).toBe('whole');
+    expect(parsed({}).said).toBeUndefined();
+    expect(() => parsed({ said: 'unclear' })).toThrow(/qa\/scenarios\/x.json: said is one of half, whole/);
+  });
+
   it('reads a card check: which card it is and the values it must show', () => {
     const scenario = parsed({ cards: [{ tool: 'inventory.product.create', match: { name: 'tarta' }, expect: { price: 550 } }] });
     expect(scenario.cards).toEqual([{ tool: 'inventory.product.create', match: { name: 'tarta' }, expect: { price: 550 } }]);
@@ -110,7 +117,9 @@ describe('loadedScenarios', () => {
     const folder = join(dirname(fileURLToPath(import.meta.url)), 'qa', 'scenarios');
     const files = readdirSync(folder).filter((name) => name.endsWith('.json'));
     const scenarios = loadedScenarios(files.map((name) => ({ source: name, text: readFileSync(join(folder, name), 'utf8') })));
-    expect(scenarios.length).toBe(10);
+    expect(scenarios.length).toBe(14);
+    expect(scenarios.filter((scenario) => scenario.said === 'half').map((scenario) => scenario.vertical).sort()).toEqual(['hair_salon', 'restaurant']);
+    expect(scenarios.filter((scenario) => scenario.said === 'whole').map((scenario) => scenario.vertical).sort()).toEqual(['hair_salon', 'restaurant']);
     expect(new Set(scenarios.map((scenario) => scenario.vertical))).toEqual(new Set(['restaurant', 'hair_salon']));
     expect(scenarios.some((scenario) => scenario.language === 'en')).toBe(true);
   });

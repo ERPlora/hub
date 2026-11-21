@@ -8,14 +8,9 @@ from live.outbox import record_event
 
 from apps.whatsapp_inbox import clock, events
 from apps.whatsapp_inbox.models import Note
-from apps.whatsapp_inbox.queries import (
-    NOTE_NOT_FOUND,
-    actor_id,
-    find_conversation,
-    may_delete_note,
-    note_out,
-    person_name,
-)
+from apps.whatsapp_inbox.queries.conversations import find_conversation
+from apps.whatsapp_inbox.queries.notes import NOTE_NOT_FOUND, may_delete_note, note_out
+from apps.whatsapp_inbox.queries.reads import actor_id, person_name
 from apps.whatsapp_inbox.schemas import NoteAddIn, NoteDeletedOut, NoteOut, NoteRefIn
 from base.services.sessions import acting_hub_user
 

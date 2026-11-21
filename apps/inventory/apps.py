@@ -103,7 +103,7 @@ class InventoryConfig(LiveAppConfig):
         Nav("movements", _("Movements"), "ion:swap-vertical-outline", "/inventory/movements"),
         Nav("categories", _("Categories"), "ion:list-outline", "/inventory/categories"),
     ]
-    help = Help()
+    help = Help(videos={"es": "dIppfjMEKWo", "en": "Pet7Q2ayo_Y"})
     # The Home's hooks, on the Panel's own queries. Registered icons only: `trending-down-outline` waits in
     # UI-REQUESTS.md.
     setup = [

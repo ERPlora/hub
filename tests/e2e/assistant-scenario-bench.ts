@@ -6,6 +6,7 @@
 import { type BenchCall, type BenchMeta, type BenchReport, keptReport, type Usage } from './assistant-bench.ts';
 import type { Exchange } from './assistant-owner.ts';
 import type { Scenario } from './assistant-scenario.ts';
+import type { AskScore } from './assistant-scenario-ask.ts';
 import type { AskOutcome, CheckResult, ScenarioScore, ScenarioTurn, SeenCard } from './assistant-scenario-score.ts';
 
 /** `scored`: asked and scored; `not_runnable`: a precheck kept it out (the same for every model); `excluded`: its
@@ -30,6 +31,8 @@ export interface ScenarioRow {
   wrongWrites: number;
   mustAsk: { id: string; outcome: AskOutcome }[];
   invented: number;
+  /** Whether it asked before acting: its first move, the writes before the owner made the job clear, and the score. */
+  ask: AskScore;
   ownerMessages: number;
   endedBy: EndedBy | null;
   wallMs: number | null;
@@ -56,7 +59,17 @@ export interface ScenarioMeasured {
   owner?: { tokensIn: number; tokensOut: number; costUsd: number | null };
 }
 
-const NOT_SCORED: ScenarioScore = { done: false, fraction: 0, forbidden: [], unwanted: [], wrongCards: [], wrongWrites: 0, mustAsk: [], invented: 0 };
+const NOT_SCORED: ScenarioScore = {
+  done: false,
+  fraction: 0,
+  forbidden: [],
+  unwanted: [],
+  wrongCards: [],
+  wrongWrites: 0,
+  mustAsk: [],
+  invented: 0,
+  ask: { said: null, firstMove: null, writesBeforeClear: [], right: null },
+};
 
 function transcriptOf(turns: ScenarioTurn[]): Exchange[] {
   return turns.flatMap((turn): Exchange[] => [
