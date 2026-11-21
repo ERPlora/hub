@@ -3287,7 +3287,7 @@ Steps:
   2. Each item says its day, whether it is something new, an improvement or a fix ("New", "Improved" or "Fixed"), a
      short title and one or two sentences on what can be done now, just as they were written. They are notes written
      for the business, never the list of changes to the code.
-  3. The 20 most recent come, with no pages.
+  3. The 20 most recent are shown, with no pages.
   4. With none, it says "Nothing new yet.".
   5. Through the assistant, "what's new in ERPlora?" or "what changed in the latest update?" reads them the same way,
      in the person's language.
