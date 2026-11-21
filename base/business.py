@@ -56,6 +56,17 @@ def business_zone() -> dt.tzinfo:
     return zone_of(hub.timezone if hub else "")
 
 
+def paper_date(moment: dt.datetime) -> str:
+    """``moment`` on the business's clock as the device's app prints the date of a receipt, a bill or a cash report,
+    as it comes: «21/11/2026 15:41»."""
+    return f"{timezone.localtime(moment, business_zone()):%d/%m/%Y %H:%M}"
+
+
+def paper_time(moment: dt.datetime) -> str:
+    """``moment`` on the business's clock as the device's app prints the time of a kitchen order: «15:41»."""
+    return f"{timezone.localtime(moment, business_zone()):%H:%M}"
+
+
 def zone_name(zone: dt.tzinfo | None = None) -> str:
     """The IANA name of ``zone``, by default the business's: what a screen shows and what the browser reads."""
     zone = zone or business_zone()
