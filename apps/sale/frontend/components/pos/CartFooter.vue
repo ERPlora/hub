@@ -2,7 +2,8 @@
 // The foot of the check: the «Ticket discount» row when the check has one (its percentage and what it
 // takes off, as the server's preview says), «Total» — the preview's, a dash while it is on its way —,
 // the ticket-discount button (only where discounts are allowed), the printer («Print bill») and
-// «Charge · <total>»; while the business has not said its money, every amount is a dash, as while the total is on its
+// «Charge · <total>» — with lines marked, «Charge N lines · <what they come to>» (SALE-F22), while «Total» stays the
+// whole check; while the business has not said its money, every amount is a dash, as while an amount is on its
 // way (hub#936). A valuation refusal is said in the server's words, never left as an unexplained dash.
 // An empty check can do none of it. When something is missing (a required customer), Charge looks
 // blocked and says why, but still takes the tap: the page answers it.
@@ -18,6 +19,10 @@ const props = defineProps<{
   hasLines: boolean;
   /** The preview's total; `undefined` while it is on its way. */
   total: number | undefined;
+  /** How many lines are marked to charge apart; 0 charges the whole check. */
+  markedLines?: number;
+  /** What the marked lines come to (their own preview's total); `undefined` while it is on its way. */
+  markedTotal?: number;
   /** Why the server could not value the check; `null` when its preview is valid or pending. */
   previewError?: string | null;
   /** The check's ticket discount: percentage and fixed amount. */
@@ -36,7 +41,14 @@ const locale = useLocale();
 const business = useBusinessMoney();
 
 const hasDiscount = computed(() => Number(props.discountPercent) > 0 || props.discountAmount > 0);
-const totalText = computed(() => (props.total === undefined ? '—' : formatMoney(props.total, locale.value, business.value)));
+const money = (cents: number | undefined) => formatMoney(cents, locale.value, business.value);
+const totalText = computed(() => money(props.total));
+const chargeLabel = computed(() => {
+  const n = props.markedLines ?? 0;
+  if (!n) return t('sale.pos.chargeAmount', { amount: totalText.value });
+  const amount = money(props.markedTotal);
+  return n === 1 ? t('sale.pos.chargeLinesOne', { amount }) : t('sale.pos.chargeLines', { n, amount });
+});
 const discountLabel = computed(() => {
   const percent = Number(props.discountPercent) > 0 ? ` −${formatPercent(props.discountPercent, locale.value)}` : '';
   return `${t('sale.pos.discountTicket')}${percent}`;
@@ -108,7 +120,7 @@ const discountLabel = computed(() => {
           slot="start"
           name="ion:card-outline"
         />
-        {{ $t('sale.pos.chargeAmount', { amount: totalText }) }}
+        {{ chargeLabel }}
       </ion-button>
     </div>
   </div>

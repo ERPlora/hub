@@ -17,7 +17,7 @@ import QueueSummary from '../components/QueueSummary.vue';
 import { useNow } from '../composables/useNow';
 import { useT } from '../composables/useT';
 import type { PrinterDraft } from '../lib/discovery';
-import { printerAddress, printerPaper, printerState, STATE_TONE } from '../lib/format';
+import { deviceError, printerAddress, printerPaper, printerState, STATE_TONE } from '../lib/format';
 import { refusal } from '../lib/refusal';
 import type { PrinterOut } from '../operations';
 import { printingTabs } from '../tabs';
@@ -223,7 +223,7 @@ function onAction({ actionId, row }: { actionId: string; row: PrinterOut }): voi
                 :label="t(`printing.state.${printerState(row as PrinterOut, now)}`)"
               />
               <small v-if="row.last_error && printerState(row as PrinterOut, now) === 'failing'">{{
-                t('printing.printers.lastError', { error: row.last_error })
+                t('printing.printers.lastError', { error: deviceError(row.last_error, t) })
               }}</small>
             </span>
           </template>
