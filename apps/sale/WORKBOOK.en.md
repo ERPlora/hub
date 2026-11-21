@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:a5a0244cafc610dfd3e5308cbbd3aade601b10bdd146658456078e25ac9d65ee -->
+<!-- generated from WORKBOOK.md sha256:ff3feb727a2869e36a4e71dab229af38aa882574359bda43831db760f29bf885 -->
 
 ## What it is for and who it is for
 
@@ -747,7 +747,7 @@ In: on resuming the check, its customer, from Customers (CUSTOMER-F19).
 Out: the check stays open with its title; parking never voids it.
 If it fails: "The check could not be parked. It is still on screen.". With "Allow parked tickets" off
 there is no park button anywhere.
-Involved: CUSTOMER-F19
+Involved: CUSTOMER-F19, TABLE-F33
 
 ### SALE-F18 Delete an open check
 Status: done
@@ -800,7 +800,7 @@ Out: nothing of its own; Tables seats (`table.session.open` with the check, `.re
 If it fails: Tables' refusal inside the window, in its words ("Another device has just taken that
 table…", "That check is already at table N."…). Without Tables active, or without the permission to see
 its tables and seat, there is no button and Tables is not asked anything.
-Involved: TABLE-F10, TABLE-F12, TABLE-F13, TABLE-F24
+Involved: TABLE-F10, TABLE-F12, TABLE-F13, TABLE-F24, TABLE-F33
 
 ### SALE-F20 Send the order to the kitchen and void a sent line
 Status: done
@@ -898,7 +898,7 @@ If it fails: the same refusals as a normal charge, also that of the check that c
 being charged: the sheet charges what it showed when it opened, never what came later. If, with the sheet
 open, another device closes the check, the screen lets it go on closing the sheet and warns; a check that
 no longer exists does not stay on screen.
-Involved: none
+Involved: TABLE-F33
 
 ### SALE-F23 Split a table's check
 Status: done — the "Split check" button belongs to Tables' table control (TABLE-F17)
