@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:50c5ec01778f9017c51ed7d64b4fef6acb1d8a11476e56b0869c5e586bcdc663 -->
+<!-- generated from WORKBOOK.md sha256:6214da6f9bf53d1025f91ca456b9636c4d0fbc823f081c7a19f0e01a9797cd0c -->
 
 ## What it is for and who it is for
 
@@ -85,8 +85,8 @@ Title "Group — {name}" and its rule. Two sections:
 
 - **Options**: each one with its name, its kitchen ticket name (if different), its supplement in the
   business's currency ("+€1.00" or "-€0.50" in Spain, "+zł 1.00" in Poland; or "Free"), its own tax
-  category if it has one and the "By default" mark. Whoever manages
-  sees "Add option" and, on each one, Edit and Delete. Empty: "This group has no options yet.".
+  category if it has one, the "By default" mark and, under its name, its allergens if it has any ("Allergens: Milk").
+  Whoever manages sees "Add option" and, on each one, Edit and Delete. Empty: "This group has no options yet.".
   If it has fewer options than the minimum asks for (and they cannot repeat), a notice says so: the till
   could not complete it.
 - **Applies to**: each product ("Product · Burger (HAM-01)") or category ("Category · Meats") it is
@@ -100,7 +100,8 @@ Title "Group — {name}" and its rule. Two sections:
   = required)", "Maximum (0 = no ceiling)", "An option can be chosen more than once" and Order.
 - **Option** ("New option" / "Editing option — {name}"): Name, "Kitchen ticket name",
   "Supplement (<currency>)" (the business's: "Supplement (PLN)" in Poland; negative is a discount; empty
-  or 0, free), "Own tax category" (searched; empty = the dish's), Order and "Chosen by default".
+  or 0, free), "Own tax category" (searched; empty = the dish's), Order, "Chosen by default" and, under it,
+  "Allergens" (the fourteen: the ones the option adds to the dish are marked).
 - **Link** ("Apply «{group}» to…"): Product or Category, and the search box of each one.
 - **Delete** group or option and **Stop applying**: they ask for confirmation saying what goes with it.
 
@@ -135,7 +136,7 @@ With the window as it opened, Back closes it without asking (BASE-F05); a supple
 | MODIFIER-F08 | Have the supplement show on the kitchen ticket | done |
 | MODIFIER-F09 | Unlink the groups of a product or a category that is deleted | done |
 | MODIFIER-F10 | Recover the modifier groups, and those of a product or of a category, from a separate copy | done |
-| MODIFIER-F11 | Declare an option's allergens | partial — the option keeps its allergens through the assistant and the API; the form's block and the row of the group's sheet are missing |
+| MODIFIER-F11 | Declare an option's allergens | done |
 | MODIFIER-F12 | Add the options' allergens to the dish's | not done |
 
 ### MODIFIER-F01 Look up and search the groups
@@ -408,8 +409,7 @@ brought it back or an earlier one.
 Involved: BASE-F114, INVENTORY-F01, INVENTORY-F07, INVENTORY-F34, MODIFIER-F05, MODIFIER-F09
 
 ### MODIFIER-F11 Declare an option's allergens
-Status: partial — the option keeps its allergens through the assistant and the API, and the reads of the group's
-sheet and of the till give them already; the form's block and the row of the group's sheet are missing
+Status: done
 Actor: owner, administrator, manager, assistant
 Screen: Modifiers (group sheet)
 Steps:

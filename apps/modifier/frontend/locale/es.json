@@ -104,6 +104,8 @@
         "taxHint": "Solo si tributa distinto del plato; vacía = la del plato.",
         "noTax": "La del plato",
         "default": "Elegida por defecto",
+        "allergens": "Alérgenos",
+        "allergensHint": "Marca los que añade esta opción al plato.",
         "order": "Orden",
         "create": "Crear",
         "save": "Guardar"

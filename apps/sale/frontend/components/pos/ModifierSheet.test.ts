@@ -17,6 +17,7 @@ const option = (id: string, name: string, price_delta = 0, is_default = false) =
   price_delta,
   tax_category_key: null,
   is_default,
+  allergens: [],
 });
 
 const GROUPS: TargetGroupOut[] = [

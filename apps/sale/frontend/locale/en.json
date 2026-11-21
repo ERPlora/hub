@@ -150,7 +150,6 @@
       "lineNoteHint": "The kitchen reads this note on the ticket.",
       "lineNoteRemove": "Remove",
       "lineNoteSave": "Save",
-      "allergens": "Allergens: {names}",
       "allergensLoading": "Loading allergens…",
       "allergensLoadFailed": "The allergens could not be loaded.",
       "customerAllergy": "Customer allergy",
