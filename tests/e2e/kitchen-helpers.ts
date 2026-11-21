@@ -9,6 +9,16 @@ export const SIZES = [
   { label: '1440', width: 1440, height: 900 },
 ];
 
+/** The built app can load Ionic's label styles after the theme, and Vite's dev server before it: moves them last, so a
+ *  rule of a ticket that only ties with Ionic's loses here as it does in the app. */
+export async function ionicLabelStylesLast(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    const ionic = Array.from(document.querySelectorAll('style')).find((style) => style.textContent?.includes('.item.sc-ion-label-ios-h'));
+    if (!ionic) throw new Error('Ionic label styles not found');
+    ionic.parentElement?.append(ionic);
+  });
+}
+
 /** Captures `APP-KITCHEN-<flow>-<size>` at each size once `ready` holds there, and leaves the page at 1440×900. */
 export async function capture(page: Page, flow: string, ready: () => Promise<void>): Promise<void> {
   for (const size of SIZES) {
