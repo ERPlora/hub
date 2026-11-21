@@ -24,7 +24,8 @@ from apps.inventory.models import Category, fits_unit, Product, QUANTITY, Settin
 from apps.inventory.queries.exports import FORMULA_STARTS
 from apps.inventory.queries.reads import held
 from apps.inventory.queries.settings import current_settings
-from apps.inventory.schemas import CategoryImportIn, ImportReportOut, MAX_CENTS, ProductImportIn
+from apps.inventory.schemas.fields import MAX_CENTS
+from apps.inventory.schemas.imports import CategoryImportIn, ImportReportOut, ProductImportIn
 from apps.inventory.services.movements import _move
 from apps.inventory.services.products import EAN13_TAKEN, _created_payload, _save
 from apps.inventory.services.writes import _actor

@@ -281,9 +281,11 @@ const emptyKey = computed(() => (view.value === 'ready' ? 'kitchen.display.empty
 .kds {
   display: block;
 }
+/* Alone on the screen the display is the box that scrolls: the board's bar sticks over the top padding it declares. */
 .kds--fullscreen {
+  --padding-top: 0.75rem;
   background: var(--ion-background-color, #fff);
-  padding: 0.75rem;
+  padding: var(--padding-top) 0.75rem 0.75rem;
   overflow: auto;
 }
 </style>

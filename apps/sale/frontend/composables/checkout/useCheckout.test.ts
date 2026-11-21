@@ -224,4 +224,13 @@ describe('useCheckout', () => {
     expect(s.checkout.failure.value).toBeNull();
     await done;
   });
+
+  it('a refusal whose cause is gone (the cash session it asked for, now open) is forgotten, with the next key kept', async () => {
+    const s = await setup();
+    s.replies({ [COMPLETE]: [refusal(409, 'sale.cash_register_closed', 'The cash register is closed.')] });
+    await s.checkout.charge(INPUT);
+    const key = s.checkout.key.value;
+    s.checkout.clearFailure();
+    expect([s.checkout.failure.value, s.checkout.key.value]).toEqual([null, key]);
+  });
 });

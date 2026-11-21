@@ -1,5 +1,6 @@
 // The components an app gives base to mount where it says: a panel of the Home with a `component` of its own and a
-// card of System › «Usage and plan». Each is one of `apps/<app>/frontend/components/<name>.vue`, named by its file, and
+// card of System › «Usage and plan»; and the one an app mounts from another that its `requires` do not let it import,
+// found by name as that app's operations are. Each is one of `apps/<app>/frontend/components/<name>.vue`, named by its file, and
 // loads on demand in its own chunk; a name its app does not have gives none (a path never names one: the glob's keys
 // are the files themselves), and whoever asked says so.
 import type { Component } from 'vue';

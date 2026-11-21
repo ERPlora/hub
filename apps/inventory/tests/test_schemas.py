@@ -1,41 +1,32 @@
 """Input and output schemas of the inventory app: what the API, the live stream and the assistant accept."""
 
+import pkgutil
 import uuid
 from decimal import Decimal
+from importlib import import_module
 
 import pydantic
 import pytest
+from ninja import Schema
 
 from apps.inventory import schemas
-from apps.inventory.schemas import (
-    CategoryIn,
-    CategoryImportIn,
-    CategoryListIn,
-    CategoryPatchIn,
-    CategoryRefIn,
-    ConfigPatchIn,
-    CountIn,
-    MovementListIn,
-    Page,
-    PageIn,
-    ProductCategoryIn,
-    ProductImportIn,
+from apps.inventory.schemas.categories import CategoryIn, CategoryListIn, CategoryPatchIn
+from apps.inventory.schemas.fields import CategoryRefIn, Page, PageIn, ProductRefIn
+from apps.inventory.schemas.imports import CategoryImportIn, ProductImportIn
+from apps.inventory.schemas.movements import MovementListIn
+from apps.inventory.schemas.product_categories import ProductCategoryIn, ProductCategoryListIn
+from apps.inventory.schemas.products import (
     ProductIn,
     ProductListIn,
     ProductOut,
     ProductPage,
     ProductPatchIn,
-    ProductRefIn,
-    ReceiveIn,
-    SaleCompletedIn,
-    SaleVoidedIn,
-    SummaryIn,
-    LowStockListIn,
     ForSaleListIn,
-    UnitListIn,
-    ProductCategoryListIn,
-    WriteOffIn,
 )
+from apps.inventory.schemas.sale_reactions import SaleCompletedIn, SaleVoidedIn
+from apps.inventory.schemas.settings import ConfigPatchIn
+from apps.inventory.schemas.stock import CountIn, ReceiveIn, SummaryIn, LowStockListIn, WriteOffIn
+from apps.inventory.schemas.units import UnitListIn
 
 ID = uuid.uuid7()
 
@@ -429,11 +420,13 @@ def test_a_product_list_searches_at_most_200_characters():
 
 
 def test_every_field_of_every_input_and_output_is_described():
-    undescribed = [
+    modules = [import_module(f"{schemas.__name__}.{m.name}") for m in pkgutil.iter_modules(schemas.__path__)]
+    undescribed = {
         f"{name}.{field}"
-        for name, schema in vars(schemas).items()
-        if isinstance(schema, type) and issubclass(schema, schemas.Schema) and schema.__module__ == schemas.__name__
+        for module in modules
+        for name, schema in vars(module).items()
+        if isinstance(schema, type) and issubclass(schema, Schema) and schema.__module__.startswith(f"{schemas.__name__}.")
         for field, info in schema.model_fields.items()
         if not info.description
-    ]
-    assert undescribed == []
+    }
+    assert undescribed == set()

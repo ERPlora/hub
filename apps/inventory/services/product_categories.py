@@ -6,7 +6,7 @@ from live.operations import operation
 from apps.inventory import events
 from apps.inventory.models import ProductCategory
 from apps.inventory.queries.reads import find_category, find_product
-from apps.inventory.schemas import ProductCategoryIn, ProductCategoryLinkOut
+from apps.inventory.schemas.product_categories import ProductCategoryIn, ProductCategoryLinkOut
 from apps.inventory.services.writes import _record_link
 
 
