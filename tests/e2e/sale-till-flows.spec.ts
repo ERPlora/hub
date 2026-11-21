@@ -103,9 +103,11 @@ async function checkOf(context: BrowserContext, label: string): Promise<{ id: st
 }
 
 /** How a check of «Open checks» reads: its row's width and bottom, how many lines its title and its «time · amount»
- *  take, by how many pixels their text runs past the row (0 when it fits) and how far in from the row's left edge
- *  the text starts. */
-async function reading(row: Locator): Promise<{ width: number; bottom: number; lines: number[]; spill: number; indent: number }> {
+ *  take, by how many pixels their text runs past the row (0 when it fits), how far in from the row's left edge
+ *  the text starts, how far apart the title's lines are (in times its font size) and how many of those lines are cut. A line is cut when one of its corners falls outside a box,
+ *  between the text and the check's card, that hides what overflows it: the row is a button with rounded corners and
+ *  the card hides what runs past its border. `getBoundingClientRect` alone does not see it. */
+async function reading(row: Locator): Promise<{ width: number; bottom: number; lines: number[]; spill: number; indent: number; spacing: number; cut: number }> {
   return row.evaluate((button) => {
     const box = button.getBoundingClientRect();
     const texts = ['.pos-checks__name', '.pos-checks__meta'].map((part) => {
@@ -116,7 +118,26 @@ async function reading(row: Locator): Promise<{ width: number; bottom: number; l
     const lines = texts.map((text) => new Set([...text.getClientRects()].map((line) => Math.round(line.top))).size);
     const spill = Math.max(0, ...texts.map((text) => text.getBoundingClientRect()).flatMap((text) => [box.left - text.left, text.right - box.right]));
     const indent = Math.min(...texts.map((text) => text.getBoundingClientRect().left)) - box.left;
-    return { width: box.width, bottom: box.bottom, lines, spill: Math.round(spill), indent: Math.round(indent) };
+    const tops = [...new Set([...texts[0].getClientRects()].map((line) => line.top))].sort((a, b) => a - b);
+    const spacing = Math.min(...tops.slice(1).map((top, i) => top - tops[i])) / parseFloat(getComputedStyle(button.querySelector('.pos-checks__name')!).fontSize);
+    const card = button.closest('ion-item')!;
+    const clips: { left: number; top: number; right: number; bottom: number; radius: number }[] = [];
+    let node: Element | null = button.querySelector('.pos-checks__text');
+    while (node && node !== card.parentElement) {
+      const style = getComputedStyle(node);
+      if (style.overflow !== 'visible' && !['inline', 'contents'].includes(style.display)) {
+        const { left, top } = node.getBoundingClientRect();
+        const [x, y] = [left + node.clientLeft, top + node.clientTop];
+        clips.push({ left: x, top: y, right: x + node.clientWidth, bottom: y + node.clientHeight, radius: Math.max(0, parseFloat(style.borderTopLeftRadius) - node.clientLeft) || 0 });
+      }
+      node = node.assignedSlot ?? node.parentElement ?? ((node.parentNode as ShadowRoot | null)?.host ?? null);
+    }
+    const shown = (x: number, y: number) =>
+      clips.every((c) => Math.hypot(Math.max(c.left + c.radius - x, x - c.right + c.radius, 0), Math.max(c.top + c.radius - y, y - c.bottom + c.radius, 0)) <= c.radius + 1);
+    const cut = texts
+      .flatMap((text) => [...text.getClientRects()])
+      .filter((line) => ![[line.left, line.top], [line.right, line.top], [line.left, line.bottom], [line.right, line.bottom]].every(([x, y]) => shown(x, y))).length;
+    return { width: box.width, bottom: box.bottom, lines, spill: Math.round(spill), indent: Math.round(indent), spacing, cut };
   });
 }
 
@@ -324,7 +345,8 @@ test('SALE-F03: a check charged part by card and the rest in cash, with its chan
 });
 
 test('SALE-F17, F18: a check parked and taken back from «Open checks», another deleted there', async ({ page, context }) => {
-  const kept = `e2e Terrace ${RUN}`;
+  // Long enough to take two lines of «Open checks» at every size.
+  const kept = `e2e Terrace by the window, birthday party of twelve ${RUN}`;
   const dropped = `e2e Bar ${RUN}`;
   await freshTill(page);
   for (const [label, product] of [
@@ -345,7 +367,8 @@ test('SALE-F17, F18: a check parked and taken back from «Open checks», another
 
   await shown(page).locator('[data-testid=pos-open-checks]').click();
   const list = shown(page).locator('[data-testid=pos-checks]');
-  await expect(list.locator(`[data-testid=pos-parked-${keptCheck?.id}]`)).toContainText(kept);
+  const keptRow = list.locator(`[data-testid=pos-parked-${keptCheck?.id}]`);
+  await expect(keptRow).toContainText(kept);
   await shots(
     page,
     'APP-SALE-SALE-F17-F18',
@@ -381,8 +404,8 @@ test('SALE-F17, F18: a check parked and taken back from «Open checks», another
   );
   if (!(await list.isVisible())) await shown(page).locator('[data-testid=pos-open-checks]').click();
   // Armed, the check still reads whole beside its hint: as wide as before, its title and its «time · amount» each on
-  // one line inside it from its left edge, and the hint on a line of its own underneath. Also on the landscape
-  // tablet, 1280×800.
+  // one line inside it from its left edge, and the hint on a line of its own underneath. A long title takes the lines
+  // it needs, and the row grows with it without cutting a letter. Also on the landscape tablet, 1280×800.
   const row = list.locator(`[data-testid=pos-parked-${droppedCheck?.id}]`);
   for (const size of [...VIEWPORTS, { label: '1280', width: 1280, height: 800 }]) {
     await page.setViewportSize(size);
@@ -390,7 +413,13 @@ test('SALE-F17, F18: a check parked and taken back from «Open checks», another
     if (!(await list.isVisible())) await shown(page).locator('[data-testid=pos-open-checks]').click();
     await armed.waitFor({ state: 'hidden' });
     await untilStill(page);
+    const long = await reading(keptRow);
+    expect(long.lines[0], `${size.label}: lines of the long title`).toBeGreaterThan(1);
+    expect(long.cut, `${size.label}: lines of the long check cut by its row`).toBe(0);
+    expect(long.spacing, `${size.label}: the long title's lines, in times its font size apart`).toBeGreaterThanOrEqual(1.2);
+    expect(long.spill, `${size.label}: px of the long check's text past its row`).toBe(0);
     const disarmed = await reading(row);
+    expect(disarmed.cut, `${size.label}: lines of the check cut by its row`).toBe(0);
     await bin.click();
     await expect(armed).toHaveText(ARMED);
     const read = await reading(row);
@@ -419,7 +448,7 @@ test('SALE-F17, F18: a check parked and taken back from «Open checks», another
   expect(await checkOf(context, dropped)).toBeUndefined();
 
   // F17: back on screen with its line.
-  await list.locator(`[data-testid=pos-parked-${keptCheck?.id}]`).click();
+  await keptRow.click();
   await expect(lineOf(page, coffee.name)).toBeVisible();
   await expect(shown(page).locator('[data-testid=pos-check-title]')).toHaveValue(kept);
 });
