@@ -13,7 +13,7 @@ from apps.customer.models import Customer
 from apps.customer.services import lock_customers
 from apps.whatsapp_inbox import events
 from apps.whatsapp_inbox.models import Conversation
-from apps.whatsapp_inbox.queries import live_conversations
+from apps.whatsapp_inbox.queries.reads import live_conversations
 from base import outbound
 
 #: Only the system context (``*``) holds it: the doors erplora.com calls, the reactions, the deliveries.

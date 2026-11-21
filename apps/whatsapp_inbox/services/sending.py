@@ -17,19 +17,12 @@ from apps.customer.phones import InvalidPhone
 from apps.whatsapp_inbox import clock, events, samples
 from apps.whatsapp_inbox.models import Channel, Conversation, Message, Template, TemplateSample
 from apps.whatsapp_inbox.notify_schemas import NotifyIn
-from apps.whatsapp_inbox.queries import (
-    MESSAGE_NOT_FOUND,
-    CAP_REACHED,
-    NOT_CONNECTED,
-    channel,
-    e164,
-    find_conversation,
-    live_conversations,
-    live_templates,
-    message_out,
-    preview,
-    send_blocked,
-)
+from apps.whatsapp_inbox.queries.channel import channel, send_blocked
+from apps.whatsapp_inbox.queries.conversations import find_conversation
+from apps.whatsapp_inbox.queries.messages import MESSAGE_NOT_FOUND, message_out
+from apps.whatsapp_inbox.queries.reads import e164, live_conversations, preview
+from apps.whatsapp_inbox.queries.reasons import CAP_REACHED, NOT_CONNECTED
+from apps.whatsapp_inbox.queries.templates import live_templates
 from apps.whatsapp_inbox.schemas import MessageOut, MessageRefIn, SendIn
 from base.services.sessions import acting_hub_user
 
