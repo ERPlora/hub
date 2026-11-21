@@ -1,6 +1,12 @@
-<!-- generated from WORKBOOK.md sha256:9d4be4c881631363156ee7d3ca6c61bd6d7ca276289634a0e8867aa6de7084cb -->
+<!-- generated from WORKBOOK.md sha256:c335ff83dfbda5b3187b04289d5301807a61c9f7c486d2ecae1a4b635faf8e2d -->
 
 ## What it is for and who it is for
+
+Menus and combos sells the menu of the day, the kids' menu or the sandwich with a drink to take away at a closed
+price. Each menu has its courses (Starter, Main, Drink…) and each course, the choices among your products, with a
+supplement if one costs more. The till charges it with the right VAT and the kitchen gets each dish at its station.
+
+### In detail
 
 Menus and combos keeps the composite items that are sold at a **closed price**: the menu of the day
 ("starter + main + dessert + drink for €13.50"), the kids' menu or the "sandwich + drink" to take
@@ -68,6 +74,13 @@ Initial setup, step by step:
 ## Screens
 
 ### Menus
+Here are your menus, with their photo, their closed price, whether they are eaten in or sold to take away and whether
+they are on sale. With **+** you create one; on its row, "Edit details" changes it and "Withdraw" takes it off sale
+with its courses. Tap a menu to open its builder: there you add its courses, in each course the choices with their
+supplement, and you mark what is sold out today. At the top of the builder, a notice says whether the menu is already
+on the till or what it lacks.
+
+#### Detail
 Menu **Menus**. Table of menus with the search box "Search a menu…" (it searches by name and by
 kitchen name), table or cards view and columns: "Photo" (the thumbnail, or the initials over its colour),
 Name (sorts and filters), "Closed price" (in the business's currency; sorts), "How
@@ -83,7 +96,7 @@ a product / to take away", with the explanation of both always in sight and the 
 highlighted), "VAT category" (only if it is "eaten in"), "Order on the menu list" and the "On sale"
 checkbox (ticked to begin with), with "Save" and "Cancel".
 
-### Menu builder
+#### Menu builder
 It opens when a menu is tapped (`/combo/menus/<id>`). The back arrow of the top bar goes back to Menus.
 At the top of the page, the name and the price of the menu (in the business's currency), and a notice with what that menu will do on the ticket: "This menu is billed as a
 single service: one line at its VAT category, whatever the components are taxed at." or "This menu is
@@ -168,29 +181,28 @@ Screen: Menus
 Steps:
 1. In Menus, tap **+**.
 2. Type the Name; if the kitchen ticket must say something else, the "Kitchen name".
-3. Type the "Closed price (<currency>)": what the customer pays for the whole menu, in the business's
+3. Type the "Closed price" (in Spain, "Closed price (EUR)"): what the customer pays for the whole menu, in the business's
    currency and with its decimals (the yen has none). Empty is 0.
 4. Choose "How is it sold?": "Eaten in" bills ONE line at the menu's rate, the drink included (the
    menu of the day); "Sold as a product / to take away": if all the choices are taxed the same, ONE
-   line at that rate; if not, ONE line per dish, each one at its rate, with the price shared out
-   (COMBO-F09).
+   line at that rate; if not, ONE line per dish, each one at its rate, with the price shared out.
 5. If it is "eaten in", choose the "VAT category" of the whole menu (in a restaurant, "Restaurant —
    food", at 10 %).
 6. Leave "On sale" ticked if it can already be sold and tap "Save".
 7. The form closes and the menu appears in the list. It is not on the till yet: it lacks the courses
-   and the choices (COMBO-F05, F06).
+   and the choices, which are added by tapping the menu to open its builder.
 In: name, kitchen name, price, way of selling, VAT category, order and "On sale"; it reads the VAT
 categories from Taxes.
 Out: the menu (announces: new menu).
 If it fails: "Save" is grey while the name is missing and while the business has not yet said its
 currency, because the price is read in it (without it, "1500" yen would be saved as 150,000); until then, leaving the price
-keeps it as typed, without inventing decimals for it or judging it: "¥1500" or "12,50 zł" are not marked red as "This is not an amount", and as soon as the currency arrives they are read in it (hub#945). If the currency cannot be read, the window says so ("The business's currency could not be read", with the
-reason) and offers "Retry", which asks for it again; as soon as it arrives, "Save" lights up (hub#938). Next to the
+keeps it as typed, without inventing decimals for it or judging it: "¥1500" or "12,50 zł" are not marked red as "This is not an amount", and as soon as the currency arrives they are read in it. If the currency cannot be read, the window says so ("The business's currency could not be read", with the
+reason) and offers "Retry", which asks for it again; as soon as it arrives, "Save" lights up. Next to the
 field: "The menu needs a name.", "A menu eaten in needs its own VAT category:
 without it, it cannot be billed.", "This amount cannot be
-negative." (to make a choice cheaper, it gets a negative supplement: COMBO-F06), "This is not an amount. Type a figure, for example 12.50." (also with
+negative." (to make a choice cheaper, it gets a negative supplement in the builder), "This is not an amount. Type a figure, for example 12.50." (also with
 another currency's sign: "€13.50" in a business in Poland) and the one about the two possible readings of an amount ("1.250"), which quotes what was typed. A VAT category that
-does not exist in Taxes: "That tax category does not exist in Taxes.". The reason of a field goes as soon as that field is corrected, even if another one says the same (hub#888). Without the right to manage
+does not exist in Taxes: "That tax category does not exist in Taxes.". The reason of a field goes as soon as that field is corrected, even if another one says the same. Without the right to manage
 there is no + button.
 Involved: TAX-F01
 
@@ -219,7 +231,7 @@ Actor: owner, administrator, manager, assistant
 Screen: Menus
 Steps:
 1. In the menu's row, tap "Withdraw".
-2. Confirm in "Withdraw this menu?" ("{name}" stops being on sale, together with its courses and
+2. Confirm in "Withdraw this menu?" ("Menu of the day" stops being on sale, together with its courses and
    choices. Tickets already issued keep reading it.).
 3. The menu disappears from the list, with its courses and its choices, and the till stops offering
    it. Whoever has it open in its builder sees "This menu no longer exists".
@@ -227,9 +239,9 @@ In: the chosen menu (by id or by name).
 Out: the menu, its courses and its choices deleted in a single operation (announces: menu withdrawn,
 with its name). The tickets issued carry their copy and can still be read.
 If it fails: the dialog says why and stays open; a menu that no longer exists, "That menu does not
-exist in this business.". An open check that already had it charges it as it was ordered (COMBO-F08). Through the
+exist in this business.". An open check that already had it charges it as it was ordered. Through the
 assistant, a name that fits several menus or none brings up no card, and if before the "yes" another menu fits better
-what was said, nothing is withdrawn and the new card comes up (BASE-F97).
+what was said, nothing is withdrawn and the new card comes up.
 Involved: SALE-F12, COMBO-F15
 
 ### COMBO-F05 Set up the courses of a menu
@@ -249,13 +261,13 @@ Steps:
    its choices, after confirming it.
 In: name, minimum, maximum and repetition.
 Out: the course (announces: course new, changed, reordered or withdrawn).
-If it fails: next to the field: "The course needs a name.", "The maximum ({max}) is below the
-minimum ({min}): nobody could ever satisfy this course." and "That menu already has a course “{name}”.".
+If it fails: next to the field: "The course needs a name.", "The maximum (1) is below the
+minimum (2): nobody could ever satisfy this course." and "That menu already has a course “Starters”.".
 A minimum or a maximum above 50 is refused, and so are more than 20 courses in a menu ("A menu
 holds 20 courses at most."). If the server refuses, the form says so and does not lose what was written. Through the
 assistant, when changing or withdrawing a course said by its name, a name that fits several courses or none brings up
 no card, and if before the "yes" another course or another menu fits better what was said, nothing is touched and the
-new card comes up (BASE-F97). When adding or reordering courses of a menu said by its name, the "yes" counts only for
+new card comes up. When adding or reordering courses of a menu said by its name, the "yes" counts only for
 the menu the card showed.
 Involved: COMBO-F15
 
@@ -266,37 +278,37 @@ Screen: Menu builder
 Steps:
 1. On the course's card, type in "Search a product…" and choose the product from Inventory's
    catalogue (it searches by name and by SKU).
-2. Type the "Supplement (<currency>)", in the business's currency, if substituting costs more (or less,
+2. Type the "Supplement" (in Spain, "Supplement (EUR)"), in the business's currency, if substituting costs more (or less,
    with a minus sign: "-" or the "±" button at the end of the field, because a phone's decimal keyboard has no
    minus) than the closed price; empty is no supplement.
 3. Tap "Add choice": it goes in last. For several at once, "Add several": tick the boxes
-   and tap "Add N selected" ("Add 1 selected" with one; all go in without a supplement and in the order
+   and tap "Add 3 selected" ("Add 1 selected" with one; all go in without a supplement and in the order
    they were ticked). For
    a whole category, choose it in "Category": the list shows its products and "Tick all of
-   “{category}” (N)" ticks the ones the course does not offer yet.
+   “Desserts” (6)" ticks the ones the course does not offer yet.
 4. To change the product or the supplement of a choice, tap its pencil: the form says
-   "Editing «{product}». It keeps its position in the course.". With the handle, move up or move down
+   "Editing «Flan». It keeps its position in the course.". With the handle, move up or move down
    it is reordered; the bin removes it, after confirming it.
 In: the products of Inventory (the active ones, sold by units; also those sold out today,
 which can be put in a menu although the till does not offer them until they come back).
 Out: the choice (announces: choice new, changed, reordered or removed). The supplement is added to the
 closed price, never to the product's price.
 If it fails: "Pick a catalogue product first.", "This course already offers that product. To let it
-be picked twice, switch on «the same option may be picked more than once».", "“{product}” is
+be picked twice, switch on «the same option may be picked more than once».", "“Flan” is
 deactivated in Inventory: activate it before putting it in a menu.", "Only a product sold and priced
-by the unit can be a menu choice; “{product}” is sold by {unit}.", "A course holds
+by the unit can be a menu choice; “Cured cheese” is sold by kg.", "A course holds
 40 choices at most." and the amount warnings ("This is not an amount. Type a figure, for example 1.50, or -0.50 for a
 discount." and the one about the two readings of "1.250"). "Add choice" (and "Save" when editing) is off while the
 business has not yet said its currency: the supplement is read in it, and without it "1500" yen would be
-saved as 150,000; until then, leaving the supplement keeps it as typed, without inventing decimals for it or judging it: "¥150" or "-0,50 zł" are not marked red as "This is not an amount", and as soon as the currency arrives they are read in it (hub#945). If the currency cannot be read, the builder says so once, above the courses ("The
+saved as 150,000; until then, leaving the supplement keeps it as typed, without inventing decimals for it or judging it: "¥150" or "-0,50 zł" are not marked red as "This is not an amount", and as soon as the currency arrives they are read in it. If the currency cannot be read, the builder says so once, above the courses ("The
 business's currency could not be read", with the reason), and offers "Retry", which asks for it again; as
-soon as it arrives, the button lights up (hub#946). "Add several" with nothing ticked: "Tick at least one
+soon as it arrives, the button lights up. "Add several" with nothing ticked: "Tick at least one
 product first."; a search or a category with no products: "No products match.". If the
 catalogue does not load, the search box says so with "Retry". A product that does not exist yet is
 created first in Inventory: the search box finds it as soon as it is saved. Through the assistant, when changing or
 removing a choice said by its product, a name that fits several choices or none brings up no card, and if before the
-"yes" another choice or another menu fits better what was said, nothing is touched and the new card comes up
-(BASE-F97). When adding or reordering choices, the "yes" counts only for the menu, the course and the product the card
+"yes" another choice or another menu fits better what was said, nothing is touched and the new card comes up.
+When adding or reordering choices, the "yes" counts only for the menu, the course and the product the card
 showed.
 Involved: INVENTORY-F27
 
@@ -438,14 +450,13 @@ Steps:
 1. In the choice's row, tap "Sold out" (or say "no flan in the menu of the day today").
 2. The row is marked "Sold out" and the till stops offering it; the rest of the menu keeps being sold.
 3. When there is some again, tap "Available".
-4. If the product is marked sold out in Inventory (INVENTORY-F29), all its choices, in all the
+4. If the product is marked sold out in Inventory, all its choices, in all the
    menus, show "Sold out in Inventory" and the till stops offering them at once, without touching the menu;
    they come back on their own when Inventory puts it on sale again.
 In: the choice, or the product sold out in Inventory.
 Out: the changed choice (announces: choice changed).
 If it fails: if marking it sold out leaves a compulsory course without enough choices, the menu stops being
-on the till and the builder's notice says so. An open check with a dish already ordered is charged the same
-(COMBO-F08).
+on the till and the builder's notice says so. An open check with a dish already ordered is charged the same.
 Involved: COMBO-F07, INVENTORY-F29
 
 ### COMBO-F13 When a product leaves the catalogue
@@ -459,9 +470,9 @@ Steps:
    menus that offered it, and the open builder shows it at once. Meanwhile they come marked
    "No longer in the catalogue" and the till neither offers them nor can they be charged (from its screens a
    deleted product does not come back; if ERPlora's staff recover it from a separate copy, its choices come back
-   with it, COMBO-F15).
+   with it).
 3. Look at the notice at the top of the builder: if a compulsory course has been left without enough
-   choices, it says why the menu is no longer on the till; add another choice to that course (COMBO-F06).
+   choices, it says why the menu is no longer on the till; add another choice to that course.
 In: the product deactivated or deleted in Inventory.
 Out: the choices of the deleted product, out of all the menus (announces: choice removed, with the
 reason "product deleted"). If Inventory's notice arrives twice, the second one changes nothing; what
@@ -477,8 +488,8 @@ Actor: owner, administrator, manager, assistant
 Screen: Menus
 Steps:
 1. In the menu's "Edit details", under "Photo", tap "Choose from the library" (the image library opens
-   with the menu's name already searched, as in INVENTORY-F30) or "Upload photo" (a JPG, PNG or WebP of
-   up to 2 MB, as in INVENTORY-F31).
+   with the menu's name already searched) or "Upload photo" (a JPG, PNG or WebP of
+   up to 2 MB).
 2. Tap "Save": the menu keeps its photo. "Remove photo" leaves it with its initials.
 3. Through the assistant: "put a photo on the menu of the day". The assistant proposes up to five
    images of the library by their title and asks which one; it never sets one on its own.
@@ -487,12 +498,12 @@ Out: the menu with its photo (announces: menu changed); the till shows it on its
 reloading (INVENTORY-F32), and the list of menus, in its row. The photo of its own is kept in the
 business's folder, only the business's people see it and it counts against its plan's space; uploading
 another one, choosing one of the library, "Remove photo" or withdrawing the menu (COMBO-F04) deletes it.
-If it fails: the same notices as the product's photo. Next to "Photo", on choosing it, and nothing is
+If it fails: next to "Photo", on choosing it, and nothing is
 uploaded: "The photo weighs more than 2 MB. Choose a lighter one." and "That file is not a photo. Upload
 a JPG, PNG or WebP image.". If the menu was saved and the photo was not, the window says so ("The menu
-has been saved, but the photo has not: <reason>") with "Retry", which only sends the photo again, and
+has been saved, but the photo has not:", followed by the reason) with "Retry", which only sends the photo again, and
 the menu keeps the photo it had; the reason is "That image is no longer in the library. Choose another
-one.", "There is no space left for that file: your plan includes <space>." or "The photo could not be
+one.", "There is no space left for that file: your plan includes 1 GB." (with your plan's space) or "The photo could not be
 saved. Try again.". A menu without a photo, or whose photo does not load, shows its initials.
 Involved: COMBO-F03, COMBO-F04, COMBO-F07, INVENTORY-F30, INVENTORY-F31, INVENTORY-F32
 

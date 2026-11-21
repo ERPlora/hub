@@ -2,7 +2,7 @@
 and the aliases the CSV importer of inventory recognises (WORKBOOK.md)."""
 
 from django.utils.translation import gettext_lazy as _
-from live.meta import Category, LiveAppConfig, Nav, SetupCheck, SetupStep
+from live.meta import Category, Help, LiveAppConfig, Nav, SetupCheck, SetupStep
 
 from apps.tax.choices import CHOICES
 from apps.tax.events import RULE_IN_FORCE_EVENTS
@@ -74,3 +74,4 @@ class TaxConfig(LiveAppConfig):
             refresh_on=RULE_IN_FORCE_EVENTS,
         )
     ]
+    help = Help()
