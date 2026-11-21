@@ -16,7 +16,7 @@ QUANTITIES_OF_GOODS = (
 #: arrive too («han llegado dos más para la mesa 7»).
 GOODS_NOTED_AS_ARRIVED = ("apunta que llegan", "apuntame que llegan", "anota que llegan", "registra que llegan")
 #: Stock told as broken, the stock a write-off takes out.
-BROKEN_STOCK = ("roto", "rotos", "rotura", "broke", "broken")
+BROKEN_STOCK = ("roto", "rotura", "broke", "broken")
 
 
 class InventoryConfig(LiveAppConfig):
