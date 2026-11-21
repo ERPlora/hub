@@ -144,7 +144,7 @@ cierra la ventana sin guardarlo. Con la ventana como se abrió, atrás la cierra
 | MODIFIER-F09 | Soltar los grupos de un producto o una categoría que se borra | hecho |
 | MODIFIER-F10 | Recuperar los grupos de suplementos, y los de un producto o de una categoría, desde una copia aparte | hecho |
 | MODIFIER-F11 | Declarar los alérgenos de una opción | hecho |
-| MODIFIER-F12 | Sumar los alérgenos de las opciones a los del plato | no hecho |
+| MODIFIER-F12 | Sumar los alérgenos de las opciones a los del plato | hecho |
 
 ### MODIFIER-F01 Consultar y buscar los grupos
 Estado: hecho
@@ -436,13 +436,13 @@ formulario.
 Implicados: MODIFIER-F04, MODIFIER-F10, MODIFIER-F12, INVENTORY-F35
 
 ### MODIFIER-F12 Sumar los alérgenos de las opciones a los del plato
-Estado: no hecho — la valoración de las opciones ya da los alérgenos de cada una, pero la línea todavía solo lleva
-los de su producto
+Estado: hecho
 Actor: empleado, responsable
 Pantalla: Ventas: Vender
 Pasos:
 1. En el TPV, toca un artículo que tiene grupos. En su hoja, debajo del nombre del artículo salen sus alérgenos
-   y, debajo de cada opción que los tiene, los suyos: «Leche».
+   y, debajo de cada opción que los tiene, los suyos: «+Queso» dice «Alérgenos: Leche». Una opción sin alérgenos no
+   lleva esa fila.
 2. Elige las opciones y pulsa «Añadir». La línea dice, debajo del nombre, «Alérgenos: …» con los del plato y
    los de cada opción elegida, juntos, sin repetir y en el orden de la lista de los catorce: una hamburguesa con
    Gluten y «+Queso» dice «Alérgenos: Gluten, Leche». Cuentan todas las opciones elegidas, también las que se cobran
@@ -791,14 +791,15 @@ cocina (`tests/test_integration_kitchen.py`).
 
 ### Los alérgenos de una opción
 
-F11 está `hecho` y F12 `no hecho`. La lista es la de la plataforma (`base.allergens`: su tipo, su comprobación y sus
+F11 y F12 están `hecho`. La lista es la de la plataforma (`base.allergens`: su tipo, su comprobación y sus
 esquemas `AllergensIn`, `AllergensPatchIn` y `AllergensOut`), la misma que declara un producto de Inventario
 (INVENTORY-F35) y que leen Ventas y Cocina; `apps.py` declara sus nombres (`choices`) para la tarjeta del asistente.
 `ModifierOption.allergens` (migración `0002_option_allergens`, con `db_default` para el código de antes) la guardan el
 alta y la edición de la opción, y la devuelven `modifier.option.get` y `.list`, `modifier.group.for_target` y cada
 elección de `modifier.selection.resolve`; la recuperación desde una copia aparte la trae. El formulario de la opción
 la marca con `AllergenSelect` y la hoja del grupo la dice con `AllergenRow`, los dos de `@erplora/ui`, como Inventario y
-Ventas. Queda la suma en la línea del TPV, con la hoja de suplementos de Ventas y el cambio de SALE-F40 (hub#1934).
+Ventas. La hoja de suplementos del TPV, que es de Ventas, dice los de cada opción con la misma `AllergenRow`, y Ventas
+suma a la línea los de las opciones elegidas al pedirla y los congela con el resto de la copia del suplemento (SALE-F40).
 
 ### Lo que NO hace, a propósito
 
