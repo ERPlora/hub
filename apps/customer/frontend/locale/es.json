@@ -129,7 +129,10 @@
     "importCsv": {
       "button": "Importar CSV",
       "importing": "Importando…",
-      "summary": "Importación: {total} filas — {created} creadas, {skipped} omitidas.",
+      "summary": "Importación: {rows} — {created}, {skipped}.",
+      "rows": "{n} fila | {n} filas",
+      "created": "{n} creada | {n} creadas",
+      "skipped": "{n} omitida | {n} omitidas",
       "noRows": "El fichero no tiene clientes: su primera línea tiene que nombrar las columnas (nombre, email, teléfono…).",
       "unreadable": "No se pudo leer el fichero.",
       "row": "Fila {line}",
