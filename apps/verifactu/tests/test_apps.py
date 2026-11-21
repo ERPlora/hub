@@ -111,19 +111,13 @@ def test_navigation_is_the_six_tabs_of_the_old_module_with_registered_icons():
     ]
 
 
-def test_the_worker_sends_the_queue_every_minute_and_checks_the_own_certificate_every_hour():
-    # Declared in the AppConfig for the phase-2 worker, which runs them as the system; collapsed on catch-up.
+def test_the_worker_sends_the_queue_every_minute():
+    # Declared in the AppConfig for the phase-2 worker, which runs it as the system; collapsed on catch-up.
     assert verifactu().scheduled_tasks == [
         {
             "name": "process_queue",
             "operation": "verifactu.contingency.process",
             "cron": "* * * * *",
-            "catch_up": "collapse",
-        },
-        {
-            "name": "recheck_certificate",
-            "operation": "verifactu.certificate.recheck",
-            "cron": "23 * * * *",
             "catch_up": "collapse",
         },
     ]
@@ -160,7 +154,6 @@ OPERATIONS = {
     "verifactu.config.back_to_testing",
     "verifactu.certificate.upload",
     "verifactu.certificate.remove",
-    "verifactu.certificate.recheck",
     "verifactu.config.sync",
     "verifactu.config.follow_deployment",
     "verifactu.representation.submit",
