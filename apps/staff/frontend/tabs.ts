@@ -1,9 +1,8 @@
-// The sections of Staff, painted as the footer tabbar of each staff page (AppPage `tabs`): the four of
-// the app's menu (`navigation` in apps.py), same order, icons and paths, plus «Commissions» (STAFF-F21),
-// only for whoever sees the pay, and «Settings», the tab the old shell generated from the module's
-// settings block and showed only to whoever may save them. Both depend on a permission, which a menu
-// entry of apps.py cannot say. Each tab follows its route; picking one replaces the address, so Back
-// leaves Staff instead of walking its tabs.
+// The sections of Staff, painted as the footer tabbar of each staff page (AppPage `tabs`): the five of
+// the app's menu (`navigation` in apps.py), same order, icons and paths, plus «Settings», the tab the old
+// shell generated from the module's settings block and showed only to whoever may save them. «Commissions»
+// shows only to whoever sees the pay. Each tab follows its route; picking one replaces the address, so
+// Back leaves Staff instead of walking its tabs.
 import type { ShellTab } from '@erplora/ui/shell';
 
 export const STAFF_TABS: readonly Omit<ShellTab, 'label'>[] = Object.freeze([

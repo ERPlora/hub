@@ -10,6 +10,13 @@ Lo que no entra todavía: ver «Lo que queda fuera».
 
 ## Para qué sirve y para quién
 
+Personal es tu equipo: quién trabaja, con qué rol, en qué horario cada semana, cuándo falta y cuánto cobra por hora y
+de comisión. El responsable da de alta las fichas, aprueba las ausencias y ve en Comisiones lo que ha ganado cada
+profesional; cada empleado ve su ficha y pide sus ausencias. Citas, Servicios, Control horario, Tareas y el TPV leen de
+aquí quién trabaja y quién atiende.
+
+### En detalle
+
 Personal es la **plantilla del negocio como recurso de trabajo**: quién trabaja, qué rol de catálogo
 tiene («estilista», «camarero»), en qué horario trabaja cada semana, cuándo falta, cuánto cobra por hora
 y qué comisión lleva. Responde a «**quién trabaja y atiende**», no a «quién entra»:
@@ -71,12 +78,18 @@ de cocina). Al cerrar el día, **Comisiones** da lo que ha vendido y ganado cada
 
 ## Pantallas
 
-Personal se abre desde el menú **Personal** y tiene cuatro pestañas: **Personal**, **Roles**,
-**Ausencias** y **Horarios**, más **Comisiones** (para quien ve la compensación) y **Ajustes** (para
-quien puede guardarlos). Lo que una persona no puede hacer no aparece, y la app lo rechaza aunque lo
+Personal tiene cinco pestañas: **Personal**, **Roles**, **Ausencias**, **Horarios** y **Comisiones**
+(esta, solo para quien ve la compensación), más **Ajustes** (para quien puede guardarlos). Lo que una persona no puede hacer no aparece, y la app lo rechaza aunque lo
 intente por la API o por el asistente.
 
 ### Personal
+Aquí está tu equipo: una fila por persona con su nombre, su rol, su email y su estado (**Activo**, **Inactivo** o **De
+baja**) y, para quien ve la compensación, su tarifa por hora. Encima, tres cifras: **Plantilla activa**, **Ausentes
+hoy** y **Ausencias pendientes**. **+** da de alta a una persona y una fila abre su ficha para editarla; el propietario
+y el administrador también la desactivan o la dan de baja desde la fila. Quien tiene su cuenta vinculada a una ficha la
+ve en **Mi ficha**.
+
+#### Detalle
 Encima de la tabla, tres cifras: **Plantilla activa**, **Ausentes hoy** y **Ausencias pendientes**
 (STAFF-F23). Debajo, la tabla con buscador «Buscar miembro…» (nombre, apellidos, email, teléfono, nº de empleado o rol),
 columnas **Nombre, Rol, Email, Estado** y, solo para quien puede ver la compensación, **Tarifa/h**;
@@ -94,6 +107,18 @@ Email, Teléfono, Nº de empleado, Rol** («Sin rol»), **Usuario del Hub** («S
 Polonia), con sus decimales (el yen no tiene) y su símbolo al final del campo; mientras el negocio no
 contesta, un importe es «—», nunca euros ni decimales supuestos.
 
+#### Paneles del Inicio
+El **Inicio** del Hub enseña los cinco paneles de Personal, agrupados como «Personal» en **Personalizar
+panel**. De serie salen «Plantilla activa» (cuántas personas están **Activas**), «Ausentes hoy» (personas
+distintas con una ausencia aprobada que cubre hoy) y «Ausencias de hoy» (quién falta hoy, de día entero
+primero y luego por nombre, con el tipo de ausencia debajo de cada nombre); «Ausencias pendientes» (cuántas
+solicitudes esperan respuesta) y «Empleados por rol» (una barra por rol con sus personas **Activas**, el rol
+con más primero y diez como mucho; cada barra lleva el color de su rol, y la de un rol sin color, el del panel)
+se añaden desde **Personalizar panel**. Quien no ve las ausencias no
+tiene los tres de ausencias, y quien no ve el equipo, ni «Plantilla activa» ni «Empleados por rol». Cambian
+solos, sin recargar. Las mismas cifras siguen dentro de Personal: las tres encima de la tabla de Personal,
+«Ausencias de hoy» encima de la de Ausencias y la columna «Miembros» de Roles (STAFF-F20 y STAFF-F23).
+
 ### Roles
 Tabla con buscador «Buscar rol…» y columnas **Rol, Descripción, Miembros** (cuántas personas
 **Activas** lo llevan). **+** abre **Nuevo** (**Nombre del rol, Descripción, Color**); una fila abre
@@ -101,7 +126,7 @@ Tabla con buscador «Buscar rol…» y columnas **Rol, Descripción, Miembros** 
 
 ### Ausencias
 Encima de la tabla, **Ausencias de hoy**: quién falta hoy, con el tipo y, si es solo una parte del día,
-sus horas (STAFF-F20). Debajo, la tabla con buscador por nombre y columnas **Miembro, Tipo, Desde, Hasta, Estado**, con filtros por
+sus horas. Debajo, la tabla con buscador por nombre y columnas **Miembro, Tipo, Desde, Hasta, Estado**, con filtros por
 miembro, tipo, estado y fechas. Acciones de fila: **Aprobar**, **Rechazar** y **Cancelar**, donde
 valen. **+** abre el formulario: **Miembro** (solo para quien gestiona ausencias; el empleado la pide
 para sí), **Tipo** (Vacaciones, Baja por enfermedad, Asuntos propios, Formación u Otros), **Desde,
@@ -116,6 +141,13 @@ desde, Vigente hasta, Por defecto** y una fila por día de la semana con **Inici
 descanso, Fin descanso** (o «No trabaja»), con la jornada por defecto de **Ajustes** ya puesta.
 
 ### Comisiones
+Aquí ves lo que ha vendido cada profesional en un periodo y lo que le corresponde de comisión: «Hoy» al entrar, o
+«Ayer», «Esta semana», «Este mes» o «Personalizado», con sus fechas «Desde» y «Hasta». Arriba, el total de
+**Producción** y de **Comisiones**; debajo, una fila por persona con su rol, lo que ha vendido, su «Comisión %» y su
+«Comisión», en la moneda del negocio. Solo la ve quien puede ver la compensación, y se pone al día sola al cobrar,
+anular o devolver una venta.
+
+#### Detalle
 Arriba, el periodo: «Hoy» (al entrar), «Ayer», «Esta semana» (desde el lunes), «Este mes» (desde el
 día 1) o «Personalizado», que abre «Desde» y «Hasta» con los días que había en pantalla; al lado, los
 días que cuenta. En el móvil, el periodo se elige en el desplegable «Periodo», con las mismas opciones.
@@ -127,23 +159,11 @@ en el periodo aunque ya no esté («Ya no trabaja aquí» o «Inactivo» junto a
 nombre, rol, producción o comisión. En el móvil, una tarjeta por persona. Se pone al día sola al cobrar, anular
 o devolver una venta y al cambiar una ficha.
 
-### Ajustes de Personal
+### Ajustes
 «Jornada por defecto», con «Un horario nuevo propone esta jornada de lunes a viernes, con el descanso
 en mitad del día.»: «Inicio de jornada (HH:MM)», «Fin de jornada (HH:MM)»,
 «Duración del descanso (minutos)» y **Guardar**. Mientras el negocio no ha guardado nunca, salen los
 valores propuestos.
-
-### Paneles del inicio
-El **Inicio** del Hub enseña los cinco paneles de Personal, agrupados como «Personal» en **Personalizar
-panel**. De serie salen «Plantilla activa» (cuántas personas están **Activas**), «Ausentes hoy» (personas
-distintas con una ausencia aprobada que cubre hoy) y «Ausencias de hoy» (quién falta hoy, de día entero
-primero y luego por nombre, con el tipo de ausencia debajo de cada nombre); «Ausencias pendientes» (cuántas
-solicitudes esperan respuesta) y «Empleados por rol» (una barra por rol con sus personas **Activas**, el rol
-con más primero y diez como mucho; cada barra lleva el color de su rol, y la de un rol sin color, el del panel)
-se añaden desde **Personalizar panel**. Quien no ve las ausencias no
-tiene los tres de ausencias, y quien no ve el equipo, ni «Plantilla activa» ni «Empleados por rol». Cambian
-solos, sin recargar. Las mismas cifras siguen dentro de Personal: las tres encima de la tabla de Personal,
-«Ausencias de hoy» encima de la de Ausencias y la columna «Miembros» de Roles (STAFF-F20 y STAFF-F23).
 
 ## Estados de cada pantalla
 
@@ -197,7 +217,7 @@ Pantalla: Personal
 Pasos:
 1. En **Personal**, pulsa **+**: se abre **Nuevo** (sin Estado: la persona nace **Activa**).
 2. Escribe Nombre y Apellidos (obligatorios, hasta 100 caracteres). Si quieres, Email, Teléfono,
-   Nº de empleado, Rol, Usuario del Hub (STAFF-F03), Fecha de alta, Color (#RRGGBB),
+   Nº de empleado, Rol, Usuario del Hub, Fecha de alta, Color (#RRGGBB),
    Especialidades, Bio, Margen entre citas y, con permiso de compensación, Tarifa por hora y
    Comisión (%). **Reservable** viene encendido.
 3. Pulsa Guardar: la persona sale en la tabla como **Activa**.
@@ -209,14 +229,14 @@ Sale: la ficha; Personal avisa de que hay una ficha nueva (`staff.member.created
 Si falla: debajo de cada campo y sin guardar nada: nombre o apellidos vacíos, un email que no lo es,
 un color que no es #RRGGBB, una tarifa negativa, una comisión fuera de 0–100, «Ese rol no está
 disponible: no existe en este negocio, o se ha eliminado o retirado.», «Ese usuario del Hub no tiene
-acceso a este negocio.» o la cuenta ya vinculada a otra ficha (STAFF-F03). Quien no puede ver la
-compensación no puede enviarla: «Se necesita el permiso «{permiso}».». Dos fichas con el mismo
+acceso a este negocio.» o la cuenta ya vinculada a otra ficha. Quien no puede ver la
+compensación no puede enviarla: el aviso dice qué permiso le falta. Dos fichas con el mismo
 nombre, email o nº de empleado se aceptan. Desde el asistente, un rol que el negocio no tiene (o que se
 ha retirado) se comprueba antes de la tarjeta de confirmación: no sale tarjeta, el asistente dice que
-ese rol no está disponible y cuáles hay, y no se crea nada. Guardar (también al editar, STAFF-F02) está en gris
+ese rol no está disponible y cuáles hay, y no se crea nada. Guardar (también al editar) está en gris
 mientras el negocio no haya dicho todavía su moneda, porque la tarifa por hora se lee en ella (sin ella,
 «1500» yenes se guardaría como 150 000). Si la moneda no se puede leer, la ventana lo dice («No se ha podido leer la moneda del negocio», con el
-motivo) y ofrece «Reintentar», que la vuelve a pedir; en cuanto llega, Guardar se enciende (hub#938).
+motivo) y ofrece «Reintentar», que la vuelve a pedir; en cuanto llega, Guardar se enciende.
 Implicados: BASE-F97
 
 ### STAFF-F02 Editar la ficha de un profesional
@@ -224,11 +244,11 @@ Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, responsable, asistente
 Pantalla: Personal
 Pasos:
-1. Pulsa la fila: se abre **Editar · {nombre}** (el asistente la nombra por su nombre) con lo que ya
+1. Pulsa la fila: se abre **Editar · Ana García** (el asistente la nombra por su nombre) con lo que ya
    dice la fila, y «Cargando…» mientras llega la ficha completa; Guardar espera en gris hasta entonces.
 2. Cambia lo que haga falta, también antes de que llegue la ficha: lo escrito o elegido se queda, y la
-   ficha, al llegar, solo rellena lo que no se ha tocado (hub#1347). **Estado** ofrece Activo, Inactivo y
-   De baja (la baja definitiva es STAFF-F06). «Sin rol» quita el rol, «Sin acceso al Hub» desvincula la
+   ficha, al llegar, solo rellena lo que no se ha tocado. **Estado** ofrece Activo, Inactivo y
+   De baja (la baja definitiva se da con **Dar de baja**, en la fila). «Sin rol» quita el rol, «Sin acceso al Hub» desvincula la
    cuenta, y la Fecha de alta se puede **borrar**.
 3. Guarda: solo cambia lo enviado.
 Entra: la ficha (y, con permiso, su tarifa, comisión y notas).
@@ -253,9 +273,8 @@ Entra: las cuentas activas con acceso a este negocio, solo su identificador y su
 Sale: el vínculo. Con él, la persona ve su propia ficha (STAFF-F08) y pide sus ausencias (STAFF-F24).
 No cambia ningún permiso ni la comisión: una venta cuenta para quien se eligió al cobrarla (STAFF-F21).
 Dar de baja la ficha libera la cuenta.
-Si falla: «Ese usuario del Hub ya está vinculado a {nombre}. Un usuario del Hub solo puede
-pertenecer a un miembro del equipo: desvincúlalo allí primero o elige otro usuario.»
-(`staff.user_already_linked`), también si dos personas lo vinculan a la vez; «Ese usuario del Hub no
+Si falla: «Ese usuario del Hub ya está vinculado a Ana García. Un usuario del Hub solo puede
+pertenecer a un miembro del equipo: desvincúlalo allí primero o elige otro usuario.», también si dos personas lo vinculan a la vez; «Ese usuario del Hub no
 tiene acceso a este negocio.».
 Implicados: ATTENDANCE-F01, TASK-F03
 
@@ -272,7 +291,7 @@ Entra: lo tecleado.
 Sale: el rol (`staff.role.created` o `staff.role.updated`). Un rol retirado deja de ofrecerse en las
 fichas; las que ya lo llevan lo conservan. «Miembros» cuenta solo personas **Activas**. Un rol no
 concede permisos.
-Si falla: «Ya existe un rol con ese nombre.» (sin distinguir mayúsculas, `staff.role_name_taken`);
+Si falla: «Ya existe un rol con ese nombre.» (sin distinguir mayúsculas);
 «Ese rol no existe en este negocio.».
 Implicados: ninguno
 
@@ -281,7 +300,7 @@ Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, asistente
 Pantalla: Personal
 Pasos:
-1. En la fila, pulsa **Desactivar** y confirma «¿Sacar a {nombre} de la agenda? Deja de ser
+1. En la fila, pulsa **Desactivar** y confirma «¿Sacar a Ana García de la agenda? Deja de ser
    reservable; no se borra nada.».
 2. La fila pasa a **Inactivo** y deja de ser reservable.
 Entra: la ficha y sus ausencias pendientes o aprobadas que no han terminado (con el «hoy» del
@@ -289,7 +308,7 @@ negocio).
 Sale: estado Inactivo y Reservable apagado (`staff.member.deactivated`). No toca horarios, ausencias,
 cuenta ni citas. Para volver: STAFF-F02.
 Si falla: «Ese miembro tiene ausencias pendientes o aprobadas que aún no han terminado. Resuélvelas
-primero.» (`staff.active_time_off`; se rechazan o se cancelan en STAFF-F18 y STAFF-F19); «Ese
+primero.» (se rechazan o se cancelan en **Ausencias**); «Ese
 miembro del personal ya está inactivo.»; «Ese miembro del personal no existe en este negocio.».
 Implicados: ninguno
 
@@ -334,9 +353,9 @@ Implicados: ninguno
 ### STAFF-F08 Ver mi propia ficha y mis ausencias
 Estado: hecho (servidor y pantalla)
 Actor: empleado (y cualquier persona con ficha vinculada), asistente
-Pantalla: Personal (vista propia) y Ausencias
+Pantalla: Personal (vista propia), Ausencias
 Pasos:
-1. Una persona con su cuenta vinculada a su ficha (STAFF-F03) abre lo suyo.
+1. Una persona con su cuenta vinculada a su ficha pulsa **Mi ficha** en **Personal**, o abre **Ausencias**.
 2. Ve su ficha con **su propia** tarifa y comisión (sin las notas de RRHH), y sus ausencias con su
    motivo y sus notas.
 3. La ficha es solo de lectura: un único botón, **Cerrar**.
@@ -366,7 +385,7 @@ Actor: propietario, administrador, responsable, asistente
 Pantalla: Horarios
 Pasos:
 1. Elige a la persona y pulsa **+**: se abre **Nuevo** con una semana propuesta: de lunes a viernes, la
-   jornada por defecto de **Ajustes** (STAFF-F22), con el descanso en mitad del día y su inicio en el
+   jornada por defecto de **Ajustes**, con el descanso en mitad del día y su inicio en el
    cuarto de hora anterior; sin tocar los ajustes, de 09:00 a 18:00 con descanso de 13:00 a 14:00. Un
    día que no trabaja propone las mismas horas si se marca.
 2. Pon el nombre (vacío, «Horario habitual»), la vigencia si solo vale en unas fechas, «Por defecto»
@@ -383,9 +402,9 @@ hora de inicio tiene que ser anterior a la de fin.», «El descanso necesita ini
 una vez.», «La vigencia del horario termina antes de empezar.»; «Ese miembro del personal no existe
 en este negocio.». Un turno que cruza la medianoche no se admite. «Un horario necesita al menos un día de
 trabajo con horas.» sale encima de la semana y se quita en cuanto se cambia cualquier día (se marca o se
-desmarca, o se escribe una hora), sin volver a guardar (hub#1448). El motivo de un día sale debajo de ese día y
+desmarca, o se escribe una hora), sin volver a guardar. El motivo de un día sale debajo de ese día y
 se quita en cuanto se cambia ese día (se marca o se desmarca, o se escribe una de sus horas), sin volver a
-guardar; los de los demás días se quedan hasta que se cambian (hub#1460).
+guardar; los de los demás días se quedan hasta que se cambian.
 Implicados: ninguno
 
 ### STAFF-F14 Editar un horario
@@ -393,7 +412,7 @@ Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, responsable
 Pantalla: Horarios
 Pasos:
-1. Pulsa la fila del horario: se abre **Editar · {nombre}** con su semana.
+1. Pulsa la fila del horario: se abre **Editar · Horario habitual** con su semana.
 2. Cambia el nombre, la vigencia, «Por defecto» o los días; un día que desmarcas queda «No
    trabaja». Guarda: **se sustituye la semana entera**; lo demás que no envíes se queda como estaba y
    una fecha vacía quita esa vigencia.
@@ -410,7 +429,7 @@ Actor: propietario, administrador, responsable
 Pantalla: Horarios
 Pasos:
 1. **Activar / desactivar** cambia al momento: un horario inactivo no manda ningún día.
-2. **Eliminar** pide confirmar «¿Eliminar el horario «{nombre}»? Sus horas dejan de contar para la
+2. **Eliminar** pide confirmar «¿Eliminar el horario «Horario habitual»? Sus horas dejan de contar para la
    disponibilidad.» y lo borra con sus horas.
 Entra: el horario.
 Sale: `staff.schedule.updated` o `staff.schedule.deleted`. Eliminar el «Por defecto» no hace «Por
@@ -449,8 +468,7 @@ Sale: la ausencia Pendiente (`staff.time_off.created`; el aviso no lleva el moti
 cambia la agenda: solo cuenta al aprobarla (STAFF-F18). No avisa a la persona.
 Si falla: debajo de cada campo: «La fecha de fin no puede ser anterior a la de inicio.», «Una
 ausencia de medio día necesita hora de inicio y de fin.», «La hora de inicio tiene que ser anterior a
-la de fin.»; «Ese miembro ya tiene una ausencia pendiente o aprobada en esas fechas.»
-(`staff.overlapping_time_off`): se solapan si comparten algún día y, cuando las dos son de horas,
+la de fin.»; «Ese miembro ya tiene una ausencia pendiente o aprobada en esas fechas.»: se solapan si comparten algún día y, cuando las dos son de horas,
 también alguna hora (una de mañana y otra de tarde del mismo día **no** chocan); las rechazadas y
 canceladas no cuentan. «Ese miembro del personal no existe en este negocio.».
 Implicados: ninguno
@@ -468,7 +486,7 @@ Sale: el estado nuevo y, al aprobar, quién aprobó y cuándo (`staff.time_off.a
 en «Ausentes hoy»; Rechazada no cambia nada. No avisa a la persona ni mira sus citas. Quien gestiona
 ausencias puede aprobar también una suya.
 Si falla: «Ese miembro ya tiene una ausencia aprobada en esas fechas.» (al aprobar); «Esa solicitud
-de ausencia no puede pasar a ese estado desde el actual.» (`staff.invalid_transition`); «Esa
+de ausencia no puede pasar a ese estado desde el actual.»; «Esa
 solicitud de ausencia no existe en este negocio.».
 Implicados: ninguno
 
@@ -489,7 +507,7 @@ Implicados: ninguno
 ### STAFF-F20 Ver quién falta hoy
 Estado: hecho (servidor y pantalla)
 Actor: todos
-Pantalla: Ausencias, Personal e Inicio
+Pantalla: Ausencias, Personal, Inicio
 Pasos:
 1. Abre **Ausencias**: encima de la tabla, «Ausencias de hoy» lista a quien tiene una ausencia
    **aprobada** que cubre hoy (en el día del negocio), de día entero primero y luego por nombre, con el
@@ -507,15 +525,15 @@ Implicados: ninguno
 ### STAFF-F21 Dar la tarifa y la comisión de cada profesional
 Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, responsable
-Pantalla: Personal (columna Tarifa/h y formulario) y Comisiones
+Pantalla: Personal (columna Tarifa/h y formulario), Comisiones
 Pasos:
 1. Quien puede ver la compensación ve la tarifa, la comisión y las notas de RRHH de cada ficha.
-2. La **hoja de comisiones** da, por cada persona que puede cobrar comisión (Activa o De baja; no las
-   Inactivas ni las dadas de baja), su ficha, su cuenta (vacía si no tiene), nombre, rol y comisión,
-   también las de comisión 0.
-3. Para saber lo que ha ganado cada profesional, abre **Personal → Comisiones**. Sale «Hoy»: lo que ha
+2. En **Comisiones** sale cada persona que puede cobrar comisión (Activa o De baja) con su nombre, su rol
+   y su comisión, también sin ventas o con comisión 0, y quien vendió en el periodo aunque ya no esté
+   («Ya no trabaja aquí» o «Inactivo» junto al nombre).
+3. Para saber lo que ha ganado cada profesional, abre la pestaña **Comisiones**. Sale «Hoy»: lo que ha
    vendido cada persona en el día del negocio, con lo devuelto ya restado, sin los bonos que vendió y
-   sumado lo que valen las sesiones de bono que hizo (SALE-F28), su comisión y lo que le
+   sumado lo que valen las sesiones de bono que hizo, su comisión y lo que le
    corresponde (vendido × comisión ÷ 100, redondeado a la unidad más pequeña de la moneda del negocio, el
    céntimo en euros, una sola vez por persona; media unidad sube). Arriba, el total vendido y el total de
    comisiones.
@@ -537,14 +555,14 @@ Implicados: SALE-F16, SALE-F27, SALE-F28
 ### STAFF-F22 Cambiar los ajustes de Personal
 Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, responsable
-Pantalla: Ajustes de Personal
+Pantalla: Ajustes
 Pasos:
 1. Abre **Ajustes**: sale la jornada por defecto guardada o, si nunca se guardó, la propuesta (de 09:00
    a 18:00 con 60 minutos de descanso).
 2. Cambia el inicio y el fin en HH:MM (el fin, después del inicio: un día de horario no cruza la
    medianoche) y el descanso, de 0 (sin descanso) a 480 minutos y más corto que la jornada.
 3. Pulsa **Guardar**.
-   Lo que se cambia mientras se está guardando no se pierde: se queda en pantalla, por guardar (hub#914).
+   Lo que se cambia mientras se está guardando no se pierde: se queda en pantalla, por guardar.
 Entra: lo enviado; lo demás se queda como estaba.
 Sale: los ajustes del negocio (`staff.settings.updated`), con las horas siempre en HH:MM. Desde ese
 momento, un horario nuevo propone esa jornada de lunes a viernes, con el descanso en mitad del día
@@ -555,7 +573,7 @@ jornada (HH:MM)» (debajo de «Inicio de jornada (HH:MM)» si solo se cambió el
 que no cabe en la jornada, «El descanso debe caer dentro del intervalo de trabajo.» debajo del
 descanso; no se guarda nada. Como en las ventanas de formulario, el aviso se quita en cuanto se cambia algo y
 el motivo de un campo en cuanto se corrige ese campo; los dos vuelven si el siguiente intento también se
-rechaza. Un rechazo sin campo se queda hasta el siguiente intento (hub#854). Si los ajustes no se pueden leer,
+rechaza. Un rechazo sin campo se queda hasta el siguiente intento. Si los ajustes no se pueden leer,
 «No se pudieron cargar los ajustes» con «Reintentar», sin formulario: nunca se ofrecen para guardar unos valores
 que no son los del negocio.
 Implicados: ninguno
@@ -563,7 +581,7 @@ Implicados: ninguno
 ### STAFF-F23 Ver las cifras de la plantilla y por rol
 Estado: hecho (servidor y pantalla)
 Actor: todos
-Pantalla: Personal, Roles e Inicio
+Pantalla: Personal, Roles, Inicio
 Pasos:
 1. Abre **Personal**: encima de la tabla salen tres cifras: «Plantilla activa» (cuántas personas
    están **Activas**), «Ausentes hoy» (personas distintas con una ausencia aprobada que cubre hoy) y
@@ -589,12 +607,12 @@ Pantalla: Ausencias
 Pasos:
 1. En **Ausencias**, pulsa **+**: el formulario no pide Miembro, la ausencia es tuya.
 2. Elige el Tipo, las fechas, «Día completo» (o sus horas) y, si quieres, el Motivo, y guarda.
-3. Sale como **Pendiente** hasta que un responsable la apruebe o la rechace (STAFF-F18); mientras
-   esté pendiente puedes retirarla (STAFF-F19).
+3. Sale como **Pendiente** hasta que un responsable la apruebe o la rechace; mientras
+   esté pendiente puedes retirarla con **Cancelar**.
 Entra: tu ficha, por tu cuenta vinculada (STAFF-F03).
 Sale: la ausencia Pendiente, con el mismo aviso que STAFF-F17 (`staff.time_off.created`).
-Si falla: los mismos rechazos que STAFF-F17; sin ficha vinculada: «Tu usuario no está vinculado a
-ningún miembro del personal: pide a un responsable que lo vincule.» (`staff.no_member_record`).
+Si falla: los mismos rechazos que al registrar una ausencia; sin ficha vinculada: «Tu usuario no está vinculado a
+ningún miembro del personal: pide a un responsable que lo vincule.».
 Implicados: ninguno
 
 ## Servicios: lo que entra y lo que sale
