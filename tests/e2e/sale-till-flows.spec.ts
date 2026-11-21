@@ -286,12 +286,22 @@ test('SALE-F03: a check charged part by card and the rest in cash, with its chan
   );
   await sheet.locator('[data-testid=sale-checkout-split]').click();
   await expect(sheet.locator('[data-testid=sale-checkout-remaining]')).toContainText('20.00');
+  // With nothing typed, the amount of the payment already says what «Add this payment» takes: all that is
+  // left (hub#2017); a key replaces it.
+  const amount = sheet.locator('[data-testid=sale-checkout-tendered]');
   await sheet.locator(`[data-testid=sale-checkout-method-${byType.card}]`).click();
+  await expect(amount).toContainText('20.00');
   for (const key of ['1', '2']) await sheet.locator(`[data-testid=sale-checkout-keypad-${key}]`).click();
+  await expect(amount).toContainText('12.00');
   await sheet.locator('[data-testid=sale-checkout-add-leg]').click();
   await expect(sheet.locator('[data-testid=sale-checkout-remaining]')).toContainText('8.00');
   await sheet.locator(`[data-testid=sale-checkout-method-${byType.cash}]`).click();
+  await expect(amount).toContainText('8.00');
+  await shots(page, 'APP-SALE-SALE-F03-REST', async (p) => {
+    await p.locator('[data-testid=sale-checkout-modal] [data-testid=sale-checkout-tendered]').waitFor({ state: 'visible' });
+  });
   for (const key of ['1', '0']) await sheet.locator(`[data-testid=sale-checkout-keypad-${key}]`).click();
+  await expect(amount).toContainText('10.00');
   await expect(sheet.locator('[data-testid=sale-checkout-change]')).toContainText('2.00');
   await sheet.locator('[data-testid=sale-checkout-add-leg]').click();
   await expect(sheet.locator('[data-testid=sale-checkout-leg]')).toHaveCount(2);

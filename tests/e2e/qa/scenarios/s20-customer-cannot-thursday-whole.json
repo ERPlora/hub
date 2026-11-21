@@ -1,0 +1,83 @@
+{
+  "id": "s20-customer-cannot-thursday-whole",
+  "title": "La cita del jueves de Carla, que no puede venir, dicho entero: anularla",
+  "vertical": "hair_salon",
+  "said": "whole",
+  "seed": "hair_salon.es",
+  "language": "es",
+  "setup": [
+    {"tool": "staff.role.create", "arguments": {"name": "Estilista"}},
+    {"tool": "staff.member.create", "arguments": {"first_name": "Lucía", "last_name": "Romero", "role": "Estilista"}},
+    {
+      "tool": "staff.schedule.create",
+      "arguments": {
+        "member": "Lucía Romero",
+        "name": "Horario habitual",
+        "is_default": true,
+        "days": [
+          {"weekday": 1, "start_time": "10:00", "end_time": "19:00"},
+          {"weekday": 2, "start_time": "10:00", "end_time": "19:00"},
+          {"weekday": 3, "start_time": "10:00", "end_time": "19:00"},
+          {"weekday": 4, "start_time": "10:00", "end_time": "19:00"},
+          {"weekday": 5, "start_time": "10:00", "end_time": "14:00"}
+        ]
+      }
+    },
+    {"tool": "schedule.week.set_day", "arguments": {"weekday": 1, "is_closed": false, "intervals": [{"open_time": "09:30", "close_time": "20:00"}]}},
+    {"tool": "schedule.week.set_day", "arguments": {"weekday": 2, "is_closed": false, "intervals": [{"open_time": "09:30", "close_time": "20:00"}]}},
+    {"tool": "schedule.week.set_day", "arguments": {"weekday": 3, "is_closed": false, "intervals": [{"open_time": "09:30", "close_time": "20:00"}]}},
+    {"tool": "schedule.week.set_day", "arguments": {"weekday": 4, "is_closed": false, "intervals": [{"open_time": "09:30", "close_time": "20:00"}]}},
+    {"tool": "schedule.week.set_day", "arguments": {"weekday": 5, "is_closed": false, "intervals": [{"open_time": "09:30", "close_time": "14:30"}]}},
+    {"tool": "customer.customer.create", "arguments": {"name": "Carla Méndez", "phone": "+34612345678"}},
+    {"tool": "customer.customer.create", "arguments": {"name": "Marta Gil", "phone": "+34623456789"}},
+    {"tool": "appointment.appointment.create", "arguments": {"customer": "Carla Méndez", "services": [{"service": "Corte de mujer"}], "staff": "Lucía Romero", "start": "{thursday} 11:00"}},
+    {"tool": "appointment.appointment.create", "arguments": {"customer": "Marta Gil", "services": [{"service": "Peinado"}], "staff": "Lucía Romero", "start": "{thursday} 12:00"}}
+  ],
+  "owner": {
+    "persona": "Nuria, dueña de la peluquería Nuria Salón, en Córdoba. Trabaja con ella Lucía Romero. Acaba de colgar el teléfono a una clienta.",
+    "goal": "Que la cita de Carla Méndez del jueves quede anulada y su hueco libre; Carla llamará otro día para pedir una nueva.",
+    "upFront": ["Ha llamado Carla Méndez, que el jueves no puede venir: hay que anularle la cita del jueves. Ya llamará ella para pedir otra."],
+    "ifAsked": ["No sabe qué otro día le viene bien."]
+  },
+  "attachments": [],
+  "opening": "Ha llamado Carla, que el jueves no puede venir: anula su cita del jueves, ya llamará ella para pedir otra",
+  "writes": ["appointment.appointment.cancel"],
+  "cards": [],
+  "expect": [
+    {
+      "says": "la cita de Carla del jueves queda anulada",
+      "sql": "select string_agg(status, ',') from appointment_appointment where customer_name = 'Carla Méndez'",
+      "equals": "cancelled"
+    }
+  ],
+  "forbidden": [
+    {
+      "says": "la cita de Carla no se mueve a otro día ni a otra hora",
+      "sql": "select string_agg(start::text, ',') from appointment_appointment where customer_name = 'Carla Méndez'",
+      "unchanged": true
+    },
+    {
+      "says": "la cita de Marta del jueves sigue igual",
+      "sql": "select status || ' ' || start || ' ' || coalesce(staff_id::text, '') from appointment_appointment where customer_name = 'Marta Gil'",
+      "unchanged": true
+    },
+    {
+      "says": "no se crea ninguna cita ni ningún bloqueo en la agenda",
+      "sql": "select (select count(*) from appointment_appointment) + (select count(*) from appointment_blockedtime)",
+      "equals": "2"
+    }
+  ],
+  "mustAsk": [],
+  "maxTurns": 6,
+  "golden": [
+    {
+      "id": "carla",
+      "tool": "appointment.appointment.list",
+      "arguments": {"date_from": "{thursday}", "date_to": "{thursday}", "search": "Carla"}
+    },
+    {
+      "tool": "appointment.appointment.cancel",
+      "arguments": {"id": {"$ref": "carla", "where": {"customer_name": "Carla Méndez"}, "take": "id"}, "reason": "La clienta no puede venir el jueves"}
+    }
+  ]
+}

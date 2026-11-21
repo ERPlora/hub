@@ -1422,7 +1422,7 @@ Lo que sigue es para quien cambia la app; quien la usa puede parar aquí.
 
 ## El servidor
 
-- **Anatomía**: `apps.py`, `models.py`, `migrations/`, `schemas.py`, `queries/`, `services.py`,
+- **Anatomía**: `apps.py`, `models.py`, `migrations/`, `schemas.py`, `queries/`, `services/`,
   `events.py`, `live.py`, `api.py`, `admin.py`, `locale/` y un `tests/test_<fichero>.py` por fichero.
   Las páginas (`frontend/`): Panel, Productos, Movimientos, Categorías y Ajustes.
 - **31 operaciones** (12 consultas y 19 acciones), todas con `ai` (descripción y, en las acciones,
