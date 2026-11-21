@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:e7ff070a4079bf39e73af5dc1c779a0fe6f83781eb3415c3784675225e9a02b5 -->
+<!-- generated from WORKBOOK.md sha256:0892edf2da61fdc9a900ce7e5452015f6dba8f85cc834773129ee1b171e93ee9 -->
 
 ## What it is for and who it is for
 
@@ -1023,8 +1023,8 @@ Steps:
    days", under the figures, what was sold on each of those days, from oldest to today ("Wed 14 ·
    €120.50").
 3. The table: Date, Number, Customer, Payment, Status (Completed, Voided, Refunded; with "€5.00 left to
-   refund" if part was refunded) and Total. A sale charged with several methods (SALE-F03) shows them all
-   under "Payment", once each and in the order they were charged: "Cash + Card". Search with "Search
+   refund" if part was refunded) and Total. A sale charged with several methods shows them all under
+   "Payment", once each and in the order they were charged: "Cash + Card". Search with "Search
    number or customer…", filter by status, payment, date or total, or sort; the payment filter finds a
    sale by any of its methods.
 4. Tap a row to see its document. The table reloads by itself when a sale is charged, voided
