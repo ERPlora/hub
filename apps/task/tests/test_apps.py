@@ -2,7 +2,7 @@
 and the assistant's contract of every operation (``ai`` and described input fields)."""
 
 from django.apps import apps
-from live.meta import Category, LiveAppConfig, Nav, module_configs, permissions_for_role
+from live.meta import Category, Help, LiveAppConfig, Nav, module_configs, permissions_for_role
 from live.operations import AI, MIN_ASKS, registry
 
 from apps.task import queries, services  # noqa: F401  (importing them registers the operations)
@@ -167,3 +167,7 @@ def test_the_reaction_is_run_only_by_the_platform():
     op = registry["task.task.release_member"]
     assert op.permission == "task.system"
     assert "task.system" not in task_app().permissions
+
+
+def test_its_help_window_is_ready_without_a_video_yet():
+    assert task_app().help == Help()

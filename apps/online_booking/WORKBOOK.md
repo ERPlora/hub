@@ -9,6 +9,12 @@ Estado de la app: completa (2026-10-21)
 
 ## Para qué sirve y para quién
 
+Reservas online es la página en la que tus clientas piden cita solas, sin llamar: eligen el servicio, el
+profesional, el día y una hora libre, y la cita entra en la agenda de Citas. Aquí ves y atiendes esas reservas y
+preparas la página y sus reglas.
+
+### En detalle
+
 Reservas online es **la puerta por la que una clienta pide cita sola, desde fuera, sin llamar**: elige el
 servicio, el profesional (o «sin preferencia»), el día y una hora libre, deja su nombre y su teléfono, y la
 cita entra **en la agenda de Citas**, como cualquier otra, con el origen «Reserva online». Si el negocio
@@ -16,7 +22,7 @@ confirma a mano, nace **Pendiente** y espera en la **bandeja de Reservas**; si c
 **Confirmada**. La clienta recibe un número de cita y un enlace personal con el que ve su reserva y la
 cancela dentro de la política del negocio.
 
-Quién la usa:
+### Quién la usa y qué hace cada uno
 
 - La **clienta**, en la página de reservas del negocio (sin cuenta ni contraseña).
 - El **empleado** ve en la bandeja las reservas online de **su propia agenda**.
@@ -58,7 +64,13 @@ Reservas online se abre desde el menú **Reservas online** y tiene dos pestañas
 (esta, solo para quien puede cambiarlos). Lo que una persona no puede hacer sale en gris o no aparece, y la
 app lo rechaza aunque lo intente por la API o por el asistente.
 
-### Reservas (bandeja)
+### Reservas
+Aquí están las citas que tus clientas han reservado desde la página, las más recientes primero: el número, la
+clienta con su teléfono, el servicio, el profesional, el día, la hora y el estado. Busca o filtra para encontrar una
+y, desde su fila, confírmala, complétala, márcala como no-show, cancélala o bórrala. Si eres empleado, ves solo las
+de tu agenda.
+
+#### Detalle
 Tabla de 50 filas por página con buscador («Buscar nº, cliente, teléfono, servicio…») y filtros por columna
 detrás del botón de filtros de la barra: Nº, Cliente, Servicio, Profesional, Fecha
 (un día) y Estado. Columnas: **Nº** (`APT-…`), **Cliente** (con su
@@ -71,6 +83,13 @@ opcional; **Borrar** pide confirmación. Vacía: «Aún no hay reservas online.�
 coincide con la búsqueda.»). Se refresca sola cuando cambia una cita online en la agenda.
 
 ### Ajustes
+Aquí preparas la página de reservas que abren tus clientas: si está activada, su título, su mensaje de bienvenida,
+su color, su logo y qué datos pide, y las reglas de reserva que comparte con Citas (antelación, intervalo entre
+huecos, si las reservas se confirman solas y si la clienta puede cancelar). Abajo eliges qué servicios se reservan
+online. Tus clientas la abren en la dirección de tu negocio terminada en /book, por ejemplo
+aurora.erplora.com/p/aurora/book.
+
+#### Detalle
 Título «Configuración de la página de reservas». Tres bloques y un botón **Guardar**:
 
 - **Página pública**: «Página pública activada», «Título de la página», «Mensaje de bienvenida», «Color
@@ -88,7 +107,7 @@ Título «Configuración de la página de reservas». Tres bloques y un botón *
 
 Al guardar: «Configuración guardada.»; un rechazo sale debajo de su campo («No se pudo guardar»).
 
-### Página de reservas (la clienta, sin sesión)
+#### Página de reservas (la clienta, sin sesión)
 Página `/p/<negocio>/book` en la dirección del negocio: la abre cualquiera, sin iniciar sesión ni ver nada del equipo
 (sin su menú). Arriba, el nombre del negocio, su logo (el que se sube en Ajustes, servido desde la dirección del
 propio negocio; sin logo, solo el nombre) y su color. También «Reserva online» y «Elige tus servicios, un día y una hora
@@ -102,10 +121,13 @@ completa de su reserva, con el origen del negocio (`https://<negocio>.erplora.co
 profesional y estado, y puede cancelarla con confirmación si la política todavía lo permite; una ya cancelada o fuera de
 plazo no ofrece esa acción. Un enlace que no existe da un aviso claro, sin datos ni formulario.
 
-### Vista previa de la reserva (solo en desarrollo)
+#### Vista previa de la reserva (solo en desarrollo)
 Página `/online_booking/preview`, solo en el servidor de desarrollo: el mismo recorrido que la página de reservas
 (servicio → profesional → día y hora → datos → reservar → ver y cancelar con el enlace), con las mismas operaciones,
-por la sesión del equipo. No forma parte de la versión de producción.
+por la sesión del equipo. No forma parte de la versión de producción. Como en las ventanas de formulario, el aviso
+de un rechazo se quita en cuanto se cambia algo y el motivo de un campo en cuanto se corrige ese campo; los dos
+vuelven si el siguiente intento también se rechaza. Un rechazo sin campo se queda hasta el siguiente intento. La
+política de cancelación de Citas vale igual cuando el equipo prueba aquí el enlace de una reserva.
 
 ## Estados de cada pantalla
 
@@ -140,12 +162,12 @@ Fechas y horas salen en el reloj del negocio y con el formato del idioma de quie
 ### ONLINE_BOOKING-F01 La clienta reserva desde la página de reservas
 Estado: hecho
 Actor: clienta (sin sesión); propietario o administrador, con la vista previa o con el asistente
-Pantalla: página de reservas (`/p/<negocio>/book`); en desarrollo, también la vista previa
+Pantalla: Página de reservas (`/p/<negocio>/book`; en desarrollo, también la vista previa)
 Pasos:
 1. Abre la página del negocio: su nombre, su logo (el de los Ajustes, desde la dirección del propio negocio; sin
    logo, solo el nombre), título, mensaje de bienvenida y color.
 2. Elige uno o varios servicios (hasta 5) de los **reservables online**, con su precio (en la moneda del negocio,
-   la de su país —BASE-F50: «20,00 zł» en Polonia—, agrupado desde cuatro cifras: «1.234,56 €») y su duración si
+   la de su país: «20,00 zł» en Polonia; agrupado desde cuatro cifras: «1.234,56 €») y su duración si
    Servicios los enseña («Mostrar precios», «Mostrar duración»).
 3. Si el negocio lo permite, elige profesional entre los que hacen todos esos servicios, o «Sin
    preferencia».
@@ -155,7 +177,7 @@ Pasos:
 5. Escribe su nombre, su **móvil** (obligatorio), su email (si el negocio lo pide) y, si se permite, una nota.
 6. Pulsa **Reservar**: la cita entra en la agenda con el origen «Reserva online», **Confirmada** o
    **Pendiente** según «Confirmar automáticamente las reservas de la clienta» (y siempre Pendiente si un
-   servicio tiene «Requiere confirmación» en Servicios), y la clienta ve su número de cita (`APT-…`), el
+   servicio tiene «Requiere confirmación» en Servicios), y la clienta ve su número de cita (como APT-20261016-0003), el
    mensaje de confirmación y su **enlace personal**.
 Entra: los servicios reservables online (Servicios), los profesionales que los hacen (Servicios y Personal),
 las horas libres y las reglas de reserva (Citas), las fichas de Clientes.
@@ -176,10 +198,7 @@ negocio («…Inténtalo dentro de unos minutos.»), o más
 reservas online próximas con el mismo móvil de las que permiten los Ajustes (3 de fábrica: «Este móvil ya
 tiene reservas próximas…», sin decir cuántas); el campo oculto del formulario relleno, que solo rellena un robot
 («No hemos podido hacer esta reserva. Inténtalo de nuevo o llama al negocio.», sin decir por qué). Dos clientas que reservan a la vez la misma hora del mismo
-profesional: entra una y la otra recibe «Esa hora ya no está libre». En la vista previa, como en las ventanas de
-formulario, el aviso se quita en cuanto se cambia algo y el motivo de un campo en cuanto se corrige ese campo;
-los dos vuelven si el siguiente intento también se rechaza. Un rechazo sin campo se queda hasta el siguiente
-intento (hub#854).
+profesional: entra una y la otra recibe «Esa hora ya no está libre».
 Implicados: APPOINTMENT-F02, APPOINTMENT-F18, APPOINTMENT-F19, CUSTOMER-F10, CUSTOMER-F11, SERVICE-F10
 
 ### ONLINE_BOOKING-F02 Confirmar una reserva
@@ -255,7 +274,7 @@ Pantalla: Ajustes
 Pasos:
 1. Cambia los campos de **Página pública** y de **Reglas de reserva** y pulsa **Guardar**: «Configuración
    guardada.». Se guarda solo lo que cambia, todo junto o nada.
-   Lo que se cambia mientras se está guardando no se pierde: se queda en pantalla, por guardar (hub#914).
+   Lo que se cambia mientras se está guardando no se pierde: se queda en pantalla, por guardar.
 2. En **Logo**, elige una imagen JPG, PNG o WebP (hasta 5 MB y 8000 píxeles por lado): se sube al momento y sale
    en la miniatura; la página la enseña cuando se pulsa **Guardar**. **Quitar** y **Guardar** dejan la página sin
    logo. La página lo carga desde la dirección del negocio, nunca desde otra.
@@ -265,13 +284,13 @@ Entra: los ajustes guardados (o los de fábrica: página apagada, email no oblig
 móvil, elegir profesional y notas permitidos) y las reglas de Citas.
 Sale: `online_booking.settings.updated` (si cambia algo de la página) y `appointment.settings.updated` (si
 cambia una regla); el interruptor de un servicio, `service.service.updated`.
-Si falla: un color que no es `#RRGGBB`, un logo que no se subió a este negocio («Ese logo no se subió a este
+Si falla: un color que no es un código como #1A73E8, un logo que no se subió a este negocio («Ese logo no se subió a este
 negocio: vuelve a subirlo.»), un número fuera de rango o un texto demasiado largo, debajo de su campo; no se guarda
 nada. Al subir el logo, un archivo que no es una imagen JPG, PNG o WebP, que pesa más de 5 MB o que mide más de
 8000 píxeles por lado se rechaza debajo de **Logo** («Este archivo no es una imagen PNG.», «La imagen puede pesar 5 MB
 como mucho.»), y uno que no cabe en el espacio del plan, con el aviso de Archivos. Como en las ventanas de formulario, el aviso se quita
 en cuanto se cambia algo y el motivo de un campo en cuanto se corrige ese campo; los dos vuelven si el
-siguiente intento también se rechaza. Un rechazo sin campo se queda hasta el siguiente intento (hub#854).
+siguiente intento también se rechaza. Un rechazo sin campo se queda hasta el siguiente intento.
 Implicados: APPOINTMENT-F19, SERVICE-F02
 
 ### ONLINE_BOOKING-F08 Ver y buscar las reservas
@@ -305,8 +324,8 @@ Implicados: APPOINTMENT-F23, CUSTOMER-F13
 ### ONLINE_BOOKING-F10 La clienta ve su reserva con su enlace
 Estado: hecho
 Actor: clienta (sin sesión)
-Pantalla: la de su enlace (`/p/<negocio>/book/<enlace>`, en la dirección del negocio); la página de reservas, tras
-reservar; en desarrollo, la vista previa
+Pantalla: Página de reservas (la de su enlace, `/p/<negocio>/book/<enlace>`, en la dirección del negocio; tras
+reservar, la propia página; en desarrollo, la vista previa)
 Pasos:
 1. Abre el enlace de su confirmación.
 2. Ve de qué negocio es, con su nombre y su logo si lo tiene, como en la página de reservas; y el número, el estado,
@@ -322,18 +341,17 @@ Implicados: APPOINTMENT-F06
 ### ONLINE_BOOKING-F11 La clienta cancela su reserva con su enlace
 Estado: hecho
 Actor: clienta (sin sesión)
-Pantalla: la de su enlace (`/p/<negocio>/book/<enlace>`, en la dirección del negocio); la página de reservas, tras
-reservar; en desarrollo, la vista previa
+Pantalla: Página de reservas (la de su enlace, `/p/<negocio>/book/<enlace>`, en la dirección del negocio; tras
+reservar, la propia página; en desarrollo, la vista previa)
 Pasos:
 1. Desde su enlace pulsa **Cancelar la reserva**, confirma el número y el momento de la cita y puede escribir un motivo.
 2. Pulsa de nuevo **Cancelar la reserva** en la confirmación. Se aplica la política de Citas: «Permitir que la clienta
    cancele su cita» y «Antelación mínima para cancelar». La cita queda **Cancelada**, la página dice «Esta reserva está
-   cancelada.» y no vuelve a ofrecer la acción; el historial guarda «Lo pidió la clienta». La política vale igual cuando
-   el equipo prueba el enlace desde la vista previa.
+   cancelada.» y no vuelve a ofrecer la acción; el historial guarda «Lo pidió la clienta».
 Entra: el enlace de una reserva pendiente o confirmada, sin cobrar.
 Sale: `appointment.appointment.cancelled`.
 Si falla: «La cancelación online no está disponible. Ponte en contacto con el negocio.»; «Esta cita solo se
-puede cancelar online con N horas de antelación…»; una ya cancelada o completada, el motivo de Citas.
+puede cancelar online con 24 horas de antelación…»; una ya cancelada o completada, el motivo de Citas.
 Implicados: APPOINTMENT-F06, APPOINTMENT-F19
 
 ### ONLINE_BOOKING-F12 Borrar los datos de una clienta (RGPD)

@@ -10,6 +10,12 @@ Lo que no entra todavía: ver «Lo que NO hace, a propósito».
 
 ## Para qué sirve y para quién
 
+Tareas es la lista de cosas por hacer del equipo, como «limpiar el almacén» o «pedir tinte rubio». Cada tarea tiene
+una persona que se encarga, una prioridad y, si quieres, una fecha límite; se agrupan en proyectos, se parten en
+subtareas y llevan comentarios. Cada empleado ve las suyas y el responsable, todas.
+
+### En detalle
+
 Tareas es la **lista de cosas por hacer del equipo**: «limpiar el almacén», «pedir tinte rubio»,
 «revisar la cámara frigorífica». Cada tarea tiene un título, una prioridad, una fecha límite y una
 persona del equipo que se encarga; se agrupan en **proyectos** («Apertura del local», «Reforma de
@@ -17,7 +23,7 @@ verano»), se parten en **subtareas** y llevan un hilo de **comentarios**.
 
 Es para el personal, no para los clientes: una incidencia de un cliente no es una tarea.
 
-Quién la usa:
+### Quién la usa y qué hace cada uno
 
 - El **propietario**, el **administrador** y el **responsable** ven y cambian **todas** las tareas,
   las asignan, las borran y llevan los proyectos.
@@ -74,6 +80,12 @@ persona no puede hacer no aparece, y la app lo rechaza aunque lo intente por la 
 asistente.
 
 ### Tareas
+Aquí está la lista de tareas del equipo. En **Todas**, la tabla con su número, título, estado, prioridad, fecha
+límite y responsable, que puedes buscar y filtrar; en **Mis tareas**, las abiertas que tienes asignadas, primero las
+que vencen antes. Con **+** creas una tarea; desde su fila la inicias o la completas, y al tocarla se abre con sus
+subtareas y sus comentarios, donde también la asignas, la editas o la borras. Si eres empleado, ves solo las tuyas.
+
+#### Detalle
 Arriba, el selector **Todas / Mis tareas** («Mis tareas» solo sale a quien tiene ficha vinculada).
 
 **Todas**: tabla con buscador «Buscar nº o título…» (nº, título, descripción, responsable o
@@ -99,7 +111,7 @@ arriba) y después las que no, las más nuevas primero. Iniciar, asignar o comen
 tarjeta. La que completo desde su tarjeta se queda en su sitio, como hecha y sin acciones, hasta que
 cambio de pestaña.
 
-### Tarea (hoja)
+#### Tarea (hoja)
 Se abre sobre la lista con: **TSK-AAAAMMDD-NNNN — Título**, su estado y su prioridad; la descripción;
 **Vence**, **Completada**, **Asignada a** («Sin asignar»), **Proyecto**, **Creada** y **Creada por**.
 
@@ -114,6 +126,12 @@ Se abre sobre la lista con: **TSK-AAAAMMDD-NNNN — Título**, su estado y su pr
   texto se queda junto al motivo.
 
 ### Proyectos
+Aquí están los proyectos que agrupan las tareas, como «Apertura del local», con su código, su nombre, su color y si
+están activos. Con **+** creas uno; al tocarlo se abre con sus tareas, donde cambias su nombre o su color, lo
+desactivas o lo borras (sus tareas siguen, sin proyecto). Crearlos, cambiarlos y borrarlos es del responsable; el
+empleado ve la lista.
+
+#### Detalle
 Tabla con buscador «Buscar código o nombre…», columnas **Código, Nombre, Color** y **Activo** (Sí /
 No, filtro de lista; Código, Nombre y Color se filtran por «contiene»; los filtros, tras el embudo de la
 barra); orden por cualquier columna, 50 por página. Los contadores de tareas de un proyecto cuentan solo las que quien mira puede ver. **+** abre **Nuevo proyecto**:
@@ -121,7 +139,7 @@ barra); orden por cualquier columna, 50 por página. Los contadores de tareas de
 #RRGGBB). Acción de fila **Abrir**; pulsar la fila hace lo mismo. Crear, editar y borrar es del
 responsable; el empleado ve la lista.
 
-### Proyecto (hoja)
+#### Proyecto (hoja)
 **Nombre** con su color, **Activo / Inactivo** y el **Código**; **Nombre** y **Color** editables con
 **Guardar** (el código no cambia: es la clave del proyecto); **Desactivar / Activar** (no envía lo
 tecleado sin guardar); **Borrar** con confirmación; **Tareas de este proyecto ({n})**, las 50 más
@@ -175,8 +193,8 @@ Pasos:
    Prioridad (Baja, Media, Alta, Urgente; Media por defecto), Vence (un día), Asignada a (una
    persona activa del equipo), Proyecto (el selector ofrece los activos) y Etiquetas (hasta 20, de
    hasta 50 caracteres, separadas por comas).
-3. Pulsa **Crear tarea**: la tarea sale en la lista **Por hacer**, sin fecha de completada y con su número
-   `TSK-AAAAMMDD-NNNN` (el día del negocio y un contador del día que no deja huecos).
+3. Pulsa **Crear tarea**: la tarea sale en la lista **Por hacer**, sin fecha de completada y con su número, como
+   TSK-20260901-0001 (el día del negocio y un contador del día que no deja huecos).
 Entra: el formulario. El asistente nombra el proyecto por su código o su nombre, la tarea madre por su
 número o su título y al responsable por su nombre. Una fecha con hora se toma como su día en la zona
 del negocio. Creador: quien la crea, siempre de la sesión.
@@ -190,7 +208,7 @@ Implicados: Personal (la ficha del responsable)
 ### TASK-F02 Ver y buscar las tareas
 Estado: hecho (servidor y pantalla)
 Actor: todos; el empleado ve solo las suyas
-Pantalla: Tareas → Todas
+Pantalla: Tareas (Todas)
 Pasos:
 1. Abre **Tareas**: la tabla sale con las más nuevas primero.
 2. Busca, ordena por cualquier columna o pulsa el embudo, elige los filtros y pulsa **Aplicar**.
@@ -199,13 +217,13 @@ código o nombre), responsable (id o nombre), sin responsable, tarea madre, solo
 etiqueta, y rangos de vencimiento, de completada y de creación. Hasta 100 por página.
 Sale: las tareas con su proyecto, su madre, su responsable, su creador, cuántas subtareas y
 comentarios tienen y si quien mira puede cambiarlas.
-Si falla: un filtro que no existe, «422».
+Si falla: «No se han podido cargar las tareas.» con **Reintentar**; por la API, un filtro que no existe se rechaza.
 Implicados: Personal (el nombre del responsable)
 
 ### TASK-F03 Ver mis tareas
 Estado: hecho (servidor y pantalla)
 Actor: quien tiene ficha vinculada a su cuenta, asistente
-Pantalla: Tareas → Mis tareas
+Pantalla: Tareas (Mis tareas)
 Pasos:
 1. Pulsa **Mis tareas**.
 2. Salen mis tareas **abiertas** (por hacer, en curso y bloqueadas): con fecha primero, la más
@@ -255,7 +273,7 @@ Pasos:
 Entra: la tarea.
 Sale: la tarea (`task.task.status_changed` y `task.task.completed`).
 Si falla: si ya estaba hecha o cancelada, «Esa tarea ya está cerrada, así que se ha dejado como
-estaba.» (409 `task.task_already_closed`): una cancelada no se «termina» por error; para reabrirla,
+estaba.»: una cancelada no se «termina» por error; para reabrirla,
 se cambia el estado.
 Implicados: ninguno
 
@@ -278,7 +296,7 @@ Implicados: Personal
 ### TASK-F08 Editar una tarea
 Estado: hecho (servidor y pantalla)
 Actor: quien puede cambiarla
-Pantalla: Tarea → **Editar**
+Pantalla: Tarea (**Editar**)
 Pasos:
 1. Abre la tarea y pulsa **Editar**: se abre «Editando tarea — TSK-…» con sus datos.
 2. Cambia el título, la descripción, la prioridad, la fecha límite, el proyecto o las etiquetas y
@@ -317,7 +335,7 @@ Implicados: ninguno
 ### TASK-F11 Borrar una tarea
 Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, responsable, asistente (con confirmación reforzada)
-Pantalla: Tarea → **Borrar**
+Pantalla: Tarea (**Borrar**)
 Pasos:
 1. Abre la tarea y pulsa **Borrar**: se pide confirmación.
 2. Pulsa **Borrar** en el aviso: la tarea desaparece **con sus subtareas y sus comentarios**.
@@ -325,7 +343,7 @@ Entra: la tarea.
 Sale: `task.task.deleted`.
 Si falla: «Esa tarea no existe en este negocio.». Por el asistente, un nombre que vale para varias tareas o para
 ninguna no saca tarjeta, y si antes del «sí» otra tarea encaja mejor con lo dicho no se borra nada y sale la tarjeta
-nueva (BASE-F97).
+nueva.
 Implicados: ninguno
 
 ### TASK-F12 Crear un proyecto
@@ -360,7 +378,7 @@ Implicados: ninguno
 ### TASK-F14 Borrar un proyecto
 Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, responsable, asistente (con confirmación reforzada)
-Pantalla: Proyecto → **Borrar**
+Pantalla: Proyecto (**Borrar**)
 Pasos:
 1. Abre el proyecto y pulsa **Borrar**: se pide confirmación.
 2. Pulsa **Borrar** en el aviso: el proyecto desaparece; **sus tareas siguen**, sin proyecto.
@@ -368,7 +386,7 @@ Entra: el proyecto.
 Sale: `task.project.deleted`.
 Si falla: «Ese proyecto no existe en este negocio.». Por el asistente, un nombre que vale para varios proyectos o para
 ninguno no saca tarjeta, y si antes del «sí» otro proyecto encaja mejor con lo dicho no se borra nada y sale la tarjeta
-nueva (BASE-F97).
+nueva.
 Implicados: ninguno
 
 ### TASK-F15 Cuando alguien deja el equipo
