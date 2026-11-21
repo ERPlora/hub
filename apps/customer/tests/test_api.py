@@ -4,6 +4,7 @@ Requests go to business A's host (``hub_a``, in its own database) with Django's 
 test's transaction. The two purchase commands have no route: only the system runs them.
 """
 
+import json
 import uuid
 
 import pytest
@@ -479,8 +480,29 @@ def test_the_import_over_http(admin_client):
     assert (body["created"], body["skipped"], body["rows"][1]["errors"]) == (
         1,
         1,
-        {"name": "Ensure this value has at least 1 character."},
+        {"name": "This field is required."},
     )
+
+
+@HUB_DB
+@pytest.mark.parametrize(
+    ("language", "required"),
+    [("en", "This field is required."), ("es", "Este campo es obligatorio.")],
+)
+def test_an_imported_row_without_a_name_is_refused_as_the_card_by_hand_is(admin_client, language, required):
+    def send(path, data):
+        return admin_client.post(
+            f"/api{path}",
+            json.dumps(data),
+            content_type="application/json",
+            HTTP_HOST=HOST,
+            HTTP_ACCEPT_LANGUAGE=language,
+        )
+
+    imported = send("/customer/customers/import", {"rows": [{"name": ""}, {"name": "   ", "email": "bea@example.com"}]})
+    by_hand = send("/customer/customers", {"email": "bea@example.com"})
+    assert [row["errors"] for row in imported.json()["rows"]] == [{"name": required}] * 2
+    assert (by_hand.status_code, by_hand.json()["error"]["fields"]) == (422, {"name": required})
 
 
 # Health data (CUSTOMER-F32)

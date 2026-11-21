@@ -10,6 +10,7 @@ import dataclasses
 import datetime as dt
 
 import pytest
+from django.test import RequestFactory
 from live.operations import registry
 
 from apps.printing.models import PrintJob
@@ -213,6 +214,31 @@ def test_the_bill_of_a_check_prints_with_its_lines(bar, till):
     # Each press is a bill of its own; the check stays open and nothing is charged.
     assert run("sale.order.print_bill", {"order_id": str(order.id)}).queued is True
     assert len(jobs()) == 2 and not Sale.objects.exists()
+
+
+def at_the_till(device: str, role: str = "hub_manager"):
+    """Someone at the till ``device``: the SPA names its device in ``X-Device-Id`` on every request."""
+    return dataclasses.replace(ctx_for(role), request=RequestFactory().post("/api/sale/sales", HTTP_X_DEVICE_ID=device))
+
+
+def test_with_two_tills_the_receipt_the_drawer_and_the_bill_come_out_at_the_till_that_asks(bar, till):
+    """PRINTING-F22: charging on the terrace prints on the terrace's receipt printer and opens its drawer; the bar's
+    printer prints nothing."""
+    terrace = run(
+        "printing.printer.create",
+        {"name": "Till 2", "kind": "network", "address": "192.168.1.51", "usage": "receipt"},
+    )
+    for device, printer in (("bar-till", till), ("terrace-till", terrace)):
+        run("printing.device.register", {"name": device, "printers": [str(printer.id)]}, at_the_till(device))
+    run("printing.settings.update", {"open_drawer_on_sale": True})
+    out = charge("sale-print-terrace", payments=CASH, ctx=at_the_till("terrace-till", "hub_employee"))
+    (job,) = jobs()
+    assert out.printed.printer == "Till 2"
+    assert (job.printer.name, job.open_drawer) == ("Till 2", True)
+    order = run("sale.order.open", {"lines": [{"product": "COF", "quantity": "1"}], "label": "Table 4"})
+    bill = run("sale.order.print_bill", {"order_id": str(order.id)}, at_the_till("terrace-till", "hub_employee"))
+    assert bill.printer == "Till 2"
+    assert {job.printer.name for job in jobs()} == {"Till 2"}
 
 
 def test_the_employee_at_the_till_gets_the_receipt_and_the_drawer(bar, till):

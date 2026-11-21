@@ -421,7 +421,7 @@ async def test_hello_without_a_session_is_refused_and_the_socket_closed(sockets)
 
 
 async def test_a_session_opened_on_another_hub_is_no_session_here_even_for_a_member_of_both(sockets, django_user_model, hub_b):
-    """The session notes the host it was opened on (``base.middleware.SessionHostMiddleware``); the print
+    """The session notes the host it was opened on (``base.session_host.SessionHostMiddleware``); the print
     socket reads the session itself, so it applies the same rule: B's session on A's socket is 4401."""
 
     def opened_on_b() -> str:

@@ -2,9 +2,9 @@
 // - free or reserved: the guests prompt (or «Seat» with the prompt off) and the customer; seating opens its
 //   check; a table another device just took says so and stays to pick another;
 // - blocked: why it cannot be seated;
-// - occupied: guests, since when, who serves, the customer, and Charge (to the till with its check),
-//   Transfer, Merge (pick the destination on the plan), Split check, Guests, Remove table and Close table;
-//   with two checks, which one first.
+// - occupied: guests, since when, who serves, the customer, Transfer, Merge (pick the destination on the
+//   plan), Split check, Guests, Remove table and Close table; with two checks, which one first. Opened to
+//   open a check (a tap on a split table), it only lists the checks and hands the one chosen to the plan.
 import { describe, expect, it } from 'vitest';
 
 import { click, EMPLOYEE, ionChecked, mountTable, resultFrame, settle } from '../__tests__/mount-table';
@@ -15,12 +15,25 @@ import TableSheet from './TableSheet.vue';
 
 const SESSION = { id: 's1', status: 'open' };
 
+/** Table 4 split in two checks: the first one's and Ana's. */
+function split(): TableOut {
+  const table = occupied();
+  table.checks = [...table.checks, { ...table.checks[0], id: 's2', order_id: 'o2', guests_count: 1, customer_name: 'Ana García', split_from_id: 's1' }];
+  return table;
+}
+
 async function sheet(
   table: TableOut,
-  options: { settings?: Record<string, unknown>; answers?: Record<string, [number, unknown]>; session?: typeof EMPLOYEE; locale?: 'en' | 'es' } = {},
+  options: {
+    settings?: Record<string, unknown>;
+    answers?: Record<string, [number, unknown]>;
+    session?: typeof EMPLOYEE;
+    locale?: 'en' | 'es';
+    intent?: 'check' | 'actions';
+  } = {},
 ) {
   const m = await mountTable(TableSheet, {
-    props: { open: true, table, settings: { ...SETTINGS, ...options.settings }, now: NOW },
+    props: { open: true, table, settings: { ...SETTINGS, ...options.settings }, now: NOW, intent: options.intent },
     answers: options.answers ?? {},
     session: options.session,
     locale: options.locale,
@@ -85,14 +98,14 @@ describe('TableSheet · a free or reserved table', () => {
 });
 
 describe('TableSheet · an occupied table', () => {
-  it('says the guests, since when and who serves, and Charge goes to the till with its check', async () => {
+  it('says the guests, since when and who serves, with the table’s actions and no Charge: a tap on the table opens its check', async () => {
     const s = await sheet(occupied());
     expect(s.el('summary')?.textContent).toContain('3 guests');
     expect(s.el('summary')?.textContent).toContain('Since 9:05 PM · 35 min');
     expect(s.el('summary')?.textContent).toContain('Served by Luis');
-    await click(s.el('action-charge'));
-    expect(s.router.currentRoute.value.fullPath).toBe('/sale/pos?order=o1');
-    expect(s.closed()).toBe(true);
+    expect(s.el('action-charge')).toBeNull();
+    const actions = ['transfer', 'merge', 'split', 'guests', 'park', 'close'];
+    expect(actions.filter((action) => s.el(`action-${action}`) !== null)).toEqual(actions);
   });
 
   it.each([
@@ -160,14 +173,22 @@ describe('TableSheet · an occupied table', () => {
   });
 
   it('with two checks, asks which one first', async () => {
-    const table = occupied();
-    table.checks = [...table.checks, { ...table.checks[0], id: 's2', order_id: 'o2', guests_count: 1, customer_name: 'Ana García', split_from_id: 's1' }];
-    const s = await sheet(table);
-    expect(s.el('action-charge')).toBeNull();
+    const s = await sheet(split());
+    expect(s.el('action-transfer')).toBeNull();
     expect(s.el('check-s2')?.textContent).toContain('Ana García');
     await click(s.el('check-s2'));
-    await click(s.el('action-charge'));
-    expect(s.router.currentRoute.value.fullPath).toBe('/sale/pos?order=o2');
+    await click(s.el('action-transfer'));
+    expect(s.wrapper.emitted('pick')?.[0]?.[0]).toMatchObject({ mode: 'transfer', check: { id: 's2' } });
+    expect(s.wrapper.emitted('check')).toBeUndefined();
+  });
+
+  it('opened to open a check, lists the checks of a split table and hands the one chosen to the plan', async () => {
+    const s = await sheet(split(), { intent: 'check' });
+    expect(s.el('check-s1')?.textContent).toContain('Check 1');
+    await click(s.el('check-s2'));
+    expect(s.wrapper.emitted('check')).toEqual([['o2']]);
+    expect(s.closed()).toBe(true);
+    expect(s.el('action-transfer')).toBeNull();
   });
 
   it('a live repaint of the same table keeps the step and the choices on screen', async () => {

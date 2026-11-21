@@ -6,7 +6,7 @@
 import { type BrowserContext, expect, test } from '@playwright/test';
 
 import { cardOf, cleanUp, createCard, customersReady, e2eName, FLOW_VIEWPORTS, inputOf, rowNamed, searchList, spanishMobile } from './customer-helpers';
-import { A, api, capture, login, psql, shot, shown } from './helpers';
+import { A, api, capture, login, psql, saveSessionForTheSweep, shot, shown } from './helpers';
 import { rowAction } from './service-helpers';
 import { toastSaying } from './toast-helpers';
 
@@ -65,6 +65,35 @@ test('the activity names the person who wrote a note and says the platform recor
     await page.setViewportSize({ width, height });
     await shown(page).locator('[data-testid=customer-activity]').scrollIntoViewIfNeeded();
     await capture(page, `customer-card-activity-done-by-the-platform-${width}x${height}`);
+  }
+});
+
+// flow: CUSTOMER-F32 — the health steps of the activity read in the page language, never by their key (hub#2049).
+test('the activity names the health steps: permission given, data updated, permission withdrawn', async ({ page, context }) => {
+  await login(page, A, '/customer/customers');
+  const card = await createCard(context, { name: e2eName('Health steps'), phone: spanishMobile() });
+  const steps: [string, Record<string, unknown>][] = [
+    ['/customer/health/grant', { notice_text: 'I give my permission to keep my allergies.' }],
+    ['/customer/health/update', { allergies: 'PPD (hair dye)' }],
+    ['/customer/health/withdraw', {}],
+  ];
+  for (const [path, body] of steps) {
+    const res = await api(context, A, 'POST', path, { customer_id: card.id, ...body });
+    expect(res.status, path).toBeLessThan(300);
+  }
+
+  await context.addCookies([{ name: 'django_language', value: 'es', domain: new URL(A).hostname, path: '/' }]);
+  await saveSessionForTheSweep(context);
+  await page.goto(`/customer/customers/${card.id}`);
+  await expect(shown(page).locator('[data-testid=customer-activity-item] .customer-activity__title')).toHaveText([
+    'Permiso para guardar datos de salud retirado: datos de salud borrados',
+    'Datos de salud actualizados',
+    'Permiso para guardar datos de salud dado',
+  ]);
+  for (const [width, height] of [[1440, 900], [820, 1180], [375, 667]]) {
+    await page.setViewportSize({ width, height });
+    await shown(page).locator('[data-testid=customer-activity]').scrollIntoViewIfNeeded();
+    await capture(page, `customer-card-activity-health-steps-${width}x${height}`);
   }
 });
 

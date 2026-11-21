@@ -221,7 +221,7 @@ def plan(a, hub_files) -> str:
 @pytest.fixture
 def member(client, make_user, a):
     """A session of hub a, opened on its host."""
-    from base.middleware import SESSION_HOST_KEY
+    from base.session_host import SESSION_HOST_KEY
 
     client.force_login(make_user("saas:7", host=A.key))
     session = client.session
@@ -246,7 +246,7 @@ def test_a_visitor_without_a_session_never_sees_a_members_folder_nor_learns_it_e
 
 
 def test_a_session_of_another_hub_never_sees_a_members_folder(client, make_user, a, table, plan, monkeypatch, hub_files, hub_b):
-    from base.middleware import SESSION_HOST_KEY
+    from base.session_host import SESSION_HOST_KEY
 
     monkeypatch.setattr(table, "members_media", ["table/plans/"])
     b = hub_b

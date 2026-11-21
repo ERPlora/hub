@@ -31,6 +31,7 @@ from apps.sale.schemas.orders import (
 )
 from apps.sale.services.line_vouchers import _release_vouchers
 from apps.sale.services.orders import (
+    LINE_NOT_AVAILABLE,
     _guard_covered,
     _next_position,
     _open_order,
@@ -203,9 +204,10 @@ def add_combo_line(ctx: OperationContext, data: OrderAddComboLineIn) -> dict:
     input=OrderUpdateLineIn,
     output=OrderOut,
     ai=AI(
-        description="Change a pending line of an open check: its quantity, whether it is a comp (charged at 0, with a "
-        "reason) and its note. Resolve the check with sale.order.list(search=...) and its line with sale.order.get; "
-        "never ask the person for order_id or line_id. Priced from the line's frozen price.",
+        description="Change a line of an open check: its quantity, whether it is a comp (charged at 0, with a reason) "
+        "and its note. A line already sent to the kitchen only takes or loses the comp. Resolve the check with "
+        "sale.order.list(search=...) and its line with sale.order.get; never ask the person for order_id or line_id. "
+        "Priced from the line's frozen price.",
         risk="normal",
         asks={
             "en": (
@@ -223,7 +225,7 @@ def add_combo_line(ctx: OperationContext, data: OrderAddComboLineIn) -> dict:
 )
 def update_line(ctx: OperationContext, data: OrderUpdateLineIn) -> dict:
     order = _open_order(data.order_id)
-    line = _pending_line(order, data.line_id)
+    line = _line_to_update(order, data)
     if (data.quantity is not None and data.quantity != line.quantity) or (
         data.is_gift is not None and data.is_gift != line.is_gift
     ):
@@ -243,6 +245,18 @@ def update_line(ctx: OperationContext, data: OrderUpdateLineIn) -> dict:
     _touch(ctx, order)
     return _out(order)
 
+
+
+def _line_to_update(order: Order, data: OrderUpdateLineIn) -> OrderLine:
+    """The line ``data`` changes, locked. One the kitchen already has only takes or loses the comp: what is comped is
+    usually what was served, while its quantity and note stay as the kitchen received them."""
+    line = _pending_line(order, data.line_id, unfired=False)
+    kitchen_change = (data.quantity is not None and data.quantity != line.quantity) or (
+        data.notes is not None and data.notes != line.notes
+    )
+    if line.is_fired and kitchen_change:
+        raise Conflict(str(LINE_NOT_AVAILABLE), code="sale.order_line_not_available")
+    return line
 
 @operation(
     "sale.order.set_line_staff",

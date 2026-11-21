@@ -198,6 +198,7 @@ const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'i
               interface="popover"
               :value="form[printerKey(usage)]"
               :disabled="!editable"
+              :helper-text="usage === 'receipt' ? t('printing.settings.receiptPerDevice') : undefined"
               :error-text="fieldErrors[printerKey(usage)]"
               :class="invalid(fieldErrors[printerKey(usage)])"
               @ion-change="set(printerKey(usage), String($event.detail.value ?? ''))"
