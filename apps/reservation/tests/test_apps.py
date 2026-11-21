@@ -1,7 +1,7 @@
 """The reservation app declares its module metadata, its menu, its permissions and what each role gets."""
 
 from django.apps import apps
-from live.meta import Category, LiveAppConfig, Nav, module_configs
+from live.meta import Category, Help, LiveAppConfig, Nav, module_configs
 
 from base import assistant
 from base.tests.roles import grants_by_role
@@ -245,3 +245,7 @@ def test_the_reactions_are_the_platforms_only():
 
     for name in ("reservation.customer.reassign", "reservation.customer.erase"):
         assert get(name).permission == "reservation.system", name
+
+
+def test_its_help_window_is_ready_without_a_video_yet():
+    assert reservation().help == Help()

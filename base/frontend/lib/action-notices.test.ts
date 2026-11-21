@@ -1,4 +1,4 @@
-import type { ActionNotice, ActionNoticeSource } from '@erplora/ui/shell';
+import { type ActionNotice, type ActionNoticeSource, applySurface } from '@erplora/ui/shell';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { defineComponent, h } from 'vue';
 
@@ -15,6 +15,7 @@ const Host = defineComponent({
   },
 });
 
+const BILLING = 'http://localhost:8001/dashboard/billing/invoices?business=0199a1b2-0000-7000-8000-000000000001&status=open';
 const ROUTES = ['/appointment/agenda', '/whatsapp_inbox/inbox', '/printing/printers', '/demo/items', '/system', '/flow/runs', '/invoice/issuer', '/verifactu/settings'];
 
 /** A counter as the server sends it: with the words of one that declares none of its own unless `fields` says. */
@@ -72,6 +73,7 @@ const notices = (): readonly ActionNotice[] => source.notices.value ?? [];
 const notice = (id: string): ActionNotice | undefined => notices().find((n) => n.id === id);
 
 afterEach(() => {
+  applySurface('web');
   document.body.innerHTML = '';
 });
 
@@ -152,6 +154,23 @@ describe('useHubActionNotices: the counters of the bell', () => {
     expect(notices().map((n) => n.action)).toEqual([undefined, undefined]);
   });
 
+  it('a counter that leads to erplora.com opens it outside the hub, on the web', async () => {
+    const s = await setup();
+    await s.setupStatus(status([]));
+    await s.counters([counter('base.payment_pending', 1, { route: BILLING, action_label: 'Pagar en erplora.com' })]);
+    expect(notice('base.payment_pending')?.action).toEqual({ label: 'Pagar en erplora.com', href: BILLING });
+  });
+
+  it('in the installed app it pays nothing: the same notice with no button, following the surface', async () => {
+    const s = await setup();
+    await s.setupStatus(status([]));
+    applySurface('mobile');
+    await s.counters([counter('base.payment_pending', 1, { route: BILLING }), counter('demo.open_items', 1)]);
+    expect(notices().map((n) => n.action)).toEqual([undefined, { label: 'Abrir', to: '/demo/items' }]);
+    applySurface('web');
+    await flush();
+    expect(notice('base.payment_pending')?.action).toEqual({ label: 'Abrir', href: BILLING });
+  });
 });
 
 describe('useHubActionNotices: «You cannot issue invoices yet»', () => {

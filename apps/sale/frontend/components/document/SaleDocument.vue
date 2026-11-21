@@ -6,7 +6,8 @@
 // paper is painted (`ready`, with its element, what `printPaper` copies, and its number, the document's title) or
 // that it could not be (`failed`). With VeriFactu on and readable, a sale with a fiscal document waits for that
 // document's record too (VERIFACTU-F19): the paper carries its QR, a reprint included, and a record that cannot be read fails the
-// document like the sale would — never a paper without its QR.
+// document like the sale would — never a paper without its QR. A ticket that carries its code waits for its second QR
+// to be drawn, the one to ask for the full invoice (INVOICE-F04).
 // Mount it only while it is wanted: its subscriptions live as long as it does.
 import { InlineFeedback } from '@erplora/ui/components';
 import { useLive } from '@erplora/ui/sdk';
@@ -14,6 +15,7 @@ import { useSession } from '@erplora/ui/shell';
 import { IonButton, IonSpinner } from '@ionic/vue';
 import { computed, shallowRef, useTemplateRef, watch } from 'vue';
 
+import { useReceiptClaim } from '../../composables/useReceiptClaim';
 import FiscalRecordFollower, { type FiscalRecordState } from './FiscalRecordFollower.vue';
 import PendingDocuments from './PendingDocuments.vue';
 import ReceiptPaper from './ReceiptPaper.vue';
@@ -47,6 +49,10 @@ watch(recordOf, () => {
   fiscal.value = { record: undefined, error: null };
 });
 
+/** The asked sale's code to ask for the full invoice: its paper waits for that QR to be drawn. */
+const claimCode = computed(() => (sale.data.value?.id === props.saleId ? sale.data.value.receipt_code : null));
+const { claim } = useReceiptClaim(claimCode);
+
 const error = computed(
   () => sale.error.value ?? letterhead.error.value ?? settings.error.value ?? (recordOf.value ? fiscal.value.error : null),
 );
@@ -58,7 +64,8 @@ const loaded = computed(
     sale.data.value?.id === props.saleId &&
     letterhead.data.value?.sale_id === props.saleId &&
     !!settings.data.value &&
-    (!recordOf.value || fiscal.value.record !== undefined),
+    (!recordOf.value || fiscal.value.record !== undefined) &&
+    (!claimCode.value || claim.value?.code === claimCode.value),
 );
 const record = computed(() => (recordOf.value ? (fiscal.value.record ?? null) : null));
 
@@ -120,6 +127,7 @@ function retry(): void {
         :settings="settings.data.value"
         :duplicate="duplicate"
         :record="record"
+        :claim="claim"
       />
     </template>
     <div

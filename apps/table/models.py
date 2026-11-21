@@ -1,7 +1,7 @@
 """Models of the table app: the room's zones, its tables, the checks seated at them (with the trail of
 tables each one went through), the holds of the reservations and the room settings.
 
-A table's status is NOT stored: it is computed when read (queries.py) from its live checks, its
+A table's status is NOT stored: it is computed when read (queries/) from its live checks, its
 ``blocked`` flag and its live holds, so nothing has to «free a table when no other check is left».
 The check of a table points at its open check of Sales by ``order_id``: an opaque reference, no
 foreign key between apps. Zones, tables and checks are deleted logically: the history keeps pointing

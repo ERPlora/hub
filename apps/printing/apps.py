@@ -4,7 +4,7 @@ apps fill by name and the device next to the printer drains (WORKBOOK.md)."""
 
 from django.utils.translation import gettext_lazy as _
 from django.utils.translation import ngettext_lazy
-from live.meta import BellCounter, Category, LiveAppConfig, Nav, SetupCheck, SetupStep
+from live.meta import BellCounter, Category, Help, LiveAppConfig, Nav, SetupCheck, SetupStep
 
 from apps.printing.events import COVERAGE_EVENTS, UNATTENDED_EVENTS
 
@@ -137,3 +137,4 @@ class PrintingConfig(LiveAppConfig):
         Nav("jobs", _("Queue"), "ion:list-outline", "/printing/jobs"),
         Nav("settings", _("Settings"), "ion:settings-outline", "/printing/settings"),
     ]
+    help = Help()

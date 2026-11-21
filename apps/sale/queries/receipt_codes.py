@@ -12,8 +12,9 @@ import hmac
 
 from django.conf import settings
 from django.utils.crypto import salted_hmac
+from live.context import OperationContext
 
-from apps.sale.models import Sale
+from apps.sale.models import FiscalStatus, Sale
 from apps.sale.models import Settings as SaleSettings
 
 #: Four years from the charge: the limitation period (art. 66 LGT), the one art. 15.3 RD 1619/2012 gives a rectifying
@@ -24,6 +25,9 @@ _ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
 #: What a person typing a code may write instead: Crockford's own readings.
 _TYPED = str.maketrans({"O": "0", "I": "1", "L": "1"})
 _SALT = "apps.sale.receipt_code"
+#: The tickets whose paper carries the code: Invoicing issued their fiscal document, or will (until then the page says
+#: the ticket is still being registered). Without Invoicing there is no page for the code to open.
+_ON_PAPER = (FiscalStatus.ISSUED, FiscalStatus.PENDING)
 
 
 def _signature(sale: Sale, secret: str) -> str:
@@ -37,6 +41,20 @@ def receipt_code(sale: Sale) -> str | None:
     if sale.document_type != SaleSettings.DocumentType.TICKET:
         return None
     return f"{sale.number}-{_signature(sale, settings.SECRET_KEY)}"
+
+
+def paper_code(sale: Sale) -> str | None:
+    """The code the paper of ``sale`` prints under its own QR (SALE-F29); none when there is no page for it to open."""
+    return receipt_code(sale) if sale.invoice_status in _ON_PAPER else None
+
+
+def receipt_url(ctx: OperationContext, code: str) -> str:
+    """The address the code opens, the business's public page for it (INVOICE-F04): on the host the caller reached,
+    as the till's screen draws it, or, outside a request, on the business's own ``<slug>.<HUB_BASE_DOMAIN>``."""
+    path = f"/p/{ctx.scope.key}/invoice/{code}"
+    if ctx.request is not None:
+        return ctx.request.build_absolute_uri(path)
+    return f"https://{ctx.scope.key}.{settings.HUB_BASE_DOMAIN}{path}"
 
 
 def sale_of_code(code: str) -> Sale | None:

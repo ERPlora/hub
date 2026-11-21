@@ -47,21 +47,18 @@ from apps.table.queries import (
     business_zone,
     check_label,
     current_settings,
-    ended_orders,
     find_session,
     find_table,
     find_zone,
     hold_row,
-    live_sessions,
     order_is_open,
-    reserving_holds,
     seatable,
     session_out,
     settings_row,
-    table_out,
     zone_rows,
     zones_now,
 )
+from apps.table.queries.floor import ended_orders, live_sessions, reserving_holds, table_out
 from apps.table.schemas import (
     ByIdIn,
     ByOrderIn,
@@ -92,15 +89,14 @@ from apps.table.schemas import (
     TableBulkIn,
     TableIn,
     TableMoveIn,
-    TableOut,
     TablePatchIn,
     TableRefIn,
-    TablesOut,
     ZoneIn,
     ZoneOut,
     ZonePatchIn,
     ZoneRefIn,
 )
+from apps.table.schemas.floor import TableOut, TablesOut
 
 logger = logging.getLogger(__name__)
 

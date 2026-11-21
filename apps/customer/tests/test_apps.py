@@ -3,7 +3,7 @@ its operations, every one usable by the assistant (``ai``)."""
 
 from django.apps import apps
 from django.utils import translation
-from live.meta import Category, LiveAppConfig, Nav, module_configs, permissions_for_role
+from live.meta import Category, Help, LiveAppConfig, Nav, module_configs, permissions_for_role
 from live.operations import AI, INTERNAL, registry
 
 PERMISSIONS = [
@@ -257,3 +257,7 @@ def test_api_keys_reach_what_the_product_exposed():
     assert {
         name for name, op in customer_operations().items() if op.expose_api
     } == EXPOSED
+
+
+def test_its_help_window_is_ready_without_a_video_yet():
+    assert customer().help == Help()

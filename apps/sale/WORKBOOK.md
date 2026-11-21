@@ -1082,7 +1082,11 @@ Pasos:
    cambio, y el pie. Con **VeriFactu**, antes del pie va el QR fiscal: «QR tributario:» encima,
    «VERI*FACTU» debajo y «Escanéalo para cotejar este tique en la AEAT» («…esta factura…» si es una
    factura); cuando la AEAT ya respondió, su código («CSV: …») en lugar de esa frase. Mientras VeriFactu
-   no tiene registro de ese documento, el papel sale sin QR. Si su documento fiscal no se pudo emitir
+   no tiene registro de ese documento, el papel sale sin QR. Un tique con su documento fiscal (emitido o
+   pendiente) lleva después un segundo QR, el de la página donde el cliente pide la factura completa:
+   «Escanea para pedir tu factura completa» encima y el código del tique debajo, para
+   escribirlo si la cámara no lo lee; si no se pudo dibujar, debajo va la dirección entera. Una factura, o
+   una venta sin Facturación, no lo lleva. Si su documento fiscal no se pudo emitir
    al cobrar, el papel lo dice bajo el número («Documento fiscal pendiente») y, encima del papel (fuera
    de lo que se imprime), el aviso
    «Documento fiscal pendiente — Facturación no pudo emitirlo al cobrar (falta el emisor, o un permiso).
@@ -1092,7 +1096,7 @@ Pasos:
    no (o con su documento fiscal pendiente), sale por el diálogo de impresión del dispositivo con el papel
    solo: el del navegador o, en la app instalada, su pantalla de impresión (el diálogo del sistema, con la
    impresora o «Guardar como PDF»). Toda
-   impresión desde **Ventas** sale con «DUPLICADO», también con su QR fiscal; solo el primer papel justo
+   impresión desde **Ventas** sale con «DUPLICADO», también con sus QR; solo el primer papel justo
    tras cobrar es el original (y es copia si ya salió por la impresora al cobrar).
 4. **Documento pendiente**: en la lista, una venta con algún documento fiscal pendiente (el suyo, la
    rectificativa de su anulación o la de una devolución) lleva la pastilla «Documento pendiente» bajo
@@ -1109,7 +1113,7 @@ fiscal: el papel nunca sale sin él). Si no se imprime, «No se pudo imprimir»;
 abre su pantalla de impresión, con el motivo tras dos puntos, como al imprimir la cuenta para la mesa.
 «Emitir ahora» rechazado dice el motivo de Facturación («Configura el emisor…») y no cambia nada; sin
 motivo, «No se han podido emitir los documentos. Inténtalo de nuevo.».
-Implicados: INVOICE-F01, INVOICE-F02, INVOICE-F06, INVOICE-F18, PRINTING-F08, VERIFACTU-F19, SALE-F21, SALE-F34
+Implicados: INVOICE-F01, INVOICE-F02, INVOICE-F04, INVOICE-F06, INVOICE-F18, PRINTING-F08, VERIFACTU-F19, SALE-F21, SALE-F34
 
 ### SALE-F30 Anular una venta cobrada
 Estado: hecho
@@ -2013,8 +2017,14 @@ título, sus pasos y «Si falla»: ahí no van nombres de código, incidencias, 
   `sale_of_code`): la firma, doce caracteres en base32 de Crockford, es el HMAC-SHA256 del id de la venta con la
   clave secreta del servidor (y sus `SECRET_KEY_FALLBACKS` al leerlo). No se guarda: cada reimpresión da el mismo,
   también para las ventas de antes, y el cobro no escribe nada más. Vale cuatro años desde el cobro. Lo lee
-  Facturación, que requiere Ventas, en su página pública (`invoice.public.*`); el papel del tique (SALE-F29) aún no
-  lo imprime (hub#500). La decisión, con el mercado, en el WORKBOOK de Facturación («Decisiones», 22).
+  Facturación, que requiere Ventas, en su página pública (`invoice.public.*`). El papel del tique (SALE-F29) lo
+  imprime solo si Facturación emitió su documento o lo va a emitir (`paper_code`, `receipt_code` de `SaleOut`): sin
+  Facturación no hay página que abrir. La pantalla dibuja el QR de `<origen>/p/<primera etiqueta del host>/invoice/<código>`
+  con `qrcode` (`composables/useReceiptClaim.ts`) y el papel espera a tenerlo antes de imprimirse; la impresora de
+  tiques recibe la misma dirección del servidor (`receipt_url`: el host de la petición o, sin ella,
+  `<negocio>.<HUB_BASE_DOMAIN>`) en `claim_qr_data`, con `claim_note` encima y el código en `claim_locator`, que la
+  app del dispositivo ya pinta tras el pago. La decisión, con el mercado, en el WORKBOOK de Facturación
+  («Decisiones», 22).
 
 ### Lo que NO hace, a propósito
 

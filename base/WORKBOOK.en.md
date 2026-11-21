@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:03d1d1ed1b783425da2bb8aeeff7ad3c872bf06eedaa3b2135c263d5f56ad7b0 -->
+<!-- generated from WORKBOOK.md sha256:6d752d35d3c3e61516cbca4daa4ffa3a59a79446ba754506445c1a38be7cc21e -->
 
 ## What it is for and who it is for
 
@@ -74,7 +74,7 @@ also opens with the Home's link ending in `#actividad`.
 ### The bell
 At the top right, the last one in the bar, after "My apps", the assistant's sparkles and, in the installed app,
 "Change business" (HUB_APP-F04 of ERPlora/app), on a phone too. It gathers what asks for an action and stays true
-until it is solved: "You cannot issue invoices yet", the failed events, the
+until it is solved: "You cannot issue invoices yet", an unpaid invoice of the plan, the failed events, the
 plan's limits, the appointments to confirm, the WhatsApp customers waiting for an answer, a printer that does not
 print… No notice is dismissed: it goes by itself once it is solved.
 
@@ -438,6 +438,7 @@ On the Employees screens and the API documentation:
 | BASE-F114 | Put a business back as it was at a past moment from the Hub admin | done |
 | BASE-F115 | See the help of a module's screen | done |
 | BASE-F116 | Read what is new in ERPlora | done |
+| BASE-F117 | See in the bell that the plan has an unpaid invoice | done |
 
 ### BASE-F01 See what the business still has to set up
 Status: done
@@ -3299,3 +3300,30 @@ In: what is new in the version running: it travels with it, so it is always its 
 Out: nothing saved: what is new is only read.
 If it fails: "Could not load what's new" with "Retry"; the version and its date stay in view.
 Involved: BASE-F41
+
+### BASE-F117 See in the bell that the plan has an unpaid invoice
+Status: done
+Actor: owner, administrator
+Screen: The bell
+Steps:
+  1. erplora.com cannot charge the renewal of the business's plan and gives it its 7 days of grace (BILLING-F16): the
+     business keeps working with its whole plan.
+  2. The bell of whoever runs the business goes up without reloading with the urgent notice "Your ERPlora plan has an
+     unpaid invoice", which comes in as a card and settles in it. Its sentence says until when: "Pay it on
+     erplora.com: if it is not paid by Nov. 24, 2026, the business is suspended. Nothing is deleted.", with the
+     date on the business's clock, and the bell's ring empties over that last week.
+  3. "Pay on erplora.com" opens, in a new tab, this business's unpaid invoices on erplora.com, where it is paid
+     (BILLING-F17). Only in the browser: in the installed app the notice comes all the same, without the button, and
+     its sentence already says where to pay it.
+  4. If the deadline goes by and erplora.com has not suspended it yet, the notice says so at that moment, without
+     reloading: "Pay it on erplora.com: its deadline was Nov. 24, 2026 and the business may be suspended at any
+     moment. Nothing is deleted.", with the ring empty.
+  5. Once it is paid, the notice disappears as soon as erplora.com tells the business. If it is suspended, the business
+     stops opening until it is paid (BILLING-F16).
+In: the business's status and the moment it is suspended, as erplora.com sends them in its photo of the business
+(HUBS-F31). The Hub does not ask erplora.com nor count the 7 days on its own.
+Out: nothing saved in the Hub.
+If it fails: a manager or an employee does not see the notice. If the photo does not bring the deadline, the notice
+comes without a date: "Pay it on erplora.com: if it is not paid soon, the business is suspended. Nothing is deleted.".
+If the notices cannot be read, the bell keeps what it last knew, as in BASE-F10.
+Involved: BASE-F10, BASE-F11, BILLING-F16 (erplora.com), BILLING-F17 (erplora.com), HUBS-F31 (erplora.com)

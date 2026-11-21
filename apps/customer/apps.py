@@ -1,7 +1,7 @@
 """The customer app: the business's file of people and companies, and the owner of their personal data."""
 
 from django.utils.translation import gettext_lazy as _
-from live.meta import Category, LiveAppConfig, Nav
+from live.meta import Category, Help, LiveAppConfig, Nav
 
 
 class CustomerConfig(LiveAppConfig):
@@ -90,6 +90,7 @@ class CustomerConfig(LiveAppConfig):
             path="/customer/fields",
         ),
     ]
+    help = Help()
 
     fiscal_archive_models = ("Purchase",)
 

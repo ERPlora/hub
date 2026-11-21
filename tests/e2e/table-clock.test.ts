@@ -1,5 +1,5 @@
 // The times of the reservations of table-flows.spec.ts (TABLE-F25…F28, F31), chosen from the clock of the run: the
-// plan paints a reservation only on the business's today (`table_rows` in apps/table/queries.py) and Reserved only
+// plan paints a reservation only on the business's today (`table_rows` in apps/table/queries/floor.py) and Reserved only
 // from `RESERVED_LEAD` before it starts, and the book refuses a time already gone. `madrid(30)` fell on tomorrow
 // from 23:30 on (and the afternoon one with it), so TABLE-F25 failed in the last half hour of the day.
 // flow: TABLE-F25
@@ -11,7 +11,7 @@ import { describe, expect, it } from 'vitest';
 
 import { bookingDays, bookingTimes, MARGIN_MINUTES, RESERVED_LEAD_MINUTES, untilMidnight } from './table-clock';
 
-const QUERIES = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', 'apps', 'table', 'queries.py');
+const QUERIES = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', 'apps', 'table', 'queries', 'floor.py');
 const DAY = '2026-10-28';
 const WEDNESDAY = 2;
 const MINUTE = 60_000;
