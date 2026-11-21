@@ -30,6 +30,7 @@ function table(overrides: Partial<TableOut> = {}): TableOut {
     checks: [],
     hold: null,
     amount: null,
+    bill_requested: false,
     ...overrides,
   };
 }

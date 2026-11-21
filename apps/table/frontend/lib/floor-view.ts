@@ -44,6 +44,7 @@ function bill(table: TableOut, options: FloorViewOptions): string | undefined {
 }
 
 interface Spoken {
+  statusLabel: string;
   minutes: number | null;
   amount: string | undefined;
   holder: string;
@@ -57,7 +58,7 @@ function accessible(table: TableOut, view: Spoken, t: Translate): string {
     table.zone_name ?? '',
     table.name,
     t('table.pax', { count: table.capacity }),
-    t(`table.status.${table.status}`),
+    view.statusLabel,
     occupied && table.guests !== null ? t('table.guestsCount', { count: table.guests }) : '',
     occupied && view.minutes !== null ? t('table.minutes', { minutes: view.minutes }) : '',
     view.amount ? t('table.floor.bill', { amount: view.amount }) : '',
@@ -73,7 +74,8 @@ function accessible(table: TableOut, view: Spoken, t: Translate): string {
 export function floorView(table: TableOut, options: FloorViewOptions): FloorTable {
   const { t } = options;
   const { minutes, ...time } = timing(table, options);
-  const statusLabel = t(`table.status.${table.status}`);
+  const billRequested = table.status === 'occupied' && table.bill_requested;
+  const statusLabel = billRequested ? t('table.floor.billRequested') : t(`table.status.${table.status}`);
   const holdTime = clock(table.hold?.held_from, options.locale, options.timeZone);
   const holder = holdName(table.hold, t('table.erasedCustomer'));
   const pax = table.status === 'occupied' ? t('table.floor.paxOf', { guests: table.guests ?? 0, capacity: table.capacity }) : t('table.pax', { count: table.capacity });
@@ -87,6 +89,7 @@ export function floorView(table: TableOut, options: FloorViewOptions): FloorTabl
     capacity: table.capacity,
     guests: table.guests,
     ratio: paintedRatio(table),
+    billRequested,
     ...time,
     short,
     statusLabel,
@@ -95,7 +98,7 @@ export function floorView(table: TableOut, options: FloorViewOptions): FloorTabl
     amount,
     holder,
     holdTime,
-    accessible: accessible(table, { minutes, amount, holder, holdTime }, t),
+    accessible: accessible(table, { statusLabel, minutes, amount, holder, holdTime }, t),
     pickable: options.pick ? options.pick(table) : undefined,
     testid: `table-floor-tile-${table.id}`,
   };

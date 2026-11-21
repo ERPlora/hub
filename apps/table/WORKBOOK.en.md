@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:54f1aef5ec3228c021a014ffe7d0312af95002985c87cd40bf53434fbbe5930e -->
+<!-- generated from WORKBOOK.md sha256:970d65bf3d85d994224b3fcba3f1759268e6fcce128945fe790e6db17c62f965 -->
 
 ## What it is for and who it is for
 
@@ -287,7 +287,7 @@ With the window as it opened, Back closes it without asking (BASE-F05).
 | TABLE-F31 | Forget the name of a customer whose data are erased (GDPR) | done |
 | TABLE-F32 | Put or remove the customer of a table | done |
 | TABLE-F33 | See how much each table has run up | done |
-| TABLE-F34 | See which tables have asked for the bill | partial |
+| TABLE-F34 | See which tables have asked for the bill | done |
 
 ### TABLE-F01 Create and order the zones of the room
 Status: done
@@ -896,8 +896,7 @@ If it fails: as the rest of the plan, a failure on loading shows with "Retry".
 Involved: TABLE-F09, TABLE-F15, TABLE-F16, TABLE-F17, TABLE-F34, SALE-F17, SALE-F19, SALE-F22
 
 ### TABLE-F34 See which tables have asked for the bill
-Status: partial — Sales already notes on the check that its bill was printed and the plan receives it up to date,
-through the API and the assistant; the plan screen does not yet paint the table "Bill requested" (steps 2 and 5)
+Status: done
 Actor: employee, manager, assistant
 Screen: Floor plan (Service); assistant
 Steps:
