@@ -11,7 +11,7 @@ import { expect, type Locator, type Page, test } from '@playwright/test';
 
 import { answers, box, cancel, card, panel, receipts, send } from './assistant-panel';
 import { DICTATION } from './assistant-provider';
-import { A, EMPLOYEE, login, shot, THREE_SIZES as VIEWPORTS, untilStill } from './helpers';
+import { A, capture, EMPLOYEE, login, shot, THREE_SIZES as VIEWPORTS, untilStill } from './helpers';
 import { chats, panelSpec } from './provider-helpers';
 import { toastSaying } from './toast-helpers';
 
@@ -124,8 +124,7 @@ test('SALE-F01 — opened with no connection, «Speak» is greyed for the eye an
     await till(page);
     await expect(announced(page)).toHaveAttribute('aria-disabled', 'true');
     await expect(key(page)).toHaveCSS('opacity', '0.6');
-    await untilStill(page);
-    await page.screenshot({ path: shot(`sale-speak-opened-offline-${vp.label}`) });
+    await capture(page, `sale-speak-opened-offline-${vp.label}`);
   }
 });
 
