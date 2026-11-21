@@ -41,7 +41,10 @@ anterior) o del commit que se le pase (`scripts/checks.sh fast <commit>`), con l
   y las pruebas de Vitest relacionadas (`vitest related`).
 - pytest sobre sus ficheros de prueba y sobre el `test_<módulo>.py` de cada módulo tocado (también
   `test_<paquete>_<módulo>.py`, para un módulo de un paquete como `services/`) en la carpeta `tests/` más cercana,
-  contra el Postgres de `compose.yaml` y en una base de pruebas propia de cada checkout (`TEST_DB_NAME` la cambia).
+  contra el Postgres de `compose.yaml` y en una base de pruebas propia de cada checkout (`TEST_DB_NAME` la cambia). Un
+  `WORKBOOK.md` o su `WORKBOOK.en.md` corre el `test_workbook.py` de su app, si lo tiene, y las pruebas que leen todos
+  los WORKBOOK (la ayuda publicada, las traducciones, que solo guarden lo útil, los recorridos de QA y las tareas
+  programadas; la lista, en `scripts/checks.py`).
 
 Corren todas, y cualquier rojo hace fallar el comando; su salida dice qué fichero incumple y por qué. La pasada completa
 (la suite entera, el build y el humo de navegador) la hace la CI.
