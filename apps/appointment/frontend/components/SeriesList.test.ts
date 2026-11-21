@@ -104,7 +104,7 @@ describe('SeriesList', () => {
     );
     await settle();
     const said = s.find('appointment-series-outcome').text();
-    expect(said).toContain('3 appointments now with Bea Ruiz · 1 could not be moved and keep their time:');
+    expect(said).toContain('3 appointments now with Bea Ruiz · 1 could not be moved and keeps its time:');
     expect(said).toContain('Saturday, September 26, 2026: Blocked.');
     expect(said).not.toContain('0 cancelled');
   });

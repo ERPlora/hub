@@ -3,8 +3,11 @@
 // the window was already booked (never «0 appointments booked · 0 could not be booked») —, each skipped date
 // with its reason, the dates still to book from `next_from`, or the series' next date beyond the window when
 // there is nothing to book yet.
+import { createShellI18n } from '@erplora/ui/shell';
 import { describe, expect, it } from 'vitest';
 
+import en from '../locale/en.json';
+import es from '../locale/es.json';
 import type { MaterializeOut, RecurringUpdatedOut } from '../operations';
 import { describeOutcome, describeUpdate } from './outcome';
 
@@ -27,22 +30,22 @@ describe('describeOutcome', () => {
       t,
       'en',
     );
-    expect(said.summary).toBe('appointment.series.outcome.booked{"booked":3} · appointment.series.outcome.notBooked{"skipped":1}');
+    expect(said.summary).toBe('appointment.series.outcome.booked{"n":3} · appointment.series.outcome.notBooked{"n":1}');
     expect(said.skipped).toEqual(['Monday, October 26, 2026: Closed.']);
     expect(said.more).toBe('');
   });
 
   it('says only what happened: no «0 could not be booked», and nothing new when the window was booked', () => {
-    expect(describeOutcome(outcome({}), t, 'en').summary).toBe('appointment.series.outcome.booked{"booked":3}');
+    expect(describeOutcome(outcome({}), t, 'en').summary).toBe('appointment.series.outcome.booked{"n":3}');
     expect(
       describeOutcome(
         outcome({ booked: 0, skipped: [{ occurrence_date: '2026-10-26', code: 'outside_schedule', message: 'Closed.' }] }),
         t,
         'en',
       ).summary,
-    ).toBe('appointment.series.outcome.notBooked{"skipped":1}');
+    ).toBe('appointment.series.outcome.notBooked{"n":1}');
     expect(describeOutcome(outcome({ booked: 0, already_booked: 3 }), t, 'en').summary).toBe(
-      'appointment.series.outcome.alreadyBooked{"already":3}',
+      'appointment.series.outcome.alreadyBooked{"n":3}',
     );
     expect(describeOutcome(outcome({ booked: 0, upcoming_date: '2027-03-01' }), t, 'en').summary).toBe(
       'appointment.series.outcome.none{}',
@@ -75,13 +78,13 @@ describe('describeUpdate', () => {
   });
 
   it('says only what happened', () => {
-    expect(describeUpdate(updated({ moved: 3 }), {}, t, 'en').summary).toBe('appointment.series.outcome.moved{"moved":3}');
+    expect(describeUpdate(updated({ moved: 3 }), {}, t, 'en').summary).toBe('appointment.series.outcome.moved{"n":3}');
     expect(describeUpdate(updated({ moved: 2, cancelled: 1, locked: 1, booked: 4 }), {}, t, 'en').summary).toBe(
       [
-        'appointment.series.outcome.moved{"moved":2}',
-        'appointment.series.outcome.newDates{"booked":4}',
-        'appointment.series.outcome.cancelled{"cancelled":1}',
-        'appointment.series.outcome.locked{"locked":1}',
+        'appointment.series.outcome.moved{"n":2}',
+        'appointment.series.outcome.newDates{"n":4}',
+        'appointment.series.outcome.cancelled{"n":1}',
+        'appointment.series.outcome.locked{"n":1}',
       ].join(' · '),
     );
     expect(describeUpdate(updated({}), {}, t, 'en').summary).toBe('appointment.series.outcome.unchanged{}');
@@ -89,14 +92,14 @@ describe('describeUpdate', () => {
 
   it('names who the appointments go to and for which services', () => {
     expect(describeUpdate(updated({ moved: 3 }), { staff_id: 'm2' }, t, 'en').summary).toBe(
-      'appointment.series.outcome.handed{"moved":3,"staff":"Bea Ruiz"}',
+      'appointment.series.outcome.handed{"n":3,"staff":"Bea Ruiz"}',
     );
     expect(describeUpdate(updated({ moved: 3 }), { services: [{ service_id: 's2' }] }, t, 'en').summary).toBe(
-      'appointment.series.outcome.servicesChanged{"moved":3,"services":"Haircut, Colour"}',
+      'appointment.series.outcome.servicesChanged{"n":3,"services":"Haircut, Colour"}',
     );
     expect(
       describeUpdate(updated({ moved: 1 }), { staff_id: 'm2', services: [{ service_id: 's2' }] }, t, 'en').summary,
-    ).toBe('appointment.series.outcome.handedWithServices{"moved":1,"staff":"Bea Ruiz","services":"Haircut, Colour"}');
+    ).toBe('appointment.series.outcome.handedWithServices{"n":1,"staff":"Bea Ruiz","services":"Haircut, Colour"}');
   });
 
   it('lists what kept its time, with its date in the reader’s language', () => {
@@ -107,8 +110,84 @@ describe('describeUpdate', () => {
       'es',
     );
     expect(said.summary).toBe(
-      'appointment.series.outcome.moved{"moved":1} · appointment.series.outcome.notMoved{"skipped":1}',
+      'appointment.series.outcome.moved{"n":1} · appointment.series.outcome.notMoved{"n":1}',
     );
     expect(said.skipped).toEqual(['sábado, 26 de septiembre de 2026: Blocked.']);
+  });
+});
+
+// In words, with the app's own catalogue: each count is said in the singular when it is one, and in the
+// plural from two («1 cita reservada · 1 no se ha podido reservar», «2 citas reservadas»).
+describe('the outcome in words', () => {
+  const words = (locale: 'en' | 'es') => {
+    const { global } = createShellI18n({ locale, messages: { en, es } });
+    return (key: string, named: Record<string, unknown> = {}) => global.t(key, named);
+  };
+  const skips = (count: number) =>
+    Array.from({ length: count }, (_, i) => ({ occurrence_date: '2027-02-07', code: 'outside_schedule', message: `${i}` }));
+  const series = { staff_name: 'Bea Ruiz', service_names: 'Haircut, Colour' } as RecurringUpdatedOut['recurring'];
+  const edited = (count: number): RecurringUpdatedOut => ({
+    recurring: series,
+    moved: count,
+    booked: count,
+    cancelled: count,
+    locked: count,
+    skipped: skips(count),
+  });
+
+  it.each([
+    ['es', 1, 1, '1 cita reservada · 1 no se ha podido reservar'],
+    ['es', 3, 2, '3 citas reservadas · 2 no se han podido reservar'],
+    ['en', 1, 1, '1 appointment booked · 1 could not be booked'],
+    ['en', 3, 2, '3 appointments booked · 2 could not be booked'],
+  ] as const)('booking a series (%s): %i booked, %i skipped', (locale, booked, skipped, summary) => {
+    expect(describeOutcome(outcome({ booked, skipped: skips(skipped) }), words(locale), locale).summary).toBe(summary);
+  });
+
+  it.each([
+    ['es', 1, 'Nada nuevo que reservar: su cita ya estaba reservada'],
+    ['es', 8, 'Nada nuevo que reservar: sus 8 citas ya estaban reservadas'],
+    ['en', 1, 'Nothing new to book: its appointment was already booked'],
+    ['en', 8, 'Nothing new to book: its 8 appointments were already booked'],
+  ] as const)('nothing new to book (%s): %i already booked', (locale, already, summary) => {
+    expect(describeOutcome(outcome({ booked: 0, already_booked: already }), words(locale), locale).summary).toBe(summary);
+  });
+
+  it.each([
+    [
+      'es',
+      1,
+      '1 cita movida · 1 fecha nueva reservada · 1 cancelada porque ya no cae en la repetición · 1 sin tocar porque ya está cobrada · 1 no se ha podido mover y se queda a su hora:',
+    ],
+    [
+      'es',
+      2,
+      '2 citas movidas · 2 fechas nuevas reservadas · 2 canceladas porque ya no caen en la repetición · 2 sin tocar porque ya están cobradas · 2 no se han podido mover y se quedan a su hora:',
+    ],
+    [
+      'en',
+      1,
+      '1 appointment moved · 1 new date booked · 1 cancelled because it no longer fits the pattern · 1 left alone because it is already charged · 1 could not be moved and keeps its time:',
+    ],
+    [
+      'en',
+      2,
+      '2 appointments moved · 2 new dates booked · 2 cancelled because they no longer fit the pattern · 2 left alone because they are already charged · 2 could not be moved and keep their time:',
+    ],
+  ] as const)('editing a series (%s): %i of each', (locale, count, summary) => {
+    expect(describeUpdate(edited(count), {}, words(locale), locale).summary).toBe(summary);
+  });
+
+  it.each([
+    ['es', 1, '1 cita pasa a Bea Ruiz', '1 cita cambia a Haircut, Colour', '1 cita pasa a Bea Ruiz con Haircut, Colour'],
+    ['es', 2, '2 citas pasan a Bea Ruiz', '2 citas cambian a Haircut, Colour', '2 citas pasan a Bea Ruiz con Haircut, Colour'],
+    ['en', 1, '1 appointment now with Bea Ruiz', '1 appointment now for Haircut, Colour', '1 appointment now with Bea Ruiz for Haircut, Colour'],
+    ['en', 2, '2 appointments now with Bea Ruiz', '2 appointments now for Haircut, Colour', '2 appointments now with Bea Ruiz for Haircut, Colour'],
+  ] as const)('handing a series over (%s): %i moved', (locale, count, handed, serviced, both) => {
+    const said = (change: Parameters<typeof describeUpdate>[1]) =>
+      describeUpdate({ ...edited(0), moved: count }, change, words(locale), locale).summary;
+    expect(said({ staff_id: 'm2' })).toBe(handed);
+    expect(said({ services: [{ service_id: 's2' }] })).toBe(serviced);
+    expect(said({ staff_id: 'm2', services: [{ service_id: 's2' }] })).toBe(both);
   });
 });

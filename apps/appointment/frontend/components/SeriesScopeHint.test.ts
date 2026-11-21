@@ -12,7 +12,7 @@ describe('SeriesScopeHint', () => {
     expect(m.params('appointment.recurring.get')).toEqual([{ id: 'r1', from_date: '2026-11-02' }]);
     expect(m.find('series-form-scope').exists()).toBe(false);
     await m.result('appointment.recurring.get', { id: 'r1', upcoming: 5, charged: 1 });
-    expect(m.find('series-form-scope').text()).toContain('El cambio se aplica desde el lunes, 2 de noviembre de 2026: alcanza 5 citas reservadas; 1 ya cobradas no se tocarán.');
+    expect(m.find('series-form-scope').text()).toContain('El cambio se aplica desde el lunes, 2 de noviembre de 2026: alcanza 5 citas reservadas; 1 ya cobrada no se tocará.');
   });
 
   it('says only what happens: without charged appointments there is no «0 already charged»', async () => {
@@ -22,5 +22,18 @@ describe('SeriesScopeHint', () => {
     const said = m.find('series-form-scope').text();
     expect(said).toContain('The change applies from Monday, November 2, 2026: it reaches 3 booked appointments.');
     expect(said).not.toContain('charged');
+  });
+
+  it.each([
+    ['es', 1, 0, 'alcanza 1 cita reservada. Lo que'],
+    ['es', 0, 0, 'alcanza 0 citas reservadas. Lo que'],
+    ['es', 3, 2, 'alcanza 3 citas reservadas; 2 ya cobradas no se tocarán. Lo que'],
+    ['en', 1, 1, 'it reaches 1 booked appointment; 1 already charged will not be touched. What'],
+    ['en', 4, 2, 'it reaches 4 booked appointments; 2 already charged will not be touched. What'],
+  ] as const)('says each count in the singular only when it is one (%s: %i booked, %i charged)', async (locale, upcoming, charged, hint) => {
+    const m = await mountAppointment(SeriesScopeHint, { props: { seriesId: 'r1', fromDate: '2026-11-02' }, locale });
+    await m.live();
+    await m.result('appointment.recurring.get', { id: 'r1', upcoming, charged });
+    expect(m.find('series-form-scope').text()).toContain(hint);
   });
 });

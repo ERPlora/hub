@@ -17,12 +17,13 @@ const { data } = useLive(
   'appointment.recurring.get',
   computed(() => ({ id: props.seriesId, from_date: props.fromDate })),
 );
+// One plural message per count: a single sentence cannot agree with two numbers at once.
 const hint = computed(() =>
   data.value
     ? t(data.value.charged ? 'appointment.series.form.scopeHint' : 'appointment.series.form.scopeHintNoneCharged', {
         from: formatDay(props.fromDate, locale.value),
-        upcoming: data.value.upcoming,
-        charged: data.value.charged,
+        upcoming: t('appointment.series.form.scopeUpcoming', { n: data.value.upcoming }),
+        charged: t('appointment.series.form.scopeCharged', { n: data.value.charged }),
       })
     : '',
 );
