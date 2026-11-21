@@ -68,10 +68,11 @@ describe('WidgetPanel as a figure card', () => {
 
   it('is loading until its data comes, and says «No data» when its value is missing', async () => {
     const m = await panel({ map: { value: 'missing' } }, {}, 'es');
-    expect(m.wrapper.get('.ep-stat-card').attributes('data-state')).toBe('loading');
+    expect(m.wrapper.get('.ep-stat-card').attributes()).toMatchObject({ 'data-state': 'loading', 'aria-busy': 'true' });
     const call = await m.live();
     await m.result(call, 'demo.item.stats', STATS);
-    expect(m.wrapper.get('.ep-stat-card').attributes('data-state')).toBe('empty');
+    // Busy or not, as every other panel of the board says it.
+    expect(m.wrapper.get('.ep-stat-card').attributes()).toMatchObject({ 'data-state': 'empty', 'aria-busy': 'false' });
     expect(m.wrapper.get('.ep-stat-card__empty').text()).toBe('Sin datos');
   });
 

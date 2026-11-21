@@ -15,6 +15,11 @@ export const setupRow = (page: Page, key: string): Locator => setupCard(page).lo
 export const boardWidget = (page: Page, key: string): Locator =>
   shown(page).locator(`[data-testid="widget-board"] [data-testid="widget"][data-key="${key}"]`);
 
+/** The title, the figure and the error of a panel of the board, a figure card (the library's StatCard) or any other. */
+export const panelTitle = (panel: Locator): Locator => panel.locator('[data-testid="widget-title"], .ep-stat-card__label');
+export const panelValue = (panel: Locator): Locator => panel.locator('[data-testid="widget-value"], .ep-stat-card__value');
+export const panelError = (panel: Locator): Locator => panel.locator('[data-testid="widget-error"], .ep-stat-card__error');
+
 /** The localStorage key of the Home's widget board: the panels on it. */
 export const HOME_BOARD = 'dashboard-hub';
 

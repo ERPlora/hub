@@ -119,6 +119,7 @@ const chosenBar = computed(() => {
     :class="`widget--${widget.size}`"
     :data-key="widget.key"
     testid="widget"
+    :aria-busy="loading"
     :label="widget.title"
     :icon="widget.icon"
     :tone="figureTone(widget)"

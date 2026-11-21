@@ -10,7 +10,7 @@
 import { type BrowserContext, expect, test } from '@playwright/test';
 
 import { A, api, horizontalOverflow, psql, shot, shown, untilStill } from './helpers';
-import { boardWidget, setupStep, spanishOwnerWithPanels as spanishOwner } from './home-helpers';
+import { boardWidget, panelError, panelTitle, panelValue, setupStep, spanishOwnerWithPanels as spanishOwner } from './home-helpers';
 import { cleanInventory, createProduct, stamp, VIEWPORTS } from './inventory-helpers';
 
 const KEY = 'FIX-INVENTORY-SETUP-HOOKS';
@@ -103,13 +103,13 @@ test('INVENTORY-F17: Inventory\'s three default panels on the Home with the serv
     const number = new Intl.NumberFormat('es-ES');
     const money = new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' });
     const low = boardWidget(page, 'inventory.low_stock_count');
-    await expect(low.locator('[data-testid="widget-title"]')).toHaveText('Productos con stock bajo');
-    await expect(low.locator('[data-testid="widget-value"]')).toHaveText(number.format(summary.data.products_low_stock));
+    await expect(panelTitle(low)).toHaveText('Productos con stock bajo');
+    await expect(panelValue(low)).toHaveText(number.format(summary.data.products_low_stock));
     const value = boardWidget(page, 'inventory.value');
-    await expect(value.locator('[data-testid="widget-title"]')).toHaveText('Valor de existencias (a coste)');
-    await expect(value.locator('[data-testid="widget-value"]')).toHaveText(money.format(summary.data.stock_value / 100));
+    await expect(panelTitle(value)).toHaveText('Valor de existencias (a coste)');
+    await expect(panelValue(value)).toHaveText(money.format(summary.data.stock_value / 100));
     const lowest = boardWidget(page, 'inventory.low_stock_products');
-    await expect(lowest.locator('[data-testid="widget-title"]')).toHaveText('Productos con menos stock');
+    await expect(panelTitle(lowest)).toHaveText('Productos con menos stock');
     await expect(lowest).toContainText(product.name);
 
     // «Personalizar panel» offers «Productos en stock», grouped under «Inventario».
@@ -130,7 +130,7 @@ for (const size of VIEWPORTS) {
       // The step in sight while pending, with no sideways scroll; the panels read, with nothing to count yet.
       await expect(row(page).locator('[data-testid="setup-pill"]')).toHaveText('Importante');
       for (const key of PANELS) await expect(boardWidget(page, key)).toHaveAttribute('aria-busy', 'false');
-      await expect(boardWidget(page, 'inventory.low_stock_count').locator('[data-testid="widget-value"]')).toHaveText('0');
+      await expect(panelValue(boardWidget(page, 'inventory.low_stock_count'))).toHaveText('0');
       await expect(boardWidget(page, 'inventory.low_stock_products').locator('[data-testid="widget-empty"]')).toHaveText('Sin datos');
       await row(page).evaluate((element) => element.scrollIntoView({ block: 'start' }));
       await untilStill(page);
@@ -142,11 +142,11 @@ for (const size of VIEWPORTS) {
       const product = await lowStockProduct(context);
       await expect(row(page)).toHaveCount(0);
       for (const [index, key] of PANELS.entries()) {
-        await expect(boardWidget(page, key).locator('[data-testid="widget-title"]')).toHaveText(TITLES[index]);
-        await expect(boardWidget(page, key).locator('[data-testid="widget-error"]')).toHaveCount(0);
+        await expect(panelTitle(boardWidget(page, key))).toHaveText(TITLES[index]);
+        await expect(panelError(boardWidget(page, key))).toHaveCount(0);
         await expect(boardWidget(page, key)).toHaveAttribute('aria-busy', 'false');
       }
-      await expect(boardWidget(page, 'inventory.in_stock').locator('[data-testid="widget-value"]')).toHaveText('1');
+      await expect(panelValue(boardWidget(page, 'inventory.in_stock'))).toHaveText('1');
       await expect(boardWidget(page, 'inventory.low_stock_products')).toContainText(product.name);
       await boardWidget(page, 'inventory.low_stock_count').evaluate((element) => element.scrollIntoView({ block: 'start' }));
       await untilStill(page);

@@ -9,6 +9,7 @@
 import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
 import { A, api, type Credentials, EMPLOYEE, horizontalOverflow, login, OWNER, shot, shown, untilStill } from './helpers';
+import { panelError, panelTitle, panelValue } from './home-helpers';
 import { staffCleanUp } from './staff-helpers';
 import { VIEWPORTS } from './inventory-helpers';
 import { stamp } from './sale-helpers';
@@ -117,7 +118,7 @@ async function spanish(
 
 const panel = (page: Page, key: string): Locator =>
   shown(page).locator(`[data-testid="widget-board"] [data-testid="widget"][data-key="${key}"]`);
-const value = (page: Page, key: string): Locator => panel(page, key).locator('[data-testid="widget-value"]');
+const value = (page: Page, key: string): Locator => panelValue(panel(page, key));
 
 async function stats(context: BrowserContext): Promise<Stats> {
   const res = await api<Stats>(context, A, 'GET', '/staff/members/stats');
@@ -148,9 +149,9 @@ async function expectAway(page: Page, context: BrowserContext): Promise<void> {
 test('STAFF-F20 STAFF-F23: «Plantilla activa», «Ausentes hoy» and «Ausencias de hoy» by default with the server\'s figures, live', async ({ browser }) => {
   const { context, page } = await spanish(browser, { width: 1440, height: 900 });
   try {
-    await expect(panel(page, HEADCOUNT).locator('[data-testid="widget-title"]')).toHaveText('Plantilla activa');
-    await expect(panel(page, ON_LEAVE).locator('[data-testid="widget-title"]')).toHaveText('Ausentes hoy');
-    await expect(panel(page, AWAY).locator('[data-testid="widget-title"]')).toHaveText('Ausencias de hoy');
+    await expect(panelTitle(panel(page, HEADCOUNT))).toHaveText('Plantilla activa');
+    await expect(panelTitle(panel(page, ON_LEAVE))).toHaveText('Ausentes hoy');
+    await expect(panelTitle(panel(page, AWAY))).toHaveText('Ausencias de hoy');
     await expect(panel(page, PENDING)).toHaveCount(0);
     await expect(panel(page, BY_ROLE)).toHaveCount(0);
     const before = await stats(context);
@@ -187,12 +188,12 @@ test('STAFF-F20 STAFF-F23: «Ausencias pendientes» and «Empleados por rol» to
     await picker.locator(`[data-testid="widgets-add-${BY_ROLE}"]`).click();
     await picker.locator('[data-testid="widgets-close"]').click();
 
-    await expect(panel(page, PENDING).locator('[data-testid="widget-title"]')).toHaveText('Ausencias pendientes');
+    await expect(panelTitle(panel(page, PENDING))).toHaveText('Ausencias pendientes');
     const { pending_time_off: pending } = await stats(context);
     expect(pending).toBeGreaterThanOrEqual(1);
     await expect(value(page, PENDING)).toHaveText(count.format(pending));
 
-    await expect(panel(page, BY_ROLE).locator('[data-testid="widget-title"]')).toHaveText('Empleados por rol');
+    await expect(panelTitle(panel(page, BY_ROLE))).toHaveText('Empleados por rol');
     const roles = await byRole(context);
     expect(roles.find((row) => row.name === `${TAG} ${RUN} Estilista`)?.member_count).toBe(2);
     const bars = panel(page, BY_ROLE).locator('[data-testid="widget-bar"]');
@@ -208,7 +209,7 @@ test('STAFF-F20 STAFF-F23: the employee, who sees the team and the time off, rea
   try {
     for (const key of ALL) {
       await expect(panel(page, key)).toHaveAttribute('aria-busy', 'false');
-      await expect(panel(page, key).locator('[data-testid="widget-error"]')).toHaveCount(0);
+      await expect(panelError(panel(page, key))).toHaveCount(0);
     }
     const figures = await stats(context);
     await expect(value(page, HEADCOUNT)).toHaveText(count.format(figures.active));
@@ -227,7 +228,7 @@ for (const size of VIEWPORTS) {
       const overflow = () => horizontalOverflow(page);
       for (const key of ALL) {
         await expect(panel(page, key)).toHaveAttribute('aria-busy', 'false');
-        await expect(panel(page, key).locator('[data-testid="widget-error"]')).toHaveCount(0);
+        await expect(panelError(panel(page, key))).toHaveCount(0);
       }
       const figures = await stats(context);
       await expect(value(page, HEADCOUNT)).toHaveText(count.format(figures.active));
