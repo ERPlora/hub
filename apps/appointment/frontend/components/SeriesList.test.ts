@@ -61,6 +61,18 @@ describe('SeriesList', () => {
     expect(s.cells(2)[5]).toBe('Mar 1, 2027');
   });
 
+  // hub#2063: a series of one says «After 1 appointment», never «After 1 appointments».
+  it('a series of one appointment ends after it, in the singular', async () => {
+    const s = await setup();
+    await s.result(OP, page([series('r1', { max_occurrences: 1 })], 1, 100));
+    expect(s.cells(0)[5]).toBe('After 1 appointment');
+    const es = await mountAppointment(SeriesList, { props: { canAdd: true, canChange: true, businessToday: '2026-10-14' }, locale: 'es' });
+    await es.live();
+    await es.result(OP, page([series('r1', { max_occurrences: 1 })], 1, 100));
+    expect(es.wrapper.find('[data-testid="appointment-series-row"]').text()).toContain('Tras 1 cita');
+    expect(es.wrapper.find('[data-testid="appointment-series-row"]').text()).not.toContain('Tras 1 citas');
+  });
+
   it('the Active switch pauses and reactivates a series', async () => {
     const s = await setup();
     await s.result(OP, page([series('r1')], 1, 100));
@@ -104,7 +116,7 @@ describe('SeriesList', () => {
     );
     await settle();
     const said = s.find('appointment-series-outcome').text();
-    expect(said).toContain('3 appointments now with Bea Ruiz · 1 could not be moved and keep their time:');
+    expect(said).toContain('3 appointments now with Bea Ruiz · 1 could not be moved and keeps its time:');
     expect(said).toContain('Saturday, September 26, 2026: Blocked.');
     expect(said).not.toContain('0 cancelled');
   });

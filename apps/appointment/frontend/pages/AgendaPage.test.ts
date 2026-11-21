@@ -215,6 +215,12 @@ describe('AgendaPage', () => {
     const s = await setup();
     await s.result('appointment.agenda.lanes', { ...LANES, unassigned: 2 });
     expect(s.find('appointment-agenda-unassigned').text()).toContain('2 appointments have no professional');
+    await s.result('appointment.agenda.lanes', { ...LANES, unassigned: 1 });
+    expect(s.find('appointment-agenda-unassigned').text()).toContain('1 appointment has no professional: assign it by editing it');
+    const es = await mountAppointment(AgendaPage, { path: '/appointment/agenda', locale: 'es' });
+    await es.live();
+    await es.result('appointment.agenda.lanes', { ...LANES, unassigned: 1 });
+    expect(es.find('appointment-agenda-unassigned').text()).toContain('1 cita no tiene profesional: asígnala editándola');
   });
 
   it('the Settings tab is only for who may change them', async () => {
