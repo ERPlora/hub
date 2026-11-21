@@ -451,8 +451,8 @@ Actor: manager, administrator, assistant
 Screen: Rectify
 Steps:
 1. In **Invoices** (row) or on the detail, tap "Rectify" on an invoice that is not a rectifying invoice
-   and is neither cancelled nor replaced; or ask the assistant ("rectifica la factura FACT-2026-000003
-   porque el precio estaba mal") and go on at step 4.
+   and is neither cancelled nor replaced; or ask the assistant ("rectify invoice FACT-2026-000003 because
+   the price was wrong") and go on at step 4.
 2. Choose the "Type of rectifying invoice" (R1 at first: error founded in law and art. 80 One, Two and Six
    LIVA; R2 insolvency proceedings; R3 bad debts; R4 others; a ticket always R5), type the "Reason" and
    tap "Issue rectifying invoice" (a second click issues no other).

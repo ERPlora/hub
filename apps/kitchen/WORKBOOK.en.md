@@ -405,7 +405,7 @@ Steps:
    when it reaches Kitchen.
 2. The sheet carries the label, the number, the round, the waiter and each dish with its quantity, its
    modifiers (one per line) and its note, and the dishes of a menu indented under their header
-   (KITCHEN-F06, F07); if the round is rush, `!! URGENTE !!`.
+   (KITCHEN-F06, F07); if the round is rush, `!! URGENT !!`.
 In: the dishes with the destination and the printer frozen on receiving.
 Out: one job per printer in Printing's queue, only once even if it is asked for twice: the round Kitchen
 sent is not printed again when the notice from Sales reaches it.
@@ -508,7 +508,7 @@ Steps:
 1. On a card being cooked, "⋮" → "Mark rush": it carries "Rush" and jumps to the start of the board on every
    display, which ring once.
 2. The stations that print and still have dishes of that round to cook receive a short notice on paper:
-   the ticket's header with «!! URGENTE !!» and no dishes.
+   the ticket's header with "!! URGENT !!" and no dishes.
 3. "Remove rush" undoes it and prints nothing. A VIP round does not offer it, and through the
    assistant or the API it is rejected ("That ticket is VIP: a rush does not change its priority.").
 In: the ticket being cooked.
@@ -822,8 +822,8 @@ Steps:
    Gluten". A dish without an allergy marked has no block, even if it has allergens: the display does not repeat each
    dish's.
 4. On a menu, the block shows on each of its dishes, and "The dish contains" names only that dish's allergens.
-5. On the station's paper, the header carries «!! ALERGIA !!» (under «!! URGENTE !!» if the round is rush) and,
-   right under the dish and before its modifiers, «ALERGIA: GLUTEN» and, if it has it, «LLEVA: GLUTEN», each on its
+5. On the station's paper, the header carries "!! ALLERGY !!" (under "!! URGENT !!" if the round is rush) and,
+   right under the dish and before its modifiers, "ALLERGY: GLUTEN" and, if it has it, "CONTAINS: GLUTEN", each on its
    own line, in capitals and between asterisks, so that it stands out without colour. The reprint
    comes out the same.
 6. The cook carries on as always: marking ready, recalling and serving do not change,
