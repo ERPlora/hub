@@ -89,13 +89,9 @@ async function setup(props: Record<string, unknown> = {}, locale: 'en' | 'es' = 
     staffPicker().vm.$emit('update:modelValue', { id, label });
     await settle();
   }
-  /** The day and the time pickers (DateField, TimeField): `kept` is what they hold, `pick` chooses as the person does. */
   const when = (name: 'day' | 'time') => (name === 'day' ? m.wrapper.getComponent(DateField) : m.wrapper.getComponent(TimeField)).vm;
   const kept = (name: 'day' | 'time') => when(name).$props.modelValue;
-  async function pick(name: 'day' | 'time', value: string) {
-    when(name).$emit('update:modelValue', value);
-    await settle();
-  }
+  const pick = async (name: 'day' | 'time', value: string) => { when(name).$emit('update:modelValue', value); await settle(); };
   async function pickCustomer() {
     m.wrapper.findComponent(CustomerSearch).vm.$emit('update:modelValue', {
       customer_id: 'c1',
@@ -288,8 +284,7 @@ describe('AppointmentFormModal: New appointment', () => {
     expect(s.sent().filter((call) => call.path === '/api/appointment/appointments')).toHaveLength(1);
   });
 
-  // The day and the time are the app's own pickers, in its language and colours (never the device's, which paint
-  // its own), shown as read; no keyboard types in them, and a picked time counts at once.
+  // The day and the time are the app's own pickers (never the device's), shown as read; a picked time counts at once.
   it('the day and the time are the app’s pickers, shown as read, and a picked time counts at once', async () => {
     const s = await setup();
     expect([s.field('day').readonly, s.field('time').readonly]).toEqual([true, true]);
@@ -297,11 +292,9 @@ describe('AppointmentFormModal: New appointment', () => {
     await s.addService('cut', 'Haircut');
     await s.pickStaff('s1', 'Ana López');
     await s.pick('day', '2026-10-19');
-    expect(s.field('day').value).toBe('10/19/2026');
     expect(s.submit().disabled).toBe(true);
     await s.pick('time', '10:00');
-    expect(s.field('time').value).toMatch(/^10:00\sAM$/);
-    expect(s.submit().disabled).toBe(false);
+    expect([s.field('day').value, s.field('time').value, s.submit().disabled]).toEqual(['10/19/2026', expect.stringMatching(/^10:00\sAM$/), false]);
   });
 
   // Services or professionals that cannot load are never an empty list nor only the
