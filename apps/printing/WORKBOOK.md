@@ -833,7 +833,13 @@ Un valor que no es JSON (un `Decimal`, una fecha) es 422, nunca un error del ser
 
 Campos del documento que lee la impresora (los demás se ignoran):
 
-- `receipt` e `invoice`: `business_name`, `business_address`, `vat_number`, `phone`, `receipt_id`,
+- `date` (en `receipt`, `invoice`, `prebill` y `cash_session_report`) y `time` (en `kitchen_order`): el
+  momento de lo que cuenta el papel, ya escrito en el reloj del negocio tal como se imprime, `21/11/2026 15:41`
+  y `15:41` (`base.business.paper_date` y `paper_time`). Es el cobro de la venta en el tique y en todas sus
+  copias, el momento de pedir la cuenta, el cierre de la sesión en el Z (en el X, el momento de imprimirlo), el
+  envío de la ronda en la comanda y en sus copias, y la anulación en la hoja de lo anulado. Una app del
+  dispositivo que aún no los lee imprime su propia hora (ERPlora/app#77).
+- `receipt` e `invoice`: `business_name`, `business_address`, `vat_number`, `phone`, `receipt_id`, `date`,
   `duplicate`, `rectifying`, `cashier`, `customer_name`, `customer_tax_id`, `customer_address`,
   `items` (`name`, `quantity`, `total`, `notes`, `components`, `modifiers`), `subtotal`,
   `tax_amount`, `tax_label`, `tax_breakdown` (`rate`, `base`, `tax`), `discount`, `total`,
@@ -842,7 +848,7 @@ Campos del documento que lee la impresora (los demás se ignoran):
   `receipt_id`, `customer_name`, `customer_tax_id` y `tax_breakdown` no vacío (422 si falta).
 - `prebill`: lo mismo sin número, QR ni pago, con `notice`; exige `items` no vacío. La app del dispositivo no
   pinta `vat_number` en este papel: Ventas manda el NIF como última línea de `business_address` (SALE-F21).
-- `kitchen_order`: `order_number`, `round_number`, `table`, `waiter`, `label`, `priority`, `allergy`, `items`
+- `kitchen_order`: `order_number`, `round_number`, `time`, `table`, `waiter`, `label`, `priority`, `allergy`, `items`
   (`name`, `quantity`, `modifiers`, `notes`, `combo_name`, `combo_ref`); `modifiers` es una lista de textos que
   la impresora pinta un renglón cada uno, en negrita, antes de `notes`: Cocina pone primero los de la alergia del
   cliente (`*** ALERGIA: GLUTEN ***`, `*** LLEVA: GLUTEN ***`) y después los suplementos en el orden elegido
@@ -850,7 +856,7 @@ Campos del documento que lee la impresora (los demás se ignoran):
   dispositivo pinta bajo el número, en este orden, el texto de `priority` tal como llega (`HIGH`, el del contrato
   anterior, sale como su marca de urgente), el de `allergy` y la marca de copia cuando `duplicate` es verdadero.
 - `barcode_label`: `product_name`, `barcode`, `price`.
-- `cash_session_report`: `receipt_id` (la sesión), `cashier`, `opening_balance`, `closing_balance`,
+- `cash_session_report`: `receipt_id` (la sesión), `date`, `cashier`, `opening_balance`, `closing_balance`,
   `transactions` (`label`, `amount`).
 - `delivery_note`: `receipt_id`, `customer_name`, `delivery_address`, `items` (`name`, `quantity`).
 - `generic`: `title` y cualquier par clave–valor.
