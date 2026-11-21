@@ -409,6 +409,12 @@ las operaciones del propio SaaS (`SEED_PY` de `assistant-seed.ts`: `qwen`, compa
 de las huellas; con `QA_ANSWER_MODEL`, el modelo a prueba, abajo «Comparar modelos») e `index_docs`
 (idempotente: solo calcula lo nuevo); una vez por ejecución, los mensajes
 del mes de `a` a cero. La siembra nunca lee ni escribe una clave: cada proveedor dice de qué variable la lee el SaaS.
+Que `SEED_PY` sigue encajando con el SaaS lo comprueba Vitest sin pila (`assistant-seed.test.ts`, con `saas-names.ts`):
+en el SaaS de al lado (`../saas` o `E2E_SAAS_DIR`) importa cada nombre que el script toma del SaaS, resuelve cada
+atributo que lee de ellos y comprueba los argumentos de cada llamada, sin ejecutar el script. Si el SaaS mueve o
+renombra una operación, un esquema o un ajuste, cae el Vitest del Hub con la línea y el nombre que falta, no la
+preparación de una ejecución. En la CI el job `frontend` clona el SaaS de `main` al lado del Hub; un checkout del Hub
+sin el SaaS al lado se salta esa prueba y lo dice.
 Al acabar, pase o falle, su `afterAll` saca del SaaS de la pila la cuenta de personal con la que siembra
 (`CLEANUP_PY`). Se niega a sembrar en la BD compartida `saas` o en una que no sea `…e2e…`. Cada punto pregunta en una conversación nueva, en `es` (C37 en `en`), guarda lo que pasó por
 `/api/assistant/turn` (herramientas, tarjeta, extractos de `base.docs.search`, errores), confirma la tarjeta de los

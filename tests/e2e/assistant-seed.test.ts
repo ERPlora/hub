@@ -7,6 +7,7 @@ import { describe, expect, it } from 'vitest';
 
 import { QA_STAFF_EMAIL } from './assistant-battery';
 import { answerChoice, QWEN_ADDRESS, SEED_PY, seedCommand, seedSecrets } from './assistant-seed';
+import { checkInSaas, saasCheckout } from './saas-names';
 
 const KEYS = { DASHSCOPE_API_KEY: 'sk-qwen-secret', OPENAI_API_KEY: 'sk-openai-secret', PATH: '/bin' };
 const COMPARED = {
@@ -140,9 +141,18 @@ describe('seedSecrets', () => {
   });
 });
 
+const SAAS = saasCheckout(process.env);
+
+describe.skipIf(!SAAS)('SEED_PY in the SaaS beside the Hub', () => {
+  it('takes from the SaaS only names it has, called with arguments it accepts, among them the operations it seeds with', () => {
+    const checked = checkInSaas(SEED_PY, SAAS ?? '');
+    expect(checked.status, checked.problems).toBe(0);
+    expect(checked.names).toEqual(expect.arrayContaining(['model_select', 'policy_update', 'ModelSelectIn', 'PolicyIn', 'AIModel', 'AIProvider']));
+  }, 120_000);
+});
+
 describe('SEED_PY', () => {
-  it('chooses the models through the SaaS operations of their own module, prints no key and is Python', () => {
-    expect(SEED_PY).toContain('from assistant.services.model_choice import model_select, policy_update');
+  it('chooses the models through the SaaS operations, prints no key and is Python', () => {
     for (const op of ['model_select', 'policy_update']) expect(SEED_PY).toContain(`${op}(ctx, `);
     expect(SEED_PY).not.toMatch(/services\.\w+\(/);
     expect(SEED_PY).not.toMatch(/print\([^)]*(secret|key|KEY)/);

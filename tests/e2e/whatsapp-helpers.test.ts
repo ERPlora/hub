@@ -113,9 +113,11 @@ function erploraProcesses(source: string): number {
   return count;
 }
 
-/** Where the e2e starts erplora.com's Python, and how many times: `inErplora` itself, and the relay of
- *  whatsapp-inbox-offered-options.spec.ts, which runs inside its test, which gives itself 600 s for its relays. */
+/** Where the e2e starts erplora.com's Python, and how many times: `inErplora` itself, the relay of
+ *  whatsapp-inbox-offered-options.spec.ts, which runs inside its test, which gives itself 600 s for its relays, and
+ *  the check of saas-names.ts, which Vitest runs with its own timeout, never a Playwright test. */
 const ERPLORA_PROCESSES: Record<string, number> = {
+  'saas-names.ts': 1,
   'whatsapp-helpers.ts': 1,
   'whatsapp-inbox-offered-options.spec.ts': 1,
 };
