@@ -19,7 +19,7 @@ from live.models import OutboxEvent
 from live.operations import get
 
 from apps.whatsapp_inbox.models import Conversation, Message
-from apps.whatsapp_inbox.services import NO_PLAN_MESSAGES
+from apps.whatsapp_inbox.services.sending import NO_PLAN_MESSAGES
 from apps.whatsapp_inbox.tests.conftest import HUB_DB, NOW, A, connect, ctx_for, receive, run, system, template
 from base.tenancy.context import current_alias
 

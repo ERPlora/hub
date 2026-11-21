@@ -264,7 +264,7 @@ def test_a_template_is_posted_signed_with_its_key_and_200_is_meta_s_verdict():
 def test_a_template_with_a_header_file_is_waited_for_longer_but_within_the_resume(monkeypatch, template, read):
     """F29: erplora.com uploads the file to Meta before registering it; still answered before the worker's
     ``delivery.resume`` hands it over again (``STUCK_AFTER``, 2 minutes)."""
-    from apps.whatsapp_inbox.services import STUCK_AFTER
+    from apps.whatsapp_inbox.services.deliveries import STUCK_AFTER
 
     used = []
     real = httpx.Client
@@ -284,7 +284,7 @@ def test_a_template_with_a_header_file_is_waited_for_longer_but_within_the_resum
 
 def test_a_send_with_a_header_file_is_waited_for_longer_but_within_the_resume(monkeypatch):
     """F33: erplora.com puts the file on the number before sending; a text or a template without file keeps 15 s."""
-    from apps.whatsapp_inbox.services import STUCK_AFTER
+    from apps.whatsapp_inbox.services.deliveries import STUCK_AFTER
 
     used = []
     real = httpx.Client

@@ -122,7 +122,6 @@
 536 apps/whatsapp_inbox/models.py ERPlora/erplora-next#74
 1136 apps/whatsapp_inbox/queries.py ERPlora/erplora-next#74
 1211 apps/whatsapp_inbox/schemas.py ERPlora/erplora-next#74
-2587 apps/whatsapp_inbox/services.py ERPlora/erplora-next#74
 1367 apps/whatsapp_inbox/tests/test_services.py ERPlora/erplora-next#74
 1403 base/blueprint.py ERPlora/erplora-next#74
 960 base/catalog.py ERPlora/erplora-next#74
