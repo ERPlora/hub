@@ -14,7 +14,7 @@ import { computed, shallowRef, watch } from 'vue';
 
 import { useSystemBack } from '../../composables/pos/useSystemBack';
 import { useT } from '../../composables/useT';
-import type { OrderLineOut, OrderOut, OrderRow, SettingsOut } from '../../operations';
+import type { OrderLineOut, OrderOut, OrderRow, PreviewOut, SettingsOut } from '../../operations';
 import CartFooter from './CartFooter.vue';
 import CartHeading from './CartHeading.vue';
 import CartLines from './CartLines.vue';
@@ -22,6 +22,7 @@ import CartToolbar from './CartToolbar.vue';
 import KitchenSendBar from './KitchenSendBar.vue';
 import KitchenTickets from './KitchenTickets.vue';
 import OpenChecksPopover from './OpenChecksPopover.vue';
+import PreviewFollower from './PreviewFollower.vue';
 
 const props = defineProps<{
   order: OrderOut | null;
@@ -79,6 +80,12 @@ const lines = computed(() => props.order?.lines ?? []);
 const hasLines = computed(() => lines.value.length > 0);
 const total = computed(() => (hasLines.value ? props.total : 0));
 const blockedReason = computed(() => (props.needsCustomer ? t('sale.pos.customerRequiredCharge') : null));
+
+// ── What Charge takes with lines marked (SALE-F22): the server values them, as the checkout sheet will ──
+const markedPreview = shallowRef<PreviewOut | undefined>();
+const markedError = shallowRef<string | null>(null);
+/** Another set of marks is another request: the last set's amount never stands for the new one. */
+const markedKey = computed(() => props.marks.join(' '));
 
 // ── «Check» and «Current order» (SALE-F20) ──
 const tab = shallowRef<'check' | 'round'>('check');
@@ -238,10 +245,20 @@ function park(): void {
         @send="emit('send', $event)"
       />
     </div>
+    <PreviewFollower
+      v-if="order && marks.length"
+      :key="markedKey"
+      :order-id="order.id"
+      :line-ids="marks"
+      @preview="markedPreview = $event"
+      @preview-error="markedError = $event"
+    />
     <CartFooter
       :has-lines="hasLines"
       :total="total"
-      :preview-error="previewError"
+      :marked-lines="marks.length"
+      :marked-total="markedPreview?.total"
+      :preview-error="previewError ?? markedError"
       :discount-percent="order?.discount_percent ?? '0'"
       :discount-amount="order?.discount_amount ?? 0"
       :ticket-discount="ticketDiscount"
