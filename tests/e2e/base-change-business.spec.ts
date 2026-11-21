@@ -70,7 +70,8 @@ test('inside the app, «Change business» asks, signs out of this business and o
     if (compactBar(page)) await openMore(page);
     const button = compactBar(page) ? topbarMoreMenu(page).locator(BUTTON) : topbar(page).locator(BUTTON);
     await expect(button).toBeVisible();
-    await expect(button).toHaveAttribute('aria-label', 'Change business');
+    // Its name for a screen reader (Ionic hands the host's `aria-label` to its inner button).
+    await expect(button.getByRole('button', { name: 'Change business' })).toBeVisible();
     await capture(page, `${KEY}-bar-${size.label}`);
     await button.click();
     const dialog = page.locator('[data-testid=change-business-dialog]');
