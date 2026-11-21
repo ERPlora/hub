@@ -1,6 +1,13 @@
-<!-- generated from WORKBOOK.md sha256:a09e5933538527614119140e521ce8d79f67c5765fa3cd9232ff1ff48b5aceb3 -->
+<!-- generated from WORKBOOK.md sha256:a36e5e512308b790672864456d3cd22faf2fc6c8d8fbc8ace9aa2ac21e749f1e -->
 
 ## What it is for and who it is for
+
+VeriFactu turns every invoice and every ticket that Invoicing issues into its record for the Spanish tax agency
+(AEAT): chained to the previous one by its fingerprint, with the QR the customer can check, and sent to the AEAT in
+order. What cannot go out at that moment waits in the queue and goes out by itself later. It is only for businesses
+in Spain, and it starts in the AEAT's test environment until you go live.
+
+### In detail
 
 VeriFactu is the end of the fiscal chain: every invoice or ticket that Invoicing issues becomes here a chained
 **billing record** (each record carries the fingerprint of the previous one), with its verification **QR**,
@@ -97,6 +104,13 @@ Recovery, Configuration and Settings. All of them show with the view permission;
 use do not show.
 
 ### Records
+Every invoice and every ticket you issue has its VeriFactu record here, the latest on top, with its status at the
+AEAT (Pending, Sent, Accepted, Accepted with errors or Rejected) and its environment, testing or production. Search
+them by invoice, issuer or tax ID and filter them by status, type, date or total. Tap one to open its detail: the
+invoice, the fingerprint chain, the QR, the AEAT's answer and, if it has not arrived yet, why it waits; from there,
+depending on its status and your permission, you send it now, correct it or cancel it.
+
+#### Detail
 Menu **VeriFactu → Records**. Title "VeriFactu records". Table of 50 by 50 (table or cards; on the phone, cards
 with the invoice number as title) with "Seq", "Invoice", "Date", "Type" (Registration / Cancellation), "F."
 (F1…R5), "Issuer", "Total", "Environment" (Testing / Production) and "Status" (Pending, Sent, Accepted, Accepted
@@ -111,7 +125,7 @@ leaves or changes on any device.
 Empty: "No records yet. Every invoice you issue is sealed and listed here."; with a search or filter, "No
 results". Loading: "Loading…". Error: the message with "Retry".
 
-### Record detail
+#### Record detail
 It opens from a row of **Records** (`/verifactu/records/<id>`). On top, "Record {number}" with its status, its
 environment and "← Back". If it is not at the AEAT (Pending or Sent), the notice "Not at the AEAT yet" with the
 why and the when (VERIFACTU-F17). If it was rejected, the notice "The AEAT rejected it" with what to do
@@ -131,6 +145,12 @@ queue, "Correct" (VERIFACTU-F24) and "Cancel record" (VERIFACTU-F30). A refusal 
 Error on opening: "Record not found" or the failure's message, with "← Back".
 
 ### Contingency
+The queue of the records that are not at the AEAT yet, in the order they will go out, with their attempts, the next
+attempt and the last error. The system sends them by itself, in order, and whatever fails again waits a little
+longer before the next attempt. "Process queue" does the pass at that moment and "Retry" sets a record to go out
+with the next one. Empty, everything is at the AEAT.
+
+#### Detail
 Menu **VeriFactu → Contingency**. Title "Contingency queue" and button "Process queue" ("Processing…" while it
 works). Table of the records not yet at the AEAT: "Invoice", "Environment", "Attempts", "Status", "Next attempt"
 and "Last error", in the order they go out (every column sorts); search box "Search invoice or error…". Per row:
@@ -138,6 +158,11 @@ and "Last error", in the order they go out (every column sorts); search box "Sea
 Empty: "Queue empty: everything is in the AEAT.". Loading: "Loading…". Error: the message above the table.
 
 ### Events
+What has happened with your records and with the connection to the AEAT, most recent first: every record created,
+every submission accepted, deferred or failed, every pass of the queue, the chain checks, the queries to the AEAT and
+the configuration changes. Search them by type or by message and filter them by type, severity or date.
+
+#### Detail
 Menu **VeriFactu → Events**. Title "Audit events". Table, most recent first: "When", "Severity" (Debug, Info,
 Warning, Error, Critical), "Type" (Record created, Submission postponed, Submission accepted, Accepted with errors,
 Submission failed, Queue processed, Record rescheduled, Chain verified, Chain broken, AEAT query, Chain recovered,
@@ -148,6 +173,12 @@ not filter). It updates by itself.
 Empty: "No events.". Loading: "Loading…". Error: the message with "Retry".
 
 ### Recovery
+Here you check that the fingerprint chain of your records is intact and look up the records the AEAT has of your
+business this month. If needed, you recover the chain: from the AEAT, after restoring a backup of the database, or
+from the last fingerprint of the application you used before, when migrating. Both recoveries ask for
+confirmation.
+
+#### Detail
 Menu **VeriFactu → Recovery**. Title "Chain recovery". Field "Issuer tax ID" (filled with Invoicing's issuer's)
 and the current environment. Block "Chain integrity" with the last verdict ("Fingerprint chain intact ✓",
 "Fingerprint chain BROKEN ✗" with the sequence, or "Not validated yet") and the note "This recomputes the SHA-256
@@ -159,6 +190,12 @@ and "Recover chain from AEAT". Table "Latest records at the AEAT": "Invoice", "D
 for confirmation ("Confirm recovery" / "Cancel"). When done: "Operation completed.".
 
 ### Configuration
+Here you prepare how your records reach the AEAT. In "My certificate" you upload your business's electronic
+certificate (a .p12 or .pfx file) with its password, see its holder and when it expires, and renew or remove it. If
+ERPlora files on behalf of businesses, the tab "ERPlora files for you" lets you download the authorisation form and,
+once signed, send it for review, and says what status it is in. Only whoever sets up VeriFactu uploads or sends anything.
+
+#### Detail
 Menu **VeriFactu → Configuration**. Title "VeriFactu configuration". With ERPlora's route available, two tabs,
 the two routes:
 - **"ERPlora files for you"** (opens by default): "Representation
@@ -200,6 +237,13 @@ files for you", if available, shows neither the authorisation nor the procedure,
 status, without uploading or removing it.
 
 ### Settings
+Here you see which route your records go out by (with your certificate or through ERPlora) and which AEAT
+environment you are in, testing or production. You go live once nothing is missing (if something is, the screen
+says what), or go back to testing while no record has been sealed in production. You also test the connection with
+the AEAT without sending anything, create a test invoice while in testing and read the system's responsible
+declaration.
+
+#### Detail
 Menu **VeriFactu → Settings**. Title "VeriFactu settings". Three blocks:
 - **"Sending"**: with ERPlora's route available, a sentence with its icon says which route the records go out by
   and what is missing (VERIFACTU-F04), with "Open Configuration": with your certificate, "You file directly with the
@@ -311,20 +355,20 @@ Status: done — in the Hub; encrypted in the hub's DB with `FISCAL_CERTIFICATE_
 Actor: owner and administrator (configure)
 Screen: Configuration
 Steps:
-1. In **VeriFactu → Configuration**, tab "My certificate", tap "Choose the .p12 / .pfx file" and pick the
-   business's certificate (1 MB at most).
+1. In **Configuration**, tab "My certificate", tap "Choose the .p12 / .pfx file" and pick the business's
+   certificate (1 MB at most).
 2. Type its password in "Certificate password" and tap "Upload the certificate".
-3. The Hub opens it with the password, reads holder, tax ID, kind and expiry and keeps it encrypted (Fernet) together
-   with the password in the hub's database. It does not look at which authority issued it: whether it is valid is for
-   the AEAT's test environment to say (step 4). "Certificate uploaded: {holder} ({taxId})." shows and the tab turns
-   "Loaded". Uploading another one replaces the previous one.
-4. While the business is in testing, from that moment its records go out with it (VERIFACTU-F04), also those the
+3. The Hub opens it with the password, reads holder, tax ID, kind and expiry and keeps it encrypted, together with
+   the password, in the Hub's database. It does not look at which authority issued it: whether it is valid is for
+   the AEAT's test environment to say (step 4). For example, "Certificate uploaded: Bar Sol SL (B12345678)." shows
+   and the tab turns "Loaded". Uploading another one replaces the previous one.
+4. While the business is in testing, from that moment its records go out with it, also those the
    gateway had refused, and with them the AEAT's test environment tries it. In the tab, the row "AEAT test
    environment" says "Not tested yet" and below "It is tried with the next record that goes out in testing: once the
    AEAT's test environment accepts it, you can go live.". When the AEAT's test environment answers a submission made
    with it with its verdict on the records (even if it rejects one for its content), it turns "Accepted" and it can
-   go live with it (VERIFACTU-F08). If it refuses it because of the certificate, it turns "Refused" and below it says
-   why: its door redirects to the site's error page 401 ("Se ha producido un error al verificar el certificado
+   go live with it. If it refuses it because of the certificate, it turns "Refused" and below it says why: the
+   AEAT's site answers with its error page ("Se ha producido un error al verificar el certificado
    presentado": no authority it recognises issued it, it is not valid for this service or it has expired), or it
    answers the fault 4112 ("El titular del certificado debe ser Obligado Emisión, Colaborador Social, Apoderado o
    Sucesor"). An AEAT that is down or does not answer, a fault of the submission's content or a passing fault such as
@@ -340,18 +384,17 @@ Out: the certificate kept (`OwnCertificate`), an event "Own certificate of … u
 with it." or "The AEAT's test environment refused the own certificate of … (reason): upload another one." and the
 same notice. The file and the password are never shown again: neither in the API, nor in the
 admin, nor in the snapshot, nor in the server's logs.
-If it fails: the certificate is not kept (409):
-- with no storage key on the server, "This server cannot keep certificates yet: ERPlora has to set its storage
-  key." (`verifactu.certificate_storage_unavailable`);
-- with no issuer, "Set up the issuer first in Invoicing → Issuer." (`verifactu.issuer_missing`);
-- a wrong password or a file that is not a `.p12`, "The file is not a .p12/.pfx certificate that this password
+If it fails: the certificate is not kept and the screen says why:
+- if this server cannot keep certificates yet, "This server cannot keep certificates yet: ERPlora has to set its
+  storage key.";
+- with no issuer, it asks to set it up first in Invoicing, tab Issuer;
+- with a wrong password or a file that is not a .p12, "The file is not a .p12/.pfx certificate that this password
   opens."; self-signed, "No authority issued this certificate (it is self-signed), so the AEAT will not accept it.
   Use your business's electronic certificate issued by a recognised authority, for example the FNMT."; without
   client-authentication use, "The certificate does not allow client authentication, so it cannot
-  connect to the AEAT."; expired, "The certificate expired on {date}: upload a valid one."
-  (all `verifactu.certificate_invalid`);
-- a holder other than Invoicing's issuer, "The certificate belongs to {tax ID}, not to this business's issuer {tax
-  ID}." (`verifactu.certificate_holder_mismatch`): through the own route it would file on behalf of someone else.
+  connect to the AEAT."; expired, for example "The certificate expired on 2025-12-31: upload a valid one.";
+- with a holder other than Invoicing's issuer, for example "The certificate belongs to B87654321, not to this
+  business's issuer B12345678.": through the own route it would file on behalf of someone else.
 Involved: VERIFACTU-F04, VERIFACTU-F08, VERIFACTU-F34
 
 ### VERIFACTU-F03 Remove the own certificate
@@ -361,16 +404,17 @@ Screen: Configuration
 Steps:
 1. In "My certificate", with one loaded, tap "Remove"; a card asks "Remove the certificate?" and says what will
    happen (the Configuration screen).
-2. On confirming, the certificate is deleted from the hub's database, "Certificate removed." shows and the tab
+2. On confirming, the certificate is deleted from the Hub's database, "Certificate removed." shows and the tab
    turns "Not loaded".
-3. In testing, the records not sent yet go out with ERPlora's seal instead (VERIFACTU-F04), also those the gateway
-   had refused. In production with the certificate's route fixed, they can no longer go out until another one is
-   uploaded: they wait in the queue with the reason "your own certificate is not loaded or has expired" and new
-   sales are refused (VERIFACTU-F08); they never go back to the seal. In production with ERPlora's route fixed,
+3. In testing, the records not sent yet go out with ERPlora's seal instead, also those the gateway had refused. In
+   production with the certificate's route fixed, they can no longer go out until another one is uploaded: they
+   wait in the queue with the reason "your own certificate is not loaded or has expired" and new sales are refused;
+   they never go back to the seal. In production with ERPlora's route fixed,
    nothing changes.
 In: nothing (`verifactu.certificate.remove`).
 Out: the certificate deleted, an event "Own certificate of … removed" and the notice `verifactu.config.changed`.
-If it fails: without the configure permission, 403.
+If it fails: without the permission to set up VeriFactu, "Remove" does not show, and asking for it through another
+door is refused.
 Involved: VERIFACTU-F04, VERIFACTU-F08
 
 ### VERIFACTU-F04 Know who files: my certificate or ERPlora
@@ -378,26 +422,25 @@ Status: done — the route is not chosen: the certificate decides it and it is f
 Actor: administrator
 Screen: Settings
 Steps:
-1. The certificate decides the route. With an own certificate loaded and in force (VERIFACTU-F02), the records go out
+1. The certificate decides the route. With an own certificate loaded and in force, the records go out
    with it; without it, in testing ERPlora files them with its seal,
    also in a demo business. While the business is in testing, uploading, removing or letting the certificate expire
    changes the route of what has not gone out yet.
-2. In **VeriFactu → Settings**, "Sending" says it in a sentence with its icon, along with what is missing (the
-   Settings screen).
-3. On going live (VERIFACTU-F08), the route of that moment is fixed: with a valid certificate, the certificate, even
+2. In **Settings**, "Sending" says it in a sentence with its icon, along with what is missing.
+3. On going live, the route of that moment is fixed: with a valid certificate, the certificate, even
    if the authorisation is approved too; without it, ERPlora's. From then on, uploading, removing or letting the
    certificate expire does not change it. With the certificate's route fixed and no valid certificate, the records
-   wait and new sales are refused (VERIFACTU-F08); they never go back to the seal. With ERPlora's route fixed, it
-   keeps sending and cancelling with the seal while its authorisation stays approved.
-4. ERPlora can close its route on the server (`VERIFACTU_ERPLORA_ROUTE_ENABLED` set to false; open by default):
-   then going live is only possible with the own certificate. Testing without a certificate, demos included, keeps
+   wait and new sales are refused; they never go back to the seal. With ERPlora's route fixed, it keeps sending and
+   cancelling with the seal while its authorisation stays approved.
+4. ERPlora can stop filing on behalf of businesses on a server (to begin with, it does): then going live is only
+   possible with the own certificate. Testing without a certificate, demos included, keeps
    going out with the seal, and whoever is already live through it keeps sending and cancelling through it. ERPlora's
    own business is not affected: it always files with the seal.
 5. In a business outside Spain, on top it says "VeriFactu is only for businesses in Spain.".
 In: the uploaded certificate (VERIFACTU-F02, F03), the environment and, from the account, the authorisation's status.
 Out: the route each record goes out by, in `verifactu.config.get` (`route`); on going live, kept.
 If it fails: there is nothing to choose and nothing to refuse. What is missing to send is said by "Records are
-waiting:", and what is missing to go live, by VERIFACTU-F08.
+waiting:", and what is missing to go live, by the list "It cannot go live yet:", on the same screen.
 Involved: VERIFACTU-F02, VERIFACTU-F03, VERIFACTU-F05, VERIFACTU-F08
 
 ### VERIFACTU-F05 Sign and upload the representation authorisation so ERPlora files
@@ -405,19 +448,19 @@ Status: done — uploaded in the Hub, reviewed by staff in the SaaS and the stat
 Actor: administrator ("configure" permission)
 Screen: Configuration
 Steps:
-1. In **VeriFactu → Configuration**, tab "ERPlora files for you", the status says "Not signed".
-2. "Download the form" downloads the official form (Annex I of Agreement 17, the SaaS's) with the business's
+1. In **Configuration**, tab "ERPlora files for you", the status says "Not signed".
+2. "Download the form" downloads the official form (Annex I of Agreement 17, which ERPlora provides) with the business's
    details already in: Invoicing's issuer's legal name, tax ID and address (the municipality and the street, with
    the number as it appears in the address); with no issuer, it comes blank. Whatever is missing is filled in and it
    is signed away from the screen: by hand (and scanned to PDF, with the stamp if it is a company) or with
    AutoFirma. Under the button, "Model downloaded. Sign it and upload it below." appears; inside the ERPlora app the
-   form is saved in Downloads and "Saved to {path}" appears too (BASE-F112).
+   form is saved in Downloads and the folder where it was left appears too.
 3. A company writes its legal representative (name and NIF/NIE); a sole trader signs themselves.
 4. The identity document (DNI or NIE) is chosen and the PDFs attached: the signed form, the copy of the document,
    with a NIE a signature sample and, with a company, the proof of representation.
-5. "Send for review": the Hub checks the documents and forwards them as they are to the SaaS; it stays "Under
+5. "Send for review": the Hub checks the documents and forwards them as they are to ERPlora; it stays "Under
    review".
-6. A person at ERPlora reviews it in the SaaS; the account sends the Hub the new status: "Approved", "Returned"
+6. A person at ERPlora reviews it; your ERPlora account sends the Hub the new status: "Approved", "Returned"
    (with the reason) or "Revoked".
 7. In a business outside Spain it is not offered: on top it says "VeriFactu is only for businesses in Spain." and
    the tab shows neither the authorisation nor the procedure.
@@ -428,20 +471,17 @@ Out: `POST /internal/hubs/{id}/representation` to the SaaS; "Under review" (an a
 filing until the new one is approved), its trace in "What you sent" and in the audit log (number, date, document
 type and which documents; never their content) and the notice `verifactu.config.changed`. The Hub keeps no
 document. Approved, it opens the ERPlora route in production (VERIFACTU-F08).
-If it fails: before calling, with the SaaS's codes (422): the form is missing ("Attach the signed form."), it is not
-a PDF ("The signed form has to be a PDF — scan it or sign it with AutoFirma."), the copy of the document is missing,
-with a NIE the signature sample, with a company the representative or the proof, a file over 5 MB ("Each file has
-to be 5 MB at most."); the SaaS's refusal, with its `fiscal.*` code and its fields as they are; with no issuer, 409
-`verifactu.issuer_missing`; without the account's snapshot (the Hub does not know its id at ERPlora yet) or a
-business the SaaS does not know, 409 `verifactu.hub_unregistered` ("ERPlora has not linked this business yet.");
-without the SaaS, 503 `verifactu.saas_unreachable` ("ERPlora could not handle this right now. Try again in a few
-minutes.").
-With the ERPlora route closed on the server, neither "Download the form" nor "Send for review" reaches the SaaS: 409
-`verifactu.erplora_route_unavailable`, "ERPlora does not file on behalf of businesses for now: file with your own
-certificate.". ERPlora's own business is not affected.
+If it fails: before sending anything, the screen says what is missing: the form ("Attach the signed form."), that it
+be a PDF ("The signed form has to be a PDF — scan it or sign it with AutoFirma."), the copy of the document, with a
+NIE the signature sample, with a company the representative or the proof, or a file over 5 MB ("Each file has to be
+5 MB at most."). If ERPlora refuses it on receiving it, its reason shows. With no issuer in Invoicing, it asks to set
+it up first; if ERPlora has not linked the business yet, "ERPlora has not linked this business yet."; if ERPlora does
+not answer, "ERPlora could not handle this right now. Try again in a few minutes.". If ERPlora stops filing on behalf
+of businesses, the tab "ERPlora files for you" no longer shows, and asking for it through another door answers
+"ERPlora does not file on behalf of businesses for now: file with your own certificate.".
 When downloading the form, an issuer detail the form cannot write (a letter outside its own or a text that is too
 long) comes blank to write it by hand, with the rest already in: it never leaves you without a form. Inside the app,
-if it cannot save it, it says so with its reason (BASE-F112) and "Model downloaded" does not appear.
+if it cannot save it, it says so with its reason and "Model downloaded" does not appear.
 Involved: VERIFACTU-F08, BASE-F112 (inside the app)
 
 ### VERIFACTU-F06 Send the authorisation again
@@ -454,7 +494,7 @@ Steps:
    with an approved one, filing goes on with it while the new one is reviewed. "Cancel" closes it.
 In: like VERIFACTU-F05.
 Out: like VERIFACTU-F05; the submission carries the next number.
-If it fails: like VERIFACTU-F05.
+If it fails: the same as when sending it the first time.
 Involved: VERIFACTU-F05
 
 ### VERIFACTU-F08 Go live
@@ -465,7 +505,7 @@ demo hub never goes live (`verifactu.go_live_forbidden`).
 Actor: administrator
 Screen: Settings
 Steps:
-1. In **VeriFactu → Settings**, "AEAT environment" shows "Testing (AEAT test)" and "Your invoices go to the AEAT's
+1. In **Settings**, "AEAT environment" shows "Testing (AEAT test)" and "Your invoices go to the AEAT's
    test environment. When everything is ready, go live.". If something is missing, below shows "It cannot go live
    yet:" with the list (demo business, authorisation not approved, ERPlora route closed on the server, own certificate
    missing or expired, own certificate the AEAT's test environment has not accepted yet or refused, account with a
@@ -482,53 +522,28 @@ and not read).
 Out: the environment in production and the route of that moment fixed (VERIFACTU-F04: with a valid certificate, the
 certificate; without it, ERPlora's), announcing `verifactu.config.changed`: new records are born in the production
 chain, with the real site's QR; those born in testing keep going to testing.
-If it fails: while ERPlora does not open it on the server, "Going live is not open on this server yet: ERPlora
-opens it when the real submission is ready." (in Settings, in the list of what is missing: "ERPlora has not opened
-real filing with the AEAT on this server yet", `production_closed`); without the SaaS gateway on the server,
-"ERPlora's sending gateway is not configured on this server: nothing could reach the AEAT."
-(`verifactu.gateway_unavailable`); with an own certificate this server does not open (the key
-`FISCAL_CERTIFICATE_KEY` is missing or was rotated), "Your own certificate cannot be opened on this server: upload it
-again in VeriFactu → Configuration → My certificate." (`verifactu.own_certificate_unreadable`); with an own
-certificate the AEAT's test environment has not accepted yet, "The AEAT's test environment has not accepted your own
-certificate yet: it is tried with the next record that goes out in testing. Issue a sale or an invoice and go live
-once it is accepted." (`verifactu.own_certificate_untested`; in the list of what is missing: "the AEAT's test
-environment has not accepted your own certificate yet: it is tried with the next record that goes out in testing",
-`own_certificate_untested`); with one it refused, "The AEAT's test environment refused your own certificate: upload
-another one in VeriFactu → Configuration → My certificate." (`verifactu.own_certificate_rejected`; in the list: "the
-AEAT's test environment refused your own certificate: upload another one", `own_certificate_rejected`); in a demo hub, "A demo
-business cannot go live: it always files in the AEAT's test environment." (`verifactu.go_live_forbidden`;
-who is a demo is said by the platform, `base.operations.is_demo_hub`); with no issuer, "Set up the issuer first in
-Invoicing → Issuer."; with no valid certificate and no approved authorisation, "For ERPlora to file in production,
-ERPlora still has to approve your signed authorisation." (`verifactu.representation_not_approved`); with no valid
-certificate while the server keeps the ERPlora route closed, approved authorisation or not, "To go live, upload your
-own certificate: ERPlora does not file on behalf of businesses for now." (`verifactu.own_certificate_required`; in the
-list of what is missing: "ERPlora does not file on behalf of businesses for now: use your own certificate",
-`own_certificate_required`); with the account
-with a pending payment or suspended, "Your ERPlora account has a pending payment or is suspended: settle it in your
-ERPlora account to go live." (`verifactu.hub_not_active`). All of them are 409 and the environment stays in testing.
-Already in production, it does nothing.
-In a business outside Spain it is refused as with the app off, "VeriFactu is only for businesses in Spain." (404
-`app_inactive`), and Settings says it on top, "VeriFactu is only for businesses in Spain.", as the only reason
-(without the list of what is missing), with "Go live" disabled.
-If the fixed route is lost in production (with ERPlora's, the snapshot stops bringing the approved authorisation;
-with the certificate's, it expires or is removed), it neither changes route nor goes back to testing (there are production records already): **nothing new is sealed** —the
-sale or the invoice is refused with 409 and the route's code (`verifactu.representation_not_approved`,
-`verifactu.own_certificate_missing`) and "Nothing was issued: this business files for real with the AEAT and cannot
-reach it now:", the reason and "Fix it in VeriFactu → Settings and try again."— and Settings says it under "New sales
-and invoices are refused until this is fixed:" (`issue_blocker`). What was already sealed with no approved
-authorisation or no valid certificate waits, because the gateway could not file it.
-Closing the ERPlora route on the server neither takes anyone already live through it out of production nor changes
-their route: it keeps sealing, sending and cancelling with ERPlora's seal, because the AEAT only takes a cancellation
-filed with the same seal; uploading a certificate afterwards does not change it either. Whoever is already live
-through the certificate and uploads another one keeps filing with it without it being tried: production never tries
-a certificate. The Home's "Set up VeriFactu" step is only done with the own certificate once the AEAT's test
-environment accepted it and, with the route closed, only speaks of it: "Upload your business
-certificate to send your invoices to the AEAT." (with the route open, "Sign the authorisation for ERPlora to send your
-invoices to the AEAT, or upload your business certificate.").
-It is checked in this order and the first cause gives the 409 with its code: the closed server → a demo
-business → the issuer → the route (with a valid certificate, the certificate, which needs no authorisation but does
-need the AEAT's test environment to have accepted it; without it, ERPlora's, open on the server and with the approved
-authorisation) → the account.
+If it fails: while something is missing, "Go live" stays disabled, the environment stays in testing and the list "It
+cannot go live yet:" says what is missing:
+- that ERPlora has not opened real filing with the AEAT on this server yet, or that its sending gateway is missing;
+- that it is a demo business, which always files in the AEAT's test environment;
+- with your certificate, that this server cannot open it (it has to be uploaded again in "My certificate"), that the
+  AEAT's test environment has not accepted it yet (it is tried with the next record that goes out in testing: make a
+  sale or an invoice and go live once it is accepted) or that it refused it (another one has to be uploaded);
+- with no valid certificate, that ERPlora has not approved your signed authorisation yet or, if ERPlora does not file
+  on behalf of businesses, that your own certificate is missing;
+- that your ERPlora account has a pending payment or is suspended: the payment has to be settled in your account.
+
+With no issuer in Invoicing, it asks to set it up first. Already live, it does nothing. In a business outside Spain,
+Settings says on top "VeriFactu is only for businesses in Spain." as the only reason and "Go live" is disabled.
+If the fixed route is lost in production (with ERPlora's, your authorisation is revoked; with the certificate's, it
+expires or is removed), the route does not change and it does not go back to testing: nothing new is sealed. The sale
+or the invoice is refused with "Nothing was issued: this business files for real with the AEAT and cannot reach it
+now:" and the reason, and Settings says it under "New sales and invoices are refused until this is fixed:". What was
+already sealed waits, because it could not be filed.
+If ERPlora stops filing on behalf of businesses, whoever is already live through that route keeps sealing, sending and
+cancelling with ERPlora's seal, because the AEAT only accepts a cancellation filed with the same seal; uploading a
+certificate afterwards does not change it either. Whoever is already live with their certificate and uploads another
+one keeps sending with it without it being tried: production never tries a certificate.
 Involved: VERIFACTU-F04, VERIFACTU-F05, VERIFACTU-F09
 
 ### VERIFACTU-F09 Go back to testing
@@ -551,7 +566,7 @@ Status: done — with the SaaS gateway's probe (`/internal/verifactu/probe`)
 Actor: manager, administrator
 Screen: Settings
 Steps:
-1. In **VeriFactu → Settings**, "Live test", tap "Test the connection" (the buttons wait while it tests).
+1. In **Settings**, "Live test", tap "Test the connection" (the buttons wait while it tests).
 2. The Hub checks, without filing anything with the AEAT, everything needed to send: the issuer, the producer's
    data, the route and its status and, if the gateway is configured, asks it whether it can file now.
 3. Below the result shows, line by line, and "This business can send." or "It cannot send yet:" with the
@@ -570,11 +585,11 @@ Status: done
 Actor: administrator
 Screen: Settings
 Steps:
-1. With the business in testing, in **VeriFactu → Settings**, "Live test", tap "Create test invoice". In
-   production the button does not show.
+1. With the business in testing, in **Settings**, "Live test", tap "Create test invoice". In production the button
+   does not show.
 2. VeriFactu asks Invoicing for a ticket (F2) of one line "Prueba VeriFactu" of €1.00 plus 21% VAT in the TICKET
-   series, through the same door as the manual issuing (INVOICE-F03).
-3. "Test invoice {number} created: its record is in Records." shows.
+   series, like an invoice made by hand.
+3. For example, "Test invoice TICKET-2026-000001 created: its record is in Records." shows.
 4. In a business outside Spain, on top it says "VeriFactu is only for businesses in Spain." and "Create test
    invoice" is disabled.
 In: nothing to type.
@@ -587,7 +602,7 @@ Status: done
 Actor: employee, manager, administrator
 Screen: Settings
 Steps:
-1. In **VeriFactu → Settings**, card "Responsible declaration", "Read the signed declaration" opens the one
+1. In **Settings**, card "Responsible declaration", "Read the signed declaration" opens the one
    published on erplora.com (in the installed app, in the device's browser); next to it, "Declaration version".
 2. "Identifying data of this system" shows the producer's data, the installed version and the installation number
    (this business's identifier at ERPlora).
@@ -675,7 +690,7 @@ Status: done
 Actor: employee, manager, administrator
 Screen: Records
 Steps:
-1. Open **VeriFactu → Records**.
+1. Open **Records**.
 2. Search by invoice number, sequence, issuer's name or tax ID, or filter by status, type, invoice type,
    environment, date and total.
 3. Each row shows its status with a colour: green "Accepted", amber "Pending" / "Sent" / "Accepted with
@@ -683,7 +698,7 @@ Steps:
 In: the records.
 Out: nothing; it is a lookup.
 If it fails: the message with "Retry". The total is read as in any amount field of the Hub and as in the other
-lists (hub#1247: "1.000,50", "1,000.50", "2 500" and "12,50 €" filter); one it cannot read says so under its
+lists ("1.000,50", "1,000.50", "2 500" and "12,50 €" filter); one it cannot read says so under its
 field in the words of the amount field ("This is not an amount. Type a figure, for example 12.50.", "This amount
 cannot be negative." or, with "1.000" in euros, "This amount can be read in two ways…"), and an end date before
 the start date, "The end date cannot be before the start date."; neither of the two filters.
@@ -695,15 +710,16 @@ Actor: employee, manager, administrator
 Screen: Record detail
 Steps:
 1. In **Records**, tap a row.
-2. "Record {number}" opens with the invoice, the chain, the QR, the AEAT's answer and the XML.
+2. Its detail opens, for example "Record TICKET-2026-000001", with the invoice, the chain, the QR, the AEAT's
+   answer and the XML.
 3. If it is not at the AEAT, "Not at the AEAT yet" says why ("ERPlora's sending gateway is not configured on this
-   server", "your own certificate is not loaded or has expired", "the AEAT asked to wait until {time}", "the
-   gateway or the AEAT could not be reached ({detail})") and a single when: if everything it waits for clears by
+   server", "your own certificate is not loaded or has expired", that the AEAT asked to wait until a given time,
+   that the gateway or the AEAT could not be reached) and a single when: if everything it waits for clears by
    itself (the AEAT asked to wait, no connection, no answer, an AEAT fault), "It goes out by itself with the next
    pass, in order, and declared as late if it failed before. You do not have to do anything."; if it waits for
    something to be resolved (a refusal of the gateway, which is not sent again by itself; the authorisation; the
-   route; the server), "It goes out by itself, in order and declared as late, as soon as that is resolved."
-   (hub#454). Below, the "Next attempt".
+   route; the server), "It goes out by itself, in order and declared as late, as soon as that is resolved.".
+   Below, the "Next attempt".
 4. In a business outside Spain it only says "this business is not in Spain: VeriFactu is only for businesses in
    Spain, so nothing is sent to the AEAT", with no next attempt nor buttons to send, correct or cancel:
    it never goes out.
@@ -749,16 +765,16 @@ Screen: Contingency
 Steps:
 1. While selling, nothing stops because of this: if the gateway, the AEAT or the network are down, charging goes on
    and the record waits.
-2. Every minute (scheduled task `process_queue`) the system does the pass of VERIFACTU-F15 on every chain that is
-   due, each one in its environment; if passes were missed (server stopped), on coming back a single one is
-   done.
+2. Every minute the system does the sending pass on every chain that is due, each one in its environment, in order
+   and respecting the wait the AEAT asked for; if passes were missed (server stopped), on coming back a single one
+   is done.
 3. Whatever fails again waits longer (5, 10, 20, 40 and 60 minutes), with no limit of attempts.
-4. The event "Queue processed: {sent} sent, {accepted} accepted, {rejected} rejected, {waiting}
-   waiting." is left.
+4. The pass's event is left in **Events**, for example "Queue processed: 3 sent, 3 accepted, 0 rejected, 0
+   waiting.".
 In: the pending records.
 Out: the submissions and their answers (it announces `verifactu.contingency.processed`).
 If it fails: whatever does not go out stays in the queue with its reason; in a business outside Spain it never goes
-out. The pass presents each record as the business it belongs to, never as ERPlora's hub (VERIFACTU-F15, hub#454).
+out. The pass presents each record as the business it belongs to, never as ERPlora's.
 Involved: VERIFACTU-F15
 
 ### VERIFACTU-F21 Process the queue by hand
@@ -766,7 +782,7 @@ Status: done
 Actor: manager, administrator
 Screen: Contingency
 Steps:
-1. In **VeriFactu → Contingency**, tap "Process queue" ("Processing…").
+1. In **Contingency**, tap "Process queue" ("Processing…").
 2. The same pass as the automatic one is done at that moment.
 3. Under the table the result shows; the table updates by itself.
 In: the queue.
@@ -780,7 +796,7 @@ Status: done
 Actor: manager, administrator
 Screen: Contingency
 Steps:
-1. In **VeriFactu → Contingency**, tap "Retry" on the row.
+1. In **Contingency**, tap "Retry" on the row.
 2. The record (and the earlier ones of its chain, which go out before it) are set to go out with the next pass;
    the attempts are kept.
 In: the chosen record.
@@ -795,16 +811,15 @@ Actor: administrator
 Screen: Records, Record detail
 Steps:
 1. The record shows in red "Rejected" in **Records**, with "Pending correction" beside it; in **Events** "Submission
-   failed" is left with the reason. The "Correction" filter → "Pending correction" leaves only the ones still to do.
+   failed" is left with the reason. The "Correction" filter, on "Pending correction", leaves only the ones still to
+   do.
 2. In its detail, "The AEAT rejected it" with the AEAT's literal code and message and what to do: if the error is
    in the invoice's data (a customer's tax ID the AEAT does not know, an amount), it is corrected **in Invoicing**
    with a rectifying invoice; if not (a chain error after restoring a backup, a fault of ours), "Correct".
 3. "Correct" (with confirmation) seals a **new** record of the same invoice, read again, marked as a correction,
-   which enters the queue. The rejected one stays as it is. `RechazoPrevio` according to the VERI*FACTU web service
-   Description v1.0.3: `X` if the AEAT has no record of that invoice (the initial registration was rejected;
-   §9.1.3, "registration after rejection"); `S` if the AEAT does have it and what was rejected was a later
-   correction.
-4. An "Accepted with errors" can also be corrected (`Subsanacion = S`, `RechazoPrevio = N`; §9.1.2).
+   which enters the queue. The rejected one stays as it is. The new record tells the AEAT whether it already had
+   that invoice or whether it was rejected from the first submission.
+4. An "Accepted with errors" can also be corrected.
 5. Once corrected, in **Records** the earlier one says "Corrected", which opens the record that corrects it, and its
    detail, "Already corrected with a new record" with "Open the record that corrects it". If the AEAT rejects the
    correction too, that one shows "Pending correction" and is corrected in turn; the earlier one stays "Corrected".
@@ -823,13 +838,14 @@ Steps:
 1. In the detail of a pending record or of one sent with no answer, tap "Send now".
 2. Its chain up to it goes out right away (the earlier pending ones go first, in order), if the AEAT's wait is
    over.
-3. The record ends with the AEAT's answer, as in VERIFACTU-F15.
+3. The record ends with the AEAT's answer: "Accepted", "Accepted with errors" or "Rejected".
 In: the chosen record (by its id or by its invoice's number).
 Out: the submission and its answer (it announces `verifactu.record.transmitted`).
 If it fails: with no gateway, "It cannot be sent now: ERPlora's sending gateway is not configured on this server. It
 stays in the queue and goes out as soon as it can."; already accepted or rejected, "This record is not in the queue:
 it is already in the AEAT, or the AEAT rejected it."; with the AEAT's wait under
-way, "The AEAT asked to wait: it goes out by itself at {time}.". It never says "accepted" without an answer.
+way, for example "The AEAT asked to wait: it goes out by itself at 12:05.". It never says "accepted" without an
+answer.
 Involved: VERIFACTU-F15
 
 ### VERIFACTU-F26 Verify the fingerprint chain
@@ -837,12 +853,12 @@ Status: done
 Actor: employee, manager, administrator
 Screen: Recovery
 Steps:
-1. In **VeriFactu → Recovery**, with the "Issuer tax ID", tap "Validate chain" ("Working…").
+1. In **Recovery**, with the "Issuer tax ID", tap "Validate chain" ("Working…").
 2. The system recomputes the fingerprint of each record of the current environment's chain and checks that each one
    carries the previous one's.
-3. "Operation completed." and the verdict show: "Fingerprint chain intact: {total} records with their SHA-256
-   chaining verified ({tax ID})." (with one, "1 record with its"; never "record(s)") or "Fingerprint chain BROKEN
-   at sequence {seq} ({tax ID}).".
+3. "Operation completed." and the verdict show: for example, "Fingerprint chain intact: 120 records with their
+   SHA-256 chaining verified (B12345678). Amounts are not re-audited." or "Fingerprint chain BROKEN at sequence 57
+   (B12345678).".
 In: the chain's records.
 Out: the verdict as an event (it announces `verifactu.chain.validated`). It only reads: it repairs nothing and does
 not re-audit the amounts.
@@ -854,7 +870,7 @@ Status: done — through the SaaS gateway (`/internal/verifactu/query`)
 Actor: manager, administrator
 Screen: Recovery
 Steps:
-1. In **VeriFactu → Recovery**, tap "Query AEAT" ("Working…").
+1. In **Recovery**, tap "Query AEAT" ("Working…").
 2. The system asks the AEAT, through the gateway, for that issuer's records of the current month.
 3. The table "Latest records at the AEAT" fills up and "Operation completed." shows.
 4. In the table, search by invoice, fingerprint or CSV ("Search invoice, fingerprint or CSV…"), sort by any column
@@ -872,7 +888,7 @@ Actor: administrator
 Screen: Recovery
 Steps:
 1. After restoring a backup of the database (the AEAT has records the backup does not), stop issuing and open
-   **VeriFactu → Recovery**.
+   **Recovery**.
 2. Tap "Recover chain from AEAT" and confirm ("Local continuity will be rebuilt from the latest record
    available at the AEAT. Verify the issuer tax ID before continuing.").
 3. The system queries the AEAT and anchors the current environment's chain on the last record (by its generation
@@ -889,7 +905,7 @@ Status: done
 Actor: administrator
 Screen: Recovery
 Steps:
-1. In **VeriFactu → Recovery**, block "Continue chain manually (migration)", type the "Last
+1. In **Recovery**, block "Continue chain manually (migration)", type the "Last
    fingerprint (64 hex)" of the previous application, the "Invoice number" and the "Date" of that last record.
 2. Tap "Continue from this fingerprint" and confirm ("The fingerprint given will be the predecessor of the next
    fiscal record. Use this only during a migration and with the data of the last record of the previous
@@ -898,8 +914,8 @@ Steps:
 In: the fingerprint, the number and the date of the previous application's last record.
 Out: a new anchor (it announces `verifactu.chain.recovered`).
 If it fails: a fingerprint that does not have 64 hexadecimal characters, "The fingerprint must be 64 hexadecimal
-characters"; with no number or date, which are part of the chaining, the field asks for it; with pending records,
-like VERIFACTU-F28.
+characters"; with no number or date, which are part of the chaining, the field asks for it; with pending records
+in the chain, "The pending records of this chain have to go out first.".
 Involved: none
 
 ### VERIFACTU-F30 Cancel a record sent by error
@@ -908,7 +924,7 @@ Actor: administrator, assistant
 Screen: Record detail
 Steps:
 1. Only for an invoice that **should never have been issued** (a duplicate, a test made in production). A
-   refund or a correction is not cancelled: it is a rectifying invoice in Invoicing (VERIFACTU-F14).
+   refund or a correction is not cancelled: it is a rectifying invoice in Invoicing.
 2. In the detail of the registration record, tap "Cancel record", write the reason and confirm ("The AEAT will be
    told this invoice was issued by error. A refund or a correction is never this: it is a rectifying invoice in
    Invoicing. The invoice stays in Invoicing.").
@@ -918,8 +934,8 @@ In: the registration record (or its invoice's number).
 Out: the cancellation record (it announces `verifactu.record.created`).
 If it fails: a rejected registration is not cancelled (it is not at the AEAT); an already cancelled one, neither:
 "This record cannot be cancelled: only a registration that reached (or will reach) the AEAT and has no
-cancellation can.". If the AEAT rejected the cancellation, it can be cancelled again: the new one
-carries `RechazoPrevio = S` (§9.2.2, "cancellation after rejection").
+cancellation can.". If the AEAT rejected the cancellation, it can be cancelled again: the new one tells the AEAT
+that the earlier one was rejected.
 Involved: INVOICE-F07
 
 ### VERIFACTU-F31 Watch the submissions from the screens
@@ -970,9 +986,10 @@ Status: done — in the Hub (uploading the renewed one replaces the previous one
 Actor: owner and administrator (configure)
 Screen: Configuration
 Steps:
-1. "My certificate" shows "Expires on {date}" and, at 30 days or less, "Expires in {n} days: upload the renewed one
-   here.".
-2. The new certificate is uploaded as in VERIFACTU-F02 and replaces the previous one; the chain does not change.
+1. "My certificate" shows its date in "Expires on" and, at 30 days or less, for example "Expires in 12 days: upload
+   the renewed one here.".
+2. The new certificate is uploaded like the first one, with "Choose the .p12 / .pfx file", its password and "Upload
+   the certificate", and replaces the previous one; the chain does not change.
 In: the renewed certificate.
 Out: the new one, instead of the previous one.
 If it fails: expired, in testing the records go out with ERPlora's seal until the renewed one is uploaded, and in
@@ -987,10 +1004,10 @@ Actor: manager, administrator (send); ERPlora's staff from the admin
 Screen: Record detail ("Ask the AEAT"); for the staff, the Django admin (Records → "Ask the AEAT (out of the queue if
 it already has it)")
 Steps:
-1. A record was left "sent, with no answer" (or pending) and the AEAT may already have it: in its detail, tap
+1. A record was left "Sent" with no answer (or "Pending") and the AEAT may already have it: in its detail, tap
    "Ask the AEAT".
-2. The AEAT is queried, through ERPlora's gateway, for the record's issuer in the month of its issue date
-   (like VERIFACTU-F27, which renews the last snapshot).
+2. The AEAT is queried, through ERPlora's gateway, for the record's issuer in the month of its issue date; the
+   table "Latest records at the AEAT" of Recovery is brought up to date with that query.
 3. If the AEAT returns **that very record** (same issuer, number and fingerprint), it leaves the queue as "Accepted"
    or "Accepted with errors", according to what the AEAT says, without losing its attempts; an event with who did it
    is left.
