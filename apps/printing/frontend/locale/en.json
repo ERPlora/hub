@@ -269,6 +269,12 @@
       "loadErrorBody": "Try again in a moment.",
       "noPermission": "You do not have permission to change these settings."
     },
+    "deviceErrors": {
+      "unreachable": "The printer does not answer. Check that it is on and connected to this device's network or Bluetooth.",
+      "bluetoothPermission": "ERPlora may not use Bluetooth on this device. Allow “Nearby devices” for ERPlora in the device's settings.",
+      "invalidAddress": "The printer's address is not valid. Correct it by editing the printer.",
+      "updateApp": "This device could not prepare the document. Update the ERPlora app on it."
+    },
     "host": {
       "drawerFailed": "The cash drawer did not open: check that “{printer}” is on and connected.",
       "drawerFailedUnnamed": "The cash drawer did not open: check that its printer is on and connected."

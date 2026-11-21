@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:ac9333d83849a4313d048a82ee104aabc79499d75f12e85ed0eb659d7c52b5ea -->
+<!-- generated from WORKBOOK.md sha256:e49d957c6ccaa2b6da757be1c33c26d710d3604c6dac6c87c4bdda6ed69b0d45 -->
 
 ## What it is for and who it is for
 
@@ -106,7 +106,8 @@ prints and check that paper comes out.". Two areas, in this order:
   queue." with "Retry".
 - **Printers**: the table (or cards on the phone) with Name, Role, Connection, Address, Paper,
   Status and Active. The status is "Ready", "Waiting" (it has jobs that have not come out for more than a
-  minute), "With errors" (the last attempt failed: underneath, "Last error: …") or "Inactive". Per row:
+  minute), "With errors" (the last attempt failed: underneath, "Last error: …", said as in PRINTING-F19) or
+  "Inactive". Per row:
   "Edit", "Test" and "Deactivate"/"Activate". At the top, "Search printers" (PRINTING-F02) and "Add
   printer". Empty: "No printers yet. Add the one at your till by its address.". A note reminds that the paper is
   taken out by the ERPlora app on the device next to the printer; in a browser it adds "a browser cannot reach
@@ -352,8 +353,9 @@ Steps:
 In: the printer.
 Out: a "Test page" job for that printer (announces: `printing.job.queued`).
 If it fails: an inactive printer is not tested: "That printer is inactive: activate it to test it.".
-If the paper does not come out, the page goes back to the queue with the device's error and, after 5 attempts, ends up "Failed": in
-**Printing → Queue** it is retried or cancelled.
+If the paper does not come out, the page goes back to the queue with the device's error (with the printer switched
+off: "The printer does not answer. Check that it is on and connected to this device's network or Bluetooth.") and,
+after 5 attempts, ends up "Failed": in **Printing → Queue** it is retried or cancelled.
 Involved: PRINTING-F18
 
 ### PRINTING-F06 Choose how the business prints
@@ -641,7 +643,13 @@ Actor: administrator, manager, employee
 Screen: Printers
 Steps:
 1. The "Status" column of each printer says "Ready", "Waiting", "With errors" or "Inactive", with
-   its last error.
+   its last error. The ERPlora app says what happened with a code and the screen tells it in the
+   reader's language, with what to do: the printer does not answer (switched off, off the network or out
+   of Bluetooth range: "The printer does not answer. Check that it is on and connected to this device's
+   network or Bluetooth."), the app may not use Bluetooth, the printer's address is not valid, or the
+   device could not prepare the document (the app needs updating). The system's detail stays in the
+   device's log. An app older than the codes says it in its own words, shown as they are until it is
+   updated.
 2. The assistant answers it by the printer's name.
 In: the printer.
 Out: its state, how many jobs are waiting and since when, when it last printed and its last
