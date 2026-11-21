@@ -6,10 +6,10 @@ import { type Browser, type BrowserContext, expect, type Page, test } from '@pla
 import {
   A,
   api,
+  capture,
   EMPLOYEE,
   horizontalOverflow,
   hostPage,
-  shot,
   shown,
   signedInSpanish,
   testid,
@@ -54,7 +54,7 @@ async function snap(page: Page, name: string): Promise<void> {
   await expect(shown(page).locator('[data-testid$="-loading"]:visible')).toHaveCount(0);
   await untilStill(page);
   expect(await horizontalOverflow(page), `${name}: no sideways scroll`).toBeLessThanOrEqual(0);
-  await page.screenshot({ path: shot(name), fullPage: true });
+  await capture(page, name, { fullPage: true });
 }
 
 for (const { label, ...viewport } of THREE_SIZES) {
