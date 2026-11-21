@@ -961,7 +961,7 @@ def receive_stock(ctx: OperationContext, data: ReceiveIn) -> dict:
     expose_api=True,
     ai={
         "description": "Apply a stock count: the product's balance becomes the ABSOLUTE value counted, with a "
-        "mandatory reason; the ledger records the difference.",
+        "mandatory reason; the ledger records the difference. Not for breakage, waste or own consumption: a write-off.",
         "risk": "normal",
         "asks": {
             "en": (
