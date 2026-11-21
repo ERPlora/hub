@@ -13,7 +13,8 @@ from live.errors import AppInactive, Conflict, NotFound
 from live.models import OutboxEvent
 from live.operations import registry
 
-from apps.sale.tests.conftest import HUB_DB, A, ctx_for, run
+from apps.sale.tests.conftest import HUB_DB, A, B, ctx_for, run
+from base.tenancy.context import use_hub
 
 pytestmark = HUB_DB
 
@@ -27,8 +28,8 @@ def catalog(product):
     product("Water", "WAT", 200, "product.generic")
 
 
-def member(first_name: str, last_name: str = "López"):
-    return run("staff.member.create", {"first_name": first_name, "last_name": last_name}, system_context(A))
+def member(first_name: str, last_name: str = "López", scope=A):
+    return run("staff.member.create", {"first_name": first_name, "last_name": last_name}, system_context(scope))
 
 
 def reopened(order):
@@ -168,3 +169,17 @@ def test_a_split_check_keeps_who_serves_it(catalog):
     parts = run("sale.order.split", {"order_id": str(order.id), "line_ids": [str(order.lines[1].id)]})
     assert served(parts.new_order) == (lucia.id, "Lucia Garcia")
     assert served(parts.order) == (lucia.id, "Lucia Garcia")
+
+
+def test_who_serves_is_somebody_of_the_business_of_the_check_and_stays_there(catalog, hub_b):
+    in_b = ctx_for(scope=B)
+    with use_hub(hub_b):
+        bea = member("Bea", "Ruiz", scope=B)
+        theirs = run("sale.order.open", {"staff_id": str(bea.id)}, in_b)
+    order = run("sale.order.open", {"lines": [{"product": "COF"}]})
+    with pytest.raises(NotFound):
+        set_staff(order, bea.id)
+    assert served(order) == (None, "")
+    with use_hub(hub_b):
+        check = run("sale.order.get", {"order_id": str(theirs.id)}, in_b)
+    assert (check.staff_id, check.staff_name) == (bea.id, "Bea Ruiz")
