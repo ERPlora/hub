@@ -15,6 +15,7 @@ from apps.kitchen.models import Destination, KitchenSettings, OrderType, Ticket
 from apps.kitchen.queries.reads import STRUCK
 from apps.kitchen.services.writes import logger
 from base.business import paper_time
+from base.queries.people import without_address
 from base.queries.catalog_images import business_language
 
 URGENT = _("!! URGENT !!")
@@ -92,7 +93,7 @@ def _sheet(  # noqa: PLR0913
         "round_number": ticket.round_no,
         "table": title % {"label": label} if title else ticket.label,
         "label": title % {"label": label} if title else label,
-        "waiter": ticket.waiter,
+        "waiter": without_address(ticket.waiter),
         "priority": str(URGENT) if rush else "",
         "duplicate": duplicate,
         "time": paper_time(timezone.now() if negative else ticket.received_at),

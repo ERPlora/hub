@@ -11,6 +11,7 @@ from uuid import UUID
 from apps.kitchen.models import ItemStatus, Ticket, TicketItem
 from apps.kitchen.queries.reads import STRUCK, TO_DO
 from apps.sale.models import OrderLine
+from base.queries.people import without_address
 
 
 @dataclass
@@ -165,7 +166,9 @@ def saved_views(tickets: Iterable[Ticket]) -> list[TicketView]:
             priority=ticket.priority,
             status=ticket.status,
             notes=ticket.notes,
-            waiter=ticket.waiter,
+            # A colleague's address only reaches whoever sees the team's contact details: a ticket saved with one reads
+            # without it.
+            waiter=without_address(ticket.waiter),
             received_at=ticket.received_at,
             started_at=ticket.started_at,
             ready_at=ticket.ready_at,
