@@ -72,6 +72,7 @@ class SaleConfig(LiveAppConfig):
             "sale.take_payment",
             "sale.view_paymentmethod",
         ],
+        "hub_accountant": ["sale.view_sale", "sale.view_all_sales", "sale.view_paymentmethod"],
     }
     # What a manager approves on the spot with their PIN on the cashier's own device (BASE-F84;
     # Square, Toast, Lightspeed and Shopify's manager override), in the words the dialog «An approval

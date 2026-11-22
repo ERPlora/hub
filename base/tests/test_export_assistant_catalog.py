@@ -26,6 +26,7 @@ ROLES = {
     "admin": Membership.Role.ADMIN,
     "manager": Membership.Role.MANAGER,
     "employee": Membership.Role.EMPLOYEE,
+    "accountant": Membership.Role.ACCOUNTANT,
 }
 
 

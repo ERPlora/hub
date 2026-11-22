@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:c5bf1c704ba55e5ba24472a895d6073fc547534c883ad3ce4207329d9d94cd4f -->
+<!-- generated from WORKBOOK.md sha256:fe80b7afe602ea19ec5165ed35baf8c0a34588ede14506c58076cf27861f1b8f -->
 
 ## What it is for and who it is for
 
@@ -238,7 +238,7 @@ only for whoever runs the business, "API keys" and "Approvals"; each one in the 
 Employees.
 
 ### Employees · Roles
-The four roles of erplora.com, with where they come from, how many people have them and how many permissions they
+The five roles of erplora.com, with where they come from, how many people have them and how many permissions they
 give.
 
 ### Employees · API keys
@@ -2120,7 +2120,8 @@ Actor: owner, administrator
 Screen: Employees · Staff
 Steps:
   1. In **Employees › Staff**, above the table, how many of the plan's places are taken: "{used} of {limit} places
-     taken", "{used} people · no limit" or, if erplora.com has not said the plan, "{used} people".
+     taken", "{used} people · no limit" or, if erplora.com has not said the plan, "{used} people". The accountancy
+     firm takes no place: it is on the list, but it does not count here nor in "Usage and plan" of System.
   2. With every place taken, "Every place of your plan is taken" shows with "Remove on erplora.com someone who no
      longer works here, or move to a plan with more places."; on the web, and for the owner, with "Upgrade plan".
   3. To invite somebody else, "Invite on erplora.com" leads to "Members" of the business, where the limit applies
@@ -2184,12 +2185,13 @@ Involved: BASE-F77, BASE-F81
 
 ### BASE-F81 Understand how each person gets in
 Status: done
-Actor: owner, administrator, manager, employee
+Actor: owner, administrator, manager, employee, accountancy firm
 Screen: Employees · Staff
 Steps:
   1. In **Employees › Staff**, a row per person (on a phone, a card): "User" (with "You" on one's own; in a row, a
      name that does not fit is cut and shows whole on hovering over it), "Email" (only for whoever sees the team's
-     contact details: owner, administrator and manager; BASE-F119), "Role", "Access" and "Status".
+     contact details: owner, administrator and manager; BASE-F119), "Role" (the accountancy firm, the last one),
+     "Access" and "Status".
   2. "Access" says how they get in: "Account" always, and "PIN" and "Badge" if they have them (for example,
      "Account + PIN + Badge").
   3. "Status" says "Active" or, if erplora.com already invited them and they have not come in yet, "Not in yet".
@@ -2201,15 +2203,19 @@ Involved: BASE-F77, BASE-F78, BASE-F79, BASE-F119
 
 ### BASE-F82 See the business's roles
 Status: done
-Actor: owner, administrator, manager, employee
+Actor: owner, administrator, manager, employee, accountancy firm
 Screen: Employees · Roles
 Steps:
   1. In **Employees › Roles**: "These are the roles of this business. Each person gets one when invited on
      erplora.com, and it is changed there.".
-  2. A row per role: "Owner", "Administrator", "Manager" and "Employee", with "Basic", "Always available", how
-     many people have it and how many permissions it gives. It is always these four, erplora.com's: no app adds
-     roles of its own; each app says what each of them can do in it.
-  3. Whoever runs the business has "Change roles on erplora.com" (in the installed app, in the device's browser; the Google Play copy does not have it).
+  2. A row per role: "Owner", "Administrator", "Manager", "Employee" and "Accountant", with "Basic", "Always
+     available", how many people have it and how many permissions it gives. It is always these five, erplora.com's:
+     no app adds roles of its own; each app says what each of them can do in it.
+  3. "Accountant" is the role of the firm that keeps the business's books, and it only reads: everyone's sales, with
+     the business's totals, and the invoices issued, which it opens, prints and downloads, each with its taxes and
+     its VeriFactu record. Its menu has Sales and Invoicing. It does not sell, charge, issue or rectify invoices nor
+     change any setting, and it takes no place of the plan (BASE-F77).
+  4. Whoever runs the business has "Change roles on erplora.com" (in the installed app, in the device's browser; the Google Play copy does not have it).
 In: the roles and the people of the business.
 Out: nothing saved.
 If it fails: "The roles could not be loaded." with "Retry".
@@ -3401,13 +3407,13 @@ Involved: BASE-F26, HUBS-F26 (erplora.com)
 
 ### BASE-F119 What each person sees by their data permissions
 Status: done
-Actor: owner, administrator, manager, employee
+Actor: owner, administrator, manager, employee, accountancy firm
 Screen: Employees · Staff, Home · Summary
 Steps:
   1. Besides what it may do, each role says which sensitive data it sees, with four data permissions: view costs,
      view customer contact details, view team contact details and view business totals. The owner, the
      administrator and the manager have all four; the employee, only the customers' contact details, which they need
-     to serve them.
+     to serve them; the accountancy firm, only the business totals.
   2. Whoever lacks a data permission does not receive that data by any way: not on the screen, not through the API,
      not in what the assistant answers. Where it would go, the data comes empty and the screen does not show it.
   3. In **Employees › Staff**, the "Email" column only shows to whoever sees the team's contact details. An employee

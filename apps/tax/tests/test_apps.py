@@ -53,12 +53,13 @@ def test_permissions():
     assert tax().permissions == ["tax.view", "tax.manage"]
 
 
-def test_roles_are_the_four_customer_roles_with_the_hub_prefix():
+def test_roles_are_the_customer_roles_with_the_hub_prefix():
     assert set(tax().role_permissions) == {
         "hub_owner",
         "hub_admin",
         "hub_manager",
         "hub_employee",
+        "hub_accountant",
     }
 
 
@@ -69,6 +70,7 @@ def test_roles():
     assert permissions_for_role([config], "hub_manager") == {"tax.view", "tax.manage"}
     # The old cashier and employee roles only consulted and calculated: both are hub_employee now.
     assert permissions_for_role([config], "hub_employee") == {"tax.view"}
+    assert permissions_for_role([config], "hub_accountant") == {"tax.view"}
 
 
 def test_navigation_is_the_four_tabs_with_iconify_icons():

@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:4eff42dcda7feb2dd1cfda68408b3ac5e14dc53f16a3f5087fce1c07b1c5b032 -->
+<!-- generated from WORKBOOK.md sha256:ba3814de3ea3137051a399231c4c62fb1cad53f12d37e2ada1cb09dc5534de34 -->
 
 ## What it is for and who it is for
 
@@ -1172,7 +1172,7 @@ with the session of whoever sells, as it does with Inventory.
   without Sales it refuses (409 `service.sales_unavailable`), as there is no sale to say.
 - **The session spent outside the checkout with its professional (F21)**: the other one. `service.grant.redeem` with
   `member_id` or `member` calls `sale.voucher_session.record` (`session_id`, `staff_id`, `value`) with the session of
-  whoever spends it (its Sales permission, "Build the check", is held by all four roles) and in the same transaction.
+  whoever spends it (its Sales permission, "Build the check", is held by every role but the accountancy firm) and in the same transaction.
   `value` is the session's or, on an unlimited voucher, that professional's price for the service. Sales keeps it
   apart, because there is no line, and adds it to the production (SALE-F28): a session of the checkout never comes
   this way, so none counts twice. Without Sales in the business it is not called.

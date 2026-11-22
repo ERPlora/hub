@@ -87,6 +87,10 @@ msgstr "Encargado"
 msgid "Employee"
 msgstr "Empleado"
 
+#: models.py
+msgid "Accountant"
+msgstr "Gestoría"
+
 #: models.py:46
 msgid "user"
 msgstr "usuario"

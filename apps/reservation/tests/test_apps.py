@@ -128,6 +128,7 @@ def test_what_each_role_gets():
         "hub_admin": everything,
         "hub_manager": everything - ADMIN_ONLY,
         "hub_employee": EMPLOYEE,
+        "hub_accountant": set(),
     }
 
 

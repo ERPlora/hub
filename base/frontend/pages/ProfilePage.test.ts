@@ -69,6 +69,11 @@ describe('ProfilePage — who I am', () => {
     expect(summary.text()).toContain('Owner');
   });
 
+  it('names the accountancy firm’s role «Gestoría» in Spanish', async () => {
+    const { wrapper } = await profile({ ...PROFILE, role: 'hub_accountant' }, ok, 'es');
+    expect(wrapper.get('[data-testid="profile-summary"]').text()).toContain('Gestoría');
+  });
+
   it('«Save my details» saves the name and the contact email', async () => {
     const { wrapper, calls, type } = await profile();
     await type('profile-first-name', 'Ana María');

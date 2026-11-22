@@ -81,6 +81,7 @@ def test_roles():
         "hub_admin",
         "hub_manager",
         "hub_employee",
+        "hub_accountant",
     }
     for role in ("hub_owner", "hub_admin"):
         assert permissions_for_role([config], role) == set(PERMISSIONS), role
@@ -95,6 +96,8 @@ def test_roles():
         "verifactu.view_record",
         "verifactu.add_record",
     }
+    # The accountancy firm only reads the records: it neither records, sends nor corrects any.
+    assert permissions_for_role([config], "hub_accountant") == {"verifactu.view_record"}
 
 
 def test_navigation_is_the_six_tabs_of_the_old_module_with_registered_icons():

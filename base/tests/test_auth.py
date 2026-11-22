@@ -134,7 +134,7 @@ class TestRedeemCode:
         user = auth.redeem_code("c1", "a").user
         assert (user.user_id, user.name, user.locale) == ("7", "", "")
 
-    @pytest.mark.parametrize("role", ["hub_owner", "hub_admin", "hub_manager", "hub_employee"])
+    @pytest.mark.parametrize("role", ["hub_owner", "hub_admin", "hub_manager", "hub_employee", "hub_accountant"])
     def test_the_role_from_the_saas_is_kept_as_it_is(self, fake_saas, role):
         fake_saas(body={**ANA, "role": role})
         assert auth.redeem_code("c1", "a").user.role == role

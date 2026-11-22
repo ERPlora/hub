@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:d9d37387270e27e835eb8f8bd30b996bee30c4724519f2448b5e764e3e4f5077 -->
+<!-- generated from WORKBOOK.md sha256:25d3baab83db604eb2e1008da0a98b526e835de9387eb2063c577638b7825c81 -->
 
 ## What it is for and who it is for
 
@@ -1088,4 +1088,4 @@ hears every notice of Tables, like those of any app.
 
 The roles arrive from the SaaS with a prefix (`hub_owner`, `hub_admin`, `hub_manager`, `hub_employee`).
 Seating, splitting and joining also ask for "Build the
-check" of Sales (`sale.add_sale`), which the four roles have.
+check" of Sales (`sale.add_sale`), which every role but the accountancy firm has.
