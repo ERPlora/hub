@@ -521,8 +521,8 @@ test('STAFF-F24: the employee asks for their own time off from «+», without ch
     await shown(page).locator('[data-testid=staff-time-off-add]').click();
     await expect(page.locator('ion-modal[data-testid=staff-time-off-form] ion-title')).toHaveText('Request time off');
     await expect(page.locator('[data-testid=staff-time-off-form-member_id]')).toHaveCount(0);
-    await page.locator('[data-testid=staff-time-off-form-start_date] input').fill(day(80));
-    await page.locator('[data-testid=staff-time-off-form-end_date] input').fill(day(81));
+    await pickDay(page, page.locator('[data-testid=staff-time-off-form-start_date]'), day(80));
+    await pickDay(page, page.locator('[data-testid=staff-time-off-form-end_date]'), day(81));
     await page.locator('[data-testid=staff-time-off-form-submit]').click();
     await expect(page.locator('ion-modal[data-testid=staff-time-off-form]')).toBeHidden();
     await search(page, 'staff-time-off', mine.full_name.split(' ').at(-1)!);

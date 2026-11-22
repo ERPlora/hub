@@ -64,14 +64,8 @@ async function weekProblems(page: Page): Promise<string[]> {
         const title = time.querySelector('.label-text')!;
         const said = `${name}, «${(title.textContent ?? '').trim()}»`;
         if (cut(title)) found.push(`${said} cut short`);
-        // A time input clips its hour without any overflow to read, so a copy at its own width says what it needs.
-        const hour = time.querySelector('input')!;
-        const probe = hour.cloneNode() as HTMLInputElement;
-        probe.style.cssText = 'position: absolute; visibility: hidden; width: auto; min-width: 0; max-width: none;';
-        hour.after(probe);
-        const needs = probe.getBoundingClientRect().width;
-        probe.remove();
-        if (needs > hour.getBoundingClientRect().width + 1) found.push(`${said}: its hour cut short`);
+        // The hour is the text of a read-only field: what does not fit overflows it.
+        if (cut(time.querySelector('input')!)) found.push(`${said}: its hour cut short`);
       }
       return found;
     });

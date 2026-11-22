@@ -301,6 +301,11 @@ const HOURS = [
   .staff-week__hours > .staff-week__sep:nth-child(4) {
     grid-column: 1 / -1;
   }
+  /* «09:00 AM» and its clock fit: the hour fields' own padding narrows. */
+  .staff-week__time :deep(ion-input) {
+    --padding-start: 10px;
+    --padding-end: 6px;
+  }
 }
 .staff-week__sep {
   color: var(--ion-color-medium-shade, #5f5f5f);
