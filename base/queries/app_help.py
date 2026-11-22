@@ -9,7 +9,7 @@ from django.utils import translation
 from django.utils.translation import get_supported_language_variant, gettext_lazy, pgettext_lazy
 from live.context import OperationContext
 from live.errors import NotFound
-from live.meta import LiveAppConfig, module_configs
+from live.meta import Help, LiveAppConfig, module_configs
 from live.operations import AI, operation
 
 from base import workbook_help
@@ -79,13 +79,18 @@ def _language(code: str) -> str:
 )
 def help_get(ctx: OperationContext, data: AppHelpIn) -> dict:
     """A module's help in the person's language while its file is current, else in its base language's, else in the
-    source's (``language`` says which); its video likewise."""
+    source's (``language`` says which); its video and each task's short videos likewise."""
     config = _ready(data.app)
     if config is None:
         with translation.override(ctx.language):
             raise NotFound(str(HELP_MISSING), code="base.help_missing")
     language = _language(ctx.language)
-    return {**_read(config, language), "video": _video(config.help.videos, language)}
+    read = _read(config, language)
+    return {
+        **read,
+        "video": _in_language(config.help.videos, language),
+        "flows": [{**flow, "videos": _flow_videos(config.help, flow["id"], language)} for flow in read["flows"]],
+    }
 
 
 def _read(config: LiveAppConfig, language: str) -> dict:
@@ -113,9 +118,19 @@ def help_of(config: LiveAppConfig, language: str) -> tuple[str, workbook_help.He
         return served, workbook_help.parse(markdown, tabs_of(config), workbook_help.words())
 
 
-def _video(videos: Mapping[str, str], language: str) -> str | None:
-    """The module's video in ``language``, else in its base language (``en`` for ``en-gb``), else in the source's."""
+def _flow_videos(declared: Help, flow: str, language: str) -> list[str]:
+    """The short videos of ``flow`` in ``language`` (as ``_in_language``), none when it has no videos."""
+    return list(_in_language(declared.flow_videos.get(flow, {}), language) or ())
+
+
+def _in_language[T](by_language: Mapping[str, T], language: str) -> T | None:
+    """What ``by_language`` holds for ``language``, else for its base language (``en`` for ``en-gb``), else for the
+    source's."""
     return next(
-        (videos[code] for code in (language, language.split("-")[0], workbook_help.SOURCE_LANGUAGE) if videos.get(code)),
+        (
+            by_language[code]
+            for code in (language, language.split("-")[0], workbook_help.SOURCE_LANGUAGE)
+            if by_language.get(code)
+        ),
         None,
     )
