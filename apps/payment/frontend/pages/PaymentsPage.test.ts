@@ -12,18 +12,19 @@ import { describe, expect, it } from 'vitest';
 import type { Component } from 'vue';
 
 import type { PaymentOut, PaymentStatus } from '../operations';
+import { withFirstEntries } from '../../../../base/frontend/__tests__/app-menu';
 import {
   business,
   EMPLOYEE,
   errorFrame,
   flush,
+  itPaintsTheTabsItsSessionOpens,
   JAPANESE,
   type MountOptions,
   mountPayment,
   page,
   POLISH,
   RECORDER,
-  tabsOf,
 } from '../__tests__/mount-payment';
 import CancelPaymentModal from '../components/CancelPaymentModal.vue';
 import PaymentFormModal from '../components/PaymentFormModal.vue';
@@ -362,9 +363,5 @@ describe('PaymentsPage: the list fills the page', () => {
 });
 
 describe('PaymentsPage: its tab bar', () => {
-  it('paints only the sections the session opens, each named as in the menu', async () => {
-    const [section] = RECORDER.menu;
-    const s = await setup({ session: { ...RECORDER, menu: [{ ...section, items: section.items.slice(0, 1) }] } });
-    expect(tabsOf(s.wrapper)).toEqual([['payments', 'Payments']]);
-  });
+  itPaintsTheTabsItsSessionOpens(() => setup({ session: withFirstEntries(RECORDER, 1) }), [['payments', 'Payments']]);
 });

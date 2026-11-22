@@ -17,6 +17,7 @@ import {
   EMPLOYEE,
   errorFrame,
   flush,
+  itPaintsTheTabsItsSessionOpens,
   type MountOptions,
   mountSale,
   POLISH,
@@ -597,8 +598,5 @@ describe('SalesPage: «Total» is read as every amount of the Hub', () => {
 });
 
 describe('SalesPage: its tab bar', () => {
-  it('paints only the sections its person may open, each named as in the menu', async () => {
-    const s = await setup({ session: EMPLOYEE });
-    expect(tabsOf(s.wrapper)).toEqual([['pos', 'Sell'], ['sales', 'Sales']]);
-  });
+  itPaintsTheTabsItsSessionOpens(() => setup({ session: EMPLOYEE }), [['pos', 'Sell'], ['sales', 'Sales']]);
 });

@@ -15,6 +15,7 @@ import {
   EMPLOYEE,
   errorFrame,
   flush,
+  itPaintsTheTabsItsSessionOpens,
   JAPANESE,
   json,
   MANAGER,
@@ -23,7 +24,6 @@ import {
   POLISH,
   sent,
   subId,
-  tabsOf,
   VIEWER,
 } from '../__tests__/mount-customer';
 import { itReadsAmountFiltersAsTheHub } from '../../../../base/frontend/__tests__/amount-filter';
@@ -534,8 +534,5 @@ describe('CustomerListPage: «Spent» is read as every amount of the Hub', () =>
 });
 
 describe('CustomerListPage: its tab bar', () => {
-  it('paints only the sections its person may open, each named as in the menu', async () => {
-    const s = await setup({ session: EMPLOYEE });
-    expect(tabsOf(s.wrapper)).toEqual([['customers', 'Customers']]);
-  });
+  itPaintsTheTabsItsSessionOpens(() => setup({ session: EMPLOYEE }), [['customers', 'Customers']]);
 });

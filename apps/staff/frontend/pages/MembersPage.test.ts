@@ -19,6 +19,7 @@ import {
   EMPLOYEE,
   errorFrame,
   flush,
+  itPaintsTheTabsItsSessionOpens,
   JAPANESE,
   MANAGER,
   type MountOptions,
@@ -450,8 +451,8 @@ describe('MembersPage: the list fills the page', () => {
 });
 
 describe('MembersPage: its tab bar', () => {
-  it('paints only the sections its person may open, each named as in the menu', async () => {
-    const s = await setup({ session: EMPLOYEE });
-    expect(tabsOf(s.wrapper)).toEqual([['members', 'Staff'], ['time-off', 'Time Off'], ['schedules', 'Schedules']]);
-  });
+  itPaintsTheTabsItsSessionOpens(
+    () => setup({ session: EMPLOYEE }),
+    [['members', 'Staff'], ['time-off', 'Time Off'], ['schedules', 'Schedules']],
+  );
 });

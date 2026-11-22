@@ -58,6 +58,11 @@ export function withMenu(app: string, me: SessionMe): SessionMe {
   return { ...me, menu: openMenu(app, me.permissions) };
 }
 
+/** `me` with only the first `count` entries of its menu open: a session that opens fewer screens than its permissions. */
+export function withFirstEntries(me: SessionMe, count: number): SessionMe {
+  return { ...me, menu: me.menu.map((section) => ({ ...section, items: section.items.slice(0, count) })) };
+}
+
 function appsPy(app: string): string {
   return readFileSync(join(HUB, 'apps', app, 'apps.py'), 'utf8');
 }

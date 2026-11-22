@@ -9,16 +9,17 @@ import { AppPage } from '@erplora/ui/shell';
 import { describe, expect, it, vi } from 'vitest';
 import type { Component } from 'vue';
 
+import { withFirstEntries } from '../../../../base/frontend/__tests__/app-menu';
 import {
   BYE,
   EMPLOYEE,
   errorFrame,
   flush,
+  itPaintsTheTabsItsSessionOpens,
   mountInventory,
   type MountOptions,
   page,
   subId,
-  tabsOf,
 } from '../__tests__/mount-inventory';
 import KpiTile from '../components/KpiTile.vue';
 import { formatMoney } from '../lib/format';
@@ -214,9 +215,5 @@ describe('DashboardPage', () => {
 });
 
 describe('DashboardPage: its tab bar', () => {
-  it('paints only the sections the session opens, each named as in the menu', async () => {
-    const [section] = EMPLOYEE.menu;
-    const s = await setup({ session: { ...EMPLOYEE, menu: [{ ...section, items: section.items.slice(0, 1) }] } });
-    expect(tabsOf(s.wrapper)).toEqual([['dashboard', 'Dashboard']]);
-  });
+  itPaintsTheTabsItsSessionOpens(() => setup({ session: withFirstEntries(EMPLOYEE, 1) }), [['dashboard', 'Dashboard']]);
 });

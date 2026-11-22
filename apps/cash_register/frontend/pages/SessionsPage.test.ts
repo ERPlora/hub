@@ -16,9 +16,9 @@ import {
   EMPLOYEE,
   errorFrame,
   flush,
+  itPaintsTheTabsItsSessionOpens,
   mountCash,
   type MountOptions,
-  tabsOf,
   words,
 } from '../__tests__/mount-cash-register';
 import { itReadsAmountFiltersAsTheHub } from '../../../../base/frontend/__tests__/amount-filter';
@@ -380,8 +380,5 @@ describe('SessionsPage: the amounts are read as every amount of the Hub (hub#119
 });
 
 describe('SessionsPage: its tab bar', () => {
-  it('paints only the sections its person may open, each named as in the menu', async () => {
-    const s = await setup({ session: EMPLOYEE });
-    expect(tabsOf(s.wrapper)).toEqual([['sessions', 'Cash register']]);
-  });
+  itPaintsTheTabsItsSessionOpens(() => setup({ session: EMPLOYEE }), [['sessions', 'Cash register']]);
 });

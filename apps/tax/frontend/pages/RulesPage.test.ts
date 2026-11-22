@@ -11,17 +11,18 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Component } from 'vue';
 
 import type { CategoryRowOut, RuleOut } from '../operations';
+import { withFirstEntries } from '../../../../base/frontend/__tests__/app-menu';
 import {
   BYE,
   click,
   EMPLOYEE,
   errorFrame,
   flush,
+  itPaintsTheTabsItsSessionOpens,
   MANAGER,
   type MountOptions,
   mountTax,
   settle,
-  tabsOf,
 } from '../__tests__/mount-tax';
 import RuleCreateModal from '../components/RuleCreateModal.vue';
 import RuleEndModal from '../components/RuleEndModal.vue';
@@ -502,9 +503,8 @@ describe('RulesPage: «Your taxes» (TAX-F17)', () => {
 });
 
 describe('RulesPage: its tab bar', () => {
-  it('paints only the sections the session opens, each named as in the menu', async () => {
-    const [section] = MANAGER.menu;
-    const s = await setup({ session: { ...MANAGER, menu: [{ ...section, items: section.items.slice(0, 1) }] } });
-    expect(tabsOf(s.wrapper)).toEqual([['categories', 'Categories']]);
-  });
+  itPaintsTheTabsItsSessionOpens(
+    () => setup({ session: withFirstEntries(MANAGER, 1) }),
+    [['categories', 'Categories']],
+  );
 });

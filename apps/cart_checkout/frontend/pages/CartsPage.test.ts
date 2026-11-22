@@ -12,16 +12,17 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Component } from 'vue';
 
 import type { CartOut, CartStatus } from '../operations';
+import { withFirstEntries } from '../../../../base/frontend/__tests__/app-menu';
 import {
   business,
   EMPLOYEE,
   errorFrame,
   flush,
+  itPaintsTheTabsItsSessionOpens,
   mountCartCheckout,
   type MountOptions,
   page,
   POLISH,
-  tabsOf,
   totalFilter,
 } from '../__tests__/mount-cart-checkout';
 import { itReadsAmountFiltersAsTheHub } from '../../../../base/frontend/__tests__/amount-filter';
@@ -378,9 +379,5 @@ describe('CartsPage: «Total» is read as every amount of the Hub (hub#1196)', (
 });
 
 describe('CartsPage: its tab bar', () => {
-  it('paints only the sections the session opens, each named as in the menu', async () => {
-    const [section] = EMPLOYEE.menu;
-    const s = await setup({ session: { ...EMPLOYEE, menu: [{ ...section, items: section.items.slice(0, 1) }] } });
-    expect(tabsOf(s.wrapper)).toEqual([['carts', 'Carts']]);
-  });
+  itPaintsTheTabsItsSessionOpens(() => setup({ session: withFirstEntries(EMPLOYEE, 1) }), [['carts', 'Carts']]);
 });

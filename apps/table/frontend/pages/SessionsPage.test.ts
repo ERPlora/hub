@@ -8,7 +8,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Component } from 'vue';
 
 import { cardIcons, switchToCards } from '../../../../base/frontend/__tests__/data-table-cards';
-import { EMPLOYEE, flush, type MountOptions, mountTable, page, tabsOf } from '../__tests__/mount-table';
+import {
+  EMPLOYEE,
+  flush,
+  itPaintsTheTabsItsSessionOpens,
+  type MountOptions,
+  mountTable,
+  page,
+} from '../__tests__/mount-table';
 import { charged, NOW, sessionRow, SETTINGS, zoneRow } from '../__tests__/tables';
 import RestoreModal from '../components/RestoreModal.vue';
 import SessionDetailModal from '../components/SessionDetailModal.vue';
@@ -196,8 +203,8 @@ describe('SessionsPage: the list fills the page', () => {
 });
 
 describe('SessionsPage: its tab bar', () => {
-  it('paints only the sections its person may open, each named as in the menu', async () => {
-    const s = await setup({ session: EMPLOYEE });
-    expect(tabsOf(s.wrapper)).toEqual([['floor-plan', 'Floor plan'], ['sessions', 'Sessions']]);
-  });
+  itPaintsTheTabsItsSessionOpens(
+    () => setup({ session: EMPLOYEE }),
+    [['floor-plan', 'Floor plan'], ['sessions', 'Sessions']],
+  );
 });

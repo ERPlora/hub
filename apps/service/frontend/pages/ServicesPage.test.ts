@@ -9,10 +9,12 @@ import { describe, expect, it } from 'vitest';
 import type { Component } from 'vue';
 
 import type { ServiceOut } from '../operations';
+import { withFirstEntries } from '../../../../base/frontend/__tests__/app-menu';
 import {
   business,
   EMPLOYEE,
   flush,
+  itPaintsTheTabsItsSessionOpens,
   JAPANESE,
   MANAGER,
   type MountOptions,
@@ -20,7 +22,6 @@ import {
   OWNER,
   page,
   POLISH,
-  tabsOf,
 } from '../__tests__/mount-service';
 import ServiceFormModal from '../components/ServiceFormModal.vue';
 import ServicesPage from './ServicesPage.vue';
@@ -350,9 +351,5 @@ describe('ServicesPage: the list fills the page', () => {
 });
 
 describe('ServicesPage: its tab bar', () => {
-  it('paints only the sections the session opens, each named as in the menu', async () => {
-    const [section] = MANAGER.menu;
-    const s = await setup({ session: { ...MANAGER, menu: [{ ...section, items: section.items.slice(0, 1) }] } });
-    expect(tabsOf(s.wrapper)).toEqual([['services', 'Services']]);
-  });
+  itPaintsTheTabsItsSessionOpens(() => setup({ session: withFirstEntries(MANAGER, 1) }), [['services', 'Services']]);
 });

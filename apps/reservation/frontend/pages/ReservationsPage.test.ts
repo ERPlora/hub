@@ -15,10 +15,10 @@ import {
   EMPLOYEE,
   flush,
   ionValue,
+  itPaintsTheTabsItsSessionOpens,
   type MountOptions,
   mountReservation,
   page,
-  tabsOf,
 } from '../__tests__/mount-reservation';
 import { dayOut, reservationRow, settingsOut } from '../__tests__/rows';
 import DayBar from '../components/DayBar.vue';
@@ -282,8 +282,8 @@ describe('ReservationsPage: the list fills the page', () => {
 });
 
 describe('ReservationsPage: its tab bar', () => {
-  it('paints only the sections its person may open, each named as in the menu', async () => {
-    const s = await setup({ session: EMPLOYEE });
-    expect(tabsOf(s.wrapper)).toEqual([['reservations', 'Reservations'], ['waitlist', 'Waitlist']]);
-  });
+  itPaintsTheTabsItsSessionOpens(
+    () => setup({ session: EMPLOYEE }),
+    [['reservations', 'Reservations'], ['waitlist', 'Waitlist']],
+  );
 });

@@ -15,11 +15,11 @@ import {
   errorFrame,
   flush,
   followUpgrade,
+  itPaintsTheTabsItsSessionOpens,
   MANAGER,
   mountInbox,
   type MountOptions,
   SIGNED,
-  tabsOf,
 } from '../__tests__/mount-inbox';
 import ConversationPanel from '../components/ConversationPanel.vue';
 import type { ChannelOut, ConversationOut } from '../operations';
@@ -372,8 +372,5 @@ describe('InboxPage: the list fills the page', () => {
 });
 
 describe('InboxPage: its tab bar', () => {
-  it('paints only the sections its person may open, each named as in the menu', async () => {
-    const s = await setup({ session: MANAGER });
-    expect(tabsOf(s.wrapper)).toEqual([['inbox', 'Inbox']]);
-  });
+  itPaintsTheTabsItsSessionOpens(() => setup({ session: MANAGER }), [['inbox', 'Inbox']]);
 });

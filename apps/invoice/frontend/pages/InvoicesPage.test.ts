@@ -15,11 +15,11 @@ import {
   EMPLOYEE,
   errorFrame,
   flush,
+  itPaintsTheTabsItsSessionOpens,
   MANAGER,
   mountInvoice,
   type MountOptions,
   POLISH,
-  tabsOf,
 } from '../__tests__/mount-invoice';
 import { expectAnAdministratorToSetUpTheIssuer, expectIssuerSaidNoMore, expectIssuerToSetUp } from '../__tests__/issuer-notice';
 import { itReadsAmountFiltersAsTheHub } from '../../../../base/frontend/__tests__/amount-filter';
@@ -450,8 +450,5 @@ describe('InvoicesPage: «Total» is read as every amount of the Hub', () => {
 });
 
 describe('InvoicesPage: its tab bar', () => {
-  it('paints only the sections its person may open, each named as in the menu', async () => {
-    const s = await setup({ session: MANAGER });
-    expect(tabsOf(s.wrapper)).toEqual([['invoices', 'Invoices'], ['series', 'Series']]);
-  });
+  itPaintsTheTabsItsSessionOpens(() => setup({ session: MANAGER }), [['invoices', 'Invoices'], ['series', 'Series']]);
 });

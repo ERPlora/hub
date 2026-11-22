@@ -10,16 +10,17 @@ import { describe, expect, it } from 'vitest';
 import type { Component } from 'vue';
 
 import type { BookingRow } from '../operations';
+import { withFirstEntries } from '../../../../base/frontend/__tests__/app-menu';
 import {
   EMPLOYEE,
   flush,
+  itPaintsTheTabsItsSessionOpens,
   MANAGER,
   mountOnlineBooking,
   type MountOptions,
   OWNER,
   page,
   settle,
-  tabsOf,
 } from '../__tests__/mount-online-booking';
 import CancelDialog from '../components/CancelDialog.vue';
 import BookingsPage from './BookingsPage.vue';
@@ -238,9 +239,5 @@ describe('BookingsPage: the list fills the page', () => {
 });
 
 describe('BookingsPage: its tab bar', () => {
-  it('paints only the sections the session opens, each named as in the menu', async () => {
-    const [section] = OWNER.menu;
-    const s = await setup({ session: { ...OWNER, menu: [{ ...section, items: section.items.slice(0, 1) }] } });
-    expect(tabsOf(s.wrapper)).toEqual([['bookings', 'Bookings']]);
-  });
+  itPaintsTheTabsItsSessionOpens(() => setup({ session: withFirstEntries(OWNER, 1) }), [['bookings', 'Bookings']]);
 });

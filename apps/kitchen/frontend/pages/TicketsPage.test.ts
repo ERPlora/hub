@@ -13,11 +13,11 @@ import {
   EMPLOYEE,
   flush,
   ionValue,
+  itPaintsTheTabsItsSessionOpens,
   mountKitchen,
   type MountOptions,
   page,
   settle,
-  tabsOf,
 } from '../__tests__/mount-kitchen';
 import TicketDetailModal from '../components/TicketDetailModal.vue';
 import TicketFormModal from '../components/TicketFormModal.vue';
@@ -267,8 +267,8 @@ describe('TicketsPage: Android Back with unsaved changes (hub#1046, BASE-F05)', 
 });
 
 describe('TicketsPage: its tab bar', () => {
-  it('paints only the sections its person may open, each named as in the menu', async () => {
-    const s = await setup({ session: EMPLOYEE });
-    expect(tabsOf(s.wrapper)).toEqual([['display', 'Display'], ['tickets', 'Tickets'], ['history', 'History']]);
-  });
+  itPaintsTheTabsItsSessionOpens(
+    () => setup({ session: EMPLOYEE }),
+    [['display', 'Display'], ['tickets', 'Tickets'], ['history', 'History']],
+  );
 });

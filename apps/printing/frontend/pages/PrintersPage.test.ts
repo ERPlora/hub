@@ -7,7 +7,16 @@ import { AppPage, applySurface, toastError, toastSuccess } from '@erplora/ui/she
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Component } from 'vue';
 
-import { EMPLOYEE, flush, MANAGER, type MountOptions, mountPrinting, tabsOf, words } from '../__tests__/mount-printing';
+import { withFirstEntries } from '../../../../base/frontend/__tests__/app-menu';
+import {
+  EMPLOYEE,
+  flush,
+  itPaintsTheTabsItsSessionOpens,
+  MANAGER,
+  type MountOptions,
+  mountPrinting,
+  words,
+} from '../__tests__/mount-printing';
 import DiscoverPrintersModal from '../components/DiscoverPrintersModal.vue';
 import PrinterModal from '../components/PrinterModal.vue';
 import QueueSummary from '../components/QueueSummary.vue';
@@ -222,9 +231,5 @@ describe('the note says what is true where it is read', () => {
 });
 
 describe('PrintersPage: its tab bar', () => {
-  it('paints only the sections the session opens, each named as in the menu', async () => {
-    const [section] = MANAGER.menu;
-    const s = await setup({ session: { ...MANAGER, menu: [{ ...section, items: section.items.slice(0, 1) }] } });
-    expect(tabsOf(s.wrapper)).toEqual([['printers', 'Printers']]);
-  });
+  itPaintsTheTabsItsSessionOpens(() => setup({ session: withFirstEntries(MANAGER, 1) }), [['printers', 'Printers']]);
 });

@@ -18,6 +18,7 @@ import {
   page,
   settle,
   type ShellApp,
+  itPaintsTheTabsItsSessionOpens,
   subId,
   tabsOf,
   words,
@@ -412,4 +413,12 @@ describe('tabsOf', () => {
     ]);
     m.wrapper.unmount();
   });
+});
+
+describe('itPaintsTheTabsItsSessionOpens', () => {
+  const Page = defineComponent({
+    setup: () => () =>
+      h(AppPage, { title: 'Probe', tabs: [{ id: 'one', label: 'One', icon: 'ion:list-outline', to: '/probe/one' }] }),
+  });
+  itPaintsTheTabsItsSessionOpens(() => mountInShell(Page, {}, APP), [['one', 'One']]);
 });

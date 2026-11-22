@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { appMenu, menuOf, openMenu, withMenu } from './app-menu';
+import { appMenu, menuOf, openMenu, withFirstEntries, withMenu } from './app-menu';
 
 const SOURCE = `
 class StockConfig(LiveAppConfig):
@@ -97,5 +97,16 @@ describe('withMenu', () => {
     expect(withMenu('tax', owner).menu).toEqual(openMenu('tax', ['tax.manage']));
     expect(withMenu('tax', { ...withMenu('tax', owner), permissions: [] }).menu).toEqual([]);
     expect(withMenu('tax', owner).permissions).toEqual(['tax.manage']);
+  });
+});
+
+describe('withFirstEntries', () => {
+  it("leaves open only the first `count` entries of the person's menu, whatever its permissions", () => {
+    const owner = withMenu('tax', { user: { id: '1', label: 'Ana' }, permissions: ['tax.manage'], menu: [], apps: [], language: 'en' });
+    const cut = withFirstEntries(owner, 2);
+    expect(cut.menu[0].items.map((item) => item.path)).toEqual(['/tax/categories', '/tax/rules']);
+    expect(cut.menu[0].label).toBe('Taxes');
+    expect(cut.permissions).toEqual(['tax.manage']);
+    expect(owner.menu[0].items).toHaveLength(4);
   });
 });

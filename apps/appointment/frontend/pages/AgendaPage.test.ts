@@ -7,7 +7,16 @@ import { describe, expect, it } from 'vitest';
 
 import type { AppointmentRow, LanesOut, SettingsOut } from '../operations';
 
-import { EMPLOYEE, mountAppointment, OWNER, page, settle, tabsOf } from '../__tests__/mount-appointment';
+import { withFirstEntries } from '../../../../base/frontend/__tests__/app-menu';
+import {
+  EMPLOYEE,
+  itPaintsTheTabsItsSessionOpens,
+  mountAppointment,
+  OWNER,
+  page,
+  settle,
+  tabsOf,
+} from '../__tests__/mount-appointment';
 import AgendaToolbar from '../components/AgendaToolbar.vue';
 import AppointmentFormModal from '../components/AppointmentFormModal.vue';
 import AppointmentList from '../components/AppointmentList.vue';
@@ -230,12 +239,7 @@ describe('AgendaPage', () => {
     expect(await tabs(EMPLOYEE)).toEqual([['agenda', 'Agenda']]);
   });
 
-  it('paints only the sections the session opens, each named as in the menu', async () => {
-    const [section] = OWNER.menu;
-    expect(tabsOf((await setup({ ...OWNER, menu: [{ ...section, items: section.items.slice(0, 1) }] })).wrapper)).toEqual([
-      ['agenda', 'Agenda'],
-    ]);
-  });
+  itPaintsTheTabsItsSessionOpens(() => setup(withFirstEntries(OWNER, 1)), [['agenda', 'Agenda']]);
 });
 
 describe('AgendaPage: the list fills the page', () => {

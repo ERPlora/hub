@@ -10,7 +10,16 @@ import type { Component } from 'vue';
 
 import type { WeekDayOut, WeekOut } from '../operations';
 import { withMenu } from '../../../../base/frontend/__tests__/app-menu';
-import { EMPLOYEE, errorFrame, flush, MANAGER, type MountOptions, mountSchedule, settle, tabsOf } from '../__tests__/mount-schedule';
+import {
+  EMPLOYEE,
+  errorFrame,
+  flush,
+  itPaintsTheTabsItsSessionOpens,
+  MANAGER,
+  type MountOptions,
+  mountSchedule,
+  settle,
+} from '../__tests__/mount-schedule';
 import DayHoursModal from '../components/DayHoursModal.vue';
 import HoursPage from './HoursPage.vue';
 import { listFillProblems } from '../../../../frontend/testing/list-fill';
@@ -186,8 +195,8 @@ describe('HoursPage: the list fills the page', () => {
 });
 
 describe('HoursPage: its tab bar', () => {
-  it('paints only the sections its person may open, each named as in the menu', async () => {
-    const s = await setup({ session: withMenu('schedule', { ...MANAGER, permissions: ['schedule.change'] }) });
-    expect(tabsOf(s.wrapper)).toEqual([['hours', 'Hours'], ['special-days', 'Special days']]);
-  });
+  itPaintsTheTabsItsSessionOpens(
+    () => setup({ session: withMenu('schedule', { ...MANAGER, permissions: ['schedule.change'] }) }),
+    [['hours', 'Hours'], ['special-days', 'Special days']],
+  );
 });
