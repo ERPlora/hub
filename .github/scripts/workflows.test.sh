@@ -251,7 +251,7 @@ check("setup-uv caches by uv.lock",
 
 # --- test.yml: the browser smoke stops the merge ----------------------------------------------------
 # A change that breaks a critical walk in the browser turns "test / test" red: the job smoke runs smoke-e2e.sh (the
-# tests tagged @smoke, narrowed with --spec while the groups enter one at a time) on the stack nightly-e2e.sh builds,
+# tests tagged @smoke, narrowed with --spec while the groups enter one at a time) on the stack nightly_e2e.py builds,
 # with the SaaS beside the Hub because every login goes through erplora.com.
 smoke_job = tjobs.get("smoke", {})
 smoke_runs = runs(smoke_job)
@@ -259,7 +259,7 @@ smoke_step = next((step for step in steps(smoke_job) if "smoke-e2e.sh" in str(st
 smoke_words = str(smoke_step.get("run", "")).split()
 check("smoke runs the browser smoke with smoke-e2e.sh", smoke_words[:2] == ["bash", ".github/scripts/smoke-e2e.sh"])
 check("smoke runs Playwright only through smoke-e2e.sh",
-      not any(needle in smoke_runs for needle in ("pnpm e2e", "playwright", "nightly-e2e.sh")))
+      not any(needle in smoke_runs for needle in ("pnpm e2e", "playwright", "nightly_e2e.py")))
 smoke_specs = [smoke_words[index + 1] for index, word in enumerate(smoke_words[:-1]) if word == "--spec"]
 check("smoke's step is that command and its --spec, with nothing after them that could hide a red (as `|| true`)",
       smoke_words[2:] == [word for spec in smoke_specs for word in ("--spec", spec)])
@@ -290,7 +290,7 @@ check(f"every spec the smoke names exists and has a test tagged @smoke{': ' if u
       not unsmoked)
 check("smoke has a timeout of its own, in whole minutes",
       isinstance(smoke_job.get("timeout-minutes"), int) and smoke_job.get("timeout-minutes") > 0)
-# The specs reach the stack's Postgres with `docker compose exec` (tests/e2e/global-setup.ts), and nightly-e2e.sh takes
+# The specs reach the stack's Postgres with `docker compose exec` (tests/e2e/global-setup.ts), and nightly_e2e.py takes
 # the SaaS from ../saas, as in the erplora-next tree.
 check("smoke starts Postgres with docker compose before the smoke", before(smoke_job, "docker compose", "smoke-e2e.sh"))
 check("smoke clones ERPlora/saas into ../saas before the smoke",
