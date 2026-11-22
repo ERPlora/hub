@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:b0341fa635066c24acef7aaff2ed2dcf659c7aa2f094f1358327cac26adf604a -->
+<!-- generated from WORKBOOK.md sha256:60a802eaa973786dee63bd0348a62e9e45803a6339d85fa0f343ffebee4cbd98 -->
 
 ## What it is for and who it is for
 
@@ -770,7 +770,7 @@ Out: their role in the business, up to date, and what they have open with what t
 sessions of whoever is no longer in the business, ended.
 If it fails: if the hub does not answer at that moment, erplora.com passes it again shortly and the change
 arrives then. A device without a connection gets it when it reconnects.
-Involved: HUBS-F26, HUBS-F27, HUBS-F28
+Involved: HUBS-F26, HUBS-F27, HUBS-F28, BASE-F118
 
 ### BASE-F14 See the business's apps
 Status: done

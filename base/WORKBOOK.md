@@ -773,7 +773,7 @@ Sale: su rol en el negocio, al día, y lo que tiene abierto con lo que ese rol p
 ya no está en el negocio, cerradas.
 Si falla: si el hub no responde en ese momento, erplora.com se lo vuelve a pasar al poco y el cambio llega
 entonces. Un dispositivo sin conexión lo recibe al reconectar.
-Implicados: HUBS-F26, HUBS-F27, HUBS-F28
+Implicados: HUBS-F26, HUBS-F27, HUBS-F28, BASE-F118
 
 ### BASE-F14 Ver las apps del negocio
 Estado: hecho
@@ -3727,11 +3727,17 @@ Implicados: BASE-F06, BASE-F07, BASE-F81, BASE-F82, BASE-F86, SALE-F28, CUSTOMER
   índice, sin descodificar ninguna sesión: las del negocio y las que no anotaron host (de antes de la regla),
   o sin `hub_id` todas, las del admin incluidas; idempotente, un negocio desconocido responde `{ended: 0}` y
   un cuerpo fuera de contrato, 422 `internal.payload_invalid`. La foto (`base.hub.state_apply`) aplica
-  `members` en su transacción: rol nuevo o baja → `Membership` al día y sesiones de ese negocio cerradas; no
-  crea copias locales. Tras el COMMIT se despierta el host (`_wake_open_apps`): el stream vivo re-ejecuta,
+  `members` en su transacción, sin crear copias locales. Una baja borra la `Membership` y cierra las sesiones de
+  ese negocio; tras el COMMIT se despierta el host (`_wake_open_apps`): el stream vivo re-ejecuta,
   `HubContextBuilder.refresh` ve la sesión borrada (`SessionEnded`, 401) y acaba con `bye`; `/ws/print`
-  relee la sesión en cada mensaje. Tests: `base/tests/test_session_revoke.py`, `test_hub_state_members.py`,
-  `test_migrations.py` (relleno de 0008); e2e con el SaaS real `tests/e2e/base-session-revoke.spec.ts`.
+  relee la sesión en cada mensaje. Un rol nuevo cambia la `Membership` y no cierra nada: tras el COMMIT también se
+  despierta el host, cada stream re-ejecuta con los permisos del rol nuevo (`refresh` los relee) y
+  `base.session.access` (una huella de los permisos, con `base.view_home`, que tienen todos los roles) cambia.
+  `AccessFollower` (en `BackgroundChrome`, junto a `AppsFollower`) llama entonces a `sessionChanged()` y, si la
+  sesión releída abre o cierra la pantalla de delante, la vuelve a pasar por la guarda (`gateAgain`,
+  `lib/app-gate.ts`). Tests: `base/tests/test_session_revoke.py`, `test_hub_state_members.py`,
+  `test_queries_sessions.py`, `test_migrations.py` (relleno de 0008); Vitest `AccessFollower.test.ts`; e2e
+  `tests/e2e/base-role-change.spec.ts` y, con el SaaS real, `tests/e2e/base-session-revoke.spec.ts`.
 - Plantillas y Ajustes › Datos (BASE-F29–F38): `base/blueprint.py` (sin ORM) tiene el formato
   `.blueprint.zip` (`manifest.json` con `format` `erplora.blueprint` y `format_version` 1, más
   `data/<app>.<parte>.json`, más las fotos propias en `media/<nombre>`, WebP de 2 MB como mucho; 20 MB, 100 MB al
