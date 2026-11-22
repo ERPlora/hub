@@ -23,8 +23,9 @@ import { useLiveList } from '../lib/useLiveList';
 import type { GroupListIn, GroupRow } from '../operations';
 import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 
-const session = useSession();
 const tabs = useAppTabs('customer');
+
+const session = useSession();
 // Whoever manages cards sees it too: without the permission, a manager approves it with their PIN (BASE-F84).
 const canConfigure = computed(() => session.can('customer.configure') || session.can('customer.manage'));
 const canDelete = computed(() => session.can('customer.delete'));

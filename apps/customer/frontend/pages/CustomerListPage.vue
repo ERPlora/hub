@@ -36,9 +36,10 @@ import { useLiveList } from '../lib/useLiveList';
 import type { CustomerListIn, CustomerRow, CustomerSort } from '../operations';
 import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 
+const tabs = useAppTabs('customer');
+
 const router = useRouter();
 const session = useSession();
-const tabs = useAppTabs('customer');
 const canManage = computed(() => session.can('customer.manage'));
 const canExport = computed(() => session.can('customer.export'));
 const canDelete = computed(() => session.can('customer.delete'));

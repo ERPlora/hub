@@ -30,12 +30,13 @@ import { filterCents, formatMoney, useBusinessMoney } from '../lib/format';
 import type { PricingType, ServiceListIn, ServiceOut, ServiceStatus } from '../operations';
 import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 
+const tabs = useAppTabs('service');
+
 const PRICING: readonly PricingType[] = ['fixed', 'hourly', 'from', 'variable', 'free'];
 const STATUSES: readonly ServiceStatus[] = ['active', 'unconfigured', 'archived'];
 const TONE: Record<ServiceStatus, 'success' | 'danger' | 'neutral'> = { active: 'success', unconfigured: 'danger', archived: 'neutral' };
 
 const session = useSession();
-const tabs = useAppTabs('service');
 const t = useT();
 const locale = useLocale();
 /** The business's currency (its country's), a dash until it answers: never a euro by default. */

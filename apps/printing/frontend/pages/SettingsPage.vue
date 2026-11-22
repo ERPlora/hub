@@ -9,8 +9,9 @@ import { computed } from 'vue';
 import SettingsCard from '../components/SettingsCard.vue';
 import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 
-const session = useSession();
 const tabs = useAppTabs('printing');
+
+const session = useSession();
 const canManage = computed(() => session.can('printing.manage_settings'));
 </script>
 

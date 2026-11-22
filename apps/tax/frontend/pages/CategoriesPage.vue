@@ -18,8 +18,9 @@ import { categoryDisplayName, chargesNoTax } from '../lib/rules';
 import type { CategoryListIn, CategoryRowOut } from '../operations';
 import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 
-const session = useSession();
 const tabs = useAppTabs('tax');
+
+const session = useSession();
 const canManage = computed(() => session.can('tax.manage'));
 const t = useT();
 const locale = useLocale();

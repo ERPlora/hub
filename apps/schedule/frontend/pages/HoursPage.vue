@@ -19,8 +19,9 @@ import { hoursSummary, statusOf } from '../lib/intervals';
 import type { WeekDayOut } from '../operations';
 import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 
-const session = useSession();
 const tabs = useAppTabs('schedule');
+
+const session = useSession();
 const t = useT();
 const locale = useLocale();
 const canChange = computed(() => session.can('schedule.change'));

@@ -38,6 +38,8 @@ import { formatDay, formatHm, liveSeconds, monthBounds, monthLabel, monthOf, rec
 import type { RecordListIn, RecordOut, RecordStatus } from '../operations';
 import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 
+const tabs = useAppTabs('attendance');
+
 const STATUSES: readonly RecordStatus[] = ['open', 'closed', 'needs_review'];
 const TONE: Record<RecordStatus, StatusPillTone> = { open: 'info', closed: 'neutral', needs_review: 'warning' };
 /** This month and the 48 before it: the four years the law keeps the record (RD-ley 8/2019). */
@@ -46,7 +48,6 @@ const MONTHS_OFFERED = 49;
 const PEOPLE_PAGE = 20;
 
 const session = useSession();
-const tabs = useAppTabs('attendance');
 const client = useLiveClient();
 const t = useT();
 const locale = useLocale();

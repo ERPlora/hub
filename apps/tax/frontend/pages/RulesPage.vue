@@ -36,10 +36,11 @@ import { OPERATION_CLASSES, ruleCardTitle, ruleCategoryText, TAX_TYPES } from '.
 import type { RuleListIn, RuleOut, RuleStatusFilter } from '../operations';
 import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 
+const tabs = useAppTabs('tax');
+
 const STATUSES: readonly RuleStatusFilter[] = ['active', 'inactive', 'all'];
 
 const session = useSession();
-const tabs = useAppTabs('tax');
 const canManage = computed(() => session.can('tax.manage'));
 const t = useT();
 const locale = useLocale();

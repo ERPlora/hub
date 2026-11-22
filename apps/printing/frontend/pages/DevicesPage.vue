@@ -17,8 +17,9 @@ import { refusal } from '../lib/refusal';
 import type { DeviceOut } from '../operations';
 import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 
-const session = useSession();
 const tabs = useAppTabs('printing');
+
+const session = useSession();
 const canManage = computed(() => session.can('printing.manage_settings'));
 const t = useT();
 const { confirm } = useConfirm();

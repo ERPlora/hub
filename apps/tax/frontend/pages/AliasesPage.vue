@@ -18,10 +18,11 @@ import { categorySearch } from '../lib/pickers';
 import type { AliasListIn, AliasOut, AliasSource } from '../operations';
 import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 
+const tabs = useAppTabs('tax');
+
 const SOURCES: readonly AliasSource[] = ['shipped', 'learned'];
 
 const session = useSession();
-const tabs = useAppTabs('tax');
 const canManage = computed(() => session.can('tax.manage'));
 const t = useT();
 const client = useLiveClient();

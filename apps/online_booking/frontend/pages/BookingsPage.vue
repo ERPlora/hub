@@ -30,6 +30,8 @@ import { allowed, type InboxAction, inboxActions } from '../lib/actions';
 import type { BookingListIn, BookingRow, BookingSort, BookingStatus } from '../operations';
 import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 
+const tabs = useAppTabs('online_booking');
+
 const STATUSES: readonly BookingStatus[] = ['pending', 'confirmed', 'in_progress', 'completed', 'cancelled', 'no_show'];
 const ICONS: Record<InboxAction, string> = {
   confirm: 'checkmark-outline',
@@ -47,7 +49,6 @@ const COLORS: Record<InboxAction, string> = {
 };
 
 const session = useSession();
-const tabs = useAppTabs('online_booking');
 const t = useT();
 const locale = useLocale();
 

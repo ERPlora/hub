@@ -17,8 +17,9 @@ import { useT } from '../composables/useT';
 import type { QuickNoteOut } from '../operations';
 import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 
-const session = useSession();
 const tabs = useAppTabs('sale');
+
+const session = useSession();
 const canManage = computed(() => session.can('sale.manage_settings'));
 const t = useT();
 const { confirm } = useConfirm();

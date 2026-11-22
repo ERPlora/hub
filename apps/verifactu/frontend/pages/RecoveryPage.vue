@@ -31,10 +31,11 @@ import { refusal } from '../lib/refusal';
 import type { AeatRecordListIn, AeatRecordOut } from '../operations';
 import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 
+const tabs = useAppTabs('verifactu');
+
 const HASH = /^[0-9a-fA-F]{64}$/;
 
 const session = useSession();
-const tabs = useAppTabs('verifactu');
 const canSend = computed(() => session.can('verifactu.transmit_record'));
 const canConfigure = computed(() => session.can('verifactu.configure'));
 const t = useT();

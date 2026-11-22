@@ -26,10 +26,11 @@ import { STATUS_TONE } from '../lib/floor';
 import type { TableListIn, TableOut, TableStatus } from '../operations';
 import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 
+const tabs = useAppTabs('table');
+
 const STATUSES: readonly TableStatus[] = ['available', 'occupied', 'reserved', 'blocked'];
 
 const session = useSession();
-const tabs = useAppTabs('table');
 const t = useT();
 const canAdd = computed(() => session.can('table.add_table'));
 const canChange = computed(() => session.can('table.change_table'));

@@ -28,11 +28,12 @@ import { refusal } from '../lib/refusal';
 import type { JobListIn, JobOut, JobStatus, Usage } from '../operations';
 import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 
+const tabs = useAppTabs('printing');
+
 const STATUSES: readonly JobStatus[] = ['pending', 'sent', 'done', 'failed', 'cancelled'];
 const USAGES: readonly Usage[] = ['receipt', 'kitchen', 'bar', 'label'];
 
 const session = useSession();
-const tabs = useAppTabs('printing');
 const canManage = computed(() => session.can('printing.manage_jobs'));
 const t = useT();
 const locale = useLocale();

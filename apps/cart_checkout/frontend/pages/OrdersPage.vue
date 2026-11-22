@@ -29,12 +29,13 @@ import { amountFilterErrors, filterCents, formatMoney, ORDER_TONE, recordMoney, 
 import type { OrderListIn, OrderOut, OrderStatus } from '../operations';
 import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 
+const tabs = useAppTabs('cart_checkout');
+
 const STATUSES: readonly OrderStatus[] = ['initiated', 'paid', 'failed', 'completed'];
 /** Where an order may still fail from (the server's FAILABLE). */
 const FAILABLE: readonly OrderStatus[] = ['initiated', 'paid'];
 
 const session = useSession();
-const tabs = useAppTabs('cart_checkout');
 const t = useT();
 const locale = useLocale();
 const canCheckout = computed(() => session.can('cart_checkout.checkout'));

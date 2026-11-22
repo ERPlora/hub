@@ -16,6 +16,8 @@ import { useT } from '../composables/useT';
 import type { SettingsOut } from '../operations';
 import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 
+const tabs = useAppTabs('table');
+
 const NUMBERS = ['timer_warning_minutes', 'timer_critical_minutes'] as const;
 const LABELS: Record<(typeof NUMBERS)[number], [string, string]> = {
   timer_warning_minutes: ['table.settings.warning', 'table.settings.warningHint'],
@@ -25,7 +27,6 @@ const LABELS: Record<(typeof NUMBERS)[number], [string, string]> = {
 type Form = Record<(typeof NUMBERS)[number], string> & { prompt_guests_on_seat: boolean };
 
 const session = useSession();
-const tabs = useAppTabs('table');
 const t = useT();
 const canManage = computed(() => session.can('table.manage_settings'));
 

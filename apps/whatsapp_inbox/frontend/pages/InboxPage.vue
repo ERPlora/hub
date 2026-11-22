@@ -35,10 +35,11 @@ import { kindLabel } from '../lib/thread';
 import type { ConversationListIn, ConversationOut, ConversationStatus } from '../operations';
 import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 
+const tabs = useAppTabs('whatsapp_inbox');
+
 const STATUSES: readonly ConversationStatus[] = ['open', 'pending', 'closed'];
 
 const session = useSession();
-const tabs = useAppTabs('whatsapp_inbox');
 const canConfigure = computed(() => session.can('whatsapp_inbox.configure'));
 /** Where the number is connected, reconnected or disconnected (WHATSAPP_INBOX-F01, F02). */
 const SETTINGS = '/whatsapp_inbox/settings';

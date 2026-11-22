@@ -20,8 +20,9 @@ import { refusal } from '../lib/refusal';
 import type { DiagnosticOut } from '../operations';
 import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 
-const session = useSession();
 const tabs = useAppTabs('verifactu');
+
+const session = useSession();
 const canConfigure = computed(() => session.can('verifactu.configure'));
 const canSend = computed(() => session.can('verifactu.transmit_record'));
 const t = useT();

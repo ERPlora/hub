@@ -16,6 +16,8 @@ import { useT } from '../composables/useT';
 import type { SettingsOut } from '../operations';
 import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 
+const tabs = useAppTabs('appointment');
+
 const NUMBERS = [
   'default_duration',
   'min_booking_notice',
@@ -31,7 +33,6 @@ type SwitchField = (typeof SWITCHES)[number];
 type Form = Record<NumberField, string> & Record<SwitchField, boolean>;
 
 const session = useSession();
-const tabs = useAppTabs('appointment');
 const t = useT();
 const canManage = computed(() => session.can('appointment.manage_settings'));
 

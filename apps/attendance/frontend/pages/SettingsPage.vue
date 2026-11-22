@@ -21,6 +21,8 @@ import { GeoError, type GeoErrorCode, getPosition } from '../lib/geo';
 import type { Radius, SettingsOut } from '../operations';
 import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 
+const tabs = useAppTabs('attendance');
+
 const RADII: readonly Radius[] = [50, 100, 250, 500, 1000];
 /** Six decimals of a degree: about 11 cm, more than any phone reads. */
 const COORD_DECIMALS = 6;
@@ -40,7 +42,6 @@ interface Form {
 }
 
 const session = useSession();
-const tabs = useAppTabs('attendance');
 const t = useT();
 const canEdit = computed(() => session.can('attendance.manage_settings'));
 

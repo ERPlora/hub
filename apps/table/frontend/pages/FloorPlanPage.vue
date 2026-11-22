@@ -22,6 +22,8 @@ import { zoneSummary, zoneTabs } from '../lib/floor-summary';
 import type { SettingsOut, TableCheckOut, TableOut, ZoneOut } from '../operations';
 import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 
+const sections = useAppTabs('table');
+
 type Mode = 'service' | 'edit';
 interface Pick {
   mode: PickMode;
@@ -38,7 +40,6 @@ const FACTORY: SettingsOut = {
 };
 
 const session = useSession();
-const sections = useAppTabs('table');
 const router = useRouter();
 const t = useT();
 const now = useNow();

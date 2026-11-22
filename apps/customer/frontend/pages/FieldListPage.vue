@@ -22,8 +22,9 @@ import { useLiveList } from '../lib/useLiveList';
 import type { CustomFieldType, FieldListIn, FieldRow } from '../operations';
 import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 
-const session = useSession();
 const tabs = useAppTabs('customer');
+
+const session = useSession();
 // Whoever manages cards sees it too: without the permission, a manager approves it with their PIN (BASE-F84).
 const canConfigure = computed(() => session.can('customer.configure') || session.can('customer.manage'));
 const canDelete = canConfigure;

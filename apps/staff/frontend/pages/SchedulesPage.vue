@@ -15,6 +15,7 @@ import { asCombo, memberSearch } from '../lib/pickers';
 import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 
 const tabs = useAppTabs('staff');
+
 const router = useRouter();
 const client = useLiveClient();
 

@@ -20,8 +20,9 @@ import { useLocale, useT } from '../composables/useT';
 import type { DepartmentOut } from '../operations';
 import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 
-const session = useSession();
 const tabs = useAppTabs('sale');
+
+const session = useSession();
 const canManage = computed(() => session.can('sale.manage_settings'));
 const t = useT();
 // What a section charges is named by the business territory's tax («VAT», «IGIC», «IPSI»).

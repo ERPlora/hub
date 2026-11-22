@@ -32,11 +32,12 @@ import { formatMoney, formatPercentBp, useBusinessMoney } from '../lib/format';
 import type { PackageListIn, PackageOut, PackageStatus } from '../operations';
 import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 
+const tabs = useAppTabs('service');
+
 const STATUSES: readonly PackageStatus[] = ['active', 'archived', 'deleted'];
 const TONE: Record<PackageStatus, 'success' | 'neutral' | 'danger'> = { active: 'success', archived: 'neutral', deleted: 'danger' };
 
 const session = useSession();
-const tabs = useAppTabs('service');
 const t = useT();
 const locale = useLocale();
 /** The business's currency (its country's), a dash until it answers: never a euro by default. */

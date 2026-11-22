@@ -24,10 +24,11 @@ import { useT } from '../composables/useT';
 import type { ZoneColor, ZoneListIn, ZoneOut } from '../operations';
 import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 
+const tabs = useAppTabs('table');
+
 const COLORS: readonly ZoneColor[] = ['primary', 'secondary', 'tertiary', 'success', 'warning', 'danger', 'medium'];
 
 const session = useSession();
-const tabs = useAppTabs('table');
 const t = useT();
 const canAdd = computed(() => session.can('table.add_zone'));
 const canChange = computed(() => session.can('table.change_zone'));

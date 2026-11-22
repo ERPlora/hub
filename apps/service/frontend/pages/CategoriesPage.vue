@@ -17,8 +17,9 @@ import { useT } from '../composables/useT';
 import type { CategoryOut } from '../operations';
 import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 
-const session = useSession();
 const tabs = useAppTabs('service');
+
+const session = useSession();
 const t = useT();
 const canAdd = computed(() => session.can('service.add_category'));
 const canChange = computed(() => session.can('service.change_category'));

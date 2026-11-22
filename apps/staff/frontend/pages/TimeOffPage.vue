@@ -36,10 +36,11 @@ import { memberSearch } from '../lib/pickers';
 import type { TimeOffDetailOut, TimeOffListIn, TimeOffOut } from '../operations';
 import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 
+const tabs = useAppTabs('staff');
+
 type View = 'all' | 'mine';
 
 const session = useSession();
-const tabs = useAppTabs('staff');
 const t = useT();
 const locale = useLocale();
 const client = useLiveClient();

@@ -29,11 +29,12 @@ import { formatDay, formatShortDate, formatTime, todayIn } from '../lib/clock';
 import type { WaitlistOut } from '../operations';
 import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 
+const tabs = useAppTabs('reservation');
+
 /** Until the settings answer with the business's zone: the day a new entry starts on. */
 const FALLBACK_ZONE = 'Europe/Madrid';
 
 const session = useSession();
-const tabs = useAppTabs('reservation');
 const t = useT();
 const locale = useLocale();
 const canChange = computed(() => session.can('reservation.change_waitlistentry'));

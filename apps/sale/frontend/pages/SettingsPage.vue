@@ -10,8 +10,9 @@ import { computed } from 'vue';
 import SettingsForm from '../components/backoffice/SettingsForm.vue';
 import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 
-const session = useSession();
 const tabs = useAppTabs('sale');
+
+const session = useSession();
 const canManage = computed(() => session.can('sale.manage_settings'));
 </script>
 

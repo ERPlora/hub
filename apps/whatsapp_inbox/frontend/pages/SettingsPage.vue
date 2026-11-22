@@ -10,8 +10,9 @@ import { computed } from 'vue';
 import ChannelSettings from '../components/ChannelSettings.vue';
 import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 
-const session = useSession();
 const tabs = useAppTabs('whatsapp_inbox');
+
+const session = useSession();
 const canConfigure = computed(() => session.can('whatsapp_inbox.configure'));
 </script>
 

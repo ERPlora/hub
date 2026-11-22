@@ -16,6 +16,8 @@ import { formatDateTime } from '../lib/format';
 import type { LogAction, LogOut } from '../operations';
 import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 
+const tabs = useAppTabs('kitchen');
+
 const ACTIONS: readonly LogAction[] = [
   'received',
   'created',
@@ -33,7 +35,6 @@ const ACTIONS: readonly LogAction[] = [
   'deleted',
 ];
 
-const tabs = useAppTabs('kitchen');
 const t = useT();
 const locale = useLocale();
 const { data: settings } = useLive('kitchen.settings.get', {});

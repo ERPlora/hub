@@ -17,8 +17,9 @@ import { useT } from '../composables/useT';
 import type { SeriesOut } from '../operations';
 import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 
-const session = useSession();
 const tabs = useAppTabs('invoice');
+
+const session = useSession();
 const canManage = computed(() => session.can('invoice.manage_series'));
 const t = useT();
 

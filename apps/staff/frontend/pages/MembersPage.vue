@@ -36,8 +36,9 @@ import { accountSearch, roleSearch } from '../lib/pickers';
 import type { MemberListIn, MemberOut } from '../operations';
 import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 
-const session = useSession();
 const tabs = useAppTabs('staff');
+
+const session = useSession();
 const t = useT();
 const locale = useLocale();
 /** The business's currency (its country's): Rate/h is painted in it (staff-business-currency). */

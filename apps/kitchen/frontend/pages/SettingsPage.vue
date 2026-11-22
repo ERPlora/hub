@@ -17,6 +17,8 @@ import { Chime, CHIME_TONES } from '../lib/chime';
 import type { OrderType, SettingsOut, SoundTone } from '../operations';
 import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 
+const tabs = useAppTabs('kitchen');
+
 const TOGGLES = ['show_timer', 'color_coding', 'sound_enabled', 'print_pass', 'works_from_screen'] as const;
 const NUMBERS = ['warning_minutes', 'critical_minutes', 'sound_volume'] as const;
 const TYPES: readonly OrderType[] = ['dine_in', 'takeaway', 'delivery'];
@@ -35,7 +37,6 @@ type Form = Record<(typeof TOGGLES)[number], boolean> &
   Record<(typeof NUMBERS)[number], string> & { sound_tone: SoundTone; default_order_type: OrderType };
 
 const session = useSession();
-const tabs = useAppTabs('kitchen');
 const t = useT();
 const canSave = computed(() => session.can('kitchen.change_settings'));
 

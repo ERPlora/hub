@@ -25,13 +25,14 @@ import { fileToBase64 } from '../lib/files';
 import { refusal } from '../lib/refusal';
 import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 
+const tabs = useAppTabs('verifactu');
+
 /** A business certificate weighs a few KB; anything over 1 MB is not one. */
 const MAX_CERTIFICATE_BYTES = 1024 * 1024;
 
 const t = useT();
 const locale = useLocale();
 const session = useSession();
-const tabs = useAppTabs('verifactu');
 const canConfigure = computed(() => session.can('verifactu.configure'));
 const { confirm } = useConfirm();
 const tab = shallowRef<'erplora' | 'own'>('erplora');

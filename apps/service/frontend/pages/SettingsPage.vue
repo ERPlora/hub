@@ -18,6 +18,8 @@ import { searchTaxCategories } from '../lib/pickers';
 import type { SettingsOut } from '../operations';
 import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 
+const tabs = useAppTabs('service');
+
 const NUMBERS = ['default_duration', 'default_buffer_time'] as const;
 const SWITCHES = ['show_prices', 'show_duration', 'allow_online_booking'] as const;
 const LABELS: Record<(typeof NUMBERS)[number] | (typeof SWITCHES)[number], string> = {
@@ -31,7 +33,6 @@ const LABELS: Record<(typeof NUMBERS)[number] | (typeof SWITCHES)[number], strin
 type Form = Record<(typeof NUMBERS)[number], string> & Record<(typeof SWITCHES)[number], boolean> & { tax: ComboOption | null };
 
 const session = useSession();
-const tabs = useAppTabs('service');
 const t = useT();
 const locale = useLocale();
 const client = useLiveClient();

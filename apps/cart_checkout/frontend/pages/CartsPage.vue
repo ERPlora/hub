@@ -40,10 +40,11 @@ import {
 import type { CartListIn, CartOut, CartStatus } from '../operations';
 import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 
+const tabs = useAppTabs('cart_checkout');
+
 const STATUSES: readonly CartStatus[] = ['active', 'abandoned', 'converted', 'expired'];
 
 const session = useSession();
-const tabs = useAppTabs('cart_checkout');
 const t = useT();
 const locale = useLocale();
 const { confirm } = useConfirm();

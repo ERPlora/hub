@@ -23,6 +23,8 @@ import { Chime } from '../lib/chime';
 import type { AllDayOut, Priority, SettingsOut, TicketOut } from '../operations';
 import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 
+const tabs = useAppTabs('kitchen');
+
 const FACTORY: SettingsOut = {
   show_timer: true,
   warning_minutes: 15,
@@ -38,7 +40,6 @@ const FACTORY: SettingsOut = {
 };
 
 const session = useSession();
-const tabs = useAppTabs('kitchen');
 const t = useT();
 const now = useNow();
 const canChange = computed(() => session.can('kitchen.change_ticket'));

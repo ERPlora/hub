@@ -29,13 +29,14 @@ import { type CustomerFields, ESSENTIAL_FIELDS, fieldsFromDetail, MORE_FIELDS, p
 import { useCustomerI18n } from '../lib/useCustomerI18n';
 import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 
+const tabs = useAppTabs('customer');
+
 const props = defineProps<{ id: string }>();
 
 const LIST = '/customer/customers';
 const NONE: string[] = [];
 const router = useRouter();
 const session = useSession();
-const tabs = useAppTabs('customer');
 const canManage = computed(() => session.can('customer.manage'));
 const canDelete = computed(() => session.can('customer.delete'));
 // Whoever manages cards sees it too: without the permission, a manager approves it with their PIN (BASE-F84).

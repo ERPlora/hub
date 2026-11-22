@@ -33,11 +33,12 @@ import { keepCompletedInPlace } from '../lib/mine';
 import type { TaskListIn, TaskOut, TaskPriority, TaskSort, TaskStatus } from '../operations';
 import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 
+const tabs = useAppTabs('task');
+
 const STATUSES: readonly TaskStatus[] = ['todo', 'in_progress', 'blocked', 'done', 'cancelled'];
 const PRIORITIES: readonly TaskPriority[] = ['low', 'medium', 'high', 'urgent'];
 
 const session = useSession();
-const tabs = useAppTabs('task');
 const t = useT();
 const locale = useLocale();
 const zone = useBusinessZone();

@@ -35,8 +35,9 @@ import { filterQuery, filtersInUse, reversedDates, TOTAL_ENDS } from '../lib/inv
 import type { InvoiceListIn, InvoiceRowOut } from '../operations';
 import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 
-const session = useSession();
 const tabs = useAppTabs('invoice');
+
+const session = useSession();
 const canAdd = computed(() => session.can('invoice.add_invoice'));
 const canRectify = computed(() => session.can('invoice.rectify_invoice'));
 const router = useRouter();

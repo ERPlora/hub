@@ -31,6 +31,8 @@ import { filterCents, formatDay, formatMoney, paymentMoney, STATUS_TONE, useBusi
 import type { PaymentListIn, PaymentOut, PaymentStatus } from '../operations';
 import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 
+const tabs = useAppTabs('payment');
+
 const STATUSES: readonly PaymentStatus[] = ['draft', 'approved', 'sent', 'completed', 'cancelled'];
 type Step = 'approve' | 'mark_sent' | 'mark_completed';
 /** The step each status can take, the key of its label and who may take it. */
@@ -42,7 +44,6 @@ const NEXT: Partial<Record<PaymentStatus, { step: Step; label: string; permissio
 const FINISHED: readonly PaymentStatus[] = ['completed', 'cancelled'];
 
 const session = useSession();
-const tabs = useAppTabs('payment');
 const t = useT();
 const locale = useLocale();
 const money = useBusinessMoney();

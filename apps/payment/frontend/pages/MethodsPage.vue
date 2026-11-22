@@ -25,10 +25,11 @@ import { useT } from '../composables/useT';
 import type { MethodListIn, MethodOut, MethodType } from '../operations';
 import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 
+const tabs = useAppTabs('payment');
+
 const TYPES: readonly MethodType[] = ['cash', 'transfer', 'card', 'sepa', 'check', 'other'];
 
 const session = useSession();
-const tabs = useAppTabs('payment');
 const t = useT();
 const canManage = computed(() => session.can('payment.add_payment'));
 

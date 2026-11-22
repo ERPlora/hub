@@ -31,6 +31,8 @@ import { clockTime, durationMinutes, durationTone, formatMoney, recordMoney } fr
 import type { SessionListIn, SessionOut, SessionStatus, SettingsOut } from '../operations';
 import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 
+const tabs = useAppTabs('table');
+
 type Segment = 'open' | 'closed' | 'all';
 const SEGMENTS: readonly Segment[] = ['open', 'closed', 'all'];
 const STATUSES: readonly SessionStatus[] = ['open', 'closed', 'transferred', 'merged', 'parked'];
@@ -43,7 +45,6 @@ const FACTORY: SettingsOut = {
 };
 
 const session = useSession();
-const tabs = useAppTabs('table');
 const t = useT();
 const locale = useLocale();
 const now = useNow();

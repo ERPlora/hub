@@ -16,6 +16,8 @@ import { useLocale, useT } from '../composables/useT';
 import { countryLabel, countryName } from '../lib/countries';
 import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 
+const tabs = useAppTabs('tax');
+
 /** The i18n key of each region with taxes of its own; a code without one reads as itself. */
 const REGION_KEYS: Readonly<Record<string, string>> = Object.freeze({
   'ES-CN': 'canaryIslands',
@@ -28,7 +30,6 @@ const WHOLE_COUNTRY = '';
 const t = useT();
 const locale = useLocale();
 const session = useSession();
-const tabs = useAppTabs('tax');
 const locked = computed(() => !session.can('tax.manage'));
 
 const { data: settings, status, error, refresh } = useLive('tax.settings.get', {});

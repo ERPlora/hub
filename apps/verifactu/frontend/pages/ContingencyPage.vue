@@ -19,9 +19,10 @@ import { refusal } from '../lib/refusal';
 import type { QueueRowOut } from '../operations';
 import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 
+const tabs = useAppTabs('verifactu');
+
 const router = useRouter();
 const session = useSession();
-const tabs = useAppTabs('verifactu');
 const canSend = computed(() => session.can('verifactu.transmit_record'));
 const t = useT();
 const locale = useLocale();

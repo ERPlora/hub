@@ -22,8 +22,9 @@ import { refusal } from '../lib/refusal';
 import type { PrinterOut } from '../operations';
 import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 
-const session = useSession();
 const tabs = useAppTabs('printing');
+
+const session = useSession();
 const canManage = computed(() => session.can('printing.manage_settings'));
 const canPrint = computed(() => session.can('printing.print'));
 const t = useT();

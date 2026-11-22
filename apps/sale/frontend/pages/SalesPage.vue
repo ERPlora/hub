@@ -42,6 +42,8 @@ import { filterQuery, filtersInUse, hasDateRange, paymentMethodSearch, reversedD
 import type { SaleListIn, SaleRow } from '../operations';
 import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 
+const tabs = useAppTabs('sale');
+
 const PERIOD_LABELS: Record<Period, string> = {
   today: 'sale.sales.period.today',
   week: 'sale.sales.period.week',
@@ -50,7 +52,6 @@ const PERIOD_LABELS: Record<Period, string> = {
 };
 
 const session = useSession();
-const tabs = useAppTabs('sale');
 const canReports = computed(() => session.can('sale.view_reports'));
 const canIssue = computed(() => session.can('sale.take_payment'));
 const t = useT();

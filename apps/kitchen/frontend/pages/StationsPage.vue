@@ -27,8 +27,9 @@ import { useT } from '../composables/useT';
 import type { RouteOut, StationOut } from '../operations';
 import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 
-const session = useSession();
 const tabs = useAppTabs('kitchen');
+
+const session = useSession();
 const t = useT();
 const canManage = computed(() => session.can('kitchen.manage_station'));
 

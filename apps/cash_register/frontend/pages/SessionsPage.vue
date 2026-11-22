@@ -38,8 +38,9 @@ import { AMOUNT_FILTERS, AMOUNT_RANGES, filterParams, filtersInUse, SESSION_STAT
 import type { CountType, SessionRow } from '../operations';
 import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 
-const session = useSession();
 const tabs = useAppTabs('cash_register');
+
+const session = useSession();
 const can = (permission: string) => computed(() => session.can(permission));
 const canOpen = can('cash_register.add_session');
 const canMove = can('cash_register.add_movement');

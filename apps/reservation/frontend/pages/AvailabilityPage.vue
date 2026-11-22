@@ -36,10 +36,11 @@ import { WEEKDAYS, weekdayKey } from '../lib/weekdays';
 import type { BlockedDateOut, SlotLoadOut, TimeSlotOut } from '../operations';
 import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 
+const tabs = useAppTabs('reservation');
+
 const FALLBACK_ZONE = 'Europe/Madrid';
 
 const session = useSession();
-const tabs = useAppTabs('reservation');
 const t = useT();
 const locale = useLocale();
 const canSlots = computed(() => session.can('reservation.change_timeslot'));

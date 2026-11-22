@@ -13,8 +13,9 @@ import { computed, ref, watch } from 'vue';
 import PageNotices, { blockingError } from '../components/PageNotices.vue';
 import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 
-const session = useSession();
 const tabs = useAppTabs('schedule');
+
+const session = useSession();
 const canManage = computed(() => session.can('schedule.manage_settings'));
 
 const { data: settings, status, error, refresh } = useLive('schedule.settings.get', {});

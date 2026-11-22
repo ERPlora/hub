@@ -16,8 +16,9 @@ import { useT } from '../composables/useT';
 import type { RoleListIn, RoleOut } from '../operations';
 import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 
-const session = useSession();
 const tabs = useAppTabs('staff');
+
+const session = useSession();
 const t = useT();
 const canManage = computed(() => session.can('staff.manage_settings'));
 

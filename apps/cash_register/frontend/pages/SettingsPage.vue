@@ -10,8 +10,9 @@ import RegistersCard from '../components/RegistersCard.vue';
 import SettingsCard from '../components/SettingsCard.vue';
 import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 
-const session = useSession();
 const tabs = useAppTabs('cash_register');
+
+const session = useSession();
 const canManage = computed(() => session.can('cash_register.manage_settings'));
 </script>
 

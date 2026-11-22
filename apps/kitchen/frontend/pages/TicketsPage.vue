@@ -31,6 +31,8 @@ import { formatDateTime, formatMoney, useBusinessMoney } from '../lib/format';
 import type { OrderType, Priority, TicketListIn, TicketRowOut, TicketStatus } from '../operations';
 import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 
+const tabs = useAppTabs('kitchen');
+
 const STATUSES: readonly TicketStatus[] = ['pending', 'preparing', 'ready', 'served', 'cancelled'];
 const TYPES: readonly OrderType[] = ['dine_in', 'takeaway', 'delivery'];
 const PRIORITIES: readonly Priority[] = ['normal', 'rush', 'vip'];
@@ -38,7 +40,6 @@ const COOKING: readonly TicketStatus[] = ['pending', 'preparing'];
 const ON_THE_LINE: readonly TicketStatus[] = ['pending', 'preparing', 'ready'];
 
 const session = useSession();
-const tabs = useAppTabs('kitchen');
 const t = useT();
 const locale = useLocale();
 const canAdd = computed(() => session.can('kitchen.add_ticket'));

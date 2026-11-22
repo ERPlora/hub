@@ -23,8 +23,9 @@ import { useT } from '../composables/useT';
 import type { ProjectListIn, ProjectOut, ProjectSort } from '../operations';
 import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 
-const session = useSession();
 const tabs = useAppTabs('task');
+
+const session = useSession();
 const t = useT();
 const canManage = computed(() => session.can('task.manage_project'));
 

@@ -57,10 +57,11 @@ import type { ComboChoiceIn, OrderLineOut, OrderOut, OrderRow, PreviewOut, SaleO
 import { refusal } from '../lib/refusal';
 import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 
+const tabs = useAppTabs('sale');
+
 const t = useT();
 const locale = useLocale();
 const session = useSession();
-const tabs = useAppTabs('sale');
 
 // ── The till settings: nothing is shown until they are read ─────────────────────────────────────
 const settingsLive = useLive('sale.pos_settings.get', {});

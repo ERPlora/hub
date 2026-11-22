@@ -19,8 +19,9 @@ import { refusal } from '../lib/refusal';
 import type { IssuerIn, IssuerOut } from '../operations';
 import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 
-const session = useSession();
 const tabs = useAppTabs('invoice');
+
+const session = useSession();
 const canManage = computed(() => session.can('invoice.manage_issuer'));
 const t = useT();
 const locale = useLocale();

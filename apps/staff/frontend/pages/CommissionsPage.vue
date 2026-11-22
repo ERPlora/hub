@@ -19,12 +19,13 @@ import { formatDate, formatMoney, formatPercent, useBusinessMoney } from '../lib
 import type { CommissionPeriod, CommissionReportIn, CommissionReportRow } from '../operations';
 import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 
+const tabs = useAppTabs('staff');
+
 type Choice = CommissionPeriod | 'custom';
 
 const CHOICES: readonly Choice[] = ['today', 'yesterday', 'this_week', 'this_month', 'custom'];
 
 const session = useSession();
-const tabs = useAppTabs('staff');
 const t = useT();
 const locale = useLocale();
 const canSeePay = computed(() => session.can('staff.view_compensation'));

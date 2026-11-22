@@ -8,6 +8,7 @@ import SpecialDaysList from '../components/SpecialDaysList.vue';
 import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 
 const tabs = useAppTabs('schedule');
+
 </script>
 
 <template>
