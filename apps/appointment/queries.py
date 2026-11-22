@@ -76,7 +76,7 @@ from apps.service.models import Assignment, Service
 from apps.service.queries import catalog, recovery
 from apps.staff.models import Member
 from apps.staff.queries import member_availability, own_member, resolve_member
-from apps.staff.schemas import AvailabilityIn
+from apps.staff.schemas.availability import AvailabilityIn
 from base.business import business_zone, zone_name
 from base.ordering import list_order_for
 from base.relay import by_platform

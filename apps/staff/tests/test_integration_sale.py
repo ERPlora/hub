@@ -19,7 +19,7 @@ from live.live_registry import live_registry
 from live.operations import get, registry
 
 from apps.staff.models import Member
-from apps.staff.schemas import CommissionReportIn
+from apps.staff.schemas.commissions import CommissionReportIn
 
 from .conftest import HUB_DB, A, ctx_for, make_member, make_role
 
