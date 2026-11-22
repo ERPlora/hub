@@ -140,10 +140,6 @@ def unmarked_sensitive(operations: Iterable[Operation]) -> dict[str, set[str]]:
     return found
 
 
-#: The input field every read of the Hub orders by: its choices are the keys of the order.
-SORT = "sort"
-
-
 def literal_values(annotation: Any) -> Iterator[str]:
     """The texts a ``Literal`` inside ``annotation`` allows (an order's keys, with their leading ``-``)."""
     if get_origin(annotation) is Literal:
@@ -162,11 +158,14 @@ def unguarded_filters(operation: Operation) -> list[str]:
     if operation.kind != "query":
         return []
     marked = {mark.name for mark in marked_fields(operation.output)}
+    answered = {name for _, name, _ in fields_of(operation.output)} if marked else set()
     found = []
     for schema, name, field in fields_of(operation.input):
         if not marked or required_permission(field) is not None:
             continue
-        sorted_by = {value.lstrip("-") for value in literal_values(field.annotation)} if name == SORT else set()
+        # The choices of a filter called as a field of the answer are that field's values («came by phone» is a
+        # source); the choices of any other input are the keys of an order.
+        sorted_by = set() if name in answered else {value.lstrip("-") for value in literal_values(field.annotation)}
         if any(names_a(term, name) for term in marked) or sorted_by & marked:
             found.append(f"{operation.name}: {key(schema, name)}")
     return found
@@ -276,6 +275,11 @@ def test_filtering_or_sorting_by_a_marked_field_without_its_mark_is_caught():
 
 class MarkedContactOut(BaseModel):
     phone: str | None = Field(None, json_schema_extra=CUSTOMER_CONTACT)
+    source: Literal["walk_in", "phone"] = "walk_in"
+
+
+class OrderedContactListIn(BaseModel):
+    order: Literal["name", "phone"] = "name"
 
 
 class SourceListIn(BaseModel):
@@ -283,8 +287,15 @@ class SourceListIn(BaseModel):
 
 
 def test_a_filter_whose_choices_name_a_marked_field_is_not_an_order():
-    # «Came by phone» is a source, not the customer's phone: only a read's ``sort`` orders by its choices.
+    # «Came by phone» is a source, not the customer's phone: the filter chooses among the values of the answer's
+    # ``source``.
     assert unguarded_filters(operation("shop.contact.list", MarkedContactOut, SourceListIn)) == []
+
+
+def test_an_order_by_a_marked_field_is_caught_whatever_its_field_is_called():
+    assert unguarded_filters(operation("shop.contact.list", MarkedContactOut, OrderedContactListIn)) == [
+        f"shop.contact.list: {__name__}.OrderedContactListIn.order"
+    ]
 
 
 def test_with_its_mark_or_on_a_write_or_on_an_unmarked_answer_it_is_not():
