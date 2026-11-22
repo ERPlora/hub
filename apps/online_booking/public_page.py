@@ -6,15 +6,14 @@ from typing import Annotated
 
 from django.conf import settings
 from django.utils.translation import gettext_lazy as _
-from live.context import OperationContext, system_context
-from live.operations import get as get_operation
+from live.context import OperationContext
 from ninja import Field, Schema
 from pydantic import model_validator
 from pydantic.json_schema import SkipJsonSchema
 
 from apps.online_booking.logo import logo_url
+from base.operations import business_name
 
-BUSINESS = "base.business.get"
 #: ERPlora's privacy policy on erplora.com. The business decides on its customers' details and ERPlora processes
 #: them on its behalf, as that policy says; a business has no policy of its own to link here.
 PRIVACY_POLICY_PATH = "/legal/privacy/"
@@ -33,9 +32,8 @@ class LinkOwnerOut(Schema):
     @classmethod
     def owner(cls, ctx: OperationContext, logo: str) -> dict:
         """Whose page or link it is, for ``ctx``'s business: read as the platform, as nobody signed in reads it."""
-        business = get_operation(BUSINESS)
         return {
-            "business_name": business(system_context(ctx.scope), business.input()).name,
+            "business_name": business_name(ctx.scope),
             "logo_url": logo_url(ctx.scope, logo),
         }
 
