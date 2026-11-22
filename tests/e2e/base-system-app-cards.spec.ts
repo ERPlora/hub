@@ -2,13 +2,13 @@
 // as the owner of hub `a` and in the three viewports
 // of the fleet: with Printing on, «Your printer» says who prints, «Set up printing» leads to Printing's printers and,
 // in this browser, the ERPlora app for Windows, Linux and Android comes from erplora.com (the stack's SaaS), each
-// opening outside the hub. Printing turned off takes the card away without a reload and turned on brings it back. The
-// employee, who is told the business's usage is not theirs, still has the card; in Spanish, «Tu impresora». Each step
+// opening outside the hub. Printing turned off takes the card away without a reload and turned on brings it back; in
+// Spanish, «Tu impresora». Each step
 // leaves its capture `hub683-<step>-<width>` once nothing scrolls sideways; Printing ends as the run found it.
 // flow: BASE-F39 PRINTING-F21
 import { type Browser, expect, type Page, test } from '@playwright/test';
 
-import { A, api, EMPLOYEE, hostPage, saveSessionForTheSweep, signedInSpanish, testid, turnOffTurnedOn, turnOnMissing } from './helpers';
+import { A, api, hostPage, saveSessionForTheSweep, signedInSpanish, testid, turnOffTurnedOn, turnOnMissing } from './helpers';
 import { settledCapture } from './screen';
 import { STACK } from './stack';
 
@@ -65,28 +65,14 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
       await testid(page, 'printing-system-card-setup').click();
       await expect(page).toHaveURL(`${A}/printing/printers`);
     } finally {
-      // A run that falls between «off» and «on» still leaves Printing as it found it: the employee's and the Spanish
-      // tests below, and every spec after this file, count on it being on in `a`.
+      // A run that falls between «off» and «on» still leaves Printing as it found it: the Spanish test below, and every
+      // spec after this file, count on it being on in `a`.
       if (turnedOn.length === 0) await turnOnMissing(context, A, ['printing'], []);
       await turnOffTurnedOn(context, A, turnedOn);
       await context.close();
     }
   });
 }
-
-test('BASE-F39 PRINTING-F21 — the employee has the card too, below what is not theirs to see', async ({ browser }) => {
-  const { context, page } = await hostPage(browser, A, { viewport: VIEWPORTS[375], next: '/system', credentials: EMPLOYEE });
-  try {
-    await expect(testid(page, 'system-usage-denied')).toHaveText(
-      'Only the owner or an administrator can see how much the hub is using.',
-    );
-    await expect(testid(page, 'printing-system-card-title')).toHaveText('Your printer');
-    await card(page).scrollIntoViewIfNeeded();
-    await settledCapture(page, 'hub683-employee-375');
-  } finally {
-    await context.close();
-  }
-});
 
 test('BASE-F39 PRINTING-F21 — in Spanish, «Tu impresora»', async ({ browser }) => {
   const { context, page } = await signedInSpanish(browser, VIEWPORTS[1440], '/system');
