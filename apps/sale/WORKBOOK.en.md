@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:3891be20d06af9ec50e4ce71a6f4b012f4598d8736effe4f4900ca4fe98a1d33 -->
+<!-- generated from WORKBOOK.md sha256:a9543f13b1d2298f1bfe8b1063ed966b32eb16f56e407cc2a3b1eca6219777c0 -->
 
 ## What it is for and who it is for
 
@@ -1387,8 +1387,8 @@ Services active, "Services" does not show in the strip.
 Involved: SERVICE-F09, SERVICE-F03, SERVICE-F31, APPOINTMENT-F17
 
 ### SALE-F39 Charge with what another app adds (the tip)
-Status: not done — the sale already keeps apart, in each payment, what another app adds (through the API and the
-assistant), but the Charge sheet does not paint other apps' steps yet, nor does the Sale document show what was added
+Status: not done — the sale already keeps apart, in each payment, what another app adds (through the API), but the
+Charge sheet does not paint other apps' steps yet, nor does the Sale document show what was added
 (hub#1497, hub#1500, hub#1502)
 Vertical: common
 Actor: employee, manager

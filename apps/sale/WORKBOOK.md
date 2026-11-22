@@ -1388,8 +1388,8 @@ reservó este servicio o lo reservó más barato.». Sin Servicios activa, «Ser
 Implicados: SERVICE-F09, SERVICE-F03, SERVICE-F31, APPOINTMENT-F17
 
 ### SALE-F39 Cobrar con lo que añade otra app (la propina)
-Estado: no hecho — la venta ya guarda aparte, en cada cobro, lo que añade otra app (por la API y el asistente), pero
-la hoja Cobro todavía no pinta los pasos de otras apps ni el Documento de venta enseña lo añadido (hub#1497, hub#1500,
+Estado: no hecho — la venta ya guarda aparte, en cada cobro, lo que añade otra app (por la API), pero la hoja
+Cobro todavía no pinta los pasos de otras apps ni el Documento de venta enseña lo añadido (hub#1497, hub#1500,
 hub#1502)
 Vertical: común
 Actor: empleado, responsable
@@ -1415,9 +1415,9 @@ Si falla: si la app del paso se apaga con la hoja abierta, la fila desaparece y 
 cobra y el paso no consigue guardar lo suyo, la venta queda cobrada y la hoja dice el aviso del paso con
 «Reintentar» (TIP-F02); el reintento usa la misma clave del intento y no cobra dos veces (SALE-F06), y esa misma
 clave con otro importe añadido es otro cobro: «Esa clave de intento ya se usó para otro cobro. Vuelve a abrir el
-cobro para cobrar este.». Un importe añadido sin decir qué es no cobra: «Di qué es el importe añadido a este cobro (una propina,
-por ejemplo).». El tope del tique (3.000 €) y el del efectivo (1.000 €) miran el total de la venta, como siempre: la
-propina no es precio.
+cobro para cobrar este.». Un importe añadido sin decir qué es no cobra: «Di qué es el importe añadido a este cobro
+(una propina, por ejemplo).». El tope del tique (3.000 €) y el del efectivo (1.000 €) miran el total de la venta, como
+siempre: la propina no es precio.
 Implicados: TIP-F02, TIP-F03, TIP-F04, CASH_REGISTER-F18, INVOICE-F01
 
 ### SALE-F40 Ver los alérgenos de un plato al pedirlo

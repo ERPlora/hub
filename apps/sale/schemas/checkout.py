@@ -117,7 +117,7 @@ class PaymentIn(Closed):
     extra: Cents = Field(
         0,
         description="What another app adds to this leg on top of the sale (a tip), in cents: charged with it, but never "
-        "part of the sale's total or its tax.",
+        "part of the sale's total or its tax. That app's own step at the charge sends it, and records it in that app too.",
     )
     extra_label: _text(60) = Field(
         "", validate_default=True, description="What the added amount is, as the receipt names it (e.g. «Tip»)."
