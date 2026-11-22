@@ -19,7 +19,7 @@ function embed(block: object | null) {
 }
 
 async function open(options: Parameters<typeof mountBase>[1] = {}) {
-  const m = await mountBase(RolesList, { path: '/employees#roles', routes: ['/employees', '/employees/roles/:role'], ...options });
+  const m = await mountBase(RolesList, { path: '/employees#roles', routes: ['/employees'], ...options });
   const call = await m.live();
   return { ...m, call };
 }
@@ -83,7 +83,7 @@ describe('RolesList', () => {
   });
 
   it('anyone opens what a role allows from its row', async () => {
-    const m = await open({ session: EMPLOYEE });
+    const m = await open({ session: EMPLOYEE, routes: ['/employees', '/employees/roles/:role'] });
     await m.result(m.call, 'base.role.list', { roles: ROLES });
     await m.wrapper.findAll('[data-testid="roles-row"]')[3].trigger('click');
     await flush();

@@ -1,6 +1,6 @@
 // «What it allows» of a basic role: opened from Employees › Roles, read only, app by app.
 // flow: BASE-F82
-import { type Browser, expect, type Page, test } from '@playwright/test';
+import { expect, type Page, test } from '@playwright/test';
 
 import { A, collectProblems, EMPLOYEE, horizontalOverflow, hostPage, shot, shown, untilStill } from './helpers';
 
@@ -11,10 +11,6 @@ const VIEWPORTS = {
 } as const;
 
 const testid = (page: Page, id: string) => shown(page).locator(`[data-testid="${id}"]`);
-
-async function signedIn(browser: Browser, viewport: { width: number; height: number }, next: string, employee = false) {
-  return hostPage(browser, A, { viewport, next, credentials: employee ? EMPLOYEE : undefined });
-}
 
 /** The capture once the page settled, without sideways scroll. */
 async function snap(page: Page, key: string, width: number): Promise<void> {
@@ -36,7 +32,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
   const width = Number(label);
 
   test(`the owner opens what the employee role allows from Roles at ${width}`, async ({ browser }) => {
-    const { context, page } = await signedIn(browser, viewport, '/employees#roles');
+    const { context, page } = await hostPage(browser, A, { viewport, next: '/employees#roles' });
     const problems = await collectProblems(page);
     const rows = shown(page).locator('[data-testid="roles-row"], [data-testid="roles-card"]');
     await expect(rows).toHaveCount(5);
@@ -58,7 +54,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
   });
 
   test(`an employee reads it too, and a role that does not exist says so, at ${width}`, async ({ browser }) => {
-    const { context, page } = await signedIn(browser, viewport, '/employees/roles/hub_manager', true);
+    const { context, page } = await hostPage(browser, A, { viewport, next: '/employees/roles/hub_manager', credentials: EMPLOYEE });
     await expectLine(page, 'sale.void_sale', 'Void a sale', 'success');
     await snap(page, 'manager-by-employee', width);
     await page.goto(page.url().replace('hub_manager', 'hub_cashier'));
