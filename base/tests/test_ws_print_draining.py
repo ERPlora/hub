@@ -3,7 +3,18 @@ it, and a beat counts the printers the device still reaches."""
 
 from base import ws_print
 from base.tenancy.tests.business import HUB_DB_COMMITTED, in_business_a
-from base.tests.print_socket import db, enqueue, fresh_live, printer, ready_socket, run, session, sockets, status_of
+from base.tests.print_socket import (
+    db,
+    enqueue,
+    fresh_live,
+    printer,
+    ready_socket,
+    ready_with_a_job,
+    run,
+    session,
+    sockets,
+    status_of,
+)
 
 __all__ = ["fresh_live", "in_business_a", "session", "sockets"]
 pytestmark = HUB_DB_COMMITTED
@@ -48,10 +59,7 @@ async def test_claim_hands_the_oldest_job_of_its_printers_and_done_closes_it(soc
 
 
 async def test_a_reported_failure_puts_the_job_back_in_the_queue(sockets, session):
-    cookie = await db(session)
-    till = await db(printer)
-    queued = await db(enqueue, till)
-    socket = await ready_socket(sockets, cookie, [till])
+    socket, _, queued = await ready_with_a_job(sockets, session)
     await socket.send({"type": "claim", "role": "receipt"})
     await socket.receive()
 

@@ -236,6 +236,14 @@ async def ready_socket(sockets, cookie: str, printers: list[str], host: str = HU
     return socket
 
 
+async def ready_with_a_job(sockets, session):
+    """The till's device ready with a receipt queued for it: its socket, the till and the job."""
+    cookie = await db(session)
+    till = await db(printer)
+    queued = await db(enqueue, till)
+    return await ready_socket(sockets, cookie, [till]), till, queued
+
+
 async def refused_at_hello(sockets, cookie: str) -> dict:
     """The frame that refuses the hello of the till's device with ``cookie`` while a job waits: the socket is closed
     4403 and the job still waits."""

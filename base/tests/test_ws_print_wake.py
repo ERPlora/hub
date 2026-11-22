@@ -20,6 +20,7 @@ from base.tests.print_socket import (
     fresh_live,
     printer,
     ready_socket,
+    ready_with_a_job,
     run,
     session,
     sockets,
@@ -76,10 +77,7 @@ async def test_a_job_queued_after_the_commit_wakes_the_device_of_its_hub_and_no_
 async def test_a_claim_that_empties_the_queue_wakes_nobody(sockets, session):
     """The wake says a job is waiting (the old hub's: «a job was just queued for a role you host»); the queue
     changing because this device took its last job is no wake, or every job would end in a claim → idle."""
-    cookie = await db(session)
-    till = await db(printer)
-    queued = await db(enqueue, till)
-    socket = await ready_socket(sockets, cookie, [till])
+    socket, till, queued = await ready_with_a_job(sockets, session)
 
     await socket.send({"type": "claim", "role": "receipt"})
     assert (await socket.receive())["jobId"] == str(queued.id)
@@ -140,10 +138,7 @@ async def test_the_job_it_sent_back_does_not_wake_the_device_until_somebody_retr
     """A device that could not print a job sends it back and stops pulling that role, or an empty roll would burn
     the job's five hand-outs in a second (the old print host): the job waiting again is no news to it. Somebody
     retrying it is (they changed the roll)."""
-    cookie = await db(session)
-    till = await db(printer)
-    queued = await db(enqueue, till)
-    socket = await ready_socket(sockets, cookie, [till])
+    socket, _, queued = await ready_with_a_job(sockets, session)
     await socket.send({"type": "claim", "role": "receipt"})
     assert (await socket.receive())["jobId"] == str(queued.id)
     await handled_until(handled["till-1"], lambda waiting: str(queued.id) not in waiting)
