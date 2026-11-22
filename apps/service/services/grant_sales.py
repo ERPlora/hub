@@ -21,7 +21,7 @@ from apps.service.models import Grant
 from apps.service.queries.grant_checks import redeem_refusal
 from apps.service.queries.grants import balance, find_grant, load_grant, lock_grant
 from apps.service.queries.records import SALES_UNAVAILABLE
-from apps.service.schemas import GrantOut
+from apps.service.schemas.grants import GrantOut
 from apps.service.schemas.grant_sales import GrantSaleIn
 from base.operations import call
 

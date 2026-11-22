@@ -1,0 +1,67 @@
+"""Health data (CUSTOMER-F32): its own block, never on the card, the list, the export or the assistant."""
+
+from datetime import date, datetime
+from typing import Literal
+from uuid import UUID
+
+from ninja import Field, Schema
+
+from apps.customer.schemas.fields import ConsentSource, CustomerOfIn, _text
+
+HealthTestResult = Literal["", "negative", "positive"]
+
+
+class HealthDetailIn(CustomerOfIn):
+    pass
+
+
+class HealthGrantIn(CustomerOfIn):
+    notice_text: _text(2000, 1) = Field(
+        description="The exact words read to the customer, stored as proof."
+    )
+    notice_version: _text(60) = Field("", description="The version of those words.")
+    source: ConsentSource = Field(
+        "counter",
+        description="Where it was given: counter, web_form, phone, email, import or receipt.",
+    )
+    evidence: _text(500) = Field(
+        "", description="An outside reference that backs it (a signed form)."
+    )
+    occurred_at: datetime | None = Field(
+        None, description="When the customer said it, if not now."
+    )
+
+
+class HealthWithdrawIn(CustomerOfIn):
+    source: ConsentSource = Field(
+        "counter",
+        description="Where it was withdrawn: counter, web_form, phone, email, import or receipt.",
+    )
+    reason: _text(500) = Field("", description="Why, if the customer said; never required.")
+
+
+class HealthIn(CustomerOfIn):
+    allergies: _text(2000) = Field(
+        "", description="Allergies and sensitivities, as the customer tells them."
+    )
+    sensitivity_test_on: date | None = Field(
+        None, description="The day of the last sensitivity (patch) test."
+    )
+    sensitivity_test_result: HealthTestResult = Field(
+        "", description="Its result: negative, positive or empty while unread."
+    )
+
+
+class HealthOut(Schema):
+    customer_id: UUID = Field(description="The customer's id.")
+    consent: Literal["none", "granted", "withdrawn"] = Field(
+        description="The last decision on the permission to keep health data; none if never asked."
+    )
+    consent_at: datetime | None = Field(description="When that decision was said.")
+    consent_by: str = Field(description="Who wrote it down.")
+    notice_text: str = Field(description="The exact words the customer said yes to.")
+    allergies: str = Field(description="Allergies and sensitivities.")
+    sensitivity_test_on: date | None = Field(description="The day of the last sensitivity test.")
+    sensitivity_test_result: HealthTestResult = Field(description="Its result.")
+    updated_at: datetime | None = Field(description="When the health data last changed.")
+    updated_by: str = Field(description="Who changed it.")

@@ -27,43 +27,25 @@ from apps.customer.models import (
     OrderLink,
     Purchase,
 )
-from apps.customer.schemas import (
-    HealthDetailIn,
-    HealthOut,
-)
-from apps.customer.schemas import (
-    ActivityListIn,
-    ActivityPage,
+from apps.customer.schemas.activity import ActivityListIn, ActivityPage, NoteIn
+from apps.customer.schemas.cards import (
     ByPhoneIn,
-    ConsentHistoryIn,
-    ConsentPage,
-    ConsentStateIn,
-    ConsentStateOut,
     CustomerDetailOut,
-    CustomerExportIn,
     CustomerListIn,
     CustomerPage,
-    CustomerRefIn,
     CustomerStatsIn,
     CustomerStatsOut,
-    DivergencePage,
-    DivergencesIn,
-    ExportOut,
-    FieldListIn,
-    FieldPage,
-    GroupListIn,
-    GroupPage,
-    NoteIn,
-    OrderCustomerOut,
-    OrderIn,
-    OrderListIn,
-    OrderPage,
     PhoneMatchOut,
-    PurchaseListIn,
-    PurchasePage,
-    TagListIn,
-    TagPage,
 )
+from apps.customer.schemas.consent import ConsentHistoryIn, ConsentPage, ConsentStateIn, ConsentStateOut
+from apps.customer.schemas.custom_fields import FieldListIn, FieldPage
+from apps.customer.schemas.exports import CustomerExportIn, ExportOut
+from apps.customer.schemas.fields import CustomerRefIn
+from apps.customer.schemas.groups import GroupListIn, GroupPage
+from apps.customer.schemas.health import HealthDetailIn, HealthOut
+from apps.customer.schemas.orders import OrderCustomerOut, OrderIn, OrderListIn, OrderPage
+from apps.customer.schemas.purchases import DivergencePage, DivergencesIn, PurchaseListIn, PurchasePage
+from apps.customer.schemas.tags import TagListIn, TagPage
 
 from base.tests.actors import who_did_it
 

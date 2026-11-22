@@ -10,7 +10,7 @@ from live.outbox import record_event
 
 from apps.customer import events
 from apps.customer.models import Activity, Customer, Purchase
-from apps.customer.schemas import (
+from apps.customer.schemas.purchases import (
     PurchaseRecordIn,
     PurchaseRecordOut,
     PurchaseRefundIn,

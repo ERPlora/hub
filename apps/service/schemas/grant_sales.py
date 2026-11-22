@@ -6,7 +6,8 @@ from django.utils.translation import gettext_lazy as _
 from ninja import Field
 from pydantic import model_validator
 
-from apps.service.schemas import A_SALE, A_SALE_LINE, GrantRefIn
+from apps.service.schemas.fields import A_SALE, A_SALE_LINE
+from apps.service.schemas.grants import GrantRefIn
 
 SAY_WHICH_SALE = _("Say which sale charged the voucher.")
 

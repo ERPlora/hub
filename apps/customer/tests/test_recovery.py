@@ -26,7 +26,7 @@ from live.operations import get as get_operation
 
 from apps.customer import queries
 from apps.customer.models import Customer, CustomerGroup, CustomerTag, CustomField, CustomFieldValue
-from apps.customer.schemas import CustomerIn
+from apps.customer.schemas.cards import CustomerIn
 from base.tenancy.context import current_alias, use_hub
 from base.tenancy.tests.test_recovery import ANA, CUSTOMERS, LUIS, Recoveries, fresh, gone, run, run_in
 

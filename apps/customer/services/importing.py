@@ -12,7 +12,8 @@ from apps.customer.countries import country_from_text
 from apps.customer.models import Customer
 from apps.customer.phones import InvalidPhone, to_e164
 from apps.customer.queries import business_country, has_live_twin
-from apps.customer.schemas import CustomerIn, ImportIn, ImportOut, ImportRowIn
+from apps.customer.schemas.cards import CustomerIn
+from apps.customer.schemas.importing import ImportIn, ImportOut, ImportRowIn
 from apps.customer.services.writes import PHONE_INVALID
 
 COUNTRY_IMPORTED_EMPTY = _(

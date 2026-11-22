@@ -9,7 +9,7 @@ from psycopg import sql
 
 from apps.service.models import Assignment, Category, Service, parent_problem
 from apps.service.queries.reads import SYSTEM
-from apps.service.schemas import StandingForIn, StandingForOut
+from apps.service.schemas.recovery import StandingForIn, StandingForOut
 from apps.tax.models import TaxCategory
 from base.recovery import at_work, brought_back
 

@@ -14,46 +14,30 @@ from live.errors import Conflict, NotFound, PermissionDenied
 from live.operations import get
 
 from apps.service.models import Assignment, GrantAdjustment, ServiceSettings
-from apps.service.schemas import (
-    AdjustCheckOut,
+from apps.service.schemas.assignments import (
     AssignmentDetailOut,
     AssignmentListIn,
     AssignmentPage,
-    ByIdIn,
-    GrantDetailOut,
-    SessionDetailOut,
-    SessionRefIn,
-    CatalogStatusOut,
-    CategoryListIn,
-    CategoryOut,
-    CategoryPage,
-    CategoryRefIn,
     EligibleIn,
     EligiblePage,
-    GrantListIn,
-    GrantPage,
-    MovementListIn,
-    MovementPage,
-    NoIn,
-    OrphanPage,
-    PackageListIn,
-    PackageOut,
-    PackagePage,
-    PackageRefIn,
-    PageIn,
-    RedeemCheckIn,
-    RedeemCheckOut,
+)
+from apps.service.schemas.catalog import (
+    CatalogStatusOut,
     ServiceForSaleIn,
     ServiceListIn,
     ServiceOut,
     ServicePage,
-    ServiceRefIn,
     ServiceSalePage,
-    SettingsOut,
-    TenderOptionPage,
-    TenderOptionsIn,
-    VoidCheckOut,
 )
+from apps.service.schemas.categories import CategoryListIn, CategoryOut, CategoryPage
+from apps.service.schemas.fields import ByIdIn, CategoryRefIn, NoIn, PackageRefIn, PageIn, ServiceRefIn
+from apps.service.schemas.grant_checks import AdjustCheckOut, RedeemCheckIn, RedeemCheckOut, VoidCheckOut
+from apps.service.schemas.grants import GrantDetailOut, GrantListIn, GrantPage, OrphanPage
+from apps.service.schemas.movements import MovementListIn, MovementPage
+from apps.service.schemas.packages import PackageListIn, PackageOut, PackagePage
+from apps.service.schemas.sessions import SessionDetailOut, SessionRefIn
+from apps.service.schemas.settings import SettingsOut
+from apps.service.schemas.tender import TenderOptionPage, TenderOptionsIn
 
 from base.tenancy.context import current_alias
 from base.tests.ordering import assert_reads_backwards, listed_with
