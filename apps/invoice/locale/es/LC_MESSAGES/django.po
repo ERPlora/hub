@@ -986,3 +986,24 @@ msgstr "Este código ha caducado: pide la factura en el establecimiento."
 #: apps/invoice/queries/public.py
 msgid "Your ticket is still being registered. Try again in a few minutes."
 msgstr "Tu tique aún se está registrando. Prueba otra vez en unos minutos."
+
+msgid "View and print invoices, series, numbering and the issuer"
+msgstr "Ver e imprimir las facturas, las series, la numeración y el emisor"
+
+msgid "View everyone's invoices"
+msgstr "Ver las facturas de todos"
+
+msgid "Issue invoices, invoice a sale, replace a receipt and mark invoices paid"
+msgstr "Emitir facturas, facturar una venta, sustituir un tique y marcar facturas como pagadas"
+
+msgid "Issue corrective invoices"
+msgstr "Rectificar facturas"
+
+msgid "Create and change invoice series"
+msgstr "Crear y cambiar series de factura"
+
+msgid "Set up the issuer"
+msgstr "Configurar el emisor"
+
+msgid "Request the full invoice of a receipt on the public page"
+msgstr "Pedir la factura completa de un tique en la página pública"

@@ -113,7 +113,7 @@ def test_staff_has_the_store_metadata_and_belongs_to_the_hair_salon():
 
 
 def test_permissions():
-    assert staff().permissions == PERMISSIONS
+    assert list(staff().permissions) == PERMISSIONS
 
 
 def test_roles_are_the_four_customer_roles_with_the_hub_prefix():

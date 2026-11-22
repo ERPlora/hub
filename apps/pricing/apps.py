@@ -30,7 +30,10 @@ class PricingConfig(LiveAppConfig):
     # Services is read by the name of its operations (it is no requirement: WORKBOOK).
     requires = ["inventory", "customer"]
     default_auto_field = "django.db.models.BigAutoField"
-    permissions = ["pricing.view", "pricing.manage"]
+    permissions = {
+        "pricing.view": _("View price lists, prices and rules"),
+        "pricing.manage": _("Create, change, deactivate and reactivate price lists, and pick the default one"),
+    }
     # Keys are the customer roles as the SaaS sends them (``hub_`` prefix included). Viewing includes
     # asking for the price of a line.
     role_permissions = {

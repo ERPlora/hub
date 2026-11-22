@@ -39,7 +39,7 @@ def test_demo_has_the_store_metadata_but_stays_out_of_the_store():
 
 
 def test_permissions():
-    assert demo().permissions == ["demo.view", "demo.manage"]
+    assert list(demo().permissions) == ["demo.view", "demo.manage"]
 
 
 def test_roles_are_the_four_customer_roles_with_the_hub_prefix():

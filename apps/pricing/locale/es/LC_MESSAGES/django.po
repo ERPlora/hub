@@ -288,3 +288,9 @@ msgstr "desde %(quantity)s"
 # pricing.catalog.get: what a price or a rule points at in another app, by its id.
 msgid "Say one service, one category or one customer group, by its id."
 msgstr "Di un servicio, una categoría o un grupo de clientes, por su id."
+
+msgid "View price lists, prices and rules"
+msgstr "Ver las tarifas, los precios y las reglas"
+
+msgid "Create, change, deactivate and reactivate price lists, and pick the default one"
+msgstr "Crear, cambiar, desactivar y reactivar tarifas, y elegir la general"

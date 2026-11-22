@@ -378,3 +378,33 @@ msgstr "Invitaciones"
 msgctxt "cash report"
 msgid "Expected"
 msgstr "Esperado"
+
+msgid "View sessions, settings, drawers and currency"
+msgstr "Ver las sesiones, los ajustes, los cajones y la moneda"
+
+msgid "View everyone's sessions"
+msgstr "Ver las sesiones de todos"
+
+msgid "Open a cash register session"
+msgstr "Abrir una sesión de caja"
+
+msgid "Close a cash register session"
+msgstr "Cerrar una sesión de caja"
+
+msgid "View cash movements"
+msgstr "Ver los movimientos de caja"
+
+msgid "Record cash in and out"
+msgstr "Apuntar entradas y salidas de dinero"
+
+msgid "View cash counts"
+msgstr "Ver los arqueos"
+
+msgid "Record cash counts"
+msgstr "Registrar arqueos"
+
+msgid "See the expected cash during a blind count"
+msgstr "Ver el esperado en un arqueo ciego"
+
+msgid "Change the settings and drawers"
+msgstr "Cambiar los ajustes y los cajones"

@@ -39,15 +39,15 @@ class TaskConfig(LiveAppConfig):
             "sus comentarios", "que comentarios", "de comentarios",
         ),
     )
-    permissions = [
-        "task.view",
-        "task.view_all",
-        "task.add",
-        "task.change",
-        "task.change_all",
-        "task.delete",
-        "task.manage_project",
-    ]
+    permissions = {
+        "task.view": _("View their own tasks and the projects"),
+        "task.view_all": _("View all tasks"),
+        "task.add": _("Create tasks and subtasks"),
+        "task.change": _("Change, assign, complete and comment on their own tasks"),
+        "task.change_all": _("Change, assign, complete and comment on any task"),
+        "task.delete": _("Delete tasks"),
+        "task.manage_project": _("Create, change and delete projects"),
+    }
     # Keys are the customer roles as the SaaS sends them (``hub_`` prefix included). An employee sees
     # and changes their own tasks (assigned to them or created by them); a manager, every task.
     role_permissions = {

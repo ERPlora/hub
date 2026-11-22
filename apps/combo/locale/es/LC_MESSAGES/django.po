@@ -412,3 +412,9 @@ msgstr "plato de la copia al que sustituye"
 #: schemas.py
 msgid "Image"
 msgstr "Imagen"
+
+msgid "View menus and price a menu line"
+msgstr "Ver los menús y calcular una línea de menú"
+
+msgid "Create, change, sort and retire menus, their courses and choices"
+msgstr "Crear, cambiar, ordenar y retirar menús, sus platos y sus elecciones"

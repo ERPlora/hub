@@ -503,3 +503,15 @@ msgstr "Impresora sin configurar"
 #: apps.py
 msgid "We couldn't check the printer"
 msgstr "No hemos podido comprobar la impresora"
+
+msgid "View printers, settings and the queue"
+msgstr "Ver las impresoras, los ajustes y la cola"
+
+msgid "Manage printers, printing devices and settings"
+msgstr "Gestionar las impresoras, los dispositivos que imprimen y los ajustes"
+
+msgid "Print and test printers"
+msgstr "Imprimir y probar las impresoras"
+
+msgid "Retry and cancel print jobs"
+msgstr "Reintentar y cancelar trabajos de impresión"

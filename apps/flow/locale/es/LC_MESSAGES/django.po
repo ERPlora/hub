@@ -659,3 +659,15 @@ msgstr "Cancelada: se borraron los datos personales del cliente."
 
 msgid "[erased with the customer's personal data]"
 msgstr "[borrado con los datos personales del cliente]"
+
+msgid "View automations, their runs and drafts"
+msgstr "Ver las automatizaciones, sus ejecuciones y los borradores"
+
+msgid "Create, change, turn on, run and delete automations, and answer what they ask whoever runs the business"
+msgstr "Crear, cambiar, encender, ejecutar y borrar automatizaciones, y contestar lo que preguntan a quien lleva el negocio"
+
+msgid "Answer what automations ask employees"
+msgstr "Contestar lo que las automatizaciones preguntan a los empleados"
+
+msgid "Answer what automations ask managers"
+msgstr "Contestar lo que las automatizaciones preguntan a los responsables"

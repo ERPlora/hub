@@ -42,15 +42,15 @@ class InvoiceConfig(LiveAppConfig):
             "como cobrados",
         ),
     )
-    permissions = [
-        "invoice.view_invoice",
-        "invoice.view_all_invoices",
-        "invoice.add_invoice",
-        "invoice.rectify_invoice",
-        "invoice.manage_series",
-        "invoice.manage_issuer",
-        "invoice.public",
-    ]
+    permissions = {
+        "invoice.view_invoice": _("View and print invoices, series, numbering and the issuer"),
+        "invoice.view_all_invoices": _("View everyone's invoices"),
+        "invoice.add_invoice": _("Issue invoices, invoice a sale, replace a receipt and mark invoices paid"),
+        "invoice.rectify_invoice": _("Issue corrective invoices"),
+        "invoice.manage_series": _("Create and change invoice series"),
+        "invoice.manage_issuer": _("Set up the issuer"),
+        "invoice.public": _("Request the full invoice of a receipt on the public page"),
+    }
     # The page base's public door serves without a session at /p/<slug>/invoice/<code> (INVOICE-F04): whoever opens
     # it holds ``invoice.public`` and nothing else.
     public_pages = {"invoice": "invoice.public"}

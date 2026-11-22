@@ -38,11 +38,11 @@ class CartCheckoutConfig(LiveAppConfig):
         ("unidades", "cantidad", "quantity"),
         ("cesta", "carrito", "cart", "basket"),
     )
-    permissions = [
-        "cart_checkout.view_cart",
-        "cart_checkout.manage_cart",
-        "cart_checkout.checkout",
-    ]
+    permissions = {
+        "cart_checkout.view_cart": _("View carts, their lines and orders"),
+        "cart_checkout.manage_cart": _("Create, change and empty carts, and erase a customer's personal data"),
+        "cart_checkout.checkout": _("Start orders and mark them paid, failed or completed"),
+    }
     # Keys are the customer roles as the SaaS sends them (``hub_`` prefix included). The manager has all
     # three; the employee only looks.
     role_permissions = {
