@@ -12,7 +12,7 @@
 // symbol, and Save waits in grey (the rate is read in its money; hub#921); if that read fails, the dialog says so with «Retry»
 // (hub#938). If it answers with the dialog open, the rate
 // as loaded is rewritten in its decimals and what was typed is read in it when saving.
-import { Combo, type ComboOption, FormModal, InlineFeedback } from '@erplora/ui/components';
+import { Combo, type ComboOption, DateField, FormModal, InlineFeedback } from '@erplora/ui/components';
 import { ApiError, useCommand, useLiveClient } from '@erplora/ui/sdk';
 import { useSession } from '@erplora/ui/shell';
 import { IonInput, IonSelect, IonSelectOption, IonText, IonTextarea, IonToggle } from '@ionic/vue';
@@ -393,19 +393,14 @@ async function save(): Promise<void> {
             :class="invalid(fieldErrors.booking_buffer)"
             @ion-input="set('booking_buffer', text($event.detail.value))"
           />
-          <ion-input
-            data-testid="staff-member-form-hire_date"
+          <DateField
+            testid="staff-member-form-hire_date"
             name="hire_date"
             data-field
-            type="date"
-            :value="form.hire_date"
+            :model-value="form.hire_date"
             :label="$t('staff.members.form.hireDate')"
-            label-placement="floating"
-            fill="outline"
-            mode="md"
             :error-text="fieldErrors.hire_date"
-            :class="invalid(fieldErrors.hire_date)"
-            @ion-input="set('hire_date', text($event.detail.value))"
+            @update:model-value="set('hire_date', $event)"
           />
           <ion-input
             data-testid="staff-member-form-color"

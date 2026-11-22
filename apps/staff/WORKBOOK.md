@@ -406,8 +406,8 @@ hora de inicio tiene que ser anterior a la de fin.», «El descanso necesita ini
 una vez.», «La vigencia del horario termina antes de empezar.»; «Ese miembro del personal no existe
 en este negocio.». Un turno que cruza la medianoche no se admite. «Un horario necesita al menos un día de
 trabajo con horas.» sale encima de la semana y se quita en cuanto se cambia cualquier día (se marca o se
-desmarca, o se escribe una hora), sin volver a guardar. El motivo de un día sale debajo de ese día y
-se quita en cuanto se cambia ese día (se marca o se desmarca, o se escribe una de sus horas), sin volver a
+desmarca, o se elige una hora), sin volver a guardar. El motivo de un día sale debajo de ese día y
+se quita en cuanto se cambia ese día (se marca o se desmarca, o se elige una de sus horas), sin volver a
 guardar; los de los demás días se quedan hasta que se cambian.
 Implicados: ninguno
 
@@ -563,8 +563,8 @@ Pantalla: Ajustes
 Pasos:
 1. Abre **Ajustes**: sale la jornada por defecto guardada o, si nunca se guardó, la propuesta (de 09:00
    a 18:00 con 60 minutos de descanso).
-2. Cambia el inicio y el fin en HH:MM (el fin, después del inicio: un día de horario no cruza la
-   medianoche) y el descanso, de 0 (sin descanso) a 480 minutos y más corto que la jornada.
+2. Elige la hora de inicio y la de fin (el fin, después del inicio: un día de horario no cruza la
+   medianoche) y cambia el descanso, de 0 (sin descanso) a 480 minutos y más corto que la jornada.
 3. Pulsa **Guardar**.
    Lo que se cambia mientras se está guardando no se pierde: se queda en pantalla, por guardar.
 Entra: lo enviado; lo demás se queda como estaba.
@@ -837,8 +837,6 @@ ofrece la plantilla «La lista de bienvenida de alguien nuevo en el equipo» sob
   (expand/contract, PLAN-DB), con su migración reversible, una vez desplegado hub#177. Al borrarlas,
   `apps/flow/tests/test_i18n.py` (recorre las columnas de cada modelo) dirá qué entradas del catálogo de
   Automatizaciones sobran.
-- **Fechas y horas en el orden del idioma del negocio**: los
-  campos usan `ion-input type="date|time"` hasta que `@erplora/ui` tenga el suyo (`UI-REQUESTS.md`).
 
 ## Cómo son las páginas (para quien lo mantiene)
 
@@ -868,6 +866,9 @@ ofrece la plantilla «La lista de bienvenida de alguien nuevo en el equipo» sob
 - Los selectores de listas largas (miembro, rol, usuario del Hub) son el `Combo` de
   `@erplora/ui/components` y buscan en el servidor (`frontend/lib/pickers.ts`; «Sin rol» y «Sin acceso
   al Hub» van primero mientras no se teclea, con `asCombo`).
+- Los días y las horas de los formularios y de Comisiones son `DateField` y `TimeField` de
+  `@erplora/ui/components`: se eligen en el calendario o la rueda de horas de la app, en su idioma, nunca en
+  el selector del dispositivo.
 - Las cifras de Personal (`frontend/components/StaffFigures.vue`, `staff.member.stats`) y «Ausencias de
   hoy» (`frontend/components/AwayToday.vue`, `staff.time_off.today`) dan dentro de la app lo mismo que los
   paneles del Inicio (STAFF-G01…G05), como las cifras de Clientes y el panel de quién está fichado de

@@ -7,6 +7,7 @@
 import { Combo, ConfirmDialog, InlineFeedback } from '@erplora/ui/components';
 import { describe, expect, it } from 'vitest';
 
+import { pick, picked } from '../../../../base/frontend/__tests__/date-time-fields';
 import { itTellsTheCorrectedFieldApart } from '../../../../base/frontend/__tests__/same-words-refusal';
 import CustomerSearch from '../../../customer/frontend/components/CustomerSearch.vue';
 import { click, ionValue, mountReservation, settle } from '../__tests__/mount-reservation';
@@ -14,7 +15,7 @@ import { freeTable, reservationRow } from '../__tests__/rows';
 import en from '../locale/en.json';
 import ReservationFormModal from './ReservationFormModal.vue';
 
-type Control = HTMLElement & { label?: string; value?: unknown; errorText?: string; disabled?: boolean };
+type Control = HTMLElement & { label?: string; value?: unknown; errorText?: string; disabled?: boolean; readonly?: boolean; required?: boolean };
 
 const TABLES = {
   rows: [
@@ -46,7 +47,7 @@ async function setup(props: Record<string, unknown> = {}, locale: 'en' | 'es' = 
 async function fillNew(s: Awaited<ReturnType<typeof setup>>) {
   await ionValue(s.field('guest_name'), 'Ana García', 'ionInput');
   await ionValue(s.field('guest_phone'), '600 111 222', 'ionInput');
-  await ionValue(s.field('time'), '21:00', 'ionInput');
+  await pick(s.field('time'), '21:00');
   await ionValue(s.field('party_size'), '4', 'ionInput');
 }
 
@@ -61,7 +62,7 @@ describe('ReservationFormModal: New reservation', () => {
       'Time',
       'Party',
     ]);
-    expect(s.field('date').value).toBe('2026-10-15');
+    expect(picked(s.field('date'))).toBe('2026-10-15');
     expect(s.field('party_size').value).toBe('2');
     expect(s.wrapper.findComponent(CustomerSearch).exists()).toBe(true);
     expect(s.tablePicker().props('label')).toBe('Table');
@@ -76,6 +77,15 @@ describe('ReservationFormModal: New reservation', () => {
     expect(controls.map((name) => [name, drawn(name).fill, drawn(name).mode ?? drawn(name).getAttribute('mode')])).toEqual(
       controls.map((name) => [name, 'outline', 'md']),
     );
+  });
+
+  // The date and the time are the app's own calendar and time wheel, never the device's; both are needed to book, so
+  // neither offers «Clear».
+  it('the date and the time are the app’s pickers, shown as read', async () => {
+    const s = await setup();
+    await pick(s.field('time'), '21:00');
+    expect([s.field('date'), s.field('time')].map((field) => [field.readonly, field.required])).toEqual([[true, true], [true, true]]);
+    expect([s.field('date').value, s.field('time').value]).toEqual(['10/15/2026', expect.stringMatching(/^09:00\sPM$/)]);
   });
 
   it('offers the free tables at that time, the ones that fit first, saying their seats and zone', async () => {
@@ -136,7 +146,7 @@ describe('ReservationFormModal: New reservation', () => {
       '+34600999888',
       'lucia@x.es',
     ]);
-    await ionValue(s.field('time'), '21:00', 'ionInput');
+    await pick(s.field('time'), '21:00');
     s.answer(201, reservationRow());
     await click(s.submit());
     expect(s.bodies('/api/reservation/reservations')[0]).toMatchObject({ customer_id: 'c1', guest_name: 'Lucía Pérez' });
@@ -194,13 +204,13 @@ describe('ReservationFormModal: Edit reservation', () => {
   it('sends only what changed, and can leave it without a table', async () => {
     const s = await setup({ reservation: reservationRow({ status: 'confirmed' }) });
     expect(s.inDoc('reservation-form')?.getAttribute('aria-label')).toBe('Edit reservation');
-    expect([s.field('time').value, s.field('party_size').value, s.tablePicker().props('modelValue')]).toEqual([
+    expect([picked(s.field('time')), s.field('party_size').value, s.tablePicker().props('modelValue')]).toEqual([
       '21:00',
       '4',
       { id: 't5', label: '5 (Terrace)' },
     ]);
     expect(s.wrapper.findComponent(CustomerSearch).exists()).toBe(false);
-    await ionValue(s.field('time'), '21:30', 'ionInput');
+    await pick(s.field('time'), '21:30');
     s.tablePicker().vm.$emit('update:modelValue', null);
     s.answer(200, reservationRow({ time: '21:30:00', table_id: null }));
     await click(s.submit());
@@ -210,7 +220,7 @@ describe('ReservationFormModal: Edit reservation', () => {
   it('a seated reservation only changes its notes', async () => {
     const s = await setup({ reservation: reservationRow({ status: 'seated' }) });
     expect(s.inDoc('reservation-form-notes-only')?.textContent).toContain('This reservation is seated: only its notes can change.');
-    expect([s.field('time').disabled, s.field('party_size').disabled, s.tablePicker().props('disabled')]).toEqual([true, true, true]);
+    expect([s.field('date').disabled, s.field('time').disabled, s.field('party_size').disabled, s.tablePicker().props('disabled')]).toEqual([true, true, true, true]);
     await ionValue(s.field('internal_notes'), 'VIP', 'ionInput');
     s.answer(200, reservationRow({ status: 'seated', internal_notes: 'VIP' }));
     await click(s.submit());

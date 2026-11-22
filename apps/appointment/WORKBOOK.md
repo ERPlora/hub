@@ -237,7 +237,7 @@ Pasos:
    profesionales **Activos y Reservables que los hacen todos**; si un servicio no tiene a nadie
    asignado, para ese servicio vale todo el equipo reservable. «Min.» se rellena con la suma de las
    duraciones (la propia del profesional si la tiene, si no la del catálogo).
-3. Escribe el día y toca una de las **Horas libres** (o escribe otra hora).
+3. Elige el día y toca una de las **Horas libres** (o elige otra hora).
 4. Pulsa **Añadir cita**. Si el negocio permite solapes y esa hora choca con otra cita del
    profesional, responde a «Cita solapada».
 5. La cita aparece como **Confirmada** con su número (por ejemplo, APT-20261116-0001).
@@ -278,9 +278,9 @@ Pasos:
    dice solo a quien puede ver esa agenda (a un empleado, de un compañero, solo «ya tiene una cita»).
 Entra: el horario del negocio, el turno y las ausencias, los bloqueos, las citas y los ajustes.
 Sale: la lista de horas; no guarda nada.
-Si falla: «No se han podido cargar las horas libres. Puedes escribir una hora igualmente.» con
-**Reintentar**; la hora escrita se juzga al guardar. Sin horas: «No quedan horas libres ese día para este
-profesional. Puedes escribir una hora igualmente.».
+Si falla: «No se han podido cargar las horas libres. Puedes elegir una hora igualmente.» con
+**Reintentar**; la hora elegida se juzga al guardar. Sin horas: «No quedan horas libres ese día para este
+profesional. Puedes elegir una hora igualmente.».
 Implicados: SCHEDULE-F11, STAFF-F16, SERVICE-F33
 
 ### APPOINTMENT-F03 Confirmar una cita pendiente

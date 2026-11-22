@@ -323,7 +323,7 @@ Actor: propietario, administrador, responsable
 Pantalla: Reglas
 Pasos:
 1. En la fila de la regla vigente pulsa «Poner fecha de fin».
-2. Escribe el último día que se aplica (el día antes de que empiece el tipo nuevo) y pulsa «Guardar
+2. Elige el último día que se aplica (el día antes de que empiece el tipo nuevo) y pulsa «Guardar
    fecha de fin».
 3. Crea la regla nueva con **+** y «Vigente desde» el día siguiente.
 4. La tabla enseña las dos con sus fechas; desde el día del cambio las ventas nuevas usan la nueva.

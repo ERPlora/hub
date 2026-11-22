@@ -78,7 +78,7 @@
 1238 apps/service/tests/test_queries.py ERPlora/erplora-next#74
 1602 apps/service/tests/test_recovery.py ERPlora/erplora-next#74
 1095 apps/service/tests/test_services.py ERPlora/erplora-next#74
-612 apps/staff/frontend/components/MemberFormModal.test.ts ERPlora/erplora-next#74
+600 apps/staff/frontend/components/MemberFormModal.test.ts ERPlora/erplora-next#74
 512 apps/staff/frontend/operations.d.ts ERPlora/erplora-next#74
 1162 apps/staff/queries/__init__.py ERPlora/erplora-next#74
 1065 apps/staff/services.py ERPlora/erplora-next#74
@@ -134,7 +134,6 @@
 624 tests/e2e/base-home.spec.ts ERPlora/erplora-next#74
 584 tests/e2e/cash-register-flows.spec.ts ERPlora/erplora-next#74
 584 tests/e2e/combo-menus.spec.ts ERPlora/erplora-next#74
-513 tests/e2e/customer-flows.spec.ts ERPlora/erplora-next#74
 654 tests/e2e/flow-flows.spec.ts ERPlora/erplora-next#74
 689 tests/e2e/global-setup.test.ts ERPlora/erplora-next#74
 729 tests/e2e/helpers-login.test.ts ERPlora/erplora-next#74

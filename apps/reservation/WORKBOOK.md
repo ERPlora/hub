@@ -254,7 +254,7 @@ Estado: hecho
 Actor: responsable, asistente
 Pantalla: Disponibilidad (Fechas bloqueadas)
 Pasos:
-1. Pulsa «Añadir fecha bloqueada», escribe la fecha y el motivo (festivo, cierre, evento privado).
+1. Pulsa «Añadir fecha bloqueada», elige la fecha y escribe el motivo (festivo, cierre, evento privado).
 2. Deja «Todo el día» marcado o, para unas horas, quítalo y pon desde y hasta.
 3. Ese día (o esas horas) no se aceptan reservas nuevas; las que ya había se quedan.
 4. Para levantar el bloqueo, «Quitar» en su fila y confirma.
@@ -921,7 +921,8 @@ la que solo se le autorizó reservar.
   `reservation.customer_mismatch` toda reserva que no sea de esa ficha (también una inexistente o borrada,
   antes que su estado) y `update` rechaza la mesa, las notas internas y `overbook` con 409
   `reservation.staff_only_field`.
-- **Fechas y horas** se escriben con los campos del navegador (`type="date"` y `type="time"`), como en Citas.
+- **Fechas y horas** se eligen con `DateField` y `TimeField` de `@erplora/ui` (el calendario y la rueda de horas de
+  la app, en su idioma y sus colores; nunca el selector del dispositivo), como en Citas.
 
 ### Lo que NO hace, a propósito
 

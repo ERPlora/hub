@@ -6,7 +6,7 @@
 // booked and skipped). «Edit repeating appointment»: the change applies from a date on («From») — the
 // panel says how many booked appointments it reaches and how many charged ones it leaves alone — and
 // «Save from this occurrence on» sends only what changed.
-import { type ComboOption, FormModal } from '@erplora/ui/components';
+import { type ComboOption, DateField, FormModal, TimeField } from '@erplora/ui/components';
 import { useCommand, useLiveClient } from '@erplora/ui/sdk';
 import { IonInput, IonSelect, IonSelectOption } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
@@ -234,18 +234,13 @@ const text = (value: unknown): string => (value === null || value === undefined 
           :error-text="fieldErrors.staff"
           :own="!!ownStaff"
         />
-        <ion-input
+        <DateField
           v-if="series"
-          data-testid="series-form-from_date"
-          type="date"
-          :value="from"
+          v-model="from"
+          testid="series-form-from_date"
           :label="$t('appointment.series.form.fromDate')"
-          label-placement="floating"
-          fill="outline"
-          mode="md"
           name="from_date"
           :error-text="fieldErrors.from_date"
-          @ion-input="from = text($event.detail.value)"
         />
         <SeriesScopeHint
           v-if="series"
@@ -290,30 +285,22 @@ const text = (value: unknown): string => (value === null || value === undefined 
               {{ t(`appointment.weekday.${day}`) }}
             </ion-select-option>
           </ion-select>
-          <ion-input
+          <DateField
             v-if="!series"
-            data-testid="series-form-start_date"
-            type="date"
-            :value="startDate"
+            v-model="startDate"
+            testid="series-form-start_date"
             :label="$t('appointment.series.form.startDate')"
-            label-placement="floating"
-            fill="outline"
-            mode="md"
+            required
             name="start_date"
             :error-text="fieldErrors.start_date"
-            @ion-input="startDate = text($event.detail.value)"
           />
-          <ion-input
-            data-testid="series-form-time"
-            type="time"
-            :value="time"
+          <TimeField
+            v-model="time"
+            testid="series-form-time"
             :label="$t('appointment.series.form.time')"
-            label-placement="floating"
-            fill="outline"
-            mode="md"
+            required
             name="time"
             :error-text="fieldErrors.time"
-            @ion-input="time = text($event.detail.value)"
           />
           <ion-input
             data-testid="series-form-minutes"
@@ -329,17 +316,12 @@ const text = (value: unknown): string => (value === null || value === undefined 
             :error-text="fieldErrors.duration_minutes"
             @ion-input="(minutes = text($event.detail.value)), (minutesTouched = true)"
           />
-          <ion-input
-            data-testid="series-form-end_date"
-            type="date"
-            :value="endDate"
+          <DateField
+            v-model="endDate"
+            testid="series-form-end_date"
             :label="$t('appointment.series.form.endDate')"
-            label-placement="floating"
-            fill="outline"
-            mode="md"
             name="end_date"
             :error-text="fieldErrors.end_date"
-            @ion-input="endDate = text($event.detail.value)"
           />
           <ion-input
             data-testid="series-form-max_occurrences"

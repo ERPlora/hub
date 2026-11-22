@@ -7,7 +7,7 @@
 // `staff.schedule.update`, which replaces the whole week. The server judges: a day's problem goes under
 // that day's row (its `days.<i>` named back to the weekday), a week without working days on the week, and
 // each goes as soon as the person changes that day or the week.
-import { FormModal, InlineFeedback } from '@erplora/ui/components';
+import { DateField, FormModal, InlineFeedback, TimeField } from '@erplora/ui/components';
 import { useCommand, useLive } from '@erplora/ui/sdk';
 import { IonCheckbox, IonInput } from '@ionic/vue';
 import { computed, ref, shallowRef, watch } from 'vue';
@@ -111,12 +111,12 @@ async function save(): Promise<void> {
   open.value = false;
 }
 
-/** The four hour fields of a working day. */
+/** The four hour fields of a working day: its start and end are needed, its break may be left empty. */
 const HOURS = [
-  { part: 'start', key: 'start', label: 'staff.schedules.form.start', after: 'staff.schedules.form.sepTo' },
-  { part: 'end', key: 'end', label: 'staff.schedules.form.end', after: 'staff.schedules.form.sepBreak' },
-  { part: 'break_start', key: 'breakStart', label: 'staff.schedules.form.breakStart', after: 'staff.schedules.form.sepTo' },
-  { part: 'break_end', key: 'breakEnd', label: 'staff.schedules.form.breakEnd', after: '' },
+  { part: 'start', key: 'start', label: 'staff.schedules.form.start', after: 'staff.schedules.form.sepTo', required: true },
+  { part: 'end', key: 'end', label: 'staff.schedules.form.end', after: 'staff.schedules.form.sepBreak', required: true },
+  { part: 'break_start', key: 'breakStart', label: 'staff.schedules.form.breakStart', after: 'staff.schedules.form.sepTo', required: false },
+  { part: 'break_end', key: 'breakEnd', label: 'staff.schedules.form.breakEnd', after: '', required: false },
 ] as const;
 </script>
 
@@ -150,31 +150,21 @@ const HOURS = [
           @ion-input="form = { ...form, name: text($event.detail.value) }"
         />
         <div class="staff-schedule-form__pair">
-          <ion-input
-            data-testid="staff-schedule-form-effective_from"
+          <DateField
+            testid="staff-schedule-form-effective_from"
             name="effective_from"
-            type="date"
-            :value="form.effective_from"
+            :model-value="form.effective_from"
             :label="$t('staff.schedules.form.effectiveFrom')"
-            label-placement="floating"
-            fill="outline"
-            mode="md"
             :error-text="fieldErrors.effective_from"
-            :class="invalid(fieldErrors.effective_from)"
-            @ion-input="form = { ...form, effective_from: text($event.detail.value) }"
+            @update:model-value="form = { ...form, effective_from: $event }"
           />
-          <ion-input
-            data-testid="staff-schedule-form-effective_until"
+          <DateField
+            testid="staff-schedule-form-effective_until"
             name="effective_until"
-            type="date"
-            :value="form.effective_until"
+            :model-value="form.effective_until"
             :label="$t('staff.schedules.form.effectiveUntil')"
-            label-placement="floating"
-            fill="outline"
-            mode="md"
             :error-text="fieldErrors.effective_until"
-            :class="invalid(fieldErrors.effective_until)"
-            @ion-input="form = { ...form, effective_until: text($event.detail.value) }"
+            @update:model-value="form = { ...form, effective_until: $event }"
           />
         </div>
         <ion-checkbox
@@ -226,17 +216,14 @@ const HOURS = [
                 v-for="hour in HOURS"
                 :key="hour.part"
               >
-                <ion-input
-                  :data-testid="`staff-schedule-form-day-${day.weekday}-${hour.part}`"
+                <TimeField
+                  :testid="`staff-schedule-form-day-${day.weekday}-${hour.part}`"
                   :name="dayKeyOf(day.weekday)"
                   class="staff-week__time"
-                  type="time"
-                  :value="day[hour.key]"
+                  :model-value="day[hour.key]"
                   :label="$t(hour.label)"
-                  label-placement="stacked"
-                  fill="outline"
-                  mode="md"
-                  @ion-input="setDay(day.weekday, { [hour.key]: text($event.detail.value) })"
+                  :required="hour.required"
+                  @update:model-value="setDay(day.weekday, { [hour.key]: $event })"
                 />
                 <span
                   v-if="hour.after"

@@ -1,6 +1,7 @@
 // Picking a day or a time in the date and time fields of @erplora/ui (DateField, TimeField) as a person does: a tap
 // on the field opens Ionic's calendar or time wheel in a popover; the person moves to the month, taps the day (or
-// the hour, the minute and AM/PM) and presses Done. The field then shows the value in the app's language.
+// the hour, the minute and AM/PM) and presses Done, or Clear to empty a field that is not required. The field then
+// shows the value in the app's language.
 import { expect, type Locator, type Page } from '@playwright/test';
 
 /** Opens the picker of `field`: the ion-datetime of the popover it presents (Ionic hides the inline popovers that are
@@ -57,12 +58,24 @@ async function spin(picker: Locator, column: string, text: string): Promise<void
   await expect(option).toHaveClass(/option-active/);
 }
 
-/** Picks `time` (`HH:MM`, 24 hours) in the TimeField `field` of a page in English (its wheel has AM and PM). */
+/** Picks `time` (`HH:MM`, 24 hours) in the TimeField `field`: on a wheel with AM and PM (a page in English) or on the
+ *  24-hour wheel of a language that reads the clock that way, whose hours have two digits. */
 export async function pickTime(page: Page, field: Locator, time: string): Promise<void> {
   const picker = await openPicker(page, field, 'time');
   const [hours, minutes] = time.split(':').map(Number);
-  await spin(picker, 'Select a day period', hours < 12 ? 'AM' : 'PM');
-  await spin(picker, 'Select an hour', String(hours % 12 || 12));
+  if (await picker.locator('ion-picker-column[aria-label="Select a day period"]').count()) {
+    await spin(picker, 'Select a day period', hours < 12 ? 'AM' : 'PM');
+    await spin(picker, 'Select an hour', String(hours % 12 || 12));
+  } else {
+    await spin(picker, 'Select an hour', String(hours).padStart(2, '0'));
+  }
   await spin(picker, 'Select a minute', String(minutes).padStart(2, '0'));
   await confirm(picker);
+}
+
+/** Empties the DateField or TimeField `field` (one that is not required) with its picker's Clear. */
+export async function clearPick(page: Page, field: Locator, presentation: 'date' | 'time'): Promise<void> {
+  const picker = await openPicker(page, field, presentation);
+  await picker.locator('#clear-button').click();
+  await expect(picker).toBeHidden();
 }

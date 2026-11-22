@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:f246ec4966b99741518d21feb4a645a1e176fd078337fcb07b791c0e620d4cd7 -->
+<!-- generated from WORKBOOK.md sha256:37333ae5e3ca4db2431d30153bc4c0f40384ae64030bd4a84f5b968778fd4d05 -->
 
 ## What it is for and who it is for
 
@@ -247,7 +247,7 @@ Status: done
 Actor: manager, assistant
 Screen: Availability (Blocked dates)
 Steps:
-1. Tap "Add blocked date", type the date and the reason (holiday, closure, private event).
+1. Tap "Add blocked date", pick the date and type the reason (holiday, closure, private event).
 2. Leave "Whole day" ticked or, for some hours, untick it and set from and until.
 3. That day (or those hours) no new reservations are taken; the ones already there stay.
 4. To lift the block, "Remove" on its row and confirm.

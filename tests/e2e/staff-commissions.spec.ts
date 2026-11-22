@@ -13,6 +13,7 @@
 import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
 import { cleanUp as cleanCustomers, createCard, e2eName } from './customer-helpers';
+import { pickDay } from './date-time-fields';
 import { A, api, capture, type Credentials, EMPLOYEE, login, psql, saveSessionForTheSweep, shot, shown, testid } from './helpers';
 import { cleanInventory, createProduct } from './inventory-helpers';
 import { snapshotSeries } from './invoice-helpers';
@@ -155,7 +156,8 @@ test('STAFF-F21 (paso 3: la comisión del día): the owner sees what each profes
     const to = view.locator('[data-testid=staff-commissions-to] input');
     await expect(from).not.toHaveValue('');
     await expect(to).toHaveValue(await from.inputValue());
-    await to.fill('2020-01-01');
+    const aWeekAgo = new Date(Date.now() - 7 * 86_400_000).toISOString().slice(0, 10);
+    await pickDay(page, view.locator('[data-testid=staff-commissions-to]'), aWeekAgo);
     await expect(view.locator('[data-testid=staff-commissions-to]')).toContainText('The end date cannot be before the start date.');
 
     await pickPeriod(page, 'today');

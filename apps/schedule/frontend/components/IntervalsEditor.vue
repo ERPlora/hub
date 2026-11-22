@@ -3,8 +3,9 @@
 // override as in the old screen: one line per interval — «Opens», «Closes» (time fields: they hold
 // `HH:MM`) and «Remove interval» (44 px, never the last line) —, «+ Add interval» and the hint. The
 // server judges overlaps, empty intervals and the 12-line cap: its refusal goes under the lines.
+import { TimeField } from '@erplora/ui/components';
 import { HubIcon } from '@erplora/ui/shell';
-import { IonButton, IonInput } from '@ionic/vue';
+import { IonButton } from '@ionic/vue';
 
 import type { IntervalRow } from '../lib/intervals';
 
@@ -17,10 +18,8 @@ defineProps<{
 
 const rows = defineModel<IntervalRow[]>({ required: true });
 
-const text = (value: unknown): string => (value === null || value === undefined ? '' : String(value));
-
-function set(index: number, field: keyof IntervalRow, value: unknown): void {
-  rows.value = rows.value.map((row, i) => (i === index ? { ...row, [field]: text(value) } : row));
+function set(index: number, field: keyof IntervalRow, value: string): void {
+  rows.value = rows.value.map((row, i) => (i === index ? { ...row, [field]: value } : row));
 }
 
 function add(): void {
@@ -41,25 +40,21 @@ function remove(index: number): void {
       class="schedule-intervals__line"
       :data-testid="`${testid}-interval-${index}`"
     >
-      <ion-input
-        :data-testid="`${testid}-open-${index}`"
-        type="time"
-        :value="row.open_time"
+      <TimeField
+        class="schedule-intervals__time"
+        :testid="`${testid}-open-${index}`"
+        :model-value="row.open_time"
         :label="$t('schedule.intervals.open')"
-        label-placement="stacked"
-        fill="outline"
-        mode="md"
-        @ion-input="set(index, 'open_time', $event.detail.value)"
+        required
+        @update:model-value="set(index, 'open_time', $event)"
       />
-      <ion-input
-        :data-testid="`${testid}-close-${index}`"
-        type="time"
-        :value="row.close_time"
+      <TimeField
+        class="schedule-intervals__time"
+        :testid="`${testid}-close-${index}`"
+        :model-value="row.close_time"
         :label="$t('schedule.intervals.close')"
-        label-placement="stacked"
-        fill="outline"
-        mode="md"
-        @ion-input="set(index, 'close_time', $event.detail.value)"
+        required
+        @update:model-value="set(index, 'close_time', $event)"
       />
       <ion-button
         :data-testid="`${testid}-remove-${index}`"
@@ -112,7 +107,7 @@ function remove(index: number): void {
   gap: 8px;
   align-items: flex-start;
 }
-.schedule-intervals__line ion-input {
+.schedule-intervals__time {
   flex: 1 1 6rem;
   min-width: 6rem;
 }

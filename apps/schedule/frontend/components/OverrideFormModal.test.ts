@@ -2,14 +2,16 @@
 // (closed to begin with) and the interval editor when open — and «Add override»; a row opens «Edit ·
 // {reason}» with «Save». It waits for both dates and a reason. A range over another override (409) is
 // said under From, an end before the start (422) under To.
+import { DateField } from '@erplora/ui/components';
 import { describe, expect, it } from 'vitest';
 
+import { pick, picked } from '../../../../base/frontend/__tests__/date-time-fields';
 import { itTellsTheCorrectedFieldApart } from '../../../../base/frontend/__tests__/same-words-refusal';
 import type { OverrideOut } from '../operations';
 import { click, ionValue, mountSchedule, settle } from '../__tests__/mount-schedule';
 import OverrideFormModal from './OverrideFormModal.vue';
 
-type Control = HTMLElement & { label?: string; value?: unknown; disabled?: boolean; errorText?: string; type?: string };
+type Control = HTMLElement & { label?: string; value?: unknown; disabled?: boolean; errorText?: string; readonly?: boolean };
 
 const SUMMER: OverrideOut = {
   id: 'o1',
@@ -26,8 +28,12 @@ async function setup(override: OverrideOut | null = null, locale: 'en' | 'es' = 
   await settle();
   const field = (name: string) => m.inDoc(`schedule-override-form-${name}`) as Control;
   const submit = () => m.inDoc('schedule-override-form-submit') as Control;
+  /** Picks the dates (`*_date`) in their calendar and types the rest. */
   async function fill(values: Record<string, string>) {
-    for (const [name, value] of Object.entries(values)) await ionValue(field(name), value, 'ionInput');
+    for (const [name, value] of Object.entries(values)) {
+      if (name.endsWith('_date')) await pick(field(name), value);
+      else await ionValue(field(name), value, 'ionInput');
+    }
   }
   return { ...m, field, submit, fill };
 }
@@ -37,7 +43,12 @@ describe('OverrideFormModal (SCHEDULE-F05, F13)', () => {
     const s = await setup();
     expect(s.inDoc('schedule-override-form')?.getAttribute('aria-label')).toBe('New override');
     expect(['start_date', 'end_date', 'reason', 'status'].map((n) => s.field(n).label)).toEqual(['From', 'To', 'Reason', 'Status']);
-    expect([s.field('start_date').type, s.field('end_date').type, s.field('status').value]).toEqual(['date', 'date', 'closed']);
+    expect([s.field('start_date').readonly, s.field('end_date').readonly, s.field('status').value]).toEqual([true, true, 'closed']);
+    // Both dates are the app's own calendar and both are needed: no «Clear».
+    expect(s.wrapper.findAllComponents(DateField).map((date) => [date.props('testid'), date.props('required')])).toEqual([
+      ['schedule-override-form-start_date', true],
+      ['schedule-override-form-end_date', true],
+    ]);
     expect(s.submit().textContent?.trim()).toBe('Add override');
   });
 
@@ -76,12 +87,13 @@ describe('OverrideFormModal (SCHEDULE-F05, F13)', () => {
   it('a row opens «Edit · {reason}» with its hours, and «Save» sends schedule.override.update', async () => {
     const s = await setup(SUMMER);
     expect(s.inDoc('schedule-override-form')?.getAttribute('aria-label')).toBe('Edit · Summer hours');
-    expect([s.field('start_date').value, s.field('end_date').value, s.field('reason').value, s.field('status').value]).toEqual([
+    expect([picked(s.field('start_date')), picked(s.field('end_date')), s.field('reason').value, s.field('status').value]).toEqual([
       '2026-07-01',
       '2026-08-31',
       'Summer hours',
       'open',
     ]);
+    expect([s.field('start_date').value, s.field('end_date').value]).toEqual(['07/01/2026', '08/31/2026']);
     s.answer(200, SUMMER);
     await s.fill({ end_date: '2026-09-15' });
     await click(s.submit());

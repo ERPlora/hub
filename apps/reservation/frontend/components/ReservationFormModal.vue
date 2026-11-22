@@ -8,7 +8,7 @@
 // it, and what was typed stays. «Edit reservation» sends only what changed (`no_table` to leave it without
 // one); once seated, completed, cancelled or not shown, only its notes change, as the server says — and a
 // cancelled one says why on top (F09, F13).
-import { Combo, type ComboOption, ConfirmDialog, FormModal, InlineFeedback } from '@erplora/ui/components';
+import { Combo, type ComboOption, ConfirmDialog, DateField, FormModal, InlineFeedback, TimeField } from '@erplora/ui/components';
 import { type ApiError, useCommand, useLiveClient } from '@erplora/ui/sdk';
 import { IonInput, IonLabel, IonSegment, IonSegmentButton, IonTextarea } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
@@ -279,33 +279,23 @@ const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'i
           @ion-input="email = text($event.detail.value)"
         />
         <div class="reservation-form__when">
-          <ion-input
-            data-testid="reservation-form-date"
+          <DateField
+            v-model="date"
+            testid="reservation-form-date"
             name="date"
-            type="date"
-            :value="date"
             :label="$t('reservation.form.date')"
-            label-placement="floating"
-            fill="outline"
-            mode="md"
+            required
             :disabled="notesOnly"
             :error-text="fieldErrors.date"
-            :class="invalid(fieldErrors.date)"
-            @ion-input="date = text($event.detail.value)"
           />
-          <ion-input
-            data-testid="reservation-form-time"
+          <TimeField
+            v-model="time"
+            testid="reservation-form-time"
             name="time"
-            type="time"
-            :value="time"
             :label="$t('reservation.form.time')"
-            label-placement="floating"
-            fill="outline"
-            mode="md"
+            required
             :disabled="notesOnly"
             :error-text="fieldErrors.time"
-            :class="invalid(fieldErrors.time)"
-            @ion-input="time = text($event.detail.value)"
           />
           <PartyField
             v-model="party"

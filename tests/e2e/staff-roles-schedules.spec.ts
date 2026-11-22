@@ -10,6 +10,7 @@
 // Everything this spec creates is named «E2E …» and removed after it.
 import { type Browser, expect, type Page, test } from '@playwright/test';
 
+import { pickTime } from './date-time-fields';
 import { A, api, capture, psql, shot, shown } from './helpers';
 import { signedIn } from './flow-helpers';
 import { shoot } from './inventory-helpers';
@@ -160,11 +161,11 @@ test('Schedules: the default week, a day refused under its row and corrected on 
 
     // «+»: Monday to Friday 09:00–18:00 with a break 13:00–14:00 (the working day of Settings as proposed);
     // a Monday and a Tuesday ending before they start are refused, each under its own day. Correcting one takes
-    // its reason away before saving again, typing an hour or unticking it, and leaves the other's (hub#1460).
+    // its reason away before saving again, picking an hour or unticking it, and leaves the other's (hub#1460).
     await view.locator('[data-testid=staff-schedules-add]').click();
     await expect(page.locator('[data-testid=staff-schedule-form-day-5-off]')).toHaveText('Off');
-    await page.locator('[data-testid=staff-schedule-form-day-0-end] input').fill('08:00');
-    await page.locator('[data-testid=staff-schedule-form-day-1-end] input').fill('08:00');
+    await pickTime(page, page.locator('[data-testid=staff-schedule-form-day-0-end]'), '08:00');
+    await pickTime(page, page.locator('[data-testid=staff-schedule-form-day-1-end]'), '08:00');
     await page.locator('[data-testid=staff-schedule-form-submit]').click();
     const order = 'The start time must be before the end time.';
     const monday = page.locator('[data-testid=staff-schedule-form-day-0-error]');
@@ -172,7 +173,7 @@ test('Schedules: the default week, a day refused under its row and corrected on 
     await expect(monday).toContainText(order);
     await expect(tuesday).toContainText(order);
     await page.screenshot({ path: shot('staff-schedules-422') });
-    await page.locator('[data-testid=staff-schedule-form-day-0-end] input').fill('18:00');
+    await pickTime(page, page.locator('[data-testid=staff-schedule-form-day-0-end]'), '18:00');
     await expect(monday).toBeHidden();
     await expect(tuesday).toContainText(order);
     await shoot(page, 'APP-STAFF-STAFF-F13-day-corrected', { width: 1280, height: 860 });
@@ -180,7 +181,7 @@ test('Schedules: the default week, a day refused under its row and corrected on 
     await tuesdayWorks.click();
     await expect(tuesday).toBeHidden();
     await tuesdayWorks.click();
-    await page.locator('[data-testid=staff-schedule-form-day-1-end] input').fill('18:00');
+    await pickTime(page, page.locator('[data-testid=staff-schedule-form-day-1-end]'), '18:00');
     await page.locator('[data-testid=staff-schedule-form-submit]').click();
     const row = view.locator('[data-testid=staff-schedules-row]').first();
     await expect(row).toContainText('Yes');
