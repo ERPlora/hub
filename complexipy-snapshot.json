@@ -828,16 +828,6 @@
     ]
   },
   {
-    "path": "base/services/assistant.py",
-    "file_name": "assistant.py",
-    "functions": [
-      {
-        "name": "_assistant_answer",
-        "complexity": 19
-      }
-    ]
-  },
-  {
     "path": "apps/verifactu/services/authorisation.py",
     "file_name": "authorisation.py",
     "functions": [

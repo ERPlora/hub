@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:2f0d3f81fab33e5504b94cecb3bc0e9a47a514add07ca66e5d04a3df8fc91007 -->
+<!-- generated from WORKBOOK.md sha256:785b04c18d9fdd7931be89b7b0fd6fee7949dc73a9fd6b151f707b6df60673e1 -->
 
 ## What it is for and who it is for
 
@@ -2463,6 +2463,10 @@ Steps:
      changes something with the confirmation of BASE-F97. If the one it needs is not among those it has at hand for
      that message, it searches all of that person's for it and uses it in the next step; only when there is none does
      it say on which screen it is done.
+  10. The assistant knows from the start where the business is and what time it is there: its country, its time zone
+     with the date and time at that moment, its sector, the apps it has on and, to whoever runs it, its plan; it does
+     not have to look them up for each question. Every date and time it says is in the business's time, the one the
+     screens show, never in UTC: in a bar in Madrid, what happened at 16:18 it tells at 16:18, not at 15:18.
 In: what the person writes; the whole conversation travels with each question (BASE-F102).
 Out: the question to erplora.com, which answers it and counts it in the month's messages (BASE-F104).
 If it fails: without a connection, with the service down, without a plan or without messages: BASE-F106 and BASE-F104.
