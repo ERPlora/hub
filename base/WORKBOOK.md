@@ -230,8 +230,9 @@ foto), «Preferencias» (idioma y apariencia: paleta, tema y tamaño de interfaz
 «PIN».
 
 ### Ajustes · General
-Lo que se abre con «Ajustes» en el menú lateral: la primera pestaña de abajo, «General», con «Este dispositivo»,
-«Pinpad», para quien administra «Dispositivos» y, al final, «Documentación de la API».
+Lo que se abre con «Ajustes» en el menú lateral: la primera pestaña de abajo, «General», con «Este dispositivo»
+(en la app de ERPlora de un ordenador, también «Arrancar al iniciar sesión»), «Pinpad», para quien administra
+«Dispositivos» y, al final, «Documentación de la API».
 
 ### Estamos preparando tu negocio
 La página que sale en la dirección de un negocio que erplora.com aún está preparando; se actualiza sola.
@@ -301,8 +302,8 @@ una acción peligrosa, cada dato en su línea y un cuadro para escribir lo que p
 |---|---|
 | Cargando | La fila de cómo está funcionando el negocio en gris, baldosas grises en «Mis apps» («Cargando tus apps…» para el lector de pantalla), la lista en gris, «Cargando widgets…» en el tablero, la cifra de cada panel en gris y «Cargando…» en «Actividad»; «Cargando…» en el pinpad, «Cargando tu perfil…» y «Cargando los dispositivos…». |
 | Vacío | «Aquí aparecerán tus apps. Añade las que necesite tu negocio.»; sin pasos, la lista no sale; «Panel vacío. Pulsa ⋮ para añadir widgets.»; un panel sin datos, «Sin datos»; el panel de la campana, «Todo al día» y «No queda nada que requiera acción.»; «Todavía no ha entrado nadie desde ningún dispositivo.»; en «Cambiar de usuario», «Aquí nadie tiene PIN todavía: se pone en Mi perfil o en Empleados.». |
-| Error | Cada zona falla por su cuenta: «No hemos podido comprobar cómo está funcionando tu negocio.» con «Reintentar», «No se han podido cargar tus apps. Recarga la página; si sigue fallando, vuelve a iniciar sesión.», «No se ha podido cargar lo que te falta por configurar» con «Reintentar», «No se han podido cargar los paneles» con «Reintentar», un panel con «No disponible» (nunca la cifra de antes), «No se han podido cargar las últimas ventas» con «Reintentar» y, en el panel de la campana, «No se pudieron cargar los avisos» con «Reintentar» o, si ya tenía avisos, «No se pudieron actualizar los avisos. Lo que ves puede no estar al día.» con los de antes. En el acceso: «No se pudo cargar el pinpad. Puedes entrar con tu cuenta.», «No se pudo cargar el perfil» con «Reintentar», «No se pudo cargar este dispositivo. Comprueba la conexión e inténtalo de nuevo.», «No se pudo cargar cómo pide el PIN el negocio. Comprueba la conexión e inténtalo de nuevo.» y «No se pudieron cargar los dispositivos. Comprueba la conexión e inténtalo de nuevo.». |
-| Sin permiso | Un paso que la persona no puede hacer: sin botón y «Esto lo tiene que configurar un administrador.». Un panel o un contador que no puede ver, no sale. En Ajustes, quien no administra ve «Este dispositivo» y «Pinpad» con los controles apagados («Solo un administrador puede cambiar cómo entra la gente en este dispositivo.», «Solo un administrador puede cambiar si se pregunta.») y, en lugar de la lista, «Solo un administrador puede ver y quitar los dispositivos.». Una pantalla que su rol no abre, de una app o de la plataforma (como «Sistema»), abierta por su dirección: «Sin acceso» (BASE-F118). |
+| Error | Cada zona falla por su cuenta: «No hemos podido comprobar cómo está funcionando tu negocio.» con «Reintentar», «No se han podido cargar tus apps. Recarga la página; si sigue fallando, vuelve a iniciar sesión.», «No se ha podido cargar lo que te falta por configurar» con «Reintentar», «No se han podido cargar los paneles» con «Reintentar», un panel con «No disponible» (nunca la cifra de antes), «No se han podido cargar las últimas ventas» con «Reintentar» y, en el panel de la campana, «No se pudieron cargar los avisos» con «Reintentar» o, si ya tenía avisos, «No se pudieron actualizar los avisos. Lo que ves puede no estar al día.» con los de antes. En el acceso: «No se pudo cargar el pinpad. Puedes entrar con tu cuenta.», «No se pudo cargar el perfil» con «Reintentar», «No se pudo cargar este dispositivo. Comprueba la conexión e inténtalo de nuevo.», «No se pudo cargar cómo pide el PIN el negocio. Comprueba la conexión e inténtalo de nuevo.» y «No se pudieron cargar los dispositivos. Comprueba la conexión e inténtalo de nuevo.». En la app de un ordenador, «No se pudo cambiar el ajuste de arranque al iniciar sesión.» (BASE-F120). |
+| Sin permiso | Un paso que la persona no puede hacer: sin botón y «Esto lo tiene que configurar un administrador.». Un panel o un contador que no puede ver, no sale. En Ajustes, quien no administra ve «Este dispositivo» y «Pinpad» con los controles apagados («Solo un administrador puede cambiar cómo entra la gente en este dispositivo.», «Solo un administrador puede cambiar si se pregunta.»), salvo «Arrancar al iniciar sesión», que es del ordenador y no del negocio, y, en lugar de la lista, «Solo un administrador puede ver y quitar los dispositivos.». Una pantalla que su rol no abre, de una app o de la plataforma (como «Sistema»), abierta por su dirección: «Sin acceso» (BASE-F118). |
 
 En la pantalla Ajustes · Negocio:
 
@@ -462,6 +463,7 @@ En la pantalla Archivos:
 | BASE-F117 | Ver en la campana que el plan tiene una factura sin pagar | hecho |
 | BASE-F118 | Abrir una pantalla sin permiso: «Sin acceso» y a quién pedirlo | hecho |
 | BASE-F119 | Lo que se ve según los permisos de dato | hecho |
+| BASE-F120 | Arrancar ERPlora al iniciar sesión en el ordenador | hecho |
 
 ### BASE-F01 Ver lo que le falta por configurar al negocio
 Estado: hecho
@@ -3467,6 +3469,23 @@ Si falla: una petición por la API o al asistente que filtra u ordena por un dat
 con el mismo error que una operación sin su permiso (403 `permission_denied`), sin hacer nada.
 Implicados: BASE-F06, BASE-F07, BASE-F81, BASE-F82, BASE-F86, SALE-F28, CUSTOMER-F31
 
+### BASE-F120 Arrancar ERPlora al iniciar sesión en el ordenador
+Estado: hecho
+Actor: propietario, administrador, responsable, empleado
+Pantalla: Ajustes · General
+Pasos:
+  1. En la app de ERPlora de un ordenador, **Ajustes › General** lleva en «Este dispositivo» el interruptor
+     «Arrancar al iniciar sesión» («Abre ERPlora al iniciar sesión en este ordenador, para que los tiques siempre
+     tengan dónde imprimirse.»), apagado de fábrica. En un navegador y en la app de Android no sale.
+  2. Al moverlo, el Hub se lo pide a la app, que lo apunta en el sistema y vuelve a leer qué dice (HUB_APP-F27);
+     mientras tanto, el interruptor espera.
+  3. El interruptor queda donde dice el sistema, no donde se movió.
+Entra: el interruptor, en el propio ordenador.
+Sale: el arranque del sistema de este ordenador, no del negocio. En el Hub no se guarda nada.
+Si falla: debajo, «No se pudo cambiar el ajuste de arranque al iniciar sesión.», y el interruptor vuelve a lo que
+dice el sistema. Una app anterior a esta orden no lo enseña.
+Implicados: HUB_APP-F27 (ERPlora/app), BASE-F62
+
 ## Para quien lo mantiene
 
 - **Permisos de dato** (BASE-F119; `base/sensitive.py`, `base/visibility.py`, `live.sensitive`): un campo de un
@@ -3649,7 +3668,7 @@ Implicados: BASE-F06, BASE-F07, BASE-F81, BASE-F82, BASE-F86, SALE-F28, CUSTOMER
   ya escribió filas (los hubs locales `a` y `b`, todo encendido) o la preparación se repite, no toca nada. Una demo
   nace igual (sin país: España). Los hubs que ya existían no cambian. «Tus apps» (`queries.home._platform_steps`) no cuenta
   las de `born_apps`: con ellas solas el TPV no vende nada. Tests: `test_activation.py`, `test_queries_home.py` (con
-  apps de paja), `base/tenancy/tests/test_provision.py` (dos BD reales: España, Portugal, sin país, una demo, dos
+  apps de paja), `base/tenancy/tests/test_provision_apps.py` (dos BD reales: España, Portugal, sin país, una demo, dos
   negocios a la vez y una app de paja obligatoria solo en Portugal), `apps/tax/tests/test_apps.py` y la e2e
   `tests/e2e/base-sign-up-taxes-on.spec.ts`.
 - Un panel `chart` cuyas etiquetas son días (`YYYY-MM-DD`: día civil de negocio, sin zona) los nombra con
@@ -4129,7 +4148,8 @@ Implicados: BASE-F06, BASE-F07, BASE-F81, BASE-F82, BASE-F86, SALE-F28, CUSTOMER
   las claves que `DeleteObjects` rechaza dentro de un 200: el hub sigue `dropping` con el error en `last_error`
   (`drop_failed: HubFilesNotDeleted: …`, `files_purge_failed: …`) y se reintenta; nunca queda `purged` con ficheros. El
   bucket tiene versionado: la clave deja su marcador de borrado y la versión antigua se va a los 90 días por la regla
-  `noncurrent` de aws (`s3.tf`). Tests: `base/tests/test_files_delete_hub.py`, `test_offboarding.py`, `test_provision.py`.
+  `noncurrent` de aws (`s3.tf`). Tests: `base/tests/test_files_delete_hub.py`, `test_offboarding.py`,
+  `test_provision_demos.py`.
 - Lo que dejaron las purgas de antes de hub#781 (una fila `purged` no vuelve a pasar por la purga) se borra una vez con
   `manage.py delete_leftover_hub_files` (hub#785): busca en el almacén las carpetas de arriba con forma de prefijo de hub
   (`base.files.hubs_in_store`, `hub-<hex>`) y, después de listarlas, lee el registro (`base.services.demos.gone_hubs`): solo
@@ -4568,8 +4588,9 @@ Implicados: BASE-F06, BASE-F07, BASE-F81, BASE-F82, BASE-F86, SALE-F28, CUSTOMER
   cerrado o lleno, base que no está en su servidor, en restauración…), la quita y lo dice en `Hub.last_error`
   (`move_not_started: <código>: …`); si no, pone `moving_to` y el mismo pase la mueve. Cuenta para el hueco del
   clúster destino y lo protege de borrarse. «Cancelar el traslado» la quita mientras no ha empezado
-  (`control.hub.scheduled_move_cancelled`), sin cerrar nada. Tests: `control/tests/test_services.py::TestTheNight` y
-  `::TestMoveAtNight`, `base/tenancy/tests/test_move.py::TestAMoveAskedForTheNight` (dos BD reales y el arriendo) y
+  (`control.hub.scheduled_move_cancelled`), sin cerrar nada. Tests:
+  `control/tests/test_services_move_at_night.py::TestTheNight` y `::TestMoveAtNight`,
+  `base/tenancy/tests/test_move.py::TestAMoveAskedForTheNight` (dos BD reales y el arriendo) y
   `control/tests/test_admin_move.py::TestMoveToCluster` y `::TestCancelTheMove`. El aviso al negocio de que esa noche se
   le traslada no existe todavía (hub#1510).
 - **Un negocio de cualquier tamaño se traslada** (hub#1509): la copia pasa por el bucket de volcados
@@ -4587,7 +4608,7 @@ Implicados: BASE-F06, BASE-F07, BASE-F81, BASE-F82, BASE-F86, SALE-F28, CUSTOMER
   restauración a un momento y la copia aparte (BASE-F114) copian con las mismas piezas (hub#1524, nota siguiente).
   Tests: `base/tenancy/tests/test_dumps.py` (los `stream`),
   `base/tenancy/tests/test_move_bucket.py::TestTheCopyGoesThroughTheBucket` y `::TestFeedingAProgram` (dos BD reales y el S3
-  de moto), `control/tests/test_services.py::TestMove` y
+  de moto), `control/tests/test_services_move.py::TestMove` y
   `control/tests/test_admin_move.py::test_its_confirmation_page_promises_no_refusal_by_size`.
 - **«Restaurar desde una copia…»** (BASE-F114, hub#1198) es `control.admin.HubAdmin.restore_from_a_copy`: su página de
   confirmación (`RestoreFromACopyForm`, la plantilla `action_confirmation.html` que comparte con «Mover a otro
@@ -4617,7 +4638,8 @@ Implicados: BASE-F06, BASE-F07, BASE-F81, BASE-F82, BASE-F86, SALE-F28, CUSTOMER
   segunda. Una subida que falla o se para se aborta y no deja nada; la copia queda los 90 días del bucket, sin fila
   `HubDump`. Tests: `base/tenancy/tests/test_restore.py::TestTheCopyGoesThroughTheBucket`,
   `base/tenancy/tests/test_restore_aside.py::TestTheCopyGoesThroughTheBucket` (dos BD reales y el S3 de moto) y
-  `control/tests/test_services.py::TestRestore` y `::TestRestoreAside` (`test_a_copy_of_any_size_is_asked`).
+  `control/tests/test_services_restore.py::TestRestore` y `::TestRestoreAside`, con
+  `control/tests/test_services_restore_any_size.py::test_a_copy_of_any_size_is_asked`.
 - **«Restaurar en una copia aparte…»** (BASE-F114, hub#1213, capa 1) es `control.admin.HubAdmin.restore_aside`: el mismo
   formulario y la misma página (`HubAdmin.from_a_copy`), con `control.hub.restore_aside`, que comprueba lo mismo que
   `control.hub.restore` (`control.services._restorable`) y escribe una fila `control.RestoredCopy` con su nombre
@@ -4629,8 +4651,9 @@ Implicados: BASE-F06, BASE-F07, BASE-F81, BASE-F82, BASE-F86, SALE-F28, CUSTOMER
   (`names.is_left_behind`), así que `connections.register_hub_alias` se niega a darle alias. Se borra con su fila a los
   `move.MOVED_COPY_DAYS` (`restore.drop_old_aside_copies`); mientras se hace cuenta en `control.freeze.get`. Su esquema
   es el del momento. Tests: `base/tenancy/tests/test_restore_aside.py` (dos BD reales, la guarda de red y
-  `TestSendingToTheTaxAuthorityIsOffInTheCopy`, que nunca puede caer), `control/tests/test_services.py::TestRestoreAside`
-  y `control/tests/test_admin_restore.py::TestRestoreToASeparateCopy`.
+  `TestSendingToTheTaxAuthorityIsOffInTheCopy`, que nunca puede caer),
+  `control/tests/test_services_restore.py::TestRestoreAside` y
+  `control/tests/test_admin_restore.py::TestRestoreToASeparateCopy`.
 - **«Recuperar en el negocio…»** (BASE-F114, hub#1257, capa 2a) es `control.admin.RestoredCopyAdmin.recover_into_the_business`:
   su página (`RecoverForm`, la misma `action_confirmation.html` de las acciones de Hubs, con `AsksFirst`) y, por cada
   copia, `control.copy.recover`, que escribe una fila `control.CopyRecovery` con las apps pedidas y el idioma del personal.
@@ -4657,8 +4680,9 @@ Implicados: BASE-F06, BASE-F07, BASE-F81, BASE-F82, BASE-F86, SALE-F28, CUSTOMER
   (hub#1356), y `cards_not_in_business` (con `has_live_twin`, la regla de la importación) con
   `customer.customer.recover`, que rehace la ficha con sus grupos, etiquetas y campos (hub#1285). Ninguna app cuyos
   registros llegan a Hacienda responde (contrato en `test_recovery.py`). Tests: `base/tenancy/tests/test_recovery.py`
-  (dos BD reales: la copia y el negocio), `apps/customer/tests/test_recovery.py`, `control/tests/test_services.py::TestRecover`,
-  `control/tests/test_admin_restore.py::TestRecoverIntoTheBusiness` y `tests/e2e/base-recover-from-copy.spec.ts`.
+  (dos BD reales: la copia y el negocio), `apps/customer/tests/test_recovery.py`,
+  `control/tests/test_services_recover.py::TestRecover`, `control/tests/test_admin_restore.py::TestRecoverIntoTheBusiness`
+  y `tests/e2e/base-recover-from-copy.spec.ts`.
 
 ### Operaciones y sus flujos
 

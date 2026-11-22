@@ -7,11 +7,15 @@ card of Customers (``requires``); the guest's name, phone and email are copies, 
 customer's data is erased. Slots, blocked dates, reservations and waitlist entries are deleted softly.
 """
 
+from babel.dates import get_day_names
 from django.db import models
 from django.db.models import F, Q
+from django.utils.text import capfirst
+from django.utils.translation import get_language, pgettext_lazy
 from django.utils.translation import gettext_lazy as _
-from django.utils.translation import pgettext_lazy
 from live.models import UUIDModel
+
+from base.business import babel_locale
 
 #: Who saved a row, as a person reads it (a user's name, the system's label).
 ACTOR_MAX_LENGTH = 150
@@ -91,10 +95,22 @@ class Settings(UUIDModel):
         return str(_("Reservation settings"))
 
 
+def weekday_name(day: int, language: str | None = None) -> str:
+    """A day of the week (Monday = 0) as the slots' list says it, in ``language`` or the active one: CLDR's word with
+    a capital («Jueves»)."""
+    return capfirst(get_day_names("wide", locale=babel_locale(language or get_language()))[day])
+
+
+def weekdays() -> list[tuple[int, str]]:
+    """The days of the week as ``choices``, by which the assistant's card names a slot's day: a callable, so they are
+    said in the language active when read."""
+    return [(day, weekday_name(day)) for day in range(7)]
+
+
 class TimeSlot(Audited):
     """A window of a weekday the book takes reservations in, with how many fit (reservations, covers)."""
 
-    day_of_week = models.PositiveSmallIntegerField(_("day of the week"))
+    day_of_week = models.PositiveSmallIntegerField(_("day of the week"), choices=weekdays)
     start_time = models.TimeField(_("from"))
     end_time = models.TimeField(_("to"))
     max_reservations = models.PositiveSmallIntegerField(

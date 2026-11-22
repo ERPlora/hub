@@ -801,7 +801,10 @@
       "adminOnly": "Solo un administrador puede cambiar cómo entra la gente en este dispositivo.",
       "unknown": "Este navegador todavía no es un dispositivo del negocio: entra una vez aquí con tu cuenta y podrás elegir.",
       "failed": "No se pudo cambiar este dispositivo. Comprueba la conexión e inténtalo de nuevo.",
-      "loadError": "No se pudo cargar este dispositivo. Comprueba la conexión e inténtalo de nuevo."
+      "loadError": "No se pudo cargar este dispositivo. Comprueba la conexión e inténtalo de nuevo.",
+      "autostart": "Arrancar al iniciar sesión",
+      "autostartHelp": "Abre ERPlora al iniciar sesión en este ordenador, para que los tiques siempre tengan dónde imprimirse.",
+      "autostartFailed": "No se pudo cambiar el ajuste de arranque al iniciar sesión."
     },
     "pinPolicy": {
       "title": "Pinpad",

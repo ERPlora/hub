@@ -2,8 +2,8 @@
 // APPOINTMENT-F01, F04, F14, F22: the booking panel, the old agenda's side panel as a dialog.
 // «New appointment»: the Customer (Customers' own search, which also creates a card with name and phone),
 // the Services in order (only bookable ones), the Professional (only who does them all: the server's rule
-// read through Services and Staff), the Day and the Time (with the «Free times»), the Min. (the services'
-// sum unless typed) and the notes. The Min. and the Total are the professional's own for each service
+// read through Services and Staff), the Day and the Time (with the «Free times»), «Duration (min)» (the
+// services' sum unless typed) and the notes. «Duration (min)» and the Total are the professional's own for each service
 // (Services · «Who does it»), the catalog's where she has none — what the server books; the Total is in the
 // business's money (BASE-F50: «65,00 zł» in Poland, a dash until it answers). «Add appointment» books it. «Edit appointment» comes filled in, sends
 // only what changed (`appointment.appointment.update`) and shows the history below; a series occurrence
@@ -538,7 +538,7 @@ const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'i
 }
 .appointment-form__when {
   display: grid;
-  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 0.7fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
 }
 .appointment-form__label {
@@ -566,10 +566,5 @@ const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'i
 .appointment-form__history h3 {
   font-size: 0.95rem;
   margin: 8px 0;
-}
-@media (max-width: 520px) {
-  .appointment-form__when {
-    grid-template-columns: 1fr 1fr;
-  }
 }
 </style>
