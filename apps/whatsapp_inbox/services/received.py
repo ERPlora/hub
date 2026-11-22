@@ -11,7 +11,7 @@ from apps.customer.phones import InvalidPhone
 from apps.whatsapp_inbox import clock, events
 from apps.whatsapp_inbox.models import Conversation, Message
 from apps.whatsapp_inbox.queries.reads import e164, preview
-from apps.whatsapp_inbox.schemas import ReceiveIn, ReceiveOut, StatusIn, StatusOut
+from apps.whatsapp_inbox.schemas.received import ReceiveIn, ReceiveOut, StatusIn, StatusOut
 
 from .writes import NOT_A_NUMBER, RECEIVE, _conversation_for, _link_by_phone, _locked_cards_of
 

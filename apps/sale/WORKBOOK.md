@@ -1047,8 +1047,10 @@ Pasos:
    territorio de **Impuestos → Ajustes**, y cambia al momento si se cambia el territorio. Con «7 días»,
    debajo de las cifras, lo vendido cada uno de esos días, de más antiguo a hoy («mié 14 · 120,50 €»).
 3. La tabla: Fecha, Número, Cliente, Pago, Estado (Completada, Anulada, Devuelta; con «Por devolver
-   5,00 €» si se devolvió una parte) y Total. Busca con «Buscar número o cliente…», filtra por
-   estado, pago, fecha o total, u ordena.
+   5,00 €» si se devolvió una parte) y Total. Una venta cobrada con varios medios dice en «Pago»
+   todos, una vez cada uno y en el orden en que se cobraron: «Efectivo + Tarjeta». Busca con
+   «Buscar número o cliente…», filtra por estado, pago, fecha o total, u ordena; el filtro de pago
+   encuentra una venta por cualquiera de sus medios.
 4. Toca una fila para ver su documento. La tabla se recarga sola cuando se cobra, anula o
    devuelve una venta.
 5. Las cifras de hoy también están en el **Inicio**, en el tablero: «Ventas
@@ -1102,8 +1104,9 @@ Pasos:
    resto el domicilio. En una factura, bajo «Cliente», su NIF y su domicilio. Luego, el número que le
    dio Facturación en el cobro («Factura FACT-2026-000012», «Tique TICKET-2026-000031»; sin
    Facturación, o mientras su documento está pendiente, el número de la venta), fecha, líneas, una fila
-   de IVA por clave fiscal (un exento dice su causa: «Exento (E1)»), total, forma de pago, entregado y
-   cambio, y el pie. Con **VeriFactu**, antes del pie va el QR fiscal: «QR tributario:» encima,
+   de IVA por clave fiscal (un exento dice su causa: «Exento (E1)»), total, forma de pago (cobrada con
+   varios medios, todos: «Efectivo + Tarjeta»), entregado y cambio, y el pie. Con **VeriFactu**, antes
+   del pie va el QR fiscal: «QR tributario:» encima,
    «VERI*FACTU» debajo y «Escanéalo para cotejar este tique en la AEAT» («…esta factura…» si es una
    factura); cuando la AEAT ya respondió, su código («CSV: …») en lugar de esa frase. Mientras VeriFactu
    no tiene registro de ese documento, el papel sale sin QR. Un tique con su documento fiscal (emitido o

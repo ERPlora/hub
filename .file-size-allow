@@ -36,7 +36,6 @@
 2670 apps/customer/tests/test_services.py ERPlora/erplora-next#74
 506 apps/demo/frontend/pages/ItemListPage.test.ts ERPlora/erplora-next#74
 579 apps/flow/frontend/operations.d.ts ERPlora/erplora-next#74
-713 apps/inventory/frontend/components/ProductFormModal.test.ts ERPlora/erplora-next#74
 474 apps/inventory/frontend/operations.d.ts ERPlora/erplora-next#74
 555 apps/inventory/frontend/pages/ProductsPage.test.ts ERPlora/erplora-next#74
 1064 apps/inventory/tests/test_queries.py ERPlora/erplora-next#74
@@ -116,7 +115,6 @@
 558 apps/whatsapp_inbox/frontend/components/TemplateFormModal.test.ts ERPlora/erplora-next#74
 430 apps/whatsapp_inbox/frontend/operations.d.ts ERPlora/erplora-next#74
 536 apps/whatsapp_inbox/models.py ERPlora/erplora-next#74
-1211 apps/whatsapp_inbox/schemas.py ERPlora/erplora-next#74
 1367 apps/whatsapp_inbox/tests/test_services.py ERPlora/erplora-next#74
 1403 base/blueprint.py ERPlora/erplora-next#74
 960 base/catalog.py ERPlora/erplora-next#74

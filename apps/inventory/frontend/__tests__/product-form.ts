@@ -26,6 +26,8 @@ export type Control = HTMLElement & {
 
 export const CATEGORIES = page([category(), category({ id: 'c2', name: 'Food', slug: 'food' })], 2, 100);
 
+export const JAPANESE: Partial<Business> = { country: 'JP', country_name: 'Japan', currency: 'JPY', currency_label: 'JPY · Japanese Yen', currency_decimals: 0 };
+
 export const searches = (categories: unknown) => (call: ApiCall) =>
   ok(call.url.startsWith('/api/tax/categories') ? TAX_CATEGORIES : categories);
 

@@ -11,7 +11,7 @@ from apps.customer.services import lock_customers
 from apps.whatsapp_inbox import events
 from apps.whatsapp_inbox.models import Conversation
 from apps.whatsapp_inbox.queries.reads import live_conversations
-from apps.whatsapp_inbox.schemas import CustomerEventIn, MergedEventIn, ReactionOut
+from apps.whatsapp_inbox.schemas.customer_reactions import CustomerEventIn, MergedEventIn, ReactionOut
 
 from .erasing import _erase
 from .writes import RECEIVE, _link_by_phone, _locked_cards_of, _only_card_of, _save
