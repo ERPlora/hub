@@ -16,8 +16,10 @@ from types import SimpleNamespace
 import pytest
 from django.contrib.auth import get_user_model
 from django.test import Client
+from django.utils import timezone
 from live.models import OutboxEvent
 
+from apps.customer.models import Consent, Customer
 from apps.tax.models import TaxCategory
 from base import api_keys
 from base.models import ApiKey, Membership
@@ -211,6 +213,17 @@ class TestUse:
         assert made.status_code == 201, made.content
         rows = get(client, host(hub_a), "/inventory/products", **bearer(token)).json()["rows"]
         assert [(row["sku"], row["cost"]) for row in rows] == [("TEA", 90)]
+
+    def test_a_key_reads_the_address_a_customer_s_consent_was_given_for_as_whoever_makes_it(self, admin_on_a, client, hub_a):
+        """An integration that writes to the customers reads where each one agreed to be written to."""
+        token = create(admin_on_a, hub_a)["token"]
+        client.logout()
+        with use_hub(hub_a):
+            marta = Customer.objects.create(name="Marta Ruiz", email="marta@example.com")
+            Consent.objects.create(customer=marta, channel="email", state="granted", contact_point="marta@example.com",
+                                   source="counter", occurred_at=timezone.now(), created_at=timezone.now())
+        state = get(client, host(hub_a), f"/customer/consents/state?customer_id={marta.id}", **bearer(token))
+        assert [row["contact_point"] for row in state.json()["rows"]] == ["marta@example.com"]
 
     def test_its_last_use_is_kept(self, admin_on_a, client, hub_a):
         token = create(admin_on_a, hub_a)["token"]

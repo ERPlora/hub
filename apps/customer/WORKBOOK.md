@@ -245,7 +245,7 @@ Pasos:
    mayúsculas ni acentos («garcia» encuentra «García»). Un término hecho solo de cifras y signos de
    teléfono (con espacios, guiones o paréntesis, con el + o el 00 delante) se busca por sus cifras, sin
    el 00 ni el cero nacional, así que la ficha se encuentra se escriba como se escriba. Quien no ve el contacto de
-   los clientes (BASE-F119) busca solo en nombre, NIF y empresa: un teléfono o un email no le encuentran a nadie.
+   los clientes busca solo en nombre, NIF y empresa: un teléfono o un email no le encuentran a nadie.
 2. Con los filtros: etapa, origen, activo y gastado por rango («Desde / Hasta», en la moneda del negocio,
    la de su país en Ajustes → Negocio, con sus decimales: el yen no tiene; con o sin su símbolo, «12,50 zł»).
    El importe se escribe como en cualquier campo de importe del Hub y como en las demás listas: con
@@ -261,7 +261,7 @@ Si falla: la tabla enseña el error con «Reintentar». Sin resultados: «Sin cl
 puede leer no filtra y lo dice bajo su caja, con las palabras del campo de importe: «Esto no es un importe.
 Escribe una cifra, por ejemplo 12,50.», «Este importe no puede ser negativo.» o, con «1.000», «Este importe
 se puede leer de dos maneras…». Por la API o el asistente, filtrar por email o por teléfono sin ver el contacto de los
-clientes se rechaza sin buscar nada (403 `permission_denied`), y ordenar por ellos no existe (422).
+clientes se rechaza sin buscar nada, como una acción sin permiso, y ordenar por ellos no existe.
 Implicados: BASE-F119
 
 ### CUSTOMER-F03 Abrir la ficha de un cliente
@@ -276,7 +276,7 @@ Pasos:
    cuándo y quién: la persona o la API key por su nombre, o «Lo hizo la plataforma» cuando no la hizo
    nadie en persona, como la compra que apunta una venta cobrada, una automatización o una recuperación
    desde una copia aparte), sus compras y los bloques de otras apps. El email, el teléfono y la dirección para la
-   que se dio cada consentimiento, solo a quien ve el contacto de los clientes (BASE-F119).
+   que se dio cada consentimiento, solo a quien ve el contacto de los clientes.
 3. **← Volver** regresa a la lista.
 Entra: la ficha y, aparte, su actividad, sus compras y su historial de consentimientos.
 Sale: nada; solo lectura. Si otra persona la cambia mientras está abierta, se ve el cambio sin
@@ -441,8 +441,7 @@ pregunta.
 Si falla: un número vacío, con letras o que no es posible en su país no casa con nadie (nunca
 devuelve la lista entera). Las fichas eliminadas, unidas o con los datos borrados no salen. Preguntar de quién es
 un número es leer el contacto: quien no ve el contacto de los clientes (BASE-F119) recibe 403
-`permission_denied`. Una automatización y una llave de API sí preguntan: las guardan o las crean el propietario y el
-administrador, que lo ven.
+`permission_denied`. Una automatización sí pregunta: la guardan el propietario o el administrador, que lo ven.
 Implicados: RESERVATION-F06, WHATSAPP_INBOX-F04
 
 ### CUSTOMER-F11 Guardar el teléfono en formato internacional (E.164)
@@ -489,7 +488,7 @@ Actor: propietario, administrador, responsable; el empleado, con el PIN de un re
 Pantalla: Ficha de cliente
 Pasos:
 1. Abre la ficha que se va a QUEDAR y pulsa **Fusionar con…**.
-2. Busca la duplicada como en la lista (CUSTOMER-F02) y tócala.
+2. Busca la duplicada como en la lista de **Clientes** y tócala.
 3. Lee el aviso, que nombra las dos fichas: «Ana G. se fusionará en Ana García: sus citas, ventas, reservas,
    conversaciones, bonos, notas y consentimientos pasan a Ana García, los datos que falten se
    completan con los suyos y Ana G. desaparece de la lista. No se puede deshacer.».
@@ -850,7 +849,7 @@ Pasos:
    postal, país, notas, cumpleaños, aniversario, canal preferido, etapa, origen, si está activa, los
    acumulados de compra, sus grupos, sus etiquetas, sus campos personalizados y su consentimiento
    por canal. El email, el teléfono y la dirección de cada consentimiento van vacíos si quien pregunta no ve el
-   contacto de los clientes (BASE-F119); una automatización y una llave de API los reciben. La copia fiscal de la
+   contacto de los clientes (BASE-F119); una automatización los recibe. La copia fiscal de la
    venta (nombre, NIF, dirección y país) no es contacto: llega siempre.
 Entra: el identificador de la ficha y el permiso de ver clientes. Pedirla por su teléfono o su email exactos en
 lugar del identificador solo vale a quien ve el contacto de los clientes; a quien no, esas palabras solo le casan
@@ -1224,7 +1223,16 @@ asistente.
   con el control del «sí» que toca solo el registro del id). Las listas `groups` y `tags` de `set_groups` y
   `set_tags` no van con `unless`: la escritura usa los nombres junto a los ids.
 - Búsqueda: cada ficha guarda `search_text` (nombre, email, teléfono, NIF y empresa en minúsculas y
-  sin acentos), recalculado en `Customer.save()`; así no hace falta la extensión `unaccent`.
+  sin acentos) y `search_text_without_contact` (lo mismo sin email ni teléfono), recalculados en `Customer.save()`;
+  así no hace falta la extensión `unaccent`. La lista, la exportación y la auditoría de cifras buscan en el segundo a
+  quien no tiene `base.view_customer_contact` (`queries/contact.py`), y `find_customer` solo lee una referencia como
+  teléfono o email exactos con ese permiso.
+- Contacto (BASE-F119): la marca `CUSTOMER_CONTACT` (`base/sensitive.py`) va en `email` y `phone` de `CustomerRow` (y
+  lo que hereda), de `PhoneMatch` y de la fila de la exportación (`schemas/exports.py`, que escribe solo las columnas
+  de `visible_columns`), en el `contact_point` de los consentimientos, en los filtros `email` y `phone` y en la
+  entrada de `customer.customer.by_phone`; el orden no tiene ni `email` ni `phone`. La dirección, la ciudad, el código
+  postal y el país no llevan marca: son la copia fiscal de la venta. Un paso de Automatizaciones lee con los permisos
+  de dato de base (`apps/flow/services/engine.py`).
 - Estados de una ficha: viva (`deleted_at` vacío), eliminada (`deleted_at`), unida (`merged_into`) y
   con los datos borrados (`erased_at`). Las lecturas solo ven las vivas.
 - La nota y su actividad son UNA fila de `Activity` (`kind = note_added`), como el «chatter» de Odoo.

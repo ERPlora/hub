@@ -135,8 +135,9 @@ class Customer(UUIDModel):
     # Name, email, phone, tax id and company, lowercased and without accents (apps.customer.search).
     search_text = models.TextField(_("search text"), blank=True, editable=False)
     # The same without email and phone: what is searched for whoever does not see them (base.view_customer_contact).
+    # Empty in the database too: a migration of another app that makes a card with its own copy of this model gives none.
     search_text_without_contact = models.TextField(
-        _("search text without contact details"), blank=True, default="", editable=False
+        _("search text without contact details"), blank=True, default="", db_default="", editable=False
     )
     groups = models.ManyToManyField(
         CustomerGroup, related_name="customers", blank=True, verbose_name=_("groups")

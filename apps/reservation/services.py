@@ -103,8 +103,8 @@ S = Reservation.Status
 SYSTEM = "reservation.system"
 #: Tables' platform operations (the holds of reservations).
 TABLE_SYSTEM = "table.system"
-#: What finding the guest's card by her phone, or making it, asks of Customers (``card_keeper``).
-CARD_RIGHTS = frozenset({"customer.view", "customer.manage"})
+#: What finding the guest's card by the phone she gives (a contact detail), or making it, asks of Customers.
+CARD_RIGHTS = frozenset({"customer.view", "customer.manage", "base.view_customer_contact"})
 #: The reason a reservation released unconfirmed keeps (the screen translates it).
 UNCONFIRMED = "unconfirmed"
 

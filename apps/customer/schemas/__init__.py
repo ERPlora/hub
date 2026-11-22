@@ -27,6 +27,7 @@ from base.business import currency_decimals
 from base.recovery import RecoveredOut
 from base.relay import by_platform
 from base.schemas.assistant import names, unless_given
+from base.sensitive import CUSTOMER_CONTACT
 
 T = TypeVar("T")
 
@@ -260,8 +261,6 @@ class FieldRefIn(Schema):
 
 CustomerSort = Literal[
     "name",
-    "email",
-    "phone",
     "tax_id",
     "company_name",
     "lifecycle_stage",
@@ -278,19 +277,17 @@ class CustomerFilters(Schema):
     search: str | None = Field(
         None,
         max_length=200,
-        description="Text to look for in the name, email, phone, tax id and company, ignoring case and "
-        "accents; a phone is found however it is typed.",
+        description="Text to look for in the name, tax id and company, and the email and phone for whoever sees the "
+        "customers' contact details, ignoring case and accents; a phone is found however it is typed.",
     )
     name: str | None = Field(
         None, max_length=200, description="Only customers whose name contains this."
     )
     email: str | None = Field(
-        None, max_length=254, description="Only customers whose email contains this."
+        None, max_length=254, description="Only customers whose email contains this.", json_schema_extra=CUSTOMER_CONTACT
     )
     phone: str | None = Field(
-        None,
-        max_length=60,
-        description="Only customers whose phone contains these digits.",
+        None, max_length=60, description="Only customers whose phone contains these digits.", json_schema_extra=CUSTOMER_CONTACT
     )
     tax_id: str | None = Field(
         None, max_length=32, description="Only customers whose tax id contains this."
@@ -351,6 +348,7 @@ class ByPhoneIn(Schema):
         None,
         max_length=60,
         description="The number as it was typed or as WhatsApp gives it (digits without +).",
+        json_schema_extra=CUSTOMER_CONTACT,
     )
 
 
@@ -925,8 +923,8 @@ class CustomerRestoreIn(CustomerRefIn, HungInCopyIn):
 class CustomerRow(Schema):
     id: UUID = Field(description="The customer's id.")
     name: str = Field(description="Name.")
-    email: str = Field(description="Email.")
-    phone: str = Field(description="Phone, in international format.")
+    email: str | None = Field(None, description="Email.", json_schema_extra=CUSTOMER_CONTACT)
+    phone: str | None = Field(None, description="Phone, in international format.", json_schema_extra=CUSTOMER_CONTACT)
     tax_id: str = Field(description="Tax id.")
     company_name: str = Field(description="Company.")
     lifecycle_stage: Stage = Field(description=STAGE)
@@ -958,7 +956,9 @@ class ConsentStateRow(Schema):
     state: Literal["granted", "withdrawn"] = Field(
         description="The last decision: granted or withdrawn."
     )
-    contact_point: str = Field(description="The address it was given or withdrawn for.")
+    contact_point: str | None = Field(
+        None, description="The address it was given or withdrawn for.", json_schema_extra=CUSTOMER_CONTACT
+    )
     source: ConsentSource = Field(description="Where it was decided.")
     notice_version: str = Field(description="The version of the words shown.")
     occurred_at: datetime = Field(description="When the customer said it.")
@@ -1008,8 +1008,8 @@ class CustomerStatsOut(Schema):
 class PhoneMatch(Schema):
     id: UUID = Field(description="The customer's id.")
     name: str = Field(description="Name.")
-    email: str = Field(description="Email.")
-    phone: str = Field(description="Phone, in international format.")
+    email: str | None = Field(None, description="Email.", json_schema_extra=CUSTOMER_CONTACT)
+    phone: str | None = Field(None, description="Phone, in international format.", json_schema_extra=CUSTOMER_CONTACT)
 
 
 class PhoneMatchOut(Schema):
@@ -1099,7 +1099,7 @@ class ConsentRow(Schema):
         description="The channel; empty for a permission that is not about reaching the person (health data)."
     )
     state: Literal["granted", "withdrawn"] = Field(description="What was decided.")
-    contact_point: str = Field(description="The address it was decided for.")
+    contact_point: str | None = Field(None, description="The address it was decided for.", json_schema_extra=CUSTOMER_CONTACT)
     source: ConsentSource = Field(description="Where it was decided.")
     notice_text: str = Field(description="The exact words shown.")
     notice_version: str = Field(description="Their version.")

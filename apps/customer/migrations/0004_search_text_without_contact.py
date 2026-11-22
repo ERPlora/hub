@@ -37,7 +37,7 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='customer',
             name='search_text_without_contact',
-            field=models.TextField(blank=True, default='', editable=False, verbose_name='search text without contact details'),
+            field=models.TextField(blank=True, db_default='', default='', editable=False, verbose_name='search text without contact details'),
         ),
         migrations.RunPython(forwards, migrations.RunPython.noop),
     ]

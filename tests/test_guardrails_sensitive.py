@@ -20,7 +20,7 @@ from live.sensitive import marked_fields, required_permission
 from pydantic import BaseModel, Field
 from pydantic.fields import FieldInfo
 
-from base.sensitive import COSTS
+from base.sensitive import COSTS, CUSTOMER_CONTACT
 
 #: The words of a field's name that say it carries a cost or someone's contact details or pay. A name matches when one
 #: of them is a whole part of it between underscores: ``unit_cost`` and ``customer_email`` do, ``costume`` does not.
@@ -49,14 +49,6 @@ UNMARKED: dict[str, str] = {
     "apps.cart_checkout.schemas.CartDetailOut.customer_email": NOT_MARKED_YET,
     "apps.cart_checkout.schemas.CartOut.customer_email": NOT_MARKED_YET,
     "apps.cart_checkout.schemas.OrderOut.customer_email": NOT_MARKED_YET,
-    "apps.customer.schemas.CustomerDetailOut.email": NOT_MARKED_YET,
-    "apps.customer.schemas.CustomerDetailOut.phone": NOT_MARKED_YET,
-    "apps.customer.schemas.CustomerRecoveredOut.email": NOT_MARKED_YET,
-    "apps.customer.schemas.CustomerRecoveredOut.phone": NOT_MARKED_YET,
-    "apps.customer.schemas.CustomerRow.email": NOT_MARKED_YET,
-    "apps.customer.schemas.CustomerRow.phone": NOT_MARKED_YET,
-    "apps.customer.schemas.PhoneMatch.email": NOT_MARKED_YET,
-    "apps.customer.schemas.PhoneMatch.phone": NOT_MARKED_YET,
     "apps.inventory.schemas.stock.SummaryOut.products_without_cost": ABOUT_THE_DATA,
     "apps.online_booking.schemas.BookingOut.customer_email": NOT_MARKED_YET,
     "apps.online_booking.schemas.BookingOut.customer_phone": NOT_MARKED_YET,
@@ -148,6 +140,10 @@ def unmarked_sensitive(operations: Iterable[Operation]) -> dict[str, set[str]]:
     return found
 
 
+#: The input field every read of the Hub orders by: its choices are the keys of the order.
+SORT = "sort"
+
+
 def literal_values(annotation: Any) -> Iterator[str]:
     """The texts a ``Literal`` inside ``annotation`` allows (an order's keys, with their leading ``-``)."""
     if get_origin(annotation) is Literal:
@@ -170,7 +166,7 @@ def unguarded_filters(operation: Operation) -> list[str]:
     for schema, name, field in fields_of(operation.input):
         if not marked or required_permission(field) is not None:
             continue
-        sorted_by = {value.lstrip("-") for value in literal_values(field.annotation)}
+        sorted_by = {value.lstrip("-") for value in literal_values(field.annotation)} if name == SORT else set()
         if any(names_a(term, name) for term in marked) or sorted_by & marked:
             found.append(f"{operation.name}: {key(schema, name)}")
     return found
@@ -276,6 +272,19 @@ def test_filtering_or_sorting_by_a_marked_field_without_its_mark_is_caught():
         f"stock.line.list: {key(LineListIn, 'unit_cost_min')}",
         f"stock.line.list: {key(LineListIn, 'sort')}",
     ]
+
+
+class MarkedContactOut(BaseModel):
+    phone: str | None = Field(None, json_schema_extra=CUSTOMER_CONTACT)
+
+
+class SourceListIn(BaseModel):
+    source: Literal["walk_in", "phone"] | None = None
+
+
+def test_a_filter_whose_choices_name_a_marked_field_is_not_an_order():
+    # «Came by phone» is a source, not the customer's phone: only a read's ``sort`` orders by its choices.
+    assert unguarded_filters(operation("shop.contact.list", MarkedContactOut, SourceListIn)) == []
 
 
 def test_with_its_mark_or_on_a_write_or_on_an_unmarked_answer_it_is_not():

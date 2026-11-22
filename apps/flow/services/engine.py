@@ -24,6 +24,7 @@ from apps.flow.queries.reads import TURN
 from apps.flow.queries.reasons import say
 from apps.flow.queries.runs import LEAVES
 from apps.flow.queries.values import map_params, prepared, validation_fields, PERSON_PARAMS, words_for
+from base.sensitive import DATA_PERMISSIONS
 
 from .writes import _actor
 
@@ -152,11 +153,13 @@ def _finish(
 def _step_context(ctx: OperationContext, run: FlowRun, flow: Flow, op: Operation) -> OperationContext:
     """What a step runs with: the run's reference as the actor, the permission of its own operation and
     the reads of its app (to answer with what it did), never every permission — the operation's own
-    checks still apply (the old engine's «no elevation») —, in the language of whoever saved it."""
+    checks still apply (the old engine's «no elevation») —, in the language of whoever saved it. It also
+    reads every datum base's data permissions guard (a customer's phone, to write to them): only the owner and
+    an administrator save an automation, and they see them all; those permissions open no operation."""
     return OperationContext(
         scope=ctx.scope,
         actor=f"{RUN_ACTOR}{run.id}",
-        permissions=frozenset({op.permission}) | read_permissions(ctx.scope, op),
+        permissions=frozenset({op.permission}) | read_permissions(ctx.scope, op) | DATA_PERMISSIONS,
         language=flow.language,
     )
 

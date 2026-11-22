@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:a59c1c69971facfda379ed1f325fa930d8be00a4f85d973babac96b54fd67920 -->
+<!-- generated from WORKBOOK.md sha256:7660eb1bb30da531e630ace27aae9560ed6e918a361d9133de1ee3e595888a88 -->
 
 ## What it is for and who it is for
 
@@ -231,7 +231,7 @@ Steps:
 1. Type in the search. It searches at once in name, email, phone, tax ID and company, ignoring case and
    accents ("garcia" finds "García"). A term made only of digits and phone signs (with spaces, dashes or
    brackets, with the + or the 00 in front) is searched by its digits, without the 00 or the national zero,
-   so the card is found however it is written. Whoever does not see the customers' contact details (BASE-F119)
+   so the card is found however it is written. Whoever does not see the customers' contact details
    searches only in name, tax ID and company: a phone or an email finds nobody for them.
 2. With the filters: stage, source, active and spent by range ("From / To", in the business's currency,
    the one of its country in Settings → Business, with its decimals: the yen has none; with or without its
@@ -248,8 +248,8 @@ If it fails: the table shows the error with "Retry". No results: "No customers."
 read does not filter and says so under its box, in the words of the amount field: "This is not an amount.
 Type a figure, for example 12.50.", "This amount cannot be negative." or, with "1.000", "This amount can be
 read in two ways…". Through the API or the assistant, filtering by email or phone without seeing the customers'
-contact details is refused without searching anything (403 `permission_denied`), and sorting by them does not
-exist (422).
+contact details is refused without searching anything, as an action without permission, and sorting by them does
+not exist.
 Involved: BASE-F119
 
 ### CUSTOMER-F03 Open a customer's card
@@ -264,7 +264,7 @@ Steps:
    name, or "Done by the platform" when nobody did it in person, such as the purchase a charged sale
    records, an automation or a recovery from a separate copy), its purchases and the blocks of other apps. The
    email, the phone and the address each consent was given for, only to whoever sees the customers' contact
-   details (BASE-F119).
+   details.
 3. **← Back** returns to the list.
 In: the card and, apart, its activity, its purchases and its consent history.
 Out: nothing; read only. If another person changes it while it is open, the change is seen without
@@ -429,8 +429,7 @@ decides.
 If it fails: an empty number, with letters or that is not possible in its country matches nobody (it
 never returns the whole list). Cards that are deleted, merged or with their data erased do not show. Asking whose
 a number is reads the contact details: whoever does not see the customers' contact details (BASE-F119) gets 403
-`permission_denied`. An automation and an API key do ask: the owner and the administrator, who see them, save
-and make them.
+`permission_denied`. An automation does ask: the owner or the administrator, who see them, save it.
 Involved: RESERVATION-F06, WHATSAPP_INBOX-F04
 
 ### CUSTOMER-F11 Store the phone in the international format (E.164)
@@ -481,7 +480,7 @@ Actor: owner, administrator, manager; the employee, with a manager's PIN
 Screen: Customer card
 Steps:
 1. Open the card that is going to STAY and tap **Merge with…**.
-2. Look for the duplicate as in the list (CUSTOMER-F02) and tap it.
+2. Look for the duplicate as in the **Customers** list and tap it.
 3. Read the warning, which names both cards: "Ana G. will be merged into Ana García: its appointments,
    sales, bookings, conversations, prepaid packages, notes and consents move to Ana García, empty fields are
    filled from it, and Ana G. disappears from the list. This cannot be undone.".
@@ -843,7 +842,7 @@ Steps:
    country, notes, birthday, anniversary, preferred channel, stage, source, whether it is active, the
    purchase totals, its groups, its tags, its custom fields and its consent per channel. The email, the phone
    and the address of each consent come empty if whoever asks does not see the customers' contact details
-   (BASE-F119); an automation and an API key get them. The sale's tax copy (name, tax ID, address and country) is
+   (BASE-F119); an automation gets them. The sale's tax copy (name, tax ID, address and country) is
    not contact details: it always arrives.
 In: the card's identifier and the permission to view customers. Asking for it by its exact phone or email instead
 of the identifier only works for whoever sees the customers' contact details; for anyone else those words only
