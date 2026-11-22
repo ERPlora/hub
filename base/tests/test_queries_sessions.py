@@ -92,17 +92,12 @@ def access_key(user, permissions: frozenset[str]) -> str:
 def test_the_access_key_changes_with_what_the_role_gives(make_user):
     ana = make_user("ana")
     assert access_key(ana, permissions_of_role("hub_employee")) != access_key(ana, permissions_of_role("hub_manager"))
-    assert access_key(ana, permissions_of_role("hub_employee")) != access_key(ana, frozenset())
 
 
 def test_the_same_permissions_give_the_same_key_to_anyone(make_user):
     ana, luis, employee = make_user("ana"), make_user("luis"), permissions_of_role("hub_employee")
     assert access_key(ana, employee) == access_key(luis, employee)
     assert access_key(ana, employee) == access_key(ana, frozenset(sorted(employee, reverse=True)))
-
-
-def test_an_anonymous_visitor_gets_a_key_too(make_user):
-    assert access_key(None, frozenset())
 
 
 def test_the_access_is_read_again_with_each_photo_of_erplora_com():

@@ -9,6 +9,7 @@ from live.operations import INTERNAL, operation
 
 from base import activation, entitlement, home
 from base.models import Hub, HubUser
+from base.permissions import VIEW_HOME
 from base.schemas.sessions import SessionAccessIn, SessionAccessOut, SessionMeIn, SessionMeOut
 
 from .apps import _can_see, _may_use, open_entries
@@ -63,7 +64,7 @@ def session_me(ctx: OperationContext, data: SessionMeIn) -> dict[str, Any]:
 @operation(
     "base.session.access",
     kind="query",
-    permission=None,
+    permission=VIEW_HOME,
     input=SessionAccessIn,
     output=SessionAccessOut,
     database=False,
@@ -73,7 +74,8 @@ def session_access(ctx: OperationContext, data: SessionAccessIn) -> dict[str, st
     """A fingerprint of the session's permissions on this scope, which every live re-run reads again from the person's
     role: when erplora.com changes it, the device's open app sees the key change and reads ``base.session.me`` again,
     so its menu and the screen in front follow the new role without signing in again. A hash, so the stream carries a
-    few bytes and only when it changes. No permission: an anonymous visitor gets the key of having none."""
+    few bytes and only when it changes. The Home's permission, which every role of the business holds: a live query
+    needs one."""
     digest = hashlib.sha256("\n".join(sorted(ctx.permissions)).encode()).hexdigest()
     return {"key": digest}
 
