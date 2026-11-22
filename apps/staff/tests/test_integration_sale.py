@@ -14,18 +14,16 @@ from uuid import uuid7
 import pytest
 from django.utils import timezone
 from live.context import system_context
-from live.errors import PermissionDenied
 from live.live_registry import live_registry
 from live.operations import get, registry
 
 from apps.staff.models import Member
 from apps.staff.schemas.commissions import CommissionReportIn
 
-from .conftest import HUB_DB, A, ctx_for, make_member, make_role
+from .conftest import CARD, HUB_DB, A, charge, ctx_for, make_member, make_role
 
 pytestmark = HUB_DB
 
-CARD = [{"method": "card"}]
 # A Wednesday, 10:00 in Madrid (the business's zone): its week starts on Monday the 17th.
 WEDNESDAY = dt.datetime(2026, 8, 19, 8, 0, tzinfo=dt.UTC)
 
@@ -40,18 +38,6 @@ def report(role="hub_admin", **params):
 
 
 @pytest.fixture
-def catalog():
-    """Products made by Inventory, prices with tax included (what a line charges)."""
-    for name, sku, price in (("Cut", "CUT", 1800), ("Fringe", "FRG", 506), ("Shampoo", "SHP", 121)):
-        get("inventory.product.create")(
-            system_context(A),
-            get("inventory.product.create").input.model_validate(
-                {"name": name, "sku": sku, "price": price, "tax_category_key": "product.generic"}
-            ),
-        )
-
-
-@pytest.fixture
 def frozen_now(monkeypatch):
     """Freeze ``timezone.now`` (and so the business day of a sale and of the report) at an instant."""
 
@@ -59,21 +45,6 @@ def frozen_now(monkeypatch):
         monkeypatch.setattr(timezone, "now", lambda: instant)
 
     return freeze
-
-
-def charge(key, *lines, staff=None):
-    """A sale charged by card: ``lines`` as (sku, member or None); ``staff`` serves the whole sale."""
-    return run(
-        "sale.sale.complete",
-        {
-            "idempotency_key": key,
-            "lines": [
-                {"product": sku, **({"staff_id": str(member.id)} if member else {})} for sku, member in lines
-            ],
-            **({"staff_id": str(staff.id)} if staff else {}),
-            "payments": CARD,
-        },
-    )
 
 
 def give_back(sale, amount):
@@ -244,32 +215,6 @@ def test_without_sales_the_report_says_so_and_lists_nobody(sales_off):
     make_member("Ana", commission_rate=Decimal("15"))
     page = report()
     assert (page.sales_available, page.rows, page.total_sold, page.total_commission) == (False, [], 0, 0)
-
-
-def test_whoever_sees_the_pay_reads_it_and_an_employee_does_not():
-    make_member("Ana", commission_rate=Decimal("15"))
-    assert [row.full_name for row in report("hub_manager").rows] == ["Ana López"]
-    with pytest.raises(PermissionDenied):
-        report("hub_employee")
-
-
-def test_the_sales_figures_alone_do_not_open_the_pay():
-    # Whoever reads Sales' figures but not the pay (a custom combination) gets no one's commission.
-    make_member("Ana", commission_rate=Decimal("15"))
-    op = get("staff.commission.report")
-    with pytest.raises(PermissionDenied):
-        op(ctx_for(permissions={"staff.view", "sale.view_sale"}), op.input.model_validate({}))
-    # Positive control: the same figures with the pay permission read it.
-    page = op(ctx_for(permissions={"staff.view_compensation", "sale.view_sale"}), op.input.model_validate({}))
-    assert [row.full_name for row in page.rows] == ["Ana López"]
-
-
-def test_the_pay_permission_alone_does_not_open_the_sales_figures():
-    # The report shows what each one sold: it needs Sales' own permission for its figures too.
-    make_member("Ana", commission_rate=Decimal("15"))
-    op = get("staff.commission.report")
-    with pytest.raises(PermissionDenied):
-        op(ctx_for(permissions={"staff.view", "staff.view_compensation"}), op.input.model_validate({}))
 
 
 # Live

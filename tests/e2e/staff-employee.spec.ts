@@ -32,7 +32,7 @@ test('an employee reads Staff, Roles and Schedules without a single write button
     await ownerView.locator('[data-testid=staff-members-row]').first().waitFor({ state: 'visible' });
     await expect(ownerView.locator('[data-testid=staff-members-add]')).toBeVisible();
     await expect(ownerView.locator(`[data-testid^=staff-members-row-${member.data.id}-]`).first()).toBeAttached();
-    // Staff, Roles, Time Off, Schedules, Commissions and Settings (STAFF-F21: Commissions only with the pay).
+    // Staff, Roles, Time Off, Schedules, Commissions and Settings (STAFF-F21: an employee's Commissions is her own row).
     await expect(ownerView.locator('ion-footer ion-segment-button')).toHaveCount(6);
 
     // The employee: the list, nothing to write.
@@ -42,7 +42,7 @@ test('an employee reads Staff, Roles and Schedules without a single write button
     await expect(view.locator(`[data-testid^=staff-members-row-${member.data.id}-]`)).toHaveCount(0);
     await expect(view.locator('[role=columnheader]', { hasText: 'Rate/h' })).toHaveCount(0);
     await expect(ownerView.locator('[role=columnheader]', { hasText: 'Rate/h' })).toBeVisible();
-    await expect(view.locator('ion-footer ion-segment-button')).toHaveText(['Staff', 'Time Off', 'Schedules']);
+    await expect(view.locator('ion-footer ion-segment-button')).toHaveText(['Staff', 'Time Off', 'Schedules', 'Commissions']);
     await employee.page.screenshot({ path: shot('staff-employee-members') });
 
     await employee.page.goto(`${A}/staff/schedules`);

@@ -12,7 +12,7 @@ Lo que no entra todavía: ver «Lo que queda fuera».
 
 Personal es tu equipo: quién trabaja, con qué rol, en qué horario cada semana, cuándo falta y cuánto cobra por hora y
 de comisión. El responsable da de alta las fichas, aprueba las ausencias y ve en Comisiones lo que ha ganado cada
-profesional; cada empleado ve su ficha y pide sus ausencias. Citas, Servicios, Control horario, Tareas y el TPV leen de
+profesional; cada empleado ve su ficha, lo que ha ganado él en Comisiones y pide sus ausencias. Citas, Servicios, Control horario, Tareas y el TPV leen de
 aquí quién trabaja y quién atiende.
 
 ### En detalle
@@ -37,7 +37,7 @@ Quién la usa:
   aprueba, rechaza o cancela.
 - El **empleado** ve el directorio, los horarios y quién falta (nunca la tarifa ni el motivo de una
   ausencia ajena), ve su propia ficha y sus ausencias, **pide sus ausencias** y retira las que aún
-  están pendientes.
+  están pendientes. En **Comisiones** ve solo su propia fila: lo que ha hecho y lo que le corresponde.
 
 Citas (y con ella Reservas online) lee de aquí quién es reservable, su horario y sus ausencias
 aprobadas; Servicios, quién puede hacer cada servicio; Control horario, de quién es cada fichaje; Tareas, a
@@ -147,8 +147,8 @@ descanso, Fin descanso** (o «No trabaja»), con la jornada por defecto de **Aju
 Aquí ves lo que ha vendido cada profesional en un periodo y lo que le corresponde de comisión: «Hoy» al entrar, o
 «Ayer», «Esta semana», «Este mes» o «Personalizado», con sus fechas «Desde» y «Hasta». Arriba, el total de
 **Producción** y de **Comisiones**; debajo, una fila por persona con su rol, lo que ha vendido, su «Comisión %» y su
-«Comisión», en la moneda del negocio. Solo la ve quien puede ver la compensación, y se pone al día sola al cobrar,
-anular o devolver una venta.
+«Comisión», en la moneda del negocio. El propietario, el administrador y el responsable ven una fila por persona del
+equipo; un empleado ve solo la suya, con todo lo que hizo. Se pone al día sola al cobrar, anular o devolver una venta.
 
 #### Detalle
 Arriba, el periodo: «Hoy» (al entrar), «Ayer», «Esta semana» (desde el lunes), «Este mes» (desde el
@@ -528,13 +528,15 @@ Implicados: ninguno
 
 ### STAFF-F21 Dar la tarifa y la comisión de cada profesional
 Estado: hecho (servidor y pantalla)
-Actor: propietario, administrador, responsable
+Actor: propietario, administrador, responsable (todo el equipo); empleado (su propia fila de Comisiones)
 Pantalla: Personal (columna Tarifa/h y formulario), Comisiones
 Pasos:
 1. Quien puede ver la compensación ve la tarifa, la comisión y las notas de RRHH de cada ficha.
 2. En **Comisiones** sale cada persona que puede cobrar comisión (Activa o De baja) con su nombre, su rol
    y su comisión, también sin ventas o con comisión 0, y quien vendió en el periodo aunque ya no esté
-   («Ya no trabaja aquí» o «Inactivo» junto al nombre).
+   («Ya no trabaja aquí» o «Inactivo» junto al nombre). Esa es la lista de quien ve la compensación y los totales
+   del negocio (el propietario, el administrador y el responsable); quien no tiene los dos, como el empleado, ve
+   solo su propia fila, también sin ventas, y sin ficha en Personal no ve ninguna.
 3. Para saber lo que ha ganado cada profesional, abre la pestaña **Comisiones**. Sale «Hoy»: lo que ha
    vendido cada persona en el día del negocio, con lo devuelto ya restado, sin los bonos que vendió y
    sumado lo que valen las sesiones de bono que hizo, su comisión y lo que le
@@ -545,12 +547,14 @@ Pasos:
    «Hasta».
 5. Cuenta lo que se atribuyó a cada persona en Ventas: la línea que hizo ella (la de una cita, a la
    profesional de la cita) o, si la línea no dice quién, quien atendió la cuenta. Con «Yo» en el TPV, es
-   quien tenía la sesión, si su cuenta tiene ficha en Personal; si no, esa venta no cuenta para nadie.
+   quien tenía la sesión, si su cuenta tiene ficha en Personal; si no, esa venta no cuenta para nadie. La fila
+   de cada persona cuenta todo lo que hizo, también en una venta que cobró otra persona o que se atribuyó a un
+   compañero, aunque no pueda abrir esa venta: el empleado ve en la suya lo mismo que el responsable ve de él.
 Entra: la tarifa y la comisión de cada ficha y, de Ventas, la producción de cada profesional en el periodo
 (ya resta lo devuelto: lo que vuelve, a quien lo vendió; deja fuera los bonos que vendió y suma el valor de
 sus sesiones de bono). Ventas es opcional.
 Sale: solo lectura.
-Si falla: sin permiso de compensación, su dirección dice «Sin acceso»; sin Ventas, «Las comisiones salen de las ventas»; con «Hasta» antes que «Desde»,
+Si falla: sin permiso para ver el equipo, su dirección dice «Sin acceso»; sin Ventas, «Las comisiones salen de las ventas»; con «Hasta» antes que «Desde»,
 «La fecha de fin no puede ser anterior a la de inicio.» bajo «Hasta»; con un solo día, «Un periodo
 personalizado necesita su primer y su último día.»; con más de dos años, «Pide como mucho 731 días de
 una vez.».
@@ -639,7 +643,7 @@ López · Vacaciones · 2 nov 2026 – 5 nov 2026»). Lo que quien pregunta no p
 | La ficha de quien tiene la sesión, solo su id y su nombre: a ella atribuye Ventas «Yo» | cualquiera con sesión | SALE-F16 | `staff.member.current` |
 | Tarifa, comisión y notas de RRHH, con los filtros, el orden y las páginas del directorio (la columna Tarifa/h lee las mismas filas) | ver la compensación | F21 | `staff.member.compensation` |
 | La hoja de comisiones: quien puede cobrar comisión, con su ficha, su cuenta y su comisión | ver la compensación | F21 | `staff.commission.summary` |
-| Lo que ha ganado cada profesional en un periodo (hoy, ayer, esta semana, este mes o dos días): vendido con lo devuelto restado, comisión y totales; dice si el negocio no tiene Ventas | ver la compensación (y las ventas) | F21 | `staff.commission.report` |
+| Lo que ha ganado cada profesional en un periodo (hoy, ayer, esta semana, este mes o dos días): vendido con lo devuelto restado, comisión y totales; dice si el negocio no tiene Ventas | ver: la fila propia; con ver la compensación y los totales del negocio, las de todo el equipo | F21 | `staff.commission.report` |
 | Las cifras: fichas, activos, de baja, inactivos, ausentes hoy y solicitudes pendientes | ver | F23 | `staff.member.stats` |
 | Los roles con sus miembros activos, con filtros y orden | ver | F04, F23 | `staff.role.list` |
 | Un rol por su id, también retirado: lo que lee la tarjeta del asistente para nombrarlo (BASE-F97) | ver | F01, F02, F04, F07 | `staff.role.detail` |
@@ -698,7 +702,7 @@ López · Vacaciones · 2 nov 2026 – 5 nov 2026»). Lo que quien pregunta no p
 ### A qué reacciona y lo que necesita de otras apps
 No reacciona a ningún aviso y no requiere ninguna app. Para **Comisiones** pide a **Ventas**, si el
 negocio la tiene, lo vendido por cada profesional en el periodo, con lo devuelto ya restado
-(`sale.sale.by_staff`, con el permiso de ver las ventas de quien mira), y se pone al día con sus avisos
+(`sale.sale.by_staff`, leído como la plataforma: qué filas ve cada persona lo decide Personal), y se pone al día con sus avisos
 de venta cobrada, anulada o devuelta (`sale.sale.completed`, `sale.sale.voided`, `sale.sale.refunded`).
 Sin Ventas, Comisiones lo dice y no lista a nadie. De la plataforma usa las cuentas del negocio (para
 vincular una ficha) y la zona horaria del negocio (para el «hoy»).
@@ -715,9 +719,9 @@ ofrece la plantilla «La lista de bienvenida de alguien nuevo en el equipo» sob
 
 | Permiso | Propietario | Administrador | Responsable | Empleado | Servicio |
 |---|---|---|---|---|---|
-| Ver el equipo, roles, horarios, disponibilidad, cifras y ajustes | sí | sí | sí | sí | `staff.view` |
+| Ver el equipo, roles, horarios, disponibilidad, cifras, ajustes y su propia fila de Comisiones | sí | sí | sí | sí | `staff.view` |
 | Ver el email y el teléfono del equipo (permiso de dato de la plataforma) | sí | sí | sí | no | `base.view_team_contact` |
-| Ver tarifa, comisión y notas de RRHH | sí | sí | sí | no | `staff.view_compensation` |
+| Ver tarifa, comisión y notas de RRHH, y en Comisiones las filas de todo el equipo (con los totales del negocio) | sí | sí | sí | no | `staff.view_compensation` |
 | Dar de alta fichas | sí | sí | sí | no | `staff.add_member` |
 | Editar fichas | sí | sí | sí | no | `staff.change_member` |
 | Desactivar y dar de baja | sí | sí | no | no | `staff.delete_member` |
@@ -777,7 +781,9 @@ ofrece la plantilla «La lista de bienvenida de alguien nuevo en el equipo» sob
   (`test_integration_assistant.py`). El importe
   de la comisión (`staff.commission.report`) es `vendido × comisión ÷ 100` en `Decimal`, redondeado a
   unidades menores enteras con `ROUND_HALF_UP` una sola vez por persona, sobre lo que Ventas le atribuye
-  (`total_revenue`, que ya resta lo devuelto). Una venta nombra a su profesional por el id de su ficha
+  (`total_revenue`, que ya resta lo devuelto). Las filas pasan por `COMMISSION_LINES`
+  (`queries/commissions.py`, con `Owned.counted`), y la producción se pide a Ventas como la plataforma: así la
+  fila propia no pierde lo que la persona hizo en una venta que no puede abrir. Una venta nombra a su profesional por el id de su ficha
   (UUID); la cuenta (`user_id`, un entero) nunca llega a una venta, así que no hay dos identidades que
   sumar.
 - Los avisos solo llevan identificadores: nunca el motivo de una baja ni de una ausencia (datos
@@ -844,7 +850,7 @@ ofrece la plantilla «La lista de bienvenida de alguien nuevo en el equipo» sob
 
 - `frontend/routes.ts`: `/staff/members`, `/staff/roles`, `/staff/time-off`, `/staff/schedules`,
   `/staff/commissions` y `/staff/settings`. El menú de `apps.py` lleva las seis, cada una con el permiso que la abre:
-  Personal y Horarios, `staff.view`; Ausencias, `staff.view_time_off`; Comisiones, `staff.view_compensation`; Roles y
+  Personal, Horarios y Comisiones, `staff.view`; Ausencias, `staff.view_time_off`; Roles y
   Ajustes, `staff.manage_settings`. La barra de pestañas son las entradas que la persona puede abrir
   (`useAppTabs`).
 - Comisiones (`frontend/pages/CommissionsPage.vue`) sigue `staff.commission.report`: el periodo lo

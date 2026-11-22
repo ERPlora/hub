@@ -1075,9 +1075,10 @@ Pasos:
    una venta, sin recargar. Los paneles cuentan con la misma regla que las cifras de la pantalla: todo el
    negocio o sus ventas.
 Entra: nada de otras apps.
-Sale: nada guardado. Lo vendido por cada profesional en el periodo (lo piden Personal y el asistente para
-la comisión) cuenta con la misma regla: quien no ve todo el negocio recibe solo las líneas de sus ventas
-y, de las sesiones de bono gastadas fuera del cobro, las de su ficha. Ya resta lo devuelto: lo que vuelve, a quien lo vendió; el dinero que vuelve sin nada que
+Sale: nada guardado. Lo vendido por cada profesional en el periodo (lo pide el asistente para la comisión)
+cuenta con la misma regla: quien no ve todo el negocio recibe solo las líneas de sus ventas y, de las sesiones
+de bono gastadas fuera del cobro, las de su ficha. Personal lo pide como la plataforma, para que la fila de cada
+profesional cuente todo lo que hizo, y decide él qué filas ve cada persona (STAFF-F21). Ya resta lo devuelto: lo que vuelve, a quien lo vendió; el dinero que vuelve sin nada que
 valga (solo dinero, una invitación o la sesión de un bono), a todos los de esa venta según lo que a cada
 uno le queda por devolver tras las devoluciones anteriores, así que nadie baja de 0. Cada devolución
 cuenta en el día de su venta y se reparte al céntimo: con lo que nadie atendió, suma los «Ingresos» del

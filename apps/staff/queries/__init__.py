@@ -18,7 +18,7 @@ from django.db.models.functions import Concat
 from django.utils import timezone
 from django.utils.translation import gettext
 from django.utils.translation import gettext_lazy as _
-from live.context import OperationContext
+from live.context import OperationContext, system_context
 from live.errors import AppInactive, Conflict, InvalidPayload, NotFound, PermissionDenied
 from live.operations import INTERNAL, UnknownOperation, get, operation
 
@@ -57,6 +57,8 @@ from apps.staff.schemas.time_off import (
     TimeOffPage,
     TodayIn,
 )
+
+from .commissions import COMMISSION_LINES
 
 MEMBER_NOT_FOUND = _("That staff member does not exist in this business.")
 AMBIGUOUS_MEMBER = _(
@@ -350,7 +352,7 @@ EARNING = (Member.Status.ACTIVE, Member.Status.ON_LEAVE)
 @operation(
     "staff.commission.report",
     kind="query",
-    permission="staff.view_compensation",
+    permission="staff.view",
     input=CommissionReportIn,
     output=CommissionReportOut,
     expose_api=True,
@@ -367,31 +369,25 @@ EARNING = (Member.Status.ACTIVE, Member.Status.ON_LEAVE)
                 "comisiones ganadas por cada profesional en lo que va de mes",
             ),
         },
-        "description": "The commission each professional earned in a period of business days: today by "
-        "default, yesterday, this week, this month or two days of your own. Per person: what they sold "
-        "(refunds and the vouchers they sold taken off, the value of the voucher sessions they did added), their rate and their "
-        "commission, in cents, and the totals. Lists everyone "
-        "who can earn a commission, also without sales, and whoever sold in the period though no longer "
-        "active. Without Sales in the business, sales_available is false and nobody is listed."
+        "description": "The commission each professional earned in a period of business days: today by default, "
+        "yesterday, this week, this month or two days of your own. Per person: what they sold (refunds and the "
+        "vouchers they sold taken off, the value of the voucher sessions they did added), their rate and their "
+        "commission, in cents, and the totals. Lists everyone who can earn a commission, also without sales, and "
+        "whoever sold in the period though no longer active; whoever lacks the team's pay or the business's totals "
+        "gets only their own line. Without Sales in the business, sales_available is false and nobody is listed."
     },
 )
 def commission_report(ctx: OperationContext, params: CommissionReportIn) -> dict:
     """STAFF-F21 step 3: what each professional produced in the period (``sale.sale.by_staff``, refunds and vouchers
-    sold taken off, voucher sessions added) times their rate, rounded half up once per person. A sale names its professional by the
-    record's id; one with nobody, or with an id of no record, counts for nobody."""
+    sold taken off, voucher sessions added) times their rate, rounded half up once per person, on the lines the caller
+    counts (``COMMISSION_LINES``). A sale with nobody, or with an id of no record, counts for nobody."""
     first, last = report_period(params, business_today())
     sold = _sold_by_staff(ctx, first, last)
     if sold is None:
-        return {
-            "date_from": first,
-            "date_to": last,
-            "sales_available": False,
-            "rows": [],
-            "total_sold": 0,
-            "total_commission": 0,
-        }
+        nothing = {"rows": [], "total_sold": 0, "total_commission": 0}
+        return {"date_from": first, "date_to": last, "sales_available": False, **nothing}
     members = (
-        Member.objects.filter(Q(status__in=EARNING) | Q(pk__in=list(sold)))
+        COMMISSION_LINES.counted(ctx).filter(Q(status__in=EARNING) | Q(pk__in=list(sold)))
         .annotate(role_name=F("role__name"))
         .order_by("first_name", "last_name", "id")
     )
@@ -438,11 +434,12 @@ def commission_cents(sold: int, rate: Decimal) -> int:
 
 
 def _sold_by_staff(ctx: OperationContext, first: dt.date, last: dt.date) -> dict[UUID, int] | None:
-    """What each record produced from ``first`` to ``last``, refunds and vouchers sold taken off and voucher sessions added, asked to
-    Sales for the caller (its permission applies); ``None`` when the business has no Sales (absent or off)."""
+    """What each record produced from ``first`` to ``last``, refunds and vouchers sold taken off and voucher sessions
+    added. Asked to Sales as the platform: a line is all its person did, also on a sale they may not open, and
+    ``COMMISSION_LINES`` says who reads which line. ``None`` when the business has no Sales (absent or off)."""
     try:
         op = get(SALES_BY_STAFF)
-        page = op(ctx, op.input.model_validate({"date_from": first, "date_to": last}))
+        page = op(system_context(ctx.scope), op.input.model_validate({"date_from": first, "date_to": last}))
     except (UnknownOperation, AppInactive):
         return None
     return {row.staff_id: row.production_total for row in page.rows}
