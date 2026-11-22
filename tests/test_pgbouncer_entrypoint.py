@@ -2,6 +2,7 @@
 environment and replaces itself with pgbouncer. A fake pgbouncer first on the PATH records how it was started.
 """
 
+import importlib.util
 import os
 import subprocess
 import sys
@@ -58,18 +59,19 @@ class Sidecar:
                                    stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         out, err = process.communicate(timeout=60)
         self.pid, self.status = process.pid, process.returncode
-        self.output = (out + err).decode(errors="backslashreplace")
+        self.stdout, self.stderr = out.decode(errors="backslashreplace"), err.decode(errors="backslashreplace")
         return self
 
     def refused(self, message):
-        """It stopped with status 1, printed only this line and never started pgbouncer."""
-        return (self.status, self.output, self.called()) == (1, f"pgbouncer-entrypoint: {message}\n", "")
+        """It stopped with status 1, printed only this line on stderr and never started pgbouncer."""
+        expected = (1, "", f"pgbouncer-entrypoint: {message}\n", "")
+        return (self.status, self.stdout, self.stderr, self.called()) == expected
 
     def stopped_without_pgbouncer(self, status):
-        """It stopped with this status and a single line of its own, and pgbouncer never ran."""
-        lines = self.output.splitlines()
-        return (self.status == status and len(lines) == 1 and lines[0].startswith("pgbouncer-entrypoint: ")
-                and self.called() == "")
+        """It stopped with this status and a single line of its own on stderr, and pgbouncer never ran."""
+        lines = self.stderr.splitlines()
+        return (self.status == status and self.stdout == "" and len(lines) == 1
+                and lines[0].startswith("pgbouncer-entrypoint: ") and self.called() == "")
 
     def called(self):
         return self.calls.read_text()
@@ -114,7 +116,7 @@ def test_counts_and_ports_take_positive_integers_only(sidecar, name, value):
     assert sidecar.run(**{name: value}).refused(f"{name} must be a positive integer")
 
 
-@pytest.mark.parametrize("value", ["08", "5x", " 5", "-1", "٣"])
+@pytest.mark.parametrize("value", ["08", "5x", " 5", "-1", "1\u0663"])
 def test_a_count_is_ascii_digits_without_a_leading_zero_or_anything_around(sidecar, value):
     sidecar.run(PGBOUNCER_MAX_DB_CONNECTIONS=value)
     assert sidecar.refused("PGBOUNCER_MAX_DB_CONNECTIONS must be a positive integer")
@@ -192,14 +194,15 @@ def test_execs_pgbouncer_with_the_config_same_pid_no_wrapper_left(started):
 
 
 def test_never_prints_the_password(started):
-    assert started.output == ""
+    assert started.stdout == started.stderr == ""
 
 
-def test_explicit_ports_ca_file_and_connection_cap_win_over_the_defaults(sidecar):
-    sidecar.run(PGBOUNCER_SERVER_PORT="5433", PGBOUNCER_LISTEN_PORT="6433", PGBOUNCER_MAX_USER_CONNECTIONS="20",
+def test_the_writer_ports_ca_file_and_connection_cap_come_from_the_task_over_the_defaults(sidecar):
+    sidecar.run(PGBOUNCER_SERVER_HOST="other-writer.example", PGBOUNCER_SERVER_PORT="5433",
+                PGBOUNCER_LISTEN_PORT="6433", PGBOUNCER_MAX_USER_CONNECTIONS="20",
                 PGBOUNCER_SERVER_TLS_CA_FILE="/etc/ssl/certs/other.pem")
     assert sidecar.status == 0
-    assert sidecar.has("listen_port=6433", "* = host=writer.cluster.example port=5433",
+    assert sidecar.has("listen_port=6433", "* = host=other-writer.example port=5433",
                        "server_tls_ca_file=/etc/ssl/certs/other.pem", "max_user_connections=20")
 
 
@@ -271,4 +274,15 @@ def test_a_config_folder_it_cannot_create_stops_it_naming_the_folder(sidecar):
     sidecar.config_dir.write_text("a file where the folder goes")
     sidecar.run()
     assert sidecar.stopped_without_pgbouncer(1)
-    assert str(sidecar.config_dir) in sidecar.output
+    assert str(sidecar.config_dir) in sidecar.stderr
+
+
+@pytest.mark.parametrize("value", [None, ""], ids=["unset", "empty"])
+def test_the_config_goes_under_tmp_the_only_writable_path_of_the_image(monkeypatch, value):
+    spec = importlib.util.spec_from_file_location("pgbouncer_entrypoint", SCRIPT)
+    entrypoint = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(entrypoint)
+    monkeypatch.setenv("PGBOUNCER_CONFIG_DIR", "")
+    if value is None:
+        monkeypatch.delenv("PGBOUNCER_CONFIG_DIR")
+    assert entrypoint.setting("PGBOUNCER_CONFIG_DIR") == "/tmp/pgbouncer"
