@@ -287,6 +287,24 @@
         "windows": "Windows",
         "linux": "Linux",
         "android": "Android"
+      },
+      "state": {
+        "ok": {
+          "title": "Impresora lista",
+          "text": "Los tiques salen solos al cobrar."
+        },
+        "no_signal": {
+          "title": "Impresora sin conectar",
+          "text": "El dispositivo que imprime los tiques no responde: enciéndelo y abre en él la app de ERPlora."
+        },
+        "not_configured": {
+          "title": "Impresora sin configurar",
+          "text": "Todavía no hay ningún dispositivo dado de alta que imprima los tiques."
+        },
+        "unknown": {
+          "title": "No hemos podido comprobar la impresora",
+          "text": "No sabemos si está conectada; no afecta a nada más."
+        }
       }
     }
   }
