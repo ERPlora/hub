@@ -27,6 +27,7 @@ from django.db import IntegrityError, connections, transaction
 
 from apps.appointment.models import Appointment
 from apps.whatsapp_inbox.tests.test_migrations import migrate
+from base.tests.colleagues import KEPT, SAVED, written_by
 from base.tenancy.context import current_alias
 
 from .conftest import HUB_DB, MADRID, at, make_appointment
@@ -91,15 +92,11 @@ def test_the_history_line_of_a_restored_appointment_comes_and_goes_with_its_migr
 def test_a_history_line_saved_with_a_colleague_s_address_keeps_only_what_goes_before_it(database):
     restored = [("appointment", "0004_history_restored")]
     before = migrate(database, restored)
-    for number, actor in enumerate(("bea.lopez@example.com", "Luis García", "API · orders@shop.example", "")):
+    for number, actor in enumerate(SAVED):
         history_line(before, database, f"APT-{number}", actor=actor)
-    kept = ["", "API · orders@shop.example", "Luis García", "bea.lopez"]
+    lines = [("History", "actor")]
 
     after = migrate(database, [("appointment", "0005_actor_without_address")])
 
-    assert actors(after, database) == kept
-    assert actors(migrate(database, restored), database) == kept
-
-
-def actors(state, database) -> list[str]:
-    return sorted(state.get_model("appointment", "History").objects.using(database.alias).values_list("actor", flat=True))
+    assert written_by(after, database, "appointment", lines) == dict.fromkeys(lines, KEPT)
+    assert written_by(migrate(database, restored), database, "appointment", lines) == dict.fromkeys(lines, KEPT)

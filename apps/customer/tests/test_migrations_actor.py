@@ -4,6 +4,7 @@ saved by the address of an account without a name keeps what goes before the «@
 API key's keep theirs. Back, nothing changes."""
 
 from apps.whatsapp_inbox.tests.test_migrations import database, migrate
+from base.tests.colleagues import KEPT, SAVED, written_by
 
 #: The fixture taken from the inbox's migration tests: a business's database cloned from the template.
 __all__ = ["database"]
@@ -11,14 +12,7 @@ __all__ = ["database"]
 APP = "customer"
 BEFORE = [(APP, "0004_search_text_without_contact")]
 AFTER = [(APP, "0005_actor_without_address")]
-SAVED = ("bea.lopez@example.com", "Luis García", "API · orders@shop.example", "")
-KEPT = ["", "API · orders@shop.example", "Luis García", "bea.lopez"]
-WHO = {"Activity": "actor", "Consent": "recorded_by", "HealthRecord": "updated_by"}
-
-
-def written_by(apps, database) -> dict[str, list[str]]:
-    rows = {model: apps.get_model(APP, model).objects.using(database.alias) for model in WHO}
-    return {model: sorted(rows[model].values_list(field, flat=True)) for model, field in WHO.items()}
+WHO = [("Activity", "actor"), ("Consent", "recorded_by"), ("HealthRecord", "updated_by")]
 
 
 def test_who_wrote_on_a_card_saved_by_their_address_keeps_only_what_goes_before_it(database):
@@ -29,5 +23,5 @@ def test_who_wrote_on_a_card_saved_by_their_address_keeps_only_what_goes_before_
         old.get_model(APP, "Consent").objects.using(database.alias).create(customer=card, state="granted", recorded_by=who)
         old.get_model(APP, "HealthRecord").objects.using(database.alias).create(customer=card, updated_by=who)
 
-    assert written_by(migrate(database, AFTER), database) == dict.fromkeys(WHO, KEPT)
-    assert written_by(migrate(database, BEFORE), database) == dict.fromkeys(WHO, KEPT)
+    assert written_by(migrate(database, AFTER), database, APP, WHO) == dict.fromkeys(WHO, KEPT)
+    assert written_by(migrate(database, BEFORE), database, APP, WHO) == dict.fromkeys(WHO, KEPT)

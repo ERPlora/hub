@@ -26,3 +26,17 @@ def signed_in(username: str, role: str = "hub_employee", **account) -> Client:
     client = Client()
     client.force_login(user)
     return client
+
+
+#: Who acted, as a migration that names them without their address finds it kept: an account without a name (by its
+#: address), a person, an API key whose name holds an «@», and nobody.
+SAVED = (ADDRESS, "Luis García", "API · orders@shop.example", "")
+#: The same once the migration ran, sorted: only the address lost what goes after its «@».
+KEPT = sorted([SHOWN, "Luis García", "API · orders@shop.example", ""])
+
+
+def written_by(apps, database, app: str, where) -> dict[tuple[str, str], list[str]]:
+    """Who acted, sorted, on each ``(model, field)`` of ``where`` in ``app``, as the migration state ``apps`` reads
+    ``database``."""
+    rows = {model: apps.get_model(app, model).objects.using(database.alias) for model, _ in where}
+    return {(model, field): sorted(rows[model].values_list(field, flat=True)) for model, field in where}
