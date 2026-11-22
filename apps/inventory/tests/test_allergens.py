@@ -21,14 +21,13 @@ from apps.inventory.tests.test_queries import read_csv
 from apps.inventory.tests.test_services import (
     TAX,
     create,
-    import_products,
     listen,
     outbox,
     received,
-    row,
     run,
     update,
 )
+from apps.inventory.tests.test_services_imports import import_products, row
 from apps.tax.models import TaxCategory
 from base.tenancy.context import current_alias, use_hub
 
