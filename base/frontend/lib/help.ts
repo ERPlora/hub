@@ -7,6 +7,19 @@ export interface HelpFlowGroup {
   flows: HelpFlow[];
 }
 
+/** What the window's content takes and hands on to its list of tasks: the help, the tab in view and the module's icon. */
+export interface HelpViewProps {
+  help: AppHelp;
+  current?: HelpScreen;
+  icon: string;
+}
+
+/** What both report: the title of the task last opened and the screen a link of the help goes to. */
+export interface HelpViewEmits {
+  expand: [title: string];
+  go: [path: string];
+}
+
 const normalizedPath = (path: string): string => (path === '/' ? path : path.replace(/\/+$/, ''));
 
 export function resolveScreen(screens: HelpScreen[], routePath: string): HelpScreen | undefined {

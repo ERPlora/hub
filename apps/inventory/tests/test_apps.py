@@ -9,7 +9,6 @@ from live.context import OperationContext
 from live.live_registry import live_registry
 from live.meta import (
     Category,
-    Help,
     LiveAppConfig,
     Nav,
     SetupCheck,
@@ -132,16 +131,47 @@ def test_the_help_window_s_tabs_are_the_menu_s_entries():
 
 
 def test_its_help_window_plays_how_inventory_works_in_spanish_and_in_english():
-    assert inventory().help == Help(videos={"es": "dIppfjMEKWo", "en": "Pet7Q2ayo_Y"})
+    assert inventory().help.videos == {"es": "dIppfjMEKWo", "en": "Pet7Q2ayo_Y"}
+
+
+def read_help(language: str):
+    ctx = OperationContext(scope=A, actor="ana", permissions=frozenset({"base.view_home"}), language=language)
+    return get("base.help.get")(ctx, AppHelpIn(app="inventory"))
 
 
 @HUB_DB
 def test_the_help_window_gets_the_video_in_the_person_s_language():
-    def video(language: str) -> str | None:
-        ctx = OperationContext(scope=A, actor="ana", permissions=frozenset({"base.view_home"}), language=language)
-        return get("base.help.get")(ctx, AppHelpIn(app="inventory")).video
+    videos = [read_help(language).video for language in ("es", "en", "en-gb")]
+    assert videos == ["dIppfjMEKWo", "Pet7Q2ayo_Y", "Pet7Q2ayo_Y"]
 
-    assert (video("es"), video("en"), video("en-gb")) == ("dIppfjMEKWo", "Pet7Q2ayo_Y", "Pet7Q2ayo_Y")
+
+#: The short video of each task, by the flows it shows: its Spanish and its English one.
+TASK_VIDEOS = [
+    (("INVENTORY-F01", "INVENTORY-F02", "INVENTORY-F04"), "L4LipaZOq40", "hzMXqJHeFos"),
+    (("INVENTORY-F30", "INVENTORY-F31"), "yBhRFR1f_6E", "Z1MtnTUSGPQ"),
+    (("INVENTORY-F35",), "DFK01vdQIVE", "FUzkFMxT0ic"),
+    (("INVENTORY-F29", "INVENTORY-F03"), "GL4yDJmLYSA", "ekG-0-deeVc"),
+    (("INVENTORY-F09",), "VJYcIj1zuDU", "biNLckdpSyg"),
+    (("INVENTORY-F11",), "QPklnAbvc58", "RLScnZGT6qU"),
+    (("INVENTORY-F13",), "bT10ePok7D0", "-wCJF6Slq2E"),
+    (("INVENTORY-F14",), "UhYUS4HjOOU", "WuR4YbL1isc"),
+    (("INVENTORY-F15",), "O3U9Jejg13Y", "sARCVGUjtwQ"),
+    (("INVENTORY-F26",), "Yek9FtgeJGc", "mh-mnQbzXEc"),
+    (("INVENTORY-F20",), "Vwb3kAQ9O4U", "ZGFEjiIzjuo"),
+    (("INVENTORY-F06", "INVENTORY-F07"), "T9mYixTpiiU", "uu2RtLPsHkQ"),
+    (("INVENTORY-F08",), "A47AOMAoQdo", "ovjk6OQA-78"),
+    (("INVENTORY-F16",), "GkYZip01B5s", "96AlQ2-UR-s"),
+    (("INVENTORY-F10",), "Zde0OM4WtlM", "MecB51iNSrI"),
+]
+
+
+@HUB_DB
+def test_each_task_of_the_help_window_shows_its_short_video_in_the_person_s_language():
+    def videos(language: str) -> dict[str, list[str]]:
+        return {flow.id: flow.videos for flow in read_help(language).flows if flow.videos}
+
+    assert videos("es") == {flow: [es] for flows, es, _en in TASK_VIDEOS for flow in flows}
+    assert videos("en") == {flow: [en] for flows, _es, en in TASK_VIDEOS for flow in flows}
 
 
 #: The reads that only name a record on the assistant's card: no tool, no route.

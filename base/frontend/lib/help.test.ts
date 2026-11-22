@@ -14,7 +14,7 @@ const screens: HelpScreen[] = [
 ];
 
 function flow(id: string, title: string, screenIds: string[], steps = 'Open the table'): HelpFlow {
-  return { id, title, screens: screenIds, steps, failure: '' };
+  return { id, title, screens: screenIds, steps, failure: '', videos: [] };
 }
 
 const answer: AppHelp = {
