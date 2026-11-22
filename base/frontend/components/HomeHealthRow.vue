@@ -161,8 +161,10 @@ watch(
   list-style: none;
 }
 
+/* Without room beside its label, the action goes under it whole, never cut in two lines. */
 .home-health-item {
   display: inline-flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 2px;
 }
@@ -170,6 +172,7 @@ watch(
 .home-health-action,
 .home-health-system {
   margin: 0;
+  white-space: nowrap;
 }
 
 .home-health-system {
