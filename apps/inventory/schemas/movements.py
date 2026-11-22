@@ -8,6 +8,7 @@ from uuid import UUID
 from ninja import Field, Schema
 
 from apps.inventory.schemas.fields import Page, PageIn
+from base.sensitive import COSTS
 
 MovementType = Literal["initial", "reception", "sale", "void", "count", "write_off", "refund"]
 MovementSort = Literal[
@@ -69,7 +70,10 @@ class MovementOut(Schema):
         description="The reference as a person reads it: for a sale, void or refund, the number of its ticket or "
         "invoice (or the sale's own number), empty when Inventory never learnt it; else the reference itself."
     )
-    unit_cost: int | None = Field(description="Cost per unit in cents (receptions).", json_schema_extra={"money": True})
+    unit_cost: int | None = Field(
+        description="Cost per unit in cents (receptions); null for whoever does not see the costs.",
+        json_schema_extra={"money": True, **COSTS},
+    )
     actor: str = Field(description="Who made it.")
     created_at: datetime = Field(description="When.")
 

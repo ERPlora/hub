@@ -17,6 +17,7 @@ import { useT } from '../composables/useT';
 import { formatCount, formatMoney, formatQuantity, useBusinessMoney } from '../lib/format';
 
 type LowRow = OutputOf<'inventory.product.list_low_stock'>['rows'][number];
+type Kpi = { id: string; label: string; value: string; icon: string; to?: string; note?: string; tone?: 'neutral' | 'warning' | 'danger' };
 
 const PRODUCTS = '/inventory/products';
 
@@ -37,7 +38,7 @@ const kpis = computed(() => {
   const s = summary.value;
   if (!s) return [];
   const count = (n: number) => formatCount(n, locale.value);
-  return [
+  const figures: Kpi[] = [
     { id: 'tracked', label: t('inventory.dashboard.tracked'), value: count(s.products_tracked), icon: 'ion:cube-outline', to: PRODUCTS },
     { id: 'in-stock', label: t('inventory.dashboard.inStock'), value: count(s.products_in_stock), icon: 'ion:checkmark-circle-outline', to: PRODUCTS },
     {
@@ -56,14 +57,11 @@ const kpis = computed(() => {
       to: PRODUCTS,
       tone: s.products_low_stock > 0 ? ('warning' as const) : ('neutral' as const),
     },
-    {
-      id: 'value',
-      label: t('inventory.dashboard.value'),
-      value: formatMoney(s.stock_value, locale.value, business.value),
-      icon: 'ion:wallet-outline',
-      note: t('inventory.dashboard.valueAtCost'),
-    },
   ];
+  // Empty for whoever does not see the costs (base.view_costs): no tile rather than a value of nothing.
+  if (s.stock_value === null) return figures;
+  const value = formatMoney(s.stock_value, locale.value, business.value);
+  return [...figures, { id: 'value', label: t('inventory.dashboard.value'), value, icon: 'ion:wallet-outline', note: t('inventory.dashboard.valueAtCost') }];
 });
 
 // Each cell has its own hook: the figures are read exactly, never out of the whole row.
@@ -133,7 +131,7 @@ const columns = computed<DataTableColumn<LowRow>[]>(() => [
         />
       </div>
       <p
-        v-if="summary && summary.products_without_cost > 0"
+        v-if="summary && summary.stock_value !== null && summary.products_without_cost > 0"
         class="inventory-dashboard__note"
         data-testid="inventory-dashboard-without-cost"
       >
