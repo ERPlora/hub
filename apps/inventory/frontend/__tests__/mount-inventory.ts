@@ -4,6 +4,7 @@ import type { SessionMe } from '@erplora/ui/shell';
 import { ApiError, type LiveClient, type OpName } from '@erplora/ui/sdk';
 import type { Component, Ref } from 'vue';
 
+import { withMenu } from '../../../../base/frontend/__tests__/app-menu';
 import type { ApiCall, StreamCall } from '../../../../packages/ui/src/sdk/__tests__/live-harness';
 import { flush, mountInShell, overBase, page, resultFrame } from '../../../../base/frontend/__tests__/mount-in-shell';
 import { business } from '../../../../base/frontend/__tests__/business';
@@ -32,20 +33,20 @@ const ALL = [
 ];
 
 /** An owner or a manager: every inventory permission (apps.py `role_permissions`). */
-export const MANAGER: SessionMe = {
+export const MANAGER: SessionMe = withMenu('inventory', {
   user: { id: 'u1', label: 'Ana' },
   permissions: ALL,
   menu: [],
   apps: [],
   language: 'en',
-};
+});
 
 /** An employee: sees products, categories and movements, writes nothing. */
-export const EMPLOYEE: SessionMe = {
+export const EMPLOYEE: SessionMe = withMenu('inventory', {
   ...MANAGER,
   user: { id: 'u2', label: 'Leo' },
   permissions: ['inventory.view_product', 'inventory.view_category', 'inventory.view_stock', 'tax.view'],
-};
+});
 
 /** The business of the hub (`base.business.get`): one in Spain, in euros, unless a test says another
  *  (flow business-currency: the money of every screen is the business's). */

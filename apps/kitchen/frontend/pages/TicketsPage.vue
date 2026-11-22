@@ -29,7 +29,9 @@ import { useServerTable } from '../composables/useServerTable';
 import { useLocale, useT } from '../composables/useT';
 import { formatDateTime, formatMoney, useBusinessMoney } from '../lib/format';
 import type { OrderType, Priority, TicketListIn, TicketRowOut, TicketStatus } from '../operations';
-import { kitchenTabs } from '../tabs';
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
+
+const tabs = useAppTabs('kitchen');
 
 const STATUSES: readonly TicketStatus[] = ['pending', 'preparing', 'ready', 'served', 'cancelled'];
 const TYPES: readonly OrderType[] = ['dine_in', 'takeaway', 'delivery'];
@@ -210,7 +212,7 @@ async function confirmCancel(): Promise<void> {
   <AppPage
     :title="$t('kitchen.title')"
     content-layout="fill"
-    :tabs="kitchenTabs($t, { settings: session.can('kitchen.change_settings') })"
+    :tabs="tabs"
     :tabs-label="$t('kitchen.tabs.label')"
   >
     <PageNotices

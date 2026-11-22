@@ -8,7 +8,17 @@ import { describe, expect, it } from 'vitest';
 import type { Component } from 'vue';
 
 import type { AliasOut, CategoryRowOut } from '../operations';
-import { BYE, EMPLOYEE, errorFrame, flush, type MountOptions, mountTax } from '../__tests__/mount-tax';
+import { withFirstEntries } from '../../../../base/frontend/__tests__/app-menu';
+import {
+  BYE,
+  EMPLOYEE,
+  errorFrame,
+  flush,
+  itPaintsTheTabsItsSessionOpens,
+  MANAGER,
+  type MountOptions,
+  mountTax,
+} from '../__tests__/mount-tax';
 import AliasCreateModal from '../components/AliasCreateModal.vue';
 import SetupNotice from '../components/SetupNotice.vue';
 import AliasesPage from './AliasesPage.vue';
@@ -211,4 +221,8 @@ describe('AliasesPage: «Your taxes» (TAX-F17)', () => {
     expect(s.wrapper.findComponent(SetupNotice).exists()).toBe(false);
     expect(s.params('tax.rule.status')).toEqual([]);
   });
+});
+
+describe('AliasesPage: its tab bar', () => {
+  itPaintsTheTabsItsSessionOpens(() => setup({ session: withFirstEntries(MANAGER, 1) }), [['categories', 'Categories']]);
 });

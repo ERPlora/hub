@@ -16,7 +16,9 @@ import { useLocale, useT } from '../composables/useT';
 import { formatPercent } from '../lib/format';
 import { categoryDisplayName, chargesNoTax } from '../lib/rules';
 import type { CategoryListIn, CategoryRowOut } from '../operations';
-import { taxTabs } from '../tabs';
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
+
+const tabs = useAppTabs('tax');
 
 const session = useSession();
 const canManage = computed(() => session.can('tax.manage'));
@@ -100,7 +102,7 @@ const columns = computed<DataTableColumn<CategoryRowOut>[]>(() => [
   <AppPage
     :title="$t('tax.title')"
     content-layout="fill"
-    :tabs="taxTabs($t)"
+    :tabs="tabs"
     :tabs-label="$t('tax.tabs.label')"
   >
     <PageNotices

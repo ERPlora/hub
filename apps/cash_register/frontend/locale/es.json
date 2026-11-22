@@ -2,9 +2,7 @@
   "cash_register": {
     "title": "Caja",
     "tabs": {
-      "label": "Secciones de Caja",
-      "sessions": "Caja",
-      "settings": "Ajustes"
+      "label": "Secciones de Caja"
     },
     "live": {
       "reconnecting": "Reconectando… las cifras pueden no estar al día.",

@@ -20,7 +20,6 @@ describe('online booking catalogues (en source + es)', () => {
   });
 
   it('keep the old screens’ words (the WORKBOOK’s screens)', () => {
-    expect(ES.get('online_booking.tabs.bookings')).toBe('Reservas');
     expect(ES.get('online_booking.settings.title')).toBe('Configuración de la página de reservas');
     expect(ES.get('online_booking.settings.saved')).toBe('Configuración guardada.');
     expect(ES.get('online_booking.settings.loadError')).toBe('Error cargando la configuración');

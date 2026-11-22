@@ -5,6 +5,7 @@ import { configureAssistant } from '@erplora/ui/components';
 import type { SessionMe } from '@erplora/ui/shell';
 import type { Component } from 'vue';
 
+import { withMenu } from '../../../../base/frontend/__tests__/app-menu';
 import type { StreamCall } from '../../../../packages/ui/src/sdk/__tests__/live-harness';
 import { mountInShell, overBase, settle } from '../../../../base/frontend/__tests__/mount-in-shell';
 import { business, IN_YEN as JAPANESE } from '../../../../base/frontend/__tests__/business';
@@ -41,19 +42,19 @@ export const SALE_PERMISSIONS = [
 ];
 const READS = ['inventory.view_product', 'inventory.view_category', 'customer.view', 'customer.manage', 'staff.view', 'tax.view'];
 
-export const MANAGER: SessionMe = {
+export const MANAGER: SessionMe = withMenu('sale', {
   user: { id: 'u1', label: 'Ana' },
   permissions: [...SALE_PERMISSIONS, ...READS],
   menu: [],
   apps: [],
   language: 'en',
-};
+});
 
 /** The employee (the old cashier too): builds the check, charges it, reads the sales. */
-export const EMPLOYEE: SessionMe = {
+export const EMPLOYEE: SessionMe = withMenu('sale', {
   ...MANAGER,
   permissions: ['sale.view_sale', 'sale.add_sale', 'sale.take_payment', 'sale.view_paymentmethod', ...READS],
-};
+});
 
 export interface MountOptions {
   props?: Record<string, unknown>;

@@ -30,7 +30,9 @@ import { useServerTable } from '../composables/useServerTable';
 import { useLocale, useT } from '../composables/useT';
 import { formatMoney, formatPercentBp, useBusinessMoney } from '../lib/format';
 import type { PackageListIn, PackageOut, PackageStatus } from '../operations';
-import { serviceTabs } from '../tabs';
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
+
+const tabs = useAppTabs('service');
 
 const STATUSES: readonly PackageStatus[] = ['active', 'archived', 'deleted'];
 const TONE: Record<PackageStatus, 'success' | 'neutral' | 'danger'> = { active: 'success', archived: 'neutral', deleted: 'danger' };
@@ -161,7 +163,7 @@ function onRowClick(row: PackageOut): void {
   <AppPage
     :title="$t('service.title')"
     content-layout="fill"
-    :tabs="serviceTabs($t, { settings: session.can('service.manage_settings') })"
+    :tabs="tabs"
     :tabs-label="$t('service.tabs.label')"
   >
     <PageNotices

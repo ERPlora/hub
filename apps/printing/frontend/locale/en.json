@@ -2,11 +2,7 @@
   "printing": {
     "title": "Printing",
     "tabs": {
-      "label": "Printing sections",
-      "printers": "Printers",
-      "devices": "Devices",
-      "jobs": "Queue",
-      "settings": "Settings"
+      "label": "Printing sections"
     },
     "usage": {
       "receipt": "Receipt",

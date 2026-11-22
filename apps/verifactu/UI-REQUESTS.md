@@ -19,5 +19,5 @@ de `ERPlora/erplora-next` como `verifactu:ui-icons`, `verifactu:ui-money-format`
 | El formateador de momentos de la cronología del Inicio (`formatMoment` de `base/frontend/lib/home.ts`) en `@erplora/ui/components/format` | Que «Eventos AEAT recientes» diga «16:37», «Ayer 16:37» o la fecha corta, como «Actividad reciente» de Ventas en el mismo tablero | `formatDateTime`: fecha y hora enteras, como la pestaña Eventos |
 | Un componente de subida de un fichero cualquiera con zona para soltarlo (`ImageUpload` es solo de imágenes y sin soltar) | Subir el `.p12` / `.pfx` en «Mi certificado» y los PDF del otorgamiento arrastrándolos, como el módulo actual | Un botón y el nombre del fichero (`frontend/lib/files.ts`) |
 
-Al registrar un icono, cambiar a la vez `apps.py` (`icon`, `navigation`, `setup` y `widgets`), `frontend/tabs.ts`,
-las páginas que lo pintan y sus tests (`tests/test_apps.py`, `frontend/tabs.test.ts`), y correr `pnpm gen:app-icons`.
+Al registrar un icono, cambiar a la vez `apps.py` (`icon`, `navigation`, `setup` y `widgets`),
+las páginas que lo pintan y sus tests (`tests/test_apps.py`), y correr `pnpm gen:app-icons`.

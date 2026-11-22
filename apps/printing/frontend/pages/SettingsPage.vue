@@ -7,7 +7,9 @@ import { AppPage, useSession } from '@erplora/ui/shell';
 import { computed } from 'vue';
 
 import SettingsCard from '../components/SettingsCard.vue';
-import { printingTabs } from '../tabs';
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
+
+const tabs = useAppTabs('printing');
 
 const session = useSession();
 const canManage = computed(() => session.can('printing.manage_settings'));
@@ -16,7 +18,7 @@ const canManage = computed(() => session.can('printing.manage_settings'));
 <template>
   <AppPage
     :title="$t('printing.title')"
-    :tabs="printingTabs($t)"
+    :tabs="tabs"
     :tabs-label="$t('printing.tabs.label')"
     content-layout="detail"
   >

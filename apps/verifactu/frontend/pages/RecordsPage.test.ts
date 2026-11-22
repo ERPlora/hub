@@ -11,7 +11,14 @@ import { itReadsAmountFiltersAsTheHub } from '../../../../base/frontend/__tests_
 import { outOfTheApp } from '../../../../base/frontend/__tests__/app-download';
 import { business, IN_YEN } from '../../../../base/frontend/__tests__/business';
 import { insideTheInstalledApp } from '../__tests__/system-browser';
-import { errorFrame, flush, type MountOptions, mountVerifactu } from '../__tests__/mount-verifactu';
+import {
+  errorFrame,
+  flush,
+  itPaintsTheTabsItsSessionOpens,
+  MANAGER,
+  type MountOptions,
+  mountVerifactu,
+} from '../__tests__/mount-verifactu';
 import { plain } from '../lib/format';
 import type { RecordRowOut } from '../operations';
 import RecordsPage from './RecordsPage.vue';
@@ -419,4 +426,11 @@ describe('RecordsPage: the list fills the page', () => {
     const s = await setup();
     expect(listFillProblems(s.wrapper)).toEqual([]);
   });
+});
+
+describe('RecordsPage: its tab bar', () => {
+  itPaintsTheTabsItsSessionOpens(
+    () => setup({ session: MANAGER }),
+    [['records', 'Records'], ['contingency', 'Contingency'], ['events', 'Events'], ['recovery', 'Recovery']],
+  );
 });

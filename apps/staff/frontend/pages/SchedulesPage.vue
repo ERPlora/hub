@@ -5,20 +5,19 @@
 // schedule: «No staff members yet» and «Add staff member», which opens Staff.
 import { Combo, type ComboOption, EmptyState } from '@erplora/ui/components';
 import { useLive, useLiveClient } from '@erplora/ui/sdk';
-import { AppPage, useSession } from '@erplora/ui/shell';
+import { AppPage } from '@erplora/ui/shell';
 import { IonButton } from '@ionic/vue';
 import { computed, ref } from 'vue';
 import { useRouter } from 'vue-router';
 
 import MemberSchedules from '../components/MemberSchedules.vue';
 import { asCombo, memberSearch } from '../lib/pickers';
-import { staffTabs } from '../tabs';
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 
-const session = useSession();
+const tabs = useAppTabs('staff');
+
 const router = useRouter();
 const client = useLiveClient();
-const canSettings = computed(() => session.can('staff.manage_settings'));
-const canSeePay = computed(() => session.can('staff.view_compensation'));
 
 /** The first member by name: whether there is anyone, and whom to show to begin with. */
 const { data: first, status } = useLive('staff.member.list', { sort: 'name', limit: 1 });
@@ -47,7 +46,7 @@ function addMember(): void {
   <AppPage
     :title="$t('staff.title')"
     content-layout="fill"
-    :tabs="staffTabs($t, { settings: canSettings, commissions: canSeePay })"
+    :tabs="tabs"
     :tabs-label="$t('staff.tabs.label')"
   >
     <p

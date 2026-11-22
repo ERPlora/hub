@@ -6,6 +6,7 @@ import type { ActionNotice, ActionNoticeSource, SessionMe } from '@erplora/ui/sh
 import type { OpName } from '@erplora/ui/sdk';
 import type { Component } from 'vue';
 
+import { withMenu } from '../../../../base/frontend/__tests__/app-menu';
 import { memoryRouter, mountInShell, overBase } from '../../../../base/frontend/__tests__/mount-in-shell';
 import type { Business } from '../../../../base/frontend/operations/business';
 import type { SetupStatus } from '../../../../base/frontend/operations/home';
@@ -48,25 +49,25 @@ export const INVOICE_PERMISSIONS = [
 const READS = ['customer.view', 'customer.manage', 'tax.view', 'sale.view_sale'];
 
 /** The owner (and the admin): every permission of the app. */
-export const OWNER: SessionMe = {
+export const OWNER: SessionMe = withMenu('invoice', {
   user: { id: 'u1', label: 'Ana' },
   permissions: [...INVOICE_PERMISSIONS, ...READS],
   menu: [],
   apps: [],
   language: 'en',
-};
+});
 
 /** The manager: everything but the issuer. */
-export const MANAGER: SessionMe = {
+export const MANAGER: SessionMe = withMenu('invoice', {
   ...OWNER,
   permissions: ['invoice.view_invoice', 'invoice.add_invoice', 'invoice.rectify_invoice', 'invoice.manage_series', ...READS],
-};
+});
 
 /** The employee: looks, prints, issues by hand and marks paid. */
-export const EMPLOYEE: SessionMe = {
+export const EMPLOYEE: SessionMe = withMenu('invoice', {
   ...OWNER,
   permissions: ['invoice.view_invoice', 'invoice.add_invoice', ...READS],
-};
+});
 
 export interface MountOptions {
   props?: Record<string, unknown>;

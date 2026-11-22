@@ -17,16 +17,16 @@ describe('useT', () => {
       defineComponent({
         setup() {
           const t = useT();
-          const text = computed(() => `${t('sale.title')} · ${t('sale.tabs.pos', { n: 2 })}`);
+          const text = computed(() => `${t('sale.title')} · ${t('sale.tabs.label')}`);
           return () => h('p', text.value);
         },
       }),
       { global: { plugins: [i18n] } },
     );
-    expect(wrapper.text()).toBe('Sales & POS · Sell');
+    expect(wrapper.text()).toBe('Sales & POS · Sales & POS sections');
     i18n.global.locale.value = 'es';
     await wrapper.vm.$nextTick();
-    expect(wrapper.text()).toBe('Ventas / TPV · Vender');
+    expect(wrapper.text()).toBe('Ventas / TPV · Secciones de Ventas / TPV');
   });
 
   it('only works inside a component, which is where the app’s translator lives', () => {

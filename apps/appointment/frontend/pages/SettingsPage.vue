@@ -14,7 +14,9 @@ import { computed } from 'vue';
 import PageNotices from '../components/PageNotices.vue';
 import { useT } from '../composables/useT';
 import type { SettingsOut } from '../operations';
-import { appointmentTabs } from '../tabs';
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
+
+const tabs = useAppTabs('appointment');
 
 const NUMBERS = [
   'default_duration',
@@ -53,7 +55,7 @@ function toForm(settings: SettingsOut): Form {
 <template>
   <AppPage
     :title="$t('appointment.title')"
-    :tabs="appointmentTabs(t, { settings: canManage })"
+    :tabs="tabs"
     :tabs-label="$t('appointment.tabs.label')"
     content-layout="detail"
   >

@@ -8,7 +8,9 @@ import { computed } from 'vue';
 
 import RegistersCard from '../components/RegistersCard.vue';
 import SettingsCard from '../components/SettingsCard.vue';
-import { cashRegisterTabs } from '../tabs';
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
+
+const tabs = useAppTabs('cash_register');
 
 const session = useSession();
 const canManage = computed(() => session.can('cash_register.manage_settings'));
@@ -17,7 +19,7 @@ const canManage = computed(() => session.can('cash_register.manage_settings'));
 <template>
   <AppPage
     :title="$t('cash_register.title')"
-    :tabs="cashRegisterTabs($t)"
+    :tabs="tabs"
     :tabs-label="$t('cash_register.tabs.label')"
     content-layout="detail"
   >

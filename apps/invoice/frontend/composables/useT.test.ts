@@ -17,16 +17,16 @@ describe('useT', () => {
       defineComponent({
         setup() {
           const t = useT();
-          const text = computed(() => `${t('invoice.title')} · ${t('invoice.tabs.series', { n: 2 })}`);
+          const text = computed(() => `${t('invoice.title')} · ${t('invoice.tabs.label')}`);
           return () => h('p', text.value);
         },
       }),
       { global: { plugins: [i18n] } },
     );
-    expect(wrapper.text()).toBe('Invoicing · Series');
+    expect(wrapper.text()).toBe('Invoicing · Invoicing sections');
     i18n.global.locale.value = 'es';
     await wrapper.vm.$nextTick();
-    expect(wrapper.text()).toBe('Facturación · Series');
+    expect(wrapper.text()).toBe('Facturación · Secciones de Facturación');
   });
 
   it('only works inside a component, which is where the app’s translator lives', () => {

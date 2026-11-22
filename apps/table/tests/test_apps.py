@@ -108,7 +108,7 @@ def test_what_each_role_gets():
 
 
 def test_navigation_is_four_sections_and_the_settings_with_registered_icons():
-    # Settings opens only to whoever may save them, as its tab of the pages (frontend/tabs.ts).
+    # Settings opens only to whoever may save them, and so does its tab of the pages.
     entries = table().navigation
     assert all(isinstance(entry, Nav) for entry in entries)
     assert [(entry.id, str(entry.label), entry.icon, entry.path, entry.permission) for entry in entries] == [

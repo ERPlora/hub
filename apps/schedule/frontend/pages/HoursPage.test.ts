@@ -9,7 +9,17 @@ import { describe, expect, it } from 'vitest';
 import type { Component } from 'vue';
 
 import type { WeekDayOut, WeekOut } from '../operations';
-import { EMPLOYEE, errorFrame, flush, type MountOptions, mountSchedule, settle } from '../__tests__/mount-schedule';
+import { withMenu } from '../../../../base/frontend/__tests__/app-menu';
+import {
+  EMPLOYEE,
+  errorFrame,
+  flush,
+  itPaintsTheTabsItsSessionOpens,
+  MANAGER,
+  type MountOptions,
+  mountSchedule,
+  settle,
+} from '../__tests__/mount-schedule';
 import DayHoursModal from '../components/DayHoursModal.vue';
 import HoursPage from './HoursPage.vue';
 import { listFillProblems } from '../../../../frontend/testing/list-fill';
@@ -61,7 +71,7 @@ describe('HoursPage', () => {
     expect(page.props('title')).toBe('Schedules');
     expect((page.props('tabs') as Array<{ id: string; to: string }>).map((t) => [t.id, t.to])).toEqual([
       ['hours', '/schedule/hours'],
-      ['special_days', '/schedule/special-days'],
+      ['special-days', '/schedule/special-days'],
       ['settings', '/schedule/settings'],
     ]);
     expect(s.find('schedule-hours-loading').exists()).toBe(true);
@@ -182,4 +192,11 @@ describe('HoursPage: the list fills the page', () => {
     const s = await setup();
     expect(listFillProblems(s.wrapper)).toEqual([]);
   });
+});
+
+describe('HoursPage: its tab bar', () => {
+  itPaintsTheTabsItsSessionOpens(
+    () => setup({ session: withMenu('schedule', { ...MANAGER, permissions: ['schedule.change'] }) }),
+    [['hours', 'Hours'], ['special-days', 'Special days']],
+  );
 });

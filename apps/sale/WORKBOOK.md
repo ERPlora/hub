@@ -118,7 +118,8 @@ Configuración inicial, paso a paso:
 ## Pantallas
 
 Ventas / TPV se abre desde el menú **Ventas / TPV** y tiene cinco entradas: **Vender**, **Ventas**,
-**Notas rápidas**, **Secciones** y **Ajustes**. «Secciones» son los departamentos del TPV: la
+**Notas rápidas**, **Secciones** y **Ajustes**; las tres últimas, solo para quien puede cambiar los ajustes de
+Ventas. «Secciones» son los departamentos del TPV: la
 palabra corta cabe en la barra de pestañas de un móvil con las cinco a la vista.
 
 ### Vender

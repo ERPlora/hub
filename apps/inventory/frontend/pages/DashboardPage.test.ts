@@ -9,7 +9,18 @@ import { AppPage } from '@erplora/ui/shell';
 import { describe, expect, it, vi } from 'vitest';
 import type { Component } from 'vue';
 
-import { BYE, EMPLOYEE, errorFrame, flush, type MountOptions, mountInventory, page, subId } from '../__tests__/mount-inventory';
+import { withFirstEntries } from '../../../../base/frontend/__tests__/app-menu';
+import {
+  BYE,
+  EMPLOYEE,
+  errorFrame,
+  flush,
+  itPaintsTheTabsItsSessionOpens,
+  mountInventory,
+  type MountOptions,
+  page,
+  subId,
+} from '../__tests__/mount-inventory';
 import KpiTile from '../components/KpiTile.vue';
 import { formatMoney } from '../lib/format';
 import DashboardPage from './DashboardPage.vue';
@@ -201,4 +212,8 @@ describe('DashboardPage', () => {
     await s.lowStock(page([], 0, 5));
     expect(s.prop('emptyMessage')).toBe('Sin productos en stock bajo.');
   });
+});
+
+describe('DashboardPage: its tab bar', () => {
+  itPaintsTheTabsItsSessionOpens(() => setup({ session: withFirstEntries(EMPLOYEE, 1) }), [['dashboard', 'Dashboard']]);
 });

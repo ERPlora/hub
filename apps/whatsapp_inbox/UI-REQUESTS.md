@@ -8,7 +8,7 @@ llegue. Revisado al cerrar la app (CLOSE-WHATSAPP_INBOX, 2026-11-01) contra `pac
 ## Iconos
 
 - `ion:logo-whatsapp` — icono del módulo (`apps.py` `icon`), entrada de menú y pestaña **Bandeja de
-  entrada** (`frontend/tabs.ts`). Es el del bloque de ajustes del producto actual. Hoy:
+  entrada**. Es el del bloque de ajustes del producto actual. Hoy:
   `ion:chatbubbles-outline` (el de la navegación del producto actual).
 - `ion:send-outline` — botón **Enviar** del cuadro de respuesta (`components/MessageComposer.vue`).
   Hoy: botón solo con texto (está registrado `lucide:send`, de otro juego que el resto de la pantalla).
@@ -16,9 +16,8 @@ llegue. Revisado al cerrar la app (CLOSE-WHATSAPP_INBOX, 2026-11-01) contra `pac
   (`components/ThreadView.vue`), con `ion:image-outline`, que ya está registrado. Hoy: el tipo escrito
   («Foto», «Documento»…), los cuatro a la vez para que la burbuja no mezcle icono y texto.
 
-Al registrar `logo-whatsapp`, cambiar a la vez `apps.py` (`icon` y `navigation`), `frontend/tabs.ts`,
-`tests/test_apps.py` y `pnpm gen:app-icons`; `tabs.test.ts` exige que menú y pestañas lleven el mismo
-icono.
+Al registrar `logo-whatsapp`, cambiar a la vez `apps.py` (`icon` y `navigation`),
+`tests/test_apps.py` y `pnpm gen:app-icons`; las pestañas pintan el icono del menú.
 
 ## Hilo de mensajes (`ChatThread`)
 

@@ -70,7 +70,7 @@ def test_roles():
 
 
 def test_navigation_is_the_four_tabs_with_iconify_icons():
-    # The icons are the frontend tabbar's (apps/tax/frontend/tabs.ts) and the old menu's
+    # The icons are those of the tab bar of its pages and the old menu's
     # (`pricetags`, `receipt`, `swap-horizontal`), all registered in the shell: an unregistered one
     # paints nothing (and HubIcon throws in development).
     entries = tax().navigation

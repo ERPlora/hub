@@ -623,7 +623,7 @@ horario» de «Termina de configurar tu negocio» (SCHEDULE-F03).
 ## Cómo son las páginas (para quien lo mantiene)
 
 - `frontend/routes.ts`: `/schedule/hours`, `/schedule/special-days` y `/schedule/settings`; la barra de
-  pestañas (`frontend/tabs.ts`) lleva las tres, como el `navigation` de `apps.py`.
+  pestañas son las entradas del `navigation` de `apps.py` que la persona puede abrir (`useAppTabs`).
 - Horario lee `schedule.week.get` (la semana ya plegada y girada por el servidor) y edita con
   `schedule.week.set_day`; Días especiales, `schedule.special_day.list` y `schedule.override.list` con
   `useLiveList` (ventanas de 100) y `useServerTable`; las escrituras, con `useCommand`.

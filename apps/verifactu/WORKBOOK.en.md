@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:7b1a14960be8c34f046848020c3722a617d3468eb174506cf03cb76521b713cb -->
+<!-- generated from WORKBOOK.md sha256:665f91993f8150f1673a0a7bbe717dbd52bd19b8d83abb43ca66a65863e203f9 -->
 
 ## What it is for and who it is for
 
@@ -104,8 +104,8 @@ Initial setup, step by step:
 ## Screens
 
 Six tabs at the foot of every VeriFactu page (those of the menu, in this order): Records, Contingency, Events,
-Recovery, Configuration and Settings. All of them show with the view permission; the buttons the person cannot
-use do not show.
+Recovery, Configuration and Settings. The first four, for whoever sends records;
+Configuration and Settings, only for whoever configures VeriFactu. The buttons the person cannot use do not show.
 
 ### Records
 Every invoice and every ticket you issue has its VeriFactu record here, the latest on top, with its status at the

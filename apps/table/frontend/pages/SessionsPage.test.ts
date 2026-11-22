@@ -8,7 +8,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Component } from 'vue';
 
 import { cardIcons, switchToCards } from '../../../../base/frontend/__tests__/data-table-cards';
-import { EMPLOYEE, flush, type MountOptions, mountTable, page } from '../__tests__/mount-table';
+import {
+  EMPLOYEE,
+  flush,
+  itPaintsTheTabsItsSessionOpens,
+  type MountOptions,
+  mountTable,
+  page,
+} from '../__tests__/mount-table';
 import { charged, NOW, sessionRow, SETTINGS, zoneRow } from '../__tests__/tables';
 import RestoreModal from '../components/RestoreModal.vue';
 import SessionDetailModal from '../components/SessionDetailModal.vue';
@@ -157,6 +164,11 @@ describe('SessionsPage', () => {
     await s.show([OPEN]);
     expect(s.prop<Array<{ id: string }>>('actions').map((a) => a.id)).toEqual(['detail', 'close', 'restore']);
   });
+
+  itPaintsTheTabsItsSessionOpens(
+    () => setup({ session: EMPLOYEE }),
+    [['floor-plan', 'Floor plan'], ['sessions', 'Sessions']],
+  );
 });
 
 // The tablet shows the list as cards: under the title, each datum is told by the icon of its column, so the

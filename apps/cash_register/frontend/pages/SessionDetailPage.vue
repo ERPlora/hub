@@ -20,7 +20,9 @@ import SessionSummary from '../components/SessionSummary.vue';
 import { useT } from '../composables/useT';
 import { printRefusal, withReason } from '../../../../base/frontend/lib/print-paper';
 import * as paper from '../lib/print';
-import { cashRegisterTabs } from '../tabs';
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
+
+const tabs = useAppTabs('cash_register');
 
 /** The session of the address (the route hands it once: `props: true`). */
 const props = defineProps<{ id: string }>();
@@ -72,7 +74,7 @@ async function printReport(): Promise<void> {
   <AppPage
     :title="$t('cash_register.title')"
     back-href="/cash_register/sessions"
-    :tabs="cashRegisterTabs($t)"
+    :tabs="tabs"
     :tabs-label="$t('cash_register.tabs.label')"
   >
     <InlineFeedback

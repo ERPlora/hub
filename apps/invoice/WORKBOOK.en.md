@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:e9d5432543507d86dc90f51fa18933a1bf275f4a12c6f4fbe18fb71ed861720a -->
+<!-- generated from WORKBOOK.md sha256:3544b1668f5b20a61699abf961c6099d4e91455163e86bd102ce8643f84e66ac -->
 
 ## What it is for and who it is for
 
@@ -192,8 +192,8 @@ Error: "Could not load the series" with "Retry".
 
 ### Issuer
 Your business's fiscal details that appear on every invoice: legal name, tax ID and full address. Without them no
-ticket or invoice is issued. Only the owner and the administrator change them; the others see them without being
-able to edit them.
+ticket or invoice is issued. Only the owner and the administrator see this tab and change
+them.
 
 #### Detail
 Menu **Invoicing → Issuer**. "Legal name", "Tax ID", "Address", "Postal code", "City", "Province" and

@@ -11,7 +11,9 @@ import { IonButton, IonSelect, IonSelectOption } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
 
 import PageNotices, { blockingError } from '../components/PageNotices.vue';
-import { scheduleTabs } from '../tabs';
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
+
+const tabs = useAppTabs('schedule');
 
 const session = useSession();
 const canManage = computed(() => session.can('schedule.manage_settings'));
@@ -70,7 +72,7 @@ const saveError = computed(() => {
 <template>
   <AppPage
     :title="$t('schedule.title')"
-    :tabs="scheduleTabs($t)"
+    :tabs="tabs"
     :tabs-label="$t('schedule.tabs.label')"
   >
     <PageNotices
