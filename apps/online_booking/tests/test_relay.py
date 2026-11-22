@@ -13,7 +13,7 @@ from live.models import OutboxEvent
 
 from apps.customer.models import Customer
 from apps.online_booking.models import Booking
-from base.models import EventDelivery
+from base.models.relay import EventDelivery
 
 from .conftest import HUB_DB_COMMITTED, booking_data, public, run
 

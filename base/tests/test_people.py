@@ -26,7 +26,8 @@ from base import access, services
 from base.services import sessions
 from base import people as people_rules
 from base.permissions import permissions_for
-from base.models import AccessSettings, Credential, Hub, Membership
+from base.models.access import AccessSettings, Credential
+from base.models import Hub, Membership
 from base.tenancy.tests.business import A, B, HOST, HUB_DB, in_business_a
 from base.tests.routes import bound_routes, spa_routes
 from base.tests.test_access_pin import a_device, door
@@ -165,7 +166,7 @@ class TestWhoIsInTheBusiness:
         assert "@" not in json.dumps(answer)
 
     def test_the_name_is_the_one_of_my_profile_in_this_business(self, client, olga, eva):
-        from base.models import Profile
+        from base.models.profile import Profile
 
         Profile.objects.create(username="saas:3", first_name="Eva María", last_name="Ruiz")
         client.force_login(olga)

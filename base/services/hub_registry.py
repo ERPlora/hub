@@ -23,7 +23,8 @@ from live.outbox import notify, record_event
 from live.slugs import validate_hub_slug
 
 from base import activation, custom_domains, events, registry
-from base.models import AppActivation, Hub
+from base.models.activation import AppActivation
+from base.models import Hub
 from base.registry import hub_answer, internal_only
 from base.schemas.hub_registry import (
     HubCancelIn,

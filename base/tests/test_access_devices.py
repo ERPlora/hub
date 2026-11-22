@@ -25,7 +25,9 @@ from live.models import OutboxEvent
 from live.operations import get as get_operation
 
 from base import access
-from base.models import Hub, Membership, SessionOwner, TrustedDevice
+from base.models import Hub, Membership
+from base.models.sessions import SessionOwner
+from base.models.access import TrustedDevice
 from base.tenancy.context import use_hub
 from base.tests.test_access_account import enter
 from base.tests.test_auth_views import A, B, HOST, ON_HUB_A

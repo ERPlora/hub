@@ -1,7 +1,7 @@
 """Turning a business's modules on and off, and the plan's limit on them.
 
 The rules, without the database: ``base.services`` (``base.app.enable``, ``base.app.disable``) and ``base.queries``
-(``base.app.list``, ``base.session.me``) read and write the rows, ``base.models.AppActivation``.
+(``base.app.list``, ``base.session.me``) read and write the rows, ``base.models.activation.AppActivation``.
 
 - A module (``kind = "app"``) is ``on`` or ``off`` in a hub. In a hub with its own database its tables are made the
   first time it is turned on: meanwhile it is ``creating`` and, if making them failed, ``failed`` (tried

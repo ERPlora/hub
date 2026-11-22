@@ -23,7 +23,7 @@ from live.operations import AI, INTERNAL, operation
 
 from base import auth, signing
 from base.access import CREDENTIAL_SESSION_KEY
-from base.models import SessionOwner
+from base.models.sessions import SessionOwner
 from base.permissions import OPEN_MANAGEMENT, VIEW_HOME
 from base.schemas.support import SaasPassIn, SaasPassOut, SupportReportIn, SupportReportOut
 from base.services.devices import saas_user_id_of

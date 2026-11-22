@@ -29,7 +29,10 @@ from base import activation, relay
 from base.services import relay_runs
 from base.activation import ON
 from base.middleware import HubDatabaseMiddleware
-from base.models import AppActivation, EventDelivery, HubUser, TaskSchedule
+from base.models.activation import AppActivation
+from base.models.relay import EventDelivery
+from base.models import HubUser
+from base.models.scheduler import TaskSchedule
 from base.tenancy import migrator, offboarding
 from base.tenancy.context import AppNotCreated, use_hub
 from base.tenancy.router import TenantRouter

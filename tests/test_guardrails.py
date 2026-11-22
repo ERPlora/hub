@@ -857,7 +857,8 @@ def test_control_links_finds_every_kind_of_link_from_a_hub_model_to_a_control_on
     from django.contrib.auth import get_user_model
     from django.db import models as django_models
 
-    from base.models import Membership, Profile
+    from base.models import Membership
+    from base.models.profile import Profile
     from base.tenancy import inventory
     from control.models import Hub
 

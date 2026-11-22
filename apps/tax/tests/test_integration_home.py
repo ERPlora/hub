@@ -24,7 +24,7 @@ from live.outbox import channel_for
 from apps.tax.models import TaxCategory, TaxRule
 from apps.tax.tests.conftest import HUB_DB, HUB_DB_COMMITTED, A, B, empty_tax_tables
 from base import activation
-from base.models import AppActivation
+from base.models.activation import AppActivation
 from base.schemas.home import SetupStatusIn
 from base.tenancy.context import use_hub
 

@@ -16,7 +16,8 @@ from django.test import Client
 from django.utils import timezone
 
 from base import access
-from base.models import AccessSettings, SessionOwner, TrustedDevice
+from base.models.access import AccessSettings, TrustedDevice
+from base.models.sessions import SessionOwner
 from base.tenancy.context import use_hub
 from base.tests.test_auth_views import HOST, ON_HUB_A, a_code, callback, demo, host_of  # noqa: F401 (demo: a fixture)
 

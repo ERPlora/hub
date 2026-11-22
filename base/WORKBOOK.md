@@ -4395,7 +4395,7 @@ Implicados: BASE-F06, BASE-F07, BASE-F81, BASE-F82, BASE-F86, SALE-F28, CUSTOMER
   el hub enlaza a «Miembros» (`members_url` de `hub-home`). Reglas puras en `base/people.py`; operaciones
   `base.person.{list,detail,pin_remove,badge_set,badge_remove}` y `base.role.list` (rutas `/api/people…`,
   `/api/roles`). El PIN y la placa son los de Acceso (`Credential`): mismo hash, mismos frenos.
-- Llaves de API: `base.models.ApiKey` en la BD del hub (token `erpk_live_` + 256 bits, se guarda su SHA-256 y su
+- Llaves de API: `base.models.api_keys.ApiKey` en la BD del hub (token `erpk_live_` + 256 bits, se guarda su SHA-256 y su
   principio); `base/api_keys.py` pone la puerta de la llave (`KeyDoor`) delante de la sesión en toda ruta de una
   operación `expose_api`; la llave recibe el permiso de esa operación y nada más, con su ritmo por minuto y el freno
   por dirección (`KEY_ADDRESS_LIMIT`). La llave vive en la BD del negocio, así que la de uno nunca abre otro (test
@@ -4442,7 +4442,7 @@ Implicados: BASE-F06, BASE-F07, BASE-F81, BASE-F82, BASE-F86, SALE-F28, CUSTOMER
   de `apps/sale/queries/other_apps.py`) y pasa a `call` en su FIX; Reservas y Mesas, sin órdenes aprobables, llevan su
   `call_app` propio, al que no llega ninguna aprobación. En el cliente, `withApproval(() => command.run(input))` de
   `base/frontend/lib/approval.ts` abre el diálogo y repite la orden una vez (`getElevationToken` en
-  `frontend/main.ts`). El registro es `base.models.Approval` (`base.approval.list`).
+  `frontend/main.ts`). El registro es `base.models.approvals.Approval` (`base.approval.list`).
 - Documentación de la API: `base/api_docs.py` recorta el OpenAPI de ninja a las rutas `expose_api` de las apps que
   tiene el negocio, con la llave como `bearer` y solo los esquemas que usan (`base.api_doc.get`, pedido una vez y no
   en vivo: con todas las apps pasa de 1 MB, más que el tope de un resultado vivo). Cada esquema llega al documento
@@ -4450,7 +4450,7 @@ Implicados: BASE-F06, BASE-F07, BASE-F81, BASE-F82, BASE-F86, SALE-F28, CUSTOMER
   `pydantic.JsonValue`), puesto en un solo sitio, `config/openapi.py`: así dos apps con un esquema del mismo nombre
   no se pisan y cada ruta enseña el suyo; `tests/test_guardrails_openapi_schema_names.py` cae si dos clases acaban
   con el mismo nombre o un nombre llega con dos cuerpos distintos. El ajuste es
-  `base.models.ApiSettings` (`base.api_doc.settings`, `base.api_doc.settings_update`). Sin Swagger UI: producción
+  `base.models.api_keys.ApiSettings` (`base.api_doc.settings`, `base.api_doc.settings_update`). Sin Swagger UI: producción
   aplica Trusted Types; la página propia la lee y la descarga. La entrada «API» del menú lateral sale con el ajuste
   (`useApiDocsShown` de `base/frontend/lib/sidebar.ts`, que se suscribe a `base.api_doc.settings` solo con sesión).
 - Menú lateral: `SIDEBAR` de `base/frontend/lib/sidebar.ts`; cada entrada declara `permission`, el de la operación de

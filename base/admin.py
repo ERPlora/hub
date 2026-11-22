@@ -15,7 +15,10 @@ from live.context import OperationContext
 from live.errors import OperationError
 from live.slugs import validate_hub_slug
 
-from base.models import AppActivation, Hub, Location, Membership, TaskSchedule
+from base.models.activation import AppActivation
+from base.models import Hub, Membership
+from base.models.locations import Location
+from base.models.scheduler import TaskSchedule
 from base.registry import REGISTRY_SCOPE
 from base.schemas.demos import DemoSlugIn
 from base.services.demos import demo_expire

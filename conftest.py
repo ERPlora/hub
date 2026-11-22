@@ -96,7 +96,7 @@ def _every_app_on(slug):
     migration ``base.0017`` left every hub that existed before apps were born off, and ``seed_local_hubs`` the
     local ones."""
     from base import activation
-    from base.models import AppActivation
+    from base.models.activation import AppActivation
 
     if AppActivation.objects.filter(host=slug).exists():
         return

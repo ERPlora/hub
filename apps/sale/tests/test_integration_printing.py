@@ -17,7 +17,7 @@ from apps.printing.models import PrintJob
 from apps.sale.models import Sale
 from apps.sale.tests.conftest import HUB_DB, ctx_for, run
 from base.business import paper_date
-from base.models import Profile
+from base.models.profile import Profile
 from apps.sale.tests.test_integration_invoice import ISSUER
 
 pytestmark = HUB_DB

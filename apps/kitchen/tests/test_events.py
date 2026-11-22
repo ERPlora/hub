@@ -120,7 +120,7 @@ def delivery(name: str) -> tuple[str, int]:
     """``(status, attempts)`` of the delivery of the newest ``name`` event to the kitchen."""
     from live.models import OutboxEvent
 
-    from base.models import EventDelivery
+    from base.models.relay import EventDelivery
 
     event = OutboxEvent.objects.filter(name=name).latest("created_at", "id")
     row = EventDelivery.objects.get(event_id=event.id, app_label="kitchen")

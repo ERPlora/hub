@@ -25,7 +25,8 @@ from live.operations import Operation, get, registry
 from ninja import Field, Schema
 
 from base import access, assistant
-from base.models import Hub, Membership, TrustedDevice
+from base.models import Hub, Membership
+from base.models.access import TrustedDevice
 from base.tenancy.context import use_hub
 from base.tenancy.tests.business import HUB_DB, A, in_business_a
 from base.tests.card_values import ADMIN, VisitIn, ctx, is_attempt_key, reference_errors, values, writes

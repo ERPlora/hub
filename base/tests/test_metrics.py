@@ -31,7 +31,7 @@ from apps.verifactu.models import Environment, Record
 from apps.verifactu.tests.test_fiscal_backlog import record
 from base import activation, metrics, queries
 from base.metrics import FISCAL_NAMESPACE, HUBS_NAMESPACE, Emitter, FiscalBacklog, Metric, StuckActivations
-from base.models import AppActivation
+from base.models.activation import AppActivation
 from base.tenancy.context import use_control, use_hub
 from base.tenancy.tests import hubs
 from control.models import Hub

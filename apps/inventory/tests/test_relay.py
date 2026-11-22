@@ -21,7 +21,7 @@ from psycopg.conninfo import make_conninfo
 
 from apps.inventory import events
 from apps.inventory.models import Product, SaleStock, StockMovement
-from base.models import EventDelivery
+from base.models.relay import EventDelivery
 from base.tenancy.context import use_hub
 
 from .conftest import A, B, HUB_DB_COMMITTED

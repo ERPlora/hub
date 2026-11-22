@@ -12,7 +12,8 @@ import pytest
 from django.contrib import admin
 
 from base.admin import ADMIN_HUB_SESSION_KEY, HubAdmin, MembershipAdmin, TaskScheduleAdmin
-from base.models import Hub, Membership, TaskSchedule
+from base.models import Hub, Membership
+from base.models.scheduler import TaskSchedule
 from base.tenancy.context import use_control, use_hub
 from base.tenancy.tests.business import HOST, HUB_DB, A, B
 from base.tenancy.tests.concurrency import hub_staff

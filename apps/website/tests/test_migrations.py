@@ -33,7 +33,7 @@ from apps.website.models import Site
 from apps.website.palettes import PALETTES
 from apps.website.schemas import Theme
 from apps.website.tests.conftest import HUB_DB
-from base.models import HubIdentity
+from base.models.identity import HubIdentity
 from base.tenancy import connections as tenancy_connections
 from base.tenancy import names
 from base.tenancy.context import current_alias

@@ -11,7 +11,8 @@ from live.operations import AI, operation
 
 from base import blueprint, home
 from base.apps_on import active_apps
-from base.models import Hub, ImportBatch
+from base.models import Hub
+from base.models.blueprints import ImportBatch
 from base.permissions import ADMINISTER_HUB
 from base.schemas.blueprints import (
     BlueprintExportIn,

@@ -12,7 +12,8 @@ from live.meta import BellCounter
 from live.models import OutboxEvent
 from live.operations import get
 
-from base.models import EventDelivery, Hub
+from base.models.relay import EventDelivery
+from base.models import Hub
 from base.schemas.bell import BellCountersIn
 from base.tenancy.tests.business import HUB_DB, A, B, in_business_a
 from base.tests.test_queries_home import ADMIN, ctx, declare, in_b, module, modules

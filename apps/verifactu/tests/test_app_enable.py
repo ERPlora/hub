@@ -21,7 +21,7 @@ from live.operations import get
 from apps.verifactu.queries.app_hooks import VERIFACTU
 from apps.verifactu.tests.conftest import HUB_DB, A, business_in
 from base import activation, blueprint, events, services
-from base.models import AppActivation
+from base.models.activation import AppActivation
 from base.tenancy import context
 from base.tenancy.tests import hubs
 from base.tests.test_services_data import born, call, load, modules_on

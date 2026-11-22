@@ -26,7 +26,8 @@ from live.operations import get
 
 from base.auth import PLATFORM_ADMIN, RedeemedUser
 from base.session_host import PLATFORM_SESSION_HOST
-from base.models import Hub, Membership, SessionOwner
+from base.models import Hub, Membership
+from base.models.sessions import SessionOwner
 from base.operations import HubContextBuilder
 from base.services.sessions import open_admin_session_from_saas, open_session_from_saas
 from base.tenancy.context import use_control, use_hub

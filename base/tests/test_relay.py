@@ -37,7 +37,7 @@ from apps.printing.models import PrintJob
 from apps.sale.tests.conftest import db_dsn
 from apps.verifactu.models import Record
 from base import relay
-from base.models import EventDelivery
+from base.models.relay import EventDelivery
 from base.services import relay_runs
 from base.tenancy.context import use_control, use_hub
 from base.tenancy.tests import hubs

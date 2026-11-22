@@ -16,7 +16,8 @@ from live.operations import get
 from live.outbox import channel_for
 
 from base import access, events
-from base.models import Credential, Membership, TrustedDevice
+from base.models.access import Credential, TrustedDevice
+from base.models import Membership
 from base.schemas.access import AccessDoorIn, AccessSettingsUpdateIn
 from base.tenancy.context import use_hub
 from base.tenancy.tests import hubs

@@ -326,7 +326,8 @@ def test_its_yes_asks_for_a_managers_approval_as_the_screen_does_and_runs_nothin
 
 
 def test_with_the_managers_pass_it_runs_once_as_the_person_and_the_pass_is_spent(client, make_user, gateway, approvable_create):
-    from base.models import Approval, Credential
+    from base.models.approvals import Approval
+    from base.models.access import Credential
 
     _employee_and_manager(client, make_user)
     body = _answering_its_card(client, _create_turn())
@@ -355,7 +356,8 @@ def test_its_question_says_the_figures_of_the_write_and_the_record_keeps_them(cl
     command validates them; the pass spent keeps them."""
     from django.apps import apps
 
-    from base.models import Approval, Credential
+    from base.models.approvals import Approval
+    from base.models.access import Credential
 
     monkeypatch.setattr(apps.get_app_config("demo"), "approval_figures", {"demo.item.create": ["Create the item {name}"]}, raising=False)
     _employee_and_manager(client, make_user)
@@ -372,7 +374,7 @@ def test_its_question_says_the_figures_of_the_write_and_the_record_keeps_them(cl
 
 
 def test_a_pass_for_another_request_does_not_let_this_one_through(client, make_user, gateway, approvable_create):
-    from base.models import Credential
+    from base.models.access import Credential
 
     _employee_and_manager(client, make_user)
     asked = post(client, "/assistant/turn", _answering_its_card(client, _create_turn())).json()["error"]["approval"]
@@ -402,7 +404,8 @@ def test_a_pass_approved_for_another_command_on_this_very_request_does_not_let_i
     from django.core.cache import cache
 
     from apps.demo.models import Item
-    from base.models import Approval, Credential
+    from base.models.approvals import Approval
+    from base.models.access import Credential
 
     monkeypatch.setattr(
         apps.get_app_config("demo"), "approvals", {**APPROVED_CREATE, "demo.item.update": "Change an item"}, raising=False
