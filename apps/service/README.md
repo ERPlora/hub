@@ -45,7 +45,7 @@ y gasta en varias visitas, con su saldo, su caducidad, sus ajustes y cada sesió
 | Operaciones | 24 consultas (`queries/`) y 34 acciones (`services/`), todas con `ai=`; 44 rutas en `/api/service/…` (sin ruta: las 9 de la plataforma, con `service.system`, las 4 `service.session.*` que Ventas corre dentro de sus escrituras y `service.record.get`) |
 | Eventos | 25, `service.<entidad>.<hecho>` (`events.py`); `REACTIONS` a `staff.member.terminated` (`service.assignment.release_member`), `customer.customer.merged` (`service.grant.reassign`) y `customer.customer.erased` (`service.grant.forget_customer`), por el relay del outbox |
 | Tarea programada | `expire_session_holds` → `service.session.expire`, `0 * * * *`, `collapse` (la corre el worker) |
-| Migraciones | `0001_initial`, `0002_redemption_states`, `0003_service_image`, `0004_redemption_value`, `0005_grant_sale_line`, `0006_redemption_member` |
+| Migraciones | `0001_initial`, `0002_redemption_states`, `0003_service_image`, `0004_redemption_value`, `0005_grant_sale_line`, `0006_redemption_member`, `0007_service_stands_for`, `0008_actor_without_address` (quien actuó guardado por su correo se queda con lo que va antes de la @) |
 | Admin | Django admin con CRUD en `hubs.erplora.com` (PLAN §17–§18) |
 
 Las decisiones de diseño (saldo calculado al leer, estados de una sesión, concurrencia, árbol de
