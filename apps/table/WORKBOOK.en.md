@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:1378143620fce0cf05615072617cfd833c89fa6ca40c4d7b4e1e51a151adc69a -->
+<!-- generated from WORKBOOK.md sha256:de37a9b59e113cf3f2cc196b95528eccb009616ab742319dbe4a04127825106d -->
 
 ## What it is for and who it is for
 
@@ -470,7 +470,7 @@ Steps:
 3. An occupied table shows the time ("0:35") and guests ("3/4 pax"); the time moves forward by itself and
    past the warnings in Settings only the time and its arc change colour. A table with a booking today says
    its name and time. Who serves it is seen in its window: whoever serves its check in Sales (the till's
-   "Served by" chip, SALE-F16) or, if nobody changed it, whoever seated it.
+   "Served by" chip) or, if nobody changed it, whoever seated it.
 4. The plan changes by itself when somebody seats, transfers, joins, splits, charges or voids: there is no
    need to leave and come back, and the window you have open (split, guests, close, "Edit table") stays at
    the step you were at, with whatever you typed. And with the clock: a table turns Reserved an hour before

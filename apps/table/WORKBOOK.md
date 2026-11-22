@@ -471,7 +471,7 @@ Pasos:
 3. Una mesa ocupada enseña el tiempo («0:35») y los comensales («3/4 pax»); el tiempo avanza solo y, al
    pasar los avisos de los Ajustes, solo cambian de color el tiempo y su arco. Una mesa con reserva hoy dice
    el nombre y la hora. Quién la atiende se ve en su ventana: quien atiende su cuenta en Ventas (el chip
-   «Atiende» del TPV, SALE-F16) o, si nadie lo ha cambiado, quien la sentó.
+   «Atiende» del TPV) o, si nadie lo ha cambiado, quien la sentó.
 4. El plano cambia solo cuando alguien sienta, traslada, junta, divide, cobra o anula: no hay que salir y
    volver, y la ventana que tengas abierta (dividir, comensales, cerrar, «Editar mesa») sigue en el paso en
    que estabas, con lo que hayas escrito. Y con el reloj: una mesa pasa a Reservada una hora antes de su
