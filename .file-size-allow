@@ -122,7 +122,6 @@
 960 base/catalog.py ERPlora/erplora-next#74
 802 base/files.py ERPlora/erplora-next#74
 655 base/frontend/components/SystemUsage.test.ts ERPlora/erplora-next#74
-669 base/frontend/lib/home.test.ts ERPlora/erplora-next#74
 475 base/frontend/lib/home.ts ERPlora/erplora-next#74
 550 base/frontend/lib/system-back.test.ts ERPlora/erplora-next#74
 616 base/frontend/pages/FilesPage.test.ts ERPlora/erplora-next#74
