@@ -40,9 +40,12 @@ def test_whoever_the_drawer_saved_by_their_address_keeps_only_what_goes_before_i
     now = timezone.now()
     rows("Settings").create(updated_by=ADDRESS)
     rows("Register").create(name="Front", created_by=ADDRESS)
-    shift = rows("Session").create(
-        number="S-261122-0001", business_day=now.date(), sequence=1, status="closed", opened_by=ADDRESS,
-        closed_by=NAMED, closed_at=now, expected_balance=0,
+    shift, _ = (
+        rows("Session").create(
+            number=f"S-261122-000{sequence}", business_day=now.date(), sequence=sequence, status="closed",
+            opened_by=opened_by, closed_by=closed_by, closed_at=now, expected_balance=0,
+        )
+        for sequence, opened_by, closed_by in ((1, ADDRESS, NAMED), (2, NAMED, ADDRESS))
     )
     for by in (ADDRESS, NAMED, ""):
         rows("Movement").create(session=shift, type="in", amount=500, created_by=by)
@@ -50,7 +53,7 @@ def test_whoever_the_drawer_saved_by_their_address_keeps_only_what_goes_before_i
     cleaned = {
         "settings": [SHOWN],
         "drawers": [SHOWN],
-        "shifts": [NAMED, SHOWN],
+        "shifts": [NAMED, NAMED, SHOWN, SHOWN],
         "movements": ["", NAMED, SHOWN],
         "counts": [SHOWN],
     }
