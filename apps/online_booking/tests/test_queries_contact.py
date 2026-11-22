@@ -200,24 +200,16 @@ def take(client, method: str, path: str, reference: str):
 @pytest.mark.usefixtures("deleting_manager")
 @pytest.mark.parametrize("reference", [PHONE, "600 111 222", EMAIL])
 @pytest.mark.parametrize(("method", "path", "status"), STEPS)
-def test_whoever_sees_the_contact_names_the_booking_by_her_phone_or_email(
-    beas, sign_in, client, reference, method, path, status
+def test_a_phone_or_an_email_names_the_booking_only_to_whoever_sees_the_contact(
+    beas, sign_in, client, monkeypatch, reference, method, path, status
 ):
     Appointment.objects.filter(pk=beas.id).update(status=status)
     sign_in("hub_manager")
+    with monkeypatch.context() as hidden:
+        without_contact(hidden, "hub_manager")
+        refused = take(client, method, path, reference)
+        assert (refused.status_code, refused.json()["error"]["code"]) == (404, "online_booking.booking_not_found")
+        kept = Appointment.objects.get(pk=beas.id)
+        assert (kept.status, kept.deleted_at) == (status, None)
     answer = take(client, method, path, reference)
     assert answer.status_code == 200, answer.json()
-
-
-@pytest.mark.usefixtures("deleting_manager")
-@pytest.mark.parametrize("reference", [PHONE, "600 111 222", EMAIL])
-@pytest.mark.parametrize(("method", "path", "status"), STEPS)
-def test_without_it_a_phone_or_an_email_names_no_booking(
-    beas, lacking, sign_in, client, reference, method, path, status
-):
-    Appointment.objects.filter(pk=beas.id).update(status=status)
-    sign_in("hub_manager")
-    answer = take(client, method, path, reference)
-    assert (answer.status_code, answer.json()["error"]["code"]) == (404, "online_booking.booking_not_found")
-    kept = Appointment.objects.get(pk=beas.id)
-    assert (kept.status, kept.deleted_at) == (status, None)
