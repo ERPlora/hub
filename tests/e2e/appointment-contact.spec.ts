@@ -6,7 +6,7 @@
 import { expect, test } from '@playwright/test';
 
 import { aMonday, employeesRecord, salonCleanUp } from './appointment-helpers';
-import { FLOW_VIEWPORTS, spanishMobile } from './customer-helpers';
+import { cardDeletes, FLOW_VIEWPORTS, spanishMobile } from './customer-helpers';
 import { pickDay } from './date-time-fields';
 import { signedIn } from './flow-helpers';
 import { A, api, capture, EMPLOYEE, psql, shown } from './helpers';
@@ -18,15 +18,7 @@ const DAY = aMonday(2);
 type Contact = { customer_name: string; customer_phone: string | null; customer_email: string | null; notes: string };
 
 function cleanUp(): void {
-  const customers = `select id from customer_customer where name like '${TAG}%'`;
-  psql(
-    [
-      ...salonCleanUp(TAG),
-      `delete from customer_activity where customer_id in (${customers})`,
-      `delete from customer_consent where customer_id in (${customers})`,
-      `delete from customer_customer where name like '${TAG}%'`,
-    ].join('; '),
-  );
+  psql([...salonCleanUp(TAG), ...cardDeletes(`select id from customer_customer where name like '${TAG}%'`)].join('; '));
 }
 
 test.beforeAll(cleanUp);
