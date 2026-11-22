@@ -44,7 +44,7 @@ mandan el documento ya compuesto, y la app de ERPlora del dispositivo lo imprime
 | Operaciones | 12 consultas (`queries/`) y 15 acciones (`services.py`), todas con `ai=`; `printing.device.get`, `printing.device.seen` y `printing.job.prune` con `ai=INTERNAL` (las dos primeras, del canal del dispositivo; la última, del sistema); 24 rutas en `/api/printing/…` |
 | Hooks del Inicio | `setup` «Configura la impresora» y `bell` «Nadie está imprimiendo «…»» por función, con `printing.device.coverage`; `bell_refresh_every` de 30 s; `health` «Impresora lista / sin conectar / sin configurar» de la fila de salud, con `printing.device.health`; y `print_presence = "printing.device.seen"` |
 | Eventos | 13, `printing.<entidad>.<hecho>` (`events.py`), solo con identificadores; no reacciona a ninguno |
-| Migraciones | `0001_initial`, `0002_print_device`, `0003_printdevice_last_seen_at`, `0004_printjob_document_type_labels` |
+| Migraciones | `0001_initial`, `0002_print_device`, `0003_printdevice_last_seen_at`, `0004_printjob_document_type_labels`, `0005_cancel_kitchen_orders_without_printer`, `0006_actor_without_address` (quien actuó guardado por su correo se queda con lo que va antes de la @) |
 | Admin | Django admin de ajustes, impresoras, trabajos y dispositivos en `hubs.erplora.com` (PLAN §17–§18) |
 
 Las decisiones de diseño (el documento de cada función, el protocolo de `/ws/print`, la presencia, el

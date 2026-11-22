@@ -82,6 +82,14 @@ describe('RolesList', () => {
     expect(play.wrapper.find('[data-testid="roles-change"]').exists()).toBe(false);
   });
 
+  it('anyone opens what a role allows from its row', async () => {
+    const m = await open({ session: EMPLOYEE, routes: ['/employees', '/employees/roles/:role'] });
+    await m.result(m.call, 'base.role.list', { roles: ROLES });
+    await m.wrapper.findAll('[data-testid="roles-row"]')[3].trigger('click');
+    await flush();
+    expect(m.router.currentRoute.value.path).toBe('/employees/roles/hub_employee');
+  });
+
   it('a catalogue that cannot be read says so', async () => {
     const m = await open();
     m.call.push(errorFrame(subId(m.client, 'base.role.list'), 'server_error'));

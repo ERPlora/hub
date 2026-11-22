@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:732a2a6821069bd0fd73266c4747853862d9649c21194a7dac9fd6938f5814a8 -->
+<!-- generated from WORKBOOK.md sha256:353463f19b22828af22fc188815300eb0ee26c3216d32f03a6d28b3eb56bba29 -->
 
 ## What it is for and who it is for
 
@@ -522,14 +522,15 @@ Steps:
 2. "Try again" sends it back to the queue with the attempts at zero, towards whichever printer fits now:
    "Sent back to the queue: the next device to connect will print it.".
 3. "Cancel" asks for a reason (optional) and withdraws it: "Job cancelled. It will not be printed.". It stays in
-   the queue with who, when and why.
+   the queue with who (by their name or, if their account has none, by what goes before the @ of their email,
+   never the whole email), when and why.
 In: the job and, when cancelling, the reason.
 Out: the job waiting again or cancelled (announces: `printing.job.retried`, `printing.job.cancelled`); nobody
 deletes it by hand: the queue forgets it 30 days after it finished (PRINTING-F20).
 If it fails: "Only a pending or failed job, or a sent one that did not answer, goes back to the queue; this one is
 …", "A job that is printing or has printed is not cancelled; this one is …". Without permission the
 buttons are not seen.
-Involved: PRINTING-F01
+Involved: PRINTING-F01, BASE-F119
 
 ### PRINTING-F15 Go to the receipt text, which is written in Sales
 Status: done — the receipt header and footer live in the Sales settings, and the Settings note leads
