@@ -253,7 +253,8 @@ for (const [width, viewport] of Object.entries(FLOW_VIEWPORTS)) {
         const titleFits = await title.evaluate((name) => {
           const bar = name.closest('ion-title')?.shadowRoot?.querySelector('.toolbar-title')?.getBoundingClientRect();
           if (!bar) return false;
-          const whole = name.scrollWidth <= name.clientWidth || getComputedStyle(name).textOverflow === 'ellipsis';
+          const style = getComputedStyle(name);
+          const whole = name.scrollWidth <= name.clientWidth || (style.textOverflow === 'ellipsis' && style.overflowX === 'hidden');
           return name.getBoundingClientRect().right <= Math.ceil(bar.right) && whole;
         });
         expect(titleFits, 'the title is whole or ends in «…» inside its bar').toBe(true);
