@@ -288,7 +288,7 @@ def test_a_module_keeps_its_lazy_texts_alone_or_as_the_values_of_a_dict(tmp_path
         "first_texts",
         "from django.utils.translation import gettext_lazy as _\n"
         "from live.ninja import FIELD_MESSAGES\n"
-        "from apps.customer.services import PHONE_INVALID\n"
+        "from apps.customer.services.writes import PHONE_INVALID\n"
         'ALONE, PLAIN, NUMBER = _("Alone"), "plain", 3\n'
         'BY_CODE = {"a": _("In a dict"), "b": "plain", "c": {"d": _("Deeper")}}\n'
         'HEADERS = (_("In a tuple"), "plain")\n'

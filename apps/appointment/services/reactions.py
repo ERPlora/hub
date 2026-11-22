@@ -31,7 +31,7 @@ from apps.appointment.services.writes import (
     lock_appointments,
     lock_series,
 )
-from apps.customer.services import lock_customers
+from apps.customer.services.writes import lock_customers
 
 
 @operation(

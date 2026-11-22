@@ -5,7 +5,7 @@ from live.context import OperationContext
 from live.operations import INTERNAL, operation
 from live.outbox import record_event
 
-from apps.customer.services import lock_customers
+from apps.customer.services.writes import lock_customers
 from apps.sale import events
 from apps.sale.models import FiscalStatus, Refund, Sale
 from apps.sale.schemas.reactions import CustomerMergedIn, CustomerReassignOut, InvoiceIssuedIn, InvoiceRecordedOut
