@@ -205,7 +205,7 @@ test('STAFF-F21 (paso 3: la comisión del día): an employee has no Commissions 
   try {
     const view = shown(page);
     await view.locator('[data-testid=staff-members-row], [data-testid=staff-members-empty]').first().waitFor({ state: 'visible' });
-    await expect(view.locator('ion-footer ion-segment-button')).toHaveCount(4);
+    await expect(view.locator('ion-footer ion-segment-button')).toHaveCount(3);
     await expect(view.locator('ion-footer ion-segment-button', { hasText: 'Commissions' })).toHaveCount(0);
 
     await page.goto(`${A}/staff/commissions`);

@@ -544,7 +544,7 @@ sin vínculo con Inventario, y el cliente es un email y un nombre sin vínculo c
 - La barra de arriba lleva el nombre de la app (`cart_checkout.title`); la pestaña la
   añade el shell.
 - Los importes agrupan los millares también con cuatro cifras (`useGrouping: 'always'`: el CLDR del
-  español deja «1234,56 €»; hub#1090). El filtro de Total es `{ type: 'range', amount: true }` y se lee con el
+  español deja `1234,56 €`; hub#1090). El filtro de Total es `{ type: 'range', amount: true }` y se lee con el
   lector común de las listas (hub#1196): `filterCents` y `amountFilterErrors` de `base/frontend/lib/money.ts`
   (sobre `parseMoney` de `@erplora/ui`) sobre `TOTAL_BOUNDS`; las dos páginas corren la tabla de textos de
   `base/frontend/__tests__/amount-filter.ts` (pm#521).

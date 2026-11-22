@@ -1,6 +1,6 @@
 """Tests of scripts/e2e_report.py: the output of the Hub's nightly e2e run and the one open issue it keeps about it.
 
-The script runs as .github/scripts/nightly-e2e.sh runs it, with Playwright JSON reports written here and a fake gh CLI
+The script runs as scripts/nightly_e2e.py runs it, with Playwright JSON reports written here and a fake gh CLI
 on the PATH that answers the open issues and records its calls and the bodies it is given.
 """
 
@@ -141,11 +141,11 @@ ISSUE_BODY = (
     "- Pasada del 2026-11-14 sobre `main` (commit `0123456`), en el Mac. El registro de la noche (`night.log`) y las"
     f" trazas y capturas de cada fallo (`test-results/`), en `{FOLDER}`.\n"
     "- Una spec se repite en una pila propia (`tests/e2e/README.md`, «Varias ejecuciones a la vez») con `CI=1 pnpm e2e"
-    " tests/e2e/<spec>`, o con la misma pila de la noche: `bash .github/scripts/nightly-e2e.sh --no-publish --spec"
+    " tests/e2e/<spec>`, o con la misma pila de la noche: `python3 scripts/nightly_e2e.py --no-publish --spec"
     " tests/e2e/<spec>`.\n\n"
     f"{RED_DETAILS}\n"
     "## Origen\n"
-    "- Cómo se llegó: la pasada nocturna de las pruebas de navegador del Hub (`.github/scripts/nightly-e2e.sh`, que"
+    "- Cómo se llegó: la pasada nocturna de las pruebas de navegador del Hub (`scripts/nightly_e2e.py`, que"
     " lanza launchd en el Mac).\n"
     "- Sale de #877\n"
     "- La introdujo una PR: no comprobado — la pasada no sabe qué cambio la rompió; se busca entre los commits desde la"

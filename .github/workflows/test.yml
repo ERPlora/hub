@@ -190,7 +190,7 @@ jobs:
         run: for t in .github/scripts/*.test.sh; do bash "$t"; done
 
   # The browser smoke (smoke-e2e.sh, README «El humo de navegador»): the tests tagged @smoke, in the runner's Chrome, on
-  # the stack nightly-e2e.sh builds around this commit, so a change that breaks one of those walks cannot be merged.
+  # the stack scripts/nightly_e2e.py builds around this commit, so a change that breaks one of those walks cannot be merged.
   # The smoke's groups enter here one at a time, each after three green runs in a row of this job: --spec names the
   # specs already in. Every group is in, so the job runs every @smoke test, as on the Mac.
   smoke:
@@ -201,7 +201,7 @@ jobs:
     permissions:
       contents: read
     steps:
-      # The whole history, as nightly-e2e.sh expects of a clone: it fetches origin and checks this commit out in a
+      # The whole history, as nightly_e2e.py expects of a clone: it fetches origin and checks this commit out in a
       # worktree of its own, with its submodules.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -218,7 +218,7 @@ jobs:
         with:
           node-version: 24
           cache: pnpm
-      # The erplora-next tree nightly-e2e.sh expects around the Hub: the SaaS of origin/main in ../saas (every login
+      # The erplora-next tree nightly_e2e.py expects around the Hub: the SaaS of origin/main in ../saas (every login
       # goes through erplora.com), the shared image library in ../blueprints and compose.yaml's Postgres in .., which
       # the specs reach with `docker compose exec`. Each checkout gets the .env of a new one.
       - name: The SaaS, the image library and Postgres beside the Hub
