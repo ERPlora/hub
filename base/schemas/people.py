@@ -8,6 +8,7 @@ from ninja import Schema
 from pydantic import Field
 
 from base.schemas.assistant import names
+from base.sensitive import TEAM_CONTACT
 
 
 # ── People and permissions: people, roles ───────────────────────────────────────────────────────────────────────────
@@ -29,7 +30,10 @@ class PersonOut(Schema):
     id: str = Field(description="The person in this hub: their account's local name (``saas:<id>``).")
     name: str
     initials: str
-    email: str = Field(description="Their erplora.com address; empty for whom does not run the business.")
+    email: str | None = Field(
+        description="Their erplora.com address; null for whoever does not see the team's contact details.",
+        json_schema_extra=TEAM_CONTACT,
+    )
     role: Literal["hub_owner", "hub_admin", "hub_manager", "hub_employee"]
     ways: PersonWaysOut
     entered: bool = Field(description="False: erplora.com names them, and they have not entered this hub yet.")

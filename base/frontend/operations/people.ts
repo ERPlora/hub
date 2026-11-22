@@ -18,8 +18,8 @@ export interface Person {
   id: string;
   name: string;
   initials: string;
-  /** Empty for whom does not run the business (their own, always). */
-  email: string;
+  /** Null for whoever does not see the team's contact details (`base.view_team_contact`). */
+  email: string | null;
   role: HubRole;
   ways: PersonWays;
   /** False: erplora.com names them and they have not entered yet. */

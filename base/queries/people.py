@@ -98,17 +98,17 @@ def seats_of(slug: str, used: int) -> dict[str, Any]:
 
 
 def person_out(ctx: OperationContext, person: dict[str, Any]) -> dict[str, Any]:
-    """A person as Employees shows them to who asks: the address only to who runs the business, and their own."""
-    me = signed_in_username(ctx) == person["id"]
+    """A person as Employees shows them; their address only reaches whoever sees the team's contact details (the
+    mark of ``PersonOut.email``)."""
     return {
         "id": person["id"],
         "name": person["name"],
         "initials": person["initials"],
-        "email": person["email"] if (me or ctx.has(ADMINISTER_HUB)) else "",
+        "email": person["email"],
         "role": person["role"],
         "ways": person["ways"],
         "entered": person["entered"],
-        "me": me,
+        "me": signed_in_username(ctx) == person["id"],
     }
 
 
