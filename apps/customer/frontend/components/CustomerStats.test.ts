@@ -44,6 +44,7 @@ describe('CustomerStats', () => {
     expect(s.params('customer.customer.stats')).toEqual([{}]);
     expect(s.wrapper.get('[data-testid="customer-stats"]').attributes('aria-busy')).toBe('true');
     expect(s.kpi('total').text()).toContain('…');
+    expect(s.kpi('revenue').text()).toContain('…');
   });
 
   it('paints the four figures in the product order, revenue as money', async () => {
@@ -81,6 +82,13 @@ describe('CustomerStats', () => {
       'customer-stats-active',
       'customer-stats-vip',
     ]);
+  });
+
+  it('customers who have spent nothing yet show «Revenue» at zero', async () => {
+    const s = await setup();
+    await s.result(s.call, 'base.business.get', business());
+    await s.result(s.call, 'customer.customer.stats', { ...STATS, total_revenue: 0 });
+    expect(s.kpi('revenue').find('.customer-kpi__value').text()).toBe('€0.00');
   });
 
   it('a new result replaces the figures (a write elsewhere re-ran the query)', async () => {
