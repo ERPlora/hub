@@ -19,6 +19,7 @@ from live.operations import AI, registry
 
 from base import assistant
 from base.models import Membership
+from base.tests.roles import WORKING_ROLES
 from base.tests.test_assistant_asks import OWNER, TOP
 from base.tests.test_assistant_asks import assert_its_words_name, assert_offered_with_room, by_group_test
 from base.tests.test_assistant_asks import assert_reported_are_owner_probes, offered_place
@@ -175,7 +176,7 @@ test_clocking_said_as_a_person_says_it_brings_its_tool_by_time_clocks_group = in
 
 
 @HUB_DB  # the catalogue is of the apps on in the business (base.activation) and of the person's role
-@pytest.mark.parametrize("role", tuple(Membership.Role))
+@pytest.mark.parametrize("role", WORKING_ROLES)
 @pytest.mark.parametrize(("name", "phrase", "word"), CLOCKING_SAID)
 def test_whoever_clocks_is_offered_the_clock_by_mi_salida_or_mi_entrada(catalog_of, role, name, phrase, word):
     assert_offered_with_room(catalog_of(role, "es"), name, phrase, room=TOP)
