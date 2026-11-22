@@ -356,3 +356,15 @@ describe('CustomerForm: language and markup', () => {
     }
   });
 });
+
+describe('CustomerForm: the contact details that came hidden (BASE-F119)', () => {
+  it('in «Edit», an email and a phone the card came without are not in the form; in «Add», they are', async () => {
+    const edit = await setup({ mode: 'edit', form: { email: null, phone: null } });
+    expect(edit.shownFields()).not.toContain('email');
+    expect(edit.shownFields()).not.toContain('phone');
+    expect(edit.shownFields()).toContain('tax_id');
+    document.body.replaceChildren();
+    const add = await setup();
+    expect(add.shownFields()).toEqual(expect.arrayContaining(['email', 'phone']));
+  });
+});

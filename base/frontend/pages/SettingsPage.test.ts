@@ -1,10 +1,16 @@
-import { AppPage } from '@erplora/ui/shell';
+import { AppPage, type SessionMe } from '@erplora/ui/shell';
+import { nextTick, ref } from 'vue';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { EMPLOYEE, type MountOptions, mountBase } from '../__tests__/mount-base';
+import { EMPLOYEE, type MountOptions, mountBase, OWNER } from '../__tests__/mount-base';
 import SettingsPage from './SettingsPage.vue';
 
-async function settings(path = '/settings', locale: 'en' | 'es' = 'en', session?: MountOptions['session']) {
+// The owner holds every permission, Printing's included.
+const OWNER_ALL: SessionMe = { ...OWNER, permissions: [...OWNER.permissions, 'printing.manage_settings'] };
+// A manager sets Printing up but does not run the business.
+const MANAGER: SessionMe = { ...EMPLOYEE, user: { id: 'u3', label: 'Eva' }, permissions: [...EMPLOYEE.permissions, 'printing.manage_settings'] };
+
+async function settings(path = '/settings', locale: 'en' | 'es' = 'en', session: MountOptions['session'] = OWNER_ALL) {
   return mountBase(SettingsPage, {
     path,
     locale,
@@ -12,6 +18,11 @@ async function settings(path = '/settings', locale: 'en' | 'es' = 'en', session?
     routes: ['/settings'],
     stubs: { DataPanel: true, BusinessPanel: true, TicketsPanel: true },
   });
+}
+
+/** The ids of the tabs the page offers. */
+function tabIds(m: Awaited<ReturnType<typeof settings>>): string[] {
+  return (m.wrapper.getComponent(AppPage).props('tabs') ?? []).map((tab) => tab.id);
 }
 
 // «API documentation» closes General.
@@ -33,6 +44,37 @@ describe('SettingsPage', () => {
       { id: 'data', label: 'Datos y copias', icon: 'ion:swap-vertical-outline' },
     ]);
     expect(page.props('tabsLabel')).toBe('Secciones de Ajustes');
+  });
+
+  it('an employee has only «General» and «Business»: Printing and Data are not theirs to use', async () => {
+    const m = await settings('/settings', 'es', EMPLOYEE);
+    expect(tabIds(m)).toEqual(['general', 'business']);
+  });
+
+  it('a manager also has «Printing», and not «Data and backups»', async () => {
+    const m = await settings('/settings', 'en', MANAGER);
+    expect(tabIds(m)).toEqual(['general', 'business', 'tickets']);
+  });
+
+  it('a link to a tab the person does not have opens their first one, and paints nothing of the other', async () => {
+    for (const path of ['/settings#data', '/settings#tickets']) {
+      const m = await settings(path, 'en', EMPLOYEE);
+      expect(m.wrapper.find('[data-testid="device-mode-card"]').exists(), path).toBe(true);
+      expect(m.wrapper.find('data-panel-stub').exists(), path).toBe(false);
+      expect(m.wrapper.find('tickets-panel-stub').exists(), path).toBe(false);
+      m.wrapper.unmount();
+    }
+  });
+
+  it('follows the session: a permission taken away on its tab takes the tab away and opens the first', async () => {
+    const session = ref<SessionMe>(OWNER_ALL);
+    const m = await settings('/settings#data', 'en', session);
+    expect(m.wrapper.find('data-panel-stub').exists()).toBe(true);
+    session.value = MANAGER;
+    await nextTick();
+    expect(tabIds(m)).not.toContain('data');
+    expect(m.wrapper.find('data-panel-stub').exists()).toBe(false);
+    expect(m.wrapper.find('[data-testid="device-mode-card"]').exists()).toBe(true);
   });
 
   it('opens «General» from an address with no tab, its own, the older `#hub` or one it does not have', async () => {

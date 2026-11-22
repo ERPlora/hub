@@ -17,7 +17,6 @@ import {
   pendingApps,
   RETRY_BLOCKED_KEY,
   selectAll,
-  settingsTab,
   STATUS_KEY,
   somethingPending,
   statusPill,
@@ -81,24 +80,7 @@ function load(fields: Partial<ImportRow> = {}): ImportRow {
   };
 }
 
-describe('the address of Settings', () => {
-  it('opens the tab the hash names, older addresses included', () => {
-    expect(settingsTab('#data')).toBe('data');
-    expect(settingsTab('#general')).toBe('general');
-    expect(settingsTab('#business')).toBe('business');
-    expect(settingsTab('#tickets')).toBe('tickets');
-    // Published versions of VeriFactu still link `#tax`: it was the business's own tab.
-    expect(settingsTab('#tax')).toBe('business');
-    // General used to be `#hub`.
-    expect(settingsTab('#hub')).toBe('general');
-  });
-
-  it('opens the first tab, «General», without a hash or with one it does not have (`#store`, `#permissions`)', () => {
-    for (const hash of ['', '#store', '#permissions', '#nonsense']) {
-      expect(settingsTab(hash), hash).toBe('general');
-    }
-  });
-
+describe('the address of Settings › Data', () => {
   it('opens Import unless `?data=` names another section', () => {
     expect(dataSection(undefined)).toBe('import');
     expect(dataSection('export')).toBe('export');

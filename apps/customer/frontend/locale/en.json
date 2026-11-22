@@ -69,6 +69,7 @@
     "list": {
       "title": "Customers",
       "search": "Search name, phone or email…",
+      "searchWithoutContact": "Search name, tax ID or company…",
       "loadError": "The customers could not be loaded",
       "empty": "No customers.",
       "emptyMessage": "Add the first one with «Add» or bring yours with «Import CSV».",
@@ -275,6 +276,7 @@
     },
     "picker": {
       "search": "Search by name, phone, email…",
+      "searchWithoutContact": "Search by name, tax ID, company…",
       "searchLabel": "Search customers",
       "noResults": "No results.",
       "noCustomers": "No customers.",

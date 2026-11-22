@@ -13,11 +13,13 @@ from live.outbox import record_event
 
 from apps.reservation import events
 from apps.reservation.models import Reservation
+from base.sensitive import VIEW_CUSTOMER_CONTACT
 
 #: Tables' platform operations (the holds of reservations).
 TABLE_SYSTEM = "table.system"
-#: What finding the guest's card by her phone, or making it, asks of Customers (``card_keeper``).
-CARD_RIGHTS = frozenset({"customer.view", "customer.manage"})
+#: What finding the guest's card by the phone she gives, or making it, asks of Customers (``card_keeper``): that phone
+#: is looked up among the customers' contact details.
+CARD_RIGHTS = frozenset({"customer.view", "customer.manage", VIEW_CUSTOMER_CONTACT})
 TABLES_UNAVAILABLE = _(
     "Tables is not available in this business: the reservation's table cannot be held or seated."
 )

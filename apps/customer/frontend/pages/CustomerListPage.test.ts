@@ -1,8 +1,8 @@
 // Customers → Customers (WORKBOOK «Pantallas · Clientes»; CUSTOMER-F01, F02, F07, F08, F09): the four
 // figures, then the live `customer.customer.list` in a server-side DataTable — Name, Email, Phone,
 // Stage, Spent —, search on the server (name, phone, email, tax id, company), filters behind the table's
-// funnel, sort by any
-// column, 50 a page; «Add» and «Import CSV» to whoever manages cards, «Export CSV» to whoever exports;
+// funnel, sort by any column but Email and Phone,
+// 50 a page; «Add» and «Import CSV» to whoever manages cards, «Export CSV» to whoever exports;
 // a row opens the card; «Delete» on a row (owner, admin) asks first. Every state of the screen.
 import { DataTable, EmptyState, InlineFeedback } from '@erplora/ui/components';
 import { AppPage, toastSuccess } from '@erplora/ui/shell';
@@ -127,15 +127,15 @@ describe('CustomerListPage: the screen', () => {
     });
   });
 
-  it('paints Name, Email, Phone, Stage and Spent (money), each sortable on the server', async () => {
+  it('paints Name, Email, Phone, Stage and Spent (money), sortable on the server but Email and Phone', async () => {
     const s = await setup();
     await s.result(s.call, 'base.business.get', business());
     await s.show(PAGE);
     const columns = s.prop<{ key: string; label: string; sortable?: boolean }[]>('columns');
     expect(columns.map((c) => [c.key, c.label, c.sortable])).toEqual([
       ['name', 'Name', true],
-      ['email', 'Email', true],
-      ['phone', 'Phone', true],
+      ['email', 'Email', undefined],
+      ['phone', 'Phone', undefined],
       ['lifecycle_stage', 'Stage', true],
       ['total_spent', 'Spent', true],
     ]);

@@ -77,10 +77,14 @@ from apps.customer.schemas import (
     TagRefIn,
     TagRow,
 )
+from apps.customer.schemas.exports import CustomerExportRow
 from apps.customer.search import normalize, search_term
 from base import operations as platform
 from base.business import currency_decimals
+from base.exports import visible_columns
 from base.ordering import list_order
+
+from . import contact
 
 CUSTOMER_UNAVAILABLE = _("This customer is no longer available.")
 NO_CUSTOMER_MATCHES = _("No customer matches “%(reference)s”.")
@@ -96,28 +100,6 @@ SEVERAL_MATCH = _("Several match “%(reference)s”: give the id.")
 CUSTOMER_UNAVAILABLE_CODE = "customer.customer_unavailable"
 CUSTOMER_AMBIGUOUS_CODE = "customer.customer_ambiguous"
 
-#: The columns of the CSV export (CUSTOMER-F09): the import's, then the figures and the segments.
-EXPORT_COLUMNS = (
-    "name",
-    "email",
-    "phone",
-    "tax_id",
-    "company_name",
-    "address",
-    "city",
-    "postal_code",
-    "country",
-    "lifecycle_stage",
-    "notes",
-    "source",
-    "is_active",
-    "total_purchases",
-    "total_spent",
-    "last_purchase_at",
-    "created_at",
-    "groups",
-    "tags",
-)
 #: What a spreadsheet runs as a formula when a cell starts with it (OWASP «CSV injection»).
 FORMULA_STARTS = ("=", "+", "-", "@", "\t", "\r")
 
@@ -133,12 +115,12 @@ def business_country(ctx: OperationContext) -> str:
 
 
 def _matching_ids(ctx: OperationContext, reference: str) -> list[UUID]:
-    """The live cards whose email, phone or name is exactly ``reference`` (at most two: one is enough)."""
+    """The live cards whose name, or email or phone for whoever sees them, is exactly ``reference`` (at most two)."""
     text = reference.strip()
     cards = Customer.objects.live()
-    if "@" in text:
+    if "@" in text and contact.sees_contact(ctx):
         return list(cards.filter(email__iexact=text).values_list("id", flat=True)[:2])
-    numbers = candidates(text, business_country(ctx))
+    numbers = candidates(text, business_country(ctx)) if contact.sees_contact(ctx) else []
     if numbers:
         return list(
             cards.filter(phone__in=numbers)
@@ -335,11 +317,11 @@ def _ordered(rows: QuerySet, column: str, descending: bool) -> QuerySet:
     return rows.order_by(*list_order(column, descending=descending, nulls_last=True))
 
 
-def _filtered_customers(params: CustomerFilters) -> QuerySet:
+def _filtered_customers(ctx: OperationContext, params: CustomerFilters) -> QuerySet:
     cards = Customer.objects.live()
     term = search_term(params.search or "")
     if term:
-        cards = cards.filter(search_text__contains=term)
+        cards = contact.searched(ctx, cards, term)
     for field in ("name", "email", "tax_id", "company_name"):
         value = (getattr(params, field) or "").strip()
         if value:
@@ -364,8 +346,8 @@ def _filtered_customers(params: CustomerFilters) -> QuerySet:
     )
 
 
-def _customers(params: CustomerFilters) -> QuerySet:
-    return _ordered(_filtered_customers(params), params.sort, params.descending)
+def _customers(ctx: OperationContext, params: CustomerFilters) -> QuerySet:
+    return _ordered(_filtered_customers(ctx, params), params.sort, params.descending)
 
 
 def _customer_count(relation: str) -> Count:
@@ -397,7 +379,7 @@ def _customer_count(relation: str) -> Count:
     ),
 )
 def list_customers(ctx: OperationContext, params: CustomerListIn) -> dict:
-    return page(_customers(params), params)
+    return page(_customers(ctx, params), params)
 
 
 @operation(
@@ -508,21 +490,22 @@ def _cell(value) -> str:
     ),
 )
 def export_customers(ctx: OperationContext, params: CustomerExportIn) -> dict:
-    cards = _customers(params).prefetch_related("groups", "tags")
+    cards = _customers(ctx, params).prefetch_related("groups", "tags")
+    columns = visible_columns(ctx, CustomerExportRow)
     # «Spent» with the decimals of the business's currency (its country's: 0 in JPY), never two fixed.
     decimals = currency_decimals(platform.business_currency(ctx.scope))
     buffer = io.StringIO()
     writer = csv.writer(buffer, lineterminator="\n")
-    writer.writerow(EXPORT_COLUMNS)
+    writer.writerow(columns)
     count = 0
     for customer in cards:
         values = {
-            **{column: getattr(customer, column, None) for column in EXPORT_COLUMNS},
+            **{column: getattr(customer, column, None) for column in columns},
             "total_spent": f"{Decimal(customer.total_spent).scaleb(-decimals):.{decimals}f}",
             "groups": "; ".join(sorted(group.name for group in customer.groups.all())),
             "tags": "; ".join(sorted(tag.name for tag in customer.tags.all())),
         }
-        writer.writerow([_cell(values[column]) for column in EXPORT_COLUMNS])
+        writer.writerow([_cell(values[column]) for column in columns])
         count += 1
     return {
         "filename": "customers.csv",
@@ -768,7 +751,7 @@ def purchase_divergences(ctx: OperationContext, params: DivergencesIn) -> dict:
     )
     term = normalize(params.search or "")
     if term:
-        cards = cards.filter(search_text__contains=term)
+        cards = contact.searched(ctx, cards, term)
     return page(cards.order_by("name", "id"), params)
 
 
@@ -821,7 +804,7 @@ def consent_history(ctx: OperationContext, params: ConsentHistoryIn) -> dict:
         facts = facts.filter(
             Q(purpose__icontains=text)
             | Q(channel__icontains=text)
-            | Q(contact_point__icontains=text)
+            | (Q(contact_point__icontains=text) if contact.sees_contact(ctx) else Q())
             | Q(notice_text__icontains=text)
             | Q(reason__icontains=text)
         )

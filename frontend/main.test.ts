@@ -18,10 +18,10 @@ vi.mock('@erplora/ui/shell', () => ({
   applyUserThemePreferences: vi.fn(),
   resetUserThemePreferences: vi.fn(),
 }));
-// The side menu's `visible` (base/frontend/lib/sidebar.test.ts runs them): here, which one each entry carries.
+// base's side menu (base/frontend/lib/sidebar.test.ts declares and runs it): here, only that main hands it to the shell.
 vi.mock('../base/frontend/lib/sidebar', () => ({
-  allowedTo: (permission: string) => `allowedTo:${permission}`,
-  useApiDocsShown: 'useApiDocsShown',
+  SIDEBAR: 'SIDEBAR',
+  shellSidebar: (sidebar: unknown) => ({ shellSidebarOf: sidebar }),
 }));
 vi.mock('@erplora/ui/sdk', async (importOriginal) => ({
   ...((await importOriginal()) as object),
@@ -217,27 +217,12 @@ describe('main.ts', () => {
     expect(shellOptions().home).toBe(true);
   });
 
-  // The side menu's entries are the platform's, never a module (modules open from «My apps» and Home); each shows once
-  // its screen exists (the shell checks the router) and only for whoever may open it, «API» only while the business
-  // shows its API's documentation.
-  it("paints the side menu: the platform's entries in its two groups, no module, each for who may open it", async () => {
+  // The side menu is base's (each entry for whoever holds the permission its screen asks), never a module: modules open
+  // from «My apps» and Home.
+  it("paints base's side menu, as the shell takes it, and no module", async () => {
     fakeShell();
     await main.boot({});
-    expect(shellOptions().sidebar).toEqual({
-      groups: [
-        [
-          { id: 'employees', labelKey: 'sidebar.employees', icon: 'ion:people-outline', to: '/employees', visible: 'allowedTo:base.view_home' },
-          { id: 'files', labelKey: 'sidebar.files', icon: 'ion:folder-outline', to: '/files', visible: 'allowedTo:base.view_files' },
-        ],
-        [
-          { id: 'billing', labelKey: 'sidebar.billing', icon: 'ion:card-outline', to: '/billing' },
-          { id: 'apps', labelKey: 'sidebar.apps', icon: 'ion:storefront-outline', to: '/apps', visible: 'allowedTo:base.view_home' },
-          { id: 'system', labelKey: 'sidebar.system', icon: 'ion:hardware-chip-outline', to: '/system', visible: 'allowedTo:base.administer_hub' },
-          { id: 'api', labelKey: 'sidebar.api', icon: 'ion:code-slash-outline', to: '/api-docs', visible: 'useApiDocsShown' },
-          { id: 'settings', labelKey: 'sidebar.settings', icon: 'ion:settings-outline', to: '/settings', visible: 'allowedTo:base.view_home' },
-        ],
-      ],
-    });
+    expect(shellOptions().sidebar).toEqual({ shellSidebarOf: 'SIDEBAR' });
     expect(shellOptions()).not.toHaveProperty('nav');
   });
 
