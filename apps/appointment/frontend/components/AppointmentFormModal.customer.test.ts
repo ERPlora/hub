@@ -2,7 +2,7 @@
 // walk-in) and stays chosen, and what was already chosen for the appointment is kept, also when it fails.
 import { describe, expect, it } from 'vitest';
 
-import { BOOKED, READS, setup, type Control } from '../__tests__/appointment-form';
+import { BOOKED, fillChoices, READS, setup, type Control } from '../__tests__/appointment-form';
 import { click, ionValue, settle } from '../__tests__/mount-appointment';
 
 describe('AppointmentFormModal: a new customer without leaving the agenda (CUSTOMER-F25)', () => {
@@ -30,11 +30,7 @@ describe('AppointmentFormModal: a new customer without leaving the agenda (CUSTO
       '/api/customer/customers': create,
       '/api/appointment/appointments': [201, BOOKED],
     });
-    await s.addService('cut', 'Haircut');
-    await s.addService('colour', 'Colour');
-    await s.pickStaff('s1', 'Ana López');
-    await s.pick('day', '2026-10-19');
-    await s.pick('time', '10:00');
+    await fillChoices(s);
     await click(s.inDoc('customer-search-trigger'));
     await ionValue(s.inDoc('customer-picker-search'), 'Marta Ruiz', 'ionInput');
     await click(s.inDoc('customer-search-quick-add'));

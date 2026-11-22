@@ -98,11 +98,16 @@ export async function setup(props: Record<string, unknown> = {}, locale: 'en' | 
   return { ...m, field, submit, servicePicker, staffPicker, addService, pickStaff, kept, pick, pickCustomer, businessIn };
 }
 
-export async function fillNew(s: Awaited<ReturnType<typeof setup>>) {
-  await s.pickCustomer();
+/** The services, the professional, the day and the time of a new appointment; the customer is chosen apart. */
+export async function fillChoices(s: Awaited<ReturnType<typeof setup>>) {
   await s.addService('cut', 'Haircut');
   await s.addService('colour', 'Colour');
   await s.pickStaff('s1', 'Ana López');
   await s.pick('day', '2026-10-19');
   await s.pick('time', '10:00');
+}
+
+export async function fillNew(s: Awaited<ReturnType<typeof setup>>) {
+  await s.pickCustomer();
+  await fillChoices(s);
 }
