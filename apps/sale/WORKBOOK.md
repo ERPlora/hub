@@ -883,7 +883,7 @@ Impresión.». Una línea ya enviada no se puede quitar: «Esa línea ya no se p
 (anúlala con un motivo), ya está cobrada o ya no está en una cuenta abierta.». Anular una línea sin enviar, cobrada, ya anulada o sin motivo
 se rechaza con «Esa línea no se puede anular…». Sin Cocina activa no hay pestañas ni envío: la cuenta se
 cobra como siempre.
-Por el asistente: su tarjeta de confirmación dice la cuenta (por su título o, sin título, por su importe), la línea, el producto, el servicio, el menú y quién atiende por su nombre, el tipo de pedido con las palabras de Cocina, nunca por un identificador; lo que quien pregunta no puede ver, o lo que ya no está, no sale en la tarjeta (BASE-F97).
+Por el asistente: su tarjeta de confirmación dice la cuenta (la de una mesa, por la mesa como la dice Mesas y en el idioma de quien lee, «4 (Comedor)»; otra, o sin poder ver Mesas, por su título o, sin título, por su importe), la línea, el producto, el servicio, el menú y quién atiende por su nombre, el tipo de pedido con las palabras de Cocina, nunca por un identificador; lo que quien pregunta no puede ver, o lo que ya no está, no sale en la tarjeta (BASE-F97). Un producto pedido con palabras sale como el que se va a añadir: «dos cafés» con «Espresso» y «White coffee» en la carta dice «2 · White coffee · 4 (Comedor)»; si las palabras valen para varios productos o para ninguno, salen tal como se dijeron y al confirmar no se añade nada: el asistente pregunta cuál.
 Implicados: KITCHEN-F05, KITCHEN-F18, KITCHEN-F19, KITCHEN-F20, KITCHEN-F29, BASE-F84, BASE-F97
 
 ### SALE-F21 Imprimir la cuenta para la mesa (precuenta)
@@ -1667,7 +1667,9 @@ secciones, las notas rápidas y lo devolvible se pueden seguir en vivo.
 - **Mesas** (opcional): «Elegir mesa» del TPV (F19) habla con Mesas solo por el nombre de sus
   operaciones, desde la pantalla y con la sesión de quien atiende: `table.table.list` y
   `table.floor.status` (las mesas), `table.session.by_order` (la mesa de la cuenta), `table.session.open`
-  con la cuenta en pantalla, `.restore` y `.park`. Sin Mesas activa no hay botón.
+  con la cuenta en pantalla, `.restore` y `.park`. Sin Mesas activa no hay botón. La tarjeta del asistente
+  dice la cuenta de una mesa por su mesa con `table.session.by_order`, como quien pregunta; sin Mesas, o sin
+  permiso de ver sus cuentas, por su título.
 - **Citas** (opcional): la cita de una cuenta y lo que reservó, para cobrar su precio reservado
   (`appointment.appointment.get`).
 

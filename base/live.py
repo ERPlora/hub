@@ -102,6 +102,8 @@ _PEOPLE = sorted({events.PIN_SET, events.PROFILE_UPDATED, HUB_STATE_APPLIED, *ev
 live("base.person.list", on=_PEOPLE)
 live("base.person.detail", on=_PEOPLE)
 live("base.role.list", on=[HUB_STATE_APPLIED])
+# What a role allows: the photo brings the roles, and an app turned on or off adds or takes away its panel.
+live("base.role.detail", on=sorted({HUB_STATE_APPLIED, *APP_EVENTS}))
 # «No access» names who can give it: the photo brings the people and their roles, «My profile» their names.
 live("base.access.grantors", on=sorted({HUB_STATE_APPLIED, events.PROFILE_UPDATED}))
 # A device's own access: erplora.com's photo brings the roles, and the device reads its session again when it changes.

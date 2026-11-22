@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:52ffaf9cdd20a383df34640fcb09f440b6fd6946a7c9f8756ba054a79f235615 -->
+<!-- generated from WORKBOOK.md sha256:c86f668a251b01e2730cc16fe212af8e66cbbe840b4a2637ed9899e762e82fb1 -->
 
 ## What it is for and who it is for
 
@@ -881,7 +881,7 @@ longer be removed: it was sent to the kitchen (void it with a reason), it is cha
 an open check.". Voiding a line not sent, charged, already voided or without a reason is
 refused with "That line cannot be voided…". Without Kitchen active there are no tabs and no sending: the
 check is charged as always.
-Through the assistant: its confirmation card says the check (by its title or, with none, by its amount), the line, the product, the service, the menu and who serves by their name, and the order type in Kitchen's words, never by an id; what the person asking may not see, or what is no longer there, stays off the card (BASE-F97).
+Through the assistant: its confirmation card says the check (a table's, by its table as Tables says it and in the reader's language, "4 (Dining room)"; any other, or without access to Tables, by its title or, with none, by its amount), the line, the product, the service, the menu and who serves by their name, and the order type in Kitchen's words, never by an id; what the person asking may not see, or what is no longer there, stays off the card (BASE-F97). A product asked for in words shows as the one that will be added: "two coffees" with "Espresso" and "White coffee" on the menu says "2 · White coffee · 4 (Dining room)"; if the words fit several products or none, they show as they were said and confirming adds nothing: the assistant asks which one.
 Involved: KITCHEN-F05, KITCHEN-F18, KITCHEN-F19, KITCHEN-F20, KITCHEN-F29, BASE-F84, BASE-F97
 
 ### SALE-F21 Print the bill for the table (pre-bill)
@@ -1668,7 +1668,9 @@ the quick notes and what is refundable can be followed live.
 - **Tables** (optional): the POS's "Choose table" (F19) talks to Tables only by the name of its
   operations, from the screen and with the session of whoever serves: `table.table.list` and
   `table.floor.status` (the tables), `table.session.by_order` (the check's table), `table.session.open`
-  with the check on screen, `.restore` and `.park`. Without Tables active there is no button.
+  with the check on screen, `.restore` and `.park`. Without Tables active there is no button. The
+  assistant's card says a table's check by its table with `table.session.by_order`, as the person asking;
+  without Tables, or without the right to see its checks, by its title.
 - **Appointments** (optional): a check's appointment and what it booked, to charge its booked price
   (`appointment.appointment.get`).
 

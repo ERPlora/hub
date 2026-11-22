@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:ba3814de3ea3137051a399231c4c62fb1cad53f12d37e2ada1cb09dc5534de34 -->
+<!-- generated from WORKBOOK.md sha256:c27c403a8796aa121c549811591b8a8f9a240d6d4253e1335c7b2c37814871d4 -->
 
 ## What it is for and who it is for
 
@@ -585,13 +585,13 @@ Steps:
    with a return.".
 3. Type the Reason (required) and tap **Void**.
 In: the purchase and the reason.
-Out: the voucher can no longer be spent and stays as a trace, with who, when and the reason
-(`service.grant.voided`). It moves no money and issues no document. If a line of a sale paid for it, that part
+Out: the voucher can no longer be spent and stays as a trace, with who (by their name or, if their account has
+none, by what goes before the @ of their email, never the whole email), when and the reason (`service.grant.voided`). It moves no money and issues no document. If a line of a sale paid for it, that part
 counts for whoever sold it again, until a refund says otherwise (SALE-F28).
 If it fails: "That voucher was already used: it cannot be voided.", "That voucher was already voided." or
 "Say why this voucher is being voided: the reason stays on its record.". If another till spends a session
 at the same time, the void waits and gets the real reason.
-Involved: SERVICE-F16, SALE-F28, SALE-F32
+Involved: SERVICE-F16, SALE-F28, SALE-F32, BASE-F119
 
 ### SERVICE-F18 Give sessions, extend the expiry or correct the balance
 Status: done
