@@ -12,7 +12,7 @@ const help: AppHelp = {
     { id: 'floor', title: 'Plano de sala', path: '/table/floor-plan', text: 'Disponible verde; ocupada rojo.' },
     { id: 'settings', title: 'Ajustes', path: '/table/settings', text: 'Configura el comedor.' },
   ],
-  flows: [{ id: 'seat', title: 'Sentar un grupo', screens: ['floor'], steps: '1. Toca una mesa.', failure: '' }],
+  flows: [{ id: 'seat', title: 'Sentar un grupo', screens: ['floor'], steps: '1. Toca una mesa.', failure: '', videos: [] }],
 };
 
 async function setup(answer: AppHelp = help) {
@@ -89,6 +89,14 @@ describe('HelpContent', () => {
 
     await m.wrapper.get('[data-testid="help-other-screen-settings"]').trigger('click');
     expect(m.wrapper.get('[data-testid="help-other-screen-content-settings"]').text()).toContain('Every setting summary line remains.');
+  });
+
+  it("plays an opened task's video with the module's poster, inside the how-to section", async () => {
+    const m = await setup({ ...help, flows: [{ ...help.flows[0], videos: ['dQw4w9WgXcQ'] }] });
+    expect(m.wrapper.findComponent(YouTubeEmbed).exists()).toBe(false);
+    await m.wrapper.get('[data-testid="help-flow-floor-seat"]').trigger('click');
+    const video = m.wrapper.get('[data-help-section="flows"]').getComponent(YouTubeEmbed);
+    expect(video.props()).toMatchObject({ videoId: 'dQw4w9WgXcQ', title: 'Sentar un grupo', icon: 'ion:grid-outline' });
   });
 
   it('omits the how-to section when the module has no flows', async () => {

@@ -41,7 +41,7 @@ export const help: AppHelp = {
     { id: 'floor', title: 'Floor plan', path: '/table/floor-plan', text: 'The live room.' },
     { id: 'settings', title: 'Settings', path: '/table/settings', text: 'Room settings.' },
   ],
-  flows: [{ id: 'seat', title: 'Seat a party', screens: ['floor'], steps: '1. Tap a table.', failure: '' }],
+  flows: [{ id: 'seat', title: 'Seat a party', screens: ['floor'], steps: '1. Tap a table.', failure: '', videos: [] }],
 };
 
 export { business, POLISH } from './business';
