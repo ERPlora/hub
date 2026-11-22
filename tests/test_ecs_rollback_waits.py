@@ -68,6 +68,12 @@ class RolloutTest(RollbackCase):
             self.assertIn(f"::error::rollout of {service} did not complete in 30 s; see the service events\n", self.out)
         self.assertFalse(self.called(CHANGED))
 
+    def test_the_rollout_s_clock_counts_poll_seconds(self):
+        self.assertEqual(1, self.rollback(POLL_SECONDS="5", ROLLOUT_TIMEOUT_SECONDS="10",
+                                          FAKE_ROLLOUT_STATES="IN_PROGRESS"))
+        self.assertEqual(3, self.reads_of("hub"))
+        self.assertEqual(["5", "5"], self.pauses())
+
     def test_the_rollout_timeout_is_600_seconds_by_default(self):
         self.assertEqual(1, self.rollback(FAKE_ROLLOUT_STATES="IN_PROGRESS"))
         self.assertEqual(41, self.reads_of("hub"))
