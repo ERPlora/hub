@@ -4,12 +4,15 @@ Support's tool (a demo to close by hand) and the e2e's clock (a demo that ended,
 environment. All through operations: ``base.demo.expire`` (its host answers 410 from now on), its drop
 (``base.tenancy.provision.drop_now``: its database and its files, then ``base.demo.purge``), then ``base.demo.get`` to
 say how it was left. The worker may take the demo first, as soon as it ended: the command then waits for that drop
-instead of saying the step it caught it in.
+instead of saying the step it caught it in. A drop that fails is logged and left to the worker, which tries it again:
+the command says the step it stayed in.
 
 While the platform is frozen for a database upgrade (``control.freeze.set``) the demo ends all the same but its
 database is left where it is (a ``DROP DATABASE`` would never reach the upgrade's copy): the worker's reaper drops it on
 its first tick after the freeze is lifted, and the command says so.
 """
+
+import logging
 
 from django.core.management.base import BaseCommand, CommandError
 from live.context import system_context
@@ -23,6 +26,8 @@ from base.services.provisioning import registry_row_by_slug
 from base.tenancy import provision
 from base.tenancy.context import use_control
 from control.queries import active_freeze
+
+logger = logging.getLogger(__name__)
 
 
 class Command(BaseCommand):
@@ -41,7 +46,10 @@ class Command(BaseCommand):
             frozen = active_freeze() is not None
             demo = registry_row_by_slug(slug)
         if not frozen:
-            provision.drop_now(demo)
+            try:
+                provision.drop_now(demo)
+            except Exception:
+                logger.exception("base.demo.purge_failed demo=%s: the worker tries it again.", slug)
         status = demo_get(ctx, DemoSlugIn(slug=slug)).status
         if frozen:
             self.stdout.write(f"{slug}: {status} (frozen: its database is dropped once the freeze is lifted)")

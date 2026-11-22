@@ -186,3 +186,16 @@ def test_frozen_it_ends_the_demo_and_leaves_its_database_for_after_the_freeze(hu
     reap_demos()
 
     assert Hub.objects.get(slug=slug).status == "purged"
+
+
+def test_a_drop_that_fails_is_logged_and_the_command_still_says_how_the_demo_was_left(monkeypatch, caplog, hub_b):
+    slug = entered_demo(hub_b)
+
+    def refused(hub: Hub) -> None:
+        raise RuntimeError("the server refused to drop the database")
+
+    monkeypatch.setattr(provision.demos, "purge_demo_data", refused)
+
+    assert expire(slug).strip() == f"{slug}: dropping"
+    assert "base.demo.purge_failed" in caplog.text
+    assert Hub.objects.get(slug=slug).last_error.startswith("drop_failed: RuntimeError")
