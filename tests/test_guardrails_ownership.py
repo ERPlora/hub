@@ -1,7 +1,8 @@
 """Guardrail of «only mine or all»: a model whose rows belong to someone is read through its ``Owned`` declaration.
 
 An app declares in ``apps/<app>/queries/ownership.py`` whose each row of a model is (``base.queries.ownership.Owned``),
-and its reads go through ``<DECLARATION>.visible(ctx)``: a person without the «see all» permission gets only theirs.
+and its reads go through ``<DECLARATION>.visible(ctx)`` (its figures, through ``<DECLARATION>.counted(ctx)``): a person
+without the «see all» permission gets only theirs.
 ``<Model>.objects`` in a ``queries`` door skips that, so here every such read is in :data:`UNSCOPED_READS`, closed and
 with its reason; what the list names must still be there, so it never rots; and a planted read is caught, so a scan
 that found nothing is never taken for a clean tree.
@@ -157,8 +158,9 @@ def test_the_declarations_are_found():
 def test_every_read_of_an_owned_model_goes_through_its_declaration_or_is_listed_with_its_reason():
     skipped = unscoped_reads(REPO) - set(UNSCOPED_READS)
     assert skipped == set(), (
-        f"{sorted(skipped)} read an owned model with <Model>.objects: read it with <DECLARATION>.visible(ctx) (or "
-        "visible_sale in Sales), or add it to UNSCOPED_READS with a reason a reviewer can weigh"
+        f"{sorted(skipped)} read an owned model with <Model>.objects: read it with <DECLARATION>.visible(ctx) (a "
+        "figure with <DECLARATION>.counted(ctx); visible_sale in Sales), or add it to UNSCOPED_READS with a reason a "
+        "reviewer can weigh"
     )
 
 

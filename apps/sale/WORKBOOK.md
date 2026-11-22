@@ -1055,6 +1055,9 @@ Pasos:
    territorio a mitad, por ejemplo), se llama «Impuestos». Sin ventas en el periodo, lleva el impuesto del
    territorio de **Impuestos → Ajustes**, y cambia al momento si se cambia el territorio. Con «7 días»,
    debajo de las cifras, lo vendido cada uno de esos días, de más antiguo a hoy («mié 14 · 120,50 €»).
+   Son las cifras de todo el negocio para el responsable, el propietario y el administrador, que ven las
+   ventas de todos y los totales del negocio; quien ve las cifras sin esos dos permisos ve las de sus
+   ventas, las mismas que le da la tabla.
 3. La tabla: Fecha, Número, Cliente, Pago, Estado (Completada, Anulada, Devuelta; con «Por devolver
    5,00 €» si se devolvió una parte) y Total. Una venta cobrada con varios medios dice en «Pago»
    todos, una vez cada uno y en el orden en que se cobraron: «Efectivo + Tarjeta». Busca con
@@ -1069,9 +1072,11 @@ Pasos:
    hoy) y «Actividad reciente» (las ocho últimas ventas que la persona ve, la más nueva arriba, con su
    número y su cliente) se añaden con ⋮ («Personalizar panel»). Se ponen al día solos al cobrar, anular o devolver
    una venta, sin recargar. Quien no tiene permiso de informes solo puede poner «Actividad reciente».
+   Los paneles cuentan con la misma regla que las cifras de la pantalla: todo el negocio o sus ventas.
 Entra: nada de otras apps.
 Sale: nada guardado. Lo vendido por cada profesional en el periodo (lo piden Personal y el asistente para
-la comisión) ya resta lo devuelto: lo que vuelve, a quien lo vendió; el dinero que vuelve sin nada que
+la comisión) cuenta con la misma regla: quien no ve todo el negocio recibe solo las líneas de sus ventas
+y, de las sesiones de bono gastadas fuera del cobro, las de su ficha. Ya resta lo devuelto: lo que vuelve, a quien lo vendió; el dinero que vuelve sin nada que
 valga (solo dinero, una invitación o la sesión de un bono), a todos los de esa venta según lo que a cada
 uno le queda por devolver tras las devoluciones anteriores, así que nadie baja de 0. Cada devolución
 cuenta en el día de su venta y se reparte al céntimo: con lo que nadie atendió, suma los «Ingresos» del
@@ -1687,7 +1692,7 @@ secciones, las notas rápidas y lo devolvible se pueden seguir en vivo.
 | Ver los medios de pago | sí | sí | sí | sí | `sale.view_paymentmethod` |
 | Crear medios de pago | sí | sí | sí | no | `sale.add_paymentmethod` |
 | Ver las ventas de todos (sin él, solo las suyas: las que cobró y las que se le atribuyeron) | sí | sí | sí | no | `sale.view_all_sales` |
-| Ver las cifras | sí | sí | sí | no | `sale.view_reports` |
+| Ver las cifras (las de todo el negocio, con las ventas de todos y los totales del negocio, `base.view_business_totals`; sin ellos, las de sus ventas) | sí | sí | sí | no | `sale.view_reports` |
 | Ajustes, secciones y notas rápidas | sí | sí | sí | no | `sale.manage_settings` |
 
 Los papeles llegan del SaaS con prefijo (`hub_owner`, `hub_admin`, `hub_manager`, `hub_employee`).
@@ -2064,9 +2069,13 @@ título, sus pasos y «Si falla»: ahí no van nombres de código, incidencias, 
   de Personal (`staff_id`; la ficha la dice Personal por su `own_records`, sin que Ventas la requiera). Quien no
   tiene `sale.view_all_sales` lee y toca solo esas (`SALES.visible(ctx)` y `visible_sale`, con el mismo 404
   `sale.sale_not_found` que una venta que no existe). Quien no es una persona (una llave de API, una automatización,
-  la plataforma) no tiene «suyas»: alcanza las que le abre su permiso, como en Citas. Las cifras (`queries/figures.py`)
-  siguen contando el negocio entero para quien tiene `sale.view_reports`. `tests/test_guardrails_ownership.py` prohíbe
-  `Sale.objects` en los paquetes `queries` fuera de su lista cerrada, cada entrada con su motivo.
+  la plataforma) no tiene «suyas»: alcanza las que le abre su permiso, como en Citas. Las cifras (`queries/figures.py`:
+  el periodo, hoy, los 7 días y lo de cada profesional) suman `SALES.counted(ctx)`: el negocio entero solo con
+  `sale.view_all_sales` y `base.view_business_totals`, y si no, las suyas, aunque abra las de todos una a una. Lo de
+  cada profesional lee `SaleLine`, que no es de nadie: filtra sus líneas con `sale__in` sobre esas ventas, y las
+  sesiones de bono fuera del cobro con `VOUCHER_SESSIONS` (las de su ficha). `tests/test_guardrails_ownership.py`
+  prohíbe `Sale.objects` y `VoucherSession.objects` en los paquetes `queries` fuera de su lista cerrada, cada entrada
+  con su motivo.
 - **Ids sin clave ajena hacia apps fuera de `requires`** (precedente PLAN §20.5, `product_id`): la venta
   guarda `invoice_id` de Facturación y la línea `service_id`, `voucher_session_id`, `staff_id` y la
   cuenta `appointment_id`, como UUID opacos; Ventas sigue sin requerir Facturación, Caja, Citas ni
