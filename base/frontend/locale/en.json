@@ -783,7 +783,8 @@
         "hub_owner": "Owner",
         "hub_admin": "Administrator",
         "hub_manager": "Manager",
-        "hub_employee": "Employee"
+        "hub_employee": "Employee",
+        "hub_accountant": "Accountant"
       }
     },
     "device": {
@@ -879,7 +880,8 @@
         "hub_owner": "Owner",
         "hub_admin": "Administrator",
         "hub_manager": "Manager",
-        "hub_employee": "Employee"
+        "hub_employee": "Employee",
+        "hub_accountant": "Accountant"
       },
       "status": {
         "active": "Active",

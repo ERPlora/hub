@@ -22,6 +22,7 @@ from live.operations import AI, registry
 
 from base import assistant
 from base.models import Membership
+from base.tests.roles import WORKING_ROLES
 from base.tests.test_assistant_asks import TOP, assert_offered_with_room, comparable, offered_place, probe_phrases
 from base.tests.test_assistant_asks import english_coverage_test, english_words_test, nobodys_words, own_words_test
 
@@ -235,7 +236,7 @@ test_each_tool_has_its_own_english_words = english_coverage_test("kitchen", OWN_
 
 
 @HUB_DB  # the catalogue is of the apps on in the business (base.activation) and of the person's role
-@pytest.mark.parametrize("role", list(Membership.Role))
+@pytest.mark.parametrize("role", WORKING_ROLES)
 def test_kitchen_takes_no_place_from_who_has_been_serving_tables(catalog_of, role):
     """«Serving» names ``kitchen.ticket.serve``, whose asks say «servida»: Tables' «who has been serving tables?» came
     11th with them, past the tenth place ``base/tests/test_assistant_asks.py`` allows (it was tenth already). Its asks

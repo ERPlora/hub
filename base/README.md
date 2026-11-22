@@ -50,4 +50,4 @@ por `/internal`.
 El detalle está en «Lo que queda fuera» del [`WORKBOOK.md`](WORKBOOK.md): la fila de salud del Inicio en pantalla
 (hub#573) y la cola de PgBouncer de cada negocio en CloudWatch (hub#572). Ya no están fuera, cerradas después del cierre de la app: las cifras de uso y el aviso de ampliar
 (hub#603), el pase a erplora.com (saas#190), la vista previa de .xlsx y .docx (hub#578), los roles que trae una app,
-que son siempre los cuatro de erplora.com (hub#579), y las novedades en la pantalla de Actualizaciones (hub#576).
+que son siempre los cinco de erplora.com (hub#579), y las novedades en la pantalla de Actualizaciones (hub#576).

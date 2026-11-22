@@ -629,6 +629,8 @@ Nada: Impuestos no depende de ninguna app ni reacciona a avisos de otras.
 | Crear categorías, reglas y alias; poner fecha de fin, desactivar y reactivar reglas; cambiar el territorio fiscal | sí | sí | sí | no | `tax.manage` |
 
 Los papeles llegan del SaaS con prefijo (`hub_owner`, `hub_admin`, `hub_manager`, `hub_employee`).
+La gestoría (`hub_accountant`) solo tiene «Ver categorías, reglas, alias y el territorio fiscal, y calcular», como
+el empleado: lee los impuestos en cada venta y en cada factura, y no cambia nada.
 
 ## Para quien lo mantiene
 

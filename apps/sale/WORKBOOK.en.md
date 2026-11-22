@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:25f1c6e46fc0ac8b37810eb9542fa506c1d42e1f8881dd50931ed4ed44109823 -->
+<!-- generated from WORKBOOK.md sha256:e1f0e9c8086c6de4aebfb91fb2c6ccbcdb7e6c0ffbc83c44cd0c2c2f52630e02 -->
 
 ## What it is for and who it is for
 
@@ -1706,10 +1706,14 @@ an open price and discounts above the maximum. The approved action does everythi
 stays in **Employees › Approvals** (BASE-F85). Seeing everyone's sales, the figures, the settings and
 creating payment methods are not approved.
 
+The accountancy firm (`hub_accountant`) only reads: "See sales, checks, POS settings, sections and quick notes",
+"See the payment methods" and "See everyone's sales". It does not build checks, charge, void or refund, nobody
+approves anything for it and it does not touch the settings.
+
 What touches a voucher's session also asks for Services' permission, because it is Services that moves
 it with the session of whoever sells: paying a line with a voucher, undoing it, removing, voiding or
-charging a line paid with a voucher, "Spend sessions" (`service.redeem_package`, all four roles have it);
+charging a line paid with a voucher, "Spend sessions" (`service.redeem_package`, every role but the accountancy firm has it);
 voiding or refunding a sale with sessions, "Give voucher sessions back" (`service.return_session`: owner,
 administrator and manager, the same who void and refund). The other way round, saying who did a session spent
-outside the checkout (SERVICE-F21) asks for "Build the check" (`sale.add_sale`, all four roles), like saying whose a
+outside the checkout (SERVICE-F21) asks for "Build the check" (`sale.add_sale`, every role but the accountancy firm), like saying whose a
 line is.

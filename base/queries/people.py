@@ -70,7 +70,7 @@ def people_of(slug: str) -> list[dict[str, Any]]:
     return sorted(people, key=lambda person: (people_rules.role_rank(person["role"]), person["name"].casefold()))
 
 
-#: The roles the photo's ``members`` may carry: erplora.com's four.
+#: The roles the photo's ``members`` may carry: erplora.com's.
 PHOTO_ROLES = frozenset(people_rules.ROLE_ORDER)
 
 
@@ -193,7 +193,8 @@ def person_detail_out(ctx: OperationContext, person: dict[str, Any]) -> dict[str
 def person_list(ctx: OperationContext, data: PersonListIn) -> dict:
     """Employees › Personal: every person once, owner first, with the plan's places."""
     found = people_of(ctx.scope.key)
-    return {"people": [person_out(ctx, person) for person in found], "seats": seats_of(ctx.scope.key, len(found))}
+    taking_a_place = sum(1 for person in found if person["role"] not in people_rules.FREE_ROLES)
+    return {"people": [person_out(ctx, person) for person in found], "seats": seats_of(ctx.scope.key, taking_a_place)}
 
 
 @operation(
@@ -236,7 +237,7 @@ def person_detail(ctx: OperationContext, data: PersonIn) -> dict:
     ),
 )
 def role_list(ctx: OperationContext, data: RoleListIn) -> dict:
-    """Employees › Roles: erplora.com's four, from the top, with their people and permissions."""
+    """Employees › Roles: erplora.com's, from the top, with their people and permissions."""
     found = people_of(ctx.scope.key)
     with translation.override(ctx.language):
         return {

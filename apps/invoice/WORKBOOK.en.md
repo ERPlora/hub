@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:753aad779e8e76bf7a3549eb69ec2c2ed42dfc2b4e5c70b1150f9e6924d9e722 -->
+<!-- generated from WORKBOOK.md sha256:aa102b64ce37080c510bb2a1bd639b67a976f4d5813fa9c9a323df0f9c851120 -->
 
 ## What it is for and who it is for
 
@@ -968,3 +968,7 @@ The roles arrive from the SaaS with a prefix (`hub_owner`, `hub_admin`, `hub_man
 Receiving the issuer from the SaaS (`invoice.sync_issuer`) belongs to no role: only to the system. Whoever opens
 the ticket's public page holds `invoice.public`, without a session and without any other permission; no automation
 issues from it alone (high risk, as replacing a ticket at the counter).
+
+The accountancy firm (`hub_accountant`) only has "View invoices, series, numbering and issuer; print" and "View
+everyone's invoices": it opens, prints and downloads everyone's invoices issued, without issuing, rectifying or setting
+up anything.

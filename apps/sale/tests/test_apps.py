@@ -76,12 +76,13 @@ def test_permissions():
     assert sale().permissions == PERMISSIONS
 
 
-def test_roles_are_the_four_customer_roles_with_the_hub_prefix():
+def test_roles_are_the_customer_roles_with_the_hub_prefix():
     assert set(sale().role_permissions) == {
         "hub_owner",
         "hub_admin",
         "hub_manager",
         "hub_employee",
+        "hub_accountant",
     }
 
 
@@ -95,6 +96,12 @@ def test_roles():
         "sale.view_sale",
         "sale.add_sale",
         "sale.take_payment",
+        "sale.view_paymentmethod",
+    }
+    # The accountancy firm reads everyone's sales and how they were paid; it never builds a check nor charges.
+    assert permissions_for_role([config], "hub_accountant") == {
+        "sale.view_sale",
+        "sale.view_all_sales",
         "sale.view_paymentmethod",
     }
 

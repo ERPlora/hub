@@ -4,7 +4,7 @@ Who is in the business, and with which role, is erplora.com's (inviting, changin
 places): the Hub lists them — those who already entered and those the SaaS's photo names that have not yet
 — with how each one gets in (the account, and here a PIN and a badge), and lets whoever runs the business take away a
 PIN or give and take away a badge. A person removed on erplora.com and invited again comes back with what the hub kept
-of them. The roles are the four of erplora.com, with how many people and permissions each has.
+of them. The roles are erplora.com's, with how many people and permissions each has.
 """
 
 import base64
@@ -380,14 +380,14 @@ class TestComingBack:
 class TestTheRoles:
     """The roles of the business, who has each one and how many permissions it gives."""
 
-    def test_the_four_roles_of_erplora_com_with_their_people_and_permissions(self, client, olga, adam, eva):
+    def test_the_roles_of_erplora_com_with_their_people_and_permissions(self, client, olga, adam, eva):
         client.force_login(eva)
         response = get(client, "/roles")
         assert response.status_code == 200, response.content
         roles = {role["key"]: role for role in response.json()["roles"]}
-        assert list(roles) == ["hub_owner", "hub_admin", "hub_manager", "hub_employee"]
+        assert list(roles) == ["hub_owner", "hub_admin", "hub_manager", "hub_employee", "hub_accountant"]
         assert {key: role["members"] for key, role in roles.items()} == {
-            "hub_owner": 1, "hub_admin": 1, "hub_manager": 0, "hub_employee": 1,
+            "hub_owner": 1, "hub_admin": 1, "hub_manager": 0, "hub_employee": 1, "hub_accountant": 0,
         }
         # The administrator holds all the owner does but owning the business.
         assert roles["hub_owner"]["permissions"] == roles["hub_admin"]["permissions"] + 1

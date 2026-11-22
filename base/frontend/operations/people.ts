@@ -10,7 +10,7 @@ export interface PersonWays {
   badge: boolean;
 }
 
-export type HubRole = 'hub_owner' | 'hub_admin' | 'hub_manager' | 'hub_employee';
+export type HubRole = 'hub_owner' | 'hub_admin' | 'hub_manager' | 'hub_employee' | 'hub_accountant';
 
 /** `base.PersonOut`: a person of the business (Employees › Personal). */
 export interface Person {
@@ -42,7 +42,7 @@ export interface PersonDetail extends Person {
   may: { remove_pin: boolean; set_badge: boolean };
 }
 
-/** `base.RoleOut`: one of erplora.com's four roles. */
+/** `base.RoleOut`: one of erplora.com's roles. */
 export interface HubRoleRow {
   key: HubRole;
   label: string;

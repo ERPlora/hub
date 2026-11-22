@@ -11,6 +11,7 @@ const ROLES: HubRoleRow[] = [
   { key: 'hub_admin', label: 'Admin', origin: 'basic', members: 0, permissions: 149 },
   { key: 'hub_manager', label: 'Manager', origin: 'basic', members: 2, permissions: 120 },
   { key: 'hub_employee', label: 'Employee', origin: 'basic', members: 5, permissions: 43 },
+  { key: 'hub_accountant', label: 'Accountant', origin: 'basic', members: 1, permissions: 8 },
 ];
 
 function embed(block: object | null) {
@@ -40,13 +41,14 @@ describe('RolesList', () => {
     const m = await open({ locale: 'es' });
     await m.result(m.call, 'base.role.list', { roles: ROLES });
     const rows = m.wrapper.findAll('[data-testid="roles-row"]');
-    expect(rows).toHaveLength(4);
+    expect(rows).toHaveLength(5);
     expect(rows[0].text()).toContain('Propietario');
     expect(rows[2].text()).toContain('Encargado');
     expect(rows[2].text()).toContain('Básico');
     expect(rows[2].text()).toContain('Siempre disponible');
     expect(rows[3].find('[data-testid="roles-members"]').text()).toBe('5');
     expect(rows[3].find('[data-testid="roles-permissions"]').text()).toBe('43');
+    expect(rows[4].text()).toContain('Gestoría');
   });
 
   it('who runs the business changes them on erplora.com; anyone else is only shown them', async () => {

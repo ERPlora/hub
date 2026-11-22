@@ -12,6 +12,8 @@ from django.http.request import validate_host
 from ninja import Schema
 from pydantic import AfterValidator, Field
 
+from base.schemas.people import HubRole
+
 
 class HubRegistryIn(Schema):
     """``PUT /internal/hubs/{id}``: what the SaaS registers a business with."""
@@ -60,7 +62,7 @@ class MemberIn(Schema):
     """One person of the business as the photo lists them (``hubs.queries`` of the SaaS: its accepted members)."""
 
     user_id: UUID
-    role: Literal["hub_owner", "hub_admin", "hub_manager", "hub_employee"]
+    role: HubRole
     email: str | None = None
     name: str | None = None
 
