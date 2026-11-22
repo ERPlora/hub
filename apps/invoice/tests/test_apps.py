@@ -24,6 +24,7 @@ from base.queries import app_help
 
 PERMISSIONS = [
     "invoice.view_invoice",
+    "invoice.view_all_invoices",
     "invoice.add_invoice",
     "invoice.rectify_invoice",
     "invoice.manage_series",
@@ -87,14 +88,15 @@ def test_roles():
     config = invoice()
     for role in ("hub_owner", "hub_admin"):
         assert permissions_for_role([config], role) == set(PERMISSIONS), role
-    # The manager rectifies and keeps the series; the issuer is the owner's and the admin's.
+    # The manager sees everyone's invoices, rectifies and keeps the series; the issuer is the owner's and the admin's.
     assert permissions_for_role([config], "hub_manager") == {
         "invoice.view_invoice",
+        "invoice.view_all_invoices",
         "invoice.add_invoice",
         "invoice.rectify_invoice",
         "invoice.manage_series",
     }
-    # The employee looks, prints, issues by hand and marks paid (as the product did).
+    # The employee looks at and prints their own invoices, issues by hand and marks paid.
     assert permissions_for_role([config], "hub_employee") == {
         "invoice.view_invoice",
         "invoice.add_invoice",

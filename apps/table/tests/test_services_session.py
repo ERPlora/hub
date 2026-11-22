@@ -11,6 +11,7 @@ the order, split and merge keep the check, guests visible and correctable) and w
 check no longer open refuses the write; closing by hand must name the bill the check carries).
 """
 
+import logging
 import uuid
 
 import pytest
@@ -336,16 +337,16 @@ def test_closing_an_empty_check_voids_it_with_the_waiters_own_session_never_more
     room, monkeypatch
 ):
     # Tables never widens a caller's permissions: Sales decides with the waiter's real context.
-    from apps.table import services
+    from apps.table.services import seating
 
     seen = []
-    original = services.call_app
+    original = seating.call_app
 
     def spy(ctx, name, data):
         seen.append((name, ctx.permissions))
         return original(ctx, name, data)
 
-    monkeypatch.setattr(services, "call_app", spy)
+    monkeypatch.setattr(seating, "call_app", spy)
     seat(make_table("4", zone=room))
     waiter = ctx_for(EMPLOYEE)
     run("table.session.close", {"table": "4"}, waiter)
@@ -774,6 +775,13 @@ def test_a_customer_that_cannot_be_put_on_the_check_does_not_stop_the_seating(
     assert status(table) == "occupied"
 
 
+def test_a_seating_without_its_customer_is_logged_under_the_table_writes(room, caplog):
+    with caplog.at_level(logging.INFO):
+        seat(make_table("4", zone=room), customer="Nobody At All")
+    said = [r.name for r in caplog.records if r.getMessage().startswith("table: seated without the customer")]
+    assert said == ["apps.table.services"]
+
+
 def test_a_split_sales_refuses_leaves_the_table_as_it_was(room, product):
     coffee = product()
     table = make_table("4", zone=room)
@@ -790,19 +798,19 @@ def test_a_split_sales_refuses_leaves_the_table_as_it_was(room, product):
 
 
 def test_a_merge_sales_refuses_leaves_both_tables_as_they_were(room, monkeypatch):
-    from apps.table import services
+    from apps.table.services import joining
 
     origin, target = make_table("4", zone=room), make_table("6", zone=room)
     source = seat(origin)
     staying = seat(target)
-    original = services.call_app
+    original = joining.call_app
 
     def refusing(ctx, name, data):
         if name == "sale.order.merge":
             raise Conflict("The check has changed.", code="sale.order_changed")
         return original(ctx, name, data)
 
-    monkeypatch.setattr(services, "call_app", refusing)
+    monkeypatch.setattr(joining, "call_app", refusing)
     with pytest.raises(Conflict) as refused:
         run(
             "table.session.merge",

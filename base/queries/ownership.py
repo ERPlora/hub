@@ -53,10 +53,14 @@ class Owned:
         return ctx.has(self.all_permission) or not is_a_person(ctx.actor)
 
     def visible(self, ctx: OperationContext) -> QuerySet:
-        rows = self.model.objects.all()
         if self.sees_all(ctx):
-            return rows
-        return rows.filter(self.mine(me(ctx)))
+            return self.model.objects.all()
+        return self.theirs(me(ctx))
+
+    def theirs(self, person: Me) -> QuerySet:
+        """The rows that are ``person``'s, whatever the caller holds: what a model whose rows follow these reads them
+        by (an invoice is whoever's its sale is)."""
+        return self.model.objects.filter(self.mine(person))
 
     def counted(self, ctx: OperationContext) -> QuerySet:
         """The rows a caller's figures add up (a period's totals, a day's takings, the close by person): the whole

@@ -16,8 +16,8 @@ def test_the_settings_and_the_day_are_on_the_businesss_clock(monkeypatch, in_bus
     monkeypatch.setattr(in_business_a, "timezone", CANARY)
     assert run("kitchen.settings.get", {}).timezone == CANARY
     # 23:30 UTC of the 2nd is the 2nd in the Canaries, the 3rd in Madrid.
-    assert queries.business_day(dt.datetime(2026, 11, 2, 23, 30, tzinfo=dt.UTC)) == dt.date(2026, 11, 2)
-    assert queries.start_of(dt.date(2026, 11, 2)) == dt.datetime(2026, 11, 2, 0, 0, tzinfo=dt.UTC)
+    assert queries.reads.business_day(dt.datetime(2026, 11, 2, 23, 30, tzinfo=dt.UTC)) == dt.date(2026, 11, 2)
+    assert queries.reads.start_of(dt.date(2026, 11, 2)) == dt.datetime(2026, 11, 2, 0, 0, tzinfo=dt.UTC)
 
 
 def test_a_sheet_says_when_its_round_was_sent_and_a_void_slip_when_it_was_voided(

@@ -1,4 +1,4 @@
-"""The diary's rules without a database: queries.py and services.py feed them what they read.
+"""The diary's rules without a database: queries.py and services/ feed them what they read.
 
 - **Can this time be booked?** (``verdict``) The first reason that refuses wins, in this order:
   ``invalid_start`` (it does not end after it starts), ``in_past`` and ``too_soon`` (only for the

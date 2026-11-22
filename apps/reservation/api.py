@@ -48,42 +48,42 @@ async def reservation_get(request, params: Query[ReservationRefIn]):
 
 @bind(router, "reservation.reservation.create", "/reservation/reservations", status=201)
 async def reservation_create(request, data: ReservationIn):
-    return await run_operation(request, services.create_reservation, data)
+    return await run_operation(request, services.reservations.create_reservation, data)
 
 
 @bind(router, "reservation.reservation.update", "/reservation/reservations/update")
 async def reservation_update(request, data: ReservationPatchIn):
-    return await run_operation(request, services.update_reservation, data)
+    return await run_operation(request, services.reservations.update_reservation, data)
 
 
 @bind(router, "reservation.reservation.confirm", "/reservation/reservations/confirm")
 async def reservation_confirm(request, data: ReservationRefIn):
-    return await run_operation(request, services.confirm_reservation, data)
+    return await run_operation(request, services.lifecycle.confirm_reservation, data)
 
 
 @bind(router, "reservation.reservation.seat", "/reservation/reservations/seat")
 async def reservation_seat(request, data: ReservationRefIn):
-    return await run_operation(request, services.seat_reservation, data)
+    return await run_operation(request, services.lifecycle.seat_reservation, data)
 
 
 @bind(router, "reservation.reservation.complete", "/reservation/reservations/complete")
 async def reservation_complete(request, data: ReservationRefIn):
-    return await run_operation(request, services.complete_reservation, data)
+    return await run_operation(request, services.lifecycle.complete_reservation, data)
 
 
 @bind(router, "reservation.reservation.cancel", "/reservation/reservations/cancel")
 async def reservation_cancel(request, data: CancelIn):
-    return await run_operation(request, services.cancel_reservation, data)
+    return await run_operation(request, services.lifecycle.cancel_reservation, data)
 
 
 @bind(router, "reservation.reservation.no_show", "/reservation/reservations/no_show")
 async def reservation_no_show(request, data: ReservationRefIn):
-    return await run_operation(request, services.no_show_reservation, data)
+    return await run_operation(request, services.lifecycle.no_show_reservation, data)
 
 
 @bind(router, "reservation.reservation.delete", "/reservation/reservations/delete")
 async def reservation_delete(request, data: ReservationRefIn):
-    return await run_operation(request, services.delete_reservation, data)
+    return await run_operation(request, services.lifecycle.delete_reservation, data)
 
 
 @bind(
@@ -92,7 +92,7 @@ async def reservation_delete(request, data: ReservationRefIn):
     "/reservation/reservations/release_unconfirmed",
 )
 async def reservation_release_unconfirmed(request):
-    return await run_operation(request, services.release_unconfirmed)
+    return await run_operation(request, services.lifecycle.release_unconfirmed)
 
 
 # Availability
@@ -118,7 +118,7 @@ async def time_slot_list(request, params: Query[TimeSlotListIn]):
 
 @bind(router, "reservation.time_slot.create", "/reservation/time_slots", status=201)
 async def time_slot_create(request, data: TimeSlotIn):
-    return await run_operation(request, services.create_slot, data)
+    return await run_operation(request, services.slots.create_slot, data)
 
 
 @bind(router, "reservation.time_slot.get", "/reservation/time_slots/detail")
@@ -128,7 +128,7 @@ async def time_slot_get(request, params: Query[TimeSlotRefIn]):
 
 @bind(router, "reservation.time_slot.delete", "/reservation/time_slots/delete")
 async def time_slot_delete(request, data: TimeSlotRefIn):
-    return await run_operation(request, services.delete_slot, data)
+    return await run_operation(request, services.slots.delete_slot, data)
 
 
 # Blocked dates
@@ -143,7 +143,7 @@ async def blocked_date_list(request, params: Query[BlockedDateListIn]):
     router, "reservation.blocked_date.create", "/reservation/blocked_dates", status=201
 )
 async def blocked_date_create(request, data: BlockedDateIn):
-    return await run_operation(request, services.create_blocked, data)
+    return await run_operation(request, services.blocked_dates.create_blocked, data)
 
 
 @bind(router, "reservation.blocked_date.get", "/reservation/blocked_dates/detail")
@@ -153,7 +153,7 @@ async def blocked_date_get(request, params: Query[BlockedDateRefIn]):
 
 @bind(router, "reservation.blocked_date.delete", "/reservation/blocked_dates/delete")
 async def blocked_date_delete(request, data: BlockedDateRefIn):
-    return await run_operation(request, services.delete_blocked, data)
+    return await run_operation(request, services.blocked_dates.delete_blocked, data)
 
 
 # Waitlist
@@ -171,22 +171,22 @@ async def waitlist_get(request, params: Query[WaitlistRefIn]):
 
 @bind(router, "reservation.waitlist.create", "/reservation/waitlist", status=201)
 async def waitlist_create(request, data: WaitlistIn):
-    return await run_operation(request, services.create_entry, data)
+    return await run_operation(request, services.waitlist.create_entry, data)
 
 
 @bind(router, "reservation.waitlist.update", "/reservation/waitlist/update")
 async def waitlist_update(request, data: WaitlistPatchIn):
-    return await run_operation(request, services.update_entry, data)
+    return await run_operation(request, services.waitlist.update_entry, data)
 
 
 @bind(router, "reservation.waitlist.convert", "/reservation/waitlist/convert")
 async def waitlist_convert(request, data: WaitlistConvertIn):
-    return await run_operation(request, services.convert_entry, data)
+    return await run_operation(request, services.waitlist.convert_entry, data)
 
 
 @bind(router, "reservation.waitlist.delete", "/reservation/waitlist/delete")
 async def waitlist_delete(request, data: WaitlistRefIn):
-    return await run_operation(request, services.delete_entry, data)
+    return await run_operation(request, services.waitlist.delete_entry, data)
 
 
 # Settings
@@ -199,4 +199,4 @@ async def settings_get(request):
 
 @bind(router, "reservation.settings.update", "/reservation/settings")
 async def settings_update(request, data: SettingsIn):
-    return await run_operation(request, services.update_settings, data)
+    return await run_operation(request, services.settings.update_settings, data)
