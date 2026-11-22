@@ -31,8 +31,10 @@ async function mounted(locale: 'en' | 'es' = 'en') {
 /** An Ionic control's state is a property of its element, not an attribute. */
 const toggle = (m: Awaited<ReturnType<typeof mounted>>) => m.wrapper.get(TOGGLE).element as HTMLElement & { checked: boolean; disabled: boolean };
 
+/** A person's tap: the switch moves first, then it tells. */
 async function flip(m: Awaited<ReturnType<typeof mounted>>, checked: boolean): Promise<void> {
-  m.wrapper.get(TOGGLE).element.dispatchEvent(new CustomEvent('ionChange', { detail: { checked } }));
+  toggle(m).checked = checked;
+  toggle(m).dispatchEvent(new CustomEvent('ionChange', { detail: { checked } }));
   await flush();
 }
 
@@ -124,6 +126,19 @@ describe('DeviceAutostart', () => {
     refuse = false;
     await flip(m, true);
     expect(m.wrapper.find(ERROR).exists()).toBe(false);
+    expect(toggle(m).checked).toBe(true);
+  });
+
+  it('a refusal after the system did change shows what the system says now', async () => {
+    const { os } = computer(false, {
+      autostart_enable: () => {
+        os.enabled = true;
+        return Promise.reject('could not read it back');
+      },
+    });
+    const m = await mounted();
+    await flip(m, true);
+    expect(m.wrapper.find(ERROR).exists()).toBe(true);
     expect(toggle(m).checked).toBe(true);
   });
 });

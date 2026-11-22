@@ -22,17 +22,19 @@ onMounted(async () => {
   enabled.value = await readAutostart();
 });
 
+// Ionic tells only a person's tap, and the switch is off while the system answers: no change arrives twice.
 async function onChange(checked: boolean): Promise<void> {
-  if (enabled.value === null || checked === enabled.value || pending.value) return;
+  const before = enabled.value;
   pending.value = true;
   failed.value = false;
-  let answer: boolean;
+  let answer: boolean | null;
   try {
     answer = await switchAutostart(checked);
   } catch (error) {
     console.error('hub: autostart change refused', error);
     failed.value = true;
-    answer = (await readAutostart()) ?? enabled.value;
+    // The app may have changed the system before failing to read it back: what counts is what it says now.
+    answer = (await readAutostart()) ?? before;
   }
   enabled.value = answer;
   if (answer !== checked) repaint.value += 1;
