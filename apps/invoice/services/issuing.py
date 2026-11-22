@@ -15,6 +15,7 @@ from live.outbox import record_event
 
 from apps.invoice import events, fiscal
 from apps.invoice.models import Invoice, InvoiceLine, InvoiceSeries
+from apps.invoice.queries import remaining_of
 from apps.invoice.services.numbering import _take_number
 from apps.invoice.services.writes import _now, actor, logger
 from base.business import business_zone
@@ -185,3 +186,24 @@ def _line_values(line: fiscal.Line, **values) -> dict:
         "total_amount": line.total,
         **values,
     }
+
+
+def _settle_rectified(ctx: OperationContext, original: Invoice, rectification: Invoice) -> None:
+    """What a rectification leaves of ``original``: it is cancelled when nothing is left of it, and
+    ``invoice.invoice.rectified`` says so."""
+    left_over = remaining_of(original)
+    if left_over == 0 and original.status != Invoice.Status.CANCELLED:
+        original.status = Invoice.Status.CANCELLED
+        original.save(update_fields=["status", "updated_at"])
+    record_event(
+        ctx,
+        events.INVOICE_RECTIFIED,
+        {
+            "invoice_id": str(original.id),
+            "number": original.number,
+            "status": original.status,
+            "rectification_id": str(rectification.id),
+            "rectification_number": rectification.number,
+            "remaining": left_over,
+        },
+    )

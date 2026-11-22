@@ -10,9 +10,8 @@ from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext
 from live.errors import Conflict, NotFound
 from live.operations import operation
-from live.outbox import record_event
 
-from apps.invoice import events, fiscal
+from apps.invoice import fiscal
 from apps.invoice.models import Invoice
 from apps.invoice.queries import (
     RECTIFYING,
@@ -27,7 +26,7 @@ from apps.invoice.queries import (
 from apps.invoice.schemas import FromRefundIn, FromVoidIn, IssueOut, RectifyIn
 from apps.invoice.services.from_sale import _sale_key, _tell_sales
 from apps.invoice.services.issuer import _issuer_of
-from apps.invoice.services.issuing import VERBATIM, _issue
+from apps.invoice.services.issuing import VERBATIM, _issue, _settle_rectified
 from apps.invoice.services.numbering import series_of_year
 from apps.invoice.services.recipient import _recipient_of
 from apps.invoice.services.writes import _now, _result, _today
@@ -86,22 +85,7 @@ def _rectify(  # noqa: PLR0913
         description=reason[:500],
         currency=original.currency,
     )
-    left_over = remaining_of(original)
-    if left_over == 0 and original.status != Invoice.Status.CANCELLED:
-        original.status = Invoice.Status.CANCELLED
-        original.save(update_fields=["status", "updated_at"])
-    record_event(
-        ctx,
-        events.INVOICE_RECTIFIED,
-        {
-            "invoice_id": str(original.id),
-            "number": original.number,
-            "status": original.status,
-            "rectification_id": str(rectification.id),
-            "rectification_number": rectification.number,
-            "remaining": left_over,
-        },
-    )
+    _settle_rectified(ctx, original, rectification)
     return rectification
 
 

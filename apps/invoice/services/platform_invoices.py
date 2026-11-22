@@ -5,14 +5,13 @@ from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext
 from live.errors import Conflict, InvalidPayload, NotFound
 from live.operations import operation
-from live.outbox import record_event
 
-from apps.invoice import events, platform
+from apps.invoice import platform
 from apps.invoice.models import Invoice, InvoiceSeries
-from apps.invoice.queries import find_platform_invoice, platform_answer, remaining_of
+from apps.invoice.queries import find_platform_invoice, platform_answer
 from apps.invoice.schemas.platform import PlatformInvoiceIn, PlatformInvoiceOut
 from apps.invoice.services.issuer import _configured_issuer, _issuer_copy
-from apps.invoice.services.issuing import _issue
+from apps.invoice.services.issuing import _issue, _settle_rectified
 from apps.invoice.services.numbering import NUMBER_TAKEN
 from apps.invoice.services.writes import actor
 
@@ -124,20 +123,5 @@ def issue_platform(ctx: OperationContext, data: PlatformInvoiceIn) -> dict:
         **links,
     )
     if original is not None:
-        left_over = remaining_of(original)
-        if left_over == 0 and original.status != Invoice.Status.CANCELLED:
-            original.status = Invoice.Status.CANCELLED
-            original.save(update_fields=["status", "updated_at"])
-        record_event(
-            ctx,
-            events.INVOICE_RECTIFIED,
-            {
-                "invoice_id": str(original.id),
-                "number": original.number,
-                "status": original.status,
-                "rectification_id": str(invoice.id),
-                "rectification_number": invoice.number,
-                "remaining": left_over,
-            },
-        )
+        _settle_rectified(ctx, original, invoice)
     return platform_answer(ctx, invoice)
