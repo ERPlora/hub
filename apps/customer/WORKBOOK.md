@@ -273,7 +273,8 @@ Pasos:
 2. La ficha enseña todos sus datos (también notas internas, cumpleaños, aniversario y campos
    personalizados), sus grupos y etiquetas, su
    consentimiento por canal, la actividad (más reciente primero, 50 por página; cada entrada dice
-   cuándo y quién: la persona o la API key por su nombre, o «Lo hizo la plataforma» cuando no la hizo
+   cuándo y quién: la persona por su nombre o, si su cuenta no tiene, por lo que va antes de la @ de su
+   correo, nunca el correo entero; la API key por el suyo, o «Lo hizo la plataforma» cuando no la hizo
    nadie en persona, como la compra que apunta una venta cobrada, una automatización o una recuperación
    desde una copia aparte), sus compras y los bloques de otras apps. El email, el teléfono y la dirección para la
    que se dio cada consentimiento, solo a quien ve el contacto de los clientes.
@@ -282,7 +283,7 @@ Entra: la ficha y, aparte, su actividad, sus compras y su historial de consentim
 Sale: nada; solo lectura. Si otra persona la cambia mientras está abierta, se ve el cambio sin
 recargar.
 Si falla: «Este cliente ya no está disponible.» si se eliminó, se unió a otra o se borraron sus datos.
-Implicados: CUSTOMER-F24
+Implicados: CUSTOMER-F24, BASE-F119
 
 ### CUSTOMER-F04 Editar la ficha y sus campos personalizados
 Estado: hecho
