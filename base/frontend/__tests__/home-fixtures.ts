@@ -1,7 +1,10 @@
-// What the Home reads, for the tests of the Home and of its pieces: a panel as `base.widget.catalog` answers it, and a
-// step of the setup checklist and the checklist as `base.setup.status` does. One fixture each, so a field they gain is
-// added once.
+// What the Home reads, for the tests of the Home and of its pieces: a panel as `base.widget.catalog` answers it, a
+// step of the setup checklist and the checklist as `base.setup.status` does, and the business's money. One fixture
+// each, so a field they gain is added once.
 import type { SetupItem, SetupStatus, WidgetDef } from '../operations/home';
+
+/** A business in euros, the money its amounts are painted in. */
+export const EUR = { currency: 'EUR', decimals: 2 };
 
 /** A KPI panel of the demo app, its app taken from `key`'s prefix and titled by it; `fields` change it. */
 export function widget(key: string, fields: Partial<WidgetDef> = {}): WidgetDef {
