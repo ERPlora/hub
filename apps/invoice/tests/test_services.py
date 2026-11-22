@@ -56,13 +56,15 @@ def events(name):
     return list(OutboxEvent.objects.filter(name=name).order_by("created_at", "id"))
 
 
+#: Every module of the writes that reads the clock, found before any test moves it.
+CLOCK_READERS = [module for module in vars(services).values() if getattr(module, "_now", None) is writes._now]
+
+
 def at(monkeypatch, moment: dt.datetime):
     """Moves the clock the operations read (the business day follows Madrid), in every module of the writes that
     reads it."""
-    clock = writes._now
-    for module in vars(services).values():
-        if getattr(module, "_now", None) is clock:
-            monkeypatch.setattr(module, "_now", lambda: moment)
+    for module in CLOCK_READERS:
+        monkeypatch.setattr(module, "_now", lambda: moment)
 
 
 # ── The issuer (INVOICE-F21, F22) ───────────────────────────────────────────────────────────────
