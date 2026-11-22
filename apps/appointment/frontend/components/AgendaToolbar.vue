@@ -5,8 +5,9 @@
 // first two, «Day · Week». A device on another zone than the business is told the agenda shows the
 // business's clock. One or two rows, as the old agenda: on a phone, ‹ the day's
 // field › and «Today», then the filter and the switches; the long date only where it fits.
+import { DateField } from '@erplora/ui/components';
 import { HubIcon } from '@erplora/ui/shell';
-import { IonButton, IonInput, IonLabel, IonSegment, IonSegmentButton, IonSelect, IonSelectOption } from '@ionic/vue';
+import { IonButton, IonLabel, IonSegment, IonSegmentButton, IonSelect, IonSelectOption } from '@ionic/vue';
 import { computed } from 'vue';
 
 import { useLocale, useT } from '../composables/useT';
@@ -47,9 +48,8 @@ const label = computed(() =>
 );
 const otherZone = computed(() => deviceZoneDiffers(props.zone));
 
-function jump(value: unknown): void {
-  const text = String(value ?? '');
-  if (/^\d{4}-\d{2}-\d{2}$/.test(text)) day.value = text;
+function jump(value: string): void {
+  if (value) day.value = value;
 }
 </script>
 
@@ -99,15 +99,13 @@ function jump(value: unknown): void {
       >
         {{ $t('appointment.toolbar.today') }}
       </ion-button>
-      <ion-input
+      <DateField
         class="agenda-toolbar__calendar"
-        data-testid="appointment-toolbar-calendar"
-        type="date"
-        :value="day"
-        :aria-label="$t('appointment.toolbar.openCalendar')"
-        fill="outline"
-        mode="md"
-        @ion-change="jump($event.detail.value)"
+        testid="appointment-toolbar-calendar"
+        :model-value="day"
+        :label="$t('appointment.toolbar.date')"
+        required
+        @update:model-value="jump"
       />
     </div>
     <div class="agenda-toolbar__controls">

@@ -79,36 +79,42 @@ class StaffConfig(LiveAppConfig):
         ],
         "hub_employee": ["staff.view", "staff.view_time_off", "staff.request_time_off"],
     }
-    # The sections of its tab bar (frontend/tabs.ts) but Settings, which the help window adds. Commissions opens to
-    # everyone, as every app's Settings does, and its page tells whoever does not see the pay that it is not theirs.
+    # The sections of its tab bar (frontend/tabs.ts), each opening with its permission: Commissions to whoever sees the
+    # pay, Roles and Settings to whoever may save the settings.
     navigation = [
         Nav(
             id="staff",
             label=_("Staff"),
             icon="ion:people-outline",
             path="/staff/members",
+            permission="staff.view",
         ),
         Nav(
-            id="roles", label=_("Roles"), icon="ion:shield-outline", path="/staff/roles"
+            id="roles", label=_("Roles"), icon="ion:shield-outline", path="/staff/roles",
+            permission="staff.manage_settings",
         ),
         Nav(
             id="time_off",
             label=_("Time Off"),
             icon="ion:calendar-outline",
             path="/staff/time-off",
+            permission="staff.view_time_off",
         ),
         Nav(
             id="schedules",
             label=_("Schedules"),
             icon="ion:time-outline",
             path="/staff/schedules",
+            permission="staff.view",
         ),
         Nav(
             id="commissions",
             label=_("Commissions"),
             icon="ion:wallet-outline",
             path="/staff/commissions",
+            permission="staff.view_compensation",
         ),
+        Nav("settings", _("Settings"), "ion:settings-outline", "/staff/settings", permission="staff.manage_settings"),
     ]
     help = Help()
     # The Home's panels, on the queries Staff's own figures read (STAFF-F20, STAFF-F23), in every business. A KPI says

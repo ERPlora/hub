@@ -16,6 +16,7 @@ import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 import { aMonday, salonCleanUp } from './appointment-helpers';
 import { emptyMonth } from './assistant-real';
 import { cardDeletes } from './customer-helpers';
+import { pickDay } from './date-time-fields';
 import { confirmDialog, parkedEvent, signedIn } from './flow-helpers';
 import { capture, psql, shown } from './helpers';
 import { chats, relay } from './provider-helpers';
@@ -110,9 +111,7 @@ async function askAndApprove(page: Page, phone: string, text: string, viewport: 
 async function diaryRow(page: Page, id: string) {
   await page.goto('/appointment/agenda');
   const view = shown(page);
-  const calendar = view.locator('[data-testid=appointment-toolbar-calendar] input');
-  await calendar.fill(DAY);
-  await calendar.press('Tab');
+  await pickDay(page, view.locator('[data-testid=appointment-toolbar-calendar]'), DAY);
   await expect(view.locator('[data-testid=appointment-toolbar-date]')).not.toBeEmpty();
   return view.locator(`[data-testid=appointment-list-row][data-id="${id}"]`).first();
 }

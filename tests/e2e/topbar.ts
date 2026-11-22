@@ -31,6 +31,21 @@ async function pickFromMore(page: Page, id: string): Promise<void> {
   await topbarMoreMenu(page).locator(`[data-testid=${id}]`).click();
 }
 
+/**
+ * Expects the view's action `id` on its bar. On a phone the bar folds the view's actions into «⋮» when they do not fit
+ * beside its other buttons (a help window's «?», the bell): there it is looked for in the open menu, closed after.
+ */
+export async function expectBarAction(page: Page, id: string): Promise<void> {
+  if (!compactBar(page) || !(await topbarMore(page).isVisible())) {
+    await expect(shown(page).locator(`[data-testid=${id}]`)).toBeVisible();
+    return;
+  }
+  await topbarMore(page).click();
+  await expect(topbarMoreMenu(page).locator(`[data-testid=${id}]`)).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(topbarMoreMenu(page)).toBeHidden();
+}
+
 /** Presses the assistant's sparkles (its row of «⋮» on a phone): they open the panel, or close it when open. */
 export async function pressAssistant(page: Page): Promise<void> {
   if (compactBar(page)) await pickFromMore(page, 'assistant-button');

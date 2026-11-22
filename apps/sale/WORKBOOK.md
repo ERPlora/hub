@@ -322,7 +322,7 @@ cierra la ventana sin guardarlo. Con la ventana como se abrió, atrás la cierra
 | SALE-F39 | Cobrar con lo que añade otra app (la propina) | común | no hecho |
 | SALE-F40 | Ver los alérgenos de un plato al pedirlo | común | hecho |
 | SALE-F41 | Marcar la alergia del cliente en una línea | restaurante | hecho |
-| SALE-F42 | Elegir los suplementos de un plato del menú | restaurante | no hecho |
+| SALE-F42 | Elegir los suplementos de un plato del menú | restaurante | hecho |
 
 ### SALE-F01 Vender y cobrar en efectivo
 Estado: hecho
@@ -1459,26 +1459,25 @@ tarjeta de confirmación, que dice la cuenta, el plato y los alérgenos por su n
 Implicados: SALE-F13, SALE-F20, SALE-F40, INVENTORY-F35, KITCHEN-F32
 
 ### SALE-F42 Elegir los suplementos de un plato del menú
-Estado: no hecho — la hoja del menú todavía no pregunta los suplementos de cada plato, Menús no los suma al importe
-y la comanda no los lleva (hub#2019)
+Estado: hecho
 Vertical: restaurante
 Actor: empleado, responsable
 Pantalla: Vender
 Pasos:
-1. Con Menús y combos y Suplementos activas, abre un menú en el TPV (SALE-F12) y elige un plato que tiene grupos de
+1. Con Menús y combos y Suplementos activas, abre un menú en el TPV y elige un plato que tiene grupos de
    suplementos, suyos o de su categoría, los mismos que pregunta cuando se vende suelto (el entrecot con «Punto de la
    carne»): sus grupos se abren allí mismo, debajo del plato, con las reglas, los suplementos con su signo, los
-   alérgenos y las opciones por defecto de la hoja de un artículo suelto (SALE-F11). Un plato sin grupos se elige
-   como siempre.
+   alérgenos y las opciones por defecto de la hoja de un artículo suelto. Un plato sin grupos se elige como siempre.
 2. Elige las opciones. Quitar el plato, o cambiarlo por otro en un plato del menú de una sola elección, quita sus
    opciones. Una elección que se repite (dos cafés) lleva las mismas opciones cada vez.
 3. Mientras un grupo obligatorio de un plato elegido no esté completo, el botón dice qué falta («Elige 1 en «Punto de
-   la carne»») y tocarlo señala ese grupo. Con todo completo, «Añadir · <total>» suma al precio cerrado los
+   la carne»») y tocarlo señala ese grupo. Con todo completo, «Añadir · 16,50 €» suma al precio cerrado los
    suplementos del menú y los de las opciones elegidas.
-4. Púlsalo: el menú entra en la cuenta con cada plato y, debajo de él, sus opciones.
-5. Envía a cocina: cada plato lleva sus opciones debajo, en la pantalla y en el papel, como un plato suelto (COMBO-F11,
-   MODIFIER-F08). Cobra como siempre: el tique nombra las opciones bajo su plato y el menú cobra lo que valía al
-   pedirlo, opciones incluidas, aunque después cambien o se borren.
+4. Púlsalo: el menú entra en la cuenta con sus platos debajo y, junto a cada plato, sus opciones («Entrecot (Poco
+   hecho, Queso)»).
+5. Envía a cocina: cada plato lleva sus opciones debajo, en la pantalla y en el papel, como un plato suelto. Cobra
+   como siempre: el tique nombra las opciones junto a su plato, bajo el menú, y el menú cobra lo
+   que valía al pedirlo, opciones incluidas, aunque después cambien o se borren.
 Entra: los grupos y las opciones del producto de cada plato elegido, de Suplementos (MODIFIER-F06). Suplementos
 comprueba y valora las opciones de cada plato (MODIFIER-F07) y Menús las suma al importe del menú al añadir la línea
 y otra vez al cobrar, con el importe pedido (COMBO-F08).

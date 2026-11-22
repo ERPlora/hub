@@ -680,3 +680,7 @@ msgstr ""
 
 msgid "Say which sale charged the voucher."
 msgstr "Di qué venta cobró el bono."
+
+#: apps.py:140
+msgid "Settings"
+msgstr "Ajustes"

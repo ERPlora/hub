@@ -31,6 +31,9 @@ class SaleDishOut(Schema):
     product_id: UUID = Field(description="The dish's product (Inventory).")
     product_name: str = Field(description="Its name.")
     quantity: int = Field(description="How many in one menu.")
+    modifiers: list[str] = Field(
+        default_factory=list, description="The options of Modifiers charged inside it, as the receipt names them."
+    )
 
 
 class SaleLineOut(Schema):

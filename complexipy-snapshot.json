@@ -48,16 +48,6 @@
     ]
   },
   {
-    "path": "apps/combo/queries/__init__.py",
-    "file_name": "__init__.py",
-    "functions": [
-      {
-        "name": "resolve_line",
-        "complexity": 16
-      }
-    ]
-  },
-  {
     "path": "apps/flow/document.py",
     "file_name": "document.py",
     "functions": [

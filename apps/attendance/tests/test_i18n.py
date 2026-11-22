@@ -82,7 +82,7 @@ def test_spanish_texts_are_the_old_modules():
     with translation.override("es"):
         config = apps.get_app_config("attendance")
         assert str(config.verbose_name) == "Control horario"
-        assert [str(nav.label) for nav in config.navigation] == ["Fichar", "Registros"]
+        assert [str(nav.label) for nav in config.navigation] == ["Fichar", "Registros", "Ajustes"]
         assert [str(panel.title) for panel in config.widgets] == ["Fichados ahora"]
         assert [str(label) for label in Record.Status.labels] == ["Abierta", "Cerrada", "Por revisar"]
         assert str(services.ALREADY_IN) == "Ya tienes una jornada abierta: ficha la salida antes de volver a entrar."

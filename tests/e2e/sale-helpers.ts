@@ -10,6 +10,7 @@ import { type Browser, type BrowserContext, expect, type Locator, type Page, tes
 import { A, api, login, psql, shot, shown } from './helpers';
 import { cleanInventory, createProduct, photoLoaded, type Product } from './inventory-helpers';
 import { cleanInvoices, issuedIds } from './invoice-helpers';
+import { toastSaying } from './toast-helpers';
 
 export const VIEWPORTS = [
   { label: '390', width: 390, height: 844 },
@@ -355,6 +356,13 @@ export async function shots(page: Page, name: string, ready: (page: Page) => Pro
     await page.screenshot({ path: shot(`${name}-${viewport.label}`) });
   }
   await page.setViewportSize(restore);
+}
+
+/** «Current order» → «Send»: the round of the check on screen goes to the kitchen, and the till says so. */
+export async function sendRound(page: Page): Promise<void> {
+  await shown(page).locator('[data-testid=pos-cart-tab-round]').click();
+  await shown(page).locator('[data-testid=pos-kitchen-send]').click();
+  await expect(toastSaying(page, /Order \d+ sent to the kitchen\./)).toBeVisible();
 }
 
 /** Whether two boxes on screen share any of their pixels. */

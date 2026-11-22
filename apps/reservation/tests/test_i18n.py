@@ -91,7 +91,7 @@ def test_spanish_texts_of_the_workbook():
     with translation.override("es"):
         config = apps.get_app_config("reservation")
         assert str(config.verbose_name) == "Reservas"
-        assert [str(nav.label) for nav in config.navigation] == ["Reservas", "Lista de espera", "Disponibilidad"]
+        assert [str(nav.label) for nav in config.navigation] == ["Reservas", "Lista de espera", "Disponibilidad", "Ajustes"]
         assert [str(label) for label in Reservation.Status.labels] == [
             "Pendiente",
             "Confirmada",

@@ -112,15 +112,14 @@ def test_what_each_role_gets():
     }
 
 
-def test_navigation_is_the_three_tabs_of_the_old_module_with_registered_icons():
+def test_navigation_is_the_three_tabs_of_the_old_module_and_the_settings_with_registered_icons():
     entries = service().navigation
     assert all(isinstance(entry, Nav) for entry in entries)
-    assert [
-        (entry.id, str(entry.label), entry.icon, entry.path) for entry in entries
-    ] == [
-        ("services", "Services", "ion:briefcase-outline", "/service/services"),
-        ("categories", "Categories", "ion:pricetags-outline", "/service/categories"),
-        ("packages", "Packages", "ion:gift-outline", "/service/packages"),
+    assert [(entry.id, str(entry.label), entry.icon, entry.path, entry.permission) for entry in entries] == [
+        ("services", "Services", "ion:briefcase-outline", "/service/services", "service.view_service"),
+        ("categories", "Categories", "ion:pricetags-outline", "/service/categories", "service.view_category"),
+        ("packages", "Packages", "ion:gift-outline", "/service/packages", "service.view_package"),
+        ("settings", "Settings", "ion:settings-outline", "/service/settings", "service.manage_settings"),
     ]
 
 

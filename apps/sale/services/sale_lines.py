@@ -20,7 +20,8 @@ def _sale_lines(
     sale: Sale, parts: list[OrderLine], valuation, session_values: dict
 ) -> list[SaleLine]:
     """The fiscal copy of each part charged (``charge_parts``): a line of the check with the names of the
-    options charged inside it, and a child line of an option under the line of its dish."""
+    options charged inside it, and a child line of an option under the line of its dish (of a split menu's dish,
+    the line of that dish)."""
     rows: list[SaleLine] = []
     of_line: dict = {}
     for position, (line, out) in enumerate(zip(parts, valuation.lines, strict=True), start=1):
@@ -29,7 +30,7 @@ def _sale_lines(
             sale=sale,
             position=position,
             order_line_id=line.origin.id,
-            parent_line_id=of_line[line.origin.id] if child else None,
+            parent_line_id=of_line[getattr(line, "parent_part", line.origin).id] if child else None,
             modifiers=[] if child else folded_names(line),
             combo_id=line.combo_id,
             combo_name=combo_name(line),

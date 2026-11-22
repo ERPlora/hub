@@ -1,13 +1,11 @@
 // The three sections of Schedules (the old manifest's `navigation`): Hours, Special days and Settings, as
 // the footer tabbar of every schedule page. Each tab follows its route, has its icon (a registered one:
 // an unregistered icon paints nothing) and its label in the reader's language.
-import { readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
 
 import { createShellI18n } from '@erplora/ui/shell';
 import { describe, expect, it } from 'vitest';
 
+import { appMenu } from '../../../base/frontend/__tests__/app-menu';
 import { ION_ICONS } from '../../../packages/ui/src/shell/icons';
 import en from './locale/en.json';
 import es from './locale/es.json';
@@ -36,8 +34,7 @@ describe('the schedule tabbar', () => {
   });
 
   it('wears the same ids, icons and paths as the menu entries of apps.py', () => {
-    const appsPy = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '..', 'apps.py'), 'utf8');
-    const menu = [...appsPy.replace(/\s+/g, ' ').matchAll(/Nav\( ?"([a-z_]+)", .*?, "(ion:[a-z-]+)", "(\/schedule\/[a-z-]+)",? ?\)/g)].map((m) => [m[1], m[2], m[3]]);
+    const menu = appMenu('schedule').map((entry) => [entry.id, entry.icon, entry.path]);
     expect(menu).toEqual(SCHEDULE_TABS.map((tab) => [tab.id, tab.icon, tab.to]));
   });
 });

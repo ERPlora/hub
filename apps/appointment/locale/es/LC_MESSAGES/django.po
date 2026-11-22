@@ -668,3 +668,7 @@ msgstr[2] "Tus clientes esperan a que les confirmes las citas antes de que empie
 #: apps.py
 msgid "Confirm the appointments"
 msgstr "Confirmar las citas"
+
+#: apps.py:107
+msgid "Settings"
+msgstr "Ajustes"

@@ -7,14 +7,15 @@
 // ids go up in the order they were chosen; the server's refusal is read over the button.
 import { AllergenRow } from '@erplora/ui/components';
 import { IonButton } from '@ionic/vue';
-import { computed, shallowRef, watch } from 'vue';
+import { computed, watch } from 'vue';
 
 import type { ProductOut } from '../../../../inventory/frontend/operations';
 import type { TargetGroupOut } from '../../../../modifier/frontend/operations';
+import { useSheetChoice } from '../../composables/pos/useSheetChoice';
 import { useLocale, useT } from '../../composables/useT';
 import { formatMoney, useBusinessMoney } from '../../lib/format';
-import { addedCents, choose, type Choice, chosenIds, initialChoice, missingGroup, unchoose } from '../../lib/modifierChoice';
-import ChoiceGroupSection, { type SectionGroup } from './ChoiceGroupSection.vue';
+import { addedCents, chosenIds, missingGroup } from '../../lib/modifierChoice';
+import ChoiceGroupSection, { modifierSections } from './ChoiceGroupSection.vue';
 import PosSheet from './PosSheet.vue';
 
 const props = defineProps<{
@@ -30,15 +31,12 @@ const t = useT();
 const locale = useLocale();
 const business = useBusinessMoney();
 
-const choice = shallowRef<Choice>(initialChoice(props.groups));
-const attention = shallowRef<string | null>(null);
+const { choice, attention, start, tap, less } = useSheetChoice();
 
 watch(
   () => [open.value, props.groups] as const,
   ([isOpen]) => {
-    if (!isOpen) return;
-    choice.value = initialChoice(props.groups);
-    attention.value = null;
+    if (isOpen) start(props.groups);
   },
   { immediate: true },
 );
@@ -46,19 +44,7 @@ watch(
 const missing = computed(() => missingGroup(props.groups, choice.value));
 const price = computed(() => formatMoney((props.product?.price ?? 0) + addedCents(props.groups, choice.value), locale.value, business.value));
 
-const sections = computed<SectionGroup[]>(() =>
-  props.groups.map((group) => ({ ...group, options: group.options.map((option) => ({ ...option, label: option.name })) })),
-);
-
-function tap(group: SectionGroup, optionId: string): void {
-  choice.value = choose(choice.value, group, optionId);
-  attention.value = choice.value.refused;
-}
-
-function less(optionId: string): void {
-  choice.value = unchoose(choice.value, optionId);
-  attention.value = null;
-}
+const sections = computed(() => modifierSections(props.groups));
 
 function add(): void {
   if (missing.value) {

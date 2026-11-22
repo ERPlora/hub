@@ -127,14 +127,19 @@ class ServiceConfig(LiveAppConfig):
         }
     ]
     navigation = [
-        Nav("services", _("Services"), "ion:briefcase-outline", "/service/services"),
+        Nav("services", _("Services"), "ion:briefcase-outline", "/service/services", permission="service.view_service"),
         Nav(
             "categories",
             _("Categories"),
             "ion:pricetags-outline",
             "/service/categories",
+            permission="service.view_category",
         ),
-        Nav("packages", _("Packages"), "ion:gift-outline", "/service/packages"),
+        Nav("packages", _("Packages"), "ion:gift-outline", "/service/packages", permission="service.view_package"),
+        Nav(
+            "settings", _("Settings"), "ion:settings-outline", "/service/settings",
+            permission="service.manage_settings",
+        ),
     ]
     help = Help()
 
