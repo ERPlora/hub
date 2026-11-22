@@ -68,11 +68,11 @@ UNSCOPED_READS: dict[tuple[str, str], tuple[str, str]] = {
         "What refunds gave back on each professional's lines, for the close by professional that sale.view_reports "
         "opens.",
     ),
-    ("apps/cash_register/queries.py", "sale_lines"): (
+    ("apps/cash_register/queries/lines.py", "sale_lines"): (
         PART_OF_THE_WORK,
         "The tenders of the sales charged and voided while a register session was open: the session's takings.",
     ),
-    ("apps/cash_register/queries.py", "unassigned_totals"): (
+    ("apps/cash_register/queries/unassigned.py", "unassigned_totals"): (
         PART_OF_THE_WORK,
         "How many sale tenders and comps of a time window no register session copied, counted for the drawer.",
     ),

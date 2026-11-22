@@ -870,7 +870,8 @@ ofrece la plantilla «La lista de bienvenida de alguien nuevo en el equipo» sob
   al Hub» van primero mientras no se teclea, con `asCombo`).
 - Las cifras de Personal (`frontend/components/StaffFigures.vue`, `staff.member.stats`) y «Ausencias de
   hoy» (`frontend/components/AwayToday.vue`, `staff.time_off.today`) dan dentro de la app lo mismo que los
-  paneles del Inicio (STAFF-G01…G05), como las cifras de Clientes y «Fichados ahora» de Control horario;
+  paneles del Inicio (STAFF-G01…G05), como las cifras de Clientes y el panel de quién está fichado de
+  Control horario (ATTENDANCE-F11);
   sus tarjetas rehacen el `ok-kpi` hasta que `@erplora/ui` tenga una (`UI-REQUESTS.md`).
 - Los paneles del Inicio son los `widgets` de `apps.py` (`base` los sirve en `base.widget.list`): `headcount` (`kpi`), `on_leave_today` (`stat`) y `pending_time_off` (`kpi`) sobre
   `staff.member.stats`, `time_off_today` (`timeline`) sobre `staff.time_off.today` y `by_role` (`bar-list`)

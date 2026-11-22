@@ -761,7 +761,7 @@ Ventas **no** requiere Tarifas y Tarifas no toca Ventas. Lo que se pide a Ventas
   Clientes, por sus consultas).
 - Importes con el `MoneyInput` de `@erplora/ui`, el campo de importe común a todas las apps (lo que teclea
   una persona, en céntimos de la moneda que recibe: la de la tarifa o la del negocio; hub#924), y el formato del idioma (`Intl`),
-  con los millares agrupados desde cuatro cifras también en español («1.234,56 €»; el CLDR espera a cinco:
+  con los millares agrupados desde cuatro cifras también en español (`1.234,56 €`; el CLDR espera a cinco:
   hub#1090), como Cobro en línea.
 - Icono: `ion:pricetag`.
 
