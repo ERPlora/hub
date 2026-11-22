@@ -28,6 +28,7 @@ from apps.inventory.schemas.fields import (
 )
 from base.allergens import AllergensIn, AllergensOut, AllergensPatchIn
 from base.recovery import ImageInCopyIn
+from base.sensitive import COSTS
 
 ProductType = Literal["physical", "service"]
 ProductStatus = Literal["active", "inactive", "needs_tax_setup", "sold_out"]
@@ -44,6 +45,11 @@ ProductSort = Literal[
     "-created_at",
 ]
 
+#: What a product costs the business, as a product reads: only whoever sees the costs gets it (base.sensitive).
+ProductCost = Annotated[
+    int | None,
+    Field(description="Cost in cents; null for whoever does not see the costs.", json_schema_extra={"money": True, **COSTS}),
+]
 Name = _text(200, 1)
 Sku = _text(64, 1)
 Ean13 = _text(13)
@@ -134,7 +140,7 @@ class ProductIn(AllergensIn):
         title=TAX_CATEGORY,
         description="Key of the tax category (Taxes app) that says how it is taxed."
     )
-    cost: Cents = Field(0, description="Cost in cents.")
+    cost: Cents = Field(0, description="Cost in cents; only whoever sees the costs sends one.", json_schema_extra=COSTS)
     initial_stock: Quantity = Field(
         Decimal("0"),
         ge=0,
@@ -192,7 +198,9 @@ class ProductPatchIn(ProductRefIn, AllergensPatchIn):
 
     name: Name | None = Field(None, description="New name.")
     price: Cents | None = Field(None, description="New price in cents.")
-    cost: Cents | None = Field(None, description="New cost in cents.")
+    cost: Cents | None = Field(
+        None, description="New cost in cents; only whoever sees the costs sends one.", json_schema_extra=COSTS
+    )
     low_stock_threshold: Quantity | None = Field(
         None, ge=0, description="New low-stock threshold."
     )
@@ -236,7 +244,7 @@ class ProductOut(AllergensOut):
     price: int = Field(
         description="Price in cents, per price_quantity of pricing_unit.", json_schema_extra={"money": True}
     )
-    cost: int = Field(description="Cost in cents.", json_schema_extra={"money": True})
+    cost: ProductCost
     stock: Decimal = Field(description="Current stock, in its unit.")
     low_stock_threshold: Decimal = Field(description="Low-stock threshold.")
     unit: UnitCode = Field(description="Unit of measure.")
@@ -282,7 +290,7 @@ class SaleProductOut(AllergensOut):
     price: int = Field(
         description="Price in cents, per price_quantity of pricing_unit.", json_schema_extra={"money": True}
     )
-    cost: int = Field(description="Cost in cents.", json_schema_extra={"money": True})
+    cost: ProductCost
     tax_category_id: UUID | None = Field(description="Its tax category.")
     tax_category_key: str | None = Field(description="Key of its tax category.")
     needs_tax_setup: bool = Field(
