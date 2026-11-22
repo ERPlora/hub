@@ -1,8 +1,8 @@
-// Staff for an employee (`hub_employee`: view the directory, roles, schedules and who is away; ask for
-// their own time off; WORKBOOK «Quién puede qué»): no «+» on Staff, Roles or Schedules, no row action,
-// no row to open, no «Rate/h», no Settings tab and Settings itself says «You do not have permission»;
-// the API refuses every write but asking for time off with 403 `permission_denied`. The owner is the
-// positive control: the same hooks are there for who may manage.
+// Staff for an employee (`hub_employee`: view the directory, schedules and who is away; ask for their own
+// time off; WORKBOOK «Quién puede qué»): three tabs (Staff, Time Off, Schedules), no «+» on Staff or
+// Schedules, no row action, no row to open, no «Rate/h»; Positions and Settings, opened by their address,
+// say «No access» (BASE-F118); the API refuses every write but asking for time off with 403
+// `permission_denied`. The owner is the positive control: the same hooks are there for who may manage.
 import { type Browser, expect, test } from '@playwright/test';
 
 import { A, api, type Credentials, EMPLOYEE, shot, shown, testid } from './helpers';
@@ -20,7 +20,7 @@ test.afterAll(cleanup);
 /** Someone (the owner unless `credentials`) on `next` at a desk's size, in English. */
 const signedIn = (browser: Browser, next: string, credentials?: Credentials) => signedInAt(browser, next, { width: 1280, height: 860 }, credentials);
 
-test('an employee reads Staff, Roles and Schedules without a single write button, and the API agrees', async ({ browser }) => {
+test('an employee reads Staff and Schedules without a write button, gets «No access» on Positions and Settings, and the API agrees', async ({ browser }) => {
   const owner = await signedIn(browser, '/staff/members');
   const employee = await signedIn(browser, '/staff/members', EMPLOYEE);
   try {

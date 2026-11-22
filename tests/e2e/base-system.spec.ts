@@ -5,7 +5,7 @@
 import { type Browser, expect, type Locator, type Page, test } from '@playwright/test';
 
 import { bellSays, bellTotal, featureNotice, noticeButton, noticeIn, openActionCenter } from './action-center';
-import { A, EMPLOYEE, horizontalOverflow, hostPage, psql, shot, shown, untilStill } from './helpers';
+import { A, horizontalOverflow, hostPage, psql, shot, shown, untilStill } from './helpers';
 
 const VIEWPORTS = {
   390: { width: 390, height: 844 },
@@ -106,8 +106,8 @@ async function homeActionCenter(page: Page): Promise<Locator> {
 }
 const rows = (page: Page) => shown(page).locator('[data-testid="failed-event-row"]');
 
-async function signedIn(browser: Browser, viewport: { width: number; height: number }, next: string, employee = false) {
-  return hostPage(browser, A, { viewport, next, credentials: employee ? EMPLOYEE : undefined });
+async function signedIn(browser: Browser, viewport: { width: number; height: number }, next: string) {
+  return hostPage(browser, A, { viewport, next });
 }
 
 for (const [label, viewport] of Object.entries(VIEWPORTS)) {
@@ -453,25 +453,6 @@ test('the screen reports an error nobody caught, by itself', async ({ browser })
       window.dispatchEvent(new ErrorEvent('error', { message: 'E2E boom', error: new Error('E2E boom') }));
     });
     expect((await reported).status()).toBe(204);
-  } finally {
-    await context.close();
-  }
-});
-
-test('the employee has three tabs, and is told who may see the failed events', async ({ browser }) => {
-  const { context, page } = await signedIn(browser, VIEWPORTS[390], '/system', true);
-  try {
-    await expect(shown(page).locator('ion-segment-button[data-testid^="tab-"]')).toHaveCount(3);
-    await expect(testid(page, 'tab-logs')).toHaveCount(0);
-    await expect(testid(page, 'system-usage-denied')).toContainText('Only the owner or an administrator');
-    await snap(page, 'BASE-G87-employee', 390);
-    await page.goto(`${A}/system#events`);
-    await expect(testid(page, 'system-events-denied')).toContainText('Only the owner or an administrator can see the failed events.');
-    await expect(shown(page).getByText('All in order')).toHaveCount(0);
-    await snap(page, 'BASE-G91-employee', 390);
-    // Logs in the address opens Resources for them.
-    await page.goto(`${A}/system#logs`);
-    await expect(testid(page, 'tab-usage')).toHaveClass(/segment-button-checked/);
   } finally {
     await context.close();
   }

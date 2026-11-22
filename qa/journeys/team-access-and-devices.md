@@ -28,7 +28,7 @@ Para qué: que cada persona entre como le toca (cuenta, PIN o placa), con su rol
 13. BASE-F78 — a Javi se le retira el PIN.
 14. BASE-F84 — Javi necesita una aprobación y Marta la da con su PIN.
 15. BASE-F85 — quién aprobó qué.
-16. BASE-F118 — Javi abre por su dirección «Reglas» de Impuestos: «Sin acceso», con el nombre del propietario.
+16. BASE-F118 — Javi abre por su dirección «Reglas» de Impuestos y después «Sistema»: en las dos, «Sin acceso», con el nombre del propietario.
 17. BASE-F57 — Marta abre sesión en otro dispositivo.
 18. BASE-F58 — la sesión termina mientras se trabaja.
 19. BASE-F59 — la tableta que nadie toca cierra la sesión.

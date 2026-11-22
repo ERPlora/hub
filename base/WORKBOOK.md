@@ -114,7 +114,8 @@ A la izquierda (en el móvil, desde el botón de la barra): la persona arriba y 
 grupos, «Inicio», «Empleados», «Archivos» · «Apps», «Sistema», «API», «Ajustes». Cada una sale solo a quien tiene el
 permiso con el que se abre su pantalla, como en Square o Toast: «Sistema», a quien administra el negocio; «API», además,
 mientras la documentación de la API está mostrada (BASE-F91), y aparece o se va al cambiar el interruptor, sin
-recargar. Un empleado ve «Inicio», «Empleados», «Archivos», «Apps» y «Ajustes». Abajo, el código QR, «Mejorar plan»
+recargar. Un empleado ve «Inicio», «Empleados», «Archivos», «Apps» y «Ajustes». Una entrada que la persona no tiene,
+abierta por su dirección, dice «Sin acceso» (BASE-F118). Abajo, el código QR, «Mejorar plan»
 (solo el propietario) y «Gestionar en erplora.com».
 
 ### «Mejorar plan»
@@ -192,8 +193,8 @@ con «Importar» (lo que se abre), «Exportar» y
   y su «Descargar».
 
 ### Sistema · Uso y plan
-Desde «Sistema» en el menú lateral. Cuatro pestañas abajo: «Uso y plan», «Actualizaciones», «Eventos caídos» y
-«Registros» (esta, solo para quien administra el negocio); se abre «Uso y plan»: su plan con «Mejorar plan» (para el
+Desde «Sistema» en el menú lateral, que solo tiene quien administra el negocio. Cuatro pestañas abajo: «Uso y plan»,
+«Actualizaciones», «Eventos caídos» y «Registros»; se abre «Uso y plan»: su plan con «Mejorar plan» (para el
 propietario), una línea
 que dice si le alcanza o tiene que ampliar y por qué, «Lo que incluye tu plan», de lo más lleno a lo menos, con su barra,
 y «Para tu información», con las cifras que ningún plan limita.
@@ -294,7 +295,7 @@ una acción peligrosa, cada dato en su línea y un cuadro para escribir lo que p
 | Cargando | Baldosas grises en «Mis apps» («Cargando tus apps…» para el lector de pantalla), la lista en gris, «Cargando widgets…» en el tablero, la cifra de cada panel en gris y «Cargando…» en «Actividad»; «Cargando…» en el pinpad, «Cargando tu perfil…» y «Cargando los dispositivos…». |
 | Vacío | «Aquí aparecerán tus apps. Añade las que necesite tu negocio.»; sin pasos, la lista no sale; «Panel vacío. Pulsa ⋮ para añadir widgets.»; un panel sin datos, «Sin datos»; el panel de la campana, «Todo al día» y «No queda nada que requiera acción.»; «Todavía no ha entrado nadie desde ningún dispositivo.»; en «Cambiar de usuario», «Aquí nadie tiene PIN todavía: se pone en Mi perfil o en Empleados.». |
 | Error | Cada zona falla por su cuenta: «No se han podido cargar tus apps. Recarga la página; si sigue fallando, vuelve a iniciar sesión.», «No se ha podido cargar lo que te falta por configurar» con «Reintentar», «No se han podido cargar los paneles» con «Reintentar», un panel con «No disponible» (nunca la cifra de antes), «No se han podido cargar las últimas ventas» con «Reintentar» y, en el panel de la campana, «No se pudieron cargar los avisos» con «Reintentar» o, si ya tenía avisos, «No se pudieron actualizar los avisos. Lo que ves puede no estar al día.» con los de antes. En el acceso: «No se pudo cargar el pinpad. Puedes entrar con tu cuenta.», «No se pudo cargar el perfil» con «Reintentar», «No se pudo cargar este dispositivo. Comprueba la conexión e inténtalo de nuevo.», «No se pudo cargar cómo pide el PIN el negocio. Comprueba la conexión e inténtalo de nuevo.» y «No se pudieron cargar los dispositivos. Comprueba la conexión e inténtalo de nuevo.». |
-| Sin permiso | Un paso que la persona no puede hacer: sin botón y «Esto lo tiene que configurar un administrador.». Un panel o un contador que no puede ver, no sale. En Ajustes, quien no administra ve «Este dispositivo» y «Pinpad» con los controles apagados («Solo un administrador puede cambiar cómo entra la gente en este dispositivo.», «Solo un administrador puede cambiar si se pregunta.») y, en lugar de la lista, «Solo un administrador puede ver y quitar los dispositivos.». Una pantalla de una app que su rol no abre, abierta por su dirección: «Sin acceso» (BASE-F118). |
+| Sin permiso | Un paso que la persona no puede hacer: sin botón y «Esto lo tiene que configurar un administrador.». Un panel o un contador que no puede ver, no sale. En Ajustes, quien no administra ve «Este dispositivo» y «Pinpad» con los controles apagados («Solo un administrador puede cambiar cómo entra la gente en este dispositivo.», «Solo un administrador puede cambiar si se pregunta.») y, en lugar de la lista, «Solo un administrador puede ver y quitar los dispositivos.». Una pantalla que su rol no abre, de una app o de la plataforma (como «Sistema»), abierta por su dirección: «Sin acceso» (BASE-F118). |
 
 En la pantalla Ajustes · Negocio:
 
@@ -1326,7 +1327,7 @@ Implicados: BASE-F01, INVENTORY-F12, VERIFACTU-F01
 
 ### BASE-F39 Abrir Sistema y moverse por sus pestañas
 Estado: hecho
-Actor: propietario, administrador, responsable, empleado
+Actor: propietario, administrador
 Pantalla: Sistema · Uso y plan
 Pasos:
   1. Pulsa «Sistema» en el menú lateral, o llega desde el aviso de los eventos caídos de la campana.
@@ -1334,18 +1335,16 @@ Pasos:
      «Uso y plan». La pestaña elegida queda en la dirección: un enlace o recargar abre la misma.
   3. Una pestaña que no existe abre «Uso y plan», y también los enlaces de antes a «Recursos» y a «Plan y límites»; la
      antigua de las copias lleva a «Ajustes» › «Datos y copias».
-  4. Quien no es propietario ni administrador ve tres: «Registros» no existe para él y, si la pide, se abre «Uso y
-     plan». En «Uso y plan» lee «Solo el dueño o un administrador puede ver cuánto está usando el hub.» y en
-     «Eventos caídos», «Solo el dueño o un administrador puede ver los eventos caídos.», sin «Reintentar».
-  5. Al final de «Uso y plan», cualquiera ve las tarjetas que ponen ahí las apps encendidas en el negocio y que la
-     persona puede ver, cada una con lo suyo: la de Impresión es «Tu impresora» (PRINTING-F21). Una app apagada no pone
+  4. Quien no administra el negocio no tiene «Sistema» en el menú lateral: su dirección, también la de cualquiera de
+     sus pestañas, le dice «Sin acceso» (BASE-F118).
+  5. Al final de «Uso y plan» salen las tarjetas que ponen ahí las apps encendidas en el negocio y que la persona puede
+     ver, cada una con lo suyo: la de Impresión es «Tu impresora» (PRINTING-F21). Una app apagada no pone
      la suya; al encenderla o apagarla, la tarjeta aparece o se va sin recargar.
-Entra: el papel de la persona en el negocio; a quien no lo administra no se le pide nada que el hub le negaría. Las
-tarjetas, de las apps encendidas.
+Entra: las tarjetas de las apps encendidas que la persona puede ver.
 Sale: nada guardado.
 Si falla: cada pestaña dice lo suyo (BASE-F40 a BASE-F43). Si no se puede leer qué tarjetas tocan, no sale ninguna y el
 resto de la pestaña sigue; una tarjeta que no carga se queda fuera y las demás salen.
-Implicados: BASE-F40, PRINTING-F21
+Implicados: BASE-F40, BASE-F118, PRINTING-F21
 
 ### BASE-F40 Ver lo que usa el negocio y si tiene que ampliar el plan
 Estado: hecho
@@ -1405,8 +1404,7 @@ las veces que se quedó corta llevan contándose menos que su periodo, dicen «D
 erplora.com aparte: si no contesta, su fila dice «No disponible ahora», sin cifra, y la pantalla sigue; lo mismo si no
 se puede leer WhatsApp. En una demo, en lugar de todo: «En una demo no se mide el uso: sus datos se borran al
 terminar.». Mientras el hub no conoce el plan: «Todavía no conocemos el plan de este negocio: aparecerá en cuanto
-erplora.com lo envíe.» y, bajo «Lo que usas», las cifras sin tope, barra, pastilla ni línea de arriba. Quien no
-administra el negocio lee lo que dice BASE-F39.
+erplora.com lo envíe.» y, bajo «Lo que usas», las cifras sin tope, barra, pastilla ni línea de arriba.
 Implicados: BASE-F10, BASE-F11, BASE-F39, BASE-F57, BASE-F72, BASE-F73, BASE-F108, HUBS-F21, HUBS-F22
 
 ### BASE-F41 Saber qué versión corre y cuándo se actualizó
@@ -1432,8 +1430,7 @@ Estado: hecho
 Actor: propietario, administrador
 Pantalla: Sistema · Registros
 Pasos:
-  1. Abre la pestaña «Registros»: el título es «Registro de eventos». Para quien no administra el negocio la
-     pestaña no existe (BASE-F39).
+  1. Abre la pestaña «Registros»: el título es «Registro de eventos».
   2. Ve los 50 últimos sucesos entre las apps del negocio, el más reciente primero, con «Hora», «Nivel»
      («Información», «Aviso» o «Error», en una pastilla) y «Evento»: su nombre, la app que lo anotó y qué ha pasado
      con él en su idioma (entregado, esperando, en «Eventos caídos»…). Nunca lo que llevaba dentro.
@@ -1466,8 +1463,7 @@ Pasos:
 Entra: los avisos entre apps de este negocio que agotaron sus reintentos, nunca los de otro.
 Sale: nada guardado.
 Si falla: «No se pudo consultar el sistema» — «No se pudo cargar la cola de eventos caídos. Comprueba la conexión y
-reintenta.» con «Reintentar» a la vista: un fallo nunca sale como «Todo en orden». Quien no administra el negocio
-lee «Solo el dueño o un administrador puede ver los eventos caídos.».
+reintenta.» con «Reintentar» a la vista: un fallo nunca sale como «Todo en orden».
 Implicados: ninguno
 
 ### BASE-F44 Reenviar un evento caído
@@ -3348,19 +3344,19 @@ Implicados: BASE-F92, BASE-F93
 
 ### BASE-F116 Leer las novedades de ERPlora
 Estado: hecho
-Actor: propietario, administrador, responsable, empleado
+Actor: propietario, administrador; por el asistente, cualquiera del negocio
 Pantalla: Sistema · Actualizaciones
 Pasos:
   1. En la pestaña «Actualizaciones», debajo de la versión y su fecha (BASE-F41), sale «Novedades»: lo que ha cambiado
-     en ERPlora que el negocio nota, lo más reciente primero. Quien no administra el negocio también las ve: no dicen
-     nada de él. Mientras carga: «Consultando las novedades…».
+     en ERPlora que el negocio nota, lo más reciente primero. Mientras carga: «Consultando las novedades…».
   2. Cada novedad dice su día, si es algo nuevo, una mejora o un arreglo («Nuevo», «Mejora» o «Arreglo»), un título
      corto y una o dos frases de lo que se puede hacer ahora, tal cual se escribieron. Son notas escritas para el
      negocio, nunca la lista de cambios del código.
   3. Salen las 20 más recientes, sin páginas.
   4. Sin ninguna, dice «Todavía no hay novedades.».
   5. Por el asistente, «¿qué hay de nuevo en ERPlora?» o «¿qué ha cambiado en la última actualización?» las lee igual,
-     en el idioma de la persona.
+     en el idioma de la persona. Así las lee también quien no administra el negocio, que no tiene Sistema (BASE-F39):
+     no dicen nada del negocio.
 Entra: las novedades de la versión que corre: viajan con ella, así que siempre son las suyas.
 Sale: nada guardado: las novedades solo se leen.
 Si falla: «No se pudieron cargar las novedades» con «Reintentar»; la versión y su fecha siguen a la vista.
@@ -3398,17 +3394,18 @@ Estado: hecho
 Actor: responsable, empleado
 Pantalla: Sin acceso
 Pasos:
-  1. Abre por su dirección (un enlace, el historial, una pestaña que se quedó abierta o escribiéndola) una pantalla de
-     una app que su rol no abre: una entrada que no sale en su menú, como «Reglas» de Impuestos para un empleado, o
-     cualquier pantalla que cuelgue de ella.
+  1. Abre por su dirección (un enlace, el historial, una pestaña que se quedó abierta o escribiéndola) una pantalla que
+     su rol no abre: una entrada de una app que no sale en su menú, como «Reglas» de Impuestos para un empleado, una
+     de la plataforma que no sale en su menú lateral, como «Sistema» para quien no administra el negocio, o cualquier
+     pantalla que cuelgue de ellas.
   2. En lugar de la pantalla, en la misma dirección, sale «Sin acceso»: «No tienes acceso a esta pantalla» — «Tu rol en
      este negocio no la abre.». Mientras busca a quién pedirlo: «Buscando quién puede darte acceso…».
   3. Debajo, «Pide acceso a una de estas personas:» y el nombre de cada una, con su avatar: quien le puede cambiar el
      rol en erplora.com (HUBS-F26). Un empleado ve al propietario y a los administradores; un responsable, solo al
      propietario. Solo el nombre: ni el email ni el teléfono. Cuentan también los invitados que aún no han entrado.
   4. «Ir al Inicio» lleva al Inicio.
-Entra: la sesión de la persona, que dice qué pantallas de cada app tiene cerradas por su rol (las mismas que no salen
-en su menú); las personas del negocio con su rol, de la última foto de erplora.com.
+Entra: la sesión de la persona, que dice qué pantallas de cada app tiene cerradas por su rol y qué permisos tiene,
+los que abren cada entrada del menú lateral (las mismas que no salen en sus menús); las personas del negocio con su rol, de la última foto de erplora.com.
 Sale: nada.
 Si falla: si no se puede saber a quién pedirlo, «No hemos podido saber quién puede darte acceso» — «Pregunta a quien
 lleva el negocio o vuelve a intentarlo.» con «Reintentar», y la pantalla sigue diciendo que no tiene acceso. Sin nadie
@@ -3567,7 +3564,7 @@ Implicados: BASE-F06, BASE-F07, BASE-F81, BASE-F82, BASE-F86, SALE-F28, CUSTOMER
   que cada clave es única, que el componente es un nombre (nunca una ruta) con su fichero en
   `apps/<app>/frontend/components/` y que el permiso es de la app. `base.system.cards` (viva: la foto y
   encender o apagar una app la re-ejecutan; `GET /api/system/cards`) lista las de las apps encendidas que la persona
-  puede ver, y `SystemAppCards.vue` las monta al final de «Uso y plan», también para quien no administra el negocio.
+  puede ver, y `SystemAppCards.vue` las monta al final de «Uso y plan».
   Lo que dice una tarjeta es de su app. Las puertas de erplora.com a la app de ERPlora de cada sistema
   (`/app/download/<windows|linux|android>/`) van en `hub-home.app_downloads` (`base/spa.py`) para cualquier sesión, y
   `lib/app-downloads.ts` las ofrece solo en un navegador. Tests: `test_home.py`, `test_queries_home.py`, `test_spa.py`,
@@ -3820,6 +3817,8 @@ Implicados: BASE-F06, BASE-F07, BASE-F81, BASE-F82, BASE-F86, SALE-F28, CUSTOMER
   está `on` en `base.session.me` y `NoAccessPage.vue` («Sin acceso», BASE-F118) cuando la entrada de menú más larga de
   la app que cubre la dirección está en `locked` de la sesión (las rutas de las entradas `Nav` que la persona no
   abre); la decide `gateVerdict`, nunca la lista `apps`, que lleva toda app de la que la persona tiene algún permiso.
+  Una ruta de base, sin `meta.app`, la juzga con el `permission` de la entrada de `SIDEBAR` (`lib/sidebar.ts`) más
+  larga que cubre la dirección, segmento a segmento; la que ninguna cubre (el Inicio, «Mi perfil») se abre.
   Los nombres salen de `base.access.grantors` (`base/queries/access_rights.py`): quien puede subirle el rol en
   erplora.com, solo el nombre.
   «Mejorar plan» y la Tienda, solo con `useMayBuy` (`base/frontend/lib/plan-link.ts`). e2e:
@@ -4445,7 +4444,8 @@ Implicados: BASE-F06, BASE-F07, BASE-F81, BASE-F82, BASE-F86, SALE-F28, CUSTOMER
   (`useApiDocsShown` de `base/frontend/lib/sidebar.ts`, que se suscribe a `base.api_doc.settings` solo con sesión).
 - Menú lateral: `SIDEBAR` de `base/frontend/lib/sidebar.ts`; cada entrada declara `permission`, el de la operación de
   su pantalla, y `shellSidebar` lo convierte en el `visible` del shell (`ShellSidebarItem`, `packages/ui`); «API» lleva
-  además `shownWhile` (la documentación mostrada). Un empleado no ve «Sistema» (`base.administer_hub`).
+  además `shownWhile` (la documentación mostrada). Un empleado no ve «Sistema» (`base.administer_hub`), y su dirección
+  le dice «Sin acceso» (`gateVerdict` de `lib/app-gate.ts`, con el mismo `permission`).
 - Pestañas de Ajustes: `SETTINGS_TABS` de `base/frontend/lib/settings-tabs.ts`, cada una con el permiso de lo que
   lleva («Impresión», `printing.manage_settings`, el de la app a la que lleva; «Datos y copias», `base.administer_hub`);
   `settingsTab` abre la del hash solo si la persona la tiene y, si no, la primera suya.
