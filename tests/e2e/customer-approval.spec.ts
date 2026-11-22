@@ -1,7 +1,6 @@
 // What a manager holds in Customers, an employee does with a manager's PIN on the spot (BASE-F84; the old customers
 // module's rule «what the manager has, another profile may do with a manager's approval (PIN)»): the employee asks to
-// merge a duplicate card (CUSTOMER-F13) or to create a group (CUSTOMER-F27), «An approval is needed» opens over the
-// screen, the owner approves it with their PIN on the employee's own device and it is done once. Screenshots of the
+// merge a duplicate card (CUSTOMER-F13), «An approval is needed» opens over the screen, the owner approves it with their PIN on the employee's own device and it is done once. Screenshots of the
 // dialog over the card in the three viewports. The owner's PIN exists only while this file runs, after the employee
 // has entered (a PIN in hub `a` turns every browser's way in into the PIN pad: base-access.spec.ts), and the
 // approvals it records go with it, as everything else this file creates (`afterAll`).
@@ -13,12 +12,9 @@ import {
   createCard,
   e2eName,
   FLOW_VIEWPORTS,
-  inputOf,
-  rowNamed,
-  searchList,
   spanishMobile,
 } from './customer-helpers';
-import { A, api, capture, EMPLOYEE, login, OWNER, psql, shown, usernamesOf } from './helpers';
+import { A, api, capture, EMPLOYEE, login, OWNER, psql, shown, testid, usernamesOf } from './helpers';
 import { toastSaying } from './toast-helpers';
 
 const OWNER_PIN = '2468';
@@ -98,21 +94,13 @@ for (const viewport of FLOW_VIEWPORTS) {
 }
 
 // flow: CUSTOMER-F27
-test('CUSTOMER-F27: the employee creates a group and the owner approves it with their PIN', async () => {
+test('CUSTOMER-F27: Groups is no screen of the employee: «No access» by its address, with no «Add»', async () => {
   const { page } = employee;
   await page.setViewportSize({ width: 1440, height: 900 });
-  const name = e2eName('F27 Approved group');
   await page.goto(`${A}/customer/groups`);
-  await shown(page).locator('[data-testid=customer-groups-add]').click();
-  const form = page.locator('ion-modal[data-testid=customer-group-form]');
-  await inputOf(form, 'customer-group-form-name').fill(name);
-  await form.locator('[data-testid=customer-group-form-submit]').click();
-  const dialog = approval(page);
-  await expect(dialog.getByTestId('approval-action')).toHaveText(/^(Approving: Create a customer group|Se aprueba: Crear un grupo de clientes)$/);
-  await ownerApproves(page);
-  await expect(form).toBeHidden();
-  await searchList(page, 'customer-groups', name);
-  await expect(rowNamed(page, 'customer-groups', name)).toBeVisible();
+  // Groups sets the business's customers up: not in an employee's menu (BASE-F118).
+  await expect(testid(page, 'no-access')).toBeVisible();
+  await expect(shown(page).locator('[data-testid=customer-groups-add]')).toHaveCount(0);
 });
 
 // flow: CUSTOMER-F16

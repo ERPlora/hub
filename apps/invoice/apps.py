@@ -44,6 +44,7 @@ class InvoiceConfig(LiveAppConfig):
     )
     permissions = [
         "invoice.view_invoice",
+        "invoice.view_all_invoices",
         "invoice.add_invoice",
         "invoice.rectify_invoice",
         "invoice.manage_series",
@@ -60,6 +61,7 @@ class InvoiceConfig(LiveAppConfig):
         "hub_admin": ["invoice.*"],
         "hub_manager": [
             "invoice.view_invoice",
+            "invoice.view_all_invoices",
             "invoice.add_invoice",
             "invoice.rectify_invoice",
             "invoice.manage_series",

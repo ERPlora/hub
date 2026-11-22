@@ -6,7 +6,7 @@
 // viewports. The week and the settings the hub had before the file are put back after it (`afterAll`).
 import { expect, test } from '@playwright/test';
 
-import { A, api, EMPLOYEE, login, psql, shot, shown } from './helpers';
+import { A, api, EMPLOYEE, login, psql, shot, shown, testid } from './helpers';
 import { DEFAULT_WEEK, noHorizontalScroll, restoreWeek, rowTexts, snapshotWeek, VIEWPORTS, weekReady } from './schedule-helpers';
 
 /** What the hub had before this file: its rows as INSERT statements, read in `beforeAll`. */
@@ -86,14 +86,12 @@ test('SCHEDULE-F08, F09: the business zone, and a week that starts on Sunday', a
   expect((await rowTexts(page))[0]).toContain('Sunday');
 });
 
-test('An employee reads the week: no edit, no confirmation', async ({ page }) => {
+test('An employee does not open the hours: «No access» by its address, with no edit', async ({ page }) => {
   psql(DEFAULT_WEEK);
   await login(page, A, '/schedule/hours', EMPLOYEE);
-  await weekReady(page);
-  const view = shown(page);
-  await expect(view.locator('[data-testid=schedule-hours-default-week]')).toBeVisible();
-  await expect(view.locator('[data-testid=schedule-hours-confirm-week]')).toHaveCount(0);
-  await expect(view.locator('[data-testid=schedule-hours-row-0-edit]')).toHaveCount(0);
+  // Not in an employee's menu: the business's hours are set up by whoever runs it (BASE-F118).
+  await expect(testid(page, 'no-access')).toBeVisible();
+  await expect(shown(page).locator('[data-testid=schedule-hours-row-0-edit]')).toHaveCount(0);
 });
 
 test('Hours and Settings in the three viewports: no horizontal scroll; cards on a phone', async ({ page }) => {

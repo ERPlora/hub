@@ -253,7 +253,7 @@ inventario: de fábrica, el administrador y el responsable.
 Cabecera «Inventario» con «Permitir vender sin stock», «Umbral de stock bajo» (con su explicación)
 y «Controlar stock», y «Guardar». La ve y la guarda quien puede gestionar los ajustes del
 inventario: de fábrica, el administrador y el responsable. Al empleado y al cajero no se les enseña
-la pestaña; si escriben su dirección, ven «Esta página no existe». Cargando: «Cargando ajustes…».
+la pestaña; si escriben su dirección, ven «Sin acceso» (BASE-F118). Cargando: «Cargando ajustes…».
 Error: «No se pudieron cargar los ajustes.» con «Reintentar», nunca los valores de fábrica como si
 fueran los del negocio.
 
@@ -266,7 +266,7 @@ fueran los del negocio.
 | Error | Panel: «No se pudieron cargar las métricas del inventario.»; Ajustes: «No se pudieron cargar los ajustes.»; las tablas, su aviso con «Reintentar». Un rechazo de una acción sale en su ventana, junto a su campo, o encima de la tabla. |
 | Reconectando | Lo pintado se queda; una franja avisa «Reconectando…» hasta que vuelve la conexión. |
 | App inactiva | «Esta app no está activa en este negocio» en lugar de las cifras y de la tabla. |
-| Sin permiso | No aparece lo que no puede hacer (ni **+**, ni importar o exportar, ni las acciones de stock, ni el interruptor: «Sí»/«No»); Ajustes no sale y su dirección dice «Esta página no existe»; si pierde el permiso con Ajustes abierto, los campos se bloquean con «No tienes permiso para cambiar estos ajustes. Pídeselo a un administrador si lo necesitas.». |
+| Sin permiso | No aparece lo que no puede hacer (ni **+**, ni importar o exportar, ni las acciones de stock, ni el interruptor: «Sí»/«No»); Ajustes no sale y su dirección dice «Sin acceso» (BASE-F118); si pierde el permiso con Ajustes abierto, los campos se bloquean con «No tienes permiso para cambiar estos ajustes. Pídeselo a un administrador si lo necesitas.». |
 
 ## Cambios sin guardar en Android
 

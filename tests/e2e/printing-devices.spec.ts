@@ -8,7 +8,7 @@
 // flow: PRINTING-F18
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
-import { A, api, EMPLOYEE, hostPage, login, psql, shot, shown } from './helpers';
+import { A, api, EMPLOYEE, hostPage, login, psql, shot, shown, testid } from './helpers';
 import { dialog, fill } from './inventory-helpers';
 import { FLOW_VIEWPORTS, flowShots, forgetDevices } from './printing-helpers';
 import { stamp } from './sale-helpers';
@@ -171,10 +171,9 @@ test('PRINTING-F18: only the device the owner set up takes the queue, with anybo
   await employee.context.close();
 });
 
-test('PRINTING-F18: the employee reads the devices and sets none up', async ({ page }) => {
+test('PRINTING-F18: the employee does not open the devices and sets none up: «No access» by their address', async ({ page }) => {
   await login(page, A, '/printing/devices', EMPLOYEE);
-  await devicesReady(page);
-  await expect(shown(page).locator('[data-testid=printing-devices-heading]')).toHaveText(/Devices that print|Dispositivos que imprimen/);
-  await expect(shown(page).locator('[data-testid=printing-devices-this]')).toContainText(/someone who manages the printers|quien gestiona las impresoras/);
+  // Not in an employee's menu (BASE-F118): whoever manages the printers sets a device up.
+  await expect(testid(page, 'no-access')).toBeVisible();
   await expect(shown(page).locator('[data-testid=printing-devices-add]')).toHaveCount(0);
 });

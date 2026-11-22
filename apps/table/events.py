@@ -1,6 +1,6 @@
 """Events of the table app (``table.<entity>.<fact>``) and its reactions to Sales' and Customers' events.
 
-services.py records them in the outbox, in the command's transaction; live.py names the ones that re-run
+services/ records them in the outbox, in the command's transaction; live.py names the ones that re-run
 each live query. They carry ids and numbers, never a name or a free note (WORKBOOK «Lo que avisa»).
 
 Reactions, each through an operation of this app run as the system, in its own transaction:
@@ -16,7 +16,7 @@ a party already seated), so they are not listened to.
 
 The outbox relay (``base.relay``, run by the worker on every tick) hands each event to ``react``; every
 reaction is idempotent, so a repeated delivery changes nothing. What Sales did is also read on every read and
-settled on every write (queries/, services.py).
+settled on every write (queries/, services/).
 """
 
 from typing import Any

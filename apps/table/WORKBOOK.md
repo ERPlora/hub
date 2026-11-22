@@ -1086,7 +1086,7 @@ Ventas (`sale.add_sale`), que tienen los cuatro papeles.
 ## Para quien lo mantiene
 
 - Anatomía completa: `apps.py`, `models.py`, `migrations/`, `schemas/`, `queries/`,
-  `services.py`, `events.py`, `live.py`, `api.py`, `admin.py`, `locale/`, `frontend/` y un
+  `services/`, `events.py`, `live.py`, `api.py`, `admin.py`, `locale/`, `frontend/` y un
   `tests/test_<fichero>.py` por fichero, más `tests/test_integration_sale.py` (Ventas y Clientes reales),
   `tests/test_integration_relay.py` (Reservas, Clientes y Ventas reales, por el bucle del worker con el
   relay del outbox) y `tests/test_concurrency.py` (dos camareros a la vez, con hilos). Reservas → Mesas, sin

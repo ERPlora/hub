@@ -9,7 +9,7 @@ import { readFileSync } from 'node:fs';
 import { type Browser, type BrowserContext, expect, test } from '@playwright/test';
 
 import { clockIn } from './attendance-helpers';
-import { A, api, type Credentials, EMPLOYEE, login, psql, shot, shown } from './helpers';
+import { A, api, type Credentials, EMPLOYEE, login, psql, shot, shown, testid } from './helpers';
 import { offersRowAction, rowAction } from './service-helpers';
 
 type Envelope = { error?: { code: string } };
@@ -103,9 +103,9 @@ test('an employee clocks a whole day with a break and sees only their own days',
       expect(res.status, path).toBe(403);
       expect(res.data.error?.code, path).toBe('permission_denied');
     }
-    // Settings: read-only for an employee.
+    // Settings: not in an employee's menu, and by its address «No access» (BASE-F118).
     await employee.page.goto(`${A}/attendance/settings`);
-    await expect(shown(employee.page).locator('[data-testid=attendance-settings-read-only]')).toBeVisible();
+    await expect(testid(employee.page, 'no-access')).toBeVisible();
     await expect(shown(employee.page).locator('[data-testid=attendance-settings-save]')).toHaveCount(0);
   } finally {
     await owner.context.close();

@@ -2,7 +2,7 @@ name: deploy
 
 # Push to main -> test (test.yml) and, side by side, build the hub image (tag = commit SHA) into
 # prod's ECR repository; once both pass, publish the release hub-vYYYY.MM.DD.N and deploy it to prod
-# (ecs-deploy.sh; ERPlora/aws README, "Contrato").
+# (scripts/ecs_deploy.py; ERPlora/aws README, "Contrato").
 # Push to pre -> the same into pre's own ECR repository (erplora/hub-pre), deployed to pre, the team's
 # pre-production (hub-pre and worker-pre, hubs.pre.erplora.com), waking it up if its evening stop had
 # put it to sleep. No release: releases are prod's.
@@ -33,7 +33,7 @@ on:
         required: false
         default: ""
       # A push deploy stops before registering anything when deploy/app-env.json changes a protected
-      # setting in prod; this run lets it through (ecs-deploy.sh, app_env.py).
+      # setting in prod; this run lets it through (scripts/ecs_deploy.py, app_env.py).
       confirm_protected:
         description: Protected settings of deploy/app-env.json this prod deploy changes, exactly (e.g. VERIFACTU_PRODUCTION_ENABLED=true)
         type: string
@@ -307,7 +307,7 @@ jobs:
           IMAGE_TAG: ${{ steps.commit.outputs.sha }}
           ENVIRONMENT: ${{ steps.target.outputs.environment }}
           CONFIRM_PROTECTED: ${{ inputs.confirm_protected }}
-        run: bash .github/scripts/ecs-deploy.sh
+        run: python3 scripts/ecs_deploy.py
 
       # Through the ALB by name (prod and pre share it), so it also works before the DNS cutover.
       - name: Check /readyz of the environment

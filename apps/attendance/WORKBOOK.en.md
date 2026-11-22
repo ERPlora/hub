@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:b2b7fe4dd9e710f0352d9acebaaddb4870d808acba319dc7de59d7081d04c0d2 -->
+<!-- generated from WORKBOOK.md sha256:8f057bf46d6c057296ec8f6f55728fd78587c5b8f0bb55b9625786e2571d30d9 -->
 
 ## What it is for and who it is for
 
@@ -26,7 +26,7 @@ for four years and make it available to the worker, their representatives and th
 ### Who uses it and what each one does
 
 - The **employee** clocks in, clocks out and takes their breaks, sees their working days and their
-  correction history, and exports their working days in CSV.
+  correction history, and exports their working days in CSV. They do not open the settings: by its address, "No access" (BASE-F118).
 - The **manager**, the **administrator** and the **owner** also see the working days of the whole team
   and who is in right now, correct working days with a reason, clock someone else in or out (through the
   assistant or the API: "clock Ana out") and change the settings.
@@ -100,8 +100,8 @@ closed becomes "Needs review". Only whoever can change them sees this tab.
 #### Detail
 The app's "Settings" tab. "Require location when clocking in from a personal device" (below it, where a
 device is marked as personal), "Allowed radius", "Workplace location" (Latitude, Longitude and "Use my
-current location") and "Flag for review after (hours)". Only a manager or an administrator can save;
-everyone else sees it read-only with "Only a manager or an administrator can change these settings.".
+current location") and "Flag for review after (hours)". Only a manager or an administrator opens and saves
+it; an employee, by its address, "No access" (BASE-F118).
 
 ## States of each screen
 
@@ -241,8 +241,8 @@ set, it warns "Set the workplace location or nobody on a personal device will be
 with the location denied, "Use my current location" keeps what was typed and warns, under the button,
 "Location access is denied. Allow location in this browser to read the workplace position, or type the
 coordinates." (in the installed app, which has no browser, "Location access is denied. Allow location in
-your device settings to read the workplace position, or type the coordinates."); whoever is not a
-manager sees the settings read-only. As in the form windows, the notice goes as soon as something is changed
+your device settings to read the workplace position, or type the coordinates."); an employee does
+not open them: by its address, "No access". As in the form windows, the notice goes as soon as something is changed
 and a field's reason as soon as that field is corrected (the coordinates, as the pair they are: correcting one
 takes both reasons away); both come back if the next try is refused too. A refusal that names no field stays
 until the next try. Tapping "Save" with nothing to send is a try too: it says "Settings saved." and takes away the
