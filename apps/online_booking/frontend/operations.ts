@@ -55,8 +55,8 @@ export interface BookingRow {
   number: string;
   customer_id: string;
   customer_name: string;
-  customer_phone: string;
-  customer_email: string;
+  customer_phone: string | null;
+  customer_email: string | null;
   staff_id: string | null;
   staff_name: string;
   services: LineOut[];

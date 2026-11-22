@@ -35,8 +35,10 @@ from apps.appointment.queries import business_zone
 from apps.appointment.queries import current_settings as current_rules
 from apps.appointment.queries.ownership import APPOINTMENTS
 from apps.appointment.schemas import SlotsIn
+from apps.customer.models import Customer
 from apps.customer.phones import candidates
 from apps.customer.queries import business_country
+from apps.customer.queries.contact import searched, sees_contact
 from apps.customer.search import normalize
 from apps.online_booking.models import Booking, Settings
 from apps.online_booking.schemas import (
@@ -261,28 +263,23 @@ def _with_service(text: str) -> Exists:
 
 
 def _person(ctx: OperationContext, text: str) -> Q:
-    """The appointments whose customer is ``text``: part of her name (with or without accents), her phone or
-    her email."""
-    if "@" in text:
+    """The appointments whose customer is ``text``: part of her name (with or without accents) and, for whoever sees
+    the customers' contact details, her phone or her email: a search by them would tell whose they are."""
+    seen = sees_contact(ctx)
+    if seen and "@" in text:
         return Q(customer_email__iexact=text)
-    found = Q(customer_name__icontains=text) | Q(
-        customer__search_text__contains=normalize(text)
-    )
-    numbers = candidates(text, business_country(ctx))
+    found = Q(customer_name__icontains=text) | Q(customer__in=searched(ctx, Customer.objects.all(), normalize(text)))
+    numbers = candidates(text, business_country(ctx)) if seen else []
     return found | Q(customer_phone__in=numbers) if numbers else found
 
 
 def _searched(ctx: OperationContext, rows: QuerySet, text: str) -> QuerySet:
     digits = "".join(char for char in text if char.isdigit())
-    found = (
-        Q(number__icontains=text)
-        | _person(ctx, text)
-        | Q(customer_email__icontains=text)
-        | Q(staff_name__icontains=text)
-        | _with_service(text)
-    )
-    if len(digits) >= 3:
-        found |= Q(customer_phone__contains=digits)
+    found = Q(number__icontains=text) | _person(ctx, text) | Q(staff_name__icontains=text) | _with_service(text)
+    if sees_contact(ctx):
+        found |= Q(customer_email__icontains=text)
+        if len(digits) >= 3:
+            found |= Q(customer_phone__contains=digits)
     return rows.filter(found)
 
 
@@ -315,7 +312,8 @@ SORT_COLUMNS = {
             ),
         },
         "description": "List the bookings customers made online (appointments of the diary booked through the "
-        "booking page), the newest first: search by number, customer, phone, email, service or professional, and "
+        "booking page), the newest first: search by number, customer (her phone or email, for whoever sees them), "
+        "service or professional, and "
         "filter by status (pending = waiting to be confirmed), day or professional."
     },
 )

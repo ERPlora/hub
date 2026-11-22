@@ -21,7 +21,9 @@ del dispositivo para los límites.
   por negocio y hora y las reservas próximas por móvil de los Ajustes (3 de fábrica).
 - **La bandeja** (F02–F06, F08): las citas con origen «Reserva online», con búsqueda, filtros por columna y
   orden; confirmar, completar, no presentada, cancelar con motivo y borrar, que son las operaciones de Citas
-  con el permiso de quien actúa (el de esta app **y** el de Citas). El empleado ve solo las de su agenda.
+  con el permiso de quien actúa (el de esta app **y** el de Citas). El empleado ve solo las de su agenda. El
+  teléfono y el email de la clienta solo llegan a quien ve el contacto de los clientes
+  (`base.view_customer_contact`); a quien no, ni se le enseñan ni le sirven para buscar o nombrar una reserva.
 - **Ajustes** (F07): textos, color y logo de la página (una imagen JPG, PNG o WebP que se sube y se sirve desde la
   dirección del negocio), email obligatorio, reservas próximas por móvil, elegir profesional y notas; las reglas de reserva son las de Citas (compartidas con WhatsApp) y se guardan
   con ellas, todo o nada; el interruptor de cada servicio se guarda en Servicios.
