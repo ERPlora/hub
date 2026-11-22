@@ -7,7 +7,7 @@ from live.outbox import record_event
 from apps.customer import events
 from apps.customer.models import Activity
 from apps.customer.queries import find_customer
-from apps.customer.schemas import ActivityIn, ActivityRow, NoteIn
+from apps.customer.schemas.activity import ActivityIn, ActivityRow, NoteIn
 from apps.customer.services.writes import _actor
 
 
