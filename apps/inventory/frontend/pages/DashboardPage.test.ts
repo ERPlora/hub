@@ -120,6 +120,13 @@ describe('DashboardPage', () => {
     expect(s.testid('inventory-dashboard-without-cost').text()).toBe('1 product without recorded cost: the value shown is partial');
   });
 
+  it('whoever does not see the costs gets the value empty: no value tile and no note about it (BASE-F119)', async () => {
+    const s = await setup();
+    await s.summary({ ...SUMMARY, stock_value: null, products_without_cost: 2 });
+    expect(s.kpis().map(([label]) => label)).toEqual(['Tracked products', 'In stock', 'Out of stock', 'Low stock']);
+    expect(s.testid('inventory-dashboard-without-cost').exists()).toBe(false);
+  });
+
   it('a new result replaces the figures without reloading (a sale elsewhere)', async () => {
     const s = await setup();
     await s.summary(SUMMARY);

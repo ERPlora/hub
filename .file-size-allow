@@ -5,7 +5,6 @@
 # fits its cap, and no path or higher number is ever added.
 227 .github/scripts/ecs-deploy.sh ERPlora/erplora-next#74
 172 .github/scripts/ecs-rollback.sh ERPlora/erplora-next#74
-529 apps/appointment/frontend/components/AppointmentFormModal.test.ts ERPlora/erplora-next#74
 462 apps/appointment/frontend/operations.d.ts ERPlora/erplora-next#74
 531 apps/appointment/models.py ERPlora/erplora-next#74
 1660 apps/appointment/queries.py ERPlora/erplora-next#74
@@ -18,9 +17,8 @@
 504 apps/cart_checkout/schemas.py ERPlora/erplora-next#74
 769 apps/cart_checkout/services.py ERPlora/erplora-next#74
 306 apps/cash_register/frontend/operations.d.ts ERPlora/erplora-next#74
-1268 apps/cash_register/queries.py ERPlora/erplora-next#74
 626 apps/cash_register/schemas.py ERPlora/erplora-next#74
-752 apps/cash_register/services.py ERPlora/erplora-next#74
+747 apps/cash_register/services.py ERPlora/erplora-next#74
 301 apps/combo/frontend/operations.d.ts ERPlora/erplora-next#74
 1061 apps/combo/queries/__init__.py ERPlora/erplora-next#74
 737 apps/combo/schemas/__init__.py ERPlora/erplora-next#74

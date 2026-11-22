@@ -18,6 +18,7 @@ from django.contrib.auth import get_user_model
 from django.test import Client
 from live.models import OutboxEvent
 
+from apps.tax.models import TaxCategory
 from base import api_keys
 from base.models import ApiKey, Membership
 from base.tenancy.context import use_hub
@@ -197,6 +198,19 @@ class TestUse:
         response = post(client, host(hub_a), "/customer/customers", {"name": "Ana"}, **bearer(token))
         assert response.status_code == 401
         assert get(client, host(hub_a), "/keys", **bearer(token)).status_code == 401
+
+    def test_a_key_sees_and_writes_the_costs_as_whoever_makes_it(self, admin_on_a, client, hub_a):
+        """Only the owner and an administrator make a key, and they see every data of the business: so does their key.
+        An integration that keeps a product's cost reads it and sends it, as before the costs had a permission."""
+        token = create(admin_on_a, hub_a)["token"]
+        client.logout()
+        with use_hub(hub_a):
+            TaxCategory.objects.get_or_create(key="test.general", defaults={"name": "General"})
+        tea = {"name": "Tea", "sku": "TEA", "price": 150, "cost": 90, "tax_category_key": "test.general"}
+        made = post(client, host(hub_a), "/inventory/products", tea, **bearer(token))
+        assert made.status_code == 201, made.content
+        rows = get(client, host(hub_a), "/inventory/products", **bearer(token)).json()["rows"]
+        assert [(row["sku"], row["cost"]) for row in rows] == [("TEA", 90)]
 
     def test_its_last_use_is_kept(self, admin_on_a, client, hub_a):
         token = create(admin_on_a, hub_a)["token"]

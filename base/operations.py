@@ -241,7 +241,7 @@ class HubContextBuilder:
         caller = getattr(request, "auth", None)
         if isinstance(caller, KeyCaller):
             # A business's API key opened this published operation (``base.api_keys``): the key acts,
-            # with that operation's permission and nothing more.
+            # with that operation's permission and base's data permissions.
             return OperationContext(
                 scope=scope,
                 actor=caller,

@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:f0d8b91c15b79e67e6e13df0142186f2a08989900992a2b03d858fb178e94bde -->
+<!-- generated from WORKBOOK.md sha256:06fd1eecbd0134bea1c1269f6191708758d828d744bf1342cede04e183a90a6b -->
 
 ## What it is for and who it is for
 
@@ -2285,7 +2285,7 @@ In: the name, the pace and what it may do.
 Out: the key, of which the business keeps only what lets it be recognised. Event `base.api_key.created`.
 If it fails: "The API key could not be created.", "Choose at least one app and what the key may do on it.", "That
 app does not publish what the key would do on it." or "It could not be copied to the clipboard.".
-Involved: BASE-F89, BASE-F90
+Involved: BASE-F89, BASE-F90, BASE-F119
 
 ### BASE-F87 Rotate an API key
 Status: done
@@ -3373,9 +3373,11 @@ Steps:
      what comes before the @.
   4. A Home panel whose figure is a piece of data the person does not see does not show to them on the board nor
      among the ones they may add.
+  5. An API key sees the data whoever makes it sees: only the owner and the administrator make one, and they see all
+     of it, so an integration reads and writes a product's cost as before.
 In: the person's role in this business.
 Out: nothing saved.
 If it fails: a request through the API or to the assistant that filters or sorts by a piece of data the person does
 not see is refused with the same error as an operation without its permission (403 `permission_denied`), doing
 nothing.
-Involved: BASE-F06, BASE-F07, BASE-F81, BASE-F82
+Involved: BASE-F06, BASE-F07, BASE-F81, BASE-F82, BASE-F86

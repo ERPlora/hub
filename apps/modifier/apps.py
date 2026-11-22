@@ -56,7 +56,15 @@ class ModifierConfig(LiveAppConfig):
     navigation = [
         Nav("groups", _("Modifiers"), "lucide:sliders-horizontal", "/modifier/groups", permission="modifier.manage")
     ]
-    help = Help(videos={"es": "Hko8juygFws", "en": "hjdKTTO4WzU"})
+    help = Help(
+        videos={"es": "Hko8juygFws", "en": "hjdKTTO4WzU"},
+        flow_videos={
+            "MODIFIER-F02": {"es": ["if9y7jkrZoc"], "en": ["-Yc6my6DL9k"]},
+            "MODIFIER-F03": {"es": ["if9y7jkrZoc"], "en": ["-Yc6my6DL9k"]},
+            "MODIFIER-F04": {"es": ["ETY8VcEep0c"], "en": ["mew_vXeVubc"]},
+            "MODIFIER-F05": {"es": ["cS91BrL7M1g"], "en": ["IgB8rNmlNeU"]},
+        },
+    )
 
     def recoverable_from_copy(self) -> list:
         """What a separate copy of the business gives back when ERPlora's staff recovers from it (BASE-F114): each group

@@ -17,6 +17,7 @@ from live.outbox import record_event
 from base import api_keys, events, queries
 from base.models import ApiKey, ApiSettings
 from base.permissions import ADMINISTER_HUB
+from base.sensitive import DATA_PERMISSIONS
 from base.schemas.api_keys import (
     ApiDocSettingsIn,
     ApiDocSettingsOut,
@@ -190,7 +191,7 @@ def authenticate_api_key(request: HttpRequest, token: str, op) -> "api_keys.KeyC
     now = timezone.now()
     if key.last_used_at is None or now - key.last_used_at >= API_KEY_LAST_USE_EVERY:
         ApiKey.objects.filter(pk=key.pk).update(last_used_at=now)
-    granted = frozenset({op.permission}) if op.permission else frozenset()
+    granted = (frozenset({op.permission}) if op.permission else frozenset()) | DATA_PERMISSIONS
     return api_keys.KeyCaller(key_id=str(key.pk), name=key.name, prefix=key.prefix, permissions=granted)
 
 
