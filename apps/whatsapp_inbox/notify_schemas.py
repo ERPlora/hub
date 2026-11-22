@@ -1,6 +1,6 @@
 """The input of ``whatsapp_inbox.message.notify`` (FLOW-F31): what an automation may send to a customer.
 
-Kept apart from ``schemas.py`` and built from its pieces: the template is the inbox's own (``TemplateSendIn``)
+Kept apart from ``schemas/`` and built from its pieces: the template is the inbox's own (``TemplateSendIn``)
 and «a text or a template» is the same rule as sending from the inbox.
 """
 
@@ -10,7 +10,8 @@ from django.utils.translation import gettext_noop
 from ninja import Field, Schema
 from pydantic import ValidationInfo, field_validator
 
-from apps.whatsapp_inbox.schemas import TEXT_OR_TEMPLATE, TemplateSendIn, _blank, _text
+from apps.whatsapp_inbox.schemas.fields import _blank, _text
+from apps.whatsapp_inbox.schemas.sending import TEXT_OR_TEMPLATE, TemplateSendIn
 
 
 class NotifyIn(Schema):

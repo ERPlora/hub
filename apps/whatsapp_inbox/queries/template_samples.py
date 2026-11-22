@@ -7,7 +7,7 @@ from live.operations import operation
 
 from apps.whatsapp_inbox import samples
 from apps.whatsapp_inbox.models import TemplateSample
-from apps.whatsapp_inbox.schemas import TemplateSampleOut, TemplateSampleRefIn
+from apps.whatsapp_inbox.schemas.template_samples import TemplateSampleOut, TemplateSampleRefIn
 
 SAMPLE_NOT_FOUND = _("That file is not among the business's files.")
 

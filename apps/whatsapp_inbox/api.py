@@ -11,35 +11,27 @@ from ninja.decorators import decorate_view
 
 from apps.whatsapp_inbox import queries, services
 from apps.whatsapp_inbox.notify_schemas import NotifyIn
-from apps.whatsapp_inbox.schemas import (
-    MAX_SAMPLE_BASE64,
-    AgentListIn,
+from apps.whatsapp_inbox.schemas.agents import AgentListIn
+from apps.whatsapp_inbox.schemas.channel import ChannelConnectIn
+from apps.whatsapp_inbox.schemas.conversations import (
     AssignIn,
     ByPhoneIn,
-    ChannelConnectIn,
     ConversationListIn,
-    ConversationRefIn,
     LinkCustomerIn,
-    MessageRefIn,
-    MessageListIn,
-    NoteAddIn,
-    NoteListIn,
-    NoteRefIn,
     NoticesIn,
-    SendIn,
     SetStatusIn,
-    TemplateCreateIn,
-    TemplateListIn,
-    TemplateRefIn,
-    TemplateSampleRefIn,
-    TemplateSampleUploadIn,
-    TemplateUpdateIn,
 )
+from apps.whatsapp_inbox.schemas.fields import ConversationRefIn
+from apps.whatsapp_inbox.schemas.messages import MessageRefIn, MessageListIn
+from apps.whatsapp_inbox.schemas.notes import NoteAddIn, NoteListIn, NoteRefIn
+from apps.whatsapp_inbox.schemas.sending import SendIn
+from apps.whatsapp_inbox.schemas.template_samples import MAX_SAMPLE_BASE64, TemplateSampleRefIn, TemplateSampleUploadIn
+from apps.whatsapp_inbox.schemas.templates import TemplateCreateIn, TemplateListIn, TemplateRefIn, TemplateUpdateIn
 from base.request_body import accept_body_up_to
 
 router = Router(tags=["whatsapp_inbox"])
 
-#: The header file's body (F29): a 25 MB document in base64 at most (``schemas.MAX_SAMPLE_BASE64``) and its JSON.
+#: The header file's body (F29): a 25 MB document in base64 at most (``MAX_SAMPLE_BASE64``) and its JSON.
 MAX_SAMPLE_BODY = MAX_SAMPLE_BASE64 + 4096
 
 

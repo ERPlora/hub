@@ -13,7 +13,7 @@ from apps.whatsapp_inbox.queries.channel import channel, send_blocked
 from apps.whatsapp_inbox.queries.conversations import display_name, find_conversation
 from apps.whatsapp_inbox.queries.reads import page, person_name
 from apps.whatsapp_inbox.queries.reasons import message_reason
-from apps.whatsapp_inbox.schemas import MessageGetOut, MessageListIn, MessagePage, MessageRefIn
+from apps.whatsapp_inbox.schemas.messages import MessageGetOut, MessageListIn, MessagePage, MessageRefIn
 
 MESSAGE_NOT_FOUND = _("That message no longer exists.")
 
