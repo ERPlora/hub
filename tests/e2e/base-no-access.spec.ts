@@ -3,7 +3,7 @@
 // owner, the positive control, opens the same screen. A screen of the employee's own work still opens.
 import { expect, test } from '@playwright/test';
 
-import { A, api, EMPLOYEE, hostPage, shot, shown, testid, THREE_SIZES } from './helpers';
+import { A, api, EMPLOYEE, hostPage, saveSessionForTheSweep, shot, shown, testid, THREE_SIZES } from './helpers';
 
 type People = { people: { name: string; role: string; me: boolean }[] };
 
@@ -19,6 +19,7 @@ test('BASE-F118: an employee opening by its address a screen its role does not o
     expect(ownerName).not.toBe('');
 
     const { page } = employee;
+    await saveSessionForTheSweep(employee.context);
     for (const size of THREE_SIZES) {
       await page.setViewportSize(size);
       await page.goto(`${A}/tax/rules`);
