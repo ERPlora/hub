@@ -30,6 +30,7 @@ CONFIG = "/inventory/config"
 PRODUCTS = "/inventory/products"
 SALES = "/sale/sales"
 CARTS = "/cart_checkout/carts"
+MEMBERS = "/staff/members"
 
 
 @pytest.fixture
@@ -133,9 +134,10 @@ class TestAMakerWhoLeft:
         "leave",
         [
             lambda hub: Membership.objects.filter(user__username=MAKER, host=hub.slug).delete(),
+            lambda hub: Membership.objects.filter(user__username=MAKER, host=hub.slug).update(host="another"),
             lambda hub: get_user_model().objects.filter(username=MAKER).update(is_active=False),
         ],
-        ids=["out of the business", "account closed"],
+        ids=["out of the business", "only in another business", "account closed"],
     )
     def test_the_key_opens_nothing_and_says_so(self, made, client, hub_a, leave):
         leave(hub_a)
@@ -153,6 +155,14 @@ class TestAMakerWhoLeft:
         Membership.objects.filter(user__username=MAKER, host=hub_a.slug).delete()
 
         assert costs(client, hub_a, made) == [90]
+
+    def test_a_key_made_before_its_maker_was_recorded_gains_nothing(self, made, client, hub_a):
+        with use_hub(hub_a):
+            ApiKey.objects.update(owner=None)
+
+        refused = post(client, host(hub_a), MEMBERS, {"first_name": "Bea", "last_name": "Ruiz", "hourly_rate": 1200}, **made)
+
+        assert (refused.status_code, code(refused)) == (403, "permission_denied")
 
     def test_a_maker_is_never_deleted_while_a_key_names_them(self, made, hub_a):
         with use_hub(hub_a), pytest.raises(ProtectedError):

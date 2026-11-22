@@ -196,20 +196,20 @@ def authenticate_api_key(request: HttpRequest, token: str, op) -> "api_keys.KeyC
     now = timezone.now()
     if key.last_used_at is None or now - key.last_used_at >= API_KEY_LAST_USE_EVERY:
         ApiKey.objects.filter(pk=key.pk).update(last_used_at=now)
-    wanted = (frozenset({op.permission}) if op.permission else frozenset()) | DATA_PERMISSIONS | see_all_permissions()
+    wanted = (frozenset({op.permission}) if op.permission else frozenset()) | DATA_PERMISSIONS
     return api_keys.KeyCaller(
         key_id=str(key.pk),
         name=key.name,
         prefix=key.prefix,
-        permissions=wanted if held is None else wanted & held,
+        permissions=wanted if held is None else (wanted | see_all_permissions()) & held,
         owner=key.owner.username if key.owner else "",
     )
 
 
 def _held_by_its_maker(key: ApiKey, hub) -> frozenset[str] | None:
     """What whoever made ``key`` holds on ``hub`` today, its ceiling; 403 when they hold nothing there any more (out
-    of the business, or their account closed). ``None`` for a key made before its maker was recorded: it is the
-    owner's, who holds everything, until the next photo names them (``base.hub_user.sync``)."""
+    of the business, or their account closed). ``None`` for a key made before its maker was recorded: it holds what
+    it did, and reads everyone's, until the next photo gives it to the owner (``base.hub_user.sync``)."""
     if key.owner is None:
         return None
     maker = get_user_model().objects.filter(username=key.owner.username).first()
@@ -220,7 +220,6 @@ def _held_by_its_maker(key: ApiKey, hub) -> frozenset[str] | None:
             code="base.api_key_owner_gone",
         )
     return held
-
 
 
 @operation(

@@ -11,11 +11,18 @@ pytestmark = HUB_DB
 
 
 def test_a_person_s_live_record_is_theirs():
-    ana = HubUser.objects.create(username="saas:ana")
-    record = make_member(user=ana)
     make_member(first_name="Bea", user=HubUser.objects.create(username="saas:bea"))
+    record = make_member(user=HubUser.objects.create(username="saas:ana"))
 
     assert records_of("saas:ana") == frozenset({record.pk})
+
+
+def test_a_colleague_s_record_is_never_theirs():
+    make_member(first_name="Bea", user=HubUser.objects.create(username="saas:bea"))
+    make_member(first_name="Nobody's")
+    HubUser.objects.create(username="saas:carla")
+
+    assert (records_of("saas:carla"), records_of("saas:nobody")) == (frozenset(), frozenset())
 
 
 def test_a_terminated_record_or_none_at_all_is_nothing():
