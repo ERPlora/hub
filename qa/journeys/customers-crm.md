@@ -32,6 +32,6 @@ Para qué: conocer a los clientes habituales: sus datos, sus alergias, de qué s
 17. CUSTOMER-F13 — dos fichas de la misma persona, unidas.
 18. CUSTOMER-F08 — las fichas del CSV del programa anterior.
 19. CUSTOMER-F09 — todas las fichas, exportadas.
-20. CUSTOMER-F31 — las cifras de los clientes.
+20. CUSTOMER-F31 — las cifras de los clientes; el empleado las ve sin «Ingresos».
 21. CUSTOMER-F16 — un cliente pide que se borren sus datos personales.
 22. CUSTOMER-F07 — se elimina una ficha de prueba.

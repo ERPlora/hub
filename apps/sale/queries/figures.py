@@ -1,6 +1,6 @@
-"""The sales figures: a period's totals, today, the last seven days and by staff member. Each adds up the sales the
-caller counts (``SALES.counted``): the whole business's only with «See all sales» and the business totals, else their
-own (SALE-F28)."""
+"""The sales figures: a period's totals, today, the last seven days and by staff member, for whoever reads the sales.
+Each adds up the sales the caller counts (``SALES.counted``): the whole business's only with «See all sales» and the
+business totals, else their own (SALE-F28)."""
 
 import datetime as dt
 from fractions import Fraction
@@ -58,7 +58,7 @@ def declared_tax_kind(sales) -> str | None:
 @operation(
     "sale.sale.stats",
     kind="query",
-    permission="sale.view_reports",
+    permission="sale.view_sale",
     input=PeriodIn,
     output=StatsOut,
     ai=AI(
@@ -119,7 +119,7 @@ def _revenue_by_day(sales, first: dt.date, last: dt.date) -> dict[dt.date, int]:
 @operation(
     "sale.sale.today",
     kind="query",
-    permission="sale.view_reports",
+    permission="sale.view_sale",
     input=EmptyIn,
     output=TodayOut,
     ai=AI(
@@ -152,7 +152,7 @@ def today(ctx: OperationContext, params: EmptyIn) -> dict:
 @operation(
     "sale.sale.last_7_days",
     kind="query",
-    permission="sale.view_reports",
+    permission="sale.view_sale",
     input=EmptyIn,
     output=LastDaysOut,
     ai=AI(
@@ -180,7 +180,7 @@ def last_7_days(ctx: OperationContext, params: EmptyIn) -> dict:
 @operation(
     "sale.sale.by_staff",
     kind="query",
-    permission="sale.view_reports",
+    permission="sale.view_sale",
     input=PeriodIn,
     output=ByStaffOut,
     expose_api=True,

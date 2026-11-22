@@ -174,7 +174,7 @@ def test_an_employee_builds_and_charges_a_check_over_http(employee_client, produ
 
 
 @HUB_DB
-def test_an_employee_neither_voids_nor_reads_the_figures(employee_client):
+def test_an_employee_does_not_void_but_reads_the_figures_of_her_sales(employee_client):
     assert (
         post(
             employee_client,
@@ -184,8 +184,8 @@ def test_an_employee_neither_voids_nor_reads_the_figures(employee_client):
         == 403
     )
     response = get(employee_client, "/sale/sales/stats")
-    assert response.status_code == 403
-    assert response.json()["error"]["code"] == "permission_denied"
+    assert response.status_code == 200
+    assert response.json()["count"] == 0
 
 
 @HUB_DB

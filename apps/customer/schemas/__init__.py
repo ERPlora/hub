@@ -27,6 +27,7 @@ from base.business import currency_decimals
 from base.recovery import RecoveredOut
 from base.relay import by_platform
 from base.schemas.assistant import names, unless_given
+from base.sensitive import BUSINESS_TOTALS
 
 T = TypeVar("T")
 
@@ -1002,7 +1003,7 @@ class CustomerStatsOut(Schema):
     total: int = Field(description="How many customers there are.")
     active: int = Field(description="How many of them are active.")
     vip: int = Field(description="How many are at the vip stage.")
-    total_revenue: int = Field(description="What they spent altogether, in cents.", json_schema_extra={"money": True})
+    total_revenue: int | None = Field(description="What they spent altogether, in cents; empty without the business totals.", json_schema_extra={"money": True, **BUSINESS_TOTALS})
 
 
 class PhoneMatch(Schema):

@@ -1,11 +1,11 @@
 """«Only mine or all» in the sales figures (SALE-F28): the period's figures, today's sales and tickets (the Home's
 panels), the last seven days and what each professional sold add up every sale of the business only for whoever sees
 everyone's sales and the business totals (``sale.view_all_sales`` and ``base.view_business_totals``: the owner, the
-administrator and the manager). Anyone else who reads the figures gets those of their own sales, the ones their sales
-list gives them, as Square's «view own sales reports» and Toast's «My reports».
+administrator and the manager). Anyone else who reads the sales gets the figures of their own sales, the ones their
+sales list gives them, as Square's «view own sales reports» and Toast's «My reports»: Ana and Bea are employees of the
+basic role, with nothing granted.
 
-Over HTTP, as the screens, the Home's panels, the assistant and the API ask. No employee reads the figures by default
-(``sale.view_reports`` is not theirs), so here Ana and Bea are given them, as a business's own role could.
+Over HTTP, as the screens, the Home's panels, the assistant and the API ask.
 """
 
 import json
@@ -46,13 +46,7 @@ def grant(monkeypatch, app: str, role: str, *, add=(), drop=()):
 
 
 @pytest.fixture
-def reports(monkeypatch):
-    """The employees read the sales figures, without «See all sales»."""
-    grant(monkeypatch, "sale", "hub_employee", add=["sale.view_reports"])
-
-
-@pytest.fixture
-def anas_record(product, people, reports):
+def anas_record(product, people):
     """Ana's staff record, on a day when Ana charges a coffee Carla served; Bea, one Carla served and one of her own,
     and the manager gives Carla's back. Outside the till, Carla did a voucher session, and Ana another one."""
     product("Coffee", "COF", 150, "restaurant.drink")
@@ -164,6 +158,6 @@ class TestWhoCountsTheWholeBusiness:
         assert by_staff(marta) == []
 
     def test_a_caller_that_is_not_a_person_counts_what_its_permission_opens(self, anas_record):
-        # An API key or an automation has no sales of its own: the reports alone open the business's.
+        # An API key or an automation has no sales of its own: reading the sales opens the business's.
         ctx = ctx_for("hub_employee", actor="flow:7")
         assert run("sale.sale.stats", {}, ctx).count == 2

@@ -196,7 +196,7 @@ export interface CustomerStatsOut {
   total: number;
   active: number;
   vip: number;
-  total_revenue: number;
+  total_revenue: number | null;
 }
 
 export interface PhoneMatch {

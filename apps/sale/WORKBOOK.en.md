@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:25f1c6e46fc0ac8b37810eb9542fa506c1d42e1f8881dd50931ed4ed44109823 -->
+<!-- generated from WORKBOOK.md sha256:b39894103ad575e49a6c284856abdc54c2ac72cc980d4b6bd219606f00e79280 -->
 
 ## What it is for and who it is for
 
@@ -22,11 +22,11 @@ businesses:
 ### Who uses it and what each one does
 
 - The **employee** (waiter, receptionist, cashier): builds the check, adds notes, comps a line, applies
-  discounts up to the business's maximum, parks and retrieves checks, charges and looks up their sales:
-  the ones they charged and the ones attributed to them.
+  discounts up to the business's maximum, parks and retrieves checks, charges and looks up their sales
+  and their figures: the ones they charged and the ones attributed to them.
 - The **manager**: also sells at an open price, applies discounts above the maximum, voids an open check
-  or a line already sent to the kitchen, voids and refunds sales, sees everyone's sales and the figures
-  and prepares the quick
+  or a line already sent to the kitchen, voids and refunds sales, sees everyone's sales and the whole
+  business's figures and prepares the quick
   notes, the sections, the payment methods and the POS settings.
 - The **owner** and the **administrator**: everything.
 
@@ -1044,7 +1044,7 @@ Involved: SERVICE-F22, SERVICE-F23, SERVICE-F24, SERVICE-F25, SALE-F28, STAFF-F2
 ### SALE-F28 Look up the sales history and figures
 Status: done
 Vertical: common
-Actor: employee (the history of their sales), manager (everyone's and the figures)
+Actor: employee (the history and the figures of their sales), manager (everyone's)
 Screen: Sales
 Steps:
 1. Open **Sales & POS → Sales**. At the top, the period ("Today" by default, "7 days", "30 days",
@@ -1057,8 +1057,8 @@ Steps:
    of the territory in **Taxes → Settings**, and changes at once if the territory is changed. With "7
    days", under the figures, what was sold on each of those days, from oldest to today ("Wed 14 ·
    €120.50"). They are the whole business's figures for the manager, the owner and the administrator,
-   who see everyone's sales and the business totals; whoever sees the figures without those two
-   permissions sees those of their own sales, the same ones the table gives them.
+   who see everyone's sales and the business totals; whoever lacks those two permissions, like the
+   employee, sees those of their own sales, the same ones the table gives them.
 3. The table: Date, Number, Customer, Payment, Status (Completed, Voided, Refunded; with "€5.00 left to
    refund" if part was refunded) and Total. A sale charged with several methods shows them all under
    "Payment", once each and in the order they were charged: "Cash + Card". Search with "Search
@@ -1073,8 +1073,8 @@ Steps:
    "Recent activity" (the last eight sales the person sees, the newest on top, with their number and their
    customer) are
    added with ⋮ ("Customize panel"). They update by themselves when a sale is charged, voided or refunded,
-   without reloading. Whoever lacks the reports permission can only add "Recent activity". The panels
-   count by the same rule as the screen's figures: the whole business or their own sales.
+   without reloading. The panels count by the same rule as the screen's figures: the whole business or
+   their own sales.
 In: nothing from other apps.
 Out: nothing saved. What each professional sold in the period (Staff and the assistant ask for it for the
 commission) counts by the same rule: whoever does not see the whole business gets only the lines of their
@@ -1098,15 +1098,14 @@ voucher of 100.00 € in 3 sessions, sold by A and done by B, gives 0 to A and 1
 period's "Revenue". Sales charged before stay as they were: their line counts for whoever sold it and the
 sessions of those vouchers count for nobody, so nothing counts twice.
 If it fails: "Error loading metrics" (the figures show as "—"); if the last 7 days cannot be read, "The
-last 7 days could not be read.". Empty: "No sales yet.". Whoever lacks the reports permission sees the
-table, without the figures. The total filter is written like any amount in the Hub ("1.000,50",
+last 7 days could not be read.". Empty: "No sales yet.". The total filter is written like any amount in the Hub ("1.000,50",
 "1,000.50", "2 500" and "12,50 €" filter); one it cannot read says so under its field
 in the words of the amount field ("This is not an amount. Type a figure, for example 12.50.", "This amount
 cannot be negative." or, with "1.000" in euros, "This amount can be read in two ways…"), and an end date
 before the start one, "The end date cannot be before the start date."; neither of them filters and the
 period rules. On Home, a panel for a day with no sales says 0, and one that cannot
 be read, "Unavailable".
-Involved: STAFF-F21, BASE-F06, BASE-F07, BASE-F08, SALE-F27, SERVICE-F21, SERVICE-F24
+Involved: STAFF-F21, BASE-F06, BASE-F07, BASE-F08, BASE-F119, SALE-F27, SERVICE-F21, SERVICE-F24
 
 ### SALE-F29 See and reprint a sale's document
 Status: done
@@ -1547,10 +1546,10 @@ the ones attributed to them. One they do not see does not exist for them (404 `s
 | A whole sale: header, customer with its tax ID and address (on an invoice), lines, payments, VAT breakdown and what was refunded | see sales | F29 | `sale.sale.get` |
 | The business as the paper names it: name, tax ID and lines (address and receipt header); for a sale, those of its fiscal document | see sales | F21, F29 | `sale.letterhead.get` |
 | The sale recorded with a charge attempt key | see sales | F06 | `sale.sale.by_idempotency_key` |
-| The figures of a period of business days, with the tax its sales were declared with (empty if they mix taxes) | reports | F28 | `sale.sale.stats` |
-| What was sold today and today's tickets | reports | F28 | `sale.sale.today` |
-| What was sold on each of the last 7 days | reports | F28 | `sale.sale.last_7_days` |
-| What each professional sold in a period: gross, base, tax, what was refunded of their lines, what is left, what paid for vouchers they sold, what the voucher sessions they did are worth and their production (what the commission goes on) | reports | F16, F28 | `sale.sale.by_staff` |
+| The figures of a period of business days, with the tax its sales were declared with (empty if they mix taxes) | see sales | F28 | `sale.sale.stats` |
+| What was sold today and today's tickets | see sales | F28 | `sale.sale.today` |
+| What was sold on each of the last 7 days | see sales | F28 | `sale.sale.last_7_days` |
+| What each professional sold in a period: gross, base, tax, what was refunded of their lines, what is left, what paid for vouchers they sold, what the voucher sessions they did are worth and their production (what the commission goes on) | see sales | F16, F28 | `sale.sale.by_staff` |
 | What a check, or some lines, would charge, without charging anything (total, base, VAT, discounts, breakdown and lines) | see sales | F01, F21, F22 | `sale.checkout.preview` |
 | The open checks (or of another state), with search by title and pages | see sales | F17 | `sale.order.list` |
 | A check with its uncharged lines | see sales | F17, F19 | `sale.order.get` |
@@ -1683,7 +1682,7 @@ the quick notes and what is refundable can be followed live.
 
 | Permission | Owner | Administrator | Manager | Employee | Service |
 |---|---|---|---|---|---|
-| See sales, checks, POS settings, sections and quick notes | yes | yes | yes | yes | `sale.view_sale` |
+| See sales and their figures, checks, POS settings, sections and quick notes | yes | yes | yes | yes | `sale.view_sale` |
 | Build the check (open, add, change, remove, split, merge, send to the kitchen, discount up to the maximum) | yes | yes | yes | yes | `sale.add_sale` |
 | Charge | yes | yes | yes | yes | `sale.take_payment` |
 | Sell at an open price | yes | yes | yes | no | `sale.sell_open_price` |
@@ -1692,8 +1691,7 @@ the quick notes and what is refundable can be followed live.
 | Refund | yes | yes | yes | no | `sale.refund_sale` |
 | See the payment methods | yes | yes | yes | yes | `sale.view_paymentmethod` |
 | Create payment methods | yes | yes | yes | no | `sale.add_paymentmethod` |
-| See everyone's sales (without it, only their own: the ones they charged and the ones attributed to them) | yes | yes | yes | no | `sale.view_all_sales` |
-| See the figures (the whole business's, with everyone's sales and the business totals, `base.view_business_totals`; without them, those of their own sales) | yes | yes | yes | no | `sale.view_reports` |
+| See everyone's sales (without it, only their own: the ones they charged and the ones attributed to them) and, with the business totals (`base.view_business_totals`), the whole business's figures (without both, those of their own sales) | yes | yes | yes | no | `sale.view_all_sales` |
 | Settings, sections and quick notes | yes | yes | yes | no | `sale.manage_settings` |
 
 The roles come from the SaaS with a prefix (`hub_owner`, `hub_admin`, `hub_manager`, `hub_employee`).
@@ -1703,8 +1701,8 @@ their PIN or their badge ("An approval is needed", BASE-F84), once and for that 
 refunding a sale, voiding a line sent to the kitchen, deleting a check with something ordered, selling at
 an open price and discounts above the maximum. The approved action does everything the manager's does
 (also what Invoicing and Services move: the corrective invoice and the voucher sessions that go back) and
-stays in **Employees › Approvals** (BASE-F85). Seeing everyone's sales, the figures, the settings and
-creating payment methods are not approved.
+stays in **Employees › Approvals** (BASE-F85). Seeing everyone's sales, the whole business's figures, the
+settings and creating payment methods are not approved.
 
 What touches a voucher's session also asks for Services' permission, because it is Services that moves
 it with the session of whoever sells: paying a line with a voucher, undoing it, removing, voiding or

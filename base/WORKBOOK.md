@@ -3410,7 +3410,7 @@ Implicados: BASE-F26, HUBS-F26 (erplora.com)
 ### BASE-F119 Lo que se ve según los permisos de dato
 Estado: hecho
 Actor: propietario, administrador, encargado, empleado
-Pantalla: Empleados · Personal, Inicio · Resumen
+Pantalla: Empleados · Personal, Inicio · Resumen, Ventas · Ventas, Clientes
 Pasos:
   1. Además de lo que puede hacer, cada rol dice qué datos delicados ve, con cuatro permisos de dato: ver los costes,
      ver el contacto de los clientes, ver el contacto del equipo y ver los totales del negocio. El propietario, el
@@ -3425,11 +3425,14 @@ Pasos:
      añadir.
   5. Una llave de API ve los datos que ve quien la crea: solo la crean el propietario y el administrador, que los ven
      todos, así que una integración lee y escribe el coste de un producto como antes.
+  6. Los totales del negocio son las cifras de todo el negocio, más allá de lo que hace cada uno: con las ventas de
+     todos, las cifras de **Ventas** y sus paneles de Inicio son las del negocio entero; sin ellos, las de las ventas
+     de la persona. En **Clientes**, «Ingresos» solo sale a quien los ve.
 Entra: el rol de la persona en este negocio.
 Sale: nada guardado.
 Si falla: una petición por la API o al asistente que filtra u ordena por un dato que la persona no ve se rechaza
 con el mismo error que una operación sin su permiso (403 `permission_denied`), sin hacer nada.
-Implicados: BASE-F06, BASE-F07, BASE-F81, BASE-F82, BASE-F86
+Implicados: BASE-F06, BASE-F07, BASE-F81, BASE-F82, BASE-F86, SALE-F28, CUSTOMER-F31
 
 ## Para quien lo mantiene
 
@@ -3441,7 +3444,10 @@ Implicados: BASE-F06, BASE-F07, BASE-F81, BASE-F82, BASE-F86
   rechaza con 403 `permission_denied`. Un panel de Inicio no sale a quien no tiene el permiso de un campo marcado que
   lee su `map` (`visibility.widget_open`). `tests/test_guardrails_sensitive.py` exige la marca en todo campo de
   respuesta con nombre de coste, contacto o sueldo, o su entrada en `UNMARKED` con su motivo (la lista solo encoge), y
-  la misma marca en el filtro o el orden de una lectura que lo nombra.
+  la misma marca en el filtro o el orden de una lectura que lo nombra. Una lectura de cifras (`stats`, `summary`,
+  `report`, `by_staff`… o en un módulo `figures`) marca sus importes (`BUSINESS_TOTALS` los de todo el negocio) o está
+  en `UNMARKED_FIGURES` con su motivo: las de Ventas suman con `Owned.counted`, que ya cuenta solo lo propio a quien
+  no tiene los totales.
 - **Dominio propio de un negocio** (BASE-F110, HUBS-F17, PLAN-SAAS §37 punto 2; `base/custom_domains.py`,
   `base.middleware.CustomDomainMiddleware`): `ALLOWED_HOSTS` no cambia. El SaaS nombra el dominio en la foto
   (`custom_domain`: minúsculas, sin puerto, sin punto final, en su forma ASCII; `null`, vacío o ausente, ninguno, porque la

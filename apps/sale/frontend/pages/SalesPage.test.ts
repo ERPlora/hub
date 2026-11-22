@@ -1,6 +1,6 @@
 // Sales & POS → Sales (SALE-F28–F31; the old `erp-sales-list`): the title «Sales», the period (Today to
 // begin with, 7 days, 30 days, All) counted from the hub's business day, the six figures of the period
-// (only for whoever may see the reports), and the live `sale.sale.list` in a server-side DataTable —
+// (the whole business's or one's own sales'), and the live `sale.sale.list` in a server-side DataTable —
 // Date, Number, Customer, Payment, Status («<amount> left to refund» under a sale partly refunded),
 // Total —, search «Search number or customer…», the filters behind the table's funnel, table or cards, 50 a page. A row opens its
 // document; «Document» and «Reprint» for everyone, «Void» and «Refund» too, only where they apply (whoever
@@ -237,16 +237,16 @@ describe('SalesPage: the period (SALE-F28 step 1)', () => {
 });
 
 describe('SalesPage: the figures (SALE-F28 step 2)', () => {
-  it('whoever may see the reports gets the six figures of the period', async () => {
+  it('whoever reads the sales gets the six figures of the period', async () => {
     const s = await setup();
     expect(s.wrapper.findComponent(SalesKpis).props('bounds')).toEqual(TODAY);
     expect(s.paramsOf('sale.sale.stats')).toEqual([TODAY]);
   });
 
-  it('whoever may not sees the table without the figures (nothing asked)', async () => {
+  it('an employee too: the server counts the sales they see, theirs', async () => {
     const s = await setup({ session: EMPLOYEE });
-    expect(s.wrapper.findComponent(SalesKpis).exists()).toBe(false);
-    expect(s.paramsOf('sale.sale.stats')).toEqual([]);
+    expect(s.wrapper.findComponent(SalesKpis).props('bounds')).toEqual(TODAY);
+    expect(s.paramsOf('sale.sale.stats')).toEqual([TODAY]);
     expect(s.list()).toHaveLength(1);
   });
 });

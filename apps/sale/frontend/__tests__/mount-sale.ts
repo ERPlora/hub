@@ -37,7 +37,6 @@ export const SALE_PERMISSIONS = [
   'sale.refund_sale',
   'sale.view_paymentmethod',
   'sale.add_paymentmethod',
-  'sale.view_reports',
   'sale.manage_settings',
 ];
 const READS = ['inventory.view_product', 'inventory.view_category', 'customer.view', 'customer.manage', 'staff.view', 'tax.view'];

@@ -72,6 +72,17 @@ describe('CustomerStats', () => {
     ]);
   });
 
+  it('whoever does not see the business totals gets the three counts, without «Revenue»', async () => {
+    const s = await setup();
+    await s.result(s.call, 'base.business.get', business());
+    await s.result(s.call, 'customer.customer.stats', { ...STATS, total_revenue: null });
+    expect(s.wrapper.findAll('.customer-kpi').map((card) => card.attributes('data-testid'))).toEqual([
+      'customer-stats-total',
+      'customer-stats-active',
+      'customer-stats-vip',
+    ]);
+  });
+
   it('a new result replaces the figures (a write elsewhere re-ran the query)', async () => {
     const s = await setup();
     await s.result(s.call, 'customer.customer.stats', STATS);
