@@ -2,12 +2,7 @@
   "table": {
     "title": "Tables",
     "tabs": {
-      "label": "Tables sections",
-      "floor_plan": "Floor plan",
-      "zones": "Zones",
-      "tables": "Tables",
-      "sessions": "Sessions",
-      "settings": "Settings"
+      "label": "Tables sections"
     },
     "loading": "Loading…",
     "cancel": "Cancel",

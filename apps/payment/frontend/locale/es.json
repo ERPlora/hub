@@ -2,9 +2,7 @@
   "payment": {
     "title": "Pagos salientes",
     "tabs": {
-      "label": "Secciones de Pagos",
-      "payments": "Pagos",
-      "methods": "Métodos"
+      "label": "Secciones de Pagos"
     },
     "loading": "Cargando…",
     "noResults": "Sin resultados",

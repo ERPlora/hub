@@ -21,7 +21,9 @@ import { useLiveList } from '../composables/useLiveList';
 import { useServerTable } from '../composables/useServerTable';
 import { useT } from '../composables/useT';
 import type { ProjectListIn, ProjectOut, ProjectSort } from '../operations';
-import { taskTabs } from '../tabs';
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
+
+const tabs = useAppTabs('task');
 
 const session = useSession();
 const t = useT();
@@ -99,7 +101,7 @@ const swatch = (row: unknown) => (row as ProjectOut).color;
   <AppPage
     :title="$t('task.title')"
     content-layout="fill"
-    :tabs="taskTabs($t)"
+    :tabs="tabs"
     :tabs-label="$t('task.tabs.label')"
   >
     <PageNotices

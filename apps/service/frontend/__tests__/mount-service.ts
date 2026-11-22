@@ -3,6 +3,7 @@
 import type { SessionMe } from '@erplora/ui/shell';
 import type { Component } from 'vue';
 
+import { withMenu } from '../../../../base/frontend/__tests__/app-menu';
 import { type BusinessMountOptions, mountInShell, overBase } from '../../../../base/frontend/__tests__/mount-in-shell';
 import { business as baseBusiness } from '../../../../base/frontend/__tests__/business';
 import type { Business } from '../../../../base/frontend/operations/business';
@@ -18,7 +19,7 @@ export function business(fields: Partial<Business> = {}): Business {
 export { IN_YEN as JAPANESE, POLISH } from '../../../../base/frontend/__tests__/business';
 
 /** Owner or admin: `service.*` (apps.py `role_permissions`), listed one by one; they read customers and staff. */
-export const OWNER: SessionMe = {
+export const OWNER: SessionMe = withMenu('service', {
   user: { id: '1', label: 'Ana' },
   permissions: [
     'service.view_service',
@@ -46,18 +47,18 @@ export const OWNER: SessionMe = {
   menu: [],
   apps: [],
   language: 'en',
-};
+});
 
 const ADMIN_ONLY = ['service.delete_service', 'service.delete_category', 'service.delete_package', 'service.manage_settings'];
 
 /** A manager: everything but archiving, deleting and the settings. */
-export const MANAGER: SessionMe = {
+export const MANAGER: SessionMe = withMenu('service', {
   ...OWNER,
   permissions: OWNER.permissions.filter((p) => !ADMIN_ONLY.includes(p)),
-};
+});
 
 /** An employee views, creates services, grants vouchers and spends sessions. */
-export const EMPLOYEE: SessionMe = {
+export const EMPLOYEE: SessionMe = withMenu('service', {
   ...OWNER,
   user: { id: '2', label: 'Bea' },
   permissions: [
@@ -71,7 +72,7 @@ export const EMPLOYEE: SessionMe = {
     'customer.view',
     'staff.view',
   ],
-};
+});
 
 export type MountOptions = BusinessMountOptions;
 

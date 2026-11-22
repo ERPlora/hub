@@ -20,6 +20,7 @@ import {
   EMPLOYEE,
   errorFrame,
   flush,
+  itPaintsTheTabsItsSessionOpens,
   JAPANESE,
   MANAGER,
   type MountOptions,
@@ -27,6 +28,7 @@ import {
   page,
   POLISH,
   settle,
+  tabsOf,
 } from '../__tests__/mount-staff';
 import MemberFormModal from '../components/MemberFormModal.vue';
 import MyRecordModal from '../components/MyRecordModal.vue';
@@ -319,7 +321,7 @@ describe('MembersPage: who may do what', () => {
       ['deactivate', 'ban-outline'],
       ['terminate', 'person-remove-outline'],
     ]);
-    expect((s.wrapper.findComponent(AppPage).props('tabs') ?? []).map((t: { id: string }) => t.id)).toEqual(['staff', 'roles', 'time_off', 'schedules', 'commissions', 'settings']);
+    expect(tabsOf(s.wrapper).map(([id]) => id)).toEqual(['members', 'roles', 'time-off', 'schedules', 'commissions', 'settings']);
   });
 
   it('each row action tells a screen reader which person it is for, its short words first', async () => {
@@ -337,11 +339,11 @@ describe('MembersPage: who may do what', () => {
     expect(s.prop<Array<{ id: string }>>('actions').map((a) => a.id)).toEqual(['edit']);
   });
 
-  it('an employee only reads: no «+», no row to open, no action, no Commissions or Settings tab', async () => {
+  it('an employee only reads: no «+», no row to open, no action, no Roles, Commissions or Settings tab', async () => {
     const s = await setup({ session: EMPLOYEE });
     await s.show(page(ROWS));
     expect([s.prop('addable'), s.prop('rowClickable'), s.prop('actions')]).toEqual([false, false, []]);
-    expect((s.wrapper.findComponent(AppPage).props('tabs') ?? []).map((t: { id: string }) => t.id)).toEqual(['staff', 'roles', 'time_off', 'schedules']);
+    expect(tabsOf(s.wrapper).map(([id]) => id)).toEqual(['members', 'time-off', 'schedules']);
   });
 });
 
@@ -456,4 +458,11 @@ describe('MembersPage: the list fills the page', () => {
     const s = await setup();
     expect(listFillProblems(s.wrapper)).toEqual([]);
   });
+});
+
+describe('MembersPage: its tab bar', () => {
+  itPaintsTheTabsItsSessionOpens(
+    () => setup({ session: EMPLOYEE }),
+    [['members', 'Staff'], ['time-off', 'Time Off'], ['schedules', 'Schedules']],
+  );
 });

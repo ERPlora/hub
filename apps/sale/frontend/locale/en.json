@@ -2,12 +2,7 @@
   "sale": {
     "title": "Sales & POS",
     "tabs": {
-      "label": "Sales & POS sections",
-      "pos": "Sell",
-      "sales": "Sales",
-      "quickNotes": "Quick notes",
-      "departments": "Sections",
-      "settings": "Settings"
+      "label": "Sales & POS sections"
     },
     "live": {
       "retry": "Retry",

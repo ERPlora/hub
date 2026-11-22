@@ -15,7 +15,9 @@ import PageNotices from '../components/PageNotices.vue';
 import { useT } from '../composables/useT';
 import { Chime, CHIME_TONES } from '../lib/chime';
 import type { OrderType, SettingsOut, SoundTone } from '../operations';
-import { kitchenTabs } from '../tabs';
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
+
+const tabs = useAppTabs('kitchen');
 
 const TOGGLES = ['show_timer', 'color_coding', 'sound_enabled', 'print_pass', 'works_from_screen'] as const;
 const NUMBERS = ['warning_minutes', 'critical_minutes', 'sound_volume'] as const;
@@ -75,7 +77,7 @@ function testSound(): void {
 <template>
   <AppPage
     :title="$t('kitchen.title')"
-    :tabs="kitchenTabs($t, { settings: canSave })"
+    :tabs="tabs"
     :tabs-label="$t('kitchen.tabs.label')"
     content-layout="detail"
   >

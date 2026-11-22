@@ -34,7 +34,9 @@ import { formatMessageTime } from '../lib/format';
 import { nearCap, noAllowance } from '../lib/plan';
 import { kindLabel } from '../lib/thread';
 import type { ConversationListIn, ConversationOut, ConversationStatus } from '../operations';
-import { inboxTabs } from '../tabs';
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
+
+const tabs = useAppTabs('whatsapp_inbox');
 
 const STATUSES: readonly ConversationStatus[] = ['open', 'pending', 'closed'];
 
@@ -169,7 +171,7 @@ const columns = computed<DataTableColumn<ConversationOut>[]>(() => [
   <AppPage
     :title="$t('whatsapp_inbox.title')"
     content-layout="fill"
-    :tabs="inboxTabs($t)"
+    :tabs="tabs"
     :tabs-label="$t('whatsapp_inbox.tabs.label')"
   >
     <div class="wa-inbox">

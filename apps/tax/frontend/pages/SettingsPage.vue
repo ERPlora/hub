@@ -14,7 +14,9 @@ import { computed, ref, watch } from 'vue';
 
 import { useLocale, useT } from '../composables/useT';
 import { countryLabel, countryName } from '../lib/countries';
-import { taxTabs } from '../tabs';
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
+
+const tabs = useAppTabs('tax');
 
 /** The i18n key of each region with taxes of its own; a code without one reads as itself. */
 const REGION_KEYS: Readonly<Record<string, string>> = Object.freeze({
@@ -80,7 +82,7 @@ async function save(): Promise<void> {
 <template>
   <AppPage
     :title="$t('tax.title')"
-    :tabs="taxTabs($t)"
+    :tabs="tabs"
     :tabs-label="$t('tax.tabs.label')"
     content-layout="detail"
   >

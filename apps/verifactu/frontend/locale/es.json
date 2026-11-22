@@ -8,13 +8,7 @@
     "yes": "Sí",
     "no": "No",
     "tabs": {
-      "label": "Secciones de VeriFactu",
-      "records": "Registros",
-      "contingency": "Contingencia",
-      "events": "Eventos",
-      "recovery": "Recuperación",
-      "config": "Configuración",
-      "settings": "Ajustes"
+      "label": "Secciones de VeriFactu"
     },
     "live": {
       "reconnecting": "Reconectando…",

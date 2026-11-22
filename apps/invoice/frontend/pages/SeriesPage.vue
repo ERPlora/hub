@@ -15,7 +15,9 @@ import SeriesFormModal from '../components/SeriesFormModal.vue';
 import { useServerTable } from '../composables/useServerTable';
 import { useT } from '../composables/useT';
 import type { SeriesOut } from '../operations';
-import { invoiceTabs } from '../tabs';
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
+
+const tabs = useAppTabs('invoice');
 
 const session = useSession();
 const canManage = computed(() => session.can('invoice.manage_series'));
@@ -70,7 +72,7 @@ function onAction({ actionId, row }: { actionId: string; row: SeriesOut }): void
   <AppPage
     :title="$t('invoice.title')"
     content-layout="fill"
-    :tabs="invoiceTabs($t)"
+    :tabs="tabs"
     :tabs-label="$t('invoice.tabs.label')"
   >
     <PageNotices

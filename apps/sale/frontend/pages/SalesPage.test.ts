@@ -126,7 +126,7 @@ describe('SalesPage: the screen', () => {
     const page = s.wrapper.findComponent(AppPage);
     expect(page.props('title')).toBe('Sales & POS');
     expect(page.props('tabsLabel')).toBe('Sales & POS sections');
-    expect((page.props('tabs') as Array<{ id: string }>).map((tab) => tab.id)).toEqual(['pos', 'sales', 'quick_notes', 'departments', 'settings']);
+    expect((page.props('tabs') as Array<{ id: string }>).map((tab) => tab.id)).toEqual(['pos', 'sales', 'quick-notes', 'departments', 'settings']);
     expect(s.find('sales-title').text()).toBe('Sales');
   });
 

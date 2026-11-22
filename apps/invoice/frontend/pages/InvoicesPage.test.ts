@@ -15,9 +15,10 @@ import {
   EMPLOYEE,
   errorFrame,
   flush,
+  itPaintsTheTabsItsSessionOpens,
   MANAGER,
-  type MountOptions,
   mountInvoice,
+  type MountOptions,
   POLISH,
 } from '../__tests__/mount-invoice';
 import { expectAnAdministratorToSetUpTheIssuer, expectIssuerSaidNoMore, expectIssuerToSetUp } from '../__tests__/issuer-notice';
@@ -446,4 +447,8 @@ describe('InvoicesPage: «Total» is read as every amount of the Hub', () => {
       return { filter: s.filter, query: () => s.params().at(-1) as Record<string, unknown>, says: () => s.prop('filterErrors') };
     },
   });
+});
+
+describe('InvoicesPage: its tab bar', () => {
+  itPaintsTheTabsItsSessionOpens(() => setup({ session: MANAGER }), [['invoices', 'Invoices'], ['series', 'Series']]);
 });

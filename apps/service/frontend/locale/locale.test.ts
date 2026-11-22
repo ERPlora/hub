@@ -33,11 +33,8 @@ describe('service catalogues (en source + es)', () => {
     for (const kind of ['consumed', 'adjusted', 'corrected']) expect(EN.has(`service.movements.kind.${kind}`), kind).toBe(true);
   });
 
-  it('keep the old screens’ words: tabs, columns, searches, empty states, buttons', () => {
+  it('keep the old screens’ words: columns, searches, empty states, buttons', () => {
     expectWords(CATALOGUES, [
-      ['service.tabs.services', 'Services', 'Servicios'],
-      ['service.tabs.categories', 'Categories', 'Categorías'],
-      ['service.tabs.packages', 'Packages', 'Bonos y paquetes'],
       ['service.services.search', 'Search service…', 'Buscar servicio…'],
       ['service.services.empty', 'No services.', 'Sin servicios.'],
       ['service.services.new', 'New service', 'Nuevo servicio'],

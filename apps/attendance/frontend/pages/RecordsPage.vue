@@ -36,7 +36,9 @@ import { useLocale, useT } from '../composables/useT';
 import { saveCsv } from '../lib/download';
 import { formatDay, formatHm, liveSeconds, monthBounds, monthLabel, monthOf, recentMonths, timeOfDay } from '../lib/time';
 import type { RecordListIn, RecordOut, RecordStatus } from '../operations';
-import { attendanceTabs } from '../tabs';
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
+
+const tabs = useAppTabs('attendance');
 
 const STATUSES: readonly RecordStatus[] = ['open', 'closed', 'needs_review'];
 const TONE: Record<RecordStatus, StatusPillTone> = { open: 'info', closed: 'neutral', needs_review: 'warning' };
@@ -195,7 +197,7 @@ const cardTitle = (row: RecordOut): string => {
   <AppPage
     :title="$t('attendance.title')"
     content-layout="fill"
-    :tabs="attendanceTabs($t)"
+    :tabs="tabs"
     :tabs-label="$t('attendance.tabs.label')"
   >
     <PageNotices

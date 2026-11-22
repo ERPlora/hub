@@ -15,7 +15,9 @@ import { useLiveList } from '../composables/useLiveList';
 import { useServerTable } from '../composables/useServerTable';
 import { useT } from '../composables/useT';
 import type { CategoryOut } from '../operations';
-import { serviceTabs } from '../tabs';
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
+
+const tabs = useAppTabs('service');
 
 const session = useSession();
 const t = useT();
@@ -84,7 +86,7 @@ function onAction({ actionId, row }: { actionId: string; row: CategoryOut }): vo
   <AppPage
     :title="$t('service.title')"
     content-layout="fill"
-    :tabs="serviceTabs($t, { settings: session.can('service.manage_settings') })"
+    :tabs="tabs"
     :tabs-label="$t('service.tabs.label')"
   >
     <PageNotices

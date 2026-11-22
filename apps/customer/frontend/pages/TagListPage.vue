@@ -16,12 +16,14 @@ import { computed, ref, watch } from 'vue';
 
 import EntityDeleteDialog from '../components/EntityDeleteDialog.vue';
 import TagFormModal from '../components/TagFormModal.vue';
-import { customerTabs } from '../lib/tabs';
 import { useCustomerI18n } from '../lib/useCustomerI18n';
 import { type SortDir, useListState } from '../lib/useListState';
 import { useLiveList } from '../lib/useLiveList';
 import { isThemeColor } from '../lib/colors';
 import type { TagListIn, TagRow } from '../operations';
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
+
+const tabs = useAppTabs('customer');
 
 const session = useSession();
 // Whoever manages cards sees it too: without the permission, a manager approves it with their PIN (BASE-F84).
@@ -91,7 +93,7 @@ function onSort(next: { sort: string; dir: SortDir }): void {
   <AppPage
     :title="$t('customer.tags.title')"
     content-layout="fill"
-    :tabs="customerTabs($t)"
+    :tabs="tabs"
     :tabs-label="$t('customer.tabs.label')"
   >
     <InlineFeedback

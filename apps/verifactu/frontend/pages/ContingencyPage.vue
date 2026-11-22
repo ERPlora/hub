@@ -17,7 +17,9 @@ import { useLocale, useT } from '../composables/useT';
 import { statusTone } from '../lib/record';
 import { refusal } from '../lib/refusal';
 import type { QueueRowOut } from '../operations';
-import { verifactuTabs } from '../tabs';
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
+
+const tabs = useAppTabs('verifactu');
 
 const router = useRouter();
 const session = useSession();
@@ -90,7 +92,7 @@ async function onAction({ actionId, row }: { actionId: string; row: QueueRowOut 
   <AppPage
     :title="$t('verifactu.contingency.title')"
     content-layout="fill"
-    :tabs="verifactuTabs($t)"
+    :tabs="tabs"
     :tabs-label="$t('verifactu.tabs.label')"
   >
     <PageNotices

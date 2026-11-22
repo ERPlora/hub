@@ -34,7 +34,9 @@ import { formatShortDate, formatTime, todayIn, weekdayOf } from '../lib/clock';
 import { spansLine } from '../lib/states';
 import { WEEKDAYS, weekdayKey } from '../lib/weekdays';
 import type { BlockedDateOut, SlotLoadOut, TimeSlotOut } from '../operations';
-import { reservationTabs } from '../tabs';
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
+
+const tabs = useAppTabs('reservation');
 
 const FALLBACK_ZONE = 'Europe/Madrid';
 
@@ -240,7 +242,7 @@ const isBlocked = computed(() => blockingError(noticeError.value));
 <template>
   <AppPage
     :title="$t('reservation.title')"
-    :tabs="reservationTabs($t, { settings: session.can('reservation.manage_settings') })"
+    :tabs="tabs"
     :tabs-label="$t('reservation.tabs.label')"
   >
     <PageNotices
