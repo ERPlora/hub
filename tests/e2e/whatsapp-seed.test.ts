@@ -1,9 +1,15 @@
+// @vitest-environment node
 // What the WhatsApp e2e ask erplora.com's own test seed (whatsapp_hub_seed.py) and what it leaves in `a`: the month's
-// usage it is told (`--used`) and the templates it keeps as Meta lists them.
+// usage it is told (`--used`) and the templates it keeps as Meta lists them; and the script that sets `a`'s plan,
+// checked against the SaaS beside the Hub.
 // flow: WHATSAPP_INBOX-F13, WHATSAPP_INBOX-F27, WHATSAPP_INBOX-F28
 import { describe, expect, it } from 'vitest';
 
-import { SEED_TEMPLATES, seedArguments } from './whatsapp-seed';
+import { NO_CLOCK } from '../../vitest.load';
+import { checkInSaas, saasCheckout } from './saas-names';
+import { SEED_TEMPLATES, SET_PLAN, seedArguments } from './whatsapp-seed';
+
+const SAAS = saasCheckout(process.env);
 
 describe('seedArguments', () => {
   it('asks nothing more without a usage: the seed leaves the month at 0', () => {
@@ -31,4 +37,12 @@ describe('SEED_TEMPLATES', () => {
     expect(Object.keys(SEED_TEMPLATES).sort()).toEqual(['approved', 'inReview', 'manager', 'rejected']);
     expect(new Set(Object.values(SEED_TEMPLATES)).size).toBe(4);
   });
+});
+
+describe.skipIf(!SAAS)('SET_PLAN in the SaaS beside the Hub', () => {
+  it('takes from the SaaS only names it has, called with arguments it accepts', async () => {
+    const checked = await checkInSaas(SET_PLAN, SAAS ?? '');
+    expect(checked.status, checked.problems).toBe(0);
+    expect(checked.names).toEqual(expect.arrayContaining(['Hub', 'effective_plan', 'bump_state', 'sync_hub']));
+  }, NO_CLOCK);
 });
