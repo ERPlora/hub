@@ -7,7 +7,7 @@
 //     the form fits as a sheet.
 import { expect, test } from '@playwright/test';
 
-import { A, api, EMPLOYEE, hostPage, shot, shown } from './helpers';
+import { A, api, capture, EMPLOYEE, hostPage, shot, shown } from './helpers';
 import { cleanInventory, createProduct, dialog, productRow, productsReady, searchProducts, stamp } from './inventory-helpers';
 import { offersRowAction } from './service-helpers';
 
@@ -91,7 +91,7 @@ test('what a product costs is the owner\'s: the employee\'s dashboard has no sto
     await expect(shown(owner.page).locator('[data-testid=inventory-dashboard-kpi-value]')).toBeVisible();
     await expect(shown(employee.page).locator('[data-testid=inventory-dashboard-kpi-tracked]')).toBeVisible();
     await expect(shown(employee.page).locator('[data-testid=inventory-dashboard-kpi-value]')).toHaveCount(0);
-    await employee.page.screenshot({ path: shot('inventory-dashboard-employee') });
+    await capture(employee.page, 'inventory-dashboard-employee');
     const path = `/inventory/products/detail?id=${product.id}`;
     const [theirs, mine] = await Promise.all([owner.context, employee.context].map((context) => api<{ cost: number | null }>(context, A, 'GET', path)));
     expect([theirs.data.cost, mine.data.cost]).toEqual([400, null]);
