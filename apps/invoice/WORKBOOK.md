@@ -99,8 +99,9 @@ Configuración inicial, paso a paso:
 Todas las facturas del negocio: los tiques de cada cobro, las facturas completas y las rectificativas, lo último
 emitido arriba. Búscalas por número, cliente o NIF, fíltralas por estado, tipo, serie, fecha o total, y ábrelas para
 verlas, imprimirlas o guardarlas en PDF. Desde cada una la marcas pagada, la rectificas o pasas un tique a factura
-completa; con **+** emites una factura a mano. Un empleado ve solo las suyas: las que emitió y las de sus ventas
-(las que cobró y las que se le atribuyeron); el responsable, el propietario y el administrador ven las de todos.
+completa; con **+** emites una factura a mano. Un empleado ve solo las suyas: las que emitió, las de sus ventas
+(las que cobró y las que se le atribuyeron) y lo que rectifica o sustituye a una de ellas; el responsable, el
+propietario y el administrador ven las de todos.
 
 #### Detalle
 Menú **Facturación → Facturas**. Tabla paginada de 50 en 50 (vista de tabla o de tarjetas; en el móvil,
@@ -664,8 +665,10 @@ Pasos:
 2. Escribe en «Buscar facturas…» un número, un nombre de cliente o un NIF; o filtra (estado, tipo,
    serie, origen, fecha, total); o pulsa una columna para ordenar.
 3. La tabla enseña las que casan, de 50 en 50; lo último emitido, arriba. Un empleado solo ve las suyas:
-   las que emitió él y las de sus ventas (las que cobró y las que se atribuyeron a su ficha de Personal),
-   también sus rectificativas. El responsable, el propietario y el administrador ven las de todos.
+   las que emitió él y las de sus ventas (las que cobró y las que se atribuyeron a su ficha de Personal), y
+   lo que sigue a una de ellas: la factura completa que sustituyó a un tique suyo y la rectificativa de
+   cualquiera de ellas, aunque la emita el responsable. El responsable, el propietario y el administrador ven
+   las de todos.
 4. Pulsa «Ver», o la fila, para abrirla.
 Entra: las facturas del hub que la persona ve.
 Sale: nada; solo se lee.
@@ -696,8 +699,8 @@ contesta.
 Si falla: «Factura no encontrada» o el motivo del fallo. Sin VeriFactu, sin registro todavía o sin permiso
 para verlo, la ficha sale sin la tarjeta del justificante. En la app instalada, si no puede abrir la página de la
 AEAT, «No se ha podido abrir esa página. Inténtalo de nuevo.». Una factura que la persona no ve (la de otro,
-para un empleado) no se abre, tampoco por su número ni por un enlace de una suya: «Factura no encontrada», como
-una que no existe.
+para un empleado) no se abre, tampoco por su número: «Factura no encontrada», como una que no existe. Lo que
+rectifica o sustituye a una suya es suyo, así que sus enlaces se abren.
 Implicados: VERIFACTU-F19
 
 ### INVOICE-F18 Imprimir o guardar en PDF una factura
@@ -828,7 +831,8 @@ cliente por su nombre, su teléfono o su correo (como en Clientes) y una serie p
 
 Lo que lee o toca una factura ya emitida (la lista, la factura, su documento y su papel, pasarla a completa,
 marcarla pagada y rectificarla) y la factura de una venta solo alcanzan las que la persona ve: sin «Ver todas
-las facturas», las que emitió y las de sus ventas. Una que no ve no existe para ella (404 `invoice.not_found`;
+las facturas», las que emitió, las de sus ventas y lo que rectifica o sustituye a una de ellas. Una que no ve no
+existe para ella (404 `invoice.not_found`;
 la venta de otro, 404 `sale.sale_not_found`). Una llave de API o una automatización, que no son una persona,
 alcanzan todas las que abre su permiso. La numeración (sus huecos y el libro de números) es la de la serie
 entera.
@@ -953,7 +957,7 @@ lo reintenta a los 2, 4, 8… segundos hasta 8 veces; pasado eso, sale con «Emi
 | Permiso | Propietario | Administrador | Responsable | Empleado | Servicio |
 |---|---|---|---|---|---|
 | Ver facturas, series, numeración y emisor; imprimir | sí | sí | sí | sí | `invoice.view_invoice` |
-| Ver las facturas de todos (sin él, solo las suyas: las que emitió y las de sus ventas) | sí | sí | sí | no | `invoice.view_all_invoices` |
+| Ver las facturas de todos (sin él, solo las suyas: las que emitió, las de sus ventas y lo que las rectifica o sustituye) | sí | sí | sí | no | `invoice.view_all_invoices` |
 | Emitir a mano, facturar una venta, sustituir un tique, marcar pagada | sí | sí | sí | sí | `invoice.add_invoice` |
 | Rectificar (a mano, por devolución y por anulación) | sí | sí | sí | no | `invoice.rectify_invoice` |
 | Crear y cambiar series | sí | sí | sí | no | `invoice.manage_series` |
@@ -1358,9 +1362,11 @@ se publican en esa pestaña. Lo que esas partes dejaron de decir, y quien mantie
 
 23. **Cada empleado ve sus facturas; el responsable, las de todos** (Odoo «Facturación: solo mis documentos»,
     Square y Toast «ver las ventas propias / ver todas», como Ventas): las suyas son las que emitió y las de sus
-    ventas, también el tique, la F3 y las rectificativas de una devolución o una anulación de una venta suya. Una
-    que no ve es el mismo 404 que una que no existe, también al pasarla a completa, marcarla pagada o
-    rectificarla. La numeración no se filtra: un hueco o el libro de números son de la serie entera y solo dan
+    ventas (el tique, la F3 y las rectificativas de una devolución o una anulación de una venta suya), y un
+    documento sigue a su original: la F3 que sustituye a un tique suyo y la rectificativa de una factura suya
+    también son suyas, las emita quien las emita, como en Odoo, donde la rectificativa hereda el comercial de la
+    original. Una que no ve es el mismo 404 que una que no existe, también al pasarla a completa, marcarla pagada
+    o rectificarla. La numeración no se filtra: un hueco o el libro de números son de la serie entera y solo dan
     números, no clientes ni importes.
 
 ### Lo que NO hace, a propósito

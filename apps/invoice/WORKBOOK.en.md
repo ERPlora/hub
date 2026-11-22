@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:fdfa9350c691f6438e42dff84e8299f5389f94292644a13d568e425b76fd526c -->
+<!-- generated from WORKBOOK.md sha256:753aad779e8e76bf7a3549eb69ec2c2ed42dfc2b4e5c70b1150f9e6924d9e722 -->
 
 ## What it is for and who it is for
 
@@ -94,9 +94,9 @@ Initial setup, step by step:
 All the business's invoices: the tickets of every charge, the full invoices and the rectifying ones, the latest
 issued on top. Search them by number, customer or tax ID, filter them by status, type, series, date or total, and
 open them to view, print or save them as a PDF. From each one you mark it paid, rectify it or turn a ticket into a
-full invoice; **+** issues an invoice by hand. An employee sees only theirs: the ones they issued and the ones of
-their sales (the ones they charged and the ones attributed to them); the manager, the owner and the administrator see
-everyone's.
+full invoice; **+** issues an invoice by hand. An employee sees only theirs: the ones they issued, the ones of their
+sales (the ones they charged and the ones attributed to them) and what rectifies or replaces one of them; the manager,
+the owner and the administrator see everyone's.
 
 #### Detail
 Menu **Invoicing → Invoices**. Table paginated 50 at a time (table or card view; on the phone, cards
@@ -666,7 +666,9 @@ Steps:
    source, date, total); or tap a column to sort.
 3. The table shows the matching ones, 50 at a time; the latest issued, on top. An employee only sees theirs:
    the ones they issued and the ones of their sales (the ones they charged and the ones attributed to their
-   Staff record), their rectifying ones too. The manager, the owner and the administrator see everyone's.
+   Staff record), and what follows one of them: the full invoice that replaced a ticket of theirs and the
+   rectifying invoice of any of them, even when the manager issues it. The manager, the owner and the
+   administrator see everyone's.
 4. Tap "View", or the row, to open it.
 In: the hub's invoices the person sees.
 Out: nothing; it only reads.
@@ -697,8 +699,8 @@ answers.
 If it fails: "Invoice not found" or the reason of the failure. Without VeriFactu, without a record yet or
 without permission to see it, the detail shows without the receipt card. In the installed app, if it cannot open the
 AEAT's page, "Could not open that page. Try again.". An invoice the person does not see (someone else's, for an
-employee) does not open, neither by its number nor by a link of one of theirs: "Invoice not found", as one that
-does not exist.
+employee) does not open, not even by its number: "Invoice not found", as one that does not exist. What rectifies
+or replaces one of theirs is theirs, so its links open.
 Involved: VERIFACTU-F19
 
 ### INVOICE-F18 Print or save an invoice as PDF
@@ -827,7 +829,8 @@ name, their phone or their email (as in Customers) and a series by its code.
 
 What reads or touches an issued invoice (the list, the invoice, its document and its paper, turning it into a full
 invoice, marking it paid and rectifying it) and the invoice of a sale only reach the ones the person sees: without
-"See all invoices", the ones they issued and the ones of their sales. One they do not see does not exist for them
+"See all invoices", the ones they issued, the ones of their sales and what rectifies or replaces one of them. One
+they do not see does not exist for them
 (404 `invoice.not_found`; someone else's sale, 404 `sale.sale_not_found`). An API key or an automation, which are
 not a person, reach all the ones their permission opens. The numbering (its gaps and the book of numbers) is the
 whole series'.
@@ -954,7 +957,7 @@ notice delivery hands it these notices afterwards and, if that one stayed "pendi
 | Permission | Owner | Administrator | Manager | Employee | Service |
 |---|---|---|---|---|---|
 | View invoices, series, numbering and issuer; print | yes | yes | yes | yes | `invoice.view_invoice` |
-| View everyone's invoices (without it, only theirs: the ones they issued and the ones of their sales) | yes | yes | yes | no | `invoice.view_all_invoices` |
+| View everyone's invoices (without it, only theirs: the ones they issued, the ones of their sales and what rectifies or replaces them) | yes | yes | yes | no | `invoice.view_all_invoices` |
 | Issue by hand, invoice a sale, replace a ticket, mark as paid | yes | yes | yes | yes | `invoice.add_invoice` |
 | Rectify (by hand, by refund and by void) | yes | yes | yes | no | `invoice.rectify_invoice` |
 | Create and change series | yes | yes | yes | no | `invoice.manage_series` |
