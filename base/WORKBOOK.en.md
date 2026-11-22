@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:4d2a53c538695cb0b0cc36018b340859ac9f7229421d28a92037afe338226093 -->
+<!-- generated from WORKBOOK.md sha256:f3626336ac595f95cd67042c93c5b9b00f330e957e2dd2ca8c1d03763dc24a5b -->
 
 ## What it is for and who it is for
 
@@ -554,9 +554,9 @@ Steps:
   1. In "My apps", one tile per app this person can open, with its icon and its name (if it does not
      fit, the whole name shows on hover). An app shows if their role lets them open at least one of its screens. An
      employee has the ones of their daily work: Sales & POS, Cash register, Tables, Kitchen, Reservations, Online
-     booking, Appointments, Customers, Inventory, Invoicing, Services, Staff, Time clock, Tasks, Cart & Checkout and
-     the WhatsApp inbox, and Automations to answer what an automation asks them. The ones that set up the business
-     (Taxes, Price Lists, Modifiers, Menus and combos, Payments, Schedules, VeriFactu, Printing and Website) belong to
+     booking, Appointments, Customers, Inventory, Invoicing, VeriFactu, Services, Staff, Time clock, Tasks, Cart &
+     Checkout and the WhatsApp inbox, and Automations to answer what an automation asks them. The ones that set up the
+     business (Taxes, Price Lists, Modifiers, Menus and combos, Payments, Schedules, Printing and Website) belong to
      whoever manages them: the employee does not have them, even though the till and the assistant keep using what
      they read from them.
   2. The ones opened most in this browser go first.

@@ -20,8 +20,10 @@ __all__ = ["in_business_a"]
 pytestmark = HUB_DB
 
 #: The apps that set the business up: whoever manages them opens them, never an employee.
-SETUP_APPS = {"tax", "pricing", "modifier", "combo", "payment", "schedule", "verifactu", "printing", "website"}
-FLOOR_APPS = {"sale", "cash_register", "table", "kitchen", "reservation", "appointment", "customer", "attendance"}
+SETUP_APPS = {"tax", "pricing", "modifier", "combo", "payment", "schedule", "printing", "website"}
+FLOOR_APPS = {
+    "sale", "cash_register", "table", "kitchen", "reservation", "appointment", "customer", "attendance", "verifactu"
+}
 
 
 def menu_of(user, role: str) -> dict[str, list[str]]:
@@ -55,6 +57,9 @@ def test_an_employee_s_menu_has_only_the_screens_of_its_work(make_user):
     assert menu["whatsapp_inbox"] == ["/whatsapp_inbox/inbox"]
     assert menu["task"] == ["/task/tasks", "/task/projects"]
     assert menu["cart_checkout"] == ["/cart_checkout/carts", "/cart_checkout/orders"]
+    assert menu["verifactu"] == [
+        "/verifactu/records", "/verifactu/contingency", "/verifactu/events", "/verifactu/recovery"
+    ]
 
 
 def test_the_apps_an_employee_does_not_open_stay_on_for_the_screens_that_read_them(make_user):
@@ -84,7 +89,7 @@ def test_the_owner_and_the_admin_open_every_screen_of_every_app(make_user):
 def test_the_screens_an_employee_may_not_open_are_locked_under_their_app(make_user):
     locked = session_me(make_user(), "hub_employee")["locked"]
     assert locked["tax"] == ["/tax/categories", "/tax/rules", "/tax/aliases", "/tax/settings"]
-    assert locked["verifactu"] == [nav.path for nav in _navigation_of("verifactu")]
+    assert locked["verifactu"] == ["/verifactu/config", "/verifactu/settings"]
     assert "/sale/pos" not in locked.get("sale", [])
 
 
@@ -101,7 +106,3 @@ def test_every_screen_of_an_app_is_either_open_in_the_menu_or_locked(make_user):
 def test_nothing_is_locked_to_the_owner_or_the_admin(make_user):
     assert session_me(make_user("olga"), "hub_owner")["locked"] == {}
     assert session_me(make_user("adrian"), "hub_admin")["locked"] == {}
-
-
-def _navigation_of(label: str) -> list:
-    return next(config.navigation for config in module_configs() if config.label == label)

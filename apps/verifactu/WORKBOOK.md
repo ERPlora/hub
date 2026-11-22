@@ -28,9 +28,11 @@ encendida: sus facturas y tiques salen sin registro ni QR de VeriFactu, como con
 
 Quién la usa:
 
-- El **empleado** no abre sus pantallas (por su dirección, «Sin acceso» (BASE-F118)); sus ventas llegan igual a la AEAT.
-- El **responsable**, además, envía un registro concreto, procesa y reintenta la cola, consulta lo que
-  tiene la AEAT y prueba la conexión.
+- El **empleado** y el **responsable** ven todo lo que el negocio envía a la AEAT, no solo lo de sus ventas: los
+  registros, la cola, los eventos y la cadena. Vuelven a enviar lo que no ha salido: envían un registro concreto,
+  procesan y reintentan la cola, preguntan a la AEAT si ya tiene un registro y consultan lo que tiene; desde el
+  asistente, prueban también la conexión. No cambian nada: ni subsanan ni anulan registros, y Configuración y
+  Ajustes, que son de quien configura VeriFactu, no se les abren (por su dirección, «Sin acceso» (BASE-F118)).
 - El **propietario** y el **administrador**, además, suben o quitan el certificado del negocio, pasan a
   producción o vuelven a pruebas, subsanan o anulan un registro, recuperan la cadena y crean la factura de
   prueba.
@@ -573,7 +575,7 @@ Implicados: VERIFACTU-F08
 
 ### VERIFACTU-F10 Probar la conexión con la AEAT
 Estado: hecho — con la sonda de la pasarela del SaaS (`/internal/verifactu/probe`)
-Actor: responsable, administrador
+Actor: administrador; el empleado y el responsable, desde el asistente
 Pantalla: Ajustes
 Pasos:
 1. En **Ajustes**, «Prueba en vivo», pulsa «Probar la conexión» (los botones esperan mientras prueba).
@@ -607,7 +609,7 @@ Implicados: INVOICE-F03
 
 ### VERIFACTU-F12 Consultar la declaración responsable
 Estado: hecho
-Actor: empleado, responsable, administrador
+Actor: administrador; el empleado y el responsable, desde el asistente
 Pantalla: Ajustes
 Pasos:
 1. En **Ajustes**, tarjeta «Declaración responsable», «Leer la declaración firmada» abre la
@@ -787,7 +789,7 @@ Implicados: VERIFACTU-F15
 
 ### VERIFACTU-F21 Procesar la cola a mano
 Estado: hecho
-Actor: responsable, administrador
+Actor: empleado, responsable, administrador
 Pantalla: Contingencia
 Pasos:
 1. En **Contingencia**, pulsa «Procesar cola» («Procesando…»).
@@ -801,7 +803,7 @@ Implicados: VERIFACTU-F20
 
 ### VERIFACTU-F22 Reintentar una entrada de la cola
 Estado: hecho
-Actor: responsable, administrador
+Actor: empleado, responsable, administrador
 Pantalla: Contingencia
 Pasos:
 1. En **Contingencia**, pulsa «Reintentar» en la fila.
@@ -840,7 +842,7 @@ Implicados: INVOICE-F08
 
 ### VERIFACTU-F25 Reenviar un registro concreto
 Estado: hecho — por la pasarela del SaaS
-Actor: responsable, administrador, asistente
+Actor: empleado, responsable, administrador, asistente
 Pantalla: Ficha de registro
 Pasos:
 1. En la ficha de un registro pendiente o enviado sin respuesta, pulsa «Enviar ahora».
@@ -874,7 +876,7 @@ Implicados: VERIFACTU-F28
 
 ### VERIFACTU-F27 Consultar lo que tiene la AEAT
 Estado: hecho — por la pasarela del SaaS (`/internal/verifactu/query`)
-Actor: responsable, administrador
+Actor: empleado, responsable, administrador
 Pantalla: Recuperación
 Pasos:
 1. En **Recuperación**, pulsa «Consultar AEAT» («Trabajando…»).
@@ -1006,7 +1008,7 @@ Implicados: VERIFACTU-F02
 
 ### VERIFACTU-F35 Preguntar a la AEAT si ya tiene un registro de la cola
 Estado: hecho — en la ficha del registro, en el admin de Django del Hub (soporte) y por la API
-Actor: responsable, administrador (enviar); el staff de ERPlora desde el admin
+Actor: empleado, responsable, administrador (enviar); el staff de ERPlora desde el admin
 Pantalla: Ficha de registro («Preguntar a la AEAT»); para el staff, el admin de Django (Registros → «Consultar a la
 AEAT (sale de la cola si ya lo tiene)»)
 Pasos:
@@ -1137,7 +1139,7 @@ sellado no añade nada (`already`). En un negocio de fuera de España no reaccio
 |---|---|---|---|---|---|
 | Ver registros, cola, eventos, cadena y configuración; verificar la cadena | sí | sí | sí | sí | `verifactu.view_record` |
 | Registrar una factura emitida (lo pide Facturación con la sesión de quien emite) | sí | sí | sí | sí | `verifactu.add_record` |
-| Enviar, procesar y reintentar la cola, consultar a la AEAT, probar la conexión | sí | sí | sí | no | `verifactu.transmit_record` |
+| Enviar, procesar y reintentar la cola, consultar a la AEAT, probar la conexión | sí | sí | sí | sí | `verifactu.transmit_record` |
 | Subsanar y anular registros | sí | sí | no | no | `verifactu.correct_record` |
 | Subir y quitar el certificado propio, pasar a producción y volver, recuperar la cadena, factura de prueba | sí | sí | no | no | `verifactu.configure` |
 
@@ -1200,7 +1202,8 @@ WhatsApp) o «waiting» (la de «waiter»). Hasta ERPlora/live#71 el asistente l
 «producción» como un producto y «comprueba» como una compra; ya las lee como lo que son.
 `tests/test_assistant_asks.py` mide con las frases reales de la QA de la capa 2
 (`tests/e2e/qa/probes/*-es-verifactu-*.json`), nunca con los propios asks, y con una frase propia por herramienta que
-solo la trae con sus asks; el empleado no recibe las escrituras que no puede hacer, y ningún test sale de la máquina
+solo la trae con sus asks; el empleado recibe las de enviar y nunca las de subsanar, anular o configurar (las sondas
+de esas salen rechazadas), y ningún test sale de la máquina
 (ni la AEAT de pruebas ni la de producción). Hasta ERPlora/live#76, la sonda de pasar a producción («activa el envío
 real… comprobando antes que la cuenta y la autorización estén listas») se ofrecía la 34.ª de 40: «la cuenta» (la de
 ERPlora) se leía como la cuenta de una mesa y pasaban delante las escrituras de Ventas que la toman. Lo que se nombra de

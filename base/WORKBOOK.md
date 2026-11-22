@@ -556,9 +556,9 @@ Pasos:
   1. En «Mis apps», una baldosa por app que esta persona puede abrir, con su icono y su nombre (si no
      cabe, el nombre entero sale al pasar por encima). Una app sale si su rol le deja abrir al menos una de sus
      pantallas. Un empleado tiene las de su trabajo diario: Ventas / TPV, Caja, Mesas, Cocina, Reservas, Reservas
-     online, Citas, Clientes, Inventario, Facturación, Servicios, Personal, Control horario, Tareas, Carrito y pago y
-     la Bandeja de WhatsApp, y Automatizaciones para contestar lo que le pregunta una automatización. Las que
-     configuran el negocio (Impuestos, Tarifas, Suplementos, Menús y combos, Pagos, Horarios, VeriFactu, Impresión y
+     online, Citas, Clientes, Inventario, Facturación, VeriFactu, Servicios, Personal, Control horario, Tareas,
+     Carrito y pago y la Bandeja de WhatsApp, y Automatizaciones para contestar lo que le pregunta una automatización.
+     Las que configuran el negocio (Impuestos, Tarifas, Suplementos, Menús y combos, Pagos, Horarios, Impresión y
      Página web) son de quien las gestiona: el empleado no las tiene, aunque el TPV y el asistente sigan usando lo que
      leen de ellas.
   2. Las más abiertas en este navegador van primero.

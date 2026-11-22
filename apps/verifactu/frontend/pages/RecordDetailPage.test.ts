@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { outOfTheApp } from '../../../../base/frontend/__tests__/app-download';
 import { expectTapOpensInTheSystemBrowser, insideTheInstalledApp } from '../__tests__/system-browser';
-import { click, EMPLOYEE, errorFrame, flush, type MountOptions, mountVerifactu } from '../__tests__/mount-verifactu';
+import { ACCOUNTANT, click, EMPLOYEE, errorFrame, flush, type MountOptions, mountVerifactu } from '../__tests__/mount-verifactu';
 import type { RecordOut } from '../operations';
 import RecordDetailPage from './RecordDetailPage.vue';
 
@@ -300,9 +300,15 @@ describe('RecordDetailPage', () => {
     expect(s.inDoc('verifactu-cancel')).not.toBeNull();
   });
 
-  it('the employee only looks', async () => {
+  it('the employee sends the record and asks the AEAT, but neither corrects nor cancels it', async () => {
     const s = await setup({ can_correct: true }, { session: EMPLOYEE });
-    for (const action of ['transmit', 'ask', 'correct', 'cancel']) expect(s.find(`verifactu-record-${action}`).exists()).toBe(false);
+    for (const action of ['transmit', 'ask']) expect(s.find(`verifactu-record-${action}`).exists(), action).toBe(true);
+    for (const action of ['correct', 'cancel']) expect(s.find(`verifactu-record-${action}`).exists(), action).toBe(false);
+  });
+
+  it('who may not send only looks', async () => {
+    const s = await setup({ can_correct: true }, { session: ACCOUNTANT });
+    for (const action of ['transmit', 'ask', 'correct', 'cancel']) expect(s.find(`verifactu-record-${action}`).exists(), action).toBe(false);
   });
 
   it('a record that does not exist says so, with Back', async () => {
