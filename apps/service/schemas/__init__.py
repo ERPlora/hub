@@ -15,14 +15,14 @@ from datetime import datetime, timedelta
 from typing import Annotated, Generic, Literal, TypeVar
 from uuid import UUID
 
-from django.utils.translation import gettext_lazy as _
-from django.utils.translation import gettext_noop, pgettext_lazy
+from django.utils.translation import gettext_lazy as _, gettext_noop, pgettext_lazy
 from ninja import Field, Schema
 from pydantic import ConfigDict, StringConstraints, field_validator, model_validator
 
 from base.images import MAX_UPLOAD_BASE64
 from base.recovery import ImageInCopyIn, RecoveredOut
 from base.schemas import assistant, catalog_images
+from base.sensitive import COSTS
 
 T = TypeVar("T")
 
@@ -359,7 +359,7 @@ class ServiceIn(In):
     max_price: Cents | None = Field(
         None, description="Highest price of a 'from' or 'variable' service, in cents (minor units of the business's currency)."
     )
-    cost: Cents = Field(0, description="Internal cost in cents (minor units of the business's currency).")
+    cost: Cents = Field(0, description="Internal cost in cents (minor units of the business's currency).", json_schema_extra=COSTS)
     duration_minutes: Minutes | None = Field(
         None, description="Duration in minutes; without it, the settings' default."
     )
@@ -419,7 +419,7 @@ class ServicePatchIn(ServiceRefIn):
     max_price: Cents | None = Field(
         None, description="New highest price in cents (minor units of the business's currency); null removes it."
     )
-    cost: Cents | None = Field(None, description="New cost in cents (minor units of the business's currency).")
+    cost: Cents | None = Field(None, description="New cost in cents (minor units of the business's currency).", json_schema_extra=COSTS)
     duration_minutes: Minutes | None = Field(
         None, description="New duration in minutes."
     )
@@ -471,7 +471,7 @@ class ServiceOut(Schema):
     price: int = Field(json_schema_extra={"money": True})
     min_price: int | None = Field(json_schema_extra={"money": True})
     max_price: int | None = Field(json_schema_extra={"money": True})
-    cost: int = Field(json_schema_extra={"money": True})
+    cost: int | None = Field(description="Internal cost in cents; null for whoever does not see the costs.", json_schema_extra={"money": True, **COSTS})
     duration_minutes: int
     buffer_before: int
     buffer_after: int

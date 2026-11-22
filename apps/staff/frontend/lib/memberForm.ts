@@ -112,8 +112,8 @@ export function formFromRecord(record: MemberDetailOut, pay: CompensationOut | n
   return {
     first_name: record.first_name,
     last_name: record.last_name,
-    email: record.email,
-    phone: record.phone,
+    email: record.email ?? '',
+    phone: record.phone ?? '',
     employee_number: record.employee_number,
     role_id: record.role_id ?? '',
     user_id: record.user_id ?? '',

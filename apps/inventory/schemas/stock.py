@@ -18,6 +18,7 @@ from apps.inventory.schemas.fields import (
     _ProductLineRef,
     _text,
 )
+from base.sensitive import COSTS
 
 LowStockSort = Literal[
     "name",
@@ -51,7 +52,9 @@ class SummaryIn(Schema):
 class ReceiveLineIn(_ProductLineRef):
     qty: Quantity = Field(gt=0, description="Quantity received, in the product's unit.")
     unit_cost: Cents | None = Field(
-        None, description="Cost per unit in cents; null keeps the cost the product had."
+        None,
+        description="Cost per unit in cents; null keeps the cost the product had. Only whoever sees the costs sends one.",
+        json_schema_extra=COSTS,
     )
 
 
@@ -100,7 +103,8 @@ class SummaryOut(Schema):
     products_without_cost: int = Field(
         description="Of them, without a cost: the value is partial."
     )
-    stock_value: int = Field(
-        description="Σ cost × stock of the ones in stock, in cents.", json_schema_extra={"money": True}
+    stock_value: int | None = Field(
+        description="Σ cost × stock of the ones in stock, in cents; null for whoever does not see the costs.",
+        json_schema_extra={"money": True, **COSTS},
     )
     active_products: int = Field(description="Every active product, services included.")

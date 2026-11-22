@@ -2,9 +2,8 @@
 // reads the default export; menu, permissions and active apps come from the server).
 import { describe, expect, it, vi } from 'vitest';
 
-import { namedPaths, routeChecks } from '../../../base/frontend/__tests__/app-routes';
+import { menuPaths, namedPaths, routeChecks } from '../../../base/frontend/__tests__/app-routes';
 import routes from './routes';
-import { KITCHEN_TABS } from './tabs';
 
 // The pages, stubbed: `routeChecks` checks which one each route loads (app-routes.ts says why).
 vi.mock('./pages/DisplayPage.vue', () => ({ default: { name: 'DisplayPage' } }));
@@ -26,8 +25,8 @@ describe('kitchen routes.ts', () => {
 
   routeChecks(import.meta.url, routes, ['DisplayPage', 'TicketsPage', 'StationsPage', 'HistoryPage', 'SettingsPage']);
 
-  it('has a page for every tab, and every menu entry of apps.py is one of them', () => {
-    expect(routes.map((r) => r.path)).toEqual(KITCHEN_TABS.map((tab) => tab.to));
+  it('has a page for every entry of its menu (its tabs), and every menu entry of apps.py is one of them', () => {
+    expect(routes.map((r) => r.path)).toEqual(menuPaths('kitchen'));
     const paths = namedPaths('kitchen');
     expect(paths.every((path) => routes.some((r) => r.path === path))).toBe(true);
     expect(paths).toHaveLength(5);

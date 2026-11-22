@@ -10,11 +10,10 @@ está roto; van propuestas para `## 6` de `archive/migration/MIGRATION.md` de `E
 
 ## Ya en `@erplora/ui`, sin usar todavía
 
-- `ion:star-outline` — pestaña y entrada de menú **Días especiales** (`frontend/tabs.ts`, `apps.py`): es el
+- `ion:star-outline` — pestaña y entrada de menú **Días especiales** (`apps.py`): es el
   icono del módulo viejo (`star-outline` en su `navigation`), ya registrado en `packages/ui/src/shell/icons.ts`
-  (lo usa Servicios desde `FIX-UI-SHELL-ICONS-SERVICE-TASK`). Hoy: `ion:calendar-outline`. Al usarlo, cambiar a
-  la vez `frontend/tabs.ts`, `apps.py` (`navigation`) y sus tests (`tests/test_apps.py`, `frontend/tabs.test.ts`),
-  que exigen que menú y pestañas lleven el mismo icono.
+  (lo usa Servicios desde `FIX-UI-SHELL-ICONS-SERVICE-TASK`). Hoy: `ion:calendar-outline`. Al usarlo, cambiar
+  `apps.py` (`navigation`) y sus tests (`tests/test_apps.py`): las pestañas pintan el icono del menú.
 
 ## Componentes
 

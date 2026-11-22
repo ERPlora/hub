@@ -7,7 +7,7 @@ from django.contrib import admin
 from django.contrib.admin.models import CHANGE, LogEntry
 from django.utils import timezone
 
-from control import admin as control_admin
+from control import admin_freeze
 from control.models import Freeze, Hub, HubDue
 from control.tests.conftest import events
 from control.tests.test_admin import PLATFORM, nothing_kept, page, root, row_of, support
@@ -42,7 +42,7 @@ class TestFreeze:
     working on while frozen, the number the staff waits to see at 0 before the upgrade."""
 
     def test_is_registered(self):
-        assert isinstance(admin.site._registry[Freeze], control_admin.FreezeAdmin)
+        assert isinstance(admin.site._registry[Freeze], admin_freeze.FreezeAdmin)
 
     def test_lists_the_one_switch_not_frozen_and_offers_no_second(self, client, root):
         switch = the_switch()
@@ -134,7 +134,7 @@ def test_the_freeze_speaks_spanish():
         assert str(Freeze._meta.verbose_name) == "congelación"
         assert str(Freeze._meta.get_field("frozen").verbose_name) == "congelado"
         assert str(Freeze(frozen=False)) == "sin congelar"
-        assert str(control_admin.FreezeAdmin.state.short_description) == "estado"
+        assert str(admin_freeze.FreezeAdmin.state.short_description) == "estado"
         assert ngettext(
             "Frozen: the worker is still working on %(count)d hub; wait until it is 0 before the upgrade.",
             "Frozen: the worker is still working on %(count)d hubs; wait until it is 0 before the upgrade.",

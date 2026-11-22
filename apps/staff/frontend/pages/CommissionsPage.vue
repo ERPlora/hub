@@ -17,7 +17,9 @@ import PageNotices, { blockingError } from '../components/PageNotices.vue';
 import { useLocale, useT } from '../composables/useT';
 import { formatDate, formatMoney, formatPercent, useBusinessMoney } from '../lib/format';
 import type { CommissionPeriod, CommissionReportIn, CommissionReportRow } from '../operations';
-import { staffTabs } from '../tabs';
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
+
+const tabs = useAppTabs('staff');
 
 type Choice = CommissionPeriod | 'custom';
 
@@ -27,7 +29,6 @@ const session = useSession();
 const t = useT();
 const locale = useLocale();
 const canSeePay = computed(() => session.can('staff.view_compensation'));
-const canSettings = computed(() => session.can('staff.manage_settings'));
 
 // ── The period ─────────────────────────────────────────────────────────────────────────────────
 const choice = ref<Choice>('today');
@@ -130,7 +131,7 @@ const blocked = computed(() => blockingError(error.value));
   <AppPage
     :title="$t('staff.title')"
     content-layout="fill"
-    :tabs="staffTabs($t, { settings: canSettings, commissions: canSeePay })"
+    :tabs="tabs"
     :tabs-label="$t('staff.tabs.label')"
   >
     <InlineFeedback

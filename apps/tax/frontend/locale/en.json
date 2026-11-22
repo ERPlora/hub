@@ -2,11 +2,7 @@
   "tax": {
     "title": "Taxes",
     "tabs": {
-      "label": "Tax sections",
-      "categories": "Categories",
-      "rules": "Rules",
-      "aliases": "Aliases",
-      "settings": "Settings"
+      "label": "Tax sections"
     },
     "live": {
       "reconnecting": "Reconnecting…",

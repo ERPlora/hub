@@ -1,27 +1,13 @@
 // The task app's `routes.ts`: its sections → their pages, behind a session, and nothing else (main.ts
 // reads the default export; menu, permissions and active apps come from the server).
-import { readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import type { RouteComponent, RouteRecordRaw } from 'vue-router';
 import { describe, expect, it, vi } from 'vitest';
 
+import { menuPaths, namedPaths, routeChecks } from '../../../base/frontend/__tests__/app-routes';
 import routes from './routes';
-import { TASK_TABS } from './tabs';
 
-// The pages, stubbed: this file checks which page each route loads and that it loads it on demand, not
-// the page (its own tests mount it). A real page brings its whole graph (Ionic, @erplora/ui): over a
-// second idle and past Vitest's 5 s on a loaded machine. A real page where a stub is expected is a page
-// this file does not stub.
+// The pages, stubbed: `routeChecks` checks which one each route loads (app-routes.ts says why).
 vi.mock('./pages/TasksPage.vue', () => ({ default: { name: 'TasksPage' } }));
 vi.mock('./pages/ProjectsPage.vue', () => ({ default: { name: 'ProjectsPage' } }));
-
-const HERE = dirname(fileURLToPath(import.meta.url));
-
-async function load(r: RouteRecordRaw): Promise<RouteComponent> {
-  const loader = r.component as () => Promise<{ default: RouteComponent }>;
-  return (await loader()).default;
-}
 
 describe('task routes.ts', () => {
   it('maps Tasks and Projects, both behind a session', () => {
@@ -31,22 +17,10 @@ describe('task routes.ts', () => {
     ]);
   });
 
-  it('loads each page on demand (one chunk per page), not at boot', async () => {
-    for (const r of routes) expect(typeof r.component).toBe('function');
-    const pages = await Promise.all(routes.map(load));
-    expect(pages).toEqual([{ name: 'TasksPage' }, { name: 'ProjectsPage' }]);
-  });
+  routeChecks(import.meta.url, routes, ['TasksPage', 'ProjectsPage']);
 
-  it('imports types only: Vite hoists the eager glob of main.ts above the shell boot hooks', () => {
-    const source = readFileSync(join(HERE, 'routes.ts'), 'utf8');
-    expect([...source.matchAll(/^import\s+(?!type\b).*$/gm)]).toEqual([]);
-  });
-
-  it('has a page for every tab, and every menu entry of apps.py is one of them', () => {
-    expect(routes.map((r) => r.path)).toEqual(TASK_TABS.map((tab) => tab.to));
-    const appsPy = readFileSync(join(HERE, '..', 'apps.py'), 'utf8');
-    const paths = [...appsPy.matchAll(/"(\/task\/[a-z-]+)"/g)].map((m) => m[1]);
-    expect(paths.every((path) => routes.some((r) => r.path === path))).toBe(true);
-    expect(paths).toHaveLength(2);
+  it('has a page for every entry of its menu (its tabs), and every path apps.py names is one of them', () => {
+    expect(routes.map((r) => r.path)).toEqual(menuPaths('task'));
+    expect(namedPaths('task').filter((path) => !routes.some((r) => r.path === path))).toEqual([]);
   });
 });

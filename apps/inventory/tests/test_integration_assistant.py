@@ -7,6 +7,7 @@ import json
 from pathlib import Path
 
 from django.apps import apps
+from django.utils import translation
 from live.operations import get, registry
 
 from base import assistant
@@ -93,4 +94,6 @@ def test_the_card_names_a_category_sold_out_and_a_count_as_their_screens_do():
     count = assistant.cards.card(get("inventory.stock.count"), {"product": "Vino", "stock": "4", "reason": "recuento"}, "es")
     assert labels(count) == ["Producto", SCREENS["stock"]["countQty"], "Motivo"]
     receipt = assistant.cards.card(get("inventory.stock.receive"), {"items": [{"product": "Vino", "qty": "6"}]}, "es")
-    assert labels(receipt) == [SCREENS["tabs"]["products"]]
+    with translation.override("es"):
+        products = next(str(nav.label) for nav in apps.get_app_config("inventory").navigation if nav.id == "products")
+    assert labels(receipt) == [products]

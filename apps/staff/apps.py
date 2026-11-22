@@ -79,7 +79,7 @@ class StaffConfig(LiveAppConfig):
         ],
         "hub_employee": ["staff.view", "staff.view_time_off", "staff.request_time_off"],
     }
-    # The sections of its tab bar (frontend/tabs.ts), each opening with its permission: Commissions to whoever sees the
+    # The sections of its tab bar, each opening with its permission: Commissions to whoever sees the
     # pay, Roles and Settings to whoever may save the settings.
     navigation = [
         Nav(

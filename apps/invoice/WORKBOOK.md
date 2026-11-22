@@ -198,8 +198,8 @@ Error: «No se pudieron cargar las series» con «Reintentar».
 
 ### Emisor
 Los datos fiscales de tu negocio que salen en cada factura: razón social, NIF y domicilio completo. Sin ellos no se
-emite ningún tique ni factura. Solo los cambian el propietario y el administrador; los demás los ven sin poder
-editarlos.
+emite ningún tique ni factura. Solo el propietario y el administrador ven esta pestaña y
+los cambian.
 
 #### Detalle
 Menú **Facturación → Emisor**. «Razón social», «NIF», «Domicilio», «Código postal», «Ciudad»,

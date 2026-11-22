@@ -2,13 +2,7 @@
   "staff": {
     "title": "Staff",
     "tabs": {
-      "label": "Staff sections",
-      "staff": "Staff",
-      "roles": "Roles",
-      "time_off": "Time Off",
-      "schedules": "Schedules",
-      "commissions": "Commissions",
-      "settings": "Settings"
+      "label": "Staff sections"
     },
     "live": {
       "reconnecting": "Reconnecting…",

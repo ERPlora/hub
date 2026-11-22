@@ -106,8 +106,8 @@ Configuración inicial, paso a paso:
 ## Pantallas
 
 El menú **Mesas** tiene cinco pestañas: **Plano de sala**, **Zonas**, **Mesas**, **Sesiones** y
-**Ajustes** (esta solo a quien puede cambiarlos). Ninguna otra se esconde por permiso; los botones
-que el perfil no puede usar no salen.
+**Ajustes**. **Zonas** y **Mesas** solo salen a quien puede cambiarlas, y **Ajustes**, a quien puede
+cambiarlos; los botones que el perfil no puede usar no salen.
 
 ### Plano de sala
 Aquí ves de un vistazo cómo está la sala: cada mesa en su sitio, con su color y, si está ocupada, el

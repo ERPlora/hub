@@ -574,7 +574,8 @@ cliente o a un compañero).
 
 ## Cómo son las páginas (para quien lo mantiene)
 
-- `frontend/routes.ts`: `/task/tasks` y `/task/projects`; `frontend/tabs.ts` pinta las dos pestañas.
+- `frontend/routes.ts`: `/task/tasks` y `/task/projects`; las pestañas son las dos entradas del menú, las que la
+  persona puede abrir (`useAppTabs`).
 - Listas en vivo con `useLiveList` (ventanas de 100 filas, cada una su suscripción) y `useServerTable`
   (orden `columna`/`-columna`); escrituras con `useCommand`.
 - La hoja de la tarea y la del proyecto son `ion-modal` con sus consultas en vivo; la ruta de

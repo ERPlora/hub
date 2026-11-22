@@ -147,13 +147,11 @@ def test_member_list_filters_and_sorts():
     assert invalid_fields(MemberListIn, status="terminated") == {"status"}
     assert MemberListIn(sort="-hire_date").sort == "-hire_date"
     assert invalid_fields(MemberListIn, sort="salary") == {"sort"}
-    # Every column of the list sorts both ways.
+    # Every column of the list sorts both ways, but the email and the phone, by which nobody sorts the team.
     assert set(MEMBER_SORTS) == {
         "name",
         "first_name",
         "last_name",
-        "email",
-        "phone",
         "role_name",
         "status",
         "is_bookable",

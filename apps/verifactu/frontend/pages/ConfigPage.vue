@@ -23,7 +23,9 @@ import OwnCertificateStatus from '../components/OwnCertificateStatus.vue';
 import { useLocale, useT } from '../composables/useT';
 import { fileToBase64 } from '../lib/files';
 import { refusal } from '../lib/refusal';
-import { verifactuTabs } from '../tabs';
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
+
+const tabs = useAppTabs('verifactu');
 
 /** A business certificate weighs a few KB; anything over 1 MB is not one. */
 const MAX_CERTIFICATE_BYTES = 1024 * 1024;
@@ -131,7 +133,7 @@ async function removeCertificate(): Promise<void> {
 <template>
   <AppPage
     :title="$t('verifactu.config.title')"
-    :tabs="verifactuTabs($t)"
+    :tabs="tabs"
     :tabs-label="$t('verifactu.tabs.label')"
     content-layout="detail"
   >

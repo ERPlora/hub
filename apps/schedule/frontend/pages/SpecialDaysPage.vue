@@ -5,13 +5,16 @@ import { AppPage } from '@erplora/ui/shell';
 
 import OverridesList from '../components/OverridesList.vue';
 import SpecialDaysList from '../components/SpecialDaysList.vue';
-import { scheduleTabs } from '../tabs';
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
+
+const tabs = useAppTabs('schedule');
+
 </script>
 
 <template>
   <AppPage
     :title="$t('schedule.title')"
-    :tabs="scheduleTabs($t)"
+    :tabs="tabs"
     :tabs-label="$t('schedule.tabs.label')"
   >
     <div class="schedule-special-days">

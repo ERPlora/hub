@@ -28,7 +28,9 @@ import { useServerTable } from '../composables/useServerTable';
 import { useLocale, useT } from '../composables/useT';
 import { filterCents, formatMoney, useBusinessMoney } from '../lib/format';
 import type { PricingType, ServiceListIn, ServiceOut, ServiceStatus } from '../operations';
-import { serviceTabs } from '../tabs';
+import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
+
+const tabs = useAppTabs('service');
 
 const PRICING: readonly PricingType[] = ['fixed', 'hourly', 'from', 'variable', 'free'];
 const STATUSES: readonly ServiceStatus[] = ['active', 'unconfigured', 'archived'];
@@ -215,7 +217,7 @@ function onRowClick(row: ServiceOut): void {
   <AppPage
     :title="$t('service.title')"
     content-layout="fill"
-    :tabs="serviceTabs($t, { settings: session.can('service.manage_settings') })"
+    :tabs="tabs"
     :tabs-label="$t('service.tabs.label')"
   >
     <PageNotices

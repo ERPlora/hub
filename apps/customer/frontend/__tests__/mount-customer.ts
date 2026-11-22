@@ -3,6 +3,7 @@
 import type { SessionMe } from '@erplora/ui/shell';
 import type { Component } from 'vue';
 
+import { withMenu } from '../../../../base/frontend/__tests__/app-menu';
 import type { ApiCall } from '../../../../packages/ui/src/sdk/__tests__/live-harness';
 import { mountInShell, overBase } from '../../../../base/frontend/__tests__/mount-in-shell';
 import en from '../locale/en.json';
@@ -14,25 +15,25 @@ export { business, IN_YEN as JAPANESE, POLISH } from '../../../../base/frontend/
 const ALL = ['view', 'manage', 'configure', 'merge', 'export', 'delete', 'erase', 'record_activity'].map((p) => `customer.${p}`);
 
 /** `hub_owner` / `hub_admin`: every customer permission. */
-export const OWNER: SessionMe = {
+export const OWNER: SessionMe = withMenu('customer', {
   user: { id: 'u1', label: 'Ana' },
   permissions: ALL,
   menu: [],
   apps: [],
   language: 'en',
-};
+});
 
 /** `hub_manager`: everything but deleting and erasing. */
-export const MANAGER: SessionMe = {
+export const MANAGER: SessionMe = withMenu('customer', {
   ...OWNER,
   permissions: ALL.filter((p) => p !== 'customer.delete' && p !== 'customer.erase'),
-};
+});
 
 /** `hub_employee`: views and manages cards (role_permissions of apps.py). */
-export const EMPLOYEE: SessionMe = { ...OWNER, permissions: ['customer.view', 'customer.manage'] };
+export const EMPLOYEE: SessionMe = withMenu('customer', { ...OWNER, permissions: ['customer.view', 'customer.manage'] });
 
 /** Only sees. */
-export const VIEWER: SessionMe = { ...OWNER, permissions: ['customer.view'] };
+export const VIEWER: SessionMe = withMenu('customer', { ...OWNER, permissions: ['customer.view'] });
 
 export interface MountOptions {
   props?: Record<string, unknown>;

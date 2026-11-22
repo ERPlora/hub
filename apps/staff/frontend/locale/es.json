@@ -2,13 +2,7 @@
   "staff": {
     "title": "Personal",
     "tabs": {
-      "label": "Secciones de Personal",
-      "staff": "Personal",
-      "roles": "Roles",
-      "time_off": "Ausencias",
-      "schedules": "Horarios",
-      "commissions": "Comisiones",
-      "settings": "Ajustes"
+      "label": "Secciones de Personal"
     },
     "live": {
       "reconnecting": "Reconectando…",

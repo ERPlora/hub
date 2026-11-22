@@ -29,6 +29,7 @@ from apps.staff.schemas.fields import (
     _text,
 )
 from base.schemas.assistant import names
+from base.sensitive import TEAM_CONTACT
 
 INVALID_EMAIL = _("Enter a valid email address.")
 
@@ -37,12 +38,11 @@ MAX_BULK = 100
 
 MemberStatus = Literal["active", "inactive", "on_leave"]
 
+# Never by email or phone: only whoever sees the team's contact details may know their order.
 MEMBER_SORTS = (
     "name",
     "first_name",
     "last_name",
-    "email",
-    "phone",
     "role_name",
     "status",
     "is_bookable",
@@ -76,12 +76,17 @@ Percent = Annotated[Decimal, Field(ge=0, le=100, max_digits=5, decimal_places=2)
 BookingBuffer = Annotated[int, Field(ge=0, le=240)]
 
 D_SEARCH_MEMBERS = (
-    "Text to look for in the name, email, phone, employee number or role."
+    "Text to look for in the name, employee number or role, and in the email and phone for whoever sees the team's "
+    "contact details."
 )
 D_FIRST_NAME = "First name."
 D_LAST_NAME = "Last name(s)."
 D_EMAIL = "Email address; empty for none."
 D_PHONE = "Phone number, as written; empty for none."
+D_TEAM_EMAIL = "Email address; empty for none, and null for whoever does not see the team's contact details."
+D_TEAM_PHONE = (
+    "Phone number, as written; empty for none, and null for whoever does not see the team's contact details."
+)
 D_EMPLOYEE_NUMBER = "The business's own employee number; empty for none."
 #: A person of the business by their id in its database: the card names them (``base.hub_user.get``).
 A_PERSON = names("base.hub_user.get")
@@ -121,10 +126,10 @@ class MemberListIn(PageIn):
         None, description="Keep the records whose last name contains this."
     )
     email: Search | None = Field(
-        None, description="Keep the records whose email contains this."
+        None, description="Keep the records whose email contains this.", json_schema_extra=TEAM_CONTACT
     )
     phone: Search | None = Field(
-        None, description="Keep the records whose phone contains this."
+        None, description="Keep the records whose phone contains this.", json_schema_extra=TEAM_CONTACT
     )
     status: MemberStatus | None = Field(
         None, description="Keep the records in this status."
@@ -273,8 +278,8 @@ class MemberOut(Schema):
     first_name: str
     last_name: str
     full_name: str
-    email: str
-    phone: str
+    email: str | None = Field(description=D_TEAM_EMAIL, json_schema_extra=TEAM_CONTACT)
+    phone: str | None = Field(description=D_TEAM_PHONE, json_schema_extra=TEAM_CONTACT)
     employee_number: str
     role_id: UUID | None
     role_name: str | None
@@ -296,6 +301,9 @@ class MemberDetailOut(MemberOut):
 
 
 class MemberMineOut(MemberDetailOut):
+    # One's own record: their own contact details, whoever they are.
+    email: str = Field(description=D_EMAIL)
+    phone: str = Field(description=D_PHONE)
     hourly_rate: int = Field(description="Hourly rate in cents.", json_schema_extra={"money": True})
     commission_rate: Decimal = Field(description="Commission, in percent.")
 
