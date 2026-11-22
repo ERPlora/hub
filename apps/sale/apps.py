@@ -119,7 +119,7 @@ class SaleConfig(LiveAppConfig):
         Nav("departments", _("Sections"), "ion:grid-outline", "/sale/departments"),
         Nav("settings", _("Settings"), "ion:settings-outline", "/sale/settings"),
     ]
-    help = Help()
+    help = Help(videos={"es": "DOqTuM2fCJE", "en": "uFhhYJm3Mr8"})
     # The Home's panels, on the queries Sales' own screen reads, each refreshed by the events live.py re-runs its query
     # on; each figure in the colour of data of its measure, the same on every screen (sales 1, tickets 2). Registered
     # icons only: the old `trending-up-outline` and `bar-chart-outline` wait in UI-REQUESTS.md. No steps of «Finish

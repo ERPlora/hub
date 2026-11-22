@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:1fe369a9a37ac4ef873bc31b42f7eb800f6b84f662d4ca801bafad25d24717b6 -->
+<!-- generated from WORKBOOK.md sha256:78ba53e92dacd47b3a49b1109f36dbd0279b8996e7fc4c28bf5545cc020adbc2 -->
 
 ## What it is for and who it is for
 
@@ -717,8 +717,8 @@ Involved: INVENTORY-F21
 ### SALE-F16 Attribute the check or a line to whoever serves
 Status: done
 Vertical: common
-Actor: employee, manager
-Screen: Sell
+Actor: employee, manager, assistant
+Screen: Sell; assistant
 Steps:
 1. In the check's header, the "Served by me" chip says who it is attributed to. Tap it.
 2. In "Who is serving this check", choose the person from the Staff team or "Me (whoever is signed in)".
@@ -728,6 +728,9 @@ Steps:
    name shown under it ("Whose line is this") and choose another person or "The check's professional".
 4. Charge. With the chip on "Me", the sale is attributed to your Staff record; a line with its own
    professional (an appointment's, the one you moved) keeps them. Afterwards, the chip goes back to "me".
+5. With the assistant: "Lucía is serving table 6's check". It stays saved on the check until it is charged,
+   also on the new check if it is split: the kitchen order sent carries their name and the sale
+   is theirs, whoever charges it; the lines already in keep whoever they had.
 In: the Staff team (active records) and the record of whoever is signed in.
 Out: the sale and each line attributed to that person, for the close by professional and Staff's
 commissions (STAFF-F21). With "Me", the sale belongs to the record of whoever charges; without a record,
@@ -735,7 +738,8 @@ it counts for nobody. The kitchen order sent carries their name (KITCHEN-F18); w
 sends it.
 If it fails: "The team could not be loaded. The sale is still attributed to whoever is signed in.";
 "The line could not be moved to another professional. It stays with the one it had.". A line sent to
-the kitchen is not reassigned.
+the kitchen is not reassigned. With the assistant, someone not on the team: "That staff member does not
+exist in this business."; without Staff active: "Staff is not active in this business.".
 Involved: STAFF-F21, KITCHEN-F18
 
 ### SALE-F17 Park a check and retrieve it
@@ -1549,6 +1553,7 @@ the quick notes and what is refundable can be followed live.
 | Adds an open-price line | open price | F09 | `sale.order.add_open_line` |
 | Changes a line's quantity, comp or note | build the check | F01, F10, F13, F15 | `sale.order.update_line` |
 | Changes whose line it is | build the check | F16 | `sale.order.set_line_staff` |
+| Says who serves an open check (or "me"): the kitchen order carries their name and the sale is theirs | build the check | F16 | `sale.order.set_staff` |
 | Marks or takes off the customer's allergy on a line not sent yet | build the check | F41 | `sale.order.set_line_allergy` |
 | Splits a line of N units into N lines | build the check | F27 | `sale.order.split_line` |
 | Removes an unsent line | build the check | F01 | `sale.order.remove_line` |

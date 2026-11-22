@@ -43,6 +43,11 @@ from apps.sale.schemas.lines import (
 )
 from base.allergens import AllergyInDishOut, AllergyOut
 
+SERVED_BY = (
+    "Who serves the check (a member of Staff): the kitchen ticket names them and its sales are theirs; empty = whoever "
+    "holds the session."
+)
+
 
 class OrderOpenIn(Closed):
     label: Label = Field("", description="The check's title, e.g. Ana — terrace.")
@@ -50,6 +55,7 @@ class OrderOpenIn(Closed):
     appointment_id: UUID | None = Field(
         None, description="The appointment (Appointments) this check charges.", json_schema_extra=A_BOOKING
     )
+    staff_id: UUID | None = Field(None, description=SERVED_BY, json_schema_extra=A_MEMBER)
     lines: list[ProductLineIn] = Field(
         default_factory=list,
         max_length=MAX_LINES,
@@ -175,6 +181,11 @@ class OrderSetLineDiscountIn(OrderLineRefIn):
 class OrderSetLabelIn(Closed):
     order_id: UUID = Field(description="The open check's id.", json_schema_extra=A_CHECK)
     label: Label = Field(description="Its title, e.g. Table 4 or Ana — terrace.")
+
+
+class OrderSetStaffIn(Closed):
+    order_id: UUID = Field(description="The open check's id.", json_schema_extra=A_CHECK)
+    staff_id: UUID | None = Field(description=SERVED_BY, json_schema_extra=A_MEMBER)
 
 
 class OrderSetAppointmentIn(Closed):
@@ -322,6 +333,8 @@ class OrderOut(Schema):
     label: str = Field(description="Title.")
     notes: str = Field(description="Notes.")
     appointment_id: UUID | None = Field(description="The appointment it charges.")
+    staff_id: UUID | None = Field(None, description=SERVED_BY)
+    staff_name: str = Field("", description="Their name, as Staff said it when they were chosen; empty for «me».")
     discount_percent: Decimal = Field(description="Ticket discount in %.")
     discount_amount: int = Field(description="Fixed ticket discount in cents.", json_schema_extra={"money": True})
     discount_approved: bool = Field(

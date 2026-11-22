@@ -855,6 +855,10 @@
     "method": "post",
     "path": "/api/sale/orders/set_label"
   },
+  "sale.order.set_staff": {
+    "method": "post",
+    "path": "/api/sale/orders/set_staff"
+  },
   "sale.order.set_appointment": {
     "method": "post",
     "path": "/api/sale/orders/set_appointment"

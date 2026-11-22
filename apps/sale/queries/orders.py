@@ -109,6 +109,8 @@ def order_detail(order: Order) -> dict:
         "label": order.label,
         "notes": order.notes,
         "appointment_id": order.appointment_id,
+        "staff_id": order.staff_id,
+        "staff_name": order.staff_name,
         "discount_percent": order.discount_percent,
         "discount_amount": order.discount_amount,
         "discount_approved": bool(order.discount_approved_by),
