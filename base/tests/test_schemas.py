@@ -13,6 +13,7 @@ FULL = {
     "permissions": ["demo.view"],
     "menu": [{"id": "demo", "label": "Demo", "items": [{"path": "/demo/items", "label": "Demo", "icon": "ion:flask-outline"}]}],
     "apps": [{"label": "demo", "state": "on"}],
+    "locked": {"tax": ["/tax/rules"]},
     "language": "es",
     "demo": None,
 }

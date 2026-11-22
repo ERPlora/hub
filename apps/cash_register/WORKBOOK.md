@@ -75,8 +75,8 @@ Configuración inicial, paso a paso:
 
 ## Pantallas
 
-El menú **Caja** tiene dos pestañas: **Caja** y **Ajustes**, esta solo para quien puede cambiar los ajustes. Los
-botones que el perfil no puede usar no salen.
+El menú **Caja** tiene dos pestañas: **Caja** y **Ajustes**, esta solo para quien puede cambiar los ajustes; los
+demás, por su dirección, ven «Sin acceso» (BASE-F118). Los botones que el perfil no puede usar no salen.
 
 ### Caja
 Aquí abres y cierras los turnos de caja y repasas los anteriores. Arriba ves el efectivo que debería haber ahora en
@@ -158,8 +158,8 @@ Menú **Caja → Ajustes**. Una tarjeta «Caja» con «Activar caja», «Exigir 
 recuento al cierre», «Permitir saldo negativo», «Arqueo ciego», «Cierre automático diario» y «Hora del
 cierre automático» (de 00:00 a 23:00, en horas en punto), y «Guardar». Debajo, la tarjeta «Cajones»:
 la lista de cajones (nombre, activo) con «Añadir cajón», «Cambiar nombre» y «Desactivar»/«Activar».
-Quien no puede cambiar los ajustes los ve bloqueados con «No tienes permiso para cambiar estos
-ajustes.». Cargando: «Cargando ajustes…». Error: «No se pudieron cargar los ajustes.» con
+Quien no puede cambiar los ajustes no los abre:
+por su dirección, «Sin acceso» (BASE-F118). Cargando: «Cargando ajustes…». Error: «No se pudieron cargar los ajustes.» con
 «Reintentar»; al guardar, «No se pudieron guardar los ajustes.». Guardado: «Ajustes guardados.».
 «Guardar» se enciende al cambiar algo y, mientras los ajustes no se han guardado nunca, también sin
 cambios: así el negocio se queda con los de fábrica.
@@ -228,7 +228,7 @@ el primer guardado sin cambios). Sin guardar nunca, valen los de fábrica y «Tu
 abrir una sesión no lo cuenta como hecho.
 Si falla: «No se pudieron guardar los ajustes.» con el motivo, y los ajustes quedan como estaban. Si
 la lectura falla, la pantalla no enseña valores (nunca los de fábrica como si fueran los del negocio)
-y ofrece «Reintentar». Sin el permiso de ajustes, los campos salen bloqueados, no hay «Guardar» y el
+y ofrece «Reintentar». Sin el permiso de ajustes, la pantalla dice «Sin acceso» y el
 Inicio no le enseña el paso «Tu caja».
 Implicados: CASH_REGISTER-F03, F05, F07, F09, F10
 

@@ -12,7 +12,7 @@
 // runs before, so a run whose `afterAll` never ran leaves the next one clean.
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, api, EMPLOYEE, login, psql, shot, shown } from './helpers';
+import { A, api, EMPLOYEE, login, psql, shot, shown, testid } from './helpers';
 import { createProduct, dialog, fill, pick, productsReady, searchProducts } from './inventory-helpers';
 import { claim, fail, FLOW_VIEWPORTS, flowShots, forgetDevices } from './printing-helpers';
 import { shots, stamp } from './sale-helpers';
@@ -227,12 +227,11 @@ test('PRINTING-F15: the receipt’s texts are the till’s, and the note leads t
   await expect(shown(page).locator('[data-testid=sale-settings-heading], [data-testid=sale-settings-form]').first()).toBeVisible();
 });
 
-test('PRINTING-F06: the employee reads the settings blocked', async ({ page }) => {
+test('PRINTING-F06: the employee does not open the settings: «No access» by their address', async ({ page }) => {
   await login(page, A, '/printing/settings', EMPLOYEE);
-  await settingsReady(page);
-  await expect(shown(page).locator('[data-testid=printing-settings-read-only]')).toBeVisible();
+  // Not in an employee's menu (BASE-F118).
+  await expect(testid(page, 'no-access')).toBeVisible();
   await expect(shown(page).locator('[data-testid=printing-settings-save]')).toHaveCount(0);
-  await expect(shown(page).locator('[data-testid=printing-setting-open_drawer_on_sale]')).toBeDisabled();
 });
 
 test('PRINTING-F12: the label asked from the product sheet waits in the «Label» card, which says so, until a label printer takes it', async ({

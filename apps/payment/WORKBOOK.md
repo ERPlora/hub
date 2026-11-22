@@ -29,7 +29,7 @@ transferencias; «Enviado» y «Completado» los marca una persona cuando el ban
 
 Quién la usa:
 
-- El **empleado**: solo mira la lista de pagos y la de métodos.
+- El **empleado** no abre Pagos (por su dirección, «Sin acceso» (BASE-F118)).
 - El **responsable**, el **administrador** y el **propietario**: además registran pagos, los marcan
   como enviados y completados, los aprueban y los cancelan, y gestionan los métodos de pago.
 - El **asistente** (por voz o por texto, con la sesión de quien habla) hace lo mismo. Antes de una
@@ -262,7 +262,7 @@ Implicados: FLOW-F21
 
 ### PAYMENT-F06 Buscar y revisar los pagos
 Estado: hecho
-Actor: empleado, responsable, administrador, propietario, asistente
+Actor: responsable, administrador, propietario, asistente (un empleado no abre Pagos: por su dirección, «Sin acceso» (BASE-F118))
 Pantalla: Pagos
 Pasos:
 1. Abre **Pagos**.

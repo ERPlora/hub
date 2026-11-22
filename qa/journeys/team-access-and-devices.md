@@ -28,12 +28,13 @@ Para qué: que cada persona entre como le toca (cuenta, PIN o placa), con su rol
 13. BASE-F78 — a Javi se le retira el PIN.
 14. BASE-F84 — Javi necesita una aprobación y Marta la da con su PIN.
 15. BASE-F85 — quién aprobó qué.
-16. BASE-F57 — Marta abre sesión en otro dispositivo.
-17. BASE-F58 — la sesión termina mientras se trabaja.
-18. BASE-F59 — la tableta que nadie toca cierra la sesión.
-19. BASE-F68, BASE-F69 — los dispositivos; la tableta pasa a llamarse «Barra».
-20. BASE-F70 — se quita un móvil perdido.
-21. BASE-F71 — se quitan de golpe los que nadie usa.
-22. BASE-F13 — Javi sale del negocio y pierde el acceso.
-23. BASE-F80 — Javi vuelve al negocio.
-24. BASE-F61 — el propietario cierra la sesión.
+16. BASE-F118 — Javi abre por su dirección «Reglas» de Impuestos: «Sin acceso», con el nombre del propietario.
+17. BASE-F57 — Marta abre sesión en otro dispositivo.
+18. BASE-F58 — la sesión termina mientras se trabaja.
+19. BASE-F59 — la tableta que nadie toca cierra la sesión.
+20. BASE-F68, BASE-F69 — los dispositivos; la tableta pasa a llamarse «Barra».
+21. BASE-F70 — se quita un móvil perdido.
+22. BASE-F71 — se quitan de golpe los que nadie usa.
+23. BASE-F13 — Javi sale del negocio y pierde el acceso.
+24. BASE-F80 — Javi vuelve al negocio.
+25. BASE-F61 — el propietario cierra la sesión.

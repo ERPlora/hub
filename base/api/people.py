@@ -91,6 +91,12 @@ async def approval_approvers(request, data: Query[ApproversIn]):
     return await run_operation(request, queries.approvals.approval_approvers, data)
 
 
+# «No access» names who can give the screen: by name only.
+@bind(router, "base.access.grantors", "/access/grantors")
+async def access_grantors(request):
+    return await run_operation(request, queries.access_rights.access_grantors)
+
+
 @bind(router, "base.approval.approve", "/approvals")
 async def approval_approve(request, data: ApprovalIn):
     return await run_operation(request, services.approvals.approval_approve, data)

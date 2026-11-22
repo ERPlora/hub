@@ -5,7 +5,7 @@
 // What this file creates is deleted after it (`afterAll`), and the settings it touched are restored.
 import { expect, type Page, test } from '@playwright/test';
 
-import { A, EMPLOYEE, api, hostPage, login, psql, shot, shown } from './helpers';
+import { A, api, EMPLOYEE, hostPage, login, psql, shot, shown, testid } from './helpers';
 import { rowAction } from './service-helpers';
 import { shots } from './sale-helpers';
 
@@ -106,28 +106,15 @@ test('SALE-F34: the owner saves the till settings', async ({ page, context }) =>
   });
 });
 
-test('the employee reads the quick notes and departments without managing them, and no settings', async ({ browser }) => {
-  psql(
-    "insert into sale_quicknote (id, text, sort_order, is_deleted, created_at, updated_at, created_by) values (gen_random_uuid(), 'e2e read only', 1, false, now(), now(), 'e2e')",
-  );
+test('the employee does not open the quick notes, the departments or the settings: «No access» by their address', async ({ browser }) => {
   const { context, page } = await hostPage(browser, A, { next: '/sale/quick-notes', credentials: EMPLOYEE });
   try {
-    await listReady(page, 'sale-quick-notes');
-    await expect(shown(page).locator('[data-testid=sale-quick-notes-row]').filter({ hasText: 'e2e read only' })).toBeVisible();
+    // Not in an employee's menu: they set the till up (BASE-F118).
+    for (const path of ['/sale/quick-notes', '/sale/departments', '/sale/settings']) {
+      await page.goto(`${A}${path}`);
+      await expect(testid(page, 'no-access'), path).toBeVisible();
+    }
     await expect(shown(page).locator('[data-testid=sale-quick-notes-add]')).toHaveCount(0);
-    await expect(shown(page).locator('[data-testid^=sale-quick-notes-row-][data-testid$=-edit]')).toHaveCount(0);
-    await page.screenshot({ path: shot('sale-quick-notes-employee') });
-
-    await page.goto(`${A}/sale/departments`);
-    await listReady(page, 'sale-departments');
-    await expect(shown(page).locator('[data-testid=sale-departments-add]')).toHaveCount(0);
-
-    await page.goto(`${A}/sale/settings`);
-    // The business's values, blocked, with the old «You do not have permission to change these settings…».
-    const readOnly = shown(page).locator('[data-testid=sale-settings-read-only]');
-    await readOnly.scrollIntoViewIfNeeded();
-    await expect(readOnly).toBeVisible();
-    await expect(readOnly).toContainText(/permission|permiso/);
     await expect(shown(page).locator('[data-testid=sale-settings-save]')).toHaveCount(0);
     await page.screenshot({ path: shot('sale-settings-employee') });
   } finally {

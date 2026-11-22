@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:8fd3db8795bac882d0d171ad2aaab43617a0ab50e86e6dfc3cdc976eed5eceb5 -->
+<!-- generated from WORKBOOK.md sha256:8e739ce4475a5fb0a1d5963c2c40dcc893034b65d6325c21d31eea2da4882a66 -->
 
 ## What it is for and who it is for
 
@@ -24,7 +24,7 @@ These are the **business's** hours. They are not each professional's shift nor t
 
 - The **owner**, the **administrator** and the **manager** set the week, add, correct and delete special
   days and temporary changes, and change the settings.
-- The **employee** only sees it.
+- The **employee** does not open Hours (by its address, "No access" (BASE-F118)); appointments and bookings follow its hours.
 
 Appointments reads it to offer free hours and to refuse an appointment while the business is closed (also
 the ones that come through Online booking); Reservations, so as not to give a table while the business is
@@ -112,8 +112,8 @@ English). The row action **Edit** (or tapping the row) opens "Edit hours — {da
 time earlier than the opening one runs past midnight (22:00–02:00)." and **Save day**. While nobody has
 saved or confirmed the week, the yellow notice "These are default opening hours we set up for you. Check
 they match your business — appointments outside them are refused." shows above the table with the button
-**Yes, these are my hours** (the button, only for whoever can change the hours; the employee sees the
-notice). On a phone the table is painted as cards.
+**Yes, these are my hours** (the button, only for whoever can change the
+hours). On a phone the table is painted as cards.
 
 ### Special days
 Here go the exceptions to your week. In "Special days" you note a single day, closed or with other hours, such as a
