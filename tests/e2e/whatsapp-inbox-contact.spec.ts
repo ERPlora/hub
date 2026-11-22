@@ -10,7 +10,7 @@ import { expect, test } from '@playwright/test';
 import { signedIn } from './flow-helpers';
 import { A, api, capture, EMPLOYEE, shown } from './helpers';
 import { FLOW_VIEWPORTS } from './service-helpers';
-import { cleanUp, e2ePhone, PREFIX, receive } from './whatsapp-helpers';
+import { cleanUp, e2ePhone, keepPhoto, PREFIX, receive, restorePhoto } from './whatsapp-helpers';
 
 const NAME = `${PREFIX}Ana ${Date.now().toString(36)}`;
 const PHONE = e2ePhone();
@@ -20,10 +20,14 @@ type Row = { id: string; display_name: string; phone: string | null };
 test.describe.configure({ mode: 'serial' });
 
 test.beforeAll(() => {
+  keepPhoto();
   receive(PHONE, 'Hola, ¿tenéis hora mañana?', NAME);
 });
 
-test.afterAll(() => cleanUp());
+test.afterAll(() => {
+  cleanUp();
+  restorePhoto();
+});
 
 for (const viewport of FLOW_VIEWPORTS) {
   test(`the employee sees a customer's number in the inbox at ${viewport.label}px; nobody sorts by it`, async ({ browser }) => {
