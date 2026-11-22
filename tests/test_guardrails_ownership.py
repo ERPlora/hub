@@ -25,8 +25,6 @@ DECLARATIONS = "apps/*/queries/ownership.py"
 OTHER_APPS_WRITE = "another app's write"
 #: Nobody reads a row: a count or a yes/no about the whole table.
 NO_ROW_READ = "no row read"
-#: A screen of the whole business that its own permission opens to the roles that see everyone's.
-BUSINESS_WIDE = "the whole business"
 #: The record of a check, a table or a register session being worked on, not the history of sales.
 PART_OF_THE_WORK = "part of the work at hand"
 #: A customer's public page, by the signed code printed on their own paper.
@@ -51,28 +49,11 @@ UNSCOPED_READS: dict[tuple[str, str], tuple[str, str]] = {
         PUBLIC_BY_CODE,
         "The page where the customer asks for the full invoice of their ticket, opened by the code signed on it.",
     ),
-    ("apps/sale/queries/figures.py", "stats"): (
-        BUSINESS_WIDE,
-        "The figures of a period, which only sale.view_reports opens: the roles that hold it see every sale.",
-    ),
-    ("apps/sale/queries/figures.py", "_revenue_by_day"): (
-        BUSINESS_WIDE,
-        "What each day sold, for the figures and the Home's panel that sale.view_reports opens.",
-    ),
-    ("apps/sale/queries/figures.py", "today"): (
-        BUSINESS_WIDE,
-        "Today's sales and tickets, for the figures and the Home's panels that sale.view_reports opens.",
-    ),
-    ("apps/sale/queries/figures.py", "_refunded_by_staff"): (
-        BUSINESS_WIDE,
-        "What refunds gave back on each professional's lines, for the close by professional that sale.view_reports "
-        "opens.",
-    ),
-    ("apps/cash_register/queries.py", "sale_lines"): (
+    ("apps/cash_register/queries/lines.py", "sale_lines"): (
         PART_OF_THE_WORK,
         "The tenders of the sales charged and voided while a register session was open: the session's takings.",
     ),
-    ("apps/cash_register/queries.py", "unassigned_totals"): (
+    ("apps/cash_register/queries/unassigned.py", "unassigned_totals"): (
         PART_OF_THE_WORK,
         "How many sale tenders and comps of a time window no register session copied, counted for the drawer.",
     ),
@@ -169,7 +150,8 @@ def unscoped_reads(root: Path) -> set[tuple[str, str]]:
 
 
 def test_the_declarations_are_found():
-    assert owned_models(REPO)["Sale"] == "sale"
+    found = owned_models(REPO)
+    assert (found["Sale"], found["VoucherSession"]) == ("sale", "sale")
 
 
 def test_every_read_of_an_owned_model_goes_through_its_declaration_or_is_listed_with_its_reason():
@@ -186,7 +168,7 @@ def test_what_the_list_names_still_reads_without_the_declaration():
 
 
 def test_every_reason_is_one_of_the_kinds_and_says_why():
-    kinds = {OTHER_APPS_WRITE, NO_ROW_READ, BUSINESS_WIDE, PART_OF_THE_WORK, PUBLIC_BY_CODE}
+    kinds = {OTHER_APPS_WRITE, NO_ROW_READ, PART_OF_THE_WORK, PUBLIC_BY_CODE}
     for read, (kind, why) in UNSCOPED_READS.items():
         assert kind in kinds and why.endswith("."), read
 
