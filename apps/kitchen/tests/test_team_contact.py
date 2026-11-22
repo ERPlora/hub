@@ -108,12 +108,14 @@ def test_a_round_a_colleague_sends_from_the_kitchen_names_them_without_it(burger
     sent = post(bea[1], "/kitchen/tickets/send", {"order_id": opened.json()["id"]})
     assert (sent.status_code, sent.json()["waiter"]) == (201, SHOWN), sent.content
     assert get(ana[1], "/kitchen/tickets/detail", ticket_id=sent.json()["id"]).json()["waiter"] == SHOWN
+    assert Ticket.objects.get(pk=sent.json()["id"]).waiter == SHOWN
 
 
 def test_a_ticket_a_colleague_makes_by_hand_names_them_without_it(bea, ana):
     made = post(bea[1], "/kitchen/tickets", {"items": [{"name": "Staff meal"}]})
     assert made.status_code == 201, made.content
     assert get(ana[1], "/kitchen/tickets/detail", ticket_id=made.json()["id"]).json()["waiter"] == SHOWN
+    assert Ticket.objects.get(pk=made.json()["id"]).waiter == SHOWN
 
 
 def test_the_history_names_who_did_each_thing_without_their_address(bea, ana):
