@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { EMPLOYEE, errorFrame, flush, mountBase, subId } from '../__tests__/mount-base';
+import { EMPLOYEE, errorFrame, flush, installedApp, leaveInstalledApp, mountBase, subId } from '../__tests__/mount-base';
 import type { DeviceCurrent } from '../operations/devices';
 import DeviceModeCard from './DeviceModeCard.vue';
 
@@ -23,6 +23,7 @@ const prop = (wrapper: { get: (s: string) => { element: Element } }, testid: str
   (wrapper.get(`[data-testid="${testid}"]`).element as unknown as Record<string, unknown>)[name];
 
 afterEach(() => {
+  leaveInstalledApp();
   document.body.innerHTML = '';
 });
 
@@ -69,5 +70,16 @@ describe('DeviceModeCard', () => {
     call.push(errorFrame(subId(client, 'base.device.current'), 'unexpected'));
     await flush();
     expect(wrapper.get('[data-testid="device-mode-load-error"]').text()).toContain('Could not load this device.');
+  });
+
+  it('in the computer app it also carries «Start on login», for whoever uses the device; in a browser it does not', async () => {
+    const browser = await card(SHARED, { session: EMPLOYEE });
+    expect(browser.wrapper.find('[data-testid="device-autostart"]').exists()).toBe(false);
+    browser.wrapper.unmount();
+
+    installedApp('direct', { autostart_is_enabled: () => false });
+    const { wrapper } = await card(SHARED, { session: EMPLOYEE });
+    await flush();
+    expect(wrapper.get('[data-testid="device-mode-card"] [data-testid="device-autostart"]').text()).toContain('Start on login');
   });
 });
