@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:eb436b2bac086c5aa509a8fdd0a025d56418118cb35119941e058818399614b8 -->
+<!-- generated from WORKBOOK.md sha256:f0d8b91c15b79e67e6e13df0142186f2a08989900992a2b03d858fb178e94bde -->
 
 ## What it is for and who it is for
 
@@ -439,6 +439,7 @@ On the Employees screens and the API documentation:
 | BASE-F115 | See the help of a module's screen | done |
 | BASE-F116 | Read what is new in ERPlora | done |
 | BASE-F117 | See in the bell that the plan has an unpaid invoice | done |
+| BASE-F119 | What each person sees by their data permissions | done |
 
 ### BASE-F01 See what the business still has to set up
 Status: done
@@ -606,7 +607,8 @@ Steps:
      time (Oct 20, 6:10 PM), with the year if it is another. Holding the pointer over it shows the whole
      date. With the Home open, today's become yesterday's when the day changes.
   5. At first, the ones each app marks as recommended for the business's sector show.
-  6. Only the panels of the apps that are on and that this person may see show.
+  6. Only the panels of the apps that are on and that this person may see show, and none whose figure is a piece of
+     data their role does not see (BASE-F119).
 In: the panels each app that is on declares; each one's data, asked for with the permissions of whoever
 is looking.
 Out: nothing saved in the hub.
@@ -615,7 +617,7 @@ cannot be read says "Couldn't load" with "Retry", which asks for it again, and a
 "Unavailable": never an old or made-up figure. A row of a list with bars (or a day of a chart) that has no figure, such as a cash
 session closed without a count, shows a dash (—) and no bar, never a zero; a real zero does show as zero
 (€0.00). If the board cannot be read: "Could not load the panels" with "Retry".
-Involved: none
+Involved: BASE-F119
 
 ### BASE-F07 Customize the board of panels
 Status: done
@@ -2168,8 +2170,8 @@ Actor: owner, administrator, manager, employee
 Screen: Employees · Staff
 Steps:
   1. In **Employees › Staff**, a row per person (on a phone, a card): "User" (with "You" on one's own; in a row, a
-     name that does not fit is cut and shows whole on hovering over it), "Email" (only for whoever runs the business),
-     "Role", "Access" and "Status".
+     name that does not fit is cut and shows whole on hovering over it), "Email" (only for whoever sees the team's
+     contact details: owner, administrator and manager; BASE-F119), "Role", "Access" and "Status".
   2. "Access" says how they get in: "Account" always, and "PIN" and "Badge" if they have them (for example,
      "Account + PIN + Badge").
   3. "Status" says "Active" or, if erplora.com already invited them and they have not come in yet, "Not in yet".
@@ -2177,7 +2179,7 @@ Steps:
 In: the people of the business.
 Out: nothing saved. It updates by itself when somebody chooses or loses their PIN or their badge.
 If it fails: "The people of this business could not be loaded." with "Retry".
-Involved: BASE-F77, BASE-F78, BASE-F79
+Involved: BASE-F77, BASE-F78, BASE-F79, BASE-F119
 
 ### BASE-F82 See the business's roles
 Status: done
@@ -3354,3 +3356,26 @@ If it fails: a manager or an employee does not see the notice. If the photo does
 comes without a date: "Pay it on erplora.com: if it is not paid soon, the business is suspended. Nothing is deleted.".
 If the notices cannot be read, the bell keeps what it last knew, as in BASE-F10.
 Involved: BASE-F10, BASE-F11, BILLING-F16 (erplora.com), BILLING-F17 (erplora.com), HUBS-F31 (erplora.com)
+
+### BASE-F119 What each person sees by their data permissions
+Status: done
+Actor: owner, administrator, manager, employee
+Screen: Employees · Staff, Home · Summary
+Steps:
+  1. Besides what it may do, each role says which sensitive data it sees, with four data permissions: view costs,
+     view customer contact details, view team contact details and view business totals. The owner, the
+     administrator and the manager have all four; the employee, only the customers' contact details, which they need
+     to serve them.
+  2. Whoever lacks a data permission does not receive that data by any way: not on the screen, not through the API,
+     not in what the assistant answers. Where it would go, the data comes empty and the screen does not show it.
+  3. In **Employees › Staff**, the "Email" column only shows to whoever sees the team's contact details. An employee
+     sees nobody's email, not even their own, nor inside a name: an erplora.com account without a name shows with
+     what comes before the @.
+  4. A Home panel whose figure is a piece of data the person does not see does not show to them on the board nor
+     among the ones they may add.
+In: the person's role in this business.
+Out: nothing saved.
+If it fails: a request through the API or to the assistant that filters or sorts by a piece of data the person does
+not see is refused with the same error as an operation without its permission (403 `permission_denied`), doing
+nothing.
+Involved: BASE-F06, BASE-F07, BASE-F81, BASE-F82

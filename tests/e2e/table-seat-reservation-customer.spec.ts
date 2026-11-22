@@ -6,7 +6,7 @@ import { expect, test } from '@playwright/test';
 import { cardDeletes } from './customer-helpers';
 import { A, api, capture, psql, shown } from './helpers';
 import { openTheBook } from './reservation-helpers';
-import { openTillCart, stamp, zoneWithTable } from './sale-helpers';
+import { checkAtEachSize, stamp, zoneWithTable } from './sale-helpers';
 import { ownerPage, post } from './service-helpers';
 import { reservationTimes } from './table-booking';
 
@@ -70,12 +70,10 @@ test('TABLE-F28: seating a booking from the plan puts its customer on the check 
 
     await tile.click();
     await expect(shown(page).locator('[data-testid=pos-check-title]')).toHaveValue(`Table ${RUN}`);
-    for (const size of SIZES) {
-      await page.setViewportSize({ width: size.width, height: size.height });
-      await openTillCart(page);
+    await checkAtEachSize(page, SIZES, async (label) => {
       await expect(shown(page).locator('[data-testid=pos-customer-chip]')).toContainText(card.name);
-      await capture(page, `table-seat-reservation-customer-pos-${size.label}`);
-    }
+      await capture(page, `table-seat-reservation-customer-pos-${label}`);
+    });
   } finally {
     await context.close();
   }

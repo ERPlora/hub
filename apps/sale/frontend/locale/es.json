@@ -95,6 +95,7 @@
       "lineChangeFailed": "No se ha podido guardar ese cambio de la línea. La línea vuelve a estar como estaba.",
       "lineNotSaved": "No se pudo guardar ese artículo — vuelve a tocarlo",
       "lineStaffFailed": "No se ha podido mover la línea a otro profesional. Se queda con el que tenía.",
+      "staffSaveFailed": "No se ha podido cambiar quién atiende la cuenta. Se queda con quien la atendía.",
       "discountTicket": "Descuento del tique",
       "total": "Total",
       "printPrebill": "Imprimir cuenta",

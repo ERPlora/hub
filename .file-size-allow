@@ -3,7 +3,6 @@
 # the issue is ERPlora/erplora-next#74, which tracks splitting them. The list only shrinks: a listed file may change but
 # never grows past its number, the number comes down to the file's size as it shrinks, a file leaves the list once it
 # fits its cap, and no path or higher number is ever added.
-127 .github/scripts/e2e-report.sh ERPlora/erplora-next#74
 227 .github/scripts/ecs-deploy.sh ERPlora/erplora-next#74
 172 .github/scripts/ecs-rollback.sh ERPlora/erplora-next#74
 382 .github/scripts/nightly-e2e.sh ERPlora/erplora-next#74
@@ -39,7 +38,6 @@
 474 apps/inventory/frontend/operations.d.ts ERPlora/erplora-next#74
 555 apps/inventory/frontend/pages/ProductsPage.test.ts ERPlora/erplora-next#74
 1064 apps/inventory/tests/test_queries.py ERPlora/erplora-next#74
-2484 apps/inventory/tests/test_services.py ERPlora/erplora-next#74
 463 apps/invoice/frontend/operations.d.ts ERPlora/erplora-next#74
 1350 apps/invoice/queries/__init__.py ERPlora/erplora-next#74
 1031 apps/invoice/schemas/__init__.py ERPlora/erplora-next#74
@@ -73,7 +71,7 @@
 604 apps/sale/frontend/composables/pos/useTill.test.ts ERPlora/erplora-next#74
 438 apps/sale/frontend/composables/pos/useTill.ts ERPlora/erplora-next#74
 971 apps/sale/frontend/operations.d.ts ERPlora/erplora-next#74
-1060 apps/sale/frontend/pages/PosPage.test.ts ERPlora/erplora-next#74
+1038 apps/sale/frontend/pages/PosPage.test.ts ERPlora/erplora-next#74
 587 apps/sale/frontend/pages/SalesPage.test.ts ERPlora/erplora-next#74
 866 apps/sale/models.py ERPlora/erplora-next#74
 1560 apps/sale/tests/test_integration_service.py ERPlora/erplora-next#74

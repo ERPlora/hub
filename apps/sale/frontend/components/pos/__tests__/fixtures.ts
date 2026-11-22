@@ -117,6 +117,8 @@ export const order = (over: Partial<OrderOut> = {}): OrderOut => {
     label: '',
     notes: '',
     appointment_id: null,
+    staff_id: null,
+    staff_name: '',
     discount_percent: '0.00',
     discount_amount: 0,
     discount_approved: false,
