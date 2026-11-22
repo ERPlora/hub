@@ -6,7 +6,7 @@
 // app's pytest and Vitest suites. Everything created here is named «E2E Pay …» and removed before and after.
 import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, api, capture, EMPLOYEE, horizontalOverflow, login, psql, shot, shown } from './helpers';
+import { A, api, capture, EMPLOYEE, horizontalOverflow, login, psql, shot, shown, testid } from './helpers';
 import { rowAction } from './service-helpers';
 import { discardChanges } from './unsaved-back-helpers';
 
@@ -339,23 +339,21 @@ test('PAYMENT-F06: the search finds a payment by a piece of its reference and th
   }
 });
 
-// flow: PAYMENT-F06 — the employee only looks: no «New payment», no «New method», no row action
-test('PAYMENT-F06: an employee sees the payments and the methods, with no New payment, no New method and no row action', async ({ browser }) => {
+// flow: PAYMENT-F06 — the employee does not open the payments nor the methods: «No access» by their address
+test('PAYMENT-F06: an employee gets «No access» on the payments and the methods, with no New payment and no New method', async ({ browser }) => {
   const owner = await signedIn(browser, '/payment/payments');
   const bank = await method(owner.context);
-  const draft = await payment(owner.context, bank.id);
+  await payment(owner.context, bank.id);
   await owner.context.close();
   const { context, page } = await signedIn(browser, '/payment/payments', true);
   try {
-    await waitForList(page, 'payment-payments');
-    await expect(rowOf(page, 'payment-payments', draft.id)).toBeVisible();
+    // Not in an employee's menu (BASE-F118): the till charges without opening them.
+    for (const path of ['/payment/payments', '/payment/methods']) {
+      await page.goto(`${A}${path}`);
+      await expect(testid(page, 'no-access'), path).toBeVisible();
+    }
     await expect(shown(page).locator('[data-testid=payment-payments-add]')).toHaveCount(0);
-    await expect(shown(page).locator('[data-testid$=-advance]:visible, [data-testid$=-cancel]:visible')).toHaveCount(0);
-    await page.goto(`${A}/payment/methods`);
-    await waitForList(page, 'payment-methods');
-    await expect(rowOf(page, 'payment-methods', bank.id)).toBeVisible();
     await expect(shown(page).locator('[data-testid=payment-methods-add]')).toHaveCount(0);
-    await expect(shown(page).locator('[data-testid$=-deactivate]:visible, [data-testid$=-edit]:visible')).toHaveCount(0);
   } finally {
     await context.close();
   }

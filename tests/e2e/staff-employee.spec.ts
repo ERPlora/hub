@@ -5,7 +5,7 @@
 // positive control: the same hooks are there for who may manage.
 import { type Browser, expect, test } from '@playwright/test';
 
-import { A, api, type Credentials, EMPLOYEE, shot, shown } from './helpers';
+import { A, api, type Credentials, EMPLOYEE, shot, shown, testid } from './helpers';
 import { signedIn as signedInAt } from './flow-helpers';
 import { staffCleanUp } from './staff-helpers';
 
@@ -45,19 +45,17 @@ test('an employee reads Staff, Roles and Schedules without a single write button
     await expect(view.locator('ion-footer ion-segment-button')).toHaveCount(4);
     await employee.page.screenshot({ path: shot('staff-employee-members') });
 
-    for (const [path, table] of [
-      ['/staff/roles', 'staff-roles'],
-      ['/staff/schedules', 'staff-schedules'],
-    ] as const) {
-      await employee.page.goto(`${A}${path}`);
-      const section = shown(employee.page);
-      await section.locator(`[data-testid=${table}-empty], [data-testid=${table}-row]`).first().waitFor({ state: 'visible' });
-      await expect(section.locator(`[data-testid=${table}-add]`), path).toHaveCount(0);
-      await employee.page.screenshot({ path: shot(`staff-employee-${table.replace('staff-', '')}`) });
-    }
+    await employee.page.goto(`${A}/staff/schedules`);
+    const schedules = shown(employee.page);
+    await schedules.locator('[data-testid=staff-schedules-empty], [data-testid=staff-schedules-row]').first().waitFor({ state: 'visible' });
+    await expect(schedules.locator('[data-testid=staff-schedules-add]')).toHaveCount(0);
+    await employee.page.screenshot({ path: shot('staff-employee-schedules') });
 
-    await employee.page.goto(`${A}/staff/settings`);
-    await expect(shown(employee.page).locator('[data-testid=staff-settings-forbidden]')).toContainText('You do not have permission');
+    // Positions and the settings are not in an employee's menu: «No access» by their address (BASE-F118).
+    for (const path of ['/staff/roles', '/staff/settings']) {
+      await employee.page.goto(`${A}${path}`);
+      await expect(testid(employee.page, 'no-access'), path).toBeVisible();
+    }
 
     // The API refuses every write of a manager.
     const writes: ReadonlyArray<readonly [string, unknown]> = [

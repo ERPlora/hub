@@ -19,7 +19,7 @@ import { execFileSync } from 'node:child_process';
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
 import { cleanUp as cleanUpCards } from './customer-helpers';
-import { A, capture, EMPLOYEE, HUB_DIR, hostPage, login, psql, SAAS, shot, shown } from './helpers';
+import { A, capture, EMPLOYEE, hostPage, HUB_DIR, login, psql, SAAS, shot, shown, testid } from './helpers';
 import { filterBy, FLOW_VIEWPORTS, noHorizontalScroll, settled } from './service-helpers';
 import {
   cleanUp,
@@ -329,7 +329,7 @@ test('an employee notes and takes a conversation, but neither erases nor opens t
     await expect(panel(page).locator('[data-testid=whatsapp-inbox-detail-unassign]')).toBeVisible();
     await expect(panel(page).locator('[data-testid=whatsapp-inbox-detail-erase]')).toHaveCount(0);
     await page.goto(`${A}/whatsapp_inbox/settings`);
-    await expect(shown(page).locator('[data-testid=whatsapp-inbox-settings-forbidden]')).toContainText('You do not have permission');
+    await expect(testid(page, 'no-access')).toBeVisible();
     await page.screenshot({ path: shot('whatsapp-inbox-employee-settings') });
   } finally {
     await context?.close();
