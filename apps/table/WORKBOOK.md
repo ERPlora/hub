@@ -1081,7 +1081,7 @@ como los de cualquier app.
 
 Los papeles llegan del SaaS con prefijo (`hub_owner`, `hub_admin`, `hub_manager`, `hub_employee`).
 Sentar, dividir y juntar piden además «Montar la cuenta» de
-Ventas (`sale.add_sale`), que tienen los cuatro papeles.
+Ventas (`sale.add_sale`), que tienen todos los papeles menos la gestoría.
 
 ## Para quien lo mantiene
 

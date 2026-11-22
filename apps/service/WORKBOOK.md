@@ -1163,7 +1163,7 @@ con la sesión de quien vende, como hace con Inventario.
   (409 `service.sales_unavailable`), porque no hay venta que decir.
 - **La sesión gastada fuera del cobro con su profesional (F21)**: la otra. `service.grant.redeem` con `member_id` o
   `member` llama a `sale.voucher_session.record` (`session_id`, `staff_id`, `value`) con la sesión de quien la gasta
-  (su permiso de Ventas, «Montar la cuenta», lo tienen los cuatro papeles) y en la misma transacción. `value` es el de
+  (su permiso de Ventas, «Montar la cuenta», lo tienen todos los papeles menos la gestoría) y en la misma transacción. `value` es el de
   la sesión o, en un bono sin límite, el precio de esa profesional para el servicio. Ventas lo guarda aparte, porque
   no hay línea, y lo suma en la producción (SALE-F28): una sesión del cobro nunca pasa por aquí, así que ninguna cuenta
   dos veces. Sin Ventas en el negocio no se llama.

@@ -15,7 +15,7 @@ def test_key_is_a_uuid7(make_user):
 
 
 def test_roles_are_the_customer_roles_with_the_hub_prefix():
-    assert Membership.Role.values == ["hub_owner", "hub_admin", "hub_manager", "hub_employee"]
+    assert Membership.Role.values == ["hub_owner", "hub_admin", "hub_manager", "hub_employee", "hub_accountant"]
 
 
 def test_one_membership_per_user_and_host(make_user):
@@ -57,6 +57,7 @@ def test_labels_are_translated_to_spanish():
             "Administrador",
             "Encargado",
             "Empleado",
+            "Gestoría",
         ]
         assert str(Membership._meta.verbose_name_plural) == "membresías"
         assert str(Membership._meta.get_field("host").verbose_name) == "host"

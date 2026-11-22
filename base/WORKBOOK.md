@@ -253,7 +253,7 @@ pestañas: «Roles» y, solo para quien administra, «API keys» y «Aprobacione
 «Atrás» sale de Empleados.
 
 ### Empleados · Roles
-Los cuatro roles de erplora.com, con de dónde vienen, cuántas personas tienen y cuántos permisos dan.
+Los cinco roles de erplora.com, con de dónde vienen, cuántas personas tienen y cuántos permisos dan.
 
 ### Empleados · API keys
 Las llaves con las que otro sistema llama a la API del negocio: «Nueva API key», la tabla de llaves y, al pie,
@@ -2133,7 +2133,8 @@ Actor: propietario, administrador
 Pantalla: Empleados · Personal
 Pasos:
   1. En **Empleados › Personal**, encima de la tabla, cuántas plazas del plan están ocupadas: «{used} de {limit}
-     plazas ocupadas», «{used} personas · sin límite» o, si erplora.com no ha dicho el plan, «{used} personas».
+     plazas ocupadas», «{used} personas · sin límite» o, si erplora.com no ha dicho el plan, «{used} personas». La
+     gestoría no ocupa plaza: sale en la lista, pero no cuenta aquí ni en «Uso y plan» de Sistema.
   2. Con todas ocupadas sale «Tu plan tiene todas las plazas ocupadas» y «Quita en erplora.com a alguien que ya no
      trabaje aquí, o pasa a un plan con más plazas.»; en la web, y para el propietario, con «Mejorar plan».
   3. Para invitar a alguien más, «Invitar en erplora.com» lleva a «Miembros» del negocio, donde se aplica el tope
@@ -2196,12 +2197,13 @@ Implicados: BASE-F77, BASE-F81
 
 ### BASE-F81 Entender cómo entra cada persona
 Estado: hecho
-Actor: propietario, administrador, encargado, empleado
+Actor: propietario, administrador, encargado, empleado, gestoría
 Pantalla: Empleados · Personal
 Pasos:
   1. En **Empleados › Personal**, una fila por persona (en el móvil, una tarjeta): «Usuario» (con «Tú» en la suya;
      en una fila, un nombre que no cabe se corta y sale entero al pasar por encima), «Email» (solo para quien ve el
-     contacto del equipo: propietario, administrador y encargado; BASE-F119), «Rol», «Acceso» y «Estado».
+     contacto del equipo: propietario, administrador y encargado; BASE-F119), «Rol» (la gestoría, la última),
+     «Acceso» y «Estado».
   2. «Acceso» dice cómo entra: «Cuenta» siempre, y «PIN» y «Placa» si los tiene (por ejemplo, «Cuenta + PIN +
      Placa»).
   3. «Estado» dice «Activo» o, si erplora.com ya la invitó y aún no ha entrado, «Aún no ha entrado».
@@ -2213,15 +2215,19 @@ Implicados: BASE-F77, BASE-F78, BASE-F79, BASE-F119
 
 ### BASE-F82 Ver los roles del negocio
 Estado: hecho
-Actor: propietario, administrador, encargado, empleado
+Actor: propietario, administrador, encargado, empleado, gestoría
 Pantalla: Empleados · Roles
 Pasos:
   1. En **Empleados › Roles**: «Estos son los roles de este negocio. Cada persona recibe uno al invitarla en
      erplora.com, y allí se cambia.».
-  2. Una fila por rol: «Propietario», «Administrador», «Encargado» y «Empleado», con «Básico», «Siempre
-     disponible», cuántas personas lo tienen y cuántos permisos da. Son siempre estos cuatro, los de erplora.com:
-     ninguna app añade roles propios; cada app dice qué puede hacer cada uno de ellos en ella.
-  3. Quien administra tiene «Cambiar roles en erplora.com» (en la app instalada, en el navegador del dispositivo; en la de Google Play no está).
+  2. Una fila por rol: «Propietario», «Administrador», «Encargado», «Empleado» y «Gestoría», con «Básico»,
+     «Siempre disponible», cuántas personas lo tienen y cuántos permisos da. Son siempre estos cinco, los de
+     erplora.com: ninguna app añade roles propios; cada app dice qué puede hacer cada uno de ellos en ella.
+  3. «Gestoría» es el de la asesoría que lleva las cuentas del negocio, y solo lee: las ventas de todos, con los
+     totales del negocio, y las facturas emitidas, que abre, imprime y descarga, cada una con sus impuestos y su
+     registro de VeriFactu. En el menú le salen Ventas y Facturación. No vende, no cobra, no emite ni rectifica
+     facturas y no cambia ningún ajuste, y no ocupa plaza del plan (BASE-F77).
+  4. Quien administra tiene «Cambiar roles en erplora.com» (en la app instalada, en el navegador del dispositivo; en la de Google Play no está).
 Entra: los roles y las personas del negocio.
 Sale: nada guardado.
 Si falla: «No se pudo cargar el catálogo de roles.» con «Reintentar».
@@ -3413,13 +3419,13 @@ Implicados: BASE-F26, HUBS-F26 (erplora.com)
 
 ### BASE-F119 Lo que se ve según los permisos de dato
 Estado: hecho
-Actor: propietario, administrador, encargado, empleado
+Actor: propietario, administrador, encargado, empleado, gestoría
 Pantalla: Empleados · Personal, Inicio · Resumen, Ventas · Ventas, Clientes
 Pasos:
   1. Además de lo que puede hacer, cada rol dice qué datos delicados ve, con cuatro permisos de dato: ver los costes,
      ver el contacto de los clientes, ver el contacto del equipo y ver los totales del negocio. El propietario, el
      administrador y el encargado tienen los cuatro; el empleado, solo el contacto de los clientes, que necesita
-     para atenderlos.
+     para atenderlos; la gestoría, solo los totales del negocio.
   2. Quien no tiene un permiso de dato no recibe ese dato por ningún camino: ni en la pantalla, ni por la API, ni en
      lo que contesta el asistente. Donde iría, el dato llega vacío y la pantalla no lo enseña.
   3. En **Empleados › Personal**, la columna «Email» solo sale a quien ve el contacto del equipo. Un empleado no ve
@@ -4750,7 +4756,7 @@ Cada operación de la plataforma con los flujos que la usan; las que no usa ning
   programas ni archivos de más de 25 MB.
 - No invita, no cambia el rol ni quita a nadie: es de erplora.com, que lleva las plazas del plan; el hub lo enseña y
   enlaza a «Miembros».
-- No deja que una app traiga roles propios ni encienda o apague roles: un negocio tiene siempre los cuatro de
+- No deja que una app traiga roles propios ni encienda o apague roles: un negocio tiene siempre los cinco de
   erplora.com, que se dan al invitar, y cada app reparte entre ellos lo que se puede hacer en ella (BASE-F82).
 - No enseña nunca el token entero de una llave después de crearla o rotarla, ni guarda el PIN de quien aprueba.
 - El asistente no guarda la conversación en el servidor: vive en la pestaña de quien pregunta y se olvida al cerrar

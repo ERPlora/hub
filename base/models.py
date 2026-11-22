@@ -22,9 +22,8 @@ HOST_LABEL_RE = r"^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$"
 class Membership(UUIDModel):
     """The customer role a person has on a hub, as the SaaS sent it (``hub_`` prefix included).
 
-    The prefix keeps customer roles apart from the platform's (superuser, ``support``), which reach
-    the Hub only through the ``hub-admin`` audience, on a separate staff copy (``saas-staff:<id>``)
-    that never has a membership. No customer role makes the local user staff.
+    The prefix keeps customer roles apart from the platform's (superuser, ``support``), which reach the Hub only through
+    the ``hub-admin`` audience, on a staff copy (``saas-staff:<id>``) with no membership. None makes a user staff.
     """
 
     class Role(models.TextChoices):
@@ -32,6 +31,7 @@ class Membership(UUIDModel):
         ADMIN = "hub_admin", _("Admin")
         MANAGER = "hub_manager", _("Manager")
         EMPLOYEE = "hub_employee", _("Employee")
+        ACCOUNTANT = "hub_accountant", _("Accountant")
 
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,

@@ -86,6 +86,7 @@ class BaseConfig(LiveAppConfig):
             "base.view_business_totals",
         ],
         "hub_employee": ["base.view_home", "base.view_files", "base.view_customer_contact"],
+        "hub_accountant": ["base.view_home", "base.view_business_totals"],
     }
 
     @cached_property

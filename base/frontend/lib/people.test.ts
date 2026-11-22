@@ -54,6 +54,7 @@ describe('How a person gets in', () => {
   it('names each of erplora.com’s roles by its own key', () => {
     expect(roleKey('hub_owner')).toBe('base.people.roles.hub_owner');
     expect(roleKey('hub_employee')).toBe('base.people.roles.hub_employee');
+    expect(roleKey('hub_accountant')).toBe('base.people.roles.hub_accountant');
   });
 });
 

@@ -1703,12 +1703,16 @@ responsable (también lo que mueven Facturación y Servicios: la rectificativa y
 vuelven) y queda en **Empleados › Aprobaciones** (BASE-F85). Ver las ventas de todos, las cifras de todo
 el negocio, los ajustes y crear medios de pago no se aprueban.
 
+La gestoría (`hub_accountant`) solo lee: «Ver ventas, cuentas, ajustes del TPV, secciones y notas rápidas», «Ver
+los medios de pago» y «Ver las ventas de todos». No monta cuentas, no cobra, no anula ni devuelve, nadie le aprueba
+nada y no toca los ajustes.
+
 Lo que toca la sesión de un bono pide además el permiso de Servicios, porque es Servicios quien la
 mueve con la sesión de quien vende: pagar una línea con bono, deshacerlo, quitar, anular o cobrar una
-línea pagada con bono, «Gastar sesiones» (`service.redeem_package`, lo tienen los cuatro papeles); anular
+línea pagada con bono, «Gastar sesiones» (`service.redeem_package`, lo tienen todos los papeles menos la gestoría); anular
 o devolver una venta con sesiones, «Devolver sesiones de bono» (`service.return_session`: propietario,
 administrador y responsable, los mismos que anulan y devuelven). Al revés, decir quién hizo una sesión gastada
-fuera del cobro (SERVICE-F21) pide «Montar la cuenta» (`sale.add_sale`, los cuatro papeles), como decir de quién
+fuera del cobro (SERVICE-F21) pide «Montar la cuenta» (`sale.add_sale`, todos los papeles menos la gestoría), como decir de quién
 es una línea.
 
 ## Para quien lo mantiene

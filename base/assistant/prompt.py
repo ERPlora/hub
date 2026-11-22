@@ -10,10 +10,15 @@ from live.assistant import tool_name
 
 from base.models import Membership
 
-#: Who can do what a role of the business cannot (hub#585): the roles above it. The owner holds every permission of every
-#: app and an administrator all but owning the business (``base.permissions.permissions_of_role``): what no tool of
-#: theirs does is done on its screen, never someone else's.
-ABOVE = {Membership.Role.MANAGER: "the owner or an administrator", Membership.Role.EMPLOYEE: "a manager or the owner"}
+#: Who can do what a role of the business cannot (hub#585): the roles above it; for the accountancy firm, who only reads,
+#: whoever runs the business. The owner holds every permission of every app and an administrator all but owning the
+#: business (``base.permissions.permissions_of_role``): what no tool of theirs does is done on its screen, never someone
+#: else's.
+ABOVE = {
+    Membership.Role.MANAGER: "the owner or an administrator",
+    Membership.Role.EMPLOYEE: "a manager or the owner",
+    Membership.Role.ACCOUNTANT: "the owner or an administrator",
+}
 
 
 def instructions(  # noqa: PLR0913

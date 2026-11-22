@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:9d35c4c8664574f70c416b22e88c51f3c3d4f6368168295f1a2d3889eb7d5c3e -->
+<!-- generated from WORKBOOK.md sha256:627c5864767b36932b006d96bf7cacce22baac974720c665ac2433ed986b7d51 -->
 
 ## What it is for and who it is for
 
@@ -616,3 +616,5 @@ Nothing: Taxes depends on no app and reacts to no notice of others.
 | Create categories, rules and aliases; set an end date, deactivate and restore rules; change the tax region | yes | yes | yes | no | `tax.manage` |
 
 The roles come from the SaaS with a prefix (`hub_owner`, `hub_admin`, `hub_manager`, `hub_employee`).
+The accountancy firm (`hub_accountant`) only has "View categories, rules, aliases and the tax region, and calculate",
+like the employee: it reads the taxes on each sale and each invoice, and changes nothing.
