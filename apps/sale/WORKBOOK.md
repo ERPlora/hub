@@ -726,10 +726,14 @@ Vertical: común
 Actor: empleado, responsable, asistente
 Pantalla: Vender; asistente
 Pasos:
-1. En la cabecera de la cuenta, el chip «Atiende yo» dice a quién se atribuye. Tócalo.
+1. En la cabecera de la cuenta, el chip «Atiende yo» dice a quién se atribuye. Quién atiende es un dato
+   de la cuenta que guarda el Hub: al salir de ella y volver (desde el plano, desde «Cuentas abiertas» o
+   en otro dispositivo), el chip sigue diciendo esa persona. Tócalo.
 2. En «Quién atiende esta cuenta», elige a la persona del equipo de Personal o «Yo (quien tenga la
    sesión)». Si tu cuenta no tiene ficha en Personal, la hoja lo avisa: «Tu cuenta no tiene ficha en
-   Personal: si lo dejas en «Yo», esta venta no contará para nadie.»
+   Personal: si lo dejas en «Yo», esta venta no contará para nadie.» Con la cuenta abierta queda guardado
+   en ella al momento; sin cuenta todavía, la cuenta nace con esa persona al añadir lo primero, y la que
+   abre Mesas al elegirle una mesa queda también con ella.
 3. Las líneas que se añadan a partir de ahí quedan selladas con esa persona. Para corregir una línea
    ya puesta, toca el nombre que sale debajo de ella («De quién es esta línea») y elige otra persona o
    «El profesional de la cuenta». Una línea que llega con su profesional (la de una cita, la de una cuenta
@@ -743,14 +747,16 @@ Entra: el equipo de Personal (fichas activas), la ficha de quien tiene la sesió
 de cada línea.
 Sale: la venta y cada línea atribuidas a esa persona, para el cierre por profesional y las comisiones de
 Personal (STAFF-F21). Con «Yo», la venta es de la ficha de quien cobra; sin ficha, no cuenta para nadie.
-La comanda de cocina que se envíe lleva su nombre (KITCHEN-F18); con «Yo», el de quien la envía.
+La comanda de cocina que se envíe lleva su nombre (KITCHEN-F18); con «Yo», el de quien la envía. En
+Mesas, la ventana de la mesa y el plano dicen que la atiende esa persona (TABLE-F09).
 Si falla: «No se ha podido cargar el equipo. La venta se sigue atribuyendo a quien tenga la sesión.»;
+«No se ha podido cambiar quién atiende la cuenta. Se queda con quien la atendía.»;
 «No se ha podido mover la línea a otro profesional. Se queda con el que tenía.». Una línea enviada a
-cocina no se reasigna. Con el asistente, alguien que no está en el equipo: «Ese miembro del personal no
-existe en este negocio.»; sin Personal activo: «Personal no está activo en este negocio.». Si Personal no
-puede decir de quién es una línea (apagado, sin permiso o una ficha que ya no está), la línea dice «el
-profesional asignado».
-Implicados: STAFF-F21, KITCHEN-F18
+cocina no se reasigna. Si Personal no puede decir de quién es una línea (apagado, sin permiso o una ficha
+que ya no está), la línea dice «el profesional asignado». Con el asistente, alguien que no está en el equipo:
+«Ese miembro del personal no existe en este negocio.»; sin Personal activo: «Personal no está activo en
+este negocio.».
+Implicados: STAFF-F21, KITCHEN-F18, TABLE-F09
 
 ### SALE-F17 Aparcar una cuenta y recuperarla
 Estado: hecho

@@ -12,14 +12,11 @@ from live.operations import get
 from apps.staff.models import Member, StaffSettings, TimeOff
 from apps.staff.queries import ROLE_UNAVAILABLE
 from base.services.sessions import ensure_hub_user
-from apps.staff.schemas import (
-    AccountListIn,
-    AccountPage,
-    AvailabilityIn,
-    AvailabilityOut,
-    ByIdIn,
-    CommissionPage,
-    CommissionSummaryIn,
+from apps.staff.schemas.accounts import AccountListIn, AccountPage
+from apps.staff.schemas.availability import AvailabilityIn, AvailabilityOut
+from apps.staff.schemas.commissions import CommissionPage, CommissionSummaryIn
+from apps.staff.schemas.fields import ByIdIn, MemberRefIn
+from apps.staff.schemas.members import (
     CompensationListIn,
     CompensationPage,
     CurrentMemberIn,
@@ -27,20 +24,16 @@ from apps.staff.schemas import (
     MemberDetailOut,
     MemberListIn,
     MemberPage,
-    MemberRefIn,
     MemberStatsIn,
     MemberStatsOut,
     MineIn,
     MineOut,
+)
+from apps.staff.schemas.roles import RoleListIn, RoleOut, RolePage
+from apps.staff.schemas.schedules import ScheduleListIn, ScheduleDetailOut, SchedulePage
+from apps.staff.schemas.settings import SettingsGetIn, SettingsOut
+from apps.staff.schemas.time_off import (
     MyTimeOffIn,
-    RoleListIn,
-    RoleOut,
-    RolePage,
-    ScheduleListIn,
-    ScheduleDetailOut,
-    SchedulePage,
-    SettingsGetIn,
-    SettingsOut,
     TimeOffDetailOut,
     TimeOffNamedOut,
     TimeOffDetailPage,

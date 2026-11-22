@@ -36,7 +36,7 @@ Para qué: un servicio de mediodía normal, desde que se abre la caja hasta que 
 19. KITCHEN-F19 — el camarero lo ve desde el TPV.
 20. KITCHEN-F13 — se entregan.
 21. TABLE-F28 — llega Lucía: su reserva se sienta en la mesa 8.
-22. SALE-F16 — la cuenta de la mesa 8, a nombre del camarero que la atiende.
+22. SALE-F16 — la cuenta de la mesa 8, a nombre del camarero que la atiende, también al volver a ella desde el plano.
 23. TABLE-F33 — cuánto lleva cada mesa.
 24. TABLE-F11 — se vuelve a la mesa 4 a por los postres.
 25. TABLE-F34 — la mesa 4 pide la cuenta.

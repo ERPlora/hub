@@ -158,6 +158,15 @@ export async function openTillCart(page: Page): Promise<void> {
   await expect(till).toHaveClass(/pos-till--cart-open/);
 }
 
+/** The check on screen at each of `sizes` in turn (on a phone, its drawer opened), and `look` run at each. */
+export async function checkAtEachSize(page: Page, sizes: readonly { label: string; width: number; height: number }[], look: (label: string) => Promise<void>): Promise<void> {
+  for (const size of sizes) {
+    await page.setViewportSize({ width: size.width, height: size.height });
+    await openTillCart(page);
+    await look(size.label);
+  }
+}
+
 /** On the till (`/sale/pos`, already open), `product` found by its SKU in the search and put in the cart, as a cashier
  *  sells it. */
 export async function addToTill(page: Page, product: { id: string; sku: string }): Promise<void> {

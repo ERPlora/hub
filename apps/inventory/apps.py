@@ -113,7 +113,32 @@ class InventoryConfig(LiveAppConfig):
             permission="inventory.manage_settings",
         ),
     ]
-    help = Help(videos={"es": "dIppfjMEKWo", "en": "Pet7Q2ayo_Y"})
+    # The short video of each task, shown when its flow is opened in the help window: one video may show several flows.
+    help = Help(
+        videos={"es": "dIppfjMEKWo", "en": "Pet7Q2ayo_Y"},
+        flow_videos={
+            "INVENTORY-F01": {"es": ["L4LipaZOq40"], "en": ["hzMXqJHeFos"]},
+            "INVENTORY-F02": {"es": ["L4LipaZOq40"], "en": ["hzMXqJHeFos"]},
+            "INVENTORY-F03": {"es": ["GL4yDJmLYSA"], "en": ["ekG-0-deeVc"]},
+            "INVENTORY-F04": {"es": ["L4LipaZOq40"], "en": ["hzMXqJHeFos"]},
+            "INVENTORY-F06": {"es": ["T9mYixTpiiU"], "en": ["uu2RtLPsHkQ"]},
+            "INVENTORY-F07": {"es": ["T9mYixTpiiU"], "en": ["uu2RtLPsHkQ"]},
+            "INVENTORY-F08": {"es": ["A47AOMAoQdo"], "en": ["ovjk6OQA-78"]},
+            "INVENTORY-F09": {"es": ["VJYcIj1zuDU"], "en": ["biNLckdpSyg"]},
+            "INVENTORY-F10": {"es": ["Zde0OM4WtlM"], "en": ["MecB51iNSrI"]},
+            "INVENTORY-F11": {"es": ["QPklnAbvc58"], "en": ["RLScnZGT6qU"]},
+            "INVENTORY-F13": {"es": ["bT10ePok7D0"], "en": ["-wCJF6Slq2E"]},
+            "INVENTORY-F14": {"es": ["UhYUS4HjOOU"], "en": ["WuR4YbL1isc"]},
+            "INVENTORY-F15": {"es": ["O3U9Jejg13Y"], "en": ["sARCVGUjtwQ"]},
+            "INVENTORY-F16": {"es": ["GkYZip01B5s"], "en": ["96AlQ2-UR-s"]},
+            "INVENTORY-F20": {"es": ["Vwb3kAQ9O4U"], "en": ["ZGFEjiIzjuo"]},
+            "INVENTORY-F26": {"es": ["Yek9FtgeJGc"], "en": ["mh-mnQbzXEc"]},
+            "INVENTORY-F29": {"es": ["GL4yDJmLYSA"], "en": ["ekG-0-deeVc"]},
+            "INVENTORY-F30": {"es": ["yBhRFR1f_6E"], "en": ["Z1MtnTUSGPQ"]},
+            "INVENTORY-F31": {"es": ["yBhRFR1f_6E"], "en": ["Z1MtnTUSGPQ"]},
+            "INVENTORY-F35": {"es": ["DFK01vdQIVE"], "en": ["FUzkFMxT0ic"]},
+        },
+    )
     # The Home's hooks, on the Panel's own queries. Registered icons only: `trending-down-outline` waits in
     # UI-REQUESTS.md.
     setup = [

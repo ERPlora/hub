@@ -22,6 +22,7 @@ const session = useSession();
 const { isWeb } = useSurface();
 
 const admin = computed(() => session.can('base.administer_hub'));
+const seesContact = computed(() => session.can('base.view_team_contact'));
 const home = readJsonBlock<HubHome>('hub-home');
 const membersUrl = home?.members_url ?? '';
 const planUrl = home?.plan_url ?? '';
@@ -49,7 +50,7 @@ const access = (row: Person) => accessKeys(row.ways).map((key) => t(key)).join('
 
 const columns = computed<DataTableColumn<Person>[]>(() => [
   { key: 'name', label: t('base.people.columns.person'), cell: 'person', width: 'minmax(12rem,2fr)' },
-  ...(admin.value
+  ...(seesContact.value
     ? [{ key: 'email', label: t('base.people.columns.email'), width: 'minmax(12rem,2fr)', format: (value: unknown) => (value as string) || '—' }]
     : []),
   { key: 'role', label: t('base.people.columns.role'), format: (_: unknown, row: Person) => t(roleKey(row.role)), width: '10rem' },
