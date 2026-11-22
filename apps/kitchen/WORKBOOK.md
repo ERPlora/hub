@@ -983,7 +983,7 @@ que no tiene ningún papel: solo el sistema (`*`).
   `0004_item_options_and_menu`, los suplementos y el menú de cada plato; `0005_item_allergy`, la alergia y los
   alérgenos que coinciden de cada plato), `allergy.py` (la alergia de un plato y sus renglones en el papel),
   `schemas.py`, `queries/` (un módulo por tema),
-  `services.py`, `events.py`, `live.py`, `api.py` (28 rutas: todas las operaciones salvo `receive` y
+  `services/` (un módulo por tema), `events.py`, `live.py`, `api.py` (28 rutas: todas las operaciones salvo `receive` y
   `sync`, que son del sistema, y las dos lecturas internas de la tarjeta del asistente), `admin.py`, `locale/`, `frontend/` y un `tests/test_<fichero>.py` por
   fichero, más `test_integration_sale.py`, `test_integration_inventory.py`, `test_integration_combo.py`,
   `test_integration_modifier.py` y `test_concurrency.py` con las apps reales.

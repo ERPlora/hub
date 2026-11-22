@@ -108,24 +108,24 @@ def test_spanish_texts_of_the_workbook():
             "Historial",
             "Ajustes",
         ]
-        assert str(services.INVALID_TRANSITION) == (
+        assert str(services.settling.INVALID_TRANSITION) == (
             "Esa comanda ya no está en el estado que requiere esta acción. Actualiza e inténtalo de nuevo."
         )
         assert (
-            str(services.STATION_NAME_TAKEN)
+            str(services.stations.STATION_NAME_TAKEN)
             == "Ya hay una estación con ese nombre. Elige otro nombre."
         )
         assert (
-            str(services.STATION_INACTIVE)
+            str(services.routing.STATION_INACTIVE)
             == "Esa estación está desactivada: actívala o elige otra."
         )
         assert (
-            str(services.AMBER_FIRST)
+            str(services.settings.AMBER_FIRST)
             == "El aviso ámbar tiene que llegar antes que el rojo."
         )
-        assert str(services.URGENT) == "!! URGENTE !!"
+        assert str(services.paper.URGENT) == "!! URGENTE !!"
         assert (
-            str(services.VOIDED_DISH) % {"label": "Mesa 4"} == "PLATO ANULADO · Mesa 4"
+            str(services.paper.VOIDED_DISH) % {"label": "Mesa 4"} == "PLATO ANULADO · Mesa 4"
         )
         assert str(queries.tickets.TICKET_NOT_FOUND) == "Esa comanda no existe en este negocio."
         assert [str(label) for label in TicketStatus.labels] == [

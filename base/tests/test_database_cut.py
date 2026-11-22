@@ -617,7 +617,7 @@ NOT_UNDONE_BY_A_ROLLBACK = {
     "apps.cart_checkout.services._number": "numbers an order",
     "apps.cash_register.services._number": "numbers a till session",
     "apps.invoice.services._take_number": "numbers an invoice",
-    "apps.kitchen.services.take_number": "numbers a kitchen ticket",
+    "apps.kitchen.services.writes.take_number": "numbers a kitchen ticket",
     "apps.payment.services._number": "numbers a payment",
     "apps.sale.services.checkout._number": "numbers a sale",
     "apps.table.services.tables._next_number": "numbers a table",

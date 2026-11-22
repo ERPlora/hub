@@ -40,7 +40,6 @@
 355 apps/kitchen/frontend/operations.d.ts ERPlora/erplora-next#74
 506 apps/kitchen/models.py ERPlora/erplora-next#74
 766 apps/kitchen/schemas.py ERPlora/erplora-next#74
-1700 apps/kitchen/services.py ERPlora/erplora-next#74
 830 apps/modifier/queries/__init__.py ERPlora/erplora-next#74
 666 apps/modifier/schemas/__init__.py ERPlora/erplora-next#74
 687 apps/modifier/services/__init__.py ERPlora/erplora-next#74
