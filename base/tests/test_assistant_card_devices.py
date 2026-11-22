@@ -110,3 +110,18 @@ def test_removing_one_of_two_devices_with_the_same_name_says_when_it_was_last_us
     assert [field["value"] for field in card["fields"]] == ["Chrome · Linux"]
     label, when = LAST_USE[language]
     assert preview_lines(card) == [("last_entry_at", label, when)]
+
+
+def test_the_read_behind_the_card_is_not_a_tool_of_the_assistant():
+    assert not shared.is_tool(get("base.device.unused"))
+
+
+def test_a_yes_to_a_card_whose_devices_changed_removes_nothing_and_draws_the_card_again():
+    _, in_hand = a_device(days_ago=90)
+    a_device(days_ago=40, name="Bar")
+    drawn = turn(in_hand, call("base.device.prune", {}))
+    a_device(days_ago=35, name="Terrace")
+    plan = turn(in_hand, drawn["pending"][0], decision={"call_id": "c1", "accepted": True, "typed": "CONFIRM"})
+    assert plan["executed"] == []
+    assert preview_lines(plan["confirm"])[1][2] == ["Terrace", "Bar"]
+    assert TrustedDevice.objects.count() == 3

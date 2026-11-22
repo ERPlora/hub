@@ -795,7 +795,10 @@
       "adminOnly": "Only an administrator can change how people enter on this device.",
       "unknown": "This browser is not a device of the business yet: enter once here with your account and you will be able to choose.",
       "failed": "Could not change this device. Check the connection and try again.",
-      "loadError": "Could not load this device. Check the connection and try again."
+      "loadError": "Could not load this device. Check the connection and try again.",
+      "autostart": "Start on login",
+      "autostartHelp": "Open ERPlora when you sign in to this computer, so tickets always have somewhere to print.",
+      "autostartFailed": "Could not change the start on login setting."
     },
     "pinPolicy": {
       "title": "PIN pad",
