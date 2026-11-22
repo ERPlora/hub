@@ -1,5 +1,5 @@
-// The rules of Settings › Data that are not the server's: the address of the page, what an export takes, how a report
-// reads and what the Home's templates card offers. Pure: the components only paint them.
+// The rules of Settings › Data that are not the server's: its section in the address, what an export takes, how a
+// report reads and what the Home's templates card offers. Pure: the components only paint them.
 import type { StatusPillTone } from '@erplora/ui/components';
 
 import type {
@@ -14,17 +14,6 @@ import type {
 } from '../operations/blueprints';
 
 // ── The address ──────────────────────────────────────────────────────────────────────────────────────────────────
-
-export type SettingsTab = 'general' | 'business' | 'tickets' | 'data';
-export const SETTINGS_TABS: readonly SettingsTab[] = ['general', 'business', 'tickets', 'data'];
-/** Old addresses still linked: `#hub` was General; published versions of VeriFactu open `#tax`, the business's tab. */
-const SETTINGS_TAB_ALIASES: Readonly<Record<string, SettingsTab>> = { hub: 'general', tax: 'business' };
-
-/** The tab a hash opens (`#data`); one it does not have (an old `#store`, `#permissions`…) opens the first. */
-export function settingsTab(hash: string): SettingsTab {
-  const wanted = hash.replace(/^#/, '');
-  return SETTINGS_TABS.find((tab) => tab === wanted) ?? SETTINGS_TAB_ALIASES[wanted] ?? SETTINGS_TABS[0];
-}
 
 export type DataSection = 'import' | 'export' | 'reset';
 export const DATA_SECTIONS: readonly DataSection[] = ['import', 'export', 'reset'];

@@ -5,7 +5,7 @@ import { type SessionMe, type SessionStatus, type ShellSidebar } from '@erplora/
 import { assistantMessages, configureAssistant } from '@erplora/ui/components';
 import { type BaseWrapper } from '@vue/test-utils';
 import { vi } from 'vitest';
-import { type Component } from 'vue';
+import { type Component, type Ref } from 'vue';
 import { createMemoryHistory, createRouter, type RouteLocationRaw, type Router, type RouteRecordRaw } from 'vue-router';
 
 import { type ApiCall, type ApiHandler, flush } from '../../../packages/ui/src/sdk/__tests__/live-harness';
@@ -146,8 +146,8 @@ export interface MountOptions {
   props?: Record<string, unknown>;
   path?: string;
   locale?: 'en' | 'es';
-  /** `null`: no session arrived (yet, or ever: see `status`). */
-  session?: SessionMe | null;
+  /** `null`: no session arrived (yet, or ever: see `status`); a ref: a session the test changes while the page is open. */
+  session?: SessionMe | Ref<SessionMe> | null;
   status?: SessionStatus;
   /** Paths the router knows (besides the 404 catch-all named `not-found`, as the shell's). */
   routes?: string[];

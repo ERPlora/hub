@@ -97,10 +97,11 @@ print… No notice is dismissed: it goes by itself once it is solved.
 
 ### The side menu
 On the left (on a phone, from the bar's button): the person at the top and the platform's entries in two groups,
-"Home", "Employees", "Files" · "Apps", "System", "API", "Settings". Each one shows only to whoever may open its screen:
-"System", to whoever runs the business; "API", while the API documentation is shown (BASE-F91), and it appears or goes
-when the switch changes, without reloading. An employee sees "Home", "Employees", "Files", "Apps" and "Settings". At
-the bottom, the QR code, "Upgrade plan" and "Manage on erplora.com".
+"Home", "Employees", "Files" · "Apps", "System", "API", "Settings". Each one shows only to whoever holds the
+permission its screen opens with, as in Square or Toast: "System", to whoever runs the business; "API", besides, while
+the API documentation is shown (BASE-F91), and it appears or goes when the switch changes, without reloading. An
+employee sees "Home", "Employees", "Files", "Apps" and "Settings". At the bottom, the QR code, "Upgrade plan" and
+"Manage on erplora.com".
 
 ### "Upgrade plan"
 At the foot of the side menu, between the QR code and "Manage on erplora.com". It opens this business's plan page on
@@ -1522,11 +1523,14 @@ Actor: owner, administrator, manager, employee
 Screen: Settings, Settings · Printing
 Steps:
   1. Tap "Settings" in the side menu, or arrive from a link on another screen.
-  2. At the bottom, the tabs "General", "Business", "Printing" and "Data and backups";
-     "General" opens (BASE-F62). The tab chosen stays in the link, so a saved link comes back to it and Back
-     leaves Settings instead of walking its tabs. On the phone the four fit, whole.
+  2. At the bottom, the tabs "General", "Business", "Printing" and "Data and backups", each one only for whoever can
+     use what it holds: "Printing", for whoever sets up the Printing app (owner, administrator and manager), and "Data
+     and backups", for whoever runs the business. An employee has "General" and "Business". "General" opens
+     (BASE-F62). The tab chosen stays in the link, so a saved link comes back to it and Back leaves Settings instead
+     of walking its tabs. On the phone the four fit, whole.
   3. Old links still take you to their place: the one of the old "General" opens "General", the one of the old
-     taxes tab opens "Business", and the one of a tab that no longer exists opens the first.
+     taxes tab opens "Business", and the one of a tab that no longer exists, or that the person does not have, opens
+     the first.
   4. In "Printing", "Printers and ticket" ("Add your printer and set up the printed and digital ticket") opens
      the Printing app; when it is not there, it says "Install the Printing app to add your printer and set up the
      ticket" and takes you to "Apps".
